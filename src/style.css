@@ -204,3 +204,165 @@ summary {
   font-weight: 600;
   margin: 8px 0;
 }
+
+/* --- Stocks et rôles --- */
+
+.ligne-outils {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+input[type='text'],
+select {
+  font-size: 1rem;
+  padding: 7px 8px;
+  border: 1px solid #bbbbbb;
+  border-radius: 6px;
+}
+
+button.bouton {
+  border: none;
+  font-size: 1rem;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.bouton-lien {
+  background: none;
+  border: none;
+  color: #c62828;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.carte-role {
+  border: 1px solid #dddddd;
+  border-left: 4px solid #dddddd;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 10px 0;
+}
+
+.carte-role.en-edition {
+  border-left-color: var(--vert);
+  background: #f3f8f5;
+}
+
+.titre-role {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.liste-noms {
+  margin: 6px 0;
+  word-break: break-word;
+}
+
+.champ-liste {
+  display: block;
+}
+
+.champ-liste input {
+  flex: 1;
+  min-width: 0;
+}
+
+.liste-cases {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 4px 8px;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 4px;
+}
+
+.rang {
+  background: var(--vert);
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 0 5px;
+  font-size: 0.75rem;
+}
+
+.ok {
+  color: var(--vert);
+  font-weight: 600;
+}
+
+/* Barre fixée en bas de l'écran pendant une modification. */
+.barre-edition {
+  position: sticky;
+  bottom: 0;
+  background: #ffffff;
+  border-top: 2px solid var(--vert);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  padding: 8px 16px;
+  z-index: 10;
+}
+
+.barre-edition .ligne-outils {
+  margin: 6px 0 0;
+}
+
+/* --- Stocks sur le plan --- */
+
+.plan .contour {
+  fill: rgba(31, 78, 61, 0.06);
+  stroke: #999999;
+  stroke-width: 1.5;
+}
+
+.plan .contour.actif {
+  fill: rgba(198, 40, 40, 0.08);
+  stroke: #c62828;
+  stroke-width: 2;
+}
+
+.plan .ligne-rupture {
+  fill: none;
+  stroke: #ef6c00;
+  stroke-width: 2;
+}
+
+.plan .points circle.role-contour {
+  fill: #c62828;
+}
+
+.plan .points circle.role-base {
+  fill: #1565c0;
+}
+
+.plan .points circle.role-ligne {
+  fill: #ef6c00;
+}
+
+.plan .points circle.role-dessus {
+  fill: #2e7d32;
+}
+
+.plan .points circle:not([class]),
+.plan .points circle[class=''] {
+  fill: #9e9e9e;
+}
+
+.plan .points circle.selection {
+  fill: none;
+  stroke: var(--vert);
+  stroke-width: 2.5;
+}
+
+.plan .noms text.rang {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--vert);
+}

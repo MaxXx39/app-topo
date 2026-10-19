@@ -3,6 +3,8 @@ import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { formaterNombre } from './topo/format.js';
 import { creerPlan } from './plan/plan.js';
+import { creerEditeurStocks } from './stocks/editeur.js';
+import { echapper } from './outils/echapper.js';
 
 // Les points du dernier fichier importé (utilisés par les étapes suivantes).
 let points = [];
@@ -19,19 +21,31 @@ app.innerHTML = `
     </label>
     <div id="resultat-import"></div>
   </section>
-  <section id="section-plan" hidden>
-    <h2>2. Plan</h2>
-    <p class="aide">Un doigt pour déplacer, deux doigts pour zoomer (molette à l'ordinateur).</p>
+  <section class="apres-import" hidden>
+    <h2>2. Stocks et rôles des points</h2>
+    <div id="stocks"></div>
+  </section>
+  <section class="apres-import" hidden>
+    <h2>3. Plan</h2>
+    <p class="aide">Un doigt pour déplacer, deux doigts pour zoomer (molette à l'ordinateur). Pendant une modification, touche un point pour l'ajouter ou le retirer.</p>
     <div id="plan"></div>
   </section>
+  <div id="barre-edition" class="barre-edition" hidden></div>
 `;
 
-const plan = creerPlan(document.querySelector('#plan'));
-const sectionPlan = document.querySelector('#section-plan');
+const plan = creerPlan(document.querySelector('#plan'), {
+  quandToucherPoint: (nom) => editeur.toucherPoint(nom),
+});
+const editeur = creerEditeurStocks(document.querySelector('#stocks'), document.querySelector('#barre-edition'), {
+  obtenirPoints: () => points,
+  quandChange: () => plan.redessiner(editeur.obtenirDessin()),
+});
 
-/** Montre le plan s'il y a des points, et le cadre sur ces points. */
+/** Montre les sections suivantes s'il y a des points, et cadre le plan sur ces points. */
 function mettreAJourPlan() {
-  sectionPlan.hidden = points.length === 0;
+  for (const section of document.querySelectorAll('.apres-import')) section.hidden = points.length === 0;
+  editeur.rafraichir();
+  plan.redessiner(editeur.obtenirDessin());
   if (points.length > 0) plan.afficherPoints(points);
 }
 
@@ -92,13 +106,4 @@ function afficherResultat(nomFichier, resultat) {
   }
 
   return html;
-}
-
-/** Protège un texte venant d'un fichier avant de l'afficher dans la page. */
-function echapper(texte) {
-  return String(texte)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
 }
