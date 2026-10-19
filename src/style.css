@@ -172,6 +172,64 @@ p {
   }
 }
 
+/* Bouton Aide activé : rond ambre. */
+.entete-icone-bouton.bouton-aide[aria-pressed='true'] {
+  background: var(--ambre);
+  color: var(--sombre);
+}
+
+/* --- Bulles d'aide : ronds « ? » visibles seulement quand l'aide est activée --- */
+
+.rond-aide {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--ambre);
+  color: var(--sombre);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+body.aide-active .rond-aide {
+  display: inline-flex;
+}
+
+/* Sur le plan, le rond est posé à côté du bouton Calques. */
+.plan-calques .rond-aide {
+  width: 28px;
+  height: 28px;
+  margin: 0 0 0 6px;
+  box-shadow: var(--ombre);
+}
+
+.bulle-aide {
+  position: fixed;
+  z-index: 60;
+  padding: 10px 14px;
+  border-radius: var(--rayon);
+  background: var(--sombre);
+  color: #ffffff;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  box-shadow: 0 4px 20px rgba(16, 24, 20, 0.25);
+  border-left: 4px solid var(--ambre);
+}
+
+.titre-choix {
+  margin: 4px 0 8px;
+  font-weight: 600;
+}
+
 /* Petit message sous l'en-tête (« Modification annulée »). */
 .message-flottant {
   position: fixed;

@@ -1,6 +1,7 @@
 // Affichage du plan : points avec leur nom, zoom et déplacement
 // au doigt (téléphone) ou à la souris (ordinateur).
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle } from './vue.js';
+import { bulle } from '../aide/bulles.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
@@ -54,6 +55,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5" /></svg>
           Calques
         </button>
+        ${bulle('plan')}
         <div class="menu-calques" hidden>
           ${CALQUES.map(
             (c) => `<label class="case"><input type="checkbox" data-calque="${c.cle}" ${calques[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`,

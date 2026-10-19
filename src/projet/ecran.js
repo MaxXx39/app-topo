@@ -1,5 +1,6 @@
 // Écran « Mes projets » (ouvert depuis l'en-tête) : projet ouvert, liste des projets, fichier projet.
 import { echapper } from '../outils/echapper.js';
+import { bulle } from '../aide/bulles.js';
 
 /**
  * Crée l'écran Mes projets dans "conteneur". Les actions sont faites par main.js via "actions" :
@@ -33,7 +34,7 @@ export function creerEcranProjet(conteneur, actions) {
     /** Redessine l'écran. */
     afficher(projet, resumes) {
       conteneur.innerHTML = `
-        <h2>Mes projets</h2>
+        <h2>Mes projets ${bulle('projets')}</h2>
         <div class="ligne-outils">
           <label class="champ-large">Nom du projet ouvert
             <input type="text" data-champ="nom-projet" value="${echapper(projet.nom)}" />
@@ -67,7 +68,6 @@ export function creerEcranProjet(conteneur, actions) {
           Ouvrir un fichier projet (.topo.json)
           <input type="file" data-champ="fichier-projet" accept=".json,application/json" hidden />
         </label>
-        <p class="aide">Les projets restent sur cet appareil. Pour changer d'appareil : exporte le fichier projet, puis ouvre-le sur l'autre.</p>
       `;
     },
   };

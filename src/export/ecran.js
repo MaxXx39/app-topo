@@ -5,6 +5,7 @@ import { genererDxf } from './dxf.js';
 import { ECHELLES } from './echelle.js';
 import { ecrireLandXML } from '../topo/landxml.js';
 import { plageAltitudes, equidistanceAuto } from '../topo/courbes.js';
+import { bulle } from '../aide/bulles.js';
 
 const CALQUES = [
   ['triangles', 'Triangles', true],
@@ -26,7 +27,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
   const aujourdhui = new Date().toISOString().slice(0, 10);
 
   conteneur.innerHTML = `
-    <h3>Exporter</h3>
+    <h3>Exporter ${bulle('exporter')}</h3>
     <div class="champs-export">
       <label>Affaire <input type="text" data-champ="affaire" placeholder="ex. 10 203" /></label>
       <label>Date <input type="date" data-champ="date" value="${aujourdhui}" /></label>

@@ -28,6 +28,7 @@ import {
 } from './projet/projet.js';
 import * as stockage from './projet/stockage.js';
 import * as historique from './projet/historique.js';
+import { bulle, installerAide } from './aide/bulles.js';
 
 // --- État de l'application ---
 let projet = creerProjet('Mon projet'); // projet ouvert
@@ -63,19 +64,18 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="projets"><div id="projets"></div></section>
       <section class="panneau" data-onglet="importer"><div id="importer"></div></section>
       <section class="panneau" data-onglet="stocks">
-        <h2>2. Stocks <span class="aide" id="nom-leve-stocks"></span></h2>
+        <h2>2. Stocks <span class="aide" id="nom-leve-stocks"></span> ${bulle('stocks')}</h2>
         <div class="avec-points" hidden><div id="stocks"></div></div>
         <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer).</p>
       </section>
       <section class="panneau" data-onglet="volumes">
-        <h2>3. Volumes</h2>
+        <h2>3. Volumes ${bulle('volumes')}</h2>
         <div id="resultats"></div>
         <div id="export" class="carte-export"></div>
       </section>
       <section class="panneau" data-onglet="comparer">
         <h2>Comparer</h2>
-        <h3>Surfaces</h3>
-        <p class="aide">Créées à partir des points d'un levé, ou importées d'un LandXML (onglet 1. Importer).</p>
+        <h3>Surfaces ${bulle('surfaces')}</h3>
         <div id="surfaces"></div>
         <div id="comparaisons" class="section-comparaisons"></div>
       </section>
@@ -113,6 +113,7 @@ document.querySelector('.onglets').addEventListener('click', (evenement) => {
   if (bouton) afficherOnglet(bouton.dataset.onglet);
 });
 document.querySelector('#bouton-projets').addEventListener('click', () => afficherOnglet('projets'));
+installerAide(document.querySelector('#bouton-aide'));
 
 // --- Accès aux données du projet ---
 
