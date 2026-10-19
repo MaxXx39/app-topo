@@ -6,6 +6,7 @@ import { creerPlan } from './plan/plan.js';
 import { creerEditeurStocks } from './stocks/editeur.js';
 import { echapper } from './outils/echapper.js';
 import { calculerTousLesStocks, afficherResultats } from './stocks/resultats.js';
+import { creerEcranLandXML } from './landxml/ecran.js';
 
 // Les points du dernier fichier importé (utilisés par les étapes suivantes).
 let points = [];
@@ -35,8 +36,15 @@ app.innerHTML = `
     <h2>4. Volumes (mode A : base mesurée)</h2>
     <div id="resultats"></div>
   </section>
+  <section>
+    <h2>5. Surface LandXML</h2>
+    <div id="landxml"></div>
+  </section>
   <div id="barre-edition" class="barre-edition" hidden></div>
 `;
+
+// La surface choisie servira de base en mode B (étape suivante).
+creerEcranLandXML(document.querySelector('#landxml'), { quandChange: () => {} });
 
 const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPoint: (nom) => editeur.toucherPoint(nom),
