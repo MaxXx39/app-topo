@@ -22,13 +22,12 @@ const TEXTES = {
  * Options :
  * - obtenirPoints(objet) : points utilisables pour cet objet (son levé)
  * - quandChange() : appelé après chaque modification
- * - allerAuPlan() : affiche l'onglet du plan (sur téléphone)
  * - decrire(objet) : HTML d'état sous la surface (nombre de triangles, erreurs...)
  * - etiquette(objet) : texte de la surface dans la liste déroulante (nom et levé)
  * - leveActifId() : levé utilisé pour une nouvelle surface
  */
 export function creerEditeurSurfaces(conteneur, barre, options) {
-  const { obtenirPoints, quandChange, allerAuPlan, decrire, leveActifId, etiquette } = options;
+  const { obtenirPoints, quandChange, decrire, leveActifId, etiquette } = options;
   const textes = TEXTES;
   const etat = {
     objets: [],
@@ -112,7 +111,6 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       etat.suppression = false;
       etat.messages = [];
     },
-    'aller-au-plan': () => allerAuPlan?.(),
     termine: () => {
       etat.edition = null;
       etat.suppression = false;
@@ -165,7 +163,6 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
     'mode-suppression': () => {
       etat.suppression = !etat.suppression;
       etat.edition = null;
-      if (etat.suppression) allerAuPlan?.();
     },
     'retablir-triangles': () => {
       objetActif().trianglesSupprimes = [];
@@ -344,7 +341,6 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
         </span>
       </label>
       ${etat.messages.length > 0 ? `<div class="erreur"><ul>${etat.messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}
-      <button type="button" class="bouton-secondaire seulement-telephone" data-action="aller-au-plan">Toucher les points sur le plan</button>
       <details data-zone="cases" ${etat.listeCasesOuverte ? 'open' : ''}>
         <summary>Ou cocher dans la liste des points</summary>
         <div class="liste-cases">

@@ -275,7 +275,6 @@ const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces')
     }
     modifie();
   },
-  allerAuPlan: () => afficherOnglet('plan'),
   leveActifId: () => leveActif(projet)?.id ?? null,
   decrire: decrireSurface,
   etiquette: etiquetteSurface,
@@ -442,6 +441,21 @@ function recalculer({ recadrer = false } = {}) {
     pointsAffiches = pointsDuPlan;
     plan.afficherPoints(pointsDuPlan);
   }
+  basculerModeDessin();
+}
+
+/**
+ * Sur téléphone, pendant une modification (contour, ligne de rupture, triangles) :
+ * le plan reste affiché en haut de l'écran et les outils en dessous (voir style.css, « mode-dessin »).
+ */
+function basculerModeDessin() {
+  const enDessin = editeurSurfaces.enModification();
+  const debut = enDessin && !document.body.classList.contains('mode-dessin');
+  document.body.classList.toggle('mode-dessin', enDessin);
+  if (!debut) return;
+  // On revient à l'onglet Surfaces (s'il était sur le plan seul), puis on montre la carte modifiée.
+  if (document.body.dataset.onglet === 'plan') afficherOnglet('surfaces');
+  requestAnimationFrame(() => document.querySelector('#surfaces .en-edition')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
 }
 let pointsAffiches = null;
 
