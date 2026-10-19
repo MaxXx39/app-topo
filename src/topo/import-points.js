@@ -1,0 +1,196 @@
+// Lecture des fichiers de points : CSV Emlid et TXT (tabulations).
+// Chaque point lu a la forme : { nom, est, nord, altitude, ligne }
+// - est, nord, altitude : en mètres, MN95, sans aucune conversion
+// - ligne : numéro de la ligne dans le fichier (pour les messages)
+
+/**
+ * Lit le contenu d'un fichier de points et reconnaît son format tout seul.
+ * - CSV Emlid : la première ligne contient les titres (Name, Easting, ...)
+ * - TXT : chaque ligne contient nom, Est, Nord, altitude séparés par des tabulations
+ * Renvoie { format, points, erreurs, avertissements }.
+ * Une ligne illisible ne bloque pas la lecture : elle est signalée dans "erreurs".
+ */
+export function lirePoints(texte) {
+  const lignes = decouperLignes(texte);
+  const premiereLigne = lignes.find((ligne) => ligne.trim() !== '') ?? '';
+
+  let resultat;
+  if (/easting/i.test(premiereLigne)) {
+    resultat = lireCsvEmlid(lignes);
+  } else {
+    resultat = lireTxt(lignes);
+  }
+
+  resultat.avertissements = chercherNomsEnDouble(resultat.points);
+  return resultat;
+}
+
+/**
+ * Découpe le texte en lignes, quelle que soit la fin de ligne
+ * (Windows "\r\n" ou autre "\n"). Enlève aussi le caractère
+ * invisible (BOM) que certains logiciels ajoutent au début du fichier.
+ */
+function decouperLignes(texte) {
+  return texte.replace(/^﻿/, '').split(/\r\n|\r|\n/);
+}
+
+/**
+ * Lit un fichier CSV exporté par Emlid Flow.
+ * On repère les colonnes Name, Easting, Northing, Elevation par leur titre,
+ * pour ne pas dépendre de leur position.
+ */
+function lireCsvEmlid(lignes) {
+  const points = [];
+  const erreurs = [];
+
+  const indexTitres = lignes.findIndex((ligne) => ligne.trim() !== '');
+  const titres = decouperLigneCsv(lignes[indexTitres]).map((titre) => titre.trim().toLowerCase());
+  const colonnes = {
+    nom: titres.indexOf('name'),
+    est: titres.indexOf('easting'),
+    nord: titres.indexOf('northing'),
+    altitude: titres.indexOf('elevation'),
+  };
+
+  const manquantes = Object.entries({
+    Name: colonnes.nom,
+    Easting: colonnes.est,
+    Northing: colonnes.nord,
+    Elevation: colonnes.altitude,
+  })
+    .filter(([, index]) => index === -1)
+    .map(([titre]) => titre);
+  if (manquantes.length > 0) {
+    erreurs.push({
+      ligne: indexTitres + 1,
+      message: `colonne(s) introuvable(s) : ${manquantes.join(', ')}`,
+    });
+    return { format: 'CSV Emlid', points, erreurs };
+  }
+
+  for (let i = indexTitres + 1; i < lignes.length; i++) {
+    if (lignes[i].trim() === '') continue;
+    const champs = decouperLigneCsv(lignes[i]);
+    const point = creerPoint(
+      champs[colonnes.nom],
+      champs[colonnes.est],
+      champs[colonnes.nord],
+      champs[colonnes.altitude],
+      i + 1,
+    );
+    if (point.erreur) erreurs.push({ ligne: i + 1, message: point.erreur });
+    else points.push(point);
+  }
+
+  return { format: 'CSV Emlid', points, erreurs };
+}
+
+/**
+ * Lit un fichier TXT : nom, Est, Nord, altitude séparés par des tabulations.
+ */
+function lireTxt(lignes) {
+  const points = [];
+  const erreurs = [];
+
+  for (let i = 0; i < lignes.length; i++) {
+    if (lignes[i].trim() === '') continue;
+    const champs = lignes[i].split('\t');
+    if (champs.length < 4) {
+      erreurs.push({
+        ligne: i + 1,
+        message: '4 valeurs attendues (nom, Est, Nord, altitude) séparées par des tabulations',
+      });
+      continue;
+    }
+    const point = creerPoint(champs[0], champs[1], champs[2], champs[3], i + 1);
+    if (point.erreur) erreurs.push({ ligne: i + 1, message: point.erreur });
+    else points.push(point);
+  }
+
+  return { format: 'TXT', points, erreurs };
+}
+
+/**
+ * Découpe une ligne CSV en champs, séparés par des virgules.
+ * Gère les champs entre guillemets, qui peuvent contenir une virgule
+ * (par exemple une description "tas, côté nord").
+ */
+function decouperLigneCsv(ligne) {
+  const champs = [];
+  let champ = '';
+  let entreGuillemets = false;
+
+  for (let i = 0; i < ligne.length; i++) {
+    const caractere = ligne[i];
+    if (entreGuillemets) {
+      if (caractere === '"' && ligne[i + 1] === '"') {
+        champ += '"'; // deux guillemets = un guillemet dans le texte
+        i++;
+      } else if (caractere === '"') {
+        entreGuillemets = false;
+      } else {
+        champ += caractere;
+      }
+    } else if (caractere === '"') {
+      entreGuillemets = true;
+    } else if (caractere === ',') {
+      champs.push(champ);
+      champ = '';
+    } else {
+      champ += caractere;
+    }
+  }
+  champs.push(champ);
+  return champs;
+}
+
+/**
+ * Crée un point à partir des textes lus dans le fichier.
+ * Renvoie { erreur } si le nom manque ou si une coordonnée n'est pas un nombre.
+ */
+function creerPoint(texteNom, texteEst, texteNord, texteAltitude, ligne) {
+  const nom = (texteNom ?? '').trim();
+  if (nom === '') return { erreur: 'nom du point manquant' };
+
+  const est = lireNombre(texteEst);
+  const nord = lireNombre(texteNord);
+  const altitude = lireNombre(texteAltitude);
+  const illisibles = [];
+  if (est === null) illisibles.push('Est');
+  if (nord === null) illisibles.push('Nord');
+  if (altitude === null) illisibles.push('altitude');
+  if (illisibles.length > 0) {
+    return { erreur: `point « ${nom} » : ${illisibles.join(', ')} illisible(s)` };
+  }
+
+  return { nom, est, nord, altitude, ligne };
+}
+
+/**
+ * Transforme un texte en nombre (séparateur décimal : le point).
+ * Renvoie null si le texte n'est pas un nombre valable.
+ */
+function lireNombre(texte) {
+  const propre = (texte ?? '').trim();
+  if (!/^[-+]?(\d+\.?\d*|\.\d+)$/.test(propre)) return null;
+  return Number(propre);
+}
+
+/**
+ * Signale les noms de points présents plusieurs fois dans le fichier.
+ * Les points sont tous gardés : c'est à l'utilisateur de décider.
+ */
+function chercherNomsEnDouble(points) {
+  const lignesParNom = new Map();
+  for (const point of points) {
+    if (!lignesParNom.has(point.nom)) lignesParNom.set(point.nom, []);
+    lignesParNom.get(point.nom).push(point.ligne);
+  }
+  const avertissements = [];
+  for (const [nom, lignesDuNom] of lignesParNom) {
+    if (lignesDuNom.length > 1) {
+      avertissements.push(`le nom « ${nom} » apparaît plusieurs fois (lignes ${lignesDuNom.join(', ')})`);
+    }
+  }
+  return avertissements;
+}
