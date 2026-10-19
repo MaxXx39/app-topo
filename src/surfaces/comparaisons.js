@@ -51,7 +51,7 @@ export function creerEcranComparaisons(conteneur, { obtenirProjet, obtenirChoix,
         choix.map((c) => `<option value="${echapper(c.ref)}" ${c.ref === valeur ? 'selected' : ''}>${echapper(c.nom)}</option>`).join('');
       conteneur.innerHTML = `
         <h3>Comparer deux surfaces</h3>
-        <p class="aide">Par exemple le même stock levé à deux dates : volume ajouté (le dessus est monté) et volume enlevé (il est descendu).</p>
+        <p class="aide">Volume ajouté et volume enlevé entre deux dates.</p>
         ${projet.comparaisons
           .map((c) => {
             const r = obtenirResultat(c);

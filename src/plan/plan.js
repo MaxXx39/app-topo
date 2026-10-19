@@ -321,7 +321,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
-  /** Surface affichée (onglet Surfaces) : ses triangles, et les triangles supprimés en pointillés rouges. */
+  /** Surface affichée (onglet Comparer) : ses triangles, et les triangles supprimés en pointillés rouges. */
   function dessinerSurface(groupe) {
     const surface = dessin.surface;
     if (!surface) return;
@@ -349,7 +349,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (stock !== dessin.stockActif && !calques.autresStocks) return [];
       return dessin.resultats[index]?.trianglesDessus ?? [];
     });
-    // La surface affichée (onglet Surfaces) est aussi coloriée.
+    // La surface affichée (onglet Comparer) est aussi coloriée.
     if (dessin.surface) triangles.push(...dessin.surface.triangles);
     if (triangles.length === 0) return;
     const plage = plageAltitudes(triangles);
