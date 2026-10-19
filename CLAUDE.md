@@ -6,7 +6,7 @@ Ce fichier est lu par Claude Code au début de chaque session. Il décrit le pro
 
 - Géomètre topo / projeteur dans une entreprise de gros œuvre (bâtiment / génie civil), en Suisse. Il construit cette application seul, pour son usage personnel.
 - **Il est débutant en développement.** Explique simplement, sans jargon, par petites étapes. Si un terme technique est nécessaire, définis-le en une phrase.
-- Il travaille sous **Windows**. Donne les commandes pour Windows (PowerShell).
+- **Tout se fait sur le web**, rien n'est installé sur son ordinateur (Windows). Le code est écrit et testé par Claude Code dans le cloud, gardé sur GitHub et publié par GitHub Pages. L'utilisateur n'utilise que son navigateur (ordinateur ou téléphone).
 - Réponds toujours **en français**. L'interface de l'appli est aussi en français.
 - **Pose-lui des questions avant de décider** d'un point important ou ambigu.
 - Propose des solutions **simples et très répandues**. Pas de technologie exotique.
@@ -98,7 +98,7 @@ L'utilisateur n'a pas l'habitude de Git ni de GitHub. Explique chaque notion en 
 - **Git** : un historique du projet, pour pouvoir revenir en arrière.
 - **GitHub** : un site qui garde une copie du projet et peut le publier gratuitement sur une adresse web.
 
-Guide-le pas à pas pour : installer Git sous Windows, créer un compte GitHub, créer le dépôt, publier avec GitHub Pages, puis installer l'appli sur son téléphone. Ne fais jamais de publication ni d'envoi vers GitHub sans qu'il l'ait demandé. Ne lui demande jamais son mot de passe ni de jeton dans le chat : il les saisit lui-même.
+Guide-le pas à pas pour : activer GitHub Pages, valider les modifications (pull request) sur github.com, puis installer l'appli sur son téléphone. Ne fais jamais de publication ni d'envoi vers GitHub sans qu'il l'ait demandé. Ne lui demande jamais son mot de passe ni de jeton dans le chat : il les saisit lui-même.
 
 Fais un « commit » (une sauvegarde dans l'historique) après chaque fonctionnalité qui marche, avec un message clair en français.
 
