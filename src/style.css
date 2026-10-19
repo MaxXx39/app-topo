@@ -122,3 +122,85 @@ td:not(:first-child) {
     padding: 5px 6px;
   }
 }
+
+.aide {
+  color: var(--gris);
+  font-size: 0.9rem;
+}
+
+.bouton-secondaire {
+  background: #ffffff;
+  color: var(--vert);
+  border: 1px solid var(--vert);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  min-width: 40px;
+  cursor: pointer;
+}
+
+.case {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plan-outils {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.plan-cadre {
+  border: 1px solid #dddddd;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+svg.plan {
+  display: block;
+  width: 100%;
+  height: 65vh;
+  min-height: 300px;
+  background: #fafafa;
+  /* Le navigateur ne doit pas faire défiler la page quand on touche le plan. */
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.plan .points circle {
+  fill: #c62828;
+}
+
+.plan .noms text {
+  font-size: 12px;
+  fill: #1a1a1a;
+  paint-order: stroke;
+  stroke: #fafafa;
+  stroke-width: 3px;
+}
+
+.plan .echelle rect {
+  fill: rgba(255, 255, 255, 0.85);
+}
+
+.plan .echelle path {
+  fill: none;
+  stroke: #1a1a1a;
+  stroke-width: 2;
+}
+
+.plan .echelle text {
+  font-size: 11px;
+}
+
+summary {
+  cursor: pointer;
+  color: var(--vert);
+  font-weight: 600;
+  margin: 8px 0;
+}
