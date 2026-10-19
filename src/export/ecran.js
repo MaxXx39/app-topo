@@ -6,10 +6,12 @@ import { ECHELLES } from './echelle.js';
 import { ecrireLandXML } from '../topo/landxml.js';
 import { plageAltitudes, equidistanceAuto } from '../topo/courbes.js';
 import { bulle } from '../aide/bulles.js';
+import { PALIERS } from '../plan/ecarts.js';
 
 const CALQUES = [
   ['triangles', 'Triangles', true],
   ['noms', 'Noms des points', true],
+  ['ecarts', 'Remblai (rouge) / déblai (jaune)', true],
   ['courbes', 'Courbes de niveau', false],
   ['couleurs', 'Couleurs selon l\'altitude', false],
   ['photo', 'Photo aérienne (swisstopo)', false],
@@ -43,6 +45,11 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
       <summary>Calques du PDF</summary>
       <div class="liste-calques-pdf">
         ${CALQUES.map(([cle, titre, coche]) => `<label class="case"><input type="checkbox" data-calque="${cle}" ${coche ? 'checked' : ''} /> ${titre}</label>`).join('')}
+        <label class="choix-equidistance">Palier remblai / déblai
+          <select data-champ="palier">
+            ${PALIERS.map((e) => `<option value="${e}">${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
+          </select>
+        </label>
       </div>
     </details>
     <div class="ligne-outils">
@@ -55,6 +62,13 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
   `;
   const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`);
   const message = conteneur.querySelector('[data-zone="message"]');
+
+  // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre : un seul à la fois.
+  conteneur.addEventListener('change', (evenement) => {
+    const exclusifs = { ecarts: 'couleurs', couleurs: 'ecarts' };
+    const autre = exclusifs[evenement.target.dataset.calque];
+    if (autre && evenement.target.checked) conteneur.querySelector(`[data-calque="${autre}"]`).checked = false;
+  });
 
   // L'affaire et le dessinateur sont rangés dans le projet.
   for (const nom of ['affaire', 'dessinePar']) {
@@ -110,6 +124,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
         const calques = Object.fromEntries(
           [...conteneur.querySelectorAll('[data-calque]')].map((caseACocher) => [caseACocher.dataset.calque, caseACocher.checked]),
         );
+        calques.palier = champ('palier').value;
         const { document, echelle, messageFond } = await creerPdf({
           stocks,
           resultats,

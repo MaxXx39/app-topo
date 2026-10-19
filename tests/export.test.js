@@ -127,6 +127,34 @@ describe('creerPdf - calques', async () => {
     expect(contenu).not.toContain('(b100)'); // noms des points décochés
   });
 
+  it('colorie le remblai / déblai par défaut, avec sa légende par paliers', async () => {
+    const { document } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {} });
+    // (les lettres accentuées sont codées autrement dans le PDF : on cherche la fin du titre)
+    expect(document.output()).toContain('en m, palier');
+    const sans = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, calques: { ecarts: false } });
+    expect(sans.document.output()).not.toContain('en m, palier');
+  });
+
+  it('ajoute une feuille par comparaison, avec ses volumes et sa légende', async () => {
+    const { comparerSurfaces } = await import('../src/topo/comparaison.js');
+    // « Avant » : plan horizontal à 425 m sous le stock ; « après » : le dessus du stock.
+    const sommets = resultats[0].trianglesDessus.flat();
+    const ests = sommets.map((p) => p.est);
+    const nords = sommets.map((p) => p.nord);
+    const [e0, e1, n0, n1] = [Math.min(...ests) - 1, Math.max(...ests) + 1, Math.min(...nords) - 1, Math.max(...nords) + 1];
+    const plan = [
+      [{ est: e0, nord: n0, altitude: 425 }, { est: e1, nord: n0, altitude: 425 }, { est: e1, nord: n1, altitude: 425 }],
+      [{ est: e0, nord: n0, altitude: 425 }, { est: e1, nord: n1, altitude: 425 }, { est: e0, nord: n1, altitude: 425 }],
+    ];
+    const resultat = comparerSurfaces(plan, resultats[0].trianglesDessus);
+    const { document } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, comparaisons: [{ nom: 'Avant / après', resultat }] });
+    expect(document.getNumberOfPages()).toBe(2);
+    const contenu = document.output();
+    expect(contenu).toContain('Comparaison de surfaces');
+    const { formaterNombre } = await import('../src/topo/format.js');
+    expect(contenu).toContain(formaterNombre(resultat.remblai));
+  });
+
   it('crée le PDF sans le fond quand la photo est impossible (pas de navigateur)', async () => {
     const { messageFond } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, calques: { photo: true } });
     expect(messageFond).toBeTruthy();

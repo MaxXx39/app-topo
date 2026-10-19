@@ -11,12 +11,17 @@ import { bulle } from '../aide/bulles.js';
  * - obtenirZones() : zones possibles [{ zone, nom }] (toute la surface, ou contour d'un stock)
  * - obtenirResultat(comparaison) : résultat calculé (voir topo/comparaison.js)
  * - quandChange() : après chaque modification
+ * - obtenirAffichee() : id de la comparaison coloriée sur le plan ; montrer(id) : la choisir
  */
-export function creerEcranComparaisons(conteneur, { obtenirProjet, obtenirChoix, obtenirZones, obtenirResultat, quandChange }) {
+export function creerEcranComparaisons(conteneur, { obtenirProjet, obtenirChoix, obtenirZones, obtenirResultat, quandChange, obtenirAffichee, montrer }) {
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
     const projet = obtenirProjet();
+    if (bouton.dataset.action === 'montrer') {
+      montrer(bouton.dataset.id);
+      return;
+    }
     if (bouton.dataset.action === 'ajouter-comparaison') {
       const choix = obtenirChoix();
       projet.comparaisons.push({
@@ -71,6 +76,13 @@ export function creerEcranComparaisons(conteneur, { obtenirProjet, obtenirChoix,
                 </label>
               </div>
               ${resumeResultat(r)}
+              ${
+                r && !r.erreurs
+                  ? c.id === obtenirAffichee()
+                    ? '<p class="ok">✓ Remblai / déblai affiché sur le plan</p>'
+                    : `<button type="button" class="bouton-secondaire" data-action="montrer" data-id="${c.id}">Voir sur le plan</button>`
+                  : ''
+              }
             </div>`;
           })
           .join('')}

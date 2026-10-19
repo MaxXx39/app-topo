@@ -95,10 +95,14 @@ export function calculerVolumeStock(stock, points, surfaceBase = null) {
 /**
  * Volume entre une surface du dessus et une surface de base, toutes deux en triangles.
  * Le calcul se fait sur l'emprise des triangles du dessus.
- * Renvoie { surfacePlan, remblai, deblai, surfaceRemblai, surfaceDeblai, surfaceNonCouverte } (m², m³).
+ * Renvoie { surfacePlan, remblai, deblai, surfaceRemblai, surfaceDeblai, surfaceNonCouverte } (m², m³)
+ * et trianglesEcart : les petits triangles de la superposition, où « altitude » est l'écart
+ * de hauteur dessus - base (m, positif = remblai, négatif = déblai). Ils servent aux couleurs
+ * remblai / déblai du plan et du PDF.
  */
 export function volumeEntreSurfaces(trianglesDessus, trianglesBase) {
   const resultat = { surfacePlan: 0, remblai: 0, deblai: 0, surfaceRemblai: 0, surfaceDeblai: 0, surfaceNonCouverte: 0 };
+  const trianglesEcart = [];
   const boitesBase = trianglesBase.map(boite);
 
   for (const triangleDessus of trianglesDessus) {
@@ -122,6 +126,9 @@ export function volumeEntreSurfaces(trianglesDessus, trianglesBase) {
       for (let i = 1; i < morceau.length - 1; i++) {
         const aire = Math.abs(aireTriangle([morceau[0], morceau[i], morceau[i + 1]]));
         ajouterPrisme(resultat, aire, ecarts[0], ecarts[i], ecarts[i + 1]);
+        if (aire > 1e-9) {
+          trianglesEcart.push([0, i, i + 1].map((k) => ({ est: morceau[k].est, nord: morceau[k].nord, altitude: ecarts[k] })));
+        }
       }
     });
 
@@ -130,7 +137,7 @@ export function volumeEntreSurfaces(trianglesDessus, trianglesBase) {
 
   // On ignore les restes d'arrondi de calcul (moins de 1 cm²).
   if (resultat.surfaceNonCouverte < 1e-4) resultat.surfaceNonCouverte = 0;
-  return resultat;
+  return { ...resultat, trianglesEcart };
 }
 
 /**

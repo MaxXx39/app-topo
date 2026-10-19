@@ -40,9 +40,9 @@ export const TEXTES_AIDE = {
   trianglesEnTrop:
     'Sans contour, la surface relie les points extérieurs et peut créer des triangles en trop. Active le mode suppression, puis touche un triangle sur le plan pour le supprimer ; le toucher à nouveau le rétablit.',
   comparer:
-    'Choisis la surface « avant » et la surface « après » (par exemple le même stock levé à deux dates). Volume ajouté : là où le terrain est monté. Volume enlevé : là où il est descendu. La zone peut limiter le calcul au contour d\'un stock.',
+    'Choisis la surface « avant » et la surface « après » (par exemple le même stock levé à deux dates). Volume ajouté : là où le terrain est monté. Volume enlevé : là où il est descendu. La zone peut limiter le calcul au contour d\'un stock. « Voir sur le plan » colorie le remblai en rouge et le déblai en jaune.',
 
   // --- Plan ---
   plan:
-    'Pince avec deux doigts pour zoomer, glisse pour te déplacer. Touche un stock pour le choisir ; pendant une modification, touche un point pour l\'ajouter ou le retirer. « Calques » choisit ce qui est affiché.',
+    'Pince avec deux doigts pour zoomer, glisse pour te déplacer. Touche un stock pour le choisir ; pendant une modification, touche un point pour l\'ajouter ou le retirer. « Calques » choisit ce qui est affiché. Rouge = remblai, jaune = déblai : plus la couleur est foncée, plus l\'épaisseur est grande (palier réglable dans « Calques »).',
 };

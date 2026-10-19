@@ -38,6 +38,7 @@ let surfacesCalculees = new Map(); // id de surface -> résultat de calculerSurf
 let resultatsStocks = []; // volumes des stocks du levé affiché
 let resultatsComparaisons = []; // une entrée par comparaison du projet
 let ongletContexte = 'importer';
+let comparaisonMontree = null; // id de la comparaison coloriée sur le plan (onglet Comparer)
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir // dernier onglet (hors plan) : décide de ce que montre le plan
 
 // --- Mise en page : onglets ---
@@ -318,7 +319,20 @@ const ecranComparaisons = creerEcranComparaisons(document.querySelector('#compar
   obtenirZones: zonesComparables,
   obtenirResultat: (comparaison) => resultatsComparaisons[projet.comparaisons.indexOf(comparaison)],
   quandChange: () => modifie(),
+  obtenirAffichee: () => comparaisonAMontrer()?.id ?? null,
+  montrer: (id) => {
+    comparaisonMontree = id;
+    recalculer();
+    // Sur téléphone, on passe au plan ; sur ordinateur, il est déjà visible à droite.
+    if (!window.matchMedia('(min-width: 900px)').matches) afficherOnglet('plan');
+  },
 });
+
+/** Comparaison coloriée sur le plan : celle choisie, sinon la première qui a un résultat. */
+function comparaisonAMontrer() {
+  const calculables = projet.comparaisons.filter((c, i) => resultatsComparaisons[i] && !resultatsComparaisons[i].erreurs);
+  return calculables.find((c) => c.id === comparaisonMontree) ?? calculables[0] ?? null;
+}
 
 const ecranExport = creerEcranExport(document.querySelector('#export'), {
   obtenirDonnees: () => {
@@ -384,8 +398,11 @@ function recalculer({ recadrer = false } = {}) {
   const pointsDuPlan = surface ? (surface.type === 'landxml' ? surface.points : pointsDuLeve(surface.leveId)) : points;
   const dessinStocks = editeurStocks.obtenirDessin();
   const dessinSurface = editeurSurfaces.obtenirDessin();
+  // Dans l'onglet Comparer, le remblai / déblai colorié est celui de la comparaison montrée.
+  const comparaison = ongletContexte === 'comparer' ? comparaisonAMontrer() : null;
   plan.redessiner({
     ...dessinStocks,
+    ecarts: comparaison ? resultatsComparaisons[projet.comparaisons.indexOf(comparaison)].trianglesEcart : null,
     ...(surface && dessinSurface.enEdition ? { listeEnCours: dessinSurface.listeEnCours, enEdition: true } : {}),
     resultats: resultatsStocks,
     surface: calcul && !calcul.erreurs ? { triangles: calcul.triangles, trianglesRetires: calcul.trianglesRetires } : null,

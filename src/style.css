@@ -1025,6 +1025,23 @@ button.puce {
   stroke: none;
 }
 
+.plan .zones-ecart {
+  opacity: 0.8;
+}
+
+.plan .zones-ecart path {
+  stroke-width: 0.5;
+}
+
+/* Avec les couleurs remblai / déblai, le contour n'est plus rempli (on voit les couleurs). */
+.plan .stocks.avec-ecarts .contour {
+  fill: none;
+}
+
+.plan .legende .titre-legende {
+  font-weight: 600;
+}
+
 .plan .courbe {
   fill: none;
   stroke: #6b4f2a;

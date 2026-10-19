@@ -7,6 +7,7 @@ import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
 import { FONDS, niveauDeZoom, tuilesPourZone } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
+import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -24,6 +25,7 @@ const CALQUES = [
   { cle: 'contours', titre: 'Contours des stocks', parDefaut: true },
   { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true },
   { cle: 'triangles', titre: 'Triangles', parDefaut: true },
+  { cle: 'remblaiDeblai', titre: 'Remblai (rouge) / déblai (jaune)', parDefaut: true },
   { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false },
   { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false },
   { cle: 'volumes', titre: 'Volume sur chaque stock', parDefaut: true },
@@ -60,7 +62,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           ${CALQUES.map(
             (c) => `<label class="case"><input type="checkbox" data-calque="${c.cle}" ${calques[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`,
           ).join('')}
-          <label class="choix-equidistance">Équidistance
+          <label class="choix-equidistance">Palier remblai / déblai
+            <select data-calque="palier">
+              ${PALIERS.map((e) => `<option value="${e}" ${calques.palier === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
+            </select>
+          </label>
+          <label class="choix-equidistance">Équidistance des courbes
             <select data-calque="equidistance">
               ${EQUIDISTANCES.map((e) => `<option value="${e}" ${calques.equidistance === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
             </select>
@@ -93,6 +100,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // Ce qu'il faut dessiner (voir editeur.js et main.js) :
   // stocks, stockActif, pointsDeBase, listeEnCours, enEdition, resultats (un par stock, voir volume.js)
   // surface : surface affichée { triangles, trianglesRetires } ; modeTriangles : suppression au doigt
+  // ecarts : triangles d'écart d'une comparaison à colorier (onglet Comparer), sinon null
   let dessin = {
     stocks: [],
     stockActif: null,
@@ -102,6 +110,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     resultats: [],
     surface: null,
     modeTriangles: false,
+    ecarts: null,
   };
 
   /** Taille actuelle du plan à l'écran (pixels). */
@@ -115,13 +124,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     return [...stock.contour, ...stock.base, ...stock.lignesRupture.flatMap((l) => l.noms), ...stock.pointsDessus];
   }
 
-  // Légende du relief (couleurs, équidistance), remplie par dessinerRelief.
+  // Légendes remplies pendant le dessin : relief (couleurs, équidistance) et remblai / déblai.
   let legende = null;
+  let legendeEcarts = null;
 
   /** Redessine tout le plan avec la vue actuelle. */
   function dessiner() {
     svg.replaceChildren();
     legende = null;
+    legendeEcarts = null;
     dessinerFond();
     if (!vue || points.length === 0) return;
 
@@ -286,7 +297,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       return sommets.map((s, i) => `${i === 0 ? 'M' : 'L'}${s.x} ${s.y}`).join(' ') + (ferme ? ' Z' : '');
     };
 
-    const groupe = creerElement('g', { class: 'stocks' });
+    const groupe = creerElement('g', { class: calques.remblaiDeblai ? 'stocks avec-ecarts' : 'stocks' });
+    if (calques.remblaiDeblai) dessinerEcarts(groupe);
     if (calques.couleursAltitude || calques.courbes) dessinerRelief(groupe);
     dessinerSurface(groupe);
     dessin.stocks.forEach((stock, index) => {
@@ -321,6 +333,39 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
     });
     svg.append(groupe);
+  }
+
+  /**
+   * Remblai en rouge et déblai en jaune, par paliers de hauteur : sur la comparaison affichée
+   * (onglet Comparer), sinon sur les stocks visibles (écart entre le dessus et la base).
+   */
+  function dessinerEcarts(groupe) {
+    const triangles =
+      dessin.ecarts ??
+      dessin.stocks.flatMap((stock, index) => {
+        if (stock !== dessin.stockActif && !calques.autresStocks) return [];
+        return dessin.resultats[index]?.trianglesEcart ?? [];
+      });
+    if (triangles.length === 0) return;
+    const { zones, legende: legendeZones } = zonesRemblaiDeblai(triangles, calques.palier);
+    // Un seul tracé par couleur : beaucoup plus léger à afficher.
+    const tracesParCouleur = new Map();
+    for (const { couleur, polygone } of zones) {
+      const trace = polygone.map((p, i) => {
+        const { x, y } = versEcran(p.est, p.nord, vue);
+        return `${i === 0 ? 'M' : 'L'}${x} ${y}`;
+      });
+      const cle = enRgb(couleur);
+      if (!tracesParCouleur.has(cle)) tracesParCouleur.set(cle, []);
+      tracesParCouleur.get(cle).push(trace.join(' ') + ' Z');
+    }
+    // La transparence est mise sur l'ensemble (et non sur chaque tracé) : pas de traits entre les morceaux.
+    const zonesEcart = creerElement('g', { class: 'zones-ecart' });
+    for (const [couleur, traces] of tracesParCouleur) {
+      zonesEcart.append(creerElement('path', { d: traces.join(' '), fill: couleur, stroke: couleur }));
+    }
+    groupe.append(zonesEcart);
+    legendeEcarts = legendeZones;
   }
 
   /** Surface affichée (onglet Comparer) : ses triangles, et les triangles supprimés en pointillés rouges. */
@@ -395,39 +440,58 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     legende = { plage, equidistance };
   }
 
-  /** Légende en bas à droite : échelle des couleurs et équidistance. */
+  /** Légende en bas à droite : remblai / déblai par paliers, couleurs selon l'altitude, équidistance. */
   function dessinerLegende() {
-    if (!legende) return;
-    const { plage, equidistance } = legende;
+    if (!legende && !legendeEcarts) return;
     const largeur = 150;
     const x = vue.largeur - largeur - 12;
     const bas = vue.hauteur - 20; // place pour la mention des sources en dessous
-    const y = bas - (calques.couleursAltitude ? 70 : 40);
-    const groupe = creerElement('g', { class: 'legende' });
-    groupe.append(creerElement('rect', { x: x - 8, y: y - 8, width: largeur + 16, height: bas - y + 4, rx: 8 }));
-    let ligne = y + 8;
-    if (calques.couleursAltitude) {
-      const pas = 20;
-      for (let i = 0; i < pas; i++) {
-        const altitude = plage.min + ((i + 0.5) / pas) * (plage.max - plage.min);
-        groupe.append(
-          creerElement('rect', { x: x + (i * largeur) / pas, y: ligne, width: largeur / pas + 0.5, height: 10, fill: couleurAltitude(altitude, plage) }),
-        );
+    const elements = [];
+    let ligne = 0; // hauteur déjà occupée, à partir du haut de la légende
+
+    const ecrire = (tx, ty, contenu, ancre = 'start', classe = '') => {
+      const texte = creerElement('text', { x: tx, y: ty, 'text-anchor': ancre, class: classe });
+      texte.textContent = contenu;
+      elements.push(texte);
+    };
+    /** Une rangée de cases de couleur, avec la première et la dernière valeur dessous. */
+    const rangee = (cases, debut, fin) => {
+      cases.forEach((couleur, i) => {
+        elements.push(creerElement('rect', { x: x + (i * largeur) / cases.length, y: ligne, width: largeur / cases.length + 0.5, height: 10, fill: couleur }));
+      });
+      ecrire(x, ligne + 23, debut);
+      ecrire(x + largeur, ligne + 23, fin, 'end');
+      ligne += 32;
+    };
+
+    if (legendeEcarts) {
+      for (const [titre, classes] of [['Remblai', legendeEcarts.remblai], ['Déblai', legendeEcarts.deblai]]) {
+        if (classes.length === 0) continue;
+        ecrire(x, ligne + 10, `${titre} (palier ${legendeEcarts.palier} m)`, 'start', 'titre-legende');
+        ligne += 16;
+        rangee(classes.map((c) => enRgb(c.couleur)), '0', `${formaterNombre(classes.at(-1).a)} m`);
       }
-      const textes = [
-        [x, formaterNombre(plage.min), 'start'],
-        [x + largeur, formaterNombre(plage.max), 'end'],
-      ];
-      for (const [tx, contenu, ancre] of textes) {
-        const texte = creerElement('text', { x: tx, y: ligne + 24, 'text-anchor': ancre });
-        texte.textContent = contenu;
-        groupe.append(texte);
-      }
-      ligne += 38;
     }
-    const texte = creerElement('text', { x, y: ligne + 4 });
-    texte.textContent = `Équidistance ${equidistance} m`;
-    groupe.append(texte);
+    if (legende) {
+      const { plage, equidistance } = legende;
+      if (calques.couleursAltitude) {
+        const pas = 20;
+        const cases = Array.from({ length: pas }, (_, i) => couleurAltitude(plage.min + ((i + 0.5) / pas) * (plage.max - plage.min), plage));
+        ecrire(x, ligne + 10, 'Altitude', 'start', 'titre-legende');
+        ligne += 16;
+        rangee(cases, formaterNombre(plage.min), formaterNombre(plage.max));
+      }
+      if (calques.couleursAltitude || calques.courbes) {
+        ecrire(x, ligne + 10, `Équidistance ${equidistance} m`);
+        ligne += 16;
+      }
+    }
+
+    // Tout est placé à partir du haut de la légende : on la pose en bas à droite du plan.
+    const haut = bas - ligne;
+    const groupe = creerElement('g', { class: 'legende', transform: `translate(0 ${haut})` });
+    groupe.append(creerElement('rect', { x: x - 8, y: -8, width: largeur + 16, height: ligne + 8, rx: 8 }));
+    for (const element of elements) groupe.append(element);
     svg.append(groupe);
   }
 
@@ -502,6 +566,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   menuCalques.addEventListener('change', (evenement) => {
     const champ = evenement.target;
     calques[champ.dataset.calque] = champ.type === 'checkbox' ? champ.checked : champ.value;
+    // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre : un seul à la fois.
+    const exclusifs = { remblaiDeblai: 'couleursAltitude', couleursAltitude: 'remblaiDeblai' };
+    const autre = exclusifs[champ.dataset.calque];
+    if (autre && champ.checked) {
+      calques[autre] = false;
+      menuCalques.querySelector(`[data-calque="${autre}"]`).checked = false;
+    }
     memoriserCalques(calques);
     dessiner();
   });
@@ -658,10 +729,13 @@ function milieu(a, b) {
 function lireCalques() {
   const calques = Object.fromEntries(CALQUES.map((c) => [c.cle, c.parDefaut]));
   calques.equidistance = 'auto';
+  calques.palier = 'auto';
   try {
     const memoire = JSON.parse(localStorage.getItem(CLE_MEMOIRE) ?? '{}');
     for (const c of CALQUES) if (typeof memoire[c.cle] === 'boolean') calques[c.cle] = memoire[c.cle];
     if (EQUIDISTANCES.includes(memoire.equidistance)) calques.equidistance = memoire.equidistance;
+    if (PALIERS.includes(memoire.palier)) calques.palier = memoire.palier;
+    if (calques.remblaiDeblai && calques.couleursAltitude) calques.couleursAltitude = false;
   } catch {
     // Mémoire du navigateur indisponible (navigation privée...) : on garde les valeurs par défaut.
   }
