@@ -2,7 +2,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { lirePoints } from '../src/topo/import-points.js';
-import { creerStock, lireListeDeNoms, ecrireListeDeNoms, verifierStock, pointsDeBase } from '../src/topo/stocks.js';
+import {
+  creerStock,
+  lireListeDeNoms,
+  ecrireListeDeNoms,
+  verifierStock,
+  pointsDeBase,
+  detecterSeries,
+} from '../src/topo/stocks.js';
 
 const { points } = lirePoints(readFileSync(new URL('../exemples/stock_export.txt', import.meta.url), 'utf-8'));
 const noms = points.map((p) => p.nom);
@@ -59,7 +66,7 @@ describe('verifierStock', () => {
   it('accepte le stock 2 de l\'exemple', () => {
     const stock = creerStock('Stock 2');
     stock.contour = lireListeDeNoms('b100 à b116', noms).noms;
-    stock.lignesRupture = [lireListeDeNoms('h100 à h114', noms).noms];
+    stock.lignesRupture = [{ noms: lireListeDeNoms('h100 à h114', noms).noms, fermee: true }];
     expect(verifierStock(stock, noms)).toEqual([]);
     expect(pointsDeBase(stock)).toEqual(stock.contour);
   });
@@ -67,7 +74,7 @@ describe('verifierStock', () => {
   it('signale un contour trop court, une ligne d\'un seul point et un doublon', () => {
     const stock = creerStock('Essai');
     stock.contour = ['b1', 'b2', 'b1'];
-    stock.lignesRupture = [['h1']];
+    stock.lignesRupture = [{ noms: ['h1'], fermee: false }];
     const problemes = verifierStock(stock, noms);
     expect(problemes.some((p) => p.includes('en double : b1'))).toBe(true);
     expect(problemes.some((p) => p.includes('ligne de rupture 1'))).toBe(true);
@@ -84,5 +91,35 @@ describe('verifierStock', () => {
     const stock = creerStock('Essai');
     stock.contour = ['b1', 'b2', 'zz'];
     expect(verifierStock(stock, noms).at(-1)).toContain('zz');
+  });
+});
+
+describe('detecterSeries', () => {
+  it('trouve les 6 séries du fichier d\'exemple', () => {
+    const series = detecterSeries(noms).map(ecrireListeDeNoms);
+    expect(series).toEqual([
+      'b1 à b17',
+      'h1 à h31',
+      'b100 à b116',
+      'h100 à h114',
+      'b200 à b217',
+      'h200 à h216',
+    ]);
+  });
+
+  it('coupe une série quand la numérotation saute', () => {
+    expect(detecterSeries(['p1', 'p2', 'p3', 'p7', 'p8', 'x'])).toEqual([
+      ['p1', 'p2', 'p3'],
+      ['p7', 'p8'],
+    ]);
+  });
+});
+
+describe('verifierStock - ligne fermée', () => {
+  it('demande 3 points pour une ligne fermée', () => {
+    const stock = creerStock('Essai');
+    stock.contour = ['b1', 'b2', 'b3'];
+    stock.lignesRupture = [{ noms: ['h1', 'h2'], fermee: true }];
+    expect(verifierStock(stock, noms)[0]).toContain('au moins 3 points (ligne fermée)');
   });
 });

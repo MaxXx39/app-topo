@@ -366,3 +366,47 @@ button:disabled {
   font-weight: 700;
   fill: var(--vert);
 }
+
+.series {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.pastille {
+  background: #ffffff;
+  border: 1px solid var(--vert);
+  color: var(--vert);
+  border-radius: 16px;
+  padding: 5px 10px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* Série déjà utilisée dans un stock : affichée en plus discret. */
+.pastille.utilisee {
+  border-color: #cccccc;
+  color: #999999;
+}
+
+/* --- Volumes --- */
+
+.incomplet {
+  color: var(--gris);
+  font-style: italic;
+}
+
+.detail-stock {
+  margin: 8px 0;
+}
+
+.tableau-detail td:last-child {
+  text-align: right;
+}
+
+.plan .triangles {
+  fill: none;
+  stroke: #7c8b99;
+  stroke-width: 0.8;
+}
