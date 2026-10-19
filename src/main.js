@@ -7,9 +7,13 @@ import { creerEditeurStocks } from './stocks/editeur.js';
 import { echapper } from './outils/echapper.js';
 import { calculerTousLesStocks, afficherResultats } from './stocks/resultats.js';
 import { creerEcranLandXML } from './landxml/ecran.js';
+import { creerEcranExport } from './export/ecran.js';
 
 // Les points du dernier fichier importé (utilisés par les étapes suivantes).
 let points = [];
+let nomFichierPoints = '';
+// Derniers volumes calculés (pour l'export).
+let derniersResultats = [];
 
 const app = document.querySelector('#app');
 
@@ -47,8 +51,11 @@ app.innerHTML = `
         <p class="vide avant-import">Importe d'abord un fichier de points (onglet Points).</p>
       </section>
       <section class="panneau" data-onglet="volumes">
-        <h2>Volumes <span class="aide">(mode A : base mesurée)</span></h2>
-        <div class="apres-import" hidden><div id="resultats"></div></div>
+        <h2>Volumes</h2>
+        <div class="apres-import" hidden>
+          <div id="resultats"></div>
+          <div id="export" class="carte-export"></div>
+        </div>
         <p class="vide avant-import">Importe d'abord un fichier de points (onglet Points).</p>
       </section>
       <section class="panneau" data-onglet="landxml">
@@ -86,8 +93,13 @@ document.querySelector('.onglets').addEventListener('click', (evenement) => {
 });
 afficherOnglet('points');
 
-// La surface choisie servira de base en mode B (étape suivante).
-creerEcranLandXML(document.querySelector('#landxml'), { quandChange: () => {} });
+// La surface LandXML choisie sert de base aux stocks en mode B.
+const ecranLandXML = creerEcranLandXML(document.querySelector('#landxml'), {
+  quandChange: () => {
+    editeur.rafraichir();
+    recalculer();
+  },
+});
 
 const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPoint: (nom) => editeur.toucherPoint(nom),
@@ -97,12 +109,23 @@ const editeur = creerEditeurStocks(document.querySelector('#stocks'), document.q
   obtenirPoints: () => points,
   quandChange: () => recalculer(),
   allerAuPlan: () => afficherOnglet('plan'),
+  obtenirSurfaceLandXML: () => ecranLandXML.surfaceChoisie(),
+});
+
+creerEcranExport(document.querySelector('#export'), {
+  obtenirDonnees: () => ({
+    stocks: editeur.obtenirDessin().stocks,
+    resultats: derniersResultats,
+    points,
+    fichierPoints: nomFichierPoints,
+  }),
 });
 
 /** Recalcule les volumes, les affiche, et redessine le plan avec les triangles du stock actif. */
 function recalculer() {
   const dessin = editeur.obtenirDessin();
-  const resultats = calculerTousLesStocks(dessin.stocks, points);
+  const resultats = calculerTousLesStocks(dessin.stocks, points, ecranLandXML.surfaceChoisie());
+  derniersResultats = resultats;
   afficherResultats(document.querySelector('#resultats'), dessin.stocks, resultats);
   document.querySelector('#etat').textContent =
     points.length > 0 ? `${points.length} points · ${dessin.stocks.length} stock(s)` : 'Volumes de stocks';
@@ -125,6 +148,7 @@ document.querySelector('#fichier-points').addEventListener('change', async (even
   try {
     const resultat = lirePoints(await fichier.text());
     points = resultat.points;
+    nomFichierPoints = fichier.name;
     zone.innerHTML = afficherResultat(fichier.name, resultat);
     mettreAJourPlan();
   } catch (erreur) {

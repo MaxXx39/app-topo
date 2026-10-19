@@ -7,8 +7,8 @@ import { echapper } from '../outils/echapper.js';
  * Calcule les volumes de tous les stocks.
  * Renvoie une liste de résultats, dans le même ordre que les stocks.
  */
-export function calculerTousLesStocks(stocks, points) {
-  return stocks.map((stock) => calculerVolumeStock(stock, points));
+export function calculerTousLesStocks(stocks, points, surfaceLandXML) {
+  return stocks.map((stock) => calculerVolumeStock(stock, points, surfaceLandXML));
 }
 
 /** Affiche le tableau des volumes et le détail de chaque stock dans "conteneur". */
@@ -22,10 +22,11 @@ export function afficherResultats(conteneur, stocks, resultats) {
     .map((stock, i) => {
       const r = resultats[i];
       if (r.erreurs) {
-        return `<tr><td>${echapper(stock.nom)}</td><td colspan="3" class="incomplet">incomplet</td></tr>`;
+        return `<tr><td>${echapper(stock.nom)}</td><td colspan="4" class="incomplet">incomplet</td></tr>`;
       }
       return `<tr>
         <td>${echapper(stock.nom)}</td>
+        <td>${r.mode}</td>
         <td>${formaterNombre(r.surfacePlan)}</td>
         <td><strong>${formaterNombre(r.remblai)}</strong></td>
         <td>${formaterNombre(r.deblai)}</td>
@@ -38,7 +39,7 @@ export function afficherResultats(conteneur, stocks, resultats) {
   conteneur.innerHTML = `
     <div class="tableau-defilant">
       <table>
-        <thead><tr><th>Stock</th><th>Surface (m²)</th><th>Remblai (m³)</th><th>Déblai (m³)</th></tr></thead>
+        <thead><tr><th>Stock</th><th>Mode</th><th>Surface (m²)</th><th>Remblai (m³)</th><th>Déblai (m³)</th></tr></thead>
         <tbody>${lignes}</tbody>
       </table>
     </div>
@@ -56,12 +57,13 @@ function detailStock(stock, r) {
   }
   const nonCouvert =
     r.surfaceNonCouverte > 0
-      ? `<div class="avertissement"><p><strong>Attention :</strong> la surface de base ne couvre pas tout le contour. Surface non couverte : ${formaterNombre(r.surfaceNonCouverte)} m² (non comptée dans le volume).</p></div>`
+      ? `<div class="avertissement"><p><strong>${echapper(stock.nom)} :</strong> ${r.mode === 'B' ? `la surface LandXML « ${echapper(r.nomBase)} »` : 'la surface de base'} ne couvre pas tout le contour. Surface non couverte : ${formaterNombre(r.surfaceNonCouverte)} m² (non comptée dans le volume).</p></div>`
       : '';
   return `
     <details class="detail-stock">
       <summary>Détail : ${echapper(stock.nom)}</summary>
       <table class="tableau-detail">
+        <tr><td>Surface de base</td><td>${r.mode === 'B' ? `mode B : LandXML « ${echapper(r.nomBase)} »` : 'mode A : points du pied'}</td></tr>
         <tr><td>Surface en plan (triangles)</td><td>${formaterNombre(r.surfacePlan)} m²</td></tr>
         <tr><td>Surface du contour (polygone)</td><td>${formaterNombre(r.surfaceContour)} m²</td></tr>
         <tr><td>Triangles du dessus</td><td>${r.nombreTrianglesDessus}</td></tr>

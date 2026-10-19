@@ -3,6 +3,7 @@
 // {
 //   nom: 'Stock 1',
 //   contour: ['b1', 'b2', ...],      // bord du stock, dans l'ordre (fermé automatiquement)
+//   modeBase: 'mesuree',             // 'mesuree' (mode A : points du pied) ou 'landxml' (mode B)
 //   baseEgaleContour: true,          // si vrai, la surface de base utilise les points du contour
 //   base: [...],                     // points du pied (utilisés si baseEgaleContour est faux)
 //   lignesRupture: [{ noms: ['h1', 'h2', ...], fermee: false }, ...], // haut de talus, arêtes, dans l'ordre
@@ -13,7 +14,15 @@
 
 /** Crée un stock vide. */
 export function creerStock(nom) {
-  return { nom, contour: [], baseEgaleContour: true, base: [], lignesRupture: [creerLigne()], pointsDessus: [] };
+  return {
+    nom,
+    contour: [],
+    modeBase: 'mesuree',
+    baseEgaleContour: true,
+    base: [],
+    lignesRupture: [creerLigne()],
+    pointsDessus: [],
+  };
 }
 
 /** Crée une ligne de rupture vide (ouverte). */
@@ -109,7 +118,7 @@ export function verifierStock(stock, nomsExistants) {
   if (stock.contour.length < 3) problemes.push('le contour doit avoir au moins 3 points');
   signalerDoublons(stock.contour, 'contour', problemes);
 
-  if (!stock.baseEgaleContour) {
+  if (stock.modeBase !== 'landxml' && !stock.baseEgaleContour) {
     if (stock.base.length < 3) problemes.push('la surface de base doit avoir au moins 3 points');
     signalerDoublons(stock.base, 'surface de base', problemes);
   }

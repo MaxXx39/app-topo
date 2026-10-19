@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { lirePoints } from '../src/topo/import-points.js';
 import { creerStock, lireListeDeNoms } from '../src/topo/stocks.js';
 import { calculerVolumeStock, ajouterPrisme } from '../src/topo/volume.js';
+import { lireLandXML } from '../src/topo/landxml.js';
 
 /** Fabrique un point { nom, est, nord, altitude }. */
 const pt = (nom, est, nord, altitude) => ({ nom, est, nord, altitude });
@@ -156,5 +157,61 @@ describe('messages d\'erreur', () => {
     const stock = creerStock('Essai');
     stock.contour = ['b1', 'b2', 'zz'];
     expect(calculerVolumeStock(stock, carre).erreurs[0]).toContain('zz');
+  });
+});
+
+describe('mode B : base LandXML (fichier 20260520_Stock.xml, plan horizontal à 431.000 m)', () => {
+  const { points } = lirePoints(readFileSync(new URL('../exemples/stock_export.txt', import.meta.url), 'utf-8'));
+  const noms = points.map((p) => p.nom);
+  const [surface] = lireLandXML(readFileSync(new URL('../exemples/20260520_Stock.xml', import.meta.url), 'utf-8')).surfaces;
+
+  const cas = [
+    ['Stock 1', 'b1 à b17', 'h1 à h31'],
+    ['Stock 2', 'b100 à b116', 'h100 à h114'],
+    ['Stock 3', 'b200 à b217', 'h200 à h216'],
+  ];
+
+  for (const [nom, contour, ligne] of cas) {
+    it(`${nom} : remblai - déblai = volume sous le dessus - 431 m × surface`, () => {
+      const stock = creerStock(nom);
+      stock.contour = lireListeDeNoms(contour, noms).noms;
+      stock.lignesRupture = [{ noms: lireListeDeNoms(ligne, noms).noms, fermee: true }];
+      stock.modeBase = 'landxml';
+      const resultat = calculerVolumeStock(stock, points, surface);
+
+      expect(resultat.erreurs).toBeUndefined();
+      expect(resultat.mode).toBe('B');
+      expect(resultat.nombreTrianglesBase).toBe(2);
+      expect(resultat.surfaceNonCouverte).toBe(0);
+      // Contrôle indépendant : volume entre le dessus et l'altitude 0, calculé
+      // triangle par triangle (surface × altitude moyenne des 3 sommets).
+      let volumeSousDessus = 0;
+      for (const [a, b, c] of resultat.trianglesDessus) {
+        const aire = Math.abs((b.est - a.est) * (c.nord - a.nord) - (c.est - a.est) * (b.nord - a.nord)) / 2;
+        volumeSousDessus += (aire * (a.altitude + b.altitude + c.altitude)) / 3;
+      }
+      expect(resultat.remblai - resultat.deblai).toBeCloseTo(volumeSousDessus - 431 * resultat.surfacePlan, 6);
+      // Le dessus des stocks est presque partout sous 431 m : surtout du déblai.
+      expect(resultat.deblai).toBeGreaterThan(resultat.remblai);
+    });
+  }
+
+  it('signale la surface non couverte quand le LandXML ne recouvre qu\'une partie du stock', () => {
+    // Surface LandXML qui ne couvre que la moitié Ouest d'un carré de 10 m (50 m² non couverts).
+    const p = (nom, est, nord, altitude) => ({ nom, est, nord, altitude });
+    const carre = [p('b1', 0, 0, 0), p('b2', 10, 0, 0), p('b3', 10, 10, 0), p('b4', 0, 10, 0), p('h', 5, 5, 3)];
+    const demi = { nom: 'Demi', triangles: [[p('1', -1, -1, 0), p('2', 5, -1, 0), p('3', 5, 11, 0)], [p('1', -1, -1, 0), p('3', 5, 11, 0), p('4', -1, 11, 0)]] };
+    const stock = creerStock('Essai');
+    stock.contour = ['b1', 'b2', 'b3', 'b4'];
+    stock.pointsDessus = ['h'];
+    stock.modeBase = 'landxml';
+    expect(calculerVolumeStock(stock, carre, demi).surfaceNonCouverte).toBeCloseTo(50, 9);
+  });
+
+  it('demande une surface LandXML en mode B', () => {
+    const stock = creerStock('Essai');
+    stock.contour = ['b1', 'b2', 'b3'];
+    stock.modeBase = 'landxml';
+    expect(calculerVolumeStock(stock, points, null).erreurs[0]).toContain('LandXML');
   });
 });
