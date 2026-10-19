@@ -64,6 +64,8 @@ Ajouts demandés par l'utilisateur après la V1 :
 - **Comparaison** de deux surfaces (deux levés) : volume ajouté / enlevé, sur toute la surface ou dans le contour d'un stock.
 - **Exports** DXF (R12) et LandXML, en plus du CSV et du PDF ; **calques** au choix dans le PDF (triangles, noms, courbes, couleurs, photo aérienne, cadastre).
 - Plan : calques, couleurs selon l'altitude, courbes de niveau, fonds swisstopo. Couleurs de l'interface : Perrin Groupe (bleu nuit #1b2b36, ambre #f6ab07).
+- **Organisation (octobre 2026)** : onglets 1. Importer (points), 2. Surfaces, 3. Volumes (+ export), 4. Comparer. Plus de notion de « stock » : une **surface** générique (stock, terrassement, terrain…) créée à partir des points (contour, lignes de rupture, points) ou importée (LandXML, **DXF** faces 3D / polyface). La **base du volume** se choisit dans 3. Volumes : A = points du contour, B = une autre surface, ou pas de volume.
+- Remblai en rouge / déblai en jaune par paliers de hauteur (plan et PDF) ; boutons Annuler / Rétablir ; bulles d'aide activables (textes dans `src/aide/textes.js`).
 
 ## 5. Vérification : cas de référence
 

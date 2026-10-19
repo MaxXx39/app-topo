@@ -25,6 +25,7 @@
   --ombre: 0 1px 2px rgba(16, 24, 20, 0.06), 0 2px 8px rgba(16, 24, 20, 0.06);
   --hauteur-entete: 56px;
   --hauteur-onglets: 64px;
+  --hauteur-plan-dessin: 45svh; /* plan en haut de l'écran pendant une modification (téléphone) */
 }
 
 * {
@@ -282,6 +283,17 @@ body[data-onglet='projets'] .entete-projets {
   cursor: pointer;
 }
 
+.onglets span {
+  white-space: nowrap;
+}
+
+/* Petits téléphones : texte des onglets un peu plus petit pour tenir sur une ligne. */
+@media (max-width: 420px) {
+  .onglets button {
+    font-size: 0.66rem;
+  }
+}
+
 .onglets svg {
   width: 24px;
   height: 24px;
@@ -352,6 +364,30 @@ body[data-onglet='projets'] .entete-projets {
   display: inline-block;
 }
 
+/* Téléphone, pendant une modification de surface : plan en haut, outils en dessous. */
+@media (max-width: 899px) {
+  body.mode-dessin[data-onglet='surfaces'] .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: var(--hauteur-plan-dessin);
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+
+  body.mode-dessin[data-onglet='surfaces'] .mise-en-page {
+    padding-top: calc(var(--hauteur-plan-dessin) + 12px);
+  }
+
+  body.mode-dessin .en-edition {
+    scroll-margin-top: calc(var(--hauteur-entete) + var(--hauteur-plan-dessin) + 8px);
+  }
+}
+
 /* --- Ordinateur et tablette : panneau à gauche, plan toujours visible à droite --- */
 
 @media (min-width: 900px) {
@@ -396,8 +432,9 @@ body[data-onglet='projets'] .entete-projets {
 
   .onglets button {
     flex-direction: row;
-    gap: 6px;
-    font-size: 0.85rem;
+    gap: 5px;
+    padding: 0 4px;
+    font-size: 0.8rem;
     border-radius: 8px;
   }
 
@@ -1025,6 +1062,23 @@ button.puce {
   stroke: none;
 }
 
+.plan .zones-ecart {
+  opacity: 0.8;
+}
+
+.plan .zones-ecart path {
+  stroke-width: 0.5;
+}
+
+/* Avec les couleurs remblai / déblai, le contour n'est plus rempli (on voit les couleurs). */
+.plan .stocks.avec-ecarts .contour {
+  fill: none;
+}
+
+.plan .legende .titre-legende {
+  font-weight: 600;
+}
+
 .plan .courbe {
   fill: none;
   stroke: #6b4f2a;
@@ -1246,4 +1300,39 @@ svg.plan {
   .liste-calques-pdf {
     grid-template-columns: 1fr;
   }
+}
+
+/* Ligne « Total » du tableau des volumes */
+tr.total td {
+  border-top: 2px solid var(--bordure);
+  font-weight: 600;
+}
+
+/* Photos d'une surface : miniatures avec leur légende */
+.liste-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.photo {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.photo img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--fond);
+}
+
+.photo input {
+  width: 100%;
+  min-width: 0;
+  font-size: 0.9rem;
 }

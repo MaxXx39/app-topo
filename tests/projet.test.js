@@ -9,7 +9,7 @@ import {
   lireFichierProjet,
   resumerProjet,
 } from '../src/projet/projet.js';
-import { creerStock } from '../src/topo/stocks.js';
+import { creerSurface } from '../src/topo/surface.js';
 
 const point = (nom) => ({ nom, est: 2499349.955, nord: 1124567.41, altitude: 427.654 });
 
@@ -22,10 +22,10 @@ describe('projets', () => {
     expect(leveActif(projet)).toBe(juin);
   });
 
-  it('le fichier projet se relit à l\'identique (points, stocks)', () => {
+  it('le fichier projet se relit à l\'identique (points, surfaces)', () => {
     const projet = creerProjet('10 203');
     const leve = ajouterLeve(projet, 'stock.csv', [point('b1')]);
-    leve.stocks.push(creerStock('Stock 1'));
+    projet.surfaces.push(creerSurface('Stock 1', leve.id));
     const { projet: relu, erreur } = lireFichierProjet(ecrireFichierProjet(projet));
     expect(erreur).toBeUndefined();
     expect(relu).toEqual(projet);
@@ -39,7 +39,6 @@ describe('projets', () => {
   it('complète un fichier projet ancien ou incomplet', () => {
     const { projet } = lireFichierProjet('{"format":"topo-projet","version":1,"id":"x","nom":"Vieux","leves":[{"id":"l","nom":"a.csv","points":[]}]}');
     expect(projet.surfaces).toEqual([]);
-    expect(projet.leves[0].stocks).toEqual([]);
     expect(projet.cartouche).toEqual({ affaire: '', dessinePar: '' });
   });
 
@@ -55,7 +54,15 @@ describe('projets', () => {
 
   it('résume un projet pour la liste', () => {
     const projet = creerProjet('A');
-    ajouterLeve(projet, 'a.csv', []).stocks.push(creerStock('S'));
-    expect(resumerProjet(projet)).toMatchObject({ nom: 'A', nombreLeves: 1, nombreStocks: 1, nombreSurfaces: 0 });
+    projet.surfaces.push(creerSurface('S', ajouterLeve(projet, 'a.csv', []).id));
+    expect(resumerProjet(projet)).toMatchObject({ nom: 'A', nombreLeves: 1, nombreSurfaces: 1 });
+  });
+
+  it('donne une base de volume aux surfaces d\'un ancien fichier', () => {
+    const { projet } = lireFichierProjet(
+      '{"format":"topo-projet","version":1,"id":"x","nom":"V","leves":[],"surfaces":[{"id":"s","nom":"S","type":"points","contour":[]},{"id":"t","nom":"T","type":"landxml"}]}',
+    );
+    expect(projet.surfaces[0].volume).toEqual({ base: 'contour', surfaceId: null });
+    expect(projet.surfaces[1].volume).toEqual({ base: 'aucune', surfaceId: null });
   });
 });

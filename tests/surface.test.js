@@ -2,9 +2,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { lirePoints } from '../src/topo/import-points.js';
-import { lireListeDeNoms } from '../src/topo/stocks.js';
+import { lireListeDeNoms } from '../src/topo/noms.js';
 import { lireLandXML, resumerSurface } from '../src/topo/landxml.js';
-import { creerSurface, calculerSurface, cleTriangle, surfaceDepuisLandXML } from '../src/topo/surface.js';
+import { creerSurface, calculerSurface, cleTriangle, surfaceImportee } from '../src/topo/surface.js';
 
 const pt = (nom, est, nord, altitude) => ({ nom, est, nord, altitude });
 const aire = (triangles) =>
@@ -65,11 +65,11 @@ describe('calculerSurface', () => {
   });
 });
 
-describe('surfaceDepuisLandXML', () => {
+describe('surfaceImportee', () => {
   it('range une surface LandXML dans le projet sans perdre de triangle', () => {
     const texte = readFileSync(new URL('../exemples/3D SUR Tapis AC11.xml', import.meta.url), 'utf-8');
     const [lue] = lireLandXML(texte).surfaces;
-    const rangee = JSON.parse(JSON.stringify(surfaceDepuisLandXML(lue, 'tapis.xml')));
+    const rangee = JSON.parse(JSON.stringify(surfaceImportee(lue, 'tapis.xml')));
     const { triangles } = calculerSurface(rangee, []);
     expect(triangles).toHaveLength(506);
     expect(aire(triangles)).toBeCloseTo(resumerSurface(lue).surfacePlan, 6);

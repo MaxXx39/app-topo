@@ -1,38 +1,10 @@
-// Stocks et rôles des points.
-// Un stock a la forme :
-// {
-//   nom: 'Stock 1',
-//   contour: ['b1', 'b2', ...],      // bord du stock, dans l'ordre (fermé automatiquement)
-//   modeBase: 'mesuree',             // 'mesuree' (mode A : points du pied) ou 'landxml' (mode B)
-//   baseEgaleContour: true,          // si vrai, la surface de base utilise les points du contour
-//   base: [...],                     // points du pied (utilisés si baseEgaleContour est faux)
-//   lignesRupture: [{ noms: ['h1', 'h2', ...], fermee: false }, ...], // haut de talus, arêtes, dans l'ordre
-//                                    // fermee : le dernier point est relié au premier
-//   pointsDessus: [...],             // points isolés sur le dessus du stock
-// }
-// Les rôles sont choisis par l'utilisateur : on ne déduit jamais rien du nom d'un point.
-
-/** Crée un stock vide. */
-export function creerStock(nom) {
-  return {
-    nom,
-    contour: [],
-    modeBase: 'mesuree',
-    baseEgaleContour: true,
-    base: [],
-    lignesRupture: [creerLigne()],
-    pointsDessus: [],
-  };
-}
+// Listes de noms de points : lecture (« b100 à b116 »), écriture courte, séries, vérifications.
+// Les rôles des points (contour, lignes de rupture...) sont choisis par l'utilisateur :
+// on ne déduit jamais rien du nom d'un point.
 
 /** Crée une ligne de rupture vide (ouverte). */
 export function creerLigne() {
   return { noms: [], fermee: false };
-}
-
-/** Points de la surface de base d'un stock (noms). */
-export function pointsDeBase(stock) {
-  return stock.baseEgaleContour ? stock.contour : stock.base;
 }
 
 /**
@@ -109,21 +81,17 @@ export function ecrireListeDeNoms(noms) {
 }
 
 /**
- * Vérifie un stock et renvoie la liste des problèmes (textes), vide si tout va bien.
+ * Vérifie les listes de points d'une surface créée à partir d'un levé.
+ * Renvoie la liste des problèmes (textes), vide si tout va bien.
  */
-export function verifierStock(stock, nomsExistants) {
+export function verifierSurface(surface, nomsExistants) {
   const existe = new Set(nomsExistants);
   const problemes = [];
 
-  if (stock.contour.length < 3) problemes.push('le contour doit avoir au moins 3 points');
-  signalerDoublons(stock.contour, 'contour', problemes);
+  if (surface.contour.length > 0 && surface.contour.length < 3) problemes.push('le contour doit avoir au moins 3 points (ou aucun)');
+  signalerDoublons(surface.contour, 'contour', problemes);
 
-  if (stock.modeBase !== 'landxml' && !stock.baseEgaleContour) {
-    if (stock.base.length < 3) problemes.push('la surface de base doit avoir au moins 3 points');
-    signalerDoublons(stock.base, 'surface de base', problemes);
-  }
-
-  stock.lignesRupture.forEach((ligne, index) => {
+  surface.lignesRupture.forEach((ligne, index) => {
     const minimum = ligne.fermee ? 3 : 2;
     if (ligne.noms.length > 0 && ligne.noms.length < minimum) {
       problemes.push(`la ligne de rupture ${index + 1} doit avoir au moins ${minimum} points${ligne.fermee ? ' (ligne fermée)' : ''}`);
@@ -131,11 +99,9 @@ export function verifierStock(stock, nomsExistants) {
     signalerDoublons(ligne.noms, `ligne de rupture ${index + 1}`, problemes);
   });
 
-  const tous = [...stock.contour, ...pointsDeBase(stock), ...stock.lignesRupture.flatMap((ligne) => ligne.noms), ...stock.pointsDessus];
+  const tous = [...surface.contour, ...surface.lignesRupture.flatMap((ligne) => ligne.noms), ...(surface.tousLesPoints ? [] : surface.points)];
   const introuvables = [...new Set(tous.filter((nom) => !existe.has(nom)))];
-  if (introuvables.length > 0) {
-    problemes.push(`point(s) absent(s) du fichier importé : ${introuvables.join(', ')}`);
-  }
+  if (introuvables.length > 0) problemes.push(`point(s) absent(s) du levé : ${introuvables.join(', ')}`);
 
   return problemes;
 }

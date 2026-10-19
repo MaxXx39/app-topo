@@ -6,10 +6,13 @@ import { ECHELLES } from './echelle.js';
 import { ecrireLandXML } from '../topo/landxml.js';
 import { plageAltitudes, equidistanceAuto } from '../topo/courbes.js';
 import { bulle } from '../aide/bulles.js';
+import { PALIERS } from '../plan/ecarts.js';
 
 const CALQUES = [
   ['triangles', 'Triangles', true],
   ['noms', 'Noms des points', true],
+  ['ecarts', 'Remblai (rouge) / déblai (jaune)', true],
+  ['photos', 'Photos des surfaces (feuilles à part)', true],
   ['courbes', 'Courbes de niveau', false],
   ['couleurs', 'Couleurs selon l\'altitude', false],
   ['photo', 'Photo aérienne (swisstopo)', false],
@@ -18,7 +21,7 @@ const CALQUES = [
 
 /**
  * Crée le formulaire d'export dans "conteneur".
- * - obtenirDonnees() : { nomProjet, stocks, resultats, points, fichierPoints, surfaces, comparaisons, cartouche }
+ * - obtenirDonnees() : { nomProjet, stocks, resultats, points, fichierPoints, surfaces, comparaisons, photos, cartouche }
  *   surfaces : [{ nom, triangles }] ; comparaisons : [{ nom, resultat }] ; cartouche : objet modifiable du projet
  * - quandChange() : appelé quand le cartouche change (pour enregistrer le projet)
  * Renvoie { rafraichir() } pour recharger les champs quand on change de projet.
@@ -43,6 +46,11 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
       <summary>Calques du PDF</summary>
       <div class="liste-calques-pdf">
         ${CALQUES.map(([cle, titre, coche]) => `<label class="case"><input type="checkbox" data-calque="${cle}" ${coche ? 'checked' : ''} /> ${titre}</label>`).join('')}
+        <label class="choix-equidistance">Palier remblai / déblai
+          <select data-champ="palier">
+            ${PALIERS.map((e) => `<option value="${e}">${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
+          </select>
+        </label>
       </div>
     </details>
     <div class="ligne-outils">
@@ -55,6 +63,13 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
   `;
   const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`);
   const message = conteneur.querySelector('[data-zone="message"]');
+
+  // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre : un seul à la fois.
+  conteneur.addEventListener('change', (evenement) => {
+    const exclusifs = { ecarts: 'couleurs', couleurs: 'ecarts' };
+    const autre = exclusifs[evenement.target.dataset.calque];
+    if (autre && evenement.target.checked) conteneur.querySelector(`[data-calque="${autre}"]`).checked = false;
+  });
 
   // L'affaire et le dessinateur sont rangés dans le projet.
   for (const nom of ['affaire', 'dessinePar']) {
@@ -89,7 +104,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
     landxml: () => {
       const { nomProjet, stocks, resultats, surfaces } = obtenirDonnees();
       const liste = [
-        ...stocks.map((stock, i) => ({ nom: `${stock.nom} (dessus)`, triangles: resultats[i]?.trianglesDessus ?? [] })),
+        ...stocks.map((stock, i) => ({ nom: stock.nom, triangles: resultats[i]?.trianglesDessus ?? [] })),
         ...surfaces,
       ].filter((s) => s.triangles.length > 0);
       if (liste.length === 0) {
@@ -100,7 +115,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
       message.textContent = `LandXML téléchargé (${liste.length} surface(s)).`;
     },
     pdf: async () => {
-      const { stocks, resultats, points, fichierPoints, comparaisons } = obtenirDonnees();
+      const { stocks, resultats, points, fichierPoints, comparaisons, photos } = obtenirDonnees();
       if (!verifier(resultats, comparaisons)) return;
       message.textContent = 'Préparation du PDF…';
       try {
@@ -110,11 +125,13 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
         const calques = Object.fromEntries(
           [...conteneur.querySelectorAll('[data-calque]')].map((caseACocher) => [caseACocher.dataset.calque, caseACocher.checked]),
         );
+        calques.palier = champ('palier').value;
         const { document, echelle, messageFond } = await creerPdf({
           stocks,
           resultats,
           points,
           comparaisons,
+          photos,
           calques,
           cartouche: {
             affaire: champ('affaire').value.trim(),
@@ -139,7 +156,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
   /** Vérifie qu'il y a quelque chose à exporter, sinon affiche un message. */
   function verifier(resultats, comparaisons = []) {
     if (resultats.some((r) => !r.erreurs) || comparaisons.some(({ resultat }) => resultat && !resultat.erreurs)) return true;
-    message.textContent = 'Rien à exporter : complète d\'abord un stock ou une comparaison.';
+    message.textContent = 'Rien à exporter : choisis d\'abord la base d\'une surface (onglet 3. Volumes), ou crée une comparaison.';
     return false;
   }
 

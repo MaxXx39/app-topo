@@ -1,56 +1,35 @@
-// Écran de modification des stocks et des surfaces : choisir les points de chaque rôle
-// (contour, surface de base, lignes de rupture, points du dessus / points de la surface).
+// Onglet 2. Surfaces : créer et modifier les surfaces (stock, terrassement, terrain...).
+// Pour une surface créée à partir d'un levé, on choisit les points de chaque rôle :
+// contour, lignes de rupture, points de la surface ; puis on peut supprimer des triangles au doigt.
 // Trois façons de choisir les points : taper une liste de noms,
 // cocher des cases, ou toucher les points sur le plan.
-//
-// Le même écran sert pour deux "genres" d'objets :
-// - 'stock'   : contour, base (mode A ou B), lignes de rupture, points du dessus
-// - 'surface' : points (tous ou une liste), lignes de rupture, contour optionnel,
-//               et suppression de triangles au doigt
-import {
-  creerStock,
-  creerLigne,
-  detecterSeries,
-  pointsDeBase,
-  lireListeDeNoms,
-  ecrireListeDeNoms,
-  verifierStock,
-} from '../topo/stocks.js';
-import { creerSurface } from '../topo/surface.js';
+// Une surface importée (LandXML, DXF) ne se modifie pas : on peut la renommer ou la supprimer.
+import { creerLigne, detecterSeries, lireListeDeNoms, ecrireListeDeNoms, verifierSurface } from '../topo/noms.js';
+import { creerSurface, estImportee } from '../topo/surface.js';
 import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
 
 const TEXTES = {
-  stock: {
-    nouveau: '+ Nouveau stock',
-    nomParDefaut: (n) => `Stock ${n}`,
-    supprimer: 'Supprimer ce stock',
-    choix: 'Stock affiché',
-    roles: { contour: 'Contour', base: 'Surface de base', ligne: 'Ligne de rupture', dessus: 'Points du dessus' },
-  },
-  surface: {
-    nouveau: '+ Nouvelle surface',
-    nomParDefaut: (n) => `Surface ${n}`,
-    supprimer: 'Supprimer cette surface',
-    choix: 'Surface affichée',
-    roles: { contour: 'Contour (optionnel)', ligne: 'Ligne de rupture', dessus: 'Points de la surface' },
-  },
+  nouveau: '+ Nouvelle surface',
+  nomParDefaut: (n) => `Surface ${n}`,
+  supprimer: 'Supprimer cette surface',
+  choix: 'Surface affichée',
+  roles: { contour: 'Contour', ligne: 'Ligne de rupture', dessus: 'Points de la surface' },
 };
 
 /**
  * Crée l'écran dans "conteneur" ("barre" : barre du bas pendant une modification).
  * Options :
- * - genre : 'stock' ou 'surface'
  * - obtenirPoints(objet) : points utilisables pour cet objet (son levé)
  * - quandChange() : appelé après chaque modification
- * - allerAuPlan() : affiche l'onglet du plan (sur téléphone)
- * - obtenirSurfaces() : surfaces du projet [{ id, nom }] (bases possibles du mode B, genre stock)
- * - decrire(objet) : HTML d'état sous l'objet (genre surface : nombre de triangles, erreurs...)
+ * - decrire(objet) : HTML d'état sous la surface (nombre de triangles, erreurs...)
+ * - etiquette(objet) : texte de la surface dans la liste déroulante (nom et levé)
+ * - ajouterPhotos(surface, fichiers) : prépare et range les photos choisies (voir photos/photo.js)
  * - leveActifId() : levé utilisé pour une nouvelle surface
  */
-export function creerEditeurStocks(conteneur, barre, options) {
-  const { genre = 'stock', obtenirPoints, quandChange, allerAuPlan, obtenirSurfaces, decrire, leveActifId } = options;
-  const textes = TEXTES[genre];
+export function creerEditeurSurfaces(conteneur, barre, options) {
+  const { obtenirPoints, quandChange, decrire, leveActifId, etiquette, ajouterPhotos } = options;
+  const textes = TEXTES;
   const etat = {
     objets: [],
     indexActif: -1,
@@ -72,19 +51,16 @@ export function creerEditeurStocks(conteneur, barre, options) {
 
   function listeDuRole(objet, edition) {
     if (edition.role === 'contour') return objet.contour;
-    if (edition.role === 'base') return objet.base;
     if (edition.role === 'ligne') return objet.lignesRupture[edition.index].noms;
-    return genre === 'surface' ? objet.points : objet.pointsDessus;
+    return objet.points;
   }
 
   function remplacerListe(noms) {
     const objet = objetActif();
     const { role, index } = etat.edition;
     if (role === 'contour') objet.contour = noms;
-    else if (role === 'base') objet.base = noms;
     else if (role === 'ligne') objet.lignesRupture[index].noms = noms;
-    else if (genre === 'surface') objet.points = noms;
-    else objet.pointsDessus = noms;
+    else objet.points = noms;
   }
 
   function nomRole(edition) {
@@ -117,9 +93,10 @@ export function creerEditeurStocks(conteneur, barre, options) {
   const actions = {
     nouveau: () => {
       const nom = textes.nomParDefaut(etat.objets.length + 1);
-      etat.objets.push(genre === 'surface' ? creerSurface(nom, leveActifId()) : creerStock(nom));
+      etat.objets.push(creerSurface(nom, leveActifId()));
       etat.indexActif = etat.objets.length - 1;
-      etat.edition = genre === 'stock' ? { role: 'contour' } : null;
+      // On commence par le contour : c'est lui qui délimite le stock ou le terrassement.
+      etat.edition = { role: 'contour' };
       etat.suppression = false;
     },
     supprimer: () => {
@@ -135,7 +112,6 @@ export function creerEditeurStocks(conteneur, barre, options) {
       etat.suppression = false;
       etat.messages = [];
     },
-    'aller-au-plan': () => allerAuPlan?.(),
     termine: () => {
       etat.edition = null;
       etat.suppression = false;
@@ -188,10 +164,14 @@ export function creerEditeurStocks(conteneur, barre, options) {
     'mode-suppression': () => {
       etat.suppression = !etat.suppression;
       etat.edition = null;
-      if (etat.suppression) allerAuPlan?.();
     },
     'retablir-triangles': () => {
       objetActif().trianglesSupprimes = [];
+    },
+    'supprimer-photo': (bouton) => {
+      const surface = objetActif();
+      if (!confirm('Supprimer cette photo ?')) return;
+      surface.photos = surface.photos.filter((photo) => photo.id !== bouton.dataset.id);
     },
   };
 
@@ -216,17 +196,15 @@ export function creerEditeurStocks(conteneur, barre, options) {
       objet.nom = cible.value.trim() || objet.nom;
     } else if (cible.dataset.champ === 'ligne-fermee') {
       objet.lignesRupture[Number(cible.dataset.index)].fermee = cible.checked;
-    } else if (cible.dataset.champ === 'mode-base') {
-      objet.modeBase = cible.value;
-      if (etat.edition?.role === 'base') etat.edition = null;
-    } else if (cible.dataset.champ === 'surface-base') {
-      objet.surfaceBaseId = cible.value || null;
-    } else if (cible.dataset.champ === 'base-egale-contour') {
-      objet.baseEgaleContour = cible.checked;
-      etat.edition = cible.checked ? null : { role: 'base', index: 0 };
     } else if (cible.dataset.champ === 'tous-les-points') {
       objet.tousLesPoints = cible.checked;
       etat.edition = cible.checked ? null : { role: 'dessus', index: 0 };
+    } else if (cible.dataset.champ === 'legende-photo') {
+      const photo = objet.photos.find((p) => p.id === cible.dataset.id);
+      if (photo) photo.legende = cible.value.trim();
+    } else if (cible.dataset.champ === 'fichier-photo') {
+      if (cible.files.length > 0) ajouterPhotos?.(objet, [...cible.files]);
+      return;
     } else if (cible.dataset.case) {
       basculerPoint(cible.dataset.case);
       return;
@@ -263,7 +241,7 @@ export function creerEditeurStocks(conteneur, barre, options) {
         ${
           etat.objets.length > 0
             ? `<select data-champ="choix" aria-label="${textes.choix}">
-                ${etat.objets.map((o, i) => `<option value="${i}" ${i === etat.indexActif ? 'selected' : ''}>${echapper(o.nom)}</option>`).join('')}
+                ${etat.objets.map((o, i) => `<option value="${i}" ${i === etat.indexActif ? 'selected' : ''}>${echapper(etiquette?.(o) ?? o.nom)}</option>`).join('')}
               </select>`
             : ''
         }
@@ -276,60 +254,27 @@ export function creerEditeurStocks(conteneur, barre, options) {
           <label>Nom : <input type="text" data-champ="nom" value="${echapper(objet.nom)}" /></label>
           <button type="button" class="bouton-secondaire" data-action="supprimer">${textes.supprimer}</button>
         </div>
-        ${genre === 'stock' ? contenuStock(objet) : contenuSurface(objet)}`;
+        ${contenuSurface(objet)}`;
     }
 
     conteneur.innerHTML = html;
     afficherBarre();
   }
 
-  /** Cartes d'un stock : contour, base, lignes de rupture, points du dessus, vérification. */
-  function contenuStock(stock) {
-    const problemes = verifierStock(stock, pointsDe(stock).map((p) => p.nom));
-    const modeB = stock.modeBase === 'surface' || stock.modeBase === 'landxml';
-    const surfaces = obtenirSurfaces?.() ?? [];
-    return `
-      ${carteRole(stock, { role: 'contour' }, 'contour')}
-      <div class="carte-role">
-        <div class="titre-role"><strong>${textes.roles.base} ${bulle('base')}</strong></div>
-        <div class="choix-mode">
-          <label class="case"><input type="radio" name="mode-base" data-champ="mode-base" value="mesuree" ${!modeB ? 'checked' : ''} /> Mode A : points du pied</label>
-          <label class="case"><input type="radio" name="mode-base" data-champ="mode-base" value="surface" ${modeB ? 'checked' : ''} /> Mode B : une surface du projet</label>
-        </div>
-        ${
-          modeB
-            ? surfaces.length > 0
-              ? `<select data-champ="surface-base" aria-label="Surface de base">
-                  <option value="">— choisir —</option>
-                  ${surfaces.map((s) => `<option value="${s.id}" ${s.id === stock.surfaceBaseId ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}
-                </select>`
-              : '<p class="aide">Aucune surface : importe un LandXML (onglet 1. Importer) ou crée-en une (onglet Comparer).</p>'
-            : `<label class="case"><input type="checkbox" data-champ="base-egale-contour" ${stock.baseEgaleContour ? 'checked' : ''} /> mêmes points que le contour</label>
-              ${stock.baseEgaleContour ? '' : contenuRole(stock, { role: 'base' })}`
-        }
-      </div>
-      ${cartesLignes(stock)}
-      ${carteRole(stock, { role: 'dessus' }, 'dessus')}
-      ${
-        problemes.length > 0
-          ? `<div class="avertissement"><p><strong>À compléter :</strong></p><ul>${problemes.map((p) => `<li>${echapper(p)}</li>`).join('')}</ul></div>`
-          : '<p class="ok">✓ Stock complet : volume dans l\'onglet 3. Volumes.</p>'
-      }`;
-  }
-
-  /** Cartes d'une surface : points, lignes de rupture, contour, triangles supprimés, état. */
+  /** Cartes d'une surface : contour, lignes de rupture, points, triangles supprimés, état. */
   function contenuSurface(surface) {
-    if (surface.type === 'landxml') {
-      return `<p class="aide">Surface importée du fichier « ${echapper(surface.nomFichier)} ».</p>${decrire?.(surface) ?? ''}`;
+    if (estImportee(surface)) {
+      return `<p class="aide">Surface importée du fichier « ${echapper(surface.nomFichier)} » (${surface.type === 'dxf' ? 'DXF' : 'LandXML'}).</p>${decrire?.(surface) ?? ''}${cartePhotos(surface)}`;
     }
+    const problemes = verifierSurface(surface, pointsDe(surface).map((p) => p.nom));
     return `
+      ${carteRole(surface, { role: 'contour' }, 'contour')}
+      ${cartesLignes(surface)}
       <div class="carte-role ${estEnEdition({ role: 'dessus' }) ? 'en-edition' : ''}">
         <div class="titre-role"><strong>${textes.roles.dessus} ${bulle('pointsSurface')}</strong></div>
-        <label class="case"><input type="checkbox" data-champ="tous-les-points" ${surface.tousLesPoints ? 'checked' : ''} /> tous les points du levé</label>
+        <label class="case"><input type="checkbox" data-champ="tous-les-points" ${surface.tousLesPoints ? 'checked' : ''} /> tous les points du levé${surface.contour.length >= 3 ? ' (dans le contour)' : ''}</label>
         ${surface.tousLesPoints ? '' : contenuRole(surface, { role: 'dessus' })}
       </div>
-      ${cartesLignes(surface)}
-      ${carteRole(surface, { role: 'contour' }, 'contourSurface')}
       <div class="carte-role ${etat.suppression ? 'en-edition' : ''}">
         <div class="titre-role"><strong>Triangles en trop ${bulle('trianglesEnTrop')}</strong></div>
         <p>${surface.trianglesSupprimes.length} triangle(s) supprimé(s).</p>
@@ -338,7 +283,38 @@ export function creerEditeurStocks(conteneur, barre, options) {
           <button type="button" class="bouton-secondaire" data-action="retablir-triangles" ${surface.trianglesSupprimes.length === 0 ? 'disabled' : ''}>Tout rétablir</button>
         </div>
       </div>
-      ${decrire?.(surface) ?? ''}`;
+      ${
+        problemes.length > 0
+          ? `<div class="avertissement"><p><strong>À compléter :</strong></p><ul>${problemes.map((p) => `<li>${echapper(p)}</li>`).join('')}</ul></div>`
+          : ''
+      }
+      ${decrire?.(surface) ?? ''}
+      ${cartePhotos(surface)}`;
+  }
+
+  /** Photos de la surface (pour le compte rendu PDF) : miniatures, légendes, ajout. */
+  function cartePhotos(surface) {
+    const photos = surface.photos ?? [];
+    return `
+      <div class="carte-role">
+        <div class="titre-role"><strong>Photos ${bulle('photos')}</strong><span class="aide">${photos.length}</span></div>
+        <div class="liste-photos">
+          ${photos
+            .map(
+              (photo) => `
+            <figure class="photo">
+              <img src="${photo.miniature}" alt="${echapper(photo.legende || surface.nom)}" />
+              <input type="text" data-champ="legende-photo" data-id="${photo.id}" value="${echapper(photo.legende)}" placeholder="Légende" aria-label="Légende de la photo" />
+              <button type="button" class="bouton-lien" data-action="supprimer-photo" data-id="${photo.id}">supprimer</button>
+            </figure>`,
+            )
+            .join('')}
+        </div>
+        <label class="bouton-secondaire">
+          + Ajouter une photo
+          <input type="file" data-champ="fichier-photo" accept="image/*" multiple hidden />
+        </label>
+      </div>`;
   }
 
   function cartesLignes(objet) {
@@ -374,7 +350,7 @@ export function creerEditeurStocks(conteneur, barre, options) {
 
     const points = pointsDe(objet);
     const series = detecterSeries(points.map((p) => p.nom));
-    const nomsUtilises = new Set(etat.objets.flatMap(nomsDeLObjet));
+    const nomsUtilises = new Set(etat.objets.filter((o) => o.leveId === objet.leveId).flatMap(nomsDeLObjet));
     return `
       <p class="titre-choix">Choisir les points ${bulle('choisirPoints')}</p>
       ${
@@ -403,7 +379,6 @@ export function creerEditeurStocks(conteneur, barre, options) {
         </span>
       </label>
       ${etat.messages.length > 0 ? `<div class="erreur"><ul>${etat.messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}
-      <button type="button" class="bouton-secondaire seulement-telephone" data-action="aller-au-plan">Toucher les points sur le plan</button>
       <details data-zone="cases" ${etat.listeCasesOuverte ? 'open' : ''}>
         <summary>Ou cocher dans la liste des points</summary>
         <div class="liste-cases">
@@ -465,7 +440,7 @@ export function creerEditeurStocks(conteneur, barre, options) {
     /** À appeler quand les données changent ailleurs (import, autre onglet). */
     rafraichir: afficher,
     /**
-     * Remplace la liste d'objets modifiée (par exemple les stocks d'un autre levé).
+     * Remplace la liste des surfaces (par exemple à l'ouverture d'un autre projet).
      * garderPosition : après « Annuler », on reste sur le même objet et la même modification si possible.
      */
     charger(objets, { garderPosition = false } = {}) {
@@ -499,7 +474,6 @@ export function creerEditeurStocks(conteneur, barre, options) {
       return {
         stocks: etat.objets,
         stockActif: objet,
-        pointsDeBase: objet && genre === 'stock' ? pointsDeBase(objet) : [],
         listeEnCours: objet && etat.edition ? listeDuRole(objet, etat.edition) : [],
         enEdition: Boolean(objet && etat.edition),
       };
@@ -515,13 +489,11 @@ export function creerEditeurStocks(conteneur, barre, options) {
   };
 }
 
-/** Tous les noms utilisés dans un stock ou une surface, quel que soit leur rôle. */
+/** Tous les noms utilisés dans une surface, quel que soit leur rôle. */
 function nomsDeLObjet(objet) {
   return [
     ...(objet.contour ?? []),
-    ...(objet.base ?? []),
     ...(objet.lignesRupture ?? []).flatMap((ligne) => ligne.noms),
-    ...(objet.pointsDessus ?? []),
     ...(objet.points ?? []).filter((p) => typeof p === 'string'),
   ];
 }

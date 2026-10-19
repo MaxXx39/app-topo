@@ -54,7 +54,7 @@ export function creerEcranProjet(conteneur, actions) {
                 <strong>${echapper(r.nom)}</strong>
                 <span class="aide">${new Date(r.modifieLe).toLocaleDateString('fr-CH')}</span>
               </div>
-              <p class="aide">${r.nombreLeves} levé(s) · ${r.nombreStocks} stock(s) · ${r.nombreSurfaces} surface(s)</p>
+              <p class="aide">${r.nombreLeves} levé(s) · ${r.nombreSurfaces} surface(s)</p>
               <div class="ligne-outils">
                 ${r.id === projet.id ? '<span class="ok">Ouvert</span>' : `<button type="button" class="bouton-secondaire" data-action="ouvrir" data-id="${r.id}">Ouvrir</button>`}
                 <button type="button" class="bouton-secondaire" data-action="dupliquer" data-id="${r.id}">Dupliquer</button>

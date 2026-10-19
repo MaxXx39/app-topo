@@ -1,4 +1,5 @@
-// Surfaces (modèles de terrain en triangles) créées à partir d'un fichier de points.
+// Surfaces (modèles de terrain en triangles) : stock, terrassement, terrain naturel...
+// Elles sont créées à partir des points d'un levé, ou importées (LandXML, DXF).
 //
 // Une surface "points" a la forme :
 // {
@@ -8,14 +9,15 @@
 //   contour: [...],               // optionnel : bord choisi (fermé automatiquement)
 //   lignesRupture: [{ noms, fermee }],
 //   trianglesSupprimes: [...],    // clés des triangles retirés à la main (voir cleTriangle)
+//   volume: { base, surfaceId },  // base du volume (onglet Volumes) : 'contour', 'surface' ou 'aucune'
 // }
-// Une surface "landxml" (importée) a la forme { id, nom, type: 'landxml', nomFichier, points, faces }
+// Une surface importée a la forme { id, nom, type: 'landxml' ou 'dxf', nomFichier, points, faces, volume }
 // où faces = liste de [i, j, k] (positions dans "points").
 //
 // Bord : sans contour, l'appli triangule tout (bord = enveloppe extérieure des points) ;
 // l'utilisateur retire ensuite les triangles en trop en les touchant sur le plan.
 import { trianglerAvecContraintes, segmentsDeLigne, pointDansPolygone, centre } from './volume.js';
-import { creerLigne } from './stocks.js';
+import { creerLigne } from './noms.js';
 
 /** Crée une surface vide à partir d'un levé. */
 export function creerSurface(nom, leveId) {
@@ -29,7 +31,13 @@ export function creerSurface(nom, leveId) {
     contour: [],
     lignesRupture: [creerLigne()],
     trianglesSupprimes: [],
+    volume: { base: 'contour', surfaceId: null },
   };
+}
+
+/** Vrai si la surface a été importée d'un fichier (LandXML, DXF) et non créée à partir de points. */
+export function estImportee(surface) {
+  return surface.type === 'landxml' || surface.type === 'dxf';
 }
 
 /**
@@ -51,8 +59,8 @@ export function cleTriangle(triangle) {
  * trianglesRetires : triangles supprimés à la main (pour les montrer et pouvoir les rétablir).
  */
 export function calculerSurface(surface, points) {
-  if (surface.type === 'landxml') {
-    return { triangles: trianglesLandXML(surface), trianglesRetires: [], avertissements: [] };
+  if (estImportee(surface)) {
+    return { triangles: trianglesImportes(surface), trianglesRetires: [], avertissements: [] };
   }
 
   const parNom = new Map(points.map((p) => [p.nom, p]));
@@ -106,21 +114,25 @@ export function calculerSurface(surface, points) {
   };
 }
 
-/** Prépare une surface LandXML lue (voir landxml.js) pour la ranger dans un projet. */
-export function surfaceDepuisLandXML(surfaceLue, nomFichier) {
+/**
+ * Prépare une surface lue dans un fichier (voir landxml.js et dxf-lecture.js) pour la ranger
+ * dans un projet. surfaceLue = { nom, points, triangles } ; type = 'landxml' ou 'dxf'.
+ */
+export function surfaceImportee(surfaceLue, nomFichier, type = 'landxml') {
   const index = new Map(surfaceLue.points.map((p, i) => [p, i]));
   return {
     id: nouvelIdentifiant(),
     nom: surfaceLue.nom,
-    type: 'landxml',
+    type,
     nomFichier,
     points: surfaceLue.points.map(({ nom, est, nord, altitude }) => ({ nom, est, nord, altitude })),
     faces: surfaceLue.triangles.map((t) => t.map((p) => index.get(p))),
+    volume: { base: 'aucune', surfaceId: null },
   };
 }
 
-/** Triangles d'une surface LandXML rangée dans le projet. */
-function trianglesLandXML(surface) {
+/** Triangles d'une surface importée rangée dans le projet. */
+function trianglesImportes(surface) {
   return surface.faces.map((face) => face.map((i) => surface.points[i]));
 }
 

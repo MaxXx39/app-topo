@@ -1,4 +1,6 @@
-// Export PDF : une feuille A4 paysage avec le plan à l'échelle, les volumes et un cartouche.
+// Export PDF : une feuille A4 paysage avec le plan à l'échelle, les volumes et un cartouche,
+// puis une feuille par comparaison de surfaces (remblai / déblai en couleurs),
+// puis les photos des surfaces (4 par feuille, avec leur légende).
 // Le plan est dessiné en traits (vectoriel) : il reste net à l'impression et au zoom.
 // Toutes les mesures sur la feuille sont en millimètres.
 import { jsPDF } from 'jspdf';
@@ -7,12 +9,15 @@ import { placerEtiquettes, pointInterieur } from '../plan/etiquettes.js';
 import { choisirEchelle, barreEchellePapier } from './echelle.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
 import { couleurRVB } from '../plan/couleurs.js';
+import { zonesRemblaiDeblai } from '../plan/ecarts.js';
 import { FONDS, niveauDeZoom, tuilesPourZone } from '../plan/fond.js';
 
 // Calques du plan imprimé, et leur état par défaut.
 export const CALQUES_PDF = {
   triangles: true,
   noms: true,
+  ecarts: true,
+  photos: true,
   courbes: false,
   couleurs: false,
   photo: false,
@@ -37,54 +42,118 @@ const COULEURS = {
 
 /**
  * Crée le document PDF.
- * - stocks, resultats : comme dans resultats.js (un résultat par stock)
+ * - stocks, resultats : les surfaces dont le volume est calculé, et leurs volumes (voir calculerVolumeSurface)
  * - points : tous les points importés
  * - cartouche : { affaire, date, dessinePar, fichierPoints }
  * - echelleImposee : dénominateur de l'échelle voulue (500 pour 1:500), ou null pour la choisir
  *   automatiquement (la plus détaillée qui fait tout tenir). Si le plan dépasse, il est coupé au cadre.
  * - calques : calques à imprimer (voir CALQUES_PDF)
  * - comparaisons : liste de { nom, resultat } ajoutée sous le tableau des volumes
+ * - photos : liste de { surface (nom), legende, date (ISO), image (JPEG), largeur, hauteur }
  * Renvoie (après chargement éventuel de la photo aérienne)
  * { document, echelle, messageFond } : document jsPDF, échelle utilisée, et un message si le fond n'a pas pu être mis.
  */
-export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [] }) {
+export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [], photos = [] }) {
   const choix = { ...CALQUES_PDF, ...calques };
+  // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre.
+  if (choix.ecarts) choix.couleurs = false;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   doc.setFont('helvetica', 'normal');
 
-  // Cadre général de la feuille
+  const calcules = stocks.map((stock, i) => ({ stock, resultat: resultats[i] })).filter(({ resultat }) => resultat && !resultat.erreurs);
+  const comparaisonsCalculees = comparaisons.filter(({ resultat }) => resultat && !resultat.erreurs && resultat.trianglesEcart?.length > 0);
+  const messages = [];
+  let echelle = null;
+
+  // Feuille des volumes (sauf s'il n'y a que des comparaisons)
+  if (calcules.length > 0 || comparaisonsCalculees.length === 0) {
+    dessinerCadres(doc);
+    const plan = await dessinerPlan(doc, calcules, points, echelleImposee, choix);
+    dessinerColonne(doc, calcules, { ...cartouche, echelle: plan.echelle }, { choix, relief: plan.relief, ecarts: plan.legendeEcarts, comparaisons });
+    echelle = plan.echelle;
+    if (plan.messageFond) messages.push(plan.messageFond);
+  }
+
+  // Une feuille par comparaison : volume ajouté (rouge) et enlevé (jaune)
+  for (const comparaison of comparaisonsCalculees) {
+    if (echelle !== null) doc.addPage('a4', 'landscape');
+    dessinerCadres(doc);
+    const page = await dessinerPageComparaison(doc, comparaison, cartouche, echelleImposee, choix);
+    echelle ??= page.echelle;
+    if (page.messageFond && !messages.includes(page.messageFond)) messages.push(page.messageFond);
+  }
+  // Photos des surfaces, 4 par feuille
+  if (choix.photos && photos.length > 0) {
+    for (let debut = 0; debut < photos.length; debut += PHOTOS_PAR_PAGE) {
+      doc.addPage('a4', 'landscape');
+      dessinerPagePhotos(doc, photos.slice(debut, debut + PHOTOS_PAR_PAGE), cartouche);
+    }
+  }
+  return { document: doc, echelle, messageFond: messages.join(' ; ') || null };
+}
+
+const PHOTOS_PAR_PAGE = 4;
+
+/** Feuille de photos : titre, puis 2 × 2 photos avec leur légende (surface, légende, date). */
+function dessinerPagePhotos(doc, photos, cartouche) {
+  trait(doc, COULEURS.texte, 0.4);
+  doc.rect(PAGE.marge, PAGE.marge, PAGE.largeur - 2 * PAGE.marge, PAGE.hauteur - 2 * PAGE.marge);
+  doc.setTextColor(...COULEURS.texte);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('Photos', 14, 17);
+  doc.setFillColor(...COULEURS.ambre);
+  doc.rect(14, 19, 24, 0.9, 'F');
+  // Rappel de l'affaire et de la date en haut à droite
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...COULEURS.gris);
+  const entete = [cartouche.affaire ? `Affaire ${cartouche.affaire}` : null, cartouche.date || null].filter(Boolean).join(' · ');
+  doc.text(entete, PAGE.largeur - 14, 17, { align: 'right' });
+
+  // Grille 2 × 2 : chaque photo garde ses proportions dans sa case.
+  const zone = { x: 14, y: 25, largeur: PAGE.largeur - 28, hauteur: PAGE.hauteur - 25 - 13 };
+  const ecart = 6;
+  const largeurCase = (zone.largeur - ecart) / 2;
+  const hauteurCase = (zone.hauteur - ecart) / 2;
+  const hauteurLegende = 7;
+  photos.forEach((photo, i) => {
+    const x = zone.x + (i % 2) * (largeurCase + ecart);
+    const y = zone.y + Math.floor(i / 2) * (hauteurCase + ecart);
+    const facteur = Math.min(largeurCase / photo.largeur, (hauteurCase - hauteurLegende) / photo.hauteur);
+    const l = photo.largeur * facteur;
+    const h = photo.hauteur * facteur;
+    doc.addImage(photo.image, 'JPEG', x + (largeurCase - l) / 2, y, l, h);
+    doc.setFontSize(8);
+    doc.setTextColor(...COULEURS.texte);
+    doc.setFont('helvetica', 'bold');
+    const titre = doc.splitTextToSize([photo.surface, photo.legende].filter(Boolean).join(' - '), largeurCase - 22)[0];
+    doc.text(titre, x + (largeurCase - l) / 2, y + h + 4.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...COULEURS.gris);
+    doc.text(dateSuisse(photo.date), x + (largeurCase + l) / 2, y + h + 4.5, { align: 'right' });
+  });
+}
+
+/** Date ISO -> « 20.05.2026 ». */
+function dateSuisse(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+}
+
+/** Cadre général de la feuille et cadre du plan. */
+function dessinerCadres(doc) {
   trait(doc, COULEURS.texte, 0.4);
   doc.rect(PAGE.marge, PAGE.marge, PAGE.largeur - 2 * PAGE.marge, PAGE.hauteur - 2 * PAGE.marge);
   doc.rect(CADRE_PLAN.x, CADRE_PLAN.y, CADRE_PLAN.largeur, CADRE_PLAN.hauteur);
-
-  const calcules = stocks.map((stock, i) => ({ stock, resultat: resultats[i] })).filter(({ resultat }) => resultat && !resultat.erreurs);
-  const { echelle, messageFond, relief } = await dessinerPlan(doc, calcules, points, echelleImposee, choix);
-  dessinerColonne(doc, calcules, { ...cartouche, echelle }, { choix, relief, comparaisons });
-  return { document: doc, echelle, messageFond };
 }
 
 /**
- * Dessine le plan dans son cadre, à l'échelle normalisée qui fait tout tenir (ou imposée).
- * Renvoie { echelle, messageFond, relief } (relief : plage d'altitudes et équidistance, pour la légende).
+ * Échelle et passage terrain (m) -> feuille (mm) pour faire tenir la zone dans le cadre du plan.
+ * zone = { estMin, estMax, nordMin, nordMax } (m). Le Nord est en haut de la feuille.
  */
-async function dessinerPlan(doc, calcules, points, echelleImposee, choix) {
-  const parNom = new Map(points.map((p) => [p.nom, p]));
-  // Points à montrer : ceux des stocks calculés (ou tous s'il n'y a aucun stock).
-  const noms = new Set(
-    calcules.flatMap(({ stock }) => [
-      ...stock.contour,
-      ...stock.base,
-      ...stock.lignesRupture.flatMap((l) => l.noms),
-      ...stock.pointsDessus,
-    ]),
-  );
-  const pointsMontres = noms.size > 0 ? [...noms].map((nom) => parNom.get(nom)).filter(Boolean) : points;
-  if (pointsMontres.length === 0) return { echelle: 500, messageFond: null, relief: null };
-
-  // Zone du terrain à dessiner, avec une marge de 10 mm autour sur le papier.
-  const ests = pointsMontres.map((p) => p.est);
-  const nords = pointsMontres.map((p) => p.nord);
-  const zone = { estMin: Math.min(...ests), estMax: Math.max(...ests), nordMin: Math.min(...nords), nordMax: Math.max(...nords) };
+function preparerProjection(zone, echelleImposee) {
   const echelle =
     echelleImposee ??
     choisirEchelle(
@@ -96,27 +165,146 @@ async function dessinerPlan(doc, calcules, points, echelleImposee, choix) {
   const mmParMetre = 1000 / echelle;
   const centre = { est: (zone.estMin + zone.estMax) / 2, nord: (zone.nordMin + zone.nordMax) / 2 };
   const milieuCadre = { x: CADRE_PLAN.x + CADRE_PLAN.largeur / 2, y: CADRE_PLAN.y + (CADRE_PLAN.hauteur - 10) / 2 };
-  // Passage terrain (m) -> feuille (mm). Le Nord est en haut de la feuille.
-  const versPapier = (p) => ({
-    x: milieuCadre.x + (p.est - centre.est) * mmParMetre,
-    y: milieuCadre.y - (p.nord - centre.nord) * mmParMetre,
-  });
-
-  // Fond swisstopo (photo aérienne, cadastre) : une image posée sous le dessin.
-  let messageFond = null;
-  if (choix.photo || choix.cadastre) {
-    const versTerrain = (x, y) => ({
+  return {
+    echelle,
+    mmParMetre,
+    versPapier: (p) => ({
+      x: milieuCadre.x + (p.est - centre.est) * mmParMetre,
+      y: milieuCadre.y - (p.nord - centre.nord) * mmParMetre,
+    }),
+    versTerrain: (x, y) => ({
       est: centre.est + (x - milieuCadre.x) / mmParMetre,
       nord: centre.nord - (y - milieuCadre.y) / mmParMetre,
-    });
-    messageFond = await dessinerFondPdf(doc, versTerrain, mmParMetre, choix);
-  }
+    }),
+  };
+}
 
+/** Remblai (rouge) et déblai (jaune) par paliers, sous le reste du dessin. Renvoie la légende, ou null. */
+function dessinerEcartsPdf(doc, trianglesEcart, versPapier, palier) {
+  if (trianglesEcart.length === 0) return null;
+  const { zones, legende } = zonesRemblaiDeblai(trianglesEcart, palier);
+  // Couleurs pleines (sans transparence) avec un contour de la même couleur : aucun trait
+  // ne se voit entre deux morceaux voisins.
+  for (const { couleur, polygone } of zones) {
+    doc.setFillColor(...couleur);
+    trait(doc, couleur, 0.05);
+    polygonePlein(doc, polygone.map(versPapier), 'FD');
+  }
+  return legende;
+}
+
+/** Fond swisstopo, puis découpe au cadre du plan. Renvoie le message du fond (ou null). */
+async function preparerCadrePlan(doc, projection, choix) {
+  let messageFond = null;
+  if (choix.photo || choix.cadastre) messageFond = await dessinerFondPdf(doc, projection.versTerrain, projection.mmParMetre, choix);
   // Tout ce qui sort du cadre du plan est coupé (utile si l'échelle imposée est trop grande).
   doc.saveGraphicsState();
   doc.rect(CADRE_PLAN.x, CADRE_PLAN.y, CADRE_PLAN.largeur, CADRE_PLAN.hauteur, null);
   doc.clip();
   doc.discardPath();
+  return messageFond;
+}
+
+/** Après le dessin du plan : fin de la découpe, barre d'échelle, Nord et mention des sources. */
+function terminerCadrePlan(doc, echelle, choix, messageFond) {
+  doc.restoreGraphicsState();
+  dessinerBarreEchelle(doc, echelle);
+  dessinerNord(doc);
+  if ((choix.photo || choix.cadastre) && !messageFond) {
+    // Mention obligatoire de la source du fond
+    doc.setFontSize(5.5);
+    doc.setTextColor(...COULEURS.texte);
+    const source = [choix.photo ? '© swisstopo' : null, choix.cadastre ? 'Cadastre © cantons' : null].filter(Boolean).join(' · ');
+    doc.text(source, CADRE_PLAN.x + CADRE_PLAN.largeur - 1.5, CADRE_PLAN.y + CADRE_PLAN.hauteur - 1.5, { align: 'right' });
+  }
+}
+
+/**
+ * Feuille d'une comparaison : plan du remblai / déblai (toujours en couleurs) et volumes.
+ * Renvoie { echelle, messageFond }.
+ */
+async function dessinerPageComparaison(doc, { nom, resultat }, cartouche, echelleImposee, choix) {
+  const sommets = resultat.trianglesEcart.flat();
+  const ests = sommets.map((p) => p.est);
+  const nords = sommets.map((p) => p.nord);
+  const projection = preparerProjection(
+    { estMin: Math.min(...ests), estMax: Math.max(...ests), nordMin: Math.min(...nords), nordMax: Math.max(...nords) },
+    echelleImposee,
+  );
+  const messageFond = await preparerCadrePlan(doc, projection, choix);
+  const legende = dessinerEcartsPdf(doc, resultat.trianglesEcart, projection.versPapier, choix.palier);
+  terminerCadrePlan(doc, projection.echelle, choix, messageFond);
+
+  // Colonne de droite : titre, volumes, légende, cartouche
+  const x = COLONNE.x;
+  let y = dessinerTitre(doc, 'Comparaison de surfaces');
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text(doc.splitTextToSize(nom, COLONNE.largeur)[0], x, y);
+  y += 6;
+  doc.setFontSize(7.5);
+  const lignes = [
+    ['Volume ajouté (remblai)', `${formaterNombre(resultat.remblai)} m³`, true],
+    ['Volume enlevé (déblai)', `${formaterNombre(resultat.deblai)} m³`, true],
+    ['Différence (ajouté - enlevé)', `${formaterNombre(resultat.remblai - resultat.deblai)} m³`, false],
+    ['Surface comparée', `${formaterNombre(resultat.surfacePlan)} m²`, false],
+  ];
+  for (const [titre, valeur, gras] of lignes) {
+    doc.setFont('helvetica', 'normal');
+    doc.text(titre, x, y);
+    doc.setFont('helvetica', gras ? 'bold' : 'normal');
+    doc.text(valeur, x + COLONNE.largeur - 1, y, { align: 'right' });
+    y += 4.6;
+  }
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...COULEURS.gris);
+  const remarques = [];
+  if (resultat.surfaceNonCouverte > 0) remarques.push(`${formaterNombre(resultat.surfaceNonCouverte)} m² non couverts par la surface « avant » (non comptés).`);
+  if (resultat.surfaceZone - resultat.surfacePlan > 0.01) {
+    remarques.push(`${formaterNombre(resultat.surfaceZone - resultat.surfacePlan)} m² de la zone non couverts par la surface « après » (non comptés).`);
+  }
+  y += 1;
+  for (const remarque of remarques) {
+    const texte = doc.splitTextToSize(remarque, COLONNE.largeur);
+    doc.text(texte, x, y);
+    y += texte.length * 2.8;
+  }
+  doc.setTextColor(...COULEURS.texte);
+  if (legende) dessinerLegendeEcarts(doc, x, y + 3, legende);
+  dessinerCartouche(doc, { ...cartouche, echelle: projection.echelle });
+  return { echelle: projection.echelle, messageFond };
+}
+
+/**
+ * Dessine le plan dans son cadre, à l'échelle normalisée qui fait tout tenir (ou imposée).
+ * Renvoie { echelle, messageFond, relief, legendeEcarts } (relief : plage d'altitudes et
+ * équidistance ; legendeEcarts : paliers remblai / déblai ; pour les légendes).
+ */
+async function dessinerPlan(doc, calcules, points, echelleImposee, choix) {
+  const parNom = new Map(points.map((p) => [p.nom, p]));
+  // Points à montrer : ceux du levé qui servent aux surfaces calculées (contour, lignes,
+  // sommets des triangles), ou tous s'il n'y a aucune surface.
+  const sommets = calcules.flatMap(({ resultat }) => resultat.trianglesDessus.flat());
+  const noms = new Set([
+    ...calcules.flatMap(({ stock }) => [...(stock.contour ?? []), ...(stock.lignesRupture ?? []).flatMap((l) => l.noms)]),
+    ...sommets.filter((p) => parNom.get(p.nom) === p).map((p) => p.nom),
+  ]);
+  const pointsMontres = noms.size > 0 ? [...noms].map((nom) => parNom.get(nom)).filter(Boolean) : points;
+  if (pointsMontres.length === 0 && sommets.length === 0) return { echelle: 500, messageFond: null, relief: null, legendeEcarts: null };
+
+  // Zone du terrain à dessiner : points montrés et triangles (une marge est laissée autour sur le papier).
+  const ests = [...pointsMontres, ...sommets].map((p) => p.est);
+  const nords = [...pointsMontres, ...sommets].map((p) => p.nord);
+  const zone = { estMin: Math.min(...ests), estMax: Math.max(...ests), nordMin: Math.min(...nords), nordMax: Math.max(...nords) };
+  const projection = preparerProjection(zone, echelleImposee);
+  const { echelle, versPapier } = projection;
+  const messageFond = await preparerCadrePlan(doc, projection, choix);
+
+  // Remblai (rouge) / déblai (jaune) par paliers : écart entre le dessus et la base de chaque stock
+  const legendeEcarts = choix.ecarts
+    ? dessinerEcartsPdf(doc, calcules.flatMap(({ resultat }) => resultat.trianglesEcart ?? []), versPapier, choix.palier)
+    : null;
 
   // Couleurs selon l'altitude et courbes de niveau (surface du dessus des stocks)
   const tousTriangles = calcules.flatMap(({ resultat }) => resultat.trianglesDessus);
@@ -163,9 +351,9 @@ async function dessinerPlan(doc, calcules, points, echelleImposee, choix) {
     if (fermee && sommets.length >= 3) doc.line(sommets.at(-1).x, sommets.at(-1).y, sommets[0].x, sommets[0].y);
   };
   trait(doc, COULEURS.ligne, 0.25);
-  for (const { stock } of calcules) for (const ligne of stock.lignesRupture) polyligne(ligne.noms, ligne.fermee);
+  for (const { stock } of calcules) for (const ligne of stock.lignesRupture ?? []) polyligne(ligne.noms, ligne.fermee);
   trait(doc, COULEURS.contour, 0.35);
-  for (const { stock } of calcules) polyligne(stock.contour, true);
+  for (const { stock } of calcules) polyligne(stock.contour ?? [], true);
 
   // Points et noms (placés sans chevauchement, comme sur l'écran)
   doc.setFillColor(...COULEURS.texte);
@@ -207,18 +395,8 @@ async function dessinerPlan(doc, calcules, points, echelleImposee, choix) {
     });
     doc.setFont('helvetica', 'normal');
   }
-  doc.restoreGraphicsState();
-
-  dessinerBarreEchelle(doc, echelle);
-  dessinerNord(doc);
-  if ((choix.photo || choix.cadastre) && !messageFond) {
-    // Mention obligatoire de la source du fond
-    doc.setFontSize(5.5);
-    doc.setTextColor(...COULEURS.texte);
-    const source = [choix.photo ? '© swisstopo' : null, choix.cadastre ? 'Cadastre © cantons' : null].filter(Boolean).join(' · ');
-    doc.text(source, CADRE_PLAN.x + CADRE_PLAN.largeur - 1.5, CADRE_PLAN.y + CADRE_PLAN.hauteur - 1.5, { align: 'right' });
-  }
-  return { echelle, messageFond, relief };
+  terminerCadrePlan(doc, echelle, choix, messageFond);
+  return { echelle, messageFond, relief, legendeEcarts };
 }
 
 /**
@@ -274,14 +452,14 @@ function chargerImage(adresse) {
   });
 }
 
-/** Polygone rempli (sans contour), sommets en mm sur la feuille. */
-function polygonePlein(doc, sommets) {
+/** Polygone rempli (style 'F' : sans contour, 'FD' : avec contour), sommets en mm sur la feuille. */
+function polygonePlein(doc, sommets, style = 'F') {
   const [premier, ...suivants] = sommets;
   const ecarts = suivants.map((p, i) => {
     const precedent = i === 0 ? premier : suivants[i - 1];
     return [p.x - precedent.x, p.y - precedent.y];
   });
-  doc.lines(ecarts, premier.x, premier.y, [1, 1], 'F', true);
+  doc.lines(ecarts, premier.x, premier.y, [1, 1], style, true);
 }
 
 /** Barre d'échelle en bas à gauche du plan : 4 cases noires et blanches, et l'échelle écrite. */
@@ -316,22 +494,60 @@ function dessinerNord(doc) {
   doc.setFont('helvetica', 'normal');
 }
 
-/** Colonne de droite : titre, tableau des volumes, remarques et cartouche. */
-function dessinerColonne(doc, calcules, cartouche, { choix, relief, comparaisons }) {
-  const x = COLONNE.x;
-  let y = 17;
+/** Titre de la colonne de droite, souligné en ambre. Renvoie la position (mm) de la ligne suivante. */
+function dessinerTitre(doc, titre) {
+  const y = 17;
   doc.setTextColor(...COULEURS.texte);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text('Volumes de stocks', x, y);
+  doc.text(titre, COLONNE.x, y);
   doc.setFillColor(...COULEURS.ambre);
-  doc.rect(x, y + 2, 24, 0.9, 'F');
+  doc.rect(COLONNE.x, y + 2, 24, 0.9, 'F');
+  return y + 9;
+}
 
-  // Tableau : Stock | Mode | Surface | Remblai | Déblai
-  y += 9;
+/**
+ * Légende remblai / déblai : une rangée de cases par côté, avec la valeur de chaque palier.
+ * Renvoie la position (mm) de la ligne suivante.
+ */
+function dessinerLegendeEcarts(doc, x, y, legende) {
+  const largeur = COLONNE.largeur - 8;
+  for (const [titre, classes] of [['Remblai', legende.remblai], ['Déblai', legende.deblai]]) {
+    if (classes.length === 0) continue;
+    doc.setFontSize(6.5);
+    doc.setTextColor(...COULEURS.texte);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${titre} (épaisseur en m, palier ${legende.palier} m)`, x, y);
+    doc.setFont('helvetica', 'normal');
+    y += 1.5;
+    const pas = largeur / classes.length;
+    classes.forEach((classe, i) => {
+      doc.setFillColor(...classe.couleur);
+      doc.rect(x + i * pas, y, pas, 3, 'F');
+    });
+    // Valeur de chaque limite de palier (une sur deux s'il y a beaucoup de paliers)
+    doc.setFontSize(5.5);
+    const saut = pas < 5 ? 2 : 1;
+    const limites = [0, ...classes.map((c) => c.a)];
+    limites.forEach((valeur, i) => {
+      if (i % saut !== 0 && i !== limites.length - 1) return;
+      const ancre = i === 0 ? 'left' : i === limites.length - 1 ? 'right' : 'center';
+      doc.text(String(Math.round(valeur * 1000) / 1000), x + i * pas, y + 5.5, { align: ancre });
+    });
+    y += 9;
+  }
+  return y;
+}
+
+/** Colonne de droite : titre, tableau des volumes, remarques, légendes et cartouche. */
+function dessinerColonne(doc, calcules, cartouche, { choix, relief, ecarts, comparaisons }) {
+  const x = COLONNE.x;
+  let y = dessinerTitre(doc, 'Volumes');
+
+  // Tableau : Nom | Base | Surface | Remblai | Déblai
   const colonnes = [
-    { titre: 'Stock', largeur: 21, aligne: 'left' },
-    { titre: 'Mode', largeur: 8, aligne: 'left' },
+    { titre: 'Nom', largeur: 21, aligne: 'left' },
+    { titre: 'Base', largeur: 8, aligne: 'left' },
     { titre: 'Surface m²', largeur: 17, aligne: 'right' },
     { titre: 'Remblai m³', largeur: 17, aligne: 'right' },
     { titre: 'Déblai m³', largeur: 17, aligne: 'right' },
@@ -399,10 +615,10 @@ function dessinerColonne(doc, calcules, cartouche, { choix, relief, comparaisons
   doc.setFontSize(6.5);
   doc.setTextColor(...COULEURS.gris);
   const remarques = [
-    'Mode A : base = points du pied. Mode B : base = surface LandXML.',
+    'Base A : points du contour (le pied). Base B : une autre surface.',
     ...calcules
       .filter(({ resultat }) => resultat.mode === 'B')
-      .map(({ stock, resultat }) => `${stock.nom} : base LandXML « ${resultat.nomBase} ».`),
+      .map(({ stock, resultat }) => `${stock.nom} : base « ${resultat.nomBase} ».`),
     ...calcules
       .filter(({ resultat }) => resultat.surfaceNonCouverte > 0)
       .map(({ stock, resultat }) => `Attention ${stock.nom} : ${formaterNombre(resultat.surfaceNonCouverte)} m² non couverts par la base.`),
@@ -440,7 +656,14 @@ function dessinerColonne(doc, calcules, cartouche, { choix, relief, comparaisons
     doc.text(`${formaterNombre(relief.plage.max)} m`, x + largeur, y + 3, { align: 'right' });
     y += 7;
   }
+  if (ecarts) dessinerLegendeEcarts(doc, x, y + 1, ecarts);
 
+  dessinerCartouche(doc, cartouche);
+}
+
+/** Cartouche en bas à droite : affaire, date, dessiné par, échelle, coordonnées, fichier. */
+function dessinerCartouche(doc, cartouche) {
+  const x = COLONNE.x;
   // Cartouche en bas à droite
   const lignesCartouche = [
     ['Affaire', cartouche.affaire || '-'],

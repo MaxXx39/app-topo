@@ -1,22 +1,26 @@
-// Comparaisons de deux surfaces (deux levés) : formulaire et résultats.
+// Onglet 4. Comparer : comparaisons de deux surfaces (par exemple deux levés), formulaire et résultats.
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { nouvelIdentifiant } from '../topo/surface.js';
-import { bulle } from '../aide/bulles.js';
 
 /**
  * Crée la section des comparaisons dans "conteneur".
  * - obtenirProjet() : projet ouvert
- * - obtenirChoix() : surfaces comparables [{ ref, nom }] (surfaces du projet et dessus des stocks)
- * - obtenirZones() : zones possibles [{ zone, nom }] (toute la surface, ou contour d'un stock)
+ * - obtenirChoix() : surfaces comparables [{ ref, nom }] (toutes les surfaces du projet)
+ * - obtenirZones() : zones possibles [{ zone, nom }] (toute la surface, ou contour d'une surface)
  * - obtenirResultat(comparaison) : résultat calculé (voir topo/comparaison.js)
  * - quandChange() : après chaque modification
+ * - obtenirAffichee() : id de la comparaison coloriée sur le plan ; montrer(id) : la choisir
  */
-export function creerEcranComparaisons(conteneur, { obtenirProjet, obtenirChoix, obtenirZones, obtenirResultat, quandChange }) {
+export function creerEcranComparaisons(conteneur, { obtenirProjet, obtenirChoix, obtenirZones, obtenirResultat, quandChange, obtenirAffichee, montrer }) {
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
     const projet = obtenirProjet();
+    if (bouton.dataset.action === 'montrer') {
+      montrer(bouton.dataset.id);
+      return;
+    }
     if (bouton.dataset.action === 'ajouter-comparaison') {
       const choix = obtenirChoix();
       projet.comparaisons.push({
@@ -51,7 +55,6 @@ export function creerEcranComparaisons(conteneur, { obtenirProjet, obtenirChoix,
       const options = (valeur) =>
         choix.map((c) => `<option value="${echapper(c.ref)}" ${c.ref === valeur ? 'selected' : ''}>${echapper(c.nom)}</option>`).join('');
       conteneur.innerHTML = `
-        <h3>Comparer deux surfaces ${bulle('comparer')}</h3>
         ${projet.comparaisons
           .map((c) => {
             const r = obtenirResultat(c);
@@ -71,11 +74,18 @@ export function creerEcranComparaisons(conteneur, { obtenirProjet, obtenirChoix,
                 </label>
               </div>
               ${resumeResultat(r)}
+              ${
+                r && !r.erreurs
+                  ? c.id === obtenirAffichee()
+                    ? '<p class="ok">✓ Remblai / déblai affiché sur le plan</p>'
+                    : `<button type="button" class="bouton-secondaire" data-action="montrer" data-id="${c.id}">Voir sur le plan</button>`
+                  : ''
+              }
             </div>`;
           })
           .join('')}
         <button type="button" class="bouton-secondaire" data-action="ajouter-comparaison" ${choix.length < 2 ? 'disabled' : ''}>+ Nouvelle comparaison</button>
-        ${choix.length < 2 ? '<p class="aide">Il faut au moins deux surfaces (surfaces du projet ou stocks calculés).</p>' : ''}
+        ${choix.length < 2 ? '<p class="aide">Il faut au moins deux surfaces (onglet 2. Surfaces).</p>' : ''}
       `;
     },
   };

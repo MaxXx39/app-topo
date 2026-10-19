@@ -1,15 +1,9 @@
-// Tests des stocks : lecture des plages de noms et vérification des rôles.
+// Tests des listes de noms : lecture des plages, écriture courte, séries, vérification d'une surface.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { lirePoints } from '../src/topo/import-points.js';
-import {
-  creerStock,
-  lireListeDeNoms,
-  ecrireListeDeNoms,
-  verifierStock,
-  pointsDeBase,
-  detecterSeries,
-} from '../src/topo/stocks.js';
+import { lireListeDeNoms, ecrireListeDeNoms, verifierSurface, detecterSeries } from '../src/topo/noms.js';
+import { creerSurface } from '../src/topo/surface.js';
 
 const { points } = lirePoints(readFileSync(new URL('../exemples/stock_export.txt', import.meta.url), 'utf-8'));
 const noms = points.map((p) => p.nom);
@@ -62,35 +56,32 @@ describe('ecrireListeDeNoms', () => {
   });
 });
 
-describe('verifierStock', () => {
+describe('verifierSurface', () => {
   it('accepte le stock 2 de l\'exemple', () => {
-    const stock = creerStock('Stock 2');
-    stock.contour = lireListeDeNoms('b100 à b116', noms).noms;
-    stock.lignesRupture = [{ noms: lireListeDeNoms('h100 à h114', noms).noms, fermee: true }];
-    expect(verifierStock(stock, noms)).toEqual([]);
-    expect(pointsDeBase(stock)).toEqual(stock.contour);
+    const surface = creerSurface('Stock 2', 'leve');
+    surface.contour = lireListeDeNoms('b100 à b116', noms).noms;
+    surface.lignesRupture = [{ noms: lireListeDeNoms('h100 à h114', noms).noms, fermee: true }];
+    expect(verifierSurface(surface, noms)).toEqual([]);
   });
 
   it('signale un contour trop court, une ligne d\'un seul point et un doublon', () => {
-    const stock = creerStock('Essai');
-    stock.contour = ['b1', 'b2', 'b1'];
-    stock.lignesRupture = [{ noms: ['h1'], fermee: false }];
-    const problemes = verifierStock(stock, noms);
+    const surface = creerSurface('Essai', 'leve');
+    surface.contour = ['b1', 'b1'];
+    surface.lignesRupture = [{ noms: ['h1'], fermee: false }];
+    const problemes = verifierSurface(surface, noms);
+    expect(problemes.some((p) => p.includes('au moins 3 points (ou aucun)'))).toBe(true);
     expect(problemes.some((p) => p.includes('en double : b1'))).toBe(true);
     expect(problemes.some((p) => p.includes('ligne de rupture 1'))).toBe(true);
   });
 
-  it('signale une base vide quand elle n\'est pas égale au contour', () => {
-    const stock = creerStock('Essai');
-    stock.contour = ['b1', 'b2', 'b3'];
-    stock.baseEgaleContour = false;
-    expect(verifierStock(stock, noms)).toContain('la surface de base doit avoir au moins 3 points');
+  it('accepte une surface sans contour', () => {
+    expect(verifierSurface(creerSurface('Terrain', 'leve'), noms)).toEqual([]);
   });
 
-  it('signale les points absents du fichier', () => {
-    const stock = creerStock('Essai');
-    stock.contour = ['b1', 'b2', 'zz'];
-    expect(verifierStock(stock, noms).at(-1)).toContain('zz');
+  it('signale les points absents du levé', () => {
+    const surface = creerSurface('Essai', 'leve');
+    surface.contour = ['b1', 'b2', 'zz'];
+    expect(verifierSurface(surface, noms).at(-1)).toContain('zz');
   });
 });
 
@@ -115,11 +106,11 @@ describe('detecterSeries', () => {
   });
 });
 
-describe('verifierStock - ligne fermée', () => {
+describe('verifierSurface - ligne fermée', () => {
   it('demande 3 points pour une ligne fermée', () => {
-    const stock = creerStock('Essai');
-    stock.contour = ['b1', 'b2', 'b3'];
-    stock.lignesRupture = [{ noms: ['h1', 'h2'], fermee: true }];
-    expect(verifierStock(stock, noms)[0]).toContain('au moins 3 points (ligne fermée)');
+    const surface = creerSurface('Essai', 'leve');
+    surface.contour = ['b1', 'b2', 'b3'];
+    surface.lignesRupture = [{ noms: ['h1', 'h2'], fermee: true }];
+    expect(verifierSurface(surface, noms)[0]).toContain('au moins 3 points (ligne fermée)');
   });
 });
