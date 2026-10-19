@@ -13,6 +13,7 @@ import { comparerSurfaces } from './topo/comparaison.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
 import { creerEcranVolumes } from './volumes/ecran.js';
+import { preparerPhoto } from './photos/photo.js';
 import { creerEcranExport, telecharger } from './export/ecran.js';
 import { creerEcranProjet } from './projet/ecran.js';
 import { creerEcranImport } from './import/ecran.js';
@@ -278,6 +279,19 @@ const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces')
   leveActifId: () => leveActif(projet)?.id ?? null,
   decrire: decrireSurface,
   etiquette: etiquetteSurface,
+  ajouterPhotos: async (surface, fichiers) => {
+    afficherMessage('Préparation de la photo…');
+    const erreurs = [];
+    for (const fichier of fichiers) {
+      try {
+        surface.photos = [...(surface.photos ?? []), await preparerPhoto(fichier)];
+      } catch {
+        erreurs.push(fichier.name);
+      }
+    }
+    afficherMessage(erreurs.length > 0 ? `Photo illisible : ${erreurs.join(', ')}` : `${fichiers.length} photo(s) ajoutée(s)`);
+    modifie();
+  },
 });
 editeurSurfaces.charger(projet.surfaces);
 
@@ -366,6 +380,7 @@ const ecranExport = creerEcranExport(document.querySelector('#export'), {
         .map((s) => ({ nom: s.nom, triangles: trianglesDeSurface(s.id) }))
         .filter((s) => s.triangles.length > 0),
       comparaisons: projet.comparaisons.map((c, i) => ({ nom: c.nom, resultat: resultatsComparaisons[i] })),
+      photos: surfacesAffichees().flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom }))),
       cartouche: projet.cartouche,
     };
   },

@@ -134,6 +134,17 @@ describe('creerPdf - calques', async () => {
     expect(contenu).toContain(formaterNombre(resultat.remblai));
   });
 
+  it('ajoute les photos des surfaces sur une feuille à part (4 par feuille)', async () => {
+    // Petite image JPEG de 8 × 6 pixels (couleur ambre).
+    const image = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAGAAgDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwC/ARI6f//Z';
+    const photo = (i) => ({ surface: 'Stock 2', legende: `Vue ${i}`, date: '2026-05-20T08:00:00Z', image, largeur: 8, hauteur: 6 });
+    const { document } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, photos: [1, 2, 3, 4, 5].map(photo) });
+    expect(document.getNumberOfPages()).toBe(3); // volumes + 2 feuilles de photos
+    expect(document.output()).toContain('Stock 2 - Vue 5');
+    const sans = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, photos: [photo(1)], calques: { photos: false } });
+    expect(sans.document.getNumberOfPages()).toBe(1);
+  });
+
   it('crée le PDF sans le fond quand la photo est impossible (pas de navigateur)', async () => {
     const { messageFond } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, calques: { photo: true } });
     expect(messageFond).toBeTruthy();

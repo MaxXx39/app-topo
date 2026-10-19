@@ -12,6 +12,7 @@ const CALQUES = [
   ['triangles', 'Triangles', true],
   ['noms', 'Noms des points', true],
   ['ecarts', 'Remblai (rouge) / déblai (jaune)', true],
+  ['photos', 'Photos des surfaces (feuilles à part)', true],
   ['courbes', 'Courbes de niveau', false],
   ['couleurs', 'Couleurs selon l\'altitude', false],
   ['photo', 'Photo aérienne (swisstopo)', false],
@@ -20,7 +21,7 @@ const CALQUES = [
 
 /**
  * Crée le formulaire d'export dans "conteneur".
- * - obtenirDonnees() : { nomProjet, stocks, resultats, points, fichierPoints, surfaces, comparaisons, cartouche }
+ * - obtenirDonnees() : { nomProjet, stocks, resultats, points, fichierPoints, surfaces, comparaisons, photos, cartouche }
  *   surfaces : [{ nom, triangles }] ; comparaisons : [{ nom, resultat }] ; cartouche : objet modifiable du projet
  * - quandChange() : appelé quand le cartouche change (pour enregistrer le projet)
  * Renvoie { rafraichir() } pour recharger les champs quand on change de projet.
@@ -114,7 +115,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
       message.textContent = `LandXML téléchargé (${liste.length} surface(s)).`;
     },
     pdf: async () => {
-      const { stocks, resultats, points, fichierPoints, comparaisons } = obtenirDonnees();
+      const { stocks, resultats, points, fichierPoints, comparaisons, photos } = obtenirDonnees();
       if (!verifier(resultats, comparaisons)) return;
       message.textContent = 'Préparation du PDF…';
       try {
@@ -130,6 +131,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
           resultats,
           points,
           comparaisons,
+          photos,
           calques,
           cartouche: {
             affaire: champ('affaire').value.trim(),

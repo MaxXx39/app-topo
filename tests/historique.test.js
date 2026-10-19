@@ -65,4 +65,16 @@ describe('historique : annuler et rétablir', () => {
     expect(retablir(h).stocks).toEqual(['s1', 's2']);
     expect(annuler(h).stocks).toEqual(['s1']);
   });
+
+  it('garde les photos à part et les remet quand on annule', () => {
+    const h = creerHistorique();
+    const photo = { id: 'ph1', legende: '', image: 'data:image/jpeg;base64,GRANDE', miniature: 'data:image/jpeg;base64,PETITE' };
+    const avec = { id: 'p1', nom: 'A', surfaces: [{ id: 's', photos: [photo] }] };
+    reinitialiser(h, avec);
+    // Les étapes ne contiennent pas les images (l'historique reste léger).
+    expect(h.actuel).not.toContain('GRANDE');
+    memoriser(h, { ...avec, surfaces: [{ id: 's', photos: [] }] });
+    const revenu = annuler(h);
+    expect(revenu.surfaces[0].photos[0]).toEqual(photo);
+  });
 });

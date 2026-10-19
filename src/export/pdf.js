@@ -1,5 +1,6 @@
 // Export PDF : une feuille A4 paysage avec le plan à l'échelle, les volumes et un cartouche,
-// puis une feuille par comparaison de surfaces (remblai / déblai en couleurs).
+// puis une feuille par comparaison de surfaces (remblai / déblai en couleurs),
+// puis les photos des surfaces (4 par feuille, avec leur légende).
 // Le plan est dessiné en traits (vectoriel) : il reste net à l'impression et au zoom.
 // Toutes les mesures sur la feuille sont en millimètres.
 import { jsPDF } from 'jspdf';
@@ -16,6 +17,7 @@ export const CALQUES_PDF = {
   triangles: true,
   noms: true,
   ecarts: true,
+  photos: true,
   courbes: false,
   couleurs: false,
   photo: false,
@@ -47,10 +49,11 @@ const COULEURS = {
  *   automatiquement (la plus détaillée qui fait tout tenir). Si le plan dépasse, il est coupé au cadre.
  * - calques : calques à imprimer (voir CALQUES_PDF)
  * - comparaisons : liste de { nom, resultat } ajoutée sous le tableau des volumes
+ * - photos : liste de { surface (nom), legende, date (ISO), image (JPEG), largeur, hauteur }
  * Renvoie (après chargement éventuel de la photo aérienne)
  * { document, echelle, messageFond } : document jsPDF, échelle utilisée, et un message si le fond n'a pas pu être mis.
  */
-export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [] }) {
+export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [], photos = [] }) {
   const choix = { ...CALQUES_PDF, ...calques };
   // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre.
   if (choix.ecarts) choix.couleurs = false;
@@ -79,7 +82,64 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
     echelle ??= page.echelle;
     if (page.messageFond && !messages.includes(page.messageFond)) messages.push(page.messageFond);
   }
+  // Photos des surfaces, 4 par feuille
+  if (choix.photos && photos.length > 0) {
+    for (let debut = 0; debut < photos.length; debut += PHOTOS_PAR_PAGE) {
+      doc.addPage('a4', 'landscape');
+      dessinerPagePhotos(doc, photos.slice(debut, debut + PHOTOS_PAR_PAGE), cartouche);
+    }
+  }
   return { document: doc, echelle, messageFond: messages.join(' ; ') || null };
+}
+
+const PHOTOS_PAR_PAGE = 4;
+
+/** Feuille de photos : titre, puis 2 × 2 photos avec leur légende (surface, légende, date). */
+function dessinerPagePhotos(doc, photos, cartouche) {
+  trait(doc, COULEURS.texte, 0.4);
+  doc.rect(PAGE.marge, PAGE.marge, PAGE.largeur - 2 * PAGE.marge, PAGE.hauteur - 2 * PAGE.marge);
+  doc.setTextColor(...COULEURS.texte);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('Photos', 14, 17);
+  doc.setFillColor(...COULEURS.ambre);
+  doc.rect(14, 19, 24, 0.9, 'F');
+  // Rappel de l'affaire et de la date en haut à droite
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...COULEURS.gris);
+  const entete = [cartouche.affaire ? `Affaire ${cartouche.affaire}` : null, cartouche.date || null].filter(Boolean).join(' · ');
+  doc.text(entete, PAGE.largeur - 14, 17, { align: 'right' });
+
+  // Grille 2 × 2 : chaque photo garde ses proportions dans sa case.
+  const zone = { x: 14, y: 25, largeur: PAGE.largeur - 28, hauteur: PAGE.hauteur - 25 - 13 };
+  const ecart = 6;
+  const largeurCase = (zone.largeur - ecart) / 2;
+  const hauteurCase = (zone.hauteur - ecart) / 2;
+  const hauteurLegende = 7;
+  photos.forEach((photo, i) => {
+    const x = zone.x + (i % 2) * (largeurCase + ecart);
+    const y = zone.y + Math.floor(i / 2) * (hauteurCase + ecart);
+    const facteur = Math.min(largeurCase / photo.largeur, (hauteurCase - hauteurLegende) / photo.hauteur);
+    const l = photo.largeur * facteur;
+    const h = photo.hauteur * facteur;
+    doc.addImage(photo.image, 'JPEG', x + (largeurCase - l) / 2, y, l, h);
+    doc.setFontSize(8);
+    doc.setTextColor(...COULEURS.texte);
+    doc.setFont('helvetica', 'bold');
+    const titre = doc.splitTextToSize([photo.surface, photo.legende].filter(Boolean).join(' - '), largeurCase - 22)[0];
+    doc.text(titre, x + (largeurCase - l) / 2, y + h + 4.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...COULEURS.gris);
+    doc.text(dateSuisse(photo.date), x + (largeurCase + l) / 2, y + h + 4.5, { align: 'right' });
+  });
+}
+
+/** Date ISO -> « 20.05.2026 ». */
+function dateSuisse(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
 }
 
 /** Cadre général de la feuille et cadre du plan. */

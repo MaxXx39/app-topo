@@ -25,6 +25,8 @@ export const TEXTES_AIDE = {
     'Pour choisir les points : touche une série proposée, tape une liste (ex. « b100 à b116, b120 »), touche les points sur le plan (toucher à nouveau un point le retire), ou coche-les dans la liste.',
   trianglesEnTrop:
     'Sans contour, la surface relie les points extérieurs et peut créer des triangles en trop. Active le mode suppression, puis touche un triangle sur le plan pour le supprimer ; le toucher à nouveau le rétablit.',
+  photos:
+    'Prends une photo du stock (ou choisis-la dans la galerie) : elle est réduite et rangée dans le projet, sur cet appareil. Ajoute une légende ; les photos sont imprimées sur une page « Photos » du PDF (onglet 3. Volumes).',
   importerSurface:
     'LandXML (export Mensura) : chaque surface TIN du fichier devient une surface. DXF : les faces 3D (3DFACE) ou maillages de chaque calque deviennent une surface, avec X = Est, Y = Nord, Z = altitude (MN95). Une surface importée peut servir de base pour un volume ou être comparée.',
 

@@ -24,10 +24,11 @@ const TEXTES = {
  * - quandChange() : appelé après chaque modification
  * - decrire(objet) : HTML d'état sous la surface (nombre de triangles, erreurs...)
  * - etiquette(objet) : texte de la surface dans la liste déroulante (nom et levé)
+ * - ajouterPhotos(surface, fichiers) : prépare et range les photos choisies (voir photos/photo.js)
  * - leveActifId() : levé utilisé pour une nouvelle surface
  */
 export function creerEditeurSurfaces(conteneur, barre, options) {
-  const { obtenirPoints, quandChange, decrire, leveActifId, etiquette } = options;
+  const { obtenirPoints, quandChange, decrire, leveActifId, etiquette, ajouterPhotos } = options;
   const textes = TEXTES;
   const etat = {
     objets: [],
@@ -167,6 +168,11 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
     'retablir-triangles': () => {
       objetActif().trianglesSupprimes = [];
     },
+    'supprimer-photo': (bouton) => {
+      const surface = objetActif();
+      if (!confirm('Supprimer cette photo ?')) return;
+      surface.photos = surface.photos.filter((photo) => photo.id !== bouton.dataset.id);
+    },
   };
 
   // Un seul écouteur pour tous les boutons de l'écran et de la barre.
@@ -193,6 +199,12 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
     } else if (cible.dataset.champ === 'tous-les-points') {
       objet.tousLesPoints = cible.checked;
       etat.edition = cible.checked ? null : { role: 'dessus', index: 0 };
+    } else if (cible.dataset.champ === 'legende-photo') {
+      const photo = objet.photos.find((p) => p.id === cible.dataset.id);
+      if (photo) photo.legende = cible.value.trim();
+    } else if (cible.dataset.champ === 'fichier-photo') {
+      if (cible.files.length > 0) ajouterPhotos?.(objet, [...cible.files]);
+      return;
     } else if (cible.dataset.case) {
       basculerPoint(cible.dataset.case);
       return;
@@ -252,7 +264,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   /** Cartes d'une surface : contour, lignes de rupture, points, triangles supprimés, état. */
   function contenuSurface(surface) {
     if (estImportee(surface)) {
-      return `<p class="aide">Surface importée du fichier « ${echapper(surface.nomFichier)} » (${surface.type === 'dxf' ? 'DXF' : 'LandXML'}).</p>${decrire?.(surface) ?? ''}`;
+      return `<p class="aide">Surface importée du fichier « ${echapper(surface.nomFichier)} » (${surface.type === 'dxf' ? 'DXF' : 'LandXML'}).</p>${decrire?.(surface) ?? ''}${cartePhotos(surface)}`;
     }
     const problemes = verifierSurface(surface, pointsDe(surface).map((p) => p.nom));
     return `
@@ -276,7 +288,33 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
           ? `<div class="avertissement"><p><strong>À compléter :</strong></p><ul>${problemes.map((p) => `<li>${echapper(p)}</li>`).join('')}</ul></div>`
           : ''
       }
-      ${decrire?.(surface) ?? ''}`;
+      ${decrire?.(surface) ?? ''}
+      ${cartePhotos(surface)}`;
+  }
+
+  /** Photos de la surface (pour le compte rendu PDF) : miniatures, légendes, ajout. */
+  function cartePhotos(surface) {
+    const photos = surface.photos ?? [];
+    return `
+      <div class="carte-role">
+        <div class="titre-role"><strong>Photos ${bulle('photos')}</strong><span class="aide">${photos.length}</span></div>
+        <div class="liste-photos">
+          ${photos
+            .map(
+              (photo) => `
+            <figure class="photo">
+              <img src="${photo.miniature}" alt="${echapper(photo.legende || surface.nom)}" />
+              <input type="text" data-champ="legende-photo" data-id="${photo.id}" value="${echapper(photo.legende)}" placeholder="Légende" aria-label="Légende de la photo" />
+              <button type="button" class="bouton-lien" data-action="supprimer-photo" data-id="${photo.id}">supprimer</button>
+            </figure>`,
+            )
+            .join('')}
+        </div>
+        <label class="bouton-secondaire">
+          + Ajouter une photo
+          <input type="file" data-champ="fichier-photo" accept="image/*" multiple hidden />
+        </label>
+      </div>`;
   }
 
   function cartesLignes(objet) {
