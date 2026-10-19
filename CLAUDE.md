@@ -58,6 +58,13 @@ Pièges du LandXML :
 
 Hors V1 (ne pas construire sans demande) : Google Drive, levé direct avec l'Emlid, contrôle de qualité des points, profils, implantation.
 
+Ajouts demandés par l'utilisateur après la V1 :
+- **Projets** enregistrés sur l'appareil (IndexedDB), avec plusieurs **levés** (fichiers de points) par projet ; fichier projet `.topo.json` pour passer d'un appareil à l'autre.
+- **Surfaces** créées à partir des points d'un levé (lignes de rupture, contour optionnel, suppression de triangles au doigt) ou importées d'un LandXML ; une surface peut servir de base en mode B.
+- **Comparaison** de deux surfaces (deux levés) : volume ajouté / enlevé, sur toute la surface ou dans le contour d'un stock.
+- **Exports** DXF (R12) et LandXML, en plus du CSV et du PDF ; **calques** au choix dans le PDF (triangles, noms, courbes, couleurs, photo aérienne, cadastre).
+- Plan : calques, couleurs selon l'altitude, courbes de niveau, fonds swisstopo. Couleurs de l'interface : Perrin Groupe (bleu nuit #1b2b36, ambre #f6ab07).
+
 ## 5. Vérification : cas de référence
 
 L'utilisateur compare lui-même avec Mensura. Tolérance : **0,5 %**. Fichiers d'exemple à placer dans le dossier `exemples/` : `stock.csv`, `stock_export.txt`, le PDF Mensura et un LandXML.

@@ -5,6 +5,21 @@ import { jsPDF } from 'jspdf';
 import { formaterNombre } from '../topo/format.js';
 import { placerEtiquettes, pointInterieur } from '../plan/etiquettes.js';
 import { choisirEchelle, barreEchellePapier } from './echelle.js';
+import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
+import { couleurRVB } from '../plan/couleurs.js';
+import { FONDS, niveauDeZoom, tuilesPourZone } from '../plan/fond.js';
+
+// Calques du plan imprimé, et leur état par défaut.
+export const CALQUES_PDF = {
+  triangles: true,
+  noms: true,
+  courbes: false,
+  couleurs: false,
+  photo: false,
+  cadastre: false,
+};
+// Résolution de la photo aérienne dans le PDF (points par pouce).
+const DPI_FOND = 150;
 
 // Mise en page (A4 paysage : 297 × 210 mm).
 const PAGE = { largeur: 297, hauteur: 210, marge: 8 };
@@ -27,9 +42,13 @@ const COULEURS = {
  * - cartouche : { affaire, date, dessinePar, fichierPoints }
  * - echelleImposee : dénominateur de l'échelle voulue (500 pour 1:500), ou null pour la choisir
  *   automatiquement (la plus détaillée qui fait tout tenir). Si le plan dépasse, il est coupé au cadre.
- * Renvoie { document, echelle } (document jsPDF, et dénominateur de l'échelle utilisée).
+ * - calques : calques à imprimer (voir CALQUES_PDF)
+ * - comparaisons : liste de { nom, resultat } ajoutée sous le tableau des volumes
+ * Renvoie (après chargement éventuel de la photo aérienne)
+ * { document, echelle, messageFond } : document jsPDF, échelle utilisée, et un message si le fond n'a pas pu être mis.
  */
-export function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null }) {
+export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [] }) {
+  const choix = { ...CALQUES_PDF, ...calques };
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   doc.setFont('helvetica', 'normal');
 
@@ -39,13 +58,16 @@ export function creerPdf({ stocks, resultats, points, cartouche, echelleImposee 
   doc.rect(CADRE_PLAN.x, CADRE_PLAN.y, CADRE_PLAN.largeur, CADRE_PLAN.hauteur);
 
   const calcules = stocks.map((stock, i) => ({ stock, resultat: resultats[i] })).filter(({ resultat }) => resultat && !resultat.erreurs);
-  const echelle = dessinerPlan(doc, calcules, points, echelleImposee);
-  dessinerColonne(doc, calcules, { ...cartouche, echelle });
-  return { document: doc, echelle };
+  const { echelle, messageFond, relief } = await dessinerPlan(doc, calcules, points, echelleImposee, choix);
+  dessinerColonne(doc, calcules, { ...cartouche, echelle }, { choix, relief, comparaisons });
+  return { document: doc, echelle, messageFond };
 }
 
-/** Dessine le plan dans son cadre, à l'échelle normalisée qui fait tout tenir. Renvoie l'échelle. */
-function dessinerPlan(doc, calcules, points, echelleImposee) {
+/**
+ * Dessine le plan dans son cadre, à l'échelle normalisée qui fait tout tenir (ou imposée).
+ * Renvoie { echelle, messageFond, relief } (relief : plage d'altitudes et équidistance, pour la légende).
+ */
+async function dessinerPlan(doc, calcules, points, echelleImposee, choix) {
   const parNom = new Map(points.map((p) => [p.nom, p]));
   // Points à montrer : ceux des stocks calculés (ou tous s'il n'y a aucun stock).
   const noms = new Set(
@@ -57,7 +79,7 @@ function dessinerPlan(doc, calcules, points, echelleImposee) {
     ]),
   );
   const pointsMontres = noms.size > 0 ? [...noms].map((nom) => parNom.get(nom)).filter(Boolean) : points;
-  if (pointsMontres.length === 0) return 500;
+  if (pointsMontres.length === 0) return { echelle: 500, messageFond: null, relief: null };
 
   // Zone du terrain à dessiner, avec une marge de 10 mm autour sur le papier.
   const ests = pointsMontres.map((p) => p.est);
@@ -80,16 +102,53 @@ function dessinerPlan(doc, calcules, points, echelleImposee) {
     y: milieuCadre.y - (p.nord - centre.nord) * mmParMetre,
   });
 
+  // Fond swisstopo (photo aérienne, cadastre) : une image posée sous le dessin.
+  let messageFond = null;
+  if (choix.photo || choix.cadastre) {
+    const versTerrain = (x, y) => ({
+      est: centre.est + (x - milieuCadre.x) / mmParMetre,
+      nord: centre.nord - (y - milieuCadre.y) / mmParMetre,
+    });
+    messageFond = await dessinerFondPdf(doc, versTerrain, mmParMetre, choix);
+  }
+
   // Tout ce qui sort du cadre du plan est coupé (utile si l'échelle imposée est trop grande).
   doc.saveGraphicsState();
   doc.rect(CADRE_PLAN.x, CADRE_PLAN.y, CADRE_PLAN.largeur, CADRE_PLAN.hauteur, null);
   doc.clip();
   doc.discardPath();
 
+  // Couleurs selon l'altitude et courbes de niveau (surface du dessus des stocks)
+  const tousTriangles = calcules.flatMap(({ resultat }) => resultat.trianglesDessus);
+  let relief = null;
+  if ((choix.couleurs || choix.courbes) && tousTriangles.length > 0) {
+    const plage = plageAltitudes(tousTriangles);
+    const equidistance = choix.equidistance ?? equidistanceAuto(plage.min, plage.max);
+    relief = { plage, equidistance };
+    if (choix.couleurs) {
+      doc.saveGraphicsState();
+      doc.setGState(new doc.GState({ opacity: 0.7 }));
+      for (const { altitude, polygone } of bandesDeNiveau(tousTriangles, equidistance)) {
+        doc.setFillColor(...couleurRVB(altitude + equidistance / 2, plage));
+        polygonePlein(doc, polygone.map(versPapier));
+      }
+      doc.restoreGraphicsState();
+    }
+    if (choix.courbes) {
+      for (const { altitude, a, b } of courbesDeNiveau(tousTriangles, equidistance)) {
+        const rang = altitude / (5 * equidistance);
+        trait(doc, [107, 79, 42], Math.abs(rang - Math.round(rang)) < 1e-6 ? 0.25 : 0.1);
+        const pa = versPapier(a);
+        const pb = versPapier(b);
+        doc.line(pa.x, pa.y, pb.x, pb.y);
+      }
+    }
+  }
+
   // Triangles du dessus
-  trait(doc, COULEURS.triangle, 0.08);
-  for (const { resultat } of calcules) {
-    for (const triangle of resultat.trianglesDessus) {
+  if (choix.triangles) {
+    trait(doc, COULEURS.triangle, 0.08);
+    for (const triangle of tousTriangles) {
       const [a, b, c] = triangle.map(versPapier);
       doc.line(a.x, a.y, b.x, b.y);
       doc.line(b.x, b.y, c.x, c.y);
@@ -116,13 +175,15 @@ function dessinerPlan(doc, calcules, points, echelleImposee) {
   const hauteurNom = tailleNom * 0.3528; // 1 point = 0.3528 mm
   doc.setFontSize(tailleNom);
   doc.setTextColor(...COULEURS.texte);
-  const places = placerEtiquettes(
-    positions.map(({ x, y }, i) => ({ x, y, largeur: doc.getTextWidth(pointsMontres[i].nom), hauteur: hauteurNom })),
-    0.6,
-  );
-  places.forEach((place, i) => {
-    if (place) doc.text(pointsMontres[i].nom, place.x, place.y, { align: place.aGauche ? 'right' : 'left' });
-  });
+  if (choix.noms) {
+    const places = placerEtiquettes(
+      positions.map(({ x, y }, i) => ({ x, y, largeur: doc.getTextWidth(pointsMontres[i].nom), hauteur: hauteurNom })),
+      0.6,
+    );
+    places.forEach((place, i) => {
+      if (place) doc.text(pointsMontres[i].nom, place.x, place.y, { align: place.aGauche ? 'right' : 'left' });
+    });
+  }
 
   // Nom et volume de chaque stock, dans une étiquette blanche
   for (const { stock, resultat } of calcules) {
@@ -150,7 +211,77 @@ function dessinerPlan(doc, calcules, points, echelleImposee) {
 
   dessinerBarreEchelle(doc, echelle);
   dessinerNord(doc);
-  return echelle;
+  if ((choix.photo || choix.cadastre) && !messageFond) {
+    // Mention obligatoire de la source du fond
+    doc.setFontSize(5.5);
+    doc.setTextColor(...COULEURS.texte);
+    const source = [choix.photo ? '© swisstopo' : null, choix.cadastre ? 'Cadastre © cantons' : null].filter(Boolean).join(' · ');
+    doc.text(source, CADRE_PLAN.x + CADRE_PLAN.largeur - 1.5, CADRE_PLAN.y + CADRE_PLAN.hauteur - 1.5, { align: 'right' });
+  }
+  return { echelle, messageFond, relief };
+}
+
+/**
+ * Photo aérienne et/ou cadastre swisstopo sous le plan : les tuiles sont chargées,
+ * assemblées dans une image de la taille du cadre, puis posées dans le PDF.
+ * Renvoie null si tout va bien, sinon un message (pas de connexion...).
+ */
+async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
+  if (typeof document === 'undefined') return 'fond non disponible ici';
+  const pixelsParMm = DPI_FOND / 25.4;
+  const largeurPx = Math.round(CADRE_PLAN.largeur * pixelsParMm);
+  const hauteurPx = Math.round(CADRE_PLAN.hauteur * pixelsParMm);
+  const hautGauche = versTerrain(CADRE_PLAN.x, CADRE_PLAN.y);
+  const basDroite = versTerrain(CADRE_PLAN.x + CADRE_PLAN.largeur, CADRE_PLAN.y + CADRE_PLAN.hauteur);
+  const metresParPixel = 1 / (mmParMetre * pixelsParMm);
+  const z = niveauDeZoom(metresParPixel);
+  const tuiles = tuilesPourZone({ estMin: hautGauche.est, estMax: basDroite.est, nordMin: basDroite.nord, nordMax: hautGauche.nord }, z);
+  if (tuiles.length > 200) return 'fond non mis : plan trop étendu pour la photo aérienne';
+
+  const toile = document.createElement('canvas');
+  toile.width = largeurPx;
+  toile.height = hauteurPx;
+  const contexte = toile.getContext('2d');
+  contexte.fillStyle = '#ffffff';
+  contexte.fillRect(0, 0, largeurPx, hauteurPx);
+
+  const couches = [choix.photo ? 'satellite' : null, choix.cadastre ? 'cadastre' : null].filter(Boolean);
+  try {
+    for (const couche of couches) {
+      const images = await Promise.all(tuiles.map((t) => chargerImage(FONDS[couche].url(t.z, t.colonne, t.ligne))));
+      tuiles.forEach((tuile, i) => {
+        const x = (tuile.est - hautGauche.est) * mmParMetre * pixelsParMm;
+        const y = (hautGauche.nord - tuile.nord) * mmParMetre * pixelsParMm;
+        const cote = tuile.cote * mmParMetre * pixelsParMm;
+        contexte.drawImage(images[i], x, y, cote + 0.5, cote + 0.5);
+      });
+    }
+    doc.addImage(toile.toDataURL('image/jpeg', 0.85), 'JPEG', CADRE_PLAN.x, CADRE_PLAN.y, CADRE_PLAN.largeur, CADRE_PLAN.hauteur);
+    return null;
+  } catch {
+    return 'fond swisstopo non disponible (pas de connexion ?) : PDF créé sans le fond';
+  }
+}
+
+/** Charge une image (tuile) en autorisant son usage dans le PDF. */
+function chargerImage(adresse) {
+  return new Promise((resoudre, rejeter) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => resoudre(image);
+    image.onerror = () => rejeter(new Error(`image non chargée : ${adresse}`));
+    image.src = adresse;
+  });
+}
+
+/** Polygone rempli (sans contour), sommets en mm sur la feuille. */
+function polygonePlein(doc, sommets) {
+  const [premier, ...suivants] = sommets;
+  const ecarts = suivants.map((p, i) => {
+    const precedent = i === 0 ? premier : suivants[i - 1];
+    return [p.x - precedent.x, p.y - precedent.y];
+  });
+  doc.lines(ecarts, premier.x, premier.y, [1, 1], 'F', true);
 }
 
 /** Barre d'échelle en bas à gauche du plan : 4 cases noires et blanches, et l'échelle écrite. */
@@ -186,7 +317,7 @@ function dessinerNord(doc) {
 }
 
 /** Colonne de droite : titre, tableau des volumes, remarques et cartouche. */
-function dessinerColonne(doc, calcules, cartouche) {
+function dessinerColonne(doc, calcules, cartouche, { choix, relief, comparaisons }) {
   const x = COLONNE.x;
   let y = 17;
   doc.setTextColor(...COULEURS.texte);
@@ -241,6 +372,27 @@ function dessinerColonne(doc, calcules, cartouche) {
     y += 4.4;
   }
 
+  // Comparaisons (volume ajouté / enlevé entre deux surfaces)
+  const comparaisonsCalculees = comparaisons.filter(({ resultat }) => resultat && !resultat.erreurs);
+  if (comparaisonsCalculees.length > 0) {
+    y += 3;
+    doc.setFontSize(7);
+    doc.setTextColor(...COULEURS.gris);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Comparaison', x, y);
+    doc.text('Ajouté m³', x + 63, y, { align: 'right' });
+    doc.text('Enlevé m³', x + COLONNE.largeur - 1, y, { align: 'right' });
+    y += 4.4;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...COULEURS.texte);
+    for (const { nom, resultat } of comparaisonsCalculees) {
+      doc.text(nom.length > 26 ? `${nom.slice(0, 25)}…` : nom, x, y);
+      doc.text(formaterNombre(resultat.remblai), x + 63, y, { align: 'right' });
+      doc.text(formaterNombre(resultat.deblai), x + COLONNE.largeur - 1, y, { align: 'right' });
+      y += 4.4;
+    }
+  }
+
   // Remarques : mode de calcul et surfaces non couvertes
   y += 2;
   doc.setFont('helvetica', 'normal');
@@ -266,13 +418,27 @@ function dessinerColonne(doc, calcules, cartouche) {
   const legende = [
     [COULEURS.contour, 'Contour du stock'],
     [COULEURS.ligne, 'Ligne de rupture'],
-    [COULEURS.triangle, 'Triangulation du dessus'],
-  ];
+    choix.triangles ? [COULEURS.triangle, 'Triangulation du dessus'] : null,
+    choix.courbes && relief ? [[107, 79, 42], `Courbes de niveau (équidistance ${relief.equidistance} m)`] : null,
+  ].filter(Boolean);
   for (const [couleur, texte] of legende) {
     trait(doc, couleur, 0.5);
     doc.line(x, y - 1, x + 6, y - 1);
     doc.text(texte, x + 8, y);
     y += 3.4;
+  }
+  if (choix.couleurs && relief) {
+    // Échelle des couleurs : du plus bas au plus haut
+    const largeur = 50;
+    const pas = 20;
+    for (let i = 0; i < pas; i++) {
+      const altitude = relief.plage.min + ((i + 0.5) / pas) * (relief.plage.max - relief.plage.min);
+      doc.setFillColor(...couleurRVB(altitude, relief.plage));
+      doc.rect(x + (i * largeur) / pas, y - 2, largeur / pas + 0.1, 2.5, 'F');
+    }
+    doc.text(formaterNombre(relief.plage.min), x, y + 3);
+    doc.text(`${formaterNombre(relief.plage.max)} m`, x + largeur, y + 3, { align: 'right' });
+    y += 7;
   }
 
   // Cartouche en bas à droite

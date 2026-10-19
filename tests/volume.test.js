@@ -208,10 +208,10 @@ describe('mode B : base LandXML (fichier 20260520_Stock.xml, plan horizontal à 
     expect(calculerVolumeStock(stock, carre, demi).surfaceNonCouverte).toBeCloseTo(50, 9);
   });
 
-  it('demande une surface LandXML en mode B', () => {
+  it('demande une surface de base en mode B', () => {
     const stock = creerStock('Essai');
     stock.contour = ['b1', 'b2', 'b3'];
-    stock.modeBase = 'landxml';
-    expect(calculerVolumeStock(stock, points, null).erreurs[0]).toContain('LandXML');
+    stock.modeBase = 'surface';
+    expect(calculerVolumeStock(stock, points, null).erreurs[0]).toContain('choisis une surface de base');
   });
 });

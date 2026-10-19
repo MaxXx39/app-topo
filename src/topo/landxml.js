@@ -192,3 +192,57 @@ function numeroDeLigne(texte, position) {
   for (let i = 0; i < position; i++) if (texte.charCodeAt(i) === 10) ligne++;
   return ligne;
 }
+
+/**
+ * Écrit un fichier LandXML 1.1 contenant une ou plusieurs surfaces TIN.
+ * - surfaces : liste de { nom, triangles } (triangles = 3 points { nom?, est, nord, altitude })
+ * Les points identiques (au mm près) sont partagés entre triangles. Comme dans tout
+ * fichier LandXML, les coordonnées sont écrites dans l'ordre Nord, Est, altitude.
+ */
+export function ecrireLandXML(surfaces, nomProjet = 'Topo') {
+  const date = new Date().toISOString();
+  const blocs = surfaces.map(({ nom, triangles }) => {
+    const ids = new Map();
+    const lignesPoints = [];
+    const idDuPoint = (p) => {
+      const cle = `${p.est.toFixed(3)} ${p.nord.toFixed(3)} ${p.altitude.toFixed(3)}`;
+      if (!ids.has(cle)) {
+        const id = ids.size + 1;
+        ids.set(cle, id);
+        const attributNom = p.nom ? ` name="${encoderEntites(p.nom)}"` : '';
+        lignesPoints.push(`          <P id="${id}"${attributNom}>${p.nord.toFixed(3)} ${p.est.toFixed(3)} ${p.altitude.toFixed(3)}</P>`);
+      }
+      return ids.get(cle);
+    };
+    const faces = triangles.map((t) => `          <F>${t.map(idDuPoint).join(' ')}</F>`);
+    let aire = 0;
+    for (const [a, b, c] of triangles) aire += Math.abs((b.est - a.est) * (c.nord - a.nord) - (c.est - a.est) * (b.nord - a.nord)) / 2;
+    return `    <Surface name="${encoderEntites(nom)}">
+      <Definition surfType="TIN" area2DSurf="${aire.toFixed(3)}">
+        <Pnts>
+${lignesPoints.join('\n')}
+        </Pnts>
+        <Faces>
+${faces.join('\n')}
+        </Faces>
+      </Definition>
+    </Surface>`;
+  });
+  return `<?xml version="1.0" encoding="utf-8"?>
+<LandXML xmlns="http://www.landxml.org/schema/LandXML-1.1" version="1.1" date="${date.slice(0, 10)}" time="${date.slice(11, 19)}">
+  <Application name="Topo - Volumes de stocks" />
+  <Project name="${encoderEntites(nomProjet)}" />
+  <Units>
+    <Metric areaUnit="squareMeter" linearUnit="meter" volumeUnit="cubicMeter" />
+  </Units>
+  <Surfaces>
+${blocs.join('\n')}
+  </Surfaces>
+</LandXML>
+`;
+}
+
+/** Protège les caractères spéciaux du XML (&, <, >, "). */
+function encoderEntites(texte) {
+  return String(texte).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+}

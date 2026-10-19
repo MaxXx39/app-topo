@@ -19,17 +19,18 @@ import { pointsDeBase } from './stocks.js';
 /**
  * Calcule le volume d'un stock.
  * - stock : voir stocks.js. stock.modeBase choisit la surface de base :
- *   'mesuree' (mode A, points du pied) ou 'landxml' (mode B, surface importée)
- * - points : tous les points importés { nom, est, nord, altitude }
- * - surfaceLandXML : surface TIN choisie (voir landxml.js), utilisée en mode B
+ *   'mesuree' (mode A, points du pied) ou 'surface' (mode B, une surface du projet :
+ *   créée à partir de points ou importée d'un LandXML)
+ * - points : tous les points du levé { nom, est, nord, altitude }
+ * - surfaceBase : en mode B, { nom, triangles } (triangles = 3 points { est, nord, altitude })
  * Renvoie { erreurs, segmentsEnErreur } si le calcul est impossible
  * (segmentsEnErreur : paires de noms des segments qui se croisent, s'il y en a), sinon :
  * { surfacePlan, remblai, deblai, surfaceRemblai, surfaceDeblai, surfaceNonCouverte,
  *   nombreTrianglesDessus, nombreTrianglesBase, trianglesDessus, trianglesBase }
  * Les triangles sont des listes de 3 points { nom, est, nord, altitude }.
  */
-export function calculerVolumeStock(stock, points, surfaceLandXML = null) {
-  const modeB = stock.modeBase === 'landxml';
+export function calculerVolumeStock(stock, points, surfaceBase = null) {
+  const modeB = stock.modeBase === 'surface' || stock.modeBase === 'landxml';
   const parNom = new Map(points.map((p) => [p.nom, p]));
   const erreurs = [];
 
@@ -43,7 +44,8 @@ export function calculerVolumeStock(stock, points, surfaceLandXML = null) {
   if (absents.length > 0) erreurs.push(`point(s) absent(s) du fichier : ${absents.join(', ')}`);
   if (stock.contour.length < 3) erreurs.push('le contour doit avoir au moins 3 points');
   if (!modeB && pointsDeBase(stock).length < 3) erreurs.push('la surface de base doit avoir au moins 3 points');
-  if (modeB && !surfaceLandXML) erreurs.push('mode B : importe d\'abord une surface LandXML (onglet LandXML)');
+  if (modeB && !surfaceBase) erreurs.push('mode B : choisis une surface de base (onglet Surfaces)');
+  if (modeB && surfaceBase?.triangles.length === 0) erreurs.push(`mode B : la surface « ${surfaceBase.nom} » n'a aucun triangle`);
   if (erreurs.length > 0) return { erreurs };
 
   // Segments imposés : le contour (fermé) et les lignes de rupture.
@@ -62,8 +64,8 @@ export function calculerVolumeStock(stock, points, surfaceLandXML = null) {
   // --- Surface de base ---
   let trianglesBase;
   if (modeB) {
-    // Mode B : les triangles de la surface LandXML remplacent la base.
-    trianglesBase = surfaceLandXML.triangles;
+    // Mode B : les triangles de la surface choisie remplacent la base.
+    trianglesBase = surfaceBase.triangles;
   } else {
     // Mode A : les points du pied. Les côtés du contour sont imposés quand leurs
     // deux points font partie de la base.
@@ -84,7 +86,7 @@ export function calculerVolumeStock(stock, points, surfaceLandXML = null) {
     nombreTrianglesDessus: trianglesDessus.length,
     nombreTrianglesBase: trianglesBase.length,
     mode: modeB ? 'B' : 'A',
-    nomBase: modeB ? surfaceLandXML.nom : null,
+    nomBase: modeB ? surfaceBase.nom : null,
     trianglesDessus,
     trianglesBase,
   };
@@ -224,7 +226,7 @@ export function trianglerAvecContraintes(noms, segments, parNom) {
 }
 
 /** Segments [a, b] reliant les noms d'une ligne, avec le retour au début si elle est fermée. */
-function segmentsDeLigne(noms, fermee) {
+export function segmentsDeLigne(noms, fermee) {
   const segments = [];
   for (let i = 0; i + 1 < noms.length; i++) segments.push([noms[i], noms[i + 1]]);
   if (fermee && noms.length >= 3) segments.push([noms.at(-1), noms[0]]);
@@ -273,7 +275,7 @@ function chercherCroisement(segments, parNom) {
 // --- Petits outils de géométrie en plan (Est, Nord) ---
 
 /** Aire signée d'un triangle (m²) : positive si les points tournent dans le sens inverse des aiguilles d'une montre. */
-function aireTriangle([a, b, c]) {
+export function aireTriangle([a, b, c]) {
   return ((b.est - a.est) * (c.nord - a.nord) - (c.est - a.est) * (b.nord - a.nord)) / 2;
 }
 
@@ -288,7 +290,7 @@ export function airePolygone(sommets) {
   return aire / 2;
 }
 
-function centre([a, b, c]) {
+export function centre([a, b, c]) {
   return { est: (a.est + b.est + c.est) / 3, nord: (a.nord + b.nord + c.nord) / 3 };
 }
 
@@ -307,7 +309,7 @@ export function pointDansPolygone(point, polygone) {
 }
 
 /** Altitude (m) au point (est, nord) sur le plan qui passe par les 3 sommets du triangle. */
-function altitudeSurTriangle([a, b, c], est, nord) {
+export function altitudeSurTriangle([a, b, c], est, nord) {
   const aire = aireTriangle([a, b, c]);
   const poidsA = aireTriangle([{ est, nord }, b, c]) / aire;
   const poidsB = aireTriangle([a, { est, nord }, c]) / aire;
@@ -319,7 +321,7 @@ function altitudeSurTriangle([a, b, c], est, nord) {
  * Partie commune (en plan) de deux triangles, sous forme de polygone convexe.
  * Méthode de Sutherland-Hodgman : on coupe le premier triangle par chaque côté du second.
  */
-function intersectionTriangles(triangle, decoupe) {
+export function intersectionTriangles(triangle, decoupe) {
   let polygone = triangle.map((p) => ({ est: p.est, nord: p.nord }));
   const sens = Math.sign(aireTriangle(decoupe));
   for (let i = 0; i < 3 && polygone.length > 0; i++) {
