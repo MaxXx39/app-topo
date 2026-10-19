@@ -3,14 +3,18 @@
    Couleurs et tailles réunies ici en "variables" pour les changer facilement.
    ========================================================================== */
 :root {
-  --vert: #15803d;
-  --vert-fonce: #14532d;
-  --vert-clair: #dcfce7;
-  --fond: #f3f5f4;
+  /* Couleurs de Perrin Groupe : bleu nuit et jaune ambre */
+  --sombre: #1b2b36;
+  --sombre-2: #2a3d4a;
+  --ambre: #f6ab07;
+  --ambre-fonce: #d99300;
+  --ambre-clair: #fdedc4;
+  --succes: #15803d;
+  --fond: #f2f4f5;
   --surface: #ffffff;
-  --texte: #1c2421;
-  --gris: #64706b;
-  --bordure: #dfe5e2;
+  --texte: #1b2b36;
+  --gris: #5f6d77;
+  --bordure: #dde2e6;
   --rouge: #dc2626;
   --rouge-clair: #fef2f2;
   --orange: #ea580c;
@@ -58,7 +62,7 @@ p {
   align-items: center;
   gap: 10px;
   padding: 0 16px;
-  background: var(--vert-fonce);
+  background: var(--sombre);
   color: #ffffff;
 }
 
@@ -121,11 +125,11 @@ p {
 }
 
 .onglets button.actif {
-  color: var(--vert);
+  color: var(--sombre);
 }
 
 .onglets button.actif svg {
-  background: var(--vert-clair);
+  background: var(--ambre);
   border-radius: 12px;
   padding: 1px 12px;
   width: 48px;
@@ -230,7 +234,7 @@ p {
   }
 
   .onglets button.actif {
-    background: var(--vert-clair);
+    background: var(--ambre);
   }
 
   .onglets button.actif svg {
@@ -265,15 +269,15 @@ button.bouton {
   padding: 10px 18px;
   border: none;
   border-radius: 10px;
-  background: var(--vert);
-  color: #ffffff;
+  background: var(--ambre);
+  color: var(--sombre);
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .bouton:active {
-  background: var(--vert-fonce);
+  background: var(--ambre-fonce);
 }
 
 .bouton-secondaire {
@@ -321,7 +325,7 @@ select {
 
 input[type='text']:focus,
 select:focus {
-  outline: 2px solid var(--vert);
+  outline: 2px solid var(--ambre);
   outline-offset: -1px;
 }
 
@@ -329,7 +333,7 @@ input[type='checkbox'],
 input[type='radio'] {
   width: 20px;
   height: 20px;
-  accent-color: var(--vert);
+  accent-color: var(--sombre);
 }
 
 .case {
@@ -396,13 +400,13 @@ input[type='radio'] {
 }
 
 .ok {
-  color: var(--vert);
+  color: var(--succes);
   font-weight: 600;
 }
 
 summary {
   cursor: pointer;
-  color: var(--vert);
+  color: var(--sombre);
   font-weight: 600;
   margin: 10px 0;
 }
@@ -473,8 +477,8 @@ th:not(:first-child) {
 }
 
 .carte-role.en-edition {
-  border-color: var(--vert);
-  box-shadow: 0 0 0 3px var(--vert-clair);
+  border-color: var(--ambre);
+  box-shadow: 0 0 0 3px var(--ambre-clair);
 }
 
 .titre-role {
@@ -500,7 +504,7 @@ th:not(:first-child) {
 }
 
 .rang {
-  background: var(--vert);
+  background: var(--sombre);
   color: #ffffff;
   border-radius: 8px;
   padding: 0 6px;
@@ -517,17 +521,17 @@ th:not(:first-child) {
 .pastille {
   min-height: 36px;
   padding: 6px 12px;
-  border: 1px solid var(--vert);
+  border: 1px solid var(--ambre);
   border-radius: 18px;
   background: var(--surface);
-  color: var(--vert-fonce);
+  color: var(--sombre);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .pastille:active {
-  background: var(--vert-clair);
+  background: var(--ambre-clair);
 }
 
 /* Série déjà utilisée dans un stock : affichée en plus discret. */
@@ -551,7 +555,8 @@ th:not(:first-child) {
   background: var(--surface);
   border-radius: var(--rayon);
   box-shadow: 0 4px 20px rgba(16, 24, 20, 0.18);
-  border: 1px solid var(--vert);
+  border: 1px solid var(--ambre);
+  border-top: 4px solid var(--ambre);
   padding: 10px 14px;
   font-size: 0.92rem;
 }
@@ -678,12 +683,12 @@ svg.plan {
 }
 
 .plan .points circle.role-dessus {
-  fill: var(--vert);
+  fill: var(--succes);
 }
 
 .plan .points circle.selection {
   fill: none;
-  stroke: var(--vert-fonce);
+  stroke: var(--sombre);
   stroke-width: 2.5;
 }
 
@@ -698,11 +703,11 @@ svg.plan {
 .plan .noms text.rang {
   font-size: 10px;
   font-weight: 700;
-  fill: var(--vert-fonce);
+  fill: var(--sombre);
 }
 
 .plan .contour {
-  fill: rgba(21, 128, 61, 0.05);
+  fill: rgba(27, 43, 54, 0.04);
   stroke: #a3aca8;
   stroke-width: 1.5;
 }
