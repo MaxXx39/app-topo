@@ -410,3 +410,8 @@ button:disabled {
   stroke: #7c8b99;
   stroke-width: 0.8;
 }
+
+.choix-surface {
+  display: block;
+  cursor: pointer;
+}
