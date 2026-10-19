@@ -40,7 +40,7 @@ const COULEURS = {
 
 /**
  * Crée le document PDF.
- * - stocks, resultats : comme dans resultats.js (un résultat par stock)
+ * - stocks, resultats : les surfaces dont le volume est calculé, et leurs volumes (voir calculerVolumeSurface)
  * - points : tous les points importés
  * - cartouche : { affaire, date, dessinePar, fichierPoints }
  * - echelleImposee : dénominateur de l'échelle voulue (500 pour 1:500), ou null pour la choisir
@@ -62,7 +62,7 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
   const messages = [];
   let echelle = null;
 
-  // Feuille des stocks (sauf s'il n'y a que des comparaisons)
+  // Feuille des volumes (sauf s'il n'y a que des comparaisons)
   if (calcules.length > 0 || comparaisonsCalculees.length === 0) {
     dessinerCadres(doc);
     const plan = await dessinerPlan(doc, calcules, points, echelleImposee, choix);
@@ -223,21 +223,19 @@ async function dessinerPageComparaison(doc, { nom, resultat }, cartouche, echell
  */
 async function dessinerPlan(doc, calcules, points, echelleImposee, choix) {
   const parNom = new Map(points.map((p) => [p.nom, p]));
-  // Points à montrer : ceux des stocks calculés (ou tous s'il n'y a aucun stock).
-  const noms = new Set(
-    calcules.flatMap(({ stock }) => [
-      ...stock.contour,
-      ...stock.base,
-      ...stock.lignesRupture.flatMap((l) => l.noms),
-      ...stock.pointsDessus,
-    ]),
-  );
+  // Points à montrer : ceux du levé qui servent aux surfaces calculées (contour, lignes,
+  // sommets des triangles), ou tous s'il n'y a aucune surface.
+  const sommets = calcules.flatMap(({ resultat }) => resultat.trianglesDessus.flat());
+  const noms = new Set([
+    ...calcules.flatMap(({ stock }) => [...(stock.contour ?? []), ...(stock.lignesRupture ?? []).flatMap((l) => l.noms)]),
+    ...sommets.filter((p) => parNom.get(p.nom) === p).map((p) => p.nom),
+  ]);
   const pointsMontres = noms.size > 0 ? [...noms].map((nom) => parNom.get(nom)).filter(Boolean) : points;
-  if (pointsMontres.length === 0) return { echelle: 500, messageFond: null, relief: null, legendeEcarts: null };
+  if (pointsMontres.length === 0 && sommets.length === 0) return { echelle: 500, messageFond: null, relief: null, legendeEcarts: null };
 
-  // Zone du terrain à dessiner (une marge est laissée autour sur le papier).
-  const ests = pointsMontres.map((p) => p.est);
-  const nords = pointsMontres.map((p) => p.nord);
+  // Zone du terrain à dessiner : points montrés et triangles (une marge est laissée autour sur le papier).
+  const ests = [...pointsMontres, ...sommets].map((p) => p.est);
+  const nords = [...pointsMontres, ...sommets].map((p) => p.nord);
   const zone = { estMin: Math.min(...ests), estMax: Math.max(...ests), nordMin: Math.min(...nords), nordMax: Math.max(...nords) };
   const projection = preparerProjection(zone, echelleImposee);
   const { echelle, versPapier } = projection;
@@ -293,9 +291,9 @@ async function dessinerPlan(doc, calcules, points, echelleImposee, choix) {
     if (fermee && sommets.length >= 3) doc.line(sommets.at(-1).x, sommets.at(-1).y, sommets[0].x, sommets[0].y);
   };
   trait(doc, COULEURS.ligne, 0.25);
-  for (const { stock } of calcules) for (const ligne of stock.lignesRupture) polyligne(ligne.noms, ligne.fermee);
+  for (const { stock } of calcules) for (const ligne of stock.lignesRupture ?? []) polyligne(ligne.noms, ligne.fermee);
   trait(doc, COULEURS.contour, 0.35);
-  for (const { stock } of calcules) polyligne(stock.contour, true);
+  for (const { stock } of calcules) polyligne(stock.contour ?? [], true);
 
   // Points et noms (placés sans chevauchement, comme sur l'écran)
   doc.setFillColor(...COULEURS.texte);
@@ -484,12 +482,12 @@ function dessinerLegendeEcarts(doc, x, y, legende) {
 /** Colonne de droite : titre, tableau des volumes, remarques, légendes et cartouche. */
 function dessinerColonne(doc, calcules, cartouche, { choix, relief, ecarts, comparaisons }) {
   const x = COLONNE.x;
-  let y = dessinerTitre(doc, 'Volumes de stocks');
+  let y = dessinerTitre(doc, 'Volumes');
 
-  // Tableau : Stock | Mode | Surface | Remblai | Déblai
+  // Tableau : Nom | Base | Surface | Remblai | Déblai
   const colonnes = [
-    { titre: 'Stock', largeur: 21, aligne: 'left' },
-    { titre: 'Mode', largeur: 8, aligne: 'left' },
+    { titre: 'Nom', largeur: 21, aligne: 'left' },
+    { titre: 'Base', largeur: 8, aligne: 'left' },
     { titre: 'Surface m²', largeur: 17, aligne: 'right' },
     { titre: 'Remblai m³', largeur: 17, aligne: 'right' },
     { titre: 'Déblai m³', largeur: 17, aligne: 'right' },
@@ -557,10 +555,10 @@ function dessinerColonne(doc, calcules, cartouche, { choix, relief, ecarts, comp
   doc.setFontSize(6.5);
   doc.setTextColor(...COULEURS.gris);
   const remarques = [
-    'Mode A : base = points du pied. Mode B : base = surface LandXML.',
+    'Base A : points du contour (le pied). Base B : une autre surface.',
     ...calcules
       .filter(({ resultat }) => resultat.mode === 'B')
-      .map(({ stock, resultat }) => `${stock.nom} : base LandXML « ${resultat.nomBase} ».`),
+      .map(({ stock, resultat }) => `${stock.nom} : base « ${resultat.nomBase} ».`),
     ...calcules
       .filter(({ resultat }) => resultat.surfaceNonCouverte > 0)
       .map(({ stock, resultat }) => `Attention ${stock.nom} : ${formaterNombre(resultat.surfaceNonCouverte)} m² non couverts par la base.`),

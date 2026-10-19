@@ -1,93 +1,70 @@
-// Calcul du volume d'un stock entre la surface du dessus et la surface de base.
+// Calcul du volume d'une surface (stock, terrassement...) entre son dessus et sa base.
 //
-// Méthode (validée avec l'utilisateur) :
+// Méthode (validée avec l'utilisateur sur le levé du 20/05/2026) :
 // 1. Chaque surface est triangulée (Delaunay avec contraintes) : les triangles ne
 //    traversent ni le contour ni les lignes de rupture.
 // 2. Seuls les triangles du dessus situés dans le contour sont gardés
-//    (indispensable pour les stocks en forme de « L »).
+//    (indispensable pour les formes en « L »).
 // 3. On superpose les deux triangulations : chaque triangle du dessus est découpé
 //    par les triangles de la base. Sur chaque morceau, l'écart de hauteur
 //    (dessus - base) varie de façon linéaire, donc le volume se calcule exactement.
 // 4. Remblai = volume où le dessus est au-dessus de la base,
 //    déblai = volume où le dessus est au-dessous de la base.
 //
+// La base se choisit dans l'onglet Volumes (surface.volume.base) :
+// - 'contour' (mode A) : la base passe par les points du contour (le pied) ;
+// - 'surface' (mode B) : une autre surface du projet (créée ou importée) ;
+// - 'aucune' : pas de volume pour cette surface.
+//
 // Unités : mètres (m), mètres carrés (m²), mètres cubes (m³).
 import Delaunator from 'delaunator';
 import Constrainautor from '@kninnug/constrainautor';
-import { pointsDeBase } from './stocks.js';
 
 /**
- * Calcule le volume d'un stock.
- * - stock : voir stocks.js. stock.modeBase choisit la surface de base :
- *   'mesuree' (mode A, points du pied) ou 'surface' (mode B, une surface du projet :
- *   créée à partir de points ou importée d'un LandXML)
- * - points : tous les points du levé { nom, est, nord, altitude }
+ * Calcule le volume d'une surface au-dessus de sa base.
+ * - surface : surface du projet (voir surface.js)
+ * - calcul : ses triangles, résultat de calculerSurface (déjà limités au contour)
+ * - points : points du levé de la surface { nom, est, nord, altitude }
  * - surfaceBase : en mode B, { nom, triangles } (triangles = 3 points { est, nord, altitude })
- * Renvoie { erreurs, segmentsEnErreur } si le calcul est impossible
- * (segmentsEnErreur : paires de noms des segments qui se croisent, s'il y en a), sinon :
- * { surfacePlan, remblai, deblai, surfaceRemblai, surfaceDeblai, surfaceNonCouverte,
- *   nombreTrianglesDessus, nombreTrianglesBase, trianglesDessus, trianglesBase }
- * Les triangles sont des listes de 3 points { nom, est, nord, altitude }.
+ * Renvoie null si aucune base n'est choisie, { erreurs, segmentsEnErreur } si le calcul est
+ * impossible, sinon :
+ * { mode ('A' ou 'B'), nomBase, surfacePlan, surfaceContour, remblai, deblai, surfaceRemblai,
+ *   surfaceDeblai, surfaceNonCouverte, nombreTrianglesDessus, nombreTrianglesBase,
+ *   trianglesDessus, trianglesBase, trianglesEcart }
  */
-export function calculerVolumeStock(stock, points, surfaceBase = null) {
-  const modeB = stock.modeBase === 'surface' || stock.modeBase === 'landxml';
+export function calculerVolumeSurface(surface, calcul, points, surfaceBase = null) {
+  const base = surface.volume?.base ?? 'aucune';
+  if (base === 'aucune') return null;
+  if (calcul.erreurs) return { erreurs: calcul.erreurs, segmentsEnErreur: calcul.segmentsEnErreur };
+  if (calcul.triangles.length === 0) return { erreurs: ['la surface n\'a aucun triangle'] };
+
+  const contour = surface.contour ?? [];
   const parNom = new Map(points.map((p) => [p.nom, p]));
-  const erreurs = [];
-
-  const tousLesNoms = [
-    ...stock.contour,
-    ...pointsDeBase(stock),
-    ...stock.lignesRupture.flatMap((ligne) => ligne.noms),
-    ...stock.pointsDessus,
-  ];
-  const absents = [...new Set(tousLesNoms.filter((nom) => !parNom.has(nom)))];
-  if (absents.length > 0) erreurs.push(`point(s) absent(s) du fichier : ${absents.join(', ')}`);
-  if (stock.contour.length < 3) erreurs.push('le contour doit avoir au moins 3 points');
-  if (!modeB && pointsDeBase(stock).length < 3) erreurs.push('la surface de base doit avoir au moins 3 points');
-  if (modeB && !surfaceBase) erreurs.push('mode B : choisis une surface de base (créée dans l\'onglet Comparer ou importée d\'un LandXML)');
-  if (modeB && surfaceBase?.triangles.length === 0) erreurs.push(`mode B : la surface « ${surfaceBase.nom} » n'a aucun triangle`);
-  if (erreurs.length > 0) return { erreurs };
-
-  // Segments imposés : le contour (fermé) et les lignes de rupture.
-  const segmentsContour = segmentsDeLigne(stock.contour, true);
-  const segmentsLignes = stock.lignesRupture.flatMap((ligne) => segmentsDeLigne(ligne.noms, ligne.fermee));
-  const contour = stock.contour.map((nom) => parNom.get(nom));
-
-  // --- Surface du dessus : tous les points du stock ---
-  const nomsDessus = [...new Set(tousLesNoms)];
-  const dessus = trianglerAvecContraintes(nomsDessus, [...segmentsContour, ...segmentsLignes], parNom);
-  if (dessus.erreurs) return dessus;
-  // On garde les triangles dont le centre est dans le contour. Comme les côtés du
-  // contour sont imposés, un triangle est soit entièrement dedans, soit entièrement dehors.
-  const trianglesDessus = dessus.triangles.filter((t) => pointDansPolygone(centre(t), contour));
-
-  // --- Surface de base ---
+  const polygone = contour.map((nom) => parNom.get(nom)).filter(Boolean);
   let trianglesBase;
-  if (modeB) {
-    // Mode B : les triangles de la surface choisie remplacent la base.
-    trianglesBase = surfaceBase.triangles;
+
+  if (base === 'contour') {
+    // Mode A : la base est triangulée sur les points du contour, en respectant ses côtés.
+    if (contour.length < 3) return { erreurs: ['pour un volume sur les points du contour, la surface doit avoir un contour (au moins 3 points)'] };
+    const triangulation = trianglerAvecContraintes([...new Set(contour)], segmentsDeLigne(contour, true), parNom);
+    if (triangulation.erreurs) return { ...triangulation, erreurs: triangulation.erreurs.map((e) => `base : ${e}`) };
+    trianglesBase = triangulation.triangles;
   } else {
-    // Mode A : les points du pied. Les côtés du contour sont imposés quand leurs
-    // deux points font partie de la base.
-    const nomsBase = [...new Set(pointsDeBase(stock))];
-    const ensembleBase = new Set(nomsBase);
-    const segmentsBase = segmentsContour.filter(([a, b]) => ensembleBase.has(a) && ensembleBase.has(b));
-    const base = trianglerAvecContraintes(nomsBase, segmentsBase, parNom);
-    if (base.erreurs) return { ...base, erreurs: base.erreurs.map((e) => `surface de base : ${e}`) };
-    trianglesBase = base.triangles;
+    // Mode B : les triangles d'une autre surface.
+    if (!surfaceBase) return { erreurs: ['choisis la surface de base'] };
+    if (surfaceBase.triangles.length === 0) return { erreurs: [`la surface de base « ${surfaceBase.nom} » n'a aucun triangle`] };
+    trianglesBase = surfaceBase.triangles;
   }
 
-  // --- Superposition et volume ---
-  const resultat = volumeEntreSurfaces(trianglesDessus, trianglesBase);
-
+  const resultat = volumeEntreSurfaces(calcul.triangles, trianglesBase);
   return {
     ...resultat,
-    surfaceContour: Math.abs(airePolygone(contour)),
-    nombreTrianglesDessus: trianglesDessus.length,
+    mode: base === 'contour' ? 'A' : 'B',
+    nomBase: base === 'contour' ? null : surfaceBase.nom,
+    surfaceContour: polygone.length >= 3 ? Math.abs(airePolygone(polygone)) : resultat.surfacePlan,
+    nombreTrianglesDessus: calcul.triangles.length,
     nombreTrianglesBase: trianglesBase.length,
-    mode: modeB ? 'B' : 'A',
-    nomBase: modeB ? surfaceBase.nom : null,
-    trianglesDessus,
+    trianglesDessus: calcul.triangles,
     trianglesBase,
   };
 }

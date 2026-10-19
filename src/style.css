@@ -282,6 +282,17 @@ body[data-onglet='projets'] .entete-projets {
   cursor: pointer;
 }
 
+.onglets span {
+  white-space: nowrap;
+}
+
+/* Petits téléphones : texte des onglets un peu plus petit pour tenir sur une ligne. */
+@media (max-width: 420px) {
+  .onglets button {
+    font-size: 0.66rem;
+  }
+}
+
 .onglets svg {
   width: 24px;
   height: 24px;
@@ -396,8 +407,9 @@ body[data-onglet='projets'] .entete-projets {
 
   .onglets button {
     flex-direction: row;
-    gap: 6px;
-    font-size: 0.85rem;
+    gap: 5px;
+    padding: 0 4px;
+    font-size: 0.8rem;
     border-radius: 8px;
   }
 
@@ -1263,4 +1275,10 @@ svg.plan {
   .liste-calques-pdf {
     grid-template-columns: 1fr;
   }
+}
+
+/* Ligne « Total » du tableau des volumes */
+tr.total td {
+  border-top: 2px solid var(--bordure);
+  font-weight: 600;
 }

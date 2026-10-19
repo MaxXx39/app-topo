@@ -1,18 +1,12 @@
 // Tests des exports DXF et LandXML.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { lirePoints } from '../src/topo/import-points.js';
-import { creerStock, lireListeDeNoms } from '../src/topo/stocks.js';
-import { calculerVolumeStock } from '../src/topo/volume.js';
+import { pointsDeReference, surfaceDeReference, volumeDeReference, STOCKS_REFERENCE } from './outils.js';
 import { lireLandXML, ecrireLandXML, resumerSurface } from '../src/topo/landxml.js';
 import { genererDxf } from '../src/export/dxf.js';
 
-const { points } = lirePoints(readFileSync(new URL('../exemples/stock_export.txt', import.meta.url), 'utf-8'));
-const noms = points.map((p) => p.nom);
-const stock = creerStock('Stock 2');
-stock.contour = lireListeDeNoms('b100 à b116', noms).noms;
-stock.lignesRupture = [{ noms: lireListeDeNoms('h100 à h114', noms).noms, fermee: true }];
-const resultat = calculerVolumeStock(stock, points);
+const points = pointsDeReference();
+const stock = surfaceDeReference(STOCKS_REFERENCE[1], points);
+const resultat = volumeDeReference(STOCKS_REFERENCE[1], points);
 
 describe('genererDxf', () => {
   const dxf = genererDxf({ points, stocks: [stock], resultats: [resultat], equidistance: 0.5 });

@@ -1,11 +1,8 @@
 // Tests des couleurs remblai / déblai par paliers.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { zonesRemblaiDeblai, choisirPalier, ecartsExtremes } from '../src/plan/ecarts.js';
-import { calculerVolumeStock, volumeEntreSurfaces } from '../src/topo/volume.js';
-import { creerStock } from '../src/topo/stocks.js';
-import { lirePoints } from '../src/topo/import-points.js';
-import { lireListeDeNoms } from '../src/topo/stocks.js';
+import { volumeEntreSurfaces } from '../src/topo/volume.js';
+import { volumeDe, pointsDeReference, volumeDeReference, STOCKS_REFERENCE } from './outils.js';
 
 const pt = (nom, est, nord, altitude) => ({ nom, est, nord, altitude });
 /** Aire d'un polygone { est, nord } (m²), calculée autour du premier sommet (précision en MN95). */
@@ -23,10 +20,7 @@ const aire = (polygone) => {
 describe('triangles d\'écart du calcul de volume', () => {
   // Pyramide : base carrée 10 m × 10 m à 0 m, sommet à 3 m.
   const points = [pt('b1', 0, 0, 0), pt('b2', 10, 0, 0), pt('b3', 10, 10, 0), pt('b4', 0, 10, 0), pt('h', 5, 5, 3)];
-  const stock = creerStock('Pyramide');
-  stock.contour = ['b1', 'b2', 'b3', 'b4'];
-  stock.pointsDessus = ['h'];
-  const resultat = calculerVolumeStock(stock, points);
+  const resultat = volumeDe({ contour: ['b1', 'b2', 'b3', 'b4'], points: ['h'] }, points);
 
   it('couvrent toute la surface en plan, avec l\'écart dessus - base comme hauteur', () => {
     const aireTotale = resultat.trianglesEcart.reduce((somme, t) => somme + aire(t), 0);
@@ -81,12 +75,7 @@ describe('zones remblai / déblai par paliers', () => {
   });
 
   it('cas de référence Stock 1 : remblai seulement (base = points du pied)', () => {
-    const { points } = lirePoints(readFileSync(new URL('../exemples/stock_export.txt', import.meta.url), 'utf-8'));
-    const noms = points.map((p) => p.nom);
-    const stock = creerStock('Stock 1');
-    stock.contour = lireListeDeNoms('b1 à b17', noms).noms;
-    stock.lignesRupture = [{ noms: lireListeDeNoms('h1 à h31', noms).noms, fermee: true }];
-    const resultat = calculerVolumeStock(stock, points);
+    const resultat = volumeDeReference(STOCKS_REFERENCE[0], pointsDeReference());
     const { zones, legende } = zonesRemblaiDeblai(resultat.trianglesEcart);
     expect(legende.deblai).toEqual([]);
     expect(zones.reduce((somme, z) => somme + aire(z.polygone), 0)).toBeCloseTo(resultat.surfacePlan, 3);

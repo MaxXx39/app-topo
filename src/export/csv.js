@@ -3,13 +3,13 @@
 import { formaterNombre } from '../topo/format.js';
 
 /**
- * Construit le texte du fichier CSV : une ligne par stock calculé.
- * Colonnes : Stock ; Mode ; Surface (m²) ; Remblai (m³) ; Déblai (m³).
- * Les stocks dont le calcul est impossible sont ignorés.
+ * Construit le texte du fichier CSV : une ligne par surface dont le volume est calculé.
+ * Colonnes : Nom ; Base (A ou B) ; Surface (m²) ; Remblai (m³) ; Déblai (m³).
+ * Les surfaces dont le calcul est impossible sont ignorées.
  * comparaisons : liste de { nom, resultat } ajoutée à la suite (voir topo/comparaison.js).
  */
 export function genererCsv(stocks, resultats, comparaisons = []) {
-  const lignes = [['Stock', 'Mode', 'Surface (m²)', 'Remblai (m³)', 'Déblai (m³)']];
+  const lignes = [['Nom', 'Base', 'Surface (m²)', 'Remblai (m³)', 'Déblai (m³)']];
   stocks.forEach((stock, i) => {
     const r = resultats[i];
     if (!r || r.erreurs) return;

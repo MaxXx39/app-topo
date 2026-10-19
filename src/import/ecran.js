@@ -1,11 +1,11 @@
-// Onglet 1. Importer : fichiers de points (levés) et surfaces LandXML.
+// Onglet 1. Importer : fichiers de points (levés). Les surfaces LandXML / DXF s'importent dans l'onglet 2.
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
 
 /**
  * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
- * importerPoints(fichier), importerLandXML(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id)
+ * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id)
  * Renvoie { afficher(projet, dernierImport) }.
  */
 export function creerEcranImport(conteneur, actions) {
@@ -21,29 +21,19 @@ export function creerEcranImport(conteneur, actions) {
     else if (cible.dataset.champ === 'fichier-points' && cible.files[0]) {
       await actions.importerPoints(cible.files[0]);
       cible.value = '';
-    } else if (cible.dataset.champ === 'fichier-landxml' && cible.files[0]) {
-      await actions.importerLandXML(cible.files[0]);
-      cible.value = '';
     }
   });
 
   return {
-    /** Redessine l'onglet. dernierImport : résultat du dernier import (points ou LandXML), ou null. */
+    /** Redessine l'onglet. dernierImport : résultat du dernier import de points, ou null. */
     afficher(projet, dernierImport) {
       conteneur.innerHTML = `
         <h2>1. Importer ${bulle('importer')}</h2>
-        <div class="ligne-outils">
-          <label class="bouton">
-            + Fichier de points (CSV, TXT)
-            <input type="file" data-champ="fichier-points" accept=".csv,.txt,text/csv,text/plain" hidden />
-          </label>
-          <label class="bouton-secondaire">
-            + Surface LandXML
-            <input type="file" data-champ="fichier-landxml" accept=".xml,.landxml,application/xml,text/xml" hidden />
-          </label>
-        </div>
-        ${dernierImport?.type === 'landxml' ? afficherImportLandXML(dernierImport) : ''}
-        ${dernierImport?.type === 'points' ? afficherImportPoints(dernierImport) : ''}
+        <label class="bouton">
+          + Fichier de points (CSV, TXT)
+          <input type="file" data-champ="fichier-points" accept=".csv,.txt,text/csv,text/plain" hidden />
+        </label>
+        ${dernierImport ? afficherImportPoints(dernierImport) : ''}
 
         <h3>Levés ${bulle('leves')}</h3>
         ${
@@ -55,7 +45,7 @@ export function creerEcranImport(conteneur, actions) {
                   <label class="case"><input type="radio" name="leve-actif" data-champ="leve-actif" value="${leve.id}" ${leve.id === projet.leveActifId ? 'checked' : ''} />
                     <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom du levé" /></label>
                   <div class="ligne-outils">
-                    <span class="aide">${leve.points.length} points · ${leve.stocks.length} stock(s)</span>
+                    <span class="aide">${leve.points.length} points · ${projet.surfaces.filter((s) => s.leveId === leve.id).length} surface(s)</span>
                     <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
                   </div>
                 </div>`,
@@ -83,13 +73,6 @@ function afficherImportPoints({ nomFichier, format, points, erreurs, avertisseme
     html += '</ul></div>';
   }
   return html;
-}
-
-/** Résultat d'un import LandXML : nombre de surfaces TIN, messages, ou erreur de lecture. */
-function afficherImportLandXML({ nomFichier, nombreSurfaces, messages, erreur }) {
-  if (erreur) return `<p class="erreur">Impossible de lire « ${echapper(nomFichier)} » : ${echapper(erreur)}</p>`;
-  return `<p class="resume"><strong>${nombreSurfaces} surface(s) TIN</strong> importée(s) de « ${echapper(nomFichier)} ». Elles sont dans l'onglet Comparer et peuvent servir de base à un stock (mode B).</p>
-    ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
 }
 
 /** Tableau repliable des points du levé affiché. */

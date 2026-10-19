@@ -5,12 +5,14 @@
 import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { lireLandXML } from './topo/landxml.js';
+import { lireDXF } from './topo/dxf-lecture.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceDepuisLandXML, cleTriangle } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee } from './topo/surface.js';
+import { calculerVolumeSurface } from './topo/volume.js';
 import { comparerSurfaces } from './topo/comparaison.js';
 import { creerPlan } from './plan/plan.js';
-import { creerEditeurStocks } from './stocks/editeur.js';
-import { calculerTousLesStocks, afficherResultats } from './stocks/resultats.js';
+import { creerEditeurSurfaces } from './surfaces/editeur.js';
+import { creerEcranVolumes } from './volumes/ecran.js';
 import { creerEcranExport, telecharger } from './export/ecran.js';
 import { creerEcranProjet } from './projet/ecran.js';
 import { creerEcranImport } from './import/ecran.js';
@@ -33,29 +35,29 @@ import { bulle, installerAide } from './aide/bulles.js';
 // --- État de l'application ---
 let projet = creerProjet('Mon projet'); // projet ouvert
 let resumes = []; // liste des projets enregistrés (pour l'écran Mes projets)
-let dernierImport = null; // résultat du dernier import (points ou LandXML)
-let surfacesCalculees = new Map(); // id de surface -> résultat de calculerSurface
-let resultatsStocks = []; // volumes des stocks du levé affiché
+let dernierImport = null; // résultat du dernier import de points
+let surfacesCalculees = new Map(); // id de surface -> triangles (résultat de calculerSurface)
+let volumes = new Map(); // id de surface -> volume (résultat de calculerVolumeSurface, ou null)
 let resultatsComparaisons = []; // une entrée par comparaison du projet
-let ongletContexte = 'importer';
+let ongletContexte = 'importer'; // dernier onglet (hors plan) : décide de ce que montre le plan
 let comparaisonMontree = null; // id de la comparaison coloriée sur le plan (onglet Comparer)
-const modifications = historique.creerHistorique(); // pour Annuler / Rétablir // dernier onglet (hors plan) : décide de ce que montre le plan
+const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 
 // --- Mise en page : onglets ---
-// Les onglets numérotés suivent l'ordre du travail : importer, définir les stocks, lire les volumes.
-// « Comparer » (surfaces et comparaisons) est à part. « Mes projets » s'ouvre depuis l'en-tête.
+// Les onglets numérotés suivent l'ordre du travail : importer les points, préparer les surfaces,
+// lire les volumes, comparer deux surfaces. « Mes projets » s'ouvre depuis l'en-tête.
 const ICONES = {
   importer: '<path d="M12 15V4M7 9l5-5 5 5M4 15v5h16v-5" />',
-  stocks: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
+  surfaces: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
   volumes: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
   comparer: '<path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4" />',
   plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
 };
 const ONGLETS = [
   { nom: 'importer', titre: '1. Importer' },
-  { nom: 'stocks', titre: '2. Stocks' },
+  { nom: 'surfaces', titre: '2. Surfaces' },
   { nom: 'volumes', titre: '3. Volumes' },
-  { nom: 'comparer', titre: 'Comparer' },
+  { nom: 'comparer', titre: '4. Comparer' },
   { nom: 'plan', titre: 'Plan' },
 ];
 
@@ -64,23 +66,26 @@ document.querySelector('#app').innerHTML = `
     <div class="colonne-gauche">
       <section class="panneau" data-onglet="projets"><div id="projets"></div></section>
       <section class="panneau" data-onglet="importer"><div id="importer"></div></section>
-      <section class="panneau" data-onglet="stocks">
-        <h2>2. Stocks <span class="aide" id="nom-leve-stocks"></span> ${bulle('stocks')}</h2>
-        <div class="avec-points" hidden><div id="stocks"></div></div>
-        <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer).</p>
+      <section class="panneau" data-onglet="surfaces">
+        <h2>2. Surfaces <span class="aide" id="nom-leve-surfaces"></span> ${bulle('surfaces')}</h2>
+        <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer), ou importe une surface ci-dessous.</p>
+        <div id="surfaces"></div>
+        <h3>Importer une surface ${bulle('importerSurface')}</h3>
+        <label class="bouton-secondaire">
+          + Surface LandXML ou DXF
+          <input type="file" id="fichier-surface" accept=".xml,.landxml,.dxf,application/xml,text/xml" hidden />
+        </label>
+        <div id="message-import-surface"></div>
       </section>
       <section class="panneau" data-onglet="volumes">
         <h2>3. Volumes ${bulle('volumes')}</h2>
-        <div id="resultats"></div>
+        <div id="volumes"></div>
         <div id="export" class="carte-export"></div>
       </section>
       <section class="panneau" data-onglet="comparer">
-        <h2>Comparer</h2>
-        <h3>Surfaces ${bulle('surfaces')}</h3>
-        <div id="surfaces"></div>
+        <h2>4. Comparer ${bulle('comparer')}</h2>
         <div id="comparaisons" class="section-comparaisons"></div>
       </section>
-      <div id="barre-stocks" class="barre-edition" hidden></div>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
     </div>
     <section class="panneau panneau-plan" data-onglet="plan">
@@ -120,68 +125,56 @@ installerAide(document.querySelector('#bouton-aide'));
 
 const pointsDuLeve = (id) => projet.leves.find((l) => l.id === id)?.points ?? [];
 
-/** Surfaces du projet utilisables comme base (mode B) : celles qui ont des triangles. */
-function surfacesUtilisables() {
-  return projet.surfaces.map((s) => ({ id: s.id, nom: s.nom }));
-}
-
 /** Triangles d'une surface du projet (ou [] si elle n'est pas calculable). */
 const trianglesDeSurface = (id) => surfacesCalculees.get(id)?.triangles ?? [];
 
-/**
- * Surfaces comparables : surfaces du projet et dessus des stocks de chaque levé.
- * ref : 'surface:<id>' ou 'stock:<levéId>:<nom du stock>'.
- */
-function choixComparables() {
-  const choix = projet.surfaces.map((s) => ({ ref: `surface:${s.id}`, nom: `Surface « ${s.nom} »` }));
-  for (const leve of projet.leves) {
-    for (const stock of leve.stocks) choix.push({ ref: `stock:${leve.id}:${stock.nom}`, nom: `${stock.nom} (${leve.nom})` });
-  }
-  return choix;
+/** Surfaces affichées : celles du levé coché, et les surfaces importées (LandXML, DXF). */
+function surfacesAffichees() {
+  const leve = leveActif(projet);
+  return projet.surfaces.filter((s) => estImportee(s) || s.leveId === leve?.id);
 }
 
-/** Zones de comparaison : toute la surface « après », ou le contour d'un stock. */
+/** Nom d'une surface dans les listes : avec son levé s'il y en a plusieurs, ou son format si importée. */
+function etiquetteSurface(surface) {
+  if (estImportee(surface)) return `${surface.nom} (${surface.type === 'dxf' ? 'DXF' : 'LandXML'})`;
+  const leve = projet.leves.find((l) => l.id === surface.leveId);
+  return projet.leves.length > 1 && leve ? `${surface.nom} · ${leve.nom}` : surface.nom;
+}
+
+/** Surface de base du volume (base B) : { nom, triangles }, ou null. */
+function surfaceDeBase(surface) {
+  if (surface.volume?.base !== 'surface') return null;
+  const base = projet.surfaces.find((s) => s.id === surface.volume.surfaceId && s.id !== surface.id);
+  return base ? { nom: base.nom, triangles: trianglesDeSurface(base.id) } : null;
+}
+
+/** Surfaces comparables : toutes les surfaces du projet. ref : 'surface:<id>'. */
+function choixComparables() {
+  return projet.surfaces.map((s) => ({ ref: `surface:${s.id}`, nom: etiquetteSurface(s) }));
+}
+
+/** Zones de comparaison : toute la surface « après », ou le contour d'une surface. */
 function zonesComparables() {
   const zones = [{ zone: { type: 'toute' }, nom: 'toute la surface « après »' }];
-  for (const leve of projet.leves) {
-    for (const stock of leve.stocks) {
-      if (stock.contour.length >= 3) zones.push({ zone: { type: 'stock', leveId: leve.id, stockNom: stock.nom }, nom: `contour de ${stock.nom} (${leve.nom})` });
+  for (const surface of projet.surfaces) {
+    if (!estImportee(surface) && surface.contour.length >= 3) {
+      zones.push({ zone: { type: 'surface', surfaceId: surface.id }, nom: `contour de ${etiquetteSurface(surface)}` });
     }
   }
   return zones;
 }
 
-/** Triangles d'une surface comparable (voir choixComparables). */
-function trianglesComparables(ref) {
-  if (!ref) return [];
-  if (ref.startsWith('surface:')) return trianglesDeSurface(ref.slice('surface:'.length));
-  const [, leveId, ...nom] = ref.split(':');
-  const leve = projet.leves.find((l) => l.id === leveId);
-  const index = leve?.stocks.findIndex((s) => s.nom === nom.join(':')) ?? -1;
-  if (index < 0) return [];
-  const resultat = calculerTousLesStocks([leve.stocks[index]], leve.points, surfaceDeBase)[0];
-  return resultat.trianglesDessus ?? [];
-}
-
-/** Surface de base d'un stock en mode B. */
-function surfaceDeBase(stock) {
-  const surface = projet.surfaces.find((s) => s.id === stock.surfaceBaseId);
-  return surface ? { nom: surface.nom, triangles: trianglesDeSurface(surface.id) } : null;
-}
-
 /** Calcule une comparaison du projet. */
 function calculerComparaison(comparaison) {
-  const avant = trianglesComparables(comparaison.avant);
-  const apres = trianglesComparables(comparaison.apres);
+  const triangles = (ref) => (ref?.startsWith('surface:') ? trianglesDeSurface(ref.slice('surface:'.length)) : []);
   let contour = null;
-  if (comparaison.zone?.type === 'stock') {
-    const leve = projet.leves.find((l) => l.id === comparaison.zone.leveId);
-    const stock = leve?.stocks.find((s) => s.nom === comparaison.zone.stockNom);
-    if (!stock) return { erreurs: ['le stock de la zone n\'existe plus'] };
-    const parNom = new Map(leve.points.map((p) => [p.nom, p]));
-    contour = stock.contour.map((nom) => parNom.get(nom)).filter(Boolean);
+  if (comparaison.zone?.type === 'surface') {
+    const surface = projet.surfaces.find((s) => s.id === comparaison.zone.surfaceId);
+    if (!surface) return { erreurs: ['la surface de la zone n\'existe plus'] };
+    const parNom = new Map(pointsDuLeve(surface.leveId).map((p) => [p.nom, p]));
+    contour = surface.contour.map((nom) => parNom.get(nom)).filter(Boolean);
   }
-  return comparerSurfaces(avant, apres, contour);
+  return comparerSurfaces(triangles(comparaison.avant), triangles(comparaison.apres), contour);
 }
 
 // --- Écrans ---
@@ -190,32 +183,16 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
   importerPoints: async (fichier) => {
     try {
       const resultat = lirePoints(await fichier.text());
-      dernierImport = { type: 'points', ...resultat, nomFichier: fichier.name };
-      if (resultat.points.length > 0) {
-        ajouterLeve(projet, fichier.name, resultat.points);
-        changerDeLeve();
-      }
+      dernierImport = { ...resultat, nomFichier: fichier.name };
+      if (resultat.points.length > 0) ajouterLeve(projet, fichier.name, resultat.points);
     } catch (erreur) {
-      dernierImport = { type: 'points', nomFichier: fichier.name, format: '?', points: [], erreurs: [{ ligne: '-', message: erreur.message }], avertissements: [] };
-    }
-    modifie({ recadrer: true });
-  },
-  // Chaque surface TIN du fichier devient une surface du projet.
-  importerLandXML: async (fichier) => {
-    try {
-      const { surfaces, erreurs, avertissements } = lireLandXML(await fichier.text());
-      for (const surface of surfaces) projet.surfaces.push(surfaceDepuisLandXML(surface, fichier.name));
-      dernierImport = { type: 'landxml', nomFichier: fichier.name, nombreSurfaces: surfaces.length, messages: [...erreurs, ...avertissements] };
-      editeurSurfaces.charger(projet.surfaces);
-      if (surfaces.length > 0) editeurSurfaces.choisir(projet.surfaces.length - 1);
-    } catch (erreur) {
-      dernierImport = { type: 'landxml', nomFichier: fichier.name, erreur: erreur.message };
+      dernierImport = { nomFichier: fichier.name, format: '?', points: [], erreurs: [{ ligne: '-', message: erreur.message }], avertissements: [] };
     }
     modifie({ recadrer: true });
   },
   choisirLeve: (id) => {
     projet.leveActifId = id;
-    changerDeLeve();
+    montrerUneSurfaceDuLeve();
     modifie({ recadrer: true });
   },
   renommerLeve: (id, nom) => {
@@ -225,10 +202,12 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
   },
   supprimerLeve: (id) => {
     const leve = projet.leves.find((l) => l.id === id);
-    if (!leve || !confirm(`Supprimer le levé « ${leve.nom} » et ses ${leve.stocks.length} stock(s) ?`)) return;
+    const surfacesDuLeve = projet.surfaces.filter((s) => s.leveId === id);
+    if (!leve || !confirm(`Supprimer le levé « ${leve.nom} » et ses ${surfacesDuLeve.length} surface(s) ?`)) return;
     projet.leves = projet.leves.filter((l) => l.id !== id);
+    projet.surfaces = projet.surfaces.filter((s) => s.leveId !== id);
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
-    changerDeLeve();
+    editeurSurfaces.charger(projet.surfaces);
     modifie({ recadrer: true });
   },
 });
@@ -281,37 +260,67 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
 });
 
 const plan = creerPlan(document.querySelector('#plan'), {
-  quandToucherPoint: (nom) => {
-    if (editeurStocks.enModification()) editeurStocks.toucherPoint(nom);
-    else if (editeurSurfaces.enModification()) editeurSurfaces.toucherPoint(nom);
-  },
-  quandToucherStock: (index) => editeurStocks.choisir(index),
+  quandToucherPoint: (nom) => editeurSurfaces.toucherPoint(nom),
+  quandToucherStock: (index) => editeurSurfaces.choisir(index),
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
 });
 
-const editeurStocks = creerEditeurStocks(document.querySelector('#stocks'), document.querySelector('#barre-stocks'), {
-  genre: 'stock',
-  obtenirPoints: () => leveActif(projet)?.points ?? [],
+const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces'), document.querySelector('#barre-surfaces'), {
+  obtenirPoints: (surface) => (estImportee(surface) ? [] : pointsDuLeve(surface.leveId)),
   quandChange: () => {
-    if (editeurStocks.enModification()) editeurSurfaces.arreterModification();
-    modifie();
-  },
-  allerAuPlan: () => afficherOnglet('plan'),
-  obtenirSurfaces: surfacesUtilisables,
-});
-
-const editeurSurfaces = creerEditeurStocks(document.querySelector('#surfaces'), document.querySelector('#barre-surfaces'), {
-  genre: 'surface',
-  obtenirPoints: (surface) => (surface.type === 'landxml' ? [] : pointsDuLeve(surface.leveId)),
-  quandChange: () => {
-    if (editeurSurfaces.enModification()) editeurStocks.arreterModification();
+    // Une surface d'un autre levé est choisie : ce levé devient le levé affiché.
+    const surface = editeurSurfaces.objetActif();
+    if (surface && !estImportee(surface) && surface.leveId && surface.leveId !== projet.leveActifId) {
+      projet.leveActifId = surface.leveId;
+    }
     modifie();
   },
   allerAuPlan: () => afficherOnglet('plan'),
   leveActifId: () => leveActif(projet)?.id ?? null,
   decrire: decrireSurface,
+  etiquette: etiquetteSurface,
 });
 editeurSurfaces.charger(projet.surfaces);
+
+/** Après un changement de levé : on montre une surface de ce levé (s'il en a une). */
+function montrerUneSurfaceDuLeve() {
+  const active = editeurSurfaces.objetActif();
+  if (active && (estImportee(active) || active.leveId === projet.leveActifId)) return;
+  const index = projet.surfaces.findIndex((s) => s.leveId === projet.leveActifId);
+  if (index >= 0) editeurSurfaces.choisir(index);
+}
+
+// --- Import d'une surface LandXML ou DXF : chaque surface du fichier devient une surface du projet ---
+document.querySelector('#fichier-surface').addEventListener('change', async (evenement) => {
+  const fichier = evenement.target.files[0];
+  if (!fichier) return;
+  const zone = document.querySelector('#message-import-surface');
+  try {
+    const texte = await fichier.text();
+    const type = /\.dxf$/i.test(fichier.name) ? 'dxf' : 'landxml';
+    const { surfaces, erreurs, avertissements } = type === 'dxf' ? lireDXF(texte) : lireLandXML(texte);
+    for (const surface of surfaces) projet.surfaces.push(surfaceImportee(surface, fichier.name, type));
+    const messages = [...erreurs, ...avertissements];
+    zone.innerHTML = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} ».</p>
+      ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
+    editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+    if (surfaces.length > 0) editeurSurfaces.choisir(projet.surfaces.length - 1);
+  } catch (erreur) {
+    zone.innerHTML = `<p class="erreur">Impossible de lire « ${echapper(fichier.name)} » : ${echapper(erreur.message)}</p>`;
+  }
+  evenement.target.value = '';
+  modifie({ recadrer: true });
+});
+
+const ecranVolumes = creerEcranVolumes(document.querySelector('#volumes'), {
+  obtenirLignes: () =>
+    surfacesAffichees().map((surface) => ({
+      surface,
+      resultat: volumes.get(surface.id),
+      bases: projet.surfaces.map((s) => ({ id: s.id, nom: etiquetteSurface(s) })),
+    })),
+  quandChange: () => modifie(),
+});
 
 const ecranComparaisons = creerEcranComparaisons(document.querySelector('#comparaisons'), {
   obtenirProjet: () => projet,
@@ -334,16 +343,29 @@ function comparaisonAMontrer() {
   return calculables.find((c) => c.id === comparaisonMontree) ?? calculables[0] ?? null;
 }
 
+/** Surfaces affichées dont le volume est calculé : [{ surface, resultat }]. */
+function volumesCalcules() {
+  return surfacesAffichees()
+    .map((surface) => ({ surface, resultat: volumes.get(surface.id) }))
+    .filter(({ resultat }) => resultat && !resultat.erreurs);
+}
+
 const ecranExport = creerEcranExport(document.querySelector('#export'), {
   obtenirDonnees: () => {
     const leve = leveActif(projet);
+    const calcules = volumesCalcules();
+    const avecVolume = new Set(calcules.map(({ surface }) => surface.id));
     return {
       nomProjet: projet.nom,
-      stocks: leve?.stocks ?? [],
-      resultats: resultatsStocks,
+      stocks: calcules.map(({ surface }) => surface),
+      resultats: calcules.map(({ resultat }) => resultat),
       points: leve?.points ?? [],
       fichierPoints: leve?.nom ?? '',
-      surfaces: projet.surfaces.map((s) => ({ nom: s.nom, triangles: trianglesDeSurface(s.id) })).filter((s) => s.triangles.length > 0),
+      // Surfaces sans volume (les autres sont déjà exportées avec leur volume).
+      surfaces: surfacesAffichees()
+        .filter((s) => !avecVolume.has(s.id))
+        .map((s) => ({ nom: s.nom, triangles: trianglesDeSurface(s.id) }))
+        .filter((s) => s.triangles.length > 0),
       comparaisons: projet.comparaisons.map((c, i) => ({ nom: c.nom, resultat: resultatsComparaisons[i] })),
       cartouche: projet.cartouche,
     };
@@ -358,18 +380,13 @@ function decrireSurface(surface) {
   if (r.erreurs) return `<div class="erreur"><ul>${r.erreurs.map((e) => `<li>${echapper(e)}</li>`).join('')}</ul></div>`;
   let aire = 0;
   for (const [a, b, c] of r.triangles) aire += Math.abs((b.est - a.est) * (c.nord - a.nord) - (c.est - a.est) * (b.nord - a.nord)) / 2;
-  const leve = projet.leves.find((l) => l.id === surface.leveId);
+  const volume = volumes.get(surface.id);
   return `
-    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${leve ? ` · levé « ${echapper(leve.nom)} »` : ''}</p>
+    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${volume && !volume.erreurs ? ` · remblai ${formaterNombre(volume.remblai)} m³ (onglet 3. Volumes)` : ''}</p>
     ${r.avertissements.length > 0 ? `<div class="avertissement"><ul>${r.avertissements.map((a) => `<li>${echapper(a)}</li>`).join('')}</ul></div>` : ''}`;
 }
 
 // --- Calculs et affichage ---
-
-/** Après un changement de levé : l'écran des stocks montre les stocks de ce levé. */
-function changerDeLeve() {
-  editeurStocks.charger(leveActif(projet)?.stocks ?? []);
-}
 
 /** Recalcule tout (surfaces, volumes, comparaisons) et met à jour les écrans et le plan. */
 function recalculer({ recadrer = false } = {}) {
@@ -377,36 +394,49 @@ function recalculer({ recadrer = false } = {}) {
   const points = leve?.points ?? [];
 
   surfacesCalculees = new Map(projet.surfaces.map((s) => [s.id, calculerSurface(s, pointsDuLeve(s.leveId))]));
-  resultatsStocks = calculerTousLesStocks(leve?.stocks ?? [], points, surfaceDeBase);
+  volumes = new Map(
+    projet.surfaces.map((s) => [s.id, calculerVolumeSurface(s, surfacesCalculees.get(s.id), pointsDuLeve(s.leveId), surfaceDeBase(s))]),
+  );
   resultatsComparaisons = projet.comparaisons.map(calculerComparaison);
 
-  for (const element of document.querySelectorAll('.avec-points')) element.hidden = points.length === 0;
-  for (const element of document.querySelectorAll('.sans-points')) element.hidden = points.length > 0;
-  document.querySelector('#nom-leve-stocks').textContent = leve ? `· levé « ${leve.nom} »` : '';
-  document.querySelector('#etat').textContent = `${projet.nom} · ${points.length} points · ${leve?.stocks.length ?? 0} stock(s)`;
+  for (const element of document.querySelectorAll('.sans-points')) element.hidden = projet.leves.length > 0;
+  document.querySelector('#nom-leve-surfaces').textContent = leve ? `· levé « ${leve.nom} »` : '';
+  document.querySelector('#etat').textContent = `${projet.nom} · ${points.length} points · ${surfacesAffichees().length} surface(s)`;
 
-  editeurStocks.rafraichir();
   editeurSurfaces.rafraichir();
+  ecranVolumes.afficher();
   ecranComparaisons.afficher();
   ecranImport.afficher(projet, dernierImport);
   ecranProjet.afficher(projet, resumes);
-  afficherResultats(document.querySelector('#resultats'), leve?.stocks ?? [], resultatsStocks);
 
-  // Plan : dans l'onglet Comparer, on montre la surface choisie (et les points de son levé).
-  const surface = ongletContexte === 'comparer' ? editeurSurfaces.objetActif() : null;
-  const calcul = surface ? surfacesCalculees.get(surface.id) : null;
-  const pointsDuPlan = surface ? (surface.type === 'landxml' ? surface.points : pointsDuLeve(surface.leveId)) : points;
-  const dessinStocks = editeurStocks.obtenirDessin();
-  const dessinSurface = editeurSurfaces.obtenirDessin();
+  // Plan : surfaces du levé affiché et surfaces importées ; les autres sont cachées.
+  const visibles = new Set(surfacesAffichees());
+  const active = editeurSurfaces.objetActif();
+  const calculActif = active ? surfacesCalculees.get(active.id) : null;
+  const dansSurfaces = ongletContexte === 'surfaces';
+  // Une surface importée montre ses propres points ; sinon, les points du levé.
+  const pointsDuPlan = dansSurfaces && active && estImportee(active) ? active.points : points;
   // Dans l'onglet Comparer, le remblai / déblai colorié est celui de la comparaison montrée.
   const comparaison = ongletContexte === 'comparer' ? comparaisonAMontrer() : null;
   plan.redessiner({
-    ...dessinStocks,
+    ...editeurSurfaces.obtenirDessin(),
+    cachees: new Set(projet.surfaces.filter((s) => !visibles.has(s))),
+    resultats: projet.surfaces.map((s) => {
+      const calcul = surfacesCalculees.get(s.id);
+      const volume = volumes.get(s.id);
+      return {
+        trianglesDessus: calcul?.triangles ?? null,
+        segmentsEnErreur: calcul?.segmentsEnErreur ?? [],
+        ...(volume && !volume.erreurs ? volume : {}),
+      };
+    }),
     ecarts: comparaison ? resultatsComparaisons[projet.comparaisons.indexOf(comparaison)].trianglesEcart : null,
-    ...(surface && dessinSurface.enEdition ? { listeEnCours: dessinSurface.listeEnCours, enEdition: true } : {}),
-    resultats: resultatsStocks,
-    surface: calcul && !calcul.erreurs ? { triangles: calcul.triangles, trianglesRetires: calcul.trianglesRetires } : null,
-    modeTriangles: Boolean(surface && editeurSurfaces.enSuppression()),
+    // Triangles supprimés à la main : montrés (en pointillés) pendant la suppression au doigt.
+    surface:
+      dansSurfaces && calculActif && !calculActif.erreurs && editeurSurfaces.enSuppression()
+        ? { triangles: calculActif.triangles, trianglesRetires: calculActif.trianglesRetires }
+        : null,
+    modeTriangles: dansSurfaces && editeurSurfaces.enSuppression(),
   });
   if (recadrer || pointsDuPlan !== pointsAffiches) {
     pointsAffiches = pointsDuPlan;
@@ -445,7 +475,6 @@ function mettreAJourAnnuler() {
 function revenirA(etat, message) {
   if (!etat) return;
   projet = completerProjet(etat);
-  editeurStocks.charger(leveActif(projet)?.stocks ?? [], { garderPosition: true });
   editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
   ecranExport.rafraichir();
   recalculer();
@@ -506,18 +535,19 @@ async function rafraichirListe() {
 
 /**
  * Ouvre un projet : il devient le projet affiché, et il est enregistré.
- * Puis on va à l'étape utile : les stocks s'il a déjà des points, sinon l'import.
+ * Puis on va à l'étape utile : les surfaces s'il a déjà des points, sinon l'import.
  */
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
   dernierImport = null;
-  changerDeLeve();
+  document.querySelector('#message-import-surface').innerHTML = '';
   editeurSurfaces.charger(projet.surfaces);
+  montrerUneSurfaceDuLeve();
   ecranExport.rafraichir();
   recalculer({ recadrer: true });
   historique.reinitialiser(modifications, projet);
   mettreAJourAnnuler();
-  if (changerOnglet) afficherOnglet(leveActif(projet) ? 'stocks' : 'importer');
+  if (changerOnglet) afficherOnglet(leveActif(projet) ? 'surfaces' : 'importer');
   await enregistrer();
 }
 

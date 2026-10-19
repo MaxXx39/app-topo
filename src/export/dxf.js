@@ -3,10 +3,10 @@
 //
 // Calques créés :
 // - POINTS : les points levés (avec altitude)       - NOMS : nom de chaque point
-// - CONTOURS : contour de chaque stock (3D)         - LIGNES_RUPTURE : lignes de rupture (3D)
-// - TRIANGLES_<stock> : triangles du dessus de chaque stock (faces 3D)
-// - SURFACE_<nom> : triangles de chaque surface du projet (faces 3D)
-// - COURBES : courbes de niveau des stocks (si demandées)
+// - CONTOURS : contour de chaque surface (3D)       - LIGNES_RUPTURE : lignes de rupture (3D)
+// - TRIANGLES_<nom> : triangles de chaque surface dont le volume est calculé (faces 3D)
+// - SURFACE_<nom> : triangles des autres surfaces (faces 3D)
+// - COURBES : courbes de niveau des surfaces calculées (si demandées)
 import { courbesDeNiveau } from '../topo/courbes.js';
 
 // Couleurs AutoCAD (numéros) : 1 rouge, 2 jaune, 3 vert, 4 cyan, 5 bleu, 6 magenta, 7 blanc/noir, 8 gris, 30 orange.
@@ -15,7 +15,7 @@ const COULEURS = { POINTS: 7, NOMS: 8, CONTOURS: 1, LIGNES_RUPTURE: 30, COURBES:
 /**
  * Construit le texte du fichier DXF.
  * - points : points du levé
- * - stocks, resultats : stocks et leurs volumes (resultats[i].trianglesDessus)
+ * - stocks, resultats : surfaces dont le volume est calculé, et leurs volumes (resultats[i].trianglesDessus)
  * - surfaces : liste de { nom, triangles }
  * - equidistance : équidistance des courbes de niveau (m), ou null pour ne pas en mettre
  */
@@ -30,9 +30,9 @@ export function genererDxf({ points, stocks = [], resultats = [], surfaces = [],
   }
 
   stocks.forEach((stock, i) => {
-    const contour = stock.contour.map((nom) => parNom.get(nom)).filter(Boolean);
+    const contour = (stock.contour ?? []).map((nom) => parNom.get(nom)).filter(Boolean);
     if (contour.length >= 3) entites.push(...polyligne3D(contour, true, 'CONTOURS'));
-    for (const ligne of stock.lignesRupture) {
+    for (const ligne of stock.lignesRupture ?? []) {
       const sommets = ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean);
       if (sommets.length >= 2) entites.push(...polyligne3D(sommets, ligne.fermee, 'LIGNES_RUPTURE'));
     }

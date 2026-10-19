@@ -22,14 +22,14 @@ const CALQUES = [
   { cle: 'points', titre: 'Points', parDefaut: true },
   { cle: 'noms', titre: 'Noms des points', parDefaut: true },
   { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false },
-  { cle: 'contours', titre: 'Contours des stocks', parDefaut: true },
+  { cle: 'contours', titre: 'Contours des surfaces', parDefaut: true },
   { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true },
   { cle: 'triangles', titre: 'Triangles', parDefaut: true },
   { cle: 'remblaiDeblai', titre: 'Remblai (rouge) / déblai (jaune)', parDefaut: true },
   { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false },
   { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false },
-  { cle: 'volumes', titre: 'Volume sur chaque stock', parDefaut: true },
-  { cle: 'autresStocks', titre: 'Autres stocks', parDefaut: true },
+  { cle: 'volumes', titre: 'Volume sur chaque surface', parDefaut: true },
+  { cle: 'autresStocks', titre: 'Autres surfaces', parDefaut: true },
 ];
 const CLE_MEMOIRE = 'topo-calques';
 // Équidistances proposées pour les courbes et les couleurs (m). « auto » : choisie selon la hauteur du stock.
@@ -98,13 +98,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
   // Ce qu'il faut dessiner (voir editeur.js et main.js) :
-  // stocks, stockActif, pointsDeBase, listeEnCours, enEdition, resultats (un par stock, voir volume.js)
+  // stocks (les surfaces du projet), stockActif (surface choisie), listeEnCours, enEdition,
+  // resultats (un par surface : trianglesDessus, et le volume s'il est calculé, voir volume.js),
+  // cachees : surfaces à ne pas dessiner (celles d'un autre levé)
   // surface : surface affichée { triangles, trianglesRetires } ; modeTriangles : suppression au doigt
   // ecarts : triangles d'écart d'une comparaison à colorier (onglet Comparer), sinon null
   let dessin = {
     stocks: [],
     stockActif: null,
-    pointsDeBase: [],
+    cachees: new Set(),
     listeEnCours: [],
     enEdition: false,
     resultats: [],
@@ -119,9 +121,19 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     return { largeur: rectangle.width, hauteur: rectangle.height };
   }
 
-  /** Noms des points qui appartiennent à un stock (tous rôles confondus). */
+  /** Noms des points choisis dans une surface (tous rôles confondus). */
   function nomsDuStock(stock) {
-    return [...stock.contour, ...stock.base, ...stock.lignesRupture.flatMap((l) => l.noms), ...stock.pointsDessus];
+    return [...(stock.contour ?? []), ...(stock.lignesRupture ?? []).flatMap((l) => l.noms), ...pointsChoisis(stock)];
+  }
+
+  /** Points choisis un par un pour une surface (rien si elle prend tous les points, ou si elle est importée). */
+  function pointsChoisis(stock) {
+    return stock.tousLesPoints ? [] : (stock.points ?? []).filter((p) => typeof p === 'string');
+  }
+
+  /** Vrai si la surface doit être dessinée : pas cachée, et active ou « Autres surfaces » coché. */
+  function estVisible(stock) {
+    return !dessin.cachees?.has(stock) && (stock === dessin.stockActif || calques.autresStocks);
   }
 
   // Légendes remplies pendant le dessin : relief (couleurs, équidistance) et remblai / déblai.
@@ -142,7 +154,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (!calques.autresStocks) {
       const nomsActifs = new Set(stock ? nomsDuStock(stock) : []);
       for (const autre of dessin.stocks) {
-        if (autre !== stock) for (const nom of nomsDuStock(autre)) if (!nomsActifs.has(nom)) nomsCaches.add(nom);
+        if (autre !== stock && !dessin.cachees?.has(autre)) for (const nom of nomsDuStock(autre)) if (!nomsActifs.has(nom)) nomsCaches.add(nom);
       }
     }
 
@@ -151,10 +163,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Rôle de chaque point dans le stock actif, pour lui donner une couleur.
     const classes = new Map();
     if (stock) {
-      for (const nom of stock.pointsDessus) classes.set(nom, 'role-dessus');
-      for (const nom of stock.lignesRupture.flatMap((ligne) => ligne.noms)) classes.set(nom, 'role-ligne');
-      for (const nom of dessin.pointsDeBase) classes.set(nom, 'role-base');
-      for (const nom of stock.contour) classes.set(nom, 'role-contour');
+      for (const nom of pointsChoisis(stock)) classes.set(nom, 'role-dessus');
+      for (const nom of (stock.lignesRupture ?? []).flatMap((ligne) => ligne.noms)) classes.set(nom, 'role-ligne');
+      for (const nom of stock.contour ?? []) classes.set(nom, 'role-contour');
     }
     const rangs = new Map(dessin.listeEnCours.map((nom, index) => [nom, index + 1]));
 
@@ -303,7 +314,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     dessinerSurface(groupe);
     dessin.stocks.forEach((stock, index) => {
       const actif = stock === dessin.stockActif;
-      if (!actif && !calques.autresStocks) return;
+      if (!estVisible(stock)) return;
       const resultat = dessin.resultats[index];
 
       // Triangles du dessus : stock actif seulement, pour ne pas surcharger.
@@ -317,11 +328,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         groupe.append(creerElement('path', { d: traits, class: 'triangles' }));
       }
       if (calques.contours) {
-        const contour = chemin(stock.contour, true);
+        const contour = chemin(stock.contour ?? [], true);
         if (contour) groupe.append(creerElement('path', { d: contour, class: actif ? 'contour actif' : 'contour' }));
       }
       if (calques.lignes) {
-        for (const ligne of stock.lignesRupture) {
+        for (const ligne of stock.lignesRupture ?? []) {
           const trace = chemin(ligne.noms, ligne.fermee);
           if (trace) groupe.append(creerElement('path', { d: trace, class: actif ? 'ligne-rupture actif' : 'ligne-rupture' }));
         }
@@ -343,7 +354,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const triangles =
       dessin.ecarts ??
       dessin.stocks.flatMap((stock, index) => {
-        if (stock !== dessin.stockActif && !calques.autresStocks) return [];
+        if (!estVisible(stock)) return [];
         return dessin.resultats[index]?.trianglesEcart ?? [];
       });
     if (triangles.length === 0) return;
@@ -393,7 +404,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    */
   function dessinerRelief(groupe) {
     const triangles = dessin.stocks.flatMap((stock, index) => {
-      if (stock !== dessin.stockActif && !calques.autresStocks) return [];
+      if (!estVisible(stock)) return [];
       return dessin.resultats[index]?.trianglesDessus ?? [];
     });
     // La surface affichée (onglet Comparer) est aussi coloriée.
@@ -495,20 +506,23 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
-  /** Nom et volume de remblai écrits au milieu de chaque stock calculé. */
+  /** Nom et volume (remblai, et déblai s'il y en a) écrits au milieu de chaque surface calculée. */
   function dessinerVolumes() {
     const groupe = creerElement('g', { class: 'volumes' });
     dessin.stocks.forEach((stock, index) => {
       const actif = stock === dessin.stockActif;
-      if (!actif && !calques.autresStocks) return;
+      if (!estVisible(stock)) return;
       const resultat = dessin.resultats[index];
-      const centre = resultat?.trianglesDessus ? pointInterieur(resultat.trianglesDessus) : null;
+      if (resultat?.remblai === undefined) return;
+      const centre = resultat.trianglesDessus ? pointInterieur(resultat.trianglesDessus) : null;
       if (!centre) return;
       const { x, y } = versEcran(centre.est, centre.nord, vue);
-      const lignes = [stock.nom, `${formaterNombre(resultat.remblai)} m³`];
+      const lignes = [stock.nom, `${resultat.deblai > 0 ? 'R ' : ''}${formaterNombre(resultat.remblai)} m³`];
+      if (resultat.deblai > 0) lignes.push(`D ${formaterNombre(resultat.deblai)} m³`);
       const largeur = Math.max(...lignes.map((l) => l.length)) * 7.2 + 16;
+      const hauteur = 22 + lignes.length * 16 - 16;
       groupe.append(
-        creerElement('rect', { x: x - largeur / 2, y: y - 20, width: largeur, height: 38, rx: 8, class: actif ? 'actif' : '' }),
+        creerElement('rect', { x: x - largeur / 2, y: y - 20, width: largeur, height: hauteur + 16, rx: 8, class: actif ? 'actif' : '' }),
       );
       lignes.forEach((ligne, i) => {
         const texte = creerElement('text', { x, y: y - 4 + i * 16, 'text-anchor': 'middle', class: i === 0 ? 'nom-stock' : '' });
@@ -674,7 +688,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const terrain = versTerrain(position.x, position.y, vue);
     const parNom = new Map(points.map((p) => [p.nom, p]));
     return dessin.stocks.findIndex((stock) => {
-      const contour = stock.contour.map((nom) => parNom.get(nom)).filter(Boolean);
+      if (dessin.cachees?.has(stock)) return false;
+      const contour = (stock.contour ?? []).map((nom) => parNom.get(nom)).filter(Boolean);
       return contour.length >= 3 && pointDansPolygone(terrain, contour);
     });
   }

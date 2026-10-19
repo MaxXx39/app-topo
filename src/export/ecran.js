@@ -103,7 +103,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
     landxml: () => {
       const { nomProjet, stocks, resultats, surfaces } = obtenirDonnees();
       const liste = [
-        ...stocks.map((stock, i) => ({ nom: `${stock.nom} (dessus)`, triangles: resultats[i]?.trianglesDessus ?? [] })),
+        ...stocks.map((stock, i) => ({ nom: stock.nom, triangles: resultats[i]?.trianglesDessus ?? [] })),
         ...surfaces,
       ].filter((s) => s.triangles.length > 0);
       if (liste.length === 0) {
@@ -154,7 +154,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
   /** Vérifie qu'il y a quelque chose à exporter, sinon affiche un message. */
   function verifier(resultats, comparaisons = []) {
     if (resultats.some((r) => !r.erreurs) || comparaisons.some(({ resultat }) => resultat && !resultat.erreurs)) return true;
-    message.textContent = 'Rien à exporter : complète d\'abord un stock ou une comparaison.';
+    message.textContent = 'Rien à exporter : choisis d\'abord la base d\'une surface (onglet 3. Volumes), ou crée une comparaison.';
     return false;
   }
 

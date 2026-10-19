@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { genererCsv } from '../src/export/csv.js';
 import { choisirEchelle, barreEchellePapier } from '../src/export/echelle.js';
+import { pointsDeReference, surfaceDeReference, volumeDeReference, STOCKS_REFERENCE } from './outils.js';
 
 describe('genererCsv', () => {
   const stocks = [{ nom: 'Stock 1' }, { nom: 'Stock; 2' }, { nom: 'Incomplet' }];
@@ -14,7 +15,7 @@ describe('genererCsv', () => {
 
   it('écrit l\'en-tête et une ligne par stock calculé', () => {
     expect(lignes).toEqual([
-      'Stock;Mode;Surface (m²);Remblai (m³);Déblai (m³)',
+      'Nom;Base;Surface (m²);Remblai (m³);Déblai (m³)',
       'Stock 1;A;758.638;1636.197;0.000',
       '"Stock; 2";B;436.969;0.000;1006.247',
     ]);
@@ -38,25 +39,10 @@ describe('barreEchellePapier', () => {
 });
 
 describe('creerPdf - levé du 20/05/2026', async () => {
-  const { readFileSync } = await import('node:fs');
-  const { lirePoints } = await import('../src/topo/import-points.js');
-  const { creerStock, lireListeDeNoms } = await import('../src/topo/stocks.js');
-  const { calculerVolumeStock } = await import('../src/topo/volume.js');
   const { creerPdf } = await import('../src/export/pdf.js');
-
-  const { points } = lirePoints(readFileSync(new URL('../exemples/stock_export.txt', import.meta.url), 'utf-8'));
-  const noms = points.map((p) => p.nom);
-  const stocks = [
-    ['Stock 1', 'b1 à b17', 'h1 à h31'],
-    ['Stock 2', 'b100 à b116', 'h100 à h114'],
-    ['Stock 3', 'b200 à b217', 'h200 à h216'],
-  ].map(([nom, contour, ligne]) => {
-    const stock = creerStock(nom);
-    stock.contour = lireListeDeNoms(contour, noms).noms;
-    stock.lignesRupture = [{ noms: lireListeDeNoms(ligne, noms).noms, fermee: true }];
-    return stock;
-  });
-  const resultats = stocks.map((stock) => calculerVolumeStock(stock, points));
+  const points = pointsDeReference();
+  const stocks = STOCKS_REFERENCE.map((stock) => surfaceDeReference(stock, points));
+  const resultats = STOCKS_REFERENCE.map((stock) => volumeDeReference(stock, points));
   const cartouche = { affaire: '10 203', date: '20.05.2026', dessinePar: 'MGO', fichierPoints: 'stock.csv' };
   const { document, echelle } = await creerPdf({ stocks, resultats, points, cartouche });
   const contenu = document.output();
@@ -90,7 +76,7 @@ describe('genererCsv - comparaisons', () => {
   it('ajoute les comparaisons après une ligne vide', () => {
     const texte = genererCsv([], [], [{ nom: 'Mai → juin', resultat: { surfacePlan: 400, remblai: 200, deblai: 12.3456 } }]);
     expect(texte.trim().split('\r\n')).toEqual([
-      'Stock;Mode;Surface (m²);Remblai (m³);Déblai (m³)',
+      'Nom;Base;Surface (m²);Remblai (m³);Déblai (m³)',
       '',
       'Comparaison;Surface (m²);Ajouté (m³);Enlevé (m³)',
       'Mai → juin;400.000;200.000;12.346',
@@ -99,17 +85,10 @@ describe('genererCsv - comparaisons', () => {
 });
 
 describe('creerPdf - calques', async () => {
-  const { readFileSync } = await import('node:fs');
-  const { lirePoints } = await import('../src/topo/import-points.js');
-  const { creerStock, lireListeDeNoms } = await import('../src/topo/stocks.js');
-  const { calculerVolumeStock } = await import('../src/topo/volume.js');
   const { creerPdf } = await import('../src/export/pdf.js');
-  const { points } = lirePoints(readFileSync(new URL('../exemples/stock_export.txt', import.meta.url), 'utf-8'));
-  const noms = points.map((p) => p.nom);
-  const stock = creerStock('Stock 2');
-  stock.contour = lireListeDeNoms('b100 à b116', noms).noms;
-  stock.lignesRupture = [{ noms: lireListeDeNoms('h100 à h114', noms).noms, fermee: true }];
-  const resultats = [calculerVolumeStock(stock, points)];
+  const points = pointsDeReference();
+  const stock = surfaceDeReference(STOCKS_REFERENCE[1], points);
+  const resultats = [volumeDeReference(STOCKS_REFERENCE[1], points)];
 
   it('ajoute courbes et couleurs dans la légende, et les comparaisons', async () => {
     const { document } = await creerPdf({

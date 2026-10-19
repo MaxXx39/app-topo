@@ -4,14 +4,16 @@
 // {
 //   format: 'topo-projet', version: 1,
 //   id, nom, creeLe, modifieLe (dates ISO),
-//   leves: [{ id, nom, importeLe, points: [{ nom, est, nord, altitude }], stocks: [...] }],
+//   leves: [{ id, nom, importeLe, points: [{ nom, est, nord, altitude }] }],
 //   leveActifId,                    // levé affiché
-//   surfaces: [...],                // voir topo/surface.js
-//   comparaisons: [{ id, nom, avantId, apresId, zone }],
-//                                   // zone : { type: 'toute' } ou { type: 'stock', leveId, stockNom }
+//   surfaces: [...],                // stocks, terrassements, terrains... : voir topo/surface.js
+//   comparaisons: [{ id, nom, avant, apres, zone }],
+//                                   // avant, apres : 'surface:<id>' ; zone : { type: 'toute' }
+//                                   // ou { type: 'surface', surfaceId } (contour d'une surface)
 //   cartouche: { affaire, dessinePar },
 // }
-// Les stocks appartiennent à un levé : leurs noms de points renvoient aux points de ce levé.
+// Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
+// aux points de ce levé.
 import { nouvelIdentifiant } from '../topo/surface.js';
 
 export const FORMAT = 'topo-projet';
@@ -37,7 +39,7 @@ export function creerProjet(nom) {
 
 /** Ajoute un levé (un fichier de points) au projet et le rend actif. Renvoie le levé. */
 export function ajouterLeve(projet, nomFichier, points) {
-  const leve = { id: nouvelIdentifiant(), nom: nomFichier, importeLe: new Date().toISOString(), points, stocks: [] };
+  const leve = { id: nouvelIdentifiant(), nom: nomFichier, importeLe: new Date().toISOString(), points };
   projet.leves.push(leve);
   projet.leveActifId = leve.id;
   return leve;
@@ -84,8 +86,11 @@ export function lireFichierProjet(texte) {
 export function completerProjet(projet) {
   const vide = creerProjet(projet.nom ?? 'Projet');
   const complet = { ...vide, ...projet, cartouche: { ...vide.cartouche, ...projet.cartouche } };
-  complet.leves = (complet.leves ?? []).map((leve) => ({ stocks: [], ...leve }));
-  complet.surfaces ??= [];
+  complet.leves ??= [];
+  complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
+    volume: { base: surface.type === 'points' ? 'contour' : 'aucune', surfaceId: null },
+    ...surface,
+  }));
   complet.comparaisons ??= [];
   return complet;
 }
@@ -97,7 +102,6 @@ export function resumerProjet(projet) {
     nom: projet.nom,
     modifieLe: projet.modifieLe,
     nombreLeves: projet.leves.length,
-    nombreStocks: projet.leves.reduce((n, l) => n + l.stocks.length, 0),
     nombreSurfaces: projet.surfaces.length,
   };
 }
