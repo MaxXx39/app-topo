@@ -84,7 +84,7 @@ Rester sur des outils très répandus :
 - **PWA** (installable sur téléphone et ordinateur) : plugin `vite-plugin-pwa`.
 - Calculs de topo dans des fichiers séparés de l'interface, faciles à tester.
 - Tests avec **Vitest**.
-- Plan dessiné en SVG ou canvas, sans carte de fond en V1.
+- Plan dessiné en SVG. Fonds swisstopo en option (photo aérienne SWISSIMAGE, cadastre), demandés par l'utilisateur : tuiles WMTS en MN95, connexion internet nécessaire, mention « © swisstopo » obligatoire.
 - PDF avec une bibliothèque courante (ex. jsPDF).
 - Triangulation avec contraintes (contour, lignes de rupture) : proposer une bibliothèque existante plutôt que l'écrire soi-même, et expliquer le choix.
 - Les données de l'utilisateur **restent sur son appareil** (pas de serveur, pas de compte).

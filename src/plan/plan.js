@@ -4,6 +4,7 @@ import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
+import { FONDS, niveauDeZoom, tuilesPourZone } from './fond.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -13,6 +14,8 @@ const RAYON_TOUCHER = 22;
 
 // Calques que l'on peut afficher ou masquer, avec leur état de départ.
 const CALQUES = [
+  { cle: 'fondSatellite', titre: 'Fond photo aérienne (swisstopo)', parDefaut: false },
+  { cle: 'cadastre', titre: 'Cadastre', parDefaut: false },
   { cle: 'points', titre: 'Points', parDefaut: true },
   { cle: 'noms', titre: 'Noms des points', parDefaut: true },
   { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false },
@@ -42,7 +45,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
   // Boutons posés sur le plan : calques en haut à gauche, zoom en haut à droite.
   conteneur.innerHTML = `
     <div class="plan-cadre">
+      <div class="plan-fond" aria-hidden="true"></div>
       <svg class="plan" role="img" aria-label="Plan des points"></svg>
+      <div class="plan-attribution" hidden></div>
       <div class="plan-calques">
         <button type="button" class="puce" data-action="calques" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5" /></svg>
@@ -71,6 +76,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
   const svg = conteneur.querySelector('svg.plan');
   const boutonCalques = conteneur.querySelector('[data-action="calques"]');
   const menuCalques = conteneur.querySelector('.menu-calques');
+  const cadre = conteneur.querySelector('.plan-cadre');
+  const fond = conteneur.querySelector('.plan-fond');
+  const attribution = conteneur.querySelector('.plan-attribution');
+  // Images des tuiles affichées, rangées par adresse (pour les réutiliser d'un dessin à l'autre).
+  const tuilesAffichees = new Map();
+  let fondIndisponible = false;
 
   let points = [];
   let vue = null;
@@ -98,6 +109,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
   function dessiner() {
     svg.replaceChildren();
     legende = null;
+    dessinerFond();
     if (!vue || points.length === 0) return;
 
     const stock = dessin.stockActif;
@@ -179,6 +191,77 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
     if (calques.volumes) dessinerVolumes();
     dessinerLegende();
     dessinerBarreEchelle();
+  }
+
+  /**
+   * Fonds de plan swisstopo (photo aérienne, cadastre) : des images posées sous le dessin.
+   * Seules les tuiles visibles à l'écran sont chargées (connexion internet nécessaire).
+   */
+  function dessinerFond() {
+    const couches = Object.keys(FONDS).filter((nom) => calques[nom === 'satellite' ? 'fondSatellite' : nom]);
+    const voulues = new Set();
+
+    if (vue && points.length > 0 && couches.length > 0) {
+      const z = niveauDeZoom(1 / vue.echelle, window.devicePixelRatio || 1);
+      const hautGauche = versTerrain(0, 0, vue);
+      const basDroite = versTerrain(vue.largeur, vue.hauteur, vue);
+      const tuiles = tuilesPourZone(
+        { estMin: hautGauche.est, estMax: basDroite.est, nordMin: basDroite.nord, nordMax: hautGauche.nord },
+        z,
+      );
+      // Garde-fou : on ne charge pas des centaines d'images d'un coup.
+      if (tuiles.length <= 300) {
+        couches.forEach((nom, ordre) => {
+          for (const tuile of tuiles) {
+            const adresse = FONDS[nom].url(tuile.z, tuile.colonne, tuile.ligne);
+            voulues.add(adresse);
+            let image = tuilesAffichees.get(adresse);
+            if (!image) {
+              image = document.createElement('img');
+              image.alt = '';
+              image.decoding = 'async';
+              image.draggable = false;
+              image.className = `tuile ${nom}`;
+              image.addEventListener('error', () => {
+                image.style.visibility = 'hidden';
+                fondIndisponible = true;
+                afficherAttribution(couches);
+              });
+              image.src = adresse;
+              tuilesAffichees.set(adresse, image);
+              fond.append(image);
+            }
+            // Position arrondie au pixel, un pixel de plus pour éviter les fentes entre tuiles.
+            const coin = versEcran(tuile.est, tuile.nord, vue);
+            const cote = tuile.cote * vue.echelle;
+            image.style.left = `${Math.floor(coin.x)}px`;
+            image.style.top = `${Math.floor(coin.y)}px`;
+            image.style.width = `${Math.ceil(cote) + 1}px`;
+            image.style.height = `${Math.ceil(cote) + 1}px`;
+            image.style.zIndex = String(ordre);
+          }
+        });
+      }
+    }
+
+    // On retire les tuiles qui ne servent plus (autre zoom, hors de l'écran, calque décoché).
+    for (const [adresse, image] of tuilesAffichees) {
+      if (!voulues.has(adresse)) {
+        image.remove();
+        tuilesAffichees.delete(adresse);
+      }
+    }
+    if (voulues.size === 0) fondIndisponible = false;
+    cadre.classList.toggle('avec-photo', calques.fondSatellite);
+    afficherAttribution(couches);
+  }
+
+  /** Mention obligatoire de la source des fonds (et message si le fond ne charge pas). */
+  function afficherAttribution(couches) {
+    attribution.hidden = couches.length === 0;
+    const textes = couches.map((nom) => FONDS[nom].attribution);
+    if (fondIndisponible) textes.push('fond indisponible (pas de connexion ?)');
+    attribution.textContent = textes.join(' · ');
   }
 
   /** Triangles, contours des stocks, lignes de rupture et segments en erreur. */
@@ -283,9 +366,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
     const { plage, equidistance } = legende;
     const largeur = 150;
     const x = vue.largeur - largeur - 12;
-    const y = vue.hauteur - (calques.couleursAltitude ? 74 : 44);
+    const bas = vue.hauteur - 20; // place pour la mention des sources en dessous
+    const y = bas - (calques.couleursAltitude ? 70 : 40);
     const groupe = creerElement('g', { class: 'legende' });
-    groupe.append(creerElement('rect', { x: x - 8, y: y - 8, width: largeur + 16, height: vue.hauteur - y - 4, rx: 8 }));
+    groupe.append(creerElement('rect', { x: x - 8, y: y - 8, width: largeur + 16, height: bas - y + 4, rx: 8 }));
     let ligne = y + 8;
     if (calques.couleursAltitude) {
       const pas = 20;
