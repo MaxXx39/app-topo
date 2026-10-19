@@ -948,3 +948,55 @@ svg.plan {
 .avec-photo .plan .triangles {
   stroke: rgba(255, 255, 255, 0.6);
 }
+
+.choix-mode {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0;
+}
+
+/* --- Export --- */
+
+.carte-export {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--bordure);
+}
+
+.carte-export h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.champs-export {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.champs-export label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--gris);
+}
+
+.champs-export input,
+.champs-export select {
+  width: 100%;
+  min-width: 0;
+  font-size: 1rem;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--texte);
+}
+
+@media (max-width: 480px) {
+  .champs-export {
+    grid-template-columns: 1fr;
+  }
+}

@@ -17,16 +17,19 @@ import Constrainautor from '@kninnug/constrainautor';
 import { pointsDeBase } from './stocks.js';
 
 /**
- * Calcule le volume d'un stock en mode A (base mesurée).
- * - stock : voir stocks.js
+ * Calcule le volume d'un stock.
+ * - stock : voir stocks.js. stock.modeBase choisit la surface de base :
+ *   'mesuree' (mode A, points du pied) ou 'landxml' (mode B, surface importée)
  * - points : tous les points importés { nom, est, nord, altitude }
+ * - surfaceLandXML : surface TIN choisie (voir landxml.js), utilisée en mode B
  * Renvoie { erreurs, segmentsEnErreur } si le calcul est impossible
  * (segmentsEnErreur : paires de noms des segments qui se croisent, s'il y en a), sinon :
  * { surfacePlan, remblai, deblai, surfaceRemblai, surfaceDeblai, surfaceNonCouverte,
  *   nombreTrianglesDessus, nombreTrianglesBase, trianglesDessus, trianglesBase }
  * Les triangles sont des listes de 3 points { nom, est, nord, altitude }.
  */
-export function calculerVolumeStock(stock, points) {
+export function calculerVolumeStock(stock, points, surfaceLandXML = null) {
+  const modeB = stock.modeBase === 'landxml';
   const parNom = new Map(points.map((p) => [p.nom, p]));
   const erreurs = [];
 
@@ -39,7 +42,8 @@ export function calculerVolumeStock(stock, points) {
   const absents = [...new Set(tousLesNoms.filter((nom) => !parNom.has(nom)))];
   if (absents.length > 0) erreurs.push(`point(s) absent(s) du fichier : ${absents.join(', ')}`);
   if (stock.contour.length < 3) erreurs.push('le contour doit avoir au moins 3 points');
-  if (pointsDeBase(stock).length < 3) erreurs.push('la surface de base doit avoir au moins 3 points');
+  if (!modeB && pointsDeBase(stock).length < 3) erreurs.push('la surface de base doit avoir au moins 3 points');
+  if (modeB && !surfaceLandXML) erreurs.push('mode B : importe d\'abord une surface LandXML (onglet LandXML)');
   if (erreurs.length > 0) return { erreurs };
 
   // Segments imposés : le contour (fermé) et les lignes de rupture.
@@ -55,14 +59,21 @@ export function calculerVolumeStock(stock, points) {
   // contour sont imposés, un triangle est soit entièrement dedans, soit entièrement dehors.
   const trianglesDessus = dessus.triangles.filter((t) => pointDansPolygone(centre(t), contour));
 
-  // --- Surface de base : les points du pied ---
-  // Les côtés du contour sont imposés quand leurs deux points font partie de la base.
-  const nomsBase = [...new Set(pointsDeBase(stock))];
-  const ensembleBase = new Set(nomsBase);
-  const segmentsBase = segmentsContour.filter(([a, b]) => ensembleBase.has(a) && ensembleBase.has(b));
-  const base = trianglerAvecContraintes(nomsBase, segmentsBase, parNom);
-  if (base.erreurs) return { ...base, erreurs: base.erreurs.map((e) => `surface de base : ${e}`) };
-  const trianglesBase = base.triangles;
+  // --- Surface de base ---
+  let trianglesBase;
+  if (modeB) {
+    // Mode B : les triangles de la surface LandXML remplacent la base.
+    trianglesBase = surfaceLandXML.triangles;
+  } else {
+    // Mode A : les points du pied. Les côtés du contour sont imposés quand leurs
+    // deux points font partie de la base.
+    const nomsBase = [...new Set(pointsDeBase(stock))];
+    const ensembleBase = new Set(nomsBase);
+    const segmentsBase = segmentsContour.filter(([a, b]) => ensembleBase.has(a) && ensembleBase.has(b));
+    const base = trianglerAvecContraintes(nomsBase, segmentsBase, parNom);
+    if (base.erreurs) return { ...base, erreurs: base.erreurs.map((e) => `surface de base : ${e}`) };
+    trianglesBase = base.triangles;
+  }
 
   // --- Superposition et volume ---
   const resultat = volumeEntreSurfaces(trianglesDessus, trianglesBase);
@@ -72,6 +83,8 @@ export function calculerVolumeStock(stock, points) {
     surfaceContour: Math.abs(airePolygone(contour)),
     nombreTrianglesDessus: trianglesDessus.length,
     nombreTrianglesBase: trianglesBase.length,
+    mode: modeB ? 'B' : 'A',
+    nomBase: modeB ? surfaceLandXML.nom : null,
     trianglesDessus,
     trianglesBase,
   };

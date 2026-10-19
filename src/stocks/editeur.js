@@ -25,8 +25,9 @@ const NOMS_DES_ROLES = {
  * - obtenirPoints() : renvoie les points importés
  * - quandChange() : appelé après chaque modification (pour redessiner le plan)
  * - allerAuPlan() : affiche l'onglet du plan (sur téléphone)
+ * - obtenirSurfaceLandXML() : surface LandXML choisie (mode B), ou null
  */
-export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChange, allerAuPlan }) {
+export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChange, allerAuPlan, obtenirSurfaceLandXML }) {
   const etat = {
     stocks: [],
     indexActif: -1,
@@ -146,6 +147,9 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
       stockActif().nom = cible.value.trim() || stockActif().nom;
     } else if (cible.dataset.champ === 'ligne-fermee') {
       stockActif().lignesRupture[Number(cible.dataset.index)].fermee = cible.checked;
+    } else if (cible.dataset.champ === 'mode-base') {
+      stockActif().modeBase = cible.value;
+      if (etat.edition?.role === 'base') etat.edition = null;
     } else if (cible.dataset.champ === 'base-egale-contour') {
       stockActif().baseEgaleContour = cible.checked;
       etat.edition = cible.checked ? null : { role: 'base', index: 0 };
@@ -179,6 +183,7 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
 
   function afficher() {
     const stock = stockActif();
+    const nomSurfaceLandXML = obtenirSurfaceLandXML?.()?.nom ?? null;
     const nomsExistants = obtenirPoints().map((p) => p.nom);
 
     let html = `
@@ -202,11 +207,17 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
         </div>
         ${carteRole(stock, { role: 'contour' }, 'Bord du stock, dans l\'ordre. Le polygone est fermé automatiquement.')}
         <div class="carte-role">
-          <div class="titre-role">
-            <strong>${NOMS_DES_ROLES.base}</strong>
-            <label class="case"><input type="checkbox" data-champ="base-egale-contour" ${stock.baseEgaleContour ? 'checked' : ''} /> mêmes points que le contour</label>
+          <div class="titre-role"><strong>${NOMS_DES_ROLES.base}</strong></div>
+          <div class="choix-mode">
+            <label class="case"><input type="radio" name="mode-base" data-champ="mode-base" value="mesuree" ${stock.modeBase !== 'landxml' ? 'checked' : ''} /> Mode A : points du pied</label>
+            <label class="case"><input type="radio" name="mode-base" data-champ="mode-base" value="landxml" ${stock.modeBase === 'landxml' ? 'checked' : ''} /> Mode B : surface LandXML</label>
           </div>
-          ${stock.baseEgaleContour ? '' : contenuRole(stock, { role: 'base' }, 'Points du pied du stock.')}
+          ${
+            stock.modeBase === 'landxml'
+              ? `<p class="aide">${nomSurfaceLandXML ? `Surface « ${echapper(nomSurfaceLandXML)} » (onglet LandXML).` : 'Aucune surface LandXML : importe-la dans l\'onglet LandXML.'}</p>`
+              : `<label class="case"><input type="checkbox" data-champ="base-egale-contour" ${stock.baseEgaleContour ? 'checked' : ''} /> mêmes points que le contour</label>
+                ${stock.baseEgaleContour ? '' : contenuRole(stock, { role: 'base' }, 'Points du pied du stock.')}`
+          }
         </div>
         ${stock.lignesRupture
           .map((_, index) =>
