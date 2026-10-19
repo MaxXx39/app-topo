@@ -465,12 +465,23 @@ export function creerEditeurStocks(conteneur, barre, options) {
     },
     /** À appeler quand les données changent ailleurs (import, autre onglet). */
     rafraichir: afficher,
-    /** Remplace la liste d'objets modifiée (par exemple les stocks d'un autre levé). */
-    charger(objets) {
+    /**
+     * Remplace la liste d'objets modifiée (par exemple les stocks d'un autre levé).
+     * garderPosition : après « Annuler », on reste sur le même objet et la même modification si possible.
+     */
+    charger(objets, { garderPosition = false } = {}) {
       etat.objets = objets;
-      etat.indexActif = objets.length > 0 ? 0 : -1;
-      etat.edition = null;
-      etat.suppression = false;
+      if (garderPosition) {
+        etat.indexActif = Math.min(Math.max(etat.indexActif, 0), objets.length - 1);
+        const objet = objetActif();
+        const ligneDisparue = etat.edition?.role === 'ligne' && etat.edition.index >= (objet?.lignesRupture.length ?? 0);
+        if (!objet || ligneDisparue) etat.edition = null;
+        if (!objet) etat.suppression = false;
+      } else {
+        etat.indexActif = objets.length > 0 ? 0 : -1;
+        etat.edition = null;
+        etat.suppression = false;
+      }
       afficher();
     },
     /** Arrête la modification en cours (quand un autre écran commence une modification). */

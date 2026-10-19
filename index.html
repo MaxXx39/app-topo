@@ -15,9 +15,15 @@
         <h1>Topo</h1>
         <p class="entete-etat" id="etat">Volumes de stocks</p>
       </div>
-      <button type="button" class="entete-projets" id="bouton-projets">
+      <button type="button" class="entete-icone-bouton" id="bouton-annuler" title="Annuler (Ctrl+Z)" aria-label="Annuler" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-3" /></svg>
+      </button>
+      <button type="button" class="entete-icone-bouton" id="bouton-retablir" title="Rétablir (Ctrl+Y)" aria-label="Rétablir" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5" /><path d="M20 9H9a5 5 0 0 0 0 10h3" /></svg>
+      </button>
+      <button type="button" class="entete-projets" id="bouton-projets" aria-label="Mes projets">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z" /></svg>
-        Mes projets
+        <span>Mes projets</span>
       </button>
     </header>
     <div id="app"></div>

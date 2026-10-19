@@ -121,6 +121,73 @@ p {
   stroke-linejoin: round;
 }
 
+/* Boutons ronds de l'en-tête (Annuler, Rétablir, Aide). */
+.entete-icone-bouton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.entete-icone-bouton svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.entete-icone-bouton:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.entete-icone-bouton:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Sur téléphone, « Mes projets » n'affiche que son icône pour laisser la place aux autres boutons. */
+@media (max-width: 480px) {
+  .entete {
+    gap: 4px;
+    padding: 0 8px 0 12px;
+  }
+
+  .entete-projets {
+    padding: 8px;
+  }
+
+  .entete-projets span {
+    display: none;
+  }
+}
+
+/* Petit message sous l'en-tête (« Modification annulée »). */
+.message-flottant {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--hauteur-entete) + 12px);
+  transform: translateX(-50%);
+  z-index: 50;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--sombre);
+  color: #ffffff;
+  font-size: 0.9rem;
+  box-shadow: var(--ombre);
+  pointer-events: none;
+}
+
 body[data-onglet='projets'] .entete-projets {
   background: var(--ambre);
   border-color: var(--ambre);

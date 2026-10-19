@@ -27,6 +27,7 @@ import {
   resumerProjet,
 } from './projet/projet.js';
 import * as stockage from './projet/stockage.js';
+import * as historique from './projet/historique.js';
 
 // --- État de l'application ---
 let projet = creerProjet('Mon projet'); // projet ouvert
@@ -35,7 +36,8 @@ let dernierImport = null; // résultat du dernier import (points ou LandXML)
 let surfacesCalculees = new Map(); // id de surface -> résultat de calculerSurface
 let resultatsStocks = []; // volumes des stocks du levé affiché
 let resultatsComparaisons = []; // une entrée par comparaison du projet
-let ongletContexte = 'importer'; // dernier onglet (hors plan) : décide de ce que montre le plan
+let ongletContexte = 'importer';
+const modifications = historique.creerHistorique(); // pour Annuler / Rétablir // dernier onglet (hors plan) : décide de ce que montre le plan
 
 // --- Mise en page : onglets ---
 // Les onglets numérotés suivent l'ordre du travail : importer, définir les stocks, lire les volumes.
@@ -398,11 +400,73 @@ let pointsAffiches = null;
 // --- Enregistrement automatique ---
 let minuterie = null;
 
-/** Après chaque modification : recalcule, puis enregistre le projet un court instant plus tard. */
+/** Après chaque modification : recalcule, retient l'étape (Annuler), puis enregistre un court instant plus tard. */
 function modifie(options) {
   recalculer(options);
+  historique.memoriser(modifications, projet);
+  mettreAJourAnnuler();
+  enregistrerBientot();
+}
+
+function enregistrerBientot() {
   clearTimeout(minuterie);
   minuterie = setTimeout(enregistrer, 400);
+}
+
+// --- Annuler / Rétablir ---
+
+const boutonAnnuler = document.querySelector('#bouton-annuler');
+const boutonRetablir = document.querySelector('#bouton-retablir');
+
+function mettreAJourAnnuler() {
+  boutonAnnuler.disabled = !historique.peutAnnuler(modifications);
+  boutonRetablir.disabled = !historique.peutRetablir(modifications);
+}
+
+/** Remplace le projet affiché par un état de l'historique, en restant au même endroit dans les écrans. */
+function revenirA(etat, message) {
+  if (!etat) return;
+  projet = completerProjet(etat);
+  editeurStocks.charger(leveActif(projet)?.stocks ?? [], { garderPosition: true });
+  editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+  ecranExport.rafraichir();
+  recalculer();
+  mettreAJourAnnuler();
+  afficherMessage(message);
+  enregistrerBientot();
+}
+
+const annulerModification = () => revenirA(historique.annuler(modifications), 'Modification annulée');
+const retablirModification = () => revenirA(historique.retablir(modifications), 'Modification rétablie');
+boutonAnnuler.addEventListener('click', annulerModification);
+boutonRetablir.addEventListener('click', retablirModification);
+
+// Raccourcis clavier (ordinateur) : Ctrl+Z annule, Ctrl+Y ou Ctrl+Maj+Z rétablit.
+// Dans une case de texte, on laisse le navigateur annuler la frappe.
+document.addEventListener('keydown', (evenement) => {
+  if (!(evenement.ctrlKey || evenement.metaKey) || evenement.target.closest('input, textarea, select')) return;
+  const touche = evenement.key.toLowerCase();
+  if (touche === 'z' && !evenement.shiftKey) annulerModification();
+  else if (touche === 'y' || (touche === 'z' && evenement.shiftKey)) retablirModification();
+  else return;
+  evenement.preventDefault();
+});
+
+/** Petit message sous l'en-tête, qui disparaît tout seul. */
+let minuterieMessage = null;
+function afficherMessage(texte) {
+  let zone = document.querySelector('#message-flottant');
+  if (!zone) {
+    zone = document.createElement('div');
+    zone.id = 'message-flottant';
+    zone.className = 'message-flottant';
+    zone.setAttribute('role', 'status');
+    document.body.append(zone);
+  }
+  zone.textContent = texte;
+  zone.hidden = false;
+  clearTimeout(minuterieMessage);
+  minuterieMessage = setTimeout(() => (zone.hidden = true), 2000);
 }
 
 async function enregistrer() {
@@ -433,6 +497,8 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   editeurSurfaces.charger(projet.surfaces);
   ecranExport.rafraichir();
   recalculer({ recadrer: true });
+  historique.reinitialiser(modifications, projet);
+  mettreAJourAnnuler();
   if (changerOnglet) afficherOnglet(leveActif(projet) ? 'stocks' : 'importer');
   await enregistrer();
 }
@@ -450,6 +516,7 @@ async function demarrer() {
     // Base de données indisponible (navigation privée...) : l'appli marche, sans enregistrement.
     console.error(erreur);
     recalculer({ recadrer: true });
+    historique.reinitialiser(modifications, projet);
     document.querySelector('#etat').textContent = 'Attention : enregistrement impossible sur cet appareil';
   }
 }
