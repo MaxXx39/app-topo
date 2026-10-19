@@ -336,7 +336,15 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
         stockActif: stock,
         pointsDeBase: stock ? pointsDeBase(stock) : [],
         listeEnCours: stock && etat.edition ? listeDuRole(stock, etat.edition) : [],
+        enEdition: Boolean(stock && etat.edition),
       };
+    },
+    /** Choisit le stock affiché (par exemple en le touchant sur le plan). */
+    choisirStock(index) {
+      if (index === etat.indexActif) return;
+      etat.indexActif = index;
+      etat.edition = null;
+      changer();
     },
   };
 }

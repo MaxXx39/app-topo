@@ -20,7 +20,8 @@ import { pointsDeBase } from './stocks.js';
  * Calcule le volume d'un stock en mode A (base mesurée).
  * - stock : voir stocks.js
  * - points : tous les points importés { nom, est, nord, altitude }
- * Renvoie { erreurs } si le calcul est impossible, sinon :
+ * Renvoie { erreurs, segmentsEnErreur } si le calcul est impossible
+ * (segmentsEnErreur : paires de noms des segments qui se croisent, s'il y en a), sinon :
  * { surfacePlan, remblai, deblai, surfaceRemblai, surfaceDeblai, surfaceNonCouverte,
  *   nombreTrianglesDessus, nombreTrianglesBase, trianglesDessus, trianglesBase }
  * Les triangles sont des listes de 3 points { nom, est, nord, altitude }.
@@ -49,7 +50,7 @@ export function calculerVolumeStock(stock, points) {
   // --- Surface du dessus : tous les points du stock ---
   const nomsDessus = [...new Set(tousLesNoms)];
   const dessus = trianglerAvecContraintes(nomsDessus, [...segmentsContour, ...segmentsLignes], parNom);
-  if (dessus.erreurs) return { erreurs: dessus.erreurs };
+  if (dessus.erreurs) return dessus;
   // On garde les triangles dont le centre est dans le contour. Comme les côtés du
   // contour sont imposés, un triangle est soit entièrement dedans, soit entièrement dehors.
   const trianglesDessus = dessus.triangles.filter((t) => pointDansPolygone(centre(t), contour));
@@ -60,7 +61,7 @@ export function calculerVolumeStock(stock, points) {
   const ensembleBase = new Set(nomsBase);
   const segmentsBase = segmentsContour.filter(([a, b]) => ensembleBase.has(a) && ensembleBase.has(b));
   const base = trianglerAvecContraintes(nomsBase, segmentsBase, parNom);
-  if (base.erreurs) return { erreurs: base.erreurs.map((e) => `surface de base : ${e}`) };
+  if (base.erreurs) return { ...base, erreurs: base.erreurs.map((e) => `surface de base : ${e}`) };
   const trianglesBase = base.triangles;
 
   // --- Superposition et volume ---
@@ -182,7 +183,7 @@ export function trianglerAvecContraintes(noms, segments, parNom) {
   }
 
   const croisement = chercherCroisement(segments, parNom);
-  if (croisement) return { erreurs: [croisement] };
+  if (croisement) return { erreurs: [croisement.message], segmentsEnErreur: croisement.segments };
 
   // Coordonnées locales (autour du premier point) pour garder la précision des calculs.
   const origine = sommets[0];
@@ -219,7 +220,7 @@ function segmentsDeLigne(noms, fermee) {
 
 /**
  * Cherche deux segments imposés qui se croisent (ou se chevauchent).
- * Renvoie un message d'erreur, ou null si tout va bien.
+ * Renvoie { message, segments } (les deux segments fautifs), ou null si tout va bien.
  */
 function chercherCroisement(segments, parNom) {
   // On enlève les segments en double (même ligne saisie deux fois, ou contour = ligne).
@@ -240,10 +241,16 @@ function chercherCroisement(segments, parNom) {
       const p3 = parNom.get(c);
       const p4 = parNom.get(d);
       if (communs === 0 && segmentsSeCroisent(p1, p2, p3, p4)) {
-        return `les segments ${a}-${b} et ${c}-${d} se croisent : vérifie le contour et les lignes de rupture`;
+        return {
+          message: `les segments ${a}-${b} et ${c}-${d} se croisent : vérifie le contour et les lignes de rupture`,
+          segments: [liste[i], liste[j]],
+        };
       }
       if (communs === 1 && segmentsSeChevauchent(p1, p2, p3, p4)) {
-        return `les segments ${a}-${b} et ${c}-${d} se superposent : vérifie l'ordre des points`;
+        return {
+          message: `les segments ${a}-${b} et ${c}-${d} se superposent : vérifie l'ordre des points`,
+          segments: [liste[i], liste[j]],
+        };
       }
     }
   }

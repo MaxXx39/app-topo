@@ -91,6 +91,7 @@ creerEcranLandXML(document.querySelector('#landxml'), { quandChange: () => {} })
 
 const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPoint: (nom) => editeur.toucherPoint(nom),
+  quandToucherStock: (index) => editeur.choisirStock(index),
 });
 const editeur = creerEditeurStocks(document.querySelector('#stocks'), document.querySelector('#barre-edition'), {
   obtenirPoints: () => points,
@@ -105,8 +106,7 @@ function recalculer() {
   afficherResultats(document.querySelector('#resultats'), dessin.stocks, resultats);
   document.querySelector('#etat').textContent =
     points.length > 0 ? `${points.length} points · ${dessin.stocks.length} stock(s)` : 'Volumes de stocks';
-  const resultatActif = resultats[dessin.stocks.indexOf(dessin.stockActif)];
-  plan.redessiner({ ...dessin, triangles: resultatActif?.trianglesDessus ?? [] });
+  plan.redessiner({ ...dessin, resultats });
 }
 
 /** Montre les sections suivantes s'il y a des points, et cadre le plan sur ces points. */

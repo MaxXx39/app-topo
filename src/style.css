@@ -763,3 +763,84 @@ body:has(.barre-edition:not([hidden])) .colonne-gauche {
     white-space: normal;
   }
 }
+
+/* --- Calques et étiquettes du plan --- */
+
+.plan-calques {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
+
+button.puce {
+  border: none;
+  color: var(--texte);
+}
+
+.puce svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.menu-calques {
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: var(--surface);
+  border-radius: var(--rayon);
+  box-shadow: 0 4px 20px rgba(16, 24, 20, 0.18);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.92rem;
+}
+
+.menu-calques[hidden] {
+  display: none;
+}
+
+.plan .noms text.altitude {
+  fill: var(--gris);
+  font-size: 11px;
+}
+
+.plan .ligne-rupture {
+  stroke: #f3a777;
+}
+
+.plan .ligne-rupture.actif {
+  stroke: var(--orange);
+}
+
+.plan .segment-erreur {
+  fill: none;
+  stroke: var(--rouge);
+  stroke-width: 5;
+  stroke-dasharray: 8 5;
+  stroke-linecap: round;
+}
+
+.plan .volumes rect {
+  fill: rgba(255, 255, 255, 0.92);
+  stroke: #a3aca8;
+  stroke-width: 1;
+}
+
+.plan .volumes rect.actif {
+  stroke: var(--rouge);
+  stroke-width: 1.5;
+}
+
+.plan .volumes text {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--texte);
+}
+
+.plan .volumes text.nom-stock {
+  font-weight: 600;
+  fill: var(--gris);
+  font-size: 11px;
+}
