@@ -19,16 +19,19 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
       <button type="button" class="bouton-secondaire" data-action="zoom-plus" aria-label="Zoomer">+</button>
       <button type="button" class="bouton-secondaire" data-action="zoom-moins" aria-label="Dézoomer">−</button>
       <label class="case"><input type="checkbox" data-action="noms" checked /> Noms</label>
+      <label class="case"><input type="checkbox" data-action="triangles" checked /> Triangles</label>
     </div>
     <div class="plan-cadre"><svg class="plan" role="img" aria-label="Plan des points"></svg></div>
   `;
   const svg = conteneur.querySelector('svg');
   const caseNoms = conteneur.querySelector('[data-action="noms"]');
+  const caseTriangles = conteneur.querySelector('[data-action="triangles"]');
 
   let points = [];
   let vue = null;
   // Stocks à dessiner : { stocks, stockActif, pointsDeBase, listeEnCours } (voir editeur.js)
-  let dessin = { stocks: [], stockActif: null, pointsDeBase: [], listeEnCours: [] };
+  // triangles : triangles du dessus du stock actif (voir volume.js)
+  let dessin = { stocks: [], stockActif: null, pointsDeBase: [], listeEnCours: [], triangles: [] };
 
   /** Taille actuelle du plan à l'écran (pixels). */
   function taille() {
@@ -88,6 +91,15 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
     };
 
     const groupe = creerElement('g', { class: 'stocks' });
+    if (caseTriangles.checked && dessin.triangles?.length > 0) {
+      const traits = dessin.triangles
+        .map((triangle) => {
+          const [a, b, c] = triangle.map((p) => versEcran(p.est, p.nord, vue));
+          return `M${a.x} ${a.y} L${b.x} ${b.y} L${c.x} ${c.y} Z`;
+        })
+        .join(' ');
+      groupe.append(creerElement('path', { d: traits, class: 'triangles' }));
+    }
     for (const stock of dessin.stocks) {
       const actif = stock === dessin.stockActif;
       const contour = chemin(stock.contour, true);
@@ -134,6 +146,7 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
   conteneur.querySelector('[data-action="zoom-plus"]').addEventListener('click', () => zoomerAuCentre(1.5));
   conteneur.querySelector('[data-action="zoom-moins"]').addEventListener('click', () => zoomerAuCentre(1 / 1.5));
   caseNoms.addEventListener('change', dessiner);
+  caseTriangles.addEventListener('change', dessiner);
 
   // --- Molette de la souris : zoom autour du curseur ---
   svg.addEventListener(

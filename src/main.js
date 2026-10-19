@@ -5,6 +5,7 @@ import { formaterNombre } from './topo/format.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurStocks } from './stocks/editeur.js';
 import { echapper } from './outils/echapper.js';
+import { calculerTousLesStocks, afficherResultats } from './stocks/resultats.js';
 
 // Les points du dernier fichier importé (utilisés par les étapes suivantes).
 let points = [];
@@ -30,6 +31,10 @@ app.innerHTML = `
     <p class="aide">Un doigt pour déplacer, deux doigts pour zoomer (molette à l'ordinateur). Pendant une modification, touche un point pour l'ajouter ou le retirer.</p>
     <div id="plan"></div>
   </section>
+  <section class="apres-import" hidden>
+    <h2>4. Volumes (mode A : base mesurée)</h2>
+    <div id="resultats"></div>
+  </section>
   <div id="barre-edition" class="barre-edition" hidden></div>
 `;
 
@@ -38,14 +43,23 @@ const plan = creerPlan(document.querySelector('#plan'), {
 });
 const editeur = creerEditeurStocks(document.querySelector('#stocks'), document.querySelector('#barre-edition'), {
   obtenirPoints: () => points,
-  quandChange: () => plan.redessiner(editeur.obtenirDessin()),
+  quandChange: () => recalculer(),
 });
+
+/** Recalcule les volumes, les affiche, et redessine le plan avec les triangles du stock actif. */
+function recalculer() {
+  const dessin = editeur.obtenirDessin();
+  const resultats = calculerTousLesStocks(dessin.stocks, points);
+  afficherResultats(document.querySelector('#resultats'), dessin.stocks, resultats);
+  const resultatActif = resultats[dessin.stocks.indexOf(dessin.stockActif)];
+  plan.redessiner({ ...dessin, triangles: resultatActif?.trianglesDessus ?? [] });
+}
 
 /** Montre les sections suivantes s'il y a des points, et cadre le plan sur ces points. */
 function mettreAJourPlan() {
   for (const section of document.querySelectorAll('.apres-import')) section.hidden = points.length === 0;
   editeur.rafraichir();
-  plan.redessiner(editeur.obtenirDessin());
+  recalculer();
   if (points.length > 0) plan.afficherPoints(points);
 }
 

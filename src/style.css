@@ -389,3 +389,24 @@ button:disabled {
   border-color: #cccccc;
   color: #999999;
 }
+
+/* --- Volumes --- */
+
+.incomplet {
+  color: var(--gris);
+  font-style: italic;
+}
+
+.detail-stock {
+  margin: 8px 0;
+}
+
+.tableau-detail td:last-child {
+  text-align: right;
+}
+
+.plan .triangles {
+  fill: none;
+  stroke: #7c8b99;
+  stroke-width: 0.8;
+}
