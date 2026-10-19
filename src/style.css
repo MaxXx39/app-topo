@@ -890,3 +890,61 @@ button.puce {
   min-height: 36px;
   padding: 4px 8px;
 }
+
+/* --- Fonds de plan swisstopo --- */
+
+.plan-fond {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.plan-fond img {
+  position: absolute;
+  max-width: none;
+  user-select: none;
+}
+
+/* Le dessin et les boutons restent au-dessus du fond. */
+svg.plan {
+  position: relative;
+  z-index: 1;
+}
+
+.plan-calques,
+.plan-boutons {
+  z-index: 2;
+}
+
+.plan-attribution {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: 1px 6px;
+  background: rgba(255, 255, 255, 0.85);
+  border-top-left-radius: 6px;
+  font-size: 10px;
+  color: var(--texte);
+}
+
+/* Sur la photo aérienne : contours et noms plus contrastés. */
+.avec-photo .plan .noms text {
+  stroke: rgba(255, 255, 255, 0.9);
+}
+
+.avec-photo .plan .contour {
+  fill: rgba(255, 255, 255, 0.08);
+  stroke: #ffffff;
+}
+
+.avec-photo .plan .contour.actif {
+  stroke: var(--ambre);
+  stroke-width: 2.5;
+  fill: rgba(246, 171, 7, 0.12);
+}
+
+.avec-photo .plan .triangles {
+  stroke: rgba(255, 255, 255, 0.6);
+}
