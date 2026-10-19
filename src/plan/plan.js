@@ -4,6 +4,7 @@ import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
+import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -18,10 +19,16 @@ const CALQUES = [
   { cle: 'contours', titre: 'Contours des stocks', parDefaut: true },
   { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true },
   { cle: 'triangles', titre: 'Triangles', parDefaut: true },
+  { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false },
+  { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false },
   { cle: 'volumes', titre: 'Volume sur chaque stock', parDefaut: true },
   { cle: 'autresStocks', titre: 'Autres stocks', parDefaut: true },
 ];
 const CLE_MEMOIRE = 'topo-calques';
+// Équidistances proposées pour les courbes et les couleurs (m). « auto » : choisie selon la hauteur du stock.
+const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
+// Couleurs du plus bas (bleu) au plus haut (rouge), palette classique des cartes d'altitude.
+const PALETTE = ['#2c7bb6', '#abd9e9', '#ffffbf', '#fdae61', '#d7191c'];
 
 /**
  * Crée le plan dans l'élément "conteneur" de la page.
@@ -45,6 +52,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
           ${CALQUES.map(
             (c) => `<label class="case"><input type="checkbox" data-calque="${c.cle}" ${calques[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`,
           ).join('')}
+          <label class="choix-equidistance">Équidistance
+            <select data-calque="equidistance">
+              ${EQUIDISTANCES.map((e) => `<option value="${e}" ${calques.equidistance === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
+            </select>
+          </label>
         </div>
       </div>
       <div class="plan-boutons">
@@ -79,9 +91,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
     return [...stock.contour, ...stock.base, ...stock.lignesRupture.flatMap((l) => l.noms), ...stock.pointsDessus];
   }
 
+  // Légende du relief (couleurs, équidistance), remplie par dessinerRelief.
+  let legende = null;
+
   /** Redessine tout le plan avec la vue actuelle. */
   function dessiner() {
     svg.replaceChildren();
+    legende = null;
     if (!vue || points.length === 0) return;
 
     const stock = dessin.stockActif;
@@ -161,6 +177,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
 
     svg.append(groupePoints, groupeNoms);
     if (calques.volumes) dessinerVolumes();
+    dessinerLegende();
     dessinerBarreEchelle();
   }
 
@@ -174,6 +191,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
     };
 
     const groupe = creerElement('g', { class: 'stocks' });
+    if (calques.couleursAltitude || calques.courbes) dessinerRelief(groupe);
     dessin.stocks.forEach((stock, index) => {
       const actif = stock === dessin.stockActif;
       if (!actif && !calques.autresStocks) return;
@@ -205,6 +223,92 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
         if (trace) groupe.append(creerElement('path', { d: trace, class: 'segment-erreur' }));
       }
     });
+    svg.append(groupe);
+  }
+
+  /**
+   * Couleurs selon l'altitude et courbes de niveau, sur la surface du dessus des stocks visibles.
+   * Les couleurs utilisent la même échelle pour tous les stocks, pour pouvoir les comparer.
+   */
+  function dessinerRelief(groupe) {
+    const triangles = dessin.stocks.flatMap((stock, index) => {
+      if (stock !== dessin.stockActif && !calques.autresStocks) return [];
+      return dessin.resultats[index]?.trianglesDessus ?? [];
+    });
+    if (triangles.length === 0) return;
+    const plage = plageAltitudes(triangles);
+    const equidistance =
+      calques.equidistance === 'auto' ? equidistanceAuto(plage.min, plage.max) : Number(calques.equidistance);
+    const versPixels = (p) => versEcran(p.est, p.nord, vue);
+
+    if (calques.couleursAltitude) {
+      // Une couleur par bande : on regroupe les morceaux de même altitude en un seul tracé.
+      const tracesParBande = new Map();
+      for (const { altitude, polygone } of bandesDeNiveau(triangles, equidistance)) {
+        const trace = polygone.map((p, i) => {
+          const { x, y } = versPixels(p);
+          return `${i === 0 ? 'M' : 'L'}${x} ${y}`;
+        });
+        if (!tracesParBande.has(altitude)) tracesParBande.set(altitude, []);
+        tracesParBande.get(altitude).push(trace.join(' ') + ' Z');
+      }
+      for (const [altitude, traces] of tracesParBande) {
+        const milieu = altitude + equidistance / 2;
+        groupe.append(creerElement('path', { d: traces.join(' '), class: 'bande', fill: couleurAltitude(milieu, plage) }));
+      }
+    }
+
+    if (calques.courbes) {
+      // Une courbe sur 5 (courbe maîtresse) est plus épaisse.
+      const traits = { normale: [], maitresse: [] };
+      for (const { altitude, a, b } of courbesDeNiveau(triangles, equidistance)) {
+        const pa = versPixels(a);
+        const pb = versPixels(b);
+        const rang = altitude / (5 * equidistance);
+        const type = Math.abs(rang - Math.round(rang)) < 1e-6 ? 'maitresse' : 'normale';
+        traits[type].push(`M${pa.x} ${pa.y} L${pb.x} ${pb.y}`);
+      }
+      if (traits.normale.length > 0) groupe.append(creerElement('path', { d: traits.normale.join(' '), class: 'courbe' }));
+      if (traits.maitresse.length > 0) {
+        groupe.append(creerElement('path', { d: traits.maitresse.join(' '), class: 'courbe maitresse' }));
+      }
+    }
+
+    legende = { plage, equidistance };
+  }
+
+  /** Légende en bas à droite : échelle des couleurs et équidistance. */
+  function dessinerLegende() {
+    if (!legende) return;
+    const { plage, equidistance } = legende;
+    const largeur = 150;
+    const x = vue.largeur - largeur - 12;
+    const y = vue.hauteur - (calques.couleursAltitude ? 74 : 44);
+    const groupe = creerElement('g', { class: 'legende' });
+    groupe.append(creerElement('rect', { x: x - 8, y: y - 8, width: largeur + 16, height: vue.hauteur - y - 4, rx: 8 }));
+    let ligne = y + 8;
+    if (calques.couleursAltitude) {
+      const pas = 20;
+      for (let i = 0; i < pas; i++) {
+        const altitude = plage.min + ((i + 0.5) / pas) * (plage.max - plage.min);
+        groupe.append(
+          creerElement('rect', { x: x + (i * largeur) / pas, y: ligne, width: largeur / pas + 0.5, height: 10, fill: couleurAltitude(altitude, plage) }),
+        );
+      }
+      const textes = [
+        [x, formaterNombre(plage.min), 'start'],
+        [x + largeur, formaterNombre(plage.max), 'end'],
+      ];
+      for (const [tx, contenu, ancre] of textes) {
+        const texte = creerElement('text', { x: tx, y: ligne + 24, 'text-anchor': ancre });
+        texte.textContent = contenu;
+        groupe.append(texte);
+      }
+      ligne += 38;
+    }
+    const texte = creerElement('text', { x, y: ligne + 4 });
+    texte.textContent = `Équidistance ${equidistance} m`;
+    groupe.append(texte);
     svg.append(groupe);
   }
 
@@ -277,7 +381,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
     boutonCalques.setAttribute('aria-expanded', String(!menuCalques.hidden));
   });
   menuCalques.addEventListener('change', (evenement) => {
-    calques[evenement.target.dataset.calque] = evenement.target.checked;
+    const champ = evenement.target;
+    calques[champ.dataset.calque] = champ.type === 'checkbox' ? champ.checked : champ.value;
     memoriserCalques(calques);
     dessiner();
   });
@@ -427,9 +532,11 @@ function milieu(a, b) {
 /** Relit les calques choisis la dernière fois (gardés dans le navigateur), sinon ceux par défaut. */
 function lireCalques() {
   const calques = Object.fromEntries(CALQUES.map((c) => [c.cle, c.parDefaut]));
+  calques.equidistance = 'auto';
   try {
     const memoire = JSON.parse(localStorage.getItem(CLE_MEMOIRE) ?? '{}');
     for (const c of CALQUES) if (typeof memoire[c.cle] === 'boolean') calques[c.cle] = memoire[c.cle];
+    if (EQUIDISTANCES.includes(memoire.equidistance)) calques.equidistance = memoire.equidistance;
   } catch {
     // Mémoire du navigateur indisponible (navigation privée...) : on garde les valeurs par défaut.
   }
@@ -442,4 +549,25 @@ function memoriserCalques(calques) {
   } catch {
     // Pas grave : les calques reviendront aux valeurs par défaut à la prochaine ouverture.
   }
+}
+
+/**
+ * Couleur d'une altitude (m) : du bleu (plus bas) au rouge (plus haut),
+ * en mélangeant les couleurs voisines de la palette.
+ */
+function couleurAltitude(altitude, plage) {
+  const etendue = plage.max - plage.min;
+  const t = etendue > 0 ? Math.min(Math.max((altitude - plage.min) / etendue, 0), 1) : 0.5;
+  const position = t * (PALETTE.length - 1);
+  const i = Math.min(Math.floor(position), PALETTE.length - 2);
+  const melange = position - i;
+  const [r1, g1, b1] = enRVB(PALETTE[i]);
+  const [r2, g2, b2] = enRVB(PALETTE[i + 1]);
+  const canal = (a, b) => Math.round(a + (b - a) * melange);
+  return `rgb(${canal(r1, r2)}, ${canal(g1, g2)}, ${canal(b1, b2)})`;
+}
+
+/** '#2c7bb6' -> [44, 123, 182] */
+function enRVB(couleur) {
+  return [1, 3, 5].map((i) => parseInt(couleur.slice(i, i + 2), 16));
 }
