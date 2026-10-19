@@ -302,7 +302,7 @@ export function creerEditeurStocks(conteneur, barre, options) {
                   <option value="">— choisir —</option>
                   ${surfaces.map((s) => `<option value="${s.id}" ${s.id === stock.surfaceBaseId ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}
                 </select>`
-              : '<p class="aide">Aucune surface : crée-en une ou importe un LandXML dans l\'onglet Surfaces.</p>'
+              : '<p class="aide">Aucune surface : importe un LandXML (onglet 1. Importer) ou crée-en une (onglet Comparer).</p>'
             : `<label class="case"><input type="checkbox" data-champ="base-egale-contour" ${stock.baseEgaleContour ? 'checked' : ''} /> mêmes points que le contour</label>
               ${stock.baseEgaleContour ? '' : contenuRole(stock, { role: 'base' }, 'Points du pied du stock.')}`
         }
@@ -312,7 +312,7 @@ export function creerEditeurStocks(conteneur, barre, options) {
       ${
         problemes.length > 0
           ? `<div class="avertissement"><p><strong>À compléter :</strong></p><ul>${problemes.map((p) => `<li>${echapper(p)}</li>`).join('')}</ul></div>`
-          : '<p class="ok">✓ Stock complet.</p>'
+          : '<p class="ok">✓ Stock complet : volume dans l\'onglet 3. Volumes.</p>'
       }`;
   }
 
@@ -328,10 +328,10 @@ export function creerEditeurStocks(conteneur, barre, options) {
         ${surface.tousLesPoints ? '' : contenuRole(surface, { role: 'dessus' }, 'Points utilisés pour la surface (en plus de ceux des lignes et du contour).')}
       </div>
       ${cartesLignes(surface)}
-      ${carteRole(surface, { role: 'contour' }, 'Bord de la surface. Sans contour, le bord suit les points extérieurs ; supprime ensuite les triangles en trop.')}
+      ${carteRole(surface, { role: 'contour' }, 'Bord de la surface. Sans contour, le bord suit les points extérieurs.')}
       <div class="carte-role ${etat.suppression ? 'en-edition' : ''}">
         <div class="titre-role"><strong>Triangles en trop</strong></div>
-        <p class="aide">${surface.trianglesSupprimes.length} triangle(s) supprimé(s). Active le mode, puis touche un triangle sur le plan pour le supprimer (toucher à nouveau le rétablit).</p>
+        <p class="aide">${surface.trianglesSupprimes.length} triangle(s) supprimé(s). Touche un triangle sur le plan pour le supprimer ou le rétablir.</p>
         <div class="ligne-outils">
           <button type="button" class="${etat.suppression ? 'bouton' : 'bouton-secondaire'}" data-action="mode-suppression">${etat.suppression ? 'Mode suppression actif' : 'Supprimer des triangles au doigt'}</button>
           <button type="button" class="bouton-secondaire" data-action="retablir-triangles" ${surface.trianglesSupprimes.length === 0 ? 'disabled' : ''}>Tout rétablir</button>
@@ -379,12 +379,12 @@ export function creerEditeurStocks(conteneur, barre, options) {
       ${
         edition.role === 'ligne'
           ? `<label class="case"><input type="checkbox" data-champ="ligne-fermee" data-index="${edition.index}" ${objet.lignesRupture[edition.index].fermee ? 'checked' : ''} /> ligne fermée (le dernier point est relié au premier)</label>
-            <p class="aide">Plusieurs séries touchées = plusieurs lignes indépendantes. Dans la liste tapée, sépare les lignes par « ; ».</p>`
+            <p class="aide">Une série = une ligne. Dans la liste, sépare les lignes par « ; ».</p>`
           : ''
       }
       ${
         series.length > 0
-          ? `<p class="aide">Séries trouvées dans le fichier (toucher pour l'ajouter) :</p>
+          ? `<p class="aide">Séries du fichier (toucher pour ajouter) :</p>
             <div class="series">
               ${series
                 .map(

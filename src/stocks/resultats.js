@@ -15,7 +15,7 @@ export function calculerTousLesStocks(stocks, points, obtenirSurfaceBase) {
 /** Affiche le tableau des volumes et le détail de chaque stock dans "conteneur". */
 export function afficherResultats(conteneur, stocks, resultats) {
   if (stocks.length === 0) {
-    conteneur.innerHTML = '<p class="aide">Crée un stock pour voir son volume.</p>';
+    conteneur.innerHTML = '<p class="vide">Crée d\'abord un stock (onglet 2. Stocks).</p>';
     return;
   }
 
@@ -77,27 +77,4 @@ function detailStock(stock, r) {
       </table>
     </details>
     ${nonCouvert}`;
-}
-
-/** Tableau des comparaisons (volume ajouté / enlevé entre deux surfaces). */
-export function afficherComparaisons(conteneur, comparaisons, resultats) {
-  if (comparaisons.length === 0) {
-    conteneur.innerHTML = '';
-    return;
-  }
-  const lignes = comparaisons
-    .map((c, i) => {
-      const r = resultats[i];
-      if (!r || r.erreurs) return `<tr><td>${echapper(c.nom)}</td><td colspan="3" class="incomplet">impossible</td></tr>`;
-      return `<tr><td>${echapper(c.nom)}</td><td>${formaterNombre(r.surfacePlan)}</td><td><strong>${formaterNombre(r.remblai)}</strong></td><td><strong>${formaterNombre(r.deblai)}</strong></td></tr>`;
-    })
-    .join('');
-  conteneur.innerHTML = `
-    <h3>Comparaisons</h3>
-    <div class="tableau-defilant">
-      <table>
-        <thead><tr><th>Comparaison</th><th>Surface (m²)</th><th>Ajouté (m³)</th><th>Enlevé (m³)</th></tr></thead>
-        <tbody>${lignes}</tbody>
-      </table>
-    </div>`;
 }

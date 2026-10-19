@@ -84,6 +84,49 @@ p {
   opacity: 0.8;
 }
 
+.entete-texte {
+  flex: 1;
+  min-width: 0;
+}
+
+.entete-texte .entete-etat {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Bouton « Mes projets » à droite de l'en-tête. */
+.entete-projets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: none;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.entete-projets svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+body[data-onglet='projets'] .entete-projets {
+  background: var(--ambre);
+  border-color: var(--ambre);
+  color: var(--sombre);
+}
+
 /* --- Onglets (barre du bas sur téléphone) --- */
 
 .onglets {
@@ -959,13 +1002,6 @@ svg.plan {
 
 .carte-export {
   margin-top: 20px;
-  padding-top: 12px;
-  border-top: 1px solid var(--bordure);
-}
-
-.carte-export h3 {
-  margin: 0 0 8px;
-  font-size: 1.05rem;
 }
 
 .champs-export {
@@ -1023,6 +1059,13 @@ svg.plan {
   margin: 22px 0 8px;
   padding-top: 14px;
   border-top: 1px solid var(--bordure);
+}
+
+/* Un sous-titre placé juste sous le titre de l'onglet n'a pas besoin de trait de séparation. */
+.panneau h2 + h3 {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .champ-large {

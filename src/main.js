@@ -10,9 +10,10 @@ import { calculerSurface, surfaceDepuisLandXML, cleTriangle } from './topo/surfa
 import { comparerSurfaces } from './topo/comparaison.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurStocks } from './stocks/editeur.js';
-import { calculerTousLesStocks, afficherResultats, afficherComparaisons } from './stocks/resultats.js';
+import { calculerTousLesStocks, afficherResultats } from './stocks/resultats.js';
 import { creerEcranExport, telecharger } from './export/ecran.js';
 import { creerEcranProjet } from './projet/ecran.js';
+import { creerEcranImport } from './import/ecran.js';
 import { creerEcranComparaisons } from './surfaces/comparaisons.js';
 import { echapper } from './outils/echapper.js';
 import {
@@ -29,54 +30,52 @@ import * as stockage from './projet/stockage.js';
 
 // --- État de l'application ---
 let projet = creerProjet('Mon projet'); // projet ouvert
-let resumes = []; // liste des projets enregistrés (pour l'onglet Projet)
-let dernierImport = null; // résultat du dernier import de points
+let resumes = []; // liste des projets enregistrés (pour l'écran Mes projets)
+let dernierImport = null; // résultat du dernier import (points ou LandXML)
 let surfacesCalculees = new Map(); // id de surface -> résultat de calculerSurface
 let resultatsStocks = []; // volumes des stocks du levé affiché
 let resultatsComparaisons = []; // une entrée par comparaison du projet
-let ongletContexte = 'projet'; // dernier onglet (hors plan) : décide de ce que montre le plan
+let ongletContexte = 'importer'; // dernier onglet (hors plan) : décide de ce que montre le plan
 
 // --- Mise en page : onglets ---
+// Les onglets numérotés suivent l'ordre du travail : importer, définir les stocks, lire les volumes.
+// « Comparer » (surfaces et comparaisons) est à part. « Mes projets » s'ouvre depuis l'en-tête.
 const ICONES = {
-  projet: '<path d="M3 7h6l2 2h10v10H3z" />',
+  importer: '<path d="M12 15V4M7 9l5-5 5 5M4 15v5h16v-5" />',
   stocks: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
-  surfaces: '<path d="M3 17 9 8l4 5 3-4 5 8zM3 17h18" /><path d="m9 8 7 1" />',
-  plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
   volumes: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
+  comparer: '<path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4" />',
+  plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
 };
 const ONGLETS = [
-  { nom: 'projet', titre: 'Projet' },
-  { nom: 'stocks', titre: 'Stocks' },
-  { nom: 'surfaces', titre: 'Surfaces' },
+  { nom: 'importer', titre: '1. Importer' },
+  { nom: 'stocks', titre: '2. Stocks' },
+  { nom: 'volumes', titre: '3. Volumes' },
+  { nom: 'comparer', titre: 'Comparer' },
   { nom: 'plan', titre: 'Plan' },
-  { nom: 'volumes', titre: 'Volumes' },
 ];
 
 document.querySelector('#app').innerHTML = `
   <div class="mise-en-page">
     <div class="colonne-gauche">
-      <section class="panneau" data-onglet="projet"><div id="projet"></div></section>
+      <section class="panneau" data-onglet="projets"><div id="projets"></div></section>
+      <section class="panneau" data-onglet="importer"><div id="importer"></div></section>
       <section class="panneau" data-onglet="stocks">
-        <h2>Stocks <span class="aide" id="nom-leve-stocks"></span></h2>
+        <h2>2. Stocks <span class="aide" id="nom-leve-stocks"></span></h2>
         <div class="avec-points" hidden><div id="stocks"></div></div>
-        <p class="vide sans-points">Importe d'abord un fichier de points (onglet Projet).</p>
-      </section>
-      <section class="panneau" data-onglet="surfaces">
-        <h2>Surfaces</h2>
-        <p class="aide">Une surface (modèle de terrain) se crée à partir des points d'un levé, ou s'importe d'un LandXML. Elle peut servir de base à un stock (mode B) ou être comparée à une autre.</p>
-        <div id="surfaces"></div>
-        <label class="bouton-secondaire bouton-fichier">
-          Importer une surface LandXML
-          <input type="file" id="fichier-landxml" accept=".xml,.landxml,application/xml,text/xml" hidden />
-        </label>
-        <div id="message-landxml"></div>
-        <div id="comparaisons" class="section-comparaisons"></div>
+        <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer).</p>
       </section>
       <section class="panneau" data-onglet="volumes">
-        <h2>Volumes</h2>
+        <h2>3. Volumes</h2>
         <div id="resultats"></div>
-        <div id="resultats-comparaisons"></div>
         <div id="export" class="carte-export"></div>
+      </section>
+      <section class="panneau" data-onglet="comparer">
+        <h2>Comparer</h2>
+        <h3>Surfaces</h3>
+        <p class="aide">Créées à partir des points d'un levé, ou importées d'un LandXML (onglet 1. Importer).</p>
+        <div id="surfaces"></div>
+        <div id="comparaisons" class="section-comparaisons"></div>
       </section>
       <div id="barre-stocks" class="barre-edition" hidden></div>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
@@ -111,6 +110,7 @@ document.querySelector('.onglets').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-onglet]');
   if (bouton) afficherOnglet(bouton.dataset.onglet);
 });
+document.querySelector('#bouton-projets').addEventListener('click', () => afficherOnglet('projets'));
 
 // --- Accès aux données du projet ---
 
@@ -182,21 +182,30 @@ function calculerComparaison(comparaison) {
 
 // --- Écrans ---
 
-const ecranProjet = creerEcranProjet(document.querySelector('#projet'), {
-  renommer: (nom) => {
-    if (nom) projet.nom = nom;
-    modifie();
-  },
+const ecranImport = creerEcranImport(document.querySelector('#importer'), {
   importerPoints: async (fichier) => {
     try {
       const resultat = lirePoints(await fichier.text());
-      dernierImport = { ...resultat, nomFichier: fichier.name };
+      dernierImport = { type: 'points', ...resultat, nomFichier: fichier.name };
       if (resultat.points.length > 0) {
         ajouterLeve(projet, fichier.name, resultat.points);
         changerDeLeve();
       }
     } catch (erreur) {
-      dernierImport = { nomFichier: fichier.name, format: '?', points: [], erreurs: [{ ligne: '-', message: erreur.message }], avertissements: [] };
+      dernierImport = { type: 'points', nomFichier: fichier.name, format: '?', points: [], erreurs: [{ ligne: '-', message: erreur.message }], avertissements: [] };
+    }
+    modifie({ recadrer: true });
+  },
+  // Chaque surface TIN du fichier devient une surface du projet.
+  importerLandXML: async (fichier) => {
+    try {
+      const { surfaces, erreurs, avertissements } = lireLandXML(await fichier.text());
+      for (const surface of surfaces) projet.surfaces.push(surfaceDepuisLandXML(surface, fichier.name));
+      dernierImport = { type: 'landxml', nomFichier: fichier.name, nombreSurfaces: surfaces.length, messages: [...erreurs, ...avertissements] };
+      editeurSurfaces.charger(projet.surfaces);
+      if (surfaces.length > 0) editeurSurfaces.choisir(projet.surfaces.length - 1);
+    } catch (erreur) {
+      dernierImport = { type: 'landxml', nomFichier: fichier.name, erreur: erreur.message };
     }
     modifie({ recadrer: true });
   },
@@ -217,6 +226,13 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projet'), {
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
     changerDeLeve();
     modifie({ recadrer: true });
+  },
+});
+
+const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
+  renommer: (nom) => {
+    if (nom) projet.nom = nom;
+    modifie();
   },
   exporterProjet: () => {
     const nom = projet.nom.replace(/[^\w-]+/g, '_') || 'projet';
@@ -241,10 +257,10 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projet'), {
     await stockage.supprimerProjet(id);
     if (id === projet.id) {
       const restants = (await stockage.listerProjets()).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
-      await ouvrir(restants[0] ? completerProjet(restants[0]) : creerProjet('Mon projet'));
+      await ouvrir(restants[0] ? completerProjet(restants[0]) : creerProjet('Mon projet'), { changerOnglet: false });
     } else {
       await rafraichirListe();
-      ecranProjet.afficher(projet, resumes, dernierImport);
+      ecranProjet.afficher(projet, resumes);
     }
   },
   importerFichierProjet: async (fichier) => {
@@ -331,26 +347,6 @@ function decrireSurface(surface) {
     ${r.avertissements.length > 0 ? `<div class="avertissement"><ul>${r.avertissements.map((a) => `<li>${echapper(a)}</li>`).join('')}</ul></div>` : ''}`;
 }
 
-// --- Import d'un LandXML : chaque surface TIN devient une surface du projet ---
-document.querySelector('#fichier-landxml').addEventListener('change', async (evenement) => {
-  const fichier = evenement.target.files[0];
-  if (!fichier) return;
-  const zone = document.querySelector('#message-landxml');
-  try {
-    const { surfaces, erreurs, avertissements } = lireLandXML(await fichier.text());
-    for (const surface of surfaces) projet.surfaces.push(surfaceDepuisLandXML(surface, fichier.name));
-    const messages = [...erreurs, ...avertissements];
-    zone.innerHTML = `<p class="resume"><strong>${surfaces.length} surface(s) TIN</strong> importée(s) de « ${echapper(fichier.name)} ».</p>
-      ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
-    editeurSurfaces.charger(projet.surfaces);
-    if (surfaces.length > 0) editeurSurfaces.choisir(projet.surfaces.length - 1);
-  } catch (erreur) {
-    zone.innerHTML = `<p class="erreur">Impossible de lire « ${echapper(fichier.name)} » : ${echapper(erreur.message)}</p>`;
-  }
-  evenement.target.value = '';
-  modifie({ recadrer: true });
-});
-
 // --- Calculs et affichage ---
 
 /** Après un changement de levé : l'écran des stocks montre les stocks de ce levé. */
@@ -375,12 +371,12 @@ function recalculer({ recadrer = false } = {}) {
   editeurStocks.rafraichir();
   editeurSurfaces.rafraichir();
   ecranComparaisons.afficher();
-  ecranProjet.afficher(projet, resumes, dernierImport);
+  ecranImport.afficher(projet, dernierImport);
+  ecranProjet.afficher(projet, resumes);
   afficherResultats(document.querySelector('#resultats'), leve?.stocks ?? [], resultatsStocks);
-  afficherComparaisons(document.querySelector('#resultats-comparaisons'), projet.comparaisons, resultatsComparaisons);
 
-  // Plan : dans l'onglet Surfaces, on montre la surface choisie (et les points de son levé).
-  const surface = ongletContexte === 'surfaces' ? editeurSurfaces.objetActif() : null;
+  // Plan : dans l'onglet Comparer, on montre la surface choisie (et les points de son levé).
+  const surface = ongletContexte === 'comparer' ? editeurSurfaces.objetActif() : null;
   const calcul = surface ? surfacesCalculees.get(surface.id) : null;
   const pointsDuPlan = surface ? (surface.type === 'landxml' ? surface.points : pointsDuLeve(surface.leveId)) : points;
   const dessinStocks = editeurStocks.obtenirDessin();
@@ -415,7 +411,7 @@ async function enregistrer() {
     await stockage.enregistrerProjet(projet);
     stockage.memoriserDernierProjet(projet.id);
     await rafraichirListe();
-    ecranProjet.afficher(projet, resumes, dernierImport);
+    ecranProjet.afficher(projet, resumes);
   } catch (erreur) {
     console.error(erreur);
     document.querySelector('#etat').textContent = `Enregistrement impossible : ${erreur.message}`;
@@ -426,20 +422,24 @@ async function rafraichirListe() {
   resumes = (await stockage.listerProjets()).map(resumerProjet).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
 }
 
-/** Ouvre un projet : il devient le projet affiché, et il est enregistré. */
-async function ouvrir(nouveau) {
+/**
+ * Ouvre un projet : il devient le projet affiché, et il est enregistré.
+ * Puis on va à l'étape utile : les stocks s'il a déjà des points, sinon l'import.
+ */
+async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
   dernierImport = null;
   changerDeLeve();
   editeurSurfaces.charger(projet.surfaces);
   ecranExport.rafraichir();
   recalculer({ recadrer: true });
+  if (changerOnglet) afficherOnglet(leveActif(projet) ? 'stocks' : 'importer');
   await enregistrer();
 }
 
 // --- Démarrage : on rouvre le dernier projet, sinon le plus récent, sinon un nouveau ---
 async function demarrer() {
-  afficherOnglet('projet');
+  afficherOnglet('importer');
   stockage.demanderStockagePersistant();
   try {
     await rafraichirListe();

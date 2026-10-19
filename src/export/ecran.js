@@ -50,7 +50,6 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
       <button type="button" class="bouton-secondaire" data-action="dxf">DXF</button>
       <button type="button" class="bouton-secondaire" data-action="landxml">LandXML</button>
     </div>
-    <p class="aide">DXF : points, contours, lignes de rupture, triangles (faces 3D), surfaces et courbes. LandXML : dessus de chaque stock et surfaces du projet.</p>
     <p class="aide" data-zone="message"></p>
   `;
   const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`);

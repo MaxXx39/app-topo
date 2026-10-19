@@ -44,7 +44,7 @@ export function calculerVolumeStock(stock, points, surfaceBase = null) {
   if (absents.length > 0) erreurs.push(`point(s) absent(s) du fichier : ${absents.join(', ')}`);
   if (stock.contour.length < 3) erreurs.push('le contour doit avoir au moins 3 points');
   if (!modeB && pointsDeBase(stock).length < 3) erreurs.push('la surface de base doit avoir au moins 3 points');
-  if (modeB && !surfaceBase) erreurs.push('mode B : choisis une surface de base (onglet Surfaces)');
+  if (modeB && !surfaceBase) erreurs.push('mode B : choisis une surface de base (créée dans l\'onglet Comparer ou importée d\'un LandXML)');
   if (modeB && surfaceBase?.triangles.length === 0) erreurs.push(`mode B : la surface « ${surfaceBase.nom} » n'a aucun triangle`);
   if (erreurs.length > 0) return { erreurs };
 
