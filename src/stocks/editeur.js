@@ -106,6 +106,13 @@ export function creerEditeurStocks(conteneur, barre, options) {
     changer();
   }
 
+  /** Ajoute une ligne de rupture indépendante avec ces points, et passe à sa modification. */
+  function nouvelleLigne(noms) {
+    const objet = objetActif();
+    objet.lignesRupture.push({ ...creerLigne(), noms: [...noms] });
+    etat.edition = { role: 'ligne', index: objet.lignesRupture.length - 1 };
+  }
+
   const actions = {
     nouveau: () => {
       const nom = textes.nomParDefaut(etat.objets.length + 1);
@@ -136,15 +143,32 @@ export function creerEditeurStocks(conteneur, barre, options) {
     'retirer-dernier': () => remplacerListe(listeDuRole(objetActif(), etat.edition).slice(0, -1)),
     vider: () => remplacerListe([]),
     'utiliser-serie': (bouton) => {
-      // Ajoute la série proposée à la fin de la liste (sans répéter les points déjà dedans).
       const serie = detecterSeries(pointsDe(objetActif()).map((p) => p.nom))[Number(bouton.dataset.index)];
       const liste = listeDuRole(objetActif(), etat.edition);
-      remplacerListe([...liste, ...serie.filter((nom) => !liste.includes(nom))]);
+      if (etat.edition.role === 'ligne' && liste.length > 0) {
+        // Ligne de rupture déjà commencée : la série devient une nouvelle ligne, indépendante
+        // (elle n'est pas reliée à la ligne précédente).
+        nouvelleLigne(serie);
+      } else {
+        // Contour, points... : la série est ajoutée à la fin (sans répéter les points déjà dedans).
+        remplacerListe([...liste, ...serie.filter((nom) => !liste.includes(nom))]);
+      }
       etat.messages = [];
     },
     appliquer: () => {
       const texte = conteneur.querySelector('[data-champ="liste"]').value;
-      const resultat = lireListeDeNoms(texte, pointsDe(objetActif()).map((p) => p.nom));
+      const nomsExistants = pointsDe(objetActif()).map((p) => p.nom);
+      if (etat.edition.role === 'ligne') {
+        // Lignes de rupture : le point-virgule sépare des lignes indépendantes
+        // (« h1 à h31; h100 à h114 » donne 2 lignes), la virgule continue la même ligne.
+        const morceaux = texte.split(';').filter((m) => m.trim() !== '');
+        const lectures = (morceaux.length > 0 ? morceaux : ['']).map((m) => lireListeDeNoms(m, nomsExistants));
+        remplacerListe(lectures[0].noms);
+        for (const lecture of lectures.slice(1)) if (lecture.noms.length > 0) nouvelleLigne(lecture.noms);
+        etat.messages = lectures.flatMap((l) => l.erreurs);
+        return;
+      }
+      const resultat = lireListeDeNoms(texte, nomsExistants);
       remplacerListe(resultat.noms);
       etat.messages = resultat.erreurs;
     },
@@ -354,7 +378,8 @@ export function creerEditeurStocks(conteneur, barre, options) {
       <p class="aide">${aide}</p>
       ${
         edition.role === 'ligne'
-          ? `<label class="case"><input type="checkbox" data-champ="ligne-fermee" data-index="${edition.index}" ${objet.lignesRupture[edition.index].fermee ? 'checked' : ''} /> ligne fermée (le dernier point est relié au premier)</label>`
+          ? `<label class="case"><input type="checkbox" data-champ="ligne-fermee" data-index="${edition.index}" ${objet.lignesRupture[edition.index].fermee ? 'checked' : ''} /> ligne fermée (le dernier point est relié au premier)</label>
+            <p class="aide">Plusieurs séries touchées = plusieurs lignes indépendantes. Dans la liste tapée, sépare les lignes par « ; ».</p>`
           : ''
       }
       ${
