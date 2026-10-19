@@ -5,14 +5,20 @@
 //   contour: ['b1', 'b2', ...],      // bord du stock, dans l'ordre (fermé automatiquement)
 //   baseEgaleContour: true,          // si vrai, la surface de base utilise les points du contour
 //   base: [...],                     // points du pied (utilisés si baseEgaleContour est faux)
-//   lignesRupture: [['h1', 'h2', ...], ...], // haut de talus, arêtes : chaque ligne dans l'ordre
+//   lignesRupture: [{ noms: ['h1', 'h2', ...], fermee: false }, ...], // haut de talus, arêtes, dans l'ordre
+//                                    // fermee : le dernier point est relié au premier
 //   pointsDessus: [...],             // points isolés sur le dessus du stock
 // }
 // Les rôles sont choisis par l'utilisateur : on ne déduit jamais rien du nom d'un point.
 
 /** Crée un stock vide. */
 export function creerStock(nom) {
-  return { nom, contour: [], baseEgaleContour: true, base: [], lignesRupture: [[]], pointsDessus: [] };
+  return { nom, contour: [], baseEgaleContour: true, base: [], lignesRupture: [creerLigne()], pointsDessus: [] };
+}
+
+/** Crée une ligne de rupture vide (ouverte). */
+export function creerLigne() {
+  return { noms: [], fermee: false };
 }
 
 /** Points de la surface de base d'un stock (noms). */
@@ -109,17 +115,41 @@ export function verifierStock(stock, nomsExistants) {
   }
 
   stock.lignesRupture.forEach((ligne, index) => {
-    if (ligne.length === 1) problemes.push(`la ligne de rupture ${index + 1} n'a qu'un point (2 au minimum)`);
-    signalerDoublons(ligne, `ligne de rupture ${index + 1}`, problemes);
+    const minimum = ligne.fermee ? 3 : 2;
+    if (ligne.noms.length > 0 && ligne.noms.length < minimum) {
+      problemes.push(`la ligne de rupture ${index + 1} doit avoir au moins ${minimum} points${ligne.fermee ? ' (ligne fermée)' : ''}`);
+    }
+    signalerDoublons(ligne.noms, `ligne de rupture ${index + 1}`, problemes);
   });
 
-  const tous = [...stock.contour, ...pointsDeBase(stock), ...stock.lignesRupture.flat(), ...stock.pointsDessus];
+  const tous = [...stock.contour, ...pointsDeBase(stock), ...stock.lignesRupture.flatMap((ligne) => ligne.noms), ...stock.pointsDessus];
   const introuvables = [...new Set(tous.filter((nom) => !existe.has(nom)))];
   if (introuvables.length > 0) {
     problemes.push(`point(s) absent(s) du fichier importé : ${introuvables.join(', ')}`);
   }
 
   return problemes;
+}
+
+/**
+ * Repère les séries de points numérotés à la suite dans le fichier,
+ * par exemple b1, b2, ..., b17 puis h1, ..., h31.
+ * Ce ne sont que des propositions : c'est l'utilisateur qui choisit le rôle de chaque série.
+ * Renvoie une liste de séries (chacune est une liste de noms, d'au moins 2 points).
+ */
+export function detecterSeries(noms) {
+  const series = [];
+  let serie = [];
+  for (const nom of noms) {
+    if (serie.length > 0 && pasEntre(serie.at(-1), nom) === 1) {
+      serie.push(nom);
+    } else {
+      if (serie.length >= 2) series.push(serie);
+      serie = [nom];
+    }
+  }
+  if (serie.length >= 2) series.push(serie);
+  return series;
 }
 
 /** Ajoute un problème si un nom apparaît deux fois dans la même liste. */

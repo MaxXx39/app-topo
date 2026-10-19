@@ -48,7 +48,7 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
     const classes = new Map();
     if (stock) {
       for (const nom of stock.pointsDessus) classes.set(nom, 'role-dessus');
-      for (const nom of stock.lignesRupture.flat()) classes.set(nom, 'role-ligne');
+      for (const nom of stock.lignesRupture.flatMap((ligne) => ligne.noms)) classes.set(nom, 'role-ligne');
       for (const nom of dessin.pointsDeBase) classes.set(nom, 'role-base');
       for (const nom of stock.contour) classes.set(nom, 'role-contour');
     }
@@ -94,7 +94,7 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
       if (contour) groupe.append(creerElement('path', { d: contour, class: actif ? 'contour actif' : 'contour' }));
       if (!actif) continue;
       for (const ligne of stock.lignesRupture) {
-        const trace = chemin(ligne, false);
+        const trace = chemin(ligne.noms, ligne.fermee);
         if (trace) groupe.append(creerElement('path', { d: trace, class: 'ligne-rupture' }));
       }
     }

@@ -4,6 +4,8 @@
 // cocher des cases, ou toucher les points sur le plan.
 import {
   creerStock,
+  creerLigne,
+  detecterSeries,
   pointsDeBase,
   lireListeDeNoms,
   ecrireListeDeNoms,
@@ -41,7 +43,7 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
   function listeDuRole(stock, edition) {
     if (edition.role === 'contour') return stock.contour;
     if (edition.role === 'base') return stock.base;
-    if (edition.role === 'ligne') return stock.lignesRupture[edition.index];
+    if (edition.role === 'ligne') return stock.lignesRupture[edition.index].noms;
     return stock.pointsDessus;
   }
 
@@ -50,7 +52,7 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
     const { role, index } = etat.edition;
     if (role === 'contour') stock.contour = noms;
     else if (role === 'base') stock.base = noms;
-    else if (role === 'ligne') stock.lignesRupture[index] = noms;
+    else if (role === 'ligne') stock.lignesRupture[index].noms = noms;
     else stock.pointsDessus = noms;
   }
 
@@ -97,6 +99,13 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
     },
     'retirer-dernier': () => remplacerListe(listeDuRole(stockActif(), etat.edition).slice(0, -1)),
     vider: () => remplacerListe([]),
+    'utiliser-serie': (bouton) => {
+      // Ajoute la série proposée à la fin de la liste (sans répéter les points déjà dedans).
+      const serie = detecterSeries(obtenirPoints().map((p) => p.nom))[Number(bouton.dataset.index)];
+      const liste = listeDuRole(stockActif(), etat.edition);
+      remplacerListe([...liste, ...serie.filter((nom) => !liste.includes(nom))]);
+      etat.messages = [];
+    },
     appliquer: () => {
       const texte = conteneur.querySelector('[data-champ="liste"]').value;
       const resultat = lireListeDeNoms(texte, obtenirPoints().map((p) => p.nom));
@@ -105,13 +114,13 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
     },
     'ajouter-ligne': () => {
       const stock = stockActif();
-      stock.lignesRupture.push([]);
+      stock.lignesRupture.push(creerLigne());
       etat.edition = { role: 'ligne', index: stock.lignesRupture.length - 1 };
     },
     'supprimer-ligne': (bouton) => {
       const stock = stockActif();
       stock.lignesRupture.splice(Number(bouton.dataset.index), 1);
-      if (stock.lignesRupture.length === 0) stock.lignesRupture.push([]);
+      if (stock.lignesRupture.length === 0) stock.lignesRupture.push(creerLigne());
       etat.edition = null;
     },
   };
@@ -133,6 +142,8 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
       etat.edition = null;
     } else if (cible.dataset.champ === 'nom-stock') {
       stockActif().nom = cible.value.trim() || stockActif().nom;
+    } else if (cible.dataset.champ === 'ligne-fermee') {
+      stockActif().lignesRupture[Number(cible.dataset.index)].fermee = cible.checked;
     } else if (cible.dataset.champ === 'base-egale-contour') {
       stockActif().baseEgaleContour = cible.checked;
       etat.edition = cible.checked ? null : { role: 'base', index: 0 };
@@ -237,8 +248,28 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
     }
 
     const points = obtenirPoints();
+    const series = detecterSeries(points.map((p) => p.nom));
+    const nomsUtilises = new Set(etat.stocks.flatMap(nomsDuStock));
     return `
       <p class="aide">${aide}</p>
+      ${
+        edition.role === 'ligne'
+          ? `<label class="case"><input type="checkbox" data-champ="ligne-fermee" data-index="${edition.index}" ${stock.lignesRupture[edition.index].fermee ? 'checked' : ''} /> ligne fermée (le dernier point est relié au premier)</label>`
+          : ''
+      }
+      ${
+        series.length > 0
+          ? `<p class="aide">Séries trouvées dans le fichier (toucher pour l'ajouter) :</p>
+            <div class="series">
+              ${series
+                .map(
+                  (serie, index) =>
+                    `<button type="button" class="pastille ${serie.every((nom) => nomsUtilises.has(nom)) ? 'utilisee' : ''}" data-action="utiliser-serie" data-index="${index}">${echapper(ecrireListeDeNoms(serie))} <span class="aide">(${serie.length})</span></button>`,
+                )
+                .join('')}
+            </div>`
+          : ''
+      }
       <label class="champ-liste">
         Liste de noms (ex. « b100 à b116, b120 »)
         <span class="ligne-outils">
@@ -305,4 +336,9 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
       };
     },
   };
+}
+
+/** Tous les noms utilisés dans un stock, quel que soit leur rôle. */
+function nomsDuStock(stock) {
+  return [...stock.contour, ...stock.base, ...stock.lignesRupture.flatMap((ligne) => ligne.noms), ...stock.pointsDessus];
 }
