@@ -38,3 +38,87 @@ main {
   color: var(--gris);
   font-size: 0.9rem;
 }
+
+h2 {
+  font-size: 1.1rem;
+  color: var(--vert);
+}
+
+.bouton {
+  display: inline-block;
+  background: var(--vert);
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.resume {
+  margin-top: 16px;
+}
+
+.erreur,
+.avertissement {
+  border-radius: 6px;
+  padding: 4px 12px;
+  margin: 12px 0;
+}
+
+.erreur {
+  background: #fdecea;
+  border-left: 4px solid #c62828;
+}
+
+.avertissement {
+  background: #fff8e1;
+  border-left: 4px solid #f9a825;
+}
+
+.tableau-defilant {
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid #dddddd;
+  border-radius: 6px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #eeeeee;
+  white-space: nowrap;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  background: #f4f4f4;
+  text-align: left;
+}
+
+td:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sur téléphone : tableau plus compact pour voir les 4 colonnes. */
+@media (max-width: 480px) {
+  main {
+    padding: 12px;
+  }
+
+  table {
+    font-size: 0.8rem;
+  }
+
+  th,
+  td {
+    padding: 5px 6px;
+  }
+}
