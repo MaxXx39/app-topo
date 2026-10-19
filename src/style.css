@@ -849,3 +849,44 @@ button.puce {
   fill: var(--gris);
   font-size: 11px;
 }
+
+/* --- Relief : couleurs selon l'altitude et courbes de niveau --- */
+
+.plan .bande {
+  opacity: 0.75;
+  stroke: none;
+}
+
+.plan .courbe {
+  fill: none;
+  stroke: #6b4f2a;
+  stroke-width: 0.8;
+}
+
+.plan .courbe.maitresse {
+  stroke-width: 1.8;
+}
+
+.plan .legende rect:first-child {
+  fill: rgba(255, 255, 255, 0.92);
+}
+
+.plan .legende text {
+  font-size: 11px;
+  fill: var(--texte);
+}
+
+.choix-equidistance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--bordure);
+  margin-top: 4px;
+}
+
+.choix-equidistance select {
+  min-height: 36px;
+  padding: 4px 8px;
+}
