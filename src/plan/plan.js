@@ -5,6 +5,7 @@ import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
 import { FONDS, niveauDeZoom, tuilesPourZone } from './fond.js';
+import { couleurAltitude } from './couleurs.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -30,16 +31,16 @@ const CALQUES = [
 const CLE_MEMOIRE = 'topo-calques';
 // Équidistances proposées pour les courbes et les couleurs (m). « auto » : choisie selon la hauteur du stock.
 const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
-// Couleurs du plus bas (bleu) au plus haut (rouge), palette classique des cartes d'altitude.
-const PALETTE = ['#2c7bb6', '#abd9e9', '#ffffbf', '#fdae61', '#d7191c'];
 
 /**
  * Crée le plan dans l'élément "conteneur" de la page.
  * - quandToucherPoint(nom) : appelé quand on touche un point pendant une modification
  * - quandToucherStock(index) : appelé quand on touche l'intérieur d'un stock (hors modification)
+ * - quandToucherTriangle(triangle) : appelé quand on touche un triangle de la surface affichée,
+ *   en mode suppression de triangles (dessin.modeTriangles)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle } = {}) {
   const calques = lireCalques();
 
   // Boutons posés sur le plan : calques en haut à gauche, zoom en haut à droite.
@@ -89,7 +90,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
   let recadrerQuandVisible = false;
   // Ce qu'il faut dessiner (voir editeur.js et main.js) :
   // stocks, stockActif, pointsDeBase, listeEnCours, enEdition, resultats (un par stock, voir volume.js)
-  let dessin = { stocks: [], stockActif: null, pointsDeBase: [], listeEnCours: [], enEdition: false, resultats: [] };
+  // surface : surface affichée { triangles, trianglesRetires } ; modeTriangles : suppression au doigt
+  let dessin = {
+    stocks: [],
+    stockActif: null,
+    pointsDeBase: [],
+    listeEnCours: [],
+    enEdition: false,
+    resultats: [],
+    surface: null,
+    modeTriangles: false,
+  };
 
   /** Taille actuelle du plan à l'écran (pixels). */
   function taille() {
@@ -275,6 +286,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
 
     const groupe = creerElement('g', { class: 'stocks' });
     if (calques.couleursAltitude || calques.courbes) dessinerRelief(groupe);
+    dessinerSurface(groupe);
     dessin.stocks.forEach((stock, index) => {
       const actif = stock === dessin.stockActif;
       if (!actif && !calques.autresStocks) return;
@@ -309,6 +321,25 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
     svg.append(groupe);
   }
 
+  /** Surface affichée (onglet Surfaces) : ses triangles, et les triangles supprimés en pointillés rouges. */
+  function dessinerSurface(groupe) {
+    const surface = dessin.surface;
+    if (!surface) return;
+    const trace = (triangles) =>
+      triangles
+        .map((triangle) => {
+          const [a, b, c] = triangle.map((p) => versEcran(p.est, p.nord, vue));
+          return `M${a.x} ${a.y} L${b.x} ${b.y} L${c.x} ${c.y} Z`;
+        })
+        .join(' ');
+    if (calques.triangles && surface.triangles.length > 0) {
+      groupe.append(creerElement('path', { d: trace(surface.triangles), class: 'surface-triangles' }));
+    }
+    if (surface.trianglesRetires.length > 0) {
+      groupe.append(creerElement('path', { d: trace(surface.trianglesRetires), class: 'triangles-retires' }));
+    }
+  }
+
   /**
    * Couleurs selon l'altitude et courbes de niveau, sur la surface du dessus des stocks visibles.
    * Les couleurs utilisent la même échelle pour tous les stocks, pour pouvoir les comparer.
@@ -318,6 +349,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
       if (stock !== dessin.stockActif && !calques.autresStocks) return [];
       return dessin.resultats[index]?.trianglesDessus ?? [];
     });
+    // La surface affichée (onglet Surfaces) est aussi coloriée.
+    if (dessin.surface) triangles.push(...dessin.surface.triangles);
     if (triangles.length === 0) return;
     const plage = plageAltitudes(triangles);
     const equidistance =
@@ -526,7 +559,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = 
   svg.addEventListener('pointerup', (evenement) => {
     pointeurs.delete(evenement.pointerId);
     if (toucher && pointeurs.size === 0) {
-      if (dessin.enEdition) {
+      if (dessin.modeTriangles) {
+        // Suppression de triangles : on cherche le triangle sous le doigt.
+        const terrain = versTerrain(toucher.x, toucher.y, vue);
+        const tous = [...(dessin.surface?.triangles ?? []), ...(dessin.surface?.trianglesRetires ?? [])];
+        const triangle = tous.find((t) => pointDansPolygone(terrain, t));
+        if (triangle) quandToucherTriangle?.(triangle);
+      } else if (dessin.enEdition) {
         // Pendant une modification : toucher un point l'ajoute ou le retire.
         const point = pointLePlusProche(toucher);
         if (point) quandToucherPoint?.(point.nom);
@@ -633,25 +672,4 @@ function memoriserCalques(calques) {
   } catch {
     // Pas grave : les calques reviendront aux valeurs par défaut à la prochaine ouverture.
   }
-}
-
-/**
- * Couleur d'une altitude (m) : du bleu (plus bas) au rouge (plus haut),
- * en mélangeant les couleurs voisines de la palette.
- */
-function couleurAltitude(altitude, plage) {
-  const etendue = plage.max - plage.min;
-  const t = etendue > 0 ? Math.min(Math.max((altitude - plage.min) / etendue, 0), 1) : 0.5;
-  const position = t * (PALETTE.length - 1);
-  const i = Math.min(Math.floor(position), PALETTE.length - 2);
-  const melange = position - i;
-  const [r1, g1, b1] = enRVB(PALETTE[i]);
-  const [r2, g2, b2] = enRVB(PALETTE[i + 1]);
-  const canal = (a, b) => Math.round(a + (b - a) * melange);
-  return `rgb(${canal(r1, r2)}, ${canal(g1, g2)}, ${canal(b1, b2)})`;
-}
-
-/** '#2c7bb6' -> [44, 123, 182] */
-function enRVB(couleur) {
-  return [1, 3, 5].map((i) => parseInt(couleur.slice(i, i + 2), 16));
 }

@@ -58,7 +58,7 @@ describe('creerPdf - levé du 20/05/2026', async () => {
   });
   const resultats = stocks.map((stock) => calculerVolumeStock(stock, points));
   const cartouche = { affaire: '10 203', date: '20.05.2026', dessinePar: 'MGO', fichierPoints: 'stock.csv' };
-  const { document, echelle } = creerPdf({ stocks, resultats, points, cartouche });
+  const { document, echelle } = await creerPdf({ stocks, resultats, points, cartouche });
   const contenu = document.output();
 
   it('choisit 1:1000 pour les 3 stocks (59 m × 91 m : 182 mm de haut à 1:500, trop pour le cadre)', () => {
@@ -66,8 +66,8 @@ describe('creerPdf - levé du 20/05/2026', async () => {
     expect(contenu).toContain('1:1000');
   });
 
-  it('utilise l\'échelle imposée par l\'utilisateur', () => {
-    const impose = creerPdf({ stocks, resultats, points, cartouche, echelleImposee: 500 });
+  it('utilise l\'échelle imposée par l\'utilisateur', async () => {
+    const impose = await creerPdf({ stocks, resultats, points, cartouche, echelleImposee: 500 });
     expect(impose.echelle).toBe(500);
     expect(impose.document.output()).toContain('1:500');
   });
@@ -83,5 +83,52 @@ describe('creerPdf - levé du 20/05/2026', async () => {
   it('fait une seule page A4 paysage', () => {
     expect(document.getNumberOfPages()).toBe(1);
     expect(Math.round(document.internal.pageSize.getWidth())).toBe(297);
+  });
+});
+
+describe('genererCsv - comparaisons', () => {
+  it('ajoute les comparaisons après une ligne vide', () => {
+    const texte = genererCsv([], [], [{ nom: 'Mai → juin', resultat: { surfacePlan: 400, remblai: 200, deblai: 12.3456 } }]);
+    expect(texte.trim().split('\r\n')).toEqual([
+      'Stock;Mode;Surface (m²);Remblai (m³);Déblai (m³)',
+      '',
+      'Comparaison;Surface (m²);Ajouté (m³);Enlevé (m³)',
+      'Mai → juin;400.000;200.000;12.346',
+    ]);
+  });
+});
+
+describe('creerPdf - calques', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { lirePoints } = await import('../src/topo/import-points.js');
+  const { creerStock, lireListeDeNoms } = await import('../src/topo/stocks.js');
+  const { calculerVolumeStock } = await import('../src/topo/volume.js');
+  const { creerPdf } = await import('../src/export/pdf.js');
+  const { points } = lirePoints(readFileSync(new URL('../exemples/stock_export.txt', import.meta.url), 'utf-8'));
+  const noms = points.map((p) => p.nom);
+  const stock = creerStock('Stock 2');
+  stock.contour = lireListeDeNoms('b100 à b116', noms).noms;
+  stock.lignesRupture = [{ noms: lireListeDeNoms('h100 à h114', noms).noms, fermee: true }];
+  const resultats = [calculerVolumeStock(stock, points)];
+
+  it('ajoute courbes et couleurs dans la légende, et les comparaisons', async () => {
+    const { document } = await creerPdf({
+      stocks: [stock],
+      resultats,
+      points,
+      cartouche: {},
+      calques: { courbes: true, couleurs: true, noms: false },
+      comparaisons: [{ nom: 'Mai - juin', resultat: { remblai: 12.5, deblai: 3, surfacePlan: 100 } }],
+    });
+    const contenu = document.output();
+    expect(contenu).toContain('Courbes de niveau');
+    expect(contenu).toContain('Mai - juin');
+    expect(contenu).toContain('12.500');
+    expect(contenu).not.toContain('(b100)'); // noms des points décochés
+  });
+
+  it('crée le PDF sans le fond quand la photo est impossible (pas de navigateur)', async () => {
+    const { messageFond } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, calques: { photo: true } });
+    expect(messageFond).toBeTruthy();
   });
 });
