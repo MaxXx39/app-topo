@@ -1,6 +1,7 @@
 // Onglet 1. Importer : fichiers de points (levés) et surfaces LandXML.
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
+import { bulle } from '../aide/bulles.js';
 
 /**
  * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
@@ -30,7 +31,7 @@ export function creerEcranImport(conteneur, actions) {
     /** Redessine l'onglet. dernierImport : résultat du dernier import (points ou LandXML), ou null. */
     afficher(projet, dernierImport) {
       conteneur.innerHTML = `
-        <h2>1. Importer</h2>
+        <h2>1. Importer ${bulle('importer')}</h2>
         <div class="ligne-outils">
           <label class="bouton">
             + Fichier de points (CSV, TXT)
@@ -44,11 +45,10 @@ export function creerEcranImport(conteneur, actions) {
         ${dernierImport?.type === 'landxml' ? afficherImportLandXML(dernierImport) : ''}
         ${dernierImport?.type === 'points' ? afficherImportPoints(dernierImport) : ''}
 
-        <h3>Levés</h3>
+        <h3>Levés ${bulle('leves')}</h3>
         ${
           projet.leves.length > 0
-            ? `<p class="aide">Les stocks se rattachent au levé coché.</p>
-              <div class="liste-leves">${projet.leves
+            ? `<div class="liste-leves">${projet.leves
                 .map(
                   (leve) => `
                 <div class="carte-role ${leve.id === projet.leveActifId ? 'en-edition' : ''}">

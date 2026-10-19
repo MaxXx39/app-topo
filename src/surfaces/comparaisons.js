@@ -2,6 +2,7 @@
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { nouvelIdentifiant } from '../topo/surface.js';
+import { bulle } from '../aide/bulles.js';
 
 /**
  * Crée la section des comparaisons dans "conteneur".
@@ -50,8 +51,7 @@ export function creerEcranComparaisons(conteneur, { obtenirProjet, obtenirChoix,
       const options = (valeur) =>
         choix.map((c) => `<option value="${echapper(c.ref)}" ${c.ref === valeur ? 'selected' : ''}>${echapper(c.nom)}</option>`).join('');
       conteneur.innerHTML = `
-        <h3>Comparer deux surfaces</h3>
-        <p class="aide">Volume ajouté et volume enlevé entre deux dates.</p>
+        <h3>Comparer deux surfaces ${bulle('comparer')}</h3>
         ${projet.comparaisons
           .map((c) => {
             const r = obtenirResultat(c);

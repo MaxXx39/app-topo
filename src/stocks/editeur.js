@@ -17,6 +17,7 @@ import {
   verifierStock,
 } from '../topo/stocks.js';
 import { creerSurface } from '../topo/surface.js';
+import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
 
 const TEXTES = {
@@ -288,9 +289,9 @@ export function creerEditeurStocks(conteneur, barre, options) {
     const modeB = stock.modeBase === 'surface' || stock.modeBase === 'landxml';
     const surfaces = obtenirSurfaces?.() ?? [];
     return `
-      ${carteRole(stock, { role: 'contour' }, 'Bord du stock, dans l\'ordre. Le polygone est fermé automatiquement.')}
+      ${carteRole(stock, { role: 'contour' }, 'contour')}
       <div class="carte-role">
-        <div class="titre-role"><strong>${textes.roles.base}</strong></div>
+        <div class="titre-role"><strong>${textes.roles.base} ${bulle('base')}</strong></div>
         <div class="choix-mode">
           <label class="case"><input type="radio" name="mode-base" data-champ="mode-base" value="mesuree" ${!modeB ? 'checked' : ''} /> Mode A : points du pied</label>
           <label class="case"><input type="radio" name="mode-base" data-champ="mode-base" value="surface" ${modeB ? 'checked' : ''} /> Mode B : une surface du projet</label>
@@ -304,11 +305,11 @@ export function creerEditeurStocks(conteneur, barre, options) {
                 </select>`
               : '<p class="aide">Aucune surface : importe un LandXML (onglet 1. Importer) ou crée-en une (onglet Comparer).</p>'
             : `<label class="case"><input type="checkbox" data-champ="base-egale-contour" ${stock.baseEgaleContour ? 'checked' : ''} /> mêmes points que le contour</label>
-              ${stock.baseEgaleContour ? '' : contenuRole(stock, { role: 'base' }, 'Points du pied du stock.')}`
+              ${stock.baseEgaleContour ? '' : contenuRole(stock, { role: 'base' })}`
         }
       </div>
       ${cartesLignes(stock)}
-      ${carteRole(stock, { role: 'dessus' }, 'Points isolés sur le dessus, hors lignes de rupture.')}
+      ${carteRole(stock, { role: 'dessus' }, 'dessus')}
       ${
         problemes.length > 0
           ? `<div class="avertissement"><p><strong>À compléter :</strong></p><ul>${problemes.map((p) => `<li>${echapper(p)}</li>`).join('')}</ul></div>`
@@ -323,15 +324,15 @@ export function creerEditeurStocks(conteneur, barre, options) {
     }
     return `
       <div class="carte-role ${estEnEdition({ role: 'dessus' }) ? 'en-edition' : ''}">
-        <div class="titre-role"><strong>${textes.roles.dessus}</strong></div>
+        <div class="titre-role"><strong>${textes.roles.dessus} ${bulle('pointsSurface')}</strong></div>
         <label class="case"><input type="checkbox" data-champ="tous-les-points" ${surface.tousLesPoints ? 'checked' : ''} /> tous les points du levé</label>
-        ${surface.tousLesPoints ? '' : contenuRole(surface, { role: 'dessus' }, 'Points utilisés pour la surface (en plus de ceux des lignes et du contour).')}
+        ${surface.tousLesPoints ? '' : contenuRole(surface, { role: 'dessus' })}
       </div>
       ${cartesLignes(surface)}
-      ${carteRole(surface, { role: 'contour' }, 'Bord de la surface. Sans contour, le bord suit les points extérieurs.')}
+      ${carteRole(surface, { role: 'contour' }, 'contourSurface')}
       <div class="carte-role ${etat.suppression ? 'en-edition' : ''}">
-        <div class="titre-role"><strong>Triangles en trop</strong></div>
-        <p class="aide">${surface.trianglesSupprimes.length} triangle(s) supprimé(s). Touche un triangle sur le plan pour le supprimer ou le rétablir.</p>
+        <div class="titre-role"><strong>Triangles en trop ${bulle('trianglesEnTrop')}</strong></div>
+        <p>${surface.trianglesSupprimes.length} triangle(s) supprimé(s).</p>
         <div class="ligne-outils">
           <button type="button" class="${etat.suppression ? 'bouton' : 'bouton-secondaire'}" data-action="mode-suppression">${etat.suppression ? 'Mode suppression actif' : 'Supprimer des triangles au doigt'}</button>
           <button type="button" class="bouton-secondaire" data-action="retablir-triangles" ${surface.trianglesSupprimes.length === 0 ? 'disabled' : ''}>Tout rétablir</button>
@@ -343,25 +344,25 @@ export function creerEditeurStocks(conteneur, barre, options) {
   function cartesLignes(objet) {
     return `
       ${objet.lignesRupture
-        .map((_, index) => carteRole(objet, { role: 'ligne', index }, 'Haut de talus, arêtes : dans l\'ordre de la ligne.', true))
+        .map((_, index) => carteRole(objet, { role: 'ligne', index }, 'ligne', true))
         .join('')}
       <button type="button" class="bouton-secondaire" data-action="ajouter-ligne">+ Ajouter une ligne de rupture</button>`;
   }
 
-  /** Une carte pour un rôle : titre, liste des points, et bouton pour la modifier. */
-  function carteRole(objet, edition, aide, supprimable = false) {
+  /** Une carte pour un rôle : titre (avec sa bulle d'aide), liste des points, et bouton pour la modifier. */
+  function carteRole(objet, edition, cleAide, supprimable = false) {
     return `
       <div class="carte-role ${estEnEdition(edition) ? 'en-edition' : ''}">
         <div class="titre-role">
-          <strong>${nomRole(edition)}</strong>
+          <strong>${nomRole(edition)} ${bulle(cleAide)}</strong>
           ${supprimable && objet.lignesRupture.length > 1 ? `<button type="button" class="bouton-lien" data-action="supprimer-ligne" data-index="${edition.index}">supprimer</button>` : ''}
         </div>
-        ${contenuRole(objet, edition, aide)}
+        ${contenuRole(objet, edition)}
       </div>`;
   }
 
   /** Contenu d'une carte : résumé de la liste, ou outils de modification si elle est en cours. */
-  function contenuRole(objet, edition, aide) {
+  function contenuRole(objet, edition) {
     const liste = listeDuRole(objet, edition);
     const resume = liste.length > 0 ? `${echapper(ecrireListeDeNoms(liste))} <span class="aide">(${liste.length} pt)</span>` : '<span class="aide">aucun point</span>';
 
@@ -375,16 +376,15 @@ export function creerEditeurStocks(conteneur, barre, options) {
     const series = detecterSeries(points.map((p) => p.nom));
     const nomsUtilises = new Set(etat.objets.flatMap(nomsDeLObjet));
     return `
-      <p class="aide">${aide}</p>
+      <p class="titre-choix">Choisir les points ${bulle('choisirPoints')}</p>
       ${
         edition.role === 'ligne'
-          ? `<label class="case"><input type="checkbox" data-champ="ligne-fermee" data-index="${edition.index}" ${objet.lignesRupture[edition.index].fermee ? 'checked' : ''} /> ligne fermée (le dernier point est relié au premier)</label>
-            <p class="aide">Une série = une ligne. Dans la liste, sépare les lignes par « ; ».</p>`
+          ? `<label class="case"><input type="checkbox" data-champ="ligne-fermee" data-index="${edition.index}" ${objet.lignesRupture[edition.index].fermee ? 'checked' : ''} /> ligne fermée (le dernier point est relié au premier)</label>`
           : ''
       }
       ${
         series.length > 0
-          ? `<p class="aide">Séries du fichier (toucher pour ajouter) :</p>
+          ? `<p class="aide">Séries du fichier :</p>
             <div class="series">
               ${series
                 .map(
@@ -403,7 +403,6 @@ export function creerEditeurStocks(conteneur, barre, options) {
         </span>
       </label>
       ${etat.messages.length > 0 ? `<div class="erreur"><ul>${etat.messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}
-      <p class="aide">Ou touche les points sur le plan (toucher à nouveau un point le retire).</p>
       <button type="button" class="bouton-secondaire seulement-telephone" data-action="aller-au-plan">Toucher les points sur le plan</button>
       <details data-zone="cases" ${etat.listeCasesOuverte ? 'open' : ''}>
         <summary>Ou cocher dans la liste des points</summary>
@@ -465,12 +464,23 @@ export function creerEditeurStocks(conteneur, barre, options) {
     },
     /** À appeler quand les données changent ailleurs (import, autre onglet). */
     rafraichir: afficher,
-    /** Remplace la liste d'objets modifiée (par exemple les stocks d'un autre levé). */
-    charger(objets) {
+    /**
+     * Remplace la liste d'objets modifiée (par exemple les stocks d'un autre levé).
+     * garderPosition : après « Annuler », on reste sur le même objet et la même modification si possible.
+     */
+    charger(objets, { garderPosition = false } = {}) {
       etat.objets = objets;
-      etat.indexActif = objets.length > 0 ? 0 : -1;
-      etat.edition = null;
-      etat.suppression = false;
+      if (garderPosition) {
+        etat.indexActif = Math.min(Math.max(etat.indexActif, 0), objets.length - 1);
+        const objet = objetActif();
+        const ligneDisparue = etat.edition?.role === 'ligne' && etat.edition.index >= (objet?.lignesRupture.length ?? 0);
+        if (!objet || ligneDisparue) etat.edition = null;
+        if (!objet) etat.suppression = false;
+      } else {
+        etat.indexActif = objets.length > 0 ? 0 : -1;
+        etat.edition = null;
+        etat.suppression = false;
+      }
       afficher();
     },
     /** Arrête la modification en cours (quand un autre écran commence une modification). */
