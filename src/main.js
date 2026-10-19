@@ -2,6 +2,7 @@
 import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { formaterNombre } from './topo/format.js';
+import { creerPlan } from './plan/plan.js';
 
 // Les points du dernier fichier importé (utilisés par les étapes suivantes).
 let points = [];
@@ -18,7 +19,21 @@ app.innerHTML = `
     </label>
     <div id="resultat-import"></div>
   </section>
+  <section id="section-plan" hidden>
+    <h2>2. Plan</h2>
+    <p class="aide">Un doigt pour déplacer, deux doigts pour zoomer (molette à l'ordinateur).</p>
+    <div id="plan"></div>
+  </section>
 `;
+
+const plan = creerPlan(document.querySelector('#plan'));
+const sectionPlan = document.querySelector('#section-plan');
+
+/** Montre le plan s'il y a des points, et le cadre sur ces points. */
+function mettreAJourPlan() {
+  sectionPlan.hidden = points.length === 0;
+  if (points.length > 0) plan.afficherPoints(points);
+}
 
 document.querySelector('#fichier-points').addEventListener('change', async (evenement) => {
   const fichier = evenement.target.files[0];
@@ -28,8 +43,10 @@ document.querySelector('#fichier-points').addEventListener('change', async (even
     const resultat = lirePoints(await fichier.text());
     points = resultat.points;
     zone.innerHTML = afficherResultat(fichier.name, resultat);
+    mettreAJourPlan();
   } catch (erreur) {
     points = [];
+    mettreAJourPlan();
     zone.innerHTML = `<p class="erreur">Impossible de lire le fichier « ${echapper(fichier.name)} » : ${echapper(erreur.message)}</p>`;
   }
   // Permet de choisir à nouveau le même fichier après l'avoir modifié.
@@ -56,6 +73,8 @@ function afficherResultat(nomFichier, resultat) {
 
   if (pointsLus.length > 0) {
     html += `
+      <details>
+      <summary>Voir la liste des points (${pointsLus.length})</summary>
       <div class="tableau-defilant">
         <table>
           <thead><tr><th>Nom</th><th>Est (m)</th><th>Nord (m)</th><th>Altitude (m)</th></tr></thead>
@@ -68,7 +87,8 @@ function afficherResultat(nomFichier, resultat) {
               .join('')}
           </tbody>
         </table>
-      </div>`;
+      </div>
+      </details>`;
   }
 
   return html;
