@@ -131,7 +131,11 @@ describe('messages d\'erreur', () => {
     const stock = creerStock('Essai');
     stock.contour = ['b1', 'b2', 'b3', 'b4'];
     stock.lignesRupture = [{ noms: ['h1', 'h2'], fermee: false }];
-    expect(calculerVolumeStock(stock, points).erreurs[0]).toContain('se croisent');
+    const resultat = calculerVolumeStock(stock, points);
+    expect(resultat.erreurs[0]).toContain('se croisent');
+    // Les deux segments fautifs sont rendus pour être dessinés en rouge sur le plan.
+    expect(resultat.segmentsEnErreur).toHaveLength(2);
+    expect(resultat.segmentsEnErreur.flat()).toContain('h2');
   });
 
   it('signale un contour dans le désordre (qui se croise lui-même)', () => {

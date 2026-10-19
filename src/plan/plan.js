@@ -1,25 +1,51 @@
 // Affichage du plan : points avec leur nom, zoom et déplacement
 // au doigt (téléphone) ou à la souris (ordinateur).
-import { cadrerSurPoints, versEcran, deplacer, zoomer, barreEchelle } from './vue.js';
+import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle } from './vue.js';
+import { placerEtiquettes, pointInterieur } from './etiquettes.js';
+import { pointDansPolygone } from '../topo/volume.js';
+import { formaterNombre } from '../topo/format.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
 // Distance maximale (pixels) entre le doigt et un point pour le "toucher".
 const RAYON_TOUCHER = 22;
 
+// Calques que l'on peut afficher ou masquer, avec leur état de départ.
+const CALQUES = [
+  { cle: 'points', titre: 'Points', parDefaut: true },
+  { cle: 'noms', titre: 'Noms des points', parDefaut: true },
+  { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false },
+  { cle: 'contours', titre: 'Contours des stocks', parDefaut: true },
+  { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true },
+  { cle: 'triangles', titre: 'Triangles', parDefaut: true },
+  { cle: 'volumes', titre: 'Volume sur chaque stock', parDefaut: true },
+  { cle: 'autresStocks', titre: 'Autres stocks', parDefaut: true },
+];
+const CLE_MEMOIRE = 'topo-calques';
+
 /**
  * Crée le plan dans l'élément "conteneur" de la page.
- * - quandToucherPoint(nom) : appelé quand on touche un point (sans faire glisser)
+ * - quandToucherPoint(nom) : appelé quand on touche un point pendant une modification
+ * - quandToucherStock(index) : appelé quand on touche l'intérieur d'un stock (hors modification)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint } = {}) {
-  // Boutons posés sur le plan : options en haut à gauche, zoom en haut à droite.
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock } = {}) {
+  const calques = lireCalques();
+
+  // Boutons posés sur le plan : calques en haut à gauche, zoom en haut à droite.
   conteneur.innerHTML = `
     <div class="plan-cadre">
       <svg class="plan" role="img" aria-label="Plan des points"></svg>
-      <div class="plan-options">
-        <label class="puce"><input type="checkbox" data-action="noms" checked /> Noms</label>
-        <label class="puce"><input type="checkbox" data-action="triangles" checked /> Triangles</label>
+      <div class="plan-calques">
+        <button type="button" class="puce" data-action="calques" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5" /></svg>
+          Calques
+        </button>
+        <div class="menu-calques" hidden>
+          ${CALQUES.map(
+            (c) => `<label class="case"><input type="checkbox" data-calque="${c.cle}" ${calques[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`,
+          ).join('')}
+        </div>
       </div>
       <div class="plan-boutons">
         <button type="button" data-action="zoom-plus" aria-label="Zoomer">+</button>
@@ -30,17 +56,17 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
       </div>
     </div>
   `;
-  const svg = conteneur.querySelector('svg');
-  const caseNoms = conteneur.querySelector('[data-action="noms"]');
-  const caseTriangles = conteneur.querySelector('[data-action="triangles"]');
+  const svg = conteneur.querySelector('svg.plan');
+  const boutonCalques = conteneur.querySelector('[data-action="calques"]');
+  const menuCalques = conteneur.querySelector('.menu-calques');
 
   let points = [];
   let vue = null;
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
-  // Stocks à dessiner : { stocks, stockActif, pointsDeBase, listeEnCours } (voir editeur.js)
-  // triangles : triangles du dessus du stock actif (voir volume.js)
-  let dessin = { stocks: [], stockActif: null, pointsDeBase: [], listeEnCours: [], triangles: [] };
+  // Ce qu'il faut dessiner (voir editeur.js et main.js) :
+  // stocks, stockActif, pointsDeBase, listeEnCours, enEdition, resultats (un par stock, voir volume.js)
+  let dessin = { stocks: [], stockActif: null, pointsDeBase: [], listeEnCours: [], enEdition: false, resultats: [] };
 
   /** Taille actuelle du plan à l'écran (pixels). */
   function taille() {
@@ -48,15 +74,29 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
     return { largeur: rectangle.width, hauteur: rectangle.height };
   }
 
+  /** Noms des points qui appartiennent à un stock (tous rôles confondus). */
+  function nomsDuStock(stock) {
+    return [...stock.contour, ...stock.base, ...stock.lignesRupture.flatMap((l) => l.noms), ...stock.pointsDessus];
+  }
+
   /** Redessine tout le plan avec la vue actuelle. */
   function dessiner() {
     svg.replaceChildren();
     if (!vue || points.length === 0) return;
 
+    const stock = dessin.stockActif;
+    // Si « Autres stocks » est décoché, on cache les points qui appartiennent à un autre stock.
+    const nomsCaches = new Set();
+    if (!calques.autresStocks) {
+      const nomsActifs = new Set(stock ? nomsDuStock(stock) : []);
+      for (const autre of dessin.stocks) {
+        if (autre !== stock) for (const nom of nomsDuStock(autre)) if (!nomsActifs.has(nom)) nomsCaches.add(nom);
+      }
+    }
+
     dessinerStocks();
 
     // Rôle de chaque point dans le stock actif, pour lui donner une couleur.
-    const stock = dessin.stockActif;
     const classes = new Map();
     if (stock) {
       for (const nom of stock.pointsDessus) classes.set(nom, 'role-dessus');
@@ -66,13 +106,22 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
     }
     const rangs = new Map(dessin.listeEnCours.map((nom, index) => [nom, index + 1]));
 
+    // Points visibles à l'écran, ceux du stock actif en premier (leurs noms sont prioritaires).
+    const visibles = [];
+    for (const point of points) {
+      if (nomsCaches.has(point.nom)) continue;
+      const { x, y } = versEcran(point.est, point.nord, vue);
+      if (x < -50 || y < -50 || x > vue.largeur + 50 || y > vue.hauteur + 50) continue;
+      visibles.push({ point, x, y, prioritaire: rangs.has(point.nom) || classes.has(point.nom) });
+    }
+    visibles.sort((a, b) => Number(b.prioritaire) - Number(a.prioritaire));
+
     const groupePoints = creerElement('g', { class: 'points' });
     const groupeNoms = creerElement('g', { class: 'noms' });
-    for (const point of points) {
-      const { x, y } = versEcran(point.est, point.nord, vue);
-      // On ne dessine pas les points loin hors de l'écran.
-      if (x < -50 || y < -50 || x > vue.largeur + 50 || y > vue.hauteur + 50) continue;
-      groupePoints.append(creerElement('circle', { cx: x, cy: y, r: 3.5, class: classes.get(point.nom) ?? '' }));
+    for (const { point, x, y } of visibles) {
+      if (calques.points || rangs.has(point.nom)) {
+        groupePoints.append(creerElement('circle', { cx: x, cy: y, r: 3.5, class: classes.get(point.nom) ?? '' }));
+      }
       if (rangs.has(point.nom)) {
         // Point de la liste en cours : entouré, avec son numéro d'ordre.
         groupePoints.append(creerElement('circle', { cx: x, cy: y, r: 8, class: 'selection' }));
@@ -80,17 +129,42 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
         rang.textContent = rangs.get(point.nom);
         groupeNoms.append(rang);
       }
-      if (caseNoms.checked) {
-        const nom = creerElement('text', { x: x + 5, y: y - 5 });
-        nom.textContent = point.nom;
-        groupeNoms.append(nom);
-      }
     }
+
+    // Noms et altitudes : placés sans chevauchement (les étiquettes sans place sont cachées).
+    if (calques.noms || calques.altitudes) {
+      const textes = visibles.map(({ point }) =>
+        [calques.noms ? point.nom : null, calques.altitudes ? formaterNombre(point.altitude) : null].filter(Boolean),
+      );
+      const places = placerEtiquettes(
+        visibles.map(({ x, y }, i) => ({
+          x,
+          y,
+          largeur: Math.max(...textes[i].map((t) => t.length)) * 6.6,
+          hauteur: textes[i].length * 13,
+        })),
+      );
+      places.forEach((place, i) => {
+        if (!place) return;
+        textes[i].forEach((texte, ligne) => {
+          const element = creerElement('text', {
+            x: place.x,
+            y: place.y - (textes[i].length - 1 - ligne) * 13 - 2,
+            'text-anchor': place.aGauche ? 'end' : 'start',
+            class: calques.noms && ligne === 0 ? '' : 'altitude',
+          });
+          element.textContent = texte;
+          groupeNoms.append(element);
+        });
+      });
+    }
+
     svg.append(groupePoints, groupeNoms);
+    if (calques.volumes) dessinerVolumes();
     dessinerBarreEchelle();
   }
 
-  /** Contours de tous les stocks, puis lignes de rupture du stock actif. */
+  /** Triangles, contours des stocks, lignes de rupture et segments en erreur. */
   function dessinerStocks() {
     const positions = new Map(points.map((p) => [p.nom, versEcran(p.est, p.nord, vue)]));
     const chemin = (noms, ferme) => {
@@ -100,25 +174,61 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
     };
 
     const groupe = creerElement('g', { class: 'stocks' });
-    if (caseTriangles.checked && dessin.triangles?.length > 0) {
-      const traits = dessin.triangles
-        .map((triangle) => {
-          const [a, b, c] = triangle.map((p) => versEcran(p.est, p.nord, vue));
-          return `M${a.x} ${a.y} L${b.x} ${b.y} L${c.x} ${c.y} Z`;
-        })
-        .join(' ');
-      groupe.append(creerElement('path', { d: traits, class: 'triangles' }));
-    }
-    for (const stock of dessin.stocks) {
+    dessin.stocks.forEach((stock, index) => {
       const actif = stock === dessin.stockActif;
-      const contour = chemin(stock.contour, true);
-      if (contour) groupe.append(creerElement('path', { d: contour, class: actif ? 'contour actif' : 'contour' }));
-      if (!actif) continue;
-      for (const ligne of stock.lignesRupture) {
-        const trace = chemin(ligne.noms, ligne.fermee);
-        if (trace) groupe.append(creerElement('path', { d: trace, class: 'ligne-rupture' }));
+      if (!actif && !calques.autresStocks) return;
+      const resultat = dessin.resultats[index];
+
+      // Triangles du dessus : stock actif seulement, pour ne pas surcharger.
+      if (actif && calques.triangles && resultat?.trianglesDessus) {
+        const traits = resultat.trianglesDessus
+          .map((triangle) => {
+            const [a, b, c] = triangle.map((p) => versEcran(p.est, p.nord, vue));
+            return `M${a.x} ${a.y} L${b.x} ${b.y} L${c.x} ${c.y} Z`;
+          })
+          .join(' ');
+        groupe.append(creerElement('path', { d: traits, class: 'triangles' }));
       }
-    }
+      if (calques.contours) {
+        const contour = chemin(stock.contour, true);
+        if (contour) groupe.append(creerElement('path', { d: contour, class: actif ? 'contour actif' : 'contour' }));
+      }
+      if (calques.lignes) {
+        for (const ligne of stock.lignesRupture) {
+          const trace = chemin(ligne.noms, ligne.fermee);
+          if (trace) groupe.append(creerElement('path', { d: trace, class: actif ? 'ligne-rupture actif' : 'ligne-rupture' }));
+        }
+      }
+      // Segments qui se croisent : en rouge, toujours visibles, pour trouver l'erreur.
+      for (const segment of resultat?.segmentsEnErreur ?? []) {
+        const trace = chemin(segment, false);
+        if (trace) groupe.append(creerElement('path', { d: trace, class: 'segment-erreur' }));
+      }
+    });
+    svg.append(groupe);
+  }
+
+  /** Nom et volume de remblai écrits au milieu de chaque stock calculé. */
+  function dessinerVolumes() {
+    const groupe = creerElement('g', { class: 'volumes' });
+    dessin.stocks.forEach((stock, index) => {
+      const actif = stock === dessin.stockActif;
+      if (!actif && !calques.autresStocks) return;
+      const resultat = dessin.resultats[index];
+      const centre = resultat?.trianglesDessus ? pointInterieur(resultat.trianglesDessus) : null;
+      if (!centre) return;
+      const { x, y } = versEcran(centre.est, centre.nord, vue);
+      const lignes = [stock.nom, `${formaterNombre(resultat.remblai)} m³`];
+      const largeur = Math.max(...lignes.map((l) => l.length)) * 7.2 + 16;
+      groupe.append(
+        creerElement('rect', { x: x - largeur / 2, y: y - 20, width: largeur, height: 38, rx: 8, class: actif ? 'actif' : '' }),
+      );
+      lignes.forEach((ligne, i) => {
+        const texte = creerElement('text', { x, y: y - 4 + i * 16, 'text-anchor': 'middle', class: i === 0 ? 'nom-stock' : '' });
+        texte.textContent = ligne;
+        groupe.append(texte);
+      });
+    });
     svg.append(groupe);
   }
 
@@ -160,8 +270,22 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
   conteneur.querySelector('[data-action="tout-voir"]').addEventListener('click', toutVoir);
   conteneur.querySelector('[data-action="zoom-plus"]').addEventListener('click', () => zoomerAuCentre(1.5));
   conteneur.querySelector('[data-action="zoom-moins"]').addEventListener('click', () => zoomerAuCentre(1 / 1.5));
-  caseNoms.addEventListener('change', dessiner);
-  caseTriangles.addEventListener('change', dessiner);
+
+  // --- Menu des calques ---
+  boutonCalques.addEventListener('click', () => {
+    menuCalques.hidden = !menuCalques.hidden;
+    boutonCalques.setAttribute('aria-expanded', String(!menuCalques.hidden));
+  });
+  menuCalques.addEventListener('change', (evenement) => {
+    calques[evenement.target.dataset.calque] = evenement.target.checked;
+    memoriserCalques(calques);
+    dessiner();
+  });
+  // Le menu se ferme quand on touche le plan.
+  svg.addEventListener('pointerdown', () => {
+    menuCalques.hidden = true;
+    boutonCalques.setAttribute('aria-expanded', 'false');
+  });
 
   // --- Molette de la souris : zoom autour du curseur ---
   svg.addEventListener(
@@ -212,9 +336,16 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
 
   svg.addEventListener('pointerup', (evenement) => {
     pointeurs.delete(evenement.pointerId);
-    if (toucher && pointeurs.size === 0 && quandToucherPoint) {
-      const point = pointLePlusProche(toucher);
-      if (point) quandToucherPoint(point.nom);
+    if (toucher && pointeurs.size === 0) {
+      if (dessin.enEdition) {
+        // Pendant une modification : toucher un point l'ajoute ou le retire.
+        const point = pointLePlusProche(toucher);
+        if (point) quandToucherPoint?.(point.nom);
+      } else {
+        // Sinon : toucher l'intérieur d'un stock le choisit.
+        const index = stockSousLeDoigt(toucher);
+        if (index >= 0) quandToucherStock?.(index);
+      }
     }
     toucher = null;
   });
@@ -235,6 +366,16 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
       }
     }
     return meilleur;
+  }
+
+  /** Numéro du stock dont le contour contient la position touchée, ou -1. */
+  function stockSousLeDoigt(position) {
+    const terrain = versTerrain(position.x, position.y, vue);
+    const parNom = new Map(points.map((p) => [p.nom, p]));
+    return dessin.stocks.findIndex((stock) => {
+      const contour = stock.contour.map((nom) => parNom.get(nom)).filter(Boolean);
+      return contour.length >= 3 && pointDansPolygone(terrain, contour);
+    });
   }
 
   /** Position du doigt ou de la souris dans le plan (pixels). */
@@ -281,4 +422,24 @@ function distance(a, b) {
 
 function milieu(a, b) {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+/** Relit les calques choisis la dernière fois (gardés dans le navigateur), sinon ceux par défaut. */
+function lireCalques() {
+  const calques = Object.fromEntries(CALQUES.map((c) => [c.cle, c.parDefaut]));
+  try {
+    const memoire = JSON.parse(localStorage.getItem(CLE_MEMOIRE) ?? '{}');
+    for (const c of CALQUES) if (typeof memoire[c.cle] === 'boolean') calques[c.cle] = memoire[c.cle];
+  } catch {
+    // Mémoire du navigateur indisponible (navigation privée...) : on garde les valeurs par défaut.
+  }
+  return calques;
+}
+
+function memoriserCalques(calques) {
+  try {
+    localStorage.setItem(CLE_MEMOIRE, JSON.stringify(calques));
+  } catch {
+    // Pas grave : les calques reviendront aux valeurs par défaut à la prochaine ouverture.
+  }
 }
