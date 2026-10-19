@@ -24,8 +24,9 @@ const NOMS_DES_ROLES = {
  * Crée l'écran des stocks dans "conteneur".
  * - obtenirPoints() : renvoie les points importés
  * - quandChange() : appelé après chaque modification (pour redessiner le plan)
+ * - allerAuPlan() : affiche l'onglet du plan (sur téléphone)
  */
-export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChange }) {
+export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChange, allerAuPlan }) {
   const etat = {
     stocks: [],
     indexActif: -1,
@@ -93,6 +94,7 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
       etat.edition = { role: bouton.dataset.role, index: Number(bouton.dataset.index ?? 0) };
       etat.messages = [];
     },
+    'aller-au-plan': () => allerAuPlan?.(),
     termine: () => {
       etat.edition = null;
       etat.messages = [];
@@ -279,6 +281,7 @@ export function creerEditeurStocks(conteneur, barre, { obtenirPoints, quandChang
       </label>
       ${etat.messages.length > 0 ? `<div class="erreur"><ul>${etat.messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}
       <p class="aide">Ou touche les points sur le plan (toucher à nouveau un point le retire).</p>
+      <button type="button" class="bouton-secondaire seulement-telephone" data-action="aller-au-plan">Toucher les points sur le plan</button>
       <details data-zone="cases" ${etat.listeCasesOuverte ? 'open' : ''}>
         <summary>Ou cocher dans la liste des points</summary>
         <div class="liste-cases">

@@ -13,15 +13,22 @@ const RAYON_TOUCHER = 22;
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
 export function creerPlan(conteneur, { quandToucherPoint } = {}) {
+  // Boutons posés sur le plan : options en haut à gauche, zoom en haut à droite.
   conteneur.innerHTML = `
-    <div class="plan-outils">
-      <button type="button" class="bouton-secondaire" data-action="tout-voir">Tout voir</button>
-      <button type="button" class="bouton-secondaire" data-action="zoom-plus" aria-label="Zoomer">+</button>
-      <button type="button" class="bouton-secondaire" data-action="zoom-moins" aria-label="Dézoomer">−</button>
-      <label class="case"><input type="checkbox" data-action="noms" checked /> Noms</label>
-      <label class="case"><input type="checkbox" data-action="triangles" checked /> Triangles</label>
+    <div class="plan-cadre">
+      <svg class="plan" role="img" aria-label="Plan des points"></svg>
+      <div class="plan-options">
+        <label class="puce"><input type="checkbox" data-action="noms" checked /> Noms</label>
+        <label class="puce"><input type="checkbox" data-action="triangles" checked /> Triangles</label>
+      </div>
+      <div class="plan-boutons">
+        <button type="button" data-action="zoom-plus" aria-label="Zoomer">+</button>
+        <button type="button" data-action="zoom-moins" aria-label="Dézoomer">−</button>
+        <button type="button" data-action="tout-voir" aria-label="Tout voir" title="Tout voir">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+        </button>
+      </div>
     </div>
-    <div class="plan-cadre"><svg class="plan" role="img" aria-label="Plan des points"></svg></div>
   `;
   const svg = conteneur.querySelector('svg');
   const caseNoms = conteneur.querySelector('[data-action="noms"]');
@@ -29,6 +36,8 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
 
   let points = [];
   let vue = null;
+  // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
+  let recadrerQuandVisible = false;
   // Stocks à dessiner : { stocks, stockActif, pointsDeBase, listeEnCours } (voir editeur.js)
   // triangles : triangles du dessus du stock actif (voir volume.js)
   let dessin = { stocks: [], stockActif: null, pointsDeBase: [], listeEnCours: [], triangles: [] };
@@ -131,6 +140,12 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
 
   function toutVoir() {
     const { largeur, hauteur } = taille();
+    if (largeur === 0 || hauteur === 0) {
+      // Plan caché (autre onglet) : on recadrera quand il s'affichera.
+      recadrerQuandVisible = true;
+      return;
+    }
+    recadrerQuandVisible = false;
     vue = cadrerSurPoints(points, largeur, hauteur);
     dessiner();
   }
@@ -228,10 +243,15 @@ export function creerPlan(conteneur, { quandToucherPoint } = {}) {
     return { x: evenement.clientX - rectangle.left, y: evenement.clientY - rectangle.top };
   }
 
-  // Si la taille de l'écran change (rotation du téléphone), on garde le même centre.
+  // Si la taille du plan change (rotation du téléphone, changement d'onglet), on garde le même centre.
   new ResizeObserver(() => {
-    if (!vue) return;
-    vue = { ...vue, ...taille() };
+    const nouvelleTaille = taille();
+    if (nouvelleTaille.largeur === 0 || nouvelleTaille.hauteur === 0) return;
+    if (recadrerQuandVisible || !vue) {
+      toutVoir();
+      return;
+    }
+    vue = { ...vue, ...nouvelleTaille };
     dessiner();
   }).observe(svg);
 

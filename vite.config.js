@@ -16,7 +16,7 @@ export default defineConfig({
         short_name: 'Topo',
         description: 'Calcul de volumes de stocks à partir de points GNSS',
         lang: 'fr',
-        theme_color: '#1f4e3d',
+        theme_color: '#14532d',
         background_color: '#ffffff',
         display: 'standalone',
         icons: [

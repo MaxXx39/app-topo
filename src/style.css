@@ -1,57 +1,370 @@
-/* Mise en page simple, lisible sur téléphone et ordinateur. */
+/* ==========================================================================
+   Style de l'application
+   Couleurs et tailles réunies ici en "variables" pour les changer facilement.
+   ========================================================================== */
 :root {
-  --vert: #1f4e3d;
-  --fond: #ffffff;
-  --texte: #1a1a1a;
-  --gris: #666666;
+  --vert: #15803d;
+  --vert-fonce: #14532d;
+  --vert-clair: #dcfce7;
+  --fond: #f3f5f4;
+  --surface: #ffffff;
+  --texte: #1c2421;
+  --gris: #64706b;
+  --bordure: #dfe5e2;
+  --rouge: #dc2626;
+  --rouge-clair: #fef2f2;
+  --orange: #ea580c;
+  --jaune-clair: #fffbeb;
+  --jaune: #d97706;
+  --bleu: #2563eb;
+  --rayon: 12px;
+  --ombre: 0 1px 2px rgba(16, 24, 20, 0.06), 0 2px 8px rgba(16, 24, 20, 0.06);
+  --hauteur-entete: 56px;
+  --hauteur-onglets: 64px;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   background: var(--fond);
   color: var(--texte);
-}
-
-header {
-  background: var(--vert);
-  color: #ffffff;
-  padding: 12px 16px;
-}
-
-header h1 {
-  margin: 0;
-  font-size: 1.2rem;
-}
-
-main {
-  padding: 16px;
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.version {
-  color: var(--gris);
-  font-size: 0.9rem;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
 }
 
 h2 {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  margin: 0 0 12px;
+}
+
+p {
+  margin: 8px 0;
+}
+
+/* --- En-tête --- */
+
+.entete {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: var(--hauteur-entete);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  background: var(--vert-fonce);
+  color: #ffffff;
+}
+
+.entete-icone {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.entete h1 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.entete-etat {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+/* --- Onglets (barre du bas sur téléphone) --- */
+
+.onglets {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  height: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface);
+  border-top: 1px solid var(--bordure);
+}
+
+.onglets button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: none;
+  background: none;
+  color: var(--gris);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.onglets svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.onglets button.actif {
   color: var(--vert);
 }
 
-.bouton {
+.onglets button.actif svg {
+  background: var(--vert-clair);
+  border-radius: 12px;
+  padding: 1px 12px;
+  width: 48px;
+}
+
+/* --- Panneaux (un seul visible à la fois sur téléphone) --- */
+
+.mise-en-page {
+  padding: 12px 12px calc(var(--hauteur-onglets) + 24px);
+}
+
+.panneau {
+  display: none;
+  background: var(--surface);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre);
+  padding: 16px;
+}
+
+.panneau.actif {
+  display: block;
+}
+
+/* Sur téléphone, l'onglet Plan occupe tout l'écran entre l'en-tête et les onglets. */
+.panneau-plan.actif {
+  position: fixed;
+  top: var(--hauteur-entete);
+  left: 0;
+  right: 0;
+  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom));
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.panneau-plan #plan,
+.panneau-plan .plan-cadre {
+  height: 100%;
+}
+
+.vide {
+  color: var(--gris);
+  text-align: center;
+  padding: 24px 8px;
+}
+
+.plan-vide {
+  padding-top: 40vh;
+}
+
+.seulement-telephone {
   display: inline-block;
+}
+
+/* --- Ordinateur et tablette : panneau à gauche, plan toujours visible à droite --- */
+
+@media (min-width: 900px) {
+  .mise-en-page {
+    display: grid;
+    grid-template-columns: 440px 1fr;
+    gap: 16px;
+    padding: 16px;
+    padding-top: calc(16px + 52px);
+    height: calc(100vh - var(--hauteur-entete));
+  }
+
+  .colonne-gauche {
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .panneau-plan,
+  .panneau-plan.actif {
+    display: block;
+    position: static;
+    padding: 0;
+    overflow: hidden;
+    border-radius: var(--rayon);
+    box-shadow: var(--ombre);
+  }
+
+  /* Les onglets passent en haut, au-dessus du panneau de gauche. */
+  .onglets {
+    position: fixed;
+    top: calc(var(--hauteur-entete) + 12px);
+    bottom: auto;
+    left: 16px;
+    right: auto;
+    width: 440px;
+    height: 44px;
+    padding: 4px;
+    border: none;
+    border-radius: var(--rayon);
+    box-shadow: var(--ombre);
+  }
+
+  .onglets button {
+    flex-direction: row;
+    gap: 6px;
+    font-size: 0.85rem;
+    border-radius: 8px;
+  }
+
+  .onglets button.actif {
+    background: var(--vert-clair);
+  }
+
+  .onglets button.actif svg {
+    background: none;
+    padding: 0;
+    width: 18px;
+  }
+
+  .onglets svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .onglets button[data-onglet='plan'] {
+    display: none;
+  }
+
+  .seulement-telephone {
+    display: none;
+  }
+}
+
+/* --- Boutons --- */
+
+.bouton,
+button.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 10px;
   background: var(--vert);
   color: #ffffff;
-  padding: 10px 16px;
-  border-radius: 6px;
-  cursor: pointer;
+  font-size: 1rem;
   font-weight: 600;
+  cursor: pointer;
+}
+
+.bouton:active {
+  background: var(--vert-fonce);
+}
+
+.bouton-secondaire {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--texte);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bouton-secondaire:active {
+  background: var(--fond);
+}
+
+.bouton-lien {
+  background: none;
+  border: none;
+  color: var(--rouge);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 4px;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* --- Champs --- */
+
+input[type='text'],
+select {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--texte);
+  font-size: 1rem;
+}
+
+input[type='text']:focus,
+select:focus {
+  outline: 2px solid var(--vert);
+  outline-offset: -1px;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--vert);
+}
+
+.case {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.ligne-outils {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.champ-liste {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: var(--gris);
+}
+
+.champ-liste input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- Textes et messages --- */
+
+.aide {
+  color: var(--gris);
+  font-size: 0.88rem;
+  font-weight: 400;
 }
 
 .resume {
@@ -60,26 +373,47 @@ h2 {
 
 .erreur,
 .avertissement {
-  border-radius: 6px;
-  padding: 4px 12px;
+  border-radius: 10px;
+  padding: 8px 14px;
   margin: 12px 0;
+  font-size: 0.92rem;
 }
 
 .erreur {
-  background: #fdecea;
-  border-left: 4px solid #c62828;
+  background: var(--rouge-clair);
+  border-left: 4px solid var(--rouge);
 }
 
 .avertissement {
-  background: #fff8e1;
-  border-left: 4px solid #f9a825;
+  background: var(--jaune-clair);
+  border-left: 4px solid var(--jaune);
 }
+
+.erreur ul,
+.avertissement ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.ok {
+  color: var(--vert);
+  font-weight: 600;
+}
+
+summary {
+  cursor: pointer;
+  color: var(--vert);
+  font-weight: 600;
+  margin: 10px 0;
+}
+
+/* --- Tableaux --- */
 
 .tableau-defilant {
   max-height: 60vh;
   overflow: auto;
-  border: 1px solid #dddddd;
-  border-radius: 6px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
 }
 
 table {
@@ -90,169 +424,57 @@ table {
 
 th,
 td {
-  padding: 6px 10px;
-  border-bottom: 1px solid #eeeeee;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--bordure);
   white-space: nowrap;
+}
+
+tr:last-child td {
+  border-bottom: none;
 }
 
 th {
   position: sticky;
   top: 0;
-  background: #f4f4f4;
+  background: #f7f9f8;
   text-align: left;
+  font-weight: 600;
+  color: var(--gris);
+  font-size: 0.8rem;
 }
 
-td:not(:first-child) {
+td:not(:first-child),
+th:not(:first-child) {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-/* Sur téléphone : tableau plus compact pour voir les 4 colonnes. */
-@media (max-width: 480px) {
-  main {
-    padding: 12px;
-  }
-
-  table {
-    font-size: 0.8rem;
-  }
-
-  th,
-  td {
-    padding: 5px 6px;
-  }
+.tableau-detail td {
+  white-space: normal;
 }
 
-.aide {
+.incomplet {
   color: var(--gris);
-  font-size: 0.9rem;
+  font-style: italic;
 }
 
-.bouton-secondaire {
-  background: #ffffff;
-  color: var(--vert);
-  border: 1px solid var(--vert);
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 1rem;
-  font-weight: 600;
-  min-width: 40px;
-  cursor: pointer;
-}
-
-.case {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.plan-outils {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.plan-cadre {
-  border: 1px solid #dddddd;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-svg.plan {
-  display: block;
-  width: 100%;
-  height: 65vh;
-  min-height: 300px;
-  background: #fafafa;
-  /* Le navigateur ne doit pas faire défiler la page quand on touche le plan. */
-  touch-action: none;
-  cursor: grab;
-  user-select: none;
-}
-
-.plan .points circle {
-  fill: #c62828;
-}
-
-.plan .noms text {
-  font-size: 12px;
-  fill: #1a1a1a;
-  paint-order: stroke;
-  stroke: #fafafa;
-  stroke-width: 3px;
-}
-
-.plan .echelle rect {
-  fill: rgba(255, 255, 255, 0.85);
-}
-
-.plan .echelle path {
-  fill: none;
-  stroke: #1a1a1a;
-  stroke-width: 2;
-}
-
-.plan .echelle text {
-  font-size: 11px;
-}
-
-summary {
-  cursor: pointer;
-  color: var(--vert);
-  font-weight: 600;
+.detail-stock {
   margin: 8px 0;
 }
 
 /* --- Stocks et rôles --- */
 
-.ligne-outils {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0;
-}
-
-input[type='text'],
-select {
-  font-size: 1rem;
-  padding: 7px 8px;
-  border: 1px solid #bbbbbb;
-  border-radius: 6px;
-}
-
-button.bouton {
-  border: none;
-  font-size: 1rem;
-}
-
-button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.bouton-lien {
-  background: none;
-  border: none;
-  color: #c62828;
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
 .carte-role {
-  border: 1px solid #dddddd;
-  border-left: 4px solid #dddddd;
-  border-radius: 6px;
-  padding: 8px 12px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  padding: 10px 14px;
   margin: 10px 0;
+  background: var(--surface);
 }
 
 .carte-role.en-edition {
-  border-left-color: var(--vert);
-  background: #f3f8f5;
+  border-color: var(--vert);
+  box-shadow: 0 0 0 3px var(--vert-clair);
 }
 
 .titre-role {
@@ -264,23 +486,14 @@ button:disabled {
 }
 
 .liste-noms {
-  margin: 6px 0;
+  margin: 6px 0 10px;
   word-break: break-word;
-}
-
-.champ-liste {
-  display: block;
-}
-
-.champ-liste input {
-  flex: 1;
-  min-width: 0;
 }
 
 .liste-cases {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: 4px 8px;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 2px 8px;
   max-height: 40vh;
   overflow: auto;
   padding: 4px;
@@ -290,81 +503,8 @@ button:disabled {
   background: var(--vert);
   color: #ffffff;
   border-radius: 8px;
-  padding: 0 5px;
+  padding: 0 6px;
   font-size: 0.75rem;
-}
-
-.ok {
-  color: var(--vert);
-  font-weight: 600;
-}
-
-/* Barre fixée en bas de l'écran pendant une modification. */
-.barre-edition {
-  position: sticky;
-  bottom: 0;
-  background: #ffffff;
-  border-top: 2px solid var(--vert);
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-  padding: 8px 16px;
-  z-index: 10;
-}
-
-.barre-edition .ligne-outils {
-  margin: 6px 0 0;
-}
-
-/* --- Stocks sur le plan --- */
-
-.plan .contour {
-  fill: rgba(31, 78, 61, 0.06);
-  stroke: #999999;
-  stroke-width: 1.5;
-}
-
-.plan .contour.actif {
-  fill: rgba(198, 40, 40, 0.08);
-  stroke: #c62828;
-  stroke-width: 2;
-}
-
-.plan .ligne-rupture {
-  fill: none;
-  stroke: #ef6c00;
-  stroke-width: 2;
-}
-
-.plan .points circle.role-contour {
-  fill: #c62828;
-}
-
-.plan .points circle.role-base {
-  fill: #1565c0;
-}
-
-.plan .points circle.role-ligne {
-  fill: #ef6c00;
-}
-
-.plan .points circle.role-dessus {
-  fill: #2e7d32;
-}
-
-.plan .points circle:not([class]),
-.plan .points circle[class=''] {
-  fill: #9e9e9e;
-}
-
-.plan .points circle.selection {
-  fill: none;
-  stroke: var(--vert);
-  stroke-width: 2.5;
-}
-
-.plan .noms text.rang {
-  font-size: 10px;
-  font-weight: 700;
-  fill: var(--vert);
 }
 
 .series {
@@ -375,43 +515,251 @@ button:disabled {
 }
 
 .pastille {
-  background: #ffffff;
+  min-height: 36px;
+  padding: 6px 12px;
   border: 1px solid var(--vert);
-  color: var(--vert);
-  border-radius: 16px;
-  padding: 5px 10px;
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--vert-fonce);
   font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
+}
+
+.pastille:active {
+  background: var(--vert-clair);
 }
 
 /* Série déjà utilisée dans un stock : affichée en plus discret. */
 .pastille.utilisee {
-  border-color: #cccccc;
-  color: #999999;
-}
-
-/* --- Volumes --- */
-
-.incomplet {
-  color: var(--gris);
-  font-style: italic;
-}
-
-.detail-stock {
-  margin: 8px 0;
-}
-
-.tableau-detail td:last-child {
-  text-align: right;
-}
-
-.plan .triangles {
-  fill: none;
-  stroke: #7c8b99;
-  stroke-width: 0.8;
+  border-color: var(--bordure);
+  color: #a3aca8;
 }
 
 .choix-surface {
   display: block;
   cursor: pointer;
+}
+
+/* Barre fixée en bas de l'écran pendant une modification (visible aussi sur le plan). */
+.barre-edition {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 8px);
+  z-index: 30;
+  background: var(--surface);
+  border-radius: var(--rayon);
+  box-shadow: 0 4px 20px rgba(16, 24, 20, 0.18);
+  border: 1px solid var(--vert);
+  padding: 10px 14px;
+  font-size: 0.92rem;
+}
+
+.barre-edition .ligne-outils {
+  margin: 8px 0 0;
+}
+
+@media (min-width: 900px) {
+  .barre-edition {
+    left: 16px;
+    right: auto;
+    width: 440px;
+    bottom: 16px;
+  }
+}
+
+/* ==========================================================================
+   Plan
+   ========================================================================== */
+
+.plan-cadre {
+  position: relative;
+  height: 100%;
+  min-height: 300px;
+  overflow: hidden;
+  background: #fbfcfb;
+}
+
+svg.plan {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Le navigateur ne doit pas faire défiler la page quand on touche le plan. */
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+/* Boutons posés sur le plan */
+.plan-options {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: calc(100% - 70px);
+}
+
+.puce {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 18px;
+  box-shadow: var(--ombre);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.puce input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.plan-boutons {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 10px;
+  box-shadow: var(--ombre);
+  overflow: hidden;
+}
+
+.plan-boutons button {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-bottom: 1px solid var(--bordure);
+  background: var(--surface);
+  color: var(--texte);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.plan-boutons button:last-child {
+  border-bottom: none;
+}
+
+.plan-boutons svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+}
+
+/* Dessin du plan */
+.plan .points circle {
+  fill: #9aa5a0;
+}
+
+.plan .points circle.role-contour {
+  fill: var(--rouge);
+}
+
+.plan .points circle.role-base {
+  fill: var(--bleu);
+}
+
+.plan .points circle.role-ligne {
+  fill: var(--orange);
+}
+
+.plan .points circle.role-dessus {
+  fill: var(--vert);
+}
+
+.plan .points circle.selection {
+  fill: none;
+  stroke: var(--vert-fonce);
+  stroke-width: 2.5;
+}
+
+.plan .noms text {
+  font-size: 12px;
+  fill: var(--texte);
+  paint-order: stroke;
+  stroke: #fbfcfb;
+  stroke-width: 3px;
+}
+
+.plan .noms text.rang {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--vert-fonce);
+}
+
+.plan .contour {
+  fill: rgba(21, 128, 61, 0.05);
+  stroke: #a3aca8;
+  stroke-width: 1.5;
+}
+
+.plan .contour.actif {
+  fill: rgba(220, 38, 38, 0.07);
+  stroke: var(--rouge);
+  stroke-width: 2;
+}
+
+.plan .ligne-rupture {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 2;
+}
+
+.plan .triangles {
+  fill: none;
+  stroke: #8a979f;
+  stroke-width: 0.8;
+}
+
+.plan .echelle rect {
+  fill: rgba(255, 255, 255, 0.9);
+}
+
+.plan .echelle path {
+  fill: none;
+  stroke: var(--texte);
+  stroke-width: 2;
+}
+
+.plan .echelle text {
+  font-size: 11px;
+}
+
+/* Pendant une modification, on laisse de la place pour la barre du bas. */
+body:has(.barre-edition:not([hidden])) .mise-en-page {
+  padding-bottom: calc(var(--hauteur-onglets) + 170px);
+}
+
+body:has(.barre-edition:not([hidden])) .colonne-gauche {
+  padding-bottom: 150px;
+}
+
+/* Sur téléphone : tableaux plus compacts, titres sur deux lignes si besoin. */
+@media (max-width: 480px) {
+  table {
+    font-size: 0.85rem;
+  }
+
+  th,
+  td {
+    padding: 7px 6px;
+  }
+
+  th {
+    white-space: normal;
+  }
 }
