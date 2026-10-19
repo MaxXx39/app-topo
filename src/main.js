@@ -13,35 +13,78 @@ let points = [];
 
 const app = document.querySelector('#app');
 
+// Petites icônes des onglets (traits simples).
+const ICONES = {
+  points: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" />',
+  stocks: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
+  plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
+  volumes: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
+  landxml: '<path d="M4 4h10l6 6v10H4zM14 4v6h6" />',
+};
+const ONGLETS = [
+  { nom: 'points', titre: 'Points' },
+  { nom: 'stocks', titre: 'Stocks' },
+  { nom: 'plan', titre: 'Plan' },
+  { nom: 'volumes', titre: 'Volumes' },
+  { nom: 'landxml', titre: 'LandXML' },
+];
+
 app.innerHTML = `
-  <section>
-    <h2>1. Importer les points</h2>
-    <p>Fichier CSV exporté d'Emlid Flow, ou fichier TXT (nom, Est, Nord, altitude séparés par des tabulations).</p>
-    <label class="bouton">
-      Choisir un fichier
-      <input type="file" id="fichier-points" accept=".csv,.txt,text/csv,text/plain" hidden />
-    </label>
-    <div id="resultat-import"></div>
-  </section>
-  <section class="apres-import" hidden>
-    <h2>2. Stocks et rôles des points</h2>
-    <div id="stocks"></div>
-  </section>
-  <section class="apres-import" hidden>
-    <h2>3. Plan</h2>
-    <p class="aide">Un doigt pour déplacer, deux doigts pour zoomer (molette à l'ordinateur). Pendant une modification, touche un point pour l'ajouter ou le retirer.</p>
-    <div id="plan"></div>
-  </section>
-  <section class="apres-import" hidden>
-    <h2>4. Volumes (mode A : base mesurée)</h2>
-    <div id="resultats"></div>
-  </section>
-  <section>
-    <h2>5. Surface LandXML</h2>
-    <div id="landxml"></div>
-  </section>
-  <div id="barre-edition" class="barre-edition" hidden></div>
+  <div class="mise-en-page">
+    <div class="colonne-gauche">
+      <section class="panneau" data-onglet="points">
+        <h2>Importer les points</h2>
+        <p class="aide">Fichier CSV exporté d'Emlid Flow, ou fichier TXT (nom, Est, Nord, altitude séparés par des tabulations).</p>
+        <label class="bouton">
+          Choisir un fichier
+          <input type="file" id="fichier-points" accept=".csv,.txt,text/csv,text/plain" hidden />
+        </label>
+        <div id="resultat-import"></div>
+      </section>
+      <section class="panneau" data-onglet="stocks">
+        <h2>Stocks et rôles des points</h2>
+        <div class="apres-import" hidden><div id="stocks"></div></div>
+        <p class="vide avant-import">Importe d'abord un fichier de points (onglet Points).</p>
+      </section>
+      <section class="panneau" data-onglet="volumes">
+        <h2>Volumes <span class="aide">(mode A : base mesurée)</span></h2>
+        <div class="apres-import" hidden><div id="resultats"></div></div>
+        <p class="vide avant-import">Importe d'abord un fichier de points (onglet Points).</p>
+      </section>
+      <section class="panneau" data-onglet="landxml">
+        <h2>Surface LandXML</h2>
+        <div id="landxml"></div>
+      </section>
+      <div id="barre-edition" class="barre-edition" hidden></div>
+    </div>
+    <section class="panneau panneau-plan" data-onglet="plan">
+      <div id="plan" class="apres-import" hidden></div>
+      <p class="vide plan-vide avant-import">Le plan s'affichera après l'import des points.</p>
+    </section>
+  </div>
+  <nav class="onglets" aria-label="Onglets">
+    ${ONGLETS.map(
+      (o) => `<button type="button" data-onglet="${o.nom}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[o.nom]}</svg>
+        <span>${o.titre}</span>
+      </button>`,
+    ).join('')}
+  </nav>
 `;
+
+/** Affiche un onglet. Sur ordinateur, le plan reste toujours visible à droite. */
+function afficherOnglet(nom) {
+  for (const element of document.querySelectorAll('[data-onglet]')) {
+    element.classList.toggle('actif', element.dataset.onglet === nom);
+  }
+  document.body.dataset.onglet = nom;
+  window.scrollTo(0, 0);
+}
+document.querySelector('.onglets').addEventListener('click', (evenement) => {
+  const bouton = evenement.target.closest('button[data-onglet]');
+  if (bouton) afficherOnglet(bouton.dataset.onglet);
+});
+afficherOnglet('points');
 
 // La surface choisie servira de base en mode B (étape suivante).
 creerEcranLandXML(document.querySelector('#landxml'), { quandChange: () => {} });
@@ -52,6 +95,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
 const editeur = creerEditeurStocks(document.querySelector('#stocks'), document.querySelector('#barre-edition'), {
   obtenirPoints: () => points,
   quandChange: () => recalculer(),
+  allerAuPlan: () => afficherOnglet('plan'),
 });
 
 /** Recalcule les volumes, les affiche, et redessine le plan avec les triangles du stock actif. */
@@ -59,13 +103,16 @@ function recalculer() {
   const dessin = editeur.obtenirDessin();
   const resultats = calculerTousLesStocks(dessin.stocks, points);
   afficherResultats(document.querySelector('#resultats'), dessin.stocks, resultats);
+  document.querySelector('#etat').textContent =
+    points.length > 0 ? `${points.length} points · ${dessin.stocks.length} stock(s)` : 'Volumes de stocks';
   const resultatActif = resultats[dessin.stocks.indexOf(dessin.stockActif)];
   plan.redessiner({ ...dessin, triangles: resultatActif?.trianglesDessus ?? [] });
 }
 
 /** Montre les sections suivantes s'il y a des points, et cadre le plan sur ces points. */
 function mettreAJourPlan() {
-  for (const section of document.querySelectorAll('.apres-import')) section.hidden = points.length === 0;
+  for (const element of document.querySelectorAll('.apres-import')) element.hidden = points.length === 0;
+  for (const element of document.querySelectorAll('.avant-import')) element.hidden = points.length > 0;
   editeur.rafraichir();
   recalculer();
   if (points.length > 0) plan.afficherPoints(points);
