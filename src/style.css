@@ -239,11 +239,15 @@ body.aide-active .rond-aide {
   top: calc(var(--hauteur-entete) + 12px);
   transform: translateX(-50%);
   z-index: 50;
+  width: max-content;
+  max-width: calc(100vw - 32px);
   padding: 8px 16px;
-  border-radius: 999px;
+  /* Arrondi modéré : un message long (photo refusée...) tient sur plusieurs lignes. */
+  border-radius: 16px;
   background: var(--sombre);
   color: #ffffff;
   font-size: 0.9rem;
+  text-align: center;
   box-shadow: var(--ombre);
   pointer-events: none;
 }

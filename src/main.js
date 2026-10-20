@@ -280,16 +280,18 @@ const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces')
   decrire: decrireSurface,
   etiquette: etiquetteSurface,
   ajouterPhotos: async (surface, fichiers) => {
-    afficherMessage('Préparation de la photo…');
+    // La conversion d'une photo HEIC prend quelques secondes : le message reste affiché jusqu'à la fin.
+    afficherMessage('Préparation de la photo…', null);
     const erreurs = [];
     for (const fichier of fichiers) {
       try {
         surface.photos = [...(surface.photos ?? []), await preparerPhoto(fichier)];
-      } catch {
-        erreurs.push(fichier.name);
+      } catch (erreur) {
+        erreurs.push(`${fichier.name} : ${erreur.message}`);
       }
     }
-    afficherMessage(erreurs.length > 0 ? `Photo illisible : ${erreurs.join(', ')}` : `${fichiers.length} photo(s) ajoutée(s)`);
+    if (erreurs.length > 0) afficherMessage(`Photo refusée. ${erreurs.join(' ; ')}`, 8000);
+    else afficherMessage(`${fichiers.length} photo(s) ajoutée(s)`);
     modifie();
   },
 });
@@ -528,9 +530,9 @@ document.addEventListener('keydown', (evenement) => {
   evenement.preventDefault();
 });
 
-/** Petit message sous l'en-tête, qui disparaît tout seul. */
+/** Petit message sous l'en-tête, qui disparaît tout seul après "duree" millisecondes (null : il reste). */
 let minuterieMessage = null;
-function afficherMessage(texte) {
+function afficherMessage(texte, duree = 2000) {
   let zone = document.querySelector('#message-flottant');
   if (!zone) {
     zone = document.createElement('div');
@@ -542,7 +544,7 @@ function afficherMessage(texte) {
   zone.textContent = texte;
   zone.hidden = false;
   clearTimeout(minuterieMessage);
-  minuterieMessage = setTimeout(() => (zone.hidden = true), 2000);
+  if (duree !== null) minuterieMessage = setTimeout(() => (zone.hidden = true), duree);
 }
 
 async function enregistrer() {
