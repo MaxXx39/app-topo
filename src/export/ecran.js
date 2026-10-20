@@ -12,7 +12,7 @@ const CALQUES = [
   ['triangles', 'Triangles', true],
   ['noms', 'Noms des points', true],
   ['ecarts', 'Remblai (rouge) / déblai (jaune)', true],
-  ['photos', 'Photos des surfaces (feuilles à part)', true],
+  ['photos', 'Photos cochées (sous la légende)', true],
   ['courbes', 'Courbes de niveau', false],
   ['couleurs', 'Couleurs selon l\'altitude', false],
   ['photo', 'Photo aérienne (swisstopo)', false],

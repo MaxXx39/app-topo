@@ -380,7 +380,10 @@ const ecranExport = creerEcranExport(document.querySelector('#export'), {
       },
       points: leve?.points ?? [],
       fichierPoints: leve?.nom ?? '',
-      photos: surfacesAffichees().flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom }))),
+      // Photos cochées « dans le PDF » (toutes, pour celles d'avant la case à cocher).
+      photos: surfacesAffichees().flatMap((s) =>
+        (s.photos ?? []).filter((photo) => photo.dansPdf !== false).map((photo) => ({ ...photo, surface: s.nom })),
+      ),
       cartouche: projet.cartouche,
     };
   },

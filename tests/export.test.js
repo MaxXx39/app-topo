@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { genererCsv } from '../src/export/csv.js';
 import { choisirEchelle, barreEchellePapier } from '../src/export/echelle.js';
+import { disposerPhotos } from '../src/export/pdf.js';
 import { pointsDeReference, surfaceDeReference, volumeDeReference, STOCKS_REFERENCE } from './outils.js';
 
 describe('genererCsv', () => {
@@ -18,6 +19,25 @@ describe('genererCsv', () => {
       'Stock 1;ligne basse;758.638;1636.197;0.000',
       '"Stock; 2";TN;436.969;0.000;1006.247',
     ]);
+  });
+});
+
+describe('disposerPhotos', () => {
+  const zone = { x: 0, y: 0, largeur: 80, hauteur: 60 };
+  it('une photo prend toute la largeur si elle tient en hauteur', () => {
+    const [position] = disposerPhotos([{ largeur: 4000, hauteur: 2000 }], zone, 3, 2);
+    expect(position.largeur).toBeCloseTo(80, 6);
+    expect(position.hauteur).toBeCloseTo(40, 6);
+  });
+
+  it('deux photos en largeur : côte à côte, chacune dans sa moitié', () => {
+    const cases = disposerPhotos([{ largeur: 4, hauteur: 3 }, { largeur: 4, hauteur: 3 }], { x: 0, y: 0, largeur: 80, hauteur: 30 }, 3, 2);
+    expect(cases[0].y).toBe(cases[1].y);
+    expect(cases[1].x).toBeGreaterThan(cases[0].x + cases[0].largeur);
+  });
+
+  it('renvoie null si les photos seraient trop petites', () => {
+    expect(disposerPhotos(Array.from({ length: 30 }, () => ({ largeur: 4, hauteur: 3 })), zone)).toBeNull();
   });
 });
 
@@ -122,13 +142,16 @@ describe('creerPdf - calques', async () => {
     expect(contenu).toContain(formaterNombre(resultat.remblai));
   });
 
-  it('ajoute les photos des surfaces sur une feuille à part (4 par feuille)', async () => {
+  it('met les photos dans la colonne, sous la légende ; sur des feuilles à part si elles n\'y tiennent pas', async () => {
     // Petite image JPEG de 8 × 6 pixels (couleur ambre).
     const image = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAGAAgDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwC/ARI6f//Z';
     const photo = (i) => ({ surface: 'Stock 2', legende: `Vue ${i}`, date: '2026-05-20T08:00:00Z', image, largeur: 8, hauteur: 6 });
-    const { document } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, photos: [1, 2, 3, 4, 5].map(photo) });
-    expect(document.getNumberOfPages()).toBe(3); // volumes + 2 feuilles de photos
-    expect(document.output()).toContain('Stock 2 - Vue 5');
+    const { document } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, photos: [1, 2].map(photo) });
+    expect(document.getNumberOfPages()).toBe(1); // tout sur la feuille des volumes
+    expect(document.output()).toContain('Stock 2 - Vue 2');
+    // Trop de photos pour la colonne : 4 par feuille, à la suite.
+    const beaucoup = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, photos: Array.from({ length: 30 }, (_, i) => photo(i + 1)) });
+    expect(beaucoup.document.getNumberOfPages()).toBe(9); // volumes + 8 feuilles (30 photos, 4 par feuille)
     const sans = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, photos: [photo(1)], calques: { photos: false } });
     expect(sans.document.getNumberOfPages()).toBe(1);
   });

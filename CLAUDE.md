@@ -69,6 +69,7 @@ Ajouts demandés par l'utilisateur après la V1 :
 - **Volumes et Comparer réunis (octobre 2026)** : onglets 1. Importer, 2. Surfaces, 3. Volumes. Une surface est un **stock**, un **terrain naturel** ou un **terrassement** (nature : « + Nouvelle surface » crée un stock, on change ensuite avec « C'est : » ; le nom automatique et le calcul automatique suivent). Dans 3. Volumes, chaque **calcul** a une surface 1 (dessus / après) et soit « une seule surface » (volume sur la ligne basse = points du contour), soit une surface 2 (dessous / avant), sur toute la surface 1 ou dans le contour d'une surface. Résultats toujours en remblai / déblai. Calcul prérempli : un stock → une seule surface ; un terrassement → par rapport au dernier terrain naturel (calcul `auto`, jamais modifié par l'appli une fois retouché à la main).
 - Saisie des surfaces : contour (rouge), lignes de rupture (orange), « Points isolés / caractéristiques » (vert), mêmes couleurs que le plan ; « Valider » ferme la saisie. Les anciens projets sont convertis (fichier projet version 2, `src/volumes/calculs.js`).
 - Photos HEIC (Android, iPhone) converties en JPEG sur l'appareil (bibliothèque `heic-to`, chargée seulement quand il le faut).
+- Photos des surfaces : case « dans le PDF » par photo ; dans le PDF, les photos cochées sont dans la colonne de droite sous la légende (feuilles à part seulement si elles n'y tiennent pas).
 
 ## 5. Vérification : cas de référence
 

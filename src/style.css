@@ -1380,10 +1380,22 @@ tr.total td {
   background: var(--fond);
 }
 
-.photo input {
+.photo input[type='text'] {
   width: 100%;
   min-width: 0;
   font-size: 0.9rem;
+}
+
+/* Case « dans le PDF » de chaque photo */
+.photo .case {
+  font-size: 0.9rem;
+  min-height: 30px;
+}
+
+.photo .case input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
 }
 
 /* --- Rôles d'une surface : même couleur que sur le plan ---
