@@ -7,7 +7,7 @@ import { bulle } from '../aide/bulles.js';
 /**
  * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
  * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id),
- * importerFond(fichier), supprimerFond(id), montrerCalqueFond(id, calque, visible)
+ * importerFond(fichier), supprimerFond(id), montrerCalqueFond(id, calque, visible), pointer()
  * Renvoie { afficher(projet, dernierImport, messageFond) }.
  */
 export function creerEcranImport(conteneur, actions) {
@@ -15,6 +15,7 @@ export function creerEcranImport(conteneur, actions) {
     const bouton = evenement.target.closest('button[data-action]');
     if (bouton?.dataset.action === 'supprimer-leve') actions.supprimerLeve(bouton.dataset.id);
     if (bouton?.dataset.action === 'supprimer-fond') actions.supprimerFond(bouton.dataset.id);
+    if (bouton?.dataset.action === 'pointer') actions.pointer();
   });
 
   conteneur.addEventListener('change', async (evenement) => {
@@ -72,6 +73,14 @@ export function creerEcranImport(conteneur, actions) {
           <input type="file" data-champ="fichier-fond" accept=".dxf" hidden />
         </label>
         ${messageFond}
+        ${
+          (projet.fonds ?? []).length > 0
+            ? `<div class="ligne-outils">
+                <button type="button" class="bouton" data-action="pointer">Pointer sur le fond</button>
+                ${bulle('pointage')}
+              </div>`
+            : ''
+        }
         ${(projet.fonds ?? []).map(carteFond).join('')}
       `;
     },

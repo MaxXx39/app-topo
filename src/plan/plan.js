@@ -10,6 +10,7 @@ import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
 import { emprise } from '../fond/dxf-fond.js';
+import { coinsAccrochables } from '../fond/pointage.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -43,9 +44,11 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandToucherStock(index) : appelé quand on touche l'intérieur d'un stock (hors modification)
  * - quandToucherTriangle(triangle) : appelé quand on touche un triangle de la surface affichée,
  *   en mode suppression de triangles (dessin.modeTriangles)
+ * - quandPointer(position, rayon) : pointage sur le fond de plan (dessin.modePointage) ;
+ *   position { est, nord } touchée et rayon de recherche (m) qui correspond au doigt
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandPointer } = {}) {
   const calques = lireCalques();
 
   // Boutons posés sur le plan : calques en haut à gauche, zoom en haut à droite.
@@ -106,8 +109,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // surface : surface affichée { triangles, trianglesRetires } ; modeTriangles : suppression au doigt
   // ecarts : triangles d'écart à colorier à la place de ceux des surfaces, sinon null
   // fonds : fonds de plan DXF du projet (voir fond/dxf-fond.js)
+  // modePointage : toucher le plan pointe un coin du fond ; coinChoisi : coin touché { est, nord } ou null
   let dessin = {
     fonds: [],
+    modePointage: false,
+    coinChoisi: null,
     stocks: [],
     stockActif: null,
     cachees: new Set(),
@@ -153,7 +159,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (vue && calques.fondDxf) dessinerFondsDxf();
     if (!vue || points.length === 0) {
       // Pas encore de points : on montre au moins le fond de plan DXF et l'échelle.
-      if (vue && (dessin.fonds ?? []).length > 0) dessinerBarreEchelle();
+      if (vue && (dessin.fonds ?? []).length > 0) {
+        dessinerPointage();
+        dessinerBarreEchelle();
+      }
       return;
     }
 
@@ -231,6 +240,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       });
     }
 
+    // Coins du pointage sous les points : un point déjà dessiné reste bien visible.
+    dessinerPointage();
     svg.append(groupePoints, groupeNoms);
     if (calques.volumes) dessinerVolumes();
     dessinerLegende();
@@ -331,6 +342,26 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         element.textContent = texte.texte;
         groupe.append(element);
       }
+    }
+    svg.append(groupe);
+  }
+
+  /**
+   * Pendant le pointage : petits carrés sur les coins où l'on peut s'accrocher (seulement quand
+   * on a assez zoomé pour les distinguer : 150 coins à l'écran au plus), et un rond sur le coin touché.
+   */
+  function dessinerPointage() {
+    if (!dessin.modePointage) return;
+    const groupe = creerElement('g', { class: 'pointage' });
+    const coins = coinsAccrochables(dessin.fonds ?? [])
+      .map((c) => versEcran(c.est, c.nord, vue))
+      .filter(({ x, y }) => x > -10 && y > -10 && x < vue.largeur + 10 && y < vue.hauteur + 10);
+    if (coins.length <= 150) {
+      for (const { x, y } of coins) groupe.append(creerElement('rect', { x: x - 2.5, y: y - 2.5, width: 5, height: 5, class: 'coin' }));
+    }
+    if (dessin.coinChoisi) {
+      const { x, y } = versEcran(dessin.coinChoisi.est, dessin.coinChoisi.nord, vue);
+      groupe.append(creerElement('circle', { cx: x, cy: y, r: 11, class: 'coin-choisi' }));
     }
     svg.append(groupe);
   }
@@ -609,7 +640,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       return;
     }
     recadrerQuandVisible = false;
-    vue = cadrerSurPoints(points.length > 0 ? points : coinsDesFonds(), largeur, hauteur);
+    // Les points et le fond de plan : tout est visible.
+    vue = cadrerSurPoints([...points, ...coinsDesFonds()], largeur, hauteur);
     dessiner();
   }
 
@@ -698,7 +730,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   svg.addEventListener('pointerup', (evenement) => {
     pointeurs.delete(evenement.pointerId);
     if (toucher && pointeurs.size === 0) {
-      if (dessin.modeTriangles) {
+      if (dessin.modePointage) {
+        // Pointage : on cherche un coin du fond de plan (ou un point dessiné) sous le doigt.
+        quandPointer?.(versTerrain(toucher.x, toucher.y, vue), RAYON_TOUCHER / vue.echelle);
+      } else if (dessin.modeTriangles) {
         // Suppression de triangles : on cherche le triangle sous le doigt.
         const terrain = versTerrain(toucher.x, toucher.y, vue);
         const tous = [...(dessin.surface?.triangles ?? []), ...(dessin.surface?.trianglesRetires ?? [])];

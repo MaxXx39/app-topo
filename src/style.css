@@ -1492,3 +1492,37 @@ tr.total td {
   overflow-y: auto;
 }
 
+
+/* --- Pointage sur le fond de plan --- */
+.plan .pointage .coin {
+  fill: #ffffff;
+  stroke: #7a5c99;
+  stroke-width: 1;
+}
+
+.plan .pointage .coin-choisi {
+  fill: rgba(246, 171, 7, 0.25);
+  stroke: var(--ambre-fonce);
+  stroke-width: 3;
+}
+
+.champs-pointage {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.champs-pointage label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.champs-pointage input {
+  width: 100%;
+  min-width: 0;
+  font-size: 1.05rem;
+}

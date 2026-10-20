@@ -14,7 +14,8 @@ const SEGMENTS_CERCLE = 32;
  * Lit le texte d'un fichier DXF.
  * Renvoie { calques, traits, textes, erreurs, avertissements } :
  * - calques : noms des calques qui contiennent quelque chose, triés
- * - traits : [{ calque, points: [{ est, nord }], ferme }] (lignes, polylignes, cercles, arcs)
+ * - traits : [{ calque, points: [{ est, nord }], ferme }] (lignes, polylignes, cercles, arcs) ;
+ *   les cercles et arcs ont en plus courbe: true et leur centre { est, nord }
  * - textes : [{ calque, est, nord, texte, hauteur (m), rotation (degrés) }]
  */
 export function lireFondDXF(texte) {
@@ -49,13 +50,14 @@ export function lireFondDXF(texte) {
     } else if (type === 'CIRCLE') {
       const centre = point(entite, '10', '20');
       const rayon = Number(valeur(entite, '40'));
-      if (centre && rayon > 0) resultat.traits.push({ calque, points: pointsArc(centre, rayon, 0, 360), ferme: true });
+      // courbe : dessiné en petits segments ; on s'accroche à son centre, pas à ses segments.
+      if (centre && rayon > 0) resultat.traits.push({ calque, points: pointsArc(centre, rayon, 0, 360), ferme: true, courbe: true, centre });
     } else if (type === 'ARC') {
       const centre = point(entite, '10', '20');
       const rayon = Number(valeur(entite, '40'));
       if (centre && rayon > 0) {
         const traitArc = pointsArc(centre, rayon, Number(valeur(entite, '50')) || 0, Number(valeur(entite, '51')) || 0);
-        resultat.traits.push({ calque, points: traitArc, ferme: false });
+        resultat.traits.push({ calque, points: traitArc, ferme: false, courbe: true, centre });
       }
     } else if (type === 'TEXT' || type === 'MTEXT') {
       const position = point(entite, '10', '20');

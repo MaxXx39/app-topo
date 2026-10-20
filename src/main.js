@@ -7,6 +7,8 @@ import { lirePoints } from './topo/import-points.js';
 import { lireLandXML } from './topo/landxml.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { lireFondDXF, decoderTexteDXF } from './fond/dxf-fond.js';
+import { coinsAccrochables, lePlusProche, lireAltitude, nomSuivant } from './fond/pointage.js';
+import { creerBarrePointage } from './fond/barre-pointage.js';
 import { formaterNombre } from './topo/format.js';
 import { calculerSurface, surfaceImportee, cleTriangle, estImportee, nomNature, nouvelIdentifiant } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
@@ -37,6 +39,8 @@ let projet = creerProjet('Mon projet'); // projet ouvert
 let resumes = []; // liste des projets enregistrés (pour l'écran Mes projets)
 let dernierImport = null; // résultat du dernier import de points
 let messageFond = ''; // résultat du dernier import de fond de plan (HTML)
+// Pointage sur le fond de plan : actif, coin touché (voir fond/barre-pointage.js), dernière altitude tapée.
+const pointage = { actif: false, choix: null, erreur: '', derniereAltitude: null };
 let surfacesCalculees = new Map(); // id de surface -> triangles (résultat de calculerSurface)
 let resultatsCalculs = new Map(); // id de calcul -> volume (résultat de calculerVolume)
 let ongletContexte = 'importer'; // dernier onglet (hors plan) : décide de ce que montre le plan
@@ -81,6 +85,7 @@ document.querySelector('#app').innerHTML = `
         <div id="export" class="carte-export"></div>
       </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
+      <div id="barre-pointage" class="barre-edition" hidden></div>
     </div>
     <section class="panneau panneau-plan" data-onglet="plan">
       <div id="plan"></div>
@@ -102,6 +107,8 @@ function afficherOnglet(nom) {
     element.classList.toggle('actif', element.dataset.onglet === nom);
   }
   document.body.dataset.onglet = nom;
+  // Le pointage s'arrête quand on passe aux surfaces ou aux volumes (le plan y sert à autre chose).
+  if (pointage.actif && (nom === 'surfaces' || nom === 'volumes')) arreterPointage();
   if (nom !== 'plan' && nom !== ongletContexte) {
     ongletContexte = nom;
     recalculer();
@@ -207,6 +214,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     messageFond = '';
     modifie();
   },
+  pointer: () => commencerPointage(),
   montrerCalqueFond: (id, calque, visible) => {
     const fond = projet.fonds.find((f) => f.id === id);
     if (!fond) return;
@@ -276,7 +284,100 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPoint: (nom) => editeurSurfaces.toucherPoint(nom),
   quandToucherStock: (index) => editeurSurfaces.choisir(index),
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
+  quandPointer: (position, rayon) => toucherPourPointage(position, rayon),
 });
+
+// --- Pointage sur le fond de plan DXF : chaque coin touché devient un point du levé « dessiné » ---
+
+/** Levé où sont rangés les points pointés sur le fond (créé au premier pointage). */
+function leveDessine() {
+  let leve = projet.leves.find((l) => l.dessine);
+  if (!leve) {
+    leve = ajouterLeve(projet, 'Points dessinés', []);
+    leve.dessine = true;
+  }
+  return leve;
+}
+
+function commencerPointage() {
+  projet.leveActifId = leveDessine().id;
+  Object.assign(pointage, { actif: true, choix: null, erreur: '' });
+  modifie();
+  // Sur téléphone, on passe au plan ; sur ordinateur, il est déjà visible à droite.
+  if (!window.matchMedia('(min-width: 900px)').matches) afficherOnglet('plan');
+}
+
+function arreterPointage() {
+  Object.assign(pointage, { actif: false, choix: null, erreur: '' });
+  recalculer();
+}
+
+/**
+ * Le doigt a touché le plan (position en m, rayon de recherche en m) : un point déjà dessiné
+ * (pour le corriger), sinon le coin du fond de plan le plus proche.
+ */
+function toucherPourPointage(position, rayon) {
+  const leve = leveDessine();
+  const existant = lePlusProche(leve.points, position, rayon);
+  const coin = existant ? null : lePlusProche(coinsAccrochables(projet.fonds), position, rayon);
+  if (existant) pointage.choix = { ...existant, existant: true };
+  else if (coin) pointage.choix = { ...coin, nom: nomSuivant(leve.points), altitude: pointage.derniereAltitude, existant: false };
+  else {
+    afficherMessage('Pas de coin du plan ici : zoome, ou touche plus près d\'un trait.');
+    return;
+  }
+  pointage.erreur = '';
+  recalculer();
+}
+
+const barrePointage = creerBarrePointage(document.querySelector('#barre-pointage'), {
+  valider: (nomTape, altitudeTapee) => {
+    const leve = leveDessine();
+    const choix = pointage.choix;
+    const nom = nomTape.trim();
+    const altitude = lireAltitude(altitudeTapee);
+    const autre = leve.points.find((p) => p.nom === nom && !(choix.existant && p.nom === choix.nom));
+    pointage.erreur = altitude === null ? 'Altitude illisible : tape par exemple 473.20' : !nom ? 'Donne un nom au point' : autre ? `Le nom ${nom} est déjà pris` : '';
+    if (pointage.erreur) {
+      recalculer();
+      return;
+    }
+    if (choix.existant) {
+      const point = leve.points.find((p) => p.nom === choix.nom);
+      // Point renommé : les surfaces qui l'utilisent suivent le nouveau nom.
+      if (nom !== choix.nom) renommerPointDansSurfaces(leve.id, choix.nom, nom);
+      Object.assign(point, { nom, altitude });
+    } else {
+      leve.points.push({ nom, est: choix.est, nord: choix.nord, altitude });
+    }
+    pointage.derniereAltitude = altitude;
+    pointage.choix = null;
+    modifie();
+  },
+  annuler: () => {
+    pointage.choix = null;
+    pointage.erreur = '';
+    recalculer();
+  },
+  supprimer: () => {
+    const leve = leveDessine();
+    if (!confirm(`Supprimer le point ${pointage.choix.nom} ?`)) return;
+    leve.points = leve.points.filter((p) => p.nom !== pointage.choix.nom);
+    pointage.choix = null;
+    modifie({ recadrer: false });
+  },
+  terminer: arreterPointage,
+});
+
+/** Remplace un nom de point dans les surfaces d'un levé (contour, lignes de rupture, points choisis). */
+function renommerPointDansSurfaces(leveId, ancien, nouveau) {
+  const remplacer = (noms) => noms.map((n) => (n === ancien ? nouveau : n));
+  for (const surface of projet.surfaces.filter((s) => s.leveId === leveId)) {
+    surface.contour = remplacer(surface.contour);
+    surface.points = remplacer(surface.points);
+    for (const ligne of surface.lignesRupture) ligne.noms = remplacer(ligne.noms);
+  }
+}
 
 const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces'), document.querySelector('#barre-surfaces'), {
   obtenirPoints: (surface) => (estImportee(surface) ? [] : pointsDuLeve(surface.leveId)),
@@ -484,7 +585,10 @@ function recalculer({ recadrer = false } = {}) {
         : null,
     modeTriangles: dansSurfaces && editeurSurfaces.enSuppression(),
     fonds: projet.fonds,
+    modePointage: pointage.actif,
+    coinChoisi: pointage.choix,
   });
+  barrePointage.afficher({ actif: pointage.actif, nombrePoints: leveActif(projet)?.dessine ? points.length : 0, choix: pointage.choix, erreur: pointage.erreur });
   if (recadrer || pointsDuPlan !== pointsAffiches) {
     pointsAffiches = pointsDuPlan;
     plan.afficherPoints(pointsDuPlan);

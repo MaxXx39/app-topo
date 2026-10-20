@@ -15,6 +15,9 @@ export const TEXTES_AIDE = {
   fondDxf:
     'Plan du projet (DXF en MN95, exporté d\'AutoCAD ou de Mensura) affiché sous les points : talus, murs, axes… Seule la position en plan est lue. Décoche les calques inutiles pour alléger le plan.',
 
+  pointage:
+    'Touche un coin du plan : l\'appli s\'accroche au sommet le plus proche (coin de polyligne, bout de ligne, centre de cercle). Tape son altitude, puis Valider. Les points vont dans le levé « Points dessinés » ; utilise-les ensuite dans 2. Surfaces (contour, lignes de rupture). Touche un point déjà dessiné pour corriger son nom ou son altitude.',
+
   // --- 2. Surfaces ---
   surfaces:
     'Une surface peut être un stock, un terrain naturel ou un terrassement. Nomme-la comme tu veux. Elle se crée à partir des points du levé coché (contour, lignes de rupture, points), ou s\'importe d\'un LandXML ou d\'un DXF. Le rôle d\'un point ne dépend jamais de son nom : c\'est toi qui choisis. Touche une surface sur le plan pour la sélectionner.',
