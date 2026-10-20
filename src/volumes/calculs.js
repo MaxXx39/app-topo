@@ -15,6 +15,7 @@
 //   surface2Id,    // surface 2 (si uneSeule est faux), ou null
 //   zone,          // { type: 'toute' } : toute la surface 1 ;
 //                  // { type: 'surface', surfaceId } : seulement dans le contour de cette surface
+//   auto,          // vrai : créé par l'appli (voir calculsAutomatiques), pas encore modifié à la main
 // }
 // Unités : m, m², m³.
 import { nouvelIdentifiant, estImportee, nomNature, NATURES } from '../topo/surface.js';
@@ -39,6 +40,25 @@ export function preremplir(calcul, surface1, surfaces) {
   const terrains = surfaces.filter((s) => s.nature === 'terrain' && s.id !== surface1.id);
   calcul.surface2Id = calcul.uneSeule ? null : (terrains.at(-1)?.id ?? null);
   calcul.zone = { type: 'toute' };
+}
+
+/**
+ * Calculs créés par l'appli pour une surface, d'après sa nature, à sa création ou quand sa
+ * nature change : un stock ou un terrassement reçoit un calcul prérempli, un terrain naturel
+ * aucun. Les calculs déjà modifiés à la main ne sont jamais touchés.
+ * Les calculs automatiques qui n'ont pas encore de surface 2 reçoivent le dernier terrain naturel.
+ * Renvoie la nouvelle liste des calculs.
+ */
+export function calculsAutomatiques(calculs, surfaces, surface) {
+  const resultat = calculs.filter((c) => !(c.auto && c.surface1Id === surface.id));
+  if (surface.nature === 'stock' || surface.nature === 'terrassement') {
+    resultat.push({ ...creerCalcul(surface, surfaces), auto: true });
+  }
+  for (const calcul of resultat) {
+    const surface1 = surfaces.find((s) => s.id === calcul.surface1Id);
+    if (calcul.auto && !calcul.uneSeule && !calcul.surface2Id && surface1) preremplir(calcul, surface1, surfaces);
+  }
+  return resultat;
 }
 
 /** Nom proposé quand l'utilisateur n'en a pas choisi : « Stock 1 », ou « Terrassement 1 / TN ». */

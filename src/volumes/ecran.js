@@ -55,6 +55,8 @@ export function creerEcranVolumes(conteneur, options) {
     else if (champ === 'surface2') calcul.surface2Id = cible.value || null;
     else if (champ === 'zone') calcul.zone = JSON.parse(cible.value);
     else return;
+    // Modifié à la main : l'appli ne le changera plus (voir calculsAutomatiques).
+    calcul.auto = false;
     quandChange();
   });
 

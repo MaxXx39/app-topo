@@ -1,6 +1,6 @@
 // Onglet 2. Surfaces : créer et modifier les surfaces (stock, terrassement, terrain...).
 // Pour une surface créée à partir d'un levé, on choisit les points de chaque rôle :
-// contour, lignes de rupture, points de la surface ; puis on peut supprimer des triangles au doigt.
+// contour, lignes de rupture, points isolés / caractéristiques ; puis on peut supprimer des triangles au doigt.
 // Trois façons de choisir les points : taper une liste de noms,
 // cocher des cases, ou toucher les points sur le plan.
 // Une surface importée (LandXML, DXF) ne se modifie pas : on peut la renommer ou la supprimer.
@@ -10,11 +10,35 @@ import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
 
 const TEXTES = {
-  nouveau: 'Nouvelle surface :',
+  nouveau: '+ Nouvelle surface',
   supprimer: 'Supprimer cette surface',
   choix: 'Surface affichée',
-  roles: { contour: 'Contour', ligne: 'Ligne de rupture', dessus: 'Points de la surface' },
+  roles: { contour: 'Contour', ligne: 'Ligne de rupture', dessus: 'Points isolés / caractéristiques' },
 };
+
+// Petit dessin de chaque rôle, dans la couleur du plan (contour rouge, lignes de rupture
+// orange, points isolés verts) : on retrouve sur le plan ce que l'on saisit.
+const ICONES_ROLES = {
+  contour: '<path d="M4 8 11 3l9 5-2 11-13 1z" />',
+  ligne: '<path d="M3 18l6-7 4 4 8-9" /><circle cx="3" cy="18" r="1.6" /><circle cx="9" cy="11" r="1.6" /><circle cx="13" cy="15" r="1.6" /><circle cx="21" cy="6" r="1.6" />',
+  dessus: '<circle cx="6" cy="7" r="2.2" /><circle cx="17" cy="9" r="2.2" /><circle cx="9" cy="17" r="2.2" /><circle cx="18" cy="18" r="2.2" />',
+};
+
+/** Icône d'un rôle (contour, ligne, dessus), à mettre devant son titre. */
+function iconeRole(role) {
+  return `<svg class="icone-role" viewBox="0 0 24 24" aria-hidden="true">${ICONES_ROLES[role]}</svg>`;
+}
+
+/** Nom donné à une nouvelle surface : « Stock 4 », « Terrassement 1 »... */
+function nomParDefautPour(objets, nature) {
+  const titre = NATURES.find(([cle]) => cle === nature)?.[1] ?? 'Surface';
+  return `${titre} ${objets.filter((o) => o.nature === nature).length + 1}`;
+}
+
+/** Vrai si le nom est encore un nom automatique (« Stock 4 », « Terrain naturel 2 »...). */
+function estNomParDefaut(nom) {
+  return NATURES.some(([, titre]) => new RegExp(`^${titre} \\d+$`).test(nom));
+}
 
 /**
  * Crée l'écran dans "conteneur" ("barre" : barre du bas pendant une modification).
@@ -25,10 +49,11 @@ const TEXTES = {
  * - etiquette(objet) : texte de la surface dans la liste déroulante (nom et levé)
  * - ajouterPhotos(surface, fichiers) : prépare et range les photos choisies (voir photos/photo.js)
  * - leveActifId() : levé utilisé pour une nouvelle surface
- * - quandCree(surface) : appelé quand une surface est créée (avant quandChange)
+ * - quandNatureChange(surface) : appelé quand une surface est créée ou que sa nature change
+ *   (avant quandChange)
  */
 export function creerEditeurSurfaces(conteneur, barre, options) {
-  const { obtenirPoints, quandChange, decrire, leveActifId, etiquette, ajouterPhotos, quandCree } = options;
+  const { obtenirPoints, quandChange, decrire, leveActifId, etiquette, ajouterPhotos, quandNatureChange } = options;
   const textes = TEXTES;
   const etat = {
     objets: [],
@@ -38,6 +63,8 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
     messages: [], // erreurs de la dernière liste tapée
     listeCasesOuverte: false,
   };
+
+  const nomParDefaut = (nature) => nomParDefautPour(etat.objets, nature);
 
   // --- Accès à la liste de noms du rôle en cours de modification ---
 
@@ -91,14 +118,12 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   }
 
   const actions = {
-    nouveau: (bouton) => {
-      // La nature (stock, terrain naturel, terrassement) est choisie avec le bouton touché.
-      const [nature, titre] = NATURES.find(([cle]) => cle === bouton.dataset.nature) ?? NATURES[0];
-      const numero = etat.objets.filter((o) => o.nature === nature).length + 1;
-      const surface = creerSurface(`${titre} ${numero}`, leveActifId(), nature);
+    nouveau: () => {
+      // Une nouvelle surface est un stock ; sa nature se change ensuite (« C'est : »).
+      const surface = creerSurface(nomParDefaut('stock'), leveActifId(), 'stock');
       etat.objets.push(surface);
       etat.indexActif = etat.objets.length - 1;
-      quandCree?.(surface);
+      quandNatureChange?.(surface);
       // On commence par le contour : c'est lui qui délimite le stock ou le terrassement.
       etat.edition = { role: 'contour' };
       etat.suppression = false;
@@ -153,6 +178,11 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       remplacerListe(resultat.noms);
       etat.messages = resultat.erreurs;
     },
+    // « Valider » : la liste tapée est prise, puis la saisie se ferme (sauf s'il y a une erreur à lire).
+    valider: () => {
+      actions.appliquer();
+      if (etat.messages.length === 0) etat.edition = null;
+    },
     'ajouter-ligne': () => {
       const objet = objetActif();
       objet.lignesRupture.push(creerLigne());
@@ -199,12 +229,18 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
     } else if (cible.dataset.champ === 'nom') {
       objet.nom = cible.value.trim() || objet.nom;
     } else if (cible.dataset.champ === 'nature') {
+      // Nom encore automatique (« Stock 4 ») : il suit la nature (« Terrassement 1 »).
+      if (estNomParDefaut(objet.nom)) objet.nom = nomParDefaut(cible.value);
       objet.nature = cible.value;
+      quandNatureChange?.(objet);
     } else if (cible.dataset.champ === 'ligne-fermee') {
       objet.lignesRupture[Number(cible.dataset.index)].fermee = cible.checked;
     } else if (cible.dataset.champ === 'tous-les-points') {
       objet.tousLesPoints = cible.checked;
       etat.edition = cible.checked ? null : { role: 'dessus', index: 0 };
+    } else if (cible.dataset.champ === 'photo-pdf') {
+      const photo = objet.photos.find((p) => p.id === cible.dataset.id);
+      if (photo) photo.dansPdf = cible.checked;
     } else if (cible.dataset.champ === 'legende-photo') {
       const photo = objet.photos.find((p) => p.id === cible.dataset.id);
       if (photo) photo.legende = cible.value.trim();
@@ -232,7 +268,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   // Valider la liste tapée avec la touche Entrée.
   conteneur.addEventListener('keydown', (evenement) => {
     if (evenement.key === 'Enter' && evenement.target.dataset.champ === 'liste') {
-      actions.appliquer();
+      actions.valider();
       changer();
     }
   });
@@ -250,9 +286,8 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
         </div>`
       : '';
     html += `
-      <div class="ligne-outils nouvelle-surface">
-        <span>${textes.nouveau} ${bulle('nature')}</span>
-        ${NATURES.map(([cle, titre]) => `<button type="button" class="bouton-secondaire" data-action="nouveau" data-nature="${cle}">+ ${titre}</button>`).join('')}
+      <div class="ligne-outils">
+        <button type="button" class="bouton" data-action="nouveau">${textes.nouveau}</button>
       </div>`;
 
     if (objet) {
@@ -262,7 +297,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
           <button type="button" class="bouton-secondaire" data-action="supprimer">${textes.supprimer}</button>
         </div>
         <div class="ligne-outils choix-nature" role="radiogroup" aria-label="Nature de la surface">
-          <span>C'est :</span>
+          <span>C'est : ${bulle('nature')}</span>
           ${NATURES.map(
             ([cle, titre]) => `<label class="case"><input type="radio" name="nature" data-champ="nature" value="${cle}" ${objet.nature === cle ? 'checked' : ''} /> ${titre}</label>`,
           ).join('')}
@@ -283,8 +318,8 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
     return `
       ${carteRole(surface, { role: 'contour' }, 'contour')}
       ${cartesLignes(surface)}
-      <div class="carte-role ${estEnEdition({ role: 'dessus' }) ? 'en-edition' : ''}">
-        <div class="titre-role"><strong>${textes.roles.dessus} ${bulle('pointsSurface')}</strong></div>
+      <div class="carte-role role-dessus ${estEnEdition({ role: 'dessus' }) ? 'en-edition' : ''}">
+        <div class="titre-role"><strong>${iconeRole('dessus')}${textes.roles.dessus} ${bulle('pointsSurface')}</strong></div>
         <label class="case"><input type="checkbox" data-champ="tous-les-points" ${surface.tousLesPoints ? 'checked' : ''} /> tous les points du levé${surface.contour.length >= 3 ? ' (dans le contour)' : ''}</label>
         ${surface.tousLesPoints ? '' : contenuRole(surface, { role: 'dessus' })}
       </div>
@@ -318,6 +353,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
             <figure class="photo">
               <img src="${photo.miniature}" alt="${echapper(photo.legende || surface.nom)}" />
               <input type="text" data-champ="legende-photo" data-id="${photo.id}" value="${echapper(photo.legende)}" placeholder="Légende" aria-label="Légende de la photo" />
+              <label class="case"><input type="checkbox" data-champ="photo-pdf" data-id="${photo.id}" ${photo.dansPdf === false ? '' : 'checked'} /> dans le PDF</label>
               <button type="button" class="bouton-lien" data-action="supprimer-photo" data-id="${photo.id}">supprimer</button>
             </figure>`,
             )
@@ -341,9 +377,9 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   /** Une carte pour un rôle : titre (avec sa bulle d'aide), liste des points, et bouton pour la modifier. */
   function carteRole(objet, edition, cleAide, supprimable = false) {
     return `
-      <div class="carte-role ${estEnEdition(edition) ? 'en-edition' : ''}">
+      <div class="carte-role role-${edition.role} ${estEnEdition(edition) ? 'en-edition' : ''}">
         <div class="titre-role">
-          <strong>${nomRole(edition)} ${bulle(cleAide)}</strong>
+          <strong>${iconeRole(edition.role)}${nomRole(edition)} ${bulle(cleAide)}</strong>
           ${supprimable && objet.lignesRupture.length > 1 ? `<button type="button" class="bouton-lien" data-action="supprimer-ligne" data-index="${edition.index}">supprimer</button>` : ''}
         </div>
         ${contenuRole(objet, edition)}
@@ -388,7 +424,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
         Liste de noms (ex. « b100 à b116, b120 »)
         <span class="ligne-outils">
           <input type="text" data-champ="liste" value="${echapper(ecrireListeDeNoms(liste))}" autocomplete="off" autocapitalize="off" spellcheck="false" />
-          <button type="button" class="bouton" data-action="appliquer">Valider</button>
+          <button type="button" class="bouton" data-action="valider">Valider</button>
         </span>
       </label>
       ${etat.messages.length > 0 ? `<div class="erreur"><ul>${etat.messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}

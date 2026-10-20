@@ -1,6 +1,7 @@
 // Export PDF : une feuille A4 paysage avec le plan à l'échelle, les volumes et un cartouche,
-// puis une feuille par calcul limité au contour d'une surface (remblai / déblai en couleurs),
-// puis les photos des surfaces (4 par feuille, avec leur légende).
+// puis une feuille par calcul limité au contour d'une surface (remblai / déblai en couleurs).
+// Les photos des surfaces se placent dans la colonne de droite, sous la légende (sur une feuille
+// à part seulement s'il n'y a pas la place).
 // Le plan est dessiné en traits (vectoriel) : il reste net à l'impression et au zoom.
 // Toutes les mesures sur la feuille sont en millimètres.
 import { jsPDF } from 'jspdf';
@@ -12,6 +13,8 @@ import { couleurRVB } from '../plan/couleurs.js';
 import { zonesRemblaiDeblai } from '../plan/ecarts.js';
 import { FONDS, niveauDeZoom, tuilesPourZone } from '../plan/fond.js';
 import { grouperParNature } from '../volumes/calculs.js';
+// Logo Perrin, dans le fichier PDF (image JPEG de 406 × 104 pixels, écrite dans le code).
+import logoPerrin from '../assets/logo-perrin.jpg?inline';
 
 // Calques du plan imprimé, et leur état par défaut.
 export const CALQUES_PDF = {
@@ -31,6 +34,13 @@ const DPI_FOND = 150;
 const PAGE = { largeur: 297, hauteur: 210, marge: 8 };
 const CADRE_PLAN = { x: 10, y: 10, largeur: 193, hauteur: 190 };
 const COLONNE = { x: 207, largeur: 80 };
+// Cartouche en bas de la colonne : le logo (case de 12 mm), puis 6 lignes de 6 mm.
+// Y_CARTOUCHE = haut du cartouche (mm).
+const HAUTEUR_LOGO_CARTOUCHE = 12;
+const LOGO = { hauteur: 8, largeur: (8 * 406) / 104 }; // mm, proportions de l'image
+const LIGNES_CARTOUCHE = 6;
+const HAUTEUR_LIGNE_CARTOUCHE = 6;
+const Y_CARTOUCHE = PAGE.hauteur - PAGE.marge - 2 - HAUTEUR_LOGO_CARTOUCHE - LIGNES_CARTOUCHE * HAUTEUR_LIGNE_CARTOUCHE;
 
 const COULEURS = {
   texte: [27, 43, 54],
@@ -52,7 +62,8 @@ const COULEURS = {
  * - calques : calques à imprimer (voir CALQUES_PDF)
  * - comparaisons : calculs dans le contour d'une surface, liste de { nom, description, resultat } (voir
  *   comparerSurfaces) : ajoutés sous le tableau des volumes, puis une feuille chacun
- * - photos : liste de { surface (nom), legende, date (ISO), image (JPEG), largeur, hauteur }
+ * - photos : liste de { surface (nom), legende, date (ISO), image (JPEG), largeur, hauteur }, à placer
+ *   sous la légende de la première feuille
  * Renvoie (après chargement éventuel de la photo aérienne)
  * { document, echelle, messageFond } : document jsPDF, échelle utilisée, et un message si le fond n'a pas pu être mis.
  */
@@ -67,12 +78,18 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
   const comparaisonsCalculees = comparaisons.filter(({ resultat }) => resultat && !resultat.erreurs && resultat.trianglesEcart?.length > 0);
   const messages = [];
   let echelle = null;
+  // Photos encore à placer : sous la légende de la première feuille si elles y tiennent.
+  let photosAPlacer = choix.photos ? photos : [];
+  const placerPhotos = (yLibre) => {
+    if (photosAPlacer.length > 0 && dessinerPhotosColonne(doc, photosAPlacer, yLibre)) photosAPlacer = [];
+  };
 
   // Feuille des volumes (sauf s'il n'y a que des comparaisons)
   if (calcules.length > 0 || comparaisonsCalculees.length === 0) {
     dessinerCadres(doc);
     const plan = await dessinerPlan(doc, calcules, points, echelleImposee, choix);
-    dessinerColonne(doc, calcules, { ...cartouche, echelle: plan.echelle }, { choix, relief: plan.relief, ecarts: plan.legendeEcarts, comparaisons });
+    const yLibre = dessinerColonne(doc, calcules, { ...cartouche, echelle: plan.echelle }, { choix, relief: plan.relief, ecarts: plan.legendeEcarts, comparaisons });
+    placerPhotos(yLibre);
     echelle = plan.echelle;
     if (plan.messageFond) messages.push(plan.messageFond);
   }
@@ -82,22 +99,79 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
     if (echelle !== null) doc.addPage('a4', 'landscape');
     dessinerCadres(doc);
     const page = await dessinerPageComparaison(doc, comparaison, cartouche, echelleImposee, choix);
+    placerPhotos(page.yLibre);
     echelle ??= page.echelle;
     if (page.messageFond && !messages.includes(page.messageFond)) messages.push(page.messageFond);
   }
-  // Photos des surfaces, 4 par feuille
-  if (choix.photos && photos.length > 0) {
-    for (let debut = 0; debut < photos.length; debut += PHOTOS_PAR_PAGE) {
-      doc.addPage('a4', 'landscape');
-      dessinerPagePhotos(doc, photos.slice(debut, debut + PHOTOS_PAR_PAGE), cartouche);
-    }
+  // Photos qui ne tiennent pas dans la colonne : 4 par feuille, à la suite
+  for (let debut = 0; debut < photosAPlacer.length; debut += PHOTOS_PAR_PAGE) {
+    doc.addPage('a4', 'landscape');
+    dessinerPagePhotos(doc, photosAPlacer.slice(debut, debut + PHOTOS_PAR_PAGE), cartouche);
   }
   return { document: doc, echelle, messageFond: messages.join(' ; ') || null };
 }
 
 const PHOTOS_PAR_PAGE = 4;
+const HAUTEUR_TEXTE_PHOTO = 3.2; // mm, sous chaque photo de la colonne
+const HAUTEUR_MIN_PHOTO = 14; // mm : en dessous, les photos vont sur une feuille à part
 
-/** Feuille de photos : titre, puis 2 × 2 photos avec leur légende (surface, légende, date). */
+/**
+ * Place des photos dans une zone (mm) en les gardant le plus grandes possible : essaie 1, 2, 3...
+ * colonnes et garde la disposition où la plus petite photo est la plus grande.
+ * - photos : liste de { largeur, hauteur } (pixels, pour les proportions)
+ * - zone : { x, y, largeur, hauteur } (mm)
+ * Renvoie la position de chaque photo [{ x, y, largeur, hauteur }] (mm), ou null si elles
+ * seraient trop petites (moins de HAUTEUR_MIN_PHOTO de haut).
+ */
+export function disposerPhotos(photos, zone, hauteurTexte = HAUTEUR_TEXTE_PHOTO, ecart = 2) {
+  let meilleure = null;
+  for (let colonnes = 1; colonnes <= photos.length; colonnes++) {
+    const rangees = Math.ceil(photos.length / colonnes);
+    const largeurCase = (zone.largeur - (colonnes - 1) * ecart) / colonnes;
+    const hauteurCase = (zone.hauteur - (rangees - 1) * ecart) / rangees - hauteurTexte;
+    if (largeurCase <= 0 || hauteurCase <= 0) continue;
+    const cases = photos.map((photo, i) => {
+      const facteur = Math.min(largeurCase / photo.largeur, hauteurCase / photo.hauteur);
+      const largeur = photo.largeur * facteur;
+      const hauteur = photo.hauteur * facteur;
+      return {
+        x: zone.x + (i % colonnes) * (largeurCase + ecart) + (largeurCase - largeur) / 2,
+        y: zone.y + Math.floor(i / colonnes) * (hauteurCase + hauteurTexte + ecart),
+        largeur,
+        hauteur,
+      };
+    });
+    const plusPetite = Math.min(...cases.map((c) => c.largeur * c.hauteur));
+    if (!meilleure || plusPetite > meilleure.plusPetite) meilleure = { cases, plusPetite };
+  }
+  if (!meilleure || Math.min(...meilleure.cases.map((c) => c.hauteur)) < HAUTEUR_MIN_PHOTO) return null;
+  return meilleure.cases;
+}
+
+/**
+ * Photos dans la colonne de droite, entre "yHaut" (fin de la légende) et le cartouche.
+ * Renvoie vrai si elles y tiennent (sinon rien n'est dessiné).
+ */
+function dessinerPhotosColonne(doc, photos, yHaut) {
+  const zone = { x: COLONNE.x, y: yHaut + 4, largeur: COLONNE.largeur, hauteur: Y_CARTOUCHE - 3 - (yHaut + 4) };
+  const cases = zone.hauteur > 0 ? disposerPhotos(photos, zone) : null;
+  if (!cases) return false;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...COULEURS.texte);
+  doc.text('Photos', COLONNE.x, yHaut + 2.5);
+  photos.forEach((photo, i) => {
+    const { x, y, largeur, hauteur } = cases[i];
+    doc.addImage(photo.image, 'JPEG', x, y, largeur, hauteur);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.5);
+    const texte = [photo.surface, photo.legende].filter(Boolean).join(' - ');
+    doc.text(doc.splitTextToSize(texte, largeur)[0], x, y + hauteur + 2.3);
+  });
+  return true;
+}
+
+/** Feuille de photos : titre, puis 2 × 2 photos avec leur légende (surface et légende). */
 function dessinerPagePhotos(doc, photos, cartouche) {
   trait(doc, COULEURS.texte, 0.4);
   doc.rect(PAGE.marge, PAGE.marge, PAGE.largeur - 2 * PAGE.marge, PAGE.hauteur - 2 * PAGE.marge);
@@ -130,19 +204,10 @@ function dessinerPagePhotos(doc, photos, cartouche) {
     doc.setFontSize(8);
     doc.setTextColor(...COULEURS.texte);
     doc.setFont('helvetica', 'bold');
-    const titre = doc.splitTextToSize([photo.surface, photo.legende].filter(Boolean).join(' - '), largeurCase - 22)[0];
+    const titre = doc.splitTextToSize([photo.surface, photo.legende].filter(Boolean).join(' - '), l)[0];
     doc.text(titre, x + (largeurCase - l) / 2, y + h + 4.5);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...COULEURS.gris);
-    doc.text(dateSuisse(photo.date), x + (largeurCase + l) / 2, y + h + 4.5, { align: 'right' });
   });
-}
-
-/** Date ISO -> « 20.05.2026 ». */
-function dateSuisse(iso) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
 }
 
 /** Cadre général de la feuille et cadre du plan. */
@@ -284,9 +349,9 @@ async function dessinerPageComparaison(doc, { nom, description, resultat }, cart
     y += texte.length * 2.8;
   }
   doc.setTextColor(...COULEURS.texte);
-  if (legende) dessinerLegendeEcarts(doc, x, y + 3, legende);
+  if (legende) y = dessinerLegendeEcarts(doc, x, y + 3, legende);
   dessinerCartouche(doc, { ...cartouche, echelle: projection.echelle });
-  return { echelle: projection.echelle, messageFond };
+  return { echelle: projection.echelle, messageFond, yLibre: y };
 }
 
 /**
@@ -668,12 +733,14 @@ function dessinerColonne(doc, calcules, cartouche, { choix, relief, ecarts, comp
     doc.text(`${formaterNombre(relief.plage.max)} m`, x + largeur, y + 3, { align: 'right' });
     y += 7;
   }
-  if (ecarts) dessinerLegendeEcarts(doc, x, y + 1, ecarts);
+  if (ecarts) y = dessinerLegendeEcarts(doc, x, y + 1, ecarts);
 
   dessinerCartouche(doc, cartouche);
+  // Fin de la légende : les photos peuvent se placer en dessous.
+  return y;
 }
 
-/** Cartouche en bas à droite : affaire, date, dessiné par, échelle, coordonnées, fichier. */
+/** Cartouche en bas à droite : logo, puis affaire, date, dessiné par, échelle, coordonnées, fichier. */
 function dessinerCartouche(doc, cartouche) {
   const x = COLONNE.x;
   // Cartouche en bas à droite
@@ -685,9 +752,12 @@ function dessinerCartouche(doc, cartouche) {
     ['Coordonnées', 'MN95 (m)'],
     ['Fichier de points', cartouche.fichierPoints || '-'],
   ];
-  const hauteurLigne = 6;
-  const yCartouche = PAGE.hauteur - PAGE.marge - 2 - lignesCartouche.length * hauteurLigne;
+  const hauteurLigne = HAUTEUR_LIGNE_CARTOUCHE;
   trait(doc, COULEURS.texte, 0.3);
+  // Case du logo, en haut du cartouche
+  doc.rect(x, Y_CARTOUCHE, COLONNE.largeur, HAUTEUR_LOGO_CARTOUCHE);
+  doc.addImage(logoPerrin, 'JPEG', x + 2, Y_CARTOUCHE + (HAUTEUR_LOGO_CARTOUCHE - LOGO.hauteur) / 2, LOGO.largeur, LOGO.hauteur);
+  const yCartouche = Y_CARTOUCHE + HAUTEUR_LOGO_CARTOUCHE;
   doc.rect(x, yCartouche, COLONNE.largeur, lignesCartouche.length * hauteurLigne);
   lignesCartouche.forEach(([titre, valeur], i) => {
     const yl = yCartouche + i * hauteurLigne;
