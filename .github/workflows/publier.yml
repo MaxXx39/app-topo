@@ -21,6 +21,12 @@ concurrency:
 jobs:
   construire:
     runs-on: ubuntu-latest
+    # Même code pour l'appli (projet app-topo) et la version de test V2 (projet app_topo_v2) :
+    # adresse, base de données et titre différents, pour ne jamais mélanger les deux.
+    env:
+      CHEMIN_APPLI: /${{ github.event.repository.name }}/
+      VITE_NOM_BASE: ${{ github.event.repository.name == 'app-topo' && 'topo' || 'topo-v2' }}
+      VITE_TITRE_APPLI: ${{ github.event.repository.name == 'app-topo' && 'Topo' || 'Topo V2 (test)' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
