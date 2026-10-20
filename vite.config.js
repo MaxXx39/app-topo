@@ -11,6 +11,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icone.svg', 'apple-touch-icon.png'],
+      workbox: {
+        // La lecture des photos HEIC (bibliothèque heic-to) pèse environ 3 Mo : on la garde
+        // quand même sur l'appareil, pour ajouter des photos sans connexion sur le chantier.
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      },
       manifest: {
         name: 'Topo - Volumes de stocks',
         short_name: 'Topo',

@@ -5,13 +5,12 @@
 // cocher des cases, ou toucher les points sur le plan.
 // Une surface importée (LandXML, DXF) ne se modifie pas : on peut la renommer ou la supprimer.
 import { creerLigne, detecterSeries, lireListeDeNoms, ecrireListeDeNoms, verifierSurface } from '../topo/noms.js';
-import { creerSurface, estImportee } from '../topo/surface.js';
+import { creerSurface, estImportee, NATURES } from '../topo/surface.js';
 import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
 
 const TEXTES = {
-  nouveau: '+ Nouvelle surface',
-  nomParDefaut: (n) => `Surface ${n}`,
+  nouveau: 'Nouvelle surface :',
   supprimer: 'Supprimer cette surface',
   choix: 'Surface affichée',
   roles: { contour: 'Contour', ligne: 'Ligne de rupture', dessus: 'Points de la surface' },
@@ -26,9 +25,10 @@ const TEXTES = {
  * - etiquette(objet) : texte de la surface dans la liste déroulante (nom et levé)
  * - ajouterPhotos(surface, fichiers) : prépare et range les photos choisies (voir photos/photo.js)
  * - leveActifId() : levé utilisé pour une nouvelle surface
+ * - quandCree(surface) : appelé quand une surface est créée (avant quandChange)
  */
 export function creerEditeurSurfaces(conteneur, barre, options) {
-  const { obtenirPoints, quandChange, decrire, leveActifId, etiquette, ajouterPhotos } = options;
+  const { obtenirPoints, quandChange, decrire, leveActifId, etiquette, ajouterPhotos, quandCree } = options;
   const textes = TEXTES;
   const etat = {
     objets: [],
@@ -91,10 +91,14 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   }
 
   const actions = {
-    nouveau: () => {
-      const nom = textes.nomParDefaut(etat.objets.length + 1);
-      etat.objets.push(creerSurface(nom, leveActifId()));
+    nouveau: (bouton) => {
+      // La nature (stock, terrain naturel, terrassement) est choisie avec le bouton touché.
+      const [nature, titre] = NATURES.find(([cle]) => cle === bouton.dataset.nature) ?? NATURES[0];
+      const numero = etat.objets.filter((o) => o.nature === nature).length + 1;
+      const surface = creerSurface(`${titre} ${numero}`, leveActifId(), nature);
+      etat.objets.push(surface);
       etat.indexActif = etat.objets.length - 1;
+      quandCree?.(surface);
       // On commence par le contour : c'est lui qui délimite le stock ou le terrassement.
       etat.edition = { role: 'contour' };
       etat.suppression = false;
@@ -194,6 +198,8 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       etat.suppression = false;
     } else if (cible.dataset.champ === 'nom') {
       objet.nom = cible.value.trim() || objet.nom;
+    } else if (cible.dataset.champ === 'nature') {
+      objet.nature = cible.value;
     } else if (cible.dataset.champ === 'ligne-fermee') {
       objet.lignesRupture[Number(cible.dataset.index)].fermee = cible.checked;
     } else if (cible.dataset.champ === 'tous-les-points') {
@@ -236,16 +242,17 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   function afficher() {
     const objet = objetActif();
 
-    let html = `
-      <div class="ligne-outils">
-        ${
-          etat.objets.length > 0
-            ? `<select data-champ="choix" aria-label="${textes.choix}">
-                ${etat.objets.map((o, i) => `<option value="${i}" ${i === etat.indexActif ? 'selected' : ''}>${echapper(etiquette?.(o) ?? o.nom)}</option>`).join('')}
-              </select>`
-            : ''
-        }
-        <button type="button" class="bouton" data-action="nouveau">${textes.nouveau}</button>
+    let html = etat.objets.length > 0
+      ? `<div class="ligne-outils">
+          <select data-champ="choix" aria-label="${textes.choix}">
+            ${etat.objets.map((o, i) => `<option value="${i}" ${i === etat.indexActif ? 'selected' : ''}>${echapper(etiquette?.(o) ?? o.nom)}</option>`).join('')}
+          </select>
+        </div>`
+      : '';
+    html += `
+      <div class="ligne-outils nouvelle-surface">
+        <span>${textes.nouveau} ${bulle('nature')}</span>
+        ${NATURES.map(([cle, titre]) => `<button type="button" class="bouton-secondaire" data-action="nouveau" data-nature="${cle}">+ ${titre}</button>`).join('')}
       </div>`;
 
     if (objet) {
@@ -253,6 +260,12 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
         <div class="ligne-outils">
           <label>Nom : <input type="text" data-champ="nom" value="${echapper(objet.nom)}" /></label>
           <button type="button" class="bouton-secondaire" data-action="supprimer">${textes.supprimer}</button>
+        </div>
+        <div class="ligne-outils choix-nature" role="radiogroup" aria-label="Nature de la surface">
+          <span>C'est :</span>
+          ${NATURES.map(
+            ([cle, titre]) => `<label class="case"><input type="radio" name="nature" data-champ="nature" value="${cle}" ${objet.nature === cle ? 'checked' : ''} /> ${titre}</label>`,
+          ).join('')}
         </div>
         ${contenuSurface(objet)}`;
     }

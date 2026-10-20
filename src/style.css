@@ -239,11 +239,15 @@ body.aide-active .rond-aide {
   top: calc(var(--hauteur-entete) + 12px);
   transform: translateX(-50%);
   z-index: 50;
+  width: max-content;
+  max-width: calc(100vw - 32px);
   padding: 8px 16px;
-  border-radius: 999px;
+  /* Arrondi modéré : un message long (photo refusée...) tient sur plusieurs lignes. */
+  border-radius: 16px;
   background: var(--sombre);
   color: #ffffff;
   font-size: 0.9rem;
+  text-align: center;
   box-shadow: var(--ombre);
   pointer-events: none;
 }
@@ -593,6 +597,11 @@ input[type='radio'] {
   align-items: center;
   gap: 8px;
   margin: 10px 0;
+}
+
+/* Choix de la nature d'une surface : les trois cases sur une ligne si elles tiennent. */
+.choix-nature {
+  gap: 4px 14px;
 }
 
 .champ-liste {
@@ -1318,7 +1327,8 @@ svg.plan {
   margin: 8px 0;
 }
 
-.section-comparaisons .titre-role input {
+/* Nom d'un calcul de volume (onglet 3. Volumes). */
+#volumes .titre-role input {
   flex: 1;
   min-width: 0;
   font-weight: 600;

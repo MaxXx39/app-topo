@@ -21,8 +21,12 @@ const CALQUES = [
 
 /**
  * Crée le formulaire d'export dans "conteneur".
- * - obtenirDonnees() : { nomProjet, stocks, resultats, points, fichierPoints, surfaces, comparaisons, photos, cartouche }
- *   surfaces : [{ nom, triangles }] ; comparaisons : [{ nom, resultat }] ; cartouche : objet modifiable du projet
+ * - obtenirDonnees() : { nomProjet, stocks, resultats, comparaisons, volumes, dessinSurfaces, points, fichierPoints, photos, cartouche }
+ *   stocks, resultats : calculs dessinés sur la feuille principale du PDF (surface 1 et volume) ;
+ *   comparaisons : calculs dans un contour, une feuille chacun [{ nom, description, resultat }] ;
+ *   volumes : tous les calculs, pour le CSV [{ nom, base, resultat }] ;
+ *   dessinSurfaces : surfaces affichées, pour le DXF et le LandXML { stocks, resultats, surfaces } ;
+ *   cartouche : objet modifiable du projet
  * - quandChange() : appelé quand le cartouche change (pour enregistrer le projet)
  * Renvoie { rafraichir() } pour recharger les champs quand on change de projet.
  */
@@ -81,14 +85,15 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
 
   const boutons = {
     csv: () => {
-      const { stocks, resultats, comparaisons } = obtenirDonnees();
-      if (!verifier(resultats, comparaisons)) return;
+      const { volumes } = obtenirDonnees();
+      if (!verifier(volumes)) return;
       // Le caractère invisible ﻿ au début aide Excel à lire les accents.
-      telecharger(new Blob(['﻿' + genererCsv(stocks, resultats, comparaisons)], { type: 'text/csv;charset=utf-8' }), `${nomDeFichier()}.csv`);
+      telecharger(new Blob(['﻿' + genererCsv(volumes)], { type: 'text/csv;charset=utf-8' }), `${nomDeFichier()}.csv`);
       message.textContent = 'CSV téléchargé.';
     },
     dxf: () => {
-      const { points, stocks, resultats, surfaces } = obtenirDonnees();
+      const { points, dessinSurfaces } = obtenirDonnees();
+      const { stocks, resultats, surfaces } = dessinSurfaces;
       const triangles = resultats.flatMap((r) => r.trianglesDessus ?? []);
       const plage = triangles.length > 0 ? plageAltitudes(triangles) : null;
       const texte = genererDxf({
@@ -102,21 +107,22 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
       message.textContent = 'DXF téléchargé (coordonnées MN95, altitudes en Z).';
     },
     landxml: () => {
-      const { nomProjet, stocks, resultats, surfaces } = obtenirDonnees();
+      const { nomProjet, dessinSurfaces } = obtenirDonnees();
+      const { stocks, resultats, surfaces } = dessinSurfaces;
       const liste = [
         ...stocks.map((stock, i) => ({ nom: stock.nom, triangles: resultats[i]?.trianglesDessus ?? [] })),
         ...surfaces,
       ].filter((s) => s.triangles.length > 0);
       if (liste.length === 0) {
-        message.textContent = 'Aucune surface à exporter : calcule d\'abord un stock ou crée une surface.';
+        message.textContent = 'Aucune surface à exporter : crée d\'abord une surface (onglet 2. Surfaces).';
         return;
       }
       telecharger(new Blob([ecrireLandXML(liste, nomProjet)], { type: 'application/xml' }), `${nomDeFichier()}.xml`);
       message.textContent = `LandXML téléchargé (${liste.length} surface(s)).`;
     },
     pdf: async () => {
-      const { stocks, resultats, points, fichierPoints, comparaisons, photos } = obtenirDonnees();
-      if (!verifier(resultats, comparaisons)) return;
+      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos } = obtenirDonnees();
+      if (!verifier(volumes)) return;
       message.textContent = 'Préparation du PDF…';
       try {
         // La bibliothèque PDF n'est chargée qu'au premier export (l'appli démarre plus vite).
@@ -154,9 +160,9 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
   });
 
   /** Vérifie qu'il y a quelque chose à exporter, sinon affiche un message. */
-  function verifier(resultats, comparaisons = []) {
-    if (resultats.some((r) => !r.erreurs) || comparaisons.some(({ resultat }) => resultat && !resultat.erreurs)) return true;
-    message.textContent = 'Rien à exporter : choisis d\'abord la base d\'une surface (onglet 3. Volumes), ou crée une comparaison.';
+  function verifier(volumes) {
+    if (volumes.some(({ resultat }) => resultat && !resultat.erreurs)) return true;
+    message.textContent = 'Rien à exporter : crée d\'abord un calcul de volume (ci-dessus).';
     return false;
   }
 

@@ -7,17 +7,17 @@
 //   leves: [{ id, nom, importeLe, points: [{ nom, est, nord, altitude }] }],
 //   leveActifId,                    // levé affiché
 //   surfaces: [...],                // stocks, terrassements, terrains... : voir topo/surface.js
-//   comparaisons: [{ id, nom, avant, apres, zone }],
-//                                   // avant, apres : 'surface:<id>' ; zone : { type: 'toute' }
-//                                   // ou { type: 'surface', surfaceId } (contour d'une surface)
+//   calculs: [...],                 // calculs de volume (onglet 3. Volumes) : voir volumes/calculs.js
 //   cartouche: { affaire, dessinePar },
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé.
-import { nouvelIdentifiant } from '../topo/surface.js';
+import { nouvelIdentifiant, estImportee } from '../topo/surface.js';
+import { calculsDUnAncienProjet } from '../volumes/calculs.js';
 
 export const FORMAT = 'topo-projet';
-export const VERSION = 1;
+// Version 2 : calculs de volume (onglets Volumes et Comparer réunis) et nature des surfaces.
+export const VERSION = 2;
 
 /** Crée un projet vide. */
 export function creerProjet(nom) {
@@ -32,7 +32,7 @@ export function creerProjet(nom) {
     leves: [],
     leveActifId: null,
     surfaces: [],
-    comparaisons: [],
+    calculs: [],
     cartouche: { affaire: '', dessinePar: '' },
   };
 }
@@ -82,16 +82,22 @@ export function lireFichierProjet(texte) {
   return { projet: completerProjet(donnees) };
 }
 
-/** Ajoute les champs manquants avec leur valeur par défaut. */
+/**
+ * Ajoute les champs manquants avec leur valeur par défaut. Un projet de la version 1 est
+ * transformé : la base de chaque surface et les comparaisons deviennent des calculs de volume.
+ */
 export function completerProjet(projet) {
   const vide = creerProjet(projet.nom ?? 'Projet');
-  const complet = { ...vide, ...projet, cartouche: { ...vide.cartouche, ...projet.cartouche } };
+  const complet = { ...vide, ...projet, version: VERSION, cartouche: { ...vide.cartouche, ...projet.cartouche } };
   complet.leves ??= [];
   complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
-    volume: { base: surface.type === 'points' ? 'contour' : 'aucune', surfaceId: null },
+    nature: estImportee(surface) ? 'terrain' : 'stock',
     ...surface,
   }));
-  complet.comparaisons ??= [];
+  if (!Array.isArray(projet.calculs)) complet.calculs = calculsDUnAncienProjet(complet.surfaces, projet.comparaisons);
+  // Anciens champs, remplacés par les calculs.
+  delete complet.comparaisons;
+  for (const surface of complet.surfaces) delete surface.volume;
   return complet;
 }
 

@@ -5,19 +5,18 @@ import { choisirEchelle, barreEchellePapier } from '../src/export/echelle.js';
 import { pointsDeReference, surfaceDeReference, volumeDeReference, STOCKS_REFERENCE } from './outils.js';
 
 describe('genererCsv', () => {
-  const stocks = [{ nom: 'Stock 1' }, { nom: 'Stock; 2' }, { nom: 'Incomplet' }];
-  const resultats = [
-    { mode: 'A', surfacePlan: 758.6381, remblai: 1636.1966, deblai: 0 },
-    { mode: 'B', surfacePlan: 436.969, remblai: 0, deblai: 1006.2471 },
-    { erreurs: ['contour trop court'] },
+  const volumes = [
+    { nom: 'Stock 1', base: 'ligne basse', resultat: { surfacePlan: 758.6381, remblai: 1636.1966, deblai: 0 } },
+    { nom: 'Stock; 2', base: 'TN', resultat: { surfacePlan: 436.969, remblai: 0, deblai: 1006.2471 } },
+    { nom: 'Incomplet', base: '-', resultat: { erreurs: ['contour trop court'] } },
   ];
-  const lignes = genererCsv(stocks, resultats).trim().split('\r\n');
+  const lignes = genererCsv(volumes).trim().split('\r\n');
 
-  it('écrit l\'en-tête et une ligne par stock calculé', () => {
+  it('écrit l\'en-tête et une ligne par calcul réussi', () => {
     expect(lignes).toEqual([
       'Nom;Base;Surface (m²);Remblai (m³);Déblai (m³)',
-      'Stock 1;A;758.638;1636.197;0.000',
-      '"Stock; 2";B;436.969;0.000;1006.247',
+      'Stock 1;ligne basse;758.638;1636.197;0.000',
+      '"Stock; 2";TN;436.969;0.000;1006.247',
     ]);
   });
 });
@@ -72,18 +71,6 @@ describe('creerPdf - levé du 20/05/2026', async () => {
   });
 });
 
-describe('genererCsv - comparaisons', () => {
-  it('ajoute les comparaisons après une ligne vide', () => {
-    const texte = genererCsv([], [], [{ nom: 'Mai → juin', resultat: { surfacePlan: 400, remblai: 200, deblai: 12.3456 } }]);
-    expect(texte.trim().split('\r\n')).toEqual([
-      'Nom;Base;Surface (m²);Remblai (m³);Déblai (m³)',
-      '',
-      'Comparaison;Surface (m²);Ajouté (m³);Enlevé (m³)',
-      'Mai → juin;400.000;200.000;12.346',
-    ]);
-  });
-});
-
 describe('creerPdf - calques', async () => {
   const { creerPdf } = await import('../src/export/pdf.js');
   const points = pointsDeReference();
@@ -114,7 +101,7 @@ describe('creerPdf - calques', async () => {
     expect(sans.document.output()).not.toContain('en m, palier');
   });
 
-  it('ajoute une feuille par comparaison, avec ses volumes et sa légende', async () => {
+  it('ajoute une feuille par calcul dans un contour, avec ses volumes et sa légende', async () => {
     const { comparerSurfaces } = await import('../src/topo/comparaison.js');
     // « Avant » : plan horizontal à 425 m sous le stock ; « après » : le dessus du stock.
     const sommets = resultats[0].trianglesDessus.flat();
@@ -126,10 +113,11 @@ describe('creerPdf - calques', async () => {
       [{ est: e0, nord: n0, altitude: 425 }, { est: e1, nord: n1, altitude: 425 }, { est: e0, nord: n1, altitude: 425 }],
     ];
     const resultat = comparerSurfaces(plan, resultats[0].trianglesDessus);
-    const { document } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, comparaisons: [{ nom: 'Avant / après', resultat }] });
+    const { document } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, comparaisons: [{ nom: 'Avant / après', description: 'Stock 2 par rapport au plan 425', resultat }] });
     expect(document.getNumberOfPages()).toBe(2);
     const contenu = document.output();
-    expect(contenu).toContain('Comparaison de surfaces');
+    expect(contenu).toContain('Volume entre deux surfaces');
+    expect(contenu).toContain('Stock 2 par rapport au plan 425');
     const { formaterNombre } = await import('../src/topo/format.js');
     expect(contenu).toContain(formaterNombre(resultat.remblai));
   });

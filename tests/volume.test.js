@@ -129,11 +129,6 @@ describe('messages d\'erreur', () => {
     const points = [...carre, pt('h', 5, 5, 3)];
     expect(volumeDe({ points: ['b1', 'b2', 'b3', 'b4', 'h'] }, points).erreurs[0]).toContain('contour');
   });
-
-  it('pas de volume si la base est « aucune »', () => {
-    const surface = surfaceDe({ contour: ['b1', 'b2', 'b3', 'b4'], base: 'aucune' });
-    expect(calculerVolumeSurface(surface, calculerSurface(surface, carre), carre)).toBeNull();
-  });
 });
 
 describe('base B : surface LandXML (fichier 20260520_Stock.xml, plan horizontal à 431.000 m)', () => {
@@ -166,10 +161,4 @@ describe('base B : surface LandXML (fichier 20260520_Stock.xml, plan horizontal 
       expect(resultat.deblai).toBeGreaterThan(resultat.remblai);
     });
   }
-
-  it('demande la surface de base quand elle manque', () => {
-    const carre = [pt('b1', 0, 0, 0), pt('b2', 10, 0, 0), pt('b3', 10, 10, 0)];
-    const surface = surfaceDe({ contour: ['b1', 'b2', 'b3'], base: 'surface' });
-    expect(calculerVolumeSurface(surface, calculerSurface(surface, carre), carre, null).erreurs[0]).toContain('choisis la surface de base');
-  });
 });

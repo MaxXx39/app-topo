@@ -7,17 +7,15 @@ import { lirePoints } from './topo/import-points.js';
 import { lireLandXML } from './topo/landxml.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee } from './topo/surface.js';
-import { calculerVolumeSurface } from './topo/volume.js';
-import { comparerSurfaces } from './topo/comparaison.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, nomNature } from './topo/surface.js';
+import { creerCalcul, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
-import { creerEcranVolumes } from './volumes/ecran.js';
+import { creerEcranVolumes, texteBase } from './volumes/ecran.js';
 import { preparerPhoto } from './photos/photo.js';
 import { creerEcranExport, telecharger } from './export/ecran.js';
 import { creerEcranProjet } from './projet/ecran.js';
 import { creerEcranImport } from './import/ecran.js';
-import { creerEcranComparaisons } from './surfaces/comparaisons.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -38,27 +36,24 @@ let projet = creerProjet('Mon projet'); // projet ouvert
 let resumes = []; // liste des projets enregistrés (pour l'écran Mes projets)
 let dernierImport = null; // résultat du dernier import de points
 let surfacesCalculees = new Map(); // id de surface -> triangles (résultat de calculerSurface)
-let volumes = new Map(); // id de surface -> volume (résultat de calculerVolumeSurface, ou null)
-let resultatsComparaisons = []; // une entrée par comparaison du projet
+let resultatsCalculs = new Map(); // id de calcul -> volume (résultat de calculerVolume)
 let ongletContexte = 'importer'; // dernier onglet (hors plan) : décide de ce que montre le plan
-let comparaisonMontree = null; // id de la comparaison coloriée sur le plan (onglet Comparer)
+let calculMontre = null; // id du calcul colorié sur le plan (bouton « Voir sur le plan »)
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 
 // --- Mise en page : onglets ---
 // Les onglets numérotés suivent l'ordre du travail : importer les points, préparer les surfaces,
-// lire les volumes, comparer deux surfaces. « Mes projets » s'ouvre depuis l'en-tête.
+// calculer les volumes. « Mes projets » s'ouvre depuis l'en-tête.
 const ICONES = {
   importer: '<path d="M12 15V4M7 9l5-5 5 5M4 15v5h16v-5" />',
   surfaces: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
   volumes: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
-  comparer: '<path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4" />',
   plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
 };
 const ONGLETS = [
   { nom: 'importer', titre: '1. Importer' },
   { nom: 'surfaces', titre: '2. Surfaces' },
   { nom: 'volumes', titre: '3. Volumes' },
-  { nom: 'comparer', titre: '4. Comparer' },
   { nom: 'plan', titre: 'Plan' },
 ];
 
@@ -82,10 +77,6 @@ document.querySelector('#app').innerHTML = `
         <h2>3. Volumes ${bulle('volumes')}</h2>
         <div id="volumes"></div>
         <div id="export" class="carte-export"></div>
-      </section>
-      <section class="panneau" data-onglet="comparer">
-        <h2>4. Comparer ${bulle('comparer')}</h2>
-        <div id="comparaisons" class="section-comparaisons"></div>
       </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
     </div>
@@ -135,28 +126,23 @@ function surfacesAffichees() {
   return projet.surfaces.filter((s) => estImportee(s) || s.leveId === leve?.id);
 }
 
-/** Nom d'une surface dans les listes : avec son levé s'il y en a plusieurs, ou son format si importée. */
+/**
+ * Nom d'une surface dans les listes : avec sa nature (si son nom ne la dit pas déjà),
+ * son format si elle est importée, et son levé s'il y en a plusieurs.
+ */
 function etiquetteSurface(surface) {
-  if (estImportee(surface)) return `${surface.nom} (${surface.type === 'dxf' ? 'DXF' : 'LandXML'})`;
+  const nature = nomNature(surface.nature);
+  const precisions = [];
+  if (nature && !surface.nom.toLowerCase().includes(nature.toLowerCase())) precisions.push(nature.toLowerCase());
+  if (estImportee(surface)) precisions.push(surface.type === 'dxf' ? 'DXF' : 'LandXML');
+  const texte = precisions.length > 0 ? `${surface.nom} (${precisions.join(', ')})` : surface.nom;
   const leve = projet.leves.find((l) => l.id === surface.leveId);
-  return projet.leves.length > 1 && leve ? `${surface.nom} · ${leve.nom}` : surface.nom;
+  return projet.leves.length > 1 && leve ? `${texte} · ${leve.nom}` : texte;
 }
 
-/** Surface de base du volume (base B) : { nom, triangles }, ou null. */
-function surfaceDeBase(surface) {
-  if (surface.volume?.base !== 'surface') return null;
-  const base = projet.surfaces.find((s) => s.id === surface.volume.surfaceId && s.id !== surface.id);
-  return base ? { nom: base.nom, triangles: trianglesDeSurface(base.id) } : null;
-}
-
-/** Surfaces comparables : toutes les surfaces du projet. ref : 'surface:<id>'. */
-function choixComparables() {
-  return projet.surfaces.map((s) => ({ ref: `surface:${s.id}`, nom: etiquetteSurface(s) }));
-}
-
-/** Zones de comparaison : toute la surface « après », ou le contour d'une surface. */
+/** Zones d'un calcul à deux surfaces : toute la surface 1, ou le contour d'une surface. */
 function zonesComparables() {
-  const zones = [{ zone: { type: 'toute' }, nom: 'toute la surface « après »' }];
+  const zones = [{ zone: { type: 'toute' }, nom: 'toute la surface 1' }];
   for (const surface of projet.surfaces) {
     if (!estImportee(surface) && surface.contour.length >= 3) {
       zones.push({ zone: { type: 'surface', surfaceId: surface.id }, nom: `contour de ${etiquetteSurface(surface)}` });
@@ -165,17 +151,13 @@ function zonesComparables() {
   return zones;
 }
 
-/** Calcule une comparaison du projet. */
-function calculerComparaison(comparaison) {
-  const triangles = (ref) => (ref?.startsWith('surface:') ? trianglesDeSurface(ref.slice('surface:'.length)) : []);
-  let contour = null;
-  if (comparaison.zone?.type === 'surface') {
-    const surface = projet.surfaces.find((s) => s.id === comparaison.zone.surfaceId);
-    if (!surface) return { erreurs: ['la surface de la zone n\'existe plus'] };
-    const parNom = new Map(pointsDuLeve(surface.leveId).map((p) => [p.nom, p]));
-    contour = surface.contour.map((nom) => parNom.get(nom)).filter(Boolean);
-  }
-  return comparerSurfaces(triangles(comparaison.avant), triangles(comparaison.apres), contour);
+/**
+ * Calcul de volume dessiné sur une surface (couleurs remblai / déblai et étiquette du volume) :
+ * celui montré avec « Voir sur le plan » s'il porte sur cette surface, sinon le premier calculé.
+ */
+function calculDuPlan(surface) {
+  const calculable = (c) => c.surface1Id === surface.id && resultatsCalculs.get(c.id) && !resultatsCalculs.get(c.id).erreurs;
+  return projet.calculs.find((c) => c.id === calculMontre && calculable(c)) ?? projet.calculs.find(calculable) ?? null;
 }
 
 // --- Écrans ---
@@ -268,6 +250,11 @@ const plan = creerPlan(document.querySelector('#plan'), {
 
 const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces'), document.querySelector('#barre-surfaces'), {
   obtenirPoints: (surface) => (estImportee(surface) ? [] : pointsDuLeve(surface.leveId)),
+  // Nouvelle surface : un stock a tout de suite son calcul de volume (sur sa ligne basse), un
+  // terrassement aussi (par rapport au dernier terrain naturel). Voir volumes/calculs.js.
+  quandCree: (surface) => {
+    if (surface.nature === 'stock' || surface.nature === 'terrassement') projet.calculs.push(creerCalcul(surface, projet.surfaces));
+  },
   quandChange: () => {
     // Une surface d'un autre levé est choisie : ce levé devient le levé affiché.
     const surface = editeurSurfaces.objetActif();
@@ -280,16 +267,18 @@ const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces')
   decrire: decrireSurface,
   etiquette: etiquetteSurface,
   ajouterPhotos: async (surface, fichiers) => {
-    afficherMessage('Préparation de la photo…');
+    // La conversion d'une photo HEIC prend quelques secondes : le message reste affiché jusqu'à la fin.
+    afficherMessage('Préparation de la photo…', null);
     const erreurs = [];
     for (const fichier of fichiers) {
       try {
         surface.photos = [...(surface.photos ?? []), await preparerPhoto(fichier)];
-      } catch {
-        erreurs.push(fichier.name);
+      } catch (erreur) {
+        erreurs.push(`${fichier.name} : ${erreur.message}`);
       }
     }
-    afficherMessage(erreurs.length > 0 ? `Photo illisible : ${erreurs.join(', ')}` : `${fichiers.length} photo(s) ajoutée(s)`);
+    if (erreurs.length > 0) afficherMessage(`Photo refusée. ${erreurs.join(' ; ')}`, 8000);
+    else afficherMessage(`${fichiers.length} photo(s) ajoutée(s)`);
     modifie();
   },
 });
@@ -326,60 +315,66 @@ document.querySelector('#fichier-surface').addEventListener('change', async (eve
 });
 
 const ecranVolumes = creerEcranVolumes(document.querySelector('#volumes'), {
-  obtenirLignes: () =>
-    surfacesAffichees().map((surface) => ({
-      surface,
-      resultat: volumes.get(surface.id),
-      bases: projet.surfaces.map((s) => ({ id: s.id, nom: etiquetteSurface(s) })),
-    })),
-  quandChange: () => modifie(),
-});
-
-const ecranComparaisons = creerEcranComparaisons(document.querySelector('#comparaisons'), {
   obtenirProjet: () => projet,
-  obtenirChoix: choixComparables,
+  obtenirResultat: (calcul) => resultatsCalculs.get(calcul.id),
+  etiquette: etiquetteSurface,
   obtenirZones: zonesComparables,
-  obtenirResultat: (comparaison) => resultatsComparaisons[projet.comparaisons.indexOf(comparaison)],
-  quandChange: () => modifie(),
-  obtenirAffichee: () => comparaisonAMontrer()?.id ?? null,
+  surfaceActive: () => editeurSurfaces.objetActif(),
+  obtenirMontre: () => calculMontre,
   montrer: (id) => {
-    comparaisonMontree = id;
-    recalculer();
+    calculMontre = id;
+    // La surface 1 d'un autre levé : ce levé devient le levé affiché, pour la voir sur le plan.
+    const calcul = projet.calculs.find((c) => c.id === id);
+    const surface = projet.surfaces.find((s) => s.id === calcul?.surface1Id);
+    if (surface && !estImportee(surface) && surface.leveId !== projet.leveActifId) {
+      projet.leveActifId = surface.leveId;
+      modifie({ recadrer: true });
+    } else {
+      recalculer();
+    }
     // Sur téléphone, on passe au plan ; sur ordinateur, il est déjà visible à droite.
     if (!window.matchMedia('(min-width: 900px)').matches) afficherOnglet('plan');
   },
+  quandChange: () => modifie(),
 });
 
-/** Comparaison coloriée sur le plan : celle choisie, sinon la première qui a un résultat. */
-function comparaisonAMontrer() {
-  const calculables = projet.comparaisons.filter((c, i) => resultatsComparaisons[i] && !resultatsComparaisons[i].erreurs);
-  return calculables.find((c) => c.id === comparaisonMontree) ?? calculables[0] ?? null;
-}
-
-/** Surfaces affichées dont le volume est calculé : [{ surface, resultat }]. */
-function volumesCalcules() {
-  return surfacesAffichees()
-    .map((surface) => ({ surface, resultat: volumes.get(surface.id) }))
+/** Calculs de volume du projet dont le résultat est connu : [{ calcul, resultat }]. */
+function calculsReussis() {
+  return projet.calculs
+    .map((calcul) => ({ calcul, resultat: resultatsCalculs.get(calcul.id) }))
     .filter(({ resultat }) => resultat && !resultat.erreurs);
 }
 
 const ecranExport = creerEcranExport(document.querySelector('#export'), {
   obtenirDonnees: () => {
     const leve = leveActif(projet);
-    const calcules = volumesCalcules();
-    const avecVolume = new Set(calcules.map(({ surface }) => surface.id));
+    const surfaceDe = (id) => projet.surfaces.find((s) => s.id === id);
+    const nom = (calcul) => nomDuCalcul(calcul, projet.surfaces);
+    // Feuille principale du PDF : calculs sur toute la surface 1 ; les calculs limités au
+    // contour d'une surface ont chacun leur feuille.
+    const dansUnContour = ({ calcul }) => !calcul.uneSeule && calcul.zone?.type === 'surface';
+    const principaux = calculsReussis().filter((c) => !dansUnContour(c));
+    const affichees = surfacesAffichees();
+    const creees = affichees.filter((s) => !estImportee(s));
     return {
       nomProjet: projet.nom,
-      stocks: calcules.map(({ surface }) => surface),
-      resultats: calcules.map(({ resultat }) => resultat),
+      stocks: principaux.map(({ calcul }) => ({ ...surfaceDe(calcul.surface1Id), nom: nom(calcul), description: descriptionCalcul(calcul, projet.surfaces) })),
+      resultats: principaux.map(({ resultat }) => resultat),
+      comparaisons: calculsReussis()
+        .filter(dansUnContour)
+        .map(({ calcul, resultat }) => ({ nom: nom(calcul), description: descriptionCalcul(calcul, projet.surfaces), resultat })),
+      volumes: projet.calculs.map((calcul) => ({ nom: nom(calcul), base: texteBase(calcul, projet.surfaces), resultat: resultatsCalculs.get(calcul.id) })),
+      // DXF et LandXML : les surfaces affichées, avec ou sans volume.
+      dessinSurfaces: {
+        stocks: creees,
+        resultats: creees.map((s) => ({ trianglesDessus: trianglesDeSurface(s.id) })),
+        surfaces: affichees
+          .filter(estImportee)
+          .map((s) => ({ nom: s.nom, triangles: trianglesDeSurface(s.id) }))
+          .filter((s) => s.triangles.length > 0),
+      },
       points: leve?.points ?? [],
       fichierPoints: leve?.nom ?? '',
-      // Surfaces sans volume (les autres sont déjà exportées avec leur volume).
-      surfaces: surfacesAffichees()
-        .filter((s) => !avecVolume.has(s.id))
-        .map((s) => ({ nom: s.nom, triangles: trianglesDeSurface(s.id) }))
-        .filter((s) => s.triangles.length > 0),
-      comparaisons: projet.comparaisons.map((c, i) => ({ nom: c.nom, resultat: resultatsComparaisons[i] })),
       photos: surfacesAffichees().flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom }))),
       cartouche: projet.cartouche,
     };
@@ -394,24 +389,23 @@ function decrireSurface(surface) {
   if (r.erreurs) return `<div class="erreur"><ul>${r.erreurs.map((e) => `<li>${echapper(e)}</li>`).join('')}</ul></div>`;
   let aire = 0;
   for (const [a, b, c] of r.triangles) aire += Math.abs((b.est - a.est) * (c.nord - a.nord) - (c.est - a.est) * (b.nord - a.nord)) / 2;
-  const volume = volumes.get(surface.id);
+  const calcul = calculDuPlan(surface);
+  const volume = calcul ? resultatsCalculs.get(calcul.id) : null;
   return `
-    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${volume && !volume.erreurs ? ` · remblai ${formaterNombre(volume.remblai)} m³ (onglet 3. Volumes)` : ''}</p>
+    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${volume ? ` · remblai ${formaterNombre(volume.remblai)} m³ (onglet 3. Volumes)` : ''}</p>
     ${r.avertissements.length > 0 ? `<div class="avertissement"><ul>${r.avertissements.map((a) => `<li>${echapper(a)}</li>`).join('')}</ul></div>` : ''}`;
 }
 
 // --- Calculs et affichage ---
 
-/** Recalcule tout (surfaces, volumes, comparaisons) et met à jour les écrans et le plan. */
+/** Recalcule tout (surfaces, volumes) et met à jour les écrans et le plan. */
 function recalculer({ recadrer = false } = {}) {
   const leve = leveActif(projet);
   const points = leve?.points ?? [];
 
   surfacesCalculees = new Map(projet.surfaces.map((s) => [s.id, calculerSurface(s, pointsDuLeve(s.leveId))]));
-  volumes = new Map(
-    projet.surfaces.map((s) => [s.id, calculerVolumeSurface(s, surfacesCalculees.get(s.id), pointsDuLeve(s.leveId), surfaceDeBase(s))]),
-  );
-  resultatsComparaisons = projet.comparaisons.map(calculerComparaison);
+  const donnees = { surfaces: projet.surfaces, triangulations: surfacesCalculees, pointsDe: (s) => pointsDuLeve(s.leveId) };
+  resultatsCalculs = new Map(projet.calculs.map((c) => [c.id, calculerVolume(c, donnees)]));
 
   for (const element of document.querySelectorAll('.sans-points')) element.hidden = projet.leves.length > 0;
   document.querySelector('#nom-leve-surfaces').textContent = leve ? `· levé « ${leve.nom} »` : '';
@@ -419,7 +413,6 @@ function recalculer({ recadrer = false } = {}) {
 
   editeurSurfaces.rafraichir();
   ecranVolumes.afficher();
-  ecranComparaisons.afficher();
   ecranImport.afficher(projet, dernierImport);
   ecranProjet.afficher(projet, resumes);
 
@@ -430,21 +423,22 @@ function recalculer({ recadrer = false } = {}) {
   const dansSurfaces = ongletContexte === 'surfaces';
   // Une surface importée montre ses propres points ; sinon, les points du levé.
   const pointsDuPlan = dansSurfaces && active && estImportee(active) ? active.points : points;
-  // Dans l'onglet Comparer, le remblai / déblai colorié est celui de la comparaison montrée.
-  const comparaison = ongletContexte === 'comparer' ? comparaisonAMontrer() : null;
   plan.redessiner({
     ...editeurSurfaces.obtenirDessin(),
     cachees: new Set(projet.surfaces.filter((s) => !visibles.has(s))),
     resultats: projet.surfaces.map((s) => {
-      const calcul = surfacesCalculees.get(s.id);
-      const volume = volumes.get(s.id);
+      const triangulation = surfacesCalculees.get(s.id);
+      const calcul = calculDuPlan(s);
+      const volume = calcul ? resultatsCalculs.get(calcul.id) : null;
       return {
-        trianglesDessus: calcul?.triangles ?? null,
-        segmentsEnErreur: calcul?.segmentsEnErreur ?? [],
-        ...(volume && !volume.erreurs ? volume : {}),
+        // Le volume d'abord : ses triangles du dessus sont limités à la zone du calcul,
+        // mais le plan dessine toujours la surface entière.
+        ...(volume ?? {}),
+        trianglesDessus: triangulation?.triangles ?? null,
+        segmentsEnErreur: triangulation?.segmentsEnErreur ?? [],
       };
     }),
-    ecarts: comparaison ? resultatsComparaisons[projet.comparaisons.indexOf(comparaison)].trianglesEcart : null,
+    ecarts: null,
     // Triangles supprimés à la main : montrés (en pointillés) pendant la suppression au doigt.
     surface:
       dansSurfaces && calculActif && !calculActif.erreurs && editeurSurfaces.enSuppression()
@@ -479,6 +473,8 @@ let minuterie = null;
 
 /** Après chaque modification : recalcule, retient l'étape (Annuler), puis enregistre un court instant plus tard. */
 function modifie(options) {
+  // Une surface supprimée : ses calculs de volume disparaissent avec elle.
+  projet.calculs = nettoyerCalculs(projet.calculs, projet.surfaces);
   recalculer(options);
   historique.memoriser(modifications, projet);
   mettreAJourAnnuler();
@@ -528,9 +524,9 @@ document.addEventListener('keydown', (evenement) => {
   evenement.preventDefault();
 });
 
-/** Petit message sous l'en-tête, qui disparaît tout seul. */
+/** Petit message sous l'en-tête, qui disparaît tout seul après "duree" millisecondes (null : il reste). */
 let minuterieMessage = null;
-function afficherMessage(texte) {
+function afficherMessage(texte, duree = 2000) {
   let zone = document.querySelector('#message-flottant');
   if (!zone) {
     zone = document.createElement('div');
@@ -542,7 +538,7 @@ function afficherMessage(texte) {
   zone.textContent = texte;
   zone.hidden = false;
   clearTimeout(minuterieMessage);
-  minuterieMessage = setTimeout(() => (zone.hidden = true), 2000);
+  if (duree !== null) minuterieMessage = setTimeout(() => (zone.hidden = true), duree);
 }
 
 async function enregistrer() {
