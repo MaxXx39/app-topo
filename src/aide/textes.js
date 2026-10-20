@@ -38,7 +38,7 @@ export const TEXTES_AIDE = {
   base:
     'Une seule surface (case cochée) : la base passe par les points du contour de la surface 1 (la ligne basse, le pied), comme pour un stock posé sur le terrain. Sinon, la base est la surface 2 : terrain naturel, levé plus ancien… (surface 1 = dessus ou après, surface 2 = dessous ou avant). La zone peut limiter le calcul au contour d\'une surface. Si la base ne couvre pas tout, la partie non couverte n\'est pas comptée et un avertissement l\'indique. « Voir sur le plan » colorie le remblai en rouge et le déblai en jaune.',
   exporter:
-    'PDF : plan à l\'échelle, volumes et cartouche, plus une feuille par calcul limité au contour d\'une surface. CSV : tableau des volumes pour Excel. DXF (R12) : points, contours, lignes de rupture, triangles en faces 3D, surfaces et courbes. LandXML : les surfaces affichées.',
+    'PDF : plan à l\'échelle, volumes et cartouche, plus une feuille par calcul limité au contour d\'une surface. Coche ce que le PDF doit montrer (noms, altitudes des points, triangles…). CSV : tableau des volumes pour Excel. DXF (R12) : points avec leur nom et leur altitude (calques NOMS et ALTITUDES), contours, lignes de rupture, triangles en faces 3D, surfaces et courbes. LandXML : les surfaces affichées.',
 
   // --- Plan ---
   plan:
