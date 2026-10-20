@@ -11,6 +11,7 @@ import { PALIERS } from '../plan/ecarts.js';
 const CALQUES = [
   ['triangles', 'Triangles', true],
   ['noms', 'Noms des points', true],
+  ['altitudes', 'Altitudes des points', false],
   ['ecarts', 'Remblai (rouge) / déblai (jaune)', true],
   ['photos', 'Photos cochées (sous la légende)', true],
   ['courbes', 'Courbes de niveau', false],
@@ -46,8 +47,8 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
         </select>
       </label>
     </div>
-    <details class="calques-pdf">
-      <summary>Calques du PDF</summary>
+    <div class="calques-pdf">
+      <p class="titre-choix">Contenu du PDF</p>
       <div class="liste-calques-pdf">
         ${CALQUES.map(([cle, titre, coche]) => `<label class="case"><input type="checkbox" data-calque="${cle}" ${coche ? 'checked' : ''} /> ${titre}</label>`).join('')}
         <label class="choix-equidistance">Palier remblai / déblai
@@ -56,7 +57,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
           </select>
         </label>
       </div>
-    </details>
+    </div>
     <div class="ligne-outils">
       <button type="button" class="bouton" data-action="pdf">PDF</button>
       <button type="button" class="bouton-secondaire" data-action="csv">CSV</button>

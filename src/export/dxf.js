@@ -3,14 +3,16 @@
 //
 // Calques créés :
 // - POINTS : les points levés (avec altitude)       - NOMS : nom de chaque point
+// - ALTITUDES : altitude de chaque point écrite sous son nom (m, 3 décimales)
 // - CONTOURS : contour de chaque surface (3D)       - LIGNES_RUPTURE : lignes de rupture (3D)
 // - TRIANGLES_<nom> : triangles de chaque surface dont le volume est calculé (faces 3D)
 // - SURFACE_<nom> : triangles des autres surfaces (faces 3D)
 // - COURBES : courbes de niveau des surfaces calculées (si demandées)
 import { courbesDeNiveau } from '../topo/courbes.js';
+import { formaterNombre } from '../topo/format.js';
 
 // Couleurs AutoCAD (numéros) : 1 rouge, 2 jaune, 3 vert, 4 cyan, 5 bleu, 6 magenta, 7 blanc/noir, 8 gris, 30 orange.
-const COULEURS = { POINTS: 7, NOMS: 8, CONTOURS: 1, LIGNES_RUPTURE: 30, COURBES: 32 };
+const COULEURS = { POINTS: 7, NOMS: 8, ALTITUDES: 5, CONTOURS: 1, LIGNES_RUPTURE: 30, COURBES: 32 };
 
 /**
  * Construit le texte du fichier DXF.
@@ -27,6 +29,8 @@ export function genererDxf({ points, stocks = [], resultats = [], surfaces = [],
   for (const p of points) {
     entites.push(['0', 'POINT', '8', 'POINTS', ...xyz(p, 0)]);
     entites.push(['0', 'TEXT', '8', 'NOMS', ...xyz({ ...p, est: p.est + 0.2, nord: p.nord + 0.2 }, 0), '40', '0.3', '1', p.nom]);
+    // Altitude sous le nom (texte de 0.25 m de haut)
+    entites.push(['0', 'TEXT', '8', 'ALTITUDES', ...xyz({ ...p, est: p.est + 0.2, nord: p.nord - 0.4 }, 0), '40', '0.25', '1', formaterNombre(p.altitude)]);
   }
 
   stocks.forEach((stock, i) => {

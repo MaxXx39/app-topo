@@ -13,9 +13,13 @@ describe('genererDxf', () => {
   const lignes = dxf.split('\r\n');
   const compter = (mot) => lignes.filter((l) => l === mot).length;
 
-  it('contient un point et un nom par point levé', () => {
+  it('contient un point, un nom et une altitude par point levé', () => {
     expect(compter('POINT')).toBe(115);
-    expect(compter('TEXT')).toBe(115);
+    expect(compter('TEXT')).toBe(2 * 115);
+    expect(compter('ALTITUDES')).toBe(115 + 1); // 115 textes + la définition du calque
+    // Altitude du premier point (b1), avec 3 décimales
+    const premiere = lignes.indexOf('ALTITUDES', lignes.indexOf('ENTITIES'));
+    expect(lignes[premiere + 10]).toBe('427.654');
   });
 
   it('contient une face 3D par triangle du stock et les polylignes 3D', () => {

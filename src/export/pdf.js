@@ -20,6 +20,7 @@ import logoPerrin from '../assets/logo-perrin.jpg?inline';
 export const CALQUES_PDF = {
   triangles: true,
   noms: true,
+  altitudes: false,
   ecarts: true,
   photos: true,
   courbes: false,
@@ -441,14 +442,30 @@ async function dessinerPlan(doc, calcules, points, echelleImposee, choix) {
   const hauteurNom = tailleNom * 0.3528; // 1 point = 0.3528 mm
   doc.setFontSize(tailleNom);
   doc.setTextColor(...COULEURS.texte);
-  if (choix.noms) {
+  if (choix.noms || choix.altitudes) {
+    // Étiquette de chaque point : son nom et / ou son altitude (m, 3 décimales), sur une ou deux lignes.
+    const textes = pointsMontres.map((p) => [choix.noms ? p.nom : null, choix.altitudes ? formaterNombre(p.altitude) : null].filter(Boolean));
+    const interligne = hauteurNom * 1.15;
     const places = placerEtiquettes(
-      positions.map(({ x, y }, i) => ({ x, y, largeur: doc.getTextWidth(pointsMontres[i].nom), hauteur: hauteurNom })),
+      positions.map(({ x, y }, i) => ({
+        x,
+        y,
+        largeur: Math.max(...textes[i].map((t) => doc.getTextWidth(t))),
+        hauteur: hauteurNom + (textes[i].length - 1) * interligne,
+      })),
       0.6,
     );
     places.forEach((place, i) => {
-      if (place) doc.text(pointsMontres[i].nom, place.x, place.y, { align: place.aGauche ? 'right' : 'left' });
+      if (!place) return;
+      const lignes = textes[i];
+      lignes.forEach((ligne, k) => {
+        // Le nom en noir, l'altitude en gris en dessous.
+        const estAltitude = choix.altitudes && k === lignes.length - 1;
+        doc.setTextColor(...(estAltitude ? COULEURS.gris : COULEURS.texte));
+        doc.text(ligne, place.x, place.y - (lignes.length - 1 - k) * interligne, { align: place.aGauche ? 'right' : 'left' });
+      });
     });
+    doc.setTextColor(...COULEURS.texte);
   }
 
   // Nom et volume de chaque stock, dans une étiquette blanche

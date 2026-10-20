@@ -1244,8 +1244,14 @@ svg.plan {
 
 /* --- Export --- */
 
+/* Bloc « Exporter » (onglet 3. Volumes) : une carte bien visible, avec un trait ambre en haut. */
 .carte-export {
   margin-top: 20px;
+  padding: 4px 14px 10px;
+  border: 1px solid var(--bordure);
+  border-top: 4px solid var(--ambre);
+  border-radius: 10px;
+  background: var(--surface);
 }
 
 .champs-export {
@@ -1429,9 +1435,14 @@ tr.total td {
   --couleur-role: var(--succes);
 }
 
+.carte-role.role-triangles {
+  --couleur-role: #7c3aed; /* violet */
+}
+
 .carte-role.role-contour,
 .carte-role.role-ligne,
-.carte-role.role-dessus {
+.carte-role.role-dessus,
+.carte-role.role-triangles {
   border-left: 5px solid var(--couleur-role);
   background: color-mix(in srgb, var(--couleur-role) 4%, var(--surface));
 }
@@ -1451,4 +1462,11 @@ tr.total td {
 .icone-role circle {
   fill: var(--couleur-role);
   stroke: none;
+}
+
+/* Carte grisée : outil inutile pour cette surface (ex. triangles en trop avec un contour fermé). */
+.carte-role.inutile {
+  --couleur-role: #9aa3aa;
+  background: var(--fond);
+  color: var(--gris);
 }

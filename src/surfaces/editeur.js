@@ -22,6 +22,8 @@ const ICONES_ROLES = {
   contour: '<path d="M4 8 11 3l9 5-2 11-13 1z" />',
   ligne: '<path d="M3 18l6-7 4 4 8-9" /><circle cx="3" cy="18" r="1.6" /><circle cx="9" cy="11" r="1.6" /><circle cx="13" cy="15" r="1.6" /><circle cx="21" cy="6" r="1.6" />',
   dessus: '<circle cx="6" cy="7" r="2.2" /><circle cx="17" cy="9" r="2.2" /><circle cx="9" cy="17" r="2.2" /><circle cx="18" cy="18" r="2.2" />',
+  // Triangles en trop : un triangle barré.
+  triangles: '<path d="M12 3 21 20H3z" /><path d="m9 11 6 6M15 11l-6 6" />',
 };
 
 /** Icône d'un rôle (contour, ligne, dessus), à mettre devant son titre. */
@@ -323,14 +325,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
         <label class="case"><input type="checkbox" data-champ="tous-les-points" ${surface.tousLesPoints ? 'checked' : ''} /> tous les points du levé${surface.contour.length >= 3 ? ' (dans le contour)' : ''}</label>
         ${surface.tousLesPoints ? '' : contenuRole(surface, { role: 'dessus' })}
       </div>
-      <div class="carte-role ${etat.suppression ? 'en-edition' : ''}">
-        <div class="titre-role"><strong>Triangles en trop ${bulle('trianglesEnTrop')}</strong></div>
-        <p>${surface.trianglesSupprimes.length} triangle(s) supprimé(s).</p>
-        <div class="ligne-outils">
-          <button type="button" class="${etat.suppression ? 'bouton' : 'bouton-secondaire'}" data-action="mode-suppression">${etat.suppression ? 'Mode suppression actif' : 'Supprimer des triangles au doigt'}</button>
-          <button type="button" class="bouton-secondaire" data-action="retablir-triangles" ${surface.trianglesSupprimes.length === 0 ? 'disabled' : ''}>Tout rétablir</button>
-        </div>
-      </div>
+      ${carteTriangles(surface)}
       ${
         problemes.length > 0
           ? `<div class="avertissement"><p><strong>À compléter :</strong></p><ul>${problemes.map((p) => `<li>${echapper(p)}</li>`).join('')}</ul></div>`
@@ -338,6 +333,25 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       }
       ${decrire?.(surface) ?? ''}
       ${cartePhotos(surface)}`;
+  }
+
+  /**
+   * Carte « Triangles en trop ». Avec un contour fermé, elle est grisée : la surface s'arrête
+   * déjà au contour, il n'y a pas de triangle en trop (seul « Tout rétablir » reste possible
+   * si des triangles avaient été supprimés avant).
+   */
+  function carteTriangles(surface) {
+    const avecContour = surface.contour.length >= 3;
+    const supprimes = surface.trianglesSupprimes.length;
+    return `
+      <div class="carte-role role-triangles ${avecContour ? 'inutile' : ''} ${etat.suppression ? 'en-edition' : ''}">
+        <div class="titre-role"><strong>${iconeRole('triangles')}Triangles en trop ${bulle('trianglesEnTrop')}</strong></div>
+        <p>${avecContour ? 'Inutile ici : le contour fermé limite déjà la surface.' : `${supprimes} triangle(s) supprimé(s).`}</p>
+        <div class="ligne-outils">
+          <button type="button" class="${etat.suppression ? 'bouton' : 'bouton-secondaire'}" data-action="mode-suppression" ${avecContour && !etat.suppression ? 'disabled' : ''}>${etat.suppression ? 'Mode suppression actif' : 'Supprimer des triangles au doigt'}</button>
+          <button type="button" class="bouton-secondaire" data-action="retablir-triangles" ${supprimes === 0 ? 'disabled' : ''}>Tout rétablir${avecContour && supprimes > 0 ? ` (${supprimes})` : ''}</button>
+        </div>
+      </div>`;
   }
 
   /** Photos de la surface (pour le compte rendu PDF) : miniatures, légendes, ajout. */

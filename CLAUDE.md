@@ -71,6 +71,7 @@ Ajouts demandés par l'utilisateur après la V1 :
 - Photos HEIC (Android, iPhone) converties en JPEG sur l'appareil (bibliothèque `heic-to`, chargée seulement quand il le faut).
 - Photos des surfaces : case « dans le PDF » par photo ; dans le PDF, les photos cochées sont dans la colonne de droite sous la légende (feuilles à part seulement si elles n'y tiennent pas).
 - **Logo Perrin** (`src/assets/logo-perrin.jpg`) : dans l'en-tête de l'appli (sur fond blanc) et en haut du cartouche du PDF.
+- Export : options du PDF toujours visibles (« Contenu du PDF »), case « Altitudes des points » (sous le nom, en gris) ; DXF avec un calque ALTITUDES. Carte « Triangles en trop » en violet, grisée quand la surface a un contour fermé.
 
 ## 5. Vérification : cas de référence
 
