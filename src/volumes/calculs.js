@@ -17,7 +17,7 @@
 //                  // { type: 'surface', surfaceId } : seulement dans le contour de cette surface
 // }
 // Unités : m, m², m³.
-import { nouvelIdentifiant, estImportee, nomNature } from '../topo/surface.js';
+import { nouvelIdentifiant, estImportee, nomNature, NATURES } from '../topo/surface.js';
 import { calculerVolumeSurface } from '../topo/volume.js';
 import { comparerSurfaces } from '../topo/comparaison.js';
 
@@ -52,6 +52,31 @@ export function nomAutomatique(calcul, surfaces) {
 /** Nom du calcul : celui choisi par l'utilisateur, sinon le nom automatique. */
 export function nomDuCalcul(calcul, surfaces) {
   return calcul.nom || nomAutomatique(calcul, surfaces);
+}
+
+const TITRES_TOTAUX = { stock: 'Total stocks', terrain: 'Total terrains naturels', terrassement: 'Total terrassements' };
+
+/**
+ * Range les lignes du tableau des volumes par nature de la surface 1 (stocks, terrains naturels,
+ * terrassements), pour ne jamais additionner des volumes qui n'ont rien à voir.
+ * - lignes : liste de { nature, resultat, ... } (resultat : volume calculé)
+ * Renvoie [{ nature, lignes, total }] dans l'ordre des natures. total = { titre, surfacePlan,
+ * remblai, deblai } (m², m³) quand le groupe a au moins deux lignes, sinon null.
+ */
+export function grouperParNature(lignes) {
+  const ordre = [...NATURES.map(([cle]) => cle), null];
+  const natureConnue = (nature) => (ordre.includes(nature) ? nature : null);
+  return ordre
+    .map((nature) => {
+      const groupe = lignes.filter((ligne) => natureConnue(ligne.nature) === nature);
+      const somme = (cle) => groupe.reduce((total, { resultat }) => total + resultat[cle], 0);
+      const total =
+        groupe.length >= 2
+          ? { titre: TITRES_TOTAUX[nature] ?? 'Total', surfacePlan: somme('surfacePlan'), remblai: somme('remblai'), deblai: somme('deblai') }
+          : null;
+      return { nature, lignes: groupe, total };
+    })
+    .filter((groupe) => groupe.lignes.length > 0);
 }
 
 /**

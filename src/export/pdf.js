@@ -11,6 +11,7 @@ import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } fro
 import { couleurRVB } from '../plan/couleurs.js';
 import { zonesRemblaiDeblai } from '../plan/ecarts.js';
 import { FONDS, niveauDeZoom, tuilesPourZone } from '../plan/fond.js';
+import { grouperParNature } from '../volumes/calculs.js';
 
 // Calques du plan imprimé, et leur état par défaut.
 export const CALQUES_PDF = {
@@ -580,19 +581,18 @@ function dessinerColonne(doc, calcules, cartouche, { choix, relief, ecarts, comp
   trait(doc, COULEURS.gris, 0.15);
   doc.line(x, y - 3, x + COLONNE.largeur, y - 3);
   doc.setTextColor(...COULEURS.texte);
-  let totalRemblai = 0;
-  let totalDeblai = 0;
-  let totalSurface = 0;
-  for (const { stock, resultat } of calcules) {
-    const nom = stock.nom.length > 14 ? `${stock.nom.slice(0, 13)}…` : stock.nom;
-    ecrireLigne([nom, resultat.mode, formaterNombre(resultat.surfacePlan), formaterNombre(resultat.remblai), formaterNombre(resultat.deblai)]);
-    totalRemblai += resultat.remblai;
-    totalDeblai += resultat.deblai;
-    totalSurface += resultat.surfacePlan;
-  }
-  if (calcules.length > 1) {
-    doc.line(x, y - 3, x + COLONNE.largeur, y - 3);
-    ecrireLigne(['Total', '', formaterNombre(totalSurface), formaterNombre(totalRemblai), formaterNombre(totalDeblai)], true);
+  // Lignes rangées par nature de la surface 1, avec un total par nature (jamais un total
+  // qui additionne des stocks et des terrassements).
+  const groupes = grouperParNature(calcules.map((ligne) => ({ ...ligne, nature: ligne.stock.nature })));
+  for (const { lignes, total } of groupes) {
+    for (const { stock, resultat } of lignes) {
+      const nom = stock.nom.length > 14 ? `${stock.nom.slice(0, 13)}…` : stock.nom;
+      ecrireLigne([nom, resultat.mode, formaterNombre(resultat.surfacePlan), formaterNombre(resultat.remblai), formaterNombre(resultat.deblai)]);
+    }
+    if (total) {
+      doc.line(x, y - 3, x + COLONNE.largeur, y - 3);
+      ecrireLigne([total.titre, '', formaterNombre(total.surfacePlan), formaterNombre(total.remblai), formaterNombre(total.deblai)], true);
+    }
   }
   if (calcules.length === 0) {
     doc.setFont('helvetica', 'italic');

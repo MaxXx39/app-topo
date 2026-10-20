@@ -8,6 +8,7 @@ import {
   nettoyerCalculs,
   nomAutomatique,
   descriptionCalcul,
+  grouperParNature,
 } from '../src/volumes/calculs.js';
 import { pt, pointsDeReference, surfaceDeReference, STOCKS_REFERENCE } from './outils.js';
 
@@ -139,5 +140,23 @@ describe('noms et nettoyage des calculs', () => {
     expect(calculFouille.surface2Id).toBeNull();
     expect(calculFouille.zone).toEqual({ type: 'toute' });
     expect(nettoyerCalculs([calculStock, calculFouille], [terrassement])).toEqual([calculFouille]);
+  });
+});
+
+describe('grouperParNature', () => {
+  const volume = (remblai, deblai) => ({ surfacePlan: 100, remblai, deblai });
+  it('range les lignes par nature et fait un total par nature (jamais stocks + terrassements)', () => {
+    const groupes = grouperParNature([
+      { nom: 'Fouille', nature: 'terrassement', resultat: volume(10, 500) },
+      { nom: 'Stock 1', nature: 'stock', resultat: volume(1636.197, 0) },
+      { nom: 'Stock 2', nature: 'stock', resultat: volume(648.979, 0) },
+    ]);
+    expect(groupes.map((g) => g.nature)).toEqual(['stock', 'terrassement']);
+    expect(groupes[0].lignes.map((l) => l.nom)).toEqual(['Stock 1', 'Stock 2']);
+    expect(groupes[0].total.titre).toBe('Total stocks');
+    expect(groupes[0].total.remblai).toBeCloseTo(2285.176, 6);
+    expect(groupes[0].total.surfacePlan).toBe(200);
+    // Un seul terrassement : pas de ligne de total.
+    expect(groupes[1].total).toBeNull();
   });
 });

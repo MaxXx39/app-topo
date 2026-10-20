@@ -5,7 +5,7 @@ import { formaterNombre } from '../topo/format.js';
 import { estImportee } from '../topo/surface.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
-import { creerCalcul, preremplir, nomAutomatique, nomDuCalcul } from './calculs.js';
+import { creerCalcul, preremplir, nomAutomatique, nomDuCalcul, grouperParNature } from './calculs.js';
 
 /**
  * Crée l'écran des volumes dans "conteneur". Options :
@@ -81,32 +81,38 @@ export function texteBase(calcul, surfaces) {
   return surfaces.find((s) => s.id === calcul.surface2Id)?.nom ?? '-';
 }
 
-/** Tableau récapitulatif des volumes calculés, avec un total s'il y en a plusieurs. */
+/**
+ * Tableau récapitulatif des volumes calculés, rangés par nature de la surface 1 (stocks,
+ * terrains naturels, terrassements), avec un total par nature quand il y en a plusieurs.
+ */
 function tableau(lignes, surfaces) {
-  const calculees = lignes.filter(({ resultat }) => resultat && !resultat.erreurs);
+  const calculees = lignes
+    .filter(({ resultat }) => resultat && !resultat.erreurs)
+    .map((ligne) => ({ ...ligne, nature: surfaces.find((s) => s.id === ligne.calcul.surface1Id)?.nature }));
   if (calculees.length === 0) return '<p class="aide">Aucun volume calculé : crée un calcul ci-dessous.</p>';
-  const total = (cle) => calculees.reduce((somme, { resultat }) => somme + resultat[cle], 0);
   return `
     <div class="tableau-defilant">
       <table>
         <thead><tr><th>Calcul</th><th>Base</th><th>Surface (m²)</th><th>Remblai (m³)</th><th>Déblai (m³)</th></tr></thead>
         <tbody>
-          ${calculees
-            .map(
-              ({ calcul, resultat, nom }) => `<tr>
-                <td>${echapper(nom)}</td>
-                <td>${echapper(texteBase(calcul, surfaces))}</td>
-                <td>${formaterNombre(resultat.surfacePlan)}</td>
-                <td><strong>${formaterNombre(resultat.remblai)}</strong></td>
-                <td><strong>${formaterNombre(resultat.deblai)}</strong></td>
-              </tr>`,
+          ${grouperParNature(calculees)
+            .map(({ lignes: groupe, total }) =>
+              [
+                ...groupe.map(
+                  ({ calcul, resultat, nom }) => `<tr>
+                    <td>${echapper(nom)}</td>
+                    <td>${echapper(texteBase(calcul, surfaces))}</td>
+                    <td>${formaterNombre(resultat.surfacePlan)}</td>
+                    <td><strong>${formaterNombre(resultat.remblai)}</strong></td>
+                    <td><strong>${formaterNombre(resultat.deblai)}</strong></td>
+                  </tr>`,
+                ),
+                total
+                  ? `<tr class="total"><td>${total.titre}</td><td></td><td>${formaterNombre(total.surfacePlan)}</td><td><strong>${formaterNombre(total.remblai)}</strong></td><td><strong>${formaterNombre(total.deblai)}</strong></td></tr>`
+                  : '',
+              ].join(''),
             )
             .join('')}
-          ${
-            calculees.length > 1
-              ? `<tr class="total"><td>Total</td><td></td><td>${formaterNombre(total('surfacePlan'))}</td><td><strong>${formaterNombre(total('remblai'))}</strong></td><td><strong>${formaterNombre(total('deblai'))}</strong></td></tr>`
-              : ''
-          }
         </tbody>
       </table>
     </div>`;
