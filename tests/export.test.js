@@ -149,6 +149,7 @@ describe('creerPdf - calques', async () => {
     const { document } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, photos: [1, 2].map(photo) });
     expect(document.getNumberOfPages()).toBe(1); // tout sur la feuille des volumes
     expect(document.output()).toContain('Stock 2 - Vue 2');
+    expect(document.output()).not.toContain('20.05.2026'); // pas de date sous les photos
     // Trop de photos pour la colonne : 4 par feuille, à la suite.
     const beaucoup = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, photos: Array.from({ length: 30 }, (_, i) => photo(i + 1)) });
     expect(beaucoup.document.getNumberOfPages()).toBe(9); // volumes + 8 feuilles (30 photos, 4 par feuille)

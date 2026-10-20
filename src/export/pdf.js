@@ -160,13 +160,13 @@ function dessinerPhotosColonne(doc, photos, yHaut) {
     doc.addImage(photo.image, 'JPEG', x, y, largeur, hauteur);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(5.5);
-    const texte = `${[photo.surface, photo.legende].filter(Boolean).join(' - ')} (${dateSuisse(photo.date)})`;
+    const texte = [photo.surface, photo.legende].filter(Boolean).join(' - ');
     doc.text(doc.splitTextToSize(texte, largeur)[0], x, y + hauteur + 2.3);
   });
   return true;
 }
 
-/** Feuille de photos : titre, puis 2 × 2 photos avec leur légende (surface, légende, date). */
+/** Feuille de photos : titre, puis 2 × 2 photos avec leur légende (surface et légende). */
 function dessinerPagePhotos(doc, photos, cartouche) {
   trait(doc, COULEURS.texte, 0.4);
   doc.rect(PAGE.marge, PAGE.marge, PAGE.largeur - 2 * PAGE.marge, PAGE.hauteur - 2 * PAGE.marge);
@@ -199,19 +199,10 @@ function dessinerPagePhotos(doc, photos, cartouche) {
     doc.setFontSize(8);
     doc.setTextColor(...COULEURS.texte);
     doc.setFont('helvetica', 'bold');
-    const titre = doc.splitTextToSize([photo.surface, photo.legende].filter(Boolean).join(' - '), largeurCase - 22)[0];
+    const titre = doc.splitTextToSize([photo.surface, photo.legende].filter(Boolean).join(' - '), l)[0];
     doc.text(titre, x + (largeurCase - l) / 2, y + h + 4.5);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...COULEURS.gris);
-    doc.text(dateSuisse(photo.date), x + (largeurCase + l) / 2, y + h + 4.5, { align: 'right' });
   });
-}
-
-/** Date ISO -> « 20.05.2026 ». */
-function dateSuisse(iso) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
 }
 
 /** Cadre général de la feuille et cadre du plan. */
