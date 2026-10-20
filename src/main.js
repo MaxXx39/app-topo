@@ -8,7 +8,7 @@ import { lireLandXML } from './topo/landxml.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { formaterNombre } from './topo/format.js';
 import { calculerSurface, surfaceImportee, cleTriangle, estImportee, nomNature } from './topo/surface.js';
-import { creerCalcul, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
+import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
 import { creerEcranVolumes, texteBase } from './volumes/ecran.js';
@@ -250,10 +250,10 @@ const plan = creerPlan(document.querySelector('#plan'), {
 
 const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces'), document.querySelector('#barre-surfaces'), {
   obtenirPoints: (surface) => (estImportee(surface) ? [] : pointsDuLeve(surface.leveId)),
-  // Nouvelle surface : un stock a tout de suite son calcul de volume (sur sa ligne basse), un
-  // terrassement aussi (par rapport au dernier terrain naturel). Voir volumes/calculs.js.
-  quandCree: (surface) => {
-    if (surface.nature === 'stock' || surface.nature === 'terrassement') projet.calculs.push(creerCalcul(surface, projet.surfaces));
+  // Nouvelle surface, ou nature changée : un stock a tout de suite son calcul de volume (sur sa
+  // ligne basse), un terrassement aussi (par rapport au dernier terrain naturel). Voir volumes/calculs.js.
+  quandNatureChange: (surface) => {
+    projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
   },
   quandChange: () => {
     // Une surface d'un autre levé est choisie : ce levé devient le levé affiché.
@@ -301,7 +301,12 @@ document.querySelector('#fichier-surface').addEventListener('change', async (eve
     const texte = await fichier.text();
     const type = /\.dxf$/i.test(fichier.name) ? 'dxf' : 'landxml';
     const { surfaces, erreurs, avertissements } = type === 'dxf' ? lireDXF(texte) : lireLandXML(texte);
-    for (const surface of surfaces) projet.surfaces.push(surfaceImportee(surface, fichier.name, type));
+    for (const surface of surfaces) {
+      const importee = surfaceImportee(surface, fichier.name, type);
+      projet.surfaces.push(importee);
+      // Un terrain naturel importé : les terrassements qui l'attendaient le prennent comme surface 2.
+      projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, importee);
+    }
     const messages = [...erreurs, ...avertissements];
     zone.innerHTML = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} ».</p>
       ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;

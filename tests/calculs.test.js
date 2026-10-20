@@ -9,6 +9,7 @@ import {
   nomAutomatique,
   descriptionCalcul,
   grouperParNature,
+  calculsAutomatiques,
 } from '../src/volumes/calculs.js';
 import { pt, pointsDeReference, surfaceDeReference, STOCKS_REFERENCE } from './outils.js';
 
@@ -158,5 +159,35 @@ describe('grouperParNature', () => {
     expect(groupes[0].total.surfacePlan).toBe(200);
     // Un seul terrassement : pas de ligne de total.
     expect(groupes[1].total).toBeNull();
+  });
+});
+
+describe('calculsAutomatiques', () => {
+  it('suit la nature de la surface, sans toucher aux calculs modifiés à la main', () => {
+    const surface = creerSurface('Stock 4', 'leve', 'stock');
+    const tn = creerSurface('TN', 'leve', 'terrain');
+    const surfaces = [surface];
+
+    // Nouvelle surface (un stock) : un calcul sur sa ligne basse.
+    let calculs = calculsAutomatiques([], surfaces, surface);
+    expect(calculs).toHaveLength(1);
+    expect(calculs[0]).toMatchObject({ auto: true, uneSeule: true });
+
+    // Elle devient un terrassement : son calcul est remplacé, en attente d'un terrain naturel...
+    surface.nature = 'terrassement';
+    calculs = calculsAutomatiques(calculs, surfaces, surface);
+    expect(calculs).toHaveLength(1);
+    expect(calculs[0]).toMatchObject({ auto: true, uneSeule: false, surface2Id: null });
+
+    // ... qu'il reçoit dès qu'un terrain naturel arrive.
+    surfaces.push(tn);
+    calculs = calculsAutomatiques(calculs, surfaces, tn);
+    expect(calculs).toHaveLength(1);
+    expect(calculs[0].surface2Id).toBe(tn.id);
+
+    // Un calcul modifié à la main reste, même si la surface devient un terrain naturel.
+    calculs[0].auto = false;
+    surface.nature = 'terrain';
+    expect(calculsAutomatiques(calculs, surfaces, surface)).toEqual(calculs);
   });
 });

@@ -16,13 +16,13 @@ export const TEXTES_AIDE = {
   surfaces:
     'Une surface peut être un stock, un terrain naturel ou un terrassement. Nomme-la comme tu veux. Elle se crée à partir des points du levé coché (contour, lignes de rupture, points), ou s\'importe d\'un LandXML ou d\'un DXF. Le rôle d\'un point ne dépend jamais de son nom : c\'est toi qui choisis. Touche une surface sur le plan pour la sélectionner.',
   nature:
-    'Choisis ce que représente la nouvelle surface. Un stock reçoit tout de suite un calcul de volume sur sa ligne basse (son contour) ; un terrassement, un calcul par rapport au dernier terrain naturel. Tu peux changer ces calculs dans l\'onglet 3. Volumes.',
+    'Ce que représente la surface. Un stock reçoit tout de suite un calcul de volume sur sa ligne basse (son contour) ; un terrassement, un calcul par rapport au dernier terrain naturel ; un terrain naturel, aucun. Tu peux changer ces calculs dans l\'onglet 3. Volumes.',
   contour:
     'Bord de la surface, dans l\'ordre. Le polygone est fermé automatiquement. Seul l\'intérieur du contour est gardé, même pour une forme en « L ». Sans contour, le bord suit les points extérieurs (supprime ensuite les triangles en trop).',
   ligne:
     'Haut de talus, arêtes : les triangles ne traversent jamais ces lignes. Une série = une ligne indépendante ; dans la liste tapée, sépare les lignes par « ; ». Ligne fermée : le dernier point est relié au premier.',
   pointsSurface:
-    'Par défaut, tous les points du levé situés dans le contour sont utilisés. Décoche pour choisir les points un par un (en plus de ceux du contour et des lignes de rupture).',
+    'Points isolés ou caractéristiques (sommets, creux…), ni sur le contour ni sur une ligne de rupture. Par défaut, tous les points du levé situés dans le contour sont utilisés. Décoche pour choisir les points un par un (en plus de ceux du contour et des lignes de rupture).',
   choisirPoints:
     'Pour choisir les points : touche une série proposée, tape une liste (ex. « b100 à b116, b120 »), touche les points sur le plan (toucher à nouveau un point le retire), ou coche-les dans la liste.',
   trianglesEnTrop:

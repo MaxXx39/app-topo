@@ -1385,3 +1385,41 @@ tr.total td {
   min-width: 0;
   font-size: 0.9rem;
 }
+
+/* --- Rôles d'une surface : même couleur que sur le plan ---
+   Contour en rouge, lignes de rupture en orange, points isolés / caractéristiques en vert. */
+.carte-role.role-contour {
+  --couleur-role: var(--rouge);
+}
+
+.carte-role.role-ligne {
+  --couleur-role: var(--orange);
+}
+
+.carte-role.role-dessus {
+  --couleur-role: var(--succes);
+}
+
+.carte-role.role-contour,
+.carte-role.role-ligne,
+.carte-role.role-dessus {
+  border-left: 5px solid var(--couleur-role);
+  background: color-mix(in srgb, var(--couleur-role) 4%, var(--surface));
+}
+
+.icone-role {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  vertical-align: -4px;
+  fill: none;
+  stroke: var(--couleur-role);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icone-role circle {
+  fill: var(--couleur-role);
+  stroke: none;
+}
