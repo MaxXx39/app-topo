@@ -71,6 +71,10 @@ describe('creerPdf - levé du 20/05/2026', async () => {
     expect(contenu).toContain('1:1000');
   });
 
+  it('met le logo Perrin dans le cartouche (une image dans le PDF)', () => {
+    expect(contenu).toContain('/Subtype /Image');
+  });
+
   it('utilise l\'échelle imposée par l\'utilisateur', async () => {
     const impose = await creerPdf({ stocks, resultats, points, cartouche, echelleImposee: 500 });
     expect(impose.echelle).toBe(500);

@@ -12,6 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icone.svg', 'apple-touch-icon.png'],
       workbox: {
+        // Fichiers gardés sur l'appareil pour marcher sans connexion (dont le logo Perrin).
+        globPatterns: ['**/*.{js,css,html,svg,png,jpg}'],
         // La lecture des photos HEIC (bibliothèque heic-to) pèse environ 3 Mo : on la garde
         // quand même sur l'appareil, pour ajouter des photos sans connexion sur le chantier.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,

@@ -70,6 +70,7 @@ Ajouts demandés par l'utilisateur après la V1 :
 - Saisie des surfaces : contour (rouge), lignes de rupture (orange), « Points isolés / caractéristiques » (vert), mêmes couleurs que le plan ; « Valider » ferme la saisie. Les anciens projets sont convertis (fichier projet version 2, `src/volumes/calculs.js`).
 - Photos HEIC (Android, iPhone) converties en JPEG sur l'appareil (bibliothèque `heic-to`, chargée seulement quand il le faut).
 - Photos des surfaces : case « dans le PDF » par photo ; dans le PDF, les photos cochées sont dans la colonne de droite sous la légende (feuilles à part seulement si elles n'y tiennent pas).
+- **Logo Perrin** (`src/assets/logo-perrin.jpg`) : dans l'en-tête de l'appli (sur fond blanc) et en haut du cartouche du PDF.
 
 ## 5. Vérification : cas de référence
 

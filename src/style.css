@@ -68,10 +68,27 @@ p {
   color: #ffffff;
 }
 
-.entete-icone {
-  width: 32px;
+/* Logo Perrin dans l'en-tête : sur un petit fond blanc (l'image a un fond blanc). */
+.entete-logo {
   height: 32px;
-  border-radius: 8px;
+  width: auto;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+/* Téléphone : logo plus petit, pour laisser la place au nom du projet. */
+@media (max-width: 600px) {
+  .entete {
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .entete-logo {
+    height: 24px;
+    padding: 3px 4px;
+    border-radius: 4px;
+  }
 }
 
 .entete h1 {
