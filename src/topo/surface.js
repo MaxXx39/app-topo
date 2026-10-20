@@ -4,14 +4,14 @@
 // Une surface "points" a la forme :
 // {
 //   id, nom, type: 'points', leveId,
+//   nature: 'stock',              // ce que représente la surface : voir NATURES
 //   tousLesPoints: true,          // si vrai : tous les points du levé ; sinon la liste "points"
 //   points: [...],                // noms des points (si tousLesPoints est faux)
 //   contour: [...],               // optionnel : bord choisi (fermé automatiquement)
 //   lignesRupture: [{ noms, fermee }],
 //   trianglesSupprimes: [...],    // clés des triangles retirés à la main (voir cleTriangle)
-//   volume: { base, surfaceId },  // base du volume (onglet Volumes) : 'contour', 'surface' ou 'aucune'
 // }
-// Une surface importée a la forme { id, nom, type: 'landxml' ou 'dxf', nomFichier, points, faces, volume }
+// Une surface importée a la forme { id, nom, type: 'landxml' ou 'dxf', nature, nomFichier, points, faces }
 // où faces = liste de [i, j, k] (positions dans "points").
 //
 // Bord : sans contour, l'appli triangule tout (bord = enveloppe extérieure des points) ;
@@ -19,19 +19,34 @@
 import { trianglerAvecContraintes, segmentsDeLigne, pointDansPolygone, centre } from './volume.js';
 import { creerLigne } from './noms.js';
 
+/**
+ * Ce que représente une surface : [clé, nom affiché]. Choisi par l'utilisateur à la création.
+ * Il sert d'étiquette et à préremplir les calculs de volume (voir volumes/calculs.js).
+ */
+export const NATURES = [
+  ['stock', 'Stock'],
+  ['terrain', 'Terrain naturel'],
+  ['terrassement', 'Terrassement'],
+];
+
+/** Nom affiché d'une nature ('terrain' -> 'Terrain naturel'). */
+export function nomNature(nature) {
+  return NATURES.find(([cle]) => cle === nature)?.[1] ?? '';
+}
+
 /** Crée une surface vide à partir d'un levé. */
-export function creerSurface(nom, leveId) {
+export function creerSurface(nom, leveId, nature = 'stock') {
   return {
     id: nouvelIdentifiant(),
     nom,
     type: 'points',
+    nature,
     leveId,
     tousLesPoints: true,
     points: [],
     contour: [],
     lignesRupture: [creerLigne()],
     trianglesSupprimes: [],
-    volume: { base: 'contour', surfaceId: null },
   };
 }
 
@@ -124,10 +139,11 @@ export function surfaceImportee(surfaceLue, nomFichier, type = 'landxml') {
     id: nouvelIdentifiant(),
     nom: surfaceLue.nom,
     type,
+    // Une surface importée est le plus souvent un terrain : l'utilisateur peut changer.
+    nature: 'terrain',
     nomFichier,
     points: surfaceLue.points.map(({ nom, est, nord, altitude }) => ({ nom, est, nord, altitude })),
     faces: surfaceLue.triangles.map((t) => t.map((p) => index.get(p))),
-    volume: { base: 'aucune', surfaceId: null },
   };
 }
 

@@ -102,7 +102,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // resultats (un par surface : trianglesDessus, et le volume s'il est calculé, voir volume.js),
   // cachees : surfaces à ne pas dessiner (celles d'un autre levé)
   // surface : surface affichée { triangles, trianglesRetires } ; modeTriangles : suppression au doigt
-  // ecarts : triangles d'écart d'une comparaison à colorier (onglet Comparer), sinon null
+  // ecarts : triangles d'écart à colorier à la place de ceux des surfaces, sinon null
   let dessin = {
     stocks: [],
     stockActif: null,
@@ -348,7 +348,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /**
    * Remblai en rouge et déblai en jaune, par paliers de hauteur : sur la comparaison affichée
-   * (onglet Comparer), sinon sur les stocks visibles (écart entre le dessus et la base).
+   * s'ils sont donnés, sinon sur les surfaces visibles (calcul de volume de chacune).
    */
   function dessinerEcarts(groupe) {
     const triangles =
@@ -379,7 +379,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     legendeEcarts = legendeZones;
   }
 
-  /** Surface affichée (onglet Comparer) : ses triangles, et les triangles supprimés en pointillés rouges. */
+  /** Surface affichée (onglet 2. Surfaces) : ses triangles, et les triangles supprimés en pointillés rouges. */
   function dessinerSurface(groupe) {
     const surface = dessin.surface;
     if (!surface) return;
@@ -407,7 +407,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (!estVisible(stock)) return [];
       return dessin.resultats[index]?.trianglesDessus ?? [];
     });
-    // La surface affichée (onglet Comparer) est aussi coloriée.
+    // La surface affichée (onglet 2. Surfaces) est aussi coloriée.
     if (dessin.surface) triangles.push(...dessin.surface.triangles);
     if (triangles.length === 0) return;
     const plage = plageAltitudes(triangles);

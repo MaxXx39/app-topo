@@ -1,5 +1,5 @@
 // Export PDF : une feuille A4 paysage avec le plan à l'échelle, les volumes et un cartouche,
-// puis une feuille par comparaison de surfaces (remblai / déblai en couleurs),
+// puis une feuille par calcul limité au contour d'une surface (remblai / déblai en couleurs),
 // puis les photos des surfaces (4 par feuille, avec leur légende).
 // Le plan est dessiné en traits (vectoriel) : il reste net à l'impression et au zoom.
 // Toutes les mesures sur la feuille sont en millimètres.
@@ -42,13 +42,15 @@ const COULEURS = {
 
 /**
  * Crée le document PDF.
- * - stocks, resultats : les surfaces dont le volume est calculé, et leurs volumes (voir calculerVolumeSurface)
+ * - stocks, resultats : calculs de volume de la feuille principale : surface 1 (nom = nom du calcul,
+ *   description = phrase qui décrit le calcul) et volume (voir calculerVolumeSurface)
  * - points : tous les points importés
  * - cartouche : { affaire, date, dessinePar, fichierPoints }
  * - echelleImposee : dénominateur de l'échelle voulue (500 pour 1:500), ou null pour la choisir
  *   automatiquement (la plus détaillée qui fait tout tenir). Si le plan dépasse, il est coupé au cadre.
  * - calques : calques à imprimer (voir CALQUES_PDF)
- * - comparaisons : liste de { nom, resultat } ajoutée sous le tableau des volumes
+ * - comparaisons : calculs dans le contour d'une surface, liste de { nom, description, resultat } (voir
+ *   comparerSurfaces) : ajoutés sous le tableau des volumes, puis une feuille chacun
  * - photos : liste de { surface (nom), legende, date (ISO), image (JPEG), largeur, hauteur }
  * Renvoie (après chargement éventuel de la photo aérienne)
  * { document, echelle, messageFond } : document jsPDF, échelle utilisée, et un message si le fond n'a pas pu être mis.
@@ -74,7 +76,7 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
     if (plan.messageFond) messages.push(plan.messageFond);
   }
 
-  // Une feuille par comparaison : volume ajouté (rouge) et enlevé (jaune)
+  // Une feuille par calcul dans un contour : remblai (rouge) et déblai (jaune)
   for (const comparaison of comparaisonsCalculees) {
     if (echelle !== null) doc.addPage('a4', 'landscape');
     dessinerCadres(doc);
@@ -223,7 +225,7 @@ function terminerCadrePlan(doc, echelle, choix, messageFond) {
  * Feuille d'une comparaison : plan du remblai / déblai (toujours en couleurs) et volumes.
  * Renvoie { echelle, messageFond }.
  */
-async function dessinerPageComparaison(doc, { nom, resultat }, cartouche, echelleImposee, choix) {
+async function dessinerPageComparaison(doc, { nom, description, resultat }, cartouche, echelleImposee, choix) {
   const sommets = resultat.trianglesEcart.flat();
   const ests = sommets.map((p) => p.est);
   const nords = sommets.map((p) => p.nord);
@@ -237,17 +239,27 @@ async function dessinerPageComparaison(doc, { nom, resultat }, cartouche, echell
 
   // Colonne de droite : titre, volumes, légende, cartouche
   const x = COLONNE.x;
-  let y = dessinerTitre(doc, 'Comparaison de surfaces');
+  let y = dessinerTitre(doc, 'Volume entre deux surfaces');
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.text(doc.splitTextToSize(nom, COLONNE.largeur)[0], x, y);
-  y += 6;
+  y += 4.5;
+  if (description) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...COULEURS.gris);
+    const texte = doc.splitTextToSize(description, COLONNE.largeur);
+    doc.text(texte, x, y);
+    y += texte.length * 2.8;
+    doc.setTextColor(...COULEURS.texte);
+  }
+  y += 1.5;
   doc.setFontSize(7.5);
   const lignes = [
-    ['Volume ajouté (remblai)', `${formaterNombre(resultat.remblai)} m³`, true],
-    ['Volume enlevé (déblai)', `${formaterNombre(resultat.deblai)} m³`, true],
-    ['Différence (ajouté - enlevé)', `${formaterNombre(resultat.remblai - resultat.deblai)} m³`, false],
-    ['Surface comparée', `${formaterNombre(resultat.surfacePlan)} m²`, false],
+    ['Remblai', `${formaterNombre(resultat.remblai)} m³`, true],
+    ['Déblai', `${formaterNombre(resultat.deblai)} m³`, true],
+    ['Différence (remblai - déblai)', `${formaterNombre(resultat.remblai - resultat.deblai)} m³`, false],
+    ['Surface calculée', `${formaterNombre(resultat.surfacePlan)} m²`, false],
   ];
   for (const [titre, valeur, gras] of lignes) {
     doc.setFont('helvetica', 'normal');
@@ -260,9 +272,9 @@ async function dessinerPageComparaison(doc, { nom, resultat }, cartouche, echell
   doc.setFontSize(6.5);
   doc.setTextColor(...COULEURS.gris);
   const remarques = [];
-  if (resultat.surfaceNonCouverte > 0) remarques.push(`${formaterNombre(resultat.surfaceNonCouverte)} m² non couverts par la surface « avant » (non comptés).`);
+  if (resultat.surfaceNonCouverte > 0) remarques.push(`${formaterNombre(resultat.surfaceNonCouverte)} m² non couverts par la surface 2 (non comptés).`);
   if (resultat.surfaceZone - resultat.surfacePlan > 0.01) {
-    remarques.push(`${formaterNombre(resultat.surfaceZone - resultat.surfacePlan)} m² de la zone non couverts par la surface « après » (non comptés).`);
+    remarques.push(`${formaterNombre(resultat.surfaceZone - resultat.surfacePlan)} m² de la zone non couverts par la surface 1 (non comptés).`);
   }
   y += 1;
   for (const remarque of remarques) {
@@ -588,16 +600,16 @@ function dessinerColonne(doc, calcules, cartouche, { choix, relief, ecarts, comp
     y += 4.4;
   }
 
-  // Comparaisons (volume ajouté / enlevé entre deux surfaces)
+  // Calculs dans le contour d'une surface (une feuille chacun, à la suite)
   const comparaisonsCalculees = comparaisons.filter(({ resultat }) => resultat && !resultat.erreurs);
   if (comparaisonsCalculees.length > 0) {
     y += 3;
     doc.setFontSize(7);
     doc.setTextColor(...COULEURS.gris);
     doc.setFont('helvetica', 'bold');
-    doc.text('Comparaison', x, y);
-    doc.text('Ajouté m³', x + 63, y, { align: 'right' });
-    doc.text('Enlevé m³', x + COLONNE.largeur - 1, y, { align: 'right' });
+    doc.text('Dans un contour', x, y);
+    doc.text('Remblai m³', x + 63, y, { align: 'right' });
+    doc.text('Déblai m³', x + COLONNE.largeur - 1, y, { align: 'right' });
     y += 4.4;
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...COULEURS.texte);
@@ -609,16 +621,16 @@ function dessinerColonne(doc, calcules, cartouche, { choix, relief, ecarts, comp
     }
   }
 
-  // Remarques : mode de calcul et surfaces non couvertes
+  // Remarques : base de chaque calcul, avec la nature des surfaces, et surfaces non couvertes
   y += 2;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(...COULEURS.gris);
   const remarques = [
-    'Base A : points du contour (le pied). Base B : une autre surface.',
+    'Base A : ligne basse (points du contour). Base B : une autre surface (surface 2).',
     ...calcules
-      .filter(({ resultat }) => resultat.mode === 'B')
-      .map(({ stock, resultat }) => `${stock.nom} : base « ${resultat.nomBase} ».`),
+      .filter(({ stock }) => stock.description)
+      .map(({ stock }) => `${stock.nom} : ${stock.description}.`),
     ...calcules
       .filter(({ resultat }) => resultat.surfaceNonCouverte > 0)
       .map(({ stock, resultat }) => `Attention ${stock.nom} : ${formaterNombre(resultat.surfaceNonCouverte)} m² non couverts par la base.`),

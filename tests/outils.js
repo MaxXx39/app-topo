@@ -12,7 +12,7 @@ export const pt = (nom, est, nord, altitude) => ({ nom, est, nord, altitude });
  * Surface créée à partir de points : contour et lignes de rupture (listes de noms).
  * points : liste de noms choisis un par un, ou null pour « tous les points du levé ».
  */
-export function surfaceDe({ nom = 'Essai', contour = [], lignes = null, points = null, base = 'contour' }) {
+export function surfaceDe({ nom = 'Essai', contour = [], lignes = null, points = null }) {
   const surface = creerSurface(nom, 'leve');
   surface.contour = contour;
   if (lignes) surface.lignesRupture = lignes;
@@ -20,7 +20,6 @@ export function surfaceDe({ nom = 'Essai', contour = [], lignes = null, points =
     surface.tousLesPoints = false;
     surface.points = points;
   }
-  surface.volume = { base, surfaceId: null };
   return surface;
 }
 
@@ -29,7 +28,7 @@ export function surfaceDe({ nom = 'Essai', contour = [], lignes = null, points =
  * ou base B si surfaceBase = { nom, triangles } est donnée.
  */
 export function volumeDe(description, pointsLeve, surfaceBase = null) {
-  const surface = surfaceDe({ ...description, base: surfaceBase ? 'surface' : 'contour' });
+  const surface = surfaceDe(description);
   return calculerVolumeSurface(surface, calculerSurface(surface, pointsLeve), pointsLeve, surfaceBase);
 }
 

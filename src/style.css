@@ -599,6 +599,11 @@ input[type='radio'] {
   margin: 10px 0;
 }
 
+/* Choix de la nature d'une surface : les trois cases sur une ligne si elles tiennent. */
+.choix-nature {
+  gap: 4px 14px;
+}
+
 .champ-liste {
   display: block;
   margin-top: 8px;
@@ -1322,7 +1327,8 @@ svg.plan {
   margin: 8px 0;
 }
 
-.section-comparaisons .titre-role input {
+/* Nom d'un calcul de volume (onglet 3. Volumes). */
+#volumes .titre-role input {
   flex: 1;
   min-width: 0;
   font-weight: 600;

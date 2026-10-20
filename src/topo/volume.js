@@ -11,10 +11,9 @@
 // 4. Remblai = volume où le dessus est au-dessus de la base,
 //    déblai = volume où le dessus est au-dessous de la base.
 //
-// La base se choisit dans l'onglet Volumes (surface.volume.base) :
-// - 'contour' (mode A) : la base passe par les points du contour (le pied) ;
-// - 'surface' (mode B) : une autre surface du projet (créée ou importée) ;
-// - 'aucune' : pas de volume pour cette surface.
+// La base se choisit dans l'onglet Volumes (voir volumes/calculs.js) :
+// - mode A, « une seule surface » : la base passe par les points du contour (la ligne basse, le pied) ;
+// - mode B : une autre surface du projet (créée ou importée), la « surface 2 ».
 //
 // Unités : mètres (m), mètres carrés (m²), mètres cubes (m³).
 import Delaunator from 'delaunator';
@@ -25,16 +24,15 @@ import Constrainautor from '@kninnug/constrainautor';
  * - surface : surface du projet (voir surface.js)
  * - calcul : ses triangles, résultat de calculerSurface (déjà limités au contour)
  * - points : points du levé de la surface { nom, est, nord, altitude }
- * - surfaceBase : en mode B, { nom, triangles } (triangles = 3 points { est, nord, altitude })
- * Renvoie null si aucune base n'est choisie, { erreurs, segmentsEnErreur } si le calcul est
- * impossible, sinon :
+ * - surfaceBase : en mode B, { nom, triangles } (triangles = 3 points { est, nord, altitude }) ;
+ *   null en mode A (base sur les points du contour)
+ * Renvoie { erreurs, segmentsEnErreur } si le calcul est impossible, sinon :
  * { mode ('A' ou 'B'), nomBase, surfacePlan, surfaceContour, remblai, deblai, surfaceRemblai,
  *   surfaceDeblai, surfaceNonCouverte, nombreTrianglesDessus, nombreTrianglesBase,
  *   trianglesDessus, trianglesBase, trianglesEcart }
  */
 export function calculerVolumeSurface(surface, calcul, points, surfaceBase = null) {
-  const base = surface.volume?.base ?? 'aucune';
-  if (base === 'aucune') return null;
+  const base = surfaceBase ? 'surface' : 'contour';
   if (calcul.erreurs) return { erreurs: calcul.erreurs, segmentsEnErreur: calcul.segmentsEnErreur };
   if (calcul.triangles.length === 0) return { erreurs: ['la surface n\'a aucun triangle'] };
 
@@ -45,13 +43,12 @@ export function calculerVolumeSurface(surface, calcul, points, surfaceBase = nul
 
   if (base === 'contour') {
     // Mode A : la base est triangulée sur les points du contour, en respectant ses côtés.
-    if (contour.length < 3) return { erreurs: ['pour un volume sur les points du contour, la surface doit avoir un contour (au moins 3 points)'] };
+    if (contour.length < 3) return { erreurs: ['pour un volume sur la ligne basse, la surface 1 doit avoir un contour (au moins 3 points)'] };
     const triangulation = trianglerAvecContraintes([...new Set(contour)], segmentsDeLigne(contour, true), parNom);
     if (triangulation.erreurs) return { ...triangulation, erreurs: triangulation.erreurs.map((e) => `base : ${e}`) };
     trianglesBase = triangulation.triangles;
   } else {
     // Mode B : les triangles d'une autre surface.
-    if (!surfaceBase) return { erreurs: ['choisis la surface de base'] };
     if (surfaceBase.triangles.length === 0) return { erreurs: [`la surface de base « ${surfaceBase.nom} » n'a aucun triangle`] };
     trianglesBase = surfaceBase.triangles;
   }

@@ -58,11 +58,41 @@ describe('projets', () => {
     expect(resumerProjet(projet)).toMatchObject({ nom: 'A', nombreLeves: 1, nombreSurfaces: 1 });
   });
 
-  it('donne une base de volume aux surfaces d\'un ancien fichier', () => {
+  it('ancien fichier sans base de volume : un stock sur sa ligne basse, rien pour une surface importée', () => {
     const { projet } = lireFichierProjet(
       '{"format":"topo-projet","version":1,"id":"x","nom":"V","leves":[],"surfaces":[{"id":"s","nom":"S","type":"points","contour":[]},{"id":"t","nom":"T","type":"landxml"}]}',
     );
-    expect(projet.surfaces[0].volume).toEqual({ base: 'contour', surfaceId: null });
-    expect(projet.surfaces[1].volume).toEqual({ base: 'aucune', surfaceId: null });
+    expect(projet.surfaces.map((s) => s.nature)).toEqual(['stock', 'terrain']);
+    expect(projet.calculs).toHaveLength(1);
+    expect(projet.calculs[0]).toMatchObject({ surface1Id: 's', uneSeule: true, surface2Id: null });
+  });
+
+  it('ancien fichier (version 1) : bases et comparaisons deviennent des calculs de volume', () => {
+    const ancien = {
+      format: 'topo-projet',
+      version: 1,
+      id: 'x',
+      nom: 'V',
+      leves: [],
+      surfaces: [
+        { id: 'a', nom: 'Stock', type: 'points', contour: [], volume: { base: 'contour', surfaceId: null } },
+        { id: 'b', nom: 'Terrassement', type: 'points', contour: [], volume: { base: 'surface', surfaceId: 't' } },
+        { id: 't', nom: 'TN', type: 'landxml', volume: { base: 'aucune', surfaceId: null } },
+      ],
+      comparaisons: [{ id: 'c', nom: 'Mai → juin', avant: 'surface:t', apres: 'surface:b', zone: { type: 'surface', surfaceId: 'a' } }],
+    };
+    const { projet } = lireFichierProjet(JSON.stringify(ancien));
+    expect(projet.version).toBe(2);
+    expect(projet.comparaisons).toBeUndefined();
+    expect(projet.surfaces.some((s) => 'volume' in s)).toBe(false);
+    expect(projet.calculs.map(({ nom, surface1Id, uneSeule, surface2Id, zone }) => ({ nom, surface1Id, uneSeule, surface2Id, zone }))).toEqual([
+      { nom: '', surface1Id: 'a', uneSeule: true, surface2Id: null, zone: { type: 'toute' } },
+      { nom: '', surface1Id: 'b', uneSeule: false, surface2Id: 't', zone: { type: 'toute' } },
+      { nom: 'Mai → juin', surface1Id: 'b', uneSeule: false, surface2Id: 't', zone: { type: 'surface', surfaceId: 'a' } },
+    ]);
+  });
+
+  it('refuse un fichier d\'une version plus récente de l\'appli', () => {
+    expect(lireFichierProjet('{"format":"topo-projet","version":3}').erreur).toContain('plus récente');
   });
 });
