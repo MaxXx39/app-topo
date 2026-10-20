@@ -9,6 +9,7 @@ import { FONDS, niveauDeZoom, tuilesPourZone } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
+import { emprise } from '../fond/dxf-fond.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -19,6 +20,7 @@ const RAYON_TOUCHER = 22;
 const CALQUES = [
   { cle: 'fondSatellite', titre: 'Fond photo aérienne (swisstopo)', parDefaut: false },
   { cle: 'cadastre', titre: 'Cadastre', parDefaut: false },
+  { cle: 'fondDxf', titre: 'Fond de plan DXF', parDefaut: true },
   { cle: 'points', titre: 'Points', parDefaut: true },
   { cle: 'noms', titre: 'Noms des points', parDefaut: true },
   { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false },
@@ -103,7 +105,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // cachees : surfaces à ne pas dessiner (celles d'un autre levé)
   // surface : surface affichée { triangles, trianglesRetires } ; modeTriangles : suppression au doigt
   // ecarts : triangles d'écart à colorier à la place de ceux des surfaces, sinon null
+  // fonds : fonds de plan DXF du projet (voir fond/dxf-fond.js)
   let dessin = {
+    fonds: [],
     stocks: [],
     stockActif: null,
     cachees: new Set(),
@@ -146,7 +150,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     legende = null;
     legendeEcarts = null;
     dessinerFond();
-    if (!vue || points.length === 0) return;
+    if (vue && calques.fondDxf) dessinerFondsDxf();
+    if (!vue || points.length === 0) {
+      // Pas encore de points : on montre au moins le fond de plan DXF et l'échelle.
+      if (vue && (dessin.fonds ?? []).length > 0) dessinerBarreEchelle();
+      return;
+    }
 
     const stock = dessin.stockActif;
     // Si « Autres stocks » est décoché, on cache les points qui appartiennent à un autre stock.
@@ -289,6 +298,41 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (voulues.size === 0) fondIndisponible = false;
     cadre.classList.toggle('avec-photo', calques.fondSatellite);
     afficherAttribution(couches);
+  }
+
+  /**
+   * Fonds de plan DXF : un seul tracé par calque visible (plus léger à afficher), et les textes
+   * à leur taille réelle (cachés quand ils deviennent trop petits pour être lus).
+   */
+  function dessinerFondsDxf() {
+    const groupe = creerElement('g', { class: 'fond-dxf' });
+    for (const fond of dessin.fonds ?? []) {
+      const caches = new Set(fond.calquesCaches);
+      const parCalque = new Map();
+      for (const trait of fond.traits) {
+        if (caches.has(trait.calque)) continue;
+        const sommets = trait.points.map((p) => versEcran(p.est, p.nord, vue));
+        const chemin = sommets.map((s, i) => `${i === 0 ? 'M' : 'L'}${s.x.toFixed(1)} ${s.y.toFixed(1)}`).join('') + (trait.ferme ? 'Z' : '');
+        parCalque.set(trait.calque, (parCalque.get(trait.calque) ?? '') + chemin);
+      }
+      for (const chemin of parCalque.values()) groupe.append(creerElement('path', { d: chemin }));
+      for (const texte of fond.textes) {
+        const taille = texte.hauteur * vue.echelle;
+        if (caches.has(texte.calque) || taille < 5) continue;
+        const { x, y } = versEcran(texte.est, texte.nord, vue);
+        if (x < -200 || y < -50 || x > vue.largeur + 50 || y > vue.hauteur + 50) continue;
+        const element = creerElement('text', {
+          x: x.toFixed(1),
+          y: y.toFixed(1),
+          'font-size': taille.toFixed(1),
+          // Le DXF compte les angles dans le sens inverse des aiguilles d'une montre ; l'écran, dans l'autre sens.
+          transform: texte.rotation ? `rotate(${-texte.rotation} ${x.toFixed(1)} ${y.toFixed(1)})` : '',
+        });
+        element.textContent = texte.texte;
+        groupe.append(element);
+      }
+    }
+    svg.append(groupe);
   }
 
   /** Mention obligatoire de la source des fonds (et message si le fond ne charge pas). */
@@ -549,6 +593,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
+  /** Coins du rectangle qui contient les fonds de plan DXF (pour cadrer quand il n'y a pas de points). */
+  function coinsDesFonds() {
+    return (dessin.fonds ?? []).flatMap((fond) => {
+      const zone = emprise(fond);
+      return zone ? [{ est: zone.estMin, nord: zone.nordMin }, { est: zone.estMax, nord: zone.nordMax }] : [];
+    });
+  }
+
   function toutVoir() {
     const { largeur, hauteur } = taille();
     if (largeur === 0 || hauteur === 0) {
@@ -557,7 +609,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       return;
     }
     recadrerQuandVisible = false;
-    vue = cadrerSurPoints(points, largeur, hauteur);
+    vue = cadrerSurPoints(points.length > 0 ? points : coinsDesFonds(), largeur, hauteur);
     dessiner();
   }
 

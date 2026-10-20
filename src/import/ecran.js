@@ -1,17 +1,20 @@
-// Onglet 1. Importer : fichiers de points (levés). Les surfaces LandXML / DXF s'importent dans l'onglet 2.
+// Onglet 1. Importer : fichiers de points (levés) et fonds de plan (DXF).
+// Les surfaces LandXML / DXF s'importent dans l'onglet 2.
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
 
 /**
  * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
- * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id)
- * Renvoie { afficher(projet, dernierImport) }.
+ * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id),
+ * importerFond(fichier), supprimerFond(id), montrerCalqueFond(id, calque, visible)
+ * Renvoie { afficher(projet, dernierImport, messageFond) }.
  */
 export function creerEcranImport(conteneur, actions) {
   conteneur.addEventListener('click', (evenement) => {
-    const bouton = evenement.target.closest('button[data-action="supprimer-leve"]');
-    if (bouton) actions.supprimerLeve(bouton.dataset.id);
+    const bouton = evenement.target.closest('button[data-action]');
+    if (bouton?.dataset.action === 'supprimer-leve') actions.supprimerLeve(bouton.dataset.id);
+    if (bouton?.dataset.action === 'supprimer-fond') actions.supprimerFond(bouton.dataset.id);
   });
 
   conteneur.addEventListener('change', async (evenement) => {
@@ -21,12 +24,20 @@ export function creerEcranImport(conteneur, actions) {
     else if (cible.dataset.champ === 'fichier-points' && cible.files[0]) {
       await actions.importerPoints(cible.files[0]);
       cible.value = '';
+    } else if (cible.dataset.champ === 'fichier-fond' && cible.files[0]) {
+      await actions.importerFond(cible.files[0]);
+      cible.value = '';
+    } else if (cible.dataset.champ === 'calque-fond') {
+      actions.montrerCalqueFond(cible.dataset.id, cible.dataset.calque, cible.checked);
     }
   });
 
   return {
-    /** Redessine l'onglet. dernierImport : résultat du dernier import de points, ou null. */
-    afficher(projet, dernierImport) {
+    /**
+     * Redessine l'onglet. dernierImport : résultat du dernier import de points, ou null ;
+     * messageFond : HTML du résultat du dernier import de fond de plan, ou ''.
+     */
+    afficher(projet, dernierImport, messageFond = '') {
       conteneur.innerHTML = `
         <h2>1. Importer ${bulle('importer')}</h2>
         <label class="bouton">
@@ -54,6 +65,14 @@ export function creerEcranImport(conteneur, actions) {
             : '<p class="vide">Aucun levé : importe un fichier de points.</p>'
         }
         ${listePointsDuLeve(projet)}
+
+        <h3>Fond de plan (DXF) ${bulle('fondDxf')}</h3>
+        <label class="bouton-secondaire">
+          + Fond de plan (DXF)
+          <input type="file" data-champ="fichier-fond" accept=".dxf" hidden />
+        </label>
+        ${messageFond}
+        ${(projet.fonds ?? []).map(carteFond).join('')}
       `;
     },
   };
@@ -96,4 +115,40 @@ function listePointsDuLeve(projet) {
         </table>
       </div>
     </details>`;
+}
+
+/** Carte d'un fond de plan : nom, contenu, et une case par calque pour l'afficher ou le cacher. */
+function carteFond(fond) {
+  const calques = [...new Set([...fond.traits, ...fond.textes].map((e) => e.calque))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const debut = prefixeCommun(calques).length;
+  const nomCourt = (calque) => calque.slice(debut) || calque;
+  const nombre = (calque) => fond.traits.filter((t) => t.calque === calque).length + fond.textes.filter((t) => t.calque === calque).length;
+  return `
+    <div class="carte-role carte-fond">
+      <div class="titre-role">
+        <strong>${echapper(fond.nom)}</strong>
+        <button type="button" class="bouton-lien" data-action="supprimer-fond" data-id="${fond.id}">supprimer</button>
+      </div>
+      <p class="aide">${fond.traits.length} trait(s) · ${fond.textes.length} texte(s) · ${calques.length} calque(s). Décoche les calques inutiles (hachures, cotes…).</p>
+      <div class="liste-calques-fond">
+        ${calques
+          .map(
+            (calque) =>
+              `<label class="case"><input type="checkbox" data-champ="calque-fond" data-id="${fond.id}" data-calque="${echapper(calque)}" ${fond.calquesCaches.includes(calque) ? '' : 'checked'} /> ${echapper(nomCourt(calque))} <span class="aide">(${nombre(calque)})</span></label>`,
+          )
+          .join('')}
+      </div>
+    </div>`;
+}
+
+/**
+ * Début commun à tous les noms de calques (ex. « DWG_1989-100 - »), coupé après un séparateur,
+ * pour n'afficher que la fin utile des noms (« RS_TALUS-HAUT »). '' s'il n'y en a pas.
+ */
+export function prefixeCommun(noms) {
+  if (noms.length < 2) return '';
+  let prefixe = noms[0];
+  for (const nom of noms) while (!nom.startsWith(prefixe)) prefixe = prefixe.slice(0, -1);
+  const coupure = Math.max(...[' ', '-', '_'].map((c) => prefixe.lastIndexOf(c)));
+  return coupure >= 0 ? prefixe.slice(0, coupure + 1) : '';
 }

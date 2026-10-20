@@ -72,6 +72,7 @@ Ajouts demandés par l'utilisateur après la V1 :
 - Photos des surfaces : case « dans le PDF » par photo ; dans le PDF, les photos cochées sont dans la colonne de droite sous la légende (feuilles à part seulement si elles n'y tiennent pas).
 - **Logo Perrin** (`src/assets/logo-perrin.jpg`) : dans l'en-tête de l'appli (sur fond blanc) et en haut du cartouche du PDF.
 - Export : options du PDF toujours visibles (« Contenu du PDF »), case « Altitudes des points » (sous le nom, en gris) ; DXF avec un calque ALTITUDES. Carte « Triangles en trop » en violet, grisée quand la surface a un contour fermé.
+- **V2 (branche `claude/v2-fond-dxf`, à part : ne pas toucher à la V1 publiée)** : terrassement d'une maison à partir d'un plan DXF (exemple `exemples/20261019_Ter_100A.dxf`, 2D, MN95). Étapes validées avec l'utilisateur : 1. fond de plan DXF (fait : `src/fond/dxf-fond.js`, onglet 1. Importer, calques à cocher) ; 2. toucher un coin (accrochage) et saisir son altitude au téléphone → levé « dessiné » ; 3. altitude proposée (texte de niveau voisin) ou prise sur le terrain naturel (surface créée dans l'appli ; haut de talus = altitude du TN) ; 4. ressauts verticaux : le pied est décalé de 1 cm (validé). La version de test utilise une autre base de données (`VITE_NOM_BASE`).
 
 ## 5. Vérification : cas de référence
 

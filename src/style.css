@@ -1470,3 +1470,25 @@ tr.total td {
   background: var(--fond);
   color: var(--gris);
 }
+
+/* --- Fond de plan DXF (plan du projet sous les points) --- */
+.plan .fond-dxf path {
+  fill: none;
+  stroke: #6b7a86;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.plan .fond-dxf text {
+  fill: #7a5c99;
+  font-family: inherit;
+}
+
+.liste-calques-fond {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 10px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+

@@ -8,6 +8,9 @@
 //   leveActifId,                    // levé affiché
 //   surfaces: [...],                // stocks, terrassements, terrains... : voir topo/surface.js
 //   calculs: [...],                 // calculs de volume (onglet 3. Volumes) : voir volumes/calculs.js
+//   fonds: [{ id, nom, calquesCaches, traits, textes }],
+//                                   // fonds de plan DXF (voir fond/dxf-fond.js) ; calquesCaches : noms
+//                                   // des calques du DXF que l'utilisateur ne veut pas voir
 //   cartouche: { affaire, dessinePar },
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
@@ -33,6 +36,7 @@ export function creerProjet(nom) {
     leveActifId: null,
     surfaces: [],
     calculs: [],
+    fonds: [],
     cartouche: { affaire: '', dessinePar: '' },
   };
 }
@@ -90,6 +94,7 @@ export function completerProjet(projet) {
   const vide = creerProjet(projet.nom ?? 'Projet');
   const complet = { ...vide, ...projet, version: VERSION, cartouche: { ...vide.cartouche, ...projet.cartouche } };
   complet.leves ??= [];
+  complet.fonds ??= [];
   complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
     nature: estImportee(surface) ? 'terrain' : 'stock',
     ...surface,

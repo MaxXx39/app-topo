@@ -2,7 +2,10 @@
 // Rien n'est envoyé sur internet. Chaque appareil (téléphone, ordinateur) a ses propres projets ;
 // pour passer de l'un à l'autre, on utilise le fichier projet (.topo.json).
 
-const NOM_BASE = 'topo';
+// Nom de la base : « topo » pour l'appli. La version de test (V2, publiée à part) utilise
+// une autre base (variable VITE_NOM_BASE au moment de construire l'appli), pour ne jamais
+// toucher aux projets de l'appli habituelle.
+const NOM_BASE = import.meta.env?.VITE_NOM_BASE || 'topo';
 const TABLE = 'projets';
 let promesseBase = null;
 

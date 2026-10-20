@@ -6,8 +6,9 @@ import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { lireLandXML } from './topo/landxml.js';
 import { lireDXF } from './topo/dxf-lecture.js';
+import { lireFondDXF, decoderTexteDXF } from './fond/dxf-fond.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee, nomNature } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, nomNature, nouvelIdentifiant } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
@@ -35,6 +36,7 @@ import { bulle, installerAide } from './aide/bulles.js';
 let projet = creerProjet('Mon projet'); // projet ouvert
 let resumes = []; // liste des projets enregistrés (pour l'écran Mes projets)
 let dernierImport = null; // résultat du dernier import de points
+let messageFond = ''; // résultat du dernier import de fond de plan (HTML)
 let surfacesCalculees = new Map(); // id de surface -> triangles (résultat de calculerSurface)
 let resultatsCalculs = new Map(); // id de calcul -> volume (résultat de calculerVolume)
 let ongletContexte = 'importer'; // dernier onglet (hors plan) : décide de ce que montre le plan
@@ -181,6 +183,34 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
   renommerLeve: (id, nom) => {
     const leve = projet.leves.find((l) => l.id === id);
     if (leve && nom) leve.nom = nom;
+    modifie();
+  },
+  // Fond de plan DXF : lu puis rangé dans le projet (lignes et textes seulement).
+  importerFond: async (fichier) => {
+    try {
+      const lu = lireFondDXF(decoderTexteDXF(await fichier.arrayBuffer()));
+      if (lu.erreurs.length === 0) {
+        projet.fonds.push({ id: nouvelIdentifiant(), nom: fichier.name, calquesCaches: [], traits: lu.traits, textes: lu.textes });
+      }
+      const messages = [...lu.erreurs, ...lu.avertissements];
+      messageFond = `${lu.erreurs.length === 0 ? `<p class="resume"><strong>Fond de plan « ${echapper(fichier.name)} » importé</strong> (${lu.traits.length} traits, ${lu.textes.length} textes).</p>` : ''}
+        ${messages.length > 0 ? `<div class="${lu.erreurs.length > 0 ? 'erreur' : 'avertissement'}"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
+    } catch (erreur) {
+      messageFond = `<p class="erreur">Impossible de lire « ${echapper(fichier.name)} » : ${echapper(erreur.message)}</p>`;
+    }
+    modifie({ recadrer: true });
+  },
+  supprimerFond: (id) => {
+    const fond = projet.fonds.find((f) => f.id === id);
+    if (!fond || !confirm(`Supprimer le fond de plan « ${fond.nom} » ?`)) return;
+    projet.fonds = projet.fonds.filter((f) => f !== fond);
+    messageFond = '';
+    modifie();
+  },
+  montrerCalqueFond: (id, calque, visible) => {
+    const fond = projet.fonds.find((f) => f.id === id);
+    if (!fond) return;
+    fond.calquesCaches = visible ? fond.calquesCaches.filter((c) => c !== calque) : [...fond.calquesCaches, calque];
     modifie();
   },
   supprimerLeve: (id) => {
@@ -421,7 +451,7 @@ function recalculer({ recadrer = false } = {}) {
 
   editeurSurfaces.rafraichir();
   ecranVolumes.afficher();
-  ecranImport.afficher(projet, dernierImport);
+  ecranImport.afficher(projet, dernierImport, messageFond);
   ecranProjet.afficher(projet, resumes);
 
   // Plan : surfaces du levé affiché et surfaces importées ; les autres sont cachées.
@@ -453,6 +483,7 @@ function recalculer({ recadrer = false } = {}) {
         ? { triangles: calculActif.triangles, trianglesRetires: calculActif.trianglesRetires }
         : null,
     modeTriangles: dansSurfaces && editeurSurfaces.enSuppression(),
+    fonds: projet.fonds,
   });
   if (recadrer || pointsDuPlan !== pointsAffiches) {
     pointsAffiches = pointsDuPlan;
@@ -573,6 +604,7 @@ async function rafraichirListe() {
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
   dernierImport = null;
+  messageFond = '';
   document.querySelector('#message-import-surface').innerHTML = '';
   editeurSurfaces.charger(projet.surfaces);
   montrerUneSurfaceDuLeve();

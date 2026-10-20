@@ -12,6 +12,9 @@ export const TEXTES_AIDE = {
   leves:
     'Un levé = un fichier de points. Le levé coché est celui affiché sur le plan, avec ses surfaces. Avec plusieurs levés (deux dates), tu peux calculer le volume entre leurs surfaces dans l\'onglet 3. Volumes.',
 
+  fondDxf:
+    'Plan du projet (DXF en MN95, exporté d\'AutoCAD ou de Mensura) affiché sous les points : talus, murs, axes… Seule la position en plan est lue. Décoche les calques inutiles pour alléger le plan.',
+
   // --- 2. Surfaces ---
   surfaces:
     'Une surface peut être un stock, un terrain naturel ou un terrassement. Nomme-la comme tu veux. Elle se crée à partir des points du levé coché (contour, lignes de rupture, points), ou s\'importe d\'un LandXML ou d\'un DXF. Le rôle d\'un point ne dépend jamais de son nom : c\'est toi qui choisis. Touche une surface sur le plan pour la sélectionner.',
