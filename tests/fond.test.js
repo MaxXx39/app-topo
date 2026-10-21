@@ -1,6 +1,6 @@
 // Tests du découpage du fond de plan swisstopo en tuiles.
 import { describe, it, expect } from 'vitest';
-import { niveauDeZoom, tuilesPourZone, RESOLUTIONS, FONDS, emprise } from '../src/plan/fond.js';
+import { niveauDeZoom, tuilesPourZone, RESOLUTIONS, FONDS, estUnTrait } from '../src/plan/fond.js';
 
 describe('niveauDeZoom', () => {
   it('choisit une résolution au moins aussi fine que l\'écran', () => {
@@ -42,12 +42,18 @@ describe('tuilesPourZone', () => {
     );
   });
 
-  it('cadastre en traits (WMS transparent) : image à la place exacte de la tuile', () => {
-    // Niveau 27 : tuiles de 64 m. Colonne 1242 -> Est 2 420 000 + 1242 × 64 ; ligne 3509 -> Nord 1 350 000 - 3509 × 64.
-    expect(emprise(27, 1242, 3509)).toEqual({ estMin: 2499488, nordMin: 1125360, estMax: 2499552, nordMax: 1125424 });
-    const adresse = FONDS.cadastre.url(27, 1242, 3509);
-    expect(adresse).toContain('LAYERS=ch.swisstopo-vd.amtliche-vermessung');
-    expect(adresse).toContain('CRS=EPSG:2056&BBOX=2499488,1125360,2499552,1125424');
-    expect(adresse).toContain('TRANSPARENT=true');
+  it('cadastre : tuiles WMTS du plan cadastral, dont on ne garde que les traits', () => {
+    expect(FONDS.cadastre.url(27, 1242, 3509)).toBe(
+      'https://wmts.geo.admin.ch/1.0.0/ch.kantone.cadastralwebmap-farbe/default/current/2056/27/1242/3509.png',
+    );
+    expect(FONDS.cadastre.traitsSeulement).toBe(true);
+  });
+
+  it('un trait est un pixel sombre et visible', () => {
+    expect(estUnTrait(0, 0, 0, 255)).toBe(true); // limite de parcelle noire
+    expect(estUnTrait(160, 20, 20, 255)).toBe(true); // contour de bâtiment rouge foncé
+    expect(estUnTrait(255, 255, 255, 255)).toBe(false); // fond blanc
+    expect(estUnTrait(250, 200, 200, 255)).toBe(false); // bâtiment rose clair
+    expect(estUnTrait(0, 0, 0, 0)).toBe(false); // transparent
   });
 });

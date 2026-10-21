@@ -1148,19 +1148,11 @@ button.puce {
   pointer-events: none;
 }
 
-.plan-fond img {
+.plan-fond img,
+.plan-fond canvas {
   position: absolute;
   max-width: none;
   user-select: none;
-}
-
-/* Cadastre mélangé en mode « produit » : son fond blanc laisse voir la photo aérienne dessous. */
-.plan-fond {
-  isolation: isolate;
-}
-
-.plan-fond img.cadastre {
-  mix-blend-mode: multiply;
 }
 
 /* Le dessin et les boutons restent au-dessus du fond. */

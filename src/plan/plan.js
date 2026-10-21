@@ -5,7 +5,7 @@ import { bulle } from '../aide/bulles.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
-import { FONDS, FONDS_SECOURS, niveauDeZoom, tuilesPourZone } from './fond.js';
+import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
@@ -266,23 +266,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
             voulues.add(adresse);
             let image = tuilesAffichees.get(adresse);
             if (!image) {
-              image = document.createElement('img');
-              image.alt = '';
-              image.decoding = 'async';
-              image.draggable = false;
-              image.className = `tuile ${nom}`;
-              image.addEventListener('error', () => {
-                // Tuile non chargée : on essaie une fois le fond de secours (cadastre en couleurs).
-                const secours = FONDS_SECOURS[nom]?.url(tuile.z, tuile.colonne, tuile.ligne);
-                if (secours && image.src !== secours) {
-                  image.src = secours;
-                  return;
-                }
-                image.style.visibility = 'hidden';
+              image = creerTuile(adresse, FONDS[nom].traitsSeulement, () => {
                 fondIndisponible = true;
                 afficherAttribution(couches);
               });
-              image.src = adresse;
+              image.className = `tuile ${nom}`;
               tuilesAffichees.set(adresse, image);
               fond.append(image);
             }
@@ -309,6 +297,40 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (voulues.size === 0) fondIndisponible = false;
     cadre.classList.toggle('avec-photo', calques.fondSatellite);
     afficherAttribution(couches);
+  }
+
+  /**
+   * Élément d'une tuile du fond. Pour le cadastre (traitsSeulement), la tuile est recopiée dans
+   * un "canvas" en ne gardant que les traits : le reste est transparent, la photo se voit dessous.
+   * quandErreur() : appelé si la tuile ne se charge pas.
+   */
+  function creerTuile(adresse, traitsSeulement, quandErreur) {
+    const image = document.createElement('img');
+    image.alt = '';
+    image.decoding = 'async';
+    image.draggable = false;
+    if (!traitsSeulement) {
+      image.addEventListener('error', () => {
+        image.style.visibility = 'hidden';
+        quandErreur();
+      });
+      image.src = adresse;
+      return image;
+    }
+    const toile = document.createElement('canvas');
+    toile.style.visibility = 'hidden'; // visible une fois la tuile chargée et traitée
+    image.crossOrigin = 'anonymous'; // pour pouvoir lire ses pixels
+    image.addEventListener('load', () => {
+      try {
+        garderLesTraits(image, toile);
+        toile.style.visibility = '';
+      } catch {
+        quandErreur();
+      }
+    });
+    image.addEventListener('error', quandErreur);
+    image.src = adresse;
+    return toile;
   }
 
   /** Mention obligatoire de la source des fonds (et message si le fond ne charge pas). */
