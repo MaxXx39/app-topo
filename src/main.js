@@ -136,17 +136,6 @@ function etiquetteSurface(surface) {
   return projet.leves.length > 1 && leve ? `${texte} · ${leve.nom}` : texte;
 }
 
-/** Zones d'un calcul à deux surfaces : toute la surface 1, ou le contour d'une surface. */
-function zonesComparables() {
-  const zones = [{ zone: { type: 'toute' }, nom: 'toute la surface 1' }];
-  for (const surface of projet.surfaces) {
-    if (!estImportee(surface) && surface.contour.length >= 3) {
-      zones.push({ zone: { type: 'surface', surfaceId: surface.id }, nom: `contour de ${etiquetteSurface(surface)}` });
-    }
-  }
-  return zones;
-}
-
 /**
  * Calcul de volume dessiné sur une surface (couleurs remblai / déblai et étiquette du volume) :
  * celui montré avec « Voir sur le plan » s'il porte sur cette surface, sinon le premier calculé.
@@ -320,8 +309,6 @@ const ecranVolumes = creerEcranVolumes(document.querySelector('#volumes'), {
   obtenirProjet: () => projet,
   obtenirResultat: (calcul) => resultatsCalculs.get(calcul.id),
   etiquette: etiquetteSurface,
-  obtenirZones: zonesComparables,
-  surfaceActive: () => editeurSurfaces.objetActif(),
   obtenirMontre: () => calculMontre,
   montrer: (id) => {
     calculMontre = id;

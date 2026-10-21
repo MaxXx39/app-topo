@@ -95,6 +95,8 @@ export function completerProjet(projet) {
     ...surface,
   }));
   if (!Array.isArray(projet.calculs)) complet.calculs = calculsDUnAncienProjet(complet.surfaces, projet.comparaisons);
+  // Calculs d'avant le choix de la base « depuis une altitude » : base sur la ligne du contour.
+  complet.calculs = complet.calculs.map((calcul) => ({ base: 'contour', altitude: null, ...calcul }));
   // Anciens champs, remplacés par les calculs.
   delete complet.comparaisons;
   for (const surface of complet.surfaces) delete surface.volume;

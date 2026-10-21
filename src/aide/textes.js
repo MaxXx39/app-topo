@@ -36,9 +36,9 @@ export const TEXTES_AIDE = {
 
   // --- 3. Volumes ---
   volumes:
-    'Chaque calcul donne le volume de la surface 1 au-dessus de sa base. Remblai : là où la surface 1 est au-dessus de la base. Déblai : là où elle est au-dessous. Surface : surface en plan (m²). Ouvre « Détail » pour les valeurs intermédiaires.',
+    'Ajoute un volume, puis choisis : « Stock seul » ou « Comparaison de 2 surfaces ». Remblai : le dessus est au-dessus de la base ; déblai : au-dessous. Surface : surface en plan (m²). Ouvre « Détail » pour les valeurs intermédiaires. Le récapitulatif et l\'export sont en dessous.',
   base:
-    'Une seule surface (case cochée) : la base passe par les points du contour de la surface 1 (la ligne basse, le pied), comme pour un stock posé sur le terrain. Sinon, la base est la surface 2 : terrain naturel, levé plus ancien… (surface 1 = dessus ou après, surface 2 = dessous ou avant). La zone peut limiter le calcul au contour d\'une surface. Si la base ne couvre pas tout, la partie non couverte n\'est pas comptée et un avertissement l\'indique. « Voir sur le plan » colorie le remblai en rouge et le déblai en jaune.',
+    'Stock seul : volume d\'un stock au-dessus de sa base, prise sur la ligne du contour (les points du pied) ou sur un plan horizontal à l\'altitude que tu donnes. Comparaison : la 1re surface est la référence (terrain naturel, état avant…), la 2e est comparée (terrassement, état après…). Le volume est calculé là où les deux surfaces se recouvrent ; la partie non couverte est signalée. « Voir sur le plan » colorie le remblai en rouge et le déblai en jaune.',
   exporter:
     'PDF : plan à l\'échelle, volumes et cartouche, plus une feuille par calcul limité au contour d\'une surface. Coche ce que le PDF doit montrer (noms, altitudes des points, triangles…). CSV : tableau des volumes pour Excel. DXF (R12) : points avec leur nom et leur altitude (calques NOMS et ALTITUDES), contours, lignes de rupture, triangles en faces 3D, surfaces et courbes. LandXML : les surfaces affichées.',
 

@@ -1508,3 +1508,34 @@ body.mode-dessin[data-onglet='surfaces'] .barre-edition[data-role] {
   background: var(--fond);
   color: var(--gris);
 }
+
+/* --- 3. Volumes : une carte par volume --- */
+
+.carte-volume .champ-large {
+  margin: 8px 0;
+}
+
+/* Choix « Stock seul » / « Comparaison de 2 surfaces », puis la base du stock. */
+.choix-sorte,
+.choix-base {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin: 4px 0 8px;
+}
+
+.choix-sorte {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--bordure);
+  font-weight: 600;
+}
+
+.champ-altitude {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 200px;
+  font-size: 0.85rem;
+  color: var(--gris);
+}

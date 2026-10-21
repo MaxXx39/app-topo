@@ -709,7 +709,7 @@ function dessinerColonne(doc, calcules, cartouche, { choix, relief, ecarts, comp
   doc.setFontSize(6.5);
   doc.setTextColor(...COULEURS.gris);
   const remarques = [
-    'Base A : ligne basse (points du contour). Base B : une autre surface (surface 2).',
+    'Base A : ligne basse (points du contour). Base Z : plan à une altitude. Base B : comparaison à une surface de référence.',
     ...calcules
       .filter(({ stock }) => stock.description)
       .map(({ stock }) => `${stock.nom} : ${stock.description}.`),

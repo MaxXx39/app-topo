@@ -1,25 +1,24 @@
-// Onglet 3. Volumes : liste des calculs de volume (surface 1 sur sa ligne basse, ou surface 1
-// par rapport à une surface 2), tableau récapitulatif et détail de chaque calcul.
+// Onglet 3. Volumes : d'abord les volumes (bouton « + Ajouter un volume », puis une carte par
+// volume : stock seul ou comparaison de 2 surfaces), ensuite le tableau récapitulatif.
 // L'export (PDF, CSV, DXF, LandXML) est ajouté sous cet écran par main.js.
 import { formaterNombre } from '../topo/format.js';
 import { estImportee } from '../topo/surface.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
-import { creerCalcul, preremplir, nomAutomatique, nomDuCalcul, grouperParNature } from './calculs.js';
+import { nouveauVolume, choisirSorte, nomAutomatique, nomDuCalcul, grouperParNature } from './calculs.js';
 
 /**
  * Crée l'écran des volumes dans "conteneur". Options :
  * - obtenirProjet() : projet ouvert (projet.surfaces, projet.calculs)
  * - obtenirResultat(calcul) : volume calculé (voir calculerVolume dans calculs.js)
  * - etiquette(surface) : nom d'une surface dans les listes
- * - obtenirZones() : zones possibles [{ zone, nom }] (toute la surface 1, ou contour d'une surface)
- * - surfaceActive() : surface choisie dans l'onglet 2. Surfaces (proposée pour un nouveau calcul)
  * - obtenirMontre() : id du calcul colorié sur le plan ; montrer(id) : le choisir
  * - quandChange() : après chaque modification
  * Renvoie { afficher() }.
  */
 export function creerEcranVolumes(conteneur, options) {
-  const { obtenirProjet, obtenirResultat, etiquette, obtenirZones, surfaceActive, obtenirMontre, montrer, quandChange } = options;
+  const { obtenirProjet, obtenirResultat, etiquette, obtenirMontre, montrer, quandChange } = options;
+  let nouveauId = null; // volume qui vient d'être ajouté : on le fait défiler jusqu'à l'écran
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
@@ -30,11 +29,13 @@ export function creerEcranVolumes(conteneur, options) {
       montrer(bouton.dataset.id);
       return;
     }
-    if (action === 'ajouter-calcul') {
-      projet.calculs.push(creerCalcul(surfaceActive() ?? projet.surfaces[0], projet.surfaces));
+    if (action === 'ajouter-volume') {
+      const volume = nouveauVolume();
+      projet.calculs.push(volume);
+      nouveauId = volume.id;
     } else if (action === 'supprimer-calcul') {
       const calcul = projet.calculs.find((c) => c.id === bouton.dataset.id);
-      if (!calcul || !confirm(`Supprimer le calcul « ${nomDuCalcul(calcul, projet.surfaces)} » ?`)) return;
+      if (!calcul || !confirm(`Supprimer le volume « ${nomDuCalcul(calcul, projet.surfaces)} » ?`)) return;
       projet.calculs = projet.calculs.filter((c) => c !== calcul);
     }
     quandChange();
@@ -47,13 +48,18 @@ export function creerEcranVolumes(conteneur, options) {
     if (!calcul) return;
     const champ = cible.dataset.champ;
     if (champ === 'nom') calcul.nom = cible.value.trim();
-    else if (champ === 'surface1') {
-      // Nouvelle surface 1 : la base est préremplie d'après sa nature (stock, terrain...).
-      const surface = projet.surfaces.find((s) => s.id === cible.value);
-      if (surface) preremplir(calcul, surface, projet.surfaces);
-    } else if (champ === 'une-seule') calcul.uneSeule = cible.checked;
-    else if (champ === 'surface2') calcul.surface2Id = cible.value || null;
-    else if (champ === 'zone') calcul.zone = JSON.parse(cible.value);
+    else if (champ === 'sorte') choisirSorte(calcul, cible.value, projet.surfaces, projet.calculs);
+    else if (champ === 'stock') {
+      calcul.surface1Id = cible.value || null;
+      // Un stock importé n'a pas de ligne de contour : sa base est forcément une altitude.
+      const stock = projet.surfaces.find((s) => s.id === calcul.surface1Id);
+      if (stock && estImportee(stock)) calcul.base = 'altitude';
+    } else if (champ === 'base') calcul.base = cible.value;
+    else if (champ === 'altitude') {
+      const valeur = Number(cible.value.replace(',', '.'));
+      calcul.altitude = cible.value.trim() !== '' && Number.isFinite(valeur) ? valeur : null;
+    } else if (champ === 'reference') calcul.surface2Id = cible.value || null;
+    else if (champ === 'comparee') calcul.surface1Id = cible.value || null;
     else return;
     // Modifié à la main : l'appli ne le changera plus (voir calculsAutomatiques).
     calcul.auto = false;
@@ -69,16 +75,26 @@ export function creerEcranVolumes(conteneur, options) {
       }
       const lignes = projet.calculs.map((calcul) => ({ calcul, resultat: obtenirResultat(calcul), nom: nomDuCalcul(calcul, projet.surfaces) }));
       conteneur.innerHTML = `
-        ${tableau(lignes, projet.surfaces)}
-        <h3>Calculs ${bulle('base')}</h3>
-        ${lignes.map((ligne) => carte(ligne, projet.surfaces, { etiquette, zones: obtenirZones(), montre: obtenirMontre() })).join('')}
-        <button type="button" class="bouton-secondaire" data-action="ajouter-calcul">+ Nouveau calcul</button>`;
+        <div class="ligne-outils">
+          <button type="button" class="bouton" data-action="ajouter-volume">+ Ajouter un volume</button>
+          ${bulle('base')}
+        </div>
+        ${lignes.map((ligne) => carte(ligne, projet.surfaces, { etiquette, montre: obtenirMontre() })).join('')}
+        <h3>Récapitulatif</h3>
+        ${tableau(lignes, projet.surfaces)}`;
+      if (nouveauId) {
+        conteneur.querySelector(`[data-carte="${nouveauId}"]`)?.scrollIntoView({ block: 'center' });
+        nouveauId = null;
+      }
     },
   };
 }
 
-/** Base d'un calcul, en quelques mots : « ligne basse » ou le nom de la surface 2. */
+/** Base d'un calcul, en quelques mots : « ligne basse », « altitude 425.000 » ou le nom de la référence. */
 export function texteBase(calcul, surfaces) {
+  if (calcul.uneSeule && calcul.base === 'altitude') {
+    return Number.isFinite(calcul.altitude) ? `altitude ${formaterNombre(calcul.altitude)}` : 'altitude ?';
+  }
   if (calcul.uneSeule) return 'ligne basse';
   return surfaces.find((s) => s.id === calcul.surface2Id)?.nom ?? '-';
 }
@@ -91,11 +107,11 @@ function tableau(lignes, surfaces) {
   const calculees = lignes
     .filter(({ resultat }) => resultat && !resultat.erreurs)
     .map((ligne) => ({ ...ligne, nature: surfaces.find((s) => s.id === ligne.calcul.surface1Id)?.nature }));
-  if (calculees.length === 0) return '<p class="aide">Aucun volume calculé : crée un calcul ci-dessous.</p>';
+  if (calculees.length === 0) return '<p class="aide">Aucun volume calculé : ajoute un volume ci-dessus.</p>';
   return `
     <div class="tableau-defilant">
       <table>
-        <thead><tr><th>Calcul</th><th>Base</th><th>Surface (m²)</th><th>Remblai (m³)</th><th>Déblai (m³)</th></tr></thead>
+        <thead><tr><th>Volume</th><th>Base</th><th>Surface (m²)</th><th>Remblai (m³)</th><th>Déblai (m³)</th></tr></thead>
         <tbody>
           ${grouperParNature(calculees)
             .map(({ lignes: groupe, total }) =>
@@ -120,52 +136,79 @@ function tableau(lignes, surfaces) {
     </div>`;
 }
 
-/** Carte d'un calcul : nom, surfaces, zone, puis le volume ou la raison pour laquelle il manque. */
-function carte({ calcul, resultat }, surfaces, { etiquette, zones, montre }) {
-  const surface1 = surfaces.find((s) => s.id === calcul.surface1Id);
-  const options = (choisi, sauf = null) =>
-    surfaces
-      .filter((s) => s.id !== sauf)
-      .map((s) => `<option value="${s.id}" ${s.id === choisi ? 'selected' : ''}>${echapper(etiquette(s))}</option>`)
-      .join('');
-  const importee = surface1 && estImportee(surface1);
-  return `
-    <div class="carte-role ${calcul.id === montre ? 'en-edition' : ''}">
-      <div class="titre-role">
-        <input type="text" data-champ="nom" data-id="${calcul.id}" value="${echapper(calcul.nom)}"
-          placeholder="${echapper(nomAutomatique(calcul, surfaces))}" aria-label="Nom du calcul" />
-        <button type="button" class="bouton-lien" data-action="supprimer-calcul" data-id="${calcul.id}">supprimer</button>
+/**
+ * Carte d'un volume : sorte (stock seul ou comparaison), nom, surfaces et base,
+ * puis le volume ou la raison pour laquelle il manque.
+ */
+function carte({ calcul, resultat }, surfaces, { etiquette, montre }) {
+  const options = (liste, choisi) =>
+    `<option value="" ${choisi ? '' : 'selected'}>- choisir -</option>` +
+    liste.map((s) => `<option value="${s.id}" ${s.id === choisi ? 'selected' : ''}>${echapper(etiquette(s))}</option>`).join('');
+  const id = calcul.id;
+  const sorte = calcul.uneSeule === true ? 'stock' : calcul.uneSeule === false ? 'comparaison' : null;
+  const radioSorte = (valeur, titre) =>
+    `<label class="case"><input type="radio" name="sorte-${id}" data-champ="sorte" data-id="${id}" value="${valeur}" ${sorte === valeur ? 'checked' : ''} /> ${titre}</label>`;
+
+  let reglages = '';
+  if (sorte === 'stock') {
+    const stocks = surfaces.filter((s) => s.nature === 'stock');
+    const stock = surfaces.find((s) => s.id === calcul.surface1Id);
+    const importe = stock && estImportee(stock);
+    const radioBase = (valeur, titre, desactive = false) =>
+      `<label class="case"><input type="radio" name="base-${id}" data-champ="base" data-id="${id}" value="${valeur}" ${calcul.base === valeur ? 'checked' : ''} ${desactive ? 'disabled' : ''} /> ${titre}</label>`;
+    reglages = `
+      <label class="champ-large">Stock
+        <select data-champ="stock" data-id="${id}">${options(stocks, calcul.surface1Id)}</select>
+      </label>
+      ${stocks.length === 0 ? '<p class="aide">Aucune surface « Stock » dans le projet (onglet 2. Surfaces, « C\'est : Stock »).</p>' : ''}
+      <div class="choix-base" role="radiogroup" aria-label="Base du volume">
+        <span>Base :</span>
+        ${radioBase('contour', 'depuis la ligne du contour', importe)}
+        ${radioBase('altitude', 'depuis une altitude')}
       </div>
-      <label class="champ-large">Surface 1 (dessus, ou après)
-        <select data-champ="surface1" data-id="${calcul.id}">${options(calcul.surface1Id)}</select>
-      </label>
-      <label class="case">
-        <input type="checkbox" data-champ="une-seule" data-id="${calcul.id}" ${calcul.uneSeule ? 'checked' : ''} ${importee && !calcul.uneSeule ? 'disabled' : ''} />
-        Une seule surface : volume sur sa ligne basse (points du contour)
-      </label>
       ${
-        calcul.uneSeule
-          ? ''
-          : `<label class="champ-large">Surface 2 (dessous, ou avant)
-              <select data-champ="surface2" data-id="${calcul.id}">
-                <option value="" ${calcul.surface2Id ? '' : 'selected'}>- choisir -</option>
-                ${options(calcul.surface2Id, calcul.surface1Id)}
-              </select>
-            </label>
-            <label class="champ-large">Zone
-              <select data-champ="zone" data-id="${calcul.id}">
-                ${zones.map((z) => `<option value="${echapper(JSON.stringify(z.zone))}" ${JSON.stringify(z.zone) === JSON.stringify(calcul.zone) ? 'selected' : ''}>${echapper(z.nom)}</option>`).join('')}
-              </select>
+        calcul.base === 'altitude'
+          ? `<label class="champ-altitude">Altitude de la base (m)
+              <input type="text" inputmode="decimal" data-champ="altitude" data-id="${id}" value="${Number.isFinite(calcul.altitude) ? formaterNombre(calcul.altitude) : ''}" placeholder="ex. 425.000" />
             </label>`
-      }
-      ${detail(calcul, resultat, surfaces)}
+          : ''
+      }`;
+  } else if (sorte === 'comparaison') {
+    reglages = `
+      <label class="champ-large">1. Surface de référence (dessous, avant : ex. terrain naturel)
+        <select data-champ="reference" data-id="${id}">${options(surfaces.filter((s) => s.id !== calcul.surface1Id), calcul.surface2Id)}</select>
+      </label>
+      <label class="champ-large">2. Surface comparée (dessus, après : ex. terrassement)
+        <select data-champ="comparee" data-id="${id}">${options(surfaces.filter((s) => s.id !== calcul.surface2Id), calcul.surface1Id)}</select>
+      </label>
+      <p class="aide">Remblai : la surface 2 est au-dessus de la référence ; déblai : au-dessous. Calculé là où les deux surfaces se recouvrent.</p>
+      ${calcul.zone?.type === 'surface' ? `<p class="aide">Limité au contour de « ${echapper(surfaces.find((s) => s.id === calcul.zone.surfaceId)?.nom ?? '?')} » (réglage d'une ancienne version).</p>` : ''}`;
+  }
+
+  return `
+    <div class="carte-role carte-volume ${calcul.id === montre ? 'en-edition' : ''}" data-carte="${id}">
+      <div class="choix-sorte" role="radiogroup" aria-label="Sorte de volume">
+        ${radioSorte('stock', 'Stock seul')}
+        ${radioSorte('comparaison', 'Comparaison de 2 surfaces')}
+      </div>
       ${
-        resultat && !resultat.erreurs
-          ? calcul.id === montre
-            ? '<p class="ok">✓ Remblai / déblai affiché sur le plan</p>'
-            : `<button type="button" class="bouton-secondaire" data-action="montrer" data-id="${calcul.id}">Voir sur le plan</button>`
+        sorte
+          ? `<label class="champ-large">Nom du volume
+              <input type="text" data-champ="nom" data-id="${id}" value="${echapper(calcul.nom)}"
+                placeholder="${echapper(nomAutomatique(calcul, surfaces))}" />
+            </label>
+            ${reglages}
+            ${detail(calcul, resultat, surfaces)}
+            ${
+              resultat && !resultat.erreurs
+                ? calcul.id === montre
+                  ? '<p class="ok">✓ Remblai / déblai affiché sur le plan</p>'
+                  : `<button type="button" class="bouton-secondaire" data-action="montrer" data-id="${id}">Voir sur le plan</button>`
+                : ''
+            }`
           : ''
       }
+      <div class="ligne-outils pied-role"><button type="button" class="bouton-lien" data-action="supprimer-calcul" data-id="${id}">supprimer ce volume</button></div>
     </div>`;
 }
 
@@ -177,19 +220,20 @@ function detail(calcul, r, surfaces) {
   }
   const avertissements = [];
   if (r.surfaceNonCouverte > 0) {
-    const base = calcul.uneSeule ? 'La ligne basse' : `La surface 2 « ${echapper(texteBase(calcul, surfaces))} »`;
-    avertissements.push(`${base} ne couvre pas toute la surface 1 : ${formaterNombre(r.surfaceNonCouverte)} m² non couverts (non comptés dans le volume).`);
+    const base = calcul.uneSeule ? 'La ligne basse' : `La référence « ${echapper(texteBase(calcul, surfaces))} »`;
+    const dessus = calcul.uneSeule ? 'le stock' : 'la surface comparée';
+    avertissements.push(`${base} ne couvre pas tout ${dessus} : ${formaterNombre(r.surfaceNonCouverte)} m² non couverts (non comptés dans le volume).`);
   }
   if (r.surfaceZone !== undefined && r.surfaceZone - r.surfacePlan > 0.01) {
-    avertissements.push(`${formaterNombre(r.surfaceZone - r.surfacePlan)} m² de la zone ne sont pas couverts par la surface 1 (non comptés).`);
+    avertissements.push(`${formaterNombre(r.surfaceZone - r.surfacePlan)} m² de la zone ne sont pas couverts par la surface comparée (non comptés).`);
   }
   // Lignes du détail : seulement les valeurs connues pour ce calcul.
   const lignes = [
-    ['Base', calcul.uneSeule ? 'ligne basse de la surface 1 (points du contour)' : `surface 2 « ${echapper(texteBase(calcul, surfaces))} »`],
+    ['Base', calcul.uneSeule ? (calcul.base === 'altitude' ? `plan horizontal à ${echapper(texteBase(calcul, surfaces))} m` : 'ligne du contour (points du pied)') : `référence « ${echapper(texteBase(calcul, surfaces))} »`],
     ['Surface en plan (triangles)', `${formaterNombre(r.surfacePlan)} m²`],
     r.surfaceContour !== undefined ? ['Surface du contour (polygone)', `${formaterNombre(r.surfaceContour)} m²`] : null,
     r.surfaceZone !== undefined ? ['Surface de la zone', `${formaterNombre(r.surfaceZone)} m²`] : null,
-    r.nombreTrianglesDessus !== undefined ? ['Triangles de la surface 1', r.nombreTrianglesDessus] : null,
+    r.nombreTrianglesDessus !== undefined ? ['Triangles du dessus', r.nombreTrianglesDessus] : null,
     r.nombreTrianglesBase !== undefined ? ['Triangles de la base', r.nombreTrianglesBase] : null,
     ['Volume au-dessus de la base (remblai)', `${formaterNombre(r.remblai)} m³`],
     ['Volume au-dessous de la base (déblai)', `${formaterNombre(r.deblai)} m³`],
