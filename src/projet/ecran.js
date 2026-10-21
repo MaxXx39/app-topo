@@ -96,6 +96,7 @@ export function creerEcranProjet(conteneur, actions) {
               </p>`
             : ''
         }
+        <p class="aide">Version de l'appli : ${__VERSION_APPLI__}</p>
       `;
     },
   };

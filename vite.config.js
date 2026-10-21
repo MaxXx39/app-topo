@@ -1,10 +1,16 @@
 // Configuration de Vite (l'outil qui assemble l'application web).
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+
+// Numéro de version de l'appli (package.json), affiché dans l'onglet Projet : il permet de
+// vérifier que le téléphone a bien la dernière version publiée.
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));
 
 export default defineConfig({
   // Adresse du site sur GitHub Pages : https://maxxx39.github.io/app-topo/
   base: '/app-topo/',
+  define: { __VERSION_APPLI__: JSON.stringify(version) },
   plugins: [
     // Rend l'application installable sur téléphone et ordinateur (PWA),
     // et utilisable sans connexion une fois installée.
