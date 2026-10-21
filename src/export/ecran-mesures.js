@@ -6,6 +6,7 @@ import { genererDxfMesures } from './dxf.js';
 import { ECHELLES } from './echelle.js';
 import { telecharger, dateSuisse } from './ecran.js';
 import { bulle } from '../aide/bulles.js';
+import { titreSection } from '../outils/section.js';
 
 // Cases du PDF des mesures : [clé, texte, cochée au départ].
 const CALQUES = [
@@ -26,7 +27,7 @@ export function creerEcranExportMesures(conteneur, { obtenirDonnees }) {
   // Fermé au départ : on l'ouvre avec « Exporter les mesures » (l'écran reste simple).
   conteneur.innerHTML = `
     <details class="export-repliable">
-    <summary><h3>Exporter les mesures ${bulle('exporterMesures')}</h3></summary>
+    <summary>${titreSection('exporter', 'Exporter les mesures', bulle('exporterMesures'))}</summary>
     <div class="champs-export">
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">

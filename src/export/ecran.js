@@ -6,6 +6,7 @@ import { ECHELLES } from './echelle.js';
 import { ecrireLandXML } from '../topo/landxml.js';
 import { plageAltitudes, equidistanceAuto } from '../topo/courbes.js';
 import { bulle } from '../aide/bulles.js';
+import { titreSection } from '../outils/section.js';
 import { PALIERS } from '../plan/ecarts.js';
 
 // Cases du PDF : [clé, texte, cochée au départ]. « Photos » (celles des surfaces) en dernier.
@@ -37,7 +38,7 @@ const COULEURS = [
 export function creerEcranExport(conteneur, { obtenirDonnees }) {
 
   conteneur.innerHTML = `
-    <h3>Exporter ${bulle('exporter')}</h3>
+    ${titreSection('exporter', 'Exporter', bulle('exporter'))}
     <div class="champs-export">
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">

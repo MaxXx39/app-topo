@@ -1262,16 +1262,6 @@ svg.plan {
 
 /* --- Export --- */
 
-/* Bloc « Exporter » (onglet 2.2 Volumes) : une carte bien visible, avec un trait ambre en haut. */
-.carte-export {
-  margin-top: 20px;
-  padding: 4px 14px 10px;
-  border: 1px solid var(--bordure);
-  border-top: 4px solid var(--ambre);
-  border-radius: 10px;
-  background: var(--surface);
-}
-
 .champs-export {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1349,7 +1339,7 @@ svg.plan {
   width: 100%;
 }
 
-.carte-role .case input.nom-leve {
+.ligne-leve .case input.nom-leve {
   min-height: 36px;
   padding: 4px 8px;
   font-weight: 600;
@@ -1357,7 +1347,7 @@ svg.plan {
   min-width: 0;
 }
 
-.carte-role .case:has(.nom-leve) {
+.ligne-leve .case:has(.nom-leve) {
   display: flex;
   width: 100%;
 }
@@ -1857,8 +1847,10 @@ th.nombre {
 }
 
 /* Export repliable : le titre sert de bouton pour l'ouvrir. */
-.export-repliable > summary h3 {
-  display: inline;
+.panneau .export-repliable > summary .titre-bloc {
+  display: inline-flex;
+  vertical-align: middle;
+  margin: 0;
 }
 
 /* Menu des calques dans l'onglet Mesures : pas de calque des surfaces. */
@@ -1930,15 +1922,15 @@ th.nombre {
    Onglet Projet : des blocs bien séparés, pour s'y retrouver d'un coup d'œil
    ========================================================================== */
 
-/* Projet ouvert : bandeau bleu nuit avec son nom, puis les étapes du travail. */
-.projet-ouvert {
+/* Bloc « ouvert » (projet ouvert, surface affichée) : bandeau bleu nuit avec son nom, puis son contenu. */
+.bloc-ouvert {
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--sombre);
   margin-bottom: 16px;
 }
 
-.projet-entete {
+.bloc-entete {
   background: var(--sombre);
   color: #ffffff;
   padding: 12px 14px 14px;
@@ -1955,7 +1947,7 @@ th.nombre {
   margin-bottom: 4px;
 }
 
-.projet-entete input.nom-projet {
+.bloc-entete .champ-entete {
   width: 100%;
   min-height: 44px;
   padding: 6px 10px;
@@ -1967,7 +1959,7 @@ th.nombre {
   font-weight: 700;
 }
 
-.projet-corps {
+.bloc-corps {
   padding: 10px 14px 14px;
   background: var(--surface);
 }
@@ -2050,7 +2042,7 @@ th.nombre {
 }
 
 /* Autres blocs : cartouche, fichier projet, mes projets. */
-.panneau .carte-section h3 {
+.panneau .titre-bloc {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2110,4 +2102,46 @@ th.nombre {
 
 .carte-section .bouton-fichier {
   margin: 0;
+}
+
+/* Volume montré sur le plan : son bloc est entouré d'ambre. */
+.carte-section.en-edition {
+  border-color: var(--ambre);
+  border-left-color: var(--ambre);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambre) 25%, transparent);
+}
+
+/* Choix dans le bandeau bleu nuit (surface affichée). */
+.bloc-entete select.champ-entete {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  background-color: var(--sombre-2);
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.bloc-entete select.champ-entete option {
+  color: var(--texte);
+  background: #ffffff;
+}
+
+/* Levés : une ligne par levé, le levé affiché marqué d'un trait ambre. */
+.ligne-leve {
+  padding: 8px 10px;
+  margin: 6px 0;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+}
+
+.ligne-leve.actif {
+  border-left: 4px solid var(--ambre);
+  background: color-mix(in srgb, var(--ambre) 6%, var(--surface));
+}
+
+.ligne-leve .ligne-outils {
+  margin: 4px 0 0;
 }

@@ -2,6 +2,7 @@
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
+import { titreSection } from '../outils/section.js';
 
 /**
  * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
@@ -29,31 +30,39 @@ export function creerEcranImport(conteneur, actions) {
     afficher(projet, dernierImport) {
       conteneur.innerHTML = `
         <h2>1. Importer ${bulle('importer')}</h2>
-        <label class="bouton">
-          + Fichier de points (CSV, TXT)
-          <input type="file" data-champ="fichier-points" accept=".csv,.txt,text/csv,text/plain" hidden />
-        </label>
-        ${dernierImport ? afficherImportPoints(dernierImport) : ''}
 
-        <h3>Levés ${bulle('leves')}</h3>
-        ${
-          projet.leves.length > 0
-            ? `<div class="liste-leves">${projet.leves
-                .map(
-                  (leve) => `
-                <div class="carte-role ${leve.id === projet.leveActifId ? 'en-edition' : ''}">
-                  <label class="case"><input type="radio" name="leve-actif" data-champ="leve-actif" value="${leve.id}" ${leve.id === projet.leveActifId ? 'checked' : ''} />
-                    <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom du levé" /></label>
-                  <div class="ligne-outils">
-                    <span class="aide">${leve.points.length} points · ${projet.surfaces.filter((s) => s.leveId === leve.id).length} surface(s)</span>
-                    <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
-                  </div>
-                </div>`,
-                )
-                .join('')}</div>`
-            : '<p class="vide">Aucun levé : importe un fichier de points.</p>'
-        }
-        ${listePointsDuLeve(projet)}
+        <section class="carte-section">
+          ${titreSection('importer', 'Importer un fichier de points')}
+          <p class="aide">CSV d'Emlid Flow, ou TXT (nom, Est, Nord, altitude). Chaque fichier devient un levé.</p>
+          <label class="bouton">
+            + Fichier de points (CSV, TXT)
+            <input type="file" data-champ="fichier-points" accept=".csv,.txt,text/csv,text/plain" hidden />
+          </label>
+          ${dernierImport ? afficherImportPoints(dernierImport) : ''}
+        </section>
+
+        <section class="carte-section">
+          ${titreSection('leves', 'Mes levés', bulle('leves'))}
+          ${
+            projet.leves.length > 0
+              ? `<p class="aide">Le levé coché est celui affiché sur le plan.</p>
+                <div class="liste-leves">${projet.leves
+                  .map(
+                    (leve) => `
+                  <div class="ligne-leve ${leve.id === projet.leveActifId ? 'actif' : ''}">
+                    <label class="case"><input type="radio" name="leve-actif" data-champ="leve-actif" value="${leve.id}" ${leve.id === projet.leveActifId ? 'checked' : ''} aria-label="Afficher ce levé" />
+                      <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom du levé" /></label>
+                    <div class="ligne-outils">
+                      <span class="aide">${leve.points.length} points · ${projet.surfaces.filter((s) => s.leveId === leve.id).length} surface(s)</span>
+                      <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
+                    </div>
+                  </div>`,
+                  )
+                  .join('')}</div>`
+              : '<p class="vide">Aucun levé : importe un fichier de points.</p>'
+          }
+          ${listePointsDuLeve(projet)}
+        </section>
       `;
     },
   };

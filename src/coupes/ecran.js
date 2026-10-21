@@ -4,6 +4,7 @@
 import { formaterNombre } from '../topo/format.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
+import { titreSection } from '../outils/section.js';
 import { nouvelIdentifiant } from '../topo/surface.js';
 import { longueurCoupe } from '../topo/coupe.js';
 import { preparerDessinCoupe, coupeEnSvg, texteEchellesCoupe, couleurCoupe } from './dessin.js';
@@ -75,7 +76,7 @@ export function creerEcranCoupes(conteneur, options) {
     const projet = obtenirProjet();
     const trace = traceEnCours();
     conteneur.innerHTML = `
-      <h3>Coupes ${bulle('coupes')}</h3>
+      ${titreSection('coupes', 'Coupes', bulle('coupes'))}
       ${projet.coupes.map((coupe) => carte(coupe, trace, obtenirProfils)).join('')}
       ${
         projet.coupes.length < COUPES_MAX

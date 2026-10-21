@@ -109,13 +109,13 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="volumes">
         <h2>2.2 Volumes ${bulle('volumes')}</h2>
         <div id="volumes"></div>
-        <div id="coupes"></div>
-        <div id="export" class="carte-export"></div>
+        <div id="coupes" class="carte-section"></div>
+        <div id="export" class="carte-section"></div>
       </section>
       <section class="panneau" data-onglet="mesures">
         <h2>3. Mesures <span class="aide" id="nom-leve-mesures"></span> ${bulle('mesures')}</h2>
         <div id="mesures"></div>
-        <div id="export-mesures" class="carte-export"></div>
+        <div id="export-mesures" class="carte-section"></div>
       </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
       <div id="barre-mesures" class="barre-edition" hidden></div>
