@@ -25,7 +25,7 @@ const CALQUES = [
   { cle: 'contours', titre: 'Contours des surfaces', parDefaut: true },
   { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true },
   { cle: 'triangles', titre: 'Triangles', parDefaut: true },
-  { cle: 'remblaiDeblai', titre: 'Remblai (rouge) / déblai (jaune)', parDefaut: true },
+  { cle: 'remblaiDeblai', titre: 'Déblai (jaune) / remblai (rouge)', parDefaut: true },
   { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false },
   { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false },
   { cle: 'volumes', titre: 'Volume sur chaque surface', parDefaut: true },
@@ -64,7 +64,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           ${CALQUES.map(
             (c) => `<label class="case"><input type="checkbox" data-calque="${c.cle}" ${calques[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`,
           ).join('')}
-          <label class="choix-equidistance">Palier remblai / déblai
+          <label class="choix-equidistance">Palier déblai / remblai
             <select data-calque="palier">
               ${PALIERS.map((e) => `<option value="${e}" ${calques.palier === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
             </select>

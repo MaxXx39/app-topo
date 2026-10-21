@@ -8,17 +8,21 @@ import { plageAltitudes, equidistanceAuto } from '../topo/courbes.js';
 import { bulle } from '../aide/bulles.js';
 import { PALIERS } from '../plan/ecarts.js';
 
+// Cases du PDF : [clé, texte, cochée au départ]. « Photos » (celles des surfaces) en dernier.
 const CALQUES = [
   ['triangles', 'Triangles', true],
   ['noms', 'Noms des points', true],
   ['altitudes', 'Altitudes des points', false],
-  ['ecarts', 'Remblai (rouge) / déblai (jaune)', true],
-  ['photos', 'Photos cochées (sous la légende)', true],
   ['courbes', 'Courbes de niveau', false],
-  ['couleurs', 'Couleurs selon l\'altitude', false],
-  ['photo', 'Photo aérienne (swisstopo)', false],
-  ['photoAttenuee', '… photo atténuée à 50 % (plus claire)', true],
-  ['cadastre', 'Cadastre (limites en traits)', false],
+  ['photo', 'Photo aérienne', false],
+  ['cadastre', 'Cadastre', false],
+  ['photos', 'Photos', true],
+];
+// Couleurs du plan : l'une ou l'autre (elles ne se lisent pas l'une sur l'autre), ou aucune.
+const COULEURS = [
+  ['ecarts', 'Déblai / remblai', true],
+  ['couleurs', 'Altitude', false],
+  ['aucune', 'Aucune', false],
 ];
 
 /**
@@ -29,13 +33,11 @@ const CALQUES = [
  *   volumes : tous les calculs, pour le CSV [{ nom, base, resultat }] ;
  *   dessinSurfaces : surfaces affichées, pour le DXF et le LandXML { stocks, resultats, surfaces } ;
  *   cartouche : { affaire, dessinePar, date } du projet (date '' : date du jour)
- * Renvoie { rafraichir() } pour remettre à jour le rappel du cartouche.
  */
 export function creerEcranExport(conteneur, { obtenirDonnees }) {
 
   conteneur.innerHTML = `
     <h3>Exporter ${bulle('exporter')}</h3>
-    <p class="aide" data-zone="cartouche"></p>
     <div class="champs-export">
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">
@@ -49,12 +51,16 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
       <p class="titre-choix">Contenu du PDF</p>
       <div class="liste-calques-pdf">
         ${CALQUES.map(([cle, titre, coche]) => `<label class="case"><input type="checkbox" data-calque="${cle}" ${coche ? 'checked' : ''} /> ${titre}</label>`).join('')}
-        <label class="choix-equidistance">Palier remblai / déblai
-          <select data-champ="palier">
-            ${PALIERS.map((e) => `<option value="${e}">${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
-          </select>
-        </label>
       </div>
+      <div class="ligne-couleurs-pdf" role="radiogroup" aria-label="Couleurs du plan">
+        <span>Couleurs :</span>
+        ${COULEURS.map(([cle, titre, coche]) => `<label class="case"><input type="radio" name="couleurs-pdf" data-couleurs="${cle}" ${coche ? 'checked' : ''} /> ${titre}</label>`).join('')}
+      </div>
+      <label class="choix-equidistance">Palier déblai / remblai
+        <select data-champ="palier">
+          ${PALIERS.map((e) => `<option value="${e}">${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
+        </select>
+      </label>
     </div>
     <div class="ligne-outils">
       <button type="button" class="bouton" data-action="pdf">PDF</button>
@@ -66,16 +72,6 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
   `;
   const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`);
   const message = conteneur.querySelector('[data-zone="message"]');
-
-  // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre : un seul à la fois.
-  // « Photo atténuée » est un réglage de la photo aérienne : la cocher coche aussi la photo.
-  conteneur.addEventListener('change', (evenement) => {
-    const calque = evenement.target.dataset.calque;
-    const exclusifs = { ecarts: 'couleurs', couleurs: 'ecarts' };
-    const autre = exclusifs[calque];
-    if (autre && evenement.target.checked) conteneur.querySelector(`[data-calque="${autre}"]`).checked = false;
-    if (calque === 'photoAttenuee' && evenement.target.checked) conteneur.querySelector('[data-calque="photo"]').checked = true;
-  });
 
   /** Date du cartouche ('AAAA-MM-JJ') : celle du projet, sinon la date du jour. */
   const dateDuPlan = () => obtenirDonnees().cartouche.date || new Date().toISOString().slice(0, 10);
@@ -128,6 +124,11 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
         const calques = Object.fromEntries(
           [...conteneur.querySelectorAll('[data-calque]')].map((caseACocher) => [caseACocher.dataset.calque, caseACocher.checked]),
         );
+        // Couleurs du plan : déblai / remblai, altitude, ou aucune. La photo aérienne est toujours atténuée à 50 %.
+        const couleurs = conteneur.querySelector('[data-couleurs]:checked')?.dataset.couleurs;
+        calques.ecarts = couleurs === 'ecarts';
+        calques.couleurs = couleurs === 'couleurs';
+        calques.photoAttenuee = true;
         calques.palier = champ('palier').value;
         const { document, echelle, format, messageFond } = await creerPdf({
           stocks,
@@ -169,19 +170,6 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
     const affaire = (obtenirDonnees().cartouche.affaire ?? '').replace(/[^\w-]+/g, '_') || 'stocks';
     return `volumes_${affaire}_${dateDuPlan()}`;
   }
-
-  return {
-    /** Rappelle le cartouche du projet ouvert (il se change dans l'onglet Projet). */
-    rafraichir() {
-      const { cartouche } = obtenirDonnees();
-      const morceaux = [
-        `affaire ${cartouche.affaire || '—'}`,
-        `dessiné par ${cartouche.dessinePar || '—'}`,
-        `date ${dateSuisse(dateDuPlan())}`,
-      ];
-      conteneur.querySelector('[data-zone="cartouche"]').textContent = `Cartouche : ${morceaux.join(' · ')} (à changer dans l'onglet Projet).`;
-    },
-  };
 }
 
 /** '2026-05-20' -> '20.05.2026' */

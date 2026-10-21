@@ -569,6 +569,15 @@ input[type='radio'] {
   min-height: 36px;
 }
 
+/* Cases et boutons ronds : toujours la même taille, même quand le texte passe sur 2 lignes. */
+.case input[type='checkbox'],
+.case input[type='radio'] {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
 .ligne-outils {
   display: flex;
   flex-wrap: wrap;
@@ -1328,6 +1337,17 @@ svg.plan {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2px 10px;
+}
+
+/* Couleurs du plan dans le PDF : déblai / remblai, altitude ou aucune, sur une seule ligne. */
+.ligne-couleurs-pdf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 14px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--bordure);
 }
 
 @media (max-width: 480px) {
