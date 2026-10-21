@@ -241,7 +241,7 @@ export function creerEcranMesures(conteneur, barre, options) {
           <button type="button" class="bouton" data-action="nouvelle" data-type="longueur" ${sansPoints ? 'disabled' : ''}>+ Longueur</button>
           <button type="button" class="bouton" data-action="nouvelle" data-type="aire" ${sansPoints ? 'disabled' : ''}>+ Aire</button>
         </div>
-        ${sansPoints ? '<p class="vide">Importe d\'abord un fichier de points (onglet 1. Importer).</p>' : ''}
+        ${sansPoints ? '<p class="vide">Importe ou lève d\'abord des points (onglet 1. Points).</p>' : ''}
       </section>
       ${listeDesMesures(mesure)}`;
     if (mesure) html += contenuMesure(mesure);

@@ -36,6 +36,20 @@ import {
 import * as stockage from './projet/stockage.js';
 import * as historique from './projet/historique.js';
 import { bulle, installerAide } from './aide/bulles.js';
+import { creerEcranLeve, mettreAJourBandeaux } from './leve/ecran.js';
+import {
+  estLeveDirect,
+  creerLeveDirect,
+  creerStockDirect,
+  prochainNom,
+  ajouterPointDirect,
+  annulerDernierPoint,
+  nouvelleLigne,
+  basculerFermeture,
+  ligneEnCours,
+  resumeStock,
+} from './topo/leve-direct.js';
+import { recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 
 // --- État de l'application ---
 let projet = creerProjet('Mon projet'); // projet ouvert
@@ -48,6 +62,9 @@ let ongletContexte = 'importer'; // dernier onglet (hors plan) : décide de ce q
 let calculMontre = null; // id du calcul colorié sur le plan (bouton « Voir sur le plan »)
 let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, etape: 'debut' ou 'fin', debut }
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
+// Levé avec le récepteur (appli Android) : levé et stock en cours, rôle du prochain point.
+const leveDirect = { leveId: null, stockId: null, role: 'contour' };
+let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
 
 // --- Mise en page : onglets ---
 // L'onglet Projet vient en premier (l'appli s'ouvre dessus). Les onglets numérotés suivent
@@ -64,7 +81,7 @@ const ICONES = {
 // "court" : titre utilisé sur les petits téléphones. "groupe" : onglets dessinés dans un même cadre.
 const ONGLETS = [
   { nom: 'projets', titre: 'Projet' },
-  { nom: 'importer', titre: '1. Importer' },
+  { nom: 'importer', titre: '1. Points' },
   { nom: 'surfaces', titre: '2.1 Surfaces', court: '2.1 Surf.', groupe: 'volumes' },
   { nom: 'volumes', titre: '2.2 Volumes', court: '2.2 Vol.', groupe: 'volumes' },
   { nom: 'mesures', titre: '3. Mesures' },
@@ -99,10 +116,14 @@ document.querySelector('#app').innerHTML = `
   <div class="mise-en-page">
     <div class="colonne-gauche">
       <section class="panneau" data-onglet="projets"><div id="projets"></div></section>
-      <section class="panneau" data-onglet="importer"><div id="importer"></div></section>
+      <section class="panneau" data-onglet="importer">
+        <h2>1. Points ${bulle('importer')}</h2>
+        <div id="leve-direct"></div>
+        <div id="importer"></div>
+      </section>
       <section class="panneau" data-onglet="surfaces">
         <h2>2.1 Surfaces <span class="aide" id="nom-leve-surfaces"></span> ${bulle('surfaces')}</h2>
-        <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer), ou une surface LandXML ou DXF.</p>
+        <p class="vide sans-points">Importe ou lève d'abord des points (onglet 1. Points), ou importe une surface LandXML ou DXF.</p>
         <div id="message-import-surface"></div>
         <div id="surfaces"></div>
       </section>
@@ -225,6 +246,156 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     modifie({ recadrer: true });
   },
 });
+
+// --- Levé avec le récepteur Emlid (seulement dans l'appli Android) ---
+// Les points pris vont dans un levé (comme un fichier importé) et, selon leur rôle, dans le stock
+// en cours (voir topo/leve-direct.js) : surfaces, volumes, mesures et exports marchent pareil.
+
+/** Levé en cours (fait avec le récepteur) et son stock en cours, ou null. */
+function leveEnCours() {
+  return projet.leves.find((l) => l.id === leveDirect.leveId && estLeveDirect(l)) ?? null;
+}
+function stockEnCours() {
+  const leve = leveEnCours();
+  return projet.surfaces.find((s) => s.id === leveDirect.stockId && s.leveId === leve?.id) ?? null;
+}
+
+/** Choisit le levé et le stock en cours, en les affichant sur le plan et dans 2.1 Surfaces. */
+function montrerStockEnCours() {
+  const leve = leveEnCours();
+  if (leve) projet.leveActifId = leve.id;
+  const index = projet.surfaces.indexOf(stockEnCours());
+  if (index >= 0) editeurSurfaces.choisir(index);
+}
+
+/** Reprend un levé du projet s'il n'y en a pas en cours (le levé affiché, sinon le dernier). */
+function reprendreLeveDirect() {
+  if (leveEnCours()) return;
+  const directs = projet.leves.filter(estLeveDirect);
+  const leve = directs.find((l) => l.id === projet.leveActifId) ?? directs[directs.length - 1] ?? null;
+  leveDirect.leveId = leve?.id ?? null;
+  const stocks = projet.surfaces.filter((s) => s.leveId === leve?.id);
+  leveDirect.stockId = stocks[stocks.length - 1]?.id ?? null;
+}
+
+/** Nouveau stock dans le levé en cours : il a tout de suite son calcul de volume. */
+function ajouterStockDirect(leve) {
+  const stock = creerStockDirect(projet, leve);
+  projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, stock);
+  leveDirect.stockId = stock.id;
+  editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+  montrerStockEnCours();
+  modifie({ recadrer: true });
+}
+
+const ecranLeve = recepteurDisponible()
+  ? creerEcranLeve(document.querySelector('#leve-direct'), {
+      choisirRecepteur,
+      reconnecter: reconnecterRecepteur,
+      deconnecter: deconnecterRecepteur,
+      nouveauLeve: () => ajouterStockDirect(creerLeveDirect(projet)),
+      choisirLeve: (id) => {
+        leveDirect.leveId = id;
+        leveDirect.stockId = null;
+        const stocks = projet.surfaces.filter((s) => s.leveId === id);
+        leveDirect.stockId = stocks[stocks.length - 1]?.id ?? null;
+        montrerStockEnCours();
+        modifie({ recadrer: true });
+      },
+      nouveauStock: () => {
+        const leve = leveEnCours();
+        if (leve) ajouterStockDirect(leve);
+      },
+      choisirStock: (id) => {
+        leveDirect.stockId = id;
+        montrerStockEnCours();
+        recalculer();
+      },
+      choisirRole: (role) => {
+        leveDirect.role = role;
+        recalculer();
+      },
+      nouvelleLigne: () => {
+        const stock = stockEnCours();
+        if (!stock) return;
+        nouvelleLigne(stock);
+        modifie();
+      },
+      basculerFermeture: () => {
+        const stock = stockEnCours();
+        if (!stock) return;
+        basculerFermeture(stock);
+        modifie();
+      },
+      prendrePoint: (nom) => {
+        const leve = leveEnCours();
+        const stock = stockEnCours();
+        if (!leve || !stock) return;
+        // Position vérifiée par l'appli Android au moment du toucher : RTK fixe et inclinaison prête.
+        const reponse = prendrePointRecepteur();
+        if (!reponse.ok) {
+          afficherMessage(`Point refusé : ${reponse.raison}`, 4000);
+          return;
+        }
+        const { est, nord, altitude, ...gnss } = reponse.point;
+        const resultat = ajouterPointDirect(leve, stock, leveDirect.role, {
+          nom: nom.trim() || prochainNom(leve, stock, leveDirect.role),
+          est,
+          nord,
+          altitude,
+          gnss: { ...gnss, prisLe: new Date().toISOString() },
+        });
+        if (resultat.erreur) {
+          afficherMessage(`Point refusé : ${resultat.erreur}`, 4000);
+          return;
+        }
+        navigator.vibrate?.(60);
+        afficherMessage(`Point ${resultat.point.nom} pris`);
+        modifie();
+      },
+      annulerDernierPoint: () => {
+        const leve = leveEnCours();
+        const dernier = leve?.points[leve.points.length - 1];
+        if (!dernier || !confirm(`Effacer le dernier point (${dernier.nom}) ?`)) return;
+        annulerDernierPoint(leve, projet.surfaces);
+        afficherMessage(`Point ${dernier.nom} effacé`);
+        modifie();
+      },
+      voirSurPlan: () => afficherOnglet('plan'),
+    })
+  : null;
+
+/** Ce que montre le bloc de levé (voir leve/ecran.js). */
+function donneesLeve() {
+  reprendreLeveDirect();
+  const leve = leveEnCours();
+  const stock = stockEnCours();
+  const ligne = stock ? ligneEnCours(stock) : null;
+  const numeroLigne = stock ? stock.lignesRupture.indexOf(ligne) + 1 : 0;
+  return {
+    leves: projet.leves.filter(estLeveDirect),
+    leve,
+    stocks: projet.surfaces.filter((s) => s.leveId === leve?.id),
+    stock,
+    role: leveDirect.role,
+    ligne: ligne ? { numero: numeroLigne, nbPoints: ligne.noms.length, fermee: ligne.fermee } : null,
+    nomPropose: stock ? prochainNom(leve, stock, leveDirect.role) : '',
+    dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
+    resume: stock ? resumeStock(stock) : null,
+    description: stock ? decrireSurface(stock) : '',
+  };
+}
+
+// État du récepteur, 2 fois par seconde : bandeaux, bloc de levé, position sur le plan.
+if (recepteurDisponible()) {
+  ecouterRecepteur((etat) => {
+    etatRecepteur = etat;
+    mettreAJourBandeaux(etat);
+    ecranLeve.mettreAJourRecepteur(etat);
+    const position = etat.connecte && etat.recu ? etat.position : null;
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete) } : null);
+  });
+}
 
 const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   renommer: (nom) => {
@@ -560,7 +731,10 @@ function recalculer({ recadrer = false } = {}) {
   ecranCoupes.afficher();
   ecranMesures.afficher();
   ecranImport.afficher(projet, dernierImport);
+  ecranLeve?.afficher(donneesLeve());
   ecranProjet.afficher(projet, resumes);
+  // Téléphone, levé avec le récepteur : le plan reste en haut de l'onglet 1. Points (voir style.css).
+  document.body.classList.toggle('mode-leve', Boolean(ecranLeve && stockEnCours()));
 
   // Plan : surfaces du levé affiché et surfaces importées ; les autres sont cachées.
   const visibles = new Set(surfacesAffichees());
@@ -615,7 +789,12 @@ function recalculer({ recadrer = false } = {}) {
   });
   if (recadrer || pointsDuPlan !== pointsAffiches) {
     pointsAffiches = pointsDuPlan;
+    nombrePointsAffiches = pointsDuPlan.length;
     plan.afficherPoints(pointsDuPlan);
+  } else if (pointsDuPlan.length !== nombrePointsAffiches) {
+    // Point levé avec le récepteur (ou effacé) : même liste, un point de plus ou de moins.
+    nombrePointsAffiches = pointsDuPlan.length;
+    plan.mettreAJourPoints(pointsDuPlan);
   }
   basculerModeDessin();
 }
@@ -636,6 +815,7 @@ function basculerModeDessin() {
   requestAnimationFrame(() => document.querySelector(`#${onglet} .en-edition`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
 }
 let pointsAffiches = null;
+let nombrePointsAffiches = 0;
 
 // --- Enregistrement automatique ---
 let minuterie = null;

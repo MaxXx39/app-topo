@@ -8,7 +8,9 @@ export const TEXTES_AIDE = {
   cartouche:
     'Affaire, dessinateur et date du plan, écrits dans le cartouche du PDF et dans le nom des fichiers exportés. Date vide : la date du jour de l\'export.',
 
-  // --- 1. Importer ---
+  // --- 1. Points ---
+  lever:
+    'Seulement dans l\'appli Android. Appaire d\'abord le RX2 dans les réglages Bluetooth du téléphone, et active dans Emlid Flow « Envoyer la position compensée » ; laisse Emlid Flow ouvert pour les corrections. Choisis le rôle du point (contour, ligne de rupture, point isolé) avant de le prendre : le stock se construit tout seul, avec son volume. PRENDRE LE POINT est bloqué tant que le RTK n\'est pas fixe et l\'inclinaison pas prête. Coordonnées en MN95, altitudes RAN95.',
   importer:
     'Fichier de points : CSV Emlid ou TXT (nom, Est, Nord, altitude, séparés par des tabulations), en MN95. Les lignes illisibles sont signalées avec leur numéro.',
   leves:

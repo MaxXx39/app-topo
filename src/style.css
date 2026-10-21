@@ -2146,3 +2146,213 @@ th.nombre {
 .ligne-leve .ligne-outils {
   margin: 4px 0 0;
 }
+
+/* ==========================================================================
+   Levé avec le récepteur Emlid (appli Android) : src/leve/ecran.js
+   ========================================================================== */
+
+/* Bandeaux « RTK » et « Inclinaison » : une bande sous l'en-tête, dans tous les onglets.
+   L'en-tête grandit d'autant (tout ce qui se place sous l'en-tête suit la variable). */
+body.avec-recepteur {
+  --hauteur-entete: 86px;
+}
+
+body.avec-recepteur .entete {
+  position: sticky;
+  padding-bottom: 30px;
+}
+
+.bandeaux-recepteur {
+  display: none;
+}
+
+body.avec-recepteur .bandeaux-recepteur {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30px;
+  display: flex;
+}
+
+.bandeaux-recepteur span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.bandeaux-recepteur .ok {
+  background: var(--succes);
+}
+
+.bandeaux-recepteur .pas-ok {
+  background: var(--rouge);
+}
+
+.bandeaux-recepteur .attente {
+  background: var(--gris);
+}
+
+.connexion-leve {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.champ-leve {
+  display: block;
+  margin: 10px 0;
+  font-size: 0.9rem;
+  color: var(--gris);
+}
+
+.champ-leve select {
+  flex: 1;
+  min-width: 0;
+}
+
+.champ-leve input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* Rôle du prochain point : 3 gros boutons, à la couleur du plan
+   (contour rouge, ligne de rupture orange, point isolé vert). */
+.roles-leve {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 12px 0 8px;
+}
+
+.role-leve {
+  --couleur-role: var(--gris);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 8px 4px;
+  border: 2px solid var(--couleur-role);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--couleur-role);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.role-leve svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.role-leve.role-contour {
+  --couleur-role: var(--rouge);
+}
+
+.role-leve.role-ligne {
+  --couleur-role: var(--orange);
+}
+
+.role-leve.role-isole {
+  --couleur-role: var(--succes);
+}
+
+.role-leve.choisi {
+  background: var(--couleur-role);
+  color: #ffffff;
+}
+
+.outils-ligne {
+  padding: 8px 10px;
+  border-left: 4px solid var(--orange);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--orange) 6%, var(--surface));
+}
+
+.outils-ligne .bouton-secondaire.actif {
+  border-color: var(--orange);
+  background: var(--orange);
+  color: #ffffff;
+}
+
+.position-leve {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 8px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.position-leve.pas-prete strong {
+  color: var(--gris);
+}
+
+.bouton.bouton-prendre {
+  width: 100%;
+  min-height: 64px;
+  font-size: 1.2rem;
+  letter-spacing: 0.03em;
+}
+
+.raison-leve {
+  margin: 6px 0;
+  color: var(--rouge);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Position du récepteur sur le plan : bleu, grise si l'inclinaison n'est pas prête. */
+.plan .position circle {
+  fill: var(--bleu);
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.plan .position circle.halo {
+  fill: var(--bleu);
+  fill-opacity: 0.2;
+  stroke: none;
+}
+
+.plan .position.pas-prete circle {
+  fill: var(--gris);
+}
+
+/* Téléphone, pendant le levé : le plan reste en haut de l'onglet 1. Points, les outils dessous. */
+@media (max-width: 899px) {
+  body.mode-leve[data-onglet='importer'] .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: 38svh;
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+
+  body.mode-leve[data-onglet='importer'] .mise-en-page {
+    padding-top: calc(38svh + 12px);
+  }
+}

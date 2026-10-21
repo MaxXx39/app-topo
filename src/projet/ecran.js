@@ -130,12 +130,12 @@ function compter(nombre, mot) {
 }
 
 /**
- * Tuiles des étapes du travail (1. Importer, 2.1 Surfaces, 2.2 Volumes, 3. Mesures) : ce qu'il y a
+ * Tuiles des étapes du travail (1. Points, 2.1 Surfaces, 2.2 Volumes, 3. Mesures) : ce qu'il y a
  * déjà dans le projet ; on touche une tuile pour aller à son onglet.
  */
 function tuilesEtapes(projet) {
   const etapes = [
-    { onglet: 'importer', numero: '1', titre: '1. Importer', nombre: projet.leves.length, mot: 'levé' },
+    { onglet: 'importer', numero: '1', titre: '1. Points', nombre: projet.leves.length, mot: 'levé' },
     { onglet: 'surfaces', numero: '2.1', titre: '2.1 Surfaces', nombre: projet.surfaces.length, mot: 'surface' },
     { onglet: 'volumes', numero: '2.2', titre: '2.2 Volumes', nombre: projet.calculs.length, mot: 'volume' },
     { onglet: 'mesures', numero: '3', titre: '3. Mesures', nombre: projet.mesures.length, mot: 'mesure' },

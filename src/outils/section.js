@@ -15,6 +15,8 @@ const ICONES = {
   cartouche: '<path d="M4 4h16v16H4zM4 15h16M10 15v5" />',
   fichier: '<path d="M6 3h8l4 4v14H6zM14 3v4h4M12 11v6M9 14l3 3 3-3" />',
   projets: '<path d="M3 7h6l2 2h10v10H3z" />',
+  // Lever avec le récepteur : une canne GNSS (antenne en haut, pointe en bas).
+  lever: '<path d="M12 8v13M8 5a4 2 0 0 0 8 0a4 2 0 0 0-8 0M10 21h4" />',
 };
 
 /** Icône (SVG) d'un titre de bloc. */

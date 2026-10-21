@@ -39,9 +39,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Fabrication de l'APK
+      - name: Tests du récepteur et fabrication de l'APK
         working-directory: android
-        run: ./gradlew --no-daemon :app:assembleDebug
+        run: ./gradlew --no-daemon :noyau:test :app:assembleDebug
 
       - name: Renommer l'APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk Topo.apk

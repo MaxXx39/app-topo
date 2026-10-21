@@ -32,3 +32,36 @@ export async function enregistrerDansAndroid(blob, nom) {
     alert(`Export de « ${nom} » impossible : ${erreur.message ?? erreur}.`);
   }
 }
+
+// --- Récepteur Emlid (Bluetooth), lu par l'appli Android ---
+
+/** Vrai si l'appli Android sait lire le récepteur (APK assez récent). */
+export function recepteurDisponible() {
+  return estDansAppliAndroid() && typeof window.AppliAndroid.prendrePoint === 'function';
+}
+
+/**
+ * Appelle "fonction(etat)" à chaque état reçu du récepteur (2 fois par seconde), voir
+ * EtatRecepteur.enJson côté Kotlin : { connecte, bluetooth, dernierRecepteur, recu, qualite,
+ * libelleQualite, nbSatellites, hdop, ageCorrections, etatInclinaison, inclinaisonPrete,
+ * inclinaison, position: { est, nord, altitude } ou null, erreurConversion, autorise, raison }.
+ */
+export function ecouterRecepteur(fonction) {
+  window.recevoirEtatRecepteur = fonction;
+}
+
+export const choisirRecepteur = () => window.AppliAndroid.choisirRecepteur();
+export const reconnecterRecepteur = () => window.AppliAndroid.reconnecterRecepteur();
+export const deconnecterRecepteur = () => window.AppliAndroid.deconnecterRecepteur();
+
+/**
+ * Point à prendre maintenant (MN95 / RAN95), vérifié par l'appli Android : RTK fixe et
+ * inclinaison prête. Renvoie { ok: true, point } ou { ok: false, raison }.
+ */
+export function prendrePointRecepteur() {
+  try {
+    return JSON.parse(window.AppliAndroid.prendrePoint());
+  } catch (erreur) {
+    return { ok: false, raison: `réponse illisible du récepteur (${erreur.message})` };
+  }
+}

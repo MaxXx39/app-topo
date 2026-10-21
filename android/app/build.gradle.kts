@@ -60,3 +60,7 @@ val verifierAppliWeb by tasks.registering {
     }
 }
 tasks.named("preBuild") { dependsOn(verifierAppliWeb) }
+
+dependencies {
+    implementation(project(":noyau"))
+}

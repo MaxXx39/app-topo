@@ -4,6 +4,17 @@
     <!-- Internet : fonds de carte swisstopo (photo aérienne, cadastre) -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Bluetooth (flux NMEA du récepteur Emlid) : anciennes versions d'Android -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <!-- Bluetooth : Android 12 et plus récent (« Appareils à proximité ») -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+
+    <!-- Petite vibration quand un point est pris -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application
         android:icon="@mipmap/ic_lanceur"
         android:label="@string/nom_appli"

@@ -1,17 +1,25 @@
 package ch.apptopo
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.content.ActivityNotFoundException
 import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.view.View
 import android.view.WindowInsets
+import android.view.WindowManager
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.ValueCallback
@@ -30,9 +38,17 @@ import java.util.Locale
  * Activité unique de l'appli. Elle affiche l'appli web (la même que sur GitHub Pages, rangée
  * dans l'APK) dans une WebView (fenêtre de navigateur intégrée), et fait pour elle ce qu'un
  * navigateur fait d'habitude : choisir des fichiers, prendre des photos, enregistrer les exports,
- * afficher les questions (« Supprimer… ? »).
+ * afficher les questions (« Supprimer… ? »). Elle garde aussi la connexion Bluetooth au
+ * récepteur Emlid et envoie son état à la page 2 fois par seconde.
  */
 class EcranPrincipal : Activity() {
+
+    val recepteur = EtatRecepteur()
+    private val minuterie = Handler(Looper.getMainLooper())
+    private var pageChargee = false
+
+    // Action à refaire quand l'utilisateur aura accepté la permission Bluetooth.
+    private var apresPermission: (() -> Unit)? = null
 
     private lateinit var page: WebView
     private val serveur by lazy { ServeurAppli(assets) }
@@ -64,9 +80,39 @@ class EcranPrincipal : Activity() {
         page.loadUrl(ServeurAppli.ADRESSE_ACCUEIL)
     }
 
+    override fun onResume() {
+        super.onResume()
+        minuterie.post(envoyerEtat)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        minuterie.removeCallbacks(envoyerEtat)
+    }
+
     override fun onDestroy() {
+        recepteur.bluetooth.deconnecter()
         page.destroy()
         super.onDestroy()
+    }
+
+    /**
+     * Envoie l'état du récepteur à la page, 2 fois par seconde (fonction window.recevoirEtatRecepteur,
+     * voir src/android/pont.js). Pendant la connexion, l'écran reste allumé.
+     */
+    private val envoyerEtat = object : Runnable {
+        override fun run() {
+            if (pageChargee) {
+                val etat = recepteur.enJson(nomDernierRecepteur())
+                page.evaluateJavascript("window.recevoirEtatRecepteur && window.recevoirEtatRecepteur($etat)", null)
+            }
+            if (recepteur.connecte) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+            minuterie.postDelayed(this, 500)
+        }
     }
 
     @Deprecated("Méthode Android classique, suffisante ici")
@@ -103,6 +149,10 @@ class EcranPrincipal : Activity() {
     // =====================================================================
 
     private inner class ClientNavigation : WebViewClient() {
+        override fun onPageFinished(vue: WebView, adresse: String) {
+            pageChargee = true
+        }
+
         override fun shouldInterceptRequest(vue: WebView, demande: WebResourceRequest) = serveur.repondre(demande.url)
 
         override fun shouldOverrideUrlLoading(vue: WebView, demande: WebResourceRequest): Boolean {
@@ -241,6 +291,100 @@ class EcranPrincipal : Activity() {
         }
 
     // =====================================================================
+    // Récepteur Emlid : permission, choix de l'appareil, connexion (comme Emlid Stock)
+    // =====================================================================
+
+    private fun preferences() = getSharedPreferences("reglages", MODE_PRIVATE)
+
+    private fun nomDernierRecepteur(): String? = preferences().getString(CLE_NOM_RECEPTEUR, null)
+
+    fun choisirRecepteur() {
+        val adaptateur = adaptateurBluetooth { choisirRecepteur() } ?: return
+        @SuppressLint("MissingPermission")
+        val appareils: List<BluetoothDevice> = adaptateur.bondedDevices?.toList().orEmpty()
+        if (appareils.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Aucun appareil appairé")
+                .setMessage("Appairez d'abord le RX2 dans les réglages Bluetooth du téléphone, puis revenez ici.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+        @SuppressLint("MissingPermission")
+        val noms = appareils.map { "${it.name ?: "(sans nom)"}\n${it.address}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Choisir le récepteur")
+            .setItems(noms) { _, numero ->
+                val appareil = appareils[numero]
+                @SuppressLint("MissingPermission")
+                val nom = appareil.name ?: appareil.address
+                preferences().edit()
+                    .putString(CLE_DERNIER_RECEPTEUR, appareil.address)
+                    .putString(CLE_NOM_RECEPTEUR, nom)
+                    .apply()
+                recepteur.bluetooth.connecter(appareil)
+            }
+            .setNegativeButton("Annuler", null)
+            .show()
+    }
+
+    fun reconnecterRecepteur() {
+        val adresse = preferences().getString(CLE_DERNIER_RECEPTEUR, null)
+        if (adresse == null) {
+            choisirRecepteur()
+            return
+        }
+        val adaptateur = adaptateurBluetooth { reconnecterRecepteur() } ?: return
+        try {
+            recepteur.bluetooth.connecter(adaptateur.getRemoteDevice(adresse))
+        } catch (erreur: IllegalArgumentException) {
+            choisirRecepteur()
+        }
+    }
+
+    fun deconnecterRecepteur() {
+        recepteur.bluetooth.deconnecter()
+        recepteur.oublier("non connecté")
+    }
+
+    private fun aLaPermission(permission: String) =
+        checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Renvoie l'adaptateur Bluetooth prêt à l'emploi, ou null (avec un message) s'il ne l'est pas.
+     * Sans la permission (Android 12 et plus), on la demande, puis on refait [ensuite].
+     */
+    private fun adaptateurBluetooth(ensuite: () -> Unit): BluetoothAdapter? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !aLaPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
+            apresPermission = ensuite
+            requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), CODE_PERMISSIONS)
+            return null
+        }
+        val adaptateur = getSystemService(BluetoothManager::class.java)?.adapter
+        if (adaptateur == null) {
+            message("Ce téléphone n'a pas de Bluetooth.")
+            return null
+        }
+        if (!adaptateur.isEnabled) {
+            message("Activez le Bluetooth du téléphone.")
+            return null
+        }
+        return adaptateur
+    }
+
+    override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, resultats: IntArray) {
+        super.onRequestPermissionsResult(code, permissions, resultats)
+        if (code != CODE_PERMISSIONS) return
+        val action = apresPermission
+        apresPermission = null
+        if (resultats.isNotEmpty() && resultats.all { it == PackageManager.PERMISSION_GRANTED }) {
+            action?.invoke()
+        } else {
+            message("Sans la permission « Appareils à proximité », l'appli ne peut pas lire le récepteur.")
+        }
+    }
+
+    // =====================================================================
     // Exports
     // =====================================================================
 
@@ -309,5 +453,8 @@ class EcranPrincipal : Activity() {
     companion object {
         private const val CODE_CHOISIR = 1
         private const val CODE_ENREGISTRER = 2
+        private const val CODE_PERMISSIONS = 3
+        private const val CLE_DERNIER_RECEPTEUR = "dernier_recepteur"
+        private const val CLE_NOM_RECEPTEUR = "nom_dernier_recepteur"
     }
 }

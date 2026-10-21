@@ -86,6 +86,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <button type="button" data-action="tout-voir" aria-label="Tout voir" title="Tout voir">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
         </button>
+        <button type="button" data-action="ma-position" aria-label="Ma position" title="Ma position" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
+        </button>
       </div>
     </div>
   `;
@@ -101,6 +104,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   let points = [];
   let vue = null;
+  // Position du récepteur (levé avec l'appli Android) : { est, nord, prete } ou null.
+  let position = null;
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
   // Ce qu'il faut dessiner (voir editeur.js et main.js) :
@@ -160,7 +165,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     legende = null;
     legendeEcarts = null;
     dessinerFond();
-    if (!vue || points.length === 0) return;
+    if (!vue || points.length === 0) {
+      dessinerPosition();
+      return;
+    }
 
     const stock = dessin.stockActif;
     // Si « Autres stocks » est décoché, on cache les points qui appartiennent à un autre stock.
@@ -258,8 +266,31 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (calques.volumes) dessinerVolumes();
     dessinerLegende();
     dessinerBarreEchelle();
+    dessinerPosition();
   }
 
+  /**
+   * Position du récepteur : rond bleu (gris si l'inclinaison n'est pas prête : c'est alors
+   * la position de l'antenne, pas celle du bout de canne). Redessinée seule, 2 fois par seconde.
+   */
+  function dessinerPosition() {
+    svg.querySelector('g.position')?.remove();
+    if (!position || !vue) return;
+    const { x, y } = versEcran(position.est, position.nord, vue);
+    const groupe = creerElement('g', { class: position.prete ? 'position' : 'position pas-prete' });
+    groupe.append(creerElement('circle', { cx: x, cy: y, r: 13, class: 'halo' }), creerElement('circle', { cx: x, cy: y, r: 6 }));
+    svg.append(groupe);
+  }
+
+  /** Centre le plan sur la position du récepteur (sans changer le zoom, sauf au premier affichage). */
+  function centrerSurPosition() {
+    if (!position) return;
+    const { largeur, hauteur } = taille();
+    if (largeur === 0 || hauteur === 0) return;
+    // Sans vue (aucun point encore) : environ 60 m de large à l'écran.
+    vue = vue ? { ...vue, estCentre: position.est, nordCentre: position.nord } : { echelle: largeur / 60, estCentre: position.est, nordCentre: position.nord, largeur, hauteur };
+    dessiner();
+  }
   /**
    * Fonds de plan swisstopo (photo aérienne, cadastre) : des images posées sous le dessin.
    * Seules les tuiles visibles à l'écran sont chargées (connexion internet nécessaire).
@@ -268,7 +299,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const couches = Object.keys(FONDS).filter((nom) => calques[nom === 'satellite' ? 'fondSatellite' : nom]);
     const voulues = new Set();
 
-    if (vue && points.length > 0 && couches.length > 0) {
+    if (vue && (points.length > 0 || position) && couches.length > 0) {
       const z = niveauDeZoom(1 / vue.echelle, window.devicePixelRatio || 1);
       const hautGauche = versTerrain(0, 0, vue);
       const basDroite = versTerrain(vue.largeur, vue.hauteur, vue);
@@ -742,7 +773,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       return;
     }
     recadrerQuandVisible = false;
-    vue = cadrerSurPoints(points, largeur, hauteur);
+    // Levé avec le récepteur, encore 0 ou 1 point : environ 60 m de large autour du point
+    // (ou de la position du récepteur), plutôt qu'un zoom extrême sur un seul point.
+    // Sans point ni position : pas encore de vue (elle se fera sur la première position reçue).
+    const centre = points.length === 1 ? points[0] : points.length === 0 ? position : null;
+    if (centre) vue = { echelle: largeur / 60, estCentre: centre.est, nordCentre: centre.nord, largeur, hauteur };
+    else vue = points.length > 0 ? cadrerSurPoints(points, largeur, hauteur) : null;
     dessiner();
   }
 
@@ -756,6 +792,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   conteneur.querySelector('[data-action="tout-voir"]').addEventListener('click', toutVoir);
   conteneur.querySelector('[data-action="zoom-plus"]').addEventListener('click', () => zoomerAuCentre(1.5));
   conteneur.querySelector('[data-action="zoom-moins"]').addEventListener('click', () => zoomerAuCentre(1 / 1.5));
+  const boutonPosition = conteneur.querySelector('[data-action="ma-position"]');
+  boutonPosition.addEventListener('click', centrerSurPosition);
 
   // --- Menu des calques ---
   boutonCalques.addEventListener('click', () => {
@@ -910,6 +948,23 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     afficherPoints(nouveauxPoints) {
       points = nouveauxPoints;
       toutVoir();
+    },
+    /** Nouvelle liste de points (un point levé en plus ou en moins), sans changer le cadrage. */
+    mettreAJourPoints(nouveauxPoints) {
+      points = nouveauxPoints;
+      if (!vue) toutVoir();
+      else dessiner();
+    },
+    /**
+     * Position du récepteur { est, nord, prete } (ou null : on la cache). Le premier affichage
+     * d'un levé encore vide se cadre sur elle.
+     */
+    afficherPosition(nouvellePosition) {
+      const premiere = !position && nouvellePosition;
+      position = nouvellePosition;
+      boutonPosition.hidden = !position;
+      if (position && (!vue || (premiere && points.length === 0))) centrerSurPosition();
+      else dessinerPosition();
     },
     /** Redessine le plan avec les stocks (sans changer le zoom). */
     redessiner(nouveauDessin) {
