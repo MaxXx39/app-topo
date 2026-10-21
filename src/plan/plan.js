@@ -164,6 +164,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const classes = new Map();
     if (stock) {
       for (const nom of pointsChoisis(stock)) classes.set(nom, 'role-dessus');
+      // « Tous les points du levé » : ils sont tous en vert (seulement ceux dans le contour s'il y en a un).
+      if (stock.type === 'points' && stock.tousLesPoints) {
+        const parNom = new Map(points.map((p) => [p.nom, p]));
+        const polygone = (stock.contour ?? []).map((nom) => parNom.get(nom)).filter(Boolean);
+        for (const point of points) {
+          if (polygone.length < 3 || pointDansPolygone(point, polygone)) classes.set(point.nom, 'role-dessus');
+        }
+      }
       for (const nom of (stock.lignesRupture ?? []).flatMap((ligne) => ligne.noms)) classes.set(nom, 'role-ligne');
       for (const nom of stock.contour ?? []) classes.set(nom, 'role-contour');
     }

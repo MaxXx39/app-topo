@@ -66,14 +66,9 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="importer"><div id="importer"></div></section>
       <section class="panneau" data-onglet="surfaces">
         <h2>2. Surfaces <span class="aide" id="nom-leve-surfaces"></span> ${bulle('surfaces')}</h2>
-        <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer), ou importe une surface ci-dessous.</p>
-        <div id="surfaces"></div>
-        <h3>Importer une surface ${bulle('importerSurface')}</h3>
-        <label class="bouton-secondaire">
-          + Surface LandXML ou DXF
-          <input type="file" id="fichier-surface" accept=".xml,.landxml,.dxf,application/xml,text/xml" hidden />
-        </label>
+        <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer), ou une surface LandXML ou DXF.</p>
         <div id="message-import-surface"></div>
+        <div id="surfaces"></div>
       </section>
       <section class="panneau" data-onglet="volumes">
         <h2>3. Volumes ${bulle('volumes')}</h2>
@@ -261,6 +256,7 @@ const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces')
   quandNatureChange: (surface) => {
     projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
   },
+  importerFichier: importerSurface,
   quandChange: () => {
     // Une surface d'un autre levé est choisie : ce levé devient le levé affiché.
     const surface = editeurSurfaces.objetActif();
@@ -299,19 +295,15 @@ function montrerUneSurfaceDuLeve() {
 }
 
 // --- Import d'une surface LandXML ou DXF : chaque surface du fichier devient une surface du projet ---
-document.querySelector('#fichier-surface').addEventListener('change', async (evenement) => {
-  const fichier = evenement.target.files[0];
-  if (!fichier) return;
+// Sa nature (stock, terrain naturel, terrassement) est ensuite demandée, comme pour une nouvelle surface.
+async function importerSurface(fichier) {
   const zone = document.querySelector('#message-import-surface');
   try {
     const texte = await fichier.text();
     const type = /\.dxf$/i.test(fichier.name) ? 'dxf' : 'landxml';
     const { surfaces, erreurs, avertissements } = type === 'dxf' ? lireDXF(texte) : lireLandXML(texte);
     for (const surface of surfaces) {
-      const importee = surfaceImportee(surface, fichier.name, type);
-      projet.surfaces.push(importee);
-      // Un terrain naturel importé : les terrassements qui l'attendaient le prennent comme surface 2.
-      projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, importee);
+      projet.surfaces.push({ ...surfaceImportee(surface, fichier.name, type), nature: null });
     }
     const messages = [...erreurs, ...avertissements];
     zone.innerHTML = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} ».</p>
@@ -321,9 +313,8 @@ document.querySelector('#fichier-surface').addEventListener('change', async (eve
   } catch (erreur) {
     zone.innerHTML = `<p class="erreur">Impossible de lire « ${echapper(fichier.name)} » : ${echapper(erreur.message)}</p>`;
   }
-  evenement.target.value = '';
   modifie({ recadrer: true });
-});
+}
 
 const ecranVolumes = creerEcranVolumes(document.querySelector('#volumes'), {
   obtenirProjet: () => projet,

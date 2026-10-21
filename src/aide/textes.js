@@ -18,7 +18,7 @@ export const TEXTES_AIDE = {
   surfaces:
     'Une surface peut être un stock, un terrain naturel ou un terrassement. Nomme-la comme tu veux. Elle se crée à partir des points du levé coché (contour, lignes de rupture, points), ou s\'importe d\'un LandXML ou d\'un DXF. Le rôle d\'un point ne dépend jamais de son nom : c\'est toi qui choisis. Touche une surface sur le plan pour la sélectionner.',
   nature:
-    'Ce que représente la surface. Un stock reçoit tout de suite un calcul de volume sur sa ligne basse (son contour) ; un terrassement, un calcul par rapport au dernier terrain naturel ; un terrain naturel, aucun. Tu peux changer ces calculs dans l\'onglet 3. Volumes.',
+    'Ce que représente la surface : à choisir avant tout le reste, elle donne son nom automatique (« Stock 2 », « Terrain naturel 1 »…). Un stock reçoit tout de suite son volume (sur sa ligne basse, le contour). Les autres volumes s\'ajoutent dans l\'onglet 3. Volumes. Tu peux changer de nature plus tard (« C\'est : »).',
   contour:
     'Bord de la surface, dans l\'ordre. Le polygone est fermé automatiquement. Seul l\'intérieur du contour est gardé, même pour une forme en « L ». Sans contour, le bord suit les points extérieurs (supprime ensuite les triangles en trop).',
   ligne:
@@ -32,7 +32,7 @@ export const TEXTES_AIDE = {
   photos:
     'Prends une photo du stock (ou choisis-la dans la galerie) : elle est réduite et rangée dans le projet, sur cet appareil. Ajoute une légende. Les photos cochées « dans le PDF » sont imprimées dans la colonne de droite, sous la légende (onglet 3. Volumes).',
   importerSurface:
-    'LandXML (export Mensura) : chaque surface TIN du fichier devient une surface. DXF : les faces 3D (3DFACE) ou maillages de chaque calque deviennent une surface, avec X = Est, Y = Nord, Z = altitude (MN95). Une surface importée peut servir de surface 2 dans un calcul de volume.',
+    'LandXML (export Mensura) : chaque surface TIN du fichier devient une surface. DXF : les faces 3D (3DFACE) ou maillages de chaque calque deviennent une surface, avec X = Est, Y = Nord, Z = altitude (MN95). Tu choisis ensuite ce que c\'est (stock, terrain naturel, terrassement). Une surface importée peut servir de référence dans une comparaison de volumes.',
 
   // --- 3. Volumes ---
   volumes:

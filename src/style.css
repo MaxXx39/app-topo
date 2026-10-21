@@ -708,8 +708,8 @@ th:not(:first-child) {
 }
 
 .carte-role.en-edition {
-  border-color: var(--ambre);
-  box-shadow: 0 0 0 3px var(--ambre-clair);
+  border-color: var(--couleur-role, var(--ambre));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--couleur-role, var(--ambre)) 22%, transparent);
 }
 
 .titre-role {
@@ -752,7 +752,7 @@ th:not(:first-child) {
 .pastille {
   min-height: 36px;
   padding: 6px 12px;
-  border: 1px solid var(--ambre);
+  border: 1px solid var(--couleur-role, var(--ambre));
   border-radius: 18px;
   background: var(--surface);
   color: var(--sombre);
@@ -1400,12 +1400,89 @@ tr.total td {
   --couleur-role: #7c3aed; /* violet */
 }
 
+/* Photos : bleu nuit Perrin, en version claire. */
+.carte-role.role-photos {
+  --couleur-role: var(--sombre);
+}
+
 .carte-role.role-contour,
 .carte-role.role-ligne,
 .carte-role.role-dessus,
-.carte-role.role-triangles {
+.carte-role.role-triangles,
+.carte-role.role-photos {
   border-left: 5px solid var(--couleur-role);
   background: color-mix(in srgb, var(--couleur-role) 4%, var(--surface));
+}
+
+/* Boutons dans une carte de couleur : bordure de la couleur du rôle. */
+.carte-role[class*='role-'] .bouton-secondaire {
+  border-color: color-mix(in srgb, var(--couleur-role) 45%, var(--bordure));
+}
+
+.pied-role {
+  margin-top: 10px;
+}
+
+/* Barre de modification (en bas, ou sous le plan sur téléphone) : couleur de ce que l'on modifie. */
+.barre-edition[data-role='contour'] {
+  --couleur-role: var(--rouge);
+}
+
+.barre-edition[data-role='ligne'] {
+  --couleur-role: var(--orange);
+}
+
+.barre-edition[data-role='dessus'] {
+  --couleur-role: var(--succes);
+}
+
+.barre-edition[data-role='triangles'] {
+  --couleur-role: #7c3aed;
+}
+
+.barre-edition[data-role] {
+  border-color: var(--couleur-role);
+  background: color-mix(in srgb, var(--couleur-role) 6%, var(--surface));
+}
+
+body.mode-dessin[data-onglet='surfaces'] .barre-edition[data-role] {
+  border-bottom-color: var(--couleur-role);
+}
+
+/* Nouvelle surface : choix de la nature (stock, terrain naturel, terrassement) en gros boutons. */
+.carte-nature {
+  border: 2px solid var(--ambre);
+  background: var(--jaune-clair);
+}
+
+.choix-nature-gros {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.choix-nature-gros button {
+  min-height: 52px;
+}
+
+/* Bouton discret (import LandXML / DXF) : texte gris, bordure en pointillés, sans fond. */
+.bouton-discret {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px dashed #9aa3aa;
+  border-radius: 10px;
+  color: var(--gris);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bouton-discret:active {
+  background: var(--fond);
 }
 
 .icone-role {

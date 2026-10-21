@@ -11,6 +11,7 @@ import { echapper } from '../outils/echapper.js';
 
 const TEXTES = {
   nouveau: '+ Nouvelle surface',
+  importer: '+ Nouvelle surface depuis LandXML ou DXF',
   supprimer: 'Supprimer cette surface',
   choix: 'Surface affichée',
   roles: { contour: 'Contour', ligne: 'Ligne de rupture', dessus: 'Points isolés / caractéristiques' },
@@ -24,7 +25,12 @@ const ICONES_ROLES = {
   dessus: '<circle cx="6" cy="7" r="2.2" /><circle cx="17" cy="9" r="2.2" /><circle cx="9" cy="17" r="2.2" /><circle cx="18" cy="18" r="2.2" />',
   // Triangles en trop : un triangle barré.
   triangles: '<path d="M12 3 21 20H3z" /><path d="m9 11 6 6M15 11l-6 6" />',
+  // Photos : un appareil photo.
+  photos: '<path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" />',
 };
+
+// Nom d'une surface tant que l'on n'a pas choisi ce que c'est (stock, terrain naturel, terrassement).
+const NOM_SANS_NATURE = 'Nouvelle surface';
 
 /** Icône d'un rôle (contour, ligne, dessus), à mettre devant son titre. */
 function iconeRole(role) {
@@ -37,9 +43,9 @@ function nomParDefautPour(objets, nature) {
   return `${titre} ${objets.filter((o) => o.nature === nature).length + 1}`;
 }
 
-/** Vrai si le nom est encore un nom automatique (« Stock 4 », « Terrain naturel 2 »...). */
+/** Vrai si le nom est encore un nom automatique (« Stock 4 », « Terrain naturel 2 », « Nouvelle surface »...). */
 function estNomParDefaut(nom) {
-  return NATURES.some(([, titre]) => new RegExp(`^${titre} \\d+$`).test(nom));
+  return nom === NOM_SANS_NATURE || NATURES.some(([, titre]) => new RegExp(`^${titre} \\d+$`).test(nom));
 }
 
 /**
@@ -51,11 +57,12 @@ function estNomParDefaut(nom) {
  * - etiquette(objet) : texte de la surface dans la liste déroulante (nom et levé)
  * - ajouterPhotos(surface, fichiers) : prépare et range les photos choisies (voir photos/photo.js)
  * - leveActifId() : levé utilisé pour une nouvelle surface
- * - quandNatureChange(surface) : appelé quand une surface est créée ou que sa nature change
+ * - quandNatureChange(surface) : appelé quand la nature d'une surface est choisie ou change
  *   (avant quandChange)
+ * - importerFichier(fichier) : importe les surfaces d'un fichier LandXML ou DXF
  */
 export function creerEditeurSurfaces(conteneur, barre, options) {
-  const { obtenirPoints, quandChange, decrire, leveActifId, etiquette, ajouterPhotos, quandNatureChange } = options;
+  const { obtenirPoints, quandChange, decrire, leveActifId, etiquette, ajouterPhotos, quandNatureChange, importerFichier } = options;
   const textes = TEXTES;
   const etat = {
     objets: [],
@@ -98,6 +105,17 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
 
   // --- Modifications ---
 
+  /** Donne une nature à la surface. Un nom encore automatique (« Stock 4 ») la suit (« Terrassement 1 »). */
+  function changerNature(objet, nature) {
+    if (!objet || objet.nature === nature) return;
+    if (estNomParDefaut(objet.nom)) {
+      objet.nature = null; // pour ne pas se compter soi-même dans le numéro
+      objet.nom = nomParDefaut(nature);
+    }
+    objet.nature = nature;
+    quandNatureChange?.(objet);
+  }
+
   function changer() {
     afficher();
     quandChange();
@@ -121,15 +139,16 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
 
   const actions = {
     nouveau: () => {
-      // Une nouvelle surface est un stock ; sa nature se change ensuite (« C'est : »).
-      const surface = creerSurface(nomParDefaut('stock'), leveActifId(), 'stock');
+      // Une nouvelle surface n'a pas encore de nature : on demande d'abord ce que c'est
+      // (stock, terrain naturel, terrassement), puis on lui donne son nom (« Stock 2 »...).
+      const surface = creerSurface(NOM_SANS_NATURE, leveActifId(), null);
       etat.objets.push(surface);
       etat.indexActif = etat.objets.length - 1;
-      quandNatureChange?.(surface);
-      // On commence par le contour : c'est lui qui délimite le stock ou le terrassement.
-      etat.edition = { role: 'contour' };
+      etat.edition = null;
       etat.suppression = false;
+      etat.allerEnHaut = true;
     },
+    'choisir-nature': (bouton) => changerNature(objetActif(), bouton.dataset.nature),
     supprimer: () => {
       const objet = objetActif();
       if (!objet || !confirm(`Supprimer « ${objet.nom} » ?`)) return;
@@ -231,10 +250,10 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
     } else if (cible.dataset.champ === 'nom') {
       objet.nom = cible.value.trim() || objet.nom;
     } else if (cible.dataset.champ === 'nature') {
-      // Nom encore automatique (« Stock 4 ») : il suit la nature (« Terrassement 1 »).
-      if (estNomParDefaut(objet.nom)) objet.nom = nomParDefaut(cible.value);
-      objet.nature = cible.value;
-      quandNatureChange?.(objet);
+      changerNature(objet, cible.value);
+    } else if (cible.dataset.champ === 'fichier-surface') {
+      if (cible.files[0]) importerFichier?.(cible.files[0]);
+      return;
     } else if (cible.dataset.champ === 'ligne-fermee') {
       objet.lignesRupture[Number(cible.dataset.index)].fermee = cible.checked;
     } else if (cible.dataset.champ === 'tous-les-points') {
@@ -287,12 +306,28 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
           </select>
         </div>`
       : '';
-    html += `
+    html = `
       <div class="ligne-outils">
         <button type="button" class="bouton" data-action="nouveau">${textes.nouveau}</button>
-      </div>`;
+        <label class="bouton-discret">
+          ${textes.importer}
+          <input type="file" data-champ="fichier-surface" accept=".xml,.landxml,.dxf,application/xml,text/xml" hidden />
+        </label>
+        ${bulle('importerSurface')}
+      </div>
+      ${html}`;
 
-    if (objet) {
+    if (objet && !objet.nature) {
+      // Surface toute neuve (ou importée) : on commence par dire ce que c'est.
+      html += `
+        <div class="carte-role carte-nature">
+          <p class="titre-choix">${estImportee(objet) ? `« ${echapper(objet.nom)} » (${echapper(objet.nomFichier)})` : 'Nouvelle surface'} : c'est… ${bulle('nature')}</p>
+          <div class="choix-nature-gros">
+            ${NATURES.map(([cle, titre]) => `<button type="button" class="bouton-secondaire" data-action="choisir-nature" data-nature="${cle}">${titre}</button>`).join('')}
+          </div>
+          <div class="ligne-outils"><button type="button" class="bouton-lien" data-action="supprimer">annuler (supprimer cette surface)</button></div>
+        </div>`;
+    } else if (objet) {
       html += `
         <div class="ligne-outils">
           <label>Nom : <input type="text" data-champ="nom" value="${echapper(objet.nom)}" /></label>
@@ -309,6 +344,13 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
 
     conteneur.innerHTML = html;
     afficherBarre();
+    // Nouvelle surface : on remonte en haut de l'onglet, là où elle s'affiche.
+    if (etat.allerEnHaut) {
+      etat.allerEnHaut = false;
+      window.scrollTo(0, 0);
+      const colonne = conteneur.closest('.colonne-gauche');
+      if (colonne) colonne.scrollTop = 0;
+    }
   }
 
   /** Cartes d'une surface : contour, lignes de rupture, points, triangles supprimés, état. */
@@ -358,8 +400,8 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   function cartePhotos(surface) {
     const photos = surface.photos ?? [];
     return `
-      <div class="carte-role">
-        <div class="titre-role"><strong>Photos ${bulle('photos')}</strong><span class="aide">${photos.length}</span></div>
+      <div class="carte-role role-photos">
+        <div class="titre-role"><strong>${iconeRole('photos')}Photos ${bulle('photos')}</strong><span class="aide">${photos.length}</span></div>
         <div class="liste-photos">
           ${photos
             .map(
@@ -380,16 +422,20 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       </div>`;
   }
 
+  /** Cartes des lignes de rupture ; « + Ajouter une ligne de rupture » est dans la dernière (encadré orange). */
   function cartesLignes(objet) {
-    return `
-      ${objet.lignesRupture
-        .map((_, index) => carteRole(objet, { role: 'ligne', index }, 'ligne', true))
-        .join('')}
-      <button type="button" class="bouton-secondaire" data-action="ajouter-ligne">+ Ajouter une ligne de rupture</button>`;
+    const derniere = objet.lignesRupture.length - 1;
+    const ajouter = '<div class="ligne-outils pied-role"><button type="button" class="bouton-secondaire" data-action="ajouter-ligne">+ Ajouter une ligne de rupture</button></div>';
+    return objet.lignesRupture
+      .map((_, index) => carteRole(objet, { role: 'ligne', index }, 'ligne', true, index === derniere ? ajouter : ''))
+      .join('');
   }
 
-  /** Une carte pour un rôle : titre (avec sa bulle d'aide), liste des points, et bouton pour la modifier. */
-  function carteRole(objet, edition, cleAide, supprimable = false) {
+  /**
+   * Une carte pour un rôle : titre (avec sa bulle d'aide), liste des points, et bouton pour la modifier.
+   * pied : HTML ajouté en bas de la carte.
+   */
+  function carteRole(objet, edition, cleAide, supprimable = false, pied = '') {
     return `
       <div class="carte-role role-${edition.role} ${estEnEdition(edition) ? 'en-edition' : ''}">
         <div class="titre-role">
@@ -397,6 +443,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
           ${supprimable && objet.lignesRupture.length > 1 ? `<button type="button" class="bouton-lien" data-action="supprimer-ligne" data-index="${edition.index}">supprimer</button>` : ''}
         </div>
         ${contenuRole(objet, edition)}
+        ${pied}
       </div>`;
   }
 
@@ -471,6 +518,8 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       return;
     }
     barre.hidden = false;
+    // La barre prend la couleur de ce que l'on modifie (contour rouge, ligne orange, points verts, triangles violets).
+    barre.dataset.role = etat.suppression ? 'triangles' : etat.edition.role;
     if (etat.suppression) {
       barre.innerHTML = `
         <div class="barre-texte"><strong>${echapper(objet.nom)} · suppression de triangles</strong> : touche un triangle sur le plan (${objet.trianglesSupprimes.length} supprimé(s))</div>
