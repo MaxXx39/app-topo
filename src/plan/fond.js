@@ -15,10 +15,9 @@ const ORIGINE_NORD = 1350000;
 const TAILLE_TUILE = 256; // pixels
 
 // Fonds disponibles : photo aérienne, et cadastre posé par-dessus.
-// Le cadastre est la couche « Mensuration officielle » de swisstopo : seulement les limites des
-// parcelles et les bâtiments, en traits, sur un fond transparent (on voit la photo aérienne
-// derrière). Elle n'existe qu'en service WMS : on demande une image PNG transparente par tuile,
-// à la place exacte de la tuile (BBOX = Est min, Nord min, Est max, Nord max, en MN95).
+// Le cadastre vient du plan cadastral swisstopo en couleurs (tuiles WMTS, comme la photo).
+// On n'en garde que les traits sombres (limites de parcelles, contours des bâtiments, textes) :
+// le reste devient transparent et on voit la photo aérienne derrière (voir garderLesTraits).
 export const FONDS = {
   satellite: {
     url: (z, colonne, ligne) =>
@@ -26,35 +25,42 @@ export const FONDS = {
     attribution: '© swisstopo',
   },
   cadastre: {
-    url: (z, colonne, ligne) => {
-      const { estMin, nordMin, estMax, nordMax } = emprise(z, colonne, ligne);
-      return (
-        'https://wms.geo.admin.ch/?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ch.swisstopo-vd.amtliche-vermessung' +
-        `&STYLES=&CRS=EPSG:2056&BBOX=${estMin},${nordMin},${estMax},${nordMax}` +
-        `&WIDTH=${TAILLE_TUILE}&HEIGHT=${TAILLE_TUILE}&FORMAT=image/png&TRANSPARENT=true`
-      );
-    },
-    attribution: 'Mensuration officielle © swisstopo / cantons',
-  },
-};
-
-// Fonds de secours : si une tuile d'un fond ne se charge pas, on essaie celle-ci à la place.
-// Le cadastre en traits (service WMS) peut refuser d'être copié dans le PDF ou être indisponible :
-// on reprend alors le plan cadastral en couleurs (tuiles WMTS, comme la photo aérienne).
-export const FONDS_SECOURS = {
-  cadastre: {
     url: (z, colonne, ligne) =>
       `https://wmts.geo.admin.ch/1.0.0/ch.kantone.cadastralwebmap-farbe/default/current/2056/${z}/${colonne}/${ligne}.png`,
     attribution: 'Cadastre © cantons',
+    traitsSeulement: true,
   },
 };
 
-/** Emprise d'une tuile sur le terrain (m, MN95) : { estMin, nordMin, estMax, nordMax }. */
-export function emprise(z, colonne, ligne) {
-  const cote = TAILLE_TUILE * RESOLUTIONS[z];
-  const estMin = ORIGINE_EST + colonne * cote;
-  const nordMax = ORIGINE_NORD - ligne * cote;
-  return { estMin, nordMin: nordMax - cote, estMax: estMin + cote, nordMax };
+// Clarté (0 = noir, 255 = blanc) en dessous de laquelle un pixel du cadastre est un trait.
+const SEUIL_TRAIT = 140;
+
+/**
+ * Vrai si un pixel du plan cadastral fait partie d'un trait : il est assez sombre
+ * (clarté sous SEUIL_TRAIT) et pas transparent. r, g, b, a de 0 à 255.
+ */
+export function estUnTrait(r, g, b, a) {
+  return a > 0 && 0.299 * r + 0.587 * g + 0.114 * b < SEUIL_TRAIT;
+}
+
+/**
+ * Copie d'une tuile du plan cadastral où seuls les traits restent : les autres pixels
+ * (fond blanc, surfaces colorées) deviennent transparents. Renvoie une image "canvas".
+ * La tuile doit avoir été chargée avec crossOrigin = 'anonymous'.
+ */
+export function garderLesTraits(image, toile = document.createElement('canvas')) {
+  toile.width = image.naturalWidth || TAILLE_TUILE;
+  toile.height = image.naturalHeight || TAILLE_TUILE;
+  const contexte = toile.getContext('2d');
+  contexte.clearRect(0, 0, toile.width, toile.height);
+  contexte.drawImage(image, 0, 0);
+  const pixels = contexte.getImageData(0, 0, toile.width, toile.height);
+  const d = pixels.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!estUnTrait(d[i], d[i + 1], d[i + 2], d[i + 3])) d[i + 3] = 0;
+  }
+  contexte.putImageData(pixels, 0, 0);
+  return toile;
 }
 
 /**

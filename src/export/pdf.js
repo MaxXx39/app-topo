@@ -12,7 +12,7 @@ import { choisirEchelle, barreEchellePapier, choisirFormat, miseEnPage } from '.
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
 import { couleurRVB } from '../plan/couleurs.js';
 import { zonesRemblaiDeblai } from '../plan/ecarts.js';
-import { FONDS, FONDS_SECOURS, niveauDeZoom, tuilesPourZone } from '../plan/fond.js';
+import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from '../plan/fond.js';
 import { grouperParNature } from '../volumes/calculs.js';
 import { preparerDessinCoupe, texteEchellesCoupe } from '../coupes/dessin.js';
 import { longueurCoupe } from '../topo/coupe.js';
@@ -582,15 +582,10 @@ async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
   const messages = [];
   const sources = [];
   for (const couche of couches) {
-    let source = FONDS[couche];
+    const source = FONDS[couche];
     let images = await chargerTuiles(tuiles, source);
-    // Fond de secours (cadastre en couleurs) si aucune tuile n'a pu être chargée,
-    // ou si le serveur n'a renvoyé que des images vides (entièrement transparentes).
-    if (FONDS_SECOURS[couche] && images.filter(Boolean).every(estVide)) {
-      source = FONDS_SECOURS[couche];
-      images = await chargerTuiles(tuiles, source);
-      if (images.some(Boolean)) messages.push('cadastre en traits vide ou indisponible : cadastre en couleurs mis à la place');
-    }
+    // Cadastre : seuls les traits restent, le reste est transparent (on voit la photo dessous).
+    if (source.traitsSeulement) images = images.map((image) => (image ? traitsOuRien(image) : null));
     const manquantes = images.filter((image) => !image).length;
     if (manquantes === images.length) {
       messages.push(`${NOMS_COUCHES[couche]} non disponible (pas de connexion ?)`);
@@ -599,9 +594,6 @@ async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
     if (manquantes > 0) messages.push(`${NOMS_COUCHES[couche]} : ${manquantes} tuile(s) sur ${images.length} non chargée(s)`);
     // Photo aérienne atténuée : posée à 50 % sur le fond blanc, le plan se lit mieux par-dessus.
     contexte.globalAlpha = couche === 'satellite' && choix.photoAttenuee ? 0.5 : 1;
-    // Cadastre mélangé en mode « produit » : son fond blanc laisse voir la photo dessous,
-    // ses traits et ses couleurs restent (le cadastre en couleurs a un fond blanc opaque).
-    contexte.globalCompositeOperation = couche === 'cadastre' ? 'multiply' : 'source-over';
     tuiles.forEach((tuile, i) => {
       if (!images[i]) return;
       const x = (tuile.est - hautGauche.est) * mmParMetre * pixelsParMm;
@@ -610,7 +602,6 @@ async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
       contexte.drawImage(images[i], x, y, cote + 0.5, cote + 0.5);
     });
     contexte.globalAlpha = 1;
-    contexte.globalCompositeOperation = 'source-over';
     sources.push(source.attribution);
   }
   if (sources.length > 0) {
@@ -623,19 +614,12 @@ async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
   return { message: messages.join(' ; ') || null, sources };
 }
 
-/** Vrai si une image (tuile) est entièrement transparente : rien n'y est dessiné. */
-function estVide(image) {
-  const toile = document.createElement('canvas');
-  toile.width = 64;
-  toile.height = 64;
-  const contexte = toile.getContext('2d');
-  contexte.drawImage(image, 0, 0, 64, 64);
+/** Tuile du cadastre réduite à ses traits, ou null si le navigateur refuse de la lire. */
+function traitsOuRien(image) {
   try {
-    const { data } = contexte.getImageData(0, 0, 64, 64);
-    for (let i = 3; i < data.length; i += 4) if (data[i] > 0) return false;
-    return true;
+    return garderLesTraits(image);
   } catch {
-    return false; // image non lisible : on ne peut pas savoir, on la garde
+    return null;
   }
 }
 
