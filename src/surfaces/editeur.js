@@ -4,10 +4,11 @@
 // Trois façons de choisir les points : taper une liste de noms,
 // cocher des cases, ou toucher les points sur le plan.
 // Une surface importée (LandXML, DXF) ne se modifie pas : on peut la renommer ou la supprimer.
-import { creerLigne, detecterSeries, lireListeDeNoms, ecrireListeDeNoms, verifierSurface } from '../topo/noms.js';
+import { creerLigne, detecterSeries, lireListeDeNoms, verifierSurface } from '../topo/noms.js';
 import { creerSurface, estImportee, NATURES } from '../topo/surface.js';
 import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
+import { htmlChoixPoints, resumeListe } from './choix-points.js';
 
 const TEXTES = {
   nouveau: '+ Nouvelle surface',
@@ -446,56 +447,24 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   /** Contenu d'une carte : résumé de la liste, ou outils de modification si elle est en cours. */
   function contenuRole(objet, edition) {
     const liste = listeDuRole(objet, edition);
-    const resume = liste.length > 0 ? `${echapper(ecrireListeDeNoms(liste))} <span class="aide">(${liste.length} pt)</span>` : '<span class="aide">aucun point</span>';
 
     if (!estEnEdition(edition)) {
       return `
-        <p class="liste-noms">${resume}</p>
+        <p class="liste-noms">${resumeListe(liste)}</p>
         <button type="button" class="bouton-secondaire" data-action="modifier" data-role="${edition.role}" data-index="${edition.index ?? 0}">Modifier</button>`;
     }
 
-    const points = pointsDe(objet);
-    const series = detecterSeries(points.map((p) => p.nom));
-    const nomsUtilises = new Set(etat.objets.filter((o) => o.leveId === objet.leveId).flatMap(nomsDeLObjet));
-    return `
-      <p class="titre-choix">Choisir les points ${bulle('choisirPoints')}</p>
-      ${
+    return htmlChoixPoints({
+      liste,
+      points: pointsDe(objet),
+      nomsUtilises: new Set(etat.objets.filter((o) => o.leveId === objet.leveId).flatMap(nomsDeLObjet)),
+      messages: etat.messages,
+      casesOuvertes: etat.listeCasesOuverte,
+      enTete:
         edition.role === 'ligne'
           ? `<label class="case"><input type="checkbox" data-champ="ligne-fermee" data-index="${edition.index}" ${objet.lignesRupture[edition.index].fermee ? 'checked' : ''} /> ligne fermée (le dernier point est relié au premier)</label>`
-          : ''
-      }
-      ${
-        series.length > 0
-          ? `<p class="aide">Séries du fichier :</p>
-            <div class="series">
-              ${series
-                .map(
-                  (serie, index) =>
-                    `<button type="button" class="pastille ${serie.every((nom) => nomsUtilises.has(nom)) ? 'utilisee' : ''}" data-action="utiliser-serie" data-index="${index}">${echapper(ecrireListeDeNoms(serie))} <span class="aide">(${serie.length})</span></button>`,
-                )
-                .join('')}
-            </div>`
-          : ''
-      }
-      <label class="champ-liste">
-        Liste de noms (ex. « b100 à b116, b120 »)
-        <span class="ligne-outils">
-          <input type="text" data-champ="liste" value="${echapper(ecrireListeDeNoms(liste))}" autocomplete="off" autocapitalize="off" spellcheck="false" />
-          <button type="button" class="bouton" data-action="valider">Valider</button>
-        </span>
-      </label>
-      ${etat.messages.length > 0 ? `<div class="erreur"><ul>${etat.messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}
-      <details data-zone="cases" ${etat.listeCasesOuverte ? 'open' : ''}>
-        <summary>Ou cocher dans la liste des points</summary>
-        <div class="liste-cases">
-          ${points
-            .map((p) => {
-              const rang = liste.indexOf(p.nom);
-              return `<label class="case"><input type="checkbox" data-case="${echapper(p.nom)}" ${rang >= 0 ? 'checked' : ''} /> ${echapper(p.nom)}${rang >= 0 ? ` <span class="rang">${rang + 1}</span>` : ''}</label>`;
-            })
-            .join('')}
-        </div>
-      </details>`;
+          : '',
+    });
   }
 
   function estEnEdition(edition) {

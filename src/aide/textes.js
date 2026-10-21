@@ -44,6 +44,14 @@ export const TEXTES_AIDE = {
   exporter:
     'PDF : plan à l\'échelle (centré sur les surfaces ; A4, ou A3 si le plan ne tient pas en A4 à l\'échelle choisie), volumes et cartouche. Photo aérienne : toujours atténuée à 50 % pour que le plan se lise mieux. Cadastre : seulement les traits, sur fond transparent. Photos : celles des surfaces, sous la légende. Couleurs : déblai / remblai, ou altitude (l\'un ou l\'autre). Coche ce que le PDF doit montrer. CSV : tableau des volumes pour Excel. DXF (R12) : points avec leur nom et leur altitude (calques NOMS et ALTITUDES), contours, lignes de rupture, triangles en faces 3D, surfaces et courbes. LandXML : les surfaces affichées.',
 
+  // --- 3. Mesures ---
+  mesures:
+    'Mesures de longueurs et d\'aires sur les points importés, à part des surfaces et des volumes (une mesure ne crée pas de surface et ne sert jamais pour un volume). « + Longueur » : touche les points dans l\'ordre (ou tape une liste, ou coche). « + Aire » : un contour (fermé automatiquement), et si besoin des lignes de rupture et des points isolés, comme pour une surface. Sur le plan, les mesures sont en cyan pointillé ; touche une mesure pour la choisir.',
+  valeursMesure:
+    'Longueur 2D : à plat. Longueur 3D : distance inclinée, morceau par morceau. Dénivelé : altitude du dernier point moins celle du premier. Pente = dénivelé ÷ longueur 2D × 100 (positive quand ça monte). Aire 2D : aire du contour à plat. Aire 3D : somme des triangles (contour, lignes de rupture et points isolés). Coche « Plan et PDF » pour écrire la valeur sur le plan et dans le PDF ; « Détail » donne chaque morceau.',
+  exporterMesures:
+    'Export à part de celui des volumes : aucun volume dedans. PDF : plan à l\'échelle centré sur les mesures, et à droite le tableau des valeurs cochées. « Valeurs sur le plan » écrit sur le plan les valeurs cochées de chaque mesure (et ses morceaux si « Chaque morceau » est coché). CSV : toutes les valeurs de chaque mesure, puis chaque morceau, pour Excel. DXF : calque MESURES (lignes, contours et textes), triangles des aires, points avec nom et altitude.',
+
   // --- Plan ---
   plan:
     'Pince avec deux doigts pour zoomer, glisse pour te déplacer. Touche une surface pour la choisir ; pendant une modification, touche un point pour l\'ajouter ou le retirer. « Calques » choisit ce qui est affiché. Rouge = remblai, jaune = déblai : plus la couleur est foncée, plus l\'épaisseur est grande (palier réglable dans « Calques »).',

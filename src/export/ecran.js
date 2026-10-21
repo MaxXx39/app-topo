@@ -173,7 +173,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
 }
 
 /** '2026-05-20' -> '20.05.2026' */
-function dateSuisse(iso) {
+export function dateSuisse(iso) {
   const [annee, mois, jour] = iso.split('-');
   return annee && mois && jour ? `${jour}.${mois}.${annee}` : '';
 }

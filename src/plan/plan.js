@@ -9,6 +9,8 @@ import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js'
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
+import { lignesEtiquette, texteMorceau, placeEtiquetteMesure } from '../mesures/valeurs.js';
+import { nomsDeLaMesure } from '../topo/mesure.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -16,20 +18,21 @@ const SVG = 'http://www.w3.org/2000/svg';
 const RAYON_TOUCHER = 22;
 
 // Calques que l'on peut afficher ou masquer, avec leur état de départ.
+// "surfaces" : calque des surfaces seulement, caché dans le menu de l'onglet 3. Mesures.
 const CALQUES = [
   { cle: 'fondSatellite', titre: 'Fond photo aérienne (swisstopo)', parDefaut: false },
   { cle: 'cadastre', titre: 'Cadastre', parDefaut: false },
   { cle: 'points', titre: 'Points', parDefaut: true },
   { cle: 'noms', titre: 'Noms des points', parDefaut: true },
   { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false },
-  { cle: 'contours', titre: 'Contours des surfaces', parDefaut: true },
-  { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true },
+  { cle: 'contours', titre: 'Contours des surfaces', parDefaut: true, surfaces: true },
+  { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true, surfaces: true },
   { cle: 'triangles', titre: 'Triangles', parDefaut: true },
-  { cle: 'remblaiDeblai', titre: 'Déblai (jaune) / remblai (rouge)', parDefaut: true },
+  { cle: 'remblaiDeblai', titre: 'Déblai (jaune) / remblai (rouge)', parDefaut: true, surfaces: true },
   { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false },
   { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false },
-  { cle: 'volumes', titre: 'Volume sur chaque surface', parDefaut: true },
-  { cle: 'autresStocks', titre: 'Autres surfaces', parDefaut: true },
+  { cle: 'volumes', titre: 'Volume sur chaque surface', parDefaut: true, surfaces: true },
+  { cle: 'autresStocks', titre: 'Autres surfaces', parDefaut: true, surfaces: true },
 ];
 const CLE_MEMOIRE = 'topo-calques';
 // Équidistances proposées pour les courbes et les couleurs (m). « auto » : choisie selon la hauteur du stock.
@@ -43,9 +46,10 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  *   en mode suppression de triangles (dessin.modeTriangles)
  * - quandToucherPosition({ est, nord }) : appelé pendant le tracé d'une coupe (dessin.traceCoupe) ;
  *   près d'un point levé, la position est celle de ce point
+ * - quandToucherMesure(id) : appelé quand on touche une mesure (onglet 3. Mesures, hors modification)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure } = {}) {
   const calques = lireCalques();
 
   // Boutons posés sur le plan : calques en haut à gauche, zoom en haut à droite.
@@ -62,9 +66,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         ${bulle('plan')}
         <div class="menu-calques" hidden>
           ${CALQUES.map(
-            (c) => `<label class="case"><input type="checkbox" data-calque="${c.cle}" ${calques[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`,
+            (c) => `<label class="case ${c.surfaces ? 'seulement-surfaces' : ''}"><input type="checkbox" data-calque="${c.cle}" ${calques[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`,
           ).join('')}
-          <label class="choix-equidistance">Palier déblai / remblai
+          <label class="choix-equidistance seulement-surfaces">Palier déblai / remblai
             <select data-calque="palier">
               ${PALIERS.map((e) => `<option value="${e}" ${calques.palier === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
             </select>
@@ -106,7 +110,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // surface : surface affichée { triangles, trianglesRetires } ; modeTriangles : suppression au doigt
   // ecarts : triangles d'écart à colorier à la place de ceux des surfaces, sinon null
   // coupes : coupes tracées [{ nom, debut, fin }] ; traceCoupe : { debut } pendant un tracé, sinon null
+  // modeMesures : onglet 3. Mesures (pas de surface ni de coupe) ; mesures : [{ mesure, resultat }]
+  // du levé affiché ; mesureActive : mesure choisie (ses points sont entourés pendant une modification)
   let dessin = {
+    modeMesures: false,
+    mesures: [],
+    mesureActive: null,
     coupes: [],
     traceCoupe: null,
     stocks: [],
@@ -180,6 +189,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       for (const nom of (stock.lignesRupture ?? []).flatMap((ligne) => ligne.noms)) classes.set(nom, 'role-ligne');
       for (const nom of stock.contour ?? []) classes.set(nom, 'role-contour');
     }
+    // Points de la mesure choisie : en cyan, la couleur des mesures.
+    if (dessin.mesureActive) {
+      for (const nom of nomsDeLaMesure(dessin.mesureActive)) classes.set(nom, 'role-mesure');
+      const triangles = dessin.mesures.find((m) => m.mesure === dessin.mesureActive)?.resultat?.triangles ?? [];
+      for (const nom of triangles.flat().map((p) => p.nom)) classes.set(nom, 'role-mesure');
+    }
     const rangs = new Map(dessin.listeEnCours.map((nom, index) => [nom, index + 1]));
 
     // Points visibles à l'écran, ceux du stock actif en premier (leurs noms sont prioritaires).
@@ -235,7 +250,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       });
     }
 
+    dessinerTracesMesures();
     svg.append(groupePoints, groupeNoms);
+    dessinerEtiquettesMesures();
     dessinerCoupes();
     if (calques.volumes) dessinerVolumes();
     dessinerLegende();
@@ -449,8 +466,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (!estVisible(stock)) return [];
       return dessin.resultats[index]?.trianglesDessus ?? [];
     });
-    // La surface affichée (onglet 2.1 Surfaces) est aussi coloriée.
+    // La surface affichée (onglet 2.1 Surfaces) est aussi coloriée, et les aires mesurées (onglet 3. Mesures).
     if (dessin.surface) triangles.push(...dessin.surface.triangles);
+    for (const { resultat } of dessin.mesures ?? []) if (resultat?.triangles) triangles.push(...resultat.triangles);
     if (triangles.length === 0) return;
     const plage = plageAltitudes(triangles);
     const equidistance =
@@ -599,6 +617,97 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
+  /** Position à l'écran de chaque point de la mesure (ceux qui existent dans le levé). */
+  function sommetsMesure(noms) {
+    const parNom = new Map(points.map((p) => [p.nom, p]));
+    return noms.map((nom) => parNom.get(nom)).filter(Boolean).map((p) => versEcran(p.est, p.nord, vue));
+  }
+
+  /** Tracé SVG passant par des positions à l'écran (fermé ou non). */
+  const tracePar = (sommets, ferme) => sommets.map((s, i) => `${i === 0 ? 'M' : 'L'}${s.x} ${s.y}`).join(' ') + (ferme ? ' Z' : '');
+
+  /**
+   * Mesures (onglet 3. Mesures) : longueurs en trait cyan pointillé, aires avec leur contour
+   * pointillé, un fond cyan léger, leurs lignes de rupture et leurs triangles (calque « Triangles »).
+   */
+  function dessinerTracesMesures() {
+    if (!dessin.mesures?.length) return;
+    const groupe = creerElement('g', { class: 'mesures' });
+    for (const { mesure, resultat } of dessin.mesures) {
+      const actif = mesure === dessin.mesureActive ? ' actif' : '';
+      if (mesure.type === 'aire') {
+        if (calques.triangles && resultat?.triangles) {
+          const traits = resultat.triangles.map((t) => tracePar(t.map((p) => versEcran(p.est, p.nord, vue)), true)).join(' ');
+          groupe.append(creerElement('path', { d: traits, class: 'triangles-mesure' }));
+        }
+        for (const ligne of mesure.lignesRupture) {
+          const sommets = sommetsMesure(ligne.noms);
+          if (sommets.length >= 2) groupe.append(creerElement('path', { d: tracePar(sommets, ligne.fermee), class: `ligne-mesure${actif}` }));
+        }
+        const contour = sommetsMesure(mesure.contour);
+        if (contour.length >= 2) groupe.append(creerElement('path', { d: tracePar(contour, contour.length >= 3), class: `aire-mesure${actif}` }));
+      } else {
+        const sommets = sommetsMesure(mesure.points);
+        if (sommets.length >= 2) groupe.append(creerElement('path', { d: tracePar(sommets, false), class: `longueur-mesure${actif}` }));
+      }
+    }
+    svg.append(groupe);
+  }
+
+  /** Étiquette de chaque mesure (nom et valeurs cochées), et texte de chaque morceau si demandé. */
+  function dessinerEtiquettesMesures() {
+    if (!dessin.mesures?.length) return;
+    const groupe = creerElement('g', { class: 'etiquettes-mesures' });
+    for (const { mesure, resultat } of dessin.mesures) {
+      if (!resultat || resultat.erreurs) continue;
+      if (mesure.afficher?.morceaux) {
+        for (const morceau of resultat.morceaux) {
+          const a = versEcran(morceau.debut.est, morceau.debut.nord, vue);
+          const b = versEcran(morceau.fin.est, morceau.fin.nord, vue);
+          // Texte le long du morceau, toujours lisible (jamais à l'envers), un peu au-dessus du trait.
+          let angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+          if (angle > 90) angle -= 180;
+          if (angle < -90) angle += 180;
+          const x = (a.x + b.x) / 2;
+          const y = (a.y + b.y) / 2;
+          const texte = creerElement('text', { x, y: y - 5, 'text-anchor': 'middle', class: 'cote-morceau', transform: `rotate(${angle} ${x} ${y})` });
+          texte.textContent = texteMorceau(mesure, morceau);
+          groupe.append(texte);
+        }
+      }
+      const lignes = lignesEtiquette(mesure, resultat);
+      const place = placeEtiquetteMesure(mesure, resultat);
+      const { x, y } = versEcran(place.est, place.nord, vue);
+      const largeur = Math.max(...lignes.map((l) => l.length)) * 6.8 + 14;
+      const hauteur = lignes.length * 15 + 8;
+      groupe.append(creerElement('rect', { x: x - largeur / 2, y: y - hauteur / 2, width: largeur, height: hauteur, rx: 6, class: mesure === dessin.mesureActive ? 'actif' : '' }));
+      lignes.forEach((ligne, i) => {
+        const texte = creerElement('text', { x, y: y - hauteur / 2 + 15 + i * 15, 'text-anchor': 'middle', class: i === 0 ? 'nom-mesure' : '' });
+        texte.textContent = ligne;
+        groupe.append(texte);
+      });
+    }
+    svg.append(groupe);
+  }
+
+  /** Mesure touchée : dans le contour d'une aire, ou tout près du trait d'une longueur. Renvoie son id, ou null. */
+  function mesureSousLeDoigt(position) {
+    const terrain = versTerrain(position.x, position.y, vue);
+    for (const { mesure } of dessin.mesures ?? []) {
+      if (mesure.type === 'aire') {
+        const parNom = new Map(points.map((p) => [p.nom, p]));
+        const contour = mesure.contour.map((nom) => parNom.get(nom)).filter(Boolean);
+        if (contour.length >= 3 && pointDansPolygone(terrain, contour)) return mesure.id;
+      } else {
+        const sommets = sommetsMesure(mesure.points);
+        for (let i = 0; i + 1 < sommets.length; i++) {
+          if (distanceAuSegment(position, sommets[i], sommets[i + 1]) < RAYON_TOUCHER / 2) return mesure.id;
+        }
+      }
+    }
+    return null;
+  }
+
   /** Barre d'échelle en bas à gauche, avec une longueur ronde en mètres. */
   function dessinerBarreEchelle() {
     const { metres, pixels } = barreEchelle(vue.echelle);
@@ -726,6 +835,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         // Pendant une modification : toucher un point l'ajoute ou le retire.
         const point = pointLePlusProche(toucher);
         if (point) quandToucherPoint?.(point.nom);
+      } else if (dessin.modeMesures) {
+        // Onglet 3. Mesures : toucher une mesure la choisit.
+        const id = mesureSousLeDoigt(toucher);
+        if (id) quandToucherMesure?.(id);
       } else {
         // Sinon : toucher l'intérieur d'un stock le choisit.
         const index = stockSousLeDoigt(toucher);
@@ -791,6 +904,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     /** Redessine le plan avec les stocks (sans changer le zoom). */
     redessiner(nouveauDessin) {
       dessin = nouveauDessin;
+      // Onglet 3. Mesures : le menu ne propose pas les calques des surfaces.
+      menuCalques.classList.toggle('mode-mesures', Boolean(dessin.modeMesures));
       dessiner();
     },
   };
@@ -808,6 +923,13 @@ function distance(a, b) {
 
 function milieu(a, b) {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+/** Distance (pixels) entre une position p et le segment [a, b]. */
+function distanceAuSegment(p, a, b) {
+  const longueur2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
+  const t = longueur2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / longueur2)) : 0;
+  return distance(p, { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
 }
 
 /** Relit les calques choisis la dernière fois (gardés dans le navigateur), sinon ceux par défaut. */
