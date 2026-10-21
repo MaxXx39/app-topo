@@ -46,21 +46,49 @@ const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 
 // --- Mise en page : onglets ---
 // L'onglet Projet vient en premier (l'appli s'ouvre dessus). Les onglets numérotés suivent
-// l'ordre du travail : importer les points, préparer les surfaces, calculer les volumes.
+// l'ordre du travail : importer les points, préparer les surfaces et calculer les volumes
+// (2.1 et 2.2, réunis dans un même cadre), puis mesurer (3, à part des volumes).
 const ICONES = {
   projets: '<path d="M3 7h6l2 2h10v10H3z" />',
   importer: '<path d="M12 15V4M7 9l5-5 5 5M4 15v5h16v-5" />',
   surfaces: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
   volumes: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
+  mesures: '<path d="M3 16 16 3l5 5L8 21zM7 12l2 2M10 9l2 2M13 6l2 2" />',
   plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
 };
+// "court" : titre utilisé sur les petits téléphones. "groupe" : onglets dessinés dans un même cadre.
 const ONGLETS = [
   { nom: 'projets', titre: 'Projet' },
   { nom: 'importer', titre: '1. Importer' },
-  { nom: 'surfaces', titre: '2. Surfaces' },
-  { nom: 'volumes', titre: '3. Volumes' },
+  { nom: 'surfaces', titre: '2.1 Surfaces', court: '2.1 Surf.', groupe: 'volumes' },
+  { nom: 'volumes', titre: '2.2 Volumes', court: '2.2 Vol.', groupe: 'volumes' },
+  { nom: 'mesures', titre: '3. Mesures' },
   { nom: 'plan', titre: 'Plan' },
 ];
+
+/** Bouton d'un onglet (icône + titre, et titre court pour les petits téléphones). */
+const boutonOnglet = (o) => `<button type="button" data-onglet="${o.nom}">
+    <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[o.nom]}</svg>
+    ${o.court
+      ? `<span class="titre-long">${o.titre}</span><span class="titre-court" aria-hidden="true">${o.court}</span>`
+      : `<span>${o.titre}</span>`}
+  </button>`;
+
+/** Barre des onglets : les onglets d'un même groupe sont réunis dans un cadre. */
+function barreOnglets() {
+  let html = '';
+  for (let i = 0; i < ONGLETS.length; i += 1) {
+    const o = ONGLETS[i];
+    if (!o.groupe) {
+      html += boutonOnglet(o);
+      continue;
+    }
+    const groupe = ONGLETS.filter((autre) => autre.groupe === o.groupe);
+    html += `<div class="groupe-onglets" role="group" aria-label="Surfaces et volumes">${groupe.map(boutonOnglet).join('')}</div>`;
+    i += groupe.length - 1;
+  }
+  return html;
+}
 
 document.querySelector('#app').innerHTML = `
   <div class="mise-en-page">
@@ -68,16 +96,20 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="projets"><div id="projets"></div></section>
       <section class="panneau" data-onglet="importer"><div id="importer"></div></section>
       <section class="panneau" data-onglet="surfaces">
-        <h2>2. Surfaces <span class="aide" id="nom-leve-surfaces"></span> ${bulle('surfaces')}</h2>
+        <h2>2.1 Surfaces <span class="aide" id="nom-leve-surfaces"></span> ${bulle('surfaces')}</h2>
         <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer), ou une surface LandXML ou DXF.</p>
         <div id="message-import-surface"></div>
         <div id="surfaces"></div>
       </section>
       <section class="panneau" data-onglet="volumes">
-        <h2>3. Volumes ${bulle('volumes')}</h2>
+        <h2>2.2 Volumes ${bulle('volumes')}</h2>
         <div id="volumes"></div>
         <div id="coupes"></div>
         <div id="export" class="carte-export"></div>
+      </section>
+      <section class="panneau" data-onglet="mesures">
+        <h2>3. Mesures</h2>
+        <p class="vide">Bientôt : mesurer des longueurs et des aires (2D et 3D) sur les points importés.</p>
       </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
     </div>
@@ -85,14 +117,7 @@ document.querySelector('#app').innerHTML = `
       <div id="plan"></div>
     </section>
   </div>
-  <nav class="onglets" aria-label="Onglets">
-    ${ONGLETS.map(
-      (o) => `<button type="button" data-onglet="${o.nom}">
-        <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[o.nom]}</svg>
-        <span>${o.titre}</span>
-      </button>`,
-    ).join('')}
-  </nav>
+  <nav class="onglets" aria-label="Onglets">${barreOnglets()}</nav>
 `;
 
 /** Affiche un onglet. Sur ordinateur, le plan reste toujours visible à droite. */
@@ -446,7 +471,7 @@ function decrireSurface(surface) {
   const calcul = calculDuPlan(surface);
   const volume = calcul ? resultatsCalculs.get(calcul.id) : null;
   return `
-    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${volume ? ` · remblai ${formaterNombre(volume.remblai)} m³ (onglet 3. Volumes)` : ''}</p>
+    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${volume ? ` · remblai ${formaterNombre(volume.remblai)} m³ (onglet 2.2 Volumes)` : ''}</p>
     ${r.avertissements.length > 0 ? `<div class="avertissement"><ul>${r.avertissements.map((a) => `<li>${echapper(a)}</li>`).join('')}</ul></div>` : ''}`;
 }
 

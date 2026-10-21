@@ -1,4 +1,4 @@
-// Calculs de volume du projet (onglet 3. Volumes). Deux sortes de volumes :
+// Calculs de volume du projet (onglet 2.2 Volumes). Deux sortes de volumes :
 // - « Stock seul » : le volume d'un stock par rapport à sa base, au choix
 //   la ligne du contour (les points du pied) ou un plan horizontal à une altitude ;
 // - « Comparaison de 2 surfaces » : une surface de référence (la première choisie : terrain

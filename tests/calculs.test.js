@@ -1,4 +1,4 @@
-// Tests des calculs de volume de l'onglet 3. Volumes (surface 1, ligne basse ou surface 2, zone).
+// Tests des calculs de volume de l'onglet 2.2 Volumes (surface 1, ligne basse ou surface 2, zone).
 import { describe, it, expect } from 'vitest';
 import { creerSurface, surfaceImportee, calculerSurface } from '../src/topo/surface.js';
 import { calculerVolumeSurface, volumeSurAltitude } from '../src/topo/volume.js';

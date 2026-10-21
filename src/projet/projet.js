@@ -7,7 +7,7 @@
 //   leves: [{ id, nom, importeLe, points: [{ nom, est, nord, altitude }] }],
 //   leveActifId,                    // levé affiché
 //   surfaces: [...],                // stocks, terrassements, terrains... : voir topo/surface.js
-//   calculs: [...],                 // calculs de volume (onglet 3. Volumes) : voir volumes/calculs.js
+//   calculs: [...],                 // calculs de volume (onglet 2.2 Volumes) : voir volumes/calculs.js
 //   coupes: [{ id, nom ('A', 'B'), debut, fin, exageration (1 ou 2), dansPdf }],  // 2 au maximum
 //                                   // debut, fin : { est, nord } (m, MN95)
 //   cartouche: { affaire, dessinePar, date },   // date : 'AAAA-MM-JJ', ou '' pour la date du jour

@@ -1,4 +1,4 @@
-// Onglet 2. Surfaces : créer et modifier les surfaces (stock, terrassement, terrain...).
+// Onglet 2.1 Surfaces : créer et modifier les surfaces (stock, terrassement, terrain...).
 // Pour une surface créée à partir d'un levé, on choisit les points de chaque rôle :
 // contour, lignes de rupture, points isolés / caractéristiques ; puis on peut supprimer des triangles au doigt.
 // Trois façons de choisir les points : taper une liste de noms,

@@ -421,7 +421,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     legendeEcarts = legendeZones;
   }
 
-  /** Surface affichée (onglet 2. Surfaces) : ses triangles, et les triangles supprimés en pointillés rouges. */
+  /** Surface affichée (onglet 2.1 Surfaces) : ses triangles, et les triangles supprimés en pointillés rouges. */
   function dessinerSurface(groupe) {
     const surface = dessin.surface;
     if (!surface) return;
@@ -449,7 +449,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (!estVisible(stock)) return [];
       return dessin.resultats[index]?.trianglesDessus ?? [];
     });
-    // La surface affichée (onglet 2. Surfaces) est aussi coloriée.
+    // La surface affichée (onglet 2.1 Surfaces) est aussi coloriée.
     if (dessin.surface) triangles.push(...dessin.surface.triangles);
     if (triangles.length === 0) return;
     const plage = plageAltitudes(triangles);

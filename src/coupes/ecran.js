@@ -1,4 +1,4 @@
-// Coupes (onglet 3. Volumes, sous le récapitulatif) : 2 au maximum, A – A' et B – B'.
+// Coupes (onglet 2.2 Volumes, sous le récapitulatif) : 2 au maximum, A – A' et B – B'.
 // Une coupe se trace en touchant le plan deux fois (début, puis fin) ; ses coordonnées se
 // corrigent ensuite au clavier. Elle montre toutes les surfaces affichées qu'elle traverse.
 import { formaterNombre } from '../topo/format.js';

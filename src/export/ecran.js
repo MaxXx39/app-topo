@@ -107,7 +107,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
         ...surfaces,
       ].filter((s) => s.triangles.length > 0);
       if (liste.length === 0) {
-        message.textContent = 'Aucune surface à exporter : crée d\'abord une surface (onglet 2. Surfaces).';
+        message.textContent = 'Aucune surface à exporter : crée d\'abord une surface (onglet 2.1 Surfaces).';
         return;
       }
       telecharger(new Blob([ecrireLandXML(liste, nomProjet)], { type: 'application/xml' }), `${nomDeFichier()}.xml`);

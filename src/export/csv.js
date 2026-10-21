@@ -3,7 +3,7 @@
 import { formaterNombre } from '../topo/format.js';
 
 /**
- * Construit le texte du fichier CSV : une ligne par calcul de volume (onglet 3. Volumes).
+ * Construit le texte du fichier CSV : une ligne par calcul de volume (onglet 2.2 Volumes).
  * - volumes : liste de { nom, base, resultat } ; base = « ligne basse » ou le nom de la surface 2
  * Colonnes : Nom ; Base ; Surface (m²) ; Remblai (m³) ; Déblai (m³).
  * Les calculs impossibles sont ignorés.

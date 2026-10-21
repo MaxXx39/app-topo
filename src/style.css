@@ -270,10 +270,38 @@ body.aide-active .rond-aide {
   white-space: nowrap;
 }
 
-/* Petits téléphones : texte des onglets un peu plus petit pour tenir sur une ligne. */
+/* 2.1 Surfaces et 2.2 Volumes vont ensemble : un cadre ambre clair les réunit. */
+.groupe-onglets {
+  flex: 2;
+  display: flex;
+  margin: 5px 2px;
+  border: 1.5px solid var(--ambre);
+  border-radius: 12px;
+  background: var(--jaune-clair);
+}
+
+.titre-court {
+  display: none;
+}
+
+/* Petits téléphones : texte des onglets un peu plus petit pour tenir sur une ligne,
+   et titres courts (« 2.1 Surf. », « 2.2 Vol. »). */
 @media (max-width: 420px) {
   .onglets button {
-    font-size: 0.66rem;
+    font-size: 0.64rem;
+  }
+
+  .onglets .titre-long {
+    display: none;
+  }
+
+  .onglets .titre-court {
+    display: inline;
+  }
+
+  .onglets button.actif svg {
+    width: 40px;
+    padding: 1px 8px;
   }
 }
 
@@ -417,7 +445,7 @@ body.aide-active .rond-aide {
     grid-template-columns: 440px 1fr;
     gap: 16px;
     padding: 16px;
-    padding-top: calc(16px + 52px);
+    padding-top: calc(16px + 56px);
     height: calc(100vh - var(--hauteur-entete));
   }
 
@@ -444,19 +472,27 @@ body.aide-active .rond-aide {
     left: 16px;
     right: auto;
     width: 440px;
-    height: 44px;
+    height: 48px;
     padding: 4px;
     border: none;
     border-radius: var(--rayon);
     box-shadow: var(--ombre);
   }
 
+  /* Chaque onglet prend la place de son titre, pour que les 5 tiennent sur la ligne. */
   .onglets button {
+    flex: 1 1 auto;
     flex-direction: row;
-    gap: 5px;
-    padding: 0 4px;
-    font-size: 0.8rem;
+    gap: 4px;
+    padding: 0 3px;
+    font-size: 0.74rem;
     border-radius: 8px;
+  }
+
+  .groupe-onglets {
+    flex: 2 1 auto;
+    margin: 0 2px;
+    border-radius: 10px;
   }
 
   .onglets button.actif {
@@ -1215,7 +1251,7 @@ svg.plan {
 
 /* --- Export --- */
 
-/* Bloc « Exporter » (onglet 3. Volumes) : une carte bien visible, avec un trait ambre en haut. */
+/* Bloc « Exporter » (onglet 2.2 Volumes) : une carte bien visible, avec un trait ambre en haut. */
 .carte-export {
   margin-top: 20px;
   padding: 4px 14px 10px;
@@ -1321,7 +1357,7 @@ svg.plan {
   margin: 8px 0;
 }
 
-/* Nom d'un calcul de volume (onglet 3. Volumes). */
+/* Nom d'un calcul de volume (onglet 2.2 Volumes). */
 #volumes .titre-role input {
   flex: 1;
   min-width: 0;
@@ -1530,7 +1566,7 @@ body.mode-dessin[data-onglet='surfaces'] .barre-edition[data-role] {
   color: var(--gris);
 }
 
-/* --- 3. Volumes : une carte par volume --- */
+/* --- 2.2 Volumes : une carte par volume --- */
 
 .carte-volume .champ-large {
   margin: 8px 0;
@@ -1561,7 +1597,7 @@ body.mode-dessin[data-onglet='surfaces'] .barre-edition[data-role] {
   color: var(--gris);
 }
 
-/* --- Coupes (onglet 3. Volumes) --- */
+/* --- Coupes (onglet 2.2 Volumes) --- */
 
 .carte-coupe {
   --couleur-role: var(--sombre);
