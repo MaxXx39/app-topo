@@ -1154,6 +1154,15 @@ button.puce {
   user-select: none;
 }
 
+/* Cadastre mélangé en mode « produit » : son fond blanc laisse voir la photo aérienne dessous. */
+.plan-fond {
+  isolation: isolate;
+}
+
+.plan-fond img.cadastre {
+  mix-blend-mode: multiply;
+}
+
 /* Le dessin et les boutons restent au-dessus du fond. */
 svg.plan {
   position: relative;

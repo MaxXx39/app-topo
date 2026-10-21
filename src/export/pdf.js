@@ -599,6 +599,9 @@ async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
     if (manquantes > 0) messages.push(`${NOMS_COUCHES[couche]} : ${manquantes} tuile(s) sur ${images.length} non chargée(s)`);
     // Photo aérienne atténuée : posée à 50 % sur le fond blanc, le plan se lit mieux par-dessus.
     contexte.globalAlpha = couche === 'satellite' && choix.photoAttenuee ? 0.5 : 1;
+    // Cadastre mélangé en mode « produit » : son fond blanc laisse voir la photo dessous,
+    // ses traits et ses couleurs restent (le cadastre en couleurs a un fond blanc opaque).
+    contexte.globalCompositeOperation = couche === 'cadastre' ? 'multiply' : 'source-over';
     tuiles.forEach((tuile, i) => {
       if (!images[i]) return;
       const x = (tuile.est - hautGauche.est) * mmParMetre * pixelsParMm;
@@ -607,6 +610,7 @@ async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
       contexte.drawImage(images[i], x, y, cote + 0.5, cote + 0.5);
     });
     contexte.globalAlpha = 1;
+    contexte.globalCompositeOperation = 'source-over';
     sources.push(source.attribution);
   }
   if (sources.length > 0) {
