@@ -126,7 +126,13 @@ export function creerEcranMesures(conteneur, barre, options) {
       etat.edition = { role: bouton.dataset.role, index: Number(bouton.dataset.index ?? 0) };
       etat.messages = [];
     },
+    // « Terminé » (barre du bas) : la liste tapée est prise, puis la saisie se ferme
+    // (sauf s'il y a une erreur à lire). Un seul bouton pour finir, comme la touche Entrée.
     termine: () => {
+      if (etat.edition && conteneur.querySelector('[data-champ="liste"]')) {
+        actions.valider();
+        return;
+      }
       etat.edition = null;
       etat.messages = [];
     },
@@ -143,7 +149,7 @@ export function creerEcranMesures(conteneur, barre, options) {
       }
       etat.messages = [];
     },
-    // « Valider » : la liste tapée est prise, puis la saisie se ferme (sauf s'il y a une erreur à lire).
+    // La liste tapée est prise, puis la saisie se ferme (sauf s'il y a une erreur à lire) : touche Entrée, ou « Terminé ».
     valider: () => {
       const texte = conteneur.querySelector('[data-champ="liste"]').value;
       const nomsExistants = obtenirPoints(mesureActive()).map((p) => p.nom);

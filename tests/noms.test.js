@@ -114,3 +114,12 @@ describe('verifierSurface - ligne fermée', () => {
     expect(verifierSurface(surface, noms)[0]).toContain('au moins 3 points (ligne fermée)');
   });
 });
+
+describe('liste écrite puis relue (« Terminé » reprend le texte du champ)', () => {
+  it('redonne exactement les mêmes points, dans le même ordre', () => {
+    const existants = ['b1', 'b2', 'b3', 'b4', 'b5', 'h1', 'h2', 'route3', '27', 'B10'];
+    for (const liste of [['b5', 'b4', 'b3'], ['route3', '27'], ['b1', 'b2', 'b3', 'h2', 'h1', 'B10'], ['b2', 'b4', 'b1']]) {
+      expect(lireListeDeNoms(ecrireListeDeNoms(liste), existants)).toEqual({ noms: liste, erreurs: [] });
+    }
+  });
+});
