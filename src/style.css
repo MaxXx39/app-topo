@@ -271,14 +271,14 @@ body.aide-active .rond-aide {
   white-space: nowrap;
 }
 
-/* 2.1 Surfaces et 2.2 Volumes vont ensemble : un cadre ambre clair les réunit. */
+/* 2.1 Surfaces et 2.2 Volumes vont ensemble : un cadre gris discret les réunit. */
 .groupe-onglets {
   flex: 2;
   display: flex;
   margin: 5px 2px;
-  border: 1.5px solid var(--ambre);
+  border: 1.5px solid #c5ccd1;
   border-radius: 12px;
-  background: var(--jaune-clair);
+  background: var(--fond);
 }
 
 .titre-court {
@@ -566,6 +566,12 @@ button.bouton {
   font-size: 0.9rem;
   cursor: pointer;
   padding: 4px;
+}
+
+/* Lien qui ne supprime rien (modifier, dupliquer...) : bleu nuit souligné, pas rouge. */
+.bouton-lien.bouton-lien-neutre {
+  color: var(--sombre);
+  text-decoration: underline;
 }
 
 button:disabled {
@@ -1918,4 +1924,190 @@ th.nombre {
   paint-order: stroke;
   stroke: #ffffff;
   stroke-width: 3px;
+}
+
+/* ==========================================================================
+   Onglet Projet : des blocs bien séparés, pour s'y retrouver d'un coup d'œil
+   ========================================================================== */
+
+/* Projet ouvert : bandeau bleu nuit avec son nom, puis les étapes du travail. */
+.projet-ouvert {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--sombre);
+  margin-bottom: 16px;
+}
+
+.projet-entete {
+  background: var(--sombre);
+  color: #ffffff;
+  padding: 12px 14px 14px;
+  border-bottom: 4px solid var(--ambre);
+}
+
+.etiquette-entete {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ambre);
+  margin-bottom: 4px;
+}
+
+.projet-entete input.nom-projet {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  background: var(--sombre-2);
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.projet-corps {
+  padding: 10px 14px 14px;
+  background: var(--surface);
+}
+
+.titre-section {
+  margin: 4px 0 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gris);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Étapes : 4 tuiles (2 par ligne sur téléphone, 4 sur une ligne si la place le permet). */
+.etapes-projet {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+@media (min-width: 560px) and (max-width: 899px) {
+  .etapes-projet {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.tuile-etape {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--fond);
+  color: var(--texte);
+  text-align: left;
+  cursor: pointer;
+}
+
+.numero-etape {
+  grid-row: span 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #dfe4e8;
+  color: var(--gris);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.titre-etape {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.compte-etape {
+  font-size: 0.8rem;
+  color: var(--gris);
+}
+
+/* Étape où il y a déjà quelque chose : coche verte. */
+.tuile-etape.faite {
+  background: var(--surface);
+}
+
+.tuile-etape.faite .numero-etape {
+  background: var(--succes);
+  color: #ffffff;
+  font-size: 0.95rem;
+}
+
+.bouton-large {
+  width: 100%;
+}
+
+/* Autres blocs : cartouche, fichier projet, mes projets. */
+.panneau .carte-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: none;
+}
+
+.carte-section {
+  border: 1px solid var(--bordure);
+  border-left: 4px solid var(--sombre);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  background: var(--surface);
+}
+
+.icone-section {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--sombre);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  flex: none;
+}
+
+.ligne-projet {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--bordure);
+}
+
+.ligne-projet .ligne-outils {
+  margin: 0;
+}
+
+.infos-projet {
+  display: flex;
+  flex-direction: column;
+}
+
+.liste-projets {
+  margin-top: 10px;
+}
+
+.pied-projet {
+  margin-top: 16px;
+  color: var(--gris);
+  font-size: 0.9rem;
+}
+
+.carte-section .bouton-fichier {
+  margin: 0;
 }

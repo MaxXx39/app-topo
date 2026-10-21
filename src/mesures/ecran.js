@@ -321,7 +321,7 @@ export function creerEcranMesures(conteneur, barre, options) {
         <strong>${nomRole(edition)}</strong>
         ${supprimable ? `<button type="button" class="bouton-lien" data-action="supprimer-ligne" data-index="${edition.index}">supprimer</button>` : ''}
         ${contenuListe(mesure, edition)}
-        ${avecAjout ? '<button type="button" class="bouton-lien" data-action="ajouter-ligne">+ Ajouter une ligne de rupture</button>' : ''}
+        ${avecAjout ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="ajouter-ligne">+ Ajouter une ligne de rupture</button>' : ''}
       </div>`;
   }
 
@@ -331,7 +331,7 @@ export function creerEcranMesures(conteneur, barre, options) {
     if (!estEnEdition(edition)) {
       return `
         <p class="liste-noms">${resumeListe(liste)}
-          <button type="button" class="bouton-lien" data-action="modifier" data-role="${edition.role}" data-index="${edition.index ?? 0}">Modifier</button>
+          <button type="button" class="bouton-lien bouton-lien-neutre" data-action="modifier" data-role="${edition.role}" data-index="${edition.index ?? 0}">Modifier</button>
         </p>`;
     }
     return htmlChoixPoints({
