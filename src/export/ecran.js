@@ -16,7 +16,7 @@ const CALQUES = [
   ['courbes', 'Courbes de niveau', false],
   ['photo', 'Photo aérienne', false],
   ['cadastre', 'Cadastre', false],
-  ['photos', 'Photos', true],
+  ['photos', 'Photos', false],
 ];
 // Couleurs du plan : l'une ou l'autre (elles ne se lisent pas l'une sur l'autre), ou aucune.
 const COULEURS = [
@@ -63,7 +63,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
       </label>
     </div>
     <div class="ligne-outils">
-      <button type="button" class="bouton" data-action="pdf">PDF</button>
+      <button type="button" class="bouton-secondaire" data-action="pdf">PDF</button>
       <button type="button" class="bouton-secondaire" data-action="csv">CSV</button>
       <button type="button" class="bouton-secondaire" data-action="dxf">DXF</button>
       <button type="button" class="bouton-secondaire" data-action="landxml">LandXML</button>

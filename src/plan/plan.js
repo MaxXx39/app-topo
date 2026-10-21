@@ -4,6 +4,7 @@ import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle
 import { bulle } from '../aide/bulles.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
+import { pointsIsolesAutomatiques } from '../topo/surface.js';
 import { formaterNombre } from '../topo/format.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
@@ -171,11 +172,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       for (const nom of pointsChoisis(stock)) classes.set(nom, 'role-dessus');
       // « Tous les points du levé » : ils sont tous en vert (seulement ceux dans le contour s'il y en a un).
       if (stock.type === 'points' && stock.tousLesPoints) {
-        const parNom = new Map(points.map((p) => [p.nom, p]));
-        const polygone = (stock.contour ?? []).map((nom) => parNom.get(nom)).filter(Boolean);
-        for (const point of points) {
-          if (polygone.length < 3 || pointDansPolygone(point, polygone)) classes.set(point.nom, 'role-dessus');
-        }
+        for (const nom of pointsIsolesAutomatiques(stock, points)) classes.set(nom, 'role-dessus');
       }
       for (const nom of (stock.lignesRupture ?? []).flatMap((ligne) => ligne.noms)) classes.set(nom, 'role-ligne');
       for (const nom of stock.contour ?? []) classes.set(nom, 'role-contour');

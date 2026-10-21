@@ -34,6 +34,22 @@ export function nomNature(nature) {
   return NATURES.find(([cle]) => cle === nature)?.[1] ?? '';
 }
 
+/**
+ * Points isolés / caractéristiques pris avec « tous les points du levé » : les points du levé
+ * situés dans le contour (tous s'il n'y a pas de contour), sauf ceux du contour et des lignes
+ * de rupture. Renvoie leurs noms, dans l'ordre du levé.
+ * - points : points du levé { nom, est, nord } (m)
+ */
+export function pointsIsolesAutomatiques(surface, points) {
+  const parNom = new Map(points.map((p) => [p.nom, p]));
+  const polygone = (surface.contour ?? []).map((nom) => parNom.get(nom)).filter(Boolean);
+  const dejaPris = new Set([...(surface.contour ?? []), ...(surface.lignesRupture ?? []).flatMap((ligne) => ligne.noms)]);
+  return points
+    .filter((p) => !dejaPris.has(p.nom))
+    .filter((p) => polygone.length < 3 || pointDansPolygone(p, polygone))
+    .map((p) => p.nom);
+}
+
 /** Crée une surface vide à partir d'un levé. */
 export function creerSurface(nom, leveId, nature = 'stock') {
   return {

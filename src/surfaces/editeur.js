@@ -5,7 +5,7 @@
 // cocher des cases, ou toucher les points sur le plan.
 // Une surface importée (LandXML, DXF) ne se modifie pas : on peut la renommer ou la supprimer.
 import { creerLigne, detecterSeries, lireListeDeNoms, ecrireListeDeNoms, verifierSurface } from '../topo/noms.js';
-import { creerSurface, estImportee, NATURES } from '../topo/surface.js';
+import { creerSurface, estImportee, NATURES, pointsIsolesAutomatiques } from '../topo/surface.js';
 import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
 
@@ -362,7 +362,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       <div class="carte-role role-dessus ${estEnEdition({ role: 'dessus' }) ? 'en-edition' : ''}">
         <div class="titre-role"><strong>${iconeRole('dessus')}${textes.roles.dessus} ${bulle('pointsSurface')}</strong></div>
         <label class="case"><input type="checkbox" data-champ="tous-les-points" ${surface.tousLesPoints ? 'checked' : ''} /> tous les points du levé${surface.contour.length >= 3 ? ' (dans le contour)' : ''}</label>
-        ${surface.tousLesPoints ? '' : contenuRole(surface, { role: 'dessus' })}
+        ${surface.tousLesPoints ? resumePointsAutomatiques(surface) : contenuRole(surface, { role: 'dessus' })}
       </div>
       ${carteTriangles(surface)}
       ${
@@ -372,6 +372,14 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       }
       ${decrire?.(surface) ?? ''}
       ${cartePhotos(surface)}`;
+  }
+
+  /** Liste des points pris avec « tous les points du levé » (hors contour et lignes de rupture). */
+  function resumePointsAutomatiques(surface) {
+    const noms = pointsIsolesAutomatiques(surface, pointsDe(surface));
+    return noms.length > 0
+      ? `<p class="liste-noms">${echapper(ecrireListeDeNoms(noms))} <span class="aide">(${noms.length} pt)</span></p>`
+      : '<p class="liste-noms"><span class="aide">aucun point (en plus du contour et des lignes de rupture)</span></p>';
   }
 
   /**

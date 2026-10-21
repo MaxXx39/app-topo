@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { lirePoints } from '../src/topo/import-points.js';
 import { lireListeDeNoms } from '../src/topo/noms.js';
 import { lireLandXML, resumerSurface } from '../src/topo/landxml.js';
-import { creerSurface, calculerSurface, cleTriangle, surfaceImportee } from '../src/topo/surface.js';
+import { creerSurface, calculerSurface, cleTriangle, surfaceImportee, pointsIsolesAutomatiques } from '../src/topo/surface.js';
 
 const pt = (nom, est, nord, altitude) => ({ nom, est, nord, altitude });
 const aire = (triangles) =>
@@ -73,5 +73,23 @@ describe('surfaceImportee', () => {
     const { triangles } = calculerSurface(rangee, []);
     expect(triangles).toHaveLength(506);
     expect(aire(triangles)).toBeCloseTo(resumerSurface(lue).surfacePlan, 6);
+  });
+});
+
+describe('pointsIsolesAutomatiques', () => {
+  // Carré de 10 m (contour c1 à c4), un point de ligne au milieu, un point isolé dedans, un dehors.
+  const points = [
+    pt('c1', 0, 0, 1), pt('c2', 10, 0, 1), pt('c3', 10, 10, 1), pt('c4', 0, 10, 1),
+    pt('h1', 5, 5, 3), pt('i1', 2, 2, 2), pt('loin', 50, 50, 1),
+  ];
+
+  it('avec un contour : les points dedans, sans ceux du contour ni des lignes de rupture', () => {
+    const surface = { ...creerSurface('Stock 1', 'leve', 'stock'), contour: ['c1', 'c2', 'c3', 'c4'], lignesRupture: [{ noms: ['h1'], fermee: false }] };
+    expect(pointsIsolesAutomatiques(surface, points)).toEqual(['i1']);
+  });
+
+  it('sans contour : tous les points du levé (hors lignes de rupture)', () => {
+    const surface = creerSurface('Stock 1', 'leve', 'stock');
+    expect(pointsIsolesAutomatiques(surface, points)).toEqual(['c1', 'c2', 'c3', 'c4', 'h1', 'i1', 'loin']);
   });
 });
