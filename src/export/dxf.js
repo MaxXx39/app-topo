@@ -13,7 +13,7 @@
 import { courbesDeNiveau } from '../topo/courbes.js';
 import { formaterNombre } from '../topo/format.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
-import { lignesEtiquette, texteMorceau, placeEtiquetteMesure } from '../mesures/valeurs.js';
+import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, aciDeMesure } from '../mesures/valeurs.js';
 
 // Couleurs AutoCAD (numéros) : 1 rouge, 2 jaune, 3 vert, 4 cyan, 5 bleu, 6 magenta, 7 blanc/noir, 8 gris, 30 orange.
 const COULEURS = { POINTS: 7, NOMS: 8, ALTITUDES: 5, CONTOURS: 1, LIGNES_RUPTURE: 30, COURBES: 32 };
@@ -72,7 +72,7 @@ export function genererDxf({ points, stocks = [], resultats = [], surfaces = [],
  * - mesures : liste de { mesure, resultat } (mesures calculées)
  * Calques : POINTS, NOMS, ALTITUDES ; MESURES (lignes et contours en polylignes 3D, et les
  * textes : nom et valeurs cochées de chaque mesure, et chaque morceau si demandé) ;
- * MESURES_TRIANGLES (triangles des aires, en faces 3D).
+ * MESURES_TRIANGLES (triangles des aires, en faces 3D). Lignes et textes ont la couleur de la mesure.
  */
 export function genererDxfMesures({ points, mesures }) {
   const calques = new Map([['POINTS', COULEURS.POINTS], ['NOMS', COULEURS.NOMS], ['ALTITUDES', COULEURS.ALTITUDES], ['MESURES', 4], ['MESURES_TRIANGLES', 8]]);
@@ -85,16 +85,17 @@ export function genererDxfMesures({ points, mesures }) {
     entites.push(['0', 'TEXT', '8', 'ALTITUDES', ...xyz({ ...p, est: p.est + 0.2, nord: p.nord - 0.4 }, 0), '40', '0.25', '1', formaterNombre(p.altitude)]);
   }
   for (const { mesure, resultat } of mesures) {
-    entites.push(...polyligne3D(resultat.sommets, mesure.type === 'aire', 'MESURES'));
+    const couleur = aciDeMesure(mesure);
+    entites.push(...polyligne3D(resultat.sommets, mesure.type === 'aire', 'MESURES', couleur));
     for (const ligne of mesure.lignesRupture ?? []) {
       const sommets = ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean);
-      if (sommets.length >= 2) entites.push(...polyligne3D(sommets, ligne.fermee, 'MESURES'));
+      if (sommets.length >= 2) entites.push(...polyligne3D(sommets, ligne.fermee, 'MESURES', couleur));
     }
     for (const t of resultat.triangles ?? []) entites.push(face3D(t, 'MESURES_TRIANGLES'));
     // Étiquette : nom, puis valeurs cochées, une ligne de texte chacune (0.4 m de haut).
     const place = placeEtiquetteMesure(mesure, resultat);
     lignesEtiquette(mesure, resultat).forEach((ligne, i) => {
-      entites.push(texteCentre({ ...place, nord: place.nord - i * 0.6, altitude: 0 }, 0.4, 0, texteAscii(ligne), 'MESURES'));
+      entites.push(texteCentre({ ...place, nord: place.nord - i * 0.6, altitude: 0 }, 0.4, 0, texteAscii(ligne), 'MESURES', couleur));
     });
     if (mesure.afficher?.morceaux) {
       for (const morceau of resultat.morceaux) {
@@ -103,7 +104,7 @@ export function genererDxfMesures({ points, mesures }) {
         if (angle > 90) angle -= 180;
         if (angle < -90) angle += 180;
         const milieu = { est: (morceau.debut.est + morceau.fin.est) / 2, nord: (morceau.debut.nord + morceau.fin.nord) / 2, altitude: 0 };
-        entites.push(texteCentre(milieu, 0.25, angle, texteAscii(texteMorceau(mesure, morceau)), 'MESURES'));
+        entites.push(texteCentre(milieu, 0.25, angle, texteAscii(texteMorceau(mesure, morceau)), 'MESURES', couleur));
       }
     }
   }
@@ -129,9 +130,17 @@ function xyz(p, n) {
   return [String(10 + n), arrondi(p.est), String(20 + n), arrondi(p.nord), String(30 + n), arrondi(p.altitude ?? 0)];
 }
 
-/** Texte centré sur un point (hauteur en m, angle en degrés depuis l'Est, sens inverse des aiguilles d'une montre). */
-function texteCentre(p, hauteur, angle, texte, calque) {
-  return ['0', 'TEXT', '8', calque, ...xyz(p, 0), '40', String(hauteur), '1', texte, '50', angle.toFixed(2), '72', '1', ...xyz(p, 1)];
+/**
+ * Texte centré sur un point (hauteur en m, angle en degrés depuis l'Est, sens inverse des aiguilles
+ * d'une montre). couleur : numéro de couleur AutoCAD, ou null pour la couleur du calque.
+ */
+function texteCentre(p, hauteur, angle, texte, calque, couleur = null) {
+  return ['0', 'TEXT', '8', calque, ...codeCouleur(couleur), ...xyz(p, 0), '40', String(hauteur), '1', texte, '50', angle.toFixed(2), '72', '1', ...xyz(p, 1)];
+}
+
+/** Code DXF d'une couleur propre à l'entité (62), ou rien pour garder la couleur du calque. */
+function codeCouleur(couleur) {
+  return couleur === null ? [] : ['62', String(couleur)];
 }
 
 /** Texte sans accent ni signe spécial, lu partout dans un DXF R12 (« Déniv. » -> « Deniv. », « m² » -> « m2 »). */
@@ -148,11 +157,11 @@ function face3D([a, b, c], calque) {
   return ['0', '3DFACE', '8', calque, ...xyz(a, 0), ...xyz(b, 1), ...xyz(c, 2), ...xyz(c, 3)];
 }
 
-/** Polyligne 3D (fermée ou non). */
-function polyligne3D(sommets, fermee, calque) {
+/** Polyligne 3D (fermée ou non). couleur : numéro de couleur AutoCAD, ou null pour la couleur du calque. */
+function polyligne3D(sommets, fermee, calque, couleur = null) {
   return [
-    ['0', 'POLYLINE', '8', calque, '66', '1', '10', '0', '20', '0', '30', '0', '70', String(8 + (fermee ? 1 : 0))],
-    ...sommets.map((p) => ['0', 'VERTEX', '8', calque, ...xyz(p, 0), '70', '32']),
+    ['0', 'POLYLINE', '8', calque, ...codeCouleur(couleur), '66', '1', '10', '0', '20', '0', '30', '0', '70', String(8 + (fermee ? 1 : 0))],
+    ...sommets.map((p) => ['0', 'VERTEX', '8', calque, ...codeCouleur(couleur), ...xyz(p, 0), '70', '32']),
     ['0', 'SEQEND', '8', calque],
   ];
 }

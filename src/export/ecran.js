@@ -63,7 +63,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
       </label>
     </div>
     <div class="ligne-outils">
-      <button type="button" class="bouton" data-action="pdf">PDF</button>
+      <button type="button" class="bouton-secondaire" data-action="pdf">PDF</button>
       <button type="button" class="bouton-secondaire" data-action="csv">CSV</button>
       <button type="button" class="bouton-secondaire" data-action="dxf">DXF</button>
       <button type="button" class="bouton-secondaire" data-action="landxml">LandXML</button>

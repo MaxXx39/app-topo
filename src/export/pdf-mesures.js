@@ -7,7 +7,7 @@ import { jsPDF } from 'jspdf';
 import { choisirFormat } from './echelle.js';
 import { courbesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
-import { VALEURS, NOM_TYPE, lignesEtiquette, texteMorceau, placeEtiquetteMesure } from '../mesures/valeurs.js';
+import { VALEURS, NOM_TYPE, lignesEtiquette, texteMorceau, placeEtiquetteMesure, couleurDeMesure, rvbDeCouleur } from '../mesures/valeurs.js';
 import {
   appliquerFormat,
   COULEURS,
@@ -33,8 +33,8 @@ export const CALQUES_PDF_MESURES = {
   photoAttenuee: true,
   cadastre: false,
 };
-const CYAN = [8, 145, 178];
-const CYAN_FONCE = [14, 116, 144];
+const couleur = (mesure) => rvbDeCouleur(couleurDeMesure(mesure));
+const couleurFoncee = (mesure) => rvbDeCouleur(couleurDeMesure(mesure), 0.8);
 const COULEUR_COURBES = [107, 79, 42];
 
 /**
@@ -144,11 +144,14 @@ function dessinerPlanMesures(doc, mesures, pointsMontres, { versPapier, echelle 
     }
   }
 
-  // Aires : fond cyan léger, puis contours, lignes de rupture et longueurs en pointillé
+  // Aires : fond léger de leur couleur, puis contours, lignes de rupture et longueurs en pointillé
   doc.saveGraphicsState();
   doc.setGState(new doc.GState({ opacity: 0.12 }));
-  doc.setFillColor(...CYAN);
-  for (const { mesure, resultat } of mesures) if (mesure.type === 'aire') polygonePlein(doc, resultat.sommets.map(versPapier));
+  for (const { mesure, resultat } of mesures) {
+    if (mesure.type !== 'aire') continue;
+    doc.setFillColor(...couleur(mesure));
+    polygonePlein(doc, resultat.sommets.map(versPapier));
+  }
   doc.restoreGraphicsState();
   const parNom = new Map(pointsMontres.map((p) => [p.nom, p]));
   const polyligne = (sommets, fermee) => {
@@ -158,11 +161,11 @@ function dessinerPlanMesures(doc, mesures, pointsMontres, { versPapier, echelle 
   };
   for (const { mesure, resultat } of mesures) {
     if (mesure.type === 'aire') {
-      trait(doc, CYAN, 0.15);
+      trait(doc, couleur(mesure), 0.15);
       doc.setLineDashPattern([0.8, 0.8], 0);
       for (const ligne of mesure.lignesRupture) polyligne(ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean), ligne.fermee);
     }
-    trait(doc, CYAN, 0.4);
+    trait(doc, couleur(mesure), 0.4);
     doc.setLineDashPattern([2, 1], 0);
     polyligne(resultat.sommets, mesure.type === 'aire');
   }
@@ -175,7 +178,7 @@ function dessinerPlanMesures(doc, mesures, pointsMontres, { versPapier, echelle 
   for (const { mesure, resultat } of mesures) {
     if (choix.valeurs && mesure.afficher?.morceaux) {
       doc.setFontSize(taille - 1);
-      doc.setTextColor(...CYAN_FONCE);
+      doc.setTextColor(...couleurFoncee(mesure));
       for (const morceau of resultat.morceaux) {
         const a = versPapier(morceau.debut);
         const b = versPapier(morceau.fin);
@@ -200,11 +203,11 @@ function dessinerPlanMesures(doc, mesures, pointsMontres, { versPapier, echelle 
     const largeur = Math.max(...lignes.map((l) => doc.getTextWidth(l))) + 3;
     const hauteur = lignes.length * interligne + 1.6;
     doc.setFillColor(255, 255, 255);
-    trait(doc, CYAN, 0.25);
+    trait(doc, couleur(mesure), 0.25);
     doc.roundedRect(x - largeur / 2, y - hauteur / 2, largeur, hauteur, 1, 1, 'FD');
     lignes.forEach((ligne, i) => {
       doc.setFont('helvetica', i === 0 ? 'bold' : 'normal');
-      doc.setTextColor(...(i === 0 ? CYAN_FONCE : COULEURS.texte));
+      doc.setTextColor(...(i === 0 ? couleurFoncee(mesure) : COULEURS.texte));
       doc.text(ligne, x, y - hauteur / 2 + 0.8 + interligne * (i + 0.85), { align: 'center' });
     });
     doc.setFont('helvetica', 'normal');
@@ -227,7 +230,7 @@ function ecrireMesures(doc, mesures, x, y, largeur, yMax) {
     if (y + hauteur > yMax) return { y, suite: mesures.slice(i) };
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...CYAN_FONCE);
+    doc.setTextColor(...couleurFoncee(mesure));
     doc.text(doc.splitTextToSize(mesure.nom, largeur - 16)[0], x, y);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
@@ -255,15 +258,15 @@ function ecrireMesures(doc, mesures, x, y, largeur, yMax) {
   return { y, suite: [] };
 }
 
-/** Légende : longueur, aire, courbes de niveau, et ce que veulent dire 2D et 3D. */
+/** Légende (en gris : chaque mesure a sa couleur) : longueur, aire, courbes de niveau, et ce que veulent dire 2D et 3D. */
 function dessinerLegende(doc, x, y, largeur, equidistance) {
   doc.setFontSize(6.5);
   doc.setTextColor(...COULEURS.texte);
-  trait(doc, CYAN, 0.5);
+  trait(doc, COULEURS.gris, 0.5);
   doc.setLineDashPattern([2, 1], 0);
   doc.line(x, y - 1, x + 6, y - 1);
   doc.text('Mesure de longueur', x + 8, y);
-  doc.setFillColor(205, 233, 240);
+  doc.setFillColor(232, 235, 237);
   doc.rect(x, y + 1.6, 6, 2.6, 'FD');
   doc.setLineDashPattern([], 0);
   doc.text('Mesure d\'aire', x + 8, y + 3.8);

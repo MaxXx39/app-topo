@@ -964,7 +964,7 @@ svg.plan {
 }
 
 .plan .points circle.role-mesure {
-  fill: var(--cyan);
+  fill: var(--couleur-mesure, var(--cyan));
 }
 
 .plan .points circle.selection {
@@ -1503,7 +1503,7 @@ tr.total td {
 }
 
 .barre-edition[data-role='mesure'] {
-  --couleur-role: var(--cyan);
+  --couleur-role: var(--couleur-mesure, var(--cyan));
 }
 
 .barre-edition[data-role] {
@@ -1732,35 +1732,91 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
   background: color-mix(in srgb, var(--couleur-role) 4%, var(--surface));
 }
 
-.carte-valeurs {
-  border: 1px solid color-mix(in srgb, var(--cyan) 40%, var(--bordure));
+/* Liste des mesures : une ligne par mesure (nom à gauche, valeur à droite). */
+.liste-mesures {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.choix-mesure {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--bordure);
   border-radius: 10px;
-  padding: 10px 14px;
+  background: var(--surface);
+  color: var(--texte);
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.choix-mesure .valeur {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--gris);
+}
+
+.choix-mesure {
+  border-left: 5px solid var(--couleur-mesure, var(--cyan));
+}
+
+.choix-mesure.active {
+  border: 2px dashed var(--couleur-mesure, var(--cyan));
+  border-left-width: 5px;
+  background: color-mix(in srgb, var(--couleur-mesure, var(--cyan)) 6%, var(--surface));
+  font-weight: 600;
+}
+
+/* Mesure ouverte : un seul encadré cyan pointillé. */
+.carte-mesure {
+  border: 2px dashed var(--couleur-mesure, var(--cyan));
+  border-radius: 12px;
+  padding: 6px 14px 4px;
+  margin: 12px 0;
+}
+
+.bloc-liste {
   margin: 10px 0;
 }
 
+.bloc-liste .liste-noms {
+  margin: 4px 0;
+}
+
+.bloc-liste.en-edition {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--couleur-mesure, var(--cyan)) 7%, var(--surface));
+}
+
+.cases-plan {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px 10px;
+}
+
 .tableau-valeurs,
-.tableau-morceaux,
-.tableau-recap-mesures {
+.tableau-morceaux {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.92rem;
 }
 
 .tableau-valeurs td,
-.tableau-valeurs th,
 .tableau-morceaux td,
-.tableau-morceaux th,
-.tableau-recap-mesures td,
-.tableau-recap-mesures th {
+.tableau-morceaux th {
   padding: 5px 6px;
   border-bottom: 1px solid var(--bordure);
   text-align: left;
 }
 
-.tableau-valeurs th,
-.tableau-morceaux th,
-.tableau-recap-mesures th {
+.tableau-morceaux th {
   color: var(--gris);
   font-size: 0.78rem;
   font-weight: 600;
@@ -1773,20 +1829,30 @@ th.nombre {
   font-variant-numeric: tabular-nums;
 }
 
-td.case-plan,
-th.case-plan {
-  text-align: center;
-  width: 64px;
+/* Couleur d'une mesure : une pastille ronde par couleur. */
+.palette-mesure {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0;
 }
 
-.case-plan input {
-  width: 20px;
-  height: 20px;
-  accent-color: var(--cyan);
+.pastille-couleur {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--bordure);
+  cursor: pointer;
 }
 
-.tableau-defilant {
-  overflow-x: auto;
+.pastille-couleur.choisie {
+  box-shadow: 0 0 0 3px var(--sombre);
+}
+
+/* Export repliable : le titre sert de bouton pour l'ouvrir. */
+.export-repliable > summary h3 {
+  display: inline;
 }
 
 /* Menu des calques dans l'onglet Mesures : pas de calque des surfaces. */
@@ -1794,19 +1860,19 @@ th.case-plan {
   display: none;
 }
 
-/* Plan : mesures en cyan pointillé, aires avec un fond cyan léger. */
+/* Plan : mesures en pointillé dans leur couleur (cyan au départ), aires avec un fond léger. */
 .plan .longueur-mesure,
 .plan .aire-mesure,
 .plan .ligne-mesure {
   fill: none;
-  stroke: var(--cyan);
+  stroke: var(--couleur-mesure, var(--cyan));
   stroke-width: 2;
   stroke-dasharray: 7 4;
   stroke-linejoin: round;
 }
 
 .plan .aire-mesure {
-  fill: rgba(8, 145, 178, 0.08);
+  fill: color-mix(in srgb, var(--couleur-mesure, var(--cyan)) 8%, transparent);
 }
 
 .plan .ligne-mesure {
@@ -1821,13 +1887,13 @@ th.case-plan {
 
 .plan .triangles-mesure {
   fill: none;
-  stroke: rgba(8, 145, 178, 0.45);
+  stroke: color-mix(in srgb, var(--couleur-mesure, var(--cyan)) 45%, transparent);
   stroke-width: 0.7;
 }
 
 .plan .etiquettes-mesures rect {
   fill: rgba(255, 255, 255, 0.92);
-  stroke: var(--cyan);
+  stroke: var(--couleur-mesure, var(--cyan));
   stroke-width: 1;
   stroke-dasharray: 4 2;
 }
@@ -1843,12 +1909,12 @@ th.case-plan {
 
 .plan .etiquettes-mesures text.nom-mesure {
   font-weight: 700;
-  fill: #0e7490;
+  fill: color-mix(in srgb, var(--couleur-mesure, var(--cyan)) 80%, black);
 }
 
 .plan .etiquettes-mesures text.cote-morceau {
   font-size: 10.5px;
-  fill: #0e7490;
+  fill: color-mix(in srgb, var(--couleur-mesure, var(--cyan)) 80%, black);
   paint-order: stroke;
   stroke: #ffffff;
   stroke-width: 3px;

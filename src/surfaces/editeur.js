@@ -376,13 +376,14 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   }
 
   /**
-   * Carte « Triangles en trop ». Avec un contour fermé, elle est grisée : la surface s'arrête
-   * déjà au contour, il n'y a pas de triangle en trop (seul « Tout rétablir » reste possible
-   * si des triangles avaient été supprimés avant).
+   * Carte « Triangles en trop ». Avec un contour fermé, elle est cachée : la surface s'arrête
+   * déjà au contour, il n'y a pas de triangle en trop. (Si des triangles avaient été supprimés
+   * avant, elle reste grisée, avec seulement « Tout rétablir ».)
    */
   function carteTriangles(surface) {
     const avecContour = surface.contour.length >= 3;
     const supprimes = surface.trianglesSupprimes.length;
+    if (avecContour && supprimes === 0 && !etat.suppression) return '';
     return `
       <div class="carte-role role-triangles ${avecContour ? 'inutile' : ''} ${etat.suppression ? 'en-edition' : ''}">
         <div class="titre-role"><strong>${iconeRole('triangles')}Triangles en trop ${bulle('trianglesEnTrop')}</strong></div>
