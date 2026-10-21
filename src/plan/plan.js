@@ -9,7 +9,7 @@ import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js'
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
-import { lignesEtiquette, texteMorceau, placeEtiquetteMesure } from '../mesures/valeurs.js';
+import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, valeurPrincipale } from '../mesures/valeurs.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -654,13 +654,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
-  /** Étiquette de chaque mesure (nom et valeurs cochées), et texte de chaque morceau si demandé. */
+  /**
+   * Étiquette de chaque mesure : petite (nom et une valeur) pour les autres mesures ; pour la
+   * mesure choisie, toutes ses valeurs cochées et, si demandé, le texte de chaque morceau.
+   */
   function dessinerEtiquettesMesures() {
     if (!dessin.mesures?.length) return;
     const groupe = creerElement('g', { class: 'etiquettes-mesures' });
     for (const { mesure, resultat } of dessin.mesures) {
       if (!resultat || resultat.erreurs) continue;
-      if (mesure.afficher?.morceaux) {
+      const active = mesure === dessin.mesureActive;
+      if (active && mesure.afficher?.morceaux) {
         for (const morceau of resultat.morceaux) {
           const a = versEcran(morceau.debut.est, morceau.debut.nord, vue);
           const b = versEcran(morceau.fin.est, morceau.fin.nord, vue);
@@ -675,12 +679,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           groupe.append(texte);
         }
       }
-      const lignes = lignesEtiquette(mesure, resultat);
+      const lignes = active ? lignesEtiquette(mesure, resultat) : [mesure.nom, valeurPrincipale(mesure, resultat)];
       const place = placeEtiquetteMesure(mesure, resultat);
       const { x, y } = versEcran(place.est, place.nord, vue);
       const largeur = Math.max(...lignes.map((l) => l.length)) * 6.8 + 14;
       const hauteur = lignes.length * 15 + 8;
-      groupe.append(creerElement('rect', { x: x - largeur / 2, y: y - hauteur / 2, width: largeur, height: hauteur, rx: 6, class: mesure === dessin.mesureActive ? 'actif' : '' }));
+      groupe.append(creerElement('rect', { x: x - largeur / 2, y: y - hauteur / 2, width: largeur, height: hauteur, rx: 6, class: active ? 'actif' : '' }));
       lignes.forEach((ligne, i) => {
         const texte = creerElement('text', { x, y: y - hauteur / 2 + 15 + i * 15, 'text-anchor': 'middle', class: i === 0 ? 'nom-mesure' : '' });
         texte.textContent = ligne;

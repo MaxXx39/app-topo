@@ -1,12 +1,13 @@
 // Onglet 3. Mesures : longueurs et aires, en 2D et en 3D, à part des surfaces et des volumes.
 // Les points se choisissent comme pour une surface : séries, liste de noms tapée, cases à
 // cocher, ou en touchant les points sur le plan. Seuls les points importés (levé) servent.
-// Chaque valeur a sa case « Plan et PDF » : ce qui est coché s'écrit sur le plan et dans le PDF.
+// L'écran reste simple : une ligne par mesure ; la mesure ouverte montre son nom, ses points et
+// ses valeurs ; le reste (lignes de rupture, points isolés, cases « Plan et PDF », détail des
+// morceaux) est rangé dans « Plus d'options ».
 import { lireListeDeNoms, detecterSeries, creerLigne, verifierSurface } from '../topo/noms.js';
 import { creerMesure, nomDeMesureLibre, nomsDeLaMesure } from '../topo/mesure.js';
-import { formaterNombre } from '../topo/format.js';
 import { htmlChoixPoints, resumeListe } from '../surfaces/choix-points.js';
-import { VALEURS, TEXTE_MORCEAUX, NOM_TYPE, valeursMorceau } from './valeurs.js';
+import { VALEURS, TEXTE_MORCEAUX, valeursMorceau, valeurPrincipale } from './valeurs.js';
 import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
 
@@ -35,7 +36,7 @@ export function creerEcranMesures(conteneur, barre, options) {
     edition: null, // liste en cours de modification : { role, index }
     messages: [], // erreurs de la dernière liste tapée
     casesOuvertes: false,
-    detailOuvert: false, // tableau « Détail des morceaux »
+    optionsOuvertes: false, // « Plus d'options » de la mesure ouverte
   };
 
   const mesures = () => obtenirProjet().mesures;
@@ -102,6 +103,13 @@ export function creerEcranMesures(conteneur, barre, options) {
       // On commence tout de suite à choisir les points.
       etat.edition = { role: type === 'longueur' ? 'points' : 'contour', index: 0 };
       etat.messages = [];
+      etat.optionsOuvertes = false;
+    },
+    ouvrir: (bouton) => {
+      if (bouton.dataset.id === etat.idActif) return;
+      etat.idActif = bouton.dataset.id;
+      etat.edition = null;
+      etat.optionsOuvertes = false;
     },
     supprimer: () => {
       const mesure = mesureActive();
@@ -175,10 +183,7 @@ export function creerEcranMesures(conteneur, barre, options) {
   conteneur.addEventListener('change', (evenement) => {
     const cible = evenement.target;
     const mesure = mesureActive();
-    if (cible.dataset.champ === 'choix') {
-      etat.idActif = cible.value;
-      etat.edition = null;
-    } else if (cible.dataset.champ === 'nom') {
+    if (cible.dataset.champ === 'nom') {
       mesure.nom = cible.value.trim() || mesure.nom;
     } else if (cible.dataset.afficher) {
       mesure.afficher = { ...mesure.afficher, [cible.dataset.afficher]: cible.checked };
@@ -201,7 +206,7 @@ export function creerEcranMesures(conteneur, barre, options) {
     'toggle',
     (evenement) => {
       if (evenement.target.dataset.zone === 'cases') etat.casesOuvertes = evenement.target.open;
-      if (evenement.target.dataset.zone === 'detail') etat.detailOuvert = evenement.target.open;
+      if (evenement.target.dataset.zone === 'options') etat.optionsOuvertes = evenement.target.open;
     },
     true,
   );
@@ -218,65 +223,85 @@ export function creerEcranMesures(conteneur, barre, options) {
 
   function afficher() {
     const mesure = mesureActive();
-    const liste = mesures();
     const sansPoints = !leveActifId();
     let html = `
       <div class="ligne-outils">
         <button type="button" class="bouton" data-action="nouvelle" data-type="longueur" ${sansPoints ? 'disabled' : ''}>+ Longueur</button>
         <button type="button" class="bouton" data-action="nouvelle" data-type="aire" ${sansPoints ? 'disabled' : ''}>+ Aire</button>
       </div>
-      ${sansPoints ? '<p class="vide">Importe d\'abord un fichier de points (onglet 1. Importer).</p>' : ''}`;
-    if (liste.length > 0) {
-      html += `
-        <div class="ligne-outils">
-          <select data-champ="choix" aria-label="Mesure affichée">
-            ${liste.map((m) => `<option value="${m.id}" ${m === mesure ? 'selected' : ''}>${echapper(etiquette?.(m) ?? m.nom)}</option>`).join('')}
-          </select>
-        </div>`;
-    }
+      ${sansPoints ? '<p class="vide">Importe d\'abord un fichier de points (onglet 1. Importer).</p>' : ''}
+      ${listeDesMesures(mesure)}`;
     if (mesure) html += contenuMesure(mesure);
-    html += recapitulatif();
     conteneur.innerHTML = html;
     afficherBarre();
   }
 
-  /** Nom, listes de points, puis valeurs de la mesure affichée. */
-  function contenuMesure(mesure) {
-    const points = obtenirPoints(mesure);
-    const listes =
-      mesure.type === 'longueur'
-        ? carteListe(mesure, { role: 'points' }, '<p class="aide">Les points dans l\'ordre, du début à la fin (la ligne n\'est pas fermée).</p>')
-        : `${carteListe(mesure, { role: 'contour' }, '<p class="aide">Fermé automatiquement (le dernier point est relié au premier).</p>')}
-           ${mesure.lignesRupture.map((_, index) => carteListe(mesure, { role: 'ligne', index }, '', index === mesure.lignesRupture.length - 1)).join('')}
-           <div class="carte-role role-mesure ${estEnEdition({ role: 'dessus' }) ? 'en-edition' : ''}">
-             <div class="titre-role"><strong>${ROLES.dessus}</strong></div>
-             <label class="case"><input type="checkbox" data-champ="tous-les-points" ${mesure.tousLesPoints ? 'checked' : ''} /> tous les points du levé (dans le contour)</label>
-             ${mesure.tousLesPoints ? '' : contenuListe(mesure, { role: 'dessus' })}
-           </div>`;
-    const problemes = mesure.type === 'aire' ? verifierSurface(mesure, points.map((p) => p.nom)) : [];
+  /** Liste courte de toutes les mesures, une ligne chacune (nom et valeur principale) : on touche une ligne pour l'ouvrir. */
+  function listeDesMesures(active) {
+    const liste = mesures();
+    if (liste.length === 0) return '';
     return `
-      <div class="ligne-outils">
-        <label>Nom : <input type="text" data-champ="nom" value="${echapper(mesure.nom)}" /></label>
-        <button type="button" class="bouton-secondaire" data-action="supprimer">Supprimer cette mesure</button>
-      </div>
-      <p class="aide">${NOM_TYPE[mesure.type]}${mesure.type === 'aire' ? ' : 2D = aire du contour à plat, 3D = aire des triangles' : ' : 2D = à plat, 3D = distance inclinée'}.</p>
-      ${listes}
-      ${problemes.length > 0 ? `<div class="avertissement"><p><strong>À compléter :</strong></p><ul>${problemes.map((p) => `<li>${echapper(p)}</li>`).join('')}</ul></div>` : ''}
-      ${carteValeurs(mesure)}`;
+      <div class="liste-mesures">
+        ${liste
+          .map((m) => {
+            const r = obtenirResultat(m);
+            const valeur = r && !r.erreurs ? valeurPrincipale(m, r) : 'à compléter';
+            return `<button type="button" class="choix-mesure ${m === active ? 'active' : ''}" data-action="ouvrir" data-id="${m.id}">
+              <span class="nom">${echapper(etiquette?.(m) ?? m.nom)}</span><span class="valeur">${echapper(valeur)}</span>
+            </button>`;
+          })
+          .join('')}
+      </div>`;
   }
 
-  /** Une carte pour une liste de points (titre, résumé ou outils de modification). */
-  function carteListe(mesure, edition, aide = '', avecAjout = false) {
+  /**
+   * Mesure ouverte : l'essentiel (nom, points, valeurs), puis « Plus d'options » (lignes de rupture
+   * et points isolés d'une aire, cases « Plan et PDF », détail des morceaux).
+   */
+  function contenuMesure(mesure) {
+    const resultat = obtenirResultat(mesure);
+    const listePrincipale = mesure.type === 'longueur' ? { role: 'points' } : { role: 'contour' };
+    // Une liste des options en cours de modification : les options restent ouvertes.
+    const ouvertes = etat.optionsOuvertes || ['ligne', 'dessus'].includes(etat.edition?.role);
+    const problemes = mesure.type === 'aire' ? verifierSurface(mesure, obtenirPoints(mesure).map((p) => p.nom)) : [];
+    return `
+      <div class="carte-mesure">
+        <div class="ligne-outils">
+          <label>Nom : <input type="text" data-champ="nom" value="${echapper(mesure.nom)}" /></label>
+          <button type="button" class="bouton-lien" data-action="supprimer">supprimer</button>
+        </div>
+        ${blocListe(mesure, listePrincipale)}
+        ${problemes.length > 0 ? `<div class="avertissement"><ul>${problemes.map((p) => `<li>${echapper(p)}</li>`).join('')}</ul></div>` : ''}
+        ${tableauValeurs(mesure, resultat)}
+        <details data-zone="options" ${ouvertes ? 'open' : ''}>
+          <summary>Plus d'options</summary>
+          ${mesure.type === 'aire' ? optionsAire(mesure) : ''}
+          ${casesPlan(mesure, resultat)}
+          ${detailMorceaux(mesure, resultat)}
+        </details>
+      </div>`;
+  }
+
+  /** Lignes de rupture et points isolés d'une aire. */
+  function optionsAire(mesure) {
+    return `
+      ${mesure.lignesRupture.map((_, index) => blocListe(mesure, { role: 'ligne', index }, index === mesure.lignesRupture.length - 1)).join('')}
+      <div class="bloc-liste ${estEnEdition({ role: 'dessus' }) ? 'en-edition' : ''}">
+        <strong>${ROLES.dessus}</strong>
+        <label class="case"><input type="checkbox" data-champ="tous-les-points" ${mesure.tousLesPoints ? 'checked' : ''} /> tous les points du levé (dans le contour)</label>
+        ${mesure.tousLesPoints ? '' : contenuListe(mesure, { role: 'dessus' })}
+      </div>`;
+  }
+
+  /** Une liste de points : titre et résumé (« b1 à b5 · Modifier »), ou outils de choix pendant la modification. */
+  function blocListe(mesure, edition, avecAjout = false) {
     const supprimable = edition.role === 'ligne' && mesure.lignesRupture.length > 1;
     return `
-      <div class="carte-role role-mesure ${estEnEdition(edition) ? 'en-edition' : ''}">
-        <div class="titre-role">
-          <strong>${nomRole(edition)}</strong>
-          ${supprimable ? `<button type="button" class="bouton-lien" data-action="supprimer-ligne" data-index="${edition.index}">supprimer</button>` : ''}
-        </div>
-        ${aide}
+      <div class="bloc-liste ${estEnEdition(edition) ? 'en-edition' : ''}">
+        <strong>${nomRole(edition)}</strong>
+        ${supprimable ? `<button type="button" class="bouton-lien" data-action="supprimer-ligne" data-index="${edition.index}">supprimer</button>` : ''}
         ${contenuListe(mesure, edition)}
-        ${avecAjout ? '<div class="ligne-outils pied-role"><button type="button" class="bouton-secondaire" data-action="ajouter-ligne">+ Ajouter une ligne de rupture</button></div>' : ''}
+        ${avecAjout ? '<button type="button" class="bouton-lien" data-action="ajouter-ligne">+ Ajouter une ligne de rupture</button>' : ''}
       </div>`;
   }
 
@@ -285,8 +310,9 @@ export function creerEcranMesures(conteneur, barre, options) {
     const liste = listeDuRole(mesure, edition);
     if (!estEnEdition(edition)) {
       return `
-        <p class="liste-noms">${resumeListe(liste)}</p>
-        <button type="button" class="bouton-secondaire" data-action="modifier" data-role="${edition.role}" data-index="${edition.index ?? 0}">Modifier</button>`;
+        <p class="liste-noms">${resumeListe(liste)}
+          <button type="button" class="bouton-lien" data-action="modifier" data-role="${edition.role}" data-index="${edition.index ?? 0}">Modifier</button>
+        </p>`;
     }
     return htmlChoixPoints({
       liste,
@@ -294,81 +320,59 @@ export function creerEcranMesures(conteneur, barre, options) {
       nomsUtilises: new Set(mesures().filter((m) => m !== mesure && m.leveId === mesure.leveId).flatMap(nomsDeLaMesure)),
       messages: etat.messages,
       casesOuvertes: etat.casesOuvertes,
+      // Séries et cases à cocher rangées dans « Plus de choix » : seule la liste de noms reste visible.
+      plusDeChoix: true,
       enTete:
         edition.role === 'ligne'
-          ? `<label class="case"><input type="checkbox" data-champ="ligne-fermee" data-index="${edition.index}" ${mesure.lignesRupture[edition.index].fermee ? 'checked' : ''} /> ligne fermée (le dernier point est relié au premier)</label>`
+          ? `<label class="case"><input type="checkbox" data-champ="ligne-fermee" data-index="${edition.index}" ${mesure.lignesRupture[edition.index].fermee ? 'checked' : ''} /> ligne fermée</label>`
           : '',
     });
   }
 
-  /** Valeurs de la mesure, chacune avec sa case « Plan et PDF », puis le détail des morceaux. */
-  function carteValeurs(mesure) {
-    const resultat = obtenirResultat(mesure);
+  /** Valeurs de la mesure (sans case à cocher), ou ses erreurs. */
+  function tableauValeurs(mesure, resultat) {
     if (!resultat) return '';
-    if (resultat.erreurs) {
-      return `<div class="erreur"><ul>${resultat.erreurs.map((e) => `<li>${echapper(e)}</li>`).join('')}</ul></div>`;
-    }
-    const coche = (cle) => (mesure.afficher?.[cle] ? 'checked' : '');
-    const lignes = VALEURS[mesure.type]
-      .map(
-        (v) => `<tr>
-          <td>${v.titre}</td>
-          <td class="nombre"><strong>${v.ecrire(resultat)}</strong></td>
-          <td class="case-plan"><input type="checkbox" data-afficher="${v.cle}" ${coche(v.cle)} aria-label="${v.titre} sur le plan et dans le PDF" /></td>
-        </tr>`,
-      )
-      .join('');
-    const morceau = mesure.type === 'longueur' ? 'Morceau' : 'Côté';
+    if (resultat.erreurs) return `<div class="erreur"><ul>${resultat.erreurs.map((e) => `<li>${echapper(e)}</li>`).join('')}</ul></div>`;
     return `
-      <div class="carte-valeurs">
-        <div class="titre-role"><strong>Valeurs ${bulle('valeursMesure')}</strong></div>
-        <table class="tableau-valeurs">
-          <thead><tr><th></th><th class="nombre"></th><th class="case-plan">Plan et PDF</th></tr></thead>
-          <tbody>
-            ${lignes}
-            <tr><td colspan="2">${TEXTE_MORCEAUX[mesure.type]}</td><td class="case-plan"><input type="checkbox" data-afficher="morceaux" ${coche('morceaux')} aria-label="${TEXTE_MORCEAUX[mesure.type]}" /></td></tr>
-          </tbody>
-        </table>
-        ${resultat.triangles ? `<p class="aide">${resultat.triangles.length} triangles.</p>` : ''}
-        ${resultat.avertissements?.length > 0 ? `<div class="avertissement"><ul>${resultat.avertissements.map((a) => `<li>${echapper(a)}</li>`).join('')}</ul></div>` : ''}
-        <details data-zone="detail" ${etat.detailOuvert ? 'open' : ''}>
-          <summary>Détail : ${resultat.morceaux.length} ${morceau.toLowerCase()}(s)</summary>
-          <div class="tableau-defilant">
-            <table class="tableau-morceaux">
-              <thead><tr><th>${morceau}</th><th class="nombre">L 2D</th><th class="nombre">L 3D</th><th class="nombre">Déniv.</th><th class="nombre">Pente</th></tr></thead>
-              <tbody>
-                ${resultat.morceaux
-                  .map(
-                    (m) => `<tr><td>${echapper(m.debut.nom)} → ${echapper(m.fin.nom)}</td>${valeursMorceau(m)
-                      .map((v) => `<td class="nombre">${v}</td>`)
-                      .join('')}</tr>`,
-                  )
-                  .join('')}
-              </tbody>
-            </table>
-          </div>
-        </details>
+      <table class="tableau-valeurs">
+        <tbody>
+          ${VALEURS[mesure.type].map((v) => `<tr><td>${v.titre}</td><td class="nombre"><strong>${v.ecrire(resultat)}</strong></td></tr>`).join('')}
+        </tbody>
+      </table>
+      ${resultat.avertissements?.length > 0 ? `<div class="avertissement"><ul>${resultat.avertissements.map((a) => `<li>${echapper(a)}</li>`).join('')}</ul></div>` : ''}`;
+  }
+
+  /** Cases « Plan et PDF » : ce qui s'écrit sur le plan (mesure touchée) et dans le PDF. */
+  function casesPlan(mesure, resultat) {
+    if (!resultat || resultat.erreurs) return '';
+    const coche = (cle) => (mesure.afficher?.[cle] ? 'checked' : '');
+    return `
+      <div class="bloc-liste">
+        <strong>Sur le plan et dans le PDF ${bulle('valeursMesure')}</strong>
+        <div class="cases-plan">
+          ${VALEURS[mesure.type].map((v) => `<label class="case"><input type="checkbox" data-afficher="${v.cle}" ${coche(v.cle)} /> ${v.titre}</label>`).join('')}
+          <label class="case"><input type="checkbox" data-afficher="morceaux" ${coche('morceaux')} /> ${TEXTE_MORCEAUX[mesure.type]}</label>
+        </div>
       </div>`;
   }
 
-  /** Tableau de toutes les mesures du projet : nom, sorte, valeur 2D et 3D. */
-  function recapitulatif() {
-    const liste = mesures();
-    if (liste.length === 0) return '';
-    const lignes = liste.map((m) => {
-      const r = obtenirResultat(m);
-      const unite = m.type === 'longueur' ? 'm' : 'm²';
-      const [v2d, v3d] = m.type === 'longueur' ? [r?.l2d, r?.l3d] : [r?.a2d, r?.a3d];
-      const valeur = (v) => (r && !r.erreurs ? `${formaterNombre(v)} ${unite}` : '-');
-      return `<tr><td>${echapper(etiquette?.(m) ?? m.nom)}</td><td class="nombre">${valeur(v2d)}</td><td class="nombre">${valeur(v3d)}</td></tr>`;
-    });
+  /** Tableau de chaque morceau (longueur) ou côté (aire). */
+  function detailMorceaux(mesure, resultat) {
+    if (!resultat || resultat.erreurs) return '';
+    const morceau = mesure.type === 'longueur' ? 'Morceau' : 'Côté';
     return `
-      <h3>Récapitulatif</h3>
-      <div class="tableau-defilant">
-        <table class="tableau-recap-mesures">
-          <thead><tr><th>Mesure</th><th class="nombre">2D</th><th class="nombre">3D</th></tr></thead>
-          <tbody>${lignes.join('')}</tbody>
-        </table>
+      <div class="bloc-liste">
+        <strong>Détail : ${resultat.morceaux.length} ${morceau.toLowerCase()}(s)</strong>
+        <div class="tableau-defilant">
+          <table class="tableau-morceaux">
+            <thead><tr><th>${morceau}</th><th class="nombre">L 2D</th><th class="nombre">L 3D</th><th class="nombre">Déniv.</th><th class="nombre">Pente</th></tr></thead>
+            <tbody>
+              ${resultat.morceaux
+                .map((m) => `<tr><td>${echapper(m.debut.nom)} → ${echapper(m.fin.nom)}</td>${valeursMorceau(m).map((v) => `<td class="nombre">${v}</td>`).join('')}</tr>`)
+                .join('')}
+            </tbody>
+          </table>
+        </div>
       </div>`;
   }
 

@@ -23,8 +23,10 @@ const CALQUES = [
  *   points, fichierPoints, cartouche: { affaire, dessinePar, date } }
  */
 export function creerEcranExportMesures(conteneur, { obtenirDonnees }) {
+  // Fermé au départ : on l'ouvre avec « Exporter les mesures » (l'écran reste simple).
   conteneur.innerHTML = `
-    <h3>Exporter les mesures ${bulle('exporterMesures')}</h3>
+    <details class="export-repliable">
+    <summary><h3>Exporter les mesures ${bulle('exporterMesures')}</h3></summary>
     <div class="champs-export">
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">
@@ -41,11 +43,12 @@ export function creerEcranExportMesures(conteneur, { obtenirDonnees }) {
       </div>
     </div>
     <div class="ligne-outils">
-      <button type="button" class="bouton" data-action="pdf">PDF</button>
+      <button type="button" class="bouton-secondaire" data-action="pdf">PDF</button>
       <button type="button" class="bouton-secondaire" data-action="csv">CSV</button>
       <button type="button" class="bouton-secondaire" data-action="dxf">DXF</button>
     </div>
     <p class="aide" data-zone="message"></p>
+    </details>
   `;
   const message = conteneur.querySelector('[data-zone="message"]');
 

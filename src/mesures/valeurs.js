@@ -40,6 +40,16 @@ export const TEXTE_MORCEAUX = {
 /** Nom affiché d'une sorte de mesure. */
 export const NOM_TYPE = { longueur: 'Longueur', aire: 'Aire' };
 
+/**
+ * Valeur principale d'une mesure, pour la liste et la petite étiquette du plan : la première
+ * valeur cochée (« L 2D 31.788 m »), sinon la valeur 2D.
+ */
+export function valeurPrincipale(mesure, resultat) {
+  const valeurs = VALEURS[mesure.type];
+  const valeur = valeurs.find((v) => mesure.afficher?.[v.cle]) ?? valeurs[0];
+  return `${valeur.court} ${valeur.ecrire(resultat)}`;
+}
+
 /** Lignes de l'étiquette d'une mesure sur le plan : son nom, puis les valeurs cochées (« L 2D 12.345 m »). */
 export function lignesEtiquette(mesure, resultat) {
   const valeurs = VALEURS[mesure.type].filter((v) => mesure.afficher?.[v.cle]);
