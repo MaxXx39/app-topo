@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sans barre de titre : l'appli web a déjà son en-tête. Barre d'état bleu nuit. -->
+    <style name="Theme.Topo" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/bleu_nuit</item>
+        <item name="android:navigationBarColor">@color/bleu_nuit</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

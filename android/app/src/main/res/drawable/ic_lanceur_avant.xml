@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Logo de l'appli topo (public/icone.svg) : tas ambre sur fond bleu nuit. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group
+        android:pivotX="256"
+        android:pivotY="280"
+        android:scaleX="0.85"
+        android:scaleY="0.85">
+        <path
+            android:fillColor="#F6AB07"
+            android:pathData="M96,364 L200,200 L252,252 L312,156 L416,364 Z" />
+        <path
+            android:pathData="M200,200 L252,252 L312,156"
+            android:strokeAlpha="0.35"
+            android:strokeColor="#1B2B36"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="14" />
+        <path
+            android:fillAlpha="0.55"
+            android:fillColor="#F6AB07"
+            android:pathData="M105,384 L407,384 A9,9 0,0 1,407 402 L105,402 A9,9 0,0 1,105 384 Z" />
+    </group>
+</vector>

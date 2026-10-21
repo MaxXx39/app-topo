@@ -8,6 +8,7 @@ import { plageAltitudes, equidistanceAuto } from '../topo/courbes.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { PALIERS } from '../plan/ecarts.js';
+import { estDansAppliAndroid, enregistrerDansAndroid } from '../android/pont.js';
 
 // Cases du PDF : [clé, texte, cochée au départ]. « Photos » (celles des surfaces) en dernier.
 const CALQUES = [
@@ -179,8 +180,12 @@ export function dateSuisse(iso) {
   return annee && mois && jour ? `${jour}.${mois}.${annee}` : '';
 }
 
-/** Fait télécharger un fichier par le navigateur. */
+/** Fait télécharger un fichier par le navigateur (dans l'APK : par l'appli Android). */
 export function telecharger(blob, nom) {
+  if (estDansAppliAndroid()) {
+    enregistrerDansAndroid(blob, nom);
+    return;
+  }
   const adresse = URL.createObjectURL(blob);
   const lien = document.createElement('a');
   lien.href = adresse;

@@ -4,6 +4,7 @@
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
+import { estDansAppliAndroid } from '../android/pont.js';
 
 /**
  * Crée l'écran Projet dans "conteneur". Les actions sont faites par main.js via "actions" :
@@ -112,7 +113,7 @@ export function creerEcranProjet(conteneur, actions) {
                 </p>`
               : ''
           }
-          <p class="aide">Version de l'appli : ${__VERSION_APPLI__}</p>
+          <p class="aide">Version de l'appli : ${__VERSION_APPLI__}${estDansAppliAndroid() ? ' (appli Android)' : ''}</p>
         </div>
       `;
     },
