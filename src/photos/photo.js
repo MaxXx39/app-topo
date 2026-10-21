@@ -1,7 +1,7 @@
 // Photos d'une surface (pour le compte rendu PDF).
 //
-// Une photo est rangée dans sa surface : surface.photos = [{ id, legende, date, image, miniature, largeur, hauteur, dansPdf }]
-// - dansPdf : faux si la case « dans le PDF » est décochée
+// Une photo est rangée dans sa surface : surface.photos = [{ id, legende, date, image, miniature, largeur, hauteur }]
+// Toutes les photos vont dans le PDF quand la case « Photos » de l'export est cochée.
 // - image : la photo réduite (JPEG, 1600 pixels de côté au plus), pour le PDF
 // - miniature : petite version (240 pixels), pour l'écran
 // - date : date de la prise de vue (ou du fichier), au format ISO
@@ -34,7 +34,6 @@ export async function preparerPhoto(fichier) {
   const photo = {
     id: nouvelIdentifiant(),
     legende: '',
-    dansPdf: true,
     date: new Date(fichier.lastModified || Date.now()).toISOString(),
     image: enJpeg(image, grande, 0.8),
     miniature: enJpeg(image, petite, 0.7),

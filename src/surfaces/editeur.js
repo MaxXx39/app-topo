@@ -259,9 +259,6 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
     } else if (cible.dataset.champ === 'tous-les-points') {
       objet.tousLesPoints = cible.checked;
       etat.edition = cible.checked ? null : { role: 'dessus', index: 0 };
-    } else if (cible.dataset.champ === 'photo-pdf') {
-      const photo = objet.photos.find((p) => p.id === cible.dataset.id);
-      if (photo) photo.dansPdf = cible.checked;
     } else if (cible.dataset.champ === 'legende-photo') {
       const photo = objet.photos.find((p) => p.id === cible.dataset.id);
       if (photo) photo.legende = cible.value.trim();
@@ -409,7 +406,6 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
             <figure class="photo">
               <img src="${photo.miniature}" alt="${echapper(photo.legende || surface.nom)}" />
               <input type="text" data-champ="legende-photo" data-id="${photo.id}" value="${echapper(photo.legende)}" placeholder="Légende" aria-label="Légende de la photo" />
-              <label class="case"><input type="checkbox" data-champ="photo-pdf" data-id="${photo.id}" ${photo.dansPdf === false ? '' : 'checked'} /> dans le PDF</label>
               <button type="button" class="bouton-lien" data-action="supprimer-photo" data-id="${photo.id}">supprimer</button>
             </figure>`,
             )

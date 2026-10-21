@@ -395,7 +395,7 @@ function calculsReussis() {
     .filter(({ resultat }) => resultat && !resultat.erreurs);
 }
 
-const ecranExport = creerEcranExport(document.querySelector('#export'), {
+creerEcranExport(document.querySelector('#export'), {
   obtenirDonnees: () => {
     const leve = leveActif(projet);
     const surfaceDe = (id) => projet.surfaces.find((s) => s.id === id);
@@ -425,10 +425,8 @@ const ecranExport = creerEcranExport(document.querySelector('#export'), {
       },
       points: leve?.points ?? [],
       fichierPoints: leve?.nom ?? '',
-      // Photos cochées « dans le PDF » (toutes, pour celles d'avant la case à cocher).
-      photos: surfacesAffichees().flatMap((s) =>
-        (s.photos ?? []).filter((photo) => photo.dansPdf !== false).map((photo) => ({ ...photo, surface: s.nom })),
-      ),
+      // Photos des surfaces affichées (case « Photos » de l'export).
+      photos: surfacesAffichees().flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom }))),
       cartouche: projet.cartouche,
       // Coupes cochées « dans le PDF », avec les profils des surfaces traversées.
       coupes: projet.coupes
@@ -470,7 +468,6 @@ function recalculer({ recadrer = false } = {}) {
   editeurSurfaces.rafraichir();
   ecranVolumes.afficher();
   ecranCoupes.afficher();
-  ecranExport.rafraichir();
   ecranImport.afficher(projet, dernierImport);
   ecranProjet.afficher(projet, resumes);
 
@@ -562,7 +559,6 @@ function revenirA(etat, message) {
   if (!etat) return;
   projet = completerProjet(etat);
   editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
-  ecranExport.rafraichir();
   recalculer();
   mettreAJourAnnuler();
   afficherMessage(message);
@@ -632,7 +628,6 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   document.querySelector('#message-import-surface').innerHTML = '';
   editeurSurfaces.charger(projet.surfaces);
   montrerUneSurfaceDuLeve();
-  ecranExport.rafraichir();
   recalculer({ recadrer: true });
   historique.reinitialiser(modifications, projet);
   mettreAJourAnnuler();
