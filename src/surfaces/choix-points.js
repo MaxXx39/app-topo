@@ -4,7 +4,8 @@
 // (Toucher les points sur le plan est géré par chaque écran.)
 //
 // Boutons et champs créés (à écouter par l'écran) : data-action="utiliser-serie" (data-index),
-// data-champ="liste" et data-action="valider", data-case="<nom>", data-zone="cases" (liste des cases).
+// data-champ="liste" (liste tapée : prise avec Entrée ou « Terminé », dans la barre de modification),
+// data-case="<nom>", data-zone="cases" (liste des cases).
 import { detecterSeries, ecrireListeDeNoms } from '../topo/noms.js';
 import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
@@ -36,11 +37,8 @@ export function htmlChoixPoints({ liste, points, nomsUtilises = new Set(), messa
       : '';
   const htmlListe = `
       <label class="champ-liste">
-        Liste de noms (ex. « b100 à b116, b120 »)
-        <span class="ligne-outils">
-          <input type="text" data-champ="liste" value="${echapper(ecrireListeDeNoms(liste))}" autocomplete="off" autocapitalize="off" spellcheck="false" />
-          <button type="button" class="bouton" data-action="valider">Valider</button>
-        </span>
+        Liste de noms (ex. « b100 à b116, b120 »), puis « Terminé »
+        <input type="text" data-champ="liste" value="${echapper(ecrireListeDeNoms(liste))}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" />
       </label>
       ${messages.length > 0 ? `<div class="erreur"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
   const listeCases = `

@@ -164,7 +164,13 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       etat.suppression = false;
       etat.messages = [];
     },
+    // « Terminé » (barre du bas) : la liste tapée est prise, puis la saisie se ferme
+    // (sauf s'il y a une erreur à lire). Un seul bouton pour finir, comme la touche Entrée.
     termine: () => {
+      if (etat.edition && conteneur.querySelector('[data-champ="liste"]')) {
+        actions.valider();
+        if (etat.messages.length > 0) return;
+      }
       etat.edition = null;
       etat.suppression = false;
       etat.messages = [];
@@ -201,7 +207,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       remplacerListe(resultat.noms);
       etat.messages = resultat.erreurs;
     },
-    // « Valider » : la liste tapée est prise, puis la saisie se ferme (sauf s'il y a une erreur à lire).
+    // La liste tapée est prise, puis la saisie se ferme (sauf s'il y a une erreur à lire) : touche Entrée, ou « Terminé ».
     valider: () => {
       actions.appliquer();
       if (etat.messages.length === 0) etat.edition = null;
