@@ -35,7 +35,7 @@ export function creerEcranCoupes(conteneur, options) {
     if (action === 'ajouter-coupe') {
       if (projet.coupes.length >= COUPES_MAX) return;
       const nom = NOMS_COUPES.find((n) => !projet.coupes.some((c) => c.nom === n));
-      const nouvelle = { id: nouvelIdentifiant(), nom, debut: null, fin: null, exageration: 1, dansPdf: true };
+      const nouvelle = { id: nouvelIdentifiant(), nom, debut: null, fin: null, exageration: 1, dansPdf: false };
       projet.coupes.push(nouvelle);
       quandChange();
       commencerTrace(nouvelle);

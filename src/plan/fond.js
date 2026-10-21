@@ -38,6 +38,17 @@ export const FONDS = {
   },
 };
 
+// Fonds de secours : si une tuile d'un fond ne se charge pas, on essaie celle-ci à la place.
+// Le cadastre en traits (service WMS) peut refuser d'être copié dans le PDF ou être indisponible :
+// on reprend alors le plan cadastral en couleurs (tuiles WMTS, comme la photo aérienne).
+export const FONDS_SECOURS = {
+  cadastre: {
+    url: (z, colonne, ligne) =>
+      `https://wmts.geo.admin.ch/1.0.0/ch.kantone.cadastralwebmap-farbe/default/current/2056/${z}/${colonne}/${ligne}.png`,
+    attribution: 'Cadastre © cantons',
+  },
+};
+
 /** Emprise d'une tuile sur le terrain (m, MN95) : { estMin, nordMin, estMax, nordMax }. */
 export function emprise(z, colonne, ligne) {
   const cote = TAILLE_TUILE * RESOLUTIONS[z];

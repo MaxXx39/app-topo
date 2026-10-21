@@ -12,7 +12,7 @@ import { choisirEchelle, barreEchellePapier, choisirFormat, miseEnPage } from '.
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
 import { couleurRVB } from '../plan/couleurs.js';
 import { zonesRemblaiDeblai } from '../plan/ecarts.js';
-import { FONDS, niveauDeZoom, tuilesPourZone } from '../plan/fond.js';
+import { FONDS, FONDS_SECOURS, niveauDeZoom, tuilesPourZone } from '../plan/fond.js';
 import { grouperParNature } from '../volumes/calculs.js';
 import { preparerDessinCoupe, texteEchellesCoupe } from '../coupes/dessin.js';
 import { longueurCoupe } from '../topo/coupe.js';
@@ -317,29 +317,31 @@ function dessinerEcartsPdf(doc, trianglesEcart, versPapier, palier) {
   return legende;
 }
 
-/** Fond swisstopo, puis découpe au cadre du plan. Renvoie le message du fond (ou null). */
+/**
+ * Fond swisstopo, puis découpe au cadre du plan.
+ * Renvoie { messageFond, sources } : message du fond (ou null) et mentions des fonds dessinés.
+ */
 async function preparerCadrePlan(doc, projection, choix) {
-  let messageFond = null;
-  if (choix.photo || choix.cadastre) messageFond = await dessinerFondPdf(doc, projection.versTerrain, projection.mmParMetre, choix);
+  let fond = { message: null, sources: [] };
+  if (choix.photo || choix.cadastre) fond = await dessinerFondPdf(doc, projection.versTerrain, projection.mmParMetre, choix);
   // Tout ce qui sort du cadre du plan est coupé (utile si l'échelle imposée est trop grande).
   doc.saveGraphicsState();
   doc.rect(CADRE_PLAN.x, CADRE_PLAN.y, CADRE_PLAN.largeur, CADRE_PLAN.hauteur, null);
   doc.clip();
   doc.discardPath();
-  return messageFond;
+  return { messageFond: fond.message, sources: fond.sources };
 }
 
-/** Après le dessin du plan : fin de la découpe, barre d'échelle, Nord et mention des sources. */
-function terminerCadrePlan(doc, echelle, choix, messageFond) {
+/** Après le dessin du plan : fin de la découpe, barre d'échelle, Nord et mention des sources des fonds. */
+function terminerCadrePlan(doc, echelle, sources) {
   doc.restoreGraphicsState();
   dessinerBarreEchelle(doc, echelle);
   dessinerNord(doc);
-  if ((choix.photo || choix.cadastre) && !messageFond) {
+  if (sources.length > 0) {
     // Mention obligatoire de la source du fond
     doc.setFontSize(5.5);
     doc.setTextColor(...COULEURS.texte);
-    const source = [choix.photo ? '© swisstopo' : null, choix.cadastre ? 'Mensuration officielle © swisstopo / cantons' : null].filter(Boolean).join(' · ');
-    doc.text(source, CADRE_PLAN.x + CADRE_PLAN.largeur - 1.5, CADRE_PLAN.y + CADRE_PLAN.hauteur - 1.5, { align: 'right' });
+    doc.text(sources.join(' · '), CADRE_PLAN.x + CADRE_PLAN.largeur - 1.5, CADRE_PLAN.y + CADRE_PLAN.hauteur - 1.5, { align: 'right' });
   }
 }
 
@@ -349,9 +351,9 @@ function terminerCadrePlan(doc, echelle, choix, messageFond) {
  */
 async function dessinerPageComparaison(doc, { nom, description, resultat }, cartouche, echelleImposee, choix) {
   const projection = preparerProjection(zoneDe(resultat.trianglesEcart.flat()), echelleImposee);
-  const messageFond = await preparerCadrePlan(doc, projection, choix);
+  const { messageFond, sources } = await preparerCadrePlan(doc, projection, choix);
   const legende = dessinerEcartsPdf(doc, resultat.trianglesEcart, projection.versPapier, choix.palier);
-  terminerCadrePlan(doc, projection.echelle, choix, messageFond);
+  terminerCadrePlan(doc, projection.echelle, sources);
 
   // Colonne de droite : titre, volumes, légende, cartouche
   const x = COLONNE.x;
@@ -432,7 +434,7 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
   if (!zone) return { echelle: echelleImposee ?? 500, messageFond: null, relief: null, legendeEcarts: null };
   const projection = preparerProjection(zone, echelleImposee);
   const { echelle, versPapier } = projection;
-  const messageFond = await preparerCadrePlan(doc, projection, choix);
+  const { messageFond, sources } = await preparerCadrePlan(doc, projection, choix);
 
   // Remblai (rouge) / déblai (jaune) par paliers : écart entre le dessus et la base de chaque stock
   const legendeEcarts = choix.ecarts
@@ -545,17 +547,19 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
     doc.setFont('helvetica', 'normal');
   }
   dessinerTraitsCoupes(doc, coupes, versPapier);
-  terminerCadrePlan(doc, echelle, choix, messageFond);
+  terminerCadrePlan(doc, echelle, sources);
   return { echelle, messageFond, relief, legendeEcarts };
 }
 
 /**
  * Photo aérienne et/ou cadastre swisstopo sous le plan : les tuiles sont chargées,
  * assemblées dans une image de la taille du cadre, puis posées dans le PDF.
- * Renvoie null si tout va bien, sinon un message (pas de connexion...).
+ * Chaque couche est indépendante : si le cadastre ne se charge pas, la photo reste.
+ * Renvoie { message, sources } : message (pas de connexion, cadastre remplacé...) ou null,
+ * et la mention de la source de chaque fond dessiné.
  */
 async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
-  if (typeof document === 'undefined') return 'fond non disponible ici';
+  if (typeof document === 'undefined') return { message: 'fond non disponible ici', sources: [] };
   const pixelsParMm = DPI_FOND / 25.4;
   const largeurPx = Math.round(CADRE_PLAN.largeur * pixelsParMm);
   const hauteurPx = Math.round(CADRE_PLAN.hauteur * pixelsParMm);
@@ -564,7 +568,7 @@ async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
   const metresParPixel = 1 / (mmParMetre * pixelsParMm);
   const z = niveauDeZoom(metresParPixel);
   const tuiles = tuilesPourZone({ estMin: hautGauche.est, estMax: basDroite.est, nordMin: basDroite.nord, nordMax: hautGauche.nord }, z);
-  if (tuiles.length > 200) return 'fond non mis : plan trop étendu pour la photo aérienne';
+  if (tuiles.length > 200) return { message: 'fond non mis : plan trop étendu pour la photo aérienne', sources: [] };
 
   const toile = document.createElement('canvas');
   toile.width = largeurPx;
@@ -574,24 +578,51 @@ async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
   contexte.fillRect(0, 0, largeurPx, hauteurPx);
 
   const couches = [choix.photo ? 'satellite' : null, choix.cadastre ? 'cadastre' : null].filter(Boolean);
-  try {
-    for (const couche of couches) {
-      const images = await Promise.all(tuiles.map((t) => chargerImage(FONDS[couche].url(t.z, t.colonne, t.ligne))));
-      // Photo aérienne atténuée : posée à 50 % sur le fond blanc, le plan se lit mieux par-dessus.
-      contexte.globalAlpha = couche === 'satellite' && choix.photoAttenuee ? 0.5 : 1;
-      tuiles.forEach((tuile, i) => {
-        const x = (tuile.est - hautGauche.est) * mmParMetre * pixelsParMm;
-        const y = (hautGauche.nord - tuile.nord) * mmParMetre * pixelsParMm;
-        const cote = tuile.cote * mmParMetre * pixelsParMm;
-        contexte.drawImage(images[i], x, y, cote + 0.5, cote + 0.5);
-      });
+  const NOMS_COUCHES = { satellite: 'photo aérienne', cadastre: 'cadastre' };
+  const messages = [];
+  const sources = [];
+  for (const couche of couches) {
+    let source = FONDS[couche];
+    let images = await chargerTuiles(tuiles, source);
+    if (images.every((image) => !image) && FONDS_SECOURS[couche]) {
+      // Fond de secours (cadastre en couleurs) si aucune tuile n'a pu être chargée.
+      source = FONDS_SECOURS[couche];
+      images = await chargerTuiles(tuiles, source);
+      if (images.some(Boolean)) messages.push('cadastre en traits indisponible : cadastre en couleurs mis à la place');
     }
+    if (images.every((image) => !image)) {
+      messages.push(`${NOMS_COUCHES[couche]} non disponible (pas de connexion ?)`);
+      continue;
+    }
+    // Photo aérienne atténuée : posée à 50 % sur le fond blanc, le plan se lit mieux par-dessus.
+    contexte.globalAlpha = couche === 'satellite' && choix.photoAttenuee ? 0.5 : 1;
+    tuiles.forEach((tuile, i) => {
+      if (!images[i]) return;
+      const x = (tuile.est - hautGauche.est) * mmParMetre * pixelsParMm;
+      const y = (hautGauche.nord - tuile.nord) * mmParMetre * pixelsParMm;
+      const cote = tuile.cote * mmParMetre * pixelsParMm;
+      contexte.drawImage(images[i], x, y, cote + 0.5, cote + 0.5);
+    });
     contexte.globalAlpha = 1;
-    doc.addImage(toile.toDataURL('image/jpeg', 0.85), 'JPEG', CADRE_PLAN.x, CADRE_PLAN.y, CADRE_PLAN.largeur, CADRE_PLAN.hauteur);
-    return null;
-  } catch {
-    return 'fond swisstopo non disponible (pas de connexion ?) : PDF créé sans le fond';
+    sources.push(source.attribution);
   }
+  if (sources.length > 0) {
+    try {
+      doc.addImage(toile.toDataURL('image/jpeg', 0.85), 'JPEG', CADRE_PLAN.x, CADRE_PLAN.y, CADRE_PLAN.largeur, CADRE_PLAN.hauteur);
+    } catch {
+      return { message: 'fond swisstopo refusé par le navigateur : PDF créé sans le fond', sources: [] };
+    }
+  }
+  return { message: messages.join(' ; ') || null, sources };
+}
+
+/**
+ * Charge les tuiles d'un fond. Renvoie une image par tuile, ou null pour celles qui
+ * n'ont pas pu être chargées (le reste du fond est quand même dessiné).
+ */
+async function chargerTuiles(tuiles, fond) {
+  const resultats = await Promise.allSettled(tuiles.map((t) => chargerImage(fond.url(t.z, t.colonne, t.ligne))));
+  return resultats.map((r) => (r.status === 'fulfilled' ? r.value : null));
 }
 
 /** Charge une image (tuile) en autorisant son usage dans le PDF. */

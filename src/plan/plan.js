@@ -5,7 +5,7 @@ import { bulle } from '../aide/bulles.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
-import { FONDS, niveauDeZoom, tuilesPourZone } from './fond.js';
+import { FONDS, FONDS_SECOURS, niveauDeZoom, tuilesPourZone } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
@@ -272,6 +272,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
               image.draggable = false;
               image.className = `tuile ${nom}`;
               image.addEventListener('error', () => {
+                // Tuile non chargée : on essaie une fois le fond de secours (cadastre en couleurs).
+                const secours = FONDS_SECOURS[nom]?.url(tuile.z, tuile.colonne, tuile.ligne);
+                if (secours && image.src !== secours) {
+                  image.src = secours;
+                  return;
+                }
                 image.style.visibility = 'hidden';
                 fondIndisponible = true;
                 afficherAttribution(couches);
