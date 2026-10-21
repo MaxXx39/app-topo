@@ -584,16 +584,19 @@ async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
   for (const couche of couches) {
     let source = FONDS[couche];
     let images = await chargerTuiles(tuiles, source);
-    if (images.every((image) => !image) && FONDS_SECOURS[couche]) {
-      // Fond de secours (cadastre en couleurs) si aucune tuile n'a pu être chargée.
+    // Fond de secours (cadastre en couleurs) si aucune tuile n'a pu être chargée,
+    // ou si le serveur n'a renvoyé que des images vides (entièrement transparentes).
+    if (FONDS_SECOURS[couche] && images.filter(Boolean).every(estVide)) {
       source = FONDS_SECOURS[couche];
       images = await chargerTuiles(tuiles, source);
-      if (images.some(Boolean)) messages.push('cadastre en traits indisponible : cadastre en couleurs mis à la place');
+      if (images.some(Boolean)) messages.push('cadastre en traits vide ou indisponible : cadastre en couleurs mis à la place');
     }
-    if (images.every((image) => !image)) {
+    const manquantes = images.filter((image) => !image).length;
+    if (manquantes === images.length) {
       messages.push(`${NOMS_COUCHES[couche]} non disponible (pas de connexion ?)`);
       continue;
     }
+    if (manquantes > 0) messages.push(`${NOMS_COUCHES[couche]} : ${manquantes} tuile(s) sur ${images.length} non chargée(s)`);
     // Photo aérienne atténuée : posée à 50 % sur le fond blanc, le plan se lit mieux par-dessus.
     contexte.globalAlpha = couche === 'satellite' && choix.photoAttenuee ? 0.5 : 1;
     tuiles.forEach((tuile, i) => {
@@ -614,6 +617,22 @@ async function dessinerFondPdf(doc, versTerrain, mmParMetre, choix) {
     }
   }
   return { message: messages.join(' ; ') || null, sources };
+}
+
+/** Vrai si une image (tuile) est entièrement transparente : rien n'y est dessiné. */
+function estVide(image) {
+  const toile = document.createElement('canvas');
+  toile.width = 64;
+  toile.height = 64;
+  const contexte = toile.getContext('2d');
+  contexte.drawImage(image, 0, 0, 64, 64);
+  try {
+    const { data } = contexte.getImageData(0, 0, 64, 64);
+    for (let i = 3; i < data.length; i += 4) if (data[i] > 0) return false;
+    return true;
+  } catch {
+    return false; // image non lisible : on ne peut pas savoir, on la garde
+  }
 }
 
 /**

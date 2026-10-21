@@ -17,7 +17,7 @@ const CALQUES = [
   ['courbes', 'Courbes de niveau', false],
   ['couleurs', 'Couleurs selon l\'altitude', false],
   ['photo', 'Photo aérienne (swisstopo)', false],
-  ['photoAttenuee', 'Photo aérienne atténuée (50 %)', true],
+  ['photoAttenuee', '… photo atténuée à 50 % (plus claire)', true],
   ['cadastre', 'Cadastre (limites en traits)', false],
 ];
 
@@ -68,10 +68,13 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
   const message = conteneur.querySelector('[data-zone="message"]');
 
   // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre : un seul à la fois.
+  // « Photo atténuée » est un réglage de la photo aérienne : la cocher coche aussi la photo.
   conteneur.addEventListener('change', (evenement) => {
+    const calque = evenement.target.dataset.calque;
     const exclusifs = { ecarts: 'couleurs', couleurs: 'ecarts' };
-    const autre = exclusifs[evenement.target.dataset.calque];
+    const autre = exclusifs[calque];
     if (autre && evenement.target.checked) conteneur.querySelector(`[data-calque="${autre}"]`).checked = false;
+    if (calque === 'photoAttenuee' && evenement.target.checked) conteneur.querySelector('[data-calque="photo"]').checked = true;
   });
 
   /** Date du cartouche ('AAAA-MM-JJ') : celle du projet, sinon la date du jour. */
