@@ -7,7 +7,7 @@
 import { lireListeDeNoms, detecterSeries, creerLigne, verifierSurface } from '../topo/noms.js';
 import { creerMesure, nomDeMesureLibre, nomsDeLaMesure } from '../topo/mesure.js';
 import { htmlChoixPoints, resumeListe } from '../surfaces/choix-points.js';
-import { VALEURS, TEXTE_MORCEAUX, valeursMorceau, valeurPrincipale } from './valeurs.js';
+import { VALEURS, TEXTE_MORCEAUX, valeursMorceau, valeurPrincipale, COULEURS_MESURES, couleurDeMesure } from './valeurs.js';
 import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
 
@@ -104,6 +104,9 @@ export function creerEcranMesures(conteneur, barre, options) {
       etat.edition = { role: type === 'longueur' ? 'points' : 'contour', index: 0 };
       etat.messages = [];
       etat.optionsOuvertes = false;
+    },
+    couleur: (bouton) => {
+      mesureActive().couleur = bouton.dataset.couleur;
     },
     ouvrir: (bouton) => {
       if (bouton.dataset.id === etat.idActif) return;
@@ -233,6 +236,8 @@ export function creerEcranMesures(conteneur, barre, options) {
       ${listeDesMesures(mesure)}`;
     if (mesure) html += contenuMesure(mesure);
     conteneur.innerHTML = html;
+    // La mesure ouverte (encadré, liste en cours) prend sa couleur.
+    conteneur.style.setProperty('--couleur-mesure', mesure ? couleurDeMesure(mesure) : '');
     afficherBarre();
   }
 
@@ -246,7 +251,7 @@ export function creerEcranMesures(conteneur, barre, options) {
           .map((m) => {
             const r = obtenirResultat(m);
             const valeur = r && !r.erreurs ? valeurPrincipale(m, r) : 'à compléter';
-            return `<button type="button" class="choix-mesure ${m === active ? 'active' : ''}" data-action="ouvrir" data-id="${m.id}">
+            return `<button type="button" class="choix-mesure ${m === active ? 'active' : ''}" data-action="ouvrir" data-id="${m.id}" style="--couleur-mesure: ${couleurDeMesure(m)}">
               <span class="nom">${echapper(etiquette?.(m) ?? m.nom)}</span><span class="valeur">${echapper(valeur)}</span>
             </button>`;
           })
@@ -275,10 +280,25 @@ export function creerEcranMesures(conteneur, barre, options) {
         ${tableauValeurs(mesure, resultat)}
         <details data-zone="options" ${ouvertes ? 'open' : ''}>
           <summary>Plus d'options</summary>
+          ${choixCouleur(mesure)}
           ${mesure.type === 'aire' ? optionsAire(mesure) : ''}
           ${casesPlan(mesure, resultat)}
           ${detailMorceaux(mesure, resultat)}
         </details>
+      </div>`;
+  }
+
+  /** Couleur de la mesure (sur le plan, dans le PDF et le DXF) : une pastille par couleur de la palette. */
+  function choixCouleur(mesure) {
+    const actuelle = couleurDeMesure(mesure);
+    return `
+      <div class="bloc-liste">
+        <strong>Couleur</strong>
+        <div class="palette-mesure">
+          ${COULEURS_MESURES.map(
+            (c) => `<button type="button" class="pastille-couleur ${c.couleur === actuelle ? 'choisie' : ''}" data-action="couleur" data-couleur="${c.couleur}" style="background: ${c.couleur}" aria-label="${c.nom}" title="${c.nom}" aria-pressed="${c.couleur === actuelle}"></button>`,
+          ).join('')}
+        </div>
       </div>`;
   }
 
@@ -393,6 +413,7 @@ export function creerEcranMesures(conteneur, barre, options) {
     }
     barre.hidden = false;
     barre.dataset.role = 'mesure';
+    barre.style.setProperty('--couleur-mesure', couleurDeMesure(mesure));
     const liste = listeDuRole(mesure, etat.edition);
     barre.innerHTML = `
       <div class="barre-texte"><strong>${echapper(mesure.nom)} · ${nomRole(etat.edition)}</strong> : ${liste.length} point(s)${liste.length > 0 ? `, dernier ${echapper(liste.at(-1))}` : ''}</div>

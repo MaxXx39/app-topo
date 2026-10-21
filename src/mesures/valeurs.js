@@ -37,6 +37,36 @@ export const TEXTE_MORCEAUX = {
   aire: 'Chaque côté sur le plan',
 };
 
+/**
+ * Couleurs proposées pour une mesure : { couleur (écran et PDF), nom, aci (numéro de couleur AutoCAD, pour le DXF) }.
+ * Le cyan est la couleur de départ.
+ */
+export const COULEURS_MESURES = [
+  { couleur: '#0891b2', nom: 'Cyan', aci: 4 },
+  { couleur: '#2563eb', nom: 'Bleu', aci: 5 },
+  { couleur: '#7c3aed', nom: 'Violet', aci: 6 },
+  { couleur: '#db2777', nom: 'Rose', aci: 221 },
+  { couleur: '#dc2626', nom: 'Rouge', aci: 1 },
+  { couleur: '#ea580c', nom: 'Orange', aci: 30 },
+  { couleur: '#16a34a', nom: 'Vert', aci: 3 },
+  { couleur: '#1b2b36', nom: 'Bleu nuit', aci: 7 },
+];
+
+/** Couleur d'une mesure (de la palette), cyan si elle n'en a pas. */
+export function couleurDeMesure(mesure) {
+  return (COULEURS_MESURES.find((c) => c.couleur === mesure.couleur) ?? COULEURS_MESURES[0]).couleur;
+}
+
+/** Numéro de couleur AutoCAD (DXF) d'une mesure. */
+export function aciDeMesure(mesure) {
+  return (COULEURS_MESURES.find((c) => c.couleur === mesure.couleur) ?? COULEURS_MESURES[0]).aci;
+}
+
+/** '#0891b2' -> [8, 145, 178] (rouge, vert, bleu), pour le PDF. facteur < 1 : plus foncé. */
+export function rvbDeCouleur(couleur, facteur = 1) {
+  return [1, 3, 5].map((i) => Math.round(parseInt(couleur.slice(i, i + 2), 16) * facteur));
+}
+
 /** Nom affiché d'une sorte de mesure. */
 export const NOM_TYPE = { longueur: 'Longueur', aire: 'Aire' };
 

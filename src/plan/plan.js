@@ -9,7 +9,7 @@ import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js'
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
-import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, valeurPrincipale } from '../mesures/valeurs.js';
+import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, valeurPrincipale, couleurDeMesure } from '../mesures/valeurs.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -189,7 +189,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       for (const nom of (stock.lignesRupture ?? []).flatMap((ligne) => ligne.noms)) classes.set(nom, 'role-ligne');
       for (const nom of stock.contour ?? []) classes.set(nom, 'role-contour');
     }
-    // Points de la mesure choisie : en cyan, la couleur des mesures.
+    // Points de la mesure choisie : dans sa couleur (cyan au départ).
+    svg.style.setProperty('--couleur-mesure', dessin.mesureActive ? couleurDeMesure(dessin.mesureActive) : '');
     if (dessin.mesureActive) {
       for (const nom of nomsDeLaMesure(dessin.mesureActive)) classes.set(nom, 'role-mesure');
       const triangles = dessin.mesures.find((m) => m.mesure === dessin.mesureActive)?.resultat?.triangles ?? [];
@@ -632,9 +633,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    */
   function dessinerTracesMesures() {
     if (!dessin.mesures?.length) return;
-    const groupe = creerElement('g', { class: 'mesures' });
+    const tout = creerElement('g', { class: 'mesures' });
     for (const { mesure, resultat } of dessin.mesures) {
       const actif = mesure === dessin.mesureActive ? ' actif' : '';
+      // Chaque mesure dans sa couleur.
+      const groupe = creerElement('g', { style: `--couleur-mesure: ${couleurDeMesure(mesure)}` });
+      tout.append(groupe);
       if (mesure.type === 'aire') {
         if (calques.triangles && resultat?.triangles) {
           const traits = resultat.triangles.map((t) => tracePar(t.map((p) => versEcran(p.est, p.nord, vue)), true)).join(' ');
@@ -651,7 +655,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         if (sommets.length >= 2) groupe.append(creerElement('path', { d: tracePar(sommets, false), class: `longueur-mesure${actif}` }));
       }
     }
-    svg.append(groupe);
+    svg.append(tout);
   }
 
   /**
@@ -660,10 +664,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    */
   function dessinerEtiquettesMesures() {
     if (!dessin.mesures?.length) return;
-    const groupe = creerElement('g', { class: 'etiquettes-mesures' });
+    const tout = creerElement('g', { class: 'etiquettes-mesures' });
     for (const { mesure, resultat } of dessin.mesures) {
       if (!resultat || resultat.erreurs) continue;
       const active = mesure === dessin.mesureActive;
+      const groupe = creerElement('g', { style: `--couleur-mesure: ${couleurDeMesure(mesure)}` });
+      tout.append(groupe);
       if (active && mesure.afficher?.morceaux) {
         for (const morceau of resultat.morceaux) {
           const a = versEcran(morceau.debut.est, morceau.debut.nord, vue);
@@ -691,7 +697,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         groupe.append(texte);
       });
     }
-    svg.append(groupe);
+    svg.append(tout);
   }
 
   /** Mesure touchée : dans le contour d'une aire, ou tout près du trait d'une longueur. Renvoie son id, ou null. */

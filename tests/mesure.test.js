@@ -148,3 +148,24 @@ describe('noms et étiquettes', () => {
     expect(formaterPente(null)).toBe('-');
   });
 });
+
+describe('couleur des mesures', async () => {
+  const { couleurDeMesure, aciDeMesure, rvbDeCouleur } = await import('../src/mesures/valeurs.js');
+  const { genererDxfMesures } = await import('../src/export/dxf.js');
+
+  it('cyan au départ (et pour une ancienne mesure sans couleur), sinon la couleur choisie', () => {
+    expect(creerMesure('aire', 'A1', 'leve').couleur).toBe('#0891b2');
+    expect(couleurDeMesure({})).toBe('#0891b2');
+    expect(couleurDeMesure({ couleur: '#db2777' })).toBe('#db2777');
+    expect(aciDeMesure({ couleur: '#db2777' })).toBe(221);
+    expect(rvbDeCouleur('#0891b2')).toEqual([8, 145, 178]);
+  });
+
+  it('DXF : les lignes et les textes ont la couleur de la mesure', () => {
+    const points = [pt('a', 0, 0, 10), pt('b', 30, 40, 11)];
+    const mesure = { ...creerMesure('longueur', 'L1', 'leve'), points: ['a', 'b'], couleur: '#dc2626' };
+    const texte = genererDxfMesures({ points, mesures: [{ mesure, resultat: calculerMesure(mesure, points) }] });
+    expect(texte).toMatch(/POLYLINE\r\n8\r\nMESURES\r\n62\r\n1\r\n/);
+    expect(texte).toMatch(/TEXT\r\n8\r\nMESURES\r\n62\r\n1\r\n/);
+  });
+});

@@ -8,6 +8,7 @@
 // { id, nom, type: 'aire', leveId, contour: [...], lignesRupture: [{ noms, fermee }],
 //   tousLesPoints, points: [...points isolés / caractéristiques], afficher: { a2d, a3d, p2d, p3d, morceaux } }
 // "afficher" : valeurs à montrer sur le plan et dans le PDF (cases cochées par l'utilisateur).
+// "couleur" : couleur choisie (voir COULEURS_MESURES dans mesures/valeurs.js), cyan au départ.
 import { calculerSurface, nouvelIdentifiant } from './surface.js';
 import { airePolygone } from './volume.js';
 import { creerLigne } from './noms.js';
@@ -20,7 +21,7 @@ const AFFICHER_PAR_DEFAUT = {
 
 /** Crée une mesure vide ('longueur' ou 'aire') sur les points d'un levé. */
 export function creerMesure(type, nom, leveId) {
-  const commun = { id: nouvelIdentifiant(), nom, type, leveId, afficher: { ...AFFICHER_PAR_DEFAUT[type] } };
+  const commun = { id: nouvelIdentifiant(), nom, type, leveId, couleur: '#0891b2', afficher: { ...AFFICHER_PAR_DEFAUT[type] } };
   if (type === 'longueur') return { ...commun, points: [] };
   return { ...commun, contour: [], lignesRupture: [creerLigne()], tousLesPoints: false, points: [] };
 }
