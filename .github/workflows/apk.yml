@@ -1,8 +1,9 @@
 # Fabrication automatique de l'appli Android « Topo » (fichier APK) par GitHub.
 # - À chaque envoi sur GitHub : tests de l'appli web, puis fabrication de l'APK
 #   (téléchargeable dans l'onglet « Actions »).
-# - Sur la branche principale (main) : l'APK est aussi publié dans « Releases »,
-#   sous le nom « APK Android - dernière version », pour l'installer depuis le téléphone.
+# - Puis l'APK est publié dans « Releases », sous le nom « APK Android - dernière version »
+#   (le dernier fabriqué, quelle que soit la branche), pour l'installer depuis le téléphone :
+#   https://github.com/MaxXx39/app-topo/releases/download/apk-derniere-version/Topo.apk
 name: Fabriquer l'APK
 
 on:
@@ -52,7 +53,6 @@ jobs:
           path: Topo.apk
 
       - name: Publier « APK Android - dernière version » (Releases)
-        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -60,5 +60,5 @@ jobs:
           gh release delete apk-derniere-version --cleanup-tag --yes || true
           gh release create apk-derniere-version Topo.apk \
             --target "${{ github.sha }}" \
-            --title "APK Android - dernière version (${VERSION}, n° ${{ github.run_number }})" \
+            --title "APK Android - dernière version (${VERSION}, n° ${{ github.run_number }}, ${{ github.ref_name }})" \
             --notes "Appli Topo pour Android, version ${VERSION} (${{ github.run_number }}). Sur le téléphone : touchez Topo.apk pour le télécharger, puis ouvrez-le pour l'installer."
