@@ -223,3 +223,50 @@ describe('creerPdf - coupes', async () => {
     expect(contenu).toContain("(B')");
   });
 });
+
+describe('exports des mesures (onglet 3. Mesures)', async () => {
+  const { genererCsvMesures } = await import('../src/export/csv.js');
+  const { genererDxfMesures } = await import('../src/export/dxf.js');
+  const { creerPdfMesures } = await import('../src/export/pdf-mesures.js');
+  const { creerMesure, calculerMesure } = await import('../src/topo/mesure.js');
+  const { pt } = await import('./outils.js');
+
+  const points = [pt('a', 0, 0, 10), pt('b', 30, 40, 11), pt('c', 30, 0, 10), pt('d', 0, 40, 12)];
+  const longueur = { ...creerMesure('longueur', 'Bordure', 'leve'), points: ['a', 'b'] };
+  const aire = { ...creerMesure('aire', 'A1', 'leve'), contour: ['a', 'c', 'b', 'd'] };
+  const mesures = [longueur, aire].map((mesure) => ({ mesure, resultat: calculerMesure(mesure, points) }));
+
+  it('CSV : une ligne par mesure (sans volume), puis chaque morceau', () => {
+    const lignes = genererCsvMesures(mesures).trim().split('\r\n');
+    expect(lignes[0]).toBe('Nom;Type;Points;Longueur 2D (m);Longueur 3D (m);Dénivelé (m);Pente (%);Aire 2D (m²);Aire 3D (m²);Périmètre 2D (m);Périmètre 3D (m)');
+    expect(lignes[1]).toBe(`Bordure;Longueur;a, b;50.000;${Math.hypot(50, 1).toFixed(3)};1.000;2.00;;;;`);
+    expect(lignes[2]).toMatch(/^A1;Aire;a, c, b, d;;;;;1200\.000;/);
+    expect(lignes).toContain('Bordure;1;a;b;50.000;50.010;1.000;2.00');
+    expect(lignes.join(' ')).not.toMatch(/Remblai|Déblai/);
+  });
+
+  it('DXF : calque MESURES avec les lignes et les textes, sans accent', () => {
+    const texte = genererDxfMesures({ points, mesures });
+    expect(texte).toContain('\r\nMESURES\r\n');
+    expect(texte).toContain('MESURES_TRIANGLES');
+    expect(texte).toContain('A 2D 1200.000 m2');
+    expect(texte).not.toMatch(/[^\x00-\x7f]/);
+  });
+
+  it('PDF : une feuille, les mesures et le cartouche, aucun volume', async () => {
+    const { document, echelle } = await creerPdfMesures({ mesures, points, cartouche: { affaire: '10 203' } });
+    expect(document.getNumberOfPages()).toBe(1);
+    expect(echelle).toBeGreaterThan(0);
+    const contenu = document.output();
+    expect(contenu).toContain('Mesures');
+    expect(contenu).toContain('Bordure');
+    expect(contenu).not.toMatch(/Remblai|Volumes/);
+  });
+
+  it('PDF : les mesures qui ne tiennent pas dans la colonne vont sur une feuille à part', async () => {
+    const beaucoup = Array.from({ length: 30 }, (_, i) => ({ ...mesures[0], mesure: { ...longueur, nom: `L${i + 1}` } }));
+    const { document } = await creerPdfMesures({ mesures: beaucoup, points, cartouche: {} });
+    expect(document.getNumberOfPages()).toBe(2);
+    expect(document.output()).toContain('L30');
+  });
+});

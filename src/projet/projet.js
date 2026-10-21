@@ -7,13 +7,14 @@
 //   leves: [{ id, nom, importeLe, points: [{ nom, est, nord, altitude }] }],
 //   leveActifId,                    // levé affiché
 //   surfaces: [...],                // stocks, terrassements, terrains... : voir topo/surface.js
-//   calculs: [...],                 // calculs de volume (onglet 3. Volumes) : voir volumes/calculs.js
+//   calculs: [...],                 // calculs de volume (onglet 2.2 Volumes) : voir volumes/calculs.js
 //   coupes: [{ id, nom ('A', 'B'), debut, fin, exageration (1 ou 2), dansPdf }],  // 2 au maximum
 //                                   // debut, fin : { est, nord } (m, MN95)
+//   mesures: [...],                 // longueurs et aires (onglet 3. Mesures) : voir topo/mesure.js
 //   cartouche: { affaire, dessinePar, date },   // date : 'AAAA-MM-JJ', ou '' pour la date du jour
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
-// aux points de ce levé.
+// aux points de ce levé. De même pour une mesure.
 import { nouvelIdentifiant, estImportee } from '../topo/surface.js';
 import { calculsDUnAncienProjet } from '../volumes/calculs.js';
 
@@ -36,6 +37,7 @@ export function creerProjet(nom) {
     surfaces: [],
     calculs: [],
     coupes: [],
+    mesures: [],
     cartouche: { affaire: '', dessinePar: '', date: '' },
   };
 }

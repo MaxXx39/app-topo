@@ -1,4 +1,4 @@
-// Onglet 1. Importer : fichiers de points (levés). Les surfaces LandXML / DXF s'importent dans l'onglet 2.
+// Onglet 1. Importer : fichiers de points (levés). Les surfaces LandXML / DXF s'importent dans l'onglet 2.1 Surfaces.
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';

@@ -48,17 +48,21 @@ let CADRE_PLAN;
 let COLONNE;
 let Y_CARTOUCHE;
 
-/** Prend la mise en page d'un format de feuille ('a4' ou 'a3'), pour les dessins qui suivent. */
-function appliquerFormat(format) {
+/**
+ * Prend la mise en page d'un format de feuille ('a4' ou 'a3'), pour les dessins qui suivent.
+ * Renvoie { page, cadrePlan, colonne, yCartouche } (mm), pour les autres PDF (mesures).
+ */
+export function appliquerFormat(format) {
   const mise = miseEnPage(format);
   PAGE = mise.page;
   CADRE_PLAN = mise.cadrePlan;
   COLONNE = mise.colonne;
   Y_CARTOUCHE = PAGE.hauteur - PAGE.marge - 2 - HAUTEUR_LOGO_CARTOUCHE - LIGNES_CARTOUCHE * HAUTEUR_LIGNE_CARTOUCHE;
+  return { page: PAGE, cadrePlan: CADRE_PLAN, colonne: COLONNE, yCartouche: Y_CARTOUCHE };
 }
 appliquerFormat('a4');
 
-const COULEURS = {
+export const COULEURS = {
   texte: [27, 43, 54],
   gris: [95, 109, 119],
   ambre: [246, 171, 7],
@@ -160,7 +164,7 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
 }
 
 /** Zone du terrain couverte par des points { est, nord } : { estMin, estMax, nordMin, nordMax } (m), ou null. */
-function zoneDe(sommets) {
+export function zoneDe(sommets) {
   if (sommets.length === 0) return null;
   const ests = sommets.map((p) => p.est);
   const nords = sommets.map((p) => p.nord);
@@ -267,7 +271,7 @@ function dessinerPagePhotos(doc, photos, cartouche) {
 }
 
 /** Cadre général de la feuille et cadre du plan. */
-function dessinerCadres(doc) {
+export function dessinerCadres(doc) {
   trait(doc, COULEURS.texte, 0.4);
   doc.rect(PAGE.marge, PAGE.marge, PAGE.largeur - 2 * PAGE.marge, PAGE.hauteur - 2 * PAGE.marge);
   doc.rect(CADRE_PLAN.x, CADRE_PLAN.y, CADRE_PLAN.largeur, CADRE_PLAN.hauteur);
@@ -277,7 +281,7 @@ function dessinerCadres(doc) {
  * Échelle et passage terrain (m) -> feuille (mm) pour faire tenir la zone dans le cadre du plan.
  * zone = { estMin, estMax, nordMin, nordMax } (m). Le Nord est en haut de la feuille.
  */
-function preparerProjection(zone, echelleImposee) {
+export function preparerProjection(zone, echelleImposee) {
   const echelle =
     echelleImposee ??
     choisirEchelle(
@@ -321,7 +325,7 @@ function dessinerEcartsPdf(doc, trianglesEcart, versPapier, palier) {
  * Fond swisstopo, puis découpe au cadre du plan.
  * Renvoie { messageFond, sources } : message du fond (ou null) et mentions des fonds dessinés.
  */
-async function preparerCadrePlan(doc, projection, choix) {
+export async function preparerCadrePlan(doc, projection, choix) {
   let fond = { message: null, sources: [] };
   if (choix.photo || choix.cadastre) fond = await dessinerFondPdf(doc, projection.versTerrain, projection.mmParMetre, choix);
   // Tout ce qui sort du cadre du plan est coupé (utile si l'échelle imposée est trop grande).
@@ -333,7 +337,7 @@ async function preparerCadrePlan(doc, projection, choix) {
 }
 
 /** Après le dessin du plan : fin de la découpe, barre d'échelle, Nord et mention des sources des fonds. */
-function terminerCadrePlan(doc, echelle, sources) {
+export function terminerCadrePlan(doc, echelle, sources) {
   doc.restoreGraphicsState();
   dessinerBarreEchelle(doc, echelle);
   dessinerNord(doc);
@@ -490,7 +494,40 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
   trait(doc, COULEURS.contour, 0.35);
   for (const { stock } of calcules) polyligne(stock.contour ?? [], true);
 
-  // Points et noms (placés sans chevauchement, comme sur l'écran)
+  dessinerPointsPdf(doc, pointsMontres, versPapier, echelle, choix);
+
+  // Nom et volume de chaque stock, dans une étiquette blanche
+  for (const { stock, resultat } of calcules) {
+    const centreStock = pointInterieur(resultat.trianglesDessus);
+    if (!centreStock) continue;
+    const { x, y } = versPapier(centreStock);
+    const lignes = [stock.nom, `Remblai ${formaterNombre(resultat.remblai)} m³`];
+    if (resultat.deblai > 0) lignes.push(`Déblai ${formaterNombre(resultat.deblai)} m³`);
+    // Étiquette plus petite aux petites échelles (1:1000 et plus), pour moins cacher le plan.
+    const taille = echelle >= 1000 ? 5.5 : 7;
+    const interligne = taille * 0.46;
+    doc.setFontSize(taille);
+    const largeur = Math.max(...lignes.map((l) => doc.getTextWidth(l))) + 3;
+    const hauteur = lignes.length * interligne + 1.6;
+    doc.setFillColor(255, 255, 255);
+    trait(doc, COULEURS.contour, 0.25);
+    doc.roundedRect(x - largeur / 2, y - hauteur / 2, largeur, hauteur, 1, 1, 'FD');
+    lignes.forEach((ligne, i) => {
+      doc.setFont('helvetica', i === 0 ? 'bold' : 'normal');
+      doc.text(ligne, x, y - hauteur / 2 + 0.8 + interligne * (i + 0.85), { align: 'center' });
+    });
+    doc.setFont('helvetica', 'normal');
+  }
+  dessinerTraitsCoupes(doc, coupes, versPapier);
+  terminerCadrePlan(doc, echelle, sources);
+  return { echelle, messageFond, relief, legendeEcarts };
+}
+
+/**
+ * Points (petits ronds) et, selon les calques, leur nom et leur altitude (en gris, en dessous),
+ * placés sans chevauchement comme sur l'écran. Taille du texte selon l'échelle (1:250 et plus détaillé : plus grand).
+ */
+export function dessinerPointsPdf(doc, pointsMontres, versPapier, echelle, choix) {
   doc.setFillColor(...COULEURS.texte);
   const positions = pointsMontres.map(versPapier);
   for (const { x, y } of positions) doc.circle(x, y, 0.3, 'F');
@@ -523,32 +560,6 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
     });
     doc.setTextColor(...COULEURS.texte);
   }
-
-  // Nom et volume de chaque stock, dans une étiquette blanche
-  for (const { stock, resultat } of calcules) {
-    const centreStock = pointInterieur(resultat.trianglesDessus);
-    if (!centreStock) continue;
-    const { x, y } = versPapier(centreStock);
-    const lignes = [stock.nom, `Remblai ${formaterNombre(resultat.remblai)} m³`];
-    if (resultat.deblai > 0) lignes.push(`Déblai ${formaterNombre(resultat.deblai)} m³`);
-    // Étiquette plus petite aux petites échelles (1:1000 et plus), pour moins cacher le plan.
-    const taille = echelle >= 1000 ? 5.5 : 7;
-    const interligne = taille * 0.46;
-    doc.setFontSize(taille);
-    const largeur = Math.max(...lignes.map((l) => doc.getTextWidth(l))) + 3;
-    const hauteur = lignes.length * interligne + 1.6;
-    doc.setFillColor(255, 255, 255);
-    trait(doc, COULEURS.contour, 0.25);
-    doc.roundedRect(x - largeur / 2, y - hauteur / 2, largeur, hauteur, 1, 1, 'FD');
-    lignes.forEach((ligne, i) => {
-      doc.setFont('helvetica', i === 0 ? 'bold' : 'normal');
-      doc.text(ligne, x, y - hauteur / 2 + 0.8 + interligne * (i + 0.85), { align: 'center' });
-    });
-    doc.setFont('helvetica', 'normal');
-  }
-  dessinerTraitsCoupes(doc, coupes, versPapier);
-  terminerCadrePlan(doc, echelle, sources);
-  return { echelle, messageFond, relief, legendeEcarts };
 }
 
 /**
@@ -644,7 +655,7 @@ function chargerImage(adresse) {
 }
 
 /** Polygone rempli (style 'F' : sans contour, 'FD' : avec contour), sommets en mm sur la feuille. */
-function polygonePlein(doc, sommets, style = 'F') {
+export function polygonePlein(doc, sommets, style = 'F') {
   const [premier, ...suivants] = sommets;
   const ecarts = suivants.map((p, i) => {
     const precedent = i === 0 ? premier : suivants[i - 1];
@@ -686,7 +697,7 @@ function dessinerNord(doc) {
 }
 
 /** Titre de la colonne de droite, souligné en ambre. Renvoie la position (mm) de la ligne suivante. */
-function dessinerTitre(doc, titre) {
+export function dessinerTitre(doc, titre) {
   const y = 17;
   doc.setTextColor(...COULEURS.texte);
   doc.setFont('helvetica', 'bold');
@@ -854,7 +865,7 @@ function dessinerColonne(doc, calcules, cartouche, { choix, relief, ecarts, comp
 }
 
 /** Cartouche en bas à droite : logo, puis affaire, date, dessiné par, échelle, coordonnées, fichier. */
-function dessinerCartouche(doc, cartouche) {
+export function dessinerCartouche(doc, cartouche) {
   const x = COLONNE.x;
   // Cartouche en bas à droite
   const lignesCartouche = [
@@ -1005,7 +1016,7 @@ function dessinerCoupePdf(doc, dessin, ox, oy) {
 }
 
 /** Choisit la couleur et l'épaisseur (mm) des traits. */
-function trait(doc, couleur, epaisseur) {
+export function trait(doc, couleur, epaisseur) {
   doc.setDrawColor(...couleur);
   doc.setLineWidth(epaisseur);
 }

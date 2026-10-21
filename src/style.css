@@ -21,6 +21,7 @@
   --jaune-clair: #fffbeb;
   --jaune: #d97706;
   --bleu: #2563eb;
+  --cyan: #0891b2; /* mesures (onglet 3. Mesures) : couleur à part, jamais utilisée pour les surfaces */
   --rayon: 12px;
   --ombre: 0 1px 2px rgba(16, 24, 20, 0.06), 0 2px 8px rgba(16, 24, 20, 0.06);
   --hauteur-entete: 56px;
@@ -270,10 +271,38 @@ body.aide-active .rond-aide {
   white-space: nowrap;
 }
 
-/* Petits téléphones : texte des onglets un peu plus petit pour tenir sur une ligne. */
+/* 2.1 Surfaces et 2.2 Volumes vont ensemble : un cadre ambre clair les réunit. */
+.groupe-onglets {
+  flex: 2;
+  display: flex;
+  margin: 5px 2px;
+  border: 1.5px solid var(--ambre);
+  border-radius: 12px;
+  background: var(--jaune-clair);
+}
+
+.titre-court {
+  display: none;
+}
+
+/* Petits téléphones : texte des onglets un peu plus petit pour tenir sur une ligne,
+   et titres courts (« 2.1 Surf. », « 2.2 Vol. »). */
 @media (max-width: 420px) {
   .onglets button {
-    font-size: 0.66rem;
+    font-size: 0.64rem;
+  }
+
+  .onglets .titre-long {
+    display: none;
+  }
+
+  .onglets .titre-court {
+    display: inline;
+  }
+
+  .onglets button.actif svg {
+    width: 40px;
+    padding: 1px 8px;
   }
 }
 
@@ -347,9 +376,9 @@ body.aide-active .rond-aide {
   display: inline-block;
 }
 
-/* Téléphone, pendant une modification de surface : plan en haut, outils en dessous. */
+/* Téléphone, pendant une modification de surface ou de mesure : plan en haut, outils en dessous. */
 @media (max-width: 899px) {
-  body.mode-dessin[data-onglet='surfaces'] .panneau-plan {
+  body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .panneau-plan {
     display: block;
     position: fixed;
     top: var(--hauteur-entete);
@@ -363,7 +392,7 @@ body.aide-active .rond-aide {
   }
 
   /* La barre « Terminé » se place juste sous le plan, en version compacte. */
-  body.mode-dessin[data-onglet='surfaces'] .barre-edition {
+  body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-edition {
     top: calc(var(--hauteur-entete) + var(--hauteur-plan-dessin));
     bottom: auto;
     left: 0;
@@ -377,29 +406,29 @@ body.aide-active .rond-aide {
     font-size: 0.85rem;
   }
 
-  body.mode-dessin[data-onglet='surfaces'] .barre-edition .barre-texte {
+  body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-edition .barre-texte {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  body.mode-dessin[data-onglet='surfaces'] .barre-edition .ligne-outils {
+  body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-edition .ligne-outils {
     margin-top: 4px;
     flex-wrap: nowrap;
   }
 
-  body.mode-dessin[data-onglet='surfaces'] .barre-edition button {
+  body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-edition button {
     min-height: 36px;
     padding: 4px 10px;
     font-size: 0.85rem;
   }
 
   /* Pendant le dessin, les onglets du bas sont cachés (on sort avec « Terminé »). */
-  body.mode-dessin[data-onglet='surfaces'] .onglets {
+  body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .onglets {
     display: none;
   }
 
-  body.mode-dessin[data-onglet='surfaces'] .mise-en-page {
+  body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .mise-en-page {
     padding-top: calc(var(--hauteur-plan-dessin) + var(--hauteur-barre-dessin) + 12px);
     padding-bottom: 24px;
   }
@@ -417,7 +446,7 @@ body.aide-active .rond-aide {
     grid-template-columns: 440px 1fr;
     gap: 16px;
     padding: 16px;
-    padding-top: calc(16px + 52px);
+    padding-top: calc(16px + 56px);
     height: calc(100vh - var(--hauteur-entete));
   }
 
@@ -444,19 +473,27 @@ body.aide-active .rond-aide {
     left: 16px;
     right: auto;
     width: 440px;
-    height: 44px;
+    height: 48px;
     padding: 4px;
     border: none;
     border-radius: var(--rayon);
     box-shadow: var(--ombre);
   }
 
+  /* Chaque onglet prend la place de son titre, pour que les 5 tiennent sur la ligne. */
   .onglets button {
+    flex: 1 1 auto;
     flex-direction: row;
-    gap: 5px;
-    padding: 0 4px;
-    font-size: 0.8rem;
+    gap: 4px;
+    padding: 0 3px;
+    font-size: 0.74rem;
     border-radius: 8px;
+  }
+
+  .groupe-onglets {
+    flex: 2 1 auto;
+    margin: 0 2px;
+    border-radius: 10px;
   }
 
   .onglets button.actif {
@@ -926,6 +963,10 @@ svg.plan {
   fill: var(--succes);
 }
 
+.plan .points circle.role-mesure {
+  fill: var(--cyan);
+}
+
 .plan .points circle.selection {
   fill: none;
   stroke: var(--sombre);
@@ -1215,7 +1256,7 @@ svg.plan {
 
 /* --- Export --- */
 
-/* Bloc « Exporter » (onglet 3. Volumes) : une carte bien visible, avec un trait ambre en haut. */
+/* Bloc « Exporter » (onglet 2.2 Volumes) : une carte bien visible, avec un trait ambre en haut. */
 .carte-export {
   margin-top: 20px;
   padding: 4px 14px 10px;
@@ -1321,7 +1362,7 @@ svg.plan {
   margin: 8px 0;
 }
 
-/* Nom d'un calcul de volume (onglet 3. Volumes). */
+/* Nom d'un calcul de volume (onglet 2.2 Volumes). */
 #volumes .titre-role input {
   flex: 1;
   min-width: 0;
@@ -1461,12 +1502,16 @@ tr.total td {
   --couleur-role: #7c3aed;
 }
 
+.barre-edition[data-role='mesure'] {
+  --couleur-role: var(--cyan);
+}
+
 .barre-edition[data-role] {
   border-color: var(--couleur-role);
   background: color-mix(in srgb, var(--couleur-role) 6%, var(--surface));
 }
 
-body.mode-dessin[data-onglet='surfaces'] .barre-edition[data-role] {
+body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-edition[data-role] {
   border-bottom-color: var(--couleur-role);
 }
 
@@ -1530,7 +1575,7 @@ body.mode-dessin[data-onglet='surfaces'] .barre-edition[data-role] {
   color: var(--gris);
 }
 
-/* --- 3. Volumes : une carte par volume --- */
+/* --- 2.2 Volumes : une carte par volume --- */
 
 .carte-volume .champ-large {
   margin: 8px 0;
@@ -1561,7 +1606,7 @@ body.mode-dessin[data-onglet='surfaces'] .barre-edition[data-role] {
   color: var(--gris);
 }
 
-/* --- Coupes (onglet 3. Volumes) --- */
+/* --- Coupes (onglet 2.2 Volumes) --- */
 
 .carte-coupe {
   --couleur-role: var(--sombre);
@@ -1672,6 +1717,138 @@ body.mode-dessin[data-onglet='surfaces'] .barre-edition[data-role] {
   font-size: 15px;
   font-weight: 700;
   fill: var(--sombre);
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+
+/* ==========================================================================
+   3. Mesures : tout en cyan pointillé, pour ne pas les confondre avec les surfaces
+   ========================================================================== */
+
+.carte-role.role-mesure {
+  --couleur-role: var(--cyan);
+  border-left: 5px dashed var(--couleur-role);
+  background: color-mix(in srgb, var(--couleur-role) 4%, var(--surface));
+}
+
+.carte-valeurs {
+  border: 1px solid color-mix(in srgb, var(--cyan) 40%, var(--bordure));
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 10px 0;
+}
+
+.tableau-valeurs,
+.tableau-morceaux,
+.tableau-recap-mesures {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.tableau-valeurs td,
+.tableau-valeurs th,
+.tableau-morceaux td,
+.tableau-morceaux th,
+.tableau-recap-mesures td,
+.tableau-recap-mesures th {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--bordure);
+  text-align: left;
+}
+
+.tableau-valeurs th,
+.tableau-morceaux th,
+.tableau-recap-mesures th {
+  color: var(--gris);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+td.nombre,
+th.nombre {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+td.case-plan,
+th.case-plan {
+  text-align: center;
+  width: 64px;
+}
+
+.case-plan input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--cyan);
+}
+
+.tableau-defilant {
+  overflow-x: auto;
+}
+
+/* Menu des calques dans l'onglet Mesures : pas de calque des surfaces. */
+.menu-calques.mode-mesures .seulement-surfaces {
+  display: none;
+}
+
+/* Plan : mesures en cyan pointillé, aires avec un fond cyan léger. */
+.plan .longueur-mesure,
+.plan .aire-mesure,
+.plan .ligne-mesure {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 2;
+  stroke-dasharray: 7 4;
+  stroke-linejoin: round;
+}
+
+.plan .aire-mesure {
+  fill: rgba(8, 145, 178, 0.08);
+}
+
+.plan .ligne-mesure {
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+}
+
+.plan .longueur-mesure.actif,
+.plan .aire-mesure.actif {
+  stroke-width: 3.2;
+}
+
+.plan .triangles-mesure {
+  fill: none;
+  stroke: rgba(8, 145, 178, 0.45);
+  stroke-width: 0.7;
+}
+
+.plan .etiquettes-mesures rect {
+  fill: rgba(255, 255, 255, 0.92);
+  stroke: var(--cyan);
+  stroke-width: 1;
+  stroke-dasharray: 4 2;
+}
+
+.plan .etiquettes-mesures rect.actif {
+  stroke-width: 2;
+}
+
+.plan .etiquettes-mesures text {
+  font-size: 11.5px;
+  fill: var(--texte);
+}
+
+.plan .etiquettes-mesures text.nom-mesure {
+  font-weight: 700;
+  fill: #0e7490;
+}
+
+.plan .etiquettes-mesures text.cote-morceau {
+  font-size: 10.5px;
+  fill: #0e7490;
   paint-order: stroke;
   stroke: #ffffff;
   stroke-width: 3px;

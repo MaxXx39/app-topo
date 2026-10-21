@@ -17,6 +17,10 @@ import { creerEcranExport, telecharger } from './export/ecran.js';
 import { creerEcranProjet } from './projet/ecran.js';
 import { creerEcranImport } from './import/ecran.js';
 import { creerEcranCoupes } from './coupes/ecran.js';
+import { creerEcranMesures } from './mesures/ecran.js';
+import { creerEcranExportMesures } from './export/ecran-mesures.js';
+import { calculerMesure } from './topo/mesure.js';
+import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface } from './topo/coupe.js';
 import { echapper } from './outils/echapper.js';
 import {
@@ -39,6 +43,7 @@ let resumes = []; // liste des projets enregistrés (pour l'onglet Projet)
 let dernierImport = null; // résultat du dernier import de points
 let surfacesCalculees = new Map(); // id de surface -> triangles (résultat de calculerSurface)
 let resultatsCalculs = new Map(); // id de calcul -> volume (résultat de calculerVolume)
+let resultatsMesures = new Map(); // id de mesure -> longueurs, aires (résultat de calculerMesure)
 let ongletContexte = 'importer'; // dernier onglet (hors plan) : décide de ce que montre le plan
 let calculMontre = null; // id du calcul colorié sur le plan (bouton « Voir sur le plan »)
 let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, etape: 'debut' ou 'fin', debut }
@@ -46,21 +51,49 @@ const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 
 // --- Mise en page : onglets ---
 // L'onglet Projet vient en premier (l'appli s'ouvre dessus). Les onglets numérotés suivent
-// l'ordre du travail : importer les points, préparer les surfaces, calculer les volumes.
+// l'ordre du travail : importer les points, préparer les surfaces et calculer les volumes
+// (2.1 et 2.2, réunis dans un même cadre), puis mesurer (3, à part des volumes).
 const ICONES = {
   projets: '<path d="M3 7h6l2 2h10v10H3z" />',
   importer: '<path d="M12 15V4M7 9l5-5 5 5M4 15v5h16v-5" />',
   surfaces: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
   volumes: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
+  mesures: '<path d="M3 16 16 3l5 5L8 21zM7 12l2 2M10 9l2 2M13 6l2 2" />',
   plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
 };
+// "court" : titre utilisé sur les petits téléphones. "groupe" : onglets dessinés dans un même cadre.
 const ONGLETS = [
   { nom: 'projets', titre: 'Projet' },
   { nom: 'importer', titre: '1. Importer' },
-  { nom: 'surfaces', titre: '2. Surfaces' },
-  { nom: 'volumes', titre: '3. Volumes' },
+  { nom: 'surfaces', titre: '2.1 Surfaces', court: '2.1 Surf.', groupe: 'volumes' },
+  { nom: 'volumes', titre: '2.2 Volumes', court: '2.2 Vol.', groupe: 'volumes' },
+  { nom: 'mesures', titre: '3. Mesures' },
   { nom: 'plan', titre: 'Plan' },
 ];
+
+/** Bouton d'un onglet (icône + titre, et titre court pour les petits téléphones). */
+const boutonOnglet = (o) => `<button type="button" data-onglet="${o.nom}">
+    <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[o.nom]}</svg>
+    ${o.court
+      ? `<span class="titre-long">${o.titre}</span><span class="titre-court" aria-hidden="true">${o.court}</span>`
+      : `<span>${o.titre}</span>`}
+  </button>`;
+
+/** Barre des onglets : les onglets d'un même groupe sont réunis dans un cadre. */
+function barreOnglets() {
+  let html = '';
+  for (let i = 0; i < ONGLETS.length; i += 1) {
+    const o = ONGLETS[i];
+    if (!o.groupe) {
+      html += boutonOnglet(o);
+      continue;
+    }
+    const groupe = ONGLETS.filter((autre) => autre.groupe === o.groupe);
+    html += `<div class="groupe-onglets" role="group" aria-label="Surfaces et volumes">${groupe.map(boutonOnglet).join('')}</div>`;
+    i += groupe.length - 1;
+  }
+  return html;
+}
 
 document.querySelector('#app').innerHTML = `
   <div class="mise-en-page">
@@ -68,31 +101,30 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="projets"><div id="projets"></div></section>
       <section class="panneau" data-onglet="importer"><div id="importer"></div></section>
       <section class="panneau" data-onglet="surfaces">
-        <h2>2. Surfaces <span class="aide" id="nom-leve-surfaces"></span> ${bulle('surfaces')}</h2>
+        <h2>2.1 Surfaces <span class="aide" id="nom-leve-surfaces"></span> ${bulle('surfaces')}</h2>
         <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer), ou une surface LandXML ou DXF.</p>
         <div id="message-import-surface"></div>
         <div id="surfaces"></div>
       </section>
       <section class="panneau" data-onglet="volumes">
-        <h2>3. Volumes ${bulle('volumes')}</h2>
+        <h2>2.2 Volumes ${bulle('volumes')}</h2>
         <div id="volumes"></div>
         <div id="coupes"></div>
         <div id="export" class="carte-export"></div>
       </section>
+      <section class="panneau" data-onglet="mesures">
+        <h2>3. Mesures <span class="aide" id="nom-leve-mesures"></span> ${bulle('mesures')}</h2>
+        <div id="mesures"></div>
+        <div id="export-mesures" class="carte-export"></div>
+      </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
+      <div id="barre-mesures" class="barre-edition" hidden></div>
     </div>
     <section class="panneau panneau-plan" data-onglet="plan">
       <div id="plan"></div>
     </section>
   </div>
-  <nav class="onglets" aria-label="Onglets">
-    ${ONGLETS.map(
-      (o) => `<button type="button" data-onglet="${o.nom}">
-        <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[o.nom]}</svg>
-        <span>${o.titre}</span>
-      </button>`,
-    ).join('')}
-  </nav>
+  <nav class="onglets" aria-label="Onglets">${barreOnglets()}</nav>
 `;
 
 /** Affiche un onglet. Sur ordinateur, le plan reste toujours visible à droite. */
@@ -102,6 +134,13 @@ function afficherOnglet(nom) {
   }
   document.body.dataset.onglet = nom;
   if (nom !== 'plan' && nom !== ongletContexte) {
+    // Les mesures sont à part : on ne modifie pas une surface (ou une coupe) et une mesure en même temps.
+    if (nom === 'mesures') {
+      editeurSurfaces.arreterModification();
+      if (traceCoupe) arreterTrace();
+    } else {
+      ecranMesures.arreterModification();
+    }
     ongletContexte = nom;
     recalculer();
   }
@@ -175,9 +214,12 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
   supprimerLeve: (id) => {
     const leve = projet.leves.find((l) => l.id === id);
     const surfacesDuLeve = projet.surfaces.filter((s) => s.leveId === id);
-    if (!leve || !confirm(`Supprimer le levé « ${leve.nom} » et ses ${surfacesDuLeve.length} surface(s) ?`)) return;
+    const mesuresDuLeve = projet.mesures.filter((m) => m.leveId === id);
+    const texteMesures = mesuresDuLeve.length > 0 ? ` et ses ${mesuresDuLeve.length} mesure(s)` : '';
+    if (!leve || !confirm(`Supprimer le levé « ${leve.nom} », ses ${surfacesDuLeve.length} surface(s)${texteMesures} ?`)) return;
     projet.leves = projet.leves.filter((l) => l.id !== id);
     projet.surfaces = projet.surfaces.filter((s) => s.leveId !== id);
+    projet.mesures = projet.mesures.filter((m) => m.leveId !== id);
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
     editeurSurfaces.charger(projet.surfaces);
     modifie({ recadrer: true });
@@ -238,7 +280,9 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
 
 const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPosition: toucherPourCoupe,
-  quandToucherPoint: (nom) => editeurSurfaces.toucherPoint(nom),
+  // Un point touché va à la liste en cours : celle d'une mesure (onglet 3. Mesures) ou d'une surface.
+  quandToucherPoint: (nom) => (ongletContexte === 'mesures' ? ecranMesures.toucherPoint(nom) : editeurSurfaces.toucherPoint(nom)),
+  quandToucherMesure: (id) => ecranMesures.choisir(id),
   quandToucherStock: (index) => editeurSurfaces.choisir(index),
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
 });
@@ -388,6 +432,49 @@ const ecranCoupes = creerEcranCoupes(document.querySelector('#coupes'), {
   quandChange: () => modifie(),
 });
 
+// --- Mesures (onglet 3. Mesures) : longueurs et aires, à part des surfaces et des volumes ---
+
+/** Nom d'une mesure dans les listes : avec sa sorte, et son levé s'il y en a plusieurs. */
+function etiquetteMesure(mesure) {
+  const texte = `${mesure.nom} (${NOM_TYPE[mesure.type].toLowerCase()})`;
+  const leve = projet.leves.find((l) => l.id === mesure.leveId);
+  return projet.leves.length > 1 && leve ? `${texte} · ${leve.nom}` : texte;
+}
+
+const ecranMesures = creerEcranMesures(document.querySelector('#mesures'), document.querySelector('#barre-mesures'), {
+  obtenirProjet: () => projet,
+  obtenirPoints: (mesure) => pointsDuLeve(mesure.leveId),
+  obtenirResultat: (mesure) => resultatsMesures.get(mesure.id),
+  leveActifId: () => leveActif(projet)?.id ?? null,
+  etiquette: etiquetteMesure,
+  quandChange: () => {
+    // Une mesure d'un autre levé est choisie : ce levé devient le levé affiché.
+    const mesure = ecranMesures.mesureActive();
+    const autreLeve = mesure && mesure.leveId !== projet.leveActifId;
+    if (autreLeve) projet.leveActifId = mesure.leveId;
+    modifie({ recadrer: autreLeve });
+  },
+});
+
+/** Mesures du levé affiché, avec leur résultat : [{ mesure, resultat }]. */
+function mesuresAffichees() {
+  const leve = leveActif(projet);
+  return projet.mesures.filter((m) => m.leveId === leve?.id).map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }));
+}
+
+// Export des mesures : à part de celui des volumes (aucun volume dedans).
+creerEcranExportMesures(document.querySelector('#export-mesures'), {
+  obtenirDonnees: () => {
+    const leve = leveActif(projet);
+    return {
+      mesures: mesuresAffichees().filter(({ resultat }) => resultat && !resultat.erreurs),
+      points: leve?.points ?? [],
+      fichierPoints: leve?.nom ?? '',
+      cartouche: projet.cartouche,
+    };
+  },
+});
+
 /** Calculs de volume du projet dont le résultat est connu : [{ calcul, resultat }]. */
 function calculsReussis() {
   return projet.calculs
@@ -446,7 +533,7 @@ function decrireSurface(surface) {
   const calcul = calculDuPlan(surface);
   const volume = calcul ? resultatsCalculs.get(calcul.id) : null;
   return `
-    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${volume ? ` · remblai ${formaterNombre(volume.remblai)} m³ (onglet 3. Volumes)` : ''}</p>
+    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${volume ? ` · remblai ${formaterNombre(volume.remblai)} m³ (onglet 2.2 Volumes)` : ''}</p>
     ${r.avertissements.length > 0 ? `<div class="avertissement"><ul>${r.avertissements.map((a) => `<li>${echapper(a)}</li>`).join('')}</ul></div>` : ''}`;
 }
 
@@ -460,14 +547,17 @@ function recalculer({ recadrer = false } = {}) {
   surfacesCalculees = new Map(projet.surfaces.map((s) => [s.id, calculerSurface(s, pointsDuLeve(s.leveId))]));
   const donnees = { surfaces: projet.surfaces, triangulations: surfacesCalculees, pointsDe: (s) => pointsDuLeve(s.leveId) };
   resultatsCalculs = new Map(projet.calculs.map((c) => [c.id, calculerVolume(c, donnees)]));
+  resultatsMesures = new Map(projet.mesures.map((m) => [m.id, calculerMesure(m, pointsDuLeve(m.leveId))]));
 
   for (const element of document.querySelectorAll('.sans-points')) element.hidden = projet.leves.length > 0;
   document.querySelector('#nom-leve-surfaces').textContent = leve ? `· levé « ${leve.nom} »` : '';
+  document.querySelector('#nom-leve-mesures').textContent = leve ? `· levé « ${leve.nom} »` : '';
   document.querySelector('#etat').textContent = `${projet.nom} · ${points.length} points · ${surfacesAffichees().length} surface(s)`;
 
   editeurSurfaces.rafraichir();
   ecranVolumes.afficher();
   ecranCoupes.afficher();
+  ecranMesures.afficher();
   ecranImport.afficher(projet, dernierImport);
   ecranProjet.afficher(projet, resumes);
 
@@ -478,7 +568,25 @@ function recalculer({ recadrer = false } = {}) {
   const dansSurfaces = ongletContexte === 'surfaces';
   // Une surface importée montre ses propres points ; sinon, les points du levé.
   const pointsDuPlan = dansSurfaces && active && estImportee(active) ? active.points : points;
-  plan.redessiner({
+  if (ongletContexte === 'mesures') {
+    // Onglet 3. Mesures : seulement les points et les mesures (aucune surface, aucune coupe).
+    plan.redessiner({
+      modeMesures: true,
+      mesures: mesuresAffichees(),
+      mesureActive: ecranMesures.mesureActive(),
+      listeEnCours: ecranMesures.listeEnCours(),
+      enEdition: ecranMesures.enModification(),
+      stocks: [],
+      stockActif: null,
+      cachees: new Set(),
+      resultats: [],
+      ecarts: null,
+      surface: null,
+      modeTriangles: false,
+      coupes: [],
+      traceCoupe: null,
+    });
+  } else plan.redessiner({
     ...editeurSurfaces.obtenirDessin(),
     cachees: new Set(projet.surfaces.filter((s) => !visibles.has(s))),
     resultats: projet.surfaces.map((s) => {
@@ -516,13 +624,15 @@ function recalculer({ recadrer = false } = {}) {
  * le plan reste affiché en haut de l'écran et les outils en dessous (voir style.css, « mode-dessin »).
  */
 function basculerModeDessin() {
-  const enDessin = editeurSurfaces.enModification();
+  const dansMesures = ongletContexte === 'mesures';
+  const enDessin = dansMesures ? ecranMesures.enModification() : editeurSurfaces.enModification();
   const debut = enDessin && !document.body.classList.contains('mode-dessin');
   document.body.classList.toggle('mode-dessin', enDessin);
   if (!debut) return;
-  // On revient à l'onglet Surfaces (s'il était sur le plan seul), puis on montre la carte modifiée.
-  if (document.body.dataset.onglet === 'plan') afficherOnglet('surfaces');
-  requestAnimationFrame(() => document.querySelector('#surfaces .en-edition')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  // On revient à l'onglet (s'il était sur le plan seul), puis on montre la carte modifiée.
+  const onglet = dansMesures ? 'mesures' : 'surfaces';
+  if (document.body.dataset.onglet === 'plan') afficherOnglet(onglet);
+  requestAnimationFrame(() => document.querySelector(`#${onglet} .en-edition`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
 }
 let pointsAffiches = null;
 
