@@ -40,7 +40,7 @@ export const TEXTES_AIDE = {
   base:
     'Stock seul : volume d\'un stock au-dessus de sa base, prise sur la ligne du contour (les points du pied) ou sur un plan horizontal à l\'altitude que tu donnes. Comparaison : la 1re surface est la référence (terrain naturel, état avant…), la 2e est comparée (terrassement, état après…). Le volume est calculé là où les deux surfaces se recouvrent ; la partie non couverte est signalée. « Voir sur le plan » colorie le remblai en rouge et le déblai en jaune.',
   exporter:
-    'PDF : plan à l\'échelle, volumes et cartouche, plus une feuille par calcul limité au contour d\'une surface. Coche ce que le PDF doit montrer (noms, altitudes des points, triangles…). CSV : tableau des volumes pour Excel. DXF (R12) : points avec leur nom et leur altitude (calques NOMS et ALTITUDES), contours, lignes de rupture, triangles en faces 3D, surfaces et courbes. LandXML : les surfaces affichées.',
+    'PDF : plan à l\'échelle (centré sur les surfaces ; A4, ou A3 si le plan ne tient pas en A4 à l\'échelle choisie), volumes et cartouche. Photo aérienne atténuée : à 50 % pour que le plan se lise mieux. Cadastre : seulement les limites, en traits, sur fond transparent. Coche ce que le PDF doit montrer (noms, altitudes des points, triangles…). CSV : tableau des volumes pour Excel. DXF (R12) : points avec leur nom et leur altitude (calques NOMS et ALTITUDES), contours, lignes de rupture, triangles en faces 3D, surfaces et courbes. LandXML : les surfaces affichées.',
 
   // --- Plan ---
   plan:

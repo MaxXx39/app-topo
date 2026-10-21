@@ -17,7 +17,8 @@ const CALQUES = [
   ['courbes', 'Courbes de niveau', false],
   ['couleurs', 'Couleurs selon l\'altitude', false],
   ['photo', 'Photo aérienne (swisstopo)', false],
-  ['cadastre', 'Cadastre', false],
+  ['photoAttenuee', 'Photo aérienne atténuée (50 %)', true],
+  ['cadastre', 'Cadastre (limites en traits)', false],
 ];
 
 /**
@@ -38,10 +39,11 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
     <div class="champs-export">
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">
-          <option value="auto">auto (tout le plan sur la feuille)</option>
+          <option value="auto">auto (tout le plan sur une A4)</option>
           ${ECHELLES.map((e) => `<option value="${e}">1:${e}</option>`).join('')}
         </select>
       </label>
+      <p class="aide">Plan centré sur les surfaces. Échelle choisie : feuille A4 si le plan y tient, sinon A3.</p>
     </div>
     <div class="calques-pdf">
       <p class="titre-choix">Contenu du PDF</p>
@@ -124,7 +126,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
           [...conteneur.querySelectorAll('[data-calque]')].map((caseACocher) => [caseACocher.dataset.calque, caseACocher.checked]),
         );
         calques.palier = champ('palier').value;
-        const { document, echelle, messageFond } = await creerPdf({
+        const { document, echelle, format, messageFond } = await creerPdf({
           stocks,
           resultats,
           points,
@@ -140,7 +142,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
           echelleImposee: echelleChoisie === 'auto' ? null : Number(echelleChoisie),
         });
         telecharger(document.output('blob'), `${nomDeFichier()}.pdf`);
-        message.textContent = `PDF téléchargé (plan à l'échelle 1:${echelle}).${messageFond ? ` Attention : ${messageFond}.` : ''}`;
+        message.textContent = `PDF téléchargé (${format.toUpperCase()}, plan à l'échelle 1:${echelle}).${messageFond ? ` Attention : ${messageFond}.` : ''}`;
       } catch (erreur) {
         message.textContent = `Impossible de créer le PDF : ${erreur.message}`;
       }

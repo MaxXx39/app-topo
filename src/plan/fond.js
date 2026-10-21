@@ -14,7 +14,11 @@ const ORIGINE_EST = 2420000;
 const ORIGINE_NORD = 1350000;
 const TAILLE_TUILE = 256; // pixels
 
-// Fonds disponibles : photo aérienne et plan cadastral (transparent, posé par-dessus).
+// Fonds disponibles : photo aérienne, et cadastre posé par-dessus.
+// Le cadastre est la couche « Mensuration officielle » de swisstopo : seulement les limites des
+// parcelles et les bâtiments, en traits, sur un fond transparent (on voit la photo aérienne
+// derrière). Elle n'existe qu'en service WMS : on demande une image PNG transparente par tuile,
+// à la place exacte de la tuile (BBOX = Est min, Nord min, Est max, Nord max, en MN95).
 export const FONDS = {
   satellite: {
     url: (z, colonne, ligne) =>
@@ -22,11 +26,25 @@ export const FONDS = {
     attribution: '© swisstopo',
   },
   cadastre: {
-    url: (z, colonne, ligne) =>
-      `https://wmts.geo.admin.ch/1.0.0/ch.kantone.cadastralwebmap-farbe/default/current/2056/${z}/${colonne}/${ligne}.png`,
-    attribution: 'Cadastre © cantons',
+    url: (z, colonne, ligne) => {
+      const { estMin, nordMin, estMax, nordMax } = emprise(z, colonne, ligne);
+      return (
+        'https://wms.geo.admin.ch/?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ch.swisstopo-vd.amtliche-vermessung' +
+        `&STYLES=&CRS=EPSG:2056&BBOX=${estMin},${nordMin},${estMax},${nordMax}` +
+        `&WIDTH=${TAILLE_TUILE}&HEIGHT=${TAILLE_TUILE}&FORMAT=image/png&TRANSPARENT=true`
+      );
+    },
+    attribution: 'Mensuration officielle © swisstopo / cantons',
   },
 };
+
+/** Emprise d'une tuile sur le terrain (m, MN95) : { estMin, nordMin, estMax, nordMax }. */
+export function emprise(z, colonne, ligne) {
+  const cote = TAILLE_TUILE * RESOLUTIONS[z];
+  const estMin = ORIGINE_EST + colonne * cote;
+  const nordMax = ORIGINE_NORD - ligne * cote;
+  return { estMin, nordMin: nordMax - cote, estMax: estMin + cote, nordMax };
+}
 
 /**
  * Choisit le niveau de zoom des tuiles : le moins détaillé qui reste net à l'écran.
