@@ -8,7 +8,9 @@
 //   leveActifId,                    // levé affiché
 //   surfaces: [...],                // stocks, terrassements, terrains... : voir topo/surface.js
 //   calculs: [...],                 // calculs de volume (onglet 3. Volumes) : voir volumes/calculs.js
-//   cartouche: { affaire, dessinePar },
+//   coupes: [{ id, nom ('A', 'B'), debut, fin, exageration (1 ou 2), dansPdf }],  // 2 au maximum
+//                                   // debut, fin : { est, nord } (m, MN95)
+//   cartouche: { affaire, dessinePar, date },   // date : 'AAAA-MM-JJ', ou '' pour la date du jour
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé.
@@ -33,7 +35,8 @@ export function creerProjet(nom) {
     leveActifId: null,
     surfaces: [],
     calculs: [],
-    cartouche: { affaire: '', dessinePar: '' },
+    coupes: [],
+    cartouche: { affaire: '', dessinePar: '', date: '' },
   };
 }
 
@@ -95,6 +98,8 @@ export function completerProjet(projet) {
     ...surface,
   }));
   if (!Array.isArray(projet.calculs)) complet.calculs = calculsDUnAncienProjet(complet.surfaces, projet.comparaisons);
+  // Calculs d'avant le choix de la base « depuis une altitude » : base sur la ligne du contour.
+  complet.calculs = complet.calculs.map((calcul) => ({ base: 'contour', altitude: null, ...calcul }));
   // Anciens champs, remplacés par les calculs.
   delete complet.comparaisons;
   for (const surface of complet.surfaces) delete surface.volume;

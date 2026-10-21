@@ -1,7 +1,7 @@
 // Tests des exports (CSV, échelle du plan imprimé).
 import { describe, it, expect } from 'vitest';
 import { genererCsv } from '../src/export/csv.js';
-import { choisirEchelle, barreEchellePapier } from '../src/export/echelle.js';
+import { choisirEchelle, barreEchellePapier, choisirFormat, miseEnPage } from '../src/export/echelle.js';
 import { disposerPhotos } from '../src/export/pdf.js';
 import { pointsDeReference, surfaceDeReference, volumeDeReference, STOCKS_REFERENCE } from './outils.js';
 
@@ -50,6 +50,25 @@ describe('choisirEchelle', () => {
   });
 });
 
+describe('choisirFormat', () => {
+  it('garde l\'A4 en échelle automatique', () => {
+    expect(choisirFormat(500, 500, null)).toEqual({ format: 'a4', depasse: false });
+  });
+
+  it('A4 si le plan y tient, sinon A3, sinon A3 avec avertissement', () => {
+    // Place du dessin : A4 173 × 160 mm, A3 296 × 247 mm.
+    expect(choisirFormat(59, 91, 1000)).toEqual({ format: 'a4', depasse: false }); // 59 × 91 mm
+    expect(choisirFormat(59, 91, 500)).toEqual({ format: 'a3', depasse: false }); // 118 × 182 mm
+    expect(choisirFormat(59, 91, 200)).toEqual({ format: 'a3', depasse: true }); // 295 × 455 mm
+  });
+
+  it('mise en page : même colonne de droite, plan plus grand en A3', () => {
+    expect(miseEnPage('a4').cadrePlan).toEqual({ x: 10, y: 10, largeur: 193, hauteur: 190 });
+    expect(miseEnPage('a4').colonne).toEqual({ x: 207, largeur: 80 });
+    expect(miseEnPage('a3').cadrePlan).toEqual({ x: 10, y: 10, largeur: 316, hauteur: 277 });
+  });
+});
+
 describe('barreEchellePapier', () => {
   it('choisit une longueur ronde', () => {
     expect(barreEchellePapier(500, 50)).toEqual({ metres: 20, mm: 40 }); // 50 mm = 25 m -> 20 m
@@ -75,10 +94,19 @@ describe('creerPdf - levé du 20/05/2026', async () => {
     expect(contenu).toContain('/Subtype /Image');
   });
 
-  it('utilise l\'échelle imposée par l\'utilisateur', async () => {
+  it('utilise l\'échelle imposée : à 1:500 le plan ne tient pas en A4, la feuille passe en A3', async () => {
     const impose = await creerPdf({ stocks, resultats, points, cartouche, echelleImposee: 500 });
     expect(impose.echelle).toBe(500);
+    expect(impose.format).toBe('a3');
+    expect(Math.round(impose.document.internal.pageSize.getWidth())).toBe(420);
     expect(impose.document.output()).toContain('1:500');
+    expect(impose.messageFond).toBeNull();
+  });
+
+  it('avertit si le plan dépasse même l\'A3', async () => {
+    const impose = await creerPdf({ stocks, resultats, points, cartouche, echelleImposee: 200 });
+    expect(impose.format).toBe('a3');
+    expect(impose.messageFond).toContain('dépasse la feuille A3');
   });
 
   it('écrit les volumes et le cartouche', () => {
@@ -164,5 +192,34 @@ describe('creerPdf - calques', async () => {
   it('crée le PDF sans le fond quand la photo est impossible (pas de navigateur)', async () => {
     const { messageFond } = await creerPdf({ stocks: [stock], resultats, points, cartouche: {}, calques: { photo: true } });
     expect(messageFond).toBeTruthy();
+  });
+});
+
+describe('creerPdf - coupes', async () => {
+  const { creerPdf } = await import('../src/export/pdf.js');
+  const { profilSurface } = await import('../src/topo/coupe.js');
+  const points = pointsDeReference();
+  const stock = surfaceDeReference(STOCKS_REFERENCE[1], points);
+  const resultats = [volumeDeReference(STOCKS_REFERENCE[1], points)];
+  const parNom = new Map(points.map((p) => [p.nom, p]));
+
+  it('ajoute une feuille « Coupes » avec les coupes cochées, et leur trait sur le plan', async () => {
+    const coupe = (nom, a, b) => {
+      const debut = { est: parNom.get(a).est, nord: parNom.get(a).nord };
+      const fin = { est: parNom.get(b).est, nord: parNom.get(b).nord };
+      return { nom, debut, fin, exageration: 2, profils: [{ nom: 'Stock 2', nature: 'stock', lignes: profilSurface(resultats[0].trianglesDessus, debut, fin) }] };
+    };
+    const { document } = await creerPdf({
+      stocks: [stock],
+      resultats,
+      points,
+      cartouche: {},
+      coupes: [coupe('A', 'b100', 'b108'), coupe('B', 'b104', 'b112')],
+    });
+    expect(document.getNumberOfPages()).toBe(2);
+    const contenu = document.output();
+    expect(contenu).toContain('Coupes');
+    expect(contenu).toContain('Longueurs 1:');
+    expect(contenu).toContain("(B')");
   });
 });

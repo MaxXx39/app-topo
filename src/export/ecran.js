@@ -1,4 +1,4 @@
-// Formulaire d'export : cartouche (affaire, date, dessiné par), échelle et calques du PDF,
+// Formulaire d'export : échelle et calques du PDF (le cartouche se remplit dans l'onglet Projet),
 // boutons PDF, CSV, DXF et LandXML.
 import { genererCsv } from './csv.js';
 import { genererDxf } from './dxf.js';
@@ -17,35 +17,33 @@ const CALQUES = [
   ['courbes', 'Courbes de niveau', false],
   ['couleurs', 'Couleurs selon l\'altitude', false],
   ['photo', 'Photo aérienne (swisstopo)', false],
-  ['cadastre', 'Cadastre', false],
+  ['photoAttenuee', 'Photo aérienne atténuée (50 %)', true],
+  ['cadastre', 'Cadastre (limites en traits)', false],
 ];
 
 /**
  * Crée le formulaire d'export dans "conteneur".
- * - obtenirDonnees() : { nomProjet, stocks, resultats, comparaisons, volumes, dessinSurfaces, points, fichierPoints, photos, cartouche }
+ * - obtenirDonnees() : { nomProjet, stocks, resultats, comparaisons, volumes, dessinSurfaces, points, fichierPoints, photos, cartouche, coupes }
  *   stocks, resultats : calculs dessinés sur la feuille principale du PDF (surface 1 et volume) ;
  *   comparaisons : calculs dans un contour, une feuille chacun [{ nom, description, resultat }] ;
  *   volumes : tous les calculs, pour le CSV [{ nom, base, resultat }] ;
  *   dessinSurfaces : surfaces affichées, pour le DXF et le LandXML { stocks, resultats, surfaces } ;
- *   cartouche : objet modifiable du projet
- * - quandChange() : appelé quand le cartouche change (pour enregistrer le projet)
- * Renvoie { rafraichir() } pour recharger les champs quand on change de projet.
+ *   cartouche : { affaire, dessinePar, date } du projet (date '' : date du jour)
+ * Renvoie { rafraichir() } pour remettre à jour le rappel du cartouche.
  */
-export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
-  const aujourdhui = new Date().toISOString().slice(0, 10);
+export function creerEcranExport(conteneur, { obtenirDonnees }) {
 
   conteneur.innerHTML = `
     <h3>Exporter ${bulle('exporter')}</h3>
+    <p class="aide" data-zone="cartouche"></p>
     <div class="champs-export">
-      <label>Affaire <input type="text" data-champ="affaire" placeholder="ex. 10 203" /></label>
-      <label>Date <input type="date" data-champ="date" value="${aujourdhui}" /></label>
-      <label>Dessiné par <input type="text" data-champ="dessinePar" placeholder="ex. MGO" /></label>
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">
-          <option value="auto">auto (tout le plan sur la feuille)</option>
+          <option value="auto">auto (tout le plan sur une A4)</option>
           ${ECHELLES.map((e) => `<option value="${e}">1:${e}</option>`).join('')}
         </select>
       </label>
+      <p class="aide">Plan centré sur les surfaces. Échelle choisie : feuille A4 si le plan y tient, sinon A3.</p>
     </div>
     <div class="calques-pdf">
       <p class="titre-choix">Contenu du PDF</p>
@@ -76,13 +74,8 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
     if (autre && evenement.target.checked) conteneur.querySelector(`[data-calque="${autre}"]`).checked = false;
   });
 
-  // L'affaire et le dessinateur sont rangés dans le projet.
-  for (const nom of ['affaire', 'dessinePar']) {
-    champ(nom).addEventListener('change', () => {
-      obtenirDonnees().cartouche[nom] = champ(nom).value.trim();
-      quandChange();
-    });
-  }
+  /** Date du cartouche ('AAAA-MM-JJ') : celle du projet, sinon la date du jour. */
+  const dateDuPlan = () => obtenirDonnees().cartouche.date || new Date().toISOString().slice(0, 10);
 
   const boutons = {
     csv: () => {
@@ -122,7 +115,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
       message.textContent = `LandXML téléchargé (${liste.length} surface(s)).`;
     },
     pdf: async () => {
-      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos } = obtenirDonnees();
+      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos, coupes } = obtenirDonnees();
       if (!verifier(volumes)) return;
       message.textContent = 'Préparation du PDF…';
       try {
@@ -133,23 +126,24 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
           [...conteneur.querySelectorAll('[data-calque]')].map((caseACocher) => [caseACocher.dataset.calque, caseACocher.checked]),
         );
         calques.palier = champ('palier').value;
-        const { document, echelle, messageFond } = await creerPdf({
+        const { document, echelle, format, messageFond } = await creerPdf({
           stocks,
           resultats,
           points,
           comparaisons,
           photos,
+          coupes,
           calques,
           cartouche: {
-            affaire: champ('affaire').value.trim(),
-            date: dateSuisse(champ('date').value),
-            dessinePar: champ('dessinePar').value.trim(),
+            affaire: obtenirDonnees().cartouche.affaire ?? '',
+            date: dateSuisse(dateDuPlan()),
+            dessinePar: obtenirDonnees().cartouche.dessinePar ?? '',
             fichierPoints,
           },
           echelleImposee: echelleChoisie === 'auto' ? null : Number(echelleChoisie),
         });
         telecharger(document.output('blob'), `${nomDeFichier()}.pdf`);
-        message.textContent = `PDF téléchargé (plan à l'échelle 1:${echelle}).${messageFond ? ` Attention : ${messageFond}.` : ''}`;
+        message.textContent = `PDF téléchargé (${format.toUpperCase()}, plan à l'échelle 1:${echelle}).${messageFond ? ` Attention : ${messageFond}.` : ''}`;
       } catch (erreur) {
         message.textContent = `Impossible de créer le PDF : ${erreur.message}`;
       }
@@ -169,16 +163,20 @@ export function creerEcranExport(conteneur, { obtenirDonnees, quandChange }) {
 
   /** Nom des fichiers : volumes_<affaire>_<date>. */
   function nomDeFichier() {
-    const affaire = champ('affaire').value.trim().replace(/[^\w-]+/g, '_') || 'stocks';
-    return `volumes_${affaire}_${champ('date').value || 'sans-date'}`;
+    const affaire = (obtenirDonnees().cartouche.affaire ?? '').replace(/[^\w-]+/g, '_') || 'stocks';
+    return `volumes_${affaire}_${dateDuPlan()}`;
   }
 
   return {
-    /** Recharge l'affaire et le dessinateur du projet ouvert. */
+    /** Rappelle le cartouche du projet ouvert (il se change dans l'onglet Projet). */
     rafraichir() {
       const { cartouche } = obtenirDonnees();
-      champ('affaire').value = cartouche.affaire ?? '';
-      champ('dessinePar').value = cartouche.dessinePar ?? '';
+      const morceaux = [
+        `affaire ${cartouche.affaire || '—'}`,
+        `dessiné par ${cartouche.dessinePar || '—'}`,
+        `date ${dateSuisse(dateDuPlan())}`,
+      ];
+      conteneur.querySelector('[data-zone="cartouche"]').textContent = `Cartouche : ${morceaux.join(' · ')} (à changer dans l'onglet Projet).`;
     },
   };
 }

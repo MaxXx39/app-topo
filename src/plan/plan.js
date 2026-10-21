@@ -41,9 +41,11 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandToucherStock(index) : appelé quand on touche l'intérieur d'un stock (hors modification)
  * - quandToucherTriangle(triangle) : appelé quand on touche un triangle de la surface affichée,
  *   en mode suppression de triangles (dessin.modeTriangles)
+ * - quandToucherPosition({ est, nord }) : appelé pendant le tracé d'une coupe (dessin.traceCoupe) ;
+ *   près d'un point levé, la position est celle de ce point
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition } = {}) {
   const calques = lireCalques();
 
   // Boutons posés sur le plan : calques en haut à gauche, zoom en haut à droite.
@@ -103,7 +105,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // cachees : surfaces à ne pas dessiner (celles d'un autre levé)
   // surface : surface affichée { triangles, trianglesRetires } ; modeTriangles : suppression au doigt
   // ecarts : triangles d'écart à colorier à la place de ceux des surfaces, sinon null
+  // coupes : coupes tracées [{ nom, debut, fin }] ; traceCoupe : { debut } pendant un tracé, sinon null
   let dessin = {
+    coupes: [],
+    traceCoupe: null,
     stocks: [],
     stockActif: null,
     cachees: new Set(),
@@ -164,6 +169,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const classes = new Map();
     if (stock) {
       for (const nom of pointsChoisis(stock)) classes.set(nom, 'role-dessus');
+      // « Tous les points du levé » : ils sont tous en vert (seulement ceux dans le contour s'il y en a un).
+      if (stock.type === 'points' && stock.tousLesPoints) {
+        const parNom = new Map(points.map((p) => [p.nom, p]));
+        const polygone = (stock.contour ?? []).map((nom) => parNom.get(nom)).filter(Boolean);
+        for (const point of points) {
+          if (polygone.length < 3 || pointDansPolygone(point, polygone)) classes.set(point.nom, 'role-dessus');
+        }
+      }
       for (const nom of (stock.lignesRupture ?? []).flatMap((ligne) => ligne.noms)) classes.set(nom, 'role-ligne');
       for (const nom of stock.contour ?? []) classes.set(nom, 'role-contour');
     }
@@ -223,6 +236,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
 
     svg.append(groupePoints, groupeNoms);
+    dessinerCoupes();
     if (calques.volumes) dessinerVolumes();
     dessinerLegende();
     dessinerBarreEchelle();
@@ -506,6 +520,30 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
+  /** Coupes A – A', B – B' : trait bleu nuit avec le nom à chaque bout ; début d'une coupe en cours de tracé. */
+  function dessinerCoupes() {
+    const groupe = creerElement('g', { class: 'coupes' });
+    for (const coupe of dessin.coupes ?? []) {
+      const a = versEcran(coupe.debut.est, coupe.debut.nord, vue);
+      const b = versEcran(coupe.fin.est, coupe.fin.nord, vue);
+      groupe.append(creerElement('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y }));
+      // Les noms sont écrits un peu au-delà des bouts, dans le prolongement du trait.
+      const longueur = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const [ux, uy] = [(b.x - a.x) / longueur, (b.y - a.y) / longueur];
+      for (const [bout, texte, sens] of [[a, coupe.nom, -1], [b, `${coupe.nom}'`, 1]]) {
+        groupe.append(creerElement('circle', { cx: bout.x, cy: bout.y, r: 4 }));
+        const etiquette = creerElement('text', { x: bout.x + sens * ux * 14, y: bout.y + sens * uy * 14 + 5, 'text-anchor': 'middle' });
+        etiquette.textContent = texte;
+        groupe.append(etiquette);
+      }
+    }
+    if (dessin.traceCoupe?.debut) {
+      const a = versEcran(dessin.traceCoupe.debut.est, dessin.traceCoupe.debut.nord, vue);
+      groupe.append(creerElement('circle', { cx: a.x, cy: a.y, r: 7, class: 'debut-trace' }));
+    }
+    svg.append(groupe);
+  }
+
   /** Nom et volume (remblai, et déblai s'il y en a) écrits au milieu de chaque surface calculée. */
   function dessinerVolumes() {
     const groupe = creerElement('g', { class: 'volumes' });
@@ -646,7 +684,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   svg.addEventListener('pointerup', (evenement) => {
     pointeurs.delete(evenement.pointerId);
     if (toucher && pointeurs.size === 0) {
-      if (dessin.modeTriangles) {
+      if (dessin.traceCoupe) {
+        // Tracé d'une coupe : la position touchée (celle du point levé s'il y en a un tout près).
+        const point = pointLePlusProche(toucher);
+        quandToucherPosition?.(point ? { est: point.est, nord: point.nord } : versTerrain(toucher.x, toucher.y, vue));
+      } else if (dessin.modeTriangles) {
         // Suppression de triangles : on cherche le triangle sous le doigt.
         const terrain = versTerrain(toucher.x, toucher.y, vue);
         const tous = [...(dessin.surface?.triangles ?? []), ...(dessin.surface?.trianglesRetires ?? [])];

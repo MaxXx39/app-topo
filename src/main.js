@@ -16,6 +16,8 @@ import { preparerPhoto } from './photos/photo.js';
 import { creerEcranExport, telecharger } from './export/ecran.js';
 import { creerEcranProjet } from './projet/ecran.js';
 import { creerEcranImport } from './import/ecran.js';
+import { creerEcranCoupes } from './coupes/ecran.js';
+import { profilSurface } from './topo/coupe.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -33,24 +35,27 @@ import { bulle, installerAide } from './aide/bulles.js';
 
 // --- État de l'application ---
 let projet = creerProjet('Mon projet'); // projet ouvert
-let resumes = []; // liste des projets enregistrés (pour l'écran Mes projets)
+let resumes = []; // liste des projets enregistrés (pour l'onglet Projet)
 let dernierImport = null; // résultat du dernier import de points
 let surfacesCalculees = new Map(); // id de surface -> triangles (résultat de calculerSurface)
 let resultatsCalculs = new Map(); // id de calcul -> volume (résultat de calculerVolume)
 let ongletContexte = 'importer'; // dernier onglet (hors plan) : décide de ce que montre le plan
 let calculMontre = null; // id du calcul colorié sur le plan (bouton « Voir sur le plan »)
+let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, etape: 'debut' ou 'fin', debut }
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 
 // --- Mise en page : onglets ---
-// Les onglets numérotés suivent l'ordre du travail : importer les points, préparer les surfaces,
-// calculer les volumes. « Mes projets » s'ouvre depuis l'en-tête.
+// L'onglet Projet vient en premier (l'appli s'ouvre dessus). Les onglets numérotés suivent
+// l'ordre du travail : importer les points, préparer les surfaces, calculer les volumes.
 const ICONES = {
+  projets: '<path d="M3 7h6l2 2h10v10H3z" />',
   importer: '<path d="M12 15V4M7 9l5-5 5 5M4 15v5h16v-5" />',
   surfaces: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
   volumes: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
   plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
 };
 const ONGLETS = [
+  { nom: 'projets', titre: 'Projet' },
   { nom: 'importer', titre: '1. Importer' },
   { nom: 'surfaces', titre: '2. Surfaces' },
   { nom: 'volumes', titre: '3. Volumes' },
@@ -64,18 +69,14 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="importer"><div id="importer"></div></section>
       <section class="panneau" data-onglet="surfaces">
         <h2>2. Surfaces <span class="aide" id="nom-leve-surfaces"></span> ${bulle('surfaces')}</h2>
-        <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer), ou importe une surface ci-dessous.</p>
-        <div id="surfaces"></div>
-        <h3>Importer une surface ${bulle('importerSurface')}</h3>
-        <label class="bouton-secondaire">
-          + Surface LandXML ou DXF
-          <input type="file" id="fichier-surface" accept=".xml,.landxml,.dxf,application/xml,text/xml" hidden />
-        </label>
+        <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer), ou une surface LandXML ou DXF.</p>
         <div id="message-import-surface"></div>
+        <div id="surfaces"></div>
       </section>
       <section class="panneau" data-onglet="volumes">
         <h2>3. Volumes ${bulle('volumes')}</h2>
         <div id="volumes"></div>
+        <div id="coupes"></div>
         <div id="export" class="carte-export"></div>
       </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
@@ -110,7 +111,6 @@ document.querySelector('.onglets').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-onglet]');
   if (bouton) afficherOnglet(bouton.dataset.onglet);
 });
-document.querySelector('#bouton-projets').addEventListener('click', () => afficherOnglet('projets'));
 installerAide(document.querySelector('#bouton-aide'));
 
 // --- Accès aux données du projet ---
@@ -138,17 +138,6 @@ function etiquetteSurface(surface) {
   const texte = precisions.length > 0 ? `${surface.nom} (${precisions.join(', ')})` : surface.nom;
   const leve = projet.leves.find((l) => l.id === surface.leveId);
   return projet.leves.length > 1 && leve ? `${texte} · ${leve.nom}` : texte;
-}
-
-/** Zones d'un calcul à deux surfaces : toute la surface 1, ou le contour d'une surface. */
-function zonesComparables() {
-  const zones = [{ zone: { type: 'toute' }, nom: 'toute la surface 1' }];
-  for (const surface of projet.surfaces) {
-    if (!estImportee(surface) && surface.contour.length >= 3) {
-      zones.push({ zone: { type: 'surface', surfaceId: surface.id }, nom: `contour de ${etiquetteSurface(surface)}` });
-    }
-  }
-  return zones;
 }
 
 /**
@@ -200,6 +189,11 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
     if (nom) projet.nom = nom;
     modifie();
   },
+  changerCartouche: (champ, valeur) => {
+    projet.cartouche[champ] = valeur;
+    modifie();
+  },
+  continuer: () => afficherOnglet(etapeUtile()),
   exporterProjet: () => {
     const nom = projet.nom.replace(/[^\w-]+/g, '_') || 'projet';
     telecharger(new Blob([ecrireFichierProjet(projet)], { type: 'application/json' }), `${nom}.topo.json`);
@@ -243,6 +237,7 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
 });
 
 const plan = creerPlan(document.querySelector('#plan'), {
+  quandToucherPosition: toucherPourCoupe,
   quandToucherPoint: (nom) => editeurSurfaces.toucherPoint(nom),
   quandToucherStock: (index) => editeurSurfaces.choisir(index),
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
@@ -255,6 +250,7 @@ const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces')
   quandNatureChange: (surface) => {
     projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
   },
+  importerFichier: importerSurface,
   quandChange: () => {
     // Une surface d'un autre levé est choisie : ce levé devient le levé affiché.
     const surface = editeurSurfaces.objetActif();
@@ -293,19 +289,15 @@ function montrerUneSurfaceDuLeve() {
 }
 
 // --- Import d'une surface LandXML ou DXF : chaque surface du fichier devient une surface du projet ---
-document.querySelector('#fichier-surface').addEventListener('change', async (evenement) => {
-  const fichier = evenement.target.files[0];
-  if (!fichier) return;
+// Sa nature (stock, terrain naturel, terrassement) est ensuite demandée, comme pour une nouvelle surface.
+async function importerSurface(fichier) {
   const zone = document.querySelector('#message-import-surface');
   try {
     const texte = await fichier.text();
     const type = /\.dxf$/i.test(fichier.name) ? 'dxf' : 'landxml';
     const { surfaces, erreurs, avertissements } = type === 'dxf' ? lireDXF(texte) : lireLandXML(texte);
     for (const surface of surfaces) {
-      const importee = surfaceImportee(surface, fichier.name, type);
-      projet.surfaces.push(importee);
-      // Un terrain naturel importé : les terrassements qui l'attendaient le prennent comme surface 2.
-      projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, importee);
+      projet.surfaces.push({ ...surfaceImportee(surface, fichier.name, type), nature: null });
     }
     const messages = [...erreurs, ...avertissements];
     zone.innerHTML = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} ».</p>
@@ -315,16 +307,13 @@ document.querySelector('#fichier-surface').addEventListener('change', async (eve
   } catch (erreur) {
     zone.innerHTML = `<p class="erreur">Impossible de lire « ${echapper(fichier.name)} » : ${echapper(erreur.message)}</p>`;
   }
-  evenement.target.value = '';
   modifie({ recadrer: true });
-});
+}
 
 const ecranVolumes = creerEcranVolumes(document.querySelector('#volumes'), {
   obtenirProjet: () => projet,
   obtenirResultat: (calcul) => resultatsCalculs.get(calcul.id),
   etiquette: etiquetteSurface,
-  obtenirZones: zonesComparables,
-  surfaceActive: () => editeurSurfaces.objetActif(),
   obtenirMontre: () => calculMontre,
   montrer: (id) => {
     calculMontre = id;
@@ -340,6 +329,62 @@ const ecranVolumes = creerEcranVolumes(document.querySelector('#volumes'), {
     // Sur téléphone, on passe au plan ; sur ordinateur, il est déjà visible à droite.
     if (!window.matchMedia('(min-width: 900px)').matches) afficherOnglet('plan');
   },
+  quandChange: () => modifie(),
+});
+
+// --- Coupes : tracées en touchant le plan deux fois (début, puis fin) ---
+
+/** Profils des surfaces affichées le long d'une coupe : [{ nom, nature, lignes }] (voir profilSurface). */
+function profilsDeCoupe(coupe) {
+  return surfacesAffichees().map((s) => ({ nom: s.nom, nature: s.nature, lignes: profilSurface(trianglesDeSurface(s.id), coupe.debut, coupe.fin) }));
+}
+
+const estTelephone = () => !window.matchMedia('(min-width: 900px)').matches;
+
+/** Commence le tracé d'une coupe : les deux prochains touchers du plan donnent son début et sa fin. */
+function commencerTrace(coupe) {
+  editeurSurfaces.arreterModification();
+  traceCoupe = { id: coupe.id, etape: 'debut', debut: null };
+  afficherMessage(`Coupe ${coupe.nom} : touche le début sur le plan`, null);
+  if (estTelephone()) afficherOnglet('plan');
+  recalculer();
+}
+
+/** Abandonne le tracé en cours (la coupe garde sa position d'avant). */
+function arreterTrace() {
+  traceCoupe = null;
+  afficherMessage('Tracé annulé');
+  recalculer();
+}
+
+/** Toucher du plan pendant le tracé d'une coupe (position en m, MN95). */
+function toucherPourCoupe(touche) {
+  const coupe = projet.coupes.find((c) => c.id === traceCoupe?.id);
+  if (!coupe) return;
+  // Coordonnées arrondies au millimètre.
+  const position = { est: Math.round(touche.est * 1000) / 1000, nord: Math.round(touche.nord * 1000) / 1000 };
+  if (traceCoupe.etape === 'debut') {
+    traceCoupe = { ...traceCoupe, etape: 'fin', debut: position };
+    afficherMessage(`Coupe ${coupe.nom} : touche maintenant la fin (${coupe.nom}')`, null);
+    recalculer();
+    return;
+  }
+  if (position.est === traceCoupe.debut.est && position.nord === traceCoupe.debut.nord) return; // même point : on attend la fin
+  coupe.debut = traceCoupe.debut;
+  coupe.fin = position;
+  traceCoupe = null;
+  afficherMessage(`Coupe ${coupe.nom} – ${coupe.nom}' tracée`);
+  if (estTelephone()) afficherOnglet('volumes');
+  modifie();
+  requestAnimationFrame(() => document.querySelector('#coupes .carte-coupe:last-of-type')?.scrollIntoView({ block: 'center' }));
+}
+
+const ecranCoupes = creerEcranCoupes(document.querySelector('#coupes'), {
+  obtenirProjet: () => projet,
+  obtenirProfils: profilsDeCoupe,
+  commencerTrace,
+  arreterTrace,
+  traceEnCours: () => traceCoupe,
   quandChange: () => modifie(),
 });
 
@@ -385,9 +430,12 @@ const ecranExport = creerEcranExport(document.querySelector('#export'), {
         (s.photos ?? []).filter((photo) => photo.dansPdf !== false).map((photo) => ({ ...photo, surface: s.nom })),
       ),
       cartouche: projet.cartouche,
+      // Coupes cochées « dans le PDF », avec les profils des surfaces traversées.
+      coupes: projet.coupes
+        .filter((coupe) => coupe.dansPdf && coupe.debut && coupe.fin)
+        .map((coupe) => ({ ...coupe, profils: profilsDeCoupe(coupe) })),
     };
   },
-  quandChange: () => modifie(),
 });
 
 /** État d'une surface sous ses réglages : triangles, surface en plan, problèmes. */
@@ -421,6 +469,8 @@ function recalculer({ recadrer = false } = {}) {
 
   editeurSurfaces.rafraichir();
   ecranVolumes.afficher();
+  ecranCoupes.afficher();
+  ecranExport.rafraichir();
   ecranImport.afficher(projet, dernierImport);
   ecranProjet.afficher(projet, resumes);
 
@@ -453,6 +503,9 @@ function recalculer({ recadrer = false } = {}) {
         ? { triangles: calculActif.triangles, trianglesRetires: calculActif.trianglesRetires }
         : null,
     modeTriangles: dansSurfaces && editeurSurfaces.enSuppression(),
+    // Coupes tracées (A – A', B – B'), et celle en cours de tracé.
+    coupes: projet.coupes.filter((c) => c.debut && c.fin && c.id !== traceCoupe?.id),
+    traceCoupe,
   });
   if (recadrer || pointsDuPlan !== pointsAffiches) {
     pointsAffiches = pointsDuPlan;
@@ -566,9 +619,12 @@ async function rafraichirListe() {
   resumes = (await stockage.listerProjets()).map(resumerProjet).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
 }
 
+/** Étape où reprendre le travail : les surfaces si le projet a déjà des points, sinon l'import. */
+const etapeUtile = () => (leveActif(projet) ? 'surfaces' : 'importer');
+
 /**
  * Ouvre un projet : il devient le projet affiché, et il est enregistré.
- * Puis on va à l'étape utile : les surfaces s'il a déjà des points, sinon l'import.
+ * Puis on va à l'étape utile (voir etapeUtile).
  */
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
@@ -580,19 +636,20 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   recalculer({ recadrer: true });
   historique.reinitialiser(modifications, projet);
   mettreAJourAnnuler();
-  if (changerOnglet) afficherOnglet(leveActif(projet) ? 'surfaces' : 'importer');
+  if (changerOnglet) afficherOnglet(etapeUtile());
   await enregistrer();
 }
 
 // --- Démarrage : on rouvre le dernier projet, sinon le plus récent, sinon un nouveau ---
+// L'appli s'ouvre sur l'onglet Projet (bouton « Continuer » pour reprendre le travail).
 async function demarrer() {
-  afficherOnglet('importer');
+  afficherOnglet('projets');
   stockage.demanderStockagePersistant();
   try {
     await rafraichirListe();
     const id = stockage.dernierProjet();
     const lu = (id && (await stockage.lireProjet(id))) || (resumes[0] && (await stockage.lireProjet(resumes[0].id)));
-    await ouvrir(lu ? completerProjet(lu) : creerProjet('Mon projet'));
+    await ouvrir(lu ? completerProjet(lu) : creerProjet('Mon projet'), { changerOnglet: false });
   } catch (erreur) {
     // Base de données indisponible (navigation privée...) : l'appli marche, sans enregistrement.
     console.error(erreur);

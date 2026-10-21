@@ -1,9 +1,12 @@
 // Tests des calculs de volume de l'onglet 3. Volumes (surface 1, ligne basse ou surface 2, zone).
 import { describe, it, expect } from 'vitest';
 import { creerSurface, surfaceImportee, calculerSurface } from '../src/topo/surface.js';
-import { calculerVolumeSurface } from '../src/topo/volume.js';
+import { calculerVolumeSurface, volumeSurAltitude } from '../src/topo/volume.js';
 import {
   creerCalcul,
+  nouveauVolume,
+  choisirSorte,
+  nomDeVolumeLibre,
   calculerVolume,
   nettoyerCalculs,
   nomAutomatique,
@@ -109,10 +112,77 @@ describe('calculerVolume', () => {
     const tn = planHorizontal('TN', 425);
     const donnees = donneesDe([stock, tn]);
     const deuxSurfaces = { ...creerCalcul(stock, [stock]), uneSeule: false };
-    expect(calculerVolume({ ...deuxSurfaces, surface2Id: null }, donnees).erreurs[0]).toContain('choisis la surface 2');
+    expect(calculerVolume({ ...deuxSurfaces, surface2Id: null }, donnees).erreurs[0]).toContain('choisis la surface de référence');
     expect(calculerVolume({ ...deuxSurfaces, surface2Id: stock.id }, donnees).erreurs[0]).toContain('deux surfaces différentes');
-    expect(calculerVolume({ ...deuxSurfaces, surface1Id: 'disparue' }, donnees).erreurs[0]).toContain('choisis la surface 1');
-    expect(calculerVolume({ ...creerCalcul(tn, [tn]), uneSeule: true }, donnees).erreurs[0]).toContain('pas de ligne basse');
+    expect(calculerVolume({ ...deuxSurfaces, surface1Id: 'disparue' }, donnees).erreurs[0]).toContain('choisis la surface comparée');
+    expect(calculerVolume({ ...creerCalcul(tn, [tn]), uneSeule: true }, donnees).erreurs[0]).toContain('pas de ligne de contour');
+    expect(calculerVolume(nouveauVolume(), donnees).erreurs[0]).toContain('stock seul ou comparaison');
+    expect(calculerVolume({ ...creerCalcul(stock, [stock]), base: 'altitude', altitude: null }, donnees).erreurs[0]).toContain('altitude');
+  });
+
+  it('stock seul depuis une altitude : même volume qu\'au-dessus d\'un plan horizontal importé', () => {
+    const stock = stockDeReference(1);
+    const tn = planHorizontal('TN', 425);
+    const donnees = donneesDe([stock, tn]);
+    const surPlan = calculerVolume({ ...creerCalcul(stock, [stock, tn]), uneSeule: false, surface2Id: tn.id }, donnees);
+    const surAltitude = calculerVolume({ ...creerCalcul(stock, [stock]), base: 'altitude', altitude: 425 }, donnees);
+    expect(surAltitude.erreurs).toBeUndefined();
+    expect(surAltitude.mode).toBe('Z');
+    expect(surAltitude.remblai).toBeCloseTo(surPlan.remblai, 6);
+    expect(surAltitude.deblai).toBe(0);
+    expect(surAltitude.surfacePlan).toBeCloseTo(surPlan.surfacePlan, 6);
+    // Altitude très haute : tout le stock est sous le plan, tout en déblai.
+    const enDessous = calculerVolume({ ...creerCalcul(stock, [stock]), base: 'altitude', altitude: 500 }, donnees);
+    expect(enDessous.remblai).toBe(0);
+    expect(enDessous.deblai).toBeGreaterThan(0);
+  });
+});
+
+describe('volumeSurAltitude', () => {
+  // Triangle rectangle de 10 m × 10 m (50 m² en plan).
+  const triangle = (a1, a2, a3) => [pt('a', 0, 0, a1), pt('b', 10, 0, a2), pt('c', 0, 10, a3)];
+
+  it('triangle à 1 m au-dessus du plan : 50 m³ de remblai', () => {
+    const r = volumeSurAltitude([triangle(101, 101, 101)], 100);
+    expect(r.surfacePlan).toBeCloseTo(50, 9);
+    expect(r.remblai).toBeCloseTo(50, 9);
+    expect(r.deblai).toBe(0);
+  });
+
+  it('triangle à 2 m au-dessous du plan : 100 m³ de déblai', () => {
+    const r = volumeSurAltitude([triangle(98, 98, 98)], 100);
+    expect(r.remblai).toBe(0);
+    expect(r.deblai).toBeCloseTo(100, 9);
+  });
+
+  it('triangle qui traverse le plan : remblai et déblai séparés, somme = volume net', () => {
+    const r = volumeSurAltitude([triangle(99, 101, 102)], 100);
+    // Volume net = aire × moyenne des écarts = 50 × (-1 + 1 + 2) / 3.
+    expect(r.remblai - r.deblai).toBeCloseTo(100 / 3, 9);
+    expect(r.remblai).toBeGreaterThan(0);
+    expect(r.deblai).toBeGreaterThan(0);
+  });
+});
+
+describe('sorte d\'un nouveau volume', () => {
+  const stock = creerSurface('Stock 1', 'leve', 'stock');
+  const tn = creerSurface('TN', 'leve', 'terrain');
+  const fouille = creerSurface('Fouille', 'leve', 'terrassement');
+  const surfaces = [tn, stock, fouille];
+
+  it('stock seul : le premier stock, base sur le contour, nom du stock', () => {
+    const volume = nouveauVolume();
+    choisirSorte(volume, 'stock', surfaces, [volume]);
+    expect(volume).toMatchObject({ uneSeule: true, surface1Id: stock.id, base: 'contour', surface2Id: null, nom: '' });
+    expect(nomAutomatique(volume, surfaces)).toBe('Stock 1');
+  });
+
+  it('comparaison : nom « Volume N » libre, référence = dernier terrain naturel', () => {
+    const calculs = [{ nom: 'Volume 1' }];
+    const volume = nouveauVolume();
+    choisirSorte(volume, 'comparaison', surfaces, [...calculs, volume]);
+    expect(volume).toMatchObject({ uneSeule: false, surface2Id: tn.id, nom: 'Volume 2' });
+    expect(nomDeVolumeLibre([])).toBe('Volume 1');
   });
 });
 
@@ -159,6 +229,12 @@ describe('grouperParNature', () => {
     expect(groupes[0].total.surfacePlan).toBe(200);
     // Un seul terrassement : pas de ligne de total.
     expect(groupes[1].total).toBeNull();
+    // Deux volumes du même stock : pas de total.
+    const doublon = grouperParNature([
+      { calcul: { surface1Id: 's1' }, nature: 'stock', resultat: volume(10, 0) },
+      { calcul: { surface1Id: 's1' }, nature: 'stock', resultat: volume(12, 0) },
+    ]);
+    expect(doublon[0].total).toBeNull();
   });
 });
 
@@ -173,19 +249,17 @@ describe('calculsAutomatiques', () => {
     expect(calculs).toHaveLength(1);
     expect(calculs[0]).toMatchObject({ auto: true, uneSeule: true });
 
-    // Elle devient un terrassement : son calcul est remplacé, en attente d'un terrain naturel...
+    // Elle devient un terrassement : son calcul automatique disparaît (les comparaisons s'ajoutent à la main).
     surface.nature = 'terrassement';
-    calculs = calculsAutomatiques(calculs, surfaces, surface);
-    expect(calculs).toHaveLength(1);
-    expect(calculs[0]).toMatchObject({ auto: true, uneSeule: false, surface2Id: null });
+    expect(calculsAutomatiques(calculs, surfaces, surface)).toHaveLength(0);
 
-    // ... qu'il reçoit dès qu'un terrain naturel arrive.
+    // Un terrain naturel n'a pas de calcul automatique non plus.
     surfaces.push(tn);
-    calculs = calculsAutomatiques(calculs, surfaces, tn);
-    expect(calculs).toHaveLength(1);
-    expect(calculs[0].surface2Id).toBe(tn.id);
+    expect(calculsAutomatiques([], surfaces, tn)).toHaveLength(0);
 
     // Un calcul modifié à la main reste, même si la surface devient un terrain naturel.
+    surface.nature = 'stock';
+    calculs = calculsAutomatiques([], surfaces, surface);
     calculs[0].auto = false;
     surface.nature = 'terrain';
     expect(calculsAutomatiques(calculs, surfaces, surface)).toEqual(calculs);

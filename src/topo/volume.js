@@ -12,8 +12,9 @@
 //    déblai = volume où le dessus est au-dessous de la base.
 //
 // La base se choisit dans l'onglet Volumes (voir volumes/calculs.js) :
-// - mode A, « une seule surface » : la base passe par les points du contour (la ligne basse, le pied) ;
-// - mode B : une autre surface du projet (créée ou importée), la « surface 2 ».
+// - mode A, « stock seul » : la base passe par les points du contour (la ligne basse, le pied) ;
+// - mode Z, « stock seul » depuis une altitude : la base est un plan horizontal à cette altitude ;
+// - mode B : une autre surface du projet (créée ou importée), la surface de référence.
 //
 // Unités : mètres (m), mètres carrés (m²), mètres cubes (m³).
 import Delaunator from 'delaunator';
@@ -25,14 +26,14 @@ import Constrainautor from '@kninnug/constrainautor';
  * - calcul : ses triangles, résultat de calculerSurface (déjà limités au contour)
  * - points : points du levé de la surface { nom, est, nord, altitude }
  * - surfaceBase : en mode B, { nom, triangles } (triangles = 3 points { est, nord, altitude }) ;
- *   null en mode A (base sur les points du contour)
+ *   en mode Z, { altitude } (m) : plan horizontal ; null en mode A (base sur les points du contour)
  * Renvoie { erreurs, segmentsEnErreur } si le calcul est impossible, sinon :
- * { mode ('A' ou 'B'), nomBase, surfacePlan, surfaceContour, remblai, deblai, surfaceRemblai,
+ * { mode ('A', 'Z' ou 'B'), nomBase, altitudeBase, surfacePlan, surfaceContour, remblai, deblai, surfaceRemblai,
  *   surfaceDeblai, surfaceNonCouverte, nombreTrianglesDessus, nombreTrianglesBase,
  *   trianglesDessus, trianglesBase, trianglesEcart }
  */
 export function calculerVolumeSurface(surface, calcul, points, surfaceBase = null) {
-  const base = surfaceBase ? 'surface' : 'contour';
+  const base = !surfaceBase ? 'contour' : surfaceBase.altitude !== undefined ? 'altitude' : 'surface';
   if (calcul.erreurs) return { erreurs: calcul.erreurs, segmentsEnErreur: calcul.segmentsEnErreur };
   if (calcul.triangles.length === 0) return { erreurs: ['la surface n\'a aucun triangle'] };
 
@@ -40,6 +41,22 @@ export function calculerVolumeSurface(surface, calcul, points, surfaceBase = nul
   const parNom = new Map(points.map((p) => [p.nom, p]));
   const polygone = contour.map((nom) => parNom.get(nom)).filter(Boolean);
   let trianglesBase;
+
+  if (base === 'altitude') {
+    // Mode Z : plan horizontal à l'altitude choisie, sous toute la surface.
+    if (!Number.isFinite(surfaceBase.altitude)) return { erreurs: ['indique l\'altitude de la base (m)'] };
+    const resultat = volumeSurAltitude(calcul.triangles, surfaceBase.altitude);
+    return {
+      ...resultat,
+      mode: 'Z',
+      nomBase: null,
+      altitudeBase: surfaceBase.altitude,
+      surfaceContour: polygone.length >= 3 ? Math.abs(airePolygone(polygone)) : resultat.surfacePlan,
+      nombreTrianglesDessus: calcul.triangles.length,
+      trianglesDessus: calcul.triangles,
+      trianglesBase: [],
+    };
+  }
 
   if (base === 'contour') {
     // Mode A : la base est triangulée sur les points du contour, en respectant ses côtés.
@@ -111,6 +128,24 @@ export function volumeEntreSurfaces(trianglesDessus, trianglesBase) {
 
   // On ignore les restes d'arrondi de calcul (moins de 1 cm²).
   if (resultat.surfaceNonCouverte < 1e-4) resultat.surfaceNonCouverte = 0;
+  return { ...resultat, trianglesEcart };
+}
+
+/**
+ * Volume entre une surface (triangles) et un plan horizontal à l'altitude "altitude" (m).
+ * Remblai : là où la surface est au-dessus du plan ; déblai : là où elle est au-dessous.
+ * Renvoie le même résultat que volumeEntreSurfaces (le plan couvre toujours toute la surface).
+ */
+export function volumeSurAltitude(triangles, altitude) {
+  const resultat = { surfacePlan: 0, remblai: 0, deblai: 0, surfaceRemblai: 0, surfaceDeblai: 0, surfaceNonCouverte: 0 };
+  const trianglesEcart = [];
+  for (const triangle of triangles) {
+    const aire = Math.abs(aireTriangle(triangle));
+    resultat.surfacePlan += aire;
+    const ecarts = triangle.map((p) => p.altitude - altitude);
+    ajouterPrisme(resultat, aire, ...ecarts);
+    if (aire > 1e-9) trianglesEcart.push(triangle.map((p, k) => ({ est: p.est, nord: p.nord, altitude: ecarts[k] })));
+  }
   return { ...resultat, trianglesEcart };
 }
 
