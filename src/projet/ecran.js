@@ -3,6 +3,7 @@
 // du PDF, le fichier projet, puis les autres projets de l'appareil.
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
+import { titreSection } from '../outils/section.js';
 
 /**
  * Crée l'écran Projet dans "conteneur". Les actions sont faites par main.js via "actions" :
@@ -45,12 +46,12 @@ export function creerEcranProjet(conteneur, actions) {
       conteneur.innerHTML = `
         <h2>Projet ${bulle('projets')}</h2>
 
-        <section class="projet-ouvert">
-          <div class="projet-entete">
+        <section class="bloc-ouvert">
+          <div class="bloc-entete">
             <span class="etiquette-entete">Projet ouvert</span>
-            <input type="text" class="nom-projet" data-champ="nom-projet" value="${echapper(projet.nom)}" aria-label="Nom du projet" />
+            <input type="text" class="champ-entete" data-champ="nom-projet" value="${echapper(projet.nom)}" aria-label="Nom du projet" />
           </div>
-          <div class="projet-corps">
+          <div class="bloc-corps">
             <p class="titre-section">Où en est le projet</p>
             <div class="etapes-projet">${tuilesEtapes(projet)}</div>
             <button type="button" class="bouton bouton-large" data-action="continuer">Continuer →</button>
@@ -58,7 +59,7 @@ export function creerEcranProjet(conteneur, actions) {
         </section>
 
         <section class="carte-section">
-          <h3>${icone(ICONES.cartouche)}Cartouche du PDF ${bulle('cartouche')}</h3>
+          ${titreSection('cartouche', 'Cartouche du PDF', bulle('cartouche'))}
           <div class="champs-export">
             <label>Affaire <input type="text" data-cartouche="affaire" value="${echapper(projet.cartouche.affaire ?? '')}" placeholder="ex. 10 203" /></label>
             <label>Dessiné par <input type="text" data-cartouche="dessinePar" value="${echapper(projet.cartouche.dessinePar ?? '')}" placeholder="ex. MGO" /></label>
@@ -67,7 +68,7 @@ export function creerEcranProjet(conteneur, actions) {
         </section>
 
         <section class="carte-section">
-          <h3>${icone(ICONES.fichier)}Fichier projet</h3>
+          ${titreSection('fichier', 'Fichier projet')}
           <p class="aide">Pour passer du téléphone à l'ordinateur (et l'inverse).</p>
           <div class="ligne-outils">
             <button type="button" class="bouton-secondaire" data-action="exporter">Exporter le fichier projet</button>
@@ -79,7 +80,7 @@ export function creerEcranProjet(conteneur, actions) {
         </section>
 
         <section class="carte-section">
-          <h3>${icone(ICONES.projets)}Mes projets sur cet appareil</h3>
+          ${titreSection('projets', 'Mes projets sur cet appareil')}
           <button type="button" class="bouton-secondaire" data-action="nouveau">+ Nouveau projet</button>
           ${autres.length === 0 ? '<p class="aide">Aucun autre projet pour l\'instant.</p>' : ''}
           <div class="liste-projets">
@@ -116,18 +117,6 @@ export function creerEcranProjet(conteneur, actions) {
       `;
     },
   };
-}
-
-// Petits dessins des titres de section (traits, comme les icônes des onglets).
-const ICONES = {
-  cartouche: '<path d="M4 4h16v16H4zM4 15h16M10 15v5" />',
-  fichier: '<path d="M6 3h8l4 4v14H6zM14 3v4h4M12 11v6M9 14l3 3 3-3" />',
-  projets: '<path d="M3 7h6l2 2h10v10H3z" />',
-};
-
-/** Icône (SVG) placée devant un titre de section. */
-function icone(dessin) {
-  return `<svg class="icone-section" viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg>`;
 }
 
 // Mots féminins (« aucune surface ») ; les autres sont masculins (« aucun levé »).

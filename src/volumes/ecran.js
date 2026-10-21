@@ -2,6 +2,7 @@
 // volume : stock seul ou comparaison de 2 surfaces), ensuite le tableau récapitulatif.
 // L'export (PDF, CSV, DXF, LandXML) est ajouté sous cet écran par main.js.
 import { formaterNombre } from '../topo/format.js';
+import { titreSection } from '../outils/section.js';
 import { estImportee } from '../topo/surface.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
@@ -80,8 +81,10 @@ export function creerEcranVolumes(conteneur, options) {
           ${bulle('base')}
         </div>
         ${lignes.map((ligne) => carte(ligne, projet.surfaces, { etiquette, montre: obtenirMontre() })).join('')}
-        <h3>Récapitulatif</h3>
-        ${tableau(lignes, projet.surfaces)}`;
+        <section class="carte-section">
+          ${titreSection('recapitulatif', 'Récapitulatif')}
+          ${tableau(lignes, projet.surfaces)}
+        </section>`;
       if (nouveauId) {
         conteneur.querySelector(`[data-carte="${nouveauId}"]`)?.scrollIntoView({ block: 'center' });
         nouveauId = null;
@@ -140,7 +143,7 @@ function tableau(lignes, surfaces) {
  * Carte d'un volume : sorte (stock seul ou comparaison), nom, surfaces et base,
  * puis le volume ou la raison pour laquelle il manque.
  */
-function carte({ calcul, resultat }, surfaces, { etiquette, montre }) {
+function carte({ calcul, resultat, nom }, surfaces, { etiquette, montre }) {
   const options = (liste, choisi) =>
     `<option value="" ${choisi ? '' : 'selected'}>- choisir -</option>` +
     liste.map((s) => `<option value="${s.id}" ${s.id === choisi ? 'selected' : ''}>${echapper(etiquette(s))}</option>`).join('');
@@ -186,7 +189,8 @@ function carte({ calcul, resultat }, surfaces, { etiquette, montre }) {
   }
 
   return `
-    <div class="carte-role carte-volume ${calcul.id === montre ? 'en-edition' : ''}" data-carte="${id}">
+    <div class="carte-section carte-volume ${calcul.id === montre ? 'en-edition' : ''}" data-carte="${id}">
+      ${titreSection('volumes', echapper(sorte ? nom : 'Nouveau volume'))}
       <div class="choix-sorte" role="radiogroup" aria-label="Sorte de volume">
         ${radioSorte('stock', 'Stock seul')}
         ${radioSorte('comparaison', 'Comparaison de 2 surfaces')}

@@ -9,11 +9,12 @@ import { creerSurface, estImportee, NATURES } from '../topo/surface.js';
 import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
 import { htmlChoixPoints, resumeListe } from './choix-points.js';
+import { titreSection } from '../outils/section.js';
 
 const TEXTES = {
   nouveau: '+ Nouvelle surface',
   importer: '+ Nouvelle surface depuis LandXML ou DXF',
-  supprimer: 'Supprimer cette surface',
+  supprimer: 'supprimer cette surface',
   choix: 'Surface affichée',
   roles: { contour: 'Contour', ligne: 'Ligne de rupture', dessus: 'Points isolés / caractéristiques' },
 };
@@ -297,47 +298,32 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   function afficher() {
     const objet = objetActif();
 
-    let html = etat.objets.length > 0
-      ? `<div class="ligne-outils">
-          <select data-champ="choix" aria-label="${textes.choix}">
-            ${etat.objets.map((o, i) => `<option value="${i}" ${i === etat.indexActif ? 'selected' : ''}>${echapper(etiquette?.(o) ?? o.nom)}</option>`).join('')}
-          </select>
-        </div>`
-      : '';
-    html = `
-      <div class="ligne-outils">
-        <button type="button" class="bouton" data-action="nouveau">${textes.nouveau}</button>
-        <label class="bouton-discret">
-          ${textes.importer}
-          <input type="file" data-champ="fichier-surface" accept=".xml,.landxml,.dxf,application/xml,text/xml" hidden />
-        </label>
-        ${bulle('importerSurface')}
-      </div>
-      ${html}`;
-
-    if (objet && !objet.nature) {
-      // Surface toute neuve (ou importée) : on commence par dire ce que c'est.
-      html += `
-        <div class="carte-role carte-nature">
-          <p class="titre-choix">${estImportee(objet) ? `« ${echapper(objet.nom)} » (${echapper(objet.nomFichier)})` : 'Nouvelle surface'} : c'est… ${bulle('nature')}</p>
-          <div class="choix-nature-gros">
-            ${NATURES.map(([cle, titre]) => `<button type="button" class="bouton-secondaire" data-action="choisir-nature" data-nature="${cle}">${titre}</button>`).join('')}
-          </div>
-          <div class="ligne-outils"><button type="button" class="bouton-lien" data-action="supprimer">annuler (supprimer cette surface)</button></div>
-        </div>`;
-    } else if (objet) {
-      html += `
+    // Bloc « Ajouter une surface » : nouvelle surface (à partir des points) ou import d'un fichier.
+    let html = `
+      <section class="carte-section">
+        ${titreSection('ajouter', 'Ajouter une surface')}
         <div class="ligne-outils">
-          <label>Nom : <input type="text" data-champ="nom" value="${echapper(objet.nom)}" /></label>
-          <button type="button" class="bouton-secondaire" data-action="supprimer">${textes.supprimer}</button>
+          <button type="button" class="bouton" data-action="nouveau">${textes.nouveau}</button>
+          <label class="bouton-discret">
+            ${textes.importer}
+            <input type="file" data-champ="fichier-surface" accept=".xml,.landxml,.dxf,application/xml,text/xml" hidden />
+          </label>
+          ${bulle('importerSurface')}
         </div>
-        <div class="ligne-outils choix-nature" role="radiogroup" aria-label="Nature de la surface">
-          <span>C'est : ${bulle('nature')}</span>
-          ${NATURES.map(
-            ([cle, titre]) => `<label class="case"><input type="radio" name="nature" data-champ="nature" value="${cle}" ${objet.nature === cle ? 'checked' : ''} /> ${titre}</label>`,
-          ).join('')}
-        </div>
-        ${contenuSurface(objet)}`;
+      </section>`;
+
+    if (objet) {
+      // Surface affichée : bandeau bleu nuit avec le choix de la surface, puis son contenu.
+      html += `
+        <section class="bloc-ouvert">
+          <div class="bloc-entete">
+            <span class="etiquette-entete">${textes.choix}</span>
+            <select class="champ-entete" data-champ="choix" aria-label="${textes.choix}">
+              ${etat.objets.map((o, i) => `<option value="${i}" ${i === etat.indexActif ? 'selected' : ''}>${echapper(etiquette?.(o) ?? o.nom)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="bloc-corps">${contenuObjet(objet)}</div>
+        </section>`;
     }
 
     conteneur.innerHTML = html;
@@ -349,6 +335,33 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       const colonne = conteneur.closest('.colonne-gauche');
       if (colonne) colonne.scrollTop = 0;
     }
+  }
+
+  /** Contenu de la surface affichée : d'abord sa nature à choisir, ensuite son nom, sa nature et ses cartes. */
+  function contenuObjet(objet) {
+    if (!objet.nature) {
+      // Surface toute neuve (ou importée) : on commence par dire ce que c'est.
+      return `
+        <div class="carte-role carte-nature">
+          <p class="titre-choix">${estImportee(objet) ? `« ${echapper(objet.nom)} » (${echapper(objet.nomFichier)})` : 'Nouvelle surface'} : c'est… ${bulle('nature')}</p>
+          <div class="choix-nature-gros">
+            ${NATURES.map(([cle, titre]) => `<button type="button" class="bouton-secondaire" data-action="choisir-nature" data-nature="${cle}">${titre}</button>`).join('')}
+          </div>
+          <div class="ligne-outils"><button type="button" class="bouton-lien" data-action="supprimer">annuler (supprimer cette surface)</button></div>
+        </div>`;
+    }
+    return `
+      <div class="ligne-outils">
+        <label>Nom : <input type="text" data-champ="nom" value="${echapper(objet.nom)}" /></label>
+        <button type="button" class="bouton-lien" data-action="supprimer">${textes.supprimer}</button>
+      </div>
+      <div class="ligne-outils choix-nature" role="radiogroup" aria-label="Nature de la surface">
+        <span>C'est : ${bulle('nature')}</span>
+        ${NATURES.map(
+          ([cle, titre]) => `<label class="case"><input type="radio" name="nature" data-champ="nature" value="${cle}" ${objet.nature === cle ? 'checked' : ''} /> ${titre}</label>`,
+        ).join('')}
+      </div>
+      ${contenuSurface(objet)}`;
   }
 
   /** Cartes d'une surface : contour, lignes de rupture, points, triangles supprimés, état. */

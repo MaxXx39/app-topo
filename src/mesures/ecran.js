@@ -9,6 +9,7 @@ import { creerMesure, nomDeMesureLibre, nomsDeLaMesure } from '../topo/mesure.js
 import { htmlChoixPoints, resumeListe } from '../surfaces/choix-points.js';
 import { VALEURS, TEXTE_MORCEAUX, valeursMorceau, valeurPrincipale, COULEURS_MESURES, couleurDeMesure } from './valeurs.js';
 import { bulle } from '../aide/bulles.js';
+import { titreSection } from '../outils/section.js';
 import { echapper } from '../outils/echapper.js';
 
 // Nom des listes de points que l'on modifie, selon la sorte de mesure.
@@ -228,11 +229,14 @@ export function creerEcranMesures(conteneur, barre, options) {
     const mesure = mesureActive();
     const sansPoints = !leveActifId();
     let html = `
-      <div class="ligne-outils">
-        <button type="button" class="bouton" data-action="nouvelle" data-type="longueur" ${sansPoints ? 'disabled' : ''}>+ Longueur</button>
-        <button type="button" class="bouton" data-action="nouvelle" data-type="aire" ${sansPoints ? 'disabled' : ''}>+ Aire</button>
-      </div>
-      ${sansPoints ? '<p class="vide">Importe d\'abord un fichier de points (onglet 1. Importer).</p>' : ''}
+      <section class="carte-section">
+        ${titreSection('ajouter', 'Ajouter une mesure')}
+        <div class="ligne-outils">
+          <button type="button" class="bouton" data-action="nouvelle" data-type="longueur" ${sansPoints ? 'disabled' : ''}>+ Longueur</button>
+          <button type="button" class="bouton" data-action="nouvelle" data-type="aire" ${sansPoints ? 'disabled' : ''}>+ Aire</button>
+        </div>
+        ${sansPoints ? '<p class="vide">Importe d\'abord un fichier de points (onglet 1. Importer).</p>' : ''}
+      </section>
       ${listeDesMesures(mesure)}`;
     if (mesure) html += contenuMesure(mesure);
     conteneur.innerHTML = html;
@@ -246,6 +250,8 @@ export function creerEcranMesures(conteneur, barre, options) {
     const liste = mesures();
     if (liste.length === 0) return '';
     return `
+      <section class="carte-section">
+      ${titreSection('mesures', 'Mes mesures')}
       <div class="liste-mesures">
         ${liste
           .map((m) => {
@@ -256,7 +262,8 @@ export function creerEcranMesures(conteneur, barre, options) {
             </button>`;
           })
           .join('')}
-      </div>`;
+      </div>
+      </section>`;
   }
 
   /**
