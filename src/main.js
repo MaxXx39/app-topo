@@ -236,6 +236,7 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
     modifie();
   },
   continuer: () => afficherOnglet(etapeUtile()),
+  allerA: (onglet) => afficherOnglet(onglet),
   exporterProjet: () => {
     const nom = projet.nom.replace(/[^\w-]+/g, '_') || 'projet';
     telecharger(new Blob([ecrireFichierProjet(projet)], { type: 'application/json' }), `${nom}.topo.json`);
