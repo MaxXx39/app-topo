@@ -194,3 +194,32 @@ describe('creerPdf - calques', async () => {
     expect(messageFond).toBeTruthy();
   });
 });
+
+describe('creerPdf - coupes', async () => {
+  const { creerPdf } = await import('../src/export/pdf.js');
+  const { profilSurface } = await import('../src/topo/coupe.js');
+  const points = pointsDeReference();
+  const stock = surfaceDeReference(STOCKS_REFERENCE[1], points);
+  const resultats = [volumeDeReference(STOCKS_REFERENCE[1], points)];
+  const parNom = new Map(points.map((p) => [p.nom, p]));
+
+  it('ajoute une feuille « Coupes » avec les coupes cochées, et leur trait sur le plan', async () => {
+    const coupe = (nom, a, b) => {
+      const debut = { est: parNom.get(a).est, nord: parNom.get(a).nord };
+      const fin = { est: parNom.get(b).est, nord: parNom.get(b).nord };
+      return { nom, debut, fin, exageration: 2, profils: [{ nom: 'Stock 2', nature: 'stock', lignes: profilSurface(resultats[0].trianglesDessus, debut, fin) }] };
+    };
+    const { document } = await creerPdf({
+      stocks: [stock],
+      resultats,
+      points,
+      cartouche: {},
+      coupes: [coupe('A', 'b100', 'b108'), coupe('B', 'b104', 'b112')],
+    });
+    expect(document.getNumberOfPages()).toBe(2);
+    const contenu = document.output();
+    expect(contenu).toContain('Coupes');
+    expect(contenu).toContain('Longueurs 1:');
+    expect(contenu).toContain("(B')");
+  });
+});

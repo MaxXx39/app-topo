@@ -14,6 +14,8 @@ import { couleurRVB } from '../plan/couleurs.js';
 import { zonesRemblaiDeblai } from '../plan/ecarts.js';
 import { FONDS, niveauDeZoom, tuilesPourZone } from '../plan/fond.js';
 import { grouperParNature } from '../volumes/calculs.js';
+import { preparerDessinCoupe, texteEchellesCoupe } from '../coupes/dessin.js';
+import { longueurCoupe } from '../topo/coupe.js';
 // Logo Perrin, dans le fichier PDF (image JPEG de 406 × 104 pixels, écrite dans le code).
 import logoPerrin from '../assets/logo-perrin.jpg?inline';
 
@@ -80,11 +82,13 @@ const COULEURS = {
  *   comparerSurfaces) : ajoutés sous le tableau des volumes, puis une feuille chacun
  * - photos : liste de { surface (nom), legende, date (ISO), image (JPEG), largeur, hauteur }, à placer
  *   sous la légende de la première feuille
+ * - coupes : coupes à imprimer [{ nom, debut, fin, exageration, profils: [{ nom, nature, lignes }] }] :
+ *   leur trait sur le plan, et une feuille « Coupes » (A4)
  * Renvoie (après chargement éventuel de la photo aérienne)
  * { document, echelle, format, messageFond } : document jsPDF, échelle utilisée, format de la
  * première feuille ('a4' ou 'a3'), et un message (fond non mis, plan coupé...) ou null.
  */
-export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [], photos = [] }) {
+export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [], photos = [], coupes = [] }) {
   const choix = { ...CALQUES_PDF, ...calques };
   // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre.
   if (choix.ecarts) choix.couleurs = false;
@@ -122,10 +126,10 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
 
   // Feuille des volumes (sauf s'il n'y a que des comparaisons)
   if (calcules.length > 0 || comparaisonsCalculees.length === 0) {
-    const contenu = contenuDuPlan(calcules, points);
+    const contenu = contenuDuPlan(calcules, points, coupes);
     nouvelleFeuille(formatDuPlan(contenu.zone));
     dessinerCadres(doc);
-    const plan = await dessinerPlan(doc, calcules, contenu, echelleImposee, choix);
+    const plan = await dessinerPlan(doc, calcules, contenu, echelleImposee, choix, coupes);
     const yLibre = dessinerColonne(doc, calcules, { ...cartouche, echelle: plan.echelle }, { choix, relief: plan.relief, ecarts: plan.legendeEcarts, comparaisons });
     placerPhotos(yLibre);
     echelle = plan.echelle;
@@ -140,6 +144,12 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
     placerPhotos(page.yLibre);
     echelle ??= page.echelle;
     if (page.messageFond && !messages.includes(page.messageFond)) messages.push(page.messageFond);
+  }
+  // Feuille des coupes (A4)
+  const coupesDessinables = coupes.filter((coupe) => coupe.profils.some((p) => p.lignes.length > 0));
+  if (coupesDessinables.length > 0) {
+    nouvelleFeuille('a4');
+    dessinerPageCoupes(doc, coupesDessinables, cartouche);
   }
   // Photos qui ne tiennent pas dans la colonne : 4 par feuille, à la suite
   for (let debut = 0; debut < photosAPlacer.length; debut += PHOTOS_PAR_PAGE) {
@@ -399,7 +409,7 @@ async function dessinerPageComparaison(doc, { nom, description, resultat }, cart
  * lignes, sommets des triangles), ou tous s'il n'y a aucune surface, et la zone du terrain à
  * dessiner (points montrés et triangles). Renvoie { parNom, pointsMontres, zone } (zone null si vide).
  */
-function contenuDuPlan(calcules, points) {
+function contenuDuPlan(calcules, points, coupes = []) {
   const parNom = new Map(points.map((p) => [p.nom, p]));
   const sommets = calcules.flatMap(({ resultat }) => resultat.trianglesDessus.flat());
   const noms = new Set([
@@ -407,7 +417,9 @@ function contenuDuPlan(calcules, points) {
     ...sommets.filter((p) => parNom.get(p.nom) === p).map((p) => p.nom),
   ]);
   const pointsMontres = noms.size > 0 ? [...noms].map((nom) => parNom.get(nom)).filter(Boolean) : points;
-  return { parNom, pointsMontres, zone: zoneDe([...pointsMontres, ...sommets]) };
+  // Les coupes doivent se voir en entier sur le plan.
+  const boutsDesCoupes = coupes.flatMap((coupe) => [coupe.debut, coupe.fin]);
+  return { parNom, pointsMontres, zone: zoneDe([...pointsMontres, ...sommets, ...boutsDesCoupes]) };
 }
 
 /**
@@ -416,7 +428,7 @@ function contenuDuPlan(calcules, points) {
  * Renvoie { echelle, messageFond, relief, legendeEcarts } (relief : plage d'altitudes et
  * équidistance ; legendeEcarts : paliers remblai / déblai ; pour les légendes).
  */
-async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, echelleImposee, choix) {
+async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, echelleImposee, choix, coupes = []) {
   if (!zone) return { echelle: echelleImposee ?? 500, messageFond: null, relief: null, legendeEcarts: null };
   const projection = preparerProjection(zone, echelleImposee);
   const { echelle, versPapier } = projection;
@@ -532,6 +544,7 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
     });
     doc.setFont('helvetica', 'normal');
   }
+  dessinerTraitsCoupes(doc, coupes, versPapier);
   terminerCadrePlan(doc, echelle, choix, messageFond);
   return { echelle, messageFond, relief, legendeEcarts };
 }
@@ -810,7 +823,7 @@ function dessinerCartouche(doc, cartouche) {
     ['Affaire', cartouche.affaire || '-'],
     ['Date', cartouche.date || '-'],
     ['Dessiné par', cartouche.dessinePar || '-'],
-    ['Échelle', `1:${cartouche.echelle}`],
+    ['Échelle', cartouche.texteEchelle ?? `1:${cartouche.echelle}`],
     ['Coordonnées', 'MN95 (m)'],
     ['Fichier de points', cartouche.fichierPoints || '-'],
   ];
@@ -835,6 +848,122 @@ function dessinerCartouche(doc, cartouche) {
     doc.text(texte, x + 1.5, yl + 5.2);
   });
   doc.setFont('helvetica', 'normal');
+}
+
+/** Trait de chaque coupe sur le plan (tirets bleu nuit), avec son nom à chaque bout (A et A'). */
+function dessinerTraitsCoupes(doc, coupes, versPapier) {
+  for (const coupe of coupes) {
+    const a = versPapier(coupe.debut);
+    const b = versPapier(coupe.fin);
+    trait(doc, COULEURS.texte, 0.4);
+    doc.setLineDashPattern([2, 1], 0);
+    doc.line(a.x, a.y, b.x, b.y);
+    doc.setLineDashPattern([], 0);
+    const longueur = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const [ux, uy] = [(b.x - a.x) / longueur, (b.y - a.y) / longueur];
+    doc.setFillColor(...COULEURS.texte);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...COULEURS.texte);
+    for (const [bout, texte, sens] of [[a, coupe.nom, -1], [b, `${coupe.nom}'`, 1]]) {
+      doc.circle(bout.x, bout.y, 0.6, 'F');
+      doc.text(texte, bout.x + sens * ux * 3.5, bout.y + sens * uy * 3.5 + 1.2, { align: 'center' });
+    }
+    doc.setFont('helvetica', 'normal');
+  }
+}
+
+/**
+ * Feuille « Coupes » : les coupes l'une sous l'autre dans le cadre de gauche ; à droite le titre,
+ * les échelles de chaque coupe, la légende des surfaces et le cartouche.
+ */
+function dessinerPageCoupes(doc, coupes, cartouche) {
+  dessinerCadres(doc);
+  const hauteurCoupe = CADRE_PLAN.hauteur / coupes.length;
+  const dessins = coupes.map((coupe, i) => {
+    const zone = { x: CADRE_PLAN.x + 3, y: CADRE_PLAN.y + i * hauteurCoupe + 4, largeur: CADRE_PLAN.largeur - 6, hauteur: hauteurCoupe - 8 };
+    const dessin = preparerDessinCoupe(coupe, coupe.profils, zone.largeur, zone.hauteur);
+    if (i > 0) {
+      trait(doc, COULEURS.gris, 0.2);
+      doc.line(CADRE_PLAN.x, CADRE_PLAN.y + i * hauteurCoupe, CADRE_PLAN.x + CADRE_PLAN.largeur, CADRE_PLAN.y + i * hauteurCoupe);
+    }
+    // Le dessin, ajusté au relief, est centré en hauteur dans sa part de la feuille.
+    dessinerCoupePdf(doc, dessin, zone.x, zone.y + (zone.hauteur - dessin.hauteurTotale) / 2);
+    return { coupe, dessin };
+  });
+
+  // Colonne de droite : titre, échelles, légende, cartouche
+  const x = COLONNE.x;
+  let y = dessinerTitre(doc, 'Coupes');
+  for (const { coupe, dessin } of dessins) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...COULEURS.texte);
+    doc.text(dessin.titre, x, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...COULEURS.gris);
+    doc.text(`${texteEchellesCoupe(dessin)} · longueur ${formaterNombre(longueurCoupe(coupe.debut, coupe.fin))} m`, x, y + 3.2);
+    y += 8;
+  }
+  // Légende : une couleur par surface traversée
+  const legende = new Map();
+  for (const { dessin } of dessins) for (const { nom, couleur } of dessin.courbes) if (!legende.has(nom)) legende.set(nom, couleur);
+  y += 2;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...COULEURS.texte);
+  doc.text('Surfaces', x, y);
+  y += 3.5;
+  doc.setFont('helvetica', 'normal');
+  for (const [nom, couleur] of legende) {
+    trait(doc, couleur, 0.6);
+    doc.line(x, y - 0.8, x + 6, y - 0.8);
+    doc.text(doc.splitTextToSize(nom, COLONNE.largeur - 9)[0], x + 8, y);
+    y += 3.6;
+  }
+  doc.setFontSize(6);
+  doc.setTextColor(...COULEURS.gris);
+  doc.text(doc.splitTextToSize('Altitudes et longueurs en m. Coupes tracées sur le plan (A – A\', B – B\').', COLONNE.largeur), x, y + 2);
+  const texteEchelle = dessins.map(({ dessin }) => `1:${dessin.echelle}`).join(' / ');
+  dessinerCartouche(doc, { ...cartouche, texteEchelle });
+}
+
+/** Dessine une coupe préparée par preparerDessinCoupe (mesures en mm), décalée de (ox, oy). */
+function dessinerCoupePdf(doc, dessin, ox, oy) {
+  const { cadre } = dessin;
+  const X = (x) => ox + x;
+  const Y = (y) => oy + y;
+  const xFin = dessin.cotesX.at(-1).x; // fin de la coupe (A')
+  // Quadrillage léger aux cotes
+  trait(doc, [221, 226, 230], 0.1);
+  for (const { x } of dessin.cotesX) doc.line(X(x), Y(cadre.y), X(x), Y(cadre.y + cadre.hauteur));
+  for (const { y } of dessin.cotesY) doc.line(X(cadre.x), Y(y), X(xFin), Y(y));
+  // Axes
+  trait(doc, COULEURS.texte, 0.25);
+  doc.line(X(cadre.x), Y(cadre.y), X(cadre.x), Y(cadre.y + cadre.hauteur));
+  doc.line(X(cadre.x), Y(cadre.y + cadre.hauteur), X(xFin), Y(cadre.y + cadre.hauteur));
+  // Cotes de longueur (en bas) et d'altitude (à gauche)
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...COULEURS.gris);
+  for (const { x, texte } of dessin.cotesX) doc.text(texte, X(x), Y(cadre.y + cadre.hauteur + 3.6), { align: 'center' });
+  for (const { y, texte } of dessin.cotesY) doc.text(texte, X(cadre.x - 1), Y(y + 0.9), { align: 'right' });
+  // Noms des extrémités (A et A') et titre
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...COULEURS.texte);
+  for (const { x, texte } of dessin.extremites) doc.text(texte, X(x), Y(cadre.y - 1.5), { align: 'center' });
+  doc.setFontSize(7);
+  doc.text(`${dessin.titre}   ${texteEchellesCoupe(dessin)}`, X(cadre.x + cadre.largeur), Y(cadre.y - 1.5), { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  // Profils des surfaces
+  for (const { couleur, lignes } of dessin.courbes) {
+    trait(doc, couleur, 0.45);
+    for (const ligne of lignes) {
+      for (let i = 0; i + 1 < ligne.length; i++) doc.line(X(ligne[i].x), Y(ligne[i].y), X(ligne[i + 1].x), Y(ligne[i + 1].y));
+    }
+  }
 }
 
 /** Choisit la couleur et l'épaisseur (mm) des traits. */

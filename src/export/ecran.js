@@ -23,7 +23,7 @@ const CALQUES = [
 
 /**
  * Crée le formulaire d'export dans "conteneur".
- * - obtenirDonnees() : { nomProjet, stocks, resultats, comparaisons, volumes, dessinSurfaces, points, fichierPoints, photos, cartouche }
+ * - obtenirDonnees() : { nomProjet, stocks, resultats, comparaisons, volumes, dessinSurfaces, points, fichierPoints, photos, cartouche, coupes }
  *   stocks, resultats : calculs dessinés sur la feuille principale du PDF (surface 1 et volume) ;
  *   comparaisons : calculs dans un contour, une feuille chacun [{ nom, description, resultat }] ;
  *   volumes : tous les calculs, pour le CSV [{ nom, base, resultat }] ;
@@ -115,7 +115,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
       message.textContent = `LandXML téléchargé (${liste.length} surface(s)).`;
     },
     pdf: async () => {
-      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos } = obtenirDonnees();
+      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos, coupes } = obtenirDonnees();
       if (!verifier(volumes)) return;
       message.textContent = 'Préparation du PDF…';
       try {
@@ -132,6 +132,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
           points,
           comparaisons,
           photos,
+          coupes,
           calques,
           cartouche: {
             affaire: obtenirDonnees().cartouche.affaire ?? '',

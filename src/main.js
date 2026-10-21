@@ -16,6 +16,8 @@ import { preparerPhoto } from './photos/photo.js';
 import { creerEcranExport, telecharger } from './export/ecran.js';
 import { creerEcranProjet } from './projet/ecran.js';
 import { creerEcranImport } from './import/ecran.js';
+import { creerEcranCoupes } from './coupes/ecran.js';
+import { profilSurface } from './topo/coupe.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -39,6 +41,7 @@ let surfacesCalculees = new Map(); // id de surface -> triangles (résultat de c
 let resultatsCalculs = new Map(); // id de calcul -> volume (résultat de calculerVolume)
 let ongletContexte = 'importer'; // dernier onglet (hors plan) : décide de ce que montre le plan
 let calculMontre = null; // id du calcul colorié sur le plan (bouton « Voir sur le plan »)
+let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, etape: 'debut' ou 'fin', debut }
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 
 // --- Mise en page : onglets ---
@@ -73,6 +76,7 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="volumes">
         <h2>3. Volumes ${bulle('volumes')}</h2>
         <div id="volumes"></div>
+        <div id="coupes"></div>
         <div id="export" class="carte-export"></div>
       </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
@@ -233,6 +237,7 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
 });
 
 const plan = creerPlan(document.querySelector('#plan'), {
+  quandToucherPosition: toucherPourCoupe,
   quandToucherPoint: (nom) => editeurSurfaces.toucherPoint(nom),
   quandToucherStock: (index) => editeurSurfaces.choisir(index),
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
@@ -327,6 +332,62 @@ const ecranVolumes = creerEcranVolumes(document.querySelector('#volumes'), {
   quandChange: () => modifie(),
 });
 
+// --- Coupes : tracées en touchant le plan deux fois (début, puis fin) ---
+
+/** Profils des surfaces affichées le long d'une coupe : [{ nom, nature, lignes }] (voir profilSurface). */
+function profilsDeCoupe(coupe) {
+  return surfacesAffichees().map((s) => ({ nom: s.nom, nature: s.nature, lignes: profilSurface(trianglesDeSurface(s.id), coupe.debut, coupe.fin) }));
+}
+
+const estTelephone = () => !window.matchMedia('(min-width: 900px)').matches;
+
+/** Commence le tracé d'une coupe : les deux prochains touchers du plan donnent son début et sa fin. */
+function commencerTrace(coupe) {
+  editeurSurfaces.arreterModification();
+  traceCoupe = { id: coupe.id, etape: 'debut', debut: null };
+  afficherMessage(`Coupe ${coupe.nom} : touche le début sur le plan`, null);
+  if (estTelephone()) afficherOnglet('plan');
+  recalculer();
+}
+
+/** Abandonne le tracé en cours (la coupe garde sa position d'avant). */
+function arreterTrace() {
+  traceCoupe = null;
+  afficherMessage('Tracé annulé');
+  recalculer();
+}
+
+/** Toucher du plan pendant le tracé d'une coupe (position en m, MN95). */
+function toucherPourCoupe(touche) {
+  const coupe = projet.coupes.find((c) => c.id === traceCoupe?.id);
+  if (!coupe) return;
+  // Coordonnées arrondies au millimètre.
+  const position = { est: Math.round(touche.est * 1000) / 1000, nord: Math.round(touche.nord * 1000) / 1000 };
+  if (traceCoupe.etape === 'debut') {
+    traceCoupe = { ...traceCoupe, etape: 'fin', debut: position };
+    afficherMessage(`Coupe ${coupe.nom} : touche maintenant la fin (${coupe.nom}')`, null);
+    recalculer();
+    return;
+  }
+  if (position.est === traceCoupe.debut.est && position.nord === traceCoupe.debut.nord) return; // même point : on attend la fin
+  coupe.debut = traceCoupe.debut;
+  coupe.fin = position;
+  traceCoupe = null;
+  afficherMessage(`Coupe ${coupe.nom} – ${coupe.nom}' tracée`);
+  if (estTelephone()) afficherOnglet('volumes');
+  modifie();
+  requestAnimationFrame(() => document.querySelector('#coupes .carte-coupe:last-of-type')?.scrollIntoView({ block: 'center' }));
+}
+
+const ecranCoupes = creerEcranCoupes(document.querySelector('#coupes'), {
+  obtenirProjet: () => projet,
+  obtenirProfils: profilsDeCoupe,
+  commencerTrace,
+  arreterTrace,
+  traceEnCours: () => traceCoupe,
+  quandChange: () => modifie(),
+});
+
 /** Calculs de volume du projet dont le résultat est connu : [{ calcul, resultat }]. */
 function calculsReussis() {
   return projet.calculs
@@ -369,6 +430,10 @@ const ecranExport = creerEcranExport(document.querySelector('#export'), {
         (s.photos ?? []).filter((photo) => photo.dansPdf !== false).map((photo) => ({ ...photo, surface: s.nom })),
       ),
       cartouche: projet.cartouche,
+      // Coupes cochées « dans le PDF », avec les profils des surfaces traversées.
+      coupes: projet.coupes
+        .filter((coupe) => coupe.dansPdf && coupe.debut && coupe.fin)
+        .map((coupe) => ({ ...coupe, profils: profilsDeCoupe(coupe) })),
     };
   },
 });
@@ -404,6 +469,7 @@ function recalculer({ recadrer = false } = {}) {
 
   editeurSurfaces.rafraichir();
   ecranVolumes.afficher();
+  ecranCoupes.afficher();
   ecranExport.rafraichir();
   ecranImport.afficher(projet, dernierImport);
   ecranProjet.afficher(projet, resumes);
@@ -437,6 +503,9 @@ function recalculer({ recadrer = false } = {}) {
         ? { triangles: calculActif.triangles, trianglesRetires: calculActif.trianglesRetires }
         : null,
     modeTriangles: dansSurfaces && editeurSurfaces.enSuppression(),
+    // Coupes tracées (A – A', B – B'), et celle en cours de tracé.
+    coupes: projet.coupes.filter((c) => c.debut && c.fin && c.id !== traceCoupe?.id),
+    traceCoupe,
   });
   if (recadrer || pointsDuPlan !== pointsAffiches) {
     pointsAffiches = pointsDuPlan;

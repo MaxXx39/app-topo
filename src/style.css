@@ -1539,3 +1539,119 @@ body.mode-dessin[data-onglet='surfaces'] .barre-edition[data-role] {
   font-size: 0.85rem;
   color: var(--gris);
 }
+
+/* --- Coupes (onglet 3. Volumes) --- */
+
+.carte-coupe {
+  --couleur-role: var(--sombre);
+  border-left: 5px solid var(--sombre);
+}
+
+.coordonnees-coupe {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: 0.85rem;
+}
+
+.coordonnees-coupe th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--gris);
+  padding: 0 4px;
+}
+
+.coordonnees-coupe td {
+  padding: 2px 4px;
+}
+
+.coordonnees-coupe input {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 4px 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dessin-coupe {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 8px 0 2px;
+  background: #ffffff;
+  border: 1px solid var(--bordure);
+  border-radius: 6px;
+}
+
+.dessin-coupe .grille {
+  stroke: var(--bordure);
+  stroke-width: 0.15;
+}
+
+.dessin-coupe .axe {
+  fill: none;
+  stroke: var(--sombre);
+  stroke-width: 0.3;
+}
+
+.dessin-coupe text {
+  font-size: 3px;
+  fill: var(--gris);
+}
+
+.dessin-coupe text.extremite {
+  font-size: 4px;
+  font-weight: 700;
+  fill: var(--sombre);
+}
+
+.dessin-coupe .profil {
+  fill: none;
+  stroke-width: 0.6;
+  stroke-linejoin: round;
+}
+
+.legende-coupe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.legende-coupe span {
+  display: inline-block;
+  width: 18px;
+  height: 4px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+
+/* Coupes sur le plan : trait bleu nuit, nom à chaque bout. */
+.plan .coupes line {
+  stroke: var(--sombre);
+  stroke-width: 2.5;
+  stroke-dasharray: 10 4;
+}
+
+.plan .coupes circle {
+  fill: var(--sombre);
+}
+
+.plan .coupes circle.debut-trace {
+  fill: var(--ambre);
+  stroke: var(--sombre);
+  stroke-width: 2;
+}
+
+.plan .coupes text {
+  font-size: 15px;
+  font-weight: 700;
+  fill: var(--sombre);
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
