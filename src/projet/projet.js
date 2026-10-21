@@ -8,7 +8,7 @@
 //   leveActifId,                    // levé affiché
 //   surfaces: [...],                // stocks, terrassements, terrains... : voir topo/surface.js
 //   calculs: [...],                 // calculs de volume (onglet 3. Volumes) : voir volumes/calculs.js
-//   cartouche: { affaire, dessinePar },
+//   cartouche: { affaire, dessinePar, date },   // date : 'AAAA-MM-JJ', ou '' pour la date du jour
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé.
@@ -33,7 +33,7 @@ export function creerProjet(nom) {
     leveActifId: null,
     surfaces: [],
     calculs: [],
-    cartouche: { affaire: '', dessinePar: '' },
+    cartouche: { affaire: '', dessinePar: '', date: '' },
   };
 }
 

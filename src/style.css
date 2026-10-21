@@ -114,32 +114,6 @@ p {
   text-overflow: ellipsis;
 }
 
-/* Bouton « Mes projets » à droite de l'en-tête. */
-.entete-projets {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 6px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 999px;
-  background: none;
-  color: #ffffff;
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.entete-projets svg {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linejoin: round;
-}
-
 /* Boutons ronds de l'en-tête (Annuler, Rétablir, Aide). */
 .entete-icone-bouton {
   display: flex;
@@ -175,19 +149,11 @@ p {
   background: rgba(255, 255, 255, 0.12);
 }
 
-/* Sur téléphone, « Mes projets » n'affiche que son icône pour laisser la place aux autres boutons. */
+/* Sur téléphone, en-tête plus serré. */
 @media (max-width: 480px) {
   .entete {
     gap: 4px;
     padding: 0 8px 0 12px;
-  }
-
-  .entete-projets {
-    padding: 8px;
-  }
-
-  .entete-projets span {
-    display: none;
   }
 }
 
@@ -269,11 +235,6 @@ body.aide-active .rond-aide {
   pointer-events: none;
 }
 
-body[data-onglet='projets'] .entete-projets {
-  background: var(--ambre);
-  border-color: var(--ambre);
-  color: var(--sombre);
-}
 
 /* --- Onglets (barre du bas sur téléphone) --- */
 

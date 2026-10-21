@@ -2,9 +2,11 @@
 // Chaque bulle est désignée par une clé (ex. 'contour'), utilisée par bulle('contour').
 
 export const TEXTES_AIDE = {
-  // --- Mes projets ---
+  // --- Projet ---
   projets:
-    'Les projets sont enregistrés automatiquement sur cet appareil, rien n\'est envoyé sur internet. Pour passer du téléphone à l\'ordinateur : « Exporter le fichier projet », envoie-le-toi (mail, Drive…), puis « Ouvrir un fichier projet » sur l\'autre appareil.',
+    'Les projets sont enregistrés automatiquement sur cet appareil, rien n\'est envoyé sur internet. « Continuer » reprend le travail là où il en est. Pour passer du téléphone à l\'ordinateur : « Exporter le fichier projet », envoie-le-toi (mail, Drive…), puis « Ouvrir un fichier projet » sur l\'autre appareil.',
+  cartouche:
+    'Affaire, dessinateur et date du plan, écrits dans le cartouche du PDF et dans le nom des fichiers exportés. Date vide : la date du jour de l\'export.',
 
   // --- 1. Importer ---
   importer:

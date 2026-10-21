@@ -33,7 +33,7 @@ import { bulle, installerAide } from './aide/bulles.js';
 
 // --- État de l'application ---
 let projet = creerProjet('Mon projet'); // projet ouvert
-let resumes = []; // liste des projets enregistrés (pour l'écran Mes projets)
+let resumes = []; // liste des projets enregistrés (pour l'onglet Projet)
 let dernierImport = null; // résultat du dernier import de points
 let surfacesCalculees = new Map(); // id de surface -> triangles (résultat de calculerSurface)
 let resultatsCalculs = new Map(); // id de calcul -> volume (résultat de calculerVolume)
@@ -42,15 +42,17 @@ let calculMontre = null; // id du calcul colorié sur le plan (bouton « Voir su
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 
 // --- Mise en page : onglets ---
-// Les onglets numérotés suivent l'ordre du travail : importer les points, préparer les surfaces,
-// calculer les volumes. « Mes projets » s'ouvre depuis l'en-tête.
+// L'onglet Projet vient en premier (l'appli s'ouvre dessus). Les onglets numérotés suivent
+// l'ordre du travail : importer les points, préparer les surfaces, calculer les volumes.
 const ICONES = {
+  projets: '<path d="M3 7h6l2 2h10v10H3z" />',
   importer: '<path d="M12 15V4M7 9l5-5 5 5M4 15v5h16v-5" />',
   surfaces: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
   volumes: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
   plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
 };
 const ONGLETS = [
+  { nom: 'projets', titre: 'Projet' },
   { nom: 'importer', titre: '1. Importer' },
   { nom: 'surfaces', titre: '2. Surfaces' },
   { nom: 'volumes', titre: '3. Volumes' },
@@ -110,7 +112,6 @@ document.querySelector('.onglets').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-onglet]');
   if (bouton) afficherOnglet(bouton.dataset.onglet);
 });
-document.querySelector('#bouton-projets').addEventListener('click', () => afficherOnglet('projets'));
 installerAide(document.querySelector('#bouton-aide'));
 
 // --- Accès aux données du projet ---
@@ -200,6 +201,11 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
     if (nom) projet.nom = nom;
     modifie();
   },
+  changerCartouche: (champ, valeur) => {
+    projet.cartouche[champ] = valeur;
+    modifie();
+  },
+  continuer: () => afficherOnglet(etapeUtile()),
   exporterProjet: () => {
     const nom = projet.nom.replace(/[^\w-]+/g, '_') || 'projet';
     telecharger(new Blob([ecrireFichierProjet(projet)], { type: 'application/json' }), `${nom}.topo.json`);
@@ -387,7 +393,6 @@ const ecranExport = creerEcranExport(document.querySelector('#export'), {
       cartouche: projet.cartouche,
     };
   },
-  quandChange: () => modifie(),
 });
 
 /** État d'une surface sous ses réglages : triangles, surface en plan, problèmes. */
@@ -421,6 +426,7 @@ function recalculer({ recadrer = false } = {}) {
 
   editeurSurfaces.rafraichir();
   ecranVolumes.afficher();
+  ecranExport.rafraichir();
   ecranImport.afficher(projet, dernierImport);
   ecranProjet.afficher(projet, resumes);
 
@@ -566,9 +572,12 @@ async function rafraichirListe() {
   resumes = (await stockage.listerProjets()).map(resumerProjet).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
 }
 
+/** Étape où reprendre le travail : les surfaces si le projet a déjà des points, sinon l'import. */
+const etapeUtile = () => (leveActif(projet) ? 'surfaces' : 'importer');
+
 /**
  * Ouvre un projet : il devient le projet affiché, et il est enregistré.
- * Puis on va à l'étape utile : les surfaces s'il a déjà des points, sinon l'import.
+ * Puis on va à l'étape utile (voir etapeUtile).
  */
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
@@ -580,19 +589,20 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   recalculer({ recadrer: true });
   historique.reinitialiser(modifications, projet);
   mettreAJourAnnuler();
-  if (changerOnglet) afficherOnglet(leveActif(projet) ? 'surfaces' : 'importer');
+  if (changerOnglet) afficherOnglet(etapeUtile());
   await enregistrer();
 }
 
 // --- Démarrage : on rouvre le dernier projet, sinon le plus récent, sinon un nouveau ---
+// L'appli s'ouvre sur l'onglet Projet (bouton « Continuer » pour reprendre le travail).
 async function demarrer() {
-  afficherOnglet('importer');
+  afficherOnglet('projets');
   stockage.demanderStockagePersistant();
   try {
     await rafraichirListe();
     const id = stockage.dernierProjet();
     const lu = (id && (await stockage.lireProjet(id))) || (resumes[0] && (await stockage.lireProjet(resumes[0].id)));
-    await ouvrir(lu ? completerProjet(lu) : creerProjet('Mon projet'));
+    await ouvrir(lu ? completerProjet(lu) : creerProjet('Mon projet'), { changerOnglet: false });
   } catch (erreur) {
     // Base de données indisponible (navigation privée...) : l'appli marche, sans enregistrement.
     console.error(erreur);

@@ -39,7 +39,7 @@ describe('projets', () => {
   it('complète un fichier projet ancien ou incomplet', () => {
     const { projet } = lireFichierProjet('{"format":"topo-projet","version":1,"id":"x","nom":"Vieux","leves":[{"id":"l","nom":"a.csv","points":[]}]}');
     expect(projet.surfaces).toEqual([]);
-    expect(projet.cartouche).toEqual({ affaire: '', dessinePar: '' });
+    expect(projet.cartouche).toEqual({ affaire: '', dessinePar: '', date: '' });
   });
 
   it('duplique un projet avec un nouvel identifiant', () => {
