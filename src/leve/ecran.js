@@ -25,6 +25,12 @@ const VUES_COUPES = [
   ['axe', 'Dans l\'axe'],
 ];
 export const LONGUEURS_COUPE = [5, 10, 20];
+// Ce que l'on lève (même choix que « + Nouvelle surface » dans Calculs › Surfaces).
+const NATURES_TERRAIN = [
+  ['stock', 'Stock'],
+  ['terrain', 'Terrain naturel'],
+  ['terrassement', 'Terrassement'],
+];
 const TITRES_COUPES = {
   perpendiculaire: { titre: 'Perpendiculaire', gauche: '← gauche', droite: 'droite →' },
   axe: { titre: 'Dans l\'axe', gauche: '← derrière', droite: 'devant →' },
@@ -39,8 +45,7 @@ const ICONES = {
 
 /**
  * Crée l'écran dans "conteneur". Les actions sont faites par main.js via "actions" :
- * choisirRecepteur(), reconnecter(), deconnecter(), nouveauLeve(), choisirLeve(id), nouveauStock(),
- * choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
+ * choisirRecepteur(), reconnecter(), deconnecter(), nouvelleSurface(nature), choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
  * annulerDernierPoint(), choisirMode(mode), choisirSurfaceControle(id), choisirVueCoupes(vue),
  * choisirLongueurCoupe(m), choisirSourceOrientation(source)
  * Renvoie { afficher(donnees), mettreAJourRecepteur(etat, direct) }.
@@ -48,13 +53,19 @@ const ICONES = {
 export function creerEcranLeve(conteneur, actions) {
   let etat = null; // dernier état du récepteur (voir src/android/pont.js)
   let donnees = null;
-  let reglagesOuverts = false; // ligne « Levé · Stock » dépliée (gardée d'un dessin à l'autre)
+  let choixNatureOuvert = false; // « + Nouvelle » touché : on choisit stock, terrain naturel ou terrassement
   let direct = null; // orientation et contrôle calculés par main.js à chaque état du récepteur
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton || bouton.disabled) return;
     const { action } = bouton.dataset;
+    if (action === 'ouvrirChoixNature' || action === 'fermerChoixNature') {
+      choixNatureOuvert = action === 'ouvrirChoixNature';
+      dessiner();
+      return;
+    }
+    if (action === 'nouvelleSurface') choixNatureOuvert = false;
     if (action === 'prendre') actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '');
     else if (action === 'role') actions.choisirRole(bouton.dataset.role);
     else actions[action]?.(bouton.dataset.valeur);
@@ -62,14 +73,9 @@ export function creerEcranLeve(conteneur, actions) {
 
   conteneur.addEventListener('change', (evenement) => {
     const cible = evenement.target;
-    if (cible.dataset.champ === 'leve') actions.choisirLeve(cible.value);
-    else if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
+    if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
   });
-
-  conteneur.addEventListener('toggle', (evenement) => {
-    if (evenement.target.matches('details.reglages-leve')) reglagesOuverts = evenement.target.open;
-  }, true);
 
   // Touche Entrée dans le nom : prend le point (comme le bouton), si c'est permis.
   conteneur.addEventListener('keydown', (evenement) => {
@@ -196,31 +202,33 @@ export function creerEcranLeve(conteneur, actions) {
     </div>`;
   }
 
-  /** Ligne repliable : levé et stock en cours (à changer), récepteur connecté (à couper). */
-  function reglages() {
-    if (!donnees.leve) return '';
-    const titre = `${echapper(donnees.leve.nom)} · ${donnees.stock ? echapper(donnees.stock.nom) : 'aucun stock'}`;
-    return `<details class="reglages-leve" ${reglagesOuverts ? 'open' : ''}>
-      <summary><span>${titre}</span><span class="aide">changer</span></summary>
-      <label class="champ-leve">Levé
-        <span class="ligne-outils">
-          <select data-champ="leve">${donnees.leves.map((l) => `<option value="${l.id}" ${l.id === donnees.leve.id ? 'selected' : ''}>${echapper(l.nom)} (${l.points.length} pts)</option>`).join('')}</select>
-          <button type="button" class="bouton-secondaire" data-action="nouveauLeve">+ Nouveau levé</button>
-        </span>
-      </label>
-      <label class="champ-leve">Stock
-        <span class="ligne-outils">
-          ${donnees.stocks.length > 0
-            ? `<select data-champ="stock">${donnees.stocks.map((s) => `<option value="${s.id}" ${s.id === donnees.stock?.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}</select>`
-            : ''}
-          <button type="button" class="bouton-secondaire" data-action="nouveauStock">+ Nouveau stock</button>
-        </span>
-      </label>
-      <p class="ligne-outils" data-si-connecte hidden>
-        <span>Récepteur : <strong data-vivant="connexion"></strong></span>
-        <button type="button" class="bouton-lien" data-action="deconnecter">couper</button>
-      </p>
-    </details>`;
+  /** Choix de ce que l'on va lever : une nouvelle surface de cette nature. */
+  function choixNature() {
+    return `<div class="choix-nature">
+      <p class="titre-choix">${donnees.stock ? 'Nouvelle surface : c\'est…' : 'Que lèves-tu ?'}</p>
+      <div class="natures-terrain">
+        ${NATURES_TERRAIN.map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}">${titre}</button>`).join('')}
+      </div>
+      ${donnees.stock ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerChoixNature">annuler</button>' : ''}
+    </div>`;
+  }
+
+  /** Une seule ligne : la surface levée en cours (à changer) et « + Nouvelle ». */
+  function ligneSurface() {
+    return `<div class="ligne-surface">
+      <select data-champ="stock" aria-label="Surface levée">
+        ${donnees.stocks.map((s) => `<option value="${s.id}" ${s.id === donnees.stock.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}
+      </select>
+      <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouvelle</button>
+    </div>`;
+  }
+
+  /** Récepteur connecté (à couper), en bas de l'écran. */
+  function piedRecepteur() {
+    return `<p class="pied-recepteur" data-si-connecte hidden>
+      <span>Récepteur : <strong data-vivant="connexion"></strong></span>
+      <button type="button" class="bouton-lien" data-action="deconnecter">couper</button>
+    </p>`;
   }
 
   /** Choix du rôle : 3 gros boutons à la couleur du rôle. */
@@ -254,13 +262,9 @@ export function creerEcranLeve(conteneur, actions) {
 
   /** Prise de point : rôle, nom, position, bouton, annulation. */
   function priseDePoint() {
-    if (!donnees.leve) {
-      return '<button type="button" class="bouton bouton-large" data-action="nouveauLeve">+ Commencer un levé</button>';
-    }
-    if (!donnees.stock) {
-      return '<button type="button" class="bouton bouton-large" data-action="nouveauStock">+ Nouveau stock</button>';
-    }
+    if (!donnees.stock || choixNatureOuvert) return choixNature();
     return `
+      ${ligneSurface()}
       ${boutonsRoles()}
       ${outilsLigne()}
       <div class="nom-et-position">
@@ -268,6 +272,7 @@ export function creerEcranLeve(conteneur, actions) {
         <div class="position-leve" data-vivant="position"></div>
       </div>
       <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>PRENDRE LE POINT</button>
+      <p class="aide astuce-volume">ou touche <strong>volume −</strong> de la tablette</p>
       <p class="raison-leve" data-vivant="raison" hidden></p>
       <div class="pied-terrain">
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
@@ -278,20 +283,26 @@ export function creerEcranLeve(conteneur, actions) {
 
   return {
     /**
-     * Redessine l'écran. donnees : { leves (levés faits avec le récepteur), leve, stocks (du levé),
-     * stock, role, ligne: { numero, nbPoints, fermee }, nomPropose, dernierPoint (nom), resume
+     * Redessine l'écran. donnees : { leve (levé de la surface en cours), stocks (surfaces levées :
+     * [{ id, nom }]), stock (surface en cours), role, ligne: { numero, nbPoints, fermee }, nomPropose, dernierPoint (nom), resume
      * (voir resumeStock), volume (remblai en m³, ou null), mode ('lever' ou 'controler'),
      * controle: { surfaceId, vueCoupes, demiLongueur, sourceOrientation }, surfaces: [{ id, etiquette }] }.
      */
     afficher(nouvellesDonnees) {
       donnees = nouvellesDonnees;
-      conteneur.innerHTML = `
-        <div class="ecran-terrain">
-          ${choixMode()}
-          ${connexion()}
-          ${donnees.mode === 'controler' ? controle() : `${reglages()}${priseDePoint()}`}
-        </div>`;
-      rafraichirVivant();
+      dessiner();
+    },
+
+    /**
+     * Touche « volume − » : prend le point comme le bouton, avec les mêmes vérifications.
+     * Renvoie null si le point est demandé, sinon la raison du refus (texte).
+     */
+    prendreDepuisTouche() {
+      const bouton = conteneur.querySelector('[data-action="prendre"]');
+      if (!bouton) return 'pas de surface en cours';
+      if (bouton.disabled) return etat?.connecte ? etat.raison ?? 'pas prêt' : 'récepteur non connecté';
+      actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '');
+      return null;
     },
 
     /**
@@ -305,6 +316,19 @@ export function creerEcranLeve(conteneur, actions) {
       rafraichirVivant();
     },
   };
+
+  /** Dessine tout l'écran avec les dernières données. */
+  function dessiner() {
+    if (!donnees) return;
+    conteneur.innerHTML = `
+        <div class="ecran-terrain">
+          ${choixMode()}
+          ${connexion()}
+          ${donnees.mode === 'controler' ? controle() : priseDePoint()}
+          ${piedRecepteur()}
+        </div>`;
+    rafraichirVivant();
+  }
 }
 
 /**

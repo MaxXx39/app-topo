@@ -17,6 +17,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
@@ -46,6 +47,9 @@ class EcranPrincipal : Activity() {
     val recepteur = EtatRecepteur()
     private val minuterie = Handler(Looper.getMainLooper())
     private var pageChargee = false
+
+    // Vrai quand la touche « volume − » prend le point (onglet Terrain, mode Lever : voir la page).
+    @Volatile private var toucheVolumePourPoint = false
 
     // Action à refaire quand l'utilisateur aura accepté la permission Bluetooth.
     private var apresPermission: (() -> Unit)? = null
@@ -113,6 +117,25 @@ class EcranPrincipal : Activity() {
             }
             minuterie.postDelayed(this, 200)
         }
+    }
+
+    /** Demandé par la page : la touche « volume − » prend le point (ou redevient le volume). */
+    fun activerToucheVolume(actif: Boolean) {
+        toucheVolumePourPoint = actif
+    }
+
+    /**
+     * Touche « volume − » pendant le levé : elle prend le point comme le bouton PRENDRE LE POINT
+     * (la page fait les mêmes vérifications) et le volume ne change pas. Sinon, rien ne change.
+     */
+    override fun dispatchKeyEvent(evenement: KeyEvent): Boolean {
+        if (toucheVolumePourPoint && evenement.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (evenement.action == KeyEvent.ACTION_DOWN && evenement.repeatCount == 0) {
+                page.evaluateJavascript("window.toucheVolumeBas && window.toucheVolumeBas()", null)
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(evenement)
     }
 
     @Deprecated("Méthode Android classique, suffisante ici")

@@ -50,4 +50,10 @@ class PontAndroid(private val ecran: EcranPrincipal) {
      */
     @JavascriptInterface
     fun prendrePoint(): String = ecran.recepteur.pointEnJson()
+
+    /** La touche « volume − » prend le point (vrai) ou redevient le volume (faux). */
+    @JavascriptInterface
+    fun activerToucheVolume(actif: Boolean) {
+        ecran.activerToucheVolume(actif)
+    }
 }

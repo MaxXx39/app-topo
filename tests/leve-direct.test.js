@@ -2,7 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   creerLeveDirect,
-  creerStockDirect,
+  creerSurfaceDirecte,
+  leveDuJour,
   prochainNom,
   ajouterPointDirect,
   annulerDernierPoint,
@@ -22,7 +23,7 @@ import { pointsDeReference } from './outils.js';
 function nouveauLeve() {
   const projet = creerProjet('Essai');
   const leve = creerLeveDirect(projet, new Date('2026-10-21T10:00:00Z'));
-  const stock = creerStockDirect(projet, leve);
+  const stock = creerSurfaceDirecte(projet, leve, 'stock');
   return { projet, leve, stock };
 }
 
@@ -40,7 +41,23 @@ describe('levé direct', () => {
     expect(projet.leveActifId).toBe(leve.id);
     expect(stock).toMatchObject({ nom: 'Stock 1', nature: 'stock', leveId: leve.id, tousLesPoints: false });
     expect(creerLeveDirect(projet, new Date('2026-10-21T15:00:00Z')).nom).toBe('Levé RX2 2026-10-21 (2)');
-    expect(creerStockDirect(projet, leve).nom).toBe('Stock 2');
+    expect(creerSurfaceDirecte(projet, leve, 'stock').nom).toBe('Stock 2');
+  });
+
+  it('crée la surface de la nature choisie, avec son propre numéro', () => {
+    const { projet, leve } = nouveauLeve();
+    expect(creerSurfaceDirecte(projet, leve, 'terrain')).toMatchObject({ nom: 'Terrain naturel 1', nature: 'terrain', tousLesPoints: false });
+    expect(creerSurfaceDirecte(projet, leve, 'terrassement')).toMatchObject({ nom: 'Terrassement 1', nature: 'terrassement' });
+    expect(creerSurfaceDirecte(projet, leve, 'terrain').nom).toBe('Terrain naturel 2');
+  });
+
+  it('range les surfaces du même jour dans le même levé', () => {
+    const projet = creerProjet('Essai');
+    const matin = leveDuJour(projet, new Date(2026, 9, 22, 8, 0));
+    expect(matin.nom).toBe('Levé RX2 2026-10-22');
+    expect(leveDuJour(projet, new Date(2026, 9, 22, 16, 30))).toBe(matin);
+    expect(leveDuJour(projet, new Date(2026, 9, 23, 7, 0)).nom).toBe('Levé RX2 2026-10-23');
+    expect(projet.leves).toHaveLength(2);
   });
 
   it('nomme les points B, H<ligne>-<n> et C, comme Emlid Stock', () => {
@@ -60,7 +77,7 @@ describe('levé direct', () => {
     const { projet, leve, stock } = nouveauLeve();
     lever(leve, stock, 'contour');
     lever(leve, stock, 'ligne');
-    const stock2 = creerStockDirect(projet, leve);
+    const stock2 = creerSurfaceDirecte(projet, leve, 'stock');
     expect(prochainNom(leve, stock2, 'contour')).toBe('B2');
     expect(prochainNom(leve, stock2, 'ligne')).toBe('H2-1');
   });

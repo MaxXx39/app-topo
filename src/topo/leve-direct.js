@@ -1,12 +1,14 @@
 // Levé direct avec le récepteur Emlid (appli Android) : chaque point pris est rangé dans un levé,
 // exactement comme les points d'un fichier importé, et, selon le rôle choisi avant de le prendre,
-// dans le stock en cours : contour, ligne de rupture (ouverte ou fermée) ou point isolé.
+// dans la surface en cours : contour, ligne de rupture (ouverte ou fermée) ou point isolé.
 // Les surfaces, volumes, mesures et exports marchent donc sans rien changer.
+// Sur le terrain, on ne voit que les surfaces (stock, terrain naturel, terrassement) : leur levé
+// est créé tout seul, un par jour (« Levé RX2 AAAA-MM-JJ »), et reçoit les points du jour.
 //
 // Noms proposés (comme Emlid Stock) : contour B1, B2… ; lignes de rupture H1-1, H1-2… puis H2-1… ;
 // points isolés C1, C2… Le numéro suivant = le plus grand du levé + 1 (les noms restent uniques
 // dans le levé, même avec plusieurs stocks). L'utilisateur peut changer le nom avant de prendre le point.
-import { creerSurface, nouvelIdentifiant } from './surface.js';
+import { creerSurface, nouvelIdentifiant, NATURES } from './surface.js';
 import { creerLigne } from './noms.js';
 
 /** Rôles d'un point levé : [clé, nom affiché]. */
@@ -21,26 +23,41 @@ export function estLeveDirect(leve) {
   return Boolean(leve?.direct);
 }
 
+/** Date du jour sur l'appareil, « AAAA-MM-JJ » (heure de Suisse, pas l'heure universelle). */
+export function jourLocal(maintenant = new Date()) {
+  const deux = (n) => String(n).padStart(2, '0');
+  return `${maintenant.getFullYear()}-${deux(maintenant.getMonth() + 1)}-${deux(maintenant.getDate())}`;
+}
+
 /** Crée un levé vide fait avec le récepteur, l'ajoute au projet et le rend actif. Renvoie le levé. */
 export function creerLeveDirect(projet, maintenant = new Date()) {
-  const jour = maintenant.toISOString().slice(0, 10);
+  const jour = jourLocal(maintenant);
   const base = `Levé RX2 ${jour}`;
   const noms = new Set(projet.leves.map((l) => l.nom));
   let nom = base;
   for (let numero = 2; noms.has(nom); numero += 1) nom = `${base} (${numero})`;
-  const leve = { id: nouvelIdentifiant(), nom, importeLe: maintenant.toISOString(), direct: true, points: [] };
+  const leve = { id: nouvelIdentifiant(), nom, importeLe: maintenant.toISOString(), jour, direct: true, points: [] };
   projet.leves.push(leve);
   projet.leveActifId = leve.id;
   return leve;
 }
 
+/** Levé du jour fait avec le récepteur (créé s'il n'existe pas encore). */
+export function leveDuJour(projet, maintenant = new Date()) {
+  const jour = jourLocal(maintenant);
+  return projet.leves.find((l) => estLeveDirect(l) && l.jour === jour) ?? creerLeveDirect(projet, maintenant);
+}
+
 /**
- * Crée un stock vide dans ce levé (« Stock 3 » : le plus grand numéro du projet + 1) et l'ajoute
- * au projet. Seuls les points levés pour lui en font partie. Renvoie la surface.
+ * Crée une surface vide dans ce levé, de cette nature (stock, terrain, terrassement), nommée
+ * « Stock 3 », « Terrain naturel 1 »… (le plus grand numéro du projet pour cette nature + 1), et
+ * l'ajoute au projet. Seuls les points levés pour elle en font partie. Renvoie la surface.
  */
-export function creerStockDirect(projet, leve) {
-  const numeros = projet.surfaces.map((s) => /^Stock (\d+)$/.exec(s.nom)?.[1]).filter(Boolean).map(Number);
-  const surface = creerSurface(`Stock ${Math.max(0, ...numeros) + 1}`, leve.id, 'stock');
+export function creerSurfaceDirecte(projet, leve, nature = 'stock') {
+  const titre = NATURES.find(([cle]) => cle === nature)?.[1] ?? 'Stock';
+  const modele = new RegExp(`^${titre} (\\d+)$`);
+  const numeros = projet.surfaces.map((s) => modele.exec(s.nom)?.[1]).filter(Boolean).map(Number);
+  const surface = creerSurface(`${titre} ${Math.max(0, ...numeros) + 1}`, leve.id, NATURES.some(([cle]) => cle === nature) ? nature : 'stock');
   surface.tousLesPoints = false;
   projet.surfaces.push(surface);
   return surface;

@@ -41,8 +41,8 @@ import { creerSuiviOrientation } from './leve/orientation.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe } from './topo/implantation.js';
 import {
   estLeveDirect,
-  creerLeveDirect,
-  creerStockDirect,
+  leveDuJour,
+  creerSurfaceDirecte,
   prochainNom,
   ajouterPointDirect,
   annulerDernierPoint,
@@ -51,7 +51,7 @@ import {
   ligneEnCours,
   resumeStock,
 } from './topo/leve-direct.js';
-import { recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
+import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 
 // --- État de l'application ---
 let projet = creerProjet('Mon projet'); // projet ouvert
@@ -65,7 +65,7 @@ let calculMontre = null; // id du calcul colorié sur le plan (bouton « Voir su
 let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, etape: 'debut' ou 'fin', debut }
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 // Levé avec le récepteur (appli Android) : levé et stock en cours, rôle du prochain point.
-const leveDirect = { leveId: null, stockId: null, role: 'contour' };
+const leveDirect = { stockId: null, role: 'contour' };
 let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
 // Onglet Terrain : mode (Lever ou Contrôler) et réglages du contrôle, retenus sur l'appareil.
 const CLE_TERRAIN = 'topo-terrain';
@@ -191,6 +191,7 @@ function afficherOnglet(demande) {
     ongletContexte = nom;
     recalculer();
   }
+  mettreAJourToucheVolume();
   window.scrollTo(0, 0);
 }
 document.querySelector('.onglets').addEventListener('click', (evenement) => {
@@ -278,41 +279,46 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
 });
 
 // --- Levé avec le récepteur Emlid (seulement dans l'appli Android) ---
-// Les points pris vont dans un levé (comme un fichier importé) et, selon leur rôle, dans le stock
-// en cours (voir topo/leve-direct.js) : surfaces, volumes, mesures et exports marchent pareil.
+// Sur le terrain, on lève une surface (stock, terrain naturel ou terrassement). Ses points vont
+// dans le levé du jour (créé tout seul, comme un fichier importé) et, selon leur rôle, dans la
+// surface (voir topo/leve-direct.js) : surfaces, volumes, mesures et exports marchent pareil.
 
-/** Levé en cours (fait avec le récepteur) et son stock en cours, ou null. */
-function leveEnCours() {
-  return projet.leves.find((l) => l.id === leveDirect.leveId && estLeveDirect(l)) ?? null;
-}
+/** Surface levée en cours (dans un levé fait avec le récepteur), ou null. */
 function stockEnCours() {
-  const leve = leveEnCours();
-  return projet.surfaces.find((s) => s.id === leveDirect.stockId && s.leveId === leve?.id) ?? null;
+  const surface = projet.surfaces.find((s) => s.id === leveDirect.stockId);
+  const leve = projet.leves.find((l) => l.id === surface?.leveId);
+  return surface && estLeveDirect(leve) ? surface : null;
+}
+/** Levé (fait avec le récepteur) de la surface en cours, ou null. */
+function leveEnCours() {
+  const surface = stockEnCours();
+  return surface ? projet.leves.find((l) => l.id === surface.leveId) : null;
 }
 
-/** Choisit le levé et le stock en cours, en les affichant sur le plan et dans 2.1 Surfaces. */
+/** Surfaces levées avec le récepteur (celles qu'on peut reprendre dans l'onglet Terrain). */
+function surfacesLevees() {
+  const directs = new Set(projet.leves.filter(estLeveDirect).map((l) => l.id));
+  return projet.surfaces.filter((s) => directs.has(s.leveId));
+}
+
+/** Affiche la surface en cours sur le plan et dans Calculs › Surfaces (son levé devient le levé affiché). */
 function montrerStockEnCours() {
-  const leve = leveEnCours();
-  if (leve) projet.leveActifId = leve.id;
   const index = projet.surfaces.indexOf(stockEnCours());
   if (index >= 0) editeurSurfaces.choisir(index);
 }
 
-/** Reprend un levé du projet s'il n'y en a pas en cours (le levé affiché, sinon le dernier). */
+/** Reprend une surface levée s'il n'y en a pas en cours (celle du levé affiché, sinon la dernière). */
 function reprendreLeveDirect() {
-  if (leveEnCours()) return;
-  const directs = projet.leves.filter(estLeveDirect);
-  const leve = directs.find((l) => l.id === projet.leveActifId) ?? directs[directs.length - 1] ?? null;
-  leveDirect.leveId = leve?.id ?? null;
-  const stocks = projet.surfaces.filter((s) => s.leveId === leve?.id);
-  leveDirect.stockId = stocks[stocks.length - 1]?.id ?? null;
+  if (stockEnCours()) return;
+  const levees = surfacesLevees();
+  leveDirect.stockId = (levees.filter((s) => s.leveId === projet.leveActifId).at(-1) ?? levees.at(-1))?.id ?? null;
 }
 
-/** Nouveau stock dans le levé en cours : il a tout de suite son calcul de volume. */
-function ajouterStockDirect(leve) {
-  const stock = creerStockDirect(projet, leve);
-  projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, stock);
-  leveDirect.stockId = stock.id;
+/** Nouvelle surface levée (dans le levé du jour) : un stock a tout de suite son calcul de volume. */
+function ajouterSurfaceLevee(nature) {
+  const surface = creerSurfaceDirecte(projet, leveDuJour(projet), nature);
+  projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
+  leveDirect.stockId = surface.id;
   editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
   montrerStockEnCours();
   modifie({ recadrer: true });
@@ -323,19 +329,7 @@ const ecranLeve = recepteurDisponible()
       choisirRecepteur,
       reconnecter: reconnecterRecepteur,
       deconnecter: deconnecterRecepteur,
-      nouveauLeve: () => ajouterStockDirect(creerLeveDirect(projet)),
-      choisirLeve: (id) => {
-        leveDirect.leveId = id;
-        leveDirect.stockId = null;
-        const stocks = projet.surfaces.filter((s) => s.leveId === id);
-        leveDirect.stockId = stocks[stocks.length - 1]?.id ?? null;
-        montrerStockEnCours();
-        modifie({ recadrer: true });
-      },
-      nouveauStock: () => {
-        const leve = leveEnCours();
-        if (leve) ajouterStockDirect(leve);
-      },
+      nouvelleSurface: (nature) => ajouterSurfaceLevee(nature),
       choisirStock: (id) => {
         leveDirect.stockId = id;
         montrerStockEnCours();
@@ -423,11 +417,37 @@ const ecranLeve = recepteurDisponible()
     })
   : null;
 
+/** Date d'un levé fait avec le récepteur, à la suisse (« 22.10.2026 »). */
+function jourDuLeve(leveId) {
+  const leve = projet.leves.find((l) => l.id === leveId);
+  return (leve?.jour ?? leve?.importeLe?.slice(0, 10) ?? '').split('-').reverse().join('.');
+}
+
 /** Remblai (m³) du stock levé, ou null s'il n'est pas encore calculable. */
 function volumeDuStock(stock) {
   const calcul = calculDuPlan(stock);
   const resultat = calcul ? resultatsCalculs.get(calcul.id) : null;
   return resultat && !resultat.erreurs ? resultat.remblai : null;
+}
+
+/**
+ * Touche « volume − » : elle prend le point seulement dans l'onglet Terrain, en mode Lever, avec une
+ * surface en cours ; ailleurs, elle règle le volume comme d'habitude. Point refusé : message et
+ * double vibration (on ne regarde pas forcément l'écran).
+ */
+let toucheVolumeActive = null;
+function mettreAJourToucheVolume() {
+  if (!ecranLeve) return;
+  const actif = document.body.dataset.onglet === 'terrain' && terrain.mode === 'lever' && Boolean(stockEnCours());
+  if (actif === toucheVolumeActive) return;
+  toucheVolumeActive = actif;
+  regleToucheVolume(actif, () => {
+    const refus = ecranLeve.prendreDepuisTouche();
+    if (refus) {
+      navigator.vibrate?.([80, 80, 80]);
+      afficherMessage(`Point refusé : ${refus}`, 4000);
+    }
+  });
 }
 
 /** Ce que montre l'onglet Terrain (voir leve/ecran.js). */
@@ -438,9 +458,9 @@ function donneesLeve() {
   const ligne = stock ? ligneEnCours(stock) : null;
   const numeroLigne = stock ? stock.lignesRupture.indexOf(ligne) + 1 : 0;
   return {
-    leves: projet.leves.filter(estLeveDirect),
     leve,
-    stocks: projet.surfaces.filter((s) => s.leveId === leve?.id),
+    // Surfaces levées, avec la date de leur levé (« Stock 2 · 22.10.2026 »).
+    stocks: surfacesLevees().map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}` })),
     stock,
     role: leveDirect.role,
     ligne: ligne ? { numero: numeroLigne, nbPoints: ligne.noms.length, fermee: ligne.fermee } : null,
@@ -858,6 +878,7 @@ function recalculer({ recadrer = false } = {}) {
   // en mode Contrôler pour laisser la place aux coupes.
   document.body.classList.toggle('mode-leve', Boolean(ecranLeve));
   document.body.classList.toggle('mode-controle', Boolean(ecranLeve) && terrain.mode === 'controler');
+  mettreAJourToucheVolume();
 
   // Plan : surfaces du levé affiché et surfaces importées ; les autres sont cachées.
   const visibles = new Set(surfacesAffichees());

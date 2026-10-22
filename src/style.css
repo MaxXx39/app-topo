@@ -2458,31 +2458,6 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   display: none;
 }
 
-.reglages-leve {
-  margin-bottom: 8px;
-  padding: 6px 10px;
-  border: 1px solid var(--bordure);
-  border-radius: 10px;
-  background: var(--fond);
-}
-
-.reglages-leve summary {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-weight: 700;
-  cursor: pointer;
-  list-style: none;
-}
-
-.reglages-leve summary::-webkit-details-marker {
-  display: none;
-}
-
-.reglages-leve[open] summary .aide {
-  visibility: hidden;
-}
-
 .outils-ligne {
   display: flex;
   align-items: center;
@@ -2790,5 +2765,89 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 
   body.mode-leve.mode-controle[data-onglet='terrain'] .mise-en-page {
     padding-top: calc(26svh + 12px);
+  }
+}
+
+/* --- Onglet Terrain : une seule ligne « surface en cours » (version 0.41.0) --- */
+.ecran-terrain [hidden] {
+  display: none !important;
+}
+
+.ligne-surface {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ligne-surface select {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.choix-nature {
+  margin: 8px 0;
+  text-align: center;
+}
+
+.titre-choix {
+  margin: 4px 0 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.natures-terrain {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+/* Mêmes couleurs que les surfaces dans les coupes : stock brun, terrain vert, terrassement bleu. */
+.bouton-nature {
+  --couleur-nature: #b45309;
+  min-height: 56px;
+  border: 2px solid var(--couleur-nature);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--couleur-nature) 8%, var(--surface));
+  color: var(--couleur-nature);
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bouton-nature.nature-terrain {
+  --couleur-nature: #15803d;
+}
+
+.bouton-nature.nature-terrassement {
+  --couleur-nature: #2563eb;
+}
+
+.astuce-volume {
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+.pied-recepteur {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  color: var(--gris);
+}
+
+/* Calculs : Surfaces · Volumes · Mesures restent en haut de l'écran quand on descend la page. */
+.parties-calculs {
+  position: sticky;
+  top: calc(var(--hauteur-entete) + 6px);
+  z-index: 15;
+}
+
+@media (min-width: 900px) {
+  .parties-calculs {
+    top: 0;
   }
 }

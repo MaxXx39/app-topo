@@ -66,3 +66,12 @@ export function prendrePointRecepteur() {
     return { ok: false, raison: `réponse illisible du récepteur (${erreur.message})` };
   }
 }
+
+/**
+ * Touche « volume − » de la tablette : si "actif", elle appelle "fonction()" au lieu de baisser
+ * le volume (onglet Terrain, mode Lever). Sans effet avec un APK plus ancien.
+ */
+export function regleToucheVolume(actif, fonction) {
+  window.toucheVolumeBas = fonction;
+  if (typeof window.AppliAndroid?.activerToucheVolume === 'function') window.AppliAndroid.activerToucheVolume(Boolean(actif));
+}
