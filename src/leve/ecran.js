@@ -12,6 +12,8 @@
 // L'état du récepteur arrive 5 fois par seconde (mettreAJourRecepteur) : on ne change alors que
 // quelques textes et l'état du bouton, sans redessiner l'écran (le doigt peut être dessus).
 import { echapper } from '../outils/echapper.js';
+import { bulle } from '../aide/bulles.js';
+import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
 import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
@@ -307,7 +309,7 @@ export function creerEcranLeve(conteneur, actions) {
   function controle() {
     const { controle: reglages, surfaces } = donnees;
     const vue = reglages.vueCoupes;
-    const choixImplantation = `<div class="ligne-choix choix-implantation-type">${boutonsChoix('choisirImplantation', IMPLANTATIONS, reglages.implantation)}</div>`;
+    const choixImplantation = `<div class="ligne-choix choix-implantation-type">${boutonsChoix('choisirImplantation', IMPLANTATIONS, reglages.implantation)} ${bulle('implanter')}</div>`;
     if (reglages.implantation === 'point') return choixImplantation + implanterPoint();
     if (reglages.implantation === 'ligne') return choixImplantation + implanterLigne();
     return `
@@ -317,7 +319,7 @@ export function creerEcranLeve(conteneur, actions) {
             ${reglages.surfaceId ? '' : '<option value="">— choisir une surface —</option>'}
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === reglages.surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
-        : '<p class="vide">Aucune surface dans le projet : crée-la dans Calculs › Surfaces, ou importe un LandXML.</p>'}
+        : '<p class="vide">Aucune surface.</p>'}
       <div class="ecart-direct attente" data-vivant="ecart"></div>
       <div class="coupes-directes vue-${vue}">
         ${vue !== 'axe' ? '<div data-vivant="coupe-perpendiculaire"></div>' : ''}
@@ -341,9 +343,6 @@ export function creerEcranLeve(conteneur, actions) {
     const enLigne = donnees.controle.implantation === 'ligne';
     const modes = enLigne ? ['trait', ...MODES_ACCROCHE] : MODES_ACCROCHE;
     const active = enLigne ? imp.accrocheLigne : imp.accroche;
-    const aide = enLigne
-      ? (imp.ligne ? '' : '<p class="aide">Touche une ligne du plan DXF (« Ligne DXF »), ou choisis le début, la fin (et les points entre) avec une autre accroche.</p>')
-      : (imp.choix || imp.cible ? '' : '<p class="aide">Choisis une accroche, puis touche le plan.</p>');
     return `<div class="barre-accroche ${enLigne ? 'accroches-ligne' : ''}">
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
         ${modes.map((mode) => {
@@ -353,11 +352,10 @@ export function creerEcranLeve(conteneur, actions) {
         }).join('')}
       </div>
       <div class="accroche-par-nom">
-        <input type="text" list="noms-points-projet" data-champ="nom-a-trouver" placeholder="ou tape le nom d'un point du projet" autocomplete="off" autocapitalize="characters" aria-label="Nom du point à implanter" />
+        <input type="text" list="noms-points-projet" data-champ="nom-a-trouver" placeholder="Nom d'un point" autocomplete="off" autocapitalize="characters" aria-label="Nom du point à implanter" />
         <datalist id="noms-points-projet">${imp.nomsPoints.map((nom) => `<option value="${echapper(nom)}"></option>`).join('')}</datalist>
         <button type="button" class="bouton-secondaire" data-action="trouverPoint">OK</button>
       </div>
-      ${aide}
     </div>`;
   }
 
@@ -373,12 +371,12 @@ export function creerEcranLeve(conteneur, actions) {
       : '';
     if (!imp.ligne) {
       const points = imp.pointsLigne;
-      const role = (i) => (i === 0 ? 'Début' : i === points.length - 1 ? 'Fin' : `${i + 1}`);
+      const role = (i) => (i === 0 ? `${iconeDrapeau('debut')} Début` : i === points.length - 1 ? `${iconeDrapeau('fin')} Fin` : `${i + 1}`);
       return `
         <div class="points-ligne">
           <p class="titre-choix">Points de la ligne</p>
           ${points.length === 0
-            ? '<p class="vide">Aucun point : touche le plan, ou tape un nom.</p>'
+            ? '<p class="vide">Aucun point.</p>'
             : `<ol>${points.map((p, i) => `<li><strong>${role(i)}</strong> ${p.nom ? echapper(p.nom) : ''} <span class="aide">E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)}</span></li>`).join('')}</ol>`}
           <div class="ligne-outils">
             <button type="button" class="bouton-secondaire" data-action="implanterPointsLigne" ${points.length < 2 ? 'disabled' : ''}>Implanter cette ligne</button>
@@ -406,8 +404,8 @@ export function creerEcranLeve(conteneur, actions) {
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="changerLigne">changer</button></p>
         ${segments}
         <div class="sens-ligne">
-          <p><span class="pastille-bout">Début</span> ${bout(l.debut)}</p>
-          <p><span class="pastille-bout fin">Fin</span> ${bout(l.fin)}</p>
+          <p><span class="pastille-bout">${iconeDrapeau('debut')} Début</span> ${bout(l.debut)}</p>
+          <p><span class="pastille-bout fin">${iconeDrapeau('fin')} Fin</span> ${bout(l.fin)}</p>
           <button type="button" class="bouton-secondaire" data-action="inverserLigne">⇄ Inverser le sens</button>
         </div>
         <div class="champs-implantation champs-ligne">
@@ -415,11 +413,10 @@ export function creerEcranLeve(conteneur, actions) {
           <label>Altitude début<input type="text" inputmode="decimal" data-reglage-ligne="debut" value="${valeur(l.altitudes.debut)}" placeholder="${l.altitudesDuPlan ? 'du plan (3D)' : 'facultative'}" /></label>
           <label>Altitude fin<input type="text" inputmode="decimal" data-reglage-ligne="fin" value="${valeur(l.altitudes.fin)}" placeholder="${l.altitudesDuPlan ? 'du plan (3D)' : 'facultative'}" /></label>
         </div>
-        <p class="aide">Regarde vers la fin de la ligne : « gauche » et « droite » se lisent dans ce sens.</p>
       </div>
       <div class="guidage-direct attente" data-vivant="guidage-ligne"></div>
       <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
-        <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol − de la tablette</span>
+        <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol −</span>
       </button>
       <p class="raison-leve" data-vivant="raison" hidden></p>
       ${exporter}`;
@@ -489,7 +486,7 @@ export function creerEcranLeve(conteneur, actions) {
           ${reglages.guidage === 'nseo' ? boussole() : ''}
         </div>
         <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
-          <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol − de la tablette</span>
+          <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol −</span>
         </button>
         <p class="raison-leve" data-vivant="raison" hidden></p>`
       : '';
@@ -626,7 +623,7 @@ export function creerEcranLeve(conteneur, actions) {
   /** Modification des listes de libellés : une ligne par libellé, « HT haut de talus ». */
   function editeurLibelles() {
     return `<div class="editeur-libelles">
-      <p class="aide">Une ligne par libellé : l'abréviation (sans espace ni tiret), puis ce qu'elle veut dire. La liste est gardée sur cette tablette, pour tous les projets.</p>
+      <p class="aide">Une ligne par libellé, ex. « HT haut de talus ».</p>
       <label>Lignes de rupture et longueurs (L-…)<textarea data-champ="libelles-lignes" rows="6">${echapper(ecrireTexteLibelles(donnees.libelles.lignes))}</textarea></label>
       <label>Points isolés et points comptés (P-…)<textarea data-champ="libelles-points" rows="6">${echapper(ecrireTexteLibelles(donnees.libelles.points))}</textarea></label>
       <label>Aires d'un métré (A-…)<textarea data-champ="libelles-aires" rows="5">${echapper(ecrireTexteLibelles(donnees.libelles.aires))}</textarea></label>
@@ -658,7 +655,7 @@ export function creerEcranLeve(conteneur, actions) {
         <div class="position-leve" data-vivant="position"></div>
       </div>
       <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>
-        <span>PRENDRE LE POINT</span><span class="sous-titre-prendre">ou touche vol − de la tablette</span>
+        <span>PRENDRE LE POINT</span><span class="sous-titre-prendre">ou touche vol −</span>
       </button>
       <p class="raison-leve" data-vivant="raison" hidden></p>
       <div class="pied-terrain">
@@ -794,16 +791,16 @@ function svgCouloir(numero, ecart, abscisse, longueur, couleur) {
   const yFin = (abscisse - longueur) * echelle;
   const haut = Math.max(yFin, -78);
   const bas = Math.min(yDebut, 78);
-  const repere = (y, nom) => (Math.abs(y) <= 78
-    ? `<path d="M-40 ${y.toFixed(1)}H40" class="bout-couloir" /><text x="44" y="${(y + 4).toFixed(1)}" class="nom-bout-couloir">${nom}</text>`
+  const repere = (y, type) => (Math.abs(y) <= 78
+    ? `<path d="M-40 ${y.toFixed(1)}H40" class="bout-couloir" /><g class="drapeau-couloir">${svgDrapeau(type, 44, y + 2, 20)}</g>`
     : '');
   // Rayons écrits à droite de chaque bande, en escalier (pour ne pas se chevaucher).
   return `<svg class="couloir-ligne" viewBox="-120 -94 240 176" role="img" aria-label="Couloir ${texte(bandes[0])}">
     ${bandes.map((r, i) => `<rect x="${-r * echelle}" y="-80" width="${2 * r * echelle}" height="160" class="bande bande-${i}" />`).join('')}
     ${bandes.map((r, i) => `<text x="${(r * echelle + 2).toFixed(1)}" y="${-62 + i * 14}" class="rayon">${texte(r)}</text>`).join('')}
     ${haut < bas ? `<path d="M0 ${bas.toFixed(1)}V${haut.toFixed(1)}" class="trait-couloir" />` : ''}
-    ${repere(yDebut, 'Début')}
-    ${repere(yFin, 'Fin')}
+    ${repere(yDebut, 'debut')}
+    ${repere(yFin, 'fin')}
     <text y="-84" text-anchor="middle" class="haut-cible">↑ vers la fin</text>
     <circle cx="${limiter(ecart * echelle, 112).toFixed(1)}" cy="0" r="9" class="moi" style="fill: ${couleur}" />
   </svg>`;

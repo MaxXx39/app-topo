@@ -176,7 +176,7 @@ document.querySelector('#app').innerHTML = `
       </nav>
       <section class="panneau" data-onglet="surfaces">
         <h2>Surfaces ${bulle('surfaces')}</h2>
-        <p class="vide sans-points">${recepteurDisponible() ? 'Importe des points (onglet Projet) ou lève-les (onglet Terrain), ou importe une surface LandXML ou DXF.' : 'Importe d\'abord des points (onglet Projet), ou une surface LandXML ou DXF.'}</p>
+        <p class="vide sans-points">Aucun point dans le projet.</p>
         <div id="message-import-surface"></div>
         <div id="surfaces"></div>
       </section>
@@ -847,7 +847,7 @@ function toucherPourLigne(position, tolerance) {
   if (terrain.accrocheLigne === 'trait') {
     const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(projet.plansDxf ?? [], position, tolerance).lignes);
     if (!trouve) {
-      afficherMessage('Aucune ligne du plan DXF sous le doigt : zoome, ou change d\'accroche', 3000);
+      afficherMessage('Aucune ligne DXF sous le doigt', 3000);
       return;
     }
     const sommets = trouve.sommets.map(mm);
@@ -860,7 +860,7 @@ function toucherPourLigne(position, tolerance) {
       : sourcesDesPlans(projet.plansDxf ?? [], position, tolerance);
     const trouve = accrocher(terrain.accrocheLigne, position, tolerance, sources);
     if (!trouve) {
-      afficherMessage('Rien sous le doigt : zoome, ou change d\'accroche', 3000);
+      afficherMessage('Rien sous le doigt', 3000);
       return;
     }
     ajouterPointLigne(mm(trouve));
@@ -908,7 +908,7 @@ function toucherPourImplantation(position, tolerance) {
   const trouve = accrocher(terrain.accroche, position, tolerance, sources);
   if (!trouve) {
     const quoi = { point: 'aucun point du projet', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[terrain.accroche];
-    afficherMessage(`${quoi[0].toUpperCase()}${quoi.slice(1)} sous le doigt : zoome, ou change d'accroche`, 3000);
+    afficherMessage(`${quoi[0].toUpperCase()}${quoi.slice(1)} sous le doigt`, 3000);
     return;
   }
   const mm = (valeur) => Math.round(valeur * 1000) / 1000;
@@ -1480,7 +1480,7 @@ function decrireSurface(surface) {
   const calcul = calculDuPlan(surface);
   const volume = calcul ? resultatsCalculs.get(calcul.id) : null;
   return `
-    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${volume ? ` · remblai ${formaterNombre(volume.remblai)} m³ (onglet Calculs › Volumes)` : ''}</p>
+    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${volume ? ` · remblai ${formaterNombre(volume.remblai)} m³` : ''}</p>
     ${r.avertissements.length > 0 ? `<div class="avertissement"><ul>${r.avertissements.map((a) => `<li>${echapper(a)}</li>`).join('')}</ul></div>` : ''}`;
 }
 

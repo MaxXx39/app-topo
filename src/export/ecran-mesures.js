@@ -36,7 +36,6 @@ export function creerEcranExportMesures(conteneur, { obtenirDonnees }) {
           ${ECHELLES.map((e) => `<option value="${e}">1:${e}</option>`).join('')}
         </select>
       </label>
-      <p class="aide">Plan centré sur les mesures. Échelle choisie : feuille A4 si le plan y tient, sinon A3.</p>
     </div>
     <div class="calques-pdf">
       <p class="titre-choix">Contenu du PDF</p>
@@ -68,7 +67,7 @@ export function creerEcranExportMesures(conteneur, { obtenirDonnees }) {
   function mesuresAExporter() {
     const { mesures } = obtenirDonnees();
     if (mesures.length > 0) return mesures;
-    message.textContent = 'Rien à exporter : crée d\'abord une mesure (ci-dessus), avec assez de points.';
+    message.textContent = 'Aucune mesure à exporter.';
     return null;
   }
 

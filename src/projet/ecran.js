@@ -114,8 +114,7 @@ function panneauOuvrir(projet, resumes) {
         ? autres.map((r) => ligneProjet(r, `<button type="button" class="bouton-secondaire" data-action="ouvrir" data-id="${r.id}">Ouvrir</button>`)).join('')
         : '<p class="vide">Aucun autre projet sur cet appareil.</p>'}
     </div>
-    <p class="titre-section">Depuis un fichier projet</p>
-    <p class="aide">Fichier .topo.json exporté d'un autre appareil (téléphone, ordinateur).</p>
+    <p class="titre-section">Depuis un fichier (.topo.json)</p>
     <label class="bouton-secondaire bouton-fichier">
       Ouvrir un fichier projet
       <input type="file" data-champ="fichier-projet" accept=".json,application/json" hidden />
@@ -127,7 +126,6 @@ function panneauOuvrir(projet, resumes) {
 function panneauGestion(projet, resumes) {
   return `<section class="carte-section panneau-projets">
     ${titreSection('fichier', 'Gestion de projets')}
-    <p class="aide">Exporter = fichier projet (.topo.json), pour passer d'un appareil à l'autre ou le garder.</p>
     <div class="liste-projets">
       ${resumes.map((r) => ligneProjet(r, `
         ${r.id === projet.id ? '<span class="etiquette-ouvert">ouvert</span>' : ''}

@@ -25,7 +25,7 @@ export function htmlChoixPoints({ liste, points, nomsUtilises = new Set(), messa
   const series = detecterSeries(points.map((p) => p.nom));
   const htmlSeries =
     series.length > 0
-      ? `<p class="aide">Séries du fichier :</p>
+      ? `<p class="aide">Séries :</p>
         <div class="series">
           ${series
             .map(
@@ -37,8 +37,8 @@ export function htmlChoixPoints({ liste, points, nomsUtilises = new Set(), messa
       : '';
   const htmlListe = `
       <label class="champ-liste">
-        Liste de noms (ex. « b100 à b116, b120 »), puis « Terminé »
-        <input type="text" data-champ="liste" value="${echapper(ecrireListeDeNoms(liste))}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" />
+        Liste de noms
+        <input type="text" placeholder="b100 à b116, b120" data-champ="liste" value="${echapper(ecrireListeDeNoms(liste))}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" />
       </label>
       ${messages.length > 0 ? `<div class="erreur"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
   const listeCases = `

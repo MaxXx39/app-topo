@@ -5,6 +5,7 @@ import { bulle } from '../aide/bulles.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
+import { svgDrapeau } from '../outils/drapeaux.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
@@ -22,7 +23,7 @@ const RAYON_TOUCHER = 22;
 const CALQUES = [
   { cle: 'fondSatellite', titre: 'Fond photo aérienne (swisstopo)', parDefaut: false },
   { cle: 'cadastre', titre: 'Cadastre', parDefaut: false },
-  { cle: 'plansDxf', titre: 'Plans DXF (calques : onglet Projet)', parDefaut: true },
+  { cle: 'plansDxf', titre: 'Plans DXF', parDefaut: true },
   { cle: 'points', titre: 'Points', parDefaut: true },
   { cle: 'noms', titre: 'Noms des points', parDefaut: true },
   { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false },
@@ -316,11 +317,27 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (ligne.parallele) {
         groupe.append(creerElement('path', { d: tracePar(ligne.parallele.map((s) => versEcran(s.est, s.nord, vue)), false), class: 'parallele-a-implanter' }));
       }
-      for (const [bout, texte] of [[ecran[0], 'Début'], [ecran.at(-1), 'Fin']]) {
-        groupe.append(creerElement('circle', { cx: bout.x, cy: bout.y, r: 6, class: 'bout-ligne' }));
-        const etiquette = creerElement('text', { x: bout.x + 9, y: bout.y - 8, class: 'nom-bout-ligne' });
-        etiquette.textContent = texte;
-        groupe.append(etiquette);
+      // Sens : petits chevrons tout le long, environ tous les 60 pixels.
+      for (let i = 0; i + 1 < ecran.length; i++) {
+        const a = ecran[i];
+        const b = ecran[i + 1];
+        const longueur = Math.hypot(b.x - a.x, b.y - a.y);
+        if (longueur < 16) continue;
+        const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+        const nombre = Math.max(1, Math.floor(longueur / 60));
+        for (let k = 0; k < nombre; k++) {
+          const t = (k + 0.5) / nombre;
+          const x = a.x + (b.x - a.x) * t;
+          const y = a.y + (b.y - a.y) * t;
+          groupe.append(creerElement('path', { d: 'M-5 -6 3 0-5 6', class: 'chevron-ligne', transform: `translate(${x} ${y}) rotate(${angle})` }));
+        }
+      }
+      // Début : drapeau vert ; fin : drapeau à damier.
+      for (const [bout, type] of [[ecran[0], 'debut'], [ecran.at(-1), 'fin']]) {
+        groupe.append(creerElement('circle', { cx: bout.x, cy: bout.y, r: 5, class: 'bout-ligne' }));
+        const drapeau = creerElement('g', { class: 'drapeau-ligne' });
+        drapeau.innerHTML = svgDrapeau(type, bout.x, bout.y, 26);
+        groupe.append(drapeau);
       }
     }
     // Points choisis pour faire une ligne : croix ambre numérotées.

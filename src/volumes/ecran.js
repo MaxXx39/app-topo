@@ -71,7 +71,7 @@ export function creerEcranVolumes(conteneur, options) {
     afficher() {
       const projet = obtenirProjet();
       if (projet.surfaces.length === 0) {
-        conteneur.innerHTML = '<p class="vide">Crée d\'abord une surface (onglet Calculs › Surfaces).</p>';
+        conteneur.innerHTML = '<p class="vide">Aucune surface.</p>';
         return;
       }
       const lignes = projet.calculs.map((calcul) => ({ calcul, resultat: obtenirResultat(calcul), nom: nomDuCalcul(calcul, projet.surfaces) }));
@@ -110,7 +110,7 @@ function tableau(lignes, surfaces) {
   const calculees = lignes
     .filter(({ resultat }) => resultat && !resultat.erreurs)
     .map((ligne) => ({ ...ligne, nature: surfaces.find((s) => s.id === ligne.calcul.surface1Id)?.nature }));
-  if (calculees.length === 0) return '<p class="aide">Aucun volume calculé : ajoute un volume ci-dessus.</p>';
+  if (calculees.length === 0) return '<p class="aide">Aucun volume.</p>';
   return `
     <div class="tableau-defilant">
       <table>
@@ -163,7 +163,7 @@ function carte({ calcul, resultat, nom }, surfaces, { etiquette, montre }) {
       <label class="champ-large">Stock
         <select data-champ="stock" data-id="${id}">${options(stocks, calcul.surface1Id)}</select>
       </label>
-      ${stocks.length === 0 ? '<p class="aide">Aucune surface « Stock » dans le projet (onglet Calculs › Surfaces, « C\'est : Stock »).</p>' : ''}
+      ${stocks.length === 0 ? '<p class="aide">Aucune surface « Stock ».</p>' : ''}
       <div class="choix-base" role="radiogroup" aria-label="Base du volume">
         <span>Base :</span>
         ${radioBase('contour', 'depuis la ligne du contour', importe)}
@@ -178,14 +178,13 @@ function carte({ calcul, resultat, nom }, surfaces, { etiquette, montre }) {
       }`;
   } else if (sorte === 'comparaison') {
     reglages = `
-      <label class="champ-large">1. Surface de référence (dessous, avant : ex. terrain naturel)
+      <label class="champ-large">1. Référence (dessous, avant)
         <select data-champ="reference" data-id="${id}">${options(surfaces.filter((s) => s.id !== calcul.surface1Id), calcul.surface2Id)}</select>
       </label>
-      <label class="champ-large">2. Surface comparée (dessus, après : ex. terrassement)
+      <label class="champ-large">2. Comparée (dessus, après)
         <select data-champ="comparee" data-id="${id}">${options(surfaces.filter((s) => s.id !== calcul.surface2Id), calcul.surface1Id)}</select>
       </label>
-      <p class="aide">Remblai : la surface 2 est au-dessus de la référence ; déblai : au-dessous. Calculé là où les deux surfaces se recouvrent.</p>
-      ${calcul.zone?.type === 'surface' ? `<p class="aide">Limité au contour de « ${echapper(surfaces.find((s) => s.id === calcul.zone.surfaceId)?.nom ?? '?')} » (réglage d'une ancienne version).</p>` : ''}`;
+      ${calcul.zone?.type === 'surface' ? `<p class="aide">Dans le contour de « ${echapper(surfaces.find((s) => s.id === calcul.zone.surfaceId)?.nom ?? '?')} ».</p>` : ''}`;
   }
 
   return `

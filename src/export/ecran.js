@@ -48,7 +48,6 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
           ${ECHELLES.map((e) => `<option value="${e}">1:${e}</option>`).join('')}
         </select>
       </label>
-      <p class="aide">Plan centré sur les surfaces. Échelle choisie : feuille A4 si le plan y tient, sinon A3.</p>
     </div>
     <div class="calques-pdf">
       <p class="titre-choix">Contenu du PDF</p>
@@ -111,7 +110,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
         ...surfaces,
       ].filter((s) => s.triangles.length > 0);
       if (liste.length === 0) {
-        message.textContent = 'Aucune surface à exporter : crée d\'abord une surface (onglet Calculs › Surfaces).';
+        message.textContent = 'Aucune surface à exporter.';
         return;
       }
       telecharger(new Blob([ecrireLandXML(liste, nomProjet)], { type: 'application/xml' }), `${nomDeFichier()}.xml`);
@@ -166,7 +165,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
   /** Vérifie qu'il y a quelque chose à exporter, sinon affiche un message. */
   function verifier(volumes) {
     if (volumes.some(({ resultat }) => resultat && !resultat.erreurs)) return true;
-    message.textContent = 'Rien à exporter : crée d\'abord un calcul de volume (ci-dessus).';
+    message.textContent = 'Aucun volume à exporter.';
     return false;
   }
 
