@@ -233,7 +233,9 @@ class EcranPrincipal : Activity() {
             fichiersDemandes?.onReceiveValue(null)
             fichiersDemandes = rappel
             val plusieurs = choix.mode == FileChooserParams.MODE_OPEN_MULTIPLE
-            val photos = choix.acceptTypes.any { it.startsWith("image/") }
+            // Photos seulement si on ne demande que des images (« image/vnd.dxf » est un plan DXF, pas une photo).
+            val types = choix.acceptTypes.filter { it.isNotBlank() }
+            val photos = types.isNotEmpty() && types.all { it.startsWith("image/") && it != "image/vnd.dxf" }
             return choisirFichiers(photos, plusieurs)
         }
     }

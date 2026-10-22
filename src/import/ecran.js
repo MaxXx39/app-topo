@@ -88,7 +88,7 @@ export function creerEcranImport(conteneur, actions) {
           ${listePlansDxf(projet, calquesOuverts)}
           <label class="bouton-secondaire bouton-fichier">
             + Importer un plan DXF
-            <input type="file" data-champ="fichier-plan" accept=".dxf,application/dxf,image/vnd.dxf" hidden />
+            <input type="file" data-champ="fichier-plan" accept=".dxf,application/dxf" hidden />
           </label>
           ${dernierPlan ? messagePlan(dernierPlan) : ''}
         </section>
