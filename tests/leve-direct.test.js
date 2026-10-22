@@ -1,4 +1,4 @@
-// Tests du levé direct avec le récepteur (appli Android) : noms (1, 101, 201…), rôles, annulation, volume.
+// Tests du levé direct avec le récepteur (appli Android) : noms (B1, H2, C3…, puis B101…), rôles, annulation, volume.
 import { describe, it, expect } from 'vitest';
 import {
   creerLeveDirect,
@@ -6,6 +6,7 @@ import {
   leveDuJour,
   prochainNom,
   nomsDuProjet,
+  rolesPermis,
   ajouterPointDirect,
   annulerDernierPoint,
   nouvelleLigne,
@@ -30,7 +31,7 @@ function nouveauLeve() {
 
 /** Lève un point au nom proposé, dans ce rôle ; renvoie son nom. */
 function lever(projet, leve, stock, role, position = { est: 0, nord: 0, altitude: 0 }) {
-  const { point } = ajouterPointDirect(leve, stock, role, { ...position, nom: prochainNom(projet, stock) }, nomsDuProjet(projet));
+  const { point } = ajouterPointDirect(leve, stock, role, { ...position, nom: prochainNom(projet, stock, role) }, nomsDuProjet(projet));
   return point.nom;
 }
 
@@ -61,16 +62,16 @@ describe('levé direct', () => {
     expect(projet.leves).toHaveLength(2);
   });
 
-  it('numérote 1, 2, 3… quel que soit le rôle, et range chaque point à sa place', () => {
+  it('nomme B, H ou C selon le rôle, avec un numéro qui continue : B1, B2, H3…', () => {
     const { projet, leve, stock } = nouveauLeve();
-    expect([lever(projet, leve, stock, 'contour'), lever(projet, leve, stock, 'contour')]).toEqual(['1', '2']);
-    expect([lever(projet, leve, stock, 'ligne'), lever(projet, leve, stock, 'ligne')]).toEqual(['3', '4']);
+    expect([lever(projet, leve, stock, 'contour'), lever(projet, leve, stock, 'contour')]).toEqual(['B1', 'B2']);
+    expect([lever(projet, leve, stock, 'ligne'), lever(projet, leve, stock, 'ligne')]).toEqual(['H3', 'H4']);
     nouvelleLigne(stock);
-    expect(lever(projet, leve, stock, 'ligne')).toBe('5');
-    expect(lever(projet, leve, stock, 'isole')).toBe('6');
-    expect(stock.contour).toEqual(['1', '2']);
-    expect(stock.lignesRupture.map((l) => l.noms)).toEqual([['3', '4'], ['5']]);
-    expect(stock.points).toEqual(['6']);
+    expect(lever(projet, leve, stock, 'ligne')).toBe('H5');
+    expect(lever(projet, leve, stock, 'isole')).toBe('C6');
+    expect(stock.contour).toEqual(['B1', 'B2']);
+    expect(stock.lignesRupture.map((l) => l.noms)).toEqual([['H3', 'H4'], ['H5']]);
+    expect(stock.points).toEqual(['C6']);
     expect(resumeStock(stock)).toEqual({ contour: 2, lignes: 2, pointsLignes: 3, isoles: 1 });
   });
 
@@ -80,7 +81,7 @@ describe('levé direct', () => {
     lever(projet, leve, stock, 'contour');
     const stock2 = creerSurfaceDirecte(projet, leve, 'stock');
     expect(stock2.premierNumero).toBe(101);
-    expect(lever(projet, leve, stock2, 'contour')).toBe('101');
+    expect(lever(projet, leve, stock2, 'contour')).toBe('B101');
     // Une surface encore vide réserve sa centaine.
     const terrain = creerSurfaceDirecte(projet, leve, 'terrain');
     expect(terrain.premierNumero).toBe(201);
@@ -88,13 +89,13 @@ describe('levé direct', () => {
     const demain = leveDuJour(projet, new Date(2026, 9, 23, 7, 0));
     expect(creerSurfaceDirecte(projet, demain, 'stock').premierNumero).toBe(301);
     // La 1re surface continue dans sa centaine.
-    expect(lever(projet, leve, stock, 'isole')).toBe('3');
+    expect(lever(projet, leve, stock, 'isole')).toBe('C3');
   });
 
   it('saute les noms déjà pris dans le projet (points importés, autres levés)', () => {
     const { projet, leve, stock } = nouveauLeve();
     projet.leves.push({ id: 'importe', nom: 'stock.csv', points: [{ nom: '1', est: 0, nord: 0, altitude: 0 }, { nom: '2', est: 1, nord: 0, altitude: 0 }] });
-    expect(prochainNom(projet, stock)).toBe('3');
+    expect(prochainNom(projet, stock, 'contour')).toBe('B3');
     // Les noms importés comptent pour la centaine d'une nouvelle surface.
     projet.leves[1].points.push({ nom: '250', est: 2, nord: 0, altitude: 0 });
     expect(creerSurfaceDirecte(projet, leve, 'stock').premierNumero).toBe(301);
@@ -103,7 +104,7 @@ describe('levé direct', () => {
   it('donne une centaine à une surface levée avant cette règle', () => {
     const { projet, leve, stock } = nouveauLeve();
     delete stock.premierNumero;
-    expect(prochainNom(projet, stock)).toBe('1');
+    expect(prochainNom(projet, stock, 'ligne')).toBe('H1');
     expect(stock.premierNumero).toBe(1);
   });
 
@@ -121,21 +122,34 @@ describe('levé direct', () => {
   it('refuse un nom vide ou déjà pris dans le projet, et accepte un nom choisi', () => {
     const { projet, leve, stock } = nouveauLeve();
     lever(projet, leve, stock, 'contour');
-    expect(ajouterPointDirect(leve, stock, 'contour', { nom: '1', est: 1, nord: 1, altitude: 1 }).erreur).toMatch(/déjà pris/);
+    expect(ajouterPointDirect(leve, stock, 'contour', { nom: 'B1', est: 1, nord: 1, altitude: 1 }).erreur).toMatch(/déjà pris/);
+    // Même numéro avec une autre lettre : refusé aussi (pas de doublon de numéro).
+    expect(ajouterPointDirect(leve, stock, 'ligne', { nom: 'H1', est: 1, nord: 1, altitude: 1 }).erreur).toMatch(/numéro 1/);
     expect(ajouterPointDirect(leve, stock, 'contour', { nom: 'P7', est: 1, nord: 1, altitude: 1 }, new Set(['P7'])).erreur).toMatch(/déjà pris/);
     expect(ajouterPointDirect(leve, stock, 'contour', { nom: '  ', est: 1, nord: 1, altitude: 1 }).erreur).toBeTruthy();
     expect(ajouterPointDirect(leve, stock, 'contour', { nom: ' pied ', est: 1, nord: 1, altitude: 1 }).point.nom).toBe('pied');
-    expect(prochainNom(projet, stock)).toBe('2');
+    expect(prochainNom(projet, stock, 'contour')).toBe('B2');
+  });
+
+  it('pas de contour pour un terrain naturel ou un terrassement', () => {
+    const { projet, leve, stock } = nouveauLeve();
+    expect(rolesPermis(stock)).toEqual(['contour', 'ligne', 'isole']);
+    const terrain = creerSurfaceDirecte(projet, leve, 'terrain');
+    const terrassement = creerSurfaceDirecte(projet, leve, 'terrassement');
+    expect(rolesPermis(terrain)).toEqual(['ligne', 'isole']);
+    expect(rolesPermis(terrassement)).toEqual(['ligne', 'isole']);
+    expect(ajouterPointDirect(leve, terrain, 'contour', { nom: 'B9', est: 0, nord: 0, altitude: 0 }).erreur).toMatch(/pas de contour/);
+    expect(lever(projet, leve, terrain, 'isole')).toBe('C101');
   });
 
   it('annule le dernier point (levé et stock)', () => {
     const { projet, leve, stock } = nouveauLeve();
     lever(projet, leve, stock, 'contour');
     lever(projet, leve, stock, 'ligne');
-    expect(annulerDernierPoint(leve, [stock]).nom).toBe('2');
-    expect(leve.points.map((p) => p.nom)).toEqual(['1']);
+    expect(annulerDernierPoint(leve, [stock]).nom).toBe('H2');
+    expect(leve.points.map((p) => p.nom)).toEqual(['B1']);
     expect(ligneEnCours(stock).noms).toEqual([]);
-    expect(prochainNom(projet, stock)).toBe('2');
+    expect(prochainNom(projet, stock, 'ligne')).toBe('H2');
     annulerDernierPoint(leve, [stock]);
     expect(annulerDernierPoint(leve, [stock])).toBeNull();
     expect(stock.contour).toEqual([]);

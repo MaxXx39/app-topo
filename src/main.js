@@ -45,6 +45,7 @@ import {
   creerSurfaceDirecte,
   prochainNom,
   nomsDuProjet,
+  rolesPermis,
   ajouterPointDirect,
   annulerDernierPoint,
   nouvelleLigne,
@@ -320,6 +321,8 @@ function ajouterSurfaceLevee(nature) {
   const surface = creerSurfaceDirecte(projet, leveDuJour(projet), nature);
   projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
   leveDirect.stockId = surface.id;
+  // Un stock commence par son contour ; un terrain naturel ou un terrassement par des points isolés.
+  leveDirect.role = surface.nature === 'stock' ? 'contour' : 'isole';
   editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
   montrerStockEnCours();
   modifie({ recadrer: true });
@@ -364,7 +367,7 @@ const ecranLeve = recepteurDisponible()
         }
         const { est, nord, altitude, ...gnss } = reponse.point;
         const resultat = ajouterPointDirect(leve, stock, leveDirect.role, {
-          nom: nom.trim() || prochainNom(projet, stock),
+          nom: nom.trim() || prochainNom(projet, stock, leveDirect.role),
           est,
           nord,
           altitude,
@@ -459,6 +462,8 @@ function mettreAJourToucheVolume() {
 /** Ce que montre l'onglet Terrain (voir leve/ecran.js). */
 function donneesLeve() {
   reprendreLeveDirect();
+  // Terrain naturel ou terrassement : pas de contour, on passe aux points isolés.
+  if (!rolesPermis(stockEnCours()).includes(leveDirect.role)) leveDirect.role = 'isole';
   const leve = leveEnCours();
   const stock = stockEnCours();
   const ligne = stock ? ligneEnCours(stock) : null;
@@ -470,7 +475,8 @@ function donneesLeve() {
     stock,
     role: leveDirect.role,
     ligne: ligne ? { numero: numeroLigne, nbPoints: ligne.noms.length, fermee: ligne.fermee } : null,
-    nomPropose: stock ? prochainNom(projet, stock) : '',
+    nomPropose: stock ? prochainNom(projet, stock, leveDirect.role) : '',
+    rolesPermis: rolesPermis(stock),
     dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
     resume: stock ? resumeStock(stock) : null,
     volume: stock ? volumeDuStock(stock) : null,

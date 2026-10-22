@@ -2232,7 +2232,9 @@ body.avec-recepteur .bandeaux-recepteur {
    (contour rouge, ligne de rupture orange, point isolé vert). */
 .roles-leve {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* 3 boutons pour un stock, 2 (sans contour) pour un terrain naturel ou un terrassement. */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 6px;
   margin: 12px 0 8px;
 }

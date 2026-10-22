@@ -235,7 +235,7 @@ export function creerEcranLeve(conteneur, actions) {
   /** Choix du rôle : 3 gros boutons à la couleur du rôle. */
   function boutonsRoles() {
     return `<div class="roles-leve" role="group" aria-label="Rôle du prochain point">
-      ${ROLES_LEVE.map(
+      ${ROLES_LEVE.filter(([cle]) => donnees.rolesPermis.includes(cle)).map(
         ([cle, titre]) => `<button type="button" class="role-leve role-${cle} ${donnees.role === cle ? 'choisi' : ''}" data-action="role" data-role="${cle}" aria-pressed="${donnees.role === cle}">
           <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[cle]}</svg>${titre}</button>`,
       ).join('')}
