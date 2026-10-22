@@ -14,6 +14,9 @@
 //   cartouche: { affaire, dessinePar, date },   // date : 'AAAA-MM-JJ', ou '' pour la date du jour
 //   plansDxf: [{ id, nom, importeLe, origine, bornes, calques, contenu, compte }],  // fonds de plan DXF
 //                                   // (voir topo/dxf-plan.js) : affichés sous le levé, pour l'implantation
+//   aImplanter: [{ id, nom, est, nord, altitude (ou null) }],   // points à implanter (Terrain › Contrôler › Point)
+//   implantations: [{ id, nom, cible: { est, nord, altitude }, mesure: { est, nord, altitude, gnss },
+//                     ecarts: { dEst, dNord, distance, dAltitude }, le (date ISO) }],  // implantations enregistrées
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé. De même pour une mesure.
@@ -42,6 +45,8 @@ export function creerProjet(nom) {
     mesures: [],
     cartouche: { affaire: '', dessinePar: '', date: '' },
     plansDxf: [],
+    aImplanter: [],
+    implantations: [],
   };
 }
 
@@ -99,6 +104,8 @@ export function completerProjet(projet) {
   const complet = { ...vide, ...projet, version: VERSION, cartouche: { ...vide.cartouche, ...projet.cartouche } };
   complet.leves ??= [];
   complet.plansDxf ??= [];
+  complet.aImplanter ??= [];
+  complet.implantations ??= [];
   complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
     nature: estImportee(surface) ? 'terrain' : 'stock',
     ...surface,

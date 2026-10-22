@@ -3022,3 +3022,217 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   border-radius: 3px;
   vertical-align: middle;
 }
+
+/* --- Implantation d'un point (version 0.46.0) : Terrain › Contrôler › Point --- */
+.accroches {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.bouton-accroche {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--texte);
+  cursor: pointer;
+}
+
+.bouton-accroche svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.bouton-accroche.actif {
+  border-color: var(--sombre);
+  background: var(--sombre);
+  color: #f6ab07;
+}
+
+.choix-implantation {
+  padding: 8px 10px;
+  border: 2px solid #f6ab07;
+  border-radius: 10px;
+}
+
+.coordonnees-choix {
+  margin: 0 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.champs-implantation {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.champs-implantation label {
+  display: grid;
+  gap: 2px;
+  font-size: 0.85rem;
+  color: var(--gris);
+}
+
+.champs-implantation input {
+  width: 100%;
+  min-width: 0;
+}
+
+.titre-guidage {
+  margin: 10px 0 4px;
+}
+
+/* Guidage : flèche vers le point, avance / droite, distance ; couleurs sur la distance qui reste
+   (vert clair jusqu'à 2 cm, jaune orangé jusqu'à 5 cm), gris si la position n'est pas fiable. */
+.guidage-direct {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 92px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.guidage-direct.attente {
+  display: flex;
+  justify-content: center;
+  background: var(--fond);
+  color: var(--gris);
+  font-weight: 600;
+}
+
+.guidage-direct.vert-clair {
+  background: #86efac;
+  color: #14532d;
+}
+
+.guidage-direct.jaune-orange {
+  background: #f59e0b;
+  color: #451a03;
+}
+
+.guidage-direct.pas-fiable {
+  background: #9ca3af;
+  color: #111827;
+}
+
+.fleche-guidage {
+  grid-row: span 3;
+  width: 64px;
+  height: 64px;
+}
+
+.fleche-guidage path {
+  fill: currentColor;
+}
+
+.lignes-guidage {
+  display: grid;
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.distance-guidage {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.hauteur-guidage {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.hauteur-guidage.vert-clair {
+  background: #86efac;
+  color: #14532d;
+}
+
+.hauteur-guidage.jaune-orange {
+  background: #f59e0b;
+  color: #451a03;
+}
+
+.hauteur-guidage.rouge {
+  background: var(--rouge);
+  color: #ffffff;
+}
+
+.hauteur-guidage.bleu {
+  background: var(--bleu);
+  color: #ffffff;
+}
+
+.liste-a-implanter {
+  margin-top: 10px;
+}
+
+.ligne-a-implanter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--bordure);
+}
+
+.ligne-a-implanter.actif {
+  background: #fef3c7;
+}
+
+.ligne-a-implanter .aide {
+  flex: 1;
+}
+
+/* Sur le plan : points à implanter (croix sarcelle), point choisi (croix ambre), point en cours. */
+.plan .implantation path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.plan .croix-a-implanter {
+  stroke: #0d9488;
+  stroke-width: 3;
+}
+
+.plan .nom-a-implanter {
+  fill: #0d9488;
+  font-size: 12px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+
+.plan .croix-choix {
+  stroke: #f6ab07;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 1px #000000);
+}
+
+.plan .cible-implantation {
+  fill: none;
+  stroke: #0d9488;
+  stroke-width: 3;
+}
+
+.plan .trait-vers-cible {
+  stroke: #0d9488;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}

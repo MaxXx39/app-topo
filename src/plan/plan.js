@@ -48,9 +48,11 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandToucherPosition({ est, nord }) : appelé pendant le tracé d'une coupe (dessin.traceCoupe) ;
  *   près d'un point levé, la position est celle de ce point
  * - quandToucherMesure(id) : appelé quand on touche une mesure (onglet Calculs › Mesures, hors modification)
+ * - quandToucherImplantation({ est, nord }, tolerance) : appelé quand on touche le plan pendant
+ *   l'implantation d'un point (tolérance en m : la taille du doigt à l'échelle du plan)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation } = {}) {
   const calques = lireCalques();
 
   // Boutons posés sur le plan : calques en haut à gauche, zoom en haut à droite.
@@ -115,6 +117,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // repère du plan, en m) puis seulement déplacé et agrandi : id -> { plan, cle, groupe }.
   let plansDxf = [];
   const dessinsDxf = new Map();
+  // Implantation d'un point (Terrain › Contrôler › Point) : { actif (toucher le plan accroche un
+  // point), aImplanter: [{ nom, est, nord }], choix: { est, nord } (croix), cible: { est, nord, nom } } ou null.
+  let implantation = null;
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
   // Ce qu'il faut dessiner (voir editeur.js et main.js) :
@@ -177,6 +182,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (vue) dessinerPlansDxf();
     if (!vue || points.length === 0) {
       if (vue && plansDxf.length > 0) dessinerBarreEchelle();
+      dessinerImplantation();
       dessinerPosition();
       return;
     }
@@ -277,7 +283,36 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (calques.volumes) dessinerVolumes();
     dessinerLegende();
     dessinerBarreEchelle();
+    dessinerImplantation();
     dessinerPosition();
+  }
+
+  /**
+   * Implantation : points « À implanter » (croix sarcelle et nom), point choisi en touchant le
+   * plan (croix ambre) et point à implanter en cours (cercle autour).
+   */
+  function dessinerImplantation() {
+    if (!implantation || !vue) return;
+    const groupe = creerElement('g', { class: 'implantation' });
+    const croix = (est, nord, classe, taille) => {
+      const { x, y } = versEcran(est, nord, vue);
+      groupe.append(creerElement('path', { d: `M${x - taille} ${y}H${x + taille}M${x} ${y - taille}V${y + taille}`, class: classe }));
+      return { x, y };
+    };
+    for (const point of implantation.aImplanter ?? []) {
+      const { x, y } = croix(point.est, point.nord, 'croix-a-implanter', 7);
+      if (!calques.noms) continue;
+      const nom = creerElement('text', { x: x + 9, y: y - 6, class: 'nom-a-implanter' });
+      nom.textContent = point.nom;
+      groupe.append(nom);
+    }
+    const { cible, choix } = implantation;
+    if (cible) {
+      const { x, y } = versEcran(cible.est, cible.nord, vue);
+      groupe.append(creerElement('circle', { cx: x, cy: y, r: 14, class: 'cible-implantation' }));
+    }
+    if (choix) croix(choix.est, choix.nord, 'croix-choix', 12);
+    svg.append(groupe);
   }
 
   /**
@@ -294,6 +329,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const debut = versEcran(coupe.debut.est, coupe.debut.nord, vue);
       const fin = versEcran(coupe.fin.est, coupe.fin.nord, vue);
       groupe.append(creerElement('line', { x1: debut.x, y1: debut.y, x2: fin.x, y2: fin.y, class: `trace-coupe-directe coupe-${coupe.sens}` }));
+    }
+    // Implantation : trait en pointillés jusqu'au point à implanter.
+    if (implantation?.cible) {
+      const cible = versEcran(implantation.cible.est, implantation.cible.nord, vue);
+      groupe.append(creerElement('line', { x1: x, y1: y, x2: cible.x, y2: cible.y, class: 'trait-vers-cible' }));
     }
     groupe.append(creerElement('circle', { cx: x, cy: y, r: 13, class: 'halo' }));
     // Petite flèche (comme Google Maps) : la direction où l'on regarde, dessinée vers le haut
@@ -987,6 +1027,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         // Tracé d'une coupe : la position touchée (celle du point levé s'il y en a un tout près).
         const point = pointLePlusProche(toucher);
         quandToucherPosition?.(point ? { est: point.est, nord: point.nord } : versTerrain(toucher.x, toucher.y, vue));
+      } else if (implantation?.actif) {
+        // Implantation : main.js cherche le sommet, le milieu, l'endroit de la ligne ou le centre.
+        quandToucherImplantation?.(versTerrain(toucher.x, toucher.y, vue), RAYON_TOUCHER / vue.echelle);
       } else if (dessin.modeTriangles) {
         // Suppression de triangles : on cherche le triangle sous le doigt.
         const terrain = versTerrain(toucher.x, toucher.y, vue);
@@ -1088,6 +1131,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       for (const id of dessinsDxf.keys()) if (!plansDxf.some((plan) => plan.id === id)) dessinsDxf.delete(id);
       // Premier plan sans levé : on cadre dessus. Sinon, le dessin suit (redessiner, juste après).
       if (!vue || (avant === 0 && points.length === 0 && !position)) toutVoir();
+    },
+    /**
+     * Implantation d'un point (voir « implantation » plus haut), ou null quand on n'implante pas.
+     * Dessinée au prochain redessiner (appelé juste après par main.js).
+     */
+    afficherImplantation(nouvelle) {
+      implantation = nouvelle;
     },
     /** Cadre le plan sur ces plans DXF (bouton « voir »). */
     cadrerSurPlans(choisis) {

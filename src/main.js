@@ -41,6 +41,7 @@ import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecr
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { lireLibelles, enregistrerLibelles } from './leve/libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe } from './topo/implantation.js';
+import { MODES_ACCROCHE, accrocher, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
 import {
   estLeveDirect,
   leveDuJour,
@@ -85,8 +86,13 @@ const terrain = {
   sourceOrientation: 'rx2',
   libelleLigne: 'HT', // dernier libellé choisi pour une ligne de rupture
   libellePoint: 'TN', // et pour un point isolé
+  implantation: 'surface', // mode Contrôler : implanter une surface ou un point
+  accroche: 'sommet', // implantation d'un point : sommet, milieu, sur la ligne ou centre (voir topo/accroche.js)
   ...lireReglagesTerrain(),
 };
+// Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
+// point à implanter en cours ({ id (point de la liste « À implanter », ou null), nom, est, nord, altitude }).
+const implanter = { choix: null, cible: null };
 const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
 
 function lireReglagesTerrain() {
@@ -470,7 +476,82 @@ const ecranLeve = recepteurDisponible()
         if (terrain.mode === 'controler') montrerSurfaceControle();
         recalculer();
       },
-      choisirImplantation: () => {}, // Point et Ligne : plus tard
+      choisirImplantation: (quoi) => {
+        terrain.implantation = quoi === 'point' ? 'point' : 'surface'; // Ligne : plus tard
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      choisirAccroche: (mode) => {
+        terrain.accroche = MODES_ACCROCHE.includes(mode) ? mode : 'sommet';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      oublierChoix: () => {
+        implanter.choix = null;
+        recalculer();
+      },
+      implanterChoix: ({ nom, altitude }) => {
+        const lue = lireAltitude(altitude);
+        if (!implanter.choix || lue === undefined) return;
+        const { est, nord } = implanter.choix;
+        implanter.cible = { id: null, nom: nom.trim() || nomProposeImplantation(), est, nord, altitude: lue };
+        implanter.choix = null;
+        recalculer();
+      },
+      creerPointAImplanter: ({ nom, altitude }) => {
+        const lue = lireAltitude(altitude);
+        if (!implanter.choix || lue === undefined) return;
+        const choisi = nom.trim() || nomProposeImplantation();
+        if (projet.aImplanter.some((p) => p.nom === choisi)) {
+          alert(`Le point ${choisi} est déjà dans la liste « À implanter » : choisis un autre nom.`);
+          return;
+        }
+        projet.aImplanter.push({ id: nouvelIdentifiant(), nom: choisi, est: implanter.choix.est, nord: implanter.choix.nord, altitude: lue });
+        implanter.choix = null;
+        afficherMessage(`${choisi} ajouté à la liste « À implanter »`);
+        modifie();
+      },
+      implanterPoint: (id) => {
+        const point = projet.aImplanter.find((p) => p.id === id);
+        if (!point) return;
+        implanter.cible = { ...point };
+        implanter.choix = null;
+        recalculer();
+      },
+      supprimerPointAImplanter: (id) => {
+        const point = projet.aImplanter.find((p) => p.id === id);
+        if (!point || !confirm(`Enlever ${point.nom} de la liste « À implanter » ?`)) return;
+        projet.aImplanter = projet.aImplanter.filter((p) => p.id !== id);
+        if (implanter.cible?.id === id) implanter.cible = null;
+        modifie();
+      },
+      arreterImplantation: () => {
+        implanter.cible = null;
+        recalculer();
+      },
+      enregistrerImplantation: () => {
+        const cible = implanter.cible;
+        if (!cible) return;
+        // Position vérifiée par l'appli Android : RTK fixe et inclinaison prête, comme pour un point levé.
+        const reponse = prendrePointRecepteur();
+        if (!reponse.ok) {
+          afficherMessage(`Implantation refusée : ${reponse.raison}`, 4000);
+          return;
+        }
+        const { est, nord, altitude, ...gnss } = reponse.point;
+        const mesure = { est, nord, altitude, gnss };
+        const ecarts = ecartsImplantation(cible, mesure);
+        const le = new Date().toISOString();
+        projet.implantations.push({ id: nouvelIdentifiant(), nom: cible.nom, aImplanterId: cible.id, cible: { est: cible.est, nord: cible.nord, altitude: cible.altitude }, mesure, ecarts, le });
+        navigator.vibrate?.(60);
+        const hauteur = ecarts.dAltitude != null ? ` · dH ${formaterNombre(ecarts.dAltitude)} m` : '';
+        afficherMessage(`${cible.nom} implanté : écart ${formaterNombre(ecarts.distance)} m${hauteur}`, 4000);
+        modifie();
+      },
+      exporterImplantations: () => {
+        const nom = projet.nom.replace(/[^\w-]+/g, '_') || 'projet';
+        telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nom}_implantations.csv`);
+      },
       choisirSurfaceControle: (id) => {
         terrain.surfaceId = id || null;
         retenirReglagesTerrain();
@@ -523,6 +604,66 @@ function volumeDuStock(stock) {
 }
 
 /**
+ * Altitude tapée pour un point à implanter : un nombre (m), ou null si le champ est vide.
+ * Renvoie undefined (et prévient) si elle est illisible.
+ */
+function lireAltitude(texte) {
+  const nettoye = String(texte ?? '').trim().replace(',', '.');
+  if (!nettoye) return null;
+  const altitude = Number(nettoye);
+  if (Number.isFinite(altitude)) return altitude;
+  alert(`Altitude « ${texte} » illisible : écris un nombre, par exemple 412.350, ou laisse vide.`);
+  return undefined;
+}
+
+/** Nom proposé pour le point choisi : le sien (point levé, point à implanter), sinon I-1, I-2… */
+function nomProposeImplantation() {
+  return implanter.choix?.nom ?? nomPointAImplanter([...projet.aImplanter, ...projet.implantations]);
+}
+
+/** Vrai pendant l'implantation d'un point (Terrain › Contrôler › Point). */
+function enImplantationDePoint() {
+  return Boolean(ecranLeve) && terrain.mode === 'controler' && terrain.implantation === 'point';
+}
+
+/** Toucher du plan pendant l'implantation d'un point : on cherche le point selon l'accroche choisie. */
+function toucherPourImplantation(position, tolerance) {
+  const sources = sourcesDesPlans(projet.plansDxf ?? [], position, tolerance);
+  sources.points.push(...(pointsAffiches ?? []), ...projet.aImplanter);
+  const trouve = accrocher(terrain.accroche, position, tolerance, sources);
+  if (!trouve) {
+    const quoi = { sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[terrain.accroche];
+    afficherMessage(`${quoi[0].toUpperCase()}${quoi.slice(1)} sous le doigt : zoome, ou change d'accroche`, 3000);
+    return;
+  }
+  const mm = (valeur) => Math.round(valeur * 1000) / 1000;
+  implanter.choix = { ...trouve, est: mm(trouve.est), nord: mm(trouve.nord), altitude: trouve.altitude != null ? mm(trouve.altitude) : null };
+  recalculer();
+}
+
+/**
+ * Implantation d'un point, à chaque état du récepteur : ce qu'il reste à faire pour être dessus.
+ * Sans position fiable (pas de RTK fixe ou inclinaison pas prête), le guidage est donné en gris,
+ * avec la raison : il aide à s'approcher, mais on ne peut pas enregistrer.
+ */
+function calculerImplantation(etat, orientation) {
+  const cible = implanter.cible;
+  if (!cible) return null;
+  const position = etat.connecte && etat.recu ? etat.position : null;
+  if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
+  const g = guidage(position, cible, orientation.azimut);
+  const fiable = Boolean(etat.autorise);
+  const ecartAltitude = fiable && cible.altitude != null ? ecartSurface(cible.altitude, position.altitude) : null;
+  return {
+    guidage: { ...g, azimut: orientation.azimut },
+    classe: fiable ? classeDistance(g.distance) : 'pas-fiable',
+    ecartAltitude,
+    classeAltitude: ecartAltitude == null ? null : classeEcart(ecartAltitude),
+    message: null,
+  };
+}
+
+/**
  * Touche « volume − » : elle prend le point seulement dans l'onglet Terrain, en mode Lever, avec une
  * surface en cours ; ailleurs, elle règle le volume comme d'habitude. Point refusé : message et
  * double vibration (on ne regarde pas forcément l'écran).
@@ -530,14 +671,17 @@ function volumeDuStock(stock) {
 let toucheVolumeActive = null;
 function mettreAJourToucheVolume() {
   if (!ecranLeve) return;
-  const actif = document.body.dataset.onglet === 'terrain' && terrain.mode === 'lever' && Boolean(stockEnCours());
+  const dansTerrain = document.body.dataset.onglet === 'terrain';
+  const lever = dansTerrain && terrain.mode === 'lever' && Boolean(stockEnCours());
+  const implanterAvecTouche = dansTerrain && enImplantationDePoint() && Boolean(implanter.cible);
+  const actif = lever || implanterAvecTouche;
   if (actif === toucheVolumeActive) return;
   toucheVolumeActive = actif;
   regleToucheVolume(actif, () => {
-    const refus = ecranLeve.prendreDepuisTouche();
+    const refus = enImplantationDePoint() ? ecranLeve.enregistrerDepuisTouche() : ecranLeve.prendreDepuisTouche();
     if (refus) {
       navigator.vibrate?.([80, 80, 80]);
-      afficherMessage(`Point refusé : ${refus}`, 4000);
+      afficherMessage(`${enImplantationDePoint() ? 'Implantation refusée' : 'Point refusé'} : ${refus}`, 4000);
     }
   });
 }
@@ -580,6 +724,17 @@ function donneesLeve() {
     mode: terrain.mode,
     controle: terrain,
     surfaces: projet.surfaces.map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
+    implanter: {
+      accroche: terrain.accroche,
+      choix: implanter.choix,
+      cible: implanter.cible,
+      nomPropose: nomProposeImplantation(),
+      aImplanter: projet.aImplanter.map((p) => {
+        const derniere = [...projet.implantations].reverse().find((i) => i.aImplanterId === p.id);
+        return { ...p, fait: derniere ? { distance: derniere.ecarts.distance, dAltitude: derniere.ecarts.dAltitude } : null };
+      }),
+      nbImplantations: projet.implantations.length,
+    },
   };
 }
 
@@ -642,8 +797,10 @@ if (recepteurDisponible()) {
     etatRecepteur = etat;
     mettreAJourBandeaux(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
-    const controle = terrain.mode === 'controler' ? calculerControle(etat, orientation) : null;
-    ecranLeve.mettreAJourRecepteur(etat, { orientation, controle });
+    const enPoint = enImplantationDePoint();
+    const controle = terrain.mode === 'controler' && !enPoint ? calculerControle(etat, orientation) : null;
+    const implantation = enPoint ? calculerImplantation(etat, orientation) : null;
+    ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation });
     const position = etat.connecte && etat.recu ? etat.position : null;
     // Coupes affichées (mode Contrôler) : leur trait en pointillés sur le plan.
     const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
@@ -712,6 +869,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherMesure: (id) => ecranMesures.choisir(id),
   quandToucherStock: (index) => editeurSurfaces.choisir(index),
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
+  quandToucherImplantation: toucherPourImplantation,
 });
 
 const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces'), document.querySelector('#barre-surfaces'), {
@@ -987,6 +1145,17 @@ function recalculer({ recadrer = false } = {}) {
   ecranMesures.afficher();
   ecranImport.afficher(projet, dernierImport, dernierPlan);
   plan.afficherPlansDxf(projet.plansDxf ?? []);
+  // Point à implanter de la liste : ses coordonnées à jour (Annuler a pu l'enlever).
+  if (implanter.cible?.id) {
+    const point = projet.aImplanter.find((p) => p.id === implanter.cible.id);
+    implanter.cible = point ? { ...point } : null;
+  }
+  // Implantation d'un point : toucher le plan accroche un point (seulement depuis l'onglet Terrain).
+  // Les points « À implanter » restent visibles sur le plan dans les autres onglets.
+  const accrocheActive = enImplantationDePoint() && ongletContexte === 'terrain';
+  plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0
+    ? { actif: accrocheActive, aImplanter: projet.aImplanter, choix: accrocheActive ? implanter.choix : null, cible: accrocheActive ? implanter.cible : null }
+    : null);
   ecranLeve?.afficher(donneesLeve());
   ecranProjet.afficher(projet, resumes);
   // Téléphone, onglet Terrain : le plan reste en haut de l'écran (voir style.css), plus petit
@@ -1191,6 +1360,8 @@ function allerA(onglet) {
  */
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
+  implanter.choix = null;
+  implanter.cible = null;
   dernierImport = null;
   document.querySelector('#message-import-surface').innerHTML = '';
   editeurSurfaces.charger(projet.surfaces);

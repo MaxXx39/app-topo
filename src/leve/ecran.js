@@ -4,6 +4,9 @@
 //   bouton PRENDRE LE POINT. Le levé, le stock et le récepteur sont dans une ligne repliable.
 // - Contrôler : on choisit une surface ; en direct, de combien monter ou descendre pour être
 //   dessus, et deux coupes autour du récepteur (perpendiculaire et dans l'axe de la direction regardée).
+//   Ou on implante un point : on le choisit en touchant le plan (accroche au sommet, au milieu, sur
+//   la ligne ou au centre d'un cercle), puis on l'implante (guidage avance / droite) ou on le garde
+//   dans la liste « À implanter ». « Enregistrer l'implantation » note la position et les écarts.
 // Aussi : les bandeaux « RTK » et « Inclinaison » sous l'en-tête, visibles dans tous les onglets.
 //
 // L'état du récepteur arrive 5 fois par seconde (mettreAJourRecepteur) : on ne change alors que
@@ -12,11 +15,12 @@ import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE } from '../topo/leve-direct.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
+import { MODES_ACCROCHE } from '../topo/accroche.js';
 import { lireTexteLibelles, ecrireTexteLibelles } from './libelles.js';
 
-// Mode Contrôler : ce qu'on implante (Point et Ligne viendront plus tard), vue des coupes, longueurs.
+// Mode Contrôler : ce qu'on implante (Ligne viendra plus tard), vue des coupes, longueurs.
 const IMPLANTATIONS = [
-  ['point', 'Point', false],
+  ['point', 'Point', true],
   ['ligne', 'Ligne', false],
   ['surface', 'Surface', true],
 ];
@@ -32,6 +36,13 @@ const NATURES_TERRAIN = [
   ['terrain', 'Terrain naturel'],
   ['terrassement', 'Terrassement'],
 ];
+// Accroches : un petit dessin chacune, comme dans AutoCAD (le nom en bulle et pour la lecture d'écran).
+const ACCROCHES = {
+  sommet: ['Sommet', '<path d="M3 20 12 7l9 13" /><rect x="9" y="4" width="6" height="6" />'],
+  milieu: ['Milieu', '<path d="M2 18h20" /><path d="M12 7l6 10H6z" />'],
+  ligne: ['Sur la ligne', '<path d="M3 21 21 5" /><path d="M7 6h8l-8 9h8z" />'],
+  centre: ['Centre du cercle', '<circle cx="12" cy="12" r="8" /><path d="M12 8v8M8 12h8" />'],
+};
 const TITRES_COUPES = {
   perpendiculaire: { titre: 'Perpendiculaire', gauche: '← gauche', droite: 'droite →' },
   axe: { titre: 'Dans l\'axe', gauche: '← derrière', droite: 'devant →' },
@@ -49,8 +60,11 @@ const ICONES = {
  * choisirRecepteur(), reconnecter(), deconnecter(), nouvelleSurface(nature), choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
  * annulerDernierPoint(), choisirLibelle(abréviation), enregistrerLibelles({ lignes, points }),
  * choisirMode(mode), choisirSurfaceControle(id), choisirVueCoupes(vue),
- * choisirLongueurCoupe(m), choisirExagerationCoupe(facteur), choisirSourceOrientation(source)
- * Renvoie { afficher(donnees), mettreAJourRecepteur(etat, direct) }.
+ * choisirLongueurCoupe(m), choisirExagerationCoupe(facteur), choisirSourceOrientation(source),
+ * choisirImplantation(quoi), choisirAccroche(mode), implanterChoix({ nom, altitude }),
+ * creerPointAImplanter({ nom, altitude }), implanterPoint(id), supprimerPointAImplanter(id),
+ * arreterImplantation(), oublierChoix(), enregistrerImplantation(), exporterImplantations()
+ * Renvoie { afficher(donnees), prendreDepuisTouche(), enregistrerDepuisTouche(), mettreAJourRecepteur(etat, direct) }.
  */
 export function creerEcranLeve(conteneur, actions) {
   let etat = null; // dernier état du récepteur (voir src/android/pont.js)
@@ -80,6 +94,11 @@ export function creerEcranLeve(conteneur, actions) {
       return;
     }
     if (action === 'nouvelleSurface') choixNatureOuvert = false;
+    if (action === 'implanterChoix' || action === 'creerPointAImplanter') {
+      const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`)?.value ?? '';
+      actions[action]({ nom: champ('nom-implantation'), altitude: champ('altitude-implantation') });
+      return;
+    }
     if (action === 'prendre') actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '');
     else if (action === 'role') actions.choisirRole(bouton.dataset.role);
     else actions[action]?.(bouton.dataset.valeur);
@@ -126,7 +145,8 @@ export function creerEcranLeve(conteneur, actions) {
 
     const bouton = conteneur.querySelector('[data-action="prendre"]');
     const raison = conteneur.querySelector('[data-vivant="raison"]');
-    const permis = connecte && Boolean(etat?.autorise) && Boolean(donnees?.stock);
+    const implantation = donnees?.mode === 'controler' && donnees.controle.implantation === 'point';
+    const permis = connecte && Boolean(etat?.autorise) && Boolean(implantation ? donnees.implanter.cible : donnees?.stock);
     if (bouton) bouton.disabled = !permis;
     if (raison) {
       raison.textContent = permis || !connecte ? '' : etat?.raison ?? '';
@@ -140,7 +160,38 @@ export function creerEcranLeve(conteneur, actions) {
       const degres = (valeur) => (valeur == null ? '—' : `${Math.round(valeur)}°`);
       orientation.textContent = `cap RX2 ${degres(o?.cap)} · marche ${degres(o?.marche)}`;
     }
-    if (donnees?.mode === 'controler') rafraichirControle();
+    if (donnees?.mode === 'controler' && donnees.controle.implantation === 'point') rafraichirImplantation();
+    else if (donnees?.mode === 'controler') rafraichirControle();
+  }
+
+  /** Implantation d'un point : guidage vers le point et bouton « Enregistrer l'implantation ». */
+  function rafraichirImplantation() {
+    const g = direct?.implantation;
+    const bouton = conteneur.querySelector('[data-action="enregistrerImplantation"]');
+    if (bouton) bouton.disabled = !(etat?.connecte && etat?.autorise && donnees.implanter.cible);
+    const zone = conteneur.querySelector('[data-vivant="guidage"]');
+    if (!zone) return;
+    if (!g || g.message) {
+      zone.className = 'guidage-direct attente';
+      zone.innerHTML = `<span class="message-ecart">${echapper(g?.message ?? 'En attente de la position…')}</span>`;
+      return;
+    }
+    const { avance, droite, est, nord, distance, direction, azimut } = g.guidage;
+    const m = (valeur) => `${formaterNombre(Math.abs(valeur))} m`;
+    // Flèche vers le point : par rapport à la direction regardée, sinon par rapport au nord.
+    const angle = azimut == null ? direction : direction - azimut;
+    const lignes = avance == null
+      ? [`${nord >= 0 ? 'Nord' : 'Sud'} ${m(nord)}`, `${est >= 0 ? 'Est' : 'Ouest'} ${m(est)}`]
+      : [`${avance >= 0 ? '↑ Avance' : '↓ Recule'} ${m(avance)}`, `${droite >= 0 ? '→ Droite' : '← Gauche'} ${m(droite)}`];
+    const hauteur = g.ecartAltitude == null
+      ? ''
+      : `<span class="hauteur-guidage ${g.classeAltitude}">${g.ecartAltitude >= 0 ? '↑ Monter' : '↓ Descendre'} ${m(g.ecartAltitude)}</span>`;
+    zone.className = `guidage-direct ${g.classe}`;
+    zone.innerHTML = `
+      <svg class="fleche-guidage" viewBox="-20 -20 40 40" aria-hidden="true"><path d="M0 -17 11 6 0 0 -11 6Z" transform="rotate(${angle.toFixed(1)})" /></svg>
+      <span class="lignes-guidage">${lignes.map((texte) => `<span>${texte}</span>`).join('')}</span>
+      <span class="distance-guidage">${formaterNombre(distance)} m${azimut == null ? ' · nord en haut' : ''}</span>
+      ${hauteur}`;
   }
 
   /** Mode Contrôler : écart monter / descendre et coupes en direct. */
@@ -189,8 +240,10 @@ export function creerEcranLeve(conteneur, actions) {
   function controle() {
     const { controle: reglages, surfaces } = donnees;
     const vue = reglages.vueCoupes;
+    const choixImplantation = `<div class="ligne-choix"><span>Implanter</span>${boutonsChoix('choisirImplantation', IMPLANTATIONS, reglages.implantation)}</div>`;
+    if (reglages.implantation === 'point') return choixImplantation + implanterPoint();
     return `
-      <div class="ligne-choix"><span>Implanter</span>${boutonsChoix('choisirImplantation', IMPLANTATIONS, 'surface')}</div>
+      ${choixImplantation}
       ${surfaces.length > 0
         ? `<select data-champ="surface-controle" aria-label="Surface à contrôler">
             ${reglages.surfaceId ? '' : '<option value="">— choisir une surface —</option>'}
@@ -205,6 +258,63 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="ligne-choix"><span>Coupes</span>${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}</div>
       <div class="ligne-choix"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
       <div class="ligne-choix"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
+      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
+      <p class="aide" data-vivant="orientation"></p>`;
+  }
+
+  /**
+   * Implantation d'un point : accroche (4 petits dessins), point choisi sur le plan (implanter ou
+   * créer), guidage, enregistrement, liste « À implanter ».
+   */
+  function implanterPoint() {
+    const { implanter: imp, controle: reglages } = donnees;
+    const accroches = `<div class="accroches" role="group" aria-label="Accroche">
+      ${MODES_ACCROCHE.map((mode) => `<button type="button" class="bouton-accroche ${imp.accroche === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${ACCROCHES[mode][0]}" aria-label="${ACCROCHES[mode][0]}" aria-pressed="${imp.accroche === mode}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">${ACCROCHES[mode][1]}</svg></button>`).join('')}
+      <span class="aide">${imp.choix ? '' : 'puis touche le plan'}</span>
+    </div>`;
+    const choix = imp.choix
+      ? `<div class="choix-implantation">
+          <p class="coordonnees-choix">${imp.choix.nom ? `<strong>${echapper(imp.choix.nom)}</strong> ` : ''}E ${formaterNombre(imp.choix.est)} · N ${formaterNombre(imp.choix.nord)}
+            <button type="button" class="bouton-lien bouton-lien-neutre" data-action="oublierChoix">effacer</button></p>
+          <div class="champs-implantation">
+            <label>Nom<input type="text" data-champ="nom-implantation" value="${echapper(imp.nomPropose)}" autocomplete="off" autocapitalize="characters" /></label>
+            <label>Altitude<input type="text" inputmode="decimal" data-champ="altitude-implantation" value="${imp.choix.altitude != null ? imp.choix.altitude.toFixed(3) : ''}" placeholder="facultative" /></label>
+          </div>
+          <div class="ligne-outils">
+            <button type="button" class="bouton-secondaire" data-action="implanterChoix">Implanter</button>
+            <button type="button" class="bouton-secondaire" data-action="creerPointAImplanter">+ À implanter</button>
+          </div>
+        </div>`
+      : '';
+    const cible = imp.cible
+      ? `<p class="titre-guidage">Vers <strong>${echapper(imp.cible.nom ?? 'le point choisi')}</strong>${imp.cible.altitude != null ? ` · H ${formaterNombre(imp.cible.altitude)}` : ''}
+          <button type="button" class="bouton-lien bouton-lien-neutre" data-action="arreterImplantation">arrêter</button></p>
+        <div class="guidage-direct attente" data-vivant="guidage"></div>
+        <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
+          <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol − de la tablette</span>
+        </button>
+        <p class="raison-leve" data-vivant="raison" hidden></p>`
+      : '';
+    const liste = imp.aImplanter.length > 0
+      ? `<div class="liste-a-implanter">
+          <p class="titre-choix">À implanter</p>
+          ${imp.aImplanter.map((p) => `<div class="ligne-a-implanter ${imp.cible?.id === p.id ? 'actif' : ''}">
+              <button type="button" class="bouton-lien bouton-lien-neutre" data-action="implanterPoint" data-valeur="${p.id}"><strong>${echapper(p.nom)}</strong></button>
+              <span class="aide">${p.fait ? `✓ ${formaterNombre(p.fait.distance)} m${p.fait.dAltitude != null ? ` · dH ${formaterNombre(p.fait.dAltitude)}` : ''}` : (p.altitude != null ? `H ${formaterNombre(p.altitude)}` : '')}</span>
+              <button type="button" class="bouton-lien" data-action="supprimerPointAImplanter" data-valeur="${p.id}" aria-label="Supprimer ${echapper(p.nom)}">×</button>
+            </div>`).join('')}
+        </div>`
+      : '';
+    const exporter = imp.nbImplantations > 0
+      ? `<p class="aide">${imp.nbImplantations} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
+      : '';
+    return `
+      ${accroches}
+      ${choix}
+      ${cible}
+      ${liste}
+      ${exporter}
       <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
       <p class="aide" data-vivant="orientation"></p>`;
   }
@@ -334,7 +444,10 @@ export function creerEcranLeve(conteneur, actions) {
      * [{ id, nom }]), stock (surface en cours), role, libelles ({ lignes, points }), libelleLigne,
      * libellePoint, ligne: { libelle, numero, nbPoints, fermee }, nomPropose, dernierPoint (nom), resume
      * (voir resumeStock), volume (remblai en m³, ou null), mode ('lever' ou 'controler'),
-     * controle: { surfaceId, vueCoupes, demiLongueur, sourceOrientation }, surfaces: [{ id, etiquette }] }.
+     * controle: { surfaceId, vueCoupes, demiLongueur, sourceOrientation, implantation ('point' ou 'surface') },
+     * surfaces: [{ id, etiquette }], implanter: { accroche, choix: { est, nord, altitude, nom } ou null,
+     * cible: { id, nom, est, nord, altitude } ou null, nomPropose, aImplanter: [{ id, nom, est, nord,
+     * altitude, fait: { distance, dAltitude } ou null }], nbImplantations } }.
      */
     afficher(nouvellesDonnees) {
       donnees = nouvellesDonnees;
@@ -353,10 +466,21 @@ export function creerEcranLeve(conteneur, actions) {
       return null;
     },
 
+    /** Touche « volume − » pendant une implantation : enregistre, comme le bouton. Renvoie null, ou la raison du refus. */
+    enregistrerDepuisTouche() {
+      const bouton = conteneur.querySelector('[data-action="enregistrerImplantation"]');
+      if (!bouton) return 'pas de point à implanter';
+      if (bouton.disabled) return etat?.connecte ? etat.raison ?? 'pas prêt' : 'récepteur non connecté';
+      actions.enregistrerImplantation();
+      return null;
+    },
+
     /**
      * Nouvel état du récepteur (5 fois par seconde). direct (calculé par main.js) :
      * { orientation: { azimut, source, cap, marche }, controle: { ecart, classe, altitudeSurface,
-     *   altitudeCanne, message, coupes: { perpendiculaire, axe }, messageCoupes } ou null }.
+     *   altitudeCanne, message, coupes: { perpendiculaire, axe }, messageCoupes } ou null,
+     *   implantation: { guidage (voir topo/accroche.js, avec azimut), classe, ecartAltitude,
+     *   classeAltitude, message } ou null }.
      */
     mettreAJourRecepteur(nouvelEtat, nouveauDirect = null) {
       etat = nouvelEtat;
