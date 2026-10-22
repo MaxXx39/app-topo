@@ -16,6 +16,8 @@ import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from '../plan/fo
 import { grouperParNature } from '../volumes/calculs.js';
 import { preparerDessinCoupe, texteEchellesCoupe } from '../coupes/dessin.js';
 import { longueurCoupe } from '../topo/coupe.js';
+// Logo Perrin, dans le fichier PDF (image JPEG de 406 × 104 pixels, écrite dans le code).
+import logoPerrin from '../assets/logo-perrin.jpg?inline';
 
 // Calques du plan imprimé, et leur état par défaut.
 export const CALQUES_PDF = {
@@ -33,7 +35,9 @@ export const CALQUES_PDF = {
 // Résolution de la photo aérienne dans le PDF (points par pouce).
 const DPI_FOND = 150;
 
-// Cartouche en bas de la colonne : 7 lignes de 6 mm (sans logo).
+// Cartouche en bas de la colonne : le logo (case de 12 mm), puis 7 lignes de 6 mm.
+const HAUTEUR_LOGO_CARTOUCHE = 12;
+const LOGO = { hauteur: 8, largeur: (8 * 406) / 104 }; // mm, proportions de l'image
 const LIGNES_CARTOUCHE = 7;
 const HAUTEUR_LIGNE_CARTOUCHE = 6;
 
@@ -53,7 +57,7 @@ export function appliquerFormat(format) {
   PAGE = mise.page;
   CADRE_PLAN = mise.cadrePlan;
   COLONNE = mise.colonne;
-  Y_CARTOUCHE = PAGE.hauteur - PAGE.marge - 2 - LIGNES_CARTOUCHE * HAUTEUR_LIGNE_CARTOUCHE;
+  Y_CARTOUCHE = PAGE.hauteur - PAGE.marge - 2 - HAUTEUR_LOGO_CARTOUCHE - LIGNES_CARTOUCHE * HAUTEUR_LIGNE_CARTOUCHE;
   return { page: PAGE, cadrePlan: CADRE_PLAN, colonne: COLONNE, yCartouche: Y_CARTOUCHE };
 }
 appliquerFormat('a4');
@@ -860,7 +864,7 @@ function dessinerColonne(doc, calcules, cartouche, { choix, relief, ecarts, comp
   return y;
 }
 
-/** Cartouche en bas à droite : affaire, lieu, date, dessiné par, échelle, coordonnées, fichier. */
+/** Cartouche en bas à droite : logo, puis affaire, lieu, date, dessiné par, échelle, coordonnées, fichier. */
 export function dessinerCartouche(doc, cartouche) {
   const x = COLONNE.x;
   // Cartouche en bas à droite
@@ -875,7 +879,10 @@ export function dessinerCartouche(doc, cartouche) {
   ];
   const hauteurLigne = HAUTEUR_LIGNE_CARTOUCHE;
   trait(doc, COULEURS.texte, 0.3);
-  const yCartouche = Y_CARTOUCHE;
+  // Case du logo, en haut du cartouche
+  doc.rect(x, Y_CARTOUCHE, COLONNE.largeur, HAUTEUR_LOGO_CARTOUCHE);
+  doc.addImage(logoPerrin, 'JPEG', x + 2, Y_CARTOUCHE + (HAUTEUR_LOGO_CARTOUCHE - LOGO.hauteur) / 2, LOGO.largeur, LOGO.hauteur);
+  const yCartouche = Y_CARTOUCHE + HAUTEUR_LOGO_CARTOUCHE;
   doc.rect(x, yCartouche, COLONNE.largeur, lignesCartouche.length * hauteurLigne);
   lignesCartouche.forEach(([titre, valeur], i) => {
     const yl = yCartouche + i * hauteurLigne;

@@ -1,6 +1,6 @@
 // Tests de l'implantation d'un point : accroche (sommet, milieu, sur la ligne, centre), guidage, écarts.
 import { describe, it, expect } from 'vitest';
-import { accrocher, projeterSurSegment, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, sourcesDesPlans, csvImplantations, cibleSelonDistance, ecartsGuidage } from '../src/topo/accroche.js';
+import { accrocher, projeterSurSegment, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, sourcesDesPlans, csvImplantations, cibleSelonDistance, ecartsGuidage, couleurCanne } from '../src/topo/accroche.js';
 
 const p = (est, nord, altitude = null) => ({ est, nord, altitude });
 // Une ligne en L : (0,0) → (10,0) → (10,10), et une chambre de rayon 0.4 en (5, 5).
@@ -131,6 +131,15 @@ describe('cibles et sens du guidage', () => {
     expect(cibleSelonDistance(1.02, 2)).toBe(2); // pas encore 1.05 m : on garde la cible 2
     expect(cibleSelonDistance(1.06, 2)).toBe(1);
     expect(cibleSelonDistance(3, 3)).toBe(0); // loin d'un coup : plus de cible
+  });
+
+  it('couleur de la canne : rouge > 1 m, orange jusqu\'à 20 cm, dégradé jusqu\'au vert à 3 cm', () => {
+    expect(couleurCanne(1.5)).toBe('rgb(220, 38, 38)');
+    expect(couleurCanne(0.5)).toBe('rgb(249, 115, 22)');
+    expect(couleurCanne(0.2)).toBe('rgb(249, 115, 22)');
+    expect(couleurCanne(0.115)).toBe('rgb(136, 139, 48)'); // à mi-chemin
+    expect(couleurCanne(0.03)).toBe('rgb(22, 163, 74)');
+    expect(couleurCanne(0.01)).toBe('rgb(22, 163, 74)');
   });
 
   it('cap RX2 : devant / droite ; N-S-E-O (ou sans orientation) : nord / est', () => {

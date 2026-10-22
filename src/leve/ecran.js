@@ -16,7 +16,7 @@ import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
-import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage } from '../topo/accroche.js';
+import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne } from '../topo/accroche.js';
 import { lireTexteLibelles, ecrireTexteLibelles } from './libelles.js';
 
 // Mode Contrôler : ce qu'on implante (Ligne viendra plus tard), vue des coupes, longueurs.
@@ -224,8 +224,9 @@ export function creerEcranLeve(conteneur, actions) {
     const { distance, direction, azimut } = g.guidage;
     const { haut, droite, nordEnHaut } = ecartsGuidage(g.guidage, donnees.controle.guidage);
     const m = (valeur) => `${formaterNombre(Math.abs(valeur))} m`;
+    // Toujours « avance / recule », « droite / gauche » ; en N-S-E-O (nord devant), avec le point cardinal.
     const lignes = nordEnHaut
-      ? [`${haut >= 0 ? '↑ Nord (devant)' : '↓ Sud (derrière)'} ${m(haut)}`, `${droite >= 0 ? '→ Est (droite)' : '← Ouest (gauche)'} ${m(droite)}`]
+      ? [`${haut >= 0 ? '↑ Avance (Nord)' : '↓ Recule (Sud)'} ${m(haut)}`, `${droite >= 0 ? '→ Droite (Est)' : '← Gauche (Ouest)'} ${m(droite)}`]
       : [`${haut >= 0 ? '↑ Avance' : '↓ Recule'} ${m(haut)}`, `${droite >= 0 ? '→ Droite' : '← Gauche'} ${m(droite)}`];
     const hauteur = g.ecartAltitude == null
       ? ''
@@ -234,7 +235,7 @@ export function creerEcranLeve(conteneur, actions) {
     // Flèche vers le point : par rapport à la direction regardée, sinon par rapport au nord.
     const angle = nordEnHaut ? direction : direction - azimut;
     const dessin = cibleAffichee > 0
-      ? svgCible(cibleAffichee, haut, droite, g.classe, nordEnHaut)
+      ? svgCible(cibleAffichee, haut, droite, couleurCanne(distance), nordEnHaut)
       : `<svg class="fleche-guidage" viewBox="-20 -20 40 40" aria-hidden="true"><path d="M0 -17 11 6 0 0 -11 6Z" transform="rotate(${angle.toFixed(1)})" /></svg>`;
     zone.className = `guidage-direct ${g.classe} ${cibleAffichee > 0 ? 'avec-cible' : ''}`;
     zone.innerHTML = `
@@ -359,9 +360,9 @@ export function creerEcranLeve(conteneur, actions) {
     const cible = imp.cible
       ? `<p class="titre-guidage">Vers <strong>${echapper(imp.cible.nom ?? 'le point choisi')}</strong>${imp.cible.altitude != null ? ` · H ${formaterNombre(imp.cible.altitude)}` : ''}
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="arreterImplantation">arrêter</button></p>
-        <div class="guidage-et-boussole">
+        <div class="guidage-et-boussole ${reglages.guidage === 'nseo' ? 'avec-boussole' : ''}">
           <div class="guidage-direct attente" data-vivant="guidage"></div>
-          ${boussole()}
+          ${reglages.guidage === 'nseo' ? boussole() : ''}
         </div>
         <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
           <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol − de la tablette</span>
@@ -632,10 +633,10 @@ export function creerEcranLeve(conteneur, actions) {
 
 /**
  * Cible autour du point à implanter (au centre) : 4 cercles (voir CIBLES) avec leur rayon écrit, et
- * la position du récepteur (rond de la couleur de la distance). En haut : devant (cap RX2) ou le
+ * la position du récepteur (rond de la couleur de la distance, voir couleurCanne). En haut : devant (cap RX2) ou le
  * nord. haut, droite : où est le point par rapport au récepteur (m).
  */
-function svgCible(numero, haut, droite, classe, nordEnHaut) {
+function svgCible(numero, haut, droite, couleur, nordEnHaut) {
   const { cercles } = CIBLES[numero - 1];
   const echelle = 100 / cercles[0]; // le grand cercle fait 100 unités de rayon
   const texteRayon = (r) => (r >= 1 ? `${r} m` : `${Math.round(r * 100)} cm`);
@@ -649,7 +650,7 @@ function svgCible(numero, haut, droite, classe, nordEnHaut) {
     <path d="M-110 0H110M0 -110V110" class="axes" />
     <text y="-112" text-anchor="middle" class="haut-cible">${nordEnHaut ? 'N' : 'devant'}</text>
     <path d="M-7 0H7M0 -7V7" class="centre-cible" />
-    <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" class="moi ${classe}" />
+    <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9" class="moi" style="fill: ${couleur}" />
   </svg>`;
 }
 

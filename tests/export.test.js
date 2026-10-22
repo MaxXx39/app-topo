@@ -90,8 +90,8 @@ describe('creerPdf - levé du 20/05/2026', async () => {
     expect(contenu).toContain('1:1000');
   });
 
-  it('écrit l\'affaire et le lieu dans le cartouche, sans logo (aucune image dans le PDF)', () => {
-    expect(contenu).not.toContain('/Subtype /Image');
+  it('met le logo Perrin et le lieu dans le cartouche', () => {
+    expect(contenu).toContain('/Subtype /Image');
     expect(contenu).toContain('Lieu');
   });
 

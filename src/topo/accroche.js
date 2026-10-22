@@ -158,6 +158,23 @@ export function cibleSelonDistance(distance, precedente = 0) {
   return distance >= limiteAncienne * (1 + MARGE_CIBLE) ? numero : precedente;
 }
 
+// Couleur du rond de la canne dans la cible (choix de l'utilisateur, 22.10.2026) : rouge à plus
+// de 1 m, orange de 1 m à 20 cm, puis de l'orange au vert peu à peu jusqu'à 3 cm, vert en dessous.
+const ROUGE_CANNE = [220, 38, 38];
+const ORANGE_CANNE = [249, 115, 22];
+const VERT_CANNE = [22, 163, 74];
+
+/** Couleur (« rgb(…) ») du rond de la canne selon la distance qui reste jusqu'au point (m). */
+export function couleurCanne(distance) {
+  const ecrire = (rvb) => `rgb(${rvb.map((v) => Math.round(v)).join(', ')})`;
+  if (distance > 1) return ecrire(ROUGE_CANNE);
+  if (distance > 0.2) return ecrire(ORANGE_CANNE);
+  if (distance <= 0.03) return ecrire(VERT_CANNE);
+  // Entre 20 cm (orange) et 3 cm (vert) : mélange proportionnel.
+  const t = (0.2 - distance) / (0.2 - 0.03);
+  return ecrire(ORANGE_CANNE.map((v, i) => v + (VERT_CANNE[i] - v) * t));
+}
+
 /**
  * Écarts à montrer selon le guidage choisi :
  * - 'rx2' : « avance / recule », « droite / gauche » selon la direction regardée (cap du RX2, ou

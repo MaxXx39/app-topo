@@ -3334,8 +3334,8 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   white-space: nowrap;
 }
 
-/* Place pour la boussole, à droite des écarts. */
-.guidage-et-boussole .guidage-direct {
+/* Place pour la boussole (guidage N-S-E-O seulement), à droite des écarts. */
+.guidage-et-boussole.avec-boussole .guidage-direct {
   padding-right: 76px;
 }
 
@@ -3389,8 +3389,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 .cible-implantation .moi {
-  fill: #f6ab07;
-  stroke: currentColor;
+  stroke: #ffffff;
   stroke-width: 3;
 }
 
