@@ -2529,3 +2529,40 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 .resume-terrain strong {
   color: var(--texte);
 }
+
+/* Onglet Projet épuré (version 0.39.0) : cartouche et autres projets repliés ; le titre sert
+   de bouton pour ouvrir, avec un résumé à droite (affaire, nombre de projets). */
+.bloc-replie > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.bloc-replie > summary::-webkit-details-marker {
+  display: none;
+}
+
+.panneau .bloc-replie > summary .titre-bloc {
+  margin: 0;
+}
+
+.bloc-replie > summary .aide {
+  margin: 0;
+  text-align: right;
+}
+
+.bloc-replie > summary::after {
+  content: '▾';
+  color: var(--gris);
+}
+
+.bloc-replie[open] > summary {
+  margin-bottom: 10px;
+}
+
+.bloc-replie[open] > summary::after {
+  content: '▴';
+}

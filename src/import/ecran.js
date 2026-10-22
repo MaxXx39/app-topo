@@ -1,4 +1,6 @@
-// Onglet 1. Points : fichiers de points importés (levés). Le levé avec le récepteur est à part (src/leve/ecran.js), au-dessus. Les surfaces LandXML / DXF s'importent dans l'onglet Calculs › Surfaces.
+// Bloc « Levés » de l'onglet Projet : les levés du projet (le levé coché est affiché sur le plan) et
+// l'import d'un fichier de points (chaque fichier devient un levé). Le levé avec le récepteur se fait
+// dans l'onglet Terrain (src/leve/ecran.js) ; les surfaces LandXML / DXF dans Calculs › Surfaces.
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
@@ -26,25 +28,14 @@ export function creerEcranImport(conteneur, actions) {
   });
 
   return {
-    /** Redessine l'onglet. dernierImport : résultat du dernier import de points, ou null. */
+    /** Redessine le bloc. dernierImport : résultat du dernier import de points, ou null. */
     afficher(projet, dernierImport) {
       conteneur.innerHTML = `
         <section class="carte-section">
-          ${titreSection('importer', 'Importer un fichier de points')}
-          <p class="aide">CSV d'Emlid Flow, ou TXT (nom, Est, Nord, altitude). Chaque fichier devient un levé.</p>
-          <label class="bouton">
-            + Fichier de points (CSV, TXT)
-            <input type="file" data-champ="fichier-points" accept=".csv,.txt,text/csv,text/plain" hidden />
-          </label>
-          ${dernierImport ? afficherImportPoints(dernierImport) : ''}
-        </section>
-
-        <section class="carte-section">
-          ${titreSection('leves', 'Mes levés', bulle('leves'))}
+          ${titreSection('leves', 'Levés', bulle('leves'))}
           ${
             projet.leves.length > 0
-              ? `<p class="aide">Le levé coché est celui affiché sur le plan.</p>
-                <div class="liste-leves">${projet.leves
+              ? `<div class="liste-leves">${projet.leves
                   .map(
                     (leve) => `
                   <div class="ligne-leve ${leve.id === projet.leveActifId ? 'actif' : ''}">
@@ -57,8 +48,13 @@ export function creerEcranImport(conteneur, actions) {
                   </div>`,
                   )
                   .join('')}</div>`
-              : '<p class="vide">Aucun levé : importe un fichier de points.</p>'
+              : '<p class="vide">Aucun levé pour l\'instant.</p>'
           }
+          <label class="bouton-secondaire bouton-fichier">
+            + Importer un fichier de points (CSV, TXT)
+            <input type="file" data-champ="fichier-points" accept=".csv,.txt,text/csv,text/plain" hidden />
+          </label>
+          ${dernierImport ? afficherImportPoints(dernierImport) : ''}
           ${listePointsDuLeve(projet)}
         </section>
       `;

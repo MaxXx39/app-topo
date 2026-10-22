@@ -17,6 +17,15 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
   // le fichier projet et les autres projets.
   const parties = [conteneur, conteneurSuite];
   const ecouter = (type, fonction) => parties.forEach((partie) => partie.addEventListener(type, fonction));
+  // Blocs repliés (cartouche, autres projets) que l'utilisateur a ouverts : gardés d'un dessin à l'autre.
+  const ouverts = new Set();
+  conteneurSuite.addEventListener('toggle', (evenement) => {
+    const cle = evenement.target.dataset?.bloc;
+    if (!cle) return;
+    if (evenement.target.open) ouverts.add(cle);
+    else ouverts.delete(cle);
+  }, true);
+  const ouvert = (cle) => (ouverts.has(cle) ? 'open' : '');
   ecouter('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
@@ -63,33 +72,22 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
           </div>
         </section>
       `;
+      const { affaire, dessinePar, date } = projet.cartouche;
+      const resumeCartouche = [affaire && `affaire ${affaire}`, dessinePar, date && date.split('-').reverse().join('.')].filter(Boolean).join(' · ') || 'à remplir';
       conteneurSuite.innerHTML = `
-
-        <section class="carte-section">
-          ${titreSection('cartouche', 'Cartouche du PDF', bulle('cartouche'))}
+        <details class="carte-section bloc-replie" data-bloc="cartouche" ${ouvert('cartouche')}>
+          <summary>${titreSection('cartouche', 'Cartouche du PDF')}<span class="aide">${echapper(resumeCartouche)}</span></summary>
+          ${bulle('cartouche')}
           <div class="champs-export">
-            <label>Affaire <input type="text" data-cartouche="affaire" value="${echapper(projet.cartouche.affaire ?? '')}" placeholder="ex. 10 203" /></label>
-            <label>Dessiné par <input type="text" data-cartouche="dessinePar" value="${echapper(projet.cartouche.dessinePar ?? '')}" placeholder="ex. MGO" /></label>
-            <label>Date (vide : date du jour) <input type="date" data-cartouche="date" value="${echapper(projet.cartouche.date ?? '')}" /></label>
+            <label>Affaire <input type="text" data-cartouche="affaire" value="${echapper(affaire ?? '')}" placeholder="ex. 10 203" /></label>
+            <label>Dessiné par <input type="text" data-cartouche="dessinePar" value="${echapper(dessinePar ?? '')}" placeholder="ex. MGO" /></label>
+            <label>Date (vide : date du jour) <input type="date" data-cartouche="date" value="${echapper(date ?? '')}" /></label>
           </div>
-        </section>
+        </details>
 
-        <section class="carte-section">
-          ${titreSection('fichier', 'Fichier projet')}
-          <p class="aide">Pour passer du téléphone à l'ordinateur (et l'inverse).</p>
-          <div class="ligne-outils">
-            <button type="button" class="bouton-secondaire" data-action="exporter">Exporter le fichier projet</button>
-            <label class="bouton-secondaire bouton-fichier">
-              Ouvrir un fichier projet
-              <input type="file" data-champ="fichier-projet" accept=".json,application/json" hidden />
-            </label>
-          </div>
-        </section>
-
-        <section class="carte-section">
-          ${titreSection('projets', 'Mes projets sur cet appareil')}
+        <details class="carte-section bloc-replie" data-bloc="projets" ${ouvert('projets')}>
+          <summary>${titreSection('projets', 'Autres projets et fichier projet')}<span class="aide">${autres.length === 0 ? 'aucun autre projet' : `${autres.length} autre${autres.length > 1 ? 's' : ''} projet${autres.length > 1 ? 's' : ''}`}</span></summary>
           <button type="button" class="bouton-secondaire" data-action="nouveau">+ Nouveau projet</button>
-          ${autres.length === 0 ? '<p class="aide">Aucun autre projet pour l\'instant.</p>' : ''}
           <div class="liste-projets">
             ${autres
               .map(
@@ -108,9 +106,15 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
               )
               .join('')}
           </div>
-        </section>
-
-        <div class="pied-projet">
+          <p class="titre-section">Fichier projet</p>
+          <p class="aide">Pour passer du téléphone à l'ordinateur (et l'inverse).</p>
+          <div class="ligne-outils">
+            <button type="button" class="bouton-secondaire" data-action="exporter">Exporter le fichier projet</button>
+            <label class="bouton-secondaire bouton-fichier">
+              Ouvrir un fichier projet
+              <input type="file" data-champ="fichier-projet" accept=".json,application/json" hidden />
+            </label>
+          </div>
           ${
             resumeOuvert
               ? `<p class="ligne-outils">Projet ouvert :
@@ -119,8 +123,9 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
                 </p>`
               : ''
           }
-          <p class="aide">Version de l'appli : ${__VERSION_APPLI__}${estDansAppliAndroid() ? ' (appli Android)' : ''}</p>
-        </div>
+        </details>
+
+        <p class="aide pied-projet">Version de l'appli : ${__VERSION_APPLI__}${estDansAppliAndroid() ? ' (appli Android)' : ''}</p>
       `;
     },
   };

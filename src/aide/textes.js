@@ -14,7 +14,7 @@ export const TEXTES_AIDE = {
   importer:
     'Fichier de points : CSV Emlid ou TXT (nom, Est, Nord, altitude, séparés par des tabulations), en MN95. Les lignes illisibles sont signalées avec leur numéro.',
   leves:
-    'Un levé = un fichier de points. Le levé coché est celui affiché sur le plan, avec ses surfaces. Avec plusieurs levés (deux dates), tu peux calculer le volume entre leurs surfaces dans l\'onglet Calculs › Volumes.',
+    'Un levé = un fichier de points importé (CSV d\'Emlid Flow, ou TXT : nom, Est, Nord, altitude, en MN95), ou les points pris avec le récepteur (onglet Terrain). Le levé coché est celui affiché sur le plan, avec ses surfaces. Avec plusieurs levés (deux dates), tu peux calculer le volume entre leurs surfaces dans l\'onglet Calculs › Volumes.',
 
   // --- 2.1 Surfaces ---
   surfaces:
