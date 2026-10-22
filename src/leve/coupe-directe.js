@@ -1,4 +1,4 @@
-// Dessin d'une coupe en direct (onglet Terrain, mode Contrôler) : le profil de la surface sur
+// Dessin d'une coupe en direct (onglet Terrain, mode Implanter) : le profil de la surface sur
 // quelques mètres de part et d'autre du récepteur, et le bout de canne dessus (SVG).
 // Hauteurs à la même échelle que les longueurs (×1), ou deux fois plus grandes (×2), au choix.
 // La hauteur du dessin suit le relief (entre un minimum et un maximum) ; au-delà, il est coupé.

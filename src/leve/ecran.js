@@ -15,7 +15,7 @@ import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE } from '../topo/leve-direct.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
-import { MODES_ACCROCHE } from '../topo/accroche.js';
+import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage } from '../topo/accroche.js';
 import { lireTexteLibelles, ecrireTexteLibelles } from './libelles.js';
 
 // Mode Contrôler : ce qu'on implante (Ligne viendra plus tard), vue des coupes, longueurs.
@@ -36,13 +36,20 @@ const NATURES_TERRAIN = [
   ['terrain', 'Terrain naturel'],
   ['terrassement', 'Terrassement'],
 ];
-// Accroches : un petit dessin chacune, comme dans AutoCAD (le nom en bulle et pour la lecture d'écran).
+// Accroches : un dessin (en gris ce qu'on touche, en ambre l'endroit accroché) et un mot dessous.
+// [mot, nom complet (bulle, lecture d'écran), dessin].
 const ACCROCHES = {
-  sommet: ['Sommet', '<path d="M3 20 12 7l9 13" /><rect x="9" y="4" width="6" height="6" />'],
-  milieu: ['Milieu', '<path d="M2 18h20" /><path d="M12 7l6 10H6z" />'],
-  ligne: ['Sur la ligne', '<path d="M3 21 21 5" /><path d="M7 6h8l-8 9h8z" />'],
-  centre: ['Centre du cercle', '<circle cx="12" cy="12" r="8" /><path d="M12 8v8M8 12h8" />'],
+  point: ['Point', 'Point du projet (levé ou importé)', '<path d="M12 3v5M12 16v5M3 12h5M16 12h5" /><circle class="repere" cx="12" cy="12" r="3.5" />'],
+  sommet: ['Sommet', 'Sommet d\'une ligne du plan DXF', '<path d="M3 20 12 6l9 14" /><rect class="repere" x="9" y="3" width="6" height="6" />'],
+  milieu: ['Milieu', 'Milieu d\'un segment du plan DXF', '<path d="M2 17h20" /><circle cx="2.5" cy="17" r="1.5" /><circle cx="21.5" cy="17" r="1.5" /><path class="repere" d="M12 8l5 9H7z" />'],
+  ligne: ['Sur ligne', 'Sur une ligne du plan DXF (endroit le plus proche)', '<path d="M3 21 21 3" /><path class="repere" d="M8 8l8 8M16 8l-8 8" />'],
+  centre: ['Centre', 'Centre d\'un cercle du plan DXF', '<circle cx="12" cy="12" r="9" /><circle class="repere" cx="12" cy="12" r="2.5" />'],
 };
+// Guidage vers le point : par rapport au cap du RX2 (avance / droite) ou nord / sud / est / ouest.
+const GUIDAGES = [
+  ['rx2', 'Cap RX2'],
+  ['nseo', 'N-S-E-O'],
+];
 const TITRES_COUPES = {
   perpendiculaire: { titre: 'Perpendiculaire', gauche: '← gauche', droite: 'droite →' },
   axe: { titre: 'Dans l\'axe', gauche: '← derrière', droite: 'devant →' },
@@ -61,10 +68,12 @@ const ICONES = {
  * annulerDernierPoint(), choisirLibelle(abréviation), enregistrerLibelles({ lignes, points }),
  * choisirMode(mode), choisirSurfaceControle(id), choisirVueCoupes(vue),
  * choisirLongueurCoupe(m), choisirExagerationCoupe(facteur), choisirSourceOrientation(source),
- * choisirImplantation(quoi), choisirAccroche(mode), implanterChoix({ nom, altitude }),
+ * choisirImplantation(quoi), choisirAccroche(mode), trouverPoint(nom), choisirGuidage('rx2' ou 'nseo'),
+ * implanterChoix({ nom, altitude }),
  * creerPointAImplanter({ nom, altitude }), implanterPoint(id), supprimerPointAImplanter(id),
  * arreterImplantation(), oublierChoix(), enregistrerImplantation(), exporterImplantations()
- * Renvoie { afficher(donnees), prendreDepuisTouche(), enregistrerDepuisTouche(), mettreAJourRecepteur(etat, direct) }.
+ * Renvoie { afficher(donnees), prendreDepuisTouche(), enregistrerDepuisTouche(), mettreAJourRecepteur(etat, direct),
+ * mettreAJourBoussole(cap) }.
  */
 export function creerEcranLeve(conteneur, actions) {
   let etat = null; // dernier état du récepteur (voir src/android/pont.js)
@@ -72,6 +81,8 @@ export function creerEcranLeve(conteneur, actions) {
   let choixNatureOuvert = false; // « + Nouvelle » touché : on choisit stock, terrain naturel ou terrassement
   let libellesOuverts = false; // listes de libellés en cours de modification
   let direct = null; // orientation et contrôle calculés par main.js à chaque état du récepteur
+  let cibleAffichee = 0; // cible montrée près du point à implanter (0 : aucune, voir CIBLES)
+  let capBoussole = null; // dernier cap de la boussole de la tablette (°), ou null
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
@@ -99,6 +110,10 @@ export function creerEcranLeve(conteneur, actions) {
       actions[action]({ nom: champ('nom-implantation'), altitude: champ('altitude-implantation') });
       return;
     }
+    if (action === 'trouverPoint') {
+      actions.trouverPoint(conteneur.querySelector('[data-champ="nom-a-trouver"]')?.value ?? '');
+      return;
+    }
     if (action === 'prendre') actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '');
     else if (action === 'role') actions.choisirRole(bouton.dataset.role);
     else actions[action]?.(bouton.dataset.valeur);
@@ -110,8 +125,20 @@ export function creerEcranLeve(conteneur, actions) {
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
   });
 
-  // Touche Entrée dans le nom : prend le point (comme le bouton), si c'est permis.
+  // Nom d'un point du projet choisi dans la liste proposée : on le cherche tout de suite.
+  conteneur.addEventListener('change', (evenement) => {
+    const cible = evenement.target;
+    if (cible.dataset.champ === 'nom-a-trouver' && donnees?.implanter.nomsPoints.includes(cible.value.trim())) actions.trouverPoint(cible.value);
+  });
+
+  // Touche Entrée dans le nom : prend le point (comme le bouton), si c'est permis ; dans le nom
+  // d'un point à implanter : le cherche.
   conteneur.addEventListener('keydown', (evenement) => {
+    if (evenement.key === 'Enter' && evenement.target.dataset.champ === 'nom-a-trouver') {
+      evenement.preventDefault();
+      actions.trouverPoint(evenement.target.value);
+      return;
+    }
     if (evenement.key !== 'Enter' || evenement.target.dataset.champ !== 'nom-point') return;
     evenement.preventDefault();
     const bouton = conteneur.querySelector('[data-action="prendre"]');
@@ -164,7 +191,11 @@ export function creerEcranLeve(conteneur, actions) {
     else if (donnees?.mode === 'controler') rafraichirControle();
   }
 
-  /** Implantation d'un point : guidage vers le point et bouton « Enregistrer l'implantation ». */
+  /**
+   * Implantation d'un point : guidage vers le point et bouton « Enregistrer l'implantation ».
+   * Loin (2 m ou plus) : une flèche et les écarts ; plus près : une cible dont le centre est le
+   * point, de plus en plus précise (2 m, puis 1 m, puis 20 cm).
+   */
   function rafraichirImplantation() {
     const g = direct?.implantation;
     const bouton = conteneur.querySelector('[data-action="enregistrerImplantation"]');
@@ -172,25 +203,31 @@ export function creerEcranLeve(conteneur, actions) {
     const zone = conteneur.querySelector('[data-vivant="guidage"]');
     if (!zone) return;
     if (!g || g.message) {
+      cibleAffichee = 0;
       zone.className = 'guidage-direct attente';
       zone.innerHTML = `<span class="message-ecart">${echapper(g?.message ?? 'En attente de la position…')}</span>`;
       return;
     }
-    const { avance, droite, est, nord, distance, direction, azimut } = g.guidage;
+    const { distance, direction, azimut } = g.guidage;
+    const { haut, droite, nordEnHaut } = ecartsGuidage(g.guidage, donnees.controle.guidage);
     const m = (valeur) => `${formaterNombre(Math.abs(valeur))} m`;
-    // Flèche vers le point : par rapport à la direction regardée, sinon par rapport au nord.
-    const angle = azimut == null ? direction : direction - azimut;
-    const lignes = avance == null
-      ? [`${nord >= 0 ? 'Nord' : 'Sud'} ${m(nord)}`, `${est >= 0 ? 'Est' : 'Ouest'} ${m(est)}`]
-      : [`${avance >= 0 ? '↑ Avance' : '↓ Recule'} ${m(avance)}`, `${droite >= 0 ? '→ Droite' : '← Gauche'} ${m(droite)}`];
+    const lignes = nordEnHaut
+      ? [`${haut >= 0 ? '↑ Nord (devant)' : '↓ Sud (derrière)'} ${m(haut)}`, `${droite >= 0 ? '→ Est (droite)' : '← Ouest (gauche)'} ${m(droite)}`]
+      : [`${haut >= 0 ? '↑ Avance' : '↓ Recule'} ${m(haut)}`, `${droite >= 0 ? '→ Droite' : '← Gauche'} ${m(droite)}`];
     const hauteur = g.ecartAltitude == null
       ? ''
       : `<span class="hauteur-guidage ${g.classeAltitude}">${g.ecartAltitude >= 0 ? '↑ Monter' : '↓ Descendre'} ${m(g.ecartAltitude)}</span>`;
-    zone.className = `guidage-direct ${g.classe}`;
+    cibleAffichee = cibleSelonDistance(distance, cibleAffichee);
+    // Flèche vers le point : par rapport à la direction regardée, sinon par rapport au nord.
+    const angle = nordEnHaut ? direction : direction - azimut;
+    const dessin = cibleAffichee > 0
+      ? svgCible(cibleAffichee, haut, droite, g.classe, nordEnHaut)
+      : `<svg class="fleche-guidage" viewBox="-20 -20 40 40" aria-hidden="true"><path d="M0 -17 11 6 0 0 -11 6Z" transform="rotate(${angle.toFixed(1)})" /></svg>`;
+    zone.className = `guidage-direct ${g.classe} ${cibleAffichee > 0 ? 'avec-cible' : ''}`;
     zone.innerHTML = `
-      <svg class="fleche-guidage" viewBox="-20 -20 40 40" aria-hidden="true"><path d="M0 -17 11 6 0 0 -11 6Z" transform="rotate(${angle.toFixed(1)})" /></svg>
+      ${dessin}
       <span class="lignes-guidage">${lignes.map((texte) => `<span>${texte}</span>`).join('')}</span>
-      <span class="distance-guidage">${formaterNombre(distance)} m${azimut == null ? ' · nord en haut' : ''}</span>
+      <span class="distance-guidage">${formaterNombre(distance)} m${nordEnHaut ? ' · nord en haut' : ''}</span>
       ${hauteur}`;
   }
 
@@ -263,16 +300,35 @@ export function creerEcranLeve(conteneur, actions) {
   }
 
   /**
-   * Implantation d'un point : accroche (4 petits dessins), point choisi sur le plan (implanter ou
-   * créer), guidage, enregistrement, liste « À implanter ».
+   * Barre d'accroche (implantation d'un point), entre le plan et Lever | Implanter : cinq boutons
+   * (dessin + mot) pour choisir ce que l'on accroche en touchant le plan, ou le nom d'un point du
+   * projet à taper.
+   */
+  function barreAccroche() {
+    const { implanter: imp } = donnees;
+    return `<div class="barre-accroche">
+      <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
+        ${MODES_ACCROCHE.map((mode) => {
+          const [mot, nom, dessin] = ACCROCHES[mode];
+          return `<button type="button" class="bouton-accroche ${imp.accroche === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${nom}" aria-label="${nom}" aria-pressed="${imp.accroche === mode}">
+            <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span>${mot}</span></button>`;
+        }).join('')}
+      </div>
+      <div class="accroche-par-nom">
+        <input type="text" list="noms-points-projet" data-champ="nom-a-trouver" placeholder="ou tape le nom d'un point du projet" autocomplete="off" autocapitalize="characters" aria-label="Nom du point à implanter" />
+        <datalist id="noms-points-projet">${imp.nomsPoints.map((nom) => `<option value="${echapper(nom)}"></option>`).join('')}</datalist>
+        <button type="button" class="bouton-secondaire" data-action="trouverPoint">OK</button>
+      </div>
+      ${imp.choix || imp.cible ? '' : '<p class="aide">Choisis une accroche, puis touche le plan.</p>'}
+    </div>`;
+  }
+
+  /**
+   * Implantation d'un point : point choisi (implanter ou créer), guidage (cible, boussole),
+   * enregistrement, liste « À implanter ».
    */
   function implanterPoint() {
     const { implanter: imp, controle: reglages } = donnees;
-    const accroches = `<div class="accroches" role="group" aria-label="Accroche">
-      ${MODES_ACCROCHE.map((mode) => `<button type="button" class="bouton-accroche ${imp.accroche === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${ACCROCHES[mode][0]}" aria-label="${ACCROCHES[mode][0]}" aria-pressed="${imp.accroche === mode}">
-          <svg viewBox="0 0 24 24" aria-hidden="true">${ACCROCHES[mode][1]}</svg></button>`).join('')}
-      <span class="aide">${imp.choix ? '' : 'puis touche le plan'}</span>
-    </div>`;
     const choix = imp.choix
       ? `<div class="choix-implantation">
           <p class="coordonnees-choix">${imp.choix.nom ? `<strong>${echapper(imp.choix.nom)}</strong> ` : ''}E ${formaterNombre(imp.choix.est)} · N ${formaterNombre(imp.choix.nord)}
@@ -290,7 +346,10 @@ export function creerEcranLeve(conteneur, actions) {
     const cible = imp.cible
       ? `<p class="titre-guidage">Vers <strong>${echapper(imp.cible.nom ?? 'le point choisi')}</strong>${imp.cible.altitude != null ? ` · H ${formaterNombre(imp.cible.altitude)}` : ''}
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="arreterImplantation">arrêter</button></p>
-        <div class="guidage-direct attente" data-vivant="guidage"></div>
+        <div class="guidage-et-boussole">
+          <div class="guidage-direct attente" data-vivant="guidage"></div>
+          ${boussole()}
+        </div>
         <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
           <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol − de la tablette</span>
         </button>
@@ -310,13 +369,26 @@ export function creerEcranLeve(conteneur, actions) {
       ? `<p class="aide">${imp.nbImplantations} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
       : '';
     return `
-      ${accroches}
       ${choix}
       ${cible}
       ${liste}
       ${exporter}
-      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
+      <div class="ligne-choix"><span>Guidage</span>${boutonsChoix('choisirGuidage', GUIDAGES, reglages.guidage)}</div>
       <p class="aide" data-vivant="orientation"></p>`;
+  }
+
+  /**
+   * Boussole de la tablette : l'aiguille montre le nord (le haut = le haut de la tablette).
+   * Tournée à chaque nouvelle valeur par mettreAJourBoussole, sans redessiner l'écran.
+   */
+  function boussole() {
+    return `<div class="boussole" data-vivant="boussole" title="Boussole de la tablette (nord magnétique, environ 3° près)">
+      <svg viewBox="-30 -30 60 60" aria-hidden="true">
+        <circle r="27" class="cadran" />
+        <g class="aiguille" data-vivant="aiguille"><path d="M0 -22 6 0H-6Z" class="nord" /><path d="M0 22 6 0H-6Z" class="sud" /><text y="-11" text-anchor="middle">N</text></g>
+      </svg>
+      <span class="aide" data-vivant="texte-boussole">boussole…</span>
+    </div>`;
   }
 
   /** Connexion au récepteur : un gros bouton tant qu'il n'est pas connecté. */
@@ -489,6 +561,12 @@ export function creerEcranLeve(conteneur, actions) {
      *   implantation: { guidage (voir topo/accroche.js, avec azimut), classe, ecartAltitude,
      *   classeAltitude, message } ou null }.
      */
+    /** Nouveau cap de la boussole de la tablette (°, 0 = nord), ou null s'il n'y en a pas. */
+    mettreAJourBoussole(cap) {
+      capBoussole = cap;
+      tournerBoussole();
+    },
+
     mettreAJourRecepteur(nouvelEtat, nouveauDirect = null) {
       etat = nouvelEtat;
       direct = nouveauDirect;
@@ -501,13 +579,52 @@ export function creerEcranLeve(conteneur, actions) {
     if (!donnees) return;
     conteneur.innerHTML = `
         <div class="ecran-terrain">
+          ${donnees.mode === 'controler' && donnees.controle.implantation === 'point' ? barreAccroche() : ''}
           ${choixMode()}
           ${connexion()}
           ${donnees.mode === 'controler' ? controle() : priseDePoint()}
           ${piedRecepteur()}
         </div>`;
     rafraichirVivant();
+    tournerBoussole();
   }
+
+  /** Tourne l'aiguille de la boussole selon le dernier cap de la tablette. */
+  function tournerBoussole() {
+    const aiguille = conteneur.querySelector('[data-vivant="aiguille"]');
+    const texte = conteneur.querySelector('[data-vivant="texte-boussole"]');
+    if (!aiguille) return;
+    if (capBoussole == null) {
+      if (texte) texte.textContent = 'boussole indisponible';
+      return;
+    }
+    // Le nord est à « -cap » du haut de la tablette.
+    aiguille.setAttribute('transform', `rotate(${(-capBoussole).toFixed(1)})`);
+    if (texte) texte.textContent = `cap ${Math.round(capBoussole)}°`;
+  }
+}
+
+/**
+ * Cible autour du point à implanter (au centre) : 4 cercles (voir CIBLES) avec leur rayon écrit, et
+ * la position du récepteur (rond de la couleur de la distance). En haut : devant (cap RX2) ou le
+ * nord. haut, droite : où est le point par rapport au récepteur (m).
+ */
+function svgCible(numero, haut, droite, classe, nordEnHaut) {
+  const { cercles } = CIBLES[numero - 1];
+  const echelle = 100 / cercles[0]; // le grand cercle fait 100 unités de rayon
+  const texteRayon = (r) => (r >= 1 ? `${r} m` : `${Math.round(r * 100)} cm`);
+  // Le récepteur est à l'opposé du point : s'il faut avancer, il est en dessous du centre.
+  const limiter = (v) => Math.max(-108, Math.min(108, v));
+  const x = limiter(-droite * echelle);
+  const y = limiter(haut * echelle);
+  return `<svg class="cible-implantation cible-${numero}" viewBox="-120 -124 240 240" role="img" aria-label="Cible ${texteRayon(cercles[0])}">
+    ${cercles.map((r, i) => `<circle r="${r * echelle}" class="anneau anneau-${i}" />`).join('')}
+    ${cercles.map((r) => `<text x="${(r * echelle * Math.SQRT1_2 + 2).toFixed(1)}" y="${(r * echelle * Math.SQRT1_2 + 12).toFixed(1)}" class="rayon">${texteRayon(r)}</text>`).join('')}
+    <path d="M-110 0H110M0 -110V110" class="axes" />
+    <text y="-112" text-anchor="middle" class="haut-cible">${nordEnHaut ? 'N' : 'devant'}</text>
+    <path d="M-7 0H7M0 -7V7" class="centre-cible" />
+    <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" class="moi ${classe}" />
+  </svg>`;
 }
 
 /**

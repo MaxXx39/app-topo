@@ -1,22 +1,23 @@
-// Implantation d'un point (onglet Terrain, mode Contrôler › Point) : trouver le point voulu sur le
+// Implantation d'un point (onglet Terrain, mode Implanter › Point) : trouver le point voulu sur le
 // plan en le touchant (« accroche »), puis guider jusqu'à lui et noter les écarts une fois dessus.
 //
-// Quatre façons d'accrocher (choisies par l'utilisateur, 22.10.2026) :
-// - 'sommet'  : le sommet (ou l'extrémité) de ligne le plus proche du doigt ; aussi les points des
-//               plans DXF, les points levés et les points « À implanter » ;
+// Cinq façons d'accrocher (choisies par l'utilisateur, 22.10.2026) :
+// - 'point'   : un point du projet (levé, importé ou « À implanter »), pas ceux du plan DXF ;
+// - 'sommet'  : le sommet (ou l'extrémité) de ligne le plus proche du doigt, et les points du plan DXF ;
 // - 'milieu'  : le milieu du segment de ligne touché ;
 // - 'ligne'   : l'endroit de la ligne le plus proche du doigt (projection sur le segment) ;
 // - 'centre'  : le centre du cercle touché (sur le cercle ou dedans).
 // Coordonnées MN95 Est, Nord (m) ; altitude (m) ou null si inconnue (plan en 2D).
 
-export const MODES_ACCROCHE = ['sommet', 'milieu', 'ligne', 'centre'];
+export const MODES_ACCROCHE = ['point', 'sommet', 'milieu', 'ligne', 'centre'];
 
 /**
  * Cherche le point accroché près de "position" ({ est, nord }), à moins de "tolerance" m.
  * sources = {
  *   lignes:  [{ points: [{ est, nord, altitude }] , ferme }],   (traits des plans DXF)
  *   cercles: [{ est, nord, rayon }],
- *   points:  [{ est, nord, altitude, nom }],                    (points DXF, levés, à implanter)
+ *   points:  [{ est, nord, altitude, nom }],                    (mode 'point' : points du projet ;
+ *                                                                 mode 'sommet' : points du plan DXF)
  * }
  * Renvoie { est, nord, altitude (ou null), mode, nom (pour un point existant) } ou null.
  */
@@ -33,14 +34,14 @@ export function accrocher(mode, position, tolerance, { lignes = [], cercles = []
     return meilleur ? { est: meilleur.cercle.est, nord: meilleur.cercle.nord, altitude: meilleur.cercle.altitude ?? null, mode } : null;
   }
 
-  if (mode === 'sommet') {
+  if (mode === 'sommet' || mode === 'point') {
     let meilleur = null;
     const essayer = (p, nom = null) => {
       const d = Math.hypot(position.est - p.est, position.nord - p.nord);
       if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, p, nom };
     };
     for (const point of points) essayer(point, point.nom ?? null);
-    for (const ligne of lignes) for (const sommet of ligne.points) essayer(sommet);
+    if (mode === 'sommet') for (const ligne of lignes) for (const sommet of ligne.points) essayer(sommet);
     return meilleur ? { est: meilleur.p.est, nord: meilleur.p.nord, altitude: meilleur.p.altitude ?? null, mode, nom: meilleur.nom } : null;
   }
 
@@ -124,6 +125,50 @@ export function classeDistance(distance) {
   if (valeur <= 0.02) return 'vert-clair';
   if (valeur <= 0.05) return 'jaune-orange';
   return 'loin';
+}
+
+// Cibles affichées près du point (choix de l'utilisateur, 22.10.2026) : en dessous de 2 m, une
+// cible dont le centre est le point ; elle « zoome » en dessous de 1 m, puis de 20 cm.
+// [distance où elle commence (m), rayons des cercles (m), du plus grand au plus petit].
+export const CIBLES = [
+  { jusqua: 2, cercles: [2, 1.5, 1, 0.5] },
+  { jusqua: 1, cercles: [1, 0.75, 0.5, 0.25] },
+  { jusqua: 0.2, cercles: [0.2, 0.1, 0.05, 0.02] },
+];
+// Marge pour ne pas passer sans cesse d'une cible à l'autre quand on est juste à la limite (5 %).
+const MARGE_CIBLE = 0.05;
+
+/**
+ * Cible à montrer pour une distance au point (m) : 0 = pas de cible (2 m ou plus), 1, 2 ou 3 =
+ * numéro dans CIBLES. "precedente" (numéro affiché juste avant) évite de changer de cible tant
+ * qu'on ne dépasse pas la limite de plus de 5 %.
+ */
+export function cibleSelonDistance(distance, precedente = 0) {
+  let numero = 0;
+  CIBLES.forEach((cible, i) => {
+    if (distance < cible.jusqua) numero = i + 1;
+  });
+  if (numero === precedente) return numero;
+  // Changement : seulement si on est bien entré dans la nouvelle zone (ou bien sorti de l'ancienne).
+  if (numero > precedente) {
+    const limite = CIBLES[numero - 1].jusqua;
+    return distance < limite * (1 - MARGE_CIBLE) ? numero : precedente;
+  }
+  const limiteAncienne = CIBLES[precedente - 1].jusqua;
+  return distance >= limiteAncienne * (1 + MARGE_CIBLE) ? numero : precedente;
+}
+
+/**
+ * Écarts à montrer selon le guidage choisi :
+ * - 'rx2' : « avance / recule », « droite / gauche » selon la direction regardée (cap du RX2, ou
+ *   sens de la marche ; sans orientation : comme 'nseo') ;
+ * - 'nseo' : nord / sud, est / ouest (on se tourne vers le nord : devant = nord, derrière = sud).
+ * Renvoie { haut, droite } (m) : ce qui est devant / en haut de la cible (> 0) et à droite (> 0),
+ * et nordEnHaut (vrai si la cible et la flèche sont orientées nord en haut).
+ */
+export function ecartsGuidage(g, mode) {
+  if (mode === 'rx2' && g.avance != null) return { haut: g.avance, droite: g.droite, nordEnHaut: false };
+  return { haut: g.nord, droite: g.est, nordEnHaut: true };
 }
 
 /** Nom proposé pour un nouveau point à implanter : I-1, I-2… (le plus grand du projet + 1). */

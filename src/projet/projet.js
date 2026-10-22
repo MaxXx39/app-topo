@@ -15,7 +15,7 @@
 //                                   // dessinePar, date : anciens champs (réglés maintenant au moment du PDF)
 //   plansDxf: [{ id, nom, importeLe, origine, bornes, calques, contenu, compte }],  // fonds de plan DXF
 //                                   // (voir topo/dxf-plan.js) : affichés sous le levé, pour l'implantation
-//   aImplanter: [{ id, nom, est, nord, altitude (ou null) }],   // points à implanter (Terrain › Contrôler › Point)
+//   aImplanter: [{ id, nom, est, nord, altitude (ou null) }],   // points à implanter (Terrain › Implanter › Point)
 //   implantations: [{ id, nom, cible: { est, nord, altitude }, mesure: { est, nord, altitude, gnss },
 //                     ecarts: { dEst, dNord, distance, dAltitude }, le (date ISO) }],  // implantations enregistrées
 // }

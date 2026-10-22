@@ -108,7 +108,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   let points = [];
   let vue = null;
   // Position du récepteur (appli Android) : { est, nord, prete, azimut (°, ou null),
-  // coupes: [{ sens, debut, fin }] (coupes en direct du mode Contrôler) } ou null.
+  // coupes: [{ sens, debut, fin }] (coupes en direct du mode Implanter) } ou null.
   let position = null;
   // Suivi de la position : le plan se recentre sur elle à chaque mise à jour (bouton « Ma position »),
   // jusqu'à ce qu'on déplace le plan au doigt.
@@ -117,7 +117,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // repère du plan, en m) puis seulement déplacé et agrandi : id -> { plan, cle, groupe }.
   let plansDxf = [];
   const dessinsDxf = new Map();
-  // Implantation d'un point (Terrain › Contrôler › Point) : { actif (toucher le plan accroche un
+  // Implantation d'un point (Terrain › Implanter › Point) : { actif (toucher le plan accroche un
   // point), aImplanter: [{ nom, est, nord }], choix: { est, nord } (croix), cible: { est, nord, nom } } ou null.
   let implantation = null;
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).

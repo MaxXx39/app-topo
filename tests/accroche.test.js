@@ -1,6 +1,6 @@
 // Tests de l'implantation d'un point : accroche (sommet, milieu, sur la ligne, centre), guidage, écarts.
 import { describe, it, expect } from 'vitest';
-import { accrocher, projeterSurSegment, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, sourcesDesPlans, csvImplantations } from '../src/topo/accroche.js';
+import { accrocher, projeterSurSegment, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, sourcesDesPlans, csvImplantations, cibleSelonDistance, ecartsGuidage } from '../src/topo/accroche.js';
 
 const p = (est, nord, altitude = null) => ({ est, nord, altitude });
 // Une ligne en L : (0,0) → (10,0) → (10,10), et une chambre de rayon 0.4 en (5, 5).
@@ -15,6 +15,11 @@ describe('accroche', () => {
     expect(accrocher('sommet', p(9.8, 0.3), 0.5, SOURCES)).toMatchObject({ est: 10, nord: 0, altitude: 401, mode: 'sommet', nom: null });
     expect(accrocher('sommet', p(2.1, 3.1), 0.5, SOURCES)).toMatchObject({ est: 2, nord: 3, altitude: 402, nom: 'P-RG-1' });
     expect(accrocher('sommet', p(5, 2), 0.5, SOURCES)).toBeNull();
+  });
+
+  it('point : seulement les points (du projet), jamais les sommets des lignes', () => {
+    expect(accrocher('point', p(2.1, 3.1), 0.5, SOURCES)).toMatchObject({ est: 2, nord: 3, altitude: 402, nom: 'P-RG-1', mode: 'point' });
+    expect(accrocher('point', p(9.8, 0.3), 0.5, SOURCES)).toBeNull();
   });
 
   it('milieu : le milieu du segment touché (altitude au milieu si les deux bouts en ont une)', () => {
@@ -109,5 +114,33 @@ describe('plans DXF et export', () => {
       le: '2026-10-22T10:00:00.000Z',
     }]);
     expect(texte.split('\r\n')[1]).toBe('I-1;10.000;20.000;;10.012;19.995;412.470;0.012;-0.005;0.013;;2026-10-22T10:00:00.000Z');
+  });
+});
+
+describe('cibles et sens du guidage', () => {
+  it('pas de cible à 2 m ou plus, puis cible 1 (< 2 m), 2 (< 1 m), 3 (< 20 cm)', () => {
+    expect(cibleSelonDistance(2.5)).toBe(0);
+    expect(cibleSelonDistance(1.5)).toBe(1);
+    expect(cibleSelonDistance(0.6)).toBe(2);
+    expect(cibleSelonDistance(0.05)).toBe(3);
+  });
+
+  it('ne change pas de cible tant qu\'on reste à 5 % de la limite', () => {
+    expect(cibleSelonDistance(0.98, 1)).toBe(1); // pas encore 0.95 m : on garde la cible 1
+    expect(cibleSelonDistance(0.94, 1)).toBe(2);
+    expect(cibleSelonDistance(1.02, 2)).toBe(2); // pas encore 1.05 m : on garde la cible 2
+    expect(cibleSelonDistance(1.06, 2)).toBe(1);
+    expect(cibleSelonDistance(3, 3)).toBe(0); // loin d'un coup : plus de cible
+  });
+
+  it('cap RX2 : devant / droite ; N-S-E-O (ou sans orientation) : nord / est', () => {
+    // Point à 3 m au nord et 4 m à l'est ; on regarde vers l'est (90°).
+    const g = guidage(p(0, 0), p(4, 3), 90);
+    const rx2 = ecartsGuidage(g, 'rx2');
+    expect(rx2.haut).toBeCloseTo(4); // devant
+    expect(rx2.droite).toBeCloseTo(-3); // le nord est à gauche
+    expect(rx2.nordEnHaut).toBe(false);
+    expect(ecartsGuidage(g, 'nseo')).toMatchObject({ haut: 3, droite: 4, nordEnHaut: true });
+    expect(ecartsGuidage(guidage(p(0, 0), p(4, 3)), 'rx2')).toMatchObject({ haut: 3, droite: 4, nordEnHaut: true });
   });
 });

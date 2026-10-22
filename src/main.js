@@ -42,6 +42,7 @@ import * as historique from './projet/historique.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
+import { ecouterBoussole } from './leve/boussole.js';
 import { lireLibelles, enregistrerLibelles } from './leve/libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe } from './topo/implantation.js';
 import { MODES_ACCROCHE, accrocher, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
@@ -89,8 +90,9 @@ const terrain = {
   sourceOrientation: 'rx2',
   libelleLigne: 'HT', // dernier libellé choisi pour une ligne de rupture
   libellePoint: 'TN', // et pour un point isolé
-  implantation: 'surface', // mode Contrôler : implanter une surface ou un point
-  accroche: 'sommet', // implantation d'un point : sommet, milieu, sur la ligne ou centre (voir topo/accroche.js)
+  implantation: 'surface', // mode Implanter : implanter une surface ou un point
+  accroche: 'point', // implantation d'un point : point du projet, sommet, milieu, sur la ligne ou centre (voir topo/accroche.js)
+  guidage: 'rx2', // guidage vers le point : 'rx2' (avance / droite selon le cap du RX2) ou 'nseo' (nord / est)
   ...lireReglagesTerrain(),
 };
 // Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
@@ -492,9 +494,26 @@ const ecranLeve = recepteurDisponible()
         recalculer();
       },
       choisirAccroche: (mode) => {
-        terrain.accroche = MODES_ACCROCHE.includes(mode) ? mode : 'sommet';
+        terrain.accroche = MODES_ACCROCHE.includes(mode) ? mode : 'point';
         retenirReglagesTerrain();
-        recalculer();
+        montrerImplantation();
+      },
+      choisirGuidage: (mode) => {
+        terrain.guidage = mode === 'nseo' ? 'nseo' : 'rx2';
+        retenirReglagesTerrain();
+        montrerImplantation();
+      },
+      // Nom d'un point du projet tapé (ou choisi dans la liste) : il devient le point choisi.
+      trouverPoint: (nom) => {
+        const cherche = nom.trim();
+        if (!cherche) return;
+        const trouve = pointsDuProjet().find((p) => p.nom === cherche) ?? pointsDuProjet().find((p) => p.nom.toLowerCase() === cherche.toLowerCase());
+        if (!trouve) {
+          afficherMessage(`Aucun point « ${cherche} » dans le projet`, 3000);
+          return;
+        }
+        implanter.choix = { est: trouve.est, nord: trouve.nord, altitude: trouve.altitude ?? null, nom: trouve.nom, mode: 'point' };
+        montrerImplantation();
       },
       oublierChoix: () => {
         implanter.choix = null;
@@ -652,18 +671,37 @@ function montrerImplantation() {
   mettreAJourToucheVolume();
 }
 
-/** Vrai pendant l'implantation d'un point (Terrain › Contrôler › Point). */
+/** Vrai pendant l'implantation d'un point (Terrain › Implanter › Point). */
 function enImplantationDePoint() {
   return Boolean(ecranLeve) && terrain.mode === 'controler' && terrain.implantation === 'point';
 }
 
-/** Toucher du plan pendant l'implantation d'un point : on cherche le point selon l'accroche choisie. */
+/**
+ * Points du projet que l'on peut implanter : ceux de tous les levés (importés ou levés avec le
+ * récepteur) et les points « À implanter ». Un nom pris deux fois : le premier trouvé.
+ */
+function pointsDuProjet() {
+  const vus = new Set();
+  const liste = [];
+  for (const point of [...projet.leves.flatMap((l) => l.points), ...projet.aImplanter]) {
+    if (vus.has(point.nom)) continue;
+    vus.add(point.nom);
+    liste.push(point);
+  }
+  return liste;
+}
+
+/**
+ * Toucher du plan pendant l'implantation d'un point : on cherche le point selon l'accroche choisie
+ * (« Point » : les points du projet ; les autres : le plan DXF).
+ */
 function toucherPourImplantation(position, tolerance) {
-  const sources = sourcesDesPlans(projet.plansDxf ?? [], position, tolerance);
-  sources.points.push(...(pointsAffiches ?? []), ...projet.aImplanter);
+  const sources = terrain.accroche === 'point'
+    ? { lignes: [], cercles: [], points: pointsDuProjet() }
+    : sourcesDesPlans(projet.plansDxf ?? [], position, tolerance);
   const trouve = accrocher(terrain.accroche, position, tolerance, sources);
   if (!trouve) {
-    const quoi = { sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[terrain.accroche];
+    const quoi = { point: 'aucun point du projet', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[terrain.accroche];
     afficherMessage(`${quoi[0].toUpperCase()}${quoi.slice(1)} sous le doigt : zoome, ou change d'accroche`, 3000);
     return;
   }
@@ -765,6 +803,7 @@ function donneesLeve() {
         return { ...p, fait: derniere ? { distance: derniere.ecarts.distance, dAltitude: derniere.ecarts.dAltitude } : null };
       }),
       nbImplantations: projet.implantations.length,
+      nomsPoints: enImplantationDePoint() ? pointsDuProjet().map((p) => p.nom) : [],
     },
   };
 }
@@ -822,6 +861,21 @@ function calculerControle(etat, orientation) {
   };
 }
 
+// Boussole de la tablette (implantation : savoir où est le nord) : l'aiguille tourne au plus une
+// fois par image affichée.
+if (ecranLeve) {
+  let capEnAttente = null;
+  ecouterBoussole((cap) => {
+    if (capEnAttente === null) {
+      requestAnimationFrame(() => {
+        ecranLeve.mettreAJourBoussole(capEnAttente);
+        capEnAttente = null;
+      });
+    }
+    capEnAttente = cap;
+  });
+}
+
 // État du récepteur, 5 fois par seconde : bandeaux, bloc de levé, position sur le plan.
 if (recepteurDisponible()) {
   ecouterRecepteur((etat) => {
@@ -833,7 +887,7 @@ if (recepteurDisponible()) {
     const implantation = enPoint ? calculerImplantation(etat, orientation) : null;
     ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation });
     const position = etat.connecte && etat.recu ? etat.position : null;
-    // Coupes affichées (mode Contrôler) : leur trait en pointillés sur le plan.
+    // Coupes affichées (mode Implanter) : leur trait en pointillés sur le plan.
     const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
     const traits = controle?.coupes ? vues.map((sens) => ({ sens, debut: controle.coupes[sens].debut, fin: controle.coupes[sens].fin })) : [];
     plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits } : null);
@@ -1188,7 +1242,7 @@ function recalculer({ recadrer = false } = {}) {
   ecranLeve?.afficher(donneesLeve());
   ecranProjet.afficher(projet, resumes);
   // Téléphone, onglet Terrain : le plan reste en haut de l'écran (voir style.css), plus petit
-  // en mode Contrôler pour laisser la place aux coupes.
+  // en mode Implanter pour laisser la place aux coupes.
   document.body.classList.toggle('mode-leve', Boolean(ecranLeve));
   document.body.classList.toggle('mode-controle', Boolean(ecranLeve) && terrain.mode === 'controler');
   mettreAJourToucheVolume();

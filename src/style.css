@@ -3178,24 +3178,34 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   vertical-align: middle;
 }
 
-/* --- Implantation d'un point (version 0.46.0) : Terrain › Contrôler › Point --- */
+/* --- Implantation d'un point : Terrain › Implanter › Point --- */
+/* Barre d'accroche : à part, entre le plan et Lever | Implanter (bande grise, boutons dessin + mot). */
+.barre-accroche {
+  margin: -4px -4px 12px;
+  padding: 8px;
+  border-radius: 12px;
+  background: #e7ebee;
+}
+
 .accroches {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
 }
 
 .bouton-accroche {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 58px;
+  padding: 6px 2px 4px;
   border: 1px solid var(--bordure);
   border-radius: 10px;
   background: var(--surface);
-  color: var(--texte);
+  color: var(--sombre);
+  font-size: 0.75rem;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -3203,15 +3213,161 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   width: 28px;
   height: 28px;
   fill: none;
-  stroke: currentColor;
+  stroke: #6b7780;
   stroke-width: 2;
+  stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* L'endroit accroché, en ambre (comme la croix posée sur le plan). */
+.bouton-accroche svg .repere {
+  stroke: #b45309;
+  fill: #f6ab07;
+  stroke-width: 1.6;
+}
+
+.bouton-accroche svg path.repere[d*='l8 8'] {
+  fill: none;
+  stroke: #f6ab07;
+  stroke-width: 3;
 }
 
 .bouton-accroche.actif {
   border-color: var(--sombre);
   background: var(--sombre);
-  color: #f6ab07;
+  color: #ffffff;
+}
+
+.bouton-accroche.actif svg {
+  stroke: #cbd5dc;
+}
+
+.accroche-par-nom {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.accroche-par-nom input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.barre-accroche .aide {
+  margin: 6px 0 0;
+  text-align: center;
+}
+
+/* Guidage et boussole : la boussole en petit dans le coin en haut à droite. */
+.guidage-et-boussole {
+  position: relative;
+}
+
+.boussole {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.boussole svg {
+  width: 48px;
+  height: 48px;
+}
+
+.boussole .cadran {
+  fill: #ffffff;
+  stroke: var(--sombre);
+  stroke-width: 2;
+}
+
+.boussole .nord {
+  fill: var(--rouge);
+}
+
+.boussole .sud {
+  fill: #9ca3af;
+}
+
+.boussole text {
+  font-size: 9px;
+  font-weight: 800;
+  fill: #ffffff;
+}
+
+.boussole .aide {
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+/* Place pour la boussole, à droite des écarts. */
+.guidage-et-boussole .guidage-direct {
+  padding-right: 76px;
+}
+
+/* Cible (moins de 2 m) : en grand, le point au centre, le récepteur = rond ambre ; les écarts dessous. */
+.guidage-et-boussole .guidage-direct.avec-cible {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 8px 10px 10px;
+  text-align: center;
+}
+
+.guidage-direct.avec-cible .lignes-guidage {
+  grid-template-columns: 1fr 1fr;
+  column-gap: 14px;
+  font-size: 1.15rem;
+}
+
+.cible-implantation {
+  width: 100%;
+  max-width: 300px;
+}
+
+.cible-implantation .anneau {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  opacity: 0.85;
+}
+
+.cible-implantation .anneau-3 {
+  fill: currentColor;
+  fill-opacity: 0.12;
+}
+
+.cible-implantation .axes {
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.35;
+}
+
+.cible-implantation .rayon,
+.cible-implantation .haut-cible {
+  fill: currentColor;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cible-implantation .centre-cible {
+  stroke: #f6ab07;
+  stroke-width: 3;
+}
+
+.cible-implantation .moi {
+  fill: #f6ab07;
+  stroke: currentColor;
+  stroke-width: 3;
 }
 
 .choix-implantation {
