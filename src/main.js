@@ -128,15 +128,17 @@ const ICONES = {
 const ONGLETS = [
   { nom: 'projets', titre: 'Projet' },
   ...(recepteurDisponible() ? [{ nom: 'terrain', titre: 'Terrain' }] : []),
-  { nom: 'calculs', titre: 'Calculs' },
+  { nom: 'calculs', titre: 'Calculs / métrés' },
   { nom: 'plan', titre: 'Plan' },
 ];
-// Les trois parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux).
+// Les trois parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Surfaces et
+// Volumes vont ensemble (un même cadre), Mesures / métrés est à part.
 const PARTIES_CALCULS = [
   ['surfaces', 'Surfaces'],
   ['volumes', 'Volumes'],
-  ['mesures', 'Mesures'],
+  ['mesures', 'Mesures / métrés'],
 ];
+const boutonPartie = ([cle, titre]) => `<button type="button" data-partie="${cle}">${titre}</button>`;
 const estPartieCalculs = (nom) => PARTIES_CALCULS.some(([cle]) => cle === nom);
 let partieCalculs = 'surfaces'; // dernière partie affichée dans Calculs
 
@@ -158,10 +160,13 @@ document.querySelector('#app').innerHTML = `
         <div id="leve-direct"></div>
       </section>
       <nav class="parties-calculs" aria-label="Calculs">
-        ${PARTIES_CALCULS.map(([cle, titre]) => `<button type="button" data-partie="${cle}">${titre}</button>`).join('')}
+        <div class="groupe-surfaces-volumes" role="group" aria-label="Surfaces et volumes">
+          ${PARTIES_CALCULS.slice(0, 2).map(boutonPartie).join('')}
+        </div>
+        <div class="groupe-mesures">${boutonPartie(PARTIES_CALCULS[2])}</div>
       </nav>
       <section class="panneau" data-onglet="surfaces">
-        <h2>Surfaces <span class="aide" id="nom-leve-surfaces"></span> ${bulle('surfaces')}</h2>
+        <h2>Surfaces ${bulle('surfaces')}</h2>
         <p class="vide sans-points">${recepteurDisponible() ? 'Importe des points (onglet Projet) ou lève-les (onglet Terrain), ou importe une surface LandXML ou DXF.' : 'Importe d\'abord des points (onglet Projet), ou une surface LandXML ou DXF.'}</p>
         <div id="message-import-surface"></div>
         <div id="surfaces"></div>
@@ -173,7 +178,7 @@ document.querySelector('#app').innerHTML = `
         <div id="export" class="carte-section"></div>
       </section>
       <section class="panneau" data-onglet="mesures">
-        <h2>Mesures <span class="aide" id="nom-leve-mesures"></span> ${bulle('mesures')}</h2>
+        <h2>Mesures / métrés ${bulle('mesures')}</h2>
         <div id="mesures"></div>
         <div id="export-mesures" class="carte-section"></div>
       </section>
@@ -1164,8 +1169,6 @@ function recalculer({ recadrer = false } = {}) {
   resultatsMesures = new Map(projet.mesures.map((m) => [m.id, calculerMesure(m, pointsDuLeve(m.leveId))]));
 
   for (const element of document.querySelectorAll('.sans-points')) element.hidden = projet.leves.length > 0;
-  document.querySelector('#nom-leve-surfaces').textContent = leve ? `· levé « ${leve.nom} »` : '';
-  document.querySelector('#nom-leve-mesures').textContent = leve ? `· levé « ${leve.nom} »` : '';
   // En-tête : le projet ouvert en grand (affaire - lieu), puis son nom et ce qu'il contient.
   document.querySelector('#titre-projet').textContent = titreProjet(projet);
   document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} surface(s)`].filter(Boolean).join(' · ');

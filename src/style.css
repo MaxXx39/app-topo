@@ -2464,7 +2464,7 @@ body.avec-recepteur .bandeaux-recepteur {
 /* Calculs : Surfaces · Volumes · Mesures, un seul affiché à la fois (boutons en haut de l'onglet). */
 .parties-calculs {
   display: none;
-  gap: 4px;
+  gap: 10px;
   margin-bottom: 10px;
   padding: 4px;
   border-radius: var(--rayon);
@@ -2476,9 +2476,32 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   display: flex;
 }
 
+/* Surfaces et Volumes : un même cadre (ils vont ensemble), Mesures / métrés à part, en cyan. */
+.groupe-surfaces-volumes {
+  flex: 2;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 2px solid var(--ambre);
+  border-radius: 10px;
+}
+
+.groupe-mesures {
+  flex: 1.2;
+  display: flex;
+  padding: 3px;
+  border: 2px dashed #0891b2;
+  border-radius: 10px;
+}
+
+.parties-calculs .groupe-mesures button.actif {
+  background: #0891b2;
+}
+
 .parties-calculs button {
   flex: 1;
   min-height: 40px;
+  line-height: 1.15;
   border: none;
   border-radius: 8px;
   background: none;
@@ -3335,4 +3358,33 @@ svg.plan,
   border: 1px solid var(--bordure);
   border-radius: 8px;
   font-size: 0.95rem;
+}
+
+/* Surface active : son nom dans une liste bien visible (flèche ambre), et le nombre de surfaces. */
+.ligne-etiquette {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.compte-entete {
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bloc-entete select.champ-choix {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 44px;
+  border: 2px solid var(--ambre);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f6ab07' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 24px 24px;
+  cursor: pointer;
 }
