@@ -12,7 +12,7 @@ export const TEXTES_AIDE = {
 
   // --- 1. Points ---
   lever:
-    'Seulement dans l\'appli Android. Appaire d\'abord le RX2 dans les réglages Bluetooth du téléphone, et active dans Emlid Flow « Envoyer la position compensée » ; laisse Emlid Flow ouvert pour les corrections. Choisis le rôle du point avant de le prendre (contour pour un stock, ligne de rupture, point isolé) et ce que tu lèves (HT, BOR, RG… : « modifier » pour compléter la liste). Noms : C-Stock-1-1 (contour), L-HT-1-1 (ligne), P-RG-1 (point), numéros comptés dans tout le projet. PRENDRE LE POINT (ou la touche volume −) est bloqué tant que le RTK n\'est pas fixe et l\'inclinaison pas prête. Coordonnées en MN95, altitudes RAN95.',
+    'Seulement dans l\'appli Android. Appaire d\'abord le RX2 dans les réglages Bluetooth du téléphone, et active dans Emlid Flow « Envoyer la position compensée » ; laisse Emlid Flow ouvert pour les corrections. Choisis le rôle du point avant de le prendre (contour pour un stock, ligne de rupture, point isolé) et ce que tu lèves (HT, BOR, RG… : « modifier » pour compléter la liste). Noms : C-Stock-1-1 (contour), L-HT-1-1 (ligne), P-RG-1 (point), numéros comptés dans tout le projet. Métré : aires (A-ENR-1-1…), longueurs (L-BOR-1-1…) et points comptés (P-RG-1…) ; chacun devient tout seul une mesure de Calculs / métrés › Mesures / métrés. PRENDRE LE POINT (ou la touche volume −) est bloqué tant que le RTK n\'est pas fixe et l\'inclinaison pas prête. Coordonnées en MN95, altitudes RAN95.',
   importer:
     'Fichier de points : CSV Emlid ou TXT (nom, Est, Nord, altitude, séparés par des tabulations), en MN95. Les lignes illisibles sont signalées avec leur numéro.',
   leves:
@@ -50,7 +50,7 @@ export const TEXTES_AIDE = {
 
   // --- 3. Mesures ---
   mesures:
-    'Mesures de longueurs et d\'aires sur les points importés, à part des surfaces et des volumes (une mesure ne crée pas de surface et ne sert jamais pour un volume). « + Longueur » : touche les points dans l\'ordre (ou tape une liste, ou coche). « + Aire » : un contour (fermé automatiquement), et si besoin des lignes de rupture et des points isolés, comme pour une surface. Sur le plan, les mesures sont en cyan pointillé ; touche une mesure pour la choisir.',
+    'Mesures de longueurs et d\'aires sur les points importés, à part des surfaces et des volumes (une mesure ne crée pas de surface et ne sert jamais pour un volume). « + Longueur » : touche les points dans l\'ordre (ou tape une liste, ou coche). « + Aire » : un contour (fermé automatiquement), et si besoin des lignes de rupture et des points isolés, comme pour une surface. « + Nombre » : les points à compter (regards, poteaux…). Les mesures d\'un métré levé sur le terrain se créent toutes seules. Sur le plan, les mesures sont en cyan pointillé ; touche une mesure pour la choisir.',
   valeursMesure:
     'Longueur 2D : à plat. Longueur 3D : distance inclinée, morceau par morceau. Dénivelé : altitude du dernier point moins celle du premier. Pente = dénivelé ÷ longueur 2D × 100 (positive quand ça monte). Aire 2D : aire du contour à plat. Aire 3D : somme des triangles (contour, lignes de rupture et points isolés). Coche « Plan et PDF » pour écrire la valeur sur le plan et dans le PDF ; « Détail » donne chaque morceau.',
   exporterMesures:

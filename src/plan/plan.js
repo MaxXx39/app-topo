@@ -850,6 +850,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         }
         const contour = sommetsMesure(mesure.contour);
         if (contour.length >= 2) groupe.append(creerElement('path', { d: tracePar(contour, contour.length >= 3), class: `aire-mesure${actif}` }));
+      } else if (mesure.type === 'nombre') {
+        // Points comptés : un rond autour de chacun.
+        for (const { x, y } of sommetsMesure(mesure.points)) groupe.append(creerElement('circle', { cx: x, cy: y, r: 9, class: `compte-mesure${actif}` }));
       } else {
         const sommets = sommetsMesure(mesure.points);
         if (sommets.length >= 2) groupe.append(creerElement('path', { d: tracePar(sommets, false), class: `longueur-mesure${actif}` }));
@@ -908,6 +911,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         const parNom = new Map(points.map((p) => [p.nom, p]));
         const contour = mesure.contour.map((nom) => parNom.get(nom)).filter(Boolean);
         if (contour.length >= 3 && pointDansPolygone(terrain, contour)) return mesure.id;
+      } else if (mesure.type === 'nombre') {
+        if (sommetsMesure(mesure.points).some((s) => Math.hypot(s.x - position.x, s.y - position.y) < RAYON_TOUCHER)) return mesure.id;
       } else {
         const sommets = sommetsMesure(mesure.points);
         for (let i = 0; i + 1 < sommets.length; i++) {

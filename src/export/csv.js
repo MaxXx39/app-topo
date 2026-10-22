@@ -30,12 +30,12 @@ export function genererCsvMesures(mesures) {
   const nombre = (valeur) => (valeur === undefined ? '' : formaterNombre(valeur));
   const pente = (valeur) => (valeur === null || valeur === undefined ? '' : valeur.toFixed(2));
   const lignes = [
-    ['Nom', 'Type', 'Points', 'Longueur 2D (m)', 'Longueur 3D (m)', 'Dénivelé (m)', 'Pente (%)', 'Aire 2D (m²)', 'Aire 3D (m²)', 'Périmètre 2D (m)', 'Périmètre 3D (m)'],
+    ['Nom', 'Type', 'Points', 'Longueur 2D (m)', 'Longueur 3D (m)', 'Dénivelé (m)', 'Pente (%)', 'Aire 2D (m²)', 'Aire 3D (m²)', 'Périmètre 2D (m)', 'Périmètre 3D (m)', 'Nombre'],
   ];
   for (const { mesure, resultat: r } of mesures) {
     if (!r || r.erreurs) continue;
-    const points = ecrireListeDeNoms(mesure.type === 'longueur' ? mesure.points : mesure.contour);
-    lignes.push([mesure.nom, NOM_TYPE[mesure.type], points, nombre(r.l2d), nombre(r.l3d), nombre(r.denivele), pente(r.pente), nombre(r.a2d), nombre(r.a3d), nombre(r.p2d), nombre(r.p3d)]);
+    const points = ecrireListeDeNoms(mesure.type === 'aire' ? mesure.contour : mesure.points);
+    lignes.push([mesure.nom, NOM_TYPE[mesure.type], points, nombre(r.l2d), nombre(r.l3d), nombre(r.denivele), pente(r.pente), nombre(r.a2d), nombre(r.a3d), nombre(r.p2d), nombre(r.p3d), r.nombre ?? '']);
   }
   lignes.push([]);
   lignes.push(['Mesure', 'Morceau', 'De', 'À', 'Longueur 2D (m)', 'Longueur 3D (m)', 'Dénivelé (m)', 'Pente (%)']);

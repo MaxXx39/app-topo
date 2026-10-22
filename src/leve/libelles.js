@@ -1,8 +1,9 @@
 // Libellés des noms de points levés (onglet Terrain) : abréviations courtes qui disent ce que
 // l'on lève, dans le nom du point (L-HT-1-3 : ligne de haut de talus n° 1, point 3 ; P-RG-2 : regard 2).
-// Une liste pour les lignes de rupture, une pour les points isolés. Liste de départ validée par
-// l'utilisateur (22.10.2026), qu'il complète dans l'appli ; elle est gardée sur l'appareil
-// (la même pour tous les projets).
+// Une liste pour les lignes de rupture (et les longueurs d'un métré), une pour les points isolés
+// (et les points comptés), une pour les aires d'un métré (A-ENR-1-3 : aire d'enrobé n° 1, point 3).
+// Listes de départ (lignes et points validées par l'utilisateur le 22.10.2026, aires proposées
+// ensuite), qu'il complète dans l'appli ; elles sont gardées sur l'appareil (pour tous les projets).
 
 export const LIBELLES_DEPART = {
   lignes: [
@@ -24,15 +25,24 @@ export const LIBELLES_DEPART = {
     ['BRN', 'borne'],
     ['HYD', 'hydrante'],
   ],
+  aires: [
+    ['ENR', 'enrobé'],
+    ['GRA', 'gravier'],
+    ['GAZ', 'gazon'],
+    ['PAV', 'pavés'],
+    ['BET', 'béton'],
+    ['DAL', 'dallage'],
+  ],
 };
 
 const CLE_MEMOIRE = 'topo-libelles';
 
-/** Libellés retenus sur l'appareil, ou ceux de départ. Renvoie { lignes, points } ([[abréviation, signification]]). */
+/** Libellés retenus sur l'appareil, ou ceux de départ. Renvoie { lignes, points, aires } ([[abréviation, signification]]). */
 export function lireLibelles() {
   try {
     const lus = JSON.parse(localStorage.getItem(CLE_MEMOIRE));
-    if (lus?.lignes?.length > 0 && lus?.points?.length > 0) return lus;
+    // Listes retenues avant les métrés : sans aires, on prend celles de départ.
+    if (lus?.lignes?.length > 0 && lus?.points?.length > 0) return { ...lus, aires: lus.aires?.length > 0 ? lus.aires : structuredClone(LIBELLES_DEPART.aires) };
   } catch {
     // Mémoire indisponible ou abîmée : on reprend la liste de départ.
   }

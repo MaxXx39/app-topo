@@ -239,8 +239,8 @@ describe('exports des mesures (onglet 3. Mesures)', async () => {
 
   it('CSV : une ligne par mesure (sans volume), puis chaque morceau', () => {
     const lignes = genererCsvMesures(mesures).trim().split('\r\n');
-    expect(lignes[0]).toBe('Nom;Type;Points;Longueur 2D (m);Longueur 3D (m);Dénivelé (m);Pente (%);Aire 2D (m²);Aire 3D (m²);Périmètre 2D (m);Périmètre 3D (m)');
-    expect(lignes[1]).toBe(`Bordure;Longueur;a, b;50.000;${Math.hypot(50, 1).toFixed(3)};1.000;2.00;;;;`);
+    expect(lignes[0]).toBe('Nom;Type;Points;Longueur 2D (m);Longueur 3D (m);Dénivelé (m);Pente (%);Aire 2D (m²);Aire 3D (m²);Périmètre 2D (m);Périmètre 3D (m);Nombre');
+    expect(lignes[1]).toBe(`Bordure;Longueur;a, b;50.000;${Math.hypot(50, 1).toFixed(3)};1.000;2.00;;;;;`);
     expect(lignes[2]).toMatch(/^A1;Aire;a, c, b, d;;;;;1200\.000;/);
     expect(lignes).toContain('Bordure;1;a;b;50.000;50.010;1.000;2.00');
     expect(lignes.join(' ')).not.toMatch(/Remblai|Déblai/);
@@ -262,6 +262,15 @@ describe('exports des mesures (onglet 3. Mesures)', async () => {
     expect(contenu).toContain('Mesures');
     expect(contenu).toContain('Bordure');
     expect(contenu).not.toMatch(/Remblai|Volumes/);
+  });
+
+  it('points comptés (métré) : dans le CSV, le DXF et le PDF', async () => {
+    const regards = { ...creerMesure('nombre', 'RG', 'leve'), points: ['a', 'c'] };
+    const avecNombre = [...mesures, { mesure: regards, resultat: calculerMesure(regards, points) }];
+    expect(genererCsvMesures(avecNombre)).toContain('RG;Nombre;a, c;;;;;;;;;2');
+    expect(genererDxfMesures({ points, mesures: avecNombre })).toContain('Nb 2 pce');
+    const { document } = await creerPdfMesures({ mesures: avecNombre, points, cartouche: {} });
+    expect(document.output()).toContain('Nb 2 pce');
   });
 
   it('PDF : les mesures qui ne tiennent pas dans la colonne vont sur une feuille à part', async () => {

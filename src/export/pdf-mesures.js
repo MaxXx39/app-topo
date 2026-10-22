@@ -166,6 +166,15 @@ function dessinerPlanMesures(doc, mesures, pointsMontres, { versPapier, echelle 
       for (const ligne of mesure.lignesRupture) polyligne(ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean), ligne.fermee);
     }
     trait(doc, couleur(mesure), 0.4);
+    if (mesure.type === 'nombre') {
+      // Points comptés : un rond de la couleur de la mesure autour de chacun.
+      doc.setLineDashPattern([], 0);
+      for (const point of resultat.sommets) {
+        const p = versPapier(point);
+        doc.circle(p.x, p.y, 1.4, 'S');
+      }
+      continue;
+    }
     doc.setLineDashPattern([2, 1], 0);
     polyligne(resultat.sommets, mesure.type === 'aire');
   }

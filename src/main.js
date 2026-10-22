@@ -60,6 +60,7 @@ import {
   ligneEnCours,
   resumeStock,
 } from './topo/leve-direct.js';
+import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 
 // --- État de l'application ---
@@ -89,7 +90,8 @@ const terrain = {
   exagerationCoupe: 1,
   sourceOrientation: 'rx2',
   libelleLigne: 'HT', // dernier libellé choisi pour une ligne de rupture
-  libellePoint: 'TN', // et pour un point isolé
+  libellePoint: 'TN', // et pour un point isolé (ou compté)
+  libelleAire: 'ENR', // et pour une aire d'un métré
   implantation: 'surface', // mode Implanter : implanter une surface ou un point
   accroche: 'point', // implantation d'un point : point du projet, sommet, milieu, sur la ligne ou centre (voir topo/accroche.js)
   guidage: 'rx2', // guidage vers le point : 'rx2' (avance / droite selon le cap du RX2) ou 'nseo' (nord / est)
@@ -358,6 +360,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     projet.leves = projet.leves.filter((l) => l.id !== id);
     projet.surfaces = projet.surfaces.filter((s) => s.leveId !== id);
     projet.mesures = projet.mesures.filter((m) => m.leveId !== id);
+    projet.metres = projet.metres.filter((m) => m.leveId !== id);
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
     editeurSurfaces.charger(projet.surfaces);
     modifie({ recadrer: true });
@@ -375,10 +378,15 @@ function stockEnCours() {
   const leve = projet.leves.find((l) => l.id === surface?.leveId);
   return surface && estLeveDirect(leve) ? surface : null;
 }
-/** Levé (fait avec le récepteur) de la surface en cours, ou null. */
+/** Métré levé en cours (aires, longueurs, points comptés ; voir topo/metre.js), ou null. */
+function metreEnCours() {
+  return projet.metres.find((m) => m.id === leveDirect.stockId) ?? null;
+}
+
+/** Levé (fait avec le récepteur) de la surface ou du métré en cours, ou null. */
 function leveEnCours() {
-  const surface = stockEnCours();
-  return surface ? projet.leves.find((l) => l.id === surface.leveId) : null;
+  const enCours = stockEnCours() ?? metreEnCours();
+  return enCours ? projet.leves.find((l) => l.id === enCours.leveId) ?? null : null;
 }
 
 /** Surfaces levées avec le récepteur (celles qu'on peut reprendre dans l'onglet Terrain). */
@@ -395,13 +403,25 @@ function montrerStockEnCours() {
 
 /** Reprend une surface levée s'il n'y en a pas en cours (celle du levé affiché, sinon la dernière). */
 function reprendreLeveDirect() {
-  if (stockEnCours()) return;
+  if (stockEnCours() || metreEnCours()) return;
   const levees = surfacesLevees();
   leveDirect.stockId = (levees.filter((s) => s.leveId === projet.leveActifId).at(-1) ?? levees.at(-1))?.id ?? null;
 }
 
-/** Nouvelle surface levée (dans le levé du jour) : un stock a tout de suite son calcul de volume. */
+/**
+ * Nouvelle surface levée (dans le levé du jour) : un stock a tout de suite son calcul de volume.
+ * Un métré n'est pas une surface : ses aires, longueurs et points comptés deviennent des mesures.
+ */
 function ajouterSurfaceLevee(nature) {
+  if (nature === 'metre') {
+    const leve = leveDuJour(projet);
+    const metre = creerMetre(projet, leve);
+    projet.leveActifId = leve.id;
+    leveDirect.stockId = metre.id;
+    leveDirect.role = 'aire';
+    modifie({ recadrer: true });
+    return;
+  }
   const surface = creerSurfaceDirecte(projet, leveDuJour(projet), nature);
   projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
   leveDirect.stockId = surface.id;
@@ -420,14 +440,22 @@ const ecranLeve = recepteurDisponible()
       nouvelleSurface: (nature) => ajouterSurfaceLevee(nature),
       choisirStock: (id) => {
         leveDirect.stockId = id;
-        montrerStockEnCours();
-        recalculer();
+        const metre = metreEnCours();
+        if (metre) projet.leveActifId = metre.leveId; // ses mesures se dessinent sur les points de son levé
+        else montrerStockEnCours();
+        recalculer({ recadrer: Boolean(metre) });
       },
       choisirRole: (role) => {
         leveDirect.role = role;
         recalculer();
       },
       nouvelleLigne: () => {
+        const metre = metreEnCours();
+        if (metre) {
+          nouvelElementMetre(projet, metre, leveDirect.role);
+          recalculer();
+          return;
+        }
         const stock = stockEnCours();
         if (!stock) return;
         nouvelleLigne(stock);
@@ -442,7 +470,8 @@ const ecranLeve = recepteurDisponible()
       prendrePoint: (nom) => {
         const leve = leveEnCours();
         const stock = stockEnCours();
-        if (!leve || !stock) return;
+        const metre = metreEnCours();
+        if (!leve || !(stock || metre)) return;
         // Position vérifiée par l'appli Android au moment du toucher : RTK fixe et inclinaison prête.
         const reponse = prendrePointRecepteur();
         if (!reponse.ok) {
@@ -450,13 +479,10 @@ const ecranLeve = recepteurDisponible()
           return;
         }
         const { est, nord, altitude, ...gnss } = reponse.point;
-        const resultat = ajouterPointDirect(leve, stock, leveDirect.role, {
-          nom: nom.trim() || prochainNom(projet, stock, leveDirect.role, libelleDuRole()),
-          est,
-          nord,
-          altitude,
-          gnss: { ...gnss, prisLe: new Date().toISOString() },
-        }, nomsDuProjet(projet));
+        const point = { est, nord, altitude, gnss: { ...gnss, prisLe: new Date().toISOString() } };
+        const resultat = metre
+          ? ajouterPointMetre(projet, leve, metre, leveDirect.role, libelleDuRole(), { ...point, nom: nom.trim() || prochainNomMetre(projet, metre, leveDirect.role, libelleDuRole()) })
+          : ajouterPointDirect(leve, stock, leveDirect.role, { ...point, nom: nom.trim() || prochainNom(projet, stock, leveDirect.role, libelleDuRole()) }, nomsDuProjet(projet));
         if (resultat.erreur) {
           afficherMessage(`Point refusé : ${resultat.erreur}`, 4000);
           return;
@@ -466,14 +492,15 @@ const ecranLeve = recepteurDisponible()
         modifie();
       },
       choisirLibelle: (abreviation) => {
-        if (leveDirect.role === 'ligne') terrain.libelleLigne = abreviation;
+        if (leveDirect.role === 'aire') terrain.libelleAire = abreviation;
+        else if (['ligne', 'longueur'].includes(leveDirect.role)) terrain.libelleLigne = abreviation;
         else terrain.libellePoint = abreviation;
         retenirReglagesTerrain();
         recalculer();
       },
       enregistrerLibelles: (nouveaux) => {
-        if (nouveaux.lignes.length === 0 || nouveaux.points.length === 0) {
-          alert('Il faut au moins un libellé pour les lignes et un pour les points.');
+        if (nouveaux.lignes.length === 0 || nouveaux.points.length === 0 || nouveaux.aires.length === 0) {
+          alert('Il faut au moins un libellé pour les lignes, un pour les points et un pour les aires.');
           recalculer();
           return;
         }
@@ -612,6 +639,7 @@ const ecranLeve = recepteurDisponible()
         const dernier = leve?.points[leve.points.length - 1];
         if (!dernier || !confirm(`Effacer le dernier point (${dernier.nom}) ?`)) return;
         annulerDernierPoint(leve, projet.surfaces);
+        retirerPointDesMesures(projet, dernier.nom); // aire, longueur ou point compté d'un métré
         afficherMessage(`Point ${dernier.nom} effacé`);
         modifie();
       },
@@ -741,7 +769,7 @@ let toucheVolumeActive = null;
 function mettreAJourToucheVolume() {
   if (!ecranLeve) return;
   const dansTerrain = document.body.dataset.onglet === 'terrain';
-  const lever = dansTerrain && terrain.mode === 'lever' && Boolean(stockEnCours());
+  const lever = dansTerrain && terrain.mode === 'lever' && Boolean(stockEnCours() || metreEnCours());
   const implanterAvecTouche = dansTerrain && enImplantationDePoint() && Boolean(implanter.cible);
   const actif = lever || implanterAvecTouche;
   if (actif === toucheVolumeActive) return;
@@ -758,15 +786,20 @@ function mettreAJourToucheVolume() {
 /** Libellé utilisé pour le rôle en cours (dans la liste ; sinon le premier de la liste). */
 function libelleDuRole() {
   if (leveDirect.role === 'contour') return null;
-  const ligne = leveDirect.role === 'ligne';
-  const liste = ligne ? libelles.lignes : libelles.points;
-  const voulu = ligne ? terrain.libelleLigne : terrain.libellePoint;
+  const sorte = leveDirect.role === 'aire' ? 'aires' : ['ligne', 'longueur'].includes(leveDirect.role) ? 'lignes' : 'points';
+  const liste = libelles[sorte];
+  const voulu = { aires: terrain.libelleAire, lignes: terrain.libelleLigne, points: terrain.libellePoint }[sorte];
   return liste.some(([abreviation]) => abreviation === voulu) ? voulu : liste[0][0];
 }
+
+/** Rôles d'un point levé dans un métré. */
+const ROLES_DU_METRE = ['aire', 'longueur', 'compte'];
 
 /** Ce que montre l'onglet Terrain (voir leve/ecran.js). */
 function donneesLeve() {
   reprendreLeveDirect();
+  const metre = metreEnCours();
+  if (metre) return donneesMetre(metre);
   // Terrain naturel ou terrassement : pas de contour, on passe aux points isolés.
   if (!rolesPermis(stockEnCours()).includes(leveDirect.role)) leveDirect.role = 'isole';
   const leve = leveEnCours();
@@ -776,20 +809,58 @@ function donneesLeve() {
   const ligne = stock ? ligneEnCours(stock) : null;
   const numeroLigne = stock ? stock.lignesRupture.indexOf(ligne) + 1 : 0;
   return {
+    ...donneesCommunes(),
     leve,
-    // Surfaces levées, avec la date de leur levé (« Stock 2 · 22.10.2026 »).
-    stocks: surfacesLevees().map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}` })),
     stock,
     role: leveDirect.role,
     ligne: ligne ? { libelle: ligne.libelle, numero: ligne.numero ?? numeroLigne, nbPoints: ligne.noms.length, fermee: ligne.fermee } : null,
     nomPropose,
-    libelles,
-    libelleLigne: terrain.libelleLigne,
-    libellePoint: terrain.libellePoint,
     rolesPermis: rolesPermis(stock),
     dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
     resume: stock ? resumeStock(stock) : null,
     volume: stock ? volumeDuStock(stock) : null,
+  };
+}
+
+/** Données de l'onglet Terrain pour un métré : rôles aire / longueur / point compté, mesure en cours. */
+function donneesMetre(metre) {
+  if (!ROLES_DU_METRE.includes(leveDirect.role)) leveDirect.role = 'aire';
+  const leve = leveEnCours();
+  const libelle = libelleDuRole();
+  const nomPropose = prochainNomMetre(projet, metre, leveDirect.role, libelle);
+  const enCours = leveDirect.role === 'compte' ? null : mesureEnCours(projet, metre, leveDirect.role);
+  const memeElement = enCours && enCours.libelle === libelle;
+  return {
+    ...donneesCommunes(),
+    leve,
+    stock: metre,
+    metre,
+    role: leveDirect.role,
+    rolesPermis: ROLES_DU_METRE,
+    nomPropose,
+    // Aire ou longueur en cours (son libellé, son numéro tiré du nom proposé, ses points).
+    elementMetre: leveDirect.role === 'compte' ? null : {
+      libelle,
+      numero: Number(nomPropose.split('-').at(-2)),
+      nbPoints: memeElement ? (enCours.contour ?? enCours.points).length : 0,
+    },
+    ligne: null,
+    dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
+    resumeTexte: resumeMetre(projet, metre),
+    resume: null,
+    volume: null,
+  };
+}
+
+/** Données de l'onglet Terrain communes aux surfaces et aux métrés. */
+function donneesCommunes() {
+  return {
+    // Surfaces levées et métrés, avec la date de leur levé (« Stock 2 · 22.10.2026 »).
+    stocks: [...surfacesLevees(), ...projet.metres].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}` })),
+    libelles,
+    libelleLigne: terrain.libelleLigne,
+    libellePoint: terrain.libellePoint,
+    libelleAire: terrain.libelleAire,
     mode: terrain.mode,
     controle: terrain,
     surfaces: projet.surfaces.map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
@@ -1299,6 +1370,11 @@ function recalculer({ recadrer = false } = {}) {
     traceCoupe,
     // Onglet Terrain : le volume en petit dans un coin, pas en grand au milieu du stock.
     volumesDiscrets: ongletContexte === 'terrain',
+    // Onglet Terrain, métré en cours : ses aires, longueurs et points comptés.
+    mesures: ongletContexte === 'terrain' && metreEnCours()
+      ? projet.mesures.filter((m) => m.metreId === metreEnCours().id).map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }))
+      : [],
+    mesureActive: null,
   });
   if (recadrer || pointsDuPlan !== pointsAffiches) {
     pointsAffiches = pointsDuPlan;

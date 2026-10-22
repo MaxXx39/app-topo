@@ -14,6 +14,7 @@
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE } from '../topo/leve-direct.js';
+import { ROLES_METRE } from '../topo/metre.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
 import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage } from '../topo/accroche.js';
 import { lireTexteLibelles, ecrireTexteLibelles } from './libelles.js';
@@ -30,11 +31,13 @@ const VUES_COUPES = [
   ['axe', 'Dans l\'axe'],
 ];
 export const LONGUEURS_COUPE = [2, 5, 10, 20];
-// Ce que l'on lève (même choix que « + Nouvelle surface » dans Calculs › Surfaces).
+// Ce que l'on lève : une surface (même choix que « + Nouvelle surface » dans Calculs › Surfaces)
+// ou un métré (aires, longueurs, points comptés : des mesures de Calculs › Mesures / métrés).
 const NATURES_TERRAIN = [
   ['stock', 'Stock'],
   ['terrain', 'Terrain naturel'],
   ['terrassement', 'Terrassement'],
+  ['metre', 'Métré'],
 ];
 // Accroches : un dessin (en gris ce qu'on touche, en ambre l'endroit accroché) et un mot dessous.
 // [mot, nom complet (bulle, lecture d'écran), dessin].
@@ -55,12 +58,18 @@ const TITRES_COUPES = {
   axe: { titre: 'Dans l\'axe', gauche: '← derrière', droite: 'devant →' },
 };
 
-// Petit dessin de chaque rôle, comme dans Calculs › Surfaces (contour rouge, ligne orange, point vert).
+// Petit dessin de chaque rôle, comme dans Calculs › Surfaces (contour rouge, ligne orange, point
+// vert) ; ceux du métré en cyan, la couleur des mesures.
 const ICONES = {
   contour: '<path d="M4 8 11 3l9 5-2 11-13 1z" />',
   ligne: '<path d="M3 18l6-7 4 4 8-9" />',
   isole: '<circle cx="12" cy="12" r="4" />',
+  aire: '<path d="M4 6h16v12H4z" /><path d="M4 12h16M12 6v12" stroke-width="1" />',
+  longueur: '<path d="M3 16 21 8" /><path d="M3 13v6M21 5v6" />',
+  compte: '<circle cx="12" cy="12" r="8" /><path d="M10 9l2-1.5V16" />',
 };
+// Lettre des noms de points d'un métré (A-ENR-1-1, L-BOR-1-1).
+const LETTRES_METRE = { aire: 'A', longueur: 'L' };
 
 /**
  * Crée l'écran dans "conteneur". Les actions sont faites par main.js via "actions" :
@@ -101,7 +110,11 @@ export function creerEcranLeve(conteneur, actions) {
     if (action === 'enregistrerLibelles') {
       const texte = (champ) => conteneur.querySelector(`[data-champ="${champ}"]`)?.value ?? '';
       libellesOuverts = false;
-      actions.enregistrerLibelles({ lignes: lireTexteLibelles(texte('libelles-lignes')), points: lireTexteLibelles(texte('libelles-points')) });
+      actions.enregistrerLibelles({
+        lignes: lireTexteLibelles(texte('libelles-lignes')),
+        points: lireTexteLibelles(texte('libelles-points')),
+        aires: lireTexteLibelles(texte('libelles-aires')),
+      });
       return;
     }
     if (action === 'nouvelleSurface') choixNatureOuvert = false;
@@ -402,7 +415,7 @@ export function creerEcranLeve(conteneur, actions) {
   /** Choix de ce que l'on va lever : une nouvelle surface de cette nature. */
   function choixNature() {
     return `<div class="choix-nature">
-      <p class="titre-choix">${donnees.stock ? 'Nouvelle surface : c\'est…' : 'Que lèves-tu ?'}</p>
+      <p class="titre-choix">Que lèves-tu ?</p>
       <div class="natures-terrain">
         ${NATURES_TERRAIN.map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}">${titre}</button>`).join('')}
       </div>
@@ -438,15 +451,25 @@ export function creerEcranLeve(conteneur, actions) {
   /** Choix du rôle : 3 gros boutons à la couleur du rôle. */
   function boutonsRoles() {
     return `<div class="roles-leve" role="group" aria-label="Rôle du prochain point">
-      ${ROLES_LEVE.filter(([cle]) => donnees.rolesPermis.includes(cle)).map(
+      ${[...ROLES_LEVE, ...ROLES_METRE].filter(([cle]) => donnees.rolesPermis.includes(cle)).map(
         ([cle, titre]) => `<button type="button" class="role-leve role-${cle} ${donnees.role === cle ? 'choisi' : ''}" data-action="role" data-role="${cle}" aria-pressed="${donnees.role === cle}">
           <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[cle]}</svg>${titre}</button>`,
       ).join('')}
     </div>`;
   }
 
-  /** Ligne de rupture en cours : numéro, nombre de points, nouvelle ligne, fermer. */
+  /**
+   * Ligne de rupture en cours : numéro, nombre de points, nouvelle ligne, fermer. Dans un métré :
+   * l'aire ou la longueur en cours (« A-ENR-1 · 4 pt(s) ») et « + Nouvelle ».
+   */
   function outilsLigne() {
+    if (donnees.metre && LETTRES_METRE[donnees.role]) {
+      const e = donnees.elementMetre;
+      return `<div class="outils-ligne outils-metre">
+        <span>${LETTRES_METRE[donnees.role]}-${echapper(e.libelle)}-${e.numero} · ${e.nbPoints} pt(s)</span>
+        <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${e.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle</button>
+      </div>`;
+    }
     if (donnees.role !== 'ligne') return '';
     const { ligne } = donnees;
     return `<div class="outils-ligne">
@@ -463,10 +486,11 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function choixLibelle() {
     if (donnees.role === 'contour') return '';
-    const ligne = donnees.role === 'ligne';
-    const liste = ligne ? donnees.libelles.lignes : donnees.libelles.points;
-    const actif = ligne ? donnees.libelleLigne : donnees.libellePoint;
-    return `<div class="libelles-terrain ${ligne ? 'pour-lignes' : 'pour-points'}" role="group" aria-label="Ce que l'on lève">
+    // Liste de libellés selon le rôle : aires (métré), lignes (lignes de rupture, longueurs), points.
+    const sorte = donnees.role === 'aire' ? 'aires' : ['ligne', 'longueur'].includes(donnees.role) ? 'lignes' : 'points';
+    const liste = donnees.libelles[sorte];
+    const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
+    return `<div class="libelles-terrain pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
       ${liste.map(([abreviation, signification]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
           <strong>${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
       <button type="button" class="bouton-lien bouton-lien-neutre" data-action="ouvrirLibelles">modifier</button>
@@ -478,8 +502,9 @@ export function creerEcranLeve(conteneur, actions) {
   function editeurLibelles() {
     return `<div class="editeur-libelles">
       <p class="aide">Une ligne par libellé : l'abréviation (sans espace ni tiret), puis ce qu'elle veut dire. La liste est gardée sur cette tablette, pour tous les projets.</p>
-      <label>Lignes de rupture (L-…)<textarea data-champ="libelles-lignes" rows="6">${echapper(ecrireTexteLibelles(donnees.libelles.lignes))}</textarea></label>
-      <label>Points isolés (P-…)<textarea data-champ="libelles-points" rows="6">${echapper(ecrireTexteLibelles(donnees.libelles.points))}</textarea></label>
+      <label>Lignes de rupture et longueurs (L-…)<textarea data-champ="libelles-lignes" rows="6">${echapper(ecrireTexteLibelles(donnees.libelles.lignes))}</textarea></label>
+      <label>Points isolés et points comptés (P-…)<textarea data-champ="libelles-points" rows="6">${echapper(ecrireTexteLibelles(donnees.libelles.points))}</textarea></label>
+      <label>Aires d'un métré (A-…)<textarea data-champ="libelles-aires" rows="5">${echapper(ecrireTexteLibelles(donnees.libelles.aires))}</textarea></label>
       <div class="ligne-outils">
         <button type="button" class="bouton-secondaire" data-action="enregistrerLibelles">Enregistrer</button>
         <button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerLibelles">annuler</button>
@@ -489,6 +514,7 @@ export function creerEcranLeve(conteneur, actions) {
 
   /** Une ligne courte : points du stock par rôle et volume (le détail est dans Calculs). */
   function resume() {
+    if (donnees.resumeTexte) return `<p class="resume-terrain">${echapper(donnees.resumeTexte)}</p>`;
     const { resume: r, volume } = donnees;
     const morceaux = [`${r.contour} contour`, `${r.pointsLignes} lignes`, `${r.isoles} isolés`];
     return `<p class="resume-terrain">${morceaux.join(' · ')}${volume != null ? ` · <strong>${formaterNombre(volume)} m³</strong>` : ''}</p>`;

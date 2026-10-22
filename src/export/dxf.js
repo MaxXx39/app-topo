@@ -86,7 +86,8 @@ export function genererDxfMesures({ points, mesures }) {
   }
   for (const { mesure, resultat } of mesures) {
     const couleur = aciDeMesure(mesure);
-    entites.push(...polyligne3D(resultat.sommets, mesure.type === 'aire', 'MESURES', couleur));
+    // Nombre : pas de trait, seulement les points (calque POINTS) et l'étiquette.
+    if (mesure.type !== 'nombre') entites.push(...polyligne3D(resultat.sommets, mesure.type === 'aire', 'MESURES', couleur));
     for (const ligne of mesure.lignesRupture ?? []) {
       const sommets = ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean);
       if (sommets.length >= 2) entites.push(...polyligne3D(sommets, ligne.fermee, 'MESURES', couleur));

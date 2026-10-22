@@ -169,3 +169,20 @@ describe('couleur des mesures', async () => {
     expect(texte).toMatch(/TEXT\r\n8\r\nMESURES\r\n62\r\n1\r\n/);
   });
 });
+
+describe('calculerNombre (points comptés)', () => {
+  const points = [pt('P-RG-1', 0, 0, 400), pt('P-RG-2', 10, 0, 401), pt('P-RG-3', 0, 10, 402)];
+
+  it('compte les points de la mesure', () => {
+    const mesure = { ...creerMesure('nombre', 'RG', 'leve'), points: ['P-RG-1', 'P-RG-2', 'P-RG-3'] };
+    const r = calculerMesure(mesure, points);
+    expect(r.nombre).toBe(3);
+    expect(lignesEtiquette(mesure, r)).toEqual(['RG', 'Nb 3 pce']);
+    expect(nomDeMesureLibre([mesure], 'nombre')).toBe('N1');
+  });
+
+  it('signale un point absent ou une liste vide', () => {
+    expect(calculerMesure({ ...creerMesure('nombre', 'RG', 'leve'), points: ['x'] }, points).erreurs[0]).toContain('x');
+    expect(calculerMesure(creerMesure('nombre', 'RG', 'leve'), points).erreurs[0]).toContain('aucun point');
+  });
+});

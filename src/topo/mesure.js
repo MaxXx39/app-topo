@@ -4,6 +4,8 @@
 //
 // Une mesure de longueur a la forme :
 // { id, nom, type: 'longueur', leveId, points: [...noms dans l'ordre], afficher: { l2d, l3d, denivele, pente, morceaux } }
+// Une mesure de nombre (points comptés : regards, poteaux…, levés dans un métré) a la forme :
+// { id, nom, type: 'nombre', leveId, libelle, points: [...noms], afficher: { nombre } }
 // Une mesure d'aire a la forme :
 // { id, nom, type: 'aire', leveId, contour: [...], lignesRupture: [{ noms, fermee }],
 //   tousLesPoints, points: [...points isolés / caractéristiques], afficher: { a2d, a3d, p2d, p3d, morceaux } }
@@ -17,18 +19,19 @@ import { creerLigne } from './noms.js';
 const AFFICHER_PAR_DEFAUT = {
   longueur: { l2d: true, l3d: true, denivele: false, pente: false, morceaux: false },
   aire: { a2d: true, a3d: true, p2d: false, p3d: false, morceaux: false },
+  nombre: { nombre: true },
 };
 
-/** Crée une mesure vide ('longueur' ou 'aire') sur les points d'un levé. */
+/** Crée une mesure vide ('longueur', 'aire' ou 'nombre') sur les points d'un levé. */
 export function creerMesure(type, nom, leveId) {
   const commun = { id: nouvelIdentifiant(), nom, type, leveId, couleur: '#0891b2', afficher: { ...AFFICHER_PAR_DEFAUT[type] } };
-  if (type === 'longueur') return { ...commun, points: [] };
+  if (type === 'longueur' || type === 'nombre') return { ...commun, points: [] };
   return { ...commun, contour: [], lignesRupture: [creerLigne()], tousLesPoints: false, points: [] };
 }
 
-/** Nom proposé pour une nouvelle mesure : « L1 », « L2 »... pour les longueurs, « A1 »... pour les aires. */
+/** Nom proposé pour une nouvelle mesure : « L1 », « L2 »... pour les longueurs, « A1 »... pour les aires, « N1 »... pour les nombres. */
 export function nomDeMesureLibre(mesures, type) {
-  const lettre = type === 'longueur' ? 'L' : 'A';
+  const lettre = { longueur: 'L', aire: 'A', nombre: 'N' }[type] ?? 'A';
   let numero = 1;
   while (mesures.some((m) => m.nom === `${lettre}${numero}`)) numero += 1;
   return `${lettre}${numero}`;
@@ -136,8 +139,20 @@ export function calculerAire(mesure, points) {
   };
 }
 
-/** Calcule une mesure (longueur ou aire) sur les points de son levé. */
+/**
+ * Mesure de nombre : combien de points (regards, poteaux…). Renvoie { sommets, morceaux (aucun),
+ * nombre } ou { erreurs }.
+ */
+export function calculerNombre(mesure, points) {
+  const { sommets, absents } = retrouverPoints(mesure.points, points);
+  if (absents.length > 0) return { erreurs: [`point(s) absent(s) du levé : ${absents.join(', ')}`] };
+  if (sommets.length === 0) return { erreurs: ['aucun point compté'] };
+  return { sommets, morceaux: [], nombre: sommets.length };
+}
+
+/** Calcule une mesure (longueur, aire ou nombre) sur les points de son levé. */
 export function calculerMesure(mesure, points) {
+  if (mesure.type === 'nombre') return calculerNombre(mesure, points);
   return mesure.type === 'longueur' ? calculerLongueur(mesure, points) : calculerAire(mesure, points);
 }
 

@@ -101,12 +101,13 @@ export function nomsDuProjet(projet) {
 }
 
 /**
- * Lit un nom donné par le levé : « C-Stock-2-5 », « L-HT-1-3 » ou « P-RG-4 ».
- * Renvoie { type ('C', 'L' ou 'P'), libelle, element (n° du contour ou de la ligne ; null pour
- * un point isolé), numero (n° du point) }, ou null si le nom ne suit pas cette règle.
+ * Lit un nom donné par le levé : « C-Stock-2-5 », « L-HT-1-3 », « A-ENR-1-2 » (aire d'un métré)
+ * ou « P-RG-4 ». Renvoie { type ('C', 'L', 'A' ou 'P'), libelle, element (n° du contour, de la
+ * ligne ou de l'aire ; null pour un point isolé), numero (n° du point) }, ou null si le nom ne
+ * suit pas cette règle.
  */
 export function lireNomLeve(nom) {
-  const element = /^([CL])-([^-\s]+)-(\d+)-(\d+)$/.exec(String(nom));
+  const element = /^([CLA])-([^-\s]+)-(\d+)-(\d+)$/.exec(String(nom));
   if (element) return { type: element[1], libelle: element[2], element: Number(element[3]), numero: Number(element[4]) };
   const point = /^P-([^-\s]+)-(\d+)$/.exec(String(nom));
   if (point) return { type: 'P', libelle: point[1], element: null, numero: Number(point[2]) };
@@ -130,6 +131,11 @@ export function numeroElementLibre(projet, type, libelle, sauf = null) {
     for (const ligne of surface.lignesRupture ?? []) {
       if (ligne !== sauf && ligne.libelle === libelle && ligne.numero) plusGrand = Math.max(plusGrand, ligne.numero);
     }
+  }
+  // Aires et longueurs des métrés (voir topo/metre.js) : leur numéro est réservé aussi.
+  const typeDeMesure = { A: 'aire', L: 'longueur' }[type];
+  for (const mesure of projet.mesures ?? []) {
+    if (mesure.metreId && mesure.type === typeDeMesure && mesure.libelle === libelle && mesure.numero) plusGrand = Math.max(plusGrand, mesure.numero);
   }
   return plusGrand + 1;
 }
@@ -168,6 +174,14 @@ export function prochainNom(projet, surface, role, libelle) {
   if (role === 'contour') prefixe = `C-${LIBELLE_CONTOUR}-${numeroDeContour(projet, surface)}-`;
   else if (role === 'ligne') prefixe = `L-${libelle}-${preparerLigne(projet, surface, libelle).numero}-`;
   else prefixe = `P-${libelle}-`;
+  return nomSuivant(projet, prefixe);
+}
+
+/**
+ * Premier nom libre avec ce début (« L-HT-1- ») : le numéro qui suit le plus grand déjà pris dans
+ * le projet, en sautant les noms déjà pris.
+ */
+export function nomSuivant(projet, prefixe) {
   const pris = nomsDuProjet(projet);
   let plusGrand = 0;
   for (const nom of pris) {

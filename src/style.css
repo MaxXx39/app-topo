@@ -1898,6 +1898,17 @@ th.nombre {
   stroke-width: 3.2;
 }
 
+/* Points comptés (mesure « Nombre ») : un rond autour de chacun. */
+.plan .compte-mesure {
+  fill: none;
+  stroke: var(--couleur-mesure, var(--cyan));
+  stroke-width: 2;
+}
+
+.plan .compte-mesure.actif {
+  stroke-width: 3.2;
+}
+
 .plan .triangles-mesure {
   fill: none;
   stroke: color-mix(in srgb, var(--couleur-mesure, var(--cyan)) 45%, transparent);
@@ -2346,6 +2357,19 @@ body.avec-recepteur .bandeaux-recepteur {
 
 .role-leve.role-isole {
   --couleur-role: var(--succes);
+}
+
+/* Métré : aire, longueur, point compté, en cyan (la couleur des mesures). */
+.role-leve:is(.role-aire, .role-longueur, .role-compte) {
+  --couleur-role: #0891b2;
+}
+
+.outils-ligne.outils-metre {
+  border-left-color: #0891b2;
+}
+
+.libelles-terrain.dans-metre .puce-libelle {
+  --couleur-libelle: #0891b2;
 }
 
 .role-leve.choisi {
