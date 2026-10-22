@@ -7,7 +7,7 @@ import java.util.Base64
  * Fonctions de l'appli Android que l'appli web peut appeler (objet window.AppliAndroid,
  * côté web : src/android/pont.js). Elles sont appelées hors de l'écran (fil « JavaBridge ») :
  * on repasse sur l'écran avant d'afficher quoi que ce soit.
- * Dans l'autre sens, l'état du récepteur est envoyé à la page 2 fois par seconde
+ * Dans l'autre sens, l'état du récepteur est envoyé à la page 5 fois par seconde
  * (fonction window.recevoirEtatRecepteur, voir EcranPrincipal).
  */
 class PontAndroid(private val ecran: EcranPrincipal) {

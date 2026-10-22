@@ -103,6 +103,8 @@ class EtcTest {
         val etat = lireEtc(lirePhraseNmea("\$GNETC,062004.20,30,00,307.575,298.576,8.426,1.472,1.472,1.516*57")!!)!!
         assertEquals(30, etat.etat)
         assertEquals(8.426, etat.inclinaisonDeg!!, 1e-9)
+        assertEquals(307.575, etat.capDeg!!, 1e-9)
+        assertEquals(298.576, etat.directionInclinaisonDeg!!, 1e-9)
         assertTrue(etat.estActive)
     }
 
@@ -111,6 +113,7 @@ class EtcTest {
         val etat = lireEtc(lirePhraseNmea("\$GNETC,061840.00,20,20,,,,,,*52")!!)!!
         assertEquals(20, etat.etat)
         assertNull(etat.inclinaisonDeg)
+        assertNull(etat.capDeg)
         assertFalse(etat.estActive)
     }
 

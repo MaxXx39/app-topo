@@ -41,10 +41,11 @@ export function recepteurDisponible() {
 }
 
 /**
- * Appelle "fonction(etat)" à chaque état reçu du récepteur (2 fois par seconde), voir
+ * Appelle "fonction(etat)" à chaque état reçu du récepteur (5 fois par seconde), voir
  * EtatRecepteur.enJson côté Kotlin : { connecte, bluetooth, dernierRecepteur, recu, qualite,
  * libelleQualite, nbSatellites, hdop, ageCorrections, etatInclinaison, inclinaisonPrete,
- * inclinaison, position: { est, nord, altitude } ou null, erreurConversion, autorise, raison }.
+ * inclinaison, cap (°, orientation du RX2, à confirmer), position: { est, nord, altitude } ou null,
+ * erreurConversion, autorise, raison }.
  */
 export function ecouterRecepteur(fonction) {
   window.recevoirEtatRecepteur = fonction;

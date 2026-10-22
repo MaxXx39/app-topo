@@ -1,14 +1,34 @@
-// Onglet Terrain (seulement dans l'appli Android) : levé avec le récepteur Emlid.
-// Écran épuré pour le chantier : le plan en haut (voir style.css, « mode-leve »), puis le rôle
-// du prochain point (contour, ligne de rupture, point isolé), son nom, la position et le gros
-// bouton PRENDRE LE POINT. Le levé, le stock et le récepteur sont dans une ligne repliable.
+// Onglet Terrain (seulement dans l'appli Android), avec le récepteur Emlid. Deux modes :
+// - Lever : écran épuré pour le chantier, le plan en haut (voir style.css, « mode-leve »), puis le
+//   rôle du prochain point (contour, ligne de rupture, point isolé), son nom, la position et le gros
+//   bouton PRENDRE LE POINT. Le levé, le stock et le récepteur sont dans une ligne repliable.
+// - Contrôler : on choisit une surface ; en direct, de combien monter ou descendre pour être
+//   dessus, et deux coupes autour du récepteur (perpendiculaire et dans l'axe de la direction regardée).
 // Aussi : les bandeaux « RTK » et « Inclinaison » sous l'en-tête, visibles dans tous les onglets.
 //
-// L'état du récepteur arrive 2 fois par seconde (mettreAJourRecepteur) : on ne change alors que
+// L'état du récepteur arrive 5 fois par seconde (mettreAJourRecepteur) : on ne change alors que
 // quelques textes et l'état du bouton, sans redessiner l'écran (le doigt peut être dessus).
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE } from '../topo/leve-direct.js';
+import { svgCoupeDirecte } from './coupe-directe.js';
+
+// Mode Contrôler : ce qu'on implante (Point et Ligne viendront plus tard), vue des coupes, longueurs.
+const IMPLANTATIONS = [
+  ['point', 'Point', false],
+  ['ligne', 'Ligne', false],
+  ['surface', 'Surface', true],
+];
+const VUES_COUPES = [
+  ['les2', 'Les 2'],
+  ['perpendiculaire', 'Perpendiculaire'],
+  ['axe', 'Dans l\'axe'],
+];
+export const LONGUEURS_COUPE = [5, 10, 20];
+const TITRES_COUPES = {
+  perpendiculaire: { titre: 'Perpendiculaire', gauche: '← gauche', droite: 'droite →' },
+  axe: { titre: 'Dans l\'axe', gauche: '← derrière', droite: 'devant →' },
+};
 
 // Petit dessin de chaque rôle, comme dans Calculs › Surfaces (contour rouge, ligne orange, point vert).
 const ICONES = {
@@ -21,13 +41,15 @@ const ICONES = {
  * Crée l'écran dans "conteneur". Les actions sont faites par main.js via "actions" :
  * choisirRecepteur(), reconnecter(), deconnecter(), nouveauLeve(), choisirLeve(id), nouveauStock(),
  * choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
- * annulerDernierPoint()
- * Renvoie { afficher(donnees), mettreAJourRecepteur(etat) }.
+ * annulerDernierPoint(), choisirMode(mode), choisirSurfaceControle(id), choisirVueCoupes(vue),
+ * choisirLongueurCoupe(m), choisirSourceOrientation(source)
+ * Renvoie { afficher(donnees), mettreAJourRecepteur(etat, direct) }.
  */
 export function creerEcranLeve(conteneur, actions) {
   let etat = null; // dernier état du récepteur (voir src/android/pont.js)
   let donnees = null;
   let reglagesOuverts = false; // ligne « Levé · Stock » dépliée (gardée d'un dessin à l'autre)
+  let direct = null; // orientation et contrôle calculés par main.js à chaque état du récepteur
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
@@ -35,13 +57,14 @@ export function creerEcranLeve(conteneur, actions) {
     const { action } = bouton.dataset;
     if (action === 'prendre') actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '');
     else if (action === 'role') actions.choisirRole(bouton.dataset.role);
-    else actions[action]?.();
+    else actions[action]?.(bouton.dataset.valeur);
   });
 
   conteneur.addEventListener('change', (evenement) => {
     const cible = evenement.target;
     if (cible.dataset.champ === 'leve') actions.choisirLeve(cible.value);
     else if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
+    else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
   });
 
   conteneur.addEventListener('toggle', (evenement) => {
@@ -89,6 +112,80 @@ export function creerEcranLeve(conteneur, actions) {
       raison.textContent = permis || !connecte ? '' : etat?.raison ?? '';
       raison.hidden = permis || !connecte;
     }
+
+    // Orientation : valeurs brutes, pour contrôler le cap du RX2 sur le terrain.
+    const orientation = conteneur.querySelector('[data-vivant="orientation"]');
+    if (orientation) {
+      const o = direct?.orientation;
+      const degres = (valeur) => (valeur == null ? '—' : `${Math.round(valeur)}°`);
+      orientation.textContent = `cap RX2 ${degres(o?.cap)} · marche ${degres(o?.marche)}`;
+    }
+    if (donnees?.mode === 'controler') rafraichirControle();
+  }
+
+  /** Mode Contrôler : écart monter / descendre et coupes en direct. */
+  function rafraichirControle() {
+    const zone = conteneur.querySelector('[data-vivant="ecart"]');
+    const c = direct?.controle;
+    if (zone) {
+      if (!c || c.ecart == null) {
+        zone.className = 'ecart-direct attente';
+        zone.innerHTML = `<span class="message-ecart">${echapper(c?.message ?? 'Choisis une surface')}</span>`;
+      } else {
+        const monter = c.ecart >= 0;
+        zone.className = `ecart-direct ${c.classe}`;
+        zone.innerHTML = `<span class="fleche-ecart">${monter ? '↑' : '↓'}</span>
+          <span class="valeur-ecart">${monter ? 'Monter' : 'Descendre'} ${formaterNombre(Math.abs(c.ecart))} m</span>
+          <span class="detail-ecart">surface ${formaterNombre(c.altitudeSurface)} · canne ${formaterNombre(c.altitudeCanne)}</span>`;
+      }
+    }
+    for (const sens of ['perpendiculaire', 'axe']) {
+      const cadre = conteneur.querySelector(`[data-vivant="coupe-${sens}"]`);
+      if (!cadre) continue;
+      const coupe = c?.coupes?.[sens];
+      cadre.innerHTML = coupe
+        ? svgCoupeDirecte({ ...TITRES_COUPES[sens], ...coupe, classe: c.classe })
+        : `<p class="aide">${TITRES_COUPES[sens].titre} : ${c?.messageCoupes ?? 'en attente de la position'}</p>`;
+    }
+  }
+
+  /** Lever | Contrôler, en haut de l'onglet. */
+  function choixMode() {
+    return `<div class="modes-terrain" role="group" aria-label="Mode">
+      ${[['lever', 'Lever'], ['controler', 'Contrôler']]
+        .map(([cle, titre]) => `<button type="button" data-action="choisirMode" data-valeur="${cle}" class="${donnees.mode === cle ? 'actif' : ''}">${titre}</button>`)
+        .join('')}
+    </div>`;
+  }
+
+  /** Petits boutons au choix (un seul actif). */
+  function boutonsChoix(action, choix, actif) {
+    return choix
+      .map(([cle, titre, permis = true]) => `<button type="button" class="puce-choix ${String(cle) === String(actif) ? 'actif' : ''}" data-action="${action}" data-valeur="${cle}" ${permis ? '' : 'disabled title="bientôt"'}>${titre}</button>`)
+      .join('');
+  }
+
+  /** Mode Contrôler : quoi implanter, surface, écart en grand, coupes et leurs réglages. */
+  function controle() {
+    const { controle: reglages, surfaces } = donnees;
+    const vue = reglages.vueCoupes;
+    return `
+      <div class="ligne-choix"><span>Implanter</span>${boutonsChoix('choisirImplantation', IMPLANTATIONS, 'surface')}</div>
+      ${surfaces.length > 0
+        ? `<select data-champ="surface-controle" aria-label="Surface à contrôler">
+            ${reglages.surfaceId ? '' : '<option value="">— choisir une surface —</option>'}
+            ${surfaces.map((s) => `<option value="${s.id}" ${s.id === reglages.surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
+          </select>`
+        : '<p class="vide">Aucune surface dans le projet : crée-la dans Calculs › Surfaces, ou importe un LandXML.</p>'}
+      <div class="ecart-direct attente" data-vivant="ecart"></div>
+      <div class="coupes-directes vue-${vue}">
+        ${vue !== 'axe' ? '<div data-vivant="coupe-perpendiculaire"></div>' : ''}
+        ${vue !== 'perpendiculaire' ? '<div data-vivant="coupe-axe"></div>' : ''}
+      </div>
+      <div class="ligne-choix"><span>Coupes</span>${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}</div>
+      <div class="ligne-choix"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
+      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
+      <p class="aide" data-vivant="orientation"></p>`;
   }
 
   /** Connexion au récepteur : un gros bouton tant qu'il n'est pas connecté. */
@@ -183,22 +280,28 @@ export function creerEcranLeve(conteneur, actions) {
     /**
      * Redessine l'écran. donnees : { leves (levés faits avec le récepteur), leve, stocks (du levé),
      * stock, role, ligne: { numero, nbPoints, fermee }, nomPropose, dernierPoint (nom), resume
-     * (voir resumeStock), volume (remblai en m³, ou null) }.
+     * (voir resumeStock), volume (remblai en m³, ou null), mode ('lever' ou 'controler'),
+     * controle: { surfaceId, vueCoupes, demiLongueur, sourceOrientation }, surfaces: [{ id, etiquette }] }.
      */
     afficher(nouvellesDonnees) {
       donnees = nouvellesDonnees;
       conteneur.innerHTML = `
         <div class="ecran-terrain">
+          ${choixMode()}
           ${connexion()}
-          ${reglages()}
-          ${priseDePoint()}
+          ${donnees.mode === 'controler' ? controle() : `${reglages()}${priseDePoint()}`}
         </div>`;
       rafraichirVivant();
     },
 
-    /** Nouvel état du récepteur (2 fois par seconde). */
-    mettreAJourRecepteur(nouvelEtat) {
+    /**
+     * Nouvel état du récepteur (5 fois par seconde). direct (calculé par main.js) :
+     * { orientation: { azimut, source, cap, marche }, controle: { ecart, classe, altitudeSurface,
+     *   altitudeCanne, message, coupes: { perpendiculaire, axe }, messageCoupes } ou null }.
+     */
+    mettreAJourRecepteur(nouvelEtat, nouveauDirect = null) {
       etat = nouvelEtat;
+      direct = nouveauDirect;
       rafraichirVivant();
     },
   };

@@ -39,7 +39,7 @@ import java.util.Locale
  * dans l'APK) dans une WebView (fenêtre de navigateur intégrée), et fait pour elle ce qu'un
  * navigateur fait d'habitude : choisir des fichiers, prendre des photos, enregistrer les exports,
  * afficher les questions (« Supprimer… ? »). Elle garde aussi la connexion Bluetooth au
- * récepteur Emlid et envoie son état à la page 2 fois par seconde.
+ * récepteur Emlid et envoie son état à la page 5 fois par seconde.
  */
 class EcranPrincipal : Activity() {
 
@@ -97,7 +97,7 @@ class EcranPrincipal : Activity() {
     }
 
     /**
-     * Envoie l'état du récepteur à la page, 2 fois par seconde (fonction window.recevoirEtatRecepteur,
+     * Envoie l'état du récepteur à la page, 5 fois par seconde (comme le GGA du RX2) (fonction window.recevoirEtatRecepteur,
      * voir src/android/pont.js). Pendant la connexion, l'écran reste allumé.
      */
     private val envoyerEtat = object : Runnable {
@@ -111,7 +111,7 @@ class EcranPrincipal : Activity() {
             } else {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
-            minuterie.postDelayed(this, 500)
+            minuterie.postDelayed(this, 200)
         }
     }
 

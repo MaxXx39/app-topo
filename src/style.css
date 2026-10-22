@@ -2453,6 +2453,11 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   width: 100%;
 }
 
+/* « display: flex » ci-dessus l'emporterait sur l'attribut hidden : on le rétablit. */
+.connexion-terrain[hidden] {
+  display: none;
+}
+
 .reglages-leve {
   margin-bottom: 8px;
   padding: 6px 10px;
@@ -2565,4 +2570,224 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 
 .bloc-replie[open] > summary::after {
   content: '▴';
+}
+
+/* Flèche de la direction regardée, à côté de la position (comme Google Maps). */
+.plan .position path.fleche {
+  fill: var(--bleu);
+  stroke: #ffffff;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.plan .position.pas-prete path.fleche {
+  fill: var(--gris);
+}
+
+/* --- Onglet Terrain : Lever | Contrôler (version 0.40.0) --- */
+.modes-terrain {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--fond);
+}
+
+.modes-terrain button {
+  flex: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--gris);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modes-terrain button.actif {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.ligne-choix {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.ligne-choix > span:first-child {
+  min-width: 5.5em;
+  color: var(--gris);
+}
+
+.puce-choix {
+  min-height: 34px;
+  padding: 4px 12px;
+  border: 1px solid var(--bordure);
+  border-radius: 17px;
+  background: var(--surface);
+  color: var(--texte);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.puce-choix.actif {
+  border-color: var(--sombre);
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.ecran-terrain select[data-champ='surface-controle'] {
+  width: 100%;
+  margin: 4px 0 8px;
+}
+
+/* Écart en grand : vert clair (±2 cm), vert foncé (2 à 5 cm), rouge (monter plus de 5 cm),
+   bleu (descendre plus de 5 cm). */
+.ecart-direct {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 76px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  color: #ffffff;
+}
+
+.ecart-direct.attente {
+  display: flex;
+  justify-content: center;
+  background: var(--fond);
+  color: var(--gris);
+  font-weight: 600;
+}
+
+.ecart-direct.vert-clair {
+  background: #86efac;
+  color: #14532d;
+}
+
+.ecart-direct.vert-fonce {
+  background: #15803d;
+}
+
+.ecart-direct.rouge {
+  background: var(--rouge);
+}
+
+.ecart-direct.bleu {
+  background: var(--bleu);
+}
+
+.fleche-ecart {
+  grid-row: span 2;
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.valeur-ecart {
+  font-size: 1.6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-ecart {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+/* Coupes en direct : l'une sous l'autre (« écran partagé »). */
+.coupes-directes {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.coupe-directe {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.coupe-directe text {
+  font-size: 10px;
+  fill: var(--gris);
+}
+
+.coupe-directe .titre-coupe {
+  font-weight: 700;
+  fill: var(--texte);
+}
+
+.coupe-directe .vide-coupe {
+  font-size: 12px;
+}
+
+.coupe-directe .profil {
+  fill: none;
+  stroke: #b45309;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.coupe-directe .sous-profil {
+  fill: #b45309;
+  fill-opacity: 0.12;
+}
+
+.coupe-directe .base-coupe {
+  stroke: var(--bordure);
+}
+
+.coupe-directe .axe-canne {
+  stroke: var(--sombre);
+  stroke-dasharray: 3 3;
+}
+
+.coupe-directe .canne {
+  fill: var(--sombre);
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.coupe-directe .canne.vert-clair {
+  fill: #22c55e;
+}
+
+.coupe-directe .canne.vert-fonce {
+  fill: #15803d;
+}
+
+.coupe-directe .canne.rouge {
+  fill: var(--rouge);
+}
+
+.coupe-directe .canne.bleu {
+  fill: var(--bleu);
+}
+
+/* Téléphone, mode Contrôler : plan plus petit en haut, pour laisser la place aux coupes. */
+@media (max-width: 899px) {
+  body.mode-leve.mode-controle[data-onglet='terrain'] .panneau-plan {
+    height: 26svh;
+  }
+
+  body.mode-leve.mode-controle[data-onglet='terrain'] .plan-cadre {
+    min-height: 0;
+  }
+
+  body.mode-leve.mode-controle[data-onglet='terrain'] .mise-en-page {
+    padding-top: calc(26svh + 12px);
+  }
 }

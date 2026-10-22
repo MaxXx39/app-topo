@@ -104,7 +104,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   let points = [];
   let vue = null;
-  // Position du récepteur (levé avec l'appli Android) : { est, nord, prete } ou null.
+  // Position du récepteur (appli Android) : { est, nord, prete, azimut (°, ou null) } ou null.
   let position = null;
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
@@ -271,14 +271,24 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /**
    * Position du récepteur : rond bleu (gris si l'inclinaison n'est pas prête : c'est alors
-   * la position de l'antenne, pas celle du bout de canne). Redessinée seule, 2 fois par seconde.
+   * la position de l'antenne, pas celle du bout de canne). Redessinée seule, 5 fois par seconde.
    */
   function dessinerPosition() {
     svg.querySelector('g.position')?.remove();
     if (!position || !vue) return;
     const { x, y } = versEcran(position.est, position.nord, vue);
     const groupe = creerElement('g', { class: position.prete ? 'position' : 'position pas-prete' });
-    groupe.append(creerElement('circle', { cx: x, cy: y, r: 13, class: 'halo' }), creerElement('circle', { cx: x, cy: y, r: 6 }));
+    groupe.append(creerElement('circle', { cx: x, cy: y, r: 13, class: 'halo' }));
+    // Petite flèche (comme Google Maps) : la direction où l'on regarde, dessinée vers le haut
+    // puis tournée de l'azimut (sens des aiguilles d'une montre, comme à l'écran).
+    if (position.azimut != null) {
+      groupe.append(creerElement('path', {
+        d: `M${x} ${y - 25} L${x + 8} ${y - 9} L${x} ${y - 13} L${x - 8} ${y - 9} Z`,
+        class: 'fleche',
+        transform: `rotate(${position.azimut.toFixed(1)} ${x} ${y})`,
+      }));
+    }
+    groupe.append(creerElement('circle', { cx: x, cy: y, r: 6 }));
     svg.append(groupe);
   }
 
@@ -956,7 +966,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       else dessiner();
     },
     /**
-     * Position du récepteur { est, nord, prete } (ou null : on la cache). Le premier affichage
+     * Position du récepteur { est, nord, prete, azimut } (ou null : on la cache ; azimut null : pas de flèche). Le premier affichage
      * d'un levé encore vide se cadre sur elle.
      */
     afficherPosition(nouvellePosition) {

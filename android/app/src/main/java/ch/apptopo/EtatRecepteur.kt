@@ -17,7 +17,7 @@ import org.json.JSONObject
 /**
  * Tout ce que l'appli sait du récepteur à l'instant présent (repris d'Emlid Stock) : connexion
  * Bluetooth, dernière position (GGA convertie en MN95 / RAN95), état de l'inclinaison (ETC).
- * Les données arrivent par le fil Bluetooth ; la page les reçoit 2 fois par seconde ([enJson]).
+ * Les données arrivent par le fil Bluetooth ; la page les reçoit 5 fois par seconde ([enJson]).
  */
 class EtatRecepteur {
 
@@ -61,7 +61,7 @@ class EtatRecepteur {
     /**
      * État envoyé à la page (src/android/pont.js) :
      * { connecte, bluetooth, recu, qualite, libelleQualite, nbSatellites, hdop, ageCorrections,
-     *   etatInclinaison, inclinaisonPrete, inclinaison, position: { est, nord, altitude } ou null,
+     *   etatInclinaison, inclinaisonPrete, inclinaison, cap, position: { est, nord, altitude } ou null,
      *   erreurConversion, autorise, raison }
      */
     fun enJson(nomDernierRecepteur: String?): String {
@@ -89,6 +89,8 @@ class EtatRecepteur {
             put("etatInclinaison", if (etcRecent) compensation!!.etat ?: JSONObject.NULL else JSONObject.NULL)
             put("inclinaisonPrete", etcRecent && compensation!!.estActive)
             put("inclinaison", if (etcRecent) compensation!!.inclinaisonDeg ?: JSONObject.NULL else JSONObject.NULL)
+            // Cap du récepteur (°), seulement quand la compensation est prête (champ vide sinon).
+            put("cap", if (etcRecent && compensation!!.estActive) compensation.capDeg ?: JSONObject.NULL else JSONObject.NULL)
             put("erreurConversion", erreurConversion ?: JSONObject.NULL)
             put("autorise", autorisation.autorise)
             put("raison", autorisation.raison)

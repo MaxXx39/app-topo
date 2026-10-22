@@ -36,7 +36,9 @@ import {
 import * as stockage from './projet/stockage.js';
 import * as historique from './projet/historique.js';
 import { bulle, installerAide } from './aide/bulles.js';
-import { creerEcranLeve, mettreAJourBandeaux } from './leve/ecran.js';
+import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
+import { creerSuiviOrientation } from './leve/orientation.js';
+import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe } from './topo/implantation.js';
 import {
   estLeveDirect,
   creerLeveDirect,
@@ -65,6 +67,26 @@ const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 // Levé avec le récepteur (appli Android) : levé et stock en cours, rôle du prochain point.
 const leveDirect = { leveId: null, stockId: null, role: 'contour' };
 let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
+// Onglet Terrain : mode (Lever ou Contrôler) et réglages du contrôle, retenus sur l'appareil.
+const CLE_TERRAIN = 'topo-terrain';
+const terrain = { mode: 'lever', surfaceId: null, vueCoupes: 'les2', demiLongueur: 5, sourceOrientation: 'rx2', ...lireReglagesTerrain() };
+const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
+
+function lireReglagesTerrain() {
+  try {
+    return JSON.parse(localStorage.getItem(CLE_TERRAIN)) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function retenirReglagesTerrain() {
+  try {
+    localStorage.setItem(CLE_TERRAIN, JSON.stringify(terrain));
+  } catch {
+    // Mémoire du navigateur indisponible : les réglages ne seront simplement pas retenus.
+  }
+}
 
 // --- Mise en page : onglets ---
 // Projet (le chantier : levés importés, cartouche, fichier projet), Terrain (levé avec le récepteur,
@@ -361,6 +383,35 @@ const ecranLeve = recepteurDisponible()
         afficherMessage(`Point ${resultat.point.nom} pris`);
         modifie();
       },
+      choisirMode: (mode) => {
+        terrain.mode = mode === 'controler' ? 'controler' : 'lever';
+        retenirReglagesTerrain();
+        if (terrain.mode === 'controler') montrerSurfaceControle();
+        recalculer();
+      },
+      choisirImplantation: () => {}, // Point et Ligne : plus tard
+      choisirSurfaceControle: (id) => {
+        terrain.surfaceId = id || null;
+        retenirReglagesTerrain();
+        montrerSurfaceControle();
+        recalculer();
+      },
+      choisirVueCoupes: (vue) => {
+        terrain.vueCoupes = ['les2', 'perpendiculaire', 'axe'].includes(vue) ? vue : 'les2';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      choisirLongueurCoupe: (metres) => {
+        terrain.demiLongueur = LONGUEURS_COUPE.includes(Number(metres)) ? Number(metres) : 5;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      choisirSourceOrientation: (source) => {
+        terrain.sourceOrientation = source === 'marche' ? 'marche' : 'rx2';
+        suiviOrientation.changerSource(terrain.sourceOrientation);
+        retenirReglagesTerrain();
+        recalculer();
+      },
       annulerDernierPoint: () => {
         const leve = leveEnCours();
         const dernier = leve?.points[leve.points.length - 1];
@@ -397,17 +448,73 @@ function donneesLeve() {
     dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
     resume: stock ? resumeStock(stock) : null,
     volume: stock ? volumeDuStock(stock) : null,
+    mode: terrain.mode,
+    controle: terrain,
+    surfaces: projet.surfaces.map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
   };
 }
 
-// État du récepteur, 2 fois par seconde : bandeaux, bloc de levé, position sur le plan.
+/** Mode Contrôler : la surface choisie devient la surface affichée (plan, Calculs › Surfaces). */
+function montrerSurfaceControle() {
+  const index = projet.surfaces.findIndex((s) => s.id === terrain.surfaceId);
+  if (index >= 0) editeurSurfaces.choisir(index);
+}
+
+/**
+ * Mode Contrôler, à chaque état du récepteur : de combien monter ou descendre pour être sur la
+ * surface choisie, et les coupes autour du récepteur. L'écart n'est donné que si le point serait
+ * accepté par la règle de prise de point (RTK fixe et inclinaison prête) ; sinon, la raison.
+ */
+function calculerControle(etat, orientation) {
+  const surface = projet.surfaces.find((s) => s.id === terrain.surfaceId);
+  if (!surface) return { message: 'Choisis une surface' };
+  const triangles = trianglesDeSurface(surface.id);
+  if (triangles.length === 0) return { message: 'Cette surface n\'a pas encore de triangles' };
+  const position = etat.connecte && etat.recu ? etat.position : null;
+  if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
+
+  const altitudeSurface = altitudeSurSurface(triangles, position.est, position.nord);
+  const fiable = Boolean(etat.autorise);
+  let message = null;
+  if (!fiable) message = etat.raison ?? 'Position pas fiable';
+  else if (altitudeSurface == null) message = 'Hors surface';
+  const ecart = message ? null : ecartSurface(altitudeSurface, position.altitude);
+
+  // Coupes : sans orientation connue, on les oriente nord-sud et est-ouest.
+  const azimut = orientation.azimut ?? 0;
+  const coupes = {};
+  for (const sens of ['perpendiculaire', 'axe']) {
+    const { debut, fin } = extremitesCoupe(position, azimut, terrain.demiLongueur, sens);
+    coupes[sens] = {
+      lignes: profilSurface(triangles, debut, fin),
+      demiLongueur: terrain.demiLongueur,
+      altitudeCanne: fiable ? position.altitude : null,
+    };
+  }
+  if (orientation.azimut == null) {
+    Object.assign(coupes.perpendiculaire, { titre: 'Ouest-est (orientation inconnue)', gauche: '← ouest', droite: 'est →' });
+    Object.assign(coupes.axe, { titre: 'Sud-nord (orientation inconnue)', gauche: '← sud', droite: 'nord →' });
+  }
+  return {
+    ecart,
+    classe: ecart == null ? null : classeEcart(ecart),
+    altitudeSurface,
+    altitudeCanne: position.altitude,
+    message,
+    coupes,
+  };
+}
+
+// État du récepteur, 5 fois par seconde : bandeaux, bloc de levé, position sur le plan.
 if (recepteurDisponible()) {
   ecouterRecepteur((etat) => {
     etatRecepteur = etat;
     mettreAJourBandeaux(etat);
-    ecranLeve.mettreAJourRecepteur(etat);
+    const orientation = suiviOrientation.ajouter(etat, performance.now());
+    const controle = terrain.mode === 'controler' ? calculerControle(etat, orientation) : null;
+    ecranLeve.mettreAJourRecepteur(etat, { orientation, controle });
     const position = etat.connecte && etat.recu ? etat.position : null;
-    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete) } : null);
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut } : null);
   });
 }
 
@@ -747,8 +854,10 @@ function recalculer({ recadrer = false } = {}) {
   ecranImport.afficher(projet, dernierImport);
   ecranLeve?.afficher(donneesLeve());
   ecranProjet.afficher(projet, resumes);
-  // Téléphone, onglet Terrain : le plan reste en haut de l'écran (voir style.css).
+  // Téléphone, onglet Terrain : le plan reste en haut de l'écran (voir style.css), plus petit
+  // en mode Contrôler pour laisser la place aux coupes.
   document.body.classList.toggle('mode-leve', Boolean(ecranLeve));
+  document.body.classList.toggle('mode-controle', Boolean(ecranLeve) && terrain.mode === 'controler');
 
   // Plan : surfaces du levé affiché et surfaces importées ; les autres sont cachées.
   const visibles = new Set(surfacesAffichees());
