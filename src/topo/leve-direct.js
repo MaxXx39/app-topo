@@ -5,9 +5,10 @@
 // Sur le terrain, on ne voit que les surfaces (stock, terrain naturel, terrassement) : leur levé
 // est créé tout seul, un par jour (« Levé RX2 AAAA-MM-JJ »), et reçoit les points du jour.
 //
-// Noms proposés (comme Emlid Stock) : contour B1, B2… ; lignes de rupture H1-1, H1-2… puis H2-1… ;
-// points isolés C1, C2… Le numéro suivant = le plus grand du levé + 1 (les noms restent uniques
-// dans le levé, même avec plusieurs stocks). L'utilisateur peut changer le nom avant de prendre le point.
+// Noms proposés (demande de l'utilisateur, 22.10.2026) : des numéros, par centaine pour chaque
+// surface du projet : 1, 2, 3… pour la première, 101, 102… pour la deuxième, 201… pour la troisième,
+// quel que soit le rôle du point. Jamais deux fois le même nom dans le projet. L'utilisateur peut
+// changer le nom avant de prendre le point.
 import { creerSurface, nouvelIdentifiant, NATURES } from './surface.js';
 import { creerLigne } from './noms.js';
 
@@ -59,6 +60,7 @@ export function creerSurfaceDirecte(projet, leve, nature = 'stock') {
   const numeros = projet.surfaces.map((s) => modele.exec(s.nom)?.[1]).filter(Boolean).map(Number);
   const surface = creerSurface(`${titre} ${Math.max(0, ...numeros) + 1}`, leve.id, NATURES.some(([cle]) => cle === nature) ? nature : 'stock');
   surface.tousLesPoints = false;
+  surface.premierNumero = numeroDeDepartLibre(projet);
   projet.surfaces.push(surface);
   return surface;
 }
@@ -80,51 +82,56 @@ export function basculerFermeture(surface) {
   ligne.fermee = !ligne.fermee;
 }
 
-/** Plus grand numéro des noms du levé qui suivent ce modèle (ex. /^B(\d+)$/), ou 0. */
-function plusGrandNumero(noms, modele) {
-  let plusGrand = 0;
-  for (const nom of noms) {
-    const trouve = modele.exec(nom);
-    if (trouve) plusGrand = Math.max(plusGrand, Number(trouve[1]));
-  }
-  return plusGrand;
+/** Tous les noms de points du projet (tous ses levés). */
+export function nomsDuProjet(projet) {
+  return new Set(projet.leves.flatMap((leve) => leve.points.map((p) => p.nom)));
 }
 
-/** Numéro de la ligne en cours dans les noms H<ligne>-<point> : celui de son 1er point, sinon un nouveau. */
-function numeroDeLigne(noms, ligne) {
-  const premier = /^H(\d+)-\d+$/.exec(ligne.noms[0] ?? '');
-  return premier ? Number(premier[1]) : plusGrandNumero(noms, /^H(\d+)-\d+$/) + 1;
+/** Centaine d'un numéro : 1 à 100 → 0, 101 à 200 → 1, 201 à 300 → 2… */
+const centaine = (numero) => Math.floor((numero - 1) / 100);
+
+/**
+ * Premier numéro d'une nouvelle surface levée : 1, puis 101, 201… (la centaine qui suit le plus
+ * grand numéro déjà utilisé ou réservé par une surface dans le projet).
+ */
+export function numeroDeDepartLibre(projet) {
+  let derniere = -1;
+  for (const nom of nomsDuProjet(projet)) if (/^\d+$/.test(nom)) derniere = Math.max(derniere, centaine(Number(nom)));
+  for (const surface of projet.surfaces) if (surface.premierNumero) derniere = Math.max(derniere, centaine(surface.premierNumero));
+  return (derniere + 1) * 100 + 1;
 }
 
-/** Nom proposé pour le prochain point de ce rôle (voir en haut du fichier). */
-export function prochainNom(leve, surface, role) {
-  const noms = leve.points.map((p) => p.nom);
-  const pris = new Set(noms);
-  let fabriquer;
-  if (role === 'contour') {
-    const depart = plusGrandNumero(noms, /^B(\d+)$/);
-    fabriquer = (i) => `B${depart + i}`;
-  } else if (role === 'ligne') {
-    const ligne = numeroDeLigne(noms, ligneEnCours(surface));
-    const depart = plusGrandNumero(noms, new RegExp(`^H${ligne}-(\\d+)$`));
-    fabriquer = (i) => `H${ligne}-${depart + i}`;
-  } else {
-    const depart = plusGrandNumero(noms, /^C(\d+)$/);
-    fabriquer = (i) => `C${depart + i}`;
-  }
-  let i = 1;
-  while (pris.has(fabriquer(i))) i += 1;
-  return fabriquer(i);
+/** Noms des points d'une surface, tous rôles confondus. */
+function nomsDeLaSurface(surface) {
+  return [...surface.contour, ...surface.lignesRupture.flatMap((l) => l.noms), ...surface.points];
 }
 
 /**
- * Range un point pris avec le récepteur : dans le levé, et dans le stock selon son rôle.
- * point = { nom, est, nord, altitude, ... }. Renvoie { point } ou { erreur } (nom vide ou déjà pris).
+ * Nom proposé pour le prochain point de la surface : le numéro qui suit son plus grand numéro
+ * (à partir de son premier numéro : 1, 101, 201…), en sautant les noms déjà pris dans le projet.
+ * Une surface sans premier numéro (levée avant cette règle) en reçoit un.
  */
-export function ajouterPointDirect(leve, surface, role, point) {
+export function prochainNom(projet, surface) {
+  if (!surface.premierNumero) surface.premierNumero = numeroDeDepartLibre(projet);
+  const pris = nomsDuProjet(projet);
+  const miens = nomsDeLaSurface(surface)
+    .filter((nom) => /^\d+$/.test(nom))
+    .map(Number)
+    .filter((numero) => numero >= surface.premierNumero);
+  let numero = Math.max(surface.premierNumero - 1, ...miens) + 1;
+  while (pris.has(String(numero))) numero += 1;
+  return String(numero);
+}
+
+/**
+ * Range un point pris avec le récepteur : dans le levé, et dans la surface selon son rôle.
+ * point = { nom, est, nord, altitude, ... } ; nomsPris : noms déjà utilisés ailleurs dans le projet.
+ * Renvoie { point } ou { erreur } (nom vide ou déjà pris).
+ */
+export function ajouterPointDirect(leve, surface, role, point, nomsPris = new Set()) {
   const nom = String(point.nom ?? '').trim();
   if (!nom) return { erreur: 'donne un nom au point' };
-  if (leve.points.some((p) => p.nom === nom)) return { erreur: `le nom ${nom} est déjà pris dans ce levé` };
+  if (nomsPris.has(nom) || leve.points.some((p) => p.nom === nom)) return { erreur: `le nom ${nom} est déjà pris dans ce projet` };
   const range = { ...point, nom };
   leve.points.push(range);
   if (role === 'contour') surface.contour.push(nom);

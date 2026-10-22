@@ -2823,9 +2823,23 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   --couleur-nature: #2563eb;
 }
 
-.astuce-volume {
-  margin: 4px 0 0;
-  text-align: center;
+/* Rappel sous le texte du gros bouton : la touche volume − prend aussi le point. */
+.bouton.bouton-prendre {
+  flex-direction: column;
+  gap: 0;
+}
+
+.sous-titre-prendre {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  opacity: 0.8;
+}
+
+/* Bout de canne en dehors du dessin de la coupe : rond vide, posé sur le bord. */
+.coupe-directe .canne.hors-cadre {
+  fill: #ffffff;
+  stroke: var(--sombre);
 }
 
 .pied-recepteur {
@@ -2850,4 +2864,41 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   .parties-calculs {
     top: 0;
   }
+}
+
+/* Suivi de la position actif (bouton « Ma position ») : le plan suit le récepteur. */
+.plan-boutons button.actif {
+  background: var(--bleu);
+  color: #ffffff;
+}
+
+/* Coupes en direct (mode Contrôler) : perpendiculaire en violet, dans l'axe en rose, en pointillés
+   sur le plan et en couleur sur le bord de leur dessin. */
+.plan .trace-coupe-directe {
+  stroke-width: 3;
+  stroke-dasharray: 7 5;
+  stroke-linecap: round;
+}
+
+.plan .trace-coupe-directe.coupe-perpendiculaire,
+.coupe-directe.coupe-perpendiculaire {
+  --couleur-coupe: #7c3aed;
+}
+
+.plan .trace-coupe-directe.coupe-axe,
+.coupe-directe.coupe-axe {
+  --couleur-coupe: #db2777;
+}
+
+.plan .trace-coupe-directe {
+  stroke: var(--couleur-coupe);
+}
+
+.coupe-directe.coupe-perpendiculaire,
+.coupe-directe.coupe-axe {
+  border-left: 5px solid var(--couleur-coupe);
+}
+
+.coupe-directe .titre-coupe {
+  fill: var(--couleur-coupe, var(--texte));
 }

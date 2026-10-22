@@ -24,7 +24,7 @@ const VUES_COUPES = [
   ['perpendiculaire', 'Perpendiculaire'],
   ['axe', 'Dans l\'axe'],
 ];
-export const LONGUEURS_COUPE = [5, 10, 20];
+export const LONGUEURS_COUPE = [2, 5, 10, 20];
 // Ce que l'on lève (même choix que « + Nouvelle surface » dans Calculs › Surfaces).
 const NATURES_TERRAIN = [
   ['stock', 'Stock'],
@@ -47,7 +47,7 @@ const ICONES = {
  * Crée l'écran dans "conteneur". Les actions sont faites par main.js via "actions" :
  * choisirRecepteur(), reconnecter(), deconnecter(), nouvelleSurface(nature), choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
  * annulerDernierPoint(), choisirMode(mode), choisirSurfaceControle(id), choisirVueCoupes(vue),
- * choisirLongueurCoupe(m), choisirSourceOrientation(source)
+ * choisirLongueurCoupe(m), choisirExagerationCoupe(facteur), choisirSourceOrientation(source)
  * Renvoie { afficher(donnees), mettreAJourRecepteur(etat, direct) }.
  */
 export function creerEcranLeve(conteneur, actions) {
@@ -150,7 +150,7 @@ export function creerEcranLeve(conteneur, actions) {
       if (!cadre) continue;
       const coupe = c?.coupes?.[sens];
       cadre.innerHTML = coupe
-        ? svgCoupeDirecte({ ...TITRES_COUPES[sens], ...coupe, classe: c.classe })
+        ? svgCoupeDirecte({ ...TITRES_COUPES[sens], ...coupe, classe: c.classe, sens, exageration: donnees.controle.exagerationCoupe })
         : `<p class="aide">${TITRES_COUPES[sens].titre} : ${c?.messageCoupes ?? 'en attente de la position'}</p>`;
     }
   }
@@ -190,6 +190,7 @@ export function creerEcranLeve(conteneur, actions) {
       </div>
       <div class="ligne-choix"><span>Coupes</span>${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}</div>
       <div class="ligne-choix"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
+      <div class="ligne-choix"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
       <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
       <p class="aide" data-vivant="orientation"></p>`;
   }
@@ -271,8 +272,9 @@ export function creerEcranLeve(conteneur, actions) {
         <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" />
         <div class="position-leve" data-vivant="position"></div>
       </div>
-      <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>PRENDRE LE POINT</button>
-      <p class="aide astuce-volume">ou touche <strong>volume −</strong> de la tablette</p>
+      <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>
+        <span>PRENDRE LE POINT</span><span class="sous-titre-prendre">ou touche vol − de la tablette</span>
+      </button>
       <p class="raison-leve" data-vivant="raison" hidden></p>
       <div class="pied-terrain">
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>

@@ -104,8 +104,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   let points = [];
   let vue = null;
-  // Position du récepteur (appli Android) : { est, nord, prete, azimut (°, ou null) } ou null.
+  // Position du récepteur (appli Android) : { est, nord, prete, azimut (°, ou null),
+  // coupes: [{ sens, debut, fin }] (coupes en direct du mode Contrôler) } ou null.
   let position = null;
+  // Suivi de la position : le plan se recentre sur elle à chaque mise à jour (bouton « Ma position »),
+  // jusqu'à ce qu'on déplace le plan au doigt.
+  let suivre = false;
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
   // Ce qu'il faut dessiner (voir editeur.js et main.js) :
@@ -278,6 +282,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (!position || !vue) return;
     const { x, y } = versEcran(position.est, position.nord, vue);
     const groupe = creerElement('g', { class: position.prete ? 'position' : 'position pas-prete' });
+    // Coupes en direct : en pointillés, chacune de sa couleur (la même que son dessin).
+    for (const coupe of position.coupes ?? []) {
+      const debut = versEcran(coupe.debut.est, coupe.debut.nord, vue);
+      const fin = versEcran(coupe.fin.est, coupe.fin.nord, vue);
+      groupe.append(creerElement('line', { x1: debut.x, y1: debut.y, x2: fin.x, y2: fin.y, class: `trace-coupe-directe coupe-${coupe.sens}` }));
+    }
     groupe.append(creerElement('circle', { cx: x, cy: y, r: 13, class: 'halo' }));
     // Petite flèche (comme Google Maps) : la direction où l'on regarde, dessinée vers le haut
     // puis tournée de l'azimut (sens des aiguilles d'une montre, comme à l'écran).
@@ -803,7 +813,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   conteneur.querySelector('[data-action="zoom-plus"]').addEventListener('click', () => zoomerAuCentre(1.5));
   conteneur.querySelector('[data-action="zoom-moins"]').addEventListener('click', () => zoomerAuCentre(1 / 1.5));
   const boutonPosition = conteneur.querySelector('[data-action="ma-position"]');
-  boutonPosition.addEventListener('click', centrerSurPosition);
+  boutonPosition.addEventListener('click', () => {
+    suivre = true;
+    boutonPosition.classList.add('actif');
+    centrerSurPosition();
+  });
+
+  /** Arrête le suivi de la position (le plan a été déplacé au doigt). */
+  function arreterSuivi() {
+    suivre = false;
+    boutonPosition.classList.remove('actif');
+  }
 
   // --- Menu des calques ---
   boutonCalques.addEventListener('click', () => {
@@ -862,6 +882,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (toucher && distance(toucher, apres[0]) > 6) toucher = null;
 
     if (apres.length === 1) {
+      if (!toucher && suivre) arreterSuivi();
       vue = deplacer(vue, apres[0].x - avant[0].x, apres[0].y - avant[0].y);
     } else if (apres.length >= 2) {
       // Pincement : on zoome selon l'écart entre les deux doigts,
@@ -966,14 +987,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       else dessiner();
     },
     /**
-     * Position du récepteur { est, nord, prete, azimut } (ou null : on la cache ; azimut null : pas de flèche). Le premier affichage
+     * Position du récepteur { est, nord, prete, azimut, coupes } (ou null : on la cache ; azimut null :
+     * pas de flèche). Pendant le suivi (bouton « Ma position »), le plan se recentre sur elle. Le premier affichage
      * d'un levé encore vide se cadre sur elle.
      */
     afficherPosition(nouvellePosition) {
       const premiere = !position && nouvellePosition;
       position = nouvellePosition;
       boutonPosition.hidden = !position;
-      if (position && (!vue || (premiere && points.length === 0))) centrerSurPosition();
+      if (position && (!vue || suivre || (premiere && points.length === 0))) centrerSurPosition();
       else dessinerPosition();
     },
     /** Redessine le plan avec les stocks (sans changer le zoom). */

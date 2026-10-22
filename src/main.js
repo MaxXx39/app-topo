@@ -44,6 +44,7 @@ import {
   leveDuJour,
   creerSurfaceDirecte,
   prochainNom,
+  nomsDuProjet,
   ajouterPointDirect,
   annulerDernierPoint,
   nouvelleLigne,
@@ -69,7 +70,7 @@ const leveDirect = { stockId: null, role: 'contour' };
 let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
 // Onglet Terrain : mode (Lever ou Contrôler) et réglages du contrôle, retenus sur l'appareil.
 const CLE_TERRAIN = 'topo-terrain';
-const terrain = { mode: 'lever', surfaceId: null, vueCoupes: 'les2', demiLongueur: 5, sourceOrientation: 'rx2', ...lireReglagesTerrain() };
+const terrain = { mode: 'lever', surfaceId: null, vueCoupes: 'les2', demiLongueur: 5, exagerationCoupe: 1, sourceOrientation: 'rx2', ...lireReglagesTerrain() };
 const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
 
 function lireReglagesTerrain() {
@@ -363,12 +364,12 @@ const ecranLeve = recepteurDisponible()
         }
         const { est, nord, altitude, ...gnss } = reponse.point;
         const resultat = ajouterPointDirect(leve, stock, leveDirect.role, {
-          nom: nom.trim() || prochainNom(leve, stock, leveDirect.role),
+          nom: nom.trim() || prochainNom(projet, stock),
           est,
           nord,
           altitude,
           gnss: { ...gnss, prisLe: new Date().toISOString() },
-        });
+        }, nomsDuProjet(projet));
         if (resultat.erreur) {
           afficherMessage(`Point refusé : ${resultat.erreur}`, 4000);
           return;
@@ -397,6 +398,11 @@ const ecranLeve = recepteurDisponible()
       },
       choisirLongueurCoupe: (metres) => {
         terrain.demiLongueur = LONGUEURS_COUPE.includes(Number(metres)) ? Number(metres) : 5;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      choisirExagerationCoupe: (facteur) => {
+        terrain.exagerationCoupe = Number(facteur) === 2 ? 2 : 1;
         retenirReglagesTerrain();
         recalculer();
       },
@@ -464,7 +470,7 @@ function donneesLeve() {
     stock,
     role: leveDirect.role,
     ligne: ligne ? { numero: numeroLigne, nbPoints: ligne.noms.length, fermee: ligne.fermee } : null,
-    nomPropose: stock ? prochainNom(leve, stock, leveDirect.role) : '',
+    nomPropose: stock ? prochainNom(projet, stock) : '',
     dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
     resume: stock ? resumeStock(stock) : null,
     volume: stock ? volumeDuStock(stock) : null,
@@ -506,6 +512,8 @@ function calculerControle(etat, orientation) {
   for (const sens of ['perpendiculaire', 'axe']) {
     const { debut, fin } = extremitesCoupe(position, azimut, terrain.demiLongueur, sens);
     coupes[sens] = {
+      debut,
+      fin,
       lignes: profilSurface(triangles, debut, fin),
       demiLongueur: terrain.demiLongueur,
       altitudeCanne: fiable ? position.altitude : null,
@@ -534,7 +542,10 @@ if (recepteurDisponible()) {
     const controle = terrain.mode === 'controler' ? calculerControle(etat, orientation) : null;
     ecranLeve.mettreAJourRecepteur(etat, { orientation, controle });
     const position = etat.connecte && etat.recu ? etat.position : null;
-    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut } : null);
+    // Coupes affichées (mode Contrôler) : leur trait en pointillés sur le plan.
+    const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
+    const traits = controle?.coupes ? vues.map((sens) => ({ sens, debut: controle.coupes[sens].debut, fin: controle.coupes[sens].fin })) : [];
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits } : null);
   });
 }
 

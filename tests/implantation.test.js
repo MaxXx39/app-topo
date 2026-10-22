@@ -142,3 +142,27 @@ describe('suivi de l\'orientation', () => {
     expect(suivi.ajouter(etat(0, 3, 45), 20000).azimut).toBeNull();
   });
 });
+
+describe('dessin des coupes en direct', () => {
+  it('hauteurs à l\'échelle (×1) par défaut, ×2 au choix, avec la couleur de la coupe', async () => {
+    const { svgCoupeDirecte } = await import('../src/leve/coupe-directe.js');
+    const lignes = [[{ distance: 0, altitude: 400 }, { distance: 4, altitude: 400.5 }]];
+    const commun = { lignes, demiLongueur: 2, altitudeCanne: 400.2, classe: 'rouge', titre: 'Perpendiculaire', gauche: 'g', droite: 'd' };
+    const x1 = svgCoupeDirecte({ ...commun, sens: 'perpendiculaire' });
+    expect(x1).toContain('hauteurs ×1');
+    expect(x1).toContain('coupe-perpendiculaire');
+    expect(x1).toContain('canne rouge');
+    const x2 = svgCoupeDirecte({ ...commun, exageration: 2, sens: 'axe' });
+    expect(x2).toContain('hauteurs ×2');
+    // Hauteur du dessin : 4 m de long sur 286 unités, soit 71.5 par mètre ; relief 0.7 m (avec les
+    // marges) : 50 → minimum 80 en ×1 ; ×2 : 100.
+    const hauteur = (svg) => Number(/viewBox="0 0 340 (\d+)"/.exec(svg)[1]);
+    expect(hauteur(x1)).toBe(116);
+    expect(hauteur(x2)).toBe(136);
+  });
+
+  it('sans surface : un message', async () => {
+    const { svgCoupeDirecte } = await import('../src/leve/coupe-directe.js');
+    expect(svgCoupeDirecte({ lignes: [], demiLongueur: 5, altitudeCanne: null, titre: 'Axe', gauche: '', droite: '' })).toContain('Pas de surface ici');
+  });
+});
