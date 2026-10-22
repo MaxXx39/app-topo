@@ -766,8 +766,16 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
-  /** Nom et volume (remblai, et déblai s'il y en a) écrits au milieu de chaque surface calculée. */
+  /**
+   * Nom et volume (remblai, et déblai s'il y en a) écrits au milieu de chaque surface calculée.
+   * Onglet Terrain (volumesDiscrets) : seulement une petite pastille en bas à gauche, pour la
+   * surface en cours, qui ne cache pas les points levés.
+   */
   function dessinerVolumes() {
+    if (dessin.volumesDiscrets) {
+      dessinerPastilleVolume();
+      return;
+    }
     const groupe = creerElement('g', { class: 'volumes' });
     dessin.stocks.forEach((stock, index) => {
       const actif = stock === dessin.stockActif;
@@ -790,6 +798,23 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         groupe.append(texte);
       });
     });
+    svg.append(groupe);
+  }
+
+  /** Petite pastille « Stock 1 · 1636.197 m³ » en bas à gauche, au-dessus de l'échelle (surface en cours, onglet Terrain). */
+  function dessinerPastilleVolume() {
+    const index = dessin.stocks.indexOf(dessin.stockActif);
+    const resultat = dessin.resultats[index];
+    if (index < 0 || resultat?.remblai === undefined) return;
+    const texte = `${dessin.stockActif.nom} · ${formaterNombre(resultat.remblai)} m³${resultat.deblai > 0 ? ` · D ${formaterNombre(resultat.deblai)} m³` : ''}`;
+    const largeur = texte.length * 6.4 + 14;
+    const x = 8;
+    const y = vue.hauteur - 60;
+    const groupe = creerElement('g', { class: 'pastille-volume' });
+    groupe.append(creerElement('rect', { x, y, width: largeur, height: 20, rx: 10 }));
+    const element = creerElement('text', { x: x + largeur / 2, y: y + 14, 'text-anchor': 'middle' });
+    element.textContent = texte;
+    groupe.append(element);
     svg.append(groupe);
   }
 

@@ -2,7 +2,7 @@
 // - Lever : écran épuré pour le chantier, le plan en haut (voir style.css, « mode-leve »), puis le
 //   rôle du prochain point (contour, ligne de rupture, point isolé), son nom, la position et le gros
 //   bouton PRENDRE LE POINT. Le levé, le stock et le récepteur sont dans une ligne repliable.
-// - Contrôler : on choisit une surface ; en direct, de combien monter ou descendre pour être
+// - Implanter (mode « controler » dans le code) : on choisit une surface ; en direct, de combien monter ou descendre pour être
 //   dessus, et deux coupes autour du récepteur (perpendiculaire et dans l'axe de la direction regardée).
 //   Ou on implante un point : on le choisit en touchant le plan (accroche au sommet, au milieu, sur
 //   la ligne ou au centre d'un cercle), puis on l'implante (guidage avance / droite) ou on le garde
@@ -220,10 +220,10 @@ export function creerEcranLeve(conteneur, actions) {
     }
   }
 
-  /** Lever | Contrôler, en haut de l'onglet. */
+  /** Lever | Implanter, en haut de l'onglet (le mode « implanter » s'appelle 'controler' dans le code). */
   function choixMode() {
     return `<div class="modes-terrain" role="group" aria-label="Mode">
-      ${[['lever', 'Lever'], ['controler', 'Contrôler']]
+      ${[['lever', 'Lever'], ['controler', 'Implanter']]
         .map(([cle, titre]) => `<button type="button" data-action="choisirMode" data-valeur="${cle}" class="${donnees.mode === cle ? 'actif' : ''}">${titre}</button>`)
         .join('')}
     </div>`;
@@ -240,7 +240,7 @@ export function creerEcranLeve(conteneur, actions) {
   function controle() {
     const { controle: reglages, surfaces } = donnees;
     const vue = reglages.vueCoupes;
-    const choixImplantation = `<div class="ligne-choix"><span>Implanter</span>${boutonsChoix('choisirImplantation', IMPLANTATIONS, reglages.implantation)}</div>`;
+    const choixImplantation = `<div class="ligne-choix choix-implantation-type">${boutonsChoix('choisirImplantation', IMPLANTATIONS, reglages.implantation)}</div>`;
     if (reglages.implantation === 'point') return choixImplantation + implanterPoint();
     return `
       ${choixImplantation}
@@ -338,13 +338,20 @@ export function creerEcranLeve(conteneur, actions) {
     </div>`;
   }
 
-  /** Une seule ligne : la surface levée en cours (à changer) et « + Nouvelle ». */
+  /**
+   * Bandeau de la surface levée en cours, à la couleur de sa nature : sa nature en petit, son
+   * nom en grand (liste pour en reprendre une autre) et « + » pour en commencer une nouvelle.
+   */
   function ligneSurface() {
-    return `<div class="ligne-surface">
-      <select data-champ="stock" aria-label="Surface levée">
-        ${donnees.stocks.map((s) => `<option value="${s.id}" ${s.id === donnees.stock.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}
-      </select>
-      <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouvelle</button>
+    const nature = donnees.stock.nature ?? 'stock';
+    return `<div class="bandeau-leve nature-${nature}">
+      <div class="bandeau-leve-texte">
+        <span class="nature-leve">${echapper(NATURES_TERRAIN.find(([cle]) => cle === nature)?.[1] ?? '')}</span>
+        <select data-champ="stock" aria-label="Surface levée : en reprendre une autre">
+          ${donnees.stocks.map((s) => `<option value="${s.id}" ${s.id === donnees.stock.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}
+        </select>
+      </div>
+      <button type="button" class="bouton-plus" data-action="ouvrirChoixNature" aria-label="Nouvelle surface levée" title="Nouvelle surface levée">+</button>
     </div>`;
   }
 

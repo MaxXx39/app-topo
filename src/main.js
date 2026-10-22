@@ -1243,6 +1243,8 @@ function recalculer({ recadrer = false } = {}) {
     // Coupes tracées (A – A', B – B'), et celle en cours de tracé.
     coupes: projet.coupes.filter((c) => c.debut && c.fin && c.id !== traceCoupe?.id),
     traceCoupe,
+    // Onglet Terrain : le volume en petit dans un coin, pas en grand au milieu du stock.
+    volumesDiscrets: ongletContexte === 'terrain',
   });
   if (recadrer || pointsDuPlan !== pointsAffiches) {
     pointsAffiches = pointsDuPlan;

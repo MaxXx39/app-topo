@@ -1225,6 +1225,18 @@ svg.plan {
   z-index: 2;
 }
 
+/* Volume de la surface en cours, discret (onglet Terrain). */
+.plan .pastille-volume rect {
+  fill: rgba(255, 255, 255, 0.85);
+  stroke: var(--bordure);
+}
+
+.plan .pastille-volume text {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--gris);
+}
+
 .plan-attribution {
   position: absolute;
   right: 0;
@@ -2856,16 +2868,78 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   display: none !important;
 }
 
-.ligne-surface {
+/* Surface levée en cours : bandeau à la couleur de sa nature (comme les boutons « Que lèves-tu ? »),
+   nature en petit, nom en grand (liste à toucher pour en reprendre une autre), « + » à droite. */
+.bandeau-leve {
+  --couleur-nature: #b45309;
   display: flex;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  padding: 6px 6px 6px 12px;
+  border: 2px solid var(--couleur-nature);
+  border-left-width: 8px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--couleur-nature) 10%, var(--surface));
 }
 
-.ligne-surface select {
+.bandeau-leve.nature-terrain {
+  --couleur-nature: #15803d;
+}
+
+.bandeau-leve.nature-terrassement {
+  --couleur-nature: #2563eb;
+}
+
+.bandeau-leve.nature-metre {
+  --couleur-nature: #0891b2;
+}
+
+.bandeau-leve-texte {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.nature-leve {
+  font-size: 0.75rem;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--couleur-nature);
+}
+
+.bandeau-leve select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 28px 0 0;
+  border: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231b2b36' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 2px center / 20px 20px;
+  color: var(--texte);
+  font-size: 1.2rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bouton-plus {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: var(--couleur-nature);
+  color: #ffffff;
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.bouton-nature.nature-metre {
+  --couleur-nature: #0891b2;
 }
 
 .choix-nature {
