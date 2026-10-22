@@ -90,8 +90,9 @@ describe('creerPdf - levé du 20/05/2026', async () => {
     expect(contenu).toContain('1:1000');
   });
 
-  it('met le logo Perrin dans le cartouche (une image dans le PDF)', () => {
-    expect(contenu).toContain('/Subtype /Image');
+  it('écrit l\'affaire et le lieu dans le cartouche, sans logo (aucune image dans le PDF)', () => {
+    expect(contenu).not.toContain('/Subtype /Image');
+    expect(contenu).toContain('Lieu');
   });
 
   it('utilise l\'échelle imposée : à 1:500 le plan ne tient pas en A4, la feuille passe en A3', async () => {

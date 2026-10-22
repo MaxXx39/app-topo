@@ -1,12 +1,13 @@
 // Formulaire d'export des mesures (onglet Calculs › Mesures) : à part de l'export des volumes,
 // il ne contient aucun volume. Échelle et contenu du PDF, boutons PDF, CSV et DXF.
-// Le cartouche (affaire, dessiné par, date) se remplit dans l'onglet Projet.
+// Cartouche : dessiné par et date ici, affaire et lieu du projet (onglet Projet).
 import { genererCsvMesures } from './csv.js';
 import { genererDxfMesures } from './dxf.js';
 import { ECHELLES } from './echelle.js';
 import { telecharger, dateSuisse } from './ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
+import { champsCartouche, lireCartouche } from './cartouche.js';
 
 // Cases du PDF des mesures : [clé, texte, cochée au départ].
 const CALQUES = [
@@ -21,7 +22,7 @@ const CALQUES = [
 /**
  * Crée le formulaire d'export des mesures dans "conteneur".
  * - obtenirDonnees() : { mesures: [{ mesure, resultat }] (mesures calculées du levé affiché),
- *   points, fichierPoints, cartouche: { affaire, dessinePar, date } }
+ *   points, fichierPoints, cartouche: { affaire, lieu } du projet }
  */
 export function creerEcranExportMesures(conteneur, { obtenirDonnees }) {
   // Fermé au départ : on l'ouvre avec « Exporter les mesures » (l'écran reste simple).
@@ -43,6 +44,7 @@ export function creerEcranExportMesures(conteneur, { obtenirDonnees }) {
         ${CALQUES.map(([cle, titre, coche]) => `<label class="case"><input type="checkbox" data-calque="${cle}" ${coche ? 'checked' : ''} /> ${titre}</label>`).join('')}
       </div>
     </div>
+    ${champsCartouche()}
     <div class="ligne-outils">
       <button type="button" class="bouton-secondaire" data-action="pdf">PDF</button>
       <button type="button" class="bouton-secondaire" data-action="csv">CSV</button>
@@ -53,8 +55,8 @@ export function creerEcranExportMesures(conteneur, { obtenirDonnees }) {
   `;
   const message = conteneur.querySelector('[data-zone="message"]');
 
-  /** Date du cartouche ('AAAA-MM-JJ') : celle du projet, sinon la date du jour. */
-  const dateDuPlan = () => obtenirDonnees().cartouche.date || new Date().toISOString().slice(0, 10);
+  /** Date du cartouche ('AAAA-MM-JJ') : celle de la case, sinon la date du jour. */
+  const dateDuPlan = () => lireCartouche(conteneur).date;
 
   /** Nom des fichiers : mesures_<affaire>_<date>. */
   function nomDeFichier() {
@@ -104,8 +106,9 @@ export function creerEcranExportMesures(conteneur, { obtenirDonnees }) {
           calques,
           cartouche: {
             affaire: cartouche.affaire ?? '',
-            date: dateSuisse(dateDuPlan()),
-            dessinePar: cartouche.dessinePar ?? '',
+            lieu: cartouche.lieu ?? '',
+            date: dateSuisse(lireCartouche(conteneur).date),
+            dessinePar: lireCartouche(conteneur).dessinePar,
             fichierPoints,
           },
           echelleImposee: echelleChoisie === 'auto' ? null : Number(echelleChoisie),

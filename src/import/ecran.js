@@ -1,6 +1,8 @@
-// Bloc « Levés » de l'onglet Projet : les levés du projet (le levé coché est affiché sur le plan) et
-// l'import d'un fichier de points (chaque fichier devient un levé). Le levé avec le récepteur se fait
-// dans l'onglet Terrain (src/leve/ecran.js) ; les surfaces LandXML / DXF dans Calculs › Surfaces.
+// Bloc « Imports » de l'onglet Projet : deux boutons (fichier de points, plan DXF), puis les levés
+// du projet (le levé coché est affiché sur le plan ; chaque fichier de points devient un levé, les
+// points pris avec le récepteur aussi) et les plans DXF (fonds de plan, calques à cocher).
+// Le levé avec le récepteur se fait dans l'onglet Terrain (src/leve/ecran.js) ; les surfaces
+// LandXML / DXF dans Calculs › Surfaces.
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
@@ -54,9 +56,26 @@ export function creerEcranImport(conteneur, actions) {
      * dernierPlan : message du dernier import de plan DXF ({ erreur } ou { avertissements }), ou null.
      */
     afficher(projet, dernierImport, dernierPlan = null) {
+      const plans = projet.plansDxf ?? [];
       conteneur.innerHTML = `
         <section class="carte-section">
-          ${titreSection('leves', 'Levés', bulle('leves'))}
+          ${titreSection('importer', 'Imports', bulle('imports'))}
+          <div class="boutons-imports">
+            <label class="bouton-import">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="18" cy="7" r="1.6" /><circle cx="8" cy="17" r="1.6" /><circle cx="17" cy="17" r="1.6" /></svg>
+              <span><strong>Fichier de points</strong><span class="aide">CSV, TXT</span></span>
+              <input type="file" data-champ="fichier-points" accept=".csv,.txt,text/csv,text/plain" hidden />
+            </label>
+            <label class="bouton-import">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21 21 3M3 9l6-6M15 21l6-6M3 15h6v6" /></svg>
+              <span><strong>Plan DXF</strong><span class="aide">fond de plan</span></span>
+              <input type="file" data-champ="fichier-plan" accept=".dxf,application/dxf" hidden />
+            </label>
+          </div>
+          ${dernierImport ? afficherImportPoints(dernierImport) : ''}
+          ${dernierPlan ? messagePlan(dernierPlan) : ''}
+
+          <p class="titre-section">Levés ${bulle('leves')}</p>
           ${
             projet.leves.length > 0
               ? `<div class="liste-leves">${projet.leves
@@ -74,23 +93,9 @@ export function creerEcranImport(conteneur, actions) {
                   .join('')}</div>`
               : '<p class="vide">Aucun levé pour l\'instant.</p>'
           }
-          <label class="bouton-secondaire bouton-fichier">
-            + Importer un fichier de points (CSV, TXT)
-            <input type="file" data-champ="fichier-points" accept=".csv,.txt,text/csv,text/plain" hidden />
-          </label>
-          ${dernierImport ? afficherImportPoints(dernierImport) : ''}
           ${listePointsDuLeve(projet)}
-        </section>
 
-        <section class="carte-section">
-          ${titreSection('fichier', 'Plans DXF (fond de plan)')}
-          <p class="aide">Plan d'AutoCAD ou de Mensura en MN95, affiché sous le levé (implantation). Un DWG doit d'abord être enregistré en DXF.</p>
-          ${listePlansDxf(projet, calquesOuverts)}
-          <label class="bouton-secondaire bouton-fichier">
-            + Importer un plan DXF
-            <input type="file" data-champ="fichier-plan" accept=".dxf,application/dxf" hidden />
-          </label>
-          ${dernierPlan ? messagePlan(dernierPlan) : ''}
+          ${plans.length > 0 ? `<p class="titre-section">Plans DXF</p>${listePlansDxf(projet, calquesOuverts)}` : ''}
         </section>
       `;
     },

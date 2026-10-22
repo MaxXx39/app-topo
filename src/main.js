@@ -33,6 +33,9 @@ import {
   lireFichierProjet,
   completerProjet,
   resumerProjet,
+  titreProjet,
+  sousTitreProjet,
+  nomDeFichierProjet,
 } from './projet/projet.js';
 import * as stockage from './projet/stockage.js';
 import * as historique from './projet/historique.js';
@@ -59,7 +62,7 @@ import {
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 
 // --- État de l'application ---
-let projet = creerProjet('Mon projet'); // projet ouvert
+let projet = creerProjet(); // projet ouvert
 let resumes = []; // liste des projets enregistrés (pour l'onglet Projet)
 let dernierImport = null; // résultat du dernier import de points
 let dernierPlan = null; // message du dernier import de plan DXF
@@ -226,6 +229,8 @@ document.querySelector('.parties-calculs').addEventListener('click', (evenement)
   if (bouton) afficherOnglet(bouton.dataset.partie);
 });
 installerAide(document.querySelector('#bouton-aide'));
+// Toucher le projet ouvert (en-tête) : on va à l'onglet Projet.
+document.querySelector('#entete-projet').addEventListener('click', () => afficherOnglet('projets'));
 
 // --- Accès aux données du projet ---
 
@@ -549,8 +554,7 @@ const ecranLeve = recepteurDisponible()
         modifie();
       },
       exporterImplantations: () => {
-        const nom = projet.nom.replace(/[^\w-]+/g, '_') || 'projet';
-        telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nom}_implantations.csv`);
+        telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nomDeFichierProjet(projet)}_implantations.csv`);
       },
       choisirSurfaceControle: (id) => {
         terrain.surfaceId = id || null;
@@ -833,7 +837,7 @@ if (recepteurDisponible()) {
 
 const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   renommer: (nom) => {
-    if (nom) projet.nom = nom;
+    projet.nom = nom; // facultatif : le projet se reconnaît à son affaire et son lieu
     modifie();
   },
   changerCartouche: (champ, valeur) => {
@@ -841,15 +845,17 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
     modifie();
   },
   continuer: () => allerA(etapeUtile()),
-  allerA: (onglet) => allerA(onglet),
-  exporterProjet: () => {
-    const nom = projet.nom.replace(/[^\w-]+/g, '_') || 'projet';
-    telecharger(new Blob([ecrireFichierProjet(projet)], { type: 'application/json' }), `${nom}.topo.json`);
+  exporterProjet: async (id) => {
+    const lu = id === projet.id ? projet : await stockage.lireProjet(id);
+    if (!lu) return;
+    const complet = completerProjet(lu);
+    telecharger(new Blob([ecrireFichierProjet(complet)], { type: 'application/json' }), `${nomDeFichierProjet(complet)}.topo.json`);
   },
+  // Nouveau projet : on reste sur l'onglet Projet, curseur dans « Affaire ».
   nouveauProjet: async () => {
-    const nom = prompt('Nom du nouveau projet :', `Projet ${resumes.length + 1}`);
-    if (!nom) return;
-    await ouvrir(creerProjet(nom.trim()));
+    await ouvrir(creerProjet(), { changerOnglet: false });
+    afficherOnglet('projets');
+    document.querySelector('#projets [data-cartouche="affaire"]')?.focus();
   },
   ouvrirProjet: async (id) => {
     const lu = await stockage.lireProjet(id);
@@ -857,15 +863,15 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   },
   dupliquerProjet: async (id) => {
     const lu = id === projet.id ? projet : await stockage.lireProjet(id);
-    if (lu) await ouvrir(dupliquerProjet(completerProjet(lu), `${lu.nom} (copie)`));
+    if (lu) await ouvrir(dupliquerProjet(completerProjet(lu), lu.nom ? `${lu.nom} (copie)` : 'copie'), { changerOnglet: false });
   },
   supprimerProjet: async (id) => {
     const resume = resumes.find((r) => r.id === id);
-    if (!resume || !confirm(`Supprimer définitivement le projet « ${resume.nom} » de cet appareil ?`)) return;
+    if (!resume || !confirm(`Supprimer définitivement le projet « ${resume.titre} » de cet appareil ?`)) return;
     await stockage.supprimerProjet(id);
     if (id === projet.id) {
       const restants = (await stockage.listerProjets()).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
-      await ouvrir(restants[0] ? completerProjet(restants[0]) : creerProjet('Mon projet'), { changerOnglet: false });
+      await ouvrir(restants[0] ? completerProjet(restants[0]) : creerProjet(), { changerOnglet: false });
     } else {
       await rafraichirListe();
       ecranProjet.afficher(projet, resumes);
@@ -877,7 +883,7 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
       alert(`Impossible d'ouvrir « ${fichier.name} » : ${erreur}.`);
       return;
     }
-    if (resumes.some((r) => r.id === lu.id) && !confirm(`Le projet « ${lu.nom} » existe déjà sur cet appareil. Le remplacer par le fichier ?`)) {
+    if (resumes.some((r) => r.id === lu.id) && !confirm(`Le projet « ${titreProjet(lu)} » existe déjà sur cet appareil. Le remplacer par le fichier ?`)) {
       return;
     }
     await ouvrir(lu);
@@ -1101,7 +1107,7 @@ creerEcranExport(document.querySelector('#export'), {
     const affichees = surfacesAffichees();
     const creees = affichees.filter((s) => !estImportee(s));
     return {
-      nomProjet: projet.nom,
+      nomProjet: titreProjet(projet),
       stocks: principaux.map(({ calcul }) => ({ ...surfaceDe(calcul.surface1Id), nom: nom(calcul), description: descriptionCalcul(calcul, projet.surfaces) })),
       resultats: principaux.map(({ resultat }) => resultat),
       comparaisons: calculsReussis()
@@ -1160,7 +1166,9 @@ function recalculer({ recadrer = false } = {}) {
   for (const element of document.querySelectorAll('.sans-points')) element.hidden = projet.leves.length > 0;
   document.querySelector('#nom-leve-surfaces').textContent = leve ? `· levé « ${leve.nom} »` : '';
   document.querySelector('#nom-leve-mesures').textContent = leve ? `· levé « ${leve.nom} »` : '';
-  document.querySelector('#etat').textContent = `${projet.nom} · ${points.length} points · ${surfacesAffichees().length} surface(s)`;
+  // En-tête : le projet ouvert en grand (affaire - lieu), puis son nom et ce qu'il contient.
+  document.querySelector('#titre-projet').textContent = titreProjet(projet);
+  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} surface(s)`].filter(Boolean).join(' · ');
 
   editeurSurfaces.rafraichir();
   ecranVolumes.afficher();
@@ -1401,7 +1409,7 @@ async function demarrer() {
     await rafraichirListe();
     const id = stockage.dernierProjet();
     const lu = (id && (await stockage.lireProjet(id))) || (resumes[0] && (await stockage.lireProjet(resumes[0].id)));
-    await ouvrir(lu ? completerProjet(lu) : creerProjet('Mon projet'), { changerOnglet: false });
+    await ouvrir(lu ? completerProjet(lu) : creerProjet(), { changerOnglet: false });
   } catch (erreur) {
     // Base de données indisponible (navigation privée...) : l'appli marche, sans enregistrement.
     console.error(erreur);

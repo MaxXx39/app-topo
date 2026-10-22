@@ -4,9 +4,11 @@
 export const TEXTES_AIDE = {
   // --- Projet ---
   projets:
-    'Les projets sont enregistrés automatiquement sur cet appareil, rien n\'est envoyé sur internet. « Continuer » reprend le travail là où il en est. Pour passer du téléphone à l\'ordinateur : « Exporter le fichier projet », envoie-le-toi (mail, Drive…), puis « Ouvrir un fichier projet » sur l\'autre appareil.',
+    'Les projets sont enregistrés automatiquement sur cet appareil, rien n\'est envoyé sur internet. Un projet se reconnaît à son affaire et son lieu (écrits en haut de l\'appli et dans le cartouche du PDF), le nom est facultatif. « Continuer » reprend le travail. Pour passer du téléphone à l\'ordinateur : « Gestion de projets » › exporter, envoie-le-toi (mail, Drive…), puis « Ouvrir un projet » › « Ouvrir un fichier projet » sur l\'autre appareil.',
   cartouche:
-    'Affaire, dessinateur et date du plan, écrits dans le cartouche du PDF et dans le nom des fichiers exportés. Date vide : la date du jour de l\'export.',
+    'Écrits dans le cartouche du PDF : affaire et lieu (du projet), dessiné par (retenu sur cet appareil) et date. Date vide : la date du jour.',
+  imports:
+    'Fichier de points : CSV d\'Emlid Flow ou TXT (nom, Est, Nord, altitude, en MN95) ; chaque fichier devient un levé. Plan DXF : plan d\'AutoCAD ou de Mensura affiché en fond (implantation) ; un DWG doit d\'abord être enregistré en DXF.',
 
   // --- 1. Points ---
   lever:

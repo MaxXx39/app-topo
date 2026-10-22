@@ -16,8 +16,6 @@ import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from '../plan/fo
 import { grouperParNature } from '../volumes/calculs.js';
 import { preparerDessinCoupe, texteEchellesCoupe } from '../coupes/dessin.js';
 import { longueurCoupe } from '../topo/coupe.js';
-// Logo Perrin, dans le fichier PDF (image JPEG de 406 × 104 pixels, écrite dans le code).
-import logoPerrin from '../assets/logo-perrin.jpg?inline';
 
 // Calques du plan imprimé, et leur état par défaut.
 export const CALQUES_PDF = {
@@ -35,10 +33,8 @@ export const CALQUES_PDF = {
 // Résolution de la photo aérienne dans le PDF (points par pouce).
 const DPI_FOND = 150;
 
-// Cartouche en bas de la colonne : le logo (case de 12 mm), puis 6 lignes de 6 mm.
-const HAUTEUR_LOGO_CARTOUCHE = 12;
-const LOGO = { hauteur: 8, largeur: (8 * 406) / 104 }; // mm, proportions de l'image
-const LIGNES_CARTOUCHE = 6;
+// Cartouche en bas de la colonne : 7 lignes de 6 mm (sans logo).
+const LIGNES_CARTOUCHE = 7;
 const HAUTEUR_LIGNE_CARTOUCHE = 6;
 
 // Mise en page de la feuille en cours (voir appliquerFormat) : feuille, cadre du plan,
@@ -57,7 +53,7 @@ export function appliquerFormat(format) {
   PAGE = mise.page;
   CADRE_PLAN = mise.cadrePlan;
   COLONNE = mise.colonne;
-  Y_CARTOUCHE = PAGE.hauteur - PAGE.marge - 2 - HAUTEUR_LOGO_CARTOUCHE - LIGNES_CARTOUCHE * HAUTEUR_LIGNE_CARTOUCHE;
+  Y_CARTOUCHE = PAGE.hauteur - PAGE.marge - 2 - LIGNES_CARTOUCHE * HAUTEUR_LIGNE_CARTOUCHE;
   return { page: PAGE, cadrePlan: CADRE_PLAN, colonne: COLONNE, yCartouche: Y_CARTOUCHE };
 }
 appliquerFormat('a4');
@@ -76,7 +72,7 @@ export const COULEURS = {
  * - stocks, resultats : calculs de volume de la feuille principale : surface 1 (nom = nom du calcul,
  *   description = phrase qui décrit le calcul) et volume (voir calculerVolumeSurface)
  * - points : tous les points importés
- * - cartouche : { affaire, date, dessinePar, fichierPoints }
+ * - cartouche : { affaire, lieu, date, dessinePar, fichierPoints }
  * - echelleImposee : dénominateur de l'échelle voulue (500 pour 1:500), ou null pour la choisir
  *   automatiquement (la plus détaillée qui fait tout tenir sur une A4). Avec une échelle imposée,
  *   la feuille passe en A3 si le plan ne tient pas en A4 ; s'il dépasse encore, il est coupé
@@ -864,12 +860,13 @@ function dessinerColonne(doc, calcules, cartouche, { choix, relief, ecarts, comp
   return y;
 }
 
-/** Cartouche en bas à droite : logo, puis affaire, date, dessiné par, échelle, coordonnées, fichier. */
+/** Cartouche en bas à droite : affaire, lieu, date, dessiné par, échelle, coordonnées, fichier. */
 export function dessinerCartouche(doc, cartouche) {
   const x = COLONNE.x;
   // Cartouche en bas à droite
   const lignesCartouche = [
     ['Affaire', cartouche.affaire || '-'],
+    ['Lieu', cartouche.lieu || '-'],
     ['Date', cartouche.date || '-'],
     ['Dessiné par', cartouche.dessinePar || '-'],
     ['Échelle', cartouche.texteEchelle ?? `1:${cartouche.echelle}`],
@@ -878,10 +875,7 @@ export function dessinerCartouche(doc, cartouche) {
   ];
   const hauteurLigne = HAUTEUR_LIGNE_CARTOUCHE;
   trait(doc, COULEURS.texte, 0.3);
-  // Case du logo, en haut du cartouche
-  doc.rect(x, Y_CARTOUCHE, COLONNE.largeur, HAUTEUR_LOGO_CARTOUCHE);
-  doc.addImage(logoPerrin, 'JPEG', x + 2, Y_CARTOUCHE + (HAUTEUR_LOGO_CARTOUCHE - LOGO.hauteur) / 2, LOGO.largeur, LOGO.hauteur);
-  const yCartouche = Y_CARTOUCHE + HAUTEUR_LOGO_CARTOUCHE;
+  const yCartouche = Y_CARTOUCHE;
   doc.rect(x, yCartouche, COLONNE.largeur, lignesCartouche.length * hauteurLigne);
   lignesCartouche.forEach(([titre, valeur], i) => {
     const yl = yCartouche + i * hauteurLigne;

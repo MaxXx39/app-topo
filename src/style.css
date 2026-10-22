@@ -69,50 +69,52 @@ p {
   color: #ffffff;
 }
 
-/* Logo Perrin dans l'en-tête : sur un petit fond blanc (l'image a un fond blanc). */
-.entete-logo {
-  height: 32px;
-  width: auto;
-  padding: 4px 6px;
-  border-radius: 6px;
-  background: #ffffff;
+/* Projet ouvert, en grand dans l'en-tête (affaire - lieu, puis le nom et les nombres). On le
+   touche pour aller à l'onglet Projet. */
+.entete-texte {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-/* Téléphone : logo plus petit, pour laisser la place au nom du projet. */
+.entete-titre {
+  max-width: 100%;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entete-etat {
+  max-width: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 @media (max-width: 600px) {
   .entete {
     gap: 8px;
     padding: 0 10px;
   }
 
-  .entete-logo {
-    height: 24px;
-    padding: 3px 4px;
-    border-radius: 4px;
+  .entete-titre {
+    font-size: 1.1rem;
   }
-}
-
-.entete h1 {
-  margin: 0;
-  font-size: 1.05rem;
-  line-height: 1.2;
-}
-
-.entete-etat {
-  margin: 0;
-  font-size: 0.8rem;
-  opacity: 0.8;
-}
-
-.entete-texte {
-  flex: 1;
-  min-width: 0;
-}
-
-.entete-texte .entete-etat {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* Boutons ronds de l'en-tête (Annuler, Rétablir, Aide). */
@@ -1974,68 +1976,124 @@ th.nombre {
   letter-spacing: 0.04em;
 }
 
-/* Étapes : 4 tuiles (2 par ligne sur téléphone, 4 sur une ligne si la place le permet). */
-.etapes-projet {
+/* Trois boutons en haut de l'onglet Projet : nouveau, ouvrir, gestion. */
+.actions-projets {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 12px;
 }
 
-@media (min-width: 560px) and (max-width: 899px) {
-  .etapes-projet {
-    grid-template-columns: repeat(4, 1fr);
-  }
+.actions-projets .bouton-secondaire {
+  min-height: 48px;
+  padding: 6px 8px;
+  line-height: 1.2;
 }
 
-.tuile-etape {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 8px;
-  align-items: center;
-  padding: 8px 10px;
-  border: 1px solid var(--bordure);
-  border-radius: 10px;
-  background: var(--fond);
-  color: var(--texte);
-  text-align: left;
-  cursor: pointer;
+.actions-projets .bouton-secondaire.actif {
+  border-color: var(--sombre);
+  background: var(--sombre);
+  color: #ffffff;
 }
 
-.numero-etape {
-  grid-row: span 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #dfe4e8;
-  color: var(--gris);
+.panneau-projets {
+  margin-top: 0;
+}
+
+.etiquette-ouvert {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ambre);
+  color: var(--sombre);
   font-size: 0.75rem;
   font-weight: 700;
 }
 
-.titre-etape {
-  font-weight: 700;
-  font-size: 0.9rem;
+/* Titre du projet ouvert dans son bandeau (affaire - lieu). */
+.titre-projet-ouvert {
+  display: block;
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
-.compte-etape {
-  font-size: 0.8rem;
+/* Infos du projet : affaire et lieu côte à côte, le nom en dessous. */
+.champs-projet {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+  margin-bottom: 12px;
+}
+
+.champs-projet label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+  font-weight: 600;
   color: var(--gris);
 }
 
-/* Étape où il y a déjà quelque chose : coche verte. */
-.tuile-etape.faite {
-  background: var(--surface);
+.champs-projet .champ-large {
+  grid-column: 1 / -1;
+  display: block;
 }
 
-.tuile-etape.faite .numero-etape {
-  background: var(--succes);
-  color: #ffffff;
-  font-size: 0.95rem;
+.champs-projet input {
+  width: 100%;
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 1rem;
+  color: var(--texte);
+}
+
+/* Bloc Imports : deux gros boutons côte à côte (fichier de points, plan DXF). */
+.boutons-imports {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.bouton-import {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 1px dashed var(--sombre);
+  border-radius: 10px;
+  background: var(--fond);
+  color: var(--texte);
+  cursor: pointer;
+}
+
+.bouton-import:active {
+  background: var(--bordure);
+}
+
+.bouton-import svg {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  fill: none;
+  stroke: var(--sombre);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bouton-import > span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.bouton-import .aide {
+  font-size: 0.8rem;
 }
 
 .bouton-large {
@@ -3248,4 +3306,33 @@ svg.plan,
 .plan-cadre.en-geste svg.plan,
 .plan-cadre.en-geste .plan-fond {
   will-change: transform;
+}
+
+/* Cartouche du PDF, dans les exports : dessiné par et date côte à côte. */
+.champs-cartouche {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  margin: 10px 0;
+}
+
+.champs-cartouche .titre-choix {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.champs-cartouche label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+  color: var(--gris);
+}
+
+.champs-cartouche input {
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 0.95rem;
 }

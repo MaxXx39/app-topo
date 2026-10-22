@@ -1,4 +1,4 @@
-// Formulaire d'export : échelle et calques du PDF (le cartouche se remplit dans l'onglet Projet),
+// Formulaire d'export : échelle, calques et cartouche du PDF (dessiné par, date ; affaire et lieu du projet),
 // boutons PDF, CSV, DXF et LandXML.
 import { genererCsv } from './csv.js';
 import { genererDxf } from './dxf.js';
@@ -7,6 +7,7 @@ import { ecrireLandXML } from '../topo/landxml.js';
 import { plageAltitudes, equidistanceAuto } from '../topo/courbes.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
+import { champsCartouche, lireCartouche } from './cartouche.js';
 import { PALIERS } from '../plan/ecarts.js';
 import { estDansAppliAndroid, enregistrerDansAndroid } from '../android/pont.js';
 
@@ -34,7 +35,7 @@ const COULEURS = [
  *   comparaisons : calculs dans un contour, une feuille chacun [{ nom, description, resultat }] ;
  *   volumes : tous les calculs, pour le CSV [{ nom, base, resultat }] ;
  *   dessinSurfaces : surfaces affichées, pour le DXF et le LandXML { stocks, resultats, surfaces } ;
- *   cartouche : { affaire, dessinePar, date } du projet (date '' : date du jour)
+ *   cartouche : { affaire, lieu } du projet
  */
 export function creerEcranExport(conteneur, { obtenirDonnees }) {
 
@@ -64,6 +65,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
         </select>
       </label>
     </div>
+    ${champsCartouche()}
     <div class="ligne-outils">
       <button type="button" class="bouton-secondaire" data-action="pdf">PDF</button>
       <button type="button" class="bouton-secondaire" data-action="csv">CSV</button>
@@ -75,8 +77,8 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
   const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`);
   const message = conteneur.querySelector('[data-zone="message"]');
 
-  /** Date du cartouche ('AAAA-MM-JJ') : celle du projet, sinon la date du jour. */
-  const dateDuPlan = () => obtenirDonnees().cartouche.date || new Date().toISOString().slice(0, 10);
+  /** Date du cartouche ('AAAA-MM-JJ') : celle de la case, sinon la date du jour. */
+  const dateDuPlan = () => lireCartouche(conteneur).date;
 
   const boutons = {
     csv: () => {
@@ -142,8 +144,9 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
           calques,
           cartouche: {
             affaire: obtenirDonnees().cartouche.affaire ?? '',
-            date: dateSuisse(dateDuPlan()),
-            dessinePar: obtenirDonnees().cartouche.dessinePar ?? '',
+            lieu: obtenirDonnees().cartouche.lieu ?? '',
+            date: dateSuisse(lireCartouche(conteneur).date),
+            dessinePar: lireCartouche(conteneur).dessinePar,
             fichierPoints,
           },
           echelleImposee: echelleChoisie === 'auto' ? null : Number(echelleChoisie),
