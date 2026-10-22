@@ -14,13 +14,13 @@ export const TEXTES_AIDE = {
   importer:
     'Fichier de points : CSV Emlid ou TXT (nom, Est, Nord, altitude, séparés par des tabulations), en MN95. Les lignes illisibles sont signalées avec leur numéro.',
   leves:
-    'Un levé = un fichier de points. Le levé coché est celui affiché sur le plan, avec ses surfaces. Avec plusieurs levés (deux dates), tu peux calculer le volume entre leurs surfaces dans l\'onglet 2.2 Volumes.',
+    'Un levé = un fichier de points. Le levé coché est celui affiché sur le plan, avec ses surfaces. Avec plusieurs levés (deux dates), tu peux calculer le volume entre leurs surfaces dans l\'onglet Calculs › Volumes.',
 
   // --- 2.1 Surfaces ---
   surfaces:
     'Une surface peut être un stock, un terrain naturel ou un terrassement. Nomme-la comme tu veux. Elle se crée à partir des points du levé coché (contour, lignes de rupture, points), ou s\'importe d\'un LandXML ou d\'un DXF. Le rôle d\'un point ne dépend jamais de son nom : c\'est toi qui choisis. Touche une surface sur le plan pour la sélectionner.',
   nature:
-    'Ce que représente la surface : à choisir avant tout le reste, elle donne son nom automatique (« Stock 2 », « Terrain naturel 1 »…). Un stock reçoit tout de suite son volume (sur sa ligne basse, le contour). Les autres volumes s\'ajoutent dans l\'onglet 2.2 Volumes. Tu peux changer de nature plus tard (« C\'est : »).',
+    'Ce que représente la surface : à choisir avant tout le reste, elle donne son nom automatique (« Stock 2 », « Terrain naturel 1 »…). Un stock reçoit tout de suite son volume (sur sa ligne basse, le contour). Les autres volumes s\'ajoutent dans l\'onglet Calculs › Volumes. Tu peux changer de nature plus tard (« C\'est : »).',
   contour:
     'Bord de la surface, dans l\'ordre. Le polygone est fermé automatiquement. Seul l\'intérieur du contour est gardé, même pour une forme en « L ». Sans contour, le bord suit les points extérieurs (supprime ensuite les triangles en trop).',
   ligne:
@@ -32,7 +32,7 @@ export const TEXTES_AIDE = {
   trianglesEnTrop:
     'Sans contour, la surface relie les points extérieurs et peut créer des triangles en trop. Active le mode suppression, puis touche un triangle sur le plan pour le supprimer ; le toucher à nouveau le rétablit.',
   photos:
-    'Prends une photo du stock (ou choisis-la dans la galerie) : elle est réduite et rangée dans le projet, sur cet appareil. Ajoute une légende. Si la case « Photos » de l\'export est cochée (onglet 2.2 Volumes), elles sont imprimées dans la colonne de droite du PDF, sous la légende.',
+    'Prends une photo du stock (ou choisis-la dans la galerie) : elle est réduite et rangée dans le projet, sur cet appareil. Ajoute une légende. Si la case « Photos » de l\'export est cochée (onglet Calculs › Volumes), elles sont imprimées dans la colonne de droite du PDF, sous la légende.',
   importerSurface:
     'LandXML (export Mensura) : chaque surface TIN du fichier devient une surface. DXF : les faces 3D (3DFACE) ou maillages de chaque calque deviennent une surface, avec X = Est, Y = Nord, Z = altitude (MN95). Tu choisis ensuite ce que c\'est (stock, terrain naturel, terrassement). Une surface importée peut servir de référence dans une comparaison de volumes.',
 

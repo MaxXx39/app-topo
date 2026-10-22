@@ -1,4 +1,4 @@
-// PDF des mesures (onglet 3. Mesures) : à part du PDF des volumes, il ne montre aucun volume.
+// PDF des mesures (onglet Calculs › Mesures) : à part du PDF des volumes, il ne montre aucun volume.
 // Une feuille paysage (A4, ou A3 si le plan ne tient pas en A4 à l'échelle choisie) :
 // le plan à gauche (mesures en cyan pointillé), à droite le tableau des mesures, la légende
 // et le cartouche. S'il y a trop de mesures pour la colonne, la suite va sur une feuille à part.

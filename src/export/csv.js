@@ -5,7 +5,7 @@ import { ecrireListeDeNoms } from '../topo/noms.js';
 import { NOM_TYPE } from '../mesures/valeurs.js';
 
 /**
- * Construit le texte du fichier CSV : une ligne par calcul de volume (onglet 2.2 Volumes).
+ * Construit le texte du fichier CSV : une ligne par calcul de volume (onglet Calculs › Volumes).
  * - volumes : liste de { nom, base, resultat } ; base = « ligne basse » ou le nom de la surface 2
  * Colonnes : Nom ; Base ; Surface (m²) ; Remblai (m³) ; Déblai (m³).
  * Les calculs impossibles sont ignorés.
@@ -20,7 +20,7 @@ export function genererCsv(volumes) {
 }
 
 /**
- * Construit le texte du fichier CSV des mesures (onglet 3. Mesures), sans aucun volume.
+ * Construit le texte du fichier CSV des mesures (onglet Calculs › Mesures), sans aucun volume.
  * - mesures : liste de { mesure, resultat } (mesures calculées)
  * Un tableau avec une ligne par mesure (toutes ses valeurs, cochées ou non), puis, après une
  * ligne vide, le détail : une ligne par morceau (longueur) ou par côté (aire).

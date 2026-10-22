@@ -1,4 +1,4 @@
-// Mesures (onglet 3. Mesures) : longueurs et aires, tout à fait à part des surfaces et des volumes.
+// Mesures (onglet Calculs › Mesures) : longueurs et aires, tout à fait à part des surfaces et des volumes.
 // Une mesure ne crée pas de surface et ne sert jamais de base à un volume.
 // Pour une mesure, on parle d'« aire » (m²), jamais de « surface ».
 //

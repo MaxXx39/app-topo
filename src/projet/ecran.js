@@ -12,8 +12,12 @@ import { estDansAppliAndroid } from '../android/pont.js';
  * nouveauProjet(), ouvrirProjet(id), dupliquerProjet(id), supprimerProjet(id), importerFichierProjet(fichier)
  * Renvoie { afficher(projet, resumes) }.
  */
-export function creerEcranProjet(conteneur, actions) {
-  conteneur.addEventListener('click', (evenement) => {
+export function creerEcranProjet(conteneur, actions, conteneurSuite) {
+  // Deux parties : le projet ouvert en haut, puis (après les levés, voir main.js) le cartouche,
+  // le fichier projet et les autres projets.
+  const parties = [conteneur, conteneurSuite];
+  const ecouter = (type, fonction) => parties.forEach((partie) => partie.addEventListener(type, fonction));
+  ecouter('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
     const id = bouton.dataset.id;
@@ -27,7 +31,7 @@ export function creerEcranProjet(conteneur, actions) {
     else if (action === 'aller') actions.allerA(bouton.dataset.aller);
   });
 
-  conteneur.addEventListener('change', async (evenement) => {
+  ecouter('change', async (evenement) => {
     const cible = evenement.target;
     if (cible.dataset.champ === 'nom-projet') actions.renommer(cible.value.trim());
     else if (cible.dataset.cartouche) actions.changerCartouche(cible.dataset.cartouche, cible.value.trim());
@@ -41,7 +45,7 @@ export function creerEcranProjet(conteneur, actions) {
     /** Redessine l'écran. */
     afficher(projet, resumes) {
       // On ne redessine pas pendant une saisie : la case perdrait le curseur.
-      if (conteneur.contains(document.activeElement) && document.activeElement.matches('input')) return;
+      if (parties.some((partie) => partie.contains(document.activeElement)) && document.activeElement.matches('input')) return;
       const autres = resumes.filter((r) => r.id !== projet.id);
       const resumeOuvert = resumes.find((r) => r.id === projet.id);
       conteneur.innerHTML = `
@@ -58,6 +62,8 @@ export function creerEcranProjet(conteneur, actions) {
             <button type="button" class="bouton bouton-large" data-action="continuer">Continuer →</button>
           </div>
         </section>
+      `;
+      conteneurSuite.innerHTML = `
 
         <section class="carte-section">
           ${titreSection('cartouche', 'Cartouche du PDF', bulle('cartouche'))}
@@ -130,15 +136,16 @@ function compter(nombre, mot) {
 }
 
 /**
- * Tuiles des étapes du travail (1. Points, 2.1 Surfaces, 2.2 Volumes, 3. Mesures) : ce qu'il y a
- * déjà dans le projet ; on touche une tuile pour aller à son onglet.
+ * Tuiles des étapes du travail (levés, puis Calculs : surfaces, volumes, mesures) : ce qu'il y a
+ * déjà dans le projet ; on touche une tuile pour y aller (les levés : onglet Terrain dans l'appli
+ * Android, sinon la liste « Mes levés » plus bas).
  */
 function tuilesEtapes(projet) {
   const etapes = [
-    { onglet: 'importer', numero: '1', titre: '1. Points', nombre: projet.leves.length, mot: 'levé' },
-    { onglet: 'surfaces', numero: '2.1', titre: '2.1 Surfaces', nombre: projet.surfaces.length, mot: 'surface' },
-    { onglet: 'volumes', numero: '2.2', titre: '2.2 Volumes', nombre: projet.calculs.length, mot: 'volume' },
-    { onglet: 'mesures', numero: '3', titre: '3. Mesures', nombre: projet.mesures.length, mot: 'mesure' },
+    { onglet: 'leves', numero: '1', titre: 'Levés', nombre: projet.leves.length, mot: 'levé' },
+    { onglet: 'surfaces', numero: '2', titre: 'Surfaces', nombre: projet.surfaces.length, mot: 'surface' },
+    { onglet: 'volumes', numero: '3', titre: 'Volumes', nombre: projet.calculs.length, mot: 'volume' },
+    { onglet: 'mesures', numero: '4', titre: 'Mesures', nombre: projet.mesures.length, mot: 'mesure' },
   ];
   return etapes
     .map(

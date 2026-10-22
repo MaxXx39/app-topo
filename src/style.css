@@ -21,7 +21,7 @@
   --jaune-clair: #fffbeb;
   --jaune: #d97706;
   --bleu: #2563eb;
-  --cyan: #0891b2; /* mesures (onglet 3. Mesures) : couleur à part, jamais utilisée pour les surfaces */
+  --cyan: #0891b2; /* mesures (onglet Calculs › Mesures) : couleur à part, jamais utilisée pour les surfaces */
   --rayon: 12px;
   --ombre: 0 1px 2px rgba(16, 24, 20, 0.06), 0 2px 8px rgba(16, 24, 20, 0.06);
   --hauteur-entete: 56px;
@@ -1359,7 +1359,7 @@ svg.plan {
   margin: 8px 0;
 }
 
-/* Nom d'un calcul de volume (onglet 2.2 Volumes). */
+/* Nom d'un calcul de volume (onglet Calculs › Volumes). */
 #volumes .titre-role input {
   flex: 1;
   min-width: 0;
@@ -1603,7 +1603,7 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
   color: var(--gris);
 }
 
-/* --- Coupes (onglet 2.2 Volumes) --- */
+/* --- Coupes (onglet Calculs › Volumes) --- */
 
 .carte-coupe {
   --couleur-role: var(--sombre);
@@ -2337,9 +2337,9 @@ body.avec-recepteur .bandeaux-recepteur {
   fill: var(--gris);
 }
 
-/* Téléphone, pendant le levé : le plan reste en haut de l'onglet 1. Points, les outils dessous. */
+/* Téléphone, onglet Terrain : le plan reste en haut, les outils du levé dessous. */
 @media (max-width: 899px) {
-  body.mode-leve[data-onglet='importer'] .panneau-plan {
+  body.mode-leve[data-onglet='terrain'] .panneau-plan {
     display: block;
     position: fixed;
     top: var(--hauteur-entete);
@@ -2352,7 +2352,180 @@ body.avec-recepteur .bandeaux-recepteur {
     box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
   }
 
-  body.mode-leve[data-onglet='importer'] .mise-en-page {
+  body.mode-leve[data-onglet='terrain'] .mise-en-page {
     padding-top: calc(38svh + 12px);
   }
+}
+
+/* ==========================================================================
+   Onglets Projet · Terrain · Calculs · Plan (version 0.38.0)
+   ========================================================================== */
+
+/* L'onglet Projet a sa propre couleur (bleu nuit), pour le distinguer des onglets de travail. */
+.onglets button.onglet-projets {
+  flex: 0 0 auto;
+  min-width: 76px;
+  margin: 5px 4px 5px 6px;
+  border-radius: 12px;
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.onglets button.onglet-projets.actif {
+  color: var(--ambre);
+}
+
+.onglets button.onglet-projets.actif svg {
+  color: var(--sombre);
+}
+
+.panneau-projet {
+  border-top: 5px solid var(--sombre);
+}
+
+@media (min-width: 900px) {
+  .onglets button.onglet-projets {
+    flex: 0 0 auto;
+    margin: 0 4px 0 0;
+    padding: 0 12px;
+    border-radius: 8px;
+  }
+
+  .onglets button.onglet-projets.actif {
+    background: var(--sombre);
+    color: var(--ambre);
+  }
+
+  .onglets button.onglet-projets.actif svg {
+    color: var(--ambre);
+  }
+}
+
+/* Calculs : Surfaces · Volumes · Mesures, un seul affiché à la fois (boutons en haut de l'onglet). */
+.parties-calculs {
+  display: none;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 4px;
+  border-radius: var(--rayon);
+  background: var(--surface);
+  box-shadow: var(--ombre);
+}
+
+body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures']) .parties-calculs {
+  display: flex;
+}
+
+.parties-calculs button {
+  flex: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--gris);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.parties-calculs button.actif {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+/* Téléphone, pendant un dessin (plan en haut de l'écran) : pas de place pour ces boutons. */
+@media (max-width: 899px) {
+  body.mode-dessin .parties-calculs {
+    display: none;
+  }
+}
+
+/* --- Onglet Terrain : écran épuré pour le chantier --- */
+.connexion-terrain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.connexion-terrain .bouton {
+  width: 100%;
+}
+
+.reglages-leve {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--fond);
+}
+
+.reglages-leve summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.reglages-leve summary::-webkit-details-marker {
+  display: none;
+}
+
+.reglages-leve[open] summary .aide {
+  visibility: hidden;
+}
+
+.outils-ligne {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.outils-ligne span {
+  flex: 1;
+  font-weight: 600;
+}
+
+.nom-et-position {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 8px;
+}
+
+.nom-et-position .nom-point {
+  width: 7.5em;
+  flex: 0 0 auto;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.nom-et-position .position-leve {
+  flex: 1;
+  margin: 0;
+  gap: 0 10px;
+  font-size: 0.85rem;
+}
+
+.pied-terrain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.resume-terrain {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--gris);
+}
+
+.resume-terrain strong {
+  color: var(--texte);
 }

@@ -1,17 +1,16 @@
-// Bloc « Lever avec le récepteur » de l'onglet 1. Points (seulement dans l'appli Android) :
-// connexion au récepteur Emlid, levé et stock en cours, rôle du prochain point (contour, ligne
-// de rupture, point isolé), gros bouton PRENDRE LE POINT, annulation du dernier point.
+// Onglet Terrain (seulement dans l'appli Android) : levé avec le récepteur Emlid.
+// Écran épuré pour le chantier : le plan en haut (voir style.css, « mode-leve »), puis le rôle
+// du prochain point (contour, ligne de rupture, point isolé), son nom, la position et le gros
+// bouton PRENDRE LE POINT. Le levé, le stock et le récepteur sont dans une ligne repliable.
 // Aussi : les bandeaux « RTK » et « Inclinaison » sous l'en-tête, visibles dans tous les onglets.
 //
 // L'état du récepteur arrive 2 fois par seconde (mettreAJourRecepteur) : on ne change alors que
-// quelques textes et l'état du bouton, sans redessiner le bloc (le doigt peut être dessus).
+// quelques textes et l'état du bouton, sans redessiner l'écran (le doigt peut être dessus).
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
-import { titreSection } from '../outils/section.js';
-import { bulle } from '../aide/bulles.js';
 import { ROLES_LEVE } from '../topo/leve-direct.js';
 
-// Petit dessin de chaque rôle, comme dans 2.1 Surfaces (contour rouge, ligne orange, point vert).
+// Petit dessin de chaque rôle, comme dans Calculs › Surfaces (contour rouge, ligne orange, point vert).
 const ICONES = {
   contour: '<path d="M4 8 11 3l9 5-2 11-13 1z" />',
   ligne: '<path d="M3 18l6-7 4 4 8-9" />',
@@ -19,15 +18,16 @@ const ICONES = {
 };
 
 /**
- * Crée le bloc dans "conteneur". Les actions sont faites par main.js via "actions" :
+ * Crée l'écran dans "conteneur". Les actions sont faites par main.js via "actions" :
  * choisirRecepteur(), reconnecter(), deconnecter(), nouveauLeve(), choisirLeve(id), nouveauStock(),
  * choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
- * annulerDernierPoint(), voirSurPlan()
+ * annulerDernierPoint()
  * Renvoie { afficher(donnees), mettreAJourRecepteur(etat) }.
  */
 export function creerEcranLeve(conteneur, actions) {
   let etat = null; // dernier état du récepteur (voir src/android/pont.js)
   let donnees = null;
+  let reglagesOuverts = false; // ligne « Levé · Stock » dépliée (gardée d'un dessin à l'autre)
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
@@ -44,6 +44,10 @@ export function creerEcranLeve(conteneur, actions) {
     else if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
   });
 
+  conteneur.addEventListener('toggle', (evenement) => {
+    if (evenement.target.matches('details.reglages-leve')) reglagesOuverts = evenement.target.open;
+  }, true);
+
   // Touche Entrée dans le nom : prend le point (comme le bouton), si c'est permis.
   conteneur.addEventListener('keydown', (evenement) => {
     if (evenement.key !== 'Enter' || evenement.target.dataset.champ !== 'nom-point') return;
@@ -52,26 +56,28 @@ export function creerEcranLeve(conteneur, actions) {
     if (bouton && !bouton.disabled) actions.prendrePoint(evenement.target.value);
   });
 
-  /** Partie « récepteur » : connexion, position, bouton. Mise à jour sans redessiner le bloc. */
+  /** Partie « récepteur » : connexion, position, bouton. Mise à jour sans redessiner l'écran. */
   function rafraichirVivant() {
     const connecte = Boolean(etat?.connecte);
     for (const element of conteneur.querySelectorAll('[data-si-connecte]')) element.hidden = !connecte;
     for (const element of conteneur.querySelectorAll('[data-si-deconnecte]')) element.hidden = connecte;
     const texte = conteneur.querySelector('[data-vivant="connexion"]');
     if (texte) texte.textContent = etat?.bluetooth ?? 'non connecté';
-    const reconnecter = conteneur.querySelector('[data-action="reconnecter"]');
-    if (reconnecter) {
-      reconnecter.hidden = connecte || !etat?.dernierRecepteur;
-      reconnecter.textContent = `Reconnecter ${etat?.dernierRecepteur ?? ''}`;
+    // Bouton principal de connexion : le dernier récepteur s'il est connu, sinon la liste.
+    const connecter = conteneur.querySelector('[data-vivant="connecter"]');
+    if (connecter) {
+      connecter.dataset.action = etat?.dernierRecepteur ? 'reconnecter' : 'choisirRecepteur';
+      connecter.textContent = etat?.dernierRecepteur ? `Connecter ${etat.dernierRecepteur}` : 'Connecter le récepteur';
     }
+    const autre = conteneur.querySelector('[data-vivant="autre-recepteur"]');
+    if (autre) autre.hidden = connecte || !etat?.dernierRecepteur;
 
     const position = conteneur.querySelector('[data-vivant="position"]');
     if (position) {
       const p = connecte && etat.recu ? etat.position : null;
       position.classList.toggle('pas-prete', !etat?.inclinaisonPrete);
       position.innerHTML = p
-        ? `<span>E <strong>${formaterNombre(p.est)}</strong></span><span>N <strong>${formaterNombre(p.nord)}</strong></span><span>H <strong>${formaterNombre(p.altitude)}</strong></span>
-           ${etat.inclinaisonPrete ? '' : '<span class="aide">antenne, pas le bout de canne</span>'}`
+        ? `<span>E <strong>${formaterNombre(p.est)}</strong></span><span>N <strong>${formaterNombre(p.nord)}</strong></span><span>H <strong>${formaterNombre(p.altitude)}</strong></span>`
         : `<span class="aide">${connecte ? (etat.erreurConversion ? echapper(etat.erreurConversion) : 'En attente de la position…') : 'Récepteur non connecté'}</span>`;
     }
 
@@ -83,6 +89,41 @@ export function creerEcranLeve(conteneur, actions) {
       raison.textContent = permis || !connecte ? '' : etat?.raison ?? '';
       raison.hidden = permis || !connecte;
     }
+  }
+
+  /** Connexion au récepteur : un gros bouton tant qu'il n'est pas connecté. */
+  function connexion() {
+    return `<div class="connexion-terrain" data-si-deconnecte>
+      <button type="button" class="bouton bouton-large" data-vivant="connecter" data-action="choisirRecepteur">Connecter le récepteur</button>
+      <button type="button" class="bouton-lien bouton-lien-neutre" data-vivant="autre-recepteur" data-action="choisirRecepteur" hidden>autre récepteur</button>
+    </div>`;
+  }
+
+  /** Ligne repliable : levé et stock en cours (à changer), récepteur connecté (à couper). */
+  function reglages() {
+    if (!donnees.leve) return '';
+    const titre = `${echapper(donnees.leve.nom)} · ${donnees.stock ? echapper(donnees.stock.nom) : 'aucun stock'}`;
+    return `<details class="reglages-leve" ${reglagesOuverts ? 'open' : ''}>
+      <summary><span>${titre}</span><span class="aide">changer</span></summary>
+      <label class="champ-leve">Levé
+        <span class="ligne-outils">
+          <select data-champ="leve">${donnees.leves.map((l) => `<option value="${l.id}" ${l.id === donnees.leve.id ? 'selected' : ''}>${echapper(l.nom)} (${l.points.length} pts)</option>`).join('')}</select>
+          <button type="button" class="bouton-secondaire" data-action="nouveauLeve">+ Nouveau levé</button>
+        </span>
+      </label>
+      <label class="champ-leve">Stock
+        <span class="ligne-outils">
+          ${donnees.stocks.length > 0
+            ? `<select data-champ="stock">${donnees.stocks.map((s) => `<option value="${s.id}" ${s.id === donnees.stock?.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}</select>`
+            : ''}
+          <button type="button" class="bouton-secondaire" data-action="nouveauStock">+ Nouveau stock</button>
+        </span>
+      </label>
+      <p class="ligne-outils" data-si-connecte hidden>
+        <span>Récepteur : <strong data-vivant="connexion"></strong></span>
+        <button type="button" class="bouton-lien" data-action="deconnecter">couper</button>
+      </p>
+    </details>`;
   }
 
   /** Choix du rôle : 3 gros boutons à la couleur du rôle. */
@@ -100,82 +141,58 @@ export function creerEcranLeve(conteneur, actions) {
     if (donnees.role !== 'ligne') return '';
     const { ligne } = donnees;
     return `<div class="outils-ligne">
-      <span>Ligne ${ligne.numero} · ${ligne.nbPoints} point(s)${ligne.fermee ? ' · <strong>fermée</strong>' : ''}</span>
-      <div class="ligne-outils">
-        <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle ligne</button>
-        <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
-          ${ligne.fermee ? '✓ Ligne fermée' : 'Fermer la ligne'}</button>
-      </div>
+      <span>Ligne ${ligne.numero} · ${ligne.nbPoints} pt(s)</span>
+      <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle</button>
+      <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
+        ${ligne.fermee ? '✓ Fermée' : 'Fermer'}</button>
     </div>`;
   }
 
-  /** Levé et stock en cours (listes de choix), ou bouton pour commencer. */
-  function choixLeveEtStock() {
-    if (!donnees.leve) {
-      return `<p class="aide">Un levé garde les points pris avec le récepteur (comme un fichier importé) ; chaque stock y a son contour, ses lignes de rupture et ses points isolés.</p>
-        <button type="button" class="bouton" data-action="nouveauLeve">+ Commencer un levé</button>`;
-    }
-    return `
-      <label class="champ-leve">Levé
-        <span class="ligne-outils">
-          <select data-champ="leve">${donnees.leves.map((l) => `<option value="${l.id}" ${l.id === donnees.leve.id ? 'selected' : ''}>${echapper(l.nom)} (${l.points.length} pts)</option>`).join('')}</select>
-          <button type="button" class="bouton-secondaire" data-action="nouveauLeve">+ Nouveau</button>
-        </span>
-      </label>
-      <label class="champ-leve">Stock
-        <span class="ligne-outils">
-          ${donnees.stocks.length > 0
-            ? `<select data-champ="stock">${donnees.stocks.map((s) => `<option value="${s.id}" ${s.id === donnees.stock?.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}</select>`
-            : '<span class="aide">aucun stock</span>'}
-          <button type="button" class="bouton-secondaire" data-action="nouveauStock">+ Nouveau</button>
-        </span>
-      </label>`;
+  /** Une ligne courte : points du stock par rôle et volume (le détail est dans Calculs). */
+  function resume() {
+    const { resume: r, volume } = donnees;
+    const morceaux = [`${r.contour} contour`, `${r.pointsLignes} lignes`, `${r.isoles} isolés`];
+    return `<p class="resume-terrain">${morceaux.join(' · ')}${volume != null ? ` · <strong>${formaterNombre(volume)} m³</strong>` : ''}</p>`;
   }
 
-  /** Prise de point : rôle, nom, position, bouton, annulation, état du stock. */
+  /** Prise de point : rôle, nom, position, bouton, annulation. */
   function priseDePoint() {
-    if (!donnees.stock) return '';
-    const { resume } = donnees;
+    if (!donnees.leve) {
+      return '<button type="button" class="bouton bouton-large" data-action="nouveauLeve">+ Commencer un levé</button>';
+    }
+    if (!donnees.stock) {
+      return '<button type="button" class="bouton bouton-large" data-action="nouveauStock">+ Nouveau stock</button>';
+    }
     return `
       ${boutonsRoles()}
       ${outilsLigne()}
-      <label class="champ-leve">Nom du prochain point
-        <input type="text" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" />
-      </label>
-      <div class="position-leve" data-vivant="position"></div>
+      <div class="nom-et-position">
+        <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" />
+        <div class="position-leve" data-vivant="position"></div>
+      </div>
       <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>PRENDRE LE POINT</button>
       <p class="raison-leve" data-vivant="raison" hidden></p>
-      <div class="ligne-outils">
+      <div class="pied-terrain">
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
-          Annuler le dernier point${donnees.dernierPoint ? ` (${echapper(donnees.dernierPoint)})` : ''}</button>
-        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voirSurPlan">voir sur le plan</button>
-      </div>
-      <p class="resume">${echapper(donnees.stock.nom)} : contour ${resume.contour} pt(s) · ${resume.lignes} ligne(s) de rupture (${resume.pointsLignes} pts) · ${resume.isoles} point(s) isolé(s)</p>
-      ${donnees.description}`;
+          Annuler ${donnees.dernierPoint ? echapper(donnees.dernierPoint) : 'le dernier point'}</button>
+        ${resume()}
+      </div>`;
   }
 
   return {
     /**
-     * Redessine le bloc. donnees : { leves (levés faits avec le récepteur), leve, stocks (du levé),
+     * Redessine l'écran. donnees : { leves (levés faits avec le récepteur), leve, stocks (du levé),
      * stock, role, ligne: { numero, nbPoints, fermee }, nomPropose, dernierPoint (nom), resume
-     * (voir resumeStock), description (HTML : triangles, volume) }.
+     * (voir resumeStock), volume (remblai en m³, ou null) }.
      */
     afficher(nouvellesDonnees) {
       donnees = nouvellesDonnees;
       conteneur.innerHTML = `
-        <section class="carte-section bloc-leve">
-          ${titreSection('lever', 'Lever avec le récepteur', bulle('lever'))}
-          <div class="connexion-leve">
-            <span>Récepteur : <strong data-vivant="connexion"></strong></span>
-            <span class="ligne-outils">
-              <button type="button" class="bouton-secondaire" data-action="choisirRecepteur" data-si-deconnecte>Choisir le récepteur</button>
-              <button type="button" class="bouton-secondaire" data-action="reconnecter" data-si-deconnecte hidden></button>
-              <button type="button" class="bouton-lien" data-action="deconnecter" data-si-connecte hidden>couper</button>
-            </span>
-          </div>
-          ${choixLeveEtStock()}
+        <div class="ecran-terrain">
+          ${connexion()}
+          ${reglages()}
           ${priseDePoint()}
-        </section>`;
+        </div>`;
       rafraichirVivant();
     },
 

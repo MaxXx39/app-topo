@@ -1,5 +1,5 @@
 // Choix des points d'une liste (contour, ligne de rupture, points isolés, points d'une mesure),
-// partagé par l'onglet 2.1 Surfaces et l'onglet 3. Mesures. Trois façons de choisir :
+// partagé par l'onglet Calculs › Surfaces et l'onglet Calculs › Mesures. Trois façons de choisir :
 // les séries du fichier, une liste de noms tapée (« b100 à b116 »), ou des cases à cocher.
 // (Toucher les points sur le plan est géré par chaque écran.)
 //
@@ -18,7 +18,7 @@ import { echapper } from '../outils/echapper.js';
  * - messages : erreurs de la dernière liste tapée
  * - casesOuvertes : vrai si la liste des cases doit rester ouverte
  * - enTete : HTML ajouté sous le titre (par exemple la case « ligne fermée »)
- * - plusDeChoix : vrai pour un écran plus simple (onglet 3. Mesures) : seule la liste de noms reste
+ * - plusDeChoix : vrai pour un écran plus simple (onglet Calculs › Mesures) : seule la liste de noms reste
  *   visible, les séries et les cases à cocher sont rangées dans « Plus de choix »
  */
 export function htmlChoixPoints({ liste, points, nomsUtilises = new Set(), messages = [], casesOuvertes = false, enTete = '', plusDeChoix = false }) {

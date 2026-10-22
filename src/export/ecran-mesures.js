@@ -1,4 +1,4 @@
-// Formulaire d'export des mesures (onglet 3. Mesures) : à part de l'export des volumes,
+// Formulaire d'export des mesures (onglet Calculs › Mesures) : à part de l'export des volumes,
 // il ne contient aucun volume. Échelle et contenu du PDF, boutons PDF, CSV et DXF.
 // Le cartouche (affaire, dessiné par, date) se remplit dans l'onglet Projet.
 import { genererCsvMesures } from './csv.js';

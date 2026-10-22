@@ -9,7 +9,7 @@
 // - SURFACE_<nom> : triangles des autres surfaces (faces 3D)
 // - COURBES : courbes de niveau des surfaces calculées (si demandées)
 //
-// Le DXF des mesures (onglet 3. Mesures, voir genererDxfMesures) est un fichier à part, sans volume.
+// Le DXF des mesures (onglet Calculs › Mesures, voir genererDxfMesures) est un fichier à part, sans volume.
 import { courbesDeNiveau } from '../topo/courbes.js';
 import { formaterNombre } from '../topo/format.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';

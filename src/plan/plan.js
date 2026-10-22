@@ -18,7 +18,7 @@ const SVG = 'http://www.w3.org/2000/svg';
 const RAYON_TOUCHER = 22;
 
 // Calques que l'on peut afficher ou masquer, avec leur état de départ.
-// "surfaces" : calque des surfaces seulement, caché dans le menu de l'onglet 3. Mesures.
+// "surfaces" : calque des surfaces seulement, caché dans le menu de l'onglet Calculs › Mesures.
 const CALQUES = [
   { cle: 'fondSatellite', titre: 'Fond photo aérienne (swisstopo)', parDefaut: false },
   { cle: 'cadastre', titre: 'Cadastre', parDefaut: false },
@@ -46,7 +46,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  *   en mode suppression de triangles (dessin.modeTriangles)
  * - quandToucherPosition({ est, nord }) : appelé pendant le tracé d'une coupe (dessin.traceCoupe) ;
  *   près d'un point levé, la position est celle de ce point
- * - quandToucherMesure(id) : appelé quand on touche une mesure (onglet 3. Mesures, hors modification)
+ * - quandToucherMesure(id) : appelé quand on touche une mesure (onglet Calculs › Mesures, hors modification)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
 export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure } = {}) {
@@ -115,7 +115,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // surface : surface affichée { triangles, trianglesRetires } ; modeTriangles : suppression au doigt
   // ecarts : triangles d'écart à colorier à la place de ceux des surfaces, sinon null
   // coupes : coupes tracées [{ nom, debut, fin }] ; traceCoupe : { debut } pendant un tracé, sinon null
-  // modeMesures : onglet 3. Mesures (pas de surface ni de coupe) ; mesures : [{ mesure, resultat }]
+  // modeMesures : onglet Calculs › Mesures (pas de surface ni de coupe) ; mesures : [{ mesure, resultat }]
   // du levé affiché ; mesureActive : mesure choisie (ses points sont entourés pendant une modification)
   let dessin = {
     modeMesures: false,
@@ -470,7 +470,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     legendeEcarts = legendeZones;
   }
 
-  /** Surface affichée (onglet 2.1 Surfaces) : ses triangles, et les triangles supprimés en pointillés rouges. */
+  /** Surface affichée (onglet Calculs › Surfaces) : ses triangles, et les triangles supprimés en pointillés rouges. */
   function dessinerSurface(groupe) {
     const surface = dessin.surface;
     if (!surface) return;
@@ -498,7 +498,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (!estVisible(stock)) return [];
       return dessin.resultats[index]?.trianglesDessus ?? [];
     });
-    // La surface affichée (onglet 2.1 Surfaces) est aussi coloriée, et les aires mesurées (onglet 3. Mesures).
+    // La surface affichée (onglet Calculs › Surfaces) est aussi coloriée, et les aires mesurées (onglet Calculs › Mesures).
     if (dessin.surface) triangles.push(...dessin.surface.triangles);
     for (const { resultat } of dessin.mesures ?? []) if (resultat?.triangles) triangles.push(...resultat.triangles);
     if (triangles.length === 0) return;
@@ -659,7 +659,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const tracePar = (sommets, ferme) => sommets.map((s, i) => `${i === 0 ? 'M' : 'L'}${s.x} ${s.y}`).join(' ') + (ferme ? ' Z' : '');
 
   /**
-   * Mesures (onglet 3. Mesures) : longueurs en trait cyan pointillé, aires avec leur contour
+   * Mesures (onglet Calculs › Mesures) : longueurs en trait cyan pointillé, aires avec leur contour
    * pointillé, un fond cyan léger, leurs lignes de rupture et leurs triangles (calque « Triangles »).
    */
   function dessinerTracesMesures() {

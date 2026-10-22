@@ -1,4 +1,4 @@
-// Onglet 1. Points : fichiers de points importés (levés). Le levé avec le récepteur est à part (src/leve/ecran.js), au-dessus. Les surfaces LandXML / DXF s'importent dans l'onglet 2.1 Surfaces.
+// Onglet 1. Points : fichiers de points importés (levés). Le levé avec le récepteur est à part (src/leve/ecran.js), au-dessus. Les surfaces LandXML / DXF s'importent dans l'onglet Calculs › Surfaces.
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
