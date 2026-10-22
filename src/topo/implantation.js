@@ -60,15 +60,15 @@ export function ecartSurface(altitudeSurface, altitudePoint) {
 }
 
 /**
- * Couleur de l'écart (m), choisie par l'utilisateur : vert clair de −2 à +2 cm, vert foncé de
+ * Couleur de l'écart (m), choisie par l'utilisateur : vert clair de −2 à +2 cm, jaune orangé de
  * 2 à 5 cm (dessus ou dessous), rouge au-delà de +5 cm (il faut monter), bleu au-delà de −5 cm
- * (il faut descendre). Renvoie 'vert-clair', 'vert-fonce', 'rouge' ou 'bleu'.
+ * (il faut descendre). Renvoie 'vert-clair', 'jaune-orange', 'rouge' ou 'bleu'.
  */
 export function classeEcart(ecart) {
-  // Arrondi au dixième de millimètre : 0.05 m affiché reste « vert foncé ».
+  // Arrondi au dixième de millimètre : 0.05 m affiché reste « jaune orangé ».
   const valeur = Math.round(ecart * 10000) / 10000;
   if (Math.abs(valeur) <= 0.02) return 'vert-clair';
-  if (Math.abs(valeur) <= 0.05) return 'vert-fonce';
+  if (Math.abs(valeur) <= 0.05) return 'jaune-orange';
   return valeur > 0 ? 'rouge' : 'bleu';
 }
 

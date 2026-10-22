@@ -2648,7 +2648,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   margin: 4px 0 8px;
 }
 
-/* Écart en grand : vert clair (±2 cm), vert foncé (2 à 5 cm), rouge (monter plus de 5 cm),
+/* Écart en grand : vert clair (±2 cm), jaune orangé (2 à 5 cm), rouge (monter plus de 5 cm),
    bleu (descendre plus de 5 cm). */
 .ecart-direct {
   display: grid;
@@ -2674,8 +2674,9 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   color: #14532d;
 }
 
-.ecart-direct.vert-fonce {
-  background: #15803d;
+.ecart-direct.jaune-orange {
+  background: #f59e0b;
+  color: #451a03;
 }
 
 .ecart-direct.rouge {
@@ -2765,8 +2766,8 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   fill: #22c55e;
 }
 
-.coupe-directe .canne.vert-fonce {
-  fill: #15803d;
+.coupe-directe .canne.jaune-orange {
+  fill: #f59e0b;
 }
 
 .coupe-directe .canne.rouge {

@@ -14,7 +14,7 @@ const HAUTEUR_MIN = 0.5;
  * - lignes : profil de la surface (résultat de profilSurface), distances de 0 à 2 × demiLongueur
  * - demiLongueur : m de chaque côté de la position (le récepteur est au milieu)
  * - altitudeCanne : altitude du bout de canne (m), ou null si elle n'est pas fiable
- * - classe : couleur de l'écart ('vert-clair', 'vert-fonce', 'rouge', 'bleu') ou null
+ * - classe : couleur de l'écart ('vert-clair', 'jaune-orange', 'rouge', 'bleu') ou null
  * - titre, gauche, droite : textes (ex. « Perpendiculaire », « gauche », « droite »)
  */
 export function svgCoupeDirecte({ lignes, demiLongueur, altitudeCanne, classe, titre, gauche, droite }) {

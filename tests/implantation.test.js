@@ -79,9 +79,9 @@ describe('altitude sur une surface et écart', () => {
     expect(classeEcart(0)).toBe('vert-clair');
     expect(classeEcart(0.02)).toBe('vert-clair');
     expect(classeEcart(-0.02)).toBe('vert-clair');
-    expect(classeEcart(0.021)).toBe('vert-fonce');
-    expect(classeEcart(-0.05)).toBe('vert-fonce');
-    expect(classeEcart(0.05)).toBe('vert-fonce');
+    expect(classeEcart(0.021)).toBe('jaune-orange');
+    expect(classeEcart(-0.05)).toBe('jaune-orange');
+    expect(classeEcart(0.05)).toBe('jaune-orange');
     expect(classeEcart(0.051)).toBe('rouge');
     expect(classeEcart(-0.051)).toBe('bleu');
     expect(classeEcart(1.2)).toBe('rouge');
