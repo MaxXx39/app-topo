@@ -3236,3 +3236,16 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   stroke-width: 2;
   stroke-dasharray: 6 4;
 }
+
+/* Déplacement et zoom au doigt (version 0.46.2) : l'image dessinée est glissée et agrandie
+   depuis le coin en haut à gauche, puis redessinée quand le doigt se lève (voir plan.js, « geste »). */
+svg.plan,
+.plan-fond {
+  transform-origin: 0 0;
+}
+
+/* Pendant le geste : l'image reste en mémoire et n'est que déplacée (plus fluide). */
+.plan-cadre.en-geste svg.plan,
+.plan-cadre.en-geste .plan-fond {
+  will-change: transform;
+}

@@ -150,7 +150,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /** Taille actuelle du plan à l'écran (pixels). */
   function taille() {
-    const rectangle = svg.getBoundingClientRect();
+    const rectangle = cadre.getBoundingClientRect();
     return { largeur: rectangle.width, hauteur: rectangle.height };
   }
 
@@ -175,6 +175,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /** Redessine tout le plan avec la vue actuelle. */
   function dessiner() {
+    if (geste) return; // redessiné à la fin du geste
     svg.replaceChildren();
     legende = null;
     legendeEcarts = null;
@@ -292,6 +293,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    * plan (croix ambre) et point à implanter en cours (cercle autour).
    */
   function dessinerImplantation() {
+    svg.querySelector('g.implantation')?.remove();
     if (!implantation || !vue) return;
     const groupe = creerElement('g', { class: 'implantation' });
     const croix = (est, nord, classe, taille) => {
@@ -320,6 +322,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    * la position de l'antenne, pas celle du bout de canne). Redessinée seule, 5 fois par seconde.
    */
   function dessinerPosition() {
+    if (geste) return; // redessinée à la fin du geste
     svg.querySelector('g.position')?.remove();
     if (!position || !vue) return;
     const { x, y } = versEcran(position.est, position.nord, vue);
@@ -942,6 +945,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     centrerSurPosition();
   });
 
+  /** Vrai si la position est à plus de 20 % de la largeur (ou de la hauteur) du centre du plan. */
+  function loinDuCentre() {
+    const { x, y } = versEcran(position.est, position.nord, vue);
+    return Math.abs(x - vue.largeur / 2) > vue.largeur * 0.2 || Math.abs(y - vue.hauteur / 2) > vue.hauteur * 0.2;
+  }
+
   /** Arrête le suivi de la position (le plan a été déplacé au doigt). */
   function arreterSuivi() {
     suivre = false;
@@ -988,6 +997,31 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // --- Doigts ou souris : un doigt déplace, deux doigts zooment ---
   const pointeurs = new Map(); // position actuelle de chaque doigt posé
   let toucher = null; // position de départ, tant que le doigt n'a presque pas bougé
+  // Pendant un déplacement ou un zoom au doigt, on ne redessine pas (trop lent avec un gros plan
+  // DXF) : l'image déjà dessinée est seulement glissée et agrandie (transformation CSS), puis le
+  // plan est redessiné une fois, quand le doigt se lève. geste = { vueDepart } ou null.
+  let geste = null;
+
+  /** Glisse et agrandit l'image dessinée pour qu'elle corresponde à la vue actuelle. */
+  function suivreLeGeste() {
+    const depart = geste.vueDepart;
+    const k = vue.echelle / depart.echelle;
+    const tx = (vue.largeur / 2) * (1 - k) + vue.echelle * (depart.estCentre - vue.estCentre);
+    const ty = (vue.hauteur / 2) * (1 - k) + vue.echelle * (vue.nordCentre - depart.nordCentre);
+    const transformation = `translate(${tx}px, ${ty}px) scale(${k})`;
+    svg.style.transform = transformation;
+    fond.style.transform = transformation;
+  }
+
+  /** Fin du geste : on enlève la transformation et on redessine pour de bon. */
+  function finirLeGeste() {
+    if (!geste) return;
+    geste = null;
+    cadre.classList.remove('en-geste');
+    svg.style.transform = '';
+    fond.style.transform = '';
+    dessiner();
+  }
 
   svg.addEventListener('pointerdown', (evenement) => {
     svg.setPointerCapture(evenement.pointerId);
@@ -1004,8 +1038,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Si le doigt a bougé de plus de 6 pixels, c'est un déplacement, pas un toucher.
     if (toucher && distance(toucher, apres[0]) > 6) toucher = null;
 
+    if (toucher && apres.length === 1) return; // pas encore un déplacement
+    if (!geste) {
+      geste = { vueDepart: vue };
+      cadre.classList.add('en-geste');
+    }
     if (apres.length === 1) {
-      if (!toucher && suivre) arreterSuivi();
+      if (suivre) arreterSuivi();
       vue = deplacer(vue, apres[0].x - avant[0].x, apres[0].y - avant[0].y);
     } else if (apres.length >= 2) {
       // Pincement : on zoome selon l'écart entre les deux doigts,
@@ -1017,7 +1056,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (ecartAvant > 0) vue = zoomer(vue, ecartApres / ecartAvant, milieuAvant.x, milieuAvant.y);
       vue = deplacer(vue, milieuApres.x - milieuAvant.x, milieuApres.y - milieuAvant.y);
     }
-    dessiner();
+    suivreLeGeste();
   });
 
   svg.addEventListener('pointerup', (evenement) => {
@@ -1051,10 +1090,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
     }
     toucher = null;
+    if (pointeurs.size === 0) finirLeGeste();
   });
   svg.addEventListener('pointercancel', (evenement) => {
     pointeurs.delete(evenement.pointerId);
     toucher = null;
+    if (pointeurs.size === 0) finirLeGeste();
   });
 
   /** Point le plus proche d'une position de l'écran, s'il est à moins de RAYON_TOUCHER pixels. */
@@ -1084,7 +1125,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /** Position du doigt ou de la souris dans le plan (pixels). */
   function positionDansPlan(evenement) {
-    const rectangle = svg.getBoundingClientRect();
+    // Le cadre, pas le dessin : pendant un geste, le dessin est déplacé (voir « geste »).
+    const rectangle = cadre.getBoundingClientRect();
     return { x: evenement.clientX - rectangle.left, y: evenement.clientY - rectangle.top };
   }
 
@@ -1121,7 +1163,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const premiere = !position && nouvellePosition;
       position = nouvellePosition;
       boutonPosition.hidden = !position;
-      if (position && (!vue || suivre || (premiere && points.length === 0))) centrerSurPosition();
+      // Suivi : on ne recentre (et ne redessine tout) que si la position s'approche du bord.
+      if (position && (!vue || (suivre && loinDuCentre()) || (premiere && points.length === 0))) centrerSurPosition();
       else dessinerPosition();
     },
     /** Plans DXF à dessiner en fond (voir topo/dxf-plan.js). */
@@ -1138,6 +1181,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
      */
     afficherImplantation(nouvelle) {
       implantation = nouvelle;
+    },
+    /** Redessine seulement l'implantation (et la position, par-dessus), sans tout le plan. */
+    rafraichirImplantation() {
+      if (geste) return;
+      dessinerImplantation();
+      dessinerPosition();
     },
     /** Cadre le plan sur ces plans DXF (bouton « voir »). */
     cadrerSurPlans(choisis) {

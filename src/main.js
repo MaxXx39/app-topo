@@ -488,7 +488,7 @@ const ecranLeve = recepteurDisponible()
       },
       oublierChoix: () => {
         implanter.choix = null;
-        recalculer();
+        montrerImplantation();
       },
       implanterChoix: ({ nom, altitude }) => {
         const lue = lireAltitude(altitude);
@@ -496,7 +496,7 @@ const ecranLeve = recepteurDisponible()
         const { est, nord } = implanter.choix;
         implanter.cible = { id: null, nom: nom.trim() || nomProposeImplantation(), est, nord, altitude: lue };
         implanter.choix = null;
-        recalculer();
+        montrerImplantation();
       },
       creerPointAImplanter: ({ nom, altitude }) => {
         const lue = lireAltitude(altitude);
@@ -516,7 +516,7 @@ const ecranLeve = recepteurDisponible()
         if (!point) return;
         implanter.cible = { ...point };
         implanter.choix = null;
-        recalculer();
+        montrerImplantation();
       },
       supprimerPointAImplanter: (id) => {
         const point = projet.aImplanter.find((p) => p.id === id);
@@ -527,7 +527,7 @@ const ecranLeve = recepteurDisponible()
       },
       arreterImplantation: () => {
         implanter.cible = null;
-        recalculer();
+        montrerImplantation();
       },
       enregistrerImplantation: () => {
         const cible = implanter.cible;
@@ -621,6 +621,28 @@ function nomProposeImplantation() {
   return implanter.choix?.nom ?? nomPointAImplanter([...projet.aImplanter, ...projet.implantations]);
 }
 
+/**
+ * Implantation d'un point : toucher le plan accroche un point (seulement depuis l'onglet Terrain).
+ * Les points « À implanter » restent visibles sur le plan dans les autres onglets.
+ */
+function envoyerImplantationAuPlan() {
+  const accrocheActive = enImplantationDePoint() && ongletContexte === 'terrain';
+  plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0
+    ? { actif: accrocheActive, aImplanter: projet.aImplanter, choix: accrocheActive ? implanter.choix : null, cible: accrocheActive ? implanter.cible : null }
+    : null);
+}
+
+/**
+ * Point choisi ou point à implanter changé (rien d'autre dans le projet) : on met à jour l'écran
+ * Terrain et l'implantation sur le plan, sans tout recalculer ni redessiner (plus rapide).
+ */
+function montrerImplantation() {
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+  ecranLeve?.afficher(donneesLeve());
+  mettreAJourToucheVolume();
+}
+
 /** Vrai pendant l'implantation d'un point (Terrain › Contrôler › Point). */
 function enImplantationDePoint() {
   return Boolean(ecranLeve) && terrain.mode === 'controler' && terrain.implantation === 'point';
@@ -638,7 +660,7 @@ function toucherPourImplantation(position, tolerance) {
   }
   const mm = (valeur) => Math.round(valeur * 1000) / 1000;
   implanter.choix = { ...trouve, est: mm(trouve.est), nord: mm(trouve.nord), altitude: trouve.altitude != null ? mm(trouve.altitude) : null };
-  recalculer();
+  montrerImplantation();
 }
 
 /**
@@ -1127,7 +1149,8 @@ function decrireSurface(surface) {
 /** Recalcule tout (surfaces, volumes) et met à jour les écrans et le plan. */
 function recalculer({ recadrer = false } = {}) {
   const leve = leveActif(projet);
-  const points = leve?.points ?? [];
+  // Toujours la même liste vide : une nouvelle liste à chaque fois recadrerait le plan (voir plus bas).
+  const points = leve?.points ?? AUCUN_POINT;
 
   surfacesCalculees = new Map(projet.surfaces.map((s) => [s.id, calculerSurface(s, pointsDuLeve(s.leveId))]));
   const donnees = { surfaces: projet.surfaces, triangulations: surfacesCalculees, pointsDe: (s) => pointsDuLeve(s.leveId) };
@@ -1150,12 +1173,7 @@ function recalculer({ recadrer = false } = {}) {
     const point = projet.aImplanter.find((p) => p.id === implanter.cible.id);
     implanter.cible = point ? { ...point } : null;
   }
-  // Implantation d'un point : toucher le plan accroche un point (seulement depuis l'onglet Terrain).
-  // Les points « À implanter » restent visibles sur le plan dans les autres onglets.
-  const accrocheActive = enImplantationDePoint() && ongletContexte === 'terrain';
-  plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0
-    ? { actif: accrocheActive, aImplanter: projet.aImplanter, choix: accrocheActive ? implanter.choix : null, cible: accrocheActive ? implanter.cible : null }
-    : null);
+  envoyerImplantationAuPlan();
   ecranLeve?.afficher(donneesLeve());
   ecranProjet.afficher(projet, resumes);
   // Téléphone, onglet Terrain : le plan reste en haut de l'écran (voir style.css), plus petit
@@ -1243,6 +1261,7 @@ function basculerModeDessin() {
   requestAnimationFrame(() => document.querySelector(`#${onglet} .en-edition`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
 }
 let pointsAffiches = null;
+const AUCUN_POINT = [];
 let nombrePointsAffiches = 0;
 
 // --- Enregistrement automatique ---
