@@ -6,8 +6,9 @@ import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { lireLandXML } from './topo/landxml.js';
 import { lireDXF } from './topo/dxf-lecture.js';
+import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee, nomNature } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, nomNature, nouvelIdentifiant } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
@@ -60,6 +61,7 @@ import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecept
 let projet = creerProjet('Mon projet'); // projet ouvert
 let resumes = []; // liste des projets enregistrés (pour l'onglet Projet)
 let dernierImport = null; // résultat du dernier import de points
+let dernierPlan = null; // message du dernier import de plan DXF
 let surfacesCalculees = new Map(); // id de surface -> triangles (résultat de calculerSurface)
 let resultatsCalculs = new Map(); // id de calcul -> volume (résultat de calculerVolume)
 let resultatsMesures = new Map(); // id de mesure -> longueurs, aires (résultat de calculerMesure)
@@ -276,6 +278,57 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
   renommerLeve: (id, nom) => {
     const leve = projet.leves.find((l) => l.id === id);
     if (leve && nom) leve.nom = nom;
+    modifie();
+  },
+  importerPlanDxf: async (fichier) => {
+    afficherMessage(`Lecture du plan « ${fichier.name} »…`, null);
+    // On laisse le message s'afficher avant la lecture (quelques secondes pour un gros plan).
+    await new Promise((fin) => setTimeout(fin, 30));
+    try {
+      const { plan: lu, erreur } = lirePlanDxf(texteDuDxf(new Uint8Array(await fichier.arrayBuffer())), fichier.name);
+      if (erreur || !lu.bornes) {
+        dernierPlan = { nom: fichier.name, erreur: erreur ?? 'aucun objet dessiné trouvé' };
+        afficherMessage('Plan non importé');
+        recalculer();
+        return;
+      }
+      const avertissements = [];
+      if (!estEnMn95(lu.bornes)) {
+        avertissements.push('Ce plan ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : il est affiché tel quel, sans recalage.');
+      }
+      const ignores = Object.entries(lu.compte.ignores);
+      if (ignores.length > 0) avertissements.push(`Non affiché(s) : ${ignores.map(([type, n]) => `${n} ${type}`).join(', ')} (hachures, images… : seuls les traits, textes, cercles et aplats sont lus).`);
+      projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu });
+      dernierPlan = { nom: fichier.name, avertissements };
+      afficherMessage(`Plan « ${fichier.name} » importé : ${lu.compte.objets} objets`, 4000);
+      modifie();
+    } catch (erreur) {
+      dernierPlan = { nom: fichier.name, erreur: erreur.message };
+      afficherMessage('Plan non importé');
+      recalculer();
+    }
+  },
+  voirPlanDxf: (id) => {
+    const choisi = projet.plansDxf.find((p) => p.id === id);
+    if (!choisi) return;
+    if (estTelephone()) afficherOnglet('plan');
+    requestAnimationFrame(() => plan.cadrerSurPlans([choisi]));
+  },
+  supprimerPlanDxf: (id) => {
+    const choisi = projet.plansDxf.find((p) => p.id === id);
+    if (!choisi || !confirm(`Supprimer le plan « ${choisi.nom} » du projet ?`)) return;
+    projet.plansDxf = projet.plansDxf.filter((p) => p.id !== id);
+    dernierPlan = null;
+    modifie();
+  },
+  montrerCalqueDxf: (id, numero, visible) => {
+    const calque = projet.plansDxf.find((p) => p.id === id)?.calques[numero];
+    if (!calque) return;
+    calque.visible = visible;
+    modifie();
+  },
+  montrerTousCalquesDxf: (id, visible) => {
+    for (const calque of projet.plansDxf.find((p) => p.id === id)?.calques ?? []) calque.visible = visible;
     modifie();
   },
   supprimerLeve: (id) => {
@@ -932,7 +985,8 @@ function recalculer({ recadrer = false } = {}) {
   ecranVolumes.afficher();
   ecranCoupes.afficher();
   ecranMesures.afficher();
-  ecranImport.afficher(projet, dernierImport);
+  ecranImport.afficher(projet, dernierImport, dernierPlan);
+  plan.afficherPlansDxf(projet.plansDxf ?? []);
   ecranLeve?.afficher(donneesLeve());
   ecranProjet.afficher(projet, resumes);
   // Téléphone, onglet Terrain : le plan reste en haut de l'écran (voir style.css), plus petit

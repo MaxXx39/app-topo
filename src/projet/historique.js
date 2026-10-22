@@ -3,15 +3,15 @@
 // Après chaque modification, on garde une copie du projet (sous forme de texte JSON).
 // Annuler revient à la copie précédente ; Rétablir refait ce qui vient d'être annulé.
 // L'historique est remis à zéro quand on ouvre un autre projet.
-// Les photos sont lourdes : elles ne sont pas recopiées à chaque étape. On les garde une seule
-// fois (par leur identifiant) et on les remet en place quand on revient à une étape.
+// Les photos et le contenu des plans DXF sont lourds : ils ne sont pas recopiés à chaque étape.
+// On les garde une seule fois (par leur identifiant) et on les remet en place quand on revient à une étape.
 
 /** Nombre de retours en arrière possibles, par défaut. */
 const LIMITE = 50;
 
 /** Crée un historique vide. */
 export function creerHistorique(limite = LIMITE) {
-  return { passe: [], futur: [], actuel: null, limite, photos: new Map() };
+  return { passe: [], futur: [], actuel: null, limite, photos: new Map(), plans: new Map() };
 }
 
 /**
@@ -30,7 +30,11 @@ function instantane(historique, projet) {
         }
       : surface,
   );
-  return JSON.stringify({ ...projet, surfaces, modifieLe: null });
+  const plansDxf = (projet.plansDxf ?? []).map((plan) => {
+    historique.plans.set(plan.id, plan.contenu);
+    return { ...plan, contenu: null };
+  });
+  return JSON.stringify({ ...projet, surfaces, plansDxf, modifieLe: null });
 }
 
 /** Relit une étape de l'historique et remet les images des photos. */
@@ -39,6 +43,7 @@ function relire(historique, texte) {
   for (const surface of projet.surfaces ?? []) {
     for (const photo of surface.photos ?? []) Object.assign(photo, historique.photos.get(photo.id));
   }
+  for (const plan of projet.plansDxf ?? []) plan.contenu = historique.plans.get(plan.id) ?? null;
   return projet;
 }
 
@@ -47,6 +52,7 @@ export function reinitialiser(historique, projet) {
   historique.passe = [];
   historique.futur = [];
   historique.photos.clear();
+  historique.plans.clear();
   historique.actuel = instantane(historique, projet);
 }
 

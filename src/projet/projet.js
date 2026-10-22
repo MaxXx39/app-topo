@@ -12,6 +12,8 @@
 //                                   // debut, fin : { est, nord } (m, MN95)
 //   mesures: [...],                 // longueurs et aires (onglet Calculs › Mesures) : voir topo/mesure.js
 //   cartouche: { affaire, dessinePar, date },   // date : 'AAAA-MM-JJ', ou '' pour la date du jour
+//   plansDxf: [{ id, nom, importeLe, origine, bornes, calques, contenu, compte }],  // fonds de plan DXF
+//                                   // (voir topo/dxf-plan.js) : affichés sous le levé, pour l'implantation
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé. De même pour une mesure.
@@ -39,6 +41,7 @@ export function creerProjet(nom) {
     coupes: [],
     mesures: [],
     cartouche: { affaire: '', dessinePar: '', date: '' },
+    plansDxf: [],
   };
 }
 
@@ -95,6 +98,7 @@ export function completerProjet(projet) {
   const vide = creerProjet(projet.nom ?? 'Projet');
   const complet = { ...vide, ...projet, version: VERSION, cartouche: { ...vide.cartouche, ...projet.cartouche } };
   complet.leves ??= [];
+  complet.plansDxf ??= [];
   complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
     nature: estImportee(surface) ? 'terrain' : 'stock',
     ...surface,

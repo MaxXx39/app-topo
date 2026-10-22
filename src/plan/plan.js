@@ -22,6 +22,7 @@ const RAYON_TOUCHER = 22;
 const CALQUES = [
   { cle: 'fondSatellite', titre: 'Fond photo aérienne (swisstopo)', parDefaut: false },
   { cle: 'cadastre', titre: 'Cadastre', parDefaut: false },
+  { cle: 'plansDxf', titre: 'Plans DXF (calques : onglet Projet)', parDefaut: true },
   { cle: 'points', titre: 'Points', parDefaut: true },
   { cle: 'noms', titre: 'Noms des points', parDefaut: true },
   { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false },
@@ -110,6 +111,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // Suivi de la position : le plan se recentre sur elle à chaque mise à jour (bouton « Ma position »),
   // jusqu'à ce qu'on déplace le plan au doigt.
   let suivre = false;
+  // Plans DXF en fond (voir topo/dxf-plan.js). Leur dessin SVG est préparé une seule fois (dans le
+  // repère du plan, en m) puis seulement déplacé et agrandi : id -> { plan, cle, groupe }.
+  let plansDxf = [];
+  const dessinsDxf = new Map();
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
   // Ce qu'il faut dessiner (voir editeur.js et main.js) :
@@ -169,7 +174,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     legende = null;
     legendeEcarts = null;
     dessinerFond();
+    if (vue) dessinerPlansDxf();
     if (!vue || points.length === 0) {
+      if (vue && plansDxf.length > 0) dessinerBarreEchelle();
       dessinerPosition();
       return;
     }
@@ -302,6 +309,80 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
+  /**
+   * Dessin SVG d'un plan DXF, dans son propre repère (m depuis son origine, nord vers le haut) :
+   * un chemin par couleur pour les traits et les cercles, un pour les aplats, puis les textes.
+   * Refait seulement si le plan ou ses calques visibles changent.
+   */
+  function groupeDxf(plan) {
+    const cle = plan.calques.map((c) => (c.visible ? 1 : 0)).join('');
+    const enCache = dessinsDxf.get(plan.id);
+    if (enCache && enCache.plan === plan && enCache.cle === cle) return enCache.groupe;
+    const groupe = creerElement('g', {});
+    const visible = (objet) => plan.calques[objet.c]?.visible !== false;
+    const couleur = (objet) => objet.k ?? plan.calques[objet.c]?.couleur ?? '#000000';
+    const traits = new Map();
+    const pleins = new Map();
+    const ajouter = (liste, teinte, morceau) => {
+      if (!liste.has(teinte)) liste.set(teinte, []);
+      liste.get(teinte).push(morceau);
+    };
+    const { traits: lignes = [], cercles = [], pleins: aplats = [], textes = [] } = plan.contenu ?? {};
+    for (const trait of lignes) {
+      if (!visible(trait)) continue;
+      let d = `M${trait.p[0]} ${trait.p[1]}`;
+      for (let i = 2; i < trait.p.length; i += 2) d += `L${trait.p[i]} ${trait.p[i + 1]}`;
+      ajouter(traits, couleur(trait), trait.f ? `${d}Z` : d);
+    }
+    for (const { x, y, r, ...cercle } of cercles) {
+      if (!visible(cercle)) continue;
+      ajouter(traits, couleur(cercle), `M${x + r} ${y}A${r} ${r} 0 1 0 ${x - r} ${y}A${r} ${r} 0 1 0 ${x + r} ${y}`);
+    }
+    for (const aplat of aplats) {
+      if (!visible(aplat)) continue;
+      const p = aplat.p;
+      ajouter(pleins, couleur(aplat), `M${p[0]} ${p[1]}L${p[2]} ${p[3]}L${p[4]} ${p[5]}L${p[6]} ${p[7]}Z`);
+    }
+    for (const [teinte, morceaux] of pleins) groupe.append(creerElement('path', { d: morceaux.join(''), fill: teinte, class: 'plein-dxf' }));
+    for (const [teinte, morceaux] of traits) groupe.append(creerElement('path', { d: morceaux.join(''), stroke: teinte, class: 'trait-dxf' }));
+    const groupeTextes = creerElement('g', { class: 'textes-dxf' });
+    const ancres = ['start', 'middle', 'end'];
+    const bases = ['alphabetic', 'text-after-edge', 'central', 'text-before-edge'];
+    for (const texte of textes) {
+      if (!visible(texte)) continue;
+      // Le repère du plan a le nord vers le haut : on retourne le texte pour qu'il se lise droit.
+      const element = creerElement('text', {
+        transform: `translate(${texte.x} ${texte.y}) scale(1 -1) rotate(${-texte.a})`,
+        'font-size': texte.h,
+        fill: couleur(texte),
+        'text-anchor': ancres[texte.ah] ?? 'start',
+        'dominant-baseline': bases[texte.av] ?? 'alphabetic',
+      });
+      element.textContent = texte.t;
+      groupeTextes.append(element);
+    }
+    groupe.append(groupeTextes);
+    dessinsDxf.set(plan.id, { plan, cle, groupe });
+    return groupe;
+  }
+
+  /** Plans DXF sous le dessin : le groupe préparé, placé à l'échelle et au bon endroit. */
+  function dessinerPlansDxf() {
+    if (!calques.plansDxf) return;
+    for (const plan of plansDxf) {
+      if (!plan.contenu) continue;
+      const groupe = groupeDxf(plan);
+      const e = vue.echelle;
+      const tx = vue.largeur / 2 + (plan.origine.est - vue.estCentre) * e;
+      const ty = vue.hauteur / 2 - (plan.origine.nord - vue.nordCentre) * e;
+      groupe.setAttribute('transform', `matrix(${e} 0 0 ${-e} ${tx} ${ty})`);
+      // Textes de moins de 3 pixels de haut : cachés (illisibles, et plus rapide).
+      groupe.classList.toggle('sans-textes', e * 0.25 < 3);
+      groupe.classList.add('plan-dxf');
+      svg.append(groupe);
+    }
+  }
+
   /** Centre le plan sur la position du récepteur (sans changer le zoom, sauf au premier affichage). */
   function centrerSurPosition() {
     if (!position) return;
@@ -319,7 +400,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const couches = Object.keys(FONDS).filter((nom) => calques[nom === 'satellite' ? 'fondSatellite' : nom]);
     const voulues = new Set();
 
-    if (vue && (points.length > 0 || position) && couches.length > 0) {
+    if (vue && (points.length > 0 || position || plansDxf.length > 0) && couches.length > 0) {
       const z = niveauDeZoom(1 / vue.echelle, window.devicePixelRatio || 1);
       const hautGauche = versTerrain(0, 0, vue);
       const basDroite = versTerrain(vue.largeur, vue.hauteur, vue);
@@ -795,10 +876,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     recadrerQuandVisible = false;
     // Levé avec le récepteur, encore 0 ou 1 point : environ 60 m de large autour du point
     // (ou de la position du récepteur), plutôt qu'un zoom extrême sur un seul point.
-    // Sans point ni position : pas encore de vue (elle se fera sur la première position reçue).
+    // Sans point : sur la position du récepteur, sinon sur les plans DXF ; sinon pas encore de vue
+    // (elle se fera sur la première position reçue).
     const centre = points.length === 1 ? points[0] : points.length === 0 ? position : null;
     if (centre) vue = { echelle: largeur / 60, estCentre: centre.est, nordCentre: centre.nord, largeur, hauteur };
-    else vue = points.length > 0 ? cadrerSurPoints(points, largeur, hauteur) : null;
+    else if (points.length > 0) vue = cadrerSurPoints(points, largeur, hauteur);
+    else vue = plansDxf.length > 0 ? cadrerSurPoints(coinsDesPlans(plansDxf), largeur, hauteur) : null;
     dessiner();
   }
 
@@ -998,6 +1081,23 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (position && (!vue || suivre || (premiere && points.length === 0))) centrerSurPosition();
       else dessinerPosition();
     },
+    /** Plans DXF à dessiner en fond (voir topo/dxf-plan.js). */
+    afficherPlansDxf(nouveaux) {
+      const avant = plansDxf.length;
+      plansDxf = nouveaux.filter((plan) => plan.contenu && plan.bornes);
+      for (const id of dessinsDxf.keys()) if (!plansDxf.some((plan) => plan.id === id)) dessinsDxf.delete(id);
+      // Premier plan sans levé : on cadre dessus. Sinon, le dessin suit (redessiner, juste après).
+      if (!vue || (avant === 0 && points.length === 0 && !position)) toutVoir();
+    },
+    /** Cadre le plan sur ces plans DXF (bouton « voir »). */
+    cadrerSurPlans(choisis) {
+      const { largeur, hauteur } = taille();
+      if (largeur === 0 || hauteur === 0 || choisis.length === 0) return;
+      suivre = false;
+      boutonPosition.classList.remove('actif');
+      vue = cadrerSurPoints(coinsDesPlans(choisis), largeur, hauteur);
+      dessiner();
+    },
     /** Redessine le plan avec les stocks (sans changer le zoom). */
     redessiner(nouveauDessin) {
       dessin = nouveauDessin;
@@ -1006,6 +1106,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       dessiner();
     },
   };
+}
+
+/** Coins des plans DXF (pour les cadrer) : [{ est, nord }]. */
+function coinsDesPlans(plans) {
+  return plans.flatMap(({ bornes: b }) => [
+    { est: b.estMin, nord: b.nordMin },
+    { est: b.estMax, nord: b.nordMax },
+  ]);
 }
 
 function creerElement(type, attributs) {
