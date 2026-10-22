@@ -38,6 +38,7 @@ import * as historique from './projet/historique.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
+import { lireLibelles, enregistrerLibelles } from './leve/libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe } from './topo/implantation.js';
 import {
   estLeveDirect,
@@ -68,10 +69,22 @@ let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, eta
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 // Levé avec le récepteur (appli Android) : levé et stock en cours, rôle du prochain point.
 const leveDirect = { stockId: null, role: 'contour' };
+// Libellés des noms de points (L-HT-1-3, P-RG-2…), gardés sur l'appareil (voir leve/libelles.js).
+let libelles = lireLibelles();
 let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
 // Onglet Terrain : mode (Lever ou Contrôler) et réglages du contrôle, retenus sur l'appareil.
 const CLE_TERRAIN = 'topo-terrain';
-const terrain = { mode: 'lever', surfaceId: null, vueCoupes: 'les2', demiLongueur: 5, exagerationCoupe: 1, sourceOrientation: 'rx2', ...lireReglagesTerrain() };
+const terrain = {
+  mode: 'lever',
+  surfaceId: null,
+  vueCoupes: 'les2',
+  demiLongueur: 5,
+  exagerationCoupe: 1,
+  sourceOrientation: 'rx2',
+  libelleLigne: 'HT', // dernier libellé choisi pour une ligne de rupture
+  libellePoint: 'TN', // et pour un point isolé
+  ...lireReglagesTerrain(),
+};
 const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
 
 function lireReglagesTerrain() {
@@ -367,7 +380,7 @@ const ecranLeve = recepteurDisponible()
         }
         const { est, nord, altitude, ...gnss } = reponse.point;
         const resultat = ajouterPointDirect(leve, stock, leveDirect.role, {
-          nom: nom.trim() || prochainNom(projet, stock, leveDirect.role),
+          nom: nom.trim() || prochainNom(projet, stock, leveDirect.role, libelleDuRole()),
           est,
           nord,
           altitude,
@@ -380,6 +393,23 @@ const ecranLeve = recepteurDisponible()
         navigator.vibrate?.(60);
         afficherMessage(`Point ${resultat.point.nom} pris`);
         modifie();
+      },
+      choisirLibelle: (abreviation) => {
+        if (leveDirect.role === 'ligne') terrain.libelleLigne = abreviation;
+        else terrain.libellePoint = abreviation;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      enregistrerLibelles: (nouveaux) => {
+        if (nouveaux.lignes.length === 0 || nouveaux.points.length === 0) {
+          alert('Il faut au moins un libellé pour les lignes et un pour les points.');
+          recalculer();
+          return;
+        }
+        libelles = nouveaux;
+        enregistrerLibelles(libelles);
+        afficherMessage('Libellés enregistrés');
+        recalculer();
       },
       choisirMode: (mode) => {
         terrain.mode = mode === 'controler' ? 'controler' : 'lever';
@@ -459,6 +489,15 @@ function mettreAJourToucheVolume() {
   });
 }
 
+/** Libellé utilisé pour le rôle en cours (dans la liste ; sinon le premier de la liste). */
+function libelleDuRole() {
+  if (leveDirect.role === 'contour') return null;
+  const ligne = leveDirect.role === 'ligne';
+  const liste = ligne ? libelles.lignes : libelles.points;
+  const voulu = ligne ? terrain.libelleLigne : terrain.libellePoint;
+  return liste.some(([abreviation]) => abreviation === voulu) ? voulu : liste[0][0];
+}
+
 /** Ce que montre l'onglet Terrain (voir leve/ecran.js). */
 function donneesLeve() {
   reprendreLeveDirect();
@@ -466,6 +505,8 @@ function donneesLeve() {
   if (!rolesPermis(stockEnCours()).includes(leveDirect.role)) leveDirect.role = 'isole';
   const leve = leveEnCours();
   const stock = stockEnCours();
+  // D'abord le nom proposé : pour une ligne, il prépare la ligne en cours (libellé, numéro).
+  const nomPropose = stock ? prochainNom(projet, stock, leveDirect.role, libelleDuRole()) : '';
   const ligne = stock ? ligneEnCours(stock) : null;
   const numeroLigne = stock ? stock.lignesRupture.indexOf(ligne) + 1 : 0;
   return {
@@ -474,8 +515,11 @@ function donneesLeve() {
     stocks: surfacesLevees().map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}` })),
     stock,
     role: leveDirect.role,
-    ligne: ligne ? { numero: numeroLigne, nbPoints: ligne.noms.length, fermee: ligne.fermee } : null,
-    nomPropose: stock ? prochainNom(projet, stock, leveDirect.role) : '',
+    ligne: ligne ? { libelle: ligne.libelle, numero: ligne.numero ?? numeroLigne, nbPoints: ligne.noms.length, fermee: ligne.fermee } : null,
+    nomPropose,
+    libelles,
+    libelleLigne: terrain.libelleLigne,
+    libellePoint: terrain.libellePoint,
     rolesPermis: rolesPermis(stock),
     dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
     resume: stock ? resumeStock(stock) : null,

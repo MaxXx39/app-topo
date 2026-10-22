@@ -2480,7 +2480,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 .nom-et-position .nom-point {
-  width: 7.5em;
+  width: 10.5em;
   flex: 0 0 auto;
   font-size: 1.15rem;
   font-weight: 700;
@@ -2903,4 +2903,70 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 
 .coupe-directe .titre-coupe {
   fill: var(--couleur-coupe, var(--texte));
+}
+
+/* --- Libellés des noms de points (version 0.44.0) : L-HT-1-3, P-RG-2… --- */
+.libelles-terrain {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  align-items: center;
+}
+
+.puce-libelle {
+  --couleur-libelle: var(--orange);
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 64px;
+  padding: 4px 8px;
+  border: 1.5px solid var(--couleur-libelle);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--couleur-libelle);
+  cursor: pointer;
+}
+
+.pour-points .puce-libelle {
+  --couleur-libelle: var(--succes);
+}
+
+.puce-libelle strong {
+  font-size: 1rem;
+}
+
+.puce-libelle span {
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.puce-libelle.actif {
+  background: var(--couleur-libelle);
+  color: #ffffff;
+}
+
+.editeur-libelles {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--fond);
+}
+
+.editeur-libelles label {
+  display: block;
+  margin: 6px 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.editeur-libelles textarea {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font-family: inherit;
+  font-size: 0.95rem;
 }

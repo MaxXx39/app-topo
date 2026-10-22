@@ -12,6 +12,7 @@ import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE } from '../topo/leve-direct.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
+import { lireTexteLibelles, ecrireTexteLibelles } from './libelles.js';
 
 // Mode Contrôler : ce qu'on implante (Point et Ligne viendront plus tard), vue des coupes, longueurs.
 const IMPLANTATIONS = [
@@ -46,7 +47,8 @@ const ICONES = {
 /**
  * Crée l'écran dans "conteneur". Les actions sont faites par main.js via "actions" :
  * choisirRecepteur(), reconnecter(), deconnecter(), nouvelleSurface(nature), choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
- * annulerDernierPoint(), choisirMode(mode), choisirSurfaceControle(id), choisirVueCoupes(vue),
+ * annulerDernierPoint(), choisirLibelle(abréviation), enregistrerLibelles({ lignes, points }),
+ * choisirMode(mode), choisirSurfaceControle(id), choisirVueCoupes(vue),
  * choisirLongueurCoupe(m), choisirExagerationCoupe(facteur), choisirSourceOrientation(source)
  * Renvoie { afficher(donnees), mettreAJourRecepteur(etat, direct) }.
  */
@@ -54,6 +56,7 @@ export function creerEcranLeve(conteneur, actions) {
   let etat = null; // dernier état du récepteur (voir src/android/pont.js)
   let donnees = null;
   let choixNatureOuvert = false; // « + Nouvelle » touché : on choisit stock, terrain naturel ou terrassement
+  let libellesOuverts = false; // listes de libellés en cours de modification
   let direct = null; // orientation et contrôle calculés par main.js à chaque état du récepteur
 
   conteneur.addEventListener('click', (evenement) => {
@@ -63,6 +66,17 @@ export function creerEcranLeve(conteneur, actions) {
     if (action === 'ouvrirChoixNature' || action === 'fermerChoixNature') {
       choixNatureOuvert = action === 'ouvrirChoixNature';
       dessiner();
+      return;
+    }
+    if (action === 'ouvrirLibelles' || action === 'fermerLibelles') {
+      libellesOuverts = action === 'ouvrirLibelles';
+      dessiner();
+      return;
+    }
+    if (action === 'enregistrerLibelles') {
+      const texte = (champ) => conteneur.querySelector(`[data-champ="${champ}"]`)?.value ?? '';
+      libellesOuverts = false;
+      actions.enregistrerLibelles({ lignes: lireTexteLibelles(texte('libelles-lignes')), points: lireTexteLibelles(texte('libelles-points')) });
       return;
     }
     if (action === 'nouvelleSurface') choixNatureOuvert = false;
@@ -247,10 +261,40 @@ export function creerEcranLeve(conteneur, actions) {
     if (donnees.role !== 'ligne') return '';
     const { ligne } = donnees;
     return `<div class="outils-ligne">
-      <span>Ligne ${ligne.numero} · ${ligne.nbPoints} pt(s)</span>
+      <span>L-${echapper(ligne.libelle ?? '')}-${ligne.numero} · ${ligne.nbPoints} pt(s)</span>
       <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle</button>
       <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
         ${ligne.fermee ? '✓ Fermée' : 'Fermer'}</button>
+    </div>`;
+  }
+
+  /**
+   * Ce que l'on lève (lignes : HT, BT, BOR… ; points : TN, RG…) : une rangée de boutons, le
+   * libellé choisi va dans le nom du point. « modifier » ouvre la liste pour la compléter.
+   */
+  function choixLibelle() {
+    if (donnees.role === 'contour') return '';
+    const ligne = donnees.role === 'ligne';
+    const liste = ligne ? donnees.libelles.lignes : donnees.libelles.points;
+    const actif = ligne ? donnees.libelleLigne : donnees.libellePoint;
+    return `<div class="libelles-terrain ${ligne ? 'pour-lignes' : 'pour-points'}" role="group" aria-label="Ce que l'on lève">
+      ${liste.map(([abreviation, signification]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
+          <strong>${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
+      <button type="button" class="bouton-lien bouton-lien-neutre" data-action="ouvrirLibelles">modifier</button>
+    </div>
+    ${libellesOuverts ? editeurLibelles() : ''}`;
+  }
+
+  /** Modification des listes de libellés : une ligne par libellé, « HT haut de talus ». */
+  function editeurLibelles() {
+    return `<div class="editeur-libelles">
+      <p class="aide">Une ligne par libellé : l'abréviation (sans espace ni tiret), puis ce qu'elle veut dire. La liste est gardée sur cette tablette, pour tous les projets.</p>
+      <label>Lignes de rupture (L-…)<textarea data-champ="libelles-lignes" rows="6">${echapper(ecrireTexteLibelles(donnees.libelles.lignes))}</textarea></label>
+      <label>Points isolés (P-…)<textarea data-champ="libelles-points" rows="6">${echapper(ecrireTexteLibelles(donnees.libelles.points))}</textarea></label>
+      <div class="ligne-outils">
+        <button type="button" class="bouton-secondaire" data-action="enregistrerLibelles">Enregistrer</button>
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerLibelles">annuler</button>
+      </div>
     </div>`;
   }
 
@@ -267,6 +311,7 @@ export function creerEcranLeve(conteneur, actions) {
     return `
       ${ligneSurface()}
       ${boutonsRoles()}
+      ${choixLibelle()}
       ${outilsLigne()}
       <div class="nom-et-position">
         <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" />
@@ -286,7 +331,8 @@ export function creerEcranLeve(conteneur, actions) {
   return {
     /**
      * Redessine l'écran. donnees : { leve (levé de la surface en cours), stocks (surfaces levées :
-     * [{ id, nom }]), stock (surface en cours), role, ligne: { numero, nbPoints, fermee }, nomPropose, dernierPoint (nom), resume
+     * [{ id, nom }]), stock (surface en cours), role, libelles ({ lignes, points }), libelleLigne,
+     * libellePoint, ligne: { libelle, numero, nbPoints, fermee }, nomPropose, dernierPoint (nom), resume
      * (voir resumeStock), volume (remblai en m³, ou null), mode ('lever' ou 'controler'),
      * controle: { surfaceId, vueCoupes, demiLongueur, sourceOrientation }, surfaces: [{ id, etiquette }] }.
      */

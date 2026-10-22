@@ -10,7 +10,7 @@ export const TEXTES_AIDE = {
 
   // --- 1. Points ---
   lever:
-    'Seulement dans l\'appli Android. Appaire d\'abord le RX2 dans les réglages Bluetooth du téléphone, et active dans Emlid Flow « Envoyer la position compensée » ; laisse Emlid Flow ouvert pour les corrections. Choisis le rôle du point (contour, ligne de rupture, point isolé) avant de le prendre : le stock se construit tout seul, avec son volume. PRENDRE LE POINT est bloqué tant que le RTK n\'est pas fixe et l\'inclinaison pas prête. Coordonnées en MN95, altitudes RAN95.',
+    'Seulement dans l\'appli Android. Appaire d\'abord le RX2 dans les réglages Bluetooth du téléphone, et active dans Emlid Flow « Envoyer la position compensée » ; laisse Emlid Flow ouvert pour les corrections. Choisis le rôle du point avant de le prendre (contour pour un stock, ligne de rupture, point isolé) et ce que tu lèves (HT, BOR, RG… : « modifier » pour compléter la liste). Noms : C-Stock-1-1 (contour), L-HT-1-1 (ligne), P-RG-1 (point), numéros comptés dans tout le projet. PRENDRE LE POINT (ou la touche volume −) est bloqué tant que le RTK n\'est pas fixe et l\'inclinaison pas prête. Coordonnées en MN95, altitudes RAN95.',
   importer:
     'Fichier de points : CSV Emlid ou TXT (nom, Est, Nord, altitude, séparés par des tabulations), en MN95. Les lignes illisibles sont signalées avec leur numéro.',
   leves:
