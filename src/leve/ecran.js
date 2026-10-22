@@ -17,12 +17,15 @@ import { ROLES_LEVE } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
 import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne } from '../topo/accroche.js';
+// Couloir de l'implantation d'une ligne : bandes de chaque côté, plus fines en s'approchant
+// (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
+const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
 import { lireTexteLibelles, ecrireTexteLibelles } from './libelles.js';
 
 // Mode Contrôler : ce qu'on implante (Ligne viendra plus tard), vue des coupes, longueurs.
 const IMPLANTATIONS = [
   ['point', 'Point', true],
-  ['ligne', 'Ligne', false],
+  ['ligne', 'Ligne', true],
   ['surface', 'Surface', true],
 ];
 const VUES_COUPES = [
@@ -42,6 +45,8 @@ const NATURES_TERRAIN = [
 // Accroches : un dessin (en gris ce qu'on touche, en ambre l'endroit accroché) et un mot dessous.
 // [mot, nom complet (bulle, lecture d'écran), dessin].
 const ACCROCHES = {
+  // Implantation d'une ligne : la ligne entière du plan DXF (polyligne).
+  trait: ['Ligne DXF', 'Ligne entière du plan DXF (polyligne)', '<path class="repere-trait" d="M3 18 9 8l6 6 6-9" /><circle cx="3" cy="18" r="1.6" /><circle cx="21" cy="5" r="1.6" />'],
   point: ['Point', 'Point du projet (levé ou importé)', '<path d="M12 3v5M12 16v5M3 12h5M16 12h5" /><circle class="repere" cx="12" cy="12" r="3.5" />'],
   sommet: ['Sommet', 'Sommet d\'une ligne du plan DXF', '<path d="M3 20 12 6l9 14" /><rect class="repere" x="9" y="3" width="6" height="6" />'],
   milieu: ['Milieu', 'Milieu d\'un segment du plan DXF', '<path d="M2 17h20" /><circle cx="2.5" cy="17" r="1.5" /><circle cx="21.5" cy="17" r="1.5" /><path class="repere" d="M12 8l5 9H7z" />'],
@@ -80,7 +85,9 @@ const LETTRES_METRE = { aire: 'A', longueur: 'L' };
  * choisirImplantation(quoi), choisirAccroche(mode), trouverPoint(nom), choisirGuidage('rx2' ou 'nseo'),
  * implanterChoix({ nom, altitude }),
  * creerPointAImplanter({ nom, altitude }), implanterPoint(id), supprimerPointAImplanter(id),
- * arreterImplantation(), oublierChoix(), enregistrerImplantation(), exporterImplantations()
+ * arreterImplantation(), oublierChoix(), enregistrerImplantation(), exporterImplantations(),
+ * ligne : retirerDernierPointLigne(), implanterPointsLigne(), changerLigne(), choisirSegment('tout',
+ * 'segment', 'precedent' ou 'suivant'), inverserLigne(), reglerLigne('decalage', 'debut' ou 'fin', texte)
  * Renvoie { afficher(donnees), prendreDepuisTouche(), enregistrerDepuisTouche(), mettreAJourRecepteur(etat, direct),
  * mettreAJourBoussole(cap) }.
  */
@@ -91,6 +98,7 @@ export function creerEcranLeve(conteneur, actions) {
   let libellesOuverts = false; // listes de libellés en cours de modification
   let direct = null; // orientation et contrôle calculés par main.js à chaque état du récepteur
   let cibleAffichee = 0; // cible montrée près du point à implanter (0 : aucune, voir CIBLES)
+  let bandeCouloir = 0; // échelle du couloir de la ligne (n° dans BANDES_COULOIR)
   let capBoussole = null; // dernier cap de la boussole de la tablette (°), ou null
 
   conteneur.addEventListener('click', (evenement) => {
@@ -127,6 +135,10 @@ export function creerEcranLeve(conteneur, actions) {
       actions.trouverPoint(conteneur.querySelector('[data-champ="nom-a-trouver"]')?.value ?? '');
       return;
     }
+    if (action === 'choisirSegment') {
+      actions.choisirSegment(bouton.dataset.valeur);
+      return;
+    }
     if (action === 'prendre') actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '');
     else if (action === 'role') actions.choisirRole(bouton.dataset.role);
     else actions[action]?.(bouton.dataset.valeur);
@@ -136,12 +148,15 @@ export function creerEcranLeve(conteneur, actions) {
     const cible = evenement.target;
     if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
+    else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
   });
 
-  // Nom d'un point du projet choisi dans la liste proposée : on le cherche tout de suite.
-  conteneur.addEventListener('change', (evenement) => {
+  // Nom d'un point du projet choisi dans la liste proposée (pas tapé lettre par lettre, ni validé
+  // par Entrée, traité plus bas) : on le cherche tout de suite.
+  conteneur.addEventListener('input', (evenement) => {
     const cible = evenement.target;
-    if (cible.dataset.champ === 'nom-a-trouver' && donnees?.implanter.nomsPoints.includes(cible.value.trim())) actions.trouverPoint(cible.value);
+    const choisiDansLaListe = !evenement.inputType || evenement.inputType === 'insertReplacementText';
+    if (cible.dataset.champ === 'nom-a-trouver' && choisiDansLaListe && donnees?.implanter.nomsPoints.includes(cible.value.trim())) actions.trouverPoint(cible.value);
   });
 
   // Touche Entrée dans le nom : prend le point (comme le bouton), si c'est permis ; dans le nom
@@ -201,6 +216,7 @@ export function creerEcranLeve(conteneur, actions) {
       orientation.textContent = `cap RX2 ${degres(o?.cap)} · marche ${degres(o?.marche)}`;
     }
     if (donnees?.mode === 'controler' && donnees.controle.implantation === 'point') rafraichirImplantation();
+    else if (donnees?.mode === 'controler' && donnees.controle.implantation === 'ligne') rafraichirLigne();
     else if (donnees?.mode === 'controler') rafraichirControle();
   }
 
@@ -293,6 +309,7 @@ export function creerEcranLeve(conteneur, actions) {
     const vue = reglages.vueCoupes;
     const choixImplantation = `<div class="ligne-choix choix-implantation-type">${boutonsChoix('choisirImplantation', IMPLANTATIONS, reglages.implantation)}</div>`;
     if (reglages.implantation === 'point') return choixImplantation + implanterPoint();
+    if (reglages.implantation === 'ligne') return choixImplantation + implanterLigne();
     return `
       ${choixImplantation}
       ${surfaces.length > 0
@@ -320,11 +337,18 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function barreAccroche() {
     const { implanter: imp } = donnees;
-    return `<div class="barre-accroche">
+    // Ligne : on peut aussi prendre une ligne entière du plan DXF.
+    const enLigne = donnees.controle.implantation === 'ligne';
+    const modes = enLigne ? ['trait', ...MODES_ACCROCHE] : MODES_ACCROCHE;
+    const active = enLigne ? imp.accrocheLigne : imp.accroche;
+    const aide = enLigne
+      ? (imp.ligne ? '' : '<p class="aide">Touche une ligne du plan DXF (« Ligne DXF »), ou choisis le début, la fin (et les points entre) avec une autre accroche.</p>')
+      : (imp.choix || imp.cible ? '' : '<p class="aide">Choisis une accroche, puis touche le plan.</p>');
+    return `<div class="barre-accroche ${enLigne ? 'accroches-ligne' : ''}">
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
-        ${MODES_ACCROCHE.map((mode) => {
+        ${modes.map((mode) => {
           const [mot, nom, dessin] = ACCROCHES[mode];
-          return `<button type="button" class="bouton-accroche ${imp.accroche === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${nom}" aria-label="${nom}" aria-pressed="${imp.accroche === mode}">
+          return `<button type="button" class="bouton-accroche ${active === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${nom}" aria-label="${nom}" aria-pressed="${active === mode}">
             <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span>${mot}</span></button>`;
         }).join('')}
       </div>
@@ -333,8 +357,108 @@ export function creerEcranLeve(conteneur, actions) {
         <datalist id="noms-points-projet">${imp.nomsPoints.map((nom) => `<option value="${echapper(nom)}"></option>`).join('')}</datalist>
         <button type="button" class="bouton-secondaire" data-action="trouverPoint">OK</button>
       </div>
-      ${imp.choix || imp.cible ? '' : '<p class="aide">Choisis une accroche, puis touche le plan.</p>'}
+      ${aide}
     </div>`;
+  }
+
+  /**
+   * Implantation d'une ligne : d'abord la ligne (points choisis un à un, ou ligne du DXF), puis
+   * toute la ligne ou un segment, le sens (début → fin), le décalage parallèle, les altitudes, le
+   * couloir de guidage et l'enregistrement.
+   */
+  function implanterLigne() {
+    const { implanter: imp } = donnees;
+    const exporter = imp.nbImplantations > 0
+      ? `<p class="aide">${imp.nbImplantations} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
+      : '';
+    if (!imp.ligne) {
+      const points = imp.pointsLigne;
+      const role = (i) => (i === 0 ? 'Début' : i === points.length - 1 ? 'Fin' : `${i + 1}`);
+      return `
+        <div class="points-ligne">
+          <p class="titre-choix">Points de la ligne</p>
+          ${points.length === 0
+            ? '<p class="vide">Aucun point : touche le plan, ou tape un nom.</p>'
+            : `<ol>${points.map((p, i) => `<li><strong>${role(i)}</strong> ${p.nom ? echapper(p.nom) : ''} <span class="aide">E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)}</span></li>`).join('')}</ol>`}
+          <div class="ligne-outils">
+            <button type="button" class="bouton-secondaire" data-action="implanterPointsLigne" ${points.length < 2 ? 'disabled' : ''}>Implanter cette ligne</button>
+            ${points.length > 0 ? '<button type="button" class="bouton-lien" data-action="retirerDernierPointLigne">enlever le dernier</button>' : ''}
+          </div>
+        </div>
+        ${exporter}`;
+    }
+    const l = imp.ligne;
+    const valeur = (v) => (v == null ? '' : v.toFixed(3));
+    const segments = l.nbSegments > 1
+      ? `<div class="ligne-choix">
+          ${boutonsChoix('choisirSegment', [['tout', 'Toute la ligne'], ['segment', 'Segment par segment']], l.segment == null ? 'tout' : 'segment')}
+        </div>
+        ${l.segment == null ? '' : `<div class="choix-segment">
+          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="precedent" ${l.segment === 0 ? 'disabled' : ''} aria-label="Segment précédent">◀</button>
+          <span>Segment <strong>${l.segment + 1}</strong> / ${l.nbSegments}</span>
+          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="suivant" ${l.segment === l.nbSegments - 1 ? 'disabled' : ''} aria-label="Segment suivant">▶</button>
+        </div>`}`
+      : '';
+    const bout = (p) => `${p.nom ? `<strong>${echapper(p.nom)}</strong> ` : ''}E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)}`;
+    return `
+      <div class="ligne-choisie">
+        <p class="titre-guidage">Ligne <strong>${echapper(l.nom)}</strong> · ${formaterNombre(l.longueur)} m
+          <button type="button" class="bouton-lien bouton-lien-neutre" data-action="changerLigne">changer</button></p>
+        ${segments}
+        <div class="sens-ligne">
+          <p><span class="pastille-bout">Début</span> ${bout(l.debut)}</p>
+          <p><span class="pastille-bout fin">Fin</span> ${bout(l.fin)}</p>
+          <button type="button" class="bouton-secondaire" data-action="inverserLigne">⇄ Inverser le sens</button>
+        </div>
+        <div class="champs-implantation champs-ligne">
+          <label>Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="0 · + à droite, − à gauche" /></label>
+          <label>Altitude début<input type="text" inputmode="decimal" data-reglage-ligne="debut" value="${valeur(l.altitudes.debut)}" placeholder="${l.altitudesDuPlan ? 'du plan (3D)' : 'facultative'}" /></label>
+          <label>Altitude fin<input type="text" inputmode="decimal" data-reglage-ligne="fin" value="${valeur(l.altitudes.fin)}" placeholder="${l.altitudesDuPlan ? 'du plan (3D)' : 'facultative'}" /></label>
+        </div>
+        <p class="aide">Regarde vers la fin de la ligne : « gauche » et « droite » se lisent dans ce sens.</p>
+      </div>
+      <div class="guidage-direct attente" data-vivant="guidage-ligne"></div>
+      <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
+        <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol − de la tablette</span>
+      </button>
+      <p class="raison-leve" data-vivant="raison" hidden></p>
+      ${exporter}`;
+  }
+
+  /**
+   * Implantation d'une ligne, à chaque état du récepteur : couloir (la ligne au milieu, le rond de
+   * la canne), « ← Gauche / → Droite », position le long de la ligne et hauteur.
+   */
+  function rafraichirLigne() {
+    const g = direct?.implantationLigne;
+    const bouton = conteneur.querySelector('[data-action="enregistrerImplantation"]');
+    if (bouton) bouton.disabled = !(etat?.connecte && etat?.autorise && donnees.implanter.ligne);
+    const zone = conteneur.querySelector('[data-vivant="guidage-ligne"]');
+    if (!zone) return;
+    if (!g || g.message) {
+      bandeCouloir = 0;
+      zone.className = 'guidage-direct attente';
+      zone.innerHTML = `<span class="message-ecart">${echapper(g?.message ?? 'En attente de la position…')}</span>`;
+      return;
+    }
+    const { ecart, abscisse, longueur, reste } = g.ligne;
+    const m = (valeur) => `${formaterNombre(Math.abs(valeur))} m`;
+    bandeCouloir = cibleSelonDistance(Math.abs(ecart), bandeCouloir);
+    // La canne est trop à droite (écart > 0) : il faut aller à gauche.
+    const sens = Math.abs(ecart) < 0.0005 ? 'Sur la ligne' : `${ecart > 0 ? '← Gauche' : '→ Droite'} ${m(ecart)}`;
+    let le_long;
+    if (abscisse < 0) le_long = `Avant le début : ${m(abscisse)}`;
+    else if (abscisse > longueur) le_long = `Après la fin : ${m(abscisse - longueur)}`;
+    else le_long = `Début + ${formaterNombre(abscisse)} m · fin − ${formaterNombre(reste)} m`;
+    const hauteur = g.ecartAltitude == null
+      ? ''
+      : `<span class="hauteur-guidage ${g.classeAltitude}">${g.ecartAltitude >= 0 ? '↑ Monter' : '↓ Descendre'} ${m(g.ecartAltitude)}</span>`;
+    zone.className = `guidage-direct guidage-ligne ${g.classe}`;
+    zone.innerHTML = `
+      ${svgCouloir(bandeCouloir, ecart, abscisse, longueur, couleurCanne(Math.abs(ecart)))}
+      <span class="lignes-guidage"><span>${sens}</span></span>
+      <span class="distance-guidage">${le_long}</span>
+      ${hauteur}`;
   }
 
   /**
@@ -606,7 +730,7 @@ export function creerEcranLeve(conteneur, actions) {
     if (!donnees) return;
     conteneur.innerHTML = `
         <div class="ecran-terrain">
-          ${donnees.mode === 'controler' && donnees.controle.implantation === 'point' ? barreAccroche() : ''}
+          ${donnees.mode === 'controler' && ['point', 'ligne'].includes(donnees.controle.implantation) ? barreAccroche() : ''}
           ${choixMode()}
           ${connexion()}
           ${donnees.mode === 'controler' ? controle() : priseDePoint()}
@@ -651,6 +775,37 @@ function svgCible(numero, haut, droite, couleur, nordEnHaut) {
     <text y="-112" text-anchor="middle" class="haut-cible">${nordEnHaut ? 'N' : 'devant'}</text>
     <path d="M-7 0H7M0 -7V7" class="centre-cible" />
     <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9" class="moi" style="fill: ${couleur}" />
+  </svg>`;
+}
+
+/**
+ * Couloir de l'implantation d'une ligne : la ligne (ou sa parallèle) en trait vertical au milieu,
+ * du début (en bas) vers la fin (en haut), des bandes de distance de chaque côté (BANDES_COULOIR),
+ * et la canne (rond de la couleur de la distance) à sa place : à droite si elle est à droite.
+ * ecart : décalage de la canne (m, + à droite) ; abscisse, longueur : position le long (m).
+ */
+function svgCouloir(numero, ecart, abscisse, longueur, couleur) {
+  const bandes = BANDES_COULOIR[numero];
+  const echelle = 100 / bandes[0]; // la bande la plus large fait 100 unités de chaque côté
+  const texte = (r) => (r >= 1 ? `${r} m` : `${Math.round(r * 100)} cm`);
+  const limiter = (v, max) => Math.max(-max, Math.min(max, v));
+  // La canne est au milieu (en hauteur) ; le début est en dessous de « abscisse », la fin au-dessus.
+  const yDebut = abscisse * echelle;
+  const yFin = (abscisse - longueur) * echelle;
+  const haut = Math.max(yFin, -78);
+  const bas = Math.min(yDebut, 78);
+  const repere = (y, nom) => (Math.abs(y) <= 78
+    ? `<path d="M-40 ${y.toFixed(1)}H40" class="bout-couloir" /><text x="44" y="${(y + 4).toFixed(1)}" class="nom-bout-couloir">${nom}</text>`
+    : '');
+  // Rayons écrits à droite de chaque bande, en escalier (pour ne pas se chevaucher).
+  return `<svg class="couloir-ligne" viewBox="-120 -94 240 176" role="img" aria-label="Couloir ${texte(bandes[0])}">
+    ${bandes.map((r, i) => `<rect x="${-r * echelle}" y="-80" width="${2 * r * echelle}" height="160" class="bande bande-${i}" />`).join('')}
+    ${bandes.map((r, i) => `<text x="${(r * echelle + 2).toFixed(1)}" y="${-62 + i * 14}" class="rayon">${texte(r)}</text>`).join('')}
+    ${haut < bas ? `<path d="M0 ${bas.toFixed(1)}V${haut.toFixed(1)}" class="trait-couloir" />` : ''}
+    ${repere(yDebut, 'Début')}
+    ${repere(yFin, 'Fin')}
+    <text y="-84" text-anchor="middle" class="haut-cible">↑ vers la fin</text>
+    <circle cx="${limiter(ecart * echelle, 112).toFixed(1)}" cy="0" r="9" class="moi" style="fill: ${couleur}" />
   </svg>`;
 }
 

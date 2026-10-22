@@ -1,6 +1,6 @@
 // Tests de l'implantation d'un point : accroche (sommet, milieu, sur la ligne, centre), guidage, écarts.
 import { describe, it, expect } from 'vitest';
-import { accrocher, projeterSurSegment, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, sourcesDesPlans, csvImplantations, cibleSelonDistance, ecartsGuidage, couleurCanne } from '../src/topo/accroche.js';
+import { accrocherTrait, accrocher, projeterSurSegment, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, sourcesDesPlans, csvImplantations, cibleSelonDistance, ecartsGuidage, couleurCanne } from '../src/topo/accroche.js';
 
 const p = (est, nord, altitude = null) => ({ est, nord, altitude });
 // Une ligne en L : (0,0) → (10,0) → (10,10), et une chambre de rayon 0.4 en (5, 5).
@@ -20,6 +20,15 @@ describe('accroche', () => {
   it('point : seulement les points (du projet), jamais les sommets des lignes', () => {
     expect(accrocher('point', p(2.1, 3.1), 0.5, SOURCES)).toMatchObject({ est: 2, nord: 3, altitude: 402, nom: 'P-RG-1', mode: 'point' });
     expect(accrocher('point', p(9.8, 0.3), 0.5, SOURCES)).toBeNull();
+  });
+
+  it('trait (implantation d\'une ligne) : toute la polyligne et le segment touché', () => {
+    const r = accrocherTrait(p(10.2, 6), 0.5, SOURCES.lignes);
+    expect(r.sommets).toHaveLength(3);
+    expect(r.segment).toBe(1);
+    expect(accrocherTrait(p(5, 5), 0.5, SOURCES.lignes)).toBeNull();
+    const carre = [{ points: [p(0, 0), p(1, 0), p(1, 1), p(0, 1)], ferme: true }];
+    expect(accrocherTrait(p(0, 0.5), 0.1, carre)).toMatchObject({ segment: 3 });
   });
 
   it('milieu : le milieu du segment touché (altitude au milieu si les deux bouts en ont une)', () => {
@@ -113,7 +122,16 @@ describe('plans DXF et export', () => {
       ecarts: ecartsImplantation({ est: 10, nord: 20, altitude: null }, { est: 10.012, nord: 19.995, altitude: 412.47 }),
       le: '2026-10-22T10:00:00.000Z',
     }]);
-    expect(texte.split('\r\n')[1]).toBe('I-1;10.000;20.000;;10.012;19.995;412.470;0.012;-0.005;0.013;;2026-10-22T10:00:00.000Z');
+    expect(texte.split('\r\n')[1]).toBe('I-1;10.000;20.000;;10.012;19.995;412.470;0.012;-0.005;0.013;;2026-10-22T10:00:00.000Z;;');
+    const ligne = csvImplantations([{
+      nom: 'Ligne · 12.500',
+      cible: { est: 10, nord: 20, altitude: null },
+      mesure: { est: 10, nord: 20.01, altitude: 400 },
+      ecarts: ecartsImplantation({ est: 10, nord: 20, altitude: null }, { est: 10, nord: 20.01, altitude: 400 }),
+      le: 'date',
+      ligne: { abscisse: 12.5, decalage: -0.01 },
+    }]);
+    expect(ligne.split('\r\n')[1]).toMatch(/;date;12\.500;-0\.010$/);
   });
 });
 

@@ -308,6 +308,28 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       nom.textContent = point.nom;
       groupe.append(nom);
     }
+    // Ligne à implanter : trait sarcelle épais, sa parallèle en pointillés, « Début » et « Fin ».
+    const ligne = implantation.ligne;
+    if (ligne?.sommets.length >= 2) {
+      const ecran = ligne.sommets.map((s) => versEcran(s.est, s.nord, vue));
+      groupe.append(creerElement('path', { d: tracePar(ecran, false), class: 'ligne-a-implanter' }));
+      if (ligne.parallele) {
+        groupe.append(creerElement('path', { d: tracePar(ligne.parallele.map((s) => versEcran(s.est, s.nord, vue)), false), class: 'parallele-a-implanter' }));
+      }
+      for (const [bout, texte] of [[ecran[0], 'Début'], [ecran.at(-1), 'Fin']]) {
+        groupe.append(creerElement('circle', { cx: bout.x, cy: bout.y, r: 6, class: 'bout-ligne' }));
+        const etiquette = creerElement('text', { x: bout.x + 9, y: bout.y - 8, class: 'nom-bout-ligne' });
+        etiquette.textContent = texte;
+        groupe.append(etiquette);
+      }
+    }
+    // Points choisis pour faire une ligne : croix ambre numérotées.
+    (implantation.pointsLigne ?? []).forEach((point, i) => {
+      const { x, y } = croix(point.est, point.nord, 'croix-choix', 10);
+      const numero = creerElement('text', { x: x + 10, y: y + 16, class: 'nom-bout-ligne' });
+      numero.textContent = String(i + 1);
+      groupe.append(numero);
+    });
     const { cible, choix } = implantation;
     if (cible) {
       const { x, y } = versEcran(cible.est, cible.nord, vue);
@@ -332,6 +354,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const debut = versEcran(coupe.debut.est, coupe.debut.nord, vue);
       const fin = versEcran(coupe.fin.est, coupe.fin.nord, vue);
       groupe.append(creerElement('line', { x1: debut.x, y1: debut.y, x2: fin.x, y2: fin.y, class: `trace-coupe-directe coupe-${coupe.sens}` }));
+    }
+    // Implantation d'une ligne : trait en pointillés jusqu'au point de la ligne en face de la canne.
+    if (position.vers) {
+      const vers = versEcran(position.vers.est, position.vers.nord, vue);
+      groupe.append(creerElement('line', { x1: x, y1: y, x2: vers.x, y2: vers.y, class: 'trait-vers-cible' }));
     }
     // Implantation : trait en pointillés jusqu'au point à implanter.
     if (implantation?.cible) {

@@ -45,7 +45,8 @@ import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
 import { lireLibelles, enregistrerLibelles } from './leve/libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe } from './topo/implantation.js';
-import { MODES_ACCROCHE, accrocher, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
+import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele } from './topo/ligne-implantation.js';
+import { MODES_ACCROCHE, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
 import {
   estLeveDirect,
   leveDuJour,
@@ -95,11 +96,15 @@ const terrain = {
   implantation: 'surface', // mode Implanter : implanter une surface ou un point
   accroche: 'point', // implantation d'un point : point du projet, sommet, milieu, sur la ligne ou centre (voir topo/accroche.js)
   guidage: 'rx2', // guidage vers le point : 'rx2' (avance / droite selon le cap du RX2) ou 'nseo' (nord / est)
+  accrocheLigne: 'trait', // implantation d'une ligne : 'trait' (ligne du plan DXF) ou une accroche de point
   ...lireReglagesTerrain(),
 };
 // Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
 // point à implanter en cours ({ id (point de la liste « À implanter », ou null), nom, est, nord, altitude }).
-const implanter = { choix: null, cible: null };
+// Implantation d'une ligne : points choisis pour la faire (pointsLigne : [{ est, nord, altitude, nom }])
+// et ligne en cours (ligne : { nom, sommets, segmentTouche, segment (n° ou null : toute la ligne),
+// inverse, decalage (m, + à droite), altitudes: { debut, fin } (tapées, ou null) }).
+const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null };
 const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
 
 function lireReglagesTerrain() {
@@ -516,11 +521,58 @@ const ecranLeve = recepteurDisponible()
         recalculer();
       },
       choisirImplantation: (quoi) => {
-        terrain.implantation = quoi === 'point' ? 'point' : 'surface'; // Ligne : plus tard
+        terrain.implantation = ['point', 'ligne'].includes(quoi) ? quoi : 'surface';
         retenirReglagesTerrain();
         recalculer();
       },
+      // --- Implantation d'une ligne ---
+      retirerDernierPointLigne: () => {
+        implanter.pointsLigne.pop();
+        montrerImplantation();
+      },
+      implanterPointsLigne: () => {
+        const points = implanter.pointsLigne;
+        if (points.length < 2) return;
+        const nom = (p, i) => p.nom ?? `P${i + 1}`;
+        implanter.ligne = nouvelleLigneAImplanter(`${nom(points[0], 0)} → ${nom(points.at(-1), points.length - 1)}`, points, null);
+        implanter.pointsLigne = [];
+        montrerImplantation();
+      },
+      changerLigne: () => {
+        implanter.ligne = null;
+        montrerImplantation();
+      },
+      choisirSegment: (choix) => {
+        const ligne = implanter.ligne;
+        if (!ligne) return;
+        const nombre = ligne.sommets.length - 1;
+        if (choix === 'tout') ligne.segment = null;
+        else if (choix === 'segment') ligne.segment = ligne.segmentTouche ?? 0;
+        else if (ligne.segment != null) ligne.segment = Math.max(0, Math.min(nombre - 1, ligne.segment + (choix === 'suivant' ? 1 : -1)));
+        montrerImplantation();
+      },
+      inverserLigne: () => {
+        if (!implanter.ligne) return;
+        implanter.ligne.inverse = !implanter.ligne.inverse;
+        montrerImplantation();
+      },
+      // Décalage parallèle et altitudes tapées (début, fin) : des nombres, ou vide.
+      reglerLigne: (champ, texte) => {
+        const ligne = implanter.ligne;
+        if (!ligne) return;
+        const lue = lireAltitude(texte);
+        if (lue === undefined) return;
+        if (champ === 'decalage') ligne.decalage = lue ?? 0;
+        else ligne.altitudes[champ] = lue;
+        montrerImplantation();
+      },
       choisirAccroche: (mode) => {
+        if (terrain.implantation === 'ligne') {
+          terrain.accrocheLigne = mode === 'trait' || MODES_ACCROCHE.includes(mode) ? mode : 'trait';
+          retenirReglagesTerrain();
+          montrerImplantation();
+          return;
+        }
         terrain.accroche = MODES_ACCROCHE.includes(mode) ? mode : 'point';
         retenirReglagesTerrain();
         montrerImplantation();
@@ -539,7 +591,10 @@ const ecranLeve = recepteurDisponible()
           afficherMessage(`Aucun point « ${cherche} » dans le projet`, 3000);
           return;
         }
-        implanter.choix = { est: trouve.est, nord: trouve.nord, altitude: trouve.altitude ?? null, nom: trouve.nom, mode: 'point' };
+        const choisi = { est: trouve.est, nord: trouve.nord, altitude: trouve.altitude ?? null, nom: trouve.nom, mode: 'point' };
+        // Ligne : le point s'ajoute à la ligne en préparation (début, fin, puis les suivants).
+        if (enImplantationDeLigne()) ajouterPointLigne(choisi);
+        else implanter.choix = choisi;
         montrerImplantation();
       },
       oublierChoix: () => {
@@ -586,6 +641,10 @@ const ecranLeve = recepteurDisponible()
         montrerImplantation();
       },
       enregistrerImplantation: () => {
+        if (enImplantationDeLigne()) {
+          enregistrerImplantationLigne();
+          return;
+        }
         const cible = implanter.cible;
         if (!cible) return;
         // Position vérifiée par l'appli Android : RTK fixe et inclinaison prête, comme pour un point levé.
@@ -682,9 +741,19 @@ function nomProposeImplantation() {
  * Les points « À implanter » restent visibles sur le plan dans les autres onglets.
  */
 function envoyerImplantationAuPlan() {
-  const accrocheActive = enImplantationDePoint() && ongletContexte === 'terrain';
+  const accrocheActive = (enImplantationDePoint() || enImplantationDeLigne()) && ongletContexte === 'terrain';
+  const enLigne = accrocheActive && enImplantationDeLigne();
+  const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0
-    ? { actif: accrocheActive, aImplanter: projet.aImplanter, choix: accrocheActive ? implanter.choix : null, cible: accrocheActive ? implanter.cible : null }
+    ? {
+        actif: accrocheActive,
+        aImplanter: projet.aImplanter,
+        choix: accrocheActive && !enLigne ? implanter.choix : null,
+        cible: accrocheActive && !enLigne ? implanter.cible : null,
+        // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
+        ligne: sommets ? { sommets, parallele: implanter.ligne.decalage ? ligneParallele(sommets, implanter.ligne.decalage) : null } : null,
+        pointsLigne: enLigne ? implanter.pointsLigne : [],
+      }
     : null);
 }
 
@@ -702,6 +771,111 @@ function montrerImplantation() {
 /** Vrai pendant l'implantation d'un point (Terrain › Implanter › Point). */
 function enImplantationDePoint() {
   return Boolean(ecranLeve) && terrain.mode === 'controler' && terrain.implantation === 'point';
+}
+
+/** Vrai pendant l'implantation d'une ligne (Terrain › Implanter › Ligne). */
+function enImplantationDeLigne() {
+  return Boolean(ecranLeve) && terrain.mode === 'controler' && terrain.implantation === 'ligne';
+}
+
+/** Nouvelle ligne à implanter (toute la ligne, dans le sens des sommets, sans décalage). */
+function nouvelleLigneAImplanter(nom, sommets, segmentTouche) {
+  return { nom, sommets, segmentTouche, segment: null, inverse: false, decalage: 0, altitudes: { debut: null, fin: null } };
+}
+
+/** Sommets de la ligne à implanter : toute la ligne ou le segment choisi, dans le sens choisi. */
+function sommetsDeLaLigne() {
+  const { sommets, segment, inverse } = implanter.ligne;
+  return sommetsChoisis(sommets, { segment, inverse });
+}
+
+/**
+ * Implantation d'une ligne, à chaque état du récepteur : décalage par rapport à la ligne (ou à sa
+ * parallèle), position le long, altitude. Gris si la position n'est pas fiable.
+ */
+function calculerImplantationLigne(etat) {
+  const ligne = implanter.ligne;
+  if (!ligne) return null;
+  const position = etat.connecte && etat.recu ? etat.position : null;
+  if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
+  const g = guidageLigne(position, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: ligne.altitudes });
+  if (!g) return { message: 'Ligne sans longueur' };
+  const fiable = Boolean(etat.autorise);
+  const ecartAltitude = fiable && g.altitude != null ? ecartSurface(g.altitude, position.altitude) : null;
+  return {
+    ligne: g,
+    classe: fiable ? classeDistance(Math.abs(g.ecart)) : 'pas-fiable',
+    ecartAltitude,
+    classeAltitude: ecartAltitude == null ? null : classeEcart(ecartAltitude),
+    message: null,
+  };
+}
+
+/** « Enregistrer l'implantation » sur une ligne : position mesurée, abscisse, décalage, écarts. */
+function enregistrerImplantationLigne() {
+  const ligne = implanter.ligne;
+  if (!ligne) return;
+  const reponse = prendrePointRecepteur();
+  if (!reponse.ok) {
+    afficherMessage(`Implantation refusée : ${reponse.raison}`, 4000);
+    return;
+  }
+  const { est, nord, altitude, ...gnss } = reponse.point;
+  const mesure = { est, nord, altitude, gnss };
+  const g = guidageLigne(mesure, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: ligne.altitudes });
+  const ecarts = ecartsImplantation(g.cible, mesure);
+  projet.implantations.push({
+    id: nouvelIdentifiant(),
+    nom: `${ligne.nom} · ${formaterNombre(g.abscisse)}`,
+    type: 'ligne',
+    cible: g.cible,
+    mesure,
+    ecarts,
+    ligne: { nom: ligne.nom, abscisse: g.abscisse, decalage: g.ecart },
+    le: new Date().toISOString(),
+  });
+  navigator.vibrate?.(60);
+  const cote = Math.abs(g.ecart) < 0.0005 ? 'sur la ligne' : `${formaterNombre(Math.abs(g.ecart))} m ${g.ecart > 0 ? 'à droite' : 'à gauche'}`;
+  const hauteur = ecarts.dAltitude != null ? ` · dH ${formaterNombre(ecarts.dAltitude)} m` : '';
+  afficherMessage(`Implanté à ${formaterNombre(g.abscisse)} m du début, ${cote}${hauteur}`, 4000);
+  modifie();
+}
+
+/** Toucher du plan pendant l'implantation d'une ligne : une ligne du DXF, ou un point de plus. */
+function toucherPourLigne(position, tolerance) {
+  const mm = (p) => ({ ...p, est: Math.round(p.est * 1000) / 1000, nord: Math.round(p.nord * 1000) / 1000, altitude: p.altitude != null ? Math.round(p.altitude * 1000) / 1000 : null });
+  if (terrain.accrocheLigne === 'trait') {
+    const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(projet.plansDxf ?? [], position, tolerance).lignes);
+    if (!trouve) {
+      afficherMessage('Aucune ligne du plan DXF sous le doigt : zoome, ou change d\'accroche', 3000);
+      return;
+    }
+    const sommets = trouve.sommets.map(mm);
+    const nombre = sommets.length - 1;
+    implanter.ligne = nouvelleLigneAImplanter(`Ligne DXF (${nombre} segment${nombre > 1 ? 's' : ''})`, sommets, trouve.segment);
+    implanter.pointsLigne = [];
+  } else {
+    const sources = terrain.accrocheLigne === 'point'
+      ? { lignes: [], cercles: [], points: pointsDuProjet() }
+      : sourcesDesPlans(projet.plansDxf ?? [], position, tolerance);
+    const trouve = accrocher(terrain.accrocheLigne, position, tolerance, sources);
+    if (!trouve) {
+      afficherMessage('Rien sous le doigt : zoome, ou change d\'accroche', 3000);
+      return;
+    }
+    ajouterPointLigne(mm(trouve));
+  }
+  montrerImplantation();
+}
+
+/** Ajoute un point à la ligne en préparation (sauf s'il est à la même place que le précédent). */
+function ajouterPointLigne(point) {
+  const precedent = implanter.pointsLigne.at(-1);
+  if (precedent && Math.hypot(precedent.est - point.est, precedent.nord - point.nord) < 0.001) {
+    afficherMessage('Même point que le précédent : pas ajouté', 2500);
+    return;
+  }
+  implanter.pointsLigne.push(point);
 }
 
 /**
@@ -724,6 +898,10 @@ function pointsDuProjet() {
  * (« Point » : les points du projet ; les autres : le plan DXF).
  */
 function toucherPourImplantation(position, tolerance) {
+  if (enImplantationDeLigne()) {
+    toucherPourLigne(position, tolerance);
+    return;
+  }
   const sources = terrain.accroche === 'point'
     ? { lignes: [], cercles: [], points: pointsDuProjet() }
     : sourcesDesPlans(projet.plansDxf ?? [], position, tolerance);
@@ -770,15 +948,16 @@ function mettreAJourToucheVolume() {
   if (!ecranLeve) return;
   const dansTerrain = document.body.dataset.onglet === 'terrain';
   const lever = dansTerrain && terrain.mode === 'lever' && Boolean(stockEnCours() || metreEnCours());
-  const implanterAvecTouche = dansTerrain && enImplantationDePoint() && Boolean(implanter.cible);
+  const implanterAvecTouche = dansTerrain && ((enImplantationDePoint() && Boolean(implanter.cible)) || (enImplantationDeLigne() && Boolean(implanter.ligne)));
   const actif = lever || implanterAvecTouche;
   if (actif === toucheVolumeActive) return;
   toucheVolumeActive = actif;
   regleToucheVolume(actif, () => {
-    const refus = enImplantationDePoint() ? ecranLeve.enregistrerDepuisTouche() : ecranLeve.prendreDepuisTouche();
+    const enImplantation = enImplantationDePoint() || enImplantationDeLigne();
+    const refus = enImplantation ? ecranLeve.enregistrerDepuisTouche() : ecranLeve.prendreDepuisTouche();
     if (refus) {
       navigator.vibrate?.([80, 80, 80]);
-      afficherMessage(`${enImplantationDePoint() ? 'Implantation refusée' : 'Point refusé'} : ${refus}`, 4000);
+      afficherMessage(`${enImplantation ? 'Implantation refusée' : 'Point refusé'} : ${refus}`, 4000);
     }
   });
 }
@@ -874,8 +1053,29 @@ function donneesCommunes() {
         return { ...p, fait: derniere ? { distance: derniere.ecarts.distance, dAltitude: derniere.ecarts.dAltitude } : null };
       }),
       nbImplantations: projet.implantations.length,
-      nomsPoints: enImplantationDePoint() ? pointsDuProjet().map((p) => p.nom) : [],
+      nomsPoints: enImplantationDePoint() || enImplantationDeLigne() ? pointsDuProjet().map((p) => p.nom) : [],
+      accrocheLigne: terrain.accrocheLigne,
+      pointsLigne: implanter.pointsLigne,
+      ligne: implanter.ligne ? resumeLigne() : null,
     },
+  };
+}
+
+/** Ligne à implanter pour l'écran Terrain : nom, longueur, segments, sens, début, fin, réglages. */
+function resumeLigne() {
+  const ligne = implanter.ligne;
+  const sommets = sommetsDeLaLigne();
+  return {
+    nom: ligne.nom,
+    longueur: longueurPolyligne(sommets),
+    nbSegments: ligne.sommets.length - 1,
+    segment: ligne.segment,
+    inverse: ligne.inverse,
+    decalage: ligne.decalage,
+    altitudes: ligne.altitudes,
+    altitudesDuPlan: sommets.every((s) => s.altitude != null),
+    debut: sommets[0],
+    fin: sommets.at(-1),
   };
 }
 
@@ -954,14 +1154,18 @@ if (recepteurDisponible()) {
     mettreAJourBandeaux(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
     const enPoint = enImplantationDePoint();
-    const controle = terrain.mode === 'controler' && !enPoint ? calculerControle(etat, orientation) : null;
+    const enLigne = enImplantationDeLigne();
+    const controle = terrain.mode === 'controler' && !enPoint && !enLigne ? calculerControle(etat, orientation) : null;
     const implantation = enPoint ? calculerImplantation(etat, orientation) : null;
-    ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation });
+    const implantationLigne = enLigne ? calculerImplantationLigne(etat) : null;
+    ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation, implantationLigne });
     const position = etat.connecte && etat.recu ? etat.position : null;
     // Coupes affichées (mode Implanter) : leur trait en pointillés sur le plan.
     const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
     const traits = controle?.coupes ? vues.map((sens) => ({ sens, debut: controle.coupes[sens].debut, fin: controle.coupes[sens].fin })) : [];
-    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits } : null);
+    // Ligne : trait en pointillés jusqu'au point de la ligne en face de la canne.
+    const vers = implantationLigne?.ligne?.cible ?? null;
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers } : null);
   });
 }
 
@@ -1524,6 +1728,8 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
   implanter.choix = null;
   implanter.cible = null;
+  implanter.pointsLigne = [];
+  implanter.ligne = null;
   dernierImport = null;
   document.querySelector('#message-import-surface').innerHTML = '';
   editeurSurfaces.charger(projet.surfaces);

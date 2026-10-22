@@ -3641,3 +3641,145 @@ svg.plan,
   background-size: 24px 24px;
   cursor: pointer;
 }
+
+/* --- Implantation d'une ligne : Terrain › Implanter › Ligne --- */
+.barre-accroche.accroches-ligne .accroches {
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.barre-accroche.accroches-ligne .bouton-accroche {
+  font-size: 0.68rem;
+}
+
+.bouton-accroche svg .repere-trait {
+  stroke: #f6ab07;
+  stroke-width: 3;
+}
+
+.points-ligne ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.ligne-choisie .titre-guidage {
+  margin-top: 0;
+}
+
+.choix-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 6px 0;
+}
+
+.sens-ligne {
+  margin: 8px 0;
+  padding: 6px 10px;
+  border: 2px solid #0d9488;
+  border-radius: 10px;
+}
+
+.sens-ligne p {
+  margin: 2px 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pastille-bout {
+  display: inline-block;
+  min-width: 46px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #0d9488;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.pastille-bout.fin {
+  background: var(--sombre);
+}
+
+.champs-implantation.champs-ligne {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* Couloir : la ligne au milieu, la canne qui bouge, les écarts dessous. */
+.guidage-direct.guidage-ligne {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  text-align: center;
+}
+
+.couloir-ligne {
+  width: 100%;
+  max-width: 300px;
+}
+
+.couloir-ligne .bande {
+  fill: currentColor;
+  fill-opacity: 0.07;
+  stroke: currentColor;
+  stroke-opacity: 0.6;
+  stroke-width: 1;
+}
+
+.couloir-ligne .bande-3 {
+  fill-opacity: 0.16;
+}
+
+.couloir-ligne .rayon,
+.couloir-ligne .haut-cible,
+.couloir-ligne .nom-bout-couloir {
+  fill: currentColor;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.couloir-ligne .trait-couloir {
+  stroke: #f6ab07;
+  stroke-width: 5;
+}
+
+.couloir-ligne .bout-couloir {
+  stroke: currentColor;
+  stroke-width: 3;
+}
+
+.couloir-ligne .moi {
+  stroke: #ffffff;
+  stroke-width: 3;
+}
+
+/* Plan : la ligne à implanter (sarcelle épais), sa parallèle, Début et Fin. */
+.plan .ligne-a-implanter {
+  fill: none;
+  stroke: #0d9488;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.plan .parallele-a-implanter {
+  fill: none;
+  stroke: #0d9488;
+  stroke-width: 2;
+  stroke-dasharray: 8 5;
+}
+
+.plan .bout-ligne {
+  fill: #ffffff;
+  stroke: #0d9488;
+  stroke-width: 3;
+}
+
+.plan .nom-bout-ligne {
+  font-size: 12px;
+  font-weight: 800;
+  fill: #0d9488;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}

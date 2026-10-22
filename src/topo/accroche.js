@@ -65,6 +65,23 @@ export function accrocher(mode, position, tolerance, { lignes = [], cercles = []
 }
 
 /**
+ * Implantation d'une ligne : le trait du plan DXF le plus proche du doigt (à moins de "tolerance"
+ * m), en entier (une polyligne fermée revient à son premier sommet), et le n° du segment touché.
+ * Renvoie { sommets: [{ est, nord, altitude }], segment } ou null.
+ */
+export function accrocherTrait(position, tolerance, lignes = []) {
+  let meilleur = null;
+  for (const ligne of lignes) {
+    const sommets = ligne.ferme && ligne.points.length >= 3 ? [...ligne.points, ligne.points[0]] : ligne.points;
+    for (let i = 0; i + 1 < sommets.length; i++) {
+      const { d } = projeterSurSegment(position, sommets[i], sommets[i + 1]);
+      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, sommets, segment: i };
+    }
+  }
+  return meilleur ? { sommets: meilleur.sommets, segment: meilleur.segment } : null;
+}
+
+/**
  * Projection d'un point sur le segment a-b : t (0 en a, 1 en b) et distance d (m) entre le point
  * et sa projection.
  */
@@ -248,14 +265,16 @@ export function sourcesDesPlans(plans, position, rayon) {
 
 /**
  * Lignes CSV (point-virgule, comme les autres exports) des implantations enregistrées :
- * nom, position voulue, position mesurée, écarts (m, 3 décimales), date.
+ * nom, position voulue, position mesurée, écarts (m, 3 décimales), date ; pour une ligne, aussi
+ * l'abscisse et le décalage (m).
  */
 export function csvImplantations(implantations) {
   const n = (valeur) => (valeur == null ? '' : valeur.toFixed(3));
   const texte = (valeur) => (/[;"\r\n]/.test(valeur) ? `"${valeur.replaceAll('"', '""')}"` : valeur);
-  const lignes = ['Nom;Est voulu;Nord voulu;Altitude voulue;Est mesuré;Nord mesuré;Altitude mesurée;dEst;dNord;Distance;dAltitude;Date'];
-  for (const { nom, cible, mesure, ecarts, le } of implantations) {
-    lignes.push([texte(nom ?? ''), n(cible.est), n(cible.nord), n(cible.altitude), n(mesure.est), n(mesure.nord), n(mesure.altitude), n(ecarts.dEst), n(ecarts.dNord), n(ecarts.distance), n(ecarts.dAltitude), le ?? ''].join(';'));
+  const lignes = ['Nom;Est voulu;Nord voulu;Altitude voulue;Est mesuré;Nord mesuré;Altitude mesurée;dEst;dNord;Distance;dAltitude;Date;Abscisse;Décalage'];
+  for (const { nom, cible, mesure, ecarts, le, ligne } of implantations) {
+    // Ligne : abscisse (depuis le début) et décalage (+ à droite) en plus ; vides pour un point.
+    lignes.push([texte(nom ?? ''), n(cible.est), n(cible.nord), n(cible.altitude), n(mesure.est), n(mesure.nord), n(mesure.altitude), n(ecarts.dEst), n(ecarts.dNord), n(ecarts.distance), n(ecarts.dAltitude), le ?? '', n(ligne?.abscisse), n(ligne?.decalage)].join(';'));
   }
   return `${lignes.join('\r\n')}\r\n`;
 }
