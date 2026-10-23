@@ -3,7 +3,8 @@
 // - « Mode téléphone » : textes, icônes et boutons plus petits, libellés plus courts
 //   (classe mode-telephone sur la page, voir style.css) ;
 // - bulles d'aide (même chose que le bouton « ? ») ;
-// - nom de l'appareil (partage par Google Drive).
+// - nom de l'appareil (partage par Google Drive) ;
+// - « Fermer l'appli » (appli Android seulement).
 import { echapper } from '../outils/echapper.js';
 
 const CLE = 'topo-reglages';
@@ -32,9 +33,9 @@ export function appliquerReglages(reglages = lireReglages()) {
 
 /**
  * Ouvre la fenêtre des réglages. options : { nomAppareil, nommerAppareil(nom), aideActive,
- * basculerAide() }.
+ * basculerAide(), fermerAppli() (ou null hors de l'appli Android) }.
  */
-export function ouvrirReglages({ nomAppareil, nommerAppareil, aideActive, basculerAide }) {
+export function ouvrirReglages({ nomAppareil, nommerAppareil, aideActive, basculerAide, fermerAppli }) {
   const reglages = lireReglages();
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-reglages';
@@ -47,7 +48,10 @@ export function ouvrirReglages({ nomAppareil, nommerAppareil, aideActive, bascul
         <span><strong>Bulles d'aide « ? »</strong></span></label>
       ${nommerAppareil ? `<label class="nom-appareil">Nom de cet appareil (Drive)
         <input type="text" data-reglage="nom" value="${echapper(nomAppareil ?? '')}" placeholder="ex. Tablette Max" /></label>` : ''}
-      <div class="ligne-outils"><button class="bouton">Fermer</button></div>
+      <div class="ligne-outils">
+        ${fermerAppli ? '<button type="button" class="bouton-secondaire bouton-fermer-appli" data-action="fermer-appli">✕ Fermer l\'appli</button>' : ''}
+        <button class="bouton">OK</button>
+      </div>
     </form>`;
   fenetre.addEventListener('change', (evenement) => {
     const champ = evenement.target.dataset.reglage;
@@ -57,6 +61,12 @@ export function ouvrirReglages({ nomAppareil, nommerAppareil, aideActive, bascul
       appliquerReglages(reglages);
     } else if (champ === 'aide') basculerAide();
     else if (champ === 'nom') nommerAppareil(evenement.target.value.trim());
+  });
+  fenetre.addEventListener('click', (evenement) => {
+    if (evenement.target.closest('[data-action="fermer-appli"]')) {
+      fenetre.close();
+      fermerAppli();
+    }
   });
   fenetre.addEventListener('close', () => fenetre.remove());
   document.body.append(fenetre);

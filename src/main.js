@@ -261,18 +261,20 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
     nommerAppareil: partage ? (nom) => partage.nommerAppareil(nom) : null,
     aideActive: document.body.classList.contains('aide-active'),
     basculerAide: () => document.querySelector('#bouton-aide').click(),
+    fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? fermerAppli : null,
   });
 });
 
-// Fermer l'appli (✕, appli Android seulement) : le projet part d'abord sur Drive (5 s au plus).
-const boutonFermer = document.querySelector('#bouton-fermer');
-boutonFermer.hidden = !(estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function');
-boutonFermer.addEventListener('click', async () => {
+/**
+ * Fermer l'appli (bouton des réglages ⚙, appli Android seulement) : le projet part d'abord sur
+ * Drive et son verrou est rendu (5 s au plus).
+ */
+async function fermerAppli() {
   if (!confirm('Fermer l\'appli ?')) return;
   afficherMessage('Fermeture…', null);
-  await Promise.race([partage?.envoyerMaintenant(), new Promise((fin) => setTimeout(fin, 5000))]);
+  await Promise.race([partage?.avantDeChanger(), new Promise((fin) => setTimeout(fin, 5000))]);
   window.AppliAndroid.fermerAppli();
-});
+}
 
 // --- Accès aux données du projet ---
 
@@ -1368,13 +1370,14 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
     modifie();
   },
   continuer: () => {
-    const etape = etapeUtile();
-    // Projet encore vide (ni points ni plan DXF) : rien à implanter, on arrive en mode Lever.
-    if (etape === 'terrain' && (projet.plansDxf ?? []).length === 0 && terrain.mode !== 'lever') {
-      terrain.mode = 'lever';
-      retenirReglagesTerrain();
+    // Nouveau projet (ni levé ni plan DXF) : on reste sur l'onglet Projet, aux imports
+    // (demande du 23.10.2026) ; on va au terrain par l'onglet Terrain.
+    if (projet.leves.length === 0 && (projet.plansDxf ?? []).length === 0) {
+      document.activeElement?.blur?.();
+      document.querySelector('#importer')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      return;
     }
-    allerA(etape);
+    allerA(etapeUtile());
   },
   exporterProjet: async (id) => {
     const lu = id === projet.id ? projet : await stockage.lireProjet(id);
@@ -1398,15 +1401,21 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   },
   supprimerProjet: async (id) => {
     const resume = resumes.find((r) => r.id === id);
-    if (!resume || !confirm(`Supprimer définitivement le projet « ${resume.titre} » de cet appareil ?`)) return;
-    await stockage.supprimerProjet(id);
-    if (id === projet.id) {
-      const restants = (await stockage.listerProjets()).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
-      await ouvrir(restants[0] ? completerProjet(restants[0]) : creerProjet(), { changerOnglet: false });
-      partage?.apresOuverture();
-    } else {
-      await rafraichirListe();
-      afficherEcranProjet();
+    const surDrive = partage?.etat.projetsDrive.some((p) => p.projetId === id);
+    if (!resume || !confirm(`Supprimer le projet « ${resume.titre} » de cet appareil ?${surDrive ? '\n\nLa copie sur Google Drive reste.' : ''}`)) return;
+    await supprimerDeLAppareil(id);
+  },
+  // Supprimer partout : sur cet appareil et sur Google Drive (dossier mis à la corbeille de Drive).
+  supprimerPartout: async (id) => {
+    const surDrive = partage?.etat.projetsDrive.find((p) => p.projetId === id);
+    const titre = resumes.find((r) => r.id === id)?.titre ?? surDrive?.titre ?? 'ce projet';
+    if (!confirm(`Supprimer « ${titre} » partout : sur cet appareil ET sur Google Drive (pour tous les appareils) ?`)) return;
+    if (resumes.some((r) => r.id === id)) await supprimerDeLAppareil(id);
+    try {
+      await partage?.supprimerDeDrive(id);
+      afficherMessage(`« ${titre} » supprimé partout`, 3000);
+    } catch (erreur) {
+      alert(`Suppression sur Google Drive impossible : ${erreur.message}.`);
     }
   },
   importerFichierProjet: async (fichier) => {
@@ -1429,6 +1438,18 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   ouvrirDrive: (dossierId) => partage.ouvrirDepuisDrive(dossierId),
   rafraichirDrive: () => partage.rafraichirListe().catch((erreur) => afficherMessage(`Drive : ${erreur.message}`, 4000)),
 }, document.querySelector('#projets-suite'));
+
+/** Supprime un projet de cet appareil ; si c'était le projet ouvert, on en ouvre un autre. */
+async function supprimerDeLAppareil(id) {
+  await stockage.supprimerProjet(id);
+  if (id === projet.id) {
+    const restants = (await stockage.listerProjets()).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
+    await ouvrir(restants[0] ? completerProjet(restants[0]) : creerProjet(), { changerOnglet: false });
+    partage?.apresOuverture();
+  }
+  await rafraichirListe();
+  afficherEcranProjet();
+}
 
 /** Onglet Projet, avec l'état du partage par Drive. */
 function afficherEcranProjet() {
@@ -1766,7 +1787,6 @@ function recalculer({ recadrer = false } = {}) {
   // en mode Implanter pour laisser la place aux coupes.
   document.body.classList.toggle('mode-leve', Boolean(ecranLeve));
   document.body.classList.toggle('mode-controle', Boolean(ecranLeve) && terrain.mode === 'controler');
-  mettreAJourPastilleMode();
   mettreAJourToucheVolume();
 
   // Plan : surfaces du levé affiché et surfaces importées ; les autres sont cachées.
@@ -1929,27 +1949,15 @@ function mettreAJourEtatEntete() {
     : '';
   document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} surface(s)`, drive].filter(Boolean).join(' · ');
 
-  // Verrou du partage : « ✎ à moi » (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
+  // Verrou du partage : crayon vert ✎ (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
   // (un autre appareil l'a ; toucher = prendre la main). Rien sans Drive.
   const pastille = document.querySelector('#pastille-verrou');
   const repris = partage?.etat.connecte && partage.etat.repris?.projetId === projet.id ? partage.etat.repris : null;
   pastille.hidden = !partage?.etat.connecte;
-  pastille.textContent = repris ? `🔒 Lecture seule · ${repris.nom}` : '✎ à moi';
+  pastille.textContent = repris ? `🔒 Lecture seule · ${repris.nom}` : '✎';
   pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : 'pastille-verte'}`;
   pastille.title = repris ? 'Ouvert sur un autre appareil : toucher pour prendre la main' : 'Tu as la main sur ce projet';
 }
-/** Pastille LEVER (ambre) / IMPLANTER (sarcelle) dans l'en-tête : le mode de l'onglet Terrain. */
-function mettreAJourPastilleMode() {
-  const pastille = document.querySelector('#pastille-mode');
-  pastille.hidden = !ecranLeve;
-  if (!ecranLeve) return;
-  const implanter = terrain.mode === 'controler';
-  pastille.textContent = implanter ? 'IMPLANTER' : 'LEVER';
-  pastille.className = `pastille-entete ${implanter ? 'pastille-implanter' : 'pastille-lever'}`;
-  pastille.title = 'Onglet Terrain';
-}
-document.querySelector('#pastille-mode').addEventListener('click', () => afficherOnglet('terrain'));
-
 document.querySelector('#pastille-verrou').addEventListener('click', () => {
   if (partage?.etat.repris?.projetId === projet.id) partage.reprendreLaMain();
   else afficherMessage('Tu as la main sur ce projet', 2000);

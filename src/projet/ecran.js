@@ -1,5 +1,5 @@
 // Onglet « Projet » (le premier), court pour s'y retrouver d'un coup d'œil :
-// - en haut, deux boutons : « + Nouveau projet » et « Mes projets » (liste : toucher = ouvrir,
+// - en haut, deux boutons : « + Nouveau projet » et « Gestion de projets » (une seule liste, appareil et Drive : toucher = ouvrir,
 //   menu ⋮ = exporter, dupliquer, supprimer ; projets de Google Drive ; fichier projet) ;
 // - le projet ouvert : ses infos (affaire, lieu, nom facultatif) et « Continuer » ;
 // - ensuite (voir main.js) le bloc « Imports » (fichiers de points, plans DXF) ;
@@ -10,17 +10,19 @@ import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { estDansAppliAndroid } from '../android/pont.js';
 import { titreProjet, projetSansTitre, EXEMPLE_TITRE } from './projet.js';
+import { verrouActif } from '../partage/synchro.js';
 
 /**
  * Crée l'écran Projet dans "conteneur". Les actions sont faites par main.js via "actions" :
  * renommer(nom), changerCartouche(champ, valeur), continuer(), exporterProjet(id),
  * nouveauProjet(), ouvrirProjet(id), dupliquerProjet(id), supprimerProjet(id), importerFichierProjet(fichier),
+ * supprimerPartout(id) (cet appareil et Drive),
  * partage : connecterDrive(), deconnecterDrive(), nommerAppareil(nom), envoyerDrive(), reprendreLaMain(),
  * ouvrirDrive(dossierId), rafraichirDrive()
  * Renvoie { afficher(projet, resumes, partage) } ; partage : { etat (voir partage/partage.js), appareil: { id, nom } } ou null.
  */
 export function creerEcranProjet(conteneur, actions, conteneurSuite) {
-  // Panneau « Mes projets » ouvert sous les boutons du haut, et projet dont le menu ⋮ est ouvert.
+  // Panneau « Gestion de projets » ouvert sous les boutons du haut, et projet dont le menu ⋮ est ouvert.
   let panneau = null;
   let menuOuvert = null;
   let derniers = null; // dernier projet et liste affichés (pour redessiner après un clic)
@@ -52,6 +54,7 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
       actions[action]();
     } else if (action === 'dupliquer') actions.dupliquerProjet(id);
     else if (action === 'supprimer-projet') actions.supprimerProjet(id);
+    else if (action === 'supprimer-partout') actions.supprimerPartout(id);
     if (['exporter', 'dupliquer'].includes(action) && derniers) dessiner(...derniers);
   }
 
@@ -90,7 +93,7 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
     conteneur.innerHTML = `
       <div class="actions-projets">
         <button type="button" class="bouton-secondaire" data-action="nouveau">+ Nouveau projet</button>
-        <button type="button" class="bouton-secondaire ${panneau === 'projets' ? 'actif' : ''}" data-action="panneau" data-panneau="projets" aria-expanded="${panneau === 'projets'}">Mes projets ${panneau === 'projets' ? '▴' : '▾'}</button>
+        <button type="button" class="bouton-secondaire ${panneau === 'projets' ? 'actif' : ''}" data-action="panneau" data-panneau="projets" aria-expanded="${panneau === 'projets'}">Gestion de projets ${panneau === 'projets' ? '▴' : '▾'}</button>
       </div>
       ${panneau === 'projets' ? panneauProjets(projet, resumes, partage, menuOuvert) : ''}
 
@@ -127,39 +130,34 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
 }
 
 /**
- * Une ligne de la liste des projets : on la touche pour ouvrir le projet ; le menu ⋮ propose
- * exporter, dupliquer, supprimer.
+ * Tous les projets, chacun une seule fois : ceux de cet appareil (📱) et ceux de Google Drive (☁),
+ * réunis par leur identifiant, les plus récents d'abord.
  */
-function ligneProjet(resume, estOuvert, menu) {
-  return `<div class="ligne-projet ${estOuvert ? 'projet-ouvert' : ''}">
-    <button type="button" class="infos-projet" ${estOuvert ? 'disabled' : `data-action="ouvrir" data-id="${resume.id}"`}>
-      <strong>${echapper(resume.titre ?? resume.nom)}${estOuvert ? ' <span class="etiquette-ouvert">ouvert</span>' : ''}</strong>
-      <span class="aide">${resume.sousTitre ? `${echapper(resume.sousTitre)} · ` : ''}${new Date(resume.modifieLe).toLocaleDateString('fr-CH')} · ${compter(resume.nombreLeves, 'levé')} · ${compter(resume.nombreSurfaces, 'surface')}</span>
-    </button>
-    <button type="button" class="bouton-menu-projet" data-action="menu-projet" data-id="${resume.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
-    ${menu ? `<div class="menu-projet">
-      <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporter" data-id="${resume.id}">exporter (.topo.json)</button>
-      <button type="button" class="bouton-lien bouton-lien-neutre" data-action="dupliquer" data-id="${resume.id}">dupliquer</button>
-      <button type="button" class="bouton-lien" data-action="supprimer-projet" data-id="${resume.id}">supprimer</button>
-    </div>` : ''}
-  </div>`;
+function projetsReunis(resumes, partage) {
+  const parId = new Map();
+  for (const r of resumes) parId.set(r.id, { id: r.id, titre: r.titre ?? r.nom, sousTitre: r.sousTitre, modifieLe: r.modifieLe, local: r, drive: null });
+  if (partage?.etat.connecte) {
+    for (const p of partage.etat.projetsDrive) {
+      const deja = parId.get(p.projetId);
+      if (deja) deja.drive = p;
+      else parId.set(p.projetId, { id: p.projetId, titre: p.titre, sousTitre: '', modifieLe: p.modifieLe ?? '', local: null, drive: p });
+    }
+  }
+  return [...parId.values()].sort((a, b) => String(b.modifieLe ?? '').localeCompare(String(a.modifieLe ?? '')));
 }
 
 /**
- * « Mes projets » : les projets de l'appareil (toucher la ligne = ouvrir ; menu ⋮ = exporter,
- * dupliquer, supprimer), ceux de Google Drive (si connecté), puis un fichier projet (.topo.json).
+ * « Gestion de projets » : une seule liste. Toucher un projet l'ouvre ; ⋮ : exporter, dupliquer,
+ * supprimer de cet appareil, supprimer partout (appareil et Drive). Puis un fichier projet (.topo.json).
  */
 function panneauProjets(projet, resumes, partage, menuOuvert) {
-  const drive = partage?.etat.connecte ? partage.etat.projetsDrive.filter((p) => p.projetId !== projet.id) : null;
+  const projets = projetsReunis(resumes, partage);
   return `<section class="carte-section panneau-projets">
-    ${titreSection('projets', 'Mes projets')}
+    ${titreSection('projets', 'Gestion de projets')}
+    ${partage?.etat.connecte ? '<p class="aide legende-projets">📱 sur cet appareil · ☁ sur Google Drive <button type="button" class="bouton-lien bouton-lien-neutre" data-action="rafraichirDrive">actualiser</button></p>' : ''}
     <div class="liste-projets">
-      ${resumes.map((r) => ligneProjet(r, r.id === projet.id, menuOuvert === r.id)).join('')}
+      ${projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert === p.id, partage)).join('')}
     </div>
-    ${drive ? `<p class="titre-section">Sur Google Drive <button type="button" class="bouton-lien bouton-lien-neutre" data-action="rafraichirDrive">actualiser</button></p>
-      <div class="liste-projets">
-        ${drive.length > 0 ? drive.map((p) => ligneProjetDrive(p, partage.appareil.id)).join('') : '<p class="vide">Aucun autre projet sur Drive.</p>'}
-      </div>` : ''}
     <label class="bouton-secondaire bouton-fichier">
       Ouvrir un fichier projet (.topo.json)
       <input type="file" data-champ="fichier-projet" accept=".json,application/json" hidden />
@@ -167,16 +165,31 @@ function panneauProjets(projet, resumes, partage, menuOuvert) {
   </section>`;
 }
 
-/** Un projet de Drive : titre, date, « ouvert sur … » s'il est verrouillé par un autre appareil. */
-function ligneProjetDrive(p, monAppareil) {
-  const date = p.modifieLe ? new Date(p.modifieLe).toLocaleString('fr-CH', { dateStyle: 'short', timeStyle: 'short' }) : '';
-  const ailleurs = p.verrou && p.verrou.appareilId !== monAppareil;
-  return `<div class="ligne-projet">
-    <div class="infos-projet">
-      <strong>${echapper(p.titre)}</strong>
-      <span class="aide">${date}${ailleurs ? ` · <span class="verrou-drive">ouvert sur ${echapper(p.verrou.nom)}</span>` : ''}</span>
-    </div>
-    <div class="ligne-outils"><button type="button" class="bouton-secondaire" data-action="ouvrir-drive" data-id="${p.dossierId}">Ouvrir</button></div>
+/** Une ligne : on la touche pour ouvrir le projet ; ⋮ ouvre le menu. */
+function ligneProjet(p, estOuvert, menu, partage) {
+  const date = p.modifieLe ? new Date(p.modifieLe).toLocaleDateString('fr-CH') : '';
+  const ou = `${p.local ? '📱' : ''}${p.drive ? '☁' : ''}`;
+  const verrou = p.drive?.verrou;
+  const ailleurs = verrou && verrou.appareilId !== partage?.appareil.id && verrouActif(verrou);
+  const details = [
+    p.sousTitre ? echapper(p.sousTitre) : '',
+    date,
+    p.local ? `${compter(p.local.nombreLeves, 'levé')} · ${compter(p.local.nombreSurfaces, 'surface')}` : '',
+    ailleurs ? `<span class="verrou-drive">ouvert sur ${echapper(verrou.nom)}</span>` : '',
+  ].filter(Boolean).join(' · ');
+  const ouvrir = estOuvert ? 'disabled' : p.local ? `data-action="ouvrir" data-id="${p.id}"` : `data-action="ouvrir-drive" data-id="${p.drive.dossierId}"`;
+  return `<div class="ligne-projet ${estOuvert ? 'projet-ouvert' : ''}">
+    <button type="button" class="infos-projet" ${ouvrir}>
+      <strong><span class="ou-projet" title="${p.local ? 'sur cet appareil' : ''}${p.local && p.drive ? ' et ' : ''}${p.drive ? 'sur Google Drive' : ''}">${ou}</span> ${echapper(p.titre)}${estOuvert ? ' <span class="etiquette-ouvert">ouvert</span>' : ''}</strong>
+      <span class="aide">${details}</span>
+    </button>
+    <button type="button" class="bouton-menu-projet" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
+    ${menu ? `<div class="menu-projet">
+      ${p.local ? `<button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporter" data-id="${p.id}">exporter (.topo.json)</button>
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="dupliquer" data-id="${p.id}">dupliquer</button>
+        <button type="button" class="bouton-lien" data-action="supprimer-projet" data-id="${p.id}">supprimer de cet appareil</button>` : ''}
+      ${p.drive ? `<button type="button" class="bouton-lien" data-action="supprimer-partout" data-id="${p.id}">supprimer partout${p.local ? '' : ' (Drive)'}</button>` : ''}
+    </div>` : ''}
   </div>`;
 }
 

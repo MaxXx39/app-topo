@@ -152,8 +152,8 @@ p {
   background: rgba(255, 255, 255, 0.12);
 }
 
-/* Pastilles de l'en-tête : mode du terrain (LEVER / IMPLANTER) et verrou du partage
-   (« ✎ à moi » en vert, « 🔒 Lecture seule » en rouge). */
+/* Pastille de l'en-tête : verrou du partage (crayon ✎ vert quand on a la main,
+   « 🔒 Lecture seule » en rouge). */
 .entete-pastilles {
   display: flex;
   flex-direction: column;
@@ -4136,17 +4136,6 @@ body.mode-telephone .onglets button svg {
   color: #ffffff;
 }
 
-/* Pastille du mode dans l'en-tête, aux mêmes couleurs. */
-.pastille-lever {
-  background: var(--ambre);
-  color: var(--sombre);
-}
-
-.pastille-implanter {
-  background: #0d9488;
-  color: #ffffff;
-}
-
 /* Téléphone : la bascule est collée sous l'en-tête, au-dessus du plan. */
 @media (max-width: 899px) {
   body {
@@ -4597,4 +4586,19 @@ button.bouton-import {
   paint-order: stroke;
   stroke: #ffffff;
   stroke-width: 3px;
+}
+
+.fenetre-reglages .bouton-fermer-appli {
+  margin-right: auto;
+  color: var(--rouge);
+}
+
+/* Gestion de projets : où est le projet (📱 cet appareil, ☁ Google Drive). */
+.ou-projet {
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+}
+
+.legende-projets {
+  margin: 0 0 4px;
 }

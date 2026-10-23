@@ -1,6 +1,6 @@
 // Tests du partage des projets par Google Drive, avec un faux Drive en mémoire.
 import { describe, it, expect } from 'vitest';
-import { creerSynchro, choisirVersion, NOM_RACINE } from '../src/partage/synchro.js';
+import { creerSynchro, choisirVersion, verrouActif, NOM_RACINE } from '../src/partage/synchro.js';
 import { projetVersFichiers, fichiersVersProjet, comprimer, decomprimer, FICHIER_PROJET } from '../src/partage/fichiers.js';
 import { creerDrive, TYPE_DOSSIER } from '../src/partage/drive.js';
 import { creerProjet } from '../src/projet/projet.js';
@@ -137,6 +137,31 @@ describe('synchronisation avec Drive', () => {
     // Le bureau rend le projet : Max peut de nouveau envoyer.
     await bureau.rendreVerrou(liste[0].dossierId);
     expect((await creerSynchro(drive, MAX).envoyer(projet, memoire)).memoire).toBeTruthy();
+  });
+
+  it('verrou sans signe de vie depuis 15 minutes : le projet est libre', async () => {
+    const maintenant = Date.parse('2026-10-23T10:00:00.000Z');
+    expect(verrouActif(null)).toBe(false);
+    expect(verrouActif({ vu: '2026-10-23T09:50:00.000Z' }, maintenant)).toBe(true);
+    expect(verrouActif({ vu: '2026-10-23T09:44:00.000Z' }, maintenant)).toBe(false);
+    expect(verrouActif({ depuis: '2026-10-23T08:00:00.000Z' }, maintenant)).toBe(false); // ancien verrou sans « vu »
+
+    // Tablette éteinte depuis 2 heures : le bureau envoie sans être refusé, et prend le verrou.
+    const drive = fauxDrive();
+    const projet = projetEssai();
+    const { memoire } = await creerSynchro(drive, MAX).envoyer(projet, null, 'Essai');
+    const dossier = drive.fichiers.get(memoire.dossierId);
+    dossier.appProperties.verrouVu = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+    const bureau = creerSynchro(drive, BUREAU);
+    expect((await bureau.envoyer(projet, null)).memoire).toBeTruthy();
+    expect(dossier.appProperties.verrouPar).toBe(BUREAU.id);
+    // Max se réveille : son signe de vie voit que le bureau a la main.
+    expect((await creerSynchro(drive, MAX).signeDeVie(memoire.dossierId)).repris).toMatchObject({ nom: 'PC bureau' });
+    // Le signe de vie du bureau garde le verrou à son nom.
+    expect(await bureau.signeDeVie(memoire.dossierId)).toEqual({});
+    // Suppression : le dossier va à la corbeille, il n'est plus listé.
+    await bureau.supprimerProjet(memoire.dossierId);
+    expect(await bureau.listerProjets()).toHaveLength(0);
   });
 
   it('quelle version ouvrir : locale, Drive, ou conflit', () => {
