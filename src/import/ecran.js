@@ -115,7 +115,7 @@ export function creerEcranImport(conteneur, actions) {
             <label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="18" cy="7" r="1.6" /><circle cx="8" cy="17" r="1.6" /><circle cx="17" cy="17" r="1.6" /></svg>
               <span><strong>Fichier de points</strong><span class="aide">CSV, TXT</span></span>
-              <input type="file" data-champ="fichier-points" accept=".csv,.txt,text/csv,text/plain" hidden />
+              <input type="file" data-champ="fichier-points" accept=".csv,.txt,.pts,.xyz,.dat,.asc,text/csv,text/plain" hidden />
             </label>
             <label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21 21 3M3 9l6-6M15 21l6-6M3 15h6v6" /></svg>

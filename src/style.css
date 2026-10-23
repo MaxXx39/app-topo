@@ -4643,8 +4643,28 @@ button.bouton-import {
   letter-spacing: 1px;
 }
 
-.legende-projets {
-  margin: 0 0 4px;
+/* Gestion de projets : une page à part (version 0.53.0) ; le reste de l'onglet est caché. */
+.page-gestion-projets #importer,
+.page-gestion-projets #projets-suite {
+  display: none;
+}
+
+.entete-page-projets {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.entete-page-projets h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.bouton-nouveau-page {
+  width: 100%;
+  margin-bottom: 10px;
 }
 
 /* Levé en cours (version 0.52.0) : le bandeau à la couleur de sa nature, la liste bien visible

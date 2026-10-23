@@ -1605,16 +1605,6 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
     projet.cartouche[champ] = valeur;
     modifie();
   },
-  continuer: () => {
-    // Nouveau projet (ni levé ni plan DXF) : on reste sur l'onglet Projet, aux imports
-    // (demande du 23.10.2026) ; on va au terrain par l'onglet Terrain.
-    if (projet.leves.length === 0 && (projet.plansDxf ?? []).length === 0) {
-      document.activeElement?.blur?.();
-      document.querySelector('#importer')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-      return;
-    }
-    allerA(etapeUtile());
-  },
   exporterProjet: async (id) => {
     const lu = id === projet.id ? projet : await stockage.lireProjet(id);
     if (!lu) return;

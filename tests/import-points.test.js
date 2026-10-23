@@ -47,9 +47,31 @@ describe('lirePoints - lignes illisibles', () => {
     expect(resultat.points).toHaveLength(0);
   });
 
-  it('refuse la virgule comme séparateur décimal', () => {
-    const resultat = lirePoints('p1\t100,5\t200.000\t10.000');
-    expect(resultat.erreurs[0].message).toContain('Est');
+  it('accepte la virgule comme séparateur décimal', () => {
+    const resultat = lirePoints('p1\t100,5\t200.000\t10,25');
+    expect(resultat.erreurs).toEqual([]);
+    expect(resultat.points[0]).toMatchObject({ est: 100.5, nord: 200, altitude: 10.25 });
+  });
+
+  it('lit tous les séparateurs : tabulation, point-virgule, espaces, virgule ; ignore le code', () => {
+    const attendu = { nom: 'p1', est: 2500000.123, nord: 1200000.456, altitude: 450.2 };
+    for (const ligne of [
+      'p1\t2500000.123\t1200000.456\t450.2\tTN',
+      'p1;2500000,123;1200000,456;450,2;TN',
+      'p1 ; 2500000.123 ; 1200000.456 ; 450.2',
+      'p1   2500000,123  1200000,456 450,2 regard rond',
+      'p1,2500000.123,1200000.456,450.2,TN',
+    ]) {
+      const resultat = lirePoints(ligne);
+      expect(resultat.erreurs, ligne).toEqual([]);
+      expect(resultat.points[0], ligne).toMatchObject(attendu);
+    }
+  });
+
+  it('saute une première ligne de titres', () => {
+    const resultat = lirePoints('Nom;Est;Nord;H;Code\np1;1;2;3;TN');
+    expect(resultat.erreurs).toEqual([]);
+    expect(resultat.points).toHaveLength(1);
   });
 
   it('ignore les lignes vides', () => {

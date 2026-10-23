@@ -1,7 +1,8 @@
 // Onglet « Projet » (le premier), court pour s'y retrouver d'un coup d'œil :
-// - en haut, deux boutons : « + Nouveau projet » et « Gestion de projets » (une seule liste, appareil et Drive : toucher = ouvrir,
-//   menu ⋮ = exporter, dupliquer, supprimer ; projets de Google Drive ; fichier projet) ;
-// - le projet ouvert : ses infos (affaire, lieu, nom facultatif) et « Continuer » ;
+// - en haut, deux boutons : « + Nouveau projet » et « Gestion de projets » : une page à part (rien
+//   d'autre de l'onglet), une seule liste, appareil et Drive : toucher = ouvrir, menu ⋮ = exporter,
+//   dupliquer, supprimer ; fichier projet ; « ← » pour revenir ;
+// - le projet ouvert : ses infos (affaire, lieu, nom facultatif) ;
 // - ensuite (voir main.js) le bloc « Imports » (fichiers de points, plans DXF) ;
 // - tout en bas, le partage par Google Drive (pas besoin de le voir tout le temps), puis la version.
 // Le cartouche du PDF (dessiné par, date) se règle au moment du PDF (voir export/cartouche.js).
@@ -14,7 +15,7 @@ import { verrouActif } from '../partage/synchro.js';
 
 /**
  * Crée l'écran Projet dans "conteneur". Les actions sont faites par main.js via "actions" :
- * renommer(nom), changerCartouche(champ, valeur), continuer(), exporterProjet(id),
+ * renommer(nom), changerCartouche(champ, valeur), exporterProjet(id),
  * nouveauProjet(), ouvrirProjet(id), dupliquerProjet(id), supprimerProjet(id), importerFichierProjet(fichier),
  * supprimerPartout(id) (cet appareil et Drive),
  * partage : connecterDrive(), deconnecterDrive(), nommerAppareil(nom), envoyerDrive(), reprendreLaMain(),
@@ -22,7 +23,7 @@ import { verrouActif } from '../partage/synchro.js';
  * Renvoie { afficher(projet, resumes, partage) } ; partage : { etat (voir partage/partage.js), appareil: { id, nom } } ou null.
  */
 export function creerEcranProjet(conteneur, actions, conteneurSuite) {
-  // Panneau « Gestion de projets » ouvert sous les boutons du haut, et projet dont le menu ⋮ est ouvert.
+  // Page « Gestion de projets » ouverte (à la place de tout l'onglet), et projet dont le menu ⋮ est ouvert.
   let panneau = null;
   let menuOuvert = null;
   let derniers = null; // dernier projet et liste affichés (pour redessiner après un clic)
@@ -36,11 +37,12 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
     if (action === 'panneau') {
       panneau = panneau === bouton.dataset.panneau ? null : bouton.dataset.panneau;
       if (derniers) dessiner(...derniers);
+      conteneur.closest('.panneau')?.scrollIntoView({ block: 'start' });
+      window.scrollTo(0, 0);
     } else if (action === 'menu-projet') {
       menuOuvert = menuOuvert === id ? null : id;
       if (derniers) dessiner(...derniers);
-    } else if (action === 'continuer') actions.continuer();
-    else if (action === 'exporter') actions.exporterProjet(id);
+    } else if (action === 'exporter') actions.exporterProjet(id);
     else if (action === 'nouveau') {
       panneau = null;
       actions.nouveauProjet();
@@ -90,12 +92,18 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
     const enSaisie = (zone) => zone.contains(document.activeElement) && document.activeElement.matches('input');
     if (enSaisie(conteneur) || enSaisie(conteneurSuite)) return;
     const { affaire, lieu } = projet.cartouche;
+    // Gestion de projets : une page à part, sans le projet ouvert, les imports ni le partage.
+    const pageGestion = panneau === 'projets';
+    conteneur.closest('.panneau')?.classList.toggle('page-gestion-projets', pageGestion);
+    if (pageGestion) {
+      conteneur.innerHTML = pageProjets(projet, resumes, partage, menuOuvert);
+      return;
+    }
     conteneur.innerHTML = `
       <div class="actions-projets">
         <button type="button" class="bouton-secondaire" data-action="nouveau">+ Nouveau projet</button>
-        <button type="button" class="bouton-secondaire ${panneau === 'projets' ? 'actif' : ''}" data-action="panneau" data-panneau="projets" aria-expanded="${panneau === 'projets'}">Gestion de projets ${panneau === 'projets' ? '▴' : '▾'}</button>
+        <button type="button" class="bouton-secondaire" data-action="panneau" data-panneau="projets">Gestion de projets</button>
       </div>
-      ${panneau === 'projets' ? panneauProjets(projet, resumes, partage, menuOuvert) : ''}
 
       <section class="bloc-ouvert">
         <div class="bloc-entete">
@@ -110,7 +118,6 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
             <label>Lieu <input type="text" data-cartouche="lieu" value="${echapper(lieu ?? '')}" placeholder="ex. Gland" /></label>
             <label class="champ-large">Nom <span class="aide">(facultatif)</span> <input type="text" data-champ="nom-projet" value="${echapper(projet.nom ?? '')}" placeholder="ex : Rue Mont Blanc" /></label>
           </div>
-          <button type="button" class="bouton bouton-large" data-action="continuer">Continuer →</button>
         </div>
       </section>
     `;
@@ -147,14 +154,20 @@ function projetsReunis(resumes, partage) {
 }
 
 /**
- * « Gestion de projets » : une seule liste. Toucher un projet l'ouvre ; ⋮ : exporter, dupliquer,
- * supprimer de cet appareil, supprimer partout (appareil et Drive). Puis un fichier projet (.topo.json).
+ * Page « Gestion de projets » : « ← » pour revenir, puis une seule liste. Toucher un projet l'ouvre ;
+ * ⋮ : exporter, dupliquer, supprimer de cet appareil, supprimer partout (appareil et Drive).
+ * Puis un fichier projet (.topo.json).
  */
-function panneauProjets(projet, resumes, partage, menuOuvert) {
+function pageProjets(projet, resumes, partage, menuOuvert) {
   const projets = projetsReunis(resumes, partage);
-  return `<section class="carte-section panneau-projets">
-    ${titreSection('projets', 'Gestion de projets')}
-    ${partage?.etat.connecte ? '<p class="aide legende-projets">📱 sur cet appareil · ☁ sur Google Drive <button type="button" class="bouton-lien bouton-lien-neutre" data-action="rafraichirDrive">actualiser</button></p>' : ''}
+  return `<div class="entete-page-projets">
+    <button type="button" class="bouton-retour" data-action="panneau" data-panneau="projets" title="Retour au projet ouvert" aria-label="Retour au projet ouvert">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
+    <h2>Gestion de projets</h2>
+    ${partage?.etat.connecte ? '<button type="button" class="bouton-retour" data-action="rafraichirDrive" title="Actualiser la liste de Google Drive" aria-label="Actualiser">↻</button>' : ''}
+  </div>
+  <section class="carte-section panneau-projets">
+    <button type="button" class="bouton-secondaire bouton-nouveau-page" data-action="nouveau">+ Nouveau projet</button>
     <div class="liste-projets">
       ${projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert === p.id, partage)).join('')}
     </div>

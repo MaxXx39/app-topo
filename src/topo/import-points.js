@@ -1,4 +1,6 @@
-// Lecture des fichiers de points : CSV Emlid et TXT (tabulations).
+// Lecture des fichiers de points : CSV Emlid et TXT (nom, Est, Nord, altitude, code facultatif ;
+// séparés par des tabulations, des points-virgules, des espaces ou des virgules ; décimales avec
+// un point ou une virgule).
 // Chaque point lu a la forme : { nom, est, nord, altitude, ligne }
 // - est, nord, altitude : en mètres, MN95, sans aucune conversion
 // - ligne : numéro de la ligne dans le fichier (pour les messages)
@@ -6,7 +8,8 @@
 /**
  * Lit le contenu d'un fichier de points et reconnaît son format tout seul.
  * - CSV Emlid : la première ligne contient les titres (Name, Easting, ...)
- * - TXT : chaque ligne contient nom, Est, Nord, altitude séparés par des tabulations
+ * - TXT : chaque ligne contient nom, Est, Nord, altitude (puis un code, pas utilisé), séparés
+ *   par des tabulations, des points-virgules, des espaces ou des virgules
  * Renvoie { format, points, erreurs, avertissements }.
  * Une ligne illisible ne bloque pas la lecture : elle est signalée dans "erreurs".
  */
@@ -86,19 +89,25 @@ function lireCsvEmlid(lignes) {
 }
 
 /**
- * Lit un fichier TXT : nom, Est, Nord, altitude séparés par des tabulations.
+ * Lit un fichier TXT : nom, Est, Nord, altitude, puis éventuellement un code (pas utilisé).
+ * Séparateur au choix (voir decouperLigneTxt), décimales avec un point ou une virgule.
+ * Une première ligne de titres (« Nom ; Est ; Nord ; H ») est sautée sans erreur.
  */
 function lireTxt(lignes) {
   const points = [];
   const erreurs = [];
+  let premiere = true;
 
   for (let i = 0; i < lignes.length; i++) {
     if (lignes[i].trim() === '') continue;
-    const champs = lignes[i].split('\t');
+    const champs = decouperLigneTxt(lignes[i]);
+    const titres = premiere && champs.length >= 3 && lireNombre(champs[1]) === null && lireNombre(champs[2]) === null;
+    premiere = false;
+    if (titres) continue;
     if (champs.length < 4) {
       erreurs.push({
         ligne: i + 1,
-        message: '4 valeurs attendues (nom, Est, Nord, altitude) séparées par des tabulations',
+        message: '4 valeurs attendues (nom, Est, Nord, altitude)',
       });
       continue;
     }
@@ -108,6 +117,21 @@ function lireTxt(lignes) {
   }
 
   return { format: 'TXT', points, erreurs };
+}
+
+/**
+ * Découpe une ligne de fichier TXT en champs :
+ * - tabulation ou point-virgule s'il y en a (cases vides gardées) ;
+ * - sinon un ou plusieurs espaces ;
+ * - sinon (moins de 4 valeurs) la virgule : « p1,2500000.1,1200000.2,450.3 ».
+ */
+export function decouperLigneTxt(ligne) {
+  const propre = ligne.trim();
+  if (propre.includes('\t')) return propre.split('\t').map((champ) => champ.trim());
+  if (propre.includes(';')) return propre.split(';').map((champ) => champ.trim());
+  const parEspaces = propre.split(/\s+/);
+  if (parEspaces.length >= 4 || !propre.includes(',')) return parEspaces;
+  return propre.split(',').map((champ) => champ.trim());
 }
 
 /**
@@ -167,11 +191,11 @@ function creerPoint(texteNom, texteEst, texteNord, texteAltitude, ligne) {
 }
 
 /**
- * Transforme un texte en nombre (séparateur décimal : le point).
+ * Transforme un texte en nombre (séparateur décimal : le point ou la virgule).
  * Renvoie null si le texte n'est pas un nombre valable.
  */
 function lireNombre(texte) {
-  const propre = (texte ?? '').trim();
+  const propre = (texte ?? '').trim().replace(',', '.');
   if (!/^[-+]?(\d+\.?\d*|\.\d+)$/.test(propre)) return null;
   return Number(propre);
 }
