@@ -1062,7 +1062,9 @@ export function mettreAJourBandeaux(etat) {
     const statut = { 4: 'RTK FIXE', 5: 'RTK FLOTTANT' }[etat.qualite] ?? `GNSS : ${etat.libelleQualite ?? '?'}`;
     // Corrections reçues directement par l'appli (sans Emlid Flow) : on le rappelle.
     const direct = etat.corrections?.etat === 'recoit' ? ' · direct' : '';
-    rtk.textContent = `${statut}${satellites}${direct}`;
+    // Précision estimée par le RX2 (message GST, m) ; « — » s'il ne l'envoie pas.
+    const precision = ` · H ${formaterNombre(etat.precisionH)} V ${formaterNombre(etat.precisionV)}`;
+    rtk.textContent = `${statut}${satellites}${direct}${precision}`;
     rtk.className = etat.qualite === 4 ? 'ok' : 'pas-ok';
   }
   if (etat.etatInclinaison == null) {

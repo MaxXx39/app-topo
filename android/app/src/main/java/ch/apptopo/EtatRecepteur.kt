@@ -8,9 +8,11 @@ import ch.apptopo.noyau.leve.Autorisation
 import ch.apptopo.noyau.leve.autoriserPriseDePoint
 import ch.apptopo.noyau.nmea.EtatCompensation
 import ch.apptopo.noyau.nmea.PositionGga
+import ch.apptopo.noyau.nmea.PrecisionGst
 import ch.apptopo.noyau.nmea.libelleQualite
 import ch.apptopo.noyau.nmea.lireEtc
 import ch.apptopo.noyau.nmea.lireGga
+import ch.apptopo.noyau.nmea.lireGst
 import ch.apptopo.noyau.nmea.lirePhraseNmea
 import ch.apptopo.noyau.ntrip.ClientNtrip
 import org.json.JSONObject
@@ -48,6 +50,9 @@ class EtatRecepteur {
     @Volatile private var derniereMesure: Mesure? = null
     @Volatile private var derniereCompensation: EtatCompensation? = null
     @Volatile private var heureEtcMs: Long? = null
+    // Précision estimée par le récepteur (message GST), si le RX2 l'envoie.
+    @Volatile private var dernierePrecision: PrecisionGst? = null
+    @Volatile private var heureGstMs: Long? = null
     @Volatile private var erreurConversion: String? = null
 
     @Volatile var etatBluetooth = "non connecté"
@@ -69,6 +74,8 @@ class EtatRecepteur {
         derniereMesure = null
         derniereCompensation = null
         heureEtcMs = null
+        dernierePrecision = null
+        heureGstMs = null
         connecte = false
         etatBluetooth = texte
     }
@@ -77,7 +84,7 @@ class EtatRecepteur {
      * État envoyé à la page (src/android/pont.js) :
      * { connecte, bluetooth, recu, qualite, libelleQualite, nbSatellites, hdop, ageCorrections,
      *   etatInclinaison, inclinaisonPrete, inclinaison, cap, position: { est, nord, altitude } ou null,
-     *   erreurConversion, autorise, raison }
+     *   precisionH, precisionV (m, message GST récent, sinon null), erreurConversion, autorise, raison }
      */
     fun enJson(nomDernierRecepteur: String?): String {
         val mesure = derniereMesure
@@ -106,6 +113,10 @@ class EtatRecepteur {
             put("inclinaison", if (etcRecent) compensation!!.inclinaisonDeg ?: JSONObject.NULL else JSONObject.NULL)
             // Cap du récepteur (°), seulement quand la compensation est prête (champ vide sinon).
             put("cap", if (etcRecent && compensation!!.estActive) compensation.capDeg ?: JSONObject.NULL else JSONObject.NULL)
+            // Précision H / V (m), seulement si un GST récent est arrivé.
+            val precision = dernierePrecision.takeIf { (age(heureGstMs) ?: Long.MAX_VALUE) <= DELAI_RECENT_MS }
+            put("precisionH", precision?.horizontaleM ?: JSONObject.NULL)
+            put("precisionV", precision?.verticaleM ?: JSONObject.NULL)
             put("erreurConversion", erreurConversion ?: JSONObject.NULL)
             put("autorise", autorisation.autorise)
             put("raison", autorisation.raison)
@@ -129,7 +140,7 @@ class EtatRecepteur {
 
     /**
      * Point à prendre maintenant : { ok: true, point: { est, nord, altitude, qualite, nbSatellites,
-     * hdop, ageCorrections, inclinaison, heureUtc } }, ou { ok: false, raison } si la règle le refuse.
+     * hdop, ageCorrections, inclinaison, precisionH, precisionV, heureUtc } }, ou { ok: false, raison } si la règle le refuse.
      */
     fun pointEnJson(): String {
         val mesure = derniereMesure
@@ -145,6 +156,9 @@ class EtatRecepteur {
             put("hdop", mesure.gga.hdop ?: JSONObject.NULL)
             put("ageCorrections", mesure.gga.ageCorrectionsS ?: JSONObject.NULL)
             put("inclinaison", derniereCompensation?.inclinaisonDeg ?: JSONObject.NULL)
+            val precision = dernierePrecision.takeIf { (age(heureGstMs) ?: Long.MAX_VALUE) <= DELAI_RECENT_MS }
+            put("precisionH", precision?.horizontaleM ?: JSONObject.NULL)
+            put("precisionV", precision?.verticaleM ?: JSONObject.NULL)
             put("heureUtc", mesure.gga.heureUtc)
         }
         return JSONObject().put("ok", true).put("point", point).toString()
@@ -167,6 +181,10 @@ class EtatRecepteur {
             "ETC" -> {
                 derniereCompensation = lireEtc(phrase)
                 heureEtcMs = maintenant
+            }
+            "GST" -> {
+                dernierePrecision = lireGst(phrase)
+                heureGstMs = maintenant
             }
         }
     }
