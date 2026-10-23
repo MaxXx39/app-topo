@@ -40,7 +40,7 @@ body {
   background: var(--fond);
   color: var(--texte);
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.45;
   -webkit-tap-highlight-color: transparent;
 }
@@ -123,8 +123,8 @@ p {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 38px;
-  height: 38px;
+  width: 35px;
+  height: 35px;
   padding: 0;
   border: none;
   border-radius: 50%;
@@ -134,8 +134,8 @@ p {
 }
 
 .entete-icone-bouton svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -234,8 +234,8 @@ body.aide-active .rond-aide {
 
 /* Sur le plan, le rond est posé à côté du bouton Calques. */
 .plan-calques .rond-aide {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   margin: 0 0 0 6px;
   box-shadow: var(--ombre);
 }
@@ -343,14 +343,14 @@ body.aide-active .rond-aide {
   }
 
   .onglets button.actif svg {
-    width: 40px;
+    width: 37px;
     padding: 1px 8px;
   }
 }
 
 .onglets svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
@@ -366,7 +366,7 @@ body.aide-active .rond-aide {
   background: var(--ambre);
   border-radius: 12px;
   padding: 1px 12px;
-  width: 48px;
+  width: 45px;
 }
 
 /* --- Panneaux (un seul visible à la fois sur téléphone) --- */
@@ -545,12 +545,12 @@ body.aide-active .rond-aide {
   .onglets button.actif svg {
     background: none;
     padding: 0;
-    width: 18px;
+    width: 17px;
   }
 
   .onglets svg {
-    width: 18px;
-    height: 18px;
+    width: 17px;
+    height: 17px;
   }
 
   .onglets button[data-onglet='plan'] {
@@ -570,7 +570,7 @@ button.bouton {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 40px;
+  min-height: 37px;
   padding: 8px 16px;
   border: none;
   border-radius: 10px;
@@ -586,7 +586,7 @@ button.bouton {
 }
 
 .bouton-secondaire {
-  min-height: 36px;
+  min-height: 33px;
   padding: 6px 12px;
   border: 1px solid var(--bordure);
   border-radius: 10px;
@@ -625,7 +625,7 @@ button:disabled {
 
 input[type='text'],
 select {
-  min-height: 40px;
+  min-height: 37px;
   padding: 8px 12px;
   border: 1px solid var(--bordure);
   border-radius: 10px;
@@ -965,8 +965,8 @@ svg.plan {
 }
 
 .plan-boutons button {
-  width: 44px;
-  height: 44px;
+  width: 41px;
+  height: 41px;
   border: none;
   border-bottom: 1px solid var(--bordure);
   background: var(--surface);
@@ -981,8 +981,8 @@ svg.plan {
 }
 
 .plan-boutons svg {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -1023,7 +1023,7 @@ svg.plan {
 }
 
 .plan .noms text {
-  font-size: 12px;
+  font-size: 11.2px;
   fill: var(--texte);
   paint-order: stroke;
   stroke: #fbfcfb;
@@ -1031,7 +1031,7 @@ svg.plan {
 }
 
 .plan .noms text.rang {
-  font-size: 10px;
+  font-size: 9.3px;
   font-weight: 700;
   fill: var(--sombre);
 }
@@ -1071,7 +1071,7 @@ svg.plan {
 }
 
 .plan .echelle text {
-  font-size: 11px;
+  font-size: 10.2px;
 }
 
 /* Pendant une modification, on laisse de la place pour la barre du bas. */
@@ -1113,8 +1113,8 @@ button.puce {
 }
 
 .puce svg {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -1138,7 +1138,7 @@ button.puce {
 
 .plan .noms text.altitude {
   fill: var(--gris);
-  font-size: 11px;
+  font-size: 10.2px;
 }
 
 .plan .ligne-rupture {
@@ -1169,7 +1169,7 @@ button.puce {
 }
 
 .plan .volumes text {
-  font-size: 12px;
+  font-size: 11.2px;
   font-weight: 700;
   fill: var(--texte);
 }
@@ -1177,7 +1177,7 @@ button.puce {
 .plan .volumes text.nom-stock {
   font-weight: 600;
   fill: var(--gris);
-  font-size: 11px;
+  font-size: 10.2px;
 }
 
 /* --- Relief : couleurs selon l'altitude et courbes de niveau --- */
@@ -1219,7 +1219,7 @@ button.puce {
 }
 
 .plan .legende text {
-  font-size: 11px;
+  font-size: 10.2px;
   fill: var(--texte);
 }
 
@@ -1234,7 +1234,7 @@ button.puce {
 }
 
 .choix-equidistance select {
-  min-height: 32px;
+  min-height: 30px;
   padding: 4px 8px;
 }
 
@@ -1272,7 +1272,7 @@ svg.plan {
 }
 
 .plan .pastille-volume text {
-  font-size: 11px;
+  font-size: 10.2px;
   font-weight: 600;
   fill: var(--gris);
 }
@@ -1285,7 +1285,7 @@ svg.plan {
   padding: 1px 6px;
   background: rgba(255, 255, 255, 0.85);
   border-top-left-radius: 6px;
-  font-size: 10px;
+  font-size: 9.3px;
   color: var(--texte);
 }
 
@@ -1336,7 +1336,7 @@ svg.plan {
   width: 100%;
   min-width: 0;
   font-size: 1rem;
-  min-height: 40px;
+  min-height: 37px;
   padding: 8px 10px;
   border: 1px solid var(--bordure);
   border-radius: 10px;
@@ -1395,7 +1395,7 @@ svg.plan {
 }
 
 .ligne-leve .case input.nom-leve {
-  min-height: 32px;
+  min-height: 30px;
   padding: 4px 8px;
   font-weight: 600;
   flex: 1;
@@ -1418,7 +1418,7 @@ svg.plan {
   flex: 1;
   min-width: 0;
   font-weight: 600;
-  min-height: 32px;
+  min-height: 30px;
 }
 
 .calques-pdf {
@@ -1588,7 +1588,7 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 36px;
+  min-height: 33px;
   padding: 8px 12px;
   border: 1px dashed #9aa3aa;
   border-radius: 10px;
@@ -1603,8 +1603,8 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
 }
 
 .icone-role {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   margin-right: 8px;
   vertical-align: -4px;
   fill: none;
@@ -1685,7 +1685,7 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
 .coordonnees-coupe input {
   width: 100%;
   min-width: 0;
-  min-height: 34px;
+  min-height: 32px;
   padding: 4px 6px;
   font-variant-numeric: tabular-nums;
 }
@@ -1765,7 +1765,7 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
 }
 
 .plan .coupes text {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   fill: var(--sombre);
   paint-order: stroke;
@@ -1967,7 +1967,7 @@ th.nombre {
 }
 
 .plan .etiquettes-mesures text {
-  font-size: 11.5px;
+  font-size: 10.7px;
   fill: var(--texte);
 }
 
@@ -1977,7 +1977,7 @@ th.nombre {
 }
 
 .plan .etiquettes-mesures text.cote-morceau {
-  font-size: 10.5px;
+  font-size: 9.8px;
   fill: color-mix(in srgb, var(--couleur-mesure, var(--cyan)) 80%, black);
   paint-order: stroke;
   stroke: #ffffff;
@@ -2048,7 +2048,7 @@ th.nombre {
 }
 
 .actions-projets .bouton-secondaire {
-  min-height: 40px;
+  min-height: 37px;
   padding: 6px 8px;
   line-height: 1.2;
 }
@@ -2105,7 +2105,7 @@ th.nombre {
 
 .champs-projet input {
   width: 100%;
-  min-height: 38px;
+  min-height: 35px;
   padding: 6px 10px;
   border: 1px solid var(--bordure);
   border-radius: 8px;
@@ -2125,7 +2125,7 @@ th.nombre {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 50px;
+  min-height: 46px;
   padding: 8px 10px;
   border: 1px dashed var(--sombre);
   border-radius: 10px;
@@ -2139,8 +2139,8 @@ th.nombre {
 }
 
 .bouton-import svg {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   flex: none;
   fill: none;
   stroke: var(--sombre);
@@ -2183,8 +2183,8 @@ th.nombre {
 }
 
 .icone-section {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   fill: none;
   stroke: var(--sombre);
   stroke-width: 1.8;
@@ -2238,8 +2238,8 @@ button.infos-projet:disabled {
 }
 
 .bouton-menu-projet {
-  width: 36px;
-  height: 36px;
+  width: 33px;
+  height: 33px;
   border: 1px solid var(--bordure);
   border-radius: 50%;
   background: var(--surface);
@@ -2295,7 +2295,7 @@ button.infos-projet:disabled {
 /* Choix dans le bandeau bleu nuit (surface affichée). */
 .bloc-entete select.champ-entete {
   width: 100%;
-  min-height: 40px;
+  min-height: 37px;
   padding: 6px 10px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 8px;
@@ -2425,7 +2425,7 @@ body.avec-recepteur .bandeaux-recepteur {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  min-height: 58px;
+  min-height: 54px;
   padding: 8px 4px;
   border: 2px solid var(--couleur-role);
   border-radius: 10px;
@@ -2437,8 +2437,8 @@ body.avec-recepteur .bandeaux-recepteur {
 }
 
 .role-leve svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.2;
@@ -2503,7 +2503,7 @@ body.avec-recepteur .bandeaux-recepteur {
 
 .bouton.bouton-prendre {
   width: 100%;
-  min-height: 58px;
+  min-height: 54px;
   font-size: 1.2rem;
   letter-spacing: 0.03em;
 }
@@ -2819,7 +2819,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 .puce-choix {
-  min-height: 34px;
+  min-height: 32px;
   padding: 4px 12px;
   border: 1px solid var(--bordure);
   border-radius: 17px;
@@ -2915,7 +2915,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 .coupe-directe text {
-  font-size: 10px;
+  font-size: 9.3px;
   fill: var(--gris);
 }
 
@@ -2925,7 +2925,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 .coupe-directe .vide-coupe {
-  font-size: 12px;
+  font-size: 11.2px;
 }
 
 .coupe-directe .profil {
@@ -3027,7 +3027,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 
 .bandeau-leve select {
   width: 100%;
-  min-height: 32px;
+  min-height: 30px;
   padding: 0 28px 0 0;
   border: none;
   appearance: none;
@@ -3041,8 +3041,8 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 
 .bouton-plus {
   flex: none;
-  width: 48px;
-  height: 48px;
+  width: 45px;
+  height: 45px;
   border: none;
   border-radius: 50%;
   background: var(--couleur-nature);
@@ -3077,7 +3077,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 /* Mêmes couleurs que les surfaces dans les coupes : stock brun, terrain vert, terrassement bleu. */
 .bouton-nature {
   --couleur-nature: #b45309;
-  min-height: 50px;
+  min-height: 46px;
   border: 2px solid var(--couleur-nature);
   border-radius: 12px;
   background: color-mix(in srgb, var(--couleur-nature) 8%, var(--surface));
@@ -3313,7 +3313,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  min-height: 52px;
+  min-height: 48px;
   padding: 6px 2px 4px;
   border: 1px solid var(--bordure);
   border-radius: 10px;
@@ -3325,8 +3325,8 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 .bouton-accroche svg {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   fill: none;
   stroke: #6b7780;
   stroke-width: 2;
@@ -3366,7 +3366,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 .accroche-par-nom input {
   flex: 1;
   min-width: 0;
-  min-height: 36px;
+  min-height: 33px;
   padding: 6px 10px;
   border: 1px solid var(--bordure);
   border-radius: 8px;
@@ -3415,7 +3415,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 .boussole text {
-  font-size: 9px;
+  font-size: 8.4px;
   font-weight: 800;
   fill: #ffffff;
 }
@@ -3470,7 +3470,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 .cible-implantation .rayon,
 .cible-implantation .haut-cible {
   fill: currentColor;
-  font-size: 12px;
+  font-size: 11.2px;
   font-weight: 700;
 }
 
@@ -3637,7 +3637,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 
 .plan .nom-a-implanter {
   fill: #0d9488;
-  font-size: 12px;
+  font-size: 11.2px;
   font-weight: 700;
   paint-order: stroke;
   stroke: #ffffff;
@@ -3708,7 +3708,7 @@ svg.plan,
 }
 
 .champs-cartouche input {
-  min-height: 36px;
+  min-height: 33px;
   padding: 6px 8px;
   border: 1px solid var(--bordure);
   border-radius: 8px;
@@ -3809,8 +3809,8 @@ svg.plan,
 
 /* Drapeau dans le texte : début vert, fin à damier. */
 .icone-drapeau {
-  width: 18px;
-  height: 20px;
+  width: 17px;
+  height: 19px;
   vertical-align: -4px;
 }
 
@@ -3856,7 +3856,7 @@ svg.plan,
 .couloir-ligne .haut-cible,
 .couloir-ligne .nom-bout-couloir {
   fill: currentColor;
-  font-size: 11px;
+  font-size: 10.2px;
   font-weight: 700;
 }
 
@@ -3898,7 +3898,7 @@ svg.plan,
 }
 
 .plan .nom-bout-ligne {
-  font-size: 12px;
+  font-size: 11.2px;
   font-weight: 800;
   fill: #0d9488;
   paint-order: stroke;
@@ -3958,7 +3958,7 @@ svg.plan,
 .champs-corrections input {
   width: 100%;
   min-width: 0;
-  min-height: 34px;
+  min-height: 32px;
   padding: 4px 8px;
   border: 1px solid var(--bordure);
   border-radius: 8px;
@@ -3978,7 +3978,7 @@ svg.plan,
 .nom-appareil input {
   flex: 1;
   min-width: 0;
-  min-height: 36px;
+  min-height: 33px;
   padding: 6px 10px;
   border: 1px solid var(--bordure);
   border-radius: 8px;
@@ -4052,23 +4052,23 @@ svg.plan,
 /* --- Mode téléphone (réglage) : textes, icônes et boutons plus petits ---
    La plupart des tailles de texte sont en « rem » : baisser la taille de base les réduit toutes. */
 html:has(body.mode-telephone) {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 body.mode-telephone {
-  font-size: 14px;
+  font-size: 13px;
   --hauteur-entete: 48px;
   --hauteur-onglets: 54px;
 }
 
 body.mode-telephone .entete-icone-bouton {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
 }
 
 body.mode-telephone .entete-icone-bouton svg {
-  width: 19px;
-  height: 19px;
+  width: 18px;
+  height: 18px;
 }
 
 body.mode-telephone .entete-titre {
@@ -4077,18 +4077,18 @@ body.mode-telephone .entete-titre {
 
 body.mode-telephone .bouton,
 body.mode-telephone button.bouton {
-  min-height: 36px;
+  min-height: 33px;
   padding: 6px 12px;
 }
 
 body.mode-telephone .bouton-secondaire {
-  min-height: 32px;
+  min-height: 30px;
   padding: 4px 10px;
 }
 
 body.mode-telephone input[type='text'],
 body.mode-telephone select {
-  min-height: 36px;
+  min-height: 33px;
   padding: 6px 10px;
 }
 
@@ -4109,8 +4109,8 @@ body.mode-telephone .onglets button {
 }
 
 body.mode-telephone .onglets button svg {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
 }
 
 /* ==========================================================================
@@ -4180,7 +4180,7 @@ body.mode-telephone .onglets button svg {
 
 .choix-implantation-type .puce-choix {
   flex: 1;
-  min-height: 38px;
+  min-height: 35px;
   border: 2px solid #0d9488;
   background: var(--surface);
   color: #0f766e;
@@ -4205,8 +4205,8 @@ body.mode-telephone .onglets button svg {
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 37px;
+  height: 37px;
   padding: 0;
   border: 1px solid var(--bordure);
   border-radius: 50%;
@@ -4216,8 +4216,8 @@ body.mode-telephone .onglets button svg {
 }
 
 .bouton-retour svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.2;
@@ -4307,7 +4307,7 @@ body.mode-telephone .onglets button svg {
 
 .altitude-bout input[type='text'] {
   width: 84px;
-  min-height: 30px;
+  min-height: 28px;
   padding: 2px 6px;
 }
 
@@ -4352,7 +4352,7 @@ button.bouton-retour[data-action='inverserLigne'] {
   }
 
   body.vue-implantation .vue-guidage .bouton-prendre {
-    min-height: 54px;
+    min-height: 50px;
     margin-top: 6px;
   }
 
@@ -4419,7 +4419,7 @@ button.bouton-retour[data-action='inverserLigne'] {
 }
 
 .ligne-menu-plan select {
-  min-height: 30px;
+  min-height: 28px;
   padding: 2px 4px;
   font-size: 0.85rem;
 }
@@ -4561,7 +4561,7 @@ button.bouton-import {
 }
 
 .barre-pointage .bouton {
-  min-height: 34px;
+  min-height: 32px;
 }
 
 .ligne-barre-pointage .bouton {
@@ -4592,7 +4592,7 @@ button.bouton-import {
 
 .choix-pointage input {
   width: 110px;
-  min-height: 34px;
+  min-height: 32px;
   padding: 4px 6px;
 }
 
@@ -4614,7 +4614,7 @@ button.bouton-import {
 
 .plan .point-ajoute text {
   fill: var(--sombre);
-  font-size: 11px;
+  font-size: 10.2px;
   font-weight: 700;
   paint-order: stroke;
   stroke: #ffffff;
@@ -4676,7 +4676,7 @@ button.bouton-import {
 }
 
 .ligne-leve-en-cours .bandeau-leve select {
-  min-height: 38px;
+  min-height: 35px;
   padding: 0 44px 0 10px;
   border: 1.5px solid var(--couleur-nature);
   border-radius: 8px;
@@ -4687,8 +4687,8 @@ button.bouton-import {
 .ligne-leve-en-cours .bouton-plus {
   --couleur-nature: #b45309;
   align-self: center;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   box-shadow: 0 2px 6px rgba(16, 24, 20, 0.25);
 }
 
@@ -4743,7 +4743,7 @@ button.bouton-import {
 
 .table-libelles input {
   width: 100%;
-  min-height: 34px;
+  min-height: 32px;
   padding: 4px 6px;
 }
 
@@ -4866,8 +4866,8 @@ button.bouton-import {
 
 .invite-choix svg {
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   fill: none;
   stroke: #0d9488;
   stroke-width: 2.6;
@@ -4904,8 +4904,8 @@ button.bouton-import {
 }
 
 .bouton-implanter svg {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.2;
@@ -4914,7 +4914,7 @@ button.bouton-import {
 /* Écran de guidage : « P2 ▶ » pour implanter le point suivant. */
 .bouton-suivant {
   flex: none;
-  min-height: 38px;
+  min-height: 35px;
   padding: 4px 12px;
   border: 2px solid #0d9488;
   border-radius: 19px;
@@ -4931,7 +4931,7 @@ button.bouton-import {
 
 .cible-implantation .nord-cible text {
   fill: var(--rouge);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -4986,6 +4986,14 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 }
 
 @media (max-width: 899px) {
+  /* Cible affichée : elle prend la place laissée par les textes (plus de la moitié de l'écran). */
+  body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] {
+    --hauteur-plan-guidage: max(
+      calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) / 2),
+      calc(100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets) - 290px)
+    );
+  }
+
   body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .cible-haut {
     position: fixed;
     top: calc(var(--hauteur-entete) + var(--hauteur-bascule));
@@ -5007,7 +5015,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 /* Implantation d'une ligne : cotes écrites le long des traits (pas de bulle), avec un liseré
    blanc pour se lire sur le plan ; prolongement de la ligne en pointillés avant le début ou après la fin. */
 .plan .cote-ligne {
-  font-size: 12px;
+  font-size: 11.2px;
   font-weight: 800;
   paint-order: stroke;
   stroke: #ffffff;
@@ -5048,7 +5056,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 .table-libelles select {
   width: 100%;
   min-width: 5.5em;
-  min-height: 34px;
+  min-height: 32px;
   padding: 4px 4px;
 }
 
