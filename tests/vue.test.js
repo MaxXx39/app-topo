@@ -1,6 +1,6 @@
 // Tests des calculs de la vue du plan.
 import { describe, it, expect } from 'vitest';
-import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle } from '../src/plan/vue.js';
+import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from '../src/plan/vue.js';
 
 const points = [
   { nom: 'a', est: 2499300, nord: 1124500, altitude: 0 },
@@ -64,5 +64,45 @@ describe('barreEchelle', () => {
     expect(barreEchelle(4, 120)).toEqual({ metres: 20, pixels: 80 });
     expect(barreEchelle(1, 120)).toEqual({ metres: 100, pixels: 100 });
     expect(barreEchelle(50, 120).metres).toBe(2);
+  });
+});
+
+describe('vue tournée (devant du RX2 en haut)', () => {
+  const vue = { echelle: 10, estCentre: 1000, nordCentre: 2000, largeur: 200, hauteur: 100, rotation: 90 };
+
+  it('met la direction regardée en haut : regard vers l\'Est, l\'Est est en haut et le Nord à gauche', () => {
+    const est = versEcran(1001, 2000, vue);
+    expect(est.x).toBeCloseTo(100);
+    expect(est.y).toBeCloseTo(40);
+    const nord = versEcran(1000, 2001, vue);
+    expect(nord.x).toBeCloseTo(90);
+    expect(nord.y).toBeCloseTo(50);
+  });
+
+  it('versTerrain défait versEcran, quelle que soit la rotation', () => {
+    for (const rotation of [0, 37, 90, 200, -45]) {
+      const v = { ...vue, rotation };
+      const ecran = versEcran(1003.5, 1997.25, v);
+      const retour = versTerrain(ecran.x, ecran.y, v);
+      expect(retour.est).toBeCloseTo(1003.5, 9);
+      expect(retour.nord).toBeCloseTo(1997.25, 9);
+    }
+  });
+
+  it('déplacer et zoomer suivent le doigt sur un plan tourné', () => {
+    const avant = versTerrain(30, 70, vue);
+    const deplacee = deplacer(vue, 15, -8);
+    const apres = versEcran(avant.est, avant.nord, deplacee);
+    expect(apres.x).toBeCloseTo(45);
+    expect(apres.y).toBeCloseTo(62);
+    const zoomee = zoomer(vue, 2, 30, 70);
+    const fixe = versEcran(avant.est, avant.nord, zoomee);
+    expect(fixe.x).toBeCloseTo(30);
+    expect(fixe.y).toBeCloseTo(70);
+  });
+
+  it('la zone visible contient les 4 coins de l\'écran', () => {
+    const zone = zoneVisible({ ...vue, rotation: 45 });
+    expect(zone.estMax - zone.estMin).toBeCloseTo(((200 + 100) / Math.SQRT2) / 10);
   });
 });

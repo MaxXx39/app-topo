@@ -12,6 +12,7 @@
 // Le DXF des mesures (onglet Calculs › Mesures, voir genererDxfMesures) est un fichier à part, sans volume.
 import { courbesDeNiveau } from '../topo/courbes.js';
 import { formaterNombre } from '../topo/format.js';
+import { lireLibelles, couleurDuNom, couleurDeLigne, aciDeCouleurLibelle } from '../leve/libelles.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
 import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, aciDeMesure } from '../mesures/valeurs.js';
 
@@ -30,8 +31,10 @@ export function genererDxf({ points, stocks = [], resultats = [], surfaces = [],
   const calques = new Map(Object.entries(COULEURS).filter(([nom]) => nom !== 'COURBES' || equidistance));
   const parNom = new Map(points.map((p) => [p.nom, p]));
 
+  // Couleur du libellé (P-RG-1 : regard en noir…) sur le point et sa ligne, sinon celle du calque.
+  const libelles = lireLibelles();
   for (const p of points) {
-    entites.push(['0', 'POINT', '8', 'POINTS', ...xyz(p, 0)]);
+    entites.push(['0', 'POINT', '8', 'POINTS', ...codeCouleur(aciDeCouleurLibelle(couleurDuNom(p.nom, libelles))), ...xyz(p, 0)]);
     entites.push(['0', 'TEXT', '8', 'NOMS', ...xyz({ ...p, est: p.est + 0.2, nord: p.nord + 0.2 }, 0), '40', '0.3', '1', p.nom]);
     // Altitude sous le nom (texte de 0.25 m de haut)
     entites.push(['0', 'TEXT', '8', 'ALTITUDES', ...xyz({ ...p, est: p.est + 0.2, nord: p.nord - 0.4 }, 0), '40', '0.25', '1', formaterNombre(p.altitude)]);
@@ -42,7 +45,7 @@ export function genererDxf({ points, stocks = [], resultats = [], surfaces = [],
     if (contour.length >= 3) entites.push(...polyligne3D(contour, true, 'CONTOURS'));
     for (const ligne of stock.lignesRupture ?? []) {
       const sommets = ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean);
-      if (sommets.length >= 2) entites.push(...polyligne3D(sommets, ligne.fermee, 'LIGNES_RUPTURE'));
+      if (sommets.length >= 2) entites.push(...polyligne3D(sommets, ligne.fermee, 'LIGNES_RUPTURE', aciDeCouleurLibelle(couleurDeLigne(ligne, libelles))));
     }
     const triangles = resultats[i]?.trianglesDessus;
     if (triangles?.length > 0) {

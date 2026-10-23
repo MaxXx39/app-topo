@@ -3,7 +3,7 @@
 // d'un projet de Drive et choix de la bonne version (voir synchro.js).
 // main.js appelle : projetEnregistre(), avantDeChanger(), apresOuverture(), envoyerMaintenant().
 import { creerDrive } from './drive.js';
-import { creerSynchro, choisirVersion } from './synchro.js';
+import { creerSynchro, choisirVersion, verrouActif, SIGNE_DE_VIE } from './synchro.js';
 import { creerConnexion, connexionPossible } from './connexion.js';
 import { appareil, nommerAppareil, etaitConnecte, retenirConnexion, memoireProjet, retenirProjet } from './memoire.js';
 
@@ -33,6 +33,24 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
   let synchro = null;
   let minuterie = null;
   let envoiEnCours = null;
+
+  // Signe de vie toutes les 5 minutes : le projet ouvert reste à cet appareil (sinon, au bout de
+  // 15 minutes, un autre appareil peut l'ouvrir sans « prendre la main »).
+  setInterval(async () => {
+    if (!etat.connecte || !synchro) return;
+    const projet = obtenirProjet();
+    const dossierId = memoireProjet(projet.id)?.dossierId;
+    if (!dossierId || etat.repris?.projetId === projet.id) return;
+    try {
+      const { repris } = await synchro.signeDeVie(dossierId);
+      if (repris) {
+        etat.repris = { projetId: projet.id, ...repris };
+        changer('repris');
+      }
+    } catch {
+      // Pas de réseau : nouvel essai au prochain signe de vie.
+    }
+  }, SIGNE_DE_VIE);
 
   function changer(nouvel, texte = '') {
     etat.etat = nouvel;
@@ -86,15 +104,14 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     minuterie = setTimeout(() => envoyer(), delai);
   }
 
-  /** Envoie le projet ouvert (un seul envoi à la fois). */
-  async function envoyer() {
+  /** Envoie le projet ouvert, ou "projet" (un seul envoi à la fois). */
+  async function envoyer(projet = obtenirProjet()) {
     if (!etat.connecte || !synchro) return;
     clearTimeout(minuterie);
     if (envoiEnCours) {
       await envoiEnCours;
-      return envoyer();
+      return envoyer(projet);
     }
-    const projet = obtenirProjet();
     if (etat.repris?.projetId === projet.id) return; // ouvert ailleurs : on n'écrase rien
     envoiEnCours = (async () => {
       changer('envoi', 'envoi…');
@@ -107,6 +124,8 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
         }
         retenirProjet(projet.id, resultat.memoire);
         etat.derniereSynchro = new Date();
+        // Premier envoi de ce projet : il apparaît maintenant sur Drive (☁ dans la liste).
+        if (!etat.projetsDrive.some((p) => p.projetId === projet.id)) await rafraichirListe().catch(() => {});
         changer('a-jour');
       } catch (erreur) {
         changer('attente', erreur.message);
@@ -138,29 +157,53 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
           await ouvrirVersionDrive(surDrive, choix === 'conflit');
           return;
         }
-        if (surDrive.verrou && surDrive.verrou.appareilId !== appareil().id) {
+        if (surDrive.verrou && surDrive.verrou.appareilId !== appareil().id && verrouActif(surDrive.verrou)) {
           etat.repris = { projetId: projet.id, ...surDrive.verrou };
           changer('repris');
           return;
         }
       }
       planifier(2_000);
+      rendreAutresVerrous(projet.id);
     } catch (erreur) {
       changer('attente', erreur.message);
     }
   }
 
-  /** Avant d'ouvrir un autre projet : on envoie ce qui reste et on rend le verrou. */
-  async function avantDeChanger() {
-    if (!etat.connecte || !synchro) return;
-    const projet = obtenirProjet();
-    try {
-      if (etat.repris?.projetId !== projet.id) await envoyer();
-      const memoire = memoireProjet(projet.id);
-      if (memoire && etat.repris?.projetId !== projet.id) await synchro.rendreVerrou(memoire.dossierId);
-    } catch {
-      // Pas de réseau : le verrou restera ; l'autre appareil pourra prendre la main.
+  /**
+   * Un seul projet ouvert par appareil : les autres projets encore verrouillés au nom de cet
+   * appareil (ancien changement de projet sans réseau…) sont rendus.
+   */
+  async function rendreAutresVerrous(projetOuvertId) {
+    for (const p of etat.projetsDrive) {
+      if (p.projetId === projetOuvertId || p.verrou?.appareilId !== appareil().id) continue;
+      try {
+        await synchro.rendreVerrou(p.dossierId);
+        p.verrou = null;
+      } catch {
+        // Pas grave : il expirera tout seul (15 minutes sans signe de vie).
+      }
     }
+    quandChange();
+  }
+
+  /**
+   * Avant d'ouvrir un autre projet : on envoie ce qui reste et on rend le verrou, en arrière-plan
+   * (l'autre projet s'ouvre tout de suite, sans attendre internet). Renvoie la promesse de l'envoi.
+   */
+  function avantDeChanger() {
+    if (!etat.connecte || !synchro) return Promise.resolve();
+    const projet = obtenirProjet();
+    if (etat.repris?.projetId === projet.id) return Promise.resolve();
+    return (async () => {
+      try {
+        await envoyer(projet);
+        const memoire = memoireProjet(projet.id);
+        if (memoire && etat.repris?.projetId !== projet.id) await synchro.rendreVerrou(memoire.dossierId);
+      } catch {
+        // Pas de réseau : le verrou restera ; l'autre appareil pourra prendre la main.
+      }
+    })();
   }
 
   /**
@@ -225,12 +268,12 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       const surDrive = etat.projetsDrive.find((p) => p.dossierId === dossierId);
       if (!surDrive || !synchro) return;
       const verrou = surDrive.verrou;
-      if (verrou && verrou.appareilId !== appareil().id) {
+      if (verrou && verrou.appareilId !== appareil().id && verrouActif(verrou)) {
         const depuis = verrou.depuis ? new Date(verrou.depuis).toLocaleString('fr-CH', { dateStyle: 'short', timeStyle: 'short' }) : '?';
         if (!confirm(`« ${surDrive.titre} » est ouvert sur ${verrou.nom} (depuis ${depuis}).\n\nPrendre la main ? ${verrou.nom} ne pourra plus envoyer ses modifications.`)) return;
       }
       try {
-        await avantDeChanger();
+        avantDeChanger(); // en arrière-plan
         const local = await lireLocal(surDrive.projetId);
         const memoire = memoireProjet(surDrive.projetId);
         const choix = choisirVersion({ local: local?.modifieLe, envoyeLe: memoire?.envoyeLe, distant: surDrive.modifieLe });
@@ -245,6 +288,15 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       } catch (erreur) {
         changer('attente', erreur.message);
       }
+    },
+
+    /** Supprime un projet de Drive (dossier à la corbeille de Drive), puis rafraîchit la liste. */
+    async supprimerDeDrive(projetId) {
+      const surDrive = etat.projetsDrive.find((p) => p.projetId === projetId);
+      if (!synchro || !surDrive) return;
+      await synchro.supprimerProjet(surDrive.dossierId);
+      retenirProjet(projetId, null);
+      await rafraichirListe();
     },
 
     /** « Prendre la main » sur le projet ouvert ailleurs : le verrou passe ici, puis envoi. */

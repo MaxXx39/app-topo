@@ -157,3 +157,21 @@ function pasEntre(a, b) {
   if (ecrire(da.numero - 1) === b) return -1;
   return 0;
 }
+
+/**
+ * Nom du point suivant à implanter : même début, numéro de la fin + 1 (P1 → P2, b100 → b101,
+ * L-HT-1-3 → L-HT-1-4). S'il n'existe pas, le plus petit numéro plus grand qui existe (P1 → P4
+ * s'il n'y a ni P2 ni P3). Renvoie null s'il n'y en a pas (ou si le nom ne finit pas par un numéro).
+ */
+export function nomSuivant(nom, nomsExistants) {
+  const decoupe = /^(.*?)(\d+)$/.exec(nom ?? '');
+  if (!decoupe) return null;
+  const [, debut, numero] = decoupe;
+  let meilleur = null;
+  for (const autre of nomsExistants) {
+    const a = /^(.*?)(\d+)$/.exec(autre);
+    if (!a || a[1] !== debut || Number(a[2]) <= Number(numero)) continue;
+    if (meilleur === null || Number(a[2]) < meilleur.numero) meilleur = { nom: autre, numero: Number(a[2]) };
+  }
+  return meilleur?.nom ?? null;
+}

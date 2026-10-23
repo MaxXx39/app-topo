@@ -197,3 +197,22 @@ describe('libellés des noms de points', () => {
     expect(lireTexteLibelles(ecrireTexteLibelles(LIBELLES_DEPART.lignes))).toEqual(LIBELLES_DEPART.lignes);
   });
 });
+
+describe('couleur des libellés', () => {
+  it('trouve la couleur d\'un point ou d\'une ligne d\'après son libellé', async () => {
+    const { couleurDuNom, couleurDeLigne } = await import('../src/leve/libelles.js');
+    const libelles = {
+      lignes: [['HT', 'haut de talus', '#2563eb'], ['BT', 'bas de talus']],
+      points: [['RG', 'regard', '#111827'], ['TN', 'terrain', '']],
+      aires: [['ENR', 'enrobé', '#6b7280']],
+    };
+    expect(couleurDuNom('P-RG-3', libelles)).toBe('#111827');
+    expect(couleurDuNom('L-HT-1-2', libelles)).toBe('#2563eb');
+    expect(couleurDuNom('A-ENR-2-1', libelles)).toBe('#6b7280');
+    expect(couleurDuNom('P-TN-1', libelles)).toBeNull();
+    expect(couleurDuNom('L-BT-1-1', libelles)).toBeNull();
+    expect(couleurDuNom('b100', libelles)).toBeNull();
+    expect(couleurDeLigne({ libelle: 'HT', noms: [] }, libelles)).toBe('#2563eb');
+    expect(couleurDeLigne({ noms: ['L-HT-4-1', 'L-HT-4-2'] }, libelles)).toBe('#2563eb');
+  });
+});

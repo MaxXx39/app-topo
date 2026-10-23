@@ -5,6 +5,7 @@ import ch.apptopo.noyau.nmea.degresDepuisNmea
 import ch.apptopo.noyau.nmea.libelleQualite
 import ch.apptopo.noyau.nmea.lireEtc
 import ch.apptopo.noyau.nmea.lireGga
+import ch.apptopo.noyau.nmea.lireGst
 import ch.apptopo.noyau.nmea.lirePhraseNmea
 import ch.apptopo.noyau.nmea.sommeDeControle
 import kotlin.test.Test
@@ -76,6 +77,17 @@ class NmeaTest {
         assertEquals("RTK FIXE", libelleQualite(gga.qualite))
         assertEquals(1.0, gga.ageCorrectionsS!!, 1e-9)
         assertEquals("0000", gga.stationReference)
+    }
+
+    @Test
+    fun `GST donne la precision horizontale et verticale`() {
+        val texte = "GNGST,071530.00,0.8,0.010,0.008,45.0,0.006,0.008,0.015"
+        val gst = lireGst(lirePhraseNmea("\$$texte*${sommeDeControle(texte)}")!!)!!
+        assertEquals(0.010, gst.horizontaleM!!, 1e-9)
+        assertEquals(0.015, gst.verticaleM!!, 1e-9)
+        assertNull(lireGst(lirePhraseNmea(ggaExemple)!!))
+        val vide = "GNGST,071530.00,,,,,,,"
+        assertNull(lireGst(lirePhraseNmea("\$$vide*${sommeDeControle(vide)}")!!)!!.horizontaleM)
     }
 
     @Test

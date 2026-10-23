@@ -6,5 +6,7 @@
  * Exemple : 1636.1966 -> "1636.197"
  */
 export function formaterNombre(valeur) {
+  // Valeur inconnue (altitude d'un point ajouté sans altitude…) : un tiret.
+  if (typeof valeur !== 'number' || !Number.isFinite(valeur)) return '—';
   return valeur.toFixed(3);
 }

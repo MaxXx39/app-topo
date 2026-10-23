@@ -16,6 +16,7 @@ import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from '../plan/fo
 import { grouperParNature } from '../volumes/calculs.js';
 import { preparerDessinCoupe, texteEchellesCoupe } from '../coupes/dessin.js';
 import { longueurCoupe } from '../topo/coupe.js';
+import { lireLibelles, couleurDuNom, couleurDeLigne } from '../leve/libelles.js';
 // Logo Perrin, dans le fichier PDF (image JPEG de 406 × 104 pixels, écrite dans le code).
 import logoPerrin from '../assets/logo-perrin.jpg?inline';
 
@@ -61,6 +62,11 @@ export function appliquerFormat(format) {
   return { page: PAGE, cadrePlan: CADRE_PLAN, colonne: COLONNE, yCartouche: Y_CARTOUCHE };
 }
 appliquerFormat('a4');
+
+/** Couleur « #rrggbb » → [rouge, vert, bleu] (0 à 255). */
+function hexEnRvb(hex) {
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) || 0);
+}
 
 export const COULEURS = {
   texte: [27, 43, 54],
@@ -489,8 +495,15 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
     for (let i = 0; i + 1 < sommets.length; i++) doc.line(sommets[i].x, sommets[i].y, sommets[i + 1].x, sommets[i + 1].y);
     if (fermee && sommets.length >= 3) doc.line(sommets.at(-1).x, sommets.at(-1).y, sommets[0].x, sommets[0].y);
   };
-  trait(doc, COULEURS.ligne, 0.25);
-  for (const { stock } of calcules) for (const ligne of stock.lignesRupture ?? []) polyligne(ligne.noms, ligne.fermee);
+  // Lignes de rupture : couleur de leur libellé (HT en bleu…) si elle est choisie.
+  const libelles = lireLibelles();
+  for (const { stock } of calcules) {
+    for (const ligne of stock.lignesRupture ?? []) {
+      const couleur = couleurDeLigne(ligne, libelles);
+      trait(doc, couleur ? hexEnRvb(couleur) : COULEURS.ligne, 0.25);
+      polyligne(ligne.noms, ligne.fermee);
+    }
+  }
   trait(doc, COULEURS.contour, 0.35);
   for (const { stock } of calcules) polyligne(stock.contour ?? [], true);
 
@@ -528,9 +541,14 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
  * placés sans chevauchement comme sur l'écran. Taille du texte selon l'échelle (1:250 et plus détaillé : plus grand).
  */
 export function dessinerPointsPdf(doc, pointsMontres, versPapier, echelle, choix) {
-  doc.setFillColor(...COULEURS.texte);
   const positions = pointsMontres.map(versPapier);
-  for (const { x, y } of positions) doc.circle(x, y, 0.3, 'F');
+  // Couleur du libellé du nom (P-RG-1 : regard en noir…), sinon la couleur du texte.
+  const libelles = lireLibelles();
+  positions.forEach(({ x, y }, i) => {
+    const couleur = couleurDuNom(pointsMontres[i].nom, libelles);
+    doc.setFillColor(...(couleur ? hexEnRvb(couleur) : COULEURS.texte));
+    doc.circle(x, y, 0.3, 'F');
+  });
   const tailleNom = echelle <= 250 ? 6 : 5; // points (typographiques)
   const hauteurNom = tailleNom * 0.3528; // 1 point = 0.3528 mm
   doc.setFontSize(tailleNom);

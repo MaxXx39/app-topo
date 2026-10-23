@@ -226,7 +226,8 @@ export function sourcesDesPlans(plans, position, rayon) {
   const points = [];
   const altitude = (z) => (z ? z : null);
   for (const plan of plans) {
-    if (!plan.contenu) continue;
+    // Plan caché (œil fermé) : on n'y accroche rien.
+    if (!plan.contenu || plan.visible === false) continue;
     const { est: e0, nord: n0 } = plan.origine;
     const visible = (objet) => plan.calques[objet.c]?.visible !== false;
     // Zone touchée, dans le repère du plan.

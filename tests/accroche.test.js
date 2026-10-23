@@ -114,6 +114,11 @@ describe('plans DXF et export', () => {
     expect(accrocher('milieu', { est: 2500004, nord: 1100000.2 }, 1, sources)).toMatchObject({ est: 2500005, nord: 1100000, altitude: 400.5 });
   });
 
+  it("n'accroche rien sur un plan caché (œil fermé)", () => {
+    const plan = { visible: false, origine: { est: 0, nord: 0 }, calques: [{ visible: true }], contenu: { traits: [{ c: 0, p: [0, 0, 10, 0] }] } };
+    expect(sourcesDesPlans([plan], { est: 5, nord: 0 }, 1).lignes).toHaveLength(0);
+  });
+
   it('CSV des implantations', () => {
     const texte = csvImplantations([{
       nom: 'I-1',

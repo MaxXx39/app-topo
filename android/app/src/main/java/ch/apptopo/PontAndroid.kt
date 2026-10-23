@@ -80,6 +80,12 @@ class PontAndroid(private val ecran: EcranPrincipal) {
         ecran.runOnUiThread { ecran.demanderJetonDrive() }
     }
 
+    /** Ferme l'appli (bouton ✕ de l'en-tête, après confirmation dans la page). */
+    @JavascriptInterface
+    fun fermerAppli() {
+        ecran.runOnUiThread { ecran.finishAndRemoveTask() }
+    }
+
     /** Modèle de l'appareil (« Crosscall Core-T4 »), proposé comme nom de l'appareil. */
     @JavascriptInterface
     fun modeleAppareil(): String = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}".trim()
