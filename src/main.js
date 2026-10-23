@@ -54,6 +54,7 @@ import {
   estLeveDirect,
   leveDuJour,
   creerSurfaceDirecte,
+  creerAutres,
   prochainNom,
   nomsDuProjet,
   rolesPermis,
@@ -68,6 +69,7 @@ import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, me
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
 import { appliquerReglages, ouvrirReglages } from './reglages/reglages.js';
+import { sonValidation, sonRefus } from './outils/son.js';
 import { ajouterPointAjoute, leveDesPointsAjoutes, nomPointAjoute } from './topo/points-ajoutes.js';
 
 // --- État de l'application ---
@@ -406,6 +408,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     projet.surfaces = projet.surfaces.filter((s) => s.leveId !== id);
     projet.mesures = projet.mesures.filter((m) => m.leveId !== id);
     projet.metres = projet.metres.filter((m) => m.leveId !== id);
+    projet.autres = projet.autres.filter((a) => a.leveId !== id);
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
     editeurSurfaces.charger(projet.surfaces);
     modifie({ recadrer: true });
@@ -417,9 +420,12 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
 // dans le levé du jour (créé tout seul, comme un fichier importé) et, selon leur rôle, dans la
 // surface (voir topo/leve-direct.js) : surfaces, volumes, mesures et exports marchent pareil.
 
-/** Surface levée en cours (dans un levé fait avec le récepteur), ou null. */
+/**
+ * Surface levée en cours (dans un levé fait avec le récepteur), ou levé « Autres » en cours (même
+ * forme qu'une surface, voir creerAutres), ou null.
+ */
 function stockEnCours() {
-  const surface = projet.surfaces.find((s) => s.id === leveDirect.stockId);
+  const surface = projet.surfaces.find((s) => s.id === leveDirect.stockId) ?? projet.autres.find((a) => a.id === leveDirect.stockId);
   const leve = projet.leves.find((l) => l.id === surface?.leveId);
   return surface && estLeveDirect(leve) ? surface : null;
 }
@@ -458,6 +464,15 @@ function reprendreLeveDirect() {
  * Un métré n'est pas une surface : ses aires, longueurs et points comptés deviennent des mesures.
  */
 function ajouterSurfaceLevee(nature) {
+  if (nature === 'autres') {
+    const leve = leveDuJour(projet);
+    const autres = creerAutres(projet, leve);
+    projet.leveActifId = leve.id;
+    leveDirect.stockId = autres.id;
+    leveDirect.role = 'isole';
+    modifie({ recadrer: true });
+    return;
+  }
   if (nature === 'metre') {
     const leve = leveDuJour(projet);
     const metre = creerMetre(projet, leve);
@@ -497,10 +512,11 @@ const ecranLeve = recepteurDisponible()
       nouvelleSurface: (nature) => ajouterSurfaceLevee(nature),
       choisirStock: (id) => {
         leveDirect.stockId = id;
-        const metre = metreEnCours();
-        if (metre) projet.leveActifId = metre.leveId; // ses mesures se dessinent sur les points de son levé
+        // Métré ou « Autres » : pas une surface ; on affiche les points de son levé.
+        const horsSurface = metreEnCours() ?? projet.autres.find((a) => a.id === id);
+        if (horsSurface) projet.leveActifId = horsSurface.leveId;
         else montrerStockEnCours();
-        recalculer({ recadrer: Boolean(metre) });
+        recalculer({ recadrer: Boolean(horsSurface) });
       },
       choisirRole: (role) => {
         leveDirect.role = role;
@@ -545,6 +561,7 @@ const ecranLeve = recepteurDisponible()
           return;
         }
         navigator.vibrate?.(60);
+        sonValidation();
         afficherMessage(`Point ${resultat.point.nom} pris`);
         modifie();
       },
@@ -733,6 +750,7 @@ const ecranLeve = recepteurDisponible()
         const le = new Date().toISOString();
         projet.implantations.push({ id: nouvelIdentifiant(), nom: cible.nom, aImplanterId: cible.id, cible: { est: cible.est, nord: cible.nord, altitude: cible.altitude }, mesure, ecarts, le });
         navigator.vibrate?.(60);
+        sonValidation();
         const hauteur = ecarts.dAltitude != null ? ` · dH ${formaterNombre(ecarts.dAltitude)} m` : '';
         afficherMessage(`${cible.nom} implanté : écart ${formaterNombre(ecarts.distance)} m${hauteur}`, 4000);
         modifie();
@@ -771,7 +789,7 @@ const ecranLeve = recepteurDisponible()
         const leve = leveEnCours();
         const dernier = leve?.points[leve.points.length - 1];
         if (!dernier || !confirm(`Effacer le dernier point (${dernier.nom}) ?`)) return;
-        annulerDernierPoint(leve, projet.surfaces);
+        annulerDernierPoint(leve, [...projet.surfaces, ...projet.autres]);
         retirerPointDesMesures(projet, dernier.nom); // aire, longueur ou point compté d'un métré
         afficherMessage(`Point ${dernier.nom} effacé`);
         modifie();
@@ -940,6 +958,7 @@ function enregistrerImplantationLigne() {
     le: new Date().toISOString(),
   });
   navigator.vibrate?.(60);
+  sonValidation();
   const cote = Math.abs(g.ecart) < 0.0005 ? 'sur la ligne' : `${formaterNombre(Math.abs(g.ecart))} m ${g.ecart > 0 ? 'à droite' : 'à gauche'}`;
   const hauteur = ecarts.dAltitude != null ? ` · dH ${formaterNombre(ecarts.dAltitude)} m` : '';
   afficherMessage(`Implanté à ${formaterNombre(g.abscisse)} m du début, ${cote}${hauteur}`, 4000);
@@ -1132,6 +1151,7 @@ function mettreAJourToucheVolume() {
     const refus = enImplantation ? ecranLeve.enregistrerDepuisTouche() : ecranLeve.prendreDepuisTouche();
     if (refus) {
       navigator.vibrate?.([80, 80, 80]);
+      sonRefus();
       afficherMessage(`${enImplantation ? 'Implantation refusée' : 'Point refusé'} : ${refus}`, 4000);
     }
   });
@@ -1210,7 +1230,7 @@ function donneesMetre(metre) {
 function donneesCommunes() {
   return {
     // Surfaces levées et métrés, avec la date de leur levé (« Stock 2 · 22.10.2026 »).
-    stocks: [...surfacesLevees(), ...projet.metres].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}` })),
+    stocks: [...surfacesLevees(), ...projet.metres, ...projet.autres].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}` })),
     libelles,
     libelleLigne: terrain.libelleLigne,
     libellePoint: terrain.libellePoint,

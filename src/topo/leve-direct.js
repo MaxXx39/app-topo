@@ -78,6 +78,20 @@ export function creerSurfaceDirecte(projet, leve, nature = 'stock') {
   return surface;
 }
 
+/**
+ * Levé « Autres » (levé de contrôle, points géomètre… ; décision du 23.10.2026) : des lignes
+ * (L-<lib>-<n°>-<pt>) et des points isolés (P-<lib>-<n°>), sans surface, sans volume, sans mesure.
+ * Même forme qu'une surface (contour vide, lignesRupture, points) pour en reprendre les outils ;
+ * rangé à part dans projet.autres. Nommé « Autres N ». Renvoie l'objet créé.
+ */
+export function creerAutres(projet, leve) {
+  projet.autres ??= [];
+  const numeros = projet.autres.map((a) => /^Autres (\d+)$/.exec(a.nom)?.[1]).filter(Boolean).map(Number);
+  const autres = { id: nouvelIdentifiant(), nom: `Autres ${Math.max(0, ...numeros) + 1}`, nature: 'autres', leveId: leve.id, contour: [], lignesRupture: [], points: [] };
+  projet.autres.push(autres);
+  return autres;
+}
+
 /** Ligne de rupture en cours du stock (la dernière ; créée s'il n'y en a pas). */
 export function ligneEnCours(surface) {
   if (surface.lignesRupture.length === 0) surface.lignesRupture.push(creerLigne());
@@ -125,7 +139,7 @@ export function numeroElementLibre(projet, type, libelle, sauf = null) {
     const lu = lireNomLeve(nom);
     if (lu && lu.type === type && lu.libelle === libelle) plusGrand = Math.max(plusGrand, lu.element);
   }
-  for (const surface of projet.surfaces) {
+  for (const surface of [...projet.surfaces, ...(projet.autres ?? [])]) {
     if (type === 'C' && surface !== sauf && surface.numeroContour) plusGrand = Math.max(plusGrand, surface.numeroContour);
     if (type !== 'L') continue;
     for (const ligne of surface.lignesRupture ?? []) {

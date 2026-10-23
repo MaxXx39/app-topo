@@ -17,6 +17,8 @@
 //                                   // (voir topo/dxf-plan.js) : affichés sous le levé, pour l'implantation
 //   aImplanter: [{ id, nom, est, nord, altitude (ou null) }],   // points à implanter (Terrain › Implanter › Point)
 //   metres: [{ id, nom, nature: 'metre', leveId, enCours }],   // métrés levés (voir topo/metre.js)
+//   autres: [{ id, nom, nature: 'autres', leveId, contour: [], lignesRupture, points }],  // levés « Autres »
+//                                   // (contrôle, points géomètre… : lignes et points, pas de surface ni de volume)
 //   implantations: [{ id, nom, cible: { est, nord, altitude }, mesure: { est, nord, altitude, gnss },
 //                     ecarts: { dEst, dNord, distance, dAltitude }, le (date ISO) }],  // implantations enregistrées
 // }
@@ -50,6 +52,7 @@ export function creerProjet(nom = '') {
     aImplanter: [],
     implantations: [],
     metres: [],
+    autres: [],
   };
 }
 
@@ -138,6 +141,7 @@ export function completerProjet(projet) {
   complet.aImplanter ??= [];
   complet.implantations ??= [];
   complet.metres ??= [];
+  complet.autres ??= [];
   complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
     nature: estImportee(surface) ? 'terrain' : 'stock',
     ...surface,

@@ -23,8 +23,8 @@ import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne
 // Couloir de l'implantation d'une ligne : bandes de chaque côté, plus fines en s'approchant
 // (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
 const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
-import { lireTexteLibelles, ecrireTexteLibelles } from './libelles.js';
 import { htmlFormulairePoint, lireFormulairePoint } from '../outils/formulaire-point.js';
+import { nettoyerAbreviation } from './libelles.js';
 
 // Mode Contrôler : ce qu'on implante (Ligne viendra plus tard), vue des coupes, longueurs.
 const IMPLANTATIONS = [
@@ -45,6 +45,7 @@ const NATURES_TERRAIN = [
   ['terrain', 'Terrain naturel'],
   ['terrassement', 'Terrassement'],
   ['metre', 'Métré'],
+  ['autres', 'Autres'],
 ];
 // Accroches : un dessin (en gris ce qu'on touche, en ambre l'endroit accroché) et un mot dessous.
 // [mot, nom complet (bulle, lecture d'écran), dessin].
@@ -83,7 +84,7 @@ const LETTRES_METRE = { aire: 'A', longueur: 'L' };
 /**
  * Crée l'écran dans "conteneur". Les actions sont faites par main.js via "actions" :
  * choisirRecepteur(), reconnecter(), deconnecter(), lireReglagesCorrections(), demarrerCorrections(reglages), arreterCorrections(), nouvelleSurface(nature), choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
- * annulerDernierPoint(), choisirLibelle(abréviation), enregistrerLibelles({ lignes, points }),
+ * annulerDernierPoint(), choisirLibelle(abréviation), enregistrerLibelles({ lignes, points, aires }),
  * choisirMode(mode), choisirSurfaceControle(id), choisirVueCoupes(vue),
  * choisirLongueurCoupe(m), choisirExagerationCoupe(facteur), choisirSourceOrientation(source),
  * choisirImplantation(quoi), choisirAccroche(mode), trouverPoint(nom), choisirGuidage('rx2' ou 'nseo'),
@@ -99,7 +100,8 @@ export function creerEcranLeve(conteneur, actions) {
   let etat = null; // dernier état du récepteur (voir src/android/pont.js)
   let donnees = null;
   let choixNatureOuvert = false; // « + Nouvelle » touché : on choisit stock, terrain naturel ou terrassement
-  let libellesOuverts = false; // listes de libellés en cours de modification
+  let libellesOuverts = false; // liste de libellés en cours de modification (celle du rôle choisi)
+  let lignesLibelles = []; // [[abréviation, description]] pendant la modification
   let direct = null; // orientation et contrôle calculés par main.js à chaque état du récepteur
   let cibleAffichee = 0; // cible montrée près du point à implanter (0 : aucune, voir CIBLES)
   let bandeCouloir = 0; // échelle du couloir de la ligne (n° dans BANDES_COULOIR)
@@ -148,17 +150,23 @@ export function creerEcranLeve(conteneur, actions) {
     }
     if (action === 'ouvrirLibelles' || action === 'fermerLibelles') {
       libellesOuverts = action === 'ouvrirLibelles';
+      lignesLibelles = libellesOuverts ? donnees.libelles[sorteDuRole()].map(([a, d]) => [a, d]) : [];
       dessiner();
       return;
     }
+    if (action === 'ajouterLibelle' || action === 'enleverLibelle') {
+      lignesLibelles = lireTableLibelles();
+      if (action === 'ajouterLibelle') lignesLibelles.push(['', '']);
+      else lignesLibelles.splice(Number(bouton.dataset.valeur), 1);
+      dessiner();
+      conteneur.querySelector('.table-libelles tr:last-child input')?.focus();
+      return;
+    }
     if (action === 'enregistrerLibelles') {
-      const texte = (champ) => conteneur.querySelector(`[data-champ="${champ}"]`)?.value ?? '';
+      // Lignes sans abréviation enlevées ; une abréviation en double : la première est gardée.
+      const liste = lireTableLibelles().filter(([abreviation], i, toutes) => abreviation && toutes.findIndex(([a]) => a === abreviation) === i);
       libellesOuverts = false;
-      actions.enregistrerLibelles({
-        lignes: lireTexteLibelles(texte('libelles-lignes')),
-        points: lireTexteLibelles(texte('libelles-points')),
-        aires: lireTexteLibelles(texte('libelles-aires')),
-      });
+      actions.enregistrerLibelles({ ...donnees.libelles, [sorteDuRole()]: liste });
       return;
     }
     if (action === 'nouvelleSurface') choixNatureOuvert = false;
@@ -661,14 +669,14 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function ligneSurface() {
     const nature = donnees.stock.nature ?? 'stock';
-    return `<div class="bandeau-leve nature-${nature}">
-      <div class="bandeau-leve-texte">
+    return `<div class="ligne-leve-en-cours">
+      <div class="bandeau-leve nature-${nature}">
         <span class="nature-leve">${echapper(NATURES_TERRAIN.find(([cle]) => cle === nature)?.[1] ?? '')}</span>
-        <select data-champ="stock" aria-label="Surface levée : en reprendre une autre">
+        <select data-champ="stock" aria-label="Levé en cours : en reprendre un autre">
           ${donnees.stocks.map((s) => `<option value="${s.id}" ${s.id === donnees.stock.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}
         </select>
       </div>
-      <button type="button" class="bouton-plus" data-action="ouvrirChoixNature" aria-label="Nouvelle surface levée" title="Nouvelle surface levée">+</button>
+      <button type="button" class="bouton-plus nature-${nature}" data-action="ouvrirChoixNature" aria-label="Nouveau levé" title="Nouveau levé">+</button>
     </div>`;
   }
 
@@ -745,7 +753,7 @@ export function creerEcranLeve(conteneur, actions) {
   function choixLibelle() {
     if (donnees.role === 'contour') return '';
     // Liste de libellés selon le rôle : aires (métré), lignes (lignes de rupture, longueurs), points.
-    const sorte = donnees.role === 'aire' ? 'aires' : ['ligne', 'longueur'].includes(donnees.role) ? 'lignes' : 'points';
+    const sorte = sorteDuRole();
     const liste = donnees.libelles[sorte];
     const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
     return `<div class="libelles-terrain pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
@@ -756,14 +764,39 @@ export function creerEcranLeve(conteneur, actions) {
     ${libellesOuverts ? editeurLibelles() : ''}`;
   }
 
-  /** Modification des listes de libellés : une ligne par libellé, « HT haut de talus ». */
+  /** Liste de libellés du rôle choisi : 'aires' (métré), 'lignes' (lignes, longueurs) ou 'points'. */
+  function sorteDuRole() {
+    return donnees.role === 'aire' ? 'aires' : ['ligne', 'longueur'].includes(donnees.role) ? 'lignes' : 'points';
+  }
+
+  /** Libellés tapés dans le tableau : [[abréviation, description]] (lignes vides comprises). */
+  function lireTableLibelles() {
+    return [...conteneur.querySelectorAll('.table-libelles tbody tr')].map((ligne) => [
+      nettoyerAbreviation(ligne.querySelector('[data-libelle="abreviation"]').value),
+      ligne.querySelector('[data-libelle="description"]').value.trim(),
+    ]);
+  }
+
+  /**
+   * Modification de la liste de libellés ouverte (seulement celle du rôle choisi) : un tableau,
+   * abréviation à gauche, description à droite, × pour enlever une ligne, « + Ajouter ».
+   */
   function editeurLibelles() {
+    const titres = { lignes: 'Libellés des lignes (L-…)', points: 'Libellés des points (P-…)', aires: 'Libellés des aires (A-…)' };
     return `<div class="editeur-libelles">
-      <p class="aide">Une ligne par libellé, ex. « HT haut de talus ».</p>
-      <label>Lignes de rupture et longueurs (L-…)<textarea data-champ="libelles-lignes" rows="6">${echapper(ecrireTexteLibelles(donnees.libelles.lignes))}</textarea></label>
-      <label>Points isolés et points comptés (P-…)<textarea data-champ="libelles-points" rows="6">${echapper(ecrireTexteLibelles(donnees.libelles.points))}</textarea></label>
-      <label>Aires d'un métré (A-…)<textarea data-champ="libelles-aires" rows="5">${echapper(ecrireTexteLibelles(donnees.libelles.aires))}</textarea></label>
+      <p class="titre-choix">${titres[sorteDuRole()]}</p>
+      <table class="table-libelles">
+        <thead><tr><th>Abrév.</th><th>Description</th><th></th></tr></thead>
+        <tbody>
+          ${lignesLibelles.map(([abreviation, description], i) => `<tr>
+            <td><input type="text" data-libelle="abreviation" value="${echapper(abreviation)}" maxlength="8" autocapitalize="characters" aria-label="Abréviation" /></td>
+            <td><input type="text" data-libelle="description" value="${echapper(description)}" aria-label="Description" /></td>
+            <td><button type="button" class="bouton-lien" data-action="enleverLibelle" data-valeur="${i}" aria-label="Enlever">×</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
       <div class="ligne-outils">
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="ajouterLibelle">+ Ajouter</button>
         <button type="button" class="bouton-secondaire" data-action="enregistrerLibelles">Enregistrer</button>
         <button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerLibelles">annuler</button>
       </div>
@@ -774,7 +807,8 @@ export function creerEcranLeve(conteneur, actions) {
   function resume() {
     if (donnees.resumeTexte) return `<p class="resume-terrain">${echapper(donnees.resumeTexte)}</p>`;
     const { resume: r, volume } = donnees;
-    const morceaux = [`${r.contour} contour`, `${r.pointsLignes} lignes`, `${r.isoles} isolés`];
+    // Le contour seulement pour un stock (les autres levés n'en ont pas).
+    const morceaux = [donnees.stock?.nature === 'stock' ? `${r.contour} contour` : '', `${r.pointsLignes} lignes`, `${r.isoles} isolés`].filter(Boolean);
     return `<p class="resume-terrain">${morceaux.join(' · ')}${volume != null ? ` · <strong>${formaterNombre(volume)} m³</strong>` : ''}</p>`;
   }
 

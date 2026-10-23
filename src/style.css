@@ -4602,3 +4602,99 @@ button.bouton-import {
 .legende-projets {
   margin: 0 0 4px;
 }
+
+/* Levé en cours (version 0.52.0) : le bandeau à la couleur de sa nature, la liste bien visible
+   (cadre blanc, grosse flèche) pour reprendre un autre levé, et le « + » à part, à droite. */
+.ligne-leve-en-cours {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ligne-leve-en-cours .bandeau-leve {
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  margin-bottom: 0;
+  padding: 4px 8px 6px 10px;
+}
+
+.ligne-leve-en-cours .bandeau-leve select {
+  min-height: 38px;
+  padding: 0 44px 0 10px;
+  border: 1.5px solid var(--couleur-nature);
+  border-radius: 8px;
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%231b2b36'/%3E%3Cpath d='m7 10 5 5 5-5' fill='none' stroke='%23f6ab07' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 6px center / 28px 28px;
+  font-size: 1.1rem;
+}
+
+.ligne-leve-en-cours .bouton-plus {
+  --couleur-nature: #b45309;
+  align-self: center;
+  width: 52px;
+  height: 52px;
+  box-shadow: 0 2px 6px rgba(16, 24, 20, 0.25);
+}
+
+.bouton-plus.nature-terrain,
+.bandeau-leve.nature-terrain {
+  --couleur-nature: #15803d;
+}
+
+.bouton-plus.nature-terrassement,
+.bandeau-leve.nature-terrassement {
+  --couleur-nature: #2563eb;
+}
+
+.bouton-plus.nature-metre,
+.bandeau-leve.nature-metre {
+  --couleur-nature: #0891b2;
+}
+
+/* « Autres » (contrôle, points géomètre…) : gris ardoise. */
+.bouton-plus.nature-autres,
+.bandeau-leve.nature-autres,
+.bouton-nature.nature-autres {
+  --couleur-nature: #475569;
+}
+
+/* Libellés : tableau abréviation | description (seulement la liste du rôle choisi). */
+.table-libelles {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table-libelles th {
+  padding: 2px 4px;
+  color: var(--gris);
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.table-libelles td {
+  padding: 2px 3px;
+}
+
+.table-libelles td:first-child {
+  width: 5.5em;
+}
+
+.table-libelles td:last-child {
+  width: 2em;
+  text-align: center;
+}
+
+.table-libelles input {
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 6px;
+}
+
+.table-libelles td:first-child input {
+  font-weight: 800;
+  text-transform: uppercase;
+}
