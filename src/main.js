@@ -38,6 +38,7 @@ import {
   nomDeFichierProjet,
 } from './projet/projet.js';
 import * as stockage from './projet/stockage.js';
+import { creerPartage } from './partage/partage.js';
 import * as historique from './projet/historique.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
@@ -68,6 +69,7 @@ import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, a
 // --- État de l'application ---
 let projet = creerProjet(); // projet ouvert
 let resumes = []; // liste des projets enregistrés (pour l'onglet Projet)
+let partage = null; // partage des projets par Google Drive (voir partage/partage.js), créé plus bas
 let dernierImport = null; // résultat du dernier import de points
 let dernierPlan = null; // message du dernier import de plan DXF
 let surfacesCalculees = new Map(); // id de surface -> triangles (résultat de calculerSurface)
@@ -1200,17 +1202,17 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   },
   // Nouveau projet : on reste sur l'onglet Projet, curseur dans « Affaire ».
   nouveauProjet: async () => {
-    await ouvrir(creerProjet(), { changerOnglet: false });
+    await changerDeProjet(() => ouvrir(creerProjet(), { changerOnglet: false }));
     afficherOnglet('projets');
     document.querySelector('#projets [data-cartouche="affaire"]')?.focus();
   },
   ouvrirProjet: async (id) => {
     const lu = await stockage.lireProjet(id);
-    if (lu) await ouvrir(completerProjet(lu));
+    if (lu) await changerDeProjet(() => ouvrir(completerProjet(lu)));
   },
   dupliquerProjet: async (id) => {
     const lu = id === projet.id ? projet : await stockage.lireProjet(id);
-    if (lu) await ouvrir(dupliquerProjet(completerProjet(lu), lu.nom ? `${lu.nom} (copie)` : 'copie'), { changerOnglet: false });
+    if (lu) await changerDeProjet(() => ouvrir(dupliquerProjet(completerProjet(lu), lu.nom ? `${lu.nom} (copie)` : 'copie'), { changerOnglet: false }));
   },
   supprimerProjet: async (id) => {
     const resume = resumes.find((r) => r.id === id);
@@ -1219,9 +1221,10 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
     if (id === projet.id) {
       const restants = (await stockage.listerProjets()).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
       await ouvrir(restants[0] ? completerProjet(restants[0]) : creerProjet(), { changerOnglet: false });
+      partage?.apresOuverture();
     } else {
       await rafraichirListe();
-      ecranProjet.afficher(projet, resumes);
+      afficherEcranProjet();
     }
   },
   importerFichierProjet: async (fichier) => {
@@ -1233,9 +1236,57 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
     if (resumes.some((r) => r.id === lu.id) && !confirm(`Le projet « ${titreProjet(lu)} » existe déjà sur cet appareil. Le remplacer par le fichier ?`)) {
       return;
     }
-    await ouvrir(lu);
+    await changerDeProjet(() => ouvrir(lu));
   },
+  // --- Partage par Google Drive ---
+  connecterDrive: () => partage.connecter(),
+  deconnecterDrive: () => partage.deconnecter(),
+  nommerAppareil: (nom) => partage.nommerAppareil(nom),
+  envoyerDrive: () => partage.envoyerMaintenant(),
+  reprendreLaMain: () => partage.reprendreLaMain(),
+  ouvrirDrive: (dossierId) => partage.ouvrirDepuisDrive(dossierId),
+  rafraichirDrive: () => partage.rafraichirListe().catch((erreur) => afficherMessage(`Drive : ${erreur.message}`, 4000)),
 }, document.querySelector('#projets-suite'));
+
+/** Onglet Projet, avec l'état du partage par Drive. */
+function afficherEcranProjet() {
+  ecranProjet.afficher(projet, resumes, partage ? { etat: partage.etat, appareil: partage.appareil() } : null);
+}
+
+/**
+ * Ouvre un autre projet (action "ouvrirAutre") : le projet ouvert est d'abord envoyé sur Drive et
+ * rendu (verrou), puis le nouveau est comparé à sa version de Drive.
+ */
+async function changerDeProjet(ouvrirAutre) {
+  await partage?.avantDeChanger();
+  await ouvrirAutre();
+  partage?.apresOuverture();
+}
+
+partage = creerPartage({
+  obtenirProjet: () => projet,
+  titreDe: (p) => titreProjet(p),
+  lireLocal: async (id) => {
+    const lu = await stockage.lireProjet(id);
+    return lu ? completerProjet(lu) : null;
+  },
+  ouvrirProjet: (nouveau) => ouvrir(completerProjet(nouveau), { changerOnglet: false }),
+  garderCopie: async (local) => {
+    const copie = dupliquerProjet(completerProjet(local), `${local.nom || titreProjet(local)} (copie de cet appareil)`);
+    await stockage.enregistrerProjet(copie);
+    await rafraichirListe();
+  },
+  quandChange: () => {
+    afficherEcranProjet();
+    mettreAJourEtatEntete();
+  },
+  message: (texte) => afficherMessage(texte, 4000),
+});
+
+// L'appli passe en arrière-plan (on change d'appli, on éteint l'écran) : on envoie tout de suite.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') partage.envoyerMaintenant();
+});
 
 const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPosition: toucherPourCoupe,
@@ -1513,7 +1564,7 @@ function recalculer({ recadrer = false } = {}) {
   for (const element of document.querySelectorAll('.sans-points')) element.hidden = projet.leves.length > 0;
   // En-tête : le projet ouvert en grand (affaire - lieu), puis son nom et ce qu'il contient.
   document.querySelector('#titre-projet').textContent = titreProjet(projet);
-  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} surface(s)`].filter(Boolean).join(' · ');
+  mettreAJourEtatEntete();
 
   editeurSurfaces.rafraichir();
   ecranVolumes.afficher();
@@ -1528,7 +1579,7 @@ function recalculer({ recadrer = false } = {}) {
   }
   envoyerImplantationAuPlan();
   ecranLeve?.afficher(donneesLeve());
-  ecranProjet.afficher(projet, resumes);
+  afficherEcranProjet();
   // Téléphone, onglet Terrain : le plan reste en haut de l'écran (voir style.css), plus petit
   // en mode Implanter pour laisser la place aux coupes.
   document.body.classList.toggle('mode-leve', Boolean(ecranLeve));
@@ -1679,6 +1730,15 @@ document.addEventListener('keydown', (evenement) => {
   evenement.preventDefault();
 });
 
+/** Ligne sous le titre du projet (en-tête) : nom, points, surfaces, et l'état de Drive si connecté. */
+function mettreAJourEtatEntete() {
+  const points = leveActif(projet)?.points ?? AUCUN_POINT;
+  const drive = partage?.etat.connecte
+    ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive : ouvert ailleurs' }[partage.etat.etat] ?? 'Drive : en attente'
+    : '';
+  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} surface(s)`, drive].filter(Boolean).join(' · ');
+}
+
 /** Petit message sous l'en-tête, qui disparaît tout seul après "duree" millisecondes (null : il reste). */
 let minuterieMessage = null;
 function afficherMessage(texte, duree = 2000) {
@@ -1702,7 +1762,8 @@ async function enregistrer() {
     await stockage.enregistrerProjet(projet);
     stockage.memoriserDernierProjet(projet.id);
     await rafraichirListe();
-    ecranProjet.afficher(projet, resumes);
+    afficherEcranProjet();
+    partage?.projetEnregistre();
   } catch (erreur) {
     console.error(erreur);
     document.querySelector('#etat').textContent = `Enregistrement impossible : ${erreur.message}`;
@@ -1764,6 +1825,8 @@ async function demarrer() {
     const id = stockage.dernierProjet();
     const lu = (id && (await stockage.lireProjet(id))) || (resumes[0] && (await stockage.lireProjet(resumes[0].id)));
     await ouvrir(lu ? completerProjet(lu) : creerProjet(), { changerOnglet: false });
+    // Partage : on se reconnecte à Drive si on l'était (le projet ouvert est alors comparé à Drive).
+    partage.demarrer();
   } catch (erreur) {
     // Base de données indisponible (navigation privée...) : l'appli marche, sans enregistrement.
     console.error(erreur);

@@ -63,4 +63,7 @@ tasks.named("preBuild") { dependsOn(verifierAppliWeb) }
 
 dependencies {
     implementation(project(":noyau"))
+    // Connexion au compte Google de l'appli, pour Google Drive (partage des projets, accord de
+    // l'utilisateur du 23.10.2026) : outil officiel de Google, déjà présent sur les tablettes Android.
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 }

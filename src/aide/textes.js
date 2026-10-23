@@ -5,6 +5,8 @@ export const TEXTES_AIDE = {
   // --- Projet ---
   projets:
     'Les projets sont enregistrés automatiquement sur cet appareil, rien n\'est envoyé sur internet. Un projet se reconnaît à son affaire et son lieu (écrits en haut de l\'appli et dans le cartouche du PDF), le nom est facultatif. « Continuer » reprend le travail. Pour passer du téléphone à l\'ordinateur : « Gestion de projets » › exporter, envoie-le-toi (mail, Drive…), puis « Ouvrir un projet » › « Ouvrir un fichier projet » sur l\'autre appareil.',
+  partage:
+    'Les projets sont rangés sur le Google Drive du compte de l\'appli, dans le dossier « Topo - projets » : tous les appareils connectés les voient (« Ouvrir un projet »). Le projet ouvert est envoyé tout seul 30 s après une modification et quand on quitte l\'appli. Un projet ouvert sur un appareil est à son nom : un autre appareil peut « prendre la main », et le premier n\'envoie alors plus rien. Sans réseau, l\'envoi attend. Dans l\'APK, le compte Google de l\'appli doit être ajouté dans les réglages Android de la tablette.',
   cartouche:
     'Écrits dans le cartouche du PDF : affaire et lieu (du projet), dessiné par (retenu sur cet appareil) et date. Date vide : la date du jour.',
   imports:

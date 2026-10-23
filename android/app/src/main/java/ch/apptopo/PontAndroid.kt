@@ -69,6 +69,21 @@ class PontAndroid(private val ecran: EcranPrincipal) {
         ecran.runOnUiThread { ecran.arreterCorrections() }
     }
 
+    // --- Google Drive (partage des projets) ---
+
+    /**
+     * Demande un jeton d'accès à Google Drive ; la réponse arrive par window.recevoirJetonDrive.
+     * [renouveler] : le jeton précédent a été refusé (Google en redonne un valable).
+     */
+    @JavascriptInterface
+    fun demanderJetonDrive(renouveler: Boolean) {
+        ecran.runOnUiThread { ecran.demanderJetonDrive() }
+    }
+
+    /** Modèle de l'appareil (« Crosscall Core-T4 »), proposé comme nom de l'appareil. */
+    @JavascriptInterface
+    fun modeleAppareil(): String = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}".trim()
+
     /** La touche « volume − » prend le point (vrai) ou redevient le volume (faux). */
     @JavascriptInterface
     fun activerToucheVolume(actif: Boolean) {

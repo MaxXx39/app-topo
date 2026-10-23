@@ -3862,3 +3862,41 @@ svg.plan,
   border-radius: 8px;
   font-size: 0.95rem;
 }
+
+/* Partage par Google Drive (onglet Projet). */
+.nom-appareil {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: var(--gris);
+}
+
+.nom-appareil input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.etat-partage {
+  font-weight: 700;
+}
+
+.etat-partage.etat-ok {
+  color: var(--succes);
+}
+
+.etat-partage.etat-attente {
+  color: #b45309;
+}
+
+.etat-partage.etat-erreur,
+.verrou-drive {
+  color: var(--rouge);
+  font-weight: 600;
+}

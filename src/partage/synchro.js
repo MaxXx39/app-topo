@@ -1,0 +1,143 @@
+// Partage des projets par Google Drive, avec un seul compte Google réservé à l'appli
+// (décisions de l'utilisateur, 23.10.2026) : tout le monde voit tous les projets ; un projet
+// ouvert sur un appareil est « verrouillé » à son nom (les autres peuvent prendre la main) ;
+// l'envoi est automatique.
+//
+// Sur Drive : un dossier « Topo - projets », puis un dossier par projet (nommé par son titre),
+// qui contient les fichiers du projet (voir partage/fichiers.js). Le dossier du projet porte
+// des propriétés lues par l'appli : projetId, titre, modifieLe, et le verrou (verrouPar = id de
+// l'appareil, verrouNom, verrouDepuis).
+// Sur l'appareil, une petite mémoire par projet (voir memoire.js) retient le dossier Drive, la
+// date du dernier envoi et l'empreinte de chaque fichier envoyé (pour ne renvoyer que ce qui change).
+import { TYPE_DOSSIER } from './drive.js';
+import { projetVersFichiers, fichiersVersProjet, comprimer, decomprimer, empreinte, FICHIER_PROJET } from './fichiers.js';
+
+export const NOM_RACINE = 'Topo - projets';
+
+/** Propriétés Drive : 124 octets au plus par clé + valeur ; on coupe les textes longs. */
+const court = (texte) => String(texte ?? '').slice(0, 90);
+
+/**
+ * Crée la synchronisation. drive : voir partage/drive.js ; appareil : { id, nom }.
+ */
+export function creerSynchro(drive, appareil) {
+  let racineId = null;
+
+  /** Dossier « Topo - projets » (créé au premier besoin). */
+  async function racine() {
+    if (racineId) return racineId;
+    const trouves = await drive.lister(`mimeType = '${TYPE_DOSSIER}' and appProperties has { key='topo' and value='racine' }`);
+    racineId = trouves[0]?.id ?? (await drive.creerDossier(NOM_RACINE, null, { topo: 'racine' })).id;
+    return racineId;
+  }
+
+  /** Dossier Drive d'un projet, ou null. */
+  async function dossierDuProjet(projetId) {
+    const parent = await racine();
+    const trouves = await drive.lister(`'${parent}' in parents and appProperties has { key='projetId' and value='${projetId}' }`);
+    return trouves[0] ?? null;
+  }
+
+  const verrouDe = (dossier) => {
+    const p = dossier.appProperties ?? {};
+    return p.verrouPar ? { appareilId: p.verrouPar, nom: p.verrouNom ?? '?', depuis: p.verrouDepuis ?? null } : null;
+  };
+  const proprietesVerrou = () => ({ verrouPar: appareil.id, verrouNom: court(appareil.nom), verrouDepuis: new Date().toISOString() });
+
+  return {
+    /** Projets sur Drive : [{ dossierId, projetId, titre, modifieLe, verrou: { appareilId, nom, depuis } ou null }]. */
+    async listerProjets() {
+      const parent = await racine();
+      const dossiers = await drive.lister(`'${parent}' in parents and mimeType = '${TYPE_DOSSIER}'`);
+      return dossiers
+        .filter((d) => d.appProperties?.projetId)
+        .map((d) => ({ dossierId: d.id, projetId: d.appProperties.projetId, titre: d.appProperties.titre ?? d.name, modifieLe: d.appProperties.modifieLe ?? null, verrou: verrouDe(d) }));
+    },
+
+    /**
+     * Envoie le projet (seulement les fichiers changés depuis le dernier envoi, "memoire"), et le
+     * verrouille au nom de cet appareil. Si un autre appareil a pris la main, rien n'est envoyé.
+     * Renvoie { memoire } (nouvelle mémoire à garder) ou { repris: verrou }.
+     */
+    async envoyer(projet, memoire = null, titre = projet.nom) {
+      let dossier = memoire?.dossierId ? await drive.decrire(memoire.dossierId).catch(() => null) : null;
+      if (!dossier || dossier.trashed) dossier = await dossierDuProjet(projet.id);
+      if (dossier) {
+        const verrou = verrouDe(dossier);
+        if (verrou && verrou.appareilId !== appareil.id) return { repris: verrou };
+      } else {
+        dossier = await drive.creerDossier(court(titre), await racine(), { projetId: projet.id, titre: court(titre), ...proprietesVerrou() });
+      }
+
+      const existants = new Map((await drive.listerDossier(dossier.id)).map((f) => [f.name, f]));
+      const fichiers = projetVersFichiers(projet);
+      const empreintes = {};
+      // Le projet en dernier : quand il arrive, les plans et les photos sont déjà là.
+      const noms = [...fichiers.keys()].sort((a, b) => Number(a === FICHIER_PROJET) - Number(b === FICHIER_PROJET));
+      for (const nom of noms) {
+        const contenu = fichiers.get(nom);
+        empreintes[nom] = await empreinte(contenu);
+        const existant = existants.get(nom);
+        if (existant && memoire?.empreintes?.[nom] === empreintes[nom]) continue; // pas changé
+        const blob = await comprimer(contenu);
+        if (existant) await drive.ecrireContenu(existant.id, new Blob([blob], { type: 'application/gzip' }));
+        else await drive.creerFichier(nom, dossier.id, new Blob([blob], { type: 'application/gzip' }));
+      }
+      // Plans ou photos enlevés du projet : à la corbeille de Drive.
+      for (const [nom, fichier] of existants) if (!fichiers.has(nom)) await drive.supprimer(fichier.id);
+
+      await drive.modifier(dossier.id, { nom: court(titre), proprietes: { titre: court(titre), modifieLe: projet.modifieLe ?? '', ...proprietesVerrou() } });
+      return { memoire: { dossierId: dossier.id, envoyeLe: projet.modifieLe ?? null, empreintes } };
+    },
+
+    /** Télécharge un projet de Drive. Renvoie { projet, memoire, verrou, modifieLe }. */
+    async telecharger(dossierId) {
+      const dossier = await drive.decrire(dossierId);
+      const lus = new Map();
+      const empreintes = {};
+      for (const fichier of await drive.listerDossier(dossierId)) {
+        const objet = await decomprimer(await drive.lire(fichier.id));
+        lus.set(fichier.name, objet);
+        empreintes[fichier.name] = await empreinte(objet);
+      }
+      const projet = fichiersVersProjet(lus);
+      return {
+        projet,
+        memoire: { dossierId, envoyeLe: projet.modifieLe ?? null, empreintes },
+        verrou: verrouDe(dossier),
+        modifieLe: dossier.appProperties?.modifieLe ?? projet.modifieLe ?? null,
+      };
+    },
+
+    /** Prend la main sur un projet : le verrou passe à cet appareil. */
+    async prendreVerrou(dossierId) {
+      await drive.modifier(dossierId, { proprietes: proprietesVerrou() });
+    },
+
+    /** Rend un projet (on en ouvre un autre) : le verrou est enlevé, s'il est encore à cet appareil. */
+    async rendreVerrou(dossierId) {
+      const dossier = await drive.decrire(dossierId);
+      if (verrouDe(dossier)?.appareilId !== appareil.id) return;
+      await drive.modifier(dossierId, { proprietes: { verrouPar: null, verrouNom: null, verrouDepuis: null } });
+    },
+  };
+}
+
+/**
+ * Quelle version ouvrir quand un projet existe sur l'appareil et sur Drive ?
+ * - local : modifieLe de la copie de l'appareil ; envoyeLe : date du projet au dernier envoi
+ *   (ou téléchargement) depuis cet appareil ; distant : modifieLe sur Drive (dates ISO).
+ * Renvoie 'local' (rien de nouveau sur Drive), 'distant' (Drive plus récent, rien à perdre ici)
+ * ou 'conflit' (modifié des deux côtés depuis le dernier envoi).
+ */
+export function choisirVersion({ local, envoyeLe, distant }) {
+  if (!distant) return 'local';
+  if (!local) return 'distant';
+  if (local === distant) return 'local';
+  // Jamais échangé avec Drive depuis cet appareil, et les deux copies diffèrent : on demande.
+  if (!envoyeLe) return 'conflit';
+  const changeIci = local > envoyeLe;
+  const changeLaBas = distant > envoyeLe;
+  if (changeIci && changeLaBas) return 'conflit';
+  return changeLaBas ? 'distant' : 'local';
+}

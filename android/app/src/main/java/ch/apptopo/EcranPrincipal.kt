@@ -31,7 +31,12 @@ import android.webkit.WebViewClient
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.Toast
+import android.content.IntentSender
 import ch.apptopo.noyau.ntrip.ReglagesNtrip
+import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.Scope
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -516,7 +521,64 @@ class EcranPrincipal : Activity() {
         when (code) {
             CODE_CHOISIR -> rendreFichiersChoisis(resultat, donnees)
             CODE_ENREGISTRER -> ecrireFichierExporte(resultat, donnees)
+            CODE_DRIVE -> finirAutorisationDrive(resultat, donnees)
         }
+    }
+
+    // =====================================================================
+    // Google Drive (partage des projets) : autorisation du compte Google de l'appli
+    // =====================================================================
+
+    /**
+     * Demande un jeton d'accès à Google Drive (seulement les fichiers créés par l'appli). La
+     * première fois, Google montre une fenêtre (choix du compte, accord) ; ensuite, le jeton
+     * arrive directement. Réponse à la page par window.recevoirJetonDrive({ ok, jeton } ou { ok: false, raison }).
+     */
+    fun demanderJetonDrive() {
+        val demande = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(PORTEE_DRIVE)))
+            .build()
+        Identity.getAuthorizationClient(this).authorize(demande)
+            .addOnSuccessListener { resultat ->
+                val fenetre = resultat.pendingIntent
+                if (resultat.hasResolution() && fenetre != null) {
+                    try {
+                        @Suppress("DEPRECATION")
+                        startIntentSenderForResult(fenetre.intentSender, CODE_DRIVE, null, 0, 0, 0)
+                    } catch (erreur: IntentSender.SendIntentException) {
+                        envoyerJetonDrive(null, "fenêtre de connexion Google impossible à ouvrir")
+                    }
+                } else {
+                    envoyerJetonDrive(resultat.accessToken, "aucun jeton reçu de Google")
+                }
+            }
+            .addOnFailureListener { erreur -> envoyerJetonDrive(null, texteErreurGoogle(erreur)) }
+    }
+
+    /** Réponse de la fenêtre de connexion Google. */
+    private fun finirAutorisationDrive(resultat: Int, donnees: Intent?) {
+        if (resultat != RESULT_OK) {
+            envoyerJetonDrive(null, "connexion Google annulée")
+            return
+        }
+        try {
+            val autorisation = Identity.getAuthorizationClient(this).getAuthorizationResultFromIntent(donnees)
+            envoyerJetonDrive(autorisation.accessToken, "aucun jeton reçu de Google")
+        } catch (erreur: ApiException) {
+            envoyerJetonDrive(null, texteErreurGoogle(erreur))
+        }
+    }
+
+    /** Envoie le jeton (ou la raison de l'échec) à la page. */
+    private fun envoyerJetonDrive(jeton: String?, raisonSiAbsent: String) {
+        val reponse = if (jeton != null) JSONObject().put("ok", true).put("jeton", jeton)
+        else JSONObject().put("ok", false).put("raison", raisonSiAbsent)
+        runOnUiThread { page.evaluateJavascript("window.recevoirJetonDrive && window.recevoirJetonDrive($reponse)", null) }
+    }
+
+    private fun texteErreurGoogle(erreur: Exception): String {
+        val code = (erreur as? ApiException)?.statusCode
+        return "connexion Google impossible${code?.let { " (code $it)" } ?: ""} : ${erreur.message ?: "erreur inconnue"}"
     }
 
     /** Donne à la page les fichiers choisis (ou rien si l'utilisateur a annulé). */
@@ -557,6 +619,10 @@ class EcranPrincipal : Activity() {
         private const val CODE_CHOISIR = 1
         private const val CODE_ENREGISTRER = 2
         private const val CODE_PERMISSIONS = 3
+        private const val CODE_DRIVE = 4
+
+        // Accès à Google Drive : seulement les fichiers créés par l'appli.
+        private const val PORTEE_DRIVE = "https://www.googleapis.com/auth/drive.file"
         private const val CLE_DERNIER_RECEPTEUR = "dernier_recepteur"
         private const val CLE_NOM_RECEPTEUR = "nom_dernier_recepteur"
         private const val CLE_CORRECTIONS_ACTIVES = "actives"
