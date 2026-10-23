@@ -2971,18 +2971,10 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   fill: var(--bleu);
 }
 
-/* Téléphone, mode Contrôler : plan plus petit en haut, pour laisser la place aux coupes. */
+/* Téléphone : le plan a la même taille dans Lever et dans Implanter (version 0.53.0). */
 @media (max-width: 899px) {
-  body.mode-leve.mode-controle[data-onglet='terrain'] .panneau-plan {
-    height: 26svh;
-  }
-
   body.mode-leve.mode-controle[data-onglet='terrain'] .plan-cadre {
     min-height: 0;
-  }
-
-  body.mode-leve.mode-controle[data-onglet='terrain'] .mise-en-page {
-    padding-top: calc(26svh + 12px);
   }
 }
 
@@ -4164,10 +4156,6 @@ body.mode-telephone .onglets button svg {
     padding-top: calc(38svh + var(--hauteur-bascule) + 12px);
   }
 
-  body.mode-leve.mode-controle[data-onglet='terrain'] .mise-en-page {
-    padding-top: calc(26svh + var(--hauteur-bascule) + 12px);
-  }
-
   /* Écran de guidage : le plan prend la moitié de la place, la vue rapprochée l'autre moitié. */
   body.mode-leve.vue-implantation[data-onglet='terrain'] {
     --hauteur-plan-guidage: calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) / 2);
@@ -4558,6 +4546,20 @@ button.bouton-import {
   font-size: 0.85rem;
 }
 
+/* Accroche choisie : en ambre (le bleu nuit ne se voyait pas sur le fond de la barre). */
+.barre-pointage .puce-choix {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.barre-pointage .puce-choix.actif {
+  border-color: var(--ambre);
+  background: var(--ambre);
+  color: var(--sombre);
+  font-weight: 800;
+}
+
 .barre-pointage .bouton-accroche {
   min-height: 0;
   padding: 3px 6px;
@@ -4856,4 +4858,161 @@ button.bouton-import {
 
 .etat-recalage.recale {
   color: var(--succes);
+}
+
+/* ==========================================================================
+   Version 0.53.0
+   ========================================================================== */
+
+/* Implanter : rien de choisi → bandeau sarcelle bien visible, flèche vers le plan. */
+.invite-choix {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #ccfbf1;
+  border: 2px solid #0d9488;
+  color: #134e4a;
+}
+
+.invite-choix svg {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: #0d9488;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: invite-monte 1.4s ease-in-out infinite;
+}
+
+.invite-choix > span {
+  display: grid;
+  gap: 1px;
+  font-size: 0.85rem;
+}
+
+.invite-choix strong {
+  font-size: 1rem;
+}
+
+@keyframes invite-monte {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Bouton « Implanter » une fois le point choisi : plein, sarcelle, avec une petite cible. */
+.bouton.bouton-implanter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0d9488;
+  border-color: #0d9488;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.bouton-implanter svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+}
+
+/* Écran de guidage : « P2 ▶ » pour implanter le point suivant. */
+.bouton-suivant {
+  flex: none;
+  min-height: 38px;
+  padding: 4px 12px;
+  border: 2px solid #0d9488;
+  border-radius: 19px;
+  background: #ffffff;
+  color: #0f766e;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* Cible : le nord (triangle rouge et N) toujours marqué sur le bord. */
+.cible-implantation .nord-cible path {
+  fill: var(--rouge);
+}
+
+.cible-implantation .nord-cible text {
+  fill: var(--rouge);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* Cible en haut (moins de 2 m du point) : même place que le plan, aux couleurs de la distance. */
+.cible-haut {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.cible-haut[hidden] {
+  display: none;
+}
+
+.cible-haut.vert-clair {
+  background: #86efac;
+  color: #14532d;
+}
+
+.cible-haut.jaune-orange {
+  background: #f59e0b;
+  color: #451a03;
+}
+
+.cible-haut.pas-fiable {
+  background: #9ca3af;
+  color: #111827;
+}
+
+.cible-haut .cible-implantation {
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  max-height: 420px;
+}
+
+/* Cible en haut : les textes du guidage, seuls, en plus grand. */
+body.cible-en-haut .vue-guidage .guidage-direct.avec-cible {
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  text-align: center;
+}
+
+body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
+  grid-template-columns: 1fr;
+  font-size: 1.5rem;
+}
+
+@media (max-width: 899px) {
+  body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .cible-haut {
+    position: fixed;
+    top: calc(var(--hauteur-entete) + var(--hauteur-bascule));
+    left: 0;
+    right: 0;
+    z-index: 12;
+    height: var(--hauteur-plan-guidage);
+    border-radius: 0;
+  }
+
+  body.vue-implantation .vue-guidage .cible-haut .cible-implantation {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    max-height: none;
+  }
 }

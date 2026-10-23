@@ -10,10 +10,13 @@ const ACCROCHES = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur li
 
 /**
  * Crée la barre dans "cadre" (le cadre du plan). actions : choisirAccroche(mode), choisirSource(source),
- * ajouterPaire({ nom, est, nord } ou { nomPoint }), prendreAuRx2(), basculerPaire(index, actif),
+ * ajouterPaire({ nom, est, nord } ou { nomPoint }), toucherPointProjet(), annulerToucherProjet(),
+ * prendreAuRx2(), basculerPaire(index, actif),
  * enleverPaire(index), appliquer(), annulerRecalage(), fermer().
  * Renvoie { afficher(etat), enlever() } ; etat : { nomPlan, accroche, choix ({ x, y } ou null),
- * source ('projet', 'tape', 'rx2'), nomsPoints, rx2 (vrai dans l'appli Android), paires, dejaRecale }.
+ * source ('projet', 'tape', 'rx2'), groupesPoints ([{ titre, noms }] : points du projet par levé),
+ * toucherProjet (on touche le plan pour prendre un point du projet), rx2 (vrai dans l'appli Android),
+ * paires, dejaRecale }.
  */
 export function creerBarreRecalage(cadre, actions) {
   const barre = document.createElement('div');
@@ -67,10 +70,17 @@ export function creerBarreRecalage(cadre, actions) {
 function choixMn95(etat) {
   const sources = [['projet', 'Point du projet'], ['tape', 'E / N tapés'], ...(etat.rx2 ? [['rx2', 'RX2']] : [])];
   let saisie;
-  if (etat.source === 'projet') {
-    saisie = `<label class="large">Nom<input type="text" list="noms-calage" data-calage="nom-point" autocomplete="off" autocapitalize="characters" /></label>
-      <datalist id="noms-calage">${etat.nomsPoints.map((nom) => `<option value="${echapper(nom)}"></option>`).join('')}</datalist>
-      <button type="button" class="bouton" data-action="ajouter">Ajouter</button>`;
+  if (etat.source === 'projet' && etat.toucherProjet) {
+    saisie = `<p class="aide-pointage">Touche un point du projet sur le plan</p>
+      <button type="button" class="bouton-lien" data-action="annulerToucherProjet">annuler</button>`;
+  } else if (etat.source === 'projet') {
+    // Liste des points du projet, rangés par levé (pas besoin de connaître le nom), ou sur le plan.
+    saisie = `<label class="large">Point<select data-calage="nom-point">
+        <option value="">— choisir —</option>
+        ${etat.groupesPoints.map((g) => `<optgroup label="${echapper(g.titre)}">${g.noms.map((nom) => `<option value="${echapper(nom)}">${echapper(nom)}</option>`).join('')}</optgroup>`).join('')}
+      </select></label>
+      <button type="button" class="bouton" data-action="ajouter">Ajouter</button>
+      <button type="button" class="puce-choix" data-action="toucherPointProjet">Sur le plan</button>`;
   } else if (etat.source === 'tape') {
     saisie = `<label>Est<input type="text" inputmode="decimal" data-calage="est" autocomplete="off" /></label>
       <label>Nord<input type="text" inputmode="decimal" data-calage="nord" autocomplete="off" /></label>

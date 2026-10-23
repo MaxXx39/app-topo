@@ -72,6 +72,7 @@ import { appliquerReglages, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
 import { listesDePoints, pointsDesListes, montrerListe } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
+import { nomSuivant } from './topo/noms.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { creerBarreRecalage } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
@@ -743,6 +744,17 @@ const ecranLeve = recepteurDisponible()
         implanter.cible = null;
         montrerImplantation();
       },
+      // Point suivant (P1 → P2…, voir nomSuivant) : implanté tout de suite.
+      implanterSuivant: () => {
+        const nom = nomSuivant(implanter.cible?.nom, pointsDuProjet().map((p) => p.nom));
+        const point = pointsDuProjet().find((p) => p.nom === nom);
+        if (!point) return;
+        const dansLaListe = projet.aImplanter.find((p) => p.nom === nom);
+        implanter.cible = { id: dansLaListe?.id ?? null, nom, est: point.est, nord: point.nord, altitude: point.altitude ?? null };
+        implanter.choix = null;
+        montrerImplantation();
+        requestAnimationFrame(cadrerSurImplantation);
+      },
       enregistrerImplantation: () => {
         if (enImplantationDeLigne()) {
           enregistrerImplantationLigne();
@@ -1078,7 +1090,8 @@ function toucherPourImplantation(position, tolerance) {
 // recalage : { planId (plan en cours de recalage, ou null), accroche, choix ({ x, y } : point
 // touché sur le DXF d'origine), source ('projet', 'tape', 'rx2'), paires (points de calage
 // { x, y, est, nord, nom, actif }) }. Pendant le recalage, ce plan est montré tel qu'il a été lu.
-const recalage = { planId: null, accroche: 'sommet', choix: null, source: 'projet', paires: [] };
+// toucherProjet : vrai quand on touche le plan pour prendre un point du projet (ses coordonnées MN95).
+const recalage = { planId: null, accroche: 'sommet', choix: null, source: 'projet', paires: [], toucherProjet: false };
 let barreRecalage = null;
 
 /** Plans DXF du projet tels qu'on les utilise : recalés (sauf celui qu'on est en train de recaler). */
@@ -1100,6 +1113,24 @@ function commencerRecalage(id) {
     },
     choisirSource: (source) => {
       recalage.source = source;
+      recalage.toucherProjet = false;
+      montrerRecalage();
+    },
+    // Prendre le point du projet en le touchant sur le plan : le plan montre les points du projet.
+    toucherPointProjet: () => {
+      const points = pointsDuProjet();
+      if (points.length === 0) {
+        afficherMessage('Aucun point dans le projet', 3000);
+        return;
+      }
+      recalage.toucherProjet = true;
+      plan.cadrerSur(points, 10);
+      montrerRecalage();
+    },
+    annulerToucherProjet: () => {
+      recalage.toucherProjet = false;
+      const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+      if (choisi) plan.cadrerSurPlans([choisi]);
       montrerRecalage();
     },
     ajouterPaire: ajouterPaireCalage,
@@ -1138,6 +1169,7 @@ function commencerRecalage(id) {
 function arreterRecalage() {
   recalage.planId = null;
   recalage.choix = null;
+  recalage.toucherProjet = false;
   barreRecalage?.enlever();
   barreRecalage = null;
   recalculer();
@@ -1152,7 +1184,8 @@ function montrerRecalage() {
     accroche: recalage.accroche,
     choix: recalage.choix,
     source: recalage.source,
-    nomsPoints: pointsDuProjet().map((p) => p.nom),
+    groupesPoints: groupesDePoints(),
+    toucherProjet: recalage.toucherProjet,
     rx2: recepteurDisponible(),
     paires: recalage.paires,
     dejaRecale: Boolean(choisi.recalage?.applique),
@@ -1161,8 +1194,35 @@ function montrerRecalage() {
   plan.rafraichirImplantation();
 }
 
-/** Toucher le plan pendant le recalage : on accroche un point du DXF d'origine. */
+/**
+ * Points du projet rangés par levé (pour la liste du recalage) : [{ titre, noms }], sans nom
+ * en double (comme pointsDuProjet).
+ */
+function groupesDePoints() {
+  const vus = new Set();
+  const groupes = [...projet.leves.map((l) => ({ titre: l.nom, points: l.points })), { titre: 'À implanter', points: projet.aImplanter }];
+  return groupes
+    .map(({ titre, points }) => ({ titre, noms: points.map((p) => p.nom).filter((nom) => !vus.has(nom) && vus.add(nom)) }))
+    .filter((g) => g.noms.length > 0);
+}
+
+/**
+ * Toucher le plan pendant le recalage : on accroche un point du DXF d'origine ; ou, après « Sur le
+ * plan », un point du projet (ses coordonnées MN95), qui devient tout de suite un point de calage.
+ */
 function toucherPourRecalage(position, tolerance) {
+  if (recalage.toucherProjet) {
+    const point = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() });
+    if (!point) {
+      afficherMessage('Aucun point du projet sous le doigt', 3000);
+      return;
+    }
+    recalage.toucherProjet = false;
+    ajouterPaireCalage({ nomPoint: point.nom });
+    const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+    if (choisi) plan.cadrerSurPlans([choisi]);
+    return;
+  }
   const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
   const trouve = accrocher(recalage.accroche, position, tolerance, sourcesDesPlans([choisi], position, tolerance));
   if (!trouve) {
@@ -1459,6 +1519,8 @@ function donneesCommunes() {
       choix: implanter.choix,
       cible: implanter.cible,
       nomPropose: nomProposeImplantation(),
+      // Nom du point suivant à implanter (P1 → P2), ou null.
+      suivant: implanter.cible?.nom && enImplantationDePoint() ? nomSuivant(implanter.cible.nom, pointsDuProjet().map((p) => p.nom)) : null,
       aImplanter: projet.aImplanter.map((p) => {
         const derniere = [...projet.implantations].reverse().find((i) => i.aImplanterId === p.id);
         return { ...p, fait: derniere ? { distance: derniere.ecarts.distance, dAltitude: derniere.ecarts.dAltitude } : null };

@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { lirePoints } from '../src/topo/import-points.js';
-import { lireListeDeNoms, ecrireListeDeNoms, verifierSurface, detecterSeries } from '../src/topo/noms.js';
+import { lireListeDeNoms, ecrireListeDeNoms, verifierSurface, detecterSeries, nomSuivant } from '../src/topo/noms.js';
 import { creerSurface } from '../src/topo/surface.js';
 
 const { points } = lirePoints(readFileSync(new URL('../exemples/stock_export.txt', import.meta.url), 'utf-8'));
@@ -121,5 +121,22 @@ describe('liste écrite puis relue (« Terminé » reprend le texte du champ)', 
     for (const liste of [['b5', 'b4', 'b3'], ['route3', '27'], ['b1', 'b2', 'b3', 'h2', 'h1', 'B10'], ['b2', 'b4', 'b1']]) {
       expect(lireListeDeNoms(ecrireListeDeNoms(liste), existants)).toEqual({ noms: liste, erreurs: [] });
     }
+  });
+});
+
+describe('nomSuivant', () => {
+  it('donne le numéro suivant avec le même début', () => {
+    expect(nomSuivant('P1', ['P1', 'P2', 'P3'])).toBe('P2');
+    expect(nomSuivant('b100', noms)).toBe('b101');
+    expect(nomSuivant('L-HT-1-3', ['L-HT-1-3', 'L-HT-1-4', 'L-HT-2-1'])).toBe('L-HT-1-4');
+  });
+
+  it('saute les numéros absents', () => {
+    expect(nomSuivant('P1', ['P1', 'P4', 'P9', 'Q2'])).toBe('P4');
+  });
+
+  it('renvoie null au dernier point ou sans numéro', () => {
+    expect(nomSuivant('P3', ['P1', 'P2', 'P3'])).toBeNull();
+    expect(nomSuivant('borne', ['borne', 'borne2'])).toBeNull();
   });
 });

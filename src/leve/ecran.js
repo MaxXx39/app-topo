@@ -309,28 +309,34 @@ export function creerEcranLeve(conteneur, actions) {
     const bouton = conteneur.querySelector('[data-action="enregistrerImplantation"]');
     if (bouton) bouton.disabled = !(etat?.connecte && etat?.autorise && donnees.implanter.cible);
     const zone = conteneur.querySelector('[data-vivant="guidage"]');
+    const haut = conteneur.querySelector('[data-vivant="cible-haut"]');
     if (!zone) return;
     if (!g || g.message) {
       cibleAffichee = 0;
+      montrerCibleEnHaut(haut, null);
       zone.className = 'guidage-direct attente';
       zone.innerHTML = `<span class="message-ecart">${echapper(g?.message ?? 'En attente de la position…')}</span>`;
       return;
     }
     const { distance, direction, azimut } = g.guidage;
-    const { haut, droite, nordEnHaut } = ecartsGuidage(g.guidage, donnees.controle.guidage);
+    const { haut: avance, droite, nordEnHaut } = ecartsGuidage(g.guidage, donnees.controle.guidage);
     const m = (valeur) => `${formaterNombre(Math.abs(valeur))} m`;
     // Toujours « avance / recule », « droite / gauche » ; en N-S-E-O (nord devant), avec le point cardinal.
     const lignes = nordEnHaut
-      ? [`${haut >= 0 ? '↑ Avance (Nord)' : '↓ Recule (Sud)'} ${m(haut)}`, `${droite >= 0 ? '→ Droite (Est)' : '← Gauche (Ouest)'} ${m(droite)}`]
-      : [`${haut >= 0 ? '↑ Avance' : '↓ Recule'} ${m(haut)}`, `${droite >= 0 ? '→ Droite' : '← Gauche'} ${m(droite)}`];
+      ? [`${avance >= 0 ? '↑ Avance (Nord)' : '↓ Recule (Sud)'} ${m(avance)}`, `${droite >= 0 ? '→ Droite (Est)' : '← Gauche (Ouest)'} ${m(droite)}`]
+      : [`${avance >= 0 ? '↑ Avance' : '↓ Recule'} ${m(avance)}`, `${droite >= 0 ? '→ Droite' : '← Gauche'} ${m(droite)}`];
     const hauteur = g.ecartAltitude == null
       ? ''
       : `<span class="hauteur-guidage ${g.classeAltitude}">${g.ecartAltitude >= 0 ? '↑ Monter' : '↓ Descendre'} ${m(g.ecartAltitude)}</span>`;
     cibleAffichee = cibleSelonDistance(distance, cibleAffichee);
     // Flèche vers le point : par rapport à la direction regardée, sinon par rapport au nord.
     const angle = nordEnHaut ? direction : direction - azimut;
+    // Près du point (moins de 2 m) : la cible remplace le plan en haut de l'écran (téléphone), le
+    // nord toujours marqué dessus ; loin : le plan en haut, la flèche avec les textes.
+    const nord = nordEnHaut ? 0 : -azimut;
+    montrerCibleEnHaut(haut, cibleAffichee > 0 ? { svg: svgCible(cibleAffichee, avance, droite, couleurCanne(distance), nordEnHaut, nord), classe: g.classe } : null);
     const dessin = cibleAffichee > 0
-      ? svgCible(cibleAffichee, haut, droite, couleurCanne(distance), nordEnHaut)
+      ? ''
       : `<svg class="fleche-guidage" viewBox="-20 -20 40 40" aria-hidden="true"><path d="M0 -17 11 6 0 0 -11 6Z" transform="rotate(${angle.toFixed(1)})" /></svg>`;
     zone.className = `guidage-direct ${g.classe} ${cibleAffichee > 0 ? 'avec-cible' : ''}`;
     zone.innerHTML = `
@@ -338,6 +344,22 @@ export function creerEcranLeve(conteneur, actions) {
       <span class="lignes-guidage">${lignes.map((texte) => `<span>${texte}</span>`).join('')}</span>
       <span class="distance-guidage">${formaterNombre(distance)} m${nordEnHaut ? ' · nord en haut' : ''}</span>
       ${hauteur}`;
+  }
+
+  /**
+   * Cible en haut de l'écran (à la place du plan, voir style.css « cible-en-haut »), ou rien.
+   * cible : { svg, classe (couleur de la distance) } ou null.
+   */
+  function montrerCibleEnHaut(zone, cible) {
+    document.body.classList.toggle('cible-en-haut', Boolean(zone && cible));
+    if (!zone) return;
+    zone.hidden = !cible;
+    if (!cible) {
+      zone.innerHTML = '';
+      return;
+    }
+    zone.className = `cible-haut ${cible.classe}`;
+    zone.innerHTML = cible.svg;
   }
 
   /** Mode Contrôler : écart monter / descendre et coupes en direct. */
@@ -391,8 +413,16 @@ export function creerEcranLeve(conteneur, actions) {
     const { controle: reglages, surfaces } = donnees;
     const vue = reglages.vueCoupes;
     const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS, reglages.implantation)} ${bulle('implanter')}</div>`;
-    if (reglages.implantation === 'point') return choixImplantation + barreAccroche() + implanterPoint();
-    if (reglages.implantation === 'ligne') return choixImplantation + barreAccroche() + implanterLigne();
+    // Rien de choisi : on le rappelle bien en vue (après « ← », on ne savait plus quoi faire).
+    const imp = donnees.implanter;
+    if (reglages.implantation === 'point') {
+      const invite = imp.choix ? '' : invitation('Choisis le point à implanter', 'touche-le sur le plan ou tape son nom');
+      return choixImplantation + invite + barreAccroche() + implanterPoint();
+    }
+    if (reglages.implantation === 'ligne') {
+      const invite = imp.pointsLigne.length > 0 ? '' : invitation('Choisis la ligne à implanter', 'touche-la sur le plan, ou ses points un à un');
+      return choixImplantation + invite + barreAccroche() + implanterLigne();
+    }
     return `
       ${choixImplantation}
       ${surfaces.length > 0
@@ -411,6 +441,14 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="ligne-choix"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
       <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
       <p class="aide" data-vivant="orientation"></p>`;
+  }
+
+  /** Bandeau sarcelle bien visible : ce qu'il faut faire maintenant (flèche vers le plan). */
+  function invitation(titre, detail) {
+    return `<div class="invite-choix" role="status">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6" /></svg>
+      <span><strong>${titre}</strong><span>${detail}</span></span>
+    </div>`;
   }
 
   /**
@@ -524,7 +562,8 @@ export function creerEcranLeve(conteneur, actions) {
             <label>Altitude<input type="text" inputmode="decimal" data-champ="altitude-implantation" value="${imp.choix.altitude != null ? imp.choix.altitude.toFixed(3) : ''}" placeholder="facultative" /></label>
           </div>
           <div class="ligne-outils">
-            <button type="button" class="bouton-secondaire" data-action="implanterChoix">Implanter</button>
+            <button type="button" class="bouton bouton-implanter" data-action="implanterChoix">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></svg>Implanter</button>
             <button type="button" class="bouton-secondaire" data-action="creerPointAImplanter">+ À implanter</button>
             ${imp.choixDuProjet ? '' : '<button type="button" class="bouton-secondaire" data-action="garderPointChoisi" title="Garder ce point dans le projet (levé « Points ajoutés »)">+ Point du projet</button>'}
           </div>
@@ -559,7 +598,8 @@ export function creerEcranLeve(conteneur, actions) {
       : `Vers <strong>${echapper(imp.cible.nom ?? 'le point choisi')}</strong>`;
     const guidage = ligne
       ? '<div class="guidage-direct attente" data-vivant="guidage-ligne"></div>'
-      : `<div class="guidage-et-boussole ${reglages.guidage === 'nseo' ? 'avec-boussole' : ''}">
+      : `<div class="cible-haut" data-vivant="cible-haut" hidden></div>
+        <div class="guidage-et-boussole ${reglages.guidage === 'nseo' ? 'avec-boussole' : ''}">
           <div class="guidage-direct attente" data-vivant="guidage"></div>
           ${reglages.guidage === 'nseo' ? boussole() : ''}
         </div>`;
@@ -569,6 +609,7 @@ export function creerEcranLeve(conteneur, actions) {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
         <p class="titre-vue-guidage">${titre}</p>
         ${ligne ? '<button type="button" class="bouton-retour" data-action="inverserLigne" title="Inverser le sens" aria-label="Inverser le sens">⇄</button>' : ''}
+        ${!ligne && imp.suivant ? `<button type="button" class="bouton-suivant" data-action="implanterSuivant" title="Implanter le point suivant : ${echapper(imp.suivant)}" aria-label="Point suivant : ${echapper(imp.suivant)}">${echapper(imp.suivant)} ▶</button>` : ''}
         <button type="button" class="bouton-retour ${reglagesGuidageOuverts ? 'actif' : ''}" data-action="basculerReglagesGuidage" title="Réglages de l'implantation" aria-label="Réglages de l'implantation" aria-expanded="${reglagesGuidageOuverts}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>
       </div>
@@ -900,6 +941,7 @@ export function creerEcranLeve(conteneur, actions) {
     const enGuidage = donnees.mode === 'controler'
       && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (implantation === 'ligne' && Boolean(donnees.implanter.ligne)));
     document.body.classList.toggle('vue-implantation', enGuidage);
+    if (!enGuidage || implantation !== 'point') document.body.classList.remove('cible-en-haut');
     let contenu;
     if (enGuidage) contenu = vueImplantation();
     else contenu = `${donnees.mode === 'controler' ? controle() : priseDePoint()}${piedRecepteur()}`;
@@ -931,9 +973,10 @@ export function creerEcranLeve(conteneur, actions) {
 /**
  * Cible autour du point à implanter (au centre) : 4 cercles (voir CIBLES) avec leur rayon écrit, et
  * la position du récepteur (rond de la couleur de la distance, voir couleurCanne). En haut : devant (cap RX2) ou le
- * nord. haut, droite : où est le point par rapport au récepteur (m).
+ * nord. haut, droite : où est le point par rapport au récepteur (m). nord : direction du nord à
+ * l'écran (°, sens des aiguilles d'une montre depuis le haut), marquée « N » sur le bord.
  */
-function svgCible(numero, haut, droite, couleur, nordEnHaut) {
+function svgCible(numero, haut, droite, couleur, nordEnHaut, nord = 0) {
   const { cercles } = CIBLES[numero - 1];
   const echelle = 100 / cercles[0]; // le grand cercle fait 100 unités de rayon
   const texteRayon = (r) => (r >= 1 ? `${r} m` : `${Math.round(r * 100)} cm`);
@@ -941,11 +984,15 @@ function svgCible(numero, haut, droite, couleur, nordEnHaut) {
   const limiter = (v) => Math.max(-108, Math.min(108, v));
   const x = limiter(-droite * echelle);
   const y = limiter(haut * echelle);
-  return `<svg class="cible-implantation cible-${numero}" viewBox="-120 -124 240 240" role="img" aria-label="Cible ${texteRayon(cercles[0])}">
+  // Nord : petit triangle rouge et « N » sur le bord, tourné de l'angle du nord.
+  const marqueNord = `<g class="nord-cible" transform="rotate(${nord.toFixed(1)})">
+      <path d="M0 -118 7 -104H-7Z" /><text y="-91" text-anchor="middle" transform="rotate(${(-nord).toFixed(1)} 0 -95)">N</text></g>`;
+  return `<svg class="cible-implantation cible-${numero}" viewBox="-124 -124 248 248" role="img" aria-label="Cible ${texteRayon(cercles[0])}">
     ${cercles.map((r, i) => `<circle r="${r * echelle}" class="anneau anneau-${i}" />`).join('')}
     ${cercles.map((r) => `<text x="${(r * echelle * Math.SQRT1_2 + 2).toFixed(1)}" y="${(r * echelle * Math.SQRT1_2 + 12).toFixed(1)}" class="rayon">${texteRayon(r)}</text>`).join('')}
     <path d="M-110 0H110M0 -110V110" class="axes" />
-    <text y="-112" text-anchor="middle" class="haut-cible">${nordEnHaut ? 'N' : 'devant'}</text>
+    ${nordEnHaut ? '' : '<text x="-122" y="-112" class="haut-cible">▲ devant</text>'}
+    ${marqueNord}
     <path d="M-7 0H7M0 -7V7" class="centre-cible" />
     <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9" class="moi" style="fill: ${couleur}" />
   </svg>`;
