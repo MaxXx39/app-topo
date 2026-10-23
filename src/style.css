@@ -4563,13 +4563,57 @@ button.bouton-import {
   padding: 3px 6px;
 }
 
-.barre-pointage .titre-pointage {
-  font-weight: 700;
+.ligne-barre-pointage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
 }
 
 .barre-pointage .bouton {
-  margin-left: auto;
   min-height: 34px;
+}
+
+.ligne-barre-pointage .bouton {
+  margin-left: auto;
+}
+
+.choix-pointage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 6px 8px;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.coordonnees-pointage {
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.choix-pointage label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+}
+
+.choix-pointage input {
+  width: 110px;
+  min-height: 34px;
+  padding: 4px 6px;
+}
+
+.choix-pointage .bouton-lien {
+  color: #ffffff;
+}
+
+.aide-pointage {
+  margin: 4px 0 0;
+  opacity: 0.8;
 }
 
 /* Points ajoutés (levé « Points ajoutés ») : toujours visibles sur le plan, en losange sombre. */
@@ -4697,4 +4741,34 @@ button.bouton-import {
 .table-libelles td:first-child input {
   font-weight: 800;
   text-transform: uppercase;
+}
+
+/* Lignes des levés « Autres » sur le plan. */
+.plan .ligne-autres {
+  fill: none;
+  stroke: #475569;
+  stroke-width: 2;
+}
+
+/* Menu « Points » : pastille à la couleur de la liste (nature). */
+.pastille-liste {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #6b7280;
+}
+
+.pastille-liste.liste-stock { background: #b45309; }
+.pastille-liste.liste-terrain { background: #15803d; }
+.pastille-liste.liste-terrassement { background: #2563eb; }
+.pastille-liste.liste-metre { background: #0891b2; }
+.pastille-liste.liste-autres { background: #475569; }
+.pastille-liste.liste-fichier { background: var(--sombre); }
+.pastille-liste.liste-ajoutes { background: #7c3aed; }
+
+.menu-listes-points {
+  max-height: 50vh;
+  overflow-y: auto;
 }

@@ -25,7 +25,6 @@ const RAYON_TOUCHER = 22;
 const CALQUES = [
   { cle: 'fondSatellite', titre: 'Fond photo aérienne (swisstopo)', parDefaut: false },
   { cle: 'cadastre', titre: 'Cadastre', parDefaut: false },
-  { cle: 'plansDxf', titre: 'Plans DXF', parDefaut: true },
   { cle: 'points', titre: 'Points', parDefaut: true },
   { cle: 'noms', titre: 'Noms des points', parDefaut: true },
   { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false },
@@ -55,7 +54,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  *   l'implantation d'un point (tolérance en m : la taille du doigt à l'échelle du plan)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe } = {}) {
   const calques = lireCalques();
 
   // Boutons posés sur le plan : calques en haut à gauche, zoom en haut à droite.
@@ -74,8 +73,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h11l5 5v11H4z" /><path d="M15 4v5h5M8 13h8M8 17h5" /></svg>
           Plans
         </button>
+        <button type="button" class="puce" data-action="listes-points" aria-expanded="false" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="1.8" /><circle cx="13" cy="5" r="1.8" /><circle cx="18" cy="11" r="1.8" /><circle cx="9" cy="15" r="1.8" /><circle cx="16" cy="19" r="1.8" /></svg>
+          Points
+        </button>
         ${bulle('plan')}
         <div class="menu-plans-dxf" hidden></div>
+        <div class="menu-plans-dxf menu-listes-points" hidden></div>
         <div class="menu-calques" hidden>
           ${CALQUES.map(
             (c) => `<label class="case ${c.surfaces ? 'seulement-surfaces' : ''}"><input type="checkbox" data-calque="${c.cle}" ${calques[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`,
@@ -108,7 +112,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const boutonCalques = conteneur.querySelector('[data-action="calques"]');
   const menuCalques = conteneur.querySelector('.menu-calques');
   const boutonPlans = conteneur.querySelector('[data-action="plans-dxf"]');
-  const menuPlans = conteneur.querySelector('.menu-plans-dxf');
+  const menuPlans = conteneur.querySelector('.menu-plans-dxf:not(.menu-listes-points)');
+  const boutonListes = conteneur.querySelector('[data-action="listes-points"]');
+  const menuListes = conteneur.querySelector('.menu-listes-points');
   const cadre = conteneur.querySelector('.plan-cadre');
   const fond = conteneur.querySelector('.plan-fond');
   const canvasDxf = conteneur.querySelector('.plan-dxf-canvas');
@@ -317,18 +323,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       groupe.append(creerElement('path', { d: `M${x - taille} ${y}H${x + taille}M${x} ${y - taille}V${y + taille}`, class: classe }));
       return { x, y };
     };
-    // Points ajoutés (tapés ou pris sur le DXF) : petit losange sombre et leur nom.
-    for (const point of implantation.pointsAjoutes ?? []) {
-      const { x, y } = versEcran(point.est, point.nord, vue);
-      if (x < -20 || y < -20 || x > vue.largeur + 20 || y > vue.hauteur + 20) continue;
-      const marque = creerElement('g', { class: 'point-ajoute' });
-      marque.append(creerElement('path', { d: `M${x} ${y - 6}L${x + 6} ${y}L${x} ${y + 6}L${x - 6} ${y}Z` }));
-      if (calques.noms) {
-        const nom = creerElement('text', { x: x + 8, y: y - 5 });
-        nom.textContent = point.nom;
-        marque.append(nom);
-      }
-      groupe.append(marque);
+    // Lignes des levés « Autres » (contrôle, points géomètre…) : trait gris ardoise.
+    for (const ligne of implantation.lignesAutres ?? []) {
+      const ecran = ligne.sommets.map((p) => versEcran(p.est, p.nord, vue));
+      groupe.append(creerElement('path', { d: tracePar(ecran, ligne.fermee), class: 'ligne-autres' }));
     }
     for (const point of implantation.aImplanter ?? []) {
       const { x, y } = croix(point.est, point.nord, 'croix-a-implanter', 7);
@@ -442,7 +440,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   /** Plans DXF sous le dessin, sur le canvas (seulement si la vue ou les plans ont changé). */
   function dessinerPlansDxf() {
     const densite = Math.min(window.devicePixelRatio || 1, 2);
-    const visibles = calques.plansDxf ? plansDxf : [];
+    const visibles = plansDxf; // affichés ou cachés un par un (menu « Plans »)
     const signature = [vue.echelle, vue.estCentre, vue.nordCentre, vue.largeur, vue.hauteur, densite,
       ...visibles.map((p) => `${p.id}:${p.visible !== false}:${p.couleur ?? ''}:${p.calques.map((c) => (c.visible ? 1 : 0)).join('')}`)].join('|');
     if (signature === signatureDxf) return;
@@ -1031,15 +1029,47 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     dessiner();
   });
   // --- Menu des plans DXF : afficher / cacher chaque plan (œil), sa couleur ---
-  boutonPlans.addEventListener('click', () => {
-    menuPlans.hidden = !menuPlans.hidden;
-    menuCalques.hidden = true;
-    boutonPlans.setAttribute('aria-expanded', String(!menuPlans.hidden));
+  // Un seul menu ouvert à la fois (Calques, Plans, Points).
+  const menus = [[boutonCalques, menuCalques], [boutonPlans, menuPlans], [boutonListes, menuListes]];
+  for (const [bouton, menu] of menus) {
+    bouton.addEventListener('click', () => {
+      for (const [autreBouton, autreMenu] of menus) {
+        if (autreMenu === menu || autreMenu === menuCalques) continue; // menuCalques : géré plus bas
+        autreMenu.hidden = true;
+        autreBouton.setAttribute('aria-expanded', 'false');
+      }
+      if (menu !== menuCalques) {
+        menuCalques.hidden = true;
+        boutonCalques.setAttribute('aria-expanded', 'false');
+        menu.hidden = !menu.hidden;
+        bouton.setAttribute('aria-expanded', String(!menu.hidden));
+      }
+    });
+  }
+  menuListes.addEventListener('change', (evenement) => {
+    const id = evenement.target.dataset.liste;
+    if (id) quandMontrerListe?.(id, evenement.target.checked);
   });
-  boutonCalques.addEventListener('click', () => {
-    menuPlans.hidden = true;
-    boutonPlans.setAttribute('aria-expanded', 'false');
+  menuListes.addEventListener('click', (evenement) => {
+    const bouton = evenement.target.closest('[data-toutes]');
+    if (bouton) quandMontrerListe?.('*', bouton.dataset.toutes === 'oui');
   });
+
+  /** Menu « Points » : une case par liste de points (voir listes-points.js). */
+  let signatureListes = null;
+  function remplirMenuListes(listes) {
+    const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}`).join('|');
+    if (signature === signatureListes) return;
+    signatureListes = signature;
+    boutonListes.hidden = listes.length === 0;
+    if (listes.length === 0) menuListes.hidden = true;
+    menuListes.innerHTML = `${listes.map((l) => `<div class="ligne-menu-plan">
+        <label class="oeil-plan"><input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} />
+          <span class="pastille-liste liste-${l.nature}"></span><span>${echapper(l.nom)}</span></label>
+      </div>`).join('')}
+      <div class="ligne-outils"><button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="oui">tout</button>
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="non">rien</button></div>`;
+  }
   menuPlans.addEventListener('change', (evenement) => {
     const champ = evenement.target;
     const id = champ.dataset.plan;
@@ -1071,6 +1101,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     boutonCalques.setAttribute('aria-expanded', 'false');
     menuPlans.hidden = true;
     boutonPlans.setAttribute('aria-expanded', 'false');
+    menuListes.hidden = true;
+    boutonListes.setAttribute('aria-expanded', 'false');
   });
 
   // --- Molette de la souris : zoom autour du curseur ---
@@ -1260,6 +1292,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       // Suivi : on ne recentre (et ne redessine tout) que si la position s'approche du bord.
       if (position && (!vue || (suivre && loinDuCentre()) || (premiere && points.length === 0))) centrerSurPosition();
       else dessinerPosition();
+    },
+    /** Listes de points du menu « Points » (voir listes-points.js). */
+    afficherListesPoints(listes) {
+      remplirMenuListes(listes);
     },
     /** Plans DXF à dessiner en fond (voir topo/dxf-plan.js). */
     afficherPlansDxf(nouveaux) {

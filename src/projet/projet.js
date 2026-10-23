@@ -53,6 +53,7 @@ export function creerProjet(nom = '') {
     implantations: [],
     metres: [],
     autres: [],
+    listesCachees: [],
   };
 }
 
@@ -142,6 +143,7 @@ export function completerProjet(projet) {
   complet.implantations ??= [];
   complet.metres ??= [];
   complet.autres ??= [];
+  complet.listesCachees ??= []; // listes de points décochées dans le menu « Points » du plan
   complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
     nature: estImportee(surface) ? 'terrain' : 'stock',
     ...surface,

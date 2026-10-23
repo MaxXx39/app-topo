@@ -70,7 +70,8 @@ import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecept
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
 import { appliquerReglages, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
-import { ajouterPointAjoute, leveDesPointsAjoutes, nomPointAjoute } from './topo/points-ajoutes.js';
+import { listesDePoints, pointsDesListes, montrerListe } from './plan/listes-points.js';
+import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
 
 // --- État de l'application ---
 let projet = creerProjet(); // projet ouvert
@@ -836,21 +837,35 @@ function envoyerImplantationAuPlan() {
   const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne()) && ongletContexte === 'terrain') || pointage.actif;
   const enLigne = accrocheActive && !pointage.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
-  // Points ajoutés : dessinés à part, sauf si leur levé est le levé affiché (déjà dessinés).
-  const ajoutes = leveDesPointsAjoutes(projet);
-  const pointsAjoutes = ajoutes && ajoutes.id !== projet.leveActifId ? ajoutes.points : [];
-  plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0 || pointsAjoutes.length > 0
+  // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
+  const lignesAutres = lignesDesAutres();
+  plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0 || lignesAutres.length > 0
     ? {
         actif: accrocheActive,
         aImplanter: projet.aImplanter,
-        pointsAjoutes,
-        choix: accrocheActive && !enLigne ? implanter.choix : null,
+        lignesAutres,
+        choix: pointage.actif ? pointage.choix : accrocheActive && !enLigne ? implanter.choix : null,
         cible: accrocheActive && !enLigne ? implanter.cible : null,
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage ? ligneParallele(sommets, implanter.ligne.decalage) : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : [],
       }
     : null);
+}
+
+/** Lignes des levés « Autres » visibles : [{ sommets: [{ est, nord }], fermee }]. */
+function lignesDesAutres() {
+  const cachees = new Set(projet.listesCachees ?? []);
+  const lignes = [];
+  for (const autres of projet.autres) {
+    if (cachees.has(autres.id)) continue;
+    const parNom = new Map((projet.leves.find((l) => l.id === autres.leveId)?.points ?? []).map((p) => [p.nom, p]));
+    for (const ligne of autres.lignesRupture) {
+      const sommets = ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean);
+      if (sommets.length >= 2) lignes.push({ sommets, fermee: Boolean(ligne.fermee) });
+    }
+  }
+  return lignes;
 }
 
 /**
@@ -1045,13 +1060,16 @@ function toucherPourImplantation(position, tolerance) {
 }
 
 // --- Points ajoutés en touchant le plan DXF (Projet › Imports › Point › Pointer sur le plan DXF) ---
-// pointage : { actif, accroche ('sommet', 'milieu', 'ligne', 'centre') }.
-const pointage = { actif: false, accroche: 'sommet' };
+// pointage : { actif, accroche ('sommet', 'milieu', 'ligne', 'centre'), choix (point touché, à
+// contrôler et valider : { est, nord, altitude }) }. Le plan ne bouge pas : une croix montre le
+// point, on vérifie, on donne son nom, puis « Valider ».
+const pointage = { actif: false, accroche: 'sommet', choix: null };
 const ACCROCHES_POINTAGE = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre']];
 
 /** Début du pointage : une barre sur le plan (accroche, Terminé) ; sur téléphone, on va au plan. */
 function commencerPointage() {
   pointage.actif = true;
+  pointage.choix = null;
   dessinerBarrePointage();
   if (estTelephone()) afficherOnglet('plan');
   envoyerImplantationAuPlan();
@@ -1060,12 +1078,13 @@ function commencerPointage() {
 
 function arreterPointage() {
   pointage.actif = false;
+  pointage.choix = null;
   document.querySelector('.barre-pointage')?.remove();
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
 }
 
-/** Barre posée en bas du plan pendant le pointage. */
+/** Barre posée en bas du plan pendant le pointage : accroche, puis le point touché (nom, H, Valider). */
 function dessinerBarrePointage() {
   let barre = document.querySelector('.barre-pointage');
   if (!barre) {
@@ -1074,19 +1093,38 @@ function dessinerBarrePointage() {
     barre.addEventListener('click', (evenement) => {
       const bouton = evenement.target.closest('button[data-action]');
       if (!bouton) return;
-      if (bouton.dataset.action === 'accroche-pointage') {
+      const action = bouton.dataset.action;
+      if (action === 'accroche-pointage') {
         pointage.accroche = bouton.dataset.valeur;
         dessinerBarrePointage();
-      } else if (bouton.dataset.action === 'fin-pointage') arreterPointage();
+      } else if (action === 'valider-pointage') validerPointage();
+      else if (action === 'oublier-pointage') {
+        pointage.choix = null;
+        dessinerBarrePointage();
+        envoyerImplantationAuPlan();
+        plan.rafraichirImplantation();
+      } else if (action === 'fin-pointage') arreterPointage();
+    });
+    barre.addEventListener('keydown', (evenement) => {
+      if (evenement.key === 'Enter') validerPointage();
     });
     document.querySelector('#plan .plan-cadre').append(barre);
   }
-  barre.innerHTML = `<span class="titre-pointage">Ajouter des points :</span>
-    ${ACCROCHES_POINTAGE.map(([cle, titre]) => `<button type="button" class="puce-choix ${pointage.accroche === cle ? 'actif' : ''}" data-action="accroche-pointage" data-valeur="${cle}">${titre}</button>`).join('')}
-    <button type="button" class="bouton" data-action="fin-pointage">Terminé</button>`;
+  const c = pointage.choix;
+  barre.innerHTML = `<div class="ligne-barre-pointage">
+      ${ACCROCHES_POINTAGE.map(([cle, titre]) => `<button type="button" class="puce-choix ${pointage.accroche === cle ? 'actif' : ''}" data-action="accroche-pointage" data-valeur="${cle}">${titre}</button>`).join('')}
+      <button type="button" class="bouton" data-action="fin-pointage">Terminé</button>
+    </div>
+    ${c ? `<div class="choix-pointage">
+      <span class="coordonnees-pointage">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>
+      <label>Nom<input type="text" data-pointage="nom" value="${echapper(nomPointAjoute(projet))}" autocomplete="off" autocapitalize="characters" /></label>
+      <label>H<input type="text" inputmode="decimal" data-pointage="altitude" value="${c.altitude != null ? c.altitude.toFixed(3) : ''}" placeholder="facultative" /></label>
+      <button type="button" class="bouton" data-action="valider-pointage">Valider</button>
+      <button type="button" class="bouton-lien bouton-lien-neutre" data-action="oublier-pointage">annuler</button>
+    </div>` : '<p class="aide-pointage">Touche le plan DXF</p>'}`;
 }
 
-/** Toucher du plan pendant le pointage : le point accroché sur le DXF devient un point ajouté. */
+/** Toucher du plan pendant le pointage : le point accroché est montré (croix), à valider. */
 function toucherPourPointage(position, tolerance) {
   const trouve = accrocher(pointage.accroche, position, tolerance, sourcesDesPlans(projet.plansDxf ?? [], position, tolerance));
   if (!trouve) {
@@ -1095,18 +1133,31 @@ function toucherPourPointage(position, tolerance) {
     return;
   }
   const mm = (valeur) => Math.round(valeur * 1000) / 1000;
-  const { point, erreur } = ajouterPointAjoute(projet, {
-    nom: nomPointAjoute(projet),
-    est: mm(trouve.est),
-    nord: mm(trouve.nord),
-    altitude: trouve.altitude != null ? mm(trouve.altitude) : null,
-    source: 'dxf',
-  });
-  if (erreur) {
-    afficherMessage(erreur, 4000);
+  pointage.choix = { est: mm(trouve.est), nord: mm(trouve.nord), altitude: trouve.altitude != null ? mm(trouve.altitude) : null };
+  dessinerBarrePointage();
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+}
+
+/** « Valider » : le point montré devient un point ajouté, avec le nom et l'altitude tapés. */
+function validerPointage() {
+  if (!pointage.choix) return;
+  const barre = document.querySelector('.barre-pointage');
+  const nom = barre.querySelector('[data-pointage="nom"]').value;
+  const altitude = lireNombreTape(barre.querySelector('[data-pointage="altitude"]').value);
+  if (altitude === undefined) {
+    afficherMessage('Altitude illisible : écris un nombre, ou laisse vide', 4000);
     return;
   }
+  const { point, erreur } = ajouterPointAjoute(projet, { ...pointage.choix, nom, altitude, source: 'dxf' });
+  if (erreur) {
+    afficherMessage(`Point non ajouté : ${erreur}`, 4000);
+    return;
+  }
+  pointage.choix = null;
+  sonValidation();
   afficherMessage(`Point ${point.nom} ajouté${point.altitude != null ? ` · H ${formaterNombre(point.altitude)}` : ''}`, 2500);
+  dessinerBarrePointage();
   modifie();
 }
 
@@ -1520,6 +1571,14 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
   quandToucherImplantation: toucherPourImplantation,
   quandReglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
+  // Menu « Points » : cocher / décocher une liste de points ('*' : toutes). Pas une modification
+  // du travail (rien à annuler) : on redessine et on enregistre.
+  quandMontrerListe: (id, visible) => {
+    if (id === '*') projet.listesCachees = visible ? [] : listesDePoints(projet).map((l) => l.id);
+    else montrerListe(projet, id, visible);
+    recalculer();
+    enregistrer();
+  },
 });
 
 const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces'), document.querySelector('#barre-surfaces'), {
@@ -1809,13 +1868,22 @@ function recalculer({ recadrer = false } = {}) {
   document.body.classList.toggle('mode-controle', Boolean(ecranLeve) && terrain.mode === 'controler');
   mettreAJourToucheVolume();
 
-  // Plan : surfaces du levé affiché et surfaces importées ; les autres sont cachées.
-  const visibles = new Set(surfacesAffichees());
+  // Plan : les listes de points cochées (menu « Points » : surfaces, métrés, Autres, fichiers,
+  // points ajoutés) ; leurs points, et seulement les contours, lignes et triangles des surfaces cochées.
+  // Pendant une modification (surface, mesure), comme avant : les points et surfaces du levé affiché.
+  const listes = listesDePoints(projet);
+  plan.afficherListesPoints(listes);
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
   const dansSurfaces = ongletContexte === 'surfaces';
-  // Une surface importée montre ses propres points ; sinon, les points du levé.
-  const pointsDuPlan = dansSurfaces && active && estImportee(active) ? active.points : points;
+  const enModification = ongletContexte === 'mesures' || editeurSurfaces.enModification();
+  const cacheesParListe = new Set(listes.filter((l) => !l.visible).map((l) => l.id));
+  const visibles = new Set(enModification ? surfacesAffichees() : projet.surfaces.filter((s) => !cacheesParListe.has(s.id)));
+  // Une surface importée montre ses propres points ; sinon, ceux du levé ou des listes cochées.
+  let pointsDuPlan;
+  if (dansSurfaces && active && estImportee(active)) pointsDuPlan = active.points;
+  else if (enModification) pointsDuPlan = points;
+  else pointsDuPlan = pointsStables(pointsDesListes(projet, listes));
   if (ongletContexte === 'mesures') {
     // Onglet 3. Mesures : seulement les points et les mesures (aucune surface, aucune coupe).
     plan.redessiner({
@@ -1898,6 +1966,14 @@ function basculerModeDessin() {
 }
 let pointsAffiches = null;
 const AUCUN_POINT = [];
+// Points des listes cochées : toujours le même tableau (son contenu change), pour que le plan ne
+// se recadre pas à chaque point levé ou à chaque liste cochée (voir recalculer).
+const POINTS_DES_LISTES = [];
+function pointsStables(nouveaux) {
+  const pareil = nouveaux.length === POINTS_DES_LISTES.length && nouveaux.every((p, i) => p === POINTS_DES_LISTES[i]);
+  if (!pareil) POINTS_DES_LISTES.splice(0, POINTS_DES_LISTES.length, ...nouveaux);
+  return POINTS_DES_LISTES;
+}
 let nombrePointsAffiches = 0;
 
 // --- Enregistrement automatique ---
