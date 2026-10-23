@@ -393,6 +393,21 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }));
     }
     groupe.append(creerElement('circle', { cx: x, cy: y, r: 6 }));
+    // Implantation d'une ligne : position le long de la ligne et décalage, à côté de la canne.
+    if (position.etiquette) {
+      const lignes = position.etiquette;
+      const largeur = Math.max(...lignes.map((l) => l.length)) * 7 + 14;
+      const gauche = x + 18 + largeur > vue.largeur ? x - 18 - largeur : x + 18;
+      const haut = Math.max(4, y - 20);
+      const etiquette = creerElement('g', { class: 'etiquette-position' });
+      etiquette.append(creerElement('rect', { x: gauche, y: haut, width: largeur, height: 12 + lignes.length * 16, rx: 6 }));
+      lignes.forEach((ligne, i) => {
+        const texte = creerElement('text', { x: gauche + 7, y: haut + 18 + i * 16 });
+        texte.textContent = ligne;
+        etiquette.append(texte);
+      });
+      groupe.append(etiquette);
+    }
     svg.append(groupe);
   }
 
@@ -816,6 +831,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    * surface en cours, qui ne cache pas les points levés.
    */
   function dessinerVolumes() {
+    if (dessin.sansVolumes) return; // Terrain › Implanter : pas d'étiquettes
     if (dessin.volumesDiscrets) {
       dessinerPastilleVolume();
       return;
@@ -1261,6 +1277,16 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (geste) return;
       dessinerImplantation();
       dessinerPosition();
+    },
+    /** Cadre le plan sur ces points [{ est, nord }], sur au moins "minimum" mètres (implantation). */
+    cadrerSur(coins, minimum = 10) {
+      const { largeur, hauteur } = taille();
+      if (largeur === 0 || hauteur === 0 || coins.length === 0) return;
+      suivre = false;
+      boutonPosition.classList.remove('actif');
+      const cadre = cadrerSurPoints(coins, largeur, hauteur, 40);
+      vue = { ...cadre, echelle: Math.min(cadre.echelle, Math.min(largeur, hauteur) / minimum) };
+      dessiner();
     },
     /** Cadre le plan sur ces plans DXF (bouton « voir »). */
     cadrerSurPlans(choisis) {

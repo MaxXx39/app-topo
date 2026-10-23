@@ -4109,3 +4109,296 @@ body.mode-telephone .onglets button svg {
   width: 20px;
   height: 20px;
 }
+
+/* ==========================================================================
+   Terrain (version 0.51.0) : Lever | Implanter tout en haut, écran de guidage
+   ========================================================================== */
+
+/* Lever (ambre) | Implanter (sarcelle) : le mode actif en couleur pleine. */
+.bascule-terrain button.actif {
+  background: var(--ambre);
+  color: var(--sombre);
+}
+
+.bascule-terrain.mode-controler button.actif {
+  background: #0d9488;
+  color: #ffffff;
+}
+
+/* Pastille du mode dans l'en-tête, aux mêmes couleurs. */
+.pastille-lever {
+  background: var(--ambre);
+  color: var(--sombre);
+}
+
+.pastille-implanter {
+  background: #0d9488;
+  color: #ffffff;
+}
+
+/* Téléphone : la bascule est collée sous l'en-tête, au-dessus du plan. */
+@media (max-width: 899px) {
+  body {
+    --hauteur-bascule: 46px;
+  }
+
+  body.mode-leve[data-onglet='terrain'] .bascule-terrain {
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    z-index: 11;
+    height: var(--hauteur-bascule);
+    margin: 0;
+    padding: 5px 8px;
+    border-radius: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--bordure);
+  }
+
+  body.mode-leve[data-onglet='terrain'] .panneau-plan {
+    top: calc(var(--hauteur-entete) + var(--hauteur-bascule));
+  }
+
+  body.mode-leve[data-onglet='terrain'] .mise-en-page {
+    padding-top: calc(38svh + var(--hauteur-bascule) + 12px);
+  }
+
+  body.mode-leve.mode-controle[data-onglet='terrain'] .mise-en-page {
+    padding-top: calc(26svh + var(--hauteur-bascule) + 12px);
+  }
+
+  /* Écran de guidage : le plan prend la moitié de la place, la vue rapprochée l'autre moitié. */
+  body.mode-leve.vue-implantation[data-onglet='terrain'] {
+    --hauteur-plan-guidage: calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) / 2);
+  }
+
+  body.mode-leve.vue-implantation[data-onglet='terrain'] .panneau-plan {
+    height: var(--hauteur-plan-guidage);
+  }
+
+  body.mode-leve.vue-implantation[data-onglet='terrain'] .mise-en-page {
+    padding-top: calc(var(--hauteur-plan-guidage) + var(--hauteur-bascule) + 6px);
+  }
+}
+
+/* Point, Ligne, Surface : bien visibles, comme des onglets. */
+.choix-implantation-type {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.choix-implantation-type .puce-choix {
+  flex: 1;
+  min-height: 38px;
+  border: 2px solid #0d9488;
+  background: var(--surface);
+  color: #0f766e;
+  font-weight: 800;
+}
+
+.choix-implantation-type .puce-choix.actif {
+  background: #0d9488;
+  color: #ffffff;
+}
+
+/* Écran de guidage : ← (autre point), titre, ⚙ (réglages). */
+.entete-guidage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.bouton-retour {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--bordure);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--sombre);
+  cursor: pointer;
+}
+
+.bouton-retour svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bouton-retour.actif {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.titre-vue-guidage {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 1.05rem;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reglages-guidage {
+  margin: 0 0 8px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: var(--fond);
+}
+
+.reglages-guidage .champ-decalage {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0;
+  font-size: 0.9rem;
+}
+
+.coordonnees-cible {
+  margin: 0 0 6px;
+  color: var(--gris);
+  font-size: 0.9rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ligne : début et fin, chacun avec ses coordonnées et son altitude à côté ; ⇄ à droite. */
+.vue-guidage .sens-ligne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 4px 8px;
+}
+
+.bouts-ligne {
+  flex: 1;
+  min-width: 0;
+}
+
+.bout-ligne {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.bout-ligne .pastille-bout {
+  min-width: 0;
+  padding: 1px 4px;
+}
+
+.coordonnees-bout {
+  flex: 1;
+  min-width: 0;
+}
+
+.altitude-bout {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  font-size: 0.85rem;
+}
+
+.altitude-bout input[type='text'] {
+  width: 84px;
+  min-height: 30px;
+  padding: 2px 6px;
+}
+
+button.bouton-retour[data-action='inverserLigne'] {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.coordonnees-bout {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vue-guidage .distance-guidage {
+  font-size: 0.8rem;
+}
+
+/* Implantation d'une ligne : position le long de la ligne et décalage, à côté de la canne. */
+.plan .etiquette-position rect {
+  fill: rgba(255, 255, 255, 0.92);
+  stroke: #0d9488;
+  stroke-width: 1.5;
+}
+
+.plan .etiquette-position text {
+  fill: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Écran de guidage sur téléphone : tout doit tenir dans la moitié basse. La cible (ou le couloir)
+   à gauche, les écarts à droite ; leur taille suit la place qui reste. */
+@media (max-width: 899px) {
+  body.vue-implantation .vue-guidage .guidage-direct.avec-cible,
+  body.vue-implantation .vue-guidage .guidage-direct.guidage-ligne {
+    grid-template-columns: auto 1fr;
+    justify-items: start;
+    column-gap: 10px;
+    padding: 6px 10px;
+    text-align: left;
+  }
+
+  body.vue-implantation .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
+    grid-template-columns: 1fr;
+    font-size: 1.05rem;
+  }
+
+  body.vue-implantation .vue-guidage .cible-implantation,
+  body.vue-implantation .vue-guidage .couloir-ligne {
+    grid-row: span 3;
+    width: auto;
+    height: clamp(100px, calc(var(--hauteur-plan-guidage) - 190px), 230px);
+    max-width: 55vw;
+  }
+
+  body.vue-implantation .vue-guidage .bouton-prendre {
+    min-height: 54px;
+    margin-top: 6px;
+  }
+
+  /* Ligne : le début et la fin prennent de la place, la vue du couloir est un peu plus petite. */
+  body.vue-implantation .vue-guidage:has(.sens-ligne) .couloir-ligne {
+    height: clamp(96px, calc(var(--hauteur-plan-guidage) - 250px), 220px);
+  }
+
+  body.vue-implantation .vue-guidage .sens-ligne {
+    padding: 2px 8px;
+  }
+
+  body.vue-implantation .vue-guidage .bout-ligne {
+    min-height: 30px;
+  }
+
+  body.vue-implantation .ecran-terrain {
+    padding-top: 2px;
+  }
+}
+
+.pastille-entete {
+  font-size: 0.68rem;
+}

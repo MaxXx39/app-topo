@@ -105,6 +105,7 @@ export function creerEcranLeve(conteneur, actions) {
   let correctionsOuvertes = false; // bloc « Corrections » ouvert
   const saisieCorrections = {}; // réglages des corrections tapés, pas encore envoyés
   let capBoussole = null; // dernier cap de la boussole de la tablette (°), ou null
+  let reglagesGuidageOuverts = false; // roue ⚙ de l'écran de guidage
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
@@ -112,6 +113,11 @@ export function creerEcranLeve(conteneur, actions) {
     const { action } = bouton.dataset;
     if (action === 'ouvrirChoixNature' || action === 'fermerChoixNature') {
       choixNatureOuvert = action === 'ouvrirChoixNature';
+      dessiner();
+      return;
+    }
+    if (action === 'basculerReglagesGuidage') {
+      reglagesGuidageOuverts = !reglagesGuidageOuverts;
       dessiner();
       return;
     }
@@ -226,8 +232,9 @@ export function creerEcranLeve(conteneur, actions) {
 
     const bouton = conteneur.querySelector('[data-action="prendre"]');
     const raison = conteneur.querySelector('[data-vivant="raison"]');
-    const implantation = donnees?.mode === 'controler' && donnees.controle.implantation === 'point';
-    const permis = connecte && Boolean(etat?.autorise) && Boolean(implantation ? donnees.implanter.cible : donnees?.stock);
+    const implantation = donnees?.mode === 'controler';
+    const aImplanter = donnees?.controle.implantation === 'ligne' ? donnees.implanter.ligne : donnees?.implanter.cible;
+    const permis = connecte && Boolean(etat?.autorise) && Boolean(implantation ? aImplanter : donnees?.stock);
     if (bouton) bouton.disabled = !permis;
     if (raison) {
       raison.textContent = permis || !connecte ? '' : etat?.raison ?? '';
@@ -321,9 +328,13 @@ export function creerEcranLeve(conteneur, actions) {
     }
   }
 
-  /** Lever | Implanter, en haut de l'onglet (le mode « implanter » s'appelle 'controler' dans le code). */
+  /**
+   * Lever | Implanter, tout en haut de l'onglet, au-dessus du plan (le mode « implanter »
+   * s'appelle 'controler' dans le code). Le mode actif est en couleur : ambre pour lever,
+   * sarcelle pour implanter (même couleur que la pastille de l'en-tête).
+   */
   function choixMode() {
-    return `<div class="modes-terrain" role="group" aria-label="Mode">
+    return `<div class="modes-terrain bascule-terrain mode-${donnees.mode}" role="group" aria-label="Mode">
       ${[['lever', 'Lever'], ['controler', 'Implanter']]
         .map(([cle, titre]) => `<button type="button" data-action="choisirMode" data-valeur="${cle}" class="${donnees.mode === cle ? 'actif' : ''}">${titre}</button>`)
         .join('')}
@@ -341,9 +352,9 @@ export function creerEcranLeve(conteneur, actions) {
   function controle() {
     const { controle: reglages, surfaces } = donnees;
     const vue = reglages.vueCoupes;
-    const choixImplantation = `<div class="ligne-choix choix-implantation-type">${boutonsChoix('choisirImplantation', IMPLANTATIONS, reglages.implantation)} ${bulle('implanter')}</div>`;
-    if (reglages.implantation === 'point') return choixImplantation + implanterPoint();
-    if (reglages.implantation === 'ligne') return choixImplantation + implanterLigne();
+    const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS, reglages.implantation)} ${bulle('implanter')}</div>`;
+    if (reglages.implantation === 'point') return choixImplantation + barreAccroche() + implanterPoint();
+    if (reglages.implantation === 'ligne') return choixImplantation + barreAccroche() + implanterLigne();
     return `
       ${choixImplantation}
       ${surfaces.length > 0
@@ -392,66 +403,34 @@ export function creerEcranLeve(conteneur, actions) {
   }
 
   /**
-   * Implantation d'une ligne : d'abord la ligne (points choisis un à un, ou ligne du DXF), puis
-   * toute la ligne ou un segment, le sens (début → fin), le décalage parallèle, les altitudes, le
-   * couloir de guidage et l'enregistrement.
+   * Implantation d'une ligne, avant le guidage : les points de la ligne choisis un à un (ou une
+   * ligne du DXF, touchée avec « Ligne DXF »). La ligne choisie s'implante dans l'écran de
+   * guidage (vueImplantation).
    */
   function implanterLigne() {
     const { implanter: imp } = donnees;
-    const exporter = imp.nbImplantations > 0
-      ? `<p class="aide">${imp.nbImplantations} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
-      : '';
-    if (!imp.ligne) {
-      const points = imp.pointsLigne;
-      const role = (i) => (i === 0 ? `${iconeDrapeau('debut')} Début` : i === points.length - 1 ? `${iconeDrapeau('fin')} Fin` : `${i + 1}`);
-      return `
-        <div class="points-ligne">
-          <p class="titre-choix">Points de la ligne</p>
-          ${points.length === 0
-            ? '<p class="vide">Aucun point.</p>'
-            : `<ol>${points.map((p, i) => `<li><strong>${role(i)}</strong> ${p.nom ? echapper(p.nom) : ''} <span class="aide">E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)}</span></li>`).join('')}</ol>`}
-          <div class="ligne-outils">
-            <button type="button" class="bouton-secondaire" data-action="implanterPointsLigne" ${points.length < 2 ? 'disabled' : ''}>Implanter cette ligne</button>
-            ${points.length > 0 ? '<button type="button" class="bouton-lien" data-action="retirerDernierPointLigne">enlever le dernier</button>' : ''}
-          </div>
-        </div>
-        ${exporter}`;
-    }
-    const l = imp.ligne;
-    const valeur = (v) => (v == null ? '' : v.toFixed(3));
-    const segments = l.nbSegments > 1
-      ? `<div class="ligne-choix">
-          ${boutonsChoix('choisirSegment', [['tout', 'Toute la ligne'], ['segment', 'Segment par segment']], l.segment == null ? 'tout' : 'segment')}
-        </div>
-        ${l.segment == null ? '' : `<div class="choix-segment">
-          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="precedent" ${l.segment === 0 ? 'disabled' : ''} aria-label="Segment précédent">◀</button>
-          <span>Segment <strong>${l.segment + 1}</strong> / ${l.nbSegments}</span>
-          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="suivant" ${l.segment === l.nbSegments - 1 ? 'disabled' : ''} aria-label="Segment suivant">▶</button>
-        </div>`}`
-      : '';
-    const bout = (p) => `${p.nom ? `<strong>${echapper(p.nom)}</strong> ` : ''}E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)}`;
+    const points = imp.pointsLigne;
+    const role = (i) => (i === 0 ? `${iconeDrapeau('debut')} Début` : i === points.length - 1 ? `${iconeDrapeau('fin')} Fin` : `${i + 1}`);
     return `
-      <div class="ligne-choisie">
-        <p class="titre-guidage">Ligne <strong>${echapper(l.nom)}</strong> · ${formaterNombre(l.longueur)} m
-          <button type="button" class="bouton-lien bouton-lien-neutre" data-action="changerLigne">changer</button></p>
-        ${segments}
-        <div class="sens-ligne">
-          <p><span class="pastille-bout">${iconeDrapeau('debut')} Début</span> ${bout(l.debut)}</p>
-          <p><span class="pastille-bout fin">${iconeDrapeau('fin')} Fin</span> ${bout(l.fin)}</p>
-          <button type="button" class="bouton-secondaire" data-action="inverserLigne">⇄ Inverser le sens</button>
-        </div>
-        <div class="champs-implantation champs-ligne">
-          <label>Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="0 · + à droite, − à gauche" /></label>
-          <label>Altitude début<input type="text" inputmode="decimal" data-reglage-ligne="debut" value="${valeur(l.altitudes.debut)}" placeholder="${l.altitudesDuPlan ? 'du plan (3D)' : 'facultative'}" /></label>
-          <label>Altitude fin<input type="text" inputmode="decimal" data-reglage-ligne="fin" value="${valeur(l.altitudes.fin)}" placeholder="${l.altitudesDuPlan ? 'du plan (3D)' : 'facultative'}" /></label>
+      <div class="points-ligne">
+        <p class="titre-choix">Points de la ligne</p>
+        ${points.length === 0
+          ? '<p class="vide">Aucun point.</p>'
+          : `<ol>${points.map((p, i) => `<li><strong>${role(i)}</strong> ${p.nom ? echapper(p.nom) : ''} <span class="aide">E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)}</span></li>`).join('')}</ol>`}
+        <div class="ligne-outils">
+          <button type="button" class="bouton-secondaire" data-action="implanterPointsLigne" ${points.length < 2 ? 'disabled' : ''}>Implanter cette ligne</button>
+          ${points.length > 0 ? '<button type="button" class="bouton-lien" data-action="retirerDernierPointLigne">enlever le dernier</button>' : ''}
         </div>
       </div>
-      <div class="guidage-direct attente" data-vivant="guidage-ligne"></div>
-      <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
-        <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol −</span>
-      </button>
-      <p class="raison-leve" data-vivant="raison" hidden></p>
-      ${exporter}`;
+      ${lienExport()}`;
+  }
+
+  /** « 3 implantation(s) enregistrée(s) · exporter (CSV) », ou rien. */
+  function lienExport() {
+    const nombre = donnees.implanter.nbImplantations;
+    return nombre > 0
+      ? `<p class="aide">${nombre} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
+      : '';
   }
 
   /**
@@ -491,11 +470,11 @@ export function creerEcranLeve(conteneur, actions) {
   }
 
   /**
-   * Implantation d'un point : point choisi (implanter ou créer), guidage (cible, boussole),
-   * enregistrement, liste « À implanter ».
+   * Implantation d'un point, avant le guidage : point choisi (implanter ou garder dans la liste
+   * « À implanter »), liste « À implanter », export. Le guidage est dans vueImplantation.
    */
   function implanterPoint() {
-    const { implanter: imp, controle: reglages } = donnees;
+    const { implanter: imp } = donnees;
     const choix = imp.choix
       ? `<div class="choix-implantation">
           <p class="coordonnees-choix">${imp.choix.nom ? `<strong>${echapper(imp.choix.nom)}</strong> ` : ''}E ${formaterNombre(imp.choix.est)} · N ${formaterNombre(imp.choix.nord)}
@@ -510,18 +489,6 @@ export function creerEcranLeve(conteneur, actions) {
           </div>
         </div>`
       : '';
-    const cible = imp.cible
-      ? `<p class="titre-guidage">Vers <strong>${echapper(imp.cible.nom ?? 'le point choisi')}</strong>${imp.cible.altitude != null ? ` · H ${formaterNombre(imp.cible.altitude)}` : ''}
-          <button type="button" class="bouton-lien bouton-lien-neutre" data-action="arreterImplantation">arrêter</button></p>
-        <div class="guidage-et-boussole ${reglages.guidage === 'nseo' ? 'avec-boussole' : ''}">
-          <div class="guidage-direct attente" data-vivant="guidage"></div>
-          ${reglages.guidage === 'nseo' ? boussole() : ''}
-        </div>
-        <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
-          <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol −</span>
-        </button>
-        <p class="raison-leve" data-vivant="raison" hidden></p>`
-      : '';
     const liste = imp.aImplanter.length > 0
       ? `<div class="liste-a-implanter">
           <p class="titre-choix">À implanter</p>
@@ -532,16 +499,94 @@ export function creerEcranLeve(conteneur, actions) {
             </div>`).join('')}
         </div>`
       : '';
-    const exporter = imp.nbImplantations > 0
-      ? `<p class="aide">${imp.nbImplantations} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
-      : '';
     return `
       ${choix}
-      ${cible}
       ${liste}
-      ${exporter}
+      ${lienExport()}`;
+  }
+
+  /**
+   * Écran de guidage (après « Implanter ») : le plan en haut (moitié de l'écran, voir style.css,
+   * « vue-implantation »), ici la vue rapprochée : ← pour choisir un autre point (ou une autre
+   * ligne), ⚙ pour les réglages, la cible (ou le couloir) et ENREGISTRER.
+   */
+  function vueImplantation() {
+    const { implanter: imp, controle: reglages } = donnees;
+    const ligne = reglages.implantation === 'ligne';
+    const titre = ligne
+      ? `<strong>${echapper(imp.ligne.nom)}</strong> · ${formaterNombre(imp.ligne.longueur)} m`
+      : `Vers <strong>${echapper(imp.cible.nom ?? 'le point choisi')}</strong>`;
+    const guidage = ligne
+      ? '<div class="guidage-direct attente" data-vivant="guidage-ligne"></div>'
+      : `<div class="guidage-et-boussole ${reglages.guidage === 'nseo' ? 'avec-boussole' : ''}">
+          <div class="guidage-direct attente" data-vivant="guidage"></div>
+          ${reglages.guidage === 'nseo' ? boussole() : ''}
+        </div>`;
+    return `<div class="vue-guidage">
+      <div class="entete-guidage">
+        <button type="button" class="bouton-retour" data-action="${ligne ? 'changerLigne' : 'arreterImplantation'}" title="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}" aria-label="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
+        <p class="titre-vue-guidage">${titre}</p>
+        ${ligne ? '<button type="button" class="bouton-retour" data-action="inverserLigne" title="Inverser le sens" aria-label="Inverser le sens">⇄</button>' : ''}
+        <button type="button" class="bouton-retour ${reglagesGuidageOuverts ? 'actif' : ''}" data-action="basculerReglagesGuidage" title="Réglages de l'implantation" aria-label="Réglages de l'implantation" aria-expanded="${reglagesGuidageOuverts}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>
+      </div>
+      ${reglagesGuidageOuverts ? reglagesGuidage(ligne) : ''}
+      ${ligne ? detailLigne() : detailPoint()}
+      ${guidage}
+      <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
+        <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol −</span>
+      </button>
+      <p class="raison-leve" data-vivant="raison" hidden></p>
+    </div>`;
+  }
+
+  /** Réglages de l'implantation (roue ⚙) : guidage, orientation ; pour une ligne, segment et décalage. */
+  function reglagesGuidage(ligne) {
+    const { controle: reglages, implanter: imp } = donnees;
+    const l = imp.ligne;
+    return `<div class="reglages-guidage">
       <div class="ligne-choix"><span>Guidage</span>${boutonsChoix('choisirGuidage', GUIDAGES, reglages.guidage)}</div>
-      <p class="aide" data-vivant="orientation"></p>`;
+      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
+      ${ligne && l.nbSegments > 1 ? `<div class="ligne-choix"><span>Ligne</span>${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment par segment']], l.segment == null ? 'tout' : 'segment')}</div>` : ''}
+      ${ligne ? `<label class="champ-decalage">Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
+      <p class="aide" data-vivant="orientation"></p>
+    </div>`;
+  }
+
+  /** Point implanté : coordonnées et altitude, sur une ligne. */
+  function detailPoint() {
+    const c = donnees.implanter.cible;
+    return `<p class="coordonnees-cible">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}${c.altitude != null ? ` · H ${formaterNombre(c.altitude)}` : ''}</p>`;
+  }
+
+  /**
+   * Ligne implantée : segment en cours (◀ ▶), puis le début (drapeau vert) et la fin (damier),
+   * chacun avec ses coordonnées et son altitude à côté : celle du plan s'il est en 3D, sinon une
+   * case pour la taper (facultative). ⇄ inverse le sens.
+   */
+  function detailLigne() {
+    const l = donnees.implanter.ligne;
+    const segment = l.segment == null
+      ? ''
+      : `<div class="choix-segment">
+          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="precedent" ${l.segment === 0 ? 'disabled' : ''} aria-label="Segment précédent">◀</button>
+          <span>Segment <strong>${l.segment + 1}</strong> / ${l.nbSegments}</span>
+          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="suivant" ${l.segment === l.nbSegments - 1 ? 'disabled' : ''} aria-label="Segment suivant">▶</button>
+        </div>`;
+    const altitude = (bout, cle) => (l.altitudesDuPlan
+      ? `<span class="altitude-bout">H <strong>${bout.altitude != null ? formaterNombre(bout.altitude) : '—'}</strong></span>`
+      : `<label class="altitude-bout">H<input type="text" inputmode="decimal" data-reglage-ligne="${cle}" value="${l.altitudes[cle] == null ? '' : l.altitudes[cle].toFixed(3)}" placeholder="—" aria-label="Altitude ${cle === 'debut' ? 'du début' : 'de la fin'}" /></label>`);
+    const ligneBout = (bout, cle) => `<div class="bout-ligne">
+        <span class="pastille-bout ${cle === 'fin' ? 'fin' : ''}">${iconeDrapeau(cle)}</span>
+        <span class="coordonnees-bout">${bout.nom ? `<strong>${echapper(bout.nom)}</strong> ` : ''}E ${formaterNombre(bout.est)} · N ${formaterNombre(bout.nord)}</span>
+        ${altitude(bout, cle)}
+      </div>`;
+    return `${segment}
+      <div class="sens-ligne">
+        <div class="bouts-ligne">${ligneBout(l.debut, 'debut')}${ligneBout(l.fin, 'fin')}</div>
+      </div>
+      ${l.decalage ? `<p class="aide">Parallèle à ${formaterNombre(Math.abs(l.decalage))} m ${l.decalage > 0 ? 'à droite' : 'à gauche'}</p>` : ''}`;
   }
 
   /**
@@ -783,13 +828,19 @@ export function creerEcranLeve(conteneur, actions) {
   /** Dessine tout l'écran avec les dernières données. */
   function dessiner() {
     if (!donnees) return;
+    // Point ou ligne en cours d'implantation : écran de guidage (plan en haut, cible en bas).
+    const { implantation } = donnees.controle;
+    const enGuidage = donnees.mode === 'controler'
+      && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (implantation === 'ligne' && Boolean(donnees.implanter.ligne)));
+    document.body.classList.toggle('vue-implantation', enGuidage);
+    let contenu;
+    if (enGuidage) contenu = vueImplantation();
+    else contenu = `${donnees.mode === 'controler' ? controle() : priseDePoint()}${piedRecepteur()}`;
     conteneur.innerHTML = `
         <div class="ecran-terrain">
-          ${donnees.mode === 'controler' && ['point', 'ligne'].includes(donnees.controle.implantation) ? barreAccroche() : ''}
           ${choixMode()}
           ${connexion()}
-          ${donnees.mode === 'controler' ? controle() : priseDePoint()}
-          ${piedRecepteur()}
+          ${contenu}
         </div>`;
     rafraichirVivant();
     tournerBoussole();

@@ -801,10 +801,37 @@ function envoyerImplantationAuPlan() {
  * Terrain et l'implantation sur le plan, sans tout recalculer ni redessiner (plus rapide).
  */
 function montrerImplantation() {
+  // Écran de guidage (classe vue-implantation, mise par l'écran Terrain) avant et après.
+  const avant = document.body.classList.contains('vue-implantation');
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
   ecranLeve?.afficher(donneesLeve());
   mettreAJourToucheVolume();
+  // Début du guidage : le plan (devenu plus grand) se cadre sur le point ou la ligne et la canne.
+  if (!avant && document.body.classList.contains('vue-implantation')) requestAnimationFrame(() => requestAnimationFrame(cadrerSurImplantation));
+}
+
+/** Cadre le plan sur ce qu'on implante (point ou ligne) et la position du récepteur. */
+function cadrerSurImplantation() {
+  const coins = implanter.ligne && terrain.implantation === 'ligne' ? [...implanter.ligne.sommets] : implanter.cible ? [implanter.cible] : [];
+  const position = etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null;
+  // La canne aussi, si elle est assez près (sinon le point serait tout petit à l'écran).
+  if (position && coins.length > 0 && Math.hypot(position.est - coins[0].est, position.nord - coins[0].nord) < 300) coins.push(position);
+  plan.cadrerSur(coins, 10);
+}
+
+/**
+ * Implantation d'une ligne : texte écrit à côté de la canne sur le plan, la position le long de la
+ * ligne (depuis le début) et le décalage de la canne (à droite ou à gauche de la ligne), ou null.
+ */
+function etiquetteLigne(implantationLigne) {
+  const l = implantationLigne?.ligne;
+  if (!l || implantationLigne.message) return null;
+  const decalage = Math.abs(l.ecart) < 0.0005 ? 'sur la ligne' : `${formaterNombre(Math.abs(l.ecart))} m ${l.ecart > 0 ? 'à droite' : 'à gauche'}`;
+  let le_long = `Début + ${formaterNombre(l.abscisse)} m`;
+  if (l.abscisse < 0) le_long = `Avant le début ${formaterNombre(-l.abscisse)} m`;
+  else if (l.abscisse > l.longueur) le_long = `Après la fin ${formaterNombre(l.abscisse - l.longueur)} m`;
+  return [le_long, decalage];
 }
 
 /** Vrai pendant l'implantation d'un point (Terrain › Implanter › Point). */
@@ -1204,7 +1231,7 @@ if (recepteurDisponible()) {
     const traits = controle?.coupes ? vues.map((sens) => ({ sens, debut: controle.coupes[sens].debut, fin: controle.coupes[sens].fin })) : [];
     // Ligne : trait en pointillés jusqu'au point de la ligne en face de la canne.
     const vers = implantationLigne?.ligne?.cible ?? null;
-    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers } : null);
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, etiquette: etiquetteLigne(implantationLigne) } : null);
   });
 }
 
@@ -1615,6 +1642,7 @@ function recalculer({ recadrer = false } = {}) {
   // en mode Implanter pour laisser la place aux coupes.
   document.body.classList.toggle('mode-leve', Boolean(ecranLeve));
   document.body.classList.toggle('mode-controle', Boolean(ecranLeve) && terrain.mode === 'controler');
+  mettreAJourPastilleMode();
   mettreAJourToucheVolume();
 
   // Plan : surfaces du levé affiché et surfaces importées ; les autres sont cachées.
@@ -1667,10 +1695,12 @@ function recalculer({ recadrer = false } = {}) {
     // Coupes tracées (A – A', B – B'), et celle en cours de tracé.
     coupes: projet.coupes.filter((c) => c.debut && c.fin && c.id !== traceCoupe?.id),
     traceCoupe,
-    // Onglet Terrain : le volume en petit dans un coin, pas en grand au milieu du stock.
+    // Onglet Terrain : le volume en petit dans un coin, pas en grand au milieu du stock ;
+    // en mode Implanter, aucune étiquette (volume, mesures).
     volumesDiscrets: ongletContexte === 'terrain',
+    sansVolumes: ongletContexte === 'terrain' && terrain.mode === 'controler',
     // Onglet Terrain, métré en cours : ses aires, longueurs et points comptés.
-    mesures: ongletContexte === 'terrain' && metreEnCours()
+    mesures: ongletContexte === 'terrain' && terrain.mode === 'lever' && metreEnCours()
       ? projet.mesures.filter((m) => m.metreId === metreEnCours().id).map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }))
       : [],
     mesureActive: null,
@@ -1784,6 +1814,18 @@ function mettreAJourEtatEntete() {
   pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : 'pastille-verte'}`;
   pastille.title = repris ? 'Ouvert sur un autre appareil : toucher pour prendre la main' : 'Tu as la main sur ce projet';
 }
+/** Pastille LEVER (ambre) / IMPLANTER (sarcelle) dans l'en-tête : le mode de l'onglet Terrain. */
+function mettreAJourPastilleMode() {
+  const pastille = document.querySelector('#pastille-mode');
+  pastille.hidden = !ecranLeve;
+  if (!ecranLeve) return;
+  const implanter = terrain.mode === 'controler';
+  pastille.textContent = implanter ? 'IMPLANTER' : 'LEVER';
+  pastille.className = `pastille-entete ${implanter ? 'pastille-implanter' : 'pastille-lever'}`;
+  pastille.title = 'Onglet Terrain';
+}
+document.querySelector('#pastille-mode').addEventListener('click', () => afficherOnglet('terrain'));
+
 document.querySelector('#pastille-verrou').addEventListener('click', () => {
   if (partage?.etat.repris?.projetId === projet.id) partage.reprendreLaMain();
   else afficherMessage('Tu as la main sur ce projet', 2000);
