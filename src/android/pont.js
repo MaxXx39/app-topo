@@ -75,3 +75,26 @@ export function regleToucheVolume(actif, fonction) {
   window.toucheVolumeBas = fonction;
   if (typeof window.AppliAndroid?.activerToucheVolume === 'function') window.AppliAndroid.activerToucheVolume(Boolean(actif));
 }
+
+// --- Corrections RTK par internet (swipos), sans Emlid Flow ---
+
+/** Vrai si l'appli Android sait recevoir les corrections elle-même (APK assez récent). */
+export function correctionsDisponibles() {
+  return estDansAppliAndroid() && typeof window.AppliAndroid.demarrerCorrections === 'function';
+}
+
+/**
+ * Réglages enregistrés sur la tablette : { hote, port, pointDeMontage, utilisateur,
+ * motDePasseEnregistre, actives } (le mot de passe ne revient jamais dans la page), ou null.
+ */
+export function lireReglagesCorrections() {
+  try {
+    return JSON.parse(window.AppliAndroid.lireReglagesCorrections());
+  } catch {
+    return null;
+  }
+}
+
+/** Démarre les corrections : { hote, port, pointDeMontage, utilisateur, motDePasse ('' = garder l'ancien) }. */
+export const demarrerCorrections = (reglages) => window.AppliAndroid.demarrerCorrections(JSON.stringify(reglages));
+export const arreterCorrections = () => window.AppliAndroid.arreterCorrections();

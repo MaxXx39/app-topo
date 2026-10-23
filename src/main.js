@@ -63,6 +63,7 @@ import {
 } from './topo/leve-direct.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
+import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections } from './android/pont.js';
 
 // --- État de l'application ---
 let projet = creerProjet(); // projet ouvert
@@ -440,6 +441,18 @@ function ajouterSurfaceLevee(nature) {
 const ecranLeve = recepteurDisponible()
   ? creerEcranLeve(document.querySelector('#leve-direct'), {
       choisirRecepteur,
+      // Corrections par internet (swipos) : seulement avec un APK qui sait le faire.
+      lireReglagesCorrections: () => (correctionsDisponibles() ? lireReglagesCorrections() : null),
+      demarrerCorrections: (reglages) => {
+        demarrerCorrections(reglages);
+        afficherMessage('Corrections : connexion à swipos…');
+        setTimeout(() => ecranLeve.afficher(donneesLeve()), 300); // bouton « Redémarrer », mot de passe enregistré
+      },
+      arreterCorrections: () => {
+        arreterCorrections();
+        afficherMessage('Corrections arrêtées : Emlid Flow peut reprendre');
+        setTimeout(() => ecranLeve.afficher(donneesLeve()), 300);
+      },
       reconnecter: reconnecterRecepteur,
       deconnecter: deconnecterRecepteur,
       nouvelleSurface: (nature) => ajouterSurfaceLevee(nature),

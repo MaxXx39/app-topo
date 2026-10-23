@@ -57,6 +57,23 @@ class RecepteurBluetooth(
         }
     }
 
+    /**
+     * Envoie des octets au récepteur (les corrections RTK reçues par internet, voir ClientNtrip).
+     * Renvoie faux si le récepteur n'est pas connecté ou si l'envoi échoue.
+     */
+    fun ecrire(octets: ByteArray): Boolean {
+        val maPrise = prise ?: return false
+        return try {
+            synchronized(this) {
+                maPrise.outputStream.write(octets)
+                maPrise.outputStream.flush()
+            }
+            true
+        } catch (erreur: IOException) {
+            false
+        }
+    }
+
     /** Coupe la connexion en cours. */
     fun deconnecter() {
         numeroConnexion++

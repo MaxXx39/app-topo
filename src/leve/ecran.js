@@ -14,6 +14,7 @@
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
+import { etatCorrections } from './corrections.js';
 import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
@@ -80,7 +81,7 @@ const LETTRES_METRE = { aire: 'A', longueur: 'L' };
 
 /**
  * Crée l'écran dans "conteneur". Les actions sont faites par main.js via "actions" :
- * choisirRecepteur(), reconnecter(), deconnecter(), nouvelleSurface(nature), choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
+ * choisirRecepteur(), reconnecter(), deconnecter(), lireReglagesCorrections(), demarrerCorrections(reglages), arreterCorrections(), nouvelleSurface(nature), choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
  * annulerDernierPoint(), choisirLibelle(abréviation), enregistrerLibelles({ lignes, points }),
  * choisirMode(mode), choisirSurfaceControle(id), choisirVueCoupes(vue),
  * choisirLongueurCoupe(m), choisirExagerationCoupe(facteur), choisirSourceOrientation(source),
@@ -101,6 +102,8 @@ export function creerEcranLeve(conteneur, actions) {
   let direct = null; // orientation et contrôle calculés par main.js à chaque état du récepteur
   let cibleAffichee = 0; // cible montrée près du point à implanter (0 : aucune, voir CIBLES)
   let bandeCouloir = 0; // échelle du couloir de la ligne (n° dans BANDES_COULOIR)
+  let correctionsOuvertes = false; // bloc « Corrections » ouvert
+  const saisieCorrections = {}; // réglages des corrections tapés, pas encore envoyés
   let capBoussole = null; // dernier cap de la boussole de la tablette (°), ou null
 
   conteneur.addEventListener('click', (evenement) => {
@@ -137,6 +140,18 @@ export function creerEcranLeve(conteneur, actions) {
       actions.trouverPoint(conteneur.querySelector('[data-champ="nom-a-trouver"]')?.value ?? '');
       return;
     }
+    if (action === 'demarrerCorrections') {
+      const lire = (champ) => conteneur.querySelector(`[data-correction="${champ}"]`)?.value.trim() ?? '';
+      actions.demarrerCorrections({
+        hote: lire('hote'),
+        port: Number(lire('port')) || 2101,
+        pointDeMontage: lire('pointDeMontage'),
+        utilisateur: lire('utilisateur'),
+        motDePasse: conteneur.querySelector('[data-correction="motDePasse"]')?.value ?? '',
+      });
+      for (const cle of Object.keys(saisieCorrections)) delete saisieCorrections[cle];
+      return;
+    }
     if (action === 'choisirSegment') {
       actions.choisirSegment(bouton.dataset.valeur);
       return;
@@ -151,6 +166,15 @@ export function creerEcranLeve(conteneur, actions) {
     if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
+  });
+
+  // Réglages des corrections : ouverture du bloc et valeurs tapées (gardées si l'écran se redessine).
+  conteneur.addEventListener('toggle', (evenement) => {
+    if (evenement.target.dataset?.zone === 'corrections') correctionsOuvertes = evenement.target.open;
+  }, true);
+  conteneur.addEventListener('input', (evenement) => {
+    const champ = evenement.target.dataset.correction;
+    if (champ && champ !== 'motDePasse') saisieCorrections[champ] = evenement.target.value;
   });
 
   // Nom d'un point du projet choisi dans la liste proposée (pas tapé lettre par lettre, ni validé
@@ -208,6 +232,14 @@ export function creerEcranLeve(conteneur, actions) {
     if (raison) {
       raison.textContent = permis || !connecte ? '' : etat?.raison ?? '';
       raison.hidden = permis || !connecte;
+    }
+
+    // Corrections : par Emlid Flow, ou reçues directement (état en direct).
+    const corrections = conteneur.querySelector('[data-vivant="corrections"]');
+    if (corrections) {
+      const { texte, classe } = etatCorrections(etat?.corrections);
+      corrections.textContent = texte;
+      corrections.className = `etat-corrections ${classe}`;
     }
 
     // Orientation : valeurs brutes, pour contrôler le cap du RX2 sur le terrain.
@@ -562,12 +594,38 @@ export function creerEcranLeve(conteneur, actions) {
     </div>`;
   }
 
-  /** Récepteur connecté (à couper), en bas de l'écran. */
+  /** Récepteur connecté (à couper), en bas de l'écran, puis les corrections. */
   function piedRecepteur() {
     return `<p class="pied-recepteur" data-si-connecte hidden>
       <span>Récepteur : <strong data-vivant="connexion"></strong></span>
       <button type="button" class="bouton-lien" data-action="deconnecter">couper</button>
-    </p>`;
+    </p>
+    ${blocCorrections()}`;
+  }
+
+  /**
+   * Corrections RTK : par Emlid Flow (rien à régler ici), ou reçues directement de swipos par
+   * l'appli (réglages repris d'Emlid Flow, gardés sur la tablette). Seulement avec un APK récent.
+   */
+  function blocCorrections() {
+    const reglages = actions.lireReglagesCorrections?.();
+    if (!reglages) return '';
+    // Valeurs tapées pas encore envoyées : gardées si l'écran se redessine.
+    const valeur = (champ) => echapper(String(saisieCorrections[champ] ?? reglages[champ] ?? ''));
+    return `<details class="bloc-corrections" data-zone="corrections" ${correctionsOuvertes ? 'open' : ''}>
+      <summary>Corrections : <span class="etat-corrections" data-vivant="corrections">…</span> ${bulle('corrections')}</summary>
+      <div class="champs-corrections">
+        <label class="champ-large">Serveur<input type="text" data-correction="hote" value="${valeur('hote')}" placeholder="adresse (voir Emlid Flow)" autocapitalize="off" spellcheck="false" /></label>
+        <label>Port<input type="text" inputmode="numeric" data-correction="port" value="${valeur('port')}" /></label>
+        <label>Point de montage<input type="text" data-correction="pointDeMontage" value="${valeur('pointDeMontage')}" autocapitalize="off" spellcheck="false" /></label>
+        <label>Identifiant<input type="text" data-correction="utilisateur" value="${valeur('utilisateur')}" autocapitalize="off" spellcheck="false" autocomplete="off" /></label>
+        <label>Mot de passe<input type="password" data-correction="motDePasse" value="" placeholder="${reglages.motDePasseEnregistre ? 'enregistré' : ''}" autocomplete="off" /></label>
+      </div>
+      <div class="ligne-outils">
+        <button type="button" class="bouton-secondaire" data-action="demarrerCorrections">${reglages.actives ? 'Redémarrer' : 'Démarrer'}</button>
+        ${reglages.actives ? '<button type="button" class="bouton-lien" data-action="arreterCorrections">arrêter (retour à Emlid Flow)</button>' : ''}
+      </div>
+    </details>`;
   }
 
   /** Choix du rôle : 3 gros boutons à la couleur du rôle. */
@@ -832,7 +890,9 @@ export function mettreAJourBandeaux(etat) {
   } else {
     const satellites = etat.nbSatellites != null ? ` · ${etat.nbSatellites} sat.` : '';
     const statut = { 4: 'RTK FIXE', 5: 'RTK FLOTTANT' }[etat.qualite] ?? `GNSS : ${etat.libelleQualite ?? '?'}`;
-    rtk.textContent = `${statut}${satellites}`;
+    // Corrections reçues directement par l'appli (sans Emlid Flow) : on le rappelle.
+    const direct = etat.corrections?.etat === 'recoit' ? ' · direct' : '';
+    rtk.textContent = `${statut}${satellites}${direct}`;
     rtk.className = etat.qualite === 4 ? 'ok' : 'pas-ok';
   }
   if (etat.etatInclinaison == null) {

@@ -3803,3 +3803,62 @@ svg.plan,
   stroke: #ffffff;
   stroke-width: 3px;
 }
+
+/* Corrections RTK (Terrain, en bas) : par Emlid Flow ou reçues directement de swipos. */
+.bloc-corrections {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.bloc-corrections > summary {
+  cursor: pointer;
+  color: var(--gris);
+}
+
+.etat-corrections {
+  font-weight: 700;
+}
+
+.etat-corrections.ok {
+  color: var(--succes);
+}
+
+.etat-corrections.attente {
+  color: #b45309;
+}
+
+.etat-corrections.erreur {
+  color: var(--rouge);
+}
+
+.champs-corrections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 8px 0;
+}
+
+.champs-corrections label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+  color: var(--gris);
+}
+
+.champs-corrections .champ-large {
+  grid-column: 1 / -1;
+}
+
+.champs-corrections input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 4px 8px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}

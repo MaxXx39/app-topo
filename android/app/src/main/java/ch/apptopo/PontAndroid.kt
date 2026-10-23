@@ -51,6 +51,24 @@ class PontAndroid(private val ecran: EcranPrincipal) {
     @JavascriptInterface
     fun prendrePoint(): String = ecran.recepteur.pointEnJson()
 
+    // --- Corrections RTK par internet (swipos), sans Emlid Flow ---
+
+    /** Réglages enregistrés (texte JSON, sans le mot de passe), voir EcranPrincipal.reglagesCorrectionsJson. */
+    @JavascriptInterface
+    fun lireReglagesCorrections(): String = ecran.reglagesCorrectionsJson()
+
+    /** Démarre les corrections avec ces réglages (texte JSON) et les enregistre sur la tablette. */
+    @JavascriptInterface
+    fun demarrerCorrections(reglagesJson: String) {
+        ecran.runOnUiThread { ecran.demarrerCorrections(reglagesJson) }
+    }
+
+    /** Arrête les corrections. */
+    @JavascriptInterface
+    fun arreterCorrections() {
+        ecran.runOnUiThread { ecran.arreterCorrections() }
+    }
+
     /** La touche « volume − » prend le point (vrai) ou redevient le volume (faux). */
     @JavascriptInterface
     fun activerToucheVolume(actif: Boolean) {

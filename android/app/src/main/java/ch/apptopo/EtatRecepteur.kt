@@ -12,6 +12,7 @@ import ch.apptopo.noyau.nmea.libelleQualite
 import ch.apptopo.noyau.nmea.lireEtc
 import ch.apptopo.noyau.nmea.lireGga
 import ch.apptopo.noyau.nmea.lirePhraseNmea
+import ch.apptopo.noyau.ntrip.ClientNtrip
 import org.json.JSONObject
 
 /**
@@ -22,6 +23,20 @@ import org.json.JSONObject
 class EtatRecepteur {
 
     val bluetooth = RecepteurBluetooth(::surLigneNmea, ::surEtatBluetooth)
+
+    // Dernière phrase GGA reçue telle quelle, et son heure : envoyée au serveur de corrections.
+    @Volatile private var derniereGgaBrute: String? = null
+    @Volatile private var heureGgaBruteMs: Long? = null
+
+    /**
+     * Corrections RTK reçues directement par internet (swipos), sans Emlid Flow : le client
+     * envoie la GGA récente du RX2 au serveur et écrit les corrections vers le RX2 par Bluetooth.
+     */
+    val corrections = ClientNtrip(
+        ggaActuelle = { derniereGgaBrute.takeIf { (age(heureGgaBruteMs) ?: Long.MAX_VALUE) <= DELAI_RECENT_MS } },
+        surCorrections = { octets -> bluetooth.ecrire(octets) },
+        surEtat = {},
+    )
 
     // Grille du géoïde : chargée une seule fois, à la première conversion.
     private val grille: GrilleGeoide by lazy { GrilleGeoide.chgeo2004Lhn95() }
@@ -94,7 +109,22 @@ class EtatRecepteur {
             put("erreurConversion", erreurConversion ?: JSONObject.NULL)
             put("autorise", autorisation.autorise)
             put("raison", autorisation.raison)
+            put("corrections", correctionsEnJson())
         }.toString()
+    }
+
+    /**
+     * Corrections par internet : { etat ('arrete', 'connexion', 'recoit', 'attente', 'erreur'),
+     * message, octets, age (s depuis les dernières corrections reçues, ou null) }.
+     */
+    private fun correctionsEnJson(): JSONObject {
+        val etat = corrections.etat
+        val age = etat.heureDerniereDonnee?.let { (corrections.horloge() - it) / 1000.0 }
+        return JSONObject()
+            .put("etat", etat.etat)
+            .put("message", etat.message)
+            .put("octets", etat.octets)
+            .put("age", age ?: JSONObject.NULL)
     }
 
     /**
@@ -129,7 +159,11 @@ class EtatRecepteur {
         val phrase = lirePhraseNmea(ligne) ?: return
         if (phrase.sommeOk == false) return
         when (phrase.type) {
-            "GGA" -> lireGga(phrase)?.let { gga -> derniereMesure = Mesure(gga, convertir(gga), maintenant) }
+            "GGA" -> {
+                derniereGgaBrute = ligne
+                heureGgaBruteMs = maintenant
+                lireGga(phrase)?.let { gga -> derniereMesure = Mesure(gga, convertir(gga), maintenant) }
+            }
             "ETC" -> {
                 derniereCompensation = lireEtc(phrase)
                 heureEtcMs = maintenant

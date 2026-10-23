@@ -31,6 +31,8 @@ import android.webkit.WebViewClient
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.Toast
+import ch.apptopo.noyau.ntrip.ReglagesNtrip
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -82,6 +84,8 @@ class EcranPrincipal : Activity() {
         garderHorsDesBarres(cadre)
         setContentView(cadre)
         page.loadUrl(ServeurAppli.ADRESSE_ACCUEIL)
+        // Corrections par internet laissées en marche la dernière fois : on les reprend.
+        if (preferencesCorrections().getBoolean(CLE_CORRECTIONS_ACTIVES, false)) reglagesCorrections()?.let { recepteur.corrections.demarrer(it) }
     }
 
     override fun onResume() {
@@ -95,6 +99,7 @@ class EcranPrincipal : Activity() {
     }
 
     override fun onDestroy() {
+        recepteur.corrections.arreter()
         recepteur.bluetooth.deconnecter()
         page.destroy()
         super.onDestroy()
@@ -372,6 +377,79 @@ class EcranPrincipal : Activity() {
         recepteur.oublier("non connecté")
     }
 
+    // =====================================================================
+    // Corrections RTK par internet (swipos), sans Emlid Flow
+    // Réglages gardés dans les préférences privées de l'appli (sur cette tablette seulement),
+    // jamais dans le projet ni dans le fichier projet.
+    // =====================================================================
+
+    private fun preferencesCorrections() = getSharedPreferences("corrections", MODE_PRIVATE)
+
+    /** Réglages enregistrés, ou null s'il n'y en a pas encore. */
+    private fun reglagesCorrections(): ReglagesNtrip? {
+        val p = preferencesCorrections()
+        val hote = p.getString("hote", null) ?: return null
+        return ReglagesNtrip(
+            hote = hote,
+            port = p.getInt("port", PORT_NTRIP),
+            pointDeMontage = p.getString("pointDeMontage", "") ?: "",
+            utilisateur = p.getString("utilisateur", "") ?: "",
+            motDePasse = p.getString("motDePasse", "") ?: "",
+        )
+    }
+
+    /**
+     * Réglages pour la page (texte JSON) : { hote, port, pointDeMontage, utilisateur,
+     * motDePasseEnregistre, actives } ; le mot de passe lui-même ne quitte jamais l'appli Android.
+     */
+    fun reglagesCorrectionsJson(): String {
+        val r = reglagesCorrections()
+        return JSONObject()
+            .put("hote", r?.hote ?: "")
+            .put("port", r?.port ?: PORT_NTRIP)
+            .put("pointDeMontage", r?.pointDeMontage ?: POINT_DE_MONTAGE_PROPOSE)
+            .put("utilisateur", r?.utilisateur ?: "")
+            .put("motDePasseEnregistre", !r?.motDePasse.isNullOrEmpty())
+            .put("actives", preferencesCorrections().getBoolean(CLE_CORRECTIONS_ACTIVES, false))
+            .toString()
+    }
+
+    /**
+     * Démarre les corrections avec les réglages tapés dans la page ({ hote, port, pointDeMontage,
+     * utilisateur, motDePasse } ; mot de passe vide = garder celui enregistré), et les enregistre.
+     */
+    fun demarrerCorrections(texteJson: String) {
+        val lu = try {
+            JSONObject(texteJson)
+        } catch (erreur: Exception) {
+            message("Réglages des corrections illisibles.")
+            return
+        }
+        val ancien = reglagesCorrections()
+        val reglages = ReglagesNtrip(
+            hote = lu.optString("hote").trim(),
+            port = lu.optInt("port", PORT_NTRIP),
+            pointDeMontage = lu.optString("pointDeMontage").trim(),
+            utilisateur = lu.optString("utilisateur").trim(),
+            motDePasse = lu.optString("motDePasse").ifEmpty { ancien?.motDePasse ?: "" },
+        )
+        preferencesCorrections().edit()
+            .putString("hote", reglages.hote)
+            .putInt("port", reglages.port)
+            .putString("pointDeMontage", reglages.pointDeMontage)
+            .putString("utilisateur", reglages.utilisateur)
+            .putString("motDePasse", reglages.motDePasse)
+            .putBoolean(CLE_CORRECTIONS_ACTIVES, true)
+            .apply()
+        recepteur.corrections.demarrer(reglages)
+    }
+
+    /** Arrête les corrections (Emlid Flow peut reprendre la main). */
+    fun arreterCorrections() {
+        preferencesCorrections().edit().putBoolean(CLE_CORRECTIONS_ACTIVES, false).apply()
+        recepteur.corrections.arreter()
+    }
+
     private fun aLaPermission(permission: String) =
         checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
@@ -481,5 +559,10 @@ class EcranPrincipal : Activity() {
         private const val CODE_PERMISSIONS = 3
         private const val CLE_DERNIER_RECEPTEUR = "dernier_recepteur"
         private const val CLE_NOM_RECEPTEUR = "nom_dernier_recepteur"
+        private const val CLE_CORRECTIONS_ACTIVES = "actives"
+
+        // Port habituel des serveurs NTRIP, et point de montage swipos de l'utilisateur (à vérifier dans Emlid Flow).
+        private const val PORT_NTRIP = 2101
+        private const val POINT_DE_MONTAGE_PROPOSE = "MSM_GISGEO_LV95LHN95"
     }
 }
