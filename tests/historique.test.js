@@ -78,3 +78,21 @@ describe('historique : annuler et rétablir', () => {
     expect(revenu.surfaces[0].photos[0]).toEqual(photo);
   });
 });
+
+describe('historique et plans DXF', () => {
+  it('ne recopie pas le contenu d\'un plan DXF à chaque étape, et le remet en place', async () => {
+    const { creerHistorique, reinitialiser, memoriser, annuler } = await import('../src/projet/historique.js');
+    const { creerProjet } = await import('../src/projet/projet.js');
+    const historique = creerHistorique();
+    const projet = creerProjet('Essai');
+    const contenu = { traits: [{ c: 0, k: null, p: new Array(10000).fill(1.5), f: false }], pleins: [], cercles: [], textes: [], points: [] };
+    projet.plansDxf.push({ id: 'p1', nom: 'plan.dxf', calques: [{ nom: 'axe', couleur: '#000000', visible: true }], contenu });
+    reinitialiser(historique, projet);
+    projet.plansDxf[0].calques[0].visible = false;
+    memoriser(historique, projet);
+    expect(historique.actuel.length).toBeLessThan(2000);
+    const avant = annuler(historique);
+    expect(avant.plansDxf[0].calques[0].visible).toBe(true);
+    expect(avant.plansDxf[0].contenu.traits[0].p).toHaveLength(10000);
+  });
+});

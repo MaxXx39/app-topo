@@ -4,21 +4,31 @@
 export const TEXTES_AIDE = {
   // --- Projet ---
   projets:
-    'Les projets sont enregistrés automatiquement sur cet appareil, rien n\'est envoyé sur internet. « Continuer » reprend le travail là où il en est. Pour passer du téléphone à l\'ordinateur : « Exporter le fichier projet », envoie-le-toi (mail, Drive…), puis « Ouvrir un fichier projet » sur l\'autre appareil.',
+    'Les projets sont enregistrés automatiquement sur cet appareil, rien n\'est envoyé sur internet. Un projet se reconnaît à son affaire et son lieu (écrits en haut de l\'appli et dans le cartouche du PDF), le nom est facultatif. « Continuer » reprend le travail. Pour passer du téléphone à l\'ordinateur : « Gestion de projets » › exporter, envoie-le-toi (mail, Drive…), puis « Ouvrir un projet » › « Ouvrir un fichier projet » sur l\'autre appareil.',
+  partage:
+    'Les projets sont rangés sur le Google Drive du compte de l\'appli, dans le dossier « Topo - projets » : tous les appareils connectés les voient (« Ouvrir un projet »). Le projet ouvert est envoyé tout seul 30 s après une modification et quand on quitte l\'appli. Un projet ouvert sur un appareil est à son nom : un autre appareil peut « prendre la main », et le premier n\'envoie alors plus rien. Sans réseau, l\'envoi attend. Dans l\'APK, le compte Google de l\'appli doit être ajouté dans les réglages Android de la tablette.',
   cartouche:
-    'Affaire, dessinateur et date du plan, écrits dans le cartouche du PDF et dans le nom des fichiers exportés. Date vide : la date du jour de l\'export.',
+    'Écrits dans le cartouche du PDF : affaire et lieu (du projet), dessiné par (retenu sur cet appareil) et date. Date vide : la date du jour.',
+  imports:
+    'Fichier de points : CSV d\'Emlid Flow ou TXT (nom, Est, Nord, altitude, en MN95) ; chaque fichier devient un levé. Plan DXF : plan d\'AutoCAD ou de Mensura affiché en fond (implantation) ; un DWG doit d\'abord être enregistré en DXF.',
 
-  // --- 1. Importer ---
+  // --- 1. Points ---
+  lever:
+    'Seulement dans l\'appli Android. Appaire d\'abord le RX2 dans les réglages Bluetooth du téléphone, et active dans Emlid Flow « Envoyer la position compensée » ; laisse Emlid Flow ouvert pour les corrections. Choisis le rôle du point avant de le prendre (contour pour un stock, ligne de rupture, point isolé) et ce que tu lèves (HT, BOR, RG… : « modifier » pour compléter la liste). Noms : C-Stock-1-1 (contour), L-HT-1-1 (ligne), P-RG-1 (point), numéros comptés dans tout le projet. Métré : aires (A-ENR-1-1…), longueurs (L-BOR-1-1…) et points comptés (P-RG-1…) ; chacun devient tout seul une mesure de Calculs / métrés › Mesures / métrés. PRENDRE LE POINT (ou la touche volume −) est bloqué tant que le RTK n\'est pas fixe et l\'inclinaison pas prête. Coordonnées en MN95, altitudes RAN95.',
+  corrections:
+    'Corrections RTK. « par Emlid Flow » : comme avant, Emlid Flow reste ouvert et les envoie au RX2. Pour s\'en passer : recopie ici les réglages swipos d\'Emlid Flow (serveur, port, point de montage, identifiant, mot de passe), puis « Démarrer ». L\'appli reçoit alors les corrections par internet et les envoie elle-même au RX2. Ferme Emlid Flow avant (« Forcer l\'arrêt »). Le mot de passe reste sur cette tablette, jamais dans le projet.',
+  implanter:
+    'Point : choisis une accroche dans la barre grise (Point = points du projet ; Sommet, Milieu, Sur ligne, Centre = plan DXF), puis touche le plan, ou tape le nom d\'un point. Près du point, une cible apparaît (2 m, puis 1 m, puis 20 cm). Ligne : « Ligne DXF » puis touche un trait du plan (toute la ligne ou segment par segment), ou choisis le début, la fin et les points entre ; drapeau vert = début, drapeau à damier = fin, les chevrons montrent le sens. Gauche et droite se lisent en regardant vers la fin. Décalage parallèle : + à droite, − à gauche. Surface : de combien monter ou descendre pour être sur la surface choisie.',
   importer:
     'Fichier de points : CSV Emlid ou TXT (nom, Est, Nord, altitude, séparés par des tabulations), en MN95. Les lignes illisibles sont signalées avec leur numéro.',
   leves:
-    'Un levé = un fichier de points. Le levé coché est celui affiché sur le plan, avec ses surfaces. Avec plusieurs levés (deux dates), tu peux calculer le volume entre leurs surfaces dans l\'onglet 2.2 Volumes.',
+    'Un levé = un fichier de points importé (CSV d\'Emlid Flow, ou TXT : nom, Est, Nord, altitude, en MN95), ou les points pris avec le récepteur (onglet Terrain). Le levé coché est celui affiché sur le plan, avec ses surfaces. Avec plusieurs levés (deux dates), tu peux calculer le volume entre leurs surfaces dans l\'onglet Calculs › Volumes.',
 
   // --- 2.1 Surfaces ---
   surfaces:
     'Une surface peut être un stock, un terrain naturel ou un terrassement. Nomme-la comme tu veux. Elle se crée à partir des points du levé coché (contour, lignes de rupture, points), ou s\'importe d\'un LandXML ou d\'un DXF. Le rôle d\'un point ne dépend jamais de son nom : c\'est toi qui choisis. Touche une surface sur le plan pour la sélectionner.',
   nature:
-    'Ce que représente la surface : à choisir avant tout le reste, elle donne son nom automatique (« Stock 2 », « Terrain naturel 1 »…). Un stock reçoit tout de suite son volume (sur sa ligne basse, le contour). Les autres volumes s\'ajoutent dans l\'onglet 2.2 Volumes. Tu peux changer de nature plus tard (« C\'est : »).',
+    'Ce que représente la surface : à choisir avant tout le reste, elle donne son nom automatique (« Stock 2 », « Terrain naturel 1 »…). Un stock reçoit tout de suite son volume (sur sa ligne basse, le contour). Les autres volumes s\'ajoutent dans l\'onglet Calculs › Volumes. Tu peux changer de nature plus tard (« C\'est : »).',
   contour:
     'Bord de la surface, dans l\'ordre. Le polygone est fermé automatiquement. Seul l\'intérieur du contour est gardé, même pour une forme en « L ». Sans contour, le bord suit les points extérieurs (supprime ensuite les triangles en trop).',
   ligne:
@@ -30,7 +40,7 @@ export const TEXTES_AIDE = {
   trianglesEnTrop:
     'Sans contour, la surface relie les points extérieurs et peut créer des triangles en trop. Active le mode suppression, puis touche un triangle sur le plan pour le supprimer ; le toucher à nouveau le rétablit.',
   photos:
-    'Prends une photo du stock (ou choisis-la dans la galerie) : elle est réduite et rangée dans le projet, sur cet appareil. Ajoute une légende. Si la case « Photos » de l\'export est cochée (onglet 2.2 Volumes), elles sont imprimées dans la colonne de droite du PDF, sous la légende.',
+    'Prends une photo du stock (ou choisis-la dans la galerie) : elle est réduite et rangée dans le projet, sur cet appareil. Ajoute une légende. Si la case « Photos » de l\'export est cochée (onglet Calculs › Volumes), elles sont imprimées dans la colonne de droite du PDF, sous la légende.',
   importerSurface:
     'LandXML (export Mensura) : chaque surface TIN du fichier devient une surface. DXF : les faces 3D (3DFACE) ou maillages de chaque calque deviennent une surface, avec X = Est, Y = Nord, Z = altitude (MN95). Tu choisis ensuite ce que c\'est (stock, terrain naturel, terrassement). Une surface importée peut servir de référence dans une comparaison de volumes.',
 
@@ -46,7 +56,7 @@ export const TEXTES_AIDE = {
 
   // --- 3. Mesures ---
   mesures:
-    'Mesures de longueurs et d\'aires sur les points importés, à part des surfaces et des volumes (une mesure ne crée pas de surface et ne sert jamais pour un volume). « + Longueur » : touche les points dans l\'ordre (ou tape une liste, ou coche). « + Aire » : un contour (fermé automatiquement), et si besoin des lignes de rupture et des points isolés, comme pour une surface. Sur le plan, les mesures sont en cyan pointillé ; touche une mesure pour la choisir.',
+    'Mesures de longueurs et d\'aires sur les points importés, à part des surfaces et des volumes (une mesure ne crée pas de surface et ne sert jamais pour un volume). « + Longueur » : touche les points dans l\'ordre (ou tape une liste, ou coche). « + Aire » : un contour (fermé automatiquement), et si besoin des lignes de rupture et des points isolés, comme pour une surface. « + Nombre » : les points à compter (regards, poteaux…). Les mesures d\'un métré levé sur le terrain se créent toutes seules. Sur le plan, les mesures sont en cyan pointillé ; touche une mesure pour la choisir.',
   valeursMesure:
     'Longueur 2D : à plat. Longueur 3D : distance inclinée, morceau par morceau. Dénivelé : altitude du dernier point moins celle du premier. Pente = dénivelé ÷ longueur 2D × 100 (positive quand ça monte). Aire 2D : aire du contour à plat. Aire 3D : somme des triangles (contour, lignes de rupture et points isolés). Coche « Plan et PDF » pour écrire la valeur sur le plan et dans le PDF ; « Détail » donne chaque morceau.',
   exporterMesures:

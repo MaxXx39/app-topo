@@ -3,15 +3,22 @@
 // Un projet a la forme :
 // {
 //   format: 'topo-projet', version: 1,
-//   id, nom, creeLe, modifieLe (dates ISO),
+//   id, nom (facultatif), creeLe, modifieLe (dates ISO),
 //   leves: [{ id, nom, importeLe, points: [{ nom, est, nord, altitude }] }],
 //   leveActifId,                    // levé affiché
 //   surfaces: [...],                // stocks, terrassements, terrains... : voir topo/surface.js
-//   calculs: [...],                 // calculs de volume (onglet 2.2 Volumes) : voir volumes/calculs.js
+//   calculs: [...],                 // calculs de volume (onglet Calculs › Volumes) : voir volumes/calculs.js
 //   coupes: [{ id, nom ('A', 'B'), debut, fin, exageration (1 ou 2), dansPdf }],  // 2 au maximum
 //                                   // debut, fin : { est, nord } (m, MN95)
-//   mesures: [...],                 // longueurs et aires (onglet 3. Mesures) : voir topo/mesure.js
-//   cartouche: { affaire, dessinePar, date },   // date : 'AAAA-MM-JJ', ou '' pour la date du jour
+//   mesures: [...],                 // longueurs et aires (onglet Calculs › Mesures) : voir topo/mesure.js
+//   cartouche: { affaire, lieu, dessinePar, date },   // affaire et lieu : infos du projet (onglet Projet) ;
+//                                   // dessinePar, date : anciens champs (réglés maintenant au moment du PDF)
+//   plansDxf: [{ id, nom, importeLe, origine, bornes, calques, contenu, compte }],  // fonds de plan DXF
+//                                   // (voir topo/dxf-plan.js) : affichés sous le levé, pour l'implantation
+//   aImplanter: [{ id, nom, est, nord, altitude (ou null) }],   // points à implanter (Terrain › Implanter › Point)
+//   metres: [{ id, nom, nature: 'metre', leveId, enCours }],   // métrés levés (voir topo/metre.js)
+//   implantations: [{ id, nom, cible: { est, nord, altitude }, mesure: { est, nord, altitude, gnss },
+//                     ecarts: { dEst, dNord, distance, dAltitude }, le (date ISO) }],  // implantations enregistrées
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé. De même pour une mesure.
@@ -22,8 +29,8 @@ export const FORMAT = 'topo-projet';
 // Version 2 : calculs de volume (onglets Volumes et Comparer réunis) et nature des surfaces.
 export const VERSION = 2;
 
-/** Crée un projet vide. */
-export function creerProjet(nom) {
+/** Crée un projet vide (le nom est facultatif : le projet se reconnaît à son affaire et son lieu). */
+export function creerProjet(nom = '') {
   const maintenant = new Date().toISOString();
   return {
     format: FORMAT,
@@ -38,7 +45,11 @@ export function creerProjet(nom) {
     calculs: [],
     coupes: [],
     mesures: [],
-    cartouche: { affaire: '', dessinePar: '', date: '' },
+    cartouche: { affaire: '', lieu: '', dessinePar: '', date: '' },
+    plansDxf: [],
+    aImplanter: [],
+    implantations: [],
+    metres: [],
   };
 }
 
@@ -48,6 +59,26 @@ export function ajouterLeve(projet, nomFichier, points) {
   projet.leves.push(leve);
   projet.leveActifId = leve.id;
   return leve;
+}
+
+/**
+ * Titre du projet, en haut de l'appli et dans les listes : « Affaire - Lieu » (« 10 203 - Gland »),
+ * sinon son nom, sinon « Projet sans nom ».
+ */
+export function titreProjet(projet) {
+  const affaireLieu = [projet.cartouche?.affaire, projet.cartouche?.lieu].map((t) => (t ?? '').trim()).filter(Boolean).join(' - ');
+  return affaireLieu || (projet.nom ?? '').trim() || 'Projet sans nom';
+}
+
+/** Nom du projet, à écrire sous le titre (seulement s'il n'est pas déjà le titre), ou ''. */
+export function sousTitreProjet(projet) {
+  const nom = (projet.nom ?? '').trim();
+  return nom && nom !== titreProjet(projet) ? nom : '';
+}
+
+/** Début des noms de fichiers exportés : le titre du projet, sans caractères spéciaux. */
+export function nomDeFichierProjet(projet) {
+  return titreProjet(projet).replace(/[^\w-]+/g, '_') || 'projet';
 }
 
 /** Levé affiché (ou null). */
@@ -92,9 +123,13 @@ export function lireFichierProjet(texte) {
  * transformé : la base de chaque surface et les comparaisons deviennent des calculs de volume.
  */
 export function completerProjet(projet) {
-  const vide = creerProjet(projet.nom ?? 'Projet');
+  const vide = creerProjet(projet.nom ?? '');
   const complet = { ...vide, ...projet, version: VERSION, cartouche: { ...vide.cartouche, ...projet.cartouche } };
   complet.leves ??= [];
+  complet.plansDxf ??= [];
+  complet.aImplanter ??= [];
+  complet.implantations ??= [];
+  complet.metres ??= [];
   complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
     nature: estImportee(surface) ? 'terrain' : 'stock',
     ...surface,
@@ -113,6 +148,8 @@ export function resumerProjet(projet) {
   return {
     id: projet.id,
     nom: projet.nom,
+    titre: titreProjet(projet),
+    sousTitre: sousTitreProjet(projet),
     modifieLe: projet.modifieLe,
     nombreLeves: projet.leves.length,
     nombreSurfaces: projet.surfaces.length,

@@ -1,4 +1,4 @@
-// Coupes (onglet 2.2 Volumes, sous le récapitulatif) : 2 au maximum, A – A' et B – B'.
+// Coupes (onglet Calculs › Volumes, sous le récapitulatif) : 2 au maximum, A – A' et B – B'.
 // Une coupe se trace en touchant le plan deux fois (début, puis fin) ; ses coordonnées se
 // corrigent ensuite au clavier. Elle montre toutes les surfaces affichées qu'elle traverse.
 import { formaterNombre } from '../topo/format.js';
@@ -96,13 +96,13 @@ function carte(coupe, trace, obtenirProfils) {
   if (enTrace || !coupe.debut || !coupe.fin) {
     const consigne = enTrace
       ? trace.etape === 'debut'
-        ? `Touche sur le plan le <strong>début</strong> de la coupe (${echapper(coupe.nom)}).`
-        : `Touche maintenant la <strong>fin</strong> de la coupe (${echapper(coupe.nom)}').`
-      : 'Coupe pas encore tracée.';
+        ? `Touche le <strong>début</strong> (${echapper(coupe.nom)}).`
+        : `Touche la <strong>fin</strong> (${echapper(coupe.nom)}').`
+      : 'Pas encore tracée.';
     return `
       <div class="carte-role carte-coupe en-edition">
         <div class="titre-role">${titre}</div>
-        <p>${consigne} <span class="aide">Près d'un point levé, la coupe s'accroche à ce point.</span></p>
+        <p>${consigne}</p>
         <div class="ligne-outils">
           ${enTrace ? '<button type="button" class="bouton-secondaire" data-action="annuler-trace">Annuler le tracé</button>' : `<button type="button" class="bouton-secondaire" data-action="retracer" data-id="${id}">Tracer sur le plan</button>`}
           <button type="button" class="bouton-lien" data-action="supprimer-coupe" data-id="${id}">supprimer</button>

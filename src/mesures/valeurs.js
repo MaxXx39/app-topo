@@ -29,12 +29,14 @@ export const VALEURS = {
     { cle: 'p2d', titre: 'Périmètre 2D', court: 'P 2D', ecrire: (r) => `${formaterNombre(r.p2d)} m` },
     { cle: 'p3d', titre: 'Périmètre 3D', court: 'P 3D', ecrire: (r) => `${formaterNombre(r.p3d)} m` },
   ],
+  nombre: [{ cle: 'nombre', titre: 'Nombre de points', court: 'Nb', ecrire: (r) => `${r.nombre} pce` }],
 };
 
 /** Texte de la case « morceaux » de chaque sorte de mesure. */
 export const TEXTE_MORCEAUX = {
   longueur: 'Chaque morceau sur le plan',
   aire: 'Chaque côté sur le plan',
+  nombre: null, // pas de morceaux
 };
 
 /**
@@ -68,7 +70,7 @@ export function rvbDeCouleur(couleur, facteur = 1) {
 }
 
 /** Nom affiché d'une sorte de mesure. */
-export const NOM_TYPE = { longueur: 'Longueur', aire: 'Aire' };
+export const NOM_TYPE = { longueur: 'Longueur', aire: 'Aire', nombre: 'Nombre' };
 
 /**
  * Valeur principale d'une mesure, pour la liste et la petite étiquette du plan : la première
@@ -118,6 +120,11 @@ export function valeursMorceau(morceau) {
 export function placeEtiquetteMesure(mesure, resultat) {
   if (mesure.type === 'aire') {
     return pointInterieur(resultat.triangles) ?? resultat.sommets[0];
+  }
+  // Nombre : au milieu des points comptés.
+  if (mesure.type === 'nombre') {
+    const n = resultat.sommets.length;
+    return { est: resultat.sommets.reduce((s, p) => s + p.est, 0) / n, nord: resultat.sommets.reduce((s, p) => s + p.nord, 0) / n };
   }
   let reste = resultat.l2d / 2;
   for (const { debut, fin, l2d } of resultat.morceaux) {

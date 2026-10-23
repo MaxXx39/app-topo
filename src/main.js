@@ -6,8 +6,9 @@ import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { lireLandXML } from './topo/landxml.js';
 import { lireDXF } from './topo/dxf-lecture.js';
+import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee, nomNature } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, nomNature, nouvelIdentifiant } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
@@ -32,88 +33,164 @@ import {
   lireFichierProjet,
   completerProjet,
   resumerProjet,
+  titreProjet,
+  sousTitreProjet,
+  nomDeFichierProjet,
 } from './projet/projet.js';
 import * as stockage from './projet/stockage.js';
+import { creerPartage } from './partage/partage.js';
 import * as historique from './projet/historique.js';
 import { bulle, installerAide } from './aide/bulles.js';
+import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
+import { creerSuiviOrientation } from './leve/orientation.js';
+import { ecouterBoussole } from './leve/boussole.js';
+import { lireLibelles, enregistrerLibelles } from './leve/libelles.js';
+import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe } from './topo/implantation.js';
+import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele } from './topo/ligne-implantation.js';
+import { MODES_ACCROCHE, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
+import {
+  estLeveDirect,
+  leveDuJour,
+  creerSurfaceDirecte,
+  prochainNom,
+  nomsDuProjet,
+  rolesPermis,
+  ajouterPointDirect,
+  annulerDernierPoint,
+  nouvelleLigne,
+  basculerFermeture,
+  ligneEnCours,
+  resumeStock,
+} from './topo/leve-direct.js';
+import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
+import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
+import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections } from './android/pont.js';
 
 // --- État de l'application ---
-let projet = creerProjet('Mon projet'); // projet ouvert
+let projet = creerProjet(); // projet ouvert
 let resumes = []; // liste des projets enregistrés (pour l'onglet Projet)
+let partage = null; // partage des projets par Google Drive (voir partage/partage.js), créé plus bas
 let dernierImport = null; // résultat du dernier import de points
+let dernierPlan = null; // message du dernier import de plan DXF
 let surfacesCalculees = new Map(); // id de surface -> triangles (résultat de calculerSurface)
 let resultatsCalculs = new Map(); // id de calcul -> volume (résultat de calculerVolume)
 let resultatsMesures = new Map(); // id de mesure -> longueurs, aires (résultat de calculerMesure)
-let ongletContexte = 'importer'; // dernier onglet (hors plan) : décide de ce que montre le plan
+let ongletContexte = 'projets'; // dernier onglet (hors plan) : décide de ce que montre le plan
 let calculMontre = null; // id du calcul colorié sur le plan (bouton « Voir sur le plan »)
 let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, etape: 'debut' ou 'fin', debut }
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
+// Levé avec le récepteur (appli Android) : levé et stock en cours, rôle du prochain point.
+const leveDirect = { stockId: null, role: 'contour' };
+// Libellés des noms de points (L-HT-1-3, P-RG-2…), gardés sur l'appareil (voir leve/libelles.js).
+let libelles = lireLibelles();
+let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
+// Onglet Terrain : mode (Lever ou Contrôler) et réglages du contrôle, retenus sur l'appareil.
+const CLE_TERRAIN = 'topo-terrain';
+const terrain = {
+  mode: 'lever',
+  surfaceId: null,
+  vueCoupes: 'les2',
+  demiLongueur: 5,
+  exagerationCoupe: 1,
+  sourceOrientation: 'rx2',
+  libelleLigne: 'HT', // dernier libellé choisi pour une ligne de rupture
+  libellePoint: 'TN', // et pour un point isolé (ou compté)
+  libelleAire: 'ENR', // et pour une aire d'un métré
+  implantation: 'surface', // mode Implanter : implanter une surface ou un point
+  accroche: 'point', // implantation d'un point : point du projet, sommet, milieu, sur la ligne ou centre (voir topo/accroche.js)
+  guidage: 'rx2', // guidage vers le point : 'rx2' (avance / droite selon le cap du RX2) ou 'nseo' (nord / est)
+  accrocheLigne: 'trait', // implantation d'une ligne : 'trait' (ligne du plan DXF) ou une accroche de point
+  ...lireReglagesTerrain(),
+};
+// Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
+// point à implanter en cours ({ id (point de la liste « À implanter », ou null), nom, est, nord, altitude }).
+// Implantation d'une ligne : points choisis pour la faire (pointsLigne : [{ est, nord, altitude, nom }])
+// et ligne en cours (ligne : { nom, sommets, segmentTouche, segment (n° ou null : toute la ligne),
+// inverse, decalage (m, + à droite), altitudes: { debut, fin } (tapées, ou null) }).
+const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null };
+const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
+
+function lireReglagesTerrain() {
+  try {
+    return JSON.parse(localStorage.getItem(CLE_TERRAIN)) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function retenirReglagesTerrain() {
+  try {
+    localStorage.setItem(CLE_TERRAIN, JSON.stringify(terrain));
+  } catch {
+    // Mémoire du navigateur indisponible : les réglages ne seront simplement pas retenus.
+  }
+}
 
 // --- Mise en page : onglets ---
-// L'onglet Projet vient en premier (l'appli s'ouvre dessus). Les onglets numérotés suivent
-// l'ordre du travail : importer les points, préparer les surfaces et calculer les volumes
-// (2.1 et 2.2, réunis dans un même cadre), puis mesurer (3, à part des volumes).
+// Projet (le chantier : levés importés, cartouche, fichier projet), Terrain (levé avec le récepteur,
+// seulement dans l'appli Android), Calculs (Surfaces, Volumes, Mesures : un seul affiché à la fois,
+// choisi en haut de l'onglet) et Plan (en plein écran sur téléphone, toujours à droite sur ordinateur).
 const ICONES = {
   projets: '<path d="M3 7h6l2 2h10v10H3z" />',
-  importer: '<path d="M12 15V4M7 9l5-5 5 5M4 15v5h16v-5" />',
-  surfaces: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
-  volumes: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
-  mesures: '<path d="M3 16 16 3l5 5L8 21zM7 12l2 2M10 9l2 2M13 6l2 2" />',
+  // Terrain : une canne GNSS (antenne en haut, pointe en bas).
+  terrain: '<path d="M12 8v13M8 5a4 2 0 0 0 8 0a4 2 0 0 0-8 0M10 21h4" />',
+  calculs: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
   plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
 };
-// "court" : titre utilisé sur les petits téléphones. "groupe" : onglets dessinés dans un même cadre.
 const ONGLETS = [
   { nom: 'projets', titre: 'Projet' },
-  { nom: 'importer', titre: '1. Importer' },
-  { nom: 'surfaces', titre: '2.1 Surfaces', court: '2.1 Surf.', groupe: 'volumes' },
-  { nom: 'volumes', titre: '2.2 Volumes', court: '2.2 Vol.', groupe: 'volumes' },
-  { nom: 'mesures', titre: '3. Mesures' },
+  ...(recepteurDisponible() ? [{ nom: 'terrain', titre: 'Terrain' }] : []),
+  { nom: 'calculs', titre: 'Calculs / métrés' },
   { nom: 'plan', titre: 'Plan' },
 ];
+// Les trois parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Surfaces et
+// Volumes vont ensemble (un même cadre), Mesures / métrés est à part.
+const PARTIES_CALCULS = [
+  ['surfaces', 'Surfaces'],
+  ['volumes', 'Volumes'],
+  ['mesures', 'Mesures / métrés'],
+];
+const boutonPartie = ([cle, titre]) => `<button type="button" data-partie="${cle}">${titre}</button>`;
+const estPartieCalculs = (nom) => PARTIES_CALCULS.some(([cle]) => cle === nom);
+let partieCalculs = 'surfaces'; // dernière partie affichée dans Calculs
 
-/** Bouton d'un onglet (icône + titre, et titre court pour les petits téléphones). */
-const boutonOnglet = (o) => `<button type="button" data-onglet="${o.nom}">
+/** Bouton d'un onglet (icône + titre). */
+const boutonOnglet = (o) => `<button type="button" data-onglet="${o.nom}" class="onglet-${o.nom}">
     <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[o.nom]}</svg>
-    ${o.court
-      ? `<span class="titre-long">${o.titre}</span><span class="titre-court" aria-hidden="true">${o.court}</span>`
-      : `<span>${o.titre}</span>`}
+    <span>${o.titre}</span>
   </button>`;
-
-/** Barre des onglets : les onglets d'un même groupe sont réunis dans un cadre. */
-function barreOnglets() {
-  let html = '';
-  for (let i = 0; i < ONGLETS.length; i += 1) {
-    const o = ONGLETS[i];
-    if (!o.groupe) {
-      html += boutonOnglet(o);
-      continue;
-    }
-    const groupe = ONGLETS.filter((autre) => autre.groupe === o.groupe);
-    html += `<div class="groupe-onglets" role="group" aria-label="Surfaces et volumes">${groupe.map(boutonOnglet).join('')}</div>`;
-    i += groupe.length - 1;
-  }
-  return html;
-}
 
 document.querySelector('#app').innerHTML = `
   <div class="mise-en-page">
     <div class="colonne-gauche">
-      <section class="panneau" data-onglet="projets"><div id="projets"></div></section>
-      <section class="panneau" data-onglet="importer"><div id="importer"></div></section>
+      <section class="panneau panneau-projet" data-onglet="projets">
+        <div id="projets"></div>
+        <div id="importer"></div>
+        <div id="projets-suite"></div>
+      </section>
+      <section class="panneau" data-onglet="terrain">
+        <div id="leve-direct"></div>
+      </section>
+      <nav class="parties-calculs" aria-label="Calculs">
+        <div class="groupe-surfaces-volumes" role="group" aria-label="Surfaces et volumes">
+          ${PARTIES_CALCULS.slice(0, 2).map(boutonPartie).join('')}
+        </div>
+        <div class="groupe-mesures">${boutonPartie(PARTIES_CALCULS[2])}</div>
+      </nav>
       <section class="panneau" data-onglet="surfaces">
-        <h2>2.1 Surfaces <span class="aide" id="nom-leve-surfaces"></span> ${bulle('surfaces')}</h2>
-        <p class="vide sans-points">Importe d'abord un fichier de points (onglet 1. Importer), ou une surface LandXML ou DXF.</p>
+        <h2>Surfaces ${bulle('surfaces')}</h2>
+        <p class="vide sans-points">Aucun point dans le projet.</p>
         <div id="message-import-surface"></div>
         <div id="surfaces"></div>
       </section>
       <section class="panneau" data-onglet="volumes">
-        <h2>2.2 Volumes ${bulle('volumes')}</h2>
+        <h2>Volumes ${bulle('volumes')}</h2>
         <div id="volumes"></div>
         <div id="coupes" class="carte-section"></div>
         <div id="export" class="carte-section"></div>
       </section>
       <section class="panneau" data-onglet="mesures">
-        <h2>3. Mesures <span class="aide" id="nom-leve-mesures"></span> ${bulle('mesures')}</h2>
+        <h2>Mesures / métrés ${bulle('mesures')}</h2>
         <div id="mesures"></div>
         <div id="export-mesures" class="carte-section"></div>
       </section>
@@ -124,13 +201,26 @@ document.querySelector('#app').innerHTML = `
       <div id="plan"></div>
     </section>
   </div>
-  <nav class="onglets" aria-label="Onglets">${barreOnglets()}</nav>
+  <nav class="onglets" aria-label="Onglets">${ONGLETS.map(boutonOnglet).join('')}</nav>
 `;
 
-/** Affiche un onglet. Sur ordinateur, le plan reste toujours visible à droite. */
-function afficherOnglet(nom) {
-  for (const element of document.querySelectorAll('[data-onglet]')) {
-    element.classList.toggle('actif', element.dataset.onglet === nom);
+/**
+ * Affiche un onglet ('projets', 'terrain', 'plan') ou une partie de Calculs ('surfaces',
+ * 'volumes', 'mesures' ; 'calculs' : la dernière partie affichée). Sur ordinateur, le plan reste
+ * toujours visible à droite.
+ */
+function afficherOnglet(demande) {
+  const nom = demande === 'calculs' ? partieCalculs : demande;
+  if (estPartieCalculs(nom)) partieCalculs = nom;
+  for (const panneau of document.querySelectorAll('.panneau[data-onglet]')) {
+    panneau.classList.toggle('actif', panneau.dataset.onglet === nom);
+  }
+  const ongletVisible = estPartieCalculs(nom) ? 'calculs' : nom;
+  for (const bouton of document.querySelectorAll('.onglets button[data-onglet]')) {
+    bouton.classList.toggle('actif', bouton.dataset.onglet === ongletVisible);
+  }
+  for (const bouton of document.querySelectorAll('.parties-calculs button')) {
+    bouton.classList.toggle('actif', bouton.dataset.partie === nom);
   }
   document.body.dataset.onglet = nom;
   if (nom !== 'plan' && nom !== ongletContexte) {
@@ -144,13 +234,20 @@ function afficherOnglet(nom) {
     ongletContexte = nom;
     recalculer();
   }
+  mettreAJourToucheVolume();
   window.scrollTo(0, 0);
 }
 document.querySelector('.onglets').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-onglet]');
   if (bouton) afficherOnglet(bouton.dataset.onglet);
 });
+document.querySelector('.parties-calculs').addEventListener('click', (evenement) => {
+  const bouton = evenement.target.closest('button[data-partie]');
+  if (bouton) afficherOnglet(bouton.dataset.partie);
+});
 installerAide(document.querySelector('#bouton-aide'));
+// Toucher le projet ouvert (en-tête) : on va à l'onglet Projet.
+document.querySelector('#entete-projet').addEventListener('click', () => afficherOnglet('projets'));
 
 // --- Accès aux données du projet ---
 
@@ -211,6 +308,57 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     if (leve && nom) leve.nom = nom;
     modifie();
   },
+  importerPlanDxf: async (fichier) => {
+    afficherMessage(`Lecture du plan « ${fichier.name} »…`, null);
+    // On laisse le message s'afficher avant la lecture (quelques secondes pour un gros plan).
+    await new Promise((fin) => setTimeout(fin, 30));
+    try {
+      const { plan: lu, erreur } = lirePlanDxf(texteDuDxf(new Uint8Array(await fichier.arrayBuffer())), fichier.name);
+      if (erreur || !lu.bornes) {
+        dernierPlan = { nom: fichier.name, erreur: erreur ?? 'aucun objet dessiné trouvé' };
+        afficherMessage('Plan non importé');
+        recalculer();
+        return;
+      }
+      const avertissements = [];
+      if (!estEnMn95(lu.bornes)) {
+        avertissements.push('Ce plan ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : il est affiché tel quel, sans recalage.');
+      }
+      const ignores = Object.entries(lu.compte.ignores);
+      if (ignores.length > 0) avertissements.push(`Non affiché(s) : ${ignores.map(([type, n]) => `${n} ${type}`).join(', ')} (hachures, images… : seuls les traits, textes, cercles et aplats sont lus).`);
+      projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu });
+      dernierPlan = { nom: fichier.name, avertissements };
+      afficherMessage(`Plan « ${fichier.name} » importé : ${lu.compte.objets} objets`, 4000);
+      modifie();
+    } catch (erreur) {
+      dernierPlan = { nom: fichier.name, erreur: erreur.message };
+      afficherMessage('Plan non importé');
+      recalculer();
+    }
+  },
+  voirPlanDxf: (id) => {
+    const choisi = projet.plansDxf.find((p) => p.id === id);
+    if (!choisi) return;
+    if (estTelephone()) afficherOnglet('plan');
+    requestAnimationFrame(() => plan.cadrerSurPlans([choisi]));
+  },
+  supprimerPlanDxf: (id) => {
+    const choisi = projet.plansDxf.find((p) => p.id === id);
+    if (!choisi || !confirm(`Supprimer le plan « ${choisi.nom} » du projet ?`)) return;
+    projet.plansDxf = projet.plansDxf.filter((p) => p.id !== id);
+    dernierPlan = null;
+    modifie();
+  },
+  montrerCalqueDxf: (id, numero, visible) => {
+    const calque = projet.plansDxf.find((p) => p.id === id)?.calques[numero];
+    if (!calque) return;
+    calque.visible = visible;
+    modifie();
+  },
+  montrerTousCalquesDxf: (id, visible) => {
+    for (const calque of projet.plansDxf.find((p) => p.id === id)?.calques ?? []) calque.visible = visible;
+    modifie();
+  },
   supprimerLeve: (id) => {
     const leve = projet.leves.find((l) => l.id === id);
     const surfacesDuLeve = projet.surfaces.filter((s) => s.leveId === id);
@@ -220,50 +368,863 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     projet.leves = projet.leves.filter((l) => l.id !== id);
     projet.surfaces = projet.surfaces.filter((s) => s.leveId !== id);
     projet.mesures = projet.mesures.filter((m) => m.leveId !== id);
+    projet.metres = projet.metres.filter((m) => m.leveId !== id);
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
     editeurSurfaces.charger(projet.surfaces);
     modifie({ recadrer: true });
   },
 });
 
+// --- Levé avec le récepteur Emlid (seulement dans l'appli Android) ---
+// Sur le terrain, on lève une surface (stock, terrain naturel ou terrassement). Ses points vont
+// dans le levé du jour (créé tout seul, comme un fichier importé) et, selon leur rôle, dans la
+// surface (voir topo/leve-direct.js) : surfaces, volumes, mesures et exports marchent pareil.
+
+/** Surface levée en cours (dans un levé fait avec le récepteur), ou null. */
+function stockEnCours() {
+  const surface = projet.surfaces.find((s) => s.id === leveDirect.stockId);
+  const leve = projet.leves.find((l) => l.id === surface?.leveId);
+  return surface && estLeveDirect(leve) ? surface : null;
+}
+/** Métré levé en cours (aires, longueurs, points comptés ; voir topo/metre.js), ou null. */
+function metreEnCours() {
+  return projet.metres.find((m) => m.id === leveDirect.stockId) ?? null;
+}
+
+/** Levé (fait avec le récepteur) de la surface ou du métré en cours, ou null. */
+function leveEnCours() {
+  const enCours = stockEnCours() ?? metreEnCours();
+  return enCours ? projet.leves.find((l) => l.id === enCours.leveId) ?? null : null;
+}
+
+/** Surfaces levées avec le récepteur (celles qu'on peut reprendre dans l'onglet Terrain). */
+function surfacesLevees() {
+  const directs = new Set(projet.leves.filter(estLeveDirect).map((l) => l.id));
+  return projet.surfaces.filter((s) => directs.has(s.leveId));
+}
+
+/** Affiche la surface en cours sur le plan et dans Calculs › Surfaces (son levé devient le levé affiché). */
+function montrerStockEnCours() {
+  const index = projet.surfaces.indexOf(stockEnCours());
+  if (index >= 0) editeurSurfaces.choisir(index);
+}
+
+/** Reprend une surface levée s'il n'y en a pas en cours (celle du levé affiché, sinon la dernière). */
+function reprendreLeveDirect() {
+  if (stockEnCours() || metreEnCours()) return;
+  const levees = surfacesLevees();
+  leveDirect.stockId = (levees.filter((s) => s.leveId === projet.leveActifId).at(-1) ?? levees.at(-1))?.id ?? null;
+}
+
+/**
+ * Nouvelle surface levée (dans le levé du jour) : un stock a tout de suite son calcul de volume.
+ * Un métré n'est pas une surface : ses aires, longueurs et points comptés deviennent des mesures.
+ */
+function ajouterSurfaceLevee(nature) {
+  if (nature === 'metre') {
+    const leve = leveDuJour(projet);
+    const metre = creerMetre(projet, leve);
+    projet.leveActifId = leve.id;
+    leveDirect.stockId = metre.id;
+    leveDirect.role = 'aire';
+    modifie({ recadrer: true });
+    return;
+  }
+  const surface = creerSurfaceDirecte(projet, leveDuJour(projet), nature);
+  projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
+  leveDirect.stockId = surface.id;
+  // Un stock commence par son contour ; un terrain naturel ou un terrassement par des points isolés.
+  leveDirect.role = surface.nature === 'stock' ? 'contour' : 'isole';
+  editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+  montrerStockEnCours();
+  modifie({ recadrer: true });
+}
+
+const ecranLeve = recepteurDisponible()
+  ? creerEcranLeve(document.querySelector('#leve-direct'), {
+      choisirRecepteur,
+      // Corrections par internet (swipos) : seulement avec un APK qui sait le faire.
+      lireReglagesCorrections: () => (correctionsDisponibles() ? lireReglagesCorrections() : null),
+      demarrerCorrections: (reglages) => {
+        demarrerCorrections(reglages);
+        afficherMessage('Corrections : connexion à swipos…');
+        setTimeout(() => ecranLeve.afficher(donneesLeve()), 300); // bouton « Redémarrer », mot de passe enregistré
+      },
+      arreterCorrections: () => {
+        arreterCorrections();
+        afficherMessage('Corrections arrêtées : Emlid Flow peut reprendre');
+        setTimeout(() => ecranLeve.afficher(donneesLeve()), 300);
+      },
+      reconnecter: reconnecterRecepteur,
+      deconnecter: deconnecterRecepteur,
+      nouvelleSurface: (nature) => ajouterSurfaceLevee(nature),
+      choisirStock: (id) => {
+        leveDirect.stockId = id;
+        const metre = metreEnCours();
+        if (metre) projet.leveActifId = metre.leveId; // ses mesures se dessinent sur les points de son levé
+        else montrerStockEnCours();
+        recalculer({ recadrer: Boolean(metre) });
+      },
+      choisirRole: (role) => {
+        leveDirect.role = role;
+        recalculer();
+      },
+      nouvelleLigne: () => {
+        const metre = metreEnCours();
+        if (metre) {
+          nouvelElementMetre(projet, metre, leveDirect.role);
+          recalculer();
+          return;
+        }
+        const stock = stockEnCours();
+        if (!stock) return;
+        nouvelleLigne(stock);
+        modifie();
+      },
+      basculerFermeture: () => {
+        const stock = stockEnCours();
+        if (!stock) return;
+        basculerFermeture(stock);
+        modifie();
+      },
+      prendrePoint: (nom) => {
+        const leve = leveEnCours();
+        const stock = stockEnCours();
+        const metre = metreEnCours();
+        if (!leve || !(stock || metre)) return;
+        // Position vérifiée par l'appli Android au moment du toucher : RTK fixe et inclinaison prête.
+        const reponse = prendrePointRecepteur();
+        if (!reponse.ok) {
+          afficherMessage(`Point refusé : ${reponse.raison}`, 4000);
+          return;
+        }
+        const { est, nord, altitude, ...gnss } = reponse.point;
+        const point = { est, nord, altitude, gnss: { ...gnss, prisLe: new Date().toISOString() } };
+        const resultat = metre
+          ? ajouterPointMetre(projet, leve, metre, leveDirect.role, libelleDuRole(), { ...point, nom: nom.trim() || prochainNomMetre(projet, metre, leveDirect.role, libelleDuRole()) })
+          : ajouterPointDirect(leve, stock, leveDirect.role, { ...point, nom: nom.trim() || prochainNom(projet, stock, leveDirect.role, libelleDuRole()) }, nomsDuProjet(projet));
+        if (resultat.erreur) {
+          afficherMessage(`Point refusé : ${resultat.erreur}`, 4000);
+          return;
+        }
+        navigator.vibrate?.(60);
+        afficherMessage(`Point ${resultat.point.nom} pris`);
+        modifie();
+      },
+      choisirLibelle: (abreviation) => {
+        if (leveDirect.role === 'aire') terrain.libelleAire = abreviation;
+        else if (['ligne', 'longueur'].includes(leveDirect.role)) terrain.libelleLigne = abreviation;
+        else terrain.libellePoint = abreviation;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      enregistrerLibelles: (nouveaux) => {
+        if (nouveaux.lignes.length === 0 || nouveaux.points.length === 0 || nouveaux.aires.length === 0) {
+          alert('Il faut au moins un libellé pour les lignes, un pour les points et un pour les aires.');
+          recalculer();
+          return;
+        }
+        libelles = nouveaux;
+        enregistrerLibelles(libelles);
+        afficherMessage('Libellés enregistrés');
+        recalculer();
+      },
+      choisirMode: (mode) => {
+        terrain.mode = mode === 'controler' ? 'controler' : 'lever';
+        retenirReglagesTerrain();
+        if (terrain.mode === 'controler') montrerSurfaceControle();
+        recalculer();
+      },
+      choisirImplantation: (quoi) => {
+        terrain.implantation = ['point', 'ligne'].includes(quoi) ? quoi : 'surface';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // --- Implantation d'une ligne ---
+      retirerDernierPointLigne: () => {
+        implanter.pointsLigne.pop();
+        montrerImplantation();
+      },
+      implanterPointsLigne: () => {
+        const points = implanter.pointsLigne;
+        if (points.length < 2) return;
+        const nom = (p, i) => p.nom ?? `P${i + 1}`;
+        implanter.ligne = nouvelleLigneAImplanter(`${nom(points[0], 0)} → ${nom(points.at(-1), points.length - 1)}`, points, null);
+        implanter.pointsLigne = [];
+        montrerImplantation();
+      },
+      changerLigne: () => {
+        implanter.ligne = null;
+        montrerImplantation();
+      },
+      choisirSegment: (choix) => {
+        const ligne = implanter.ligne;
+        if (!ligne) return;
+        const nombre = ligne.sommets.length - 1;
+        if (choix === 'tout') ligne.segment = null;
+        else if (choix === 'segment') ligne.segment = ligne.segmentTouche ?? 0;
+        else if (ligne.segment != null) ligne.segment = Math.max(0, Math.min(nombre - 1, ligne.segment + (choix === 'suivant' ? 1 : -1)));
+        montrerImplantation();
+      },
+      inverserLigne: () => {
+        if (!implanter.ligne) return;
+        implanter.ligne.inverse = !implanter.ligne.inverse;
+        montrerImplantation();
+      },
+      // Décalage parallèle et altitudes tapées (début, fin) : des nombres, ou vide.
+      reglerLigne: (champ, texte) => {
+        const ligne = implanter.ligne;
+        if (!ligne) return;
+        const lue = lireAltitude(texte);
+        if (lue === undefined) return;
+        if (champ === 'decalage') ligne.decalage = lue ?? 0;
+        else ligne.altitudes[champ] = lue;
+        montrerImplantation();
+      },
+      choisirAccroche: (mode) => {
+        if (terrain.implantation === 'ligne') {
+          terrain.accrocheLigne = mode === 'trait' || MODES_ACCROCHE.includes(mode) ? mode : 'trait';
+          retenirReglagesTerrain();
+          montrerImplantation();
+          return;
+        }
+        terrain.accroche = MODES_ACCROCHE.includes(mode) ? mode : 'point';
+        retenirReglagesTerrain();
+        montrerImplantation();
+      },
+      choisirGuidage: (mode) => {
+        terrain.guidage = mode === 'nseo' ? 'nseo' : 'rx2';
+        retenirReglagesTerrain();
+        montrerImplantation();
+      },
+      // Nom d'un point du projet tapé (ou choisi dans la liste) : il devient le point choisi.
+      trouverPoint: (nom) => {
+        const cherche = nom.trim();
+        if (!cherche) return;
+        const trouve = pointsDuProjet().find((p) => p.nom === cherche) ?? pointsDuProjet().find((p) => p.nom.toLowerCase() === cherche.toLowerCase());
+        if (!trouve) {
+          afficherMessage(`Aucun point « ${cherche} » dans le projet`, 3000);
+          return;
+        }
+        const choisi = { est: trouve.est, nord: trouve.nord, altitude: trouve.altitude ?? null, nom: trouve.nom, mode: 'point' };
+        // Ligne : le point s'ajoute à la ligne en préparation (début, fin, puis les suivants).
+        if (enImplantationDeLigne()) ajouterPointLigne(choisi);
+        else implanter.choix = choisi;
+        montrerImplantation();
+      },
+      oublierChoix: () => {
+        implanter.choix = null;
+        montrerImplantation();
+      },
+      implanterChoix: ({ nom, altitude }) => {
+        const lue = lireAltitude(altitude);
+        if (!implanter.choix || lue === undefined) return;
+        const { est, nord } = implanter.choix;
+        implanter.cible = { id: null, nom: nom.trim() || nomProposeImplantation(), est, nord, altitude: lue };
+        implanter.choix = null;
+        montrerImplantation();
+      },
+      creerPointAImplanter: ({ nom, altitude }) => {
+        const lue = lireAltitude(altitude);
+        if (!implanter.choix || lue === undefined) return;
+        const choisi = nom.trim() || nomProposeImplantation();
+        if (projet.aImplanter.some((p) => p.nom === choisi)) {
+          alert(`Le point ${choisi} est déjà dans la liste « À implanter » : choisis un autre nom.`);
+          return;
+        }
+        projet.aImplanter.push({ id: nouvelIdentifiant(), nom: choisi, est: implanter.choix.est, nord: implanter.choix.nord, altitude: lue });
+        implanter.choix = null;
+        afficherMessage(`${choisi} ajouté à la liste « À implanter »`);
+        modifie();
+      },
+      implanterPoint: (id) => {
+        const point = projet.aImplanter.find((p) => p.id === id);
+        if (!point) return;
+        implanter.cible = { ...point };
+        implanter.choix = null;
+        montrerImplantation();
+      },
+      supprimerPointAImplanter: (id) => {
+        const point = projet.aImplanter.find((p) => p.id === id);
+        if (!point || !confirm(`Enlever ${point.nom} de la liste « À implanter » ?`)) return;
+        projet.aImplanter = projet.aImplanter.filter((p) => p.id !== id);
+        if (implanter.cible?.id === id) implanter.cible = null;
+        modifie();
+      },
+      arreterImplantation: () => {
+        implanter.cible = null;
+        montrerImplantation();
+      },
+      enregistrerImplantation: () => {
+        if (enImplantationDeLigne()) {
+          enregistrerImplantationLigne();
+          return;
+        }
+        const cible = implanter.cible;
+        if (!cible) return;
+        // Position vérifiée par l'appli Android : RTK fixe et inclinaison prête, comme pour un point levé.
+        const reponse = prendrePointRecepteur();
+        if (!reponse.ok) {
+          afficherMessage(`Implantation refusée : ${reponse.raison}`, 4000);
+          return;
+        }
+        const { est, nord, altitude, ...gnss } = reponse.point;
+        const mesure = { est, nord, altitude, gnss };
+        const ecarts = ecartsImplantation(cible, mesure);
+        const le = new Date().toISOString();
+        projet.implantations.push({ id: nouvelIdentifiant(), nom: cible.nom, aImplanterId: cible.id, cible: { est: cible.est, nord: cible.nord, altitude: cible.altitude }, mesure, ecarts, le });
+        navigator.vibrate?.(60);
+        const hauteur = ecarts.dAltitude != null ? ` · dH ${formaterNombre(ecarts.dAltitude)} m` : '';
+        afficherMessage(`${cible.nom} implanté : écart ${formaterNombre(ecarts.distance)} m${hauteur}`, 4000);
+        modifie();
+      },
+      exporterImplantations: () => {
+        telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nomDeFichierProjet(projet)}_implantations.csv`);
+      },
+      choisirSurfaceControle: (id) => {
+        terrain.surfaceId = id || null;
+        retenirReglagesTerrain();
+        montrerSurfaceControle();
+        recalculer();
+      },
+      choisirVueCoupes: (vue) => {
+        terrain.vueCoupes = ['les2', 'perpendiculaire', 'axe'].includes(vue) ? vue : 'les2';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      choisirLongueurCoupe: (metres) => {
+        terrain.demiLongueur = LONGUEURS_COUPE.includes(Number(metres)) ? Number(metres) : 5;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      choisirExagerationCoupe: (facteur) => {
+        terrain.exagerationCoupe = Number(facteur) === 2 ? 2 : 1;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      choisirSourceOrientation: (source) => {
+        terrain.sourceOrientation = source === 'marche' ? 'marche' : 'rx2';
+        suiviOrientation.changerSource(terrain.sourceOrientation);
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      annulerDernierPoint: () => {
+        const leve = leveEnCours();
+        const dernier = leve?.points[leve.points.length - 1];
+        if (!dernier || !confirm(`Effacer le dernier point (${dernier.nom}) ?`)) return;
+        annulerDernierPoint(leve, projet.surfaces);
+        retirerPointDesMesures(projet, dernier.nom); // aire, longueur ou point compté d'un métré
+        afficherMessage(`Point ${dernier.nom} effacé`);
+        modifie();
+      },
+    })
+  : null;
+
+/** Date d'un levé fait avec le récepteur, à la suisse (« 22.10.2026 »). */
+function jourDuLeve(leveId) {
+  const leve = projet.leves.find((l) => l.id === leveId);
+  return (leve?.jour ?? leve?.importeLe?.slice(0, 10) ?? '').split('-').reverse().join('.');
+}
+
+/** Remblai (m³) du stock levé, ou null s'il n'est pas encore calculable. */
+function volumeDuStock(stock) {
+  const calcul = calculDuPlan(stock);
+  const resultat = calcul ? resultatsCalculs.get(calcul.id) : null;
+  return resultat && !resultat.erreurs ? resultat.remblai : null;
+}
+
+/**
+ * Altitude tapée pour un point à implanter : un nombre (m), ou null si le champ est vide.
+ * Renvoie undefined (et prévient) si elle est illisible.
+ */
+function lireAltitude(texte) {
+  const nettoye = String(texte ?? '').trim().replace(',', '.');
+  if (!nettoye) return null;
+  const altitude = Number(nettoye);
+  if (Number.isFinite(altitude)) return altitude;
+  alert(`Altitude « ${texte} » illisible : écris un nombre, par exemple 412.350, ou laisse vide.`);
+  return undefined;
+}
+
+/** Nom proposé pour le point choisi : le sien (point levé, point à implanter), sinon I-1, I-2… */
+function nomProposeImplantation() {
+  return implanter.choix?.nom ?? nomPointAImplanter([...projet.aImplanter, ...projet.implantations]);
+}
+
+/**
+ * Implantation d'un point : toucher le plan accroche un point (seulement depuis l'onglet Terrain).
+ * Les points « À implanter » restent visibles sur le plan dans les autres onglets.
+ */
+function envoyerImplantationAuPlan() {
+  const accrocheActive = (enImplantationDePoint() || enImplantationDeLigne()) && ongletContexte === 'terrain';
+  const enLigne = accrocheActive && enImplantationDeLigne();
+  const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
+  plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0
+    ? {
+        actif: accrocheActive,
+        aImplanter: projet.aImplanter,
+        choix: accrocheActive && !enLigne ? implanter.choix : null,
+        cible: accrocheActive && !enLigne ? implanter.cible : null,
+        // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
+        ligne: sommets ? { sommets, parallele: implanter.ligne.decalage ? ligneParallele(sommets, implanter.ligne.decalage) : null } : null,
+        pointsLigne: enLigne ? implanter.pointsLigne : [],
+      }
+    : null);
+}
+
+/**
+ * Point choisi ou point à implanter changé (rien d'autre dans le projet) : on met à jour l'écran
+ * Terrain et l'implantation sur le plan, sans tout recalculer ni redessiner (plus rapide).
+ */
+function montrerImplantation() {
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+  ecranLeve?.afficher(donneesLeve());
+  mettreAJourToucheVolume();
+}
+
+/** Vrai pendant l'implantation d'un point (Terrain › Implanter › Point). */
+function enImplantationDePoint() {
+  return Boolean(ecranLeve) && terrain.mode === 'controler' && terrain.implantation === 'point';
+}
+
+/** Vrai pendant l'implantation d'une ligne (Terrain › Implanter › Ligne). */
+function enImplantationDeLigne() {
+  return Boolean(ecranLeve) && terrain.mode === 'controler' && terrain.implantation === 'ligne';
+}
+
+/** Nouvelle ligne à implanter (toute la ligne, dans le sens des sommets, sans décalage). */
+function nouvelleLigneAImplanter(nom, sommets, segmentTouche) {
+  return { nom, sommets, segmentTouche, segment: null, inverse: false, decalage: 0, altitudes: { debut: null, fin: null } };
+}
+
+/** Sommets de la ligne à implanter : toute la ligne ou le segment choisi, dans le sens choisi. */
+function sommetsDeLaLigne() {
+  const { sommets, segment, inverse } = implanter.ligne;
+  return sommetsChoisis(sommets, { segment, inverse });
+}
+
+/**
+ * Implantation d'une ligne, à chaque état du récepteur : décalage par rapport à la ligne (ou à sa
+ * parallèle), position le long, altitude. Gris si la position n'est pas fiable.
+ */
+function calculerImplantationLigne(etat) {
+  const ligne = implanter.ligne;
+  if (!ligne) return null;
+  const position = etat.connecte && etat.recu ? etat.position : null;
+  if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
+  const g = guidageLigne(position, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: ligne.altitudes });
+  if (!g) return { message: 'Ligne sans longueur' };
+  const fiable = Boolean(etat.autorise);
+  const ecartAltitude = fiable && g.altitude != null ? ecartSurface(g.altitude, position.altitude) : null;
+  return {
+    ligne: g,
+    classe: fiable ? classeDistance(Math.abs(g.ecart)) : 'pas-fiable',
+    ecartAltitude,
+    classeAltitude: ecartAltitude == null ? null : classeEcart(ecartAltitude),
+    message: null,
+  };
+}
+
+/** « Enregistrer l'implantation » sur une ligne : position mesurée, abscisse, décalage, écarts. */
+function enregistrerImplantationLigne() {
+  const ligne = implanter.ligne;
+  if (!ligne) return;
+  const reponse = prendrePointRecepteur();
+  if (!reponse.ok) {
+    afficherMessage(`Implantation refusée : ${reponse.raison}`, 4000);
+    return;
+  }
+  const { est, nord, altitude, ...gnss } = reponse.point;
+  const mesure = { est, nord, altitude, gnss };
+  const g = guidageLigne(mesure, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: ligne.altitudes });
+  const ecarts = ecartsImplantation(g.cible, mesure);
+  projet.implantations.push({
+    id: nouvelIdentifiant(),
+    nom: `${ligne.nom} · ${formaterNombre(g.abscisse)}`,
+    type: 'ligne',
+    cible: g.cible,
+    mesure,
+    ecarts,
+    ligne: { nom: ligne.nom, abscisse: g.abscisse, decalage: g.ecart },
+    le: new Date().toISOString(),
+  });
+  navigator.vibrate?.(60);
+  const cote = Math.abs(g.ecart) < 0.0005 ? 'sur la ligne' : `${formaterNombre(Math.abs(g.ecart))} m ${g.ecart > 0 ? 'à droite' : 'à gauche'}`;
+  const hauteur = ecarts.dAltitude != null ? ` · dH ${formaterNombre(ecarts.dAltitude)} m` : '';
+  afficherMessage(`Implanté à ${formaterNombre(g.abscisse)} m du début, ${cote}${hauteur}`, 4000);
+  modifie();
+}
+
+/** Toucher du plan pendant l'implantation d'une ligne : une ligne du DXF, ou un point de plus. */
+function toucherPourLigne(position, tolerance) {
+  const mm = (p) => ({ ...p, est: Math.round(p.est * 1000) / 1000, nord: Math.round(p.nord * 1000) / 1000, altitude: p.altitude != null ? Math.round(p.altitude * 1000) / 1000 : null });
+  if (terrain.accrocheLigne === 'trait') {
+    const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(projet.plansDxf ?? [], position, tolerance).lignes);
+    if (!trouve) {
+      afficherMessage('Aucune ligne DXF sous le doigt', 3000);
+      return;
+    }
+    const sommets = trouve.sommets.map(mm);
+    const nombre = sommets.length - 1;
+    implanter.ligne = nouvelleLigneAImplanter(`Ligne DXF (${nombre} segment${nombre > 1 ? 's' : ''})`, sommets, trouve.segment);
+    implanter.pointsLigne = [];
+  } else {
+    const sources = terrain.accrocheLigne === 'point'
+      ? { lignes: [], cercles: [], points: pointsDuProjet() }
+      : sourcesDesPlans(projet.plansDxf ?? [], position, tolerance);
+    const trouve = accrocher(terrain.accrocheLigne, position, tolerance, sources);
+    if (!trouve) {
+      afficherMessage('Rien sous le doigt', 3000);
+      return;
+    }
+    ajouterPointLigne(mm(trouve));
+  }
+  montrerImplantation();
+}
+
+/** Ajoute un point à la ligne en préparation (sauf s'il est à la même place que le précédent). */
+function ajouterPointLigne(point) {
+  const precedent = implanter.pointsLigne.at(-1);
+  if (precedent && Math.hypot(precedent.est - point.est, precedent.nord - point.nord) < 0.001) {
+    afficherMessage('Même point que le précédent : pas ajouté', 2500);
+    return;
+  }
+  implanter.pointsLigne.push(point);
+}
+
+/**
+ * Points du projet que l'on peut implanter : ceux de tous les levés (importés ou levés avec le
+ * récepteur) et les points « À implanter ». Un nom pris deux fois : le premier trouvé.
+ */
+function pointsDuProjet() {
+  const vus = new Set();
+  const liste = [];
+  for (const point of [...projet.leves.flatMap((l) => l.points), ...projet.aImplanter]) {
+    if (vus.has(point.nom)) continue;
+    vus.add(point.nom);
+    liste.push(point);
+  }
+  return liste;
+}
+
+/**
+ * Toucher du plan pendant l'implantation d'un point : on cherche le point selon l'accroche choisie
+ * (« Point » : les points du projet ; les autres : le plan DXF).
+ */
+function toucherPourImplantation(position, tolerance) {
+  if (enImplantationDeLigne()) {
+    toucherPourLigne(position, tolerance);
+    return;
+  }
+  const sources = terrain.accroche === 'point'
+    ? { lignes: [], cercles: [], points: pointsDuProjet() }
+    : sourcesDesPlans(projet.plansDxf ?? [], position, tolerance);
+  const trouve = accrocher(terrain.accroche, position, tolerance, sources);
+  if (!trouve) {
+    const quoi = { point: 'aucun point du projet', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[terrain.accroche];
+    afficherMessage(`${quoi[0].toUpperCase()}${quoi.slice(1)} sous le doigt`, 3000);
+    return;
+  }
+  const mm = (valeur) => Math.round(valeur * 1000) / 1000;
+  implanter.choix = { ...trouve, est: mm(trouve.est), nord: mm(trouve.nord), altitude: trouve.altitude != null ? mm(trouve.altitude) : null };
+  montrerImplantation();
+}
+
+/**
+ * Implantation d'un point, à chaque état du récepteur : ce qu'il reste à faire pour être dessus.
+ * Sans position fiable (pas de RTK fixe ou inclinaison pas prête), le guidage est donné en gris,
+ * avec la raison : il aide à s'approcher, mais on ne peut pas enregistrer.
+ */
+function calculerImplantation(etat, orientation) {
+  const cible = implanter.cible;
+  if (!cible) return null;
+  const position = etat.connecte && etat.recu ? etat.position : null;
+  if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
+  const g = guidage(position, cible, orientation.azimut);
+  const fiable = Boolean(etat.autorise);
+  const ecartAltitude = fiable && cible.altitude != null ? ecartSurface(cible.altitude, position.altitude) : null;
+  return {
+    guidage: { ...g, azimut: orientation.azimut },
+    classe: fiable ? classeDistance(g.distance) : 'pas-fiable',
+    ecartAltitude,
+    classeAltitude: ecartAltitude == null ? null : classeEcart(ecartAltitude),
+    message: null,
+  };
+}
+
+/**
+ * Touche « volume − » : elle prend le point seulement dans l'onglet Terrain, en mode Lever, avec une
+ * surface en cours ; ailleurs, elle règle le volume comme d'habitude. Point refusé : message et
+ * double vibration (on ne regarde pas forcément l'écran).
+ */
+let toucheVolumeActive = null;
+function mettreAJourToucheVolume() {
+  if (!ecranLeve) return;
+  const dansTerrain = document.body.dataset.onglet === 'terrain';
+  const lever = dansTerrain && terrain.mode === 'lever' && Boolean(stockEnCours() || metreEnCours());
+  const implanterAvecTouche = dansTerrain && ((enImplantationDePoint() && Boolean(implanter.cible)) || (enImplantationDeLigne() && Boolean(implanter.ligne)));
+  const actif = lever || implanterAvecTouche;
+  if (actif === toucheVolumeActive) return;
+  toucheVolumeActive = actif;
+  regleToucheVolume(actif, () => {
+    const enImplantation = enImplantationDePoint() || enImplantationDeLigne();
+    const refus = enImplantation ? ecranLeve.enregistrerDepuisTouche() : ecranLeve.prendreDepuisTouche();
+    if (refus) {
+      navigator.vibrate?.([80, 80, 80]);
+      afficherMessage(`${enImplantation ? 'Implantation refusée' : 'Point refusé'} : ${refus}`, 4000);
+    }
+  });
+}
+
+/** Libellé utilisé pour le rôle en cours (dans la liste ; sinon le premier de la liste). */
+function libelleDuRole() {
+  if (leveDirect.role === 'contour') return null;
+  const sorte = leveDirect.role === 'aire' ? 'aires' : ['ligne', 'longueur'].includes(leveDirect.role) ? 'lignes' : 'points';
+  const liste = libelles[sorte];
+  const voulu = { aires: terrain.libelleAire, lignes: terrain.libelleLigne, points: terrain.libellePoint }[sorte];
+  return liste.some(([abreviation]) => abreviation === voulu) ? voulu : liste[0][0];
+}
+
+/** Rôles d'un point levé dans un métré. */
+const ROLES_DU_METRE = ['aire', 'longueur', 'compte'];
+
+/** Ce que montre l'onglet Terrain (voir leve/ecran.js). */
+function donneesLeve() {
+  reprendreLeveDirect();
+  const metre = metreEnCours();
+  if (metre) return donneesMetre(metre);
+  // Terrain naturel ou terrassement : pas de contour, on passe aux points isolés.
+  if (!rolesPermis(stockEnCours()).includes(leveDirect.role)) leveDirect.role = 'isole';
+  const leve = leveEnCours();
+  const stock = stockEnCours();
+  // D'abord le nom proposé : pour une ligne, il prépare la ligne en cours (libellé, numéro).
+  const nomPropose = stock ? prochainNom(projet, stock, leveDirect.role, libelleDuRole()) : '';
+  const ligne = stock ? ligneEnCours(stock) : null;
+  const numeroLigne = stock ? stock.lignesRupture.indexOf(ligne) + 1 : 0;
+  return {
+    ...donneesCommunes(),
+    leve,
+    stock,
+    role: leveDirect.role,
+    ligne: ligne ? { libelle: ligne.libelle, numero: ligne.numero ?? numeroLigne, nbPoints: ligne.noms.length, fermee: ligne.fermee } : null,
+    nomPropose,
+    rolesPermis: rolesPermis(stock),
+    dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
+    resume: stock ? resumeStock(stock) : null,
+    volume: stock ? volumeDuStock(stock) : null,
+  };
+}
+
+/** Données de l'onglet Terrain pour un métré : rôles aire / longueur / point compté, mesure en cours. */
+function donneesMetre(metre) {
+  if (!ROLES_DU_METRE.includes(leveDirect.role)) leveDirect.role = 'aire';
+  const leve = leveEnCours();
+  const libelle = libelleDuRole();
+  const nomPropose = prochainNomMetre(projet, metre, leveDirect.role, libelle);
+  const enCours = leveDirect.role === 'compte' ? null : mesureEnCours(projet, metre, leveDirect.role);
+  const memeElement = enCours && enCours.libelle === libelle;
+  return {
+    ...donneesCommunes(),
+    leve,
+    stock: metre,
+    metre,
+    role: leveDirect.role,
+    rolesPermis: ROLES_DU_METRE,
+    nomPropose,
+    // Aire ou longueur en cours (son libellé, son numéro tiré du nom proposé, ses points).
+    elementMetre: leveDirect.role === 'compte' ? null : {
+      libelle,
+      numero: Number(nomPropose.split('-').at(-2)),
+      nbPoints: memeElement ? (enCours.contour ?? enCours.points).length : 0,
+    },
+    ligne: null,
+    dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
+    resumeTexte: resumeMetre(projet, metre),
+    resume: null,
+    volume: null,
+  };
+}
+
+/** Données de l'onglet Terrain communes aux surfaces et aux métrés. */
+function donneesCommunes() {
+  return {
+    // Surfaces levées et métrés, avec la date de leur levé (« Stock 2 · 22.10.2026 »).
+    stocks: [...surfacesLevees(), ...projet.metres].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}` })),
+    libelles,
+    libelleLigne: terrain.libelleLigne,
+    libellePoint: terrain.libellePoint,
+    libelleAire: terrain.libelleAire,
+    mode: terrain.mode,
+    controle: terrain,
+    surfaces: projet.surfaces.map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
+    implanter: {
+      accroche: terrain.accroche,
+      choix: implanter.choix,
+      cible: implanter.cible,
+      nomPropose: nomProposeImplantation(),
+      aImplanter: projet.aImplanter.map((p) => {
+        const derniere = [...projet.implantations].reverse().find((i) => i.aImplanterId === p.id);
+        return { ...p, fait: derniere ? { distance: derniere.ecarts.distance, dAltitude: derniere.ecarts.dAltitude } : null };
+      }),
+      nbImplantations: projet.implantations.length,
+      nomsPoints: enImplantationDePoint() || enImplantationDeLigne() ? pointsDuProjet().map((p) => p.nom) : [],
+      accrocheLigne: terrain.accrocheLigne,
+      pointsLigne: implanter.pointsLigne,
+      ligne: implanter.ligne ? resumeLigne() : null,
+    },
+  };
+}
+
+/** Ligne à implanter pour l'écran Terrain : nom, longueur, segments, sens, début, fin, réglages. */
+function resumeLigne() {
+  const ligne = implanter.ligne;
+  const sommets = sommetsDeLaLigne();
+  return {
+    nom: ligne.nom,
+    longueur: longueurPolyligne(sommets),
+    nbSegments: ligne.sommets.length - 1,
+    segment: ligne.segment,
+    inverse: ligne.inverse,
+    decalage: ligne.decalage,
+    altitudes: ligne.altitudes,
+    altitudesDuPlan: sommets.every((s) => s.altitude != null),
+    debut: sommets[0],
+    fin: sommets.at(-1),
+  };
+}
+
+/** Mode Contrôler : la surface choisie devient la surface affichée (plan, Calculs › Surfaces). */
+function montrerSurfaceControle() {
+  const index = projet.surfaces.findIndex((s) => s.id === terrain.surfaceId);
+  if (index >= 0) editeurSurfaces.choisir(index);
+}
+
+/**
+ * Mode Contrôler, à chaque état du récepteur : de combien monter ou descendre pour être sur la
+ * surface choisie, et les coupes autour du récepteur. L'écart n'est donné que si le point serait
+ * accepté par la règle de prise de point (RTK fixe et inclinaison prête) ; sinon, la raison.
+ */
+function calculerControle(etat, orientation) {
+  const surface = projet.surfaces.find((s) => s.id === terrain.surfaceId);
+  if (!surface) return { message: 'Choisis une surface' };
+  const triangles = trianglesDeSurface(surface.id);
+  if (triangles.length === 0) return { message: 'Cette surface n\'a pas encore de triangles' };
+  const position = etat.connecte && etat.recu ? etat.position : null;
+  if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
+
+  const altitudeSurface = altitudeSurSurface(triangles, position.est, position.nord);
+  const fiable = Boolean(etat.autorise);
+  let message = null;
+  if (!fiable) message = etat.raison ?? 'Position pas fiable';
+  else if (altitudeSurface == null) message = 'Hors surface';
+  const ecart = message ? null : ecartSurface(altitudeSurface, position.altitude);
+
+  // Coupes : sans orientation connue, on les oriente nord-sud et est-ouest.
+  const azimut = orientation.azimut ?? 0;
+  const coupes = {};
+  for (const sens of ['perpendiculaire', 'axe']) {
+    const { debut, fin } = extremitesCoupe(position, azimut, terrain.demiLongueur, sens);
+    coupes[sens] = {
+      debut,
+      fin,
+      lignes: profilSurface(triangles, debut, fin),
+      demiLongueur: terrain.demiLongueur,
+      altitudeCanne: fiable ? position.altitude : null,
+    };
+  }
+  if (orientation.azimut == null) {
+    Object.assign(coupes.perpendiculaire, { titre: 'Ouest-est (orientation inconnue)', gauche: '← ouest', droite: 'est →' });
+    Object.assign(coupes.axe, { titre: 'Sud-nord (orientation inconnue)', gauche: '← sud', droite: 'nord →' });
+  }
+  return {
+    ecart,
+    classe: ecart == null ? null : classeEcart(ecart),
+    altitudeSurface,
+    altitudeCanne: position.altitude,
+    message,
+    coupes,
+  };
+}
+
+// Boussole de la tablette (implantation : savoir où est le nord) : l'aiguille tourne au plus une
+// fois par image affichée.
+if (ecranLeve) {
+  let capEnAttente = null;
+  ecouterBoussole((cap) => {
+    if (capEnAttente === null) {
+      requestAnimationFrame(() => {
+        ecranLeve.mettreAJourBoussole(capEnAttente);
+        capEnAttente = null;
+      });
+    }
+    capEnAttente = cap;
+  });
+}
+
+// État du récepteur, 5 fois par seconde : bandeaux, bloc de levé, position sur le plan.
+if (recepteurDisponible()) {
+  ecouterRecepteur((etat) => {
+    etatRecepteur = etat;
+    mettreAJourBandeaux(etat);
+    const orientation = suiviOrientation.ajouter(etat, performance.now());
+    const enPoint = enImplantationDePoint();
+    const enLigne = enImplantationDeLigne();
+    const controle = terrain.mode === 'controler' && !enPoint && !enLigne ? calculerControle(etat, orientation) : null;
+    const implantation = enPoint ? calculerImplantation(etat, orientation) : null;
+    const implantationLigne = enLigne ? calculerImplantationLigne(etat) : null;
+    ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation, implantationLigne });
+    const position = etat.connecte && etat.recu ? etat.position : null;
+    // Coupes affichées (mode Implanter) : leur trait en pointillés sur le plan.
+    const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
+    const traits = controle?.coupes ? vues.map((sens) => ({ sens, debut: controle.coupes[sens].debut, fin: controle.coupes[sens].fin })) : [];
+    // Ligne : trait en pointillés jusqu'au point de la ligne en face de la canne.
+    const vers = implantationLigne?.ligne?.cible ?? null;
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers } : null);
+  });
+}
+
 const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   renommer: (nom) => {
-    if (nom) projet.nom = nom;
+    projet.nom = nom; // facultatif : le projet se reconnaît à son affaire et son lieu
     modifie();
   },
   changerCartouche: (champ, valeur) => {
     projet.cartouche[champ] = valeur;
     modifie();
   },
-  continuer: () => afficherOnglet(etapeUtile()),
-  allerA: (onglet) => afficherOnglet(onglet),
-  exporterProjet: () => {
-    const nom = projet.nom.replace(/[^\w-]+/g, '_') || 'projet';
-    telecharger(new Blob([ecrireFichierProjet(projet)], { type: 'application/json' }), `${nom}.topo.json`);
+  continuer: () => allerA(etapeUtile()),
+  exporterProjet: async (id) => {
+    const lu = id === projet.id ? projet : await stockage.lireProjet(id);
+    if (!lu) return;
+    const complet = completerProjet(lu);
+    telecharger(new Blob([ecrireFichierProjet(complet)], { type: 'application/json' }), `${nomDeFichierProjet(complet)}.topo.json`);
   },
+  // Nouveau projet : on reste sur l'onglet Projet, curseur dans « Affaire ».
   nouveauProjet: async () => {
-    const nom = prompt('Nom du nouveau projet :', `Projet ${resumes.length + 1}`);
-    if (!nom) return;
-    await ouvrir(creerProjet(nom.trim()));
+    await changerDeProjet(() => ouvrir(creerProjet(), { changerOnglet: false }));
+    afficherOnglet('projets');
+    document.querySelector('#projets [data-cartouche="affaire"]')?.focus();
   },
   ouvrirProjet: async (id) => {
     const lu = await stockage.lireProjet(id);
-    if (lu) await ouvrir(completerProjet(lu));
+    if (lu) await changerDeProjet(() => ouvrir(completerProjet(lu)));
   },
   dupliquerProjet: async (id) => {
     const lu = id === projet.id ? projet : await stockage.lireProjet(id);
-    if (lu) await ouvrir(dupliquerProjet(completerProjet(lu), `${lu.nom} (copie)`));
+    if (lu) await changerDeProjet(() => ouvrir(dupliquerProjet(completerProjet(lu), lu.nom ? `${lu.nom} (copie)` : 'copie'), { changerOnglet: false }));
   },
   supprimerProjet: async (id) => {
     const resume = resumes.find((r) => r.id === id);
-    if (!resume || !confirm(`Supprimer définitivement le projet « ${resume.nom} » de cet appareil ?`)) return;
+    if (!resume || !confirm(`Supprimer définitivement le projet « ${resume.titre} » de cet appareil ?`)) return;
     await stockage.supprimerProjet(id);
     if (id === projet.id) {
       const restants = (await stockage.listerProjets()).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
-      await ouvrir(restants[0] ? completerProjet(restants[0]) : creerProjet('Mon projet'), { changerOnglet: false });
+      await ouvrir(restants[0] ? completerProjet(restants[0]) : creerProjet(), { changerOnglet: false });
+      partage?.apresOuverture();
     } else {
       await rafraichirListe();
-      ecranProjet.afficher(projet, resumes);
+      afficherEcranProjet();
     }
   },
   importerFichierProjet: async (fichier) => {
@@ -272,20 +1233,69 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
       alert(`Impossible d'ouvrir « ${fichier.name} » : ${erreur}.`);
       return;
     }
-    if (resumes.some((r) => r.id === lu.id) && !confirm(`Le projet « ${lu.nom} » existe déjà sur cet appareil. Le remplacer par le fichier ?`)) {
+    if (resumes.some((r) => r.id === lu.id) && !confirm(`Le projet « ${titreProjet(lu)} » existe déjà sur cet appareil. Le remplacer par le fichier ?`)) {
       return;
     }
-    await ouvrir(lu);
+    await changerDeProjet(() => ouvrir(lu));
   },
+  // --- Partage par Google Drive ---
+  connecterDrive: () => partage.connecter(),
+  deconnecterDrive: () => partage.deconnecter(),
+  nommerAppareil: (nom) => partage.nommerAppareil(nom),
+  envoyerDrive: () => partage.envoyerMaintenant(),
+  reprendreLaMain: () => partage.reprendreLaMain(),
+  ouvrirDrive: (dossierId) => partage.ouvrirDepuisDrive(dossierId),
+  rafraichirDrive: () => partage.rafraichirListe().catch((erreur) => afficherMessage(`Drive : ${erreur.message}`, 4000)),
+}, document.querySelector('#projets-suite'));
+
+/** Onglet Projet, avec l'état du partage par Drive. */
+function afficherEcranProjet() {
+  ecranProjet.afficher(projet, resumes, partage ? { etat: partage.etat, appareil: partage.appareil() } : null);
+}
+
+/**
+ * Ouvre un autre projet (action "ouvrirAutre") : le projet ouvert est d'abord envoyé sur Drive et
+ * rendu (verrou), puis le nouveau est comparé à sa version de Drive.
+ */
+async function changerDeProjet(ouvrirAutre) {
+  await partage?.avantDeChanger();
+  await ouvrirAutre();
+  partage?.apresOuverture();
+}
+
+partage = creerPartage({
+  obtenirProjet: () => projet,
+  titreDe: (p) => titreProjet(p),
+  lireLocal: async (id) => {
+    const lu = await stockage.lireProjet(id);
+    return lu ? completerProjet(lu) : null;
+  },
+  ouvrirProjet: (nouveau) => ouvrir(completerProjet(nouveau), { changerOnglet: false }),
+  garderCopie: async (local) => {
+    const copie = dupliquerProjet(completerProjet(local), `${local.nom || titreProjet(local)} (copie de cet appareil)`);
+    await stockage.enregistrerProjet(copie);
+    await rafraichirListe();
+  },
+  quandChange: () => {
+    afficherEcranProjet();
+    mettreAJourEtatEntete();
+  },
+  message: (texte) => afficherMessage(texte, 4000),
+});
+
+// L'appli passe en arrière-plan (on change d'appli, on éteint l'écran) : on envoie tout de suite.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') partage.envoyerMaintenant();
 });
 
 const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPosition: toucherPourCoupe,
-  // Un point touché va à la liste en cours : celle d'une mesure (onglet 3. Mesures) ou d'une surface.
+  // Un point touché va à la liste en cours : celle d'une mesure (onglet Calculs › Mesures) ou d'une surface.
   quandToucherPoint: (nom) => (ongletContexte === 'mesures' ? ecranMesures.toucherPoint(nom) : editeurSurfaces.toucherPoint(nom)),
   quandToucherMesure: (id) => ecranMesures.choisir(id),
   quandToucherStock: (index) => editeurSurfaces.choisir(index),
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
+  quandToucherImplantation: toucherPourImplantation,
 });
 
 const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces'), document.querySelector('#barre-surfaces'), {
@@ -433,7 +1443,7 @@ const ecranCoupes = creerEcranCoupes(document.querySelector('#coupes'), {
   quandChange: () => modifie(),
 });
 
-// --- Mesures (onglet 3. Mesures) : longueurs et aires, à part des surfaces et des volumes ---
+// --- Mesures (onglet Calculs › Mesures) : longueurs et aires, à part des surfaces et des volumes ---
 
 /** Nom d'une mesure dans les listes : avec sa sorte, et son levé s'il y en a plusieurs. */
 function etiquetteMesure(mesure) {
@@ -495,7 +1505,7 @@ creerEcranExport(document.querySelector('#export'), {
     const affichees = surfacesAffichees();
     const creees = affichees.filter((s) => !estImportee(s));
     return {
-      nomProjet: projet.nom,
+      nomProjet: titreProjet(projet),
       stocks: principaux.map(({ calcul }) => ({ ...surfaceDe(calcul.surface1Id), nom: nom(calcul), description: descriptionCalcul(calcul, projet.surfaces) })),
       resultats: principaux.map(({ resultat }) => resultat),
       comparaisons: calculsReussis()
@@ -534,7 +1544,7 @@ function decrireSurface(surface) {
   const calcul = calculDuPlan(surface);
   const volume = calcul ? resultatsCalculs.get(calcul.id) : null;
   return `
-    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${volume ? ` · remblai ${formaterNombre(volume.remblai)} m³ (onglet 2.2 Volumes)` : ''}</p>
+    <p class="ok">✓ ${r.triangles.length} triangles · ${formaterNombre(aire)} m²${volume ? ` · remblai ${formaterNombre(volume.remblai)} m³` : ''}</p>
     ${r.avertissements.length > 0 ? `<div class="avertissement"><ul>${r.avertissements.map((a) => `<li>${echapper(a)}</li>`).join('')}</ul></div>` : ''}`;
 }
 
@@ -543,7 +1553,8 @@ function decrireSurface(surface) {
 /** Recalcule tout (surfaces, volumes) et met à jour les écrans et le plan. */
 function recalculer({ recadrer = false } = {}) {
   const leve = leveActif(projet);
-  const points = leve?.points ?? [];
+  // Toujours la même liste vide : une nouvelle liste à chaque fois recadrerait le plan (voir plus bas).
+  const points = leve?.points ?? AUCUN_POINT;
 
   surfacesCalculees = new Map(projet.surfaces.map((s) => [s.id, calculerSurface(s, pointsDuLeve(s.leveId))]));
   const donnees = { surfaces: projet.surfaces, triangulations: surfacesCalculees, pointsDe: (s) => pointsDuLeve(s.leveId) };
@@ -551,16 +1562,29 @@ function recalculer({ recadrer = false } = {}) {
   resultatsMesures = new Map(projet.mesures.map((m) => [m.id, calculerMesure(m, pointsDuLeve(m.leveId))]));
 
   for (const element of document.querySelectorAll('.sans-points')) element.hidden = projet.leves.length > 0;
-  document.querySelector('#nom-leve-surfaces').textContent = leve ? `· levé « ${leve.nom} »` : '';
-  document.querySelector('#nom-leve-mesures').textContent = leve ? `· levé « ${leve.nom} »` : '';
-  document.querySelector('#etat').textContent = `${projet.nom} · ${points.length} points · ${surfacesAffichees().length} surface(s)`;
+  // En-tête : le projet ouvert en grand (affaire - lieu), puis son nom et ce qu'il contient.
+  document.querySelector('#titre-projet').textContent = titreProjet(projet);
+  mettreAJourEtatEntete();
 
   editeurSurfaces.rafraichir();
   ecranVolumes.afficher();
   ecranCoupes.afficher();
   ecranMesures.afficher();
-  ecranImport.afficher(projet, dernierImport);
-  ecranProjet.afficher(projet, resumes);
+  ecranImport.afficher(projet, dernierImport, dernierPlan);
+  plan.afficherPlansDxf(projet.plansDxf ?? []);
+  // Point à implanter de la liste : ses coordonnées à jour (Annuler a pu l'enlever).
+  if (implanter.cible?.id) {
+    const point = projet.aImplanter.find((p) => p.id === implanter.cible.id);
+    implanter.cible = point ? { ...point } : null;
+  }
+  envoyerImplantationAuPlan();
+  ecranLeve?.afficher(donneesLeve());
+  afficherEcranProjet();
+  // Téléphone, onglet Terrain : le plan reste en haut de l'écran (voir style.css), plus petit
+  // en mode Implanter pour laisser la place aux coupes.
+  document.body.classList.toggle('mode-leve', Boolean(ecranLeve));
+  document.body.classList.toggle('mode-controle', Boolean(ecranLeve) && terrain.mode === 'controler');
+  mettreAJourToucheVolume();
 
   // Plan : surfaces du levé affiché et surfaces importées ; les autres sont cachées.
   const visibles = new Set(surfacesAffichees());
@@ -612,10 +1636,22 @@ function recalculer({ recadrer = false } = {}) {
     // Coupes tracées (A – A', B – B'), et celle en cours de tracé.
     coupes: projet.coupes.filter((c) => c.debut && c.fin && c.id !== traceCoupe?.id),
     traceCoupe,
+    // Onglet Terrain : le volume en petit dans un coin, pas en grand au milieu du stock.
+    volumesDiscrets: ongletContexte === 'terrain',
+    // Onglet Terrain, métré en cours : ses aires, longueurs et points comptés.
+    mesures: ongletContexte === 'terrain' && metreEnCours()
+      ? projet.mesures.filter((m) => m.metreId === metreEnCours().id).map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }))
+      : [],
+    mesureActive: null,
   });
   if (recadrer || pointsDuPlan !== pointsAffiches) {
     pointsAffiches = pointsDuPlan;
+    nombrePointsAffiches = pointsDuPlan.length;
     plan.afficherPoints(pointsDuPlan);
+  } else if (pointsDuPlan.length !== nombrePointsAffiches) {
+    // Point levé avec le récepteur (ou effacé) : même liste, un point de plus ou de moins.
+    nombrePointsAffiches = pointsDuPlan.length;
+    plan.mettreAJourPoints(pointsDuPlan);
   }
   basculerModeDessin();
 }
@@ -636,6 +1672,8 @@ function basculerModeDessin() {
   requestAnimationFrame(() => document.querySelector(`#${onglet} .en-edition`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
 }
 let pointsAffiches = null;
+const AUCUN_POINT = [];
+let nombrePointsAffiches = 0;
 
 // --- Enregistrement automatique ---
 let minuterie = null;
@@ -692,6 +1730,15 @@ document.addEventListener('keydown', (evenement) => {
   evenement.preventDefault();
 });
 
+/** Ligne sous le titre du projet (en-tête) : nom, points, surfaces, et l'état de Drive si connecté. */
+function mettreAJourEtatEntete() {
+  const points = leveActif(projet)?.points ?? AUCUN_POINT;
+  const drive = partage?.etat.connecte
+    ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive : ouvert ailleurs' }[partage.etat.etat] ?? 'Drive : en attente'
+    : '';
+  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} surface(s)`, drive].filter(Boolean).join(' · ');
+}
+
 /** Petit message sous l'en-tête, qui disparaît tout seul après "duree" millisecondes (null : il reste). */
 let minuterieMessage = null;
 function afficherMessage(texte, duree = 2000) {
@@ -715,7 +1762,8 @@ async function enregistrer() {
     await stockage.enregistrerProjet(projet);
     stockage.memoriserDernierProjet(projet.id);
     await rafraichirListe();
-    ecranProjet.afficher(projet, resumes);
+    afficherEcranProjet();
+    partage?.projetEnregistre();
   } catch (erreur) {
     console.error(erreur);
     document.querySelector('#etat').textContent = `Enregistrement impossible : ${erreur.message}`;
@@ -727,7 +1775,24 @@ async function rafraichirListe() {
 }
 
 /** Étape où reprendre le travail : les surfaces si le projet a déjà des points, sinon l'import. */
-const etapeUtile = () => (leveActif(projet) ? 'surfaces' : 'importer');
+const etapeUtile = () => (leveActif(projet) ? 'surfaces' : recepteurDisponible() ? 'terrain' : 'leves');
+
+/**
+ * Va à un onglet, ou à la liste des levés ('leves') : onglet Terrain dans l'appli Android s'il n'y
+ * a encore aucun levé, sinon le bloc des levés de l'onglet Projet (import de fichiers, « Mes levés »).
+ */
+function allerA(onglet) {
+  if (onglet !== 'leves') {
+    afficherOnglet(onglet);
+    return;
+  }
+  if (recepteurDisponible() && projet.leves.length === 0) {
+    afficherOnglet('terrain');
+    return;
+  }
+  afficherOnglet('projets');
+  requestAnimationFrame(() => document.querySelector('#importer')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+}
 
 /**
  * Ouvre un projet : il devient le projet affiché, et il est enregistré.
@@ -735,6 +1800,10 @@ const etapeUtile = () => (leveActif(projet) ? 'surfaces' : 'importer');
  */
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
+  implanter.choix = null;
+  implanter.cible = null;
+  implanter.pointsLigne = [];
+  implanter.ligne = null;
   dernierImport = null;
   document.querySelector('#message-import-surface').innerHTML = '';
   editeurSurfaces.charger(projet.surfaces);
@@ -755,7 +1824,9 @@ async function demarrer() {
     await rafraichirListe();
     const id = stockage.dernierProjet();
     const lu = (id && (await stockage.lireProjet(id))) || (resumes[0] && (await stockage.lireProjet(resumes[0].id)));
-    await ouvrir(lu ? completerProjet(lu) : creerProjet('Mon projet'), { changerOnglet: false });
+    await ouvrir(lu ? completerProjet(lu) : creerProjet(), { changerOnglet: false });
+    // Partage : on se reconnecte à Drive si on l'était (le projet ouvert est alors comparé à Drive).
+    partage.demarrer();
   } catch (erreur) {
     // Base de données indisponible (navigation privée...) : l'appli marche, sans enregistrement.
     console.error(erreur);

@@ -15,7 +15,7 @@ const TEXTES = {
   nouveau: '+ Nouvelle surface',
   importer: '+ Nouvelle surface depuis LandXML ou DXF',
   supprimer: 'supprimer cette surface',
-  choix: 'Surface affichée',
+  choix: 'Surface active',
   roles: { contour: 'Contour', ligne: 'Ligne de rupture', dessus: 'Points isolés / caractéristiques' },
 };
 
@@ -319,12 +319,17 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       </section>`;
 
     if (objet) {
-      // Surface affichée : bandeau bleu nuit avec le choix de la surface, puis son contenu.
+      // Surface active : bandeau bleu nuit avec le choix de la surface (bien visible : on peut en
+      // choisir une autre) et le nombre de surfaces du projet, puis son contenu.
+      const nombre = etat.objets.length;
       html += `
         <section class="bloc-ouvert">
           <div class="bloc-entete">
-            <span class="etiquette-entete">${textes.choix}</span>
-            <select class="champ-entete" data-champ="choix" aria-label="${textes.choix}">
+            <div class="ligne-etiquette">
+              <span class="etiquette-entete">${textes.choix}</span>
+              <span class="compte-entete">${nombre} surface${nombre > 1 ? 's' : ''}</span>
+            </div>
+            <select class="champ-entete champ-choix" data-champ="choix" aria-label="${textes.choix} : en choisir une autre">
               ${etat.objets.map((o, i) => `<option value="${i}" ${i === etat.indexActif ? 'selected' : ''}>${echapper(etiquette?.(o) ?? o.nom)}</option>`).join('')}
             </select>
           </div>
@@ -373,7 +378,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   /** Cartes d'une surface : contour, lignes de rupture, points, triangles supprimés, état. */
   function contenuSurface(surface) {
     if (estImportee(surface)) {
-      return `<p class="aide">Surface importée du fichier « ${echapper(surface.nomFichier)} » (${surface.type === 'dxf' ? 'DXF' : 'LandXML'}).</p>${decrire?.(surface) ?? ''}${cartePhotos(surface)}`;
+      return `<p class="aide">Importée : ${echapper(surface.nomFichier)} (${surface.type === 'dxf' ? 'DXF' : 'LandXML'})</p>${decrire?.(surface) ?? ''}${cartePhotos(surface)}`;
     }
     const problemes = verifierSurface(surface, pointsDe(surface).map((p) => p.nom));
     return `
@@ -406,7 +411,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
     return `
       <div class="carte-role role-triangles ${avecContour ? 'inutile' : ''} ${etat.suppression ? 'en-edition' : ''}">
         <div class="titre-role"><strong>${iconeRole('triangles')}Triangles en trop ${bulle('trianglesEnTrop')}</strong></div>
-        <p>${avecContour ? 'Inutile ici : le contour fermé limite déjà la surface.' : `${supprimes} triangle(s) supprimé(s).`}</p>
+        <p>${avecContour ? 'Inutile avec un contour fermé.' : `${supprimes} triangle(s) supprimé(s).`}</p>
         <div class="ligne-outils">
           <button type="button" class="${etat.suppression ? 'bouton' : 'bouton-secondaire'}" data-action="mode-suppression" ${avecContour && !etat.suppression ? 'disabled' : ''}>${etat.suppression ? 'Mode suppression actif' : 'Supprimer des triangles au doigt'}</button>
           <button type="button" class="bouton-secondaire" data-action="retablir-triangles" ${supprimes === 0 ? 'disabled' : ''}>Tout rétablir${avecContour && supprimes > 0 ? ` (${supprimes})` : ''}</button>

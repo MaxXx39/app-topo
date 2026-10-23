@@ -1,4 +1,4 @@
-// PDF des mesures (onglet 3. Mesures) : à part du PDF des volumes, il ne montre aucun volume.
+// PDF des mesures (onglet Calculs › Mesures) : à part du PDF des volumes, il ne montre aucun volume.
 // Une feuille paysage (A4, ou A3 si le plan ne tient pas en A4 à l'échelle choisie) :
 // le plan à gauche (mesures en cyan pointillé), à droite le tableau des mesures, la légende
 // et le cartouche. S'il y a trop de mesures pour la colonne, la suite va sur une feuille à part.
@@ -166,6 +166,15 @@ function dessinerPlanMesures(doc, mesures, pointsMontres, { versPapier, echelle 
       for (const ligne of mesure.lignesRupture) polyligne(ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean), ligne.fermee);
     }
     trait(doc, couleur(mesure), 0.4);
+    if (mesure.type === 'nombre') {
+      // Points comptés : un rond de la couleur de la mesure autour de chacun.
+      doc.setLineDashPattern([], 0);
+      for (const point of resultat.sommets) {
+        const p = versPapier(point);
+        doc.circle(p.x, p.y, 1.4, 'S');
+      }
+      continue;
+    }
     doc.setLineDashPattern([2, 1], 0);
     polyligne(resultat.sommets, mesure.type === 'aire');
   }

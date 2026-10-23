@@ -8,6 +8,9 @@ import {
   ecrireFichierProjet,
   lireFichierProjet,
   resumerProjet,
+  titreProjet,
+  sousTitreProjet,
+  nomDeFichierProjet,
 } from '../src/projet/projet.js';
 import { creerSurface } from '../src/topo/surface.js';
 
@@ -39,7 +42,7 @@ describe('projets', () => {
   it('complète un fichier projet ancien ou incomplet', () => {
     const { projet } = lireFichierProjet('{"format":"topo-projet","version":1,"id":"x","nom":"Vieux","leves":[{"id":"l","nom":"a.csv","points":[]}]}');
     expect(projet.surfaces).toEqual([]);
-    expect(projet.cartouche).toEqual({ affaire: '', dessinePar: '', date: '' });
+    expect(projet.cartouche).toEqual({ affaire: '', lieu: '', dessinePar: '', date: '' });
   });
 
   it('duplique un projet avec un nouvel identifiant', () => {
@@ -94,5 +97,19 @@ describe('projets', () => {
 
   it('refuse un fichier d\'une version plus récente de l\'appli', () => {
     expect(lireFichierProjet('{"format":"topo-projet","version":3}').erreur).toContain('plus récente');
+  });
+});
+
+describe('titre du projet', () => {
+  it('écrit « Affaire - Lieu », sinon le nom, sinon « Projet sans nom »', () => {
+    const projet = creerProjet('Stocks gravière');
+    expect(titreProjet(projet)).toBe('Stocks gravière');
+    expect(sousTitreProjet(projet)).toBe('');
+    projet.cartouche.affaire = '10 203';
+    projet.cartouche.lieu = 'Gland';
+    expect(titreProjet(projet)).toBe('10 203 - Gland');
+    expect(sousTitreProjet(projet)).toBe('Stocks gravière');
+    expect(nomDeFichierProjet(projet)).toBe('10_203_-_Gland');
+    expect(titreProjet(creerProjet())).toBe('Projet sans nom');
   });
 });

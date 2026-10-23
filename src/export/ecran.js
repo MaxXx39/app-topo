@@ -1,4 +1,4 @@
-// Formulaire d'export : échelle et calques du PDF (le cartouche se remplit dans l'onglet Projet),
+// Formulaire d'export : échelle, calques et cartouche du PDF (dessiné par, date ; affaire et lieu du projet),
 // boutons PDF, CSV, DXF et LandXML.
 import { genererCsv } from './csv.js';
 import { genererDxf } from './dxf.js';
@@ -7,7 +7,9 @@ import { ecrireLandXML } from '../topo/landxml.js';
 import { plageAltitudes, equidistanceAuto } from '../topo/courbes.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
+import { champsCartouche, lireCartouche } from './cartouche.js';
 import { PALIERS } from '../plan/ecarts.js';
+import { estDansAppliAndroid, enregistrerDansAndroid } from '../android/pont.js';
 
 // Cases du PDF : [clé, texte, cochée au départ]. « Photos » (celles des surfaces) en dernier.
 const CALQUES = [
@@ -33,7 +35,7 @@ const COULEURS = [
  *   comparaisons : calculs dans un contour, une feuille chacun [{ nom, description, resultat }] ;
  *   volumes : tous les calculs, pour le CSV [{ nom, base, resultat }] ;
  *   dessinSurfaces : surfaces affichées, pour le DXF et le LandXML { stocks, resultats, surfaces } ;
- *   cartouche : { affaire, dessinePar, date } du projet (date '' : date du jour)
+ *   cartouche : { affaire, lieu } du projet
  */
 export function creerEcranExport(conteneur, { obtenirDonnees }) {
 
@@ -46,7 +48,6 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
           ${ECHELLES.map((e) => `<option value="${e}">1:${e}</option>`).join('')}
         </select>
       </label>
-      <p class="aide">Plan centré sur les surfaces. Échelle choisie : feuille A4 si le plan y tient, sinon A3.</p>
     </div>
     <div class="calques-pdf">
       <p class="titre-choix">Contenu du PDF</p>
@@ -63,6 +64,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
         </select>
       </label>
     </div>
+    ${champsCartouche()}
     <div class="ligne-outils">
       <button type="button" class="bouton-secondaire" data-action="pdf">PDF</button>
       <button type="button" class="bouton-secondaire" data-action="csv">CSV</button>
@@ -74,8 +76,8 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
   const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`);
   const message = conteneur.querySelector('[data-zone="message"]');
 
-  /** Date du cartouche ('AAAA-MM-JJ') : celle du projet, sinon la date du jour. */
-  const dateDuPlan = () => obtenirDonnees().cartouche.date || new Date().toISOString().slice(0, 10);
+  /** Date du cartouche ('AAAA-MM-JJ') : celle de la case, sinon la date du jour. */
+  const dateDuPlan = () => lireCartouche(conteneur).date;
 
   const boutons = {
     csv: () => {
@@ -108,7 +110,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
         ...surfaces,
       ].filter((s) => s.triangles.length > 0);
       if (liste.length === 0) {
-        message.textContent = 'Aucune surface à exporter : crée d\'abord une surface (onglet 2.1 Surfaces).';
+        message.textContent = 'Aucune surface à exporter.';
         return;
       }
       telecharger(new Blob([ecrireLandXML(liste, nomProjet)], { type: 'application/xml' }), `${nomDeFichier()}.xml`);
@@ -141,8 +143,9 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
           calques,
           cartouche: {
             affaire: obtenirDonnees().cartouche.affaire ?? '',
-            date: dateSuisse(dateDuPlan()),
-            dessinePar: obtenirDonnees().cartouche.dessinePar ?? '',
+            lieu: obtenirDonnees().cartouche.lieu ?? '',
+            date: dateSuisse(lireCartouche(conteneur).date),
+            dessinePar: lireCartouche(conteneur).dessinePar,
             fichierPoints,
           },
           echelleImposee: echelleChoisie === 'auto' ? null : Number(echelleChoisie),
@@ -162,7 +165,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
   /** Vérifie qu'il y a quelque chose à exporter, sinon affiche un message. */
   function verifier(volumes) {
     if (volumes.some(({ resultat }) => resultat && !resultat.erreurs)) return true;
-    message.textContent = 'Rien à exporter : crée d\'abord un calcul de volume (ci-dessus).';
+    message.textContent = 'Aucun volume à exporter.';
     return false;
   }
 
@@ -179,8 +182,12 @@ export function dateSuisse(iso) {
   return annee && mois && jour ? `${jour}.${mois}.${annee}` : '';
 }
 
-/** Fait télécharger un fichier par le navigateur. */
+/** Fait télécharger un fichier par le navigateur (dans l'APK : par l'appli Android). */
 export function telecharger(blob, nom) {
+  if (estDansAppliAndroid()) {
+    enregistrerDansAndroid(blob, nom);
+    return;
+  }
   const adresse = URL.createObjectURL(blob);
   const lien = document.createElement('a');
   lien.href = adresse;

@@ -21,7 +21,7 @@
   --jaune-clair: #fffbeb;
   --jaune: #d97706;
   --bleu: #2563eb;
-  --cyan: #0891b2; /* mesures (onglet 3. Mesures) : couleur à part, jamais utilisée pour les surfaces */
+  --cyan: #0891b2; /* mesures (onglet Calculs › Mesures) : couleur à part, jamais utilisée pour les surfaces */
   --rayon: 12px;
   --ombre: 0 1px 2px rgba(16, 24, 20, 0.06), 0 2px 8px rgba(16, 24, 20, 0.06);
   --hauteur-entete: 56px;
@@ -69,50 +69,52 @@ p {
   color: #ffffff;
 }
 
-/* Logo Perrin dans l'en-tête : sur un petit fond blanc (l'image a un fond blanc). */
-.entete-logo {
-  height: 32px;
-  width: auto;
-  padding: 4px 6px;
-  border-radius: 6px;
-  background: #ffffff;
+/* Projet ouvert, en grand dans l'en-tête (affaire - lieu, puis le nom et les nombres). On le
+   touche pour aller à l'onglet Projet. */
+.entete-texte {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-/* Téléphone : logo plus petit, pour laisser la place au nom du projet. */
+.entete-titre {
+  max-width: 100%;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entete-etat {
+  max-width: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 @media (max-width: 600px) {
   .entete {
     gap: 8px;
     padding: 0 10px;
   }
 
-  .entete-logo {
-    height: 24px;
-    padding: 3px 4px;
-    border-radius: 4px;
+  .entete-titre {
+    font-size: 1.1rem;
   }
-}
-
-.entete h1 {
-  margin: 0;
-  font-size: 1.05rem;
-  line-height: 1.2;
-}
-
-.entete-etat {
-  margin: 0;
-  font-size: 0.8rem;
-  opacity: 0.8;
-}
-
-.entete-texte {
-  flex: 1;
-  min-width: 0;
-}
-
-.entete-texte .entete-etat {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* Boutons ronds de l'en-tête (Annuler, Rétablir, Aide). */
@@ -1223,6 +1225,18 @@ svg.plan {
   z-index: 2;
 }
 
+/* Volume de la surface en cours, discret (onglet Terrain). */
+.plan .pastille-volume rect {
+  fill: rgba(255, 255, 255, 0.85);
+  stroke: var(--bordure);
+}
+
+.plan .pastille-volume text {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--gris);
+}
+
 .plan-attribution {
   position: absolute;
   right: 0;
@@ -1359,7 +1373,7 @@ svg.plan {
   margin: 8px 0;
 }
 
-/* Nom d'un calcul de volume (onglet 2.2 Volumes). */
+/* Nom d'un calcul de volume (onglet Calculs › Volumes). */
 #volumes .titre-role input {
   flex: 1;
   min-width: 0;
@@ -1603,7 +1617,7 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
   color: var(--gris);
 }
 
-/* --- Coupes (onglet 2.2 Volumes) --- */
+/* --- Coupes (onglet Calculs › Volumes) --- */
 
 .carte-coupe {
   --couleur-role: var(--sombre);
@@ -1884,6 +1898,17 @@ th.nombre {
   stroke-width: 3.2;
 }
 
+/* Points comptés (mesure « Nombre ») : un rond autour de chacun. */
+.plan .compte-mesure {
+  fill: none;
+  stroke: var(--couleur-mesure, var(--cyan));
+  stroke-width: 2;
+}
+
+.plan .compte-mesure.actif {
+  stroke-width: 3.2;
+}
+
 .plan .triangles-mesure {
   fill: none;
   stroke: color-mix(in srgb, var(--couleur-mesure, var(--cyan)) 45%, transparent);
@@ -1974,68 +1999,124 @@ th.nombre {
   letter-spacing: 0.04em;
 }
 
-/* Étapes : 4 tuiles (2 par ligne sur téléphone, 4 sur une ligne si la place le permet). */
-.etapes-projet {
+/* Trois boutons en haut de l'onglet Projet : nouveau, ouvrir, gestion. */
+.actions-projets {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 12px;
 }
 
-@media (min-width: 560px) and (max-width: 899px) {
-  .etapes-projet {
-    grid-template-columns: repeat(4, 1fr);
-  }
+.actions-projets .bouton-secondaire {
+  min-height: 48px;
+  padding: 6px 8px;
+  line-height: 1.2;
 }
 
-.tuile-etape {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 8px;
-  align-items: center;
-  padding: 8px 10px;
-  border: 1px solid var(--bordure);
-  border-radius: 10px;
-  background: var(--fond);
-  color: var(--texte);
-  text-align: left;
-  cursor: pointer;
+.actions-projets .bouton-secondaire.actif {
+  border-color: var(--sombre);
+  background: var(--sombre);
+  color: #ffffff;
 }
 
-.numero-etape {
-  grid-row: span 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #dfe4e8;
-  color: var(--gris);
+.panneau-projets {
+  margin-top: 0;
+}
+
+.etiquette-ouvert {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ambre);
+  color: var(--sombre);
   font-size: 0.75rem;
   font-weight: 700;
 }
 
-.titre-etape {
-  font-weight: 700;
-  font-size: 0.9rem;
+/* Titre du projet ouvert dans son bandeau (affaire - lieu). */
+.titre-projet-ouvert {
+  display: block;
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
-.compte-etape {
-  font-size: 0.8rem;
+/* Infos du projet : affaire et lieu côte à côte, le nom en dessous. */
+.champs-projet {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+  margin-bottom: 12px;
+}
+
+.champs-projet label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+  font-weight: 600;
   color: var(--gris);
 }
 
-/* Étape où il y a déjà quelque chose : coche verte. */
-.tuile-etape.faite {
-  background: var(--surface);
+.champs-projet .champ-large {
+  grid-column: 1 / -1;
+  display: block;
 }
 
-.tuile-etape.faite .numero-etape {
-  background: var(--succes);
-  color: #ffffff;
-  font-size: 0.95rem;
+.champs-projet input {
+  width: 100%;
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 1rem;
+  color: var(--texte);
+}
+
+/* Bloc Imports : deux gros boutons côte à côte (fichier de points, plan DXF). */
+.boutons-imports {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.bouton-import {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 1px dashed var(--sombre);
+  border-radius: 10px;
+  background: var(--fond);
+  color: var(--texte);
+  cursor: pointer;
+}
+
+.bouton-import:active {
+  background: var(--bordure);
+}
+
+.bouton-import svg {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  fill: none;
+  stroke: var(--sombre);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bouton-import > span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.bouton-import .aide {
+  font-size: 0.8rem;
 }
 
 .bouton-large {
@@ -2145,4 +2226,1677 @@ th.nombre {
 
 .ligne-leve .ligne-outils {
   margin: 4px 0 0;
+}
+
+/* ==========================================================================
+   Levé avec le récepteur Emlid (appli Android) : src/leve/ecran.js
+   ========================================================================== */
+
+/* Bandeaux « RTK » et « Inclinaison » : une bande sous l'en-tête, dans tous les onglets.
+   L'en-tête grandit d'autant (tout ce qui se place sous l'en-tête suit la variable). */
+body.avec-recepteur {
+  --hauteur-entete: 86px;
+}
+
+body.avec-recepteur .entete {
+  position: sticky;
+  padding-bottom: 30px;
+}
+
+.bandeaux-recepteur {
+  display: none;
+}
+
+body.avec-recepteur .bandeaux-recepteur {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30px;
+  display: flex;
+}
+
+.bandeaux-recepteur span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.bandeaux-recepteur .ok {
+  background: var(--succes);
+}
+
+.bandeaux-recepteur .pas-ok {
+  background: var(--rouge);
+}
+
+.bandeaux-recepteur .attente {
+  background: var(--gris);
+}
+
+.connexion-leve {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.champ-leve {
+  display: block;
+  margin: 10px 0;
+  font-size: 0.9rem;
+  color: var(--gris);
+}
+
+.champ-leve select {
+  flex: 1;
+  min-width: 0;
+}
+
+.champ-leve input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* Rôle du prochain point : 3 gros boutons, à la couleur du plan
+   (contour rouge, ligne de rupture orange, point isolé vert). */
+.roles-leve {
+  display: grid;
+  /* 3 boutons pour un stock, 2 (sans contour) pour un terrain naturel ou un terrassement. */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+  margin: 12px 0 8px;
+}
+
+.role-leve {
+  --couleur-role: var(--gris);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 8px 4px;
+  border: 2px solid var(--couleur-role);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--couleur-role);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.role-leve svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.role-leve.role-contour {
+  --couleur-role: var(--rouge);
+}
+
+.role-leve.role-ligne {
+  --couleur-role: var(--orange);
+}
+
+.role-leve.role-isole {
+  --couleur-role: var(--succes);
+}
+
+/* Métré : aire, longueur, point compté, en cyan (la couleur des mesures). */
+.role-leve:is(.role-aire, .role-longueur, .role-compte) {
+  --couleur-role: #0891b2;
+}
+
+.outils-ligne.outils-metre {
+  border-left-color: #0891b2;
+}
+
+.libelles-terrain.dans-metre .puce-libelle {
+  --couleur-libelle: #0891b2;
+}
+
+.role-leve.choisi {
+  background: var(--couleur-role);
+  color: #ffffff;
+}
+
+.outils-ligne {
+  padding: 8px 10px;
+  border-left: 4px solid var(--orange);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--orange) 6%, var(--surface));
+}
+
+.outils-ligne .bouton-secondaire.actif {
+  border-color: var(--orange);
+  background: var(--orange);
+  color: #ffffff;
+}
+
+.position-leve {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 8px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.position-leve.pas-prete strong {
+  color: var(--gris);
+}
+
+.bouton.bouton-prendre {
+  width: 100%;
+  min-height: 64px;
+  font-size: 1.2rem;
+  letter-spacing: 0.03em;
+}
+
+.raison-leve {
+  margin: 6px 0;
+  color: var(--rouge);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Position du récepteur sur le plan : bleu, grise si l'inclinaison n'est pas prête. */
+.plan .position circle {
+  fill: var(--bleu);
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.plan .position circle.halo {
+  fill: var(--bleu);
+  fill-opacity: 0.2;
+  stroke: none;
+}
+
+.plan .position.pas-prete circle {
+  fill: var(--gris);
+}
+
+/* Téléphone, onglet Terrain : le plan reste en haut, les outils du levé dessous. */
+@media (max-width: 899px) {
+  body.mode-leve[data-onglet='terrain'] .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: 38svh;
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+
+  body.mode-leve[data-onglet='terrain'] .mise-en-page {
+    padding-top: calc(38svh + 12px);
+  }
+}
+
+/* ==========================================================================
+   Onglets Projet · Terrain · Calculs · Plan (version 0.38.0)
+   ========================================================================== */
+
+/* L'onglet Projet a sa propre couleur (bleu nuit), pour le distinguer des onglets de travail. */
+.onglets button.onglet-projets {
+  flex: 0 0 auto;
+  min-width: 76px;
+  margin: 5px 4px 5px 6px;
+  border-radius: 12px;
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.onglets button.onglet-projets.actif {
+  color: var(--ambre);
+}
+
+.onglets button.onglet-projets.actif svg {
+  color: var(--sombre);
+}
+
+.panneau-projet {
+  border-top: 5px solid var(--sombre);
+}
+
+@media (min-width: 900px) {
+  .onglets button.onglet-projets {
+    flex: 0 0 auto;
+    margin: 0 4px 0 0;
+    padding: 0 12px;
+    border-radius: 8px;
+  }
+
+  .onglets button.onglet-projets.actif {
+    background: var(--sombre);
+    color: var(--ambre);
+  }
+
+  .onglets button.onglet-projets.actif svg {
+    color: var(--ambre);
+  }
+}
+
+/* Calculs : Surfaces · Volumes · Mesures, un seul affiché à la fois (boutons en haut de l'onglet). */
+.parties-calculs {
+  display: none;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 4px;
+  border-radius: var(--rayon);
+  background: var(--surface);
+  box-shadow: var(--ombre);
+}
+
+body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures']) .parties-calculs {
+  display: flex;
+}
+
+/* Surfaces et Volumes : un même cadre (ils vont ensemble), Mesures / métrés à part, en cyan. */
+.groupe-surfaces-volumes {
+  flex: 2;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 2px solid var(--ambre);
+  border-radius: 10px;
+}
+
+.groupe-mesures {
+  flex: 1.2;
+  display: flex;
+  padding: 3px;
+  border: 2px dashed #0891b2;
+  border-radius: 10px;
+}
+
+.parties-calculs .groupe-mesures button.actif {
+  background: #0891b2;
+}
+
+.parties-calculs button {
+  flex: 1;
+  min-height: 40px;
+  line-height: 1.15;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--gris);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.parties-calculs button.actif {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+/* Téléphone, pendant un dessin (plan en haut de l'écran) : pas de place pour ces boutons. */
+@media (max-width: 899px) {
+  body.mode-dessin .parties-calculs {
+    display: none;
+  }
+}
+
+/* --- Onglet Terrain : écran épuré pour le chantier --- */
+.connexion-terrain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.connexion-terrain .bouton {
+  width: 100%;
+}
+
+/* « display: flex » ci-dessus l'emporterait sur l'attribut hidden : on le rétablit. */
+.connexion-terrain[hidden] {
+  display: none;
+}
+
+.outils-ligne {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.outils-ligne span {
+  flex: 1;
+  font-weight: 600;
+}
+
+.nom-et-position {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 8px;
+}
+
+.nom-et-position .nom-point {
+  width: 10.5em;
+  flex: 0 0 auto;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.nom-et-position .position-leve {
+  flex: 1;
+  margin: 0;
+  gap: 0 10px;
+  font-size: 0.85rem;
+}
+
+.pied-terrain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.resume-terrain {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--gris);
+}
+
+.resume-terrain strong {
+  color: var(--texte);
+}
+
+/* Onglet Projet épuré (version 0.39.0) : cartouche et autres projets repliés ; le titre sert
+   de bouton pour ouvrir, avec un résumé à droite (affaire, nombre de projets). */
+.bloc-replie > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.bloc-replie > summary::-webkit-details-marker {
+  display: none;
+}
+
+.panneau .bloc-replie > summary .titre-bloc {
+  margin: 0;
+}
+
+.bloc-replie > summary .aide {
+  margin: 0;
+  text-align: right;
+}
+
+.bloc-replie > summary::after {
+  content: '▾';
+  color: var(--gris);
+}
+
+.bloc-replie[open] > summary {
+  margin-bottom: 10px;
+}
+
+.bloc-replie[open] > summary::after {
+  content: '▴';
+}
+
+/* Flèche de la direction regardée, à côté de la position (comme Google Maps). */
+.plan .position path.fleche {
+  fill: var(--bleu);
+  stroke: #ffffff;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.plan .position.pas-prete path.fleche {
+  fill: var(--gris);
+}
+
+/* --- Onglet Terrain : Lever | Contrôler (version 0.40.0) --- */
+.modes-terrain {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--fond);
+}
+
+.modes-terrain button {
+  flex: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--gris);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modes-terrain button.actif {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.ligne-choix {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.ligne-choix > span:first-child {
+  min-width: 5.5em;
+  color: var(--gris);
+}
+
+.puce-choix {
+  min-height: 34px;
+  padding: 4px 12px;
+  border: 1px solid var(--bordure);
+  border-radius: 17px;
+  background: var(--surface);
+  color: var(--texte);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.puce-choix.actif {
+  border-color: var(--sombre);
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.ecran-terrain select[data-champ='surface-controle'] {
+  width: 100%;
+  margin: 4px 0 8px;
+}
+
+/* Écart en grand : vert clair (±2 cm), jaune orangé (2 à 5 cm), rouge (monter plus de 5 cm),
+   bleu (descendre plus de 5 cm). */
+.ecart-direct {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 76px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  color: #ffffff;
+}
+
+.ecart-direct.attente {
+  display: flex;
+  justify-content: center;
+  background: var(--fond);
+  color: var(--gris);
+  font-weight: 600;
+}
+
+.ecart-direct.vert-clair {
+  background: #86efac;
+  color: #14532d;
+}
+
+.ecart-direct.jaune-orange {
+  background: #f59e0b;
+  color: #451a03;
+}
+
+.ecart-direct.rouge {
+  background: var(--rouge);
+}
+
+.ecart-direct.bleu {
+  background: var(--bleu);
+}
+
+.fleche-ecart {
+  grid-row: span 2;
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.valeur-ecart {
+  font-size: 1.6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-ecart {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+/* Coupes en direct : l'une sous l'autre (« écran partagé »). */
+.coupes-directes {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.coupe-directe {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.coupe-directe text {
+  font-size: 10px;
+  fill: var(--gris);
+}
+
+.coupe-directe .titre-coupe {
+  font-weight: 700;
+  fill: var(--texte);
+}
+
+.coupe-directe .vide-coupe {
+  font-size: 12px;
+}
+
+.coupe-directe .profil {
+  fill: none;
+  stroke: #b45309;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.coupe-directe .sous-profil {
+  fill: #b45309;
+  fill-opacity: 0.12;
+}
+
+.coupe-directe .base-coupe {
+  stroke: var(--bordure);
+}
+
+.coupe-directe .axe-canne {
+  stroke: var(--sombre);
+  stroke-dasharray: 3 3;
+}
+
+.coupe-directe .canne {
+  fill: var(--sombre);
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.coupe-directe .canne.vert-clair {
+  fill: #22c55e;
+}
+
+.coupe-directe .canne.jaune-orange {
+  fill: #f59e0b;
+}
+
+.coupe-directe .canne.rouge {
+  fill: var(--rouge);
+}
+
+.coupe-directe .canne.bleu {
+  fill: var(--bleu);
+}
+
+/* Téléphone, mode Contrôler : plan plus petit en haut, pour laisser la place aux coupes. */
+@media (max-width: 899px) {
+  body.mode-leve.mode-controle[data-onglet='terrain'] .panneau-plan {
+    height: 26svh;
+  }
+
+  body.mode-leve.mode-controle[data-onglet='terrain'] .plan-cadre {
+    min-height: 0;
+  }
+
+  body.mode-leve.mode-controle[data-onglet='terrain'] .mise-en-page {
+    padding-top: calc(26svh + 12px);
+  }
+}
+
+/* --- Onglet Terrain : une seule ligne « surface en cours » (version 0.41.0) --- */
+.ecran-terrain [hidden] {
+  display: none !important;
+}
+
+/* Surface levée en cours : bandeau à la couleur de sa nature (comme les boutons « Que lèves-tu ? »),
+   nature en petit, nom en grand (liste à toucher pour en reprendre une autre), « + » à droite. */
+.bandeau-leve {
+  --couleur-nature: #b45309;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 6px 6px 6px 12px;
+  border: 2px solid var(--couleur-nature);
+  border-left-width: 8px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--couleur-nature) 10%, var(--surface));
+}
+
+.bandeau-leve.nature-terrain {
+  --couleur-nature: #15803d;
+}
+
+.bandeau-leve.nature-terrassement {
+  --couleur-nature: #2563eb;
+}
+
+.bandeau-leve.nature-metre {
+  --couleur-nature: #0891b2;
+}
+
+.bandeau-leve-texte {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.nature-leve {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--couleur-nature);
+}
+
+.bandeau-leve select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 28px 0 0;
+  border: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231b2b36' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 2px center / 20px 20px;
+  color: var(--texte);
+  font-size: 1.2rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bouton-plus {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: var(--couleur-nature);
+  color: #ffffff;
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.bouton-nature.nature-metre {
+  --couleur-nature: #0891b2;
+}
+
+.choix-nature {
+  margin: 8px 0;
+  text-align: center;
+}
+
+.titre-choix {
+  margin: 4px 0 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.natures-terrain {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+/* Mêmes couleurs que les surfaces dans les coupes : stock brun, terrain vert, terrassement bleu. */
+.bouton-nature {
+  --couleur-nature: #b45309;
+  min-height: 56px;
+  border: 2px solid var(--couleur-nature);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--couleur-nature) 8%, var(--surface));
+  color: var(--couleur-nature);
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bouton-nature.nature-terrain {
+  --couleur-nature: #15803d;
+}
+
+.bouton-nature.nature-terrassement {
+  --couleur-nature: #2563eb;
+}
+
+/* Rappel sous le texte du gros bouton : la touche volume − prend aussi le point. */
+.bouton.bouton-prendre {
+  flex-direction: column;
+  gap: 0;
+}
+
+.sous-titre-prendre {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  opacity: 0.8;
+}
+
+/* Bout de canne en dehors du dessin de la coupe : rond vide, posé sur le bord. */
+.coupe-directe .canne.hors-cadre {
+  fill: #ffffff;
+  stroke: var(--sombre);
+}
+
+.pied-recepteur {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  color: var(--gris);
+}
+
+/* Calculs : Surfaces · Volumes · Mesures restent en haut de l'écran quand on descend la page. */
+.parties-calculs {
+  position: sticky;
+  top: calc(var(--hauteur-entete) + 6px);
+  z-index: 15;
+}
+
+@media (min-width: 900px) {
+  .parties-calculs {
+    top: 0;
+  }
+}
+
+/* Suivi de la position actif (bouton « Ma position ») : le plan suit le récepteur. */
+.plan-boutons button.actif {
+  background: var(--bleu);
+  color: #ffffff;
+}
+
+/* Coupes en direct (mode Contrôler) : perpendiculaire en violet, dans l'axe en rose, en pointillés
+   sur le plan et en couleur sur le bord de leur dessin. */
+.plan .trace-coupe-directe {
+  stroke-width: 3;
+  stroke-dasharray: 7 5;
+  stroke-linecap: round;
+}
+
+.plan .trace-coupe-directe.coupe-perpendiculaire,
+.coupe-directe.coupe-perpendiculaire {
+  --couleur-coupe: #7c3aed;
+}
+
+.plan .trace-coupe-directe.coupe-axe,
+.coupe-directe.coupe-axe {
+  --couleur-coupe: #db2777;
+}
+
+.plan .trace-coupe-directe {
+  stroke: var(--couleur-coupe);
+}
+
+.coupe-directe.coupe-perpendiculaire,
+.coupe-directe.coupe-axe {
+  border-left: 5px solid var(--couleur-coupe);
+}
+
+.coupe-directe .titre-coupe {
+  fill: var(--couleur-coupe, var(--texte));
+}
+
+/* --- Libellés des noms de points (version 0.44.0) : L-HT-1-3, P-RG-2… --- */
+.libelles-terrain {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  align-items: center;
+}
+
+.puce-libelle {
+  --couleur-libelle: var(--orange);
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 64px;
+  padding: 4px 8px;
+  border: 1.5px solid var(--couleur-libelle);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--couleur-libelle);
+  cursor: pointer;
+}
+
+.pour-points .puce-libelle {
+  --couleur-libelle: var(--succes);
+}
+
+.puce-libelle strong {
+  font-size: 1rem;
+}
+
+.puce-libelle span {
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.puce-libelle.actif {
+  background: var(--couleur-libelle);
+  color: #ffffff;
+}
+
+.editeur-libelles {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--fond);
+}
+
+.editeur-libelles label {
+  display: block;
+  margin: 6px 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.editeur-libelles textarea {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+/* --- Plans DXF en fond (version 0.45.0) : traits fins à l'écran, quel que soit le zoom --- */
+.plan .plan-dxf .trait-dxf {
+  fill: none;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.plan .plan-dxf text {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  stroke: none;
+}
+
+.plan .plan-dxf.sans-textes .textes-dxf {
+  display: none;
+}
+
+.liste-plans-dxf {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.ligne-plan-dxf {
+  padding: 8px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+}
+
+.ligne-plan-dxf > strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.calques-dxf {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+  font-size: 0.85rem;
+}
+
+.calques-dxf .pastille-calque {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin: 0 6px 0 2px;
+  border: 1px solid var(--bordure);
+  border-radius: 3px;
+  vertical-align: middle;
+}
+
+/* --- Implantation d'un point : Terrain › Implanter › Point --- */
+/* Barre d'accroche : à part, entre le plan et Lever | Implanter (bande grise, boutons dessin + mot). */
+.barre-accroche {
+  margin: -4px -4px 12px;
+  padding: 8px;
+  border-radius: 12px;
+  background: #e7ebee;
+}
+
+.accroches {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.bouton-accroche {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 58px;
+  padding: 6px 2px 4px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--sombre);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bouton-accroche svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: #6b7780;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* L'endroit accroché, en ambre (comme la croix posée sur le plan). */
+.bouton-accroche svg .repere {
+  stroke: #b45309;
+  fill: #f6ab07;
+  stroke-width: 1.6;
+}
+
+.bouton-accroche svg path.repere[d*='l8 8'] {
+  fill: none;
+  stroke: #f6ab07;
+  stroke-width: 3;
+}
+
+.bouton-accroche.actif {
+  border-color: var(--sombre);
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.bouton-accroche.actif svg {
+  stroke: #cbd5dc;
+}
+
+.accroche-par-nom {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.accroche-par-nom input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.barre-accroche .aide {
+  margin: 6px 0 0;
+  text-align: center;
+}
+
+/* Guidage et boussole : la boussole en petit dans le coin en haut à droite. */
+.guidage-et-boussole {
+  position: relative;
+}
+
+.boussole {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.boussole svg {
+  width: 48px;
+  height: 48px;
+}
+
+.boussole .cadran {
+  fill: #ffffff;
+  stroke: var(--sombre);
+  stroke-width: 2;
+}
+
+.boussole .nord {
+  fill: var(--rouge);
+}
+
+.boussole .sud {
+  fill: #9ca3af;
+}
+
+.boussole text {
+  font-size: 9px;
+  font-weight: 800;
+  fill: #ffffff;
+}
+
+.boussole .aide {
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+/* Place pour la boussole (guidage N-S-E-O seulement), à droite des écarts. */
+.guidage-et-boussole.avec-boussole .guidage-direct {
+  padding-right: 76px;
+}
+
+/* Cible (moins de 2 m) : en grand, le point au centre, le récepteur = rond ambre ; les écarts dessous. */
+.guidage-et-boussole .guidage-direct.avec-cible {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 8px 10px 10px;
+  text-align: center;
+}
+
+.guidage-direct.avec-cible .lignes-guidage {
+  grid-template-columns: 1fr 1fr;
+  column-gap: 14px;
+  font-size: 1.15rem;
+}
+
+.cible-implantation {
+  width: 100%;
+  max-width: 300px;
+}
+
+.cible-implantation .anneau {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  opacity: 0.85;
+}
+
+.cible-implantation .anneau-3 {
+  fill: currentColor;
+  fill-opacity: 0.12;
+}
+
+.cible-implantation .axes {
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.35;
+}
+
+.cible-implantation .rayon,
+.cible-implantation .haut-cible {
+  fill: currentColor;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cible-implantation .centre-cible {
+  stroke: #f6ab07;
+  stroke-width: 3;
+}
+
+.cible-implantation .moi {
+  stroke: #ffffff;
+  stroke-width: 3;
+}
+
+.choix-implantation {
+  padding: 8px 10px;
+  border: 2px solid #f6ab07;
+  border-radius: 10px;
+}
+
+.coordonnees-choix {
+  margin: 0 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.champs-implantation {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.champs-implantation label {
+  display: grid;
+  gap: 2px;
+  font-size: 0.85rem;
+  color: var(--gris);
+}
+
+.champs-implantation input {
+  width: 100%;
+  min-width: 0;
+}
+
+.titre-guidage {
+  margin: 10px 0 4px;
+}
+
+/* Guidage : flèche vers le point, avance / droite, distance ; couleurs sur la distance qui reste
+   (vert clair jusqu'à 2 cm, jaune orangé jusqu'à 5 cm), gris si la position n'est pas fiable. */
+.guidage-direct {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 92px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.guidage-direct.attente {
+  display: flex;
+  justify-content: center;
+  background: var(--fond);
+  color: var(--gris);
+  font-weight: 600;
+}
+
+.guidage-direct.vert-clair {
+  background: #86efac;
+  color: #14532d;
+}
+
+.guidage-direct.jaune-orange {
+  background: #f59e0b;
+  color: #451a03;
+}
+
+.guidage-direct.pas-fiable {
+  background: #9ca3af;
+  color: #111827;
+}
+
+.fleche-guidage {
+  grid-row: span 3;
+  width: 64px;
+  height: 64px;
+}
+
+.fleche-guidage path {
+  fill: currentColor;
+}
+
+.lignes-guidage {
+  display: grid;
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.distance-guidage {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.hauteur-guidage {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.hauteur-guidage.vert-clair {
+  background: #86efac;
+  color: #14532d;
+}
+
+.hauteur-guidage.jaune-orange {
+  background: #f59e0b;
+  color: #451a03;
+}
+
+.hauteur-guidage.rouge {
+  background: var(--rouge);
+  color: #ffffff;
+}
+
+.hauteur-guidage.bleu {
+  background: var(--bleu);
+  color: #ffffff;
+}
+
+.liste-a-implanter {
+  margin-top: 10px;
+}
+
+.ligne-a-implanter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--bordure);
+}
+
+.ligne-a-implanter.actif {
+  background: #fef3c7;
+}
+
+.ligne-a-implanter .aide {
+  flex: 1;
+}
+
+/* Sur le plan : points à implanter (croix sarcelle), point choisi (croix ambre), point en cours. */
+.plan .implantation path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.plan .croix-a-implanter {
+  stroke: #0d9488;
+  stroke-width: 3;
+}
+
+.plan .nom-a-implanter {
+  fill: #0d9488;
+  font-size: 12px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+
+.plan .croix-choix {
+  stroke: #f6ab07;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 1px #000000);
+}
+
+.plan .cible-implantation {
+  fill: none;
+  stroke: #0d9488;
+  stroke-width: 3;
+}
+
+.plan .trait-vers-cible {
+  stroke: #0d9488;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+/* Déplacement et zoom au doigt (version 0.46.2) : l'image dessinée est glissée et agrandie
+   depuis le coin en haut à gauche, puis redessinée quand le doigt se lève (voir plan.js, « geste »). */
+svg.plan,
+.plan-fond {
+  transform-origin: 0 0;
+}
+
+/* Pendant le geste : l'image reste en mémoire et n'est que déplacée (plus fluide). */
+.plan-cadre.en-geste svg.plan,
+.plan-cadre.en-geste .plan-fond {
+  will-change: transform;
+}
+
+/* Cartouche du PDF, dans les exports : dessiné par et date côte à côte. */
+.champs-cartouche {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  margin: 10px 0;
+}
+
+.champs-cartouche .titre-choix {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.champs-cartouche label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+  color: var(--gris);
+}
+
+.champs-cartouche input {
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+/* Surface active : son nom dans une liste bien visible (flèche ambre), et le nombre de surfaces. */
+.ligne-etiquette {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.compte-entete {
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bloc-entete select.champ-choix {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 44px;
+  border: 2px solid var(--ambre);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f6ab07' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 24px 24px;
+  cursor: pointer;
+}
+
+/* --- Implantation d'une ligne : Terrain › Implanter › Ligne --- */
+.barre-accroche.accroches-ligne .accroches {
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.barre-accroche.accroches-ligne .bouton-accroche {
+  font-size: 0.68rem;
+}
+
+.bouton-accroche svg .repere-trait {
+  stroke: #f6ab07;
+  stroke-width: 3;
+}
+
+.points-ligne ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.ligne-choisie .titre-guidage {
+  margin-top: 0;
+}
+
+.choix-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 6px 0;
+}
+
+.sens-ligne {
+  margin: 8px 0;
+  padding: 6px 10px;
+  border: 2px solid #0d9488;
+  border-radius: 10px;
+}
+
+.sens-ligne p {
+  margin: 2px 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pastille-bout {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 46px;
+  padding: 1px 8px 1px 4px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #14532d;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.pastille-bout.fin {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+/* Drapeau dans le texte : début vert, fin à damier. */
+.icone-drapeau {
+  width: 18px;
+  height: 20px;
+  vertical-align: -4px;
+}
+
+/* Sens de la ligne à implanter : chevrons sarcelle foncé, plus larges que le trait. */
+.plan .chevron-ligne {
+  fill: none;
+  stroke: #134e4a;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+
+.champs-implantation.champs-ligne {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* Couloir : la ligne au milieu, la canne qui bouge, les écarts dessous. */
+.guidage-direct.guidage-ligne {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  text-align: center;
+}
+
+.couloir-ligne {
+  width: 100%;
+  max-width: 300px;
+}
+
+.couloir-ligne .bande {
+  fill: currentColor;
+  fill-opacity: 0.07;
+  stroke: currentColor;
+  stroke-opacity: 0.6;
+  stroke-width: 1;
+}
+
+.couloir-ligne .bande-3 {
+  fill-opacity: 0.16;
+}
+
+.couloir-ligne .rayon,
+.couloir-ligne .haut-cible,
+.couloir-ligne .nom-bout-couloir {
+  fill: currentColor;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.couloir-ligne .trait-couloir {
+  stroke: #f6ab07;
+  stroke-width: 5;
+}
+
+.couloir-ligne .bout-couloir {
+  stroke: currentColor;
+  stroke-width: 3;
+}
+
+.couloir-ligne .moi {
+  stroke: #ffffff;
+  stroke-width: 3;
+}
+
+/* Plan : la ligne à implanter (sarcelle épais), sa parallèle, Début et Fin. */
+.plan .ligne-a-implanter {
+  fill: none;
+  stroke: #0d9488;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.plan .parallele-a-implanter {
+  fill: none;
+  stroke: #0d9488;
+  stroke-width: 2;
+  stroke-dasharray: 8 5;
+}
+
+.plan .bout-ligne {
+  fill: #ffffff;
+  stroke: #0d9488;
+  stroke-width: 3;
+}
+
+.plan .nom-bout-ligne {
+  font-size: 12px;
+  font-weight: 800;
+  fill: #0d9488;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+
+/* Corrections RTK (Terrain, en bas) : par Emlid Flow ou reçues directement de swipos. */
+.bloc-corrections {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.bloc-corrections > summary {
+  cursor: pointer;
+  color: var(--gris);
+}
+
+.etat-corrections {
+  font-weight: 700;
+}
+
+.etat-corrections.ok {
+  color: var(--succes);
+}
+
+.etat-corrections.attente {
+  color: #b45309;
+}
+
+.etat-corrections.erreur {
+  color: var(--rouge);
+}
+
+.champs-corrections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 8px 0;
+}
+
+.champs-corrections label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+  color: var(--gris);
+}
+
+.champs-corrections .champ-large {
+  grid-column: 1 / -1;
+}
+
+.champs-corrections input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 4px 8px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+/* Partage par Google Drive (onglet Projet). */
+.nom-appareil {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: var(--gris);
+}
+
+.nom-appareil input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.etat-partage {
+  font-weight: 700;
+}
+
+.etat-partage.etat-ok {
+  color: var(--succes);
+}
+
+.etat-partage.etat-attente {
+  color: #b45309;
+}
+
+.etat-partage.etat-erreur,
+.verrou-drive {
+  color: var(--rouge);
+  font-weight: 600;
 }

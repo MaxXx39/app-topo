@@ -9,7 +9,7 @@
 // - SURFACE_<nom> : triangles des autres surfaces (faces 3D)
 // - COURBES : courbes de niveau des surfaces calculées (si demandées)
 //
-// Le DXF des mesures (onglet 3. Mesures, voir genererDxfMesures) est un fichier à part, sans volume.
+// Le DXF des mesures (onglet Calculs › Mesures, voir genererDxfMesures) est un fichier à part, sans volume.
 import { courbesDeNiveau } from '../topo/courbes.js';
 import { formaterNombre } from '../topo/format.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
@@ -86,7 +86,8 @@ export function genererDxfMesures({ points, mesures }) {
   }
   for (const { mesure, resultat } of mesures) {
     const couleur = aciDeMesure(mesure);
-    entites.push(...polyligne3D(resultat.sommets, mesure.type === 'aire', 'MESURES', couleur));
+    // Nombre : pas de trait, seulement les points (calque POINTS) et l'étiquette.
+    if (mesure.type !== 'nombre') entites.push(...polyligne3D(resultat.sommets, mesure.type === 'aire', 'MESURES', couleur));
     for (const ligne of mesure.lignesRupture ?? []) {
       const sommets = ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean);
       if (sommets.length >= 2) entites.push(...polyligne3D(sommets, ligne.fermee, 'MESURES', couleur));

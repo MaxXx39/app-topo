@@ -1,0 +1,64 @@
+# Fabrication automatique de l'appli Android « Topo » (fichier APK) par GitHub.
+# - À chaque envoi sur GitHub : tests de l'appli web, puis fabrication de l'APK
+#   (téléchargeable dans l'onglet « Actions »).
+# - Puis l'APK est publié dans « Releases », sous le nom « APK Android - dernière version »
+#   (le dernier fabriqué, quelle que soit la branche), pour l'installer depuis le téléphone :
+#   https://github.com/MaxXx39/app-topo/releases/download/apk-derniere-version/Topo.apk
+name: Fabriquer l'APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Tests de l'appli web
+        run: |
+          npm ci
+          npm test
+
+      - name: Appli web pour l'APK
+        run: npm run build:android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Tests du récepteur et fabrication de l'APK
+        working-directory: android
+        run: ./gradlew --no-daemon :noyau:test :app:assembleDebug
+
+      - name: Renommer l'APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Topo.apk
+
+      - name: Garder l'APK (onglet Actions)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Topo-apk
+          path: Topo.apk
+
+      - name: Publier « APK Android - dernière version » (Releases)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release delete apk-derniere-version --cleanup-tag --yes || true
+          gh release create apk-derniere-version Topo.apk \
+            --target "${{ github.sha }}" \
+            --title "APK Android - dernière version (${VERSION}, n° ${{ github.run_number }}, ${{ github.ref_name }})" \
+            --notes "Appli Topo pour Android, version ${VERSION} (${{ github.run_number }}). Sur le téléphone : touchez Topo.apk pour le télécharger, puis ouvrez-le pour l'installer."

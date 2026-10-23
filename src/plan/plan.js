@@ -5,6 +5,7 @@ import { bulle } from '../aide/bulles.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
+import { svgDrapeau } from '../outils/drapeaux.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
@@ -18,10 +19,11 @@ const SVG = 'http://www.w3.org/2000/svg';
 const RAYON_TOUCHER = 22;
 
 // Calques que l'on peut afficher ou masquer, avec leur état de départ.
-// "surfaces" : calque des surfaces seulement, caché dans le menu de l'onglet 3. Mesures.
+// "surfaces" : calque des surfaces seulement, caché dans le menu de l'onglet Calculs › Mesures.
 const CALQUES = [
   { cle: 'fondSatellite', titre: 'Fond photo aérienne (swisstopo)', parDefaut: false },
   { cle: 'cadastre', titre: 'Cadastre', parDefaut: false },
+  { cle: 'plansDxf', titre: 'Plans DXF', parDefaut: true },
   { cle: 'points', titre: 'Points', parDefaut: true },
   { cle: 'noms', titre: 'Noms des points', parDefaut: true },
   { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false },
@@ -46,10 +48,12 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  *   en mode suppression de triangles (dessin.modeTriangles)
  * - quandToucherPosition({ est, nord }) : appelé pendant le tracé d'une coupe (dessin.traceCoupe) ;
  *   près d'un point levé, la position est celle de ce point
- * - quandToucherMesure(id) : appelé quand on touche une mesure (onglet 3. Mesures, hors modification)
+ * - quandToucherMesure(id) : appelé quand on touche une mesure (onglet Calculs › Mesures, hors modification)
+ * - quandToucherImplantation({ est, nord }, tolerance) : appelé quand on touche le plan pendant
+ *   l'implantation d'un point (tolérance en m : la taille du doigt à l'échelle du plan)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation } = {}) {
   const calques = lireCalques();
 
   // Boutons posés sur le plan : calques en haut à gauche, zoom en haut à droite.
@@ -86,6 +90,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <button type="button" data-action="tout-voir" aria-label="Tout voir" title="Tout voir">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
         </button>
+        <button type="button" data-action="ma-position" aria-label="Ma position" title="Ma position" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
+        </button>
       </div>
     </div>
   `;
@@ -101,6 +108,19 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   let points = [];
   let vue = null;
+  // Position du récepteur (appli Android) : { est, nord, prete, azimut (°, ou null),
+  // coupes: [{ sens, debut, fin }] (coupes en direct du mode Implanter) } ou null.
+  let position = null;
+  // Suivi de la position : le plan se recentre sur elle à chaque mise à jour (bouton « Ma position »),
+  // jusqu'à ce qu'on déplace le plan au doigt.
+  let suivre = false;
+  // Plans DXF en fond (voir topo/dxf-plan.js). Leur dessin SVG est préparé une seule fois (dans le
+  // repère du plan, en m) puis seulement déplacé et agrandi : id -> { plan, cle, groupe }.
+  let plansDxf = [];
+  const dessinsDxf = new Map();
+  // Implantation d'un point (Terrain › Implanter › Point) : { actif (toucher le plan accroche un
+  // point), aImplanter: [{ nom, est, nord }], choix: { est, nord } (croix), cible: { est, nord, nom } } ou null.
+  let implantation = null;
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
   // Ce qu'il faut dessiner (voir editeur.js et main.js) :
@@ -110,7 +130,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // surface : surface affichée { triangles, trianglesRetires } ; modeTriangles : suppression au doigt
   // ecarts : triangles d'écart à colorier à la place de ceux des surfaces, sinon null
   // coupes : coupes tracées [{ nom, debut, fin }] ; traceCoupe : { debut } pendant un tracé, sinon null
-  // modeMesures : onglet 3. Mesures (pas de surface ni de coupe) ; mesures : [{ mesure, resultat }]
+  // modeMesures : onglet Calculs › Mesures (pas de surface ni de coupe) ; mesures : [{ mesure, resultat }]
   // du levé affiché ; mesureActive : mesure choisie (ses points sont entourés pendant une modification)
   let dessin = {
     modeMesures: false,
@@ -131,7 +151,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /** Taille actuelle du plan à l'écran (pixels). */
   function taille() {
-    const rectangle = svg.getBoundingClientRect();
+    const rectangle = cadre.getBoundingClientRect();
     return { largeur: rectangle.width, hauteur: rectangle.height };
   }
 
@@ -156,11 +176,18 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /** Redessine tout le plan avec la vue actuelle. */
   function dessiner() {
+    if (geste) return; // redessiné à la fin du geste
     svg.replaceChildren();
     legende = null;
     legendeEcarts = null;
     dessinerFond();
-    if (!vue || points.length === 0) return;
+    if (vue) dessinerPlansDxf();
+    if (!vue || points.length === 0) {
+      if (vue && plansDxf.length > 0) dessinerBarreEchelle();
+      dessinerImplantation();
+      dessinerPosition();
+      return;
+    }
 
     const stock = dessin.stockActif;
     // Si « Autres stocks » est décoché, on cache les points qui appartiennent à un autre stock.
@@ -258,8 +285,200 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (calques.volumes) dessinerVolumes();
     dessinerLegende();
     dessinerBarreEchelle();
+    dessinerImplantation();
+    dessinerPosition();
   }
 
+  /**
+   * Implantation : points « À implanter » (croix sarcelle et nom), point choisi en touchant le
+   * plan (croix ambre) et point à implanter en cours (cercle autour).
+   */
+  function dessinerImplantation() {
+    svg.querySelector('g.implantation')?.remove();
+    if (!implantation || !vue) return;
+    const groupe = creerElement('g', { class: 'implantation' });
+    const croix = (est, nord, classe, taille) => {
+      const { x, y } = versEcran(est, nord, vue);
+      groupe.append(creerElement('path', { d: `M${x - taille} ${y}H${x + taille}M${x} ${y - taille}V${y + taille}`, class: classe }));
+      return { x, y };
+    };
+    for (const point of implantation.aImplanter ?? []) {
+      const { x, y } = croix(point.est, point.nord, 'croix-a-implanter', 7);
+      if (!calques.noms) continue;
+      const nom = creerElement('text', { x: x + 9, y: y - 6, class: 'nom-a-implanter' });
+      nom.textContent = point.nom;
+      groupe.append(nom);
+    }
+    // Ligne à implanter : trait sarcelle épais, sa parallèle en pointillés, « Début » et « Fin ».
+    const ligne = implantation.ligne;
+    if (ligne?.sommets.length >= 2) {
+      const ecran = ligne.sommets.map((s) => versEcran(s.est, s.nord, vue));
+      groupe.append(creerElement('path', { d: tracePar(ecran, false), class: 'ligne-a-implanter' }));
+      if (ligne.parallele) {
+        groupe.append(creerElement('path', { d: tracePar(ligne.parallele.map((s) => versEcran(s.est, s.nord, vue)), false), class: 'parallele-a-implanter' }));
+      }
+      // Sens : petits chevrons tout le long, environ tous les 60 pixels.
+      for (let i = 0; i + 1 < ecran.length; i++) {
+        const a = ecran[i];
+        const b = ecran[i + 1];
+        const longueur = Math.hypot(b.x - a.x, b.y - a.y);
+        if (longueur < 16) continue;
+        const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+        const nombre = Math.max(1, Math.floor(longueur / 60));
+        for (let k = 0; k < nombre; k++) {
+          const t = (k + 0.5) / nombre;
+          const x = a.x + (b.x - a.x) * t;
+          const y = a.y + (b.y - a.y) * t;
+          groupe.append(creerElement('path', { d: 'M-5 -6 3 0-5 6', class: 'chevron-ligne', transform: `translate(${x} ${y}) rotate(${angle})` }));
+        }
+      }
+      // Début : drapeau vert ; fin : drapeau à damier.
+      for (const [bout, type] of [[ecran[0], 'debut'], [ecran.at(-1), 'fin']]) {
+        groupe.append(creerElement('circle', { cx: bout.x, cy: bout.y, r: 5, class: 'bout-ligne' }));
+        const drapeau = creerElement('g', { class: 'drapeau-ligne' });
+        drapeau.innerHTML = svgDrapeau(type, bout.x, bout.y, 26);
+        groupe.append(drapeau);
+      }
+    }
+    // Points choisis pour faire une ligne : croix ambre numérotées.
+    (implantation.pointsLigne ?? []).forEach((point, i) => {
+      const { x, y } = croix(point.est, point.nord, 'croix-choix', 10);
+      const numero = creerElement('text', { x: x + 10, y: y + 16, class: 'nom-bout-ligne' });
+      numero.textContent = String(i + 1);
+      groupe.append(numero);
+    });
+    const { cible, choix } = implantation;
+    if (cible) {
+      const { x, y } = versEcran(cible.est, cible.nord, vue);
+      groupe.append(creerElement('circle', { cx: x, cy: y, r: 14, class: 'cible-implantation' }));
+    }
+    if (choix) croix(choix.est, choix.nord, 'croix-choix', 12);
+    svg.append(groupe);
+  }
+
+  /**
+   * Position du récepteur : rond bleu (gris si l'inclinaison n'est pas prête : c'est alors
+   * la position de l'antenne, pas celle du bout de canne). Redessinée seule, 5 fois par seconde.
+   */
+  function dessinerPosition() {
+    if (geste) return; // redessinée à la fin du geste
+    svg.querySelector('g.position')?.remove();
+    if (!position || !vue) return;
+    const { x, y } = versEcran(position.est, position.nord, vue);
+    const groupe = creerElement('g', { class: position.prete ? 'position' : 'position pas-prete' });
+    // Coupes en direct : en pointillés, chacune de sa couleur (la même que son dessin).
+    for (const coupe of position.coupes ?? []) {
+      const debut = versEcran(coupe.debut.est, coupe.debut.nord, vue);
+      const fin = versEcran(coupe.fin.est, coupe.fin.nord, vue);
+      groupe.append(creerElement('line', { x1: debut.x, y1: debut.y, x2: fin.x, y2: fin.y, class: `trace-coupe-directe coupe-${coupe.sens}` }));
+    }
+    // Implantation d'une ligne : trait en pointillés jusqu'au point de la ligne en face de la canne.
+    if (position.vers) {
+      const vers = versEcran(position.vers.est, position.vers.nord, vue);
+      groupe.append(creerElement('line', { x1: x, y1: y, x2: vers.x, y2: vers.y, class: 'trait-vers-cible' }));
+    }
+    // Implantation : trait en pointillés jusqu'au point à implanter.
+    if (implantation?.cible) {
+      const cible = versEcran(implantation.cible.est, implantation.cible.nord, vue);
+      groupe.append(creerElement('line', { x1: x, y1: y, x2: cible.x, y2: cible.y, class: 'trait-vers-cible' }));
+    }
+    groupe.append(creerElement('circle', { cx: x, cy: y, r: 13, class: 'halo' }));
+    // Petite flèche (comme Google Maps) : la direction où l'on regarde, dessinée vers le haut
+    // puis tournée de l'azimut (sens des aiguilles d'une montre, comme à l'écran).
+    if (position.azimut != null) {
+      groupe.append(creerElement('path', {
+        d: `M${x} ${y - 25} L${x + 8} ${y - 9} L${x} ${y - 13} L${x - 8} ${y - 9} Z`,
+        class: 'fleche',
+        transform: `rotate(${position.azimut.toFixed(1)} ${x} ${y})`,
+      }));
+    }
+    groupe.append(creerElement('circle', { cx: x, cy: y, r: 6 }));
+    svg.append(groupe);
+  }
+
+  /**
+   * Dessin SVG d'un plan DXF, dans son propre repère (m depuis son origine, nord vers le haut) :
+   * un chemin par couleur pour les traits et les cercles, un pour les aplats, puis les textes.
+   * Refait seulement si le plan ou ses calques visibles changent.
+   */
+  function groupeDxf(plan) {
+    const cle = plan.calques.map((c) => (c.visible ? 1 : 0)).join('');
+    const enCache = dessinsDxf.get(plan.id);
+    if (enCache && enCache.plan === plan && enCache.cle === cle) return enCache.groupe;
+    const groupe = creerElement('g', {});
+    const visible = (objet) => plan.calques[objet.c]?.visible !== false;
+    const couleur = (objet) => objet.k ?? plan.calques[objet.c]?.couleur ?? '#000000';
+    const traits = new Map();
+    const pleins = new Map();
+    const ajouter = (liste, teinte, morceau) => {
+      if (!liste.has(teinte)) liste.set(teinte, []);
+      liste.get(teinte).push(morceau);
+    };
+    const { traits: lignes = [], cercles = [], pleins: aplats = [], textes = [] } = plan.contenu ?? {};
+    for (const trait of lignes) {
+      if (!visible(trait)) continue;
+      let d = `M${trait.p[0]} ${trait.p[1]}`;
+      for (let i = 2; i < trait.p.length; i += 2) d += `L${trait.p[i]} ${trait.p[i + 1]}`;
+      ajouter(traits, couleur(trait), trait.f ? `${d}Z` : d);
+    }
+    for (const { x, y, r, ...cercle } of cercles) {
+      if (!visible(cercle)) continue;
+      ajouter(traits, couleur(cercle), `M${x + r} ${y}A${r} ${r} 0 1 0 ${x - r} ${y}A${r} ${r} 0 1 0 ${x + r} ${y}`);
+    }
+    for (const aplat of aplats) {
+      if (!visible(aplat)) continue;
+      const p = aplat.p;
+      ajouter(pleins, couleur(aplat), `M${p[0]} ${p[1]}L${p[2]} ${p[3]}L${p[4]} ${p[5]}L${p[6]} ${p[7]}Z`);
+    }
+    for (const [teinte, morceaux] of pleins) groupe.append(creerElement('path', { d: morceaux.join(''), fill: teinte, class: 'plein-dxf' }));
+    for (const [teinte, morceaux] of traits) groupe.append(creerElement('path', { d: morceaux.join(''), stroke: teinte, class: 'trait-dxf' }));
+    const groupeTextes = creerElement('g', { class: 'textes-dxf' });
+    const ancres = ['start', 'middle', 'end'];
+    const bases = ['alphabetic', 'text-after-edge', 'central', 'text-before-edge'];
+    for (const texte of textes) {
+      if (!visible(texte)) continue;
+      // Le repère du plan a le nord vers le haut : on retourne le texte pour qu'il se lise droit.
+      const element = creerElement('text', {
+        transform: `translate(${texte.x} ${texte.y}) scale(1 -1) rotate(${-texte.a})`,
+        'font-size': texte.h,
+        fill: couleur(texte),
+        'text-anchor': ancres[texte.ah] ?? 'start',
+        'dominant-baseline': bases[texte.av] ?? 'alphabetic',
+      });
+      element.textContent = texte.t;
+      groupeTextes.append(element);
+    }
+    groupe.append(groupeTextes);
+    dessinsDxf.set(plan.id, { plan, cle, groupe });
+    return groupe;
+  }
+
+  /** Plans DXF sous le dessin : le groupe préparé, placé à l'échelle et au bon endroit. */
+  function dessinerPlansDxf() {
+    if (!calques.plansDxf) return;
+    for (const plan of plansDxf) {
+      if (!plan.contenu) continue;
+      const groupe = groupeDxf(plan);
+      const e = vue.echelle;
+      const tx = vue.largeur / 2 + (plan.origine.est - vue.estCentre) * e;
+      const ty = vue.hauteur / 2 - (plan.origine.nord - vue.nordCentre) * e;
+      groupe.setAttribute('transform', `matrix(${e} 0 0 ${-e} ${tx} ${ty})`);
+      // Textes de moins de 3 pixels de haut : cachés (illisibles, et plus rapide).
+      groupe.classList.toggle('sans-textes', e * 0.25 < 3);
+      groupe.classList.add('plan-dxf');
+      svg.append(groupe);
+    }
+  }
+
+  /** Centre le plan sur la position du récepteur (sans changer le zoom, sauf au premier affichage). */
+  function centrerSurPosition() {
+    if (!position) return;
+    const { largeur, hauteur } = taille();
+    if (largeur === 0 || hauteur === 0) return;
+    // Sans vue (aucun point encore) : environ 60 m de large à l'écran.
+    vue = vue ? { ...vue, estCentre: position.est, nordCentre: position.nord } : { echelle: largeur / 60, estCentre: position.est, nordCentre: position.nord, largeur, hauteur };
+    dessiner();
+  }
   /**
    * Fonds de plan swisstopo (photo aérienne, cadastre) : des images posées sous le dessin.
    * Seules les tuiles visibles à l'écran sont chargées (connexion internet nécessaire).
@@ -268,7 +487,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const couches = Object.keys(FONDS).filter((nom) => calques[nom === 'satellite' ? 'fondSatellite' : nom]);
     const voulues = new Set();
 
-    if (vue && points.length > 0 && couches.length > 0) {
+    if (vue && (points.length > 0 || position || plansDxf.length > 0) && couches.length > 0) {
       const z = niveauDeZoom(1 / vue.echelle, window.devicePixelRatio || 1);
       const hautGauche = versTerrain(0, 0, vue);
       const basDroite = versTerrain(vue.largeur, vue.hauteur, vue);
@@ -439,7 +658,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     legendeEcarts = legendeZones;
   }
 
-  /** Surface affichée (onglet 2.1 Surfaces) : ses triangles, et les triangles supprimés en pointillés rouges. */
+  /** Surface affichée (onglet Calculs › Surfaces) : ses triangles, et les triangles supprimés en pointillés rouges. */
   function dessinerSurface(groupe) {
     const surface = dessin.surface;
     if (!surface) return;
@@ -467,7 +686,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (!estVisible(stock)) return [];
       return dessin.resultats[index]?.trianglesDessus ?? [];
     });
-    // La surface affichée (onglet 2.1 Surfaces) est aussi coloriée, et les aires mesurées (onglet 3. Mesures).
+    // La surface affichée (onglet Calculs › Surfaces) est aussi coloriée, et les aires mesurées (onglet Calculs › Mesures).
     if (dessin.surface) triangles.push(...dessin.surface.triangles);
     for (const { resultat } of dessin.mesures ?? []) if (resultat?.triangles) triangles.push(...resultat.triangles);
     if (triangles.length === 0) return;
@@ -591,8 +810,16 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
-  /** Nom et volume (remblai, et déblai s'il y en a) écrits au milieu de chaque surface calculée. */
+  /**
+   * Nom et volume (remblai, et déblai s'il y en a) écrits au milieu de chaque surface calculée.
+   * Onglet Terrain (volumesDiscrets) : seulement une petite pastille en bas à gauche, pour la
+   * surface en cours, qui ne cache pas les points levés.
+   */
   function dessinerVolumes() {
+    if (dessin.volumesDiscrets) {
+      dessinerPastilleVolume();
+      return;
+    }
     const groupe = creerElement('g', { class: 'volumes' });
     dessin.stocks.forEach((stock, index) => {
       const actif = stock === dessin.stockActif;
@@ -618,6 +845,23 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
+  /** Petite pastille « Stock 1 · 1636.197 m³ » en bas à gauche, au-dessus de l'échelle (surface en cours, onglet Terrain). */
+  function dessinerPastilleVolume() {
+    const index = dessin.stocks.indexOf(dessin.stockActif);
+    const resultat = dessin.resultats[index];
+    if (index < 0 || resultat?.remblai === undefined) return;
+    const texte = `${dessin.stockActif.nom} · ${formaterNombre(resultat.remblai)} m³${resultat.deblai > 0 ? ` · D ${formaterNombre(resultat.deblai)} m³` : ''}`;
+    const largeur = texte.length * 6.4 + 14;
+    const x = 8;
+    const y = vue.hauteur - 60;
+    const groupe = creerElement('g', { class: 'pastille-volume' });
+    groupe.append(creerElement('rect', { x, y, width: largeur, height: 20, rx: 10 }));
+    const element = creerElement('text', { x: x + largeur / 2, y: y + 14, 'text-anchor': 'middle' });
+    element.textContent = texte;
+    groupe.append(element);
+    svg.append(groupe);
+  }
+
   /** Position à l'écran de chaque point de la mesure (ceux qui existent dans le levé). */
   function sommetsMesure(noms) {
     const parNom = new Map(points.map((p) => [p.nom, p]));
@@ -628,7 +872,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const tracePar = (sommets, ferme) => sommets.map((s, i) => `${i === 0 ? 'M' : 'L'}${s.x} ${s.y}`).join(' ') + (ferme ? ' Z' : '');
 
   /**
-   * Mesures (onglet 3. Mesures) : longueurs en trait cyan pointillé, aires avec leur contour
+   * Mesures (onglet Calculs › Mesures) : longueurs en trait cyan pointillé, aires avec leur contour
    * pointillé, un fond cyan léger, leurs lignes de rupture et leurs triangles (calque « Triangles »).
    */
   function dessinerTracesMesures() {
@@ -650,6 +894,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         }
         const contour = sommetsMesure(mesure.contour);
         if (contour.length >= 2) groupe.append(creerElement('path', { d: tracePar(contour, contour.length >= 3), class: `aire-mesure${actif}` }));
+      } else if (mesure.type === 'nombre') {
+        // Points comptés : un rond autour de chacun.
+        for (const { x, y } of sommetsMesure(mesure.points)) groupe.append(creerElement('circle', { cx: x, cy: y, r: 9, class: `compte-mesure${actif}` }));
       } else {
         const sommets = sommetsMesure(mesure.points);
         if (sommets.length >= 2) groupe.append(creerElement('path', { d: tracePar(sommets, false), class: `longueur-mesure${actif}` }));
@@ -708,6 +955,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         const parNom = new Map(points.map((p) => [p.nom, p]));
         const contour = mesure.contour.map((nom) => parNom.get(nom)).filter(Boolean);
         if (contour.length >= 3 && pointDansPolygone(terrain, contour)) return mesure.id;
+      } else if (mesure.type === 'nombre') {
+        if (sommetsMesure(mesure.points).some((s) => Math.hypot(s.x - position.x, s.y - position.y) < RAYON_TOUCHER)) return mesure.id;
       } else {
         const sommets = sommetsMesure(mesure.points);
         for (let i = 0; i + 1 < sommets.length; i++) {
@@ -742,7 +991,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       return;
     }
     recadrerQuandVisible = false;
-    vue = cadrerSurPoints(points, largeur, hauteur);
+    // Levé avec le récepteur, encore 0 ou 1 point : environ 60 m de large autour du point
+    // (ou de la position du récepteur), plutôt qu'un zoom extrême sur un seul point.
+    // Sans point : sur la position du récepteur, sinon sur les plans DXF ; sinon pas encore de vue
+    // (elle se fera sur la première position reçue).
+    const centre = points.length === 1 ? points[0] : points.length === 0 ? position : null;
+    if (centre) vue = { echelle: largeur / 60, estCentre: centre.est, nordCentre: centre.nord, largeur, hauteur };
+    else if (points.length > 0) vue = cadrerSurPoints(points, largeur, hauteur);
+    else vue = plansDxf.length > 0 ? cadrerSurPoints(coinsDesPlans(plansDxf), largeur, hauteur) : null;
     dessiner();
   }
 
@@ -756,6 +1012,24 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   conteneur.querySelector('[data-action="tout-voir"]').addEventListener('click', toutVoir);
   conteneur.querySelector('[data-action="zoom-plus"]').addEventListener('click', () => zoomerAuCentre(1.5));
   conteneur.querySelector('[data-action="zoom-moins"]').addEventListener('click', () => zoomerAuCentre(1 / 1.5));
+  const boutonPosition = conteneur.querySelector('[data-action="ma-position"]');
+  boutonPosition.addEventListener('click', () => {
+    suivre = true;
+    boutonPosition.classList.add('actif');
+    centrerSurPosition();
+  });
+
+  /** Vrai si la position est à plus de 20 % de la largeur (ou de la hauteur) du centre du plan. */
+  function loinDuCentre() {
+    const { x, y } = versEcran(position.est, position.nord, vue);
+    return Math.abs(x - vue.largeur / 2) > vue.largeur * 0.2 || Math.abs(y - vue.hauteur / 2) > vue.hauteur * 0.2;
+  }
+
+  /** Arrête le suivi de la position (le plan a été déplacé au doigt). */
+  function arreterSuivi() {
+    suivre = false;
+    boutonPosition.classList.remove('actif');
+  }
 
   // --- Menu des calques ---
   boutonCalques.addEventListener('click', () => {
@@ -797,6 +1071,31 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // --- Doigts ou souris : un doigt déplace, deux doigts zooment ---
   const pointeurs = new Map(); // position actuelle de chaque doigt posé
   let toucher = null; // position de départ, tant que le doigt n'a presque pas bougé
+  // Pendant un déplacement ou un zoom au doigt, on ne redessine pas (trop lent avec un gros plan
+  // DXF) : l'image déjà dessinée est seulement glissée et agrandie (transformation CSS), puis le
+  // plan est redessiné une fois, quand le doigt se lève. geste = { vueDepart } ou null.
+  let geste = null;
+
+  /** Glisse et agrandit l'image dessinée pour qu'elle corresponde à la vue actuelle. */
+  function suivreLeGeste() {
+    const depart = geste.vueDepart;
+    const k = vue.echelle / depart.echelle;
+    const tx = (vue.largeur / 2) * (1 - k) + vue.echelle * (depart.estCentre - vue.estCentre);
+    const ty = (vue.hauteur / 2) * (1 - k) + vue.echelle * (vue.nordCentre - depart.nordCentre);
+    const transformation = `translate(${tx}px, ${ty}px) scale(${k})`;
+    svg.style.transform = transformation;
+    fond.style.transform = transformation;
+  }
+
+  /** Fin du geste : on enlève la transformation et on redessine pour de bon. */
+  function finirLeGeste() {
+    if (!geste) return;
+    geste = null;
+    cadre.classList.remove('en-geste');
+    svg.style.transform = '';
+    fond.style.transform = '';
+    dessiner();
+  }
 
   svg.addEventListener('pointerdown', (evenement) => {
     svg.setPointerCapture(evenement.pointerId);
@@ -813,7 +1112,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Si le doigt a bougé de plus de 6 pixels, c'est un déplacement, pas un toucher.
     if (toucher && distance(toucher, apres[0]) > 6) toucher = null;
 
+    if (toucher && apres.length === 1) return; // pas encore un déplacement
+    if (!geste) {
+      geste = { vueDepart: vue };
+      cadre.classList.add('en-geste');
+    }
     if (apres.length === 1) {
+      if (suivre) arreterSuivi();
       vue = deplacer(vue, apres[0].x - avant[0].x, apres[0].y - avant[0].y);
     } else if (apres.length >= 2) {
       // Pincement : on zoome selon l'écart entre les deux doigts,
@@ -825,7 +1130,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (ecartAvant > 0) vue = zoomer(vue, ecartApres / ecartAvant, milieuAvant.x, milieuAvant.y);
       vue = deplacer(vue, milieuApres.x - milieuAvant.x, milieuApres.y - milieuAvant.y);
     }
-    dessiner();
+    suivreLeGeste();
   });
 
   svg.addEventListener('pointerup', (evenement) => {
@@ -835,6 +1140,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         // Tracé d'une coupe : la position touchée (celle du point levé s'il y en a un tout près).
         const point = pointLePlusProche(toucher);
         quandToucherPosition?.(point ? { est: point.est, nord: point.nord } : versTerrain(toucher.x, toucher.y, vue));
+      } else if (implantation?.actif) {
+        // Implantation : main.js cherche le sommet, le milieu, l'endroit de la ligne ou le centre.
+        quandToucherImplantation?.(versTerrain(toucher.x, toucher.y, vue), RAYON_TOUCHER / vue.echelle);
       } else if (dessin.modeTriangles) {
         // Suppression de triangles : on cherche le triangle sous le doigt.
         const terrain = versTerrain(toucher.x, toucher.y, vue);
@@ -856,10 +1164,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
     }
     toucher = null;
+    if (pointeurs.size === 0) finirLeGeste();
   });
   svg.addEventListener('pointercancel', (evenement) => {
     pointeurs.delete(evenement.pointerId);
     toucher = null;
+    if (pointeurs.size === 0) finirLeGeste();
   });
 
   /** Point le plus proche d'une position de l'écran, s'il est à moins de RAYON_TOUCHER pixels. */
@@ -889,7 +1199,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /** Position du doigt ou de la souris dans le plan (pixels). */
   function positionDansPlan(evenement) {
-    const rectangle = svg.getBoundingClientRect();
+    // Le cadre, pas le dessin : pendant un geste, le dessin est déplacé (voir « geste »).
+    const rectangle = cadre.getBoundingClientRect();
     return { x: evenement.clientX - rectangle.left, y: evenement.clientY - rectangle.top };
   }
 
@@ -911,6 +1222,55 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       points = nouveauxPoints;
       toutVoir();
     },
+    /** Nouvelle liste de points (un point levé en plus ou en moins), sans changer le cadrage. */
+    mettreAJourPoints(nouveauxPoints) {
+      points = nouveauxPoints;
+      if (!vue) toutVoir();
+      else dessiner();
+    },
+    /**
+     * Position du récepteur { est, nord, prete, azimut, coupes } (ou null : on la cache ; azimut null :
+     * pas de flèche). Pendant le suivi (bouton « Ma position »), le plan se recentre sur elle. Le premier affichage
+     * d'un levé encore vide se cadre sur elle.
+     */
+    afficherPosition(nouvellePosition) {
+      const premiere = !position && nouvellePosition;
+      position = nouvellePosition;
+      boutonPosition.hidden = !position;
+      // Suivi : on ne recentre (et ne redessine tout) que si la position s'approche du bord.
+      if (position && (!vue || (suivre && loinDuCentre()) || (premiere && points.length === 0))) centrerSurPosition();
+      else dessinerPosition();
+    },
+    /** Plans DXF à dessiner en fond (voir topo/dxf-plan.js). */
+    afficherPlansDxf(nouveaux) {
+      const avant = plansDxf.length;
+      plansDxf = nouveaux.filter((plan) => plan.contenu && plan.bornes);
+      for (const id of dessinsDxf.keys()) if (!plansDxf.some((plan) => plan.id === id)) dessinsDxf.delete(id);
+      // Premier plan sans levé : on cadre dessus. Sinon, le dessin suit (redessiner, juste après).
+      if (!vue || (avant === 0 && points.length === 0 && !position)) toutVoir();
+    },
+    /**
+     * Implantation d'un point (voir « implantation » plus haut), ou null quand on n'implante pas.
+     * Dessinée au prochain redessiner (appelé juste après par main.js).
+     */
+    afficherImplantation(nouvelle) {
+      implantation = nouvelle;
+    },
+    /** Redessine seulement l'implantation (et la position, par-dessus), sans tout le plan. */
+    rafraichirImplantation() {
+      if (geste) return;
+      dessinerImplantation();
+      dessinerPosition();
+    },
+    /** Cadre le plan sur ces plans DXF (bouton « voir »). */
+    cadrerSurPlans(choisis) {
+      const { largeur, hauteur } = taille();
+      if (largeur === 0 || hauteur === 0 || choisis.length === 0) return;
+      suivre = false;
+      boutonPosition.classList.remove('actif');
+      vue = cadrerSurPoints(coinsDesPlans(choisis), largeur, hauteur);
+      dessiner();
+    },
     /** Redessine le plan avec les stocks (sans changer le zoom). */
     redessiner(nouveauDessin) {
       dessin = nouveauDessin;
@@ -919,6 +1279,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       dessiner();
     },
   };
+}
+
+/** Coins des plans DXF (pour les cadrer) : [{ est, nord }]. */
+function coinsDesPlans(plans) {
+  return plans.flatMap(({ bornes: b }) => [
+    { est: b.estMin, nord: b.nordMin },
+    { est: b.estMax, nord: b.nordMax },
+  ]);
 }
 
 function creerElement(type, attributs) {

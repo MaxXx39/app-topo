@@ -7,14 +7,19 @@ import { VitePWA } from 'vite-plugin-pwa';
 // vérifier que le téléphone a bien la dernière version publiée.
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));
 
-export default defineConfig({
+// « npm run build:android » (mode android) : même appli, rangée dans l'APK Android
+// (android/app/src/main/assets/app-topo), sans la partie PWA : dans l'APK, les fichiers sont
+// déjà sur le téléphone, il n'y a rien à installer ni à garder en cache.
+export default defineConfig(({ mode }) => ({
   // Adresse du site sur GitHub Pages : https://maxxx39.github.io/app-topo/
+  // (dans l'APK : https://appassets.androidplatform.net/app-topo/, servie par l'appli elle-même)
   base: '/app-topo/',
   define: { __VERSION_APPLI__: JSON.stringify(version) },
+  build: mode === 'android' ? { outDir: 'android/app/src/main/assets/app-topo', emptyOutDir: true } : {},
   plugins: [
     // Rend l'application installable sur téléphone et ordinateur (PWA),
     // et utilisable sans connexion une fois installée.
-    VitePWA({
+    mode !== 'android' && VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icone.svg', 'apple-touch-icon.png'],
       workbox: {
@@ -44,4 +49,4 @@ export default defineConfig({
     // Les tests automatiques sont dans le dossier "tests".
     include: ['tests/**/*.test.js'],
   },
-});
+}));

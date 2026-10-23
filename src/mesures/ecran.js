@@ -72,7 +72,10 @@ export function creerEcranMesures(conteneur, barre, options) {
     else mesure.points = noms;
   }
 
-  const nomRole = (edition) => (edition.role === 'ligne' ? `${ROLES.ligne} ${edition.index + 1}` : ROLES[edition.role]);
+  const nomRole = (edition) => {
+    if (edition.role === 'ligne') return `${ROLES.ligne} ${edition.index + 1}`;
+    return edition.role === 'points' && mesureActive()?.type === 'nombre' ? 'Points comptés' : ROLES[edition.role];
+  };
 
   function changer() {
     afficher();
@@ -102,7 +105,7 @@ export function creerEcranMesures(conteneur, barre, options) {
       mesures().push(mesure);
       etat.idActif = mesure.id;
       // On commence tout de suite à choisir les points.
-      etat.edition = { role: type === 'longueur' ? 'points' : 'contour', index: 0 };
+      etat.edition = { role: type === 'aire' ? 'contour' : 'points', index: 0 };
       etat.messages = [];
       etat.optionsOuvertes = false;
     },
@@ -240,8 +243,9 @@ export function creerEcranMesures(conteneur, barre, options) {
         <div class="ligne-outils">
           <button type="button" class="bouton" data-action="nouvelle" data-type="longueur" ${sansPoints ? 'disabled' : ''}>+ Longueur</button>
           <button type="button" class="bouton" data-action="nouvelle" data-type="aire" ${sansPoints ? 'disabled' : ''}>+ Aire</button>
+          <button type="button" class="bouton" data-action="nouvelle" data-type="nombre" ${sansPoints ? 'disabled' : ''}>+ Nombre</button>
         </div>
-        ${sansPoints ? '<p class="vide">Importe d\'abord un fichier de points (onglet 1. Importer).</p>' : ''}
+        ${sansPoints ? '<p class="vide">Aucun point dans le projet.</p>' : ''}
       </section>
       ${listeDesMesures(mesure)}`;
     if (mesure) html += contenuMesure(mesure);
@@ -278,7 +282,7 @@ export function creerEcranMesures(conteneur, barre, options) {
    */
   function contenuMesure(mesure) {
     const resultat = obtenirResultat(mesure);
-    const listePrincipale = mesure.type === 'longueur' ? { role: 'points' } : { role: 'contour' };
+    const listePrincipale = mesure.type === 'aire' ? { role: 'contour' } : { role: 'points' };
     // Une liste des options en cours de modification : les options restent ouvertes.
     const ouvertes = etat.optionsOuvertes || ['ligne', 'dessus'].includes(etat.edition?.role);
     const problemes = mesure.type === 'aire' ? verifierSurface(mesure, obtenirPoints(mesure).map((p) => p.nom)) : [];
@@ -384,14 +388,14 @@ export function creerEcranMesures(conteneur, barre, options) {
         <strong>Sur le plan et dans le PDF ${bulle('valeursMesure')}</strong>
         <div class="cases-plan">
           ${VALEURS[mesure.type].map((v) => `<label class="case"><input type="checkbox" data-afficher="${v.cle}" ${coche(v.cle)} /> ${v.titre}</label>`).join('')}
-          <label class="case"><input type="checkbox" data-afficher="morceaux" ${coche('morceaux')} /> ${TEXTE_MORCEAUX[mesure.type]}</label>
+          ${TEXTE_MORCEAUX[mesure.type] ? `<label class="case"><input type="checkbox" data-afficher="morceaux" ${coche('morceaux')} /> ${TEXTE_MORCEAUX[mesure.type]}</label>` : ''}
         </div>
       </div>`;
   }
 
   /** Tableau de chaque morceau (longueur) ou côté (aire). */
   function detailMorceaux(mesure, resultat) {
-    if (!resultat || resultat.erreurs) return '';
+    if (!resultat || resultat.erreurs || mesure.type === 'nombre') return '';
     const morceau = mesure.type === 'longueur' ? 'Morceau' : 'Côté';
     return `
       <div class="bloc-liste">
