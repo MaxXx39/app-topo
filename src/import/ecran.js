@@ -8,18 +8,25 @@ import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { COULEURS_PLANS } from '../plan/dxf-canvas.js';
+import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '../outils/formulaire-point.js';
+import { nomPointAjoute } from '../topo/points-ajoutes.js';
 
 /**
  * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
  * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id),
  * importerPlanDxf(fichier), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
  * montrerCalqueDxf(id, n° du calque, visible),
- * montrerTousCalquesDxf(id, visible)
+ * montrerTousCalquesDxf(id, visible), ajouterPointTape({ nom, est, nord, altitude }) (renvoie
+ * { erreur } ou rien), commencerPointage() (ajouter des points en touchant le plan DXF)
  * Renvoie { afficher(projet, dernierImport, dernierPlan) }.
  */
 export function creerEcranImport(conteneur, actions) {
   // Listes de calques ouvertes (gardées d'un dessin à l'autre) : identifiants des plans.
   const calquesOuverts = new Set();
+  // « Point » ouvert (formulaire pour ajouter un point), et dernière erreur de saisie.
+  let pointOuvert = false;
+  let erreurPoint = '';
+  let derniers = null;
   conteneur.addEventListener('toggle', (evenement) => {
     const id = evenement.target.dataset?.calquesPlan;
     if (!id) return;
@@ -31,6 +38,25 @@ export function creerEcranImport(conteneur, actions) {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
     const { action, id } = bouton.dataset;
+    if (action === 'ouvrir-point') {
+      pointOuvert = !pointOuvert;
+      erreurPoint = '';
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'ajouterPointTape') {
+      const valeurs = lireFormulairePoint(conteneur);
+      erreurPoint = valeurs.erreur ?? actions.ajouterPointTape(valeurs)?.erreur ?? '';
+      const zone = conteneur.querySelector('[data-vivant="erreur-point"]');
+      if (zone) zone.textContent = erreurPoint;
+      // Ajouté : cases vidées pour le suivant (le curseur reste dans le formulaire).
+      if (!erreurPoint && derniers) viderFormulairePoint(conteneur, nomPointAjoute(derniers[0]));
+      return;
+    }
+    if (action === 'pointer-dxf') {
+      actions.commencerPointage();
+      return;
+    }
     if (action === 'supprimer-leve') actions.supprimerLeve(id);
     else if (action === 'voir-plan') actions.voirPlanDxf(id);
     else if (action === 'supprimer-plan') actions.supprimerPlanDxf(id);
@@ -58,12 +84,23 @@ export function creerEcranImport(conteneur, actions) {
     }
   });
 
-  return {
-    /**
-     * Redessine le bloc. dernierImport : résultat du dernier import de points, ou null ;
-     * dernierPlan : message du dernier import de plan DXF ({ erreur } ou { avertissements }), ou null.
-     */
-    afficher(projet, dernierImport, dernierPlan = null) {
+  // Touche Entrée dans le formulaire du point : comme « Ajouter ».
+  conteneur.addEventListener('keydown', (evenement) => {
+    if (evenement.key !== 'Enter' || !evenement.target.dataset.point) return;
+    evenement.preventDefault();
+    conteneur.querySelector('[data-action="ajouterPointTape"]')?.click();
+  });
+
+  return { afficher };
+
+  /**
+   * Redessine le bloc. dernierImport : résultat du dernier import de points, ou null ;
+   * dernierPlan : message du dernier import de plan DXF ({ erreur } ou { avertissements }), ou null.
+   */
+  function afficher(projet, dernierImport, dernierPlan = null) {
+      derniers = [projet, dernierImport, dernierPlan];
+      // Pendant une saisie dans le formulaire du point, on ne redessine pas (le curseur serait perdu).
+      if (conteneur.contains(document.activeElement) && document.activeElement.dataset?.point) return;
       const plans = projet.plansDxf ?? [];
       conteneur.innerHTML = `
         <section class="carte-section">
@@ -79,7 +116,16 @@ export function creerEcranImport(conteneur, actions) {
               <span><strong>Plan DXF</strong><span class="aide">fond de plan</span></span>
               <input type="file" data-champ="fichier-plan" accept=".dxf,application/dxf" hidden />
             </label>
+            <button type="button" class="bouton-import ${pointOuvert ? 'actif' : ''}" data-action="ouvrir-point" aria-expanded="${pointOuvert}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle cx="12" cy="12" r="2.5" /></svg>
+              <span><strong>Point</strong><span class="aide">tapé ou sur le DXF</span></span>
+            </button>
           </div>
+          ${pointOuvert ? `<div class="bloc-point-ajoute">
+            ${htmlFormulairePoint(nomPointAjoute(projet))}
+            <p class="erreur" data-vivant="erreur-point">${echapper(erreurPoint)}</p>
+            ${plans.length > 0 ? '<button type="button" class="bouton-secondaire" data-action="pointer-dxf">Pointer sur le plan DXF</button>' : ''}
+          </div>` : ''}
           ${dernierImport ? afficherImportPoints(dernierImport) : ''}
           ${dernierPlan ? messagePlan(dernierPlan) : ''}
 
@@ -106,8 +152,7 @@ export function creerEcranImport(conteneur, actions) {
           ${plans.length > 0 ? `<p class="titre-section">Plans DXF</p>${listePlansDxf(projet, calquesOuverts)}` : ''}
         </section>
       `;
-    },
-  };
+  }
 }
 
 /** Résultat d'un import de points : nombre de points, lignes illisibles, avertissements. */

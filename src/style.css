@@ -4500,3 +4500,101 @@ button.bouton-retour[data-action='inverserLigne'] {
   color: var(--gris);
   text-decoration: line-through;
 }
+
+/* Projet › Imports : 3 gros boutons (fichier de points, plan DXF, point ajouté). */
+.boutons-imports {
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+}
+
+button.bouton-import {
+  font: inherit;
+  text-align: left;
+}
+
+.bouton-import.actif {
+  border-style: solid;
+  background: var(--ambre-clair);
+}
+
+/* Formulaire « ajouter un point » : nom, Est, Nord, H, Ajouter. */
+.formulaire-point {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+  align-items: end;
+}
+
+.formulaire-point label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+  min-width: 0;
+}
+
+.formulaire-point input {
+  min-width: 0;
+}
+
+.formulaire-point button {
+  grid-column: 1 / -1;
+}
+
+.bloc-point-ajoute {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+}
+
+.bloc-point-ajoute .erreur:empty {
+  display: none;
+}
+
+/* Pointage sur le plan DXF : barre posée en bas du plan (accroche, Terminé). */
+.barre-pointage {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 34px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--rayon);
+  background: rgba(27, 43, 54, 0.92);
+  color: #ffffff;
+  font-size: 0.85rem;
+}
+
+.barre-pointage .bouton-accroche {
+  min-height: 0;
+  padding: 3px 6px;
+}
+
+.barre-pointage .titre-pointage {
+  font-weight: 700;
+}
+
+.barre-pointage .bouton {
+  margin-left: auto;
+  min-height: 34px;
+}
+
+/* Points ajoutés (levé « Points ajoutés ») : toujours visibles sur le plan, en losange sombre. */
+.plan .point-ajoute path {
+  fill: var(--sombre);
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+
+.plan .point-ajoute text {
+  fill: var(--sombre);
+  font-size: 11px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}

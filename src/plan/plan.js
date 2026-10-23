@@ -317,6 +317,19 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       groupe.append(creerElement('path', { d: `M${x - taille} ${y}H${x + taille}M${x} ${y - taille}V${y + taille}`, class: classe }));
       return { x, y };
     };
+    // Points ajoutés (tapés ou pris sur le DXF) : petit losange sombre et leur nom.
+    for (const point of implantation.pointsAjoutes ?? []) {
+      const { x, y } = versEcran(point.est, point.nord, vue);
+      if (x < -20 || y < -20 || x > vue.largeur + 20 || y > vue.hauteur + 20) continue;
+      const marque = creerElement('g', { class: 'point-ajoute' });
+      marque.append(creerElement('path', { d: `M${x} ${y - 6}L${x + 6} ${y}L${x} ${y + 6}L${x - 6} ${y}Z` }));
+      if (calques.noms) {
+        const nom = creerElement('text', { x: x + 8, y: y - 5 });
+        nom.textContent = point.nom;
+        marque.append(nom);
+      }
+      groupe.append(marque);
+    }
     for (const point of implantation.aImplanter ?? []) {
       const { x, y } = croix(point.est, point.nord, 'croix-a-implanter', 7);
       if (!calques.noms) continue;

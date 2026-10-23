@@ -68,6 +68,7 @@ import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, me
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
 import { appliquerReglages, ouvrirReglages } from './reglages/reglages.js';
+import { ajouterPointAjoute, leveDesPointsAjoutes, nomPointAjoute } from './topo/points-ajoutes.js';
 
 // --- État de l'application ---
 let projet = creerProjet(); // projet ouvert
@@ -374,6 +375,15 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     modifie();
   },
   reglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
+  // Point tapé (nom, Est, Nord, altitude facultative) : rangé dans le levé « Points ajoutés ».
+  ajouterPointTape: (valeurs) => {
+    const { point, erreur } = ajouterPointAjoute(projet, { ...valeurs, source: 'tape' });
+    if (erreur) return { erreur };
+    afficherMessage(`Point ${point.nom} ajouté`, 2500);
+    modifie();
+    return null;
+  },
+  commencerPointage: () => commencerPointage(),
   montrerCalqueDxf: (id, numero, visible) => {
     const calque = projet.plansDxf.find((p) => p.id === id)?.calques[numero];
     if (!calque) return;
@@ -676,6 +686,28 @@ const ecranLeve = recepteurDisponible()
         if (implanter.cible?.id === id) implanter.cible = null;
         modifie();
       },
+      // Point tapé (Terrain › Implanter › + Point) : ajouté au projet, puis choisi pour l'implanter.
+      ajouterPointTape: (valeurs) => {
+        const { point, erreur } = ajouterPointAjoute(projet, { ...valeurs, source: 'tape' });
+        if (erreur) return { erreur };
+        implanter.choix = { ...point };
+        afficherMessage(`Point ${point.nom} ajouté`, 2500);
+        modifie();
+        return null;
+      },
+      // Point accroché sur le DXF : gardé dans le projet (levé « Points ajoutés »).
+      garderPointChoisi: (nom) => {
+        if (!implanter.choix) return;
+        const { est, nord, altitude } = implanter.choix;
+        const { point, erreur } = ajouterPointAjoute(projet, { nom: nom.trim() || nomPointAjoute(projet), est, nord, altitude, source: 'dxf' });
+        if (erreur) {
+          alert(`Point non ajouté : ${erreur}.`);
+          return;
+        }
+        implanter.choix = { ...implanter.choix, nom: point.nom };
+        afficherMessage(`Point ${point.nom} ajouté au projet`, 2500);
+        modifie();
+      },
       arreterImplantation: () => {
         implanter.cible = null;
         montrerImplantation();
@@ -781,13 +813,17 @@ function nomProposeImplantation() {
  * Les points « À implanter » restent visibles sur le plan dans les autres onglets.
  */
 function envoyerImplantationAuPlan() {
-  const accrocheActive = (enImplantationDePoint() || enImplantationDeLigne()) && ongletContexte === 'terrain';
-  const enLigne = accrocheActive && enImplantationDeLigne();
+  const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne()) && ongletContexte === 'terrain') || pointage.actif;
+  const enLigne = accrocheActive && !pointage.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
-  plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0
+  // Points ajoutés : dessinés à part, sauf si leur levé est le levé affiché (déjà dessinés).
+  const ajoutes = leveDesPointsAjoutes(projet);
+  const pointsAjoutes = ajoutes && ajoutes.id !== projet.leveActifId ? ajoutes.points : [];
+  plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0 || pointsAjoutes.length > 0
     ? {
         actif: accrocheActive,
         aImplanter: projet.aImplanter,
+        pointsAjoutes,
         choix: accrocheActive && !enLigne ? implanter.choix : null,
         cible: accrocheActive && !enLigne ? implanter.cible : null,
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
@@ -965,6 +1001,10 @@ function pointsDuProjet() {
  * (« Point » : les points du projet ; les autres : le plan DXF).
  */
 function toucherPourImplantation(position, tolerance) {
+  if (pointage.actif) {
+    toucherPourPointage(position, tolerance);
+    return;
+  }
   if (enImplantationDeLigne()) {
     toucherPourLigne(position, tolerance);
     return;
@@ -981,6 +1021,72 @@ function toucherPourImplantation(position, tolerance) {
   const mm = (valeur) => Math.round(valeur * 1000) / 1000;
   implanter.choix = { ...trouve, est: mm(trouve.est), nord: mm(trouve.nord), altitude: trouve.altitude != null ? mm(trouve.altitude) : null };
   montrerImplantation();
+}
+
+// --- Points ajoutés en touchant le plan DXF (Projet › Imports › Point › Pointer sur le plan DXF) ---
+// pointage : { actif, accroche ('sommet', 'milieu', 'ligne', 'centre') }.
+const pointage = { actif: false, accroche: 'sommet' };
+const ACCROCHES_POINTAGE = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre']];
+
+/** Début du pointage : une barre sur le plan (accroche, Terminé) ; sur téléphone, on va au plan. */
+function commencerPointage() {
+  pointage.actif = true;
+  dessinerBarrePointage();
+  if (estTelephone()) afficherOnglet('plan');
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+}
+
+function arreterPointage() {
+  pointage.actif = false;
+  document.querySelector('.barre-pointage')?.remove();
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+}
+
+/** Barre posée en bas du plan pendant le pointage. */
+function dessinerBarrePointage() {
+  let barre = document.querySelector('.barre-pointage');
+  if (!barre) {
+    barre = document.createElement('div');
+    barre.className = 'barre-pointage';
+    barre.addEventListener('click', (evenement) => {
+      const bouton = evenement.target.closest('button[data-action]');
+      if (!bouton) return;
+      if (bouton.dataset.action === 'accroche-pointage') {
+        pointage.accroche = bouton.dataset.valeur;
+        dessinerBarrePointage();
+      } else if (bouton.dataset.action === 'fin-pointage') arreterPointage();
+    });
+    document.querySelector('#plan .plan-cadre').append(barre);
+  }
+  barre.innerHTML = `<span class="titre-pointage">Ajouter des points :</span>
+    ${ACCROCHES_POINTAGE.map(([cle, titre]) => `<button type="button" class="puce-choix ${pointage.accroche === cle ? 'actif' : ''}" data-action="accroche-pointage" data-valeur="${cle}">${titre}</button>`).join('')}
+    <button type="button" class="bouton" data-action="fin-pointage">Terminé</button>`;
+}
+
+/** Toucher du plan pendant le pointage : le point accroché sur le DXF devient un point ajouté. */
+function toucherPourPointage(position, tolerance) {
+  const trouve = accrocher(pointage.accroche, position, tolerance, sourcesDesPlans(projet.plansDxf ?? [], position, tolerance));
+  if (!trouve) {
+    const quoi = { sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', centre: 'Aucun cercle' }[pointage.accroche];
+    afficherMessage(`${quoi} sous le doigt`, 3000);
+    return;
+  }
+  const mm = (valeur) => Math.round(valeur * 1000) / 1000;
+  const { point, erreur } = ajouterPointAjoute(projet, {
+    nom: nomPointAjoute(projet),
+    est: mm(trouve.est),
+    nord: mm(trouve.nord),
+    altitude: trouve.altitude != null ? mm(trouve.altitude) : null,
+    source: 'dxf',
+  });
+  if (erreur) {
+    afficherMessage(erreur, 4000);
+    return;
+  }
+  afficherMessage(`Point ${point.nom} ajouté${point.altitude != null ? ` · H ${formaterNombre(point.altitude)}` : ''}`, 2500);
+  modifie();
 }
 
 /**
@@ -1124,6 +1230,9 @@ function donneesCommunes() {
       accrocheLigne: terrain.accrocheLigne,
       pointsLigne: implanter.pointsLigne,
       ligne: implanter.ligne ? resumeLigne() : null,
+      nomPointAjoute: nomPointAjoute(projet),
+      // Point choisi qui est déjà un point du projet (pas de « + Point du projet »).
+      choixDuProjet: Boolean(implanter.choix?.nom && pointsDuProjet().some((p) => p.nom === implanter.choix.nom)),
     },
   };
 }

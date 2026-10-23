@@ -24,6 +24,7 @@ import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne
 // (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
 const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
 import { lireTexteLibelles, ecrireTexteLibelles } from './libelles.js';
+import { htmlFormulairePoint, lireFormulairePoint } from '../outils/formulaire-point.js';
 
 // Mode Contrôler : ce qu'on implante (Ligne viendra plus tard), vue des coupes, longueurs.
 const IMPLANTATIONS = [
@@ -106,6 +107,8 @@ export function creerEcranLeve(conteneur, actions) {
   const saisieCorrections = {}; // réglages des corrections tapés, pas encore envoyés
   let capBoussole = null; // dernier cap de la boussole de la tablette (°), ou null
   let reglagesGuidageOuverts = false; // roue ⚙ de l'écran de guidage
+  let formulairePointOuvert = false; // « + Point » : taper un point (Est, Nord, H)
+  let erreurPoint = '';
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
@@ -114,6 +117,28 @@ export function creerEcranLeve(conteneur, actions) {
     if (action === 'ouvrirChoixNature' || action === 'fermerChoixNature') {
       choixNatureOuvert = action === 'ouvrirChoixNature';
       dessiner();
+      return;
+    }
+    if (action === 'ouvrirFormulairePoint') {
+      formulairePointOuvert = !formulairePointOuvert;
+      erreurPoint = '';
+      dessiner();
+      return;
+    }
+    if (action === 'ajouterPointTape') {
+      const valeurs = lireFormulairePoint(conteneur);
+      erreurPoint = valeurs.erreur ?? actions.ajouterPointTape(valeurs)?.erreur ?? '';
+      if (erreurPoint) {
+        const zone = conteneur.querySelector('[data-vivant="erreur-point"]');
+        if (zone) zone.textContent = erreurPoint;
+      } else {
+        formulairePointOuvert = false;
+        dessiner();
+      }
+      return;
+    }
+    if (action === 'garderPointChoisi') {
+      actions.garderPointChoisi(conteneur.querySelector('[data-champ="nom-implantation"]')?.value ?? '');
       return;
     }
     if (action === 'basculerReglagesGuidage') {
@@ -194,6 +219,11 @@ export function creerEcranLeve(conteneur, actions) {
   // Touche Entrée dans le nom : prend le point (comme le bouton), si c'est permis ; dans le nom
   // d'un point à implanter : le cherche.
   conteneur.addEventListener('keydown', (evenement) => {
+    if (evenement.key === 'Enter' && evenement.target.dataset.point) {
+      evenement.preventDefault();
+      conteneur.querySelector('[data-action="ajouterPointTape"]')?.click();
+      return;
+    }
     if (evenement.key === 'Enter' && evenement.target.dataset.champ === 'nom-a-trouver') {
       evenement.preventDefault();
       actions.trouverPoint(evenement.target.value);
@@ -398,7 +428,9 @@ export function creerEcranLeve(conteneur, actions) {
         <input type="text" list="noms-points-projet" data-champ="nom-a-trouver" placeholder="Nom d'un point" autocomplete="off" autocapitalize="characters" aria-label="Nom du point à implanter" />
         <datalist id="noms-points-projet">${imp.nomsPoints.map((nom) => `<option value="${echapper(nom)}"></option>`).join('')}</datalist>
         <button type="button" class="bouton-secondaire" data-action="trouverPoint">OK</button>
+        ${enLigne ? '' : `<button type="button" class="bouton-secondaire ${formulairePointOuvert ? 'actif' : ''}" data-action="ouvrirFormulairePoint" title="Taper un point (Est, Nord, H)">+ Point</button>`}
       </div>
+      ${formulairePointOuvert && !enLigne ? `${htmlFormulairePoint(imp.nomPointAjoute)}<p class="erreur" data-vivant="erreur-point">${echapper(erreurPoint)}</p>` : ''}
     </div>`;
   }
 
@@ -486,6 +518,7 @@ export function creerEcranLeve(conteneur, actions) {
           <div class="ligne-outils">
             <button type="button" class="bouton-secondaire" data-action="implanterChoix">Implanter</button>
             <button type="button" class="bouton-secondaire" data-action="creerPointAImplanter">+ À implanter</button>
+            ${imp.choixDuProjet ? '' : '<button type="button" class="bouton-secondaire" data-action="garderPointChoisi" title="Garder ce point dans le projet (levé « Points ajoutés »)">+ Point du projet</button>'}
           </div>
         </div>`
       : '';
