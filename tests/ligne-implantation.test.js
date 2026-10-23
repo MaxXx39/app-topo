@@ -1,6 +1,6 @@
 // Tests de l'implantation d'une ligne : abscisse, décalage, altitude, ligne parallèle.
 import { describe, it, expect } from 'vitest';
-import { longueurPolyligne, positionSurLigne, altitudeSurLigne, guidageLigne, ligneParallele, sommetsChoisis } from '../src/topo/ligne-implantation.js';
+import { longueurPolyligne, positionSurLigne, altitudeSurLigne, guidageLigne, ligneParallele, sommetsChoisis, pointALAbscisse } from '../src/topo/ligne-implantation.js';
 
 const p = (est, nord, altitude = null) => ({ est, nord, altitude });
 // Ligne en L : (0,0) → (10,0) → (10,10), avec des altitudes 400, 401, 403.
@@ -50,5 +50,17 @@ describe('guidage vers la ligne', () => {
     expect(parallele[2]).toMatchObject({ est: 11, nord: 10 });
     expect(sommetsChoisis(L, { segment: 1 })).toEqual([L[1], L[2]]);
     expect(sommetsChoisis(L, { inverse: true })).toEqual([L[2], L[1], L[0]]);
+  });
+});
+
+describe('pointALAbscisse', () => {
+  const ligne = [{ est: 0, nord: 0 }, { est: 10, nord: 0 }, { est: 10, nord: 10 }];
+  it('trouve le point le long de la ligne, segment par segment', () => {
+    expect(pointALAbscisse(ligne, 4)).toEqual({ est: 4, nord: 0, segment: 0 });
+    expect(pointALAbscisse(ligne, 15)).toEqual({ est: 10, nord: 5, segment: 1 });
+  });
+  it('prolonge la ligne avant le début et après la fin', () => {
+    expect(pointALAbscisse(ligne, -3)).toEqual({ est: -3, nord: 0, segment: 0 });
+    expect(pointALAbscisse(ligne, 22)).toEqual({ est: 10, nord: 12, segment: 1 });
   });
 });

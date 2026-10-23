@@ -916,17 +916,16 @@ function cadrerSurImplantation() {
 }
 
 /**
- * Implantation d'une ligne : texte écrit à côté de la canne sur le plan, la position le long de la
- * ligne (depuis le début) et le décalage de la canne (à droite ou à gauche de la ligne), ou null.
+ * Implantation d'une ligne : cotes dessinées sur le plan (voir plan.js, dessinerCotesLigne) :
+ * la ligne implantée (ou sa parallèle), la position le long (abscisse depuis le début, reste
+ * jusqu'à la fin) et l'écart de la canne ; ou null.
  */
-function etiquetteLigne(implantationLigne) {
+function cotesLigne(implantationLigne) {
   const l = implantationLigne?.ligne;
-  if (!l || implantationLigne.message) return null;
-  const decalage = Math.abs(l.ecart) < 0.0005 ? 'sur la ligne' : `${formaterNombre(Math.abs(l.ecart))} m ${l.ecart > 0 ? 'à droite' : 'à gauche'}`;
-  let le_long = `Début + ${formaterNombre(l.abscisse)} m`;
-  if (l.abscisse < 0) le_long = `Avant le début ${formaterNombre(-l.abscisse)} m`;
-  else if (l.abscisse > l.longueur) le_long = `Après la fin ${formaterNombre(l.abscisse - l.longueur)} m`;
-  return [le_long, decalage];
+  if (!l || implantationLigne.message || !implanter.ligne) return null;
+  const sommets = sommetsDeLaLigne();
+  const trace = implanter.ligne.decalage ? ligneParallele(sommets, implanter.ligne.decalage) : sommets;
+  return { sommets: trace, abscisse: l.abscisse, longueur: l.longueur, ecart: l.ecart };
 }
 
 /** Vrai pendant l'implantation d'un point (Terrain › Implanter › Point). */
@@ -1654,7 +1653,7 @@ if (recepteurDisponible()) {
     const traits = controle?.coupes ? vues.map((sens) => ({ sens, debut: controle.coupes[sens].debut, fin: controle.coupes[sens].fin })) : [];
     // Ligne : trait en pointillés jusqu'au point de la ligne en face de la canne.
     const vers = implantationLigne?.ligne?.cible ?? null;
-    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, etiquette: etiquetteLigne(implantationLigne) } : null);
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotesLigne(implantationLigne) } : null);
   });
 }
 

@@ -135,3 +135,25 @@ export function sommetsChoisis(sommets, { segment = null, inverse = false } = {}
   const choisis = segment == null ? sommets : sommets.slice(segment, segment + 2);
   return inverse ? [...choisis].reverse() : choisis;
 }
+
+/**
+ * Point de la ligne à "abscisse" m du début (m), et le segment où il est : { est, nord, segment }.
+ * Avant le début (abscisse < 0) ou après la fin : sur le prolongement du premier ou du dernier
+ * segment (comme positionSurLigne). Null si la ligne n'a pas de longueur.
+ */
+export function pointALAbscisse(sommets, abscisse) {
+  let cumul = 0;
+  const dernier = sommets.length - 2;
+  for (let i = 0; i <= dernier; i++) {
+    const a = sommets[i];
+    const b = sommets[i + 1];
+    const longueur = Math.hypot(b.est - a.est, b.nord - a.nord);
+    if (longueur === 0) continue;
+    if (abscisse <= cumul + longueur || i === dernier) {
+      const t = (abscisse - cumul) / longueur;
+      return { est: a.est + (b.est - a.est) * t, nord: a.nord + (b.nord - a.nord) * t, segment: i };
+    }
+    cumul += longueur;
+  }
+  return null;
+}

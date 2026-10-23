@@ -4326,19 +4326,6 @@ button.bouton-retour[data-action='inverserLigne'] {
   font-size: 0.8rem;
 }
 
-/* Implantation d'une ligne : position le long de la ligne et décalage, à côté de la canne. */
-.plan .etiquette-position rect {
-  fill: rgba(255, 255, 255, 0.92);
-  stroke: #0d9488;
-  stroke-width: 1.5;
-}
-
-.plan .etiquette-position text {
-  fill: #0f766e;
-  font-size: 12px;
-  font-weight: 700;
-}
-
 /* Écran de guidage sur téléphone : tout doit tenir dans la moitié basse. La cible (ou le couloir)
    à gauche, les écarts à droite ; leur taille suit la place qui reste. */
 @media (max-width: 899px) {
@@ -5015,4 +5002,44 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
     max-width: 100%;
     max-height: none;
   }
+}
+
+/* Implantation d'une ligne : cotes écrites le long des traits (pas de bulle), avec un liseré
+   blanc pour se lire sur le plan ; prolongement de la ligne en pointillés avant le début ou après la fin. */
+.plan .cote-ligne {
+  font-size: 12px;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.plan .cote-debut {
+  fill: #15803d;
+}
+
+.plan .cote-fin {
+  fill: #1b2b36;
+}
+
+.plan .cote-prolongement {
+  fill: #b45309;
+}
+
+.plan .cote-ecart {
+  fill: #0f766e;
+}
+
+.plan .prolongement-ligne {
+  fill: none;
+  stroke: #b45309;
+  stroke-width: 2.5;
+  stroke-dasharray: 7 5;
+}
+
+.plan .repere-pied {
+  stroke: #0f766e;
+  stroke-width: 2.5;
 }

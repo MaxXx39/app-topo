@@ -6,6 +6,7 @@ import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
 import { svgDrapeau } from '../outils/drapeaux.js';
+import { pointALAbscisse } from '../topo/ligne-implantation.js';
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS } from './dxf-canvas.js';
 import { echapper } from '../outils/echapper.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
@@ -419,22 +420,84 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }));
     }
     groupe.append(creerElement('circle', { cx: x, cy: y, r: 6 }));
-    // Implantation d'une ligne : position le long de la ligne et décalage, à côté de la canne.
-    if (position.etiquette) {
-      const lignes = position.etiquette;
-      const largeur = Math.max(...lignes.map((l) => l.length)) * 7 + 14;
-      const gauche = x + 18 + largeur > vue.largeur ? x - 18 - largeur : x + 18;
-      const haut = Math.max(4, y - 20);
-      const etiquette = creerElement('g', { class: 'etiquette-position' });
-      etiquette.append(creerElement('rect', { x: gauche, y: haut, width: largeur, height: 12 + lignes.length * 16, rx: 6 }));
-      lignes.forEach((ligne, i) => {
-        const texte = creerElement('text', { x: gauche + 7, y: haut + 18 + i * 16 });
-        texte.textContent = ligne;
-        etiquette.append(texte);
-      });
-      groupe.append(etiquette);
-    }
+    // Implantation d'une ligne : distances écrites le long de la ligne et sur la perpendiculaire.
+    if (position.cotesLigne) dessinerCotesLigne(groupe, position.cotesLigne, { x, y }, position.vers);
     svg.append(groupe);
+  }
+
+  /**
+   * Cotes de l'implantation d'une ligne, sans bulle, attachées aux traits : distance depuis le
+   * début et jusqu'à la fin, écrites le long de la ligne (de chaque côté du pied de la
+   * perpendiculaire) ; avant le début ou après la fin, le prolongement de la ligne en pointillés
+   * avec sa longueur ; l'écart de la canne écrit sur la perpendiculaire (canne → ligne).
+   * cotes : { sommets, abscisse, longueur, ecart } (m) ; canne : { x, y } (pixels) ; vers : pied (MN95).
+   */
+  function dessinerCotesLigne(groupe, cotes, canne, vers) {
+    const { sommets, abscisse, longueur, ecart } = cotes;
+    const ecran = (p) => versEcran(p.est, p.nord, vue);
+    const m = (valeur) => `${formaterNombre(Math.abs(valeur))} m`;
+    // Texte posé le long d'un trait (de a à b, pixels), au milieu, lisible à l'endroit.
+    const texteLeLong = (a, b, texte, classe) => {
+      if (Math.hypot(b.x - a.x, b.y - a.y) < 34) return;
+      let angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+      if (angle > 90) angle -= 180;
+      if (angle < -90) angle += 180;
+      const milieu = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const element = creerElement('text', { x: milieu.x, y: milieu.y - 5, 'text-anchor': 'middle', class: `cote-ligne ${classe}`, transform: `rotate(${angle.toFixed(1)} ${milieu.x} ${milieu.y})` });
+      element.textContent = texte;
+      groupe.append(element);
+    };
+    // Morceau de la ligne entre deux abscisses : sommets traversés compris (pixels).
+    const morceau = (de, a) => {
+      const debut = pointALAbscisse(sommets, de);
+      const fin = pointALAbscisse(sommets, a);
+      if (!debut || !fin) return [];
+      return [ecran(debut), ...sommets.slice(debut.segment + 1, fin.segment + 1).map(ecran), ecran(fin)];
+    };
+    // Texte au milieu (en longueur) d'un morceau, le long du segment où il tombe.
+    const coteMorceau = (de, a, texte, classe) => {
+      const points = morceau(de, a);
+      if (points.length < 2) return;
+      const milieu = pointALAbscisse(sommets, (de + a) / 2);
+      const debutSegment = ecran(sommets[milieu.segment]);
+      const finSegment = ecran(sommets[milieu.segment + 1]);
+      const centre = ecran(milieu);
+      const dx = finSegment.x - debutSegment.x;
+      const dy = finSegment.y - debutSegment.y;
+      const l = Math.hypot(dx, dy) || 1;
+      // Longueur du morceau à l'écran : trop court, pas de texte.
+      let pixels = 0;
+      for (let i = 0; i + 1 < points.length; i++) pixels += Math.hypot(points[i + 1].x - points[i].x, points[i + 1].y - points[i].y);
+      if (pixels < 34) return;
+      texteLeLong({ x: centre.x - (dx / l) * 20, y: centre.y - (dy / l) * 20 }, { x: centre.x + (dx / l) * 20, y: centre.y + (dy / l) * 20 }, texte, classe);
+    };
+    if (abscisse < 0) {
+      // Avant le début : prolongement du premier segment jusqu'en face de la canne.
+      groupe.append(creerElement('path', { d: tracePar(morceau(abscisse, 0), false), class: 'prolongement-ligne' }));
+      coteMorceau(abscisse, 0, `${m(abscisse)} avant le début`, 'cote-prolongement');
+    } else if (abscisse > longueur) {
+      groupe.append(creerElement('path', { d: tracePar(morceau(longueur, abscisse), false), class: 'prolongement-ligne' }));
+      coteMorceau(longueur, abscisse, `${m(abscisse - longueur)} après la fin`, 'cote-prolongement');
+    } else {
+      coteMorceau(0, abscisse, `début ${m(abscisse)}`, 'cote-debut');
+      coteMorceau(abscisse, longueur, `fin ${m(longueur - abscisse)}`, 'cote-fin');
+    }
+    // Repère au pied de la perpendiculaire (petit trait en travers de la ligne).
+    const pied = pointALAbscisse(sommets, abscisse);
+    if (pied) {
+      const p = ecran(pied);
+      const a = ecran(sommets[pied.segment]);
+      const b = ecran(sommets[pied.segment + 1]);
+      const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const nx = -(b.y - a.y) / l;
+      const ny = (b.x - a.x) / l;
+      groupe.append(creerElement('line', { x1: p.x - nx * 9, y1: p.y - ny * 9, x2: p.x + nx * 9, y2: p.y + ny * 9, class: 'repere-pied' }));
+    }
+    // Écart de la canne, écrit sur la perpendiculaire.
+    if (vers) {
+      const cible = ecran(vers);
+      texteLeLong(canne, cible, Math.abs(ecart) < 0.0005 ? 'sur la ligne' : m(ecart), 'cote-ecart');
+    }
   }
 
   /** Plans DXF sous le dessin, sur le canvas (seulement si la vue ou les plans ont changé). */
