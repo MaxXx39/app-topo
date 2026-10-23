@@ -373,6 +373,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     dernierPlan = null;
     modifie();
   },
+  reglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
   montrerCalqueDxf: (id, numero, visible) => {
     const calque = projet.plansDxf.find((p) => p.id === id)?.calques[numero];
     if (!calque) return;
@@ -1145,6 +1146,19 @@ function resumeLigne() {
   };
 }
 
+/**
+ * Réglages d'un plan DXF (liste des plans, ou menu « Plans » du plan) : visible (œil), couleur
+ * (null = celles du DXF) et nom court (« Bordures »).
+ */
+function reglerPlanDxf(id, { visible, couleur, nom }) {
+  const choisi = projet.plansDxf.find((p) => p.id === id);
+  if (!choisi) return;
+  if (visible !== undefined) choisi.visible = visible;
+  if (couleur !== undefined) choisi.couleur = couleur;
+  if (nom !== undefined && nom.trim()) choisi.nom = nom.trim();
+  modifie();
+}
+
 /** Mode Contrôler : la surface choisie devient la surface affichée (plan, Calculs › Surfaces). */
 function montrerSurfaceControle() {
   const index = projet.surfaces.findIndex((s) => s.id === terrain.surfaceId);
@@ -1355,6 +1369,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherStock: (index) => editeurSurfaces.choisir(index),
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
   quandToucherImplantation: toucherPourImplantation,
+  quandReglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
 });
 
 const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces'), document.querySelector('#barre-surfaces'), {

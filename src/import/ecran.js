@@ -7,11 +7,13 @@ import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
+import { COULEURS_PLANS } from '../plan/dxf-canvas.js';
 
 /**
  * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
  * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id),
- * importerPlanDxf(fichier), voirPlanDxf(id), supprimerPlanDxf(id), montrerCalqueDxf(id, n° du calque, visible),
+ * importerPlanDxf(fichier), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
+ * montrerCalqueDxf(id, n° du calque, visible),
  * montrerTousCalquesDxf(id, visible)
  * Renvoie { afficher(projet, dernierImport, dernierPlan) }.
  */
@@ -45,6 +47,12 @@ export function creerEcranImport(conteneur, actions) {
     } else if (cible.dataset.champ === 'fichier-plan' && cible.files[0]) {
       await actions.importerPlanDxf(cible.files[0]);
       cible.value = '';
+    } else if (cible.dataset.champ === 'plan-visible') {
+      actions.reglerPlanDxf(cible.dataset.id, { visible: cible.checked });
+    } else if (cible.dataset.champ === 'plan-couleur') {
+      actions.reglerPlanDxf(cible.dataset.id, { couleur: cible.value || null });
+    } else if (cible.dataset.champ === 'plan-nom') {
+      actions.reglerPlanDxf(cible.dataset.id, { nom: cible.value });
     } else if (cible.dataset.champ === 'calque-dxf') {
       actions.montrerCalqueDxf(cible.dataset.id, Number(cible.dataset.calque), cible.checked);
     }
@@ -149,8 +157,14 @@ function listePlansDxf(projet, calquesOuverts) {
     .map((plan) => {
       const prefixe = prefixeCommun(plan.calques.map((c) => c.nom));
       const visibles = plan.calques.filter((c) => c.visible).length;
-      return `<div class="ligne-plan-dxf">
-        <strong>${echapper(plan.nom)}</strong>
+      return `<div class="ligne-plan-dxf ${plan.visible === false ? 'plan-cache' : ''}">
+        <div class="entete-plan-dxf">
+          <label class="oeil-plan" title="Afficher / cacher le plan"><input type="checkbox" data-champ="plan-visible" data-id="${plan.id}" ${plan.visible !== false ? 'checked' : ''} aria-label="Afficher le plan" /></label>
+          <input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />
+          <select data-champ="plan-couleur" data-id="${plan.id}" aria-label="Couleur du plan" style="color: ${plan.couleur || 'inherit'}">
+            ${COULEURS_PLANS.map(([valeur, titre]) => `<option value="${valeur}" ${(plan.couleur || '') === valeur ? 'selected' : ''}>${valeur ? '●' : '◐'} ${titre}</option>`).join('')}
+          </select>
+        </div>
         <div class="ligne-outils">
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${plan.id}">voir</button>

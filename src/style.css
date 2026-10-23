@@ -3679,8 +3679,19 @@ svg.plan,
 
 /* Pendant le geste : l'image reste en mémoire et n'est que déplacée (plus fluide). */
 .plan-cadre.en-geste svg.plan,
-.plan-cadre.en-geste .plan-fond {
+.plan-cadre.en-geste .plan-fond,
+.plan-cadre.en-geste .plan-dxf-canvas {
   will-change: transform;
+}
+
+/* Plans DXF : dessinés sur un canvas sous le dessin (voir plan/dxf-canvas.js). */
+.plan-dxf-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transform-origin: 0 0;
 }
 
 /* Cartouche du PDF, dans les exports : dessiné par et date côte à côte. */
@@ -4401,4 +4412,91 @@ button.bouton-retour[data-action='inverserLigne'] {
 
 .pastille-entete {
   font-size: 0.68rem;
+}
+
+/* Menu « Plans » du plan : un plan DXF par ligne, œil (case) et couleur. */
+.menu-plans-dxf {
+  margin-top: 6px;
+  padding: 4px 10px;
+  max-width: min(340px, 80vw);
+  background: var(--surface);
+  border-radius: var(--rayon);
+  box-shadow: 0 4px 20px rgba(16, 24, 20, 0.18);
+  font-size: 0.9rem;
+}
+
+.menu-plans-dxf[hidden] {
+  display: none;
+}
+
+.ligne-menu-plan {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.ligne-menu-plan + .ligne-menu-plan {
+  border-top: 1px solid var(--bordure);
+}
+
+.oeil-plan {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.oeil-plan span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ligne-menu-plan select {
+  min-height: 30px;
+  padding: 2px 4px;
+  font-size: 0.85rem;
+}
+
+.plan-calques .puce + .puce {
+  margin-left: 4px;
+}
+
+/* Liste des plans DXF (onglet Projet) : œil, nom court modifiable, couleur. */
+.entete-plan-dxf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.entete-plan-dxf .oeil-plan {
+  flex: none;
+}
+
+.entete-plan-dxf .oeil-plan input {
+  width: 20px;
+  height: 20px;
+}
+
+.nom-plan-dxf {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.ligne-plan-dxf {
+  min-width: 0;
+}
+
+.entete-plan-dxf select {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 42%;
+}
+
+.ligne-plan-dxf.plan-cache .nom-plan-dxf {
+  color: var(--gris);
+  text-decoration: line-through;
 }
