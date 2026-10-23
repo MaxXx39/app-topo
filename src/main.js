@@ -34,6 +34,8 @@ import {
   completerProjet,
   resumerProjet,
   titreProjet,
+  projetSansTitre,
+  EXEMPLE_TITRE,
   sousTitreProjet,
   nomDeFichierProjet,
 } from './projet/projet.js';
@@ -64,7 +66,8 @@ import {
 } from './topo/leve-direct.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
-import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections } from './android/pont.js';
+import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
+import { appliquerReglages, ouvrirReglages } from './reglages/reglages.js';
 
 // --- État de l'application ---
 let projet = creerProjet(); // projet ouvert
@@ -248,6 +251,27 @@ document.querySelector('.parties-calculs').addEventListener('click', (evenement)
 installerAide(document.querySelector('#bouton-aide'));
 // Toucher le projet ouvert (en-tête) : on va à l'onglet Projet.
 document.querySelector('#entete-projet').addEventListener('click', () => afficherOnglet('projets'));
+
+// Réglages de cet appareil (roue ⚙) : mode téléphone, bulles d'aide, nom de l'appareil.
+appliquerReglages();
+document.querySelector('#bouton-reglages').addEventListener('click', () => {
+  ouvrirReglages({
+    nomAppareil: partage?.appareil().nom,
+    nommerAppareil: partage ? (nom) => partage.nommerAppareil(nom) : null,
+    aideActive: document.body.classList.contains('aide-active'),
+    basculerAide: () => document.querySelector('#bouton-aide').click(),
+  });
+});
+
+// Fermer l'appli (✕, appli Android seulement) : le projet part d'abord sur Drive (5 s au plus).
+const boutonFermer = document.querySelector('#bouton-fermer');
+boutonFermer.hidden = !(estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function');
+boutonFermer.addEventListener('click', async () => {
+  if (!confirm('Fermer l\'appli ?')) return;
+  afficherMessage('Fermeture…', null);
+  await Promise.race([partage?.envoyerMaintenant(), new Promise((fin) => setTimeout(fin, 5000))]);
+  window.AppliAndroid.fermerAppli();
+});
 
 // --- Accès aux données du projet ---
 
@@ -1193,7 +1217,15 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
     projet.cartouche[champ] = valeur;
     modifie();
   },
-  continuer: () => allerA(etapeUtile()),
+  continuer: () => {
+    const etape = etapeUtile();
+    // Projet encore vide (ni points ni plan DXF) : rien à implanter, on arrive en mode Lever.
+    if (etape === 'terrain' && (projet.plansDxf ?? []).length === 0 && terrain.mode !== 'lever') {
+      terrain.mode = 'lever';
+      retenirReglagesTerrain();
+    }
+    allerA(etape);
+  },
   exporterProjet: async (id) => {
     const lu = id === projet.id ? projet : await stockage.lireProjet(id);
     if (!lu) return;
@@ -1258,7 +1290,7 @@ function afficherEcranProjet() {
  * rendu (verrou), puis le nouveau est comparé à sa version de Drive.
  */
 async function changerDeProjet(ouvrirAutre) {
-  await partage?.avantDeChanger();
+  partage?.avantDeChanger(); // en arrière-plan : l'autre projet s'ouvre sans attendre internet
   await ouvrirAutre();
   partage?.apresOuverture();
 }
@@ -1274,7 +1306,7 @@ partage = creerPartage({
   garderCopie: async (local) => {
     const copie = dupliquerProjet(completerProjet(local), `${local.nom || titreProjet(local)} (copie de cet appareil)`);
     await stockage.enregistrerProjet(copie);
-    await rafraichirListe();
+    mettreAJourResume(copie);
   },
   quandChange: () => {
     afficherEcranProjet();
@@ -1563,7 +1595,6 @@ function recalculer({ recadrer = false } = {}) {
 
   for (const element of document.querySelectorAll('.sans-points')) element.hidden = projet.leves.length > 0;
   // En-tête : le projet ouvert en grand (affaire - lieu), puis son nom et ce qu'il contient.
-  document.querySelector('#titre-projet').textContent = titreProjet(projet);
   mettreAJourEtatEntete();
 
   editeurSurfaces.rafraichir();
@@ -1732,12 +1763,31 @@ document.addEventListener('keydown', (evenement) => {
 
 /** Ligne sous le titre du projet (en-tête) : nom, points, surfaces, et l'état de Drive si connecté. */
 function mettreAJourEtatEntete() {
+  // Titre : affaire - lieu (ou le nom) ; tant que rien n'est tapé, un exemple en gris.
+  const titre = document.querySelector('#titre-projet');
+  const sansTitre = projetSansTitre(projet);
+  titre.textContent = sansTitre ? EXEMPLE_TITRE : titreProjet(projet);
+  titre.classList.toggle('titre-exemple', sansTitre);
+
   const points = leveActif(projet)?.points ?? AUCUN_POINT;
   const drive = partage?.etat.connecte
-    ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive : ouvert ailleurs' }[partage.etat.etat] ?? 'Drive : en attente'
+    ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive' }[partage.etat.etat] ?? 'Drive : en attente'
     : '';
   document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} surface(s)`, drive].filter(Boolean).join(' · ');
+
+  // Verrou du partage : « ✎ à moi » (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
+  // (un autre appareil l'a ; toucher = prendre la main). Rien sans Drive.
+  const pastille = document.querySelector('#pastille-verrou');
+  const repris = partage?.etat.connecte && partage.etat.repris?.projetId === projet.id ? partage.etat.repris : null;
+  pastille.hidden = !partage?.etat.connecte;
+  pastille.textContent = repris ? `🔒 Lecture seule · ${repris.nom}` : '✎ à moi';
+  pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : 'pastille-verte'}`;
+  pastille.title = repris ? 'Ouvert sur un autre appareil : toucher pour prendre la main' : 'Tu as la main sur ce projet';
 }
+document.querySelector('#pastille-verrou').addEventListener('click', () => {
+  if (partage?.etat.repris?.projetId === projet.id) partage.reprendreLaMain();
+  else afficherMessage('Tu as la main sur ce projet', 2000);
+});
 
 /** Petit message sous l'en-tête, qui disparaît tout seul après "duree" millisecondes (null : il reste). */
 let minuterieMessage = null;
@@ -1761,7 +1811,9 @@ async function enregistrer() {
   try {
     await stockage.enregistrerProjet(projet);
     stockage.memoriserDernierProjet(projet.id);
-    await rafraichirListe();
+    // Seul le résumé du projet ouvert change : on ne relit pas tous les projets de l'appareil
+    // (trop lent avec des plans DXF et des photos).
+    mettreAJourResume(projet);
     afficherEcranProjet();
     partage?.projetEnregistre();
   } catch (erreur) {
@@ -1772,6 +1824,11 @@ async function enregistrer() {
 
 async function rafraichirListe() {
   resumes = (await stockage.listerProjets()).map(resumerProjet).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
+}
+
+/** Met à jour le résumé d'un projet dans la liste (sans relire les autres). */
+function mettreAJourResume(lequel) {
+  resumes = [resumerProjet(lequel), ...resumes.filter((r) => r.id !== lequel.id)].sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
 }
 
 /** Étape où reprendre le travail : les surfaces si le projet a déjà des points, sinon l'import. */

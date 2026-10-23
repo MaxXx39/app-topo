@@ -152,6 +152,46 @@ p {
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* Pastilles de l'en-tête : mode du terrain (LEVER / IMPLANTER) et verrou du partage
+   (« ✎ à moi » en vert, « 🔒 Lecture seule » en rouge). */
+.entete-pastilles {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+  max-width: 45%;
+}
+
+.entete-pastilles:not(:has(.pastille-entete:not([hidden]))) {
+  display: none;
+}
+
+.pastille-entete {
+  max-width: 100%;
+  padding: 2px 9px;
+  border: none;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.pastille-verte {
+  background: rgba(134, 239, 172, 0.18);
+  color: #86efac;
+}
+
+.pastille-rouge {
+  background: var(--rouge);
+  color: #ffffff;
+}
+
 /* Sur téléphone, en-tête plus serré. */
 @media (max-width: 480px) {
   .entete {
@@ -420,7 +460,7 @@ body.aide-active .rond-aide {
   }
 
   body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-edition button {
-    min-height: 36px;
+    min-height: 32px;
     padding: 4px 10px;
     font-size: 0.85rem;
   }
@@ -530,8 +570,8 @@ button.bouton {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 44px;
-  padding: 10px 18px;
+  min-height: 40px;
+  padding: 8px 16px;
   border: none;
   border-radius: 10px;
   background: var(--ambre);
@@ -546,8 +586,8 @@ button.bouton {
 }
 
 .bouton-secondaire {
-  min-height: 40px;
-  padding: 8px 14px;
+  min-height: 36px;
+  padding: 6px 12px;
   border: 1px solid var(--bordure);
   border-radius: 10px;
   background: var(--surface);
@@ -585,7 +625,7 @@ button:disabled {
 
 input[type='text'],
 select {
-  min-height: 44px;
+  min-height: 40px;
   padding: 8px 12px;
   border: 1px solid var(--bordure);
   border-radius: 10px;
@@ -611,7 +651,7 @@ input[type='radio'] {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
+  min-height: 32px;
 }
 
 /* Cases et boutons ronds : toujours la même taille, même quand le texte passe sur 2 lignes. */
@@ -805,7 +845,7 @@ th:not(:first-child) {
 }
 
 .pastille {
-  min-height: 36px;
+  min-height: 32px;
   padding: 6px 12px;
   border: 1px solid var(--couleur-role, var(--ambre));
   border-radius: 18px;
@@ -1194,7 +1234,7 @@ button.puce {
 }
 
 .choix-equidistance select {
-  min-height: 36px;
+  min-height: 32px;
   padding: 4px 8px;
 }
 
@@ -1296,7 +1336,7 @@ svg.plan {
   width: 100%;
   min-width: 0;
   font-size: 1rem;
-  min-height: 44px;
+  min-height: 40px;
   padding: 8px 10px;
   border: 1px solid var(--bordure);
   border-radius: 10px;
@@ -1355,7 +1395,7 @@ svg.plan {
 }
 
 .ligne-leve .case input.nom-leve {
-  min-height: 36px;
+  min-height: 32px;
   padding: 4px 8px;
   font-weight: 600;
   flex: 1;
@@ -1378,7 +1418,7 @@ svg.plan {
   flex: 1;
   min-width: 0;
   font-weight: 600;
-  min-height: 36px;
+  min-height: 32px;
 }
 
 .calques-pdf {
@@ -1540,7 +1580,7 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
 }
 
 .choix-nature-gros button {
-  min-height: 52px;
+  min-height: 46px;
 }
 
 /* Bouton discret (import LandXML / DXF) : texte gris, bordure en pointillés, sans fond. */
@@ -1548,7 +1588,7 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 40px;
+  min-height: 36px;
   padding: 8px 12px;
   border: 1px dashed #9aa3aa;
   border-radius: 10px;
@@ -1756,7 +1796,7 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
+  min-height: 40px;
   padding: 8px 12px;
   border: 1px solid var(--bordure);
   border-radius: 10px;
@@ -1975,7 +2015,7 @@ th.nombre {
 
 .bloc-entete .champ-entete {
   width: 100%;
-  min-height: 44px;
+  min-height: 40px;
   padding: 6px 10px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 8px;
@@ -2002,13 +2042,13 @@ th.nombre {
 /* Trois boutons en haut de l'onglet Projet : nouveau, ouvrir, gestion. */
 .actions-projets {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   margin-bottom: 12px;
 }
 
 .actions-projets .bouton-secondaire {
-  min-height: 48px;
+  min-height: 40px;
   padding: 6px 8px;
   line-height: 1.2;
 }
@@ -2065,7 +2105,7 @@ th.nombre {
 
 .champs-projet input {
   width: 100%;
-  min-height: 42px;
+  min-height: 38px;
   padding: 6px 10px;
   border: 1px solid var(--bordure);
   border-radius: 8px;
@@ -2085,7 +2125,7 @@ th.nombre {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 56px;
+  min-height: 50px;
   padding: 8px 10px;
   border: 1px dashed var(--sombre);
   border-radius: 10px;
@@ -2172,6 +2212,65 @@ th.nombre {
   flex-direction: column;
 }
 
+/* « Mes projets » : la ligne entière ouvre le projet ; ⋮ ouvre le menu (exporter, dupliquer, supprimer). */
+button.infos-projet {
+  flex: 1;
+  min-width: 0;
+  align-items: flex-start;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.infos-projet:not(:disabled):active,
+button.infos-projet:not(:disabled):hover {
+  background: var(--fond);
+}
+
+button.infos-projet:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.bouton-menu-projet {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--bordure);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--texte);
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.bouton-menu-projet[aria-expanded='true'] {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.menu-projet {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 14px;
+  padding: 4px 6px 2px;
+}
+
+/* Exemple écrit en gris tant que le projet n'a pas de titre (« ex. 10 203 - Gland »). */
+.titre-exemple {
+  opacity: 0.45;
+  font-style: italic;
+  font-weight: 600;
+}
+
 .liste-projets {
   margin-top: 10px;
 }
@@ -2196,7 +2295,7 @@ th.nombre {
 /* Choix dans le bandeau bleu nuit (surface affichée). */
 .bloc-entete select.champ-entete {
   width: 100%;
-  min-height: 44px;
+  min-height: 40px;
   padding: 6px 10px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 8px;
@@ -2326,7 +2425,7 @@ body.avec-recepteur .bandeaux-recepteur {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  min-height: 64px;
+  min-height: 58px;
   padding: 8px 4px;
   border: 2px solid var(--couleur-role);
   border-radius: 10px;
@@ -2404,7 +2503,7 @@ body.avec-recepteur .bandeaux-recepteur {
 
 .bouton.bouton-prendre {
   width: 100%;
-  min-height: 64px;
+  min-height: 58px;
   font-size: 1.2rem;
   letter-spacing: 0.03em;
 }
@@ -2536,7 +2635,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 
 .parties-calculs button {
   flex: 1;
-  min-height: 40px;
+  min-height: 36px;
   line-height: 1.15;
   border: none;
   border-radius: 8px;
@@ -2690,7 +2789,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 
 .modes-terrain button {
   flex: 1;
-  min-height: 40px;
+  min-height: 36px;
   border: none;
   border-radius: 8px;
   background: none;
@@ -2749,7 +2848,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   grid-template-columns: auto 1fr;
   align-items: center;
   column-gap: 12px;
-  min-height: 76px;
+  min-height: 68px;
   padding: 8px 14px;
   border-radius: 12px;
   color: #ffffff;
@@ -2936,7 +3035,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 
 .bandeau-leve select {
   width: 100%;
-  min-height: 36px;
+  min-height: 32px;
   padding: 0 28px 0 0;
   border: none;
   appearance: none;
@@ -2986,7 +3085,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 /* Mêmes couleurs que les surfaces dans les coupes : stock brun, terrain vert, terrassement bleu. */
 .bouton-nature {
   --couleur-nature: #b45309;
-  min-height: 56px;
+  min-height: 50px;
   border: 2px solid var(--couleur-nature);
   border-radius: 12px;
   background: color-mix(in srgb, var(--couleur-nature) 8%, var(--surface));
@@ -3222,7 +3321,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  min-height: 58px;
+  min-height: 52px;
   padding: 6px 2px 4px;
   border: 1px solid var(--bordure);
   border-radius: 10px;
@@ -3275,7 +3374,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 .accroche-par-nom input {
   flex: 1;
   min-width: 0;
-  min-height: 40px;
+  min-height: 36px;
   padding: 6px 10px;
   border: 1px solid var(--bordure);
   border-radius: 8px;
@@ -3433,7 +3532,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   grid-template-columns: auto 1fr;
   align-items: center;
   column-gap: 12px;
-  min-height: 92px;
+  min-height: 82px;
   padding: 8px 14px;
   border-radius: 12px;
   background: var(--sombre);
@@ -3606,7 +3705,7 @@ svg.plan,
 }
 
 .champs-cartouche input {
-  min-height: 40px;
+  min-height: 36px;
   padding: 6px 8px;
   border: 1px solid var(--bordure);
   border-radius: 8px;
@@ -3856,7 +3955,7 @@ svg.plan,
 .champs-corrections input {
   width: 100%;
   min-width: 0;
-  min-height: 38px;
+  min-height: 34px;
   padding: 4px 8px;
   border: 1px solid var(--bordure);
   border-radius: 8px;
@@ -3876,7 +3975,7 @@ svg.plan,
 .nom-appareil input {
   flex: 1;
   min-width: 0;
-  min-height: 40px;
+  min-height: 36px;
   padding: 6px 10px;
   border: 1px solid var(--bordure);
   border-radius: 8px;
@@ -3899,4 +3998,114 @@ svg.plan,
 .verrou-drive {
   color: var(--rouge);
   font-weight: 600;
+}
+
+/* --- Réglages de cet appareil (roue ⚙ de l'en-tête) --- */
+
+.fenetre-reglages {
+  width: min(92vw, 420px);
+  padding: 18px;
+  border: none;
+  border-radius: var(--rayon);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.fenetre-reglages::backdrop {
+  background: rgba(27, 43, 54, 0.45);
+}
+
+.case-reglage {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--bordure);
+}
+
+.case-reglage input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.case-reglage > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.fenetre-reglages .nom-appareil {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-top: 1px solid var(--bordure);
+}
+
+.fenetre-reglages .ligne-outils {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* --- Mode téléphone (réglage) : textes, icônes et boutons plus petits ---
+   La plupart des tailles de texte sont en « rem » : baisser la taille de base les réduit toutes. */
+html:has(body.mode-telephone) {
+  font-size: 14px;
+}
+
+body.mode-telephone {
+  font-size: 14px;
+  --hauteur-entete: 48px;
+  --hauteur-onglets: 54px;
+}
+
+body.mode-telephone .entete-icone-bouton {
+  width: 32px;
+  height: 32px;
+}
+
+body.mode-telephone .entete-icone-bouton svg {
+  width: 19px;
+  height: 19px;
+}
+
+body.mode-telephone .entete-titre {
+  font-size: 1rem;
+}
+
+body.mode-telephone .bouton,
+body.mode-telephone button.bouton {
+  min-height: 36px;
+  padding: 6px 12px;
+}
+
+body.mode-telephone .bouton-secondaire {
+  min-height: 32px;
+  padding: 4px 10px;
+}
+
+body.mode-telephone input[type='text'],
+body.mode-telephone select {
+  min-height: 36px;
+  padding: 6px 10px;
+}
+
+body.mode-telephone .carte-section {
+  padding: 10px 12px;
+}
+
+body.mode-telephone svg {
+  max-width: 100%;
+}
+
+body.mode-telephone.avec-recepteur {
+  --hauteur-entete: 78px;
+}
+
+body.mode-telephone .onglets button {
+  font-size: 0.68rem;
+}
+
+body.mode-telephone .onglets button svg {
+  width: 20px;
+  height: 20px;
 }

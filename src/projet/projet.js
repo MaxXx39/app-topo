@@ -70,6 +70,14 @@ export function titreProjet(projet) {
   return affaireLieu || (projet.nom ?? '').trim() || 'Projet sans nom';
 }
 
+// Exemple écrit en gris à la place du titre tant que le projet n'a ni affaire, ni lieu, ni nom.
+export const EXEMPLE_TITRE = 'ex. 10 203 - Gland';
+
+/** Vrai si le projet n'a encore ni affaire, ni lieu, ni nom (titre « Projet sans nom »). */
+export function projetSansTitre(projet) {
+  return ![projet.cartouche?.affaire, projet.cartouche?.lieu, projet.nom].some((t) => (t ?? '').trim());
+}
+
 /** Nom du projet, à écrire sous le titre (seulement s'il n'est pas déjà le titre), ou ''. */
 export function sousTitreProjet(projet) {
   const nom = (projet.nom ?? '').trim();

@@ -86,15 +86,14 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     minuterie = setTimeout(() => envoyer(), delai);
   }
 
-  /** Envoie le projet ouvert (un seul envoi à la fois). */
-  async function envoyer() {
+  /** Envoie le projet ouvert, ou "projet" (un seul envoi à la fois). */
+  async function envoyer(projet = obtenirProjet()) {
     if (!etat.connecte || !synchro) return;
     clearTimeout(minuterie);
     if (envoiEnCours) {
       await envoiEnCours;
-      return envoyer();
+      return envoyer(projet);
     }
-    const projet = obtenirProjet();
     if (etat.repris?.projetId === projet.id) return; // ouvert ailleurs : on n'écrase rien
     envoiEnCours = (async () => {
       changer('envoi', 'envoi…');
@@ -150,17 +149,23 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     }
   }
 
-  /** Avant d'ouvrir un autre projet : on envoie ce qui reste et on rend le verrou. */
-  async function avantDeChanger() {
-    if (!etat.connecte || !synchro) return;
+  /**
+   * Avant d'ouvrir un autre projet : on envoie ce qui reste et on rend le verrou, en arrière-plan
+   * (l'autre projet s'ouvre tout de suite, sans attendre internet). Renvoie la promesse de l'envoi.
+   */
+  function avantDeChanger() {
+    if (!etat.connecte || !synchro) return Promise.resolve();
     const projet = obtenirProjet();
-    try {
-      if (etat.repris?.projetId !== projet.id) await envoyer();
-      const memoire = memoireProjet(projet.id);
-      if (memoire && etat.repris?.projetId !== projet.id) await synchro.rendreVerrou(memoire.dossierId);
-    } catch {
-      // Pas de réseau : le verrou restera ; l'autre appareil pourra prendre la main.
-    }
+    if (etat.repris?.projetId === projet.id) return Promise.resolve();
+    return (async () => {
+      try {
+        await envoyer(projet);
+        const memoire = memoireProjet(projet.id);
+        if (memoire && etat.repris?.projetId !== projet.id) await synchro.rendreVerrou(memoire.dossierId);
+      } catch {
+        // Pas de réseau : le verrou restera ; l'autre appareil pourra prendre la main.
+      }
+    })();
   }
 
   /**
@@ -230,7 +235,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
         if (!confirm(`« ${surDrive.titre} » est ouvert sur ${verrou.nom} (depuis ${depuis}).\n\nPrendre la main ? ${verrou.nom} ne pourra plus envoyer ses modifications.`)) return;
       }
       try {
-        await avantDeChanger();
+        avantDeChanger(); // en arrière-plan
         const local = await lireLocal(surDrive.projetId);
         const memoire = memoireProjet(surDrive.projetId);
         const choix = choisirVersion({ local: local?.modifieLe, envoyeLe: memoire?.envoyeLe, distant: surDrive.modifieLe });
