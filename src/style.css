@@ -5043,3 +5043,21 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   stroke: #0f766e;
   stroke-width: 2.5;
 }
+
+/* Libellés : couleur choisie (liste), pastille de couleur sur le bouton du libellé. */
+.table-libelles select {
+  width: 100%;
+  min-width: 5.5em;
+  min-height: 34px;
+  padding: 4px 4px;
+}
+
+.pastille-libelle {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-right: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  vertical-align: baseline;
+}

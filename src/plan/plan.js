@@ -7,6 +7,7 @@ import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
 import { svgDrapeau } from '../outils/drapeaux.js';
 import { pointALAbscisse } from '../topo/ligne-implantation.js';
+import { lireLibelles, couleurDuNom, couleurDeLigne } from '../leve/libelles.js';
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS } from './dxf-canvas.js';
 import { echapper } from '../outils/echapper.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
@@ -259,9 +260,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
     const groupePoints = creerElement('g', { class: 'points' });
     const groupeNoms = creerElement('g', { class: 'noms' });
+    // Couleur choisie pour le libellé du nom (P-RG-1 : regard en noir…), à la place de celle du rôle.
+    const libelles = lireLibelles();
     for (const { point, x, y } of visibles) {
       if (calques.points || rangs.has(point.nom)) {
-        groupePoints.append(creerElement('circle', { cx: x, cy: y, r: 3.5, class: classes.get(point.nom) ?? '' }));
+        const rond = creerElement('circle', { cx: x, cy: y, r: 3.5, class: classes.get(point.nom) ?? '' });
+        const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles);
+        if (couleur) rond.style.fill = couleur;
+        groupePoints.append(rond);
       }
       if (rangs.has(point.nom)) {
         // Point de la liste en cours : entouré, avec son numéro d'ordre.
@@ -325,9 +331,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       return { x, y };
     };
     // Lignes des levés « Autres » (contrôle, points géomètre…) : trait gris ardoise.
+    const libelles = lireLibelles();
     for (const ligne of implantation.lignesAutres ?? []) {
       const ecran = ligne.sommets.map((p) => versEcran(p.est, p.nord, vue));
-      groupe.append(creerElement('path', { d: tracePar(ecran, ligne.fermee), class: 'ligne-autres' }));
+      const element = creerElement('path', { d: tracePar(ecran, ligne.fermee), class: 'ligne-autres' });
+      const couleur = couleurDuNom(ligne.sommets[0]?.nom, libelles);
+      if (couleur) element.style.stroke = couleur;
+      groupe.append(element);
     }
     for (const point of implantation.aImplanter ?? []) {
       const { x, y } = croix(point.est, point.nord, 'croix-a-implanter', 7);
@@ -652,9 +662,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         if (contour) groupe.append(creerElement('path', { d: contour, class: actif ? 'contour actif' : 'contour' }));
       }
       if (calques.lignes) {
+        const libelles = lireLibelles();
         for (const ligne of stock.lignesRupture ?? []) {
           const trace = chemin(ligne.noms, ligne.fermee);
-          if (trace) groupe.append(creerElement('path', { d: trace, class: actif ? 'ligne-rupture actif' : 'ligne-rupture' }));
+          if (!trace) continue;
+          const element = creerElement('path', { d: trace, class: actif ? 'ligne-rupture actif' : 'ligne-rupture' });
+          const couleur = couleurDeLigne(ligne, libelles);
+          if (couleur) element.style.stroke = couleur;
+          groupe.append(element);
         }
       }
       // Segments qui se croisent : en rouge, toujours visibles, pour trouver l'erreur.

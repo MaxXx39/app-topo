@@ -37,8 +37,38 @@ export const LIBELLES_DEPART = {
 
 const CLE_MEMOIRE = 'topo-libelles';
 
-/** Libellés retenus sur l'appareil, ou ceux de départ. Renvoie { lignes, points, aires } ([[abréviation, signification]]). */
+// Couleur d'un libellé (3e case : [abréviation, signification, couleur]), choisie par l'utilisateur
+// (demande du 23.10.2026) : les points et les lignes de ce libellé sont dessinés de cette couleur
+// sur le plan, dans le PDF et dans le DXF. '' = couleur habituelle (celle du rôle).
+// [couleur, nom, couleur AutoCAD du DXF].
+export const COULEURS_LIBELLES = [
+  ['', 'habituelle', null],
+  ['#111827', 'noir', 7],
+  ['#6b7280', 'gris', 8],
+  ['#2563eb', 'bleu', 5],
+  ['#0ea5e9', 'bleu clair', 4],
+  ['#16a34a', 'vert', 3],
+  ['#dc2626', 'rouge', 1],
+  ['#ea580c', 'orange', 30],
+  ['#ca8a04', 'jaune', 2],
+  ['#7c3aed', 'violet', 200],
+  ['#db2777', 'rose', 221],
+  ['#92400e', 'brun', 34],
+];
+
+// Dernière liste lue, pour ne pas relire la mémoire de l'appareil à chaque dessin du plan.
+let enCache = null;
+
+/**
+ * Libellés retenus sur l'appareil, ou ceux de départ. Renvoie { lignes, points, aires }
+ * ([[abréviation, signification, couleur (facultative)]]), une copie qu'on peut modifier.
+ */
 export function lireLibelles() {
+  if (!enCache) enCache = lireMemoire();
+  return structuredClone(enCache);
+}
+
+function lireMemoire() {
   try {
     const lus = JSON.parse(localStorage.getItem(CLE_MEMOIRE));
     // Listes retenues avant les métrés : sans aires, on prend celles de départ.
@@ -51,11 +81,35 @@ export function lireLibelles() {
 
 /** Retient les libellés sur l'appareil. */
 export function enregistrerLibelles(libelles) {
+  enCache = structuredClone(libelles);
   try {
     localStorage.setItem(CLE_MEMOIRE, JSON.stringify(libelles));
   } catch {
     // Mémoire indisponible : la liste ne sera simplement pas retenue.
   }
+}
+
+/** Couleur d'une abréviation dans une liste de libellés, ou null (pas de couleur choisie). */
+function couleurDansListe(liste, abreviation) {
+  return (liste ?? []).find(([a]) => a === abreviation)?.[2] || null;
+}
+
+/**
+ * Couleur d'un point d'après le libellé de son nom (P-RG-3 : libellé RG des points ; L-HT-1-2 :
+ * HT des lignes ; A-ENR-1-2 : ENR des aires), ou null.
+ */
+export function couleurDuNom(nom, libelles = lireLibelles()) {
+  const decoupe = /^([PLA])-([^-]+)-\d+(-\d+)?$/.exec(String(nom ?? ''));
+  if (!decoupe) return null;
+  const [, lettre, abreviation] = decoupe;
+  const liste = { P: libelles.points, L: libelles.lignes, A: libelles.aires }[lettre];
+  return couleurDansListe(liste, abreviation);
+}
+
+/** Couleur d'une ligne de rupture : son libellé (ligne.libelle), sinon celui de son premier point, ou null. */
+export function couleurDeLigne(ligne, libelles = lireLibelles()) {
+  if (ligne?.libelle) return couleurDansListe(libelles.lignes, ligne.libelle);
+  return couleurDuNom(ligne?.noms?.[0], libelles);
 }
 
 /** Abréviation utilisable dans un nom de point : sans espace ni tiret (« h t » → « HT »), en majuscules. */
@@ -82,4 +136,9 @@ export function lireTexteLibelles(texte) {
 /** Texte d'une liste de libellés, une ligne par libellé (pour la modifier). */
 export function ecrireTexteLibelles(liste) {
   return liste.map(([abreviation, signification]) => `${abreviation} ${signification}`.trim()).join('\n');
+}
+
+/** Couleur AutoCAD (DXF) d'une couleur de libellé, ou null (couleur du calque). */
+export function aciDeCouleurLibelle(couleur) {
+  return COULEURS_LIBELLES.find(([c]) => c && c === couleur)?.[2] ?? null;
 }

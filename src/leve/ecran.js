@@ -24,7 +24,7 @@ import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne
 // (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
 const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
 import { htmlFormulairePoint, lireFormulairePoint } from '../outils/formulaire-point.js';
-import { nettoyerAbreviation } from './libelles.js';
+import { nettoyerAbreviation, COULEURS_LIBELLES } from './libelles.js';
 
 // Mode Contrôler : ce qu'on implante (Ligne viendra plus tard), vue des coupes, longueurs.
 const IMPLANTATIONS = [
@@ -150,7 +150,7 @@ export function creerEcranLeve(conteneur, actions) {
     }
     if (action === 'ouvrirLibelles' || action === 'fermerLibelles') {
       libellesOuverts = action === 'ouvrirLibelles';
-      lignesLibelles = libellesOuverts ? donnees.libelles[sorteDuRole()].map(([a, d]) => [a, d]) : [];
+      lignesLibelles = libellesOuverts ? donnees.libelles[sorteDuRole()].map(([a, d, c]) => [a, d, c ?? '']) : [];
       dessiner();
       return;
     }
@@ -205,6 +205,7 @@ export function creerEcranLeve(conteneur, actions) {
     if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
+    else if (cible.dataset.libelle === 'couleur') cible.style.borderLeft = cible.value ? `12px solid ${cible.value}` : '';
   });
 
   // Réglages des corrections : ouverture du bloc et valeurs tapées (gardées si l'écran se redessine).
@@ -798,8 +799,8 @@ export function creerEcranLeve(conteneur, actions) {
     const liste = donnees.libelles[sorte];
     const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
     return `<div class="libelles-terrain pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
-      ${liste.map(([abreviation, signification]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
-          <strong>${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
+      ${liste.map(([abreviation, signification, couleur]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
+          <strong>${couleur ? `<i class="pastille-libelle" style="background: ${couleur}"></i>` : ''}${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
       <button type="button" class="bouton-lien bouton-lien-neutre" data-action="ouvrirLibelles">modifier</button>
     </div>
     ${libellesOuverts ? editeurLibelles() : ''}`;
@@ -810,11 +811,12 @@ export function creerEcranLeve(conteneur, actions) {
     return donnees.role === 'aire' ? 'aires' : ['ligne', 'longueur'].includes(donnees.role) ? 'lignes' : 'points';
   }
 
-  /** Libellés tapés dans le tableau : [[abréviation, description]] (lignes vides comprises). */
+  /** Libellés tapés dans le tableau : [[abréviation, description, couleur]] (lignes vides comprises). */
   function lireTableLibelles() {
     return [...conteneur.querySelectorAll('.table-libelles tbody tr')].map((ligne) => [
       nettoyerAbreviation(ligne.querySelector('[data-libelle="abreviation"]').value),
       ligne.querySelector('[data-libelle="description"]').value.trim(),
+      ligne.querySelector('[data-libelle="couleur"]').value,
     ]);
   }
 
@@ -827,11 +829,14 @@ export function creerEcranLeve(conteneur, actions) {
     return `<div class="editeur-libelles">
       <p class="titre-choix">${titres[sorteDuRole()]}</p>
       <table class="table-libelles">
-        <thead><tr><th>Abrév.</th><th>Description</th><th></th></tr></thead>
+        <thead><tr><th>Abrév.</th><th>Description</th><th>Couleur</th><th></th></tr></thead>
         <tbody>
-          ${lignesLibelles.map(([abreviation, description], i) => `<tr>
+          ${lignesLibelles.map(([abreviation, description, couleur = ''], i) => `<tr>
             <td><input type="text" data-libelle="abreviation" value="${echapper(abreviation)}" maxlength="8" autocapitalize="characters" aria-label="Abréviation" /></td>
             <td><input type="text" data-libelle="description" value="${echapper(description)}" aria-label="Description" /></td>
+            <td><select data-libelle="couleur" aria-label="Couleur" style="${couleur ? `border-left: 12px solid ${couleur}` : ''}">
+              ${COULEURS_LIBELLES.map(([c, nom]) => `<option value="${c}" ${c === couleur ? 'selected' : ''}>${nom}</option>`).join('')}
+            </select></td>
             <td><button type="button" class="bouton-lien" data-action="enleverLibelle" data-valeur="${i}" aria-label="Enlever">×</button></td>
           </tr>`).join('')}
         </tbody>
