@@ -10,9 +10,10 @@ import { estDansAppliAndroid } from '../android/pont.js';
 
 export const PORTEE_DRIVE = 'https://www.googleapis.com/auth/drive.file';
 
-// Identifiant « client Web » du projet Google Cloud de l'appli (pas un secret : il est visible
-// dans toute page web qui se connecte à Google). À remplir une fois le projet Google créé.
-export const ID_CLIENT_WEB = '';
+// Identifiant « client Web » du projet Google Cloud « Topo Perrin » (compte Google de l'appli).
+// Ce n'est pas un secret : il est visible dans toute page web qui se connecte à Google.
+// Origine autorisée dans Google Cloud : https://maxxx39.github.io (l'appli publiée sur GitHub Pages).
+export const ID_CLIENT_WEB = '903433626898-10vnjo1l45nvpmffo6jj6v6091tlbh2o.apps.googleusercontent.com';
 
 /** Vrai si la connexion à Drive est possible ici (APK assez récent, ou navigateur configuré). */
 export function connexionPossible() {
