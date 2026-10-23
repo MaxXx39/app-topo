@@ -52,7 +52,8 @@ const NATURES_TERRAIN = [
 const ACCROCHES = {
   // Implantation d'une ligne : la ligne entière du plan DXF (polyligne).
   trait: ['Ligne DXF', 'Ligne entière du plan DXF (polyligne)', '<path class="repere-trait" d="M3 18 9 8l6 6 6-9" /><circle cx="3" cy="18" r="1.6" /><circle cx="21" cy="5" r="1.6" />'],
-  point: ['Point', 'Point du projet (levé ou importé)', '<path d="M12 3v5M12 16v5M3 12h5M16 12h5" /><circle class="repere" cx="12" cy="12" r="3.5" />'],
+  // Point du projet : le même rond gris que les points du plan, entouré d'ambre (accroché).
+  point: ['Point', 'Point du projet (levé ou importé)', '<circle class="anneau-accroche" cx="12" cy="12" r="8" /><circle class="rond-point" cx="12" cy="12" r="4.5" />'],
   sommet: ['Sommet', 'Sommet d\'une ligne du plan DXF', '<path d="M3 20 12 6l9 14" /><rect class="repere" x="9" y="3" width="6" height="6" />'],
   milieu: ['Milieu', 'Milieu d\'un segment du plan DXF', '<path d="M2 17h20" /><circle cx="2.5" cy="17" r="1.5" /><circle cx="21.5" cy="17" r="1.5" /><path class="repere" d="M12 8l5 9H7z" />'],
   ligne: ['Sur ligne', 'Sur une ligne du plan DXF (endroit le plus proche)', '<path d="M3 21 21 3" /><path class="repere" d="M8 8l8 8M16 8l-8 8" />'],
@@ -534,9 +535,10 @@ export function creerEcranLeve(conteneur, actions) {
     // La canne est trop à droite (écart > 0) : il faut aller à gauche.
     const sens = Math.abs(ecart) < 0.0005 ? 'Sur la ligne' : `${ecart > 0 ? '← Gauche' : '→ Droite'} ${m(ecart)}`;
     let le_long;
-    if (abscisse < 0) le_long = `Avant le début : ${m(abscisse)}`;
+    // Position le long : + depuis le début, − avant le début (demande du 23.10.2026).
+    if (abscisse < 0) le_long = `−${m(abscisse)}`;
     else if (abscisse > longueur) le_long = `Après la fin : ${m(abscisse - longueur)}`;
-    else le_long = `Début + ${formaterNombre(abscisse)} m · fin − ${formaterNombre(reste)} m`;
+    else le_long = `+${m(abscisse)} · fin ${m(reste)}`;
     const hauteur = g.ecartAltitude == null
       ? ''
       : `<span class="hauteur-guidage ${g.classeAltitude}">${g.ecartAltitude >= 0 ? '↑ Monter' : '↓ Descendre'} ${m(g.ecartAltitude)}</span>`;

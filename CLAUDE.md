@@ -135,6 +135,8 @@ Ajouts demandés par l'utilisateur après la V1 :
   - **Pointage DXF** : accroche choisie en **ambre** (le bleu nuit ne se voyait pas sur la barre).
   - **Tailles** : base 16 → 15 px (mode téléphone 14 → 13 px), tailles en px des textes, icônes et boutons × 0.93.
 
+- **Version 0.53.1 (demandes du 23.10.2026)** : icône de l'accroche **Point** = le même rond gris qu'un point du plan, entouré d'ambre ; ligne à implanter : position le long écrite **« +8.111 m »** (au lieu de « début ») et **« −5.428 m »** avant le début (plan et écran de guidage ; « fin 15.727 m », « après la fin » inchangés) ; **photo aérienne swisstopo à l'écran : 25 % de transparence** (`.tuile.satellite`, opacité 0.75 ; PDF toujours à 50 %).
+
 ## 5. Vérification : cas de référence
 
 L'utilisateur compare lui-même avec Mensura. Tolérance : **0,5 %**. Fichiers d'exemple à placer dans le dossier `exemples/` : `stock.csv`, `stock_export.txt`, le PDF Mensura et un LandXML.

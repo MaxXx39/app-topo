@@ -443,7 +443,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /**
    * Cotes de l'implantation d'une ligne, sans bulle, attachées aux traits : distance depuis le
-   * début et jusqu'à la fin, écrites le long de la ligne (de chaque côté du pied de la
+   * début (« +8.111 m », « −5.428 m » avant le début) et jusqu'à la fin, écrites le long de la ligne (de chaque côté du pied de la
    * perpendiculaire) ; avant le début ou après la fin, le prolongement de la ligne en pointillés
    * avec sa longueur ; l'écart de la canne écrit sur la perpendiculaire (canne → ligne).
    * cotes : { sommets, abscisse, longueur, ecart } (m) ; canne : { x, y } (pixels) ; vers : pied (MN95).
@@ -490,12 +490,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (abscisse < 0) {
       // Avant le début : prolongement du premier segment jusqu'en face de la canne.
       groupe.append(creerElement('path', { d: tracePar(morceau(abscisse, 0), false), class: 'prolongement-ligne' }));
-      coteMorceau(abscisse, 0, `${m(abscisse)} avant le début`, 'cote-prolongement');
+      coteMorceau(abscisse, 0, `−${m(abscisse)}`, 'cote-prolongement');
     } else if (abscisse > longueur) {
       groupe.append(creerElement('path', { d: tracePar(morceau(longueur, abscisse), false), class: 'prolongement-ligne' }));
       coteMorceau(longueur, abscisse, `${m(abscisse - longueur)} après la fin`, 'cote-prolongement');
     } else {
-      coteMorceau(0, abscisse, `début ${m(abscisse)}`, 'cote-debut');
+      coteMorceau(0, abscisse, `+${m(abscisse)}`, 'cote-debut');
       coteMorceau(abscisse, longueur, `fin ${m(longueur - abscisse)}`, 'cote-fin');
     }
     // Repère au pied de la perpendiculaire (petit trait en travers de la ligne).

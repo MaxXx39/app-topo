@@ -1254,6 +1254,11 @@ button.puce {
   user-select: none;
 }
 
+/* Photo aérienne swisstopo à l'écran : 25 % de transparence, pour que le plan se lise mieux. */
+.plan-fond .tuile.satellite {
+  opacity: 0.75;
+}
+
 /* Le dessin et les boutons restent au-dessus du fond. */
 svg.plan {
   position: relative;
@@ -3345,6 +3350,17 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   fill: none;
   stroke: #f6ab07;
   stroke-width: 3;
+}
+
+.bouton-accroche svg .rond-point {
+  fill: #9aa5a0;
+  stroke: none;
+}
+
+.bouton-accroche svg .anneau-accroche {
+  fill: none;
+  stroke: #f6ab07;
+  stroke-width: 2.4;
 }
 
 .bouton-accroche.actif {
