@@ -1,6 +1,6 @@
 // Affichage du plan : points avec leur nom, zoom et déplacement
 // au doigt (téléphone) ou à la souris (ordinateur).
-import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle } from './vue.js';
+import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
 import { bulle } from '../aide/bulles.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
@@ -107,6 +107,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <button type="button" data-action="ma-position" aria-label="Ma position" title="Ma position" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
         </button>
+        <button type="button" data-action="nord-en-haut" class="bouton-nord" aria-label="Nord en haut" title="Nord en haut" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 16 12H8Z" class="nord" /><path d="M12 22 8 12h8Z" /><text x="12" y="10.5" text-anchor="middle">N</text></svg>
+        </button>
       </div>
     </div>
   `;
@@ -130,9 +133,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // Position du récepteur (appli Android) : { est, nord, prete, azimut (°, ou null),
   // coupes: [{ sens, debut, fin }] (coupes en direct du mode Implanter) } ou null.
   let position = null;
-  // Suivi de la position : le plan se recentre sur elle à chaque mise à jour (bouton « Ma position »),
-  // jusqu'à ce qu'on déplace le plan au doigt.
-  let suivre = false;
+  // Suivi de la position (bouton « Ma position », 3 modes à la suite, comme Google Maps) :
+  // 'libre' (pas de suivi), 'suivre' (le plan se recentre sur elle, nord en haut), 'cap' (il se
+  // recentre et tourne : le devant du RX2 en haut). Déplacer le plan au doigt arrête le suivi
+  // (le plan garde son angle ; la boussole du plan le remet nord en haut).
+  let suivi = 'libre';
   // Plans DXF en fond (voir topo/dxf-plan.js), dessinés sur un canvas sous le dessin (voir
   // dxf-canvas.js) ; redessinés seulement si la vue ou les plans changent (signatureDxf).
   let plansDxf = [];
@@ -315,6 +320,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     dessinerBarreEchelle();
     dessinerImplantation();
     dessinerPosition();
+    mettreAJourBoussolePlan();
   }
 
   /**
@@ -426,7 +432,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       groupe.append(creerElement('path', {
         d: `M${x} ${y - 25} L${x + 8} ${y - 9} L${x} ${y - 13} L${x - 8} ${y - 9} Z`,
         class: 'fleche',
-        transform: `rotate(${position.azimut.toFixed(1)} ${x} ${y})`,
+        transform: `rotate(${(position.azimut - (vue.rotation ?? 0)).toFixed(1)} ${x} ${y})`,
       }));
     }
     groupe.append(creerElement('circle', { cx: x, cy: y, r: 6 }));
@@ -514,7 +520,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function dessinerPlansDxf() {
     const densite = Math.min(window.devicePixelRatio || 1, 2);
     const visibles = plansDxf; // affichés ou cachés un par un (menu « Plans »)
-    const signature = [vue.echelle, vue.estCentre, vue.nordCentre, vue.largeur, vue.hauteur, densite,
+    const signature = [vue.echelle, vue.estCentre, vue.nordCentre, vue.largeur, vue.hauteur, vue.rotation ?? 0, densite,
       ...visibles.map((p) => `${p.id}:${p.visible !== false}:${p.couleur ?? ''}:${p.calques.map((c) => (c.visible ? 1 : 0)).join('')}`)].join('|');
     if (signature === signatureDxf) return;
     signatureDxf = signature;
@@ -540,12 +546,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
     if (vue && (points.length > 0 || position || plansDxf.length > 0) && couches.length > 0) {
       const z = niveauDeZoom(1 / vue.echelle, window.devicePixelRatio || 1);
-      const hautGauche = versTerrain(0, 0, vue);
-      const basDroite = versTerrain(vue.largeur, vue.hauteur, vue);
-      const tuiles = tuilesPourZone(
-        { estMin: hautGauche.est, estMax: basDroite.est, nordMin: basDroite.nord, nordMax: hautGauche.nord },
-        z,
-      );
+      // Zone vue (plus grande que l'écran quand le plan est tourné).
+      const tuiles = tuilesPourZone(zoneVisible(vue), z);
+      const rotationTuile = vue.rotation ? `rotate(${(-vue.rotation).toFixed(2)}deg)` : '';
       // Garde-fou : on ne charge pas des centaines d'images d'un coup.
       if (tuiles.length <= 300) {
         couches.forEach((nom, ordre) => {
@@ -570,6 +573,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
             image.style.width = `${Math.ceil(cote) + 1}px`;
             image.style.height = `${Math.ceil(cote) + 1}px`;
             image.style.zIndex = String(ordre);
+            // Plan tourné : la tuile tourne autour de son coin en haut à gauche (nord-ouest).
+            image.style.transformOrigin = '0 0';
+            image.style.transform = rotationTuile;
           }
         });
       }
@@ -1066,15 +1072,76 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   }
 
   // --- Boutons ---
-  conteneur.querySelector('[data-action="tout-voir"]').addEventListener('click', toutVoir);
+  conteneur.querySelector('[data-action="tout-voir"]').addEventListener('click', () => {
+    changerSuivi('libre');
+    toutVoir();
+  });
   conteneur.querySelector('[data-action="zoom-plus"]').addEventListener('click', () => zoomerAuCentre(1.5));
   conteneur.querySelector('[data-action="zoom-moins"]').addEventListener('click', () => zoomerAuCentre(1 / 1.5));
   const boutonPosition = conteneur.querySelector('[data-action="ma-position"]');
+  const boutonNord = conteneur.querySelector('[data-action="nord-en-haut"]');
+  // Dessin du bouton selon le mode : viseur (libre), viseur plein (suivi, nord en haut), flèche
+  // de navigation (suivi, devant en haut).
+  const ICONES_SUIVI = {
+    libre: '<circle cx="12" cy="12" r="4" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" />',
+    suivre: '<circle cx="12" cy="12" r="4" class="plein" /><circle cx="12" cy="12" r="8" /><path d="M12 1v3M12 20v3M1 12h3M20 12h3" />',
+    cap: '<path d="M12 2 20 21 12 16 4 21Z" class="plein" />',
+  };
+  const TITRES_SUIVI = {
+    libre: 'Ma position',
+    suivre: 'Suit ma position, nord en haut (toucher : devant en haut)',
+    cap: 'Suit ma position, devant du RX2 en haut (toucher : nord en haut)',
+  };
+
+  /** Change le mode de suivi et le dessin du bouton. */
+  function changerSuivi(mode) {
+    suivi = mode;
+    boutonPosition.classList.toggle('actif', mode !== 'libre');
+    boutonPosition.classList.toggle('mode-cap', mode === 'cap');
+    boutonPosition.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONES_SUIVI[mode]}</svg>`;
+    boutonPosition.title = TITRES_SUIVI[mode];
+    boutonPosition.setAttribute('aria-label', TITRES_SUIVI[mode]);
+  }
+
+  // 1er toucher : suivre (nord en haut) ; puis on passe de « nord en haut » à « devant en haut ».
   boutonPosition.addEventListener('click', () => {
-    suivre = true;
-    boutonPosition.classList.add('actif');
+    if (suivi === 'suivre') {
+      changerSuivi('cap');
+      if (position?.azimut != null) tournerVers(position.azimut);
+      else centrerSurPosition();
+      return;
+    }
+    changerSuivi('suivre');
+    if (vue) vue = { ...vue, rotation: 0 };
     centrerSurPosition();
   });
+
+  // Boussole du plan (visible quand il est tourné) : le remet nord en haut.
+  boutonNord.addEventListener('click', () => {
+    if (suivi === 'cap') changerSuivi('suivre');
+    if (!vue) return;
+    vue = { ...vue, rotation: 0 };
+    dessiner();
+  });
+
+  /** Écart entre deux angles (°), entre −180 et 180. */
+  function ecartAngle(a, b) {
+    return ((((a - b) % 360) + 540) % 360) - 180;
+  }
+
+  /** Tourne le plan pour que "azimut" (°) soit en haut, centré sur la position. */
+  function tournerVers(azimut) {
+    if (!vue || !position) return;
+    vue = { ...vue, rotation: azimut, estCentre: position.est, nordCentre: position.nord };
+    dessiner();
+  }
+
+  /** Boussole du plan : montrée seulement quand le plan n'a pas le nord en haut ; l'aiguille montre le nord. */
+  function mettreAJourBoussolePlan() {
+    const rotation = vue?.rotation ?? 0;
+    boutonNord.hidden = Math.abs(ecartAngle(rotation, 0)) < 0.5;
+    boutonNord.querySelector('svg').style.transform = `rotate(${(-rotation).toFixed(1)}deg)`;
+  }
 
   /** Vrai si la position est à plus de 20 % de la largeur (ou de la hauteur) du centre du plan. */
   function loinDuCentre() {
@@ -1084,8 +1151,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /** Arrête le suivi de la position (le plan a été déplacé au doigt). */
   function arreterSuivi() {
-    suivre = false;
-    boutonPosition.classList.remove('actif');
+    changerSuivi('libre');
   }
 
   // --- Menu des calques ---
@@ -1208,8 +1274,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function suivreLeGeste() {
     const depart = geste.vueDepart;
     const k = vue.echelle / depart.echelle;
-    const tx = (vue.largeur / 2) * (1 - k) + vue.echelle * (depart.estCentre - vue.estCentre);
-    const ty = (vue.hauteur / 2) * (1 - k) + vue.echelle * (vue.nordCentre - depart.nordCentre);
+    // Le coin en haut à gauche de l'ancienne image : où il est maintenant (marche aussi plan tourné).
+    const coin = versTerrain(0, 0, depart);
+    const { x: tx, y: ty } = versEcran(coin.est, coin.nord, vue);
     const transformation = `translate(${tx}px, ${ty}px) scale(${k})`;
     svg.style.transform = transformation;
     fond.style.transform = transformation;
@@ -1248,7 +1315,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       cadre.classList.add('en-geste');
     }
     if (apres.length === 1) {
-      if (suivre) arreterSuivi();
+      if (suivi !== 'libre') arreterSuivi();
       vue = deplacer(vue, apres[0].x - avant[0].x, apres[0].y - avant[0].y);
     } else if (apres.length >= 2) {
       // Pincement : on zoome selon l'écart entre les deux doigts,
@@ -1368,7 +1435,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       position = nouvellePosition;
       boutonPosition.hidden = !position;
       // Suivi : on ne recentre (et ne redessine tout) que si la position s'approche du bord.
-      if (position && (!vue || (suivre && loinDuCentre()) || (premiere && points.length === 0))) centrerSurPosition();
+      if (position && suivi === 'cap' && position.azimut != null && vue && Math.abs(ecartAngle(position.azimut, vue.rotation ?? 0)) > 3) tournerVers(position.azimut);
+      else if (position && (!vue || (suivi !== 'libre' && loinDuCentre()) || (premiere && points.length === 0))) centrerSurPosition();
       else dessinerPosition();
     },
     /** Listes de points du menu « Points » (voir listes-points.js). */
@@ -1401,8 +1469,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     cadrerSur(coins, minimum = 10) {
       const { largeur, hauteur } = taille();
       if (largeur === 0 || hauteur === 0 || coins.length === 0) return;
-      suivre = false;
-      boutonPosition.classList.remove('actif');
+      changerSuivi('libre');
       const cadre = cadrerSurPoints(coins, largeur, hauteur, 40);
       vue = { ...cadre, echelle: Math.min(cadre.echelle, Math.min(largeur, hauteur) / minimum) };
       dessiner();
@@ -1411,8 +1478,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     cadrerSurPlans(choisis) {
       const { largeur, hauteur } = taille();
       if (largeur === 0 || hauteur === 0 || choisis.length === 0) return;
-      suivre = false;
-      boutonPosition.classList.remove('actif');
+      changerSuivi('libre');
       vue = cadrerSurPoints(coinsDesPlans(choisis), largeur, hauteur);
       dessiner();
     },

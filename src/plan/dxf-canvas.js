@@ -7,6 +7,8 @@
 // - textes de moins de 3 pixels de haut : pas dessinés (illisibles).
 // Pendant un geste (glisser, pincer), l'image est seulement déplacée / agrandie (voir plan.js).
 
+import { versEcran, zoneVisible } from './vue.js';
+
 // Couleur d'un plan au choix (liste des plans) : '' = ses couleurs d'AutoCAD, sinon une seule
 // couleur pour tout le plan (pour distinguer un plan de bordures d'un plan de terrassement…).
 export const COULEURS_PLANS = [
@@ -87,7 +89,7 @@ export function aDessiner(objet, zone, echelle) {
 
 /**
  * Dessine les plans DXF sur le canvas. vue : { echelle (px/m), estCentre, nordCentre, largeur,
- * hauteur } (voir vue.js) ; densite : pixels de l'écran par pixel CSS. Seuls les plans visibles
+ * hauteur, rotation } (voir vue.js) ; densite : pixels de l'écran par pixel CSS. Seuls les plans visibles
  * (plan.visible !== false) sont dessinés.
  */
 export function dessinerPlansDxf(canvas, plans, vue, densite = 1) {
@@ -101,15 +103,24 @@ export function dessinerPlansDxf(canvas, plans, vue, densite = 1) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, largeur, hauteur);
   const e = vue.echelle;
+  // Plan tourné (devant du RX2 en haut, voir vue.js) : angle de la vue.
+  const rotation = ((vue.rotation ?? 0) * Math.PI) / 180;
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  const zoneTerrain = zoneVisible(vue);
   for (const plan of plans) {
     if (plan.visible === false || !plan.contenu) continue;
     const preparation = preparer(plan);
     // Position de l'origine du plan à l'écran (px CSS), puis zone visible dans le repère du plan.
-    const tx = vue.largeur / 2 + (plan.origine.est - vue.estCentre) * e;
-    const ty = vue.hauteur / 2 - (plan.origine.nord - vue.nordCentre) * e;
-    const zone = { xMin: -tx / e, xMax: (vue.largeur - tx) / e, yMin: (ty - vue.hauteur) / e, yMax: ty / e };
-    // Repère du plan (m, nord vers le haut) -> pixels de l'écran.
-    ctx.setTransform(densite * e, 0, 0, -densite * e, densite * tx, densite * ty);
+    const { x: tx, y: ty } = versEcran(plan.origine.est, plan.origine.nord, vue);
+    const zone = {
+      xMin: zoneTerrain.estMin - plan.origine.est,
+      xMax: zoneTerrain.estMax - plan.origine.est,
+      yMin: zoneTerrain.nordMin - plan.origine.nord,
+      yMax: zoneTerrain.nordMax - plan.origine.nord,
+    };
+    // Repère du plan (m, nord vers le haut) -> pixels de l'écran (tourné comme la vue).
+    ctx.setTransform(densite * e * cos, -densite * e * sin, -densite * e * sin, -densite * e * cos, densite * tx, densite * ty);
     ctx.lineWidth = 1 / e; // 1 pixel, quel que soit le zoom
     ctx.lineJoin = 'round';
     for (const [teinte, liste] of preparation.pleins) {
@@ -150,11 +161,13 @@ export function dessinerPlansDxf(canvas, plans, vue, densite = 1) {
     for (const texte of preparation.textes) {
       const taille = texte.h * e;
       if (taille < TEXTE_MINIMAL) continue;
-      const x = tx + texte.x * e;
-      const y = ty - texte.y * e;
+      const x = tx + (texte.x * cos - texte.y * sin) * e;
+      const y = ty - (texte.x * sin + texte.y * cos) * e;
       if (x < -taille * 20 || x > vue.largeur + taille * 20 || y < -taille * 2 || y > vue.hauteur + taille * 2) continue;
       ctx.setTransform(densite, 0, 0, densite, densite * x, densite * y);
-      if (texte.a) ctx.rotate((-texte.a * Math.PI) / 180);
+      // Angle du texte sur le terrain, plus la rotation de la vue (sens inverse des aiguilles).
+      const angle = (texte.a ?? 0) + (vue.rotation ?? 0);
+      if (angle) ctx.rotate((-angle * Math.PI) / 180);
       ctx.font = `${taille}px sans-serif`;
       ctx.textAlign = ALIGNEMENTS[texte.ah] ?? 'left';
       ctx.textBaseline = LIGNES_DE_BASE[texte.av] ?? 'alphabetic';

@@ -5061,3 +5061,32 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   border-radius: 50%;
   vertical-align: baseline;
 }
+
+/* Bouton « Ma position » : parties pleines du dessin (suivi, devant en haut). */
+.plan-boutons svg .plein {
+  fill: currentColor;
+}
+
+/* Boussole du plan (plan tourné) : l'aiguille rouge montre le nord ; toucher = nord en haut. */
+.plan-boutons .bouton-nord svg {
+  width: 26px;
+  height: 26px;
+  transition: transform 0.2s;
+}
+
+.plan-boutons .bouton-nord .nord {
+  fill: var(--rouge);
+  stroke: var(--rouge);
+}
+
+.plan-boutons .bouton-nord path:not(.nord) {
+  fill: #9ca3af;
+  stroke: #9ca3af;
+}
+
+.plan-boutons .bouton-nord text {
+  fill: #ffffff;
+  stroke: none;
+  font-size: 5px;
+  font-weight: 800;
+}
