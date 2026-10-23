@@ -26,3 +26,12 @@
 10:11:31 AM [vite] (client) hmr update /src/style.css
 10:11:50 AM [vite] (client) page reload src/main.js
 10:11:56 AM [vite] (client) hmr update /src/style.css
+10:16:07 AM [vite] (client) page reload src/main.js
+10:16:26 AM [vite] (client) page reload src/import/ecran.js
+10:16:26 AM [vite] (client) hmr update /src/style.css
+10:17:05 AM [vite] (client) hmr update /src/style.css
+10:17:05 AM [vite] (client) page reload src/main.js
+10:17:22 AM [vite] (client) page reload src/aide/textes.js
+10:17:26 AM [vite] (client) page reload src/aide/textes.js
+10:17:56 AM [vite] (client) page reload android/app/src/main/assets/app-topo/index.html
+10:17:56 AM [vite] (client) page reload android/app/src/main/assets/app-topo/index.html

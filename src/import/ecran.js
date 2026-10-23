@@ -8,6 +8,8 @@ import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { COULEURS_PLANS } from '../plan/dxf-canvas.js';
+import { estEnMn95 } from '../topo/dxf-plan.js';
+import { rotationLisible } from '../topo/recalage.js';
 import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '../outils/formulaire-point.js';
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
 
@@ -15,6 +17,7 @@ import { nomPointAjoute } from '../topo/points-ajoutes.js';
  * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
  * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id),
  * importerPlanDxf(fichier), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
+ * recalerPlanDxf(id), exporterPlanRecale(id), annulerRecalagePlan(id),
  * montrerCalqueDxf(id, n° du calque, visible),
  * montrerTousCalquesDxf(id, visible), ajouterPointTape({ nom, est, nord, altitude }) (renvoie
  * { erreur } ou rien), commencerPointage() (ajouter des points en touchant le plan DXF)
@@ -60,6 +63,9 @@ export function creerEcranImport(conteneur, actions) {
     if (action === 'supprimer-leve') actions.supprimerLeve(id);
     else if (action === 'voir-plan') actions.voirPlanDxf(id);
     else if (action === 'supprimer-plan') actions.supprimerPlanDxf(id);
+    else if (action === 'recaler-plan') actions.recalerPlanDxf(id);
+    else if (action === 'exporter-plan-recale') actions.exporterPlanRecale(id);
+    else if (action === 'annuler-recalage') actions.annulerRecalagePlan(id);
     else if (action === 'tous-calques') actions.montrerTousCalquesDxf(id, bouton.dataset.visible === 'oui');
   });
 
@@ -213,8 +219,10 @@ function listePlansDxf(projet, calquesOuverts) {
         <div class="ligne-outils">
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${plan.id}">voir</button>
+          <button type="button" class="bouton-lien bouton-lien-neutre" data-action="recaler-plan" data-id="${plan.id}">recaler</button>
           <button type="button" class="bouton-lien" data-action="supprimer-plan" data-id="${plan.id}">supprimer</button>
         </div>
+        ${etatRecalage(plan)}
         <details data-calques-plan="${plan.id}" ${calquesOuverts.has(plan.id) ? 'open' : ''}>
           <summary>Calques</summary>
           <div class="ligne-outils">
@@ -231,6 +239,19 @@ function listePlansDxf(projet, calquesOuverts) {
       </div>`;
     })
     .join('')}</div>`;
+}
+
+/** Recalage d'un plan : recalé (paramètres, export, annuler), ou « pas en MN95 », ou rien. */
+function etatRecalage(plan) {
+  const r = plan.recalage;
+  if (r?.applique) {
+    const { gon } = rotationLisible(r.parametres.rotation);
+    const ppm = (r.parametres.echelle - 1) * 1e6;
+    return `<p class="etat-recalage recale">✓ Recalé en MN95 (${r.paires.filter((p) => p.actif !== false).length} points · rotation ${gon.toFixed(4)} gon · échelle ${ppm >= 0 ? '+' : ''}${ppm.toFixed(0)} ppm)
+      <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporter-plan-recale" data-id="${plan.id}">exporter le DXF recalé</button>
+      <button type="button" class="bouton-lien" data-action="annuler-recalage" data-id="${plan.id}">annuler le recalage</button></p>`;
+  }
+  return plan.bornes && !estEnMn95(plan.bornes) ? '<p class="etat-recalage">Pas en MN95 : « recaler »</p>' : '';
 }
 
 /**

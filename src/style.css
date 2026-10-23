@@ -4772,3 +4772,68 @@ button.bouton-import {
   max-height: 50vh;
   overflow-y: auto;
 }
+
+/* --- Recalage d'un plan DXF (barre en bas du plan, comme le pointage) --- */
+.barre-recalage {
+  max-height: 62%;
+  overflow-y: auto;
+}
+
+.barre-recalage .titre-pointage {
+  flex: 1;
+}
+
+.barre-recalage .bouton-lien {
+  color: #fca5a5;
+}
+
+.barre-recalage .choix-pointage label.large input {
+  width: 160px;
+}
+
+.table-calage {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.table-calage th {
+  background: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  text-align: left;
+}
+
+.table-calage td {
+  padding: 2px 4px;
+  background: none;
+  color: inherit;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  font-variant-numeric: tabular-nums;
+}
+
+.table-calage tr.inactif td {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.parametres-recalage {
+  margin: 4px 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.erreur-recalage {
+  margin: 4px 0;
+  color: #fca5a5;
+}
+
+.etat-recalage {
+  margin: 2px 0;
+  color: var(--jaune);
+  font-size: 0.85rem;
+}
+
+.etat-recalage.recale {
+  color: var(--succes);
+}

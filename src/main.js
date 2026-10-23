@@ -71,6 +71,9 @@ import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, a
 import { appliquerReglages, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
 import { listesDePoints, pointsDesListes, montrerListe } from './plan/listes-points.js';
+import { calculerHelmert, planRecale } from './topo/recalage.js';
+import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
+import { creerBarreRecalage } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
 
 // --- État de l'application ---
@@ -352,7 +355,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
       }
       const avertissements = [];
       if (!estEnMn95(lu.bornes)) {
-        avertissements.push('Ce plan ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : il est affiché tel quel, sans recalage.');
+        avertissements.push('Ce plan ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : touche « recaler » sur le plan pour le mettre en MN95.');
       }
       const ignores = Object.entries(lu.compte.ignores);
       if (ignores.length > 0) avertissements.push(`Non affiché(s) : ${ignores.map(([type, n]) => `${n} ${type}`).join(', ')} (hachures, images… : seuls les traits, textes, cercles et aplats sont lus).`);
@@ -370,7 +373,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     const choisi = projet.plansDxf.find((p) => p.id === id);
     if (!choisi) return;
     if (estTelephone()) afficherOnglet('plan');
-    requestAnimationFrame(() => plan.cadrerSurPlans([choisi]));
+    requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
   },
   supprimerPlanDxf: (id) => {
     const choisi = projet.plansDxf.find((p) => p.id === id);
@@ -380,6 +383,14 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     modifie();
   },
   reglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
+  recalerPlanDxf: (id) => commencerRecalage(id),
+  annulerRecalagePlan: (id) => annulerRecalage(id),
+  exporterPlanRecale: (id) => {
+    const choisi = projet.plansDxf.find((p) => p.id === id);
+    if (!choisi?.recalage?.applique) return;
+    const nom = String(choisi.nom).replace(/\.dxf$/i, '');
+    telecharger(new Blob([octetsDxf(genererDxfPlan(planRecale(choisi)))], { type: 'application/dxf' }), `${nom}_MN95.dxf`);
+  },
   // Point tapé (nom, Est, Nord, altitude facultative) : rangé dans le levé « Points ajoutés ».
   ajouterPointTape: (valeurs) => {
     const { point, erreur } = ajouterPointAjoute(projet, { ...valeurs, source: 'tape' });
@@ -834,7 +845,7 @@ function nomProposeImplantation() {
  * Les points « À implanter » restent visibles sur le plan dans les autres onglets.
  */
 function envoyerImplantationAuPlan() {
-  const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne()) && ongletContexte === 'terrain') || pointage.actif;
+  const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne()) && ongletContexte === 'terrain') || pointage.actif || Boolean(recalage.planId);
   const enLigne = accrocheActive && !pointage.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
@@ -844,7 +855,7 @@ function envoyerImplantationAuPlan() {
         actif: accrocheActive,
         aImplanter: projet.aImplanter,
         lignesAutres,
-        choix: pointage.actif ? pointage.choix : accrocheActive && !enLigne ? implanter.choix : null,
+        choix: recalage.planId ? (recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : accrocheActive && !enLigne ? implanter.choix : null,
         cible: accrocheActive && !enLigne ? implanter.cible : null,
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage ? ligneParallele(sommets, implanter.ligne.decalage) : null } : null,
@@ -984,7 +995,7 @@ function enregistrerImplantationLigne() {
 function toucherPourLigne(position, tolerance) {
   const mm = (p) => ({ ...p, est: Math.round(p.est * 1000) / 1000, nord: Math.round(p.nord * 1000) / 1000, altitude: p.altitude != null ? Math.round(p.altitude * 1000) / 1000 : null });
   if (terrain.accrocheLigne === 'trait') {
-    const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(projet.plansDxf ?? [], position, tolerance).lignes);
+    const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes);
     if (!trouve) {
       afficherMessage('Aucune ligne DXF sous le doigt', 3000);
       return;
@@ -996,7 +1007,7 @@ function toucherPourLigne(position, tolerance) {
   } else {
     const sources = terrain.accrocheLigne === 'point'
       ? { lignes: [], cercles: [], points: pointsDuProjet() }
-      : sourcesDesPlans(projet.plansDxf ?? [], position, tolerance);
+      : sourcesDesPlans(plansDuProjet(), position, tolerance);
     const trouve = accrocher(terrain.accrocheLigne, position, tolerance, sources);
     if (!trouve) {
       afficherMessage('Rien sous le doigt', 3000);
@@ -1037,6 +1048,10 @@ function pointsDuProjet() {
  * (« Point » : les points du projet ; les autres : le plan DXF).
  */
 function toucherPourImplantation(position, tolerance) {
+  if (recalage.planId) {
+    toucherPourRecalage(position, tolerance);
+    return;
+  }
   if (pointage.actif) {
     toucherPourPointage(position, tolerance);
     return;
@@ -1047,7 +1062,7 @@ function toucherPourImplantation(position, tolerance) {
   }
   const sources = terrain.accroche === 'point'
     ? { lignes: [], cercles: [], points: pointsDuProjet() }
-    : sourcesDesPlans(projet.plansDxf ?? [], position, tolerance);
+    : sourcesDesPlans(plansDuProjet(), position, tolerance);
   const trouve = accrocher(terrain.accroche, position, tolerance, sources);
   if (!trouve) {
     const quoi = { point: 'aucun point du projet', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[terrain.accroche];
@@ -1057,6 +1072,156 @@ function toucherPourImplantation(position, tolerance) {
   const mm = (valeur) => Math.round(valeur * 1000) / 1000;
   implanter.choix = { ...trouve, est: mm(trouve.est), nord: mm(trouve.nord), altitude: trouve.altitude != null ? mm(trouve.altitude) : null };
   montrerImplantation();
+}
+
+// --- Recalage d'un plan DXF (Projet › Imports › Recaler ; calculs dans topo/recalage.js) ---
+// recalage : { planId (plan en cours de recalage, ou null), accroche, choix ({ x, y } : point
+// touché sur le DXF d'origine), source ('projet', 'tape', 'rx2'), paires (points de calage
+// { x, y, est, nord, nom, actif }) }. Pendant le recalage, ce plan est montré tel qu'il a été lu.
+const recalage = { planId: null, accroche: 'sommet', choix: null, source: 'projet', paires: [] };
+let barreRecalage = null;
+
+/** Plans DXF du projet tels qu'on les utilise : recalés (sauf celui qu'on est en train de recaler). */
+function plansDuProjet() {
+  return (projet.plansDxf ?? []).map((p) => (p.id === recalage.planId ? p : planRecale(p)));
+}
+
+function commencerRecalage(id) {
+  const choisi = projet.plansDxf.find((p) => p.id === id);
+  if (!choisi) return;
+  if (pointage.actif) arreterPointage();
+  recalage.planId = id;
+  recalage.choix = null;
+  recalage.paires = (choisi.recalage?.paires ?? []).map((p) => ({ ...p }));
+  barreRecalage ??= creerBarreRecalage(document.querySelector('#plan .plan-cadre'), {
+    choisirAccroche: (mode) => {
+      recalage.accroche = mode;
+      montrerRecalage();
+    },
+    choisirSource: (source) => {
+      recalage.source = source;
+      montrerRecalage();
+    },
+    ajouterPaire: ajouterPaireCalage,
+    prendreAuRx2: () => {
+      // Même règle qu'un point levé : RTK fixe et inclinaison prête.
+      const reponse = prendrePointRecepteur();
+      if (!reponse.ok) {
+        sonRefus();
+        afficherMessage(`Point refusé : ${reponse.raison}`, 4000);
+        return;
+      }
+      ajouterPaireCalage({ est: reponse.point.est, nord: reponse.point.nord, nom: `RX2 ${new Date().toLocaleTimeString('fr-CH')}` });
+    },
+    basculerPaire: (index, actif) => {
+      recalage.paires[index].actif = actif;
+      montrerRecalage();
+    },
+    enleverPaire: (index) => {
+      recalage.paires.splice(index, 1);
+      montrerRecalage();
+    },
+    appliquer: appliquerRecalage,
+    annulerRecalage: () => annulerRecalage(recalage.planId),
+    fermer: () => {
+      const enregistrees = JSON.stringify(projet.plansDxf.find((p) => p.id === recalage.planId)?.recalage?.paires ?? []);
+      if (JSON.stringify(recalage.paires) !== enregistrees && !confirm('Fermer sans appliquer ? Les points de calage ajoutés seront perdus.')) return;
+      arreterRecalage();
+    },
+  });
+  if (estTelephone()) afficherOnglet('plan');
+  recalculer();
+  requestAnimationFrame(() => plan.cadrerSurPlans([choisi]));
+  montrerRecalage();
+}
+
+function arreterRecalage() {
+  recalage.planId = null;
+  recalage.choix = null;
+  barreRecalage?.enlever();
+  barreRecalage = null;
+  recalculer();
+}
+
+/** Redessine la barre du recalage et la croix du point touché. */
+function montrerRecalage() {
+  const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+  if (!choisi || !barreRecalage) return;
+  barreRecalage.afficher({
+    nomPlan: choisi.nom,
+    accroche: recalage.accroche,
+    choix: recalage.choix,
+    source: recalage.source,
+    nomsPoints: pointsDuProjet().map((p) => p.nom),
+    rx2: recepteurDisponible(),
+    paires: recalage.paires,
+    dejaRecale: Boolean(choisi.recalage?.applique),
+  });
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+}
+
+/** Toucher le plan pendant le recalage : on accroche un point du DXF d'origine. */
+function toucherPourRecalage(position, tolerance) {
+  const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+  const trouve = accrocher(recalage.accroche, position, tolerance, sourcesDesPlans([choisi], position, tolerance));
+  if (!trouve) {
+    afficherMessage('Rien à accrocher sous le doigt', 3000);
+    return;
+  }
+  recalage.choix = { x: trouve.est, y: trouve.nord };
+  montrerRecalage();
+}
+
+/**
+ * Ajoute un point de calage : le point touché sur le DXF et ses coordonnées MN95 (un point du
+ * projet par son nom, ou Est / Nord tapés ou pris au RX2).
+ */
+function ajouterPaireCalage({ nomPoint, est, nord, nom }) {
+  if (!recalage.choix) return;
+  let mn95;
+  if (recalage.source === 'projet') {
+    const point = pointsDuProjet().find((p) => p.nom === String(nomPoint ?? '').trim());
+    if (!point) {
+      afficherMessage(`Point « ${nomPoint} » introuvable dans le projet`, 4000);
+      return;
+    }
+    mn95 = { est: point.est, nord: point.nord, nom: point.nom };
+  } else {
+    const e = typeof est === 'number' ? est : lireNombreTape(String(est).replace(/\s/g, ''));
+    const n = typeof nord === 'number' ? nord : lireNombreTape(String(nord).replace(/\s/g, ''));
+    if (e == null || n == null) {
+      afficherMessage('Est et Nord : écris deux nombres', 4000);
+      return;
+    }
+    mn95 = { est: e, nord: n, nom: nom ?? `E ${formaterNombre(e)} / N ${formaterNombre(n)}` };
+  }
+  recalage.paires.push({ x: recalage.choix.x, y: recalage.choix.y, est: mn95.est, nord: mn95.nord, nom: mn95.nom, actif: true });
+  recalage.choix = null;
+  sonValidation();
+  montrerRecalage();
+}
+
+/** « Appliquer » : le plan est recalé (ses points de calage et les paramètres sont gardés). */
+function appliquerRecalage() {
+  const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+  const helmert = calculerHelmert(recalage.paires);
+  if (!choisi || helmert.erreur) return;
+  const { a, b, tEst, tNord, echelle, rotation } = helmert;
+  choisi.recalage = { paires: recalage.paires.map((p) => ({ ...p })), parametres: { a, b, tEst, tNord, echelle, rotation }, applique: true, le: new Date().toISOString() };
+  arreterRecalage();
+  modifie();
+  afficherMessage(`Plan « ${choisi.nom} » recalé`, 3000);
+  requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+}
+
+/** Annule le recalage : le plan revient tel qu'il a été lu (les points de calage restent, pour refaire). */
+function annulerRecalage(id) {
+  const choisi = projet.plansDxf.find((p) => p.id === id);
+  if (!choisi?.recalage || !confirm(`Annuler le recalage de « ${choisi.nom} » ? Le plan revient tel qu'il a été lu.`)) return;
+  choisi.recalage.applique = false;
+  if (recalage.planId) arreterRecalage();
+  modifie();
 }
 
 // --- Points ajoutés en touchant le plan DXF (Projet › Imports › Point › Pointer sur le plan DXF) ---
@@ -1126,7 +1291,7 @@ function dessinerBarrePointage() {
 
 /** Toucher du plan pendant le pointage : le point accroché est montré (croix), à valider. */
 function toucherPourPointage(position, tolerance) {
-  const trouve = accrocher(pointage.accroche, position, tolerance, sourcesDesPlans(projet.plansDxf ?? [], position, tolerance));
+  const trouve = accrocher(pointage.accroche, position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance));
   if (!trouve) {
     const quoi = { sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', centre: 'Aucun cercle' }[pointage.accroche];
     afficherMessage(`${quoi} sous le doigt`, 3000);
@@ -1853,7 +2018,7 @@ function recalculer({ recadrer = false } = {}) {
   ecranCoupes.afficher();
   ecranMesures.afficher();
   ecranImport.afficher(projet, dernierImport, dernierPlan);
-  plan.afficherPlansDxf(projet.plansDxf ?? []);
+  plan.afficherPlansDxf(plansDuProjet());
   // Point à implanter de la liste : ses coordonnées à jour (Annuler a pu l'enlever).
   if (implanter.cible?.id) {
     const point = projet.aImplanter.find((p) => p.id === implanter.cible.id);
