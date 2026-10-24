@@ -5805,3 +5805,20 @@ body.accroches-ouvertes {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* Menus du plan : « ▾ encore » en bas tant qu'il reste des lignes à voir en faisant défiler. */
+.menu-calques.a-suivre::after,
+.menu-plans-dxf.a-suivre::after {
+  content: '▾ encore';
+  position: sticky;
+  bottom: -6px;
+  display: block;
+  margin: 0 -12px -6px;
+  padding: 14px 0 4px;
+  background: linear-gradient(rgba(255, 255, 255, 0), #ffffff 55%);
+  color: var(--sombre);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-align: center;
+  pointer-events: none;
+}

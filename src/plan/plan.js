@@ -1170,7 +1170,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     menu.style.maxHeight = '';
     const place = cadre.getBoundingClientRect().bottom - menu.getBoundingClientRect().top - 10;
     menu.style.maxHeight = `${Math.max(80, place)}px`;
+    marquerSuite(menu);
   }
+
+  /** « ▾ encore » en bas du menu tant qu'il reste des lignes plus bas (on les voit en faisant défiler). */
+  function marquerSuite(menu) {
+    menu.classList.toggle('a-suivre', menu.scrollTop + menu.clientHeight < menu.scrollHeight - 4);
+  }
+  for (const menu of [menuCalques, menuPlans, menuListes]) menu.addEventListener('scroll', () => marquerSuite(menu));
   menuCalques.addEventListener('change', (evenement) => {
     const champ = evenement.target;
     calques[champ.dataset.calque] = champ.type === 'checkbox' ? champ.checked : champ.value;

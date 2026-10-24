@@ -159,6 +159,8 @@ Ajouts demandés par l'utilisateur après la V1 :
 
 - **Version 0.55.3** : menus du plan (Calques, Plans, Afficher) plus hauts que le plan sur téléphone (bas coupé) : hauteur limitée à la place qui reste dans le plan à l'ouverture (`ajusterHauteurMenu` dans `plan.js`), le contenu défile.
 
+- **Version 0.55.4** : menus du plan : repère **« ▾ encore »** en bas (fondu blanc, la ligne suivante s'estompe) tant qu'il reste des lignes plus bas ; il disparaît en bas de la liste (`marquerSuite`, classe `a-suivre`).
+
 ## 5. Vérification : cas de référence
 
 L'utilisateur compare lui-même avec Mensura. Tolérance : **0,5 %**. Fichiers d'exemple à placer dans le dossier `exemples/` : `stock.csv`, `stock_export.txt`, le PDF Mensura et un LandXML.
