@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { listesDePoints, pointsDesListes, montrerListe } from '../src/plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, LISTE_MESURES } from '../src/plan/listes-points.js';
 
 const pt = (nom) => ({ nom, est: 0, nord: 0, altitude: 0 });
 
@@ -22,9 +22,24 @@ function projetEssai() {
 }
 
 describe('Listes de points du plan', () => {
-  it('une liste par fichier, surface, métré, Autres et points ajoutés (pas les surfaces LandXML)', () => {
+  it('une liste par fichier, points ajoutés, Autres (Points), surface (Surfaces) et métré (Métrés)', () => {
     const listes = listesDePoints(projetEssai());
-    expect(listes.map((l) => [l.id, l.nature])).toEqual([['f', 'fichier'], ['a', 'ajoutes'], ['s1', 'stock'], ['m1', 'metre'], ['o1', 'autres']]);
+    expect(listes.map((l) => [l.id, l.nature, l.section])).toEqual([
+      ['f', 'fichier', 'points'], ['a', 'ajoutes', 'points'], ['o1', 'autres', 'points'],
+      ['s1', 'stock', 'surfaces'], ['lx', 'terrain', 'surfaces'],
+      ['m1', 'metre', 'metres'],
+    ]);
+  });
+
+  it('mesures dessinées : celles des métrés cochés et, si « Mesures » est cochée, celles faites à la main', () => {
+    const projet = projetEssai();
+    projet.mesures.push({ id: 'main', contour: [], lignesRupture: [], points: [] });
+    let listes = listesDePoints(projet);
+    expect(listes.at(-1).id).toBe(LISTE_MESURES);
+    expect(mesuresVisibles(projet, listes).map((m) => m.id)).toEqual(['me', 'main']);
+    montrerListe(projet, 'm1', false);
+    listes = listesDePoints(projet);
+    expect(mesuresVisibles(projet, listes).map((m) => m.id)).toEqual(['main']);
   });
 
   it('dessine seulement les points des listes cochées, chacun une fois', () => {

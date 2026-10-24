@@ -16,6 +16,9 @@
 //   plansDxf: [{ id, nom, importeLe, origine, bornes, calques, contenu, compte }],  // fonds de plan DXF
 //                                   // (voir topo/dxf-plan.js) : affichés sous le levé, pour l'implantation
 //   aImplanter: [{ id, nom, est, nord, altitude (ou null) }],   // points à implanter (Terrain › Implanter › Point)
+//   talus: [{ id, nom, ligne: { nom, sommets, segment, inverse, altitudes: { debut, fin } },
+//            reglages: { horizontal, vertical, ligneEst ('haut', 'bas'), cote ('droite', 'gauche'),
+//                        longueur (m ou null), terrainId, altitudeSurfaceId } }],  // « Mes talus » (voir topo/talus.js)
 //   metres: [{ id, nom, nature: 'metre', leveId, enCours }],   // métrés levés (voir topo/metre.js)
 //   autres: [{ id, nom, nature: 'autres', leveId, contour: [], lignesRupture, points }],  // levés « Autres »
 //                                   // (contrôle, points géomètre… : lignes et points, pas de surface ni de volume)
@@ -50,6 +53,7 @@ export function creerProjet(nom = '') {
     cartouche: { affaire: '', lieu: '', dessinePar: '', date: '' },
     plansDxf: [],
     aImplanter: [],
+    talus: [],
     implantations: [],
     metres: [],
     autres: [],
@@ -71,15 +75,21 @@ export function ajouterLeve(projet, nomFichier, points) {
  */
 export function titreProjet(projet) {
   const affaireLieu = [projet.cartouche?.affaire, projet.cartouche?.lieu].map((t) => (t ?? '').trim()).filter(Boolean).join(' - ');
-  return affaireLieu || (projet.nom ?? '').trim() || 'Projet sans nom';
+  return affaireLieu || (projet.nom ?? '').trim() || projet.nomAuto || 'Projet sans nom';
 }
 
-// Exemple écrit en gris à la place du titre tant que le projet n'a ni affaire, ni lieu, ni nom.
-export const EXEMPLE_TITRE = 'ex. 10 203 - Gland';
-
-/** Vrai si le projet n'a encore ni affaire, ni lieu, ni nom (titre « Projet sans nom »). */
-export function projetSansTitre(projet) {
-  return ![projet.cartouche?.affaire, projet.cartouche?.lieu, projet.nom].some((t) => (t ?? '').trim());
+/**
+ * Nom donné à un nouveau projet tant qu'il n'a ni affaire, ni lieu, ni nom : « Projet sans nom »,
+ * puis « Projet sans nom 2 », « Projet sans nom 3 »… (jamais deux fois le même, demande du 24.10.2026).
+ * titres : titres des projets existants (appareil et Drive).
+ */
+export function nomAutomatique(titres) {
+  let plusGrand = 0;
+  for (const titre of titres) {
+    const trouve = /^Projet sans nom(?: (\d+))?$/.exec(String(titre ?? '').trim());
+    if (trouve) plusGrand = Math.max(plusGrand, Number(trouve[1] ?? 1));
+  }
+  return plusGrand === 0 ? 'Projet sans nom' : `Projet sans nom ${plusGrand + 1}`;
 }
 
 /** Nom du projet, à écrire sous le titre (seulement s'il n'est pas déjà le titre), ou ''. */
@@ -140,6 +150,7 @@ export function completerProjet(projet) {
   complet.leves ??= [];
   complet.plansDxf ??= [];
   complet.aImplanter ??= [];
+  complet.talus ??= [];
   complet.implantations ??= [];
   complet.metres ??= [];
   complet.autres ??= [];
