@@ -5166,3 +5166,25 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   gap: 6px;
   margin-bottom: 8px;
 }
+
+/* Menus du plan : cadre « Aucun DXF » quand il n'y a rien, titres des parties de « Afficher ». */
+.menu-vide {
+  margin: 4px 0;
+  padding: 6px 12px;
+  border: 1px dashed var(--bordure);
+  border-radius: 8px;
+  color: var(--gris);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.titre-partie-menu {
+  margin: 6px 0 2px;
+  color: var(--gris);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pastille-liste.liste-mesures { background: #0891b2; }

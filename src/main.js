@@ -69,7 +69,7 @@ import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecept
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
 import { appliquerReglages, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
-import { listesDePoints, pointsDesListes, montrerListe } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant } from './topo/noms.js';
 import { demanderChoix } from './outils/choix.js';
@@ -926,6 +926,15 @@ function cotesLigne(implantationLigne) {
   const sommets = sommetsDeLaLigne();
   const trace = implanter.ligne.decalage ? ligneParallele(sommets, implanter.ligne.decalage) : sommets;
   return { sommets: trace, abscisse: l.abscisse, longueur: l.longueur, ecart: l.ecart };
+}
+
+/** Mesures dessinées sur le plan hors de l'onglet des mesures : [{ mesure, resultat }]. */
+function mesuresDuPlan(listes) {
+  if (ongletContexte === 'terrain' && terrain.mode === 'controler') return [];
+  const choisies = new Set(mesuresVisibles(projet, listes));
+  const enCours = ongletContexte === 'terrain' && terrain.mode === 'lever' ? metreEnCours() : null;
+  if (enCours) for (const m of projet.mesures) if (m.metreId === enCours.id) choisies.add(m);
+  return [...choisies].map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }));
 }
 
 /** Vrai pendant l'implantation d'un point (Terrain › Implanter › Point). */
@@ -2161,10 +2170,10 @@ function recalculer({ recadrer = false } = {}) {
     // en mode Implanter, aucune étiquette (volume, mesures).
     volumesDiscrets: ongletContexte === 'terrain',
     sansVolumes: ongletContexte === 'terrain' && terrain.mode === 'controler',
-    // Onglet Terrain, métré en cours : ses aires, longueurs et points comptés.
-    mesures: ongletContexte === 'terrain' && terrain.mode === 'lever' && metreEnCours()
-      ? projet.mesures.filter((m) => m.metreId === metreEnCours().id).map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }))
-      : [],
+    // Mesures (aires, longueurs, nombres) des métrés cochés dans « Afficher » (et celles faites à la
+    // main si « Mesures » est cochée) ; dans Terrain › Lever, toujours celles du métré en cours ;
+    // dans Terrain › Implanter, aucune.
+    mesures: mesuresDuPlan(listes),
     mesureActive: null,
   });
   if (recadrer || pointsDuPlan !== pointsAffiches) {

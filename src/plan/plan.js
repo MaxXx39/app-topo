@@ -71,13 +71,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5" /></svg>
           Calques
         </button>
-        <button type="button" class="puce" data-action="plans-dxf" aria-expanded="false" hidden>
+        <button type="button" class="puce" data-action="plans-dxf" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h11l5 5v11H4z" /><path d="M15 4v5h5M8 13h8M8 17h5" /></svg>
           Plans
         </button>
-        <button type="button" class="puce" data-action="listes-points" aria-expanded="false" hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="1.8" /><circle cx="13" cy="5" r="1.8" /><circle cx="18" cy="11" r="1.8" /><circle cx="9" cy="15" r="1.8" /><circle cx="16" cy="19" r="1.8" /></svg>
-          Points
+        <button type="button" class="puce" data-action="listes-points" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
+          Afficher
         </button>
         ${bulle('plan')}
         <div class="menu-plans-dxf" hidden></div>
@@ -1199,18 +1199,28 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (bouton) quandMontrerListe?.('*', bouton.dataset.toutes === 'oui');
   });
 
-  /** Menu « Points » : une case par liste de points (voir listes-points.js). */
+  /**
+   * Menu « Afficher » : une case par liste (voir listes-points.js), en 3 parties : Points,
+   * Surfaces / volumes, Métrés.
+   */
+  const TITRES_SECTIONS = { points: 'Points', surfaces: 'Surfaces / volumes', metres: 'Métrés' };
   let signatureListes = null;
   function remplirMenuListes(listes) {
     const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}`).join('|');
     if (signature === signatureListes) return;
     signatureListes = signature;
-    boutonListes.hidden = listes.length === 0;
-    if (listes.length === 0) menuListes.hidden = true;
-    menuListes.innerHTML = `${listes.map((l) => `<div class="ligne-menu-plan">
+    if (listes.length === 0) {
+      menuListes.innerHTML = '<p class="menu-vide">Rien à afficher</p>';
+      return;
+    }
+    const parties = Object.entries(TITRES_SECTIONS)
+      .map(([section, titre]) => [titre, listes.filter((l) => l.section === section)])
+      .filter(([, liste]) => liste.length > 0);
+    menuListes.innerHTML = `${parties.map(([titre, liste]) => `<p class="titre-partie-menu">${titre}</p>
+      ${liste.map((l) => `<div class="ligne-menu-plan">
         <label class="oeil-plan"><input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} />
           <span class="pastille-liste liste-${l.nature}"></span><span>${echapper(l.nom)}</span></label>
-      </div>`).join('')}
+      </div>`).join('')}`).join('')}
       <div class="ligne-outils"><button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="oui">tout</button>
         <button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="non">rien</button></div>`;
   }
@@ -1228,8 +1238,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${plan.visible !== false}:${plan.couleur || ''}`).join('|');
     if (signature === signatureMenuPlans) return;
     signatureMenuPlans = signature;
-    boutonPlans.hidden = plansDxf.length === 0;
-    if (plansDxf.length === 0) menuPlans.hidden = true;
+    // Aucun plan : un petit cadre « Aucun DXF » (avant : un trait blanc vide).
+    if (plansDxf.length === 0) {
+      menuPlans.innerHTML = '<p class="menu-vide">Aucun DXF</p>';
+      return;
+    }
     menuPlans.innerHTML = plansDxf.map((plan) => `<div class="ligne-menu-plan">
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
           <span>${echapper(plan.nom)}</span></label>
