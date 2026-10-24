@@ -2965,9 +2965,11 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   fill: var(--bleu);
 }
 
-/* Téléphone : le plan a la même taille dans Lever et dans Implanter (version 0.53.0). */
+/* Téléphone : le plan a la même taille dans Lever et dans Implanter (version 0.53.0). Pas de
+   hauteur minimale (300 px) : sur un petit écran, en Lever, le plan débordait sur le bloc du
+   dessous et en cachait le haut (corrigé en 0.54.1). */
 @media (max-width: 899px) {
-  body.mode-leve.mode-controle[data-onglet='terrain'] .plan-cadre {
+  body.mode-leve[data-onglet='terrain'] .plan-cadre {
     min-height: 0;
   }
 }

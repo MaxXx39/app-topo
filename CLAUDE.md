@@ -145,7 +145,7 @@ Ajouts demandés par l'utilisateur après la V1 :
   - **Onglets** : « Calculs / métrés » → **« Calculs »** ; onglet **Projet en liseré** bleu nuit (plus rempli).
   - **Bouton « Récepteur »** (APK, `src/leve/recepteur.js`, test `recepteur.test.js`) : 5e bouton de la barre du bas (décision : en bas, à revoir si besoin) ; couleur `couleurRecepteur` : **gris** pas connecté, **vert** RTK fixe + inclinaison prête, **orange** flottant ou inclinaison pas prête, **rouge** autonome ; fenêtre : état (position, satellites, précision H / V, inclinaison, corrections), Connecter <dernier> / autre récepteur / Couper, **roue ⚙ = réglages NTRIP** (avant en bas de Terrain). Terrain : plus de bouton de connexion ni de bloc Corrections, rappel « Récepteur non connecté · Connecter » qui ouvre la fenêtre. Bandeaux RTK / inclinaison gardés (décision), plus courts (« RTK FIXE · 24 sat · H … V … », « Incl. PRÊTE »).
   - **Libellés du levé** : boutons plus petits, **crayon** « modifier » toujours visible à droite (collé au bord de la liste qui défile).
-  - **À demander** : « problème d'affichage sur Terrain › Lever entre la carte et plus bas » pas vu sur les copies d'écran (téléphone 400 px, tablette 800 px) : capture d'écran demandée à l'utilisateur.
+- **Version 0.54.1** : Terrain › Lever sur téléphone : le plan gardait sa hauteur minimale (300 px, `.plan-cadre`) plus grande que sa place (38svh) et débordait sur le haut du bloc du dessous (capture de l'utilisateur, « Récepteur non connecté » à moitié caché) ; `min-height: 0` pour tout l'onglet Terrain (avant : seulement en Implanter).
 
 ## 5. Vérification : cas de référence
 
