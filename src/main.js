@@ -34,8 +34,7 @@ import {
   completerProjet,
   resumerProjet,
   titreProjet,
-  projetSansTitre,
-  EXEMPLE_TITRE,
+  nomAutomatique,
   sousTitreProjet,
   nomDeFichierProjet,
 } from './projet/projet.js';
@@ -73,6 +72,7 @@ import { sonValidation, sonRefus } from './outils/son.js';
 import { listesDePoints, pointsDesListes, montrerListe } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant } from './topo/noms.js';
+import { demanderChoix } from './outils/choix.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { creerBarreRecalage } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
@@ -1674,7 +1674,7 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   },
   // Nouveau projet : on reste sur l'onglet Projet, curseur dans « Affaire ».
   nouveauProjet: async () => {
-    await changerDeProjet(() => ouvrir(creerProjet(), { changerOnglet: false }));
+    await changerDeProjet(() => ouvrir(nouveauProjetSansNom(), { changerOnglet: false }));
     afficherOnglet('projets');
     document.querySelector('#projets [data-cartouche="affaire"]')?.focus();
   },
@@ -1731,7 +1731,7 @@ async function supprimerDeLAppareil(id) {
   await stockage.supprimerProjet(id);
   if (id === projet.id) {
     const restants = (await stockage.listerProjets()).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
-    await ouvrir(restants[0] ? completerProjet(restants[0]) : creerProjet(), { changerOnglet: false });
+    await ouvrir(restants[0] ? completerProjet(restants[0]) : nouveauProjetSansNom(), { changerOnglet: false });
     partage?.apresOuverture();
   }
   await rafraichirListe();
@@ -1760,12 +1760,26 @@ partage = creerPartage({
     const lu = await stockage.lireProjet(id);
     return lu ? completerProjet(lu) : null;
   },
+  enregistrerLocal: async (lu) => {
+    const complet = completerProjet(lu);
+    await stockage.enregistrerProjet(complet);
+    mettreAJourResume(complet);
+  },
   ouvrirProjet: (nouveau) => ouvrir(completerProjet(nouveau), { changerOnglet: false }),
   garderCopie: async (local) => {
-    const copie = dupliquerProjet(completerProjet(local), `${local.nom || titreProjet(local)} (copie de cet appareil)`);
+    const copie = dupliquerProjet(completerProjet(local), `${titreProjet(local)} (copie)`);
     await stockage.enregistrerProjet(copie);
     mettreAJourResume(copie);
+    return copie;
   },
+  // Projet modifié ici et sur Drive : 2 boutons, « Repartir depuis Drive » mis en avant.
+  choisirVersionConflit: (titre) => demanderChoix({
+    titre: `« ${titre} » a changé ici et sur Drive`,
+    boutons: [
+      { cle: 'drive', texte: 'Repartir depuis Drive', detail: 'les changements faits ici sont perdus', principal: true },
+      { cle: 'copie', texte: 'Créer une copie', detail: 'ta version devient un nouveau projet ; Drive ne change pas' },
+    ],
+  }),
   quandChange: () => {
     afficherEcranProjet();
     mettreAJourEtatEntete();
@@ -2249,11 +2263,8 @@ document.addEventListener('keydown', (evenement) => {
 
 /** Ligne sous le titre du projet (en-tête) : nom, points, surfaces, et l'état de Drive si connecté. */
 function mettreAJourEtatEntete() {
-  // Titre : affaire - lieu (ou le nom) ; tant que rien n'est tapé, un exemple en gris.
-  const titre = document.querySelector('#titre-projet');
-  const sansTitre = projetSansTitre(projet);
-  titre.textContent = sansTitre ? EXEMPLE_TITRE : titreProjet(projet);
-  titre.classList.toggle('titre-exemple', sansTitre);
+  // Titre : affaire - lieu (ou le nom, sinon « Projet sans nom 2 »…).
+  document.querySelector('#titre-projet').textContent = titreProjet(projet);
 
   const points = leveActif(projet)?.points ?? AUCUN_POINT;
   const drive = partage?.etat.connecte
@@ -2358,6 +2369,16 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   await enregistrer();
 }
 
+/**
+ * Nouveau projet, avec un nom automatique tant qu'il n'a ni affaire, ni lieu, ni nom (« Projet sans
+ * nom 2 »… : jamais le même qu'un projet de l'appareil ou de Drive).
+ */
+function nouveauProjetSansNom() {
+  const nouveau = creerProjet();
+  nouveau.nomAuto = nomAutomatique([...resumes.map((r) => r.titre), ...(partage?.etat.projetsDrive ?? []).map((p) => p.titre)]);
+  return nouveau;
+}
+
 // --- Démarrage : on rouvre le dernier projet, sinon le plus récent, sinon un nouveau ---
 // L'appli s'ouvre sur l'onglet Projet (bouton « Continuer » pour reprendre le travail).
 async function demarrer() {
@@ -2367,7 +2388,7 @@ async function demarrer() {
     await rafraichirListe();
     const id = stockage.dernierProjet();
     const lu = (id && (await stockage.lireProjet(id))) || (resumes[0] && (await stockage.lireProjet(resumes[0].id)));
-    await ouvrir(lu ? completerProjet(lu) : creerProjet(), { changerOnglet: false });
+    await ouvrir(lu ? completerProjet(lu) : nouveauProjetSansNom(), { changerOnglet: false });
     // Partage : on se reconnecte à Drive si on l'était (le projet ouvert est alors comparé à Drive).
     partage.demarrer();
   } catch (erreur) {

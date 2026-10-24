@@ -15,10 +15,12 @@ const DELAI_NOUVEL_ESSAI = 60_000; // après un échec (pas de réseau…)
  * - obtenirProjet() : projet ouvert ; titreDe(projet) : son titre (nom du dossier Drive) ;
  * - lireLocal(id) : promesse du projet enregistré sur l'appareil (ou null) ;
  * - ouvrirProjet(projet) : ouvre ce projet dans l'appli (et l'enregistre sur l'appareil) ;
- * - garderCopie(projet) : enregistre une copie (nouveau projet) sur l'appareil ;
+ * - garderCopie(projet) : enregistre une copie (nouveau projet) sur l'appareil et la renvoie ;
+ * - enregistrerLocal(projet) : enregistre un projet sur l'appareil sans l'ouvrir ;
+ * - choisirVersionConflit(titre) : demande « drive » (repartir depuis Drive) ou « copie » ;
  * - quandChange() : l'état a changé (redessiner) ; message(texte) : petit message à l'écran.
  */
-export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, garderCopie, quandChange, message }) {
+export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLocal, ouvrirProjet, garderCopie, choisirVersionConflit, quandChange, message }) {
   const etat = {
     possible: connexionPossible(),
     connecte: false,
@@ -208,27 +210,23 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
 
   /**
    * Ouvre la version Drive d'un projet. conflit : modifié ici et sur Drive depuis le dernier
-   * échange ; on demande laquelle garder, l'autre devient une copie.
+   * échange. On ne remplace jamais Drive par la version de cet appareil (décision du 24.10.2026) :
+   * - « Repartir depuis Drive » (mis en avant) : la version de Drive est ouverte ;
+   * - « Créer une copie » : la version de cet appareil devient un nouveau projet « … (copie) »,
+   *   ouvert ; le projet d'origine reprend la version de Drive, qui n'est pas touchée.
    */
   async function ouvrirVersionDrive(surDrive, conflit) {
     changer('envoi', 'téléchargement…');
     const lu = await synchro.telecharger(surDrive.dossierId);
-    if (conflit) {
-      const prendreDrive = confirm(
-        `« ${surDrive.titre} » a été modifié ici et sur Drive.\n\nOK : prendre la version de Drive (celle de cet appareil est gardée en copie).\nAnnuler : garder celle de cet appareil (elle remplacera celle de Drive).`,
-      );
-      if (!prendreDrive) {
-        // Tout sera renvoyé depuis cet appareil (mémoire vide), par-dessus la version de Drive.
-        retenirProjet(lu.projet.id, { ...lu.memoire, envoyeLe: null, empreintes: {} });
-        await synchro.prendreVerrou(surDrive.dossierId);
-        const local = await lireLocal(lu.projet.id);
-        if (local && obtenirProjet().id !== local.id) await ouvrirProjet(local);
-        changer('a-jour');
-        planifier(2_000);
-        return;
-      }
+    if (conflit && (await choisirVersionConflit(surDrive.titre)) === 'copie') {
       const local = await lireLocal(lu.projet.id);
-      if (local) await garderCopie(local);
+      retenirProjet(lu.projet.id, lu.memoire);
+      await enregistrerLocal(lu.projet);
+      const copie = local ? await garderCopie(local) : null;
+      if (copie) await ouvrirProjet(copie);
+      message(copie ? `Copie « ${titreDe(copie)} » ouverte ; « ${surDrive.titre} » reste comme sur Drive` : 'Version de Drive gardée');
+      changer('a-jour');
+      return;
     }
     retenirProjet(lu.projet.id, lu.memoire);
     await synchro.prendreVerrou(surDrive.dossierId);

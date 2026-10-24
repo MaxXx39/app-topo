@@ -9,6 +9,7 @@ import {
   lireFichierProjet,
   resumerProjet,
   titreProjet,
+  nomAutomatique,
   sousTitreProjet,
   nomDeFichierProjet,
 } from '../src/projet/projet.js';
@@ -111,5 +112,33 @@ describe('titre du projet', () => {
     expect(sousTitreProjet(projet)).toBe('Stocks gravière');
     expect(nomDeFichierProjet(projet)).toBe('10_203_-_Gland');
     expect(titreProjet(creerProjet())).toBe('Projet sans nom');
+  });
+
+  it('donne « Projet sans nom », puis « Projet sans nom 2 », « 3 »… sans jamais répéter un titre', () => {
+    expect(nomAutomatique([])).toBe('Projet sans nom');
+    expect(nomAutomatique(['10 203 - Gland'])).toBe('Projet sans nom');
+    expect(nomAutomatique(['Projet sans nom'])).toBe('Projet sans nom 2');
+    expect(nomAutomatique(['Projet sans nom', 'Projet sans nom 4', 'Projet sans nom 2'])).toBe('Projet sans nom 5');
+    const projet = creerProjet();
+    projet.nomAuto = 'Projet sans nom 3';
+    expect(titreProjet(projet)).toBe('Projet sans nom 3');
+    projet.cartouche.affaire = '10 203';
+    expect(titreProjet(projet)).toBe('10 203');
+  });
+});
+
+describe('liste de la gestion de projets', () => {
+  it('trie par date (appareil ou Drive, le plus récent) ou par nom', async () => {
+    const { projetsReunis } = await import('../src/projet/ecran.js');
+    const resumes = [
+      { id: 'a', titre: 'Projet sans nom 10', modifieLe: '2026-10-20' },
+      { id: 'b', titre: 'Projet sans nom 2', modifieLe: '2026-10-22' },
+    ];
+    const partage = { etat: { connecte: true, projetsDrive: [
+      { projetId: 'a', titre: 'Projet sans nom 10', modifieLe: '2026-10-23' },
+      { projetId: 'c', titre: '10 203 - Gland', modifieLe: '2026-10-21' },
+    ] } };
+    expect(projetsReunis(resumes, partage).map((p) => p.id)).toEqual(['a', 'b', 'c']);
+    expect(projetsReunis(resumes, partage, 'nom').map((p) => p.id)).toEqual(['c', 'b', 'a']);
   });
 });
