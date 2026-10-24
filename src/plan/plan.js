@@ -1158,7 +1158,19 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   boutonCalques.addEventListener('click', () => {
     menuCalques.hidden = !menuCalques.hidden;
     boutonCalques.setAttribute('aria-expanded', String(!menuCalques.hidden));
+    ajusterHauteurMenu(menuCalques);
   });
+
+  /**
+   * Un menu (Calques, Plans, Afficher) ne dépasse pas le bas du plan : sur un téléphone, le plan
+   * est petit (onglet Terrain) ; le menu prend la place qui reste et son contenu défile.
+   */
+  function ajusterHauteurMenu(menu) {
+    if (menu.hidden) return;
+    menu.style.maxHeight = '';
+    const place = cadre.getBoundingClientRect().bottom - menu.getBoundingClientRect().top - 10;
+    menu.style.maxHeight = `${Math.max(80, place)}px`;
+  }
   menuCalques.addEventListener('change', (evenement) => {
     const champ = evenement.target;
     calques[champ.dataset.calque] = champ.type === 'checkbox' ? champ.checked : champ.value;
@@ -1187,6 +1199,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         boutonCalques.setAttribute('aria-expanded', 'false');
         menu.hidden = !menu.hidden;
         bouton.setAttribute('aria-expanded', String(!menu.hidden));
+        ajusterHauteurMenu(menu);
       }
     });
   }

@@ -157,6 +157,8 @@ Ajouts demandés par l'utilisateur après la V1 :
 
 - **Version 0.55.2** : barre d'accroche plus basse (`--hauteur-accroches` 42 px, 58 px avec les noms ; boutons de 32 px) et dessins **centrés** dans leurs boutons (ils restaient collés en haut, capture de l'utilisateur).
 
+- **Version 0.55.3** : menus du plan (Calques, Plans, Afficher) plus hauts que le plan sur téléphone (bas coupé) : hauteur limitée à la place qui reste dans le plan à l'ouverture (`ajusterHauteurMenu` dans `plan.js`), le contenu défile.
+
 ## 5. Vérification : cas de référence
 
 L'utilisateur compare lui-même avec Mensura. Tolérance : **0,5 %**. Fichiers d'exemple à placer dans le dossier `exemples/` : `stock.csv`, `stock_export.txt`, le PDF Mensura et un LandXML.

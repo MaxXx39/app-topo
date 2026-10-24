@@ -5797,3 +5797,11 @@ body.accroches-ouvertes {
     flex: 1;
   }
 }
+
+/* Menus du plan (Calques, Plans, Afficher) : hauteur limitée au plan (voir ajusterHauteurMenu),
+   le contenu défile (version 0.55.3). */
+.menu-calques,
+.menu-plans-dxf {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
