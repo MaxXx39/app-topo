@@ -992,7 +992,7 @@ function calculerImplantationLigne(etat) {
   if (!ligne) return null;
   const position = etat.connecte && etat.recu ? etat.position : null;
   if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
-  const g = guidageLigne(position, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: ligne.altitudes });
+  const g = guidageLigne(position, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: altitudesDesBouts() });
   if (!g) return { message: 'Ligne sans longueur' };
   const fiable = Boolean(etat.autorise);
   const ecartAltitude = fiable && g.altitude != null ? ecartSurface(g.altitude, position.altitude) : null;
@@ -1016,7 +1016,7 @@ function enregistrerImplantationLigne() {
   }
   const { est, nord, altitude, ...gnss } = reponse.point;
   const mesure = { est, nord, altitude, gnss };
-  const g = guidageLigne(mesure, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: ligne.altitudes });
+  const g = guidageLigne(mesure, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: altitudesDesBouts() });
   const ecarts = ecartsImplantation(g.cible, mesure);
   projet.implantations.push({
     id: nouvelIdentifiant(),
@@ -1587,6 +1587,19 @@ function donneesCommunes() {
   };
 }
 
+/**
+ * Altitudes du début et de la fin de la ligne à implanter (m) : celles tapées, sinon celles des
+ * points eux-mêmes (un point du projet choisi pour la ligne a souvent une altitude, même si un
+ * autre point de la ligne n'en a pas). { debut, fin }, chacune pouvant être null.
+ */
+function altitudesDesBouts() {
+  const sommets = sommetsDeLaLigne();
+  const tapees = implanter.ligne.altitudes;
+  // Tous les sommets ont une altitude (DXF 3D…) : on suit leurs altitudes, sommet par sommet.
+  if (tapees.debut == null && tapees.fin == null && sommets.every((s) => s.altitude != null)) return tapees;
+  return { debut: tapees.debut ?? sommets[0]?.altitude ?? null, fin: tapees.fin ?? sommets.at(-1)?.altitude ?? null };
+}
+
 /** Ligne à implanter pour l'écran Terrain : nom, longueur, segments, sens, début, fin, réglages. */
 function resumeLigne() {
   const ligne = implanter.ligne;
@@ -1598,7 +1611,7 @@ function resumeLigne() {
     segment: ligne.segment,
     inverse: ligne.inverse,
     decalage: ligne.decalage,
-    altitudes: ligne.altitudes,
+    altitudes: altitudesDesBouts(),
     altitudesDuPlan: sommets.every((s) => s.altitude != null),
     debut: sommets[0],
     fin: sommets.at(-1),

@@ -146,6 +146,7 @@ export function creerEcranLeve(conteneur, actions) {
       ouvrirFenetreLibelles({
         titre: titres[sorte],
         liste: donnees.libelles[sorte],
+        couleurParDefaut: { lignes: '#ea580c', points: '#15803d', aires: '#0891b2' }[sorte],
         enregistrer: (liste) => actions.enregistrerLibelles({ ...donnees.libelles, [sorte]: liste }),
       });
       return;
@@ -433,7 +434,7 @@ export function creerEcranLeve(conteneur, actions) {
         <p class="titre-choix">Points de la ligne</p>
         ${points.length === 0
           ? '<p class="vide">Aucun point.</p>'
-          : `<ol>${points.map((p, i) => `<li><strong>${role(i)}</strong> ${p.nom ? echapper(p.nom) : ''} <span class="aide">E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)}</span></li>`).join('')}</ol>`}
+          : `<ol>${points.map((p, i) => `<li><strong>${role(i)}</strong> ${p.nom ? echapper(p.nom) : ''} <span class="aide"><span class="coord-en">E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)} · </span>H ${formaterNombre(p.altitude)}</span></li>`).join('')}</ol>`}
         <div class="ligne-outils">
           <button type="button" class="bouton-secondaire" data-action="implanterPointsLigne" ${points.length < 2 ? 'disabled' : ''}>Implanter cette ligne</button>
           ${points.length > 0 ? '<button type="button" class="bouton-lien" data-action="retirerDernierPointLigne">enlever le dernier</button>' : ''}
@@ -495,8 +496,7 @@ export function creerEcranLeve(conteneur, actions) {
     const { implanter: imp } = donnees;
     const choix = imp.choix
       ? `<div class="choix-implantation">
-          <p class="coordonnees-choix">${imp.choix.nom ? `<strong>${echapper(imp.choix.nom)}</strong> ` : ''}E ${formaterNombre(imp.choix.est)} · N ${formaterNombre(imp.choix.nord)}
-            <button type="button" class="bouton-lien bouton-lien-neutre" data-action="oublierChoix">effacer</button></p>
+          <p class="coordonnees-choix">${imp.choix.nom ? `<strong>${echapper(imp.choix.nom)}</strong> ` : ''}<span class="coord-en">E ${formaterNombre(imp.choix.est)} · N ${formaterNombre(imp.choix.nord)}</span></p>
           <div class="champs-implantation">
             <label>Nom<input type="text" data-champ="nom-implantation" value="${echapper(imp.nomPropose)}" autocomplete="off" autocapitalize="characters" /></label>
             <label>Altitude<input type="text" inputmode="decimal" data-champ="altitude-implantation" value="${imp.choix.altitude != null ? imp.choix.altitude.toFixed(3) : ''}" placeholder="facultative" /></label>
@@ -579,7 +579,7 @@ export function creerEcranLeve(conteneur, actions) {
   /** Point implanté : coordonnées et altitude, sur une ligne. */
   function detailPoint() {
     const c = donnees.implanter.cible;
-    return `<p class="coordonnees-cible">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}${c.altitude != null ? ` · H ${formaterNombre(c.altitude)}` : ''}</p>`;
+    return `<p class="coordonnees-cible"><span class="coord-en">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>${c.altitude != null ? `<span class="coord-h">H ${formaterNombre(c.altitude)}</span>` : ''}</p>`;
   }
 
   /**
@@ -601,7 +601,7 @@ export function creerEcranLeve(conteneur, actions) {
       : `<label class="altitude-bout">H<input type="text" inputmode="decimal" data-reglage-ligne="${cle}" value="${l.altitudes[cle] == null ? '' : l.altitudes[cle].toFixed(3)}" placeholder="—" aria-label="Altitude ${cle === 'debut' ? 'du début' : 'de la fin'}" /></label>`);
     const ligneBout = (bout, cle) => `<div class="bout-ligne">
         <span class="pastille-bout ${cle === 'fin' ? 'fin' : ''}">${iconeDrapeau(cle)}</span>
-        <span class="coordonnees-bout">${bout.nom ? `<strong>${echapper(bout.nom)}</strong> ` : ''}E ${formaterNombre(bout.est)} · N ${formaterNombre(bout.nord)}</span>
+        <span class="coordonnees-bout">${bout.nom ? `<strong>${echapper(bout.nom)}</strong> ` : ''}<span class="coord-en">E ${formaterNombre(bout.est)} · N ${formaterNombre(bout.nord)}</span></span>
         ${altitude(bout, cle)}
       </div>`;
     return `${segment}
@@ -623,15 +623,6 @@ export function creerEcranLeve(conteneur, actions) {
       </svg>
       <span class="aide" data-vivant="texte-boussole">boussole…</span>
     </div>`;
-  }
-
-  /**
-   * Récepteur pas connecté : un rappel, qui ouvre la fenêtre du récepteur (bouton « Récepteur »
-   * de la barre du bas, voir recepteur.js : la connexion et les corrections y sont).
-   */
-  function connexion() {
-    return `<button type="button" class="connexion-terrain" data-si-deconnecte data-action="ouvrirRecepteur">
-      <span class="pastille-gris"></span>Récepteur non connecté <strong>Connecter</strong></button>`;
   }
 
   /** Choix de ce que l'on va lever : une nouvelle surface de cette nature. */
@@ -826,7 +817,6 @@ export function creerEcranLeve(conteneur, actions) {
     conteneur.innerHTML = `
         <div class="ecran-terrain">
           ${choixMode()}
-          ${connexion()}
           ${contenu}
         </div>`;
     rafraichirVivant();

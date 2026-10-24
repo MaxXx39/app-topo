@@ -5661,3 +5661,94 @@ body.accroches-ouvertes {
   color: var(--sombre);
   font-weight: 800;
 }
+
+/* ==========================================================================
+   Version 0.55.1
+   ========================================================================== */
+
+/* Mode téléphone : on cache Est / Nord des points à implanter (le nom et l'altitude suffisent). */
+body.mode-telephone .coord-en {
+  display: none;
+}
+
+.coordonnees-cible .coord-h {
+  margin-left: 8px;
+}
+
+/* Bouton « Récepteur » : l'icône dans un rond (ce n'est pas un onglet). */
+.onglets button.bouton-recepteur svg {
+  width: 34px;
+  height: 34px;
+  padding: 5px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3.5px var(--anneau-recepteur, #9ca3af);
+}
+
+.bouton-recepteur.couleur-vert { --anneau-recepteur: #16a34a; }
+.bouton-recepteur.couleur-orange { --anneau-recepteur: #f59e0b; }
+.bouton-recepteur.couleur-rouge { --anneau-recepteur: #dc2626; }
+
+/* Barre d'accroche : tout tient dans la largeur, sans glisser sur le côté. */
+.barre-accroche .accroches,
+.barre-accroche.accroches-ligne .accroches {
+  overflow: visible;
+  gap: 3px;
+}
+
+.barre-accroche .bouton-accroche {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 3px 1px;
+}
+
+.barre-accroche .bouton-accroche svg {
+  width: 22px;
+  height: 22px;
+}
+
+.barre-accroche .mot-accroche {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bouton-outil-accroche {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.bouton-deplier-accroches {
+  width: 26px;
+  margin-left: 0;
+}
+
+/* Libellés : la couleur en pastille ; palette de ronds sous la ligne ; « habituelle » = couleur du
+   rôle avec un petit point blanc au centre. */
+.pastille-couleur {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--bordure);
+  cursor: pointer;
+}
+
+.pastille-couleur.habituelle {
+  background-image: radial-gradient(circle, #ffffff 0 3px, transparent 3.5px);
+}
+
+.pastille-couleur.choisie {
+  box-shadow: 0 0 0 3px var(--sombre);
+}
+
+.palette-couleurs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 2px 8px;
+}
