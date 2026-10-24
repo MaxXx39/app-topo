@@ -5495,3 +5495,169 @@ button.connexion-terrain strong {
   margin-left: auto;
   box-shadow: none;
 }
+
+/* --- Barre d'accroche compacte (version 0.55.0) : dessins sans texte, la flèche montre les noms ;
+   « + Point » et « Liste » seulement avec l'accroche « Point ». Sur téléphone, collée sous le plan. --- */
+body {
+  --hauteur-accroches: 48px;
+}
+
+body.accroches-ouvertes {
+  --hauteur-accroches: 66px;
+}
+
+.barre-accroche {
+  margin: 0 0 10px;
+  padding: 5px 6px;
+}
+
+.barre-accroche .accroches,
+.barre-accroche.accroches-ligne .accroches {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.barre-accroche .bouton-accroche {
+  flex: 0 0 auto;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 3px 4px;
+  font-size: 0.66rem;
+}
+
+.barre-accroche .bouton-accroche svg {
+  width: 24px;
+  height: 24px;
+}
+
+.barre-accroche .mot-accroche {
+  display: none;
+}
+
+.barre-accroche.ouverte .mot-accroche {
+  display: block;
+}
+
+.separateur-accroche {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 26px;
+  margin: 0 2px;
+  background: #b6c0c7;
+}
+
+.bouton-outil-accroche {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 3px 9px;
+  border: 1.5px solid #0d9488;
+  border-radius: 10px;
+  background: var(--surface);
+  color: #0f766e;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bouton-deplier-accroches {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sombre);
+  cursor: pointer;
+}
+
+.bouton-deplier-accroches svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 899px) {
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .barre-accroche {
+    position: fixed;
+    top: calc(var(--hauteur-entete) + var(--hauteur-bascule) + 38svh);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    height: var(--hauteur-accroches);
+    margin: 0;
+    border-radius: 0;
+    border-bottom: 1px solid var(--bordure);
+    box-shadow: 0 2px 6px rgba(16, 24, 20, 0.15);
+  }
+
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .mise-en-page {
+    padding-top: calc(38svh + var(--hauteur-bascule) + var(--hauteur-accroches) + 12px);
+  }
+}
+
+/* Fenêtres « + Point » et « Liste ». */
+.fenetre-points {
+  width: min(94vw, 460px);
+  max-height: 86svh;
+  padding: 16px;
+  border: none;
+  border-radius: var(--rayon);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.fenetre-points::backdrop {
+  background: rgba(27, 43, 54, 0.45);
+}
+
+.recherche-points {
+  width: 100%;
+  min-height: 40px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.groupe-points {
+  border-top: 1px solid var(--bordure);
+  padding: 6px 0;
+}
+
+.groupe-points summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.noms-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+.noms-points button[hidden],
+.groupe-points[hidden] {
+  display: none;
+}
+
+.fenetre-points .erreur:empty {
+  display: none;
+}
+
+.fenetre-point-tape [data-action='ajouterPointTape'] {
+  border-color: var(--ambre);
+  background: var(--ambre);
+  color: var(--sombre);
+  font-weight: 800;
+}

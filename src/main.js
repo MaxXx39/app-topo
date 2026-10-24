@@ -687,6 +687,8 @@ const ecranLeve = recepteurDisponible()
         retenirReglagesTerrain();
         montrerImplantation();
       },
+      // Fenêtre « Liste » de la barre d'accroche : les points du projet, liste par liste.
+      groupesPoints: () => groupesDePointsParListe(),
       // Nom d'un point du projet tapé (ou choisi dans la liste) : il devient le point choisi.
       trouverPoint: (nom) => {
         const cherche = nom.trim();
@@ -1223,6 +1225,23 @@ function montrerRecalage() {
   });
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
+}
+
+/**
+ * Points du projet rangés comme dans « Afficher » (fichier importé, surface, métré, Autres, points
+ * ajoutés), puis « À implanter » : [{ titre, noms }] (fenêtre « Liste » de Terrain › Implanter).
+ * Un point peut être dans plusieurs listes (fichier et surface).
+ */
+function groupesDePointsParListe() {
+  const groupes = [];
+  for (const liste of listesDePoints(projet)) {
+    if (!liste.leveId) continue;
+    const leve = projet.leves.find((l) => l.id === liste.leveId);
+    const noms = [...new Set((leve?.points ?? []).map((p) => p.nom).filter((nom) => !liste.noms || liste.noms.has(nom)))];
+    if (noms.length > 0) groupes.push({ titre: liste.nom, noms });
+  }
+  if (projet.aImplanter.length > 0) groupes.push({ titre: 'À implanter', noms: projet.aImplanter.map((p) => p.nom) });
+  return groupes;
 }
 
 /**

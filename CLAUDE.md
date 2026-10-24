@@ -147,6 +147,12 @@ Ajouts demandés par l'utilisateur après la V1 :
   - **Libellés du levé** : boutons plus petits, **crayon** « modifier » toujours visible à droite (collé au bord de la liste qui défile).
 - **Version 0.54.1** : Terrain › Lever sur téléphone : le plan gardait sa hauteur minimale (300 px, `.plan-cadre`) plus grande que sa place (38svh) et débordait sur le haut du bloc du dessous (capture de l'utilisateur, « Récepteur non connecté » à moitié caché) ; `min-height: 0` pour tout l'onglet Terrain (avant : seulement en Implanter).
 
+- **Version 0.55.0 (demandes du 24.10.2026)** :
+  - **Libellés** : le crayon ouvre une **fenêtre** (`src/leve/fenetre-libelles.js`) : tableau Abrév. | Description | Couleur qui défile, barre du bas toujours visible avec **« Enregistrer »** en grand (ambre) et « annuler ».
+  - **Récepteur** : la fenêtre se **ferme toute seule** quand le récepteur vient de se connecter (sauf si les réglages NTRIP sont ouverts).
+  - **Réglages, nom de l'appareil** : affiché, pas modifiable directement ; **crayon** pour le modifier, avec l'avertissement « ne change pas ce nom une fois réglé » (Drive / verrous) ; case ouverte tant qu'il n'y a pas de nom (`blocPartage(…, { modifierNom })`).
+  - **Barre d'accroche compacte** (décisions : fenêtre Liste avec recherche, plus de case « Nom d'un point », même barre pour la ligne) : **collée sous le plan** sur téléphone (`body.avec-accroches`, fixe, `--hauteur-accroches` 48 px, 66 px ouverte), **avant** Point · Ligne · Surface ; dessins **sans texte**, petite **flèche** à droite pour voir les noms (`accrochesOuvertes`) ; avec l'accroche **Point** seulement : **« + Point »** (fenêtre « Taper un point », pas pour une ligne) et **« Liste »** (fenêtre `src/leve/fenetres-points.js` : recherche, points rangés liste par liste comme « Afficher » puis « À implanter », `groupesDePointsParListe` ; toucher un point le choisit). Cachée en mode Surface et pendant le guidage.
+
 ## 5. Vérification : cas de référence
 
 L'utilisateur compare lui-même avec Mensura. Tolérance : **0,5 %**. Fichiers d'exemple à placer dans le dossier `exemples/` : `stock.csv`, `stock_export.txt`, le PDF Mensura et un LandXML.

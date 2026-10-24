@@ -22,7 +22,7 @@ import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne
 // Couloir de l'implantation d'une ligne : bandes de chaque côté, plus fines en s'approchant
 // (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
 const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
-import { htmlFormulairePoint, lireFormulairePoint } from '../outils/formulaire-point.js';
+import { ouvrirFenetrePointTape, ouvrirListePoints } from './fenetres-points.js';
 import { ouvrirFenetreLibelles } from './fenetre-libelles.js';
 
 // Mode Contrôler : ce qu'on implante (Ligne viendra plus tard), vue des coupes, longueurs.
@@ -105,8 +105,7 @@ export function creerEcranLeve(conteneur, actions) {
   let bandeCouloir = 0; // échelle du couloir de la ligne (n° dans BANDES_COULOIR)
   let capBoussole = null; // dernier cap de la boussole de la tablette (°), ou null
   let reglagesGuidageOuverts = false; // roue ⚙ de l'écran de guidage
-  let formulairePointOuvert = false; // « + Point » : taper un point (Est, Nord, H)
-  let erreurPoint = '';
+  let accrochesOuvertes = false; // flèche de la barre d'accroche : les noms sous les dessins
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
@@ -117,22 +116,18 @@ export function creerEcranLeve(conteneur, actions) {
       dessiner();
       return;
     }
+    // Barre d'accroche : « + Point » (point tapé), « Liste » (points du projet), flèche (noms).
     if (action === 'ouvrirFormulairePoint') {
-      formulairePointOuvert = !formulairePointOuvert;
-      erreurPoint = '';
-      dessiner();
+      ouvrirFenetrePointTape({ nomPropose: donnees.implanter.nomPointAjoute, ajouter: (valeurs) => actions.ajouterPointTape(valeurs) });
       return;
     }
-    if (action === 'ajouterPointTape') {
-      const valeurs = lireFormulairePoint(conteneur);
-      erreurPoint = valeurs.erreur ?? actions.ajouterPointTape(valeurs)?.erreur ?? '';
-      if (erreurPoint) {
-        const zone = conteneur.querySelector('[data-vivant="erreur-point"]');
-        if (zone) zone.textContent = erreurPoint;
-      } else {
-        formulairePointOuvert = false;
-        dessiner();
-      }
+    if (action === 'ouvrirListePoints') {
+      ouvrirListePoints({ groupes: actions.groupesPoints(), choisir: (nom) => actions.trouverPoint(nom) });
+      return;
+    }
+    if (action === 'basculerAccroches') {
+      accrochesOuvertes = !accrochesOuvertes;
+      dessiner();
       return;
     }
     if (action === 'garderPointChoisi') {
@@ -192,11 +187,6 @@ export function creerEcranLeve(conteneur, actions) {
   // Touche Entrée dans le nom : prend le point (comme le bouton), si c'est permis ; dans le nom
   // d'un point à implanter : le cherche.
   conteneur.addEventListener('keydown', (evenement) => {
-    if (evenement.key === 'Enter' && evenement.target.dataset.point) {
-      evenement.preventDefault();
-      conteneur.querySelector('[data-action="ajouterPointTape"]')?.click();
-      return;
-    }
     if (evenement.key === 'Enter' && evenement.target.dataset.champ === 'nom-a-trouver') {
       evenement.preventDefault();
       actions.trouverPoint(evenement.target.value);
@@ -363,12 +353,12 @@ export function creerEcranLeve(conteneur, actions) {
     // Rien de choisi : on le rappelle bien en vue (après « ← », on ne savait plus quoi faire).
     const imp = donnees.implanter;
     if (reglages.implantation === 'point') {
-      const invite = imp.choix ? '' : invitation('Choisis le point à implanter', 'touche-le sur le plan ou tape son nom');
-      return choixImplantation + invite + barreAccroche() + implanterPoint();
+      const invite = imp.choix ? '' : invitation('Choisis le point à implanter', 'touche-le sur le plan, ou « Liste »');
+      return barreAccroche() + choixImplantation + invite + implanterPoint();
     }
     if (reglages.implantation === 'ligne') {
       const invite = imp.pointsLigne.length > 0 ? '' : invitation('Choisis la ligne à implanter', 'touche-la sur le plan, ou ses points un à un');
-      return choixImplantation + invite + barreAccroche() + implanterLigne();
+      return barreAccroche() + choixImplantation + invite + implanterLigne();
     }
     return `
       ${choixImplantation}
@@ -409,21 +399,23 @@ export function creerEcranLeve(conteneur, actions) {
     const enLigne = donnees.controle.implantation === 'ligne';
     const modes = enLigne ? ['trait', ...MODES_ACCROCHE] : MODES_ACCROCHE;
     const active = enLigne ? imp.accrocheLigne : imp.accroche;
-    return `<div class="barre-accroche ${enLigne ? 'accroches-ligne' : ''}">
+    // Accroche « Point » : un point tapé (+ Point, pas pour une ligne) ou choisi dans la liste.
+    const outilsPoint = active === 'point'
+      ? `<span class="separateur-accroche"></span>
+        ${enLigne ? '' : '<button type="button" class="bouton-outil-accroche" data-action="ouvrirFormulairePoint" title="Taper un point (Est, Nord, H)">+ Point</button>'}
+        <button type="button" class="bouton-outil-accroche" data-action="ouvrirListePoints" title="Choisir un point dans la liste du projet">Liste</button>`
+      : '';
+    return `<div class="barre-accroche ${enLigne ? 'accroches-ligne' : ''} ${accrochesOuvertes ? 'ouverte' : ''}">
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
         ${modes.map((mode) => {
           const [mot, nom, dessin] = ACCROCHES[mode];
           return `<button type="button" class="bouton-accroche ${active === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${nom}" aria-label="${nom}" aria-pressed="${active === mode}">
-            <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span>${mot}</span></button>`;
+            <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span class="mot-accroche">${mot}</span></button>`;
         }).join('')}
+        ${outilsPoint}
+        <button type="button" class="bouton-deplier-accroches" data-action="basculerAccroches" title="${accrochesOuvertes ? 'Cacher' : 'Voir'} les noms" aria-label="${accrochesOuvertes ? 'Cacher' : 'Voir'} les noms des accroches" aria-expanded="${accrochesOuvertes}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${accrochesOuvertes ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}" /></svg></button>
       </div>
-      <div class="accroche-par-nom">
-        <input type="text" list="noms-points-projet" data-champ="nom-a-trouver" placeholder="Nom d'un point" autocomplete="off" autocapitalize="characters" aria-label="Nom du point à implanter" />
-        <datalist id="noms-points-projet">${imp.nomsPoints.map((nom) => `<option value="${echapper(nom)}"></option>`).join('')}</datalist>
-        <button type="button" class="bouton-secondaire" data-action="trouverPoint">OK</button>
-        ${enLigne ? '' : `<button type="button" class="bouton-secondaire ${formulairePointOuvert ? 'actif' : ''}" data-action="ouvrirFormulairePoint" title="Taper un point (Est, Nord, H)">+ Point</button>`}
-      </div>
-      ${formulairePointOuvert && !enLigne ? `${htmlFormulairePoint(imp.nomPointAjoute)}<p class="erreur" data-vivant="erreur-point">${echapper(erreurPoint)}</p>` : ''}
     </div>`;
   }
 
@@ -823,6 +815,10 @@ export function creerEcranLeve(conteneur, actions) {
     const enGuidage = donnees.mode === 'controler'
       && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (implantation === 'ligne' && Boolean(donnees.implanter.ligne)));
     document.body.classList.toggle('vue-implantation', enGuidage);
+    // Barre d'accroche collée sous le plan (téléphone, voir style.css « avec-accroches »).
+    const avecAccroches = donnees.mode === 'controler' && !enGuidage && ['point', 'ligne'].includes(implantation);
+    document.body.classList.toggle('avec-accroches', avecAccroches);
+    document.body.classList.toggle('accroches-ouvertes', avecAccroches && accrochesOuvertes);
     if (!enGuidage || implantation !== 'point') document.body.classList.remove('cible-en-haut');
     let contenu;
     if (enGuidage) contenu = vueImplantation();
