@@ -16,6 +16,9 @@
 //   plansDxf: [{ id, nom, importeLe, origine, bornes, calques, contenu, compte }],  // fonds de plan DXF
 //                                   // (voir topo/dxf-plan.js) : affichés sous le levé, pour l'implantation
 //   aImplanter: [{ id, nom, est, nord, altitude (ou null) }],   // points à implanter (Terrain › Implanter › Point)
+//   talus: [{ id, nom, ligne: { nom, sommets, segment, inverse, altitudes: { debut, fin } },
+//            reglages: { horizontal, vertical, ligneEst ('haut', 'bas'), cote ('droite', 'gauche'),
+//                        longueur (m ou null), terrainId, altitudeSurfaceId } }],  // « Mes talus » (voir topo/talus.js)
 //   metres: [{ id, nom, nature: 'metre', leveId, enCours }],   // métrés levés (voir topo/metre.js)
 //   autres: [{ id, nom, nature: 'autres', leveId, contour: [], lignesRupture, points }],  // levés « Autres »
 //                                   // (contrôle, points géomètre… : lignes et points, pas de surface ni de volume)
@@ -50,6 +53,7 @@ export function creerProjet(nom = '') {
     cartouche: { affaire: '', lieu: '', dessinePar: '', date: '' },
     plansDxf: [],
     aImplanter: [],
+    talus: [],
     implantations: [],
     metres: [],
     autres: [],
@@ -146,6 +150,7 @@ export function completerProjet(projet) {
   complet.leves ??= [];
   complet.plansDxf ??= [];
   complet.aImplanter ??= [];
+  complet.talus ??= [];
   complet.implantations ??= [];
   complet.metres ??= [];
   complet.autres ??= [];

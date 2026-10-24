@@ -354,6 +354,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
     // Ligne à implanter : trait sarcelle épais, sa parallèle en pointillés, « Début » et « Fin ».
     const ligne = implantation.ligne;
+    // Talus : zone brune entre la ligne et l'entrée en terre (ou le bord), le bord en pointillés.
+    if (ligne?.talus) {
+      const bord = ligne.talus.bord.map((p) => versEcran(p.est, p.nord, vue));
+      const pied = ligne.talus.ligne.map((p) => versEcran(p.est, p.nord, vue));
+      groupe.append(creerElement('path', { d: tracePar([...pied, ...[...bord].reverse()], true), class: 'zone-talus' }));
+      groupe.append(creerElement('path', { d: tracePar(bord, false), class: 'bord-talus' }));
+    }
     if (ligne?.sommets.length >= 2) {
       const ecran = ligne.sommets.map((s) => versEcran(s.est, s.nord, vue));
       groupe.append(creerElement('path', { d: tracePar(ecran, false), class: 'ligne-a-implanter' }));

@@ -127,7 +127,7 @@ describe('plans DXF et export', () => {
       ecarts: ecartsImplantation({ est: 10, nord: 20, altitude: null }, { est: 10.012, nord: 19.995, altitude: 412.47 }),
       le: '2026-10-22T10:00:00.000Z',
     }]);
-    expect(texte.split('\r\n')[1]).toBe('I-1;10.000;20.000;;10.012;19.995;412.470;0.012;-0.005;0.013;;2026-10-22T10:00:00.000Z;;');
+    expect(texte.split('\r\n')[1]).toBe('I-1;10.000;20.000;;10.012;19.995;412.470;0.012;-0.005;0.013;;2026-10-22T10:00:00.000Z;;;');
     const ligne = csvImplantations([{
       nom: 'Ligne · 12.500',
       cible: { est: 10, nord: 20, altitude: null },
@@ -136,7 +136,17 @@ describe('plans DXF et export', () => {
       le: 'date',
       ligne: { abscisse: 12.5, decalage: -0.01 },
     }]);
-    expect(ligne.split('\r\n')[1]).toMatch(/;date;12\.500;-0\.010$/);
+    expect(ligne.split('\r\n')[1]).toMatch(/;date;12\.500;-0\.010;$/);
+    const talus = csvImplantations([{
+      nom: 'Talus 1 · 4.500',
+      cible: { est: 10, nord: 20, altitude: 97 },
+      mesure: { est: 10, nord: 20, altitude: 97 },
+      ecarts: ecartsImplantation({ est: 10, nord: 20, altitude: 97 }, { est: 10, nord: 20, altitude: 97 }),
+      le: 'date',
+      ligne: { abscisse: 4.5, decalage: 4.5 },
+      talus: { texte: '3/2 haut droite' },
+    }]);
+    expect(talus.split('\r\n')[1]).toMatch(/;date;4\.500;4\.500;3\/2 haut droite$/);
   });
 });
 

@@ -3891,6 +3891,20 @@ svg.plan,
   stroke-linejoin: round;
 }
 
+/* Talus à implanter : zone brune entre la ligne et l'entrée en terre, bord en pointillés. */
+.plan .implantation .zone-talus {
+  fill: #92400e;
+  fill-opacity: 0.18;
+  stroke: none;
+}
+
+.plan .bord-talus {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
 .plan .parallele-a-implanter {
   fill: none;
   stroke: #0d9488;
@@ -5821,4 +5835,93 @@ body.accroches-ouvertes {
   font-weight: 800;
   text-align: center;
   pointer-events: none;
+}
+
+/* Implantation d'un talus : réglages (pente H / V…) et guidage (éloigne-toi / rapproche-toi,
+   monter / descendre, profil en travers). */
+.reglages-talus .pente-talus label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.reglages-talus .pente-talus input {
+  width: 4.2em;
+}
+
+.reglages-talus .barre-pente {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.reglages-talus select {
+  width: 100%;
+}
+
+.guidage-direct.guidage-talus {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  row-gap: 2px;
+  text-align: center;
+}
+
+.guidage-talus .lignes-guidage {
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.guidage-talus .hauteur-guidage.attente {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.guidage-talus .manque-talus {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #78350f;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.profil-talus {
+  width: 100%;
+  max-width: 360px;
+  margin-top: 4px;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1b2b36;
+}
+
+.coupe-talus .trait-talus {
+  stroke: #92400e;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.coupe-talus .sol-plat {
+  stroke: #15803d;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.coupe-talus .repere-ligne-talus {
+  stroke: #0d9488;
+  stroke-width: 3;
+}
+
+.coupe-talus .point-ligne-talus {
+  fill: #0d9488;
+}
+
+.coupe-talus .repere-entree {
+  fill: #f6ab07;
+  stroke: #1b2b36;
+  stroke-width: 1;
+}
+
+.coupe-talus .canne {
+  stroke: #ffffff;
+  stroke-width: 2.5;
 }

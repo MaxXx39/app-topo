@@ -5,6 +5,7 @@ import {
   azimutEntre,
   directionDeMarche,
   altitudeSurSurface,
+  chercheurAltitude,
   ecartSurface,
   classeEcart,
   extremitesCoupe,
@@ -63,6 +64,15 @@ describe('altitude sur une surface et écart', () => {
     // Sur un sommet et sur une arête.
     expect(altitudeSurSurface(TRIANGLES, 2600010, 1200010)).toBeCloseTo(401, 6);
     expect(altitudeSurSurface(TRIANGLES, 2600005, 1200005)).toBeCloseTo(400.5, 6);
+  });
+
+  it('recherche rapide par cases : même altitude que la recherche complète', () => {
+    const chercher = chercheurAltitude(TRIANGLES, 3);
+    for (const [est, nord] of [[2600005, 1200002], [2600002.5, 1200008], [2600010, 1200010], [2600005, 1200005], [2600000, 1200000]]) {
+      expect(chercher(est, nord)).toBeCloseTo(altitudeSurSurface(TRIANGLES, est, nord), 9);
+    }
+    expect(chercher(2600011, 1200005)).toBeNull();
+    expect(chercheurAltitude([])(2600005, 1200005)).toBeNull();
   });
 
   it('ne répond rien en dehors de la surface', () => {

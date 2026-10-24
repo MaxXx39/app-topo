@@ -18,6 +18,8 @@ import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
+import { svgCoupeTalus } from './coupe-talus.js';
+import { penteSignee } from '../topo/talus.js';
 import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne } from '../topo/accroche.js';
 // Couloir de l'implantation d'une ligne : bandes de chaque côté, plus fines en s'approchant
 // (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
@@ -25,10 +27,11 @@ const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
 import { ouvrirFenetrePointTape, ouvrirListePoints } from './fenetres-points.js';
 import { ouvrirFenetreLibelles } from './fenetre-libelles.js';
 
-// Mode Contrôler : ce qu'on implante (Ligne viendra plus tard), vue des coupes, longueurs.
+// Mode Contrôler : ce qu'on implante (point, ligne, talus, surface), vue des coupes, longueurs.
 const IMPLANTATIONS = [
   ['point', 'Point', true],
   ['ligne', 'Ligne', true],
+  ['talus', 'Talus', true],
   ['surface', 'Surface', true],
 ];
 const VUES_COUPES = [
@@ -165,6 +168,10 @@ export function creerEcranLeve(conteneur, actions) {
       actions.choisirSegment(bouton.dataset.valeur);
       return;
     }
+    if (action === 'reglerTalus') {
+      actions.reglerTalus(bouton.dataset.champTalus, bouton.dataset.valeur);
+      return;
+    }
     if (action === 'prendre') actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '');
     else if (action === 'role') actions.choisirRole(bouton.dataset.role);
     else actions[action]?.(bouton.dataset.valeur);
@@ -175,6 +182,7 @@ export function creerEcranLeve(conteneur, actions) {
     if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
+    else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
   });
 
   // Nom d'un point du projet choisi dans la liste proposée (pas tapé lettre par lettre, ni validé
@@ -217,7 +225,7 @@ export function creerEcranLeve(conteneur, actions) {
     const bouton = conteneur.querySelector('[data-action="prendre"]');
     const raison = conteneur.querySelector('[data-vivant="raison"]');
     const implantation = donnees?.mode === 'controler';
-    const aImplanter = donnees?.controle.implantation === 'ligne' ? donnees.implanter.ligne : donnees?.implanter.cible;
+    const aImplanter = ['ligne', 'talus'].includes(donnees?.controle.implantation) ? donnees.implanter.ligne : donnees?.implanter.cible;
     const permis = connecte && Boolean(etat?.autorise) && Boolean(implantation ? aImplanter : donnees?.stock);
     if (bouton) bouton.disabled = !permis;
     if (raison) {
@@ -234,6 +242,7 @@ export function creerEcranLeve(conteneur, actions) {
     }
     if (donnees?.mode === 'controler' && donnees.controle.implantation === 'point') rafraichirImplantation();
     else if (donnees?.mode === 'controler' && donnees.controle.implantation === 'ligne') rafraichirLigne();
+    else if (donnees?.mode === 'controler' && donnees.controle.implantation === 'talus') rafraichirTalus();
     else if (donnees?.mode === 'controler') rafraichirControle();
   }
 
@@ -361,6 +370,10 @@ export function creerEcranLeve(conteneur, actions) {
       const invite = imp.pointsLigne.length > 0 ? '' : invitation('Choisis la ligne à implanter', 'touche-la sur le plan, ou ses points un à un');
       return barreAccroche() + choixImplantation + invite + implanterLigne();
     }
+    if (reglages.implantation === 'talus') {
+      const invite = imp.pointsLigne.length > 0 ? '' : invitation('Choisis la ligne du talus (haut ou bas)', 'touche-la sur le plan, ou ses points un à un');
+      return barreAccroche() + choixImplantation + invite + implanterLigne() + mesTalus();
+    }
     return `
       ${choixImplantation}
       ${surfaces.length > 0
@@ -397,7 +410,7 @@ export function creerEcranLeve(conteneur, actions) {
   function barreAccroche() {
     const { implanter: imp } = donnees;
     // Ligne : on peut aussi prendre une ligne entière du plan DXF.
-    const enLigne = donnees.controle.implantation === 'ligne';
+    const enLigne = ['ligne', 'talus'].includes(donnees.controle.implantation);
     const modes = enLigne ? ['trait', ...MODES_ACCROCHE] : MODES_ACCROCHE;
     const active = enLigne ? imp.accrocheLigne : imp.accroche;
     // Accroche « Point » : un point tapé (+ Point, pas pour une ligne) ou choisi dans la liste.
@@ -436,7 +449,7 @@ export function creerEcranLeve(conteneur, actions) {
           ? '<p class="vide">Aucun point.</p>'
           : `<ol>${points.map((p, i) => `<li><strong>${role(i)}</strong> ${p.nom ? echapper(p.nom) : ''} <span class="aide"><span class="coord-en">E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)} · </span>H ${formaterNombre(p.altitude)}</span></li>`).join('')}</ol>`}
         <div class="ligne-outils">
-          <button type="button" class="bouton-secondaire" data-action="implanterPointsLigne" ${points.length < 2 ? 'disabled' : ''}>Implanter cette ligne</button>
+          <button type="button" class="bouton-secondaire" data-action="implanterPointsLigne" ${points.length < 2 ? 'disabled' : ''}>${donnees.controle.implantation === 'talus' ? 'Talus depuis cette ligne' : 'Implanter cette ligne'}</button>
           ${points.length > 0 ? '<button type="button" class="bouton-lien" data-action="retirerDernierPointLigne">enlever le dernier</button>' : ''}
         </div>
       </div>
@@ -532,11 +545,18 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function vueImplantation() {
     const { implanter: imp, controle: reglages } = donnees;
-    const ligne = reglages.implantation === 'ligne';
-    const titre = ligne
+    const talus = reglages.implantation === 'talus';
+    const ligne = reglages.implantation === 'ligne' || talus;
+    let titre = ligne
       ? `<strong>${echapper(imp.ligne.nom)}</strong> · ${formaterNombre(imp.ligne.longueur)} m`
       : `Vers <strong>${echapper(imp.cible.nom ?? 'le point choisi')}</strong>`;
-    const guidage = ligne
+    if (talus) titre = `<strong>${echapper(imp.talus.ouvert ?? 'Talus')}</strong> · ${echapper(imp.talus.texte)}`;
+    // Talus pas encore réglé (pente) : les réglages s'ouvrent tout seuls (et restent ouverts).
+    if (talus && !imp.talus.complet) reglagesGuidageOuverts = true;
+    const ouverts = reglagesGuidageOuverts;
+    const guidage = talus
+      ? '<div class="guidage-direct attente" data-vivant="guidage-talus"></div>'
+      : ligne
       ? '<div class="guidage-direct attente" data-vivant="guidage-ligne"></div>'
       : `<div class="cible-haut" data-vivant="cible-haut" hidden></div>
         <div class="guidage-et-boussole ${reglages.guidage === 'nseo' ? 'avec-boussole' : ''}">
@@ -550,17 +570,106 @@ export function creerEcranLeve(conteneur, actions) {
         <p class="titre-vue-guidage">${titre}</p>
         ${ligne ? '<button type="button" class="bouton-retour" data-action="inverserLigne" title="Inverser le sens" aria-label="Inverser le sens">⇄</button>' : ''}
         ${!ligne && imp.suivant ? `<button type="button" class="bouton-suivant" data-action="implanterSuivant" title="Implanter le point suivant : ${echapper(imp.suivant)}" aria-label="Point suivant : ${echapper(imp.suivant)}">${echapper(imp.suivant)} ▶</button>` : ''}
-        <button type="button" class="bouton-retour ${reglagesGuidageOuverts ? 'actif' : ''}" data-action="basculerReglagesGuidage" title="Réglages de l'implantation" aria-label="Réglages de l'implantation" aria-expanded="${reglagesGuidageOuverts}">
+        <button type="button" class="bouton-retour ${ouverts ? 'actif' : ''}" data-action="basculerReglagesGuidage" title="Réglages de l'implantation" aria-label="Réglages de l'implantation" aria-expanded="${ouverts}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>
       </div>
-      ${reglagesGuidageOuverts ? reglagesGuidage(ligne) : ''}
+      ${ouverts ? (talus ? reglagesTalus() : reglagesGuidage(ligne)) : ''}
       ${ligne ? detailLigne() : detailPoint()}
       ${guidage}
       <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
-        <span>ENREGISTRER L'IMPLANTATION</span><span class="sous-titre-prendre">ou touche vol −</span>
+        <span>${talus ? 'ENREGISTRER L\'ENTRÉE EN TERRE' : 'ENREGISTRER L\'IMPLANTATION'}</span><span class="sous-titre-prendre">ou touche vol −</span>
       </button>
       <p class="raison-leve" data-vivant="raison" hidden></p>
     </div>`;
+  }
+
+  /**
+   * Réglages du talus (roue ⚙, ouverts tout seuls tant que la pente manque) : pente H / V, la
+   * ligne est le haut ou le bas, côté, longueur, terrain, altitude de la ligne ; puis le segment,
+   * le guidage, « Mes talus ».
+   */
+  function reglagesTalus() {
+    const { implanter: imp, surfaces } = donnees;
+    const r = imp.talus.reglages;
+    const l = imp.ligne;
+    const nombre = (v) => (v == null ? '' : String(Math.round(v * 1000) / 1000));
+    const choix = (champ, liste, actif) => liste
+      .map(([cle, titre]) => `<button type="button" class="puce-choix ${cle === actif ? 'actif' : ''}" data-action="reglerTalus" data-champ-talus="${champ}" data-valeur="${cle}">${titre}</button>`)
+      .join('');
+    const listeSurfaces = (champ, actif, sans) => `<select data-reglage-talus="${champ}">
+        <option value="">${sans}</option>
+        ${surfaces.map((s) => `<option value="${s.id}" ${s.id === actif ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
+      </select>`;
+    return `<div class="reglages-guidage reglages-talus">
+      <div class="ligne-choix pente-talus"><span>Pente</span>
+        <label>H<input type="text" inputmode="decimal" data-reglage-talus="horizontal" value="${nombre(r.horizontal)}" placeholder="—" aria-label="Horizontal (m)" /></label>
+        <span class="barre-pente">/</span>
+        <label>V<input type="text" inputmode="decimal" data-reglage-talus="vertical" value="${nombre(r.vertical)}" placeholder="—" aria-label="Vertical (m)" /></label>
+        ${bulle('talus')}
+      </div>
+      <div class="ligne-choix"><span>La ligne est</span>${choix('ligneEst', [['haut', 'Haut du talus'], ['bas', 'Bas du talus']], r.ligneEst)}</div>
+      <div class="ligne-choix"><span>Talus à</span>${choix('cote', [['gauche', '← Gauche'], ['droite', 'Droite →']], r.cote)}</div>
+      <label class="champ-decalage">Longueur en plan (m)<input type="text" inputmode="decimal" data-reglage-talus="longueur" value="${nombre(r.longueur)}" placeholder="vide : jusqu'au terrain" /></label>
+      <label class="champ-decalage">Terrain${listeSurfaces('terrainId', r.terrainId, 'sol à l\'altitude de la canne')}</label>
+      <label class="champ-decalage">Altitude de la ligne${listeSurfaces('altitudeSurfaceId', r.altitudeSurfaceId, l.altitudesDuPlan ? 'celle de la ligne (3D)' : 'tapée au début et à la fin')}</label>
+      ${l.nbSegments > 1 ? `<div class="ligne-choix"><span>Ligne</span>${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment par segment']], l.segment == null ? 'tout' : 'segment')}</div>` : ''}
+      <div class="ligne-outils">
+        ${imp.talus.ouvert
+          ? `<span class="aide">Gardé dans « Mes talus » : ${echapper(imp.talus.ouvert)}</span>`
+          : '<button type="button" class="bouton-secondaire" data-action="enregistrerTalus">+ Mes talus</button>'}
+      </div>
+    </div>`;
+  }
+
+  /** « Mes talus » : talus gardés dans le projet (toucher = l'implanter, × = l'enlever). */
+  function mesTalus() {
+    const liste = donnees.implanter.talus.mesTalus;
+    if (liste.length === 0) return '';
+    return `<div class="liste-a-implanter">
+        <p class="titre-choix">Mes talus</p>
+        ${liste.map((t) => `<div class="ligne-a-implanter">
+            <button type="button" class="bouton-lien bouton-lien-neutre" data-action="ouvrirTalus" data-valeur="${t.id}"><strong>${echapper(t.nom)}</strong></button>
+            <span class="aide">${echapper(t.texte)}</span>
+            <button type="button" class="bouton-lien" data-action="supprimerTalus" data-valeur="${t.id}" aria-label="Supprimer ${echapper(t.nom)}">×</button>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  /**
+   * Implantation d'un talus, à chaque état du récepteur : en grand « Éloigne-toi / Rapproche-toi »
+   * (de la ligne, jusqu'à l'entrée en terre), puis « Monter / Descendre » (talus à l'endroit de la
+   * canne), le détail et le profil en travers.
+   */
+  function rafraichirTalus() {
+    const t = direct?.implantationTalus;
+    const bouton = conteneur.querySelector('[data-action="enregistrerImplantation"]');
+    if (bouton) bouton.disabled = !(etat?.connecte && etat?.autorise && donnees.implanter.ligne && t && !t.message);
+    const zone = conteneur.querySelector('[data-vivant="guidage-talus"]');
+    if (!zone) return;
+    if (!t || t.message) {
+      zone.className = 'guidage-direct attente';
+      zone.innerHTML = `<span class="message-ecart">${echapper(t?.message ?? 'En attente de la position…')}</span>`;
+      return;
+    }
+    const g = t.talus;
+    const m = (valeur) => `${formaterNombre(Math.abs(valeur))} m`;
+    const mot = g.auBord ? 'Bord du talus' : 'Entrée en terre';
+    // Distance > voulue : la canne est trop loin de la ligne, il faut se rapprocher.
+    const sens = Math.abs(g.ecartDistance) < 0.0005
+      ? `${mot} ✓`
+      : `${g.ecartDistance > 0 ? '← Rapproche-toi' : 'Éloigne-toi →'} ${m(g.ecartDistance)}`;
+    const hauteur = t.ecartAltitude == null
+      ? `<span class="hauteur-guidage attente">${g.altitudeTalusCanne == null ? 'hors du talus' : ''}</span>`
+      : `<span class="hauteur-guidage ${t.classeAltitude}">${t.ecartAltitude >= 0 ? '↑ Monter' : '↓ Descendre'} ${m(t.ecartAltitude)}</span>`;
+    const detail = [`${mot.toLowerCase()} à ${m(g.distanceVoulue)}`, `toi à ${formaterNombre(g.distance)} m`, g.solPlat ? 'sol = canne' : ''].filter(Boolean).join(' · ');
+    const manque = g.auBord && g.manque != null ? `<span class="manque-talus">Le talus n'atteint pas le terrain : il manque ${m(g.manque)} de haut</span>` : '';
+    zone.className = `guidage-direct guidage-talus ${t.classe}`;
+    zone.innerHTML = `
+      <span class="lignes-guidage"><span>${sens}</span></span>
+      ${hauteur}
+      <span class="distance-guidage">${detail}</span>
+      ${manque}
+      <div class="profil-talus">${svgCoupeTalus({ talus: g, pente: penteSignee(t.reglages), profil: t.profil, altitudeCanne: t.altitudeCanne, couleurCanne: couleurCanne(Math.abs(g.ecartDistance)) })}</div>`;
   }
 
   /** Réglages de l'implantation (roue ⚙) : guidage, orientation ; pour une ligne, segment et décalage. */
@@ -804,10 +913,10 @@ export function creerEcranLeve(conteneur, actions) {
     // Point ou ligne en cours d'implantation : écran de guidage (plan en haut, cible en bas).
     const { implantation } = donnees.controle;
     const enGuidage = donnees.mode === 'controler'
-      && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (implantation === 'ligne' && Boolean(donnees.implanter.ligne)));
+      && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (['ligne', 'talus'].includes(implantation) && Boolean(donnees.implanter.ligne)));
     document.body.classList.toggle('vue-implantation', enGuidage);
     // Barre d'accroche collée sous le plan (téléphone, voir style.css « avec-accroches »).
-    const avecAccroches = donnees.mode === 'controler' && !enGuidage && ['point', 'ligne'].includes(implantation);
+    const avecAccroches = donnees.mode === 'controler' && !enGuidage && ['point', 'ligne', 'talus'].includes(implantation);
     document.body.classList.toggle('avec-accroches', avecAccroches);
     document.body.classList.toggle('accroches-ouvertes', avecAccroches && accrochesOuvertes);
     if (!enGuidage || implantation !== 'point') document.body.classList.remove('cible-en-haut');
