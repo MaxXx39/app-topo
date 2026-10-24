@@ -5752,3 +5752,48 @@ body.mode-telephone .coord-en {
   gap: 8px;
   padding: 6px 2px 8px;
 }
+
+/* Barre d'accroche plus basse, dessins centrés dans leurs boutons (version 0.55.2). */
+body {
+  --hauteur-accroches: 42px;
+}
+
+body.accroches-ouvertes {
+  --hauteur-accroches: 58px;
+}
+
+.barre-accroche {
+  padding: 4px 6px;
+}
+
+.barre-accroche .bouton-accroche {
+  justify-content: center;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 1px;
+}
+
+.barre-accroche.ouverte .bouton-accroche {
+  height: 48px;
+}
+
+.barre-accroche .bouton-accroche svg {
+  width: 20px;
+  height: 20px;
+}
+
+.barre-accroche .bouton-outil-accroche {
+  min-height: 32px;
+  height: 32px;
+}
+
+@media (max-width: 899px) {
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .barre-accroche {
+    display: flex;
+    align-items: center;
+  }
+
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .barre-accroche .accroches {
+    flex: 1;
+  }
+}

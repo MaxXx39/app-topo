@@ -155,6 +155,8 @@ Ajouts demandés par l'utilisateur après la V1 :
 
 - **Version 0.55.1 (demandes du 24.10.2026)** : bouton **Récepteur** = icône dans un **rond** cerclé de la couleur de l'état (pas un onglet) ; « effacer » enlevé du point choisi ; **altitude des points de ligne** affichée dans la liste « Points de la ligne », et reprise toute seule au début / à la fin s'ils en ont une (`altitudesDesBouts` : tapée, sinon celle du point ; si tous les sommets ont une altitude, on suit les sommets) ; **mode téléphone** : Est / Nord cachés pour les points à implanter (`.coord-en`), nom et altitude restent ; barre d'accroche **sans défilement** (boutons qui se partagent la largeur) ; rappel « Récepteur non connecté · Connecter » **enlevé** de Terrain (le bouton grisé suffit) ; fenêtre des libellés : couleur en **pastille**, palette de **ronds de couleur** sous la ligne (couleur habituelle = celle du rôle avec un point blanc).
 
+- **Version 0.55.2** : barre d'accroche plus basse (`--hauteur-accroches` 42 px, 58 px avec les noms ; boutons de 32 px) et dessins **centrés** dans leurs boutons (ils restaient collés en haut, capture de l'utilisateur).
+
 ## 5. Vérification : cas de référence
 
 L'utilisateur compare lui-même avec Mensura. Tolérance : **0,5 %**. Fichiers d'exemple à placer dans le dossier `exemples/` : `stock.csv`, `stock_export.txt`, le PDF Mensura et un LandXML.
