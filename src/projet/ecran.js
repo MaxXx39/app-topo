@@ -134,7 +134,8 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
         </div>
       </section>
     `;
-    conteneurSuite.innerHTML = `${partage ? blocPartage(partage) : ''}
+    // Le partage par Google Drive est dans les réglages (roue de l'en-tête, version 0.54.0).
+    conteneurSuite.innerHTML = `
       <p class="aide pied-projet">Version de l'appli : ${__VERSION_APPLI__}${estDansAppliAndroid() ? ' (appli Android)' : ''}</p>`;
   }
 
@@ -240,8 +241,12 @@ const ETATS_PARTAGE = {
   erreur: ['erreur', 'etat-erreur'],
 };
 
-/** Bloc « Partage » : nom de l'appareil, connexion à Drive, état de l'envoi du projet ouvert. */
-function blocPartage({ etat, appareil }) {
+/**
+ * Bloc « Partage » : nom de l'appareil, connexion à Drive, état de l'envoi du projet ouvert.
+ * Affiché dans la fenêtre des réglages (voir reglages/reglages.js) ; boutons data-action :
+ * connecterDrive, deconnecterDrive, envoyerDrive, reprendreLaMain ; case data-champ="nom-appareil".
+ */
+export function blocPartage({ etat, appareil }) {
   const [texte, classe] = ETATS_PARTAGE[etat.etat] ?? ['?', ''];
   const heure = etat.etat === 'a-jour' && etat.derniereSynchro ? ` · ${etat.derniereSynchro.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}` : '';
   const reprise = etat.etat === 'repris' && etat.repris

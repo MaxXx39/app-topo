@@ -3,8 +3,8 @@
 // - « Mode téléphone » : textes, icônes et boutons plus petits, libellés plus courts
 //   (classe mode-telephone sur la page, voir style.css) ;
 // - bulles d'aide (même chose que le bouton « ? ») ;
-// - nom de l'appareil (partage par Google Drive) ;
-// - « Fermer l'appli » (appli Android seulement).
+// - partage par Google Drive (nom de l'appareil, connexion, état), déplacé de l'onglet Projet ;
+// - « Fermer l'appli » (appli Android seulement), en rouge tout en haut.
 import { echapper } from '../outils/echapper.js';
 
 const CLE = 'topo-reglages';
@@ -32,27 +32,34 @@ export function appliquerReglages(reglages = lireReglages()) {
 }
 
 /**
- * Ouvre la fenêtre des réglages. options : { nomAppareil, nommerAppareil(nom), aideActive,
- * basculerAide(), fermerAppli() (ou null hors de l'appli Android) }.
+ * Ouvre la fenêtre des réglages. options : { aideActive, basculerAide(), fermerAppli() (ou null
+ * hors de l'appli Android), partage: { html() (bloc Partage, voir projet/ecran.js), actions } ou null }.
+ * Renvoie { rafraichir() } : redessine le bloc Partage (son état a changé), tant que la fenêtre est ouverte.
  */
-export function ouvrirReglages({ nomAppareil, nommerAppareil, aideActive, basculerAide, fermerAppli }) {
+export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage }) {
   const reglages = lireReglages();
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-reglages';
   fenetre.innerHTML = `
     <form method="dialog">
+      ${fermerAppli ? `<button type="button" class="bouton bouton-fermer-appli" data-action="fermer-appli">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>Fermer l'appli</button>` : ''}
       <h2>Réglages de cet appareil</h2>
       <label class="case-reglage"><input type="checkbox" data-reglage="telephone" ${reglages.telephone ? 'checked' : ''} />
         <span><strong>Mode téléphone</strong><span class="aide">textes et boutons plus petits</span></span></label>
       <label class="case-reglage"><input type="checkbox" data-reglage="aide" ${aideActive ? 'checked' : ''} />
         <span><strong>Bulles d'aide « ? »</strong></span></label>
-      ${nommerAppareil ? `<label class="nom-appareil">Nom de cet appareil (Drive)
-        <input type="text" data-reglage="nom" value="${echapper(nomAppareil ?? '')}" placeholder="ex. Tablette Max" /></label>` : ''}
+      <div class="partage-reglages" data-zone="partage"></div>
       <div class="ligne-outils">
-        ${fermerAppli ? '<button type="button" class="bouton-secondaire bouton-fermer-appli" data-action="fermer-appli">✕ Fermer l\'appli</button>' : ''}
         <button class="bouton">OK</button>
       </div>
     </form>`;
+  const zonePartage = fenetre.querySelector('[data-zone="partage"]');
+  // On ne redessine pas pendant qu'on tape le nom de l'appareil (le curseur serait perdu).
+  const rafraichir = () => {
+    if (!partage || !fenetre.open || zonePartage.contains(document.activeElement)) return;
+    zonePartage.innerHTML = partage.html();
+  };
   fenetre.addEventListener('change', (evenement) => {
     const champ = evenement.target.dataset.reglage;
     if (champ === 'telephone') {
@@ -60,15 +67,21 @@ export function ouvrirReglages({ nomAppareil, nommerAppareil, aideActive, bascul
       ecrireReglages(reglages);
       appliquerReglages(reglages);
     } else if (champ === 'aide') basculerAide();
-    else if (champ === 'nom') nommerAppareil(evenement.target.value.trim());
+    else if (evenement.target.dataset.champ === 'nom-appareil') partage?.actions.nommerAppareil(evenement.target.value.trim());
   });
   fenetre.addEventListener('click', (evenement) => {
     if (evenement.target.closest('[data-action="fermer-appli"]')) {
       fenetre.close();
       fermerAppli();
+      return;
     }
+    const bouton = evenement.target.closest('[data-zone="partage"] button[data-action]');
+    if (bouton) partage?.actions[bouton.dataset.action]?.();
   });
+  fenetre.addEventListener('focusout', () => setTimeout(rafraichir, 0));
   fenetre.addEventListener('close', () => fenetre.remove());
   document.body.append(fenetre);
   fenetre.showModal();
+  rafraichir();
+  return { rafraichir };
 }

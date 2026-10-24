@@ -2561,18 +2561,19 @@ body.avec-recepteur .bandeaux-recepteur {
    Onglets Projet · Terrain · Calculs · Plan (version 0.38.0)
    ========================================================================== */
 
-/* L'onglet Projet a sa propre couleur (bleu nuit), pour le distinguer des onglets de travail. */
+/* L'onglet Projet à part des onglets de travail : un liseré bleu nuit, pas rempli (version 0.54.0). */
 .onglets button.onglet-projets {
   flex: 0 0 auto;
   min-width: 76px;
   margin: 5px 4px 5px 6px;
+  border: 2px solid var(--sombre);
   border-radius: 12px;
-  background: var(--sombre);
-  color: #ffffff;
+  background: transparent;
+  color: var(--sombre);
 }
 
 .onglets button.onglet-projets.actif {
-  color: var(--ambre);
+  color: var(--sombre);
 }
 
 .onglets button.onglet-projets.actif svg {
@@ -2592,12 +2593,12 @@ body.avec-recepteur .bandeaux-recepteur {
   }
 
   .onglets button.onglet-projets.actif {
-    background: var(--sombre);
-    color: var(--ambre);
+    background: transparent;
+    color: var(--sombre);
   }
 
   .onglets button.onglet-projets.actif svg {
-    color: var(--ambre);
+    color: var(--sombre);
   }
 }
 
@@ -4638,8 +4639,36 @@ button.bouton-import {
 }
 
 .fenetre-reglages .bouton-fermer-appli {
-  margin-right: auto;
-  color: var(--rouge);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  margin-bottom: 14px;
+  border-color: var(--rouge);
+  background: var(--rouge);
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.fenetre-reglages .bouton-fermer-appli svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+.fenetre-reglages .partage-reglages .carte-section {
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border: none;
+  border-top: 1px solid var(--bordure);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* Gestion de projets : où est le projet (📱 cet appareil, ☁ Google Drive). */
@@ -5188,3 +5217,62 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 }
 
 .pastille-liste.liste-mesures { background: #0891b2; }
+
+/* Libellés du levé : boutons plus petits ; le crayon « modifier » reste toujours visible à droite
+   (collé au bord pendant que la liste défile). */
+.libelles-terrain .puce-libelle {
+  min-width: 46px;
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+
+.libelles-terrain .puce-libelle strong {
+  font-size: 0.88rem;
+  line-height: 1.15;
+}
+
+.libelles-terrain .puce-libelle span {
+  font-size: 0.6rem;
+  line-height: 1.1;
+}
+
+.bouton-crayon-libelles {
+  position: sticky;
+  right: 0;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  border: 1px solid var(--bordure);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: -6px 0 8px var(--surface);
+  color: var(--sombre);
+  cursor: pointer;
+}
+
+.bouton-crayon-libelles svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+/* Roue des réglages : le petit bouton marche / arrêt en rouge clair (on peut aussi fermer l'appli). */
+.bouton-reglages .marche-arret {
+  stroke: #fca5a5;
+  stroke-width: 2.4;
+}
+
+.partage-reglages .nom-appareil {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  text-align: left;
+}

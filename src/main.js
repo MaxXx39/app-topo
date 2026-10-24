@@ -15,7 +15,7 @@ import { creerEditeurSurfaces } from './surfaces/editeur.js';
 import { creerEcranVolumes, texteBase } from './volumes/ecran.js';
 import { preparerPhoto } from './photos/photo.js';
 import { creerEcranExport, telecharger } from './export/ecran.js';
-import { creerEcranProjet } from './projet/ecran.js';
+import { creerEcranProjet, blocPartage } from './projet/ecran.js';
 import { creerEcranImport } from './import/ecran.js';
 import { creerEcranCoupes } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
@@ -151,7 +151,7 @@ const ICONES = {
 const ONGLETS = [
   { nom: 'projets', titre: 'Projet' },
   ...(recepteurDisponible() ? [{ nom: 'terrain', titre: 'Terrain' }] : []),
-  { nom: 'calculs', titre: 'Calculs / métrés' },
+  { nom: 'calculs', titre: 'Calculs' },
   { nom: 'plan', titre: 'Plan' },
 ];
 // Les trois parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Surfaces et
@@ -262,13 +262,29 @@ document.querySelector('#entete-projet').addEventListener('click', () => affiche
 
 // Réglages de cet appareil (roue ⚙) : mode téléphone, bulles d'aide, nom de l'appareil.
 appliquerReglages();
+// Fenêtre des réglages ouverte (pour y redessiner l'état du partage Drive), ou null.
+let fenetreReglages = null;
 document.querySelector('#bouton-reglages').addEventListener('click', () => {
-  ouvrirReglages({
-    nomAppareil: partage?.appareil().nom,
-    nommerAppareil: partage ? (nom) => partage.nommerAppareil(nom) : null,
+  fenetreReglages = ouvrirReglages({
     aideActive: document.body.classList.contains('aide-active'),
     basculerAide: () => document.querySelector('#bouton-aide').click(),
     fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? fermerAppli : null,
+    // Partage par Google Drive (dans les réglages depuis la version 0.54.0).
+    partage: partage
+      ? {
+          html: () => blocPartage({ etat: partage.etat, appareil: partage.appareil() }),
+          actions: {
+            connecterDrive: () => partage.connecter(),
+            deconnecterDrive: () => partage.deconnecter(),
+            envoyerDrive: () => partage.envoyerMaintenant(),
+            reprendreLaMain: () => partage.reprendreLaMain(),
+            nommerAppareil: (nom) => {
+              partage.nommerAppareil(nom);
+              fenetreReglages?.rafraichir();
+            },
+          },
+        }
+      : null,
   });
 });
 
@@ -1792,6 +1808,7 @@ partage = creerPartage({
   quandChange: () => {
     afficherEcranProjet();
     mettreAJourEtatEntete();
+    fenetreReglages?.rafraichir();
   },
   message: (texte) => afficherMessage(texte, 4000),
 });
@@ -2238,9 +2255,10 @@ function enregistrerBientot() {
 const boutonAnnuler = document.querySelector('#bouton-annuler');
 const boutonRetablir = document.querySelector('#bouton-retablir');
 
+// Plus de boutons Annuler / Rétablir dans l'en-tête (version 0.54.0) : Ctrl+Z / Ctrl+Y restent (ordinateur).
 function mettreAJourAnnuler() {
-  boutonAnnuler.disabled = !historique.peutAnnuler(modifications);
-  boutonRetablir.disabled = !historique.peutRetablir(modifications);
+  if (boutonAnnuler) boutonAnnuler.disabled = !historique.peutAnnuler(modifications);
+  if (boutonRetablir) boutonRetablir.disabled = !historique.peutRetablir(modifications);
 }
 
 /** Remplace le projet affiché par un état de l'historique, en restant au même endroit dans les écrans. */
@@ -2256,8 +2274,8 @@ function revenirA(etat, message) {
 
 const annulerModification = () => revenirA(historique.annuler(modifications), 'Modification annulée');
 const retablirModification = () => revenirA(historique.retablir(modifications), 'Modification rétablie');
-boutonAnnuler.addEventListener('click', annulerModification);
-boutonRetablir.addEventListener('click', retablirModification);
+boutonAnnuler?.addEventListener('click', annulerModification);
+boutonRetablir?.addEventListener('click', retablirModification);
 
 // Raccourcis clavier (ordinateur) : Ctrl+Z annule, Ctrl+Y ou Ctrl+Maj+Z rétablit.
 // Dans une case de texte, on laisse le navigateur annuler la frappe.
