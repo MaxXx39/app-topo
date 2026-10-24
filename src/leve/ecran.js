@@ -19,6 +19,7 @@ import { ROLES_LEVE } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
 import { svgCoupeTalus } from './coupe-talus.js';
+import { svgCroquisTalus } from './croquis-talus.js';
 import { penteSignee } from '../topo/talus.js';
 import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne } from '../topo/accroche.js';
 // Couloir de l'implantation d'une ligne : bandes de chaque côté, plus fines en s'approchant
@@ -601,6 +602,7 @@ export function creerEcranLeve(conteneur, actions) {
         ${surfaces.map((s) => `<option value="${s.id}" ${s.id === actif ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
       </select>`;
     return `<div class="reglages-guidage reglages-talus">
+      ${svgCroquisTalus(r)}
       <div class="ligne-choix pente-talus"><span>Pente</span>
         <label>H<input type="text" inputmode="decimal" data-reglage-talus="horizontal" value="${nombre(r.horizontal)}" placeholder="—" aria-label="Horizontal (m)" /></label>
         <span class="barre-pente">/</span>

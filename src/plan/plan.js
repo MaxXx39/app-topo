@@ -6,6 +6,7 @@ import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
 import { svgDrapeau } from '../outils/drapeaux.js';
+import { traitsDeBarbules } from './barbules.js';
 import { pointALAbscisse } from '../topo/ligne-implantation.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne } from '../leve/libelles.js';
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS } from './dxf-canvas.js';
@@ -354,12 +355,35 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
     // Ligne à implanter : trait sarcelle épais, sa parallèle en pointillés, « Début » et « Fin ».
     const ligne = implantation.ligne;
-    // Talus : zone brune entre la ligne et l'entrée en terre (ou le bord), le bord en pointillés.
-    if (ligne?.talus) {
-      const bord = ligne.talus.bord.map((p) => versEcran(p.est, p.nord, vue));
-      const pied = ligne.talus.ligne.map((p) => versEcran(p.est, p.nord, vue));
-      groupe.append(creerElement('path', { d: tracePar([...pied, ...[...bord].reverse()], true), class: 'zone-talus' }));
-      groupe.append(creerElement('path', { d: tracePar(bord, false), class: 'bord-talus' }));
+    // Talus : zone brune entre la ligne et l'entrée en terre (ou le bord), le bord en pointillés,
+    // et les barbules (traits longs et courts) qui partent du haut du talus. Sans entrée en terre
+    // connue (ni surface ni longueur) : barbules courtes du côté du talus, pour le montrer.
+    if (ligne?.talus && ligne.sommets.length >= 2) {
+      const { zone, cote, ligneEst } = ligne.talus;
+      let pied = [];
+      let bord = [];
+      if (zone) {
+        pied = zone.ligne.map((p) => versEcran(p.est, p.nord, vue));
+        bord = zone.bord.map((p) => versEcran(p.est, p.nord, vue));
+        groupe.append(creerElement('path', { d: tracePar([...pied, ...[...bord].reverse()], true), class: 'zone-talus' }));
+        groupe.append(creerElement('path', { d: tracePar(bord, false), class: 'bord-talus' }));
+      } else {
+        const ecran = ligne.sommets.map((p) => versEcran(p.est, p.nord, vue));
+        const signe = cote === 'gauche' ? -1 : 1;
+        for (let i = 0; i + 1 < ecran.length; i++) {
+          const a = ecran[i];
+          const b = ecran[i + 1];
+          const l = Math.hypot(b.x - a.x, b.y - a.y);
+          if (l === 0) continue;
+          // À droite du sens de la ligne, à l'écran (y vers le bas) : (−dy, dx).
+          const n = { x: (-(b.y - a.y) / l) * 16 * signe, y: ((b.x - a.x) / l) * 16 * signe };
+          pied.push(a, b);
+          bord.push({ x: a.x + n.x, y: a.y + n.y }, { x: b.x + n.x, y: b.y + n.y });
+        }
+      }
+      const [haut, bas] = ligneEst === 'bas' ? [bord, pied] : [pied, bord];
+      const d = traitsDeBarbules(haut, bas, 9);
+      if (d) groupe.append(creerElement('path', { d, class: 'barbules-talus' }));
     }
     if (ligne?.sommets.length >= 2) {
       const ecran = ligne.sommets.map((s) => versEcran(s.est, s.nord, vue));

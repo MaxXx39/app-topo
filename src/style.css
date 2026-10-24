@@ -3891,6 +3891,13 @@ svg.plan,
   stroke-linejoin: round;
 }
 
+/* Barbules du talus (traits longs et courts depuis le haut du talus). */
+.plan .implantation .barbules-talus {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 1.3;
+}
+
 /* Talus à implanter : zone brune entre la ligne et l'entrée en terre, bord en pointillés. */
 .plan .implantation .zone-talus {
   fill: #92400e;
@@ -5924,4 +5931,99 @@ body.accroches-ouvertes {
 .coupe-talus .canne {
   stroke: #ffffff;
   stroke-width: 2.5;
+}
+
+/* Croquis des réglages du talus (en plan, en coupe). */
+.croquis-talus {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto 6px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.croquis-talus .titre-croquis {
+  fill: #1b2b36;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.croquis-talus .texte-croquis {
+  fill: #475569;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.croquis-talus .cote-croquis {
+  fill: #1b2b36;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.croquis-talus .separation-croquis {
+  stroke: #e2e8f0;
+  stroke-width: 1;
+}
+
+.croquis-talus .ligne-croquis {
+  stroke: #0d9488;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.croquis-talus .chevron-croquis {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1.8;
+}
+
+.croquis-talus .zone-croquis {
+  fill: #92400e;
+  fill-opacity: 0.12;
+}
+
+.croquis-talus .bord-croquis {
+  stroke: #92400e;
+  stroke-width: 1.3;
+  stroke-dasharray: 4 3;
+}
+
+.croquis-talus .barbules-croquis {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 1.2;
+}
+
+.croquis-talus .plateforme-croquis {
+  stroke: #94a3b8;
+  stroke-width: 3;
+}
+
+.croquis-talus .terrain-croquis {
+  stroke: #15803d;
+  stroke-width: 2;
+}
+
+.croquis-talus .triangle-croquis {
+  fill: none;
+  stroke: #64748b;
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
+.croquis-talus .talus-croquis {
+  stroke: #92400e;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.croquis-talus .point-ligne-croquis {
+  fill: #0d9488;
+}
+
+.croquis-talus .entree-croquis {
+  fill: #f6ab07;
+  stroke: #1b2b36;
+  stroke-width: 1;
 }
