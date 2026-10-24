@@ -166,6 +166,9 @@ export function creerBoutonRecepteur(nav, actions) {
   return {
     /** Nouvel état du récepteur : couleur du bouton, et la fenêtre si elle est ouverte. */
     mettreAJour(nouvelEtat) {
+      // Le récepteur vient de se connecter : la fenêtre se ferme toute seule (sauf pendant les
+      // réglages NTRIP, on peut être en train de taper).
+      if (fenetre && !reglagesOuverts && !etat?.connecte && nouvelEtat?.connecte) fenetre.close();
       etat = nouvelEtat;
       const couleur = couleurRecepteur(etat);
       bouton.className = `bouton-recepteur couleur-${couleur}`;

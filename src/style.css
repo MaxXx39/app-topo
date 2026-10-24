@@ -5424,3 +5424,74 @@ button.connexion-terrain strong {
     font-size: 0.78rem;
   }
 }
+
+/* ==========================================================================
+   Version 0.55.0
+   ========================================================================== */
+
+/* Fenêtre des libellés : le tableau défile, « Enregistrer » reste toujours visible en bas. */
+.fenetre-libelles {
+  display: flex;
+  flex-direction: column;
+  width: min(96vw, 520px);
+  max-height: 88svh;
+  padding: 0;
+  border: none;
+  border-radius: var(--rayon);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.fenetre-libelles:not([open]) {
+  display: none;
+}
+
+.fenetre-libelles::backdrop {
+  background: rgba(27, 43, 54, 0.45);
+}
+
+.fenetre-libelles h2 {
+  margin: 0;
+  padding: 14px 16px 8px;
+}
+
+.corps-libelles {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 12px 10px;
+}
+
+.pied-libelles {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--bordure);
+  background: var(--surface);
+}
+
+.pied-libelles .bouton-enregistrer {
+  flex: 1;
+  max-width: 260px;
+  min-height: 46px;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+/* Réglages : nom de l'appareil affiché, crayon pour le modifier (évite les fausses manipulations). */
+.nom-appareil-fixe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+}
+
+.nom-appareil-fixe span {
+  color: var(--gris);
+}
+
+.nom-appareil-fixe .bouton-crayon-libelles {
+  position: static;
+  margin-left: auto;
+  box-shadow: none;
+}

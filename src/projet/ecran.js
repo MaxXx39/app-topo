@@ -244,9 +244,12 @@ const ETATS_PARTAGE = {
 /**
  * Bloc « Partage » : nom de l'appareil, connexion à Drive, état de l'envoi du projet ouvert.
  * Affiché dans la fenêtre des réglages (voir reglages/reglages.js) ; boutons data-action :
- * connecterDrive, deconnecterDrive, envoyerDrive, reprendreLaMain ; case data-champ="nom-appareil".
+ * connecterDrive, deconnecterDrive, envoyerDrive, reprendreLaMain, modifierNomAppareil ; case
+ * data-champ="nom-appareil". Le nom de l'appareil n'est modifiable qu'après le crayon (modifierNom :
+ * vrai), avec un avertissement (le changer une fois réglé déconnecte de Drive) ; tant qu'il n'est
+ * pas donné, la case est ouverte.
  */
-export function blocPartage({ etat, appareil }) {
+export function blocPartage({ etat, appareil }, { modifierNom = false } = {}) {
   const [texte, classe] = ETATS_PARTAGE[etat.etat] ?? ['?', ''];
   const heure = etat.etat === 'a-jour' && etat.derniereSynchro ? ` · ${etat.derniereSynchro.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}` : '';
   const reprise = etat.etat === 'repris' && etat.repris
@@ -256,7 +259,12 @@ export function blocPartage({ etat, appareil }) {
   return `<section class="carte-section bloc-partage">
     ${titreSection('partage', 'Partage (Google Drive)', bulle('partage'))}
     ${etat.possible ? '' : '<p class="aide">Pas encore réglé sur cet appareil.</p>'}
-    <label class="nom-appareil">Cet appareil <input type="text" data-champ="nom-appareil" value="${echapper(appareil.nom)}" placeholder="ex. Tablette Max" /></label>
+    ${modifierNom || !appareil.nom
+      ? `<label class="nom-appareil">Cet appareil <input type="text" data-champ="nom-appareil" value="${echapper(appareil.nom)}" placeholder="ex. Tablette Max" /></label>
+         ${appareil.nom ? '<p class="avertissement">⚠ Ne change pas ce nom une fois réglé : Drive te déconnecte et les verrous des projets ne te reconnaissent plus.</p>' : ''}`
+      : `<p class="nom-appareil-fixe"><span>Cet appareil</span><strong>${echapper(appareil.nom)}</strong>
+          <button type="button" class="bouton-crayon-libelles" data-action="modifierNomAppareil" title="Modifier le nom de l'appareil" aria-label="Modifier le nom de l'appareil">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button></p>`}
     ${etat.possible ? `<div class="ligne-outils">
       ${etat.connecte
         ? `<span class="etat-partage ${classe}">${texte}${heure}</span>

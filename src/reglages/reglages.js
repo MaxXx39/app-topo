@@ -55,10 +55,11 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage 
       </div>
     </form>`;
   const zonePartage = fenetre.querySelector('[data-zone="partage"]');
+  let modifierNom = false; // crayon touché : le nom de l'appareil devient modifiable
   // On ne redessine pas pendant qu'on tape le nom de l'appareil (le curseur serait perdu).
   const rafraichir = () => {
     if (!partage || !fenetre.open || zonePartage.contains(document.activeElement)) return;
-    zonePartage.innerHTML = partage.html();
+    zonePartage.innerHTML = partage.html({ modifierNom });
   };
   fenetre.addEventListener('change', (evenement) => {
     const champ = evenement.target.dataset.reglage;
@@ -67,7 +68,10 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage 
       ecrireReglages(reglages);
       appliquerReglages(reglages);
     } else if (champ === 'aide') basculerAide();
-    else if (evenement.target.dataset.champ === 'nom-appareil') partage?.actions.nommerAppareil(evenement.target.value.trim());
+    else if (evenement.target.dataset.champ === 'nom-appareil') {
+      modifierNom = false;
+      partage?.actions.nommerAppareil(evenement.target.value.trim());
+    }
   });
   fenetre.addEventListener('click', (evenement) => {
     if (evenement.target.closest('[data-action="fermer-appli"]')) {
@@ -76,7 +80,11 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage 
       return;
     }
     const bouton = evenement.target.closest('[data-zone="partage"] button[data-action]');
-    if (bouton) partage?.actions[bouton.dataset.action]?.();
+    if (bouton?.dataset.action === 'modifierNomAppareil') {
+      modifierNom = true;
+      zonePartage.innerHTML = partage.html({ modifierNom });
+      zonePartage.querySelector('[data-champ="nom-appareil"]')?.focus();
+    } else if (bouton) partage?.actions[bouton.dataset.action]?.();
   });
   fenetre.addEventListener('focusout', () => setTimeout(rafraichir, 0));
   fenetre.addEventListener('close', () => fenetre.remove());

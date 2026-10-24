@@ -273,7 +273,7 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
     // Partage par Google Drive (dans les réglages depuis la version 0.54.0).
     partage: partage
       ? {
-          html: () => blocPartage({ etat: partage.etat, appareil: partage.appareil() }),
+          html: (options) => blocPartage({ etat: partage.etat, appareil: partage.appareil() }, options),
           actions: {
             connecterDrive: () => partage.connecter(),
             deconnecterDrive: () => partage.deconnecter(),

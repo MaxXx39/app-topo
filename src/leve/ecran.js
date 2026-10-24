@@ -23,7 +23,7 @@ import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne
 // (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
 const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
 import { htmlFormulairePoint, lireFormulairePoint } from '../outils/formulaire-point.js';
-import { nettoyerAbreviation, COULEURS_LIBELLES } from './libelles.js';
+import { ouvrirFenetreLibelles } from './fenetre-libelles.js';
 
 // Mode Contrôler : ce qu'on implante (Ligne viendra plus tard), vue des coupes, longueurs.
 const IMPLANTATIONS = [
@@ -100,8 +100,6 @@ export function creerEcranLeve(conteneur, actions) {
   let etat = null; // dernier état du récepteur (voir src/android/pont.js)
   let donnees = null;
   let choixNatureOuvert = false; // « + Nouvelle » touché : on choisit stock, terrain naturel ou terrassement
-  let libellesOuverts = false; // liste de libellés en cours de modification (celle du rôle choisi)
-  let lignesLibelles = []; // [[abréviation, description]] pendant la modification
   let direct = null; // orientation et contrôle calculés par main.js à chaque état du récepteur
   let cibleAffichee = 0; // cible montrée près du point à implanter (0 : aucune, voir CIBLES)
   let bandeCouloir = 0; // échelle du couloir de la ligne (n° dans BANDES_COULOIR)
@@ -146,25 +144,15 @@ export function creerEcranLeve(conteneur, actions) {
       dessiner();
       return;
     }
-    if (action === 'ouvrirLibelles' || action === 'fermerLibelles') {
-      libellesOuverts = action === 'ouvrirLibelles';
-      lignesLibelles = libellesOuverts ? donnees.libelles[sorteDuRole()].map(([a, d, c]) => [a, d, c ?? '']) : [];
-      dessiner();
-      return;
-    }
-    if (action === 'ajouterLibelle' || action === 'enleverLibelle') {
-      lignesLibelles = lireTableLibelles();
-      if (action === 'ajouterLibelle') lignesLibelles.push(['', '']);
-      else lignesLibelles.splice(Number(bouton.dataset.valeur), 1);
-      dessiner();
-      conteneur.querySelector('.table-libelles tr:last-child input')?.focus();
-      return;
-    }
-    if (action === 'enregistrerLibelles') {
-      // Lignes sans abréviation enlevées ; une abréviation en double : la première est gardée.
-      const liste = lireTableLibelles().filter(([abreviation], i, toutes) => abreviation && toutes.findIndex(([a]) => a === abreviation) === i);
-      libellesOuverts = false;
-      actions.enregistrerLibelles({ ...donnees.libelles, [sorteDuRole()]: liste });
+    if (action === 'ouvrirLibelles') {
+      // Fenêtre à part, « Enregistrer » toujours visible en bas (voir fenetre-libelles.js).
+      const sorte = sorteDuRole();
+      const titres = { lignes: 'Libellés des lignes (L-…)', points: 'Libellés des points (P-…)', aires: 'Libellés des aires (A-…)' };
+      ouvrirFenetreLibelles({
+        titre: titres[sorte],
+        liste: donnees.libelles[sorte],
+        enregistrer: (liste) => actions.enregistrerLibelles({ ...donnees.libelles, [sorte]: liste }),
+      });
       return;
     }
     if (action === 'nouvelleSurface') choixNatureOuvert = false;
@@ -191,7 +179,6 @@ export function creerEcranLeve(conteneur, actions) {
     if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
-    else if (cible.dataset.libelle === 'couleur') cible.style.borderLeft = cible.value ? `12px solid ${cible.value}` : '';
   });
 
   // Nom d'un point du projet choisi dans la liste proposée (pas tapé lettre par lettre, ni validé
@@ -731,50 +718,12 @@ export function creerEcranLeve(conteneur, actions) {
       <button type="button" class="bouton-crayon-libelles" data-action="ouvrirLibelles" title="Modifier les libellés" aria-label="Modifier les libellés">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
     </div>
-    ${libellesOuverts ? editeurLibelles() : ''}`;
+`;
   }
 
   /** Liste de libellés du rôle choisi : 'aires' (métré), 'lignes' (lignes, longueurs) ou 'points'. */
   function sorteDuRole() {
     return donnees.role === 'aire' ? 'aires' : ['ligne', 'longueur'].includes(donnees.role) ? 'lignes' : 'points';
-  }
-
-  /** Libellés tapés dans le tableau : [[abréviation, description, couleur]] (lignes vides comprises). */
-  function lireTableLibelles() {
-    return [...conteneur.querySelectorAll('.table-libelles tbody tr')].map((ligne) => [
-      nettoyerAbreviation(ligne.querySelector('[data-libelle="abreviation"]').value),
-      ligne.querySelector('[data-libelle="description"]').value.trim(),
-      ligne.querySelector('[data-libelle="couleur"]').value,
-    ]);
-  }
-
-  /**
-   * Modification de la liste de libellés ouverte (seulement celle du rôle choisi) : un tableau,
-   * abréviation à gauche, description à droite, × pour enlever une ligne, « + Ajouter ».
-   */
-  function editeurLibelles() {
-    const titres = { lignes: 'Libellés des lignes (L-…)', points: 'Libellés des points (P-…)', aires: 'Libellés des aires (A-…)' };
-    return `<div class="editeur-libelles">
-      <p class="titre-choix">${titres[sorteDuRole()]}</p>
-      <table class="table-libelles">
-        <thead><tr><th>Abrév.</th><th>Description</th><th>Couleur</th><th></th></tr></thead>
-        <tbody>
-          ${lignesLibelles.map(([abreviation, description, couleur = ''], i) => `<tr>
-            <td><input type="text" data-libelle="abreviation" value="${echapper(abreviation)}" maxlength="8" autocapitalize="characters" aria-label="Abréviation" /></td>
-            <td><input type="text" data-libelle="description" value="${echapper(description)}" aria-label="Description" /></td>
-            <td><select data-libelle="couleur" aria-label="Couleur" style="${couleur ? `border-left: 12px solid ${couleur}` : ''}">
-              ${COULEURS_LIBELLES.map(([c, nom]) => `<option value="${c}" ${c === couleur ? 'selected' : ''}>${nom}</option>`).join('')}
-            </select></td>
-            <td><button type="button" class="bouton-lien" data-action="enleverLibelle" data-valeur="${i}" aria-label="Enlever">×</button></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-      <div class="ligne-outils">
-        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="ajouterLibelle">+ Ajouter</button>
-        <button type="button" class="bouton-secondaire" data-action="enregistrerLibelles">Enregistrer</button>
-        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerLibelles">annuler</button>
-      </div>
-    </div>`;
   }
 
   /** Une ligne courte : points du stock par rôle et volume (le détail est dans Calculs). */
