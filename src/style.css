@@ -2665,18 +2665,6 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 /* --- Onglet Terrain : écran épuré pour le chantier --- */
-.connexion-terrain {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-
-.connexion-terrain .bouton {
-  width: 100%;
-}
-
 /* « display: flex » ci-dessus l'emporterait sur l'attribut hidden : on le rétablit. */
 .connexion-terrain[hidden] {
   display: none;
@@ -5275,4 +5263,162 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   align-items: stretch;
   gap: 4px;
   text-align: left;
+}
+
+/* --- Bouton « Récepteur » de la barre du bas (appli Android) : couleur selon l'état --- */
+.onglets button.bouton-recepteur svg {
+  padding: 2px 10px;
+  width: 44px;
+  border-radius: 12px;
+  color: #ffffff;
+}
+
+.bouton-recepteur.couleur-gris svg {
+  background: #9ca3af;
+}
+
+.bouton-recepteur.couleur-vert svg {
+  background: #16a34a;
+}
+
+.bouton-recepteur.couleur-orange svg {
+  background: #f59e0b;
+}
+
+.bouton-recepteur.couleur-rouge svg {
+  background: #dc2626;
+}
+
+/* Fenêtre du récepteur. */
+.fenetre-recepteur {
+  width: min(94vw, 460px);
+  max-height: 90svh;
+  padding: 16px;
+  border: none;
+  border-radius: var(--rayon);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.fenetre-recepteur::backdrop {
+  background: rgba(27, 43, 54, 0.45);
+}
+
+.entete-fenetre-recepteur {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.entete-fenetre-recepteur h2 {
+  flex: 1;
+  margin: 0;
+}
+
+.pastille-etat-recepteur {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.pastille-etat-recepteur > span {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.pastille-etat-recepteur strong {
+  margin-left: auto;
+  font-size: 0.85rem;
+}
+
+.pastille-etat-recepteur.couleur-vert > span { background: #16a34a; }
+.pastille-etat-recepteur.couleur-orange > span { background: #f59e0b; }
+.pastille-etat-recepteur.couleur-rouge > span { background: #dc2626; }
+
+.etat-recepteur dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+}
+
+.etat-recepteur dt {
+  color: var(--gris);
+}
+
+.etat-recepteur dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions-recepteur {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.actions-recepteur .bouton-large {
+  width: 100%;
+}
+
+.bouton-couper {
+  border-color: var(--rouge);
+  color: var(--rouge);
+}
+
+.bloc-ntrip {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bordure);
+}
+
+/* Terrain : rappel « Récepteur non connecté · Connecter » (ouvre la fenêtre du récepteur). */
+button.connexion-terrain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px dashed var(--bordure);
+  border-radius: 10px;
+  background: var(--fond);
+  color: var(--texte);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+button.connexion-terrain[hidden] {
+  display: none;
+}
+
+button.connexion-terrain strong {
+  margin-left: auto;
+  color: var(--sombre);
+  text-decoration: underline;
+}
+
+.pastille-gris {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+/* Bandeaux du récepteur : le RTK (plus long, avec la précision) prend plus de place. */
+.bandeaux-recepteur span[data-bandeau='rtk'] {
+  flex: 1.7;
+  padding: 0 6px;
+}
+
+@media (max-width: 899px) {
+  .bandeaux-recepteur span {
+    font-size: 0.78rem;
+  }
 }

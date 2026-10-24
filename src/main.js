@@ -43,6 +43,7 @@ import { creerPartage } from './partage/partage.js';
 import * as historique from './projet/historique.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
+import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
 import { lireLibelles, enregistrerLibelles } from './leve/libelles.js';
@@ -521,23 +522,29 @@ function ajouterSurfaceLevee(nature) {
   modifie({ recadrer: true });
 }
 
-const ecranLeve = recepteurDisponible()
-  ? creerEcranLeve(document.querySelector('#leve-direct'), {
+// Bouton « Récepteur » de la barre du bas (appli Android) : couleur selon l'état, fenêtre pour
+// connecter / couper le récepteur et régler les corrections NTRIP (voir leve/recepteur.js).
+const boutonRecepteur = recepteurDisponible()
+  ? creerBoutonRecepteur(document.querySelector('.onglets'), {
       choisirRecepteur,
+      reconnecter: reconnecterRecepteur,
+      deconnecter: deconnecterRecepteur,
       // Corrections par internet (swipos) : seulement avec un APK qui sait le faire.
       lireReglagesCorrections: () => (correctionsDisponibles() ? lireReglagesCorrections() : null),
       demarrerCorrections: (reglages) => {
         demarrerCorrections(reglages);
         afficherMessage('Corrections : connexion à swipos…');
-        setTimeout(() => ecranLeve.afficher(donneesLeve()), 300); // bouton « Redémarrer », mot de passe enregistré
       },
       arreterCorrections: () => {
         arreterCorrections();
         afficherMessage('Corrections arrêtées : Emlid Flow peut reprendre');
-        setTimeout(() => ecranLeve.afficher(donneesLeve()), 300);
       },
-      reconnecter: reconnecterRecepteur,
-      deconnecter: deconnecterRecepteur,
+    })
+  : null;
+
+const ecranLeve = recepteurDisponible()
+  ? creerEcranLeve(document.querySelector('#leve-direct'), {
+      ouvrirRecepteur: () => boutonRecepteur.ouvrir(),
       nouvelleSurface: (nature) => ajouterSurfaceLevee(nature),
       choisirStock: (id) => {
         leveDirect.stockId = id;
@@ -1665,6 +1672,7 @@ if (recepteurDisponible()) {
   ecouterRecepteur((etat) => {
     etatRecepteur = etat;
     mettreAJourBandeaux(etat);
+    boutonRecepteur?.mettreAJour(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
     const enPoint = enImplantationDePoint();
     const enLigne = enImplantationDeLigne();
