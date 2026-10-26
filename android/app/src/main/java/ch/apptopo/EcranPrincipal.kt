@@ -52,6 +52,8 @@ import java.util.Locale
 class EcranPrincipal : Activity() {
 
     val recepteur = EtatRecepteur()
+    // Essai à 2 récepteurs (mode Confirmé) : un 2e RX2, connecté à part ; il reçoit les mêmes corrections.
+    val recepteur2 = EtatRecepteur()
     private val minuterie = Handler(Looper.getMainLooper())
     private var pageChargee = false
 
@@ -89,6 +91,7 @@ class EcranPrincipal : Activity() {
         garderHorsDesBarres(cadre)
         setContentView(cadre)
         page.loadUrl(ServeurAppli.ADRESSE_ACCUEIL)
+        recepteur.copieCorrections = { octets -> recepteur2.bluetooth.ecrire(octets) }
         // Corrections par internet laissées en marche la dernière fois : on les reprend.
         if (preferencesCorrections().getBoolean(CLE_CORRECTIONS_ACTIVES, false)) reglagesCorrections()?.let { recepteur.corrections.demarrer(it) }
     }
@@ -106,6 +109,7 @@ class EcranPrincipal : Activity() {
     override fun onDestroy() {
         recepteur.corrections.arreter()
         recepteur.bluetooth.deconnecter()
+        recepteur2.bluetooth.deconnecter()
         page.destroy()
         super.onDestroy()
     }
@@ -119,8 +123,11 @@ class EcranPrincipal : Activity() {
             if (pageChargee) {
                 val etat = recepteur.enJson(nomDernierRecepteur())
                 page.evaluateJavascript("window.recevoirEtatRecepteur && window.recevoirEtatRecepteur($etat)", null)
+                // 2e récepteur (essai) : son état à part, seulement s'il est connecté ou vient de l'être.
+                val etat2 = recepteur2.enJson(preferences().getString(CLE_NOM_RECEPTEUR_2, null))
+                page.evaluateJavascript("window.recevoirEtatRecepteur2 && window.recevoirEtatRecepteur2($etat2)", null)
             }
-            if (recepteur.connecte) {
+            if (recepteur.connecte || recepteur2.connecte) {
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             } else {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -382,6 +389,40 @@ class EcranPrincipal : Activity() {
         recepteur.oublier("non connecté")
     }
 
+    /** Essai à 2 récepteurs : choisit le 2e RX2 dans les appareils appairés et s'y connecte. */
+    fun choisirRecepteur2() {
+        val adaptateur = adaptateurBluetooth { choisirRecepteur2() } ?: return
+        @SuppressLint("MissingPermission")
+        val appareils: List<BluetoothDevice> = adaptateur.bondedDevices?.toList().orEmpty()
+        if (appareils.isEmpty()) {
+            message("Aucun appareil Bluetooth appairé.")
+            return
+        }
+        @SuppressLint("MissingPermission")
+        val noms = appareils.map { "${it.name ?: "(sans nom)"}\n${it.address}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Choisir le 2e récepteur")
+            .setItems(noms) { _, numero ->
+                val appareil = appareils[numero]
+                if (appareil.address == preferences().getString(CLE_DERNIER_RECEPTEUR, null) && recepteur.connecte) {
+                    message("C'est déjà le récepteur 1 : choisis l'autre RX2.")
+                    return@setItems
+                }
+                @SuppressLint("MissingPermission")
+                val nom = appareil.name ?: appareil.address
+                preferences().edit().putString(CLE_NOM_RECEPTEUR_2, nom).apply()
+                recepteur2.bluetooth.connecter(appareil)
+            }
+            .setNegativeButton("Annuler", null)
+            .show()
+    }
+
+    /** Essai à 2 récepteurs : coupe le 2e RX2. */
+    fun deconnecterRecepteur2() {
+        recepteur2.bluetooth.deconnecter()
+        recepteur2.oublier("non connecté")
+    }
+
     // =====================================================================
     // Corrections RTK par internet (swipos), sans Emlid Flow
     // Réglages gardés dans les préférences privées de l'appli (sur cette tablette seulement),
@@ -625,6 +666,7 @@ class EcranPrincipal : Activity() {
         private const val PORTEE_DRIVE = "https://www.googleapis.com/auth/drive.file"
         private const val CLE_DERNIER_RECEPTEUR = "dernier_recepteur"
         private const val CLE_NOM_RECEPTEUR = "nom_dernier_recepteur"
+        private const val CLE_NOM_RECEPTEUR_2 = "nom_recepteur_2"
         private const val CLE_CORRECTIONS_ACTIVES = "actives"
 
         // Port habituel des serveurs NTRIP, et point de montage swipos de l'utilisateur (à vérifier dans Emlid Flow).

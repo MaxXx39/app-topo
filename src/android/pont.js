@@ -53,6 +53,21 @@ export function ecouterRecepteur(fonction) {
 }
 
 export const choisirRecepteur = () => window.AppliAndroid.choisirRecepteur();
+
+// --- Essai à 2 récepteurs (demande du 26.10.2026, mode Confirmé) : un 2e RX2, même état que le 1er ---
+
+/** Vrai si l'APK sait connecter un 2e récepteur. */
+export function recepteur2Disponible() {
+  return estDansAppliAndroid() && typeof window.AppliAndroid.choisirRecepteur2 === 'function';
+}
+
+/** Appelle "fonction(etat)" à chaque état du 2e récepteur (même forme que ecouterRecepteur). */
+export function ecouterRecepteur2(fonction) {
+  window.recevoirEtatRecepteur2 = fonction;
+}
+
+export const choisirRecepteur2 = () => window.AppliAndroid.choisirRecepteur2();
+export const deconnecterRecepteur2 = () => window.AppliAndroid.deconnecterRecepteur2();
 export const reconnecterRecepteur = () => window.AppliAndroid.reconnecterRecepteur();
 export const deconnecterRecepteur = () => window.AppliAndroid.deconnecterRecepteur();
 

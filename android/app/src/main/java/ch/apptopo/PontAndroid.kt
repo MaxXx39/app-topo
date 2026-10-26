@@ -44,6 +44,18 @@ class PontAndroid(private val ecran: EcranPrincipal) {
         ecran.runOnUiThread { ecran.deconnecterRecepteur() }
     }
 
+    /** Essai à 2 récepteurs : choisit le 2e RX2 et s'y connecte. */
+    @JavascriptInterface
+    fun choisirRecepteur2() {
+        ecran.runOnUiThread { ecran.choisirRecepteur2() }
+    }
+
+    /** Essai à 2 récepteurs : coupe le 2e RX2. */
+    @JavascriptInterface
+    fun deconnecterRecepteur2() {
+        ecran.runOnUiThread { ecran.deconnecterRecepteur2() }
+    }
+
     /**
      * Point à prendre maintenant, en MN95 / RAN95 (texte JSON, voir EtatRecepteur.pointEnJson) :
      * refusé si le RTK n'est pas fixe ou si l'inclinaison n'est pas prête.

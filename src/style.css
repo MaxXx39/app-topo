@@ -6542,3 +6542,10 @@ body.mode-base .parties-calculs {
   position: static;
   margin: 6px 0;
 }
+
+/* Fenêtre du récepteur : essai à 2 récepteurs (mode Confirmé). */
+.bloc-recepteur2 {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--bordure);
+}

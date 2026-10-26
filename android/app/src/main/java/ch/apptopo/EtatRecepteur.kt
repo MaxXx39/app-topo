@@ -36,9 +36,18 @@ class EtatRecepteur {
      */
     val corrections = ClientNtrip(
         ggaActuelle = { derniereGgaBrute.takeIf { (age(heureGgaBruteMs) ?: Long.MAX_VALUE) <= DELAI_RECENT_MS } },
-        surCorrections = { octets -> bluetooth.ecrire(octets) },
+        surCorrections = { octets ->
+            bluetooth.ecrire(octets)
+            copieCorrections?.invoke(octets)
+        },
         surEtat = {},
     )
+
+    /**
+     * Essai à 2 récepteurs (demande du 26.10.2026) : les mêmes corrections sont aussi envoyées au
+     * 2e récepteur (même flux swipos, calculé près du 1er : les deux sont sur le même engin).
+     */
+    @Volatile var copieCorrections: ((ByteArray) -> Unit)? = null
 
     // Grille du géoïde : chargée une seule fois, à la première conversion.
     private val grille: GrilleGeoide by lazy { GrilleGeoide.chgeo2004Lhn95() }

@@ -72,6 +72,7 @@ import {
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
+import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2 } from './android/pont.js';
 import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle } from './topo/controle.js';
@@ -587,8 +588,12 @@ const boutonRecepteur = recepteurDisponible()
         arreterCorrections();
         afficherMessage('Corrections arrêtées : Emlid Flow peut reprendre');
       },
+      // Essai à 2 récepteurs (mode Confirmé) : seulement avec un APK qui le sait.
+      choisirRecepteur2: recepteur2Disponible() ? choisirRecepteur2 : null,
+      deconnecter2: deconnecterRecepteur2,
     })
   : null;
+if (boutonRecepteur && recepteur2Disponible()) ecouterRecepteur2((etat) => boutonRecepteur.mettreAJour2(etat));
 
 const ecranLeve = recepteurDisponible()
   ? creerEcranLeve(document.querySelector('#leve-direct'), {

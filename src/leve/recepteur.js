@@ -31,9 +31,10 @@ const ICONE = '<path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><
 
 /**
  * Crée le bouton dans la barre du bas "nav". actions : choisirRecepteur(), reconnecter(),
- * deconnecter(), lireReglagesCorrections() (ou null), demarrerCorrections(reglages), arreterCorrections().
- * Renvoie { mettreAJour(etat) } (appelé à chaque état du récepteur, 5 fois par seconde), et
- * ouvrir() (ouvre la fenêtre, par exemple depuis l'onglet Terrain).
+ * deconnecter(), lireReglagesCorrections() (ou null), demarrerCorrections(reglages), arreterCorrections(),
+ * et pour l'essai à 2 récepteurs (ou null sans APK qui le sait) : choisirRecepteur2(), deconnecter2().
+ * Renvoie { mettreAJour(etat) } (appelé à chaque état du récepteur, 5 fois par seconde),
+ * mettreAJour2(etat) (2e récepteur), et ouvrir() (ouvre la fenêtre, par exemple depuis l'onglet Terrain).
  */
 export function creerBoutonRecepteur(nav, actions) {
   const bouton = document.createElement('button');
@@ -43,6 +44,7 @@ export function creerBoutonRecepteur(nav, actions) {
   nav.append(bouton);
 
   let etat = null;
+  let etat2 = null; // 2e récepteur (essai)
   let fenetre = null;
   let reglagesOuverts = false; // roue ⚙ : réglages NTRIP
   let deverrouille = false; // bon code tapé pour les réglages NTRIP (voir outils/code.js), jusqu'à la fermeture
@@ -82,6 +84,8 @@ export function creerBoutonRecepteur(nav, actions) {
     if (!cible) return;
     const { action } = cible.dataset;
     if (action === 'fermer') fenetre.close();
+    else if (action === 'choisirRecepteur2') actions.choisirRecepteur2();
+    else if (action === 'deconnecter2') actions.deconnecter2();
     else if (action === 'reglages') basculerReglages(); else if (action === 'demarrerCorrections') {
       const lire = (champ) => fenetre.querySelector(`[data-correction="${champ}"]`)?.value.trim() ?? '';
       actions.demarrerCorrections({
@@ -122,8 +126,10 @@ export function creerBoutonRecepteur(nav, actions) {
       </div>
       <div class="etat-recepteur" data-vivant="etat-recepteur"></div>
       <div class="actions-recepteur" data-vivant="actions-recepteur"></div>
+      ${actions.choisirRecepteur2 ? '<div class="bloc-recepteur2 seulement-confirme" data-vivant="recepteur2"></div>' : ''}
       ${reglages && reglagesOuverts ? `<div class="seulement-confirme">${blocNtrip(reglages)}</div>` : ''}`;
     rafraichir();
+    rafraichir2();
   }
 
   /** Réglages des corrections NTRIP (swipos), repris d'Emlid Flow, gardés sur la tablette. */
@@ -175,7 +181,46 @@ export function creerBoutonRecepteur(nav, actions) {
     }
   }
 
+  /**
+   * Essai à 2 récepteurs : état du 2e RX2 (position, précision) et écart avec le 1er (distance en
+   * plan, différence d'altitude : sur un engin, elle doit rester à peu près constante).
+   */
+  function rafraichir2() {
+    const zone = fenetre?.querySelector('[data-vivant="recepteur2"]');
+    if (!zone) return;
+    const connecte = Boolean(etat2?.connecte);
+    const couleur = couleurRecepteur(etat2);
+    const lignes = [];
+    const p1 = etat?.connecte && etat.recu ? etat.position : null;
+    const p2 = connecte && etat2.recu ? etat2.position : null;
+    if (p2) {
+      const statut = { 4: 'RTK FIXE', 5: 'RTK FLOTTANT' }[etat2.qualite] ?? `GNSS : ${etat2.libelleQualite ?? '?'}`;
+      lignes.push(['Position', `${statut}${etat2.nbSatellites != null ? ` · ${etat2.nbSatellites} sat.` : ''}`]);
+      lignes.push(['E / N / H', `${formaterNombre(p2.est)} / ${formaterNombre(p2.nord)} / ${formaterNombre(p2.altitude)}`]);
+      lignes.push(['Précision', `H ${formaterNombre(etat2.precisionH)} · V ${formaterNombre(etat2.precisionV)}`]);
+      if (p1) lignes.push(['Écart 1 → 2', `${formaterNombre(Math.hypot(p2.est - p1.est, p2.nord - p1.nord))} m en plan · dH ${formaterNombre(p2.altitude - p1.altitude)} m`]);
+    } else if (connecte) lignes.push(['Position', 'en attente du récepteur…']);
+    const boutons = connecte
+      ? '<button type="button" class="bouton-lien" data-action="deconnecter2">couper le récepteur 2</button>'
+      : '<button type="button" class="bouton-secondaire" data-action="choisirRecepteur2">Connecter un 2e récepteur</button>';
+    const html = `<p class="titre-choix">Récepteur 2 (essai)</p>
+      <p class="pastille-etat-recepteur couleur-${couleur}"><span></span>${connecte ? echapper(etat2.bluetooth ?? 'connecté') : 'non connecté'}
+        <strong>${TEXTES_COULEURS[couleur]}</strong></p>
+      ${lignes.length > 0 ? `<dl>${lignes.map(([titre, texte]) => `<dt>${titre}</dt><dd>${echapper(texte)}</dd>`).join('')}</dl>` : ''}
+      <div class="ligne-outils">${boutons}</div>`;
+    // On ne redessine que si le texte change (le doigt peut être sur le bouton).
+    if (zone.dataset.html !== html) {
+      zone.dataset.html = html;
+      zone.innerHTML = html;
+    }
+  }
+
   return {
+    /** Nouvel état du 2e récepteur (essai) : la fenêtre si elle est ouverte. */
+    mettreAJour2(nouvelEtat) {
+      etat2 = nouvelEtat;
+      rafraichir2();
+    },
     /** Nouvel état du récepteur : couleur du bouton, et la fenêtre si elle est ouverte. */
     mettreAJour(nouvelEtat) {
       // Le récepteur vient de se connecter : la fenêtre se ferme toute seule (sauf pendant les
