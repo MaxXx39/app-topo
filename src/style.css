@@ -3967,6 +3967,30 @@ svg.plan,
   background: rgba(27, 43, 54, 0.45);
 }
 
+/* Fenêtre « Code » (réglages protégés : nom de l'appareil, NTRIP). */
+.fenetre-code {
+  width: min(86vw, 320px);
+}
+
+.champ-code {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.champ-code input {
+  min-height: 44px;
+  font-size: 1.4rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
+.fenetre-code .ligne-outils {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
 /* Mode de l'appli (réglages ⚙) : Base ou Confirmé, deux gros boutons avec l'étoile. */
 .choix-mode-appli {
   display: flex;

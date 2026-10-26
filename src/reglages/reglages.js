@@ -9,6 +9,7 @@
 // - partage par Google Drive (nom de l'appareil, connexion, état), déplacé de l'onglet Projet ;
 // - « Fermer l'appli » (appli Android seulement), en rouge tout en haut.
 import { echapper } from '../outils/echapper.js';
+import { demanderCode } from '../outils/code.js';
 
 const CLE = 'topo-reglages';
 // Étoile à 5 branches (en-tête et choix du mode).
@@ -90,6 +91,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     </form>`;
   const zonePartage = fenetre.querySelector('[data-zone="partage"]');
   let modifierNom = false; // crayon touché : le nom de l'appareil devient modifiable
+  let deverrouille = false; // bon code tapé (voir outils/code.js) : vaut jusqu'à la fermeture de la fenêtre
   // On ne redessine pas pendant qu'on tape le nom de l'appareil (le curseur serait perdu).
   const rafraichir = () => {
     if (!partage || !fenetre.open || zonePartage.contains(document.activeElement)) return;
@@ -120,12 +122,17 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       return;
     }
     const bouton = evenement.target.closest('[data-zone="partage"] button[data-action]');
-    if (bouton?.dataset.action === 'modifierNomAppareil') {
-      modifierNom = true;
-      zonePartage.innerHTML = partage.html({ modifierNom });
-      zonePartage.querySelector('[data-champ="nom-appareil"]')?.focus();
-    } else if (bouton) partage?.actions[bouton.dataset.action]?.();
+    if (bouton?.dataset.action === 'modifierNomAppareil') modifierNomProtege();
+    else if (bouton) partage?.actions[bouton.dataset.action]?.();
   });
+  /** Crayon du nom de l'appareil : protégé par le code (demandé une fois par ouverture de la fenêtre). */
+  async function modifierNomProtege() {
+    if (!deverrouille && !(await demanderCode('Modifier le nom de l\'appareil'))) return;
+    deverrouille = true;
+    modifierNom = true;
+    zonePartage.innerHTML = partage.html({ modifierNom });
+    zonePartage.querySelector('[data-champ="nom-appareil"]')?.focus();
+  }
   fenetre.addEventListener('focusout', () => setTimeout(rafraichir, 0));
   fenetre.addEventListener('close', () => fenetre.remove());
   document.body.append(fenetre);
