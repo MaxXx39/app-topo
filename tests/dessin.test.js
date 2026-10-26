@@ -68,3 +68,51 @@ describe('pente le long d\'un côté', () => {
     expect(directionUnitaire(A, A)).toBeNull();
   });
 });
+
+describe('pilote : gisement et distance', async () => {
+  const { gisement, gisementNormal, pointSelonGisement, airePolygone, longueursCotes, altitudesDuDessin, nomDessin } = await import('../src/topo/dessin.js');
+
+  it('gisement : nord 0, est 100, sud 200, ouest 300 gon', () => {
+    expect(gisement(A, versNord)).toBeCloseTo(0, 9);
+    expect(gisement(A, versEst)).toBeCloseTo(100, 9);
+    expect(gisement(A, { est: A.est, nord: A.nord - 1 })).toBeCloseTo(200, 9);
+    expect(gisement(A, { est: A.est - 1, nord: A.nord })).toBeCloseTo(300, 9);
+    expect(gisement(A, { est: A.est + 1, nord: A.nord + 1 })).toBeCloseTo(50, 9);
+    expect(gisement(A, A)).toBeNull();
+  });
+
+  it('gisement ramené entre 0 et 400', () => {
+    expect(gisementNormal(420)).toBe(20);
+    expect(gisementNormal(-100)).toBe(300);
+  });
+
+  it('point à 7.5 m au gisement 200 (plein sud)', () => {
+    const p = pointSelonGisement(A, 200, 7.5);
+    expect(p.est - A.est).toBeCloseTo(0, 9);
+    expect(p.nord - A.nord).toBeCloseTo(-7.5, 9);
+  });
+
+  it('aller-retour : le gisement du point calculé est celui donné', () => {
+    expect(gisement(A, pointSelonGisement(A, 137.25, 12))).toBeCloseTo(137.25, 9);
+  });
+
+  it('aire et côtés d\'un rectangle 12 × 8', () => {
+    const { sommets } = rectangle(A, versEst, 12, 8, 'droite');
+    expect(airePolygone(sommets)).toBeCloseTo(96, 9);
+    expect(longueursCotes(sommets, true).map((l) => Math.round(l * 1000) / 1000)).toEqual([12, 8, 12, 8]);
+    expect(longueursCotes(sommets, false)).toHaveLength(3);
+  });
+
+  it('altitudes : fixe, avec pente, par sommet', () => {
+    const { sommets } = rectangle(A, versEst, 20, 10, 'gauche');
+    const avec = (hauteur) => altitudesDuDessin({ sommets: sommets.map((s, i) => ({ ...s, altitude: 400 + i })), hauteur });
+    expect(avec({ mode: 'fixe', altitude: 450, pente: null })).toEqual([450, 450, 450, 450]);
+    expect(avec({ mode: 'fixe', altitude: 450, pente: { pourcent: 2, cote: 0, depuis: 0 } }).map((v) => Math.round(v * 1000) / 1000)).toEqual([450, 450.4, 450.4, 450]);
+    expect(avec({ mode: 'sommets', altitude: 450 })).toEqual([400, 401, 402, 403]);
+  });
+
+  it('nom automatique : le numéro suivant de ce type', () => {
+    expect(nomDessin('plateforme', [{ nom: 'Plateforme 1' }, { nom: 'Plateforme 3' }, { nom: 'Ligne 9' }])).toBe('Plateforme 4');
+    expect(nomDessin('batiment', [])).toBe('Bâtiment 1');
+  });
+});

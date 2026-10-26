@@ -3,6 +3,7 @@
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
 import { bulle } from '../aide/bulles.js';
 import { estModeBase } from '../reglages/reglages.js';
+import { dessinerDessins } from './dessins.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
@@ -445,6 +446,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       groupe.append(creerElement('circle', { cx: x, cy: y, r: 14, class: 'cible-implantation' }));
     }
     if (choix) croix(choix.est, choix.nord, 'croix-choix', 12);
+    // Dessins (Calculs › Dessin) et, pour celui en cours, le pilote.
+    dessinerDessins(groupe, implantation, (est, nord) => versEcran(est, nord, vue), creerElement, 1 / vue.echelle);
     svg.append(groupe);
   }
 

@@ -2667,7 +2667,7 @@ body.avec-recepteur .bandeaux-recepteur {
   box-shadow: var(--ombre);
 }
 
-body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures']) .parties-calculs {
+body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']) .parties-calculs {
   display: flex;
 }
 
@@ -6305,4 +6305,198 @@ body.mode-base .parties-calculs {
   font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+/* ==========================================================================
+   Calculs › Dessin (version 0.60.0) : bouton de la partie, cartes, pilote, dessin sur le plan
+   ========================================================================== */
+
+.groupe-dessin {
+  flex: 0.8;
+  display: flex;
+  padding: 3px;
+  border: 2px dashed #7c3aed;
+  border-radius: 10px;
+}
+
+.parties-calculs .groupe-dessin button.actif {
+  background: #7c3aed;
+}
+
+.boutons-dessin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.carte-dessin {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--bordure);
+  border-left: 5px solid #7c3aed;
+  border-radius: var(--rayon);
+  background: var(--surface);
+  box-shadow: var(--ombre);
+}
+
+.carte-dessin.en-edition {
+  border-color: #7c3aed;
+}
+
+.entete-dessin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.type-dessin {
+  color: #7c3aed;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nom-dessin {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.pilote-dessin {
+  margin: 8px 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #7c3aed 7%, var(--surface));
+}
+
+.etape-pilote {
+  margin: 0 0 8px;
+  font-weight: 800;
+}
+
+.direction-distance,
+.rectangle-dessin,
+.champs-hauteur {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.direction-distance label,
+.rectangle-dessin label,
+.champs-hauteur label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  color: var(--gris);
+}
+
+.direction-distance input,
+.rectangle-dessin input,
+.champs-hauteur input {
+  width: 110px;
+  min-height: 38px;
+  font-size: 1.05rem;
+}
+
+.rectangle-dessin > span {
+  width: 100%;
+  font-weight: 700;
+}
+
+.hauteur-dessin {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--bordure);
+}
+
+.altitude-sommet {
+  width: 100px;
+}
+
+/* Plan : dessins en violet, le dessin en cours plus épais, sommets numérotés, longueurs des côtés. */
+.plan .trait-dessin {
+  fill: none;
+  stroke: #7c3aed;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.plan .trait-dessin.type-plateforme {
+  fill: rgba(124, 58, 237, 0.08);
+}
+
+.plan .trait-dessin.actif {
+  stroke-width: 3.5;
+}
+
+.plan .sommet-dessin {
+  fill: #ffffff;
+  stroke: #7c3aed;
+  stroke-width: 2;
+}
+
+.plan .sommet-dessin.actif {
+  fill: #7c3aed;
+}
+
+.plan .numero-dessin,
+.plan .cote-dessin {
+  fill: #5b21b6;
+  font-size: 11.2px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+
+.plan .cote-dessin {
+  text-anchor: middle;
+}
+
+.plan .pilote-dessin-point {
+  fill: none;
+  stroke: #f6ab07;
+  stroke-width: 3;
+}
+
+.plan .pilote-dessin-direction {
+  fill: none;
+  stroke: #f6ab07;
+  stroke-width: 2.5;
+  stroke-dasharray: 7 5;
+}
+
+.plan .pilote-dessin-prochain {
+  stroke: #f6ab07;
+  stroke-width: 3;
+}
+
+/* Téléphone, pendant un dessin : plan en haut, pilote en dessous (pas de barre « Terminé »). */
+@media (max-width: 899px) {
+  body.mode-dessin[data-onglet='dessin'] .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: var(--hauteur-plan-dessin);
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+
+  body.mode-dessin[data-onglet='dessin'] .onglets {
+    display: none;
+  }
+
+  body.mode-dessin[data-onglet='dessin'] .mise-en-page {
+    padding-top: calc(var(--hauteur-plan-dessin) + 12px);
+    padding-bottom: 24px;
+  }
 }

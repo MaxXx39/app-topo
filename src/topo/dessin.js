@@ -74,3 +74,87 @@ export function altitudesEnPente(sommets, { altitude, depuis = 0, cote = 0, pent
   const origine = sommets[depuis];
   return sommets.map((s) => altitude + (pente / 100) * ((s.est - origine.est) * direction.est + (s.nord - origine.nord) * direction.nord));
 }
+
+// --- Pilote (comme Leica iCON) : depuis le dernier sommet, une direction et une distance ---
+
+/**
+ * Gisement de A vers B (gon) : 0 = Nord, sens des aiguilles d'une montre (100 = Est, 200 = Sud,
+ * 300 = Ouest), entre 0 et 400. null si A et B sont au même endroit.
+ */
+export function gisement(a, b) {
+  const de = b.est - a.est;
+  const dn = b.nord - a.nord;
+  if (Math.hypot(de, dn) < 1e-9) return null;
+  const gon = (Math.atan2(de, dn) * 200) / Math.PI;
+  return (gon + 400) % 400;
+}
+
+/** Gisement ramené entre 0 et 400 gon (ex. 420 → 20, −100 → 300). */
+export function gisementNormal(gon) {
+  return ((gon % 400) + 400) % 400;
+}
+
+/** Point à "distance" m de P dans la direction "gon" (gisement). Renvoie { est, nord }. */
+export function pointSelonGisement(p, gon, distance) {
+  const angle = (gon * Math.PI) / 200;
+  return { est: p.est + distance * Math.sin(angle), nord: p.nord + distance * Math.cos(angle) };
+}
+
+/** Aire d'un polygone fermé (m², à plat), quel que soit le sens des sommets. */
+export function airePolygone(sommets) {
+  let double = 0;
+  for (let i = 0; i < sommets.length; i++) {
+    const a = sommets[i];
+    const b = sommets[(i + 1) % sommets.length];
+    double += a.est * b.nord - b.est * a.nord;
+  }
+  return Math.abs(double) / 2;
+}
+
+/** Longueurs des côtés (m, à plat) ; un dessin fermé a aussi le côté du dernier sommet au premier. */
+export function longueursCotes(sommets, ferme) {
+  const longueurs = [];
+  const nombre = ferme && sommets.length > 2 ? sommets.length : sommets.length - 1;
+  for (let i = 0; i < nombre; i++) {
+    const a = sommets[i];
+    const b = sommets[(i + 1) % sommets.length];
+    longueurs.push(Math.hypot(b.est - a.est, b.nord - a.nord));
+  }
+  return longueurs;
+}
+
+/** Vrai si le dessin est une figure fermée (plateforme, bâtiment). */
+export function estFerme(dessin) {
+  return dessin.type === 'plateforme' || dessin.type === 'batiment';
+}
+
+/**
+ * Altitudes des sommets d'un dessin (m, ou null) : par sommet (mode 'sommets'), ou une altitude
+ * fixe, avec éventuellement une pente le long d'un côté (voir altitudesEnPente).
+ */
+export function altitudesDuDessin(dessin) {
+  const { sommets, hauteur } = dessin;
+  if (!hauteur || hauteur.mode === 'sommets' || hauteur.altitude == null) return sommets.map((s) => s.altitude ?? null);
+  const pente = hauteur.pente;
+  if (pente?.pourcent && sommets.length >= 2) {
+    const cote = Math.min(pente.cote ?? 0, sommets.length - 1);
+    const depuis = Math.min(pente.depuis ?? 0, sommets.length - 1);
+    return altitudesEnPente(sommets, { altitude: hauteur.altitude, depuis, cote, pente: pente.pourcent }) ?? sommets.map(() => hauteur.altitude);
+  }
+  return sommets.map(() => hauteur.altitude);
+}
+
+// Natures de dessin : [clé, nom (aussi le début du nom automatique)].
+export const TYPES_DESSIN = [
+  ['plateforme', 'Plateforme'],
+  ['batiment', 'Bâtiment'],
+  ['ligne', 'Ligne'],
+  ['points', 'Points'],
+];
+
+/** Nom automatique d'un nouveau dessin : « Plateforme 2 » (le numéro suivant de ce type). */
+export function nomDessin(type, dessins) {
+  const debut = TYPES_DESSIN.find(([cle]) => cle === type)?.[1] ?? 'Dessin';
+  const numeros = dessins.map((d) => new RegExp(`^${debut} (\\d+)$`).exec(d.nom)?.[1]).filter(Boolean).map(Number);
+  return `${debut} ${Math.max(0, ...numeros) + 1}`;
+}

@@ -19,6 +19,9 @@ import { creerEcranProjet, blocPartage } from './projet/ecran.js';
 import { creerEcranImport } from './import/ecran.js';
 import { creerEcranCoupes } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
+import { creerEcranDessin } from './dessin/ecran.js';
+import { ouvrirFenetrePointTape } from './leve/fenetres-points.js';
+import { gisement, gisementNormal, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin } from './topo/dessin.js';
 import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
@@ -93,6 +96,10 @@ let resultatsMesures = new Map(); // id de mesure -> longueurs, aires (résultat
 let ongletContexte = 'projets'; // dernier onglet (hors plan) : décide de ce que montre le plan
 let calculMontre = null; // id du calcul colorié sur le plan (bouton « Voir sur le plan »)
 let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, etape: 'debut' ou 'fin', debut }
+// Calculs › Dessin : dessin en cours avec l'outil « pilote » (voir dessin/ecran.js), ou null :
+// { dessinId, toucher ('sommet' ou 'direction' : ce que fait un toucher sur le plan), direction
+// (gisement en gon, ou null), distance (texte tapé), reference (nom du point visé, ou null) }.
+let pilote = null;
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 // Levé avec le récepteur (appli Android) : levé et stock en cours, rôle du prochain point.
 const leveDirect = { stockId: null, role: 'contour' };
@@ -173,6 +180,7 @@ const PARTIES_CALCULS = [
   ['surfaces', 'Surfaces'],
   ['volumes', 'Volumes'],
   ['mesures', 'Mesures / métrés'],
+  ['dessin', 'Dessin'],
 ];
 const boutonPartie = ([cle, titre]) => `<button type="button" data-partie="${cle}">${titre}</button>`;
 const estPartieCalculs = (nom) => PARTIES_CALCULS.some(([cle]) => cle === nom);
@@ -200,6 +208,7 @@ document.querySelector('#app').innerHTML = `
           ${PARTIES_CALCULS.slice(0, 2).map(boutonPartie).join('')}
         </div>
         <div class="groupe-mesures">${boutonPartie(PARTIES_CALCULS[2])}</div>
+        <div class="groupe-dessin">${boutonPartie(PARTIES_CALCULS[3])}</div>
       </nav>
       <section class="panneau" data-onglet="surfaces">
         <h2>Surfaces ${bulle('surfaces')}</h2>
@@ -217,6 +226,10 @@ document.querySelector('#app').innerHTML = `
         <h2>Mesures / métrés ${bulle('mesures')}</h2>
         <div id="mesures"></div>
         <div id="export-mesures" class="carte-section"></div>
+      </section>
+      <section class="panneau" data-onglet="dessin">
+        <h2>Dessin ${bulle('dessin')}</h2>
+        <div id="dessins"></div>
       </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
       <div id="barre-mesures" class="barre-edition" hidden></div>
@@ -247,6 +260,7 @@ function afficherOnglet(demande) {
     bouton.classList.toggle('actif', bouton.dataset.partie === nom);
   }
   document.body.dataset.onglet = nom;
+  if (nom !== 'plan' && nom !== 'dessin') pilote = null;
   if (nom !== 'plan' && nom !== ongletContexte) {
     // Les mesures sont à part : on ne modifie pas une surface (ou une coupe) et une mesure en même temps.
     if (nom === 'mesures') {
@@ -1034,9 +1048,14 @@ function envoyerImplantationAuPlan() {
   const pointsControle = (projet.listesCachees ?? []).includes(LISTE_CONTROLE) ? [] : projet.pointsControle;
   // Mode Contrôler : le point de contrôle vers lequel on guide est la cible du plan.
   const cibleControle = enAutocontrole() && ongletContexte === 'terrain' ? autocontrole.cible : null;
-  plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0 || lignesAutres.length > 0 || pointsControle.length > 0 || cibleControle
+  // Dessins (Calculs › Dessin) : toujours sur le plan ; le dessin en cours avec son pilote.
+  const avecPilote = piloteActif();
+  plan.afficherImplantation(accrocheActive || avecPilote || projet.aImplanter.length > 0 || lignesAutres.length > 0 || pointsControle.length > 0 || cibleControle || projet.dessins.length > 0
     ? {
-        actif: accrocheActive,
+        actif: accrocheActive || avecPilote,
+        dessins: projet.dessins,
+        actifId: avecPilote ? pilote.dessinId : null,
+        pilote: avecPilote ? { direction: pilote.direction, distance: lireNombreTape(pilote.distance) ?? null } : null,
         aImplanter: projet.aImplanter,
         pointsControle,
         lignesAutres,
@@ -1133,6 +1152,241 @@ function enImplantationDePoint() {
 function enImplantationDeLigne() {
   return Boolean(ecranLeve) && terrain.mode === 'controler' && ['ligne', 'talus'].includes(terrain.implantation);
 }
+
+// --- Calculs › Dessin (outil « pilote », voir dessin/ecran.js et topo/dessin.js) ---
+
+/** Vrai pendant un dessin avec le pilote (dans Calculs › Dessin, plan compris). */
+function piloteActif() {
+  return Boolean(pilote) && ongletContexte === 'dessin' && projet.dessins.some((d) => d.id === pilote.dessinId);
+}
+
+/** Dessin du projet par son identifiant. */
+const dessinDe = (id) => projet.dessins.find((d) => d.id === id);
+
+/** Pilote pour dessiner "dessin" : toucher le plan pose un sommet au début, puis donne la direction. */
+function nouveauPilote(dessin) {
+  return { dessinId: dessin.id, toucher: dessin.sommets.length > 0 && dessin.type !== 'points' ? 'direction' : 'sommet', direction: null, distance: '', reference: null };
+}
+
+const auMillimetre = (valeur) => (valeur == null ? null : Math.round(valeur * 1000) / 1000);
+
+/** Ajoute un sommet au dessin en cours ({ est, nord, altitude }) ; après le départ, toucher = direction. */
+function ajouterSommetDessin(point) {
+  const dessin = dessinDe(pilote?.dessinId);
+  if (!dessin) return;
+  dessin.sommets.push({ est: auMillimetre(point.est), nord: auMillimetre(point.nord), altitude: auMillimetre(point.altitude ?? null) });
+  if (dessin.sommets.length === 1 && dessin.type !== 'points') pilote.toucher = 'direction';
+  modifie();
+}
+
+/**
+ * Toucher le plan pendant un dessin : on s'accroche à un point du projet, à un sommet d'un dessin,
+ * ou à un sommet du plan DXF (sinon l'endroit touché) ; puis sommet ou direction selon le pilote.
+ */
+function toucherPourDessin(position, tolerance) {
+  const dessin = dessinDe(pilote.dessinId);
+  const pointsProches = [...pointsDuProjet(), ...projet.dessins.flatMap((d) => d.sommets.map((s, i) => ({ ...s, nom: `${d.nom} · ${i + 1}` })))];
+  const trouve = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsProches })
+    ?? accrocher('sommet', position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance));
+  const point = trouve ?? { ...position, altitude: null };
+  if (pilote.toucher === 'direction' && dessin.sommets.length > 0) {
+    const gon = gisement(dessin.sommets.at(-1), point);
+    if (gon == null) return;
+    pilote.direction = gon;
+    pilote.reference = trouve?.nom ?? null;
+    recalculer();
+    return;
+  }
+  ajouterSommetDessin(point);
+}
+
+/**
+ * Direction ou distance tapée : seul le plan est mis à jour (pointillés du pilote), pas l'écran,
+ * pour ne pas perdre la case où l'on tape.
+ */
+function montrerPilote() {
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+}
+
+/** Données de l'écran Calculs › Dessin : les dessins (côtés, aire, altitudes) et le pilote. */
+function donneesDessin() {
+  return {
+    dessins: projet.dessins.map((d) => {
+      const ferme = estFerme(d) && d.sommets.length >= 3;
+      return { ...d, perimetre: longueursCotes(d.sommets, ferme).reduce((somme, l) => somme + l, 0), aire: ferme ? airePolygone(d.sommets) : 0, altitudes: altitudesDuDessin(d) };
+    }),
+    pilote,
+    recepteur: recepteurDisponible(),
+  };
+}
+
+const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
+  nouveauDessin: (type) => {
+    const dessin = { id: nouvelIdentifiant(), nom: nomDessin(type, projet.dessins), type, sommets: [], hauteur: { mode: 'fixe', altitude: null, pente: null } };
+    projet.dessins.push(dessin);
+    pilote = nouveauPilote(dessin);
+    modifie();
+  },
+  dessiner: (id) => {
+    const dessin = dessinDe(id);
+    if (!dessin) return;
+    pilote = nouveauPilote(dessin);
+    recalculer();
+  },
+  terminerDessin: () => {
+    pilote = null;
+    recalculer();
+  },
+  supprimerDessin: (id) => {
+    const dessin = dessinDe(id);
+    if (!dessin || !confirm(`Supprimer « ${dessin.nom} » ?`)) return;
+    projet.dessins = projet.dessins.filter((d) => d.id !== id);
+    if (pilote?.dessinId === id) pilote = null;
+    modifie();
+  },
+  renommerDessin: (id, nom) => {
+    const dessin = dessinDe(id);
+    if (!dessin || !nom) return;
+    dessin.nom = nom;
+    modifie();
+  },
+  choisirToucher: (mode) => {
+    if (!pilote) return;
+    pilote.toucher = mode === 'direction' ? 'direction' : 'sommet';
+    recalculer();
+  },
+  reglerDirection: (texte) => {
+    if (!pilote) return;
+    const valeur = lireNombreTape(texte);
+    if (valeur === undefined) {
+      afficherMessage('Direction illisible : un nombre en gon (0 = Nord, 100 = Est)', 4000);
+      return;
+    }
+    if (valeur == null) return;
+    const gon = gisementNormal(valeur);
+    // Même valeur (arrondie à l'écran) : on garde la direction exacte et le point visé.
+    if (pilote.direction != null && Math.abs(gon - pilote.direction) < 0.00005) return;
+    pilote.direction = gon;
+    pilote.reference = null;
+    montrerPilote();
+  },
+  tournerDirection: (sens) => {
+    if (pilote?.direction == null) return;
+    pilote.direction = gisementNormal(pilote.direction + (sens === 'droite' ? 100 : -100));
+    pilote.reference = null;
+    recalculer();
+  },
+  reglerDistance: (texte) => {
+    if (!pilote || pilote.distance === texte.trim()) return;
+    pilote.distance = texte.trim();
+    montrerPilote();
+  },
+  ajouterSommetPilote: () => {
+    const dessin = dessinDe(pilote?.dessinId);
+    const distance = lireNombreTape(pilote?.distance);
+    if (!dessin || dessin.sommets.length === 0) return;
+    if (pilote.direction == null) {
+      afficherMessage('Donne d\'abord la direction : touche le plan, ou tape un gisement en gon', 4000);
+      return;
+    }
+    if (!(distance > 0)) {
+      afficherMessage('Distance illisible : un nombre de mètres plus grand que 0', 4000);
+      return;
+    }
+    ajouterSommetDessin({ ...pointSelonGisement(dessin.sommets.at(-1), pilote.direction, distance), altitude: null });
+  },
+  ouvrirSommetTape: () => {
+    ouvrirFenetrePointTape({
+      nomPropose: 'facultatif',
+      ajouter: ({ est, nord, altitude }) => {
+        ajouterSommetDessin({ est, nord, altitude });
+        return null;
+      },
+    });
+  },
+  sommetRx2: () => {
+    const reponse = prendrePointRecepteur();
+    if (!reponse.ok) {
+      afficherMessage(`Point refusé : ${reponse.raison}`, 4000);
+      return;
+    }
+    sonValidation();
+    ajouterSommetDessin(reponse.point);
+  },
+  directionRx2: () => {
+    const dessin = dessinDe(pilote?.dessinId);
+    const reponse = prendrePointRecepteur();
+    if (!reponse.ok) {
+      afficherMessage(`Point refusé : ${reponse.raison}`, 4000);
+      return;
+    }
+    const gon = dessin?.sommets.length ? gisement(dessin.sommets.at(-1), reponse.point) : null;
+    if (gon == null) {
+      afficherMessage('Le RX2 est sur le dernier sommet : éloigne-toi dans la direction voulue', 4000);
+      return;
+    }
+    sonValidation();
+    pilote.direction = gon;
+    pilote.reference = 'RX2';
+    recalculer();
+  },
+  rectangleDessin: ({ longueur, largeur, cote }) => {
+    const dessin = dessinDe(pilote?.dessinId);
+    if (!dessin || dessin.sommets.length !== 1 || pilote.direction == null) return;
+    const a = dessin.sommets[0];
+    const { sommets, erreur } = rectangle(a, pointSelonGisement(a, pilote.direction, 1), lireNombreTape(longueur), lireNombreTape(largeur), cote);
+    if (erreur) {
+      afficherMessage(`Rectangle : ${erreur}`, 4000);
+      return;
+    }
+    dessin.sommets = sommets.map((s, i) => (i === 0 ? a : { est: auMillimetre(s.est), nord: auMillimetre(s.nord), altitude: null }));
+    modifie();
+  },
+  annulerSommet: () => {
+    const dessin = dessinDe(pilote?.dessinId);
+    if (!dessin?.sommets.length) return;
+    dessin.sommets.pop();
+    if (dessin.sommets.length === 0) pilote.toucher = 'sommet';
+    modifie();
+  },
+  choisirModeHauteur: (valeur) => {
+    const [id, mode] = valeur.split(':');
+    const dessin = dessinDe(id);
+    if (!dessin) return;
+    dessin.hauteur.mode = mode === 'sommets' ? 'sommets' : 'fixe';
+    modifie();
+  },
+  reglerHauteur: (id, champ, texte) => {
+    const dessin = dessinDe(id);
+    if (!dessin) return;
+    const h = dessin.hauteur;
+    if (champ === 'cote' || champ === 'depuis') {
+      h.pente = { pourcent: h.pente?.pourcent ?? 0, cote: h.pente?.cote ?? 0, depuis: h.pente?.depuis ?? 0, [champ]: Number(texte) };
+      modifie();
+      return;
+    }
+    const valeur = lireNombreTape(texte);
+    if (valeur === undefined) {
+      afficherMessage(`${champ === 'altitude' ? 'Altitude' : 'Pente'} illisible : écris un nombre, ou laisse vide`, 4000);
+      return;
+    }
+    if (champ === 'altitude') h.altitude = valeur;
+    else h.pente = valeur ? { cote: h.pente?.cote ?? 0, depuis: h.pente?.depuis ?? 0, pourcent: valeur } : null;
+    modifie();
+  },
+  altitudeSommet: (id, numero, texte) => {
+    const sommet = dessinDe(id)?.sommets[numero];
+    const valeur = lireNombreTape(texte);
+    if (!sommet) return;
+    if (valeur === undefined) {
+      afficherMessage(`Altitude du sommet ${numero + 1} illisible : écris un nombre, ou laisse vide`, 4000);
+      return;
+    }
+    sommet.altitude = valeur;
+    modifie();
+  },
+});
 
 /** Vrai pendant l'autocontrôle (Terrain › Contrôle). */
 function enAutocontrole() {
@@ -1550,6 +1804,10 @@ function pointsDuProjet() {
  * (« Point » : les points du projet ; les autres : le plan DXF).
  */
 function toucherPourImplantation(position, tolerance) {
+  if (piloteActif()) {
+    toucherPourDessin(position, tolerance);
+    return;
+  }
   if (recalage.planId) {
     toucherPourRecalage(position, tolerance);
     return;
@@ -2623,6 +2881,7 @@ function recalculer({ recadrer = false } = {}) {
   ecranVolumes.afficher();
   ecranCoupes.afficher();
   ecranMesures.afficher();
+  ecranDessin.afficher(donneesDessin());
   ecranImport.afficher(projet, dernierImport, dernierPlan);
   plan.afficherPlansDxf(plansDuProjet());
   // Point à implanter de la liste : ses coordonnées à jour (Annuler a pu l'enlever).
@@ -2726,13 +2985,15 @@ function recalculer({ recadrer = false } = {}) {
  */
 function basculerModeDessin() {
   const dansMesures = ongletContexte === 'mesures';
-  const enDessin = dansMesures ? ecranMesures.enModification() : editeurSurfaces.enModification();
+  const dansDessin = ongletContexte === 'dessin';
+  let enDessin = dansMesures ? ecranMesures.enModification() : editeurSurfaces.enModification();
+  if (dansDessin) enDessin = piloteActif();
   const debut = enDessin && !document.body.classList.contains('mode-dessin');
   document.body.classList.toggle('mode-dessin', enDessin);
   if (!debut) return;
   // On revient à l'onglet (s'il était sur le plan seul), puis on montre la carte modifiée.
-  const onglet = dansMesures ? 'mesures' : 'surfaces';
-  if (document.body.dataset.onglet === 'plan') afficherOnglet(onglet);
+  const onglet = dansMesures ? 'mesures' : dansDessin ? 'dessins' : 'surfaces';
+  if (document.body.dataset.onglet === 'plan') afficherOnglet(onglet === 'dessins' ? 'dessin' : onglet);
   requestAnimationFrame(() => document.querySelector(`#${onglet} .en-edition`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
 }
 let pointsAffiches = null;
