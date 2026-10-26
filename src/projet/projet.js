@@ -28,6 +28,9 @@
 //   tolerancesControle: { plan: { vert, orange }, hauteur: { vert, orange } },  // m (voir topo/controle.js)
 //   controles: [{ id, type: 'mesure', pointId, nom, connu, mesure, ecarts, resultat, gnss, appareil, remarque, le }
 //               ou { id, type: 'refus', appareil, le }],  // autocontrôles et refus du rappel
+//   dessins: [{ id, nom, type ('plateforme', 'batiment', 'ligne', 'points'), sommets: [{ est, nord, altitude }],
+//              hauteur: { mode ('fixe', 'sommets'), altitude, pente: { pourcent, cote, depuis } ou null } }],
+//                                   // Calculs › Dessin (voir topo/dessin.js)
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé. De même pour une mesure.
@@ -66,6 +69,7 @@ export function creerProjet(nom = '') {
     pointsControle: [],
     tolerancesControle: structuredClone(TOLERANCES_PAR_DEFAUT),
     controles: [],
+    dessins: [],
   };
 }
 
@@ -166,6 +170,7 @@ export function completerProjet(projet) {
   complet.pointsControle ??= [];
   complet.tolerancesControle ??= structuredClone(TOLERANCES_PAR_DEFAUT);
   complet.controles ??= [];
+  complet.dessins ??= [];
   complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
     nature: estImportee(surface) ? 'terrain' : 'stock',
     ...surface,

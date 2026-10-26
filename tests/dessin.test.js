@@ -68,3 +68,82 @@ describe('pente le long d\'un côté', () => {
     expect(directionUnitaire(A, A)).toBeNull();
   });
 });
+
+describe('pilote : gisement et distance', async () => {
+  const { gisement, gisementNormal, pointSelonGisement, airePolygone, longueursCotes, altitudesDuDessin, nomDessin } = await import('../src/topo/dessin.js');
+
+  it('gisement : nord 0, est 100, sud 200, ouest 300 gon', () => {
+    expect(gisement(A, versNord)).toBeCloseTo(0, 9);
+    expect(gisement(A, versEst)).toBeCloseTo(100, 9);
+    expect(gisement(A, { est: A.est, nord: A.nord - 1 })).toBeCloseTo(200, 9);
+    expect(gisement(A, { est: A.est - 1, nord: A.nord })).toBeCloseTo(300, 9);
+    expect(gisement(A, { est: A.est + 1, nord: A.nord + 1 })).toBeCloseTo(50, 9);
+    expect(gisement(A, A)).toBeNull();
+  });
+
+  it('gisement ramené entre 0 et 400', () => {
+    expect(gisementNormal(420)).toBe(20);
+    expect(gisementNormal(-100)).toBe(300);
+  });
+
+  it('point à 7.5 m au gisement 200 (plein sud)', () => {
+    const p = pointSelonGisement(A, 200, 7.5);
+    expect(p.est - A.est).toBeCloseTo(0, 9);
+    expect(p.nord - A.nord).toBeCloseTo(-7.5, 9);
+  });
+
+  it('aller-retour : le gisement du point calculé est celui donné', () => {
+    expect(gisement(A, pointSelonGisement(A, 137.25, 12))).toBeCloseTo(137.25, 9);
+  });
+
+  it('aire et côtés d\'un rectangle 12 × 8', () => {
+    const { sommets } = rectangle(A, versEst, 12, 8, 'droite');
+    expect(airePolygone(sommets)).toBeCloseTo(96, 9);
+    expect(longueursCotes(sommets, true).map((l) => Math.round(l * 1000) / 1000)).toEqual([12, 8, 12, 8]);
+    expect(longueursCotes(sommets, false)).toHaveLength(3);
+  });
+
+  it('altitudes : fixe, avec pente, par sommet', () => {
+    const { sommets } = rectangle(A, versEst, 20, 10, 'gauche');
+    const avec = (hauteur) => altitudesDuDessin({ sommets: sommets.map((s, i) => ({ ...s, altitude: 400 + i })), hauteur });
+    expect(avec({ mode: 'fixe', altitude: 450, pente: null })).toEqual([450, 450, 450, 450]);
+    expect(avec({ mode: 'fixe', altitude: 450, pente: { pourcent: 2, cote: 0, depuis: 0 } }).map((v) => Math.round(v * 1000) / 1000)).toEqual([450, 450.4, 450.4, 450]);
+    expect(avec({ mode: 'sommets', altitude: 450 })).toEqual([400, 401, 402, 403]);
+  });
+
+  it('nom automatique : le numéro suivant de ce type', () => {
+    expect(nomDessin('plateforme', [{ nom: 'Plateforme 1' }, { nom: 'Plateforme 3' }, { nom: 'Ligne 9' }])).toBe('Plateforme 4');
+    expect(nomDessin('batiment', [])).toBe('Bâtiment 1');
+  });
+});
+
+describe('implanter un dessin', async () => {
+  const { pointsDuDessin, cotesDuDessin, coteSousLeDoigt, numeroDessin } = await import('../src/topo/dessin.js');
+  const { sommets } = rectangle(A, versEst, 12, 8, 'gauche'); // 0,0 → 12,0 → 12,8 → 0,8
+  const plateforme = { id: 'p', type: 'plateforme', numero: 2, sommets, hauteur: { mode: 'fixe', altitude: 450.2, pente: null } };
+  const ligne = { id: 'l', type: 'ligne', sommets: sommets.slice(0, 3), hauteur: null };
+  const dessins = [plateforme, ligne];
+
+  it('noms courts : PF2-1… (numéro gardé), LI1-1… (place parmi les lignes)', () => {
+    expect(pointsDuDessin(plateforme, dessins).map((p) => p.nom)).toEqual(['PF2-1', 'PF2-2', 'PF2-3', 'PF2-4']);
+    expect(pointsDuDessin(ligne, dessins).map((p) => p.nom)).toEqual(['LI1-1', 'LI1-2', 'LI1-3']);
+    expect(numeroDessin(ligne, dessins)).toBe(1);
+  });
+
+  it('altitude des points : celle de la plateforme', () => {
+    expect(pointsDuDessin(plateforme, dessins).every((p) => p.altitude === 450.2)).toBe(true);
+  });
+
+  it('côtés : 4 pour la plateforme fermée, 2 pour la ligne, aucun pour des points', () => {
+    expect(cotesDuDessin(plateforme, dessins).map((c) => c.nom)).toEqual(['PF2-1 → PF2-2', 'PF2-2 → PF2-3', 'PF2-3 → PF2-4', 'PF2-4 → PF2-1']);
+    expect(cotesDuDessin(ligne, dessins)).toHaveLength(2);
+    expect(cotesDuDessin({ type: 'points', sommets }, [])).toEqual([]);
+  });
+
+  it('côté sous le doigt : le plus proche, à la tolérance près', () => {
+    const cotes = cotesDuDessin(plateforme, dessins);
+    expect(coteSousLeDoigt({ est: A.est + 6, nord: A.nord + 0.3 }, 0.5, cotes).nom).toBe('PF2-1 → PF2-2');
+    expect(coteSousLeDoigt({ est: A.est + 12.2, nord: A.nord + 4 }, 0.5, cotes).nom).toBe('PF2-2 → PF2-3');
+    expect(coteSousLeDoigt({ est: A.est + 6, nord: A.nord + 4 }, 0.5, cotes)).toBeNull();
+  });
+});
