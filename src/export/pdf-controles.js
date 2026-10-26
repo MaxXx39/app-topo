@@ -1,4 +1,4 @@
-// PDF des autocontrôles (Terrain › Contrôler) : une feuille A4 paysage, le tableau des contrôles à
+// PDF des autocontrôles (Terrain › Contrôle) : une feuille A4 paysage, le tableau des contrôles à
 // gauche (dans le cadre du plan), à droite les tolérances, un résumé et le cartouche. Autant de
 // feuilles que nécessaire si les contrôles ne tiennent pas sur une seule.
 import { jsPDF } from 'jspdf';

@@ -1,4 +1,4 @@
-// Terrain › Contrôler (autocontrôle sur des points connus, demande du 26.10.2026) : morceaux d'écran.
+// Terrain › Contrôle (autocontrôle sur des points connus, demande du 26.10.2026) : morceaux d'écran.
 // - la liste des points de contrôle (toucher un point = aller le mesurer, guidage comme pour implanter) ;
 // - l'historique des contrôles du projet (couleur selon les tolérances, remarque facultative) ;
 // - la gestion (roue ⚙, protégée par le code de sécurité) : tolérances et points de contrôle.

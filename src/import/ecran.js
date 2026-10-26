@@ -1,6 +1,6 @@
 // Trois blocs de l'onglet Projet (demande du 26.10.2026) :
-// - « Import » : fichier de points (case « Points de contrôle » : le fichier devient la liste des
-//   points de contrôle, après le code de sécurité), plan DXF, point tapé ;
+// - « Import » : fichier de points, points de contrôle (un fichier de points, après le code de
+//   sécurité), plan DXF, point tapé ;
 // - « Listes de points du projet » : chaque fichier de points (et les points pris avec le
 //   récepteur) est une liste ; celle cochée est affichée sur le plan ; ses points se voient sous
 //   elle. Puis les points de contrôle, dans une liste à part (en rouge) ;
@@ -36,7 +36,6 @@ export function creerEcranImport(conteneur, actions) {
   let pointOuvert = false;
   let erreurPoint = '';
   let derniers = null;
-  let pourControle = false; // case « Points de contrôle » cochée (après le code de sécurité)
   let messageControle = ''; // erreur du dernier import de points de contrôle
   conteneur.addEventListener('toggle', (evenement) => {
     const id = evenement.target.dataset?.calquesPlan;
@@ -79,14 +78,12 @@ export function creerEcranImport(conteneur, actions) {
 
   conteneur.addEventListener('change', async (evenement) => {
     const cible = evenement.target;
-    if (cible.dataset.champ === 'pour-controle') {
-      // Cocher demande le code de sécurité (les points de contrôle sont protégés) ; décocher, non.
-      pourControle = cible.checked && (await demanderCode('Importer des points de contrôle'));
-      cible.checked = pourControle;
-    } else if (cible.dataset.champ === 'fichier-points' && cible.files[0] && pourControle) {
-      messageControle = (await actions.importerPointsControle(cible.files[0]))?.erreur ?? '';
+    if (cible.dataset.champ === 'fichier-controle' && cible.files[0]) {
+      // Points de contrôle : protégés par le code de sécurité, demandé une fois le fichier choisi.
+      const fichier = cible.files[0];
       cible.value = '';
-      pourControle = false;
+      if (!(await demanderCode('Importer des points de contrôle'))) return;
+      messageControle = (await actions.importerPointsControle(fichier))?.erreur ?? '';
       if (derniers) afficher(...derniers);
     } else if (cible.dataset.champ === 'leve-actif') actions.choisirLeve(cible.value);
     else if (cible.dataset.champ === 'nom-leve') actions.renommerLeve(cible.dataset.id, cible.value.trim());
@@ -134,6 +131,11 @@ export function creerEcranImport(conteneur, actions) {
               <span><strong>Fichier de points</strong><span class="aide">CSV, TXT</span></span>
               <input type="file" data-champ="fichier-points" accept=".csv,.txt,.pts,.xyz,.dat,.asc,text/csv,text/plain" hidden />
             </label>
+            <label class="bouton-import import-controle">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 21 19H3Z" /></svg>
+              <span><strong>Points de contrôle</strong><span class="aide">CSV, TXT</span></span>
+              <input type="file" data-champ="fichier-controle" accept=".csv,.txt,.pts,.xyz,.dat,.asc,text/csv,text/plain" hidden />
+            </label>
             <label class="bouton-import seulement-confirme">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21 21 3M3 9l6-6M15 21l6-6M3 15h6v6" /></svg>
               <span><strong>Plan DXF</strong><span class="aide">fond de plan</span></span>
@@ -144,7 +146,6 @@ export function creerEcranImport(conteneur, actions) {
               <span><strong>Point</strong><span class="aide">tapé ou sur le DXF</span></span>
             </button>
           </div>
-          <label class="case case-controle"><input type="checkbox" data-champ="pour-controle" ${pourControle ? 'checked' : ''} /> Le fichier de points = points de contrôle</label>
           ${messageControle ? `<p class="erreur">${echapper(messageControle)}</p>` : ''}
           ${pointOuvert ? `<div class="bloc-point-ajoute">
             ${htmlFormulairePoint(nomPointAjoute(projet))}
@@ -220,7 +221,7 @@ function tableauPoints(points, titre) {
     </details>`;
 }
 
-/** Points de contrôle (Terrain › Contrôler) : une liste à part, en rouge, sous les listes de points. */
+/** Points de contrôle (Terrain › Contrôle) : une liste à part, en rouge, sous les listes de points. */
 function listePointsControle(projet) {
   const points = projet.pointsControle ?? [];
   if (points.length === 0) return '';

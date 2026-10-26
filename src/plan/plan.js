@@ -355,7 +355,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (couleur) element.style.stroke = couleur;
       groupe.append(element);
     }
-    // Points de contrôle (Terrain › Contrôler) : triangle rouge et nom en rouge.
+    // Points de contrôle (Terrain › Contrôle) : triangle rouge et nom en rouge.
     for (const point of implantation.pointsControle ?? []) {
       const { x, y } = versEcran(point.est, point.nord, vue);
       groupe.append(creerElement('path', { d: `M${x} ${y - 8}L${x + 7} ${y + 5}H${x - 7}Z`, class: 'triangle-controle' }));

@@ -24,7 +24,7 @@
 //                                   // (contrôle, points géomètre… : lignes et points, pas de surface ni de volume)
 //   implantations: [{ id, nom, cible: { est, nord, altitude }, mesure: { est, nord, altitude, gnss },
 //                     ecarts: { dEst, dNord, distance, dAltitude }, le (date ISO) }],  // implantations enregistrées
-//   pointsControle: [{ id, nom, est, nord, altitude (ou null) }],  // points de contrôle (Terrain › Contrôler)
+//   pointsControle: [{ id, nom, est, nord, altitude (ou null) }],  // points de contrôle (Terrain › Contrôle)
 //   tolerancesControle: { plan: { vert, orange }, hauteur: { vert, orange } },  // m (voir topo/controle.js)
 //   controles: [{ id, type: 'mesure', pointId, nom, connu, mesure, ecarts, resultat, gnss, appareil, remarque, le }
 //               ou { id, type: 'refus', appareil, le }],  // autocontrôles et refus du rappel

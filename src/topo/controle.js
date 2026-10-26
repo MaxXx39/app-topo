@@ -1,4 +1,4 @@
-// Autocontrôle sur des points connus (Terrain › Contrôler, demande du 26.10.2026) : on mesure à
+// Autocontrôle sur des points connus (Terrain › Contrôle, demande du 26.10.2026) : on mesure à
 // nouveau un point de contrôle du projet et on compare à ses coordonnées connues.
 // - écarts Est, Nord, en plan et en hauteur (m) ;
 // - couleur selon deux limites par tolérance : vert jusqu'à la 1re, orange jusqu'à la 2e, rouge au-delà ;

@@ -1131,7 +1131,7 @@ function enImplantationDeLigne() {
   return Boolean(ecranLeve) && terrain.mode === 'controler' && ['ligne', 'talus'].includes(terrain.implantation);
 }
 
-/** Vrai pendant l'autocontrôle (Terrain › Contrôler). */
+/** Vrai pendant l'autocontrôle (Terrain › Contrôle). */
 function enAutocontrole() {
   return Boolean(ecranLeve) && terrain.mode === 'autocontrole';
 }
@@ -1151,8 +1151,8 @@ function ajouterAuxPointsControle(points) {
 }
 
 /**
- * Fichier de points (CSV, TXT) ajouté aux points de contrôle (Projet › Import avec la case
- * « Points de contrôle », ou Terrain › Contrôler › ⚙). Renvoie { erreur } ou null.
+ * Fichier de points (CSV, TXT) ajouté aux points de contrôle (Projet › Import › « Points de contrôle »,
+ * ou Terrain › Contrôle › ⚙). Renvoie { erreur } ou null.
  */
 async function importerPointsControle(fichier) {
   try {
@@ -1217,7 +1217,7 @@ function enregistrerControle() {
 /**
  * Rappel du contrôle, à la connexion du RX2 (ou à l'ouverture d'un projet, RX2 déjà connecté) :
  * s'il n'y a pas eu de contrôle réussi aujourd'hui, ou depuis 4 h (voir topo/controle.js).
- * « Oui » ouvre Terrain › Contrôler ; « Non » note le refus dans le projet (CSV, PDF, Drive).
+ * « Oui » ouvre Terrain › Contrôle ; « Non » note le refus dans le projet (CSV, PDF, Drive).
  */
 let rappelEnCours = false;
 async function proposerControle() {
@@ -1255,7 +1255,7 @@ async function proposerControle() {
   modifie();
 }
 
-/** Données de l'écran Terrain › Contrôler (voir leve/controle-ecran.js). */
+/** Données de l'écran Terrain › Contrôle (voir leve/controle-ecran.js). */
 function donneesAutocontrole() {
   const controles = projet.controles;
   const dates = controles.filter(estControleReussi).map((c) => c.le).sort();

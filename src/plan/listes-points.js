@@ -18,7 +18,7 @@ import { nomsDeLaMesure } from '../topo/mesure.js';
 
 // Identifiant de la case « Mesures » (mesures faites à la main).
 export const LISTE_MESURES = 'mesures-calculs';
-// Identifiant de la case « Points de contrôle » (Terrain › Contrôler), dessinés en rouge.
+// Identifiant de la case « Points de contrôle » (Terrain › Contrôle), dessinés en rouge.
 export const LISTE_CONTROLE = 'points-controle';
 
 const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? []).flatMap((l) => l.noms), ...(s.points ?? [])];

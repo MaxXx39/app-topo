@@ -397,7 +397,7 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function choixMode() {
     return `<div class="modes-terrain bascule-terrain mode-${donnees.mode}" role="group" aria-label="Mode">
-      ${[['lever', 'Lever'], ['controler', 'Implanter'], ['autocontrole', 'Contrôler']]
+      ${[['lever', 'Lever'], ['controler', 'Implanter'], ['autocontrole', 'Contrôle']]
         .map(([cle, titre]) => `<button type="button" data-action="choisirMode" data-valeur="${cle}" class="${donnees.mode === cle ? 'actif' : ''}">${titre}</button>`)
         .join('')}
     </div>`;

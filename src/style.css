@@ -6107,9 +6107,17 @@ body.mode-base .parties-calculs {
    Terrain › Contrôler (autocontrôle sur les points connus, version 0.59.0)
    ========================================================================== */
 
-/* Bouton du mode : violet (le rouge est gardé pour « hors tolérance » et les points de contrôle). */
+/* Bouton « Contrôle » : plus petit que Lever et Implanter, en rouge (texte rouge, fond rouge
+   quand il est choisi). */
+.bascule-terrain button[data-valeur='autocontrole'] {
+  flex: 0 0 auto;
+  padding: 0 10px;
+  color: #dc2626;
+  font-size: 0.85rem;
+}
+
 .bascule-terrain.mode-autocontrole button.actif {
-  background: #7c3aed;
+  background: #dc2626;
   color: #ffffff;
 }
 
@@ -6248,11 +6256,14 @@ body.mode-base .parties-calculs {
   font-size: 0.9rem;
 }
 
-/* Projet › Import : case « points de contrôle » ; liste des points de contrôle en rouge. */
-.case-controle {
-  margin-top: 8px;
+/* Projet › Import : bouton « Points de contrôle » en rouge ; leur liste aussi. */
+.bouton-import.import-controle {
+  border-color: #dc2626;
   color: #dc2626;
-  font-weight: 700;
+}
+
+.bouton-import.import-controle svg {
+  stroke: #dc2626;
 }
 
 .ligne-leve.liste-controle {
