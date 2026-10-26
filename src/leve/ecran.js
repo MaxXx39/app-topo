@@ -749,7 +749,7 @@ export function creerEcranLeve(conteneur, actions) {
 
   /**
    * Bandeau de la surface levée en cours, à la couleur de sa nature : sa nature en petit, son
-   * nom en grand (liste pour en reprendre une autre) et « + » pour en commencer une nouvelle.
+   * nom en grand (liste pour en reprendre une autre) et « + » (couleur neutre) pour en commencer une nouvelle.
    */
   function ligneSurface() {
     const nature = donnees.stock.nature ?? 'stock';
@@ -760,7 +760,7 @@ export function creerEcranLeve(conteneur, actions) {
           ${donnees.stocks.map((s) => `<option value="${s.id}" ${s.id === donnees.stock.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}
         </select>
       </div>
-      <button type="button" class="bouton-plus nature-${nature}" data-action="ouvrirChoixNature" aria-label="Nouveau levé" title="Nouveau levé">+</button>
+      <button type="button" class="bouton-plus" data-action="ouvrirChoixNature" aria-label="Nouveau levé" title="Nouveau levé">+</button>
     </div>`;
   }
 
@@ -978,9 +978,10 @@ function svgCible(numero, haut, droite, couleur, nordEnHaut, nord = 0) {
 }
 
 /**
- * Couloir de l'implantation d'une ligne : la ligne (ou sa parallèle) en trait vertical au milieu,
- * du début (en bas) vers la fin (en haut), des bandes de distance de chaque côté (BANDES_COULOIR),
- * et la canne (rond de la couleur de la distance) à sa place : à droite si elle est à droite.
+ * Couloir de l'implantation d'une ligne : seulement la ligne (ou sa parallèle) en trait vertical au
+ * milieu, du début (en bas) vers la fin (en haut), et la canne (rond de la couleur de la distance) à
+ * sa place : à droite si elle est à droite. Pas de bandes autour (demande du 26.10.2026) : la
+ * distance écrite et la couleur suffisent ; BANDES_COULOIR ne sert plus qu'à l'échelle (zoom).
  * ecart : décalage de la canne (m, + à droite) ; abscisse, longueur : position le long (m).
  */
 function svgCouloir(numero, ecart, abscisse, longueur, couleur) {
@@ -996,10 +997,7 @@ function svgCouloir(numero, ecart, abscisse, longueur, couleur) {
   const repere = (y, type) => (Math.abs(y) <= 78
     ? `<path d="M-40 ${y.toFixed(1)}H40" class="bout-couloir" /><g class="drapeau-couloir">${svgDrapeau(type, 44, y + 2, 20)}</g>`
     : '');
-  // Rayons écrits à droite de chaque bande, en escalier (pour ne pas se chevaucher).
   return `<svg class="couloir-ligne" viewBox="-120 -94 240 176" role="img" aria-label="Couloir ${texte(bandes[0])}">
-    ${bandes.map((r, i) => `<rect x="${-r * echelle}" y="-80" width="${2 * r * echelle}" height="160" class="bande bande-${i}" />`).join('')}
-    ${bandes.map((r, i) => `<text x="${(r * echelle + 2).toFixed(1)}" y="${-62 + i * 14}" class="rayon">${texte(r)}</text>`).join('')}
     ${haut < bas ? `<path d="M0 ${bas.toFixed(1)}V${haut.toFixed(1)}" class="trait-couloir" />` : ''}
     ${repere(yDebut, 'debut')}
     ${repere(yFin, 'fin')}

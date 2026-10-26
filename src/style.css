@@ -3847,19 +3847,6 @@ svg.plan,
   max-width: 300px;
 }
 
-.couloir-ligne .bande {
-  fill: currentColor;
-  fill-opacity: 0.07;
-  stroke: currentColor;
-  stroke-opacity: 0.6;
-  stroke-width: 1;
-}
-
-.couloir-ligne .bande-3 {
-  fill-opacity: 0.16;
-}
-
-.couloir-ligne .rayon,
 .couloir-ligne .haut-cible,
 .couloir-ligne .nom-bout-couloir {
   fill: currentColor;
@@ -4741,30 +4728,26 @@ button.bouton-import {
 }
 
 .ligne-leve-en-cours .bouton-plus {
-  --couleur-nature: #b45309;
+  --couleur-nature: var(--sombre); /* neutre : ne prend pas la couleur du levé en cours */
   align-self: center;
   width: 48px;
   height: 48px;
   box-shadow: 0 2px 6px rgba(16, 24, 20, 0.25);
 }
 
-.bouton-plus.nature-terrain,
 .bandeau-leve.nature-terrain {
   --couleur-nature: #15803d;
 }
 
-.bouton-plus.nature-terrassement,
 .bandeau-leve.nature-terrassement {
   --couleur-nature: #2563eb;
 }
 
-.bouton-plus.nature-metre,
 .bandeau-leve.nature-metre {
   --couleur-nature: #0891b2;
 }
 
 /* « Autres » (contrôle, points géomètre…) : gris ardoise. */
-.bouton-plus.nature-autres,
 .bandeau-leve.nature-autres,
 .bouton-nature.nature-autres {
   --couleur-nature: #475569;
