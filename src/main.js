@@ -158,6 +158,9 @@ const ICONES = {
   calculs: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
   plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
 };
+// Main ouverte (on a la main sur le projet), dessinée en traits comme les autres icônes.
+const ICONE_MAIN = '<path d="M18 11V6a2 2 0 0 0-4 0v5" /><path d="M14 10V4a2 2 0 0 0-4 0v6" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />';
+
 const ONGLETS = [
   { nom: 'projets', titre: 'Projet' },
   ...(recepteurDisponible() ? [{ nom: 'terrain', titre: 'Terrain' }] : []),
@@ -2811,12 +2814,13 @@ function mettreAJourEtatEntete() {
     : '';
   document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} surface(s)`, drive].filter(Boolean).join(' · ');
 
-  // Verrou du partage : crayon vert ✎ (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
+  // Verrou du partage : main verte (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
   // (un autre appareil l'a ; toucher = prendre la main). Rien sans Drive.
   const pastille = document.querySelector('#pastille-verrou');
   const repris = partage?.etat.connecte && partage.etat.repris?.projetId === projet.id ? partage.etat.repris : null;
   pastille.hidden = !partage?.etat.connecte;
-  pastille.textContent = repris ? `🔒 Lecture seule · ${repris.nom}` : '✎';
+  if (repris) pastille.textContent = `🔒 Lecture seule · ${repris.nom}`;
+  else pastille.innerHTML = `<svg class="main-verrou" viewBox="0 0 24 24" aria-hidden="true">${ICONE_MAIN}</svg>`;
   pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : 'pastille-verte'}`;
   pastille.title = repris ? 'Ouvert sur un autre appareil : toucher pour prendre la main' : 'Tu as la main sur ce projet';
 }

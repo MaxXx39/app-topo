@@ -188,6 +188,18 @@ p {
   cursor: pointer;
 }
 
+/* Main verte (on a la main sur le projet partagé). */
+.main-verrou {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .pastille-verte {
   background: rgba(134, 239, 172, 0.18);
   color: #86efac;
@@ -4194,15 +4206,32 @@ body.mode-telephone .onglets button svg {
    Terrain (version 0.51.0) : Lever | Implanter tout en haut, écran de guidage
    ========================================================================== */
 
-/* Lever (ambre) | Implanter (sarcelle) : le mode actif en couleur pleine. */
-.bascule-terrain button.actif {
-  background: var(--ambre);
+/* Lever (ambre) | Implanter (sarcelle) | Contrôle (rouge) : chaque mode a un liseré de sa
+   couleur ; le mode choisi est en couleur pleine (0.59.3). */
+.bascule-terrain button {
+  --couleur-mode: var(--ambre);
+  border: 2px solid var(--couleur-mode);
+  background: var(--surface);
   color: var(--sombre);
 }
 
-.bascule-terrain.mode-controler button.actif {
-  background: #0d9488;
+.bascule-terrain button[data-valeur='controler'] {
+  --couleur-mode: #0d9488;
+  color: #0d9488;
+}
+
+.bascule-terrain button[data-valeur='autocontrole'] {
+  --couleur-mode: #dc2626;
+  color: #dc2626;
+}
+
+.bascule-terrain button.actif {
+  background: var(--couleur-mode);
   color: #ffffff;
+}
+
+.bascule-terrain button[data-valeur='lever'].actif {
+  color: var(--sombre);
 }
 
 /* Téléphone : la bascule est collée sous l'en-tête, au-dessus du plan. */
@@ -6107,18 +6136,11 @@ body.mode-base .parties-calculs {
    Terrain › Contrôler (autocontrôle sur les points connus, version 0.59.0)
    ========================================================================== */
 
-/* Bouton « Contrôle » : plus petit que Lever et Implanter, en rouge (texte rouge, fond rouge
-   quand il est choisi). */
+/* Bouton « Contrôle » : plus petit que Lever et Implanter (couleur rouge : voir .bascule-terrain). */
 .bascule-terrain button[data-valeur='autocontrole'] {
   flex: 0 0 auto;
   padding: 0 10px;
-  color: #dc2626;
   font-size: 0.85rem;
-}
-
-.bascule-terrain.mode-autocontrole button.actif {
-  background: #dc2626;
-  color: #ffffff;
 }
 
 .entete-controle {
