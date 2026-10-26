@@ -158,3 +158,63 @@ export function nomDessin(type, dessins) {
   const numeros = dessins.map((d) => new RegExp(`^${debut} (\\d+)$`).exec(d.nom)?.[1]).filter(Boolean).map(Number);
   return `${debut} ${Math.max(0, ...numeros) + 1}`;
 }
+
+// --- Implanter un dessin : ses sommets sont des points, chacun de ses côtés une ligne ---
+
+// Abréviations des noms de sommets (demande du 26.10.2026) : PF1-1 = plateforme 1, sommet 1.
+export const ABREVIATIONS_DESSIN = { plateforme: 'PF', batiment: 'BAT', ligne: 'LI', points: 'PT' };
+
+/**
+ * Numéro d'un dessin dans son type (le 1 de « PF1-1 ») : celui gardé à la création, sinon sa
+ * place parmi les dessins du même type.
+ */
+export function numeroDessin(dessin, dessins) {
+  if (dessin.numero) return dessin.numero;
+  return dessins.filter((d) => d.type === dessin.type).indexOf(dessin) + 1;
+}
+
+/**
+ * Points d'un dessin, prêts à implanter : [{ nom (« PF1-1 »…), est, nord, altitude (m ou null) }],
+ * l'altitude calculée (fixe, pente ou par sommet, voir altitudesDuDessin).
+ */
+export function pointsDuDessin(dessin, dessins) {
+  const debut = `${ABREVIATIONS_DESSIN[dessin.type] ?? 'D'}${numeroDessin(dessin, dessins)}`;
+  const altitudes = altitudesDuDessin(dessin);
+  return dessin.sommets.map((s, i) => ({ nom: `${debut}-${i + 1}`, est: s.est, nord: s.nord, altitude: altitudes[i] ?? null }));
+}
+
+/**
+ * Côtés d'un dessin, chacun une ligne à implanter : [{ nom (« PF1-1 → PF1-2 »), sommets: [a, b] }] ;
+ * un dessin fermé a aussi le côté du dernier sommet au premier ; un dessin « points » n'en a pas.
+ */
+export function cotesDuDessin(dessin, dessins) {
+  if (dessin.type === 'points') return [];
+  const points = pointsDuDessin(dessin, dessins);
+  const nombre = estFerme(dessin) && points.length > 2 ? points.length : points.length - 1;
+  const cotes = [];
+  for (let i = 0; i < nombre; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    cotes.push({ nom: `${a.nom} → ${b.nom}`, sommets: [a, b] });
+  }
+  return cotes;
+}
+
+/** Distance (m) d'une position au segment [a, b]. */
+function distanceAuSegment(p, a, b) {
+  const de = b.est - a.est;
+  const dn = b.nord - a.nord;
+  const carre = de * de + dn * dn;
+  const t = carre === 0 ? 0 : Math.max(0, Math.min(1, ((p.est - a.est) * de + (p.nord - a.nord) * dn) / carre));
+  return Math.hypot(p.est - (a.est + t * de), p.nord - (a.nord + t * dn));
+}
+
+/** Côté (voir cotesDuDessin) le plus proche de "position", à moins de "tolerance" m ; ou null. */
+export function coteSousLeDoigt(position, tolerance, cotes) {
+  let meilleur = null;
+  for (const cote of cotes) {
+    const d = distanceAuSegment(position, cote.sommets[0], cote.sommets[1]);
+    if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, cote };
+  }
+  return meilleur?.cote ?? null;
+}

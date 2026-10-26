@@ -21,7 +21,7 @@ import { creerEcranCoupes } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
 import { creerEcranDessin } from './dessin/ecran.js';
 import { ouvrirFenetrePointTape } from './leve/fenetres-points.js';
-import { gisement, gisementNormal, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin } from './topo/dessin.js';
+import { gisement, gisementNormal, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt } from './topo/dessin.js';
 import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
@@ -1050,10 +1050,10 @@ function envoyerImplantationAuPlan() {
   const cibleControle = enAutocontrole() && ongletContexte === 'terrain' ? autocontrole.cible : null;
   // Dessins (Calculs › Dessin) : toujours sur le plan ; le dessin en cours avec son pilote.
   const avecPilote = piloteActif();
-  plan.afficherImplantation(accrocheActive || avecPilote || projet.aImplanter.length > 0 || lignesAutres.length > 0 || pointsControle.length > 0 || cibleControle || projet.dessins.length > 0
+  plan.afficherImplantation(accrocheActive || avecPilote || projet.aImplanter.length > 0 || lignesAutres.length > 0 || pointsControle.length > 0 || cibleControle || dessinsVisibles().length > 0
     ? {
         actif: accrocheActive || avecPilote,
-        dessins: projet.dessins,
+        dessins: dessinsVisibles().map((d) => ({ ...d, noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom) })),
         actifId: avecPilote ? pilote.dessinId : null,
         pilote: avecPilote ? { direction: pilote.direction, distance: lireNombreTape(pilote.distance) ?? null } : null,
         aImplanter: projet.aImplanter,
@@ -1209,12 +1209,23 @@ function montrerPilote() {
   plan.rafraichirImplantation();
 }
 
+/** Sommets de tous les dessins, prêts à implanter (« PF1-1 »…, avec leur altitude). */
+function pointsDesDessins() {
+  return projet.dessins.flatMap((d) => pointsDuDessin(d, projet.dessins));
+}
+
+/** Dessins montrés sur le plan : ceux cochés dans « Afficher » (et toujours celui en cours). */
+function dessinsVisibles() {
+  const cachees = new Set(projet.listesCachees ?? []);
+  return projet.dessins.filter((d) => !cachees.has(d.id) || (piloteActif() && d.id === pilote.dessinId));
+}
+
 /** Données de l'écran Calculs › Dessin : les dessins (côtés, aire, altitudes) et le pilote. */
 function donneesDessin() {
   return {
     dessins: projet.dessins.map((d) => {
       const ferme = estFerme(d) && d.sommets.length >= 3;
-      return { ...d, perimetre: longueursCotes(d.sommets, ferme).reduce((somme, l) => somme + l, 0), aire: ferme ? airePolygone(d.sommets) : 0, altitudes: altitudesDuDessin(d) };
+      return { ...d, perimetre: longueursCotes(d.sommets, ferme).reduce((somme, l) => somme + l, 0), aire: ferme ? airePolygone(d.sommets) : 0, altitudes: altitudesDuDessin(d), noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom) };
     }),
     pilote,
     recepteur: recepteurDisponible(),
@@ -1223,7 +1234,9 @@ function donneesDessin() {
 
 const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   nouveauDessin: (type) => {
-    const dessin = { id: nouvelIdentifiant(), nom: nomDessin(type, projet.dessins), type, sommets: [], hauteur: { mode: 'fixe', altitude: null, pente: null } };
+    const nom = nomDessin(type, projet.dessins);
+    // numero : le 1 de « PF1-1 » (noms des sommets à implanter), gardé même si le dessin est renommé.
+    const dessin = { id: nouvelIdentifiant(), nom, numero: Number(nom.split(' ').at(-1)), type, sommets: [], hauteur: { mode: 'fixe', altitude: null, pente: null } };
     projet.dessins.push(dessin);
     pilote = nouveauPilote(dessin);
     modifie();
@@ -1750,9 +1763,18 @@ function zoneDuTalus() {
 function toucherPourLigne(position, tolerance) {
   const mm = (p) => ({ ...p, est: Math.round(p.est * 1000) / 1000, nord: Math.round(p.nord * 1000) / 1000, altitude: p.altitude != null ? Math.round(p.altitude * 1000) / 1000 : null });
   if (terrain.accrocheLigne === 'trait') {
+    // Un côté d'un dessin (Calculs › Dessin) d'abord : chaque côté est une ligne à lui seul.
+    const cote = coteSousLeDoigt(position, tolerance, dessinsVisibles().flatMap((d) => cotesDuDessin(d, projet.dessins)));
+    if (cote) {
+      implanter.ligne = nouvelleLigneAImplanter(cote.nom, cote.sommets.map(mm), null);
+      implanter.talusId = null;
+      implanter.pointsLigne = [];
+      montrerImplantation();
+      return;
+    }
     const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes);
     if (!trouve) {
-      afficherMessage('Aucune ligne DXF sous le doigt', 3000);
+      afficherMessage('Aucune ligne DXF ni côté de dessin sous le doigt', 3000);
       return;
     }
     const sommets = trouve.sommets.map(mm);
@@ -1791,7 +1813,7 @@ function ajouterPointLigne(point) {
 function pointsDuProjet() {
   const vus = new Set();
   const liste = [];
-  for (const point of [...projet.leves.flatMap((l) => l.points), ...projet.aImplanter, ...projet.pointsControle]) {
+  for (const point of [...projet.leves.flatMap((l) => l.points), ...projet.aImplanter, ...projet.pointsControle, ...pointsDesDessins()]) {
     if (vus.has(point.nom)) continue;
     vus.add(point.nom);
     liste.push(point);
@@ -1958,6 +1980,10 @@ function groupesDePointsParListe() {
   if (projet.aImplanter.length > 0) groupes.push({ titre: 'À implanter', noms: projet.aImplanter.map((p) => p.nom) });
   // Points de contrôle : une liste à part, en rouge (voir fenetres-points.js).
   if (projet.pointsControle.length > 0) groupes.push({ titre: 'Points de contrôle', noms: projet.pointsControle.map((p) => p.nom), classe: 'groupe-controle' });
+  // Dessins (Calculs › Dessin) : une liste par dessin, en violet.
+  for (const dessin of projet.dessins) {
+    if (dessin.sommets.length > 0) groupes.push({ titre: dessin.nom, noms: pointsDuDessin(dessin, projet.dessins).map((p) => p.nom), classe: 'groupe-points-dessin' });
+  }
   return groupes;
 }
 

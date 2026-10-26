@@ -1,15 +1,17 @@
 // Dessins (Calculs › Dessin) sur le plan : traits violets, sommets en petits carrés ; pour le dessin
 // en cours, les numéros des sommets et la longueur de chaque côté (comme Leica iCON), puis le pilote :
 // le dernier sommet entouré et la direction en pointillés jusqu'au prochain sommet (ou une flèche).
+// Les autres dessins ont le nom de leurs sommets (« PF1-1 »…), pour les implanter.
 import { estFerme, longueursCotes, pointSelonGisement } from '../topo/dessin.js';
 import { formaterNombre } from '../topo/format.js';
 
 /**
  * Dessine dans "groupe" (SVG). donnees : { dessins, actifId, pilote: { direction (gon) ou null,
  * distance (m) ou null } ou null } ; versEcran(est, nord) → { x, y } ; creer(type, attributs) :
- * élément SVG ; metresParPixel : taille d'un pixel sur le terrain (m).
+ * élément SVG ; metresParPixel : taille d'un pixel sur le terrain (m) ; avecNoms : écrire le nom
+ * des sommets (dessin.noms) des dessins qui ne sont pas en cours (calque « Noms des points »).
  */
-export function dessinerDessins(groupe, { dessins = [], actifId = null, pilote = null }, versEcran, creer, metresParPixel) {
+export function dessinerDessins(groupe, { dessins = [], actifId = null, pilote = null }, versEcran, creer, metresParPixel, avecNoms = true) {
   for (const dessin of dessins) {
     const actif = dessin.id === actifId;
     const ecran = dessin.sommets.map((s) => versEcran(s.est, s.nord));
@@ -20,7 +22,13 @@ export function dessinerDessins(groupe, { dessins = [], actifId = null, pilote =
     }
     ecran.forEach((p, i) => {
       groupe.append(creer('rect', { x: p.x - 4, y: p.y - 4, width: 8, height: 8, class: `sommet-dessin ${actif ? 'actif' : ''}` }));
-      if (!actif) return;
+      if (!actif) {
+        if (!avecNoms || !dessin.noms?.[i]) return;
+        const nom = creer('text', { x: p.x + 7, y: p.y - 7, class: 'nom-sommet-dessin' });
+        nom.textContent = dessin.noms[i];
+        groupe.append(nom);
+        return;
+      }
       const numero = creer('text', { x: p.x + 7, y: p.y - 7, class: 'numero-dessin' });
       numero.textContent = String(i + 1);
       groupe.append(numero);

@@ -447,7 +447,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
     if (choix) croix(choix.est, choix.nord, 'croix-choix', 12);
     // Dessins (Calculs › Dessin) et, pour celui en cours, le pilote.
-    dessinerDessins(groupe, implantation, (est, nord) => versEcran(est, nord, vue), creerElement, 1 / vue.echelle);
+    dessinerDessins(groupe, implantation, (est, nord) => versEcran(est, nord, vue), creerElement, 1 / vue.echelle, calques.noms);
     svg.append(groupe);
   }
 

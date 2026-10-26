@@ -116,3 +116,34 @@ describe('pilote : gisement et distance', async () => {
     expect(nomDessin('batiment', [])).toBe('Bâtiment 1');
   });
 });
+
+describe('implanter un dessin', async () => {
+  const { pointsDuDessin, cotesDuDessin, coteSousLeDoigt, numeroDessin } = await import('../src/topo/dessin.js');
+  const { sommets } = rectangle(A, versEst, 12, 8, 'gauche'); // 0,0 → 12,0 → 12,8 → 0,8
+  const plateforme = { id: 'p', type: 'plateforme', numero: 2, sommets, hauteur: { mode: 'fixe', altitude: 450.2, pente: null } };
+  const ligne = { id: 'l', type: 'ligne', sommets: sommets.slice(0, 3), hauteur: null };
+  const dessins = [plateforme, ligne];
+
+  it('noms courts : PF2-1… (numéro gardé), LI1-1… (place parmi les lignes)', () => {
+    expect(pointsDuDessin(plateforme, dessins).map((p) => p.nom)).toEqual(['PF2-1', 'PF2-2', 'PF2-3', 'PF2-4']);
+    expect(pointsDuDessin(ligne, dessins).map((p) => p.nom)).toEqual(['LI1-1', 'LI1-2', 'LI1-3']);
+    expect(numeroDessin(ligne, dessins)).toBe(1);
+  });
+
+  it('altitude des points : celle de la plateforme', () => {
+    expect(pointsDuDessin(plateforme, dessins).every((p) => p.altitude === 450.2)).toBe(true);
+  });
+
+  it('côtés : 4 pour la plateforme fermée, 2 pour la ligne, aucun pour des points', () => {
+    expect(cotesDuDessin(plateforme, dessins).map((c) => c.nom)).toEqual(['PF2-1 → PF2-2', 'PF2-2 → PF2-3', 'PF2-3 → PF2-4', 'PF2-4 → PF2-1']);
+    expect(cotesDuDessin(ligne, dessins)).toHaveLength(2);
+    expect(cotesDuDessin({ type: 'points', sommets }, [])).toEqual([]);
+  });
+
+  it('côté sous le doigt : le plus proche, à la tolérance près', () => {
+    const cotes = cotesDuDessin(plateforme, dessins);
+    expect(coteSousLeDoigt({ est: A.est + 6, nord: A.nord + 0.3 }, 0.5, cotes).nom).toBe('PF2-1 → PF2-2');
+    expect(coteSousLeDoigt({ est: A.est + 12.2, nord: A.nord + 4 }, 0.5, cotes).nom).toBe('PF2-2 → PF2-3');
+    expect(coteSousLeDoigt({ est: A.est + 6, nord: A.nord + 4 }, 0.5, cotes)).toBeNull();
+  });
+});

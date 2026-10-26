@@ -4919,6 +4919,7 @@ button.bouton-import {
 .pastille-liste.liste-fichier { background: var(--sombre); }
 .pastille-liste.liste-ajoutes { background: #7c3aed; }
 .pastille-liste.liste-controle { background: #dc2626; }
+.pastille-liste.liste-dessin { background: #7c3aed; }
 
 .menu-listes-points {
   max-height: 50vh;
@@ -6499,4 +6500,23 @@ body.mode-base .parties-calculs {
     padding-top: calc(var(--hauteur-plan-dessin) + 12px);
     padding-bottom: 24px;
   }
+}
+
+/* Fenêtre « Liste » : une liste par dessin, en violet ; noms des sommets sur le plan. */
+.groupe-points.groupe-points-dessin summary,
+.groupe-points.groupe-points-dessin .puce-choix {
+  color: #7c3aed;
+}
+
+.groupe-points.groupe-points-dessin .puce-choix {
+  border-color: #7c3aed;
+}
+
+.plan .nom-sommet-dessin {
+  fill: #7c3aed;
+  font-size: 10.4px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
 }

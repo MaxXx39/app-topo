@@ -172,8 +172,8 @@ function htmlSommets(d) {
   return `<details class="sommets-dessin">
     <summary>Voir les ${d.type === 'points' ? 'points' : 'sommets'} (${d.sommets.length})</summary>
     <div class="tableau-defilant"><table>
-      <thead><tr><th>N°</th><th>Est (m)</th><th>Nord (m)</th><th>Altitude (m)</th></tr></thead>
-      <tbody>${d.sommets.map((s, i) => `<tr><td>${i + 1}</td><td>${formaterNombre(s.est)}</td><td>${formaterNombre(s.nord)}</td>
+      <thead><tr><th>Nom</th><th>Est (m)</th><th>Nord (m)</th><th>Altitude (m)</th></tr></thead>
+      <tbody>${d.sommets.map((s, i) => `<tr><td>${echapper(d.noms[i] ?? String(i + 1))}</td><td>${formaterNombre(s.est)}</td><td>${formaterNombre(s.nord)}</td>
         <td>${parSommet
           ? `<input type="text" inputmode="decimal" class="altitude-sommet" data-altitude-sommet="${i}" data-id="${d.id}" value="${nombre(s.altitude)}" aria-label="Altitude du sommet ${i + 1}" />`
           : (d.altitudes[i] == null ? '—' : formaterNombre(d.altitudes[i]))}</td></tr>`).join('')}</tbody>
