@@ -18,13 +18,18 @@ export function dessinerDessins(groupe, { dessins = [], actifId = null, pilote =
     const ferme = estFerme(dessin) && ecran.length >= 3;
     if (dessin.type !== 'points' && ecran.length >= 2) {
       const d = `M${ecran.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('L')}${ferme ? 'Z' : ''}`;
-      groupe.append(creer('path', { d, class: `trait-dessin type-${dessin.type} ${actif ? 'actif' : ''}` }));
+      const trait = creer('path', { d, class: `trait-dessin type-${dessin.type} ${actif ? 'actif' : ''}` });
+      if (dessin.couleur) trait.style.stroke = dessin.couleur; // couleur choisie pour sa liste
+      groupe.append(trait);
     }
     ecran.forEach((p, i) => {
-      groupe.append(creer('rect', { x: p.x - 4, y: p.y - 4, width: 8, height: 8, class: `sommet-dessin ${actif ? 'actif' : ''}` }));
+      const carre = creer('rect', { x: p.x - 4, y: p.y - 4, width: 8, height: 8, class: `sommet-dessin ${actif ? 'actif' : ''}` });
+      if (dessin.couleur) carre.style.stroke = dessin.couleur;
+      groupe.append(carre);
       if (!actif) {
         if (!avecNoms || !dessin.noms?.[i]) return;
         const nom = creer('text', { x: p.x + 7, y: p.y - 7, class: 'nom-sommet-dessin' });
+        if (dessin.couleur) nom.style.fill = dessin.couleur;
         nom.textContent = dessin.noms[i];
         groupe.append(nom);
         return;

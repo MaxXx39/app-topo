@@ -53,3 +53,28 @@ describe('Listes de points du plan', () => {
     expect(projet.listesCachees).toEqual(['o1']);
   });
 });
+
+describe('couleur des listes de points', async () => {
+  const { listesDePoints: listes, couleursDesPoints, COULEUR_CONTROLE } = await import('../src/plan/listes-points.js');
+  it('couleur choisie pour un fichier de points ; points de contrôle toujours rouges', () => {
+    const a = { nom: 'a', est: 0, nord: 0 };
+    const b = { nom: 'b', est: 1, nord: 1 };
+    const projet = {
+      leves: [{ id: 'f1', nom: 'fichier.csv', points: [a, b] }, { id: 'f2', nom: 'autre.csv', points: [{ nom: 'c', est: 2, nord: 2 }] }],
+      surfaces: [], metres: [], mesures: [], autres: [],
+      pointsControle: [{ id: 'k', nom: 'PF1', est: 0, nord: 0 }],
+      couleursListes: { f1: '#2563eb', 'points-controle': '#16a34a' },
+      listesCachees: [],
+    };
+    const l = listes(projet);
+    expect(l.find((x) => x.id === 'f1').couleur).toBe('#2563eb');
+    expect(l.find((x) => x.id === 'f2').couleur).toBeNull();
+    const controle = l.find((x) => x.nature === 'controle');
+    expect(controle.couleur).toBe(COULEUR_CONTROLE);
+    expect(controle.couleurModifiable).toBe(false);
+    const couleurs = couleursDesPoints(projet, l);
+    expect(couleurs.get(a)).toBe('#2563eb');
+    expect(couleurs.get(b)).toBe('#2563eb');
+    expect(couleurs.size).toBe(2);
+  });
+});

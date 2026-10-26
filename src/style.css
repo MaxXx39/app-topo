@@ -6520,3 +6520,25 @@ body.mode-base .parties-calculs {
   stroke: #ffffff;
   stroke-width: 3px;
 }
+
+/* Altitude des points de contrôle (calque « Altitudes des points »), en rouge plus clair. */
+.plan .altitude-controle {
+  fill: #b91c1c;
+  font-size: 10px;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+
+/* Couleur d'une liste de points (Projet › Listes de points). */
+.couleur-liste {
+  max-width: 150px;
+  min-height: 32px;
+  font-size: 0.85rem;
+}
+
+/* Dessin : barre d'accroche dans le pilote (pas collée sous le plan comme dans Terrain). */
+.barre-accroche-dessin {
+  position: static;
+  margin: 6px 0;
+}

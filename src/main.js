@@ -76,7 +76,7 @@ import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/regla
 import { sonValidation, sonRefus } from './outils/son.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, LISTE_CONTROLE } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant } from './topo/noms.js';
 import { demanderChoix } from './outils/choix.js';
@@ -97,7 +97,8 @@ let ongletContexte = 'projets'; // dernier onglet (hors plan) : décide de ce qu
 let calculMontre = null; // id du calcul colorié sur le plan (bouton « Voir sur le plan »)
 let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, etape: 'debut' ou 'fin', debut }
 // Calculs › Dessin : dessin en cours avec l'outil « pilote » (voir dessin/ecran.js), ou null :
-// { dessinId, toucher ('sommet' ou 'direction' : ce que fait un toucher sur le plan), direction
+// { dessinId, toucher ('sommet' ou 'direction' : ce que fait un toucher sur le plan), accroche
+// (objet pris en touchant : 'point', 'sommet', 'milieu', 'ligne', 'centre', voir topo/accroche.js), direction
 // (gisement en gon, ou null), distance (texte tapé), reference (nom du point visé, ou null) }.
 let pilote = null;
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
@@ -384,6 +385,7 @@ function calculDuPlan(surface) {
 // --- Écrans ---
 
 const ecranImport = creerEcranImport(document.querySelector('#importer'), {
+  colorerListe: (id, couleur) => colorerListe(id, couleur),
   importerPointsControle: (fichier) => importerPointsControle(fichier),
   importerPoints: async (fichier) => {
     try {
@@ -1053,7 +1055,7 @@ function envoyerImplantationAuPlan() {
   plan.afficherImplantation(accrocheActive || avecPilote || projet.aImplanter.length > 0 || lignesAutres.length > 0 || pointsControle.length > 0 || cibleControle || dessinsVisibles().length > 0
     ? {
         actif: accrocheActive || avecPilote,
-        dessins: dessinsVisibles().map((d) => ({ ...d, noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom) })),
+        dessins: dessinsVisibles().map((d) => ({ ...d, noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom), couleur: projet.couleursListes?.[d.id] ?? null })),
         actifId: avecPilote ? pilote.dessinId : null,
         pilote: avecPilote ? { direction: pilote.direction, distance: lireNombreTape(pilote.distance) ?? null } : null,
         aImplanter: projet.aImplanter,
@@ -1068,6 +1070,14 @@ function envoyerImplantationAuPlan() {
     : null);
 }
 
+/** Couleur choisie pour une liste de points (null : la couleur normale). Les points de contrôle restent rouges. */
+function colorerListe(id, couleur) {
+  projet.couleursListes ??= {};
+  if (couleur) projet.couleursListes[id] = couleur;
+  else delete projet.couleursListes[id];
+  modifie();
+}
+
 /** Lignes des levés « Autres » visibles : [{ sommets: [{ est, nord }], fermee }]. */
 function lignesDesAutres() {
   const cachees = new Set(projet.listesCachees ?? []);
@@ -1077,7 +1087,7 @@ function lignesDesAutres() {
     const parNom = new Map((projet.leves.find((l) => l.id === autres.leveId)?.points ?? []).map((p) => [p.nom, p]));
     for (const ligne of autres.lignesRupture) {
       const sommets = ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean);
-      if (sommets.length >= 2) lignes.push({ sommets, fermee: Boolean(ligne.fermee) });
+      if (sommets.length >= 2) lignes.push({ sommets, fermee: Boolean(ligne.fermee), couleur: projet.couleursListes?.[autres.id] ?? null });
     }
   }
   return lignes;
@@ -1165,7 +1175,7 @@ const dessinDe = (id) => projet.dessins.find((d) => d.id === id);
 
 /** Pilote pour dessiner "dessin" : toucher le plan pose un sommet au début, puis donne la direction. */
 function nouveauPilote(dessin) {
-  return { dessinId: dessin.id, toucher: dessin.sommets.length > 0 && dessin.type !== 'points' ? 'direction' : 'sommet', direction: null, distance: '', reference: null };
+  return { dessinId: dessin.id, toucher: dessin.sommets.length > 0 && dessin.type !== 'points' ? 'direction' : 'sommet', accroche: pilote?.accroche ?? 'point', direction: null, distance: '', reference: null };
 }
 
 const auMillimetre = (valeur) => (valeur == null ? null : Math.round(valeur * 1000) / 1000);
@@ -1180,15 +1190,28 @@ function ajouterSommetDessin(point) {
 }
 
 /**
- * Toucher le plan pendant un dessin : on s'accroche à un point du projet, à un sommet d'un dessin,
- * ou à un sommet du plan DXF (sinon l'endroit touché) ; puis sommet ou direction selon le pilote.
+ * Toucher le plan pendant un dessin : on s'accroche à un objet selon l'accroche choisie (point du
+ * projet, sommet, milieu, sur une ligne ou centre : du plan DXF et des dessins), jamais à un endroit
+ * vide (demande du 26.10.2026) ; puis point de départ (sommet) ou direction selon le pilote.
  */
 function toucherPourDessin(position, tolerance) {
   const dessin = dessinDe(pilote.dessinId);
-  const pointsProches = [...pointsDuProjet(), ...projet.dessins.flatMap((d) => d.sommets.map((s, i) => ({ ...s, nom: `${d.nom} · ${i + 1}` })))];
-  const trouve = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsProches })
-    ?? accrocher('sommet', position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance));
-  const point = trouve ?? { ...position, altitude: null };
+  const accroche = pilote.accroche ?? 'point';
+  let sources;
+  if (accroche === 'point') sources = { lignes: [], cercles: [], points: pointsDuProjet() };
+  else {
+    // Plan DXF, et les côtés des autres dessins (le dessin en cours aussi, pour s'accrocher à ses sommets).
+    const dxf = sourcesDesPlans(plansDuProjet(), position, tolerance);
+    const lignesDessins = projet.dessins.filter((d) => d.type !== 'points' && d.sommets.length >= 2).map((d) => ({ points: d.sommets, ferme: estFerme(d) && d.sommets.length >= 3 }));
+    sources = { ...dxf, lignes: [...dxf.lignes, ...lignesDessins] };
+  }
+  const trouve = accrocher(accroche, position, tolerance, sources);
+  if (!trouve) {
+    const quoi = { point: 'aucun point', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[accroche];
+    afficherMessage(`${quoi[0].toUpperCase()}${quoi.slice(1)} sous le doigt`, 3000);
+    return;
+  }
+  const point = trouve;
   if (pilote.toucher === 'direction' && dessin.sommets.length > 0) {
     const gon = gisement(dessin.sommets.at(-1), point);
     if (gon == null) return;
@@ -1313,6 +1336,11 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     dessin.nom = nom;
     modifie();
   },
+  choisirAccrocheDessin: (mode) => {
+    if (!pilote) return;
+    pilote.accroche = MODES_ACCROCHE.includes(mode) ? mode : 'point';
+    recalculer();
+  },
   choisirToucher: (mode) => {
     if (!pilote) return;
     pilote.toucher = mode === 'direction' ? 'direction' : 'sommet';
@@ -1329,15 +1357,16 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     const gon = gisementNormal(valeur);
     // Même valeur (arrondie à l'écran) : on garde la direction exacte et le point visé.
     if (pilote.direction != null && Math.abs(gon - pilote.direction) < 0.00005) return;
-    const premiere = pilote.direction == null;
     pilote.direction = gon;
     pilote.reference = null;
-    // Première direction : l'écran est redessiné (boutons 90°, rectangle) ; ensuite, seulement le plan.
-    if (premiere) recalculer();
-    else montrerPilote();
+    montrerPilote();
   },
   tournerDirection: (sens) => {
-    if (pilote?.direction == null) return;
+    if (!pilote) return;
+    if (pilote.direction == null) {
+      afficherMessage('Donne d\'abord la direction : touche le plan, ou tape un gisement en gon', 4000);
+      return;
+    }
     pilote.direction = gisementNormal(pilote.direction + (sens === 'droite' ? 100 : -100));
     pilote.reference = null;
     recalculer();
@@ -1398,7 +1427,11 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   },
   rectangleDessin: ({ longueur, largeur, cote }) => {
     const dessin = dessinDe(pilote?.dessinId);
-    if (!dessin || dessin.sommets.length !== 1 || pilote.direction == null) return;
+    if (!dessin || dessin.sommets.length !== 1) return;
+    if (pilote.direction == null) {
+      afficherMessage('Rectangle : donne d\'abord la direction de la longueur (touche le plan, ou tape un gisement)', 4000);
+      return;
+    }
     const a = dessin.sommets[0];
     const { sommets, erreur } = rectangle(a, pointSelonGisement(a, pilote.direction, 1), lireNombreTape(longueur), lireNombreTape(largeur), cote);
     if (erreur) {
@@ -2680,6 +2713,8 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandReglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
   // Menu « Points » : cocher / décocher une liste de points ('*' : toutes). Pas une modification
   // du travail (rien à annuler) : on redessine et on enregistre.
+  // Couleur d'une liste (menu « Afficher » ; aussi dans Projet › Listes de points).
+  quandColorerListe: (id, couleur) => colorerListe(id, couleur),
   quandMontrerListe: (id, visible) => {
     if (id === '*') projet.listesCachees = visible ? [] : listesDePoints(projet).map((l) => l.id);
     else montrerListe(projet, id, visible);
@@ -2985,6 +3020,7 @@ function recalculer({ recadrer = false } = {}) {
   // Pendant une modification (surface, mesure), comme avant : les points et surfaces du levé affiché.
   const listes = listesDePoints(projet);
   plan.afficherListesPoints(listes);
+  plan.afficherCouleursPoints(couleursDesPoints(projet, listes));
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
   const dansSurfaces = ongletContexte === 'surfaces';

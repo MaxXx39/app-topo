@@ -56,7 +56,7 @@ exemples/            fichiers de référence (NE PAS modifier ni supprimer)
 ## Référence de calcul
 Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 m³, Stock 2 = 648.979 m³, Stock 3 = 372.201 m³ (remblai Mensura). Tests automatiques sur ce cas.
 
-## État d'avancement (version 0.62.0)
+## État d'avancement (version 0.62.1)
 **Fait**
 - Import points (CSV Emlid, TXT), LandXML, DXF (surfaces et fond de plan) ; recalage Helmert d'un plan DXF.
 - Surfaces (stock, terrain naturel, terrassement), volumes (remblai / déblai, comparaison), coupes, mesures / métrés.
@@ -72,6 +72,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Calculs › **Dessin** étape 1 (0.60.0, mode Confirmé) : plateformes, bâtiments, lignes, points (`projet.dessins`) avec l'outil « pilote » inspiré de Leica iCON : départ (toucher le plan avec accroche, coordonnées, RX2), puis direction (toucher le plan, gisement en gon 0 = Nord sens horaire, vers le RX2, ±90°) + distance ; rectangle (longueur, largeur à gauche / droite) ; altitude fixe + pente % le long d'un côté (positive = monte) ou par sommet. Dessins violets sur le plan, cotes des côtés. Calculs `src/topo/dessin.js`, écran `src/dessin/ecran.js`, plan `src/plan/dessins.js`.
 - Dessin étape 2 (0.61.0) : un dessin terminé s'implante comme le reste, dans les deux modes. Sommets nommés PF1-1 (plateforme), BAT1-1 (bâtiment), LI1-1 (ligne), PT1-1 (points) — `numero` gardé à la création —, avec l'altitude du dessin ; une liste par dessin (violet) dans la fenêtre « Liste » et le menu « Afficher » ; chaque côté = une ligne (Implanter › Ligne › Ligne DXF : toucher le côté).
 - Dessin étape 3 (0.62.0) : plateforme ou bâtiment → « Créer la surface » = surface `type: 'dessin'` (nature terrassement, `dessinId`, points PF1-1… + faces par la méthode des oreilles), remise à jour avec le dessin (`synchroniserSurfacesDessins` dans `modifie`), supprimée avec lui ; volume par Calculs › Volumes › Comparaison de 2 surfaces. Dessins cochés dans « Afficher » : DXF (calques DESSINS, DESSINS_NOMS) et plan du PDF.
+- 0.62.1 : couleur au choix par liste de points (`projet.couleursListes`, menu « Afficher » et Projet › Listes de points ; rouge réservé, points de contrôle toujours rouges ; couleur du libellé prioritaire) ; altitudes des points de contrôle sur le plan ; Dessin : barre d'accroche (Point, Sommet, Milieu, Sur ligne, Centre ; rien sous le doigt = rien de pris), puces « Point de départ » / « Direction ».
 
 **Reste / à valider**
 - Essai terrain du talus (0.56.1) et question ouverte : arrondi (cône) aux angles saillants, est-ce voulu ?
@@ -81,4 +82,4 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 
 **À développer**
 - Essai de 2 RX2 pour guidage d'engin type grader sur la même tablette (2 NTRIP ? 2 connexions Bluetooth ?).
-- Dessin, étape suivante : 4. plateforme avec talus jusqu'au terrain naturel (entrées en terre, volume).
+- Dessin, étape suivante (en suspens) : 4. plateforme avec talus jusqu'au terrain naturel (entrées en terre, volume).
