@@ -7,6 +7,8 @@
 //   estModeBase() dans le code). Rien n'est supprimé du projet. Confirmé par défaut ;
 // - bulles d'aide (même chose que le bouton « ? ») ;
 // - partage par Google Drive (nom de l'appareil, connexion, état), déplacé de l'onglet Projet ;
+// - « Prise de main protégée » (0.67.0, changée avec le code de sécurité) : quand cet appareil a
+//   la main sur un projet, un autre appareil doit taper le code de sécurité pour la lui prendre ;
 // - « Fermer l'appli » (appli Android seulement), en rouge tout en haut.
 import { echapper } from '../outils/echapper.js';
 import { demanderCode } from '../outils/code.js';
@@ -14,11 +16,11 @@ import { demanderCode } from '../outils/code.js';
 const CLE = 'topo-reglages';
 // Étoile à 5 branches (en-tête et choix du mode).
 export const ETOILE = 'M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z';
-const PAR_DEFAUT = { telephone: false, mode: 'confirme' };
+const PAR_DEFAUT = { telephone: false, mode: 'confirme', priseProtegee: false };
 // Mode retenu (relu une fois, puis gardé ici) : estModeBase() est appelé très souvent par le plan.
 let modeRetenu = null;
 
-/** Réglages enregistrés : { telephone: vrai / faux, mode: 'base' ou 'confirme' }. */
+/** Réglages enregistrés : { telephone: vrai / faux, mode: 'base' ou 'confirme', priseProtegee: vrai / faux }. */
 export function lireReglages() {
   try {
     return { ...PAR_DEFAUT, ...JSON.parse(localStorage.getItem(CLE) ?? '{}') };
@@ -85,6 +87,8 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       <label class="case-reglage"><input type="checkbox" data-reglage="aide" ${aideActive ? 'checked' : ''} />
         <span><strong>Bulles d'aide « ? »</strong></span></label>
       <div class="partage-reglages" data-zone="partage"></div>
+      ${partage ? `<label class="case-reglage"><input type="checkbox" data-reglage="priseProtegee" ${reglages.priseProtegee ? 'checked' : ''} />
+        <span><strong>Prise de main protégée</strong><span class="aide">code de sécurité demandé aux autres appareils</span></span></label>` : ''}
       <div class="ligne-outils">
         <button class="bouton">OK</button>
       </div>
@@ -109,7 +113,8 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       reglages.telephone = evenement.target.checked;
       ecrireReglages(reglages);
       appliquerReglages(reglages);
-    } else if (champ === 'aide') basculerAide();
+    } else if (champ === 'priseProtegee') changerPriseProtegee(evenement.target);
+    else if (champ === 'aide') basculerAide();
     else if (evenement.target.dataset.champ === 'nom-appareil') {
       modifierNom = false;
       partage?.actions.nommerAppareil(evenement.target.value.trim());
@@ -125,6 +130,18 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     if (bouton?.dataset.action === 'modifierNomAppareil') modifierNomProtege();
     else if (bouton) partage?.actions[bouton.dataset.action]?.();
   });
+  /** « Prise de main protégée » : changée seulement avec le code de sécurité (une fois par ouverture). */
+  async function changerPriseProtegee(caseACocher) {
+    const voulu = caseACocher.checked;
+    caseACocher.checked = !voulu; // tant que le code n'est pas bon, rien ne change
+    if (!deverrouille && !(await demanderCode('Prise de main protégée'))) return;
+    deverrouille = true;
+    caseACocher.checked = voulu;
+    reglages.priseProtegee = voulu;
+    ecrireReglages(reglages);
+    partage?.actions.priseProtegeeChangee?.();
+  }
+
   /** Crayon du nom de l'appareil : protégé par le code (demandé une fois par ouverture de la fenêtre). */
   async function modifierNomProtege() {
     if (!deverrouille && !(await demanderCode('Modifier le nom de l\'appareil'))) return;

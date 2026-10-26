@@ -210,3 +210,25 @@ describe('volume : terrain naturel contre plateforme dessinée', async () => {
     expect(resultat.deblai).toBeCloseTo(0, 6);
   });
 });
+
+describe('dessin simplifié (0.66.0)', async () => {
+  const { directionTournee, estFerme, nomDessin, pointsDuDessin, surfaceDuDessin } = await import('../src/topo/dessin.js');
+
+  it('angle en degrés à gauche ou à droite du côté précédent', () => {
+    expect(directionTournee(100, 90, 'droite')).toBeCloseTo(200, 9); // vers l'est, d'équerre à droite → sud
+    expect(directionTournee(100, 90, 'gauche')).toBeCloseTo(0, 9); // à gauche → nord
+    expect(directionTournee(0, 45, 'gauche')).toBeCloseTo(350, 9); // nord, 45° à gauche → nord-ouest
+    expect(directionTournee(100, 0, 'droite')).toBeCloseTo(100, 9); // 0° : tout droit
+  });
+
+  it('figure fermée seulement après « Fermer la figure » ; noms D1-1…', () => {
+    const dessin = { id: 'a', nom: 'Dessin 1', numero: 1, type: 'dessin', sommets: [{ est: 0, nord: 0 }, { est: 10, nord: 0 }, { est: 10, nord: 5 }], hauteur: { mode: 'fixe', altitude: 450, pente: null } };
+    expect(estFerme(dessin)).toBe(false);
+    expect(surfaceDuDessin(dessin, [dessin]).erreur).toBeTruthy();
+    dessin.ferme = true;
+    expect(estFerme(dessin)).toBe(true);
+    expect(pointsDuDessin(dessin, [dessin]).map((p) => p.nom)).toEqual(['D1-1', 'D1-2', 'D1-3']);
+    expect(surfaceDuDessin(dessin, [dessin]).faces).toHaveLength(1);
+    expect(nomDessin('dessin', [dessin])).toBe('Dessin 2');
+  });
+});

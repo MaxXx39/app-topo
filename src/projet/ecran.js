@@ -2,7 +2,7 @@
 // - en haut, deux boutons : « + Nouveau projet » et « Gestion de projets » : une page à part (rien
 //   d'autre de l'onglet), une seule liste, appareil et Drive : toucher = ouvrir, menu ⋮ = exporter,
 //   dupliquer, supprimer ; fichier projet ; « ← » pour revenir ;
-// - le projet ouvert : ses infos (affaire, lieu, nom facultatif) ;
+// - le projet ouvert : ses infos (affaire, désignation) ;
 // - ensuite (voir main.js) le bloc « Imports » (fichiers de points, plans DXF) ;
 // - tout en bas, le partage par Google Drive (pas besoin de le voir tout le temps), puis la version.
 // Le cartouche du PDF (dessiné par, date) se règle au moment du PDF (voir export/cartouche.js).
@@ -129,8 +129,7 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
         <div class="bloc-corps">
           <div class="champs-projet">
             <label>Affaire <input type="text" data-cartouche="affaire" value="${echapper(affaire ?? '')}" placeholder="ex. 10 203" /></label>
-            <label>Lieu <input type="text" data-cartouche="lieu" value="${echapper(lieu ?? '')}" placeholder="ex. Gland" /></label>
-            <label class="champ-large">Nom <span class="aide">(facultatif)</span> <input type="text" data-champ="nom-projet" value="${echapper(projet.nom ?? '')}" placeholder="ex : Rue Mont Blanc" /></label>
+            <label>Désignation <input type="text" data-cartouche="lieu" value="${echapper(lieu ?? '')}" placeholder="ex. Gland, plateforme Migros" /></label>
           </div>
         </div>
       </section>
@@ -239,13 +238,15 @@ const ETATS_PARTAGE = {
   envoi: ['envoi…', 'etat-attente'],
   attente: ['pas envoyé (nouvel essai bientôt)', 'etat-attente'],
   repris: ['ouvert sur un autre appareil', 'etat-erreur'],
+  rendu: ['main rendue', 'etat-attente'],
   erreur: ['erreur', 'etat-erreur'],
 };
 
 /**
  * Bloc « Partage » : nom de l'appareil, connexion à Drive, état de l'envoi du projet ouvert.
  * Affiché dans la fenêtre des réglages (voir reglages/reglages.js) ; boutons data-action :
- * connecterDrive, deconnecterDrive, envoyerDrive, reprendreLaMain, modifierNomAppareil ; case
+ * connecterDrive, deconnecterDrive, envoyerDrive, reprendreLaMain, rendreLaMain, reprendreApresRendu,
+ * modifierNomAppareil ; case
  * data-champ="nom-appareil". Le nom de l'appareil n'est modifiable qu'après le crayon (modifierNom :
  * vrai), avec un avertissement (le changer une fois réglé déconnecte de Drive) ; tant qu'il n'est
  * pas donné, la case est ouverte.
@@ -269,7 +270,9 @@ export function blocPartage({ etat, appareil }, { modifierNom = false } = {}) {
     ${etat.possible ? `<div class="ligne-outils">
       ${etat.connecte
         ? `<span class="etat-partage ${classe}">${texte}${heure}</span>
-           ${etat.etat === 'repris' ? '' : '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="envoyerDrive">envoyer maintenant</button>'}
+           ${['repris', 'rendu'].includes(etat.etat) ? '' : '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="envoyerDrive">envoyer maintenant</button>'}
+           ${['repris', 'rendu'].includes(etat.etat) ? '' : '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="rendreLaMain">rendre la main</button>'}
+           ${etat.etat === 'rendu' ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="reprendreApresRendu">reprendre la main</button>' : ''}
            <button type="button" class="bouton-lien" data-action="deconnecterDrive">se déconnecter</button>`
         : `<button type="button" class="bouton-secondaire" data-action="connecterDrive" ${appareil.nom ? '' : 'disabled'}>Se connecter à Google Drive</button>`}
     </div>` : ''}

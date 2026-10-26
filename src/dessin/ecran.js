@@ -1,11 +1,13 @@
-// Calculs › Dessin (demande du 26.10.2026, mode Confirmé) : plateformes, bâtiments, lignes et points
-// dessinés dans l'appli, comme avec l'outil « pilote » de Leica iCON :
-// - un point de départ (toucher le plan, accroché à un objet : point, sommet, milieu, sur une
-//   ligne, centre ; coordonnées tapées ; ou le RX2) ;
-// - puis, depuis le dernier sommet, une direction (toucher le plan, gisement en gon, vers le RX2,
-//   ou tourner de 90°) et une distance → « Ajouter le sommet » ;
-// - plateforme et bâtiment : figures fermées ; « Rectangle » (longueur, largeur, à droite ou à gauche) ;
+// Calculs › Dessin (mode Confirmé), simplifié en 0.66.0 : un seul « + Dessin » (noms D1-1, D1-2…),
+// comme l'outil « pilote » de Leica iCON :
+// 1. Point de départ : toucher le plan (accroché à un objet : point, sommet, milieu, sur une ligne,
+//    centre ; rien sous le doigt = rien de pris) ou le RX2 ;
+// 2. Direction du 1er côté : toucher le plan ou vers le RX2, puis la distance → « Ajouter le sommet » ;
+// 3. Côtés suivants : tourner de x° (degrés) à gauche ou à droite du côté précédent (ou toucher le
+//    plan), puis la distance ; « Fermer la figure » relie le dernier sommet au premier ;
+// - rectangle (longueur, largeur, à gauche ou à droite) après le départ et la direction ;
 // - altitudes : une altitude fixe (avec une pente le long d'un côté, facultative) ou une par sommet.
+// Les plateformes, bâtiments, lignes et points d'avant 0.66.0 gardent leur type et leurs noms (PF1-1…).
 // Calculs dans topo/dessin.js ; le dessin sur le plan dans plan/dessins.js.
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
@@ -18,11 +20,11 @@ const NOM_TYPE = Object.fromEntries(TYPES_DESSIN);
 const nombre = (valeur) => (valeur == null ? '' : String(Math.round(valeur * 1000) / 1000));
 
 /**
- * Crée l'écran dans "conteneur". actions (main.js) : nouveauDessin(type), dessiner(id),
- * terminerDessin(), supprimerDessin(id), renommerDessin(id, nom), choisirToucher(mode),
- * choisirAccrocheDessin(mode), reglerDirection(texte), tournerDirection(sens), reglerDistance(texte), ajouterSommetPilote(),
- * ouvrirSommetTape(), sommetRx2(), directionRx2(), rectangleDessin({ longueur, largeur, cote }),
- * annulerSommet(), reglerHauteur(id, champ, valeur), altitudeSommet(id, n°, texte), creerSurfaceDessin(id).
+ * Crée l'écran dans "conteneur". actions (main.js) : nouveauDessin(), dessiner(id),
+ * terminerDessin(), supprimerDessin(id), renommerDessin(id, nom), choisirAccrocheDessin(mode),
+ * tournerCote({ angle, sens }), reglerDistance(texte), ajouterSommetPilote(), sommetRx2(),
+ * directionRx2(), fermerFigure(), rectangleDessin({ longueur, largeur, cote }), annulerSommet(),
+ * choisirModeHauteur(id:mode), reglerHauteur(id, champ, valeur), altitudeSommet(id, n°, texte), creerSurfaceDessin(id).
  * Renvoie { afficher(donnees) } ; donnees : { dessins, pilote, recepteur }.
  */
 export function creerEcranDessin(conteneur, actions) {
@@ -35,14 +37,16 @@ export function creerEcranDessin(conteneur, actions) {
       actions.rectangleDessin({ longueur: lire('longueur'), largeur: lire('largeur'), cote: valeur });
       return;
     }
+    // Les cases tapées sans Entrée sont lues d'abord (l'écran est redessiné après chaque réglage).
+    const distance = conteneur.querySelector('[data-pilote="distance"]')?.value ?? '';
     if (action === 'ajouterSommetPilote') {
-      // Les cases tapées sans Entrée sont lues d'abord, toutes les deux avant de les envoyer
-      // (l'écran est redessiné après chaque réglage).
-      const direction = conteneur.querySelector('[data-pilote="direction"]')?.value ?? '';
-      const distance = conteneur.querySelector('[data-pilote="distance"]')?.value ?? '';
-      actions.reglerDirection(direction);
       actions.reglerDistance(distance);
       actions.ajouterSommetPilote();
+      return;
+    }
+    if (action === 'tournerCote') {
+      actions.reglerDistance(distance);
+      actions.tournerCote({ angle: conteneur.querySelector('[data-pilote="angle"]')?.value ?? '', sens: valeur });
       return;
     }
     actions[action]?.(valeur);
@@ -52,7 +56,6 @@ export function creerEcranDessin(conteneur, actions) {
     const champ = evenement.target;
     const { id } = champ.dataset;
     if (champ.dataset.champ === 'nom-dessin') actions.renommerDessin(id, champ.value.trim());
-    else if (champ.dataset.pilote === 'direction') actions.reglerDirection(champ.value);
     else if (champ.dataset.pilote === 'distance') actions.reglerDistance(champ.value);
     else if (champ.dataset.hauteur) actions.reglerHauteur(id, champ.dataset.hauteur, champ.value);
     else if (champ.dataset.altitudeSommet != null) actions.altitudeSommet(id, Number(champ.dataset.altitudeSommet), champ.value);
@@ -78,11 +81,11 @@ export function creerEcranDessin(conteneur, actions) {
   };
 }
 
-/** Tout l'écran : boutons de création, puis chaque dessin (le dessin en cours avec le pilote). */
+/** Tout l'écran : « + Dessin », puis chaque dessin (le dessin en cours avec le pilote). */
 function htmlDessins({ dessins, pilote, recepteur }) {
   return `
     <div class="boutons-dessin">
-      ${TYPES_DESSIN.map(([cle, titre]) => `<button type="button" class="bouton-secondaire" data-action="nouveauDessin" data-valeur="${cle}">+ ${titre}</button>`).join('')}
+      <button type="button" class="bouton" data-action="nouveauDessin">+ Dessin</button>
     </div>
     ${dessins.length === 0 ? '<p class="vide">Aucun dessin.</p>' : dessins.map((d) => carteDessin(d, pilote?.dessinId === d.id ? pilote : null, recepteur)).join('')}`;
 }
@@ -92,31 +95,36 @@ function carteDessin(d, pilote, recepteur) {
   const ferme = estFerme(d);
   const resume = [
     `${d.sommets.length} ${d.type === 'points' ? 'point(s)' : 'sommet(s)'}`,
+    d.ferme ? 'figure fermée' : '',
     d.type === 'points' || d.sommets.length < 2 ? '' : `${ferme ? 'périmètre' : 'longueur'} ${formaterNombre(d.perimetre)} m`,
     ferme && d.sommets.length >= 3 ? `aire ${formaterNombre(d.aire)} m²` : '',
   ].filter(Boolean).join(' · ');
-  return `<div class="carte-dessin type-${d.type} ${pilote ? 'en-edition' : ''}">
+  // Altitude en haut (avant le pilote) ; la surface seulement pour une figure fermée.
+  return `<div class="carte-dessin sorte-${d.type} ${pilote ? 'en-edition' : ''}">
+    ${pilote ? '<button type="button" class="bouton-retour-dessin" data-action="terminerDessin">← Retour</button>' : ''}
     <div class="entete-dessin">
-      <span class="type-dessin">${NOM_TYPE[d.type]}</span>
+      <span class="type-dessin">${NOM_TYPE[d.type] ?? 'Dessin'}</span>
       <input type="text" class="nom-dessin" data-champ="nom-dessin" data-id="${d.id}" value="${echapper(d.nom)}" aria-label="Nom du dessin" />
     </div>
     <p class="aide">${resume}</p>
+    ${d.type === 'points' ? '' : htmlHauteur(d)}
     ${pilote ? htmlPilote(d, pilote, recepteur) : `<div class="ligne-outils">
-        <button type="button" class="bouton-secondaire" data-action="dessiner" data-valeur="${d.id}">Dessiner</button>
+        <button type="button" class="bouton-secondaire" data-action="dessiner" data-valeur="${d.id}">${d.ferme ? 'Rouvrir et dessiner' : 'Dessiner'}</button>
         <button type="button" class="bouton-lien" data-action="supprimerDessin" data-valeur="${d.id}">supprimer</button>
       </div>`}
-    ${d.type === 'plateforme' || d.type === 'batiment' ? htmlHauteur(d) + htmlSurface(d) : ''}
+    ${ferme ? htmlSurface(d) : ''}
     ${htmlSommets(d)}
   </div>`;
 }
 
 /**
- * Pilote : ce que fait un toucher sur le plan (sommet ou direction), départ par coordonnées ou RX2,
- * direction (gon, ±90°) et distance, rectangle, annuler, terminé.
+ * Pilote, étape par étape (le nom de l'étape en évidence) : point de départ (plan ou RX2), direction
+ * du 1er côté (plan ou RX2) et distance, puis pour chaque côté suivant un angle (°) à gauche ou à
+ * droite du côté précédent et la distance ; rectangle ; fermer la figure ; annuler, terminé.
  */
 function htmlPilote(d, p, recepteur) {
-  const avecDepart = d.sommets.length > 0;
-  const puce = (mode, titre, permis = true) => `<button type="button" class="puce-choix ${p.toucher === mode ? 'actif' : ''}" data-action="choisirToucher" data-valeur="${mode}" ${permis ? '' : 'disabled'}>${titre}</button>`;
+  const n = d.sommets.length;
+  const points = d.type === 'points';
   // Accroche aux objets (comme Terrain › Implanter) : un toucher prend toujours un objet, jamais un endroit vide.
   const accroches = `<div class="barre-accroche ouverte barre-accroche-dessin">
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
@@ -127,37 +135,59 @@ function htmlPilote(d, p, recepteur) {
         }).join('')}
       </div>
     </div>`;
+  let etape;
+  let detail;
+  if (points) {
+    etape = 'Point';
+    detail = 'touche le plan, ou prends le point au RX2';
+  } else if (n === 0) {
+    etape = 'Point de départ';
+    detail = 'touche le plan, ou prends le point au RX2';
+  } else if (n === 1) {
+    etape = 'Direction du 1er côté';
+    detail = 'touche le plan (un point vers où aller), ou vers le RX2 ; puis la distance';
+  } else {
+    etape = `Côté ${n}`;
+    detail = 'tourne à gauche ou à droite du côté précédent (ou touche le plan), puis la distance';
+  }
+  const direction = p.direction == null
+    ? '<span class="aide">direction pas encore donnée</span>'
+    : `<span class="direction-choisie">✓ direction ${p.reference ? echapper(p.reference) : 'donnée'}</span>`;
   // Toujours affichés (même sans direction) : l'écran n'a pas à être redessiné pendant la saisie.
-  const rectangle = (d.type === 'plateforme' || d.type === 'batiment') && d.sommets.length === 1
-    ? `<div class="rectangle-dessin">
-        <span>Rectangle</span>
+  const rectangle = n === 1 && d.type !== 'ligne' && !points
+    ? `<details class="rectangle-dessin">
+        <summary>Rectangle (depuis le départ, dans la direction donnée)</summary>
         <label>Longueur<input type="text" inputmode="decimal" data-rectangle="longueur" placeholder="m" /></label>
         <label>Largeur<input type="text" inputmode="decimal" data-rectangle="largeur" placeholder="m" /></label>
         <button type="button" class="bouton-secondaire" data-action="rectangleDessin" data-valeur="gauche">↰ à gauche</button>
         <button type="button" class="bouton-secondaire" data-action="rectangleDessin" data-valeur="droite">à droite ↱</button>
+      </details>`
+    : '';
+  const tourner = n >= 2 && !points
+    ? `<div class="tourner-dessin">
+        <label>Tourner de<input type="text" inputmode="decimal" data-pilote="angle" value="${echapper(p.angle ?? '90')}" aria-label="Angle en degrés" /><span>°</span></label>
+        <button type="button" class="bouton-secondaire ${p.sens === 'gauche' ? 'actif' : ''}" data-action="tournerCote" data-valeur="gauche">↰ à gauche</button>
+        <button type="button" class="bouton-secondaire ${p.sens === 'droite' ? 'actif' : ''}" data-action="tournerCote" data-valeur="droite">à droite ↱</button>
       </div>`
     : '';
   return `<div class="pilote-dessin">
-    <p class="etape-pilote">${avecDepart ? `Depuis le sommet ${d.sommets.length} : direction et distance` : 'Point de départ'} ${bulle('dessin')}</p>
-    <div class="ligne-choix"><span>Toucher le plan</span>${puce('sommet', d.type === 'points' ? 'Point' : 'Point de départ')}${d.type === 'points' ? '' : puce('direction', 'Direction', avecDepart)}</div>
+    <p class="etape-pilote"><strong>${etape}</strong> ${bulle('dessin')}</p>
+    <p class="aide">${detail}</p>
     ${accroches}
     <div class="ligne-outils">
-      <button type="button" class="bouton-secondaire" data-action="ouvrirSommetTape">+ Coordonnées</button>
-      ${recepteur ? '<button type="button" class="bouton-secondaire" data-action="sommetRx2">+ Point RX2</button>' : ''}
-      ${recepteur && avecDepart && d.type !== 'points' ? '<button type="button" class="bouton-secondaire" data-action="directionRx2">Direction vers RX2</button>' : ''}
+      ${recepteur && (points || n === 0) ? '<button type="button" class="bouton-secondaire" data-action="sommetRx2">Point au RX2</button>' : ''}
+      ${recepteur && n >= 1 && !points ? '<button type="button" class="bouton-secondaire" data-action="directionRx2">Direction vers le RX2</button>' : ''}
     </div>
-    ${avecDepart && d.type !== 'points' ? `<div class="direction-distance">
-        <label>Direction (gon)<input type="text" inputmode="decimal" data-pilote="direction" value="${p.direction == null ? '' : p.direction.toFixed(4)}" placeholder="touche le plan" /></label>
-        <button type="button" class="bouton-secondaire" data-action="tournerDirection" data-valeur="gauche" aria-label="Tourner de 90° à gauche">↰ 90°</button>
-        <button type="button" class="bouton-secondaire" data-action="tournerDirection" data-valeur="droite" aria-label="Tourner de 90° à droite">90° ↱</button>
+    ${tourner}
+    ${n >= 1 && !points ? `<div class="direction-distance">
+        ${direction}
         <label>Distance (m)<input type="text" inputmode="decimal" data-pilote="distance" value="${echapper(p.distance ?? '')}" /></label>
-        ${p.reference ? `<span class="aide">vers ${echapper(p.reference)}</span>` : ''}
       </div>
       <button type="button" class="bouton bouton-large" data-action="ajouterSommetPilote">Ajouter le sommet</button>` : ''}
     ${rectangle}
-    ${p.ecartFermeture != null ? `<p class="aide">Écart de fermeture : ${formaterNombre(p.ecartFermeture)} m</p>` : ''}
     <div class="ligne-outils">
-      <button type="button" class="bouton-lien" data-action="annulerSommet" ${avecDepart ? '' : 'disabled'}>annuler le dernier</button>
+      <button type="button" class="bouton-lien" data-action="annulerSommet" ${n > 0 ? '' : 'disabled'}>annuler le dernier</button>
+      ${n >= 3 && !points && !estFerme(d) ? '<button type="button" class="bouton-secondaire" data-action="fermerFigure">Fermer la figure</button>' : ''}
       <button type="button" class="bouton" data-action="terminerDessin">Terminé</button>
     </div>
   </div>`;

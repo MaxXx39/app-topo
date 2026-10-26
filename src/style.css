@@ -210,6 +210,12 @@ p {
   color: #ffffff;
 }
 
+/* Main rendue (Drive) : grise ; la toucher la reprend. */
+.pastille-grise {
+  background: rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+}
+
 /* Sur téléphone, en-tête plus serré. */
 @media (max-width: 480px) {
   .entete {
@@ -1287,18 +1293,6 @@ svg.plan {
   z-index: 2;
 }
 
-/* Volume de la surface en cours, discret (onglet Terrain). */
-.plan .pastille-volume rect {
-  fill: rgba(255, 255, 255, 0.85);
-  stroke: var(--bordure);
-}
-
-.plan .pastille-volume text {
-  font-size: 10.2px;
-  font-weight: 600;
-  fill: var(--gris);
-}
-
 .plan-attribution {
   position: absolute;
   right: 0;
@@ -1930,11 +1924,6 @@ th.nombre {
   margin: 0;
 }
 
-/* Menu des calques dans l'onglet Mesures : pas de calque des surfaces. */
-.menu-calques.mode-mesures .seulement-surfaces {
-  display: none;
-}
-
 /* Plan : mesures en pointillé dans leur couleur (cyan au départ), aires avec un fond léger. */
 .plan .longueur-mesure,
 .plan .aire-mesure,
@@ -2134,7 +2123,7 @@ th.nombre {
 /* Titre du projet ouvert dans son bandeau (affaire - lieu). */
 .titre-projet-ouvert {
   display: block;
-  font-size: 1.3rem;
+  font-size: 1.7rem;
   font-weight: 800;
   line-height: 1.25;
   overflow-wrap: anywhere;
@@ -2591,15 +2580,24 @@ body.avec-recepteur .bandeaux-recepteur {
   fill: var(--gris);
 }
 
-/* Téléphone, onglet Terrain : le plan reste en haut, les outils du levé dessous. */
+/* Téléphone, onglet Terrain : le plan reste en haut, les outils du levé dessous. Le plan prend
+   1/3 de la place (ou 1/2 avec la flèche sous le plan, classe plan-terrain-grand, 0.64.0). */
 @media (max-width: 899px) {
+  body.mode-leve[data-onglet='terrain'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) / 3);
+  }
+
+  body.mode-leve.plan-terrain-grand[data-onglet='terrain'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) / 2);
+  }
+
   body.mode-leve[data-onglet='terrain'] .panneau-plan {
     display: block;
     position: fixed;
     top: var(--hauteur-entete);
     left: 0;
     right: 0;
-    height: 38svh;
+    height: var(--hauteur-plan-terrain);
     z-index: 10;
     padding: 0;
     border-radius: 0;
@@ -2607,7 +2605,7 @@ body.avec-recepteur .bandeaux-recepteur {
   }
 
   body.mode-leve[data-onglet='terrain'] .mise-en-page {
-    padding-top: calc(38svh + 12px);
+    padding-top: calc(var(--hauteur-plan-terrain) + 12px);
   }
 }
 
@@ -4140,24 +4138,25 @@ svg.plan,
 
 /* --- Mode téléphone (réglage) : textes, icônes et boutons plus petits ---
    La plupart des tailles de texte sont en « rem » : baisser la taille de base les réduit toutes. */
+/* 0.64.0 : textes encore 15 % plus petits (13 → 11 px), boutons et icônes 25 % plus petits. */
 html:has(body.mode-telephone) {
-  font-size: 13px;
+  font-size: 11px;
 }
 
 body.mode-telephone {
-  font-size: 13px;
-  --hauteur-entete: 48px;
-  --hauteur-onglets: 54px;
+  font-size: 11px;
+  --hauteur-entete: 40px;
+  --hauteur-onglets: 44px;
 }
 
 body.mode-telephone .entete-icone-bouton {
-  width: 30px;
-  height: 30px;
+  width: 23px;
+  height: 23px;
 }
 
 body.mode-telephone .entete-icone-bouton svg {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
 }
 
 body.mode-telephone .entete-titre {
@@ -4166,20 +4165,32 @@ body.mode-telephone .entete-titre {
 
 body.mode-telephone .bouton,
 body.mode-telephone button.bouton {
-  min-height: 33px;
-  padding: 6px 12px;
+  min-height: 25px;
+  padding: 4px 9px;
 }
 
 body.mode-telephone .bouton-secondaire {
-  min-height: 30px;
-  padding: 4px 10px;
+  min-height: 23px;
+  padding: 3px 8px;
 }
 
 body.mode-telephone input[type='text'],
 body.mode-telephone select {
-  min-height: 33px;
-  padding: 6px 10px;
+  min-height: 25px;
+  padding: 4px 8px;
 }
+
+/* Gros boutons à toucher : 25 % plus petits. */
+body.mode-telephone .role-leve { min-height: 40px; padding: 5px 3px; }
+body.mode-telephone .bouton-accroche { min-height: 36px; padding: 4px 2px 3px; }
+body.mode-telephone .puce-choix { min-height: 24px; padding: 3px 9px; }
+body.mode-telephone .bouton-import { min-height: 34px; padding: 5px 8px; }
+body.mode-telephone .point-controle { min-height: 42px; padding: 5px 8px; }
+body.mode-telephone .bouton-retour { width: 28px; height: 28px; }
+body.mode-telephone .bouton-projet { min-height: 38px; }
+body.mode-telephone .modes-terrain button { min-height: 27px; }
+body.mode-telephone .bouton-accroche svg,
+body.mode-telephone .bouton-import svg { width: 18px; height: 18px; }
 
 body.mode-telephone .carte-section {
   padding: 10px 12px;
@@ -4198,8 +4209,8 @@ body.mode-telephone .onglets button {
 }
 
 body.mode-telephone .onglets button svg {
-  width: 19px;
-  height: 19px;
+  width: 14px;
+  height: 14px;
 }
 
 /* ==========================================================================
@@ -4234,7 +4245,7 @@ body.mode-telephone .onglets button svg {
   color: var(--sombre);
 }
 
-/* Téléphone : la bascule est collée sous l'en-tête, au-dessus du plan. */
+/* Téléphone : la bascule est collée sous le plan (0.64.0 ; avant : au-dessus du plan). */
 @media (max-width: 899px) {
   body {
     --hauteur-bascule: 46px;
@@ -4242,7 +4253,7 @@ body.mode-telephone .onglets button svg {
 
   body.mode-leve[data-onglet='terrain'] .bascule-terrain {
     position: fixed;
-    top: var(--hauteur-entete);
+    top: calc(var(--hauteur-entete) + var(--hauteur-plan-terrain));
     left: 0;
     right: 0;
     z-index: 11;
@@ -4254,21 +4265,14 @@ body.mode-telephone .onglets button svg {
     border-bottom: 1px solid var(--bordure);
   }
 
-  body.mode-leve[data-onglet='terrain'] .panneau-plan {
-    top: calc(var(--hauteur-entete) + var(--hauteur-bascule));
-  }
-
   body.mode-leve[data-onglet='terrain'] .mise-en-page {
-    padding-top: calc(38svh + var(--hauteur-bascule) + 12px);
+    padding-top: calc(var(--hauteur-plan-terrain) + var(--hauteur-bascule) + 12px);
   }
 
   /* Écran de guidage : le plan prend la moitié de la place, la vue rapprochée l'autre moitié. */
   body.mode-leve.vue-implantation[data-onglet='terrain'] {
     --hauteur-plan-guidage: calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) / 2);
-  }
-
-  body.mode-leve.vue-implantation[data-onglet='terrain'] .panneau-plan {
-    height: var(--hauteur-plan-guidage);
+    --hauteur-plan-terrain: var(--hauteur-plan-guidage);
   }
 
   body.mode-leve.vue-implantation[data-onglet='terrain'] .mise-en-page {
@@ -4790,70 +4794,143 @@ button.bouton-import {
   margin-bottom: 10px;
 }
 
-/* Levé en cours (version 0.57.1) : « Levé en cours » en petit, puis la liste des levés dans un
-   cadre neutre ; le nom du levé (et chaque levé de la liste) est écrit à la couleur de sa nature.
-   « + Nouveau levé » en haut de la liste. */
-.ligne-leve-en-cours {
+/* Levé en cours (0.64.0) : sa nature en petit, son nom en grand à la couleur de la nature, un
+   crayon pour le renommer, puis « Changer » et « + Nouveau ». */
+.entete-levee {
+  --couleur-nature: #b45309;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
   margin-bottom: 10px;
 }
 
-.titre-leve-en-cours {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--gris);
-}
-
-.choix-leve {
-  --couleur-nature: #b45309;
-  width: 100%;
-  min-height: 40px;
-  padding: 0 44px 0 10px;
-  border: 1.5px solid var(--bordure);
-  border-radius: 8px;
-  appearance: none;
-  -webkit-appearance: none;
-  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%231b2b36'/%3E%3Cpath d='m7 10 5 5 5-5' fill='none' stroke='%23f6ab07' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 6px center / 28px 28px;
-  color: var(--couleur-nature);
-  font-size: 1.1rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.choix-leve option {
-  --couleur-nature: #b45309;
-  color: var(--couleur-nature);
-  font-weight: 700;
-}
-
-.choix-leve option.nouveau-leve {
-  color: var(--texte);
-}
-
-.choix-leve.nature-terrain,
-.choix-leve option.nature-terrain {
+.entete-levee.nature-terrain {
   --couleur-nature: #15803d;
 }
 
-.choix-leve.nature-terrassement,
-.choix-leve option.nature-terrassement {
+.entete-levee.nature-terrassement {
   --couleur-nature: #2563eb;
 }
 
-.choix-leve.nature-metre,
-.choix-leve option.nature-metre {
+.entete-levee.nature-metre {
   --couleur-nature: #0891b2;
 }
 
 /* « Levé libre » (contrôle, points géomètre… ; « autres » dans le code) : gris ardoise. */
-.choix-leve.nature-autres,
-.choix-leve option.nature-autres,
+.entete-levee.nature-autres,
 .bouton-nature.nature-autres {
   --couleur-nature: #475569;
+}
+
+.nom-levee {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: 4px;
+  min-width: 0;
+}
+
+.nature-levee {
+  grid-column: 1 / -1;
+  color: var(--couleur-nature);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.nom-levee strong {
+  overflow: hidden;
+  color: var(--couleur-nature);
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bouton-crayon-levee {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--couleur-nature);
+  cursor: pointer;
+}
+
+.bouton-crayon-levee svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.boutons-levee {
+  display: flex;
+  gap: 6px;
+}
+
+/* Contenu de l'onglet Terrain encadré à la couleur du mode (0.64.0) : ambre (Lever), sarcelle
+   (Implanter), rouge (Contrôle). */
+.panneau[data-onglet='terrain'] {
+  border: 2px solid var(--ambre);
+}
+
+.panneau[data-onglet='terrain']:has(.cadre-mode-controler) {
+  border-color: #0d9488;
+}
+
+.panneau[data-onglet='terrain']:has(.cadre-mode-autocontrole) {
+  border-color: #dc2626;
+}
+
+/* Flèche sous le plan (téléphone, onglet Terrain) : plan sur 1/3 ou sur 1/2 de l'écran. */
+.bouton-taille-plan {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  body.mode-leve[data-onglet='terrain']:not(.vue-implantation) .bouton-taille-plan {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 22px;
+    border: 1px solid var(--bordure);
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    background: var(--surface);
+    color: var(--sombre);
+    transform: translateX(-50%);
+    cursor: pointer;
+  }
+
+  .bouton-taille-plan svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  body.plan-terrain-grand .bouton-taille-plan svg {
+    transform: rotate(180deg);
+  }
 }
 
 /* Libellés : tableau abréviation | description (seulement la liste du rôle choisi). */
@@ -5140,7 +5217,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 
   body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .cible-haut {
     position: fixed;
-    top: calc(var(--hauteur-entete) + var(--hauteur-bascule));
+    top: var(--hauteur-entete);
     left: 0;
     right: 0;
     z-index: 12;
@@ -5698,7 +5775,7 @@ body.accroches-ouvertes {
 @media (max-width: 899px) {
   body.mode-leve.avec-accroches[data-onglet='terrain'] .barre-accroche {
     position: fixed;
-    top: calc(var(--hauteur-entete) + var(--hauteur-bascule) + 38svh);
+    top: calc(var(--hauteur-entete) + var(--hauteur-plan-terrain) + var(--hauteur-bascule));
     left: 0;
     right: 0;
     z-index: 10;
@@ -5710,7 +5787,7 @@ body.accroches-ouvertes {
   }
 
   body.mode-leve.avec-accroches[data-onglet='terrain'] .mise-en-page {
-    padding-top: calc(38svh + var(--hauteur-bascule) + var(--hauteur-accroches) + 12px);
+    padding-top: calc(var(--hauteur-plan-terrain) + var(--hauteur-bascule) + var(--hauteur-accroches) + 12px);
   }
 }
 
@@ -6298,6 +6375,14 @@ body.mode-base .parties-calculs {
   color: #dc2626;
 }
 
+.ligne-leve.liste-dessin {
+  border-left: 4px solid #7c3aed;
+}
+
+.ligne-leve.liste-dessin > strong {
+  color: #7c3aed;
+}
+
 .points-de-la-liste {
   margin-top: 4px;
 }
@@ -6372,9 +6457,68 @@ body.mode-base .parties-calculs {
   background: color-mix(in srgb, #7c3aed 7%, var(--surface));
 }
 
+/* Étape du pilote en évidence : « Point de départ », « Direction du 1er côté », « Côté 3 ». */
 .etape-pilote {
-  margin: 0 0 8px;
+  margin: 0 0 2px;
+  color: #5b21b6;
+  font-size: 1.25rem;
   font-weight: 800;
+}
+
+.etape-pilote + .aide {
+  margin: 0 0 8px;
+}
+
+/* « ← Retour » : sur téléphone, les onglets sont cachés pendant le dessin. */
+.bouton-retour-dessin {
+  margin: 0 0 6px;
+  padding: 4px 10px;
+  border: 1px solid #7c3aed;
+  border-radius: 8px;
+  background: var(--surface);
+  color: #5b21b6;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tourner-dessin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.tourner-dessin label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.tourner-dessin input {
+  width: 70px;
+  min-height: 38px;
+  font-size: 1.05rem;
+  text-align: right;
+}
+
+.tourner-dessin .bouton-secondaire.actif {
+  border-color: #7c3aed;
+  background: #7c3aed;
+  color: #ffffff;
+}
+
+.direction-choisie {
+  align-self: center;
+  color: #15803d;
+  font-weight: 700;
+}
+
+.rectangle-dessin summary {
+  width: 100%;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .direction-distance,
@@ -6404,11 +6548,6 @@ body.mode-base .parties-calculs {
   font-size: 1.05rem;
 }
 
-.rectangle-dessin > span {
-  width: 100%;
-  font-weight: 700;
-}
-
 .hauteur-dessin {
   margin-top: 8px;
   padding-top: 8px;
@@ -6427,7 +6566,8 @@ body.mode-base .parties-calculs {
   stroke-linejoin: round;
 }
 
-.plan .trait-dessin.type-plateforme {
+.plan .trait-dessin.type-plateforme,
+.plan .trait-dessin.ferme {
   fill: rgba(124, 58, 237, 0.08);
 }
 
@@ -6548,4 +6688,9 @@ body.mode-base .parties-calculs {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px dashed var(--bordure);
+}
+
+/* Mode téléphone : le gros bouton PRENDRE LE POINT / ENREGISTRER, 25 % plus petit. */
+body.mode-telephone .bouton.bouton-prendre {
+  min-height: 40px;
 }

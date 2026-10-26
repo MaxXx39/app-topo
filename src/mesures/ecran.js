@@ -7,7 +7,7 @@
 import { lireListeDeNoms, detecterSeries, creerLigne, verifierSurface } from '../topo/noms.js';
 import { creerMesure, nomDeMesureLibre, nomsDeLaMesure } from '../topo/mesure.js';
 import { htmlChoixPoints, resumeListe } from '../surfaces/choix-points.js';
-import { VALEURS, TEXTE_MORCEAUX, valeursMorceau, valeurPrincipale, COULEURS_MESURES, couleurDeMesure } from './valeurs.js';
+import { VALEURS, TEXTE_MORCEAUX, valeursCochees, valeursMorceau, valeurPrincipale, COULEURS_MESURES, couleurDeMesure } from './valeurs.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { echapper } from '../outils/echapper.js';
@@ -31,7 +31,7 @@ const ROLES = {
  * - quandChange() : après chaque modification
  */
 export function creerEcranMesures(conteneur, barre, options) {
-  const { obtenirProjet, obtenirPoints, obtenirResultat, leveActifId, etiquette, quandChange } = options;
+  const { obtenirProjet, obtenirPoints, obtenirResultat, leveActifId, etiquette, quandChange, ajouterPhotos } = options;
   const etat = {
     idActif: null,
     edition: null, // liste en cours de modification : { role, index }
@@ -181,6 +181,11 @@ export function creerEcranMesures(conteneur, barre, options) {
       if (mesure.lignesRupture.length === 0) mesure.lignesRupture.push(creerLigne());
       etat.edition = null;
     },
+    'supprimer-photo': (bouton) => {
+      const mesure = mesureActive();
+      if (!confirm('Supprimer cette photo ?')) return;
+      mesure.photos = (mesure.photos ?? []).filter((photo) => photo.id !== bouton.dataset.id);
+    },
   };
 
   // Un seul écouteur pour tous les boutons de l'écran et de la barre.
@@ -205,6 +210,12 @@ export function creerEcranMesures(conteneur, barre, options) {
     } else if (cible.dataset.champ === 'tous-les-points') {
       mesure.tousLesPoints = cible.checked;
       etat.edition = cible.checked ? null : { role: 'dessus', index: 0 };
+    } else if (cible.dataset.champ === 'legende-photo') {
+      const photo = (mesure.photos ?? []).find((p) => p.id === cible.dataset.id);
+      if (photo) photo.legende = cible.value.trim();
+    } else if (cible.dataset.champ === 'fichier-photo') {
+      if (cible.files.length > 0) ajouterPhotos?.(mesure, [...cible.files]);
+      return;
     } else if (cible.dataset.case) {
       basculerPoint(cible.dataset.case);
       return;
@@ -295,6 +306,7 @@ export function creerEcranMesures(conteneur, barre, options) {
         ${blocListe(mesure, listePrincipale)}
         ${problemes.length > 0 ? `<div class="avertissement"><ul>${problemes.map((p) => `<li>${echapper(p)}</li>`).join('')}</ul></div>` : ''}
         ${tableauValeurs(mesure, resultat)}
+        ${cartePhotos(mesure)}
         <details data-zone="options" ${ouvertes ? 'open' : ''}>
           <summary>Plus d'options</summary>
           ${choixCouleur(mesure)}
@@ -366,17 +378,42 @@ export function creerEcranMesures(conteneur, barre, options) {
     });
   }
 
-  /** Valeurs de la mesure (sans case à cocher), ou ses erreurs. */
+  /** Valeurs cochées de la mesure (cases « Sur le plan et dans le PDF »), ou ses erreurs. */
   function tableauValeurs(mesure, resultat) {
     if (!resultat) return '';
     if (resultat.erreurs) return `<div class="erreur"><ul>${resultat.erreurs.map((e) => `<li>${echapper(e)}</li>`).join('')}</ul></div>`;
     return `
       <table class="tableau-valeurs">
         <tbody>
-          ${VALEURS[mesure.type].map((v) => `<tr><td>${v.titre}</td><td class="nombre"><strong>${v.ecrire(resultat)}</strong></td></tr>`).join('')}
+          ${valeursCochees(mesure).map((v) => `<tr><td>${v.titre}</td><td class="nombre"><strong>${v.ecrire(resultat)}</strong></td></tr>`).join('')}
         </tbody>
       </table>
       ${resultat.avertissements?.length > 0 ? `<div class="avertissement"><ul>${resultat.avertissements.map((a) => `<li>${echapper(a)}</li>`).join('')}</ul></div>` : ''}`;
+  }
+
+  /** Photos de la mesure (réduites, rangées dans le projet), avec leur légende. */
+  function cartePhotos(mesure) {
+    const photos = mesure.photos ?? [];
+    return `
+      <div class="bloc-liste photos-mesure">
+        <strong>Photos ${bulle('photosMesure')} <span class="aide">${photos.length}</span></strong>
+        <div class="liste-photos">
+          ${photos
+            .map(
+              (photo) => `
+            <figure class="photo">
+              <img src="${photo.miniature}" alt="${echapper(photo.legende || mesure.nom)}" />
+              <input type="text" data-champ="legende-photo" data-id="${photo.id}" value="${echapper(photo.legende ?? '')}" placeholder="Légende" aria-label="Légende de la photo" />
+              <button type="button" class="bouton-lien" data-action="supprimer-photo" data-id="${photo.id}">supprimer</button>
+            </figure>`,
+            )
+            .join('')}
+        </div>
+        <label class="bouton-secondaire">
+          + Ajouter une photo
+          <input type="file" data-champ="fichier-photo" accept="image/*" multiple hidden />
+        </label>
+      </div>`;
   }
 
   /** Cases « Plan et PDF » : ce qui s'écrit sur le plan (mesure touchée) et dans le PDF. */

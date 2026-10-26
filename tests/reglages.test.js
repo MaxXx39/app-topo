@@ -37,7 +37,7 @@ describe('mode Base / Confirmé', () => {
 
   it('anciens réglages (sans mode) : Confirmé, mode téléphone gardé', async () => {
     const { lireReglages } = await chargerReglages({ 'topo-reglages': JSON.stringify({ telephone: true }) });
-    expect(lireReglages()).toEqual({ telephone: true, mode: 'confirme' });
+    expect(lireReglages()).toEqual({ telephone: true, mode: 'confirme', priseProtegee: false });
   });
 
   it('mémoire illisible : Confirmé', async () => {

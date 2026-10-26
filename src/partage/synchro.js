@@ -6,7 +6,9 @@
 // Sur Drive : un dossier « Topo - projets », puis un dossier par projet (nommé par son titre),
 // qui contient les fichiers du projet (voir partage/fichiers.js). Le dossier du projet porte
 // des propriétés lues par l'appli : projetId, titre, modifieLe, et le verrou (verrouPar = id de
-// l'appareil, verrouNom, verrouDepuis, verrouVu = dernier signe de vie de l'appareil).
+// l'appareil, verrouNom, verrouDepuis, verrouVu = dernier signe de vie de l'appareil, verrouProtege
+// = 'oui' si l'appareil a coché « Prise de main protégée » : les autres doivent taper le code de
+// sécurité pour prendre la main, 0.67.0).
 // Un verrou sans signe de vie depuis 15 minutes (tablette éteinte, appli fermée sans ✕) ne compte
 // plus : le projet est libre (décision du 23.10.2026).
 // Sur l'appareil, une petite mémoire par projet (voir memoire.js) retient le dossier Drive, la
@@ -33,9 +35,10 @@ export function verrouActif(verrou, maintenant = Date.now()) {
 const court = (texte) => String(texte ?? '').slice(0, 90);
 
 /**
- * Crée la synchronisation. drive : voir partage/drive.js ; appareil : { id, nom }.
+ * Crée la synchronisation. drive : voir partage/drive.js ; appareil : { id, nom } ;
+ * protege() : vrai si cet appareil a coché « Prise de main protégée » (lu à chaque verrou posé).
  */
-export function creerSynchro(drive, appareil) {
+export function creerSynchro(drive, appareil, { protege = () => false } = {}) {
   let racineId = null;
 
   /** Dossier « Topo - projets » (créé au premier besoin). */
@@ -55,11 +58,13 @@ export function creerSynchro(drive, appareil) {
 
   const verrouDe = (dossier) => {
     const p = dossier.appProperties ?? {};
-    return p.verrouPar ? { appareilId: p.verrouPar, nom: p.verrouNom ?? '?', depuis: p.verrouDepuis ?? null, vu: p.verrouVu ?? p.verrouDepuis ?? null } : null;
+    return p.verrouPar
+      ? { appareilId: p.verrouPar, nom: p.verrouNom ?? '?', depuis: p.verrouDepuis ?? null, vu: p.verrouVu ?? p.verrouDepuis ?? null, protege: p.verrouProtege === 'oui' }
+      : null;
   };
   const proprietesVerrou = () => {
     const maintenant = new Date().toISOString();
-    return { verrouPar: appareil.id, verrouNom: court(appareil.nom), verrouDepuis: maintenant, verrouVu: maintenant };
+    return { verrouPar: appareil.id, verrouNom: court(appareil.nom), verrouDepuis: maintenant, verrouVu: maintenant, verrouProtege: protege() ? 'oui' : null };
   };
 
   return {
@@ -85,7 +90,9 @@ export function creerSynchro(drive, appareil) {
         const verrou = verrouDe(dossier);
         if (verrou && verrou.appareilId !== appareil.id && verrouActif(verrou)) return { repris: verrou };
       } else {
-        dossier = await drive.creerDossier(court(titre), await racine(), { projetId: projet.id, titre: court(titre), ...proprietesVerrou() });
+        // Nouveau dossier : seulement les propriétés qui ont une valeur (pas de « null » à la création).
+        const proprietes = Object.fromEntries(Object.entries({ projetId: projet.id, titre: court(titre), ...proprietesVerrou() }).filter(([, v]) => v != null));
+        dossier = await drive.creerDossier(court(titre), await racine(), proprietes);
       }
 
       const existants = new Map((await drive.listerDossier(dossier.id)).map((f) => [f.name, f]));
@@ -133,11 +140,14 @@ export function creerSynchro(drive, appareil) {
       await drive.modifier(dossierId, { proprietes: proprietesVerrou() });
     },
 
-    /** Rend un projet (on en ouvre un autre) : le verrou est enlevé, s'il est encore à cet appareil. */
+    /**
+     * Rend un projet (on en ouvre un autre, « Rendre la main », 5 minutes sans rien faire) : le
+     * verrou est enlevé, s'il est encore à cet appareil.
+     */
     async rendreVerrou(dossierId) {
       const dossier = await drive.decrire(dossierId);
       if (verrouDe(dossier)?.appareilId !== appareil.id) return;
-      await drive.modifier(dossierId, { proprietes: { verrouPar: null, verrouNom: null, verrouDepuis: null, verrouVu: null } });
+      await drive.modifier(dossierId, { proprietes: { verrouPar: null, verrouNom: null, verrouDepuis: null, verrouVu: null, verrouProtege: null } });
     },
 
     /**

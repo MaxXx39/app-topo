@@ -82,6 +82,13 @@ export function valeurPrincipale(mesure, resultat) {
   return `${valeur.court} ${valeur.ecrire(resultat)}`;
 }
 
+/** Valeurs cochées d'une mesure (mesure.afficher) ; aucune cochée : la première (ex. Longueur 2D). */
+export function valeursCochees(mesure) {
+  const valeurs = VALEURS[mesure.type];
+  const cochees = valeurs.filter((v) => mesure.afficher?.[v.cle]);
+  return cochees.length > 0 ? cochees : valeurs.slice(0, 1);
+}
+
 /** Lignes de l'étiquette d'une mesure sur le plan : son nom, puis les valeurs cochées (« L 2D 12.345 m »). */
 export function lignesEtiquette(mesure, resultat) {
   const valeurs = VALEURS[mesure.type].filter((v) => mesure.afficher?.[v.cle]);

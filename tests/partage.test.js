@@ -73,6 +73,7 @@ function projetEssai() {
   projet.cartouche.affaire = '10 203';
   projet.plansDxf = [{ id: 'p1', nom: 'plan.dxf', calques: [], contenu: { traits: [{ c: 0, p: [0, 0, 10, 10] }] } }];
   projet.surfaces = [{ id: 's1', nom: 'Stock 1', photos: [{ id: 'ph1', legende: 'vue', image: 'data:image/jpeg;base64,AAAA', miniature: 'data:image/jpeg;base64,BB' }] }];
+  projet.mesures = [{ id: 'm1', nom: 'Mur', photos: [{ id: 'ph2', legende: 'mur', image: 'data:image/jpeg;base64,CC', miniature: 'data:image/jpeg;base64,DD' }] }, { id: 'm2', nom: 'Sans photo' }];
   return projet;
 }
 
@@ -83,7 +84,8 @@ describe('fichiers du projet', () => {
   it('découpe le projet (plans et photos à part) et le recompose à l\'identique', async () => {
     const projet = projetEssai();
     const fichiers = projetVersFichiers(projet);
-    expect([...fichiers.keys()].sort()).toEqual(['photo-ph1.json.gz', 'plan-p1.json.gz', FICHIER_PROJET]);
+    expect([...fichiers.keys()].sort()).toEqual(['photo-ph1.json.gz', 'photo-ph2.json.gz', 'plan-p1.json.gz', FICHIER_PROJET]);
+    expect(fichiers.get(FICHIER_PROJET).mesures[0].photos[0].image).toBeNull();
     expect(fichiers.get(FICHIER_PROJET).plansDxf[0].contenu).toBeNull();
     // Aller-retour par la compression.
     const relus = new Map();
@@ -137,6 +139,21 @@ describe('synchronisation avec Drive', () => {
     // Le bureau rend le projet : Max peut de nouveau envoyer.
     await bureau.rendreVerrou(liste[0].dossierId);
     expect((await creerSynchro(drive, MAX).envoyer(projet, memoire)).memoire).toBeTruthy();
+  });
+
+  it('prise de main protégée : le verrou le dit aux autres appareils ; rendu, il est enlevé', async () => {
+    const drive = fauxDrive();
+    const projet = projetEssai();
+    let protege = true;
+    const max = creerSynchro(drive, MAX, { protege: () => protege });
+    const { memoire } = await max.envoyer(projet, null, 'Essai');
+    const [surDrive] = await creerSynchro(drive, BUREAU).listerProjets();
+    expect(surDrive.verrou).toMatchObject({ nom: 'Tablette Max', protege: true });
+    protege = false;
+    await max.signeDeVie(memoire.dossierId);
+    expect((await creerSynchro(drive, BUREAU).listerProjets())[0].verrou.protege).toBe(false);
+    await max.rendreVerrou(memoire.dossierId);
+    expect((await creerSynchro(drive, BUREAU).listerProjets())[0].verrou).toBeNull();
   });
 
   it('verrou sans signe de vie depuis 15 minutes : le projet est libre', async () => {
