@@ -63,6 +63,10 @@ class EcranPrincipal : Activity() {
     // Action à refaire quand l'utilisateur aura accepté la permission Bluetooth.
     private var apresPermission: (() -> Unit)? = null
 
+    // GPS de la tablette : se localiser sur le plan sans RX2 (permission demandée une fois par lancement).
+    private val positionTablette by lazy { PositionTablette(this) }
+    private var localisationDemandee = false
+
     private lateinit var page: WebView
     private val serveur by lazy { ServeurAppli(assets) }
 
@@ -105,6 +109,7 @@ class EcranPrincipal : Activity() {
     override fun onPause() {
         super.onPause()
         minuterie.removeCallbacks(envoyerEtat)
+        positionTablette.arreter()
     }
 
     override fun onDestroy() {
@@ -129,6 +134,10 @@ class EcranPrincipal : Activity() {
                 val etat2 = recepteur2.enJson(preferences().getString(CLE_NOM_RECEPTEUR_2, null))
                 val mode2 = JSONObject.quote(modeCorrections2())
                 page.evaluateJavascript("window.recevoirEtatRecepteur2 && window.recevoirEtatRecepteur2($etat2, $mode2)", null)
+                // Sans RX2 connecté : la position du GPS de la tablette (pour se localiser seulement).
+                if (recepteur.connecte) positionTablette.arreter() // le RX2 suffit (et la batterie dure plus)
+                val tablette = if (recepteur.connecte) "null" else gpsTablette()
+                page.evaluateJavascript("window.recevoirPositionTablette && window.recevoirPositionTablette($tablette)", null)
             }
             if (recepteur.connecte || recepteur2.connecte) {
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -526,6 +535,23 @@ class EcranPrincipal : Activity() {
         }
     }
 
+    /**
+     * Position du GPS de la tablette (texte JSON, ou "null") : l'écoute démarre au premier besoin ;
+     * sans la permission, on la demande une fois par lancement de l'appli.
+     */
+    private fun gpsTablette(): String {
+        val accordee = aLaPermission(Manifest.permission.ACCESS_FINE_LOCATION) || aLaPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (!accordee) {
+            if (!localisationDemandee) {
+                localisationDemandee = true
+                requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), CODE_LOCALISATION)
+            }
+            return "null"
+        }
+        positionTablette.demarrer()
+        return positionTablette.enJson()
+    }
+
     private fun aLaPermission(permission: String) =
         checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
@@ -553,6 +579,11 @@ class EcranPrincipal : Activity() {
 
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, resultats: IntArray) {
         super.onRequestPermissionsResult(code, permissions, resultats)
+        if (code == CODE_LOCALISATION) {
+            // Refus : pas de position sans RX2 (rien d'autre ne change).
+            if (resultats.none { it == PackageManager.PERMISSION_GRANTED }) message("Sans la localisation, le plan ne montre ta position qu'avec le RX2.")
+            return
+        }
         if (code != CODE_PERMISSIONS) return
         val action = apresPermission
         apresPermission = null
@@ -714,6 +745,7 @@ class EcranPrincipal : Activity() {
         private const val CODE_CHOISIR = 1
         private const val CODE_ENREGISTRER = 2
         private const val CODE_PERMISSIONS = 3
+        private const val CODE_LOCALISATION = 7
         private const val CODE_DRIVE = 4
 
         // Accès à Google Drive : seulement les fichiers créés par l'appli.

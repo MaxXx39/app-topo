@@ -64,3 +64,70 @@ export function ligneDeCoupeLame(gauche, droite, marge = 1) {
     fin: { est: droite.est + ue * marge, nord: droite.nord + un * marge },
   };
 }
+
+// --- Profil en long (0.73.0) : la surface devant (et un peu derrière) la lame, dans le sens de marche ---
+
+/**
+ * Point du profil : coin gauche, coin droit, ou milieu de la lame (moyenne des deux coins, Est,
+ * Nord et altitude). choix : 'gauche', 'droite' ou 'milieu'.
+ */
+export function pointDeProfil(gauche, droite, choix = 'milieu') {
+  if (choix === 'gauche') return { ...gauche };
+  if (choix === 'droite') return { ...droite };
+  return { est: (gauche.est + droite.est) / 2, nord: (gauche.nord + droite.nord) / 2, altitude: (gauche.altitude + droite.altitude) / 2 };
+}
+
+/**
+ * Direction « vers l'avant » quand la niveleuse est arrêtée : perpendiculaire à la lame, en
+ * regardant depuis la cabine (gauche à gauche, droite à droite). Vecteur unitaire { est, nord }, ou null.
+ */
+export function avantDeLaLame(gauche, droite) {
+  const largeur = Math.hypot(droite.est - gauche.est, droite.nord - gauche.nord);
+  if (largeur < LARGEUR_MIN) return null;
+  // Vers la droite (gauche → droite) tourné d'un quart de tour à gauche = vers l'avant.
+  return { est: -(droite.nord - gauche.nord) / largeur, nord: (droite.est - gauche.est) / largeur };
+}
+
+/** Vecteur unitaire { est, nord } d'un azimut (degrés, 0 = nord, sens des aiguilles d'une montre). */
+export function vecteurAzimut(azimut) {
+  const angle = (azimut * Math.PI) / 180;
+  return { est: Math.sin(angle), nord: Math.cos(angle) };
+}
+
+/**
+ * Tronçons d'un profil (morceaux de profilSurface, distances en m, altitudes en m) : les segments
+ * qui se suivent sont regroupés tant que leur pente ne change pas de plus de "seuil" % ; chaque
+ * changement plus grand est une rupture de pente. Renvoie [{ debut, fin (distances, m), pente (%) }]
+ * et ruptures : [distance (m)] (entre deux tronçons d'un même morceau).
+ */
+export function tronconsProfil(morceaux, seuil = 0.5) {
+  const troncons = [];
+  const ruptures = [];
+  for (const morceau of morceaux) {
+    let depart = null; // premier point du tronçon en cours
+    let penteDepart = null; // pente du premier segment du tronçon
+    for (let i = 1; i < morceau.length; i++) {
+      const a = morceau[i - 1];
+      const b = morceau[i];
+      const longueur = b.distance - a.distance;
+      if (longueur < 1e-6) continue;
+      const pente = ((b.altitude - a.altitude) / longueur) * 100;
+      if (depart && Math.abs(pente - penteDepart) > seuil) {
+        troncons.push(tronconEntre(depart, a));
+        ruptures.push(a.distance);
+        depart = null;
+      }
+      if (!depart) {
+        depart = a;
+        penteDepart = pente;
+      }
+      if (i === morceau.length - 1) troncons.push(tronconEntre(depart, b));
+    }
+  }
+  return { troncons, ruptures };
+}
+
+/** Tronçon de a à b : { debut, fin (m), pente (%) }. */
+function tronconEntre(a, b) {
+  return { debut: a.distance, fin: b.distance, pente: ((b.altitude - a.altitude) / (b.distance - a.distance)) * 100 };
+}

@@ -1,6 +1,7 @@
 // Onglet Terrain › Lame (0.70.0, mode Confirmé) : guidage d'une lame de grader avec 2 RX2 (calculs
 // dans topo/lame.js). En haut : la surface à suivre, puis l'écart à chaque coin en grand (monter /
-// descendre, en couleur), le dévers mesuré et voulu, et la coupe vue de derrière la lame.
+// descendre, en couleur), le dévers mesuré et voulu, la coupe vue de derrière la lame et (0.73.0)
+// le profil en long dans le sens de marche, avec un petit dessin de niveleuse.
 // Les nombres changent 5 fois par seconde sans redessiner l'écran (rafraichirLame).
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
@@ -52,6 +53,13 @@ export function htmlLame(donnees, { reglagesOuverts = false } = {}) {
     </div>
     <p class="devers-lame" data-vivant="lame-devers">Dévers —</p>
     <div class="coupe-lame" data-vivant="lame-coupe"></div>
+    <div class="reglages-profil-lame">
+      <span class="titre-profil">Profil en long</span>
+      ${[['gauche', 'Gauche'], ['milieu', 'Milieu'], ['droite', 'Droite']].map(([cle, titre]) => `<button type="button" class="puce-choix ${donnees.pointProfil === cle ? 'actif' : ''}" data-action="choisirPointProfil" data-valeur="${cle}">${titre}</button>`).join('')}
+      <label>devant <input type="text" inputmode="decimal" data-profil-lame="devant" value="${donnees.devant}" /> m</label>
+      <label>derrière <input type="text" inputmode="decimal" data-profil-lame="derriere" value="${donnees.derriere}" /> m</label>
+    </div>
+    <div class="profil-lame" data-vivant="lame-profil"></div>
   </div>`;
 }
 
@@ -77,6 +85,77 @@ export function rafraichirLame(conteneur, vivant) {
     ? `Dévers <strong>${pourcent(g.devers)}</strong> · voulu <strong>${pourcent(g.deversVoulu)}</strong>${g.ecartDevers == null ? '' : ` · écart ${pourcent(g.ecartDevers)}`} · lame ${formaterNombre(g.largeur)} m`
     : 'Dévers —';
   zone('lame-coupe').innerHTML = g && vivant.coupe ? svgCoupeLame(vivant.coupe, g) : '';
+  const profil = zone('lame-profil');
+  if (profil) profil.innerHTML = g && vivant.profil ? svgProfilLame(vivant.profil) : '';
+}
+
+/** Niveleuse vue de derrière, au-dessus de la lame (coins en pixels) : petit dessin, mâts sur les coins. */
+function niveleuseDeDerriere(xg, yg, xd, yd) {
+  const xm = (xg + xd) / 2;
+  const ym = (yg + yd) / 2;
+  return `<g class="niveleuse">
+    <path d="M${(xg).toFixed(1)} ${yg.toFixed(1)}V${(yg - 22).toFixed(1)}M${xd.toFixed(1)} ${yd.toFixed(1)}V${(yd - 22).toFixed(1)}" class="mat" />
+    <circle cx="${xg.toFixed(1)}" cy="${(yg - 24).toFixed(1)}" r="2.5" class="antenne" /><circle cx="${xd.toFixed(1)}" cy="${(yd - 24).toFixed(1)}" r="2.5" class="antenne" />
+    <rect x="${(xm - 16).toFixed(1)}" y="${(ym - 40).toFixed(1)}" width="32" height="16" rx="2" class="cabine" />
+    <rect x="${(xm - 22).toFixed(1)}" y="${(ym - 26).toFixed(1)}" width="44" height="8" rx="2" />
+  </g>`;
+}
+
+/** Niveleuse vue de côté (avant à droite), lame en x, y (pixels) : petit dessin, toujours de la même taille. */
+function niveleuseDeCote(x, y) {
+  return `<g class="niveleuse" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})">
+    <path d="M-34 -14H34L40 -8V-4H-38V-10Z" />
+    <path d="M-30 -14V-30H-14L-10 -14Z" class="cabine" />
+    <path d="M0 0V-18" class="mat" /><circle cx="0" cy="-20" r="2.5" class="antenne" />
+    <circle cx="-26" cy="-4" r="5" /><circle cx="-14" cy="-4" r="5" /><circle cx="32" cy="-4" r="5" />
+    <path d="M-4 0H4" class="lame" />
+  </g>`;
+}
+
+/**
+ * Profil en long (sens de marche, avant à droite) : la surface, la pente de chaque tronçon, les
+ * ruptures de pente (trait et distance), la niveleuse sur la lame (distance 0). profil : { morceaux,
+ * troncons, ruptures, devant, derriere (m), altitude (de la lame), source ('marche' ou 'lame') }.
+ */
+export function svgProfilLame(profil) {
+  const largeur = 340;
+  const hauteur = 150;
+  const marge = 16;
+  const { morceaux, troncons, ruptures, devant, derriere, altitude } = profil;
+  const altitudes = [altitude, ...morceaux.flat().map((p) => p.altitude)];
+  const milieu = (Math.min(...altitudes) + Math.max(...altitudes)) / 2;
+  const etendue = Math.max(0.5, Math.max(...altitudes) - Math.min(...altitudes)) * 1.4;
+  const x = (d) => marge + ((d + derriere) / (devant + derriere)) * (largeur - 2 * marge);
+  const y = (z) => hauteur / 2 + 10 - ((z - milieu) / etendue) * (hauteur - 2 * marge - 20);
+  const surface = morceaux
+    .map((m) => `<path class="surface-coupe-lame" d="M${m.map((p) => `${x(p.distance).toFixed(1)} ${y(p.altitude).toFixed(1)}`).join('L')}" />`)
+    .join('');
+  // Pente au milieu de chaque tronçon assez long à l'écran.
+  const pentes = troncons
+    .filter((t) => x(t.fin) - x(t.debut) > 34)
+    .map((t) => {
+      const d = (t.debut + t.fin) / 2;
+      const morceau = morceaux.find((m) => m[0].distance <= d && m.at(-1).distance >= d) ?? [];
+      const i = morceau.findIndex((p) => p.distance >= d);
+      const a = morceau[Math.max(0, i - 1)];
+      const b = morceau[i];
+      const z = a && b && b.distance > a.distance ? a.altitude + ((d - a.distance) / (b.distance - a.distance)) * (b.altitude - a.altitude) : altitude;
+      // Sous la ligne : au-dessus, la niveleuse pourrait la cacher.
+      return `<text x="${x(d).toFixed(1)}" y="${(y(z) + 15).toFixed(1)}" text-anchor="middle" class="pente-profil">${t.pente >= 0 ? '+' : '−'}${Math.abs(t.pente).toFixed(1)} %</text>`;
+    })
+    .join('');
+  const marques = ruptures
+    .map((d) => `<line class="rupture-profil" x1="${x(d).toFixed(1)}" y1="${marge}" x2="${x(d).toFixed(1)}" y2="${hauteur - 14}" />
+      <text x="${x(d).toFixed(1)}" y="${hauteur - 3}" text-anchor="middle" class="distance-profil">${d.toFixed(1)} m</text>`)
+    .join('');
+  return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-profil-lame" role="img" aria-label="Profil en long devant la lame">
+    ${marques}
+    ${surface}
+    ${pentes}
+    ${niveleuseDeCote(x(0), y(altitude))}
+    <text x="4" y="12" class="note-coupe-lame">${profil.source === 'marche' ? 'sens de marche' : 'perpendiculaire à la lame (arrêté)'} →</text>
+    <text x="${largeur - 4}" y="12" text-anchor="end" class="note-coupe-lame">hauteurs agrandies</text>
+  </svg>`;
 }
 
 /**
@@ -104,6 +183,7 @@ export function svgCoupeLame(coupe, guidage) {
     <line class="lame-coupe lame-${pire}" x1="${xg.toFixed(1)}" y1="${y(gauche.altitude).toFixed(1)}" x2="${xd.toFixed(1)}" y2="${y(droite.altitude).toFixed(1)}" />
     <circle class="coin-coupe-lame" cx="${xg.toFixed(1)}" cy="${y(gauche.altitude).toFixed(1)}" r="5" />
     <circle class="coin-coupe-lame" cx="${xd.toFixed(1)}" cy="${y(droite.altitude).toFixed(1)}" r="5" />
+    ${niveleuseDeDerriere(xg, y(gauche.altitude), xd, y(droite.altitude))}
     <text x="${xg.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">G</text>
     <text x="${xd.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">D</text>
     <text x="${largeur - 4}" y="12" text-anchor="end" class="note-coupe-lame">hauteurs agrandies</text>

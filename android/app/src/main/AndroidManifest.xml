@@ -12,6 +12,11 @@
 
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
 
+    <!-- GPS de la tablette : se localiser sur le plan quand aucun RX2 n'est connecté -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
     <!-- Petite vibration quand un point est pris -->
     <uses-permission android:name="android.permission.VIBRATE" />
 

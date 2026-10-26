@@ -69,6 +69,15 @@ export function ecouterRecepteur2(fonction) {
   window.recevoirEtatRecepteur2 = fonction;
 }
 
+/**
+ * Appelle "fonction(position)" avec la position du GPS de la tablette quand aucun RX2 n'est
+ * connecté (environ 5 fois par seconde) : { est, nord, precision (m) } en MN95, ou null.
+ * Seulement pour se localiser sur le plan (jamais pour un point, une implantation ou un guidage).
+ */
+export function ecouterPositionTablette(fonction) {
+  window.recevoirPositionTablette = fonction;
+}
+
 export const choisirRecepteur2 = () => window.AppliAndroid.choisirRecepteur2();
 export const deconnecterRecepteur2 = () => window.AppliAndroid.deconnecterRecepteur2();
 

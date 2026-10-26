@@ -8,7 +8,7 @@ import { lireLandXML } from './topo/landxml.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee, origineSurface, nomNature, nouvelIdentifiant } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, origineSurface, nomNature, nouvelIdentifiant, NATURES } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
@@ -25,7 +25,7 @@ import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface } from './topo/coupe.js';
-import { guidageLame, ligneDeCoupeLame, TOLERANCES_LAME } from './topo/lame.js';
+import { guidageLame, ligneDeCoupeLame, TOLERANCES_LAME, pointDeProfil, avantDeLaLame, vecteurAzimut, tronconsProfil } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -50,7 +50,7 @@ import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
 import { lireLibelles, enregistrerLibelles } from './leve/libelles.js';
-import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude } from './topo/implantation.js';
+import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
 import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele } from './topo/ligne-implantation.js';
 import { MODES_ACCROCHE, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
@@ -73,7 +73,7 @@ import {
 } from './topo/leve-direct.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
-import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
+import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
@@ -114,6 +114,8 @@ const leveDirect = { stockId: null, role: 'contour' };
 let libelles = lireLibelles();
 let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
 let etatRecepteur2 = null; // dernier état du 2e récepteur (essai à 2 RX2, guidage de lame)
+// GPS de la tablette (APK, sans RX2 connecté) : { est, nord, precision } ou null ; seulement pour se localiser.
+let positionTablette = null;
 // Onglet Terrain : mode (Lever ou Contrôler) et réglages du contrôle, retenus sur l'appareil.
 const CLE_TERRAIN = 'topo-terrain';
 const terrain = {
@@ -133,9 +135,12 @@ const terrain = {
   // Implantation d'un talus (voir topo/talus.js) : derniers réglages, repris pour le talus suivant.
   talus: { horizontal: null, vertical: null, ligneEst: 'haut', cote: 'droite', longueur: null, terrainId: null, altitudeSurfaceId: null },
   // Guidage de lame à 2 RX2 (mode Lame, voir topo/lame.js) : surface suivie, gauche / droite inversés, tolérances (m).
-  lame: { surfaceId: null, inverse: false, tolerances: { ...TOLERANCES_LAME } },
+  // Profil en long (0.73.0) : point de la lame ('gauche', 'milieu', 'droite'), longueur devant et derrière (m).
+  lame: { surfaceId: null, inverse: false, tolerances: { ...TOLERANCES_LAME }, pointProfil: 'milieu', devant: 20, derriere: 5 },
   ...lireReglagesTerrain(),
 };
+// Anciens réglages (avant 0.73.0) : le profil en long prend ses valeurs de départ.
+terrain.lame = { pointProfil: 'milieu', devant: 20, derriere: 5, ...terrain.lame };
 // Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
 // point à implanter en cours ({ id (point de la liste « À implanter », ou null), nom, est, nord, altitude }).
 // Implantation d'une ligne : points choisis pour la faire (pointsLigne : [{ est, nord, altitude, nom }])
@@ -223,7 +228,6 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="surfaces">
         <h2>Surfaces ${bulle('surfaces')}</h2>
         <p class="vide sans-points">Aucun point dans le projet.</p>
-        <div id="message-import-surface"></div>
         <div id="surfaces"></div>
       </section>
       <section class="panneau" data-onglet="volumes">
@@ -246,9 +250,14 @@ document.querySelector('#app').innerHTML = `
     </div>
     <section class="panneau panneau-plan" data-onglet="plan">
       <div id="plan"></div>
-      <button type="button" class="bouton-taille-plan" data-action="taille-plan-terrain" aria-label="Agrandir ou réduire le plan">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-      </button>
+      <div class="boutons-taille-plan">
+        <button type="button" class="bouton-taille-plan" data-taille-plan="-1" aria-label="Réduire le plan">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
+        </button>
+        <button type="button" class="bouton-taille-plan" data-taille-plan="1" aria-label="Agrandir le plan">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+      </div>
     </section>
   </div>
   <nav class="onglets" aria-label="Onglets">${ONGLETS.map(boutonOnglet).join('')}</nav>
@@ -406,6 +415,7 @@ function calculDuPlan(surface) {
 // --- Écrans ---
 
 const ecranImport = creerEcranImport(document.querySelector('#importer'), {
+  importerSurface: (fichier) => importerSurface(fichier),
   colorerListe: (id, couleur) => colorerListe(id, couleur),
   importerPointsControle: (fichier) => importerPointsControle(fichier),
   importerPoints: async (fichier) => {
@@ -630,21 +640,30 @@ if (boutonRecepteur && recepteur2Disponible()) {
   });
 }
 
-// Onglet Terrain (téléphone) : flèche sous le plan, plan sur 1/3 ou 1/2 de l'écran (retenu sur l'appareil).
-const CLE_PLAN_TERRAIN = 'topo-plan-terrain-grand';
+// Onglet Terrain (téléphone) : flèches ▲ / ▼ sous le plan ; chaque appui change sa hauteur de 15 %
+// de l'écran (entre 20 % et 80 %, 35 % au départ), retenue sur l'appareil.
+const CLE_PLAN_TERRAIN = 'topo-plan-terrain-part';
+const PART_PLAN = { pas: 0.15, min: 0.2, max: 0.8, depart: 0.35 };
+let partPlanTerrain = PART_PLAN.depart;
 try {
-  document.body.classList.toggle('plan-terrain-grand', localStorage.getItem(CLE_PLAN_TERRAIN) === 'oui');
+  const lue = Number(localStorage.getItem(CLE_PLAN_TERRAIN));
+  if (lue >= PART_PLAN.min && lue <= PART_PLAN.max) partPlanTerrain = lue;
 } catch {
-  // stockage refusé : plan sur 1/3
+  // stockage refusé : hauteur de départ
 }
-document.querySelector('[data-action="taille-plan-terrain"]').addEventListener('click', () => {
-  const grand = document.body.classList.toggle('plan-terrain-grand');
-  try {
-    localStorage.setItem(CLE_PLAN_TERRAIN, grand ? 'oui' : 'non');
-  } catch {
-    // pas retenu
-  }
-});
+document.body.style.setProperty('--part-plan-terrain', String(partPlanTerrain));
+for (const bouton of document.querySelectorAll('[data-taille-plan]')) {
+  bouton.addEventListener('click', () => {
+    const voulue = partPlanTerrain + Number(bouton.dataset.taillePlan) * PART_PLAN.pas;
+    partPlanTerrain = Math.round(Math.min(PART_PLAN.max, Math.max(PART_PLAN.min, voulue)) * 100) / 100;
+    document.body.style.setProperty('--part-plan-terrain', String(partPlanTerrain));
+    try {
+      localStorage.setItem(CLE_PLAN_TERRAIN, String(partPlanTerrain));
+    } catch {
+      // pas retenu
+    }
+  });
+}
 
 const ecranLeve = recepteurDisponible()
   ? creerEcranLeve(document.querySelector('#leve-direct'), {
@@ -764,6 +783,22 @@ const ecranLeve = recepteurDisponible()
         retenirReglagesTerrain();
         afficherMessage(terrain.lame.inverse ? 'Gauche = récepteur 2, droite = récepteur 1' : 'Gauche = récepteur 1, droite = récepteur 2', 3000);
         montrerLame();
+      },
+      choisirPointProfil: (point) => {
+        terrain.lame.pointProfil = ['gauche', 'droite'].includes(point) ? point : 'milieu';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      reglerProfilLame: (cle, texte) => {
+        const metres = lireNombreTape(texte);
+        if (!(metres >= 0 && metres <= 500)) {
+          afficherMessage('Longueur illisible : un nombre de mètres entre 0 et 500', 4000);
+          recalculer();
+          return;
+        }
+        terrain.lame[cle === 'derriere' ? 'derriere' : 'devant'] = metres;
+        retenirReglagesTerrain();
+        recalculer();
       },
       reglerToleranceLame: (cle, texte) => {
         const cm = lireNombreTape(texte);
@@ -1630,6 +1665,8 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
 
 // Recherche rapide de l'altitude de la surface suivie (refaite quand ses triangles changent).
 let chercheurLame = { triangles: null, chercher: null };
+// Dernières positions du milieu de la lame { est, nord, temps } : sens de marche du profil en long.
+const historiqueLame = [];
 
 /** Pourquoi un récepteur ne peut pas guider (texte), ou null s'il est prêt (RTK fixe, inclinaison prête). */
 function raisonRecepteurLame(etat, nom) {
@@ -1665,7 +1702,30 @@ function calculerLame() {
     gauche: { distance: 1, altitude: coins.gauche.altitude },
     droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
   };
-  return { raison: null, guidage, coupe, coins };
+  return { raison: null, guidage, coupe, coins, profil: profilEnLongLame(coins, triangles) };
+}
+
+/**
+ * Profil en long de la lame : depuis le point choisi (gauche, milieu, droite), dans le sens de marche
+ * (dernières positions du milieu de la lame ; arrêté : perpendiculaire à la lame, vers l'avant),
+ * de "derrière" m derrière à "devant" m devant. Tronçons et ruptures de pente de plus de 0.5 %.
+ */
+function profilEnLongLame(coins, triangles) {
+  const milieu = pointDeProfil(coins.gauche, coins.droite, 'milieu');
+  const maintenant = performance.now();
+  historiqueLame.push({ est: milieu.est, nord: milieu.nord, temps: maintenant });
+  while (historiqueLame.length > 0 && maintenant - historiqueLame[0].temps > 10_000) historiqueLame.shift();
+  const azimut = directionDeMarche(historiqueLame, { distanceMin: 1, dureeMax: 5000 });
+  const sens = azimut == null ? avantDeLaLame(coins.gauche, coins.droite) : vecteurAzimut(azimut);
+  if (!sens) return null;
+  const { devant, derriere, pointProfil } = terrain.lame;
+  const point = pointDeProfil(coins.gauche, coins.droite, pointProfil);
+  const debut = { est: point.est - sens.est * derriere, nord: point.nord - sens.nord * derriere };
+  const fin = { est: point.est + sens.est * devant, nord: point.nord + sens.nord * devant };
+  // Distances comptées depuis la lame (négatives derrière).
+  const morceaux = profilSurface(triangles, debut, fin).map((m) => m.map((p) => ({ distance: p.distance - derriere, altitude: p.altitude })));
+  const { troncons, ruptures } = tronconsProfil(morceaux, 0.5);
+  return { morceaux, troncons, ruptures, devant, derriere, altitude: point.altitude, source: azimut == null ? 'lame' : 'marche' };
 }
 
 /** Écran Lame et lame sur le plan, avec les derniers états des 2 récepteurs. */
@@ -2612,6 +2672,9 @@ function donneesCommunes() {
       surfaceId: terrain.lame.surfaceId,
       inverse: terrain.lame.inverse,
       tolerances: terrain.lame.tolerances,
+      pointProfil: terrain.lame.pointProfil,
+      devant: terrain.lame.devant,
+      derriere: terrain.lame.derriere,
       recepteur2: Boolean(etatRecepteur2?.connecte),
     },
     autocontrole: donneesAutocontrole(),
@@ -2766,7 +2829,7 @@ if (recepteurDisponible()) {
     const vientDeSeConnecter = Boolean(etat.connecte) && !etatRecepteur?.connecte;
     etatRecepteur = etat;
     if (vientDeSeConnecter) proposerControle();
-    mettreAJourBandeaux(etat);
+    mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette);
     boutonRecepteur?.mettreAJour(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
     const enPoint = enImplantationDePoint();
@@ -2788,7 +2851,13 @@ if (recepteurDisponible()) {
     // Talus : trait jusqu'à l'entrée en terre (ou au bord du talus) en face de la canne.
     const vers = implantationLigne?.ligne?.cible ?? (implantationTalus?.message ? null : implantationTalus?.talus?.cible) ?? null;
     const cotes = implantationTalus ? cotesTalus(implantationTalus) : cotesLigne(implantationLigne);
-    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotes } : null);
+    // Sans RX2 connecté : la position du GPS de la tablette, en gris avec son cercle de précision.
+    const tablette = !etat.connecte && positionTablette ? { est: positionTablette.est, nord: positionTablette.nord, prete: false, tablette: true, precision: positionTablette.precision, azimut: null } : null;
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotes } : tablette);
+  });
+  // GPS de la tablette : gardé ici, montré avec l'état suivant du RX2 (5 fois par seconde).
+  ecouterPositionTablette((position) => {
+    positionTablette = position && Number.isFinite(position.est) && Number.isFinite(position.nord) ? position : null;
   });
 }
 
@@ -2997,26 +3066,34 @@ function montrerUneSurfaceDuLeve() {
   if (index >= 0) editeurSurfaces.choisir(index);
 }
 
-// --- Import d'une surface LandXML ou DXF : chaque surface du fichier devient une surface du projet ---
-// Sa nature (stock, terrain naturel, terrassement) est ensuite demandée, comme pour une nouvelle surface.
+// --- Import d'une surface LandXML ou DXF 3D (Projet › Import, depuis 0.71.0) : chaque surface du
+// fichier devient une surface du projet, de la nature choisie juste après (stock, terrain naturel,
+// terrassement). Renvoie le message à afficher sous l'import (HTML).
 async function importerSurface(fichier) {
-  const zone = document.querySelector('#message-import-surface');
+  let message;
   try {
     const texte = await fichier.text();
     const type = /\.dxf$/i.test(fichier.name) ? 'dxf' : 'landxml';
     const { surfaces, erreurs, avertissements } = type === 'dxf' ? lireDXF(texte) : lireLandXML(texte);
-    for (const surface of surfaces) {
-      projet.surfaces.push({ ...surfaceImportee(surface, fichier.name, type), nature: null });
+    let nature = null;
+    if (surfaces.length > 0) {
+      nature = await demanderChoix({
+        titre: `${surfaces.length} surface(s) dans « ${fichier.name} »`,
+        texte: 'C\'est quoi ?',
+        boutons: NATURES.map(([cle, titre], i) => ({ cle, texte: titre, principal: i === 0 })),
+      });
     }
+    for (const surface of surfaces) projet.surfaces.push({ ...surfaceImportee(surface, fichier.name, type), nature });
     const messages = [...erreurs, ...avertissements];
-    zone.innerHTML = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} ».</p>
+    message = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} »${nature ? ` (${echapper(nomNature(nature).toLowerCase())})` : ''} : voir Calculs › Surfaces.</p>
       ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
     editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
     if (surfaces.length > 0) editeurSurfaces.choisir(projet.surfaces.length - 1);
   } catch (erreur) {
-    zone.innerHTML = `<p class="erreur">Impossible de lire « ${echapper(fichier.name)} » : ${echapper(erreur.message)}</p>`;
+    message = `<p class="erreur">Impossible de lire « ${echapper(fichier.name)} » : ${echapper(erreur.message)}</p>`;
   }
   modifie({ recadrer: true });
+  return message;
 }
 
 const ecranVolumes = creerEcranVolumes(document.querySelector('#volumes'), {
@@ -3560,7 +3637,6 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   implanter.talusId = null;
   autocontrole.cible = null;
   dernierImport = null;
-  document.querySelector('#message-import-surface').innerHTML = '';
   editeurSurfaces.charger(projet.surfaces);
   montrerUneSurfaceDuLeve();
   recalculer({ recadrer: true });

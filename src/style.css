@@ -1924,14 +1924,14 @@ th.nombre {
   margin: 0;
 }
 
-/* Plan : mesures en pointillé dans leur couleur (cyan au départ), aires avec un fond léger. */
+/* Plan : mesures en trait plein dans leur couleur (cyan au départ), comme les contours et les
+   dessins (0.71.0 ; avant : pointillés), aires avec un fond léger. */
 .plan .longueur-mesure,
 .plan .aire-mesure,
 .plan .ligne-mesure {
   fill: none;
   stroke: var(--couleur-mesure, var(--cyan));
   stroke-width: 2;
-  stroke-dasharray: 7 4;
   stroke-linejoin: round;
 }
 
@@ -1941,7 +1941,6 @@ th.nombre {
 
 .plan .ligne-mesure {
   stroke-width: 1.2;
-  stroke-dasharray: 3 3;
 }
 
 .plan .longueur-mesure.actif,
@@ -1970,7 +1969,6 @@ th.nombre {
   fill: rgba(255, 255, 255, 0.92);
   stroke: var(--couleur-mesure, var(--cyan));
   stroke-width: 1;
-  stroke-dasharray: 4 2;
 }
 
 .plan .etiquettes-mesures rect.actif {
@@ -2580,15 +2578,11 @@ body.avec-recepteur .bandeaux-recepteur {
   fill: var(--gris);
 }
 
-/* Téléphone, onglet Terrain : le plan reste en haut, les outils du levé dessous. Le plan prend
-   1/3 de la place (ou 1/2 avec la flèche sous le plan, classe plan-terrain-grand, 0.64.0). */
+/* Téléphone, onglet Terrain : le plan reste en haut, les outils du levé dessous. Sa hauteur est
+   une part de l'écran (--part-plan-terrain, réglée par les flèches ▲ / ▼ sous le plan, 0.71.0). */
 @media (max-width: 899px) {
   body.mode-leve[data-onglet='terrain'] {
-    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) / 3);
-  }
-
-  body.mode-leve.plan-terrain-grand[data-onglet='terrain'] {
-    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) / 2);
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * var(--part-plan-terrain, 0.35));
   }
 
   body.mode-leve[data-onglet='terrain'] .panneau-plan {
@@ -4902,28 +4896,33 @@ button.bouton-import {
   border-color: #1d4ed8;
 }
 
-/* Flèche sous le plan (téléphone, onglet Terrain) : plan sur 1/3 ou sur 1/2 de l'écran. */
-.bouton-taille-plan {
+/* Flèches ▲ / ▼ sous le plan (téléphone, onglet Terrain) : plus petit / plus grand. */
+.boutons-taille-plan {
   display: none;
 }
 
 @media (max-width: 899px) {
-  body.mode-leve[data-onglet='terrain']:not(.vue-implantation) .bouton-taille-plan {
+  body.mode-leve[data-onglet='terrain']:not(.vue-implantation) .boutons-taille-plan {
     position: absolute;
     bottom: 0;
     left: 50%;
     z-index: 3;
     display: flex;
+    gap: 2px;
+    transform: translateX(-50%);
+  }
+
+  .bouton-taille-plan {
+    display: flex;
     align-items: center;
     justify-content: center;
-    width: 56px;
-    height: 22px;
+    width: 48px;
+    height: 24px;
     border: 1px solid var(--bordure);
     border-bottom: none;
     border-radius: 10px 10px 0 0;
     background: var(--surface);
     color: var(--sombre);
-    transform: translateX(-50%);
     cursor: pointer;
   }
 
@@ -4935,10 +4934,6 @@ button.bouton-import {
     stroke-width: 2.6;
     stroke-linecap: round;
     stroke-linejoin: round;
-  }
-
-  body.plan-terrain-grand .bouton-taille-plan svg {
-    transform: rotate(180deg);
   }
 }
 
@@ -6974,4 +6969,128 @@ body.mode-telephone .bouton.bouton-prendre {
   font-size: 10px;
   font-weight: 800;
   pointer-events: none;
+}
+
+/* Onglet Projet (0.71.0) : blocs Import, Listes de points, DXF repliables (flèche à droite du titre). */
+.bloc-repliable > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  list-style: none;
+  cursor: pointer;
+}
+
+.bloc-repliable > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bloc-repliable > summary .titre-bloc {
+  margin: 0;
+}
+
+.bloc-repliable > summary::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  margin: 0 6px 4px 10px;
+  border-right: 2.5px solid var(--sombre);
+  border-bottom: 2.5px solid var(--sombre);
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+}
+
+.bloc-repliable:not([open]) > summary::after {
+  margin-bottom: 0;
+  transform: rotate(-45deg);
+}
+
+.bloc-repliable[open] > summary {
+  margin-bottom: 10px;
+}
+
+/* GPS de la tablette (sans RX2, 0.72.0) : position grise et cercle de précision ; bandeau marqué. */
+.plan .position.position-tablette circle {
+  fill: #64748b;
+}
+
+.plan .position.position-tablette circle.precision-tablette {
+  fill: #64748b;
+  fill-opacity: 0.12;
+  stroke: #64748b;
+  stroke-width: 1;
+}
+
+.bandeaux-recepteur .tablette {
+  background: #64748b;
+  color: #ffffff;
+}
+
+/* Terrain › Lame, profil en long (0.73.0) : choix du point, longueurs, pentes, ruptures, niveleuse. */
+.reglages-profil-lame {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 6px;
+}
+
+.reglages-profil-lame .titre-profil {
+  font-weight: 800;
+}
+
+.reglages-profil-lame input {
+  width: 52px;
+}
+
+.svg-profil-lame {
+  max-height: 180px;
+}
+
+.svg-coupe-lame .pente-profil {
+  fill: #1d4ed8;
+  font-size: 10px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+
+.svg-coupe-lame .rupture-profil {
+  stroke: #9a3412;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.svg-coupe-lame .distance-profil {
+  fill: #9a3412;
+  font-size: 9px;
+}
+
+.svg-coupe-lame .niveleuse path,
+.svg-coupe-lame .niveleuse rect,
+.svg-coupe-lame .niveleuse circle {
+  fill: #f59e0b;
+  stroke: #1b2b36;
+  stroke-width: 1;
+}
+
+.svg-coupe-lame .niveleuse .cabine {
+  fill: #fde68a;
+}
+
+.svg-coupe-lame .niveleuse .mat {
+  fill: none;
+  stroke: #1b2b36;
+  stroke-width: 1.5;
+}
+
+.svg-coupe-lame .niveleuse .antenne {
+  fill: #1d4ed8;
+  stroke: none;
+}
+
+.svg-coupe-lame .niveleuse .lame {
+  fill: none;
+  stroke: #1b2b36;
+  stroke-width: 3;
 }
