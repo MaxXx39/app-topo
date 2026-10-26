@@ -147,3 +147,66 @@ describe('implanter un dessin', async () => {
     expect(coteSousLeDoigt({ est: A.est + 6, nord: A.nord + 4 }, 0.5, cotes)).toBeNull();
   });
 });
+
+describe('plateforme → surface', async () => {
+  const { trianglesPolygone, surfaceDuDessin, airePolygone: aire } = await import('../src/topo/dessin.js');
+  const aireTriangles = (sommets, faces) => faces.reduce((s, [i, j, k]) => s + aire([sommets[i], sommets[j], sommets[k]]), 0);
+
+  it('rectangle : 2 triangles qui couvrent l\'aire', () => {
+    const { sommets } = rectangle(A, versEst, 12, 8, 'gauche');
+    const faces = trianglesPolygone(sommets);
+    expect(faces).toHaveLength(2);
+    expect(aireTriangles(sommets, faces)).toBeCloseTo(96, 6);
+  });
+
+  it('forme en L (coin rentrant), dans les deux sens de rotation', () => {
+    const { sommets } = contourParCotes(A, versNord, [
+      { longueur: 10 }, { longueur: 4, tourne: 'droite' }, { longueur: 6, tourne: 'droite' },
+      { longueur: 3, tourne: 'gauche' }, { longueur: 4, tourne: 'droite' },
+    ]);
+    // 0,0 → 0,10 → 4,10 → 4,4 → 7,4 → 7,0 (le 7e côté ferme)
+    const aireL = aire(sommets);
+    expect(aireL).toBeCloseTo(52, 6);
+    for (const contour of [sommets, [...sommets].reverse()]) {
+      const faces = trianglesPolygone(contour);
+      expect(faces).toHaveLength(contour.length - 2);
+      expect(aireTriangles(contour, faces)).toBeCloseTo(aireL, 6);
+    }
+  });
+
+  it('contour qui se croise (nœud papillon) : refusé', () => {
+    const p = (e, n) => ({ est: A.est + e, nord: A.nord + n });
+    expect(trianglesPolygone([p(0, 0), p(10, 10), p(10, 0), p(0, 10)])).toBeNull();
+  });
+
+  it('surface d\'une plateforme : points nommés avec altitude, faces ; erreurs claires', () => {
+    const { sommets } = rectangle(A, versEst, 12, 8, 'gauche');
+    const plateforme = { type: 'plateforme', numero: 1, sommets, hauteur: { mode: 'fixe', altitude: 450.2, pente: null } };
+    const surface = surfaceDuDessin(plateforme, [plateforme]);
+    expect(surface.points.map((x) => x.nom)).toEqual(['PF1-1', 'PF1-2', 'PF1-3', 'PF1-4']);
+    expect(surface.faces).toHaveLength(2);
+    expect(surfaceDuDessin({ ...plateforme, hauteur: { mode: 'fixe', altitude: null } }, [plateforme]).erreur).toMatch(/altitude manquante/);
+    expect(surfaceDuDessin({ ...plateforme, type: 'ligne' }, []).erreur).toBeTruthy();
+  });
+});
+
+describe('volume : terrain naturel contre plateforme dessinée', async () => {
+  const { surfaceDuDessin } = await import('../src/topo/dessin.js');
+  const { calculerSurface } = await import('../src/topo/surface.js');
+  const { calculerVolume } = await import('../src/volumes/calculs.js');
+
+  it('plateforme 12 × 8 m à 450.50 sur un terrain plat à 450.00 : 48.000 m³ de remblai', () => {
+    // Terrain naturel plat à 450.00, plus grand que la plateforme (surface importée : points et faces).
+    const p = (nom, e, n) => ({ nom, est: A.est + e, nord: A.nord + n, altitude: 450 });
+    const tn = { id: 'tn', nom: 'TN', type: 'landxml', nature: 'terrain', points: [p('t1', -10, -10), p('t2', 30, -10), p('t3', 30, 20), p('t4', -10, 20)], faces: [[0, 1, 2], [0, 2, 3]] };
+    const { sommets } = rectangle(A, versEst, 12, 8, 'gauche');
+    const dessin = { type: 'plateforme', numero: 1, sommets, hauteur: { mode: 'fixe', altitude: 450.5, pente: null } };
+    const pf = { id: 'pf', nom: 'Plateforme 1', type: 'dessin', nature: 'terrassement', ...surfaceDuDessin(dessin, [dessin]) };
+    const surfaces = [tn, pf];
+    const triangulations = new Map(surfaces.map((s) => [s.id, calculerSurface(s, [])]));
+    const resultat = calculerVolume({ uneSeule: false, surface1Id: 'pf', surface2Id: 'tn', zone: { type: 'toute' } }, { surfaces, triangulations, pointsDe: () => [] });
+    expect(resultat.erreurs).toBeUndefined();
+    expect(resultat.remblai).toBeCloseTo(48, 3);
+    expect(resultat.deblai).toBeCloseTo(0, 6);
+  });
+});

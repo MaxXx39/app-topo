@@ -70,6 +70,7 @@ export function creerProjet(nom = '') {
     tolerancesControle: structuredClone(TOLERANCES_PAR_DEFAUT),
     controles: [],
     dessins: [],
+    couleursListes: {},
   };
 }
 
@@ -171,6 +172,7 @@ export function completerProjet(projet) {
   complet.tolerancesControle ??= structuredClone(TOLERANCES_PAR_DEFAUT);
   complet.controles ??= [];
   complet.dessins ??= [];
+  complet.couleursListes ??= {}; // couleur choisie par liste de points (id → « #2563eb »)
   complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
     nature: estImportee(surface) ? 'terrain' : 'stock',
     ...surface,

@@ -8,6 +8,7 @@
 // - TRIANGLES_<nom> : triangles de chaque surface dont le volume est calculé (faces 3D)
 // - SURFACE_<nom> : triangles des autres surfaces (faces 3D)
 // - COURBES : courbes de niveau des surfaces calculées (si demandées)
+// - DESSINS : dessins de Calculs › Dessin (contours et lignes en 3D, sommets) ; DESSINS_NOMS : PF1-1…
 //
 // Le DXF des mesures (onglet Calculs › Mesures, voir genererDxfMesures) est un fichier à part, sans volume.
 import { courbesDeNiveau } from '../topo/courbes.js';
@@ -25,8 +26,10 @@ const COULEURS = { POINTS: 7, NOMS: 8, ALTITUDES: 5, CONTOURS: 1, LIGNES_RUPTURE
  * - stocks, resultats : surfaces dont le volume est calculé, et leurs volumes (resultats[i].trianglesDessus)
  * - surfaces : liste de { nom, triangles }
  * - equidistance : équidistance des courbes de niveau (m), ou null pour ne pas en mettre
+ * - dessins : [{ ferme, lignes (vrai : relier les sommets), points: [{ nom, est, nord, altitude }] }]
+ *   (Calculs › Dessin ; altitude inconnue écrite à 0)
  */
-export function genererDxf({ points, stocks = [], resultats = [], surfaces = [], equidistance = null }) {
+export function genererDxf({ points, stocks = [], resultats = [], surfaces = [], equidistance = null, dessins = [] }) {
   const entites = [];
   const calques = new Map(Object.entries(COULEURS).filter(([nom]) => nom !== 'COURBES' || equidistance));
   const parNom = new Map(points.map((p) => [p.nom, p]));
@@ -65,6 +68,18 @@ export function genererDxf({ points, stocks = [], resultats = [], surfaces = [],
     calques.set(calque, 5);
     for (const t of surface.triangles) entites.push(face3D(t, calque));
   });
+
+  if (dessins.length > 0) {
+    calques.set('DESSINS', 6);
+    calques.set('DESSINS_NOMS', 6);
+  }
+  for (const dessin of dessins) {
+    if (dessin.lignes && dessin.points.length >= 2) entites.push(...polyligne3D(dessin.points, dessin.ferme && dessin.points.length >= 3, 'DESSINS'));
+    for (const p of dessin.points) {
+      entites.push(['0', 'POINT', '8', 'DESSINS', ...xyz(p, 0)]);
+      entites.push(['0', 'TEXT', '8', 'DESSINS_NOMS', ...xyz({ ...p, est: p.est + 0.2, nord: p.nord + 0.2 }, 0), '40', '0.3', '1', p.nom]);
+    }
+  }
 
   return ecrireDxf(calques, entites);
 }

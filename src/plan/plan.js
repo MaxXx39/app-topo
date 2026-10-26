@@ -13,6 +13,7 @@ import { pointALAbscisse } from '../topo/ligne-implantation.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne } from '../leve/libelles.js';
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS } from './dxf-canvas.js';
 import { echapper } from '../outils/echapper.js';
+import { COULEURS_LISTES } from './listes-points.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
@@ -61,7 +62,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  *   l'implantation d'un point (tolérance en m : la taille du doigt à l'échelle du plan)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe } = {}) {
   // Calques choisis (retenus dans le navigateur) ; « calques » est ce qui est dessiné : en mode
   // Base, les calques « confirme » sont lus comme décochés.
   const calquesChoisis = lireCalques();
@@ -156,6 +157,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // point), aImplanter: [{ nom, est, nord }], pointsControle: [{ nom, est, nord }] (triangles rouges),
   // choix: { est, nord } (croix), cible: { est, nord, nom } } ou null.
   let implantation = null;
+  // Couleur de chaque point d'après sa liste (menu « Afficher » ou Projet, voir listes-points.js) : Map point → couleur.
+  let couleursPoints = new Map();
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
   // Ce qu'il faut dessiner (voir editeur.js et main.js) :
@@ -281,7 +284,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     for (const { point, x, y } of visibles) {
       if (calques.points || rangs.has(point.nom)) {
         const rond = creerElement('circle', { cx: x, cy: y, r: 3.5, class: classes.get(point.nom) ?? '' });
-        const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles);
+        // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
+        const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? couleursPoints.get(point);
         if (couleur) rond.style.fill = couleur;
         groupePoints.append(rond);
       }
@@ -316,6 +320,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
             'text-anchor': place.aGauche ? 'end' : 'start',
             class: calques.noms && ligne === 0 ? '' : 'altitude',
           });
+          // Nom à la couleur de sa liste, si elle en a une.
+          const couleurListe = couleursPoints.get(visibles[i].point);
+          if (couleurListe && calques.noms && ligne === 0) element.style.fill = couleurListe;
           element.textContent = texte;
           groupeNoms.append(element);
         });
@@ -352,7 +359,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     for (const ligne of implantation.lignesAutres ?? []) {
       const ecran = ligne.sommets.map((p) => versEcran(p.est, p.nord, vue));
       const element = creerElement('path', { d: tracePar(ecran, ligne.fermee), class: 'ligne-autres' });
-      const couleur = couleurDuNom(ligne.sommets[0]?.nom, libelles);
+      const couleur = couleurDuNom(ligne.sommets[0]?.nom, libelles) ?? ligne.couleur;
       if (couleur) element.style.stroke = couleur;
       groupe.append(element);
     }
@@ -360,10 +367,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     for (const point of implantation.pointsControle ?? []) {
       const { x, y } = versEcran(point.est, point.nord, vue);
       groupe.append(creerElement('path', { d: `M${x} ${y - 8}L${x + 7} ${y + 5}H${x - 7}Z`, class: 'triangle-controle' }));
-      if (!calques.noms) continue;
-      const nom = creerElement('text', { x: x + 9, y: y - 6, class: 'nom-controle' });
-      nom.textContent = point.nom;
-      groupe.append(nom);
+      if (calques.noms) {
+        const nom = creerElement('text', { x: x + 9, y: y - 6, class: 'nom-controle' });
+        nom.textContent = point.nom;
+        groupe.append(nom);
+      }
+      // Altitude (calque « Altitudes des points »), sous le nom.
+      if (calques.altitudes && point.altitude != null) {
+        const altitude = creerElement('text', { x: x + 9, y: y + (calques.noms ? 7 : -6), class: 'altitude-controle' });
+        altitude.textContent = formaterNombre(point.altitude);
+        groupe.append(altitude);
+      }
     }
     for (const point of implantation.aImplanter ?? []) {
       const { x, y } = croix(point.est, point.nord, 'croix-a-implanter', 7);
@@ -1265,6 +1279,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   menuListes.addEventListener('change', (evenement) => {
     const id = evenement.target.dataset.liste;
     if (id) quandMontrerListe?.(id, evenement.target.checked);
+    const couleur = evenement.target.dataset.couleurListe;
+    if (couleur) quandColorerListe?.(couleur, evenement.target.value || null);
   });
   menuListes.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('[data-toutes]');
@@ -1278,7 +1294,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const TITRES_SECTIONS = { points: 'Points', surfaces: 'Surfaces / volumes', metres: 'Métrés' };
   let signatureListes = null;
   function remplirMenuListes(listes) {
-    const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}`).join('|');
+    const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}:${l.couleur}`).join('|');
     if (signature === signatureListes) return;
     signatureListes = signature;
     if (listes.length === 0) {
@@ -1291,7 +1307,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     menuListes.innerHTML = `${parties.map(([titre, liste]) => `<p class="titre-partie-menu">${titre}</p>
       ${liste.map((l) => `<div class="ligne-menu-plan">
         <label class="oeil-plan"><input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} />
-          <span class="pastille-liste liste-${l.nature}"></span><span>${echapper(l.nom)}</span></label>
+          <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span>${echapper(l.nom)}</span></label>
+        ${l.couleurModifiable ? `<select data-couleur-liste="${l.id}" aria-label="Couleur de ${echapper(l.nom)}" style="color: ${l.couleur || 'inherit'}">
+          ${COULEURS_LISTES.map(([valeur, titre]) => `<option value="${valeur}" ${(l.couleur || '') === valeur ? 'selected' : ''}>${valeur ? '●' : '◐'} ${titre}</option>`).join('')}
+        </select>` : ''}
       </div>`).join('')}`).join('')}
       <div class="ligne-outils"><button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="oui">tout</button>
         <button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="non">rien</button></div>`;
@@ -1527,6 +1546,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     /** Listes de points du menu « Points » (voir listes-points.js). */
     afficherListesPoints(listes) {
       remplirMenuListes(listes);
+    },
+    /** Couleur de chaque point d'après sa liste (Map point → couleur, voir couleursDesPoints). */
+    afficherCouleursPoints(couleurs) {
+      couleursPoints = couleurs;
     },
     /** Plans DXF à dessiner en fond (voir topo/dxf-plan.js). */
     afficherPlansDxf(nouveaux) {

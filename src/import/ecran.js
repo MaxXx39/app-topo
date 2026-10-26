@@ -17,6 +17,7 @@ import { rotationLisible } from '../topo/recalage.js';
 import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '../outils/formulaire-point.js';
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
 import { demanderCode } from '../outils/code.js';
+import { COULEURS_LISTES } from '../plan/listes-points.js';
 
 /**
  * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
@@ -85,7 +86,8 @@ export function creerEcranImport(conteneur, actions) {
       if (!(await demanderCode('Importer des points de contrôle'))) return;
       messageControle = (await actions.importerPointsControle(fichier))?.erreur ?? '';
       if (derniers) afficher(...derniers);
-    } else if (cible.dataset.champ === 'leve-actif') actions.choisirLeve(cible.value);
+    } else if (cible.dataset.champ === 'couleur-liste') actions.colorerListe(cible.dataset.id, cible.value || null);
+    else if (cible.dataset.champ === 'leve-actif') actions.choisirLeve(cible.value);
     else if (cible.dataset.champ === 'nom-leve') actions.renommerLeve(cible.dataset.id, cible.value.trim());
     else if (cible.dataset.champ === 'fichier-points' && cible.files[0]) {
       await actions.importerPoints(cible.files[0]);
@@ -166,6 +168,7 @@ export function creerEcranImport(conteneur, actions) {
                   <div class="ligne-leve ${leve.id === projet.leveActifId ? 'actif' : ''}">
                     <label class="case"><input type="radio" name="leve-actif" data-champ="leve-actif" value="${leve.id}" ${leve.id === projet.leveActifId ? 'checked' : ''} aria-label="Afficher cette liste" />
                       <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom de la liste" /></label>
+                    ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}
                     <div class="ligne-outils">
                       <span class="aide">${leve.points.length} points · ${projet.surfaces.filter((s) => s.leveId === leve.id).length} surface(s)</span>
                       <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
@@ -201,6 +204,13 @@ function afficherImportPoints({ nomFichier, format, points, erreurs, avertisseme
     html += '</ul></div>';
   }
   return html;
+}
+
+/** Couleur de la liste sur le plan (rouge réservé aux points de contrôle). */
+function choixCouleur(id, couleur) {
+  return `<select class="couleur-liste" data-champ="couleur-liste" data-id="${id}" aria-label="Couleur de la liste" style="color: ${couleur || 'inherit'}">
+    ${COULEURS_LISTES.map(([valeur, titre]) => `<option value="${valeur}" ${(couleur || '') === valeur ? 'selected' : ''}>${valeur ? '●' : '◐'} ${titre}</option>`).join('')}
+  </select>`;
 }
 
 /** Tableau repliable de points (nom, Est, Nord, altitude), sous leur liste. */

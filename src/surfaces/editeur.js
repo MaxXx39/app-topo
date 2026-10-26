@@ -5,7 +5,7 @@
 // cocher des cases, ou toucher les points sur le plan.
 // Une surface importée (LandXML, DXF) ne se modifie pas : on peut la renommer ou la supprimer.
 import { creerLigne, detecterSeries, lireListeDeNoms, verifierSurface } from '../topo/noms.js';
-import { creerSurface, estImportee, NATURES } from '../topo/surface.js';
+import { creerSurface, estImportee, origineSurface, NATURES } from '../topo/surface.js';
 import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
 import { htmlChoixPoints, resumeListe } from './choix-points.js';
@@ -378,7 +378,8 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   /** Cartes d'une surface : contour, lignes de rupture, points, triangles supprimés, état. */
   function contenuSurface(surface) {
     if (estImportee(surface)) {
-      return `<p class="aide">Importée : ${echapper(surface.nomFichier)} (${surface.type === 'dxf' ? 'DXF' : 'LandXML'})</p>${decrire?.(surface) ?? ''}${cartePhotos(surface)}`;
+      const source = surface.type === 'dessin' ? `Dessin : ${echapper(surface.nomFichier)} (mise à jour avec le dessin)` : `Importée : ${echapper(surface.nomFichier)} (${origineSurface(surface)})`;
+      return `<p class="aide">${source}</p>${decrire?.(surface) ?? ''}${cartePhotos(surface)}`;
     }
     const problemes = verifierSurface(surface, pointsDe(surface).map((p) => p.nom));
     return `

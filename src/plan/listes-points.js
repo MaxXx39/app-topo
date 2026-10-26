@@ -20,19 +20,42 @@ import { nomsDeLaMesure } from '../topo/mesure.js';
 export const LISTE_MESURES = 'mesures-calculs';
 // Identifiant de la case « Points de contrôle » (Terrain › Contrôle), dessinés en rouge.
 export const LISTE_CONTROLE = 'points-controle';
+// Couleur des points de contrôle : toujours rouge (jamais au choix).
+export const COULEUR_CONTROLE = '#dc2626';
+// Couleurs au choix d'une liste de points (demande du 26.10.2026 ; le rouge est gardé pour les
+// points de contrôle). '' = la couleur normale (celle du rôle ou du libellé).
+export const COULEURS_LISTES = [
+  ['', 'Couleur normale'],
+  ['#2563eb', 'Bleu'],
+  ['#16a34a', 'Vert'],
+  ['#ea580c', 'Orange'],
+  ['#7c3aed', 'Violet'],
+  ['#0891b2', 'Cyan'],
+  ['#db2777', 'Rose'],
+  ['#a16207', 'Brun'],
+  ['#6b7280', 'Gris'],
+  ['#000000', 'Noir'],
+];
 
 const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? []).flatMap((l) => l.noms), ...(s.points ?? [])];
 
 /**
  * Listes du projet : [{ id, nom, nature ('stock', 'terrain', 'terrassement', 'metre', 'mesures',
- * 'autres', 'fichier', 'ajoutes'), section ('points', 'surfaces', 'metres'), leveId (ou null :
- * pas de points à dessiner), noms (Set des noms de points, ou null = tous ceux du levé), visible }].
+ * 'autres', 'fichier', 'ajoutes', 'controle', 'dessin'), section ('points', 'surfaces', 'metres'),
+ * leveId (ou null : pas de points à dessiner), noms (Set des noms de points, ou null = tous ceux du
+ * levé), visible, couleur (choisie pour la liste, ou pour son levé dans Projet ; ou null),
+ * couleurModifiable (vrai pour les listes de la partie « Points », sauf les points de contrôle) }].
  */
 export function listesDePoints(projet) {
   const cachees = new Set(projet.listesCachees ?? []);
   const listes = [];
   const SECTIONS = { fichier: 'points', ajoutes: 'points', autres: 'points', controle: 'points', dessin: 'points', metre: 'metres', mesures: 'metres' };
-  const ajouter = (id, nom, nature, leveId, noms) => listes.push({ id, nom, nature, section: SECTIONS[nature] ?? 'surfaces', leveId, noms, visible: !cachees.has(id) });
+  const couleurs = projet.couleursListes ?? {};
+  const ajouter = (id, nom, nature, leveId, noms) => {
+    const section = SECTIONS[nature] ?? 'surfaces';
+    const couleur = nature === 'controle' ? COULEUR_CONTROLE : couleurs[id] ?? (leveId ? couleurs[leveId] : null) ?? null;
+    listes.push({ id, nom, nature, section, leveId, noms, visible: !cachees.has(id), couleur, couleurModifiable: section === 'points' && nature !== 'controle' });
+  };
   for (const leve of projet.leves) {
     if (leve.ajoutes) ajouter(leve.id, leve.nom, 'ajoutes', leve.id, null);
     else if (!estLeveDirect(leve)) ajouter(leve.id, leve.nom, 'fichier', leve.id, null);
@@ -80,6 +103,23 @@ export function pointsDesListes(projet, listes) {
     }
   }
   return resultat;
+}
+
+/**
+ * Couleur de chaque point dessiné, d'après la couleur de sa liste (la première liste cochée qui a
+ * une couleur) : Map point → couleur (« #2563eb »). Les points sans couleur choisie n'y sont pas.
+ */
+export function couleursDesPoints(projet, listes) {
+  const couleurs = new Map();
+  for (const liste of listes) {
+    if (!liste.visible || !liste.couleur || !liste.leveId) continue;
+    const leve = projet.leves.find((l) => l.id === liste.leveId);
+    for (const point of leve?.points ?? []) {
+      if (liste.noms && !liste.noms.has(point.nom)) continue;
+      if (!couleurs.has(point)) couleurs.set(point, liste.couleur);
+    }
+  }
+  return couleurs;
 }
 
 /** Coche (visible) ou décoche une liste. */

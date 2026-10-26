@@ -31,9 +31,12 @@ const ICONE = '<path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><
 
 /**
  * Crée le bouton dans la barre du bas "nav". actions : choisirRecepteur(), reconnecter(),
- * deconnecter(), lireReglagesCorrections() (ou null), demarrerCorrections(reglages), arreterCorrections().
- * Renvoie { mettreAJour(etat) } (appelé à chaque état du récepteur, 5 fois par seconde), et
- * ouvrir() (ouvre la fenêtre, par exemple depuis l'onglet Terrain).
+ * deconnecter(), lireReglagesCorrections() (ou null), demarrerCorrections(reglages), arreterCorrections(),
+ * et pour l'essai à 2 récepteurs (ou null sans APK qui le sait) : choisirRecepteur2(), deconnecter2(),
+ * choisirModeCorrections2('copie' ou 'ntrip'), lireReglagesCorrections2(), demarrerCorrections2(reglages),
+ * arreterCorrections2().
+ * Renvoie { mettreAJour(etat) } (appelé à chaque état du récepteur, 5 fois par seconde),
+ * mettreAJour2(etat, mode) (2e récepteur), et ouvrir() (ouvre la fenêtre, par exemple depuis l'onglet Terrain).
  */
 export function creerBoutonRecepteur(nav, actions) {
   const bouton = document.createElement('button');
@@ -43,10 +46,14 @@ export function creerBoutonRecepteur(nav, actions) {
   nav.append(bouton);
 
   let etat = null;
+  let etat2 = null; // 2e récepteur (essai)
+  let mode2 = 'copie'; // corrections du 2e : 'copie' (copie de celles du 1er) ou 'ntrip' (sa propre connexion)
   let fenetre = null;
   let reglagesOuverts = false; // roue ⚙ : réglages NTRIP
+  let reglages2Ouverts = false; // roue ⚙ du récepteur 2 : sa connexion NTRIP
   let deverrouille = false; // bon code tapé pour les réglages NTRIP (voir outils/code.js), jusqu'à la fermeture
-  const saisie = {}; // réglages NTRIP tapés, pas encore envoyés (gardés si la fenêtre se redessine)
+  // Réglages NTRIP tapés, pas encore envoyés (gardés si la fenêtre se redessine), par récepteur (1, 2).
+  const saisie = { 1: {}, 2: {} };
 
   bouton.addEventListener('click', ouvrir);
 
@@ -58,13 +65,15 @@ export function creerBoutonRecepteur(nav, actions) {
     fenetre.addEventListener('click', quandClic);
     fenetre.addEventListener('input', (evenement) => {
       const champ = evenement.target.dataset.correction;
-      if (champ && champ !== 'motDePasse') saisie[champ] = evenement.target.value;
+      const numero = evenement.target.closest('[data-numero]')?.dataset.numero ?? '1';
+      if (champ && champ !== 'motDePasse') saisie[numero][champ] = evenement.target.value;
     });
     fenetre.addEventListener('close', () => {
       fenetre.remove();
       fenetre = null;
       // Le code est redemandé à la prochaine ouverture.
       reglagesOuverts = false;
+      reglages2Ouverts = false;
       deverrouille = false;
     });
     document.body.append(fenetre);
@@ -82,30 +91,50 @@ export function creerBoutonRecepteur(nav, actions) {
     if (!cible) return;
     const { action } = cible.dataset;
     if (action === 'fermer') fenetre.close();
-    else if (action === 'reglages') basculerReglages(); else if (action === 'demarrerCorrections') {
-      const lire = (champ) => fenetre.querySelector(`[data-correction="${champ}"]`)?.value.trim() ?? '';
-      actions.demarrerCorrections({
+    else if (action === 'choisirRecepteur2') actions.choisirRecepteur2();
+    else if (action === 'deconnecter2') actions.deconnecter2();
+    else if (action === 'modeCorrections2') {
+      mode2 = cible.dataset.valeur === 'ntrip' ? 'ntrip' : 'copie';
+      actions.choisirModeCorrections2(mode2);
+      if (mode2 === 'copie') reglages2Ouverts = false;
+      dessiner();
+    } else if (action === 'reglages2') basculerReglages(2);
+    else if (action === 'reglages') basculerReglages(1);
+    else if (action === 'demarrerCorrections') {
+      // Bloc du récepteur 1 ou 2 (data-numero) : ses propres cases.
+      const bloc = cible.closest('.bloc-ntrip');
+      const numero = bloc.dataset.numero;
+      const lire = (champ) => bloc.querySelector(`[data-correction="${champ}"]`)?.value.trim() ?? '';
+      const reglages = {
         hote: lire('hote'),
         port: Number(lire('port')) || 2101,
         pointDeMontage: lire('pointDeMontage'),
         utilisateur: lire('utilisateur'),
-        motDePasse: fenetre.querySelector('[data-correction="motDePasse"]')?.value ?? '',
-      });
-      for (const cle of Object.keys(saisie)) delete saisie[cle];
+        motDePasse: bloc.querySelector('[data-correction="motDePasse"]')?.value ?? '',
+      };
+      if (numero === '2') actions.demarrerCorrections2(reglages);
+      else actions.demarrerCorrections(reglages);
+      saisie[numero] = {};
       setTimeout(dessiner, 300); // « Redémarrer », mot de passe enregistré
     } else if (action === 'arreterCorrections') {
-      actions.arreterCorrections();
+      if (cible.closest('.bloc-ntrip').dataset.numero === '2') actions.arreterCorrections2();
+      else actions.arreterCorrections();
       setTimeout(dessiner, 300);
     } else actions[action]?.();
   }
 
-  /** Roue ⚙ : ouvre ou ferme les réglages NTRIP ; les ouvrir demande le code (une fois par ouverture). */
-  async function basculerReglages() {
-    if (!reglagesOuverts && !deverrouille) {
+  /**
+   * Roue ⚙ : ouvre ou ferme les réglages NTRIP du récepteur 1 (ou 2) ; les ouvrir demande le code
+   * de sécurité (une fois par ouverture de la fenêtre).
+   */
+  async function basculerReglages(numero = 1) {
+    const ouverts = numero === 2 ? reglages2Ouverts : reglagesOuverts;
+    if (!ouverts && !deverrouille) {
       if (!(await demanderCode('Réglages des corrections (NTRIP)'))) return;
       deverrouille = true;
     }
-    reglagesOuverts = !reglagesOuverts;
+    if (numero === 2) reglages2Ouverts = !reglages2Ouverts;
+    else reglagesOuverts = !reglagesOuverts;
     dessiner();
   }
 
@@ -122,15 +151,22 @@ export function creerBoutonRecepteur(nav, actions) {
       </div>
       <div class="etat-recepteur" data-vivant="etat-recepteur"></div>
       <div class="actions-recepteur" data-vivant="actions-recepteur"></div>
-      ${reglages && reglagesOuverts ? `<div class="seulement-confirme">${blocNtrip(reglages)}</div>` : ''}`;
+      ${reglages && reglagesOuverts ? `<div class="seulement-confirme">${blocNtrip(reglages, 1)}</div>` : ''}
+      ${actions.choisirRecepteur2 ? `<div class="bloc-recepteur2 seulement-confirme">
+          <p class="titre-choix">Récepteur 2 (essai)</p>
+          <div data-vivant="etat-recepteur2"></div>
+          <div data-vivant="actions-recepteur2"></div>
+          ${mode2 === 'ntrip' && reglages2Ouverts ? blocNtrip(actions.lireReglagesCorrections2() ?? {}, 2) : ''}
+        </div>` : ''}`;
     rafraichir();
+    rafraichir2();
   }
 
   /** Réglages des corrections NTRIP (swipos), repris d'Emlid Flow, gardés sur la tablette. */
-  function blocNtrip(reglages) {
-    const valeur = (champ) => echapper(String(saisie[champ] ?? reglages[champ] ?? ''));
-    return `<div class="bloc-ntrip">
-      <p class="titre-choix">Corrections NTRIP ${bulle('corrections')}</p>
+  function blocNtrip(reglages, numero = 1) {
+    const valeur = (champ) => echapper(String(saisie[numero][champ] ?? reglages[champ] ?? ''));
+    return `<div class="bloc-ntrip" data-numero="${numero}">
+      <p class="titre-choix">Corrections NTRIP${numero === 2 ? ' du récepteur 2' : ''} ${bulle('corrections')}</p>
       <div class="champs-corrections">
         <label class="champ-large">Serveur<input type="text" data-correction="hote" value="${valeur('hote')}" placeholder="adresse (voir Emlid Flow)" autocapitalize="off" spellcheck="false" /></label>
         <label>Port<input type="text" inputmode="numeric" data-correction="port" value="${valeur('port')}" /></label>
@@ -175,7 +211,56 @@ export function creerBoutonRecepteur(nav, actions) {
     }
   }
 
+  /**
+   * Essai à 2 récepteurs : état du 2e RX2 (position, précision) et écart avec le 1er (distance en
+   * plan, différence d'altitude : sur un engin, elle doit rester à peu près constante).
+   */
+  function rafraichir2() {
+    const zoneEtat = fenetre?.querySelector('[data-vivant="etat-recepteur2"]');
+    const zoneActions = fenetre?.querySelector('[data-vivant="actions-recepteur2"]');
+    if (!zoneEtat || !zoneActions) return;
+    const connecte = Boolean(etat2?.connecte);
+    const couleur = couleurRecepteur(etat2);
+    const lignes = [];
+    const p1 = etat?.connecte && etat.recu ? etat.position : null;
+    const p2 = connecte && etat2.recu ? etat2.position : null;
+    if (p2) {
+      const statut = { 4: 'RTK FIXE', 5: 'RTK FLOTTANT' }[etat2.qualite] ?? `GNSS : ${etat2.libelleQualite ?? '?'}`;
+      lignes.push(['Position', `${statut}${etat2.nbSatellites != null ? ` · ${etat2.nbSatellites} sat.` : ''}`]);
+      lignes.push(['E / N / H', `${formaterNombre(p2.est)} / ${formaterNombre(p2.nord)} / ${formaterNombre(p2.altitude)}`]);
+      lignes.push(['Précision', `H ${formaterNombre(etat2.precisionH)} · V ${formaterNombre(etat2.precisionV)}`]);
+      if (p1) lignes.push(['Écart 1 → 2', `${formaterNombre(Math.hypot(p2.est - p1.est, p2.nord - p1.nord))} m en plan · dH ${formaterNombre(p2.altitude - p1.altitude)} m`]);
+    } else if (connecte) lignes.push(['Position', 'en attente du récepteur…']);
+    if (connecte) lignes.push(['Corrections', mode2 === 'ntrip' ? `2e connexion : ${etatCorrections(etat2?.corrections).texte}` : 'copie de celles du récepteur 1']);
+    zoneEtat.innerHTML = `<p class="pastille-etat-recepteur couleur-${couleur}"><span></span>${connecte ? echapper(etat2.bluetooth ?? 'connecté') : 'non connecté'}
+        <strong>${TEXTES_COULEURS[couleur]}</strong></p>
+      ${lignes.length > 0 ? `<dl>${lignes.map(([titre, texte]) => `<dt>${titre}</dt><dd>${echapper(texte)}</dd>`).join('')}</dl>` : ''}`;
+    // Les boutons ne changent que si la connexion, le mode ou la roue changent (le doigt peut être dessus).
+    const voulu = `${connecte}:${mode2}:${reglages2Ouverts}`;
+    if (zoneActions.dataset.etat === voulu) return;
+    zoneActions.dataset.etat = voulu;
+    const puce = (valeur, titre) => `<button type="button" class="puce-choix ${mode2 === valeur ? 'actif' : ''}" data-action="modeCorrections2" data-valeur="${valeur}">${titre}</button>`;
+    zoneActions.innerHTML = `
+      <div class="ligne-choix"><span>Corrections</span>${puce('copie', 'Copie du récepteur 1')}${puce('ntrip', '2e connexion NTRIP')}
+        ${mode2 === 'ntrip' ? `<button type="button" class="bouton-retour ${reglages2Ouverts ? 'actif' : ''}" data-action="reglages2" title="Réglages NTRIP du récepteur 2" aria-label="Réglages NTRIP du récepteur 2" aria-expanded="${reglages2Ouverts}">⚙</button>` : ''}</div>
+      <div class="ligne-outils">${connecte
+        ? '<button type="button" class="bouton-lien" data-action="deconnecter2">couper le récepteur 2</button>'
+        : '<button type="button" class="bouton-secondaire" data-action="choisirRecepteur2">Connecter un 2e récepteur</button>'}</div>`;
+  }
+
   return {
+    /** Nouvel état du 2e récepteur (essai) : la fenêtre si elle est ouverte. */
+    mettreAJour2(nouvelEtat, mode) {
+      etat2 = nouvelEtat;
+      const nouveauMode = mode === 'ntrip' ? 'ntrip' : 'copie';
+      // Le mode vient de l'appli Android (retenu sur la tablette) : on le suit.
+      if (mode && nouveauMode !== mode2) {
+        mode2 = nouveauMode;
+        if (fenetre) dessiner();
+        return;
+      }
+      rafraichir2();
+    },
     /** Nouvel état du récepteur : couleur du bouton, et la fenêtre si elle est ouverte. */
     mettreAJour(nouvelEtat) {
       // Le récepteur vient de se connecter : la fenêtre se ferme toute seule (sauf pendant les

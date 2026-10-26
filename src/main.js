@@ -8,7 +8,7 @@ import { lireLandXML } from './topo/landxml.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee, nomNature, nouvelIdentifiant } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, origineSurface, nomNature, nouvelIdentifiant } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
@@ -21,7 +21,7 @@ import { creerEcranCoupes } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
 import { creerEcranDessin } from './dessin/ecran.js';
 import { ouvrirFenetrePointTape } from './leve/fenetres-points.js';
-import { gisement, gisementNormal, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt } from './topo/dessin.js';
+import { gisement, gisementNormal, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt, surfaceDuDessin } from './topo/dessin.js';
 import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
@@ -72,11 +72,12 @@ import {
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
+import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, LISTE_CONTROLE } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant } from './topo/noms.js';
 import { demanderChoix } from './outils/choix.js';
@@ -97,7 +98,8 @@ let ongletContexte = 'projets'; // dernier onglet (hors plan) : décide de ce qu
 let calculMontre = null; // id du calcul colorié sur le plan (bouton « Voir sur le plan »)
 let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, etape: 'debut' ou 'fin', debut }
 // Calculs › Dessin : dessin en cours avec l'outil « pilote » (voir dessin/ecran.js), ou null :
-// { dessinId, toucher ('sommet' ou 'direction' : ce que fait un toucher sur le plan), direction
+// { dessinId, toucher ('sommet' ou 'direction' : ce que fait un toucher sur le plan), accroche
+// (objet pris en touchant : 'point', 'sommet', 'milieu', 'ligne', 'centre', voir topo/accroche.js), direction
 // (gisement en gon, ou null), distance (texte tapé), reference (nom du point visé, ou null) }.
 let pilote = null;
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
@@ -366,7 +368,7 @@ function etiquetteSurface(surface) {
   const nature = nomNature(surface.nature);
   const precisions = [];
   if (nature && !surface.nom.toLowerCase().includes(nature.toLowerCase())) precisions.push(nature.toLowerCase());
-  if (estImportee(surface)) precisions.push(surface.type === 'dxf' ? 'DXF' : 'LandXML');
+  if (estImportee(surface)) precisions.push(origineSurface(surface));
   const texte = precisions.length > 0 ? `${surface.nom} (${precisions.join(', ')})` : surface.nom;
   const leve = projet.leves.find((l) => l.id === surface.leveId);
   return projet.leves.length > 1 && leve ? `${texte} · ${leve.nom}` : texte;
@@ -384,6 +386,7 @@ function calculDuPlan(surface) {
 // --- Écrans ---
 
 const ecranImport = creerEcranImport(document.querySelector('#importer'), {
+  colorerListe: (id, couleur) => colorerListe(id, couleur),
   importerPointsControle: (fichier) => importerPointsControle(fichier),
   importerPoints: async (fichier) => {
     try {
@@ -585,8 +588,19 @@ const boutonRecepteur = recepteurDisponible()
         arreterCorrections();
         afficherMessage('Corrections arrêtées : Emlid Flow peut reprendre');
       },
+      // Essai à 2 récepteurs (mode Confirmé) : seulement avec un APK qui le sait.
+      choisirRecepteur2: recepteur2Disponible() ? choisirRecepteur2 : null,
+      deconnecter2: deconnecterRecepteur2,
+      choisirModeCorrections2,
+      lireReglagesCorrections2,
+      demarrerCorrections2: (reglages) => {
+        demarrerCorrections2(reglages);
+        afficherMessage('Récepteur 2 : connexion à swipos…');
+      },
+      arreterCorrections2,
     })
   : null;
+if (boutonRecepteur && recepteur2Disponible()) ecouterRecepteur2((etat, mode) => boutonRecepteur.mettreAJour2(etat, mode));
 
 const ecranLeve = recepteurDisponible()
   ? creerEcranLeve(document.querySelector('#leve-direct'), {
@@ -1053,7 +1067,7 @@ function envoyerImplantationAuPlan() {
   plan.afficherImplantation(accrocheActive || avecPilote || projet.aImplanter.length > 0 || lignesAutres.length > 0 || pointsControle.length > 0 || cibleControle || dessinsVisibles().length > 0
     ? {
         actif: accrocheActive || avecPilote,
-        dessins: dessinsVisibles().map((d) => ({ ...d, noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom) })),
+        dessins: dessinsVisibles().map((d) => ({ ...d, noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom), couleur: projet.couleursListes?.[d.id] ?? null })),
         actifId: avecPilote ? pilote.dessinId : null,
         pilote: avecPilote ? { direction: pilote.direction, distance: lireNombreTape(pilote.distance) ?? null } : null,
         aImplanter: projet.aImplanter,
@@ -1068,6 +1082,14 @@ function envoyerImplantationAuPlan() {
     : null);
 }
 
+/** Couleur choisie pour une liste de points (null : la couleur normale). Les points de contrôle restent rouges. */
+function colorerListe(id, couleur) {
+  projet.couleursListes ??= {};
+  if (couleur) projet.couleursListes[id] = couleur;
+  else delete projet.couleursListes[id];
+  modifie();
+}
+
 /** Lignes des levés « Autres » visibles : [{ sommets: [{ est, nord }], fermee }]. */
 function lignesDesAutres() {
   const cachees = new Set(projet.listesCachees ?? []);
@@ -1077,7 +1099,7 @@ function lignesDesAutres() {
     const parNom = new Map((projet.leves.find((l) => l.id === autres.leveId)?.points ?? []).map((p) => [p.nom, p]));
     for (const ligne of autres.lignesRupture) {
       const sommets = ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean);
-      if (sommets.length >= 2) lignes.push({ sommets, fermee: Boolean(ligne.fermee) });
+      if (sommets.length >= 2) lignes.push({ sommets, fermee: Boolean(ligne.fermee), couleur: projet.couleursListes?.[autres.id] ?? null });
     }
   }
   return lignes;
@@ -1165,7 +1187,7 @@ const dessinDe = (id) => projet.dessins.find((d) => d.id === id);
 
 /** Pilote pour dessiner "dessin" : toucher le plan pose un sommet au début, puis donne la direction. */
 function nouveauPilote(dessin) {
-  return { dessinId: dessin.id, toucher: dessin.sommets.length > 0 && dessin.type !== 'points' ? 'direction' : 'sommet', direction: null, distance: '', reference: null };
+  return { dessinId: dessin.id, toucher: dessin.sommets.length > 0 && dessin.type !== 'points' ? 'direction' : 'sommet', accroche: pilote?.accroche ?? 'point', direction: null, distance: '', reference: null };
 }
 
 const auMillimetre = (valeur) => (valeur == null ? null : Math.round(valeur * 1000) / 1000);
@@ -1180,15 +1202,28 @@ function ajouterSommetDessin(point) {
 }
 
 /**
- * Toucher le plan pendant un dessin : on s'accroche à un point du projet, à un sommet d'un dessin,
- * ou à un sommet du plan DXF (sinon l'endroit touché) ; puis sommet ou direction selon le pilote.
+ * Toucher le plan pendant un dessin : on s'accroche à un objet selon l'accroche choisie (point du
+ * projet, sommet, milieu, sur une ligne ou centre : du plan DXF et des dessins), jamais à un endroit
+ * vide (demande du 26.10.2026) ; puis point de départ (sommet) ou direction selon le pilote.
  */
 function toucherPourDessin(position, tolerance) {
   const dessin = dessinDe(pilote.dessinId);
-  const pointsProches = [...pointsDuProjet(), ...projet.dessins.flatMap((d) => d.sommets.map((s, i) => ({ ...s, nom: `${d.nom} · ${i + 1}` })))];
-  const trouve = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsProches })
-    ?? accrocher('sommet', position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance));
-  const point = trouve ?? { ...position, altitude: null };
+  const accroche = pilote.accroche ?? 'point';
+  let sources;
+  if (accroche === 'point') sources = { lignes: [], cercles: [], points: pointsDuProjet() };
+  else {
+    // Plan DXF, et les côtés des autres dessins (le dessin en cours aussi, pour s'accrocher à ses sommets).
+    const dxf = sourcesDesPlans(plansDuProjet(), position, tolerance);
+    const lignesDessins = projet.dessins.filter((d) => d.type !== 'points' && d.sommets.length >= 2).map((d) => ({ points: d.sommets, ferme: estFerme(d) && d.sommets.length >= 3 }));
+    sources = { ...dxf, lignes: [...dxf.lignes, ...lignesDessins] };
+  }
+  const trouve = accrocher(accroche, position, tolerance, sources);
+  if (!trouve) {
+    const quoi = { point: 'aucun point', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[accroche];
+    afficherMessage(`${quoi[0].toUpperCase()}${quoi.slice(1)} sous le doigt`, 3000);
+    return;
+  }
+  const point = trouve;
   if (pilote.toucher === 'direction' && dessin.sommets.length > 0) {
     const gon = gisement(dessin.sommets.at(-1), point);
     if (gon == null) return;
@@ -1209,6 +1244,30 @@ function montrerPilote() {
   plan.rafraichirImplantation();
 }
 
+/**
+ * Surfaces faites d'un dessin (plateforme, bâtiment) : remises à jour avec leur dessin à chaque
+ * modification ; enlevées si le dessin est supprimé. Si le dessin ne donne plus de surface
+ * (altitude effacée…), la surface garde sa dernière forme et la raison est notée (erreurDessin).
+ */
+function synchroniserSurfacesDessins() {
+  const avant = projet.surfaces.length;
+  projet.surfaces = projet.surfaces.filter((s) => !s.dessinId || projet.dessins.some((d) => d.id === s.dessinId));
+  for (const surface of projet.surfaces) {
+    if (!surface.dessinId) continue;
+    const dessin = dessinDe(surface.dessinId);
+    const { points, faces, erreur } = surfaceDuDessin(dessin, projet.dessins);
+    surface.nomFichier = dessin.nom;
+    if (erreur) {
+      surface.erreurDessin = erreur;
+      continue;
+    }
+    delete surface.erreurDessin;
+    surface.points = points;
+    surface.faces = faces;
+  }
+  if (projet.surfaces.length !== avant) editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+}
+
 /** Sommets de tous les dessins, prêts à implanter (« PF1-1 »…, avec leur altitude). */
 function pointsDesDessins() {
   return projet.dessins.flatMap((d) => pointsDuDessin(d, projet.dessins));
@@ -1225,7 +1284,18 @@ function donneesDessin() {
   return {
     dessins: projet.dessins.map((d) => {
       const ferme = estFerme(d) && d.sommets.length >= 3;
-      return { ...d, perimetre: longueursCotes(d.sommets, ferme).reduce((somme, l) => somme + l, 0), aire: ferme ? airePolygone(d.sommets) : 0, altitudes: altitudesDuDessin(d), noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom) };
+      const surface = projet.surfaces.find((s) => s.dessinId === d.id);
+      return {
+        ...d,
+        perimetre: longueursCotes(d.sommets, ferme).reduce((somme, l) => somme + l, 0),
+        aire: ferme ? airePolygone(d.sommets) : 0,
+        altitudes: altitudesDuDessin(d),
+        noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom),
+        // Plateforme, bâtiment : sa surface de terrassement (nom, et pourquoi elle n'est pas à jour), ou
+        // pourquoi on ne peut pas encore la créer.
+        surface: surface ? { nom: surface.nom, erreur: surface.erreurDessin ?? null } : null,
+        empecheSurface: estFerme(d) ? (surfaceDuDessin(d, projet.dessins).erreur ?? null) : null,
+      };
     }),
     pilote,
     recepteur: recepteurDisponible(),
@@ -1253,9 +1323,23 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   },
   supprimerDessin: (id) => {
     const dessin = dessinDe(id);
-    if (!dessin || !confirm(`Supprimer « ${dessin.nom} » ?`)) return;
+    const avecSurface = projet.surfaces.some((s) => s.dessinId === id);
+    if (!dessin || !confirm(`Supprimer « ${dessin.nom} »${avecSurface ? ' et sa surface' : ''} ?`)) return;
     projet.dessins = projet.dessins.filter((d) => d.id !== id);
     if (pilote?.dessinId === id) pilote = null;
+    modifie(); // sa surface part avec lui (voir synchroniserSurfacesDessins)
+  },
+  creerSurfaceDessin: (id) => {
+    const dessin = dessinDe(id);
+    if (!dessin || projet.surfaces.some((s) => s.dessinId === id)) return;
+    const { points, faces, erreur } = surfaceDuDessin(dessin, projet.dessins);
+    if (erreur) {
+      afficherMessage(`Surface impossible : ${erreur}`, 4000);
+      return;
+    }
+    projet.surfaces.push({ id: nouvelIdentifiant(), nom: dessin.nom, type: 'dessin', nature: 'terrassement', nomFichier: dessin.nom, dessinId: id, points, faces });
+    editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+    afficherMessage(`Surface « ${dessin.nom} » créée (Calculs › Surfaces, terrassement)`, 4000);
     modifie();
   },
   renommerDessin: (id, nom) => {
@@ -1263,6 +1347,11 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     if (!dessin || !nom) return;
     dessin.nom = nom;
     modifie();
+  },
+  choisirAccrocheDessin: (mode) => {
+    if (!pilote) return;
+    pilote.accroche = MODES_ACCROCHE.includes(mode) ? mode : 'point';
+    recalculer();
   },
   choisirToucher: (mode) => {
     if (!pilote) return;
@@ -1285,7 +1374,11 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     montrerPilote();
   },
   tournerDirection: (sens) => {
-    if (pilote?.direction == null) return;
+    if (!pilote) return;
+    if (pilote.direction == null) {
+      afficherMessage('Donne d\'abord la direction : touche le plan, ou tape un gisement en gon', 4000);
+      return;
+    }
     pilote.direction = gisementNormal(pilote.direction + (sens === 'droite' ? 100 : -100));
     pilote.reference = null;
     recalculer();
@@ -1346,7 +1439,11 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   },
   rectangleDessin: ({ longueur, largeur, cote }) => {
     const dessin = dessinDe(pilote?.dessinId);
-    if (!dessin || dessin.sommets.length !== 1 || pilote.direction == null) return;
+    if (!dessin || dessin.sommets.length !== 1) return;
+    if (pilote.direction == null) {
+      afficherMessage('Rectangle : donne d\'abord la direction de la longueur (touche le plan, ou tape un gisement)', 4000);
+      return;
+    }
     const a = dessin.sommets[0];
     const { sommets, erreur } = rectangle(a, pointSelonGisement(a, pilote.direction, 1), lireNombreTape(longueur), lireNombreTape(largeur), cote);
     if (erreur) {
@@ -2628,6 +2725,8 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandReglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
   // Menu « Points » : cocher / décocher une liste de points ('*' : toutes). Pas une modification
   // du travail (rien à annuler) : on redessine et on enregistre.
+  // Couleur d'une liste (menu « Afficher » ; aussi dans Projet › Listes de points).
+  quandColorerListe: (id, couleur) => colorerListe(id, couleur),
   quandMontrerListe: (id, visible) => {
     if (id === '*') projet.listesCachees = visible ? [] : listesDePoints(projet).map((l) => l.id);
     else montrerListe(projet, id, visible);
@@ -2861,6 +2960,10 @@ creerEcranExport(document.querySelector('#export'), {
       },
       points: leve?.points ?? [],
       fichierPoints: leve?.nom ?? '',
+      // Dessins (Calculs › Dessin) cochés dans « Afficher » : DXF (calque DESSINS) et PDF.
+      dessins: dessinsVisibles()
+        .filter((d) => d.sommets.length > 0)
+        .map((d) => ({ ferme: estFerme(d), lignes: d.type !== 'points', points: pointsDuDessin(d, projet.dessins) })),
       // Photos des surfaces affichées (case « Photos » de l'export).
       photos: surfacesAffichees().flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom }))),
       cartouche: projet.cartouche,
@@ -2929,6 +3032,7 @@ function recalculer({ recadrer = false } = {}) {
   // Pendant une modification (surface, mesure), comme avant : les points et surfaces du levé affiché.
   const listes = listesDePoints(projet);
   plan.afficherListesPoints(listes);
+  plan.afficherCouleursPoints(couleursDesPoints(projet, listes));
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
   const dansSurfaces = ongletContexte === 'surfaces';
@@ -3039,6 +3143,7 @@ let minuterie = null;
 
 /** Après chaque modification : recalcule, retient l'étape (Annuler), puis enregistre un court instant plus tard. */
 function modifie(options) {
+  synchroniserSurfacesDessins();
   // Une surface supprimée : ses calculs de volume disparaissent avec elle.
   projet.calculs = nettoyerCalculs(projet.calculs, projet.surfaces);
   recalculer(options);

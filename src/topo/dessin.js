@@ -218,3 +218,78 @@ export function coteSousLeDoigt(position, tolerance, cotes) {
   }
   return meilleur?.cote ?? null;
 }
+
+// --- Plateforme ou bâtiment → surface de terrassement (Calculs › Surfaces) ---
+
+/** Aire signée (m²) : positive si les sommets tournent dans le sens inverse des aiguilles d'une montre. */
+function aireSignee(sommets) {
+  let double = 0;
+  for (let i = 0; i < sommets.length; i++) {
+    const a = sommets[i];
+    const b = sommets[(i + 1) % sommets.length];
+    double += a.est * b.nord - b.est * a.nord;
+  }
+  return double / 2;
+}
+
+/** Vrai si deux côtés non voisins du contour fermé se coupent. */
+export function contourSeCroise(sommets) {
+  const n = sommets.length;
+  const cote = (a, b, c) => Math.sign((b.est - a.est) * (c.nord - a.nord) - (b.nord - a.nord) * (c.est - a.est));
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue; // côtés voisins : ils se touchent au sommet commun
+      const [a, b] = [sommets[i], sommets[(i + 1) % n]];
+      const [c, d] = [sommets[j], sommets[(j + 1) % n]];
+      if (cote(a, b, c) * cote(a, b, d) < 0 && cote(c, d, a) * cote(c, d, b) < 0) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Triangles d'un polygone simple (même en forme de L), par la méthode des « oreilles » : on coupe
+ * un à un les coins saillants qui ne contiennent aucun autre sommet. Renvoie [[i, j, k]] (numéros
+ * des sommets), ou null si le contour se croise (aucune oreille trouvée).
+ */
+export function trianglesPolygone(sommets) {
+  const n = sommets.length;
+  if (n < 3 || contourSeCroise(sommets)) return null;
+  const sens = aireSignee(sommets) >= 0 ? 1 : -1;
+  const restants = sommets.map((_, i) => i);
+  const triangles = [];
+  const produit = (a, b, c) => ((b.est - a.est) * (c.nord - a.nord) - (b.nord - a.nord) * (c.est - a.est)) * sens;
+  const dedans = (p, a, b, c) => produit(a, b, p) > 1e-12 && produit(b, c, p) > 1e-12 && produit(c, a, p) > 1e-12;
+  let garde = 0;
+  while (restants.length > 3 && garde++ < n * n) {
+    let coupe = false;
+    for (let k = 0; k < restants.length; k++) {
+      const [ia, ib, ic] = [restants[(k + restants.length - 1) % restants.length], restants[k], restants[(k + 1) % restants.length]];
+      const [a, b, c] = [sommets[ia], sommets[ib], sommets[ic]];
+      if (produit(a, b, c) <= 1e-12) continue; // coin rentrant (ou plat)
+      if (restants.some((i) => i !== ia && i !== ib && i !== ic && dedans(sommets[i], a, b, c))) continue;
+      triangles.push([ia, ib, ic]);
+      restants.splice(k, 1);
+      coupe = true;
+      break;
+    }
+    if (!coupe) return null;
+  }
+  if (restants.length === 3) triangles.push(restants.slice());
+  return triangles;
+}
+
+/**
+ * Surface d'une plateforme ou d'un bâtiment : { points: [{ nom, est, nord, altitude }], faces:
+ * [[i, j, k]] } (même forme qu'une surface importée), ou { erreur } (moins de 3 sommets, une
+ * altitude manque, contour qui se croise).
+ */
+export function surfaceDuDessin(dessin, dessins) {
+  if (!estFerme(dessin) || dessin.sommets.length < 3) return { erreur: 'il faut au moins 3 sommets' };
+  const points = pointsDuDessin(dessin, dessins);
+  const sans = points.filter((p) => p.altitude == null).map((p) => p.nom);
+  if (sans.length > 0) return { erreur: `altitude manquante : ${sans.join(', ')}` };
+  const faces = trianglesPolygone(points);
+  if (!faces) return { erreur: 'le contour se croise' };
+  return { points, faces };
+}

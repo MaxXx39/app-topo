@@ -94,11 +94,13 @@ export const COULEURS = {
  *   sous la légende de la première feuille
  * - coupes : coupes à imprimer [{ nom, debut, fin, exageration, profils: [{ nom, nature, lignes }] }] :
  *   leur trait sur le plan, et une feuille « Coupes » (A4)
+ * - dessins : dessins de Calculs › Dessin [{ ferme, lignes, points: [{ nom, est, nord }] }] : traits
+ *   violets et nom des sommets sur le plan
  * Renvoie (après chargement éventuel de la photo aérienne)
  * { document, echelle, format, messageFond } : document jsPDF, échelle utilisée, format de la
  * première feuille ('a4' ou 'a3'), et un message (fond non mis, plan coupé...) ou null.
  */
-export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [], photos = [], coupes = [] }) {
+export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [], photos = [], coupes = [], dessins = [] }) {
   const choix = { ...CALQUES_PDF, ...calques };
   // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre.
   if (choix.ecarts) choix.couleurs = false;
@@ -136,10 +138,10 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
 
   // Feuille des volumes (sauf s'il n'y a que des comparaisons)
   if (calcules.length > 0 || comparaisonsCalculees.length === 0) {
-    const contenu = contenuDuPlan(calcules, points, coupes);
+    const contenu = contenuDuPlan(calcules, points, coupes, dessins);
     nouvelleFeuille(formatDuPlan(contenu.zone));
     dessinerCadres(doc);
-    const plan = await dessinerPlan(doc, calcules, contenu, echelleImposee, choix, coupes);
+    const plan = await dessinerPlan(doc, calcules, contenu, echelleImposee, choix, coupes, dessins);
     const yLibre = dessinerColonne(doc, calcules, { ...cartouche, echelle: plan.echelle }, { choix, relief: plan.relief, ecarts: plan.legendeEcarts, comparaisons });
     placerPhotos(yLibre);
     echelle = plan.echelle;
@@ -421,7 +423,7 @@ async function dessinerPageComparaison(doc, { nom, description, resultat }, cart
  * lignes, sommets des triangles), ou tous s'il n'y a aucune surface, et la zone du terrain à
  * dessiner (points montrés et triangles). Renvoie { parNom, pointsMontres, zone } (zone null si vide).
  */
-function contenuDuPlan(calcules, points, coupes = []) {
+function contenuDuPlan(calcules, points, coupes = [], dessins = []) {
   const parNom = new Map(points.map((p) => [p.nom, p]));
   const sommets = calcules.flatMap(({ resultat }) => resultat.trianglesDessus.flat());
   const noms = new Set([
@@ -431,7 +433,9 @@ function contenuDuPlan(calcules, points, coupes = []) {
   const pointsMontres = noms.size > 0 ? [...noms].map((nom) => parNom.get(nom)).filter(Boolean) : points;
   // Les coupes doivent se voir en entier sur le plan.
   const boutsDesCoupes = coupes.flatMap((coupe) => [coupe.debut, coupe.fin]);
-  return { parNom, pointsMontres, zone: zoneDe([...pointsMontres, ...sommets, ...boutsDesCoupes]) };
+  // Les dessins aussi (plateformes, bâtiments…).
+  const sommetsDessins = dessins.flatMap((d) => d.points);
+  return { parNom, pointsMontres, zone: zoneDe([...pointsMontres, ...sommets, ...boutsDesCoupes, ...sommetsDessins]) };
 }
 
 /**
@@ -440,7 +444,7 @@ function contenuDuPlan(calcules, points, coupes = []) {
  * Renvoie { echelle, messageFond, relief, legendeEcarts } (relief : plage d'altitudes et
  * équidistance ; legendeEcarts : paliers remblai / déblai ; pour les légendes).
  */
-async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, echelleImposee, choix, coupes = []) {
+async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, echelleImposee, choix, coupes = [], dessins = []) {
   if (!zone) return { echelle: echelleImposee ?? 500, messageFond: null, relief: null, legendeEcarts: null };
   const projection = preparerProjection(zone, echelleImposee);
   const { echelle, versPapier } = projection;
@@ -507,6 +511,7 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
   trait(doc, COULEURS.contour, 0.35);
   for (const { stock } of calcules) polyligne(stock.contour ?? [], true);
 
+  dessinerDessinsPdf(doc, dessins, versPapier, choix);
   dessinerPointsPdf(doc, pointsMontres, versPapier, echelle, choix);
 
   // Nom et volume de chaque stock, dans une étiquette blanche
@@ -534,6 +539,27 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
   dessinerTraitsCoupes(doc, coupes, versPapier);
   terminerCadrePlan(doc, echelle, sources);
   return { echelle, messageFond, relief, legendeEcarts };
+}
+
+/** Dessins (Calculs › Dessin) : traits violets, sommets en petits carrés et leur nom (calque « noms »). */
+function dessinerDessinsPdf(doc, dessins, versPapier, choix) {
+  const violet = [124, 58, 237];
+  for (const dessin of dessins) {
+    const papier = dessin.points.map(versPapier);
+    trait(doc, violet, 0.3);
+    if (dessin.lignes) {
+      for (let i = 0; i + 1 < papier.length; i++) doc.line(papier[i].x, papier[i].y, papier[i + 1].x, papier[i + 1].y);
+      if (dessin.ferme && papier.length >= 3) doc.line(papier.at(-1).x, papier.at(-1).y, papier[0].x, papier[0].y);
+    }
+    doc.setFillColor(...violet);
+    doc.setFontSize(5.5);
+    doc.setTextColor(...violet);
+    papier.forEach((p, i) => {
+      doc.rect(p.x - 0.5, p.y - 0.5, 1, 1, 'F');
+      if (choix.noms) doc.text(dessin.points[i].nom, p.x + 0.9, p.y - 0.7);
+    });
+    doc.setTextColor(...COULEURS.texte);
+  }
 }
 
 /**

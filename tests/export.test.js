@@ -280,3 +280,32 @@ describe('exports des mesures (onglet 3. Mesures)', async () => {
     expect(document.output()).toContain('L30');
   });
 });
+
+describe('dessins dans le DXF', async () => {
+  const { genererDxf } = await import('../src/export/dxf.js');
+  it('calques DESSINS et DESSINS_NOMS : contour fermé 3D et noms des sommets', () => {
+    const points = [
+      { nom: 'PF1-1', est: 2500000, nord: 1100000, altitude: 450.2 },
+      { nom: 'PF1-2', est: 2500012, nord: 1100000, altitude: 450.2 },
+      { nom: 'PF1-3', est: 2500012, nord: 1100008, altitude: 450.2 },
+    ];
+    const texte = genererDxf({ points: [], dessins: [{ ferme: true, lignes: true, points }] });
+    expect(texte).toContain('DESSINS_NOMS');
+    expect(texte).toContain('PF1-3');
+    expect(texte).toMatch(/POLYLINE\r?\n\s*8\r?\nDESSINS/);
+    expect(texte).toContain('450.200');
+  });
+});
+
+describe('dessins dans le PDF', async () => {
+  const { creerPdf } = await import('../src/export/pdf.js');
+  it('noms des sommets sur le plan', async () => {
+    const points = [
+      { nom: 'BAT1-1', est: 2500000, nord: 1100000, altitude: null },
+      { nom: 'BAT1-2', est: 2500012, nord: 1100000, altitude: null },
+      { nom: 'BAT1-3', est: 2500012, nord: 1100008, altitude: null },
+    ];
+    const { document } = await creerPdf({ stocks: [], resultats: [], points: [], cartouche: {}, dessins: [{ ferme: true, lignes: true, points }] });
+    expect(document.output()).toContain('BAT1-2');
+  });
+});

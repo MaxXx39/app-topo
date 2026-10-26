@@ -52,7 +52,12 @@ export function creerSurface(nom, leveId, nature = 'stock') {
 
 /** Vrai si la surface a été importée d'un fichier (LandXML, DXF) et non créée à partir de points. */
 export function estImportee(surface) {
-  return surface.type === 'landxml' || surface.type === 'dxf';
+  return surface.type === 'landxml' || surface.type === 'dxf' || surface.type === 'dessin';
+}
+
+/** D'où vient une surface importée : « LandXML », « DXF » ou « Dessin » (plateforme ou bâtiment dessiné). */
+export function origineSurface(surface) {
+  return { dxf: 'DXF', landxml: 'LandXML', dessin: 'Dessin' }[surface.type] ?? '';
 }
 
 /**

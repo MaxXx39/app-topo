@@ -58,7 +58,7 @@ const NATURES_TERRAIN = [
 ];
 // Accroches : un dessin (en gris ce qu'on touche, en ambre l'endroit accroché) et un mot dessous.
 // [mot, nom complet (bulle, lecture d'écran), dessin].
-const ACCROCHES = {
+export const ACCROCHES = {
   // Implantation d'une ligne : la ligne entière du plan DXF (polyligne).
   trait: ['Ligne DXF', 'Ligne entière du plan DXF (polyligne)', '<path class="repere-trait" d="M3 18 9 8l6 6 6-9" /><circle cx="3" cy="18" r="1.6" /><circle cx="21" cy="5" r="1.6" />'],
   // Point du projet : le même rond gris que les points du plan, entouré d'ambre (accroché).
