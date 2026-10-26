@@ -225,3 +225,24 @@ describe('levé libre', () => {
     expect(creerAutres({}, { id: 'l1' }).nom).toBe('Levé libre 1');
   });
 });
+
+describe('supprimer un levé du Terrain', async () => {
+  const { supprimerLevee, pointsDeLaLevee } = await import('../src/topo/leve-direct.js');
+
+  it('enlève la surface et ses points, garde ceux d\'une autre surface du même jour', () => {
+    const { projet, leve, stock } = nouveauLeve();
+    const a = lever(projet, leve, stock, 'contour');
+    const b = lever(projet, leve, stock, 'contour');
+    const autre = creerSurfaceDirecte(projet, leve, 'terrain');
+    const c = lever(projet, leve, autre, 'ligne');
+    autre.points.push(b); // b sert aussi au terrain naturel
+    expect(pointsDeLaLevee(projet, stock.id)).toEqual([a]);
+    expect(supprimerLevee(projet, stock.id)).toEqual({ nom: 'Stock 1', points: 1 });
+    expect(projet.surfaces.map((s) => s.nom)).toEqual(['Terrain naturel 1']);
+    expect(leve.points.map((p) => p.nom)).toEqual([b, c]);
+    // Dernière surface du levé : le levé du jour, vide, part aussi.
+    supprimerLevee(projet, autre.id);
+    expect(projet.leves).toHaveLength(0);
+    expect(supprimerLevee(projet, 'inconnu')).toBeNull();
+  });
+});

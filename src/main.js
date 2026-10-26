@@ -67,6 +67,8 @@ import {
   basculerFermeture,
   ligneEnCours,
   resumeStock,
+  supprimerLevee,
+  pointsDeLaLevee,
 } from './topo/leve-direct.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
@@ -76,7 +78,7 @@ import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/regla
 import { sonValidation, sonRefus } from './outils/son.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant } from './topo/noms.js';
 import { demanderChoix } from './outils/choix.js';
@@ -637,6 +639,22 @@ const ecranLeve = recepteurDisponible()
         if (!levee) return;
         levee.nom = nom;
         modifie();
+      },
+      // Croix rouge de « Changer » (Confirmé) : le levé et ses points, après confirmation.
+      supprimerLevee: (id) => {
+        const levee = [...projet.surfaces, ...projet.metres, ...projet.autres].find((s) => s.id === id);
+        if (!levee) return false;
+        const nombre = pointsDeLaLevee(projet, id).length;
+        if (!confirm(`Supprimer « ${levee.nom} » et ${nombre} point(s) ?\n\nLa suppression est définitive.`)) return false;
+        const resultat = supprimerLevee(projet, id);
+        if (leveDirect.stockId === id) {
+          leveDirect.stockId = null;
+          reprendreLeveDirect();
+        }
+        editeurSurfaces.charger(projet.surfaces);
+        afficherMessage(`« ${resultat.nom} » supprimé (${resultat.points} point(s))`, 3000);
+        modifie({ recadrer: true });
+        return true;
       },
       choisirStock: (id) => {
         leveDirect.stockId = id;
@@ -3002,20 +3020,27 @@ const ecranMesures = creerEcranMesures(document.querySelector('#mesures'), docum
   },
 });
 
-/** Mesures du levé affiché, avec leur résultat : [{ mesure, resultat }]. */
-function mesuresAffichees() {
-  const leve = leveActif(projet);
-  return projet.mesures.filter((m) => m.leveId === leve?.id).map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }));
-}
-
 // Export des mesures : à part de celui des volumes (aucun volume dedans).
+/** Vrai si cette liste (surface, métré, dessin, levé…) est cochée dans « Afficher ». */
+const estAffichee = (id) => !(projet.listesCachees ?? []).includes(id);
+
 creerEcranExportMesures(document.querySelector('#export-mesures'), {
-  obtenirDonnees: () => {
-    const leve = leveActif(projet);
+  // « Quoi exporter ? » : chaque métré, et chaque mesure faite à la main ; cochés comme « Afficher ».
+  obtenirGroupes: () => [
+    { titre: 'Métrés', elements: projet.metres.map((m) => ({ id: m.id, nom: m.nom, defaut: estAffichee(m.id) })) },
+    { titre: 'Mesures', elements: projet.mesures.filter((m) => !m.metreId).map((m) => ({ id: m.id, nom: m.nom, defaut: estAffichee(LISTE_MESURES) })) },
+  ],
+  obtenirDonnees: (selection) => {
+    const mesures = projet.mesures
+      .filter((m) => selection.has(m.metreId ?? m.id))
+      .map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }))
+      .filter(({ resultat }) => resultat && !resultat.erreurs);
+    // Les points des levés de ces mesures.
+    const leves = projet.leves.filter((l) => mesures.some(({ mesure }) => mesure.leveId === l.id));
     return {
-      mesures: mesuresAffichees().filter(({ resultat }) => resultat && !resultat.erreurs),
-      points: leve?.points ?? [],
-      fichierPoints: leve?.nom ?? '',
+      mesures,
+      points: leves.flatMap((l) => l.points),
+      fichierPoints: leves.map((l) => l.nom).join(', '),
       cartouche: projet.cartouche,
     };
   },
@@ -3029,25 +3054,46 @@ function calculsReussis() {
 }
 
 creerEcranExport(document.querySelector('#export'), {
-  obtenirDonnees: () => {
-    const leve = leveActif(projet);
+  // « Quoi exporter ? » : volumes, surfaces (par nature), dessins, listes de points ; cochés comme « Afficher ».
+  obtenirGroupes: () => {
+    const surfacesDe = (natures) => projet.surfaces.filter((s) => natures.includes(s.nature ?? 'stock')).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
+    return [
+      { titre: 'Volumes', elements: projet.calculs.map((c) => ({ id: c.id, nom: nomDuCalcul(c, projet.surfaces), defaut: estAffichee(c.surface1Id) })) },
+      { titre: 'Stocks', elements: surfacesDe(['stock']) },
+      { titre: 'Terrain naturel', elements: surfacesDe(['terrain']) },
+      { titre: 'Terrassement', elements: surfacesDe(['terrassement']) },
+      { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
+      {
+        titre: 'Listes de points',
+        elements: projet.leves.map((l) => ({
+          id: l.id,
+          nom: l.nom,
+          // Levé du récepteur : coché si c'est le levé affiché ; fichier importé : comme « Afficher ».
+          defaut: estLeveDirect(l) ? l.id === projet.leveActifId : estAffichee(l.id),
+        })),
+      },
+    ];
+  },
+  obtenirDonnees: (selection) => {
+    const leves = projet.leves.filter((l) => selection.has(l.id));
+    const choisi = ({ calcul }) => selection.has(calcul.id);
     const surfaceDe = (id) => projet.surfaces.find((s) => s.id === id);
     const nom = (calcul) => nomDuCalcul(calcul, projet.surfaces);
     // Feuille principale du PDF : calculs sur toute la surface 1 ; les calculs limités au
     // contour d'une surface ont chacun leur feuille.
     const dansUnContour = ({ calcul }) => !calcul.uneSeule && calcul.zone?.type === 'surface';
-    const principaux = calculsReussis().filter((c) => !dansUnContour(c));
-    const affichees = surfacesAffichees();
+    const principaux = calculsReussis().filter((c) => choisi(c) && !dansUnContour(c));
+    const affichees = projet.surfaces.filter((s) => selection.has(s.id));
     const creees = affichees.filter((s) => !estImportee(s));
     return {
       nomProjet: titreProjet(projet),
       stocks: principaux.map(({ calcul }) => ({ ...surfaceDe(calcul.surface1Id), nom: nom(calcul), description: descriptionCalcul(calcul, projet.surfaces) })),
       resultats: principaux.map(({ resultat }) => resultat),
       comparaisons: calculsReussis()
-        .filter(dansUnContour)
+        .filter((c) => choisi(c) && dansUnContour(c))
         .map(({ calcul, resultat }) => ({ nom: nom(calcul), description: descriptionCalcul(calcul, projet.surfaces), resultat })),
-      volumes: projet.calculs.map((calcul) => ({ nom: nom(calcul), base: texteBase(calcul, projet.surfaces), resultat: resultatsCalculs.get(calcul.id) })),
-      // DXF et LandXML : les surfaces affichées, avec ou sans volume.
+      volumes: projet.calculs.filter((c) => selection.has(c.id)).map((calcul) => ({ nom: nom(calcul), base: texteBase(calcul, projet.surfaces), resultat: resultatsCalculs.get(calcul.id) })),
+      // DXF et LandXML : les surfaces cochées, avec ou sans volume.
       dessinSurfaces: {
         stocks: creees,
         resultats: creees.map((s) => ({ trianglesDessus: trianglesDeSurface(s.id) })),
@@ -3056,14 +3102,14 @@ creerEcranExport(document.querySelector('#export'), {
           .map((s) => ({ nom: s.nom, triangles: trianglesDeSurface(s.id) }))
           .filter((s) => s.triangles.length > 0),
       },
-      points: leve?.points ?? [],
-      fichierPoints: leve?.nom ?? '',
-      // Dessins (Calculs › Dessin) cochés dans « Afficher » : DXF (calque DESSINS) et PDF.
-      dessins: dessinsVisibles()
-        .filter((d) => d.sommets.length > 0)
+      points: leves.flatMap((l) => l.points),
+      fichierPoints: leves.map((l) => l.nom).join(', '),
+      // Dessins (Calculs › Dessin) cochés : DXF (calque DESSINS) et PDF.
+      dessins: projet.dessins
+        .filter((d) => selection.has(d.id) && d.sommets.length > 0)
         .map((d) => ({ ferme: estFerme(d), lignes: d.type !== 'points', points: pointsDuDessin(d, projet.dessins) })),
-      // Photos des surfaces affichées (case « Photos » de l'export).
-      photos: surfacesAffichees().flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom }))),
+      // Photos des surfaces cochées (case « Photos » de l'export).
+      photos: affichees.flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom }))),
       cartouche: projet.cartouche,
       // Coupes cochées « dans le PDF », avec les profils des surfaces traversées.
       coupes: projet.coupes
@@ -3134,14 +3180,21 @@ function recalculer({ recadrer = false } = {}) {
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
   const dansSurfaces = ongletContexte === 'surfaces';
-  const enModification = ongletContexte === 'mesures' || editeurSurfaces.enModification();
+  // Calculs › Mesures : hors modification, les points des listes cochées (comme ailleurs) ; pendant la
+  // modification d'une mesure, ceux de son levé (ce sont eux qu'on touche pour les ajouter).
+  const enModification = (ongletContexte === 'mesures' && ecranMesures.enModification()) || editeurSurfaces.enModification();
   const cacheesParListe = new Set(listes.filter((l) => !l.visible).map((l) => l.id));
   const visibles = new Set(editeurSurfaces.enModification() ? surfacesAffichees() : projet.surfaces.filter((s) => !cacheesParListe.has(s.id)));
   // Une surface importée montre ses propres points ; sinon, ceux du levé ou des listes cochées.
   let pointsDuPlan;
   if (dansSurfaces && active && estImportee(active)) pointsDuPlan = active.points;
   else if (enModification) pointsDuPlan = points;
-  else pointsDuPlan = pointsStables(pointsDesListes(projet, listes));
+  else if (ongletContexte === 'mesures') {
+    // Mesures : les listes cochées, plus le levé affiché (les mesures sont faites sur ses points).
+    const desListes = pointsDesListes(projet, listes);
+    const dejaLa = new Set(desListes);
+    pointsDuPlan = pointsStables([...desListes, ...points.filter((p) => !dejaLa.has(p))]);
+  } else pointsDuPlan = pointsStables(pointsDesListes(projet, listes));
   // Ce qui est coché (calques, « Afficher ») vaut dans tous les onglets.
   const dessinDuPlan = {
     ...editeurSurfaces.obtenirDessin(),

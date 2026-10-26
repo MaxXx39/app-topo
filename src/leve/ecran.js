@@ -14,7 +14,8 @@
 import { echapper } from '../outils/echapper.js';
 import { estModeBase } from '../reglages/reglages.js';
 import { demanderCode } from '../outils/code.js';
-import { demanderChoix, demanderTexte } from '../outils/choix.js';
+import { demanderTexte } from '../outils/choix.js';
+import { ouvrirChoixLevees } from './fenetre-levees.js';
 import { htmlControle } from './controle-ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
@@ -137,15 +138,14 @@ export function creerEcranLeve(conteneur, actions) {
       return;
     }
     if (action === 'changerLevee') {
-      const titres = Object.fromEntries(NATURES_TERRAIN);
-      demanderChoix({
-        titre: 'Reprendre un levé',
-        boutons: [
-          ...donnees.stocks.map((s) => ({ cle: s.id, texte: s.nom, detail: titres[s.nature] ?? '', principal: s.id === donnees.stock.id })),
-          { cle: '', texte: 'Annuler' },
-        ],
-      }).then((id) => {
-        if (id && id !== donnees.stock.id) actions.choisirStock(id);
+      // Croix rouge (supprimer le levé et ses points) seulement en mode Confirmé.
+      ouvrirChoixLevees({
+        levees: donnees.stocks,
+        actuel: donnees.stock.id,
+        titres: Object.fromEntries(NATURES_TERRAIN),
+        supprimable: !estModeBase(),
+        choisir: (id) => id !== donnees.stock.id && actions.choisirStock(id),
+        supprimer: (id) => actions.supprimerLevee(id),
       });
       return;
     }
@@ -836,7 +836,7 @@ export function creerEcranLeve(conteneur, actions) {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
       </div>
       <div class="boutons-levee">
-        <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 ? '' : 'disabled'}>Changer</button>
+        <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer</button>
         <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau</button>
       </div>
     </div>`;

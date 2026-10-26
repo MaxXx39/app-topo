@@ -31,5 +31,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- « Envoyer » un fichier exporté : lecture seule, donnée à l'appli choisie (voir FichiersPartages). -->
+        <provider
+            android:name=".FichiersPartages"
+            android:authorities="ch.apptopo.partage"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

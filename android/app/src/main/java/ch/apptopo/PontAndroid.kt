@@ -24,6 +24,18 @@ class PontAndroid(private val ecran: EcranPrincipal) {
         ecran.runOnUiThread { ecran.enregistrerFichier(nom, type, contenu) }
     }
 
+    /** « Envoyer » un fichier exporté : le partage d'Android (mail, WhatsApp, Drive…). */
+    @JavascriptInterface
+    fun partagerFichier(nom: String, type: String, contenuBase64: String) {
+        val contenu = try {
+            Base64.getDecoder().decode(contenuBase64)
+        } catch (erreur: IllegalArgumentException) {
+            ecran.runOnUiThread { ecran.message("Envoi impossible : fichier mal transmis.") }
+            return
+        }
+        ecran.runOnUiThread { ecran.partagerFichier(nom, type, contenu) }
+    }
+
     // --- Récepteur Emlid (Bluetooth) ---
 
     /** Montre la liste des appareils Bluetooth appairés, puis se connecte à celui choisi. */
