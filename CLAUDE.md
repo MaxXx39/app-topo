@@ -56,7 +56,7 @@ exemples/            fichiers de référence (NE PAS modifier ni supprimer)
 ## Référence de calcul
 Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 m³, Stock 2 = 648.979 m³, Stock 3 = 372.201 m³ (remblai Mensura). Tests automatiques sur ce cas.
 
-## État d'avancement (version 0.58.1)
+## État d'avancement (version 0.59.0)
 **Fait**
 - Import points (CSV Emlid, TXT), LandXML, DXF (surfaces et fond de plan) ; recalage Helmert d'un plan DXF.
 - Surfaces (stock, terrain naturel, terrassement), volumes (remblai / déblai, comparaison), coupes, mesures / métrés.
@@ -67,6 +67,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Modes Base / Confirmé (0.57.0, réglages ⚙, étoile ☆ / ★ dans l'en-tête, Confirmé par défaut, retenu par l'appareil). En Base, éléments `.seulement-confirme` cachés et `estModeBase()` dans le code. Base = projets, import points, Drive, point tapé, récepteur, lever « Levé libre » (« autres » dans le code), rôles et libellés existants, implanter point / ligne simple, accroches DXF, contrôle de surface, réglages du guidage, plan (fonds, cadastre, points, noms, altitudes). Tout le reste (onglet Calculs, DXF, talus, NTRIP, libellés à modifier, options de ligne, triangles / courbes…) = Confirmé.
 - Terrain (0.57.1) : « Levé en cours » = liste des levés écrits à la couleur de leur nature, « + Nouveau levé » en haut de la liste.
 - Réglages protégés par le « Code de sécurité » (0.58.1, `src/outils/code.js`, code 1196, dans les deux modes) : modification du nom de l'appareil et réglages NTRIP ; redemandé à chaque ouverture de la fenêtre. Le passage Base → Confirmé reste libre. Simple barrière, pas une vraie sécurité ; ne jamais écrire le code dans les bulles d'aide.
+- Terrain › **Contrôler** (0.59.0, mode Base) : autocontrôle sur les points de contrôle du projet (`projet.pointsControle`, liste à part et triangles rouges sur le plan), guidage comme l'implantation d'un point, écarts E / N / plan / hauteur, couleurs selon `projet.tolerancesControle` (vert ≤ 2 cm, orange ≤ 4 cm, rouge au-delà, plan et hauteur, réglables), remarque, historique `projet.controles`, export CSV et PDF. Rappel « Faire le contrôle ? » à la connexion du RX2 si aucun contrôle réussi (vert / orange) aujourd'hui ou depuis 4 h ; « Non » = refus noté dans le projet. Tolérances et points protégés par le code de sécurité. Calculs : `src/topo/controle.js` ; écran : `src/leve/controle-ecran.js` ; PDF : `src/export/pdf-controles.js`.
 
 **Reste / à valider**
 - Essai terrain du talus (0.56.1) et question ouverte : arrondi (cône) aux angles saillants, est-ce voulu ?
@@ -78,4 +79,3 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 **À développer**
 - Essai de 2 RX2 pour guidage d'engin type grader sur la même tablette (2 NTRIP ? 2 connexions Bluetooth ?).
 - Mode « dessin » pour dessiner des plateformes ou bâtiments directement dans l'appli.
-- Mode « Contrôle » pour faire des autocontrôles (à préciser avec l'utilisateur avant de coder : quoi contrôler, tolérances, compte rendu ; mode Base ou Confirmé).

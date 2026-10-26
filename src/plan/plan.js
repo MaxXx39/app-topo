@@ -152,7 +152,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   let plansDxf = [];
   let signatureDxf = '';
   // Implantation d'un point (Terrain › Implanter › Point) : { actif (toucher le plan accroche un
-  // point), aImplanter: [{ nom, est, nord }], choix: { est, nord } (croix), cible: { est, nord, nom } } ou null.
+  // point), aImplanter: [{ nom, est, nord }], pointsControle: [{ nom, est, nord }] (triangles rouges),
+  // choix: { est, nord } (croix), cible: { est, nord, nom } } ou null.
   let implantation = null;
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
@@ -353,6 +354,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const couleur = couleurDuNom(ligne.sommets[0]?.nom, libelles);
       if (couleur) element.style.stroke = couleur;
       groupe.append(element);
+    }
+    // Points de contrôle (Terrain › Contrôler) : triangle rouge et nom en rouge.
+    for (const point of implantation.pointsControle ?? []) {
+      const { x, y } = versEcran(point.est, point.nord, vue);
+      groupe.append(creerElement('path', { d: `M${x} ${y - 8}L${x + 7} ${y + 5}H${x - 7}Z`, class: 'triangle-controle' }));
+      if (!calques.noms) continue;
+      const nom = creerElement('text', { x: x + 9, y: y - 6, class: 'nom-controle' });
+      nom.textContent = point.nom;
+      groupe.append(nom);
     }
     for (const point of implantation.aImplanter ?? []) {
       const { x, y } = croix(point.est, point.nord, 'croix-a-implanter', 7);

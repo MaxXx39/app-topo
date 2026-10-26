@@ -13,6 +13,8 @@
 // quelques textes et l'état du bouton, sans redessiner l'écran (le doigt peut être dessus).
 import { echapper } from '../outils/echapper.js';
 import { estModeBase } from '../reglages/reglages.js';
+import { demanderCode } from '../outils/code.js';
+import { htmlControle } from './controle-ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
 import { formaterNombre } from '../topo/format.js';
@@ -114,6 +116,8 @@ export function creerEcranLeve(conteneur, actions) {
   let capBoussole = null; // dernier cap de la boussole de la tablette (°), ou null
   let reglagesGuidageOuverts = false; // roue ⚙ de l'écran de guidage
   let accrochesOuvertes = false; // flèche de la barre d'accroche : les noms sous les dessins
+  let gestionControleOuverte = false; // mode Contrôler : roue ⚙ (après le code de sécurité)
+  let erreurGestion = ''; // mode Contrôler : erreur de la gestion (tolérances, fichier, point tapé)
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
@@ -159,6 +163,24 @@ export function creerEcranLeve(conteneur, actions) {
       });
       return;
     }
+    // --- Mode Contrôler ---
+    if (action === 'basculerGestionControle') {
+      basculerGestionControle();
+      return;
+    }
+    if (action === 'enregistrerTolerances') {
+      const textes = Object.fromEntries([...conteneur.querySelectorAll('[data-tolerance]')].map((champ) => [champ.dataset.tolerance, champ.value]));
+      montrerErreurGestion(actions.enregistrerTolerances(textes)?.erreur);
+      return;
+    }
+    if (action === 'choisirPointControle') {
+      ouvrirListePoints({ groupes: actions.groupesPoints(), choisir: (nom) => montrerErreurGestion(actions.ajouterPointControle(nom)?.erreur) });
+      return;
+    }
+    if (action === 'taperPointControle') {
+      ouvrirFenetrePointTape({ nomPropose: '', ajouter: (valeurs) => actions.ajouterPointControleTape(valeurs) });
+      return;
+    }
     if (action === 'nouvelleSurface') choixNatureOuvert = false;
     if (action === 'implanterChoix' || action === 'creerPointAImplanter') {
       const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`)?.value ?? '';
@@ -192,7 +214,30 @@ export function creerEcranLeve(conteneur, actions) {
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
+    else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
+    else if (cible.dataset.champ === 'fichier-controle' && cible.files?.[0]) {
+      actions.importerPointsControle(cible.files[0]).then((reponse) => montrerErreurGestion(reponse?.erreur));
+    }
   });
+
+  /** Roue ⚙ du mode Contrôler : l'ouvrir demande le code de sécurité (à chaque fois). */
+  async function basculerGestionControle() {
+    if (!gestionControleOuverte && !(await demanderCode('Points de contrôle et tolérances'))) return;
+    gestionControleOuverte = !gestionControleOuverte;
+    erreurGestion = '';
+    dessiner();
+  }
+
+  /** Erreur de la gestion des contrôles (ou rien) : écrite sous la gestion. */
+  function montrerErreurGestion(erreur) {
+    erreurGestion = erreur ?? '';
+    dessiner();
+  }
+
+  /** Point vers lequel on guide : le point à implanter, ou le point de contrôle (mode Contrôler). */
+  function cibleGuidee() {
+    return donnees?.mode === 'autocontrole' ? donnees.autocontrole.cible : donnees?.implanter.cible;
+  }
 
   // Nom d'un point du projet choisi dans la liste proposée (pas tapé lettre par lettre, ni validé
   // par Entrée, traité plus bas) : on le cherche tout de suite.
@@ -249,7 +294,8 @@ export function creerEcranLeve(conteneur, actions) {
       const degres = (valeur) => (valeur == null ? '—' : `${Math.round(valeur)}°`);
       orientation.textContent = `cap RX2 ${degres(o?.cap)} · marche ${degres(o?.marche)}`;
     }
-    if (donnees?.mode === 'controler' && donnees.controle.implantation === 'point') rafraichirImplantation();
+    if (donnees?.mode === 'autocontrole') rafraichirImplantation();
+    else if (donnees?.mode === 'controler' && donnees.controle.implantation === 'point') rafraichirImplantation();
     else if (donnees?.mode === 'controler' && donnees.controle.implantation === 'ligne') rafraichirLigne();
     else if (donnees?.mode === 'controler' && donnees.controle.implantation === 'talus') rafraichirTalus();
     else if (donnees?.mode === 'controler') rafraichirControle();
@@ -263,7 +309,7 @@ export function creerEcranLeve(conteneur, actions) {
   function rafraichirImplantation() {
     const g = direct?.implantation;
     const bouton = conteneur.querySelector('[data-action="enregistrerImplantation"]');
-    if (bouton) bouton.disabled = !(etat?.connecte && etat?.autorise && donnees.implanter.cible);
+    if (bouton) bouton.disabled = !(etat?.connecte && etat?.autorise && cibleGuidee());
     const zone = conteneur.querySelector('[data-vivant="guidage"]');
     const haut = conteneur.querySelector('[data-vivant="cible-haut"]');
     if (!zone) return;
@@ -351,7 +397,7 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function choixMode() {
     return `<div class="modes-terrain bascule-terrain mode-${donnees.mode}" role="group" aria-label="Mode">
-      ${[['lever', 'Lever'], ['controler', 'Implanter']]
+      ${[['lever', 'Lever'], ['controler', 'Implanter'], ['autocontrole', 'Contrôler']]
         .map(([cle, titre]) => `<button type="button" data-action="choisirMode" data-valeur="${cle}" class="${donnees.mode === cle ? 'actif' : ''}">${titre}</button>`)
         .join('')}
     </div>`;
@@ -554,11 +600,13 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function vueImplantation() {
     const { implanter: imp, controle: reglages } = donnees;
-    const talus = reglages.implantation === 'talus';
-    const ligne = reglages.implantation === 'ligne' || talus;
+    // Mode Contrôler : guidage vers le point de contrôle, comme pour un point à implanter.
+    const autocontrole = donnees.mode === 'autocontrole';
+    const talus = !autocontrole && reglages.implantation === 'talus';
+    const ligne = !autocontrole && (reglages.implantation === 'ligne' || talus);
     let titre = ligne
       ? `<strong>${echapper(imp.ligne.nom)}</strong> · ${formaterNombre(imp.ligne.longueur)} m`
-      : `Vers <strong>${echapper(imp.cible.nom ?? 'le point choisi')}</strong>`;
+      : `${autocontrole ? 'Contrôle de' : 'Vers'} <strong>${echapper(cibleGuidee().nom ?? 'le point choisi')}</strong>`;
     if (talus) titre = `<strong>${echapper(imp.talus.ouvert ?? 'Talus')}</strong> · ${echapper(imp.talus.texte)}`;
     // Talus pas encore réglé (pente) : les réglages s'ouvrent tout seuls (et restent ouverts).
     if (talus && !imp.talus.complet) reglagesGuidageOuverts = true;
@@ -574,11 +622,11 @@ export function creerEcranLeve(conteneur, actions) {
         </div>`;
     return `<div class="vue-guidage">
       <div class="entete-guidage">
-        <button type="button" class="bouton-retour" data-action="${ligne ? 'changerLigne' : 'arreterImplantation'}" title="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}" aria-label="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}">
+        <button type="button" class="bouton-retour" data-action="${ligne ? 'changerLigne' : autocontrole ? 'arreterControle' : 'arreterImplantation'}" title="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}" aria-label="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
         <p class="titre-vue-guidage">${titre}</p>
         ${ligne ? '<button type="button" class="bouton-retour seulement-confirme" data-action="inverserLigne" title="Inverser le sens" aria-label="Inverser le sens">⇄</button>' : ''}
-        ${!ligne && imp.suivant ? `<button type="button" class="bouton-suivant" data-action="implanterSuivant" title="Implanter le point suivant : ${echapper(imp.suivant)}" aria-label="Point suivant : ${echapper(imp.suivant)}">${echapper(imp.suivant)} ▶</button>` : ''}
+        ${!ligne && !autocontrole && imp.suivant ? `<button type="button" class="bouton-suivant" data-action="implanterSuivant" title="Implanter le point suivant : ${echapper(imp.suivant)}" aria-label="Point suivant : ${echapper(imp.suivant)}">${echapper(imp.suivant)} ▶</button>` : ''}
         <button type="button" class="bouton-retour ${ouverts ? 'actif' : ''}" data-action="basculerReglagesGuidage" title="Réglages de l'implantation" aria-label="Réglages de l'implantation" aria-expanded="${ouverts}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>
       </div>
@@ -586,7 +634,7 @@ export function creerEcranLeve(conteneur, actions) {
       ${ligne ? detailLigne() : detailPoint()}
       ${guidage}
       <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
-        <span>${talus ? 'ENREGISTRER L\'ENTRÉE EN TERRE' : 'ENREGISTRER L\'IMPLANTATION'}</span><span class="sous-titre-prendre">ou touche vol −</span>
+        <span>${talus ? 'ENREGISTRER L\'ENTRÉE EN TERRE' : autocontrole ? 'ENREGISTRER LE CONTRÔLE' : 'ENREGISTRER L\'IMPLANTATION'}</span><span class="sous-titre-prendre">ou touche vol −</span>
       </button>
       <p class="raison-leve" data-vivant="raison" hidden></p>
     </div>`;
@@ -697,7 +745,7 @@ export function creerEcranLeve(conteneur, actions) {
 
   /** Point implanté : coordonnées et altitude, sur une ligne. */
   function detailPoint() {
-    const c = donnees.implanter.cible;
+    const c = cibleGuidee();
     return `<p class="coordonnees-cible"><span class="coord-en">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>${c.altitude != null ? `<span class="coord-h">H ${formaterNombre(c.altitude)}</span>` : ''}</p>`;
   }
 
@@ -922,16 +970,18 @@ export function creerEcranLeve(conteneur, actions) {
     if (!donnees) return;
     // Point ou ligne en cours d'implantation : écran de guidage (plan en haut, cible en bas).
     const { implantation } = donnees.controle;
-    const enGuidage = donnees.mode === 'controler'
-      && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (['ligne', 'talus'].includes(implantation) && Boolean(donnees.implanter.ligne)));
+    const autocontrole = donnees.mode === 'autocontrole';
+    const enGuidage = (autocontrole && Boolean(donnees.autocontrole.cible)) || (donnees.mode === 'controler'
+      && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (['ligne', 'talus'].includes(implantation) && Boolean(donnees.implanter.ligne))));
     document.body.classList.toggle('vue-implantation', enGuidage);
     // Barre d'accroche collée sous le plan (téléphone, voir style.css « avec-accroches »).
     const avecAccroches = donnees.mode === 'controler' && !enGuidage && ['point', 'ligne', 'talus'].includes(implantation);
     document.body.classList.toggle('avec-accroches', avecAccroches);
     document.body.classList.toggle('accroches-ouvertes', avecAccroches && accrochesOuvertes);
-    if (!enGuidage || implantation !== 'point') document.body.classList.remove('cible-en-haut');
+    if (!enGuidage || (!autocontrole && implantation !== 'point')) document.body.classList.remove('cible-en-haut');
     let contenu;
     if (enGuidage) contenu = vueImplantation();
+    else if (autocontrole) contenu = htmlControle(donnees.autocontrole, { gestionOuverte: gestionControleOuverte, erreurGestion });
     else contenu = donnees.mode === 'controler' ? controle() : priseDePoint();
     conteneur.innerHTML = `
         <div class="ecran-terrain">

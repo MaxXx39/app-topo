@@ -3572,6 +3572,22 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   stroke-linecap: round;
 }
 
+/* Points de contrôle (Terrain › Contrôler) : triangle rouge, nom en rouge. */
+.plan .triangle-controle {
+  fill: #dc2626;
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+
+.plan .nom-controle {
+  fill: #dc2626;
+  font-size: 11.2px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+
 .plan .croix-a-implanter {
   stroke: #0d9488;
   stroke-width: 3;
@@ -4836,6 +4852,7 @@ button.bouton-import {
 .pastille-liste.liste-autres { background: #475569; }
 .pastille-liste.liste-fichier { background: var(--sombre); }
 .pastille-liste.liste-ajoutes { background: #7c3aed; }
+.pastille-liste.liste-controle { background: #dc2626; }
 
 .menu-listes-points {
   max-height: 50vh;
@@ -6037,4 +6054,159 @@ body.mode-base .seulement-confirme,
 body.mode-base .onglets .onglet-calculs,
 body.mode-base .parties-calculs {
   display: none !important;
+}
+
+/* Fenêtre « Liste » : les points de contrôle à part, en rouge. */
+.groupe-points.groupe-controle summary,
+.groupe-points.groupe-controle .puce-choix {
+  color: #dc2626;
+}
+
+.groupe-points.groupe-controle .puce-choix {
+  border-color: #dc2626;
+}
+
+/* ==========================================================================
+   Terrain › Contrôler (autocontrôle sur les points connus, version 0.59.0)
+   ========================================================================== */
+
+/* Bouton du mode : violet (le rouge est gardé pour « hors tolérance » et les points de contrôle). */
+.bascule-terrain.mode-autocontrole button.actif {
+  background: #7c3aed;
+  color: #ffffff;
+}
+
+.entete-controle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.entete-controle .titre-choix {
+  margin: 0;
+}
+
+.etat-controle {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.etat-controle.a-faire {
+  background: var(--rouge-clair);
+  color: var(--rouge);
+}
+
+.etat-controle.fait {
+  background: color-mix(in srgb, var(--succes) 12%, var(--surface));
+  color: var(--succes);
+}
+
+.points-controle {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.point-controle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 2px solid #dc2626;
+  border-radius: 10px;
+  background: var(--surface);
+  color: #dc2626;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.point-controle strong {
+  font-size: 1.1rem;
+}
+
+.pastille-resultat {
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.pastille-resultat.vert { background: #15803d; }
+.pastille-resultat.orange { background: #ea580c; }
+.pastille-resultat.rouge { background: #dc2626; }
+
+.gestion-controle {
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px dashed var(--bordure);
+  border-radius: 10px;
+}
+
+.tolerances-controle {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  align-items: end;
+  gap: 6px 8px;
+}
+
+.tolerances-controle span {
+  padding-bottom: 8px;
+  font-weight: 700;
+}
+
+.tolerances-controle label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  color: var(--gris);
+}
+
+.tolerances-controle input {
+  width: 100%;
+  min-height: 36px;
+}
+
+.historique-controle {
+  margin-top: 12px;
+}
+
+.ligne-controle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  padding: 6px 8px;
+  border-left: 5px solid var(--bordure);
+  border-bottom: 1px solid var(--bordure);
+}
+
+.ligne-controle.vert { border-left-color: #15803d; }
+.ligne-controle.orange { border-left-color: #ea580c; }
+.ligne-controle.rouge { border-left-color: #dc2626; }
+.ligne-controle.rouge > strong { color: #dc2626; }
+
+.date-controle {
+  color: var(--gris);
+  font-size: 0.85rem;
+}
+
+.ecarts-controle,
+.remarque-controle {
+  grid-column: 1 / -1;
+}
+
+.ecarts-controle .vert { color: #15803d; font-weight: 700; }
+.ecarts-controle .orange { color: #ea580c; font-weight: 700; }
+.ecarts-controle .rouge { color: #dc2626; font-weight: 700; }
+
+.remarque-controle {
+  min-height: 32px;
+  font-size: 0.9rem;
 }

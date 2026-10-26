@@ -1,6 +1,6 @@
 // Listes du bouton « Afficher » du plan (demandes du 23 et du 24.10.2026) : une liste par chose
 // levée ou importée, à cocher pour l'afficher, rangées en 3 parties (section) :
-// - 'points' : fichiers importés, « Points ajoutés », levés « Autres » ;
+// - 'points' : fichiers importés, « Points ajoutés », levés « Autres », « Points de contrôle » ;
 // - 'surfaces' : surfaces (avec leur contour, leurs lignes, leurs triangles et leur volume),
 //   aussi celles importées d'un LandXML ou d'un DXF ;
 // - 'metres' : métrés (leurs points et leurs mesures : aires, longueurs, nombres), et « Mesures »
@@ -18,6 +18,8 @@ import { nomsDeLaMesure } from '../topo/mesure.js';
 
 // Identifiant de la case « Mesures » (mesures faites à la main).
 export const LISTE_MESURES = 'mesures-calculs';
+// Identifiant de la case « Points de contrôle » (Terrain › Contrôler), dessinés en rouge.
+export const LISTE_CONTROLE = 'points-controle';
 
 const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? []).flatMap((l) => l.noms), ...(s.points ?? [])];
 
@@ -29,7 +31,7 @@ const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? [])
 export function listesDePoints(projet) {
   const cachees = new Set(projet.listesCachees ?? []);
   const listes = [];
-  const SECTIONS = { fichier: 'points', ajoutes: 'points', autres: 'points', metre: 'metres', mesures: 'metres' };
+  const SECTIONS = { fichier: 'points', ajoutes: 'points', autres: 'points', controle: 'points', metre: 'metres', mesures: 'metres' };
   const ajouter = (id, nom, nature, leveId, noms) => listes.push({ id, nom, nature, section: SECTIONS[nature] ?? 'surfaces', leveId, noms, visible: !cachees.has(id) });
   for (const leve of projet.leves) {
     if (leve.ajoutes) ajouter(leve.id, leve.nom, 'ajoutes', leve.id, null);
@@ -50,6 +52,8 @@ export function listesDePoints(projet) {
   // Mesures faites à la main (pas d'un métré) : une seule case, pour leurs traits et leurs valeurs.
   if ((projet.mesures ?? []).some((m) => !m.metreId)) ajouter(LISTE_MESURES, 'Mesures', 'mesures', null, new Set());
   for (const autres of projet.autres ?? []) ajouter(autres.id, autres.nom, 'autres', autres.leveId, new Set(nomsDeLaSurface(autres)));
+  // Points de contrôle : pas dans un levé, dessinés à part (triangles rouges, voir plan.js).
+  if ((projet.pointsControle ?? []).length > 0) ajouter(LISTE_CONTROLE, 'Points de contrôle', 'controle', null, new Set());
   const ordre = ['points', 'surfaces', 'metres'];
   return listes.sort((a, b) => ordre.indexOf(a.section) - ordre.indexOf(b.section));
 }
