@@ -143,6 +143,12 @@ p {
   stroke-linejoin: round;
 }
 
+/* Étoile du mode : vide (contour blanc) = Base, pleine ambre = Confirmé. */
+.bouton-mode.confirme svg {
+  fill: var(--ambre);
+  stroke: var(--ambre);
+}
+
 .entete-icone-bouton:disabled {
   opacity: 0.3;
   cursor: default;
@@ -1252,6 +1258,11 @@ button.puce {
   position: absolute;
   max-width: none;
   user-select: none;
+}
+
+/* Photo aérienne swisstopo à l'écran : 25 % de transparence, pour que le plan se lise mieux. */
+.plan-fond .tuile.satellite {
+  opacity: 0.75;
 }
 
 /* Le dessin et les boutons restent au-dessus du fond. */
@@ -2556,18 +2567,19 @@ body.avec-recepteur .bandeaux-recepteur {
    Onglets Projet · Terrain · Calculs · Plan (version 0.38.0)
    ========================================================================== */
 
-/* L'onglet Projet a sa propre couleur (bleu nuit), pour le distinguer des onglets de travail. */
+/* L'onglet Projet à part des onglets de travail : un liseré bleu nuit, pas rempli (version 0.54.0). */
 .onglets button.onglet-projets {
   flex: 0 0 auto;
   min-width: 76px;
   margin: 5px 4px 5px 6px;
+  border: 2px solid var(--sombre);
   border-radius: 12px;
-  background: var(--sombre);
-  color: #ffffff;
+  background: transparent;
+  color: var(--sombre);
 }
 
 .onglets button.onglet-projets.actif {
-  color: var(--ambre);
+  color: var(--sombre);
 }
 
 .onglets button.onglet-projets.actif svg {
@@ -2587,12 +2599,12 @@ body.avec-recepteur .bandeaux-recepteur {
   }
 
   .onglets button.onglet-projets.actif {
-    background: var(--sombre);
-    color: var(--ambre);
+    background: transparent;
+    color: var(--sombre);
   }
 
   .onglets button.onglet-projets.actif svg {
-    color: var(--ambre);
+    color: var(--sombre);
   }
 }
 
@@ -2659,18 +2671,6 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 /* --- Onglet Terrain : écran épuré pour le chantier --- */
-.connexion-terrain {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-
-.connexion-terrain .bouton {
-  width: 100%;
-}
-
 /* « display: flex » ci-dessus l'emporterait sur l'attribut hidden : on le rétablit. */
 .connexion-terrain[hidden] {
   display: none;
@@ -2971,9 +2971,11 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   fill: var(--bleu);
 }
 
-/* Téléphone : le plan a la même taille dans Lever et dans Implanter (version 0.53.0). */
+/* Téléphone : le plan a la même taille dans Lever et dans Implanter (version 0.53.0). Pas de
+   hauteur minimale (300 px) : sur un petit écran, en Lever, le plan débordait sur le bloc du
+   dessous et en cachait le haut (corrigé en 0.54.1). */
 @media (max-width: 899px) {
-  body.mode-leve.mode-controle[data-onglet='terrain'] .plan-cadre {
+  body.mode-leve[data-onglet='terrain'] .plan-cadre {
     min-height: 0;
   }
 }
@@ -3345,6 +3347,17 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   fill: none;
   stroke: #f6ab07;
   stroke-width: 3;
+}
+
+.bouton-accroche svg .rond-point {
+  fill: #9aa5a0;
+  stroke: none;
+}
+
+.bouton-accroche svg .anneau-accroche {
+  fill: none;
+  stroke: #f6ab07;
+  stroke-width: 2.4;
 }
 
 .bouton-accroche.actif {
@@ -3840,19 +3853,6 @@ svg.plan,
   max-width: 300px;
 }
 
-.couloir-ligne .bande {
-  fill: currentColor;
-  fill-opacity: 0.07;
-  stroke: currentColor;
-  stroke-opacity: 0.6;
-  stroke-width: 1;
-}
-
-.couloir-ligne .bande-3 {
-  fill-opacity: 0.16;
-}
-
-.couloir-ligne .rayon,
 .couloir-ligne .haut-cible,
 .couloir-ligne .nom-bout-couloir {
   fill: currentColor;
@@ -3882,6 +3882,27 @@ svg.plan,
   stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* Barbules du talus (traits longs et courts depuis le haut du talus). */
+.plan .implantation .barbules-talus {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 1.3;
+}
+
+/* Talus à implanter : zone brune entre la ligne et l'entrée en terre, bord en pointillés. */
+.plan .implantation .zone-talus {
+  fill: #92400e;
+  fill-opacity: 0.18;
+  stroke: none;
+}
+
+.plan .bord-talus {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
 }
 
 .plan .parallele-a-implanter {
@@ -4015,6 +4036,56 @@ svg.plan,
 
 .fenetre-reglages::backdrop {
   background: rgba(27, 43, 54, 0.45);
+}
+
+/* Mode de l'appli (réglages ⚙) : Base ou Confirmé, deux gros boutons avec l'étoile. */
+.choix-mode-appli {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0 12px;
+}
+
+.puce-mode {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1.5px solid var(--bordure);
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.puce-mode input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.puce-mode.actif {
+  border-color: var(--ambre);
+  background: var(--ambre-clair);
+}
+
+.puce-mode:has(input:focus-visible) {
+  outline: 2px solid var(--ambre-fonce);
+  outline-offset: 2px;
+}
+
+.etoile-mode {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--sombre);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+.etoile-mode.confirme {
+  fill: var(--ambre);
+  stroke: var(--ambre-fonce);
 }
 
 .case-reglage {
@@ -4622,8 +4693,36 @@ button.bouton-import {
 }
 
 .fenetre-reglages .bouton-fermer-appli {
-  margin-right: auto;
-  color: var(--rouge);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  margin-bottom: 14px;
+  border-color: var(--rouge);
+  background: var(--rouge);
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.fenetre-reglages .bouton-fermer-appli svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+.fenetre-reglages .partage-reglages .carte-section {
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border: none;
+  border-top: 1px solid var(--bordure);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* Gestion de projets : où est le projet (📱 cet appareil, ☁ Google Drive). */
@@ -4685,30 +4784,26 @@ button.bouton-import {
 }
 
 .ligne-leve-en-cours .bouton-plus {
-  --couleur-nature: #b45309;
+  --couleur-nature: var(--sombre); /* neutre : ne prend pas la couleur du levé en cours */
   align-self: center;
   width: 48px;
   height: 48px;
   box-shadow: 0 2px 6px rgba(16, 24, 20, 0.25);
 }
 
-.bouton-plus.nature-terrain,
 .bandeau-leve.nature-terrain {
   --couleur-nature: #15803d;
 }
 
-.bouton-plus.nature-terrassement,
 .bandeau-leve.nature-terrassement {
   --couleur-nature: #2563eb;
 }
 
-.bouton-plus.nature-metre,
 .bandeau-leve.nature-metre {
   --couleur-nature: #0891b2;
 }
 
 /* « Autres » (contrôle, points géomètre…) : gris ardoise. */
-.bouton-plus.nature-autres,
 .bandeau-leve.nature-autres,
 .bouton-nature.nature-autres {
   --couleur-nature: #475569;
@@ -5097,4 +5192,884 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   stroke: none;
   font-size: 5px;
   font-weight: 800;
+}
+
+/* ==========================================================================
+   Version 0.54.0
+   ========================================================================== */
+
+/* Fenêtre à plusieurs boutons (voir outils/choix.js) : le choix mis en avant en ambre, plein. */
+.fenetre-choix {
+  width: min(92vw, 420px);
+  padding: 18px;
+  border: none;
+  border-radius: var(--rayon);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.fenetre-choix::backdrop {
+  background: rgba(27, 43, 54, 0.45);
+}
+
+.fenetre-choix h2 {
+  margin: 0 0 10px;
+}
+
+.boutons-choix {
+  display: grid;
+  gap: 10px;
+}
+
+.boutons-choix button {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: left;
+}
+
+.boutons-choix button span {
+  font-size: 0.8rem;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.boutons-choix .bouton strong {
+  font-size: 1.1rem;
+}
+
+/* Gestion de projets : tri Récents / A → Z. */
+.tri-projets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+/* Menus du plan : cadre « Aucun DXF » quand il n'y a rien, titres des parties de « Afficher ». */
+.menu-vide {
+  margin: 4px 0;
+  padding: 6px 12px;
+  border: 1px dashed var(--bordure);
+  border-radius: 8px;
+  color: var(--gris);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.titre-partie-menu {
+  margin: 6px 0 2px;
+  color: var(--gris);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pastille-liste.liste-mesures { background: #0891b2; }
+
+/* Libellés du levé : boutons plus petits ; le crayon « modifier » reste toujours visible à droite
+   (collé au bord pendant que la liste défile). */
+.libelles-terrain .puce-libelle {
+  min-width: 46px;
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+
+.libelles-terrain .puce-libelle strong {
+  font-size: 0.88rem;
+  line-height: 1.15;
+}
+
+.libelles-terrain .puce-libelle span {
+  font-size: 0.6rem;
+  line-height: 1.1;
+}
+
+.bouton-crayon-libelles {
+  position: sticky;
+  right: 0;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  border: 1px solid var(--bordure);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: -6px 0 8px var(--surface);
+  color: var(--sombre);
+  cursor: pointer;
+}
+
+.bouton-crayon-libelles svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+/* Roue des réglages : le petit bouton marche / arrêt en rouge clair (on peut aussi fermer l'appli). */
+.bouton-reglages .marche-arret {
+  stroke: #fca5a5;
+  stroke-width: 2.4;
+}
+
+.partage-reglages .nom-appareil {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  text-align: left;
+}
+
+/* --- Bouton « Récepteur » de la barre du bas (appli Android) : couleur selon l'état --- */
+.onglets button.bouton-recepteur svg {
+  padding: 2px 10px;
+  width: 44px;
+  border-radius: 12px;
+  color: #ffffff;
+}
+
+.bouton-recepteur.couleur-gris svg {
+  background: #9ca3af;
+}
+
+.bouton-recepteur.couleur-vert svg {
+  background: #16a34a;
+}
+
+.bouton-recepteur.couleur-orange svg {
+  background: #f59e0b;
+}
+
+.bouton-recepteur.couleur-rouge svg {
+  background: #dc2626;
+}
+
+/* Fenêtre du récepteur. */
+.fenetre-recepteur {
+  width: min(94vw, 460px);
+  max-height: 90svh;
+  padding: 16px;
+  border: none;
+  border-radius: var(--rayon);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.fenetre-recepteur::backdrop {
+  background: rgba(27, 43, 54, 0.45);
+}
+
+.entete-fenetre-recepteur {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.entete-fenetre-recepteur h2 {
+  flex: 1;
+  margin: 0;
+}
+
+.pastille-etat-recepteur {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.pastille-etat-recepteur > span {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.pastille-etat-recepteur strong {
+  margin-left: auto;
+  font-size: 0.85rem;
+}
+
+.pastille-etat-recepteur.couleur-vert > span { background: #16a34a; }
+.pastille-etat-recepteur.couleur-orange > span { background: #f59e0b; }
+.pastille-etat-recepteur.couleur-rouge > span { background: #dc2626; }
+
+.etat-recepteur dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+}
+
+.etat-recepteur dt {
+  color: var(--gris);
+}
+
+.etat-recepteur dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions-recepteur {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.actions-recepteur .bouton-large {
+  width: 100%;
+}
+
+.bouton-couper {
+  border-color: var(--rouge);
+  color: var(--rouge);
+}
+
+.bloc-ntrip {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bordure);
+}
+
+/* Terrain : rappel « Récepteur non connecté · Connecter » (ouvre la fenêtre du récepteur). */
+button.connexion-terrain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px dashed var(--bordure);
+  border-radius: 10px;
+  background: var(--fond);
+  color: var(--texte);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+button.connexion-terrain[hidden] {
+  display: none;
+}
+
+button.connexion-terrain strong {
+  margin-left: auto;
+  color: var(--sombre);
+  text-decoration: underline;
+}
+
+.pastille-gris {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+/* Bandeaux du récepteur : le RTK (plus long, avec la précision) prend plus de place. */
+.bandeaux-recepteur span[data-bandeau='rtk'] {
+  flex: 1.7;
+  padding: 0 6px;
+}
+
+@media (max-width: 899px) {
+  .bandeaux-recepteur span {
+    font-size: 0.78rem;
+  }
+}
+
+/* ==========================================================================
+   Version 0.55.0
+   ========================================================================== */
+
+/* Fenêtre des libellés : le tableau défile, « Enregistrer » reste toujours visible en bas. */
+.fenetre-libelles {
+  display: flex;
+  flex-direction: column;
+  width: min(96vw, 520px);
+  max-height: 88svh;
+  padding: 0;
+  border: none;
+  border-radius: var(--rayon);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.fenetre-libelles:not([open]) {
+  display: none;
+}
+
+.fenetre-libelles::backdrop {
+  background: rgba(27, 43, 54, 0.45);
+}
+
+.fenetre-libelles h2 {
+  margin: 0;
+  padding: 14px 16px 8px;
+}
+
+.corps-libelles {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 12px 10px;
+}
+
+.pied-libelles {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--bordure);
+  background: var(--surface);
+}
+
+.pied-libelles .bouton-enregistrer {
+  flex: 1;
+  max-width: 260px;
+  min-height: 46px;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+/* Réglages : nom de l'appareil affiché, crayon pour le modifier (évite les fausses manipulations). */
+.nom-appareil-fixe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+}
+
+.nom-appareil-fixe span {
+  color: var(--gris);
+}
+
+.nom-appareil-fixe .bouton-crayon-libelles {
+  position: static;
+  margin-left: auto;
+  box-shadow: none;
+}
+
+/* --- Barre d'accroche compacte (version 0.55.0) : dessins sans texte, la flèche montre les noms ;
+   « + Point » et « Liste » seulement avec l'accroche « Point ». Sur téléphone, collée sous le plan. --- */
+body {
+  --hauteur-accroches: 48px;
+}
+
+body.accroches-ouvertes {
+  --hauteur-accroches: 66px;
+}
+
+.barre-accroche {
+  margin: 0 0 10px;
+  padding: 5px 6px;
+}
+
+.barre-accroche .accroches,
+.barre-accroche.accroches-ligne .accroches {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.barre-accroche .bouton-accroche {
+  flex: 0 0 auto;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 3px 4px;
+  font-size: 0.66rem;
+}
+
+.barre-accroche .bouton-accroche svg {
+  width: 24px;
+  height: 24px;
+}
+
+.barre-accroche .mot-accroche {
+  display: none;
+}
+
+.barre-accroche.ouverte .mot-accroche {
+  display: block;
+}
+
+.separateur-accroche {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 26px;
+  margin: 0 2px;
+  background: #b6c0c7;
+}
+
+.bouton-outil-accroche {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 3px 9px;
+  border: 1.5px solid #0d9488;
+  border-radius: 10px;
+  background: var(--surface);
+  color: #0f766e;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bouton-deplier-accroches {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sombre);
+  cursor: pointer;
+}
+
+.bouton-deplier-accroches svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 899px) {
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .barre-accroche {
+    position: fixed;
+    top: calc(var(--hauteur-entete) + var(--hauteur-bascule) + 38svh);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    height: var(--hauteur-accroches);
+    margin: 0;
+    border-radius: 0;
+    border-bottom: 1px solid var(--bordure);
+    box-shadow: 0 2px 6px rgba(16, 24, 20, 0.15);
+  }
+
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .mise-en-page {
+    padding-top: calc(38svh + var(--hauteur-bascule) + var(--hauteur-accroches) + 12px);
+  }
+}
+
+/* Fenêtres « + Point » et « Liste ». */
+.fenetre-points {
+  width: min(94vw, 460px);
+  max-height: 86svh;
+  padding: 16px;
+  border: none;
+  border-radius: var(--rayon);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.fenetre-points::backdrop {
+  background: rgba(27, 43, 54, 0.45);
+}
+
+.recherche-points {
+  width: 100%;
+  min-height: 40px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.groupe-points {
+  border-top: 1px solid var(--bordure);
+  padding: 6px 0;
+}
+
+.groupe-points summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.noms-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+.noms-points button[hidden],
+.groupe-points[hidden] {
+  display: none;
+}
+
+.fenetre-points .erreur:empty {
+  display: none;
+}
+
+.fenetre-point-tape [data-action='ajouterPointTape'] {
+  border-color: var(--ambre);
+  background: var(--ambre);
+  color: var(--sombre);
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   Version 0.55.1
+   ========================================================================== */
+
+/* Mode téléphone : on cache Est / Nord des points à implanter (le nom et l'altitude suffisent). */
+body.mode-telephone .coord-en {
+  display: none;
+}
+
+.coordonnees-cible .coord-h {
+  margin-left: 8px;
+}
+
+/* Bouton « Récepteur » : l'icône dans un rond (ce n'est pas un onglet). */
+.onglets button.bouton-recepteur svg {
+  width: 34px;
+  height: 34px;
+  padding: 5px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3.5px var(--anneau-recepteur, #9ca3af);
+}
+
+.bouton-recepteur.couleur-vert { --anneau-recepteur: #16a34a; }
+.bouton-recepteur.couleur-orange { --anneau-recepteur: #f59e0b; }
+.bouton-recepteur.couleur-rouge { --anneau-recepteur: #dc2626; }
+
+/* Barre d'accroche : tout tient dans la largeur, sans glisser sur le côté. */
+.barre-accroche .accroches,
+.barre-accroche.accroches-ligne .accroches {
+  overflow: visible;
+  gap: 3px;
+}
+
+.barre-accroche .bouton-accroche {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 3px 1px;
+}
+
+.barre-accroche .bouton-accroche svg {
+  width: 22px;
+  height: 22px;
+}
+
+.barre-accroche .mot-accroche {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bouton-outil-accroche {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.bouton-deplier-accroches {
+  width: 26px;
+  margin-left: 0;
+}
+
+/* Libellés : la couleur en pastille ; palette de ronds sous la ligne ; « habituelle » = couleur du
+   rôle avec un petit point blanc au centre. */
+.pastille-couleur {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--bordure);
+  cursor: pointer;
+}
+
+.pastille-couleur.habituelle {
+  background-image: radial-gradient(circle, #ffffff 0 3px, transparent 3.5px);
+}
+
+.pastille-couleur.choisie {
+  box-shadow: 0 0 0 3px var(--sombre);
+}
+
+.palette-couleurs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 2px 8px;
+}
+
+/* Barre d'accroche plus basse, dessins centrés dans leurs boutons (version 0.55.2). */
+body {
+  --hauteur-accroches: 42px;
+}
+
+body.accroches-ouvertes {
+  --hauteur-accroches: 58px;
+}
+
+.barre-accroche {
+  padding: 4px 6px;
+}
+
+.barre-accroche .bouton-accroche {
+  justify-content: center;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 1px;
+}
+
+.barre-accroche.ouverte .bouton-accroche {
+  height: 48px;
+}
+
+.barre-accroche .bouton-accroche svg {
+  width: 20px;
+  height: 20px;
+}
+
+.barre-accroche .bouton-outil-accroche {
+  min-height: 32px;
+  height: 32px;
+}
+
+@media (max-width: 899px) {
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .barre-accroche {
+    display: flex;
+    align-items: center;
+  }
+
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .barre-accroche .accroches {
+    flex: 1;
+  }
+}
+
+/* Menus du plan (Calques, Plans, Afficher) : hauteur limitée au plan (voir ajusterHauteurMenu),
+   le contenu défile (version 0.55.3). */
+.menu-calques,
+.menu-plans-dxf {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Menus du plan : « ▾ encore » en bas tant qu'il reste des lignes à voir en faisant défiler. */
+.menu-calques.a-suivre::after,
+.menu-plans-dxf.a-suivre::after {
+  content: '▾ encore';
+  position: sticky;
+  bottom: -6px;
+  display: block;
+  margin: 0 -12px -6px;
+  padding: 14px 0 4px;
+  background: linear-gradient(rgba(255, 255, 255, 0), #ffffff 55%);
+  color: var(--sombre);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Implantation d'un talus : réglages (pente H / V…) et guidage (éloigne-toi / rapproche-toi,
+   monter / descendre, profil en travers). */
+.reglages-talus .pente-talus label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.reglages-talus .pente-talus input {
+  width: 4.2em;
+}
+
+.reglages-talus .barre-pente {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.reglages-talus select {
+  width: 100%;
+}
+
+.guidage-direct.guidage-talus {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  row-gap: 2px;
+  text-align: center;
+}
+
+.guidage-talus .lignes-guidage {
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.guidage-talus .hauteur-guidage.attente {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.guidage-talus .manque-talus {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #78350f;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.profil-talus {
+  width: 100%;
+  max-width: 360px;
+  margin-top: 4px;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1b2b36;
+}
+
+.coupe-talus .trait-talus {
+  stroke: #92400e;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.coupe-talus .sol-plat {
+  stroke: #15803d;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.coupe-talus .repere-ligne-talus {
+  stroke: #0d9488;
+  stroke-width: 3;
+}
+
+.coupe-talus .point-ligne-talus {
+  fill: #0d9488;
+}
+
+.coupe-talus .repere-entree {
+  fill: #f6ab07;
+  stroke: #1b2b36;
+  stroke-width: 1;
+}
+
+.coupe-talus .canne {
+  stroke: #ffffff;
+  stroke-width: 2.5;
+}
+
+/* Croquis des réglages du talus (en plan, en coupe). */
+.croquis-talus {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto 6px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.croquis-talus .titre-croquis {
+  fill: #1b2b36;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.croquis-talus .texte-croquis {
+  fill: #475569;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.croquis-talus .cote-croquis {
+  fill: #1b2b36;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.croquis-talus .separation-croquis {
+  stroke: #e2e8f0;
+  stroke-width: 1;
+}
+
+.croquis-talus .ligne-croquis {
+  stroke: #0d9488;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.croquis-talus .chevron-croquis {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1.8;
+}
+
+.croquis-talus .zone-croquis {
+  fill: #92400e;
+  fill-opacity: 0.12;
+}
+
+.croquis-talus .bord-croquis {
+  stroke: #92400e;
+  stroke-width: 1.3;
+  stroke-dasharray: 4 3;
+}
+
+.croquis-talus .barbules-croquis {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 1.2;
+}
+
+.croquis-talus .plateforme-croquis {
+  stroke: #94a3b8;
+  stroke-width: 3;
+}
+
+.croquis-talus .terrain-croquis {
+  stroke: #15803d;
+  stroke-width: 2;
+}
+
+.croquis-talus .triangle-croquis {
+  fill: none;
+  stroke: #64748b;
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
+.croquis-talus .talus-croquis {
+  stroke: #92400e;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.croquis-talus .point-ligne-croquis {
+  fill: #0d9488;
+}
+
+.croquis-talus .entree-croquis {
+  fill: #f6ab07;
+  stroke: #1b2b36;
+  stroke-width: 1;
+}
+
+/* Mode Base (réglages ⚙) : fonctions avancées cachées (rien n'est supprimé du projet). */
+body.mode-base .seulement-confirme,
+body.mode-base .onglets .onglet-calculs,
+body.mode-base .parties-calculs {
+  display: none !important;
 }

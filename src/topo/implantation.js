@@ -52,6 +52,33 @@ export function altitudeSurSurface(triangles, est, nord) {
 }
 
 /**
+ * Recherche rapide de l'altitude d'une surface (même résultat que altitudeSurSurface) : les
+ * triangles sont rangés une fois dans des cases carrées de "taille" m, puis on ne regarde que ceux
+ * de la case du point. Renvoie une fonction (est, nord) → altitude (m) ou null hors de la surface.
+ */
+export function chercheurAltitude(triangles, taille = 5) {
+  const cases = new Map();
+  const cle = (i, j) => `${i}:${j}`;
+  for (const triangle of triangles) {
+    const est = triangle.map((p) => p.est);
+    const nord = triangle.map((p) => p.nord);
+    const [i0, i1] = [Math.floor(Math.min(...est) / taille), Math.floor(Math.max(...est) / taille)];
+    const [j0, j1] = [Math.floor(Math.min(...nord) / taille), Math.floor(Math.max(...nord) / taille)];
+    for (let i = i0; i <= i1; i++) {
+      for (let j = j0; j <= j1; j++) {
+        const k = cle(i, j);
+        if (!cases.has(k)) cases.set(k, []);
+        cases.get(k).push(triangle);
+      }
+    }
+  }
+  return (est, nord) => {
+    const dansLaCase = cases.get(cle(Math.floor(est / taille), Math.floor(nord / taille)));
+    return dansLaCase ? altitudeSurSurface(dansLaCase, est, nord) : null;
+  };
+}
+
+/**
  * Écart vertical (m) entre la surface et le bout de canne : altitude de la surface − altitude du
  * point. Positif : il faut monter de cette valeur ; négatif : il faut descendre.
  */

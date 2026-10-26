@@ -267,15 +267,15 @@ export function sourcesDesPlans(plans, position, rayon) {
 /**
  * Lignes CSV (point-virgule, comme les autres exports) des implantations enregistrées :
  * nom, position voulue, position mesurée, écarts (m, 3 décimales), date ; pour une ligne, aussi
- * l'abscisse et le décalage (m).
+ * l'abscisse et le décalage (m) ; pour un talus (entrée en terre), aussi le talus (« 3/2 haut droite »).
  */
 export function csvImplantations(implantations) {
   const n = (valeur) => (valeur == null ? '' : valeur.toFixed(3));
   const texte = (valeur) => (/[;"\r\n]/.test(valeur) ? `"${valeur.replaceAll('"', '""')}"` : valeur);
-  const lignes = ['Nom;Est voulu;Nord voulu;Altitude voulue;Est mesuré;Nord mesuré;Altitude mesurée;dEst;dNord;Distance;dAltitude;Date;Abscisse;Décalage'];
-  for (const { nom, cible, mesure, ecarts, le, ligne } of implantations) {
+  const lignes = ['Nom;Est voulu;Nord voulu;Altitude voulue;Est mesuré;Nord mesuré;Altitude mesurée;dEst;dNord;Distance;dAltitude;Date;Abscisse;Décalage;Talus'];
+  for (const { nom, cible, mesure, ecarts, le, ligne, talus } of implantations) {
     // Ligne : abscisse (depuis le début) et décalage (+ à droite) en plus ; vides pour un point.
-    lignes.push([texte(nom ?? ''), n(cible.est), n(cible.nord), n(cible.altitude), n(mesure.est), n(mesure.nord), n(mesure.altitude), n(ecarts.dEst), n(ecarts.dNord), n(ecarts.distance), n(ecarts.dAltitude), le ?? '', n(ligne?.abscisse), n(ligne?.decalage)].join(';'));
+    lignes.push([texte(nom ?? ''), n(cible.est), n(cible.nord), n(cible.altitude), n(mesure.est), n(mesure.nord), n(mesure.altitude), n(ecarts.dEst), n(ecarts.dNord), n(ecarts.distance), n(ecarts.dAltitude), le ?? '', n(ligne?.abscisse), n(ligne?.decalage), texte(talus?.texte ?? '')].join(';'));
   }
   return `${lignes.join('\r\n')}\r\n`;
 }

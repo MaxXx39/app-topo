@@ -15,7 +15,7 @@ import { creerEditeurSurfaces } from './surfaces/editeur.js';
 import { creerEcranVolumes, texteBase } from './volumes/ecran.js';
 import { preparerPhoto } from './photos/photo.js';
 import { creerEcranExport, telecharger } from './export/ecran.js';
-import { creerEcranProjet } from './projet/ecran.js';
+import { creerEcranProjet, blocPartage } from './projet/ecran.js';
 import { creerEcranImport } from './import/ecran.js';
 import { creerEcranCoupes } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
@@ -34,8 +34,7 @@ import {
   completerProjet,
   resumerProjet,
   titreProjet,
-  projetSansTitre,
-  EXEMPLE_TITRE,
+  nomAutomatique,
   sousTitreProjet,
   nomDeFichierProjet,
 } from './projet/projet.js';
@@ -44,10 +43,12 @@ import { creerPartage } from './partage/partage.js';
 import * as historique from './projet/historique.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
+import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
 import { lireLibelles, enregistrerLibelles } from './leve/libelles.js';
-import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe } from './topo/implantation.js';
+import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude } from './topo/implantation.js';
+import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
 import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele } from './topo/ligne-implantation.js';
 import { MODES_ACCROCHE, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
 import {
@@ -68,11 +69,12 @@ import {
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
-import { appliquerReglages, ouvrirReglages } from './reglages/reglages.js';
+import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
-import { listesDePoints, pointsDesListes, montrerListe } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant } from './topo/noms.js';
+import { demanderChoix } from './outils/choix.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { creerBarreRecalage } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
@@ -111,6 +113,8 @@ const terrain = {
   accroche: 'point', // implantation d'un point : point du projet, sommet, milieu, sur la ligne ou centre (voir topo/accroche.js)
   guidage: 'rx2', // guidage vers le point : 'rx2' (avance / droite selon le cap du RX2) ou 'nseo' (nord / est)
   accrocheLigne: 'trait', // implantation d'une ligne : 'trait' (ligne du plan DXF) ou une accroche de point
+  // Implantation d'un talus (voir topo/talus.js) : derniers réglages, repris pour le talus suivant.
+  talus: { horizontal: null, vertical: null, ligneEst: 'haut', cote: 'droite', longueur: null, terrainId: null, altitudeSurfaceId: null },
   ...lireReglagesTerrain(),
 };
 // Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
@@ -118,7 +122,9 @@ const terrain = {
 // Implantation d'une ligne : points choisis pour la faire (pointsLigne : [{ est, nord, altitude, nom }])
 // et ligne en cours (ligne : { nom, sommets, segmentTouche, segment (n° ou null : toute la ligne),
 // inverse, decalage (m, + à droite), altitudes: { debut, fin } (tapées, ou null) }).
-const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null };
+// Talus : la ligne est implanter.ligne, ses réglages terrain.talus ; talusId : talus de « Mes talus »
+// ouvert (ses changements y sont gardés), ou null.
+const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null, talusId: null };
 const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
 
 function lireReglagesTerrain() {
@@ -151,7 +157,7 @@ const ICONES = {
 const ONGLETS = [
   { nom: 'projets', titre: 'Projet' },
   ...(recepteurDisponible() ? [{ nom: 'terrain', titre: 'Terrain' }] : []),
-  { nom: 'calculs', titre: 'Calculs / métrés' },
+  { nom: 'calculs', titre: 'Calculs' },
   { nom: 'plan', titre: 'Plan' },
 ];
 // Les trois parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Surfaces et
@@ -260,17 +266,52 @@ installerAide(document.querySelector('#bouton-aide'));
 // Toucher le projet ouvert (en-tête) : on va à l'onglet Projet.
 document.querySelector('#entete-projet').addEventListener('click', () => afficherOnglet('projets'));
 
-// Réglages de cet appareil (roue ⚙) : mode téléphone, bulles d'aide, nom de l'appareil.
+// Réglages de cet appareil (roue ⚙) : mode Base / Confirmé, mode téléphone, bulles d'aide, nom de l'appareil.
 appliquerReglages();
+// L'étoile de l'en-tête (mode Base ☆ / Confirmé ★) ouvre aussi les réglages.
+document.querySelector('#bouton-mode').addEventListener('click', () => document.querySelector('#bouton-reglages').click());
+// Fenêtre des réglages ouverte (pour y redessiner l'état du partage Drive), ou null.
+let fenetreReglages = null;
 document.querySelector('#bouton-reglages').addEventListener('click', () => {
-  ouvrirReglages({
-    nomAppareil: partage?.appareil().nom,
-    nommerAppareil: partage ? (nom) => partage.nommerAppareil(nom) : null,
+  fenetreReglages = ouvrirReglages({
     aideActive: document.body.classList.contains('aide-active'),
     basculerAide: () => document.querySelector('#bouton-aide').click(),
     fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? fermerAppli : null,
+    changerMode: () => {
+      adapterAuMode();
+      recalculer();
+    },
+    // Partage par Google Drive (dans les réglages depuis la version 0.54.0).
+    partage: partage
+      ? {
+          html: (options) => blocPartage({ etat: partage.etat, appareil: partage.appareil() }, options),
+          actions: {
+            connecterDrive: () => partage.connecter(),
+            deconnecterDrive: () => partage.deconnecter(),
+            envoyerDrive: () => partage.envoyerMaintenant(),
+            reprendreLaMain: () => partage.reprendreLaMain(),
+            nommerAppareil: (nom) => {
+              partage.nommerAppareil(nom);
+              fenetreReglages?.rafraichir();
+            },
+          },
+        }
+      : null,
   });
 });
+
+/**
+ * Mode Base : on quitte ce qui y est caché (onglet Calculs, implantation d'un talus). Rien n'est
+ * supprimé : en repassant en Confirmé, tout est là.
+ */
+function adapterAuMode() {
+  if (!estModeBase()) return;
+  if (estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
+  if (terrain.implantation === 'talus') {
+    terrain.implantation = 'ligne';
+    retenirReglagesTerrain();
+  }
+}
 
 /**
  * Fermer l'appli (bouton des réglages ⚙, appli Android seulement) : le projet part d'abord sur
@@ -505,23 +546,29 @@ function ajouterSurfaceLevee(nature) {
   modifie({ recadrer: true });
 }
 
-const ecranLeve = recepteurDisponible()
-  ? creerEcranLeve(document.querySelector('#leve-direct'), {
+// Bouton « Récepteur » de la barre du bas (appli Android) : couleur selon l'état, fenêtre pour
+// connecter / couper le récepteur et régler les corrections NTRIP (voir leve/recepteur.js).
+const boutonRecepteur = recepteurDisponible()
+  ? creerBoutonRecepteur(document.querySelector('.onglets'), {
       choisirRecepteur,
+      reconnecter: reconnecterRecepteur,
+      deconnecter: deconnecterRecepteur,
       // Corrections par internet (swipos) : seulement avec un APK qui sait le faire.
       lireReglagesCorrections: () => (correctionsDisponibles() ? lireReglagesCorrections() : null),
       demarrerCorrections: (reglages) => {
         demarrerCorrections(reglages);
         afficherMessage('Corrections : connexion à swipos…');
-        setTimeout(() => ecranLeve.afficher(donneesLeve()), 300); // bouton « Redémarrer », mot de passe enregistré
       },
       arreterCorrections: () => {
         arreterCorrections();
         afficherMessage('Corrections arrêtées : Emlid Flow peut reprendre');
-        setTimeout(() => ecranLeve.afficher(donneesLeve()), 300);
       },
-      reconnecter: reconnecterRecepteur,
-      deconnecter: deconnecterRecepteur,
+    })
+  : null;
+
+const ecranLeve = recepteurDisponible()
+  ? creerEcranLeve(document.querySelector('#leve-direct'), {
+      ouvrirRecepteur: () => boutonRecepteur.ouvrir(),
       nouvelleSurface: (nature) => ajouterSurfaceLevee(nature),
       choisirStock: (id) => {
         leveDirect.stockId = id;
@@ -603,7 +650,8 @@ const ecranLeve = recepteurDisponible()
         recalculer();
       },
       choisirImplantation: (quoi) => {
-        terrain.implantation = ['point', 'ligne'].includes(quoi) ? quoi : 'surface';
+        const permises = estModeBase() ? ['point', 'ligne'] : ['point', 'ligne', 'talus'];
+        terrain.implantation = permises.includes(quoi) ? quoi : 'surface';
         retenirReglagesTerrain();
         recalculer();
       },
@@ -617,11 +665,13 @@ const ecranLeve = recepteurDisponible()
         if (points.length < 2) return;
         const nom = (p, i) => p.nom ?? `P${i + 1}`;
         implanter.ligne = nouvelleLigneAImplanter(`${nom(points[0], 0)} → ${nom(points.at(-1), points.length - 1)}`, points, null);
+        implanter.talusId = null;
         implanter.pointsLigne = [];
         montrerImplantation();
       },
       changerLigne: () => {
         implanter.ligne = null;
+        implanter.talusId = null;
         montrerImplantation();
       },
       choisirSegment: (choix) => {
@@ -631,11 +681,13 @@ const ecranLeve = recepteurDisponible()
         if (choix === 'tout') ligne.segment = null;
         else if (choix === 'segment') ligne.segment = ligne.segmentTouche ?? 0;
         else if (ligne.segment != null) ligne.segment = Math.max(0, Math.min(nombre - 1, ligne.segment + (choix === 'suivant' ? 1 : -1)));
+        garderTalusOuvert();
         montrerImplantation();
       },
       inverserLigne: () => {
         if (!implanter.ligne) return;
         implanter.ligne.inverse = !implanter.ligne.inverse;
+        garderTalusOuvert();
         montrerImplantation();
       },
       // Décalage parallèle et altitudes tapées (début, fin) : des nombres, ou vide.
@@ -646,10 +698,60 @@ const ecranLeve = recepteurDisponible()
         if (lue === undefined) return;
         if (champ === 'decalage') ligne.decalage = lue ?? 0;
         else ligne.altitudes[champ] = lue;
+        garderTalusOuvert();
         montrerImplantation();
       },
+      // --- Implantation d'un talus (réglages : voir topo/talus.js) ---
+      // Champs tapés (pente H, V, longueur : des nombres, ou vide) et choix (haut / bas, côté, surfaces).
+      reglerTalus: (champ, valeur) => {
+        const reglages = terrain.talus;
+        if (['horizontal', 'vertical', 'longueur'].includes(champ)) {
+          const lue = lireNombrePositif(valeur, champ === 'longueur' ? 'Longueur' : 'Pente');
+          if (lue === undefined) {
+            montrerImplantation();
+            return;
+          }
+          reglages[champ] = lue;
+        } else if (champ === 'ligneEst') reglages.ligneEst = valeur === 'bas' ? 'bas' : 'haut';
+        else if (champ === 'cote') reglages.cote = valeur === 'gauche' ? 'gauche' : 'droite';
+        else if (champ === 'terrainId' || champ === 'altitudeSurfaceId') reglages[champ] = valeur || null;
+        else return;
+        retenirReglagesTerrain();
+        garderTalusOuvert();
+        montrerImplantation();
+      },
+      // « Mes talus » : garder le talus en cours (ligne et réglages) dans le projet, sous un nom.
+      enregistrerTalus: () => {
+        if (!implanter.ligne) return;
+        const propose = `Talus ${projet.talus.length + 1}`;
+        const nom = prompt('Nom du talus', propose);
+        if (nom == null) return;
+        const talus = { id: nouvelIdentifiant(), nom: nom.trim() || propose, ...copieDuTalus() };
+        projet.talus.push(talus);
+        implanter.talusId = talus.id;
+        afficherMessage(`${talus.nom} gardé dans « Mes talus »`, 2500);
+        modifie();
+      },
+      ouvrirTalus: (id) => {
+        const talus = projet.talus.find((t) => t.id === id);
+        if (!talus) return;
+        const { nom, sommets, segment, inverse, altitudes } = talus.ligne;
+        implanter.ligne = { ...nouvelleLigneAImplanter(nom, sommets.map((p) => ({ ...p })), null), segment, inverse, altitudes: { ...altitudes } };
+        implanter.pointsLigne = [];
+        implanter.talusId = talus.id;
+        terrain.talus = { ...terrain.talus, ...talus.reglages };
+        retenirReglagesTerrain();
+        montrerImplantation();
+      },
+      supprimerTalus: (id) => {
+        const talus = projet.talus.find((t) => t.id === id);
+        if (!talus || !confirm(`Enlever ${talus.nom} de « Mes talus » ?`)) return;
+        projet.talus = projet.talus.filter((t) => t.id !== id);
+        if (implanter.talusId === id) implanter.talusId = null;
+        modifie();
+      },
       choisirAccroche: (mode) => {
-        if (terrain.implantation === 'ligne') {
+        if (enImplantationDeLigne()) {
           terrain.accrocheLigne = mode === 'trait' || MODES_ACCROCHE.includes(mode) ? mode : 'trait';
           retenirReglagesTerrain();
           montrerImplantation();
@@ -664,6 +766,8 @@ const ecranLeve = recepteurDisponible()
         retenirReglagesTerrain();
         montrerImplantation();
       },
+      // Fenêtre « Liste » de la barre d'accroche : les points du projet, liste par liste.
+      groupesPoints: () => groupesDePointsParListe(),
       // Nom d'un point du projet tapé (ou choisi dans la liste) : il devient le point choisi.
       trouverPoint: (nom) => {
         const cherche = nom.trim();
@@ -756,6 +860,10 @@ const ecranLeve = recepteurDisponible()
         requestAnimationFrame(cadrerSurImplantation);
       },
       enregistrerImplantation: () => {
+        if (enTalus()) {
+          enregistrerImplantationTalus();
+          return;
+        }
         if (enImplantationDeLigne()) {
           enregistrerImplantationLigne();
           return;
@@ -870,7 +978,7 @@ function envoyerImplantationAuPlan() {
         choix: recalage.planId ? (recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : accrocheActive && !enLigne ? implanter.choix : null,
         cible: accrocheActive && !enLigne ? implanter.cible : null,
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
-        ligne: sommets ? { sommets, parallele: implanter.ligne.decalage ? ligneParallele(sommets, implanter.ligne.decalage) : null } : null,
+        ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : [],
       }
     : null);
@@ -908,7 +1016,7 @@ function montrerImplantation() {
 
 /** Cadre le plan sur ce qu'on implante (point ou ligne) et la position du récepteur. */
 function cadrerSurImplantation() {
-  const coins = implanter.ligne && terrain.implantation === 'ligne' ? [...implanter.ligne.sommets] : implanter.cible ? [implanter.cible] : [];
+  const coins = implanter.ligne && ['ligne', 'talus'].includes(terrain.implantation) ? [...implanter.ligne.sommets] : implanter.cible ? [implanter.cible] : [];
   const position = etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null;
   // La canne aussi, si elle est assez près (sinon le point serait tout petit à l'écran).
   if (position && coins.length > 0 && Math.hypot(position.est - coins[0].est, position.nord - coins[0].nord) < 300) coins.push(position);
@@ -928,14 +1036,41 @@ function cotesLigne(implantationLigne) {
   return { sommets: trace, abscisse: l.abscisse, longueur: l.longueur, ecart: l.ecart };
 }
 
+/**
+ * Talus : mêmes cotes que pour une ligne (position le long de la ligne), et sur le trait canne →
+ * entrée en terre, la distance qui reste à faire ; ou null.
+ */
+function cotesTalus(implantationTalus) {
+  const g = implantationTalus?.talus;
+  if (!g || implantationTalus.message || !implanter.ligne) return null;
+  return { sommets: sommetsDeLaLigne(), abscisse: g.abscisse, longueur: g.longueur, ecart: g.ecartDistance };
+}
+
+/** Mesures dessinées sur le plan hors de l'onglet des mesures : [{ mesure, resultat }]. */
+function mesuresDuPlan(listes) {
+  if (ongletContexte === 'terrain' && terrain.mode === 'controler') return [];
+  const choisies = new Set(mesuresVisibles(projet, listes));
+  const enCours = ongletContexte === 'terrain' && terrain.mode === 'lever' ? metreEnCours() : null;
+  if (enCours) for (const m of projet.mesures) if (m.metreId === enCours.id) choisies.add(m);
+  return [...choisies].map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }));
+}
+
 /** Vrai pendant l'implantation d'un point (Terrain › Implanter › Point). */
 function enImplantationDePoint() {
   return Boolean(ecranLeve) && terrain.mode === 'controler' && terrain.implantation === 'point';
 }
 
-/** Vrai pendant l'implantation d'une ligne (Terrain › Implanter › Ligne). */
+/**
+ * Vrai pendant l'implantation d'une ligne (Terrain › Implanter › Ligne), ou d'un talus (on choisit
+ * sa ligne de la même façon).
+ */
 function enImplantationDeLigne() {
-  return Boolean(ecranLeve) && terrain.mode === 'controler' && terrain.implantation === 'ligne';
+  return Boolean(ecranLeve) && terrain.mode === 'controler' && ['ligne', 'talus'].includes(terrain.implantation);
+}
+
+/** Vrai pendant l'implantation d'un talus (Terrain › Implanter › Talus). */
+function enTalus() {
+  return Boolean(ecranLeve) && terrain.mode === 'controler' && terrain.implantation === 'talus';
 }
 
 /** Nouvelle ligne à implanter (toute la ligne, dans le sens des sommets, sans décalage). */
@@ -958,7 +1093,7 @@ function calculerImplantationLigne(etat) {
   if (!ligne) return null;
   const position = etat.connecte && etat.recu ? etat.position : null;
   if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
-  const g = guidageLigne(position, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: ligne.altitudes });
+  const g = guidageLigne(position, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: altitudesDesBouts() });
   if (!g) return { message: 'Ligne sans longueur' };
   const fiable = Boolean(etat.autorise);
   const ecartAltitude = fiable && g.altitude != null ? ecartSurface(g.altitude, position.altitude) : null;
@@ -982,7 +1117,7 @@ function enregistrerImplantationLigne() {
   }
   const { est, nord, altitude, ...gnss } = reponse.point;
   const mesure = { est, nord, altitude, gnss };
-  const g = guidageLigne(mesure, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: ligne.altitudes });
+  const g = guidageLigne(mesure, sommetsDeLaLigne(), { decalageVoulu: ligne.decalage, altitudes: altitudesDesBouts() });
   const ecarts = ecartsImplantation(g.cible, mesure);
   projet.implantations.push({
     id: nouvelIdentifiant(),
@@ -1002,6 +1137,153 @@ function enregistrerImplantationLigne() {
   modifie();
 }
 
+// --- Implantation d'un talus (Terrain › Implanter › Talus ; calculs dans topo/talus.js) ---
+
+/**
+ * Nombre positif tapé (pente, longueur, m) : le nombre, ou null si le champ est vide.
+ * Renvoie undefined (et prévient) s'il est illisible ou pas plus grand que 0.
+ */
+function lireNombrePositif(texte, quoi) {
+  const nettoye = String(texte ?? '').trim().replace(',', '.');
+  if (!nettoye) return null;
+  const nombre = Number(nettoye);
+  if (Number.isFinite(nombre) && nombre > 0) return nombre;
+  alert(`${quoi} « ${texte} » illisible : écris un nombre plus grand que 0, ou laisse vide.`);
+  return undefined;
+}
+
+/** Ligne et réglages du talus en cours, pour « Mes talus » (copies : rien n'est partagé). */
+function copieDuTalus() {
+  const { nom, sommets, segment, inverse, altitudes } = implanter.ligne;
+  return {
+    ligne: { nom, sommets: sommets.map((p) => ({ est: p.est, nord: p.nord, altitude: p.altitude ?? null, ...(p.nom ? { nom: p.nom } : {}) })), segment, inverse, altitudes: { ...altitudes } },
+    reglages: { ...terrain.talus },
+  };
+}
+
+/** Talus de « Mes talus » ouvert : ses changements (sens, segment, altitudes, réglages) y sont gardés. */
+function garderTalusOuvert() {
+  if (!enTalus() || !implanter.talusId || !implanter.ligne) return;
+  const talus = projet.talus.find((t) => t.id === implanter.talusId);
+  if (!talus) return;
+  Object.assign(talus, copieDuTalus());
+  enregistrerBientot();
+}
+
+// Recherche rapide de l'altitude d'une surface (voir chercheurAltitude), préparée une fois par surface calculée.
+const chercheursAltitude = new WeakMap();
+function altitudeDeSurface(id) {
+  const triangles = id ? trianglesDeSurface(id) : [];
+  if (triangles.length === 0) return null;
+  if (!chercheursAltitude.has(triangles)) chercheursAltitude.set(triangles, chercheurAltitude(triangles));
+  return chercheursAltitude.get(triangles);
+}
+
+/** Ce qu'il faut pour calculer le talus : sa ligne, l'altitude de la ligne et celle du terrain (ou null). */
+function donneesTalus() {
+  const sommets = sommetsDeLaLigne();
+  const reglages = terrain.talus;
+  return {
+    sommets,
+    reglages,
+    altitudeLigne: sourceAltitudeLigne(sommets, altitudesDesBouts(), altitudeDeSurface(reglages.altitudeSurfaceId)),
+    altitudeTerrain: altitudeDeSurface(reglages.terrainId),
+  };
+}
+
+/** Talus en mots, pour le CSV et les messages : « 3/2 haut droite ». */
+function texteTalus(reglages) {
+  return `${textePente(reglages)} ${reglages.ligneEst} ${reglages.cote}`;
+}
+
+/**
+ * Implantation d'un talus, à chaque état du récepteur : entrée en terre (s'éloigner / se
+ * rapprocher de la ligne), monter / descendre par rapport au talus, profil en travers.
+ */
+function calculerImplantationTalus(etat) {
+  if (!implanter.ligne) return null;
+  const position = etat.connecte && etat.recu ? etat.position : null;
+  if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
+  const { sommets, reglages, altitudeLigne, altitudeTerrain } = donneesTalus();
+  const g = guidageTalus(position, sommets, reglages, { altitudeLigne, altitudeTerrain });
+  if (g.message) return { message: g.message, talus: g };
+  const fiable = Boolean(etat.autorise);
+  const ecartAltitude = fiable && g.altitudeTalusCanne != null ? ecartSurface(g.altitudeTalusCanne, position.altitude) : null;
+  // Profil du terrain en travers (de la ligne vers le talus), pour la coupe : surface, sinon rien.
+  const debut = Math.min(0, g.distance) - 1;
+  const fin = Math.max(g.distanceVoulue, g.distance, 0) + 1;
+  const profil = [];
+  if (altitudeTerrain) {
+    const pas = (fin - debut) / 60;
+    for (let d = debut; d <= fin + 1e-9; d += pas) {
+      const altitude = altitudeTerrain(g.pied.est + g.direction.est * d, g.pied.nord + g.direction.nord * d);
+      if (altitude != null) profil.push({ distance: d, altitude });
+    }
+  }
+  return {
+    talus: g,
+    reglages,
+    classe: fiable ? classeDistance(Math.abs(g.ecartDistance)) : 'pas-fiable',
+    ecartAltitude,
+    classeAltitude: ecartAltitude == null ? null : classeEcart(ecartAltitude),
+    altitudeCanne: fiable ? position.altitude : null,
+    profil,
+    message: null,
+  };
+}
+
+/** « Enregistrer l'implantation » d'un talus : l'entrée en terre (ou le bord du talus) et les écarts. */
+function enregistrerImplantationTalus() {
+  if (!implanter.ligne) return;
+  const reponse = prendrePointRecepteur();
+  if (!reponse.ok) {
+    afficherMessage(`Implantation refusée : ${reponse.raison}`, 4000);
+    return;
+  }
+  const { est, nord, altitude, ...gnss } = reponse.point;
+  const mesure = { est, nord, altitude, gnss };
+  const { sommets, reglages, altitudeLigne, altitudeTerrain } = donneesTalus();
+  const g = guidageTalus(mesure, sommets, reglages, { altitudeLigne, altitudeTerrain });
+  if (g.message) {
+    afficherMessage(`Implantation refusée : ${g.message}`, 4000);
+    return;
+  }
+  const ecarts = ecartsImplantation(g.cible, mesure);
+  const nomTalus = projet.talus.find((t) => t.id === implanter.talusId)?.nom ?? implanter.ligne.nom;
+  const sur = g.auBord ? 'bord du talus' : 'entrée en terre';
+  const accord = g.auBord ? 'enregistré' : 'enregistrée';
+  projet.implantations.push({
+    id: nouvelIdentifiant(),
+    nom: `${nomTalus} · ${sur} · ${formaterNombre(g.abscisse)}`,
+    type: 'talus',
+    cible: g.cible,
+    mesure,
+    ecarts,
+    ligne: { nom: implanter.ligne.nom, abscisse: g.abscisse, decalage: g.distance * (reglages.cote === 'gauche' ? -1 : 1) },
+    talus: { texte: texteTalus(reglages), distanceVoulue: g.distanceVoulue, auBord: g.auBord, solPlat: g.solPlat },
+    le: new Date().toISOString(),
+  });
+  navigator.vibrate?.(60);
+  sonValidation();
+  afficherMessage(`${sur[0].toUpperCase()}${sur.slice(1)} ${accord} (+${formaterNombre(g.abscisse)} m) : écart ${formaterNombre(ecarts.distance)} m`, 4000);
+  modifie();
+}
+
+// Zone du talus sur le plan : calculée seulement quand la ligne, ses réglages ou les surfaces changent.
+let zoneTalusMemoire = { cle: null, zone: null };
+function zoneDuTalus() {
+  if (!enTalus() || !implanter.ligne || !talusComplet(terrain.talus)) return null;
+  const donnees = donneesTalus();
+  const { reglages } = donnees;
+  const cle = JSON.stringify([donnees.sommets, reglages, altitudesDesBouts()]);
+  const surfaces = [trianglesDeSurface(reglages.terrainId), trianglesDeSurface(reglages.altitudeSurfaceId)];
+  if (zoneTalusMemoire.cle !== cle || zoneTalusMemoire.surfaces?.some((t, i) => t !== surfaces[i])) {
+    const longueur = longueurPolyligne(donnees.sommets);
+    zoneTalusMemoire = { cle, surfaces, zone: zoneTalus(donnees.sommets, reglages, { ...donnees, pas: Math.max(0.5, longueur / 200) }) };
+  }
+  return zoneTalusMemoire.zone;
+}
+
 /** Toucher du plan pendant l'implantation d'une ligne : une ligne du DXF, ou un point de plus. */
 function toucherPourLigne(position, tolerance) {
   const mm = (p) => ({ ...p, est: Math.round(p.est * 1000) / 1000, nord: Math.round(p.nord * 1000) / 1000, altitude: p.altitude != null ? Math.round(p.altitude * 1000) / 1000 : null });
@@ -1014,6 +1296,7 @@ function toucherPourLigne(position, tolerance) {
     const sommets = trouve.sommets.map(mm);
     const nombre = sommets.length - 1;
     implanter.ligne = nouvelleLigneAImplanter(`Ligne DXF (${nombre} segment${nombre > 1 ? 's' : ''})`, sommets, trouve.segment);
+    implanter.talusId = null;
     implanter.pointsLigne = [];
   } else {
     const sources = terrain.accrocheLigne === 'point'
@@ -1191,6 +1474,23 @@ function montrerRecalage() {
   });
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
+}
+
+/**
+ * Points du projet rangés comme dans « Afficher » (fichier importé, surface, métré, Autres, points
+ * ajoutés), puis « À implanter » : [{ titre, noms }] (fenêtre « Liste » de Terrain › Implanter).
+ * Un point peut être dans plusieurs listes (fichier et surface).
+ */
+function groupesDePointsParListe() {
+  const groupes = [];
+  for (const liste of listesDePoints(projet)) {
+    if (!liste.leveId) continue;
+    const leve = projet.leves.find((l) => l.id === liste.leveId);
+    const noms = [...new Set((leve?.points ?? []).map((p) => p.nom).filter((nom) => !liste.noms || liste.noms.has(nom)))];
+    if (noms.length > 0) groupes.push({ titre: liste.nom, noms });
+  }
+  if (projet.aImplanter.length > 0) groupes.push({ titre: 'À implanter', noms: projet.aImplanter.map((p) => p.nom) });
+  return groupes;
 }
 
 /**
@@ -1529,11 +1829,32 @@ function donneesCommunes() {
       accrocheLigne: terrain.accrocheLigne,
       pointsLigne: implanter.pointsLigne,
       ligne: implanter.ligne ? resumeLigne() : null,
+      // Talus : réglages, talus de « Mes talus » ouvert (nom) et la liste.
+      talus: {
+        reglages: terrain.talus,
+        complet: talusComplet(terrain.talus),
+        texte: textePente(terrain.talus),
+        ouvert: projet.talus.find((t) => t.id === implanter.talusId)?.nom ?? null,
+        mesTalus: projet.talus.map((t) => ({ id: t.id, nom: t.nom, texte: `${textePente(t.reglages)} · ${t.reglages.ligneEst === 'bas' ? 'depuis le bas' : 'depuis le haut'} · à ${t.reglages.cote}` })),
+      },
       nomPointAjoute: nomPointAjoute(projet),
       // Point choisi qui est déjà un point du projet (pas de « + Point du projet »).
       choixDuProjet: Boolean(implanter.choix?.nom && pointsDuProjet().some((p) => p.nom === implanter.choix.nom)),
     },
   };
+}
+
+/**
+ * Altitudes du début et de la fin de la ligne à implanter (m) : celles tapées, sinon celles des
+ * points eux-mêmes (un point du projet choisi pour la ligne a souvent une altitude, même si un
+ * autre point de la ligne n'en a pas). { debut, fin }, chacune pouvant être null.
+ */
+function altitudesDesBouts() {
+  const sommets = sommetsDeLaLigne();
+  const tapees = implanter.ligne.altitudes;
+  // Tous les sommets ont une altitude (DXF 3D…) : on suit leurs altitudes, sommet par sommet.
+  if (tapees.debut == null && tapees.fin == null && sommets.every((s) => s.altitude != null)) return tapees;
+  return { debut: tapees.debut ?? sommets[0]?.altitude ?? null, fin: tapees.fin ?? sommets.at(-1)?.altitude ?? null };
 }
 
 /** Ligne à implanter pour l'écran Terrain : nom, longueur, segments, sens, début, fin, réglages. */
@@ -1547,7 +1868,7 @@ function resumeLigne() {
     segment: ligne.segment,
     inverse: ligne.inverse,
     decalage: ligne.decalage,
-    altitudes: ligne.altitudes,
+    altitudes: altitudesDesBouts(),
     altitudesDuPlan: sommets.every((s) => s.altitude != null),
     debut: sommets[0],
     fin: sommets.at(-1),
@@ -1640,20 +1961,25 @@ if (recepteurDisponible()) {
   ecouterRecepteur((etat) => {
     etatRecepteur = etat;
     mettreAJourBandeaux(etat);
+    boutonRecepteur?.mettreAJour(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
     const enPoint = enImplantationDePoint();
     const enLigne = enImplantationDeLigne();
     const controle = terrain.mode === 'controler' && !enPoint && !enLigne ? calculerControle(etat, orientation) : null;
     const implantation = enPoint ? calculerImplantation(etat, orientation) : null;
-    const implantationLigne = enLigne ? calculerImplantationLigne(etat) : null;
-    ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation, implantationLigne });
+    const talus = enTalus();
+    const implantationLigne = enLigne && !talus ? calculerImplantationLigne(etat) : null;
+    const implantationTalus = talus ? calculerImplantationTalus(etat) : null;
+    ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation, implantationLigne, implantationTalus });
     const position = etat.connecte && etat.recu ? etat.position : null;
     // Coupes affichées (mode Implanter) : leur trait en pointillés sur le plan.
     const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
     const traits = controle?.coupes ? vues.map((sens) => ({ sens, debut: controle.coupes[sens].debut, fin: controle.coupes[sens].fin })) : [];
     // Ligne : trait en pointillés jusqu'au point de la ligne en face de la canne.
-    const vers = implantationLigne?.ligne?.cible ?? null;
-    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotesLigne(implantationLigne) } : null);
+    // Talus : trait jusqu'à l'entrée en terre (ou au bord du talus) en face de la canne.
+    const vers = implantationLigne?.ligne?.cible ?? (implantationTalus?.message ? null : implantationTalus?.talus?.cible) ?? null;
+    const cotes = implantationTalus ? cotesTalus(implantationTalus) : cotesLigne(implantationLigne);
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotes } : null);
   });
 }
 
@@ -1674,7 +2000,7 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   },
   // Nouveau projet : on reste sur l'onglet Projet, curseur dans « Affaire ».
   nouveauProjet: async () => {
-    await changerDeProjet(() => ouvrir(creerProjet(), { changerOnglet: false }));
+    await changerDeProjet(() => ouvrir(nouveauProjetSansNom(), { changerOnglet: false }));
     afficherOnglet('projets');
     document.querySelector('#projets [data-cartouche="affaire"]')?.focus();
   },
@@ -1731,7 +2057,7 @@ async function supprimerDeLAppareil(id) {
   await stockage.supprimerProjet(id);
   if (id === projet.id) {
     const restants = (await stockage.listerProjets()).sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
-    await ouvrir(restants[0] ? completerProjet(restants[0]) : creerProjet(), { changerOnglet: false });
+    await ouvrir(restants[0] ? completerProjet(restants[0]) : nouveauProjetSansNom(), { changerOnglet: false });
     partage?.apresOuverture();
   }
   await rafraichirListe();
@@ -1760,15 +2086,30 @@ partage = creerPartage({
     const lu = await stockage.lireProjet(id);
     return lu ? completerProjet(lu) : null;
   },
+  enregistrerLocal: async (lu) => {
+    const complet = completerProjet(lu);
+    await stockage.enregistrerProjet(complet);
+    mettreAJourResume(complet);
+  },
   ouvrirProjet: (nouveau) => ouvrir(completerProjet(nouveau), { changerOnglet: false }),
   garderCopie: async (local) => {
-    const copie = dupliquerProjet(completerProjet(local), `${local.nom || titreProjet(local)} (copie de cet appareil)`);
+    const copie = dupliquerProjet(completerProjet(local), `${titreProjet(local)} (copie)`);
     await stockage.enregistrerProjet(copie);
     mettreAJourResume(copie);
+    return copie;
   },
+  // Projet modifié ici et sur Drive : 2 boutons, « Repartir depuis Drive » mis en avant.
+  choisirVersionConflit: (titre) => demanderChoix({
+    titre: `« ${titre} » a changé ici et sur Drive`,
+    boutons: [
+      { cle: 'drive', texte: 'Repartir depuis Drive', detail: 'les changements faits ici sont perdus', principal: true },
+      { cle: 'copie', texte: 'Créer une copie', detail: 'ta version devient un nouveau projet ; Drive ne change pas' },
+    ],
+  }),
   quandChange: () => {
     afficherEcranProjet();
     mettreAJourEtatEntete();
+    fenetreReglages?.rafraichir();
   },
   message: (texte) => afficherMessage(texte, 4000),
 });
@@ -2147,10 +2488,10 @@ function recalculer({ recadrer = false } = {}) {
     // en mode Implanter, aucune étiquette (volume, mesures).
     volumesDiscrets: ongletContexte === 'terrain',
     sansVolumes: ongletContexte === 'terrain' && terrain.mode === 'controler',
-    // Onglet Terrain, métré en cours : ses aires, longueurs et points comptés.
-    mesures: ongletContexte === 'terrain' && terrain.mode === 'lever' && metreEnCours()
-      ? projet.mesures.filter((m) => m.metreId === metreEnCours().id).map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }))
-      : [],
+    // Mesures (aires, longueurs, nombres) des métrés cochés dans « Afficher » (et celles faites à la
+    // main si « Mesures » est cochée) ; dans Terrain › Lever, toujours celles du métré en cours ;
+    // dans Terrain › Implanter, aucune.
+    mesures: mesuresDuPlan(listes),
     mesureActive: null,
   });
   if (recadrer || pointsDuPlan !== pointsAffiches) {
@@ -2215,9 +2556,10 @@ function enregistrerBientot() {
 const boutonAnnuler = document.querySelector('#bouton-annuler');
 const boutonRetablir = document.querySelector('#bouton-retablir');
 
+// Plus de boutons Annuler / Rétablir dans l'en-tête (version 0.54.0) : Ctrl+Z / Ctrl+Y restent (ordinateur).
 function mettreAJourAnnuler() {
-  boutonAnnuler.disabled = !historique.peutAnnuler(modifications);
-  boutonRetablir.disabled = !historique.peutRetablir(modifications);
+  if (boutonAnnuler) boutonAnnuler.disabled = !historique.peutAnnuler(modifications);
+  if (boutonRetablir) boutonRetablir.disabled = !historique.peutRetablir(modifications);
 }
 
 /** Remplace le projet affiché par un état de l'historique, en restant au même endroit dans les écrans. */
@@ -2233,8 +2575,8 @@ function revenirA(etat, message) {
 
 const annulerModification = () => revenirA(historique.annuler(modifications), 'Modification annulée');
 const retablirModification = () => revenirA(historique.retablir(modifications), 'Modification rétablie');
-boutonAnnuler.addEventListener('click', annulerModification);
-boutonRetablir.addEventListener('click', retablirModification);
+boutonAnnuler?.addEventListener('click', annulerModification);
+boutonRetablir?.addEventListener('click', retablirModification);
 
 // Raccourcis clavier (ordinateur) : Ctrl+Z annule, Ctrl+Y ou Ctrl+Maj+Z rétablit.
 // Dans une case de texte, on laisse le navigateur annuler la frappe.
@@ -2249,11 +2591,8 @@ document.addEventListener('keydown', (evenement) => {
 
 /** Ligne sous le titre du projet (en-tête) : nom, points, surfaces, et l'état de Drive si connecté. */
 function mettreAJourEtatEntete() {
-  // Titre : affaire - lieu (ou le nom) ; tant que rien n'est tapé, un exemple en gris.
-  const titre = document.querySelector('#titre-projet');
-  const sansTitre = projetSansTitre(projet);
-  titre.textContent = sansTitre ? EXEMPLE_TITRE : titreProjet(projet);
-  titre.classList.toggle('titre-exemple', sansTitre);
+  // Titre : affaire - lieu (ou le nom, sinon « Projet sans nom 2 »…).
+  document.querySelector('#titre-projet').textContent = titreProjet(projet);
 
   const points = leveActif(projet)?.points ?? AUCUN_POINT;
   const drive = partage?.etat.connecte
@@ -2347,6 +2686,7 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   implanter.cible = null;
   implanter.pointsLigne = [];
   implanter.ligne = null;
+  implanter.talusId = null;
   dernierImport = null;
   document.querySelector('#message-import-surface').innerHTML = '';
   editeurSurfaces.charger(projet.surfaces);
@@ -2358,16 +2698,27 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   await enregistrer();
 }
 
+/**
+ * Nouveau projet, avec un nom automatique tant qu'il n'a ni affaire, ni lieu, ni nom (« Projet sans
+ * nom 2 »… : jamais le même qu'un projet de l'appareil ou de Drive).
+ */
+function nouveauProjetSansNom() {
+  const nouveau = creerProjet();
+  nouveau.nomAuto = nomAutomatique([...resumes.map((r) => r.titre), ...(partage?.etat.projetsDrive ?? []).map((p) => p.titre)]);
+  return nouveau;
+}
+
 // --- Démarrage : on rouvre le dernier projet, sinon le plus récent, sinon un nouveau ---
 // L'appli s'ouvre sur l'onglet Projet (bouton « Continuer » pour reprendre le travail).
 async function demarrer() {
   afficherOnglet('projets');
+  adapterAuMode();
   stockage.demanderStockagePersistant();
   try {
     await rafraichirListe();
     const id = stockage.dernierProjet();
     const lu = (id && (await stockage.lireProjet(id))) || (resumes[0] && (await stockage.lireProjet(resumes[0].id)));
-    await ouvrir(lu ? completerProjet(lu) : creerProjet(), { changerOnglet: false });
+    await ouvrir(lu ? completerProjet(lu) : nouveauProjetSansNom(), { changerOnglet: false });
     // Partage : on se reconnecte à Drive si on l'était (le projet ouvert est alors comparé à Drive).
     partage.demarrer();
   } catch (erreur) {

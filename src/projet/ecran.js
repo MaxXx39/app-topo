@@ -10,7 +10,7 @@ import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { estDansAppliAndroid } from '../android/pont.js';
-import { titreProjet, projetSansTitre, EXEMPLE_TITRE } from './projet.js';
+import { titreProjet } from './projet.js';
 import { verrouActif } from '../partage/synchro.js';
 
 /**
@@ -27,6 +27,13 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
   let panneau = null;
   let menuOuvert = null;
   let derniers = null; // dernier projet et liste affichés (pour redessiner après un clic)
+  // Tri de la liste : 'date' (dernière modification, ici ou sur Drive) ou 'nom' (A → Z), retenu sur l'appareil.
+  let triProjets = 'date';
+  try {
+    if (localStorage.getItem('topo-tri-projets') === 'nom') triProjets = 'nom';
+  } catch {
+    // Mémoire indisponible : tri par date.
+  }
 
   function quandClic(evenement) {
     const bouton = evenement.target.closest('button[data-action]');
@@ -39,6 +46,14 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
       if (derniers) dessiner(...derniers);
       conteneur.closest('.panneau')?.scrollIntoView({ block: 'start' });
       window.scrollTo(0, 0);
+    } else if (action === 'trier') {
+      triProjets = bouton.dataset.tri === 'nom' ? 'nom' : 'date';
+      try {
+        localStorage.setItem('topo-tri-projets', triProjets);
+      } catch {
+        // Mémoire indisponible : le tri vaut jusqu'à la fermeture de l'appli.
+      }
+      if (derniers) dessiner(...derniers);
     } else if (action === 'menu-projet') {
       menuOuvert = menuOuvert === id ? null : id;
       if (derniers) dessiner(...derniers);
@@ -96,7 +111,7 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
     const pageGestion = panneau === 'projets';
     conteneur.closest('.panneau')?.classList.toggle('page-gestion-projets', pageGestion);
     if (pageGestion) {
-      conteneur.innerHTML = pageProjets(projet, resumes, partage, menuOuvert);
+      conteneur.innerHTML = pageProjets(projet, resumes, partage, menuOuvert, triProjets);
       return;
     }
     conteneur.innerHTML = `
@@ -108,9 +123,7 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
       <section class="bloc-ouvert">
         <div class="bloc-entete">
           <span class="etiquette-entete">Projet ouvert ${bulle('projets')}</span>
-          ${projetSansTitre(projet)
-            ? `<span class="titre-projet-ouvert titre-exemple">${EXEMPLE_TITRE}</span>`
-            : `<span class="titre-projet-ouvert">${echapper(titreProjet(projet))}</span>`}
+          <span class="titre-projet-ouvert">${echapper(titreProjet(projet))}</span>
         </div>
         <div class="bloc-corps">
           <div class="champs-projet">
@@ -121,7 +134,8 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
         </div>
       </section>
     `;
-    conteneurSuite.innerHTML = `${partage ? blocPartage(partage) : ''}
+    // Le partage par Google Drive est dans les réglages (roue de l'en-tête, version 0.54.0).
+    conteneurSuite.innerHTML = `
       <p class="aide pied-projet">Version de l'appli : ${__VERSION_APPLI__}${estDansAppliAndroid() ? ' (appli Android)' : ''}</p>`;
   }
 
@@ -138,19 +152,24 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
 
 /**
  * Tous les projets, chacun une seule fois : ceux de cet appareil (📱) et ceux de Google Drive (☁),
- * réunis par leur identifiant, les plus récents d'abord.
+ * réunis par leur identifiant. tri : 'date' (le plus récent d'abord, la date la plus récente entre
+ * l'appareil et Drive) ou 'nom' (ordre alphabétique).
  */
-function projetsReunis(resumes, partage) {
+export function projetsReunis(resumes, partage, tri = 'date') {
   const parId = new Map();
   for (const r of resumes) parId.set(r.id, { id: r.id, titre: r.titre ?? r.nom, sousTitre: r.sousTitre, modifieLe: r.modifieLe, local: r, drive: null });
   if (partage?.etat.connecte) {
     for (const p of partage.etat.projetsDrive) {
       const deja = parId.get(p.projetId);
-      if (deja) deja.drive = p;
-      else parId.set(p.projetId, { id: p.projetId, titre: p.titre, sousTitre: '', modifieLe: p.modifieLe ?? '', local: null, drive: p });
+      if (deja) {
+        deja.drive = p;
+        if (String(p.modifieLe ?? '') > String(deja.modifieLe ?? '')) deja.modifieLe = p.modifieLe;
+      } else parId.set(p.projetId, { id: p.projetId, titre: p.titre, sousTitre: '', modifieLe: p.modifieLe ?? '', local: null, drive: p });
     }
   }
-  return [...parId.values()].sort((a, b) => String(b.modifieLe ?? '').localeCompare(String(a.modifieLe ?? '')));
+  const liste = [...parId.values()];
+  if (tri === 'nom') return liste.sort((a, b) => String(a.titre ?? '').localeCompare(String(b.titre ?? ''), 'fr', { numeric: true, sensitivity: 'base' }));
+  return liste.sort((a, b) => String(b.modifieLe ?? '').localeCompare(String(a.modifieLe ?? '')));
 }
 
 /**
@@ -158,8 +177,8 @@ function projetsReunis(resumes, partage) {
  * ⋮ : exporter, dupliquer, supprimer de cet appareil, supprimer partout (appareil et Drive).
  * Puis un fichier projet (.topo.json).
  */
-function pageProjets(projet, resumes, partage, menuOuvert) {
-  const projets = projetsReunis(resumes, partage);
+function pageProjets(projet, resumes, partage, menuOuvert, tri) {
+  const projets = projetsReunis(resumes, partage, tri);
   return `<div class="entete-page-projets">
     <button type="button" class="bouton-retour" data-action="panneau" data-panneau="projets" title="Retour au projet ouvert" aria-label="Retour au projet ouvert">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
@@ -168,10 +187,15 @@ function pageProjets(projet, resumes, partage, menuOuvert) {
   </div>
   <section class="carte-section panneau-projets">
     <button type="button" class="bouton-secondaire bouton-nouveau-page" data-action="nouveau">+ Nouveau projet</button>
+    <div class="tri-projets" role="group" aria-label="Trier">
+      <span class="aide">Trier :</span>
+      <button type="button" class="puce-choix ${tri === 'date' ? 'actif' : ''}" data-action="trier" data-tri="date">Récents</button>
+      <button type="button" class="puce-choix ${tri === 'nom' ? 'actif' : ''}" data-action="trier" data-tri="nom">A → Z</button>
+    </div>
     <div class="liste-projets">
       ${projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert === p.id, partage)).join('')}
     </div>
-    <label class="bouton-secondaire bouton-fichier">
+    <label class="bouton-secondaire bouton-fichier seulement-confirme">
       Ouvrir un fichier projet (.topo.json)
       <input type="file" data-champ="fichier-projet" accept=".json,application/json" hidden />
     </label>
@@ -198,8 +222,8 @@ function ligneProjet(p, estOuvert, menu, partage) {
     </button>
     <button type="button" class="bouton-menu-projet" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
     ${menu ? `<div class="menu-projet">
-      ${p.local ? `<button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporter" data-id="${p.id}">exporter (.topo.json)</button>
-        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="dupliquer" data-id="${p.id}">dupliquer</button>
+      ${p.local ? `<button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter" data-id="${p.id}">exporter (.topo.json)</button>
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="dupliquer" data-id="${p.id}">dupliquer</button>
         <button type="button" class="bouton-lien" data-action="supprimer-projet" data-id="${p.id}">supprimer de cet appareil</button>` : ''}
       ${p.drive ? `<button type="button" class="bouton-lien" data-action="supprimer-partout" data-id="${p.id}">supprimer partout${p.local ? '' : ' (Drive)'}</button>` : ''}
     </div>` : ''}
@@ -217,8 +241,15 @@ const ETATS_PARTAGE = {
   erreur: ['erreur', 'etat-erreur'],
 };
 
-/** Bloc « Partage » : nom de l'appareil, connexion à Drive, état de l'envoi du projet ouvert. */
-function blocPartage({ etat, appareil }) {
+/**
+ * Bloc « Partage » : nom de l'appareil, connexion à Drive, état de l'envoi du projet ouvert.
+ * Affiché dans la fenêtre des réglages (voir reglages/reglages.js) ; boutons data-action :
+ * connecterDrive, deconnecterDrive, envoyerDrive, reprendreLaMain, modifierNomAppareil ; case
+ * data-champ="nom-appareil". Le nom de l'appareil n'est modifiable qu'après le crayon (modifierNom :
+ * vrai), avec un avertissement (le changer une fois réglé déconnecte de Drive) ; tant qu'il n'est
+ * pas donné, la case est ouverte.
+ */
+export function blocPartage({ etat, appareil }, { modifierNom = false } = {}) {
   const [texte, classe] = ETATS_PARTAGE[etat.etat] ?? ['?', ''];
   const heure = etat.etat === 'a-jour' && etat.derniereSynchro ? ` · ${etat.derniereSynchro.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}` : '';
   const reprise = etat.etat === 'repris' && etat.repris
@@ -228,7 +259,12 @@ function blocPartage({ etat, appareil }) {
   return `<section class="carte-section bloc-partage">
     ${titreSection('partage', 'Partage (Google Drive)', bulle('partage'))}
     ${etat.possible ? '' : '<p class="aide">Pas encore réglé sur cet appareil.</p>'}
-    <label class="nom-appareil">Cet appareil <input type="text" data-champ="nom-appareil" value="${echapper(appareil.nom)}" placeholder="ex. Tablette Max" /></label>
+    ${modifierNom || !appareil.nom
+      ? `<label class="nom-appareil">Cet appareil <input type="text" data-champ="nom-appareil" value="${echapper(appareil.nom)}" placeholder="ex. Tablette Max" /></label>
+         ${appareil.nom ? '<p class="avertissement">⚠ Ne change pas ce nom une fois réglé : Drive te déconnecte et les verrous des projets ne te reconnaissent plus.</p>' : ''}`
+      : `<p class="nom-appareil-fixe"><span>Cet appareil</span><strong>${echapper(appareil.nom)}</strong>
+          <button type="button" class="bouton-crayon-libelles" data-action="modifierNomAppareil" title="Modifier le nom de l'appareil" aria-label="Modifier le nom de l'appareil">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button></p>`}
     ${etat.possible ? `<div class="ligne-outils">
       ${etat.connecte
         ? `<span class="etat-partage ${classe}">${texte}${heure}</span>

@@ -117,7 +117,7 @@ export function creerEcranImport(conteneur, actions) {
               <span><strong>Fichier de points</strong><span class="aide">CSV, TXT</span></span>
               <input type="file" data-champ="fichier-points" accept=".csv,.txt,.pts,.xyz,.dat,.asc,text/csv,text/plain" hidden />
             </label>
-            <label class="bouton-import">
+            <label class="bouton-import seulement-confirme">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21 21 3M3 9l6-6M15 21l6-6M3 15h6v6" /></svg>
               <span><strong>Plan DXF</strong><span class="aide">fond de plan</span></span>
               <input type="file" data-champ="fichier-plan" accept=".dxf,application/dxf" hidden />
@@ -130,7 +130,7 @@ export function creerEcranImport(conteneur, actions) {
           ${pointOuvert ? `<div class="bloc-point-ajoute">
             ${htmlFormulairePoint(nomPointAjoute(projet))}
             <p class="erreur" data-vivant="erreur-point">${echapper(erreurPoint)}</p>
-            ${plans.length > 0 ? '<button type="button" class="bouton-secondaire" data-action="pointer-dxf">Pointer sur le plan DXF</button>' : ''}
+            ${plans.length > 0 ? '<button type="button" class="bouton-secondaire seulement-confirme" data-action="pointer-dxf">Pointer sur le plan DXF</button>' : ''}
           </div>` : ''}
           ${dernierImport ? afficherImportPoints(dernierImport) : ''}
           ${dernierPlan ? messagePlan(dernierPlan) : ''}
@@ -155,7 +155,7 @@ export function creerEcranImport(conteneur, actions) {
           }
           ${listePointsDuLeve(projet)}
 
-          ${plans.length > 0 ? `<p class="titre-section">Plans DXF</p>${listePlansDxf(projet, calquesOuverts)}` : ''}
+          ${plans.length > 0 ? `<div class="seulement-confirme"><p class="titre-section">Plans DXF</p>${listePlansDxf(projet, calquesOuverts)}</div>` : ''}
         </section>
       `;
   }

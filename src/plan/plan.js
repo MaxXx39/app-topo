@@ -2,10 +2,12 @@
 // au doigt (téléphone) ou à la souris (ordinateur).
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
 import { bulle } from '../aide/bulles.js';
+import { estModeBase } from '../reglages/reglages.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { formaterNombre } from '../topo/format.js';
 import { svgDrapeau } from '../outils/drapeaux.js';
+import { traitsDeBarbules } from './barbules.js';
 import { pointALAbscisse } from '../topo/ligne-implantation.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne } from '../leve/libelles.js';
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS } from './dxf-canvas.js';
@@ -32,13 +34,15 @@ const CALQUES = [
   { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false },
   { cle: 'contours', titre: 'Contours des surfaces', parDefaut: true, surfaces: true },
   { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true, surfaces: true },
-  { cle: 'triangles', titre: 'Triangles', parDefaut: true },
+  { cle: 'triangles', titre: 'Triangles', parDefaut: true, confirme: true },
   { cle: 'remblaiDeblai', titre: 'Déblai (jaune) / remblai (rouge)', parDefaut: true, surfaces: true },
-  { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false },
-  { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false },
+  { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false, confirme: true },
+  { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false, confirme: true },
   { cle: 'volumes', titre: 'Volume sur chaque surface', parDefaut: true, surfaces: true },
   { cle: 'autresStocks', titre: 'Autres surfaces', parDefaut: true, surfaces: true },
 ];
+// Calques « confirme » : cachés et pas dessinés en mode Base (réglages ⚙), sans changer le choix retenu.
+const CALQUES_CONFIRME = new Set(CALQUES.filter((c) => c.confirme).map((c) => c.cle));
 const CLE_MEMOIRE = 'topo-calques';
 // Équidistances proposées pour les courbes et les couleurs (m). « auto » : choisie selon la hauteur du stock.
 const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
@@ -57,7 +61,12 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
 export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe } = {}) {
-  const calques = lireCalques();
+  // Calques choisis (retenus dans le navigateur) ; « calques » est ce qui est dessiné : en mode
+  // Base, les calques « confirme » sont lus comme décochés.
+  const calquesChoisis = lireCalques();
+  const calques = new Proxy(calquesChoisis, {
+    get: (cible, cle) => (CALQUES_CONFIRME.has(cle) && estModeBase() ? false : cible[cle]),
+  });
 
   // Boutons posés sur le plan : calques en haut à gauche, zoom en haut à droite.
   conteneur.innerHTML = `
@@ -71,27 +80,27 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5" /></svg>
           Calques
         </button>
-        <button type="button" class="puce" data-action="plans-dxf" aria-expanded="false" hidden>
+        <button type="button" class="puce seulement-confirme" data-action="plans-dxf" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h11l5 5v11H4z" /><path d="M15 4v5h5M8 13h8M8 17h5" /></svg>
           Plans
         </button>
-        <button type="button" class="puce" data-action="listes-points" aria-expanded="false" hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="1.8" /><circle cx="13" cy="5" r="1.8" /><circle cx="18" cy="11" r="1.8" /><circle cx="9" cy="15" r="1.8" /><circle cx="16" cy="19" r="1.8" /></svg>
-          Points
+        <button type="button" class="puce seulement-confirme" data-action="listes-points" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
+          Afficher
         </button>
         ${bulle('plan')}
         <div class="menu-plans-dxf" hidden></div>
         <div class="menu-plans-dxf menu-listes-points" hidden></div>
         <div class="menu-calques" hidden>
           ${CALQUES.map(
-            (c) => `<label class="case ${c.surfaces ? 'seulement-surfaces' : ''}"><input type="checkbox" data-calque="${c.cle}" ${calques[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`,
+            (c) => `<label class="case ${c.surfaces ? 'seulement-surfaces' : ''} ${c.confirme ? 'seulement-confirme' : ''}"><input type="checkbox" data-calque="${c.cle}" ${calquesChoisis[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`,
           ).join('')}
-          <label class="choix-equidistance seulement-surfaces">Palier déblai / remblai
+          <label class="choix-equidistance seulement-surfaces seulement-confirme">Palier déblai / remblai
             <select data-calque="palier">
               ${PALIERS.map((e) => `<option value="${e}" ${calques.palier === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
             </select>
           </label>
-          <label class="choix-equidistance">Équidistance des courbes
+          <label class="choix-equidistance seulement-confirme">Équidistance des courbes
             <select data-calque="equidistance">
               ${EQUIDISTANCES.map((e) => `<option value="${e}" ${calques.equidistance === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
             </select>
@@ -354,6 +363,36 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
     // Ligne à implanter : trait sarcelle épais, sa parallèle en pointillés, « Début » et « Fin ».
     const ligne = implantation.ligne;
+    // Talus : zone brune entre la ligne et l'entrée en terre (ou le bord), le bord en pointillés,
+    // et les barbules (traits longs et courts) qui partent du haut du talus. Sans entrée en terre
+    // connue (ni surface ni longueur) : barbules courtes du côté du talus, pour le montrer.
+    if (ligne?.talus && ligne.sommets.length >= 2) {
+      const { zone, cote, ligneEst } = ligne.talus;
+      let pied = [];
+      let bord = [];
+      if (zone) {
+        pied = zone.ligne.map((p) => versEcran(p.est, p.nord, vue));
+        bord = zone.bord.map((p) => versEcran(p.est, p.nord, vue));
+        groupe.append(creerElement('path', { d: tracePar([...pied, ...[...bord].reverse()], true), class: 'zone-talus' }));
+        groupe.append(creerElement('path', { d: tracePar(bord, false), class: 'bord-talus' }));
+      } else {
+        const ecran = ligne.sommets.map((p) => versEcran(p.est, p.nord, vue));
+        const signe = cote === 'gauche' ? -1 : 1;
+        for (let i = 0; i + 1 < ecran.length; i++) {
+          const a = ecran[i];
+          const b = ecran[i + 1];
+          const l = Math.hypot(b.x - a.x, b.y - a.y);
+          if (l === 0) continue;
+          // À droite du sens de la ligne, à l'écran (y vers le bas) : (−dy, dx).
+          const n = { x: (-(b.y - a.y) / l) * 16 * signe, y: ((b.x - a.x) / l) * 16 * signe };
+          pied.push(a, b);
+          bord.push({ x: a.x + n.x, y: a.y + n.y }, { x: b.x + n.x, y: b.y + n.y });
+        }
+      }
+      const [haut, bas] = ligneEst === 'bas' ? [bord, pied] : [pied, bord];
+      const d = traitsDeBarbules(haut, bas, 9);
+      if (d) groupe.append(creerElement('path', { d, class: 'barbules-talus' }));
+    }
     if (ligne?.sommets.length >= 2) {
       const ecran = ligne.sommets.map((s) => versEcran(s.est, s.nord, vue));
       groupe.append(creerElement('path', { d: tracePar(ecran, false), class: 'ligne-a-implanter' }));
@@ -443,7 +482,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /**
    * Cotes de l'implantation d'une ligne, sans bulle, attachées aux traits : distance depuis le
-   * début et jusqu'à la fin, écrites le long de la ligne (de chaque côté du pied de la
+   * début (« +8.111 m », « −5.428 m » avant le début) et jusqu'à la fin, écrites le long de la ligne (de chaque côté du pied de la
    * perpendiculaire) ; avant le début ou après la fin, le prolongement de la ligne en pointillés
    * avec sa longueur ; l'écart de la canne écrit sur la perpendiculaire (canne → ligne).
    * cotes : { sommets, abscisse, longueur, ecart } (m) ; canne : { x, y } (pixels) ; vers : pied (MN95).
@@ -490,12 +529,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (abscisse < 0) {
       // Avant le début : prolongement du premier segment jusqu'en face de la canne.
       groupe.append(creerElement('path', { d: tracePar(morceau(abscisse, 0), false), class: 'prolongement-ligne' }));
-      coteMorceau(abscisse, 0, `${m(abscisse)} avant le début`, 'cote-prolongement');
+      coteMorceau(abscisse, 0, `−${m(abscisse)}`, 'cote-prolongement');
     } else if (abscisse > longueur) {
       groupe.append(creerElement('path', { d: tracePar(morceau(longueur, abscisse), false), class: 'prolongement-ligne' }));
       coteMorceau(longueur, abscisse, `${m(abscisse - longueur)} après la fin`, 'cote-prolongement');
     } else {
-      coteMorceau(0, abscisse, `début ${m(abscisse)}`, 'cote-debut');
+      coteMorceau(0, abscisse, `+${m(abscisse)}`, 'cote-debut');
       coteMorceau(abscisse, longueur, `fin ${m(longueur - abscisse)}`, 'cote-fin');
     }
     // Repère au pied de la perpendiculaire (petit trait en travers de la ligne).
@@ -1158,7 +1197,26 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   boutonCalques.addEventListener('click', () => {
     menuCalques.hidden = !menuCalques.hidden;
     boutonCalques.setAttribute('aria-expanded', String(!menuCalques.hidden));
+    ajusterHauteurMenu(menuCalques);
   });
+
+  /**
+   * Un menu (Calques, Plans, Afficher) ne dépasse pas le bas du plan : sur un téléphone, le plan
+   * est petit (onglet Terrain) ; le menu prend la place qui reste et son contenu défile.
+   */
+  function ajusterHauteurMenu(menu) {
+    if (menu.hidden) return;
+    menu.style.maxHeight = '';
+    const place = cadre.getBoundingClientRect().bottom - menu.getBoundingClientRect().top - 10;
+    menu.style.maxHeight = `${Math.max(80, place)}px`;
+    marquerSuite(menu);
+  }
+
+  /** « ▾ encore » en bas du menu tant qu'il reste des lignes plus bas (on les voit en faisant défiler). */
+  function marquerSuite(menu) {
+    menu.classList.toggle('a-suivre', menu.scrollTop + menu.clientHeight < menu.scrollHeight - 4);
+  }
+  for (const menu of [menuCalques, menuPlans, menuListes]) menu.addEventListener('scroll', () => marquerSuite(menu));
   menuCalques.addEventListener('change', (evenement) => {
     const champ = evenement.target;
     calques[champ.dataset.calque] = champ.type === 'checkbox' ? champ.checked : champ.value;
@@ -1169,7 +1227,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       calques[autre] = false;
       menuCalques.querySelector(`[data-calque="${autre}"]`).checked = false;
     }
-    memoriserCalques(calques);
+    memoriserCalques(calquesChoisis);
     dessiner();
   });
   // --- Menu des plans DXF : afficher / cacher chaque plan (œil), sa couleur ---
@@ -1187,6 +1245,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         boutonCalques.setAttribute('aria-expanded', 'false');
         menu.hidden = !menu.hidden;
         bouton.setAttribute('aria-expanded', String(!menu.hidden));
+        ajusterHauteurMenu(menu);
       }
     });
   }
@@ -1199,18 +1258,28 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (bouton) quandMontrerListe?.('*', bouton.dataset.toutes === 'oui');
   });
 
-  /** Menu « Points » : une case par liste de points (voir listes-points.js). */
+  /**
+   * Menu « Afficher » : une case par liste (voir listes-points.js), en 3 parties : Points,
+   * Surfaces / volumes, Métrés.
+   */
+  const TITRES_SECTIONS = { points: 'Points', surfaces: 'Surfaces / volumes', metres: 'Métrés' };
   let signatureListes = null;
   function remplirMenuListes(listes) {
     const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}`).join('|');
     if (signature === signatureListes) return;
     signatureListes = signature;
-    boutonListes.hidden = listes.length === 0;
-    if (listes.length === 0) menuListes.hidden = true;
-    menuListes.innerHTML = `${listes.map((l) => `<div class="ligne-menu-plan">
+    if (listes.length === 0) {
+      menuListes.innerHTML = '<p class="menu-vide">Rien à afficher</p>';
+      return;
+    }
+    const parties = Object.entries(TITRES_SECTIONS)
+      .map(([section, titre]) => [titre, listes.filter((l) => l.section === section)])
+      .filter(([, liste]) => liste.length > 0);
+    menuListes.innerHTML = `${parties.map(([titre, liste]) => `<p class="titre-partie-menu">${titre}</p>
+      ${liste.map((l) => `<div class="ligne-menu-plan">
         <label class="oeil-plan"><input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} />
           <span class="pastille-liste liste-${l.nature}"></span><span>${echapper(l.nom)}</span></label>
-      </div>`).join('')}
+      </div>`).join('')}`).join('')}
       <div class="ligne-outils"><button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="oui">tout</button>
         <button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="non">rien</button></div>`;
   }
@@ -1228,8 +1297,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${plan.visible !== false}:${plan.couleur || ''}`).join('|');
     if (signature === signatureMenuPlans) return;
     signatureMenuPlans = signature;
-    boutonPlans.hidden = plansDxf.length === 0;
-    if (plansDxf.length === 0) menuPlans.hidden = true;
+    // Aucun plan : un petit cadre « Aucun DXF » (avant : un trait blanc vide).
+    if (plansDxf.length === 0) {
+      menuPlans.innerHTML = '<p class="menu-vide">Aucun DXF</p>';
+      return;
+    }
     menuPlans.innerHTML = plansDxf.map((plan) => `<div class="ligne-menu-plan">
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
           <span>${echapper(plan.nom)}</span></label>
