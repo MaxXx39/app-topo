@@ -25,6 +25,7 @@ import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface } from './topo/coupe.js';
+import { guidageLame, ligneDeCoupeLame, TOLERANCES_LAME } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -112,6 +113,7 @@ const leveDirect = { stockId: null, role: 'contour' };
 // Libellés des noms de points (L-HT-1-3, P-RG-2…), gardés sur l'appareil (voir leve/libelles.js).
 let libelles = lireLibelles();
 let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
+let etatRecepteur2 = null; // dernier état du 2e récepteur (essai à 2 RX2, guidage de lame)
 // Onglet Terrain : mode (Lever ou Contrôler) et réglages du contrôle, retenus sur l'appareil.
 const CLE_TERRAIN = 'topo-terrain';
 const terrain = {
@@ -130,6 +132,8 @@ const terrain = {
   accrocheLigne: 'trait', // implantation d'une ligne : 'trait' (ligne du plan DXF) ou une accroche de point
   // Implantation d'un talus (voir topo/talus.js) : derniers réglages, repris pour le talus suivant.
   talus: { horizontal: null, vertical: null, ligneEst: 'haut', cote: 'droite', longueur: null, terrainId: null, altitudeSurfaceId: null },
+  // Guidage de lame à 2 RX2 (mode Lame, voir topo/lame.js) : surface suivie, gauche / droite inversés, tolérances (m).
+  lame: { surfaceId: null, inverse: false, tolerances: { ...TOLERANCES_LAME } },
   ...lireReglagesTerrain(),
 };
 // Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
@@ -343,6 +347,11 @@ function adapterAuMode() {
   if (estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
   if (terrain.implantation === 'talus') {
     terrain.implantation = 'ligne';
+    retenirReglagesTerrain();
+  }
+  // Guidage de lame : mode Confirmé seulement.
+  if (terrain.mode === 'lame') {
+    terrain.mode = 'lever';
     retenirReglagesTerrain();
   }
 }
@@ -611,7 +620,15 @@ const boutonRecepteur = recepteurDisponible()
       arreterCorrections2,
     })
   : null;
-if (boutonRecepteur && recepteur2Disponible()) ecouterRecepteur2((etat, mode) => boutonRecepteur.mettreAJour2(etat, mode));
+if (boutonRecepteur && recepteur2Disponible()) {
+  ecouterRecepteur2((etat, mode) => {
+    const changeConnexion = Boolean(etat?.connecte) !== Boolean(etatRecepteur2?.connecte);
+    etatRecepteur2 = etat;
+    boutonRecepteur.mettreAJour2(etat, mode);
+    if (changeConnexion && terrain.mode === 'lame') recalculer(); // message « Connecte le 2e RX2 »
+    else montrerLame();
+  });
+}
 
 // Onglet Terrain (téléphone) : flèche sous le plan, plan sur 1/3 ou 1/2 de l'écran (retenu sur l'appareil).
 const CLE_PLAN_TERRAIN = 'topo-plan-terrain-grand';
@@ -730,9 +747,33 @@ const ecranLeve = recepteurDisponible()
         recalculer();
       },
       choisirMode: (mode) => {
-        terrain.mode = ['controler', 'autocontrole'].includes(mode) ? mode : 'lever';
+        const permis = estModeBase() ? ['controler', 'autocontrole'] : ['controler', 'autocontrole', 'lame'];
+        terrain.mode = permis.includes(mode) ? mode : 'lever';
         retenirReglagesTerrain();
         if (terrain.mode === 'controler') montrerSurfaceControle();
+        recalculer();
+      },
+      // --- Guidage de lame (mode Lame) ---
+      choisirSurfaceLame: (id) => {
+        terrain.lame.surfaceId = id || null;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      inverserLame: () => {
+        terrain.lame.inverse = !terrain.lame.inverse;
+        retenirReglagesTerrain();
+        afficherMessage(terrain.lame.inverse ? 'Gauche = récepteur 2, droite = récepteur 1' : 'Gauche = récepteur 1, droite = récepteur 2', 3000);
+        montrerLame();
+      },
+      reglerToleranceLame: (cle, texte) => {
+        const cm = lireNombreTape(texte);
+        if (!(cm > 0)) {
+          afficherMessage('Tolérance illisible : un nombre de centimètres plus grand que 0', 4000);
+          recalculer();
+          return;
+        }
+        terrain.lame.tolerances = { ...terrain.lame.tolerances, [cle]: cm / 100 };
+        retenirReglagesTerrain();
         recalculer();
       },
       choisirImplantation: (quoi) => {
@@ -1584,6 +1625,58 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     modifie();
   },
 });
+
+// --- Guidage de lame à 2 RX2 (Terrain › Lame, voir topo/lame.js et leve/lame-ecran.js) ---
+
+// Recherche rapide de l'altitude de la surface suivie (refaite quand ses triangles changent).
+let chercheurLame = { triangles: null, chercher: null };
+
+/** Pourquoi un récepteur ne peut pas guider (texte), ou null s'il est prêt (RTK fixe, inclinaison prête). */
+function raisonRecepteurLame(etat, nom) {
+  if (!etat?.connecte) return `${nom} : pas connecté`;
+  if (!etat.recu || !etat.position) return `${nom} : en attente de la position`;
+  if (!etat.autorise) return `${nom} : ${etat.raison ?? 'position pas fiable'}`;
+  return null;
+}
+
+/**
+ * Guidage de la lame avec les 2 derniers états reçus : { raison (texte ou null), guidage, coupe,
+ * coins: { gauche, droite } (positions, pour le plan) }, ou null hors du mode Lame.
+ */
+function calculerLame() {
+  if (!ecranLeve || terrain.mode !== 'lame' || estModeBase()) return null;
+  const [etatG, etatD] = terrain.lame.inverse ? [etatRecepteur2, etatRecepteur] : [etatRecepteur, etatRecepteur2];
+  const [nomG, nomD] = terrain.lame.inverse ? ['Gauche (récepteur 2)', 'Droite (récepteur 1)'] : ['Gauche (récepteur 1)', 'Droite (récepteur 2)'];
+  const coins = etatG?.position && etatD?.position ? { gauche: etatG.position, droite: etatD.position } : null;
+  const surface = projet.surfaces.find((s) => s.id === terrain.lame.surfaceId);
+  const triangles = surface ? trianglesDeSurface(surface.id) : [];
+  const raison = (!surface && 'Choisis la surface à suivre')
+    || (triangles.length === 0 && 'Cette surface n\'a pas encore de triangles')
+    || raisonRecepteurLame(etatG, nomG)
+    || raisonRecepteurLame(etatD, nomD);
+  if (raison) return { raison, guidage: null, coupe: null, coins };
+  if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
+  const guidage = guidageLame({ gauche: coins.gauche, droite: coins.droite, altitudeSurface: chercheurLame.chercher, tolerances: terrain.lame.tolerances });
+  if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coupe: null, coins };
+  const ligne = ligneDeCoupeLame(coins.gauche, coins.droite, 1);
+  const coupe = {
+    longueur: guidage.largeur + 2,
+    profils: profilSurface(triangles, ligne.debut, ligne.fin),
+    gauche: { distance: 1, altitude: coins.gauche.altitude },
+    droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
+  };
+  return { raison: null, guidage, coupe, coins };
+}
+
+/** Écran Lame et lame sur le plan, avec les derniers états des 2 récepteurs. */
+function montrerLame() {
+  const lame = calculerLame();
+  if (lame) ecranLeve.mettreAJourLame(lame);
+  const surPlan = lame?.coins && ongletContexte === 'terrain'
+    ? { ...lame.coins, classeGauche: lame.guidage?.gauche.classe ?? null, classeDroite: lame.guidage?.droite.classe ?? null }
+    : null;
+  plan.afficherLame(surPlan);
+}
 
 /** Vrai pendant l'autocontrôle (Terrain › Contrôle). */
 function enAutocontrole() {
@@ -2513,6 +2606,14 @@ function donneesCommunes() {
     libelleAire: terrain.libelleAire,
     mode: terrain.mode,
     controle: terrain,
+    // Mode Lame : surfaces (terrassement d'abord), surface suivie, tolérances, 2e RX2 connecté ?
+    lame: {
+      surfaces: [...projet.surfaces].sort((a, b) => Number(b.nature === 'terrassement') - Number(a.nature === 'terrassement')).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
+      surfaceId: terrain.lame.surfaceId,
+      inverse: terrain.lame.inverse,
+      tolerances: terrain.lame.tolerances,
+      recepteur2: Boolean(etatRecepteur2?.connecte),
+    },
     autocontrole: donneesAutocontrole(),
     surfaces: projet.surfaces.map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
     implanter: {
@@ -2677,6 +2778,7 @@ if (recepteurDisponible()) {
     const implantationLigne = enLigne && !talus ? calculerImplantationLigne(etat) : null;
     const implantationTalus = talus ? calculerImplantationTalus(etat) : null;
     ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation, implantationLigne, implantationTalus });
+    montrerLame();
     const position = etat.connecte && etat.recu ? etat.position : null;
     // Coupes affichées (mode Implanter) : leur trait en pointillés sur le plan.
     const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];

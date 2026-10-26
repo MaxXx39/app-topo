@@ -4236,6 +4236,11 @@ body.mode-telephone .onglets button svg {
   color: #dc2626;
 }
 
+.bascule-terrain button[data-valeur='lame'] {
+  --couleur-mode: #1d4ed8;
+  color: #1d4ed8;
+}
+
 .bascule-terrain button.actif {
   background: var(--couleur-mode);
   color: #ffffff;
@@ -4891,6 +4896,10 @@ button.bouton-import {
 
 .panneau[data-onglet='terrain']:has(.cadre-mode-autocontrole) {
   border-color: #dc2626;
+}
+
+.panneau[data-onglet='terrain']:has(.cadre-mode-lame) {
+  border-color: #1d4ed8;
 }
 
 /* Flèche sous le plan (téléphone, onglet Terrain) : plan sur 1/3 ou sur 1/2 de l'écran. */
@@ -6833,4 +6842,136 @@ body.mode-telephone .bouton.bouton-prendre {
   align-items: center;
   gap: 6px;
   margin: 2px 0;
+}
+
+/* Terrain › Lame (0.70.0) : surface suivie, écart à chaque coin en grand, dévers, coupe. */
+.ligne-lame {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ligne-lame select {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.reglages-lame {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.reglages-lame input {
+  width: 60px;
+}
+
+.raison-lame {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 700;
+}
+
+.coins-lame {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.coin-lame {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--fond);
+  text-align: center;
+}
+
+.coin-lame .titre-coin {
+  color: var(--gris);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.coin-lame strong {
+  font-size: 1.5rem;
+}
+
+.coin-lame.ecart-vert { background: #dcfce7; color: #166534; }
+.coin-lame.ecart-orange { background: #ffedd5; color: #9a3412; }
+.coin-lame.ecart-rouge { background: #fee2e2; color: #991b1b; }
+
+.devers-lame {
+  margin: 8px 0;
+  text-align: center;
+}
+
+.svg-coupe-lame {
+  display: block;
+  width: 100%;
+  max-height: 160px;
+  border-radius: 10px;
+  background: var(--fond);
+}
+
+.svg-coupe-lame .surface-coupe-lame {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 2.5;
+}
+
+.svg-coupe-lame .lame-coupe {
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.svg-coupe-lame .lame-vert { stroke: #16a34a; }
+.svg-coupe-lame .lame-orange { stroke: #ea580c; }
+.svg-coupe-lame .lame-rouge { stroke: #dc2626; }
+
+.svg-coupe-lame .coin-coupe-lame {
+  fill: #1d4ed8;
+}
+
+.svg-coupe-lame text {
+  fill: var(--texte);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.svg-coupe-lame .note-coupe-lame {
+  fill: var(--gris);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+/* Lame sur le plan : trait bleu épais, coins G / D de la couleur de leur écart. */
+.plan .trait-lame {
+  stroke: #1d4ed8;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.plan .coin-lame-plan {
+  fill: #1d4ed8;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.plan .coin-lame-plan.ecart-vert { fill: #16a34a; }
+.plan .coin-lame-plan.ecart-orange { fill: #ea580c; }
+.plan .coin-lame-plan.ecart-rouge { fill: #dc2626; }
+
+.plan .lettre-lame {
+  fill: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  pointer-events: none;
 }

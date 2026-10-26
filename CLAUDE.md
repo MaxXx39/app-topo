@@ -56,7 +56,7 @@ exemples/            fichiers de référence (NE PAS modifier ni supprimer)
 ## Référence de calcul
 Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 m³, Stock 2 = 648.979 m³, Stock 3 = 372.201 m³ (remblai Mensura). Tests automatiques sur ce cas.
 
-## État d'avancement (version 0.69.0)
+## État d'avancement (version 0.70.0)
 **Fait**
 - Import points (CSV Emlid, TXT), LandXML, DXF (surfaces et fond de plan) ; recalage Helmert d'un plan DXF.
 - Surfaces (stock, terrain naturel, terrassement), volumes (remblai / déblai, comparaison), coupes, mesures / métrés.
@@ -80,6 +80,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - 0.67.0 (Drive) : « Prise de main protégée » (réglages ⚙, `priseProtegee` dans `topo-reglages`, changée avec le code de sécurité) : le verrou Drive porte `verrouProtege = 'oui'` ; un autre appareil doit taper le code pour prendre la main (`accordPriseDeMain` dans `partage.js`). « Rendre la main » (Partage, `rendreLaMain`) : envoi puis verrou enlevé, état `rendu` (main grise dans l'en-tête) ; sur le site (pas l'APK), fait tout seul après 5 min sans toucher l'écran ; la prochaine modification (ou la main grise) la reprend via `apresOuverture`.
 - 0.68.0 (Dessin, retouches) : en-tête compact (← , nom, résumé sur une ligne) ; altitude sur une ligne (Fixe / Par sommet, altitude, pente, côté et sommet seulement si pente) ; « Départ » (nom accroché ou RX2, E, N ; `dessin.nomDepart`) dans la carte et rond plein « Départ » sur le plan ; pendant un dessin, seule sa carte est montrée ; tourner cumulé (chaque clic ↰ / ↱ ajoute l'angle inscrit, `pilote.tourne` depuis le prolongement du côté précédent) + « ↑ Tout droit » ; « OK » à côté de la distance = aperçu sur le plan ; case altitude du prochain sommet (`altitudeProchainSommet`, passage « par sommet » avec `passerParSommet`) ; altitude modifiable dans « Voir les sommets » (tableau gardé ouvert).
 - 0.69.0 : Calculs › Mesures montre aussi les points des listes cochées (hors modification d'une mesure). Terrain › Lever › « Changer » : fenêtre `src/leve/fenetre-levees.js`, croix rouge en Confirmé = supprimer le levé (surface, métré ou levé libre) et ses points après confirmation (`supprimerLevee` / `pointsDeLaLevee` dans `topo/leve-direct.js` ; points gardés s'ils servent ailleurs ; levé du jour vide supprimé ; pas d'annulation : le bouton Annuler n'existe plus, seulement Ctrl+Z). Exports : « Quoi exporter ? » (`src/export/choix-export.js`) par catégories (volumes, stocks, terrain naturel, terrassement, dessins, listes de points ; métrés et mesures pour l'export des mesures), pré-coché comme « Afficher » ; barre « Envoyer » après chaque export (`src/export/partager.js`) : APK `partagerFichier` → `FichiersPartages.kt` (ContentProvider fait main, cache/partage, lecture seule) + partage Android ; site : `navigator.share`. DWG : non (format fermé), DXF seulement.
+- 0.70.0 : Terrain › **Lame** (4e mode, bleu, Confirmé) : guidage de lame de grader avec 2 RX2 (mât au-dessus de chaque coin, hauteur du mât = hauteur de canne dans Emlid Flow, compensation d'inclinaison). Surface suivie (terrassement d'abord), « ⇄ G / D » (inverser, retenu dans `terrain.lame`, `topo-terrain`), tolérances ⚙ (vert ≤ 2 cm, orange ≤ 5 cm). Formules validées (`src/topo/lame.js`) : écart coin = altitude surface − altitude coin (positif = monter) ; dévers = (H droite − H gauche) ÷ largeur à plat × 100 (positif = droite plus haute) ; dévers voulu = idem avec la surface. Nombres seulement si les 2 RX2 sont prêts (`autorise`). Écran `src/leve/lame-ecran.js` (écarts, dévers, coupe vue de derrière), lame sur le plan (`plan.afficherLame`). **À essayer sur la machine.**
 
 **Reste / à valider**
 - Essai terrain du talus (0.56.1) et question ouverte : arrondi (cône) aux angles saillants, est-ce voulu ?
@@ -88,5 +89,5 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Google Cloud en mode Test (réautorisation environ tous les 7 jours) : publier l'écran de consentement si besoin.
 
 **À développer**
-- 2 RX2 pour guidage d'engin type grader : l'essai de connexion est fait (0.63.0) ; à valider sur le terrain avant de faire le guidage.
+- Guidage de lame (0.70.0) : à valider sur la machine (hauteur de mât, signes, vitesse d'affichage).
 - Dessin, étape suivante (en suspens) : 4. plateforme avec talus jusqu'au terrain naturel (entrées en terre, volume).

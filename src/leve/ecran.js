@@ -17,6 +17,7 @@ import { demanderCode } from '../outils/code.js';
 import { demanderTexte } from '../outils/choix.js';
 import { ouvrirChoixLevees } from './fenetre-levees.js';
 import { htmlControle } from './controle-ecran.js';
+import { htmlLame, rafraichirLame } from './lame-ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
 import { formaterNombre } from '../topo/format.js';
@@ -120,6 +121,7 @@ export function creerEcranLeve(conteneur, actions) {
   let accrochesOuvertes = false; // flèche de la barre d'accroche : les noms sous les dessins
   let gestionControleOuverte = false; // mode Contrôler : roue ⚙ (après le code de sécurité)
   let erreurGestion = ''; // mode Contrôler : erreur de la gestion (tolérances, fichier, point tapé)
+  let reglagesLameOuverts = false; // mode Lame : roue ⚙ (tolérances)
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
@@ -127,6 +129,12 @@ export function creerEcranLeve(conteneur, actions) {
     const { action } = bouton.dataset;
     if (action === 'ouvrirChoixNature' || action === 'fermerChoixNature') {
       choixNatureOuvert = action === 'ouvrirChoixNature';
+      dessiner();
+      return;
+    }
+    // Mode Lame : roue ⚙ des tolérances.
+    if (action === 'reglagesLame') {
+      reglagesLameOuverts = !reglagesLameOuverts;
       dessiner();
       return;
     }
@@ -228,6 +236,8 @@ export function creerEcranLeve(conteneur, actions) {
   conteneur.addEventListener('change', (evenement) => {
     const cible = evenement.target;
     if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
+    else if (cible.dataset.champ === 'surface-lame') actions.choisirSurfaceLame(cible.value);
+    else if (cible.dataset.toleranceLame) actions.reglerToleranceLame(cible.dataset.toleranceLame, cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
@@ -413,7 +423,7 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function choixMode() {
     return `<div class="modes-terrain bascule-terrain mode-${donnees.mode}" role="group" aria-label="Mode">
-      ${[['lever', 'Lever'], ['controler', 'Implanter'], ['autocontrole', 'Contrôle']]
+      ${[['lever', 'Lever'], ['controler', 'Implanter'], ['autocontrole', 'Contrôle'], ...(estModeBase() ? [] : [['lame', 'Lame']])]
         .map(([cle, titre]) => `<button type="button" data-action="choisirMode" data-valeur="${cle}" class="${donnees.mode === cle ? 'actif' : ''}">${titre}</button>`)
         .join('')}
     </div>`;
@@ -980,6 +990,11 @@ export function creerEcranLeve(conteneur, actions) {
       tournerBoussole();
     },
 
+    /** Mode Lame : nombres en direct (voir lame-ecran.js rafraichirLame). */
+    mettreAJourLame(vivant) {
+      if (donnees?.mode === 'lame') rafraichirLame(conteneur, vivant);
+    },
+
     mettreAJourRecepteur(nouvelEtat, nouveauDirect = null) {
       etat = nouvelEtat;
       direct = nouveauDirect;
@@ -1004,6 +1019,7 @@ export function creerEcranLeve(conteneur, actions) {
     let contenu;
     if (enGuidage) contenu = vueImplantation();
     else if (autocontrole) contenu = htmlControle(donnees.autocontrole, { gestionOuverte: gestionControleOuverte, erreurGestion });
+    else if (donnees.mode === 'lame') contenu = htmlLame(donnees.lame, { reglagesOuverts: reglagesLameOuverts });
     else contenu = donnees.mode === 'controler' ? controle() : priseDePoint();
     conteneur.innerHTML = `
         <div class="ecran-terrain cadre-mode-${donnees.mode}">
