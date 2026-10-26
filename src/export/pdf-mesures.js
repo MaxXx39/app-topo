@@ -1,6 +1,6 @@
 // PDF des mesures (onglet Calculs › Mesures) : à part du PDF des volumes, il ne montre aucun volume.
 // Une feuille paysage (A4, ou A3 si le plan ne tient pas en A4 à l'échelle choisie) :
-// le plan à gauche (mesures en cyan pointillé), à droite le tableau des mesures, la légende
+// le plan à gauche (mesures en trait plein de leur couleur), à droite le tableau des mesures, la légende
 // et le cartouche. S'il y a trop de mesures pour la colonne, la suite va sur une feuille à part.
 // Toutes les mesures sur la feuille sont en millimètres.
 import { jsPDF } from 'jspdf';
@@ -135,7 +135,7 @@ export async function creerPdfMesures({ mesures, points, cartouche, echelleImpos
 }
 
 /**
- * Plan des mesures : courbes de niveau (sur les aires), mesures en cyan pointillé, points et noms,
+ * Plan des mesures : courbes de niveau (sur les aires), mesures en trait plein, points et noms,
  * puis les valeurs. Renvoie l'équidistance des courbes dessinées (m), ou null.
  */
 function dessinerPlanMesures(doc, mesures, pointsMontres, { versPapier, echelle }, choix) {
@@ -154,7 +154,7 @@ function dessinerPlanMesures(doc, mesures, pointsMontres, { versPapier, echelle 
     }
   }
 
-  // Aires : fond léger de leur couleur, puis contours, lignes de rupture et longueurs en pointillé
+  // Aires : fond léger de leur couleur, puis contours, lignes de rupture et longueurs en trait plein (0.71.0)
   doc.saveGraphicsState();
   doc.setGState(new doc.GState({ opacity: 0.12 }));
   for (const { mesure, resultat } of mesures) {
@@ -172,23 +172,19 @@ function dessinerPlanMesures(doc, mesures, pointsMontres, { versPapier, echelle 
   for (const { mesure, resultat } of mesures) {
     if (mesure.type === 'aire') {
       trait(doc, couleur(mesure), 0.15);
-      doc.setLineDashPattern([0.8, 0.8], 0);
       for (const ligne of mesure.lignesRupture) polyligne(ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean), ligne.fermee);
     }
     trait(doc, couleur(mesure), 0.4);
     if (mesure.type === 'nombre') {
       // Points comptés : un rond de la couleur de la mesure autour de chacun.
-      doc.setLineDashPattern([], 0);
       for (const point of resultat.sommets) {
         const p = versPapier(point);
         doc.circle(p.x, p.y, 1.4, 'S');
       }
       continue;
     }
-    doc.setLineDashPattern([2, 1], 0);
     polyligne(resultat.sommets, mesure.type === 'aire');
   }
-  doc.setLineDashPattern([], 0);
 
   dessinerPointsPdf(doc, pointsMontres, versPapier, echelle, choix);
 

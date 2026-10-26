@@ -25,6 +25,8 @@ const SVG = 'http://www.w3.org/2000/svg';
 
 // Distance maximale (pixels) entre le doigt et un point pour le "toucher".
 const RAYON_TOUCHER = 22;
+// Bouton « Ma position » : le plan montre environ 50 m (dans sa plus petite dimension) autour de soi.
+const METRES_AUTOUR_DE_MOI = 50;
 
 // Calques que l'on peut afficher ou masquer, avec leur état de départ, rangés par familles (titres
 // du menu). Ce qui est coché vaut dans tous les onglets.
@@ -618,13 +620,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     dessinerCanvasDxf(canvasDxf, visibles, vue, densite);
   }
 
-  /** Centre le plan sur la position du récepteur (sans changer le zoom, sauf au premier affichage). */
-  function centrerSurPosition() {
+  /**
+   * Centre le plan sur la position du récepteur (sans changer le zoom, sauf au premier affichage,
+   * ou avec "zoomer" : environ 50 m visibles, bouton « Ma position »).
+   */
+  function centrerSurPosition(zoomer = false) {
     if (!position) return;
     const { largeur, hauteur } = taille();
     if (largeur === 0 || hauteur === 0) return;
     // Sans vue (aucun point encore) : environ 60 m de large à l'écran.
-    vue = vue ? { ...vue, estCentre: position.est, nordCentre: position.nord } : { echelle: largeur / 60, estCentre: position.est, nordCentre: position.nord, largeur, hauteur };
+    const echelle = zoomer ? Math.min(largeur, hauteur) / METRES_AUTOUR_DE_MOI : vue?.echelle ?? largeur / 60;
+    vue = vue ? { ...vue, echelle, estCentre: position.est, nordCentre: position.nord } : { echelle, estCentre: position.est, nordCentre: position.nord, largeur, hauteur };
     dessiner();
   }
   /**
@@ -1181,7 +1187,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
     changerSuivi('suivre');
     if (vue) vue = { ...vue, rotation: 0 };
-    centrerSurPosition();
+    centrerSurPosition(true);
   });
 
   // Boussole du plan (visible quand il est tourné) : le remet nord en haut.

@@ -13,7 +13,6 @@ import { titreSection } from '../outils/section.js';
 
 const TEXTES = {
   nouveau: '+ Nouvelle surface',
-  importer: '+ Nouvelle surface depuis LandXML ou DXF',
   supprimer: 'supprimer cette surface',
   choix: 'Surface active',
   roles: { contour: 'Contour', ligne: 'Ligne de rupture', dessus: 'Points isolés / caractéristiques' },
@@ -304,17 +303,13 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   function afficher() {
     const objet = objetActif();
 
-    // Bloc « Ajouter une surface » : nouvelle surface (à partir des points) ou import d'un fichier.
+    // Bloc « Ajouter une surface » : nouvelle surface à partir des points (l'import d'un fichier
+    // LandXML / DXF 3D est dans Projet › Import depuis 0.71.0).
     let html = `
       <section class="carte-section">
         ${titreSection('ajouter', 'Ajouter une surface')}
         <div class="ligne-outils">
           <button type="button" class="bouton" data-action="nouveau">${textes.nouveau}</button>
-          <label class="bouton-discret">
-            ${textes.importer}
-            <input type="file" data-champ="fichier-surface" accept=".xml,.landxml,.dxf,application/xml,text/xml" hidden />
-          </label>
-          ${bulle('importerSurface')}
         </div>
       </section>`;
 

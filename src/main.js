@@ -8,7 +8,7 @@ import { lireLandXML } from './topo/landxml.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee, origineSurface, nomNature, nouvelIdentifiant } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, origineSurface, nomNature, nouvelIdentifiant, NATURES } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
@@ -223,7 +223,6 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="surfaces">
         <h2>Surfaces ${bulle('surfaces')}</h2>
         <p class="vide sans-points">Aucun point dans le projet.</p>
-        <div id="message-import-surface"></div>
         <div id="surfaces"></div>
       </section>
       <section class="panneau" data-onglet="volumes">
@@ -246,9 +245,14 @@ document.querySelector('#app').innerHTML = `
     </div>
     <section class="panneau panneau-plan" data-onglet="plan">
       <div id="plan"></div>
-      <button type="button" class="bouton-taille-plan" data-action="taille-plan-terrain" aria-label="Agrandir ou réduire le plan">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-      </button>
+      <div class="boutons-taille-plan">
+        <button type="button" class="bouton-taille-plan" data-taille-plan="-1" aria-label="Réduire le plan">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
+        </button>
+        <button type="button" class="bouton-taille-plan" data-taille-plan="1" aria-label="Agrandir le plan">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+      </div>
     </section>
   </div>
   <nav class="onglets" aria-label="Onglets">${ONGLETS.map(boutonOnglet).join('')}</nav>
@@ -406,6 +410,7 @@ function calculDuPlan(surface) {
 // --- Écrans ---
 
 const ecranImport = creerEcranImport(document.querySelector('#importer'), {
+  importerSurface: (fichier) => importerSurface(fichier),
   colorerListe: (id, couleur) => colorerListe(id, couleur),
   importerPointsControle: (fichier) => importerPointsControle(fichier),
   importerPoints: async (fichier) => {
@@ -630,21 +635,30 @@ if (boutonRecepteur && recepteur2Disponible()) {
   });
 }
 
-// Onglet Terrain (téléphone) : flèche sous le plan, plan sur 1/3 ou 1/2 de l'écran (retenu sur l'appareil).
-const CLE_PLAN_TERRAIN = 'topo-plan-terrain-grand';
+// Onglet Terrain (téléphone) : flèches ▲ / ▼ sous le plan ; chaque appui change sa hauteur de 15 %
+// de l'écran (entre 20 % et 80 %, 35 % au départ), retenue sur l'appareil.
+const CLE_PLAN_TERRAIN = 'topo-plan-terrain-part';
+const PART_PLAN = { pas: 0.15, min: 0.2, max: 0.8, depart: 0.35 };
+let partPlanTerrain = PART_PLAN.depart;
 try {
-  document.body.classList.toggle('plan-terrain-grand', localStorage.getItem(CLE_PLAN_TERRAIN) === 'oui');
+  const lue = Number(localStorage.getItem(CLE_PLAN_TERRAIN));
+  if (lue >= PART_PLAN.min && lue <= PART_PLAN.max) partPlanTerrain = lue;
 } catch {
-  // stockage refusé : plan sur 1/3
+  // stockage refusé : hauteur de départ
 }
-document.querySelector('[data-action="taille-plan-terrain"]').addEventListener('click', () => {
-  const grand = document.body.classList.toggle('plan-terrain-grand');
-  try {
-    localStorage.setItem(CLE_PLAN_TERRAIN, grand ? 'oui' : 'non');
-  } catch {
-    // pas retenu
-  }
-});
+document.body.style.setProperty('--part-plan-terrain', String(partPlanTerrain));
+for (const bouton of document.querySelectorAll('[data-taille-plan]')) {
+  bouton.addEventListener('click', () => {
+    const voulue = partPlanTerrain + Number(bouton.dataset.taillePlan) * PART_PLAN.pas;
+    partPlanTerrain = Math.round(Math.min(PART_PLAN.max, Math.max(PART_PLAN.min, voulue)) * 100) / 100;
+    document.body.style.setProperty('--part-plan-terrain', String(partPlanTerrain));
+    try {
+      localStorage.setItem(CLE_PLAN_TERRAIN, String(partPlanTerrain));
+    } catch {
+      // pas retenu
+    }
+  });
+}
 
 const ecranLeve = recepteurDisponible()
   ? creerEcranLeve(document.querySelector('#leve-direct'), {
@@ -2997,26 +3011,34 @@ function montrerUneSurfaceDuLeve() {
   if (index >= 0) editeurSurfaces.choisir(index);
 }
 
-// --- Import d'une surface LandXML ou DXF : chaque surface du fichier devient une surface du projet ---
-// Sa nature (stock, terrain naturel, terrassement) est ensuite demandée, comme pour une nouvelle surface.
+// --- Import d'une surface LandXML ou DXF 3D (Projet › Import, depuis 0.71.0) : chaque surface du
+// fichier devient une surface du projet, de la nature choisie juste après (stock, terrain naturel,
+// terrassement). Renvoie le message à afficher sous l'import (HTML).
 async function importerSurface(fichier) {
-  const zone = document.querySelector('#message-import-surface');
+  let message;
   try {
     const texte = await fichier.text();
     const type = /\.dxf$/i.test(fichier.name) ? 'dxf' : 'landxml';
     const { surfaces, erreurs, avertissements } = type === 'dxf' ? lireDXF(texte) : lireLandXML(texte);
-    for (const surface of surfaces) {
-      projet.surfaces.push({ ...surfaceImportee(surface, fichier.name, type), nature: null });
+    let nature = null;
+    if (surfaces.length > 0) {
+      nature = await demanderChoix({
+        titre: `${surfaces.length} surface(s) dans « ${fichier.name} »`,
+        texte: 'C\'est quoi ?',
+        boutons: NATURES.map(([cle, titre], i) => ({ cle, texte: titre, principal: i === 0 })),
+      });
     }
+    for (const surface of surfaces) projet.surfaces.push({ ...surfaceImportee(surface, fichier.name, type), nature });
     const messages = [...erreurs, ...avertissements];
-    zone.innerHTML = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} ».</p>
+    message = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} »${nature ? ` (${echapper(nomNature(nature).toLowerCase())})` : ''} : voir Calculs › Surfaces.</p>
       ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
     editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
     if (surfaces.length > 0) editeurSurfaces.choisir(projet.surfaces.length - 1);
   } catch (erreur) {
-    zone.innerHTML = `<p class="erreur">Impossible de lire « ${echapper(fichier.name)} » : ${echapper(erreur.message)}</p>`;
+    message = `<p class="erreur">Impossible de lire « ${echapper(fichier.name)} » : ${echapper(erreur.message)}</p>`;
   }
   modifie({ recadrer: true });
+  return message;
 }
 
 const ecranVolumes = creerEcranVolumes(document.querySelector('#volumes'), {
@@ -3560,7 +3582,6 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   implanter.talusId = null;
   autocontrole.cible = null;
   dernierImport = null;
-  document.querySelector('#message-import-surface').innerHTML = '';
   editeurSurfaces.charger(projet.surfaces);
   montrerUneSurfaceDuLeve();
   recalculer({ recadrer: true });
