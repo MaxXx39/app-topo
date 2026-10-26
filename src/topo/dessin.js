@@ -94,6 +94,16 @@ export function gisementNormal(gon) {
   return ((gon % 400) + 400) % 400;
 }
 
+/**
+ * Direction du côté suivant (gisement en gon) : celle du côté précédent (gisement en gon), tournée de
+ * "degres" (°) à gauche ou à droite, en regardant le plan nord en haut. 0° = tout droit, 90° =
+ * d'équerre. Ex. côté vers l'Est (100 gon), 90° à droite → vers le Sud (200 gon).
+ */
+export function directionTournee(gisementPrecedent, degres, sens) {
+  const gon = (degres * 400) / 360;
+  return gisementNormal(gisementPrecedent + (sens === 'droite' ? gon : -gon));
+}
+
 /** Point à "distance" m de P dans la direction "gon" (gisement). Renvoie { est, nord }. */
 export function pointSelonGisement(p, gon, distance) {
   const angle = (gon * Math.PI) / 200;
@@ -123,9 +133,12 @@ export function longueursCotes(sommets, ferme) {
   return longueurs;
 }
 
-/** Vrai si le dessin est une figure fermée (plateforme, bâtiment). */
+/**
+ * Vrai si le dessin est une figure fermée : un dessin fermé avec « Fermer la figure » (dessin.ferme),
+ * ou une plateforme, un bâtiment (dessins faits avant la version 0.66.0).
+ */
 export function estFerme(dessin) {
-  return dessin.type === 'plateforme' || dessin.type === 'batiment';
+  return Boolean(dessin.ferme) || dessin.type === 'plateforme' || dessin.type === 'batiment';
 }
 
 /**
@@ -144,8 +157,10 @@ export function altitudesDuDessin(dessin) {
   return sommets.map(() => hauteur.altitude);
 }
 
-// Natures de dessin : [clé, nom (aussi le début du nom automatique)].
+// Natures de dessin : [clé, nom (aussi le début du nom automatique)]. Depuis 0.66.0, on ne crée plus
+// que des « dessin » (ouverts, ou fermés avec « Fermer la figure ») ; les autres restent lisibles.
 export const TYPES_DESSIN = [
+  ['dessin', 'Dessin'],
   ['plateforme', 'Plateforme'],
   ['batiment', 'Bâtiment'],
   ['ligne', 'Ligne'],
@@ -162,7 +177,7 @@ export function nomDessin(type, dessins) {
 // --- Implanter un dessin : ses sommets sont des points, chacun de ses côtés une ligne ---
 
 // Abréviations des noms de sommets (demande du 26.10.2026) : PF1-1 = plateforme 1, sommet 1.
-export const ABREVIATIONS_DESSIN = { plateforme: 'PF', batiment: 'BAT', ligne: 'LI', points: 'PT' };
+export const ABREVIATIONS_DESSIN = { dessin: 'D', plateforme: 'PF', batiment: 'BAT', ligne: 'LI', points: 'PT' };
 
 /**
  * Numéro d'un dessin dans son type (le 1 de « PF1-1 ») : celui gardé à la création, sinon sa

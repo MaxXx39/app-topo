@@ -28,7 +28,8 @@
 //   tolerancesControle: { plan: { vert, orange }, hauteur: { vert, orange } },  // m (voir topo/controle.js)
 //   controles: [{ id, type: 'mesure', pointId, nom, connu, mesure, ecarts, resultat, gnss, appareil, remarque, le }
 //               ou { id, type: 'refus', appareil, le }],  // autocontrôles et refus du rappel
-//   dessins: [{ id, nom, type ('plateforme', 'batiment', 'ligne', 'points'), sommets: [{ est, nord, altitude }],
+//   dessins: [{ id, nom, numero, type ('dessin' depuis 0.66.0 ; avant : 'plateforme', 'batiment', 'ligne',
+//              'points'), ferme (type 'dessin' : « Fermer la figure »), sommets: [{ est, nord, altitude }],
 //              hauteur: { mode ('fixe', 'sommets'), altitude, pente: { pourcent, cote, depuis } ou null } }],
 //                                   // Calculs › Dessin (voir topo/dessin.js)
 // }

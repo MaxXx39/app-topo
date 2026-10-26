@@ -1,7 +1,7 @@
 // Dessins (Calculs › Dessin) sur le plan : traits violets, sommets en petits carrés ; pour le dessin
 // en cours, les numéros des sommets et la longueur de chaque côté (comme Leica iCON), puis le pilote :
 // le dernier sommet entouré et la direction en pointillés jusqu'au prochain sommet (ou une flèche).
-// Les autres dessins ont le nom de leurs sommets (« PF1-1 »…), pour les implanter.
+// Les autres dessins ont le nom de leurs sommets (« D1-1 », « PF1-1 »…), pour les implanter.
 import { estFerme, longueursCotes, pointSelonGisement } from '../topo/dessin.js';
 import { formaterNombre } from '../topo/format.js';
 
@@ -18,7 +18,7 @@ export function dessinerDessins(groupe, { dessins = [], actifId = null, pilote =
     const ferme = estFerme(dessin) && ecran.length >= 3;
     if (dessin.type !== 'points' && ecran.length >= 2) {
       const d = `M${ecran.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('L')}${ferme ? 'Z' : ''}`;
-      const trait = creer('path', { d, class: `trait-dessin type-${dessin.type} ${actif ? 'actif' : ''}` });
+      const trait = creer('path', { d, class: `trait-dessin type-${dessin.type} ${ferme ? 'ferme' : ''} ${actif ? 'actif' : ''}` });
       if (dessin.couleur) trait.style.stroke = dessin.couleur; // couleur choisie pour sa liste
       groupe.append(trait);
     }

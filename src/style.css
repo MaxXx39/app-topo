@@ -6451,9 +6451,68 @@ body.mode-base .parties-calculs {
   background: color-mix(in srgb, #7c3aed 7%, var(--surface));
 }
 
+/* Étape du pilote en évidence : « Point de départ », « Direction du 1er côté », « Côté 3 ». */
 .etape-pilote {
-  margin: 0 0 8px;
+  margin: 0 0 2px;
+  color: #5b21b6;
+  font-size: 1.25rem;
   font-weight: 800;
+}
+
+.etape-pilote + .aide {
+  margin: 0 0 8px;
+}
+
+/* « ← Retour » : sur téléphone, les onglets sont cachés pendant le dessin. */
+.bouton-retour-dessin {
+  margin: 0 0 6px;
+  padding: 4px 10px;
+  border: 1px solid #7c3aed;
+  border-radius: 8px;
+  background: var(--surface);
+  color: #5b21b6;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tourner-dessin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.tourner-dessin label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.tourner-dessin input {
+  width: 70px;
+  min-height: 38px;
+  font-size: 1.05rem;
+  text-align: right;
+}
+
+.tourner-dessin .bouton-secondaire.actif {
+  border-color: #7c3aed;
+  background: #7c3aed;
+  color: #ffffff;
+}
+
+.direction-choisie {
+  align-self: center;
+  color: #15803d;
+  font-weight: 700;
+}
+
+.rectangle-dessin summary {
+  width: 100%;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .direction-distance,
@@ -6483,11 +6542,6 @@ body.mode-base .parties-calculs {
   font-size: 1.05rem;
 }
 
-.rectangle-dessin > span {
-  width: 100%;
-  font-weight: 700;
-}
-
 .hauteur-dessin {
   margin-top: 8px;
   padding-top: 8px;
@@ -6506,7 +6560,8 @@ body.mode-base .parties-calculs {
   stroke-linejoin: round;
 }
 
-.plan .trait-dessin.type-plateforme {
+.plan .trait-dessin.type-plateforme,
+.plan .trait-dessin.ferme {
   fill: rgba(124, 58, 237, 0.08);
 }
 
