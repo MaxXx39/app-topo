@@ -57,7 +57,7 @@ export function ouvrirListePoints({ groupes, choisir }) {
   const fenetre = creerFenetre('fenetre-liste-points', 'Points du projet', `
     <input type="search" class="recherche-points" data-champ="recherche" placeholder="Chercher (ex. b10)" autocomplete="off" autocapitalize="characters" aria-label="Chercher un point" />
     <div class="groupes-points">
-      ${total === 0 ? '<p class="vide">Aucun point dans le projet.</p>' : groupes.map((g, i) => `<details class="groupe-points" ${groupes.length === 1 || i === 0 ? 'open' : ''}>
+      ${total === 0 ? '<p class="vide">Aucun point dans le projet.</p>' : groupes.map((g, i) => `<details class="groupe-points ${g.classe ?? ''}" ${groupes.length === 1 || i === 0 ? 'open' : ''}>
         <summary>${echapper(g.titre)} <span class="aide">${g.noms.length}</span></summary>
         <div class="noms-points">${g.noms.map((nom) => `<button type="button" class="puce-choix" data-nom="${echapper(nom)}">${echapper(nom)}</button>`).join('')}</div>
       </details>`).join('')}

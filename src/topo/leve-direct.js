@@ -79,15 +79,16 @@ export function creerSurfaceDirecte(projet, leve, nature = 'stock') {
 }
 
 /**
- * Levé « Autres » (levé de contrôle, points géomètre… ; décision du 23.10.2026) : des lignes
+ * Levé « Levé libre » (« Autres » dans le code ; levé de contrôle, points géomètre… ; décision du 23.10.2026) : des lignes
  * (L-<lib>-<n°>-<pt>) et des points isolés (P-<lib>-<n°>), sans surface, sans volume, sans mesure.
  * Même forme qu'une surface (contour vide, lignesRupture, points) pour en reprendre les outils ;
- * rangé à part dans projet.autres. Nommé « Autres N ». Renvoie l'objet créé.
+ * rangé à part dans projet.autres. Nommé « Levé libre N » (« Autres N » avant la 0.57.1). Renvoie l'objet créé.
  */
 export function creerAutres(projet, leve) {
   projet.autres ??= [];
-  const numeros = projet.autres.map((a) => /^Autres (\d+)$/.exec(a.nom)?.[1]).filter(Boolean).map(Number);
-  const autres = { id: nouvelIdentifiant(), nom: `Autres ${Math.max(0, ...numeros) + 1}`, nature: 'autres', leveId: leve.id, contour: [], lignesRupture: [], points: [] };
+  // Anciens noms « Autres N » comptés aussi (avant la version 0.57.1).
+  const numeros = projet.autres.map((a) => /^(?:Autres|Levé libre) (\d+)$/.exec(a.nom)?.[1]).filter(Boolean).map(Number);
+  const autres = { id: nouvelIdentifiant(), nom: `Levé libre ${Math.max(0, ...numeros) + 1}`, nature: 'autres', leveId: leve.id, contour: [], lignesRupture: [], points: [] };
   projet.autres.push(autres);
   return autres;
 }

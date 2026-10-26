@@ -188,6 +188,18 @@ p {
   cursor: pointer;
 }
 
+/* Main verte (on a la main sur le projet partagé). */
+.main-verrou {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .pastille-verte {
   background: rgba(134, 239, 172, 0.18);
   color: #86efac;
@@ -283,7 +295,6 @@ body.aide-active .rond-aide {
   box-shadow: var(--ombre);
   pointer-events: none;
 }
-
 
 /* --- Onglets (barre du bas sur téléphone) --- */
 
@@ -2064,6 +2075,43 @@ th.nombre {
   line-height: 1.2;
 }
 
+/* « + Nouveau projet » (ambre) et « Gestion de projets » (sombre) : bien en évidence (0.59.1). */
+.bouton-projet {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(16, 24, 20, 0.2);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.bouton-projet svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.bouton-projet.nouveau-projet {
+  background: var(--ambre);
+  color: var(--sombre);
+}
+
+.bouton-projet.gestion-projets {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
 .actions-projets .bouton-secondaire.actif {
   border-color: var(--sombre);
   background: var(--sombre);
@@ -2985,76 +3033,6 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   display: none !important;
 }
 
-/* Surface levée en cours : bandeau à la couleur de sa nature (comme les boutons « Que lèves-tu ? »),
-   nature en petit, nom en grand (liste à toucher pour en reprendre une autre), « + » à droite. */
-.bandeau-leve {
-  --couleur-nature: #b45309;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding: 6px 6px 6px 12px;
-  border: 2px solid var(--couleur-nature);
-  border-left-width: 8px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--couleur-nature) 10%, var(--surface));
-}
-
-.bandeau-leve.nature-terrain {
-  --couleur-nature: #15803d;
-}
-
-.bandeau-leve.nature-terrassement {
-  --couleur-nature: #2563eb;
-}
-
-.bandeau-leve.nature-metre {
-  --couleur-nature: #0891b2;
-}
-
-.bandeau-leve-texte {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.nature-leve {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--couleur-nature);
-}
-
-.bandeau-leve select {
-  width: 100%;
-  min-height: 30px;
-  padding: 0 28px 0 0;
-  border: none;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231b2b36' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 2px center / 20px 20px;
-  color: var(--texte);
-  font-size: 1.2rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.bouton-plus {
-  flex: none;
-  width: 45px;
-  height: 45px;
-  border: none;
-  border-radius: 50%;
-  background: var(--couleur-nature);
-  color: #ffffff;
-  font-size: 1.8rem;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-}
-
 .bouton-nature.nature-metre {
   --couleur-nature: #0891b2;
 }
@@ -3643,6 +3621,22 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   stroke-linecap: round;
 }
 
+/* Points de contrôle (Terrain › Contrôler) : triangle rouge, nom en rouge. */
+.plan .triangle-controle {
+  fill: #dc2626;
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+
+.plan .nom-controle {
+  fill: #dc2626;
+  font-size: 11.2px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+
 .plan .croix-a-implanter {
   stroke: #0d9488;
   stroke-width: 3;
@@ -4038,6 +4032,30 @@ svg.plan,
   background: rgba(27, 43, 54, 0.45);
 }
 
+/* Fenêtre « Code de sécurité » (réglages protégés : nom de l'appareil, NTRIP). */
+.fenetre-code {
+  width: min(86vw, 320px);
+}
+
+.champ-code {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.champ-code input {
+  min-height: 44px;
+  font-size: 1.4rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
+.fenetre-code .ligne-outils {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
 /* Mode de l'appli (réglages ⚙) : Base ou Confirmé, deux gros boutons avec l'étoile. */
 .choix-mode-appli {
   display: flex;
@@ -4188,15 +4206,32 @@ body.mode-telephone .onglets button svg {
    Terrain (version 0.51.0) : Lever | Implanter tout en haut, écran de guidage
    ========================================================================== */
 
-/* Lever (ambre) | Implanter (sarcelle) : le mode actif en couleur pleine. */
-.bascule-terrain button.actif {
-  background: var(--ambre);
+/* Lever (ambre) | Implanter (sarcelle) | Contrôle (rouge) : chaque mode a un liseré de sa
+   couleur ; le mode choisi est en couleur pleine (0.59.3). */
+.bascule-terrain button {
+  --couleur-mode: var(--ambre);
+  border: 2px solid var(--couleur-mode);
+  background: var(--surface);
   color: var(--sombre);
 }
 
-.bascule-terrain.mode-controler button.actif {
-  background: #0d9488;
+.bascule-terrain button[data-valeur='controler'] {
+  --couleur-mode: #0d9488;
+  color: #0d9488;
+}
+
+.bascule-terrain button[data-valeur='autocontrole'] {
+  --couleur-mode: #dc2626;
+  color: #dc2626;
+}
+
+.bascule-terrain button.actif {
+  background: var(--couleur-mode);
   color: #ffffff;
+}
+
+.bascule-terrain button[data-valeur='lever'].actif {
+  color: var(--sombre);
 }
 
 /* Téléphone : la bascule est collée sous l'en-tête, au-dessus du plan. */
@@ -4755,56 +4790,68 @@ button.bouton-import {
   margin-bottom: 10px;
 }
 
-/* Levé en cours (version 0.52.0) : le bandeau à la couleur de sa nature, la liste bien visible
-   (cadre blanc, grosse flèche) pour reprendre un autre levé, et le « + » à part, à droite. */
+/* Levé en cours (version 0.57.1) : « Levé en cours » en petit, puis la liste des levés dans un
+   cadre neutre ; le nom du levé (et chaque levé de la liste) est écrit à la couleur de sa nature.
+   « + Nouveau levé » en haut de la liste. */
 .ligne-leve-en-cours {
   display: flex;
-  align-items: stretch;
-  gap: 10px;
+  flex-direction: column;
+  gap: 2px;
   margin-bottom: 10px;
 }
 
-.ligne-leve-en-cours .bandeau-leve {
-  flex: 1;
-  min-width: 0;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  margin-bottom: 0;
-  padding: 4px 8px 6px 10px;
+.titre-leve-en-cours {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gris);
 }
 
-.ligne-leve-en-cours .bandeau-leve select {
-  min-height: 35px;
+.choix-leve {
+  --couleur-nature: #b45309;
+  width: 100%;
+  min-height: 40px;
   padding: 0 44px 0 10px;
-  border: 1.5px solid var(--couleur-nature);
+  border: 1.5px solid var(--bordure);
   border-radius: 8px;
+  appearance: none;
+  -webkit-appearance: none;
   background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%231b2b36'/%3E%3Cpath d='m7 10 5 5 5-5' fill='none' stroke='%23f6ab07' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 6px center / 28px 28px;
+  color: var(--couleur-nature);
   font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
 }
 
-.ligne-leve-en-cours .bouton-plus {
-  --couleur-nature: var(--sombre); /* neutre : ne prend pas la couleur du levé en cours */
-  align-self: center;
-  width: 48px;
-  height: 48px;
-  box-shadow: 0 2px 6px rgba(16, 24, 20, 0.25);
+.choix-leve option {
+  --couleur-nature: #b45309;
+  color: var(--couleur-nature);
+  font-weight: 700;
 }
 
-.bandeau-leve.nature-terrain {
+.choix-leve option.nouveau-leve {
+  color: var(--texte);
+}
+
+.choix-leve.nature-terrain,
+.choix-leve option.nature-terrain {
   --couleur-nature: #15803d;
 }
 
-.bandeau-leve.nature-terrassement {
+.choix-leve.nature-terrassement,
+.choix-leve option.nature-terrassement {
   --couleur-nature: #2563eb;
 }
 
-.bandeau-leve.nature-metre {
+.choix-leve.nature-metre,
+.choix-leve option.nature-metre {
   --couleur-nature: #0891b2;
 }
 
-/* « Autres » (contrôle, points géomètre…) : gris ardoise. */
-.bandeau-leve.nature-autres,
+/* « Levé libre » (contrôle, points géomètre… ; « autres » dans le code) : gris ardoise. */
+.choix-leve.nature-autres,
+.choix-leve option.nature-autres,
 .bouton-nature.nature-autres {
   --couleur-nature: #475569;
 }
@@ -4871,6 +4918,7 @@ button.bouton-import {
 .pastille-liste.liste-autres { background: #475569; }
 .pastille-liste.liste-fichier { background: var(--sombre); }
 .pastille-liste.liste-ajoutes { background: #7c3aed; }
+.pastille-liste.liste-controle { background: #dc2626; }
 
 .menu-listes-points {
   max-height: 50vh;
@@ -6072,4 +6120,189 @@ body.mode-base .seulement-confirme,
 body.mode-base .onglets .onglet-calculs,
 body.mode-base .parties-calculs {
   display: none !important;
+}
+
+/* Fenêtre « Liste » : les points de contrôle à part, en rouge. */
+.groupe-points.groupe-controle summary,
+.groupe-points.groupe-controle .puce-choix {
+  color: #dc2626;
+}
+
+.groupe-points.groupe-controle .puce-choix {
+  border-color: #dc2626;
+}
+
+/* ==========================================================================
+   Terrain › Contrôler (autocontrôle sur les points connus, version 0.59.0)
+   ========================================================================== */
+
+/* Bouton « Contrôle » : plus petit que Lever et Implanter (couleur rouge : voir .bascule-terrain). */
+.bascule-terrain button[data-valeur='autocontrole'] {
+  flex: 0 0 auto;
+  padding: 0 10px;
+  font-size: 0.85rem;
+}
+
+.entete-controle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.entete-controle .titre-choix {
+  margin: 0;
+}
+
+.etat-controle {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.etat-controle.a-faire {
+  background: var(--rouge-clair);
+  color: var(--rouge);
+}
+
+.etat-controle.fait {
+  background: color-mix(in srgb, var(--succes) 12%, var(--surface));
+  color: var(--succes);
+}
+
+.points-controle {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.point-controle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 2px solid #dc2626;
+  border-radius: 10px;
+  background: var(--surface);
+  color: #dc2626;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.point-controle strong {
+  font-size: 1.1rem;
+}
+
+.pastille-resultat {
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.pastille-resultat.vert { background: #15803d; }
+.pastille-resultat.orange { background: #ea580c; }
+.pastille-resultat.rouge { background: #dc2626; }
+
+.gestion-controle {
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px dashed var(--bordure);
+  border-radius: 10px;
+}
+
+.tolerances-controle {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  align-items: end;
+  gap: 6px 8px;
+}
+
+.tolerances-controle span {
+  padding-bottom: 8px;
+  font-weight: 700;
+}
+
+.tolerances-controle label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  color: var(--gris);
+}
+
+.tolerances-controle input {
+  width: 100%;
+  min-height: 36px;
+}
+
+.historique-controle {
+  margin-top: 12px;
+}
+
+.ligne-controle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  padding: 6px 8px;
+  border-left: 5px solid var(--bordure);
+  border-bottom: 1px solid var(--bordure);
+}
+
+.ligne-controle.vert { border-left-color: #15803d; }
+.ligne-controle.orange { border-left-color: #ea580c; }
+.ligne-controle.rouge { border-left-color: #dc2626; }
+.ligne-controle.rouge > strong { color: #dc2626; }
+
+.date-controle {
+  color: var(--gris);
+  font-size: 0.85rem;
+}
+
+.ecarts-controle,
+.remarque-controle {
+  grid-column: 1 / -1;
+}
+
+.ecarts-controle .vert { color: #15803d; font-weight: 700; }
+.ecarts-controle .orange { color: #ea580c; font-weight: 700; }
+.ecarts-controle .rouge { color: #dc2626; font-weight: 700; }
+
+.remarque-controle {
+  min-height: 32px;
+  font-size: 0.9rem;
+}
+
+/* Projet › Import : bouton « Points de contrôle » en rouge ; leur liste aussi. */
+.bouton-import.import-controle {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.bouton-import.import-controle svg {
+  stroke: #dc2626;
+}
+
+.ligne-leve.liste-controle {
+  border-left: 4px solid #dc2626;
+}
+
+.ligne-leve.liste-controle > strong,
+.liste-controle .points-de-la-liste summary {
+  color: #dc2626;
+}
+
+.points-de-la-liste {
+  margin-top: 4px;
+}
+
+.points-de-la-liste summary {
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
 }

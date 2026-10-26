@@ -71,7 +71,9 @@ import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecept
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
 import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles } from './plan/listes-points.js';
+import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle } from './topo/controle.js';
+import { pdfControles } from './export/pdf-controles.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, LISTE_CONTROLE } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant } from './topo/noms.js';
 import { demanderChoix } from './outils/choix.js';
@@ -125,6 +127,8 @@ const terrain = {
 // Talus : la ligne est implanter.ligne, ses réglages terrain.talus ; talusId : talus de « Mes talus »
 // ouvert (ses changements y sont gardés), ou null.
 const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null, talusId: null };
+// Mode Contrôler (autocontrôle) : point de contrôle vers lequel on guide ({ id, nom, est, nord, altitude }) ou null.
+const autocontrole = { cible: null };
 const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
 
 function lireReglagesTerrain() {
@@ -154,6 +158,9 @@ const ICONES = {
   calculs: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
   plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
 };
+// Main ouverte (on a la main sur le projet), dessinée en traits comme les autres icônes.
+const ICONE_MAIN = '<path d="M18 11V6a2 2 0 0 0-4 0v5" /><path d="M14 10V4a2 2 0 0 0-4 0v6" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />';
+
 const ONGLETS = [
   { nom: 'projets', titre: 'Projet' },
   ...(recepteurDisponible() ? [{ nom: 'terrain', titre: 'Terrain' }] : []),
@@ -363,6 +370,7 @@ function calculDuPlan(surface) {
 // --- Écrans ---
 
 const ecranImport = creerEcranImport(document.querySelector('#importer'), {
+  importerPointsControle: (fichier) => importerPointsControle(fichier),
   importerPoints: async (fichier) => {
     try {
       const resultat = lirePoints(await fichier.text());
@@ -644,7 +652,7 @@ const ecranLeve = recepteurDisponible()
         recalculer();
       },
       choisirMode: (mode) => {
-        terrain.mode = mode === 'controler' ? 'controler' : 'lever';
+        terrain.mode = ['controler', 'autocontrole'].includes(mode) ? mode : 'lever';
         retenirReglagesTerrain();
         if (terrain.mode === 'controler') montrerSurfaceControle();
         recalculer();
@@ -860,6 +868,10 @@ const ecranLeve = recepteurDisponible()
         requestAnimationFrame(cadrerSurImplantation);
       },
       enregistrerImplantation: () => {
+        if (enAutocontrole()) {
+          enregistrerControle();
+          return;
+        }
         if (enTalus()) {
           enregistrerImplantationTalus();
           return;
@@ -889,6 +901,54 @@ const ecranLeve = recepteurDisponible()
       },
       exporterImplantations: () => {
         telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nomDeFichierProjet(projet)}_implantations.csv`);
+      },
+      // --- Mode Contrôler (autocontrôle sur les points de contrôle du projet) ---
+      controlerPoint: (id) => {
+        const point = projet.pointsControle.find((p) => p.id === id);
+        if (!point) return;
+        autocontrole.cible = { ...point };
+        montrerImplantation();
+        requestAnimationFrame(cadrerSurImplantation);
+      },
+      arreterControle: () => {
+        autocontrole.cible = null;
+        montrerImplantation();
+      },
+      remarqueControle: (id, texte) => {
+        const controle = projet.controles.find((c) => c.id === id);
+        if (!controle) return;
+        controle.remarque = texte.trim();
+        modifie();
+      },
+      exporterControles: (format) => {
+        const nom = `${nomDeFichierProjet(projet)}_controles`;
+        if (format === 'pdf') telecharger(pdfControles(projet), `${nom}.pdf`);
+        else telecharger(new Blob(['\ufeff' + csvControles(projet.controles)], { type: 'text/csv;charset=utf-8' }), `${nom}.csv`);
+      },
+      enregistrerTolerances: (textes) => {
+        const { tolerances, erreur } = lireTolerances(textes);
+        if (erreur) return { erreur };
+        projet.tolerancesControle = tolerances;
+        afficherMessage('Tolérances enregistrées');
+        modifie();
+        return null;
+      },
+      ajouterPointControle: (nom) => {
+        const point = pointsDuProjet().find((p) => p.nom === nom);
+        if (!point) return { erreur: `point ${nom} introuvable` };
+        return ajouterAuxPointsControle([point]);
+      },
+      ajouterPointControleTape: (valeurs) => {
+        if (!valeurs.nom) return { erreur: 'donne un nom au point' };
+        return ajouterAuxPointsControle([valeurs]);
+      },
+      importerPointsControle: (fichier) => importerPointsControle(fichier),
+      supprimerPointControle: (id) => {
+        const point = projet.pointsControle.find((p) => p.id === id);
+        if (!point || !confirm(`Enlever ${point.nom} des points de contrôle ?`)) return;
+        projet.pointsControle = projet.pointsControle.filter((p) => p.id !== id);
+        if (autocontrole.cible?.id === id) autocontrole.cible = null;
+        modifie();
       },
       choisirSurfaceControle: (id) => {
         terrain.surfaceId = id || null;
@@ -970,13 +1030,18 @@ function envoyerImplantationAuPlan() {
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
   const lignesAutres = lignesDesAutres();
-  plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0 || lignesAutres.length > 0
+  // Points de contrôle : dessinés si leur case « Points de contrôle » est cochée (menu Afficher).
+  const pointsControle = (projet.listesCachees ?? []).includes(LISTE_CONTROLE) ? [] : projet.pointsControle;
+  // Mode Contrôler : le point de contrôle vers lequel on guide est la cible du plan.
+  const cibleControle = enAutocontrole() && ongletContexte === 'terrain' ? autocontrole.cible : null;
+  plan.afficherImplantation(accrocheActive || projet.aImplanter.length > 0 || lignesAutres.length > 0 || pointsControle.length > 0 || cibleControle
     ? {
         actif: accrocheActive,
         aImplanter: projet.aImplanter,
+        pointsControle,
         lignesAutres,
         choix: recalage.planId ? (recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : accrocheActive && !enLigne ? implanter.choix : null,
-        cible: accrocheActive && !enLigne ? implanter.cible : null,
+        cible: cibleControle ?? (accrocheActive && !enLigne ? implanter.cible : null),
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : [],
@@ -1016,7 +1081,8 @@ function montrerImplantation() {
 
 /** Cadre le plan sur ce qu'on implante (point ou ligne) et la position du récepteur. */
 function cadrerSurImplantation() {
-  const coins = implanter.ligne && ['ligne', 'talus'].includes(terrain.implantation) ? [...implanter.ligne.sommets] : implanter.cible ? [implanter.cible] : [];
+  let coins = implanter.ligne && ['ligne', 'talus'].includes(terrain.implantation) ? [...implanter.ligne.sommets] : implanter.cible ? [implanter.cible] : [];
+  if (enAutocontrole()) coins = autocontrole.cible ? [autocontrole.cible] : [];
   const position = etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null;
   // La canne aussi, si elle est assez près (sinon le point serait tout petit à l'écran).
   if (position && coins.length > 0 && Math.hypot(position.est - coins[0].est, position.nord - coins[0].nord) < 300) coins.push(position);
@@ -1066,6 +1132,148 @@ function enImplantationDePoint() {
  */
 function enImplantationDeLigne() {
   return Boolean(ecranLeve) && terrain.mode === 'controler' && ['ligne', 'talus'].includes(terrain.implantation);
+}
+
+/** Vrai pendant l'autocontrôle (Terrain › Contrôle). */
+function enAutocontrole() {
+  return Boolean(ecranLeve) && terrain.mode === 'autocontrole';
+}
+
+/**
+ * Ajoute des points à la liste des points de contrôle (sans nom en double) : message, puis
+ * { erreur } si certains n'ont pas été ajoutés, sinon null.
+ */
+function ajouterAuxPointsControle(points) {
+  const { ajoutes, deja, sansNom } = ajouterPointsControle(projet.pointsControle, points, nouvelIdentifiant);
+  if (ajoutes > 0) {
+    afficherMessage(`${ajoutes} point(s) de contrôle ajouté(s)`);
+    modifie();
+  }
+  const refus = [deja.length > 0 ? `déjà dans la liste : ${deja.slice(0, 5).join(', ')}${deja.length > 5 ? '…' : ''}` : '', sansNom > 0 ? `${sansNom} point(s) sans nom` : ''].filter(Boolean);
+  return refus.length > 0 ? { erreur: `Pas ajouté(s) : ${refus.join(' ; ')}` } : null;
+}
+
+/**
+ * Fichier de points (CSV, TXT) ajouté aux points de contrôle (Projet › Import › « Points de contrôle »,
+ * ou Terrain › Contrôle › ⚙). Renvoie { erreur } ou null.
+ */
+async function importerPointsControle(fichier) {
+  try {
+    const { points, erreurs } = lirePoints(await fichier.text());
+    const reponse = ajouterAuxPointsControle(points);
+    if (erreurs.length > 0) return { erreur: `${erreurs.length} ligne(s) illisible(s), non importée(s) : ${erreurs.slice(0, 5).map((e) => `ligne ${e.ligne}`).join(', ')}${erreurs.length > 5 ? '…' : ''}` };
+    return reponse;
+  } catch (erreur) {
+    return { erreur: `impossible de lire « ${fichier.name} » : ${erreur.message}` };
+  }
+}
+
+/** Nom de cet appareil (partage Drive), noté dans chaque contrôle ; '' s'il n'est pas donné. */
+function nomDeLAppareil() {
+  return partage?.appareil()?.nom ?? '';
+}
+
+/**
+ * « Enregistrer le contrôle » : position vérifiée par l'appli Android (RTK fixe, inclinaison prête),
+ * écarts avec le point connu, couleur selon les tolérances du projet ; puis retour à la liste.
+ */
+function enregistrerControle() {
+  const point = autocontrole.cible;
+  if (!point) return;
+  const reponse = prendrePointRecepteur();
+  if (!reponse.ok) {
+    afficherMessage(`Contrôle refusé : ${reponse.raison}`, 4000);
+    return;
+  }
+  const { est, nord, altitude, ...gnss } = reponse.point;
+  const mesure = { est, nord, altitude };
+  const ecarts = ecartsControle(point, mesure);
+  const resultat = resultatControle(ecarts, projet.tolerancesControle);
+  projet.controles.push({
+    id: nouvelIdentifiant(),
+    type: 'mesure',
+    pointId: point.id,
+    nom: point.nom,
+    connu: { est: point.est, nord: point.nord, altitude: point.altitude ?? null },
+    mesure,
+    ecarts,
+    resultat,
+    gnss,
+    appareil: nomDeLAppareil(),
+    remarque: '',
+    le: new Date().toISOString(),
+  });
+  if (resultat.global === 'rouge') {
+    navigator.vibrate?.([80, 80, 80]);
+    sonRefus();
+  } else {
+    navigator.vibrate?.(60);
+    sonValidation();
+  }
+  const mots = { vert: 'OK', orange: 'limite', rouge: 'HORS TOLÉRANCE' };
+  const hauteur = ecarts.hauteur != null ? ` · haut. ${formaterNombre(ecarts.hauteur)} m` : '';
+  afficherMessage(`${point.nom} : ${mots[resultat.global]} (plan ${formaterNombre(ecarts.plan)} m${hauteur})`, 5000);
+  autocontrole.cible = null;
+  modifie();
+}
+
+/**
+ * Rappel du contrôle, à la connexion du RX2 (ou à l'ouverture d'un projet, RX2 déjà connecté) :
+ * s'il n'y a pas eu de contrôle réussi aujourd'hui, ou depuis 4 h (voir topo/controle.js).
+ * « Oui » ouvre Terrain › Contrôle ; « Non » note le refus dans le projet (CSV, PDF, Drive).
+ */
+let rappelEnCours = false;
+async function proposerControle() {
+  if (!ecranLeve || rappelEnCours || !controleNecessaire(projet.controles)) return;
+  rappelEnCours = true;
+  const projetDuRappel = projet;
+  const aujourdHui = projet.controles.some((c) => estControleReussi(c) && new Date(c.le).toDateString() === new Date().toDateString());
+  const texte = aujourdHui ? 'Dernier contrôle réussi il y a plus de 4 h.' : 'Aucun contrôle réussi aujourd\'hui.';
+  // Pas de point de contrôle dans le projet : le rappel attire quand même l'attention, avec OK
+  // seulement (rien n'est noté ; demande du 26.10.2026).
+  if (projet.pointsControle.length === 0) {
+    await demanderChoix({ titre: 'Faire le contrôle ?', texte: `${texte} Aucun point de contrôle dans ce projet.`, boutons: [{ cle: 'ok', texte: 'OK', principal: true }] });
+    rappelEnCours = false;
+    return;
+  }
+  const choix = await demanderChoix({
+    titre: 'Faire le contrôle ?',
+    texte,
+    boutons: [
+      { cle: 'oui', texte: 'Oui, faire le contrôle', principal: true },
+      { cle: 'non', texte: 'Non' },
+    ],
+  });
+  rappelEnCours = false;
+  if (projet !== projetDuRappel) return; // un autre projet a été ouvert entre-temps
+  if (choix === 'oui') {
+    terrain.mode = 'autocontrole';
+    retenirReglagesTerrain();
+    afficherOnglet('terrain');
+    recalculer();
+    return;
+  }
+  projet.controles.push({ id: nouvelIdentifiant(), type: 'refus', appareil: nomDeLAppareil(), le: new Date().toISOString() });
+  afficherMessage('Refus enregistré : le géomètre sera au courant', 5000);
+  modifie();
+}
+
+/** Données de l'écran Terrain › Contrôle (voir leve/controle-ecran.js). */
+function donneesAutocontrole() {
+  const controles = projet.controles;
+  const dates = controles.filter(estControleReussi).map((c) => c.le).sort();
+  return {
+    points: projet.pointsControle.map((p) => {
+      const dernier = [...controles].reverse().find((c) => c.type === 'mesure' && c.pointId === p.id);
+      return { ...p, dernier: dernier ? { global: dernier.resultat.global, le: dernier.le } : null };
+    }),
+    cible: autocontrole.cible,
+    tolerances: projet.tolerancesControle,
+    controles: [...controles].sort((a, b) => (a.le < b.le ? 1 : -1)).slice(0, 30),
+    nbControles: controles.length,
+    necessaire: controleNecessaire(controles),
+    dernierReussi: dates.at(-1) ?? null,
+  };
 }
 
 /** Vrai pendant l'implantation d'un talus (Terrain › Implanter › Talus). */
@@ -1329,7 +1537,7 @@ function ajouterPointLigne(point) {
 function pointsDuProjet() {
   const vus = new Set();
   const liste = [];
-  for (const point of [...projet.leves.flatMap((l) => l.points), ...projet.aImplanter]) {
+  for (const point of [...projet.leves.flatMap((l) => l.points), ...projet.aImplanter, ...projet.pointsControle]) {
     if (vus.has(point.nom)) continue;
     vus.add(point.nom);
     liste.push(point);
@@ -1490,6 +1698,8 @@ function groupesDePointsParListe() {
     if (noms.length > 0) groupes.push({ titre: liste.nom, noms });
   }
   if (projet.aImplanter.length > 0) groupes.push({ titre: 'À implanter', noms: projet.aImplanter.map((p) => p.nom) });
+  // Points de contrôle : une liste à part, en rouge (voir fenetres-points.js).
+  if (projet.pointsControle.length > 0) groupes.push({ titre: 'Points de contrôle', noms: projet.pointsControle.map((p) => p.nom), classe: 'groupe-controle' });
   return groupes;
 }
 
@@ -1690,8 +1900,7 @@ function validerPointage() {
  * Sans position fiable (pas de RTK fixe ou inclinaison pas prête), le guidage est donné en gris,
  * avec la raison : il aide à s'approcher, mais on ne peut pas enregistrer.
  */
-function calculerImplantation(etat, orientation) {
-  const cible = implanter.cible;
+function calculerImplantation(etat, orientation, cible = implanter.cible) {
   if (!cible) return null;
   const position = etat.connecte && etat.recu ? etat.position : null;
   if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
@@ -1717,17 +1926,17 @@ function mettreAJourToucheVolume() {
   if (!ecranLeve) return;
   const dansTerrain = document.body.dataset.onglet === 'terrain';
   const lever = dansTerrain && terrain.mode === 'lever' && Boolean(stockEnCours() || metreEnCours());
-  const implanterAvecTouche = dansTerrain && ((enImplantationDePoint() && Boolean(implanter.cible)) || (enImplantationDeLigne() && Boolean(implanter.ligne)));
+  const implanterAvecTouche = dansTerrain && ((enImplantationDePoint() && Boolean(implanter.cible)) || (enImplantationDeLigne() && Boolean(implanter.ligne)) || (enAutocontrole() && Boolean(autocontrole.cible)));
   const actif = lever || implanterAvecTouche;
   if (actif === toucheVolumeActive) return;
   toucheVolumeActive = actif;
   regleToucheVolume(actif, () => {
-    const enImplantation = enImplantationDePoint() || enImplantationDeLigne();
+    const enImplantation = enImplantationDePoint() || enImplantationDeLigne() || enAutocontrole();
     const refus = enImplantation ? ecranLeve.enregistrerDepuisTouche() : ecranLeve.prendreDepuisTouche();
     if (refus) {
       navigator.vibrate?.([80, 80, 80]);
       sonRefus();
-      afficherMessage(`${enImplantation ? 'Implantation refusée' : 'Point refusé'} : ${refus}`, 4000);
+      afficherMessage(`${enAutocontrole() ? 'Contrôle refusé' : enImplantation ? 'Implantation refusée' : 'Point refusé'} : ${refus}`, 4000);
     }
   });
 }
@@ -1805,13 +2014,14 @@ function donneesMetre(metre) {
 function donneesCommunes() {
   return {
     // Surfaces levées et métrés, avec la date de leur levé (« Stock 2 · 22.10.2026 »).
-    stocks: [...surfacesLevees(), ...projet.metres, ...projet.autres].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}` })),
+    stocks: [...surfacesLevees(), ...projet.metres, ...projet.autres].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}`, nature: s.nature ?? 'stock' })),
     libelles,
     libelleLigne: terrain.libelleLigne,
     libellePoint: terrain.libellePoint,
     libelleAire: terrain.libelleAire,
     mode: terrain.mode,
     controle: terrain,
+    autocontrole: donneesAutocontrole(),
     surfaces: projet.surfaces.map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
     implanter: {
       accroche: terrain.accroche,
@@ -1959,14 +2169,18 @@ if (ecranLeve) {
 // État du récepteur, 5 fois par seconde : bandeaux, bloc de levé, position sur le plan.
 if (recepteurDisponible()) {
   ecouterRecepteur((etat) => {
+    // RX2 qui vient de se connecter : rappel du contrôle s'il en faut un (voir proposerControle).
+    const vientDeSeConnecter = Boolean(etat.connecte) && !etatRecepteur?.connecte;
     etatRecepteur = etat;
+    if (vientDeSeConnecter) proposerControle();
     mettreAJourBandeaux(etat);
     boutonRecepteur?.mettreAJour(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
     const enPoint = enImplantationDePoint();
     const enLigne = enImplantationDeLigne();
     const controle = terrain.mode === 'controler' && !enPoint && !enLigne ? calculerControle(etat, orientation) : null;
-    const implantation = enPoint ? calculerImplantation(etat, orientation) : null;
+    let implantation = enPoint ? calculerImplantation(etat, orientation) : null;
+    if (enAutocontrole() && autocontrole.cible) implantation = calculerImplantation(etat, orientation, autocontrole.cible);
     const talus = enTalus();
     const implantationLigne = enLigne && !talus ? calculerImplantationLigne(etat) : null;
     const implantationTalus = talus ? calculerImplantationTalus(etat) : null;
@@ -2600,12 +2814,13 @@ function mettreAJourEtatEntete() {
     : '';
   document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} surface(s)`, drive].filter(Boolean).join(' · ');
 
-  // Verrou du partage : crayon vert ✎ (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
+  // Verrou du partage : main verte (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
   // (un autre appareil l'a ; toucher = prendre la main). Rien sans Drive.
   const pastille = document.querySelector('#pastille-verrou');
   const repris = partage?.etat.connecte && partage.etat.repris?.projetId === projet.id ? partage.etat.repris : null;
   pastille.hidden = !partage?.etat.connecte;
-  pastille.textContent = repris ? `🔒 Lecture seule · ${repris.nom}` : '✎';
+  if (repris) pastille.textContent = `🔒 Lecture seule · ${repris.nom}`;
+  else pastille.innerHTML = `<svg class="main-verrou" viewBox="0 0 24 24" aria-hidden="true">${ICONE_MAIN}</svg>`;
   pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : 'pastille-verte'}`;
   pastille.title = repris ? 'Ouvert sur un autre appareil : toucher pour prendre la main' : 'Tu as la main sur ce projet';
 }
@@ -2687,6 +2902,7 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   implanter.pointsLigne = [];
   implanter.ligne = null;
   implanter.talusId = null;
+  autocontrole.cible = null;
   dernierImport = null;
   document.querySelector('#message-import-surface').innerHTML = '';
   editeurSurfaces.charger(projet.surfaces);
@@ -2696,6 +2912,8 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   mettreAJourAnnuler();
   if (changerOnglet) afficherOnglet(etapeUtile());
   await enregistrer();
+  // RX2 déjà connecté : rappel du contrôle pour ce projet, s'il en faut un.
+  if (etatRecepteur?.connecte) proposerControle();
 }
 
 /**

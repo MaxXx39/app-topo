@@ -4,6 +4,7 @@
 // état en détail, et la roue ⚙ pour les réglages des corrections NTRIP (swipos), qui étaient avant
 // en bas de l'onglet Terrain.
 import { echapper } from '../outils/echapper.js';
+import { demanderCode } from '../outils/code.js';
 import { formaterNombre } from '../topo/format.js';
 import { etatCorrections } from './corrections.js';
 import { bulle } from '../aide/bulles.js';
@@ -44,6 +45,7 @@ export function creerBoutonRecepteur(nav, actions) {
   let etat = null;
   let fenetre = null;
   let reglagesOuverts = false; // roue ⚙ : réglages NTRIP
+  let deverrouille = false; // bon code tapé pour les réglages NTRIP (voir outils/code.js), jusqu'à la fermeture
   const saisie = {}; // réglages NTRIP tapés, pas encore envoyés (gardés si la fenêtre se redessine)
 
   bouton.addEventListener('click', ouvrir);
@@ -61,6 +63,9 @@ export function creerBoutonRecepteur(nav, actions) {
     fenetre.addEventListener('close', () => {
       fenetre.remove();
       fenetre = null;
+      // Le code est redemandé à la prochaine ouverture.
+      reglagesOuverts = false;
+      deverrouille = false;
     });
     document.body.append(fenetre);
     dessiner();
@@ -77,10 +82,7 @@ export function creerBoutonRecepteur(nav, actions) {
     if (!cible) return;
     const { action } = cible.dataset;
     if (action === 'fermer') fenetre.close();
-    else if (action === 'reglages') {
-      reglagesOuverts = !reglagesOuverts;
-      dessiner();
-    } else if (action === 'demarrerCorrections') {
+    else if (action === 'reglages') basculerReglages(); else if (action === 'demarrerCorrections') {
       const lire = (champ) => fenetre.querySelector(`[data-correction="${champ}"]`)?.value.trim() ?? '';
       actions.demarrerCorrections({
         hote: lire('hote'),
@@ -95,6 +97,16 @@ export function creerBoutonRecepteur(nav, actions) {
       actions.arreterCorrections();
       setTimeout(dessiner, 300);
     } else actions[action]?.();
+  }
+
+  /** Roue ⚙ : ouvre ou ferme les réglages NTRIP ; les ouvrir demande le code (une fois par ouverture). */
+  async function basculerReglages() {
+    if (!reglagesOuverts && !deverrouille) {
+      if (!(await demanderCode('Réglages des corrections (NTRIP)'))) return;
+      deverrouille = true;
+    }
+    reglagesOuverts = !reglagesOuverts;
+    dessiner();
   }
 
   /** Dessine toute la fenêtre (à l'ouverture, ou quand la roue ⚙ est touchée). */

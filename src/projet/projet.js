@@ -24,11 +24,16 @@
 //                                   // (contrôle, points géomètre… : lignes et points, pas de surface ni de volume)
 //   implantations: [{ id, nom, cible: { est, nord, altitude }, mesure: { est, nord, altitude, gnss },
 //                     ecarts: { dEst, dNord, distance, dAltitude }, le (date ISO) }],  // implantations enregistrées
+//   pointsControle: [{ id, nom, est, nord, altitude (ou null) }],  // points de contrôle (Terrain › Contrôle)
+//   tolerancesControle: { plan: { vert, orange }, hauteur: { vert, orange } },  // m (voir topo/controle.js)
+//   controles: [{ id, type: 'mesure', pointId, nom, connu, mesure, ecarts, resultat, gnss, appareil, remarque, le }
+//               ou { id, type: 'refus', appareil, le }],  // autocontrôles et refus du rappel
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé. De même pour une mesure.
 import { nouvelIdentifiant, estImportee } from '../topo/surface.js';
 import { calculsDUnAncienProjet } from '../volumes/calculs.js';
+import { TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
 
 export const FORMAT = 'topo-projet';
 // Version 2 : calculs de volume (onglets Volumes et Comparer réunis) et nature des surfaces.
@@ -58,6 +63,9 @@ export function creerProjet(nom = '') {
     metres: [],
     autres: [],
     listesCachees: [],
+    pointsControle: [],
+    tolerancesControle: structuredClone(TOLERANCES_PAR_DEFAUT),
+    controles: [],
   };
 }
 
@@ -155,6 +163,9 @@ export function completerProjet(projet) {
   complet.metres ??= [];
   complet.autres ??= [];
   complet.listesCachees ??= []; // listes de points décochées dans le menu « Points » du plan
+  complet.pointsControle ??= [];
+  complet.tolerancesControle ??= structuredClone(TOLERANCES_PAR_DEFAUT);
+  complet.controles ??= [];
   complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
     nature: estImportee(surface) ? 'terrain' : 'stock',
     ...surface,

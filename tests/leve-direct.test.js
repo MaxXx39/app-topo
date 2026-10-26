@@ -15,6 +15,7 @@ import {
   ligneEnCours,
   resumeStock,
   estLeveDirect,
+  creerAutres,
 } from '../src/topo/leve-direct.js';
 import { creerProjet } from '../src/projet/projet.js';
 import { calculerSurface } from '../src/topo/surface.js';
@@ -214,5 +215,13 @@ describe('couleur des libellés', () => {
     expect(couleurDuNom('b100', libelles)).toBeNull();
     expect(couleurDeLigne({ libelle: 'HT', noms: [] }, libelles)).toBe('#2563eb');
     expect(couleurDeLigne({ noms: ['L-HT-4-1', 'L-HT-4-2'] }, libelles)).toBe('#2563eb');
+  });
+});
+
+describe('levé libre', () => {
+  it('nommé « Levé libre N », en comptant les anciens « Autres N »', () => {
+    const projet = { autres: [{ nom: 'Autres 1' }, { nom: 'Levé libre 2' }] };
+    expect(creerAutres(projet, { id: 'l1' }).nom).toBe('Levé libre 3');
+    expect(creerAutres({}, { id: 'l1' }).nom).toBe('Levé libre 1');
   });
 });
