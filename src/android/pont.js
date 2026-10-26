@@ -61,13 +61,31 @@ export function recepteur2Disponible() {
   return estDansAppliAndroid() && typeof window.AppliAndroid.choisirRecepteur2 === 'function';
 }
 
-/** Appelle "fonction(etat)" à chaque état du 2e récepteur (même forme que ecouterRecepteur). */
+/**
+ * Appelle "fonction(etat, mode)" à chaque état du 2e récepteur (même forme que ecouterRecepteur) ;
+ * mode : façon dont il reçoit ses corrections ('copie' ou 'ntrip', retenue sur la tablette).
+ */
 export function ecouterRecepteur2(fonction) {
   window.recevoirEtatRecepteur2 = fonction;
 }
 
 export const choisirRecepteur2 = () => window.AppliAndroid.choisirRecepteur2();
 export const deconnecterRecepteur2 = () => window.AppliAndroid.deconnecterRecepteur2();
+
+/** Corrections du 2e récepteur : 'copie' (copie de celles du 1er) ou 'ntrip' (sa propre connexion). */
+export const choisirModeCorrections2 = (mode) => window.AppliAndroid.choisirModeCorrections2(mode);
+
+/** Réglages NTRIP du 2e récepteur (même forme que lireReglagesCorrections), ou null. */
+export function lireReglagesCorrections2() {
+  try {
+    return JSON.parse(window.AppliAndroid.lireReglagesCorrections2());
+  } catch {
+    return null;
+  }
+}
+
+export const demarrerCorrections2 = (reglages) => window.AppliAndroid.demarrerCorrections2(JSON.stringify(reglages));
+export const arreterCorrections2 = () => window.AppliAndroid.arreterCorrections2();
 export const reconnecterRecepteur = () => window.AppliAndroid.reconnecterRecepteur();
 export const deconnecterRecepteur = () => window.AppliAndroid.deconnecterRecepteur();
 

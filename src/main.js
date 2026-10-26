@@ -72,7 +72,7 @@ import {
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
-import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2 } from './android/pont.js';
+import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle } from './topo/controle.js';
@@ -591,9 +591,16 @@ const boutonRecepteur = recepteurDisponible()
       // Essai à 2 récepteurs (mode Confirmé) : seulement avec un APK qui le sait.
       choisirRecepteur2: recepteur2Disponible() ? choisirRecepteur2 : null,
       deconnecter2: deconnecterRecepteur2,
+      choisirModeCorrections2,
+      lireReglagesCorrections2,
+      demarrerCorrections2: (reglages) => {
+        demarrerCorrections2(reglages);
+        afficherMessage('Récepteur 2 : connexion à swipos…');
+      },
+      arreterCorrections2,
     })
   : null;
-if (boutonRecepteur && recepteur2Disponible()) ecouterRecepteur2((etat) => boutonRecepteur.mettreAJour2(etat));
+if (boutonRecepteur && recepteur2Disponible()) ecouterRecepteur2((etat, mode) => boutonRecepteur.mettreAJour2(etat, mode));
 
 const ecranLeve = recepteurDisponible()
   ? creerEcranLeve(document.querySelector('#leve-direct'), {

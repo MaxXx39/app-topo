@@ -91,7 +91,8 @@ class EcranPrincipal : Activity() {
         garderHorsDesBarres(cadre)
         setContentView(cadre)
         page.loadUrl(ServeurAppli.ADRESSE_ACCUEIL)
-        recepteur.copieCorrections = { octets -> recepteur2.bluetooth.ecrire(octets) }
+        // Essai à 2 récepteurs : le 2e reçoit une copie des corrections du 1er, ou a sa propre connexion.
+        appliquerModeCorrections2()
         // Corrections par internet laissées en marche la dernière fois : on les reprend.
         if (preferencesCorrections().getBoolean(CLE_CORRECTIONS_ACTIVES, false)) reglagesCorrections()?.let { recepteur.corrections.demarrer(it) }
     }
@@ -108,6 +109,7 @@ class EcranPrincipal : Activity() {
 
     override fun onDestroy() {
         recepteur.corrections.arreter()
+        recepteur2.corrections.arreter()
         recepteur.bluetooth.deconnecter()
         recepteur2.bluetooth.deconnecter()
         page.destroy()
@@ -125,7 +127,8 @@ class EcranPrincipal : Activity() {
                 page.evaluateJavascript("window.recevoirEtatRecepteur && window.recevoirEtatRecepteur($etat)", null)
                 // 2e récepteur (essai) : son état à part, seulement s'il est connecté ou vient de l'être.
                 val etat2 = recepteur2.enJson(preferences().getString(CLE_NOM_RECEPTEUR_2, null))
-                page.evaluateJavascript("window.recevoirEtatRecepteur2 && window.recevoirEtatRecepteur2($etat2)", null)
+                val mode2 = JSONObject.quote(modeCorrections2())
+                page.evaluateJavascript("window.recevoirEtatRecepteur2 && window.recevoirEtatRecepteur2($etat2, $mode2)", null)
             }
             if (recepteur.connecte || recepteur2.connecte) {
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -429,11 +432,15 @@ class EcranPrincipal : Activity() {
     // jamais dans le projet ni dans le fichier projet.
     // =====================================================================
 
-    private fun preferencesCorrections() = getSharedPreferences("corrections", MODE_PRIVATE)
+    // Récepteur 1 : préférences « corrections » ; récepteur 2 (essai) : « corrections2 », à part.
+    private fun preferencesCorrections(numero: Int = 1) = getSharedPreferences(if (numero == 2) "corrections2" else "corrections", MODE_PRIVATE)
+
+    /** Récepteur (1 ou 2) dont on règle les corrections. */
+    private fun recepteurNumero(numero: Int) = if (numero == 2) recepteur2 else recepteur
 
     /** Réglages enregistrés, ou null s'il n'y en a pas encore. */
-    private fun reglagesCorrections(): ReglagesNtrip? {
-        val p = preferencesCorrections()
+    private fun reglagesCorrections(numero: Int = 1): ReglagesNtrip? {
+        val p = preferencesCorrections(numero)
         val hote = p.getString("hote", null) ?: return null
         return ReglagesNtrip(
             hote = hote,
@@ -448,15 +455,15 @@ class EcranPrincipal : Activity() {
      * Réglages pour la page (texte JSON) : { hote, port, pointDeMontage, utilisateur,
      * motDePasseEnregistre, actives } ; le mot de passe lui-même ne quitte jamais l'appli Android.
      */
-    fun reglagesCorrectionsJson(): String {
-        val r = reglagesCorrections()
+    fun reglagesCorrectionsJson(numero: Int = 1): String {
+        val r = reglagesCorrections(numero)
         return JSONObject()
             .put("hote", r?.hote ?: "")
             .put("port", r?.port ?: PORT_NTRIP)
             .put("pointDeMontage", r?.pointDeMontage ?: POINT_DE_MONTAGE_PROPOSE)
             .put("utilisateur", r?.utilisateur ?: "")
             .put("motDePasseEnregistre", !r?.motDePasse.isNullOrEmpty())
-            .put("actives", preferencesCorrections().getBoolean(CLE_CORRECTIONS_ACTIVES, false))
+            .put("actives", preferencesCorrections(numero).getBoolean(CLE_CORRECTIONS_ACTIVES, false))
             .toString()
     }
 
@@ -464,14 +471,14 @@ class EcranPrincipal : Activity() {
      * Démarre les corrections avec les réglages tapés dans la page ({ hote, port, pointDeMontage,
      * utilisateur, motDePasse } ; mot de passe vide = garder celui enregistré), et les enregistre.
      */
-    fun demarrerCorrections(texteJson: String) {
+    fun demarrerCorrections(texteJson: String, numero: Int = 1) {
         val lu = try {
             JSONObject(texteJson)
         } catch (erreur: Exception) {
             message("Réglages des corrections illisibles.")
             return
         }
-        val ancien = reglagesCorrections()
+        val ancien = reglagesCorrections(numero)
         val reglages = ReglagesNtrip(
             hote = lu.optString("hote").trim(),
             port = lu.optInt("port", PORT_NTRIP),
@@ -479,7 +486,7 @@ class EcranPrincipal : Activity() {
             utilisateur = lu.optString("utilisateur").trim(),
             motDePasse = lu.optString("motDePasse").ifEmpty { ancien?.motDePasse ?: "" },
         )
-        preferencesCorrections().edit()
+        preferencesCorrections(numero).edit()
             .putString("hote", reglages.hote)
             .putInt("port", reglages.port)
             .putString("pointDeMontage", reglages.pointDeMontage)
@@ -487,13 +494,36 @@ class EcranPrincipal : Activity() {
             .putString("motDePasse", reglages.motDePasse)
             .putBoolean(CLE_CORRECTIONS_ACTIVES, true)
             .apply()
-        recepteur.corrections.demarrer(reglages)
+        recepteurNumero(numero).corrections.demarrer(reglages)
     }
 
     /** Arrête les corrections (Emlid Flow peut reprendre la main). */
-    fun arreterCorrections() {
-        preferencesCorrections().edit().putBoolean(CLE_CORRECTIONS_ACTIVES, false).apply()
-        recepteur.corrections.arreter()
+    fun arreterCorrections(numero: Int = 1) {
+        preferencesCorrections(numero).edit().putBoolean(CLE_CORRECTIONS_ACTIVES, false).apply()
+        recepteurNumero(numero).corrections.arreter()
+    }
+
+    /** Essai à 2 récepteurs : 'copie' (copie des corrections du 1er) ou 'ntrip' (sa propre connexion). */
+    fun modeCorrections2(): String = preferencesCorrections(2).getString(CLE_MODE_CORRECTIONS, "copie") ?: "copie"
+
+    /** Change la façon dont le 2e récepteur reçoit ses corrections, et l'applique tout de suite. */
+    fun choisirModeCorrections2(mode: String) {
+        preferencesCorrections(2).edit().putString(CLE_MODE_CORRECTIONS, if (mode == "ntrip") "ntrip" else "copie").apply()
+        appliquerModeCorrections2()
+    }
+
+    /**
+     * Copie : le 1er récepteur recopie ses corrections vers le 2e (la 2e connexion est arrêtée).
+     * 2e connexion : plus de copie ; la connexion du 2e reprend si elle était en marche.
+     */
+    private fun appliquerModeCorrections2() {
+        if (modeCorrections2() == "ntrip") {
+            recepteur.copieCorrections = null
+            if (preferencesCorrections(2).getBoolean(CLE_CORRECTIONS_ACTIVES, false)) reglagesCorrections(2)?.let { recepteur2.corrections.demarrer(it) }
+        } else {
+            recepteur2.corrections.arreter()
+            recepteur.copieCorrections = { octets -> recepteur2.bluetooth.ecrire(octets) }
+        }
     }
 
     private fun aLaPermission(permission: String) =
@@ -667,6 +697,7 @@ class EcranPrincipal : Activity() {
         private const val CLE_DERNIER_RECEPTEUR = "dernier_recepteur"
         private const val CLE_NOM_RECEPTEUR = "nom_dernier_recepteur"
         private const val CLE_NOM_RECEPTEUR_2 = "nom_recepteur_2"
+        private const val CLE_MODE_CORRECTIONS = "mode"
         private const val CLE_CORRECTIONS_ACTIVES = "actives"
 
         // Port habituel des serveurs NTRIP, et point de montage swipos de l'utilisateur (à vérifier dans Emlid Flow).
