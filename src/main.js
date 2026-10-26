@@ -69,7 +69,7 @@ import {
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
-import { appliquerReglages, ouvrirReglages } from './reglages/reglages.js';
+import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
@@ -266,8 +266,10 @@ installerAide(document.querySelector('#bouton-aide'));
 // Toucher le projet ouvert (en-tête) : on va à l'onglet Projet.
 document.querySelector('#entete-projet').addEventListener('click', () => afficherOnglet('projets'));
 
-// Réglages de cet appareil (roue ⚙) : mode téléphone, bulles d'aide, nom de l'appareil.
+// Réglages de cet appareil (roue ⚙) : mode Base / Confirmé, mode téléphone, bulles d'aide, nom de l'appareil.
 appliquerReglages();
+// L'étoile de l'en-tête (mode Base ☆ / Confirmé ★) ouvre aussi les réglages.
+document.querySelector('#bouton-mode').addEventListener('click', () => document.querySelector('#bouton-reglages').click());
 // Fenêtre des réglages ouverte (pour y redessiner l'état du partage Drive), ou null.
 let fenetreReglages = null;
 document.querySelector('#bouton-reglages').addEventListener('click', () => {
@@ -275,6 +277,10 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
     aideActive: document.body.classList.contains('aide-active'),
     basculerAide: () => document.querySelector('#bouton-aide').click(),
     fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? fermerAppli : null,
+    changerMode: () => {
+      adapterAuMode();
+      recalculer();
+    },
     // Partage par Google Drive (dans les réglages depuis la version 0.54.0).
     partage: partage
       ? {
@@ -293,6 +299,19 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
       : null,
   });
 });
+
+/**
+ * Mode Base : on quitte ce qui y est caché (onglet Calculs, implantation d'un talus). Rien n'est
+ * supprimé : en repassant en Confirmé, tout est là.
+ */
+function adapterAuMode() {
+  if (!estModeBase()) return;
+  if (estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
+  if (terrain.implantation === 'talus') {
+    terrain.implantation = 'ligne';
+    retenirReglagesTerrain();
+  }
+}
 
 /**
  * Fermer l'appli (bouton des réglages ⚙, appli Android seulement) : le projet part d'abord sur
@@ -631,7 +650,8 @@ const ecranLeve = recepteurDisponible()
         recalculer();
       },
       choisirImplantation: (quoi) => {
-        terrain.implantation = ['point', 'ligne', 'talus'].includes(quoi) ? quoi : 'surface';
+        const permises = estModeBase() ? ['point', 'ligne'] : ['point', 'ligne', 'talus'];
+        terrain.implantation = permises.includes(quoi) ? quoi : 'surface';
         retenirReglagesTerrain();
         recalculer();
       },
@@ -2692,6 +2712,7 @@ function nouveauProjetSansNom() {
 // L'appli s'ouvre sur l'onglet Projet (bouton « Continuer » pour reprendre le travail).
 async function demarrer() {
   afficherOnglet('projets');
+  adapterAuMode();
   stockage.demanderStockagePersistant();
   try {
     await rafraichirListe();

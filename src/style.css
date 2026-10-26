@@ -143,6 +143,12 @@ p {
   stroke-linejoin: round;
 }
 
+/* Étoile du mode : vide (contour blanc) = Base, pleine ambre = Confirmé. */
+.bouton-mode.confirme svg {
+  fill: var(--ambre);
+  stroke: var(--ambre);
+}
+
 .entete-icone-bouton:disabled {
   opacity: 0.3;
   cursor: default;
@@ -4032,6 +4038,56 @@ svg.plan,
   background: rgba(27, 43, 54, 0.45);
 }
 
+/* Mode de l'appli (réglages ⚙) : Base ou Confirmé, deux gros boutons avec l'étoile. */
+.choix-mode-appli {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0 12px;
+}
+
+.puce-mode {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1.5px solid var(--bordure);
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.puce-mode input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.puce-mode.actif {
+  border-color: var(--ambre);
+  background: var(--ambre-clair);
+}
+
+.puce-mode:has(input:focus-visible) {
+  outline: 2px solid var(--ambre-fonce);
+  outline-offset: 2px;
+}
+
+.etoile-mode {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--sombre);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+.etoile-mode.confirme {
+  fill: var(--ambre);
+  stroke: var(--ambre-fonce);
+}
+
 .case-reglage {
   display: flex;
   align-items: center;
@@ -6009,4 +6065,11 @@ body.accroches-ouvertes {
   fill: #f6ab07;
   stroke: #1b2b36;
   stroke-width: 1;
+}
+
+/* Mode Base (réglages ⚙) : fonctions avancées cachées (rien n'est supprimé du projet). */
+body.mode-base .seulement-confirme,
+body.mode-base .onglets .onglet-calculs,
+body.mode-base .parties-calculs {
+  display: none !important;
 }

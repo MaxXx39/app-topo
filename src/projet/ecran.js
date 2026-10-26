@@ -195,7 +195,7 @@ function pageProjets(projet, resumes, partage, menuOuvert, tri) {
     <div class="liste-projets">
       ${projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert === p.id, partage)).join('')}
     </div>
-    <label class="bouton-secondaire bouton-fichier">
+    <label class="bouton-secondaire bouton-fichier seulement-confirme">
       Ouvrir un fichier projet (.topo.json)
       <input type="file" data-champ="fichier-projet" accept=".json,application/json" hidden />
     </label>
@@ -222,8 +222,8 @@ function ligneProjet(p, estOuvert, menu, partage) {
     </button>
     <button type="button" class="bouton-menu-projet" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
     ${menu ? `<div class="menu-projet">
-      ${p.local ? `<button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporter" data-id="${p.id}">exporter (.topo.json)</button>
-        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="dupliquer" data-id="${p.id}">dupliquer</button>
+      ${p.local ? `<button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter" data-id="${p.id}">exporter (.topo.json)</button>
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="dupliquer" data-id="${p.id}">dupliquer</button>
         <button type="button" class="bouton-lien" data-action="supprimer-projet" data-id="${p.id}">supprimer de cet appareil</button>` : ''}
       ${p.drive ? `<button type="button" class="bouton-lien" data-action="supprimer-partout" data-id="${p.id}">supprimer partout${p.local ? '' : ' (Drive)'}</button>` : ''}
     </div>` : ''}

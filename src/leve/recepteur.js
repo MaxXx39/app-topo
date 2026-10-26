@@ -104,13 +104,13 @@ export function creerBoutonRecepteur(nav, actions) {
     fenetre.innerHTML = `
       <div class="entete-fenetre-recepteur">
         <h2>Récepteur</h2>
-        ${reglages ? `<button type="button" class="bouton-retour ${reglagesOuverts ? 'actif' : ''}" data-action="reglages" title="Réglages des corrections (NTRIP)" aria-label="Réglages des corrections (NTRIP)" aria-expanded="${reglagesOuverts}">
+        ${reglages ? `<button type="button" class="bouton-retour seulement-confirme ${reglagesOuverts ? 'actif' : ''}" data-action="reglages" title="Réglages des corrections (NTRIP)" aria-label="Réglages des corrections (NTRIP)" aria-expanded="${reglagesOuverts}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>` : ''}
         <button type="button" class="bouton-retour" data-action="fermer" title="Fermer" aria-label="Fermer">✕</button>
       </div>
       <div class="etat-recepteur" data-vivant="etat-recepteur"></div>
       <div class="actions-recepteur" data-vivant="actions-recepteur"></div>
-      ${reglages && reglagesOuverts ? blocNtrip(reglages) : ''}`;
+      ${reglages && reglagesOuverts ? `<div class="seulement-confirme">${blocNtrip(reglages)}</div>` : ''}`;
     rafraichir();
   }
 

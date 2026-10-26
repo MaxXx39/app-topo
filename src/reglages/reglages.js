@@ -2,23 +2,38 @@
 // dans le projet :
 // - « Mode téléphone » : textes, icônes et boutons plus petits, libellés plus courts
 //   (classe mode-telephone sur la page, voir style.css) ;
+// - mode « Base » ou « Confirmé » (demande du 26.10.2026) : en Base, les fonctions avancées sont
+//   cachées (classe mode-base sur la page ; éléments .seulement-confirme, voir style.css ; et
+//   estModeBase() dans le code). Rien n'est supprimé du projet. Confirmé par défaut ;
 // - bulles d'aide (même chose que le bouton « ? ») ;
 // - partage par Google Drive (nom de l'appareil, connexion, état), déplacé de l'onglet Projet ;
 // - « Fermer l'appli » (appli Android seulement), en rouge tout en haut.
 import { echapper } from '../outils/echapper.js';
 
 const CLE = 'topo-reglages';
+// Étoile à 5 branches (en-tête et choix du mode).
+export const ETOILE = 'M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z';
+const PAR_DEFAUT = { telephone: false, mode: 'confirme' };
+// Mode retenu (relu une fois, puis gardé ici) : estModeBase() est appelé très souvent par le plan.
+let modeRetenu = null;
 
-/** Réglages enregistrés : { telephone: vrai / faux }. */
+/** Réglages enregistrés : { telephone: vrai / faux, mode: 'base' ou 'confirme' }. */
 export function lireReglages() {
   try {
-    return { telephone: false, ...JSON.parse(localStorage.getItem(CLE) ?? '{}') };
+    return { ...PAR_DEFAUT, ...JSON.parse(localStorage.getItem(CLE) ?? '{}') };
   } catch {
-    return { telephone: false };
+    return { ...PAR_DEFAUT };
   }
 }
 
+/** Vrai en mode Base (fonctions avancées cachées), faux en mode Confirmé. */
+export function estModeBase() {
+  if (modeRetenu == null) modeRetenu = lireReglages().mode;
+  return modeRetenu === 'base';
+}
+
 function ecrireReglages(reglages) {
+  modeRetenu = reglages.mode;
   try {
     localStorage.setItem(CLE, JSON.stringify(reglages));
   } catch {
@@ -26,17 +41,31 @@ function ecrireReglages(reglages) {
   }
 }
 
-/** Applique les réglages à la page (classe mode-telephone). */
+/**
+ * Applique les réglages à la page : classes mode-telephone et mode-base, étoile de l'en-tête
+ * (☆ vide = Base, ★ pleine = Confirmé).
+ */
 export function appliquerReglages(reglages = lireReglages()) {
+  modeRetenu = reglages.mode;
+  const base = reglages.mode === 'base';
   document.body.classList.toggle('mode-telephone', Boolean(reglages.telephone));
+  document.body.classList.toggle('mode-base', base);
+  const etoile = document.querySelector('#bouton-mode');
+  if (etoile) {
+    etoile.classList.toggle('confirme', !base);
+    const texte = `Mode ${base ? 'Base' : 'Confirmé'} (toucher pour changer)`;
+    etoile.title = texte;
+    etoile.setAttribute('aria-label', texte);
+  }
 }
 
 /**
  * Ouvre la fenêtre des réglages. options : { aideActive, basculerAide(), fermerAppli() (ou null
- * hors de l'appli Android), partage: { html() (bloc Partage, voir projet/ecran.js), actions } ou null }.
+ * hors de l'appli Android), partage: { html() (bloc Partage, voir projet/ecran.js), actions } ou null,
+ * changerMode() : appelé après le passage Base ↔ Confirmé (pour redessiner les écrans) }.
  * Renvoie { rafraichir() } : redessine le bloc Partage (son état a changé), tant que la fenêtre est ouverte.
  */
-export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage }) {
+export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage, changerMode }) {
   const reglages = lireReglages();
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-reglages';
@@ -45,6 +74,11 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage 
       ${fermerAppli ? `<button type="button" class="bouton bouton-fermer-appli" data-action="fermer-appli">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>Fermer l'appli</button>` : ''}
       <h2>Réglages de cet appareil</h2>
+      <div class="choix-mode-appli" role="radiogroup" aria-label="Mode de l'appli">
+        ${[['base', 'Base'], ['confirme', 'Confirmé']].map(([cle, titre]) => `<label class="puce-mode ${reglages.mode === cle ? 'actif' : ''}">
+          <input type="radio" name="mode-appli" data-reglage="mode" value="${cle}" ${reglages.mode === cle ? 'checked' : ''} />
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="etoile-mode ${cle}"><path d="${ETOILE}" /></svg>${titre}</label>`).join('')}
+      </div>
       <label class="case-reglage"><input type="checkbox" data-reglage="telephone" ${reglages.telephone ? 'checked' : ''} />
         <span><strong>Mode téléphone</strong><span class="aide">textes et boutons plus petits</span></span></label>
       <label class="case-reglage"><input type="checkbox" data-reglage="aide" ${aideActive ? 'checked' : ''} />
@@ -63,7 +97,13 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage 
   };
   fenetre.addEventListener('change', (evenement) => {
     const champ = evenement.target.dataset.reglage;
-    if (champ === 'telephone') {
+    if (champ === 'mode') {
+      reglages.mode = evenement.target.value;
+      ecrireReglages(reglages);
+      appliquerReglages(reglages);
+      for (const puce of fenetre.querySelectorAll('.puce-mode')) puce.classList.toggle('actif', puce.contains(evenement.target));
+      changerMode?.();
+    } else if (champ === 'telephone') {
       reglages.telephone = evenement.target.checked;
       ecrireReglages(reglages);
       appliquerReglages(reglages);

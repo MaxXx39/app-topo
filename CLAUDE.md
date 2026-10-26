@@ -55,7 +55,7 @@ exemples/            fichiers de référence (NE PAS modifier ni supprimer)
 ## Référence de calcul
 Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 m³, Stock 2 = 648.979 m³, Stock 3 = 372.201 m³ (remblai Mensura). Tests automatiques sur ce cas.
 
-## État d'avancement (version 0.56.2)
+## État d'avancement (version 0.57.0)
 **Fait**
 - Import points (CSV Emlid, TXT), LandXML, DXF (surfaces et fond de plan) ; recalage Helmert d'un plan DXF.
 - Surfaces (stock, terrain naturel, terrassement), volumes (remblai / déblai, comparaison), coupes, mesures / métrés.
@@ -63,6 +63,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Exports : CSV, PDF (cartouche), DXF, LandXML.
 - Projets locaux + partage Google Drive (verrou, envoi auto).
 - APK : levé RX2 (Bluetooth), corrections swipos (NTRIP), contrôle de surface, implantation point / ligne / talus, libellés et couleurs.
+- Modes Base / Confirmé (0.57.0, réglages ⚙, étoile ☆ / ★ dans l'en-tête, Confirmé par défaut, retenu par l'appareil). En Base, éléments `.seulement-confirme` cachés et `estModeBase()` dans le code. Base = projets, import points, Drive, point tapé, récepteur, lever « Autres », rôles et libellés existants, implanter point / ligne simple, accroches DXF, contrôle de surface, réglages du guidage, plan (fonds, cadastre, points, noms, altitudes). Tout le reste (onglet Calculs, DXF, talus, NTRIP, libellés à modifier, options de ligne, triangles / courbes…) = Confirmé.
 
 **Reste / à valider**
 - Essai terrain du talus (0.56.1) et question ouverte : arrondi (cône) aux angles saillants, est-ce voulu ?
@@ -74,4 +75,3 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 **À développer**
 - Essai de 2 RX2 pour guidage d'engin type grader sur la même tablette (2 NTRIP ? 2 connexions Bluetooth ?).
 - Mode « dessin » pour dessiner des plateformes ou bâtiments directement dans l'appli.
-- Configurer la tablette / téléphone sur 2 modes au choix : Base ou Confirmé ; lister l'ensemble des fonctionnalités et les ranger dans le bon mode.
