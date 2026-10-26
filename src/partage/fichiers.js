@@ -17,20 +17,23 @@ const FIN = '.json.gz';
  */
 export function projetVersFichiers(projet) {
   const fichiers = new Map();
-  const surfaces = (projet.surfaces ?? []).map((surface) => ({
-    ...surface,
-    photos: (surface.photos ?? []).map((photo) => {
+  // Photos des surfaces et des mesures : l'image part dans son propre fichier.
+  const sansImages = (objet) => !objet.photos?.length ? objet : ({
+    ...objet,
+    photos: (objet.photos ?? []).map((photo) => {
       fichiers.set(`${prefixePhoto}${photo.id}${FIN}`, { image: photo.image, miniature: photo.miniature });
       return { ...photo, image: null, miniature: null };
     }),
-  }));
+  });
+  const surfaces = (projet.surfaces ?? []).map(sansImages);
+  const mesures = projet.mesures ? { mesures: projet.mesures.map(sansImages) } : {};
   const plansDxf = (projet.plansDxf ?? []).map((plan) => {
     fichiers.set(`${prefixePlan}${plan.id}${FIN}`, plan.contenu);
     return { ...plan, contenu: null };
   });
   // Le lien vers Drive est propre à chaque appareil : il ne part pas avec le projet.
   const { drive, ...reste } = projet;
-  fichiers.set(FICHIER_PROJET, { ...reste, surfaces, plansDxf });
+  fichiers.set(FICHIER_PROJET, { ...reste, surfaces, ...mesures, plansDxf });
   return fichiers;
 }
 
@@ -41,8 +44,8 @@ export function projetVersFichiers(projet) {
 export function fichiersVersProjet(fichiers) {
   const projet = structuredClone(fichiers.get(FICHIER_PROJET));
   if (!projet) throw new Error('fichier projet absent du dossier Drive');
-  for (const surface of projet.surfaces ?? []) {
-    for (const photo of surface.photos ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});
+  for (const objet of [...(projet.surfaces ?? []), ...(projet.mesures ?? [])]) {
+    for (const photo of objet.photos ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});
   }
   for (const plan of projet.plansDxf ?? []) plan.contenu = fichiers.get(`${prefixePlan}${plan.id}${FIN}`) ?? null;
   return projet;

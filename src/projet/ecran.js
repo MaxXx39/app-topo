@@ -2,7 +2,7 @@
 // - en haut, deux boutons : « + Nouveau projet » et « Gestion de projets » : une page à part (rien
 //   d'autre de l'onglet), une seule liste, appareil et Drive : toucher = ouvrir, menu ⋮ = exporter,
 //   dupliquer, supprimer ; fichier projet ; « ← » pour revenir ;
-// - le projet ouvert : ses infos (affaire, lieu, nom facultatif) ;
+// - le projet ouvert : ses infos (affaire, désignation) ;
 // - ensuite (voir main.js) le bloc « Imports » (fichiers de points, plans DXF) ;
 // - tout en bas, le partage par Google Drive (pas besoin de le voir tout le temps), puis la version.
 // Le cartouche du PDF (dessiné par, date) se règle au moment du PDF (voir export/cartouche.js).
@@ -129,8 +129,7 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
         <div class="bloc-corps">
           <div class="champs-projet">
             <label>Affaire <input type="text" data-cartouche="affaire" value="${echapper(affaire ?? '')}" placeholder="ex. 10 203" /></label>
-            <label>Lieu <input type="text" data-cartouche="lieu" value="${echapper(lieu ?? '')}" placeholder="ex. Gland" /></label>
-            <label class="champ-large">Nom <span class="aide">(facultatif)</span> <input type="text" data-champ="nom-projet" value="${echapper(projet.nom ?? '')}" placeholder="ex : Rue Mont Blanc" /></label>
+            <label>Désignation <input type="text" data-cartouche="lieu" value="${echapper(lieu ?? '')}" placeholder="ex. Gland, plateforme Migros" /></label>
           </div>
         </div>
       </section>

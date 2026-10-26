@@ -17,6 +17,7 @@ const CALQUES = [
   ['courbes', 'Courbes de niveau', false],
   ['photo', 'Photo aérienne (atténuée 50 %)', false],
   ['cadastre', 'Cadastre', false],
+  ['photos', 'Photos des mesures', true],
 ];
 
 /**

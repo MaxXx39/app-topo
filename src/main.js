@@ -1053,7 +1053,8 @@ function nomProposeImplantation() {
  * Les points « À implanter » restent visibles sur le plan dans les autres onglets.
  */
 function envoyerImplantationAuPlan() {
-  const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne()) && ongletContexte === 'terrain') || pointage.actif || Boolean(recalage.planId);
+  // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
+  const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || Boolean(recalage.planId);
   const enLigne = accrocheActive && !pointage.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
@@ -1073,8 +1074,8 @@ function envoyerImplantationAuPlan() {
         aImplanter: projet.aImplanter,
         pointsControle,
         lignesAutres,
-        choix: recalage.planId ? (recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : accrocheActive && !enLigne ? implanter.choix : null,
-        cible: cibleControle ?? (accrocheActive && !enLigne ? implanter.cible : null),
+        choix: recalage.planId ? (recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : accrocheActive && !enLigne && !enAutocontrole() ? implanter.choix : null,
+        cible: cibleControle ?? (accrocheActive && !enLigne && !enAutocontrole() ? implanter.cible : null),
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : [],
@@ -1155,10 +1156,7 @@ function cotesTalus(implantationTalus) {
 
 /** Mesures dessinées sur le plan hors de l'onglet des mesures : [{ mesure, resultat }]. */
 function mesuresDuPlan(listes) {
-  if (ongletContexte === 'terrain' && terrain.mode === 'controler') return [];
   const choisies = new Set(mesuresVisibles(projet, listes));
-  const enCours = ongletContexte === 'terrain' && terrain.mode === 'lever' ? metreEnCours() : null;
-  if (enCours) for (const m of projet.mesures) if (m.metreId === enCours.id) choisies.add(m);
   return [...choisies].map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }));
 }
 
@@ -1576,9 +1574,16 @@ function enregistrerControle() {
   }
   const mots = { vert: 'OK', orange: 'limite', rouge: 'HORS TOLÉRANCE' };
   const hauteur = ecarts.hauteur != null ? ` · haut. ${formaterNombre(ecarts.hauteur)} m` : '';
+  const detail = `${point.nom} : plan ${formaterNombre(ecarts.plan)} m${hauteur}`;
   afficherMessage(`${point.nom} : ${mots[resultat.global]} (plan ${formaterNombre(ecarts.plan)} m${hauteur})`, 5000);
   autocontrole.cible = null;
   modifie();
+  // Orange : avertissement ; rouge : contacter le géomètre (demande du 26.10.2026). Un OK pour fermer.
+  if (resultat.global === 'orange') {
+    demanderChoix({ titre: '⚠ Contrôle à la limite', texte: `${detail}. Écart entre les deux tolérances : avertissement.`, boutons: [{ cle: 'ok', texte: 'OK', principal: true }] });
+  } else if (resultat.global === 'rouge') {
+    demanderChoix({ titre: '⛔ Hors tolérance', texte: `${detail}. Contacte le géomètre.`, boutons: [{ cle: 'ok', texte: 'OK', principal: true }] });
+  }
 }
 
 /**
@@ -1605,7 +1610,7 @@ async function proposerControle() {
     texte,
     boutons: [
       { cle: 'oui', texte: 'Oui, faire le contrôle', principal: true },
-      { cle: 'non', texte: 'Non' },
+      { cle: 'non', texte: 'Non', detail: '⚠ le géomètre sera averti' },
     ],
   });
   rappelEnCours = false;
@@ -1620,6 +1625,19 @@ async function proposerControle() {
   projet.controles.push({ id: nouvelIdentifiant(), type: 'refus', appareil: nomDeLAppareil(), le: new Date().toISOString() });
   afficherMessage('Refus enregistré : le géomètre sera au courant', 5000);
   modifie();
+}
+
+/** Terrain › Contrôle : toucher un point de contrôle sur le plan le choisit (comme dans la liste). */
+function toucherPourControle(position, tolerance) {
+  const trouve = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: projet.pointsControle });
+  const point = trouve && projet.pointsControle.find((p) => p.nom === trouve.nom);
+  if (!point) {
+    afficherMessage('Aucun point de contrôle sous le doigt', 3000);
+    return;
+  }
+  autocontrole.cible = { ...point };
+  montrerImplantation();
+  requestAnimationFrame(cadrerSurImplantation);
 }
 
 /** Données de l'écran Terrain › Contrôle (voir leve/controle-ecran.js). */
@@ -1925,6 +1943,10 @@ function pointsDuProjet() {
 function toucherPourImplantation(position, tolerance) {
   if (piloteActif()) {
     toucherPourDessin(position, tolerance);
+    return;
+  }
+  if (enAutocontrole()) {
+    toucherPourControle(position, tolerance);
     return;
   }
   if (recalage.planId) {
@@ -2569,7 +2591,8 @@ if (recepteurDisponible()) {
     const position = etat.connecte && etat.recu ? etat.position : null;
     // Coupes affichées (mode Implanter) : leur trait en pointillés sur le plan.
     const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
-    const traits = controle?.coupes ? vues.map((sens) => ({ sens, debut: controle.coupes[sens].debut, fin: controle.coupes[sens].fin })) : [];
+    // Seulement dans l'onglet Terrain (ailleurs, la croix des coupes n'a rien à faire sur le plan).
+    const traits = controle?.coupes && ongletContexte === 'terrain' ? vues.map((sens) => ({ sens, debut: controle.coupes[sens].debut, fin: controle.coupes[sens].fin })) : [];
     // Ligne : trait en pointillés jusqu'au point de la ligne en face de la canne.
     // Talus : trait jusqu'à l'entrée en terre (ou au bord du talus) en face de la canne.
     const vers = implantationLigne?.ligne?.cible ?? (implantationTalus?.message ? null : implantationTalus?.talus?.cible) ?? null;
@@ -2735,6 +2758,23 @@ const plan = creerPlan(document.querySelector('#plan'), {
   },
 });
 
+/** Ajoute des photos (réduites) à une surface ou à une mesure : objet.photos. */
+async function ajouterPhotos(objet, fichiers) {
+  // La conversion d'une photo HEIC prend quelques secondes : le message reste affiché jusqu'à la fin.
+  afficherMessage('Préparation de la photo…', null);
+  const erreurs = [];
+  for (const fichier of fichiers) {
+    try {
+      objet.photos = [...(objet.photos ?? []), await preparerPhoto(fichier)];
+    } catch (erreur) {
+      erreurs.push(`${fichier.name} : ${erreur.message}`);
+    }
+  }
+  if (erreurs.length > 0) afficherMessage(`Photo refusée. ${erreurs.join(' ; ')}`, 8000);
+  else afficherMessage(`${fichiers.length} photo(s) ajoutée(s)`);
+  modifie();
+}
+
 const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces'), document.querySelector('#barre-surfaces'), {
   obtenirPoints: (surface) => (estImportee(surface) ? [] : pointsDuLeve(surface.leveId)),
   // Nouvelle surface, ou nature changée : un stock a tout de suite son calcul de volume (sur sa
@@ -2754,21 +2794,7 @@ const editeurSurfaces = creerEditeurSurfaces(document.querySelector('#surfaces')
   leveActifId: () => leveActif(projet)?.id ?? null,
   decrire: decrireSurface,
   etiquette: etiquetteSurface,
-  ajouterPhotos: async (surface, fichiers) => {
-    // La conversion d'une photo HEIC prend quelques secondes : le message reste affiché jusqu'à la fin.
-    afficherMessage('Préparation de la photo…', null);
-    const erreurs = [];
-    for (const fichier of fichiers) {
-      try {
-        surface.photos = [...(surface.photos ?? []), await preparerPhoto(fichier)];
-      } catch (erreur) {
-        erreurs.push(`${fichier.name} : ${erreur.message}`);
-      }
-    }
-    if (erreurs.length > 0) afficherMessage(`Photo refusée. ${erreurs.join(' ; ')}`, 8000);
-    else afficherMessage(`${fichiers.length} photo(s) ajoutée(s)`);
-    modifie();
-  },
+  ajouterPhotos,
 });
 editeurSurfaces.charger(projet.surfaces);
 
@@ -2895,6 +2921,7 @@ const ecranMesures = creerEcranMesures(document.querySelector('#mesures'), docum
   obtenirResultat: (mesure) => resultatsMesures.get(mesure.id),
   leveActifId: () => leveActif(projet)?.id ?? null,
   etiquette: etiquetteMesure,
+  ajouterPhotos,
   quandChange: () => {
     // Une mesure d'un autre levé est choisie : ce levé devient le levé affiché.
     const mesure = ecranMesures.mesureActive();
@@ -3038,31 +3065,14 @@ function recalculer({ recadrer = false } = {}) {
   const dansSurfaces = ongletContexte === 'surfaces';
   const enModification = ongletContexte === 'mesures' || editeurSurfaces.enModification();
   const cacheesParListe = new Set(listes.filter((l) => !l.visible).map((l) => l.id));
-  const visibles = new Set(enModification ? surfacesAffichees() : projet.surfaces.filter((s) => !cacheesParListe.has(s.id)));
+  const visibles = new Set(editeurSurfaces.enModification() ? surfacesAffichees() : projet.surfaces.filter((s) => !cacheesParListe.has(s.id)));
   // Une surface importée montre ses propres points ; sinon, ceux du levé ou des listes cochées.
   let pointsDuPlan;
   if (dansSurfaces && active && estImportee(active)) pointsDuPlan = active.points;
   else if (enModification) pointsDuPlan = points;
   else pointsDuPlan = pointsStables(pointsDesListes(projet, listes));
-  if (ongletContexte === 'mesures') {
-    // Onglet 3. Mesures : seulement les points et les mesures (aucune surface, aucune coupe).
-    plan.redessiner({
-      modeMesures: true,
-      mesures: mesuresAffichees(),
-      mesureActive: ecranMesures.mesureActive(),
-      listeEnCours: ecranMesures.listeEnCours(),
-      enEdition: ecranMesures.enModification(),
-      stocks: [],
-      stockActif: null,
-      cachees: new Set(),
-      resultats: [],
-      ecarts: null,
-      surface: null,
-      modeTriangles: false,
-      coupes: [],
-      traceCoupe: null,
-    });
-  } else plan.redessiner({
+  // Ce qui est coché (calques, « Afficher ») vaut dans tous les onglets.
+  const dessinDuPlan = {
     ...editeurSurfaces.obtenirDessin(),
     cachees: new Set(projet.surfaces.filter((s) => !visibles.has(s))),
     resultats: projet.surfaces.map((s) => {
@@ -3087,16 +3097,29 @@ function recalculer({ recadrer = false } = {}) {
     // Coupes tracées (A – A', B – B'), et celle en cours de tracé.
     coupes: projet.coupes.filter((c) => c.debut && c.fin && c.id !== traceCoupe?.id),
     traceCoupe,
-    // Onglet Terrain : le volume en petit dans un coin, pas en grand au milieu du stock ;
-    // en mode Implanter, aucune étiquette (volume, mesures).
-    volumesDiscrets: ongletContexte === 'terrain',
-    sansVolumes: ongletContexte === 'terrain' && terrain.mode === 'controler',
     // Mesures (aires, longueurs, nombres) des métrés cochés dans « Afficher » (et celles faites à la
-    // main si « Mesures » est cochée) ; dans Terrain › Lever, toujours celles du métré en cours ;
-    // dans Terrain › Implanter, aucune.
+    // main si « Mesures » est cochée).
     mesures: mesuresDuPlan(listes),
     mesureActive: null,
-  });
+  };
+  if (ongletContexte === 'mesures') {
+    // Onglet 3. Mesures : les mesures cochées et celle ouverte ; toucher une mesure la choisit.
+    const mesureActive = ecranMesures.mesureActive();
+    const mesures = mesuresDuPlan(listes);
+    if (mesureActive && !mesures.some((m) => m.mesure === mesureActive)) mesures.push({ mesure: mesureActive, resultat: resultatsMesures.get(mesureActive.id) });
+    plan.redessiner({
+      ...dessinDuPlan,
+      modeMesures: true,
+      mesures,
+      mesureActive,
+      listeEnCours: ecranMesures.listeEnCours(),
+      enEdition: ecranMesures.enModification(),
+      stockActif: null,
+      surface: null,
+      modeTriangles: false,
+      traceCoupe: null,
+    });
+  } else plan.redessiner(dessinDuPlan);
   if (recadrer || pointsDuPlan !== pointsAffiches) {
     pointsAffiches = pointsDuPlan;
     nombrePointsAffiches = pointsDuPlan.length;

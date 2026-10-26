@@ -83,7 +83,7 @@ export function ajouterLeve(projet, nomFichier, points) {
 }
 
 /**
- * Titre du projet, en haut de l'appli et dans les listes : « Affaire - Lieu » (« 10 203 - Gland »),
+ * Titre du projet, en haut de l'appli et dans les listes : « Affaire - Désignation » (« 10 203 - Gland »),
  * sinon son nom, sinon « Projet sans nom ».
  */
 export function titreProjet(projet) {

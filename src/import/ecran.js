@@ -3,7 +3,7 @@
 //   sécurité), plan DXF, point tapé ;
 // - « Listes de points du projet » : chaque fichier de points (et les points pris avec le
 //   récepteur) est une liste ; celle cochée est affichée sur le plan ; ses points se voient sous
-//   elle. Puis les points de contrôle, dans une liste à part (en rouge) ;
+//   elle. Puis les points des dessins (en violet) et les points de contrôle (liste à part, en rouge) ;
 // - « DXF importés » : les plans DXF (fonds de plan, calques à cocher).
 // Le levé avec le récepteur se fait dans l'onglet Terrain (src/leve/ecran.js) ; les surfaces
 // LandXML / DXF dans Calculs › Surfaces.
@@ -18,6 +18,7 @@ import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
 import { demanderCode } from '../outils/code.js';
 import { COULEURS_LISTES } from '../plan/listes-points.js';
+import { pointsDuDessin } from '../topo/dessin.js';
 
 /**
  * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
@@ -125,7 +126,7 @@ export function creerEcranImport(conteneur, actions) {
       if (conteneur.contains(document.activeElement) && document.activeElement.dataset?.point) return;
       const plans = projet.plansDxf ?? [];
       conteneur.innerHTML = `
-        <section class="carte-section">
+        <section class="carte-section seulement-confirme">
           ${titreSection('importer', 'Import', bulle('imports'))}
           <div class="boutons-imports">
             <label class="bouton-import">
@@ -179,6 +180,7 @@ export function creerEcranImport(conteneur, actions) {
                   .join('')}</div>`
               : '<p class="vide">Aucune liste de points pour l\'instant.</p>'
           }
+          ${listesDessins(projet)}
           ${listePointsControle(projet)}
         </section>
 
@@ -229,6 +231,21 @@ function tableauPoints(points, titre) {
         </table>
       </div>
     </details>`;
+}
+
+/** Points des dessins (Calculs › Dessin) : une liste par dessin, en violet (PF1-1, D1-1…). */
+function listesDessins(projet) {
+  const dessins = (projet.dessins ?? []).filter((d) => d.sommets.length > 0);
+  return dessins
+    .map((dessin) => {
+      const points = pointsDuDessin(dessin, projet.dessins);
+      return `<div class="ligne-leve liste-dessin">
+      <strong>${echapper(dessin.nom)}</strong>
+      <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span></div>
+      ${tableauPoints(points, 'Voir les points')}
+    </div>`;
+    })
+    .join('');
 }
 
 /** Points de contrôle (Terrain › Contrôle) : une liste à part, en rouge, sous les listes de points. */

@@ -26,23 +26,25 @@ const SVG = 'http://www.w3.org/2000/svg';
 // Distance maximale (pixels) entre le doigt et un point pour le "toucher".
 const RAYON_TOUCHER = 22;
 
-// Calques que l'on peut afficher ou masquer, avec leur état de départ.
-// "surfaces" : calque des surfaces seulement, caché dans le menu de l'onglet Calculs › Mesures.
+// Calques que l'on peut afficher ou masquer, avec leur état de départ, rangés par familles (titres
+// du menu). Ce qui est coché vaut dans tous les onglets.
 const CALQUES = [
-  { cle: 'fondSatellite', titre: 'Fond photo aérienne (swisstopo)', parDefaut: false },
-  { cle: 'cadastre', titre: 'Cadastre', parDefaut: false },
-  { cle: 'points', titre: 'Points', parDefaut: true },
-  { cle: 'noms', titre: 'Noms des points', parDefaut: true },
-  { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false },
-  { cle: 'contours', titre: 'Contours des surfaces', parDefaut: true, surfaces: true },
-  { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true, surfaces: true },
-  { cle: 'triangles', titre: 'Triangles', parDefaut: true, confirme: true },
-  { cle: 'remblaiDeblai', titre: 'Déblai (jaune) / remblai (rouge)', parDefaut: true, surfaces: true },
-  { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false, confirme: true },
-  { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false, confirme: true },
-  { cle: 'volumes', titre: 'Volume sur chaque surface', parDefaut: true, surfaces: true },
-  { cle: 'autresStocks', titre: 'Autres surfaces', parDefaut: true, surfaces: true },
+  { cle: 'fondSatellite', titre: 'Fond photo aérienne (swisstopo)', parDefaut: false, famille: 'Fonds' },
+  { cle: 'cadastre', titre: 'Cadastre', parDefaut: false, famille: 'Fonds' },
+  { cle: 'points', titre: 'Points', parDefaut: true, famille: 'Points' },
+  { cle: 'noms', titre: 'Noms des points', parDefaut: true, famille: 'Points' },
+  { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false, famille: 'Points' },
+  { cle: 'contours', titre: 'Contours des surfaces', parDefaut: true, famille: 'Surfaces' },
+  { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true, famille: 'Surfaces' },
+  { cle: 'triangles', titre: 'Triangles', parDefaut: true, confirme: true, famille: 'Surfaces' },
+  { cle: 'autresStocks', titre: 'Autres surfaces', parDefaut: true, famille: 'Surfaces' },
+  { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false, confirme: true, famille: 'Surfaces' },
+  { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false, confirme: true, famille: 'Surfaces' },
+  { cle: 'volumes', titre: 'Volume sur chaque surface', parDefaut: true, famille: 'Volumes' },
+  { cle: 'remblaiDeblai', titre: 'Déblai (jaune) / remblai (rouge)', parDefaut: true, famille: 'Volumes' },
+  { cle: 'mesures', titre: 'Mesures et métrés (traits, valeurs)', parDefaut: true, famille: 'Mesures' },
 ];
+const FAMILLES_CALQUES = [...new Set(CALQUES.map((c) => c.famille))];
 // Calques « confirme » : cachés et pas dessinés en mode Base (réglages ⚙), sans changer le choix retenu.
 const CALQUES_CONFIRME = new Set(CALQUES.filter((c) => c.confirme).map((c) => c.cle));
 const CLE_MEMOIRE = 'topo-calques';
@@ -94,19 +96,21 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <div class="menu-plans-dxf" hidden></div>
         <div class="menu-plans-dxf menu-listes-points" hidden></div>
         <div class="menu-calques" hidden>
-          ${CALQUES.map(
-            (c) => `<label class="case ${c.surfaces ? 'seulement-surfaces' : ''} ${c.confirme ? 'seulement-confirme' : ''}"><input type="checkbox" data-calque="${c.cle}" ${calquesChoisis[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`,
-          ).join('')}
-          <label class="choix-equidistance seulement-surfaces seulement-confirme">Palier déblai / remblai
-            <select data-calque="palier">
-              ${PALIERS.map((e) => `<option value="${e}" ${calques.palier === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
-            </select>
-          </label>
-          <label class="choix-equidistance seulement-confirme">Équidistance des courbes
-            <select data-calque="equidistance">
-              ${EQUIDISTANCES.map((e) => `<option value="${e}" ${calques.equidistance === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
-            </select>
-          </label>
+          ${FAMILLES_CALQUES.map((famille) => {
+            const cases = CALQUES.filter((c) => c.famille === famille);
+            return `<p class="titre-partie-menu ${cases.every((c) => c.confirme) ? 'seulement-confirme' : ''}">${famille}</p>
+              ${cases.map((c) => `<label class="case ${c.confirme ? 'seulement-confirme' : ''}"><input type="checkbox" data-calque="${c.cle}" ${calquesChoisis[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`).join('')}
+              ${famille === 'Surfaces' ? `<label class="choix-equidistance seulement-confirme">Équidistance des courbes
+                <select data-calque="equidistance">
+                  ${EQUIDISTANCES.map((e) => `<option value="${e}" ${calques.equidistance === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
+                </select>
+              </label>` : ''}
+              ${famille === 'Volumes' ? `<label class="choix-equidistance seulement-confirme">Palier déblai / remblai
+                <select data-calque="palier">
+                  ${PALIERS.map((e) => `<option value="${e}" ${calques.palier === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
+                </select>
+              </label>` : ''}`;
+          }).join('')}
         </div>
       </div>
       <div class="plan-boutons">
@@ -168,7 +172,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // surface : surface affichée { triangles, trianglesRetires } ; modeTriangles : suppression au doigt
   // ecarts : triangles d'écart à colorier à la place de ceux des surfaces, sinon null
   // coupes : coupes tracées [{ nom, debut, fin }] ; traceCoupe : { debut } pendant un tracé, sinon null
-  // modeMesures : onglet Calculs › Mesures (pas de surface ni de coupe) ; mesures : [{ mesure, resultat }]
+  // modeMesures : onglet Calculs › Mesures (toucher une mesure la choisit) ; mesures : [{ mesure, resultat }]
   // du levé affiché ; mesureActive : mesure choisie (ses points sont entourés pendant une modification)
   let dessin = {
     modeMesures: false,
@@ -939,16 +943,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   }
 
   /**
-   * Nom et volume (remblai, et déblai s'il y en a) écrits au milieu de chaque surface calculée.
-   * Onglet Terrain (volumesDiscrets) : seulement une petite pastille en bas à gauche, pour la
-   * surface en cours, qui ne cache pas les points levés.
+   * Nom et volume (remblai, et déblai s'il y en a) écrits au milieu de chaque surface calculée
+   * (calque « Volume sur chaque surface », dans tous les onglets).
    */
   function dessinerVolumes() {
-    if (dessin.sansVolumes) return; // Terrain › Implanter : pas d'étiquettes
-    if (dessin.volumesDiscrets) {
-      dessinerPastilleVolume();
-      return;
-    }
     const groupe = creerElement('g', { class: 'volumes' });
     dessin.stocks.forEach((stock, index) => {
       const actif = stock === dessin.stockActif;
@@ -974,23 +972,6 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
-  /** Petite pastille « Stock 1 · 1636.197 m³ » en bas à gauche, au-dessus de l'échelle (surface en cours, onglet Terrain). */
-  function dessinerPastilleVolume() {
-    const index = dessin.stocks.indexOf(dessin.stockActif);
-    const resultat = dessin.resultats[index];
-    if (index < 0 || resultat?.remblai === undefined) return;
-    const texte = `${dessin.stockActif.nom} · ${formaterNombre(resultat.remblai)} m³${resultat.deblai > 0 ? ` · D ${formaterNombre(resultat.deblai)} m³` : ''}`;
-    const largeur = texte.length * 6.4 + 14;
-    const x = 8;
-    const y = vue.hauteur - 60;
-    const groupe = creerElement('g', { class: 'pastille-volume' });
-    groupe.append(creerElement('rect', { x, y, width: largeur, height: 20, rx: 10 }));
-    const element = creerElement('text', { x: x + largeur / 2, y: y + 14, 'text-anchor': 'middle' });
-    element.textContent = texte;
-    groupe.append(element);
-    svg.append(groupe);
-  }
-
   /** Position à l'écran de chaque point de la mesure (ceux qui existent dans le levé). */
   function sommetsMesure(noms) {
     const parNom = new Map(points.map((p) => [p.nom, p]));
@@ -1005,7 +986,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    * pointillé, un fond cyan léger, leurs lignes de rupture et leurs triangles (calque « Triangles »).
    */
   function dessinerTracesMesures() {
-    if (!dessin.mesures?.length) return;
+    if (!dessin.mesures?.length || !(calques.mesures || dessin.modeMesures)) return;
     const tout = creerElement('g', { class: 'mesures' });
     for (const { mesure, resultat } of dessin.mesures) {
       const actif = mesure === dessin.mesureActive ? ' actif' : '';
@@ -1039,7 +1020,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    * mesure choisie, toutes ses valeurs cochées et, si demandé, le texte de chaque morceau.
    */
   function dessinerEtiquettesMesures() {
-    if (!dessin.mesures?.length) return;
+    if (!dessin.mesures?.length || !(calques.mesures || dessin.modeMesures)) return;
     const tout = creerElement('g', { class: 'etiquettes-mesures' });
     for (const { mesure, resultat } of dessin.mesures) {
       if (!resultat || resultat.erreurs) continue;
@@ -1594,7 +1575,6 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     redessiner(nouveauDessin) {
       dessin = nouveauDessin;
       // Onglet 3. Mesures : le menu ne propose pas les calques des surfaces.
-      menuCalques.classList.toggle('mode-mesures', Boolean(dessin.modeMesures));
       dessiner();
     },
   };

@@ -35,8 +35,8 @@ import { ouvrirFenetreLibelles } from './fenetre-libelles.js';
 const IMPLANTATIONS = [
   ['point', 'Point', true],
   ['ligne', 'Ligne', true],
-  ['talus', 'Talus', true],
   ['surface', 'Surface', true],
+  ['talus', 'Talus', true], // tout à droite (demande du 26.10.2026)
 ];
 // Mode Base (réglages ⚙) : pas de talus, et on ne lève que des « Levé libre » (lignes et points).
 const IMPLANTATIONS_CONFIRME = ['talus'];
@@ -544,7 +544,7 @@ export function creerEcranLeve(conteneur, actions) {
     // Position le long : + depuis le début, − avant le début (demande du 23.10.2026).
     if (abscisse < 0) le_long = `−${m(abscisse)}`;
     else if (abscisse > longueur) le_long = `Après la fin : ${m(abscisse - longueur)}`;
-    else le_long = `+${m(abscisse)} · fin ${m(reste)}`;
+    else le_long = `début ${m(abscisse)} · fin ${m(reste)}`;
     const hauteur = g.ecartAltitude == null
       ? ''
       : `<span class="hauteur-guidage ${g.classeAltitude}">${g.ecartAltitude >= 0 ? '↑ Monter' : '↓ Descendre'} ${m(g.ecartAltitude)}</span>`;
@@ -1059,7 +1059,7 @@ function svgCouloir(numero, ecart, abscisse, longueur, couleur) {
     ${haut < bas ? `<path d="M0 ${bas.toFixed(1)}V${haut.toFixed(1)}" class="trait-couloir" />` : ''}
     ${repere(yDebut, 'debut')}
     ${repere(yFin, 'fin')}
-    <text y="-84" text-anchor="middle" class="haut-cible">↑ vers la fin</text>
+    <g class="drapeau-fin-couloir">${svgDrapeau('fin', -8, -72, 22)}</g>
     <circle cx="${limiter(ecart * echelle, 112).toFixed(1)}" cy="0" r="9" class="moi" style="fill: ${couleur}" />
   </svg>`;
 }

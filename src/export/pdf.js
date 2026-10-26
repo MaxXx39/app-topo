@@ -179,7 +179,7 @@ export function zoneDe(sommets) {
   return { estMin: Math.min(...ests), estMax: Math.max(...ests), nordMin: Math.min(...nords), nordMax: Math.max(...nords) };
 }
 
-const PHOTOS_PAR_PAGE = 4;
+export const PHOTOS_PAR_PAGE = 4;
 const HAUTEUR_TEXTE_PHOTO = 3.2; // mm, sous chaque photo de la colonne
 const HAUTEUR_MIN_PHOTO = 14; // mm : en dessous, les photos vont sur une feuille à part
 
@@ -240,7 +240,7 @@ function dessinerPhotosColonne(doc, photos, yHaut) {
 }
 
 /** Feuille de photos : titre, puis 2 × 2 photos avec leur légende (surface et légende). */
-function dessinerPagePhotos(doc, photos, cartouche) {
+export function dessinerPagePhotos(doc, photos, cartouche) {
   trait(doc, COULEURS.texte, 0.4);
   doc.rect(PAGE.marge, PAGE.marge, PAGE.largeur - 2 * PAGE.marge, PAGE.hauteur - 2 * PAGE.marge);
   doc.setTextColor(...COULEURS.texte);
@@ -914,7 +914,7 @@ export function dessinerCartouche(doc, cartouche) {
   // Cartouche en bas à droite
   const lignesCartouche = [
     ['Affaire', cartouche.affaire || '-'],
-    ['Lieu', cartouche.lieu || '-'],
+    ['Désignation', cartouche.lieu || '-'],
     ['Date', cartouche.date || '-'],
     ['Dessiné par', cartouche.dessinePar || '-'],
     ['Échelle', cartouche.texteEchelle ?? `1:${cartouche.echelle}`],

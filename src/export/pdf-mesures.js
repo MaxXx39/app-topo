@@ -20,6 +20,8 @@ import {
   dessinerTitre,
   dessinerCartouche,
   dessinerPointsPdf,
+  dessinerPagePhotos,
+  PHOTOS_PAR_PAGE,
   trait,
 } from './pdf.js';
 
@@ -32,6 +34,7 @@ export const CALQUES_PDF_MESURES = {
   photo: false,
   photoAttenuee: true,
   cadastre: false,
+  photos: true, // photos des mesures, 4 par feuille à la fin
 };
 const couleur = (mesure) => rvbDeCouleur(couleurDeMesure(mesure));
 const couleurFoncee = (mesure) => rvbDeCouleur(couleurDeMesure(mesure), 0.8);
@@ -120,6 +123,13 @@ export async function creerPdfMesures({ mesures, points, cartouche, echelleImpos
     for (let colonne = 0; colonne < 3 && suite.length > 0; colonne++) {
       suite = ecrireMesures(doc, suite, 14 + colonne * (largeur + 8), 27, largeur, page.page.hauteur - 14).suite;
     }
+  }
+  // Photos des mesures : 4 par feuille A4, à la fin.
+  const photos = choix.photos ? mesures.flatMap(({ mesure }) => (mesure.photos ?? []).map((photo) => ({ ...photo, surface: mesure.nom }))) : [];
+  for (let debut = 0; debut < photos.length; debut += PHOTOS_PAR_PAGE) {
+    appliquerFormat('a4');
+    doc.addPage('a4', 'landscape');
+    dessinerPagePhotos(doc, photos.slice(debut, debut + PHOTOS_PAR_PAGE), cartouche);
   }
   return { document: doc, echelle, format, messageFond: messages.join(' ; ') || null };
 }

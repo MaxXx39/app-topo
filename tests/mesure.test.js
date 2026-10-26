@@ -12,7 +12,7 @@ import {
   calculerAire,
   calculerMesure,
 } from '../src/topo/mesure.js';
-import { lignesEtiquette, texteMorceau, formaterPente } from '../src/mesures/valeurs.js';
+import { lignesEtiquette, texteMorceau, formaterPente, valeursCochees } from '../src/mesures/valeurs.js';
 import { lireListeDeNoms } from '../src/topo/noms.js';
 import { pt, pointsDeReference, STOCKS_REFERENCE, volumeDeReference } from './outils.js';
 
@@ -185,4 +185,10 @@ describe('calculerNombre (points comptés)', () => {
     expect(calculerMesure({ ...creerMesure('nombre', 'RG', 'leve'), points: ['x'] }, points).erreurs[0]).toContain('x');
     expect(calculerMesure(creerMesure('nombre', 'RG', 'leve'), points).erreurs[0]).toContain('aucun point');
   });
+});
+
+it('valeurs cochées : seulement celles choisies, sinon la première', () => {
+  const mesure = { type: 'aire', afficher: { a2d: false, p3d: true } };
+  expect(valeursCochees(mesure).map((v) => v.cle)).toEqual(['p3d']);
+  expect(valeursCochees({ type: 'aire', afficher: {} }).map((v) => v.cle)).toEqual(['a2d']);
 });
