@@ -18,20 +18,22 @@
 
 ## Structure
 ```
-src/main.js          point d'entrée, état de l'appli, liaison des écrans
-src/topo/            calculs de topo (volume, coupe, mesure, implantation, talus, accroche, recalage, DXF…)
-src/import/          lecture CSV Emlid, TXT, LandXML, DXF
-src/plan/            plan SVG/canvas (vue, fonds swisstopo, DXF, barbules, listes de points)
-src/surfaces/ volumes/ mesures/ coupes/ photos/   écrans et logique par onglet
-src/leve/            onglet Terrain (lever, implanter, récepteur, guidage, croquis)
+src/main.js          point d'entrée, état de l'appli, liaison des écrans (gros fichier : chercher avec grep)
+src/topo/            calculs de topo (volume, coupe, mesure, implantation, talus, accroche, recalage,
+                     contrôle, dessin, lame, levé direct, métré, DXF…)
+src/import/          lecture CSV Emlid, TXT, LandXML, DXF ; écran de l'onglet Projet (blocs Import, Listes, DXF)
+src/plan/            plan SVG/canvas (vue, fonds swisstopo, DXF, barbules, listes de points, dessins)
+src/surfaces/ volumes/ mesures/ coupes/ photos/ dessin/   écrans et logique de l'onglet Calculs
+src/leve/            onglet Terrain (lever, implanter, contrôle, lame, récepteur, guidage, croquis, fenêtres)
 src/recalage/        recalage d'un plan DXF
-src/export/          CSV, PDF, DXF, LandXML, cartouche
-src/projet/          projets (IndexedDB), fichier .topo.json
+src/export/          CSV, PDF, DXF, LandXML, cartouche, « Quoi exporter ? », « Envoyer »
+src/projet/          projets (IndexedDB), fichier .topo.json, écran Projet (en-tête, gestion de projets)
 src/partage/         synchro Google Drive (drive, fichiers, synchro, verrou)
 src/android/pont.js  pont web ↔ Android (window.AppliAndroid)
-src/aide/textes.js   bulles d'aide ; src/reglages/ réglages ; src/outils/ utilitaires
+src/aide/textes.js   bulles d'aide ; src/reglages/ réglages ; src/outils/ utilitaires (choix, code, échapper…)
 tests/               tests Vitest (*.test.js)
-android/             app Kotlin ; android/noyau/ = NMEA, MN95/RAN95, NTRIP (avec tests)
+android/             app Kotlin (EcranPrincipal, PontAndroid, EtatRecepteur, RecepteurBluetooth,
+                     FichiersPartages, PositionTablette, ServeurAppli) ; android/noyau/ = NMEA, MN95/RAN95, NTRIP (avec tests)
 exemples/            fichiers de référence (NE PAS modifier ni supprimer)
 ```
 
@@ -39,58 +41,82 @@ exemples/            fichiers de référence (NE PAS modifier ni supprimer)
 - `npm run dev` : serveur de développement ; `npm run preview -- --port 4173` : aperçu (base `/app-topo/`).
 - `npm run build` : site / PWA ; `npm run build:android` : range l'appli dans `android/app/src/main/assets/app-topo`.
 - `npm test` : tous les tests (tests dans `tests/`, pas dans `src/`).
-- Essais visuels : Playwright (Chromium préinstallé).
+- Essais visuels : Playwright (Chromium préinstallé) sur l'aperçu ; pour l'onglet Terrain, simuler l'APK avec un faux `window.AppliAndroid` (`prendrePoint`, `activerToucheVolume`, `lireReglagesCorrections`, `choisirRecepteur`, `choisirRecepteur2`…) puis appeler `window.recevoirEtatRecepteur(etat)`, `window.recevoirEtatRecepteur2(etat, mode)`, `window.recevoirPositionTablette(position)`. Arrêter l'aperçu avec `pkill -f "[v]ite preview"`.
+- Pas de SDK Android ici : le Kotlin est compilé par `apk.yml` à chaque envoi (vérifier le résultat de « Fabriquer l'APK »).
+
+## Livraison et publication
+- À chaque livraison : version augmentée dans `package.json` **et** `package-lock.json` (lignes 3 et 9), CLAUDE.md et bulles d'aide à jour, `npm test` et `npm run build` sans erreur, essai Playwright, commit puis envoi sur la branche de travail.
+- Publier le site et l'APK (seulement quand l'utilisateur le demande) : PR vers `main`, attendre les vérifications (« construire », « apk ») au vert, fusionner (merge), puis `git fetch origin main && git merge --ff-only origin/main` sur la branche. Jamais de rebase ni de force-push.
+- Lien de l'APK : https://github.com/MaxXx39/app-topo/releases/download/apk-derniere-version/Topo.apk
 
 ## Conventions de code
 - Code et commentaires **simples, en français**, noms clairs (`estPoint`, `nordPoint`, `altitude`).
-- Coordonnées toujours **Est, Nord, altitude** (sauf à la lecture du LandXML : Nord, Est, altitude). Tout en **MN95**, mètres ; aucune conversion dans l'appli web (l'APK convertit le GNSS en MN95 / RAN95).
+- Coordonnées toujours **Est, Nord, altitude** (sauf à la lecture du LandXML : Nord, Est, altitude). Tout en **MN95**, mètres ; aucune conversion dans l'appli web (l'APK convertit le GNSS, et le GPS de la tablette, en MN95 / RAN95).
 - Une fonction de calcul = courte, commentée (rôle, unités m / m² / m³), **avec un test**. Calculs dans `src/topo/`, séparés de l'interface.
 - Nombres : point décimal, 3 décimales pour coordonnées et volumes.
 - Messages d'erreur compréhensibles (« ligne 12 illisible »), jamais d'échec silencieux.
-- Pas de phrases d'explication dans les écrans : l'aide est dans les bulles (`src/aide/textes.js`).
-- Noms de points jamais interprétés (le rôle est choisi par l'utilisateur). Noms levés : contour `C-Stock-n-m`, ligne `L-lib-n-m`, point `P-lib-n`, aire `A-lib-n-m`.
+- Pas de phrases d'explication dans les écrans : l'aide est dans les bulles (`src/aide/textes.js`). Attention aux apostrophes dans ces textes (`\'`), sinon la fabrication du site casse.
+- Texte venant de l'extérieur (noms d'appareils Drive, noms de fichiers, de points…) toujours passé par `echapper()` avant d'aller dans du HTML.
+- Noms de points jamais interprétés (le rôle est choisi par l'utilisateur). Noms levés : contour `C-Stock-n-m`, ligne `L-lib-n-m`, point `P-lib-n`, aire `A-lib-n-m`. Sommets de dessins : `D1-1` (anciens : `PF1-1`, `BAT1-1`, `LI1-1`, `PT1-1`).
 - LandXML : triangles par `id` interne, surfaces TIN seulement, inversion Nord/Est à l'import.
 - Version dans `package.json` (affichée dans Projet) : l'augmenter à chaque livraison.
 - Données sur l'appareil (IndexedDB) ; seule exception : partage Drive, accepté par l'utilisateur. Le mot de passe NTRIP n'est jamais mis dans le projet ni renvoyé à la page.
+- Réglages propres à l'appareil (pas dans le projet) dans le stockage du navigateur : `topo-reglages` (téléphone, mode, prise de main protégée), `topo-terrain` (réglages Terrain, lame), `topo-calques`, `topo-plan-terrain-part`, `topo-projet-replies`.
+- Pas de bouton « Annuler » visible (seulement Ctrl+Z sur ordinateur) : ne pas promettre d'annulation dans les messages.
 
 ## Référence de calcul
 Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 m³, Stock 2 = 648.979 m³, Stock 3 = 372.201 m³ (remblai Mensura). Tests automatiques sur ce cas.
 
-## État d'avancement (version 0.73.0)
-**Fait**
-- Import points (CSV Emlid, TXT), LandXML, DXF (surfaces et fond de plan) ; recalage Helmert d'un plan DXF.
-- Surfaces (stock, terrain naturel, terrassement), volumes (remblai / déblai, comparaison), coupes, mesures / métrés.
-- Plan : calques, courbes, fonds swisstopo, rotation, menu « Afficher ».
-- Exports : CSV, PDF (cartouche), DXF, LandXML.
-- Projets locaux + partage Google Drive (verrou, envoi auto).
-- APK : levé RX2 (Bluetooth), corrections swipos (NTRIP), contrôle de surface, implantation point / ligne / talus, libellés et couleurs.
-- Modes Base / Confirmé (0.57.0, réglages ⚙, étoile ☆ / ★ dans l'en-tête, Confirmé par défaut, retenu par l'appareil). En Base, éléments `.seulement-confirme` cachés et `estModeBase()` dans le code. Base = projets, import points, Drive, point tapé, récepteur, lever « Levé libre » (« autres » dans le code), rôles et libellés existants, implanter point / ligne simple, accroches DXF, contrôle de surface, réglages du guidage, plan (fonds, cadastre, points, noms, altitudes). Tout le reste (onglet Calculs, DXF, talus, NTRIP, libellés à modifier, options de ligne, triangles / courbes…) = Confirmé.
-- Terrain (0.57.1) : « Levé en cours » = liste des levés écrits à la couleur de leur nature, « + Nouveau levé » en haut de la liste.
-- Réglages protégés par le « Code de sécurité » (0.58.1, `src/outils/code.js`, code 1196, dans les deux modes) : modification du nom de l'appareil et réglages NTRIP ; redemandé à chaque ouverture de la fenêtre. Le passage Base → Confirmé reste libre. Simple barrière, pas une vraie sécurité ; ne jamais écrire le code dans les bulles d'aide.
-- Terrain › **Contrôle** (0.59.0, mode Base ; bouton plus petit et rouge depuis 0.59.2 ; les 3 modes Terrain ont un liseré de leur couleur, plein quand choisi) : autocontrôle sur les points de contrôle du projet (`projet.pointsControle`, liste à part et triangles rouges sur le plan), guidage comme l'implantation d'un point, écarts E / N / plan / hauteur, couleurs selon `projet.tolerancesControle` (vert ≤ 2 cm, orange ≤ 4 cm, rouge au-delà, plan et hauteur, réglables), remarque, historique `projet.controles`, export CSV et PDF. Rappel « Faire le contrôle ? » à la connexion du RX2 si aucun contrôle réussi (vert / orange) aujourd'hui ou depuis 4 h ; « Non » = refus noté dans le projet. Tolérances et points protégés par le code de sécurité. Calculs : `src/topo/controle.js` ; écran : `src/leve/controle-ecran.js` ; PDF : `src/export/pdf-controles.js`. Projet sans point de contrôle : le rappel s'affiche quand même, avec OK seulement (rien n'est noté).
-- Onglet Projet (0.59.1) : « + Nouveau projet » (ambre) et « Gestion de projets » (sombre) en évidence ; 3 blocs « Import » (bouton rouge « Points de contrôle », code de sécurité demandé après le choix du fichier), « Listes de points du projet » (on dit « liste de points », plus « levé » ; « Voir les points » sous chaque liste ; points de contrôle dans une liste à part en rouge), « DXF importés ».
-- Calculs › **Dessin** étape 1 (0.60.0, mode Confirmé) : plateformes, bâtiments, lignes, points (`projet.dessins`) avec l'outil « pilote » inspiré de Leica iCON : départ (toucher le plan avec accroche, coordonnées, RX2), puis direction (toucher le plan, gisement en gon 0 = Nord sens horaire, vers le RX2, ±90°) + distance ; rectangle (longueur, largeur à gauche / droite) ; altitude fixe + pente % le long d'un côté (positive = monte) ou par sommet. Dessins violets sur le plan, cotes des côtés. Calculs `src/topo/dessin.js`, écran `src/dessin/ecran.js`, plan `src/plan/dessins.js`.
-- Dessin étape 2 (0.61.0) : un dessin terminé s'implante comme le reste, dans les deux modes. Sommets nommés PF1-1 (plateforme), BAT1-1 (bâtiment), LI1-1 (ligne), PT1-1 (points) — `numero` gardé à la création —, avec l'altitude du dessin ; une liste par dessin (violet) dans la fenêtre « Liste » et le menu « Afficher » ; chaque côté = une ligne (Implanter › Ligne › Ligne DXF : toucher le côté).
-- Dessin étape 3 (0.62.0) : plateforme ou bâtiment → « Créer la surface » = surface `type: 'dessin'` (nature terrassement, `dessinId`, points PF1-1… + faces par la méthode des oreilles), remise à jour avec le dessin (`synchroniserSurfacesDessins` dans `modifie`), supprimée avec lui ; volume par Calculs › Volumes › Comparaison de 2 surfaces. Dessins cochés dans « Afficher » : DXF (calques DESSINS, DESSINS_NOMS) et plan du PDF.
-- 0.62.1 : couleur au choix par liste de points (`projet.couleursListes`, menu « Afficher » et Projet › Listes de points ; rouge réservé, points de contrôle toujours rouges ; couleur du libellé prioritaire) ; altitudes des points de contrôle sur le plan ; Dessin : barre d'accroche (Point, Sommet, Milieu, Sur ligne, Centre ; rien sous le doigt = rien de pris), puces « Point de départ » / « Direction ».
-- Essai à 2 récepteurs (0.63.0, Confirmé, sans guidage) : APK `recepteur2` (2e `EtatRecepteur`, `choisirRecepteur2` / `deconnecterRecepteur2`, état envoyé par `window.recevoirEtatRecepteur2`) ; corrections du 2e au choix (0.63.1, retenu sur la tablette) : « copie » du flux du 1er (`copieCorrections`, GGA du 1er envoyée au caster) ou « 2e connexion NTRIP » avec son propre jeu de réglages (préférences `corrections2`, protégés par le code de sécurité, sa propre GGA) ; fenêtre du récepteur : bloc « Récepteur 2 (essai) » avec position, précision et écart 1 → 2 (plan, dH). Essai réussi (les 2 en RTK fixe).
-- 0.64.0 (retouches) : rappel du contrôle « Non » avec « ⚠ le géomètre sera averti » ; après un contrôle orange → fenêtre d'avertissement, rouge → « Hors tolérance, contacte le géomètre » ; point de contrôle choisi en le touchant sur le plan. Projet : « Nom » retiré, « Lieu » devient « Désignation » (aussi dans le cartouche PDF) ; bloc Import caché en Base. Implanter : ordre Point, Ligne, Surface, Talus ; « début x m · fin y m » ; drapeau damier au lieu du texte sous 1 m. Mode téléphone plus compact (textes −15 %, icônes et gros boutons −25 %). Calques par familles (Fonds, Points, Surfaces, Volumes, Mesures, nouveau calque `mesures`) : ce qui est coché vaut dans tous les onglets (volumes et mesures aussi dans Terrain, surfaces dans Calculs › Mesures ; plus de pastille de volume). Métrés : seules les mesures cochées dans « Afficher » sont dessinées (plus de métré en cours forcé). Mesures : seules les valeurs cochées dans la carte (`valeursCochees`), photos par mesure (`mesure.photos`, fichiers Drive `photo-<id>` comme les surfaces, pages photos à la fin du PDF des mesures). Projet › Listes de points : une liste par dessin (violet, « Voir les points »).
-- 0.65.0 (mise en page Terrain, téléphone) : plan en haut (1/3 de l'écran, 1/2 avec la flèche sous le plan, classe `plan-terrain-grand` retenue sur l'appareil), bandeau Lever / Implanter / Contrôle sous le plan, puis la barre d'accroche ; contenu encadré à la couleur du mode. Lever : en-tête du levé en cours (nature en petit, nom en grand à sa couleur, crayon = renommer via `demanderTexte` de `src/outils/choix.js`, « Changer » = reprendre un autre levé, « + Nouveau »).
-- 0.66.0 (Dessin simplifié) : un seul « + Dessin » (type `dessin`, nom « Dessin n », sommets D1-1…) ; étapes en évidence : 1. Point de départ (toucher le plan avec accroche, ou « Point au RX2 »), 2. Direction du 1er côté (toucher un objet ou « Direction vers le RX2 ») + distance, 3. côtés suivants : « Tourner de » x° (degrés, 0 = tout droit, 90 = d'équerre) à gauche ou à droite du côté précédent (`directionTournee`), ou toucher le plan, + distance ; plus de gisement en gon tapé ni de coordonnées tapées. « Fermer la figure » (`dessin.ferme`, `estFerme`) → surface possible ; rectangle = figure fermée ; « Rouvrir et dessiner ». Altitude au-dessus du pilote ; « ← Retour » en haut de la carte. Les anciens dessins (plateforme, bâtiment, ligne, points) gardent leur type et leurs noms PF / BAT / LI / PT. Angle validé : déviation par rapport au prolongement du côté précédent.
-- 0.67.0 (Drive) : « Prise de main protégée » (réglages ⚙, `priseProtegee` dans `topo-reglages`, changée avec le code de sécurité) : le verrou Drive porte `verrouProtege = 'oui'` ; un autre appareil doit taper le code pour prendre la main (`accordPriseDeMain` dans `partage.js`). « Rendre la main » (Partage, `rendreLaMain`) : envoi puis verrou enlevé, état `rendu` (main grise dans l'en-tête) ; sur le site (pas l'APK), fait tout seul après 5 min sans toucher l'écran ; la prochaine modification (ou la main grise) la reprend via `apresOuverture`.
-- 0.68.0 (Dessin, retouches) : en-tête compact (← , nom, résumé sur une ligne) ; altitude sur une ligne (Fixe / Par sommet, altitude, pente, côté et sommet seulement si pente) ; « Départ » (nom accroché ou RX2, E, N ; `dessin.nomDepart`) dans la carte et rond plein « Départ » sur le plan ; pendant un dessin, seule sa carte est montrée ; tourner cumulé (chaque clic ↰ / ↱ ajoute l'angle inscrit, `pilote.tourne` depuis le prolongement du côté précédent) + « ↑ Tout droit » ; « OK » à côté de la distance = aperçu sur le plan ; case altitude du prochain sommet (`altitudeProchainSommet`, passage « par sommet » avec `passerParSommet`) ; altitude modifiable dans « Voir les sommets » (tableau gardé ouvert).
-- 0.69.0 : Calculs › Mesures montre aussi les points des listes cochées (hors modification d'une mesure). Terrain › Lever › « Changer » : fenêtre `src/leve/fenetre-levees.js`, croix rouge en Confirmé = supprimer le levé (surface, métré ou levé libre) et ses points après confirmation (`supprimerLevee` / `pointsDeLaLevee` dans `topo/leve-direct.js` ; points gardés s'ils servent ailleurs ; levé du jour vide supprimé ; pas d'annulation : le bouton Annuler n'existe plus, seulement Ctrl+Z). Exports : « Quoi exporter ? » (`src/export/choix-export.js`) par catégories (volumes, stocks, terrain naturel, terrassement, dessins, listes de points ; métrés et mesures pour l'export des mesures), pré-coché comme « Afficher » ; barre « Envoyer » après chaque export (`src/export/partager.js`) : APK `partagerFichier` → `FichiersPartages.kt` (ContentProvider fait main, cache/partage, lecture seule) + partage Android ; site : `navigator.share`. DWG : non (format fermé), DXF seulement.
-- 0.70.0 : Terrain › **Lame** (4e mode, bleu, Confirmé) : guidage de lame de grader avec 2 RX2 (mât au-dessus de chaque coin, hauteur du mât = hauteur de canne dans Emlid Flow, compensation d'inclinaison). Surface suivie (terrassement d'abord), « ⇄ G / D » (inverser, retenu dans `terrain.lame`, `topo-terrain`), tolérances ⚙ (vert ≤ 2 cm, orange ≤ 5 cm). Formules validées (`src/topo/lame.js`) : écart coin = altitude surface − altitude coin (positif = monter) ; dévers = (H droite − H gauche) ÷ largeur à plat × 100 (positif = droite plus haute) ; dévers voulu = idem avec la surface. Nombres seulement si les 2 RX2 sont prêts (`autorise`). Écran `src/leve/lame-ecran.js` (écarts, dévers, coupe vue de derrière), lame sur le plan (`plan.afficherLame`). **À essayer sur la machine.**
-- 0.71.0 : Terrain (téléphone) : flèches ▲ / ▼ sous le plan, ±15 % de l'écran par appui (20–80 %, 35 % au départ, `--part-plan-terrain`, `topo-plan-terrain-part`) ; « Ma position » zoome pour voir environ 50 m (`METRES_AUTOUR_DE_MOI`). Projet : blocs Import / Listes de points / DXF repliables (flèche, `topo-projet-replies`) ; import « Surface » (LandXML, DXF 3D) dans Projet › Import avec choix de la nature, retiré de Calculs › Surfaces. Mesures en trait plein (plan et PDF), comme dessins et contours.
-- 0.72.0 : GPS de la tablette (APK seulement, Base et Confirmé) quand aucun RX2 n'est connecté : `PositionTablette.kt` (LocationManager GPS + réseau, permission demandée une fois par lancement, arrêté si le RX2 est connecté ou l'appli en pause), MN95 par `etrs89VersMn95` (WGS84 pris comme ETRS89, < 1 m), envoyé par `window.recevoirPositionTablette` ({ est, nord, precision }) ; plan : rond gris + cercle de précision ; bandeau « GPS TABLETTE ± x m » / « RX2 non connecté ». Seulement pour se localiser : jamais points, implantation, contrôle, lame.
-- 0.73.0 : Lame, profil en long : point gauche / milieu / droite (`pointDeProfil`), sens de marche (`directionDeMarche` sur les positions du milieu de la lame, 10 s gardées ; à l'arrêt `avantDeLaLame` = perpendiculaire, vers l'avant), « devant » et « derrière » en m (`terrain.lame.devant` 20, `derriere` 5), tronçons et ruptures de pente > 0.5 % (`tronconsProfil`) ; petit dessin de niveleuse (de côté dans le profil, de derrière dans la coupe).
+## Fonctions (version 0.73.0)
 
-**Reste / à valider**
+**Modes Base / Confirmé** (réglages ⚙, étoile ☆ / ★ dans l'en-tête, Confirmé par défaut, retenu par l'appareil). En Base : éléments `.seulement-confirme` cachés, `estModeBase()` dans le code ; rien n'est supprimé du projet.
+- Base = projets, Drive, point tapé, récepteur, GPS de la tablette, lever « Levé libre » (« autres » dans le code), rôles et libellés existants, implanter point / ligne simple, accroches DXF, contrôle de surface, Terrain › Contrôle, réglages du guidage, plan (fonds, cadastre, points, noms, altitudes).
+- Confirmé = tout le reste : onglet Calculs, bloc Import du Projet, menus « Plans » et « Afficher » du plan, DXF, talus, NTRIP, libellés à modifier, options de ligne, triangles / courbes, 2e récepteur, Terrain › Lame, suppression d'un levé.
+
+**Code de sécurité** (`src/outils/code.js`, dans les deux modes ; simple barrière, pas une vraie sécurité ; ne jamais écrire le code dans les bulles d'aide) : nom de l'appareil, réglages NTRIP (des 2 récepteurs), points de contrôle et tolérances, « Prise de main protégée ». Redemandé à chaque ouverture de la fenêtre.
+
+**Onglet Projet**
+- « + Nouveau projet » (ambre), « Gestion de projets » (sombre), en-tête « Projet ouvert » (affaire, désignation ; plus de « Nom »).
+- 3 blocs repliables (flèche, retenu) :
+  - Import (Confirmé) : fichier de points, points de contrôle (code demandé après le choix du fichier), plan DXF, surface (LandXML ou DXF 3D, nature demandée tout de suite), point tapé ou pointé sur le DXF ;
+  - Listes de points : une par fichier ou levé (couleur au choix, « Voir les points »), une par dessin (violet), points de contrôle à part (rouge) ;
+  - DXF importés (calques, couleur, recalage Helmert).
+
+**Onglet Terrain** (APK)
+- Mise en page téléphone : plan en haut (flèches ▲ / ▼ = ±15 % de l'écran, 20–80 %), bandeau des modes sous le plan, contenu encadré à la couleur du mode. « Ma position » = environ 50 m autour de soi.
+- **Lever** (ambre) : en-tête du levé en cours (nature, nom en grand, crayon = renommer, « Changer » = reprendre un autre levé, croix rouge en Confirmé = supprimer le levé et ses points après confirmation, « + Nouveau ») ; natures : stock, terrain naturel, terrassement, métré, levé libre ; rôles, libellés, PRENDRE LE POINT (ou touche volume −).
+- **Implanter** (sarcelle) : point, ligne (« début x m · fin y m », drapeau damier sous 1 m), surface, talus ; barre d'accroche (Point, Sommet, Milieu, Sur ligne, Centre).
+- **Contrôle** (rouge, Base) : autocontrôle sur `projet.pointsControle` (choisi dans la liste ou en le touchant sur le plan), écarts E / N / plan / hauteur, tolérances `projet.tolerancesControle` (vert ≤ 2 cm, orange ≤ 4 cm), fenêtre d'avertissement si orange, « Hors tolérance, contacte le géomètre » si rouge, historique `projet.controles`, export CSV / PDF. Rappel « Faire le contrôle ? » à la connexion du RX2 (aucun contrôle réussi aujourd'hui ou depuis 4 h) ; « Non » (« ⚠ le géomètre sera averti ») = refus noté. Fichiers : `topo/controle.js`, `leve/controle-ecran.js`, `export/pdf-controles.js`.
+- **Lame** (bleu, Confirmé) : guidage de lame de niveleuse avec 2 RX2 (mât au-dessus de chaque coin ; hauteur du mât = hauteur de canne dans Emlid Flow, avec la compensation d'inclinaison). Surface suivie (terrassement d'abord), « ⇄ G / D », tolérances ⚙ (vert ≤ 2 cm, orange ≤ 5 cm). Formules **validées par l'utilisateur** (`topo/lame.js`) :
+  - écart d'un coin = altitude de la surface − altitude du coin (positif = monter) ;
+  - dévers = (H droite − H gauche) ÷ largeur à plat × 100 (positif = droite plus haute) ; dévers voulu = idem avec la surface.
+  - Nombres seulement si les 2 RX2 sont prêts (`autorise`). Coupe vue de derrière, lame sur le plan (`plan.afficherLame`).
+  - Profil en long : depuis le coin gauche, le milieu ou le coin droit ; dans le sens de marche (`directionDeMarche`), à l'arrêt perpendiculaire à la lame ; « devant » (20 m) et « derrière » (5 m) ; pente de chaque tronçon et ruptures de pente > 0.5 % (`tronconsProfil`) ; petite niveleuse dessinée. Écran `leve/lame-ecran.js`.
+- **Récepteurs** : RX2 en Bluetooth, corrections swipos (NTRIP) sans Emlid Flow ; 2e récepteur (Confirmé) avec corrections « copie » du 1er ou « 2e connexion NTRIP » (réglages `corrections2`). Bandeaux RTK / inclinaison sous l'en-tête.
+- **GPS de la tablette** (APK, sans RX2 connecté, deux modes) : `PositionTablette.kt` (GPS + réseau, MN95 par `etrs89VersMn95`), `window.recevoirPositionTablette({ est, nord, precision })` ; rond gris + cercle de précision, bandeau « GPS TABLETTE ± x m ». **Seulement pour se localiser** : jamais points, implantation, contrôle ni lame. Pas sur le site (choix de l'utilisateur).
+
+**Onglet Calculs** (Confirmé)
+- Surfaces (stock, terrain naturel, terrassement ; à partir des points ; l'import de fichiers est dans Projet), volumes (remblai / déblai, comparaison de 2 surfaces), coupes.
+- Mesures / métrés : longueurs, aires, nombres ; seules les valeurs cochées dans la carte ; photos par mesure ; points des listes cochées visibles sur le plan (hors modification).
+- **Dessin** : « + Dessin » (sommets D1-1…) ; 1. point de départ (plan avec accroche, ou RX2), 2. direction du 1er côté (toucher un objet, ou vers le RX2) + distance (« OK » = aperçu), 3. côtés suivants : angle en degrés, chaque clic ↰ / ↱ ajoute l'angle (déviation depuis le prolongement du côté précédent, **validé**), « ↑ Tout droit », ou toucher le plan ; altitude du prochain sommet à côté de la distance ; « Fermer la figure », rectangle, « Rouvrir et dessiner ». Altitude fixe + pente, ou par sommet (modifiable dans « Voir les sommets »). Figure fermée → « Créer la surface » (terrassement, remise à jour avec le dessin). Un dessin s'implante comme le reste (chaque côté = une ligne). Fichiers : `topo/dessin.js`, `dessin/ecran.js`, `plan/dessins.js`.
+
+**Plan** : calques par familles (Fonds, Points, Surfaces, Volumes, Mesures), valables dans tous les onglets ; menus « Plans » et « Afficher » (Confirmé) ; fonds swisstopo, rotation, suivi de position. Contours, mesures et dessins en trait plein ; dessins violets.
+
+**Exports** : CSV, PDF (cartouche : affaire, désignation, dessiné par, date), DXF, LandXML ; PDF et DXF des mesures ; « Quoi exporter ? » par catégories (pré-coché comme « Afficher ») ; barre « Envoyer » après chaque export (APK : `FichiersPartages.kt` + partage Android ; site : `navigator.share`). DWG : non (format fermé), DXF seulement.
+
+**Partage Google Drive** : dossier « Topo - projets », fichiers découpés (projet, plans DXF, photos des surfaces et des mesures), envoi automatique, verrou par appareil (expire après 15 min sans signe de vie), « prendre la main », « Prise de main protégée » (code de sécurité pour les autres appareils), « Rendre la main » (bouton ; tout seul après 5 min sans activité sur le site), main grise = rendue.
+
+**Réglages ⚙** : mode Base / Confirmé, mode téléphone (textes −15 %, icônes et gros boutons −25 %), bulles d'aide, partage Drive, prise de main protégée, « Fermer l'appli » (APK).
+
+## Reste / à valider
+- Essais sur le terrain : guidage de lame et profil en long sur la machine (hauteur de mât, signes, vitesse d'affichage, seuil de rupture 0.5 %) ; GPS de la tablette ; « Envoyer » dans l'APK ; prise de main protégée et main rendue avec 2 appareils sur Drive.
 - Essai terrain du talus (0.56.1) et question ouverte : arrondi (cône) aux angles saillants, est-ce voulu ?
 - Précision H / V (message GST) à comparer avec Emlid Flow ; vérifier que le RX2 envoie bien du GST.
 - DWG non pris en charge (enregistrer en DXF).
 - Google Cloud en mode Test (réautorisation environ tous les 7 jours) : publier l'écran de consentement si besoin.
 
-**À développer**
-- Guidage de lame (0.70.0) : à valider sur la machine (hauteur de mât, signes, vitesse d'affichage).
-- Dessin, étape suivante (en suspens) : 4. plateforme avec talus jusqu'au terrain naturel (entrées en terre, volume).
+## À développer
+- Dessin, étape suivante (en suspens) : plateforme avec talus jusqu'au terrain naturel (entrées en terre, volume).
+
+## Historique des versions (résumé)
+- 0.57 modes Base / Confirmé · 0.58 code de sécurité · 0.59 Terrain › Contrôle, onglet Projet en 3 blocs · 0.60–0.62 Dessin (pilote, implantation, surface), couleurs des listes · 0.63 2e récepteur · 0.64 retouches (calques par familles, photos des mesures, Désignation) · 0.65 mise en page Terrain · 0.66 Dessin simplifié · 0.67 Drive (prise protégée, rendre la main) · 0.68 retouches Dessin · 0.69 suppression d'un levé, « Quoi exporter ? », « Envoyer » · 0.70 guidage de lame · 0.71 flèches du plan, blocs repliables, import de surface dans Projet · 0.72 GPS de la tablette · 0.73 profil en long de la lame.
