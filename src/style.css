@@ -2574,15 +2574,24 @@ body.avec-recepteur .bandeaux-recepteur {
   fill: var(--gris);
 }
 
-/* Téléphone, onglet Terrain : le plan reste en haut, les outils du levé dessous. */
+/* Téléphone, onglet Terrain : le plan reste en haut, les outils du levé dessous. Le plan prend
+   1/3 de la place (ou 1/2 avec la flèche sous le plan, classe plan-terrain-grand, 0.64.0). */
 @media (max-width: 899px) {
+  body.mode-leve[data-onglet='terrain'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) / 3);
+  }
+
+  body.mode-leve.plan-terrain-grand[data-onglet='terrain'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) / 2);
+  }
+
   body.mode-leve[data-onglet='terrain'] .panneau-plan {
     display: block;
     position: fixed;
     top: var(--hauteur-entete);
     left: 0;
     right: 0;
-    height: 38svh;
+    height: var(--hauteur-plan-terrain);
     z-index: 10;
     padding: 0;
     border-radius: 0;
@@ -2590,7 +2599,7 @@ body.avec-recepteur .bandeaux-recepteur {
   }
 
   body.mode-leve[data-onglet='terrain'] .mise-en-page {
-    padding-top: calc(38svh + 12px);
+    padding-top: calc(var(--hauteur-plan-terrain) + 12px);
   }
 }
 
@@ -4230,7 +4239,7 @@ body.mode-telephone .onglets button svg {
   color: var(--sombre);
 }
 
-/* Téléphone : la bascule est collée sous l'en-tête, au-dessus du plan. */
+/* Téléphone : la bascule est collée sous le plan (0.64.0 ; avant : au-dessus du plan). */
 @media (max-width: 899px) {
   body {
     --hauteur-bascule: 46px;
@@ -4238,7 +4247,7 @@ body.mode-telephone .onglets button svg {
 
   body.mode-leve[data-onglet='terrain'] .bascule-terrain {
     position: fixed;
-    top: var(--hauteur-entete);
+    top: calc(var(--hauteur-entete) + var(--hauteur-plan-terrain));
     left: 0;
     right: 0;
     z-index: 11;
@@ -4250,21 +4259,14 @@ body.mode-telephone .onglets button svg {
     border-bottom: 1px solid var(--bordure);
   }
 
-  body.mode-leve[data-onglet='terrain'] .panneau-plan {
-    top: calc(var(--hauteur-entete) + var(--hauteur-bascule));
-  }
-
   body.mode-leve[data-onglet='terrain'] .mise-en-page {
-    padding-top: calc(38svh + var(--hauteur-bascule) + 12px);
+    padding-top: calc(var(--hauteur-plan-terrain) + var(--hauteur-bascule) + 12px);
   }
 
   /* Écran de guidage : le plan prend la moitié de la place, la vue rapprochée l'autre moitié. */
   body.mode-leve.vue-implantation[data-onglet='terrain'] {
     --hauteur-plan-guidage: calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) / 2);
-  }
-
-  body.mode-leve.vue-implantation[data-onglet='terrain'] .panneau-plan {
-    height: var(--hauteur-plan-guidage);
+    --hauteur-plan-terrain: var(--hauteur-plan-guidage);
   }
 
   body.mode-leve.vue-implantation[data-onglet='terrain'] .mise-en-page {
@@ -4786,70 +4788,143 @@ button.bouton-import {
   margin-bottom: 10px;
 }
 
-/* Levé en cours (version 0.57.1) : « Levé en cours » en petit, puis la liste des levés dans un
-   cadre neutre ; le nom du levé (et chaque levé de la liste) est écrit à la couleur de sa nature.
-   « + Nouveau levé » en haut de la liste. */
-.ligne-leve-en-cours {
+/* Levé en cours (0.64.0) : sa nature en petit, son nom en grand à la couleur de la nature, un
+   crayon pour le renommer, puis « Changer » et « + Nouveau ». */
+.entete-levee {
+  --couleur-nature: #b45309;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
   margin-bottom: 10px;
 }
 
-.titre-leve-en-cours {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--gris);
-}
-
-.choix-leve {
-  --couleur-nature: #b45309;
-  width: 100%;
-  min-height: 40px;
-  padding: 0 44px 0 10px;
-  border: 1.5px solid var(--bordure);
-  border-radius: 8px;
-  appearance: none;
-  -webkit-appearance: none;
-  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%231b2b36'/%3E%3Cpath d='m7 10 5 5 5-5' fill='none' stroke='%23f6ab07' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 6px center / 28px 28px;
-  color: var(--couleur-nature);
-  font-size: 1.1rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.choix-leve option {
-  --couleur-nature: #b45309;
-  color: var(--couleur-nature);
-  font-weight: 700;
-}
-
-.choix-leve option.nouveau-leve {
-  color: var(--texte);
-}
-
-.choix-leve.nature-terrain,
-.choix-leve option.nature-terrain {
+.entete-levee.nature-terrain {
   --couleur-nature: #15803d;
 }
 
-.choix-leve.nature-terrassement,
-.choix-leve option.nature-terrassement {
+.entete-levee.nature-terrassement {
   --couleur-nature: #2563eb;
 }
 
-.choix-leve.nature-metre,
-.choix-leve option.nature-metre {
+.entete-levee.nature-metre {
   --couleur-nature: #0891b2;
 }
 
 /* « Levé libre » (contrôle, points géomètre… ; « autres » dans le code) : gris ardoise. */
-.choix-leve.nature-autres,
-.choix-leve option.nature-autres,
+.entete-levee.nature-autres,
 .bouton-nature.nature-autres {
   --couleur-nature: #475569;
+}
+
+.nom-levee {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: 4px;
+  min-width: 0;
+}
+
+.nature-levee {
+  grid-column: 1 / -1;
+  color: var(--couleur-nature);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.nom-levee strong {
+  overflow: hidden;
+  color: var(--couleur-nature);
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bouton-crayon-levee {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--couleur-nature);
+  cursor: pointer;
+}
+
+.bouton-crayon-levee svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.boutons-levee {
+  display: flex;
+  gap: 6px;
+}
+
+/* Contenu de l'onglet Terrain encadré à la couleur du mode (0.64.0) : ambre (Lever), sarcelle
+   (Implanter), rouge (Contrôle). */
+.panneau[data-onglet='terrain'] {
+  border: 2px solid var(--ambre);
+}
+
+.panneau[data-onglet='terrain']:has(.cadre-mode-controler) {
+  border-color: #0d9488;
+}
+
+.panneau[data-onglet='terrain']:has(.cadre-mode-autocontrole) {
+  border-color: #dc2626;
+}
+
+/* Flèche sous le plan (téléphone, onglet Terrain) : plan sur 1/3 ou sur 1/2 de l'écran. */
+.bouton-taille-plan {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  body.mode-leve[data-onglet='terrain']:not(.vue-implantation) .bouton-taille-plan {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 22px;
+    border: 1px solid var(--bordure);
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    background: var(--surface);
+    color: var(--sombre);
+    transform: translateX(-50%);
+    cursor: pointer;
+  }
+
+  .bouton-taille-plan svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  body.plan-terrain-grand .bouton-taille-plan svg {
+    transform: rotate(180deg);
+  }
 }
 
 /* Libellés : tableau abréviation | description (seulement la liste du rôle choisi). */
@@ -5136,7 +5211,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 
   body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .cible-haut {
     position: fixed;
-    top: calc(var(--hauteur-entete) + var(--hauteur-bascule));
+    top: var(--hauteur-entete);
     left: 0;
     right: 0;
     z-index: 12;
@@ -5694,7 +5769,7 @@ body.accroches-ouvertes {
 @media (max-width: 899px) {
   body.mode-leve.avec-accroches[data-onglet='terrain'] .barre-accroche {
     position: fixed;
-    top: calc(var(--hauteur-entete) + var(--hauteur-bascule) + 38svh);
+    top: calc(var(--hauteur-entete) + var(--hauteur-plan-terrain) + var(--hauteur-bascule));
     left: 0;
     right: 0;
     z-index: 10;
@@ -5706,7 +5781,7 @@ body.accroches-ouvertes {
   }
 
   body.mode-leve.avec-accroches[data-onglet='terrain'] .mise-en-page {
-    padding-top: calc(38svh + var(--hauteur-bascule) + var(--hauteur-accroches) + 12px);
+    padding-top: calc(var(--hauteur-plan-terrain) + var(--hauteur-bascule) + var(--hauteur-accroches) + 12px);
   }
 }
 

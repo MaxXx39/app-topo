@@ -30,3 +30,41 @@ export function demanderChoix({ titre, texte = '', boutons }) {
     fenetre.showModal();
   });
 }
+
+/**
+ * Petite fenêtre pour taper un texte (ex. renommer un levé) : « OK » ou « Annuler ».
+ * Renvoie le texte tapé (sans espaces autour), ou null si annulé.
+ */
+export function demanderTexte({ titre, valeur = '' }) {
+  return new Promise((resoudre) => {
+    const fenetre = document.createElement('dialog');
+    fenetre.className = 'fenetre-choix';
+    fenetre.innerHTML = `
+      <h2>${echapper(titre)}</h2>
+      <input type="text" data-champ="texte" value="${echapper(valeur)}" aria-label="${echapper(titre)}" />
+      <div class="boutons-choix">
+        <button type="button" class="bouton" data-cle="ok"><strong>OK</strong></button>
+        <button type="button" class="bouton-secondaire" data-cle="annuler"><strong>Annuler</strong></button>
+      </div>`;
+    const champ = fenetre.querySelector('input');
+    const finir = (cle) => {
+      fenetre.close();
+      resoudre(cle === 'ok' ? champ.value.trim() : null);
+    };
+    fenetre.addEventListener('click', (evenement) => {
+      const bouton = evenement.target.closest('button[data-cle]');
+      if (bouton) finir(bouton.dataset.cle);
+    });
+    champ.addEventListener('keydown', (evenement) => {
+      if (evenement.key === 'Enter') finir('ok');
+    });
+    fenetre.addEventListener('cancel', (evenement) => {
+      evenement.preventDefault();
+      finir('annuler');
+    });
+    fenetre.addEventListener('close', () => fenetre.remove());
+    document.body.append(fenetre);
+    fenetre.showModal();
+    champ.select();
+  });
+}

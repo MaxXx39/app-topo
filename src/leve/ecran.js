@@ -14,6 +14,7 @@
 import { echapper } from '../outils/echapper.js';
 import { estModeBase } from '../reglages/reglages.js';
 import { demanderCode } from '../outils/code.js';
+import { demanderChoix, demanderTexte } from '../outils/choix.js';
 import { htmlControle } from './controle-ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
@@ -128,6 +129,26 @@ export function creerEcranLeve(conteneur, actions) {
       dessiner();
       return;
     }
+    // En-tête du levé en cours : renommer (crayon), en reprendre un autre (« Changer »).
+    if (action === 'renommerLevee') {
+      demanderTexte({ titre: 'Nom du levé', valeur: donnees.stock.nom }).then((nom) => {
+        if (nom) actions.renommerLevee(donnees.stock.id, nom);
+      });
+      return;
+    }
+    if (action === 'changerLevee') {
+      const titres = Object.fromEntries(NATURES_TERRAIN);
+      demanderChoix({
+        titre: 'Reprendre un levé',
+        boutons: [
+          ...donnees.stocks.map((s) => ({ cle: s.id, texte: s.nom, detail: titres[s.nature] ?? '', principal: s.id === donnees.stock.id })),
+          { cle: '', texte: 'Annuler' },
+        ],
+      }).then((id) => {
+        if (id && id !== donnees.stock.id) actions.choisirStock(id);
+      });
+      return;
+    }
     // Barre d'accroche : « + Point » (point tapé), « Liste » (points du projet), flèche (noms).
     if (action === 'ouvrirFormulairePoint') {
       ouvrirFenetrePointTape({ nomPropose: donnees.implanter.nomPointAjoute, ajouter: (valeurs) => actions.ajouterPointTape(valeurs) });
@@ -206,12 +227,7 @@ export function creerEcranLeve(conteneur, actions) {
 
   conteneur.addEventListener('change', (evenement) => {
     const cible = evenement.target;
-    // « + Nouveau levé » (en haut de la liste des levés) : choix de ce que l'on lève.
-    if (cible.dataset.champ === 'stock' && cible.value === 'nouveau') {
-      choixNatureOuvert = true;
-      dessiner();
-    } else if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
-    else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
+    if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
@@ -806,17 +822,23 @@ export function creerEcranLeve(conteneur, actions) {
   }
 
   /**
-   * Levé en cours (demande du 26.10.2026) : « Levé en cours » en petit, puis la liste des levés,
-   * chacun écrit à la couleur de sa nature, avec « + Nouveau levé » tout en haut.
+   * Levé en cours (0.64.0) : sa nature en petit, son nom en grand (à la couleur de la nature) avec
+   * un crayon pour le renommer, puis « Changer » (reprendre un autre levé) et « + Nouveau ».
    */
   function ligneSurface() {
     const nature = donnees.stock.nature ?? 'stock';
-    return `<div class="ligne-leve-en-cours">
-      <span class="titre-leve-en-cours">Levé en cours</span>
-      <select data-champ="stock" class="choix-leve nature-${nature}" aria-label="Levé en cours : en reprendre un autre, ou en commencer un nouveau">
-        <option value="nouveau" class="nouveau-leve">+ Nouveau levé</option>
-        ${donnees.stocks.map((s) => `<option value="${s.id}" class="nature-${s.nature}" ${s.id === donnees.stock.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}
-      </select>
+    const titre = NATURES_TERRAIN.find(([cle]) => cle === nature)?.[1] ?? '';
+    return `<div class="entete-levee nature-${nature}">
+      <div class="nom-levee">
+        <span class="nature-levee">${titre}</span>
+        <strong>${echapper(donnees.stock.nom)}</strong>
+        <button type="button" class="bouton-crayon-levee" data-action="renommerLevee" title="Renommer" aria-label="Renommer le levé">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
+      </div>
+      <div class="boutons-levee">
+        <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 ? '' : 'disabled'}>Changer</button>
+        <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau</button>
+      </div>
     </div>`;
   }
 
@@ -984,7 +1006,7 @@ export function creerEcranLeve(conteneur, actions) {
     else if (autocontrole) contenu = htmlControle(donnees.autocontrole, { gestionOuverte: gestionControleOuverte, erreurGestion });
     else contenu = donnees.mode === 'controler' ? controle() : priseDePoint();
     conteneur.innerHTML = `
-        <div class="ecran-terrain">
+        <div class="ecran-terrain cadre-mode-${donnees.mode}">
           ${choixMode()}
           ${contenu}
         </div>`;

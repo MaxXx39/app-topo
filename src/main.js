@@ -238,6 +238,9 @@ document.querySelector('#app').innerHTML = `
     </div>
     <section class="panneau panneau-plan" data-onglet="plan">
       <div id="plan"></div>
+      <button type="button" class="bouton-taille-plan" data-action="taille-plan-terrain" aria-label="Agrandir ou réduire le plan">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      </button>
     </section>
   </div>
   <nav class="onglets" aria-label="Onglets">${ONGLETS.map(boutonOnglet).join('')}</nav>
@@ -602,10 +605,33 @@ const boutonRecepteur = recepteurDisponible()
   : null;
 if (boutonRecepteur && recepteur2Disponible()) ecouterRecepteur2((etat, mode) => boutonRecepteur.mettreAJour2(etat, mode));
 
+// Onglet Terrain (téléphone) : flèche sous le plan, plan sur 1/3 ou 1/2 de l'écran (retenu sur l'appareil).
+const CLE_PLAN_TERRAIN = 'topo-plan-terrain-grand';
+try {
+  document.body.classList.toggle('plan-terrain-grand', localStorage.getItem(CLE_PLAN_TERRAIN) === 'oui');
+} catch {
+  // stockage refusé : plan sur 1/3
+}
+document.querySelector('[data-action="taille-plan-terrain"]').addEventListener('click', () => {
+  const grand = document.body.classList.toggle('plan-terrain-grand');
+  try {
+    localStorage.setItem(CLE_PLAN_TERRAIN, grand ? 'oui' : 'non');
+  } catch {
+    // pas retenu
+  }
+});
+
 const ecranLeve = recepteurDisponible()
   ? creerEcranLeve(document.querySelector('#leve-direct'), {
       ouvrirRecepteur: () => boutonRecepteur.ouvrir(),
       nouvelleSurface: (nature) => ajouterSurfaceLevee(nature),
+      // Renommer le levé en cours (surface, métré ou levé libre) : les noms des points ne changent pas.
+      renommerLevee: (id, nom) => {
+        const levee = [...projet.surfaces, ...projet.metres, ...projet.autres].find((s) => s.id === id);
+        if (!levee) return;
+        levee.nom = nom;
+        modifie();
+      },
       choisirStock: (id) => {
         leveDirect.stockId = id;
         // Métré ou « Autres » : pas une surface ; on affiche les points de son levé.
