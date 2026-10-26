@@ -316,6 +316,10 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
             deconnecterDrive: () => partage.deconnecter(),
             envoyerDrive: () => partage.envoyerMaintenant(),
             reprendreLaMain: () => partage.reprendreLaMain(),
+            rendreLaMain: () => partage.rendreLaMain('rendue à la main'),
+            reprendreApresRendu: () => partage.reprendreApresRendu(),
+            // Case « Prise de main protégée » changée : le verrou sur Drive le dit tout de suite.
+            priseProtegeeChangee: () => partage.etat.connecte && partage.envoyerMaintenant(),
             nommerAppareil: (nom) => {
               partage.nommerAppareil(nom);
               fenetreReglages?.rafraichir();
@@ -3257,7 +3261,7 @@ function mettreAJourEtatEntete() {
 
   const points = leveActif(projet)?.points ?? AUCUN_POINT;
   const drive = partage?.etat.connecte
-    ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive' }[partage.etat.etat] ?? 'Drive : en attente'
+    ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive', rendu: 'Drive : main rendue' }[partage.etat.etat] ?? 'Drive : en attente'
     : '';
   document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} surface(s)`, drive].filter(Boolean).join(' · ');
 
@@ -3266,15 +3270,30 @@ function mettreAJourEtatEntete() {
   const pastille = document.querySelector('#pastille-verrou');
   const repris = partage?.etat.connecte && partage.etat.repris?.projetId === projet.id ? partage.etat.repris : null;
   pastille.hidden = !partage?.etat.connecte;
+  // Main rendue (bouton, ou 5 minutes sans rien faire) : main grise ; toucher = la reprendre.
+  const rendu = partage?.etat.connecte && partage.etat.rendu?.projetId === projet.id;
   if (repris) pastille.textContent = `🔒 Lecture seule · ${repris.nom}`;
   else pastille.innerHTML = `<svg class="main-verrou" viewBox="0 0 24 24" aria-hidden="true">${ICONE_MAIN}</svg>`;
-  pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : 'pastille-verte'}`;
-  pastille.title = repris ? 'Ouvert sur un autre appareil : toucher pour prendre la main' : 'Tu as la main sur ce projet';
+  pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : rendu ? 'pastille-grise' : 'pastille-verte'}`;
+  pastille.title = repris ? 'Ouvert sur un autre appareil : toucher pour prendre la main' : rendu ? 'Main rendue : toucher pour la reprendre' : 'Tu as la main sur ce projet';
 }
 document.querySelector('#pastille-verrou').addEventListener('click', () => {
   if (partage?.etat.repris?.projetId === projet.id) partage.reprendreLaMain();
+  else if (partage?.etat.rendu?.projetId === projet.id) partage.reprendreApresRendu();
   else afficherMessage('Tu as la main sur ce projet', 2000);
 });
+
+// Site (pas l'APK) : après 5 minutes sans rien faire, le projet est envoyé et la main rendue
+// (demande du 26.10.2026) ; la prochaine modification la reprend.
+const INACTIVITE = 5 * 60 * 1000;
+let derniereActivite = Date.now();
+for (const evenement of ['pointerdown', 'keydown', 'wheel']) document.addEventListener(evenement, () => (derniereActivite = Date.now()), { passive: true, capture: true });
+setInterval(() => {
+  if (estDansAppliAndroid() || !partage?.etat.connecte) return;
+  if (Date.now() - derniereActivite < INACTIVITE) return;
+  if (partage.etat.rendu?.projetId === projet.id || partage.etat.repris?.projetId === projet.id) return;
+  partage.rendreLaMain('rendue après 5 minutes sans activité');
+}, 30_000);
 
 /** Petit message sous l'en-tête, qui disparaît tout seul après "duree" millisecondes (null : il reste). */
 let minuterieMessage = null;

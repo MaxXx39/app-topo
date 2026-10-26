@@ -141,6 +141,21 @@ describe('synchronisation avec Drive', () => {
     expect((await creerSynchro(drive, MAX).envoyer(projet, memoire)).memoire).toBeTruthy();
   });
 
+  it('prise de main protégée : le verrou le dit aux autres appareils ; rendu, il est enlevé', async () => {
+    const drive = fauxDrive();
+    const projet = projetEssai();
+    let protege = true;
+    const max = creerSynchro(drive, MAX, { protege: () => protege });
+    const { memoire } = await max.envoyer(projet, null, 'Essai');
+    const [surDrive] = await creerSynchro(drive, BUREAU).listerProjets();
+    expect(surDrive.verrou).toMatchObject({ nom: 'Tablette Max', protege: true });
+    protege = false;
+    await max.signeDeVie(memoire.dossierId);
+    expect((await creerSynchro(drive, BUREAU).listerProjets())[0].verrou.protege).toBe(false);
+    await max.rendreVerrou(memoire.dossierId);
+    expect((await creerSynchro(drive, BUREAU).listerProjets())[0].verrou).toBeNull();
+  });
+
   it('verrou sans signe de vie depuis 15 minutes : le projet est libre', async () => {
     const maintenant = Date.parse('2026-10-23T10:00:00.000Z');
     expect(verrouActif(null)).toBe(false);

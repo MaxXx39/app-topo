@@ -1,6 +1,7 @@
 // Code de sécurité qui protège certains réglages (nom de l'appareil, corrections NTRIP) pour qu'un utilisateur
 // ne les change pas par erreur (demande du 26.10.2026). C'est une simple barrière : le code est
 // écrit dans l'appli, ce n'est pas une vraie sécurité.
+import { echapper } from './echapper.js';
 
 const CODE = '1196';
 
@@ -19,7 +20,7 @@ export function demanderCode(titre) {
     fenetre.className = 'fenetre-reglages fenetre-code';
     fenetre.innerHTML = `
       <form method="dialog">
-        <h2>${titre}</h2>
+        <h2>${echapper(titre)}</h2>
         <label class="champ-code">Code de sécurité
           <input type="password" inputmode="numeric" autocomplete="off" data-champ="code" />
         </label>

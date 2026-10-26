@@ -210,6 +210,12 @@ p {
   color: #ffffff;
 }
 
+/* Main rendue (Drive) : grise ; la toucher la reprend. */
+.pastille-grise {
+  background: rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+}
+
 /* Sur téléphone, en-tête plus serré. */
 @media (max-width: 480px) {
   .entete {

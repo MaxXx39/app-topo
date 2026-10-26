@@ -1,11 +1,16 @@
 // Partage des projets par Google Drive, vu de l'appli : connexion, envoi automatique (environ
 // 30 s après une modification, et quand on quitte l'appli), verrou du projet ouvert, ouverture
 // d'un projet de Drive et choix de la bonne version (voir synchro.js).
-// main.js appelle : projetEnregistre(), avantDeChanger(), apresOuverture(), envoyerMaintenant().
+// main.js appelle : projetEnregistre(), avantDeChanger(), apresOuverture(), envoyerMaintenant(),
+// rendreLaMain() (bouton, ou 5 minutes sans rien faire sur le site), reprendreApresRendu().
+// Prise de main protégée (0.67.0) : si l'appareil qui a la main a coché « Prise de main protégée »
+// (réglages ⚙), il faut taper le code de sécurité pour lui prendre la main.
 import { creerDrive } from './drive.js';
 import { creerSynchro, choisirVersion, verrouActif, SIGNE_DE_VIE } from './synchro.js';
 import { creerConnexion, connexionPossible } from './connexion.js';
 import { appareil, nommerAppareil, etaitConnecte, retenirConnexion, memoireProjet, retenirProjet } from './memoire.js';
+import { lireReglages } from '../reglages/reglages.js';
+import { demanderCode } from '../outils/code.js';
 
 const DELAI_ENVOI = 30_000; // après une modification (ms)
 const DELAI_NOUVEL_ESSAI = 60_000; // après un échec (pas de réseau…)
@@ -30,7 +35,8 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
     message: '',
     derniereSynchro: null,
     projetsDrive: [],
-    repris: null, // { projetId, nom, depuis } : verrou pris par un autre appareil
+    repris: null, // { projetId, nom, depuis, protege } : verrou pris par un autre appareil
+    rendu: null, // { projetId } : main rendue (bouton ou inactivité) ; reprise à la prochaine modification
   };
   let synchro = null;
   let minuterie = null;
@@ -42,7 +48,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
     if (!etat.connecte || !synchro) return;
     const projet = obtenirProjet();
     const dossierId = memoireProjet(projet.id)?.dossierId;
-    if (!dossierId || etat.repris?.projetId === projet.id) return;
+    if (!dossierId || etat.repris?.projetId === projet.id || etat.rendu?.projetId === projet.id) return;
     try {
       const { repris } = await synchro.signeDeVie(dossierId);
       if (repris) {
@@ -68,7 +74,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
     }
     changer('connexion', 'connexion à Google…');
     const connexion = creerConnexion();
-    synchro = creerSynchro(creerDrive({ obtenirJeton: connexion.obtenirJeton }), appareil());
+    synchro = creerSynchro(creerDrive({ obtenirJeton: connexion.obtenirJeton }), appareil(), { protege: () => Boolean(lireReglages().priseProtegee) });
     try {
       await connexion.obtenirJeton();
       etat.connecte = true;
@@ -89,6 +95,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
     etat.connecte = false;
     etat.projetsDrive = [];
     etat.repris = null;
+    etat.rendu = null;
     synchro = null;
     changer('deconnecte');
   }
@@ -115,6 +122,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
       return envoyer(projet);
     }
     if (etat.repris?.projetId === projet.id) return; // ouvert ailleurs : on n'écrase rien
+    if (etat.rendu?.projetId === projet.id) return; // main rendue : rien ne part sans la reprendre
     envoiEnCours = (async () => {
       changer('envoi', 'envoi…');
       try {
@@ -147,6 +155,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
    */
   async function apresOuverture() {
     etat.repris = null;
+    etat.rendu = null;
     if (!etat.connecte || !synchro) return;
     const projet = obtenirProjet();
     try {
@@ -196,7 +205,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
   function avantDeChanger() {
     if (!etat.connecte || !synchro) return Promise.resolve();
     const projet = obtenirProjet();
-    if (etat.repris?.projetId === projet.id) return Promise.resolve();
+    if (etat.repris?.projetId === projet.id || etat.rendu?.projetId === projet.id) return Promise.resolve();
     return (async () => {
       try {
         await envoyer(projet);
@@ -235,9 +244,48 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
     changer('a-jour');
   }
 
+  /**
+   * Prendre la main à un autre appareil : on confirme, puis, si sa prise de main est protégée, il
+   * faut le code de sécurité. Renvoie vrai si on peut la prendre.
+   */
+  async function accordPriseDeMain(verrou, question) {
+    if (!confirm(question)) return false;
+    if (!verrou?.protege) return true;
+    return demanderCode(`Prise de main protégée par ${verrou.nom}`);
+  }
+
+  /**
+   * Rend la main sur le projet ouvert : on envoie ce qui reste, puis le verrou est enlevé (un autre
+   * appareil peut l'ouvrir sans rien demander). raison : texte affiché (ex. « 5 min sans activité »).
+   */
+  async function rendreLaMain(raison = '') {
+    if (!etat.connecte || !synchro) return;
+    const projet = obtenirProjet();
+    if (etat.repris?.projetId === projet.id || etat.rendu?.projetId === projet.id) return;
+    try {
+      await envoyer(projet);
+      if (etat.repris?.projetId === projet.id) return;
+      const dossierId = memoireProjet(projet.id)?.dossierId;
+      if (!dossierId) return;
+      await synchro.rendreVerrou(dossierId);
+      etat.rendu = { projetId: projet.id };
+      await rafraichirListe().catch(() => {});
+      changer('rendu', raison);
+    } catch (erreur) {
+      changer('attente', erreur.message);
+    }
+  }
+
   return {
     etat,
     connecter,
+    rendreLaMain,
+
+    /** Main rendue, et on veut de nouveau envoyer : comme à l'ouverture (version, verrou), puis envoi. */
+    reprendreApresRendu() {
+      if (etat.rendu?.projetId !== obtenirProjet().id) return;
+      apresOuverture();
+    },
     deconnecter,
     rafraichirListe,
     nommerAppareil(nom) {
@@ -254,10 +302,18 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
     /** Le projet ouvert vient d'être enregistré sur l'appareil : envoi dans 30 s. */
     projetEnregistre() {
       if (etat.repris?.projetId === obtenirProjet().id) return;
+      // Main rendue : la modification la reprend (si personne ne l'a prise entre-temps).
+      if (etat.rendu?.projetId === obtenirProjet().id) {
+        apresOuverture();
+        return;
+      }
       planifier();
     },
 
-    envoyerMaintenant: () => envoyer(),
+    envoyerMaintenant: () => {
+      if (etat.rendu?.projetId === obtenirProjet().id) return apresOuverture();
+      return envoyer();
+    },
     avantDeChanger,
     apresOuverture,
 
@@ -268,7 +324,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
       const verrou = surDrive.verrou;
       if (verrou && verrou.appareilId !== appareil().id && verrouActif(verrou)) {
         const depuis = verrou.depuis ? new Date(verrou.depuis).toLocaleString('fr-CH', { dateStyle: 'short', timeStyle: 'short' }) : '?';
-        if (!confirm(`« ${surDrive.titre} » est ouvert sur ${verrou.nom} (depuis ${depuis}).\n\nPrendre la main ? ${verrou.nom} ne pourra plus envoyer ses modifications.`)) return;
+        if (!(await accordPriseDeMain(verrou, `« ${surDrive.titre} » est ouvert sur ${verrou.nom} (depuis ${depuis}).\n\nPrendre la main ? ${verrou.nom} ne pourra plus envoyer ses modifications.`))) return;
       }
       try {
         avantDeChanger(); // en arrière-plan
@@ -303,7 +359,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
       const surDrive = etat.projetsDrive.find((p) => p.projetId === projet.id);
       const dossierId = memoireProjet(projet.id)?.dossierId ?? surDrive?.dossierId;
       if (!synchro || !dossierId) return;
-      if (!confirm(`Prendre la main sur « ${titreDe(projet)} » ? ${etat.repris?.nom ?? 'L\'autre appareil'} ne pourra plus envoyer ses modifications, et tes modifications remplaceront les siennes sur Drive.`)) return;
+      if (!(await accordPriseDeMain(etat.repris, `Prendre la main sur « ${titreDe(projet)} » ? ${etat.repris?.nom ?? 'L\'autre appareil'} ne pourra plus envoyer ses modifications, et tes modifications remplaceront les siennes sur Drive.`))) return;
       try {
         await synchro.prendreVerrou(dossierId);
         etat.repris = null;
