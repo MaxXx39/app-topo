@@ -2,10 +2,10 @@
 
 ## Utilisateur et manière de travailler
 - Géomètre topo suisse, **débutant en développement**. Répondre **en français**, simplement, sans jargon (définir un terme technique en une phrase).
-- Poser des questions **avant** une décision importante ou ambiguë. Ne **jamais deviner** une formule ou une norme de topo : le dire et faire valider.
-- Une fonctionnalité à la fois. Ensuite : lancer les tests, expliquer, dire comment l'essayer, proposer la suite.
+- Poser **toujours** des questions **avant** une décision importante ou ambiguë. Ne **jamais deviner** une formule ou une norme de topo : le dire et faire valider.
+- Fonctionnalité : lancer les tests, expliquer, dire comment l'essayer, proposer la suite.
 - Tout se fait dans le cloud ; l'utilisateur n'utilise que navigateur / tablette.
-- **Git** : commit en français après chaque fonctionnalité qui marche. **Ne jamais pousser ni publier sans demande** (chaque push fabrique l'APK « dernière version »). Ne jamais demander mot de passe ni jeton dans le chat. Aucun identifiant de modèle dans commits / PR.
+- **Git** : commit en français après chaque fonctionnalité qui marche. Ne jamais demander mot de passe ni jeton dans le chat. Aucun identifiant de modèle dans commits / PR.
 - Avant d'ajouter une bibliothèque : dire ce qu'elle fait, pourquoi, demander l'accord.
 
 ## Stack
@@ -70,3 +70,8 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - DWG non pris en charge (enregistrer en DXF).
 - Google Cloud en mode Test (réautorisation environ tous les 7 jours) : publier l'écran de consentement si besoin.
 - Pull request n° 35 (0.53.1 à 0.56.1) à fusionner par l'utilisateur.
+
+**À développer**
+- Essai de 2 RX2 pour guidage d'engin type grader sur la même tablette (2 NTRIP ? 2 connexions Bluetooth ?).
+- Mode « dessin » pour dessiner des plateformes ou bâtiments directement dans l'appli.
+- Configurer la tablette / téléphone sur 2 modes au choix : Base ou Confirmé ; lister l'ensemble des fonctionnalités et les ranger dans le bon mode.
