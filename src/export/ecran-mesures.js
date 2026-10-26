@@ -8,6 +8,7 @@ import { telecharger, dateSuisse } from './ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { champsCartouche, lireCartouche } from './cartouche.js';
+import { brancherChoixExport } from './choix-export.js';
 
 // Cases du PDF des mesures : [clé, texte, cochée au départ].
 const CALQUES = [
@@ -22,14 +23,16 @@ const CALQUES = [
 
 /**
  * Crée le formulaire d'export des mesures dans "conteneur".
- * - obtenirDonnees() : { mesures: [{ mesure, resultat }] (mesures calculées du levé affiché),
+ * - obtenirGroupes() : liste à cocher « Quoi exporter ? » (métrés, mesures ; voir choix-export.js) ;
+ * - obtenirDonnees(selection : Set des ids cochés) : { mesures: [{ mesure, resultat }] (mesures cochées),
  *   points, fichierPoints, cartouche: { affaire, lieu } du projet }
  */
-export function creerEcranExportMesures(conteneur, { obtenirDonnees }) {
+export function creerEcranExportMesures(conteneur, { obtenirGroupes, obtenirDonnees: donneesChoisies }) {
   // Fermé au départ : on l'ouvre avec « Exporter les mesures » (l'écran reste simple).
   conteneur.innerHTML = `
     <details class="export-repliable">
     <summary>${titreSection('exporter', 'Exporter les mesures', bulle('exporterMesures'))}</summary>
+    <div data-zone="choix"></div>
     <div class="champs-export">
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">
@@ -54,6 +57,9 @@ export function creerEcranExportMesures(conteneur, { obtenirDonnees }) {
     </details>
   `;
   const message = conteneur.querySelector('[data-zone="message"]');
+  const choix = brancherChoixExport(conteneur.querySelector('[data-zone="choix"]'), obtenirGroupes);
+  // Ce qui est exporté : seulement ce qui est coché dans « Quoi exporter ? ».
+  const obtenirDonnees = () => donneesChoisies(choix.selection());
 
   /** Date du cartouche ('AAAA-MM-JJ') : celle de la case, sinon la date du jour. */
   const dateDuPlan = () => lireCartouche(conteneur).date;

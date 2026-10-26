@@ -20,11 +20,12 @@ import { creerEcranImport } from './import/ecran.js';
 import { creerEcranCoupes } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
 import { creerEcranDessin } from './dessin/ecran.js';
-import { gisement, directionTournee, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt, surfaceDuDessin } from './topo/dessin.js';
+import { gisement, directionTournee, passerParSommet, altitudeProchainSommet, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt, surfaceDuDessin } from './topo/dessin.js';
 import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface } from './topo/coupe.js';
+import { guidageLame, ligneDeCoupeLame, TOLERANCES_LAME } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -67,6 +68,8 @@ import {
   basculerFermeture,
   ligneEnCours,
   resumeStock,
+  supprimerLevee,
+  pointsDeLaLevee,
 } from './topo/leve-direct.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
@@ -76,7 +79,7 @@ import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/regla
 import { sonValidation, sonRefus } from './outils/son.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant } from './topo/noms.js';
 import { demanderChoix } from './outils/choix.js';
@@ -99,7 +102,9 @@ let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, eta
 // Calculs › Dessin : dessin en cours avec l'outil « pilote » (voir dessin/ecran.js), ou null :
 // { dessinId, accroche (objet pris en touchant : 'point', 'sommet', 'milieu', 'ligne', 'centre', voir
 // topo/accroche.js), direction (gisement en gon, ou null), distance (texte tapé), reference (d'où
-// vient la direction : « vers b3 », « 90° à droite »…), angle (texte tapé, en degrés), sens }.
+// vient la direction : « vers b3 », « 30° à droite »…), angle (texte tapé, en degrés), tourne (degrés
+// tournés depuis le prolongement du côté précédent, + = à droite : chaque clic ajoute l'angle),
+// altitude (texte tapé : altitude du prochain sommet) }.
 // Un toucher sur le plan donne le point de départ (aucun sommet), sinon la direction.
 let pilote = null;
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
@@ -108,6 +113,7 @@ const leveDirect = { stockId: null, role: 'contour' };
 // Libellés des noms de points (L-HT-1-3, P-RG-2…), gardés sur l'appareil (voir leve/libelles.js).
 let libelles = lireLibelles();
 let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
+let etatRecepteur2 = null; // dernier état du 2e récepteur (essai à 2 RX2, guidage de lame)
 // Onglet Terrain : mode (Lever ou Contrôler) et réglages du contrôle, retenus sur l'appareil.
 const CLE_TERRAIN = 'topo-terrain';
 const terrain = {
@@ -126,6 +132,8 @@ const terrain = {
   accrocheLigne: 'trait', // implantation d'une ligne : 'trait' (ligne du plan DXF) ou une accroche de point
   // Implantation d'un talus (voir topo/talus.js) : derniers réglages, repris pour le talus suivant.
   talus: { horizontal: null, vertical: null, ligneEst: 'haut', cote: 'droite', longueur: null, terrainId: null, altitudeSurfaceId: null },
+  // Guidage de lame à 2 RX2 (mode Lame, voir topo/lame.js) : surface suivie, gauche / droite inversés, tolérances (m).
+  lame: { surfaceId: null, inverse: false, tolerances: { ...TOLERANCES_LAME } },
   ...lireReglagesTerrain(),
 };
 // Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
@@ -339,6 +347,11 @@ function adapterAuMode() {
   if (estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
   if (terrain.implantation === 'talus') {
     terrain.implantation = 'ligne';
+    retenirReglagesTerrain();
+  }
+  // Guidage de lame : mode Confirmé seulement.
+  if (terrain.mode === 'lame') {
+    terrain.mode = 'lever';
     retenirReglagesTerrain();
   }
 }
@@ -607,7 +620,15 @@ const boutonRecepteur = recepteurDisponible()
       arreterCorrections2,
     })
   : null;
-if (boutonRecepteur && recepteur2Disponible()) ecouterRecepteur2((etat, mode) => boutonRecepteur.mettreAJour2(etat, mode));
+if (boutonRecepteur && recepteur2Disponible()) {
+  ecouterRecepteur2((etat, mode) => {
+    const changeConnexion = Boolean(etat?.connecte) !== Boolean(etatRecepteur2?.connecte);
+    etatRecepteur2 = etat;
+    boutonRecepteur.mettreAJour2(etat, mode);
+    if (changeConnexion && terrain.mode === 'lame') recalculer(); // message « Connecte le 2e RX2 »
+    else montrerLame();
+  });
+}
 
 // Onglet Terrain (téléphone) : flèche sous le plan, plan sur 1/3 ou 1/2 de l'écran (retenu sur l'appareil).
 const CLE_PLAN_TERRAIN = 'topo-plan-terrain-grand';
@@ -635,6 +656,22 @@ const ecranLeve = recepteurDisponible()
         if (!levee) return;
         levee.nom = nom;
         modifie();
+      },
+      // Croix rouge de « Changer » (Confirmé) : le levé et ses points, après confirmation.
+      supprimerLevee: (id) => {
+        const levee = [...projet.surfaces, ...projet.metres, ...projet.autres].find((s) => s.id === id);
+        if (!levee) return false;
+        const nombre = pointsDeLaLevee(projet, id).length;
+        if (!confirm(`Supprimer « ${levee.nom} » et ${nombre} point(s) ?\n\nLa suppression est définitive.`)) return false;
+        const resultat = supprimerLevee(projet, id);
+        if (leveDirect.stockId === id) {
+          leveDirect.stockId = null;
+          reprendreLeveDirect();
+        }
+        editeurSurfaces.charger(projet.surfaces);
+        afficherMessage(`« ${resultat.nom} » supprimé (${resultat.points} point(s))`, 3000);
+        modifie({ recadrer: true });
+        return true;
       },
       choisirStock: (id) => {
         leveDirect.stockId = id;
@@ -710,9 +747,33 @@ const ecranLeve = recepteurDisponible()
         recalculer();
       },
       choisirMode: (mode) => {
-        terrain.mode = ['controler', 'autocontrole'].includes(mode) ? mode : 'lever';
+        const permis = estModeBase() ? ['controler', 'autocontrole'] : ['controler', 'autocontrole', 'lame'];
+        terrain.mode = permis.includes(mode) ? mode : 'lever';
         retenirReglagesTerrain();
         if (terrain.mode === 'controler') montrerSurfaceControle();
+        recalculer();
+      },
+      // --- Guidage de lame (mode Lame) ---
+      choisirSurfaceLame: (id) => {
+        terrain.lame.surfaceId = id || null;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      inverserLame: () => {
+        terrain.lame.inverse = !terrain.lame.inverse;
+        retenirReglagesTerrain();
+        afficherMessage(terrain.lame.inverse ? 'Gauche = récepteur 2, droite = récepteur 1' : 'Gauche = récepteur 1, droite = récepteur 2', 3000);
+        montrerLame();
+      },
+      reglerToleranceLame: (cle, texte) => {
+        const cm = lireNombreTape(texte);
+        if (!(cm > 0)) {
+          afficherMessage('Tolérance illisible : un nombre de centimètres plus grand que 0', 4000);
+          recalculer();
+          return;
+        }
+        terrain.lame.tolerances = { ...terrain.lame.tolerances, [cle]: cm / 100 };
+        retenirReglagesTerrain();
         recalculer();
       },
       choisirImplantation: (quoi) => {
@@ -1215,7 +1276,7 @@ const dessinDe = (id) => projet.dessins.find((d) => d.id === id);
 
 /** Pilote pour dessiner "dessin" : toucher le plan pose un sommet au début, puis donne la direction. */
 function nouveauPilote(dessin) {
-  return { dessinId: dessin.id, accroche: pilote?.accroche ?? 'point', direction: null, distance: '', reference: null, angle: '90', sens: null };
+  return { dessinId: dessin.id, accroche: pilote?.accroche ?? 'point', direction: null, distance: '', reference: null, angle: pilote?.angle ?? '90', tourne: 0, altitude: '' };
 }
 
 const auMillimetre = (valeur) => (valeur == null ? null : Math.round(valeur * 1000) / 1000);
@@ -1224,16 +1285,30 @@ const auMillimetre = (valeur) => (valeur == null ? null : Math.round(valeur * 10
  * Ajoute un sommet au dessin en cours ({ est, nord, altitude }) ; ensuite, la direction du côté
  * suivant est à redonner (tourner, toucher le plan ou RX2), la distance tapée est gardée.
  */
-function ajouterSommetDessin(point) {
+function ajouterSommetDessin(point, nomDepart = null) {
   const dessin = dessinDe(pilote?.dessinId);
   if (!dessin) return;
+  // Le point de départ : son nom (point accroché, « RX2 »), écrit dans la carte du dessin.
+  if (dessin.sommets.length === 0) dessin.nomDepart = nomDepart ?? point.nom ?? null;
   dessin.sommets.push({ est: auMillimetre(point.est), nord: auMillimetre(point.nord), altitude: auMillimetre(point.altitude ?? null) });
   if (dessin.sommets.length >= 2) {
     pilote.direction = null;
     pilote.reference = null;
-    pilote.sens = null;
+    pilote.tourne = 0;
   }
   modifie();
+}
+
+/**
+ * Direction du côté suivant : celle du côté précédent tournée de pilote.tourne degrés (+ = à
+ * droite) ; texte « tout droit », « 30° à droite »… dans pilote.reference.
+ */
+function appliquerTourne(dessin) {
+  const precedent = gisement(dessin.sommets.at(-2), dessin.sommets.at(-1));
+  if (precedent == null) return;
+  const t = pilote.tourne;
+  pilote.direction = directionTournee(precedent, Math.abs(t), t >= 0 ? 'droite' : 'gauche');
+  pilote.reference = t === 0 ? 'tout droit' : `${auMillimetre(Math.abs(t))}° à ${t > 0 ? 'droite' : 'gauche'}`;
 }
 
 /**
@@ -1264,7 +1339,7 @@ function toucherPourDessin(position, tolerance) {
     if (gon == null) return;
     pilote.direction = gon;
     pilote.reference = trouve?.nom ? `vers ${trouve.nom}` : 'touchée sur le plan';
-    pilote.sens = null;
+    pilote.tourne = 0;
     recalculer();
     return;
   }
@@ -1404,21 +1479,31 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     pilote.accroche = MODES_ACCROCHE.includes(mode) ? mode : 'point';
     recalculer();
   },
+  // Chaque clic tourne de l'angle inscrit (cumulé) ; « Tout droit » : dans le prolongement du côté précédent.
   tournerCote: ({ angle, sens }) => {
     const dessin = dessinDe(pilote?.dessinId);
     if (!dessin || dessin.sommets.length < 2) return;
-    const degres = lireNombreTape(angle);
-    if (degres == null || !(degres >= 0 && degres <= 180)) {
-      afficherMessage('Angle illisible : un nombre de degrés entre 0 et 180 (90 = d\'équerre)', 4000);
-      return;
+    if (sens === 'droit') pilote.tourne = 0;
+    else {
+      const degres = lireNombreTape(angle);
+      if (degres == null || !(degres > 0 && degres <= 180)) {
+        afficherMessage('Angle illisible : un nombre de degrés entre 0 et 180 (90 = d\'équerre)', 4000);
+        return;
+      }
+      pilote.angle = String(angle).trim();
+      // On part de la direction actuelle (tournée, touchée sur le plan ou vers le RX2), sinon du
+      // prolongement du côté précédent ; « tourne » est compté depuis ce prolongement, entre −180° et +180°.
+      const precedent = gisement(dessin.sommets.at(-2), dessin.sommets.at(-1));
+      const depuis = pilote.direction == null || precedent == null ? 0 : ((pilote.direction - precedent) * 360) / 400;
+      const total = depuis + (sens === 'droite' ? degres : -degres);
+      pilote.tourne = ((((total + 180) % 360) + 360) % 360) - 180;
     }
-    const precedent = gisement(dessin.sommets.at(-2), dessin.sommets.at(-1));
-    if (precedent == null) return;
-    pilote.angle = String(angle).trim();
-    pilote.sens = sens;
-    pilote.direction = directionTournee(precedent, degres, sens);
-    pilote.reference = `${degres}° à ${sens}`;
+    appliquerTourne(dessin);
     recalculer();
+  },
+  // Altitude du prochain sommet (tapée à côté de la distance).
+  reglerAltitudePilote: (texte) => {
+    if (pilote) pilote.altitude = texte.trim();
   },
   reglerDistance: (texte) => {
     if (!pilote || pilote.distance === texte.trim()) return;
@@ -1437,7 +1522,14 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
       afficherMessage('Distance illisible : un nombre de mètres plus grand que 0', 4000);
       return;
     }
-    ajouterSommetDessin({ ...pointSelonGisement(dessin.sommets.at(-1), pilote.direction, distance), altitude: null });
+    const tapee = lireNombreTape(pilote.altitude);
+    if (tapee === undefined) {
+      afficherMessage('Altitude illisible : écris un nombre, ou laisse vide', 4000);
+      return;
+    }
+    const altitude = altitudeProchainSommet(dessin, tapee);
+    pilote.altitude = '';
+    ajouterSommetDessin({ ...pointSelonGisement(dessin.sommets.at(-1), pilote.direction, distance), altitude });
   },
   sommetRx2: () => {
     const reponse = prendrePointRecepteur();
@@ -1446,7 +1538,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
       return;
     }
     sonValidation();
-    ajouterSommetDessin(reponse.point);
+    ajouterSommetDessin(reponse.point, 'RX2');
   },
   directionRx2: () => {
     const dessin = dessinDe(pilote?.dessinId);
@@ -1463,7 +1555,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     sonValidation();
     pilote.direction = gon;
     pilote.reference = 'vers le RX2';
-    pilote.sens = null;
+    pilote.tourne = 0;
     recalculer();
   },
   rectangleDessin: ({ longueur, largeur, cote }) => {
@@ -1491,7 +1583,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     dessin.sommets.pop();
     pilote.direction = null;
     pilote.reference = null;
-    pilote.sens = null;
+    pilote.tourne = 0;
     modifie();
   },
   choisirModeHauteur: (valeur) => {
@@ -1519,18 +1611,72 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     else h.pente = valeur ? { cote: h.pente?.cote ?? 0, depuis: h.pente?.depuis ?? 0, pourcent: valeur } : null;
     modifie();
   },
+  // Altitude d'un sommet changée dans « Voir les sommets » : le dessin passe « par sommet ».
   altitudeSommet: (id, numero, texte) => {
-    const sommet = dessinDe(id)?.sommets[numero];
+    const dessin = dessinDe(id);
     const valeur = lireNombreTape(texte);
-    if (!sommet) return;
+    if (!dessin?.sommets[numero]) return;
     if (valeur === undefined) {
       afficherMessage(`Altitude du sommet ${numero + 1} illisible : écris un nombre, ou laisse vide`, 4000);
       return;
     }
-    sommet.altitude = valeur;
+    passerParSommet(dessin);
+    dessin.sommets[numero].altitude = valeur;
     modifie();
   },
 });
+
+// --- Guidage de lame à 2 RX2 (Terrain › Lame, voir topo/lame.js et leve/lame-ecran.js) ---
+
+// Recherche rapide de l'altitude de la surface suivie (refaite quand ses triangles changent).
+let chercheurLame = { triangles: null, chercher: null };
+
+/** Pourquoi un récepteur ne peut pas guider (texte), ou null s'il est prêt (RTK fixe, inclinaison prête). */
+function raisonRecepteurLame(etat, nom) {
+  if (!etat?.connecte) return `${nom} : pas connecté`;
+  if (!etat.recu || !etat.position) return `${nom} : en attente de la position`;
+  if (!etat.autorise) return `${nom} : ${etat.raison ?? 'position pas fiable'}`;
+  return null;
+}
+
+/**
+ * Guidage de la lame avec les 2 derniers états reçus : { raison (texte ou null), guidage, coupe,
+ * coins: { gauche, droite } (positions, pour le plan) }, ou null hors du mode Lame.
+ */
+function calculerLame() {
+  if (!ecranLeve || terrain.mode !== 'lame' || estModeBase()) return null;
+  const [etatG, etatD] = terrain.lame.inverse ? [etatRecepteur2, etatRecepteur] : [etatRecepteur, etatRecepteur2];
+  const [nomG, nomD] = terrain.lame.inverse ? ['Gauche (récepteur 2)', 'Droite (récepteur 1)'] : ['Gauche (récepteur 1)', 'Droite (récepteur 2)'];
+  const coins = etatG?.position && etatD?.position ? { gauche: etatG.position, droite: etatD.position } : null;
+  const surface = projet.surfaces.find((s) => s.id === terrain.lame.surfaceId);
+  const triangles = surface ? trianglesDeSurface(surface.id) : [];
+  const raison = (!surface && 'Choisis la surface à suivre')
+    || (triangles.length === 0 && 'Cette surface n\'a pas encore de triangles')
+    || raisonRecepteurLame(etatG, nomG)
+    || raisonRecepteurLame(etatD, nomD);
+  if (raison) return { raison, guidage: null, coupe: null, coins };
+  if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
+  const guidage = guidageLame({ gauche: coins.gauche, droite: coins.droite, altitudeSurface: chercheurLame.chercher, tolerances: terrain.lame.tolerances });
+  if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coupe: null, coins };
+  const ligne = ligneDeCoupeLame(coins.gauche, coins.droite, 1);
+  const coupe = {
+    longueur: guidage.largeur + 2,
+    profils: profilSurface(triangles, ligne.debut, ligne.fin),
+    gauche: { distance: 1, altitude: coins.gauche.altitude },
+    droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
+  };
+  return { raison: null, guidage, coupe, coins };
+}
+
+/** Écran Lame et lame sur le plan, avec les derniers états des 2 récepteurs. */
+function montrerLame() {
+  const lame = calculerLame();
+  if (lame) ecranLeve.mettreAJourLame(lame);
+  const surPlan = lame?.coins && ongletContexte === 'terrain'
+    ? { ...lame.coins, classeGauche: lame.guidage?.gauche.classe ?? null, classeDroite: lame.guidage?.droite.classe ?? null }
+    : null;
+  plan.afficherLame(surPlan);
+}
 
 /** Vrai pendant l'autocontrôle (Terrain › Contrôle). */
 function enAutocontrole() {
@@ -2460,6 +2606,14 @@ function donneesCommunes() {
     libelleAire: terrain.libelleAire,
     mode: terrain.mode,
     controle: terrain,
+    // Mode Lame : surfaces (terrassement d'abord), surface suivie, tolérances, 2e RX2 connecté ?
+    lame: {
+      surfaces: [...projet.surfaces].sort((a, b) => Number(b.nature === 'terrassement') - Number(a.nature === 'terrassement')).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
+      surfaceId: terrain.lame.surfaceId,
+      inverse: terrain.lame.inverse,
+      tolerances: terrain.lame.tolerances,
+      recepteur2: Boolean(etatRecepteur2?.connecte),
+    },
     autocontrole: donneesAutocontrole(),
     surfaces: projet.surfaces.map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
     implanter: {
@@ -2624,6 +2778,7 @@ if (recepteurDisponible()) {
     const implantationLigne = enLigne && !talus ? calculerImplantationLigne(etat) : null;
     const implantationTalus = talus ? calculerImplantationTalus(etat) : null;
     ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation, implantationLigne, implantationTalus });
+    montrerLame();
     const position = etat.connecte && etat.recu ? etat.position : null;
     // Coupes affichées (mode Implanter) : leur trait en pointillés sur le plan.
     const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
@@ -2967,20 +3122,27 @@ const ecranMesures = creerEcranMesures(document.querySelector('#mesures'), docum
   },
 });
 
-/** Mesures du levé affiché, avec leur résultat : [{ mesure, resultat }]. */
-function mesuresAffichees() {
-  const leve = leveActif(projet);
-  return projet.mesures.filter((m) => m.leveId === leve?.id).map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }));
-}
-
 // Export des mesures : à part de celui des volumes (aucun volume dedans).
+/** Vrai si cette liste (surface, métré, dessin, levé…) est cochée dans « Afficher ». */
+const estAffichee = (id) => !(projet.listesCachees ?? []).includes(id);
+
 creerEcranExportMesures(document.querySelector('#export-mesures'), {
-  obtenirDonnees: () => {
-    const leve = leveActif(projet);
+  // « Quoi exporter ? » : chaque métré, et chaque mesure faite à la main ; cochés comme « Afficher ».
+  obtenirGroupes: () => [
+    { titre: 'Métrés', elements: projet.metres.map((m) => ({ id: m.id, nom: m.nom, defaut: estAffichee(m.id) })) },
+    { titre: 'Mesures', elements: projet.mesures.filter((m) => !m.metreId).map((m) => ({ id: m.id, nom: m.nom, defaut: estAffichee(LISTE_MESURES) })) },
+  ],
+  obtenirDonnees: (selection) => {
+    const mesures = projet.mesures
+      .filter((m) => selection.has(m.metreId ?? m.id))
+      .map((mesure) => ({ mesure, resultat: resultatsMesures.get(mesure.id) }))
+      .filter(({ resultat }) => resultat && !resultat.erreurs);
+    // Les points des levés de ces mesures.
+    const leves = projet.leves.filter((l) => mesures.some(({ mesure }) => mesure.leveId === l.id));
     return {
-      mesures: mesuresAffichees().filter(({ resultat }) => resultat && !resultat.erreurs),
-      points: leve?.points ?? [],
-      fichierPoints: leve?.nom ?? '',
+      mesures,
+      points: leves.flatMap((l) => l.points),
+      fichierPoints: leves.map((l) => l.nom).join(', '),
       cartouche: projet.cartouche,
     };
   },
@@ -2994,25 +3156,46 @@ function calculsReussis() {
 }
 
 creerEcranExport(document.querySelector('#export'), {
-  obtenirDonnees: () => {
-    const leve = leveActif(projet);
+  // « Quoi exporter ? » : volumes, surfaces (par nature), dessins, listes de points ; cochés comme « Afficher ».
+  obtenirGroupes: () => {
+    const surfacesDe = (natures) => projet.surfaces.filter((s) => natures.includes(s.nature ?? 'stock')).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
+    return [
+      { titre: 'Volumes', elements: projet.calculs.map((c) => ({ id: c.id, nom: nomDuCalcul(c, projet.surfaces), defaut: estAffichee(c.surface1Id) })) },
+      { titre: 'Stocks', elements: surfacesDe(['stock']) },
+      { titre: 'Terrain naturel', elements: surfacesDe(['terrain']) },
+      { titre: 'Terrassement', elements: surfacesDe(['terrassement']) },
+      { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
+      {
+        titre: 'Listes de points',
+        elements: projet.leves.map((l) => ({
+          id: l.id,
+          nom: l.nom,
+          // Levé du récepteur : coché si c'est le levé affiché ; fichier importé : comme « Afficher ».
+          defaut: estLeveDirect(l) ? l.id === projet.leveActifId : estAffichee(l.id),
+        })),
+      },
+    ];
+  },
+  obtenirDonnees: (selection) => {
+    const leves = projet.leves.filter((l) => selection.has(l.id));
+    const choisi = ({ calcul }) => selection.has(calcul.id);
     const surfaceDe = (id) => projet.surfaces.find((s) => s.id === id);
     const nom = (calcul) => nomDuCalcul(calcul, projet.surfaces);
     // Feuille principale du PDF : calculs sur toute la surface 1 ; les calculs limités au
     // contour d'une surface ont chacun leur feuille.
     const dansUnContour = ({ calcul }) => !calcul.uneSeule && calcul.zone?.type === 'surface';
-    const principaux = calculsReussis().filter((c) => !dansUnContour(c));
-    const affichees = surfacesAffichees();
+    const principaux = calculsReussis().filter((c) => choisi(c) && !dansUnContour(c));
+    const affichees = projet.surfaces.filter((s) => selection.has(s.id));
     const creees = affichees.filter((s) => !estImportee(s));
     return {
       nomProjet: titreProjet(projet),
       stocks: principaux.map(({ calcul }) => ({ ...surfaceDe(calcul.surface1Id), nom: nom(calcul), description: descriptionCalcul(calcul, projet.surfaces) })),
       resultats: principaux.map(({ resultat }) => resultat),
       comparaisons: calculsReussis()
-        .filter(dansUnContour)
+        .filter((c) => choisi(c) && dansUnContour(c))
         .map(({ calcul, resultat }) => ({ nom: nom(calcul), description: descriptionCalcul(calcul, projet.surfaces), resultat })),
-      volumes: projet.calculs.map((calcul) => ({ nom: nom(calcul), base: texteBase(calcul, projet.surfaces), resultat: resultatsCalculs.get(calcul.id) })),
-      // DXF et LandXML : les surfaces affichées, avec ou sans volume.
+      volumes: projet.calculs.filter((c) => selection.has(c.id)).map((calcul) => ({ nom: nom(calcul), base: texteBase(calcul, projet.surfaces), resultat: resultatsCalculs.get(calcul.id) })),
+      // DXF et LandXML : les surfaces cochées, avec ou sans volume.
       dessinSurfaces: {
         stocks: creees,
         resultats: creees.map((s) => ({ trianglesDessus: trianglesDeSurface(s.id) })),
@@ -3021,14 +3204,14 @@ creerEcranExport(document.querySelector('#export'), {
           .map((s) => ({ nom: s.nom, triangles: trianglesDeSurface(s.id) }))
           .filter((s) => s.triangles.length > 0),
       },
-      points: leve?.points ?? [],
-      fichierPoints: leve?.nom ?? '',
-      // Dessins (Calculs › Dessin) cochés dans « Afficher » : DXF (calque DESSINS) et PDF.
-      dessins: dessinsVisibles()
-        .filter((d) => d.sommets.length > 0)
+      points: leves.flatMap((l) => l.points),
+      fichierPoints: leves.map((l) => l.nom).join(', '),
+      // Dessins (Calculs › Dessin) cochés : DXF (calque DESSINS) et PDF.
+      dessins: projet.dessins
+        .filter((d) => selection.has(d.id) && d.sommets.length > 0)
         .map((d) => ({ ferme: estFerme(d), lignes: d.type !== 'points', points: pointsDuDessin(d, projet.dessins) })),
-      // Photos des surfaces affichées (case « Photos » de l'export).
-      photos: surfacesAffichees().flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom }))),
+      // Photos des surfaces cochées (case « Photos » de l'export).
+      photos: affichees.flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom }))),
       cartouche: projet.cartouche,
       // Coupes cochées « dans le PDF », avec les profils des surfaces traversées.
       coupes: projet.coupes
@@ -3099,14 +3282,21 @@ function recalculer({ recadrer = false } = {}) {
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
   const dansSurfaces = ongletContexte === 'surfaces';
-  const enModification = ongletContexte === 'mesures' || editeurSurfaces.enModification();
+  // Calculs › Mesures : hors modification, les points des listes cochées (comme ailleurs) ; pendant la
+  // modification d'une mesure, ceux de son levé (ce sont eux qu'on touche pour les ajouter).
+  const enModification = (ongletContexte === 'mesures' && ecranMesures.enModification()) || editeurSurfaces.enModification();
   const cacheesParListe = new Set(listes.filter((l) => !l.visible).map((l) => l.id));
   const visibles = new Set(editeurSurfaces.enModification() ? surfacesAffichees() : projet.surfaces.filter((s) => !cacheesParListe.has(s.id)));
   // Une surface importée montre ses propres points ; sinon, ceux du levé ou des listes cochées.
   let pointsDuPlan;
   if (dansSurfaces && active && estImportee(active)) pointsDuPlan = active.points;
   else if (enModification) pointsDuPlan = points;
-  else pointsDuPlan = pointsStables(pointsDesListes(projet, listes));
+  else if (ongletContexte === 'mesures') {
+    // Mesures : les listes cochées, plus le levé affiché (les mesures sont faites sur ses points).
+    const desListes = pointsDesListes(projet, listes);
+    const dejaLa = new Set(desListes);
+    pointsDuPlan = pointsStables([...desListes, ...points.filter((p) => !dejaLa.has(p))]);
+  } else pointsDuPlan = pointsStables(pointsDesListes(projet, listes));
   // Ce qui est coché (calques, « Afficher ») vaut dans tous les onglets.
   const dessinDuPlan = {
     ...editeurSurfaces.obtenirDessin(),

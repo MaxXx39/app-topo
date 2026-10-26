@@ -4236,6 +4236,11 @@ body.mode-telephone .onglets button svg {
   color: #dc2626;
 }
 
+.bascule-terrain button[data-valeur='lame'] {
+  --couleur-mode: #1d4ed8;
+  color: #1d4ed8;
+}
+
 .bascule-terrain button.actif {
   background: var(--couleur-mode);
   color: #ffffff;
@@ -4893,6 +4898,10 @@ button.bouton-import {
   border-color: #dc2626;
 }
 
+.panneau[data-onglet='terrain']:has(.cadre-mode-lame) {
+  border-color: #1d4ed8;
+}
+
 /* Flèche sous le plan (téléphone, onglet Terrain) : plan sur 1/3 ou sur 1/2 de l'écran. */
 .bouton-taille-plan {
   display: none;
@@ -5362,6 +5371,58 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 
 .boutons-choix .bouton strong {
   font-size: 1.1rem;
+}
+
+/* Fenêtre « Changer » (Terrain › Lever) : un levé par ligne, à la couleur de sa nature, croix rouge (Confirmé). */
+.liste-levees {
+  display: grid;
+  gap: 8px;
+  max-height: 60svh;
+  margin-bottom: 10px;
+  overflow-y: auto;
+}
+
+.ligne-levee {
+  --couleur-nature: #b45309;
+  display: flex;
+  gap: 6px;
+}
+
+.ligne-levee.nature-terrain { --couleur-nature: #15803d; }
+.ligne-levee.nature-terrassement { --couleur-nature: #2563eb; }
+.ligne-levee.nature-metre { --couleur-nature: #0891b2; }
+.ligne-levee.nature-autres { --couleur-nature: #475569; }
+
+.choisir-levee {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.choisir-levee strong {
+  color: var(--couleur-nature);
+}
+
+.choisir-levee.bouton strong {
+  color: inherit;
+}
+
+.choisir-levee span {
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.croix-levee {
+  width: 44px;
+  border: 1.5px solid #dc2626;
+  border-radius: 8px;
+  background: var(--surface);
+  color: #dc2626;
+  font-size: 1.2rem;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 /* Gestion de projets : tri Récents / A → Z. */
@@ -6418,7 +6479,7 @@ body.mode-base .parties-calculs {
 
 .carte-dessin {
   margin-bottom: 12px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--bordure);
   border-left: 5px solid #7c3aed;
   border-radius: var(--rayon);
@@ -6430,77 +6491,119 @@ body.mode-base .parties-calculs {
   border-color: #7c3aed;
 }
 
+/* En-tête compact (0.68.0) : ← retour, nom, résumé sur une ligne. */
 .entete-dessin {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-}
-
-.type-dessin {
-  color: #7c3aed;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  gap: 4px 8px;
 }
 
 .nom-dessin {
-  flex: 1;
+  flex: 1 1 120px;
   min-width: 0;
+  min-height: 34px;
   font-weight: 700;
 }
 
-.pilote-dessin {
-  margin: 8px 0;
-  padding: 10px;
-  border-radius: 10px;
-  background: color-mix(in srgb, #7c3aed 7%, var(--surface));
+.resume-dessin {
+  color: var(--gris);
+  font-size: 0.8rem;
 }
 
-/* Étape du pilote en évidence : « Point de départ », « Direction du 1er côté », « Côté 3 ». */
-.etape-pilote {
-  margin: 0 0 2px;
-  color: #5b21b6;
-  font-size: 1.25rem;
-  font-weight: 800;
-}
-
-.etape-pilote + .aide {
-  margin: 0 0 8px;
-}
-
-/* « ← Retour » : sur téléphone, les onglets sont cachés pendant le dessin. */
+/* « ← » : sur téléphone, les onglets sont cachés pendant le dessin. */
 .bouton-retour-dessin {
-  margin: 0 0 6px;
-  padding: 4px 10px;
+  min-width: 38px;
+  min-height: 34px;
   border: 1px solid #7c3aed;
   border-radius: 8px;
   background: var(--surface);
   color: #5b21b6;
-  font-weight: 700;
+  font-size: 1.1rem;
+  font-weight: 800;
   cursor: pointer;
 }
 
-.tourner-dessin {
+/* Altitude du dessin sur une ligne : Fixe / Par sommet, altitude, pente (et côté, sommet). */
+.hauteur-dessin {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: 8px 0;
+  gap: 6px;
+  margin-top: 6px;
 }
 
-.tourner-dessin label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.titre-hauteur {
+  color: var(--gris);
+  font-size: 0.85rem;
   font-weight: 700;
 }
 
+.hauteur-dessin input {
+  width: 96px;
+  min-height: 34px;
+}
+
+.hauteur-dessin input.champ-pente {
+  width: 74px;
+}
+
+.hauteur-dessin select {
+  min-height: 34px;
+}
+
+.depart-dessin {
+  margin: 6px 0 0;
+  color: #5b21b6;
+  font-size: 0.85rem;
+}
+
+.pilote-dessin {
+  margin: 6px 0;
+  padding: 8px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #7c3aed 7%, var(--surface));
+}
+
+/* Étape du pilote en évidence : « Point de départ », « Direction du 1er côté », « Côté 3 »,
+   suivie de la direction choisie (« ✓ 30° à droite »). */
+.etape-pilote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0 0 6px;
+  color: #5b21b6;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.direction-choisie {
+  color: #15803d;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.tourner-dessin,
+.direction-distance,
+.rectangle-dessin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+}
+
 .tourner-dessin input {
-  width: 70px;
+  width: 64px;
   min-height: 38px;
   font-size: 1.05rem;
   text-align: right;
+}
+
+.tourner-dessin .bouton-secondaire {
+  min-width: 44px;
+  font-size: 1.05rem;
 }
 
 .tourner-dessin .bouton-secondaire.actif {
@@ -6509,10 +6612,10 @@ body.mode-base .parties-calculs {
   color: #ffffff;
 }
 
-.direction-choisie {
-  align-self: center;
-  color: #15803d;
-  font-weight: 700;
+.direction-distance input {
+  width: 110px;
+  min-height: 38px;
+  font-size: 1.05rem;
 }
 
 .rectangle-dessin summary {
@@ -6521,37 +6624,16 @@ body.mode-base .parties-calculs {
   cursor: pointer;
 }
 
-.direction-distance,
-.rectangle-dessin,
-.champs-hauteur {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 8px;
-  margin: 8px 0;
-}
-
-.direction-distance label,
-.rectangle-dessin label,
-.champs-hauteur label {
+.rectangle-dessin label {
   display: flex;
   flex-direction: column;
   font-size: 0.8rem;
   color: var(--gris);
 }
 
-.direction-distance input,
-.rectangle-dessin input,
-.champs-hauteur input {
-  width: 110px;
+.rectangle-dessin input {
+  width: 100px;
   min-height: 38px;
-  font-size: 1.05rem;
-}
-
-.hauteur-dessin {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--bordure);
 }
 
 .altitude-sommet {
@@ -6579,6 +6661,19 @@ body.mode-base .parties-calculs {
   fill: #ffffff;
   stroke: #7c3aed;
   stroke-width: 2;
+}
+
+.plan .depart-dessin {
+  fill: #7c3aed;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.plan .numero-dessin.texte-depart {
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
 }
 
 .plan .sommet-dessin.actif {
@@ -6693,4 +6788,190 @@ body.mode-base .parties-calculs {
 /* Mode téléphone : le gros bouton PRENDRE LE POINT / ENREGISTRER, 25 % plus petit. */
 body.mode-telephone .bouton.bouton-prendre {
   min-height: 40px;
+}
+
+/* Barre « Envoyer » après un export (0.69.0), au-dessus des onglets. */
+#barre-envoi {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--hauteur-onglets) + 12px);
+  left: 12px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 12px;
+  border-radius: var(--rayon);
+  background: var(--sombre);
+  color: #ffffff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+#barre-envoi[hidden] {
+  display: none;
+}
+
+#barre-envoi span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#barre-envoi .bouton-lien {
+  color: #ffffff;
+}
+
+/* « Quoi exporter ? » (0.69.0) : une case par ligne, rangées par catégories. */
+.choix-export {
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+}
+
+.choix-export summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.choix-export .case {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0;
+}
+
+/* Terrain › Lame (0.70.0) : surface suivie, écart à chaque coin en grand, dévers, coupe. */
+.ligne-lame {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ligne-lame select {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.reglages-lame {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.reglages-lame input {
+  width: 60px;
+}
+
+.raison-lame {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 700;
+}
+
+.coins-lame {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.coin-lame {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--fond);
+  text-align: center;
+}
+
+.coin-lame .titre-coin {
+  color: var(--gris);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.coin-lame strong {
+  font-size: 1.5rem;
+}
+
+.coin-lame.ecart-vert { background: #dcfce7; color: #166534; }
+.coin-lame.ecart-orange { background: #ffedd5; color: #9a3412; }
+.coin-lame.ecart-rouge { background: #fee2e2; color: #991b1b; }
+
+.devers-lame {
+  margin: 8px 0;
+  text-align: center;
+}
+
+.svg-coupe-lame {
+  display: block;
+  width: 100%;
+  max-height: 160px;
+  border-radius: 10px;
+  background: var(--fond);
+}
+
+.svg-coupe-lame .surface-coupe-lame {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 2.5;
+}
+
+.svg-coupe-lame .lame-coupe {
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.svg-coupe-lame .lame-vert { stroke: #16a34a; }
+.svg-coupe-lame .lame-orange { stroke: #ea580c; }
+.svg-coupe-lame .lame-rouge { stroke: #dc2626; }
+
+.svg-coupe-lame .coin-coupe-lame {
+  fill: #1d4ed8;
+}
+
+.svg-coupe-lame text {
+  fill: var(--texte);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.svg-coupe-lame .note-coupe-lame {
+  fill: var(--gris);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+/* Lame sur le plan : trait bleu épais, coins G / D de la couleur de leur écart. */
+.plan .trait-lame {
+  stroke: #1d4ed8;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.plan .coin-lame-plan {
+  fill: #1d4ed8;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.plan .coin-lame-plan.ecart-vert { fill: #16a34a; }
+.plan .coin-lame-plan.ecart-orange { fill: #ea580c; }
+.plan .coin-lame-plan.ecart-rouge { fill: #dc2626; }
+
+.plan .lettre-lame {
+  fill: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  pointer-events: none;
 }

@@ -569,6 +569,30 @@ class EcranPrincipal : Activity() {
 
     /** Demande où enregistrer le fichier (Téléchargements, Google Drive…), puis y écrit [contenu]. */
     @Suppress("DEPRECATION")
+    /**
+     * « Envoyer » : le fichier est écrit dans le cache (dossier « partage », vidé avant), puis le
+     * partage d'Android s'ouvre ; l'appli choisie a le droit de le lire (voir FichiersPartages).
+     */
+    fun partagerFichier(nom: String, type: String, contenu: ByteArray) {
+        // Nom sans dossier ni caractère gênant (il sert d'adresse au fichier).
+        val nomPropre = nom.replace(Regex("[^\\w.\\- ]"), "_").ifBlank { "export" }
+        val dossier = FichiersPartages.dossier(this)
+        dossier.deleteRecursively()
+        dossier.mkdirs()
+        java.io.File(dossier, nomPropre).writeBytes(contenu)
+        val envoi = Intent(Intent.ACTION_SEND).apply {
+            this.type = type.substringBefore(';').trim().ifEmpty { "application/octet-stream" }
+            putExtra(Intent.EXTRA_STREAM, FichiersPartages.adresse(nomPropre))
+            putExtra(Intent.EXTRA_SUBJECT, nomPropre)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            startActivity(Intent.createChooser(envoi, "Envoyer $nomPropre"))
+        } catch (erreur: ActivityNotFoundException) {
+            message("Aucune appli pour envoyer ce fichier.")
+        }
+    }
+
     fun enregistrerFichier(nom: String, type: String, contenu: ByteArray) {
         contenuAEnregistrer = contenu
         val intention = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {

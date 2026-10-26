@@ -469,6 +469,26 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
+  // Lame suivie (Terrain › Lame), ou null.
+  let lame = null;
+
+  /** Lame sur le plan : trait épais entre les coins, chaque coin de la couleur de son écart, G et D. */
+  function dessinerLame() {
+    svg.querySelector('g.lame-plan')?.remove();
+    if (!lame || !vue) return;
+    const g = versEcran(lame.gauche.est, lame.gauche.nord, vue);
+    const d = versEcran(lame.droite.est, lame.droite.nord, vue);
+    const groupe = creerElement('g', { class: 'lame-plan' });
+    groupe.append(creerElement('line', { x1: g.x, y1: g.y, x2: d.x, y2: d.y, class: 'trait-lame' }));
+    for (const [p, classe, lettre] of [[g, lame.classeGauche, 'G'], [d, lame.classeDroite, 'D']]) {
+      groupe.append(creerElement('circle', { cx: p.x, cy: p.y, r: 8, class: `coin-lame-plan ${classe ? `ecart-${classe}` : ''}` }));
+      const texte = creerElement('text', { x: p.x, y: p.y + 4, 'text-anchor': 'middle', class: 'lettre-lame' });
+      texte.textContent = lettre;
+      groupe.append(texte);
+    }
+    svg.append(groupe);
+  }
+
   /**
    * Position du récepteur : rond bleu (gris si l'inclinaison n'est pas prête : c'est alors
    * la position de l'antenne, pas celle du bout de canne). Redessinée seule, 5 fois par seconde.
@@ -476,6 +496,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function dessinerPosition() {
     if (geste) return; // redessinée à la fin du geste
     svg.querySelector('g.position')?.remove();
+    dessinerLame();
     if (!position || !vue) return;
     const { x, y } = versEcran(position.est, position.nord, vue);
     const groupe = creerElement('g', { class: position.prete ? 'position' : 'position pas-prete' });
@@ -1523,6 +1544,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (position && suivi === 'cap' && position.azimut != null && vue && Math.abs(ecartAngle(position.azimut, vue.rotation ?? 0)) > 3) tournerVers(position.azimut);
       else if (position && (!vue || (suivi !== 'libre' && loinDuCentre()) || (premiere && points.length === 0))) centrerSurPosition();
       else dessinerPosition();
+    },
+    /**
+     * Lame (Terrain › Lame, 2 RX2) : { gauche, droite } (positions des coins), classeGauche,
+     * classeDroite ('vert', 'orange', 'rouge' ou null) ; null pour la cacher.
+     */
+    afficherLame(nouvelleLame) {
+      lame = nouvelleLame;
+      dessinerPosition();
     },
     /** Listes de points du menu « Points » (voir listes-points.js). */
     afficherListesPoints(listes) {

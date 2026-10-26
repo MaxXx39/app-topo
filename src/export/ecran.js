@@ -10,6 +10,8 @@ import { titreSection } from '../outils/section.js';
 import { champsCartouche, lireCartouche } from './cartouche.js';
 import { PALIERS } from '../plan/ecarts.js';
 import { estDansAppliAndroid, enregistrerDansAndroid } from '../android/pont.js';
+import { proposerEnvoi } from './partager.js';
+import { brancherChoixExport } from './choix-export.js';
 
 // Cases du PDF : [clé, texte, cochée au départ]. « Photos » (celles des surfaces) en dernier.
 const CALQUES = [
@@ -30,17 +32,19 @@ const COULEURS = [
 
 /**
  * Crée le formulaire d'export dans "conteneur".
- * - obtenirDonnees() : { nomProjet, stocks, resultats, comparaisons, volumes, dessinSurfaces, points, fichierPoints, photos, cartouche, coupes }
+ * - obtenirGroupes() : liste à cocher « Quoi exporter ? » (voir choix-export.js) ;
+ * - obtenirDonnees(selection : Set des ids cochés) : { nomProjet, stocks, resultats, comparaisons, volumes, dessinSurfaces, points, fichierPoints, photos, cartouche, coupes }
  *   stocks, resultats : calculs dessinés sur la feuille principale du PDF (surface 1 et volume) ;
  *   comparaisons : calculs dans un contour, une feuille chacun [{ nom, description, resultat }] ;
  *   volumes : tous les calculs, pour le CSV [{ nom, base, resultat }] ;
  *   dessinSurfaces : surfaces affichées, pour le DXF et le LandXML { stocks, resultats, surfaces } ;
  *   cartouche : { affaire, lieu } du projet
  */
-export function creerEcranExport(conteneur, { obtenirDonnees }) {
+export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: donneesChoisies }) {
 
   conteneur.innerHTML = `
     ${titreSection('exporter', 'Exporter', bulle('exporter'))}
+    <div data-zone="choix"></div>
     <div class="champs-export">
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">
@@ -73,6 +77,9 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
     </div>
     <p class="aide" data-zone="message"></p>
   `;
+  const choix = brancherChoixExport(conteneur.querySelector('[data-zone="choix"]'), obtenirGroupes);
+  // Ce qui est exporté : seulement ce qui est coché dans « Quoi exporter ? ».
+  const obtenirDonnees = () => donneesChoisies(choix.selection());
   const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`);
   const message = conteneur.querySelector('[data-zone="message"]');
 
@@ -184,8 +191,12 @@ export function dateSuisse(iso) {
   return annee && mois && jour ? `${jour}.${mois}.${annee}` : '';
 }
 
-/** Fait télécharger un fichier par le navigateur (dans l'APK : par l'appli Android). */
+/**
+ * Fait télécharger un fichier par le navigateur (dans l'APK : par l'appli Android), puis propose
+ * de l'envoyer (barre « Envoyer », voir partager.js).
+ */
 export function telecharger(blob, nom) {
+  proposerEnvoi(blob, nom);
   if (estDansAppliAndroid()) {
     enregistrerDansAndroid(blob, nom);
     return;
