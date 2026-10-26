@@ -77,3 +77,4 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 **À développer**
 - Essai de 2 RX2 pour guidage d'engin type grader sur la même tablette (2 NTRIP ? 2 connexions Bluetooth ?).
 - Mode « dessin » pour dessiner des plateformes ou bâtiments directement dans l'appli.
+- Mode « Contrôle » pour faire des autocontrôles (à préciser avec l'utilisateur avant de coder : quoi contrôler, tolérances, compte rendu ; mode Base ou Confirmé).
