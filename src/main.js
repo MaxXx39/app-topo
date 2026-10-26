@@ -8,7 +8,7 @@ import { lireLandXML } from './topo/landxml.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee, nomNature, nouvelIdentifiant } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, origineSurface, nomNature, nouvelIdentifiant } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
@@ -21,7 +21,7 @@ import { creerEcranCoupes } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
 import { creerEcranDessin } from './dessin/ecran.js';
 import { ouvrirFenetrePointTape } from './leve/fenetres-points.js';
-import { gisement, gisementNormal, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt } from './topo/dessin.js';
+import { gisement, gisementNormal, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt, surfaceDuDessin } from './topo/dessin.js';
 import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
@@ -366,7 +366,7 @@ function etiquetteSurface(surface) {
   const nature = nomNature(surface.nature);
   const precisions = [];
   if (nature && !surface.nom.toLowerCase().includes(nature.toLowerCase())) precisions.push(nature.toLowerCase());
-  if (estImportee(surface)) precisions.push(surface.type === 'dxf' ? 'DXF' : 'LandXML');
+  if (estImportee(surface)) precisions.push(origineSurface(surface));
   const texte = precisions.length > 0 ? `${surface.nom} (${precisions.join(', ')})` : surface.nom;
   const leve = projet.leves.find((l) => l.id === surface.leveId);
   return projet.leves.length > 1 && leve ? `${texte} · ${leve.nom}` : texte;
@@ -1209,6 +1209,30 @@ function montrerPilote() {
   plan.rafraichirImplantation();
 }
 
+/**
+ * Surfaces faites d'un dessin (plateforme, bâtiment) : remises à jour avec leur dessin à chaque
+ * modification ; enlevées si le dessin est supprimé. Si le dessin ne donne plus de surface
+ * (altitude effacée…), la surface garde sa dernière forme et la raison est notée (erreurDessin).
+ */
+function synchroniserSurfacesDessins() {
+  const avant = projet.surfaces.length;
+  projet.surfaces = projet.surfaces.filter((s) => !s.dessinId || projet.dessins.some((d) => d.id === s.dessinId));
+  for (const surface of projet.surfaces) {
+    if (!surface.dessinId) continue;
+    const dessin = dessinDe(surface.dessinId);
+    const { points, faces, erreur } = surfaceDuDessin(dessin, projet.dessins);
+    surface.nomFichier = dessin.nom;
+    if (erreur) {
+      surface.erreurDessin = erreur;
+      continue;
+    }
+    delete surface.erreurDessin;
+    surface.points = points;
+    surface.faces = faces;
+  }
+  if (projet.surfaces.length !== avant) editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+}
+
 /** Sommets de tous les dessins, prêts à implanter (« PF1-1 »…, avec leur altitude). */
 function pointsDesDessins() {
   return projet.dessins.flatMap((d) => pointsDuDessin(d, projet.dessins));
@@ -1225,7 +1249,18 @@ function donneesDessin() {
   return {
     dessins: projet.dessins.map((d) => {
       const ferme = estFerme(d) && d.sommets.length >= 3;
-      return { ...d, perimetre: longueursCotes(d.sommets, ferme).reduce((somme, l) => somme + l, 0), aire: ferme ? airePolygone(d.sommets) : 0, altitudes: altitudesDuDessin(d), noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom) };
+      const surface = projet.surfaces.find((s) => s.dessinId === d.id);
+      return {
+        ...d,
+        perimetre: longueursCotes(d.sommets, ferme).reduce((somme, l) => somme + l, 0),
+        aire: ferme ? airePolygone(d.sommets) : 0,
+        altitudes: altitudesDuDessin(d),
+        noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom),
+        // Plateforme, bâtiment : sa surface de terrassement (nom, et pourquoi elle n'est pas à jour), ou
+        // pourquoi on ne peut pas encore la créer.
+        surface: surface ? { nom: surface.nom, erreur: surface.erreurDessin ?? null } : null,
+        empecheSurface: estFerme(d) ? (surfaceDuDessin(d, projet.dessins).erreur ?? null) : null,
+      };
     }),
     pilote,
     recepteur: recepteurDisponible(),
@@ -1253,9 +1288,23 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   },
   supprimerDessin: (id) => {
     const dessin = dessinDe(id);
-    if (!dessin || !confirm(`Supprimer « ${dessin.nom} » ?`)) return;
+    const avecSurface = projet.surfaces.some((s) => s.dessinId === id);
+    if (!dessin || !confirm(`Supprimer « ${dessin.nom} »${avecSurface ? ' et sa surface' : ''} ?`)) return;
     projet.dessins = projet.dessins.filter((d) => d.id !== id);
     if (pilote?.dessinId === id) pilote = null;
+    modifie(); // sa surface part avec lui (voir synchroniserSurfacesDessins)
+  },
+  creerSurfaceDessin: (id) => {
+    const dessin = dessinDe(id);
+    if (!dessin || projet.surfaces.some((s) => s.dessinId === id)) return;
+    const { points, faces, erreur } = surfaceDuDessin(dessin, projet.dessins);
+    if (erreur) {
+      afficherMessage(`Surface impossible : ${erreur}`, 4000);
+      return;
+    }
+    projet.surfaces.push({ id: nouvelIdentifiant(), nom: dessin.nom, type: 'dessin', nature: 'terrassement', nomFichier: dessin.nom, dessinId: id, points, faces });
+    editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+    afficherMessage(`Surface « ${dessin.nom} » créée (Calculs › Surfaces, terrassement)`, 4000);
     modifie();
   },
   renommerDessin: (id, nom) => {
@@ -1280,9 +1329,12 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     const gon = gisementNormal(valeur);
     // Même valeur (arrondie à l'écran) : on garde la direction exacte et le point visé.
     if (pilote.direction != null && Math.abs(gon - pilote.direction) < 0.00005) return;
+    const premiere = pilote.direction == null;
     pilote.direction = gon;
     pilote.reference = null;
-    montrerPilote();
+    // Première direction : l'écran est redessiné (boutons 90°, rectangle) ; ensuite, seulement le plan.
+    if (premiere) recalculer();
+    else montrerPilote();
   },
   tournerDirection: (sens) => {
     if (pilote?.direction == null) return;
@@ -2861,6 +2913,10 @@ creerEcranExport(document.querySelector('#export'), {
       },
       points: leve?.points ?? [],
       fichierPoints: leve?.nom ?? '',
+      // Dessins (Calculs › Dessin) cochés dans « Afficher » : DXF (calque DESSINS) et PDF.
+      dessins: dessinsVisibles()
+        .filter((d) => d.sommets.length > 0)
+        .map((d) => ({ ferme: estFerme(d), lignes: d.type !== 'points', points: pointsDuDessin(d, projet.dessins) })),
       // Photos des surfaces affichées (case « Photos » de l'export).
       photos: surfacesAffichees().flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom }))),
       cartouche: projet.cartouche,
@@ -3039,6 +3095,7 @@ let minuterie = null;
 
 /** Après chaque modification : recalcule, retient l'étape (Annuler), puis enregistre un court instant plus tard. */
 function modifie(options) {
+  synchroniserSurfacesDessins();
   // Une surface supprimée : ses calculs de volume disparaissent avec elle.
   projet.calculs = nettoyerCalculs(projet.calculs, projet.surfaces);
   recalculer(options);

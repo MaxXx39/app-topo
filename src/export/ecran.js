@@ -88,7 +88,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
       message.textContent = 'CSV téléchargé.';
     },
     dxf: () => {
-      const { points, dessinSurfaces } = obtenirDonnees();
+      const { points, dessinSurfaces, dessins } = obtenirDonnees();
       const { stocks, resultats, surfaces } = dessinSurfaces;
       const triangles = resultats.flatMap((r) => r.trianglesDessus ?? []);
       const plage = triangles.length > 0 ? plageAltitudes(triangles) : null;
@@ -98,6 +98,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
         resultats,
         surfaces,
         equidistance: plage ? equidistanceAuto(plage.min, plage.max) : null,
+        dessins,
       });
       telecharger(new Blob([texte], { type: 'application/dxf' }), `${nomDeFichier()}.dxf`);
       message.textContent = 'DXF téléchargé (coordonnées MN95, altitudes en Z).';
@@ -117,7 +118,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
       message.textContent = `LandXML téléchargé (${liste.length} surface(s)).`;
     },
     pdf: async () => {
-      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos, coupes } = obtenirDonnees();
+      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos, coupes, dessins } = obtenirDonnees();
       if (!verifier(volumes)) return;
       message.textContent = 'Préparation du PDF…';
       try {
@@ -140,6 +141,7 @@ export function creerEcranExport(conteneur, { obtenirDonnees }) {
           comparaisons,
           photos,
           coupes,
+          dessins,
           calques,
           cartouche: {
             affaire: obtenirDonnees().cartouche.affaire ?? '',

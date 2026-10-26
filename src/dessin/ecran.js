@@ -19,7 +19,7 @@ const nombre = (valeur) => (valeur == null ? '' : String(Math.round(valeur * 100
  * terminerDessin(), supprimerDessin(id), renommerDessin(id, nom), choisirToucher(mode),
  * reglerDirection(texte), tournerDirection(sens), reglerDistance(texte), ajouterSommetPilote(),
  * ouvrirSommetTape(), sommetRx2(), directionRx2(), rectangleDessin({ longueur, largeur, cote }),
- * annulerSommet(), reglerHauteur(id, champ, valeur), altitudeSommet(id, n°, texte).
+ * annulerSommet(), reglerHauteur(id, champ, valeur), altitudeSommet(id, n°, texte), creerSurfaceDessin(id).
  * Renvoie { afficher(donnees) } ; donnees : { dessins, pilote, recepteur }.
  */
 export function creerEcranDessin(conteneur, actions) {
@@ -102,7 +102,7 @@ function carteDessin(d, pilote, recepteur) {
         <button type="button" class="bouton-secondaire" data-action="dessiner" data-valeur="${d.id}">Dessiner</button>
         <button type="button" class="bouton-lien" data-action="supprimerDessin" data-valeur="${d.id}">supprimer</button>
       </div>`}
-    ${d.type === 'plateforme' || d.type === 'batiment' ? htmlHauteur(d) : ''}
+    ${d.type === 'plateforme' || d.type === 'batiment' ? htmlHauteur(d) + htmlSurface(d) : ''}
     ${htmlSommets(d)}
   </div>`;
 }
@@ -163,6 +163,20 @@ function htmlHauteur(d) {
         <label>altitude au sommet<select data-hauteur="depuis" data-id="${d.id}">${options(h.pente?.depuis ?? 0, (i) => String(i + 1))}</select></label>` : ''}
       </div>` : ''}
   </div>`;
+}
+
+/**
+ * Surface de terrassement d'une plateforme ou d'un bâtiment : « Créer la surface », ou son nom
+ * (et pourquoi elle n'est pas à jour) ; la raison si on ne peut pas encore la créer.
+ */
+function htmlSurface(d) {
+  if (d.surface) {
+    return `<p class="surface-dessin">✓ Surface « ${echapper(d.surface.nom)} » (Calculs › Surfaces)${d.surface.erreur ? ` <span class="erreur">pas à jour : ${echapper(d.surface.erreur)}</span>` : ''}</p>`;
+  }
+  return `<div class="ligne-outils">
+      <button type="button" class="bouton-secondaire" data-action="creerSurfaceDessin" data-valeur="${d.id}" ${d.empecheSurface ? 'disabled' : ''}>Créer la surface</button>
+      ${d.empecheSurface ? `<span class="aide">${echapper(d.empecheSurface)}</span>` : ''}
+    </div>`;
 }
 
 /** Sommets : n°, Est, Nord, altitude (case à remplir en mode « par sommet »). */
