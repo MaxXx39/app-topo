@@ -73,7 +73,7 @@ import {
 } from './topo/leve-direct.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
-import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid } from './android/pont.js';
+import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
@@ -114,6 +114,8 @@ const leveDirect = { stockId: null, role: 'contour' };
 let libelles = lireLibelles();
 let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
 let etatRecepteur2 = null; // dernier état du 2e récepteur (essai à 2 RX2, guidage de lame)
+// GPS de la tablette (APK, sans RX2 connecté) : { est, nord, precision } ou null ; seulement pour se localiser.
+let positionTablette = null;
 // Onglet Terrain : mode (Lever ou Contrôler) et réglages du contrôle, retenus sur l'appareil.
 const CLE_TERRAIN = 'topo-terrain';
 const terrain = {
@@ -2780,7 +2782,7 @@ if (recepteurDisponible()) {
     const vientDeSeConnecter = Boolean(etat.connecte) && !etatRecepteur?.connecte;
     etatRecepteur = etat;
     if (vientDeSeConnecter) proposerControle();
-    mettreAJourBandeaux(etat);
+    mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette);
     boutonRecepteur?.mettreAJour(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
     const enPoint = enImplantationDePoint();
@@ -2802,7 +2804,13 @@ if (recepteurDisponible()) {
     // Talus : trait jusqu'à l'entrée en terre (ou au bord du talus) en face de la canne.
     const vers = implantationLigne?.ligne?.cible ?? (implantationTalus?.message ? null : implantationTalus?.talus?.cible) ?? null;
     const cotes = implantationTalus ? cotesTalus(implantationTalus) : cotesLigne(implantationLigne);
-    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotes } : null);
+    // Sans RX2 connecté : la position du GPS de la tablette, en gris avec son cercle de précision.
+    const tablette = !etat.connecte && positionTablette ? { est: positionTablette.est, nord: positionTablette.nord, prete: false, tablette: true, precision: positionTablette.precision, azimut: null } : null;
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotes } : tablette);
+  });
+  // GPS de la tablette : gardé ici, montré avec l'état suivant du RX2 (5 fois par seconde).
+  ecouterPositionTablette((position) => {
+    positionTablette = position && Number.isFinite(position.est) && Number.isFinite(position.nord) ? position : null;
   });
 }
 

@@ -1106,7 +1106,11 @@ function svgCouloir(numero, ecart, abscisse, longueur, couleur) {
  * Bandeaux sous l'en-tête, dans tous les onglets, quand le récepteur est connecté :
  * « RTK FIXE » (vert) ou autre (rouge), « Inclinaison PRÊTE » (vert) ou « NON PRÊTE » (rouge).
  */
-export function mettreAJourBandeaux(etat) {
+/**
+ * Bandeaux sous l'en-tête : état du RX2 (RTK, inclinaison) ; sans RX2 connecté mais avec le GPS de
+ * la tablette (tablette : { precision } ou null), « GPS tablette ± x m » bien marqué.
+ */
+export function mettreAJourBandeaux(etat, tablette = null) {
   let bandeaux = document.querySelector('#bandeaux-recepteur');
   if (!bandeaux) {
     bandeaux = document.createElement('div');
@@ -1116,9 +1120,17 @@ export function mettreAJourBandeaux(etat) {
     bandeaux.innerHTML = '<span data-bandeau="rtk"></span><span data-bandeau="inclinaison"></span>';
     document.querySelector('.entete').append(bandeaux);
   }
-  const visible = Boolean(etat?.connecte);
+  const visible = Boolean(etat?.connecte) || Boolean(tablette);
   document.body.classList.toggle('avec-recepteur', visible);
   if (!visible) return;
+  if (!etat?.connecte) {
+    const [rtk, inclinaison] = bandeaux.querySelectorAll('[data-bandeau]');
+    rtk.textContent = `GPS TABLETTE · ± ${Math.max(1, Math.round(tablette.precision ?? 0))} m`;
+    rtk.className = 'tablette';
+    inclinaison.textContent = 'RX2 non connecté';
+    inclinaison.className = 'attente';
+    return;
+  }
 
   const rtk = bandeaux.querySelector('[data-bandeau="rtk"]');
   const inclinaison = bandeaux.querySelector('[data-bandeau="inclinaison"]');

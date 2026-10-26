@@ -501,7 +501,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     dessinerLame();
     if (!position || !vue) return;
     const { x, y } = versEcran(position.est, position.nord, vue);
-    const groupe = creerElement('g', { class: position.prete ? 'position' : 'position pas-prete' });
+    const groupe = creerElement('g', { class: position.tablette ? 'position position-tablette' : position.prete ? 'position' : 'position pas-prete' });
+    // GPS de la tablette (sans RX2) : cercle de sa précision (quelques mètres), en gris.
+    if (position.tablette && position.precision > 0) groupe.append(creerElement('circle', { cx: x, cy: y, r: Math.max(13, position.precision * vue.echelle), class: 'precision-tablette' }));
     // Coupes en direct : en pointillés, chacune de sa couleur (la même que son dessin).
     for (const coupe of position.coupes ?? []) {
       const debut = versEcran(coupe.debut.est, coupe.debut.nord, vue);

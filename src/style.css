@@ -7007,3 +7007,20 @@ body.mode-telephone .bouton.bouton-prendre {
 .bloc-repliable[open] > summary {
   margin-bottom: 10px;
 }
+
+/* GPS de la tablette (sans RX2, 0.72.0) : position grise et cercle de précision ; bandeau marqué. */
+.plan .position.position-tablette circle {
+  fill: #64748b;
+}
+
+.plan .position.position-tablette circle.precision-tablette {
+  fill: #64748b;
+  fill-opacity: 0.12;
+  stroke: #64748b;
+  stroke-width: 1;
+}
+
+.bandeaux-recepteur .tablette {
+  background: #64748b;
+  color: #ffffff;
+}
