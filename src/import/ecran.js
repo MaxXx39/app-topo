@@ -1,6 +1,10 @@
-// Bloc « Imports » de l'onglet Projet : deux boutons (fichier de points, plan DXF), puis les levés
-// du projet (le levé coché est affiché sur le plan ; chaque fichier de points devient un levé, les
-// points pris avec le récepteur aussi) et les plans DXF (fonds de plan, calques à cocher).
+// Trois blocs de l'onglet Projet (demande du 26.10.2026) :
+// - « Import » : fichier de points (case « Points de contrôle » : le fichier devient la liste des
+//   points de contrôle, après le code de sécurité), plan DXF, point tapé ;
+// - « Listes de points du projet » : chaque fichier de points (et les points pris avec le
+//   récepteur) est une liste ; celle cochée est affichée sur le plan ; ses points se voient sous
+//   elle. Puis les points de contrôle, dans une liste à part (en rouge) ;
+// - « DXF importés » : les plans DXF (fonds de plan, calques à cocher).
 // Le levé avec le récepteur se fait dans l'onglet Terrain (src/leve/ecran.js) ; les surfaces
 // LandXML / DXF dans Calculs › Surfaces.
 import { echapper } from '../outils/echapper.js';
@@ -12,6 +16,7 @@ import { estEnMn95 } from '../topo/dxf-plan.js';
 import { rotationLisible } from '../topo/recalage.js';
 import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '../outils/formulaire-point.js';
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
+import { demanderCode } from '../outils/code.js';
 
 /**
  * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
@@ -20,7 +25,8 @@ import { nomPointAjoute } from '../topo/points-ajoutes.js';
  * recalerPlanDxf(id), exporterPlanRecale(id), annulerRecalagePlan(id),
  * montrerCalqueDxf(id, n° du calque, visible),
  * montrerTousCalquesDxf(id, visible), ajouterPointTape({ nom, est, nord, altitude }) (renvoie
- * { erreur } ou rien), commencerPointage() (ajouter des points en touchant le plan DXF)
+ * { erreur } ou rien), commencerPointage() (ajouter des points en touchant le plan DXF),
+ * importerPointsControle(fichier) (renvoie { erreur } ou rien)
  * Renvoie { afficher(projet, dernierImport, dernierPlan) }.
  */
 export function creerEcranImport(conteneur, actions) {
@@ -30,6 +36,8 @@ export function creerEcranImport(conteneur, actions) {
   let pointOuvert = false;
   let erreurPoint = '';
   let derniers = null;
+  let pourControle = false; // case « Points de contrôle » cochée (après le code de sécurité)
+  let messageControle = ''; // erreur du dernier import de points de contrôle
   conteneur.addEventListener('toggle', (evenement) => {
     const id = evenement.target.dataset?.calquesPlan;
     if (!id) return;
@@ -71,7 +79,16 @@ export function creerEcranImport(conteneur, actions) {
 
   conteneur.addEventListener('change', async (evenement) => {
     const cible = evenement.target;
-    if (cible.dataset.champ === 'leve-actif') actions.choisirLeve(cible.value);
+    if (cible.dataset.champ === 'pour-controle') {
+      // Cocher demande le code de sécurité (les points de contrôle sont protégés) ; décocher, non.
+      pourControle = cible.checked && (await demanderCode('Importer des points de contrôle'));
+      cible.checked = pourControle;
+    } else if (cible.dataset.champ === 'fichier-points' && cible.files[0] && pourControle) {
+      messageControle = (await actions.importerPointsControle(cible.files[0]))?.erreur ?? '';
+      cible.value = '';
+      pourControle = false;
+      if (derniers) afficher(...derniers);
+    } else if (cible.dataset.champ === 'leve-actif') actions.choisirLeve(cible.value);
     else if (cible.dataset.champ === 'nom-leve') actions.renommerLeve(cible.dataset.id, cible.value.trim());
     else if (cible.dataset.champ === 'fichier-points' && cible.files[0]) {
       await actions.importerPoints(cible.files[0]);
@@ -110,7 +127,7 @@ export function creerEcranImport(conteneur, actions) {
       const plans = projet.plansDxf ?? [];
       conteneur.innerHTML = `
         <section class="carte-section">
-          ${titreSection('importer', 'Imports', bulle('imports'))}
+          ${titreSection('importer', 'Import', bulle('imports'))}
           <div class="boutons-imports">
             <label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="18" cy="7" r="1.6" /><circle cx="8" cy="17" r="1.6" /><circle cx="17" cy="17" r="1.6" /></svg>
@@ -127,6 +144,8 @@ export function creerEcranImport(conteneur, actions) {
               <span><strong>Point</strong><span class="aide">tapé ou sur le DXF</span></span>
             </button>
           </div>
+          <label class="case case-controle"><input type="checkbox" data-champ="pour-controle" ${pourControle ? 'checked' : ''} /> Le fichier de points = points de contrôle</label>
+          ${messageControle ? `<p class="erreur">${echapper(messageControle)}</p>` : ''}
           ${pointOuvert ? `<div class="bloc-point-ajoute">
             ${htmlFormulairePoint(nomPointAjoute(projet))}
             <p class="erreur" data-vivant="erreur-point">${echapper(erreurPoint)}</p>
@@ -134,29 +153,35 @@ export function creerEcranImport(conteneur, actions) {
           </div>` : ''}
           ${dernierImport ? afficherImportPoints(dernierImport) : ''}
           ${dernierPlan ? messagePlan(dernierPlan) : ''}
+        </section>
 
-          <p class="titre-section">Levés ${bulle('leves')}</p>
+        <section class="carte-section">
+          ${titreSection('leves', 'Listes de points du projet', bulle('leves'))}
           ${
             projet.leves.length > 0
               ? `<div class="liste-leves">${projet.leves
                   .map(
                     (leve) => `
                   <div class="ligne-leve ${leve.id === projet.leveActifId ? 'actif' : ''}">
-                    <label class="case"><input type="radio" name="leve-actif" data-champ="leve-actif" value="${leve.id}" ${leve.id === projet.leveActifId ? 'checked' : ''} aria-label="Afficher ce levé" />
-                      <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom du levé" /></label>
+                    <label class="case"><input type="radio" name="leve-actif" data-champ="leve-actif" value="${leve.id}" ${leve.id === projet.leveActifId ? 'checked' : ''} aria-label="Afficher cette liste" />
+                      <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom de la liste" /></label>
                     <div class="ligne-outils">
                       <span class="aide">${leve.points.length} points · ${projet.surfaces.filter((s) => s.leveId === leve.id).length} surface(s)</span>
                       <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
                     </div>
+                    ${tableauPoints(leve.points, 'Voir les points')}
                   </div>`,
                   )
                   .join('')}</div>`
-              : '<p class="vide">Aucun levé pour l\'instant.</p>'
+              : '<p class="vide">Aucune liste de points pour l\'instant.</p>'
           }
-          ${listePointsDuLeve(projet)}
-
-          ${plans.length > 0 ? `<div class="seulement-confirme"><p class="titre-section">Plans DXF</p>${listePlansDxf(projet, calquesOuverts)}</div>` : ''}
+          ${listePointsControle(projet)}
         </section>
+
+        ${plans.length > 0 ? `<section class="carte-section seulement-confirme">
+          ${titreSection('fichier', 'DXF importés')}
+          ${listePlansDxf(projet, calquesOuverts)}
+        </section>` : ''}
       `;
   }
 }
@@ -177,27 +202,33 @@ function afficherImportPoints({ nomFichier, format, points, erreurs, avertisseme
   return html;
 }
 
-/** Tableau repliable des points du levé affiché. */
-function listePointsDuLeve(projet) {
-  const leve = projet.leves.find((l) => l.id === projet.leveActifId);
-  if (!leve || leve.points.length === 0) return '';
+/** Tableau repliable de points (nom, Est, Nord, altitude), sous leur liste. */
+function tableauPoints(points, titre) {
+  if (points.length === 0) return '';
+  const n = (valeur) => (valeur == null ? '—' : formaterNombre(valeur));
   return `
-    <details>
-      <summary>Voir les points du levé « ${echapper(leve.nom)} » (${leve.points.length})</summary>
+    <details class="points-de-la-liste">
+      <summary>${titre} (${points.length})</summary>
       <div class="tableau-defilant">
         <table>
           <thead><tr><th>Nom</th><th>Est (m)</th><th>Nord (m)</th><th>Altitude (m)</th></tr></thead>
           <tbody>
-            ${leve.points
-              .map(
-                (p) =>
-                  `<tr><td>${echapper(p.nom)}</td><td>${formaterNombre(p.est)}</td><td>${formaterNombre(p.nord)}</td><td>${formaterNombre(p.altitude)}</td></tr>`,
-              )
-              .join('')}
+            ${points.map((p) => `<tr><td>${echapper(p.nom)}</td><td>${n(p.est)}</td><td>${n(p.nord)}</td><td>${n(p.altitude)}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
     </details>`;
+}
+
+/** Points de contrôle (Terrain › Contrôler) : une liste à part, en rouge, sous les listes de points. */
+function listePointsControle(projet) {
+  const points = projet.pointsControle ?? [];
+  if (points.length === 0) return '';
+  return `<div class="ligne-leve liste-controle">
+      <strong>Points de contrôle</strong>
+      <div class="ligne-outils"><span class="aide">${points.length} points</span></div>
+      ${tableauPoints(points, 'Voir les points de contrôle')}
+    </div>`;
 }
 
 /** Plans DXF du projet : nom, nombre d'objets, voir / supprimer, et la liste des calques à cocher. */

@@ -2063,6 +2063,43 @@ th.nombre {
   line-height: 1.2;
 }
 
+/* « + Nouveau projet » (ambre) et « Gestion de projets » (sombre) : bien en évidence (0.59.1). */
+.bouton-projet {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(16, 24, 20, 0.2);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.bouton-projet svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.bouton-projet.nouveau-projet {
+  background: var(--ambre);
+  color: var(--sombre);
+}
+
+.bouton-projet.gestion-projets {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
 .actions-projets .bouton-secondaire.actif {
   border-color: var(--sombre);
   background: var(--sombre);
@@ -6209,4 +6246,30 @@ body.mode-base .parties-calculs {
 .remarque-controle {
   min-height: 32px;
   font-size: 0.9rem;
+}
+
+/* Projet › Import : case « points de contrôle » ; liste des points de contrôle en rouge. */
+.case-controle {
+  margin-top: 8px;
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.ligne-leve.liste-controle {
+  border-left: 4px solid #dc2626;
+}
+
+.ligne-leve.liste-controle > strong,
+.liste-controle .points-de-la-liste summary {
+  color: #dc2626;
+}
+
+.points-de-la-liste {
+  margin-top: 4px;
+}
+
+.points-de-la-liste summary {
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
 }

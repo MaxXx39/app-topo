@@ -367,6 +367,7 @@ function calculDuPlan(surface) {
 // --- Écrans ---
 
 const ecranImport = creerEcranImport(document.querySelector('#importer'), {
+  importerPointsControle: (fichier) => importerPointsControle(fichier),
   importerPoints: async (fichier) => {
     try {
       const resultat = lirePoints(await fichier.text());
@@ -938,16 +939,7 @@ const ecranLeve = recepteurDisponible()
         if (!valeurs.nom) return { erreur: 'donne un nom au point' };
         return ajouterAuxPointsControle([valeurs]);
       },
-      importerPointsControle: async (fichier) => {
-        try {
-          const { points, erreurs } = lirePoints(await fichier.text());
-          const reponse = ajouterAuxPointsControle(points);
-          if (erreurs.length > 0) return { erreur: `${erreurs.length} ligne(s) illisible(s), non importée(s) : ${erreurs.slice(0, 5).map((e) => `ligne ${e.ligne}`).join(', ')}${erreurs.length > 5 ? '…' : ''}` };
-          return reponse;
-        } catch (erreur) {
-          return { erreur: `impossible de lire « ${fichier.name} » : ${erreur.message}` };
-        }
-      },
+      importerPointsControle: (fichier) => importerPointsControle(fichier),
       supprimerPointControle: (id) => {
         const point = projet.pointsControle.find((p) => p.id === id);
         if (!point || !confirm(`Enlever ${point.nom} des points de contrôle ?`)) return;
@@ -1158,6 +1150,21 @@ function ajouterAuxPointsControle(points) {
   return refus.length > 0 ? { erreur: `Pas ajouté(s) : ${refus.join(' ; ')}` } : null;
 }
 
+/**
+ * Fichier de points (CSV, TXT) ajouté aux points de contrôle (Projet › Import avec la case
+ * « Points de contrôle », ou Terrain › Contrôler › ⚙). Renvoie { erreur } ou null.
+ */
+async function importerPointsControle(fichier) {
+  try {
+    const { points, erreurs } = lirePoints(await fichier.text());
+    const reponse = ajouterAuxPointsControle(points);
+    if (erreurs.length > 0) return { erreur: `${erreurs.length} ligne(s) illisible(s), non importée(s) : ${erreurs.slice(0, 5).map((e) => `ligne ${e.ligne}`).join(', ')}${erreurs.length > 5 ? '…' : ''}` };
+    return reponse;
+  } catch (erreur) {
+    return { erreur: `impossible de lire « ${fichier.name} » : ${erreur.message}` };
+  }
+}
+
 /** Nom de cet appareil (partage Drive), noté dans chaque contrôle ; '' s'il n'est pas donné. */
 function nomDeLAppareil() {
   return partage?.appareil()?.nom ?? '';
@@ -1218,9 +1225,17 @@ async function proposerControle() {
   rappelEnCours = true;
   const projetDuRappel = projet;
   const aujourdHui = projet.controles.some((c) => estControleReussi(c) && new Date(c.le).toDateString() === new Date().toDateString());
+  const texte = aujourdHui ? 'Dernier contrôle réussi il y a plus de 4 h.' : 'Aucun contrôle réussi aujourd\'hui.';
+  // Pas de point de contrôle dans le projet : le rappel attire quand même l'attention, avec OK
+  // seulement (rien n'est noté ; demande du 26.10.2026).
+  if (projet.pointsControle.length === 0) {
+    await demanderChoix({ titre: 'Faire le contrôle ?', texte: `${texte} Aucun point de contrôle dans ce projet.`, boutons: [{ cle: 'ok', texte: 'OK', principal: true }] });
+    rappelEnCours = false;
+    return;
+  }
   const choix = await demanderChoix({
     titre: 'Faire le contrôle ?',
-    texte: aujourdHui ? 'Dernier contrôle réussi il y a plus de 4 h.' : 'Aucun contrôle réussi aujourd\'hui.',
+    texte,
     boutons: [
       { cle: 'oui', texte: 'Oui, faire le contrôle', principal: true },
       { cle: 'non', texte: 'Non' },

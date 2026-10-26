@@ -116,8 +116,9 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
     }
     conteneur.innerHTML = `
       <div class="actions-projets">
-        <button type="button" class="bouton-secondaire" data-action="nouveau">+ Nouveau projet</button>
-        <button type="button" class="bouton-secondaire" data-action="panneau" data-panneau="projets">Gestion de projets</button>
+        <button type="button" class="bouton-projet nouveau-projet" data-action="nouveau">+ Nouveau projet</button>
+        <button type="button" class="bouton-projet gestion-projets" data-action="panneau" data-panneau="projets">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z" /></svg>Gestion de projets</button>
       </div>
 
       <section class="bloc-ouvert">
