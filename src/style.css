@@ -7024,3 +7024,73 @@ body.mode-telephone .bouton.bouton-prendre {
   background: #64748b;
   color: #ffffff;
 }
+
+/* Terrain › Lame, profil en long (0.73.0) : choix du point, longueurs, pentes, ruptures, niveleuse. */
+.reglages-profil-lame {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 6px;
+}
+
+.reglages-profil-lame .titre-profil {
+  font-weight: 800;
+}
+
+.reglages-profil-lame input {
+  width: 52px;
+}
+
+.svg-profil-lame {
+  max-height: 180px;
+}
+
+.svg-coupe-lame .pente-profil {
+  fill: #1d4ed8;
+  font-size: 10px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+
+.svg-coupe-lame .rupture-profil {
+  stroke: #9a3412;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.svg-coupe-lame .distance-profil {
+  fill: #9a3412;
+  font-size: 9px;
+}
+
+.svg-coupe-lame .niveleuse path,
+.svg-coupe-lame .niveleuse rect,
+.svg-coupe-lame .niveleuse circle {
+  fill: #f59e0b;
+  stroke: #1b2b36;
+  stroke-width: 1;
+}
+
+.svg-coupe-lame .niveleuse .cabine {
+  fill: #fde68a;
+}
+
+.svg-coupe-lame .niveleuse .mat {
+  fill: none;
+  stroke: #1b2b36;
+  stroke-width: 1.5;
+}
+
+.svg-coupe-lame .niveleuse .antenne {
+  fill: #1d4ed8;
+  stroke: none;
+}
+
+.svg-coupe-lame .niveleuse .lame {
+  fill: none;
+  stroke: #1b2b36;
+  stroke-width: 3;
+}

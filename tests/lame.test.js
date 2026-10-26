@@ -45,3 +45,40 @@ describe('guidage de lame', () => {
     expect(fin.nord).toBeCloseTo(4.8, 9);
   });
 });
+
+describe('profil en long de la lame', async () => {
+  const { pointDeProfil, avantDeLaLame, vecteurAzimut, tronconsProfil } = await import('../src/topo/lame.js');
+
+  it('point du profil : gauche, droite ou milieu', () => {
+    const g = { est: 0, nord: 0, altitude: 10 };
+    const d = { est: 4, nord: 0, altitude: 10.2 };
+    expect(pointDeProfil(g, d, 'gauche')).toEqual(g);
+    expect(pointDeProfil(g, d, 'droite')).toEqual(d);
+    const m = pointDeProfil(g, d, 'milieu');
+    expect(m.est).toBe(2);
+    expect(m.altitude).toBeCloseTo(10.1, 9);
+  });
+
+  it('avant de la lame : gauche à l\'ouest, droite à l\'est → on regarde vers le nord', () => {
+    const avant = avantDeLaLame({ est: 0, nord: 0 }, { est: 3, nord: 0 });
+    expect(avant.est).toBeCloseTo(0, 9);
+    expect(avant.nord).toBeCloseTo(1, 9);
+    const est = vecteurAzimut(90);
+    expect(est.est).toBeCloseTo(1, 9);
+    expect(est.nord).toBeCloseTo(0, 9);
+  });
+
+  it('tronçons : segments de même pente regroupés, ruptures de plus de 0.5 %', () => {
+    // 0 → 10 m à +2 % (2 segments), puis 10 → 20 m à −1 %, puis 20 → 30 m à −1.3 % (pas de rupture : 0.3 %).
+    const morceau = [
+      { distance: 0, altitude: 100 }, { distance: 5, altitude: 100.1 }, { distance: 10, altitude: 100.2 },
+      { distance: 20, altitude: 100.1 }, { distance: 30, altitude: 99.97 },
+    ];
+    const { troncons, ruptures } = tronconsProfil([morceau]);
+    expect(ruptures).toEqual([10]);
+    expect(troncons).toHaveLength(2);
+    expect(troncons[0]).toMatchObject({ debut: 0, fin: 10 });
+    expect(troncons[0].pente).toBeCloseTo(2, 9);
+    expect(troncons[1].pente).toBeCloseTo(-1.15, 9);
+  });
+});

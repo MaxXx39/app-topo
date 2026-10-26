@@ -25,7 +25,7 @@ import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface } from './topo/coupe.js';
-import { guidageLame, ligneDeCoupeLame, TOLERANCES_LAME } from './topo/lame.js';
+import { guidageLame, ligneDeCoupeLame, TOLERANCES_LAME, pointDeProfil, avantDeLaLame, vecteurAzimut, tronconsProfil } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -50,7 +50,7 @@ import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
 import { lireLibelles, enregistrerLibelles } from './leve/libelles.js';
-import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude } from './topo/implantation.js';
+import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
 import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele } from './topo/ligne-implantation.js';
 import { MODES_ACCROCHE, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
@@ -135,9 +135,12 @@ const terrain = {
   // Implantation d'un talus (voir topo/talus.js) : derniers réglages, repris pour le talus suivant.
   talus: { horizontal: null, vertical: null, ligneEst: 'haut', cote: 'droite', longueur: null, terrainId: null, altitudeSurfaceId: null },
   // Guidage de lame à 2 RX2 (mode Lame, voir topo/lame.js) : surface suivie, gauche / droite inversés, tolérances (m).
-  lame: { surfaceId: null, inverse: false, tolerances: { ...TOLERANCES_LAME } },
+  // Profil en long (0.73.0) : point de la lame ('gauche', 'milieu', 'droite'), longueur devant et derrière (m).
+  lame: { surfaceId: null, inverse: false, tolerances: { ...TOLERANCES_LAME }, pointProfil: 'milieu', devant: 20, derriere: 5 },
   ...lireReglagesTerrain(),
 };
+// Anciens réglages (avant 0.73.0) : le profil en long prend ses valeurs de départ.
+terrain.lame = { pointProfil: 'milieu', devant: 20, derriere: 5, ...terrain.lame };
 // Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
 // point à implanter en cours ({ id (point de la liste « À implanter », ou null), nom, est, nord, altitude }).
 // Implantation d'une ligne : points choisis pour la faire (pointsLigne : [{ est, nord, altitude, nom }])
@@ -780,6 +783,22 @@ const ecranLeve = recepteurDisponible()
         retenirReglagesTerrain();
         afficherMessage(terrain.lame.inverse ? 'Gauche = récepteur 2, droite = récepteur 1' : 'Gauche = récepteur 1, droite = récepteur 2', 3000);
         montrerLame();
+      },
+      choisirPointProfil: (point) => {
+        terrain.lame.pointProfil = ['gauche', 'droite'].includes(point) ? point : 'milieu';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      reglerProfilLame: (cle, texte) => {
+        const metres = lireNombreTape(texte);
+        if (!(metres >= 0 && metres <= 500)) {
+          afficherMessage('Longueur illisible : un nombre de mètres entre 0 et 500', 4000);
+          recalculer();
+          return;
+        }
+        terrain.lame[cle === 'derriere' ? 'derriere' : 'devant'] = metres;
+        retenirReglagesTerrain();
+        recalculer();
       },
       reglerToleranceLame: (cle, texte) => {
         const cm = lireNombreTape(texte);
@@ -1646,6 +1665,8 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
 
 // Recherche rapide de l'altitude de la surface suivie (refaite quand ses triangles changent).
 let chercheurLame = { triangles: null, chercher: null };
+// Dernières positions du milieu de la lame { est, nord, temps } : sens de marche du profil en long.
+const historiqueLame = [];
 
 /** Pourquoi un récepteur ne peut pas guider (texte), ou null s'il est prêt (RTK fixe, inclinaison prête). */
 function raisonRecepteurLame(etat, nom) {
@@ -1681,7 +1702,30 @@ function calculerLame() {
     gauche: { distance: 1, altitude: coins.gauche.altitude },
     droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
   };
-  return { raison: null, guidage, coupe, coins };
+  return { raison: null, guidage, coupe, coins, profil: profilEnLongLame(coins, triangles) };
+}
+
+/**
+ * Profil en long de la lame : depuis le point choisi (gauche, milieu, droite), dans le sens de marche
+ * (dernières positions du milieu de la lame ; arrêté : perpendiculaire à la lame, vers l'avant),
+ * de "derrière" m derrière à "devant" m devant. Tronçons et ruptures de pente de plus de 0.5 %.
+ */
+function profilEnLongLame(coins, triangles) {
+  const milieu = pointDeProfil(coins.gauche, coins.droite, 'milieu');
+  const maintenant = performance.now();
+  historiqueLame.push({ est: milieu.est, nord: milieu.nord, temps: maintenant });
+  while (historiqueLame.length > 0 && maintenant - historiqueLame[0].temps > 10_000) historiqueLame.shift();
+  const azimut = directionDeMarche(historiqueLame, { distanceMin: 1, dureeMax: 5000 });
+  const sens = azimut == null ? avantDeLaLame(coins.gauche, coins.droite) : vecteurAzimut(azimut);
+  if (!sens) return null;
+  const { devant, derriere, pointProfil } = terrain.lame;
+  const point = pointDeProfil(coins.gauche, coins.droite, pointProfil);
+  const debut = { est: point.est - sens.est * derriere, nord: point.nord - sens.nord * derriere };
+  const fin = { est: point.est + sens.est * devant, nord: point.nord + sens.nord * devant };
+  // Distances comptées depuis la lame (négatives derrière).
+  const morceaux = profilSurface(triangles, debut, fin).map((m) => m.map((p) => ({ distance: p.distance - derriere, altitude: p.altitude })));
+  const { troncons, ruptures } = tronconsProfil(morceaux, 0.5);
+  return { morceaux, troncons, ruptures, devant, derriere, altitude: point.altitude, source: azimut == null ? 'lame' : 'marche' };
 }
 
 /** Écran Lame et lame sur le plan, avec les derniers états des 2 récepteurs. */
@@ -2628,6 +2672,9 @@ function donneesCommunes() {
       surfaceId: terrain.lame.surfaceId,
       inverse: terrain.lame.inverse,
       tolerances: terrain.lame.tolerances,
+      pointProfil: terrain.lame.pointProfil,
+      devant: terrain.lame.devant,
+      derriere: terrain.lame.derriere,
       recepteur2: Boolean(etatRecepteur2?.connecte),
     },
     autocontrole: donneesAutocontrole(),
