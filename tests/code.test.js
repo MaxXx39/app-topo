@@ -1,8 +1,8 @@
-// Code qui protège certains réglages (nom de l'appareil, corrections NTRIP).
+// Code de sécurité qui protège certains réglages (nom de l'appareil, corrections NTRIP).
 import { describe, it, expect } from 'vitest';
 import { estBonCode } from '../src/outils/code.js';
 
-describe('code des réglages protégés', () => {
+describe('code de sécurité des réglages protégés', () => {
   it('accepte 1196, même avec des espaces autour', () => {
     expect(estBonCode('1196')).toBe(true);
     expect(estBonCode(' 1196 ')).toBe(true);

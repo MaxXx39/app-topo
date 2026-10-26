@@ -1,4 +1,4 @@
-// Code qui protège certains réglages (nom de l'appareil, corrections NTRIP) pour qu'un utilisateur
+// Code de sécurité qui protège certains réglages (nom de l'appareil, corrections NTRIP) pour qu'un utilisateur
 // ne les change pas par erreur (demande du 26.10.2026). C'est une simple barrière : le code est
 // écrit dans l'appli, ce n'est pas une vraie sécurité.
 
@@ -10,7 +10,7 @@ export function estBonCode(texte) {
 }
 
 /**
- * Fenêtre « Code » par-dessus l'écran : renvoie une promesse, vraie si le bon code est tapé, fausse
+ * Fenêtre « Code de sécurité » par-dessus l'écran : renvoie une promesse, vraie si le bon code est tapé, fausse
  * si on annule. Un code faux est signalé et la fenêtre reste ouverte.
  */
 export function demanderCode(titre) {
@@ -20,10 +20,10 @@ export function demanderCode(titre) {
     fenetre.innerHTML = `
       <form method="dialog">
         <h2>${titre}</h2>
-        <label class="champ-code">Code
+        <label class="champ-code">Code de sécurité
           <input type="password" inputmode="numeric" autocomplete="off" data-champ="code" />
         </label>
-        <p class="erreur" data-vivant="erreur-code" hidden>Code faux</p>
+        <p class="erreur" data-vivant="erreur-code" hidden>Code de sécurité faux</p>
         <div class="ligne-outils">
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="annuler">annuler</button>
           <button class="bouton" data-action="valider">Valider</button>

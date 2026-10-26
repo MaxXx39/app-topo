@@ -3967,7 +3967,7 @@ svg.plan,
   background: rgba(27, 43, 54, 0.45);
 }
 
-/* Fenêtre « Code » (réglages protégés : nom de l'appareil, NTRIP). */
+/* Fenêtre « Code de sécurité » (réglages protégés : nom de l'appareil, NTRIP). */
 .fenetre-code {
   width: min(86vw, 320px);
 }
