@@ -34,8 +34,10 @@ export function dessinerDessins(groupe, { dessins = [], actifId = null, pilote =
         groupe.append(nom);
         return;
       }
-      const numero = creer('text', { x: p.x + 7, y: p.y - 7, class: 'numero-dessin' });
-      numero.textContent = String(i + 1);
+      // Point de départ bien visible : rond violet plein et « Départ ».
+      if (i === 0) groupe.append(creer('circle', { cx: p.x, cy: p.y, r: 7, class: 'depart-dessin' }));
+      const numero = creer('text', { x: p.x + 9, y: p.y - 9, class: `numero-dessin ${i === 0 ? 'texte-depart' : ''}` });
+      numero.textContent = i === 0 ? 'Départ' : String(i + 1);
       groupe.append(numero);
     });
     if (actif && dessin.type !== 'points') {

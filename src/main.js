@@ -20,7 +20,7 @@ import { creerEcranImport } from './import/ecran.js';
 import { creerEcranCoupes } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
 import { creerEcranDessin } from './dessin/ecran.js';
-import { gisement, directionTournee, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt, surfaceDuDessin } from './topo/dessin.js';
+import { gisement, directionTournee, passerParSommet, altitudeProchainSommet, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt, surfaceDuDessin } from './topo/dessin.js';
 import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
@@ -99,7 +99,9 @@ let traceCoupe = null; // coupe en train d'être tracée sur le plan : { id, eta
 // Calculs › Dessin : dessin en cours avec l'outil « pilote » (voir dessin/ecran.js), ou null :
 // { dessinId, accroche (objet pris en touchant : 'point', 'sommet', 'milieu', 'ligne', 'centre', voir
 // topo/accroche.js), direction (gisement en gon, ou null), distance (texte tapé), reference (d'où
-// vient la direction : « vers b3 », « 90° à droite »…), angle (texte tapé, en degrés), sens }.
+// vient la direction : « vers b3 », « 30° à droite »…), angle (texte tapé, en degrés), tourne (degrés
+// tournés depuis le prolongement du côté précédent, + = à droite : chaque clic ajoute l'angle),
+// altitude (texte tapé : altitude du prochain sommet) }.
 // Un toucher sur le plan donne le point de départ (aucun sommet), sinon la direction.
 let pilote = null;
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
@@ -1215,7 +1217,7 @@ const dessinDe = (id) => projet.dessins.find((d) => d.id === id);
 
 /** Pilote pour dessiner "dessin" : toucher le plan pose un sommet au début, puis donne la direction. */
 function nouveauPilote(dessin) {
-  return { dessinId: dessin.id, accroche: pilote?.accroche ?? 'point', direction: null, distance: '', reference: null, angle: '90', sens: null };
+  return { dessinId: dessin.id, accroche: pilote?.accroche ?? 'point', direction: null, distance: '', reference: null, angle: pilote?.angle ?? '90', tourne: 0, altitude: '' };
 }
 
 const auMillimetre = (valeur) => (valeur == null ? null : Math.round(valeur * 1000) / 1000);
@@ -1224,16 +1226,30 @@ const auMillimetre = (valeur) => (valeur == null ? null : Math.round(valeur * 10
  * Ajoute un sommet au dessin en cours ({ est, nord, altitude }) ; ensuite, la direction du côté
  * suivant est à redonner (tourner, toucher le plan ou RX2), la distance tapée est gardée.
  */
-function ajouterSommetDessin(point) {
+function ajouterSommetDessin(point, nomDepart = null) {
   const dessin = dessinDe(pilote?.dessinId);
   if (!dessin) return;
+  // Le point de départ : son nom (point accroché, « RX2 »), écrit dans la carte du dessin.
+  if (dessin.sommets.length === 0) dessin.nomDepart = nomDepart ?? point.nom ?? null;
   dessin.sommets.push({ est: auMillimetre(point.est), nord: auMillimetre(point.nord), altitude: auMillimetre(point.altitude ?? null) });
   if (dessin.sommets.length >= 2) {
     pilote.direction = null;
     pilote.reference = null;
-    pilote.sens = null;
+    pilote.tourne = 0;
   }
   modifie();
+}
+
+/**
+ * Direction du côté suivant : celle du côté précédent tournée de pilote.tourne degrés (+ = à
+ * droite) ; texte « tout droit », « 30° à droite »… dans pilote.reference.
+ */
+function appliquerTourne(dessin) {
+  const precedent = gisement(dessin.sommets.at(-2), dessin.sommets.at(-1));
+  if (precedent == null) return;
+  const t = pilote.tourne;
+  pilote.direction = directionTournee(precedent, Math.abs(t), t >= 0 ? 'droite' : 'gauche');
+  pilote.reference = t === 0 ? 'tout droit' : `${auMillimetre(Math.abs(t))}° à ${t > 0 ? 'droite' : 'gauche'}`;
 }
 
 /**
@@ -1264,7 +1280,7 @@ function toucherPourDessin(position, tolerance) {
     if (gon == null) return;
     pilote.direction = gon;
     pilote.reference = trouve?.nom ? `vers ${trouve.nom}` : 'touchée sur le plan';
-    pilote.sens = null;
+    pilote.tourne = 0;
     recalculer();
     return;
   }
@@ -1404,21 +1420,31 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     pilote.accroche = MODES_ACCROCHE.includes(mode) ? mode : 'point';
     recalculer();
   },
+  // Chaque clic tourne de l'angle inscrit (cumulé) ; « Tout droit » : dans le prolongement du côté précédent.
   tournerCote: ({ angle, sens }) => {
     const dessin = dessinDe(pilote?.dessinId);
     if (!dessin || dessin.sommets.length < 2) return;
-    const degres = lireNombreTape(angle);
-    if (degres == null || !(degres >= 0 && degres <= 180)) {
-      afficherMessage('Angle illisible : un nombre de degrés entre 0 et 180 (90 = d\'équerre)', 4000);
-      return;
+    if (sens === 'droit') pilote.tourne = 0;
+    else {
+      const degres = lireNombreTape(angle);
+      if (degres == null || !(degres > 0 && degres <= 180)) {
+        afficherMessage('Angle illisible : un nombre de degrés entre 0 et 180 (90 = d\'équerre)', 4000);
+        return;
+      }
+      pilote.angle = String(angle).trim();
+      // On part de la direction actuelle (tournée, touchée sur le plan ou vers le RX2), sinon du
+      // prolongement du côté précédent ; « tourne » est compté depuis ce prolongement, entre −180° et +180°.
+      const precedent = gisement(dessin.sommets.at(-2), dessin.sommets.at(-1));
+      const depuis = pilote.direction == null || precedent == null ? 0 : ((pilote.direction - precedent) * 360) / 400;
+      const total = depuis + (sens === 'droite' ? degres : -degres);
+      pilote.tourne = ((((total + 180) % 360) + 360) % 360) - 180;
     }
-    const precedent = gisement(dessin.sommets.at(-2), dessin.sommets.at(-1));
-    if (precedent == null) return;
-    pilote.angle = String(angle).trim();
-    pilote.sens = sens;
-    pilote.direction = directionTournee(precedent, degres, sens);
-    pilote.reference = `${degres}° à ${sens}`;
+    appliquerTourne(dessin);
     recalculer();
+  },
+  // Altitude du prochain sommet (tapée à côté de la distance).
+  reglerAltitudePilote: (texte) => {
+    if (pilote) pilote.altitude = texte.trim();
   },
   reglerDistance: (texte) => {
     if (!pilote || pilote.distance === texte.trim()) return;
@@ -1437,7 +1463,14 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
       afficherMessage('Distance illisible : un nombre de mètres plus grand que 0', 4000);
       return;
     }
-    ajouterSommetDessin({ ...pointSelonGisement(dessin.sommets.at(-1), pilote.direction, distance), altitude: null });
+    const tapee = lireNombreTape(pilote.altitude);
+    if (tapee === undefined) {
+      afficherMessage('Altitude illisible : écris un nombre, ou laisse vide', 4000);
+      return;
+    }
+    const altitude = altitudeProchainSommet(dessin, tapee);
+    pilote.altitude = '';
+    ajouterSommetDessin({ ...pointSelonGisement(dessin.sommets.at(-1), pilote.direction, distance), altitude });
   },
   sommetRx2: () => {
     const reponse = prendrePointRecepteur();
@@ -1446,7 +1479,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
       return;
     }
     sonValidation();
-    ajouterSommetDessin(reponse.point);
+    ajouterSommetDessin(reponse.point, 'RX2');
   },
   directionRx2: () => {
     const dessin = dessinDe(pilote?.dessinId);
@@ -1463,7 +1496,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     sonValidation();
     pilote.direction = gon;
     pilote.reference = 'vers le RX2';
-    pilote.sens = null;
+    pilote.tourne = 0;
     recalculer();
   },
   rectangleDessin: ({ longueur, largeur, cote }) => {
@@ -1491,7 +1524,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     dessin.sommets.pop();
     pilote.direction = null;
     pilote.reference = null;
-    pilote.sens = null;
+    pilote.tourne = 0;
     modifie();
   },
   choisirModeHauteur: (valeur) => {
@@ -1519,15 +1552,17 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     else h.pente = valeur ? { cote: h.pente?.cote ?? 0, depuis: h.pente?.depuis ?? 0, pourcent: valeur } : null;
     modifie();
   },
+  // Altitude d'un sommet changée dans « Voir les sommets » : le dessin passe « par sommet ».
   altitudeSommet: (id, numero, texte) => {
-    const sommet = dessinDe(id)?.sommets[numero];
+    const dessin = dessinDe(id);
     const valeur = lireNombreTape(texte);
-    if (!sommet) return;
+    if (!dessin?.sommets[numero]) return;
     if (valeur === undefined) {
       afficherMessage(`Altitude du sommet ${numero + 1} illisible : écris un nombre, ou laisse vide`, 4000);
       return;
     }
-    sommet.altitude = valeur;
+    passerParSommet(dessin);
+    dessin.sommets[numero].altitude = valeur;
     modifie();
   },
 });

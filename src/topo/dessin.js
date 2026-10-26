@@ -157,6 +157,31 @@ export function altitudesDuDessin(dessin) {
   return sommets.map(() => hauteur.altitude);
 }
 
+/**
+ * Passe un dessin en altitudes « par sommet » : chaque sommet garde l'altitude qu'il avait
+ * (fixe, ou avec la pente). Modifie le dessin ; rien à faire s'il y est déjà.
+ */
+export function passerParSommet(dessin) {
+  if (dessin.hauteur?.mode === 'sommets') return;
+  const altitudes = altitudesDuDessin(dessin);
+  dessin.sommets.forEach((s, i) => (s.altitude = altitudes[i] ?? null));
+  dessin.hauteur = { ...(dessin.hauteur ?? {}), mode: 'sommets' };
+}
+
+/**
+ * Altitude (m) du prochain sommet : celle tapée (nombre), sinon, en mode « par sommet », celle du
+ * sommet précédent ; en mode fixe, null (l'altitude du dessin s'applique). Si une altitude est
+ * tapée en mode fixe, le dessin passe d'abord « par sommet » (voir passerParSommet).
+ */
+export function altitudeProchainSommet(dessin, tapee) {
+  if (tapee != null) {
+    passerParSommet(dessin);
+    return tapee;
+  }
+  if (dessin.hauteur?.mode === 'sommets') return dessin.sommets.at(-1)?.altitude ?? null;
+  return null;
+}
+
 // Natures de dessin : [clé, nom (aussi le début du nom automatique)]. Depuis 0.66.0, on ne crée plus
 // que des « dessin » (ouverts, ou fermés avec « Fermer la figure ») ; les autres restent lisibles.
 export const TYPES_DESSIN = [

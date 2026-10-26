@@ -12,22 +12,34 @@
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { formaterNombre } from '../topo/format.js';
-import { TYPES_DESSIN, estFerme } from '../topo/dessin.js';
+import { estFerme } from '../topo/dessin.js';
 import { MODES_ACCROCHE } from '../topo/accroche.js';
 import { ACCROCHES } from '../leve/ecran.js';
 
-const NOM_TYPE = Object.fromEntries(TYPES_DESSIN);
 const nombre = (valeur) => (valeur == null ? '' : String(Math.round(valeur * 1000) / 1000));
 
 /**
  * Crée l'écran dans "conteneur". actions (main.js) : nouveauDessin(), dessiner(id),
  * terminerDessin(), supprimerDessin(id), renommerDessin(id, nom), choisirAccrocheDessin(mode),
- * tournerCote({ angle, sens }), reglerDistance(texte), ajouterSommetPilote(), sommetRx2(),
+ * tournerCote({ angle, sens : 'gauche', 'droite' ou 'droit' }), reglerDistance(texte),
+ * reglerAltitudePilote(texte), ajouterSommetPilote(), sommetRx2(),
  * directionRx2(), fermerFigure(), rectangleDessin({ longueur, largeur, cote }), annulerSommet(),
  * choisirModeHauteur(id:mode), reglerHauteur(id, champ, valeur), altitudeSommet(id, n°, texte), creerSurfaceDessin(id).
  * Renvoie { afficher(donnees) } ; donnees : { dessins, pilote, recepteur }.
  */
 export function creerEcranDessin(conteneur, actions) {
+  // « Voir les sommets » ouverts (gardés quand l'écran est redessiné) : identifiants des dessins.
+  const ouverts = new Set();
+  conteneur.addEventListener(
+    'toggle',
+    (evenement) => {
+      const id = evenement.target.dataset?.sommets;
+      if (!id) return;
+      if (evenement.target.open) ouverts.add(id);
+      else ouverts.delete(id);
+    },
+    true,
+  );
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton || bouton.disabled) return;
@@ -39,6 +51,13 @@ export function creerEcranDessin(conteneur, actions) {
     }
     // Les cases tapées sans Entrée sont lues d'abord (l'écran est redessiné après chaque réglage).
     const distance = conteneur.querySelector('[data-pilote="distance"]')?.value ?? '';
+    const altitude = conteneur.querySelector('[data-pilote="altitude"]')?.value ?? '';
+    actions.reglerAltitudePilote?.(altitude);
+    if (action === 'voirDistance') {
+      // OK : le prochain sommet est montré sur le plan (croix), sans l'ajouter.
+      actions.reglerDistance(distance);
+      return;
+    }
     if (action === 'ajouterSommetPilote') {
       actions.reglerDistance(distance);
       actions.ajouterSommetPilote();
@@ -57,6 +76,7 @@ export function creerEcranDessin(conteneur, actions) {
     const { id } = champ.dataset;
     if (champ.dataset.champ === 'nom-dessin') actions.renommerDessin(id, champ.value.trim());
     else if (champ.dataset.pilote === 'distance') actions.reglerDistance(champ.value);
+    else if (champ.dataset.pilote === 'altitude') actions.reglerAltitudePilote(champ.value);
     else if (champ.dataset.hauteur) actions.reglerHauteur(id, champ.dataset.hauteur, champ.value);
     else if (champ.dataset.altitudeSommet != null) actions.altitudeSommet(id, Number(champ.dataset.altitudeSommet), champ.value);
   });
@@ -75,52 +95,60 @@ export function creerEcranDessin(conteneur, actions) {
       const cle = actif
         ? ['data-pilote', 'data-hauteur', 'data-champ', 'data-altitude-sommet', 'data-id'].filter((a) => actif.hasAttribute(a)).map((a) => `[${a}="${actif.getAttribute(a)}"]`).join('')
         : '';
-      conteneur.innerHTML = htmlDessins(donnees);
+      conteneur.innerHTML = htmlDessins(donnees, ouverts);
       if (cle) conteneur.querySelector(`input${cle}`)?.focus();
     },
   };
 }
 
-/** Tout l'écran : « + Dessin », puis chaque dessin (le dessin en cours avec le pilote). */
-function htmlDessins({ dessins, pilote, recepteur }) {
+/**
+ * Tout l'écran : « + Dessin », puis chaque dessin. Pendant un dessin, seule sa carte est montrée
+ * (moins de place, surtout sur téléphone).
+ */
+function htmlDessins({ dessins, pilote, recepteur }, ouverts) {
+  const enCours = pilote ? dessins.find((d) => d.id === pilote.dessinId) : null;
+  if (enCours) return carteDessin(enCours, pilote, recepteur, ouverts);
   return `
     <div class="boutons-dessin">
       <button type="button" class="bouton" data-action="nouveauDessin">+ Dessin</button>
     </div>
-    ${dessins.length === 0 ? '<p class="vide">Aucun dessin.</p>' : dessins.map((d) => carteDessin(d, pilote?.dessinId === d.id ? pilote : null, recepteur)).join('')}`;
+    ${dessins.length === 0 ? '<p class="vide">Aucun dessin.</p>' : dessins.map((d) => carteDessin(d, null, recepteur, ouverts)).join('')}`;
 }
 
-/** Un dessin : nom, résumé, pilote (s'il est en cours), altitudes, sommets. */
-function carteDessin(d, pilote, recepteur) {
+/** Un dessin : nom et résumé (une ligne), altitude (une ligne), départ, pilote, surface, sommets. */
+function carteDessin(d, pilote, recepteur, ouverts) {
   const ferme = estFerme(d);
   const resume = [
-    `${d.sommets.length} ${d.type === 'points' ? 'point(s)' : 'sommet(s)'}`,
-    d.ferme ? 'figure fermée' : '',
-    d.type === 'points' || d.sommets.length < 2 ? '' : `${ferme ? 'périmètre' : 'longueur'} ${formaterNombre(d.perimetre)} m`,
-    ferme && d.sommets.length >= 3 ? `aire ${formaterNombre(d.aire)} m²` : '',
+    `${d.sommets.length} ${d.type === 'points' ? 'pt' : 'sommet(s)'}`,
+    d.ferme ? 'fermé' : '',
+    d.type === 'points' || d.sommets.length < 2 ? '' : `${ferme ? 'pér.' : 'long.'} ${formaterNombre(d.perimetre)} m`,
+    ferme && d.sommets.length >= 3 ? `${formaterNombre(d.aire)} m²` : '',
   ].filter(Boolean).join(' · ');
-  // Altitude en haut (avant le pilote) ; la surface seulement pour une figure fermée.
+  const depart = d.sommets[0]
+    ? `<p class="depart-dessin"><strong>Départ</strong> ${d.nomDepart ? `${echapper(d.nomDepart)} · ` : ''}E ${formaterNombre(d.sommets[0].est)} · N ${formaterNombre(d.sommets[0].nord)}</p>`
+    : '';
   return `<div class="carte-dessin sorte-${d.type} ${pilote ? 'en-edition' : ''}">
-    ${pilote ? '<button type="button" class="bouton-retour-dessin" data-action="terminerDessin">← Retour</button>' : ''}
     <div class="entete-dessin">
-      <span class="type-dessin">${NOM_TYPE[d.type] ?? 'Dessin'}</span>
+      ${pilote ? '<button type="button" class="bouton-retour-dessin" data-action="terminerDessin" aria-label="Retour">←</button>' : ''}
       <input type="text" class="nom-dessin" data-champ="nom-dessin" data-id="${d.id}" value="${echapper(d.nom)}" aria-label="Nom du dessin" />
+      <span class="resume-dessin">${resume}</span>
     </div>
-    <p class="aide">${resume}</p>
     ${d.type === 'points' ? '' : htmlHauteur(d)}
+    ${depart}
     ${pilote ? htmlPilote(d, pilote, recepteur) : `<div class="ligne-outils">
         <button type="button" class="bouton-secondaire" data-action="dessiner" data-valeur="${d.id}">${d.ferme ? 'Rouvrir et dessiner' : 'Dessiner'}</button>
         <button type="button" class="bouton-lien" data-action="supprimerDessin" data-valeur="${d.id}">supprimer</button>
       </div>`}
     ${ferme ? htmlSurface(d) : ''}
-    ${htmlSommets(d)}
+    ${htmlSommets(d, ouverts.has(d.id))}
   </div>`;
 }
 
 /**
  * Pilote, étape par étape (le nom de l'étape en évidence) : point de départ (plan ou RX2), direction
- * du 1er côté (plan ou RX2) et distance, puis pour chaque côté suivant un angle (°) à gauche ou à
- * droite du côté précédent et la distance ; rectangle ; fermer la figure ; annuler, terminé.
+ * du 1er côté (plan ou RX2), puis pour chaque côté suivant tourner (chaque clic ajoute l'angle
+ * inscrit) ou tout droit ; distance + OK (aperçu sur le plan), altitude du prochain sommet ;
+ * rectangle ; fermer la figure ; annuler, terminé.
  */
 function htmlPilote(d, p, recepteur) {
   const n = d.sommets.length;
@@ -136,52 +164,41 @@ function htmlPilote(d, p, recepteur) {
       </div>
     </div>`;
   let etape;
-  let detail;
-  if (points) {
-    etape = 'Point';
-    detail = 'touche le plan, ou prends le point au RX2';
-  } else if (n === 0) {
-    etape = 'Point de départ';
-    detail = 'touche le plan, ou prends le point au RX2';
-  } else if (n === 1) {
-    etape = 'Direction du 1er côté';
-    detail = 'touche le plan (un point vers où aller), ou vers le RX2 ; puis la distance';
-  } else {
-    etape = `Côté ${n}`;
-    detail = 'tourne à gauche ou à droite du côté précédent (ou touche le plan), puis la distance';
-  }
-  const direction = p.direction == null
-    ? '<span class="aide">direction pas encore donnée</span>'
-    : `<span class="direction-choisie">✓ direction ${p.reference ? echapper(p.reference) : 'donnée'}</span>`;
-  // Toujours affichés (même sans direction) : l'écran n'a pas à être redessiné pendant la saisie.
+  if (points) etape = 'Point';
+  else if (n === 0) etape = 'Point de départ';
+  else if (n === 1) etape = 'Direction du 1er côté';
+  else etape = `Côté ${n}`;
+  const rx2 = recepteur
+    ? (points || n === 0 ? '<button type="button" class="bouton-secondaire" data-action="sommetRx2">Point au RX2</button>' : '')
+      + (n >= 1 && !points ? '<button type="button" class="bouton-secondaire" data-action="directionRx2">Direction vers le RX2</button>' : '')
+    : '';
+  const direction = p.direction == null ? '' : `<span class="direction-choisie">✓ ${p.reference ? echapper(p.reference) : 'direction donnée'}</span>`;
+  const tourner = n >= 2 && !points
+    ? `<div class="tourner-dessin">
+        <input type="text" inputmode="decimal" data-pilote="angle" value="${echapper(p.angle ?? '90')}" aria-label="Angle en degrés" /><span>°</span>
+        <button type="button" class="bouton-secondaire" data-action="tournerCote" data-valeur="gauche" aria-label="Tourner à gauche">↰</button>
+        <button type="button" class="bouton-secondaire ${p.direction != null && p.tourne === 0 ? 'actif' : ''}" data-action="tournerCote" data-valeur="droit">↑ Tout droit</button>
+        <button type="button" class="bouton-secondaire" data-action="tournerCote" data-valeur="droite" aria-label="Tourner à droite">↱</button>
+      </div>`
+    : '';
   const rectangle = n === 1 && d.type !== 'ligne' && !points
     ? `<details class="rectangle-dessin">
-        <summary>Rectangle (depuis le départ, dans la direction donnée)</summary>
+        <summary>Rectangle</summary>
         <label>Longueur<input type="text" inputmode="decimal" data-rectangle="longueur" placeholder="m" /></label>
         <label>Largeur<input type="text" inputmode="decimal" data-rectangle="largeur" placeholder="m" /></label>
         <button type="button" class="bouton-secondaire" data-action="rectangleDessin" data-valeur="gauche">↰ à gauche</button>
         <button type="button" class="bouton-secondaire" data-action="rectangleDessin" data-valeur="droite">à droite ↱</button>
       </details>`
     : '';
-  const tourner = n >= 2 && !points
-    ? `<div class="tourner-dessin">
-        <label>Tourner de<input type="text" inputmode="decimal" data-pilote="angle" value="${echapper(p.angle ?? '90')}" aria-label="Angle en degrés" /><span>°</span></label>
-        <button type="button" class="bouton-secondaire ${p.sens === 'gauche' ? 'actif' : ''}" data-action="tournerCote" data-valeur="gauche">↰ à gauche</button>
-        <button type="button" class="bouton-secondaire ${p.sens === 'droite' ? 'actif' : ''}" data-action="tournerCote" data-valeur="droite">à droite ↱</button>
-      </div>`
-    : '';
   return `<div class="pilote-dessin">
-    <p class="etape-pilote"><strong>${etape}</strong> ${bulle('dessin')}</p>
-    <p class="aide">${detail}</p>
+    <p class="etape-pilote"><strong>${etape}</strong> ${direction} ${bulle('dessin')}</p>
     ${accroches}
-    <div class="ligne-outils">
-      ${recepteur && (points || n === 0) ? '<button type="button" class="bouton-secondaire" data-action="sommetRx2">Point au RX2</button>' : ''}
-      ${recepteur && n >= 1 && !points ? '<button type="button" class="bouton-secondaire" data-action="directionRx2">Direction vers le RX2</button>' : ''}
-    </div>
+    ${rx2 ? `<div class="ligne-outils">${rx2}</div>` : ''}
     ${tourner}
     ${n >= 1 && !points ? `<div class="direction-distance">
-        ${direction}
-        <label>Distance (m)<input type="text" inputmode="decimal" data-pilote="distance" value="${echapper(p.distance ?? '')}" /></label>
+        <input type="text" inputmode="decimal" data-pilote="distance" value="${echapper(p.distance ?? '')}" placeholder="distance m" aria-label="Distance (m)" />
+        <button type="button" class="bouton-secondaire" data-action="voirDistance">OK</button>
+        <input type="text" inputmode="decimal" data-pilote="altitude" value="${echapper(p.altitude ?? '')}" placeholder="altitude" aria-label="Altitude du prochain sommet (m)" />
       </div>
       <button type="button" class="bouton bouton-large" data-action="ajouterSommetPilote">Ajouter le sommet</button>` : ''}
     ${rectangle}
@@ -193,20 +210,22 @@ function htmlPilote(d, p, recepteur) {
   </div>`;
 }
 
-/** Altitudes d'une plateforme ou d'un bâtiment : fixe (avec pente facultative) ou par sommet. */
+/**
+ * Altitudes du dessin, sur une ligne : Fixe (altitude, pente %, et si pente : le long de quel
+ * côté, depuis quel sommet) ou Par sommet (chaque sommet a la sienne, voir « Voir les sommets »).
+ */
 function htmlHauteur(d) {
   const h = d.hauteur;
   const n = d.sommets.length;
   const choix = (mode, titre) => `<button type="button" class="puce-choix ${h.mode === mode ? 'actif' : ''}" data-action="choisirModeHauteur" data-valeur="${d.id}:${mode}">${titre}</button>`;
   const options = (actif, texte) => Array.from({ length: n }, (_, i) => `<option value="${i}" ${i === actif ? 'selected' : ''}>${texte(i)}</option>`).join('');
+  const avecPente = Boolean(h.pente?.pourcent) && n >= 2;
   return `<div class="hauteur-dessin">
-    <div class="ligne-choix"><span>Altitude</span>${choix('fixe', 'Fixe')}${choix('sommets', 'Par sommet')}</div>
-    ${h.mode === 'fixe' ? `<div class="champs-hauteur">
-        <label>Altitude (m)<input type="text" inputmode="decimal" data-hauteur="altitude" data-id="${d.id}" value="${nombre(h.altitude)}" placeholder="ex. 450.20" /></label>
-        <label>Pente (%)<input type="text" inputmode="decimal" data-hauteur="pourcent" data-id="${d.id}" value="${nombre(h.pente?.pourcent)}" placeholder="0" /></label>
-        ${n >= 2 ? `<label>le long du côté<select data-hauteur="cote" data-id="${d.id}">${options(h.pente?.cote ?? 0, (i) => `${i + 1} → ${(i + 1) % n + 1}`)}</select></label>
-        <label>altitude au sommet<select data-hauteur="depuis" data-id="${d.id}">${options(h.pente?.depuis ?? 0, (i) => String(i + 1))}</select></label>` : ''}
-      </div>` : ''}
+    <span class="titre-hauteur">Alt.</span>${choix('fixe', 'Fixe')}${choix('sommets', 'Par sommet')}
+    ${h.mode === 'fixe' ? `<input type="text" inputmode="decimal" data-hauteur="altitude" data-id="${d.id}" value="${nombre(h.altitude)}" placeholder="altitude m" aria-label="Altitude (m)" />
+      <input type="text" inputmode="decimal" class="champ-pente" data-hauteur="pourcent" data-id="${d.id}" value="${nombre(h.pente?.pourcent)}" placeholder="pente %" aria-label="Pente (%)" />
+      ${avecPente ? `<select data-hauteur="cote" data-id="${d.id}" aria-label="Le long du côté">${options(h.pente?.cote ?? 0, (i) => `côté ${i + 1}→${(i + 1) % n + 1}`)}</select>
+      <select data-hauteur="depuis" data-id="${d.id}" aria-label="Altitude au sommet">${options(h.pente?.depuis ?? 0, (i) => `au sommet ${i + 1}`)}</select>` : ''}` : ''}
   </div>`;
 }
 
@@ -224,18 +243,15 @@ function htmlSurface(d) {
     </div>`;
 }
 
-/** Sommets : n°, Est, Nord, altitude (case à remplir en mode « par sommet »). */
-function htmlSommets(d) {
+/** Sommets : nom, Est, Nord, altitude (toujours modifiable : le dessin passe alors « par sommet »). */
+function htmlSommets(d, ouvert) {
   if (d.sommets.length === 0) return '';
-  const parSommet = d.hauteur?.mode === 'sommets';
-  return `<details class="sommets-dessin">
+  return `<details class="sommets-dessin" data-sommets="${d.id}" ${ouvert ? 'open' : ''}>
     <summary>Voir les ${d.type === 'points' ? 'points' : 'sommets'} (${d.sommets.length})</summary>
     <div class="tableau-defilant"><table>
       <thead><tr><th>Nom</th><th>Est (m)</th><th>Nord (m)</th><th>Altitude (m)</th></tr></thead>
       <tbody>${d.sommets.map((s, i) => `<tr><td>${echapper(d.noms[i] ?? String(i + 1))}</td><td>${formaterNombre(s.est)}</td><td>${formaterNombre(s.nord)}</td>
-        <td>${parSommet
-          ? `<input type="text" inputmode="decimal" class="altitude-sommet" data-altitude-sommet="${i}" data-id="${d.id}" value="${nombre(s.altitude)}" aria-label="Altitude du sommet ${i + 1}" />`
-          : (d.altitudes[i] == null ? '—' : formaterNombre(d.altitudes[i]))}</td></tr>`).join('')}</tbody>
+        <td><input type="text" inputmode="decimal" class="altitude-sommet" data-altitude-sommet="${i}" data-id="${d.id}" value="${nombre(d.altitudes[i])}" aria-label="Altitude du sommet ${i + 1}" /></td></tr>`).join('')}</tbody>
     </table></div>
   </details>`;
 }

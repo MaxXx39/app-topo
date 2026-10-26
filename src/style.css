@@ -6418,7 +6418,7 @@ body.mode-base .parties-calculs {
 
 .carte-dessin {
   margin-bottom: 12px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--bordure);
   border-left: 5px solid #7c3aed;
   border-radius: var(--rayon);
@@ -6430,77 +6430,119 @@ body.mode-base .parties-calculs {
   border-color: #7c3aed;
 }
 
+/* En-tête compact (0.68.0) : ← retour, nom, résumé sur une ligne. */
 .entete-dessin {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-}
-
-.type-dessin {
-  color: #7c3aed;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  gap: 4px 8px;
 }
 
 .nom-dessin {
-  flex: 1;
+  flex: 1 1 120px;
   min-width: 0;
+  min-height: 34px;
   font-weight: 700;
 }
 
-.pilote-dessin {
-  margin: 8px 0;
-  padding: 10px;
-  border-radius: 10px;
-  background: color-mix(in srgb, #7c3aed 7%, var(--surface));
+.resume-dessin {
+  color: var(--gris);
+  font-size: 0.8rem;
 }
 
-/* Étape du pilote en évidence : « Point de départ », « Direction du 1er côté », « Côté 3 ». */
-.etape-pilote {
-  margin: 0 0 2px;
-  color: #5b21b6;
-  font-size: 1.25rem;
-  font-weight: 800;
-}
-
-.etape-pilote + .aide {
-  margin: 0 0 8px;
-}
-
-/* « ← Retour » : sur téléphone, les onglets sont cachés pendant le dessin. */
+/* « ← » : sur téléphone, les onglets sont cachés pendant le dessin. */
 .bouton-retour-dessin {
-  margin: 0 0 6px;
-  padding: 4px 10px;
+  min-width: 38px;
+  min-height: 34px;
   border: 1px solid #7c3aed;
   border-radius: 8px;
   background: var(--surface);
   color: #5b21b6;
-  font-weight: 700;
+  font-size: 1.1rem;
+  font-weight: 800;
   cursor: pointer;
 }
 
-.tourner-dessin {
+/* Altitude du dessin sur une ligne : Fixe / Par sommet, altitude, pente (et côté, sommet). */
+.hauteur-dessin {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: 8px 0;
+  gap: 6px;
+  margin-top: 6px;
 }
 
-.tourner-dessin label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.titre-hauteur {
+  color: var(--gris);
+  font-size: 0.85rem;
   font-weight: 700;
 }
 
+.hauteur-dessin input {
+  width: 96px;
+  min-height: 34px;
+}
+
+.hauteur-dessin input.champ-pente {
+  width: 74px;
+}
+
+.hauteur-dessin select {
+  min-height: 34px;
+}
+
+.depart-dessin {
+  margin: 6px 0 0;
+  color: #5b21b6;
+  font-size: 0.85rem;
+}
+
+.pilote-dessin {
+  margin: 6px 0;
+  padding: 8px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #7c3aed 7%, var(--surface));
+}
+
+/* Étape du pilote en évidence : « Point de départ », « Direction du 1er côté », « Côté 3 »,
+   suivie de la direction choisie (« ✓ 30° à droite »). */
+.etape-pilote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0 0 6px;
+  color: #5b21b6;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.direction-choisie {
+  color: #15803d;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.tourner-dessin,
+.direction-distance,
+.rectangle-dessin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+}
+
 .tourner-dessin input {
-  width: 70px;
+  width: 64px;
   min-height: 38px;
   font-size: 1.05rem;
   text-align: right;
+}
+
+.tourner-dessin .bouton-secondaire {
+  min-width: 44px;
+  font-size: 1.05rem;
 }
 
 .tourner-dessin .bouton-secondaire.actif {
@@ -6509,10 +6551,10 @@ body.mode-base .parties-calculs {
   color: #ffffff;
 }
 
-.direction-choisie {
-  align-self: center;
-  color: #15803d;
-  font-weight: 700;
+.direction-distance input {
+  width: 110px;
+  min-height: 38px;
+  font-size: 1.05rem;
 }
 
 .rectangle-dessin summary {
@@ -6521,37 +6563,16 @@ body.mode-base .parties-calculs {
   cursor: pointer;
 }
 
-.direction-distance,
-.rectangle-dessin,
-.champs-hauteur {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 8px;
-  margin: 8px 0;
-}
-
-.direction-distance label,
-.rectangle-dessin label,
-.champs-hauteur label {
+.rectangle-dessin label {
   display: flex;
   flex-direction: column;
   font-size: 0.8rem;
   color: var(--gris);
 }
 
-.direction-distance input,
-.rectangle-dessin input,
-.champs-hauteur input {
-  width: 110px;
+.rectangle-dessin input {
+  width: 100px;
   min-height: 38px;
-  font-size: 1.05rem;
-}
-
-.hauteur-dessin {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--bordure);
 }
 
 .altitude-sommet {
@@ -6579,6 +6600,19 @@ body.mode-base .parties-calculs {
   fill: #ffffff;
   stroke: #7c3aed;
   stroke-width: 2;
+}
+
+.plan .depart-dessin {
+  fill: #7c3aed;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.plan .numero-dessin.texte-depart {
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
 }
 
 .plan .sommet-dessin.actif {

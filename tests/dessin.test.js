@@ -232,3 +232,24 @@ describe('dessin simplifié (0.66.0)', async () => {
     expect(nomDessin('dessin', [dessin])).toBe('Dessin 2');
   });
 });
+
+describe('altitude des sommets (0.68.0)', async () => {
+  const { passerParSommet, altitudeProchainSommet, altitudesDuDessin } = await import('../src/topo/dessin.js');
+  const nouveau = () => ({ type: 'dessin', sommets: [{ est: 0, nord: 0, altitude: 999 }, { est: 10, nord: 0, altitude: null }], hauteur: { mode: 'fixe', altitude: 450, pente: { pourcent: 2, cote: 0, depuis: 0 } } });
+
+  it('passer par sommet garde les altitudes calculées (fixe + pente 2 %)', () => {
+    const d = nouveau();
+    passerParSommet(d);
+    expect(d.hauteur.mode).toBe('sommets');
+    expect(d.sommets.map((s) => s.altitude)).toEqual([450, 450.2]);
+    expect(altitudesDuDessin(d)).toEqual([450, 450.2]);
+  });
+
+  it('prochain sommet : tapée, sinon la précédente (par sommet), sinon rien (fixe)', () => {
+    expect(altitudeProchainSommet(nouveau(), null)).toBeNull();
+    const d = nouveau();
+    expect(altitudeProchainSommet(d, 451.5)).toBe(451.5);
+    expect(d.hauteur.mode).toBe('sommets');
+    expect(altitudeProchainSommet(d, null)).toBeCloseTo(450.2, 9);
+  });
+});
