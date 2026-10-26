@@ -4,6 +4,7 @@
 - Géomètre topo suisse, **débutant en développement**. Répondre **en français**, simplement, sans jargon (définir un terme technique en une phrase).
 - Poser **toujours** des questions **avant** une décision importante ou ambiguë. Ne **jamais deviner** une formule ou une norme de topo : le dire et faire valider.
 - Fonctionnalité : lancer les tests, expliquer, dire comment l'essayer, proposer la suite.
+- Nouvelle fonctionnalité : **toujours demander** dans quel mode la mettre (**Base** ou **Confirmé**) avant de la coder.
 - Tout se fait dans le cloud ; l'utilisateur n'utilise que navigateur / tablette.
 - **Git** : commit en français après chaque fonctionnalité qui marche. Ne jamais demander mot de passe ni jeton dans le chat. Aucun identifiant de modèle dans commits / PR.
 - Avant d'ajouter une bibliothèque : dire ce qu'elle fait, pourquoi, demander l'accord.
@@ -55,7 +56,7 @@ exemples/            fichiers de référence (NE PAS modifier ni supprimer)
 ## Référence de calcul
 Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 m³, Stock 2 = 648.979 m³, Stock 3 = 372.201 m³ (remblai Mensura). Tests automatiques sur ce cas.
 
-## État d'avancement (version 0.57.0)
+## État d'avancement (version 0.57.1)
 **Fait**
 - Import points (CSV Emlid, TXT), LandXML, DXF (surfaces et fond de plan) ; recalage Helmert d'un plan DXF.
 - Surfaces (stock, terrain naturel, terrassement), volumes (remblai / déblai, comparaison), coupes, mesures / métrés.
@@ -63,7 +64,8 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Exports : CSV, PDF (cartouche), DXF, LandXML.
 - Projets locaux + partage Google Drive (verrou, envoi auto).
 - APK : levé RX2 (Bluetooth), corrections swipos (NTRIP), contrôle de surface, implantation point / ligne / talus, libellés et couleurs.
-- Modes Base / Confirmé (0.57.0, réglages ⚙, étoile ☆ / ★ dans l'en-tête, Confirmé par défaut, retenu par l'appareil). En Base, éléments `.seulement-confirme` cachés et `estModeBase()` dans le code. Base = projets, import points, Drive, point tapé, récepteur, lever « Autres », rôles et libellés existants, implanter point / ligne simple, accroches DXF, contrôle de surface, réglages du guidage, plan (fonds, cadastre, points, noms, altitudes). Tout le reste (onglet Calculs, DXF, talus, NTRIP, libellés à modifier, options de ligne, triangles / courbes…) = Confirmé.
+- Modes Base / Confirmé (0.57.0, réglages ⚙, étoile ☆ / ★ dans l'en-tête, Confirmé par défaut, retenu par l'appareil). En Base, éléments `.seulement-confirme` cachés et `estModeBase()` dans le code. Base = projets, import points, Drive, point tapé, récepteur, lever « Levé libre » (« autres » dans le code), rôles et libellés existants, implanter point / ligne simple, accroches DXF, contrôle de surface, réglages du guidage, plan (fonds, cadastre, points, noms, altitudes). Tout le reste (onglet Calculs, DXF, talus, NTRIP, libellés à modifier, options de ligne, triangles / courbes…) = Confirmé.
+- Terrain (0.57.1) : « Levé en cours » = liste des levés écrits à la couleur de leur nature, « + Nouveau levé » en haut de la liste.
 
 **Reste / à valider**
 - Essai terrain du talus (0.56.1) et question ouverte : arrondi (cône) aux angles saillants, est-ce voulu ?

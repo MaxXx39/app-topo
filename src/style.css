@@ -284,7 +284,6 @@ body.aide-active .rond-aide {
   pointer-events: none;
 }
 
-
 /* --- Onglets (barre du bas sur téléphone) --- */
 
 .onglets {
@@ -2985,76 +2984,6 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   display: none !important;
 }
 
-/* Surface levée en cours : bandeau à la couleur de sa nature (comme les boutons « Que lèves-tu ? »),
-   nature en petit, nom en grand (liste à toucher pour en reprendre une autre), « + » à droite. */
-.bandeau-leve {
-  --couleur-nature: #b45309;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding: 6px 6px 6px 12px;
-  border: 2px solid var(--couleur-nature);
-  border-left-width: 8px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--couleur-nature) 10%, var(--surface));
-}
-
-.bandeau-leve.nature-terrain {
-  --couleur-nature: #15803d;
-}
-
-.bandeau-leve.nature-terrassement {
-  --couleur-nature: #2563eb;
-}
-
-.bandeau-leve.nature-metre {
-  --couleur-nature: #0891b2;
-}
-
-.bandeau-leve-texte {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.nature-leve {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--couleur-nature);
-}
-
-.bandeau-leve select {
-  width: 100%;
-  min-height: 30px;
-  padding: 0 28px 0 0;
-  border: none;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231b2b36' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 2px center / 20px 20px;
-  color: var(--texte);
-  font-size: 1.2rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.bouton-plus {
-  flex: none;
-  width: 45px;
-  height: 45px;
-  border: none;
-  border-radius: 50%;
-  background: var(--couleur-nature);
-  color: #ffffff;
-  font-size: 1.8rem;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-}
-
 .bouton-nature.nature-metre {
   --couleur-nature: #0891b2;
 }
@@ -4755,56 +4684,68 @@ button.bouton-import {
   margin-bottom: 10px;
 }
 
-/* Levé en cours (version 0.52.0) : le bandeau à la couleur de sa nature, la liste bien visible
-   (cadre blanc, grosse flèche) pour reprendre un autre levé, et le « + » à part, à droite. */
+/* Levé en cours (version 0.57.1) : « Levé en cours » en petit, puis la liste des levés dans un
+   cadre neutre ; le nom du levé (et chaque levé de la liste) est écrit à la couleur de sa nature.
+   « + Nouveau levé » en haut de la liste. */
 .ligne-leve-en-cours {
   display: flex;
-  align-items: stretch;
-  gap: 10px;
+  flex-direction: column;
+  gap: 2px;
   margin-bottom: 10px;
 }
 
-.ligne-leve-en-cours .bandeau-leve {
-  flex: 1;
-  min-width: 0;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  margin-bottom: 0;
-  padding: 4px 8px 6px 10px;
+.titre-leve-en-cours {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gris);
 }
 
-.ligne-leve-en-cours .bandeau-leve select {
-  min-height: 35px;
+.choix-leve {
+  --couleur-nature: #b45309;
+  width: 100%;
+  min-height: 40px;
   padding: 0 44px 0 10px;
-  border: 1.5px solid var(--couleur-nature);
+  border: 1.5px solid var(--bordure);
   border-radius: 8px;
+  appearance: none;
+  -webkit-appearance: none;
   background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%231b2b36'/%3E%3Cpath d='m7 10 5 5 5-5' fill='none' stroke='%23f6ab07' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 6px center / 28px 28px;
+  color: var(--couleur-nature);
   font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
 }
 
-.ligne-leve-en-cours .bouton-plus {
-  --couleur-nature: var(--sombre); /* neutre : ne prend pas la couleur du levé en cours */
-  align-self: center;
-  width: 48px;
-  height: 48px;
-  box-shadow: 0 2px 6px rgba(16, 24, 20, 0.25);
+.choix-leve option {
+  --couleur-nature: #b45309;
+  color: var(--couleur-nature);
+  font-weight: 700;
 }
 
-.bandeau-leve.nature-terrain {
+.choix-leve option.nouveau-leve {
+  color: var(--texte);
+}
+
+.choix-leve.nature-terrain,
+.choix-leve option.nature-terrain {
   --couleur-nature: #15803d;
 }
 
-.bandeau-leve.nature-terrassement {
+.choix-leve.nature-terrassement,
+.choix-leve option.nature-terrassement {
   --couleur-nature: #2563eb;
 }
 
-.bandeau-leve.nature-metre {
+.choix-leve.nature-metre,
+.choix-leve option.nature-metre {
   --couleur-nature: #0891b2;
 }
 
-/* « Autres » (contrôle, points géomètre…) : gris ardoise. */
-.bandeau-leve.nature-autres,
+/* « Levé libre » (contrôle, points géomètre… ; « autres » dans le code) : gris ardoise. */
+.choix-leve.nature-autres,
+.choix-leve option.nature-autres,
 .bouton-nature.nature-autres {
   --couleur-nature: #475569;
 }

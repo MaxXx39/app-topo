@@ -1805,7 +1805,7 @@ function donneesMetre(metre) {
 function donneesCommunes() {
   return {
     // Surfaces levées et métrés, avec la date de leur levé (« Stock 2 · 22.10.2026 »).
-    stocks: [...surfacesLevees(), ...projet.metres, ...projet.autres].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}` })),
+    stocks: [...surfacesLevees(), ...projet.metres, ...projet.autres].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}`, nature: s.nature ?? 'stock' })),
     libelles,
     libelleLigne: terrain.libelleLigne,
     libellePoint: terrain.libellePoint,

@@ -36,7 +36,7 @@ const IMPLANTATIONS = [
   ['talus', 'Talus', true],
   ['surface', 'Surface', true],
 ];
-// Mode Base (réglages ⚙) : pas de talus, et on ne lève que des « Autres » (lignes et points).
+// Mode Base (réglages ⚙) : pas de talus, et on ne lève que des « Levé libre » (lignes et points).
 const IMPLANTATIONS_CONFIRME = ['talus'];
 const NATURES_BASE = ['autres'];
 const VUES_COUPES = [
@@ -52,7 +52,7 @@ const NATURES_TERRAIN = [
   ['terrain', 'Terrain naturel'],
   ['terrassement', 'Terrassement'],
   ['metre', 'Métré'],
-  ['autres', 'Autres'],
+  ['autres', 'Levé libre'],
 ];
 // Accroches : un dessin (en gris ce qu'on touche, en ambre l'endroit accroché) et un mot dessous.
 // [mot, nom complet (bulle, lecture d'écran), dessin].
@@ -184,7 +184,11 @@ export function creerEcranLeve(conteneur, actions) {
 
   conteneur.addEventListener('change', (evenement) => {
     const cible = evenement.target;
-    if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
+    // « + Nouveau levé » (en haut de la liste des levés) : choix de ce que l'on lève.
+    if (cible.dataset.champ === 'stock' && cible.value === 'nouveau') {
+      choixNatureOuvert = true;
+      dessiner();
+    } else if (cible.dataset.champ === 'stock') actions.choisirStock(cible.value);
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
@@ -754,19 +758,17 @@ export function creerEcranLeve(conteneur, actions) {
   }
 
   /**
-   * Bandeau de la surface levée en cours, à la couleur de sa nature : sa nature en petit, son
-   * nom en grand (liste pour en reprendre une autre) et « + » (couleur neutre) pour en commencer une nouvelle.
+   * Levé en cours (demande du 26.10.2026) : « Levé en cours » en petit, puis la liste des levés,
+   * chacun écrit à la couleur de sa nature, avec « + Nouveau levé » tout en haut.
    */
   function ligneSurface() {
     const nature = donnees.stock.nature ?? 'stock';
     return `<div class="ligne-leve-en-cours">
-      <div class="bandeau-leve nature-${nature}">
-        <span class="nature-leve">${echapper(NATURES_TERRAIN.find(([cle]) => cle === nature)?.[1] ?? '')}</span>
-        <select data-champ="stock" aria-label="Levé en cours : en reprendre un autre">
-          ${donnees.stocks.map((s) => `<option value="${s.id}" ${s.id === donnees.stock.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}
-        </select>
-      </div>
-      <button type="button" class="bouton-plus" data-action="ouvrirChoixNature" aria-label="Nouveau levé" title="Nouveau levé">+</button>
+      <span class="titre-leve-en-cours">Levé en cours</span>
+      <select data-champ="stock" class="choix-leve nature-${nature}" aria-label="Levé en cours : en reprendre un autre, ou en commencer un nouveau">
+        <option value="nouveau" class="nouveau-leve">+ Nouveau levé</option>
+        ${donnees.stocks.map((s) => `<option value="${s.id}" class="nature-${s.nature}" ${s.id === donnees.stock.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}
+      </select>
     </div>`;
   }
 
