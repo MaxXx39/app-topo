@@ -1,6 +1,6 @@
 // Tests du pont vers l'appli Android (APK).
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { enBase64, estDansAppliAndroid, enregistrerDansAndroid } from '../src/android/pont.js';
+import { enBase64, estDansAppliAndroid, enregistrerDansAndroid, journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from '../src/android/pont.js';
 
 describe('enBase64', () => {
   it('code des octets en base64', () => {
@@ -30,5 +30,16 @@ describe('appli Android', () => {
     expect(estDansAppliAndroid()).toBe(true);
     await enregistrerDansAndroid(new Blob(['abc'], { type: 'text/csv;charset=utf-8' }), 'volumes.csv');
     expect(enregistrerFichier).toHaveBeenCalledWith('volumes.csv', 'text/csv;charset=utf-8', btoa('abc'));
+  });
+
+  it('journal NMEA : seulement avec une APK qui le sait ; durée et texte passent par le pont', () => {
+    globalThis.window = { AppliAndroid: { prendrePoint() {} } };
+    expect(journalNmeaDisponible()).toBe(false);
+    const demarrer = vi.fn();
+    globalThis.window = { AppliAndroid: { demarrerJournalNmea: demarrer, lireJournalNmea: () => '$GNGGA,1\r\n$GNETC,2\r\n' } };
+    expect(journalNmeaDisponible()).toBe(true);
+    demarrerJournalNmea(60);
+    expect(demarrer).toHaveBeenCalledWith(60);
+    expect(lireJournalNmea().split('\r\n')[1]).toBe('$GNETC,2');
   });
 });

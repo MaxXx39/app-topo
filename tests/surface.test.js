@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { lirePoints } from '../src/topo/import-points.js';
 import { lireListeDeNoms } from '../src/topo/noms.js';
 import { lireLandXML, resumerSurface } from '../src/topo/landxml.js';
-import { creerSurface, calculerSurface, cleTriangle, surfaceImportee } from '../src/topo/surface.js';
+import { creerSurface, calculerSurface, cleTriangle, surfaceImportee, bordDeTriangles } from '../src/topo/surface.js';
 
 const pt = (nom, est, nord, altitude) => ({ nom, est, nord, altitude });
 const aire = (triangles) =>
@@ -73,5 +73,18 @@ describe('surfaceImportee', () => {
     const { triangles } = calculerSurface(rangee, []);
     expect(triangles).toHaveLength(506);
     expect(aire(triangles)).toBeCloseTo(resumerSurface(lue).surfacePlan, 6);
+  });
+});
+
+describe('bord d\'une surface en triangles', () => {
+  it('carré en 2 triangles : 4 côtés de bord, la diagonale n\'en fait pas partie', () => {
+    const a = { est: 0, nord: 0 };
+    const b = { est: 10, nord: 0 };
+    const c = { est: 10, nord: 10 };
+    const d = { est: 0, nord: 10 };
+    const bord = bordDeTriangles([[a, b, c], [a, c, d]]);
+    expect(bord).toHaveLength(4);
+    const diagonale = bord.some(([p, q]) => (p === a && q === c) || (p === c && q === a));
+    expect(diagonale).toBe(false);
   });
 });

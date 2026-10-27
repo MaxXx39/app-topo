@@ -166,3 +166,24 @@ function trianglesImportes(surface) {
 export function nouvelIdentifiant() {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
+
+/**
+ * Bord d'une surface en triangles (0.83.0) : les côtés qui n'appartiennent qu'à un seul triangle
+ * (les côtés intérieurs sont partagés par deux triangles). triangles : [[a, b, c]] de points
+ * { est, nord }. Renvoie [[p, q]] (segments du bord, dans n'importe quel ordre).
+ */
+export function bordDeTriangles(triangles) {
+  const cle = (p) => `${p.est},${p.nord}`;
+  const cotes = new Map();
+  for (const triangle of triangles) {
+    for (let i = 0; i < 3; i++) {
+      const p = triangle[i];
+      const q = triangle[(i + 1) % 3];
+      const k = [cle(p), cle(q)].sort().join('|');
+      const deja = cotes.get(k);
+      if (deja) deja.nombre += 1;
+      else cotes.set(k, { segment: [p, q], nombre: 1 });
+    }
+  }
+  return [...cotes.values()].filter((c) => c.nombre === 1).map((c) => c.segment);
+}

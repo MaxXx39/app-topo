@@ -857,9 +857,9 @@ export function creerEcranLeve(conteneur, actions) {
   function ligneSurface() {
     const nature = donnees.stock.nature ?? 'stock';
     const titre = NATURES_TERRAIN.find(([cle]) => cle === nature)?.[1] ?? '';
-    return `<div class="entete-levee nature-${nature}">
+    return `<div class="entete-levee nature-${nature}" title="${titre}">
+      <span class="titre-cadre">Lever</span>
       <div class="nom-levee">
-        <span class="nature-levee">${titre}</span>
         <strong>${echapper(donnees.stock.nom)}</strong>
         <button type="button" class="bouton-crayon-levee" data-action="renommerLevee" title="Renommer" aria-label="Renommer le levé">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
