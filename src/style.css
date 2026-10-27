@@ -7281,17 +7281,41 @@ body.lecture-seule .bouton-photo-levee {
 
 /* Terrain › Lever (0.78.0) : le levé en cours dans un cadre (nom, « Changer de levé », « + Nouveau levé »). */
 .entete-levee {
-  padding: 8px 10px;
+  position: relative;
+  margin-top: 10px;
+  padding: 14px 10px 8px;
   border: 2px solid var(--couleur-nature);
   border-radius: 12px;
   background: color-mix(in srgb, var(--couleur-nature) 5%, var(--surface));
 }
 
+/* Titre posé sur le trait du cadre (0.81.0) : le trait est coupé derrière le texte (fond blanc
+   au-dessus du trait, fond teinté du cadre en dessous). */
+.entete-levee > .titre-cadre,
+.element-en-cours > .titre-element {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  transform: translateY(-55%);
+  padding: 0 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.entete-levee > .titre-cadre {
+  color: var(--couleur-nature);
+  background: linear-gradient(var(--surface) 55%, color-mix(in srgb, var(--couleur-nature) 5%, var(--surface)) 55%);
+}
+
 /* Ligne ou contour en cours : titre, nom en gras, nombre de points, boutons. */
 .element-en-cours {
   --couleur-element: var(--orange);
-  margin-bottom: 8px;
-  padding: 6px 10px 8px;
+  position: relative;
+  margin: 14px 0 8px;
+  padding: 12px 10px 8px;
   border: 2px solid var(--couleur-element);
   border-radius: 10px;
   background: color-mix(in srgb, var(--couleur-element) 6%, var(--surface));
@@ -7302,12 +7326,8 @@ body.lecture-seule .bouton-photo-levee {
 }
 
 .element-en-cours .titre-element {
-  display: block;
   color: var(--couleur-element);
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  background: linear-gradient(var(--surface) 55%, color-mix(in srgb, var(--couleur-element) 6%, var(--surface)) 55%);
 }
 
 .element-en-cours .corps-element {
