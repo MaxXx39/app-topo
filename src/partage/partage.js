@@ -50,7 +50,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     // { projetId, appareilId, nom, depuis, vu, attente } : un autre appareil a la main (lecture seule) ;
     // attente : vrai si cet appareil l'avait (il la reprendra tout seul quand elle sera rendue).
     repris: null,
-    rendu: null, // { projetId } : main rendue (ou libre) ; reprise à la prochaine modification
+    rendu: null, // { projetId } : main rendue (ou libre) : lecture seule jusqu'à la reprendre (main grise, 0.80.0)
   };
   let synchro = null;
   let minuterie = null;
@@ -418,16 +418,13 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     /** Le projet ouvert vient d'être enregistré sur l'appareil : envoi dans 30 s. */
     projetEnregistre() {
       if (silence || etat.repris?.projetId === obtenirProjet().id) return;
-      // Main rendue : la modification la reprend (si personne ne l'a prise entre-temps).
-      if (etat.rendu?.projetId === obtenirProjet().id) {
-        apresOuverture();
-        return;
-      }
+      // Main rendue : lecture seule, rien ne part (on la reprend en touchant la main grise, 0.80.0).
+      if (etat.rendu?.projetId === obtenirProjet().id) return;
       planifier();
     },
 
     envoyerMaintenant: () => {
-      if (etat.rendu?.projetId === obtenirProjet().id) return apresOuverture();
+      if (etat.rendu?.projetId === obtenirProjet().id) return Promise.resolve();
       return envoyer();
     },
     avantDeChanger,
