@@ -2,8 +2,9 @@
 // exactement comme les points d'un fichier importé, et, selon le rôle choisi avant de le prendre,
 // dans la surface en cours : contour, ligne de rupture (ouverte ou fermée) ou point isolé.
 // Les surfaces, volumes, mesures et exports marchent donc sans rien changer.
-// Sur le terrain, on ne voit que les surfaces (stock, terrain naturel, terrassement) : leur levé
-// est créé tout seul, un par jour (« Levé RX2 AAAA-MM-JJ »), et reçoit les points du jour.
+// Sur le terrain, on ne voit que les levés (stock, terrain naturel, terrassement, métré, levé
+// libre). Depuis la 0.77.0, chaque levé a sa propre liste de points, à son nom (creerListeDeLevee) ;
+// avant, une liste par jour (« Levé RX2 AAAA-MM-JJ ») recevait les points du jour.
 //
 // Noms proposés (décision de l'utilisateur, 22.10.2026 : dans Mensura, il ne travaille qu'avec les
 // noms, et retrouve une ligne par ses numéros qui se suivent) : type - libellé - numéro(s).
@@ -56,6 +57,72 @@ export function creerLeveDirect(projet, maintenant = new Date()) {
   projet.leves.push(leve);
   projet.leveActifId = leve.id;
   return leve;
+}
+
+/**
+ * Liste de points d'un nouveau levé (0.77.0, demande du 27.10.2026) : chaque levé fait dans
+ * Terrain (stock, terrain naturel, terrassement, métré, levé libre) a sa propre liste, qui porte
+ * son nom (voir nommerListeDeLevee) et garde sa date de création (importeLe). Renvoie la liste.
+ */
+export function creerListeDeLevee(projet, maintenant = new Date()) {
+  const leve = creerLeveDirect(projet, maintenant);
+  leve.dediee = true;
+  return leve;
+}
+
+/** La liste propre à un levé prend le nom du levé (à la création et quand on le renomme). */
+export function nommerListeDeLevee(projet, levee) {
+  const leve = projet.leves.find((l) => l.id === levee.leveId);
+  if (leve?.dediee) leve.nom = levee.nom;
+}
+
+/**
+ * Fichier de points importé comme levé (0.77.0) : sa liste devient la liste propre d'un levé de
+ * cette nature (stock, terrain, terrassement), nommé d'après le fichier (sans l'extension). Tous
+ * les points du fichier font partie de la surface ; on la complète dans Terrain › Lever.
+ * Renvoie la surface créée.
+ */
+export function leveDepuisFichier(projet, leve, nature) {
+  leve.direct = true;
+  leve.dediee = true;
+  const nom = String(leve.nom).replace(/\.[^.]+$/, '') || 'Levé importé';
+  const surface = creerSurface(nom, leve.id, NATURES.some(([cle]) => cle === nature) ? nature : 'stock');
+  projet.surfaces.push(surface);
+  nommerListeDeLevee(projet, surface);
+  return surface;
+}
+
+/**
+ * Surface d'un dessin fermé (Calculs › Dessin, 0.77.0) : un levé de nature « Surface », rangé avec
+ * les levés, avec sa propre liste de points. Les sommets du dessin (« D1-1 »…) sont dans la liste
+ * et forment le contour ; on peut y ajouter des lignes et des points au RX2 (Terrain › Lever).
+ * sommets : points du dessin [{ nom, est, nord, altitude }]. Renvoie la surface créée.
+ */
+export function creerLeveeDuDessin(projet, dessin, sommets, maintenant = new Date()) {
+  const leve = creerListeDeLevee(projet, maintenant);
+  const numeros = projet.surfaces.map((s) => /^Surface (\d+)$/.exec(s.nom)?.[1]).filter(Boolean).map(Number);
+  const surface = creerSurface(`Surface ${Math.max(0, ...numeros) + 1}`, leve.id, 'surface');
+  surface.dessinId = dessin.id;
+  surface.tousLesPoints = false;
+  surface.lignesRupture = [];
+  projet.surfaces.push(surface);
+  nommerListeDeLevee(projet, surface);
+  synchroniserLeveeDuDessin(projet, surface, sommets);
+  return surface;
+}
+
+/**
+ * Le dessin a changé : ses sommets sont remis dans la liste du levé (coordonnées, altitudes ; ceux
+ * enlevés du dessin partent) et forment le contour. Les points levés au RX2 restent.
+ */
+export function synchroniserLeveeDuDessin(projet, surface, sommets) {
+  const leve = projet.leves.find((l) => l.id === surface.leveId);
+  if (!leve) return;
+  const anciens = new Set(surface.contour);
+  const nouveaux = new Set(sommets.map((p) => p.nom));
+  const autres = leve.points.filter((p) => !anciens.has(p.nom) && !nouveaux.has(p.nom));
+  leve.points = [...sommets.map((p) => ({ nom: p.nom, est: p.est, nord: p.nord, altitude: p.altitude ?? null })), ...autres];
+  surface.contour = sommets.map((p) => p.nom);
 }
 
 /** Levé du jour fait avec le récepteur (créé s'il n'existe pas encore). */

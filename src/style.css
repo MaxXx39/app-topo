@@ -1790,12 +1790,12 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
 }
 
 /* ==========================================================================
-   3. Mesures : tout en cyan pointillé, pour ne pas les confondre avec les surfaces
+   3. Mesures : tout en cyan (traits pleins, comme les autres modes, 0.74.0)
    ========================================================================== */
 
 .carte-role.role-mesure {
   --couleur-role: var(--cyan);
-  border-left: 5px dashed var(--couleur-role);
+  border-left: 5px solid var(--couleur-role);
   background: color-mix(in srgb, var(--couleur-role) 4%, var(--surface));
 }
 
@@ -1834,15 +1834,15 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
 }
 
 .choix-mesure.active {
-  border: 2px dashed var(--couleur-mesure, var(--cyan));
+  border: 2px solid var(--couleur-mesure, var(--cyan));
   border-left-width: 5px;
   background: color-mix(in srgb, var(--couleur-mesure, var(--cyan)) 6%, var(--surface));
   font-weight: 600;
 }
 
-/* Mesure ouverte : un seul encadré cyan pointillé. */
+/* Mesure ouverte : un seul encadré cyan. */
 .carte-mesure {
-  border: 2px dashed var(--couleur-mesure, var(--cyan));
+  border: 2px solid var(--couleur-mesure, var(--cyan));
   border-radius: 12px;
   padding: 6px 14px 4px;
   margin: 12px 0;
@@ -2677,7 +2677,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   flex: 1.2;
   display: flex;
   padding: 3px;
-  border: 2px dashed #0891b2;
+  border: 2px solid #0891b2;
   border-radius: 10px;
 }
 
@@ -4813,6 +4813,10 @@ button.bouton-import {
   --couleur-nature: #2563eb;
 }
 
+.entete-levee.nature-surface {
+  --couleur-nature: #7c3aed;
+}
+
 .entete-levee.nature-metre {
   --couleur-nature: #0891b2;
 }
@@ -5368,6 +5372,25 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   font-size: 1.1rem;
 }
 
+/* Fenêtre à cases (ex. nouveau projet) : titre et ✕ sur une ligne, une case par ligne, OK en bas. */
+.entete-fenetre-champs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fenetre-champs label {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.fenetre-champs .boutons-choix .bouton {
+  text-align: center;
+}
+
 /* Fenêtre « Changer » (Terrain › Lever) : un levé par ligne, à la couleur de sa nature, croix rouge (Confirmé). */
 .liste-levees {
   display: grid;
@@ -5385,6 +5408,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 
 .ligne-levee.nature-terrain { --couleur-nature: #15803d; }
 .ligne-levee.nature-terrassement { --couleur-nature: #2563eb; }
+.ligne-levee.nature-surface { --couleur-nature: #7c3aed; }
 .ligne-levee.nature-metre { --couleur-nature: #0891b2; }
 .ligne-levee.nature-autres { --couleur-nature: #475569; }
 
@@ -6457,7 +6481,7 @@ body.mode-base .parties-calculs {
   flex: 0.8;
   display: flex;
   padding: 3px;
-  border: 2px dashed #7c3aed;
+  border: 2px solid #7c3aed;
   border-radius: 10px;
 }
 
@@ -6785,38 +6809,61 @@ body.mode-telephone .bouton.bouton-prendre {
   min-height: 40px;
 }
 
-/* Barre « Envoyer » après un export (0.69.0), au-dessus des onglets. */
-#barre-envoi {
-  position: fixed;
-  right: 12px;
+/* Fenêtre « Exporter » (0.79.0) : format, Enregistrer, Envoyer par mail, Envoyer autrement. */
+.fenetre-export h2 {
+  overflow-wrap: anywhere;
+}
+
+.formats-export {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.puce-format {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 2px solid var(--bordure);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.puce-format input {
+  position: absolute;
+  opacity: 0;
+}
+
+.puce-format span {
+  color: var(--gris);
+  font-size: 0.75rem;
+}
+
+.puce-format.actif {
+  border-color: var(--ambre);
+  background: color-mix(in srgb, var(--ambre) 12%, var(--surface));
+}
+
+.envoi-mail {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+}
+
+.envoi-mail select {
+  width: 100%;
+}
+
+#message-export {
   bottom: calc(var(--hauteur-onglets) + 12px);
-  left: 12px;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 560px;
-  margin: 0 auto;
-  padding: 8px 12px;
-  border-radius: var(--rayon);
-  background: var(--sombre);
-  color: #ffffff;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  top: auto;
 }
 
-#barre-envoi[hidden] {
+#message-export[hidden] {
   display: none;
-}
-
-#barre-envoi span {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#barre-envoi .bouton-lien {
-  color: #ffffff;
 }
 
 /* « Quoi exporter ? » (0.69.0) : une case par ligne, rangées par catégories. */
@@ -6906,6 +6953,36 @@ body.mode-telephone .bouton.bouton-prendre {
 .devers-lame {
   margin: 8px 0;
   text-align: center;
+}
+
+/* Bords de la surface (0.75.0) : une colonne à gauche et à droite de la coupe ; rouge hors surface. */
+.coupe-lame-bords {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.bord-lame {
+  display: grid;
+  justify-items: center;
+  min-width: 58px;
+  font-size: 0.8rem;
+  color: var(--gris);
+  line-height: 1.25;
+}
+
+.bord-lame strong {
+  font-size: 1.05rem;
+  color: var(--sombre);
+}
+
+.bord-lame.hors strong {
+  color: #dc2626;
+}
+
+.bord-lame .titre-bord {
+  font-weight: 600;
 }
 
 .svg-coupe-lame {
@@ -7093,4 +7170,274 @@ body.mode-telephone .bouton.bouton-prendre {
   fill: none;
   stroke: #1b2b36;
   stroke-width: 3;
+}
+
+/* Lecture seule (0.76.0) : un autre appareil a la main. On voit et on implante, mais les boutons
+   qui ajoutent ou enregistrent sont grisés (toute modification est de toute façon défaite). */
+body.lecture-seule :is(
+  [data-action="prendre"],
+  [data-action="enregistrerImplantation"],
+  [data-action="ouvrirChoixNature"],
+  [data-action="nouvelleLigne"],
+  [data-action="basculerFermeture"],
+  [data-action="renommerLevee"],
+  [data-action="enregistrerTalus"],
+  details[data-bloc="import"]
+) {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Projet › listes (0.77.0) : petit titre de chaque catégorie (Liste de points, Lever, Dessin…). */
+.titre-categorie-liste {
+  margin: 14px 0 6px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--bordure);
+  color: var(--gris);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.titre-categorie-liste:first-child {
+  margin-top: 4px;
+}
+
+/* Terrain › Lever (0.77.0) : appareil photo à gauche de PRENDRE LE POINT. */
+.ligne-prendre {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.ligne-prendre .bouton-prendre {
+  flex: 1;
+  width: auto;
+}
+
+.bouton-photo-levee {
+  display: flex;
+  flex: 0 0 60px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--ambre);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--sombre);
+  cursor: pointer;
+}
+
+.bouton-photo-levee svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+/* Bas de l'écran Lever : triangles en trop (Confirmé) et photos du levé. */
+.bas-du-leve {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.triangles-leve {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+}
+
+.triangles-leve.actif {
+  border: 2px solid var(--rouge);
+}
+
+.triangles-leve > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.triangles-leve svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+body.lecture-seule .bouton-photo-levee {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Terrain › Lever (0.78.0) : le levé en cours dans un cadre (nom, « Changer de levé », « + Nouveau levé »). */
+.entete-levee {
+  padding: 8px 10px;
+  border: 2px solid var(--couleur-nature);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--couleur-nature) 5%, var(--surface));
+}
+
+/* Ligne ou contour en cours : titre, nom en gras, nombre de points, boutons. */
+.element-en-cours {
+  --couleur-element: var(--orange);
+  margin-bottom: 8px;
+  padding: 6px 10px 8px;
+  border: 2px solid var(--couleur-element);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--couleur-element) 6%, var(--surface));
+}
+
+.element-en-cours.role-contour {
+  --couleur-element: var(--rouge);
+}
+
+.element-en-cours .titre-element {
+  display: block;
+  color: var(--couleur-element);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.element-en-cours .corps-element {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.element-en-cours .corps-element strong {
+  font-size: 1.1rem;
+}
+
+.element-en-cours .corps-element > span {
+  flex: 1;
+  color: var(--gris);
+}
+
+.element-en-cours .bouton-secondaire.actif {
+  border-color: var(--couleur-element);
+  background: var(--couleur-element);
+  color: #ffffff;
+}
+
+/* « ID point » au-dessus du nom du prochain point. */
+.champ-id-point {
+  display: grid;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.champ-id-point > span {
+  color: var(--gris);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Lignes du levé (bas de Lever) : contour, lignes et points isolés, à dérouler. */
+.elements-leve {
+  display: grid;
+  gap: 6px;
+}
+
+.element-leve {
+  --couleur-element: var(--orange);
+  border: 1px solid var(--bordure);
+  border-left: 4px solid var(--couleur-element);
+  border-radius: 8px;
+}
+
+.element-leve.role-contour {
+  --couleur-element: var(--rouge);
+}
+
+.element-leve.role-isole {
+  --couleur-element: #15803d;
+}
+
+.element-leve summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.element-leve summary span {
+  color: var(--gris);
+  font-size: 0.85rem;
+}
+
+.element-leve ul {
+  margin: 0;
+  padding: 0 10px 8px 22px;
+  list-style: none;
+}
+
+.element-leve .point-element {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  border-bottom: 1px solid var(--bordure);
+}
+
+.element-leve .segment-element {
+  padding-left: 14px;
+  font-size: 0.8rem;
+}
+
+/* Listes partagées (0.79.0) : réglages ⚙ et fenêtre de modification. */
+.listes-reglages {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fenetre-listes textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.reglage-swipos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px 10px;
+  margin-bottom: 10px;
+  padding: 8px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+}
+
+.reglage-swipos label {
+  display: grid;
+  gap: 2px;
+  font-size: 0.85rem;
+}
+
+.reglage-swipos .bouton-lien {
+  justify-self: start;
+}
+
+.choix-swipos {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.reglage-swipos input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }

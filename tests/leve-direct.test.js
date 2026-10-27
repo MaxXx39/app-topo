@@ -16,6 +16,11 @@ import {
   resumeStock,
   estLeveDirect,
   creerAutres,
+  creerListeDeLevee,
+  nommerListeDeLevee,
+  leveDepuisFichier,
+  creerLeveeDuDessin,
+  synchroniserLeveeDuDessin,
 } from '../src/topo/leve-direct.js';
 import { creerProjet } from '../src/projet/projet.js';
 import { calculerSurface } from '../src/topo/surface.js';
@@ -244,5 +249,67 @@ describe('supprimer un levé du Terrain', async () => {
     supprimerLevee(projet, autre.id);
     expect(projet.leves).toHaveLength(0);
     expect(supprimerLevee(projet, 'inconnu')).toBeNull();
+  });
+});
+
+describe('une liste de points par levé (0.77.0)', () => {
+  it('chaque levé a sa liste, à son nom, avec sa date de création ; renommer le levé renomme la liste', () => {
+    const projet = creerProjet();
+    const maintenant = new Date('2026-10-27T09:30:00');
+    const liste1 = creerListeDeLevee(projet, maintenant);
+    const stock = creerSurfaceDirecte(projet, liste1, 'stock');
+    nommerListeDeLevee(projet, stock);
+    const liste2 = creerListeDeLevee(projet, maintenant);
+    const libre = creerAutres(projet, liste2);
+    nommerListeDeLevee(projet, libre);
+    expect(projet.leves.map((l) => l.nom)).toEqual(['Stock 1', 'Levé libre 1']);
+    expect(liste1.importeLe).toBe(maintenant.toISOString());
+    expect(estLeveDirect(liste1)).toBe(true);
+    stock.nom = 'Stock gravier';
+    nommerListeDeLevee(projet, stock);
+    expect(liste1.nom).toBe('Stock gravier');
+    // Une ancienne liste du jour (partagée par plusieurs levés) ne change pas de nom.
+    const ancienne = creerLeveDirect(projet, maintenant);
+    const ancienStock = creerSurfaceDirecte(projet, ancienne, 'stock');
+    nommerListeDeLevee(projet, ancienStock);
+    expect(ancienne.nom).toMatch(/^Levé RX2 2026-10-27/);
+  });
+});
+
+describe('fichier importé comme levé (0.77.0)', () => {
+  it('la liste du fichier devient celle d\'un levé, nommé d\'après le fichier, avec tous ses points', () => {
+    const projet = creerProjet();
+    const leve = { id: 'l1', nom: '20260520_Stock.csv', importeLe: '2026-10-27T08:00:00.000Z', points: [{ nom: '1', est: 0, nord: 0, altitude: 0 }] };
+    projet.leves.push(leve);
+    const surface = leveDepuisFichier(projet, leve, 'terrain');
+    expect(surface).toMatchObject({ nom: '20260520_Stock', nature: 'terrain', leveId: 'l1', tousLesPoints: true });
+    expect(leve).toMatchObject({ nom: '20260520_Stock', direct: true, dediee: true });
+    expect(projet.surfaces).toEqual([surface]);
+  });
+});
+
+describe('surface d\'un dessin = levé « Surface » (0.77.0)', () => {
+  it('sa liste a les sommets du dessin (contour) ; le dessin change, les points du RX2 restent', () => {
+    const projet = creerProjet();
+    const sommets = [
+      { nom: 'D1-1', est: 0, nord: 0, altitude: 400 },
+      { nom: 'D1-2', est: 10, nord: 0, altitude: 400 },
+      { nom: 'D1-3', est: 10, nord: 10, altitude: 400 },
+    ];
+    const surface = creerLeveeDuDessin(projet, { id: 'd1' }, sommets);
+    expect(surface).toMatchObject({ nom: 'Surface 1', nature: 'surface', dessinId: 'd1', contour: ['D1-1', 'D1-2', 'D1-3'], tousLesPoints: false });
+    const leve = projet.leves.find((l) => l.id === surface.leveId);
+    expect(leve).toMatchObject({ nom: 'Surface 1', dediee: true, direct: true });
+    expect(leve.points.map((p) => p.nom)).toEqual(['D1-1', 'D1-2', 'D1-3']);
+    // Un point levé au RX2, puis le dessin change (un sommet déplacé, un ajouté).
+    leve.points.push({ nom: 'P-TN-1', est: 5, nord: 2, altitude: 401 });
+    synchroniserLeveeDuDessin(projet, surface, [...sommets.slice(0, 2), { nom: 'D1-3', est: 12, nord: 10, altitude: 400 }, { nom: 'D1-4', est: 0, nord: 10, altitude: 400 }]);
+    expect(leve.points.map((p) => p.nom)).toEqual(['D1-1', 'D1-2', 'D1-3', 'D1-4', 'P-TN-1']);
+    expect(leve.points[2].est).toBe(12);
+    expect(surface.contour).toEqual(['D1-1', 'D1-2', 'D1-3', 'D1-4']);
+    // Un sommet enlevé du dessin part de la liste.
+    synchroniserLeveeDuDessin(projet, surface, sommets.slice(0, 3));
+    expect(leve.points.map((p) => p.nom)).toEqual(['D1-1', 'D1-2', 'D1-3', 'P-TN-1']);
+    expect(creerLeveeDuDessin(projet, { id: 'd2' }, sommets).nom).toBe('Surface 2');
   });
 });

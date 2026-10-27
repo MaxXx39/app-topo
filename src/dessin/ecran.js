@@ -235,7 +235,7 @@ function htmlHauteur(d) {
  */
 function htmlSurface(d) {
   if (d.surface) {
-    return `<p class="surface-dessin">✓ Surface « ${echapper(d.surface.nom)} » (Calculs › Surfaces)${d.surface.erreur ? ` <span class="erreur">pas à jour : ${echapper(d.surface.erreur)}</span>` : ''}</p>`;
+    return `<p class="surface-dessin">✓ Levé « ${echapper(d.surface.nom)} » (Terrain › Lever, Volumes)${d.surface.erreur ? ` <span class="erreur">pas à jour : ${echapper(d.surface.erreur)}</span>` : ''}</p>`;
   }
   return `<div class="ligne-outils">
       <button type="button" class="bouton-secondaire" data-action="creerSurfaceDessin" data-valeur="${d.id}" ${d.empecheSurface ? 'disabled' : ''}>Créer la surface</button>

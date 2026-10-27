@@ -1,9 +1,9 @@
 // Trois blocs de l'onglet Projet (demande du 26.10.2026), repliables avec la flèche du titre (0.71.0) :
 // - « Import » : fichier de points, points de contrôle (un fichier de points, après le code de
 //   sécurité), plan DXF, surface (LandXML ou DXF 3D, 0.71.0), point tapé ;
-// - « Listes de points du projet » : chaque fichier de points (et les points pris avec le
-//   récepteur) est une liste ; celle cochée est affichée sur le plan ; ses points se voient sous
-//   elle. Puis les points des dessins (en violet) et les points de contrôle (liste à part, en rouge) ;
+// - « Liste de points - Lever - Dessin - Surface Projet - Contrôle » (0.77.0) : les listes rangées
+//   par catégories (voir blocListes) ; celle cochée est affichée sur le plan ; ses points se voient
+//   sous elle ;
 // - « DXF importés » : les plans DXF (fonds de plan, calques à cocher).
 // Le levé avec le récepteur se fait dans l'onglet Terrain (src/leve/ecran.js).
 import { echapper } from '../outils/echapper.js';
@@ -28,31 +28,22 @@ import { pointsDuDessin } from '../topo/dessin.js';
  * montrerTousCalquesDxf(id, visible), ajouterPointTape({ nom, est, nord, altitude }) (renvoie
  * { erreur } ou rien), commencerPointage() (ajouter des points en touchant le plan DXF),
  * importerPointsControle(fichier) (renvoie { erreur } ou rien), importerSurface(fichier) (renvoie
- * le message à afficher, en HTML)
+ * le message à afficher, en HTML), renommerSurfaceProjet(id, nom), supprimerSurfaceProjet(id),
+ * exporterListe(type ('leve', 'dessin' ou 'controle'), id)
  * Renvoie { afficher(projet, dernierImport, dernierPlan) }.
  */
 export function creerEcranImport(conteneur, actions) {
-  // Blocs repliés (flèche du titre ; 0.71.0) : « import », « listes », « dxf », retenus sur l'appareil.
-  const CLE_REPLIES = 'topo-projet-replies';
-  let replies = new Set();
-  try {
-    replies = new Set(JSON.parse(localStorage.getItem(CLE_REPLIES) ?? '[]'));
-  } catch {
-    // tout ouvert
-  }
+  // Blocs ouverts (flèche du titre ; 0.71.0) : « import », « listes », « dxf ». Tous repliés à
+  // chaque ouverture de l'appli (demande du 27.10.2026) : l'utilisateur ouvre ce dont il a besoin.
+  const ouverts = new Set();
   conteneur.addEventListener('toggle', (evenement) => {
     const bloc = evenement.target.dataset?.bloc;
     if (!bloc) return;
-    if (evenement.target.open) replies.delete(bloc);
-    else replies.add(bloc);
-    try {
-      localStorage.setItem(CLE_REPLIES, JSON.stringify([...replies]));
-    } catch {
-      // pas retenu
-    }
+    if (evenement.target.open) ouverts.add(bloc);
+    else ouverts.delete(bloc);
   }, true);
   /** Bloc repliable : titre avec une flèche, contenu dessous. */
-  const bloc = (cle, titre, contenu, classe = '') => `<details class="carte-section bloc-repliable ${classe}" data-bloc="${cle}" ${replies.has(cle) ? '' : 'open'}>
+  const bloc = (cle, titre, contenu, classe = '') => `<details class="carte-section bloc-repliable ${classe}" data-bloc="${cle}" ${ouverts.has(cle) ? 'open' : ''}>
       <summary>${titre}</summary>
       ${contenu}
     </details>`;
@@ -95,6 +86,8 @@ export function creerEcranImport(conteneur, actions) {
       return;
     }
     if (action === 'supprimer-leve') actions.supprimerLeve(id);
+    else if (action === 'exporter-liste') actions.exporterListe(bouton.dataset.type, id);
+    else if (action === 'supprimer-surface-projet') actions.supprimerSurfaceProjet(id);
     else if (action === 'voir-plan') actions.voirPlanDxf(id);
     else if (action === 'supprimer-plan') actions.supprimerPlanDxf(id);
     else if (action === 'recaler-plan') actions.recalerPlanDxf(id);
@@ -115,6 +108,7 @@ export function creerEcranImport(conteneur, actions) {
     } else if (cible.dataset.champ === 'couleur-liste') actions.colorerListe(cible.dataset.id, cible.value || null);
     else if (cible.dataset.champ === 'leve-actif') actions.choisirLeve(cible.value);
     else if (cible.dataset.champ === 'nom-leve') actions.renommerLeve(cible.dataset.id, cible.value.trim());
+    else if (cible.dataset.champ === 'nom-surface-projet') actions.renommerSurfaceProjet(cible.dataset.id, cible.value.trim());
     else if (cible.dataset.champ === 'fichier-points' && cible.files[0]) {
       await actions.importerPoints(cible.files[0]);
       cible.value = '';
@@ -195,33 +189,65 @@ export function creerEcranImport(conteneur, actions) {
           ${messageSurface}
         `, 'seulement-confirme')}
 
-        ${bloc('listes', titreSection('leves', 'Listes de points du projet', bulle('leves')), `
-          ${
-            projet.leves.length > 0
-              ? `<div class="liste-leves">${projet.leves
-                  .map(
-                    (leve) => `
-                  <div class="ligne-leve ${leve.id === projet.leveActifId ? 'actif' : ''}">
-                    <label class="case"><input type="radio" name="leve-actif" data-champ="leve-actif" value="${leve.id}" ${leve.id === projet.leveActifId ? 'checked' : ''} aria-label="Afficher cette liste" />
-                      <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom de la liste" /></label>
-                    ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}
-                    <div class="ligne-outils">
-                      <span class="aide">${leve.points.length} points · ${projet.surfaces.filter((s) => s.leveId === leve.id).length} surface(s)</span>
-                      <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
-                    </div>
-                    ${tableauPoints(leve.points, 'Voir les points')}
-                  </div>`,
-                  )
-                  .join('')}</div>`
-              : '<p class="vide">Aucune liste de points pour l\'instant.</p>'
-          }
-          ${listesDessins(projet)}
-          ${listePointsControle(projet)}
-        `)}
+        ${bloc('listes', titreSection('leves', 'Liste de points - Lever - Dessin - Surface Projet - Contrôle', bulle('leves')), blocListes(projet))}
 
         ${plans.length > 0 ? bloc('dxf', titreSection('fichier', 'DXF importés'), listePlansDxf(projet, calquesOuverts), 'seulement-confirme') : ''}
       `;
   }
+}
+
+/**
+ * Listes du projet, rangées par catégories (demande du 27.10.2026, 0.77.0) : Liste de points
+ * (fichiers importés, points tapés), Lever (une liste par levé fait dans Terrain, à son nom),
+ * Dessin, Surface Projet (surfaces importées : LandXML, DXF 3D) et Contrôle.
+ */
+function blocListes(projet) {
+  const listes = projet.leves.filter((l) => !l.direct);
+  const levees = projet.leves.filter((l) => l.direct);
+  const surfacesProjet = projet.surfaces.filter((s) => s.type === 'landxml' || s.type === 'dxf');
+  const categorie = (titre, contenu) => (contenu ? `<p class="titre-categorie-liste">${titre}</p>${contenu}` : '');
+  const contenu = [
+    categorie('Liste de points', listes.length > 0 ? `<div class="liste-leves">${listes.map((l) => ligneListe(projet, l)).join('')}</div>` : ''),
+    categorie('Lever', levees.length > 0 ? `<div class="liste-leves">${levees.map((l) => ligneListe(projet, l)).join('')}</div>` : ''),
+    categorie('Dessin', listesDessins(projet)),
+    categorie('Surface Projet', surfacesProjet.map(ligneSurfaceProjet).join('')),
+    categorie('Contrôle', listePointsControle(projet)),
+  ].join('');
+  return contenu || '<p class="vide">Aucune liste de points pour l\'instant.</p>';
+}
+
+/**
+ * Une liste de points : case pour l'afficher, nom (celui d'un levé se change dans Terrain › Lever),
+ * couleur, nombre de points (et date de création pour un levé), supprimer, voir les points.
+ */
+function ligneListe(projet, leve) {
+  const actif = leve.id === projet.leveActifId;
+  const date = leve.direct && leve.importeLe ? ` · créé le ${new Date(leve.importeLe).toLocaleDateString('fr-CH')}` : '';
+  const nom = leve.dediee
+    ? `<strong class="nom-leve">${echapper(leve.nom)}</strong>`
+    : `<input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom de la liste" />`;
+  return `<div class="ligne-leve ${actif ? 'actif' : ''}">
+      <label class="case"><input type="radio" name="leve-actif" data-champ="leve-actif" value="${leve.id}" ${actif ? 'checked' : ''} aria-label="Afficher cette liste" />${nom}</label>
+      ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}
+      <div class="ligne-outils">
+        <span class="aide">${leve.points.length} points${date}</span>
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter-liste" data-type="leve" data-id="${leve.id}">exporter</button>
+        <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
+      </div>
+      ${tableauPoints(leve.points, 'Voir les points')}
+    </div>`;
+}
+
+/** Surface importée (LandXML, DXF 3D) : nom à changer, nature, fichier d'origine, supprimer. */
+function ligneSurfaceProjet(surface) {
+  const nature = { stock: 'stock', terrain: 'terrain naturel', terrassement: 'terrassement' }[surface.nature] ?? '';
+  return `<div class="ligne-leve liste-surface-projet">
+      <input type="text" class="nom-leve" data-champ="nom-surface-projet" data-id="${surface.id}" value="${echapper(surface.nom)}" aria-label="Nom de la surface" />
+      <div class="ligne-outils">
+        <span class="aide">${[nature, surface.type === 'dxf' ? 'DXF' : 'LandXML', surface.nomFichier].filter(Boolean).map(echapper).join(' · ')} · ${surface.faces?.length ?? 0} triangles</span>
+        <button type="button" class="bouton-lien" data-action="supprimer-surface-projet" data-id="${surface.id}">supprimer</button>
+      </div>
+    </div>`;
 }
 
 /** Résultat d'un import de points : nombre de points, lignes illisibles, avertissements. */
@@ -273,7 +299,7 @@ function listesDessins(projet) {
       const points = pointsDuDessin(dessin, projet.dessins);
       return `<div class="ligne-leve liste-dessin">
       <strong>${echapper(dessin.nom)}</strong>
-      <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span></div>
+      <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span><button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter-liste" data-type="dessin" data-id="${dessin.id}">exporter</button></div>
       ${tableauPoints(points, 'Voir les points')}
     </div>`;
     })
@@ -286,7 +312,7 @@ function listePointsControle(projet) {
   if (points.length === 0) return '';
   return `<div class="ligne-leve liste-controle">
       <strong>Points de contrôle</strong>
-      <div class="ligne-outils"><span class="aide">${points.length} points</span></div>
+      <div class="ligne-outils"><span class="aide">${points.length} points</span><button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter-liste" data-type="controle" data-id="controle">exporter</button></div>
       ${tableauPoints(points, 'Voir les points de contrôle')}
     </div>`;
 }

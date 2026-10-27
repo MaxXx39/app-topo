@@ -36,12 +36,12 @@ const CALQUES = [
   { cle: 'points', titre: 'Points', parDefaut: true, famille: 'Points' },
   { cle: 'noms', titre: 'Noms des points', parDefaut: true, famille: 'Points' },
   { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false, famille: 'Points' },
-  { cle: 'contours', titre: 'Contours des surfaces', parDefaut: true, famille: 'Surfaces' },
-  { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true, famille: 'Surfaces' },
-  { cle: 'triangles', titre: 'Triangles', parDefaut: true, confirme: true, famille: 'Surfaces' },
-  { cle: 'autresStocks', titre: 'Autres surfaces', parDefaut: true, famille: 'Surfaces' },
-  { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false, confirme: true, famille: 'Surfaces' },
-  { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false, confirme: true, famille: 'Surfaces' },
+  { cle: 'contours', titre: 'Contours', parDefaut: true, famille: 'Levés' },
+  { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true, famille: 'Levés' },
+  { cle: 'triangles', titre: 'Triangles', parDefaut: true, confirme: true, famille: 'Levés' },
+  { cle: 'autresStocks', titre: 'Autres levés', parDefaut: true, famille: 'Levés' },
+  { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false, confirme: true, famille: 'Levés' },
+  { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false, confirme: true, famille: 'Levés' },
   { cle: 'volumes', titre: 'Volume sur chaque surface', parDefaut: true, famille: 'Volumes' },
   { cle: 'remblaiDeblai', titre: 'Déblai (jaune) / remblai (rouge)', parDefaut: true, famille: 'Volumes' },
   { cle: 'mesures', titre: 'Mesures et métrés (traits, valeurs)', parDefaut: true, famille: 'Mesures' },
@@ -102,7 +102,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
             const cases = CALQUES.filter((c) => c.famille === famille);
             return `<p class="titre-partie-menu ${cases.every((c) => c.confirme) ? 'seulement-confirme' : ''}">${famille}</p>
               ${cases.map((c) => `<label class="case ${c.confirme ? 'seulement-confirme' : ''}"><input type="checkbox" data-calque="${c.cle}" ${calquesChoisis[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`).join('')}
-              ${famille === 'Surfaces' ? `<label class="choix-equidistance seulement-confirme">Équidistance des courbes
+              ${famille === 'Levés' ? `<label class="choix-equidistance seulement-confirme">Équidistance des courbes
                 <select data-calque="equidistance">
                   ${EQUIDISTANCES.map((e) => `<option value="${e}" ${calques.equidistance === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
                 </select>

@@ -17,7 +17,7 @@ const FIN = '.json.gz';
  */
 export function projetVersFichiers(projet) {
   const fichiers = new Map();
-  // Photos des surfaces et des mesures : l'image part dans son propre fichier.
+  // Photos des levés et des mesures : l'image part dans son propre fichier.
   const sansImages = (objet) => !objet.photos?.length ? objet : ({
     ...objet,
     photos: (objet.photos ?? []).map((photo) => {
@@ -27,13 +27,16 @@ export function projetVersFichiers(projet) {
   });
   const surfaces = (projet.surfaces ?? []).map(sansImages);
   const mesures = projet.mesures ? { mesures: projet.mesures.map(sansImages) } : {};
+  // Photos des levés (0.77.0) : aussi pour les métrés et les levés libres.
+  const metres = projet.metres ? { metres: projet.metres.map(sansImages) } : {};
+  const autres = projet.autres ? { autres: projet.autres.map(sansImages) } : {};
   const plansDxf = (projet.plansDxf ?? []).map((plan) => {
     fichiers.set(`${prefixePlan}${plan.id}${FIN}`, plan.contenu);
     return { ...plan, contenu: null };
   });
   // Le lien vers Drive est propre à chaque appareil : il ne part pas avec le projet.
   const { drive, ...reste } = projet;
-  fichiers.set(FICHIER_PROJET, { ...reste, surfaces, ...mesures, plansDxf });
+  fichiers.set(FICHIER_PROJET, { ...reste, surfaces, ...mesures, ...metres, ...autres, plansDxf });
   return fichiers;
 }
 
@@ -44,7 +47,7 @@ export function projetVersFichiers(projet) {
 export function fichiersVersProjet(fichiers) {
   const projet = structuredClone(fichiers.get(FICHIER_PROJET));
   if (!projet) throw new Error('fichier projet absent du dossier Drive');
-  for (const objet of [...(projet.surfaces ?? []), ...(projet.mesures ?? [])]) {
+  for (const objet of [...(projet.surfaces ?? []), ...(projet.mesures ?? []), ...(projet.metres ?? []), ...(projet.autres ?? [])]) {
     for (const photo of objet.photos ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});
   }
   for (const plan of projet.plansDxf ?? []) plan.contenu = fichiers.get(`${prefixePlan}${plan.id}${FIN}`) ?? null;

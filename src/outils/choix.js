@@ -4,9 +4,10 @@ import { echapper } from './echapper.js';
 
 /**
  * Ouvre la fenêtre et attend le choix. boutons : [{ cle, texte, detail, principal }].
- * Renvoie la clé du bouton touché.
+ * Renvoie la clé du bouton touché. signal (AbortSignal, facultatif) : la fenêtre se ferme toute
+ * seule quand il est déclenché, et renvoie null.
  */
-export function demanderChoix({ titre, texte = '', boutons }) {
+export function demanderChoix({ titre, texte = '', boutons, signal = null }) {
   return new Promise((resoudre) => {
     const fenetre = document.createElement('dialog');
     fenetre.className = 'fenetre-choix';
@@ -26,6 +27,10 @@ export function demanderChoix({ titre, texte = '', boutons }) {
     // Touche « retour » ou Échap : le premier bouton (le choix mis en avant).
     fenetre.addEventListener('cancel', (evenement) => evenement.preventDefault());
     fenetre.addEventListener('close', () => fenetre.remove());
+    signal?.addEventListener('abort', () => {
+      if (fenetre.open) fenetre.close();
+      resoudre(null);
+    });
     document.body.append(fenetre);
     fenetre.showModal();
   });
@@ -66,5 +71,46 @@ export function demanderTexte({ titre, valeur = '' }) {
     document.body.append(fenetre);
     fenetre.showModal();
     champ.select();
+  });
+}
+
+/**
+ * Petite fenêtre avec plusieurs cases à remplir puis « OK » (ex. nouveau projet : affaire,
+ * désignation). champs : [{ cle, titre, exemple }]. Renvoie { cle: texte tapé } avec OK, ou null
+ * si la fenêtre est fermée (✕, touche retour, Échap) : rien n'est fait.
+ */
+export function demanderChamps({ titre, champs }) {
+  return new Promise((resoudre) => {
+    const fenetre = document.createElement('dialog');
+    fenetre.className = 'fenetre-choix fenetre-champs';
+    fenetre.innerHTML = `
+      <div class="entete-fenetre-champs">
+        <h2>${echapper(titre)}</h2>
+        <button type="button" class="bouton-retour" data-cle="fermer" title="Fermer" aria-label="Fermer">✕</button>
+      </div>
+      ${champs.map((c) => `<label>${echapper(c.titre)}<input type="text" data-champ="${echapper(c.cle)}" placeholder="${echapper(c.exemple ?? '')}" /></label>`).join('')}
+      <div class="boutons-choix">
+        <button type="button" class="bouton" data-cle="ok"><strong>OK</strong></button>
+      </div>`;
+    const finir = (cle) => {
+      const valeurs = Object.fromEntries([...fenetre.querySelectorAll('input[data-champ]')].map((champ) => [champ.dataset.champ, champ.value.trim()]));
+      fenetre.close();
+      resoudre(cle === 'ok' ? valeurs : null);
+    };
+    fenetre.addEventListener('click', (evenement) => {
+      const bouton = evenement.target.closest('button[data-cle]');
+      if (bouton) finir(bouton.dataset.cle);
+    });
+    fenetre.addEventListener('keydown', (evenement) => {
+      if (evenement.key === 'Enter' && evenement.target.matches('input')) finir('ok');
+    });
+    fenetre.addEventListener('cancel', (evenement) => {
+      evenement.preventDefault();
+      finir('fermer');
+    });
+    fenetre.addEventListener('close', () => fenetre.remove());
+    document.body.append(fenetre);
+    fenetre.showModal();
+    fenetre.querySelector('input')?.focus();
   });
 }

@@ -60,7 +60,7 @@ export function calculerVolumeSurface(surface, calcul, points, surfaceBase = nul
 
   if (base === 'contour') {
     // Mode A : la base est triangulée sur les points du contour, en respectant ses côtés.
-    if (contour.length < 3) return { erreurs: ['pour un volume sur la ligne basse, la surface 1 doit avoir un contour (au moins 3 points)'] };
+    if (contour.length < 3) return { erreurs: ['pour un volume sur la ligne basse, le levé doit avoir un contour (au moins 3 points ; Terrain › Lever)'] };
     const triangulation = trianglerAvecContraintes([...new Set(contour)], segmentsDeLigne(contour, true), parNom);
     if (triangulation.erreurs) return { ...triangulation, erreurs: triangulation.erreurs.map((e) => `base : ${e}`) };
     trianglesBase = triangulation.triangles;

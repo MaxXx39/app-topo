@@ -604,7 +604,7 @@ class EcranPrincipal : Activity() {
      * « Envoyer » : le fichier est écrit dans le cache (dossier « partage », vidé avant), puis le
      * partage d'Android s'ouvre ; l'appli choisie a le droit de le lire (voir FichiersPartages).
      */
-    fun partagerFichier(nom: String, type: String, contenu: ByteArray) {
+    fun partagerFichier(nom: String, type: String, contenu: ByteArray, adresse: String? = null) {
         // Nom sans dossier ni caractère gênant (il sert d'adresse au fichier).
         val nomPropre = nom.replace(Regex("[^\\w.\\- ]"), "_").ifBlank { "export" }
         val dossier = FichiersPartages.dossier(this)
@@ -615,6 +615,8 @@ class EcranPrincipal : Activity() {
             this.type = type.substringBefore(';').trim().ifEmpty { "application/octet-stream" }
             putExtra(Intent.EXTRA_STREAM, FichiersPartages.adresse(nomPropre))
             putExtra(Intent.EXTRA_SUBJECT, nomPropre)
+            // Envoi par mail (0.79.0) : l'adresse choisie dans la liste partagée, déjà remplie.
+            if (!adresse.isNullOrBlank()) putExtra(Intent.EXTRA_EMAIL, arrayOf(adresse))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         try {

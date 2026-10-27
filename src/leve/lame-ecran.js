@@ -1,7 +1,8 @@
 // Onglet Terrain › Lame (0.70.0, mode Confirmé) : guidage d'une lame de grader avec 2 RX2 (calculs
 // dans topo/lame.js). En haut : la surface à suivre, puis l'écart à chaque coin en grand (monter /
 // descendre, en couleur), le dévers mesuré et voulu, la coupe vue de derrière la lame et (0.73.0)
-// le profil en long dans le sens de marche, avec un petit dessin de niveleuse.
+// le profil en long dans le sens de marche, avec un petit dessin de niveleuse. De chaque côté de la
+// coupe (0.75.0) : le bord de la surface dans le prolongement de la lame (distance, altitude).
 // Les nombres changent 5 fois par seconde sans redessiner l'écran (rafraichirLame).
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
@@ -32,11 +33,11 @@ export function htmlLame(donnees, { reglagesOuverts = false } = {}) {
   return `<div class="ecran-lame">
     <div class="ligne-lame">
       ${surfaces.length > 0
-        ? `<select data-champ="surface-lame" aria-label="Surface à suivre">
-            ${surfaceId ? '' : '<option value="">— surface à suivre —</option>'}
+        ? `<select data-champ="surface-lame" aria-label="Levé à suivre">
+            ${surfaceId ? '' : '<option value="">— levé à suivre —</option>'}
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
-        : '<p class="vide">Aucune surface (Calculs › Surfaces).</p>'}
+        : '<p class="vide">Aucun levé (Terrain › Lever).</p>'}
       <button type="button" class="bouton-secondaire" data-action="inverserLame" title="Inverser gauche et droite">⇄ G / D</button>
       <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Tolérances">⚙</button>
       ${bulle('lame')}
@@ -52,7 +53,11 @@ export function htmlLame(donnees, { reglagesOuverts = false } = {}) {
       <div class="coin-lame" data-vivant="lame-droite"><span class="titre-coin">Droite</span><strong>—</strong></div>
     </div>
     <p class="devers-lame" data-vivant="lame-devers">Dévers —</p>
-    <div class="coupe-lame" data-vivant="lame-coupe"></div>
+    <div class="coupe-lame-bords">
+      <div class="bord-lame bord-gauche" data-vivant="lame-bord-gauche"></div>
+      <div class="coupe-lame" data-vivant="lame-coupe"></div>
+      <div class="bord-lame bord-droite" data-vivant="lame-bord-droite"></div>
+    </div>
     <div class="reglages-profil-lame">
       <span class="titre-profil">Profil en long</span>
       ${[['gauche', 'Gauche'], ['milieu', 'Milieu'], ['droite', 'Droite']].map(([cle, titre]) => `<button type="button" class="puce-choix ${donnees.pointProfil === cle ? 'actif' : ''}" data-action="choisirPointProfil" data-valeur="${cle}">${titre}</button>`).join('')}
@@ -66,7 +71,7 @@ export function htmlLame(donnees, { reglagesOuverts = false } = {}) {
 /**
  * Met à jour les nombres en direct dans "conteneur". vivant : { raison (texte, ou null),
  * guidage (voir topo/lame.js guidageLame) ou null, coupe: { longueur, profils, gauche: { distance,
- * altitude }, droite: { … } } ou null }.
+ * altitude }, droite: { … } } ou null, bords: { gauche, droite } (voir bordsDeLaLame) ou null }.
  */
 export function rafraichirLame(conteneur, vivant) {
   const zone = (nom) => conteneur.querySelector(`[data-vivant="${nom}"]`);
@@ -85,6 +90,15 @@ export function rafraichirLame(conteneur, vivant) {
     ? `Dévers <strong>${pourcent(g.devers)}</strong> · voulu <strong>${pourcent(g.deversVoulu)}</strong>${g.ecartDevers == null ? '' : ` · écart ${pourcent(g.ecartDevers)}`} · lame ${formaterNombre(g.largeur)} m`
     : 'Dévers —';
   zone('lame-coupe').innerHTML = g && vivant.coupe ? svgCoupeLame(vivant.coupe, g) : '';
+  // Bords de la surface dans le prolongement de la lame (0.75.0) : distance (négative hors surface) et altitude.
+  for (const cote of ['gauche', 'droite']) {
+    const element = zone(`lame-bord-${cote}`);
+    const bord = g ? vivant.bords?.[cote] : null;
+    element.classList.toggle('hors', Boolean(bord && bord.distance < 0));
+    element.innerHTML = bord
+      ? `<span class="titre-bord">${cote === 'gauche' ? '◂ bord' : 'bord ▸'}</span><strong>${bord.distance < 0 ? '−' : ''}${Math.abs(bord.distance).toFixed(2)} m</strong><span>H ${formaterNombre(bord.altitude)}</span>`
+      : '';
+  }
   const profil = zone('lame-profil');
   if (profil) profil.innerHTML = g && vivant.profil ? svgProfilLame(vivant.profil) : '';
 }

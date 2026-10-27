@@ -237,7 +237,7 @@ const ETATS_PARTAGE = {
   'a-jour': ['à jour', 'etat-ok'],
   envoi: ['envoi…', 'etat-attente'],
   attente: ['pas envoyé (nouvel essai bientôt)', 'etat-attente'],
-  repris: ['ouvert sur un autre appareil', 'etat-erreur'],
+  repris: ['lecture seule (un autre appareil a la main)', 'etat-erreur'],
   rendu: ['main rendue', 'etat-attente'],
   erreur: ['erreur', 'etat-erreur'],
 };
@@ -255,8 +255,8 @@ export function blocPartage({ etat, appareil }, { modifierNom = false } = {}) {
   const [texte, classe] = ETATS_PARTAGE[etat.etat] ?? ['?', ''];
   const heure = etat.etat === 'a-jour' && etat.derniereSynchro ? ` · ${etat.derniereSynchro.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}` : '';
   const reprise = etat.etat === 'repris' && etat.repris
-    ? `<p class="avertissement">Ouvert sur <strong>${echapper(etat.repris.nom)}</strong> : tes modifications ne partent plus sur Drive.
-        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="reprendreLaMain">prendre la main</button></p>`
+    ? `<p class="avertissement"><strong>${echapper(etat.repris.nom)}</strong> a la main : lecture seule, rien ne s'enregistre.
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="reprendreLaMain">prendre la main</button></p>`
     : '';
   return `<section class="carte-section bloc-partage">
     ${titreSection('partage', 'Partage (Google Drive)', bulle('partage'))}

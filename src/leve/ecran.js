@@ -12,7 +12,7 @@
 // L'état du récepteur arrive 5 fois par seconde (mettreAJourRecepteur) : on ne change alors que
 // quelques textes et l'état du bouton, sans redessiner l'écran (le doigt peut être dessus).
 import { echapper } from '../outils/echapper.js';
-import { estModeBase } from '../reglages/reglages.js';
+import { estModeBase, lameActive } from '../reglages/reglages.js';
 import { demanderCode } from '../outils/code.js';
 import { demanderTexte } from '../outils/choix.js';
 import { ouvrirChoixLevees } from './fenetre-levees.js';
@@ -58,6 +58,8 @@ const NATURES_TERRAIN = [
   ['terrassement', 'Terrassement'],
   ['metre', 'Métré'],
   ['autres', 'Levé libre'],
+  // Surface d'un dessin (Calculs › Dessin) : pas créée ici, mais on la complète au RX2.
+  ['surface', 'Surface'],
 ];
 // Accroches : un dessin (en gris ce qu'on touche, en ambre l'endroit accroché) et un mot dessous.
 // [mot, nom complet (bulle, lecture d'écran), dessin].
@@ -91,6 +93,8 @@ const ICONES = {
   longueur: '<path d="M3 16 21 8" /><path d="M3 13v6M21 5v6" />',
   compte: '<circle cx="12" cy="12" r="8" /><path d="M10 9l2-1.5V16" />',
 };
+// Appareil photo (photo du levé, à gauche de PRENDRE LE POINT).
+const ICONE_PHOTO = '<path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" />';
 // Lettre des noms de points d'un métré (A-ENR-1-1, L-BOR-1-1).
 const LETTRES_METRE = { aire: 'A', longueur: 'L' };
 
@@ -118,10 +122,19 @@ export function creerEcranLeve(conteneur, actions) {
   let bandeCouloir = 0; // échelle du couloir de la ligne (n° dans BANDES_COULOIR)
   let capBoussole = null; // dernier cap de la boussole de la tablette (°), ou null
   let reglagesGuidageOuverts = false; // roue ⚙ de l'écran de guidage
+  const elementsOuverts = new Set(); // lignes du levé dépliées en bas de Lever ('contour', 'ligne-2', 'isoles')
   let accrochesOuvertes = false; // flèche de la barre d'accroche : les noms sous les dessins
   let gestionControleOuverte = false; // mode Contrôler : roue ⚙ (après le code de sécurité)
   let erreurGestion = ''; // mode Contrôler : erreur de la gestion (tolérances, fichier, point tapé)
   let reglagesLameOuverts = false; // mode Lame : roue ⚙ (tolérances)
+
+  // Lignes du levé dépliées : gardées d'un dessin de l'écran à l'autre.
+  conteneur.addEventListener('toggle', (evenement) => {
+    const cle = evenement.target.dataset?.element;
+    if (!cle) return;
+    if (evenement.target.open) elementsOuverts.add(cle);
+    else elementsOuverts.delete(cle);
+  }, true);
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
@@ -242,6 +255,11 @@ export function creerEcranLeve(conteneur, actions) {
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
+    else if (cible.dataset.champ === 'photo-levee' && cible.files?.length) {
+      // Photo du levé (0.77.0) : appareil photo de la tablette, rangée avec le levé en cours.
+      actions.ajouterPhotosLevee([...cible.files]);
+      cible.value = '';
+    } else if (cible.dataset.champ === 'legende-photo-levee') actions.legendePhotoLevee(cible.dataset.id, cible.value.trim());
     else if (cible.dataset.champ === 'fichier-controle' && cible.files?.[0]) {
       actions.importerPointsControle(cible.files[0]).then((reponse) => montrerErreurGestion(reponse?.erreur));
     }
@@ -424,7 +442,7 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function choixMode() {
     return `<div class="modes-terrain bascule-terrain mode-${donnees.mode}" role="group" aria-label="Mode">
-      ${[['lever', 'Lever'], ['controler', 'Implanter'], ['autocontrole', 'Contrôle'], ...(estModeBase() ? [] : [['lame', 'Lame']])]
+      ${[['lever', 'Lever'], ['controler', 'Implanter'], ['autocontrole', 'Contrôle'], ...(lameActive() ? [['lame', 'Lame']] : [])]
         .map(([cle, titre]) => `<button type="button" data-action="choisirMode" data-valeur="${cle}" class="${donnees.mode === cle ? 'actif' : ''}">${titre}</button>`)
         .join('')}
     </div>`;
@@ -826,7 +844,7 @@ export function creerEcranLeve(conteneur, actions) {
     return `<div class="choix-nature">
       <p class="titre-choix">Que lèves-tu ?</p>
       <div class="natures-terrain">
-        ${NATURES_TERRAIN.filter(([cle]) => !estModeBase() || NATURES_BASE.includes(cle)).map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}">${titre}</button>`).join('')}
+        ${NATURES_TERRAIN.filter(([cle]) => cle !== 'surface' && (!estModeBase() || NATURES_BASE.includes(cle))).map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}">${titre}</button>`).join('')}
       </div>
       ${donnees.stock ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerChoixNature">annuler</button>' : ''}
     </div>`;
@@ -847,8 +865,8 @@ export function creerEcranLeve(conteneur, actions) {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
       </div>
       <div class="boutons-levee">
-        <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer</button>
-        <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau</button>
+        <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer de levé</button>
+        <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau levé</button>
       </div>
     </div>`;
   }
@@ -875,13 +893,24 @@ export function creerEcranLeve(conteneur, actions) {
         <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${e.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle</button>
       </div>`;
     }
+    // Contour en cours (0.78.0) : même cadre que la ligne, sans « Fermer » (un contour est toujours fermé).
+    if (donnees.role === 'contour') {
+      const nbPoints = donnees.elements?.contour?.noms.length ?? 0;
+      return `<div class="element-en-cours role-contour">
+        <span class="titre-element">Contour en cours</span>
+        <div class="corps-element"><strong>${echapper(donnees.nomPropose.replace(/-\d+$/, ''))}</strong><span>${nbPoints} pt(s)</span></div>
+      </div>`;
+    }
     if (donnees.role !== 'ligne') return '';
     const { ligne } = donnees;
-    return `<div class="outils-ligne">
-      <span>L-${echapper(ligne.libelle ?? '')}-${ligne.numero} · ${ligne.nbPoints} pt(s)</span>
-      <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle</button>
-      <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
-        ${ligne.fermee ? '✓ Fermée' : 'Fermer'}</button>
+    return `<div class="element-en-cours role-ligne">
+      <span class="titre-element">Ligne en cours</span>
+      <div class="corps-element">
+        <strong>L-${echapper(ligne.libelle ?? '')}-${ligne.numero}</strong><span>${ligne.nbPoints} pt(s)</span>
+        <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle ligne</button>
+        <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
+          ${ligne.fermee ? '✓ Ligne fermée' : 'Fermer ligne'}</button>
+      </div>
     </div>`;
   }
 
@@ -927,18 +956,93 @@ export function creerEcranLeve(conteneur, actions) {
       ${choixLibelle()}
       ${outilsLigne()}
       <div class="nom-et-position">
-        <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" />
+        <label class="champ-id-point"><span>ID point</span>
+          <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" /></label>
         <div class="position-leve" data-vivant="position"></div>
       </div>
-      <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>
-        <span>PRENDRE LE POINT</span><span class="sous-titre-prendre">ou touche vol −</span>
-      </button>
+      <div class="ligne-prendre">
+        <label class="bouton-photo-levee" title="Photo du levé" aria-label="Photo du levé">
+          <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>
+          <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
+        </label>
+        <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>
+          <span>PRENDRE LE POINT</span><span class="sous-titre-prendre">ou touche vol −</span>
+        </button>
+      </div>
       <p class="raison-leve" data-vivant="raison" hidden></p>
       <div class="pied-terrain">
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
           Annuler ${donnees.dernierPoint ? echapper(donnees.dernierPoint) : 'le dernier point'}</button>
         ${resume()}
-      </div>`;
+      </div>
+      ${basDuLeve()}`;
+  }
+
+  /**
+   * Bas de l'écran Lever (0.77.0) : triangles en trop (mode Confirmé, levés qui ont une surface :
+   * supprimer au doigt sur le plan, tout rétablir) et photos du levé (légende, supprimer).
+   */
+  function basDuLeve() {
+    const photos = donnees.photos ?? [];
+    const t = donnees.triangles;
+    const triangles = t
+      ? `<div class="triangles-leve seulement-confirme ${t.actif ? 'actif' : ''}">
+          <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 21 20H3z" /><path d="m9 11 6 6M15 11l-6 6" /></svg>Triangles en trop · ${t.supprimes} supprimé(s) ${bulle('trianglesEnTrop')}</span>
+          <div class="ligne-outils">
+            <button type="button" class="${t.actif ? 'bouton' : 'bouton-secondaire'}" data-action="basculerTrianglesLevee">${t.actif ? 'Terminer' : 'Supprimer au doigt'}</button>
+            <button type="button" class="bouton-lien bouton-lien-neutre" data-action="retablirTrianglesLevee" ${t.supprimes === 0 ? 'disabled' : ''}>tout rétablir</button>
+          </div>
+        </div>`
+      : '';
+    const listePhotos = photos.length > 0
+      ? `<div class="photos-leve">
+          <p class="titre-choix">Photos (${photos.length}) ${bulle('photos')}</p>
+          <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
+              <img src="${photo.miniature}" alt="${echapper(photo.legende || donnees.stock.nom)}" />
+              <input type="text" data-champ="legende-photo-levee" data-id="${photo.id}" value="${echapper(photo.legende ?? '')}" placeholder="Légende" aria-label="Légende de la photo" />
+              <button type="button" class="bouton-lien" data-action="supprimerPhotoLevee" data-valeur="${photo.id}">supprimer</button>
+            </figure>`).join('')}</div>
+        </div>`
+      : '';
+    const elements = listeElements();
+    return elements || triangles || listePhotos ? `<div class="bas-du-leve">${elements}${triangles}${listePhotos}</div>` : '';
+  }
+
+  /**
+   * Lignes du levé (0.78.0) : le contour, chaque ligne et les points isolés, à dérouler pour voir
+   * leurs points ; ✕ supprime un point, ✂ supprime le segment entre deux points d'une ligne.
+   */
+  function listeElements() {
+    const e = donnees.elements;
+    if (!e || (!e.contour && e.lignes.length === 0 && e.isoles.length === 0)) return '';
+    const ouvert = (cle) => (elementsOuverts.has(cle) ? 'open' : '');
+    const point = (nom, supprimable = true) => `<li class="point-element"><span>${echapper(nom)}</span>${supprimable
+      ? `<button type="button" class="bouton-lien" data-action="supprimerPointLevee" data-valeur="${echapper(nom)}" title="Supprimer le point ${echapper(nom)}" aria-label="Supprimer le point ${echapper(nom)}">✕</button>` : ''}</li>`;
+    const segment = (index, i, a, b) => `<li class="segment-element"><button type="button" class="bouton-lien bouton-lien-neutre" data-action="supprimerSegmentLevee" data-valeur="${index}:${i}" title="Supprimer le segment ${echapper(a)} → ${echapper(b)}">✂ segment</button></li>`;
+    const ligne = (l) => {
+      const morceaux = [];
+      l.noms.forEach((nom, i) => {
+        morceaux.push(point(nom));
+        if (i + 1 < l.noms.length) morceaux.push(segment(l.index, i, nom, l.noms[i + 1]));
+      });
+      if (l.fermee && l.noms.length >= 3) morceaux.push(segment(l.index, l.noms.length - 1, l.noms.at(-1), l.noms[0]));
+      return `<details class="element-leve role-ligne" data-element="ligne-${l.index}" ${ouvert(`ligne-${l.index}`)}>
+          <summary><strong>${echapper(l.nom)}</strong><span>${l.noms.length} pt(s)${l.fermee ? ' · fermée' : ''}</span></summary>
+          <ul>${morceaux.join('')}</ul>
+        </details>`;
+    };
+    return `<div class="elements-leve">
+      <p class="titre-choix">Lignes du levé ${bulle('lignesLevee')}</p>
+      ${e.contour ? `<details class="element-leve role-contour" data-element="contour" ${ouvert('contour')}>
+          <summary><strong>${echapper(e.contour.nom)}</strong><span>contour · ${e.contour.noms.length} pt(s)</span></summary>
+          <ul>${e.contour.noms.map((nom) => point(nom, e.contour.modifiable)).join('')}</ul>
+        </details>` : ''}
+      ${e.lignes.map(ligne).join('')}
+      ${e.isoles.length > 0 ? `<details class="element-leve role-isole" data-element="isoles" ${ouvert('isoles')}>
+          <summary><strong>Points isolés</strong><span>${e.isoles.length} pt(s)</span></summary>
+          <ul>${e.isoles.map((nom) => point(nom)).join('')}</ul>
+        </details>` : ''}
+    </div>`;
   }
 
   return {

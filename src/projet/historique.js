@@ -6,6 +6,9 @@
 // Les photos et le contenu des plans DXF sont lourds : ils ne sont pas recopiés à chaque étape.
 // On les garde une seule fois (par leur identifiant) et on les remet en place quand on revient à une étape.
 
+// Parties du projet qui ont des photos (leurs images sont gardées une seule fois).
+const CLES_PHOTOS = ['surfaces', 'mesures', 'metres', 'autres'];
+
 /** Nombre de retours en arrière possibles, par défaut. */
 const LIMITE = 50;
 
@@ -19,29 +22,30 @@ export function creerHistorique(limite = LIMITE) {
  * modification) ; les images des photos sont remplacées par leur identifiant et gardées à part.
  */
 function instantane(historique, projet) {
-  const surfaces = (projet.surfaces ?? []).map((surface) =>
-    surface.photos?.length
+  const sansImages = (objet) =>
+    objet.photos?.length
       ? {
-          ...surface,
-          photos: surface.photos.map((photo) => {
+          ...objet,
+          photos: objet.photos.map((photo) => {
             historique.photos.set(photo.id, { image: photo.image, miniature: photo.miniature });
             return { ...photo, image: null, miniature: null };
           }),
         }
-      : surface,
-  );
+      : objet;
+  // Photos des levés (surfaces, métrés, levés libres ; 0.77.0) et des mesures.
+  const avecPhotos = Object.fromEntries(CLES_PHOTOS.filter((cle) => projet[cle]).map((cle) => [cle, projet[cle].map(sansImages)]));
   const plansDxf = (projet.plansDxf ?? []).map((plan) => {
     historique.plans.set(plan.id, plan.contenu);
     return { ...plan, contenu: null };
   });
-  return JSON.stringify({ ...projet, surfaces, plansDxf, modifieLe: null });
+  return JSON.stringify({ ...projet, ...avecPhotos, plansDxf, modifieLe: null });
 }
 
 /** Relit une étape de l'historique et remet les images des photos. */
 function relire(historique, texte) {
   const projet = JSON.parse(texte);
-  for (const surface of projet.surfaces ?? []) {
-    for (const photo of surface.photos ?? []) Object.assign(photo, historique.photos.get(photo.id));
+  for (const objet of CLES_PHOTOS.flatMap((cle) => projet[cle] ?? [])) {
+    for (const photo of objet.photos ?? []) Object.assign(photo, historique.photos.get(photo.id));
   }
   for (const plan of projet.plansDxf ?? []) plan.contenu = historique.plans.get(plan.id) ?? null;
   return projet;
@@ -71,6 +75,11 @@ export function memoriser(historique, projet) {
   historique.futur = [];
   historique.actuel = nouveau;
   return true;
+}
+
+/** Projet de l'état actuel (le dernier mémorisé), relu : nouvel objet (lecture seule, 0.76.0). */
+export function relireActuel(historique) {
+  return relire(historique, historique.actuel);
 }
 
 export const peutAnnuler = (historique) => historique.passe.length > 0;
