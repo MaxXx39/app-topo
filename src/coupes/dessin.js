@@ -13,6 +13,7 @@ const COULEURS_NATURE = {
   stock: [180, 83, 9], // brun
   terrain: [21, 128, 61], // vert
   terrassement: [37, 99, 235], // bleu
+  surface: [124, 58, 237], // violet (surface d'un dessin)
 };
 const COULEUR_AUTRE = [95, 109, 119]; // gris
 

@@ -33,11 +33,11 @@ export function htmlLame(donnees, { reglagesOuverts = false } = {}) {
   return `<div class="ecran-lame">
     <div class="ligne-lame">
       ${surfaces.length > 0
-        ? `<select data-champ="surface-lame" aria-label="Surface à suivre">
-            ${surfaceId ? '' : '<option value="">— surface à suivre —</option>'}
+        ? `<select data-champ="surface-lame" aria-label="Levé à suivre">
+            ${surfaceId ? '' : '<option value="">— levé à suivre —</option>'}
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
-        : '<p class="vide">Aucune surface (Calculs › Surfaces).</p>'}
+        : '<p class="vide">Aucun levé (Terrain › Lever).</p>'}
       <button type="button" class="bouton-secondaire" data-action="inverserLame" title="Inverser gauche et droite">⇄ G / D</button>
       <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Tolérances">⚙</button>
       ${bulle('lame')}

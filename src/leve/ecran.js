@@ -58,6 +58,8 @@ const NATURES_TERRAIN = [
   ['terrassement', 'Terrassement'],
   ['metre', 'Métré'],
   ['autres', 'Levé libre'],
+  // Surface d'un dessin (Calculs › Dessin) : pas créée ici, mais on la complète au RX2.
+  ['surface', 'Surface'],
 ];
 // Accroches : un dessin (en gris ce qu'on touche, en ambre l'endroit accroché) et un mot dessous.
 // [mot, nom complet (bulle, lecture d'écran), dessin].
@@ -833,7 +835,7 @@ export function creerEcranLeve(conteneur, actions) {
     return `<div class="choix-nature">
       <p class="titre-choix">Que lèves-tu ?</p>
       <div class="natures-terrain">
-        ${NATURES_TERRAIN.filter(([cle]) => !estModeBase() || NATURES_BASE.includes(cle)).map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}">${titre}</button>`).join('')}
+        ${NATURES_TERRAIN.filter(([cle]) => cle !== 'surface' && (!estModeBase() || NATURES_BASE.includes(cle))).map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}">${titre}</button>`).join('')}
       </div>
       ${donnees.stock ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerChoixNature">annuler</button>' : ''}
     </div>`;

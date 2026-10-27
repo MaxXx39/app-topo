@@ -27,7 +27,12 @@ export const NATURES = [
   ['stock', 'Stock'],
   ['terrain', 'Terrain naturel'],
   ['terrassement', 'Terrassement'],
+  // Surface faite dans Calculs › Dessin (0.77.0) : rangée comme un levé, complétée au RX2.
+  ['surface', 'Surface'],
 ];
+
+/** Natures qu'on choisit à l'import d'un fichier (la « Surface » vient seulement d'un dessin). */
+export const NATURES_IMPORT = NATURES.filter(([cle]) => cle !== 'surface');
 
 /** Nom affiché d'une nature ('terrain' -> 'Terrain naturel'). */
 export function nomNature(nature) {

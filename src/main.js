@@ -8,7 +8,7 @@ import { lireLandXML } from './topo/landxml.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee, origineSurface, nomNature, nouvelIdentifiant, NATURES } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, origineSurface, nomNature, nouvelIdentifiant, NATURES_IMPORT } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
@@ -59,6 +59,8 @@ import {
   creerListeDeLevee,
   nommerListeDeLevee,
   leveDepuisFichier,
+  creerLeveeDuDessin,
+  synchroniserLeveeDuDessin,
   creerSurfaceDirecte,
   creerAutres,
   prochainNom,
@@ -428,7 +430,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
         const choix = await demanderChoix({
           titre: `${resultat.points.length} point(s) dans « ${fichier.name} »`,
           texte: 'C\'est quoi ?',
-          boutons: [['liste', 'Liste de points'], ...NATURES].map(([cle, titre], i) => ({ cle, texte: titre, detail: i === 0 ? '' : 'levé', principal: i === 0 })),
+          boutons: [['liste', 'Liste de points'], ...NATURES_IMPORT].map(([cle, titre], i) => ({ cle, texte: titre, detail: i === 0 ? '' : 'levé', principal: i === 0 })),
         });
         const leve = ajouterLeve(projet, fichier.name, resultat.points);
         if (choix !== 'liste') {
@@ -1468,10 +1470,22 @@ function montrerPilote() {
  */
 function synchroniserSurfacesDessins() {
   const avant = projet.surfaces.length;
-  projet.surfaces = projet.surfaces.filter((s) => !s.dessinId || projet.dessins.some((d) => d.id === s.dessinId));
+  // Dessin supprimé : sa surface part, et la liste de points de son levé « Surface » aussi.
+  const parties = projet.surfaces.filter((s) => s.dessinId && !projet.dessins.some((d) => d.id === s.dessinId));
+  projet.surfaces = projet.surfaces.filter((s) => !parties.includes(s));
+  const listesParties = new Set(parties.filter((s) => s.type === 'points').map((s) => s.leveId));
+  projet.leves = projet.leves.filter((l) => !(listesParties.has(l.id) && l.dediee));
+  if (listesParties.has(projet.leveActifId)) projet.leveActifId = projet.leves[0]?.id ?? null;
   for (const surface of projet.surfaces) {
     if (!surface.dessinId) continue;
     const dessin = dessinDe(surface.dessinId);
+    // Levé « Surface » (0.77.0) : les sommets du dessin sont remis dans sa liste (contour).
+    if (surface.type === 'points') {
+      surface.erreurDessin = surfaceDuDessin(dessin, projet.dessins).erreur;
+      if (!surface.erreurDessin) delete surface.erreurDessin;
+      synchroniserLeveeDuDessin(projet, surface, pointsDuDessin(dessin, projet.dessins));
+      continue;
+    }
     const { points, faces, erreur } = surfaceDuDessin(dessin, projet.dessins);
     surface.nomFichier = dessin.nom;
     if (erreur) {
@@ -1556,7 +1570,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   supprimerDessin: (id) => {
     const dessin = dessinDe(id);
     const avecSurface = projet.surfaces.some((s) => s.dessinId === id);
-    if (!dessin || !confirm(`Supprimer « ${dessin.nom} »${avecSurface ? ' et sa surface' : ''} ?`)) return;
+    if (!dessin || !confirm(`Supprimer « ${dessin.nom} »${avecSurface ? ' et son levé « Surface » (avec ses points)' : ''} ?`)) return;
     projet.dessins = projet.dessins.filter((d) => d.id !== id);
     if (pilote?.dessinId === id) pilote = null;
     modifie(); // sa surface part avec lui (voir synchroniserSurfacesDessins)
@@ -1564,14 +1578,16 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   creerSurfaceDessin: (id) => {
     const dessin = dessinDe(id);
     if (!dessin || projet.surfaces.some((s) => s.dessinId === id)) return;
-    const { points, faces, erreur } = surfaceDuDessin(dessin, projet.dessins);
+    const { points, erreur } = surfaceDuDessin(dessin, projet.dessins);
     if (erreur) {
       afficherMessage(`Surface impossible : ${erreur}`, 4000);
       return;
     }
-    projet.surfaces.push({ id: nouvelIdentifiant(), nom: dessin.nom, type: 'dessin', nature: 'terrassement', nomFichier: dessin.nom, dessinId: id, points, faces });
+    // Un levé « Surface » (0.77.0) : rangé avec les levés, complété au RX2 dans Terrain › Lever.
+    const surface = creerLeveeDuDessin(projet, dessin, points);
+    projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
     editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
-    afficherMessage(`Surface « ${dessin.nom} » créée (Calculs › Surfaces, terrassement)`, 4000);
+    afficherMessage(`Levé « ${surface.nom} » créé (Terrain › Lever, et Volumes)`, 4000);
     modifie();
   },
   renommerDessin: (id, nom) => {
@@ -1758,8 +1774,8 @@ function calculerLame() {
   const coins = etatG?.position && etatD?.position ? { gauche: etatG.position, droite: etatD.position } : null;
   const surface = projet.surfaces.find((s) => s.id === terrain.lame.surfaceId);
   const triangles = surface ? trianglesDeSurface(surface.id) : [];
-  const raison = (!surface && 'Choisis la surface à suivre')
-    || (triangles.length === 0 && 'Cette surface n\'a pas encore de triangles')
+  const raison = (!surface && 'Choisis le levé à suivre')
+    || (triangles.length === 0 && 'Ce levé n\'a pas encore de triangles')
     || raisonRecepteurLame(etatG, nomG)
     || raisonRecepteurLame(etatD, nomD);
   if (raison) return { raison, guidage: null, coupe: null, coins };
@@ -2747,7 +2763,7 @@ function donneesCommunes() {
     controle: terrain,
     // Mode Lame : surfaces (terrassement d'abord), surface suivie, tolérances, 2e RX2 connecté ?
     lame: {
-      surfaces: [...projet.surfaces].sort((a, b) => Number(b.nature === 'terrassement') - Number(a.nature === 'terrassement')).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
+      surfaces: [...projet.surfaces].sort((a, b) => Number(['terrassement', 'surface'].includes(b.nature)) - Number(['terrassement', 'surface'].includes(a.nature))).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
       surfaceId: terrain.lame.surfaceId,
       inverse: terrain.lame.inverse,
       tolerances: terrain.lame.tolerances,
@@ -3174,7 +3190,7 @@ async function importerSurface(fichier) {
       nature = await demanderChoix({
         titre: `${surfaces.length} surface(s) dans « ${fichier.name} »`,
         texte: 'C\'est quoi ?',
-        boutons: NATURES.map(([cle, titre], i) => ({ cle, texte: titre, principal: i === 0 })),
+        boutons: NATURES_IMPORT.map(([cle, titre], i) => ({ cle, texte: titre, principal: i === 0 })),
       });
     }
     for (const surface of surfaces) projet.surfaces.push({ ...surfaceImportee(surface, fichier.name, type), nature });
@@ -3335,6 +3351,7 @@ creerEcranExport(document.querySelector('#export'), {
       { titre: 'Stocks', elements: surfacesDe(['stock']) },
       { titre: 'Terrain naturel', elements: surfacesDe(['terrain']) },
       { titre: 'Terrassement', elements: surfacesDe(['terrassement']) },
+      { titre: 'Surfaces (dessins)', elements: surfacesDe(['surface']) },
       { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
       {
         titre: 'Listes de points',
@@ -3636,7 +3653,7 @@ function mettreAJourEtatEntete() {
   const drive = partage?.etat.connecte
     ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive', rendu: 'Drive : main rendue' }[partage.etat.etat] ?? 'Drive : en attente'
     : '';
-  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} surface(s)`, drive].filter(Boolean).join(' · ');
+  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} levé(s)`, drive].filter(Boolean).join(' · ');
 
   // Verrou du partage : main verte (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
   // (un autre appareil l'a ; toucher = prendre la main). Rien sans Drive.

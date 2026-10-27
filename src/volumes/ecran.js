@@ -71,7 +71,7 @@ export function creerEcranVolumes(conteneur, options) {
     afficher() {
       const projet = obtenirProjet();
       if (projet.surfaces.length === 0) {
-        conteneur.innerHTML = '<p class="vide">Aucune surface.</p>';
+        conteneur.innerHTML = '<p class="vide">Aucun levé.</p>';
         return;
       }
       const lignes = projet.calculs.map((calcul) => ({ calcul, resultat: obtenirResultat(calcul), nom: nomDuCalcul(calcul, projet.surfaces) }));
@@ -163,7 +163,7 @@ function carte({ calcul, resultat, nom }, surfaces, { etiquette, montre }) {
       <label class="champ-large">Stock
         <select data-champ="stock" data-id="${id}">${options(stocks, calcul.surface1Id)}</select>
       </label>
-      ${stocks.length === 0 ? '<p class="aide">Aucune surface « Stock ».</p>' : ''}
+      ${stocks.length === 0 ? '<p class="aide">Aucun levé « Stock ».</p>' : ''}
       <div class="choix-base" role="radiogroup" aria-label="Base du volume">
         <span>Base :</span>
         ${radioBase('contour', 'depuis la ligne du contour', importe)}
@@ -192,7 +192,7 @@ function carte({ calcul, resultat, nom }, surfaces, { etiquette, montre }) {
       ${titreSection('volumes', echapper(sorte ? nom : 'Nouveau volume'))}
       <div class="choix-sorte" role="radiogroup" aria-label="Sorte de volume">
         ${radioSorte('stock', 'Stock seul')}
-        ${radioSorte('comparaison', 'Comparaison de 2 surfaces')}
+        ${radioSorte('comparaison', 'Comparaison de 2 levés')}
       </div>
       ${
         sorte
@@ -224,11 +224,11 @@ function detail(calcul, r, surfaces) {
   const avertissements = [];
   if (r.surfaceNonCouverte > 0) {
     const base = calcul.uneSeule ? 'La ligne basse' : `La référence « ${echapper(texteBase(calcul, surfaces))} »`;
-    const dessus = calcul.uneSeule ? 'le stock' : 'la surface comparée';
+    const dessus = calcul.uneSeule ? 'le stock' : 'le levé comparé';
     avertissements.push(`${base} ne couvre pas tout ${dessus} : ${formaterNombre(r.surfaceNonCouverte)} m² non couverts (non comptés dans le volume).`);
   }
   if (r.surfaceZone !== undefined && r.surfaceZone - r.surfacePlan > 0.01) {
-    avertissements.push(`${formaterNombre(r.surfaceZone - r.surfacePlan)} m² de la zone ne sont pas couverts par la surface comparée (non comptés).`);
+    avertissements.push(`${formaterNombre(r.surfaceZone - r.surfacePlan)} m² de la zone ne sont pas couverts par le levé comparé (non comptés).`);
   }
   // Lignes du détail : seulement les valeurs connues pour ce calcul.
   const lignes = [

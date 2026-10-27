@@ -4813,6 +4813,10 @@ button.bouton-import {
   --couleur-nature: #2563eb;
 }
 
+.entete-levee.nature-surface {
+  --couleur-nature: #7c3aed;
+}
+
 .entete-levee.nature-metre {
   --couleur-nature: #0891b2;
 }
@@ -5404,6 +5408,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 
 .ligne-levee.nature-terrain { --couleur-nature: #15803d; }
 .ligne-levee.nature-terrassement { --couleur-nature: #2563eb; }
+.ligne-levee.nature-surface { --couleur-nature: #7c3aed; }
 .ligne-levee.nature-metre { --couleur-nature: #0891b2; }
 .ligne-levee.nature-autres { --couleur-nature: #475569; }
 

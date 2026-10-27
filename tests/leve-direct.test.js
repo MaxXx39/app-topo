@@ -19,6 +19,8 @@ import {
   creerListeDeLevee,
   nommerListeDeLevee,
   leveDepuisFichier,
+  creerLeveeDuDessin,
+  synchroniserLeveeDuDessin,
 } from '../src/topo/leve-direct.js';
 import { creerProjet } from '../src/projet/projet.js';
 import { calculerSurface } from '../src/topo/surface.js';
@@ -283,5 +285,31 @@ describe('fichier importé comme levé (0.77.0)', () => {
     expect(surface).toMatchObject({ nom: '20260520_Stock', nature: 'terrain', leveId: 'l1', tousLesPoints: true });
     expect(leve).toMatchObject({ nom: '20260520_Stock', direct: true, dediee: true });
     expect(projet.surfaces).toEqual([surface]);
+  });
+});
+
+describe('surface d\'un dessin = levé « Surface » (0.77.0)', () => {
+  it('sa liste a les sommets du dessin (contour) ; le dessin change, les points du RX2 restent', () => {
+    const projet = creerProjet();
+    const sommets = [
+      { nom: 'D1-1', est: 0, nord: 0, altitude: 400 },
+      { nom: 'D1-2', est: 10, nord: 0, altitude: 400 },
+      { nom: 'D1-3', est: 10, nord: 10, altitude: 400 },
+    ];
+    const surface = creerLeveeDuDessin(projet, { id: 'd1' }, sommets);
+    expect(surface).toMatchObject({ nom: 'Surface 1', nature: 'surface', dessinId: 'd1', contour: ['D1-1', 'D1-2', 'D1-3'], tousLesPoints: false });
+    const leve = projet.leves.find((l) => l.id === surface.leveId);
+    expect(leve).toMatchObject({ nom: 'Surface 1', dediee: true, direct: true });
+    expect(leve.points.map((p) => p.nom)).toEqual(['D1-1', 'D1-2', 'D1-3']);
+    // Un point levé au RX2, puis le dessin change (un sommet déplacé, un ajouté).
+    leve.points.push({ nom: 'P-TN-1', est: 5, nord: 2, altitude: 401 });
+    synchroniserLeveeDuDessin(projet, surface, [...sommets.slice(0, 2), { nom: 'D1-3', est: 12, nord: 10, altitude: 400 }, { nom: 'D1-4', est: 0, nord: 10, altitude: 400 }]);
+    expect(leve.points.map((p) => p.nom)).toEqual(['D1-1', 'D1-2', 'D1-3', 'D1-4', 'P-TN-1']);
+    expect(leve.points[2].est).toBe(12);
+    expect(surface.contour).toEqual(['D1-1', 'D1-2', 'D1-3', 'D1-4']);
+    // Un sommet enlevé du dessin part de la liste.
+    synchroniserLeveeDuDessin(projet, surface, sommets.slice(0, 3));
+    expect(leve.points.map((p) => p.nom)).toEqual(['D1-1', 'D1-2', 'D1-3', 'P-TN-1']);
+    expect(creerLeveeDuDessin(projet, { id: 'd2' }, sommets).nom).toBe('Surface 2');
   });
 });

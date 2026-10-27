@@ -92,6 +92,39 @@ export function leveDepuisFichier(projet, leve, nature) {
   return surface;
 }
 
+/**
+ * Surface d'un dessin fermé (Calculs › Dessin, 0.77.0) : un levé de nature « Surface », rangé avec
+ * les levés, avec sa propre liste de points. Les sommets du dessin (« D1-1 »…) sont dans la liste
+ * et forment le contour ; on peut y ajouter des lignes et des points au RX2 (Terrain › Lever).
+ * sommets : points du dessin [{ nom, est, nord, altitude }]. Renvoie la surface créée.
+ */
+export function creerLeveeDuDessin(projet, dessin, sommets, maintenant = new Date()) {
+  const leve = creerListeDeLevee(projet, maintenant);
+  const numeros = projet.surfaces.map((s) => /^Surface (\d+)$/.exec(s.nom)?.[1]).filter(Boolean).map(Number);
+  const surface = creerSurface(`Surface ${Math.max(0, ...numeros) + 1}`, leve.id, 'surface');
+  surface.dessinId = dessin.id;
+  surface.tousLesPoints = false;
+  surface.lignesRupture = [];
+  projet.surfaces.push(surface);
+  nommerListeDeLevee(projet, surface);
+  synchroniserLeveeDuDessin(projet, surface, sommets);
+  return surface;
+}
+
+/**
+ * Le dessin a changé : ses sommets sont remis dans la liste du levé (coordonnées, altitudes ; ceux
+ * enlevés du dessin partent) et forment le contour. Les points levés au RX2 restent.
+ */
+export function synchroniserLeveeDuDessin(projet, surface, sommets) {
+  const leve = projet.leves.find((l) => l.id === surface.leveId);
+  if (!leve) return;
+  const anciens = new Set(surface.contour);
+  const nouveaux = new Set(sommets.map((p) => p.nom));
+  const autres = leve.points.filter((p) => !anciens.has(p.nom) && !nouveaux.has(p.nom));
+  leve.points = [...sommets.map((p) => ({ nom: p.nom, est: p.est, nord: p.nord, altitude: p.altitude ?? null })), ...autres];
+  surface.contour = sommets.map((p) => p.nom);
+}
+
 /** Levé du jour fait avec le récepteur (créé s'il n'existe pas encore). */
 export function leveDuJour(projet, maintenant = new Date()) {
   const jour = jourLocal(maintenant);
