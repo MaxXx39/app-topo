@@ -1790,12 +1790,12 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
 }
 
 /* ==========================================================================
-   3. Mesures : tout en cyan pointillé, pour ne pas les confondre avec les surfaces
+   3. Mesures : tout en cyan (traits pleins, comme les autres modes, 0.74.0)
    ========================================================================== */
 
 .carte-role.role-mesure {
   --couleur-role: var(--cyan);
-  border-left: 5px dashed var(--couleur-role);
+  border-left: 5px solid var(--couleur-role);
   background: color-mix(in srgb, var(--couleur-role) 4%, var(--surface));
 }
 
@@ -1834,15 +1834,15 @@ body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures']) .barre-ed
 }
 
 .choix-mesure.active {
-  border: 2px dashed var(--couleur-mesure, var(--cyan));
+  border: 2px solid var(--couleur-mesure, var(--cyan));
   border-left-width: 5px;
   background: color-mix(in srgb, var(--couleur-mesure, var(--cyan)) 6%, var(--surface));
   font-weight: 600;
 }
 
-/* Mesure ouverte : un seul encadré cyan pointillé. */
+/* Mesure ouverte : un seul encadré cyan. */
 .carte-mesure {
-  border: 2px dashed var(--couleur-mesure, var(--cyan));
+  border: 2px solid var(--couleur-mesure, var(--cyan));
   border-radius: 12px;
   padding: 6px 14px 4px;
   margin: 12px 0;
@@ -2677,7 +2677,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   flex: 1.2;
   display: flex;
   padding: 3px;
-  border: 2px dashed #0891b2;
+  border: 2px solid #0891b2;
   border-radius: 10px;
 }
 
@@ -5368,6 +5368,25 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   font-size: 1.1rem;
 }
 
+/* Fenêtre à cases (ex. nouveau projet) : titre et ✕ sur une ligne, une case par ligne, OK en bas. */
+.entete-fenetre-champs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fenetre-champs label {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.fenetre-champs .boutons-choix .bouton {
+  text-align: center;
+}
+
 /* Fenêtre « Changer » (Terrain › Lever) : un levé par ligne, à la couleur de sa nature, croix rouge (Confirmé). */
 .liste-levees {
   display: grid;
@@ -6457,7 +6476,7 @@ body.mode-base .parties-calculs {
   flex: 0.8;
   display: flex;
   padding: 3px;
-  border: 2px dashed #7c3aed;
+  border: 2px solid #7c3aed;
   border-radius: 10px;
 }
 

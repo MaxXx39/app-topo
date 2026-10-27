@@ -27,7 +27,8 @@ export function htmlControle(ac, { gestionOuverte, erreurGestion }) {
     <p class="etat-controle ${ac.necessaire ? 'a-faire' : 'fait'}">${ac.necessaire ? 'Contrôle à faire' : `Dernier contrôle réussi : ${echapper(dateHeure(ac.dernierReussi))}`}</p>
     ${ac.points.length === 0
       ? '<p class="vide">Aucun point de contrôle.</p>'
-      : `<div class="points-controle">${ac.points.map((p) => `<button type="button" class="point-controle" data-action="controlerPoint" data-valeur="${p.id}">
+      : `<p class="titre-choix titre-choisir-controle">Choisir un point sur le plan ou dans la liste</p>
+      <div class="points-controle">${ac.points.map((p) => `<button type="button" class="point-controle" data-action="controlerPoint" data-valeur="${p.id}">
           <strong>${echapper(p.nom)}</strong>
           ${p.dernier ? `<span class="pastille-resultat ${p.dernier.global}">${echapper(dateHeure(p.dernier.le))}</span>` : '<span class="aide">jamais contrôlé</span>'}
         </button>`).join('')}</div>`}

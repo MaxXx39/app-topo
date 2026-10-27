@@ -32,27 +32,17 @@ import { pointsDuDessin } from '../topo/dessin.js';
  * Renvoie { afficher(projet, dernierImport, dernierPlan) }.
  */
 export function creerEcranImport(conteneur, actions) {
-  // Blocs repliés (flèche du titre ; 0.71.0) : « import », « listes », « dxf », retenus sur l'appareil.
-  const CLE_REPLIES = 'topo-projet-replies';
-  let replies = new Set();
-  try {
-    replies = new Set(JSON.parse(localStorage.getItem(CLE_REPLIES) ?? '[]'));
-  } catch {
-    // tout ouvert
-  }
+  // Blocs ouverts (flèche du titre ; 0.71.0) : « import », « listes », « dxf ». Tous repliés à
+  // chaque ouverture de l'appli (demande du 27.10.2026) : l'utilisateur ouvre ce dont il a besoin.
+  const ouverts = new Set();
   conteneur.addEventListener('toggle', (evenement) => {
     const bloc = evenement.target.dataset?.bloc;
     if (!bloc) return;
-    if (evenement.target.open) replies.delete(bloc);
-    else replies.add(bloc);
-    try {
-      localStorage.setItem(CLE_REPLIES, JSON.stringify([...replies]));
-    } catch {
-      // pas retenu
-    }
+    if (evenement.target.open) ouverts.add(bloc);
+    else ouverts.delete(bloc);
   }, true);
   /** Bloc repliable : titre avec une flèche, contenu dessous. */
-  const bloc = (cle, titre, contenu, classe = '') => `<details class="carte-section bloc-repliable ${classe}" data-bloc="${cle}" ${replies.has(cle) ? '' : 'open'}>
+  const bloc = (cle, titre, contenu, classe = '') => `<details class="carte-section bloc-repliable ${classe}" data-bloc="${cle}" ${ouverts.has(cle) ? 'open' : ''}>
       <summary>${titre}</summary>
       ${contenu}
     </details>`;

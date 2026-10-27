@@ -12,7 +12,7 @@
 // L'état du récepteur arrive 5 fois par seconde (mettreAJourRecepteur) : on ne change alors que
 // quelques textes et l'état du bouton, sans redessiner l'écran (le doigt peut être dessus).
 import { echapper } from '../outils/echapper.js';
-import { estModeBase } from '../reglages/reglages.js';
+import { estModeBase, lameActive } from '../reglages/reglages.js';
 import { demanderCode } from '../outils/code.js';
 import { demanderTexte } from '../outils/choix.js';
 import { ouvrirChoixLevees } from './fenetre-levees.js';
@@ -424,7 +424,7 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function choixMode() {
     return `<div class="modes-terrain bascule-terrain mode-${donnees.mode}" role="group" aria-label="Mode">
-      ${[['lever', 'Lever'], ['controler', 'Implanter'], ['autocontrole', 'Contrôle'], ...(estModeBase() ? [] : [['lame', 'Lame']])]
+      ${[['lever', 'Lever'], ['controler', 'Implanter'], ['autocontrole', 'Contrôle'], ...(lameActive() ? [['lame', 'Lame']] : [])]
         .map(([cle, titre]) => `<button type="button" data-action="choisirMode" data-valeur="${cle}" class="${donnees.mode === cle ? 'actif' : ''}">${titre}</button>`)
         .join('')}
     </div>`;

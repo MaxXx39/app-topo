@@ -9,6 +9,8 @@
 // - partage par Google Drive (nom de l'appareil, connexion, état), déplacé de l'onglet Projet ;
 // - « Prise de main protégée » (0.67.0, changée avec le code de sécurité) : quand cet appareil a
 //   la main sur un projet, un autre appareil doit taper le code de sécurité pour la lui prendre ;
+// - « Onglet Lame » (Confirmé, 0.74.0) : montre le mode Lame de l'onglet Terrain et la connexion
+//   d'un 2e récepteur dans la fenêtre du récepteur ; décoché (par défaut) : un seul récepteur ;
 // - « Fermer l'appli » (appli Android seulement), en rouge tout en haut.
 import { echapper } from '../outils/echapper.js';
 import { demanderCode } from '../outils/code.js';
@@ -16,7 +18,7 @@ import { demanderCode } from '../outils/code.js';
 const CLE = 'topo-reglages';
 // Étoile à 5 branches (en-tête et choix du mode).
 export const ETOILE = 'M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z';
-const PAR_DEFAUT = { telephone: false, mode: 'confirme', priseProtegee: false };
+const PAR_DEFAUT = { telephone: false, mode: 'confirme', priseProtegee: false, lame: false };
 // Mode retenu (relu une fois, puis gardé ici) : estModeBase() est appelé très souvent par le plan.
 let modeRetenu = null;
 
@@ -33,6 +35,11 @@ export function lireReglages() {
 export function estModeBase() {
   if (modeRetenu == null) modeRetenu = lireReglages().mode;
   return modeRetenu === 'base';
+}
+
+/** Vrai si le guidage de lame (et le 2e récepteur) est montré : mode Confirmé et case « Onglet Lame » cochée. */
+export function lameActive() {
+  return !estModeBase() && Boolean(lireReglages().lame);
 }
 
 function ecrireReglages(reglages) {
@@ -86,6 +93,8 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
         <span><strong>Mode téléphone</strong><span class="aide">textes et boutons plus petits</span></span></label>
       <label class="case-reglage"><input type="checkbox" data-reglage="aide" ${aideActive ? 'checked' : ''} />
         <span><strong>Bulles d'aide « ? »</strong></span></label>
+      <label class="case-reglage seulement-confirme"><input type="checkbox" data-reglage="lame" ${reglages.lame ? 'checked' : ''} />
+        <span><strong>Onglet Lame</strong><span class="aide">guidage de lame, 2e récepteur</span></span></label>
       <div class="partage-reglages" data-zone="partage"></div>
       ${partage ? `<label class="case-reglage"><input type="checkbox" data-reglage="priseProtegee" ${reglages.priseProtegee ? 'checked' : ''} />
         <span><strong>Prise de main protégée</strong><span class="aide">code de sécurité demandé aux autres appareils</span></span></label>` : ''}
@@ -113,6 +122,10 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       reglages.telephone = evenement.target.checked;
       ecrireReglages(reglages);
       appliquerReglages(reglages);
+    } else if (champ === 'lame') {
+      reglages.lame = evenement.target.checked;
+      ecrireReglages(reglages);
+      changerMode?.();
     } else if (champ === 'priseProtegee') changerPriseProtegee(evenement.target);
     else if (champ === 'aide') basculerAide();
     else if (evenement.target.dataset.champ === 'nom-appareil') {

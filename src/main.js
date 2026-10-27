@@ -75,14 +75,14 @@ import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, me
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
-import { appliquerReglages, estModeBase, ouvrirReglages } from './reglages/reglages.js';
+import { appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant } from './topo/noms.js';
-import { demanderChoix } from './outils/choix.js';
+import { demanderChamps, demanderChoix } from './outils/choix.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { creerBarreRecalage } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
@@ -352,15 +352,15 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
  * supprimé : en repassant en Confirmé, tout est là.
  */
 function adapterAuMode() {
+  // Guidage de lame : mode Confirmé et case « Onglet Lame » des réglages.
+  if (terrain.mode === 'lame' && !lameActive()) {
+    terrain.mode = 'lever';
+    retenirReglagesTerrain();
+  }
   if (!estModeBase()) return;
   if (estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
   if (terrain.implantation === 'talus') {
     terrain.implantation = 'ligne';
-    retenirReglagesTerrain();
-  }
-  // Guidage de lame : mode Confirmé seulement.
-  if (terrain.mode === 'lame') {
-    terrain.mode = 'lever';
     retenirReglagesTerrain();
   }
 }
@@ -766,7 +766,7 @@ const ecranLeve = recepteurDisponible()
         recalculer();
       },
       choisirMode: (mode) => {
-        const permis = estModeBase() ? ['controler', 'autocontrole'] : ['controler', 'autocontrole', 'lame'];
+        const permis = lameActive() ? ['controler', 'autocontrole', 'lame'] : ['controler', 'autocontrole'];
         terrain.mode = permis.includes(mode) ? mode : 'lever';
         retenirReglagesTerrain();
         if (terrain.mode === 'controler') montrerSurfaceControle();
@@ -1681,7 +1681,7 @@ function raisonRecepteurLame(etat, nom) {
  * coins: { gauche, droite } (positions, pour le plan) }, ou null hors du mode Lame.
  */
 function calculerLame() {
-  if (!ecranLeve || terrain.mode !== 'lame' || estModeBase()) return null;
+  if (!ecranLeve || terrain.mode !== 'lame' || !lameActive()) return null;
   const [etatG, etatD] = terrain.lame.inverse ? [etatRecepteur2, etatRecepteur] : [etatRecepteur, etatRecepteur2];
   const [nomG, nomD] = terrain.lame.inverse ? ['Gauche (récepteur 2)', 'Droite (récepteur 1)'] : ['Gauche (récepteur 1)', 'Droite (récepteur 2)'];
   const coins = etatG?.position && etatD?.position ? { gauche: etatG.position, droite: etatD.position } : null;
@@ -2876,11 +2876,23 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
     const complet = completerProjet(lu);
     telecharger(new Blob([ecrireFichierProjet(complet)], { type: 'application/json' }), `${nomDeFichierProjet(complet)}.topo.json`);
   },
-  // Nouveau projet : on reste sur l'onglet Projet, curseur dans « Affaire ».
+  // Nouveau projet (0.74.0) : une fenêtre (affaire, désignation) ; le projet n'est créé qu'avec
+  // « OK » (fenêtre fermée : rien ne change). On reste sur l'onglet Projet.
   nouveauProjet: async () => {
-    await changerDeProjet(() => ouvrir(nouveauProjetSansNom(), { changerOnglet: false }));
+    const valeurs = await demanderChamps({
+      titre: 'Nouveau projet',
+      champs: [
+        { cle: 'affaire', titre: 'Affaire', exemple: 'ex. 10 203' },
+        { cle: 'lieu', titre: 'Désignation', exemple: 'ex. Gland, plateforme Migros' },
+      ],
+    });
+    if (!valeurs) return;
+    const nouveau = nouveauProjetSansNom();
+    nouveau.cartouche.affaire = valeurs.affaire;
+    nouveau.cartouche.lieu = valeurs.lieu;
+    await changerDeProjet(() => ouvrir(nouveau, { changerOnglet: false }));
     afficherOnglet('projets');
-    document.querySelector('#projets [data-cartouche="affaire"]')?.focus();
+    afficherMessage(`Projet « ${titreProjet(nouveau)} » créé`);
   },
   ouvrirProjet: async (id) => {
     const lu = await stockage.lireProjet(id);

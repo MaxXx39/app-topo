@@ -8,6 +8,7 @@ import { demanderCode } from '../outils/code.js';
 import { formaterNombre } from '../topo/format.js';
 import { etatCorrections } from './corrections.js';
 import { bulle } from '../aide/bulles.js';
+import { lameActive } from '../reglages/reglages.js';
 
 /**
  * Couleur du bouton selon l'état du récepteur (décision du 24.10.2026) :
@@ -152,8 +153,8 @@ export function creerBoutonRecepteur(nav, actions) {
       <div class="etat-recepteur" data-vivant="etat-recepteur"></div>
       <div class="actions-recepteur" data-vivant="actions-recepteur"></div>
       ${reglages && reglagesOuverts ? `<div class="seulement-confirme">${blocNtrip(reglages, 1)}</div>` : ''}
-      ${actions.choisirRecepteur2 ? `<div class="bloc-recepteur2 seulement-confirme">
-          <p class="titre-choix">Récepteur 2 (essai)</p>
+      ${actions.choisirRecepteur2 && (lameActive() || etat2?.connecte) ? `<div class="bloc-recepteur2">
+          <p class="titre-choix">Récepteur 2 (lame)</p>
           <div data-vivant="etat-recepteur2"></div>
           <div data-vivant="actions-recepteur2"></div>
           ${mode2 === 'ntrip' && reglages2Ouverts ? blocNtrip(actions.lireReglagesCorrections2() ?? {}, 2) : ''}

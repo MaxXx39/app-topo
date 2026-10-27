@@ -37,7 +37,13 @@ describe('mode Base / Confirmé', () => {
 
   it('anciens réglages (sans mode) : Confirmé, mode téléphone gardé', async () => {
     const { lireReglages } = await chargerReglages({ 'topo-reglages': JSON.stringify({ telephone: true }) });
-    expect(lireReglages()).toEqual({ telephone: true, mode: 'confirme', priseProtegee: false });
+    expect(lireReglages()).toEqual({ telephone: true, mode: 'confirme', priseProtegee: false, lame: false });
+  });
+
+  it('onglet Lame : caché par défaut, montré seulement en Confirmé avec la case cochée', async () => {
+    expect((await chargerReglages({})).lameActive()).toBe(false);
+    expect((await chargerReglages({ 'topo-reglages': JSON.stringify({ lame: true }) })).lameActive()).toBe(true);
+    expect((await chargerReglages({ 'topo-reglages': JSON.stringify({ lame: true, mode: 'base' }) })).lameActive()).toBe(false);
   });
 
   it('mémoire illisible : Confirmé', async () => {
