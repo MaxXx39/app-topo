@@ -20,9 +20,13 @@ function memoire() {
 
 const BUREAU = { id: 'appareil-bureau', nom: 'PC bureau' };
 
-/** Laisse tourner les tâches de fond (compression…) jusqu'à ce que condition() soit vraie. */
+/**
+ * Laisse tourner les tâches de fond (compression…) jusqu'à ce que condition() soit vraie (5 s au
+ * plus, en temps réel : la date du test est simulée, pas performance.now()).
+ */
 async function attendre(condition) {
-  for (let i = 0; i < 500 && !condition(); i++) await new Promise((fin) => setImmediate(fin));
+  const debut = performance.now();
+  while (!condition() && performance.now() - debut < 5000) await new Promise((fin) => setImmediate(fin));
   expect(condition()).toBe(true);
 }
 

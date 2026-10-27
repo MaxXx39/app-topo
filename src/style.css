@@ -7159,3 +7159,94 @@ body.lecture-seule :is(
   opacity: 0.4;
   pointer-events: none;
 }
+
+/* Projet › listes (0.77.0) : petit titre de chaque catégorie (Liste de points, Lever, Dessin…). */
+.titre-categorie-liste {
+  margin: 14px 0 6px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--bordure);
+  color: var(--gris);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.titre-categorie-liste:first-child {
+  margin-top: 4px;
+}
+
+/* Terrain › Lever (0.77.0) : appareil photo à gauche de PRENDRE LE POINT. */
+.ligne-prendre {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.ligne-prendre .bouton-prendre {
+  flex: 1;
+  width: auto;
+}
+
+.bouton-photo-levee {
+  display: flex;
+  flex: 0 0 60px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--ambre);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--sombre);
+  cursor: pointer;
+}
+
+.bouton-photo-levee svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+/* Bas de l'écran Lever : triangles en trop (Confirmé) et photos du levé. */
+.bas-du-leve {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.triangles-leve {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+}
+
+.triangles-leve.actif {
+  border: 2px solid var(--rouge);
+}
+
+.triangles-leve > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.triangles-leve svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+body.lecture-seule .bouton-photo-levee {
+  opacity: 0.4;
+  pointer-events: none;
+}

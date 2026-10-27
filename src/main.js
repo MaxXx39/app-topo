@@ -56,7 +56,9 @@ import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele } from 
 import { MODES_ACCROCHE, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
 import {
   estLeveDirect,
-  leveDuJour,
+  creerListeDeLevee,
+  nommerListeDeLevee,
+  leveDepuisFichier,
   creerSurfaceDirecte,
   creerAutres,
   prochainNom,
@@ -190,17 +192,17 @@ const ONGLETS = [
   { nom: 'calculs', titre: 'Calculs' },
   { nom: 'plan', titre: 'Plan' },
 ];
-// Les trois parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Surfaces et
-// Volumes vont ensemble (un même cadre), Mesures / métrés est à part.
+// Les parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Volumes, Mesures /
+// métrés, Dessin. Plus de « Surfaces » (0.77.0, demande du 27.10.2026) : tout se fait dans
+// Terrain › Lever ; son panneau reste caché (l'éditeur garde le levé affiché et les triangles en trop).
 const PARTIES_CALCULS = [
-  ['surfaces', 'Surfaces'],
   ['volumes', 'Volumes'],
   ['mesures', 'Mesures / métrés'],
   ['dessin', 'Dessin'],
 ];
 const boutonPartie = ([cle, titre]) => `<button type="button" data-partie="${cle}">${titre}</button>`;
 const estPartieCalculs = (nom) => PARTIES_CALCULS.some(([cle]) => cle === nom);
-let partieCalculs = 'surfaces'; // dernière partie affichée dans Calculs
+let partieCalculs = 'volumes'; // dernière partie affichée dans Calculs
 
 /** Bouton d'un onglet (icône + titre). */
 const boutonOnglet = (o) => `<button type="button" data-onglet="${o.nom}" class="onglet-${o.nom}">
@@ -220,11 +222,9 @@ document.querySelector('#app').innerHTML = `
         <div id="leve-direct"></div>
       </section>
       <nav class="parties-calculs" aria-label="Calculs">
-        <div class="groupe-surfaces-volumes" role="group" aria-label="Surfaces et volumes">
-          ${PARTIES_CALCULS.slice(0, 2).map(boutonPartie).join('')}
-        </div>
-        <div class="groupe-mesures">${boutonPartie(PARTIES_CALCULS[2])}</div>
-        <div class="groupe-dessin">${boutonPartie(PARTIES_CALCULS[3])}</div>
+        <div class="groupe-surfaces-volumes">${boutonPartie(PARTIES_CALCULS[0])}</div>
+        <div class="groupe-mesures">${boutonPartie(PARTIES_CALCULS[1])}</div>
+        <div class="groupe-dessin">${boutonPartie(PARTIES_CALCULS[2])}</div>
       </nav>
       <section class="panneau" data-onglet="surfaces">
         <h2>Surfaces ${bulle('surfaces')}</h2>
@@ -285,6 +285,8 @@ function afficherOnglet(demande) {
   document.body.dataset.onglet = nom;
   if (nom !== 'plan' && nom !== 'dessin') pilote = null;
   if (nom !== 'plan' && nom !== ongletContexte) {
+    // Triangles en trop (Terrain › Lever) : on arrête en quittant l'onglet.
+    if (ongletContexte === 'terrain') editeurSurfaces.arreterModification();
     // Les mesures sont à part : on ne modifie pas une surface (ou une coupe) et une mesure en même temps.
     if (nom === 'mesures') {
       editeurSurfaces.arreterModification();
@@ -421,7 +423,22 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     try {
       const resultat = lirePoints(await fichier.text());
       dernierImport = { ...resultat, nomFichier: fichier.name };
-      if (resultat.points.length > 0) ajouterLeve(projet, fichier.name, resultat.points);
+      if (resultat.points.length > 0) {
+        // Simple liste de points, ou levé (0.77.0) : rangé dans Lever, à compléter dans Terrain › Lever.
+        const choix = await demanderChoix({
+          titre: `${resultat.points.length} point(s) dans « ${fichier.name} »`,
+          texte: 'C\'est quoi ?',
+          boutons: [['liste', 'Liste de points'], ...NATURES].map(([cle, titre], i) => ({ cle, texte: titre, detail: i === 0 ? '' : 'levé', principal: i === 0 })),
+        });
+        const leve = ajouterLeve(projet, fichier.name, resultat.points);
+        if (choix !== 'liste') {
+          const surface = leveDepuisFichier(projet, leve, choix);
+          projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
+          leveDirect.stockId = surface.id;
+          editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+          montrerStockEnCours();
+        }
+      }
     } catch (erreur) {
       dernierImport = { nomFichier: fichier.name, format: '?', points: [], erreurs: [{ ligne: '-', message: erreur.message }], avertissements: [] };
     }
@@ -508,16 +525,31 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
   },
   supprimerLeve: (id) => {
     const leve = projet.leves.find((l) => l.id === id);
-    const surfacesDuLeve = projet.surfaces.filter((s) => s.leveId === id);
+    const levees = [...projet.surfaces, ...projet.metres, ...projet.autres].filter((s) => s.leveId === id);
     const mesuresDuLeve = projet.mesures.filter((m) => m.leveId === id);
-    const texteMesures = mesuresDuLeve.length > 0 ? ` et ses ${mesuresDuLeve.length} mesure(s)` : '';
-    if (!leve || !confirm(`Supprimer le levé « ${leve.nom} », ses ${surfacesDuLeve.length} surface(s)${texteMesures} ?`)) return;
+    const texteLevees = levees.length > 0 ? `, ${levees.length === 1 && leve?.dediee ? 'le levé' : `${levees.length} levé(s)`}` : '';
+    const texteMesures = mesuresDuLeve.length > 0 ? ` et ${mesuresDuLeve.length} mesure(s)` : '';
+    if (!leve || !confirm(`Supprimer la liste « ${leve.nom} » (${leve.points.length} points)${texteLevees}${texteMesures} ?`)) return;
     projet.leves = projet.leves.filter((l) => l.id !== id);
     projet.surfaces = projet.surfaces.filter((s) => s.leveId !== id);
     projet.mesures = projet.mesures.filter((m) => m.leveId !== id);
     projet.metres = projet.metres.filter((m) => m.leveId !== id);
     projet.autres = projet.autres.filter((a) => a.leveId !== id);
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
+    editeurSurfaces.charger(projet.surfaces);
+    modifie({ recadrer: true });
+  },
+  // Projet › Surface Projet (0.77.0) : surfaces importées (LandXML, DXF 3D).
+  renommerSurfaceProjet: (id, nom) => {
+    const surface = projet.surfaces.find((s) => s.id === id);
+    if (!surface || !nom) return;
+    surface.nom = nom;
+    modifie();
+  },
+  supprimerSurfaceProjet: (id) => {
+    const surface = projet.surfaces.find((s) => s.id === id);
+    if (!surface || !confirm(`Supprimer la surface « ${surface.nom} » ?`)) return;
+    projet.surfaces = projet.surfaces.filter((s) => s.id !== id);
     editeurSurfaces.charger(projet.surfaces);
     modifie({ recadrer: true });
   },
@@ -568,13 +600,15 @@ function reprendreLeveDirect() {
 }
 
 /**
- * Nouvelle surface levée (dans le levé du jour) : un stock a tout de suite son calcul de volume.
+ * Nouveau levé (avec sa propre liste de points) : un stock a tout de suite son calcul de volume.
  * Un métré n'est pas une surface : ses aires, longueurs et points comptés deviennent des mesures.
  */
 function ajouterSurfaceLevee(nature) {
+  // Chaque levé a sa propre liste de points, à son nom (0.77.0).
+  const leve = creerListeDeLevee(projet);
   if (nature === 'autres') {
-    const leve = leveDuJour(projet);
     const autres = creerAutres(projet, leve);
+    nommerListeDeLevee(projet, autres);
     projet.leveActifId = leve.id;
     leveDirect.stockId = autres.id;
     leveDirect.role = 'isole';
@@ -582,15 +616,16 @@ function ajouterSurfaceLevee(nature) {
     return;
   }
   if (nature === 'metre') {
-    const leve = leveDuJour(projet);
     const metre = creerMetre(projet, leve);
+    nommerListeDeLevee(projet, metre);
     projet.leveActifId = leve.id;
     leveDirect.stockId = metre.id;
     leveDirect.role = 'aire';
     modifie({ recadrer: true });
     return;
   }
-  const surface = creerSurfaceDirecte(projet, leveDuJour(projet), nature);
+  const surface = creerSurfaceDirecte(projet, leve, nature);
+  nommerListeDeLevee(projet, surface);
   projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
   leveDirect.stockId = surface.id;
   // Un stock commence par son contour ; un terrain naturel ou un terrassement par des points isolés.
@@ -673,6 +708,7 @@ const ecranLeve = recepteurDisponible()
         const levee = [...projet.surfaces, ...projet.metres, ...projet.autres].find((s) => s.id === id);
         if (!levee) return;
         levee.nom = nom;
+        nommerListeDeLevee(projet, levee);
         modifie();
       },
       // Croix rouge de « Changer » (Confirmé) : le levé et ses points, après confirmation.
@@ -692,6 +728,7 @@ const ecranLeve = recepteurDisponible()
         return true;
       },
       choisirStock: (id) => {
+        editeurSurfaces.arreterModification();
         leveDirect.stockId = id;
         // Métré ou « Autres » : pas une surface ; on affiche les points de son levé.
         const horsSurface = metreEnCours() ?? projet.autres.find((a) => a.id === id);
@@ -719,6 +756,38 @@ const ecranLeve = recepteurDisponible()
         const stock = stockEnCours();
         if (!stock) return;
         basculerFermeture(stock);
+        modifie();
+      },
+      // Photos du levé en cours (0.77.0) : appareil photo à gauche de PRENDRE LE POINT.
+      ajouterPhotosLevee: (fichiers) => {
+        const levee = stockEnCours() ?? metreEnCours();
+        if (!levee || refuserEnLectureSeule()) return;
+        ajouterPhotos(levee, fichiers);
+      },
+      legendePhotoLevee: (id, legende) => {
+        const photo = (stockEnCours() ?? metreEnCours())?.photos?.find((p) => p.id === id);
+        if (!photo) return;
+        photo.legende = legende;
+        modifie();
+      },
+      supprimerPhotoLevee: (id) => {
+        const levee = stockEnCours() ?? metreEnCours();
+        if (!levee?.photos?.some((p) => p.id === id) || !confirm('Supprimer cette photo ?')) return;
+        levee.photos = levee.photos.filter((p) => p.id !== id);
+        modifie();
+      },
+      // Triangles en trop (Confirmé, 0.77.0) : on les touche sur le plan pour les enlever ou les remettre.
+      basculerTrianglesLevee: () => {
+        const stock = stockEnCours();
+        if (!stock) return;
+        montrerStockEnCours();
+        editeurSurfaces.suppressionTriangles(!(editeurSurfaces.enSuppression() && editeurSurfaces.objetActif() === stock));
+        recalculer();
+      },
+      retablirTrianglesLevee: () => {
+        const stock = stockEnCours();
+        if (!stock?.trianglesSupprimes?.length) return;
+        stock.trianglesSupprimes = [];
         modifie();
       },
       prendrePoint: (nom) => {
@@ -766,6 +835,7 @@ const ecranLeve = recepteurDisponible()
         recalculer();
       },
       choisirMode: (mode) => {
+        editeurSurfaces.arreterModification();
         const permis = lameActive() ? ['controler', 'autocontrole', 'lame'] : ['controler', 'autocontrole'];
         terrain.mode = permis.includes(mode) ? mode : 'lever';
         retenirReglagesTerrain();
@@ -2624,6 +2694,11 @@ function donneesLeve() {
     dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
     resume: stock ? resumeStock(stock) : null,
     volume: stock ? volumeDuStock(stock) : null,
+    photos: stock?.photos ?? [],
+    // Triangles en trop (Confirmé) : seulement pour un levé qui a une surface (pas un levé libre).
+    triangles: stock && projet.surfaces.includes(stock)
+      ? { actif: editeurSurfaces.enSuppression() && editeurSurfaces.objetActif() === stock, supprimes: stock.trianglesSupprimes?.length ?? 0 }
+      : null,
   };
 }
 
@@ -2654,6 +2729,8 @@ function donneesMetre(metre) {
     resumeTexte: resumeMetre(projet, metre),
     resume: null,
     volume: null,
+    photos: metre.photos ?? [],
+    triangles: null,
   };
 }
 
@@ -3102,7 +3179,7 @@ async function importerSurface(fichier) {
     }
     for (const surface of surfaces) projet.surfaces.push({ ...surfaceImportee(surface, fichier.name, type), nature });
     const messages = [...erreurs, ...avertissements];
-    message = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} »${nature ? ` (${echapper(nomNature(nature).toLowerCase())})` : ''} : voir Calculs › Surfaces.</p>
+    message = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} »${nature ? ` (${echapper(nomNature(nature).toLowerCase())})` : ''} : voir Surface Projet, plus bas.</p>
       ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
     editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
     if (surfaces.length > 0) editeurSurfaces.choisir(projet.surfaces.length - 1);
@@ -3376,6 +3453,8 @@ function recalculer({ recadrer = false } = {}) {
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
   const dansSurfaces = ongletContexte === 'surfaces';
+  // Triangles en trop : supprimés au doigt depuis Terrain › Lever (0.77.0 ; avant : Calculs › Surfaces).
+  const trianglesAuDoigt = (dansSurfaces || (ongletContexte === 'terrain' && terrain.mode === 'lever')) && editeurSurfaces.enSuppression();
   // Calculs › Mesures : hors modification, les points des listes cochées (comme ailleurs) ; pendant la
   // modification d'une mesure, ceux de son levé (ce sont eux qu'on touche pour les ajouter).
   const enModification = (ongletContexte === 'mesures' && ecranMesures.enModification()) || editeurSurfaces.enModification();
@@ -3410,10 +3489,10 @@ function recalculer({ recadrer = false } = {}) {
     ecarts: null,
     // Triangles supprimés à la main : montrés (en pointillés) pendant la suppression au doigt.
     surface:
-      dansSurfaces && calculActif && !calculActif.erreurs && editeurSurfaces.enSuppression()
+      trianglesAuDoigt && calculActif && !calculActif.erreurs
         ? { triangles: calculActif.triangles, trianglesRetires: calculActif.trianglesRetires }
         : null,
-    modeTriangles: dansSurfaces && editeurSurfaces.enSuppression(),
+    modeTriangles: trianglesAuDoigt,
     // Coupes tracées (A – A', B – B'), et celle en cours de tracé.
     coupes: projet.coupes.filter((c) => c.debut && c.fin && c.id !== traceCoupe?.id),
     traceCoupe,
@@ -3461,6 +3540,8 @@ function basculerModeDessin() {
   const dansDessin = ongletContexte === 'dessin';
   let enDessin = dansMesures ? ecranMesures.enModification() : editeurSurfaces.enModification();
   if (dansDessin) enDessin = piloteActif();
+  // Triangles en trop depuis Terrain › Lever : l'écran Terrain reste tel quel.
+  if (ongletContexte === 'terrain') enDessin = false;
   const debut = enDessin && !document.body.classList.contains('mode-dessin');
   document.body.classList.toggle('mode-dessin', enDessin);
   if (!debut) return;
@@ -3676,8 +3757,8 @@ function mettreAJourResume(lequel) {
   resumes = [resumerProjet(lequel), ...resumes.filter((r) => r.id !== lequel.id)].sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
 }
 
-/** Étape où reprendre le travail : les surfaces si le projet a déjà des points, sinon l'import. */
-const etapeUtile = () => (leveActif(projet) ? 'surfaces' : recepteurDisponible() ? 'terrain' : 'leves');
+/** Étape où reprendre le travail : Terrain dans l'APK ; sinon Volumes si le projet a des points, sinon Projet. */
+const etapeUtile = () => (recepteurDisponible() ? 'terrain' : leveActif(projet) ? 'volumes' : 'projets');
 
 /**
  * Va à un onglet, ou à la liste des levés ('leves') : onglet Terrain dans l'appli Android s'il n'y

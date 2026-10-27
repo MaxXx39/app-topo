@@ -91,6 +91,8 @@ const ICONES = {
   longueur: '<path d="M3 16 21 8" /><path d="M3 13v6M21 5v6" />',
   compte: '<circle cx="12" cy="12" r="8" /><path d="M10 9l2-1.5V16" />',
 };
+// Appareil photo (photo du levé, à gauche de PRENDRE LE POINT).
+const ICONE_PHOTO = '<path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" />';
 // Lettre des noms de points d'un métré (A-ENR-1-1, L-BOR-1-1).
 const LETTRES_METRE = { aire: 'A', longueur: 'L' };
 
@@ -242,6 +244,11 @@ export function creerEcranLeve(conteneur, actions) {
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
+    else if (cible.dataset.champ === 'photo-levee' && cible.files?.length) {
+      // Photo du levé (0.77.0) : appareil photo de la tablette, rangée avec le levé en cours.
+      actions.ajouterPhotosLevee([...cible.files]);
+      cible.value = '';
+    } else if (cible.dataset.champ === 'legende-photo-levee') actions.legendePhotoLevee(cible.dataset.id, cible.value.trim());
     else if (cible.dataset.champ === 'fichier-controle' && cible.files?.[0]) {
       actions.importerPointsControle(cible.files[0]).then((reponse) => montrerErreurGestion(reponse?.erreur));
     }
@@ -930,15 +937,51 @@ export function creerEcranLeve(conteneur, actions) {
         <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" />
         <div class="position-leve" data-vivant="position"></div>
       </div>
-      <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>
-        <span>PRENDRE LE POINT</span><span class="sous-titre-prendre">ou touche vol −</span>
-      </button>
+      <div class="ligne-prendre">
+        <label class="bouton-photo-levee" title="Photo du levé" aria-label="Photo du levé">
+          <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>
+          <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
+        </label>
+        <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>
+          <span>PRENDRE LE POINT</span><span class="sous-titre-prendre">ou touche vol −</span>
+        </button>
+      </div>
       <p class="raison-leve" data-vivant="raison" hidden></p>
       <div class="pied-terrain">
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
           Annuler ${donnees.dernierPoint ? echapper(donnees.dernierPoint) : 'le dernier point'}</button>
         ${resume()}
-      </div>`;
+      </div>
+      ${basDuLeve()}`;
+  }
+
+  /**
+   * Bas de l'écran Lever (0.77.0) : triangles en trop (mode Confirmé, levés qui ont une surface :
+   * supprimer au doigt sur le plan, tout rétablir) et photos du levé (légende, supprimer).
+   */
+  function basDuLeve() {
+    const photos = donnees.photos ?? [];
+    const t = donnees.triangles;
+    const triangles = t
+      ? `<div class="triangles-leve seulement-confirme ${t.actif ? 'actif' : ''}">
+          <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 21 20H3z" /><path d="m9 11 6 6M15 11l-6 6" /></svg>Triangles en trop · ${t.supprimes} supprimé(s) ${bulle('trianglesEnTrop')}</span>
+          <div class="ligne-outils">
+            <button type="button" class="${t.actif ? 'bouton' : 'bouton-secondaire'}" data-action="basculerTrianglesLevee">${t.actif ? 'Terminer' : 'Supprimer au doigt'}</button>
+            <button type="button" class="bouton-lien bouton-lien-neutre" data-action="retablirTrianglesLevee" ${t.supprimes === 0 ? 'disabled' : ''}>tout rétablir</button>
+          </div>
+        </div>`
+      : '';
+    const listePhotos = photos.length > 0
+      ? `<div class="photos-leve">
+          <p class="titre-choix">Photos (${photos.length}) ${bulle('photos')}</p>
+          <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
+              <img src="${photo.miniature}" alt="${echapper(photo.legende || donnees.stock.nom)}" />
+              <input type="text" data-champ="legende-photo-levee" data-id="${photo.id}" value="${echapper(photo.legende ?? '')}" placeholder="Légende" aria-label="Légende de la photo" />
+              <button type="button" class="bouton-lien" data-action="supprimerPhotoLevee" data-valeur="${photo.id}">supprimer</button>
+            </figure>`).join('')}</div>
+        </div>`
+      : '';
+    return triangles || listePhotos ? `<div class="bas-du-leve">${triangles}${listePhotos}</div>` : '';
   }
 
   return {

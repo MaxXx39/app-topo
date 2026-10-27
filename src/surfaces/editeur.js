@@ -563,6 +563,12 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       etat.suppression = false;
       afficher();
     },
+    /** Suppression de triangles au doigt sur la surface affichée (depuis Terrain › Lever, 0.77.0). */
+    suppressionTriangles(actif) {
+      etat.suppression = Boolean(actif && objetActif());
+      etat.edition = null;
+      afficher();
+    },
     enModification: () => Boolean(etat.edition || etat.suppression),
     enSuppression: () => etat.suppression,
     objetActif,

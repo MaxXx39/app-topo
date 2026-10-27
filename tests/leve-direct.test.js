@@ -16,6 +16,9 @@ import {
   resumeStock,
   estLeveDirect,
   creerAutres,
+  creerListeDeLevee,
+  nommerListeDeLevee,
+  leveDepuisFichier,
 } from '../src/topo/leve-direct.js';
 import { creerProjet } from '../src/projet/projet.js';
 import { calculerSurface } from '../src/topo/surface.js';
@@ -244,5 +247,41 @@ describe('supprimer un levé du Terrain', async () => {
     supprimerLevee(projet, autre.id);
     expect(projet.leves).toHaveLength(0);
     expect(supprimerLevee(projet, 'inconnu')).toBeNull();
+  });
+});
+
+describe('une liste de points par levé (0.77.0)', () => {
+  it('chaque levé a sa liste, à son nom, avec sa date de création ; renommer le levé renomme la liste', () => {
+    const projet = creerProjet();
+    const maintenant = new Date('2026-10-27T09:30:00');
+    const liste1 = creerListeDeLevee(projet, maintenant);
+    const stock = creerSurfaceDirecte(projet, liste1, 'stock');
+    nommerListeDeLevee(projet, stock);
+    const liste2 = creerListeDeLevee(projet, maintenant);
+    const libre = creerAutres(projet, liste2);
+    nommerListeDeLevee(projet, libre);
+    expect(projet.leves.map((l) => l.nom)).toEqual(['Stock 1', 'Levé libre 1']);
+    expect(liste1.importeLe).toBe(maintenant.toISOString());
+    expect(estLeveDirect(liste1)).toBe(true);
+    stock.nom = 'Stock gravier';
+    nommerListeDeLevee(projet, stock);
+    expect(liste1.nom).toBe('Stock gravier');
+    // Une ancienne liste du jour (partagée par plusieurs levés) ne change pas de nom.
+    const ancienne = creerLeveDirect(projet, maintenant);
+    const ancienStock = creerSurfaceDirecte(projet, ancienne, 'stock');
+    nommerListeDeLevee(projet, ancienStock);
+    expect(ancienne.nom).toMatch(/^Levé RX2 2026-10-27/);
+  });
+});
+
+describe('fichier importé comme levé (0.77.0)', () => {
+  it('la liste du fichier devient celle d\'un levé, nommé d\'après le fichier, avec tous ses points', () => {
+    const projet = creerProjet();
+    const leve = { id: 'l1', nom: '20260520_Stock.csv', importeLe: '2026-10-27T08:00:00.000Z', points: [{ nom: '1', est: 0, nord: 0, altitude: 0 }] };
+    projet.leves.push(leve);
+    const surface = leveDepuisFichier(projet, leve, 'terrain');
+    expect(surface).toMatchObject({ nom: '20260520_Stock', nature: 'terrain', leveId: 'l1', tousLesPoints: true });
+    expect(leve).toMatchObject({ nom: '20260520_Stock', direct: true, dediee: true });
+    expect(projet.surfaces).toEqual([surface]);
   });
 });

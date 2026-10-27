@@ -28,7 +28,7 @@ export const TEXTES_AIDE = {
   importer:
     'Fichier de points : CSV Emlid ou TXT (nom, Est, Nord, altitude, puis un code éventuel, pas utilisé ; séparés par des tabulations, des points-virgules, des espaces ou des virgules ; décimales avec un point ou une virgule), en MN95. Les lignes illisibles sont signalées avec leur numéro.',
   leves:
-    'Une liste de points = un fichier de points importé (CSV d\'Emlid Flow, ou TXT : nom, Est, Nord, altitude, en MN95), ou les points pris avec le récepteur (onglet Terrain). La liste cochée est celle affichée sur le plan, avec ses surfaces ; « Voir les points » sous chaque liste. Les points des dessins (Calculs › Dessin) ont chacun leur liste, en violet ; les points de contrôle sont dans une liste à part, en rouge. Avec plusieurs levés (deux dates), tu peux calculer le volume entre leurs surfaces dans l\'onglet Calculs › Volumes.',
+    'Les listes sont rangées par catégories. Liste de points : un fichier de points importé (CSV d\'Emlid Flow, ou TXT : nom, Est, Nord, altitude, en MN95), ou les points tapés. Lever : une liste par levé fait dans Terrain › Lever, à son nom (il se change avec le crayon dans Lever), avec sa date de création. Dessin : les sommets de chaque dessin, en violet. Surface Projet : les surfaces importées (LandXML, DXF 3D), à renommer ou supprimer ici. Contrôle : les points de contrôle, en rouge. La liste cochée est celle affichée sur le plan ; « Voir les points » sous chaque liste. Supprimer la liste d\'un levé supprime aussi le levé. Avec plusieurs levés (deux dates), tu peux calculer le volume entre eux dans l\'onglet Calculs › Volumes.',
 
   // --- 2.1 Surfaces ---
   surfaces:
