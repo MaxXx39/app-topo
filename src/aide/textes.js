@@ -45,6 +45,8 @@ export const TEXTES_AIDE = {
     'Pour choisir les points : touche une série proposée, tape une liste (ex. « b100 à b116, b120 »), touche les points sur le plan (toucher à nouveau un point le retire), ou coche-les dans la liste.',
   lignesLevee:
     'Le contour, chaque ligne et les points isolés du levé en cours : touche un nom pour voir ses points. ✕ supprime un point (il part aussi de la liste du levé). ✂ supprime le segment entre deux points d\'une ligne : la ligne est coupée en deux et les points restent. Le contour d\'une Surface (dessin) suit le dessin : ses points se changent dans Calculs › Dessin.',
+  journalNmea:
+    'Mode Confirmé. Enregistre pendant 1 minute tout ce que le RX2 envoie à l\'appli (messages NMEA : position GGA, précision GST, inclinaison ETC…), puis propose d\'enregistrer ou d\'envoyer le fichier texte. Tape d\'abord la hauteur de canne réglée dans Emlid Flow : elle est mise dans le nom du fichier. Pour savoir si le RX2 envoie la hauteur de canne : un journal avec une hauteur, un autre avec une autre hauteur, et comparer.',
   trianglesEnTrop:
     'Mode Confirmé, en bas de Terrain › Lever. Sans contour, le levé relie les points extérieurs et peut créer des triangles en trop. « Supprimer au doigt », puis touche un triangle sur le plan pour l\'enlever ; le toucher à nouveau le remet. « Terminer » quand c\'est fini ; « tout rétablir » remet tous les triangles.',
   photos:

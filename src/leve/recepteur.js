@@ -166,6 +166,8 @@ export function creerBoutonRecepteur(nav, actions) {
       </div>
       <div class="etat-recepteur" data-vivant="etat-recepteur"></div>
       <div class="actions-recepteur" data-vivant="actions-recepteur"></div>
+      ${actions.journalNmea ? `<div class="ligne-outils seulement-confirme">
+          <button type="button" class="bouton-lien bouton-lien-neutre" data-action="journalNmea">Journal NMEA (1 min)</button> ${bulle('journalNmea')}</div>` : ''}
       ${reglages && reglagesOuverts ? `<div class="seulement-confirme">${blocNtrip(reglages, 1)}</div>` : ''}
       ${actions.choisirRecepteur2 && (lameActive() || etat2?.connecte) ? `<div class="bloc-recepteur2">
           <p class="titre-choix">Récepteur 2 (lame)</p>

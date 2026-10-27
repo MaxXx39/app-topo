@@ -64,6 +64,20 @@ class EtatRecepteur {
     @Volatile private var heureGstMs: Long? = null
     @Volatile private var erreurConversion: String? = null
 
+    // Journal NMEA (0.82.0, mode Confirmé) : toutes les lignes reçues, telles quelles, pendant un
+    // temps donné ; pour chercher par exemple si le RX2 envoie la hauteur de canne.
+    private val journal = StringBuilder()
+    @Volatile private var finJournalMs = 0L
+
+    /** Commence un journal de "dureeMs" millisecondes (le précédent est effacé). */
+    fun demarrerJournal(dureeMs: Long) {
+        synchronized(journal) { journal.setLength(0) }
+        finJournalMs = SystemClock.elapsedRealtime() + dureeMs
+    }
+
+    /** Texte du journal (une ligne reçue par ligne). */
+    fun lireJournal(): String = synchronized(journal) { journal.toString() }
+
     @Volatile var etatBluetooth = "non connecté"
         private set
     @Volatile var connecte = false
@@ -179,6 +193,8 @@ class EtatRecepteur {
     /** Appelé (depuis le fil Bluetooth) pour chaque ligne reçue du récepteur. */
     private fun surLigneNmea(ligne: String) {
         val maintenant = SystemClock.elapsedRealtime()
+        // Journal : la ligne brute, avant toute lecture (au plus 2 millions de caractères).
+        if (maintenant < finJournalMs) synchronized(journal) { if (journal.length < 2_000_000) journal.append(ligne).append("\r\n") }
         val phrase = lirePhraseNmea(ligne) ?: return
         if (phrase.sommeOk == false) return
         when (phrase.type) {

@@ -68,6 +68,16 @@ class PontAndroid(private val ecran: EcranPrincipal) {
         ecran.runOnUiThread { ecran.deconnecterRecepteur() }
     }
 
+    /** Journal NMEA (0.82.0) : enregistre tout ce que le RX2 envoie pendant "secondes" (5 à 300). */
+    @JavascriptInterface
+    fun demarrerJournalNmea(secondes: Int) {
+        ecran.recepteur.demarrerJournal(secondes.coerceIn(5, 300) * 1000L)
+    }
+
+    /** Journal NMEA : le texte enregistré (une ligne reçue par ligne). */
+    @JavascriptInterface
+    fun lireJournalNmea(): String = ecran.recepteur.lireJournal()
+
     /** Essai à 2 récepteurs : choisit le 2e RX2 et s'y connecte. */
     @JavascriptInterface
     fun choisirRecepteur2() {

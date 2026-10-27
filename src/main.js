@@ -81,6 +81,7 @@ import { segmentCroise, supprimerSegment, ajouterPointExistant, horsDuContour, s
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
+import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
@@ -89,7 +90,7 @@ import { pdfControles } from './export/pdf-controles.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant } from './topo/noms.js';
-import { demanderChamps, demanderChoix } from './outils/choix.js';
+import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
 import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { creerBarreRecalage } from './recalage/barre.js';
@@ -691,6 +692,8 @@ const boutonRecepteur = recepteurDisponible()
         arreterCorrections();
         afficherMessage('Corrections arrêtées : Emlid Flow peut reprendre');
       },
+      // Journal NMEA (Confirmé, 0.82.0) : tout ce que le RX2 envoie pendant 1 minute, dans un fichier.
+      journalNmea: journalNmeaDisponible() ? enregistrerJournalNmea : null,
       // Essai à 2 récepteurs (mode Confirmé) : seulement avec un APK qui le sait.
       choisirRecepteur2: recepteur2Disponible() ? choisirRecepteur2 : null,
       deconnecter2: deconnecterRecepteur2,
@@ -2734,6 +2737,39 @@ function mettreAJourToucheVolume() {
 function toucherPourLever() {
   return Boolean(ecranLeve) && ongletContexte === 'terrain' && terrain.mode === 'lever' && !estModeBase()
     && Boolean(stockEnCours()) && ['ligne', 'contour'].includes(leveDirect.role) && !editeurSurfaces.enSuppression();
+}
+
+/**
+ * Journal NMEA (0.82.0) : on note la hauteur de canne réglée dans Emlid Flow (pour le nom du
+ * fichier), l'APK enregistre tout ce que le RX2 envoie pendant 1 minute, puis la fenêtre
+ * « Exporter » propose d'enregistrer ou d'envoyer le fichier texte.
+ */
+async function enregistrerJournalNmea() {
+  if (!etatRecepteur?.connecte) {
+    afficherMessage('Connecte d\'abord le récepteur', 3000);
+    return;
+  }
+  const hauteur = await demanderTexte({ titre: 'Hauteur de canne dans Emlid Flow (m)', valeur: '' });
+  if (hauteur === null) return;
+  const duree = 60;
+  demarrerJournalNmea(duree);
+  const fin = Date.now() + duree * 1000;
+  const minuterie = setInterval(() => {
+    const reste = Math.max(0, Math.round((fin - Date.now()) / 1000));
+    afficherMessage(`Journal NMEA : enregistrement… ${reste} s (ne coupe pas le récepteur)`, null);
+  }, 1000);
+  setTimeout(() => {
+    clearInterval(minuterie);
+    const texte = lireJournalNmea();
+    if (!texte.trim()) {
+      afficherMessage('Journal NMEA : rien reçu du récepteur', 5000);
+      return;
+    }
+    afficherMessage(`Journal NMEA : ${texte.trim().split(/\r?\n/).length} lignes`, 3000);
+    const date = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    const canne = hauteur.trim() ? `_canne-${hauteur.trim().replace(/[^\d.,]/g, '').replace(',', '.')}m` : '';
+    telecharger(new Blob([texte], { type: 'text/plain;charset=utf-8' }), `journal-nmea_${date}${canne}.txt`);
+  }, duree * 1000 + 1500);
 }
 
 /** Point rangé dans le levé (ou refusé) : vibration, son et message, puis enregistrement. */

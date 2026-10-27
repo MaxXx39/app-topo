@@ -56,6 +56,17 @@ export const choisirRecepteur = () => window.AppliAndroid.choisirRecepteur();
 
 // --- Essai à 2 récepteurs (demande du 26.10.2026, mode Confirmé) : un 2e RX2, même état que le 1er ---
 
+/** Journal NMEA (0.82.0) : vrai si l'APK sait enregistrer tout ce que le RX2 envoie. */
+export function journalNmeaDisponible() {
+  return estDansAppliAndroid() && typeof window.AppliAndroid.demarrerJournalNmea === 'function';
+}
+
+/** Commence un journal NMEA de "secondes" secondes. */
+export const demarrerJournalNmea = (secondes) => window.AppliAndroid.demarrerJournalNmea(secondes);
+
+/** Texte du journal NMEA (une ligne reçue du RX2 par ligne). */
+export const lireJournalNmea = () => String(window.AppliAndroid.lireJournalNmea() ?? '');
+
 /** Vrai si l'APK sait connecter un 2e récepteur. */
 export function recepteur2Disponible() {
   return estDansAppliAndroid() && typeof window.AppliAndroid.choisirRecepteur2 === 'function';
