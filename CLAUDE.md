@@ -61,23 +61,23 @@ exemples/            fichiers de référence (NE PAS modifier ni supprimer)
 - LandXML : triangles par `id` interne, surfaces TIN seulement, inversion Nord/Est à l'import.
 - Version dans `package.json` (affichée dans Projet) : l'augmenter à chaque livraison.
 - Données sur l'appareil (IndexedDB) ; seule exception : partage Drive, accepté par l'utilisateur. Le mot de passe NTRIP n'est jamais mis dans le projet ni renvoyé à la page.
-- Réglages propres à l'appareil (pas dans le projet) dans le stockage du navigateur : `topo-reglages` (téléphone, mode, prise de main protégée), `topo-terrain` (réglages Terrain, lame), `topo-calques`, `topo-plan-terrain-part`, `topo-projet-replies`.
+- Réglages propres à l'appareil (pas dans le projet) dans le stockage du navigateur : `topo-reglages` (téléphone, mode, prise de main protégée, onglet Lame), `topo-terrain` (réglages Terrain, lame), `topo-calques`, `topo-plan-terrain-part`.
 - Pas de bouton « Annuler » visible (seulement Ctrl+Z sur ordinateur) : ne pas promettre d'annulation dans les messages.
 
 ## Référence de calcul
 Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 m³, Stock 2 = 648.979 m³, Stock 3 = 372.201 m³ (remblai Mensura). Tests automatiques sur ce cas.
 
-## Fonctions (version 0.73.0)
+## Fonctions (version 0.74.0)
 
 **Modes Base / Confirmé** (réglages ⚙, étoile ☆ / ★ dans l'en-tête, Confirmé par défaut, retenu par l'appareil). En Base : éléments `.seulement-confirme` cachés, `estModeBase()` dans le code ; rien n'est supprimé du projet.
 - Base = projets, Drive, point tapé, récepteur, GPS de la tablette, lever « Levé libre » (« autres » dans le code), rôles et libellés existants, implanter point / ligne simple, accroches DXF, contrôle de surface, Terrain › Contrôle, réglages du guidage, plan (fonds, cadastre, points, noms, altitudes).
-- Confirmé = tout le reste : onglet Calculs, bloc Import du Projet, menus « Plans » et « Afficher » du plan, DXF, talus, NTRIP, libellés à modifier, options de ligne, triangles / courbes, 2e récepteur, Terrain › Lame, suppression d'un levé.
+- Confirmé = tout le reste : onglet Calculs, bloc Import du Projet, menus « Plans » et « Afficher » du plan, DXF, talus, NTRIP, libellés à modifier, options de ligne, triangles / courbes, suppression d'un levé ; Terrain › Lame et 2e récepteur seulement si la case « Onglet Lame » des réglages ⚙ est cochée (`lameActive()`, décochée par défaut).
 
 **Code de sécurité** (`src/outils/code.js`, dans les deux modes ; simple barrière, pas une vraie sécurité ; ne jamais écrire le code dans les bulles d'aide) : nom de l'appareil, réglages NTRIP (des 2 récepteurs), points de contrôle et tolérances, « Prise de main protégée ». Redemandé à chaque ouverture de la fenêtre.
 
 **Onglet Projet**
-- « + Nouveau projet » (ambre), « Gestion de projets » (sombre), en-tête « Projet ouvert » (affaire, désignation ; plus de « Nom »).
-- 3 blocs repliables (flèche, retenu) :
+- « + Nouveau projet » (ambre) : fenêtre affaire / désignation, projet créé seulement avec OK (`demanderChamps`) ; « Gestion de projets » (sombre), en-tête « Projet ouvert » (affaire, désignation ; plus de « Nom »).
+- 3 blocs repliables (flèche), tous repliés à chaque ouverture de l'appli :
   - Import (Confirmé) : fichier de points, points de contrôle (code demandé après le choix du fichier), plan DXF, surface (LandXML ou DXF 3D, nature demandée tout de suite), point tapé ou pointé sur le DXF ;
   - Listes de points : une par fichier ou levé (couleur au choix, « Voir les points »), une par dessin (violet), points de contrôle à part (rouge) ;
   - DXF importés (calques, couleur, recalage Helmert).
@@ -86,13 +86,13 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mise en page téléphone : plan en haut (flèches ▲ / ▼ = ±15 % de l'écran, 20–80 %), bandeau des modes sous le plan, contenu encadré à la couleur du mode. « Ma position » = environ 50 m autour de soi.
 - **Lever** (ambre) : en-tête du levé en cours (nature, nom en grand, crayon = renommer, « Changer » = reprendre un autre levé, croix rouge en Confirmé = supprimer le levé et ses points après confirmation, « + Nouveau ») ; natures : stock, terrain naturel, terrassement, métré, levé libre ; rôles, libellés, PRENDRE LE POINT (ou touche volume −).
 - **Implanter** (sarcelle) : point, ligne (« début x m · fin y m », drapeau damier sous 1 m), surface, talus ; barre d'accroche (Point, Sommet, Milieu, Sur ligne, Centre).
-- **Contrôle** (rouge, Base) : autocontrôle sur `projet.pointsControle` (choisi dans la liste ou en le touchant sur le plan), écarts E / N / plan / hauteur, tolérances `projet.tolerancesControle` (vert ≤ 2 cm, orange ≤ 4 cm), fenêtre d'avertissement si orange, « Hors tolérance, contacte le géomètre » si rouge, historique `projet.controles`, export CSV / PDF. Rappel « Faire le contrôle ? » à la connexion du RX2 (aucun contrôle réussi aujourd'hui ou depuis 4 h) ; « Non » (« ⚠ le géomètre sera averti ») = refus noté. Fichiers : `topo/controle.js`, `leve/controle-ecran.js`, `export/pdf-controles.js`.
-- **Lame** (bleu, Confirmé) : guidage de lame de niveleuse avec 2 RX2 (mât au-dessus de chaque coin ; hauteur du mât = hauteur de canne dans Emlid Flow, avec la compensation d'inclinaison). Surface suivie (terrassement d'abord), « ⇄ G / D », tolérances ⚙ (vert ≤ 2 cm, orange ≤ 5 cm). Formules **validées par l'utilisateur** (`topo/lame.js`) :
+- **Contrôle** (rouge, Base) : autocontrôle sur `projet.pointsControle` (« Choisir un point sur le plan ou dans la liste »), écarts E / N / plan / hauteur, tolérances `projet.tolerancesControle` (vert ≤ 2 cm, orange ≤ 4 cm), fenêtre d'avertissement si orange, « Hors tolérance, contacte le géomètre » si rouge, historique `projet.controles`, export CSV / PDF. Rappel « Faire le contrôle ? » à la connexion du RX2 (aucun contrôle réussi aujourd'hui ou depuis 4 h) ; « Non » (« ⚠ le géomètre sera averti ») = refus noté. Fichiers : `topo/controle.js`, `leve/controle-ecran.js`, `export/pdf-controles.js`.
+- **Lame** (bleu, Confirmé + case « Onglet Lame » des réglages) : guidage de lame de niveleuse avec 2 RX2 (mât au-dessus de chaque coin ; hauteur du mât = hauteur de canne dans Emlid Flow, avec la compensation d'inclinaison). Surface suivie (terrassement d'abord), « ⇄ G / D », tolérances ⚙ (vert ≤ 2 cm, orange ≤ 5 cm). Formules **validées par l'utilisateur** (`topo/lame.js`) :
   - écart d'un coin = altitude de la surface − altitude du coin (positif = monter) ;
   - dévers = (H droite − H gauche) ÷ largeur à plat × 100 (positif = droite plus haute) ; dévers voulu = idem avec la surface.
   - Nombres seulement si les 2 RX2 sont prêts (`autorise`). Coupe vue de derrière, lame sur le plan (`plan.afficherLame`).
   - Profil en long : depuis le coin gauche, le milieu ou le coin droit ; dans le sens de marche (`directionDeMarche`), à l'arrêt perpendiculaire à la lame ; « devant » (20 m) et « derrière » (5 m) ; pente de chaque tronçon et ruptures de pente > 0.5 % (`tronconsProfil`) ; petite niveleuse dessinée. Écran `leve/lame-ecran.js`.
-- **Récepteurs** : RX2 en Bluetooth, corrections swipos (NTRIP) sans Emlid Flow ; 2e récepteur (Confirmé) avec corrections « copie » du 1er ou « 2e connexion NTRIP » (réglages `corrections2`). Bandeaux RTK / inclinaison sous l'en-tête.
+- **Récepteurs** : RX2 en Bluetooth, corrections swipos (NTRIP) sans Emlid Flow ; 2e récepteur (avec l'onglet Lame) avec corrections « copie » du 1er ou « 2e connexion NTRIP » (réglages `corrections2`). Bandeaux RTK / inclinaison sous l'en-tête.
 - **GPS de la tablette** (APK, sans RX2 connecté, deux modes) : `PositionTablette.kt` (GPS + réseau, MN95 par `etrs89VersMn95`), `window.recevoirPositionTablette({ est, nord, precision })` ; rond gris + cercle de précision, bandeau « GPS TABLETTE ± x m ». **Seulement pour se localiser** : jamais points, implantation, contrôle ni lame. Pas sur le site (choix de l'utilisateur).
 
 **Onglet Calculs** (Confirmé)
@@ -106,7 +106,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 
 **Partage Google Drive** : dossier « Topo - projets », fichiers découpés (projet, plans DXF, photos des surfaces et des mesures), envoi automatique, verrou par appareil (expire après 15 min sans signe de vie), « prendre la main », « Prise de main protégée » (code de sécurité pour les autres appareils), « Rendre la main » (bouton ; tout seul après 5 min sans activité sur le site), main grise = rendue.
 
-**Réglages ⚙** : mode Base / Confirmé, mode téléphone (textes −15 %, icônes et gros boutons −25 %), bulles d'aide, partage Drive, prise de main protégée, « Fermer l'appli » (APK).
+**Réglages ⚙** : mode Base / Confirmé, onglet Lame (Confirmé), mode téléphone (textes −15 %, icônes et gros boutons −25 %), bulles d'aide, partage Drive, prise de main protégée, « Fermer l'appli » (APK).
 
 ## Reste / à valider
 - Essais sur le terrain : guidage de lame et profil en long sur la machine (hauteur de mât, signes, vitesse d'affichage, seuil de rupture 0.5 %) ; GPS de la tablette ; « Envoyer » dans l'APK ; prise de main protégée et main rendue avec 2 appareils sur Drive.
@@ -116,7 +116,13 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Google Cloud en mode Test (réautorisation environ tous les 7 jours) : publier l'écran de consentement si besoin.
 
 ## À développer
+- Demande du 27.10.2026 (réponses de l'utilisateur reçues), livraisons suivantes :
+  - Lame : distance (négative si le coin est hors surface) et altitude du bord de la surface dans le prolongement de la lame, à gauche et à droite de la coupe.
+  - Drive : dossier « App Topo › Configuration Projet » créé par l'appli (drive.file) ; prise de main (site et APK) toujours avec le code de sécurité (« Prise de main protégée » supprimée) ; l'autre appareil est bloqué (« Le géomètre a la main ») ; le site prend la version Drive (points non envoyés de la tablette perdus, choix b) ; lecture seule = voir et implanter sans rien enregistrer ; fenêtre « a changé ici et sur Drive » supprimée ; prise de main = Confirmé.
+  - Lever / Surfaces : onglet Calculs › Surfaces supprimé, « surface » devient « levé » partout ; une liste de points par levé, à son nom (date de création gardée) ; catégories Liste de points – Lever – Dessin – Surface Projet – Contrôle ; CSV importé : « liste de points » ou « levé » ; surface du Dessin = levé de nature « Surface » (complétable au RX2) ; Volumes : seulement stock, terrain naturel, terrassement, Surface (pas les métrés) ; photo du levé (Base, logo à gauche de PRENDRE LE POINT) ; suppression de triangles dans Lever (Confirmé).
+  - Écran Lever : cadre levé (« Changer de levé », « + Nouveau levé ») ; « Ligne en cours » (« + Nouvelle ligne », « Fermer ligne »), même principe pour le contour sans « Fermer » ; titre « ID point » ; liste des lignes / contours / points en bas, dépliable, suppression d'un point (Base) ; point touché sur le plan pour une ligne (Confirmé ; un point ne peut pas être dans 2 lignes, à préciser).
+  - Exports : bouton Exporter sur chaque liste (Confirmé), TXT / CSV (toutes les infos : heure, précision…) / DXF, fenêtre « Enregistrer » ou « Envoyer » ; adresses mail à choisir dans une liste ; liste des réglages swipos (utilisateur, adresse, port, point de montage, mot de passe) à choisir ; ces 2 listes modifiables avec le code de sécurité et partagées par Drive sur tous les appareils (mot de passe swipos accepté sur Drive par l'utilisateur).
 - Dessin, étape suivante (en suspens) : plateforme avec talus jusqu'au terrain naturel (entrées en terre, volume).
 
 ## Historique des versions (résumé)
-- 0.57 modes Base / Confirmé · 0.58 code de sécurité · 0.59 Terrain › Contrôle, onglet Projet en 3 blocs · 0.60–0.62 Dessin (pilote, implantation, surface), couleurs des listes · 0.63 2e récepteur · 0.64 retouches (calques par familles, photos des mesures, Désignation) · 0.65 mise en page Terrain · 0.66 Dessin simplifié · 0.67 Drive (prise protégée, rendre la main) · 0.68 retouches Dessin · 0.69 suppression d'un levé, « Quoi exporter ? », « Envoyer » · 0.70 guidage de lame · 0.71 flèches du plan, blocs repliables, import de surface dans Projet · 0.72 GPS de la tablette · 0.73 profil en long de la lame.
+- 0.57 modes Base / Confirmé · 0.58 code de sécurité · 0.59 Terrain › Contrôle, onglet Projet en 3 blocs · 0.60–0.62 Dessin (pilote, implantation, surface), couleurs des listes · 0.63 2e récepteur · 0.64 retouches (calques par familles, photos des mesures, Désignation) · 0.65 mise en page Terrain · 0.66 Dessin simplifié · 0.67 Drive (prise protégée, rendre la main) · 0.68 retouches Dessin · 0.69 suppression d'un levé, « Quoi exporter ? », « Envoyer » · 0.70 guidage de lame · 0.71 flèches du plan, blocs repliables, import de surface dans Projet · 0.72 GPS de la tablette · 0.73 profil en long de la lame · 0.74 onglet Lame dans les réglages, blocs de Projet repliés, OK du nouveau projet, liserés de Calculs en trait plein.
