@@ -37,7 +37,7 @@ describe('mode Base / Confirmé', () => {
 
   it('anciens réglages (sans mode) : Confirmé, mode téléphone gardé', async () => {
     const { lireReglages } = await chargerReglages({ 'topo-reglages': JSON.stringify({ telephone: true }) });
-    expect(lireReglages()).toEqual({ telephone: true, mode: 'confirme', priseProtegee: false, lame: false });
+    expect(lireReglages()).toEqual({ telephone: true, mode: 'confirme', lame: false });
   });
 
   it('onglet Lame : caché par défaut, montré seulement en Confirmé avec la case cochée', async () => {

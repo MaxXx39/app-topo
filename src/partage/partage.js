@@ -1,64 +1,139 @@
 // Partage des projets par Google Drive, vu de l'appli : connexion, envoi automatique (environ
 // 30 s après une modification, et quand on quitte l'appli), verrou du projet ouvert, ouverture
-// d'un projet de Drive et choix de la bonne version (voir synchro.js).
+// d'un projet de Drive (voir synchro.js).
 // main.js appelle : projetEnregistre(), avantDeChanger(), apresOuverture(), envoyerMaintenant(),
-// rendreLaMain() (bouton, ou 5 minutes sans rien faire sur le site), reprendreApresRendu().
-// Prise de main protégée (0.67.0) : si l'appareil qui a la main a coché « Prise de main protégée »
-// (réglages ⚙), il faut taper le code de sécurité pour lui prendre la main.
+// rendreLaMain() (main touchée, ou 5 minutes sans rien faire sur le site), reprendreApresRendu(),
+// prendreLaMain().
+// Une seule main par projet (demande du 27.10.2026, 0.76.0) :
+// - prendre la main à un autre appareil (site ou APK) : mode Confirmé et code de sécurité, toujours ;
+//   on prend la version de Drive (ce que l'autre n'a pas encore envoyé est perdu : choix de l'utilisateur) ;
+// - l'appareil qui perd la main le voit en 30 s au plus (verrou relu toutes les 30 s) : il est mis
+//   en attente (fenêtre « … a la main », lecture seule) ; quand la main est rendue, il reprend tout
+//   seul la version de Drive et la main ;
+// - on peut ouvrir en lecture seule un projet qu'un autre appareil a en main : on voit et on
+//   implante, mais rien ne s'enregistre ;
+// - plus de fenêtre « a changé ici et sur Drive » : la version de Drive l'emporte.
+
 import { creerDrive } from './drive.js';
 import { creerSynchro, choisirVersion, verrouActif, SIGNE_DE_VIE } from './synchro.js';
 import { creerConnexion, connexionPossible } from './connexion.js';
 import { appareil, nommerAppareil, etaitConnecte, retenirConnexion, memoireProjet, retenirProjet } from './memoire.js';
-import { lireReglages } from '../reglages/reglages.js';
-import { demanderCode } from '../outils/code.js';
 
 const DELAI_ENVOI = 30_000; // après une modification (ms)
 const DELAI_NOUVEL_ESSAI = 60_000; // après un échec (pas de réseau…)
+const VERIFICATION = 30_000; // le verrou du projet ouvert est relu toutes les 30 s
 
 /**
  * Crée le partage.
  * - obtenirProjet() : projet ouvert ; titreDe(projet) : son titre (nom du dossier Drive) ;
  * - lireLocal(id) : promesse du projet enregistré sur l'appareil (ou null) ;
  * - ouvrirProjet(projet) : ouvre ce projet dans l'appli (et l'enregistre sur l'appareil) ;
- * - garderCopie(projet) : enregistre une copie (nouveau projet) sur l'appareil et la renvoie ;
- * - enregistrerLocal(projet) : enregistre un projet sur l'appareil sans l'ouvrir ;
- * - choisirVersionConflit(titre) : demande « drive » (repartir depuis Drive) ou « copie » ;
+ * - demanderPriseDeMain(verrou, titre, { avecAnnuler }) : « lecture » (voir en lecture seule),
+ *   « prendre » (prendre la main) ou null (ne pas ouvrir) ;
+ * - autoriserPrise(verrou) : promesse vraie si on peut prendre la main (mode Confirmé, code) ;
+ * - quandMainPrise(verrou) : un autre appareil vient de prendre la main (fenêtre d'attente) ;
+ * - quandMainRendue(nom) : il l'a rendue, le projet est à jour (fermer la fenêtre d'attente) ;
  * - quandChange() : l'état a changé (redessiner) ; message(texte) : petit message à l'écran.
  */
-export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLocal, ouvrirProjet, garderCopie, choisirVersionConflit, quandChange, message }) {
+export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, demanderPriseDeMain, autoriserPrise, quandMainPrise, quandMainRendue, quandChange, message }) {
   const etat = {
     possible: connexionPossible(),
     connecte: false,
     // 'deconnecte', 'connexion', 'a-jour', 'envoi', 'attente' (hors ligne, nouvel essai bientôt),
-    // 'repris' (ouvert sur un autre appareil), 'erreur'
+    // 'repris' (un autre appareil a la main : lecture seule), 'rendu', 'erreur'
     etat: 'deconnecte',
     message: '',
     derniereSynchro: null,
     projetsDrive: [],
-    repris: null, // { projetId, nom, depuis, protege } : verrou pris par un autre appareil
-    rendu: null, // { projetId } : main rendue (bouton ou inactivité) ; reprise à la prochaine modification
+    // { projetId, appareilId, nom, depuis, vu, attente } : un autre appareil a la main (lecture seule) ;
+    // attente : vrai si cet appareil l'avait (il la reprendra tout seul quand elle sera rendue).
+    repris: null,
+    rendu: null, // { projetId } : main rendue (ou libre) ; reprise à la prochaine modification
   };
   let synchro = null;
   let minuterie = null;
   let envoiEnCours = null;
 
-  // Signe de vie toutes les 5 minutes : le projet ouvert reste à cet appareil (sinon, au bout de
-  // 15 minutes, un autre appareil peut l'ouvrir sans « prendre la main »).
+  let dernierSigneDeVie = 0;
+  let silence = false; // projet ouvert par le partage lui-même : son enregistrement ne relance rien
+  // Ouverture, prise de main ou vérification en cours : la vérification du verrou attend (sinon
+  // elle pourrait croire que la main est perdue pendant qu'on l'ouvre).
+  let occupe = 0;
+
+  // Toutes les 30 s : le verrou du projet ouvert. Cet appareil a la main : un autre la lui a-t-il
+  // prise ? (et, toutes les 5 minutes, signe de vie : sinon, au bout de 15 minutes, le projet est
+  // libre). Un autre a la main : l'a-t-il rendue ?
   setInterval(async () => {
-    if (!etat.connecte || !synchro) return;
+    if (occupe > 0 || envoiEnCours || !etat.connecte || !synchro) return;
+    occupe += 1;
+    try {
+      await verifierVerrou();
+    } catch {
+      // Pas de réseau : nouvel essai dans 30 s.
+    } finally {
+      occupe -= 1;
+    }
+  }, VERIFICATION);
+
+  async function verifierVerrou() {
     const projet = obtenirProjet();
     const dossierId = memoireProjet(projet.id)?.dossierId;
-    if (!dossierId || etat.repris?.projetId === projet.id || etat.rendu?.projetId === projet.id) return;
-    try {
-      const { repris } = await synchro.signeDeVie(dossierId);
-      if (repris) {
-        etat.repris = { projetId: projet.id, ...repris };
+    if (!dossierId || etat.rendu?.projetId === projet.id) return;
+    if (etat.repris?.projetId === projet.id) {
+      const { verrou } = await synchro.lireVerrou(dossierId);
+      if (!verrou || verrou.appareilId === appareil().id) await mainLiberee(dossierId);
+      else if (verrou.appareilId !== etat.repris.appareilId) {
+        etat.repris = { ...etat.repris, ...verrou };
         changer('repris');
       }
-    } catch {
-      // Pas de réseau : nouvel essai au prochain signe de vie.
+      return;
     }
-  }, SIGNE_DE_VIE);
+    let pris = null;
+    if (Date.now() - dernierSigneDeVie >= SIGNE_DE_VIE) {
+      pris = (await synchro.signeDeVie(dossierId)).repris ?? null;
+      dernierSigneDeVie = Date.now();
+    } else {
+      const { verrou } = await synchro.lireVerrou(dossierId);
+      if (verrou && verrou.appareilId !== appareil().id) pris = verrou;
+    }
+    if (pris && obtenirProjet().id === projet.id) perdreLaMain(projet, pris);
+  }
+
+  /** Un autre appareil a pris la main sur le projet ouvert : plus d'envoi, lecture seule, fenêtre d'attente. */
+  function perdreLaMain(projet, verrou) {
+    clearTimeout(minuterie);
+    etat.repris = { projetId: projet.id, ...verrou, attente: true };
+    changer('repris');
+    if (obtenirProjet().id === projet.id) quandMainPrise(etat.repris);
+  }
+
+  /**
+   * Le projet ouvert en lecture seule est libre : on prend la version de Drive. Cet appareil
+   * l'avait en main (attente) : il la reprend tout seul ; sinon la main reste libre (main grise).
+   */
+  async function mainLiberee(dossierId) {
+    const { attente, nom } = etat.repris;
+    changer('envoi', 'téléchargement…');
+    if (attente) await synchro.prendreVerrou(dossierId);
+    const lu = await synchro.telecharger(dossierId);
+    retenirProjet(lu.projet.id, lu.memoire);
+    etat.repris = null;
+    etat.rendu = attente ? null : { projetId: lu.projet.id };
+    await ouvrirEnSilence(lu.projet);
+    changer(attente ? 'a-jour' : 'rendu');
+    if (attente) quandMainRendue(nom);
+    else message(`${nom} a rendu la main : projet à jour`);
+  }
+
+  /** Ouvre un projet sans que son enregistrement sur l'appareil ne relance un envoi ou une prise de main. */
+  async function ouvrirEnSilence(projet) {
+    silence = true;
+    try {
+      await ouvrirProjet(projet);
+    } finally {
+      silence = false;
+    }
+  }
 
   function changer(nouvel, texte = '') {
     etat.etat = nouvel;
@@ -74,7 +149,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
     }
     changer('connexion', 'connexion à Google…');
     const connexion = creerConnexion();
-    synchro = creerSynchro(creerDrive({ obtenirJeton: connexion.obtenirJeton }), appareil(), { protege: () => Boolean(lireReglages().priseProtegee) });
+    synchro = creerSynchro(creerDrive({ obtenirJeton: connexion.obtenirJeton }), appareil());
     try {
       await connexion.obtenirJeton();
       etat.connecte = true;
@@ -128,8 +203,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
       try {
         const resultat = await synchro.envoyer(projet, memoireProjet(projet.id), titreDe(projet));
         if (resultat.repris) {
-          etat.repris = { projetId: projet.id, ...resultat.repris };
-          changer('repris');
+          perdreLaMain(projet, resultat.repris);
           return;
         }
         retenirProjet(projet.id, resultat.memoire);
@@ -151,26 +225,32 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
 
   /**
    * Après l'ouverture d'un projet (ou la connexion) : version plus récente sur Drive ? verrou
-   * pris par un autre appareil ? Sinon, on l'envoie bientôt (il prend le verrou).
+   * pris par un autre appareil (lecture seule, ou prendre la main) ? Sinon, on l'envoie bientôt
+   * (il prend le verrou).
    */
   async function apresOuverture() {
     etat.repris = null;
     etat.rendu = null;
     if (!etat.connecte || !synchro) return;
     const projet = obtenirProjet();
+    occupe += 1;
     try {
       await rafraichirListe();
       const surDrive = etat.projetsDrive.find((p) => p.projetId === projet.id);
       if (surDrive) {
         const memoire = memoireProjet(projet.id);
         const choix = choisirVersion({ local: projet.modifieLe, envoyeLe: memoire?.envoyeLe, distant: surDrive.modifieLe });
-        if (choix !== 'local') {
-          await ouvrirVersionDrive(surDrive, choix === 'conflit');
+        const verrou = autreMain(surDrive.verrou);
+        if (verrou) {
+          if (choix !== 'local') await ouvrirVersionDrive(surDrive, { prendre: false });
+          retenirProjet(projet.id, { ...(memoireProjet(projet.id) ?? {}), dossierId: surDrive.dossierId });
+          etat.repris = { projetId: projet.id, ...verrou, attente: false };
+          changer('repris');
+          if ((await demanderPriseDeMain(verrou, surDrive.titre)) === 'prendre') await prendreLaMain();
           return;
         }
-        if (surDrive.verrou && surDrive.verrou.appareilId !== appareil().id && verrouActif(surDrive.verrou)) {
-          etat.repris = { projetId: projet.id, ...surDrive.verrou };
-          changer('repris');
+        if (choix !== 'local') {
+          await ouvrirVersionDrive(surDrive, { prendre: true, conflit: choix === 'conflit' });
           return;
         }
       }
@@ -178,7 +258,14 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
       rendreAutresVerrous(projet.id);
     } catch (erreur) {
       changer('attente', erreur.message);
+    } finally {
+      occupe -= 1;
     }
+  }
+
+  /** Verrou d'un autre appareil encore en vie (il a la main), ou null. */
+  function autreMain(verrou) {
+    return verrou && verrou.appareilId !== appareil().id && verrouActif(verrou) ? verrou : null;
   }
 
   /**
@@ -218,40 +305,49 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
   }
 
   /**
-   * Ouvre la version Drive d'un projet. conflit : modifié ici et sur Drive depuis le dernier
-   * échange. On ne remplace jamais Drive par la version de cet appareil (décision du 24.10.2026) :
-   * - « Repartir depuis Drive » (mis en avant) : la version de Drive est ouverte ;
-   * - « Créer une copie » : la version de cet appareil devient un nouveau projet « … (copie) »,
-   *   ouvert ; le projet d'origine reprend la version de Drive, qui n'est pas touchée.
+   * Ouvre la version Drive d'un projet. prendre : la main passe à cet appareil (avant le
+   * téléchargement : l'autre appareil n'envoie plus rien) ; sinon lecture seule. conflit : modifié
+   * ici et sur Drive depuis le dernier échange : la version de Drive l'emporte (0.76.0).
    */
-  async function ouvrirVersionDrive(surDrive, conflit) {
+  async function ouvrirVersionDrive(surDrive, { prendre, conflit = false }) {
     changer('envoi', 'téléchargement…');
+    if (prendre) await synchro.prendreVerrou(surDrive.dossierId);
     const lu = await synchro.telecharger(surDrive.dossierId);
-    if (conflit && (await choisirVersionConflit(surDrive.titre)) === 'copie') {
-      const local = await lireLocal(lu.projet.id);
-      retenirProjet(lu.projet.id, lu.memoire);
-      await enregistrerLocal(lu.projet);
-      const copie = local ? await garderCopie(local) : null;
-      if (copie) await ouvrirProjet(copie);
-      message(copie ? `Copie « ${titreDe(copie)} » ouverte ; « ${surDrive.titre} » reste comme sur Drive` : 'Version de Drive gardée');
-      changer('a-jour');
-      return;
-    }
     retenirProjet(lu.projet.id, lu.memoire);
-    await synchro.prendreVerrou(surDrive.dossierId);
-    await ouvrirProjet(lu.projet);
-    message(`Version de Drive ouverte${surDrive.verrou?.nom ? ` (dernier envoi : ${surDrive.verrou.nom})` : ''}`);
+    await ouvrirEnSilence(lu.projet);
+    if (conflit) message('Version de Drive ouverte : les changements faits ici depuis le dernier envoi sont remplacés');
+    else if (prendre) message(`Version de Drive ouverte${surDrive.verrou?.nom ? ` (dernier envoi : ${surDrive.verrou.nom})` : ''}`);
     changer('a-jour');
   }
 
   /**
-   * Prendre la main à un autre appareil : on confirme, puis, si sa prise de main est protégée, il
-   * faut le code de sécurité. Renvoie vrai si on peut la prendre.
+   * Prendre la main sur le projet ouvert, qu'un autre appareil a (mode Confirmé, code de
+   * sécurité) : le verrou passe ici, puis on ouvre la version de Drive.
    */
-  async function accordPriseDeMain(verrou, question) {
-    if (!confirm(question)) return false;
-    if (!verrou?.protege) return true;
-    return demanderCode(`Prise de main protégée par ${verrou.nom}`);
+  async function prendreLaMain() {
+    const projet = obtenirProjet();
+    const surDrive = etat.projetsDrive.find((p) => p.projetId === projet.id);
+    const dossierId = memoireProjet(projet.id)?.dossierId ?? surDrive?.dossierId;
+    if (!synchro || !dossierId || etat.repris?.projetId !== projet.id) return;
+    const { nom } = etat.repris;
+    if (!(await autoriserPrise(etat.repris))) return;
+    occupe += 1;
+    try {
+      changer('envoi', 'téléchargement…');
+      await synchro.prendreVerrou(dossierId);
+      const lu = await synchro.telecharger(dossierId);
+      retenirProjet(lu.projet.id, lu.memoire);
+      etat.repris = null;
+      etat.rendu = null;
+      await ouvrirEnSilence(lu.projet);
+      dernierSigneDeVie = Date.now();
+      message(`Tu as la main (dernière version envoyée par ${nom})`);
+      changer('a-jour');
+    } catch (erreur) {
+      changer('attente', erreur.message);
+    } finally {
+      occupe -= 1;
+    }
   }
 
   /**
@@ -301,7 +397,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
 
     /** Le projet ouvert vient d'être enregistré sur l'appareil : envoi dans 30 s. */
     projetEnregistre() {
-      if (etat.repris?.projetId === obtenirProjet().id) return;
+      if (silence || etat.repris?.projetId === obtenirProjet().id) return;
       // Main rendue : la modification la reprend (si personne ne l'a prise entre-temps).
       if (etat.rendu?.projetId === obtenirProjet().id) {
         apresOuverture();
@@ -317,30 +413,47 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
     avantDeChanger,
     apresOuverture,
 
-    /** Ouvre un projet de la liste Drive (en prenant la main s'il est ouvert ailleurs). */
+    /**
+     * Ouvre un projet de la liste Drive. Un autre appareil l'a en main : lecture seule, ou prendre
+     * la main (mode Confirmé, code de sécurité).
+     */
     async ouvrirDepuisDrive(dossierId) {
       const surDrive = etat.projetsDrive.find((p) => p.dossierId === dossierId);
       if (!surDrive || !synchro) return;
-      const verrou = surDrive.verrou;
-      if (verrou && verrou.appareilId !== appareil().id && verrouActif(verrou)) {
-        const depuis = verrou.depuis ? new Date(verrou.depuis).toLocaleString('fr-CH', { dateStyle: 'short', timeStyle: 'short' }) : '?';
-        if (!(await accordPriseDeMain(verrou, `« ${surDrive.titre} » est ouvert sur ${verrou.nom} (depuis ${depuis}).\n\nPrendre la main ? ${verrou.nom} ne pourra plus envoyer ses modifications.`))) return;
+      const verrou = autreMain(surDrive.verrou);
+      let prendre = true;
+      if (verrou) {
+        const choix = await demanderPriseDeMain(verrou, surDrive.titre, { avecAnnuler: true });
+        if (!choix || (choix === 'prendre' && !(await autoriserPrise(verrou)))) return;
+        prendre = choix === 'prendre';
       }
+      occupe += 1;
       try {
         avantDeChanger(); // en arrière-plan
+        etat.repris = null;
+        etat.rendu = null;
+        if (!prendre) {
+          retenirProjet(surDrive.projetId, { ...(memoireProjet(surDrive.projetId) ?? {}), dossierId });
+          etat.repris = { projetId: surDrive.projetId, ...verrou, attente: false };
+          await ouvrirVersionDrive(surDrive, { prendre: false });
+          changer('repris');
+          return;
+        }
         const local = await lireLocal(surDrive.projetId);
         const memoire = memoireProjet(surDrive.projetId);
         const choix = choisirVersion({ local: local?.modifieLe, envoyeLe: memoire?.envoyeLe, distant: surDrive.modifieLe });
-        if (choix === 'local') {
+        if (choix === 'local' && !verrou) {
           await synchro.prendreVerrou(dossierId);
           retenirProjet(local.id, { ...(memoire ?? {}), dossierId });
           await ouvrirProjet(local);
           changer('a-jour');
           return;
         }
-        await ouvrirVersionDrive(surDrive, choix === 'conflit');
+        await ouvrirVersionDrive(surDrive, { prendre: true, conflit: choix === 'conflit' && !verrou });
       } catch (erreur) {
         changer('attente', erreur.message);
+      } finally {
+        occupe -= 1;
       }
     },
 
@@ -353,20 +466,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, enregistrerLoc
       await rafraichirListe();
     },
 
-    /** « Prendre la main » sur le projet ouvert ailleurs : le verrou passe ici, puis envoi. */
-    async reprendreLaMain() {
-      const projet = obtenirProjet();
-      const surDrive = etat.projetsDrive.find((p) => p.projetId === projet.id);
-      const dossierId = memoireProjet(projet.id)?.dossierId ?? surDrive?.dossierId;
-      if (!synchro || !dossierId) return;
-      if (!(await accordPriseDeMain(etat.repris, `Prendre la main sur « ${titreDe(projet)} » ? ${etat.repris?.nom ?? 'L\'autre appareil'} ne pourra plus envoyer ses modifications, et tes modifications remplaceront les siennes sur Drive.`))) return;
-      try {
-        await synchro.prendreVerrou(dossierId);
-        etat.repris = null;
-        await envoyer();
-      } catch (erreur) {
-        changer('attente', erreur.message);
-      }
-    },
+    /** « Prendre la main » sur le projet ouvert, qu'un autre appareil a (main rouge, réglages). */
+    prendreLaMain,
   };
 }

@@ -73,6 +73,11 @@ export function memoriser(historique, projet) {
   return true;
 }
 
+/** Projet de l'état actuel (le dernier mémorisé), relu : nouvel objet (lecture seule, 0.76.0). */
+export function relireActuel(historique) {
+  return relire(historique, historique.actuel);
+}
+
 export const peutAnnuler = (historique) => historique.passe.length > 0;
 export const peutRetablir = (historique) => historique.futur.length > 0;
 

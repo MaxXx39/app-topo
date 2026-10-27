@@ -83,6 +83,7 @@ import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleur
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant } from './topo/noms.js';
 import { demanderChamps, demanderChoix } from './outils/choix.js';
+import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { creerBarreRecalage } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
@@ -332,11 +333,9 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
             connecterDrive: () => partage.connecter(),
             deconnecterDrive: () => partage.deconnecter(),
             envoyerDrive: () => partage.envoyerMaintenant(),
-            reprendreLaMain: () => partage.reprendreLaMain(),
+            reprendreLaMain: () => partage.prendreLaMain(),
             rendreLaMain: () => partage.rendreLaMain('rendue à la main'),
             reprendreApresRendu: () => partage.reprendreApresRendu(),
-            // Case « Prise de main protégée » changée : le verrou sur Drive le dit tout de suite.
-            priseProtegeeChangee: () => partage.etat.connecte && partage.envoyerMaintenant(),
             nommerAppareil: (nom) => {
               partage.nommerAppareil(nom);
               fenetreReglages?.rafraichir();
@@ -723,6 +722,7 @@ const ecranLeve = recepteurDisponible()
         modifie();
       },
       prendrePoint: (nom) => {
+        if (refuserEnLectureSeule()) return;
         const leve = leveEnCours();
         const stock = stockEnCours();
         const metre = metreEnCours();
@@ -1022,6 +1022,7 @@ const ecranLeve = recepteurDisponible()
         requestAnimationFrame(cadrerSurImplantation);
       },
       enregistrerImplantation: () => {
+        if (refuserEnLectureSeule()) return;
         if (enAutocontrole()) {
           enregistrerControle();
           return;
@@ -2576,6 +2577,7 @@ function mettreAJourToucheVolume() {
   if (actif === toucheVolumeActive) return;
   toucheVolumeActive = actif;
   regleToucheVolume(actif, () => {
+    if (refuserEnLectureSeule()) return;
     const enImplantation = enImplantationDePoint() || enImplantationDeLigne() || enAutocontrole();
     const refus = enImplantation ? ecranLeve.enregistrerDepuisTouche() : ecranLeve.prendreDepuisTouche();
     if (refus) {
@@ -2937,7 +2939,7 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   deconnecterDrive: () => partage.deconnecter(),
   nommerAppareil: (nom) => partage.nommerAppareil(nom),
   envoyerDrive: () => partage.envoyerMaintenant(),
-  reprendreLaMain: () => partage.reprendreLaMain(),
+  reprendreLaMain: () => partage.prendreLaMain(),
   ouvrirDrive: (dossierId) => partage.ouvrirDepuisDrive(dossierId),
   rafraichirDrive: () => partage.rafraichirListe().catch((erreur) => afficherMessage(`Drive : ${erreur.message}`, 4000)),
 }, document.querySelector('#projets-suite'));
@@ -2976,26 +2978,29 @@ partage = creerPartage({
     const lu = await stockage.lireProjet(id);
     return lu ? completerProjet(lu) : null;
   },
-  enregistrerLocal: async (lu) => {
-    const complet = completerProjet(lu);
-    await stockage.enregistrerProjet(complet);
-    mettreAJourResume(complet);
-  },
   ouvrirProjet: (nouveau) => ouvrir(completerProjet(nouveau), { changerOnglet: false }),
-  garderCopie: async (local) => {
-    const copie = dupliquerProjet(completerProjet(local), `${titreProjet(local)} (copie)`);
-    await stockage.enregistrerProjet(copie);
-    mettreAJourResume(copie);
-    return copie;
-  },
-  // Projet modifié ici et sur Drive : 2 boutons, « Repartir depuis Drive » mis en avant.
-  choisirVersionConflit: (titre) => demanderChoix({
-    titre: `« ${titre} » a changé ici et sur Drive`,
+  // Projet qu'un autre appareil a en main (0.76.0) : lecture seule, ou prendre la main (Confirmé).
+  demanderPriseDeMain: (verrou, titre, { avecAnnuler = false } = {}) => demanderChoix({
+    titre: `${verrou.nom} a la main sur « ${titre} »`,
+    texte: verrou.depuis ? `depuis ${new Date(verrou.depuis).toLocaleString('fr-CH', { dateStyle: 'short', timeStyle: 'short' })}` : '',
     boutons: [
-      { cle: 'drive', texte: 'Repartir depuis Drive', detail: 'les changements faits ici sont perdus', principal: true },
-      { cle: 'copie', texte: 'Créer une copie', detail: 'ta version devient un nouveau projet ; Drive ne change pas' },
+      { cle: 'lecture', texte: 'Voir en lecture seule', detail: 'voir et implanter, sans rien enregistrer', principal: true },
+      ...(estModeBase() ? [] : [{ cle: 'prendre', texte: 'Prendre la main', detail: `code de sécurité ; ${verrou.nom} sera mis en attente` }]),
+      ...(avecAnnuler ? [{ cle: 'annuler', texte: 'Ne pas ouvrir' }] : []),
     ],
-  }),
+  }).then((cle) => (cle === 'annuler' ? null : cle)),
+  autoriserPrise: async (verrou) => {
+    if (estModeBase()) {
+      afficherMessage('Prendre la main : seulement en mode Confirmé', 4000);
+      return false;
+    }
+    return demanderCode(`Prendre la main à ${verrou.nom}`);
+  },
+  quandMainPrise: (verrou) => montrerAttenteMain(verrou),
+  quandMainRendue: (nom) => {
+    fermetureAttente?.abort();
+    afficherMessage(`${nom} a rendu la main : projet mis à jour, tu as de nouveau la main`, 5000);
+  },
   quandChange: () => {
     afficherEcranProjet();
     mettreAJourEtatEntete();
@@ -3481,6 +3486,14 @@ let minuterie = null;
 
 /** Après chaque modification : recalcule, retient l'étape (Annuler), puis enregistre un court instant plus tard. */
 function modifie(options) {
+  // Lecture seule : la modification est défaite tout de suite (retour à l'état d'avant).
+  if (lectureSeule()) {
+    projet = completerProjet(historique.relireActuel(modifications));
+    editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+    recalculer(options);
+    refuserEnLectureSeule();
+    return;
+  }
   synchroniserSurfacesDessins();
   // Une surface supprimée : ses calculs de volume disparaissent avec elle.
   projet.calculs = nettoyerCalculs(projet.calculs, projet.surfaces);
@@ -3551,16 +3564,63 @@ function mettreAJourEtatEntete() {
   pastille.hidden = !partage?.etat.connecte;
   // Main rendue (bouton, ou 5 minutes sans rien faire) : main grise ; toucher = la reprendre.
   const rendu = partage?.etat.connecte && partage.etat.rendu?.projetId === projet.id;
-  if (repris) pastille.textContent = `🔒 Lecture seule · ${repris.nom}`;
+  if (repris) pastille.textContent = `🔒 ${repris.nom} a la main`;
   else pastille.innerHTML = `<svg class="main-verrou" viewBox="0 0 24 24" aria-hidden="true">${ICONE_MAIN}</svg>`;
   pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : rendu ? 'pastille-grise' : 'pastille-verte'}`;
-  pastille.title = repris ? 'Ouvert sur un autre appareil : toucher pour prendre la main' : rendu ? 'Main rendue : toucher pour la reprendre' : 'Tu as la main sur ce projet';
+  pastille.title = repris ? 'Lecture seule : toucher pour prendre la main' : rendu ? 'Main rendue : toucher pour la reprendre' : 'Tu as la main : toucher pour la rendre';
+  document.body.classList.toggle('lecture-seule', Boolean(repris));
 }
-document.querySelector('#pastille-verrou').addEventListener('click', () => {
-  if (partage?.etat.repris?.projetId === projet.id) partage.reprendreLaMain();
+// Main de l'en-tête (0.76.0) : rouge = prendre la main (Confirmé, code), grise = la reprendre,
+// verte = la rendre (le projet part sur Drive, un autre appareil peut la prendre).
+document.querySelector('#pastille-verrou').addEventListener('click', async () => {
+  if (partage?.etat.repris?.projetId === projet.id) partage.prendreLaMain();
   else if (partage?.etat.rendu?.projetId === projet.id) partage.reprendreApresRendu();
-  else afficherMessage('Tu as la main sur ce projet', 2000);
+  else if (partage?.etat.connecte) {
+    const choix = await demanderChoix({
+      titre: 'Rendre la main ?',
+      texte: 'Le projet part sur Drive ; un autre appareil peut alors le reprendre.',
+      boutons: [
+        { cle: 'rendre', texte: 'Rendre la main', principal: true },
+        { cle: 'garder', texte: 'Garder la main' },
+      ],
+    });
+    if (choix === 'rendre') partage.rendreLaMain('rendue à la main');
+  }
 });
+
+// Fenêtre d'attente (0.76.0) : un autre appareil a pris la main sur le projet ouvert. Elle se
+// ferme toute seule quand il la rend (le projet est alors repris de Drive, avec la main).
+let fermetureAttente = null;
+async function montrerAttenteMain(verrou) {
+  fermetureAttente?.abort();
+  fermetureAttente = new AbortController();
+  const choix = await demanderChoix({
+    titre: `${verrou.nom} a la main`,
+    texte: 'Ce projet est en attente : il sera mis à jour et tu reprendras la main dès qu\'elle sera rendue.',
+    boutons: [
+      { cle: 'lecture', texte: 'Voir en lecture seule', detail: 'voir et implanter, sans rien enregistrer', principal: true },
+      { cle: 'autre', texte: 'Ouvrir un autre projet' },
+    ],
+    signal: fermetureAttente.signal,
+  });
+  if (choix === 'autre') {
+    afficherOnglet('projets');
+    document.querySelector('#projets [data-panneau="projets"]')?.click();
+  }
+}
+
+/** Vrai si un autre appareil a la main sur le projet ouvert : rien ne s'enregistre (0.76.0). */
+function lectureSeule() {
+  return Boolean(partage?.etat.connecte && partage.etat.repris?.projetId === projet.id);
+}
+
+/** En lecture seule : message et vrai (l'action est refusée). */
+function refuserEnLectureSeule() {
+  if (!lectureSeule()) return false;
+  afficherMessage(`Lecture seule : ${partage.etat.repris.nom} a la main`, 3000);
+  navigator.vibrate?.([80, 80, 80]);
+  return true;
+}
 
 // Site (pas l'APK) : après 5 minutes sans rien faire, le projet est envoyé et la main rendue
 // (demande du 26.10.2026) ; la prochaine modification la reprend.

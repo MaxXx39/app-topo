@@ -3,12 +3,13 @@
 // ouvert sur un appareil est « verrouillé » à son nom (les autres peuvent prendre la main) ;
 // l'envoi est automatique.
 //
-// Sur Drive : un dossier « Topo - projets », puis un dossier par projet (nommé par son titre),
-// qui contient les fichiers du projet (voir partage/fichiers.js). Le dossier du projet porte
-// des propriétés lues par l'appli : projetId, titre, modifieLe, et le verrou (verrouPar = id de
-// l'appareil, verrouNom, verrouDepuis, verrouVu = dernier signe de vie de l'appareil, verrouProtege
-// = 'oui' si l'appareil a coché « Prise de main protégée » : les autres doivent taper le code de
-// sécurité pour prendre la main, 0.67.0).
+// Sur Drive (0.76.0, organisation de l'utilisateur) : un dossier « App Topo », dedans « Configuration
+// Projet », puis un dossier par projet (nommé par son titre), qui contient les fichiers du projet
+// (voir partage/fichiers.js). L'appli ne voit que les dossiers qu'elle a créés (accès « drive.file ») :
+// elle crée elle-même « App Topo » et « Configuration Projet » (l'ancien dossier « Topo - projets »
+// est ignoré). Le dossier du projet porte des propriétés lues par l'appli : projetId, titre,
+// modifieLe, et le verrou (verrouPar = id de l'appareil, verrouNom, verrouDepuis, verrouVu = dernier
+// signe de vie de l'appareil).
 // Un verrou sans signe de vie depuis 15 minutes (tablette éteinte, appli fermée sans ✕) ne compte
 // plus : le projet est libre (décision du 23.10.2026).
 // Sur l'appareil, une petite mémoire par projet (voir memoire.js) retient le dossier Drive, la
@@ -16,7 +17,8 @@
 import { TYPE_DOSSIER } from './drive.js';
 import { projetVersFichiers, fichiersVersProjet, comprimer, decomprimer, empreinte, FICHIER_PROJET } from './fichiers.js';
 
-export const NOM_RACINE = 'Topo - projets';
+export const NOM_RACINE = 'App Topo';
+export const NOM_PROJETS = 'Configuration Projet';
 // Signe de vie de l'appareil qui a le projet (ms), et durée après laquelle son verrou expire.
 export const SIGNE_DE_VIE = 5 * 60 * 1000;
 export const VERROU_EXPIRE = 15 * 60 * 1000;
@@ -35,17 +37,20 @@ export function verrouActif(verrou, maintenant = Date.now()) {
 const court = (texte) => String(texte ?? '').slice(0, 90);
 
 /**
- * Crée la synchronisation. drive : voir partage/drive.js ; appareil : { id, nom } ;
- * protege() : vrai si cet appareil a coché « Prise de main protégée » (lu à chaque verrou posé).
+ * Crée la synchronisation. drive : voir partage/drive.js ; appareil : { id, nom }.
  */
-export function creerSynchro(drive, appareil, { protege = () => false } = {}) {
+export function creerSynchro(drive, appareil) {
   let racineId = null;
 
-  /** Dossier « Topo - projets » (créé au premier besoin). */
+  /** Dossier qui contient les projets : « App Topo › Configuration Projet » (créés au premier besoin). */
   async function racine() {
     if (racineId) return racineId;
-    const trouves = await drive.lister(`mimeType = '${TYPE_DOSSIER}' and appProperties has { key='topo' and value='racine' }`);
-    racineId = trouves[0]?.id ?? (await drive.creerDossier(NOM_RACINE, null, { topo: 'racine' })).id;
+    const dossier = async (nom, parentId, cle) => {
+      const dans = parentId ? `'${parentId}' in parents and ` : '';
+      const trouves = await drive.lister(`${dans}mimeType = '${TYPE_DOSSIER}' and appProperties has { key='topo' and value='${cle}' }`);
+      return trouves[0]?.id ?? (await drive.creerDossier(nom, parentId, { topo: cle })).id;
+    };
+    racineId = await dossier(NOM_PROJETS, await dossier(NOM_RACINE, null, 'app-topo'), 'configuration-projet');
     return racineId;
   }
 
@@ -59,12 +64,12 @@ export function creerSynchro(drive, appareil, { protege = () => false } = {}) {
   const verrouDe = (dossier) => {
     const p = dossier.appProperties ?? {};
     return p.verrouPar
-      ? { appareilId: p.verrouPar, nom: p.verrouNom ?? '?', depuis: p.verrouDepuis ?? null, vu: p.verrouVu ?? p.verrouDepuis ?? null, protege: p.verrouProtege === 'oui' }
+      ? { appareilId: p.verrouPar, nom: p.verrouNom ?? '?', depuis: p.verrouDepuis ?? null, vu: p.verrouVu ?? p.verrouDepuis ?? null }
       : null;
   };
   const proprietesVerrou = () => {
     const maintenant = new Date().toISOString();
-    return { verrouPar: appareil.id, verrouNom: court(appareil.nom), verrouDepuis: maintenant, verrouVu: maintenant, verrouProtege: protege() ? 'oui' : null };
+    return { verrouPar: appareil.id, verrouNom: court(appareil.nom), verrouDepuis: maintenant, verrouVu: maintenant };
   };
 
   return {
@@ -112,6 +117,9 @@ export function creerSynchro(drive, appareil, { protege = () => false } = {}) {
       // Plans ou photos enlevés du projet : à la corbeille de Drive.
       for (const [nom, fichier] of existants) if (!fichiers.has(nom)) await drive.supprimer(fichier.id);
 
+      // Main prise par un autre appareil pendant l'envoi : on ne lui reprend pas le verrou.
+      const prisEntreTemps = verrouDe(await drive.decrire(dossier.id));
+      if (prisEntreTemps && prisEntreTemps.appareilId !== appareil.id && verrouActif(prisEntreTemps)) return { repris: prisEntreTemps };
       await drive.modifier(dossier.id, { nom: court(titre), proprietes: { titre: court(titre), modifieLe: projet.modifieLe ?? '', ...proprietesVerrou() } });
       return { memoire: { dossierId: dossier.id, envoyeLe: projet.modifieLe ?? null, empreintes } };
     },
@@ -147,7 +155,17 @@ export function creerSynchro(drive, appareil, { protege = () => false } = {}) {
     async rendreVerrou(dossierId) {
       const dossier = await drive.decrire(dossierId);
       if (verrouDe(dossier)?.appareilId !== appareil.id) return;
-      await drive.modifier(dossierId, { proprietes: { verrouPar: null, verrouNom: null, verrouDepuis: null, verrouVu: null, verrouProtege: null } });
+      await drive.modifier(dossierId, { proprietes: { verrouPar: null, verrouNom: null, verrouDepuis: null, verrouVu: null } });
+    },
+
+    /**
+     * Verrou d'un projet, lu toutes les 30 s (0.76.0) : { verrou (ou null), modifieLe }. Un verrou
+     * sans signe de vie depuis 15 minutes compte comme null.
+     */
+    async lireVerrou(dossierId) {
+      const dossier = await drive.decrire(dossierId);
+      const verrou = verrouDe(dossier);
+      return { verrou: verrouActif(verrou) ? verrou : null, modifieLe: dossier.appProperties?.modifieLe ?? null };
     },
 
     /**

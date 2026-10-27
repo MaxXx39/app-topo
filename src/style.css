@@ -7143,3 +7143,19 @@ body.mode-telephone .bouton.bouton-prendre {
   stroke: #1b2b36;
   stroke-width: 3;
 }
+
+/* Lecture seule (0.76.0) : un autre appareil a la main. On voit et on implante, mais les boutons
+   qui ajoutent ou enregistrent sont grisés (toute modification est de toute façon défaite). */
+body.lecture-seule :is(
+  [data-action="prendre"],
+  [data-action="enregistrerImplantation"],
+  [data-action="ouvrirChoixNature"],
+  [data-action="nouvelleLigne"],
+  [data-action="basculerFermeture"],
+  [data-action="renommerLevee"],
+  [data-action="enregistrerTalus"],
+  details[data-bloc="import"]
+) {
+  opacity: 0.4;
+  pointer-events: none;
+}

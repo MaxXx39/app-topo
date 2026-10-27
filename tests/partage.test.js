@@ -1,70 +1,10 @@
 // Tests du partage des projets par Google Drive, avec un faux Drive en mémoire.
 import { describe, it, expect } from 'vitest';
-import { creerSynchro, choisirVersion, verrouActif, NOM_RACINE } from '../src/partage/synchro.js';
+import { creerSynchro, choisirVersion, verrouActif, NOM_RACINE, NOM_PROJETS } from '../src/partage/synchro.js';
 import { projetVersFichiers, fichiersVersProjet, comprimer, decomprimer, FICHIER_PROJET } from '../src/partage/fichiers.js';
-import { creerDrive, TYPE_DOSSIER } from '../src/partage/drive.js';
+import { creerDrive } from '../src/partage/drive.js';
+import { fauxDrive } from './faux-drive.js';
 import { creerProjet } from '../src/projet/projet.js';
-
-/** Faux Drive : mêmes fonctions que partage/drive.js, fichiers gardés en mémoire. */
-function fauxDrive() {
-  const fichiers = new Map();
-  let numero = 0;
-  const ecritures = [];
-  const correspond = (f, q) => {
-    if (f.trashed) return false;
-    const parent = /'([^']+)' in parents/.exec(q);
-    if (parent && !(f.parents ?? []).includes(parent[1])) return false;
-    const type = /mimeType = '([^']+)'/.exec(q);
-    if (type && f.mimeType !== type[1]) return false;
-    const propriete = /appProperties has \{ key='([^']+)' and value='([^']+)' \}/.exec(q);
-    if (propriete && f.appProperties?.[propriete[1]] !== propriete[2]) return false;
-    return true;
-  };
-  const copie = (f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, trashed: f.trashed, appProperties: { ...f.appProperties } });
-  return {
-    fichiers,
-    ecritures,
-    async lister(q) {
-      return [...fichiers.values()].filter((f) => correspond(f, q)).map(copie);
-    },
-    listerDossier(id) {
-      return this.lister(`'${id}' in parents`);
-    },
-    async creerDossier(nom, parentId, proprietes = {}) {
-      const f = { id: `d${++numero}`, name: nom, mimeType: TYPE_DOSSIER, parents: parentId ? [parentId] : [], appProperties: { ...proprietes } };
-      fichiers.set(f.id, f);
-      return copie(f);
-    },
-    async creerFichier(nom, parentId, contenu) {
-      const f = { id: `f${++numero}`, name: nom, mimeType: contenu.type, parents: [parentId], appProperties: {}, contenu };
-      fichiers.set(f.id, f);
-      ecritures.push(nom);
-      return copie(f);
-    },
-    async ecrireContenu(id, contenu) {
-      fichiers.get(id).contenu = contenu;
-      ecritures.push(fichiers.get(id).name);
-    },
-    async modifier(id, { nom, proprietes } = {}) {
-      const f = fichiers.get(id);
-      if (nom) f.name = nom;
-      for (const [cle, valeur] of Object.entries(proprietes ?? {})) {
-        if (valeur === null) delete f.appProperties[cle];
-        else f.appProperties[cle] = valeur;
-      }
-      return copie(f);
-    },
-    async decrire(id) {
-      return copie(fichiers.get(id));
-    },
-    async lire(id) {
-      return fichiers.get(id).contenu;
-    },
-    async supprimer(id) {
-      fichiers.get(id).trashed = true;
-    },
-  };
-}
 
 /** Projet d'essai avec un plan DXF et une photo. */
 function projetEssai() {
@@ -95,12 +35,18 @@ describe('fichiers du projet', () => {
 });
 
 describe('synchronisation avec Drive', () => {
-  it('premier envoi : dossier « Topo - projets », dossier du projet, 3 fichiers, verrou à cet appareil', async () => {
+  it('premier envoi : « App Topo › Configuration Projet », dossier du projet, 3 fichiers, verrou à cet appareil', async () => {
     const drive = fauxDrive();
     const { memoire } = await creerSynchro(drive, MAX).envoyer(projetEssai(), null, '10 203 - Gland');
-    const noms = [...drive.fichiers.values()].map((f) => f.name);
-    expect(noms).toContain(NOM_RACINE);
-    expect(noms).toContain('10 203 - Gland');
+    const parNom = (nom) => [...drive.fichiers.values()].find((f) => f.name === nom);
+    expect(NOM_RACINE).toBe('App Topo');
+    expect(NOM_PROJETS).toBe('Configuration Projet');
+    expect(parNom(NOM_RACINE).parents).toEqual([]);
+    expect(parNom(NOM_PROJETS).parents).toEqual([parNom(NOM_RACINE).id]);
+    expect(parNom('10 203 - Gland').parents).toEqual([parNom(NOM_PROJETS).id]);
+    // Un 2e appareil retrouve les mêmes dossiers (pas de doublon).
+    await creerSynchro(drive, BUREAU).listerProjets();
+    expect([...drive.fichiers.values()].filter((f) => f.name === NOM_PROJETS)).toHaveLength(1);
     expect(drive.ecritures.at(-1)).toBe(FICHIER_PROJET); // le projet en dernier
     const dossier = drive.fichiers.get(memoire.dossierId);
     expect(dossier.appProperties).toMatchObject({ titre: '10 203 - Gland', verrouPar: MAX.id, verrouNom: 'Tablette Max' });
@@ -141,19 +87,23 @@ describe('synchronisation avec Drive', () => {
     expect((await creerSynchro(drive, MAX).envoyer(projet, memoire)).memoire).toBeTruthy();
   });
 
-  it('prise de main protégée : le verrou le dit aux autres appareils ; rendu, il est enlevé', async () => {
+  it('verrou relu toutes les 30 s : qui a la main ; rendu, il est libre', async () => {
     const drive = fauxDrive();
     const projet = projetEssai();
-    let protege = true;
-    const max = creerSynchro(drive, MAX, { protege: () => protege });
+    const max = creerSynchro(drive, MAX);
     const { memoire } = await max.envoyer(projet, null, 'Essai');
-    const [surDrive] = await creerSynchro(drive, BUREAU).listerProjets();
-    expect(surDrive.verrou).toMatchObject({ nom: 'Tablette Max', protege: true });
-    protege = false;
-    await max.signeDeVie(memoire.dossierId);
-    expect((await creerSynchro(drive, BUREAU).listerProjets())[0].verrou.protege).toBe(false);
-    await max.rendreVerrou(memoire.dossierId);
-    expect((await creerSynchro(drive, BUREAU).listerProjets())[0].verrou).toBeNull();
+    const bureau = creerSynchro(drive, BUREAU);
+    expect((await bureau.lireVerrou(memoire.dossierId)).verrou).toMatchObject({ appareilId: MAX.id, nom: 'Tablette Max' });
+    // Le bureau prend la main : Max le voit à sa prochaine lecture.
+    await bureau.prendreVerrou(memoire.dossierId);
+    expect((await max.lireVerrou(memoire.dossierId)).verrou).toMatchObject({ nom: 'PC bureau' });
+    // Le bureau rend la main : libre.
+    await bureau.rendreVerrou(memoire.dossierId);
+    expect((await max.lireVerrou(memoire.dossierId)).verrou).toBeNull();
+    // Verrou sans signe de vie depuis 2 heures : compte comme libre.
+    await bureau.prendreVerrou(memoire.dossierId);
+    drive.fichiers.get(memoire.dossierId).appProperties.verrouVu = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+    expect((await max.lireVerrou(memoire.dossierId)).verrou).toBeNull();
   });
 
   it('verrou sans signe de vie depuis 15 minutes : le projet est libre', async () => {

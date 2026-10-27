@@ -4,9 +4,10 @@ import { echapper } from './echapper.js';
 
 /**
  * Ouvre la fenêtre et attend le choix. boutons : [{ cle, texte, detail, principal }].
- * Renvoie la clé du bouton touché.
+ * Renvoie la clé du bouton touché. signal (AbortSignal, facultatif) : la fenêtre se ferme toute
+ * seule quand il est déclenché, et renvoie null.
  */
-export function demanderChoix({ titre, texte = '', boutons }) {
+export function demanderChoix({ titre, texte = '', boutons, signal = null }) {
   return new Promise((resoudre) => {
     const fenetre = document.createElement('dialog');
     fenetre.className = 'fenetre-choix';
@@ -26,6 +27,10 @@ export function demanderChoix({ titre, texte = '', boutons }) {
     // Touche « retour » ou Échap : le premier bouton (le choix mis en avant).
     fenetre.addEventListener('cancel', (evenement) => evenement.preventDefault());
     fenetre.addEventListener('close', () => fenetre.remove());
+    signal?.addEventListener('abort', () => {
+      if (fenetre.open) fenetre.close();
+      resoudre(null);
+    });
     document.body.append(fenetre);
     fenetre.showModal();
   });
