@@ -238,7 +238,7 @@ const ETATS_PARTAGE = {
   envoi: ['envoi…', 'etat-attente'],
   attente: ['pas envoyé (nouvel essai bientôt)', 'etat-attente'],
   repris: ['lecture seule (un autre appareil a la main)', 'etat-erreur'],
-  rendu: ['main rendue', 'etat-attente'],
+  rendu: ['lecture seule (main rendue)', 'etat-attente'],
   erreur: ['erreur', 'etat-erreur'],
 };
 

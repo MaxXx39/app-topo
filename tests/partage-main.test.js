@@ -93,4 +93,44 @@ describe('une seule main par projet', () => {
     expect(partage.etat.repris).toBeNull();
     expect((await bureau.lireVerrou(surDrive.dossierId)).verrou).toMatchObject({ nom: 'Tablette Max' });
   });
+
+  it('main rendue : lecture seule, l\'appli ne la reprend pas toute seule ; le toucher de la main la reprend', async () => {
+    const { creerPartage } = await import('../src/partage/partage.js');
+    const { nommerAppareil } = await import('../src/partage/memoire.js');
+    nommerAppareil('Tablette Max');
+    const ouvert = creerProjet('Essai');
+    ouvert.modifieLe = '2026-10-27T08:00:00.000Z';
+    const partage = creerPartage({
+      obtenirProjet: () => ouvert,
+      titreDe: (p) => p.nom,
+      lireLocal: async () => ouvert,
+      ouvrirProjet: async () => {},
+      demanderPriseDeMain: async () => 'lecture',
+      autoriserPrise: async () => true,
+      quandMainPrise: () => {},
+      quandMainRendue: () => {},
+      quandChange: () => {},
+      message: () => {},
+    });
+    await partage.connecter();
+    await vi.advanceTimersByTimeAsync(3_000);
+    await attendre(() => partage.etat.etat === 'a-jour');
+    const bureau = creerSynchro(commun.drive, BUREAU);
+    const [surDrive] = await bureau.listerProjets();
+
+    await partage.rendreLaMain('rendue à la main');
+    await attendre(() => partage.etat.etat === 'rendu');
+    expect((await bureau.lireVerrou(surDrive.dossierId)).verrou).toBeNull();
+    // Un enregistrement ou un passage en arrière-plan ne reprend pas la main.
+    partage.projetEnregistre();
+    await partage.envoyerMaintenant();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(partage.etat.rendu).toMatchObject({ projetId: ouvert.id });
+    expect((await bureau.lireVerrou(surDrive.dossierId)).verrou).toBeNull();
+    // Toucher la main grise : la main revient.
+    partage.reprendreApresRendu();
+    await vi.advanceTimersByTimeAsync(3_000);
+    await attendre(() => partage.etat.etat === 'a-jour' && !partage.etat.rendu);
+    expect((await bureau.lireVerrou(surDrive.dossierId)).verrou).toMatchObject({ nom: 'Tablette Max' });
+  });
 });

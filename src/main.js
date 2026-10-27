@@ -3863,13 +3863,14 @@ function mettreAJourEtatEntete() {
   const pastille = document.querySelector('#pastille-verrou');
   const repris = partage?.etat.connecte && partage.etat.repris?.projetId === projet.id ? partage.etat.repris : null;
   pastille.hidden = !partage?.etat.connecte;
-  // Main rendue (bouton, ou 5 minutes sans rien faire) : main grise ; toucher = la reprendre.
+  // Main rendue (bouton, ou 5 minutes sans rien faire) : « 🔒 Lecture seule · main rendue » en gris ; toucher = la reprendre.
   const rendu = partage?.etat.connecte && partage.etat.rendu?.projetId === projet.id;
   if (repris) pastille.textContent = `🔒 ${repris.nom} a la main`;
+  else if (rendu) pastille.textContent = '🔒 Lecture seule · main rendue';
   else pastille.innerHTML = `<svg class="main-verrou" viewBox="0 0 24 24" aria-hidden="true">${ICONE_MAIN}</svg>`;
   pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : rendu ? 'pastille-grise' : 'pastille-verte'}`;
   pastille.title = repris ? 'Lecture seule : toucher pour prendre la main' : rendu ? 'Main rendue : toucher pour la reprendre' : 'Tu as la main : toucher pour la rendre';
-  document.body.classList.toggle('lecture-seule', Boolean(repris));
+  document.body.classList.toggle('lecture-seule', Boolean(repris || rendu));
 }
 // Main de l'en-tête (0.76.0) : rouge = prendre la main (Confirmé, code), grise = la reprendre,
 // verte = la rendre (le projet part sur Drive, un autre appareil peut la prendre).
@@ -3912,19 +3913,20 @@ async function montrerAttenteMain(verrou) {
 
 /** Vrai si un autre appareil a la main sur le projet ouvert : rien ne s'enregistre (0.76.0). */
 function lectureSeule() {
-  return Boolean(partage?.etat.connecte && partage.etat.repris?.projetId === projet.id);
+  // Main rendue (0.80.0) : lecture seule aussi, jusqu'à la reprendre (main grise).
+  return Boolean(partage?.etat.connecte && (partage.etat.repris?.projetId === projet.id || partage.etat.rendu?.projetId === projet.id));
 }
 
 /** En lecture seule : message et vrai (l'action est refusée). */
 function refuserEnLectureSeule() {
   if (!lectureSeule()) return false;
-  afficherMessage(`Lecture seule : ${partage.etat.repris.nom} a la main`, 3000);
+  afficherMessage(partage.etat.repris ? `Lecture seule : ${partage.etat.repris.nom} a la main` : 'Lecture seule : main rendue (touche la main en haut pour la reprendre)', 3000);
   navigator.vibrate?.([80, 80, 80]);
   return true;
 }
 
 // Site (pas l'APK) : après 5 minutes sans rien faire, le projet est envoyé et la main rendue
-// (demande du 26.10.2026) ; la prochaine modification la reprend.
+// (demande du 26.10.2026) : lecture seule jusqu'à la reprendre (main grise, 0.80.0).
 const INACTIVITE = 5 * 60 * 1000;
 let derniereActivite = Date.now();
 for (const evenement of ['pointerdown', 'keydown', 'wheel']) document.addEventListener(evenement, () => (derniereActivite = Date.now()), { passive: true, capture: true });
