@@ -25,7 +25,7 @@ import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface } from './topo/coupe.js';
-import { guidageLame, ligneDeCoupeLame, TOLERANCES_LAME, pointDeProfil, avantDeLaLame, vecteurAzimut, tronconsProfil } from './topo/lame.js';
+import { guidageLame, ligneDeCoupeLame, TOLERANCES_LAME, pointDeProfil, avantDeLaLame, vecteurAzimut, tronconsProfil, bordsDeLaLame } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -1702,7 +1702,7 @@ function calculerLame() {
     gauche: { distance: 1, altitude: coins.gauche.altitude },
     droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
   };
-  return { raison: null, guidage, coupe, coins, profil: profilEnLongLame(coins, triangles) };
+  return { raison: null, guidage, coupe, coins, bords: bordsDeLaLame(coins.gauche, coins.droite, triangles), profil: profilEnLongLame(coins, triangles) };
 }
 
 /**

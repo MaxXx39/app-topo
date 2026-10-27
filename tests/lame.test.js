@@ -1,6 +1,6 @@
 // Tests du guidage de lame à 2 RX2 (formules validées par l'utilisateur le 26.10.2026).
 import { describe, it, expect } from 'vitest';
-import { guidageLame, classeEcartLame, deversEntre, ligneDeCoupeLame } from '../src/topo/lame.js';
+import { guidageLame, classeEcartLame, deversEntre, ligneDeCoupeLame, bordsDeLaLame } from '../src/topo/lame.js';
 
 // Surface plane qui monte de 2 % vers l'Est : altitude 450 en Est 2500000.
 const surface = (est) => 450 + 0.02 * (est - 2500000);
@@ -80,5 +80,47 @@ describe('profil en long de la lame', async () => {
     expect(troncons[0]).toMatchObject({ debut: 0, fin: 10 });
     expect(troncons[0].pente).toBeCloseTo(2, 9);
     expect(troncons[1].pente).toBeCloseTo(-1.15, 9);
+  });
+});
+
+describe('bords de la surface dans le prolongement de la lame', () => {
+  // Carré de 10 m × 10 m (Est 0 à 10, Nord 0 à 10), altitude = 100 + 0.1 × Est.
+  const point = (est, nord) => ({ est, nord, altitude: 100 + 0.1 * est });
+  const triangles = [
+    [point(0, 0), point(10, 0), point(10, 10)],
+    [point(0, 0), point(10, 10), point(0, 10)],
+  ];
+
+  it('lame dans la surface : longueur qui reste de chaque côté et altitude au bord', () => {
+    const bords = bordsDeLaLame({ est: 2, nord: 5, altitude: 100 }, { est: 6, nord: 5, altitude: 100 }, triangles);
+    expect(bords.gauche.distance).toBeCloseTo(2, 6);
+    expect(bords.gauche.altitude).toBeCloseTo(100, 6);
+    expect(bords.droite.distance).toBeCloseTo(4, 6);
+    expect(bords.droite.altitude).toBeCloseTo(101, 6);
+  });
+
+  it('coin hors de la surface : distance négative jusqu\'au bord', () => {
+    const bords = bordsDeLaLame({ est: -3, nord: 5, altitude: 100 }, { est: 4, nord: 5, altitude: 100 }, triangles);
+    expect(bords.gauche.distance).toBeCloseTo(-3, 6);
+    expect(bords.gauche.altitude).toBeCloseTo(100, 6);
+    expect(bords.droite.distance).toBeCloseTo(6, 6);
+  });
+
+  it('lame tournée (de droite à gauche) : gauche et droite suivent les coins', () => {
+    const bords = bordsDeLaLame({ est: 6, nord: 5, altitude: 100 }, { est: 2, nord: 5, altitude: 100 }, triangles);
+    expect(bords.gauche.distance).toBeCloseTo(4, 6);
+    expect(bords.gauche.altitude).toBeCloseTo(101, 6);
+    expect(bords.droite.distance).toBeCloseTo(2, 6);
+  });
+
+  it('les 2 coins hors de la surface, du même côté : distances négatives', () => {
+    const bords = bordsDeLaLame({ est: 12, nord: 5, altitude: 100 }, { est: 15, nord: 5, altitude: 100 }, triangles);
+    expect(bords.gauche.distance).toBeCloseTo(-2, 6);
+    expect(bords.droite.distance).toBeCloseTo(-5, 6);
+  });
+
+  it('ligne de la lame qui ne touche pas la surface : rien', () => {
+    const bords = bordsDeLaLame({ est: 2, nord: 20, altitude: 100 }, { est: 6, nord: 20, altitude: 100 }, triangles);
+    expect(bords).toEqual({ gauche: null, droite: null });
   });
 });

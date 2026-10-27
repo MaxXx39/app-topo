@@ -6927,6 +6927,36 @@ body.mode-telephone .bouton.bouton-prendre {
   text-align: center;
 }
 
+/* Bords de la surface (0.75.0) : une colonne à gauche et à droite de la coupe ; rouge hors surface. */
+.coupe-lame-bords {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.bord-lame {
+  display: grid;
+  justify-items: center;
+  min-width: 58px;
+  font-size: 0.8rem;
+  color: var(--gris);
+  line-height: 1.25;
+}
+
+.bord-lame strong {
+  font-size: 1.05rem;
+  color: var(--sombre);
+}
+
+.bord-lame.hors strong {
+  color: #dc2626;
+}
+
+.bord-lame .titre-bord {
+  font-weight: 600;
+}
+
 .svg-coupe-lame {
   display: block;
   width: 100%;
