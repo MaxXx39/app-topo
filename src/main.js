@@ -22,7 +22,7 @@ import { creerEcranImport } from './import/ecran.js';
 import { creerEcranCoupes } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
 import { creerEcranDessin } from './dessin/ecran.js';
-import { gisement, directionTournee, passerParSommet, altitudeProchainSommet, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt, surfaceDuDessin } from './topo/dessin.js';
+import { gisement, directionTournee, passerParSommet, altitudeProchainSommet, altitudeSelonChoix, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt, surfaceDuDessin } from './topo/dessin.js';
 import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
@@ -718,23 +718,29 @@ if (boutonRecepteur && recepteur2Disponible()) {
 
 // Onglet Terrain (téléphone) : flèches ▲ / ▼ sous le plan ; chaque appui change sa hauteur de 15 %
 // de l'écran (entre 20 % et 80 %, 35 % au départ), retenue sur l'appareil.
+// Pendant le guidage d'une implantation (0.84.0), le plan a sa propre part (la moitié au départ).
 const CLE_PLAN_TERRAIN = 'topo-plan-terrain-part';
-const PART_PLAN = { pas: 0.15, min: 0.2, max: 0.8, depart: 0.35 };
-let partPlanTerrain = PART_PLAN.depart;
-try {
-  const lue = Number(localStorage.getItem(CLE_PLAN_TERRAIN));
-  if (lue >= PART_PLAN.min && lue <= PART_PLAN.max) partPlanTerrain = lue;
-} catch {
-  // stockage refusé : hauteur de départ
+const CLE_PLAN_GUIDAGE = 'topo-plan-guidage-part';
+const PART_PLAN = { pas: 0.15, min: 0.2, max: 0.8, depart: 0.35, departGuidage: 0.5 };
+const partsPlan = { terrain: PART_PLAN.depart, guidage: PART_PLAN.departGuidage };
+for (const [sorte, cle, variable] of [['terrain', CLE_PLAN_TERRAIN, '--part-plan-terrain'], ['guidage', CLE_PLAN_GUIDAGE, '--part-plan-guidage']]) {
+  try {
+    const lue = Number(localStorage.getItem(cle));
+    if (lue >= PART_PLAN.min && lue <= PART_PLAN.max) partsPlan[sorte] = lue;
+  } catch {
+    // stockage refusé : hauteur de départ
+  }
+  document.body.style.setProperty(variable, String(partsPlan[sorte]));
 }
-document.body.style.setProperty('--part-plan-terrain', String(partPlanTerrain));
 for (const bouton of document.querySelectorAll('[data-taille-plan]')) {
   bouton.addEventListener('click', () => {
-    const voulue = partPlanTerrain + Number(bouton.dataset.taillePlan) * PART_PLAN.pas;
-    partPlanTerrain = Math.round(Math.min(PART_PLAN.max, Math.max(PART_PLAN.min, voulue)) * 100) / 100;
-    document.body.style.setProperty('--part-plan-terrain', String(partPlanTerrain));
+    const enGuidage = document.body.classList.contains('vue-implantation');
+    const sorte = enGuidage ? 'guidage' : 'terrain';
+    const voulue = partsPlan[sorte] + Number(bouton.dataset.taillePlan) * PART_PLAN.pas;
+    partsPlan[sorte] = Math.round(Math.min(PART_PLAN.max, Math.max(PART_PLAN.min, voulue)) * 100) / 100;
+    document.body.style.setProperty(enGuidage ? '--part-plan-guidage' : '--part-plan-terrain', String(partsPlan[sorte]));
     try {
-      localStorage.setItem(CLE_PLAN_TERRAIN, String(partPlanTerrain));
+      localStorage.setItem(enGuidage ? CLE_PLAN_GUIDAGE : CLE_PLAN_TERRAIN, String(partsPlan[sorte]));
     } catch {
       // pas retenu
     }
@@ -1443,7 +1449,7 @@ const dessinDe = (id) => projet.dessins.find((d) => d.id === id);
 
 /** Pilote pour dessiner "dessin" : toucher le plan pose un sommet au début, puis donne la direction. */
 function nouveauPilote(dessin) {
-  return { dessinId: dessin.id, accroche: pilote?.accroche ?? 'point', direction: null, distance: '', reference: null, angle: pilote?.angle ?? '90', tourne: 0, altitude: '' };
+  return { dessinId: dessin.id, accroche: pilote?.accroche ?? 'point', direction: null, distance: '', reference: null, angle: pilote?.angle ?? '90', tourne: 0, altitude: '', altitudeChoix: pilote?.altitudeChoix ?? 'tapee', pente: pilote?.pente ?? '' };
 }
 
 const auMillimetre = (valeur) => (valeur == null ? null : Math.round(valeur * 1000) / 1000);
@@ -1684,7 +1690,20 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   },
   // Altitude du prochain sommet (tapée à côté de la distance).
   reglerAltitudePilote: (texte) => {
-    if (pilote) pilote.altitude = texte.trim();
+    if (!pilote) return;
+    pilote.altitude = texte.trim();
+    // Une altitude tapée remplace « idem » ou « pente » (qui se choisissent en touchant leur bouton).
+    if (pilote.altitude !== '') pilote.altitudeChoix = 'tapee';
+  },
+  // « = dernier point » ou « pente depuis le dernier » (0.84.0) : touché une 2e fois, retour à l'altitude tapée.
+  choisirAltitudePilote: (valeur) => {
+    if (!pilote) return;
+    pilote.altitudeChoix = pilote.altitudeChoix === valeur ? 'tapee' : valeur;
+    pilote.altitude = '';
+    recalculer();
+  },
+  reglerPentePilote: (texte) => {
+    if (pilote) pilote.pente = texte.trim();
   },
   reglerDistance: (texte) => {
     if (!pilote || pilote.distance === texte.trim()) return;
@@ -1708,7 +1727,12 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
       afficherMessage('Altitude illisible : écris un nombre, ou laisse vide', 4000);
       return;
     }
-    const altitude = altitudeProchainSommet(dessin, tapee);
+    const choisie = altitudeSelonChoix(dessin, { choix: pilote.altitudeChoix, tapee, pente: lireNombreTape(pilote.pente), distance });
+    if (choisie.erreur) {
+      afficherMessage(`Altitude : ${choisie.erreur}`, 4000);
+      return;
+    }
+    const altitude = altitudeProchainSommet(dessin, choisie.altitude);
     pilote.altitude = '';
     ajouterSommetDessin({ ...pointSelonGisement(dessin.sommets.at(-1), pilote.direction, distance), altitude });
   },
@@ -3183,6 +3207,28 @@ if (recepteurDisponible()) {
   });
 }
 
+/**
+ * Nouveau projet (0.74.0) : une fenêtre (affaire, désignation) ; le projet n'est créé qu'avec
+ * « OK » (fenêtre fermée : rien ne change). On reste sur l'onglet Projet. Renvoie vrai si créé.
+ */
+async function creerNouveauProjet() {
+  const valeurs = await demanderChamps({
+    titre: 'Nouveau projet',
+    champs: [
+      { cle: 'affaire', titre: 'Affaire', exemple: 'ex. 10 203' },
+      { cle: 'lieu', titre: 'Désignation', exemple: 'ex. Gland, plateforme Migros' },
+    ],
+  });
+  if (!valeurs) return false;
+  const nouveau = nouveauProjetSansNom();
+  nouveau.cartouche.affaire = valeurs.affaire;
+  nouveau.cartouche.lieu = valeurs.lieu;
+  await changerDeProjet(() => ouvrir(nouveau, { changerOnglet: false }));
+  afficherOnglet('projets');
+  afficherMessage(`Projet « ${titreProjet(nouveau)} » créé`);
+  return true;
+}
+
 const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   renommer: (nom) => {
     projet.nom = nom; // facultatif : le projet se reconnaît à son affaire et son lieu
@@ -3190,6 +3236,21 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   },
   changerCartouche: (champ, valeur) => {
     projet.cartouche[champ] = valeur;
+    modifie();
+  },
+  // Crayon à côté du projet ouvert (0.84.0) : affaire et désignation dans une fenêtre, comme au « Nouveau projet ».
+  modifierProjet: async () => {
+    if (refuserEnLectureSeule()) return;
+    const valeurs = await demanderChamps({
+      titre: 'Renommer le projet',
+      champs: [
+        { cle: 'affaire', titre: 'Affaire', exemple: 'ex. 10 203', valeur: projet.cartouche.affaire ?? '' },
+        { cle: 'lieu', titre: 'Désignation', exemple: 'ex. Gland, plateforme Migros', valeur: projet.cartouche.lieu ?? '' },
+      ],
+    });
+    if (!valeurs) return;
+    projet.cartouche.affaire = valeurs.affaire;
+    projet.cartouche.lieu = valeurs.lieu;
     modifie();
   },
   exporterProjet: async (id) => {
@@ -3200,22 +3261,7 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   },
   // Nouveau projet (0.74.0) : une fenêtre (affaire, désignation) ; le projet n'est créé qu'avec
   // « OK » (fenêtre fermée : rien ne change). On reste sur l'onglet Projet.
-  nouveauProjet: async () => {
-    const valeurs = await demanderChamps({
-      titre: 'Nouveau projet',
-      champs: [
-        { cle: 'affaire', titre: 'Affaire', exemple: 'ex. 10 203' },
-        { cle: 'lieu', titre: 'Désignation', exemple: 'ex. Gland, plateforme Migros' },
-      ],
-    });
-    if (!valeurs) return;
-    const nouveau = nouveauProjetSansNom();
-    nouveau.cartouche.affaire = valeurs.affaire;
-    nouveau.cartouche.lieu = valeurs.lieu;
-    await changerDeProjet(() => ouvrir(nouveau, { changerOnglet: false }));
-    afficherOnglet('projets');
-    afficherMessage(`Projet « ${titreProjet(nouveau)} » créé`);
-  },
+  nouveauProjet: () => creerNouveauProjet(),
   ouvrirProjet: async (id) => {
     const lu = await stockage.lireProjet(id);
     if (lu) await changerDeProjet(() => ouvrir(completerProjet(lu)));
@@ -3317,9 +3363,15 @@ partage = creerPartage({
     return demanderCode(`Prendre la main à ${verrou.nom}`);
   },
   quandMainPrise: (verrou) => montrerAttenteMain(verrou),
-  quandMainRendue: (nom) => {
+  quandMainRendue: (nom, { repris = true } = {}) => {
     fermetureAttente?.abort();
-    afficherMessage(`${nom} a rendu la main : projet mis à jour, tu as de nouveau la main`, 5000);
+    // Fenêtre avec « OK » (0.84.0) : un petit message passait inaperçu. Le projet est déjà repris.
+    navigator.vibrate?.([200, 100, 200]);
+    demanderChoix({
+      titre: `${nom} a rendu la main`,
+      texte: repris ? 'Le projet est mis à jour et tu as de nouveau la main.' : 'Le projet est mis à jour. Il reste en lecture seule : touche la main en haut pour la reprendre.',
+      boutons: [{ cle: 'ok', texte: 'OK', principal: true }],
+    });
   },
   quandChange: () => {
     afficherEcranProjet();
@@ -4069,8 +4121,9 @@ function nouveauProjetSansNom() {
   return nouveau;
 }
 
-// --- Démarrage : on rouvre le dernier projet, sinon le plus récent, sinon un nouveau ---
-// L'appli s'ouvre sur l'onglet Projet (bouton « Continuer » pour reprendre le travail).
+// --- Démarrage : fenêtre « Continuer sur… / Ouvrir un projet / Nouveau projet » (0.84.0) ---
+// L'appli s'ouvre sur l'onglet Projet. Le dernier projet ouvert sur cet appareil (sinon le plus
+// récent) est chargé tout de suite ; Drive ne le compare qu'après le choix.
 async function demarrer() {
   afficherOnglet('projets');
   adapterAuMode();
@@ -4080,8 +4133,22 @@ async function demarrer() {
     const id = stockage.dernierProjet();
     const lu = (id && (await stockage.lireProjet(id))) || (resumes[0] && (await stockage.lireProjet(resumes[0].id)));
     await ouvrir(lu ? completerProjet(lu) : nouveauProjetSansNom(), { changerOnglet: false });
+    // Premier lancement (aucun projet sur l'appareil) : rien à demander.
+    const choix = lu ? await demanderChoix({
+      titre: 'Que veux-tu faire ?',
+      boutons: [
+        { cle: 'continuer', texte: `Continuer sur « ${titreProjet(projet)} »`, detail: 'le dernier projet ouvert sur cette tablette', principal: true },
+        { cle: 'ouvrir', texte: 'Ouvrir un projet' },
+        { cle: 'nouveau', texte: 'Nouveau projet' },
+      ],
+    }) : 'continuer';
     // Partage : on se reconnecte à Drive si on l'était (le projet ouvert est alors comparé à Drive).
-    partage.demarrer();
+    partage.demarrer({ choixEnAttente: choix !== 'continuer' });
+    if (choix === 'ouvrir') document.querySelector('#projets [data-panneau="projets"]')?.click();
+    else if (choix === 'nouveau' && !(await creerNouveauProjet())) {
+      // Fenêtre fermée sans créer : on reste sur le dernier projet.
+      partage.apresOuverture();
+    }
   } catch (erreur) {
     // Base de données indisponible (navigation privée...) : l'appli marche, sans enregistrement.
     console.error(erreur);

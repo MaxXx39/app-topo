@@ -74,10 +74,19 @@ export function creerBoutonRecepteur(nav, actions) {
     });
     // Réglage swipos choisi dans la liste partagée : il remplit les cases (puis « Démarrer »).
     fenetre.addEventListener('change', (evenement) => {
-      if (evenement.target.dataset.champ !== 'swipos-choisi') return;
+      const champ = evenement.target.dataset.champ;
+      if (champ !== 'swipos-choisi' && champ !== 'swipos-direct') return;
       const numero = evenement.target.closest('[data-numero]')?.dataset.numero ?? '1';
       const choisi = lireListesPartagees().swipos.find((r) => r.id === evenement.target.value);
       if (!choisi) return;
+      // Choix direct (0.84.0, sans code) : la connexion démarre tout de suite avec ce réglage.
+      if (champ === 'swipos-direct') {
+        const reglagesChoisis = { hote: choisi.hote, port: choisi.port, pointDeMontage: choisi.pointDeMontage, utilisateur: choisi.utilisateur, motDePasse: choisi.motDePasse };
+        if (numero === '2') actions.demarrerCorrections2(reglagesChoisis);
+        else actions.demarrerCorrections(reglagesChoisis);
+        setTimeout(dessiner, 300);
+        return;
+      }
       saisie[numero] = { hote: choisi.hote, port: String(choisi.port), pointDeMontage: choisi.pointDeMontage, utilisateur: choisi.utilisateur };
       motDePasseChoisi[numero] = choisi.motDePasse;
       dessiner();
@@ -131,7 +140,8 @@ export function creerBoutonRecepteur(nav, actions) {
       saisie[numero] = {};
       motDePasseChoisi[numero] = '';
       setTimeout(dessiner, 300); // « Redémarrer », mot de passe enregistré
-    } else if (action === 'arreterCorrections') {
+    } else if (action === 'relancerCorrections') relancerCorrections(cible.closest('[data-numero]')?.dataset.numero === '2' ? 2 : 1);
+    else if (action === 'arreterCorrections') {
       if (cible.closest('.bloc-ntrip').dataset.numero === '2') actions.arreterCorrections2();
       else actions.arreterCorrections();
       setTimeout(dessiner, 300);
@@ -153,6 +163,40 @@ export function creerBoutonRecepteur(nav, actions) {
     dessiner();
   }
 
+  /**
+   * « Relancer la connexion NTRIP » (0.84.0, Confirmé) : redémarre avec les derniers réglages
+   * enregistrés (mot de passe vide = l'APK garde celui qu'il a). Demande le code de sécurité.
+   */
+  async function relancerCorrections(numero) {
+    const lire = numero === 2 ? actions.lireReglagesCorrections2 : actions.lireReglagesCorrections;
+    const reglages = lire?.();
+    if (!reglages?.hote) return;
+    if (!(await demanderCode('Relancer la connexion NTRIP'))) return;
+    const relance = { hote: reglages.hote, port: reglages.port, pointDeMontage: reglages.pointDeMontage, utilisateur: reglages.utilisateur, motDePasse: '' };
+    if (numero === 2) actions.demarrerCorrections2(relance);
+    else actions.demarrerCorrections(relance);
+    setTimeout(dessiner, 300);
+  }
+
+  /**
+   * Choix du réglage swipos (0.84.0) : la liste partagée, sans code ; un choix démarre la connexion.
+   * En Confirmé : « Relancer la connexion NTRIP » (code de sécurité), si des réglages sont enregistrés.
+   */
+  function choixCorrections(reglages, numero = 1) {
+    const enregistres = lireListesPartagees().swipos;
+    const actuel = enregistres.find((r) => reglages.actives && r.hote === reglages.hote && r.utilisateur === reglages.utilisateur);
+    const lance = reglages.hote ? `<button type="button" class="bouton-secondaire seulement-confirme" data-action="relancerCorrections">Relancer la connexion NTRIP</button>` : '';
+    if (enregistres.length === 0 && !lance) return '';
+    return `<div class="choix-corrections" data-numero="${numero}">
+      <p class="titre-choix">Corrections swipos${numero === 2 ? ' du récepteur 2' : ''} ${bulle('corrections')}</p>
+      ${enregistres.length > 0 ? `<label class="champ-large choix-swipos">
+          <select data-champ="swipos-direct" aria-label="Réglage swipos"><option value="" ${actuel ? '' : 'selected'}>— choisir un réglage swipos —</option>
+            ${enregistres.map((r) => `<option value="${echapper(r.id)}" ${actuel?.id === r.id ? 'selected' : ''}>${echapper(r.utilisateur)}${r.pointDeMontage ? ` · ${echapper(r.pointDeMontage)}` : ''}</option>`).join('')}
+          </select></label>` : ''}
+      ${lance}
+    </div>`;
+  }
+
   /** Dessine toute la fenêtre (à l'ouverture, ou quand la roue ⚙ est touchée). */
   function dessiner() {
     if (!fenetre) return;
@@ -166,6 +210,7 @@ export function creerBoutonRecepteur(nav, actions) {
       </div>
       <div class="etat-recepteur" data-vivant="etat-recepteur"></div>
       <div class="actions-recepteur" data-vivant="actions-recepteur"></div>
+      ${reglages ? choixCorrections(reglages, 1) : ''}
       ${actions.journalNmea ? `<div class="ligne-outils seulement-confirme">
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="journalNmea">Journal NMEA (1 min)</button> ${bulle('journalNmea')}</div>` : ''}
       ${reglages && reglagesOuverts ? `<div class="seulement-confirme">${blocNtrip(reglages, 1)}</div>` : ''}
@@ -173,6 +218,7 @@ export function creerBoutonRecepteur(nav, actions) {
           <p class="titre-choix">Récepteur 2 (lame)</p>
           <div data-vivant="etat-recepteur2"></div>
           <div data-vivant="actions-recepteur2"></div>
+          ${mode2 === 'ntrip' && actions.lireReglagesCorrections2 ? choixCorrections(actions.lireReglagesCorrections2() ?? {}, 2) : ''}
           ${mode2 === 'ntrip' && reglages2Ouverts ? blocNtrip(actions.lireReglagesCorrections2() ?? {}, 2) : ''}
         </div>` : ''}`;
     rafraichir();

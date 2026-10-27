@@ -4270,7 +4270,7 @@ body.mode-telephone .onglets button svg {
 
   /* Écran de guidage : le plan prend la moitié de la place, la vue rapprochée l'autre moitié. */
   body.mode-leve.vue-implantation[data-onglet='terrain'] {
-    --hauteur-plan-guidage: calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) / 2);
+    --hauteur-plan-guidage: calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * var(--part-plan-guidage, 0.5));
     --hauteur-plan-terrain: var(--hauteur-plan-guidage);
   }
 
@@ -4906,7 +4906,7 @@ button.bouton-import {
 }
 
 @media (max-width: 899px) {
-  body.mode-leve[data-onglet='terrain']:not(.vue-implantation) .boutons-taille-plan {
+  body.mode-leve[data-onglet='terrain'] .boutons-taille-plan {
     position: absolute;
     bottom: 0;
     left: 50%;
@@ -5218,7 +5218,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   /* Cible affichée : elle prend la place laissée par les textes (plus de la moitié de l'écran). */
   body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] {
     --hauteur-plan-guidage: max(
-      calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) / 2),
+      calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * var(--part-plan-guidage, 0.5)),
       calc(100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets) - 290px)
     );
   }
@@ -7489,4 +7489,104 @@ body.lecture-seule .bouton-photo-levee {
   fill: none;
   stroke: var(--couleur-nature);
   stroke-width: 2;
+}
+
+/* Terrain › Lever (0.84.0) : « Changer de levé » et « + Nouveau levé » hors du cadre du levé ; ID
+   point, position, photo, PRENDRE LE POINT et Annuler dans un cadre à la couleur du mode Lever (ambre). */
+.boutons-levee {
+  margin: 0 0 10px;
+}
+
+.cadre-prise {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 8px;
+  padding: 14px 10px 10px;
+  border: 2px solid var(--ambre);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ambre) 5%, var(--surface));
+}
+
+.cadre-prise .nom-et-position {
+  margin: 0;
+}
+
+.titre-cadre-prise {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  transform: translateY(-55%);
+  padding: 0 6px;
+  color: var(--ambre);
+  background: linear-gradient(var(--surface) 55%, color-mix(in srgb, var(--ambre) 5%, var(--surface)) 55%);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Implanter une ligne (0.84.0) : gauche / droite, début / fin et monter / descendre ont la même
+   taille de texte (celle du guidage d'un point, avec la cible). */
+.guidage-direct.guidage-ligne .lignes-guidage,
+.guidage-direct.guidage-ligne .hauteur-guidage {
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 899px) {
+  body.vue-implantation .vue-guidage .guidage-direct.guidage-ligne .lignes-guidage {
+    grid-template-columns: 1fr;
+    font-size: 1.05rem;
+  }
+
+  body.vue-implantation .vue-guidage .guidage-direct.guidage-ligne .hauteur-guidage {
+    font-size: 1.05rem;
+  }
+
+  body.cible-en-haut .vue-guidage .guidage-direct.guidage-ligne .lignes-guidage,
+  body.cible-en-haut .vue-guidage .guidage-direct.guidage-ligne .hauteur-guidage {
+    font-size: 1.5rem;
+  }
+}
+
+/* Dessin › altitude du prochain sommet (0.84.0) : « = dernier point » ou « pente depuis le dernier ». */
+.altitude-pilote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.altitude-pilote .champ-pente {
+  width: 6em;
+}
+
+/* Projet ouvert : crayon à côté du titre pour le renommer (0.84.0). */
+.bouton-crayon-projet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: 4px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--ambre);
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.bouton-crayon-projet svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

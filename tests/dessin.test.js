@@ -253,3 +253,32 @@ describe('altitude des sommets (0.68.0)', async () => {
     expect(altitudeProchainSommet(d, null)).toBeCloseTo(450.2, 9);
   });
 });
+
+describe('altitude du prochain sommet : idem ou pente depuis le dernier (0.84.0)', async () => {
+  const { altitudeSelonChoix } = await import('../src/topo/dessin.js');
+  const par = (altitude) => ({ type: 'dessin', sommets: [{ est: 0, nord: 0, altitude: 450 }, { est: 10, nord: 0, altitude }], hauteur: { mode: 'sommets' } });
+
+  it('tapée : le nombre tapé, ou rien', () => {
+    expect(altitudeSelonChoix(par(451), { choix: 'tapee', tapee: 452.5 })).toEqual({ altitude: 452.5 });
+    expect(altitudeSelonChoix(par(451), { choix: 'tapee' })).toEqual({ altitude: null });
+  });
+
+  it('idem : l\'altitude du dernier sommet', () => {
+    expect(altitudeSelonChoix(par(451.2), { choix: 'idem' })).toEqual({ altitude: 451.2 });
+  });
+
+  it('pente : dernier sommet + pente % × distance (2 % sur 10 m = +0.200 m ; −1.5 % sur 8 m = −0.120 m)', () => {
+    expect(altitudeSelonChoix(par(451), { choix: 'pente', pente: 2, distance: 10 })).toEqual({ altitude: 451.2 });
+    expect(altitudeSelonChoix(par(451), { choix: 'pente', pente: -1.5, distance: 8 })).toEqual({ altitude: 450.88 });
+  });
+
+  it('dernier sommet sans altitude, ou pente illisible : message', () => {
+    expect(altitudeSelonChoix(par(null), { choix: 'idem' }).erreur).toMatch(/pas d'altitude/);
+    expect(altitudeSelonChoix(par(451), { choix: 'pente', pente: NaN, distance: 10 }).erreur).toMatch(/pente illisible/);
+  });
+
+  it('en altitude fixe avec pente du dessin : le dernier sommet est celui du dessin', () => {
+    const d = { type: 'dessin', sommets: [{ est: 0, nord: 0 }, { est: 10, nord: 0 }], hauteur: { mode: 'fixe', altitude: 450, pente: { pourcent: 2, cote: 0, depuis: 0 } } };
+    expect(altitudeSelonChoix(d, { choix: 'idem' })).toEqual({ altitude: 450.2 });
+  });
+});

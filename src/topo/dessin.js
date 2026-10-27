@@ -182,6 +182,23 @@ export function altitudeProchainSommet(dessin, tapee) {
   return null;
 }
 
+/**
+ * Altitude (m) du prochain sommet selon le choix fait dans le pilote (0.84.0) :
+ * - 'tapee' : l'altitude tapée (nombre) ou null si rien n'est tapé ;
+ * - 'idem' : la même que le dernier sommet ;
+ * - 'pente' : depuis le dernier sommet, avec une pente en % (positive = ça monte) sur la distance
+ *   horizontale du côté : altitude du dernier sommet + pente ÷ 100 × distance.
+ * Renvoie { altitude } (arrondie au millimètre, ou null) ou { erreur } (texte compréhensible).
+ */
+export function altitudeSelonChoix(dessin, { choix = 'tapee', tapee = null, pente = null, distance = 0 }) {
+  if (choix !== 'idem' && choix !== 'pente') return { altitude: tapee ?? null };
+  const dernier = altitudesDuDessin(dessin).at(-1);
+  if (dernier == null) return { erreur: 'le dernier sommet n\'a pas d\'altitude' };
+  if (choix === 'idem') return { altitude: dernier };
+  if (!Number.isFinite(pente)) return { erreur: 'pente illisible : écris un nombre de %' };
+  return { altitude: Math.round((dernier + (pente / 100) * distance) * 1000) / 1000 };
+}
+
 // Natures de dessin : [clé, nom (aussi le début du nom automatique)]. Depuis 0.66.0, on ne crée plus
 // que des « dessin » (ouverts, ou fermés avec « Fermer la figure ») ; les autres restent lisibles.
 export const TYPES_DESSIN = [
