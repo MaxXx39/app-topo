@@ -7461,3 +7461,32 @@ body.lecture-seule .bouton-photo-levee {
   min-width: 0;
   box-sizing: border-box;
 }
+
+/* Surfaces importées (LandXML, DXF 3D ; 0.83.0) : fond léger et bord à la couleur de leur nature. */
+.plan .surface-importee,
+.plan .bord-surface-importee {
+  --couleur-nature: #2563eb;
+}
+
+.plan .nature-stock { --couleur-nature: #b45309; }
+.plan .nature-terrain { --couleur-nature: #15803d; }
+.plan .nature-terrassement { --couleur-nature: #2563eb; }
+.plan .nature-surface { --couleur-nature: #7c3aed; }
+
+.plan .surface-importee {
+  fill: var(--couleur-nature);
+  fill-opacity: 0.12;
+  stroke: none;
+}
+
+.plan .surface-importee.avec-triangles {
+  stroke: var(--couleur-nature);
+  stroke-opacity: 0.35;
+  stroke-width: 0.6;
+}
+
+.plan .bord-surface-importee {
+  fill: none;
+  stroke: var(--couleur-nature);
+  stroke-width: 2;
+}

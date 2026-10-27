@@ -6,6 +6,7 @@ import { estModeBase } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
+import { bordDeTriangles } from '../topo/surface.js';
 import { formaterNombre } from '../topo/format.js';
 import { svgDrapeau } from '../outils/drapeaux.js';
 import { traitsDeBarbules } from './barbules.js';
@@ -167,6 +168,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   let couleursPoints = new Map();
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
+  let cadreSurfacesImportees = 0; // sommets des surfaces importées sur lesquels on a déjà cadré (projet sans point)
   // Ce qu'il faut dessiner (voir editeur.js et main.js) :
   // stocks (les surfaces du projet), stockActif (surface choisie), listeEnCours, enEdition,
   // resultats (un par surface : trianglesDessus, et le volume s'il est calculé, voir volume.js),
@@ -229,6 +231,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     else if (signatureDxf) {
       canvasDxf.getContext('2d').clearRect(0, 0, canvasDxf.width, canvasDxf.height);
       signatureDxf = '';
+    }
+    // Sans point, une surface importée (LandXML, DXF 3D) se dessine quand même (0.83.0).
+    if (vue && points.length === 0 && sommetsDesSurfacesImportees().length > 0) {
+      dessinerStocks();
+      dessinerBarreEchelle();
+      dessinerImplantation();
+      dessinerPosition();
+      return;
     }
     if (!vue || points.length === 0) {
       if (vue && plansDxf.length > 0) dessinerBarreEchelle();
@@ -734,6 +744,20 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     attribution.textContent = textes.join(' · ');
   }
 
+  /** Sommets des surfaces importées visibles (LandXML, DXF 3D) : pour cadrer un projet sans point. */
+  function sommetsDesSurfacesImportees() {
+    return dessin.stocks
+      .filter((s) => (s.type === 'landxml' || s.type === 'dxf') && !dessin.cachees?.has(s))
+      .flatMap((s) => s.points ?? []);
+  }
+
+  // Bord de chaque surface importée, calculé une fois par liste de triangles (le plan se redessine souvent).
+  const bords = new WeakMap();
+  function bordDuStock(triangles) {
+    if (!bords.has(triangles)) bords.set(triangles, bordDeTriangles(triangles));
+    return bords.get(triangles);
+  }
+
   /** Triangles, contours des stocks, lignes de rupture et segments en erreur. */
   function dessinerStocks() {
     const positions = new Map(points.map((p) => [p.nom, versEcran(p.est, p.nord, vue)]));
@@ -752,8 +776,30 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (!estVisible(stock)) return;
       const resultat = dessin.resultats[index];
 
+      // Surface importée (LandXML, DXF 3D ; 0.83.0, mode Base) : elle n'a pas de contour ; fond
+      // léger à la couleur de sa nature, bord en trait plein, triangles avec la case « Triangles ».
+      const importee = stock.type === 'landxml' || stock.type === 'dxf';
+      if (importee && resultat?.trianglesDessus?.length) {
+        const nature = `nature-${stock.nature ?? 'terrassement'}`;
+        const enPixels = (p) => versEcran(p.est, p.nord, vue);
+        const traces = resultat.trianglesDessus
+          .map((triangle) => {
+            const [a, b, c] = triangle.map(enPixels);
+            return `M${a.x} ${a.y} L${b.x} ${b.y} L${c.x} ${c.y} Z`;
+          })
+          .join(' ');
+        groupe.append(creerElement('path', { d: traces, class: `surface-importee ${nature}${calques.triangles ? ' avec-triangles' : ''}` }));
+        const bord = bordDuStock(resultat.trianglesDessus)
+          .map(([p, q]) => {
+            const [a, b] = [enPixels(p), enPixels(q)];
+            return `M${a.x} ${a.y} L${b.x} ${b.y}`;
+          })
+          .join(' ');
+        groupe.append(creerElement('path', { d: bord, class: `bord-surface-importee ${nature}` }));
+      }
+
       // Triangles du dessus : stock actif seulement, pour ne pas surcharger.
-      if (actif && calques.triangles && resultat?.trianglesDessus) {
+      if (!importee && actif && calques.triangles && resultat?.trianglesDessus) {
         const traits = resultat.trianglesDessus
           .map((triangle) => {
             const [a, b, c] = triangle.map((p) => versEcran(p.est, p.nord, vue));
@@ -1134,9 +1180,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // (ou de la position du récepteur), plutôt qu'un zoom extrême sur un seul point.
     // Sans point : sur la position du récepteur, sinon sur les plans DXF ; sinon pas encore de vue
     // (elle se fera sur la première position reçue).
-    const centre = points.length === 1 ? points[0] : points.length === 0 ? position : null;
+    // Sans point mais avec une surface importée : sur ses sommets (0.83.0).
+    const sommetsImportes = points.length === 0 ? sommetsDesSurfacesImportees() : [];
+    const centre = points.length === 1 ? points[0] : points.length === 0 && sommetsImportes.length === 0 ? position : null;
     if (centre) vue = { echelle: largeur / 60, estCentre: centre.est, nordCentre: centre.nord, largeur, hauteur };
     else if (points.length > 0) vue = cadrerSurPoints(points, largeur, hauteur);
+    else if (sommetsImportes.length > 0) vue = cadrerSurPoints(sommetsImportes, largeur, hauteur);
     else vue = plansDxf.length > 0 ? cadrerSurPoints(coinsDesPlans(plansDxf), largeur, hauteur) : null;
     dessiner();
   }
@@ -1611,6 +1660,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     /** Redessine le plan avec les stocks (sans changer le zoom). */
     redessiner(nouveauDessin) {
       dessin = nouveauDessin;
+      // Projet sans point avec une surface importée : on cadre une fois sur elle (0.83.0).
+      const signature = points.length === 0 ? sommetsDesSurfacesImportees().length : 0;
+      if (signature > 0 && signature !== cadreSurfacesImportees) {
+        cadreSurfacesImportees = signature;
+        toutVoir();
+        return;
+      }
       // Onglet 3. Mesures : le menu ne propose pas les calques des surfaces.
       dessiner();
     },
