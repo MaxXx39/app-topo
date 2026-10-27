@@ -60,20 +60,20 @@ exemples/            fichiers de référence (NE PAS modifier ni supprimer)
 - Noms de points jamais interprétés (le rôle est choisi par l'utilisateur). Noms levés : contour `C-Stock-n-m`, ligne `L-lib-n-m`, point `P-lib-n`, aire `A-lib-n-m`. Sommets de dessins : `D1-1` (anciens : `PF1-1`, `BAT1-1`, `LI1-1`, `PT1-1`).
 - LandXML : triangles par `id` interne, surfaces TIN seulement, inversion Nord/Est à l'import.
 - Version dans `package.json` (affichée dans Projet) : l'augmenter à chaque livraison.
-- Données sur l'appareil (IndexedDB) ; seule exception : partage Drive, accepté par l'utilisateur. Le mot de passe NTRIP n'est jamais mis dans le projet ni renvoyé à la page.
+- Données sur l'appareil (IndexedDB) ; seule exception : partage Drive, accepté par l'utilisateur. Le mot de passe NTRIP n'est jamais mis dans le projet ; l'APK ne le renvoie pas à la page (seule exception : la liste partagée des réglages swipos, sur Drive, acceptée par l'utilisateur).
 - Réglages propres à l'appareil (pas dans le projet) dans le stockage du navigateur : `topo-reglages` (téléphone, mode, onglet Lame), `topo-terrain` (réglages Terrain, lame), `topo-calques`, `topo-plan-terrain-part`.
 - Pas de bouton « Annuler » visible (seulement Ctrl+Z sur ordinateur) : ne pas promettre d'annulation dans les messages.
 
 ## Référence de calcul
 Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 m³, Stock 2 = 648.979 m³, Stock 3 = 372.201 m³ (remblai Mensura). Tests automatiques sur ce cas.
 
-## Fonctions (version 0.78.0)
+## Fonctions (version 0.79.0)
 
 **Modes Base / Confirmé** (réglages ⚙, étoile ☆ / ★ dans l'en-tête, Confirmé par défaut, retenu par l'appareil). En Base : éléments `.seulement-confirme` cachés, `estModeBase()` dans le code ; rien n'est supprimé du projet.
 - Base = projets, Drive, point tapé, récepteur, GPS de la tablette, lever « Levé libre » (« autres » dans le code), rôles et libellés existants, implanter point / ligne simple, accroches DXF, contrôle de surface, Terrain › Contrôle, réglages du guidage, plan (fonds, cadastre, points, noms, altitudes).
 - Confirmé = tout le reste : onglet Calculs, bloc Import du Projet, menus « Plans » et « Afficher » du plan, DXF, talus, NTRIP, libellés à modifier, options de ligne, triangles / courbes, suppression d'un levé ; Terrain › Lame et 2e récepteur seulement si la case « Onglet Lame » des réglages ⚙ est cochée (`lameActive()`, décochée par défaut).
 
-**Code de sécurité** (`src/outils/code.js`, dans les deux modes ; simple barrière, pas une vraie sécurité ; ne jamais écrire le code dans les bulles d'aide) : nom de l'appareil, réglages NTRIP (des 2 récepteurs), points de contrôle et tolérances, prendre la main à un autre appareil (Drive). Redemandé à chaque fois.
+**Code de sécurité** (`src/outils/code.js`, dans les deux modes ; simple barrière, pas une vraie sécurité ; ne jamais écrire le code dans les bulles d'aide) : nom de l'appareil, réglages NTRIP (des 2 récepteurs), points de contrôle et tolérances, prendre la main à un autre appareil (Drive), listes partagées (adresses mail, réglages swipos). Redemandé à chaque fois.
 
 **Onglet Projet**
 - « + Nouveau projet » (ambre) : fenêtre affaire / désignation, projet créé seulement avec OK (`demanderChamps`) ; « Gestion de projets » (sombre), en-tête « Projet ouvert » (affaire, désignation ; plus de « Nom »).
@@ -104,7 +104,10 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 
 **Plan** : calques par familles (Fonds, Points, Levés, Volumes, Mesures), valables dans tous les onglets ; menus « Plans » et « Afficher » (Confirmé) ; fonds swisstopo, rotation, suivi de position. Contours, mesures et dessins en trait plein ; dessins violets.
 
-**Exports** : CSV, PDF (cartouche : affaire, désignation, dessiné par, date), DXF, LandXML ; PDF et DXF des mesures ; « Quoi exporter ? » par catégories (pré-coché comme « Afficher ») ; barre « Envoyer » après chaque export (APK : `FichiersPartages.kt` + partage Android ; site : `navigator.share`). DWG : non (format fermé), DXF seulement.
+**Exports** : CSV, PDF (cartouche : affaire, désignation, dessiné par, date), DXF, LandXML ; PDF et DXF des mesures ; « Quoi exporter ? » par catégories (pré-coché comme « Afficher ») ; DWG : non (format fermé), DXF seulement.
+- **Fenêtre « Exporter »** (0.79.0, `export/fenetre-export.js`, appelée par `telecharger`) pour tous les exports : format si besoin, « Enregistrer » (`enregistrer`), « Envoyer par mail » (adresse de la liste partagée ; APK : `partagerFichierMail` avec EXTRA_EMAIL ; site : téléchargement + `mailto:`), « Envoyer autrement » (APK : `FichiersPartages.kt` + partage Android ; site : `navigator.share`). Plus de barre « Envoyer ».
+- **Exporter une liste de points** (Projet, bouton « exporter », Confirmé ; listes, levés, dessins, contrôle ; `export/points.js`) : TXT (nom, E, N, H, tabulations, sans en-tête), CSV (toutes les infos : rôle, date, heure, précisions H / V, qualité RTK, satellites, HDOP, âge des corrections, inclinaison), DXF (points, noms, altitudes).
+- **Listes partagées** (`reglages/listes-partagees.js`, `fenetre-listes.js`) : adresses mail et réglages swipos (utilisateur, serveur, port, point de montage, mot de passe), modifiées dans réglages ⚙ avec le code de sécurité, fichier `listes-partagees.json.gz` dans « App Topo » sur Drive (la plus récente gagne : connexion, toutes les 10 min, à chaque modification ; mot de passe sur Drive accepté par l'utilisateur) ; « Réglage swipos enregistré » dans les réglages NTRIP du récepteur remplit les cases.
 
 **Partage Google Drive** (`partage/partage.js`, `synchro.js`) : dossier « App Topo › Configuration Projet » créé par l'appli (l'ancien « Topo - projets » est ignoré), fichiers découpés (projet, plans DXF, photos des surfaces et des mesures), envoi automatique (30 s après une modification). **Une seule main par projet** (0.76.0) :
 - verrou par appareil (expire après 15 min sans signe de vie), relu toutes les 30 s (`lireVerrou`) ; signe de vie toutes les 5 min ;
@@ -114,19 +117,17 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - projet qu'un autre a en main : « Voir en lecture seule » ou « Prendre la main » ; lecture seule = voir et implanter, rien ne s'enregistre (`lectureSeule()` : `modifie()` défait la modification, boutons d'ajout grisés par `body.lecture-seule`, PRENDRE LE POINT / ENREGISTRER / touche volume refusés) ;
 - plus de fenêtre « a changé ici et sur Drive » : la version de Drive l'emporte (message).
 
-**Réglages ⚙** : mode Base / Confirmé, onglet Lame (Confirmé), mode téléphone (textes −15 %, icônes et gros boutons −25 %), bulles d'aide, partage Drive, « Fermer l'appli » (APK).
+**Réglages ⚙** : mode Base / Confirmé, onglet Lame (Confirmé), listes partagées (code), mode téléphone (textes −15 %, icônes et gros boutons −25 %), bulles d'aide, partage Drive, « Fermer l'appli » (APK).
 
 ## Reste / à valider
-- Essais sur le terrain : guidage de lame et profil en long sur la machine (hauteur de mât, signes, vitesse d'affichage, seuil de rupture 0.5 %) ; GPS de la tablette ; « Envoyer » dans l'APK ; prise de main (code), attente, lecture seule et reprise automatique avec 2 appareils sur Drive (site + APK).
+- Essais sur le terrain : guidage de lame et profil en long sur la machine (hauteur de mât, signes, vitesse d'affichage, seuil de rupture 0.5 %) ; GPS de la tablette ; « Envoyer par mail » (adresse remplie) et « Envoyer autrement » dans l'APK ; listes partagées entre 2 appareils ; prise de main (code), attente, lecture seule et reprise automatique avec 2 appareils sur Drive (site + APK).
 - Essai terrain du talus (0.56.1) et question ouverte : arrondi (cône) aux angles saillants, est-ce voulu ?
 - Précision H / V (message GST) à comparer avec Emlid Flow ; vérifier que le RX2 envoie bien du GST.
 - DWG non pris en charge (enregistrer en DXF).
 - Google Cloud en mode Test (réautorisation environ tous les 7 jours) : publier l'écran de consentement si besoin.
 
 ## À développer
-- Demande du 27.10.2026 (réponses de l'utilisateur reçues), livraisons suivantes :
-  - Exports : bouton Exporter sur chaque liste (Confirmé), TXT / CSV (toutes les infos : heure, précision…) / DXF, fenêtre « Enregistrer » ou « Envoyer » ; adresses mail à choisir dans une liste ; liste des réglages swipos (utilisateur, adresse, port, point de montage, mot de passe) à choisir ; ces 2 listes modifiables avec le code de sécurité et partagées par Drive sur tous les appareils (mot de passe swipos accepté sur Drive par l'utilisateur).
 - Dessin, étape suivante (en suspens) : plateforme avec talus jusqu'au terrain naturel (entrées en terre, volume).
 
 ## Historique des versions (résumé)
-- 0.57 modes Base / Confirmé · 0.58 code de sécurité · 0.59 Terrain › Contrôle, onglet Projet en 3 blocs · 0.60–0.62 Dessin (pilote, implantation, surface), couleurs des listes · 0.63 2e récepteur · 0.64 retouches (calques par familles, photos des mesures, Désignation) · 0.65 mise en page Terrain · 0.66 Dessin simplifié · 0.67 Drive (prise protégée, rendre la main) · 0.68 retouches Dessin · 0.69 suppression d'un levé, « Quoi exporter ? », « Envoyer » · 0.70 guidage de lame · 0.71 flèches du plan, blocs repliables, import de surface dans Projet · 0.72 GPS de la tablette · 0.73 profil en long de la lame · 0.74 onglet Lame dans les réglages, blocs de Projet repliés, OK du nouveau projet, liserés de Calculs en trait plein · 0.75 bords de la surface à côté de la coupe de la lame · 0.76 Drive : dossier « App Topo › Configuration Projet », une seule main par projet (code, attente, lecture seule, reprise automatique) · 0.77 levés au lieu de surfaces (liste par levé, catégories des listes, import en levé, onglet Surfaces retiré, photo et triangles dans Lever, levé « Surface » du Dessin) · 0.78 écran Lever (cadres, ID point, lignes du levé, croisements, segments, contour du stock, point touché sur le plan).
+- 0.57 modes Base / Confirmé · 0.58 code de sécurité · 0.59 Terrain › Contrôle, onglet Projet en 3 blocs · 0.60–0.62 Dessin (pilote, implantation, surface), couleurs des listes · 0.63 2e récepteur · 0.64 retouches (calques par familles, photos des mesures, Désignation) · 0.65 mise en page Terrain · 0.66 Dessin simplifié · 0.67 Drive (prise protégée, rendre la main) · 0.68 retouches Dessin · 0.69 suppression d'un levé, « Quoi exporter ? », « Envoyer » · 0.70 guidage de lame · 0.71 flèches du plan, blocs repliables, import de surface dans Projet · 0.72 GPS de la tablette · 0.73 profil en long de la lame · 0.74 onglet Lame dans les réglages, blocs de Projet repliés, OK du nouveau projet, liserés de Calculs en trait plein · 0.75 bords de la surface à côté de la coupe de la lame · 0.76 Drive : dossier « App Topo › Configuration Projet », une seule main par projet (code, attente, lecture seule, reprise automatique) · 0.77 levés au lieu de surfaces (liste par levé, catégories des listes, import en levé, onglet Surfaces retiré, photo et triangles dans Lever, levé « Surface » du Dessin) · 0.78 écran Lever (cadres, ID point, lignes du levé, croisements, segments, contour du stock, point touché sur le plan) · 0.79 fenêtre « Exporter » (enregistrer, mail, autre), export des listes de points (TXT, CSV complet, DXF), listes partagées (adresses mail, réglages swipos).

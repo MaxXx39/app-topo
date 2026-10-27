@@ -9,9 +9,13 @@
 // - partage par Google Drive (nom de l'appareil, connexion, état), déplacé de l'onglet Projet ;
 // - « Onglet Lame » (Confirmé, 0.74.0) : montre le mode Lame de l'onglet Terrain et la connexion
 //   d'un 2e récepteur dans la fenêtre du récepteur ; décoché (par défaut) : un seul récepteur ;
+// - « Listes partagées » (0.79.0, code de sécurité) : adresses mail et réglages swipos, pour tous
+//   les appareils (voir listes-partagees.js) ;
 // - « Fermer l'appli » (appli Android seulement), en rouge tout en haut.
 import { echapper } from '../outils/echapper.js';
 import { demanderCode } from '../outils/code.js';
+import { lireListesPartagees } from './listes-partagees.js';
+import { ouvrirFenetreListes } from './fenetre-listes.js';
 
 const CLE = 'topo-reglages';
 // Étoile à 5 branches (en-tête et choix du mode).
@@ -67,6 +71,12 @@ export function appliquerReglages(reglages = lireReglages()) {
   }
 }
 
+/** « 2 adresse(s) mail · 1 réglage(s) swipos » (listes partagées). */
+function compteListes() {
+  const { adresses, swipos } = lireListesPartagees();
+  return `${adresses.length} adresse(s) mail · ${swipos.length} réglage(s) swipos`;
+}
+
 /**
  * Ouvre la fenêtre des réglages. options : { aideActive, basculerAide(), fermerAppli() (ou null
  * hors de l'appli Android), partage: { html() (bloc Partage, voir projet/ecran.js), actions } ou null,
@@ -93,6 +103,10 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
         <span><strong>Bulles d'aide « ? »</strong></span></label>
       <label class="case-reglage seulement-confirme"><input type="checkbox" data-reglage="lame" ${reglages.lame ? 'checked' : ''} />
         <span><strong>Onglet Lame</strong><span class="aide">guidage de lame, 2e récepteur</span></span></label>
+      <div class="case-reglage listes-reglages">
+        <span><strong>Listes partagées</strong><span class="aide" data-zone="compte-listes">${compteListes()}</span></span>
+        <button type="button" class="bouton-secondaire" data-action="listes">Modifier</button>
+      </div>
       <div class="partage-reglages" data-zone="partage"></div>
       <div class="ligne-outils">
         <button class="bouton">OK</button>
@@ -134,10 +148,24 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       fermerAppli();
       return;
     }
+    if (evenement.target.closest('[data-action="listes"]')) {
+      modifierListes();
+      return;
+    }
     const bouton = evenement.target.closest('[data-zone="partage"] button[data-action]');
     if (bouton?.dataset.action === 'modifierNomAppareil') modifierNomProtege();
     else if (bouton) partage?.actions[bouton.dataset.action]?.();
   });
+  /** Listes partagées (adresses mail, réglages swipos) : protégées par le code de sécurité. */
+  async function modifierListes() {
+    if (!deverrouille && !(await demanderCode('Listes partagées'))) return;
+    deverrouille = true;
+    ouvrirFenetreListes(() => {
+      const zone = fenetre.querySelector('[data-zone="compte-listes"]');
+      if (zone) zone.textContent = compteListes();
+    });
+  }
+
   /** Crayon du nom de l'appareil : protégé par le code (demandé une fois par ouverture de la fenêtre). */
   async function modifierNomProtege() {
     if (!deverrouille && !(await demanderCode('Modifier le nom de l\'appareil'))) return;

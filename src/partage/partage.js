@@ -18,10 +18,12 @@ import { creerDrive } from './drive.js';
 import { creerSynchro, choisirVersion, verrouActif, SIGNE_DE_VIE } from './synchro.js';
 import { creerConnexion, connexionPossible } from './connexion.js';
 import { appareil, nommerAppareil, etaitConnecte, retenirConnexion, memoireProjet, retenirProjet } from './memoire.js';
+import { lireListesPartagees, ecrireListesPartagees, surChangementListes, versionAGarder } from '../reglages/listes-partagees.js';
 
 const DELAI_ENVOI = 30_000; // après une modification (ms)
 const DELAI_NOUVEL_ESSAI = 60_000; // après un échec (pas de réseau…)
 const VERIFICATION = 30_000; // le verrou du projet ouvert est relu toutes les 30 s
+const LISTES = 10 * 60_000; // listes partagées (adresses, swipos) relues toutes les 10 minutes
 
 /**
  * Crée le partage.
@@ -74,6 +76,23 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       occupe -= 1;
     }
   }, VERIFICATION);
+
+  // Listes partagées (0.79.0) : relues à la connexion et toutes les 10 minutes ; une modification
+  // faite ici part tout de suite sur Drive.
+  setInterval(() => synchroniserListes().catch(() => {}), LISTES);
+  surChangementListes((listes, { depuisDrive }) => {
+    if (!depuisDrive && etat.connecte && synchro) synchro.ecrireListes(listes).catch(() => {});
+  });
+
+  /** Garde la version la plus récente des listes partagées, ici ou sur Drive. */
+  async function synchroniserListes() {
+    if (!etat.connecte || !synchro) return;
+    const local = lireListesPartagees();
+    const distant = await synchro.lireListes();
+    const garder = versionAGarder(local.modifieLe, distant?.modifieLe ?? null);
+    if (garder === 'drive') ecrireListesPartagees(distant.listes, { modifieLe: distant.modifieLe, depuisDrive: true });
+    else if (garder === 'local') await synchro.ecrireListes(local);
+  }
 
   async function verifierVerrou() {
     const projet = obtenirProjet();
@@ -156,6 +175,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       retenirConnexion(true);
       await rafraichirListe();
       changer('a-jour');
+      synchroniserListes().catch(() => {});
       await apresOuverture();
     } catch (erreur) {
       etat.connecte = false;

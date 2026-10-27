@@ -9,6 +9,7 @@ import { formaterNombre } from '../topo/format.js';
 import { etatCorrections } from './corrections.js';
 import { bulle } from '../aide/bulles.js';
 import { lameActive } from '../reglages/reglages.js';
+import { lireListesPartagees } from '../reglages/listes-partagees.js';
 
 /**
  * Couleur du bouton selon l'état du récepteur (décision du 24.10.2026) :
@@ -55,6 +56,8 @@ export function creerBoutonRecepteur(nav, actions) {
   let deverrouille = false; // bon code tapé pour les réglages NTRIP (voir outils/code.js), jusqu'à la fermeture
   // Réglages NTRIP tapés, pas encore envoyés (gardés si la fenêtre se redessine), par récepteur (1, 2).
   const saisie = { 1: {}, 2: {} };
+  // Mot de passe d'un réglage swipos choisi dans la liste partagée (0.79.0), pas encore envoyé.
+  const motDePasseChoisi = { 1: '', 2: '' };
 
   bouton.addEventListener('click', ouvrir);
 
@@ -68,6 +71,16 @@ export function creerBoutonRecepteur(nav, actions) {
       const champ = evenement.target.dataset.correction;
       const numero = evenement.target.closest('[data-numero]')?.dataset.numero ?? '1';
       if (champ && champ !== 'motDePasse') saisie[numero][champ] = evenement.target.value;
+    });
+    // Réglage swipos choisi dans la liste partagée : il remplit les cases (puis « Démarrer »).
+    fenetre.addEventListener('change', (evenement) => {
+      if (evenement.target.dataset.champ !== 'swipos-choisi') return;
+      const numero = evenement.target.closest('[data-numero]')?.dataset.numero ?? '1';
+      const choisi = lireListesPartagees().swipos.find((r) => r.id === evenement.target.value);
+      if (!choisi) return;
+      saisie[numero] = { hote: choisi.hote, port: String(choisi.port), pointDeMontage: choisi.pointDeMontage, utilisateur: choisi.utilisateur };
+      motDePasseChoisi[numero] = choisi.motDePasse;
+      dessiner();
     });
     fenetre.addEventListener('close', () => {
       fenetre.remove();
@@ -116,6 +129,7 @@ export function creerBoutonRecepteur(nav, actions) {
       if (numero === '2') actions.demarrerCorrections2(reglages);
       else actions.demarrerCorrections(reglages);
       saisie[numero] = {};
+      motDePasseChoisi[numero] = '';
       setTimeout(dessiner, 300); // « Redémarrer », mot de passe enregistré
     } else if (action === 'arreterCorrections') {
       if (cible.closest('.bloc-ntrip').dataset.numero === '2') actions.arreterCorrections2();
@@ -166,14 +180,19 @@ export function creerBoutonRecepteur(nav, actions) {
   /** Réglages des corrections NTRIP (swipos), repris d'Emlid Flow, gardés sur la tablette. */
   function blocNtrip(reglages, numero = 1) {
     const valeur = (champ) => echapper(String(saisie[numero][champ] ?? reglages[champ] ?? ''));
+    const enregistres = lireListesPartagees().swipos;
     return `<div class="bloc-ntrip" data-numero="${numero}">
       <p class="titre-choix">Corrections NTRIP${numero === 2 ? ' du récepteur 2' : ''} ${bulle('corrections')}</p>
+      ${enregistres.length > 0 ? `<label class="champ-large choix-swipos">Réglage swipos enregistré
+          <select data-champ="swipos-choisi"><option value="">— choisir —</option>
+            ${enregistres.map((r) => `<option value="${echapper(r.id)}">${echapper(r.utilisateur)}${r.pointDeMontage ? ` · ${echapper(r.pointDeMontage)}` : ''}</option>`).join('')}
+          </select></label>` : ''}
       <div class="champs-corrections">
         <label class="champ-large">Serveur<input type="text" data-correction="hote" value="${valeur('hote')}" placeholder="adresse (voir Emlid Flow)" autocapitalize="off" spellcheck="false" /></label>
         <label>Port<input type="text" inputmode="numeric" data-correction="port" value="${valeur('port')}" /></label>
         <label>Point de montage<input type="text" data-correction="pointDeMontage" value="${valeur('pointDeMontage')}" autocapitalize="off" spellcheck="false" /></label>
         <label>Identifiant<input type="text" data-correction="utilisateur" value="${valeur('utilisateur')}" autocapitalize="off" spellcheck="false" autocomplete="off" /></label>
-        <label>Mot de passe<input type="password" data-correction="motDePasse" value="" placeholder="${reglages.motDePasseEnregistre ? 'enregistré' : ''}" autocomplete="off" /></label>
+        <label>Mot de passe<input type="password" data-correction="motDePasse" value="${echapper(motDePasseChoisi[numero])}" placeholder="${reglages.motDePasseEnregistre ? 'enregistré' : ''}" autocomplete="off" /></label>
       </div>
       <div class="ligne-outils">
         <button type="button" class="bouton-secondaire" data-action="demarrerCorrections">${reglages.actives ? 'Redémarrer' : 'Démarrer'}</button>

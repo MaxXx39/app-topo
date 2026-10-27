@@ -10,7 +10,7 @@ import { titreSection } from '../outils/section.js';
 import { champsCartouche, lireCartouche } from './cartouche.js';
 import { PALIERS } from '../plan/ecarts.js';
 import { estDansAppliAndroid, enregistrerDansAndroid } from '../android/pont.js';
-import { proposerEnvoi } from './partager.js';
+import { ouvrirFenetreExport } from './fenetre-export.js';
 import { brancherChoixExport } from './choix-export.js';
 
 // Cases du PDF : [clé, texte, cochée au départ]. « Photos » (celles des surfaces) en dernier.
@@ -192,11 +192,31 @@ export function dateSuisse(iso) {
 }
 
 /**
- * Fait télécharger un fichier par le navigateur (dans l'APK : par l'appli Android), puis propose
- * de l'envoyer (barre « Envoyer », voir partager.js).
+ * Un fichier exporté (0.79.0) : la fenêtre « Exporter » (voir fenetre-export.js) propose de
+ * l'enregistrer, de l'envoyer par mail ou autrement.
  */
 export function telecharger(blob, nom) {
-  proposerEnvoi(blob, nom);
+  ouvrirFenetreExport({ titre: nom, fabriquer: () => ({ blob, nom }), enregistrer, message: messageExport });
+}
+
+/** Petit message en bas de l'écran (enregistré, mail…), qui disparaît tout seul. */
+function messageExport(texte) {
+  let zone = document.querySelector('#message-export');
+  if (!zone) {
+    zone = document.createElement('div');
+    zone.id = 'message-export';
+    zone.className = 'message-flottant';
+    zone.setAttribute('role', 'status');
+    document.body.append(zone);
+  }
+  zone.textContent = texte;
+  zone.hidden = false;
+  clearTimeout(zone.minuterie);
+  zone.minuterie = setTimeout(() => (zone.hidden = true), 5000);
+}
+
+/** Fait télécharger un fichier par le navigateur (dans l'APK : l'enregistre par l'appli Android). */
+export function enregistrer(blob, nom) {
   if (estDansAppliAndroid()) {
     enregistrerDansAndroid(blob, nom);
     return;

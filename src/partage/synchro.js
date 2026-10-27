@@ -41,6 +41,7 @@ const court = (texte) => String(texte ?? '').slice(0, 90);
  */
 export function creerSynchro(drive, appareil) {
   let racineId = null;
+  let appTopoId = null; // dossier « App Topo » (les listes partagées y sont rangées)
 
   /** Dossier qui contient les projets : « App Topo › Configuration Projet » (créés au premier besoin). */
   async function racine() {
@@ -50,8 +51,16 @@ export function creerSynchro(drive, appareil) {
       const trouves = await drive.lister(`${dans}mimeType = '${TYPE_DOSSIER}' and appProperties has { key='topo' and value='${cle}' }`);
       return trouves[0]?.id ?? (await drive.creerDossier(nom, parentId, { topo: cle })).id;
     };
-    racineId = await dossier(NOM_PROJETS, await dossier(NOM_RACINE, null, 'app-topo'), 'configuration-projet');
+    appTopoId = await dossier(NOM_RACINE, null, 'app-topo');
+    racineId = await dossier(NOM_PROJETS, appTopoId, 'configuration-projet');
     return racineId;
+  }
+
+  /** Fichier des listes partagées (adresses mail, réglages swipos) dans « App Topo », ou null. */
+  async function fichierListes() {
+    await racine();
+    const trouves = await drive.lister(`'${appTopoId}' in parents and appProperties has { key='topo' and value='listes-partagees' }`);
+    return trouves[0] ?? null;
   }
 
   /** Dossier Drive d'un projet, ou null. */
@@ -178,6 +187,29 @@ export function creerSynchro(drive, appareil) {
       if (verrou && verrou.appareilId !== appareil.id && verrouActif(verrou)) return { repris: verrou };
       await drive.modifier(dossierId, { proprietes: { ...proprietesVerrou(), verrouDepuis: verrou?.appareilId === appareil.id ? verrou.depuis : new Date().toISOString() } });
       return {};
+    },
+
+    /**
+     * Listes partagées par tous les appareils (0.79.0, voir reglages/listes-partagees.js) :
+     * { listes, modifieLe } lues sur Drive, ou null s'il n'y en a pas encore.
+     */
+    async lireListes() {
+      const fichier = await fichierListes();
+      if (!fichier) return null;
+      return { listes: await decomprimer(await drive.lire(fichier.id)), modifieLe: fichier.appProperties?.modifieLe ?? null };
+    },
+
+    /** Écrit les listes partagées sur Drive (fichier créé au premier envoi). */
+    async ecrireListes(listes) {
+      const fichier = await fichierListes();
+      const blob = new Blob([await comprimer(listes)], { type: 'application/gzip' });
+      if (fichier) await drive.ecrireContenu(fichier.id, blob);
+      else {
+        const cree = await drive.creerFichier('listes-partagees.json.gz', appTopoId, blob);
+        await drive.modifier(cree.id, { proprietes: { topo: 'listes-partagees' } });
+      }
+      const id = fichier?.id ?? (await fichierListes())?.id;
+      if (id) await drive.modifier(id, { proprietes: { topo: 'listes-partagees', modifieLe: listes.modifieLe ?? '' } });
     },
 
     /** Supprime un projet de Drive (son dossier va à la corbeille de Drive). */

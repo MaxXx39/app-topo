@@ -14,7 +14,9 @@ import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
 import { creerEcranVolumes, texteBase } from './volumes/ecran.js';
 import { preparerPhoto } from './photos/photo.js';
-import { creerEcranExport, telecharger } from './export/ecran.js';
+import { creerEcranExport, telecharger, enregistrer as enregistrerFichier } from './export/ecran.js';
+import { ouvrirFenetreExport } from './export/fenetre-export.js';
+import { FORMATS_POINTS, fichierPoints } from './export/points.js';
 import { creerEcranProjet, blocPartage } from './projet/ecran.js';
 import { creerEcranImport } from './import/ecran.js';
 import { creerEcranCoupes } from './coupes/ecran.js';
@@ -541,6 +543,40 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
     editeurSurfaces.charger(projet.surfaces);
     modifie({ recadrer: true });
+  },
+  // Bouton « exporter » d'une liste (Confirmé, 0.79.0) : TXT, CSV (toutes les infos) ou DXF, puis
+  // Enregistrer, Envoyer par mail ou autrement (fenêtre « Exporter »).
+  exporterListe: (type, id) => {
+    let points;
+    let titre;
+    let roles = new Map();
+    if (type === 'controle') {
+      points = projet.pointsControle;
+      titre = 'Points de contrôle';
+    } else if (type === 'dessin') {
+      const dessin = dessinDe(id);
+      if (!dessin) return;
+      points = pointsDuDessin(dessin, projet.dessins);
+      titre = dessin.nom;
+    } else {
+      const leve = projet.leves.find((l) => l.id === id);
+      if (!leve) return;
+      points = leve.points;
+      titre = leve.nom;
+      roles = rolesDesPoints(leve.id);
+    }
+    // Nom du fichier : projet_liste, sans l'extension du fichier importé (« stock.csv » -> « stock »).
+    const base = `${nomDeFichierProjet(projet)}_${titre.replace(/\.[a-z0-9]{2,4}$/i, '')}`.replace(/[\\/:*?"<>|]/g, '_');
+    ouvrirFenetreExport({
+      titre,
+      formats: FORMATS_POINTS,
+      fabriquer: (format) => {
+        const { blob, extension } = fichierPoints(points, format, roles);
+        return { blob, nom: `${base}.${extension}` };
+      },
+      enregistrer: enregistrerFichier,
+      message: (texte) => afficherMessage(texte, 5000),
+    });
   },
   // Projet › Surface Projet (0.77.0) : surfaces importées (LandXML, DXF 3D).
   renommerSurfaceProjet: (id, nom) => {
@@ -2710,6 +2746,17 @@ function rangerPointPris(resultat) {
   sonValidation();
   afficherMessage(`Point ${resultat.point.nom} pris`);
   modifie();
+}
+
+/** Rôle de chaque point d'une liste dans ses levés (« contour », « ligne L-HT-1 », « point isolé ») : Map nom -> texte. */
+function rolesDesPoints(leveId) {
+  const roles = new Map();
+  for (const levee of [...projet.surfaces, ...projet.autres].filter((s) => s.leveId === leveId)) {
+    for (const nom of levee.contour ?? []) roles.set(nom, 'contour');
+    (levee.lignesRupture ?? []).forEach((ligne, index) => ligne.noms.forEach((nom) => roles.set(nom, `ligne ${nomDeLigne(ligne, index)}`)));
+    for (const nom of levee.points ?? []) if (typeof nom === 'string') roles.set(nom, 'point isolé');
+  }
+  return roles;
 }
 
 /** Libellé des points isolés (celui choisi, sinon le premier de la liste). */

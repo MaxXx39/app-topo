@@ -28,7 +28,8 @@ import { pointsDuDessin } from '../topo/dessin.js';
  * montrerTousCalquesDxf(id, visible), ajouterPointTape({ nom, est, nord, altitude }) (renvoie
  * { erreur } ou rien), commencerPointage() (ajouter des points en touchant le plan DXF),
  * importerPointsControle(fichier) (renvoie { erreur } ou rien), importerSurface(fichier) (renvoie
- * le message à afficher, en HTML), renommerSurfaceProjet(id, nom), supprimerSurfaceProjet(id)
+ * le message à afficher, en HTML), renommerSurfaceProjet(id, nom), supprimerSurfaceProjet(id),
+ * exporterListe(type ('leve', 'dessin' ou 'controle'), id)
  * Renvoie { afficher(projet, dernierImport, dernierPlan) }.
  */
 export function creerEcranImport(conteneur, actions) {
@@ -85,6 +86,7 @@ export function creerEcranImport(conteneur, actions) {
       return;
     }
     if (action === 'supprimer-leve') actions.supprimerLeve(id);
+    else if (action === 'exporter-liste') actions.exporterListe(bouton.dataset.type, id);
     else if (action === 'supprimer-surface-projet') actions.supprimerSurfaceProjet(id);
     else if (action === 'voir-plan') actions.voirPlanDxf(id);
     else if (action === 'supprimer-plan') actions.supprimerPlanDxf(id);
@@ -229,6 +231,7 @@ function ligneListe(projet, leve) {
       ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}
       <div class="ligne-outils">
         <span class="aide">${leve.points.length} points${date}</span>
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter-liste" data-type="leve" data-id="${leve.id}">exporter</button>
         <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
       </div>
       ${tableauPoints(leve.points, 'Voir les points')}
@@ -296,7 +299,7 @@ function listesDessins(projet) {
       const points = pointsDuDessin(dessin, projet.dessins);
       return `<div class="ligne-leve liste-dessin">
       <strong>${echapper(dessin.nom)}</strong>
-      <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span></div>
+      <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span><button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter-liste" data-type="dessin" data-id="${dessin.id}">exporter</button></div>
       ${tableauPoints(points, 'Voir les points')}
     </div>`;
     })
@@ -309,7 +312,7 @@ function listePointsControle(projet) {
   if (points.length === 0) return '';
   return `<div class="ligne-leve liste-controle">
       <strong>Points de contrôle</strong>
-      <div class="ligne-outils"><span class="aide">${points.length} points</span></div>
+      <div class="ligne-outils"><span class="aide">${points.length} points</span><button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter-liste" data-type="controle" data-id="controle">exporter</button></div>
       ${tableauPoints(points, 'Voir les points de contrôle')}
     </div>`;
 }

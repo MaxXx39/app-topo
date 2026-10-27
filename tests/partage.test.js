@@ -87,6 +87,22 @@ describe('synchronisation avec Drive', () => {
     expect((await creerSynchro(drive, MAX).envoyer(projet, memoire)).memoire).toBeTruthy();
   });
 
+  it('listes partagées : écrites dans « App Topo », relues par un autre appareil', async () => {
+    const drive = fauxDrive();
+    const max = creerSynchro(drive, MAX);
+    expect(await max.lireListes()).toBeNull();
+    const listes = { adresses: ['bureau@geometre.ch'], swipos: [], modifieLe: '2026-10-27T10:00:00.000Z' };
+    await max.ecrireListes(listes);
+    const lu = await creerSynchro(drive, BUREAU).lireListes();
+    expect(lu).toEqual({ listes, modifieLe: '2026-10-27T10:00:00.000Z' });
+    const fichier = [...drive.fichiers.values()].find((f) => f.name === 'listes-partagees.json.gz');
+    expect(drive.fichiers.get(fichier.parents[0]).name).toBe(NOM_RACINE);
+    // 2e écriture : le même fichier est mis à jour.
+    await max.ecrireListes({ ...listes, adresses: [], modifieLe: '2026-10-27T11:00:00.000Z' });
+    expect([...drive.fichiers.values()].filter((f) => f.name === 'listes-partagees.json.gz')).toHaveLength(1);
+    expect((await max.lireListes()).listes.adresses).toEqual([]);
+  });
+
   it('verrou relu toutes les 30 s : qui a la main ; rendu, il est libre', async () => {
     const drive = fauxDrive();
     const projet = projetEssai();
