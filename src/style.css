@@ -7255,3 +7255,122 @@ body.lecture-seule .bouton-photo-levee {
   opacity: 0.4;
   pointer-events: none;
 }
+
+/* Terrain › Lever (0.78.0) : le levé en cours dans un cadre (nom, « Changer de levé », « + Nouveau levé »). */
+.entete-levee {
+  padding: 8px 10px;
+  border: 2px solid var(--couleur-nature);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--couleur-nature) 5%, var(--surface));
+}
+
+/* Ligne ou contour en cours : titre, nom en gras, nombre de points, boutons. */
+.element-en-cours {
+  --couleur-element: var(--orange);
+  margin-bottom: 8px;
+  padding: 6px 10px 8px;
+  border: 2px solid var(--couleur-element);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--couleur-element) 6%, var(--surface));
+}
+
+.element-en-cours.role-contour {
+  --couleur-element: var(--rouge);
+}
+
+.element-en-cours .titre-element {
+  display: block;
+  color: var(--couleur-element);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.element-en-cours .corps-element {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.element-en-cours .corps-element strong {
+  font-size: 1.1rem;
+}
+
+.element-en-cours .corps-element > span {
+  flex: 1;
+  color: var(--gris);
+}
+
+.element-en-cours .bouton-secondaire.actif {
+  border-color: var(--couleur-element);
+  background: var(--couleur-element);
+  color: #ffffff;
+}
+
+/* « ID point » au-dessus du nom du prochain point. */
+.champ-id-point {
+  display: grid;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.champ-id-point > span {
+  color: var(--gris);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Lignes du levé (bas de Lever) : contour, lignes et points isolés, à dérouler. */
+.elements-leve {
+  display: grid;
+  gap: 6px;
+}
+
+.element-leve {
+  --couleur-element: var(--orange);
+  border: 1px solid var(--bordure);
+  border-left: 4px solid var(--couleur-element);
+  border-radius: 8px;
+}
+
+.element-leve.role-contour {
+  --couleur-element: var(--rouge);
+}
+
+.element-leve.role-isole {
+  --couleur-element: #15803d;
+}
+
+.element-leve summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.element-leve summary span {
+  color: var(--gris);
+  font-size: 0.85rem;
+}
+
+.element-leve ul {
+  margin: 0;
+  padding: 0 10px 8px 22px;
+  list-style: none;
+}
+
+.element-leve .point-element {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  border-bottom: 1px solid var(--bordure);
+}
+
+.element-leve .segment-element {
+  padding-left: 14px;
+  font-size: 0.8rem;
+}

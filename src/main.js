@@ -75,6 +75,7 @@ import {
   supprimerLevee,
   pointsDeLaLevee,
 } from './topo/leve-direct.js';
+import { segmentCroise, supprimerSegment, ajouterPointExistant, horsDuContour, supprimerPointDuLevee, placeDuPoint, nomDeLigne } from './topo/lignes-levee.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
@@ -806,16 +807,35 @@ const ecranLeve = recepteurDisponible()
         }
         const { est, nord, altitude, ...gnss } = reponse.point;
         const point = { est, nord, altitude, gnss: { ...gnss, prisLe: new Date().toISOString() } };
-        const resultat = metre
-          ? ajouterPointMetre(projet, leve, metre, leveDirect.role, libelleDuRole(), { ...point, nom: nom.trim() || prochainNomMetre(projet, metre, leveDirect.role, libelleDuRole()) })
-          : ajouterPointDirect(leve, stock, leveDirect.role, { ...point, nom: nom.trim() || prochainNom(projet, stock, leveDirect.role, libelleDuRole()) }, nomsDuProjet(projet));
-        if (resultat.erreur) {
-          afficherMessage(`Point refusé : ${resultat.erreur}`, 4000);
+        if (metre) {
+          rangerPointPris(ajouterPointMetre(projet, leve, metre, leveDirect.role, libelleDuRole(), { ...point, nom: nom.trim() || prochainNomMetre(projet, metre, leveDirect.role, libelleDuRole()) }));
           return;
         }
-        navigator.vibrate?.(60);
-        sonValidation();
-        afficherMessage(`Point ${resultat.point.nom} pris`);
+        // Contour du stock et croisements (0.78.0) : le point peut finir en point isolé, ou être refusé.
+        controlerPlacePoint(stock, leveDirect.role, point).then((role) => {
+          if (!role) return;
+          const nomVoulu = role === leveDirect.role ? nom.trim() : '';
+          const libelle = role === leveDirect.role ? libelleDuRole() : libelleDesPoints();
+          rangerPointPris(ajouterPointDirect(leve, stock, role, { ...point, nom: nomVoulu || prochainNom(projet, stock, role, libelle) }, nomsDuProjet(projet)));
+        });
+      },
+      // Liste des lignes en bas de Lever (0.78.0) : supprimer un point, ou un segment d'une ligne.
+      supprimerPointLevee: (nom) => {
+        const stock = stockEnCours();
+        const leve = leveEnCours();
+        if (!stock || !leve || refuserEnLectureSeule() || !confirm(`Supprimer le point ${nom} ?`)) return;
+        supprimerPointDuLevee(leve, stock, nom, [...projet.surfaces, ...projet.autres, ...projet.mesures]);
+        afficherMessage(`Point ${nom} supprimé`);
+        modifie();
+      },
+      supprimerSegmentLevee: (valeur) => {
+        const stock = stockEnCours();
+        const [index, i] = String(valeur).split(':').map(Number);
+        const ligne = stock?.lignesRupture[index];
+        if (!ligne || refuserEnLectureSeule()) return;
+        const [a, b] = [ligne.noms[i], ligne.noms[(i + 1) % ligne.noms.length]];
+        if (!confirm(`Supprimer le segment ${a} → ${b} de ${nomDeLigne(ligne, index)} ?\n\nLa ligne est coupée en deux ; les points restent.`)) return;
+        supprimerSegment(stock, index, i);
         modifie();
       },
       choisirLibelle: (abreviation) => {
@@ -2674,6 +2694,112 @@ function mettreAJourToucheVolume() {
   });
 }
 
+/** Vrai quand toucher un point du plan l'ajoute à la ligne ou au contour en cours (Terrain › Lever, Confirmé). */
+function toucherPourLever() {
+  return Boolean(ecranLeve) && ongletContexte === 'terrain' && terrain.mode === 'lever' && !estModeBase()
+    && Boolean(stockEnCours()) && ['ligne', 'contour'].includes(leveDirect.role) && !editeurSurfaces.enSuppression();
+}
+
+/** Point rangé dans le levé (ou refusé) : vibration, son et message, puis enregistrement. */
+function rangerPointPris(resultat) {
+  if (resultat.erreur) {
+    afficherMessage(`Point refusé : ${resultat.erreur}`, 4000);
+    return;
+  }
+  navigator.vibrate?.(60);
+  sonValidation();
+  afficherMessage(`Point ${resultat.point.nom} pris`);
+  modifie();
+}
+
+/** Libellé des points isolés (celui choisi, sinon le premier de la liste). */
+function libelleDesPoints() {
+  return libelles.points.some(([abreviation]) => abreviation === terrain.libellePoint) ? terrain.libellePoint : libelles.points[0][0];
+}
+
+/**
+ * Avant de ranger un point dans un levé (0.78.0, demandes du 27.10.2026) :
+ * - un nouveau segment de ligne ou de contour (depuis son dernier point) ne doit pas croiser un
+ *   autre segment du levé : fenêtre « Supprimer le segment du dessous » (ligne la plus ancienne,
+ *   ce segment seulement ; ses points restent) ou « Lever en point isolé » ;
+ * - dans un stock, un point de ligne ou un point isolé hors du contour est refusé.
+ * position : { est, nord } ; versNom : nom du point s'il est déjà levé (toucher sur le plan).
+ * Renvoie le rôle à utiliser ('contour', 'ligne' ou 'isole'), ou null si le point est refusé.
+ */
+async function controlerPlacePoint(stock, role, position, versNom = null) {
+  const parNom = new Map(pointsDuLeve(stock.leveId).map((p) => [p.nom, p]));
+  // Stock : un point de ligne ou un point isolé hors du contour est refusé tout de suite.
+  if (role !== 'contour' && horsDuContour(stock, parNom, position)) {
+    afficherMessage('Point refusé : hors du contour du stock', 4000);
+    navigator.vibrate?.([80, 80, 80]);
+    return null;
+  }
+  let roleFinal = role;
+  let segmentSupprime = false;
+  if (role === 'ligne' || role === 'contour') {
+    const depuis = (role === 'contour' ? stock.contour : ligneEnCours(stock).noms).at(-1);
+    for (let essai = 0; depuis && essai < 20; essai++) {
+      const croise = segmentCroise(stock, parNom, depuis, position, versNom);
+      if (!croise) break;
+      const nomCroise = croise.type === 'contour' ? 'le contour' : nomDeLigne(stock.lignesRupture[croise.index], croise.index);
+      const choix = await demanderChoix({
+        titre: 'Les lignes se croisent',
+        texte: `Le segment ${depuis} → ${versNom ?? 'nouveau point'} croise ${nomCroise} (${croise.a} → ${croise.b}).`,
+        boutons: [
+          ...(croise.type === 'ligne' ? [{ cle: 'segment', texte: 'Supprimer le segment du dessous', detail: `${croise.a} → ${croise.b} de ${nomCroise} ; ses points restent`, principal: true }] : []),
+          { cle: 'isole', texte: 'Lever en point isolé', principal: croise.type !== 'ligne' },
+          { cle: 'annuler', texte: 'Ne pas prendre le point' },
+        ],
+      });
+      if (choix === 'segment') {
+        supprimerSegment(stock, croise.index, croise.i);
+        segmentSupprime = true;
+        continue;
+      }
+      roleFinal = choix === 'isole' ? 'isole' : null;
+      break;
+    }
+  }
+  if (!roleFinal && segmentSupprime) modifie();
+  return roleFinal;
+}
+
+/**
+ * Toucher un point déjà levé sur le plan (mode Confirmé, rôle Ligne ou Contour, 0.78.0) : il entre
+ * dans la ligne ou le contour en cours avec son nom (s'il n'est encore dans aucune ligne), après
+ * les mêmes contrôles qu'un point pris au RX2.
+ */
+async function ajouterPointTouche(nom) {
+  const stock = stockEnCours();
+  if (!stock || !['ligne', 'contour'].includes(leveDirect.role) || refuserEnLectureSeule()) return;
+  const point = pointsDuLeve(stock.leveId).find((p) => p.nom === nom);
+  if (!point) {
+    afficherMessage(`${nom} n'est pas dans la liste de ce levé`, 3000);
+    return;
+  }
+  const place = placeDuPoint(stock, nom);
+  if (place && place.type !== 'isole') {
+    afficherMessage(`${nom} est déjà dans ${place.type === 'contour' ? 'le contour' : `la ligne ${nomDeLigne(stock.lignesRupture[place.index], place.index)}`}`, 3000);
+    return;
+  }
+  const role = await controlerPlacePoint(stock, leveDirect.role, point, nom);
+  if (!role) return;
+  if (role === 'isole') {
+    if (!place) stock.points.push(nom);
+    afficherMessage(`${nom} : point isolé`);
+  } else {
+    if (role === 'ligne') prochainNom(projet, stock, 'ligne', libelleDuRole()); // prépare la ligne en cours (libellé, numéro)
+    const refus = ajouterPointExistant(stock, role, nom);
+    if (refus) {
+      afficherMessage(refus.erreur, 3000);
+      return;
+    }
+    afficherMessage(`${nom} ajouté ${role === 'contour' ? 'au contour' : `à ${nomDeLigne(ligneEnCours(stock), stock.lignesRupture.length - 1)}`}`);
+  }
+  navigator.vibrate?.(40);
+  modifie();
+}
+
 /** Libellé utilisé pour le rôle en cours (dans la liste ; sinon le premier de la liste). */
 function libelleDuRole() {
   if (leveDirect.role === 'contour') return null;
@@ -2710,11 +2836,29 @@ function donneesLeve() {
     dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
     resume: stock ? resumeStock(stock) : null,
     volume: stock ? volumeDuStock(stock) : null,
+    elements: stock ? elementsDuLevee(stock) : null,
     photos: stock?.photos ?? [],
     // Triangles en trop (Confirmé) : seulement pour un levé qui a une surface (pas un levé libre).
     triangles: stock && projet.surfaces.includes(stock)
       ? { actif: editeurSurfaces.enSuppression() && editeurSurfaces.objetActif() === stock, supprimes: stock.trianglesSupprimes?.length ?? 0 }
       : null,
+  };
+}
+
+/**
+ * Contour, lignes et points isolés du levé, pour la liste en bas de Terrain › Lever (0.78.0) :
+ * { contour: { nom, noms, modifiable } ou null, lignes: [{ index, nom, noms, fermee }], isoles: [nom] }.
+ * Le contour d'une Surface (dessin) suit le dessin : ses points ne se suppriment pas ici.
+ */
+function elementsDuLevee(stock) {
+  const dans = new Set([...(stock.contour ?? []), ...stock.lignesRupture.flatMap((l) => l.noms)]);
+  const isoles = stock.tousLesPoints ? pointsDuLeve(stock.leveId).map((p) => p.nom).filter((n) => !dans.has(n)) : [...(stock.points ?? [])];
+  return {
+    contour: stock.contour?.length
+      ? { nom: stock.numeroContour ? `C-Stock-${stock.numeroContour}` : 'Contour', noms: [...stock.contour], modifiable: !stock.dessinId }
+      : null,
+    lignes: stock.lignesRupture.map((l, index) => ({ index, nom: nomDeLigne(l, index), noms: [...l.noms], fermee: l.fermee })).filter((l) => l.noms.length > 0),
+    isoles,
   };
 }
 
@@ -3110,7 +3254,11 @@ document.addEventListener('visibilitychange', () => {
 const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPosition: toucherPourCoupe,
   // Un point touché va à la liste en cours : celle d'une mesure (onglet Calculs › Mesures) ou d'une surface.
-  quandToucherPoint: (nom) => (ongletContexte === 'mesures' ? ecranMesures.toucherPoint(nom) : editeurSurfaces.toucherPoint(nom)),
+  quandToucherPoint: (nom) => {
+    if (ongletContexte === 'mesures') ecranMesures.toucherPoint(nom);
+    else if (toucherPourLever()) ajouterPointTouche(nom);
+    else editeurSurfaces.toucherPoint(nom);
+  },
   quandToucherMesure: (id) => ecranMesures.choisir(id),
   quandToucherStock: (index) => editeurSurfaces.choisir(index),
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
@@ -3535,7 +3683,15 @@ function recalculer({ recadrer = false } = {}) {
       modeTriangles: false,
       traceCoupe: null,
     });
-  } else plan.redessiner(dessinDuPlan);
+  } else {
+    // Terrain › Lever, rôle Ligne ou Contour (Confirmé) : toucher un point levé l'ajoute (0.78.0).
+    if (toucherPourLever()) {
+      const stock = stockEnCours();
+      dessinDuPlan.enEdition = true;
+      dessinDuPlan.listeEnCours = leveDirect.role === 'contour' ? stock.contour : ligneEnCours(stock).noms;
+    }
+    plan.redessiner(dessinDuPlan);
+  }
   if (recadrer || pointsDuPlan !== pointsAffiches) {
     pointsAffiches = pointsDuPlan;
     nombrePointsAffiches = pointsDuPlan.length;

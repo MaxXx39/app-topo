@@ -122,10 +122,19 @@ export function creerEcranLeve(conteneur, actions) {
   let bandeCouloir = 0; // échelle du couloir de la ligne (n° dans BANDES_COULOIR)
   let capBoussole = null; // dernier cap de la boussole de la tablette (°), ou null
   let reglagesGuidageOuverts = false; // roue ⚙ de l'écran de guidage
+  const elementsOuverts = new Set(); // lignes du levé dépliées en bas de Lever ('contour', 'ligne-2', 'isoles')
   let accrochesOuvertes = false; // flèche de la barre d'accroche : les noms sous les dessins
   let gestionControleOuverte = false; // mode Contrôler : roue ⚙ (après le code de sécurité)
   let erreurGestion = ''; // mode Contrôler : erreur de la gestion (tolérances, fichier, point tapé)
   let reglagesLameOuverts = false; // mode Lame : roue ⚙ (tolérances)
+
+  // Lignes du levé dépliées : gardées d'un dessin de l'écran à l'autre.
+  conteneur.addEventListener('toggle', (evenement) => {
+    const cle = evenement.target.dataset?.element;
+    if (!cle) return;
+    if (evenement.target.open) elementsOuverts.add(cle);
+    else elementsOuverts.delete(cle);
+  }, true);
 
   conteneur.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');
@@ -856,8 +865,8 @@ export function creerEcranLeve(conteneur, actions) {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
       </div>
       <div class="boutons-levee">
-        <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer</button>
-        <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau</button>
+        <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer de levé</button>
+        <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau levé</button>
       </div>
     </div>`;
   }
@@ -884,13 +893,24 @@ export function creerEcranLeve(conteneur, actions) {
         <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${e.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle</button>
       </div>`;
     }
+    // Contour en cours (0.78.0) : même cadre que la ligne, sans « Fermer » (un contour est toujours fermé).
+    if (donnees.role === 'contour') {
+      const nbPoints = donnees.elements?.contour?.noms.length ?? 0;
+      return `<div class="element-en-cours role-contour">
+        <span class="titre-element">Contour en cours</span>
+        <div class="corps-element"><strong>${echapper(donnees.nomPropose.replace(/-\d+$/, ''))}</strong><span>${nbPoints} pt(s)</span></div>
+      </div>`;
+    }
     if (donnees.role !== 'ligne') return '';
     const { ligne } = donnees;
-    return `<div class="outils-ligne">
-      <span>L-${echapper(ligne.libelle ?? '')}-${ligne.numero} · ${ligne.nbPoints} pt(s)</span>
-      <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle</button>
-      <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
-        ${ligne.fermee ? '✓ Fermée' : 'Fermer'}</button>
+    return `<div class="element-en-cours role-ligne">
+      <span class="titre-element">Ligne en cours</span>
+      <div class="corps-element">
+        <strong>L-${echapper(ligne.libelle ?? '')}-${ligne.numero}</strong><span>${ligne.nbPoints} pt(s)</span>
+        <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle ligne</button>
+        <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
+          ${ligne.fermee ? '✓ Ligne fermée' : 'Fermer ligne'}</button>
+      </div>
     </div>`;
   }
 
@@ -936,7 +956,8 @@ export function creerEcranLeve(conteneur, actions) {
       ${choixLibelle()}
       ${outilsLigne()}
       <div class="nom-et-position">
-        <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" />
+        <label class="champ-id-point"><span>ID point</span>
+          <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" /></label>
         <div class="position-leve" data-vivant="position"></div>
       </div>
       <div class="ligne-prendre">
@@ -983,7 +1004,45 @@ export function creerEcranLeve(conteneur, actions) {
             </figure>`).join('')}</div>
         </div>`
       : '';
-    return triangles || listePhotos ? `<div class="bas-du-leve">${triangles}${listePhotos}</div>` : '';
+    const elements = listeElements();
+    return elements || triangles || listePhotos ? `<div class="bas-du-leve">${elements}${triangles}${listePhotos}</div>` : '';
+  }
+
+  /**
+   * Lignes du levé (0.78.0) : le contour, chaque ligne et les points isolés, à dérouler pour voir
+   * leurs points ; ✕ supprime un point, ✂ supprime le segment entre deux points d'une ligne.
+   */
+  function listeElements() {
+    const e = donnees.elements;
+    if (!e || (!e.contour && e.lignes.length === 0 && e.isoles.length === 0)) return '';
+    const ouvert = (cle) => (elementsOuverts.has(cle) ? 'open' : '');
+    const point = (nom, supprimable = true) => `<li class="point-element"><span>${echapper(nom)}</span>${supprimable
+      ? `<button type="button" class="bouton-lien" data-action="supprimerPointLevee" data-valeur="${echapper(nom)}" title="Supprimer le point ${echapper(nom)}" aria-label="Supprimer le point ${echapper(nom)}">✕</button>` : ''}</li>`;
+    const segment = (index, i, a, b) => `<li class="segment-element"><button type="button" class="bouton-lien bouton-lien-neutre" data-action="supprimerSegmentLevee" data-valeur="${index}:${i}" title="Supprimer le segment ${echapper(a)} → ${echapper(b)}">✂ segment</button></li>`;
+    const ligne = (l) => {
+      const morceaux = [];
+      l.noms.forEach((nom, i) => {
+        morceaux.push(point(nom));
+        if (i + 1 < l.noms.length) morceaux.push(segment(l.index, i, nom, l.noms[i + 1]));
+      });
+      if (l.fermee && l.noms.length >= 3) morceaux.push(segment(l.index, l.noms.length - 1, l.noms.at(-1), l.noms[0]));
+      return `<details class="element-leve role-ligne" data-element="ligne-${l.index}" ${ouvert(`ligne-${l.index}`)}>
+          <summary><strong>${echapper(l.nom)}</strong><span>${l.noms.length} pt(s)${l.fermee ? ' · fermée' : ''}</span></summary>
+          <ul>${morceaux.join('')}</ul>
+        </details>`;
+    };
+    return `<div class="elements-leve">
+      <p class="titre-choix">Lignes du levé ${bulle('lignesLevee')}</p>
+      ${e.contour ? `<details class="element-leve role-contour" data-element="contour" ${ouvert('contour')}>
+          <summary><strong>${echapper(e.contour.nom)}</strong><span>contour · ${e.contour.noms.length} pt(s)</span></summary>
+          <ul>${e.contour.noms.map((nom) => point(nom, e.contour.modifiable)).join('')}</ul>
+        </details>` : ''}
+      ${e.lignes.map(ligne).join('')}
+      ${e.isoles.length > 0 ? `<details class="element-leve role-isole" data-element="isoles" ${ouvert('isoles')}>
+          <summary><strong>Points isolés</strong><span>${e.isoles.length} pt(s)</span></summary>
+          <ul>${e.isoles.map((nom) => point(nom)).join('')}</ul>
+        </details>` : ''}
+    </div>`;
   }
 
   return {
