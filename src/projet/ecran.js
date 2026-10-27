@@ -2,7 +2,7 @@
 // - en haut, deux boutons : « + Nouveau projet » et « Gestion de projets » : une page à part (rien
 //   d'autre de l'onglet), une seule liste, appareil et Drive : toucher = ouvrir, menu ⋮ = exporter,
 //   dupliquer, supprimer ; fichier projet ; « ← » pour revenir ;
-// - le projet ouvert : ses infos (affaire, désignation) ;
+// - le projet ouvert : son titre (affaire - désignation) et un crayon pour le renommer ;
 // - ensuite (voir main.js) le bloc « Imports » (fichiers de points, plans DXF) ;
 // - tout en bas, le partage par Google Drive (pas besoin de le voir tout le temps), puis la version.
 // Le cartouche du PDF (dessiné par, date) se règle au moment du PDF (voir export/cartouche.js).
@@ -15,7 +15,7 @@ import { verrouActif } from '../partage/synchro.js';
 
 /**
  * Crée l'écran Projet dans "conteneur". Les actions sont faites par main.js via "actions" :
- * renommer(nom), changerCartouche(champ, valeur), exporterProjet(id),
+ * renommer(nom), changerCartouche(champ, valeur), modifierProjet() (crayon : affaire et désignation), exporterProjet(id),
  * nouveauProjet(), ouvrirProjet(id), dupliquerProjet(id), supprimerProjet(id), importerFichierProjet(fichier),
  * supprimerPartout(id) (cet appareil et Drive),
  * partage : connecterDrive(), deconnecterDrive(), nommerAppareil(nom), envoyerDrive(), reprendreLaMain(),
@@ -58,6 +58,7 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
       menuOuvert = menuOuvert === id ? null : id;
       if (derniers) dessiner(...derniers);
     } else if (action === 'exporter') actions.exporterProjet(id);
+    else if (action === 'renommerProjet') actions.modifierProjet();
     else if (action === 'nouveau') {
       panneau = null;
       actions.nouveauProjet();
@@ -106,7 +107,6 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
     // On ne redessine pas pendant une saisie : la case perdrait le curseur.
     const enSaisie = (zone) => zone.contains(document.activeElement) && document.activeElement.matches('input');
     if (enSaisie(conteneur) || enSaisie(conteneurSuite)) return;
-    const { affaire, lieu } = projet.cartouche;
     // Gestion de projets : une page à part, sans le projet ouvert, les imports ni le partage.
     const pageGestion = panneau === 'projets';
     conteneur.closest('.panneau')?.classList.toggle('page-gestion-projets', pageGestion);
@@ -124,13 +124,9 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
       <section class="bloc-ouvert">
         <div class="bloc-entete">
           <span class="etiquette-entete">Projet ouvert ${bulle('projets')}</span>
-          <span class="titre-projet-ouvert">${echapper(titreProjet(projet))}</span>
-        </div>
-        <div class="bloc-corps">
-          <div class="champs-projet">
-            <label>Affaire <input type="text" data-cartouche="affaire" value="${echapper(affaire ?? '')}" placeholder="ex. 10 203" /></label>
-            <label>Désignation <input type="text" data-cartouche="lieu" value="${echapper(lieu ?? '')}" placeholder="ex. Gland, plateforme Migros" /></label>
-          </div>
+          <span class="titre-projet-ouvert">${echapper(titreProjet(projet))}
+            <button type="button" class="bouton-crayon-projet" data-action="renommerProjet" title="Renommer le projet" aria-label="Renommer le projet">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button></span>
         </div>
       </section>
     `;

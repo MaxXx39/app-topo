@@ -34,7 +34,8 @@ const LISTES = 10 * 60_000; // listes partagées (adresses, swipos) relues toute
  *   « prendre » (prendre la main) ou null (ne pas ouvrir) ;
  * - autoriserPrise(verrou) : promesse vraie si on peut prendre la main (mode Confirmé, code) ;
  * - quandMainPrise(verrou) : un autre appareil vient de prendre la main (fenêtre d'attente) ;
- * - quandMainRendue(nom) : il l'a rendue, le projet est à jour (fermer la fenêtre d'attente) ;
+ * - quandMainRendue(nom, { repris }) : il l'a rendue, le projet est à jour (fermer la fenêtre d'attente) ;
+ *   repris : vrai si cet appareil a retrouvé la main, faux s'il reste en lecture seule ;
  * - quandChange() : l'état a changé (redessiner) ; message(texte) : petit message à l'écran.
  */
 export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, demanderPriseDeMain, autoriserPrise, quandMainPrise, quandMainRendue, quandChange, message }) {
@@ -57,6 +58,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
   let envoiEnCours = null;
 
   let dernierSigneDeVie = 0;
+  let choixEnAttente = false; // fenêtre de démarrage : le projet ouvert n'est pas encore celui qu'on garde
   let silence = false; // projet ouvert par le partage lui-même : son enregistrement ne relance rien
   // Ouverture, prise de main ou vérification en cours : la vérification du verrou attend (sinon
   // elle pourrait croire que la main est perdue pendant qu'on l'ouvre).
@@ -140,8 +142,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     etat.rendu = attente ? null : { projetId: lu.projet.id };
     await ouvrirEnSilence(lu.projet);
     changer(attente ? 'a-jour' : 'rendu');
-    if (attente) quandMainRendue(nom);
-    else message(`${nom} a rendu la main : projet à jour`);
+    quandMainRendue(nom, { repris: Boolean(attente) });
   }
 
   /** Ouvre un projet sans que son enregistrement sur l'appareil ne relance un envoi ou une prise de main. */
@@ -176,7 +177,8 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       await rafraichirListe();
       changer('a-jour');
       synchroniserListes().catch(() => {});
-      await apresOuverture();
+      // Choix du projet pas encore fait (fenêtre de démarrage) : rien n'est comparé ni pris pour l'instant.
+      if (!choixEnAttente) await apresOuverture();
     } catch (erreur) {
       etat.connecte = false;
       synchro = null;
@@ -249,6 +251,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
    * (il prend le verrou).
    */
   async function apresOuverture() {
+    choixEnAttente = false;
     etat.repris = null;
     etat.rendu = null;
     if (!etat.connecte || !synchro) return;
@@ -310,7 +313,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
    * (l'autre projet s'ouvre tout de suite, sans attendre internet). Renvoie la promesse de l'envoi.
    */
   function avantDeChanger() {
-    if (!etat.connecte || !synchro) return Promise.resolve();
+    if (choixEnAttente || !etat.connecte || !synchro) return Promise.resolve();
     const projet = obtenirProjet();
     if (etat.repris?.projetId === projet.id || etat.rendu?.projetId === projet.id) return Promise.resolve();
     return (async () => {
@@ -411,13 +414,16 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     appareil,
 
     /** Au démarrage de l'appli : se reconnecte si on l'était (dans l'APK, sans rien demander). */
-    demarrer() {
+    demarrer({ choixEnAttente: attente = false } = {}) {
+      // Fenêtre de démarrage (0.84.0) : si on n'ouvre pas le dernier projet, il n'est ni comparé à
+      // Drive ni envoyé ; c'est le projet ouvert ensuite (apresOuverture) qui le sera.
+      choixEnAttente = attente;
       if (etat.possible && etaitConnecte() && appareil().nom) connecter();
     },
 
     /** Le projet ouvert vient d'être enregistré sur l'appareil : envoi dans 30 s. */
     projetEnregistre() {
-      if (silence || etat.repris?.projetId === obtenirProjet().id) return;
+      if (choixEnAttente || silence || etat.repris?.projetId === obtenirProjet().id) return;
       // Main rendue : lecture seule, rien ne part (on la reprend en touchant la main grise, 0.80.0).
       if (etat.rendu?.projetId === obtenirProjet().id) return;
       planifier();

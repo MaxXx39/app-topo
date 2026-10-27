@@ -76,7 +76,7 @@ export function demanderTexte({ titre, valeur = '' }) {
 
 /**
  * Petite fenêtre avec plusieurs cases à remplir puis « OK » (ex. nouveau projet : affaire,
- * désignation). champs : [{ cle, titre, exemple }]. Renvoie { cle: texte tapé } avec OK, ou null
+ * désignation). champs : [{ cle, titre, exemple, valeur (texte déjà là, facultatif) }]. Renvoie { cle: texte tapé } avec OK, ou null
  * si la fenêtre est fermée (✕, touche retour, Échap) : rien n'est fait.
  */
 export function demanderChamps({ titre, champs }) {
@@ -88,7 +88,7 @@ export function demanderChamps({ titre, champs }) {
         <h2>${echapper(titre)}</h2>
         <button type="button" class="bouton-retour" data-cle="fermer" title="Fermer" aria-label="Fermer">✕</button>
       </div>
-      ${champs.map((c) => `<label>${echapper(c.titre)}<input type="text" data-champ="${echapper(c.cle)}" placeholder="${echapper(c.exemple ?? '')}" /></label>`).join('')}
+      ${champs.map((c) => `<label>${echapper(c.titre)}<input type="text" data-champ="${echapper(c.cle)}" value="${echapper(c.valeur ?? '')}" placeholder="${echapper(c.exemple ?? '')}" /></label>`).join('')}
       <div class="boutons-choix">
         <button type="button" class="bouton" data-cle="ok"><strong>OK</strong></button>
       </div>`;

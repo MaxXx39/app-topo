@@ -26,8 +26,8 @@ const SVG = 'http://www.w3.org/2000/svg';
 
 // Distance maximale (pixels) entre le doigt et un point pour le "toucher".
 const RAYON_TOUCHER = 22;
-// Bouton « Ma position » : le plan montre environ 50 m (dans sa plus petite dimension) autour de soi.
-const METRES_AUTOUR_DE_MOI = 50;
+// Bouton « Ma position » : le plan montre environ 20 m (dans sa plus petite dimension) autour de soi.
+const METRES_AUTOUR_DE_MOI = 20;
 
 // Calques que l'on peut afficher ou masquer, avec leur état de départ, rangés par familles (titres
 // du menu). Ce qui est coché vaut dans tous les onglets.
@@ -549,7 +549,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   /**
    * Cotes de l'implantation d'une ligne, sans bulle, attachées aux traits : distance depuis le
    * début (« +8.111 m », « −5.428 m » avant le début) et jusqu'à la fin, écrites le long de la ligne (de chaque côté du pied de la
-   * perpendiculaire) ; avant le début ou après la fin, le prolongement de la ligne en pointillés
+   * perpendiculaire ; si la distance est courte, le texte est quand même écrit, décalé vers le début ou vers la fin) ; avant le début ou après la fin, le prolongement de la ligne en pointillés
    * avec sa longueur ; l'écart de la canne écrit sur la perpendiculaire (canne → ligne).
    * cotes : { sommets, abscisse, longueur, ecart } (m) ; canne : { x, y } (pixels) ; vers : pied (MN95).
    */
@@ -559,7 +559,6 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const m = (valeur) => `${formaterNombre(Math.abs(valeur))} m`;
     // Texte posé le long d'un trait (de a à b, pixels), au milieu, lisible à l'endroit.
     const texteLeLong = (a, b, texte, classe) => {
-      if (Math.hypot(b.x - a.x, b.y - a.y) < 34) return;
       let angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
       if (angle > 90) angle -= 180;
       if (angle < -90) angle += 180;
@@ -575,8 +574,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (!debut || !fin) return [];
       return [ecran(debut), ...sommets.slice(debut.segment + 1, fin.segment + 1).map(ecran), ecran(fin)];
     };
-    // Texte au milieu (en longueur) d'un morceau, le long du segment où il tombe.
-    const coteMorceau = (de, a, texte, classe) => {
+    // Texte au milieu (en longueur) d'un morceau, le long du segment où il tombe. Morceau trop court
+    // à l'écran pour contenir le texte : il est écrit quand même, décalé de 20 px dans le sens
+    // « cote » (−1 vers le début de la ligne, +1 vers la fin) pour ne pas se poser sur l'autre.
+    const coteMorceau = (de, a, texte, classe, cote = 0) => {
       const points = morceau(de, a);
       if (points.length < 2) return;
       const milieu = pointALAbscisse(sommets, (de + a) / 2);
@@ -586,11 +587,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const dx = finSegment.x - debutSegment.x;
       const dy = finSegment.y - debutSegment.y;
       const l = Math.hypot(dx, dy) || 1;
-      // Longueur du morceau à l'écran : trop court, pas de texte.
       let pixels = 0;
       for (let i = 0; i + 1 < points.length; i++) pixels += Math.hypot(points[i + 1].x - points[i].x, points[i + 1].y - points[i].y);
-      if (pixels < 34) return;
-      texteLeLong({ x: centre.x - (dx / l) * 20, y: centre.y - (dy / l) * 20 }, { x: centre.x + (dx / l) * 20, y: centre.y + (dy / l) * 20 }, texte, classe);
+      const decalage = pixels < 34 ? cote * 20 : 0;
+      const c = { x: centre.x + (dx / l) * decalage, y: centre.y + (dy / l) * decalage };
+      texteLeLong({ x: c.x - (dx / l) * 20, y: c.y - (dy / l) * 20 }, { x: c.x + (dx / l) * 20, y: c.y + (dy / l) * 20 }, texte, classe);
     };
     if (abscisse < 0) {
       // Avant le début : prolongement du premier segment jusqu'en face de la canne.
@@ -600,8 +601,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       groupe.append(creerElement('path', { d: tracePar(morceau(longueur, abscisse), false), class: 'prolongement-ligne' }));
       coteMorceau(longueur, abscisse, `${m(abscisse - longueur)} après la fin`, 'cote-prolongement');
     } else {
-      coteMorceau(0, abscisse, `+${m(abscisse)}`, 'cote-debut');
-      coteMorceau(abscisse, longueur, `fin ${m(longueur - abscisse)}`, 'cote-fin');
+      coteMorceau(0, abscisse, `+${m(abscisse)}`, 'cote-debut', -1);
+      coteMorceau(abscisse, longueur, `fin ${m(longueur - abscisse)}`, 'cote-fin', 1);
     }
     // Repère au pied de la perpendiculaire (petit trait en travers de la ligne).
     const pied = pointALAbscisse(sommets, abscisse);
@@ -634,7 +635,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /**
    * Centre le plan sur la position du récepteur (sans changer le zoom, sauf au premier affichage,
-   * ou avec "zoomer" : environ 50 m visibles, bouton « Ma position »).
+   * ou avec "zoomer" : environ 20 m visibles, bouton « Ma position »).
    */
   function centrerSurPosition(zoomer = false) {
     if (!position) return;

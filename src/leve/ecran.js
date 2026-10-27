@@ -585,19 +585,19 @@ export function creerEcranLeve(conteneur, actions) {
     bandeCouloir = cibleSelonDistance(Math.abs(ecart), bandeCouloir);
     // La canne est trop à droite (écart > 0) : il faut aller à gauche.
     const sens = Math.abs(ecart) < 0.0005 ? 'Sur la ligne' : `${ecart > 0 ? '← Gauche' : '→ Droite'} ${m(ecart)}`;
+    // Position le long : + depuis le début, − avant le début (demande du 23.10.2026). Début et fin sur
+    // deux lignes, de la même taille que gauche / droite (0.84.0).
     let le_long;
-    // Position le long : + depuis le début, − avant le début (demande du 23.10.2026).
-    if (abscisse < 0) le_long = `−${m(abscisse)}`;
-    else if (abscisse > longueur) le_long = `Après la fin : ${m(abscisse - longueur)}`;
-    else le_long = `début ${m(abscisse)} · fin ${m(reste)}`;
+    if (abscisse < 0) le_long = [`−${m(abscisse)}`];
+    else if (abscisse > longueur) le_long = [`Après la fin : ${m(abscisse - longueur)}`];
+    else le_long = [`début ${m(abscisse)}`, `fin ${m(reste)}`];
     const hauteur = g.ecartAltitude == null
       ? ''
       : `<span class="hauteur-guidage ${g.classeAltitude}">${g.ecartAltitude >= 0 ? '↑ Monter' : '↓ Descendre'} ${m(g.ecartAltitude)}</span>`;
     zone.className = `guidage-direct guidage-ligne ${g.classe}`;
     zone.innerHTML = `
       ${svgCouloir(bandeCouloir, ecart, abscisse, longueur, couleurCanne(Math.abs(ecart)))}
-      <span class="lignes-guidage"><span>${sens}</span></span>
-      <span class="distance-guidage">${le_long}</span>
+      <span class="lignes-guidage"><span>${sens}</span>${le_long.map((texte) => `<span>${texte}</span>`).join('')}</span>
       ${hauteur}`;
   }
 
@@ -864,10 +864,10 @@ export function creerEcranLeve(conteneur, actions) {
         <button type="button" class="bouton-crayon-levee" data-action="renommerLevee" title="Renommer" aria-label="Renommer le levé">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
       </div>
-      <div class="boutons-levee">
-        <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer de levé</button>
-        <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau levé</button>
-      </div>
+    </div>
+    <div class="boutons-levee">
+      <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer de levé</button>
+      <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau levé</button>
     </div>`;
   }
 
@@ -955,26 +955,27 @@ export function creerEcranLeve(conteneur, actions) {
       ${boutonsRoles()}
       ${choixLibelle()}
       ${outilsLigne()}
-      <div class="nom-et-position">
-        <label class="champ-id-point"><span>ID point</span>
-          <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" /></label>
-        <div class="position-leve" data-vivant="position"></div>
-      </div>
-      <div class="ligne-prendre">
-        <label class="bouton-photo-levee" title="Photo du levé" aria-label="Photo du levé">
-          <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>
-          <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
-        </label>
-        <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>
-          <span>PRENDRE LE POINT</span><span class="sous-titre-prendre">ou touche vol −</span>
-        </button>
-      </div>
-      <p class="raison-leve" data-vivant="raison" hidden></p>
-      <div class="pied-terrain">
+      <div class="cadre-prise">
+        <span class="titre-cadre-prise">Point</span>
+        <div class="nom-et-position">
+          <label class="champ-id-point"><span>ID point</span>
+            <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" /></label>
+          <div class="position-leve" data-vivant="position"></div>
+        </div>
+        <div class="ligne-prendre">
+          <label class="bouton-photo-levee" title="Photo du levé" aria-label="Photo du levé">
+            <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>
+            <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
+          </label>
+          <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>
+            <span>PRENDRE LE POINT</span><span class="sous-titre-prendre">ou touche vol −</span>
+          </button>
+        </div>
+        <p class="raison-leve" data-vivant="raison" hidden></p>
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
           Annuler ${donnees.dernierPoint ? echapper(donnees.dernierPoint) : 'le dernier point'}</button>
-        ${resume()}
       </div>
+      <div class="pied-terrain">${resume()}</div>
       ${basDuLeve()}`;
   }
 

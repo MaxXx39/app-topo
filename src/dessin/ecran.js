@@ -22,7 +22,7 @@ const nombre = (valeur) => (valeur == null ? '' : String(Math.round(valeur * 100
  * Crée l'écran dans "conteneur". actions (main.js) : nouveauDessin(), dessiner(id),
  * terminerDessin(), supprimerDessin(id), renommerDessin(id, nom), choisirAccrocheDessin(mode),
  * tournerCote({ angle, sens : 'gauche', 'droite' ou 'droit' }), reglerDistance(texte),
- * reglerAltitudePilote(texte), ajouterSommetPilote(), sommetRx2(),
+ * reglerAltitudePilote(texte), choisirAltitudePilote('idem' ou 'pente'), reglerPentePilote(texte), ajouterSommetPilote(), sommetRx2(),
  * directionRx2(), fermerFigure(), rectangleDessin({ longueur, largeur, cote }), annulerSommet(),
  * choisirModeHauteur(id:mode), reglerHauteur(id, champ, valeur), altitudeSommet(id, n°, texte), creerSurfaceDessin(id).
  * Renvoie { afficher(donnees) } ; donnees : { dessins, pilote, recepteur }.
@@ -53,6 +53,7 @@ export function creerEcranDessin(conteneur, actions) {
     const distance = conteneur.querySelector('[data-pilote="distance"]')?.value ?? '';
     const altitude = conteneur.querySelector('[data-pilote="altitude"]')?.value ?? '';
     actions.reglerAltitudePilote?.(altitude);
+    actions.reglerPentePilote?.(conteneur.querySelector('[data-pilote="pente"]')?.value ?? '');
     if (action === 'voirDistance') {
       // OK : le prochain sommet est montré sur le plan (croix), sans l'ajouter.
       actions.reglerDistance(distance);
@@ -77,6 +78,7 @@ export function creerEcranDessin(conteneur, actions) {
     if (champ.dataset.champ === 'nom-dessin') actions.renommerDessin(id, champ.value.trim());
     else if (champ.dataset.pilote === 'distance') actions.reglerDistance(champ.value);
     else if (champ.dataset.pilote === 'altitude') actions.reglerAltitudePilote(champ.value);
+    else if (champ.dataset.pilote === 'pente') actions.reglerPentePilote(champ.value);
     else if (champ.dataset.hauteur) actions.reglerHauteur(id, champ.dataset.hauteur, champ.value);
     else if (champ.dataset.altitudeSommet != null) actions.altitudeSommet(id, Number(champ.dataset.altitudeSommet), champ.value);
   });
@@ -199,6 +201,11 @@ function htmlPilote(d, p, recepteur) {
         <input type="text" inputmode="decimal" data-pilote="distance" value="${echapper(p.distance ?? '')}" placeholder="distance m" aria-label="Distance (m)" />
         <button type="button" class="bouton-secondaire" data-action="voirDistance">OK</button>
         <input type="text" inputmode="decimal" data-pilote="altitude" value="${echapper(p.altitude ?? '')}" placeholder="altitude" aria-label="Altitude du prochain sommet (m)" />
+      </div>
+      <div class="altitude-pilote" role="group" aria-label="Altitude du prochain sommet">
+        <button type="button" class="puce-choix ${p.altitudeChoix === 'idem' ? 'actif' : ''}" data-action="choisirAltitudePilote" data-valeur="idem" aria-pressed="${p.altitudeChoix === 'idem'}">= dernier point</button>
+        <button type="button" class="puce-choix ${p.altitudeChoix === 'pente' ? 'actif' : ''}" data-action="choisirAltitudePilote" data-valeur="pente" aria-pressed="${p.altitudeChoix === 'pente'}">pente depuis le dernier</button>
+        ${p.altitudeChoix === 'pente' ? `<input type="text" inputmode="decimal" class="champ-pente" data-pilote="pente" value="${echapper(p.pente ?? '')}" placeholder="pente %" aria-label="Pente depuis le dernier sommet (%)" />` : ''}
       </div>
       <button type="button" class="bouton bouton-large" data-action="ajouterSommetPilote">Ajouter le sommet</button>` : ''}
     ${rectangle}
