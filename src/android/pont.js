@@ -54,7 +54,7 @@ export function ecouterRecepteur(fonction) {
 
 export const choisirRecepteur = () => window.AppliAndroid.choisirRecepteur();
 
-// --- Essai à 2 récepteurs (demande du 26.10.2026, mode Confirmé) : un 2e RX2, même état que le 1er ---
+// --- Essai à 2 récepteurs (demande du 26.10.2026, mode Expert) : un 2e RX2, même état que le 1er ---
 
 /** Journal NMEA (0.82.0) : vrai si l'APK sait enregistrer tout ce que le RX2 envoie. */
 export function journalNmeaDisponible() {

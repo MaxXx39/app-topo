@@ -17,6 +17,7 @@ import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
 import { demanderCode } from '../outils/code.js';
 import { COULEURS_LISTES } from '../plan/listes-points.js';
+import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
 
 /**
@@ -63,6 +64,15 @@ export function creerEcranImport(conteneur, actions) {
   }, true);
 
   conteneur.addEventListener('click', (evenement) => {
+    // Pastille de couleur (liste de points, plan DXF) : voir outils/palette.js.
+    const pastille = evenement.target.closest('[data-choix-couleur]');
+    if (pastille) {
+      const { champCouleur, id, choixCouleur: valeur } = pastille.dataset;
+      pastille.closest('details')?.removeAttribute('open');
+      if (champCouleur === 'couleur-liste') actions.colorerListe(id, valeur || null);
+      else if (champCouleur === 'plan-couleur') actions.reglerPlanDxf(id, { couleur: valeur || null });
+      return;
+    }
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
     const { action, id } = bouton.dataset;
@@ -163,12 +173,12 @@ export function creerEcranImport(conteneur, actions) {
               <span><strong>Points de contrôle</strong><span class="aide">CSV, TXT</span></span>
               <input type="file" data-champ="fichier-controle" accept=".csv,.txt,.pts,.xyz,.dat,.asc,text/csv,text/plain" hidden />
             </label>
-            <label class="bouton-import seulement-confirme">
+            <label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21 21 3M3 9l6-6M15 21l6-6M3 15h6v6" /></svg>
               <span><strong>Plan DXF</strong><span class="aide">fond de plan</span></span>
               <input type="file" data-champ="fichier-plan" accept=".dxf,application/dxf" hidden />
             </label>
-            <label class="bouton-import seulement-confirme">
+            <label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17 9 7l5 6 3-4 4 8z" /><path d="M3 17h18" /></svg>
               <span><strong>Surface</strong><span class="aide">LandXML, DXF 3D</span></span>
               <input type="file" data-champ="fichier-surface-projet" accept=".xml,.landxml,.dxf,application/xml,text/xml" hidden />
@@ -182,16 +192,16 @@ export function creerEcranImport(conteneur, actions) {
           ${pointOuvert ? `<div class="bloc-point-ajoute">
             ${htmlFormulairePoint(nomPointAjoute(projet))}
             <p class="erreur" data-vivant="erreur-point">${echapper(erreurPoint)}</p>
-            ${plans.length > 0 ? '<button type="button" class="bouton-secondaire seulement-confirme" data-action="pointer-dxf">Pointer sur le plan DXF</button>' : ''}
+            ${plans.length > 0 ? '<button type="button" class="bouton-secondaire" data-action="pointer-dxf">Pointer sur le plan DXF</button>' : ''}
           </div>` : ''}
           ${dernierImport ? afficherImportPoints(dernierImport) : ''}
           ${dernierPlan ? messagePlan(dernierPlan) : ''}
           ${messageSurface}
-        `, 'seulement-confirme')}
+        `, 'seulement-expert')}
 
         ${bloc('listes', titreSection('leves', 'Liste de points - Lever - Dessin - Surface Projet - Contrôle', bulle('leves')), blocListes(projet))}
 
-        ${plans.length > 0 ? bloc('dxf', titreSection('fichier', 'DXF importés'), listePlansDxf(projet, calquesOuverts), 'seulement-confirme') : ''}
+        ${plans.length > 0 ? bloc('dxf', titreSection('fichier', 'DXF importés'), listePlansDxf(projet, calquesOuverts), 'seulement-intermediaire') : ''}
       `;
   }
 }
@@ -205,12 +215,13 @@ function blocListes(projet) {
   const listes = projet.leves.filter((l) => !l.direct);
   const levees = projet.leves.filter((l) => l.direct);
   const surfacesProjet = projet.surfaces.filter((s) => s.type === 'landxml' || s.type === 'dxf');
-  const categorie = (titre, contenu) => (contenu ? `<p class="titre-categorie-liste">${titre}</p>${contenu}` : '');
+  // Dessin : Intermédiaire et Expert ; Surface Projet : Expert (tableau des modes).
+  const categorie = (titre, contenu, mode = '') => (contenu ? `<div class="${mode}"><p class="titre-categorie-liste">${titre}</p>${contenu}</div>` : '');
   const contenu = [
     categorie('Liste de points', listes.length > 0 ? `<div class="liste-leves">${listes.map((l) => ligneListe(projet, l)).join('')}</div>` : ''),
     categorie('Lever', levees.length > 0 ? `<div class="liste-leves">${levees.map((l) => ligneListe(projet, l)).join('')}</div>` : ''),
-    categorie('Dessin', listesDessins(projet)),
-    categorie('Surface Projet', surfacesProjet.map(ligneSurfaceProjet).join('')),
+    categorie('Dessin', listesDessins(projet), 'seulement-intermediaire'),
+    categorie('Surface Projet', surfacesProjet.map(ligneSurfaceProjet).join(''), 'seulement-expert'),
     categorie('Contrôle', listePointsControle(projet)),
   ].join('');
   return contenu || '<p class="vide">Aucune liste de points pour l\'instant.</p>';
@@ -231,7 +242,7 @@ function ligneListe(projet, leve) {
       ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}
       <div class="ligne-outils">
         <span class="aide">${leve.points.length} points${date}</span>
-        <button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter-liste" data-type="leve" data-id="${leve.id}">exporter</button>
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-intermediaire" data-action="exporter-liste" data-type="leve" data-id="${leve.id}">exporter</button>
         <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
       </div>
       ${tableauPoints(leve.points, 'Voir les points')}
@@ -240,7 +251,7 @@ function ligneListe(projet, leve) {
 
 /** Surface importée (LandXML, DXF 3D) : nom à changer, nature, fichier d'origine, supprimer. */
 function ligneSurfaceProjet(surface) {
-  const nature = { stock: 'stock', terrain: 'terrain naturel', terrassement: 'terrassement' }[surface.nature] ?? '';
+  const nature = { stock: 'stock', terrain: 'terrain', recollement: 'recollement', terrassement: 'terrassement' }[surface.nature] ?? '';
   return `<div class="ligne-leve liste-surface-projet">
       <input type="text" class="nom-leve" data-champ="nom-surface-projet" data-id="${surface.id}" value="${echapper(surface.nom)}" aria-label="Nom de la surface" />
       <div class="ligne-outils">
@@ -268,9 +279,7 @@ function afficherImportPoints({ nomFichier, format, points, erreurs, avertisseme
 
 /** Couleur de la liste sur le plan (rouge réservé aux points de contrôle). */
 function choixCouleur(id, couleur) {
-  return `<select class="couleur-liste" data-champ="couleur-liste" data-id="${id}" aria-label="Couleur de la liste" style="color: ${couleur || 'inherit'}">
-    ${COULEURS_LISTES.map(([valeur, titre]) => `<option value="${valeur}" ${(couleur || '') === valeur ? 'selected' : ''}>${valeur ? '●' : '◐'} ${titre}</option>`).join('')}
-  </select>`;
+  return `<span class="couleur-liste seulement-intermediaire">${paletteCouleur({ couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${id}"`, nom: 'Couleur de la liste' })}</span>`;
 }
 
 /** Tableau repliable de points (nom, Est, Nord, altitude), sous leur liste. */
@@ -299,7 +308,7 @@ function listesDessins(projet) {
       const points = pointsDuDessin(dessin, projet.dessins);
       return `<div class="ligne-leve liste-dessin">
       <strong>${echapper(dessin.nom)}</strong>
-      <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span><button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter-liste" data-type="dessin" data-id="${dessin.id}">exporter</button></div>
+      <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span><button type="button" class="bouton-lien bouton-lien-neutre seulement-intermediaire" data-action="exporter-liste" data-type="dessin" data-id="${dessin.id}">exporter</button></div>
       ${tableauPoints(points, 'Voir les points')}
     </div>`;
     })
@@ -312,7 +321,7 @@ function listePointsControle(projet) {
   if (points.length === 0) return '';
   return `<div class="ligne-leve liste-controle">
       <strong>Points de contrôle</strong>
-      <div class="ligne-outils"><span class="aide">${points.length} points</span><button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter-liste" data-type="controle" data-id="controle">exporter</button></div>
+      <div class="ligne-outils"><span class="aide">${points.length} points</span><button type="button" class="bouton-lien bouton-lien-neutre seulement-intermediaire" data-action="exporter-liste" data-type="controle" data-id="controle">exporter</button></div>
       ${tableauPoints(points, 'Voir les points de contrôle')}
     </div>`;
 }
@@ -329,9 +338,7 @@ function listePlansDxf(projet, calquesOuverts) {
         <div class="entete-plan-dxf">
           <label class="oeil-plan" title="Afficher / cacher le plan"><input type="checkbox" data-champ="plan-visible" data-id="${plan.id}" ${plan.visible !== false ? 'checked' : ''} aria-label="Afficher le plan" /></label>
           <input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />
-          <select data-champ="plan-couleur" data-id="${plan.id}" aria-label="Couleur du plan" style="color: ${plan.couleur || 'inherit'}">
-            ${COULEURS_PLANS.map(([valeur, titre]) => `<option value="${valeur}" ${(plan.couleur || '') === valeur ? 'selected' : ''}>${valeur ? '●' : '◐'} ${titre}</option>`).join('')}
-          </select>
+          ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: 'Couleur du plan' })}
         </div>
         <div class="ligne-outils">
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>

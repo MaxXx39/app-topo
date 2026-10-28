@@ -199,7 +199,7 @@ describe('noms et nettoyage des calculs', () => {
     expect(nomAutomatique(calculFouille, surfaces)).toBe('Fouille / TN');
     expect(descriptionCalcul(calculStock, surfaces)).toBe('« Stock 1 » (stock) sur sa ligne basse');
     expect(descriptionCalcul({ ...calculFouille, zone: { type: 'surface', surfaceId: stock.id } }, surfaces)).toBe(
-      '« Fouille » (terrassement) par rapport à « TN » (terrain naturel), dans le contour de « Stock 1 »',
+      '« Fouille » (terrassement) par rapport à « TN » (terrain), dans le contour de « Stock 1 »',
     );
   });
 

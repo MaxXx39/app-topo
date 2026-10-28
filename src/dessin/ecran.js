@@ -1,4 +1,4 @@
-// Calculs › Dessin (mode Confirmé), simplifié en 0.66.0 : un seul « + Dessin » (noms D1-1, D1-2…),
+// Calculs › Dessin (mode Expert), simplifié en 0.66.0 : un seul « + Dessin » (noms D1-1, D1-2…),
 // comme l'outil « pilote » de Leica iCON :
 // 1. Point de départ : toucher le plan (accroché à un objet : point, sommet, milieu, sur une ligne,
 //    centre ; rien sous le doigt = rien de pris) ou le RX2 ;
@@ -171,8 +171,8 @@ function htmlPilote(d, p, recepteur) {
   else if (n === 1) etape = 'Direction du 1er côté';
   else etape = `Côté ${n}`;
   const rx2 = recepteur
-    ? (points || n === 0 ? '<button type="button" class="bouton-secondaire" data-action="sommetRx2">Point au RX2</button>' : '')
-      + (n >= 1 && !points ? '<button type="button" class="bouton-secondaire" data-action="directionRx2">Direction vers le RX2</button>' : '')
+    ? (points || n === 0 ? '<button type="button" class="bouton-secondaire" data-action="sommetRx2">Point au GNSS</button>' : '')
+      + (n >= 1 && !points ? '<button type="button" class="bouton-secondaire" data-action="directionRx2">Direction vers le GNSS</button>' : '')
     : '';
   const direction = p.direction == null ? '' : `<span class="direction-choisie">✓ ${p.reference ? echapper(p.reference) : 'direction donnée'}</span>`;
   const tourner = n >= 2 && !points

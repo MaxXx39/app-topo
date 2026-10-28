@@ -143,10 +143,9 @@ p {
   stroke-linejoin: round;
 }
 
-/* Étoile du mode : vide (contour blanc) = Base, pleine ambre = Confirmé. */
-.bouton-mode.confirme svg {
-  fill: var(--ambre);
-  stroke: var(--ambre);
+/* Barres du mode (comme le signal d'un téléphone) : couleurs données par le dessin lui-même. */
+.barres-mode {
+  stroke: none;
 }
 
 .entete-icone-bouton:disabled {
@@ -2001,15 +2000,14 @@ th.nombre {
 .bloc-ouvert {
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--sombre);
+  border: 1px solid var(--ambre-fonce);
   margin-bottom: 16px;
 }
 
 .bloc-entete {
-  background: var(--sombre);
-  color: #ffffff;
+  background: var(--ambre);
+  color: var(--sombre);
   padding: 12px 14px 14px;
-  border-bottom: 4px solid var(--ambre);
 }
 
 .etiquette-entete {
@@ -2018,7 +2016,7 @@ th.nombre {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--ambre);
+  color: var(--sombre);
   margin-bottom: 4px;
 }
 
@@ -2095,8 +2093,9 @@ th.nombre {
 }
 
 .bouton-projet.gestion-projets {
-  background: var(--sombre);
-  color: #ffffff;
+  border: 2px solid var(--sombre);
+  background: var(--surface);
+  color: var(--sombre);
 }
 
 .actions-projets .bouton-secondaire.actif {
@@ -3061,6 +3060,10 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 
 .bouton-nature.nature-terrain {
   --couleur-nature: #15803d;
+}
+
+.bouton-nature.nature-recollement {
+  --couleur-nature: #db2777;
 }
 
 .bouton-nature.nature-terrassement {
@@ -4048,7 +4051,7 @@ svg.plan,
   margin-top: 12px;
 }
 
-/* Mode de l'appli (réglages ⚙) : Base ou Confirmé, deux gros boutons avec l'étoile. */
+/* Mode de l'appli (réglages ⚙) : Base, Intermédiaire ou Expert, trois gros boutons avec les barres. */
 .choix-mode-appli {
   display: flex;
   gap: 8px;
@@ -4060,10 +4063,12 @@ svg.plan,
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   min-height: 44px;
+  padding: 0 4px;
   border: 1.5px solid var(--bordure);
   border-radius: 10px;
+  font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -4084,18 +4089,10 @@ svg.plan,
   outline-offset: 2px;
 }
 
-.etoile-mode {
+.puce-mode .barres-mode {
   width: 22px;
   height: 22px;
-  fill: none;
-  stroke: var(--sombre);
-  stroke-width: 1.8;
-  stroke-linejoin: round;
-}
-
-.etoile-mode.confirme {
-  fill: var(--ambre);
-  stroke: var(--ambre-fonce);
+  flex: none;
 }
 
 .case-reglage {
@@ -4244,24 +4241,11 @@ body.mode-telephone .onglets button svg {
   color: var(--sombre);
 }
 
-/* Téléphone : la bascule est collée sous le plan (0.64.0 ; avant : au-dessus du plan). */
+/* Téléphone : plus de bascule sous le plan. */
 @media (max-width: 899px) {
+  /* Plus de bascule sous le plan (0.86.0) : les modes sont dans la barre du bas. */
   body {
-    --hauteur-bascule: 46px;
-  }
-
-  body.mode-leve[data-onglet='terrain'] .bascule-terrain {
-    position: fixed;
-    top: calc(var(--hauteur-entete) + var(--hauteur-plan-terrain));
-    left: 0;
-    right: 0;
-    z-index: 11;
-    height: var(--hauteur-bascule);
-    margin: 0;
-    padding: 5px 8px;
-    border-radius: 0;
-    background: var(--surface);
-    border-bottom: 1px solid var(--bordure);
+    --hauteur-bascule: 0px;
   }
 
   body.mode-leve[data-onglet='terrain'] .mise-en-page {
@@ -4807,6 +4791,10 @@ button.bouton-import {
 
 .entete-levee.nature-terrain {
   --couleur-nature: #15803d;
+}
+
+.entete-levee.nature-recollement {
+  --couleur-nature: #db2777;
 }
 
 .entete-levee.nature-terrassement {
@@ -5391,7 +5379,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   text-align: center;
 }
 
-/* Fenêtre « Changer » (Terrain › Lever) : un levé par ligne, à la couleur de sa nature, croix rouge (Confirmé). */
+/* Fenêtre « Changer » (Terrain › Lever) : un levé par ligne, à la couleur de sa nature, croix rouge (Expert). */
 .liste-levees {
   display: grid;
   gap: 8px;
@@ -5407,6 +5395,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 }
 
 .ligne-levee.nature-terrain { --couleur-nature: #15803d; }
+.ligne-levee.nature-recollement { --couleur-nature: #db2777; }
 .ligne-levee.nature-terrassement { --couleur-nature: #2563eb; }
 .ligne-levee.nature-surface { --couleur-nature: #7c3aed; }
 .ligne-levee.nature-metre { --couleur-nature: #0891b2; }
@@ -6273,8 +6262,11 @@ body.accroches-ouvertes {
   stroke-width: 1;
 }
 
-/* Mode Base (réglages ⚙) : fonctions avancées cachées (rien n'est supprimé du projet). */
-body.mode-base .seulement-confirme,
+/* Modes (réglages ⚙) : fonctions avancées cachées (rien n'est supprimé du projet).
+   .seulement-intermediaire = caché en Base ; .seulement-expert = caché en Base et en Intermédiaire. */
+body.mode-base .seulement-intermediaire,
+body.mode-base .seulement-expert,
+body.mode-intermediaire .seulement-expert,
 body.mode-base .onglets .onglet-calculs,
 body.mode-base .parties-calculs {
   display: none !important;
@@ -6784,11 +6776,9 @@ body.mode-base .parties-calculs {
   stroke-width: 3px;
 }
 
-/* Couleur d'une liste de points (Projet › Listes de points). */
+/* Couleur d'une liste de points (Projet › Listes de points) : pastille, voir outils/palette.js. */
 .couleur-liste {
-  max-width: 150px;
-  min-height: 32px;
-  font-size: 0.85rem;
+  display: inline-flex;
 }
 
 /* Dessin : barre d'accroche dans le pilote (pas collée sous le plan comme dans Terrain). */
@@ -6797,7 +6787,7 @@ body.mode-base .parties-calculs {
   margin: 6px 0;
 }
 
-/* Fenêtre du récepteur : essai à 2 récepteurs (mode Confirmé). */
+/* Fenêtre du récepteur : essai à 2 récepteurs (mode Expert). */
 .bloc-recepteur2 {
   margin-top: 12px;
   padding-top: 10px;
@@ -7237,7 +7227,7 @@ body.lecture-seule :is(
   stroke-linejoin: round;
 }
 
-/* Bas de l'écran Lever : triangles en trop (Confirmé) et photos du levé. */
+/* Bas de l'écran Lever : triangles en trop (dès Intermédiaire) et photos du levé. */
 .bas-du-leve {
   display: grid;
   gap: 10px;
@@ -7470,6 +7460,7 @@ body.lecture-seule .bouton-photo-levee {
 
 .plan .nature-stock { --couleur-nature: #b45309; }
 .plan .nature-terrain { --couleur-nature: #15803d; }
+.plan .nature-recollement { --couleur-nature: #db2777; }
 .plan .nature-terrassement { --couleur-nature: #2563eb; }
 .plan .nature-surface { --couleur-nature: #7c3aed; }
 
@@ -7576,7 +7567,7 @@ body.lecture-seule .bouton-photo-levee {
   border: none;
   border-radius: 8px;
   background: none;
-  color: var(--ambre);
+  color: var(--sombre);
   vertical-align: middle;
   cursor: pointer;
 }
@@ -7589,4 +7580,382 @@ body.lecture-seule .bouton-photo-levee {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* --- 0.86.0 : Projet en haut à gauche, modes de Terrain dans la barre du bas, barre du récepteur cliquable --- */
+.bouton-onglet-projet.actif {
+  background: var(--ambre);
+  color: var(--sombre);
+}
+
+.entete-texte.actif .entete-titre {
+  text-decoration: underline;
+}
+
+/* Boutons Lever / Implanter / Contrôle / Guidage (0.87.0) : un rectangle large à la couleur du mode,
+   contour seul quand le mode n'est pas choisi, plein (icône et texte en blanc) quand il l'est. Un trait
+   de la couleur du mode court sur toute la largeur de la barre et rejoint le rectangle choisi. */
+.onglets button[data-mode-terrain] {
+  --couleur-mode: var(--ambre);
+  min-width: 0;
+  margin: 6px 3px;
+  border: 2px solid var(--couleur-mode);
+  border-radius: 10px;
+  color: var(--couleur-mode);
+}
+
+.onglets button[data-mode-terrain] svg {
+  color: var(--couleur-mode);
+}
+
+.onglets button.onglet-mode-controler { --couleur-mode: #0d9488; }
+.onglets button.onglet-mode-autocontrole { --couleur-mode: #dc2626; }
+.onglets button.onglet-mode-lame { --couleur-mode: #1d4ed8; }
+
+.onglets button[data-mode-terrain].actif {
+  margin-top: 0;
+  border-top-color: transparent;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  background: var(--couleur-mode);
+  color: #ffffff;
+}
+
+.onglets button[data-mode-terrain].actif svg {
+  color: #ffffff;
+}
+
+/* Trait de la couleur du mode en haut de la barre, sur toute la largeur. */
+body[data-mode-terrain] .onglets {
+  border-top: 4px solid var(--couleur-barre, var(--ambre));
+}
+
+body[data-mode-terrain='controler'] .onglets { --couleur-barre: #0d9488; }
+body[data-mode-terrain='autocontrole'] .onglets { --couleur-barre: #dc2626; }
+body[data-mode-terrain='lame'] .onglets { --couleur-barre: #1d4ed8; }
+
+/* Barre du récepteur : toujours là, on la touche pour ouvrir la fenêtre du récepteur. */
+body.avec-recepteur .bandeaux-recepteur {
+  cursor: pointer;
+}
+
+.bandeaux-recepteur .icone-bandeau {
+  flex: none;
+  box-sizing: content-box;
+  width: 20px;
+  height: 20px;
+  align-self: center;
+  margin: 0 6px;
+  padding: 2px 5px;
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  border: 2px solid #ffffff;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* 0.87.0 : le rôle choisi (bouton) et tout ce qui le concerne (libellé, ligne en cours, point) sont
+   entourés d'un seul trait, à la couleur du rôle : un onglet qui se prolonge en cadre. */
+.roles-leve {
+  margin-bottom: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.role-leve.choisi {
+  margin-bottom: -2px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.cadre-role {
+  --couleur-role: var(--gris);
+  padding: 4px 8px 8px;
+  border: 2px solid var(--couleur-role);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--couleur-role) 4%, var(--surface));
+}
+
+.cadre-role.role-contour { --couleur-role: var(--rouge); }
+.cadre-role.role-ligne { --couleur-role: var(--orange); }
+.cadre-role.role-isole { --couleur-role: var(--succes); }
+.cadre-role:is(.role-aire, .role-longueur, .role-compte) { --couleur-role: #0891b2; }
+
+.element-en-cours .libelles-terrain {
+  margin: 8px 0 0;
+}
+
+.onglets button[data-mode-terrain].actif svg {
+  width: 22px;
+  padding: 0;
+  background: none;
+}
+
+/* --- 0.88.0 : Lever plus compact --- */
+/* Levé en cours : une seule ligne, sans cadre : « Lever en cours : nom ✎ » puis Changer et + Nouveau. */
+.entete-levee.levee-en-cours {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px 8px;
+  margin: 10px 0 8px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.levee-en-cours .etiquette-levee {
+  color: var(--gris);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.levee-en-cours .nom-levee-en-cours {
+  color: var(--couleur-nature);
+  font-size: 1.15rem;
+}
+
+.levee-en-cours .boutons-levee {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 0 auto;
+}
+
+.levee-en-cours .boutons-levee .bouton-secondaire {
+  min-height: 36px;
+  padding: 4px 10px;
+}
+
+/* Point : ID point, appareil photo et « Enreg. Pts » sur la même ligne. */
+.ligne-id-prendre {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.ligne-id-prendre .champ-id-point {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.ligne-id-prendre .champ-id-point > span {
+  margin: 0;
+}
+
+.ligne-id-prendre .nom-point {
+  width: 100%;
+  min-width: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.ligne-id-prendre .bouton-photo-levee {
+  flex: 0 0 52px;
+  height: 52px;
+}
+
+.ligne-id-prendre .bouton.bouton-prendre {
+  flex: 1 1 0;
+  width: auto;
+  min-height: 52px;
+  font-size: 1.05rem;
+}
+
+.cadre-prise > .position-leve {
+  margin: 0;
+  gap: 0 10px;
+  font-size: 0.85rem;
+}
+
+/* Rôle choisi : l'onglet est dans la continuité du cadre (même fond, même trait, pas de trait entre les
+   deux), le trait fait tout le tour : onglet, puis cadre. */
+.role-leve.choisi {
+  background: color-mix(in srgb, var(--couleur-role) 6%, var(--surface));
+  color: var(--couleur-role);
+  border-bottom-color: color-mix(in srgb, var(--couleur-role) 6%, var(--surface));
+  box-shadow: none;
+}
+
+.cadre-role {
+  border-radius: 12px;
+}
+
+.cadre-role.onglet-premier {
+  border-top-left-radius: 0;
+}
+
+.cadre-role.onglet-dernier {
+  border-top-right-radius: 0;
+}
+
+.roles-leve .role-leve:not(.choisi) {
+  margin-bottom: 4px;
+}
+
+/* Calculs et Plan : même rectangle que les modes, en gris foncé (contour, plein quand choisi). */
+.onglets button.onglet-calculs,
+.onglets button.onglet-plan {
+  margin: 6px 3px;
+  border: 2px solid var(--sombre);
+  border-radius: 10px;
+  color: var(--sombre);
+}
+
+.onglets button.onglet-calculs svg,
+.onglets button.onglet-plan svg {
+  color: var(--sombre);
+}
+
+.onglets button.onglet-calculs.actif,
+.onglets button.onglet-plan.actif {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.onglets button.onglet-calculs.actif svg,
+.onglets button.onglet-plan.actif svg {
+  width: 22px;
+  padding: 0;
+  background: none;
+  color: #ffffff;
+}
+
+/* 0.88.1 : « Lever en cours » est dans le cadre ambre « Point » ; « ou touche vol − » est de retour. */
+.cadre-prise .entete-levee.levee-en-cours {
+  margin: 0;
+}
+
+.ligne-id-prendre .bouton.bouton-prendre {
+  min-height: 56px;
+  font-size: 1.05rem;
+}
+
+.ligne-id-prendre .sous-titre-prendre {
+  margin-top: 2px;
+  font-size: 0.68rem;
+}
+
+/* 0.88.2 : « Lever en cours » est le bandeau du haut du grand cadre ambre (collé au trait, fond teinté). */
+.ecran-terrain > .entete-levee.levee-en-cours {
+  margin: -16px -16px 12px;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--couleur-nature);
+  border-radius: 10px 10px 0 0;
+  background: color-mix(in srgb, var(--couleur-nature) 8%, var(--surface));
+}
+
+/* 0.88.3 : le bandeau « Lever en cours » est ambre, quelle que soit la nature du levé. */
+.ecran-terrain > .entete-levee.levee-en-cours {
+  --couleur-nature: var(--ambre);
+}
+
+.ecran-terrain > .levee-en-cours .nom-levee-en-cours {
+  color: var(--sombre);
+}
+
+/* 0.88.4 : icône Projet de l'en-tête dans un rectangle ambre (plein quand l'onglet Projet est ouvert). */
+.entete .bouton-onglet-projet {
+  width: 44px;
+  height: 40px;
+  border: 2px solid var(--ambre);
+  border-radius: 10px;
+  color: var(--ambre);
+}
+
+.entete .bouton-onglet-projet.actif {
+  background: var(--ambre);
+  color: var(--sombre);
+}
+
+/* --- 0.89.0 : choix de couleur en pastilles sans texte --- */
+.choix-couleur {
+  position: relative;
+  flex: none;
+}
+
+.choix-couleur > summary {
+  display: block;
+  width: 28px;
+  height: 28px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.choix-couleur > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* « Couleur normale » : un rond à moitié rempli, sans texte. */
+.pastille-couleur.sans-couleur {
+  background: linear-gradient(90deg, #ffffff 50%, #6b7280 50%);
+}
+
+.palette-flottante {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 190px;
+  padding: 8px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--ombre);
+}
+
+.palette-flottante .pastille-couleur {
+  width: 28px;
+  height: 28px;
+}
+
+/* Calculs : sa couleur (rose), comme Lever (ambre), Implanter, Contrôle et Guidage. */
+.onglets button.onglet-calculs {
+  border-color: #db2777;
+  color: #db2777;
+}
+
+.onglets button.onglet-calculs svg {
+  color: #db2777;
+}
+
+.onglets button.onglet-calculs.actif {
+  background: #db2777;
+  color: #ffffff;
+}
+
+.onglets button.onglet-calculs.actif svg {
+  color: #ffffff;
+}
+
+body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']) .onglets {
+  border-top: 4px solid #db2777;
+}
+
+.panneau:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']) {
+  border: 2px solid #db2777;
+}
+
+/* Calculs › Volumes choisi : ambre clair (le sombre était trop foncé). */
+.parties-calculs .groupe-surfaces-volumes button.actif {
+  background: var(--ambre);
+  color: var(--sombre);
+}
+
+/* Plan : contour arrondi. */
+.panneau-plan,
+.panneau-plan .plan-cadre {
+  border-radius: var(--rayon);
+  overflow: hidden;
+}
+
+/* 0.89.1 : le bouton Plan de la barre du bas est presque rond. */
+.onglets button.onglet-plan {
+  border-radius: 28px;
 }

@@ -1,5 +1,5 @@
 // Fenêtre « Changer » de l'onglet Terrain › Lever (0.69.0) : les levés (surfaces levées, métrés,
-// levés libres), chacun écrit à la couleur de sa nature ; le toucher le reprend. En mode Confirmé,
+// levés libres), chacun écrit à la couleur de sa nature ; le toucher le reprend. En mode Expert,
 // une croix rouge le supprime (avec ses points), après confirmation.
 import { echapper } from '../outils/echapper.js';
 

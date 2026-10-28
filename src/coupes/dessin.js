@@ -12,6 +12,7 @@ import { formaterNombre } from '../topo/format.js';
 const COULEURS_NATURE = {
   stock: [180, 83, 9], // brun
   terrain: [21, 128, 61], // vert
+  recollement: [219, 39, 119], // rose
   terrassement: [37, 99, 235], // bleu
   surface: [124, 58, 237], // violet (surface d'un dessin)
 };

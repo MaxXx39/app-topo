@@ -56,9 +56,9 @@ describe('levé direct', () => {
 
   it('crée la surface de la nature choisie, avec son propre numéro', () => {
     const { projet, leve } = nouveauLeve();
-    expect(creerSurfaceDirecte(projet, leve, 'terrain')).toMatchObject({ nom: 'Terrain naturel 1', nature: 'terrain', tousLesPoints: false });
+    expect(creerSurfaceDirecte(projet, leve, 'terrain')).toMatchObject({ nom: 'Terrain 1', nature: 'terrain', tousLesPoints: false });
     expect(creerSurfaceDirecte(projet, leve, 'terrassement')).toMatchObject({ nom: 'Terrassement 1', nature: 'terrassement' });
-    expect(creerSurfaceDirecte(projet, leve, 'terrain').nom).toBe('Terrain naturel 2');
+    expect(creerSurfaceDirecte(projet, leve, 'terrain').nom).toBe('Terrain 2');
   });
 
   it('range les surfaces du même jour dans le même levé', () => {
@@ -243,7 +243,7 @@ describe('supprimer un levé du Terrain', async () => {
     autre.points.push(b); // b sert aussi au terrain naturel
     expect(pointsDeLaLevee(projet, stock.id)).toEqual([a]);
     expect(supprimerLevee(projet, stock.id)).toEqual({ nom: 'Stock 1', points: 1 });
-    expect(projet.surfaces.map((s) => s.nom)).toEqual(['Terrain naturel 1']);
+    expect(projet.surfaces.map((s) => s.nom)).toEqual(['Terrain 1']);
     expect(leve.points.map((p) => p.nom)).toEqual([b, c]);
     // Dernière surface du levé : le levé du jour, vide, part aussi.
     supprimerLevee(projet, autre.id);

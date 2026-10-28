@@ -116,9 +116,9 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
     }
     conteneur.innerHTML = `
       <div class="actions-projets">
-        <button type="button" class="bouton-projet nouveau-projet" data-action="nouveau">+ Nouveau projet</button>
+        <button type="button" class="bouton-projet nouveau-projet seulement-intermediaire" data-action="nouveau">+ Nouveau projet</button>
         <button type="button" class="bouton-projet gestion-projets" data-action="panneau" data-panneau="projets">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z" /></svg>Gestion de projets</button>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z" /></svg>Ouvrir projet</button>
       </div>
 
       <section class="bloc-ouvert">
@@ -178,11 +178,11 @@ function pageProjets(projet, resumes, partage, menuOuvert, tri) {
   return `<div class="entete-page-projets">
     <button type="button" class="bouton-retour" data-action="panneau" data-panneau="projets" title="Retour au projet ouvert" aria-label="Retour au projet ouvert">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
-    <h2>Gestion de projets</h2>
+    <h2>Ouvrir projet</h2>
     ${partage?.etat.connecte ? '<button type="button" class="bouton-retour" data-action="rafraichirDrive" title="Actualiser la liste de Google Drive" aria-label="Actualiser">↻</button>' : ''}
   </div>
   <section class="carte-section panneau-projets">
-    <button type="button" class="bouton-secondaire bouton-nouveau-page" data-action="nouveau">+ Nouveau projet</button>
+    <button type="button" class="bouton-secondaire bouton-nouveau-page seulement-intermediaire" data-action="nouveau">+ Nouveau projet</button>
     <div class="tri-projets" role="group" aria-label="Trier">
       <span class="aide">Trier :</span>
       <button type="button" class="puce-choix ${tri === 'date' ? 'actif' : ''}" data-action="trier" data-tri="date">Récents</button>
@@ -191,7 +191,7 @@ function pageProjets(projet, resumes, partage, menuOuvert, tri) {
     <div class="liste-projets">
       ${projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert === p.id, partage)).join('')}
     </div>
-    <label class="bouton-secondaire bouton-fichier seulement-confirme">
+    <label class="bouton-secondaire bouton-fichier seulement-expert">
       Ouvrir un fichier projet (.topo.json)
       <input type="file" data-champ="fichier-projet" accept=".json,application/json" hidden />
     </label>
@@ -218,10 +218,10 @@ function ligneProjet(p, estOuvert, menu, partage) {
     </button>
     <button type="button" class="bouton-menu-projet" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
     ${menu ? `<div class="menu-projet">
-      ${p.local ? `<button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="exporter" data-id="${p.id}">exporter (.topo.json)</button>
-        <button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="dupliquer" data-id="${p.id}">dupliquer</button>
-        <button type="button" class="bouton-lien" data-action="supprimer-projet" data-id="${p.id}">supprimer de cet appareil</button>` : ''}
-      ${p.drive ? `<button type="button" class="bouton-lien" data-action="supprimer-partout" data-id="${p.id}">supprimer partout${p.local ? '' : ' (Drive)'}</button>` : ''}
+      ${p.local ? `<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="exporter" data-id="${p.id}">exporter (.topo.json)</button>
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="dupliquer" data-id="${p.id}">dupliquer</button>
+        <button type="button" class="bouton-lien seulement-expert" data-action="supprimer-projet" data-id="${p.id}">supprimer de cet appareil</button>` : ''}
+      ${p.drive ? `<button type="button" class="bouton-lien seulement-expert" data-action="supprimer-partout" data-id="${p.id}">supprimer partout${p.local ? '' : ' (Drive)'}</button>` : ''}
     </div>` : ''}
   </div>`;
 }
@@ -252,7 +252,7 @@ export function blocPartage({ etat, appareil }, { modifierNom = false } = {}) {
   const heure = etat.etat === 'a-jour' && etat.derniereSynchro ? ` · ${etat.derniereSynchro.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}` : '';
   const reprise = etat.etat === 'repris' && etat.repris
     ? `<p class="avertissement"><strong>${echapper(etat.repris.nom)}</strong> a la main : lecture seule, rien ne s'enregistre.
-        <button type="button" class="bouton-lien bouton-lien-neutre seulement-confirme" data-action="reprendreLaMain">prendre la main</button></p>`
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="reprendreLaMain">prendre la main</button></p>`
     : '';
   return `<section class="carte-section bloc-partage">
     ${titreSection('partage', 'Partage (Google Drive)', bulle('partage'))}

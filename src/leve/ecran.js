@@ -12,7 +12,7 @@
 // L'état du récepteur arrive 5 fois par seconde (mettreAJourRecepteur) : on ne change alors que
 // quelques textes et l'état du bouton, sans redessiner l'écran (le doigt peut être dessus).
 import { echapper } from '../outils/echapper.js';
-import { estModeBase, lameActive } from '../reglages/reglages.js';
+import { aAcces, estModeBase } from '../reglages/reglages.js';
 import { demanderCode } from '../outils/code.js';
 import { demanderTexte } from '../outils/choix.js';
 import { ouvrirChoixLevees } from './fenetre-levees.js';
@@ -41,8 +41,8 @@ const IMPLANTATIONS = [
   ['surface', 'Surface', true],
   ['talus', 'Talus', true], // tout à droite (demande du 26.10.2026)
 ];
-// Mode Base (réglages ⚙) : pas de talus, et on ne lève que des « Levé libre » (lignes et points).
-const IMPLANTATIONS_CONFIRME = ['talus'];
+// Talus : Expert seulement. Base : on ne lève que des « Levé libre » (points seulement).
+const IMPLANTATIONS_EXPERT = ['talus'];
 const NATURES_BASE = ['autres'];
 const VUES_COUPES = [
   ['les2', 'Les 2'],
@@ -54,8 +54,8 @@ export const LONGUEURS_COUPE = [2, 5, 10, 20];
 // ou un métré (aires, longueurs, points comptés : des mesures de Calculs › Mesures / métrés).
 const NATURES_TERRAIN = [
   ['stock', 'Stock'],
-  ['terrain', 'Terrain naturel'],
-  ['terrassement', 'Terrassement'],
+  ['terrain', 'Terrain'], // terrain naturel et terrassement fusionnés (0.87.0)
+  ['recollement', 'Recollement'], // Intermédiaire et Expert ; se comporte comme Terrain (à approfondir)
   ['metre', 'Métré'],
   ['autres', 'Levé libre'],
   // Surface d'un dessin (Calculs › Dessin) : pas créée ici, mais on la complète au RX2.
@@ -75,7 +75,7 @@ export const ACCROCHES = {
 };
 // Guidage vers le point : par rapport au cap du RX2 (avance / droite) ou nord / sud / est / ouest.
 const GUIDAGES = [
-  ['rx2', 'Cap RX2'],
+  ['rx2', 'Cap GNSS'],
   ['nseo', 'N-S-E-O'],
 ];
 const TITRES_COUPES = {
@@ -159,12 +159,12 @@ export function creerEcranLeve(conteneur, actions) {
       return;
     }
     if (action === 'changerLevee') {
-      // Croix rouge (supprimer le levé et ses points) seulement en mode Confirmé.
+      // Croix rouge (supprimer le levé et ses points) seulement en mode Expert.
       ouvrirChoixLevees({
         levees: donnees.stocks,
         actuel: donnees.stock.id,
         titres: Object.fromEntries(NATURES_TERRAIN),
-        supprimable: !estModeBase(),
+        supprimable: aAcces('expert'),
         choisir: (id) => id !== donnees.stock.id && actions.choisirStock(id),
         supprimer: (id) => actions.supprimerLevee(id),
       });
@@ -337,7 +337,7 @@ export function creerEcranLeve(conteneur, actions) {
     if (orientation) {
       const o = direct?.orientation;
       const degres = (valeur) => (valeur == null ? '—' : `${Math.round(valeur)}°`);
-      orientation.textContent = `cap RX2 ${degres(o?.cap)} · marche ${degres(o?.marche)}`;
+      orientation.textContent = `cap GNSS ${degres(o?.cap)} · marche ${degres(o?.marche)}`;
     }
     if (donnees?.mode === 'autocontrole') rafraichirImplantation();
     else if (donnees?.mode === 'controler' && donnees.controle.implantation === 'point') rafraichirImplantation();
@@ -435,19 +435,6 @@ export function creerEcranLeve(conteneur, actions) {
     }
   }
 
-  /**
-   * Lever | Implanter, tout en haut de l'onglet, au-dessus du plan (le mode « implanter »
-   * s'appelle 'controler' dans le code). Le mode actif est en couleur : ambre pour lever,
-   * sarcelle pour implanter (même couleur que la pastille de l'en-tête).
-   */
-  function choixMode() {
-    return `<div class="modes-terrain bascule-terrain mode-${donnees.mode}" role="group" aria-label="Mode">
-      ${[['lever', 'Lever'], ['controler', 'Implanter'], ['autocontrole', 'Contrôle'], ...(lameActive() ? [['lame', 'Lame']] : [])]
-        .map(([cle, titre]) => `<button type="button" data-action="choisirMode" data-valeur="${cle}" class="${donnees.mode === cle ? 'actif' : ''}">${titre}</button>`)
-        .join('')}
-    </div>`;
-  }
-
   /** Petits boutons au choix (un seul actif). */
   function boutonsChoix(action, choix, actif) {
     return choix
@@ -458,8 +445,9 @@ export function creerEcranLeve(conteneur, actions) {
   /** Mode Contrôler : quoi implanter, surface, écart en grand, coupes et leurs réglages. */
   function controle() {
     const { controle: reglages, surfaces } = donnees;
-    const vue = reglages.vueCoupes;
-    const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => !estModeBase() || !IMPLANTATIONS_CONFIRME.includes(cle)), reglages.implantation)} ${bulle('implanter')}</div>`;
+    // Coupes directes : en Base, dans l'axe seulement (perpendiculaire, longueur et hauteurs dès Intermédiaire).
+    const vue = estModeBase() ? 'axe' : reglages.vueCoupes;
+    const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => aAcces('expert') || !IMPLANTATIONS_EXPERT.includes(cle)), reglages.implantation)} ${bulle('implanter')}</div>`;
     // Rien de choisi : on le rappelle bien en vue (après « ← », on ne savait plus quoi faire).
     const imp = donnees.implanter;
     if (reglages.implantation === 'point') {
@@ -487,10 +475,10 @@ export function creerEcranLeve(conteneur, actions) {
         ${vue !== 'axe' ? '<div data-vivant="coupe-perpendiculaire"></div>' : ''}
         ${vue !== 'perpendiculaire' ? '<div data-vivant="coupe-axe"></div>' : ''}
       </div>
-      <div class="ligne-choix"><span>Coupes</span>${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}</div>
-      <div class="ligne-choix"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
-      <div class="ligne-choix"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
-      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
+      <div class="ligne-choix seulement-intermediaire"><span>Coupes</span>${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}</div>
+      <div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
+      <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
+      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap GNSS'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
       <p class="aide" data-vivant="orientation"></p>`;
   }
 
@@ -560,7 +548,7 @@ export function creerEcranLeve(conteneur, actions) {
   function lienExport() {
     const nombre = donnees.implanter.nbImplantations;
     return nombre > 0
-      ? `<p class="aide">${nombre} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
+      ? `<p class="aide seulement-expert">${nombre} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
       : '';
   }
 
@@ -617,13 +605,13 @@ export function creerEcranLeve(conteneur, actions) {
           <div class="ligne-outils">
             <button type="button" class="bouton bouton-implanter" data-action="implanterChoix">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></svg>Implanter</button>
-            <button type="button" class="bouton-secondaire" data-action="creerPointAImplanter">+ À implanter</button>
+            <button type="button" class="bouton-secondaire seulement-expert" data-action="creerPointAImplanter">+ À implanter</button>
             ${imp.choixDuProjet ? '' : '<button type="button" class="bouton-secondaire" data-action="garderPointChoisi" title="Garder ce point dans le projet (levé « Points ajoutés »)">+ Point du projet</button>'}
           </div>
         </div>`
       : '';
     const liste = imp.aImplanter.length > 0
-      ? `<div class="liste-a-implanter">
+      ? `<div class="liste-a-implanter seulement-expert">
           <p class="titre-choix">À implanter</p>
           ${imp.aImplanter.map((p) => `<div class="ligne-a-implanter ${imp.cible?.id === p.id ? 'actif' : ''}">
               <button type="button" class="bouton-lien bouton-lien-neutre" data-action="implanterPoint" data-valeur="${p.id}"><strong>${echapper(p.nom)}</strong></button>
@@ -670,7 +658,7 @@ export function creerEcranLeve(conteneur, actions) {
         <button type="button" class="bouton-retour" data-action="${ligne ? 'changerLigne' : autocontrole ? 'arreterControle' : 'arreterImplantation'}" title="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}" aria-label="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
         <p class="titre-vue-guidage">${titre}</p>
-        ${ligne ? '<button type="button" class="bouton-retour seulement-confirme" data-action="inverserLigne" title="Inverser le sens" aria-label="Inverser le sens">⇄</button>' : ''}
+        ${ligne ? '<button type="button" class="bouton-retour" data-action="inverserLigne" title="Inverser le sens" aria-label="Inverser le sens">⇄</button>' : ''}
         ${!ligne && !autocontrole && imp.suivant ? `<button type="button" class="bouton-suivant" data-action="implanterSuivant" title="Implanter le point suivant : ${echapper(imp.suivant)}" aria-label="Point suivant : ${echapper(imp.suivant)}">${echapper(imp.suivant)} ▶</button>` : ''}
         <button type="button" class="bouton-retour ${ouverts ? 'actif' : ''}" data-action="basculerReglagesGuidage" title="Réglages de l'implantation" aria-label="Réglages de l'implantation" aria-expanded="${ouverts}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>
@@ -678,7 +666,7 @@ export function creerEcranLeve(conteneur, actions) {
       ${ouverts ? (talus ? reglagesTalus() : reglagesGuidage(ligne)) : ''}
       ${ligne ? detailLigne() : detailPoint()}
       ${guidage}
-      <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
+      <button type="button" class="bouton bouton-prendre ${autocontrole ? '' : 'seulement-intermediaire'}" data-action="enregistrerImplantation" disabled>
         <span>${talus ? 'ENREGISTRER L\'ENTRÉE EN TERRE' : autocontrole ? 'ENREGISTRER LE CONTRÔLE' : 'ENREGISTRER L\'IMPLANTATION'}</span><span class="sous-titre-prendre">ou touche vol −</span>
       </button>
       <p class="raison-leve" data-vivant="raison" hidden></p>
@@ -781,9 +769,9 @@ export function creerEcranLeve(conteneur, actions) {
     const l = imp.ligne;
     return `<div class="reglages-guidage">
       <div class="ligne-choix"><span>Guidage</span>${boutonsChoix('choisirGuidage', GUIDAGES, reglages.guidage)}</div>
-      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
-      ${ligne && l.nbSegments > 1 ? `<div class="ligne-choix seulement-confirme"><span>Ligne</span>${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment par segment']], l.segment == null ? 'tout' : 'segment')}</div>` : ''}
-      ${ligne ? `<label class="champ-decalage seulement-confirme">Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
+      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap GNSS'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
+      ${ligne && l.nbSegments > 1 ? `<div class="ligne-choix"><span>Ligne</span>${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment par segment']], l.segment == null ? 'tout' : 'segment')}</div>` : ''}
+      ${ligne ? `<label class="champ-decalage">Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
       <p class="aide" data-vivant="orientation"></p>
     </div>`;
   }
@@ -808,7 +796,7 @@ export function creerEcranLeve(conteneur, actions) {
           <span>Segment <strong>${l.segment + 1}</strong> / ${l.nbSegments}</span>
           <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="suivant" ${l.segment === l.nbSegments - 1 ? 'disabled' : ''} aria-label="Segment suivant">▶</button>
         </div>`;
-    // Altitude tapée : seulement en mode Confirmé (en Base, on montre celle qui a pu être tapée avant).
+    // Altitude tapée : dès le mode Intermédiaire (en Base, on montre celle qui a pu être tapée avant).
     const lue = (bout, cle) => (l.altitudesDuPlan ? bout.altitude : l.altitudes[cle]);
     const altitude = (bout, cle) => (l.altitudesDuPlan || estModeBase()
       ? `<span class="altitude-bout">H <strong>${lue(bout, cle) != null ? formaterNombre(lue(bout, cle)) : '—'}</strong></span>`
@@ -857,24 +845,34 @@ export function creerEcranLeve(conteneur, actions) {
   function ligneSurface() {
     const nature = donnees.stock.nature ?? 'stock';
     const titre = NATURES_TERRAIN.find(([cle]) => cle === nature)?.[1] ?? '';
-    return `<div class="entete-levee nature-${nature}" title="${titre}">
-      <span class="titre-cadre">Lever</span>
-      <div class="nom-levee">
-        <strong>${echapper(donnees.stock.nom)}</strong>
-        <button type="button" class="bouton-crayon-levee" data-action="renommerLevee" title="Renommer" aria-label="Renommer le levé">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
-      </div>
-    </div>
-    <div class="boutons-levee">
-      <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer de levé</button>
-      <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau levé</button>
+    return `<div class="entete-levee levee-en-cours nature-${nature}" title="${titre}">
+      <span class="etiquette-levee">Lever en cours :</span>
+      <strong class="nom-levee-en-cours">${echapper(donnees.stock.nom)}</strong>
+      <button type="button" class="bouton-crayon-levee" data-action="renommerLevee" title="Renommer" aria-label="Renommer le levé">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
+      <span class="boutons-levee">
+        <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer</button>
+        <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau</button>
+      </span>
     </div>`;
+  }
+
+  /** Rôles proposés pour le levé en cours (dans l'ordre des boutons). */
+  function rolesAffiches() {
+    return [...ROLES_LEVE, ...ROLES_METRE].filter(([cle]) => donnees.rolesPermis.includes(cle));
+  }
+
+  /** Place du rôle choisi dans la rangée : le cadre n'a pas de coin arrondi sous l'onglet (premier, dernier). */
+  function classeOnglet() {
+    const roles = rolesAffiches();
+    const i = roles.findIndex(([cle]) => cle === donnees.role);
+    return `${i === 0 ? 'onglet-premier' : ''} ${i === roles.length - 1 ? 'onglet-dernier' : ''}`;
   }
 
   /** Choix du rôle : 3 gros boutons à la couleur du rôle. */
   function boutonsRoles() {
     return `<div class="roles-leve" role="group" aria-label="Rôle du prochain point">
-      ${[...ROLES_LEVE, ...ROLES_METRE].filter(([cle]) => donnees.rolesPermis.includes(cle)).map(
+      ${rolesAffiches().map(
         ([cle, titre]) => `<button type="button" class="role-leve role-${cle} ${donnees.role === cle ? 'choisi' : ''}" data-action="role" data-role="${cle}" aria-pressed="${donnees.role === cle}">
           <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[cle]}</svg>${titre}</button>`,
       ).join('')}
@@ -911,6 +909,7 @@ export function creerEcranLeve(conteneur, actions) {
         <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
           ${ligne.fermee ? '✓ Ligne fermée' : 'Fermer ligne'}</button>
       </div>
+      ${choixLibelle()}
     </div>`;
   }
 
@@ -924,10 +923,10 @@ export function creerEcranLeve(conteneur, actions) {
     const sorte = sorteDuRole();
     const liste = donnees.libelles[sorte];
     const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
-    return `<div class="libelles-terrain pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
+    return `<div class="libelles-terrain seulement-intermediaire pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
       ${liste.map(([abreviation, signification, couleur]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
           <strong>${couleur ? `<i class="pastille-libelle" style="background: ${couleur}"></i>` : ''}${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
-      <button type="button" class="bouton-crayon-libelles seulement-confirme" data-action="ouvrirLibelles" title="Modifier les libellés" aria-label="Modifier les libellés">
+      <button type="button" class="bouton-crayon-libelles seulement-intermediaire" data-action="ouvrirLibelles" title="Modifier les libellés" aria-label="Modifier les libellés">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
     </div>
 `;
@@ -953,41 +952,41 @@ export function creerEcranLeve(conteneur, actions) {
     return `
       ${ligneSurface()}
       ${boutonsRoles()}
-      ${choixLibelle()}
+      <div class="cadre-role role-${donnees.role} ${classeOnglet()}">
+      ${donnees.role === 'ligne' ? '' : choixLibelle()}
       ${outilsLigne()}
       <div class="cadre-prise">
         <span class="titre-cadre-prise">Point</span>
-        <div class="nom-et-position">
+        <div class="ligne-id-prendre">
           <label class="champ-id-point"><span>ID point</span>
             <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" /></label>
-          <div class="position-leve" data-vivant="position"></div>
-        </div>
-        <div class="ligne-prendre">
           <label class="bouton-photo-levee" title="Photo du levé" aria-label="Photo du levé">
             <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>
             <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
           </label>
-          <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>
-            <span>PRENDRE LE POINT</span><span class="sous-titre-prendre">ou touche vol −</span>
+          <button type="button" class="bouton bouton-prendre" data-action="prendre" title="Enregistrer le point (ou touche volume −)" disabled>
+            <span>Enreg. Pts</span><span class="sous-titre-prendre">ou touche vol −</span>
           </button>
         </div>
+        <div class="position-leve" data-vivant="position"></div>
         <p class="raison-leve" data-vivant="raison" hidden></p>
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
           Annuler ${donnees.dernierPoint ? echapper(donnees.dernierPoint) : 'le dernier point'}</button>
+      </div>
       </div>
       <div class="pied-terrain">${resume()}</div>
       ${basDuLeve()}`;
   }
 
   /**
-   * Bas de l'écran Lever (0.77.0) : triangles en trop (mode Confirmé, levés qui ont une surface :
+   * Bas de l'écran Lever (0.77.0) : triangles en trop (dès Intermédiaire, levés qui ont une surface :
    * supprimer au doigt sur le plan, tout rétablir) et photos du levé (légende, supprimer).
    */
   function basDuLeve() {
     const photos = donnees.photos ?? [];
     const t = donnees.triangles;
     const triangles = t
-      ? `<div class="triangles-leve seulement-confirme ${t.actif ? 'actif' : ''}">
+      ? `<div class="triangles-leve seulement-intermediaire ${t.actif ? 'actif' : ''}">
           <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 21 20H3z" /><path d="m9 11 6 6M15 11l-6 6" /></svg>Triangles en trop · ${t.supprimes} supprimé(s) ${bulle('trianglesEnTrop')}</span>
           <div class="ligne-outils">
             <button type="button" class="${t.actif ? 'bouton' : 'bouton-secondaire'}" data-action="basculerTrianglesLevee">${t.actif ? 'Terminer' : 'Supprimer au doigt'}</button>
@@ -1014,7 +1013,9 @@ export function creerEcranLeve(conteneur, actions) {
    * leurs points ; ✕ supprime un point, ✂ supprime le segment entre deux points d'une ligne.
    */
   function listeElements() {
-    const e = donnees.elements;
+    // Base : seulement la liste « Points de ce levé » (contour, lignes et ✕ dès Intermédiaire).
+    const base = estModeBase();
+    const e = base && donnees.elements ? { ...donnees.elements, contour: null, lignes: [] } : donnees.elements;
     if (!e || (!e.contour && e.lignes.length === 0 && e.isoles.length === 0)) return '';
     const ouvert = (cle) => (elementsOuverts.has(cle) ? 'open' : '');
     const point = (nom, supprimable = true) => `<li class="point-element"><span>${echapper(nom)}</span>${supprimable
@@ -1033,7 +1034,7 @@ export function creerEcranLeve(conteneur, actions) {
         </details>`;
     };
     return `<div class="elements-leve">
-      <p class="titre-choix">Lignes du levé ${bulle('lignesLevee')}</p>
+      <p class="titre-choix">${base ? 'Points de ce levé' : 'Lignes du levé'} ${bulle('lignesLevee')}</p>
       ${e.contour ? `<details class="element-leve role-contour" data-element="contour" ${ouvert('contour')}>
           <summary><strong>${echapper(e.contour.nom)}</strong><span>contour · ${e.contour.noms.length} pt(s)</span></summary>
           <ul>${e.contour.noms.map((nom) => point(nom, e.contour.modifiable)).join('')}</ul>
@@ -1041,7 +1042,7 @@ export function creerEcranLeve(conteneur, actions) {
       ${e.lignes.map(ligne).join('')}
       ${e.isoles.length > 0 ? `<details class="element-leve role-isole" data-element="isoles" ${ouvert('isoles')}>
           <summary><strong>Points isolés</strong><span>${e.isoles.length} pt(s)</span></summary>
-          <ul>${e.isoles.map((nom) => point(nom)).join('')}</ul>
+          <ul>${e.isoles.map((nom) => point(nom, !base)).join('')}</ul>
         </details>` : ''}
     </div>`;
   }
@@ -1129,7 +1130,6 @@ export function creerEcranLeve(conteneur, actions) {
     else contenu = donnees.mode === 'controler' ? controle() : priseDePoint();
     conteneur.innerHTML = `
         <div class="ecran-terrain cadre-mode-${donnees.mode}">
-          ${choixMode()}
           ${contenu}
         </div>`;
     rafraichirVivant();
@@ -1223,17 +1223,28 @@ export function mettreAJourBandeaux(etat, tablette = null) {
     bandeaux.id = 'bandeaux-recepteur';
     bandeaux.className = 'bandeaux-recepteur';
     bandeaux.setAttribute('role', 'status');
-    bandeaux.innerHTML = '<span data-bandeau="rtk"></span><span data-bandeau="inclinaison"></span>';
+    bandeaux.title = 'Récepteur : toucher pour connecter ou régler';
+    // Petite icône de récepteur (+ flèche) : on comprend qu'on peut toucher la barre (0.86.0).
+    bandeaux.innerHTML = `<span data-bandeau="rtk"></span><span data-bandeau="inclinaison"></span>
+      <svg class="icone-bandeau" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><ellipse cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" /></svg>`;
+    bandeaux.addEventListener('click', () => document.dispatchEvent(new CustomEvent('ouvrir-recepteur')));
     document.querySelector('.entete').append(bandeaux);
   }
-  const visible = Boolean(etat?.connecte) || Boolean(tablette);
-  document.body.classList.toggle('avec-recepteur', visible);
-  if (!visible) return;
+  // Toujours visible (appli Android) : c'est l'accès au récepteur.
+  document.body.classList.add('avec-recepteur');
+  if (!etat?.connecte && !tablette) {
+    const [rtk, inclinaison] = bandeaux.querySelectorAll('[data-bandeau]');
+    rtk.textContent = 'Récepteur non connecté';
+    rtk.className = 'attente';
+    inclinaison.textContent = 'Toucher pour connecter';
+    inclinaison.className = 'attente';
+    return;
+  }
   if (!etat?.connecte) {
     const [rtk, inclinaison] = bandeaux.querySelectorAll('[data-bandeau]');
     rtk.textContent = `GPS TABLETTE · ± ${Math.max(1, Math.round(tablette.precision ?? 0))} m`;
     rtk.className = 'tablette';
-    inclinaison.textContent = 'RX2 non connecté';
+    inclinaison.textContent = 'GNSS non connecté';
     inclinaison.className = 'attente';
     return;
   }

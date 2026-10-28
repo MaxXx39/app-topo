@@ -1,9 +1,10 @@
 // Fenêtre « Exporter » (0.79.0, demande du 27.10.2026 : l'ancienne barre « Envoyer » n'était pas
 // pratique) : une seule fenêtre pour tous les exports. On choisit le format s'il y en a plusieurs
 // (liste de points : TXT, CSV, DXF), puis :
-// - « Enregistrer » : téléchargé (site) ou enregistré sur la tablette (APK) ;
+// - « Enregistrer » : téléchargé (site) ou enregistré sur la tablette (APK) (tous les modes) ;
 // - « Envoyer par mail » : à une adresse de la liste partagée (réglages ⚙) ;
 // - « Envoyer autrement » : le partage de l'appareil (WhatsApp, Drive…).
+// Mail et « autrement » : Intermédiaire et Expert seulement (tableau des modes).
 import { echapper } from '../outils/echapper.js';
 import { envoyerParMail, partagerFichier } from './partager.js';
 import { lireListesPartagees } from '../reglages/listes-partagees.js';
@@ -32,13 +33,13 @@ export function ouvrirFenetreExport({ titre, formats = null, fabriquer, enregist
       </div>` : ''}
     <div class="boutons-choix">
       <button type="button" class="bouton" data-cle="enregistrer"><strong>Enregistrer</strong><span>sur cet appareil</span></button>
-      <div class="envoi-mail">
+      <div class="envoi-mail seulement-intermediaire">
         ${adresses.length > 0
           ? `<select data-champ="adresse" aria-label="Adresse mail">${adresses.map((a) => `<option ${a === derniereAdresse ? 'selected' : ''}>${echapper(a)}</option>`).join('')}</select>`
           : '<p class="aide">Aucune adresse : réglages ⚙ › Listes partagées.</p>'}
         <button type="button" class="bouton-secondaire" data-cle="mail" ${adresses.length > 0 ? '' : 'disabled'}><strong>Envoyer par mail</strong></button>
       </div>
-      <button type="button" class="bouton-secondaire" data-cle="partager"><strong>Envoyer autrement</strong><span>WhatsApp, Drive…</span></button>
+      <button type="button" class="bouton-secondaire seulement-intermediaire" data-cle="partager"><strong>Envoyer autrement</strong><span>WhatsApp, Drive…</span></button>
     </div>`;
   fenetre.addEventListener('change', (evenement) => {
     if (evenement.target.name !== 'format-export') return;

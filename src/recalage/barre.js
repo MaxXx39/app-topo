@@ -68,7 +68,7 @@ export function creerBarreRecalage(cadre, actions) {
 
 /** Point touché sur le DXF, puis ses coordonnées MN95 : point du projet, tapées, ou RX2. */
 function choixMn95(etat) {
-  const sources = [['projet', 'Point du projet'], ['tape', 'E / N tapés'], ...(etat.rx2 ? [['rx2', 'RX2']] : [])];
+  const sources = [['projet', 'Point du projet'], ['tape', 'E / N tapés'], ...(etat.rx2 ? [['rx2', 'GNSS']] : [])];
   let saisie;
   if (etat.source === 'projet' && etat.toucherProjet) {
     saisie = `<p class="aide-pointage">Touche un point du projet sur le plan</p>
@@ -86,7 +86,7 @@ function choixMn95(etat) {
       <label>Nord<input type="text" inputmode="decimal" data-calage="nord" autocomplete="off" /></label>
       <button type="button" class="bouton" data-action="ajouter">Ajouter</button>`;
   } else {
-    saisie = '<button type="button" class="bouton" data-action="prendreAuRx2">Prendre au RX2</button>';
+    saisie = '<button type="button" class="bouton" data-action="prendreAuRx2">Prendre au GNSS</button>';
   }
   return `<div class="choix-pointage">
     <span class="coordonnees-pointage">DXF : x ${formaterNombre(etat.choix.x)} · y ${formaterNombre(etat.choix.y)} → MN95 :</span>

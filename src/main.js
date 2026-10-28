@@ -83,7 +83,7 @@ import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecept
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
-import { appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
+import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
@@ -170,6 +170,17 @@ function lireReglagesTerrain() {
   }
 }
 
+/** Mode de Terrain (Lever, Implanter = 'controler', Contrôle = 'autocontrole', Guidage = 'lame'), choisi dans la barre du bas. */
+function choisirModeTerrain(mode) {
+  editeurSurfaces.arreterModification();
+  const permis = lameActive() ? ['controler', 'autocontrole', 'lame'] : ['controler', 'autocontrole'];
+  terrain.mode = permis.includes(mode) ? mode : 'lever';
+  retenirReglagesTerrain();
+  if (terrain.mode === 'controler') montrerSurfaceControle();
+  majBoutonsTerrain();
+  recalculer();
+}
+
 function retenirReglagesTerrain() {
   try {
     localStorage.setItem(CLE_TERRAIN, JSON.stringify(terrain));
@@ -192,9 +203,17 @@ const ICONES = {
 // Main ouverte (on a la main sur le projet), dessinée en traits comme les autres icônes.
 const ICONE_MAIN = '<path d="M18 11V6a2 2 0 0 0-4 0v5" /><path d="M14 10V4a2 2 0 0 0-4 0v6" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />';
 
+// Barre du bas (0.86.0) : les 4 modes de Terrain (Lever, Implanter, Contrôle, Guidage ; appli Android
+// seulement), puis Calculs et Plan. L'onglet Projet est l'icône en haut à gauche ; le récepteur
+// s'ouvre en touchant la barre d'état du récepteur, sous l'en-tête.
+const MODES_TERRAIN = [
+  { cle: 'lever', titre: 'Lever', icone: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle cx="12" cy="12" r="2.5" />' },
+  { cle: 'controler', titre: 'Implanter', icone: '<circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" />' },
+  { cle: 'autocontrole', titre: 'Contrôle', icone: '<path d="m5 12 5 5 9-10" />' },
+  { cle: 'lame', titre: 'Guidage', icone: '<path d="M12 4v16M6 10l6-6 6 6M6 14l6 6 6-6" />', niveau: 'expert' },
+];
 const ONGLETS = [
-  { nom: 'projets', titre: 'Projet' },
-  ...(recepteurDisponible() ? [{ nom: 'terrain', titre: 'Terrain' }] : []),
+  ...(recepteurDisponible() ? MODES_TERRAIN.map((m) => ({ ...m, nom: 'terrain', mode: m.cle })) : []),
   { nom: 'calculs', titre: 'Calculs' },
   { nom: 'plan', titre: 'Plan' },
 ];
@@ -211,7 +230,12 @@ const estPartieCalculs = (nom) => PARTIES_CALCULS.some(([cle]) => cle === nom);
 let partieCalculs = 'volumes'; // dernière partie affichée dans Calculs
 
 /** Bouton d'un onglet (icône + titre). */
-const boutonOnglet = (o) => `<button type="button" data-onglet="${o.nom}" class="onglet-${o.nom}">
+const boutonOnglet = (o) => o.mode
+  ? `<button type="button" data-mode-terrain="${o.mode}" class="onglet-terrain onglet-mode-${o.mode} ${o.niveau ? `seulement-${o.niveau}` : ''}">
+    <svg viewBox="0 0 24 24" aria-hidden="true">${o.icone}</svg>
+    <span>${o.titre}</span>
+  </button>`
+  : `<button type="button" data-onglet="${o.nom}" class="onglet-${o.nom}">
     <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[o.nom]}</svg>
     <span>${o.titre}</span>
   </button>`;
@@ -230,7 +254,7 @@ document.querySelector('#app').innerHTML = `
       <nav class="parties-calculs" aria-label="Calculs">
         <div class="groupe-surfaces-volumes">${boutonPartie(PARTIES_CALCULS[0])}</div>
         <div class="groupe-mesures">${boutonPartie(PARTIES_CALCULS[1])}</div>
-        <div class="groupe-dessin">${boutonPartie(PARTIES_CALCULS[2])}</div>
+        <div class="groupe-dessin seulement-expert">${boutonPartie(PARTIES_CALCULS[2])}</div>
       </nav>
       <section class="panneau" data-onglet="surfaces">
         <h2>Surfaces ${bulle('surfaces')}</h2>
@@ -240,7 +264,7 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="volumes">
         <h2>Volumes ${bulle('volumes')}</h2>
         <div id="volumes"></div>
-        <div id="coupes" class="carte-section"></div>
+        <div id="coupes" class="carte-section seulement-expert"></div>
         <div id="export" class="carte-section"></div>
       </section>
       <section class="panneau" data-onglet="mesures">
@@ -289,6 +313,8 @@ function afficherOnglet(demande) {
     bouton.classList.toggle('actif', bouton.dataset.partie === nom);
   }
   document.body.dataset.onglet = nom;
+  document.querySelector('#bouton-projet').classList.toggle('actif', nom === 'projets');
+  majBoutonsTerrain();
   if (nom !== 'plan' && nom !== 'dessin') pilote = null;
   if (nom !== 'plan' && nom !== ongletContexte) {
     // Triangles en trop (Terrain › Lever) : on arrête en quittant l'onglet.
@@ -307,9 +333,24 @@ function afficherOnglet(demande) {
   window.scrollTo(0, 0);
 }
 document.querySelector('.onglets').addEventListener('click', (evenement) => {
+  const mode = evenement.target.closest('button[data-mode-terrain]');
+  if (mode) {
+    choisirModeTerrain(mode.dataset.modeTerrain);
+    afficherOnglet('terrain');
+    return;
+  }
   const bouton = evenement.target.closest('button[data-onglet]');
   if (bouton) afficherOnglet(bouton.dataset.onglet);
 });
+/** Boutons Lever / Implanter / Contrôle / Guidage de la barre du bas : celui du mode en cours est actif. */
+function majBoutonsTerrain() {
+  const dansTerrain = document.body.dataset.onglet === 'terrain';
+  if (dansTerrain) document.body.dataset.modeTerrain = terrain.mode;
+  else delete document.body.dataset.modeTerrain;
+  for (const bouton of document.querySelectorAll('.onglets button[data-mode-terrain]')) {
+    bouton.classList.toggle('actif', dansTerrain && bouton.dataset.modeTerrain === terrain.mode);
+  }
+}
 document.querySelector('.parties-calculs').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-partie]');
   if (bouton) afficherOnglet(bouton.dataset.partie);
@@ -317,10 +358,11 @@ document.querySelector('.parties-calculs').addEventListener('click', (evenement)
 installerAide(document.querySelector('#bouton-aide'));
 // Toucher le projet ouvert (en-tête) : on va à l'onglet Projet.
 document.querySelector('#entete-projet').addEventListener('click', () => afficherOnglet('projets'));
+document.querySelector('#bouton-projet').addEventListener('click', () => afficherOnglet('projets'));
 
-// Réglages de cet appareil (roue ⚙) : mode Base / Confirmé, mode téléphone, bulles d'aide, nom de l'appareil.
+// Réglages de cet appareil (roue ⚙) : mode Base / Intermédiaire / Expert, mode téléphone, bulles d'aide, nom de l'appareil.
 appliquerReglages();
-// L'étoile de l'en-tête (mode Base ☆ / Confirmé ★) ouvre aussi les réglages.
+// Les barres de l'en-tête (1 verte = Base, 2 jaunes = Intermédiaire, 3 rouges = Expert) ouvrent aussi les réglages.
 document.querySelector('#bouton-mode').addEventListener('click', () => document.querySelector('#bouton-reglages').click());
 // Fenêtre des réglages ouverte (pour y redessiner l'état du partage Drive), ou null.
 let fenetreReglages = null;
@@ -355,18 +397,19 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
 });
 
 /**
- * Mode Base : on quitte ce qui y est caché (onglet Calculs, implantation d'un talus). Rien n'est
- * supprimé : en repassant en Confirmé, tout est là.
+ * On quitte ce que le nouveau mode cache (onglet Calculs en Base, Dessin, guidage de lame et talus
+ * avant Expert). Rien n'est supprimé : en repassant dans un mode plus complet, tout est là.
  */
 function adapterAuMode() {
-  // Guidage de lame : mode Confirmé et case « Onglet Lame » des réglages.
+  // Guidage de lame : mode Expert seulement.
   if (terrain.mode === 'lame' && !lameActive()) {
     terrain.mode = 'lever';
     retenirReglagesTerrain();
+    majBoutonsTerrain();
   }
-  if (!estModeBase()) return;
-  if (estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
-  if (terrain.implantation === 'talus') {
+  if (estModeBase() && estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
+  else if (!aAcces('expert') && document.body.dataset.onglet === 'dessin') afficherOnglet('volumes');
+  if (!aAcces('expert') && terrain.implantation === 'talus') {
     terrain.implantation = 'ligne';
     retenirReglagesTerrain();
   }
@@ -545,7 +588,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     editeurSurfaces.charger(projet.surfaces);
     modifie({ recadrer: true });
   },
-  // Bouton « exporter » d'une liste (Confirmé, 0.79.0) : TXT, CSV (toutes les infos) ou DXF, puis
+  // Bouton « exporter » d'une liste (Intermédiaire, 0.79.0) : TXT, CSV (toutes les infos) ou DXF, puis
   // Enregistrer, Envoyer par mail ou autrement (fenêtre « Exporter »).
   exporterListe: (type, id) => {
     let points;
@@ -675,10 +718,10 @@ function ajouterSurfaceLevee(nature) {
   modifie({ recadrer: true });
 }
 
-// Bouton « Récepteur » de la barre du bas (appli Android) : couleur selon l'état, fenêtre pour
+// Récepteur (appli Android) : la barre d'état sous l'en-tête l'ouvre ; fenêtre pour
 // connecter / couper le récepteur et régler les corrections NTRIP (voir leve/recepteur.js).
 const boutonRecepteur = recepteurDisponible()
-  ? creerBoutonRecepteur(document.querySelector('.onglets'), {
+  ? creerBoutonRecepteur(document.createElement('div'), {
       choisirRecepteur,
       reconnecter: reconnecterRecepteur,
       deconnecter: deconnecterRecepteur,
@@ -692,9 +735,9 @@ const boutonRecepteur = recepteurDisponible()
         arreterCorrections();
         afficherMessage('Corrections arrêtées : Emlid Flow peut reprendre');
       },
-      // Journal NMEA (Confirmé, 0.82.0) : tout ce que le RX2 envoie pendant 1 minute, dans un fichier.
+      // Journal NMEA (Expert, 0.82.0) : tout ce que le RX2 envoie pendant 1 minute, dans un fichier.
       journalNmea: journalNmeaDisponible() ? enregistrerJournalNmea : null,
-      // Essai à 2 récepteurs (mode Confirmé) : seulement avec un APK qui le sait.
+      // Essai à 2 récepteurs (mode Expert) : seulement avec un APK qui le sait.
       choisirRecepteur2: recepteur2Disponible() ? choisirRecepteur2 : null,
       deconnecter2: deconnecterRecepteur2,
       choisirModeCorrections2,
@@ -759,7 +802,7 @@ const ecranLeve = recepteurDisponible()
         nommerListeDeLevee(projet, levee);
         modifie();
       },
-      // Croix rouge de « Changer » (Confirmé) : le levé et ses points, après confirmation.
+      // Croix rouge de « Changer » (Expert) : le levé et ses points, après confirmation.
       supprimerLevee: (id) => {
         const levee = [...projet.surfaces, ...projet.metres, ...projet.autres].find((s) => s.id === id);
         if (!levee) return false;
@@ -824,7 +867,7 @@ const ecranLeve = recepteurDisponible()
         levee.photos = levee.photos.filter((p) => p.id !== id);
         modifie();
       },
-      // Triangles en trop (Confirmé, 0.77.0) : on les touche sur le plan pour les enlever ou les remettre.
+      // Triangles en trop (Intermédiaire, 0.77.0) : on les touche sur le plan pour les enlever ou les remettre.
       basculerTrianglesLevee: () => {
         const stock = stockEnCours();
         if (!stock) return;
@@ -901,14 +944,7 @@ const ecranLeve = recepteurDisponible()
         afficherMessage('Libellés enregistrés');
         recalculer();
       },
-      choisirMode: (mode) => {
-        editeurSurfaces.arreterModification();
-        const permis = lameActive() ? ['controler', 'autocontrole', 'lame'] : ['controler', 'autocontrole'];
-        terrain.mode = permis.includes(mode) ? mode : 'lever';
-        retenirReglagesTerrain();
-        if (terrain.mode === 'controler') montrerSurfaceControle();
-        recalculer();
-      },
+      choisirMode: choisirModeTerrain,
       // --- Guidage de lame (mode Lame) ---
       choisirSurfaceLame: (id) => {
         terrain.lame.surfaceId = id || null;
@@ -949,7 +985,7 @@ const ecranLeve = recepteurDisponible()
         recalculer();
       },
       choisirImplantation: (quoi) => {
-        const permises = estModeBase() ? ['point', 'ligne'] : ['point', 'ligne', 'talus'];
+        const permises = aAcces('expert') ? ['point', 'ligne', 'talus'] : ['point', 'ligne'];
         terrain.implantation = permises.includes(quoi) ? quoi : 'surface';
         retenirReglagesTerrain();
         recalculer();
@@ -1162,6 +1198,10 @@ const ecranLeve = recepteurDisponible()
         if (refuserEnLectureSeule()) return;
         if (enAutocontrole()) {
           enregistrerControle();
+          return;
+        }
+        if (estModeBase()) {
+          afficherMessage('Enregistrer l\'implantation : seulement en mode Intermédiaire ou Expert', 4000);
           return;
         }
         if (enTalus()) {
@@ -1715,7 +1755,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     const distance = lireNombreTape(pilote?.distance);
     if (!dessin || dessin.sommets.length === 0) return;
     if (pilote.direction == null) {
-      afficherMessage(dessin.sommets.length === 1 ? 'Donne d\'abord la direction : touche le plan, ou vers le RX2' : 'Donne d\'abord la direction : tourne à gauche ou à droite, ou touche le plan', 4000);
+      afficherMessage(dessin.sommets.length === 1 ? 'Donne d\'abord la direction : touche le plan, ou vers le GNSS' : 'Donne d\'abord la direction : tourne à gauche ou à droite, ou touche le plan', 4000);
       return;
     }
     if (!(distance > 0)) {
@@ -1743,7 +1783,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
       return;
     }
     sonValidation();
-    ajouterSommetDessin(reponse.point, 'RX2');
+    ajouterSommetDessin(reponse.point, 'GNSS');
   },
   directionRx2: () => {
     const dessin = dessinDe(pilote?.dessinId);
@@ -1754,12 +1794,12 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     }
     const gon = dessin?.sommets.length ? gisement(dessin.sommets.at(-1), reponse.point) : null;
     if (gon == null) {
-      afficherMessage('Le RX2 est sur le dernier sommet : éloigne-toi dans la direction voulue', 4000);
+      afficherMessage('Le GNSS est sur le dernier sommet : éloigne-toi dans la direction voulue', 4000);
       return;
     }
     sonValidation();
     pilote.direction = gon;
-    pilote.reference = 'vers le RX2';
+    pilote.reference = 'vers le GNSS';
     pilote.tourne = 0;
     recalculer();
   },
@@ -1767,7 +1807,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     const dessin = dessinDe(pilote?.dessinId);
     if (!dessin || dessin.sommets.length !== 1) return;
     if (pilote.direction == null) {
-      afficherMessage('Rectangle : donne d\'abord la direction de la longueur (touche le plan, ou vers le RX2)', 4000);
+      afficherMessage('Rectangle : donne d\'abord la direction de la longueur (touche le plan, ou vers le GNSS)', 4000);
       return;
     }
     const a = dessin.sommets[0];
@@ -2443,7 +2483,7 @@ function commencerRecalage(id) {
         afficherMessage(`Point refusé : ${reponse.raison}`, 4000);
         return;
       }
-      ajouterPaireCalage({ est: reponse.point.est, nord: reponse.point.nord, nom: `RX2 ${new Date().toLocaleTimeString('fr-CH')}` });
+      ajouterPaireCalage({ est: reponse.point.est, nord: reponse.point.nord, nom: `GNSS ${new Date().toLocaleTimeString('fr-CH')}` });
     },
     basculerPaire: (index, actif) => {
       recalage.paires[index].actif = actif;
@@ -2757,9 +2797,14 @@ function mettreAJourToucheVolume() {
   });
 }
 
-/** Vrai quand toucher un point du plan l'ajoute à la ligne ou au contour en cours (Terrain › Lever, Confirmé). */
+/** Rôles permis pour lever : en Base, des points isolés seulement (contour et lignes dès Intermédiaire). */
+function rolesDuMode(stock) {
+  return estModeBase() ? ['isole'] : rolesPermis(stock);
+}
+
+/** Vrai quand toucher un point du plan l'ajoute à la ligne ou au contour en cours (Terrain › Lever, Intermédiaire et Expert). */
 function toucherPourLever() {
-  return Boolean(ecranLeve) && ongletContexte === 'terrain' && terrain.mode === 'lever' && !estModeBase()
+  return Boolean(ecranLeve) && ongletContexte === 'terrain' && terrain.mode === 'lever' && aAcces('intermediaire')
     && Boolean(stockEnCours()) && ['ligne', 'contour'].includes(leveDirect.role) && !editeurSurfaces.enSuppression();
 }
 
@@ -2872,7 +2917,7 @@ async function controlerPlacePoint(stock, role, position, versNom = null) {
 }
 
 /**
- * Toucher un point déjà levé sur le plan (mode Confirmé, rôle Ligne ou Contour, 0.78.0) : il entre
+ * Toucher un point déjà levé sur le plan (modes Intermédiaire et Expert, rôle Ligne ou Contour, 0.78.0) : il entre
  * dans la ligne ou le contour en cours avec son nom (s'il n'est encore dans aucune ligne), après
  * les mêmes contrôles qu'un point pris au RX2.
  */
@@ -2925,7 +2970,7 @@ function donneesLeve() {
   const metre = metreEnCours();
   if (metre) return donneesMetre(metre);
   // Terrain naturel ou terrassement : pas de contour, on passe aux points isolés.
-  if (!rolesPermis(stockEnCours()).includes(leveDirect.role)) leveDirect.role = 'isole';
+  if (!rolesDuMode(stockEnCours()).includes(leveDirect.role)) leveDirect.role = 'isole';
   const leve = leveEnCours();
   const stock = stockEnCours();
   // D'abord le nom proposé : pour une ligne, il prépare la ligne en cours (libellé, numéro).
@@ -2939,13 +2984,13 @@ function donneesLeve() {
     role: leveDirect.role,
     ligne: ligne ? { libelle: ligne.libelle, numero: ligne.numero ?? numeroLigne, nbPoints: ligne.noms.length, fermee: ligne.fermee } : null,
     nomPropose,
-    rolesPermis: rolesPermis(stock),
+    rolesPermis: rolesDuMode(stock),
     dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
     resume: stock ? resumeStock(stock) : null,
     volume: stock ? volumeDuStock(stock) : null,
     elements: stock ? elementsDuLevee(stock) : null,
     photos: stock?.photos ?? [],
-    // Triangles en trop (Confirmé) : seulement pour un levé qui a une surface (pas un levé libre).
+    // Triangles en trop (Intermédiaire) : seulement pour un levé qui a une surface (pas un levé libre).
     triangles: stock && projet.surfaces.includes(stock)
       ? { actif: editeurSurfaces.enSuppression() && editeurSurfaces.objetActif() === stock, supprimes: stock.trianglesSupprimes?.length ?? 0 }
       : null,
@@ -3168,6 +3213,11 @@ if (ecranLeve) {
   });
 }
 
+// Barre du récepteur sous l'en-tête (toujours là dans l'appli Android) : la toucher ouvre la fenêtre du récepteur.
+if (recepteurDisponible()) {
+  mettreAJourBandeaux(null, null);
+  document.addEventListener('ouvrir-recepteur', () => boutonRecepteur?.ouvrir());
+}
 // État du récepteur, 5 fois par seconde : bandeaux, bloc de levé, position sur le plan.
 if (recepteurDisponible()) {
   ecouterRecepteur((etat) => {
@@ -3345,19 +3395,19 @@ partage = creerPartage({
     return lu ? completerProjet(lu) : null;
   },
   ouvrirProjet: (nouveau) => ouvrir(completerProjet(nouveau), { changerOnglet: false }),
-  // Projet qu'un autre appareil a en main (0.76.0) : lecture seule, ou prendre la main (Confirmé).
+  // Projet qu'un autre appareil a en main (0.76.0) : lecture seule, ou prendre la main (Expert).
   demanderPriseDeMain: (verrou, titre, { avecAnnuler = false } = {}) => demanderChoix({
     titre: `${verrou.nom} a la main sur « ${titre} »`,
     texte: verrou.depuis ? `depuis ${new Date(verrou.depuis).toLocaleString('fr-CH', { dateStyle: 'short', timeStyle: 'short' })}` : '',
     boutons: [
       { cle: 'lecture', texte: 'Voir en lecture seule', detail: 'voir et implanter, sans rien enregistrer', principal: true },
-      ...(estModeBase() ? [] : [{ cle: 'prendre', texte: 'Prendre la main', detail: `code de sécurité ; ${verrou.nom} sera mis en attente` }]),
+      ...(aAcces('expert') ? [{ cle: 'prendre', texte: 'Prendre la main', detail: `code de sécurité ; ${verrou.nom} sera mis en attente` }] : []),
       ...(avecAnnuler ? [{ cle: 'annuler', texte: 'Ne pas ouvrir' }] : []),
     ],
   }).then((cle) => (cle === 'annuler' ? null : cle)),
   autoriserPrise: async (verrou) => {
-    if (estModeBase()) {
-      afficherMessage('Prendre la main : seulement en mode Confirmé', 4000);
+    if (!aAcces('expert')) {
+      afficherMessage('Prendre la main : seulement en mode Expert', 4000);
       return false;
     }
     return demanderCode(`Prendre la main à ${verrou.nom}`);
@@ -3632,7 +3682,8 @@ creerEcranExport(document.querySelector('#export'), {
     return [
       { titre: 'Volumes', elements: projet.calculs.map((c) => ({ id: c.id, nom: nomDuCalcul(c, projet.surfaces), defaut: estAffichee(c.surface1Id) })) },
       { titre: 'Stocks', elements: surfacesDe(['stock']) },
-      { titre: 'Terrain naturel', elements: surfacesDe(['terrain']) },
+      { titre: 'Terrain', elements: surfacesDe(['terrain']) },
+      { titre: 'Recollement', elements: surfacesDe(['recollement']) },
       { titre: 'Terrassement', elements: surfacesDe(['terrassement']) },
       { titre: 'Surfaces (dessins)', elements: surfacesDe(['surface']) },
       { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
@@ -3819,7 +3870,7 @@ function recalculer({ recadrer = false } = {}) {
       traceCoupe: null,
     });
   } else {
-    // Terrain › Lever, rôle Ligne ou Contour (Confirmé) : toucher un point levé l'ajoute (0.78.0).
+    // Terrain › Lever, rôle Ligne ou Contour (Intermédiaire) : toucher un point levé l'ajoute (0.78.0).
     if (toucherPourLever()) {
       const stock = stockEnCours();
       dessinDuPlan.enEdition = true;
@@ -3960,7 +4011,7 @@ function mettreAJourEtatEntete() {
   pastille.title = repris ? 'Lecture seule : toucher pour prendre la main' : rendu ? 'Main rendue : toucher pour la reprendre' : 'Tu as la main : toucher pour la rendre';
   document.body.classList.toggle('lecture-seule', Boolean(repris || rendu));
 }
-// Main de l'en-tête (0.76.0) : rouge = prendre la main (Confirmé, code), grise = la reprendre,
+// Main de l'en-tête (0.76.0) : rouge = prendre la main (Expert, code), grise = la reprendre,
 // verte = la rendre (le projet part sur Drive, un autre appareil peut la prendre).
 document.querySelector('#pastille-verrou').addEventListener('click', async () => {
   if (partage?.etat.repris?.projetId === projet.id) partage.prendreLaMain();
@@ -4139,7 +4190,7 @@ async function demarrer() {
       boutons: [
         { cle: 'continuer', texte: `Continuer sur « ${titreProjet(projet)} »`, detail: 'le dernier projet ouvert sur cette tablette', principal: true },
         { cle: 'ouvrir', texte: 'Ouvrir un projet' },
-        { cle: 'nouveau', texte: 'Nouveau projet' },
+        ...(aAcces('intermediaire') ? [{ cle: 'nouveau', texte: 'Nouveau projet' }] : []),
       ],
     }) : 'continuer';
     // Partage : on se reconnecte à Drive si on l'était (le projet ouvert est alors comparé à Drive).

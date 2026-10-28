@@ -115,7 +115,7 @@ export function nomDuCalcul(calcul, surfaces) {
   return calcul.nom || nomAutomatique(calcul, surfaces);
 }
 
-const TITRES_TOTAUX = { stock: 'Total stocks', terrain: 'Total terrains naturels', terrassement: 'Total terrassements', surface: 'Total surfaces' };
+const TITRES_TOTAUX = { stock: 'Total stocks', terrain: 'Total terrains', recollement: 'Total recollements', terrassement: 'Total terrassements', surface: 'Total surfaces' };
 
 /**
  * Range les lignes du tableau des volumes par nature de la surface 1 (stocks, terrains naturels,
