@@ -12,7 +12,7 @@
 // L'état du récepteur arrive 5 fois par seconde (mettreAJourRecepteur) : on ne change alors que
 // quelques textes et l'état du bouton, sans redessiner l'écran (le doigt peut être dessus).
 import { echapper } from '../outils/echapper.js';
-import { estModeBase, lameActive } from '../reglages/reglages.js';
+import { aAcces, estModeBase, lameActive } from '../reglages/reglages.js';
 import { demanderCode } from '../outils/code.js';
 import { demanderTexte } from '../outils/choix.js';
 import { ouvrirChoixLevees } from './fenetre-levees.js';
@@ -41,8 +41,8 @@ const IMPLANTATIONS = [
   ['surface', 'Surface', true],
   ['talus', 'Talus', true], // tout à droite (demande du 26.10.2026)
 ];
-// Mode Base (réglages ⚙) : pas de talus, et on ne lève que des « Levé libre » (lignes et points).
-const IMPLANTATIONS_CONFIRME = ['talus'];
+// Talus : Expert seulement. Base : on ne lève que des « Levé libre » (points seulement).
+const IMPLANTATIONS_EXPERT = ['talus'];
 const NATURES_BASE = ['autres'];
 const VUES_COUPES = [
   ['les2', 'Les 2'],
@@ -159,12 +159,12 @@ export function creerEcranLeve(conteneur, actions) {
       return;
     }
     if (action === 'changerLevee') {
-      // Croix rouge (supprimer le levé et ses points) seulement en mode Confirmé.
+      // Croix rouge (supprimer le levé et ses points) seulement en mode Expert.
       ouvrirChoixLevees({
         levees: donnees.stocks,
         actuel: donnees.stock.id,
         titres: Object.fromEntries(NATURES_TERRAIN),
-        supprimable: !estModeBase(),
+        supprimable: aAcces('expert'),
         choisir: (id) => id !== donnees.stock.id && actions.choisirStock(id),
         supprimer: (id) => actions.supprimerLevee(id),
       });
@@ -458,8 +458,9 @@ export function creerEcranLeve(conteneur, actions) {
   /** Mode Contrôler : quoi implanter, surface, écart en grand, coupes et leurs réglages. */
   function controle() {
     const { controle: reglages, surfaces } = donnees;
-    const vue = reglages.vueCoupes;
-    const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => !estModeBase() || !IMPLANTATIONS_CONFIRME.includes(cle)), reglages.implantation)} ${bulle('implanter')}</div>`;
+    // Coupes directes : en Base, dans l'axe seulement (perpendiculaire, longueur et hauteurs dès Intermédiaire).
+    const vue = estModeBase() ? 'axe' : reglages.vueCoupes;
+    const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => aAcces('expert') || !IMPLANTATIONS_EXPERT.includes(cle)), reglages.implantation)} ${bulle('implanter')}</div>`;
     // Rien de choisi : on le rappelle bien en vue (après « ← », on ne savait plus quoi faire).
     const imp = donnees.implanter;
     if (reglages.implantation === 'point') {
@@ -487,9 +488,9 @@ export function creerEcranLeve(conteneur, actions) {
         ${vue !== 'axe' ? '<div data-vivant="coupe-perpendiculaire"></div>' : ''}
         ${vue !== 'perpendiculaire' ? '<div data-vivant="coupe-axe"></div>' : ''}
       </div>
-      <div class="ligne-choix"><span>Coupes</span>${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}</div>
-      <div class="ligne-choix"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
-      <div class="ligne-choix"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
+      <div class="ligne-choix seulement-intermediaire"><span>Coupes</span>${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}</div>
+      <div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
+      <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
       <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
       <p class="aide" data-vivant="orientation"></p>`;
   }
@@ -560,7 +561,7 @@ export function creerEcranLeve(conteneur, actions) {
   function lienExport() {
     const nombre = donnees.implanter.nbImplantations;
     return nombre > 0
-      ? `<p class="aide">${nombre} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
+      ? `<p class="aide seulement-expert">${nombre} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
       : '';
   }
 
@@ -617,13 +618,13 @@ export function creerEcranLeve(conteneur, actions) {
           <div class="ligne-outils">
             <button type="button" class="bouton bouton-implanter" data-action="implanterChoix">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></svg>Implanter</button>
-            <button type="button" class="bouton-secondaire" data-action="creerPointAImplanter">+ À implanter</button>
+            <button type="button" class="bouton-secondaire seulement-expert" data-action="creerPointAImplanter">+ À implanter</button>
             ${imp.choixDuProjet ? '' : '<button type="button" class="bouton-secondaire" data-action="garderPointChoisi" title="Garder ce point dans le projet (levé « Points ajoutés »)">+ Point du projet</button>'}
           </div>
         </div>`
       : '';
     const liste = imp.aImplanter.length > 0
-      ? `<div class="liste-a-implanter">
+      ? `<div class="liste-a-implanter seulement-expert">
           <p class="titre-choix">À implanter</p>
           ${imp.aImplanter.map((p) => `<div class="ligne-a-implanter ${imp.cible?.id === p.id ? 'actif' : ''}">
               <button type="button" class="bouton-lien bouton-lien-neutre" data-action="implanterPoint" data-valeur="${p.id}"><strong>${echapper(p.nom)}</strong></button>
@@ -670,7 +671,7 @@ export function creerEcranLeve(conteneur, actions) {
         <button type="button" class="bouton-retour" data-action="${ligne ? 'changerLigne' : autocontrole ? 'arreterControle' : 'arreterImplantation'}" title="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}" aria-label="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
         <p class="titre-vue-guidage">${titre}</p>
-        ${ligne ? '<button type="button" class="bouton-retour seulement-confirme" data-action="inverserLigne" title="Inverser le sens" aria-label="Inverser le sens">⇄</button>' : ''}
+        ${ligne ? '<button type="button" class="bouton-retour" data-action="inverserLigne" title="Inverser le sens" aria-label="Inverser le sens">⇄</button>' : ''}
         ${!ligne && !autocontrole && imp.suivant ? `<button type="button" class="bouton-suivant" data-action="implanterSuivant" title="Implanter le point suivant : ${echapper(imp.suivant)}" aria-label="Point suivant : ${echapper(imp.suivant)}">${echapper(imp.suivant)} ▶</button>` : ''}
         <button type="button" class="bouton-retour ${ouverts ? 'actif' : ''}" data-action="basculerReglagesGuidage" title="Réglages de l'implantation" aria-label="Réglages de l'implantation" aria-expanded="${ouverts}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>
@@ -678,7 +679,7 @@ export function creerEcranLeve(conteneur, actions) {
       ${ouverts ? (talus ? reglagesTalus() : reglagesGuidage(ligne)) : ''}
       ${ligne ? detailLigne() : detailPoint()}
       ${guidage}
-      <button type="button" class="bouton bouton-prendre" data-action="enregistrerImplantation" disabled>
+      <button type="button" class="bouton bouton-prendre ${autocontrole ? '' : 'seulement-intermediaire'}" data-action="enregistrerImplantation" disabled>
         <span>${talus ? 'ENREGISTRER L\'ENTRÉE EN TERRE' : autocontrole ? 'ENREGISTRER LE CONTRÔLE' : 'ENREGISTRER L\'IMPLANTATION'}</span><span class="sous-titre-prendre">ou touche vol −</span>
       </button>
       <p class="raison-leve" data-vivant="raison" hidden></p>
@@ -782,8 +783,8 @@ export function creerEcranLeve(conteneur, actions) {
     return `<div class="reglages-guidage">
       <div class="ligne-choix"><span>Guidage</span>${boutonsChoix('choisirGuidage', GUIDAGES, reglages.guidage)}</div>
       <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
-      ${ligne && l.nbSegments > 1 ? `<div class="ligne-choix seulement-confirme"><span>Ligne</span>${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment par segment']], l.segment == null ? 'tout' : 'segment')}</div>` : ''}
-      ${ligne ? `<label class="champ-decalage seulement-confirme">Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
+      ${ligne && l.nbSegments > 1 ? `<div class="ligne-choix"><span>Ligne</span>${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment par segment']], l.segment == null ? 'tout' : 'segment')}</div>` : ''}
+      ${ligne ? `<label class="champ-decalage">Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
       <p class="aide" data-vivant="orientation"></p>
     </div>`;
   }
@@ -808,7 +809,7 @@ export function creerEcranLeve(conteneur, actions) {
           <span>Segment <strong>${l.segment + 1}</strong> / ${l.nbSegments}</span>
           <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="suivant" ${l.segment === l.nbSegments - 1 ? 'disabled' : ''} aria-label="Segment suivant">▶</button>
         </div>`;
-    // Altitude tapée : seulement en mode Confirmé (en Base, on montre celle qui a pu être tapée avant).
+    // Altitude tapée : dès le mode Intermédiaire (en Base, on montre celle qui a pu être tapée avant).
     const lue = (bout, cle) => (l.altitudesDuPlan ? bout.altitude : l.altitudes[cle]);
     const altitude = (bout, cle) => (l.altitudesDuPlan || estModeBase()
       ? `<span class="altitude-bout">H <strong>${lue(bout, cle) != null ? formaterNombre(lue(bout, cle)) : '—'}</strong></span>`
@@ -924,10 +925,10 @@ export function creerEcranLeve(conteneur, actions) {
     const sorte = sorteDuRole();
     const liste = donnees.libelles[sorte];
     const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
-    return `<div class="libelles-terrain pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
+    return `<div class="libelles-terrain seulement-intermediaire pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
       ${liste.map(([abreviation, signification, couleur]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
           <strong>${couleur ? `<i class="pastille-libelle" style="background: ${couleur}"></i>` : ''}${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
-      <button type="button" class="bouton-crayon-libelles seulement-confirme" data-action="ouvrirLibelles" title="Modifier les libellés" aria-label="Modifier les libellés">
+      <button type="button" class="bouton-crayon-libelles seulement-intermediaire" data-action="ouvrirLibelles" title="Modifier les libellés" aria-label="Modifier les libellés">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
     </div>
 `;
@@ -980,14 +981,14 @@ export function creerEcranLeve(conteneur, actions) {
   }
 
   /**
-   * Bas de l'écran Lever (0.77.0) : triangles en trop (mode Confirmé, levés qui ont une surface :
+   * Bas de l'écran Lever (0.77.0) : triangles en trop (dès Intermédiaire, levés qui ont une surface :
    * supprimer au doigt sur le plan, tout rétablir) et photos du levé (légende, supprimer).
    */
   function basDuLeve() {
     const photos = donnees.photos ?? [];
     const t = donnees.triangles;
     const triangles = t
-      ? `<div class="triangles-leve seulement-confirme ${t.actif ? 'actif' : ''}">
+      ? `<div class="triangles-leve seulement-intermediaire ${t.actif ? 'actif' : ''}">
           <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 21 20H3z" /><path d="m9 11 6 6M15 11l-6 6" /></svg>Triangles en trop · ${t.supprimes} supprimé(s) ${bulle('trianglesEnTrop')}</span>
           <div class="ligne-outils">
             <button type="button" class="${t.actif ? 'bouton' : 'bouton-secondaire'}" data-action="basculerTrianglesLevee">${t.actif ? 'Terminer' : 'Supprimer au doigt'}</button>
@@ -1014,7 +1015,9 @@ export function creerEcranLeve(conteneur, actions) {
    * leurs points ; ✕ supprime un point, ✂ supprime le segment entre deux points d'une ligne.
    */
   function listeElements() {
-    const e = donnees.elements;
+    // Base : seulement la liste « Points de ce levé » (contour, lignes et ✕ dès Intermédiaire).
+    const base = estModeBase();
+    const e = base && donnees.elements ? { ...donnees.elements, contour: null, lignes: [] } : donnees.elements;
     if (!e || (!e.contour && e.lignes.length === 0 && e.isoles.length === 0)) return '';
     const ouvert = (cle) => (elementsOuverts.has(cle) ? 'open' : '');
     const point = (nom, supprimable = true) => `<li class="point-element"><span>${echapper(nom)}</span>${supprimable
@@ -1033,7 +1036,7 @@ export function creerEcranLeve(conteneur, actions) {
         </details>`;
     };
     return `<div class="elements-leve">
-      <p class="titre-choix">Lignes du levé ${bulle('lignesLevee')}</p>
+      <p class="titre-choix">${base ? 'Points de ce levé' : 'Lignes du levé'} ${bulle('lignesLevee')}</p>
       ${e.contour ? `<details class="element-leve role-contour" data-element="contour" ${ouvert('contour')}>
           <summary><strong>${echapper(e.contour.nom)}</strong><span>contour · ${e.contour.noms.length} pt(s)</span></summary>
           <ul>${e.contour.noms.map((nom) => point(nom, e.contour.modifiable)).join('')}</ul>
@@ -1041,7 +1044,7 @@ export function creerEcranLeve(conteneur, actions) {
       ${e.lignes.map(ligne).join('')}
       ${e.isoles.length > 0 ? `<details class="element-leve role-isole" data-element="isoles" ${ouvert('isoles')}>
           <summary><strong>Points isolés</strong><span>${e.isoles.length} pt(s)</span></summary>
-          <ul>${e.isoles.map((nom) => point(nom)).join('')}</ul>
+          <ul>${e.isoles.map((nom) => point(nom, !base)).join('')}</ul>
         </details>` : ''}
     </div>`;
   }

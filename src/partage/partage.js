@@ -5,7 +5,7 @@
 // rendreLaMain() (main touchée, ou 5 minutes sans rien faire sur le site), reprendreApresRendu(),
 // prendreLaMain().
 // Une seule main par projet (demande du 27.10.2026, 0.76.0) :
-// - prendre la main à un autre appareil (site ou APK) : mode Confirmé et code de sécurité, toujours ;
+// - prendre la main à un autre appareil (site ou APK) : mode Expert et code de sécurité, toujours ;
 //   on prend la version de Drive (ce que l'autre n'a pas encore envoyé est perdu : choix de l'utilisateur) ;
 // - l'appareil qui perd la main le voit en 30 s au plus (verrou relu toutes les 30 s) : il est mis
 //   en attente (fenêtre « … a la main », lecture seule) ; quand la main est rendue, il reprend tout
@@ -32,7 +32,7 @@ const LISTES = 10 * 60_000; // listes partagées (adresses, swipos) relues toute
  * - ouvrirProjet(projet) : ouvre ce projet dans l'appli (et l'enregistre sur l'appareil) ;
  * - demanderPriseDeMain(verrou, titre, { avecAnnuler }) : « lecture » (voir en lecture seule),
  *   « prendre » (prendre la main) ou null (ne pas ouvrir) ;
- * - autoriserPrise(verrou) : promesse vraie si on peut prendre la main (mode Confirmé, code) ;
+ * - autoriserPrise(verrou) : promesse vraie si on peut prendre la main (mode Expert, code) ;
  * - quandMainPrise(verrou) : un autre appareil vient de prendre la main (fenêtre d'attente) ;
  * - quandMainRendue(nom, { repris }) : il l'a rendue, le projet est à jour (fermer la fenêtre d'attente) ;
  *   repris : vrai si cet appareil a retrouvé la main, faux s'il reste en lecture seule ;
@@ -344,7 +344,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
   }
 
   /**
-   * Prendre la main sur le projet ouvert, qu'un autre appareil a (mode Confirmé, code de
+   * Prendre la main sur le projet ouvert, qu'un autre appareil a (mode Expert, code de
    * sécurité) : le verrou passe ici, puis on ouvre la version de Drive.
    */
   async function prendreLaMain() {
@@ -438,7 +438,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
 
     /**
      * Ouvre un projet de la liste Drive. Un autre appareil l'a en main : lecture seule, ou prendre
-     * la main (mode Confirmé, code de sécurité).
+     * la main (mode Expert, code de sécurité).
      */
     async ouvrirDepuisDrive(dossierId) {
       const surDrive = etat.projetsDrive.find((p) => p.dossierId === dossierId);

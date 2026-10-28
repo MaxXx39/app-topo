@@ -1,4 +1,4 @@
-// Calculs › Dessin (mode Confirmé), simplifié en 0.66.0 : un seul « + Dessin » (noms D1-1, D1-2…),
+// Calculs › Dessin (mode Expert), simplifié en 0.66.0 : un seul « + Dessin » (noms D1-1, D1-2…),
 // comme l'outil « pilote » de Leica iCON :
 // 1. Point de départ : toucher le plan (accroché à un objet : point, sommet, milieu, sur une ligne,
 //    centre ; rien sous le doigt = rien de pris) ou le RX2 ;

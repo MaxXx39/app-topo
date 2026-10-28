@@ -83,7 +83,7 @@ import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecept
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
-import { appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
+import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus } from './outils/son.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
@@ -230,7 +230,7 @@ document.querySelector('#app').innerHTML = `
       <nav class="parties-calculs" aria-label="Calculs">
         <div class="groupe-surfaces-volumes">${boutonPartie(PARTIES_CALCULS[0])}</div>
         <div class="groupe-mesures">${boutonPartie(PARTIES_CALCULS[1])}</div>
-        <div class="groupe-dessin">${boutonPartie(PARTIES_CALCULS[2])}</div>
+        <div class="groupe-dessin seulement-expert">${boutonPartie(PARTIES_CALCULS[2])}</div>
       </nav>
       <section class="panneau" data-onglet="surfaces">
         <h2>Surfaces ${bulle('surfaces')}</h2>
@@ -240,7 +240,7 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="volumes">
         <h2>Volumes ${bulle('volumes')}</h2>
         <div id="volumes"></div>
-        <div id="coupes" class="carte-section"></div>
+        <div id="coupes" class="carte-section seulement-expert"></div>
         <div id="export" class="carte-section"></div>
       </section>
       <section class="panneau" data-onglet="mesures">
@@ -318,9 +318,9 @@ installerAide(document.querySelector('#bouton-aide'));
 // Toucher le projet ouvert (en-tête) : on va à l'onglet Projet.
 document.querySelector('#entete-projet').addEventListener('click', () => afficherOnglet('projets'));
 
-// Réglages de cet appareil (roue ⚙) : mode Base / Confirmé, mode téléphone, bulles d'aide, nom de l'appareil.
+// Réglages de cet appareil (roue ⚙) : mode Base / Intermédiaire / Expert, mode téléphone, bulles d'aide, nom de l'appareil.
 appliquerReglages();
-// L'étoile de l'en-tête (mode Base ☆ / Confirmé ★) ouvre aussi les réglages.
+// Les barres de l'en-tête (1 verte = Base, 2 jaunes = Intermédiaire, 3 rouges = Expert) ouvrent aussi les réglages.
 document.querySelector('#bouton-mode').addEventListener('click', () => document.querySelector('#bouton-reglages').click());
 // Fenêtre des réglages ouverte (pour y redessiner l'état du partage Drive), ou null.
 let fenetreReglages = null;
@@ -355,18 +355,18 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
 });
 
 /**
- * Mode Base : on quitte ce qui y est caché (onglet Calculs, implantation d'un talus). Rien n'est
- * supprimé : en repassant en Confirmé, tout est là.
+ * On quitte ce que le nouveau mode cache (onglet Calculs en Base, Dessin, guidage de lame et talus
+ * avant Expert). Rien n'est supprimé : en repassant dans un mode plus complet, tout est là.
  */
 function adapterAuMode() {
-  // Guidage de lame : mode Confirmé et case « Onglet Lame » des réglages.
+  // Guidage de lame : mode Expert seulement.
   if (terrain.mode === 'lame' && !lameActive()) {
     terrain.mode = 'lever';
     retenirReglagesTerrain();
   }
-  if (!estModeBase()) return;
-  if (estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
-  if (terrain.implantation === 'talus') {
+  if (estModeBase() && estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
+  else if (!aAcces('expert') && document.body.dataset.onglet === 'dessin') afficherOnglet('volumes');
+  if (!aAcces('expert') && terrain.implantation === 'talus') {
     terrain.implantation = 'ligne';
     retenirReglagesTerrain();
   }
@@ -545,7 +545,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     editeurSurfaces.charger(projet.surfaces);
     modifie({ recadrer: true });
   },
-  // Bouton « exporter » d'une liste (Confirmé, 0.79.0) : TXT, CSV (toutes les infos) ou DXF, puis
+  // Bouton « exporter » d'une liste (Intermédiaire, 0.79.0) : TXT, CSV (toutes les infos) ou DXF, puis
   // Enregistrer, Envoyer par mail ou autrement (fenêtre « Exporter »).
   exporterListe: (type, id) => {
     let points;
@@ -692,9 +692,9 @@ const boutonRecepteur = recepteurDisponible()
         arreterCorrections();
         afficherMessage('Corrections arrêtées : Emlid Flow peut reprendre');
       },
-      // Journal NMEA (Confirmé, 0.82.0) : tout ce que le RX2 envoie pendant 1 minute, dans un fichier.
+      // Journal NMEA (Expert, 0.82.0) : tout ce que le RX2 envoie pendant 1 minute, dans un fichier.
       journalNmea: journalNmeaDisponible() ? enregistrerJournalNmea : null,
-      // Essai à 2 récepteurs (mode Confirmé) : seulement avec un APK qui le sait.
+      // Essai à 2 récepteurs (mode Expert) : seulement avec un APK qui le sait.
       choisirRecepteur2: recepteur2Disponible() ? choisirRecepteur2 : null,
       deconnecter2: deconnecterRecepteur2,
       choisirModeCorrections2,
@@ -759,7 +759,7 @@ const ecranLeve = recepteurDisponible()
         nommerListeDeLevee(projet, levee);
         modifie();
       },
-      // Croix rouge de « Changer » (Confirmé) : le levé et ses points, après confirmation.
+      // Croix rouge de « Changer » (Expert) : le levé et ses points, après confirmation.
       supprimerLevee: (id) => {
         const levee = [...projet.surfaces, ...projet.metres, ...projet.autres].find((s) => s.id === id);
         if (!levee) return false;
@@ -824,7 +824,7 @@ const ecranLeve = recepteurDisponible()
         levee.photos = levee.photos.filter((p) => p.id !== id);
         modifie();
       },
-      // Triangles en trop (Confirmé, 0.77.0) : on les touche sur le plan pour les enlever ou les remettre.
+      // Triangles en trop (Intermédiaire, 0.77.0) : on les touche sur le plan pour les enlever ou les remettre.
       basculerTrianglesLevee: () => {
         const stock = stockEnCours();
         if (!stock) return;
@@ -949,7 +949,7 @@ const ecranLeve = recepteurDisponible()
         recalculer();
       },
       choisirImplantation: (quoi) => {
-        const permises = estModeBase() ? ['point', 'ligne'] : ['point', 'ligne', 'talus'];
+        const permises = aAcces('expert') ? ['point', 'ligne', 'talus'] : ['point', 'ligne'];
         terrain.implantation = permises.includes(quoi) ? quoi : 'surface';
         retenirReglagesTerrain();
         recalculer();
@@ -1162,6 +1162,10 @@ const ecranLeve = recepteurDisponible()
         if (refuserEnLectureSeule()) return;
         if (enAutocontrole()) {
           enregistrerControle();
+          return;
+        }
+        if (estModeBase()) {
+          afficherMessage('Enregistrer l\'implantation : seulement en mode Intermédiaire ou Expert', 4000);
           return;
         }
         if (enTalus()) {
@@ -2757,9 +2761,14 @@ function mettreAJourToucheVolume() {
   });
 }
 
-/** Vrai quand toucher un point du plan l'ajoute à la ligne ou au contour en cours (Terrain › Lever, Confirmé). */
+/** Rôles permis pour lever : en Base, des points isolés seulement (contour et lignes dès Intermédiaire). */
+function rolesDuMode(stock) {
+  return estModeBase() ? ['isole'] : rolesPermis(stock);
+}
+
+/** Vrai quand toucher un point du plan l'ajoute à la ligne ou au contour en cours (Terrain › Lever, Intermédiaire et Expert). */
 function toucherPourLever() {
-  return Boolean(ecranLeve) && ongletContexte === 'terrain' && terrain.mode === 'lever' && !estModeBase()
+  return Boolean(ecranLeve) && ongletContexte === 'terrain' && terrain.mode === 'lever' && aAcces('intermediaire')
     && Boolean(stockEnCours()) && ['ligne', 'contour'].includes(leveDirect.role) && !editeurSurfaces.enSuppression();
 }
 
@@ -2872,7 +2881,7 @@ async function controlerPlacePoint(stock, role, position, versNom = null) {
 }
 
 /**
- * Toucher un point déjà levé sur le plan (mode Confirmé, rôle Ligne ou Contour, 0.78.0) : il entre
+ * Toucher un point déjà levé sur le plan (modes Intermédiaire et Expert, rôle Ligne ou Contour, 0.78.0) : il entre
  * dans la ligne ou le contour en cours avec son nom (s'il n'est encore dans aucune ligne), après
  * les mêmes contrôles qu'un point pris au RX2.
  */
@@ -2925,7 +2934,7 @@ function donneesLeve() {
   const metre = metreEnCours();
   if (metre) return donneesMetre(metre);
   // Terrain naturel ou terrassement : pas de contour, on passe aux points isolés.
-  if (!rolesPermis(stockEnCours()).includes(leveDirect.role)) leveDirect.role = 'isole';
+  if (!rolesDuMode(stockEnCours()).includes(leveDirect.role)) leveDirect.role = 'isole';
   const leve = leveEnCours();
   const stock = stockEnCours();
   // D'abord le nom proposé : pour une ligne, il prépare la ligne en cours (libellé, numéro).
@@ -2939,13 +2948,13 @@ function donneesLeve() {
     role: leveDirect.role,
     ligne: ligne ? { libelle: ligne.libelle, numero: ligne.numero ?? numeroLigne, nbPoints: ligne.noms.length, fermee: ligne.fermee } : null,
     nomPropose,
-    rolesPermis: rolesPermis(stock),
+    rolesPermis: rolesDuMode(stock),
     dernierPoint: leve?.points[leve.points.length - 1]?.nom ?? null,
     resume: stock ? resumeStock(stock) : null,
     volume: stock ? volumeDuStock(stock) : null,
     elements: stock ? elementsDuLevee(stock) : null,
     photos: stock?.photos ?? [],
-    // Triangles en trop (Confirmé) : seulement pour un levé qui a une surface (pas un levé libre).
+    // Triangles en trop (Intermédiaire) : seulement pour un levé qui a une surface (pas un levé libre).
     triangles: stock && projet.surfaces.includes(stock)
       ? { actif: editeurSurfaces.enSuppression() && editeurSurfaces.objetActif() === stock, supprimes: stock.trianglesSupprimes?.length ?? 0 }
       : null,
@@ -3345,19 +3354,19 @@ partage = creerPartage({
     return lu ? completerProjet(lu) : null;
   },
   ouvrirProjet: (nouveau) => ouvrir(completerProjet(nouveau), { changerOnglet: false }),
-  // Projet qu'un autre appareil a en main (0.76.0) : lecture seule, ou prendre la main (Confirmé).
+  // Projet qu'un autre appareil a en main (0.76.0) : lecture seule, ou prendre la main (Expert).
   demanderPriseDeMain: (verrou, titre, { avecAnnuler = false } = {}) => demanderChoix({
     titre: `${verrou.nom} a la main sur « ${titre} »`,
     texte: verrou.depuis ? `depuis ${new Date(verrou.depuis).toLocaleString('fr-CH', { dateStyle: 'short', timeStyle: 'short' })}` : '',
     boutons: [
       { cle: 'lecture', texte: 'Voir en lecture seule', detail: 'voir et implanter, sans rien enregistrer', principal: true },
-      ...(estModeBase() ? [] : [{ cle: 'prendre', texte: 'Prendre la main', detail: `code de sécurité ; ${verrou.nom} sera mis en attente` }]),
+      ...(aAcces('expert') ? [{ cle: 'prendre', texte: 'Prendre la main', detail: `code de sécurité ; ${verrou.nom} sera mis en attente` }] : []),
       ...(avecAnnuler ? [{ cle: 'annuler', texte: 'Ne pas ouvrir' }] : []),
     ],
   }).then((cle) => (cle === 'annuler' ? null : cle)),
   autoriserPrise: async (verrou) => {
-    if (estModeBase()) {
-      afficherMessage('Prendre la main : seulement en mode Confirmé', 4000);
+    if (!aAcces('expert')) {
+      afficherMessage('Prendre la main : seulement en mode Expert', 4000);
       return false;
     }
     return demanderCode(`Prendre la main à ${verrou.nom}`);
@@ -3819,7 +3828,7 @@ function recalculer({ recadrer = false } = {}) {
       traceCoupe: null,
     });
   } else {
-    // Terrain › Lever, rôle Ligne ou Contour (Confirmé) : toucher un point levé l'ajoute (0.78.0).
+    // Terrain › Lever, rôle Ligne ou Contour (Intermédiaire) : toucher un point levé l'ajoute (0.78.0).
     if (toucherPourLever()) {
       const stock = stockEnCours();
       dessinDuPlan.enEdition = true;
@@ -3960,7 +3969,7 @@ function mettreAJourEtatEntete() {
   pastille.title = repris ? 'Lecture seule : toucher pour prendre la main' : rendu ? 'Main rendue : toucher pour la reprendre' : 'Tu as la main : toucher pour la rendre';
   document.body.classList.toggle('lecture-seule', Boolean(repris || rendu));
 }
-// Main de l'en-tête (0.76.0) : rouge = prendre la main (Confirmé, code), grise = la reprendre,
+// Main de l'en-tête (0.76.0) : rouge = prendre la main (Expert, code), grise = la reprendre,
 // verte = la rendre (le projet part sur Drive, un autre appareil peut la prendre).
 document.querySelector('#pastille-verrou').addEventListener('click', async () => {
   if (partage?.etat.repris?.projetId === projet.id) partage.prendreLaMain();
@@ -4139,7 +4148,7 @@ async function demarrer() {
       boutons: [
         { cle: 'continuer', texte: `Continuer sur « ${titreProjet(projet)} »`, detail: 'le dernier projet ouvert sur cette tablette', principal: true },
         { cle: 'ouvrir', texte: 'Ouvrir un projet' },
-        { cle: 'nouveau', texte: 'Nouveau projet' },
+        ...(aAcces('intermediaire') ? [{ cle: 'nouveau', texte: 'Nouveau projet' }] : []),
       ],
     }) : 'continuer';
     // Partage : on se reconnecte à Drive si on l'était (le projet ouvert est alors comparé à Drive).

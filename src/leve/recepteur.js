@@ -164,14 +164,13 @@ export function creerBoutonRecepteur(nav, actions) {
   }
 
   /**
-   * « Relancer la connexion NTRIP » (0.84.0, Confirmé) : redémarre avec les derniers réglages
-   * enregistrés (mot de passe vide = l'APK garde celui qu'il a). Demande le code de sécurité.
+   * « Relancer la connexion NTRIP » (0.84.0 ; tous les modes et sans code depuis 0.85.0, tableau des
+   * modes) : redémarre avec les derniers réglages enregistrés (mot de passe vide = l'APK garde celui qu'il a).
    */
   async function relancerCorrections(numero) {
     const lire = numero === 2 ? actions.lireReglagesCorrections2 : actions.lireReglagesCorrections;
     const reglages = lire?.();
     if (!reglages?.hote) return;
-    if (!(await demanderCode('Relancer la connexion NTRIP'))) return;
     const relance = { hote: reglages.hote, port: reglages.port, pointDeMontage: reglages.pointDeMontage, utilisateur: reglages.utilisateur, motDePasse: '' };
     if (numero === 2) actions.demarrerCorrections2(relance);
     else actions.demarrerCorrections(relance);
@@ -180,16 +179,16 @@ export function creerBoutonRecepteur(nav, actions) {
 
   /**
    * Choix du réglage swipos (0.84.0) : la liste partagée, sans code ; un choix démarre la connexion.
-   * En Confirmé : « Relancer la connexion NTRIP » (code de sécurité), si des réglages sont enregistrés.
+   * « Relancer la connexion NTRIP » (tous les modes, sans code), si des réglages sont enregistrés.
    */
   function choixCorrections(reglages, numero = 1) {
     const enregistres = lireListesPartagees().swipos;
     const actuel = enregistres.find((r) => reglages.actives && r.hote === reglages.hote && r.utilisateur === reglages.utilisateur);
-    const lance = reglages.hote ? `<button type="button" class="bouton-secondaire seulement-confirme" data-action="relancerCorrections">Relancer la connexion NTRIP</button>` : '';
+    const lance = reglages.hote ? `<button type="button" class="bouton-secondaire" data-action="relancerCorrections">Relancer la connexion NTRIP</button>` : '';
     if (enregistres.length === 0 && !lance) return '';
     return `<div class="choix-corrections" data-numero="${numero}">
       <p class="titre-choix">Corrections swipos${numero === 2 ? ' du récepteur 2' : ''} ${bulle('corrections')}</p>
-      ${enregistres.length > 0 ? `<label class="champ-large choix-swipos">
+      ${enregistres.length > 0 ? `<label class="champ-large choix-swipos seulement-intermediaire">
           <select data-champ="swipos-direct" aria-label="Réglage swipos"><option value="" ${actuel ? '' : 'selected'}>— choisir un réglage swipos —</option>
             ${enregistres.map((r) => `<option value="${echapper(r.id)}" ${actuel?.id === r.id ? 'selected' : ''}>${echapper(r.utilisateur)}${r.pointDeMontage ? ` · ${echapper(r.pointDeMontage)}` : ''}</option>`).join('')}
           </select></label>` : ''}
@@ -204,16 +203,16 @@ export function creerBoutonRecepteur(nav, actions) {
     fenetre.innerHTML = `
       <div class="entete-fenetre-recepteur">
         <h2>Récepteur</h2>
-        ${reglages ? `<button type="button" class="bouton-retour seulement-confirme ${reglagesOuverts ? 'actif' : ''}" data-action="reglages" title="Réglages des corrections (NTRIP)" aria-label="Réglages des corrections (NTRIP)" aria-expanded="${reglagesOuverts}">
+        ${reglages ? `<button type="button" class="bouton-retour seulement-expert ${reglagesOuverts ? 'actif' : ''}" data-action="reglages" title="Réglages des corrections (NTRIP)" aria-label="Réglages des corrections (NTRIP)" aria-expanded="${reglagesOuverts}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>` : ''}
         <button type="button" class="bouton-retour" data-action="fermer" title="Fermer" aria-label="Fermer">✕</button>
       </div>
       <div class="etat-recepteur" data-vivant="etat-recepteur"></div>
       <div class="actions-recepteur" data-vivant="actions-recepteur"></div>
       ${reglages ? choixCorrections(reglages, 1) : ''}
-      ${actions.journalNmea ? `<div class="ligne-outils seulement-confirme">
+      ${actions.journalNmea ? `<div class="ligne-outils seulement-expert">
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="journalNmea">Journal NMEA (1 min)</button> ${bulle('journalNmea')}</div>` : ''}
-      ${reglages && reglagesOuverts ? `<div class="seulement-confirme">${blocNtrip(reglages, 1)}</div>` : ''}
+      ${reglages && reglagesOuverts ? `<div class="seulement-expert">${blocNtrip(reglages, 1)}</div>` : ''}
       ${actions.choisirRecepteur2 && (lameActive() || etat2?.connecte) ? `<div class="bloc-recepteur2">
           <p class="titre-choix">Récepteur 2 (lame)</p>
           <div data-vivant="etat-recepteur2"></div>
@@ -231,7 +230,7 @@ export function creerBoutonRecepteur(nav, actions) {
     const enregistres = lireListesPartagees().swipos;
     return `<div class="bloc-ntrip" data-numero="${numero}">
       <p class="titre-choix">Corrections NTRIP${numero === 2 ? ' du récepteur 2' : ''} ${bulle('corrections')}</p>
-      ${enregistres.length > 0 ? `<label class="champ-large choix-swipos">Réglage swipos enregistré
+      ${enregistres.length > 0 ? `<label class="champ-large choix-swipos seulement-intermediaire">Réglage swipos enregistré
           <select data-champ="swipos-choisi"><option value="">— choisir —</option>
             ${enregistres.map((r) => `<option value="${echapper(r.id)}">${echapper(r.utilisateur)}${r.pointDeMontage ? ` · ${echapper(r.pointDeMontage)}` : ''}</option>`).join('')}
           </select></label>` : ''}

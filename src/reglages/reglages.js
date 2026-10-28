@@ -2,13 +2,14 @@
 // dans le projet :
 // - « Mode téléphone » : textes, icônes et boutons plus petits, libellés plus courts
 //   (classe mode-telephone sur la page, voir style.css) ;
-// - mode « Base » ou « Confirmé » (demande du 26.10.2026) : en Base, les fonctions avancées sont
-//   cachées (classe mode-base sur la page ; éléments .seulement-confirme, voir style.css ; et
-//   estModeBase() dans le code). Rien n'est supprimé du projet. Confirmé par défaut ;
+// - mode « Base », « Intermédiaire » ou « Expert » (demande du 28.10.2026, tableau
+//   docs/modes-base-intermediaire-expert.xlsx) : les fonctions avancées sont cachées selon le mode
+//   (classe mode-base / mode-intermediaire / mode-expert sur la page ; éléments .seulement-intermediaire
+//   et .seulement-expert, voir style.css ; et estModeBase() / aAcces() dans le code). Rien n'est
+//   supprimé du projet. Intermédiaire par défaut ; l'ancien « Confirmé » devient « Expert » ;
 // - bulles d'aide (même chose que le bouton « ? ») ;
 // - partage par Google Drive (nom de l'appareil, connexion, état), déplacé de l'onglet Projet ;
-// - « Onglet Lame » (Confirmé, 0.74.0) : montre le mode Lame de l'onglet Terrain et la connexion
-//   d'un 2e récepteur dans la fenêtre du récepteur ; décoché (par défaut) : un seul récepteur ;
+// - Lame et 2e récepteur : toujours montrés en Expert (plus de case « Onglet Lame », 0.85.0) ;
 // - « Listes partagées » (0.79.0, code de sécurité) : adresses mail et réglages swipos, pour tous
 //   les appareils (voir listes-partagees.js) ;
 // - « Fermer l'appli » (appli Android seulement), en rouge tout en haut.
@@ -18,30 +19,59 @@ import { lireListesPartagees } from './listes-partagees.js';
 import { ouvrirFenetreListes } from './fenetre-listes.js';
 
 const CLE = 'topo-reglages';
-// Étoile à 5 branches (en-tête et choix du mode).
-export const ETOILE = 'M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z';
-const PAR_DEFAUT = { telephone: false, mode: 'confirme', lame: false };
+const PAR_DEFAUT = { telephone: false, mode: 'intermediaire' };
+// Les trois modes, du plus simple au plus complet (le rang sert à comparer : aAcces).
+export const MODES = [['base', 'Base'], ['intermediaire', 'Intermédiaire'], ['expert', 'Expert']];
 // Mode retenu (relu une fois, puis gardé ici) : estModeBase() est appelé très souvent par le plan.
 let modeRetenu = null;
 
-/** Réglages enregistrés : { telephone: vrai / faux, mode: 'base' ou 'confirme', lame: vrai / faux }. */
+/** Mode connu : l'ancien « Confirmé » (réglages d'avant 0.85.0) devient « Expert ». */
+function modeValide(mode) {
+  if (mode === 'confirme') return 'expert';
+  return MODES.some(([cle]) => cle === mode) ? mode : PAR_DEFAUT.mode;
+}
+
+/** Réglages enregistrés : { telephone: vrai / faux, mode: 'base', 'intermediaire' ou 'expert' }. */
 export function lireReglages() {
   try {
-    return { ...PAR_DEFAUT, ...JSON.parse(localStorage.getItem(CLE) ?? '{}') };
+    const reglages = { ...PAR_DEFAUT, ...JSON.parse(localStorage.getItem(CLE) ?? '{}') };
+    reglages.mode = modeValide(reglages.mode);
+    return reglages;
   } catch {
     return { ...PAR_DEFAUT };
   }
 }
 
-/** Vrai en mode Base (fonctions avancées cachées), faux en mode Confirmé. */
-export function estModeBase() {
+/** Mode de l'appareil : 'base', 'intermediaire' ou 'expert'. */
+export function modeAppli() {
   if (modeRetenu == null) modeRetenu = lireReglages().mode;
-  return modeRetenu === 'base';
+  return modeRetenu;
 }
 
-/** Vrai si le guidage de lame (et le 2e récepteur) est montré : mode Confirmé et case « Onglet Lame » cochée. */
+/** Vrai si le mode de l'appareil est au moins `minimum` (ex. aAcces('intermediaire') : faux en Base). */
+export function aAcces(minimum) {
+  const rang = (cle) => MODES.findIndex(([c]) => c === cle);
+  return rang(modeAppli()) >= rang(minimum);
+}
+
+/** Vrai en mode Base (fonctions avancées cachées). */
+export function estModeBase() {
+  return modeAppli() === 'base';
+}
+
+/** Vrai si le guidage de lame (et le 2e récepteur) est montré : mode Expert. */
 export function lameActive() {
-  return !estModeBase() && Boolean(lireReglages().lame);
+  return aAcces('expert');
+}
+
+// Dessin des 3 barres du mode (comme le signal d'un téléphone) : Base = 1 barre verte (les autres
+// grises), Intermédiaire = 2 barres jaunes, Expert = 3 barres rouges.
+const COULEURS_MODE = { base: '#16a34a', intermediaire: '#eab308', expert: '#dc2626' };
+export function barresDuMode(mode) {
+  const rangs = MODES.findIndex(([cle]) => cle === mode) + 1;
+  const hauteurs = [8, 14, 20];
+  const barres = hauteurs.map((h, i) => `<rect x="${3 + i * 7}" y="${22 - h}" width="5" height="${h}" rx="1.2" fill="${i < rangs ? COULEURS_MODE[mode] : '#9aa5ad'}" opacity="${i < rangs ? 1 : 0.55}" />`);
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" class="barres-mode barres-${mode}">${barres.join('')}</svg>`;
 }
 
 function ecrireReglages(reglages) {
@@ -54,20 +84,19 @@ function ecrireReglages(reglages) {
 }
 
 /**
- * Applique les réglages à la page : classes mode-telephone et mode-base, étoile de l'en-tête
- * (☆ vide = Base, ★ pleine = Confirmé).
+ * Applique les réglages à la page : classes mode-telephone et mode-base / mode-intermediaire /
+ * mode-expert, barres du mode dans l'en-tête.
  */
 export function appliquerReglages(reglages = lireReglages()) {
-  modeRetenu = reglages.mode;
-  const base = reglages.mode === 'base';
+  modeRetenu = modeValide(reglages.mode);
   document.body.classList.toggle('mode-telephone', Boolean(reglages.telephone));
-  document.body.classList.toggle('mode-base', base);
-  const etoile = document.querySelector('#bouton-mode');
-  if (etoile) {
-    etoile.classList.toggle('confirme', !base);
-    const texte = `Mode ${base ? 'Base' : 'Confirmé'} (toucher pour changer)`;
-    etoile.title = texte;
-    etoile.setAttribute('aria-label', texte);
+  for (const [cle] of MODES) document.body.classList.toggle(`mode-${cle}`, cle === modeRetenu);
+  const bouton = document.querySelector('#bouton-mode');
+  if (bouton) {
+    bouton.innerHTML = barresDuMode(modeRetenu);
+    const texte = `Mode ${MODES.find(([cle]) => cle === modeRetenu)[1]} (toucher pour changer)`;
+    bouton.title = texte;
+    bouton.setAttribute('aria-label', texte);
   }
 }
 
@@ -80,7 +109,7 @@ function compteListes() {
 /**
  * Ouvre la fenêtre des réglages. options : { aideActive, basculerAide(), fermerAppli() (ou null
  * hors de l'appli Android), partage: { html() (bloc Partage, voir projet/ecran.js), actions } ou null,
- * changerMode() : appelé après le passage Base ↔ Confirmé (pour redessiner les écrans) }.
+ * changerMode() : appelé après un changement de mode (pour redessiner les écrans) }.
  * Renvoie { rafraichir() } : redessine le bloc Partage (son état a changé), tant que la fenêtre est ouverte.
  */
 export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage, changerMode }) {
@@ -93,17 +122,15 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>Fermer l'appli</button>` : ''}
       <h2>Réglages de cet appareil</h2>
       <div class="choix-mode-appli" role="radiogroup" aria-label="Mode de l'appli">
-        ${[['base', 'Base'], ['confirme', 'Confirmé']].map(([cle, titre]) => `<label class="puce-mode ${reglages.mode === cle ? 'actif' : ''}">
+        ${MODES.map(([cle, titre]) => `<label class="puce-mode ${reglages.mode === cle ? 'actif' : ''}">
           <input type="radio" name="mode-appli" data-reglage="mode" value="${cle}" ${reglages.mode === cle ? 'checked' : ''} />
-          <svg viewBox="0 0 24 24" aria-hidden="true" class="etoile-mode ${cle}"><path d="${ETOILE}" /></svg>${titre}</label>`).join('')}
+          ${barresDuMode(cle)}${titre}</label>`).join('')}
       </div>
       <label class="case-reglage"><input type="checkbox" data-reglage="telephone" ${reglages.telephone ? 'checked' : ''} />
         <span><strong>Mode téléphone</strong><span class="aide">textes et boutons plus petits</span></span></label>
       <label class="case-reglage"><input type="checkbox" data-reglage="aide" ${aideActive ? 'checked' : ''} />
         <span><strong>Bulles d'aide « ? »</strong></span></label>
-      <label class="case-reglage seulement-confirme"><input type="checkbox" data-reglage="lame" ${reglages.lame ? 'checked' : ''} />
-        <span><strong>Onglet Lame</strong><span class="aide">guidage de lame, 2e récepteur</span></span></label>
-      <div class="case-reglage listes-reglages">
+      <div class="case-reglage listes-reglages seulement-intermediaire">
         <span><strong>Listes partagées</strong><span class="aide" data-zone="compte-listes">${compteListes()}</span></span>
         <button type="button" class="bouton-secondaire" data-action="listes">Modifier</button>
       </div>
@@ -132,10 +159,6 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       reglages.telephone = evenement.target.checked;
       ecrireReglages(reglages);
       appliquerReglages(reglages);
-    } else if (champ === 'lame') {
-      reglages.lame = evenement.target.checked;
-      ecrireReglages(reglages);
-      changerMode?.();
     } else if (champ === 'aide') basculerAide();
     else if (evenement.target.dataset.champ === 'nom-appareil') {
       modifierNom = false;

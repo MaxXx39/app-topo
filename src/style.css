@@ -143,10 +143,9 @@ p {
   stroke-linejoin: round;
 }
 
-/* Étoile du mode : vide (contour blanc) = Base, pleine ambre = Confirmé. */
-.bouton-mode.confirme svg {
-  fill: var(--ambre);
-  stroke: var(--ambre);
+/* Barres du mode (comme le signal d'un téléphone) : couleurs données par le dessin lui-même. */
+.barres-mode {
+  stroke: none;
 }
 
 .entete-icone-bouton:disabled {
@@ -4048,7 +4047,7 @@ svg.plan,
   margin-top: 12px;
 }
 
-/* Mode de l'appli (réglages ⚙) : Base ou Confirmé, deux gros boutons avec l'étoile. */
+/* Mode de l'appli (réglages ⚙) : Base, Intermédiaire ou Expert, trois gros boutons avec les barres. */
 .choix-mode-appli {
   display: flex;
   gap: 8px;
@@ -4060,10 +4059,12 @@ svg.plan,
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   min-height: 44px;
+  padding: 0 4px;
   border: 1.5px solid var(--bordure);
   border-radius: 10px;
+  font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -4084,18 +4085,10 @@ svg.plan,
   outline-offset: 2px;
 }
 
-.etoile-mode {
+.puce-mode .barres-mode {
   width: 22px;
   height: 22px;
-  fill: none;
-  stroke: var(--sombre);
-  stroke-width: 1.8;
-  stroke-linejoin: round;
-}
-
-.etoile-mode.confirme {
-  fill: var(--ambre);
-  stroke: var(--ambre-fonce);
+  flex: none;
 }
 
 .case-reglage {
@@ -5391,7 +5384,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   text-align: center;
 }
 
-/* Fenêtre « Changer » (Terrain › Lever) : un levé par ligne, à la couleur de sa nature, croix rouge (Confirmé). */
+/* Fenêtre « Changer » (Terrain › Lever) : un levé par ligne, à la couleur de sa nature, croix rouge (Expert). */
 .liste-levees {
   display: grid;
   gap: 8px;
@@ -6273,8 +6266,11 @@ body.accroches-ouvertes {
   stroke-width: 1;
 }
 
-/* Mode Base (réglages ⚙) : fonctions avancées cachées (rien n'est supprimé du projet). */
-body.mode-base .seulement-confirme,
+/* Modes (réglages ⚙) : fonctions avancées cachées (rien n'est supprimé du projet).
+   .seulement-intermediaire = caché en Base ; .seulement-expert = caché en Base et en Intermédiaire. */
+body.mode-base .seulement-intermediaire,
+body.mode-base .seulement-expert,
+body.mode-intermediaire .seulement-expert,
 body.mode-base .onglets .onglet-calculs,
 body.mode-base .parties-calculs {
   display: none !important;
@@ -6797,7 +6793,7 @@ body.mode-base .parties-calculs {
   margin: 6px 0;
 }
 
-/* Fenêtre du récepteur : essai à 2 récepteurs (mode Confirmé). */
+/* Fenêtre du récepteur : essai à 2 récepteurs (mode Expert). */
 .bloc-recepteur2 {
   margin-top: 12px;
   padding-top: 10px;
@@ -7237,7 +7233,7 @@ body.lecture-seule :is(
   stroke-linejoin: round;
 }
 
-/* Bas de l'écran Lever : triangles en trop (Confirmé) et photos du levé. */
+/* Bas de l'écran Lever : triangles en trop (dès Intermédiaire) et photos du levé. */
 .bas-du-leve {
   display: grid;
   gap: 10px;

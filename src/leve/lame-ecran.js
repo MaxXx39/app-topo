@@ -1,4 +1,4 @@
-// Onglet Terrain › Lame (0.70.0, mode Confirmé) : guidage d'une lame de grader avec 2 RX2 (calculs
+// Onglet Terrain › Lame (0.70.0, mode Expert) : guidage d'une lame de grader avec 2 RX2 (calculs
 // dans topo/lame.js). En haut : la surface à suivre, puis l'écart à chaque coin en grand (monter /
 // descendre, en couleur), le dévers mesuré et voulu, la coupe vue de derrière la lame et (0.73.0)
 // le profil en long dans le sens de marche, avec un petit dessin de niveleuse. De chaque côté de la

@@ -1,4 +1,4 @@
-// Guidage de lame (grader) avec 2 RX2 (0.70.0, mode Confirmé). Un RX2 sur un mât au-dessus de
+// Guidage de lame (grader) avec 2 RX2 (0.70.0, mode Expert). Un RX2 sur un mât au-dessus de
 // chaque coin de lame ; la hauteur du mât est la hauteur de canne dans Emlid Flow, avec la
 // compensation d'inclinaison : la position reçue est celle du coin de lame.
 // Formules validées par l'utilisateur (26.10.2026) :

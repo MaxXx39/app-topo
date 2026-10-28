@@ -2,7 +2,7 @@
 // au doigt (téléphone) ou à la souris (ordinateur).
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
 import { bulle } from '../aide/bulles.js';
-import { estModeBase } from '../reglages/reglages.js';
+import { aAcces } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
@@ -39,17 +39,18 @@ const CALQUES = [
   { cle: 'altitudes', titre: 'Altitudes des points', parDefaut: false, famille: 'Points' },
   { cle: 'contours', titre: 'Contours', parDefaut: true, famille: 'Levés' },
   { cle: 'lignes', titre: 'Lignes de rupture', parDefaut: true, famille: 'Levés' },
-  { cle: 'triangles', titre: 'Triangles', parDefaut: true, confirme: true, famille: 'Levés' },
+  { cle: 'triangles', titre: 'Triangles', parDefaut: true, niveau: 'expert', famille: 'Levés' },
   { cle: 'autresStocks', titre: 'Autres levés', parDefaut: true, famille: 'Levés' },
-  { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false, confirme: true, famille: 'Levés' },
-  { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false, confirme: true, famille: 'Levés' },
-  { cle: 'volumes', titre: 'Volume sur chaque surface', parDefaut: true, famille: 'Volumes' },
-  { cle: 'remblaiDeblai', titre: 'Déblai (jaune) / remblai (rouge)', parDefaut: true, famille: 'Volumes' },
-  { cle: 'mesures', titre: 'Mesures et métrés (traits, valeurs)', parDefaut: true, famille: 'Mesures' },
+  { cle: 'couleursAltitude', titre: 'Couleurs selon l\'altitude', parDefaut: false, famille: 'Levés' },
+  { cle: 'courbes', titre: 'Courbes de niveau', parDefaut: false, famille: 'Levés' },
+  { cle: 'volumes', titre: 'Volume sur chaque surface', parDefaut: true, niveau: 'intermediaire', famille: 'Volumes' },
+  { cle: 'remblaiDeblai', titre: 'Déblai (jaune) / remblai (rouge)', parDefaut: true, niveau: 'intermediaire', famille: 'Volumes' },
+  { cle: 'mesures', titre: 'Mesures et métrés (traits, valeurs)', parDefaut: true, niveau: 'intermediaire', famille: 'Mesures' },
 ];
 const FAMILLES_CALQUES = [...new Set(CALQUES.map((c) => c.famille))];
-// Calques « confirme » : cachés et pas dessinés en mode Base (réglages ⚙), sans changer le choix retenu.
-const CALQUES_CONFIRME = new Set(CALQUES.filter((c) => c.confirme).map((c) => c.cle));
+// Calques réservés à un mode (niveau : 'intermediaire' ou 'expert', tableau des modes) : cachés et
+// pas dessinés dans les modes plus simples, sans changer le choix retenu.
+const NIVEAU_CALQUES = new Map(CALQUES.filter((c) => c.niveau).map((c) => [c.cle, c.niveau]));
 const CLE_MEMOIRE = 'topo-calques';
 // Équidistances proposées pour les courbes et les couleurs (m). « auto » : choisie selon la hauteur du stock.
 const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
@@ -68,11 +69,11 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
 export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe } = {}) {
-  // Calques choisis (retenus dans le navigateur) ; « calques » est ce qui est dessiné : en mode
-  // Base, les calques « confirme » sont lus comme décochés.
+  // Calques choisis (retenus dans le navigateur) ; « calques » est ce qui est dessiné : les calques
+  // que le mode n'autorise pas sont lus comme décochés.
   const calquesChoisis = lireCalques();
   const calques = new Proxy(calquesChoisis, {
-    get: (cible, cle) => (CALQUES_CONFIRME.has(cle) && estModeBase() ? false : cible[cle]),
+    get: (cible, cle) => (NIVEAU_CALQUES.has(cle) && !aAcces(NIVEAU_CALQUES.get(cle)) ? false : cible[cle]),
   });
 
   // Boutons posés sur le plan : calques en haut à gauche, zoom en haut à droite.
@@ -87,11 +88,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5" /></svg>
           Calques
         </button>
-        <button type="button" class="puce seulement-confirme" data-action="plans-dxf" aria-expanded="false">
+        <button type="button" class="puce" data-action="plans-dxf" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h11l5 5v11H4z" /><path d="M15 4v5h5M8 13h8M8 17h5" /></svg>
           Plans
         </button>
-        <button type="button" class="puce seulement-confirme" data-action="listes-points" aria-expanded="false">
+        <button type="button" class="puce" data-action="listes-points" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
           Afficher
         </button>
@@ -101,14 +102,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <div class="menu-calques" hidden>
           ${FAMILLES_CALQUES.map((famille) => {
             const cases = CALQUES.filter((c) => c.famille === famille);
-            return `<p class="titre-partie-menu ${cases.every((c) => c.confirme) ? 'seulement-confirme' : ''}">${famille}</p>
-              ${cases.map((c) => `<label class="case ${c.confirme ? 'seulement-confirme' : ''}"><input type="checkbox" data-calque="${c.cle}" ${calquesChoisis[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`).join('')}
-              ${famille === 'Levés' ? `<label class="choix-equidistance seulement-confirme">Équidistance des courbes
+            const classeNiveau = (c) => (c.niveau ? `seulement-${c.niveau}` : '');
+            return `<p class="titre-partie-menu ${cases.every((c) => c.niveau === cases[0].niveau) ? classeNiveau(cases[0]) : ''}">${famille}</p>
+              ${cases.map((c) => `<label class="case ${classeNiveau(c)}"><input type="checkbox" data-calque="${c.cle}" ${calquesChoisis[c.cle] ? 'checked' : ''} /> ${c.titre}</label>`).join('')}
+              ${famille === 'Levés' ? `<label class="choix-equidistance">Équidistance des courbes
                 <select data-calque="equidistance">
                   ${EQUIDISTANCES.map((e) => `<option value="${e}" ${calques.equidistance === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
                 </select>
               </label>` : ''}
-              ${famille === 'Volumes' ? `<label class="choix-equidistance seulement-confirme">Palier déblai / remblai
+              ${famille === 'Volumes' ? `<label class="choix-equidistance seulement-intermediaire">Palier déblai / remblai
                 <select data-calque="palier">
                   ${PALIERS.map((e) => `<option value="${e}" ${calques.palier === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
                 </select>

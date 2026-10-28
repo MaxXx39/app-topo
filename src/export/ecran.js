@@ -44,7 +44,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
 
   conteneur.innerHTML = `
     ${titreSection('exporter', 'Exporter', bulle('exporter'))}
-    <div data-zone="choix"></div>
+    <div data-zone="choix" class="seulement-expert"></div>
     <div class="champs-export">
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">
@@ -71,9 +71,9 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     ${champsCartouche()}
     <div class="ligne-outils">
       <button type="button" class="bouton-secondaire" data-action="pdf">PDF</button>
-      <button type="button" class="bouton-secondaire" data-action="csv">CSV</button>
+      <button type="button" class="bouton-secondaire seulement-expert" data-action="csv">CSV</button>
       <button type="button" class="bouton-secondaire" data-action="dxf">DXF</button>
-      <button type="button" class="bouton-secondaire" data-action="landxml">LandXML</button>
+      <button type="button" class="bouton-secondaire seulement-expert" data-action="landxml">LandXML</button>
     </div>
     <p class="aide" data-zone="message"></p>
   `;
