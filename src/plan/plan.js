@@ -15,6 +15,7 @@ import { lireLibelles, couleurDuNom, couleurDeLigne } from '../leve/libelles.js'
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS } from './dxf-canvas.js';
 import { echapper } from '../outils/echapper.js';
 import { COULEURS_LISTES } from './listes-points.js';
+import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
@@ -1341,10 +1342,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   menuListes.addEventListener('change', (evenement) => {
     const id = evenement.target.dataset.liste;
     if (id) quandMontrerListe?.(id, evenement.target.checked);
-    const couleur = evenement.target.dataset.couleurListe;
-    if (couleur) quandColorerListe?.(couleur, evenement.target.value || null);
   });
   menuListes.addEventListener('click', (evenement) => {
+    const pastille = evenement.target.closest('[data-choix-couleur]');
+    if (pastille) {
+      pastille.closest('details')?.removeAttribute('open');
+      quandColorerListe?.(pastille.dataset.id, pastille.dataset.choixCouleur || null);
+      return;
+    }
     const bouton = evenement.target.closest('[data-toutes]');
     if (bouton) quandMontrerListe?.('*', bouton.dataset.toutes === 'oui');
   });
@@ -1370,19 +1375,22 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       ${liste.map((l) => `<div class="ligne-menu-plan">
         <label class="oeil-plan"><input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} />
           <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span>${echapper(l.nom)}</span></label>
-        ${l.couleurModifiable ? `<select data-couleur-liste="${l.id}" aria-label="Couleur de ${echapper(l.nom)}" style="color: ${l.couleur || 'inherit'}">
-          ${COULEURS_LISTES.map(([valeur, titre]) => `<option value="${valeur}" ${(l.couleur || '') === valeur ? 'selected' : ''}>${valeur ? '●' : '◐'} ${titre}</option>`).join('')}
-        </select>` : ''}
+        ${l.couleurModifiable ? paletteCouleur({ couleur: l.couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${l.id}"`, nom: `Couleur de ${l.nom}` }) : ''}
       </div>`).join('')}`).join('')}
       <div class="ligne-outils"><button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="oui">tout</button>
         <button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="non">rien</button></div>`;
   }
+  menuPlans.addEventListener('click', (evenement) => {
+    const pastille = evenement.target.closest('[data-choix-couleur]');
+    if (!pastille) return;
+    pastille.closest('details')?.removeAttribute('open');
+    quandReglerPlanDxf?.(pastille.dataset.id, { couleur: pastille.dataset.choixCouleur || null });
+  });
   menuPlans.addEventListener('change', (evenement) => {
     const champ = evenement.target;
     const id = champ.dataset.plan;
     if (!id) return;
     if (champ.dataset.reglage === 'visible') quandReglerPlanDxf?.(id, { visible: champ.checked });
-    else if (champ.dataset.reglage === 'couleur') quandReglerPlanDxf?.(id, { couleur: champ.value || null });
   });
 
   /** Liste des plans DXF du menu « Plans » (refaite quand les plans changent). */
@@ -1399,9 +1407,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     menuPlans.innerHTML = plansDxf.map((plan) => `<div class="ligne-menu-plan">
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
           <span>${echapper(plan.nom)}</span></label>
-        <select data-plan="${plan.id}" data-reglage="couleur" aria-label="Couleur de ${echapper(plan.nom)}" style="color: ${plan.couleur || 'inherit'}">
-          ${COULEURS_PLANS.map(([valeur, titre]) => `<option value="${valeur}" ${(plan.couleur || '') === valeur ? 'selected' : ''}>${valeur ? '●' : '◐'} ${titre}</option>`).join('')}
-        </select>
+        ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
       </div>`).join('');
   }
 

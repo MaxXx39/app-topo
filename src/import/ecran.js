@@ -17,6 +17,7 @@ import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
 import { demanderCode } from '../outils/code.js';
 import { COULEURS_LISTES } from '../plan/listes-points.js';
+import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
 
 /**
@@ -63,6 +64,15 @@ export function creerEcranImport(conteneur, actions) {
   }, true);
 
   conteneur.addEventListener('click', (evenement) => {
+    // Pastille de couleur (liste de points, plan DXF) : voir outils/palette.js.
+    const pastille = evenement.target.closest('[data-choix-couleur]');
+    if (pastille) {
+      const { champCouleur, id, choixCouleur: valeur } = pastille.dataset;
+      pastille.closest('details')?.removeAttribute('open');
+      if (champCouleur === 'couleur-liste') actions.colorerListe(id, valeur || null);
+      else if (champCouleur === 'plan-couleur') actions.reglerPlanDxf(id, { couleur: valeur || null });
+      return;
+    }
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
     const { action, id } = bouton.dataset;
@@ -269,9 +279,7 @@ function afficherImportPoints({ nomFichier, format, points, erreurs, avertisseme
 
 /** Couleur de la liste sur le plan (rouge réservé aux points de contrôle). */
 function choixCouleur(id, couleur) {
-  return `<select class="couleur-liste seulement-intermediaire" data-champ="couleur-liste" data-id="${id}" aria-label="Couleur de la liste" style="color: ${couleur || 'inherit'}">
-    ${COULEURS_LISTES.map(([valeur, titre]) => `<option value="${valeur}" ${(couleur || '') === valeur ? 'selected' : ''}>${valeur ? '●' : '◐'} ${titre}</option>`).join('')}
-  </select>`;
+  return `<span class="couleur-liste seulement-intermediaire">${paletteCouleur({ couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${id}"`, nom: 'Couleur de la liste' })}</span>`;
 }
 
 /** Tableau repliable de points (nom, Est, Nord, altitude), sous leur liste. */
@@ -330,9 +338,7 @@ function listePlansDxf(projet, calquesOuverts) {
         <div class="entete-plan-dxf">
           <label class="oeil-plan" title="Afficher / cacher le plan"><input type="checkbox" data-champ="plan-visible" data-id="${plan.id}" ${plan.visible !== false ? 'checked' : ''} aria-label="Afficher le plan" /></label>
           <input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />
-          <select data-champ="plan-couleur" data-id="${plan.id}" aria-label="Couleur du plan" style="color: ${plan.couleur || 'inherit'}">
-            ${COULEURS_PLANS.map(([valeur, titre]) => `<option value="${valeur}" ${(plan.couleur || '') === valeur ? 'selected' : ''}>${valeur ? '●' : '◐'} ${titre}</option>`).join('')}
-          </select>
+          ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: 'Couleur du plan' })}
         </div>
         <div class="ligne-outils">
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>

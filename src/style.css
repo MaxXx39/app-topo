@@ -6776,11 +6776,9 @@ body.mode-base .parties-calculs {
   stroke-width: 3px;
 }
 
-/* Couleur d'une liste de points (Projet › Listes de points). */
+/* Couleur d'une liste de points (Projet › Listes de points) : pastille, voir outils/palette.js. */
 .couleur-liste {
-  max-width: 150px;
-  min-height: 32px;
-  font-size: 0.85rem;
+  display: inline-flex;
 }
 
 /* Dessin : barre d'accroche dans le pilote (pas collée sous le plan comme dans Terrain). */
@@ -7871,4 +7869,88 @@ body.avec-recepteur .bandeaux-recepteur {
 .entete .bouton-onglet-projet.actif {
   background: var(--ambre);
   color: var(--sombre);
+}
+
+/* --- 0.89.0 : choix de couleur en pastilles sans texte --- */
+.choix-couleur {
+  position: relative;
+  flex: none;
+}
+
+.choix-couleur > summary {
+  display: block;
+  width: 28px;
+  height: 28px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.choix-couleur > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* « Couleur normale » : un rond à moitié rempli, sans texte. */
+.pastille-couleur.sans-couleur {
+  background: linear-gradient(90deg, #ffffff 50%, #6b7280 50%);
+}
+
+.palette-flottante {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 190px;
+  padding: 8px;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--ombre);
+}
+
+.palette-flottante .pastille-couleur {
+  width: 28px;
+  height: 28px;
+}
+
+/* Calculs : sa couleur (rose), comme Lever (ambre), Implanter, Contrôle et Guidage. */
+.onglets button.onglet-calculs {
+  border-color: #db2777;
+  color: #db2777;
+}
+
+.onglets button.onglet-calculs svg {
+  color: #db2777;
+}
+
+.onglets button.onglet-calculs.actif {
+  background: #db2777;
+  color: #ffffff;
+}
+
+.onglets button.onglet-calculs.actif svg {
+  color: #ffffff;
+}
+
+body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']) .onglets {
+  border-top: 4px solid #db2777;
+}
+
+.panneau:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']) {
+  border: 2px solid #db2777;
+}
+
+/* Calculs › Volumes choisi : ambre clair (le sombre était trop foncé). */
+.parties-calculs .groupe-surfaces-volumes button.actif {
+  background: var(--ambre);
+  color: var(--sombre);
+}
+
+/* Plan : contour arrondi. */
+.panneau-plan,
+.panneau-plan .plan-cadre {
+  border-radius: var(--rayon);
+  overflow: hidden;
 }
