@@ -7825,3 +7825,18 @@ body.avec-recepteur .bandeaux-recepteur {
   background: none;
   color: #ffffff;
 }
+
+/* 0.88.1 : « Lever en cours » est dans le cadre ambre « Point » ; « ou touche vol − » est de retour. */
+.cadre-prise .entete-levee.levee-en-cours {
+  margin: 0;
+}
+
+.ligne-id-prendre .bouton.bouton-prendre {
+  min-height: 56px;
+  font-size: 1.05rem;
+}
+
+.ligne-id-prendre .sous-titre-prendre {
+  margin-top: 2px;
+  font-size: 0.68rem;
+}

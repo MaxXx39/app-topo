@@ -950,13 +950,13 @@ export function creerEcranLeve(conteneur, actions) {
   function priseDePoint() {
     if (!donnees.stock || choixNatureOuvert) return choixNature();
     return `
-      ${ligneSurface()}
       ${boutonsRoles()}
       <div class="cadre-role role-${donnees.role} ${classeOnglet()}">
       ${donnees.role === 'ligne' ? '' : choixLibelle()}
       ${outilsLigne()}
       <div class="cadre-prise">
         <span class="titre-cadre-prise">Point</span>
+        ${ligneSurface()}
         <div class="ligne-id-prendre">
           <label class="champ-id-point"><span>ID point</span>
             <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" /></label>
@@ -965,7 +965,7 @@ export function creerEcranLeve(conteneur, actions) {
             <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
           </label>
           <button type="button" class="bouton bouton-prendre" data-action="prendre" title="Enregistrer le point (ou touche volume −)" disabled>
-            <span>Enreg. Pts</span>
+            <span>Enreg. Pts</span><span class="sous-titre-prendre">ou touche vol −</span>
           </button>
         </div>
         <div class="position-leve" data-vivant="position"></div>
