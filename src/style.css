@@ -7954,3 +7954,8 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   border-radius: var(--rayon);
   overflow: hidden;
 }
+
+/* 0.89.1 : le bouton Plan de la barre du bas est presque rond. */
+.onglets button.onglet-plan {
+  border-radius: 28px;
+}

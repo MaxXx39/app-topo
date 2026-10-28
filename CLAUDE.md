@@ -69,7 +69,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 
 ## Fonctions (version 0.89.0)
 
-**Retouches 0.89.0** : Calculs a sa couleur (rose `#db2777` : bouton du bas, trait de la barre, cadre des panneaux) ; Calculs › Volumes choisi en ambre ; contour du Plan arrondi ; **choix de couleur = pastilles sans texte** (`outils/palette.js` : une pastille, la toucher ouvre la rangée ; rond à moitié rempli = couleur normale) pour les listes de points (Projet et menu Afficher) et les plans DXF (Projet et menu Plans).
+**Retouches 0.89.0** : Calculs a sa couleur (rose `#db2777` : bouton du bas, trait de la barre, cadre des panneaux) ; Calculs › Volumes choisi en ambre ; contour du Plan arrondi (0.89.1 : le bouton Plan du bas est presque rond) ; **choix de couleur = pastilles sans texte** (`outils/palette.js` : une pastille, la toucher ouvre la rangée ; rond à moitié rempli = couleur normale) pour les listes de points (Projet et menu Afficher) et les plans DXF (Projet et menu Plans).
 
 **Retouches 0.88.0** : Calculs et Plan dans le même rectangle que les modes (gris foncé) ; Lever : plus de cadre violet, une ligne « Lever en cours : nom ✎ » avec « Changer » et « + Nouveau » ; cadre « Point » : ID point, appareil photo et « Enreg. Pts » (ex-PRENDRE LE POINT, avec « ou touche vol − » dessous) sur une ligne ; 0.88.2 : la ligne « Lever en cours » est le bandeau du haut du grand cadre ambre ; onglet du rôle choisi dans la continuité du cadre (trait continu, `onglet-premier` / `onglet-dernier`).
 
