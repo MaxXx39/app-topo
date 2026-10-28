@@ -214,7 +214,7 @@ export function creerBoutonRecepteur(nav, actions) {
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="journalNmea">Journal NMEA (1 min)</button> ${bulle('journalNmea')}</div>` : ''}
       ${reglages && reglagesOuverts ? `<div class="seulement-expert">${blocNtrip(reglages, 1)}</div>` : ''}
       ${actions.choisirRecepteur2 && (lameActive() || etat2?.connecte) ? `<div class="bloc-recepteur2">
-          <p class="titre-choix">Récepteur 2 (lame)</p>
+          <p class="titre-choix">Récepteur 2 (guidage)</p>
           <div data-vivant="etat-recepteur2"></div>
           <div data-vivant="actions-recepteur2"></div>
           ${mode2 === 'ntrip' && actions.lireReglagesCorrections2 ? choixCorrections(actions.lireReglagesCorrections2() ?? {}, 2) : ''}

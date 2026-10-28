@@ -170,6 +170,17 @@ function lireReglagesTerrain() {
   }
 }
 
+/** Mode de Terrain (Lever, Implanter = 'controler', Contrôle = 'autocontrole', Guidage = 'lame'), choisi dans la barre du bas. */
+function choisirModeTerrain(mode) {
+  editeurSurfaces.arreterModification();
+  const permis = lameActive() ? ['controler', 'autocontrole', 'lame'] : ['controler', 'autocontrole'];
+  terrain.mode = permis.includes(mode) ? mode : 'lever';
+  retenirReglagesTerrain();
+  if (terrain.mode === 'controler') montrerSurfaceControle();
+  majBoutonsTerrain();
+  recalculer();
+}
+
 function retenirReglagesTerrain() {
   try {
     localStorage.setItem(CLE_TERRAIN, JSON.stringify(terrain));
@@ -192,9 +203,17 @@ const ICONES = {
 // Main ouverte (on a la main sur le projet), dessinée en traits comme les autres icônes.
 const ICONE_MAIN = '<path d="M18 11V6a2 2 0 0 0-4 0v5" /><path d="M14 10V4a2 2 0 0 0-4 0v6" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />';
 
+// Barre du bas (0.86.0) : les 4 modes de Terrain (Lever, Implanter, Contrôle, Guidage ; appli Android
+// seulement), puis Calculs et Plan. L'onglet Projet est l'icône en haut à gauche ; le récepteur
+// s'ouvre en touchant la barre d'état du récepteur, sous l'en-tête.
+const MODES_TERRAIN = [
+  { cle: 'lever', titre: 'Lever', icone: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle cx="12" cy="12" r="2.5" />' },
+  { cle: 'controler', titre: 'Implanter', icone: '<circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" />' },
+  { cle: 'autocontrole', titre: 'Contrôle', icone: '<path d="m5 12 5 5 9-10" />' },
+  { cle: 'lame', titre: 'Guidage', icone: '<path d="M12 4v16M6 10l6-6 6 6M6 14l6 6 6-6" />', niveau: 'expert' },
+];
 const ONGLETS = [
-  { nom: 'projets', titre: 'Projet' },
-  ...(recepteurDisponible() ? [{ nom: 'terrain', titre: 'Terrain' }] : []),
+  ...(recepteurDisponible() ? MODES_TERRAIN.map((m) => ({ ...m, nom: 'terrain', mode: m.cle })) : []),
   { nom: 'calculs', titre: 'Calculs' },
   { nom: 'plan', titre: 'Plan' },
 ];
@@ -211,7 +230,12 @@ const estPartieCalculs = (nom) => PARTIES_CALCULS.some(([cle]) => cle === nom);
 let partieCalculs = 'volumes'; // dernière partie affichée dans Calculs
 
 /** Bouton d'un onglet (icône + titre). */
-const boutonOnglet = (o) => `<button type="button" data-onglet="${o.nom}" class="onglet-${o.nom}">
+const boutonOnglet = (o) => o.mode
+  ? `<button type="button" data-mode-terrain="${o.mode}" class="onglet-terrain onglet-mode-${o.mode} ${o.niveau ? `seulement-${o.niveau}` : ''}">
+    <svg viewBox="0 0 24 24" aria-hidden="true">${o.icone}</svg>
+    <span>${o.titre}</span>
+  </button>`
+  : `<button type="button" data-onglet="${o.nom}" class="onglet-${o.nom}">
     <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[o.nom]}</svg>
     <span>${o.titre}</span>
   </button>`;
@@ -289,6 +313,8 @@ function afficherOnglet(demande) {
     bouton.classList.toggle('actif', bouton.dataset.partie === nom);
   }
   document.body.dataset.onglet = nom;
+  document.querySelector('#bouton-projet').classList.toggle('actif', nom === 'projets');
+  majBoutonsTerrain();
   if (nom !== 'plan' && nom !== 'dessin') pilote = null;
   if (nom !== 'plan' && nom !== ongletContexte) {
     // Triangles en trop (Terrain › Lever) : on arrête en quittant l'onglet.
@@ -307,9 +333,22 @@ function afficherOnglet(demande) {
   window.scrollTo(0, 0);
 }
 document.querySelector('.onglets').addEventListener('click', (evenement) => {
+  const mode = evenement.target.closest('button[data-mode-terrain]');
+  if (mode) {
+    choisirModeTerrain(mode.dataset.modeTerrain);
+    afficherOnglet('terrain');
+    return;
+  }
   const bouton = evenement.target.closest('button[data-onglet]');
   if (bouton) afficherOnglet(bouton.dataset.onglet);
 });
+/** Boutons Lever / Implanter / Contrôle / Guidage de la barre du bas : celui du mode en cours est actif. */
+function majBoutonsTerrain() {
+  const dansTerrain = document.body.dataset.onglet === 'terrain';
+  for (const bouton of document.querySelectorAll('.onglets button[data-mode-terrain]')) {
+    bouton.classList.toggle('actif', dansTerrain && bouton.dataset.modeTerrain === terrain.mode);
+  }
+}
 document.querySelector('.parties-calculs').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-partie]');
   if (bouton) afficherOnglet(bouton.dataset.partie);
@@ -317,6 +356,7 @@ document.querySelector('.parties-calculs').addEventListener('click', (evenement)
 installerAide(document.querySelector('#bouton-aide'));
 // Toucher le projet ouvert (en-tête) : on va à l'onglet Projet.
 document.querySelector('#entete-projet').addEventListener('click', () => afficherOnglet('projets'));
+document.querySelector('#bouton-projet').addEventListener('click', () => afficherOnglet('projets'));
 
 // Réglages de cet appareil (roue ⚙) : mode Base / Intermédiaire / Expert, mode téléphone, bulles d'aide, nom de l'appareil.
 appliquerReglages();
@@ -363,6 +403,7 @@ function adapterAuMode() {
   if (terrain.mode === 'lame' && !lameActive()) {
     terrain.mode = 'lever';
     retenirReglagesTerrain();
+    majBoutonsTerrain();
   }
   if (estModeBase() && estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
   else if (!aAcces('expert') && document.body.dataset.onglet === 'dessin') afficherOnglet('volumes');
@@ -675,10 +716,10 @@ function ajouterSurfaceLevee(nature) {
   modifie({ recadrer: true });
 }
 
-// Bouton « Récepteur » de la barre du bas (appli Android) : couleur selon l'état, fenêtre pour
+// Récepteur (appli Android) : la barre d'état sous l'en-tête l'ouvre ; fenêtre pour
 // connecter / couper le récepteur et régler les corrections NTRIP (voir leve/recepteur.js).
 const boutonRecepteur = recepteurDisponible()
-  ? creerBoutonRecepteur(document.querySelector('.onglets'), {
+  ? creerBoutonRecepteur(document.createElement('div'), {
       choisirRecepteur,
       reconnecter: reconnecterRecepteur,
       deconnecter: deconnecterRecepteur,
@@ -901,14 +942,7 @@ const ecranLeve = recepteurDisponible()
         afficherMessage('Libellés enregistrés');
         recalculer();
       },
-      choisirMode: (mode) => {
-        editeurSurfaces.arreterModification();
-        const permis = lameActive() ? ['controler', 'autocontrole', 'lame'] : ['controler', 'autocontrole'];
-        terrain.mode = permis.includes(mode) ? mode : 'lever';
-        retenirReglagesTerrain();
-        if (terrain.mode === 'controler') montrerSurfaceControle();
-        recalculer();
-      },
+      choisirMode: choisirModeTerrain,
       // --- Guidage de lame (mode Lame) ---
       choisirSurfaceLame: (id) => {
         terrain.lame.surfaceId = id || null;
@@ -3177,6 +3211,11 @@ if (ecranLeve) {
   });
 }
 
+// Barre du récepteur sous l'en-tête (toujours là dans l'appli Android) : la toucher ouvre la fenêtre du récepteur.
+if (recepteurDisponible()) {
+  mettreAJourBandeaux(null, null);
+  document.addEventListener('ouvrir-recepteur', () => boutonRecepteur?.ouvrir());
+}
 // État du récepteur, 5 fois par seconde : bandeaux, bloc de levé, position sur le plan.
 if (recepteurDisponible()) {
   ecouterRecepteur((etat) => {

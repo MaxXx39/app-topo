@@ -4237,24 +4237,11 @@ body.mode-telephone .onglets button svg {
   color: var(--sombre);
 }
 
-/* Téléphone : la bascule est collée sous le plan (0.64.0 ; avant : au-dessus du plan). */
+/* Téléphone : plus de bascule sous le plan. */
 @media (max-width: 899px) {
+  /* Plus de bascule sous le plan (0.86.0) : les modes sont dans la barre du bas. */
   body {
-    --hauteur-bascule: 46px;
-  }
-
-  body.mode-leve[data-onglet='terrain'] .bascule-terrain {
-    position: fixed;
-    top: calc(var(--hauteur-entete) + var(--hauteur-plan-terrain));
-    left: 0;
-    right: 0;
-    z-index: 11;
-    height: var(--hauteur-bascule);
-    margin: 0;
-    padding: 5px 8px;
-    border-radius: 0;
-    background: var(--surface);
-    border-bottom: 1px solid var(--bordure);
+    --hauteur-bascule: 0px;
   }
 
   body.mode-leve[data-onglet='terrain'] .mise-en-page {
@@ -7585,4 +7572,50 @@ body.lecture-seule .bouton-photo-levee {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* --- 0.86.0 : Projet en haut à gauche, modes de Terrain dans la barre du bas, barre du récepteur cliquable --- */
+.bouton-projet.actif {
+  background: var(--ambre);
+  color: var(--sombre);
+}
+
+.entete-texte.actif .entete-titre {
+  text-decoration: underline;
+}
+
+/* Boutons Lever / Implanter / Contrôle / Guidage : chacun à la couleur de son mode quand il est actif. */
+.onglets button[data-mode-terrain] {
+  --couleur-mode: var(--ambre);
+  min-width: 0;
+}
+
+.onglets button.onglet-mode-controler { --couleur-mode: #0d9488; }
+.onglets button.onglet-mode-autocontrole { --couleur-mode: #dc2626; }
+.onglets button.onglet-mode-lame { --couleur-mode: #1d4ed8; }
+
+.onglets button[data-mode-terrain].actif,
+.onglets button[data-mode-terrain].actif svg {
+  color: var(--couleur-mode);
+}
+
+.onglets button[data-mode-terrain].actif {
+  box-shadow: inset 0 3px 0 var(--couleur-mode);
+}
+
+/* Barre du récepteur : toujours là, on la touche pour ouvrir la fenêtre du récepteur. */
+body.avec-recepteur .bandeaux-recepteur {
+  cursor: pointer;
+}
+
+.bandeaux-recepteur .icone-bandeau {
+  flex: none;
+  width: 26px;
+  padding: 3px 4px;
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  background: var(--sombre);
 }

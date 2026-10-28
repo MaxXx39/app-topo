@@ -12,7 +12,7 @@
 // L'état du récepteur arrive 5 fois par seconde (mettreAJourRecepteur) : on ne change alors que
 // quelques textes et l'état du bouton, sans redessiner l'écran (le doigt peut être dessus).
 import { echapper } from '../outils/echapper.js';
-import { aAcces, estModeBase, lameActive } from '../reglages/reglages.js';
+import { aAcces, estModeBase } from '../reglages/reglages.js';
 import { demanderCode } from '../outils/code.js';
 import { demanderTexte } from '../outils/choix.js';
 import { ouvrirChoixLevees } from './fenetre-levees.js';
@@ -433,19 +433,6 @@ export function creerEcranLeve(conteneur, actions) {
         ? svgCoupeDirecte({ ...TITRES_COUPES[sens], ...coupe, classe: c.classe, sens, exageration: donnees.controle.exagerationCoupe })
         : `<p class="aide">${TITRES_COUPES[sens].titre} : ${c?.messageCoupes ?? 'en attente de la position'}</p>`;
     }
-  }
-
-  /**
-   * Lever | Implanter, tout en haut de l'onglet, au-dessus du plan (le mode « implanter »
-   * s'appelle 'controler' dans le code). Le mode actif est en couleur : ambre pour lever,
-   * sarcelle pour implanter (même couleur que la pastille de l'en-tête).
-   */
-  function choixMode() {
-    return `<div class="modes-terrain bascule-terrain mode-${donnees.mode}" role="group" aria-label="Mode">
-      ${[['lever', 'Lever'], ['controler', 'Implanter'], ['autocontrole', 'Contrôle'], ...(lameActive() ? [['lame', 'Lame']] : [])]
-        .map(([cle, titre]) => `<button type="button" data-action="choisirMode" data-valeur="${cle}" class="${donnees.mode === cle ? 'actif' : ''}">${titre}</button>`)
-        .join('')}
-    </div>`;
   }
 
   /** Petits boutons au choix (un seul actif). */
@@ -1132,7 +1119,6 @@ export function creerEcranLeve(conteneur, actions) {
     else contenu = donnees.mode === 'controler' ? controle() : priseDePoint();
     conteneur.innerHTML = `
         <div class="ecran-terrain cadre-mode-${donnees.mode}">
-          ${choixMode()}
           ${contenu}
         </div>`;
     rafraichirVivant();
@@ -1226,12 +1212,23 @@ export function mettreAJourBandeaux(etat, tablette = null) {
     bandeaux.id = 'bandeaux-recepteur';
     bandeaux.className = 'bandeaux-recepteur';
     bandeaux.setAttribute('role', 'status');
-    bandeaux.innerHTML = '<span data-bandeau="rtk"></span><span data-bandeau="inclinaison"></span>';
+    bandeaux.title = 'Récepteur : toucher pour connecter ou régler';
+    // Petite icône de récepteur (+ flèche) : on comprend qu'on peut toucher la barre (0.86.0).
+    bandeaux.innerHTML = `<svg class="icone-bandeau" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><ellipse cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" /></svg>
+      <span data-bandeau="rtk"></span><span data-bandeau="inclinaison"></span>`;
+    bandeaux.addEventListener('click', () => document.dispatchEvent(new CustomEvent('ouvrir-recepteur')));
     document.querySelector('.entete').append(bandeaux);
   }
-  const visible = Boolean(etat?.connecte) || Boolean(tablette);
-  document.body.classList.toggle('avec-recepteur', visible);
-  if (!visible) return;
+  // Toujours visible (appli Android) : c'est l'accès au récepteur.
+  document.body.classList.add('avec-recepteur');
+  if (!etat?.connecte && !tablette) {
+    const [rtk, inclinaison] = bandeaux.querySelectorAll('[data-bandeau]');
+    rtk.textContent = 'Récepteur non connecté';
+    rtk.className = 'attente';
+    inclinaison.textContent = 'Toucher pour connecter';
+    inclinaison.className = 'attente';
+    return;
+  }
   if (!etat?.connecte) {
     const [rtk, inclinaison] = bandeaux.querySelectorAll('[data-bandeau]');
     rtk.textContent = `GPS TABLETTE · ± ${Math.max(1, Math.round(tablette.precision ?? 0))} m`;
