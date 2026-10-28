@@ -7695,3 +7695,133 @@ body.avec-recepteur .bandeaux-recepteur {
   padding: 0;
   background: none;
 }
+
+/* --- 0.88.0 : Lever plus compact --- */
+/* Levé en cours : une seule ligne, sans cadre : « Lever en cours : nom ✎ » puis Changer et + Nouveau. */
+.entete-levee.levee-en-cours {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px 8px;
+  margin: 10px 0 8px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.levee-en-cours .etiquette-levee {
+  color: var(--gris);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.levee-en-cours .nom-levee-en-cours {
+  color: var(--couleur-nature);
+  font-size: 1.15rem;
+}
+
+.levee-en-cours .boutons-levee {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 0 auto;
+}
+
+.levee-en-cours .boutons-levee .bouton-secondaire {
+  min-height: 36px;
+  padding: 4px 10px;
+}
+
+/* Point : ID point, appareil photo et « Enreg. Pts » sur la même ligne. */
+.ligne-id-prendre {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.ligne-id-prendre .champ-id-point {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.ligne-id-prendre .champ-id-point > span {
+  margin: 0;
+}
+
+.ligne-id-prendre .nom-point {
+  width: 100%;
+  min-width: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.ligne-id-prendre .bouton-photo-levee {
+  flex: 0 0 52px;
+  height: 52px;
+}
+
+.ligne-id-prendre .bouton.bouton-prendre {
+  flex: 1 1 0;
+  width: auto;
+  min-height: 52px;
+  font-size: 1.05rem;
+}
+
+.cadre-prise > .position-leve {
+  margin: 0;
+  gap: 0 10px;
+  font-size: 0.85rem;
+}
+
+/* Rôle choisi : l'onglet est dans la continuité du cadre (même fond, même trait, pas de trait entre les
+   deux), le trait fait tout le tour : onglet, puis cadre. */
+.role-leve.choisi {
+  background: color-mix(in srgb, var(--couleur-role) 6%, var(--surface));
+  color: var(--couleur-role);
+  border-bottom-color: color-mix(in srgb, var(--couleur-role) 6%, var(--surface));
+  box-shadow: none;
+}
+
+.cadre-role {
+  border-radius: 12px;
+}
+
+.cadre-role.onglet-premier {
+  border-top-left-radius: 0;
+}
+
+.cadre-role.onglet-dernier {
+  border-top-right-radius: 0;
+}
+
+.roles-leve .role-leve:not(.choisi) {
+  margin-bottom: 4px;
+}
+
+/* Calculs et Plan : même rectangle que les modes, en gris foncé (contour, plein quand choisi). */
+.onglets button.onglet-calculs,
+.onglets button.onglet-plan {
+  margin: 6px 3px;
+  border: 2px solid var(--sombre);
+  border-radius: 10px;
+  color: var(--sombre);
+}
+
+.onglets button.onglet-calculs svg,
+.onglets button.onglet-plan svg {
+  color: var(--sombre);
+}
+
+.onglets button.onglet-calculs.actif,
+.onglets button.onglet-plan.actif {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.onglets button.onglet-calculs.actif svg,
+.onglets button.onglet-plan.actif svg {
+  width: 22px;
+  padding: 0;
+  background: none;
+  color: #ffffff;
+}

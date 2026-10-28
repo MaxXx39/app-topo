@@ -67,7 +67,9 @@ exemples/            fichiers de référence (NE PAS modifier ni supprimer)
 ## Référence de calcul
 Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 m³, Stock 2 = 648.979 m³, Stock 3 = 372.201 m³ (remblai Mensura). Tests automatiques sur ce cas.
 
-## Fonctions (version 0.87.0)
+## Fonctions (version 0.88.0)
+
+**Retouches 0.88.0** : Calculs et Plan dans le même rectangle que les modes (gris foncé) ; Lever : plus de cadre violet, une ligne « Lever en cours : nom ✎ » avec « Changer » et « + Nouveau » ; cadre « Point » : ID point, appareil photo et « Enreg. Pts » (ex-PRENDRE LE POINT) sur une ligne, position dessous ; onglet du rôle choisi dans la continuité du cadre (trait continu, `onglet-premier` / `onglet-dernier`).
 
 **Retouches 0.87.0** (demande du 28.10.2026) : logo des modes = **pyramide** en 3 paliers (vert en bas, jaune, pointe rouge ; Base = vert allumé seul, Intermédiaire = vert + jaune, Expert = les 3 ; paliers non atteints gris) ; « RX2 » n'apparaît plus dans l'appli (le récepteur peut être un RS4 ou autre) : on écrit **GNSS** (seul reste le nom d'ancienne liste « Levé RX2 date ») ; levés **Terrain** (terrain naturel + terrassement fusionnés ; les anciens « Terrassement » restent affichés tels quels, plus proposés) et **Recollement** (Intermédiaire et Expert, se comporte comme Terrain, **à approfondir avec l'utilisateur** : volumes, règles propres) ; Lever : un seul trait (`.cadre-role`) entoure le bouton du rôle choisi, le libellé (dans « Ligne en cours » pour une ligne), la ligne en cours et le cadre « Point » ; barre du bas : rectangles à la couleur du mode (contour seul, plein quand choisi) et trait de la couleur du mode sur toute la largeur (`body[data-mode-terrain]`) ; icône du récepteur à droite de la barre d'état, entourée comme un bouton ; « Gestion de projets » devient « Ouvrir projet » (fond clair) et le projet ouvert est sur fond ambre.
 

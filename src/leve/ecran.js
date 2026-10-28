@@ -845,24 +845,34 @@ export function creerEcranLeve(conteneur, actions) {
   function ligneSurface() {
     const nature = donnees.stock.nature ?? 'stock';
     const titre = NATURES_TERRAIN.find(([cle]) => cle === nature)?.[1] ?? '';
-    return `<div class="entete-levee nature-${nature}" title="${titre}">
-      <span class="titre-cadre">Lever</span>
-      <div class="nom-levee">
-        <strong>${echapper(donnees.stock.nom)}</strong>
-        <button type="button" class="bouton-crayon-levee" data-action="renommerLevee" title="Renommer" aria-label="Renommer le levé">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
-      </div>
-    </div>
-    <div class="boutons-levee">
-      <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer de levé</button>
-      <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau levé</button>
+    return `<div class="entete-levee levee-en-cours nature-${nature}" title="${titre}">
+      <span class="etiquette-levee">Lever en cours :</span>
+      <strong class="nom-levee-en-cours">${echapper(donnees.stock.nom)}</strong>
+      <button type="button" class="bouton-crayon-levee" data-action="renommerLevee" title="Renommer" aria-label="Renommer le levé">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
+      <span class="boutons-levee">
+        <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer</button>
+        <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau</button>
+      </span>
     </div>`;
+  }
+
+  /** Rôles proposés pour le levé en cours (dans l'ordre des boutons). */
+  function rolesAffiches() {
+    return [...ROLES_LEVE, ...ROLES_METRE].filter(([cle]) => donnees.rolesPermis.includes(cle));
+  }
+
+  /** Place du rôle choisi dans la rangée : le cadre n'a pas de coin arrondi sous l'onglet (premier, dernier). */
+  function classeOnglet() {
+    const roles = rolesAffiches();
+    const i = roles.findIndex(([cle]) => cle === donnees.role);
+    return `${i === 0 ? 'onglet-premier' : ''} ${i === roles.length - 1 ? 'onglet-dernier' : ''}`;
   }
 
   /** Choix du rôle : 3 gros boutons à la couleur du rôle. */
   function boutonsRoles() {
     return `<div class="roles-leve" role="group" aria-label="Rôle du prochain point">
-      ${[...ROLES_LEVE, ...ROLES_METRE].filter(([cle]) => donnees.rolesPermis.includes(cle)).map(
+      ${rolesAffiches().map(
         ([cle, titre]) => `<button type="button" class="role-leve role-${cle} ${donnees.role === cle ? 'choisi' : ''}" data-action="role" data-role="${cle}" aria-pressed="${donnees.role === cle}">
           <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[cle]}</svg>${titre}</button>`,
       ).join('')}
@@ -942,25 +952,23 @@ export function creerEcranLeve(conteneur, actions) {
     return `
       ${ligneSurface()}
       ${boutonsRoles()}
-      <div class="cadre-role role-${donnees.role}">
+      <div class="cadre-role role-${donnees.role} ${classeOnglet()}">
       ${donnees.role === 'ligne' ? '' : choixLibelle()}
       ${outilsLigne()}
       <div class="cadre-prise">
         <span class="titre-cadre-prise">Point</span>
-        <div class="nom-et-position">
+        <div class="ligne-id-prendre">
           <label class="champ-id-point"><span>ID point</span>
             <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" /></label>
-          <div class="position-leve" data-vivant="position"></div>
-        </div>
-        <div class="ligne-prendre">
           <label class="bouton-photo-levee" title="Photo du levé" aria-label="Photo du levé">
             <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>
             <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
           </label>
-          <button type="button" class="bouton bouton-prendre" data-action="prendre" disabled>
-            <span>PRENDRE LE POINT</span><span class="sous-titre-prendre">ou touche vol −</span>
+          <button type="button" class="bouton bouton-prendre" data-action="prendre" title="Enregistrer le point (ou touche volume −)" disabled>
+            <span>Enreg. Pts</span>
           </button>
         </div>
+        <div class="position-leve" data-vivant="position"></div>
         <p class="raison-leve" data-vivant="raison" hidden></p>
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
           Annuler ${donnees.dernierPoint ? echapper(donnees.dernierPoint) : 'le dernier point'}</button>
