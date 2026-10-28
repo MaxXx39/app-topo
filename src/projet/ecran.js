@@ -118,7 +118,7 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
       <div class="actions-projets">
         <button type="button" class="bouton-projet nouveau-projet seulement-intermediaire" data-action="nouveau">+ Nouveau projet</button>
         <button type="button" class="bouton-projet gestion-projets" data-action="panneau" data-panneau="projets">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z" /></svg>Gestion de projets</button>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z" /></svg>Ouvrir projet</button>
       </div>
 
       <section class="bloc-ouvert">
@@ -178,7 +178,7 @@ function pageProjets(projet, resumes, partage, menuOuvert, tri) {
   return `<div class="entete-page-projets">
     <button type="button" class="bouton-retour" data-action="panneau" data-panneau="projets" title="Retour au projet ouvert" aria-label="Retour au projet ouvert">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
-    <h2>Gestion de projets</h2>
+    <h2>Ouvrir projet</h2>
     ${partage?.etat.connecte ? '<button type="button" class="bouton-retour" data-action="rafraichirDrive" title="Actualiser la liste de Google Drive" aria-label="Actualiser">↻</button>' : ''}
   </div>
   <section class="carte-section panneau-projets">

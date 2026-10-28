@@ -25,16 +25,18 @@ import { creerLigne } from './noms.js';
  */
 export const NATURES = [
   ['stock', 'Stock'],
-  ['terrain', 'Terrain naturel'],
+  ['terrain', 'Terrain'],
+  ['recollement', 'Recollement'],
+  // Anciens levés (avant 0.87.0) : « Terrassement » reste affiché tel quel, mais n'est plus proposé.
   ['terrassement', 'Terrassement'],
   // Surface faite dans Calculs › Dessin (0.77.0) : rangée comme un levé, complétée au RX2.
   ['surface', 'Surface'],
 ];
 
 /** Natures qu'on choisit à l'import d'un fichier (la « Surface » vient seulement d'un dessin). */
-export const NATURES_IMPORT = NATURES.filter(([cle]) => cle !== 'surface');
+export const NATURES_IMPORT = NATURES.filter(([cle]) => cle !== 'surface' && cle !== 'terrassement');
 
-/** Nom affiché d'une nature ('terrain' -> 'Terrain naturel'). */
+/** Nom affiché d'une nature ('terrain' -> 'Terrain'). */
 export function nomNature(nature) {
   return NATURES.find(([cle]) => cle === nature)?.[1] ?? '';
 }

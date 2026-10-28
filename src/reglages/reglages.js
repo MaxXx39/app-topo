@@ -64,28 +64,28 @@ export function lameActive() {
   return aAcces('expert');
 }
 
-// Dessin des 3 barres du mode (comme le signal d'un téléphone) : Base = 1 barre verte (les autres
-// grises), Intermédiaire = 2 barres jaunes, Expert = 3 barres rouges.
-const COULEURS_MODE = { base: '#16a34a', intermediaire: '#eab308', expert: '#dc2626' };
+// Logo du mode : une pyramide en 3 paliers (0.87.0). Palier du bas vert, du milieu jaune, pointe
+// rouge. Base = le palier vert seul allumé, Intermédiaire = vert + jaune, Expert = les 3 ; les paliers
+// pas atteints sont gris.
+const PALIERS_MODE = [
+  { couleur: '#16a34a', haut: 15.5, bas: 21 }, // vert (le bas)
+  { couleur: '#eab308', haut: 9.5, bas: 14.5 }, // jaune
+  { couleur: '#dc2626', haut: 3, bas: 8.5 }, // rouge (la pointe)
+];
 export function barresDuMode(mode) {
-  const rangs = MODES.findIndex(([cle]) => cle === mode) + 1;
-  const hauteurs = [8, 14, 20];
-  const barres = hauteurs.map((h, i) => `<rect x="${3 + i * 7}" y="${22 - h}" width="5" height="${h}" rx="1.2" fill="${i < rangs ? COULEURS_MODE[mode] : '#9aa5ad'}" opacity="${i < rangs ? 1 : 0.55}" />`);
-  return `<svg viewBox="0 0 24 24" aria-hidden="true" class="barres-mode barres-${mode}">${barres.join('')}</svg>`;
-}
-
-function ecrireReglages(reglages) {
-  modeRetenu = reglages.mode;
-  try {
-    localStorage.setItem(CLE, JSON.stringify(reglages));
-  } catch {
-    // Mémoire indisponible : le réglage vaut jusqu'à la fermeture de l'appli.
-  }
+  const allumes = MODES.findIndex(([cle]) => cle === mode) + 1;
+  const largeur = (y) => ((y - 3) * 10) / 18; // demi-largeur de la pyramide à la hauteur y
+  const paliers = PALIERS_MODE.map(({ couleur, haut, bas }, i) => {
+    const points = [[12 - largeur(haut), haut], [12 + largeur(haut), haut], [12 + largeur(bas), bas], [12 - largeur(bas), bas]]
+      .map(([x, y]) => `${x.toFixed(2)},${y}`).join(' ');
+    return `<polygon points="${points}" fill="${i < allumes ? couleur : '#9aa5ad'}" opacity="${i < allumes ? 1 : 0.5}" />`;
+  });
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" class="barres-mode barres-${mode}">${paliers.join('')}</svg>`;
 }
 
 /**
  * Applique les réglages à la page : classes mode-telephone et mode-base / mode-intermediaire /
- * mode-expert, barres du mode dans l'en-tête.
+ * mode-expert, pyramide du mode dans l'en-tête.
  */
 export function appliquerReglages(reglages = lireReglages()) {
   modeRetenu = modeValide(reglages.mode);

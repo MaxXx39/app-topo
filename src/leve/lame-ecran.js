@@ -46,7 +46,7 @@ export function htmlLame(donnees, { reglagesOuverts = false } = {}) {
         <label>Vert ≤ <input type="text" inputmode="decimal" data-tolerance-lame="vert" value="${cm(tolerances.vert)}" /> cm</label>
         <label>Orange ≤ <input type="text" inputmode="decimal" data-tolerance-lame="orange" value="${cm(tolerances.orange)}" /> cm</label>
       </div>` : ''}
-    ${donnees.recepteur2 ? '' : '<p class="avertissement">Connecte le 2e RX2 : bouton Récepteur › « Récepteur 2 (essai) ».</p>'}
+    ${donnees.recepteur2 ? '' : '<p class="avertissement">Connecte le 2e GNSS : bouton Récepteur › « Récepteur 2 (essai) ».</p>'}
     <p class="raison-lame" data-vivant="lame-raison" hidden></p>
     <div class="coins-lame">
       <div class="coin-lame" data-vivant="lame-gauche"><span class="titre-coin">Gauche</span><strong>—</strong></div>

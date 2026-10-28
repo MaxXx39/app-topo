@@ -2000,15 +2000,14 @@ th.nombre {
 .bloc-ouvert {
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--sombre);
+  border: 1px solid var(--ambre-fonce);
   margin-bottom: 16px;
 }
 
 .bloc-entete {
-  background: var(--sombre);
-  color: #ffffff;
+  background: var(--ambre);
+  color: var(--sombre);
   padding: 12px 14px 14px;
-  border-bottom: 4px solid var(--ambre);
 }
 
 .etiquette-entete {
@@ -2017,7 +2016,7 @@ th.nombre {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--ambre);
+  color: var(--sombre);
   margin-bottom: 4px;
 }
 
@@ -2094,8 +2093,9 @@ th.nombre {
 }
 
 .bouton-projet.gestion-projets {
-  background: var(--sombre);
-  color: #ffffff;
+  border: 2px solid var(--sombre);
+  background: var(--surface);
+  color: var(--sombre);
 }
 
 .actions-projets .bouton-secondaire.actif {
@@ -3060,6 +3060,10 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 
 .bouton-nature.nature-terrain {
   --couleur-nature: #15803d;
+}
+
+.bouton-nature.nature-recollement {
+  --couleur-nature: #db2777;
 }
 
 .bouton-nature.nature-terrassement {
@@ -4789,6 +4793,10 @@ button.bouton-import {
   --couleur-nature: #15803d;
 }
 
+.entete-levee.nature-recollement {
+  --couleur-nature: #db2777;
+}
+
 .entete-levee.nature-terrassement {
   --couleur-nature: #2563eb;
 }
@@ -5387,6 +5395,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 }
 
 .ligne-levee.nature-terrain { --couleur-nature: #15803d; }
+.ligne-levee.nature-recollement { --couleur-nature: #db2777; }
 .ligne-levee.nature-terrassement { --couleur-nature: #2563eb; }
 .ligne-levee.nature-surface { --couleur-nature: #7c3aed; }
 .ligne-levee.nature-metre { --couleur-nature: #0891b2; }
@@ -7453,6 +7462,7 @@ body.lecture-seule .bouton-photo-levee {
 
 .plan .nature-stock { --couleur-nature: #b45309; }
 .plan .nature-terrain { --couleur-nature: #15803d; }
+.plan .nature-recollement { --couleur-nature: #db2777; }
 .plan .nature-terrassement { --couleur-nature: #2563eb; }
 .plan .nature-surface { --couleur-nature: #7c3aed; }
 
@@ -7559,7 +7569,7 @@ body.lecture-seule .bouton-photo-levee {
   border: none;
   border-radius: 8px;
   background: none;
-  color: var(--ambre);
+  color: var(--sombre);
   vertical-align: middle;
   cursor: pointer;
 }
@@ -7575,7 +7585,7 @@ body.lecture-seule .bouton-photo-levee {
 }
 
 /* --- 0.86.0 : Projet en haut à gauche, modes de Terrain dans la barre du bas, barre du récepteur cliquable --- */
-.bouton-projet.actif {
+.bouton-onglet-projet.actif {
   background: var(--ambre);
   color: var(--sombre);
 }
@@ -7584,24 +7594,47 @@ body.lecture-seule .bouton-photo-levee {
   text-decoration: underline;
 }
 
-/* Boutons Lever / Implanter / Contrôle / Guidage : chacun à la couleur de son mode quand il est actif. */
+/* Boutons Lever / Implanter / Contrôle / Guidage (0.87.0) : un rectangle large à la couleur du mode,
+   contour seul quand le mode n'est pas choisi, plein (icône et texte en blanc) quand il l'est. Un trait
+   de la couleur du mode court sur toute la largeur de la barre et rejoint le rectangle choisi. */
 .onglets button[data-mode-terrain] {
   --couleur-mode: var(--ambre);
   min-width: 0;
+  margin: 6px 3px;
+  border: 2px solid var(--couleur-mode);
+  border-radius: 10px;
+  color: var(--couleur-mode);
+}
+
+.onglets button[data-mode-terrain] svg {
+  color: var(--couleur-mode);
 }
 
 .onglets button.onglet-mode-controler { --couleur-mode: #0d9488; }
 .onglets button.onglet-mode-autocontrole { --couleur-mode: #dc2626; }
 .onglets button.onglet-mode-lame { --couleur-mode: #1d4ed8; }
 
-.onglets button[data-mode-terrain].actif,
-.onglets button[data-mode-terrain].actif svg {
-  color: var(--couleur-mode);
+.onglets button[data-mode-terrain].actif {
+  margin-top: 0;
+  border-top-color: transparent;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  background: var(--couleur-mode);
+  color: #ffffff;
 }
 
-.onglets button[data-mode-terrain].actif {
-  box-shadow: inset 0 3px 0 var(--couleur-mode);
+.onglets button[data-mode-terrain].actif svg {
+  color: #ffffff;
 }
+
+/* Trait de la couleur du mode en haut de la barre, sur toute la largeur. */
+body[data-mode-terrain] .onglets {
+  border-top: 4px solid var(--couleur-barre, var(--ambre));
+}
+
+body[data-mode-terrain='controler'] .onglets { --couleur-barre: #0d9488; }
+body[data-mode-terrain='autocontrole'] .onglets { --couleur-barre: #dc2626; }
+body[data-mode-terrain='lame'] .onglets { --couleur-barre: #1d4ed8; }
 
 /* Barre du récepteur : toujours là, on la touche pour ouvrir la fenêtre du récepteur. */
 body.avec-recepteur .bandeaux-recepteur {
@@ -7610,12 +7643,55 @@ body.avec-recepteur .bandeaux-recepteur {
 
 .bandeaux-recepteur .icone-bandeau {
   flex: none;
-  width: 26px;
-  padding: 3px 4px;
+  box-sizing: content-box;
+  width: 20px;
+  height: 20px;
+  align-self: center;
+  margin: 0 6px;
+  padding: 2px 5px;
   fill: none;
   stroke: #ffffff;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-  background: var(--sombre);
+  border: 2px solid #ffffff;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* 0.87.0 : le rôle choisi (bouton) et tout ce qui le concerne (libellé, ligne en cours, point) sont
+   entourés d'un seul trait, à la couleur du rôle : un onglet qui se prolonge en cadre. */
+.roles-leve {
+  margin-bottom: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.role-leve.choisi {
+  margin-bottom: -2px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.cadre-role {
+  --couleur-role: var(--gris);
+  padding: 4px 8px 8px;
+  border: 2px solid var(--couleur-role);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--couleur-role) 4%, var(--surface));
+}
+
+.cadre-role.role-contour { --couleur-role: var(--rouge); }
+.cadre-role.role-ligne { --couleur-role: var(--orange); }
+.cadre-role.role-isole { --couleur-role: var(--succes); }
+.cadre-role:is(.role-aire, .role-longueur, .role-compte) { --couleur-role: #0891b2; }
+
+.element-en-cours .libelles-terrain {
+  margin: 8px 0 0;
+}
+
+.onglets button[data-mode-terrain].actif svg {
+  width: 22px;
+  padding: 0;
+  background: none;
 }

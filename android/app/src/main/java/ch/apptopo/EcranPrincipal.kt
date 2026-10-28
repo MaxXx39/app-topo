@@ -359,7 +359,7 @@ class EcranPrincipal : Activity() {
         if (appareils.isEmpty()) {
             AlertDialog.Builder(this)
                 .setTitle("Aucun appareil appairé")
-                .setMessage("Appairez d'abord le RX2 dans les réglages Bluetooth du téléphone, puis revenez ici.")
+                .setMessage("Appairez d'abord le récepteur GNSS dans les réglages Bluetooth du téléphone, puis revenez ici.")
                 .setPositiveButton("OK", null)
                 .show()
             return
@@ -417,7 +417,7 @@ class EcranPrincipal : Activity() {
             .setItems(noms) { _, numero ->
                 val appareil = appareils[numero]
                 if (appareil.address == preferences().getString(CLE_DERNIER_RECEPTEUR, null) && recepteur.connecte) {
-                    message("C'est déjà le récepteur 1 : choisis l'autre RX2.")
+                    message("C'est déjà le récepteur 1 : choisis l'autre récepteur.")
                     return@setItems
                 }
                 @SuppressLint("MissingPermission")
@@ -581,7 +581,7 @@ class EcranPrincipal : Activity() {
         super.onRequestPermissionsResult(code, permissions, resultats)
         if (code == CODE_LOCALISATION) {
             // Refus : pas de position sans RX2 (rien d'autre ne change).
-            if (resultats.none { it == PackageManager.PERMISSION_GRANTED }) message("Sans la localisation, le plan ne montre ta position qu'avec le RX2.")
+            if (resultats.none { it == PackageManager.PERMISSION_GRANTED }) message("Sans la localisation, le plan ne montre ta position qu'avec le récepteur GNSS.")
             return
         }
         if (code != CODE_PERMISSIONS) return

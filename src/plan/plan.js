@@ -1218,7 +1218,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const TITRES_SUIVI = {
     libre: 'Ma position',
     suivre: 'Suit ma position, nord en haut (toucher : devant en haut)',
-    cap: 'Suit ma position, devant du RX2 en haut (toucher : nord en haut)',
+    cap: 'Suit ma position, devant du GNSS en haut (toucher : nord en haut)',
   };
 
   /** Change le mode de suivi et le dessin du bouton. */

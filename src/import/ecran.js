@@ -241,7 +241,7 @@ function ligneListe(projet, leve) {
 
 /** Surface importée (LandXML, DXF 3D) : nom à changer, nature, fichier d'origine, supprimer. */
 function ligneSurfaceProjet(surface) {
-  const nature = { stock: 'stock', terrain: 'terrain naturel', terrassement: 'terrassement' }[surface.nature] ?? '';
+  const nature = { stock: 'stock', terrain: 'terrain', recollement: 'recollement', terrassement: 'terrassement' }[surface.nature] ?? '';
   return `<div class="ligne-leve liste-surface-projet">
       <input type="text" class="nom-leve" data-champ="nom-surface-projet" data-id="${surface.id}" value="${echapper(surface.nom)}" aria-label="Nom de la surface" />
       <div class="ligne-outils">

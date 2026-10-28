@@ -54,8 +54,8 @@ export const LONGUEURS_COUPE = [2, 5, 10, 20];
 // ou un métré (aires, longueurs, points comptés : des mesures de Calculs › Mesures / métrés).
 const NATURES_TERRAIN = [
   ['stock', 'Stock'],
-  ['terrain', 'Terrain naturel'],
-  ['terrassement', 'Terrassement'],
+  ['terrain', 'Terrain'], // terrain naturel et terrassement fusionnés (0.87.0)
+  ['recollement', 'Recollement'], // Intermédiaire et Expert ; se comporte comme Terrain (à approfondir)
   ['metre', 'Métré'],
   ['autres', 'Levé libre'],
   // Surface d'un dessin (Calculs › Dessin) : pas créée ici, mais on la complète au RX2.
@@ -75,7 +75,7 @@ export const ACCROCHES = {
 };
 // Guidage vers le point : par rapport au cap du RX2 (avance / droite) ou nord / sud / est / ouest.
 const GUIDAGES = [
-  ['rx2', 'Cap RX2'],
+  ['rx2', 'Cap GNSS'],
   ['nseo', 'N-S-E-O'],
 ];
 const TITRES_COUPES = {
@@ -337,7 +337,7 @@ export function creerEcranLeve(conteneur, actions) {
     if (orientation) {
       const o = direct?.orientation;
       const degres = (valeur) => (valeur == null ? '—' : `${Math.round(valeur)}°`);
-      orientation.textContent = `cap RX2 ${degres(o?.cap)} · marche ${degres(o?.marche)}`;
+      orientation.textContent = `cap GNSS ${degres(o?.cap)} · marche ${degres(o?.marche)}`;
     }
     if (donnees?.mode === 'autocontrole') rafraichirImplantation();
     else if (donnees?.mode === 'controler' && donnees.controle.implantation === 'point') rafraichirImplantation();
@@ -478,7 +478,7 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="ligne-choix seulement-intermediaire"><span>Coupes</span>${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}</div>
       <div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
       <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
-      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
+      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap GNSS'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
       <p class="aide" data-vivant="orientation"></p>`;
   }
 
@@ -769,7 +769,7 @@ export function creerEcranLeve(conteneur, actions) {
     const l = imp.ligne;
     return `<div class="reglages-guidage">
       <div class="ligne-choix"><span>Guidage</span>${boutonsChoix('choisirGuidage', GUIDAGES, reglages.guidage)}</div>
-      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap RX2'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
+      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap GNSS'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
       ${ligne && l.nbSegments > 1 ? `<div class="ligne-choix"><span>Ligne</span>${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment par segment']], l.segment == null ? 'tout' : 'segment')}</div>` : ''}
       ${ligne ? `<label class="champ-decalage">Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
       <p class="aide" data-vivant="orientation"></p>
@@ -899,6 +899,7 @@ export function creerEcranLeve(conteneur, actions) {
         <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
           ${ligne.fermee ? '✓ Ligne fermée' : 'Fermer ligne'}</button>
       </div>
+      ${choixLibelle()}
     </div>`;
   }
 
@@ -941,7 +942,8 @@ export function creerEcranLeve(conteneur, actions) {
     return `
       ${ligneSurface()}
       ${boutonsRoles()}
-      ${choixLibelle()}
+      <div class="cadre-role role-${donnees.role}">
+      ${donnees.role === 'ligne' ? '' : choixLibelle()}
       ${outilsLigne()}
       <div class="cadre-prise">
         <span class="titre-cadre-prise">Point</span>
@@ -962,6 +964,7 @@ export function creerEcranLeve(conteneur, actions) {
         <p class="raison-leve" data-vivant="raison" hidden></p>
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
           Annuler ${donnees.dernierPoint ? echapper(donnees.dernierPoint) : 'le dernier point'}</button>
+      </div>
       </div>
       <div class="pied-terrain">${resume()}</div>
       ${basDuLeve()}`;
@@ -1214,8 +1217,8 @@ export function mettreAJourBandeaux(etat, tablette = null) {
     bandeaux.setAttribute('role', 'status');
     bandeaux.title = 'Récepteur : toucher pour connecter ou régler';
     // Petite icône de récepteur (+ flèche) : on comprend qu'on peut toucher la barre (0.86.0).
-    bandeaux.innerHTML = `<svg class="icone-bandeau" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><ellipse cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" /></svg>
-      <span data-bandeau="rtk"></span><span data-bandeau="inclinaison"></span>`;
+    bandeaux.innerHTML = `<span data-bandeau="rtk"></span><span data-bandeau="inclinaison"></span>
+      <svg class="icone-bandeau" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><ellipse cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" /></svg>`;
     bandeaux.addEventListener('click', () => document.dispatchEvent(new CustomEvent('ouvrir-recepteur')));
     document.querySelector('.entete').append(bandeaux);
   }
@@ -1233,7 +1236,7 @@ export function mettreAJourBandeaux(etat, tablette = null) {
     const [rtk, inclinaison] = bandeaux.querySelectorAll('[data-bandeau]');
     rtk.textContent = `GPS TABLETTE · ± ${Math.max(1, Math.round(tablette.precision ?? 0))} m`;
     rtk.className = 'tablette';
-    inclinaison.textContent = 'RX2 non connecté';
+    inclinaison.textContent = 'GNSS non connecté';
     inclinaison.className = 'attente';
     return;
   }

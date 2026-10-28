@@ -345,6 +345,8 @@ document.querySelector('.onglets').addEventListener('click', (evenement) => {
 /** Boutons Lever / Implanter / Contrôle / Guidage de la barre du bas : celui du mode en cours est actif. */
 function majBoutonsTerrain() {
   const dansTerrain = document.body.dataset.onglet === 'terrain';
+  if (dansTerrain) document.body.dataset.modeTerrain = terrain.mode;
+  else delete document.body.dataset.modeTerrain;
   for (const bouton of document.querySelectorAll('.onglets button[data-mode-terrain]')) {
     bouton.classList.toggle('actif', dansTerrain && bouton.dataset.modeTerrain === terrain.mode);
   }
@@ -1753,7 +1755,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     const distance = lireNombreTape(pilote?.distance);
     if (!dessin || dessin.sommets.length === 0) return;
     if (pilote.direction == null) {
-      afficherMessage(dessin.sommets.length === 1 ? 'Donne d\'abord la direction : touche le plan, ou vers le RX2' : 'Donne d\'abord la direction : tourne à gauche ou à droite, ou touche le plan', 4000);
+      afficherMessage(dessin.sommets.length === 1 ? 'Donne d\'abord la direction : touche le plan, ou vers le GNSS' : 'Donne d\'abord la direction : tourne à gauche ou à droite, ou touche le plan', 4000);
       return;
     }
     if (!(distance > 0)) {
@@ -1781,7 +1783,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
       return;
     }
     sonValidation();
-    ajouterSommetDessin(reponse.point, 'RX2');
+    ajouterSommetDessin(reponse.point, 'GNSS');
   },
   directionRx2: () => {
     const dessin = dessinDe(pilote?.dessinId);
@@ -1792,12 +1794,12 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     }
     const gon = dessin?.sommets.length ? gisement(dessin.sommets.at(-1), reponse.point) : null;
     if (gon == null) {
-      afficherMessage('Le RX2 est sur le dernier sommet : éloigne-toi dans la direction voulue', 4000);
+      afficherMessage('Le GNSS est sur le dernier sommet : éloigne-toi dans la direction voulue', 4000);
       return;
     }
     sonValidation();
     pilote.direction = gon;
-    pilote.reference = 'vers le RX2';
+    pilote.reference = 'vers le GNSS';
     pilote.tourne = 0;
     recalculer();
   },
@@ -1805,7 +1807,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     const dessin = dessinDe(pilote?.dessinId);
     if (!dessin || dessin.sommets.length !== 1) return;
     if (pilote.direction == null) {
-      afficherMessage('Rectangle : donne d\'abord la direction de la longueur (touche le plan, ou vers le RX2)', 4000);
+      afficherMessage('Rectangle : donne d\'abord la direction de la longueur (touche le plan, ou vers le GNSS)', 4000);
       return;
     }
     const a = dessin.sommets[0];
@@ -2481,7 +2483,7 @@ function commencerRecalage(id) {
         afficherMessage(`Point refusé : ${reponse.raison}`, 4000);
         return;
       }
-      ajouterPaireCalage({ est: reponse.point.est, nord: reponse.point.nord, nom: `RX2 ${new Date().toLocaleTimeString('fr-CH')}` });
+      ajouterPaireCalage({ est: reponse.point.est, nord: reponse.point.nord, nom: `GNSS ${new Date().toLocaleTimeString('fr-CH')}` });
     },
     basculerPaire: (index, actif) => {
       recalage.paires[index].actif = actif;
@@ -3680,7 +3682,8 @@ creerEcranExport(document.querySelector('#export'), {
     return [
       { titre: 'Volumes', elements: projet.calculs.map((c) => ({ id: c.id, nom: nomDuCalcul(c, projet.surfaces), defaut: estAffichee(c.surface1Id) })) },
       { titre: 'Stocks', elements: surfacesDe(['stock']) },
-      { titre: 'Terrain naturel', elements: surfacesDe(['terrain']) },
+      { titre: 'Terrain', elements: surfacesDe(['terrain']) },
+      { titre: 'Recollement', elements: surfacesDe(['recollement']) },
       { titre: 'Terrassement', elements: surfacesDe(['terrassement']) },
       { titre: 'Surfaces (dessins)', elements: surfacesDe(['surface']) },
       { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
