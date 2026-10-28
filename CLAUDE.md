@@ -4,7 +4,7 @@
 - Géomètre topo suisse, **débutant en développement**. Répondre **en français**, simplement, sans jargon (définir un terme technique en une phrase).
 - Poser **toujours** des questions **avant** une décision importante ou ambiguë. Ne **jamais deviner** une formule ou une norme de topo : le dire et faire valider.
 - Fonctionnalité : lancer les tests, expliquer, dire comment l'essayer, proposer la suite.
-- Nouvelle fonctionnalité : **toujours demander** dans quel mode la mettre (**Base** ou **Confirmé**) avant de la coder.
+- Nouvelle fonctionnalité : **toujours demander** dans quel mode la mettre (**Base**, **Intermédiaire** ou **Expert**) avant de la coder. Ne jamais la mettre dans un mode sans l'avoir demandé.
 - Tout se fait dans le cloud ; l'utilisateur n'utilise que navigateur / tablette.
 - **Git** : commit en français après chaque fonctionnalité qui marche. Ne jamais demander mot de passe ni jeton dans le chat. Aucun identifiant de modèle dans commits / PR.
 - Avant d'ajouter une bibliothèque : dire ce qu'elle fait, pourquoi, demander l'accord.
@@ -69,7 +69,12 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 
 ## Fonctions (version 0.84.0)
 
-**Modes Base / Confirmé** (réglages ⚙, étoile ☆ / ★ dans l'en-tête, Confirmé par défaut, retenu par l'appareil). En Base : éléments `.seulement-confirme` cachés, `estModeBase()` dans le code ; rien n'est supprimé du projet.
+**Trois modes : Base, Intermédiaire, Expert** (demande du 28.10.2026 ; réglages ⚙, étoile ☆ / ★ dans l'en-tête, retenu par l'appareil). Base = ce qui était « Base » ; Intermédiaire = nouveau ; Expert = ce qui était « Confirmé ». Dans le code, il reste pour l'instant `estModeBase()` et `.seulement-confirme` (Confirmé) : **pas encore renommé ni ajouté**, à faire quand l'utilisateur valide le tableau. Rien n'est supprimé du projet en changeant de mode.
+- **Tableau de référence** : `docs/modes-base-intermediaire-expert.xlsx` (134 fonctions : principale › secondaire › fonction ; une case par mode). Mis à jour par l'utilisateur ; à relire avant de coder une fonction.
+- **Règles** : Base coché ⇒ Intermédiaire et Expert cochés ; une fonction principale ou secondaire décochée ⇒ tout ce qui est dessous décoché (pour ce mode).
+- **Décompte** (tableau du 28.10.2026) : Base 60 fonctions, Intermédiaire 99, Expert 129 (sur 134).
+- **Points à trancher** : « Cadre Ligne en cours » (+ Nouvelle ligne, Fermer ligne) est coché en Intermédiaire mais pas en Expert ; à confirmer.
+- Ancien texte (Base / Confirmé), encore vrai dans le code : Base = `estModeBase()` ; Confirmé = `.seulement-confirme`, `lameActive()`.
 - Base = projets, Drive, point tapé, récepteur, GPS de la tablette, lever « Levé libre » (« autres » dans le code), rôles et libellés existants, implanter point / ligne simple, accroches DXF, contrôle de surface, Terrain › Contrôle, réglages du guidage, plan (fonds, cadastre, points, noms, altitudes).
 - Confirmé = tout le reste : onglet Calculs, bloc Import du Projet, menus « Plans » et « Afficher » du plan, DXF, talus, NTRIP, libellés à modifier, options de ligne, triangles / courbes, suppression d'un levé ; Terrain › Lame et 2e récepteur seulement si la case « Onglet Lame » des réglages ⚙ est cochée (`lameActive()`, décochée par défaut).
 
