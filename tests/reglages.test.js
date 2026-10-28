@@ -68,3 +68,14 @@ describe('modes Base / Intermédiaire / Expert', () => {
     expect((await chargerReglages({ 'topo-reglages': '{illisible' })).modeAppli()).toBe('intermediaire');
   });
 });
+
+describe('changement de mode dans les réglages', () => {
+  it('écrire un mode le garde dans la mémoire du navigateur', async () => {
+    const reglages = await chargerReglages({});
+    const fausseZone = { classList: { toggle() {} }, querySelector: () => null };
+    globalThis.document = { body: fausseZone, querySelector: () => null };
+    reglages.appliquerReglages({ telephone: false, mode: 'expert' });
+    expect(reglages.modeAppli()).toBe('expert');
+    delete globalThis.document;
+  });
+});

@@ -83,6 +83,15 @@ export function barresDuMode(mode) {
   return `<svg viewBox="0 0 24 24" aria-hidden="true" class="barres-mode barres-${mode}">${paliers.join('')}</svg>`;
 }
 
+function ecrireReglages(reglages) {
+  modeRetenu = reglages.mode;
+  try {
+    localStorage.setItem(CLE, JSON.stringify(reglages));
+  } catch {
+    // Mémoire indisponible : le réglage vaut jusqu'à la fermeture de l'appli.
+  }
+}
+
 /**
  * Applique les réglages à la page : classes mode-telephone et mode-base / mode-intermediaire /
  * mode-expert, pyramide du mode dans l'en-tête.
