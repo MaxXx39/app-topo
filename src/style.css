@@ -7849,3 +7849,12 @@ body.avec-recepteur .bandeaux-recepteur {
   border-radius: 10px 10px 0 0;
   background: color-mix(in srgb, var(--couleur-nature) 8%, var(--surface));
 }
+
+/* 0.88.3 : le bandeau « Lever en cours » est ambre, quelle que soit la nature du levé. */
+.ecran-terrain > .entete-levee.levee-en-cours {
+  --couleur-nature: var(--ambre);
+}
+
+.ecran-terrain > .levee-en-cours .nom-levee-en-cours {
+  color: var(--sombre);
+}
