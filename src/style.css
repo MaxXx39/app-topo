@@ -7858,3 +7858,17 @@ body.avec-recepteur .bandeaux-recepteur {
 .ecran-terrain > .levee-en-cours .nom-levee-en-cours {
   color: var(--sombre);
 }
+
+/* 0.88.4 : icône Projet de l'en-tête dans un rectangle ambre (plein quand l'onglet Projet est ouvert). */
+.entete .bouton-onglet-projet {
+  width: 44px;
+  height: 40px;
+  border: 2px solid var(--ambre);
+  border-radius: 10px;
+  color: var(--ambre);
+}
+
+.entete .bouton-onglet-projet.actif {
+  background: var(--ambre);
+  color: var(--sombre);
+}
