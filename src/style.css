@@ -7840,3 +7840,12 @@ body.avec-recepteur .bandeaux-recepteur {
   margin-top: 2px;
   font-size: 0.68rem;
 }
+
+/* 0.88.2 : « Lever en cours » est le bandeau du haut du grand cadre ambre (collé au trait, fond teinté). */
+.ecran-terrain > .entete-levee.levee-en-cours {
+  margin: -16px -16px 12px;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--couleur-nature);
+  border-radius: 10px 10px 0 0;
+  background: color-mix(in srgb, var(--couleur-nature) 8%, var(--surface));
+}

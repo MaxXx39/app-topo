@@ -950,13 +950,13 @@ export function creerEcranLeve(conteneur, actions) {
   function priseDePoint() {
     if (!donnees.stock || choixNatureOuvert) return choixNature();
     return `
+      ${ligneSurface()}
       ${boutonsRoles()}
       <div class="cadre-role role-${donnees.role} ${classeOnglet()}">
       ${donnees.role === 'ligne' ? '' : choixLibelle()}
       ${outilsLigne()}
       <div class="cadre-prise">
         <span class="titre-cadre-prise">Point</span>
-        ${ligneSurface()}
         <div class="ligne-id-prendre">
           <label class="champ-id-point"><span>ID point</span>
             <input type="text" class="nom-point" data-champ="nom-point" value="${echapper(donnees.nomPropose)}" autocomplete="off" autocapitalize="characters" aria-label="Nom du prochain point" /></label>
