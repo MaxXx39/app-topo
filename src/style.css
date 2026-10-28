@@ -7895,24 +7895,58 @@ body.avec-recepteur .bandeaux-recepteur {
 }
 
 .palette-flottante {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 40;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  width: 190px;
-  padding: 8px;
-  border: 1px solid var(--bordure);
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: var(--ombre);
+  padding: 8px 2px 2px;
 }
 
 .palette-flottante .pastille-couleur {
   width: 28px;
   height: 28px;
+}
+
+/* Palette ouverte : elle prend toute la largeur, sous la ligne (jamais coupée ni hors de l'écran). */
+.choix-couleur[open] {
+  flex: 0 0 100%;
+  order: 9;
+}
+
+.ligne-menu-plan,
+.entete-plan-dxf {
+  flex-wrap: wrap;
+}
+
+.ligne-menu-plan .oeil-plan {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Projet › listes : nom, pastille de couleur, puis le reste en dessous. */
+.ligne-leve:has(> .couleur-liste) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.ligne-leve:has(> .couleur-liste) > .case {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.ligne-leve:has(> .couleur-liste) > .couleur-liste {
+  flex: none;
+}
+
+.ligne-leve:has(> .couleur-liste) > .couleur-liste:has(details[open]) {
+  flex: 0 0 100%;
+  order: 9;
+}
+
+.ligne-leve:has(> .couleur-liste) > .ligne-outils,
+.ligne-leve:has(> .couleur-liste) > details {
+  flex: 0 0 100%;
 }
 
 /* Calculs : sa couleur (rose), comme Lever (ambre), Implanter, Contrôle et Guidage. */
