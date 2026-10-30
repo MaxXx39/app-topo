@@ -158,13 +158,8 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
   };
   fenetre.addEventListener('change', (evenement) => {
     const champ = evenement.target.dataset.reglage;
-    if (champ === 'mode') {
-      reglages.mode = evenement.target.value;
-      ecrireReglages(reglages);
-      appliquerReglages(reglages);
-      for (const puce of fenetre.querySelectorAll('.puce-mode')) puce.classList.toggle('actif', puce.contains(evenement.target));
-      changerMode?.();
-    } else if (champ === 'telephone') {
+    if (champ === 'mode') changerModeProtege(evenement.target);
+    else if (champ === 'telephone') {
       reglages.telephone = evenement.target.checked;
       ecrireReglages(reglages);
       appliquerReglages(reglages);
@@ -188,6 +183,22 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     if (bouton?.dataset.action === 'modifierNomAppareil') modifierNomProtege();
     else if (bouton) partage?.actions[bouton.dataset.action]?.();
   });
+  /** Mode choisi : monter en Expert demande le code de sécurité (0.90.0) ; descendre, non. */
+  async function changerModeProtege(choix) {
+    if (choix.value === 'expert' && reglages.mode !== 'expert' && !deverrouille) {
+      if (!(await demanderCode('Passer en mode Expert'))) {
+        for (const radio of fenetre.querySelectorAll('[data-reglage="mode"]')) radio.checked = radio.value === reglages.mode;
+        return;
+      }
+      deverrouille = true;
+    }
+    reglages.mode = choix.value;
+    ecrireReglages(reglages);
+    appliquerReglages(reglages);
+    for (const puce of fenetre.querySelectorAll('.puce-mode')) puce.classList.toggle('actif', puce.contains(choix));
+    changerMode?.();
+  }
+
   /** Listes partagées (adresses mail, réglages swipos) : protégées par le code de sécurité. */
   async function modifierListes() {
     if (!deverrouille && !(await demanderCode('Listes partagées'))) return;

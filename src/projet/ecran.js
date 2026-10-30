@@ -125,7 +125,7 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
         <div class="bloc-entete">
           <span class="etiquette-entete">Projet ouvert ${bulle('projets')}</span>
           <span class="titre-projet-ouvert">${echapper(titreProjet(projet))}
-            <button type="button" class="bouton-crayon-projet" data-action="renommerProjet" title="Renommer le projet" aria-label="Renommer le projet">
+            <button type="button" class="bouton-crayon-projet seulement-expert" data-action="renommerProjet" title="Renommer le projet" aria-label="Renommer le projet">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button></span>
         </div>
       </section>
@@ -267,8 +267,8 @@ export function blocPartage({ etat, appareil }, { modifierNom = false } = {}) {
       ${etat.connecte
         ? `<span class="etat-partage ${classe}">${texte}${heure}</span>
            ${['repris', 'rendu'].includes(etat.etat) ? '' : '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="envoyerDrive">envoyer maintenant</button>'}
-           ${['repris', 'rendu'].includes(etat.etat) ? '' : '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="rendreLaMain">rendre la main</button>'}
-           ${etat.etat === 'rendu' ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="reprendreApresRendu">reprendre la main</button>' : ''}
+           ${['repris', 'rendu'].includes(etat.etat) ? '' : '<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="rendreLaMain">rendre la main</button>'}
+           ${etat.etat === 'rendu' ? '<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="reprendreApresRendu">reprendre la main</button>' : ''}
            <button type="button" class="bouton-lien" data-action="deconnecterDrive">se déconnecter</button>`
         : `<button type="button" class="bouton-secondaire" data-action="connecterDrive" ${appareil.nom ? '' : 'disabled'}>Se connecter à Google Drive</button>`}
     </div>` : ''}

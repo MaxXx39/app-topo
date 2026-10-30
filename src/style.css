@@ -204,6 +204,10 @@ p {
   color: #86efac;
 }
 
+.pastille-entete.pastille-inactive {
+  cursor: default;
+  pointer-events: none;
+}
 .pastille-rouge {
   background: var(--rouge);
   color: #ffffff;
@@ -7962,6 +7966,14 @@ body.avec-recepteur .bandeaux-recepteur {
 .onglets button.onglet-calculs.actif {
   background: #db2777;
   color: #ffffff;
+}
+
+/* 0.90.0 : Calculs choisi rejoint le trait rose, comme les modes de Terrain. */
+body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']) .onglets button.onglet-calculs.actif {
+  margin-top: 0;
+  border-top-color: transparent;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .onglets button.onglet-calculs.actif svg {

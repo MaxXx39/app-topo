@@ -49,16 +49,16 @@ describe('levé direct', () => {
     expect(leve.nom).toBe('Levé RX2 2026-10-21');
     expect(estLeveDirect(leve)).toBe(true);
     expect(projet.leveActifId).toBe(leve.id);
-    expect(stock).toMatchObject({ nom: 'Stock 1', nature: 'stock', leveId: leve.id, tousLesPoints: false });
+    expect(stock).toMatchObject({ nom: 'LV-Stock 1', nature: 'stock', leveId: leve.id, tousLesPoints: false });
     expect(creerLeveDirect(projet, new Date('2026-10-21T15:00:00Z')).nom).toBe('Levé RX2 2026-10-21 (2)');
-    expect(creerSurfaceDirecte(projet, leve, 'stock').nom).toBe('Stock 2');
+    expect(creerSurfaceDirecte(projet, leve, 'stock').nom).toBe('LV-Stock 2');
   });
 
   it('crée la surface de la nature choisie, avec son propre numéro', () => {
     const { projet, leve } = nouveauLeve();
-    expect(creerSurfaceDirecte(projet, leve, 'terrain')).toMatchObject({ nom: 'Terrain 1', nature: 'terrain', tousLesPoints: false });
-    expect(creerSurfaceDirecte(projet, leve, 'terrassement')).toMatchObject({ nom: 'Terrassement 1', nature: 'terrassement' });
-    expect(creerSurfaceDirecte(projet, leve, 'terrain').nom).toBe('Terrain 2');
+    expect(creerSurfaceDirecte(projet, leve, 'terrain')).toMatchObject({ nom: 'LV-Terrain 1', nature: 'terrain', tousLesPoints: false });
+    expect(creerSurfaceDirecte(projet, leve, 'terrassement')).toMatchObject({ nom: 'LV-Terrassement 1', nature: 'terrassement' });
+    expect(creerSurfaceDirecte(projet, leve, 'terrain').nom).toBe('LV-Terrain 2');
   });
 
   it('range les surfaces du même jour dans le même levé', () => {
@@ -125,6 +125,18 @@ describe('levé direct', () => {
     expect(lireNomLeve('L-HT-1-12')).toEqual({ type: 'L', libelle: 'HT', element: 1, numero: 12 });
     expect(lireNomLeve('P-RG-4')).toEqual({ type: 'P', libelle: 'RG', element: null, numero: 4 });
     expect(lireNomLeve('b100')).toBeNull();
+    // Libellé « Aucun » (0.90.0).
+    expect(lireNomLeve('L-1-3')).toEqual({ type: 'L', libelle: '', element: 1, numero: 3 });
+    expect(lireNomLeve('P-5')).toEqual({ type: 'P', libelle: '', element: null, numero: 5 });
+  });
+
+  it('nomme les points sans libellé (« Aucun »)', () => {
+    const { projet, leve, stock } = nouveauLeve();
+    expect(lever(projet, leve, stock, 'ligne', '')).toBe('L-1-1');
+    expect(lever(projet, leve, stock, 'ligne', '')).toBe('L-1-2');
+    expect(lever(projet, leve, stock, 'isole', '', { est: 1, nord: 1, altitude: 0 })).toBe('P-1');
+    nouvelleLigne(stock);
+    expect(lever(projet, leve, stock, 'ligne', '', { est: 2, nord: 0, altitude: 0 })).toBe('L-2-1');
   });
 
   it('ne crée pas de ligne vide et ferme la ligne en cours', () => {
@@ -226,8 +238,8 @@ describe('couleur des libellés', () => {
 describe('levé libre', () => {
   it('nommé « Levé libre N », en comptant les anciens « Autres N »', () => {
     const projet = { autres: [{ nom: 'Autres 1' }, { nom: 'Levé libre 2' }] };
-    expect(creerAutres(projet, { id: 'l1' }).nom).toBe('Levé libre 3');
-    expect(creerAutres({}, { id: 'l1' }).nom).toBe('Levé libre 1');
+    expect(creerAutres(projet, { id: 'l1' }).nom).toBe('LV-Levé libre 3');
+    expect(creerAutres({}, { id: 'l1' }).nom).toBe('LV-Levé libre 1');
   });
 });
 
@@ -242,8 +254,8 @@ describe('supprimer un levé du Terrain', async () => {
     const c = lever(projet, leve, autre, 'ligne');
     autre.points.push(b); // b sert aussi au terrain naturel
     expect(pointsDeLaLevee(projet, stock.id)).toEqual([a]);
-    expect(supprimerLevee(projet, stock.id)).toEqual({ nom: 'Stock 1', points: 1 });
-    expect(projet.surfaces.map((s) => s.nom)).toEqual(['Terrain 1']);
+    expect(supprimerLevee(projet, stock.id)).toEqual({ nom: 'LV-Stock 1', points: 1 });
+    expect(projet.surfaces.map((s) => s.nom)).toEqual(['LV-Terrain 1']);
     expect(leve.points.map((p) => p.nom)).toEqual([b, c]);
     // Dernière surface du levé : le levé du jour, vide, part aussi.
     supprimerLevee(projet, autre.id);
@@ -262,7 +274,7 @@ describe('une liste de points par levé (0.77.0)', () => {
     const liste2 = creerListeDeLevee(projet, maintenant);
     const libre = creerAutres(projet, liste2);
     nommerListeDeLevee(projet, libre);
-    expect(projet.leves.map((l) => l.nom)).toEqual(['Stock 1', 'Levé libre 1']);
+    expect(projet.leves.map((l) => l.nom)).toEqual(['LV-Stock 1', 'LV-Levé libre 1']);
     expect(liste1.importeLe).toBe(maintenant.toISOString());
     expect(estLeveDirect(liste1)).toBe(true);
     stock.nom = 'Stock gravier';
@@ -282,8 +294,8 @@ describe('fichier importé comme levé (0.77.0)', () => {
     const leve = { id: 'l1', nom: '20260520_Stock.csv', importeLe: '2026-10-27T08:00:00.000Z', points: [{ nom: '1', est: 0, nord: 0, altitude: 0 }] };
     projet.leves.push(leve);
     const surface = leveDepuisFichier(projet, leve, 'terrain');
-    expect(surface).toMatchObject({ nom: '20260520_Stock', nature: 'terrain', leveId: 'l1', tousLesPoints: true });
-    expect(leve).toMatchObject({ nom: '20260520_Stock', direct: true, dediee: true });
+    expect(surface).toMatchObject({ nom: 'LV-20260520_Stock', nature: 'terrain', leveId: 'l1', tousLesPoints: true });
+    expect(leve).toMatchObject({ nom: 'LV-20260520_Stock', direct: true, dediee: true });
     expect(projet.surfaces).toEqual([surface]);
   });
 });
@@ -297,9 +309,9 @@ describe('surface d\'un dessin = levé « Surface » (0.77.0)', () => {
       { nom: 'D1-3', est: 10, nord: 10, altitude: 400 },
     ];
     const surface = creerLeveeDuDessin(projet, { id: 'd1' }, sommets);
-    expect(surface).toMatchObject({ nom: 'Surface 1', nature: 'surface', dessinId: 'd1', contour: ['D1-1', 'D1-2', 'D1-3'], tousLesPoints: false });
+    expect(surface).toMatchObject({ nom: 'Surf-Dessin 1', nature: 'surface', dessinId: 'd1', contour: ['D1-1', 'D1-2', 'D1-3'], tousLesPoints: false });
     const leve = projet.leves.find((l) => l.id === surface.leveId);
-    expect(leve).toMatchObject({ nom: 'Surface 1', dediee: true, direct: true });
+    expect(leve).toMatchObject({ nom: 'Surf-Dessin 1', dediee: true, direct: true });
     expect(leve.points.map((p) => p.nom)).toEqual(['D1-1', 'D1-2', 'D1-3']);
     // Un point levé au RX2, puis le dessin change (un sommet déplacé, un ajouté).
     leve.points.push({ nom: 'P-TN-1', est: 5, nord: 2, altitude: 401 });
@@ -310,6 +322,30 @@ describe('surface d\'un dessin = levé « Surface » (0.77.0)', () => {
     // Un sommet enlevé du dessin part de la liste.
     synchroniserLeveeDuDessin(projet, surface, sommets.slice(0, 3));
     expect(leve.points.map((p) => p.nom)).toEqual(['D1-1', 'D1-2', 'D1-3', 'P-TN-1']);
-    expect(creerLeveeDuDessin(projet, { id: 'd2' }, sommets).nom).toBe('Surface 2');
+    expect(creerLeveeDuDessin(projet, { id: 'd2' }, sommets).nom).toBe('Surf-Dessin 2');
+  });
+});
+
+describe('préfixes des noms (0.90.0)', () => {
+  it('ajoute LV- aux levés et Surf- aux surfaces, une seule fois, et renomme la liste du levé', async () => {
+    const { prefixerNoms } = await import('../src/projet/projet.js');
+    const projet = {
+      leves: [{ id: 'l1', nom: 'Stock 1', dediee: true }],
+      surfaces: [
+        { nom: 'Stock 1', nature: 'stock', leveId: 'l1' },
+        { nom: 'Terrain projet', type: 'landxml' },
+        { nom: 'Surface 1', nature: 'surface' },
+        { nom: 'lv-Terre', nature: 'terrain' },
+      ],
+      metres: [{ nom: 'Métré 1', nature: 'metre' }],
+      autres: [{ nom: 'Levé libre 1', nature: 'autres' }],
+    };
+    prefixerNoms(projet);
+    expect(projet.surfaces.map((s) => s.nom)).toEqual(['LV-Stock 1', 'Surf-Terrain projet', 'Surf-Surface 1', 'lv-Terre']);
+    expect(projet.metres[0].nom).toBe('LV-Métré 1');
+    expect(projet.autres[0].nom).toBe('LV-Levé libre 1');
+    expect(projet.leves[0].nom).toBe('LV-Stock 1');
+    prefixerNoms(projet);
+    expect(projet.surfaces[0].nom).toBe('LV-Stock 1');
   });
 });

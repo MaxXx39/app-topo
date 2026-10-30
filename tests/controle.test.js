@@ -122,3 +122,22 @@ describe('liste des points de contrôle', () => {
     expect(liste).toEqual([{ id: 'a', nom: 'PF1', est: 1, nord: 2, altitude: 3 }, { id: 'id1', nom: 'PF2', est: 4, nord: 5, altitude: null }]);
   });
 });
+
+describe('durée entre deux contrôles (0.90.0)', () => {
+  it('lit les heures tapées et refuse les valeurs hors limites', async () => {
+    const { lireDelaiControle, delaiControleMs, controleNecessaire } = await import('../src/topo/controle.js');
+    expect(lireDelaiControle('2')).toEqual({ heures: 2 });
+    expect(lireDelaiControle('1,5')).toEqual({ heures: 1.5 });
+    expect(lireDelaiControle('')).toHaveProperty('erreur');
+    expect(lireDelaiControle('abc')).toHaveProperty('erreur');
+    expect(lireDelaiControle('0.1')).toHaveProperty('erreur');
+    expect(lireDelaiControle('30')).toHaveProperty('erreur');
+    expect(delaiControleMs({})).toBe(4 * 3600000);
+    expect(delaiControleMs({ delaiControleHeures: 2 })).toBe(2 * 3600000);
+    // Dernier contrôle réussi il y a 3 h : pas encore à refaire avec 4 h, à refaire avec 2 h.
+    const maintenant = new Date(2026, 9, 29, 15, 0);
+    const controles = [{ type: 'mesure', resultat: { global: 'vert' }, le: new Date(2026, 9, 29, 12, 0).toISOString() }];
+    expect(controleNecessaire(controles, maintenant)).toBe(false);
+    expect(controleNecessaire(controles, maintenant, 2 * 3600000)).toBe(true);
+  });
+});

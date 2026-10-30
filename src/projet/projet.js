@@ -35,7 +35,7 @@
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé. De même pour une mesure.
-import { nouvelIdentifiant, estImportee } from '../topo/surface.js';
+import { nouvelIdentifiant, estImportee, avecPrefixe, prefixeDuNom } from '../topo/surface.js';
 import { calculsDUnAncienProjet } from '../volumes/calculs.js';
 import { TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
 
@@ -174,17 +174,35 @@ export function completerProjet(projet) {
   complet.controles ??= [];
   complet.dessins ??= [];
   complet.couleursListes ??= {}; // couleur choisie par liste de points (id → « #2563eb »)
-  complet.surfaces = (complet.surfaces ?? []).map((surface) => ({
-    nature: estImportee(surface) ? 'terrain' : 'stock',
-    ...surface,
-  }));
+  // Surfaces importées : plus de nature depuis 0.90.0 (celle des anciennes est retirée).
+  complet.surfaces = (complet.surfaces ?? []).map((surface) => {
+    if (!estImportee(surface)) return { nature: 'stock', ...surface };
+    const { nature, ...sansNature } = surface;
+    return sansNature;
+  });
   if (!Array.isArray(projet.calculs)) complet.calculs = calculsDUnAncienProjet(complet.surfaces, projet.comparaisons);
   // Calculs d'avant le choix de la base « depuis une altitude » : base sur la ligne du contour.
   complet.calculs = complet.calculs.map((calcul) => ({ base: 'contour', altitude: null, ...calcul }));
   // Anciens champs, remplacés par les calculs.
   delete complet.comparaisons;
   for (const surface of complet.surfaces) delete surface.volume;
+  prefixerNoms(complet);
   return complet;
+}
+
+/**
+ * Noms des levés et des surfaces avec leur préfixe (0.90.0) : « LV- » (levé) ou « Surf- » (surface
+ * importée ou de Dessin), ajouté s'il manque (anciens projets, nom changé à la main). La liste de
+ * points propre à un levé prend le même nom.
+ */
+export function prefixerNoms(projet) {
+  for (const objet of [...projet.surfaces, ...(projet.metres ?? []), ...(projet.autres ?? [])]) {
+    const nom = avecPrefixe(objet.nom, prefixeDuNom(objet));
+    if (nom === objet.nom) continue;
+    const liste = objet.leveId ? projet.leves.find((l) => l.id === objet.leveId) : null;
+    if (liste?.dediee && liste.nom === objet.nom) liste.nom = nom;
+    objet.nom = nom;
+  }
 }
 
 /** Résumé d'un projet pour la liste des projets. */

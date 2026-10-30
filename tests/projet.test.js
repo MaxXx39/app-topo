@@ -29,7 +29,7 @@ describe('projets', () => {
   it('le fichier projet se relit à l\'identique (points, surfaces)', () => {
     const projet = creerProjet('10 203');
     const leve = ajouterLeve(projet, 'stock.csv', [point('b1')]);
-    projet.surfaces.push(creerSurface('Stock 1', leve.id));
+    projet.surfaces.push(creerSurface('LV-Stock 1', leve.id));
     const { projet: relu, erreur } = lireFichierProjet(ecrireFichierProjet(projet));
     expect(erreur).toBeUndefined();
     expect(relu).toEqual(projet);
@@ -66,7 +66,7 @@ describe('projets', () => {
     const { projet } = lireFichierProjet(
       '{"format":"topo-projet","version":1,"id":"x","nom":"V","leves":[],"surfaces":[{"id":"s","nom":"S","type":"points","contour":[]},{"id":"t","nom":"T","type":"landxml"}]}',
     );
-    expect(projet.surfaces.map((s) => s.nature)).toEqual(['stock', 'terrain']);
+    expect(projet.surfaces.map((s) => s.nature)).toEqual(['stock', undefined]);
     expect(projet.calculs).toHaveLength(1);
     expect(projet.calculs[0]).toMatchObject({ surface1Id: 's', uneSeule: true, surface2Id: null });
   });

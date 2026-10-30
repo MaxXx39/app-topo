@@ -37,6 +37,7 @@ import {
   ecrireFichierProjet,
   lireFichierProjet,
   completerProjet,
+  prefixerNoms,
   resumerProjet,
   titreProjet,
   nomAutomatique,
@@ -84,8 +85,8 @@ import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, a
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
-import { sonValidation, sonRefus } from './outils/son.js';
-import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle } from './topo/controle.js';
+import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer } from './outils/son.js';
+import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
@@ -148,6 +149,10 @@ const terrain = {
   lame: { surfaceId: null, inverse: false, tolerances: { ...TOLERANCES_LAME }, pointProfil: 'milieu', devant: 20, derriere: 5 },
   ...lireReglagesTerrain(),
 };
+// Libellé « Aucun » (0.90.0) choisi à chaque démarrage de l'appli.
+terrain.libelleLigne = '';
+terrain.libellePoint = '';
+terrain.libelleAire = '';
 // Anciens réglages (avant 0.73.0) : le profil en long prend ses valeurs de départ.
 terrain.lame = { pointProfil: 'milieu', devant: 20, derriere: 5, ...terrain.lame };
 // Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
@@ -890,7 +895,7 @@ const ecranLeve = recepteurDisponible()
         // Position vérifiée par l'appli Android au moment du toucher : RTK fixe et inclinaison prête.
         const reponse = prendrePointRecepteur();
         if (!reponse.ok) {
-          afficherMessage(`Point refusé : ${reponse.raison}`, 4000);
+          refuser(`Point refusé : ${reponse.raison}`);
           return;
         }
         const { est, nord, altitude, ...gnss } = reponse.point;
@@ -1217,7 +1222,7 @@ const ecranLeve = recepteurDisponible()
         // Position vérifiée par l'appli Android : RTK fixe et inclinaison prête, comme pour un point levé.
         const reponse = prendrePointRecepteur();
         if (!reponse.ok) {
-          afficherMessage(`Implantation refusée : ${reponse.raison}`, 4000);
+          refuser(`Implantation refusée : ${reponse.raison}`);
           return;
         }
         const { est, nord, altitude, ...gnss } = reponse.point;
@@ -1225,7 +1230,7 @@ const ecranLeve = recepteurDisponible()
         const ecarts = ecartsImplantation(cible, mesure);
         const le = new Date().toISOString();
         projet.implantations.push({ id: nouvelIdentifiant(), nom: cible.nom, aImplanterId: cible.id, cible: { est: cible.est, nord: cible.nord, altitude: cible.altitude }, mesure, ecarts, le });
-        navigator.vibrate?.(60);
+        vibrer(60);
         sonValidation();
         const hauteur = ecarts.dAltitude != null ? ` · dH ${formaterNombre(ecarts.dAltitude)} m` : '';
         afficherMessage(`${cible.nom} implanté : écart ${formaterNombre(ecarts.distance)} m${hauteur}`, 4000);
@@ -1260,8 +1265,14 @@ const ecranLeve = recepteurDisponible()
       enregistrerTolerances: (textes) => {
         const { tolerances, erreur } = lireTolerances(textes);
         if (erreur) return { erreur };
+        // Durée entre deux contrôles (Expert, 0.90.0) : champ absent en dessous d'Expert.
+        if (aAcces('expert') && textes.delai !== undefined) {
+          const delai = lireDelaiControle(textes.delai);
+          if (delai.erreur) return { erreur: delai.erreur };
+          projet.delaiControleHeures = delai.heures;
+        }
         projet.tolerancesControle = tolerances;
-        afficherMessage('Tolérances enregistrées');
+        afficherMessage('Réglages du contrôle enregistrés');
         modifie();
         return null;
       },
@@ -1779,7 +1790,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   sommetRx2: () => {
     const reponse = prendrePointRecepteur();
     if (!reponse.ok) {
-      afficherMessage(`Point refusé : ${reponse.raison}`, 4000);
+      refuser(`Point refusé : ${reponse.raison}`);
       return;
     }
     sonValidation();
@@ -1789,7 +1800,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     const dessin = dessinDe(pilote?.dessinId);
     const reponse = prendrePointRecepteur();
     if (!reponse.ok) {
-      afficherMessage(`Point refusé : ${reponse.raison}`, 4000);
+      refuser(`Point refusé : ${reponse.raison}`);
       return;
     }
     const gon = dessin?.sommets.length ? gisement(dessin.sommets.at(-1), reponse.point) : null;
@@ -1996,7 +2007,7 @@ function enregistrerControle() {
   if (!point) return;
   const reponse = prendrePointRecepteur();
   if (!reponse.ok) {
-    afficherMessage(`Contrôle refusé : ${reponse.raison}`, 4000);
+    refuser(`Contrôle refusé : ${reponse.raison}`);
     return;
   }
   const { est, nord, altitude, ...gnss } = reponse.point;
@@ -2018,10 +2029,10 @@ function enregistrerControle() {
     le: new Date().toISOString(),
   });
   if (resultat.global === 'rouge') {
-    navigator.vibrate?.([80, 80, 80]);
+    vibrer([80, 80, 80]);
     sonRefus();
   } else {
-    navigator.vibrate?.(60);
+    vibrer(60);
     sonValidation();
   }
   const mots = { vert: 'OK', orange: 'limite', rouge: 'HORS TOLÉRANCE' };
@@ -2044,12 +2055,14 @@ function enregistrerControle() {
  * « Oui » ouvre Terrain › Contrôle ; « Non » note le refus dans le projet (CSV, PDF, Drive).
  */
 let rappelEnCours = false;
+let dernierRappel = 0; // date du dernier rappel montré (ms)
 async function proposerControle() {
-  if (!ecranLeve || rappelEnCours || !controleNecessaire(projet.controles)) return;
+  if (!ecranLeve || rappelEnCours || !controleNecessaire(projet.controles, new Date(), delaiControleMs(projet))) return;
   rappelEnCours = true;
+  dernierRappel = Date.now();
   const projetDuRappel = projet;
   const aujourdHui = projet.controles.some((c) => estControleReussi(c) && new Date(c.le).toDateString() === new Date().toDateString());
-  const texte = aujourdHui ? 'Dernier contrôle réussi il y a plus de 4 h.' : 'Aucun contrôle réussi aujourd\'hui.';
+  const texte = aujourdHui ? `Dernier contrôle réussi il y a plus de ${Number((delaiControleMs(projet) / 3600000).toFixed(2))} h.` : 'Aucun contrôle réussi aujourd\'hui.';
   // Pas de point de contrôle dans le projet : le rappel attire quand même l'attention, avec OK
   // seulement (rien n'est noté ; demande du 26.10.2026).
   if (projet.pointsControle.length === 0) {
@@ -2105,7 +2118,8 @@ function donneesAutocontrole() {
     tolerances: projet.tolerancesControle,
     controles: [...controles].sort((a, b) => (a.le < b.le ? 1 : -1)).slice(0, 30),
     nbControles: controles.length,
-    necessaire: controleNecessaire(controles),
+    necessaire: controleNecessaire(controles, new Date(), delaiControleMs(projet)),
+    delaiHeures: delaiControleMs(projet) / 3600000,
     dernierReussi: dates.at(-1) ?? null,
   };
 }
@@ -2154,7 +2168,7 @@ function enregistrerImplantationLigne() {
   if (!ligne) return;
   const reponse = prendrePointRecepteur();
   if (!reponse.ok) {
-    afficherMessage(`Implantation refusée : ${reponse.raison}`, 4000);
+    refuser(`Implantation refusée : ${reponse.raison}`);
     return;
   }
   const { est, nord, altitude, ...gnss } = reponse.point;
@@ -2171,7 +2185,7 @@ function enregistrerImplantationLigne() {
     ligne: { nom: ligne.nom, abscisse: g.abscisse, decalage: g.ecart },
     le: new Date().toISOString(),
   });
-  navigator.vibrate?.(60);
+  vibrer(60);
   sonValidation();
   const cote = Math.abs(g.ecart) < 0.0005 ? 'sur la ligne' : `${formaterNombre(Math.abs(g.ecart))} m ${g.ecart > 0 ? 'à droite' : 'à gauche'}`;
   const hauteur = ecarts.dAltitude != null ? ` · dH ${formaterNombre(ecarts.dAltitude)} m` : '';
@@ -2279,7 +2293,7 @@ function enregistrerImplantationTalus() {
   if (!implanter.ligne) return;
   const reponse = prendrePointRecepteur();
   if (!reponse.ok) {
-    afficherMessage(`Implantation refusée : ${reponse.raison}`, 4000);
+    refuser(`Implantation refusée : ${reponse.raison}`);
     return;
   }
   const { est, nord, altitude, ...gnss } = reponse.point;
@@ -2287,7 +2301,7 @@ function enregistrerImplantationTalus() {
   const { sommets, reglages, altitudeLigne, altitudeTerrain } = donneesTalus();
   const g = guidageTalus(mesure, sommets, reglages, { altitudeLigne, altitudeTerrain });
   if (g.message) {
-    afficherMessage(`Implantation refusée : ${g.message}`, 4000);
+    refuser(`Implantation refusée : ${g.message}`);
     return;
   }
   const ecarts = ecartsImplantation(g.cible, mesure);
@@ -2305,7 +2319,7 @@ function enregistrerImplantationTalus() {
     talus: { texte: texteTalus(reglages), distanceVoulue: g.distanceVoulue, auBord: g.auBord, solPlat: g.solPlat },
     le: new Date().toISOString(),
   });
-  navigator.vibrate?.(60);
+  vibrer(60);
   sonValidation();
   afficherMessage(`${sur[0].toUpperCase()}${sur.slice(1)} ${accord} (+${formaterNombre(g.abscisse)} m) : écart ${formaterNombre(ecarts.distance)} m`, 4000);
   modifie();
@@ -2479,8 +2493,7 @@ function commencerRecalage(id) {
       // Même règle qu'un point levé : RTK fixe et inclinaison prête.
       const reponse = prendrePointRecepteur();
       if (!reponse.ok) {
-        sonRefus();
-        afficherMessage(`Point refusé : ${reponse.raison}`, 4000);
+        refuser(`Point refusé : ${reponse.raison}`);
         return;
       }
       ajouterPaireCalage({ est: reponse.point.est, nord: reponse.point.nord, nom: `GNSS ${new Date().toLocaleTimeString('fr-CH')}` });
@@ -2790,9 +2803,7 @@ function mettreAJourToucheVolume() {
     const enImplantation = enImplantationDePoint() || enImplantationDeLigne() || enAutocontrole();
     const refus = enImplantation ? ecranLeve.enregistrerDepuisTouche() : ecranLeve.prendreDepuisTouche();
     if (refus) {
-      navigator.vibrate?.([80, 80, 80]);
-      sonRefus();
-      afficherMessage(`${enAutocontrole() ? 'Contrôle refusé' : enImplantation ? 'Implantation refusée' : 'Point refusé'} : ${refus}`, 4000);
+      refuser(`${enAutocontrole() ? 'Contrôle refusé' : enImplantation ? 'Implantation refusée' : 'Point refusé'} : ${refus}`);
     }
   });
 }
@@ -2841,13 +2852,20 @@ async function enregistrerJournalNmea() {
   }, duree * 1000 + 1500);
 }
 
+/** Point, implantation ou contrôle refusé (0.90.0) : vibration, son grave et message. */
+function refuser(texte) {
+  vibrer([80, 80, 80]);
+  sonRefus();
+  afficherMessage(texte, 4000);
+}
+
 /** Point rangé dans le levé (ou refusé) : vibration, son et message, puis enregistrement. */
 function rangerPointPris(resultat) {
   if (resultat.erreur) {
-    afficherMessage(`Point refusé : ${resultat.erreur}`, 4000);
+    refuser(`Point refusé : ${resultat.erreur}`);
     return;
   }
-  navigator.vibrate?.(60);
+  vibrer(60);
   sonValidation();
   afficherMessage(`Point ${resultat.point.nom} pris`);
   modifie();
@@ -2866,7 +2884,7 @@ function rolesDesPoints(leveId) {
 
 /** Libellé des points isolés (celui choisi, sinon le premier de la liste). */
 function libelleDesPoints() {
-  return libelles.points.some(([abreviation]) => abreviation === terrain.libellePoint) ? terrain.libellePoint : libelles.points[0][0];
+  return terrain.libellePoint === '' || libelles.points.some(([abreviation]) => abreviation === terrain.libellePoint) ? terrain.libellePoint : '';
 }
 
 /**
@@ -2882,8 +2900,7 @@ async function controlerPlacePoint(stock, role, position, versNom = null) {
   const parNom = new Map(pointsDuLeve(stock.leveId).map((p) => [p.nom, p]));
   // Stock : un point de ligne ou un point isolé hors du contour est refusé tout de suite.
   if (role !== 'contour' && horsDuContour(stock, parNom, position)) {
-    afficherMessage('Point refusé : hors du contour du stock', 4000);
-    navigator.vibrate?.([80, 80, 80]);
+    refuser('Point refusé : hors du contour du stock');
     return null;
   }
   let roleFinal = role;
@@ -2948,7 +2965,7 @@ async function ajouterPointTouche(nom) {
     }
     afficherMessage(`${nom} ajouté ${role === 'contour' ? 'au contour' : `à ${nomDeLigne(ligneEnCours(stock), stock.lignesRupture.length - 1)}`}`);
   }
-  navigator.vibrate?.(40);
+  vibrer(40);
   modifie();
 }
 
@@ -2958,7 +2975,7 @@ function libelleDuRole() {
   const sorte = leveDirect.role === 'aire' ? 'aires' : ['ligne', 'longueur'].includes(leveDirect.role) ? 'lignes' : 'points';
   const liste = libelles[sorte];
   const voulu = { aires: terrain.libelleAire, lignes: terrain.libelleLigne, points: terrain.libellePoint }[sorte];
-  return liste.some(([abreviation]) => abreviation === voulu) ? voulu : liste[0][0];
+  return liste.some(([abreviation]) => abreviation === voulu) ? voulu : '';
 }
 
 /** Rôles d'un point levé dans un métré. */
@@ -3223,6 +3240,14 @@ if (recepteurDisponible()) {
   ecouterRecepteur((etat) => {
     // RX2 qui vient de se connecter : rappel du contrôle s'il en faut un (voir proposerControle).
     const vientDeSeConnecter = Boolean(etat.connecte) && !etatRecepteur?.connecte;
+    // Fix RTK perdu ou retrouvé (0.90.0) : son et vibration, récepteur toujours connecté.
+    const fixAvant = etatRecepteur?.connecte && etatRecepteur?.recu && etatRecepteur.qualite === 4;
+    const fixMaintenant = etat.connecte && etat.recu && etat.qualite === 4;
+    if (etatRecepteur?.connecte && etatRecepteur.recu && etat.connecte && etat.recu && fixAvant !== fixMaintenant) {
+      if (fixMaintenant) sonRetourFix();
+      else sonPerteFix();
+      vibrer(fixMaintenant ? 60 : [200, 100, 200]);
+    }
     etatRecepteur = etat;
     if (vientDeSeConnecter) proposerControle();
     mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette);
@@ -3416,7 +3441,7 @@ partage = creerPartage({
   quandMainRendue: (nom, { repris = true } = {}) => {
     fermetureAttente?.abort();
     // Fenêtre avec « OK » (0.84.0) : un petit message passait inaperçu. Le projet est déjà repris.
-    navigator.vibrate?.([200, 100, 200]);
+    vibrer([200, 100, 200]);
     demanderChoix({
       titre: `${nom} a rendu la main`,
       texte: repris ? 'Le projet est mis à jour et tu as de nouveau la main.' : 'Le projet est mis à jour. Il reste en lecture seule : touche la main en haut pour la reprendre.',
@@ -3518,17 +3543,10 @@ async function importerSurface(fichier) {
     const texte = await fichier.text();
     const type = /\.dxf$/i.test(fichier.name) ? 'dxf' : 'landxml';
     const { surfaces, erreurs, avertissements } = type === 'dxf' ? lireDXF(texte) : lireLandXML(texte);
-    let nature = null;
-    if (surfaces.length > 0) {
-      nature = await demanderChoix({
-        titre: `${surfaces.length} surface(s) dans « ${fichier.name} »`,
-        texte: 'C\'est quoi ?',
-        boutons: NATURES_IMPORT.map(([cle, titre], i) => ({ cle, texte: titre, principal: i === 0 })),
-      });
-    }
-    for (const surface of surfaces) projet.surfaces.push({ ...surfaceImportee(surface, fichier.name, type), nature });
+    // Plus de question « Stock, Terrain… ? » (0.90.0) : la nature ne servait à rien.
+    for (const surface of surfaces) projet.surfaces.push(surfaceImportee(surface, fichier.name, type));
     const messages = [...erreurs, ...avertissements];
-    message = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} »${nature ? ` (${echapper(nomNature(nature).toLowerCase())})` : ''} : voir Surface Projet, plus bas.</p>
+    message = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} » : voir Surface Projet, plus bas.</p>
       ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
     editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
     if (surfaces.length > 0) editeurSurfaces.choisir(projet.surfaces.length - 1);
@@ -3678,7 +3696,7 @@ function calculsReussis() {
 creerEcranExport(document.querySelector('#export'), {
   // « Quoi exporter ? » : volumes, surfaces (par nature), dessins, listes de points ; cochés comme « Afficher ».
   obtenirGroupes: () => {
-    const surfacesDe = (natures) => projet.surfaces.filter((s) => natures.includes(s.nature ?? 'stock')).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
+    const surfacesDe = (natures) => projet.surfaces.filter((s) => (estImportee(s) ? natures.includes('importee') : natures.includes(s.nature ?? 'stock'))).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
     return [
       { titre: 'Volumes', elements: projet.calculs.map((c) => ({ id: c.id, nom: nomDuCalcul(c, projet.surfaces), defaut: estAffichee(c.surface1Id) })) },
       { titre: 'Stocks', elements: surfacesDe(['stock']) },
@@ -3686,6 +3704,7 @@ creerEcranExport(document.querySelector('#export'), {
       { titre: 'Recollement', elements: surfacesDe(['recollement']) },
       { titre: 'Terrassement', elements: surfacesDe(['terrassement']) },
       { titre: 'Surfaces (dessins)', elements: surfacesDe(['surface']) },
+      { titre: 'Surfaces importées', elements: surfacesDe(['importee']) },
       { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
       {
         titre: 'Listes de points',
@@ -3935,6 +3954,7 @@ function modifie(options) {
     return;
   }
   synchroniserSurfacesDessins();
+  prefixerNoms(projet);
   // Une surface supprimée : ses calculs de volume disparaissent avec elle.
   projet.calculs = nettoyerCalculs(projet.calculs, projet.surfaces);
   recalculer(options);
@@ -4008,12 +4028,15 @@ function mettreAJourEtatEntete() {
   else if (rendu) pastille.textContent = '🔒 Lecture seule · main rendue';
   else pastille.innerHTML = `<svg class="main-verrou" viewBox="0 0 24 24" aria-hidden="true">${ICONE_MAIN}</svg>`;
   pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : rendu ? 'pastille-grise' : 'pastille-verte'}`;
-  pastille.title = repris ? 'Lecture seule : toucher pour prendre la main' : rendu ? 'Main rendue : toucher pour la reprendre' : 'Tu as la main : toucher pour la rendre';
+  pastille.classList.toggle('pastille-inactive', !aAcces('expert'));
+  pastille.title = !aAcces('expert') ? (repris ? `${repris.nom} a la main` : rendu ? 'Main rendue' : 'Tu as la main') : repris ? 'Lecture seule : toucher pour prendre la main' : rendu ? 'Main rendue : toucher pour la reprendre' : 'Tu as la main : toucher pour la rendre';
   document.body.classList.toggle('lecture-seule', Boolean(repris || rendu));
 }
 // Main de l'en-tête (0.76.0) : rouge = prendre la main (Expert, code), grise = la reprendre,
 // verte = la rendre (le projet part sur Drive, un autre appareil peut la prendre).
+// Depuis 0.90.0, seulement en Expert : en Base et Intermédiaire on voit la main sans pouvoir la toucher.
 document.querySelector('#pastille-verrou').addEventListener('click', async () => {
+  if (!aAcces('expert')) return;
   if (partage?.etat.repris?.projetId === projet.id) partage.prendreLaMain();
   else if (partage?.etat.rendu?.projetId === projet.id) partage.reprendreApresRendu();
   else if (partage?.etat.connecte) {
@@ -4059,16 +4082,33 @@ function lectureSeule() {
 /** En lecture seule : message et vrai (l'action est refusée). */
 function refuserEnLectureSeule() {
   if (!lectureSeule()) return false;
-  afficherMessage(partage.etat.repris ? `Lecture seule : ${partage.etat.repris.nom} a la main` : 'Lecture seule : main rendue (touche la main en haut pour la reprendre)', 3000);
-  navigator.vibrate?.([80, 80, 80]);
+  afficherMessage(partage.etat.repris ? `Lecture seule : ${partage.etat.repris.nom} a la main` : 'Lecture seule : main rendue', 3000);
+  vibrer([80, 80, 80]);
   return true;
 }
+
+// Rappel du contrôle aussi pendant le travail (0.90.0) : GNSS connecté, une fois la durée entre deux
+// contrôles passée depuis le dernier rappel (pas seulement à la connexion du récepteur).
+setInterval(() => {
+  if (etatRecepteur?.connecte && Date.now() - dernierRappel >= delaiControleMs(projet)) proposerControle();
+}, 60_000);
 
 // Site (pas l'APK) : après 5 minutes sans rien faire, le projet est envoyé et la main rendue
 // (demande du 26.10.2026) : lecture seule jusqu'à la reprendre (main grise, 0.80.0).
 const INACTIVITE = 5 * 60 * 1000;
 let derniereActivite = Date.now();
-for (const evenement of ['pointerdown', 'keydown', 'wheel']) document.addEventListener(evenement, () => (derniereActivite = Date.now()), { passive: true, capture: true });
+// Base et Intermédiaire (0.90.0) : la main ne se touche pas ; après 5 minutes sans activité, elle
+// est reprise toute seule au premier geste.
+let derniereReprise = 0;
+for (const evenement of ['pointerdown', 'keydown', 'wheel']) {
+  document.addEventListener(evenement, () => {
+    derniereActivite = Date.now();
+    // Une seule demande à la fois (la reprise passe par Drive) : pas plus d'une toutes les 10 s.
+    if (aAcces('expert') || partage?.etat.rendu?.projetId !== projet.id || Date.now() - derniereReprise < 10_000) return;
+    derniereReprise = Date.now();
+    partage.reprendreApresRendu();
+  }, { passive: true, capture: true });
+}
 setInterval(() => {
   if (estDansAppliAndroid() || !partage?.etat.connecte) return;
   if (Date.now() - derniereActivite < INACTIVITE) return;

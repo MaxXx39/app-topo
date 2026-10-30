@@ -15,7 +15,6 @@ import { estEnMn95 } from '../topo/dxf-plan.js';
 import { rotationLisible } from '../topo/recalage.js';
 import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '../outils/formulaire-point.js';
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
-import { demanderCode } from '../outils/code.js';
 import { COULEURS_LISTES } from '../plan/listes-points.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
@@ -109,10 +108,9 @@ export function creerEcranImport(conteneur, actions) {
   conteneur.addEventListener('change', async (evenement) => {
     const cible = evenement.target;
     if (cible.dataset.champ === 'fichier-controle' && cible.files[0]) {
-      // Points de contrôle : protégés par le code de sécurité, demandé une fois le fichier choisi.
+      // Points de contrôle : sans code de sécurité depuis 0.90.0 (demande du 29.10.2026).
       const fichier = cible.files[0];
       cible.value = '';
-      if (!(await demanderCode('Importer des points de contrôle'))) return;
       messageControle = (await actions.importerPointsControle(fichier))?.erreur ?? '';
       if (derniers) afficher(...derniers);
     } else if (cible.dataset.champ === 'couleur-liste') actions.colorerListe(cible.dataset.id, cible.value || null);
@@ -249,13 +247,12 @@ function ligneListe(projet, leve) {
     </div>`;
 }
 
-/** Surface importée (LandXML, DXF 3D) : nom à changer, nature, fichier d'origine, supprimer. */
+/** Surface importée (LandXML, DXF 3D) : nom à changer, fichier d'origine, supprimer. */
 function ligneSurfaceProjet(surface) {
-  const nature = { stock: 'stock', terrain: 'terrain', recollement: 'recollement', terrassement: 'terrassement' }[surface.nature] ?? '';
   return `<div class="ligne-leve liste-surface-projet">
       <input type="text" class="nom-leve" data-champ="nom-surface-projet" data-id="${surface.id}" value="${echapper(surface.nom)}" aria-label="Nom de la surface" />
       <div class="ligne-outils">
-        <span class="aide">${[nature, surface.type === 'dxf' ? 'DXF' : 'LandXML', surface.nomFichier].filter(Boolean).map(echapper).join(' · ')} · ${surface.faces?.length ?? 0} triangles</span>
+        <span class="aide">${[surface.type === 'dxf' ? 'DXF' : 'LandXML', surface.nomFichier].filter(Boolean).map(echapper).join(' · ')} · ${surface.faces?.length ?? 0} triangles</span>
         <button type="button" class="bouton-lien" data-action="supprimer-surface-projet" data-id="${surface.id}">supprimer</button>
       </div>
     </div>`;

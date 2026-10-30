@@ -21,7 +21,7 @@ import { htmlLame, rafraichirLame } from './lame-ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
 import { formaterNombre } from '../topo/format.js';
-import { ROLES_LEVE } from '../topo/leve-direct.js';
+import { ROLES_LEVE, debutDeNom } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
 import { svgCoupeTalus } from './coupe-talus.js';
@@ -223,7 +223,17 @@ export function creerEcranLeve(conteneur, actions) {
       ouvrirFenetrePointTape({ nomPropose: '', ajouter: (valeurs) => actions.ajouterPointControleTape(valeurs) });
       return;
     }
-    if (action === 'nouvelleSurface') choixNatureOuvert = false;
+    // Nouveau levé (0.90.0) : la fenêtre du nom s'ouvre tout de suite (sinon tous s'appellent pareil).
+    if (action === 'nouvelleSurface') {
+      choixNatureOuvert = false;
+      actions.nouvelleSurface(bouton.dataset.valeur);
+      const levee = donnees.stock;
+      if (!levee) return;
+      demanderTexte({ titre: 'Nom du nouveau levé', valeur: levee.nom }).then((nom) => {
+        if (nom && nom !== levee.nom) actions.renommerLevee(levee.id, nom);
+      });
+      return;
+    }
     if (action === 'implanterChoix' || action === 'creerPointAImplanter') {
       const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`)?.value ?? '';
       actions[action]({ nom: champ('nom-implantation'), altitude: champ('altitude-implantation') });
@@ -887,7 +897,7 @@ export function creerEcranLeve(conteneur, actions) {
     if (donnees.metre && LETTRES_METRE[donnees.role]) {
       const e = donnees.elementMetre;
       return `<div class="outils-ligne outils-metre">
-        <span>${LETTRES_METRE[donnees.role]}-${echapper(e.libelle)}-${e.numero} · ${e.nbPoints} pt(s)</span>
+        <span>${echapper(debutDeNom(LETTRES_METRE[donnees.role], e.libelle))}${e.numero} · ${e.nbPoints} pt(s)</span>
         <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${e.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle</button>
       </div>`;
     }
@@ -904,7 +914,7 @@ export function creerEcranLeve(conteneur, actions) {
     return `<div class="element-en-cours role-ligne">
       <span class="titre-element">Ligne en cours</span>
       <div class="corps-element">
-        <strong>L-${echapper(ligne.libelle ?? '')}-${ligne.numero}</strong><span>${ligne.nbPoints} pt(s)</span>
+        <strong>${echapper(debutDeNom('L', ligne.libelle))}${ligne.numero}</strong><span>${ligne.nbPoints} pt(s)</span>
         <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle ligne</button>
         <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
           ${ligne.fermee ? '✓ Ligne fermée' : 'Fermer ligne'}</button>
@@ -924,6 +934,7 @@ export function creerEcranLeve(conteneur, actions) {
     const liste = donnees.libelles[sorte];
     const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
     return `<div class="libelles-terrain seulement-intermediaire pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
+      <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong>Aucun</strong><span>sans libellé</span></button>
       ${liste.map(([abreviation, signification, couleur]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
           <strong>${couleur ? `<i class="pastille-libelle" style="background: ${couleur}"></i>` : ''}${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
       <button type="button" class="bouton-crayon-libelles seulement-intermediaire" data-action="ouvrirLibelles" title="Modifier les libellés" aria-label="Modifier les libellés">
@@ -1069,7 +1080,7 @@ export function creerEcranLeve(conteneur, actions) {
      */
     prendreDepuisTouche() {
       const bouton = conteneur.querySelector('[data-action="prendre"]');
-      if (!bouton) return 'pas de surface en cours';
+      if (!bouton) return 'pas de levé en cours';
       if (bouton.disabled) return etat?.connecte ? etat.raison ?? 'pas prêt' : 'récepteur non connecté';
       actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '');
       return null;

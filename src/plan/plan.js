@@ -657,7 +657,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const couches = Object.keys(FONDS).filter((nom) => calques[nom === 'satellite' ? 'fondSatellite' : nom]);
     const voulues = new Set();
 
-    if (vue && (points.length > 0 || position || plansDxf.length > 0) && couches.length > 0) {
+    // Sans point, une surface importée suffit aussi à placer le fond (0.90.0).
+    if (vue && (points.length > 0 || position || plansDxf.length > 0 || sommetsDesSurfacesImportees().length > 0) && couches.length > 0) {
       const z = niveauDeZoom(1 / vue.echelle, window.devicePixelRatio || 1);
       // Zone vue (plus grande que l'écran quand le plan est tourné).
       const tuiles = tuilesPourZone(zoneVisible(vue), z);
@@ -1358,7 +1359,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    * Menu « Afficher » : une case par liste (voir listes-points.js), en 3 parties : Points,
    * Surfaces / volumes, Métrés.
    */
-  const TITRES_SECTIONS = { points: 'Points', surfaces: 'Surfaces / volumes', metres: 'Métrés' };
+  const TITRES_SECTIONS = { points: 'Points', surfaces: 'Levés et surfaces', metres: 'Métrés' };
   let signatureListes = null;
   function remplirMenuListes(listes) {
     const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}:${l.couleur}`).join('|');

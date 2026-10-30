@@ -32,3 +32,23 @@ export const sonValidation = () => jouer([[880, 0.09], [1320, 0.14]]);
 
 /** Point refusé : une note grave. */
 export const sonRefus = () => jouer([[220, 0.25]], 0.2);
+
+/** Fix RTK perdu : deux notes descendantes (0.90.0). */
+export const sonPerteFix = () => jouer([[660, 0.15], [330, 0.3]], 0.3);
+
+/** Fix RTK retrouvé : trois notes montantes (0.90.0). */
+export const sonRetourFix = () => jouer([[660, 0.08], [880, 0.08], [1320, 0.16]], 0.3);
+
+/**
+ * Vibration (0.90.0) : durées en ms (nombre ou liste vibration, pause, vibration…). Dans l'APK,
+ * c'est Android qui vibre (navigator.vibrate est refusé quand le point vient de la touche volume −).
+ */
+export function vibrer(motif) {
+  const durees = [motif].flat();
+  try {
+    if (typeof window.AppliAndroid?.vibrer === 'function') window.AppliAndroid.vibrer(durees.join(','));
+    else navigator.vibrate?.(durees);
+  } catch {
+    // Pas de vibreur : le son et le message suffisent.
+  }
+}

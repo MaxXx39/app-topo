@@ -11,7 +11,7 @@
 // longueur>-<n° du point> (L-BOR-1-1…, comptés avec les lignes de rupture), P-<libellé>-<n°> (P-RG-1…).
 import { nouvelIdentifiant } from './surface.js';
 import { creerMesure, nomsDeLaMesure } from './mesure.js';
-import { numeroElementLibre, nomSuivant, nomsDuProjet } from './leve-direct.js';
+import { numeroElementLibre, nomSuivant, nomsDuProjet, debutDeNom } from './leve-direct.js';
 
 /** Rôles d'un point levé dans un métré : [clé, nom affiché]. */
 export const ROLES_METRE = [
@@ -31,8 +31,8 @@ export function estMetre(objet) {
 /** Crée un métré vide dans ce levé, nommé « Métré N » (le plus grand du projet + 1). Renvoie le métré. */
 export function creerMetre(projet, leve) {
   projet.metres ??= [];
-  const numeros = projet.metres.map((m) => /^Métré (\d+)$/.exec(m.nom)?.[1]).filter(Boolean).map(Number);
-  const metre = { id: nouvelIdentifiant(), nom: `Métré ${Math.max(0, ...numeros) + 1}`, nature: 'metre', leveId: leve.id, enCours: { aire: null, longueur: null } };
+  const numeros = projet.metres.map((m) => /^(?:LV-)?Métré (\d+)$/.exec(m.nom)?.[1]).filter(Boolean).map(Number);
+  const metre = { id: nouvelIdentifiant(), nom: `LV-Métré ${Math.max(0, ...numeros) + 1}`, nature: 'metre', leveId: leve.id, enCours: { aire: null, longueur: null } };
   projet.metres.push(metre);
   return metre;
 }
@@ -59,8 +59,8 @@ function numeroPour(projet, metre, role, libelle) {
 
 /** Nom proposé pour le prochain point du métré (voir en haut du fichier). */
 export function prochainNomMetre(projet, metre, role, libelle) {
-  if (role === 'compte') return nomSuivant(projet, `P-${libelle}-`);
-  return nomSuivant(projet, `${LETTRES[role]}-${libelle}-${numeroPour(projet, metre, role, libelle)}-`);
+  if (role === 'compte') return nomSuivant(projet, debutDeNom('P', libelle));
+  return nomSuivant(projet, `${debutDeNom(LETTRES[role], libelle)}${numeroPour(projet, metre, role, libelle)}-`);
 }
 
 /**

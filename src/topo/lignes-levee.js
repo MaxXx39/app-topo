@@ -12,10 +12,11 @@
 // Coordonnées : Est, Nord (m, MN95).
 import { pointDansPolygone } from './volume.js';
 import { creerLigne } from './noms.js';
+import { debutDeNom } from './leve-direct.js';
 
 /** Nom affiché d'une ligne : « L-HT-1 » (ou « Ligne 2 » sans libellé). */
 export function nomDeLigne(ligne, index) {
-  return ligne.libelle && ligne.numero ? `L-${ligne.libelle}-${ligne.numero}` : `Ligne ${index + 1}`;
+  return ligne.numero ? `${debutDeNom('L', ligne.libelle)}${ligne.numero}` : `Ligne ${index + 1}`;
 }
 
 /**
