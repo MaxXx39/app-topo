@@ -11,7 +11,8 @@ import { formaterNombre } from '../topo/format.js';
 import { svgDrapeau } from '../outils/drapeaux.js';
 import { traitsDeBarbules } from './barbules.js';
 import { pointALAbscisse } from '../topo/ligne-implantation.js';
-import { lireLibelles, couleurDuNom, couleurDeLigne } from '../leve/libelles.js';
+import { lireLibelles, couleurDuNom, couleurDeLigne, formeDuNom } from '../leve/libelles.js';
+import { cheminForme, formeEnTrait } from './formes.js';
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS } from './dxf-canvas.js';
 import { echapper } from '../outils/echapper.js';
 import { COULEURS_LISTES, SECTIONS } from './listes-points.js';
@@ -312,10 +313,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const libelles = lireLibelles();
     for (const { point, x, y } of visibles) {
       if (calques.points || rangs.has(point.nom)) {
-        const rond = creerElement('circle', { cx: x, cy: y, r: 3.5, class: classes.get(point.nom) ?? '' });
+        // Forme choisie pour le libellé (0.97.0) : rond plein, sinon carré, triangle, croix…
+        const forme = formeDuNom(point.nom, libelles);
+        const trace = cheminForme(forme, x, y, 3.5);
+        const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}`;
+        const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: 3.5, class: classe });
         // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
         const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? couleursPoints.get(point);
-        if (couleur) rond.style.fill = couleur;
+        if (couleur) rond.style.color = couleur;
         groupePoints.append(rond);
       }
       if (rangs.has(point.nom)) {

@@ -6,7 +6,8 @@
 // ensuite). Depuis 0.95.0 (demande du 30.10.2026) : les libellés de départ ne se modifient pas
 // (seulement leur couleur) ; ceux ajoutés se modifient dans les réglages (Expert) et sont partagés
 // par Drive avec tous les appareils (listes partagées, voir reglages/listes-partagees.js :
-// libelles = { ajoutes: { lignes, points, aires }, couleurs: { lignes: { HT: '#…' }, … } }).
+// libelles = { ajoutes: { lignes, points, aires }, couleurs: { lignes: { HT: '#…' }, … },
+// formes: { points: { RG: 'carre' }, … } }). Forme du point (0.97.0, voir plan/formes.js) : 4e case.
 import { lireListesPartagees, ecrireListesPartagees, surChangementListes } from '../reglages/listes-partagees.js';
 
 export const LIBELLES_DEPART = {
@@ -89,23 +90,37 @@ export function assemblerLibelles(partage) {
   const resultat = {};
   for (const sorte of SORTES) {
     const couleurs = partage?.couleurs?.[sorte] ?? {};
-    const depart = LIBELLES_DEPART[sorte].map(([a, s]) => [a, s, couleurs[a] ?? '']);
+    const formes = partage?.formes?.[sorte] ?? {};
+    const depart = LIBELLES_DEPART[sorte].map(([a, s]) => [a, s, couleurs[a] ?? '', formes[a] ?? '']);
     const fixes = abreviationsDepart(sorte);
-    const ajoutes = (partage?.ajoutes?.[sorte] ?? []).filter(([a]) => a && !fixes.has(a)).map(([a, s, c]) => [a, s ?? '', c ?? '']);
+    const ajoutes = (partage?.ajoutes?.[sorte] ?? []).filter(([a]) => a && !fixes.has(a)).map(([a, s, c, f]) => [a, s ?? '', c ?? '', f ?? '']);
     resultat[sorte] = [...depart, ...ajoutes];
   }
   return resultat;
 }
 
-/** Part à partager d'une liste complète : { ajoutes, couleurs } (les libellés de départ ne gardent que leur couleur). */
+/**
+ * Part à partager d'une liste complète : { ajoutes, couleurs, formes } (les libellés de départ ne
+ * gardent que leur couleur et leur forme).
+ */
 export function partDesLibelles(libelles) {
-  const partage = { ajoutes: {}, couleurs: {} };
+  const partage = { ajoutes: {}, couleurs: {}, formes: {} };
   for (const sorte of SORTES) {
     const fixes = abreviationsDepart(sorte);
-    partage.ajoutes[sorte] = (libelles[sorte] ?? []).filter(([a]) => !fixes.has(a)).map(([a, s, c]) => [a, s ?? '', c ?? '']);
-    partage.couleurs[sorte] = Object.fromEntries((libelles[sorte] ?? []).filter(([a, , c]) => fixes.has(a) && c).map(([a, , c]) => [a, c]));
+    const liste = libelles[sorte] ?? [];
+    partage.ajoutes[sorte] = liste.filter(([a]) => !fixes.has(a)).map(([a, s, c, f]) => [a, s ?? '', c ?? '', f ?? '']);
+    partage.couleurs[sorte] = Object.fromEntries(liste.filter(([a, , c]) => fixes.has(a) && c).map(([a, , c]) => [a, c]));
+    partage.formes[sorte] = Object.fromEntries(liste.filter(([a, , , f]) => fixes.has(a) && f).map(([a, , , f]) => [a, f]));
   }
   return partage;
+}
+
+/** Forme du point d'après le libellé de son nom (P-RG-3, L-HT-1-2, A-ENR-1-2), ou '' (rond plein). */
+export function formeDuNom(nom, libelles = lireLibelles()) {
+  const decoupe = /^([PLA])-([^-]+)-\d+(-\d+)?$/.exec(String(nom ?? ''));
+  if (!decoupe) return '';
+  const liste = { P: libelles.points, L: libelles.lignes, A: libelles.aires }[decoupe[1]];
+  return (liste ?? []).find(([a]) => a === decoupe[2])?.[3] || '';
 }
 
 /** Anciens libellés de cet appareil (avant 0.95.0, « topo-libelles »), en part partagée, ou null. */

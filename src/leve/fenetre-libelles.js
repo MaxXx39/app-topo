@@ -5,6 +5,7 @@
 // se modifient pas et ne s'enlèvent pas : seule leur couleur se change.
 import { echapper } from '../outils/echapper.js';
 import { nettoyerAbreviation, COULEURS_LIBELLES } from './libelles.js';
+import { FORMES } from '../plan/formes.js';
 
 /** Nom d'une couleur de la palette (« noir »…), « habituelle » pour pas de couleur choisie. */
 function nomCouleur(couleur) {
@@ -18,7 +19,7 @@ function nomCouleur(couleur) {
  * liste modifiée (lignes sans abréviation enlevées, une abréviation en double gardée une fois).
  */
 export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b7280', fixes = new Set(), enregistrer }) {
-  let lignes = liste.map(([a, d, c]) => [a, d, c ?? '']);
+  let lignes = liste.map(([a, d, c, f]) => [a, d, c ?? '', f ?? '']);
   let paletteOuverte = null; // n° de la ligne dont la palette est ouverte
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-libelles';
@@ -28,6 +29,7 @@ export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b728
     nettoyerAbreviation(ligne.querySelector('[data-libelle="abreviation"]').value),
     ligne.querySelector('[data-libelle="description"]').value.trim(),
     ligne.querySelector('[data-libelle="couleur"]').dataset.couleur,
+    ligne.querySelector('[data-libelle="forme"]').value,
   ]);
 
   function dessiner() {
@@ -35,16 +37,17 @@ export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b728
       <h2>${echapper(titre)}</h2>
       <div class="corps-libelles">
         <table class="table-libelles">
-          <thead><tr><th>Abrév.</th><th>Description</th><th>Couleur</th><th></th></tr></thead>
+          <thead><tr><th>Abrév.</th><th>Description</th><th>Couleur</th><th>Forme</th><th></th></tr></thead>
           <tbody>
-            ${lignes.map(([abreviation, description, couleur], i) => `<tr data-ligne class="${fixes.has(abreviation) ? 'libelle-fixe' : ''}">
+            ${lignes.map(([abreviation, description, couleur, forme], i) => `<tr data-ligne class="${fixes.has(abreviation) ? 'libelle-fixe' : ''}">
               <td><input type="text" data-libelle="abreviation" value="${echapper(abreviation)}" maxlength="8" autocapitalize="characters" aria-label="Abréviation" ${fixes.has(abreviation) ? 'readonly' : ''} /></td>
               <td><input type="text" data-libelle="description" value="${echapper(description)}" aria-label="Description" ${fixes.has(abreviation) ? 'readonly' : ''} /></td>
               <td><button type="button" class="pastille-couleur ${couleur ? '' : 'habituelle'}" data-libelle="couleur" data-couleur="${couleur}" data-action="palette" data-valeur="${i}"
                 style="background: ${couleur || couleurParDefaut}" title="${nomCouleur(couleur)}" aria-label="Couleur : ${nomCouleur(couleur)}" aria-expanded="${paletteOuverte === i}"></button></td>
+              <td><select data-libelle="forme" aria-label="Forme du point">${FORMES.map(([cle, nom]) => `<option value="${cle}" ${cle === forme ? 'selected' : ''}>${nom}</option>`).join('')}</select></td>
               <td>${fixes.has(abreviation) ? '' : `<button type="button" class="bouton-lien" data-action="enlever" data-valeur="${i}" aria-label="Enlever">×</button>`}</td>
             </tr>
-            ${paletteOuverte === i ? `<tr class="ligne-palette"><td colspan="4"><div class="palette-couleurs">
+            ${paletteOuverte === i ? `<tr class="ligne-palette"><td colspan="5"><div class="palette-couleurs">
               ${COULEURS_LIBELLES.map(([c, nom]) => `<button type="button" class="pastille-couleur ${c ? '' : 'habituelle'} ${c === couleur ? 'choisie' : ''}" data-action="choisirCouleur" data-valeur="${i}" data-couleur="${c}"
                 style="background: ${c || couleurParDefaut}" title="${nom}" aria-label="${nom}"></button>`).join('')}
             </div></td></tr>` : ''}`).join('')}
@@ -78,7 +81,7 @@ export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b728
     if (action === 'ajouter' || action === 'enlever') {
       lignes = lire();
       paletteOuverte = null;
-      if (action === 'ajouter') lignes.push(['', '', '']);
+      if (action === 'ajouter') lignes.push(['', '', '', '']);
       else lignes.splice(Number(valeur), 1);
       dessiner();
       if (action === 'ajouter') fenetre.querySelector('tbody tr:last-child input')?.focus();

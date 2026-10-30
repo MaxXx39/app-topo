@@ -1018,28 +1018,36 @@ svg.plan {
 }
 
 /* Dessin du plan */
-.plan .points circle {
-  fill: #9aa5a0;
+.plan .points :is(circle, path) {
+  color: #9aa5a0;
+  fill: currentColor;
 }
 
-.plan .points circle.role-contour {
-  fill: var(--rouge);
+/* Formes vides et croix (0.97.0) : un trait de la couleur du point. */
+.plan .points .forme-trait {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
 }
 
-.plan .points circle.role-base {
-  fill: var(--bleu);
+.plan .points .role-contour {
+  color: var(--rouge);
 }
 
-.plan .points circle.role-ligne {
-  fill: var(--orange);
+.plan .points .role-base {
+  color: var(--bleu);
 }
 
-.plan .points circle.role-dessus {
-  fill: var(--succes);
+.plan .points .role-ligne {
+  color: var(--orange);
 }
 
-.plan .points circle.role-mesure {
-  fill: var(--couleur-mesure, var(--cyan));
+.plan .points .role-dessus {
+  color: var(--succes);
+}
+
+.plan .points .role-mesure {
+  color: var(--couleur-mesure, var(--cyan));
 }
 
 .plan .points circle.selection {
