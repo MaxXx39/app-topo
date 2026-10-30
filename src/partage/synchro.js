@@ -87,7 +87,9 @@ export function creerSynchro(drive, appareil) {
       const parent = await racine();
       const dossiers = await drive.lister(`'${parent}' in parents and mimeType = '${TYPE_DOSSIER}'`);
       return dossiers
-        .filter((d) => d.appProperties?.projetId)
+        // Sans date de modification, le premier envoi n'est pas fini (dossier créé, fichiers pas tous
+        // arrivés) : il n'y a encore rien à ouvrir, le projet n'est pas proposé.
+        .filter((d) => d.appProperties?.projetId && d.appProperties?.modifieLe)
         .map((d) => ({ dossierId: d.id, projetId: d.appProperties.projetId, titre: d.appProperties.titre ?? d.name, modifieLe: d.appProperties.modifieLe ?? null, verrou: verrouDe(d) }));
     },
 
