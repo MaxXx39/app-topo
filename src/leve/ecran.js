@@ -1011,6 +1011,7 @@ export function creerEcranLeve(conteneur, actions) {
           <p class="titre-choix">Photos (${photos.length}) ${bulle('photos')}</p>
           <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
               <img src="${photo.miniature}" alt="${echapper(photo.legende || donnees.stock.nom)}" />
+              <span class="point-photo">📷 ${photo.point ? echapper(photo.point) : photo.attentePoint ? 'prochain point' : '—'}</span>
               <input type="text" data-champ="legende-photo-levee" data-id="${photo.id}" value="${echapper(photo.legende ?? '')}" placeholder="Légende" aria-label="Légende de la photo" />
               <button type="button" class="bouton-lien" data-action="supprimerPhotoLevee" data-valeur="${photo.id}">supprimer</button>
             </figure>`).join('')}</div>

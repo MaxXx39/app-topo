@@ -8331,3 +8331,27 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   background: #0d9488;
   color: #ffffff;
 }
+
+/* Photos rattachées à un point (0.96.0) : 📷 sur le plan, fenêtre de la photo en grand. */
+.plan .fond-photo-plan {
+  fill: #ffffff;
+  stroke: #1b2b36;
+  stroke-width: 1;
+}
+
+.plan .icone-photo-plan {
+  font-size: 11px;
+}
+
+.fenetre-photo img {
+  display: block;
+  max-width: min(90vw, 900px);
+  max-height: 70vh;
+  margin: 0 auto;
+  border-radius: 8px;
+}
+
+.point-photo {
+  font-size: 0.8rem;
+  font-weight: 700;
+}

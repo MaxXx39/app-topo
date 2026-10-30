@@ -150,6 +150,8 @@ const terrain = {
 };
 // Orientation (0.90.1) : toujours le cap du GNSS (la direction de marche sert en secours, sans le dire).
 terrain.sourceOrientation = 'rx2';
+// Site sans récepteur : seulement le mode Lever (voir ONGLETS).
+if (!recepteurDisponible()) terrain.mode = 'lever';
 // Libellé « Aucun » (0.90.0) choisi à chaque démarrage de l'appli.
 terrain.libelleLigne = '';
 terrain.libellePoint = '';
@@ -218,8 +220,10 @@ const MODES_TERRAIN = [
   { cle: 'autocontrole', titre: 'Contrôle', icone: '<path d="m5 12 5 5 9-10" />' },
   { cle: 'lame', titre: 'Guidage', icone: '<path d="M12 4v16M6 10l6-6 6 6M6 14l6 6 6-6" />', niveau: 'expert' },
 ];
+// Sur le site (0.96.0, demande du 29.10.2026) : Lever seulement, pour modifier les levés (lignes,
+// contours, triangles en trop, suites de points, photos) ; pas de prise de point sans récepteur.
 const ONGLETS = [
-  ...(recepteurDisponible() ? MODES_TERRAIN.map((m) => ({ ...m, nom: 'terrain', mode: m.cle })) : []),
+  ...(recepteurDisponible() ? MODES_TERRAIN : MODES_TERRAIN.filter((m) => m.cle === 'lever')).map((m) => ({ ...m, nom: 'terrain', mode: m.cle })),
   { nom: 'calculs', titre: 'Calculs' },
   { nom: 'plan', titre: 'Plan' },
 ];
@@ -769,9 +773,9 @@ for (const bouton of document.querySelectorAll('[data-taille-plan]')) {
   });
 }
 
-const ecranLeve = recepteurDisponible()
-  ? creerEcranLeve(document.querySelector('#leve-direct'), {
-      ouvrirRecepteur: () => boutonRecepteur.ouvrir(),
+// Lever existe aussi sur le site depuis 0.96.0 (sans récepteur : modifier les levés).
+const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
+      ouvrirRecepteur: () => boutonRecepteur?.ouvrir(),
       nouvelleSurface: (nature) => ajouterSurfaceLevee(nature),
       // Renommer le levé en cours (surface, métré ou levé libre) : les noms des points ne changent pas.
       renommerLevee: (id, nom) => {
@@ -832,7 +836,8 @@ const ecranLeve = recepteurDisponible()
       ajouterPhotosLevee: (fichiers) => {
         const levee = stockEnCours() ?? metreEnCours();
         if (!levee || refuserEnLectureSeule()) return;
-        ajouterPhotos(levee, fichiers);
+        // 0.96.0 : la photo attend le prochain point enregistré, et prend son nom (voir rangerPointPris).
+        ajouterPhotos(levee, fichiers, { attentePoint: true });
       },
       legendePhotoLevee: (id, legende) => {
         const photo = (stockEnCours() ?? metreEnCours())?.photos?.find((p) => p.id === id);
@@ -1302,8 +1307,7 @@ const ecranLeve = recepteurDisponible()
         afficherMessage(`Point ${dernier.nom} effacé`);
         modifie();
       },
-    })
-  : null;
+    });
 
 /** Date d'un levé fait avec le récepteur, à la suisse (« 22.10.2026 »). */
 function jourDuLeve(leveId) {
@@ -2974,8 +2978,50 @@ function rangerPointPris(resultat) {
   }
   vibrer(60);
   sonValidation();
-  afficherMessage(`Point ${resultat.point.nom} pris`);
+  // Photos prises juste avant (0.96.0) : rattachées à ce point.
+  const levee = stockEnCours() ?? metreEnCours();
+  const enAttente = (levee?.photos ?? []).filter((photo) => photo.attentePoint);
+  for (const photo of enAttente) {
+    photo.point = resultat.point.nom;
+    delete photo.attentePoint;
+  }
+  afficherMessage(`Point ${resultat.point.nom} pris${enAttente.length > 0 ? ` · ${enAttente.length} photo(s) rattachée(s)` : ''}`);
   modifie();
+}
+
+/**
+ * Photos rattachées à un point (0.96.0) des levés montrés sur le plan : [{ id, nom (du point),
+ * est, nord }] (un 📷 près du point ; le toucher ouvre la photo, voir montrerPhoto).
+ */
+function photosDuPlan(listes) {
+  const montrees = new Set(listes.filter((l) => l.visible).map((l) => l.id));
+  const resultat = [];
+  for (const levee of [...projet.surfaces, ...projet.metres, ...projet.autres]) {
+    if (!montrees.has(levee.id)) continue;
+    const parNom = new Map(pointsDuLeve(levee.leveId).map((p) => [p.nom, p]));
+    for (const photo of levee.photos ?? []) {
+      const point = photo.point ? parNom.get(photo.point) : null;
+      if (point) resultat.push({ id: photo.id, nom: point.nom, est: point.est, nord: point.nord });
+    }
+  }
+  return resultat;
+}
+
+/** Ouvre une photo en grand (📷 touché sur le plan) : image, point et légende. */
+function montrerPhoto(id) {
+  const photo = [...projet.surfaces, ...projet.metres, ...projet.autres].flatMap((l) => l.photos ?? []).find((p) => p.id === id);
+  if (!photo) return;
+  const fenetre = document.createElement('dialog');
+  fenetre.className = 'fenetre-photo';
+  fenetre.innerHTML = `<form method="dialog">
+      <h2>📷 ${echapper(photo.point ?? '')}</h2>
+      <img src="${photo.image}" alt="${echapper(photo.legende || photo.point || 'photo')}" />
+      ${photo.legende ? `<p>${echapper(photo.legende)}</p>` : ''}
+      <div class="ligne-outils"><button class="bouton">Fermer</button></div>
+    </form>`;
+  fenetre.addEventListener('close', () => fenetre.remove());
+  document.body.append(fenetre);
+  fenetre.showModal();
 }
 
 /** Rôle de chaque point d'une liste dans ses levés (« contour », « ligne L-HT-1 », « point isolé ») : Map nom -> texte. */
@@ -3592,6 +3638,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
   // du travail (rien à annuler) : on redessine et on enregistre.
   // Couleur d'une liste (menu « Afficher » ; aussi dans Projet › Listes de points).
   quandColorerListe: (id, couleur) => colorerListe(id, couleur),
+  quandToucherPhoto: (id) => montrerPhoto(id),
   quandMontrerListe: (id, visible) => {
     if (id === '*') projet.listesCachees = visible ? [] : listesDePoints(projet).map((l) => l.id);
     else montrerListe(projet, id, visible);
@@ -3614,14 +3661,19 @@ const plan = creerPlan(document.querySelector('#plan'), {
   },
 });
 
-/** Ajoute des photos (réduites) à une surface ou à une mesure : objet.photos. */
-async function ajouterPhotos(objet, fichiers) {
+/**
+ * Ajoute des photos (réduites) à une surface ou à une mesure : objet.photos. attentePoint : la photo
+ * sera rattachée au prochain point enregistré dans ce levé (photo.point = son nom).
+ */
+async function ajouterPhotos(objet, fichiers, { attentePoint = false } = {}) {
   // La conversion d'une photo HEIC prend quelques secondes : le message reste affiché jusqu'à la fin.
   afficherMessage('Préparation de la photo…', null);
   const erreurs = [];
   for (const fichier of fichiers) {
     try {
-      objet.photos = [...(objet.photos ?? []), await preparerPhoto(fichier)];
+      const photo = await preparerPhoto(fichier);
+      if (attentePoint) photo.attentePoint = true;
+      objet.photos = [...(objet.photos ?? []), photo];
     } catch (erreur) {
       erreurs.push(`${fichier.name} : ${erreur.message}`);
     }
@@ -3883,7 +3935,8 @@ creerEcranExport(moduleExport.zone('plan'), {
         .filter((d) => selection.has(d.id) && d.sommets.length > 0)
         .map((d) => ({ ferme: estFerme(d), lignes: d.type !== 'points', points: pointsDuDessin(d, projet.dessins) })),
       // Photos des surfaces cochées (case « Photos » de l'export).
-      photos: affichees.flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom }))),
+      // Photo rattachée à un point (0.96.0) : le nom du point devant la légende.
+      photos: affichees.flatMap((s) => (s.photos ?? []).map((photo) => ({ ...photo, surface: s.nom, legende: [photo.point, photo.legende].filter(Boolean).join(' · ') }))),
       cartouche: projet.cartouche,
       // Coupes cochées « dans le PDF », avec les profils des surfaces traversées.
       coupes: projet.coupes
@@ -3954,6 +4007,7 @@ function recalculer({ recadrer = false } = {}) {
   const gardees = listesDuTravail(toutesLesListes);
   const listes = gardees ? toutesLesListes.map((l) => ({ ...l, visible: l.visible && gardees.has(l.id) })) : toutesLesListes;
   plan.afficherCouleursPoints(couleursDesPoints(projet, listes));
+  plan.afficherPhotos(photosDuPlan(listes));
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
   const dansSurfaces = ongletContexte === 'surfaces';

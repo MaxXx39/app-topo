@@ -82,7 +82,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandBasculerSeul(actif) : bouton « Seul » (seulement ce sur quoi je travaille, 0.94.0)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto } = {}) {
   // Réglages choisis ; « calques » est ce qui est dessiné : en dessous d'Expert, les réglages
   // d'Expert gardent leur valeur de départ.
   const calquesChoisis = { ...CALQUES_DEPART };
@@ -368,6 +368,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     dessinerEtiquettesMesures();
     dessinerCoupes();
     if (calques.volumes) dessinerVolumes();
+    dessinerPhotos();
     dessinerLegende();
     dessinerBarreEchelle();
     dessinerImplantation();
@@ -1671,9 +1672,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         const id = mesureSousLeDoigt(toucher);
         if (id) quandToucherMesure?.(id);
       } else {
-        // Sinon : toucher l'intérieur d'un stock le choisit.
-        const index = stockSousLeDoigt(toucher);
-        if (index >= 0) quandToucherStock?.(index);
+        // Un 📷 (photo rattachée à un point, 0.96.0) ouvre la photo ; sinon, toucher l'intérieur d'un stock le choisit.
+        const photo = photoSousLeDoigt(toucher);
+        if (photo) quandToucherPhoto?.(photo.id);
+        else {
+          const index = stockSousLeDoigt(toucher);
+          if (index >= 0) quandToucherStock?.(index);
+        }
       }
     }
     toucher = null;
@@ -1684,6 +1689,30 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     toucher = null;
     if (pointeurs.size === 0) finirLeGeste();
   });
+
+  // Photos rattachées à un point (0.96.0) : [{ id, nom, est, nord }] ; un 📷 en haut à droite du point.
+  let photos = [];
+  const decalagePhoto = (x, y) => ({ x: x + 10, y: y - 14 });
+  function dessinerPhotos() {
+    if (!vue || photos.length === 0) return;
+    const groupe = creerElement('g', { class: 'photos-plan' });
+    for (const photo of photos) {
+      const ecran = versEcran(photo.est, photo.nord, vue);
+      const { x, y } = decalagePhoto(ecran.x, ecran.y);
+      groupe.append(creerElement('rect', { x: x - 9, y: y - 8, width: 18, height: 15, rx: 4, class: 'fond-photo-plan' }));
+      const texte = creerElement('text', { x, y: y + 4, 'text-anchor': 'middle', class: 'icone-photo-plan' });
+      texte.textContent = '📷';
+      groupe.append(texte);
+    }
+    svg.append(groupe);
+  }
+  function photoSousLeDoigt(position) {
+    if (!vue) return null;
+    return photos.find((photo) => {
+      const { x, y } = versEcran(photo.est, photo.nord, vue);
+      return distance(position, decalagePhoto(x, y)) < RAYON_TOUCHER;
+    }) ?? null;
+  }
 
   /** Point le plus proche d'une position de l'écran, s'il est à moins de RAYON_TOUCHER pixels. */
   function pointLePlusProche(position) {
@@ -1766,6 +1795,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     /** Listes de points du menu « Points » (voir listes-points.js). */
     afficherListesPoints(listes) {
       remplirMenuListes(listes);
+    },
+    /** Photos rattachées à un point (📷 sur le plan) : [{ id, nom, est, nord }]. */
+    afficherPhotos(nouvelles) {
+      photos = nouvelles;
     },
     /** Couleur de chaque point d'après sa liste (Map point → couleur, voir couleursDesPoints). */
     afficherCouleursPoints(couleurs) {
