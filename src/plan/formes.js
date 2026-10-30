@@ -1,20 +1,22 @@
 // Forme des points sur le plan, choisie par libellé (0.97.0, demande du 29.10.2026, réglée en
-// Expert dans « Libellés des points ») : rond, carré, triangle (pleins ou vides), croix, croix
+// Expert dans « Libellés des points ») : rond, carré, triangle pointe en haut ou en bas (pleins ou vides), croix, croix
 // tournée à 45°, étoile, losange. '' = rond plein (la forme habituelle).
 
-// [clé, nom] dans l'ordre de la liste de choix.
+// [clé, symbole] dans l'ordre de la liste de choix (le symbole est montré à la place du nom).
 export const FORMES = [
-  ['', 'rond plein'],
-  ['rond-vide', 'rond vide'],
-  ['carre', 'carré plein'],
-  ['carre-vide', 'carré vide'],
-  ['triangle', 'triangle plein'],
-  ['triangle-vide', 'triangle vide'],
-  ['losange', 'losange plein'],
-  ['losange-vide', 'losange vide'],
-  ['croix', 'croix'],
-  ['croix-45', 'croix à 45°'],
-  ['etoile', 'étoile'],
+  ['', '●'],
+  ['rond-vide', '○'],
+  ['carre', '■'],
+  ['carre-vide', '□'],
+  ['triangle', '▲'],
+  ['triangle-vide', '△'],
+  ['triangle-bas', '▼'],
+  ['triangle-bas-vide', '▽'],
+  ['losange', '◆'],
+  ['losange-vide', '◇'],
+  ['croix', '✚'],
+  ['croix-45', '✖'],
+  ['etoile', '★'],
 ];
 
 /** Vrai si la forme se dessine en trait seulement (vide, croix). */
@@ -34,6 +36,8 @@ export function cheminForme(forme, x, y, r) {
       return polygone([[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]]);
     case 'triangle':
       return polygone([[x, y - r * 1.2], [x + r * 1.1, y + r * 0.8], [x - r * 1.1, y + r * 0.8]]);
+    case 'triangle-bas':
+      return polygone([[x, y + r * 1.2], [x + r * 1.1, y - r * 0.8], [x - r * 1.1, y - r * 0.8]]);
     case 'losange':
       return polygone([[x, y - r * 1.3], [x + r * 1.3, y], [x, y + r * 1.3], [x - r * 1.3, y]]);
     case 'croix':

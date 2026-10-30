@@ -44,7 +44,7 @@ export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b728
               <td><input type="text" data-libelle="description" value="${echapper(description)}" aria-label="Description" ${fixes.has(abreviation) ? 'readonly' : ''} /></td>
               <td><button type="button" class="pastille-couleur ${couleur ? '' : 'habituelle'}" data-libelle="couleur" data-couleur="${couleur}" data-action="palette" data-valeur="${i}"
                 style="background: ${couleur || couleurParDefaut}" title="${nomCouleur(couleur)}" aria-label="Couleur : ${nomCouleur(couleur)}" aria-expanded="${paletteOuverte === i}"></button></td>
-              <td><select data-libelle="forme" aria-label="Forme du point">${FORMES.map(([cle, nom]) => `<option value="${cle}" ${cle === forme ? 'selected' : ''}>${nom}</option>`).join('')}</select></td>
+              <td><select data-libelle="forme" aria-label="Forme du point" class="select-forme">${FORMES.map(([cle, nom]) => `<option value="${cle}" ${cle === forme ? 'selected' : ''}>${nom}</option>`).join('')}</select></td>
               <td>${fixes.has(abreviation) ? '' : `<button type="button" class="bouton-lien" data-action="enlever" data-valeur="${i}" aria-label="Enlever">×</button>`}</td>
             </tr>
             ${paletteOuverte === i ? `<tr class="ligne-palette"><td colspan="5"><div class="palette-couleurs">
