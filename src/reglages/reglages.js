@@ -16,8 +16,7 @@
 import { echapper } from '../outils/echapper.js';
 import { demanderCode } from '../outils/code.js';
 import { lireListesPartagees } from './listes-partagees.js';
-import { lireLibelles, enregistrerLibelles, abreviationsDepart } from '../leve/libelles.js';
-import { ouvrirFenetreLibelles } from '../leve/fenetre-libelles.js';
+import { modifierLibellesDeSorte } from '../leve/fenetre-libelles.js';
 import { ouvrirFenetreListes } from './fenetre-listes.js';
 
 const CLE = 'topo-reglages';
@@ -229,18 +228,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
    * ceux ajoutés oui ; enregistrés dans les listes partagées (Drive).
    */
   function modifierLibelles(sorte) {
-    const titres = { lignes: 'Libellés des lignes (L-…)', points: 'Libellés des points (P-…)', aires: 'Libellés des aires (A-…)' };
-    const tous = lireLibelles();
-    ouvrirFenetreLibelles({
-      titre: titres[sorte],
-      liste: tous[sorte],
-      fixes: abreviationsDepart(sorte),
-      couleurParDefaut: { lignes: '#ea580c', points: '#15803d', aires: '#0891b2' }[sorte],
-      enregistrer: (liste) => {
-        enregistrerLibelles({ ...tous, [sorte]: liste });
-        changerMode?.();
-      },
-    });
+    modifierLibellesDeSorte(sorte, () => changerMode?.());
   }
 
   /** Crayon du nom de l'appareil : protégé par le code (demandé une fois par ouverture de la fenêtre). */

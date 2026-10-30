@@ -5305,6 +5305,19 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   vertical-align: baseline;
 }
 
+/* Forme et couleur d'un libellé dans le choix de Lever : symbole dans une pastille blanche. */
+.symbole-libelle {
+  display: inline-block;
+  min-width: 1.3em;
+  margin-right: 4px;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--texte);
+  font-style: normal;
+  line-height: 1.3;
+  text-align: center;
+}
+
 /* Bouton « Ma position » : parties pleines du dessin (suivi, devant en haut). */
 .plan-boutons svg .plein {
   fill: currentColor;
@@ -5478,6 +5491,24 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* Titres des catégories du menu « Afficher » : bandeau de couleur pour les repérer. */
+.titre-partie-menu[class*='section-menu-'] {
+  --teinte-section: var(--gris);
+  margin: 10px 0 4px;
+  padding: 5px 8px;
+  border-left: 4px solid var(--teinte-section);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--teinte-section) 16%, var(--surface));
+  color: var(--texte);
+}
+
+.section-menu-leve { --teinte-section: var(--succes); }
+.section-menu-points { --teinte-section: var(--bleu); }
+.section-menu-controle { --teinte-section: var(--rouge); }
+.section-menu-surface { --teinte-section: #7c3aed; }
+.section-menu-dessin { --teinte-section: var(--ambre-fonce); }
+.section-menu-metre { --teinte-section: var(--cyan); }
 
 .pastille-liste.liste-mesures { background: #0891b2; }
 

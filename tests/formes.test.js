@@ -7,6 +7,7 @@ describe('formes des points (0.97.0)', () => {
     expect(cheminForme('rond-vide', 10, 10, 3)).toBeNull();
     expect(cheminForme('carre', 10, 10, 3)).toBe('M7.0 7.0L13.0 7.0L13.0 13.0L7.0 13.0Z');
     expect(cheminForme('carre-vide', 10, 10, 3)).toBe(cheminForme('carre', 10, 10, 3));
+    expect(cheminForme('triangle-bas', 0, 0, 1)).toBe('M0.0 1.2L1.1 -0.8L-1.1 -0.8Z');
     expect(cheminForme('croix-45', 0, 0, 1)).toBe('M-1.0 -1.0L1.0 1.0M-1.0 1.0L1.0 -1.0');
     expect(cheminForme('etoile', 0, 0, 2).split('L')).toHaveLength(10);
     for (const [cle] of FORMES) if (!['', 'rond-vide'].includes(cle)) expect(cheminForme(cle, 0, 0, 3)).toBeTruthy();

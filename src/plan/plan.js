@@ -1488,7 +1488,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const reglages = REGLAGES_SECTIONS[section] ?? [];
     const niveau = reglages.length > 0 && reglages.every(([, , n]) => n === 'expert') ? 'seulement-expert' : '';
     const roue = reglages.length > 0 ? `<button type="button" class="roue-menu ${niveau}" data-roue="${section}" aria-expanded="false" title="Réglages" aria-label="Réglages ${titre}">⚙</button>` : '';
-    return `<div class="titre-partie-menu titre-avec-roue"><span>${titre}</span>${roue}</div>${reglagesSection(section)}`;
+    return `<div class="titre-partie-menu titre-avec-roue section-menu-${section}"><span>${titre}</span>${roue}</div>${reglagesSection(section)}`;
   }
   let signatureListes = null;
   let couleursDesListes = new Map(); // id d'une liste → couleur choisie (surfaces importées)
