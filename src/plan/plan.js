@@ -803,6 +803,27 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         groupe.append(creerElement('path', { d: bord, class: `bord-surface-importee ${nature}` }));
       }
 
+      // Levé sans contour (terrain, recollement… ; 0.90.1) : son bord et un fond léger, même sans le
+      // calque Triangles (Expert), pour voir où il s'étend (implantation d'une surface en Base).
+      const sansContour = (stock.contour ?? []).length < 3;
+      if (!importee && sansContour && resultat?.trianglesDessus?.length && !(actif && calques.triangles)) {
+        const enPixels = (p) => versEcran(p.est, p.nord, vue);
+        const bord = bordDuStock(resultat.trianglesDessus)
+          .map(([p, q]) => {
+            const [a, b] = [enPixels(p), enPixels(q)];
+            return `M${a.x} ${a.y} L${b.x} ${b.y}`;
+          })
+          .join(' ');
+        const fond = resultat.trianglesDessus
+          .map((triangle) => {
+            const [a, b, c] = triangle.map(enPixels);
+            return `M${a.x} ${a.y} L${b.x} ${b.y} L${c.x} ${c.y} Z`;
+          })
+          .join(' ');
+        groupe.append(creerElement('path', { d: fond, class: `fond-leve nature-${stock.nature ?? 'terrain'}${actif ? ' actif' : ''}` }));
+        groupe.append(creerElement('path', { d: bord, class: `bord-leve nature-${stock.nature ?? 'terrain'}${actif ? ' actif' : ''}` }));
+      }
+
       // Triangles du dessus : stock actif seulement, pour ne pas surcharger.
       if (!importee && actif && calques.triangles && resultat?.trianglesDessus) {
         const traits = resultat.trianglesDessus

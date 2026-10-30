@@ -175,3 +175,21 @@ export function nomSuivant(nom, nomsExistants) {
   }
   return meilleur?.nom ?? null;
 }
+
+/**
+ * Nom du point précédent à implanter (0.90.1) : même début, numéro de la fin − 1 (P2 → P1). S'il
+ * n'existe pas, le plus grand numéro plus petit qui existe (P4 → P1 s'il n'y a ni P2 ni P3).
+ * Renvoie null s'il n'y en a pas (ou si le nom ne finit pas par un numéro).
+ */
+export function nomPrecedent(nom, nomsExistants) {
+  const decoupe = /^(.*?)(\d+)$/.exec(nom ?? '');
+  if (!decoupe) return null;
+  const [, debut, numero] = decoupe;
+  let meilleur = null;
+  for (const autre of nomsExistants) {
+    const a = /^(.*?)(\d+)$/.exec(autre);
+    if (!a || a[1] !== debut || Number(a[2]) >= Number(numero)) continue;
+    if (meilleur === null || Number(a[2]) > meilleur.numero) meilleur = { nom: autre, numero: Number(a[2]) };
+  }
+  return meilleur?.nom ?? null;
+}

@@ -12,6 +12,26 @@ const HAUTEUR_PROFIL_MAX = 220;
 // Marge au-dessus et au-dessous du relief (m).
 const MARGE_ALTITUDE = 0.1;
 
+// Grille (0.90.1, Expert) : un trait gris tous les mètres ; plus espacé (2, 5, 10 m…) si les traits
+// seraient à moins de ECART_GRILLE_MIN unités du SVG l'un de l'autre.
+const ECART_GRILLE_MIN = 9;
+
+/**
+ * Pas de la grille d'une coupe (m) : 1 m si les traits sont assez écartés à cette échelle
+ * (pixelsParMetre : unités du SVG par mètre), sinon 2, 5, 10, 20, 50… m, le premier lisible.
+ */
+export function pasDeGrille(pixelsParMetre, ecartMin = ECART_GRILLE_MIN) {
+  for (const pas of [1, 2, 5, 10, 20, 50, 100, 200, 500]) if (pas * pixelsParMetre >= ecartMin) return pas;
+  return 1000;
+}
+
+/** Traits de la grille entre debut et fin (m), tous les "pas" m : valeurs multiples du pas. */
+export function valeursGrille(debut, fin, pas) {
+  const valeurs = [];
+  for (let v = Math.ceil(debut / pas) * pas; v <= fin + 1e-9; v += pas) valeurs.push(Math.round(v * 1000) / 1000);
+  return valeurs;
+}
+
 /**
  * Code SVG d'une coupe en direct.
  * - lignes : profil de la surface (résultat de profilSurface), distances de 0 à 2 × demiLongueur
@@ -21,8 +41,9 @@ const MARGE_ALTITUDE = 0.1;
  * - exageration : 1 (hauteurs à l'échelle) ou 2 (hauteurs deux fois plus grandes)
  * - sens : 'perpendiculaire' ou 'axe' (couleur du dessin, la même que son trait sur le plan)
  * - titre, gauche, droite : textes (ex. « Perpendiculaire », « gauche », « droite »)
+ * - grille : vrai pour la grille grise en longueur et en hauteur (Expert)
  */
-export function svgCoupeDirecte({ lignes, demiLongueur, altitudeCanne, classe, exageration = 1, sens = '', titre, gauche, droite }) {
+export function svgCoupeDirecte({ lignes, demiLongueur, altitudeCanne, classe, exageration = 1, sens = '', titre, gauche, droite, grille = false }) {
   const longueur = 2 * demiLongueur;
   const largeurUtile = LARGEUR - MARGES.gauche - MARGES.droite;
   const pixelsParMetre = (largeurUtile / longueur) * (exageration === 2 ? 2 : 1);
@@ -51,6 +72,15 @@ export function svgCoupeDirecte({ lignes, demiLongueur, altitudeCanne, classe, e
   const y = (altitude) => MARGES.haut + (haut - altitude) * pixelsParMetre;
   const yBas = MARGES.haut + hauteurUtile;
   const cadre = `coupe-cadre-${sens || 'x'}`;
+  // Grille : en longueur depuis la position du récepteur (milieu), en hauteur sur les altitudes rondes.
+  let traitsGrille = '';
+  if (grille) {
+    const pasX = pasDeGrille(largeurUtile / longueur);
+    const pasY = pasDeGrille(pixelsParMetre);
+    const enLongueur = valeursGrille(-demiLongueur, demiLongueur, pasX).map((d) => `<line x1="${x(d + demiLongueur).toFixed(1)}" y1="${MARGES.haut}" x2="${x(d + demiLongueur).toFixed(1)}" y2="${yBas}" class="grille-coupe" />`);
+    const enHauteur = valeursGrille(bas, haut, pasY).map((h) => `<line x1="${MARGES.gauche}" y1="${y(h).toFixed(1)}" x2="${LARGEUR - MARGES.droite}" y2="${y(h).toFixed(1)}" class="grille-coupe" />`);
+    traitsGrille = `<g class="grille-coupe">${[...enLongueur, ...enHauteur].join('')}</g>`;
+  }
 
   const profils = lignes
     .map((ligne) => {
@@ -77,6 +107,7 @@ export function svgCoupeDirecte({ lignes, demiLongueur, altitudeCanne, classe, e
     <text x="${MARGES.gauche - 4}" y="${yBas}" class="cote" text-anchor="end">${bas.toFixed(2)}</text>
     <line x1="${MARGES.gauche}" y1="${yBas}" x2="${LARGEUR - MARGES.droite}" y2="${yBas}" class="base-coupe" />
     <text x="${milieu}" y="${hauteur - 4}" class="cote" text-anchor="middle">${demiLongueur} m | ${demiLongueur} m</text>
+    ${traitsGrille}
     <g clip-path="url(#${cadre})">${profils}</g>
     ${canne}
   </svg>`;

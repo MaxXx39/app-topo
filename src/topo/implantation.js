@@ -114,3 +114,20 @@ export function extremitesCoupe(position, azimut, demiLongueur, sens) {
     fin: { est: position.est + dEst, nord: position.nord + dNord },
   };
 }
+
+/**
+ * Point le plus proche de la position (0.90.1, implantation « Le plus proche », Expert), parmi les
+ * points montrés sur le plan : { est, nord, ... }. On ne quitte la cible actuelle que si un autre
+ * point est plus proche d'au moins "marge" mètres (pas de va-et-vient entre deux points voisins).
+ * Distances horizontales (m). Renvoie le point choisi, ou null s'il n'y a aucun point.
+ */
+export function pointLePlusProche(position, points, cibleActuelle = null, marge = 0.3) {
+  const distance = (p) => Math.hypot(p.est - position.est, p.nord - position.nord);
+  let meilleur = null;
+  for (const point of points) {
+    if (!Number.isFinite(point.est) || !Number.isFinite(point.nord)) continue;
+    if (meilleur === null || distance(point) < distance(meilleur)) meilleur = point;
+  }
+  if (!meilleur || !cibleActuelle) return meilleur;
+  return distance(meilleur) < distance(cibleActuelle) - marge ? meilleur : cibleActuelle;
+}

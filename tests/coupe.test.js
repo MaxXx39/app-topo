@@ -104,3 +104,20 @@ describe('preparerDessinCoupe', async () => {
     expect(preparerDessinCoupe(coupe, [{ nom: 'x', nature: 'stock', lignes: [] }], 171, 60)).toBeNull();
   });
 });
+
+describe('grille des coupes en direct (0.90.1)', () => {
+  it('pas de 1 m s\'il est lisible, sinon 2, 5, 10 m…', async () => {
+    const { pasDeGrille, valeursGrille, svgCoupeDirecte } = await import('../src/leve/coupe-directe.js');
+    expect(pasDeGrille(28.6)).toBe(1); // 10 m de coupe sur 286 unités
+    expect(pasDeGrille(5)).toBe(2);
+    expect(pasDeGrille(2)).toBe(5);
+    expect(pasDeGrille(0.5)).toBe(20);
+    expect(valeursGrille(-5, 5, 1)).toHaveLength(11);
+    expect(valeursGrille(449.37, 451.2, 1)).toEqual([450, 451]);
+    const lignes = [[{ distance: 0, altitude: 450 }, { distance: 10, altitude: 451 }]];
+    const avec = svgCoupeDirecte({ lignes, demiLongueur: 5, altitudeCanne: 450.5, classe: null, titre: 'A', gauche: 'g', droite: 'd', grille: true });
+    const sans = svgCoupeDirecte({ lignes, demiLongueur: 5, altitudeCanne: 450.5, classe: null, titre: 'A', gauche: 'g', droite: 'd' });
+    expect((avec.match(/class="grille-coupe"/g) ?? []).length).toBeGreaterThan(10);
+    expect(sans).not.toContain('grille-coupe');
+  });
+});

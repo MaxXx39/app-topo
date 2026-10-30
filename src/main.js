@@ -53,7 +53,7 @@ import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
 import { lireLibelles, enregistrerLibelles } from './leve/libelles.js';
-import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche } from './topo/implantation.js';
+import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
 import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele } from './topo/ligne-implantation.js';
 import { MODES_ACCROCHE, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
@@ -90,7 +90,7 @@ import { ecartsControle, resultatControle, estControleReussi, controleNecessaire
 import { pdfControles } from './export/pdf-controles.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
-import { nomSuivant } from './topo/noms.js';
+import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
 import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
@@ -149,6 +149,8 @@ const terrain = {
   lame: { surfaceId: null, inverse: false, tolerances: { ...TOLERANCES_LAME }, pointProfil: 'milieu', devant: 20, derriere: 5 },
   ...lireReglagesTerrain(),
 };
+// Orientation (0.90.1) : toujours le cap du GNSS (la direction de marche sert en secours, sans le dire).
+terrain.sourceOrientation = 'rx2';
 // Libellé « Aucun » (0.90.0) choisi à chaque démarrage de l'appli.
 terrain.libelleLigne = '';
 terrain.libellePoint = '';
@@ -1186,18 +1188,28 @@ const ecranLeve = recepteurDisponible()
       },
       arreterImplantation: () => {
         implanter.cible = null;
+        // ← : on choisit soi-même le point, « Le plus proche » s'arrête.
+        if (terrain.plusProche) {
+          terrain.plusProche = false;
+          retenirReglagesTerrain();
+        }
         montrerImplantation();
       },
-      // Point suivant (P1 → P2…, voir nomSuivant) : implanté tout de suite.
-      implanterSuivant: () => {
-        const nom = nomSuivant(implanter.cible?.nom, pointsDuProjet().map((p) => p.nom));
-        const point = pointsDuProjet().find((p) => p.nom === nom);
-        if (!point) return;
-        const dansLaListe = projet.aImplanter.find((p) => p.nom === nom);
-        implanter.cible = { id: dansLaListe?.id ?? null, nom, est: point.est, nord: point.nord, altitude: point.altitude ?? null };
-        implanter.choix = null;
+      // Point suivant (P1 → P2…, voir nomSuivant) ou précédent (0.90.1) : implanté tout de suite.
+      implanterSuivant: () => implanterPointNomme(nomSuivant(implanter.cible?.nom, pointsDuProjet().map((p) => p.nom))),
+      implanterPrecedent: () => implanterPointNomme(nomPrecedent(implanter.cible?.nom, pointsDuProjet().map((p) => p.nom))),
+      // « Le plus proche » (Expert, 0.90.1) : la cible suit le point montré sur le plan le plus proche.
+      basculerSeulementElement: () => {
+        terrain.seulementElement = !terrain.seulementElement;
+        retenirReglagesTerrain();
+        recalculer();
         montrerImplantation();
-        requestAnimationFrame(cadrerSurImplantation);
+      },
+      basculerPlusProche: () => {
+        terrain.plusProche = !terrain.plusProche;
+        retenirReglagesTerrain();
+        if (terrain.plusProche && !viserLePlusProche()) afficherMessage('Le plus proche : en attente de la position du GNSS', 3000);
+        montrerImplantation();
       },
       enregistrerImplantation: () => {
         if (refuserEnLectureSeule()) return;
@@ -1373,20 +1385,24 @@ function envoyerImplantationAuPlan() {
   const enLigne = accrocheActive && !pointage.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
-  const lignesAutres = lignesDesAutres();
+  // « Seulement l'élément à implanter » (0.90.1) : ni levés libres, ni points de contrôle, ni dessins, ni « À implanter ».
+  const seul = Boolean(elementSeul());
+  const lignesAutres = seul ? [] : lignesDesAutres();
   // Points de contrôle : dessinés si leur case « Points de contrôle » est cochée (menu Afficher).
-  const pointsControle = (projet.listesCachees ?? []).includes(LISTE_CONTROLE) ? [] : projet.pointsControle;
+  const pointsControle = seul || (projet.listesCachees ?? []).includes(LISTE_CONTROLE) ? [] : projet.pointsControle;
+  const dessins = seul ? [] : dessinsVisibles();
+  const aImplanter = seul ? [] : projet.aImplanter;
   // Mode Contrôler : le point de contrôle vers lequel on guide est la cible du plan.
   const cibleControle = enAutocontrole() && ongletContexte === 'terrain' ? autocontrole.cible : null;
   // Dessins (Calculs › Dessin) : toujours sur le plan ; le dessin en cours avec son pilote.
   const avecPilote = piloteActif();
-  plan.afficherImplantation(accrocheActive || avecPilote || projet.aImplanter.length > 0 || lignesAutres.length > 0 || pointsControle.length > 0 || cibleControle || dessinsVisibles().length > 0
+  plan.afficherImplantation(accrocheActive || avecPilote || aImplanter.length > 0 || lignesAutres.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0
     ? {
         actif: accrocheActive || avecPilote,
-        dessins: dessinsVisibles().map((d) => ({ ...d, noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom), couleur: projet.couleursListes?.[d.id] ?? null })),
+        dessins: dessins.map((d) => ({ ...d, noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom), couleur: projet.couleursListes?.[d.id] ?? null })),
         actifId: avecPilote ? pilote.dessinId : null,
         pilote: avecPilote ? { direction: pilote.direction, distance: lireNombreTape(pilote.distance) ?? null } : null,
-        aImplanter: projet.aImplanter,
+        aImplanter,
         pointsControle,
         lignesAutres,
         choix: recalage.planId ? (recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : accrocheActive && !enLigne && !enAutocontrole() ? implanter.choix : null,
@@ -1425,6 +1441,36 @@ function lignesDesAutres() {
  * Point choisi ou point à implanter changé (rien d'autre dans le projet) : on met à jour l'écran
  * Terrain et l'implantation sur le plan, sans tout recalculer ni redessiner (plus rapide).
  */
+/** Implante tout de suite ce point du projet (par son nom), s'il existe. */
+function implanterPointNomme(nom) {
+  const point = pointsDuProjet().find((p) => p.nom === nom);
+  if (!point) return;
+  const dansLaListe = projet.aImplanter.find((p) => p.nom === nom);
+  implanter.cible = { id: dansLaListe?.id ?? null, nom, est: point.est, nord: point.nord, altitude: point.altitude ?? null };
+  implanter.choix = null;
+  montrerImplantation();
+  requestAnimationFrame(cadrerSurImplantation);
+}
+
+/**
+ * « Le plus proche » (Expert, 0.90.1) : la cible devient le point montré sur le plan le plus proche
+ * du GNSS (voir pointLePlusProche). Vrai si une cible est choisie ; l'écran est redessiné si elle change.
+ */
+function viserLePlusProche() {
+  const position = etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null;
+  if (!position || !enImplantationDePoint()) return false;
+  const actuelle = implanter.cible ? (pointsDesListesMontres ?? []).find((p) => p.nom === implanter.cible.nom) ?? null : null;
+  const choisi = pointLePlusProche(position, pointsDesListesMontres ?? [], actuelle);
+  if (!choisi) return false;
+  if (choisi.nom !== implanter.cible?.nom) {
+    const dansLaListe = projet.aImplanter.find((p) => p.nom === choisi.nom);
+    implanter.cible = { id: dansLaListe?.id ?? null, nom: choisi.nom, est: choisi.est, nord: choisi.nord, altitude: choisi.altitude ?? null };
+    implanter.choix = null;
+    montrerImplantation();
+  }
+  return true;
+}
+
 function montrerImplantation() {
   // Écran de guidage (classe vue-implantation, mise par l'écran Terrain) avant et après.
   const avant = document.body.classList.contains('vue-implantation');
@@ -2340,6 +2386,29 @@ function zoneDuTalus() {
   return zoneTalusMemoire.zone;
 }
 
+/**
+ * Lignes de rupture et contours des levés montrés sur le plan (cases cochées dans « Afficher »),
+ * pour les implanter comme une ligne DXF (0.90.1). Chaque ligne : { nom (« L-HT-1 · LV-Stock 1 »),
+ * points: [{ est, nord, altitude }], ferme }, dans la forme qu'attend accrocherTrait.
+ */
+function lignesDesLeves() {
+  const montrees = new Set(listesDePoints(projet).filter((l) => l.visible).map((l) => l.id));
+  const lignes = [];
+  for (const levee of [...projet.surfaces, ...(projet.autres ?? [])]) {
+    if (estImportee(levee) || !montrees.has(levee.id)) continue;
+    const parNom = new Map(pointsDuLeve(levee.leveId).map((p) => [p.nom, p]));
+    const sommets = (noms) => noms.map((nom) => parNom.get(nom)).filter(Boolean).map((p) => ({ est: p.est, nord: p.nord, altitude: p.altitude ?? null }));
+    const ajouter = (nom, noms, ferme) => {
+      const points = sommets(noms);
+      if (points.length < 2) return;
+      lignes.push({ nom: `${nom} · ${levee.nom}`, points, ferme: ferme && points.length >= 3 });
+    };
+    if ((levee.contour ?? []).length >= 3) ajouter('Contour', levee.contour, true);
+    (levee.lignesRupture ?? []).forEach((ligne, index) => ajouter(nomDeLigne(ligne, index), ligne.noms, ligne.fermee));
+  }
+  return lignes;
+}
+
 /** Toucher du plan pendant l'implantation d'une ligne : une ligne du DXF, ou un point de plus. */
 function toucherPourLigne(position, tolerance) {
   const mm = (p) => ({ ...p, est: Math.round(p.est * 1000) / 1000, nord: Math.round(p.nord * 1000) / 1000, altitude: p.altitude != null ? Math.round(p.altitude * 1000) / 1000 : null });
@@ -2353,9 +2422,19 @@ function toucherPourLigne(position, tolerance) {
       montrerImplantation();
       return;
     }
+    // Puis une ligne de rupture ou un contour d'un levé montré sur le plan (0.90.1).
+    const lignesLeves = lignesDesLeves();
+    const deLeve = accrocherTrait(position, tolerance, lignesLeves);
+    if (deLeve) {
+      implanter.ligne = nouvelleLigneAImplanter(deLeve.ligne.nom, deLeve.sommets.map(mm), deLeve.segment);
+      implanter.talusId = null;
+      implanter.pointsLigne = [];
+      montrerImplantation();
+      return;
+    }
     const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes);
     if (!trouve) {
-      afficherMessage('Aucune ligne DXF ni côté de dessin sous le doigt', 3000);
+      afficherMessage('Aucune ligne (DXF, levé) ni côté de dessin sous le doigt', 3000);
       return;
     }
     const sommets = trouve.sommets.map(mm);
@@ -3086,7 +3165,8 @@ function donneesCommunes() {
       recepteur2: Boolean(etatRecepteur2?.connecte),
     },
     autocontrole: donneesAutocontrole(),
-    surfaces: projet.surfaces.map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
+    // Seulement les levés et surfaces qui ont des triangles (0.90.1 : pas les levés vides), plus la surface choisie.
+    surfaces: projet.surfaces.filter((s) => s.id === terrain.surfaceId || trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
     implanter: {
       accroche: terrain.accroche,
       choix: implanter.choix,
@@ -3094,6 +3174,8 @@ function donneesCommunes() {
       nomPropose: nomProposeImplantation(),
       // Nom du point suivant à implanter (P1 → P2), ou null.
       suivant: implanter.cible?.nom && enImplantationDePoint() ? nomSuivant(implanter.cible.nom, pointsDuProjet().map((p) => p.nom)) : null,
+      precedent: implanter.cible?.nom && enImplantationDePoint() ? nomPrecedent(implanter.cible.nom, pointsDuProjet().map((p) => p.nom)) : null,
+      plusProche: Boolean(terrain.plusProche) && aAcces('expert'),
       aImplanter: projet.aImplanter.map((p) => {
         const derniere = [...projet.implantations].reverse().find((i) => i.aImplanterId === p.id);
         return { ...p, fait: derniere ? { distance: derniere.ecarts.distance, dAltitude: derniere.ecarts.dAltitude } : null };
@@ -3253,6 +3335,7 @@ if (recepteurDisponible()) {
     mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette);
     boutonRecepteur?.mettreAJour(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
+    if (terrain.plusProche && aAcces('expert')) viserLePlusProche();
     const enPoint = enImplantationDePoint();
     const enLigne = enImplantationDeLigne();
     const controle = terrain.mode === 'controler' && !enPoint && !enLigne ? calculerControle(etat, orientation) : null;
@@ -3799,7 +3882,6 @@ function recalculer({ recadrer = false } = {}) {
   ecranMesures.afficher();
   ecranDessin.afficher(donneesDessin());
   ecranImport.afficher(projet, dernierImport, dernierPlan);
-  plan.afficherPlansDxf(plansDuProjet());
   // Point à implanter de la liste : ses coordonnées à jour (Annuler a pu l'enlever).
   if (implanter.cible?.id) {
     const point = projet.aImplanter.find((p) => p.id === implanter.cible.id);
@@ -3840,6 +3922,15 @@ function recalculer({ recadrer = false } = {}) {
     const dejaLa = new Set(desListes);
     pointsDuPlan = pointsStables([...desListes, ...points.filter((p) => !dejaLa.has(p))]);
   } else pointsDuPlan = pointsStables(pointsDesListes(projet, listes));
+  // « Le plus proche » choisit parmi les points des listes cochées, même si on n'en montre qu'un.
+  pointsDesListesMontres = pointsDuPlan;
+  // « Seulement l'élément à implanter » (0.90.1) : le point, la ligne ou la surface, rien d'autre.
+  const seul = elementSeul();
+  if (seul) {
+    pointsDuPlan = seul.pointNom ? pointsStables(pointsDuPlan.filter((p) => p.nom === seul.pointNom)) : AUCUN_POINT;
+    for (const s of projet.surfaces) if (s.id !== seul.surfaceId) visibles.delete(s);
+  }
+  plan.afficherPlansDxf(seul ? [] : plansDuProjet());
   // Ce qui est coché (calques, « Afficher ») vaut dans tous les onglets.
   const dessinDuPlan = {
     ...editeurSurfaces.obtenirDessin(),
@@ -3868,9 +3959,10 @@ function recalculer({ recadrer = false } = {}) {
     traceCoupe,
     // Mesures (aires, longueurs, nombres) des métrés cochés dans « Afficher » (et celles faites à la
     // main si « Mesures » est cochée).
-    mesures: mesuresDuPlan(listes),
+    mesures: seul ? [] : mesuresDuPlan(listes),
     mesureActive: null,
   };
+  if (seul) dessinDuPlan.coupes = [];
   if (ongletContexte === 'mesures') {
     // Onglet 3. Mesures : les mesures cochées et celle ouverte ; toucher une mesure la choisit.
     const mesureActive = ecranMesures.mesureActive();
@@ -3929,6 +4021,19 @@ function basculerModeDessin() {
   requestAnimationFrame(() => document.querySelector(`#${onglet} .en-edition`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
 }
 let pointsAffiches = null;
+let pointsDesListesMontres = null; // points des listes cochées (avant « Seulement l'élément à implanter »)
+
+/**
+ * « Seulement l'élément à implanter » (case de Terrain › Implanter, 0.90.1) : ce qu'il faut garder
+ * sur le plan { pointNom, surfaceId } quand la case est cochée et qu'un élément est choisi ; sinon null.
+ */
+function elementSeul() {
+  if (!terrain.seulementElement || ongletContexte !== 'terrain' || !ecranLeve || terrain.mode !== 'controler') return null;
+  if (terrain.implantation === 'point') return implanter.cible ? { pointNom: implanter.cible.nom, surfaceId: null } : null;
+  if (['ligne', 'talus'].includes(terrain.implantation)) return implanter.ligne ? { pointNom: null, surfaceId: terrain.implantation === 'talus' ? terrain.talus.terrainId : null } : null;
+  if (terrain.implantation === 'surface') return terrain.surfaceId ? { pointNom: null, surfaceId: terrain.surfaceId } : null;
+  return null;
+}
 const AUCUN_POINT = [];
 // Points des listes cochées : toujours le même tableau (son contenu change), pour que le plan ne
 // se recadre pas à chaque point levé ou à chaque liste cochée (voir recalculer).

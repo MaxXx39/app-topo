@@ -5145,6 +5145,12 @@ button.bouton-import {
   cursor: pointer;
 }
 
+/* « ⌖ Proche » allumé (0.90.1) : plein sarcelle. */
+.bouton-suivant.bouton-plus-proche.actif {
+  background: #0d9488;
+  color: #ffffff;
+}
+
 /* Cible : le nord (triangle rouge et N) toujours marqué sur le bord. */
 .cible-implantation .nord-cible path {
   fill: var(--rouge);
@@ -7486,6 +7492,28 @@ body.lecture-seule .bouton-photo-levee {
   stroke-width: 2;
 }
 
+/* Levé sans contour (0.90.1) : fond très léger et bord pointillé à la couleur de sa nature. */
+.plan .fond-leve {
+  fill: var(--couleur-nature, #15803d);
+  fill-opacity: 0.07;
+  stroke: none;
+}
+
+.plan .fond-leve.actif {
+  fill-opacity: 0.14;
+}
+
+.plan .bord-leve {
+  fill: none;
+  stroke: var(--couleur-nature, #15803d);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+
+.plan .bord-leve.actif {
+  stroke-width: 2.5;
+}
+
 /* Terrain › Lever (0.84.0) : « Changer de levé » et « + Nouveau levé » hors du cadre du levé ; ID
    point, position, photo, PRENDRE LE POINT et Annuler dans un cadre à la couleur du mode Lever (ambre). */
 .boutons-levee {
@@ -8004,4 +8032,124 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
 /* 0.89.1 : le bouton Plan de la barre du bas est presque rond. */
 .onglets button.onglet-plan {
   border-radius: 28px;
+}
+
+/* Guidage en 3 colonnes (0.90.1) : à gauche avance / recule et gauche / droite (ou début / fin d'une
+   ligne), au milieu la flèche (gardée aussi près du point) ou le couloir, à droite monter / descendre
+   en grand. Remplace les anciennes mises en page « avec-cible » et « guidage-ligne ». */
+.guidage-direct.guidage-3 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: stretch;
+  column-gap: 10px;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.guidage-3 .cote-plan {
+  display: grid;
+  gap: 2px;
+  justify-self: start;
+}
+
+.guidage-3 .cote-plan .lignes-guidage {
+  grid-template-columns: 1fr;
+  font-size: 1.3rem;
+}
+
+.guidage-3 .fleche-guidage {
+  grid-row: auto;
+  width: 72px;
+  height: 72px;
+}
+
+.guidage-3 .couloir-ligne {
+  grid-row: auto;
+  width: 150px;
+  max-width: 34vw;
+}
+
+.guidage-3 .cote-hauteur {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.guidage-3 .hauteur-guidage {
+  display: grid;
+  justify-items: end;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: right;
+}
+
+.guidage-3 .hauteur-guidage strong {
+  font-size: 1.9rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.guidage-3 .hauteur-guidage.sans-altitude {
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+@media (max-width: 520px) {
+  .guidage-3 .cote-plan .lignes-guidage {
+    font-size: 1.05rem;
+  }
+
+  .guidage-3 .fleche-guidage {
+    width: 52px;
+    height: 52px;
+  }
+
+  .guidage-3 .hauteur-guidage strong {
+    font-size: 1.5rem;
+  }
+}
+
+/* « Seulement l'élément à implanter » (0.90.1) : une case à cocher, en sarcelle quand elle est cochée. */
+.case-seulement {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  color: var(--texte, #1b2b36);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.case-seulement .carre-case {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #0d9488;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.case-seulement.actif .carre-case {
+  background: #0d9488;
+}
+
+/* Grille des coupes en direct (0.90.1, Expert) : gris discret, sous le profil. */
+.coupe-directe .grille-coupe line,
+.coupe-directe line.grille-coupe {
+  stroke: #9ca3af;
+  stroke-opacity: 0.35;
+  stroke-width: 0.6;
 }
