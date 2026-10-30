@@ -1,7 +1,7 @@
 {
   "name": "app-topo",
   "private": true,
-  "version": "0.103.4",
+  "version": "0.103.5",
   "description": "Calcul de volumes de stocks à partir de points GNSS (PWA personnelle)",
   "type": "module",
   "scripts": {

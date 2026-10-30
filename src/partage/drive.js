@@ -17,13 +17,39 @@ export const DELAI_DEMANDE = 45_000;
 export const DELAI_FICHIER = 180_000;
 // Réponse « jeton périmé » : la demande est refaite avec un nouveau jeton.
 const RENOUVELER = Symbol('renouveler');
+// Lecture (liste, propriétés, fichier) qui échoue à cause du réseau ou d'un Drive surchargé
+// (0.103.5) : refaite après 2 s, puis après 5 s. Une petite coupure du réseau de chantier ne fait
+// plus échouer toute l'ouverture d'un projet. Les écritures ne sont pas refaites ici (l'envoi
+// complet est refait plus tard par le partage).
+export const PAUSES_ESSAIS = [2_000, 5_000];
+
+/** Erreur due au réseau ou à Drive surchargé : la lecture peut être refaite. */
+function erreurPassagere(texte) {
+  const erreur = new Error(texte);
+  erreur.passagere = true;
+  return erreur;
+}
 
 /**
  * Crée l'accès à Drive.
  * - obtenirJeton(renouveler) : promesse d'un jeton d'accès ; renouveler = vrai si le précédent a été refusé ;
- * - envoyerRequete : fetch (remplaçable par un faux Drive dans les tests).
+ * - envoyerRequete : fetch (remplaçable par un faux Drive dans les tests) ;
+ * - pauses : attentes (ms) avant de refaire une lecture qui a échoué (voir PAUSES_ESSAIS).
  */
-export function creerDrive({ obtenirJeton, envoyerRequete = (...args) => fetch(...args) }) {
+export function creerDrive({ obtenirJeton, envoyerRequete = (...args) => fetch(...args), pauses = PAUSES_ESSAIS }) {
+  /** Demande à Drive ; une lecture (GET) qui échoue à cause du réseau est refaite (voir PAUSES_ESSAIS). */
+  async function demanderAvecEssais(adresse, options = {}, lecture = {}) {
+    const lectureSeule = !options.method || options.method === 'GET';
+    for (let numero = 0; ; numero += 1) {
+      try {
+        return await demander(adresse, options, lecture);
+      } catch (erreur) {
+        if (!lectureSeule || !erreur.passagere || numero >= pauses.length) throw erreur;
+        await new Promise((fin) => setTimeout(fin, pauses[numero]));
+      }
+    }
+  }
+
   /**
    * Demande à Drive, avec le jeton ; un jeton périmé est renouvelé une fois. lire(reponse) : lecture
    * de la réponse (JSON, fichier…), comprise dans le temps maximum "delai" (ms). Lance une erreur lisible.
@@ -35,7 +61,7 @@ export function creerDrive({ obtenirJeton, envoyerRequete = (...args) => fetch(.
     const tropLong = new Promise((_, rejeter) => {
       minuterie = setTimeout(() => {
         arret.abort();
-        rejeter(new Error('Google Drive ne répond pas (réseau trop lent ?)'));
+        rejeter(erreurPassagere('Google Drive ne répond pas (réseau trop lent ?)'));
       }, delai);
     });
 
@@ -45,7 +71,7 @@ export function creerDrive({ obtenirJeton, envoyerRequete = (...args) => fetch(.
         reponse = await envoyerRequete(adresse, { ...options, signal: arret.signal, headers: { ...options.headers, Authorization: `Bearer ${jeton}` } });
       } catch {
         // « Failed to fetch » du navigateur : Drive n'a pas répondu du tout.
-        throw new Error('Google Drive injoignable (réseau ?)');
+        throw erreurPassagere('Google Drive injoignable (réseau ?)');
       }
       if (reponse.status === 401 && essai === 0) return RENOUVELER;
       if (!reponse.ok) {
@@ -55,9 +81,16 @@ export function creerDrive({ obtenirJeton, envoyerRequete = (...args) => fetch(.
         } catch {
           // Pas de détail lisible.
         }
-        throw new Error(`Google Drive a refusé (${reponse.status}${detail ? ` : ${detail}` : ''})`);
+        const texte = `Google Drive a refusé (${reponse.status}${detail ? ` : ${detail}` : ''})`;
+        // Trop de demandes (429) ou panne passagère de Google (500, 502, 503, 504) : on peut refaire.
+        throw [429, 500, 502, 503, 504].includes(reponse.status) ? erreurPassagere(texte) : new Error(texte);
       }
-      return lire(reponse);
+      try {
+        return await lire(reponse);
+      } catch {
+        // Réponse coupée en cours de route (le navigateur dit aussi « Failed to fetch »).
+        throw erreurPassagere('réponse de Google Drive coupée en cours de route (réseau ?)');
+      }
     }
 
     let resultat;
@@ -72,7 +105,7 @@ export function creerDrive({ obtenirJeton, envoyerRequete = (...args) => fetch(.
   /** Écrit le contenu (Blob) d'un fichier existant. */
   async function ecrireContenu(id, contenu) {
     if (contenu.size > TAILLE_MAX_ENVOI) throw new Error(`fichier trop gros pour Drive (${(contenu.size / 1e6).toFixed(1)} Mo, 5 Mo au plus)`);
-    await demander(`${ENVOI}/${id}?uploadType=media&fields=id`, { method: 'PATCH', body: contenu, headers: { 'Content-Type': contenu.type || 'application/octet-stream' } }, { delai: DELAI_FICHIER });
+    await demanderAvecEssais(`${ENVOI}/${id}?uploadType=media&fields=id`, { method: 'PATCH', body: contenu, headers: { 'Content-Type': contenu.type || 'application/octet-stream' } }, { delai: DELAI_FICHIER });
   }
 
   const json = { lire: (reponse) => reponse.json() };
@@ -85,7 +118,7 @@ export function creerDrive({ obtenirJeton, envoyerRequete = (...args) => fetch(.
       do {
         const parametres = new URLSearchParams({ q: `${q} and trashed = false`, fields: `nextPageToken,files(${CHAMPS})`, pageSize: '1000', spaces: 'drive' });
         if (page) parametres.set('pageToken', page);
-        const reponse = await demander(`${API}?${parametres}`, {}, json);
+        const reponse = await demanderAvecEssais(`${API}?${parametres}`, {}, json);
         trouves.push(...(reponse.files ?? []));
         page = reponse.nextPageToken ?? '';
       } while (page);
@@ -100,13 +133,13 @@ export function creerDrive({ obtenirJeton, envoyerRequete = (...args) => fetch(.
     /** Crée un dossier (dans "parentId", ou à la racine du Drive), avec ses propriétés. */
     async creerDossier(nom, parentId = null, proprietes = {}) {
       const corps = { name: nom, mimeType: TYPE_DOSSIER, appProperties: proprietes, ...(parentId ? { parents: [parentId] } : {}) };
-      return demander(`${API}?fields=${CHAMPS}`, { method: 'POST', body: JSON.stringify(corps), headers: { 'Content-Type': 'application/json' } }, json);
+      return demanderAvecEssais(`${API}?fields=${CHAMPS}`, { method: 'POST', body: JSON.stringify(corps), headers: { 'Content-Type': 'application/json' } }, json);
     },
 
     /** Crée un fichier dans un dossier, avec son contenu (Blob). */
     async creerFichier(nom, parentId, contenu) {
       const corps = { name: nom, parents: [parentId], mimeType: contenu.type || 'application/octet-stream' };
-      const fichier = await demander(`${API}?fields=${CHAMPS}`, { method: 'POST', body: JSON.stringify(corps), headers: { 'Content-Type': 'application/json' } }, json);
+      const fichier = await demanderAvecEssais(`${API}?fields=${CHAMPS}`, { method: 'POST', body: JSON.stringify(corps), headers: { 'Content-Type': 'application/json' } }, json);
       await ecrireContenu(fichier.id, contenu);
       return fichier;
     },
@@ -116,22 +149,22 @@ export function creerDrive({ obtenirJeton, envoyerRequete = (...args) => fetch(.
     /** Change le nom ou les propriétés d'un fichier ou d'un dossier. */
     async modifier(id, { nom, proprietes } = {}) {
       const corps = { ...(nom ? { name: nom } : {}), ...(proprietes ? { appProperties: proprietes } : {}) };
-      return demander(`${API}/${id}?fields=${CHAMPS}`, { method: 'PATCH', body: JSON.stringify(corps), headers: { 'Content-Type': 'application/json' } }, json);
+      return demanderAvecEssais(`${API}/${id}?fields=${CHAMPS}`, { method: 'PATCH', body: JSON.stringify(corps), headers: { 'Content-Type': 'application/json' } }, json);
     },
 
     /** Description d'un fichier ou d'un dossier (nom, propriétés…). */
     async decrire(id) {
-      return demander(`${API}/${id}?fields=${CHAMPS}`, {}, json);
+      return demanderAvecEssais(`${API}/${id}?fields=${CHAMPS}`, {}, json);
     },
 
     /** Contenu d'un fichier (Blob). */
     async lire(id) {
-      return demander(`${API}/${id}?alt=media`, {}, { lire: (reponse) => reponse.blob(), delai: DELAI_FICHIER });
+      return demanderAvecEssais(`${API}/${id}?alt=media`, {}, { lire: (reponse) => reponse.blob(), delai: DELAI_FICHIER });
     },
 
     /** Met un fichier ou un dossier à la corbeille de Drive (récupérable 30 jours). */
     async supprimer(id) {
-      await demander(`${API}/${id}?fields=id`, { method: 'PATCH', body: JSON.stringify({ trashed: true }), headers: { 'Content-Type': 'application/json' } });
+      await demanderAvecEssais(`${API}/${id}?fields=id`, { method: 'PATCH', body: JSON.stringify({ trashed: true }), headers: { 'Content-Type': 'application/json' } });
     },
   };
 }

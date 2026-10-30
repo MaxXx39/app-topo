@@ -52,6 +52,14 @@ export function changeAilleurs(proprietes, memoire, appareilId) {
   return (proprietes.envoyePar ?? proprietes.verrouPar) !== appareilId;
 }
 
+/** Nom lisible d'un fichier du dossier Drive d'un projet (pour les messages d'erreur). */
+export function decrireFichier(nom) {
+  if (nom === FICHIER_PROJET) return 'fichier du projet';
+  if (nom.startsWith('plan-')) return `plan DXF (${nom})`;
+  if (nom.startsWith('photo-')) return `photo (${nom})`;
+  return nom;
+}
+
 /** Propriétés Drive : 124 octets au plus par clé + valeur ; on coupe les textes longs. */
 const court = (texte) => String(texte ?? '').slice(0, 90);
 
@@ -164,7 +172,13 @@ export function creerSynchro(drive, appareil) {
       const lus = new Map();
       const empreintes = {};
       for (const fichier of await drive.listerDossier(dossierId)) {
-        const objet = await decomprimer(await drive.lire(fichier.id));
+        let objet;
+        try {
+          objet = await decomprimer(await drive.lire(fichier.id));
+        } catch (erreur) {
+          // Le message dit quel fichier du dossier Drive pose problème (plan DXF, photo, projet).
+          throw new Error(`${decrireFichier(fichier.name)} : ${erreur.message}`);
+        }
         lus.set(fichier.name, objet);
         empreintes[fichier.name] = await empreinte(objet);
       }
