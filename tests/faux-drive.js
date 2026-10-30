@@ -17,32 +17,43 @@ export function fauxDrive() {
     if (propriete && f.appProperties?.[propriete[1]] !== propriete[2]) return false;
     return true;
   };
+  // Réseau coupé (essais) : toute demande échoue tant que panne.active est vrai.
+  const panne = { active: false };
+  const verifier = () => {
+    if (panne.active) throw new Error('Google Drive injoignable (réseau ?)');
+  };
   const copie = (f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, trashed: f.trashed, appProperties: { ...f.appProperties } });
   return {
     fichiers,
     ecritures,
+    panne,
     async lister(q) {
+      verifier();
       return [...fichiers.values()].filter((f) => correspond(f, q)).map(copie);
     },
     listerDossier(id) {
       return this.lister(`'${id}' in parents`);
     },
     async creerDossier(nom, parentId, proprietes = {}) {
+      verifier();
       const f = { id: `d${++numero}`, name: nom, mimeType: TYPE_DOSSIER, parents: parentId ? [parentId] : [], appProperties: { ...proprietes } };
       fichiers.set(f.id, f);
       return copie(f);
     },
     async creerFichier(nom, parentId, contenu) {
+      verifier();
       const f = { id: `f${++numero}`, name: nom, mimeType: contenu.type, parents: [parentId], appProperties: {}, contenu };
       fichiers.set(f.id, f);
       ecritures.push(nom);
       return copie(f);
     },
     async ecrireContenu(id, contenu) {
+      verifier();
       fichiers.get(id).contenu = contenu;
       ecritures.push(fichiers.get(id).name);
     },
     async modifier(id, { nom, proprietes } = {}) {
+      verifier();
       const f = fichiers.get(id);
       if (nom) f.name = nom;
       for (const [cle, valeur] of Object.entries(proprietes ?? {})) {
@@ -52,12 +63,15 @@ export function fauxDrive() {
       return copie(f);
     },
     async decrire(id) {
+      verifier();
       return copie(fichiers.get(id));
     },
     async lire(id) {
+      verifier();
       return fichiers.get(id).contenu;
     },
     async supprimer(id) {
+      verifier();
       fichiers.get(id).trashed = true;
     },
   };

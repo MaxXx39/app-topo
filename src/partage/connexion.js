@@ -48,10 +48,19 @@ export function creerConnexion() {
   return { obtenirJeton, oublier: () => (jeton = null) };
 }
 
+// Réponse d'Android attendue 2 minutes au plus (choix du compte compris) : sans réponse, la
+// connexion échoue avec un message au lieu de bloquer l'écran de synchronisation (0.103.4).
+export const DELAI_JETON_ANDROID = 2 * 60_000;
+
 /** Jeton demandé à l'appli Android (réponse par window.recevoirJetonDrive). */
-function jetonAndroid(renouveler) {
+export function jetonAndroid(renouveler) {
   return new Promise((resoudre, rejeter) => {
+    const minuterie = setTimeout(() => {
+      window.recevoirJetonDrive = null;
+      rejeter(new Error('Google ne répond pas (connexion à Drive)'));
+    }, DELAI_JETON_ANDROID);
     window.recevoirJetonDrive = (reponse) => {
+      clearTimeout(minuterie);
       window.recevoirJetonDrive = null;
       if (reponse?.ok && reponse.jeton) resoudre(reponse.jeton);
       else rejeter(new Error(reponse?.raison ?? 'connexion Google impossible'));

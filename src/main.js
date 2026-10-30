@@ -328,6 +328,8 @@ document.querySelector('#app').innerHTML = `
  */
 function afficherOnglet(demande) {
   const nom = demande === 'calculs' ? partieCalculs : demande;
+  // Drive : on travaille sur le projet de départ (fenêtre de démarrage) : il est comparé à Drive.
+  if (nom !== 'projets') partage?.choixFait();
   if (estPartieCalculs(nom)) partieCalculs = nom;
   for (const panneau of document.querySelectorAll('.panneau[data-onglet]')) {
     panneau.classList.toggle('actif', panneau.dataset.onglet === nom);
@@ -3852,8 +3854,11 @@ partage = creerPartage({
 });
 
 // L'appli passe en arrière-plan (on change d'appli, on éteint l'écran) : on envoie tout de suite.
+// Elle revient (0.103.4) : le verrou est vérifié tout de suite (main prise entre-temps, version
+// envoyée par un autre appareil pendant l'absence), sans attendre la vérification des 30 s.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') partage.envoyerMaintenant();
+  else partage.verifierMaintenant();
 });
 
 const plan = creerPlan(document.querySelector('#plan'), {
