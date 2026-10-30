@@ -19,6 +19,7 @@
 import { creerSurface, nouvelIdentifiant, NATURES, avecPrefixe, PREFIXE_LEVE, PREFIXE_SURFACE } from './surface.js';
 import { creerLigne } from './noms.js';
 import { nomsDeLaMesure } from './mesure.js';
+import { nomsDuRecollement } from './reseau.js';
 
 /** Rôles d'un point levé : [clé, nom affiché]. */
 export const ROLES_LEVE = [
@@ -338,7 +339,7 @@ const nomsDeLaLevee = (objet) => [...(objet.contour ?? []), ...(objet.lignesRupt
 
 /** Le levé (surface, métré ou levé libre) d'identifiant "id", avec la liste où il est rangé ; ou null. */
 function trouverLevee(projet, id) {
-  for (const cle of ['surfaces', 'metres', 'autres']) {
+  for (const cle of ['surfaces', 'metres', 'autres', 'reseaux']) {
     const objet = (projet[cle] ?? []).find((o) => o.id === id);
     if (objet) return { objet, cle };
   }
@@ -354,7 +355,8 @@ export function pointsDeLaLevee(projet, id) {
   const trouve = trouverLevee(projet, id);
   if (!trouve) return [];
   const { objet, cle } = trouve;
-  const propres = cle === 'metres' ? projet.mesures.filter((m) => m.metreId === id).flatMap(nomsDeLaMesure) : nomsDeLaLevee(objet);
+  const propres = cle === 'metres' ? projet.mesures.filter((m) => m.metreId === id).flatMap(nomsDeLaMesure)
+    : cle === 'reseaux' ? nomsDuRecollement(objet) : nomsDeLaLevee(objet);
   const memeLeve = (o) => o.leveId === objet.leveId && o.id !== id;
   const utilises = new Set([
     ...projet.surfaces.filter(memeLeve).flatMap(nomsDeLaLevee),
@@ -379,7 +381,7 @@ export function supprimerLevee(projet, id) {
   const leve = projet.leves.find((l) => l.id === objet.leveId);
   if (leve) {
     leve.points = leve.points.filter((p) => !aRetirer.has(p.nom));
-    const encoreUtilise = [...projet.surfaces, ...(projet.metres ?? []), ...(projet.autres ?? []), ...projet.mesures].some((o) => o.leveId === leve.id);
+    const encoreUtilise = [...projet.surfaces, ...(projet.metres ?? []), ...(projet.autres ?? []), ...(projet.reseaux ?? []), ...projet.mesures].some((o) => o.leveId === leve.id);
     if (leve.points.length === 0 && !encoreUtilise) projet.leves = projet.leves.filter((l) => l !== leve);
   }
   return { nom: objet.nom, points: aRetirer.size };

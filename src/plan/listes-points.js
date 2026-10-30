@@ -18,6 +18,8 @@
 import { estImportee } from '../topo/surface.js';
 import { estLeveDirect } from '../topo/leve-direct.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
+import { nomsDuRecollement } from '../topo/reseau.js';
+import { couleurDuReseau } from '../leve/reseaux.js';
 
 // Identifiant de la case « Mesures » (mesures faites à la main).
 export const LISTE_MESURES = 'mesures-calculs';
@@ -89,6 +91,11 @@ export function listesDePoints(projet) {
   // Mesures faites à la main (pas d'un métré) : une seule case, pour leurs traits et leurs valeurs.
   if ((projet.mesures ?? []).some((m) => !m.metreId)) ajouter(LISTE_MESURES, 'Mesures', 'mesures', null, new Set());
   for (const autres of projet.autres ?? []) ajouter(autres.id, autres.nom, 'autres', autres.leveId, new Set(nomsDeLaSurface(autres)));
+  // Recollements de réseaux (0.101.0) : leurs points, de la couleur du réseau (sauf couleur choisie).
+  for (const r of projet.reseaux ?? []) {
+    ajouter(r.id, r.nom, 'reseau', r.leveId, new Set(nomsDuRecollement(r)));
+    listes.at(-1).couleur ??= couleurDuReseau(r.reseau);
+  }
   // Points de contrôle : pas dans un levé, dessinés à part (triangles rouges, voir plan.js).
   if ((projet.pointsControle ?? []).length > 0) ajouter(LISTE_CONTROLE, 'Points de contrôle', 'controle', null, new Set());
   // Dessins (Calculs › Dessin) : une case par dessin (ses traits et ses sommets, en violet, voir plan/dessins.js).

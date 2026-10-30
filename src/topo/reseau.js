@@ -296,3 +296,11 @@ export function annulerDernierPointReseau(recollement, leve) {
   }
   return point;
 }
+
+/** Noms des points du levé de recollement (ouvrages et conduites). */
+export function nomsDuRecollement(recollement) {
+  return [...new Set([
+    ...recollement.ouvrages.flatMap((o) => o.points),
+    ...recollement.conduites.flatMap((c) => c.noeuds.filter((n) => n.point).map((n) => n.point)),
+  ])];
+}

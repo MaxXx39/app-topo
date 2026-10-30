@@ -54,7 +54,7 @@ import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
 import { lireLibelles } from './leve/libelles.js';
-import { modifierLibellesDeSorte } from './leve/fenetre-libelles.js';
+import { modifierLibellesDeSorte, modifierReseaux } from './leve/fenetre-libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
 import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele } from './topo/ligne-implantation.js';
@@ -81,6 +81,11 @@ import {
   pointsDeLaLevee,
 } from './topo/leve-direct.js';
 import { segmentCroise, supprimerSegment, ajouterPointExistant, horsDuContour, supprimerPointDuLevee, placeDuPoint, nomDeLigne, suitesLibres, creerLignesDepuisSuites } from './topo/lignes-levee.js';
+import {
+  creerRecollement, ajouterPointReseau, prochainNomReseau, nouvelleConduite, conduiteEnCours, ouvrageEnCours, dernierTroncon,
+  mesuresOuvrage, annulerDernierPointReseau, tronconsConduite, estOuvrage, ELEMENTS_RESEAU,
+} from './topo/reseau.js';
+import { lireReseaux, couleurDuReseau } from './leve/reseaux.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
@@ -148,6 +153,9 @@ const terrain = {
   // Profil en long (0.73.0) : point de la lame ('gauche', 'milieu', 'droite'), longueur devant et derrière (m).
   // Machine (0.100.0) : 'grader' ou 'bull' (sens de la coupe, voir topo/lame.js sensCoupeLame).
   lame: { surfaceId: null, inverse: false, tolerances: { ...TOLERANCES_LAME }, machine: 'grader' },
+  // Recollement (0.101.0) : diamètre extérieur (mm) et matériau gardés d'un point à l'autre ; forme des ouvrages.
+  // Gardés à part pour les ouvrages (chambre en béton Ø 1000) et les conduites (tuyau PVC Ø 315).
+  reseau: { diametre: null, materiau: 'PVC', diametreOuvrage: null, materiauOuvrage: 'Béton', forme: 'ronde' },
   ...lireReglagesTerrain(),
 };
 // Orientation (0.90.1) : toujours le cap du GNSS (la direction de marche sert en secours, sans le dire).
@@ -593,7 +601,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
   },
   supprimerLeve: (id) => {
     const leve = projet.leves.find((l) => l.id === id);
-    const levees = [...projet.surfaces, ...projet.metres, ...projet.autres].filter((s) => s.leveId === id);
+    const levees = [...projet.surfaces, ...projet.metres, ...projet.autres, ...projet.reseaux].filter((s) => s.leveId === id);
     const mesuresDuLeve = projet.mesures.filter((m) => m.leveId === id);
     const texteLevees = levees.length > 0 ? `, ${levees.length === 1 && leve?.dediee ? 'le levé' : `${levees.length} levé(s)`}` : '';
     const texteMesures = mesuresDuLeve.length > 0 ? ` et ${mesuresDuLeve.length} mesure(s)` : '';
@@ -603,6 +611,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     projet.mesures = projet.mesures.filter((m) => m.leveId !== id);
     projet.metres = projet.metres.filter((m) => m.leveId !== id);
     projet.autres = projet.autres.filter((a) => a.leveId !== id);
+    projet.reseaux = projet.reseaux.filter((r) => r.leveId !== id);
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
     editeurSurfaces.charger(projet.surfaces);
     modifie({ recadrer: true });
@@ -642,9 +651,19 @@ function metreEnCours() {
   return projet.metres.find((m) => m.id === leveDirect.stockId) ?? null;
 }
 
+/** Levé de recollement d'un réseau en cours (voir topo/reseau.js), ou null. */
+function reseauEnCours() {
+  return projet.reseaux.find((r) => r.id === leveDirect.stockId) ?? null;
+}
+
+/** Levé en cours, quelle que soit sa sorte (surface, levé libre, métré, recollement), ou null. */
+function leveeEnCours() {
+  return stockEnCours() ?? metreEnCours() ?? reseauEnCours();
+}
+
 /** Levé (fait avec le récepteur) de la surface ou du métré en cours, ou null. */
 function leveEnCours() {
-  const enCours = stockEnCours() ?? metreEnCours();
+  const enCours = leveeEnCours();
   return enCours ? projet.leves.find((l) => l.id === enCours.leveId) ?? null : null;
 }
 
@@ -662,7 +681,7 @@ function montrerStockEnCours() {
 
 /** Reprend une surface levée s'il n'y en a pas en cours (celle du levé affiché, sinon la dernière). */
 function reprendreLeveDirect() {
-  if (stockEnCours() || metreEnCours()) return;
+  if (leveeEnCours()) return;
   const levees = surfacesLevees();
   leveDirect.stockId = (levees.filter((s) => s.leveId === projet.leveActifId).at(-1) ?? levees.at(-1))?.id ?? null;
 }
@@ -680,6 +699,16 @@ function ajouterSurfaceLevee(nature) {
     projet.leveActifId = leve.id;
     leveDirect.stockId = autres.id;
     leveDirect.role = 'isole';
+    modifie({ recadrer: true });
+    return;
+  }
+  // Recollement (0.101.0) : « reseau:EU » = un levé pour ce réseau ; on commence par une chambre.
+  if (nature.startsWith('reseau:')) {
+    const recollement = creerRecollement(projet, leve, nature.slice('reseau:'.length));
+    nommerListeDeLevee(projet, recollement);
+    projet.leveActifId = leve.id;
+    leveDirect.stockId = recollement.id;
+    leveDirect.role = 'chambre';
     modifie({ recadrer: true });
     return;
   }
@@ -781,7 +810,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       nouvelleSurface: (nature) => ajouterSurfaceLevee(nature),
       // Renommer le levé en cours (surface, métré ou levé libre) : les noms des points ne changent pas.
       renommerLevee: (id, nom) => {
-        const levee = [...projet.surfaces, ...projet.metres, ...projet.autres].find((s) => s.id === id);
+        const levee = [...projet.surfaces, ...projet.metres, ...projet.autres, ...projet.reseaux].find((s) => s.id === id);
         if (!levee) return;
         levee.nom = nom;
         nommerListeDeLevee(projet, levee);
@@ -789,7 +818,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       },
       // Croix rouge de « Changer » (Expert) : le levé et ses points, après confirmation.
       supprimerLevee: (id) => {
-        const levee = [...projet.surfaces, ...projet.metres, ...projet.autres].find((s) => s.id === id);
+        const levee = [...projet.surfaces, ...projet.metres, ...projet.autres, ...projet.reseaux].find((s) => s.id === id);
         if (!levee) return false;
         const nombre = pointsDeLaLevee(projet, id).length;
         if (!confirm(`Supprimer « ${levee.nom} » et ${nombre} point(s) ?\n\nLa suppression est définitive.`)) return false;
@@ -807,7 +836,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         editeurSurfaces.arreterModification();
         leveDirect.stockId = id;
         // Métré ou « Autres » : pas une surface ; on affiche les points de son levé.
-        const horsSurface = metreEnCours() ?? projet.autres.find((a) => a.id === id);
+        const horsSurface = metreEnCours() ?? reseauEnCours() ?? projet.autres.find((a) => a.id === id);
         if (horsSurface) projet.leveActifId = horsSurface.leveId;
         else montrerStockEnCours();
         recalculer({ recadrer: Boolean(horsSurface) });
@@ -816,6 +845,36 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         leveDirect.role = role;
         recalculer();
       },
+      // Recollement : nouvelle conduite, depuis l'ouvrage choisi (id) ou de nulle part ('').
+      nouvelleConduite: (depuis) => {
+        const recollement = reseauEnCours();
+        if (!recollement || refuserEnLectureSeule()) return;
+        nouvelleConduite(recollement, depuis || null);
+        modifie();
+      },
+      choisirElementReseau: (element) => {
+        leveDirect.role = element;
+        recalculer();
+      },
+      choisirFormeOuvrage: (forme) => {
+        terrain.reseau.forme = forme;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // Radier ou profondeur tapés d'un ouvrage (m ; vide = pas connu).
+      reglerOuvrage: (id, champ, texte) => {
+        const ouvrage = reseauEnCours()?.ouvrages.find((o) => o.id === id);
+        if (!ouvrage || refuserEnLectureSeule()) return;
+        const valeur = lireNombre(texte);
+        if (String(texte).trim() && valeur == null) {
+          afficherMessage('Nombre pas compris (point décimal : 1.250)', 3000);
+          return;
+        }
+        if (champ === 'radier') ouvrage.radier = valeur;
+        else if (champ === 'profondeur') ouvrage.profondeurSaisie = valeur;
+        modifie();
+      },
+      modifierReseaux: () => modifierReseaux(recalculer),
       nouvelleLigne: () => {
         const metre = metreEnCours();
         if (metre) {
@@ -836,19 +895,19 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       },
       // Photos du levé en cours (0.77.0) : appareil photo à gauche de PRENDRE LE POINT.
       ajouterPhotosLevee: (fichiers) => {
-        const levee = stockEnCours() ?? metreEnCours();
+        const levee = leveeEnCours();
         if (!levee || refuserEnLectureSeule()) return;
         // 0.96.0 : la photo attend le prochain point enregistré, et prend son nom (voir rangerPointPris).
         ajouterPhotos(levee, fichiers, { attentePoint: true });
       },
       legendePhotoLevee: (id, legende) => {
-        const photo = (stockEnCours() ?? metreEnCours())?.photos?.find((p) => p.id === id);
+        const photo = (leveeEnCours())?.photos?.find((p) => p.id === id);
         if (!photo) return;
         photo.legende = legende;
         modifie();
       },
       supprimerPhotoLevee: (id) => {
-        const levee = stockEnCours() ?? metreEnCours();
+        const levee = leveeEnCours();
         if (!levee?.photos?.some((p) => p.id === id) || !confirm('Supprimer cette photo ?')) return;
         levee.photos = levee.photos.filter((p) => p.id !== id);
         modifie();
@@ -867,12 +926,19 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         stock.trianglesSupprimes = [];
         modifie();
       },
-      prendrePoint: (nom) => {
+      prendrePoint: (nom, attributs = {}) => {
         if (refuserEnLectureSeule()) return;
         const leve = leveEnCours();
         const stock = stockEnCours();
         const metre = metreEnCours();
-        if (!leve || !(stock || metre)) return;
+        const recollement = reseauEnCours();
+        if (!leve || !(stock || metre || recollement)) return;
+        // Recollement : diamètre (mm) et matériau à côté du point ; un nombre mal tapé refuse le point.
+        const reseau = recollement ? lireAttributsReseau(attributs) : null;
+        if (reseau?.erreur) {
+          refuser(`Point refusé : ${reseau.erreur}`);
+          return;
+        }
         // Position vérifiée par l'appli Android au moment du toucher : RTK fixe et inclinaison prête.
         const reponse = prendrePointRecepteur();
         if (!reponse.ok) {
@@ -881,6 +947,17 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         }
         const { est, nord, altitude, ...gnss } = reponse.point;
         const point = { est, nord, altitude, gnss: { ...gnss, prisLe: new Date().toISOString() } };
+        if (recollement) {
+          const element = leveDirect.role;
+          const suffixe = estOuvrage(element) ? 'Ouvrage' : '';
+          terrain.reseau[`diametre${suffixe}`] = reseau.diametre;
+          terrain.reseau[`materiau${suffixe}`] = reseau.materiau;
+          retenirReglagesTerrain();
+          const attributsPoint = { ...reseau, element, forme: terrain.reseau.forme };
+          const nomPoint = nom.trim() || prochainNomReseau(projet, recollement, element, terrain.reseau.forme);
+          rangerPointPris(ajouterPointReseau(projet, leve, recollement, { ...point, nom: nomPoint }, attributsPoint));
+          return;
+        }
         if (metre) {
           rangerPointPris(ajouterPointMetre(projet, leve, metre, leveDirect.role, libelleDuRole(), { ...point, nom: nom.trim() || prochainNomMetre(projet, metre, leveDirect.role, libelleDuRole()) }));
           return;
@@ -1295,6 +1372,13 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         const leve = leveEnCours();
         const dernier = leve?.points[leve.points.length - 1];
         if (!dernier || !confirm(`Effacer le dernier point (${dernier.nom}) ?`)) return;
+        const recollement = reseauEnCours();
+        if (recollement) {
+          annulerDernierPointReseau(recollement, leve);
+          afficherMessage(`Point ${dernier.nom} effacé`);
+          modifie();
+          return;
+        }
         annulerDernierPoint(leve, [...projet.surfaces, ...projet.autres]);
         retirerPointDesMesures(projet, dernier.nom); // aire, longueur ou point compté d'un métré
         afficherMessage(`Point ${dernier.nom} effacé`);
@@ -2975,7 +3059,7 @@ function rangerPointPris(resultat) {
   vibrer(60);
   sonValidation();
   // Photos prises juste avant (0.96.0) : rattachées à ce point.
-  const levee = stockEnCours() ?? metreEnCours();
+  const levee = leveeEnCours();
   const enAttente = (levee?.photos ?? []).filter((photo) => photo.attentePoint);
   for (const photo of enAttente) {
     photo.point = resultat.point.nom;
@@ -2992,7 +3076,7 @@ function rangerPointPris(resultat) {
 function photosDuPlan(listes) {
   const montrees = new Set(listes.filter((l) => l.visible).map((l) => l.id));
   const resultat = [];
-  for (const levee of [...projet.surfaces, ...projet.metres, ...projet.autres]) {
+  for (const levee of [...projet.surfaces, ...projet.metres, ...projet.autres, ...projet.reseaux]) {
     if (!montrees.has(levee.id)) continue;
     const parNom = new Map(pointsDuLeve(levee.leveId).map((p) => [p.nom, p]));
     for (const photo of levee.photos ?? []) {
@@ -3005,7 +3089,7 @@ function photosDuPlan(listes) {
 
 /** Ouvre une photo en grand (📷 touché sur le plan) : image, point et légende. */
 function montrerPhoto(id) {
-  const photo = [...projet.surfaces, ...projet.metres, ...projet.autres].flatMap((l) => l.photos ?? []).find((p) => p.id === id);
+  const photo = [...projet.surfaces, ...projet.metres, ...projet.autres, ...projet.reseaux].flatMap((l) => l.photos ?? []).find((p) => p.id === id);
   if (!photo) return;
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-photo';
@@ -3135,6 +3219,8 @@ function donneesLeve() {
   reprendreLeveDirect();
   const metre = metreEnCours();
   if (metre) return donneesMetre(metre);
+  const recollement = reseauEnCours();
+  if (recollement) return donneesReseau(recollement);
   // Terrain naturel ou terrassement : pas de contour, on passe aux points isolés.
   if (!rolesDuMode(stockEnCours()).includes(leveDirect.role)) leveDirect.role = 'isole';
   const leve = leveEnCours();
@@ -3214,12 +3300,91 @@ function donneesMetre(metre) {
   };
 }
 
+/** Nombre tapé (virgule acceptée), ou null s'il est vide ou illisible. */
+function lireNombre(texte) {
+  const nettoye = String(texte ?? '').trim().replace(',', '.');
+  const nombre = Number(nettoye);
+  return nettoye && Number.isFinite(nombre) ? nombre : null;
+}
+
+/**
+ * Attributs d'un point de recollement tapés dans Lever : diamètre extérieur (mm), matériau,
+ * profondeur de la fouille (m, tapée), remarque. Renvoie ces valeurs ou { erreur }.
+ */
+function lireAttributsReseau({ diametre = '', materiau = '', profondeurFouille = '', remarque = '' }) {
+  const nombre = (texte, nom) => {
+    if (!String(texte).trim()) return { valeur: null };
+    const valeur = lireNombre(texte);
+    return valeur == null || valeur < 0 ? { erreur: `${nom} pas compris (point décimal : 1.250)` } : { valeur };
+  };
+  const d = nombre(diametre, 'diamètre');
+  const f = nombre(profondeurFouille, 'profondeur de fouille');
+  if (d.erreur || f.erreur) return { erreur: d.erreur ?? f.erreur };
+  return { diametre: d.valeur, materiau: String(materiau).trim(), profondeurFouille: f.valeur, remarque: String(remarque).trim() };
+}
+
+/** Données de l'onglet Terrain pour un recollement de réseau (voir leve/ecran.js priseDePointReseau). */
+function donneesReseau(recollement) {
+  if (!ELEMENTS_RESEAU.some(([cle]) => cle === leveDirect.role)) leveDirect.role = 'chambre';
+  const leve = leveEnCours();
+  const element = leveDirect.role;
+  const forme = terrain.reseau.forme;
+  const reseaux = lireReseaux();
+  const parNom = new Map((leve?.points ?? []).map((p) => [p.nom, p]));
+  const dernierPoint = leve?.points.at(-1) ?? null;
+  const conduite = conduiteEnCours(recollement);
+  const enCours = ouvrageEnCours(recollement);
+  const dernierOuvrageFini = [...recollement.ouvrages].reverse().find((o) => o.centre) ?? null;
+  const ouvrage = (o) => ({ id: o.id, nom: o.nom, type: o.type, forme: o.forme, fini: Boolean(o.centre), nbCoins: o.points.length,
+    tampon: o.tampon, radier: o.radier, profondeurSaisie: o.profondeurSaisie, ...mesuresOuvrage(o), ecartAngleDroit: o.ecartAngleDroit ?? null });
+  return {
+    ...donneesCommunes(),
+    leve,
+    stock: recollement,
+    recollement: {
+      reseau: recollement.reseau,
+      couleur: couleurDuReseau(recollement.reseau, reseaux),
+      // Autres levés de recollement du projet : on change de réseau en un clic.
+      levees: projet.reseaux.map((r) => ({ id: r.id, nom: r.nom, reseau: r.reseau, couleur: couleurDuReseau(r.reseau, reseaux), actif: r.id === recollement.id })),
+      reseaux,
+      element,
+      ouvrage: estOuvrage(element),
+      forme,
+      diametre: estOuvrage(element) ? terrain.reseau.diametreOuvrage : terrain.reseau.diametre,
+      materiau: estOuvrage(element) ? terrain.reseau.materiauOuvrage : terrain.reseau.materiau,
+      conduite: conduite ? { numero: conduite.numero, nbPoints: conduite.noeuds.filter((n) => n.point).length } : null,
+      enCours: enCours ? ouvrage(enCours) : null,
+      ouvrages: recollement.ouvrages.map(ouvrage),
+      dernierOuvrage: dernierOuvrageFini ? ouvrage(dernierOuvrageFini) : null,
+      dernierTroncon: dernierTroncon(recollement, leve),
+      fouille: dernierPoint?.profondeurFouille ?? null,
+      conduites: recollement.conduites.filter((c) => c.noeuds.length > 0).map((c) => ({
+        id: c.id,
+        nom: c.numero ? `T-${recollement.reseau}-${c.numero}` : 'Conduite',
+        noms: c.noeuds.map((n) => (n.ouvrage ? recollement.ouvrages.find((o) => o.id === n.ouvrage)?.nom ?? '?' : n.point)),
+        elements: c.noeuds.map((n) => (n.point ? parNom.get(n.point)?.element ?? '' : 'ouvrage')),
+        troncons: tronconsConduite(recollement, leve, c).map((t) => ({ de: t.a.nom, a: t.b.nom, distance: t.distance, pente: t.pente, sens: t.sens })),
+      })),
+    },
+    role: element,
+    rolesPermis: [],
+    nomPropose: prochainNomReseau(projet, recollement, element, forme),
+    ligne: null,
+    dernierPoint: dernierPoint?.nom ?? null,
+    resume: null,
+    volume: null,
+    photos: recollement.photos ?? [],
+    triangles: null,
+  };
+}
+
 /** Données de l'onglet Terrain communes aux surfaces et aux métrés. */
 function donneesCommunes() {
   return {
     // Surfaces levées et métrés, avec la date de leur levé (« Stock 2 · 22.10.2026 »).
-    stocks: [...surfacesLevees(), ...projet.metres, ...projet.autres].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}`, nature: s.nature ?? 'stock' })),
+    stocks: [...surfacesLevees(), ...projet.metres, ...projet.autres, ...projet.reseaux].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}`, nature: s.nature ?? 'stock' })),
     libelles: lireLibelles(),
+    reseaux: lireReseaux(),
     libelleLigne: terrain.libelleLigne,
     libellePoint: terrain.libellePoint,
     libelleAire: terrain.libelleAire,
