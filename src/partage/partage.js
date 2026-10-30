@@ -492,6 +492,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
         await ouvrirVersionDrive(surDrive, { prendre: true, conflit: choix === 'conflit' && !verrou });
       } catch (erreur) {
         changer('attente', erreur.message);
+        message(`Ouverture de « ${surDrive.titre} » impossible : ${erreur.message}`);
       } finally {
         occupe -= 1;
       }
