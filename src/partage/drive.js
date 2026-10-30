@@ -20,7 +20,13 @@ export function creerDrive({ obtenirJeton, envoyerRequete = (...args) => fetch(.
   /** Demande à Drive, avec le jeton ; un jeton périmé est renouvelé une fois. Lance une erreur lisible. */
   async function demander(adresse, options = {}, essai = 0) {
     const jeton = await obtenirJeton(essai > 0);
-    const reponse = await envoyerRequete(adresse, { ...options, headers: { ...options.headers, Authorization: `Bearer ${jeton}` } });
+    let reponse;
+    try {
+      reponse = await envoyerRequete(adresse, { ...options, headers: { ...options.headers, Authorization: `Bearer ${jeton}` } });
+    } catch {
+      // « Failed to fetch » du navigateur : Drive n'a pas répondu du tout.
+      throw new Error('Google Drive injoignable (réseau ?)');
+    }
     if (reponse.status === 401 && essai === 0) return demander(adresse, options, 1);
     if (!reponse.ok) {
       let detail = '';

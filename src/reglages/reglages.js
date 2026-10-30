@@ -166,9 +166,11 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
   const zonePartage = fenetre.querySelector('[data-zone="partage"]');
   let modifierNom = false; // crayon touché : le nom de l'appareil devient modifiable
   let deverrouille = false; // bon code tapé (voir outils/code.js) : vaut jusqu'à la fermeture de la fenêtre
-  // On ne redessine pas pendant qu'on tape le nom de l'appareil (le curseur serait perdu).
+  // On ne redessine pas pendant qu'on tape le nom de l'appareil (le curseur serait perdu). Un lien
+  // touché (« se déconnecter », « envoyer maintenant »…) garde le focus : on redessine quand même.
   const rafraichir = () => {
-    if (!partage || !fenetre.open || zonePartage.contains(document.activeElement)) return;
+    const enSaisie = zonePartage.contains(document.activeElement) && document.activeElement.matches('input');
+    if (!partage || !fenetre.open || enSaisie) return;
     zonePartage.innerHTML = partage.html({ modifierNom });
   };
   fenetre.addEventListener('change', (evenement) => {
