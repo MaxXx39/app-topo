@@ -1,10 +1,11 @@
-// Trois blocs de l'onglet Projet (demande du 26.10.2026), repliables avec la flèche du titre (0.71.0) :
-// - « Import » : fichier de points, points de contrôle (un fichier de points, après le code de
-//   sécurité), plan DXF, surface (LandXML ou DXF 3D, 0.71.0), point tapé ;
-// - « Liste de points - Lever - Dessin - Surface Projet - Contrôle » (0.77.0) : les listes rangées
-//   par catégories (voir blocListes) ; celle cochée est affichée sur le plan ; ses points se voient
-//   sous elle ;
-// - « DXF importés » : les plans DXF (fonds de plan, calques à cocher).
+// Onglet Projet (0.103.0, demande du 30.10.2026) : sous le projet ouvert, deux onglets côte à côte,
+// « Import » (Expert) et « Exporter » (voir export/module.js), un seul ouvert à la fois ; dessous,
+// « Contenu du projet », par catégories repliables (voir blocContenu) :
+// Contrôle, Levés (une liste, nature en pastille), Points importés, Surfaces importées (Expert),
+// Plans DXF (Intermédiaire), Dessins (Intermédiaire).
+// - « Import » : fichier de points, points de contrôle, plan DXF, surface (LandXML ou DXF 3D),
+//   point tapé ;
+// - la liste cochée est affichée sur le plan ; ses points se voient sous elle.
 // Le levé avec le récepteur se fait dans l'onglet Terrain (src/leve/ecran.js).
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
@@ -18,9 +19,10 @@ import { nomPointAjoute } from '../topo/points-ajoutes.js';
 import { COULEURS_LISTES } from '../plan/listes-points.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
+import { lireReseaux } from '../leve/reseaux.js';
 
 /**
- * Crée l'onglet Importer dans "conteneur". Les actions sont faites par main.js via "actions" :
+ * Crée le panneau « Import » dans "conteneur" et « Contenu du projet » dans "contenu". Les actions sont faites par main.js via "actions" :
  * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id),
  * importerPlanDxf(fichier), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
  * recalerPlanDxf(id), exporterPlanRecale(id), annulerRecalagePlan(id),
@@ -32,21 +34,18 @@ import { pointsDuDessin } from '../topo/dessin.js';
  *
  * Renvoie { afficher(projet, dernierImport, dernierPlan) }.
  */
-export function creerEcranImport(conteneur, actions) {
-  // Blocs ouverts (flèche du titre ; 0.71.0) : « import », « listes », « dxf ». Tous repliés à
-  // chaque ouverture de l'appli (demande du 27.10.2026) : l'utilisateur ouvre ce dont il a besoin.
-  const ouverts = new Set();
-  conteneur.addEventListener('toggle', (evenement) => {
-    const bloc = evenement.target.dataset?.bloc;
-    if (!bloc) return;
-    if (evenement.target.open) ouverts.add(bloc);
-    else ouverts.delete(bloc);
+export function creerEcranImport(conteneur, contenu, actions) {
+  // Les deux zones reçoivent les mêmes écouteurs (boutons, champs, cases).
+  const zones = [conteneur, contenu];
+  const ecouter = (type, fonction, capture = false) => zones.forEach((zone) => zone.addEventListener(type, fonction, capture));
+  // Catégories de « Contenu du projet » repliées par l'utilisateur (ouvertes au départ).
+  const categoriesFermees = new Set();
+  ecouter('toggle', (evenement) => {
+    const categorie = evenement.target.dataset?.categorie;
+    if (!categorie) return;
+    if (evenement.target.open) categoriesFermees.delete(categorie);
+    else categoriesFermees.add(categorie);
   }, true);
-  /** Bloc repliable : titre avec une flèche, contenu dessous. */
-  const bloc = (cle, titre, contenu, classe = '') => `<details class="carte-section bloc-repliable ${classe}" data-bloc="${cle}" ${ouverts.has(cle) ? 'open' : ''}>
-      <summary>${titre}</summary>
-      ${contenu}
-    </details>`;
   let messageSurface = ''; // résultat du dernier import de surface (HTML)
   // Listes de calques ouvertes (gardées d'un dessin à l'autre) : identifiants des plans.
   const calquesOuverts = new Set();
@@ -55,14 +54,14 @@ export function creerEcranImport(conteneur, actions) {
   let erreurPoint = '';
   let derniers = null;
   let messageControle = ''; // erreur du dernier import de points de contrôle
-  conteneur.addEventListener('toggle', (evenement) => {
+  ecouter('toggle', (evenement) => {
     const id = evenement.target.dataset?.calquesPlan;
     if (!id) return;
     if (evenement.target.open) calquesOuverts.add(id);
     else calquesOuverts.delete(id);
   }, true);
 
-  conteneur.addEventListener('click', (evenement) => {
+  ecouter('click', (evenement) => {
     // Pastille de couleur (liste de points, plan DXF) : voir outils/palette.js.
     const pastille = evenement.target.closest('[data-choix-couleur]');
     if (pastille) {
@@ -103,7 +102,7 @@ export function creerEcranImport(conteneur, actions) {
     else if (action === 'tous-calques') actions.montrerTousCalquesDxf(id, bouton.dataset.visible === 'oui');
   });
 
-  conteneur.addEventListener('change', async (evenement) => {
+  ecouter('change', async (evenement) => {
     const cible = evenement.target;
     if (cible.dataset.champ === 'fichier-controle' && cible.files[0]) {
       // Points de contrôle : sans code de sécurité depuis 0.90.0 (demande du 29.10.2026).
@@ -139,7 +138,7 @@ export function creerEcranImport(conteneur, actions) {
   });
 
   // Touche Entrée dans le formulaire du point : comme « Ajouter ».
-  conteneur.addEventListener('keydown', (evenement) => {
+  ecouter('keydown', (evenement) => {
     if (evenement.key !== 'Enter' || !evenement.target.dataset.point) return;
     evenement.preventDefault();
     conteneur.querySelector('[data-action="ajouterPointTape"]')?.click();
@@ -156,8 +155,8 @@ export function creerEcranImport(conteneur, actions) {
       // Pendant une saisie dans le formulaire du point, on ne redessine pas (le curseur serait perdu).
       if (conteneur.contains(document.activeElement) && document.activeElement.dataset?.point) return;
       const plans = projet.plansDxf ?? [];
-      conteneur.innerHTML = `
-        ${bloc('import', titreSection('importer', 'Import', bulle('imports')), `
+      conteneur.innerHTML = `<div class="carte-section panneau-onglet-projet panneau-import">
+          <p class="titre-panneau-projet">Importer ${bulle('imports')}</p>
           <div class="boutons-imports">
             <label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="18" cy="7" r="1.6" /><circle cx="8" cy="17" r="1.6" /><circle cx="17" cy="17" r="1.6" /></svg>
@@ -193,48 +192,80 @@ export function creerEcranImport(conteneur, actions) {
           ${dernierImport ? afficherImportPoints(dernierImport) : ''}
           ${dernierPlan ? messagePlan(dernierPlan) : ''}
           ${messageSurface}
-        `, 'seulement-expert')}
-
-        ${bloc('listes', titreSection('leves', 'Liste de points - Lever - Dessin - Surface Projet - Contrôle', bulle('leves')), blocListes(projet))}
-
-        ${plans.length > 0 ? bloc('dxf', titreSection('fichier', 'DXF importés'), listePlansDxf(projet, calquesOuverts), 'seulement-intermediaire') : ''}
-      `;
+        </div>`;
+      contenu.innerHTML = blocContenu(projet, calquesOuverts, categoriesFermees);
   }
 }
 
+// Nature d'un levé : [nom affiché, couleur de la pastille] (mêmes couleurs que dans Lever).
+const NATURES_LEVEES = {
+  stock: ['Stock', '#b45309'],
+  terrain: ['Terrain', '#15803d'],
+  terrassement: ['Terrassement', '#2563eb'],
+  recollement: ['Recollement (ancien)', '#db2777'],
+  metre: ['Métré', '#0891b2'],
+  autres: ['Levé libre', '#475569'],
+  surface: ['Surface', '#7c3aed'],
+};
+
 /**
- * Listes du projet, rangées par catégories (demande du 27.10.2026, 0.77.0) : Liste de points
- * (fichiers importés, points tapés), Lever (une liste par levé fait dans Terrain, à son nom),
- * Dessin, Surface Projet (surfaces importées : LandXML, DXF 3D) et Contrôle.
+ * Nature du levé qui utilise cette liste de points : { nom, couleur } (recollement : le réseau, à
+ * sa couleur), ou null.
  */
-function blocListes(projet) {
+function natureDeLaListe(projet, leve, couleursReseaux) {
+  const reseau = (projet.reseaux ?? []).find((r) => r.leveId === leve.id);
+  if (reseau) return { nom: `Recollement ${reseau.reseau}`, couleur: couleursReseaux.get(reseau.reseau) ?? '#6b7280' };
+  const levee = [...projet.surfaces, ...(projet.metres ?? []), ...(projet.autres ?? [])].find((o) => o.leveId === leve.id);
+  if (!levee) return null;
+  const [nom, couleur] = NATURES_LEVEES[levee.nature ?? 'stock'] ?? NATURES_LEVEES.stock;
+  return { nom, couleur };
+}
+
+/**
+ * « Contenu du projet » (0.103.0) : une catégorie repliable par sorte, dans l'ordre demandé
+ * (Contrôle d'abord) ; une catégorie vide n'est pas montrée. fermees : catégories repliées.
+ */
+function blocContenu(projet, calquesOuverts, fermees) {
   const listes = projet.leves.filter((l) => !l.direct);
-  const levees = projet.leves.filter((l) => l.direct);
+  // Levés : le plus récent en haut.
+  const levees = projet.leves.filter((l) => l.direct).sort((a, b) => String(b.importeLe ?? '').localeCompare(String(a.importeLe ?? '')));
   const surfacesProjet = projet.surfaces.filter((s) => s.type === 'landxml' || s.type === 'dxf');
-  // Dessin : Intermédiaire et Expert ; Surface Projet : Expert (tableau des modes).
-  const categorie = (titre, contenu, mode = '') => (contenu ? `<div class="${mode}"><p class="titre-categorie-liste">${titre}</p>${contenu}</div>` : '');
+  const dessins = (projet.dessins ?? []).filter((d) => d.sommets.length > 0);
+  const couleursReseaux = new Map(lireReseaux().map(([a, , c]) => [a, c]));
+  const categorie = (cle, titre, nombre, html, mode = '') => (nombre > 0
+    ? `<details class="categorie-contenu ${mode}" data-categorie="${cle}" ${fermees.has(cle) ? '' : 'open'}>
+        <summary><span>${titre}</span><span class="nombre-categorie">${nombre}</span></summary>
+        ${html}
+      </details>`
+    : '');
   const contenu = [
-    categorie('Liste de points', listes.length > 0 ? `<div class="liste-leves">${listes.map((l) => ligneListe(projet, l)).join('')}</div>` : ''),
-    categorie('Lever', levees.length > 0 ? `<div class="liste-leves">${levees.map((l) => ligneListe(projet, l)).join('')}</div>` : ''),
-    categorie('Dessin', listesDessins(projet), 'seulement-intermediaire'),
-    categorie('Surface Projet', surfacesProjet.map(ligneSurfaceProjet).join(''), 'seulement-expert'),
-    categorie('Contrôle', listePointsControle(projet)),
+    categorie('controle', 'Contrôle', (projet.pointsControle ?? []).length, listePointsControle(projet)),
+    categorie('leves', 'Levés', levees.length, `<div class="liste-leves">${levees.map((l) => ligneListe(projet, l, natureDeLaListe(projet, l, couleursReseaux))).join('')}</div>`),
+    categorie('points', 'Points importés', listes.length, `<div class="liste-leves">${listes.map((l) => ligneListe(projet, l)).join('')}</div>`),
+    categorie('surfaces', 'Surfaces importées', surfacesProjet.length, surfacesProjet.map(ligneSurfaceProjet).join(''), 'seulement-expert'),
+    categorie('dxf', 'Plans DXF', (projet.plansDxf ?? []).length, listePlansDxf(projet, calquesOuverts), 'seulement-intermediaire'),
+    categorie('dessins', 'Dessins', dessins.length, listesDessins(projet), 'seulement-intermediaire'),
   ].join('');
-  return contenu || '<p class="vide">Aucune liste de points pour l\'instant.</p>';
+  return `<div class="carte-section contenu-projet">
+      ${titreSection('leves', 'Contenu du projet', bulle('leves'))}
+      ${contenu || '<p class="vide">Rien dans ce projet pour l\'instant.</p>'}
+    </div>`;
 }
 
 /**
  * Une liste de points : case pour l'afficher, nom (celui d'un levé se change dans Terrain › Lever),
  * couleur, nombre de points (et date de création pour un levé), supprimer, voir les points.
  */
-function ligneListe(projet, leve) {
+function ligneListe(projet, leve, nature = null) {
   const actif = leve.id === projet.leveActifId;
+  const pastille = nature ? `<span class="pastille-nature" style="--couleur-nature: ${nature.couleur}">${echapper(nature.nom)}</span>` : '';
   const date = leve.direct && leve.importeLe ? ` · créé le ${new Date(leve.importeLe).toLocaleDateString('fr-CH')}` : '';
   const nom = leve.dediee
     ? `<strong class="nom-leve">${echapper(leve.nom)}</strong>`
     : `<input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom de la liste" />`;
   return `<div class="ligne-leve ${actif ? 'actif' : ''}">
       <label class="case"><input type="radio" name="leve-actif" data-champ="leve-actif" value="${leve.id}" ${actif ? 'checked' : ''} aria-label="Afficher cette liste" />${nom}</label>
+      ${pastille}
       ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}
       <div class="ligne-outils">
         <span class="aide">${leve.points.length} points${date}</span>
