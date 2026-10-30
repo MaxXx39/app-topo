@@ -8646,3 +8646,114 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   fill: rgba(255, 255, 255, 0.85);
   stroke-width: 2.5;
 }
+
+/* --- Onglet Projet (0.103.0) : onglets Import / Exporter, puis « Contenu du projet » --- */
+.onglets-projet {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+.onglet-projet {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  border: 1.5px solid var(--bordure);
+  border-radius: var(--rayon) var(--rayon) 0 0;
+  background: var(--surface);
+  color: var(--texte);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.onglet-projet svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.onglet-projet.actif {
+  border-color: var(--sombre);
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+/* Le panneau ouvert est collé sous les onglets (bord sombre, comme un onglet). */
+.panneau-onglet-projet {
+  margin-top: 0;
+  border: 1.5px solid var(--sombre);
+  border-top-width: 3px;
+  border-radius: 0 0 var(--rayon) var(--rayon);
+}
+
+.titre-panneau-projet {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 8px;
+  color: var(--gris);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.contenu-projet {
+  margin-top: 12px;
+}
+
+.categorie-contenu {
+  margin: 6px 0;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.categorie-contenu > summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--fond);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.categorie-contenu[open] > summary {
+  border-radius: 10px 10px 0 0;
+}
+
+.nombre-categorie {
+  min-width: 1.6em;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--sombre);
+  color: #ffffff;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.categorie-contenu > :not(summary) {
+  margin: 8px 10px;
+}
+
+.pastille-nature {
+  --couleur-nature: var(--gris);
+  align-self: center;
+  padding: 1px 8px;
+  border: 1.5px solid var(--couleur-nature);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--couleur-nature) 12%, var(--surface));
+  color: var(--couleur-nature);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}

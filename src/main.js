@@ -266,8 +266,15 @@ document.querySelector('#app').innerHTML = `
     <div class="colonne-gauche">
       <section class="panneau panneau-projet" data-onglet="projets">
         <div id="projets"></div>
-        <div id="importer"></div>
-        <div id="exporter-projet"></div>
+        <div class="onglets-projet" role="group" aria-label="Import et export">
+          <button type="button" class="onglet-projet seulement-expert" data-onglet-projet="import" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 10l5 5 5-5M4 21h16" /></svg>Import</button>
+          <button type="button" class="onglet-projet" data-onglet-projet="export" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M4 21h16" /></svg>Exporter</button>
+        </div>
+        <div id="importer" hidden></div>
+        <div id="exporter-projet" hidden></div>
+        <div id="contenu-projet"></div>
         <div id="projets-suite"></div>
       </section>
       <section class="panneau" data-onglet="terrain">
@@ -485,6 +492,26 @@ function calculDuPlan(surface) {
 // --- Écrans ---
 
 // Projet › Exporter (0.92.1) : tous les exports au même endroit (voir export/module.js).
+// Onglets « Import » (Expert) et « Exporter » de l'onglet Projet (0.103.0) : un seul ouvert à la
+// fois, juste sous le projet ouvert ; le retoucher le referme. Fermés au démarrage.
+let ongletProjet = null;
+/** Montre l'onglet demandé ('import', 'export' ou null), ou remet à jour celui ouvert (après un changement de mode). */
+function montrerOngletProjet(onglet = ongletProjet) {
+  ongletProjet = onglet === 'import' && !aAcces('expert') ? null : onglet;
+  document.querySelector('#importer').hidden = ongletProjet !== 'import';
+  document.querySelector('#exporter-projet').hidden = ongletProjet !== 'export';
+  for (const bouton of document.querySelectorAll('[data-onglet-projet]')) {
+    const actif = bouton.dataset.ongletProjet === ongletProjet;
+    bouton.classList.toggle('actif', actif);
+    bouton.setAttribute('aria-pressed', String(actif));
+  }
+}
+document.querySelector('.onglets-projet').addEventListener('click', (evenement) => {
+  const bouton = evenement.target.closest('[data-onglet-projet]');
+  if (!bouton) return;
+  montrerOngletProjet(bouton.dataset.ongletProjet === ongletProjet ? null : bouton.dataset.ongletProjet);
+});
+
 const moduleExport = creerModuleExport(document.querySelector('#exporter-projet'), {
   exporterListe: (type, id) => exporterListe(type, id),
   exporterControles: (format) => exporterControles(format),
@@ -497,7 +524,7 @@ const moduleExport = creerModuleExport(document.querySelector('#exporter-projet'
   },
 });
 
-const ecranImport = creerEcranImport(document.querySelector('#importer'), {
+const ecranImport = creerEcranImport(document.querySelector('#importer'), document.querySelector('#contenu-projet'), {
   importerSurface: (fichier) => importerSurface(fichier),
   colorerListe: (id, couleur) => colorerListe(id, couleur),
   importerPointsControle: (fichier) => importerPointsControle(fichier),
@@ -4192,6 +4219,7 @@ function recalculer({ recadrer = false } = {}) {
   ecranDessin.afficher(donneesDessin());
   ecranImport.afficher(projet, dernierImport, dernierPlan);
   moduleExport.afficher(projet);
+  montrerOngletProjet();
   // Point à implanter de la liste : ses coordonnées à jour (Annuler a pu l'enlever).
   if (implanter.cible?.id) {
     const point = projet.aImplanter.find((p) => p.id === implanter.cible.id);
@@ -4451,7 +4479,7 @@ function mettreAJourEtatEntete() {
   const drive = partage?.etat.connecte
     ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive', rendu: 'Drive : main rendue' }[partage.etat.etat] ?? 'Drive : en attente'
     : '';
-  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length} levé(s)`, drive].filter(Boolean).join(' · ');
+  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length + projet.reseaux.length} levé(s)`, drive].filter(Boolean).join(' · ');
 
   // Verrou du partage : main verte (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
   // (un autre appareil l'a ; toucher = prendre la main). Rien sans Drive.
@@ -4656,7 +4684,9 @@ function allerA(onglet) {
     return;
   }
   afficherOnglet('projets');
-  requestAnimationFrame(() => document.querySelector('#importer')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  // Import ouvert (Expert), sinon le contenu du projet.
+  if (aAcces('expert')) montrerOngletProjet('import');
+  requestAnimationFrame(() => document.querySelector(aAcces('expert') ? '.onglets-projet' : '#contenu-projet')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
 }
 
 /**

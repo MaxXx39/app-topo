@@ -1,5 +1,5 @@
-// Bloc « Exporter » de l'onglet Projet (0.92.1, demande du 29.10.2026 : tous les exports au même
-// endroit, sous Import et les listes). En trois temps :
+// Panneau « Exporter » de l'onglet Projet (0.92.1, demande du 29.10.2026 : tous les exports au même
+// endroit ; depuis 0.103.0, onglet à côté de « Import », voir main.js montrerOngletProjet). En trois temps :
 // 1. Quoi ? : plan et volumes, mesures / métrés, listes de points, contrôles, implantations, plans
 //    DXF recalés, fichier projet (chacun selon le mode, voir SORTES) ;
 // 2. le format et ses réglages (PDF, DXF, CSV, LandXML, TXT…) ;
@@ -7,7 +7,6 @@
 // « Plan et volumes » et « Mesures » gardent leurs formulaires (export/ecran.js, export/ecran-mesures.js),
 // posés dans les zones data-panneau="plan" et "mesures" ; les autres parties sont dessinées ici.
 import { echapper } from '../outils/echapper.js';
-import { titreSection } from '../outils/section.js';
 import { bulle } from '../aide/bulles.js';
 import { aAcces } from '../reglages/reglages.js';
 
@@ -33,15 +32,15 @@ export function creerModuleExport(conteneur, actions) {
   let sorte = aAcces('intermediaire') ? 'plan' : 'controles';
   let derniers = null;
   conteneur.innerHTML = `
-    <details class="carte-section bloc-repliable module-export" data-bloc="export">
-      <summary>${titreSection('exporter', 'Exporter', bulle('exporterProjet'))}</summary>
+    <div class="carte-section panneau-onglet-projet module-export">
+      <p class="titre-panneau-projet">Exporter ${bulle('exporterProjet')}</p>
       <p class="titre-choix">1. Quoi ?</p>
       <div class="choix-sorte-export" role="group" aria-label="Quoi exporter">
         ${SORTES.map(([cle, titre, niveau]) => `<button type="button" class="puce-choix ${niveau ? `seulement-${niveau}` : ''}" data-sorte="${cle}">${titre}</button>`).join('')}
       </div>
       <p class="titre-choix">2. Format</p>
       ${SORTES.map(([cle]) => `<div class="panneau-export" data-panneau="${cle}" hidden></div>`).join('')}
-    </details>`;
+    </div>`;
   const panneau = (cle) => conteneur.querySelector(`[data-panneau="${cle}"]`);
 
   conteneur.addEventListener('click', (evenement) => {
