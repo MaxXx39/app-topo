@@ -6,6 +6,7 @@
 import { echapper } from '../outils/echapper.js';
 import { nettoyerAbreviation, COULEURS_LIBELLES, lireLibelles, enregistrerLibelles, abreviationsDepart } from './libelles.js';
 import { FORMES } from '../plan/formes.js';
+import { lireReseaux, enregistrerReseaux, abreviationsReseauxDepart } from './reseaux.js';
 
 /** Nom d'une couleur de la palette (« noir »…), « habituelle » pour pas de couleur choisie. */
 function nomCouleur(couleur) {
@@ -18,7 +19,7 @@ function nomCouleur(couleur) {
  * fixes : abréviations qui ne se modifient pas (libellés de départ) ; enregistrer(liste) reçoit la
  * liste modifiée (lignes sans abréviation enlevées, une abréviation en double gardée une fois).
  */
-export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b7280', fixes = new Set(), enregistrer }) {
+export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b7280', fixes = new Set(), avecForme = true, texteAjouter = '+ Ajouter un libellé', enregistrer }) {
   let lignes = liste.map(([a, d, c, f]) => [a, d, c ?? '', f ?? '']);
   let paletteOuverte = null; // n° de la ligne dont la palette est ouverte
   const fenetre = document.createElement('dialog');
@@ -29,7 +30,7 @@ export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b728
     nettoyerAbreviation(ligne.querySelector('[data-libelle="abreviation"]').value),
     ligne.querySelector('[data-libelle="description"]').value.trim(),
     ligne.querySelector('[data-libelle="couleur"]').dataset.couleur,
-    ligne.querySelector('[data-libelle="forme"]').value,
+    ligne.querySelector('[data-libelle="forme"]')?.value ?? '',
   ]);
 
   function dessiner() {
@@ -37,23 +38,23 @@ export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b728
       <h2>${echapper(titre)}</h2>
       <div class="corps-libelles">
         <table class="table-libelles">
-          <thead><tr><th>Abrév.</th><th>Description</th><th>Couleur</th><th>Forme</th><th></th></tr></thead>
+          <thead><tr><th>Abrév.</th><th>Description</th><th>Couleur</th>${avecForme ? '<th>Forme</th>' : ''}<th></th></tr></thead>
           <tbody>
             ${lignes.map(([abreviation, description, couleur, forme], i) => `<tr data-ligne class="${fixes.has(abreviation) ? 'libelle-fixe' : ''}">
               <td><input type="text" data-libelle="abreviation" value="${echapper(abreviation)}" maxlength="8" autocapitalize="characters" aria-label="Abréviation" ${fixes.has(abreviation) ? 'readonly' : ''} /></td>
               <td><input type="text" data-libelle="description" value="${echapper(description)}" aria-label="Description" ${fixes.has(abreviation) ? 'readonly' : ''} /></td>
               <td><button type="button" class="pastille-couleur ${couleur ? '' : 'habituelle'}" data-libelle="couleur" data-couleur="${couleur}" data-action="palette" data-valeur="${i}"
                 style="background: ${couleur || couleurParDefaut}" title="${nomCouleur(couleur)}" aria-label="Couleur : ${nomCouleur(couleur)}" aria-expanded="${paletteOuverte === i}"></button></td>
-              <td><select data-libelle="forme" aria-label="Forme du point" class="select-forme">${FORMES.map(([cle, nom]) => `<option value="${cle}" ${cle === forme ? 'selected' : ''}>${nom}</option>`).join('')}</select></td>
+              ${avecForme ? `<td><select data-libelle="forme" aria-label="Forme du point" class="select-forme">${FORMES.map(([cle, nom]) => `<option value="${cle}" ${cle === forme ? 'selected' : ''}>${nom}</option>`).join('')}</select></td>` : ''}
               <td>${fixes.has(abreviation) ? '' : `<button type="button" class="bouton-lien" data-action="enlever" data-valeur="${i}" aria-label="Enlever">×</button>`}</td>
             </tr>
-            ${paletteOuverte === i ? `<tr class="ligne-palette"><td colspan="5"><div class="palette-couleurs">
+            ${paletteOuverte === i ? `<tr class="ligne-palette"><td colspan="${avecForme ? 5 : 4}"><div class="palette-couleurs">
               ${COULEURS_LIBELLES.map(([c, nom]) => `<button type="button" class="pastille-couleur ${c ? '' : 'habituelle'} ${c === couleur ? 'choisie' : ''}" data-action="choisirCouleur" data-valeur="${i}" data-couleur="${c}"
                 style="background: ${c || couleurParDefaut}" title="${nom}" aria-label="${nom}"></button>`).join('')}
             </div></td></tr>` : ''}`).join('')}
           </tbody>
         </table>
-        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="ajouter">+ Ajouter un libellé</button>
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="ajouter">${texteAjouter}</button>
       </div>
       <div class="pied-libelles">
         <button type="button" class="bouton-lien bouton-lien-neutre" data-action="annuler">annuler</button>
@@ -114,6 +115,25 @@ export function modifierLibellesDeSorte(sorte, apres) {
     couleurParDefaut: { lignes: '#ea580c', points: '#15803d', aires: '#0891b2' }[sorte],
     enregistrer: (liste) => {
       enregistrerLibelles({ ...tous, [sorte]: liste });
+      apres?.();
+    },
+  });
+}
+
+/**
+ * Modifie la liste des réseaux du recollement (0.101.0) : ceux de départ gardent leur nom (couleur
+ * modifiable), ceux ajoutés se modifient ; partagée par Drive. apres() est appelé une fois enregistré.
+ */
+export function modifierReseaux(apres) {
+  ouvrirFenetreLibelles({
+    titre: 'Réseaux du recollement',
+    liste: lireReseaux(),
+    fixes: abreviationsReseauxDepart(),
+    avecForme: false,
+    texteAjouter: '+ Ajouter un réseau',
+    enregistrer: (liste) => {
+      // Un réseau sans couleur prend le gris (sa couleur sert au dessin du réseau).
+      enregistrerReseaux(liste.map(([a, d, c]) => [a, d, c || '#6b7280']));
       apres?.();
     },
   });

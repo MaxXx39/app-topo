@@ -20,6 +20,8 @@
 //            reglages: { horizontal, vertical, ligneEst ('haut', 'bas'), cote ('droite', 'gauche'),
 //                        longueur (m ou null), terrainId, altitudeSurfaceId } }],  // « Mes talus » (voir topo/talus.js)
 //   metres: [{ id, nom, nature: 'metre', leveId, enCours }],   // métrés levés (voir topo/metre.js)
+//   reseaux: [{ id, nom, nature: 'reseau', reseau (EU…), leveId, ouvrages, conduites, enCours }],  // recollements
+//                                   // de réseaux (voir topo/reseau.js)
 //   autres: [{ id, nom, nature: 'autres', leveId, contour: [], lignesRupture, points }],  // levés « Autres »
 //                                   // (contrôle, points géomètre… : lignes et points, pas de surface ni de volume)
 //   implantations: [{ id, nom, cible: { est, nord, altitude }, mesure: { est, nord, altitude, gnss },
@@ -65,6 +67,7 @@ export function creerProjet(nom = '') {
     talus: [],
     implantations: [],
     metres: [],
+    reseaux: [],
     autres: [],
     listesCachees: [],
     pointsControle: [],
@@ -167,6 +170,7 @@ export function completerProjet(projet) {
   complet.talus ??= [];
   complet.implantations ??= [];
   complet.metres ??= [];
+  complet.reseaux ??= [];
   complet.autres ??= [];
   complet.listesCachees ??= []; // listes de points décochées dans le menu « Points » du plan
   complet.pointsControle ??= [];
@@ -196,7 +200,7 @@ export function completerProjet(projet) {
  * points propre à un levé prend le même nom.
  */
 export function prefixerNoms(projet) {
-  for (const objet of [...projet.surfaces, ...(projet.metres ?? []), ...(projet.autres ?? [])]) {
+  for (const objet of [...projet.surfaces, ...(projet.metres ?? []), ...(projet.reseaux ?? []), ...(projet.autres ?? [])]) {
     const nom = avecPrefixe(objet.nom, prefixeDuNom(objet));
     if (nom === objet.nom) continue;
     const liste = objet.leveId ? projet.leves.find((l) => l.id === objet.leveId) : null;

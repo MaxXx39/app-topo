@@ -34,7 +34,9 @@ export function nettoyerListes(listes) {
     .filter((s) => s.hote && s.utilisateur);
   // Libellés des points (0.95.0, voir leve/libelles.js) : gardés tels quels s'ils existent.
   const libelles = listes?.libelles && typeof listes.libelles === 'object' ? listes.libelles : undefined;
-  return { adresses, swipos, ...(libelles ? { libelles } : {}), modifieLe: listes?.modifieLe ?? null };
+  // Réseaux du recollement (0.101.0, voir leve/reseaux.js) : gardés tels quels s'ils existent.
+  const reseaux = listes?.reseaux && typeof listes.reseaux === 'object' ? listes.reseaux : undefined;
+  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(reseaux ? { reseaux } : {}), modifieLe: listes?.modifieLe ?? null };
 }
 
 /** Listes de cet appareil. */
