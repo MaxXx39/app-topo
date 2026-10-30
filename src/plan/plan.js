@@ -13,6 +13,7 @@ import { traitsDeBarbules } from './barbules.js';
 import { pointALAbscisse } from '../topo/ligne-implantation.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne, formeDuNom } from '../leve/libelles.js';
 import { cheminForme, formeEnTrait } from './formes.js';
+import { ouvrirVue3d } from './vue3d.js';
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS } from './dxf-canvas.js';
 import { echapper } from '../outils/echapper.js';
 import { COULEURS_LISTES, SECTIONS } from './listes-points.js';
@@ -117,6 +118,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></svg>
           Seul
         </button>
+        <button type="button" class="puce seulement-expert" data-action="vue-3d" title="Vue 3D des levés et surfaces montrés">3D</button>
         ${bulle('plan')}
         <div class="menu-plans-dxf" hidden></div>
         <div class="menu-plans-dxf menu-listes-points" hidden></div>
@@ -1405,6 +1407,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function appliquerTransparence() {
     fond.style.setProperty('--opacite-photo', String(1 - calquesChoisis.transparencePhoto / 100));
   }
+  // Vue 3D (0.99.0, Expert) : les triangles des levés et surfaces montrés sur le plan.
+  conteneur.querySelector('[data-action="vue-3d"]').addEventListener('click', () => {
+    const triangles = dessin.stocks.flatMap((stock, index) => (estVisible(stock) ? dessin.resultats[index]?.trianglesDessus ?? [] : []));
+    ouvrirVue3d(triangles, dessin.stocks.filter((stock) => estVisible(stock)).map((s) => s.nom).join(', ') || 'Vue 3D');
+  });
   // « Seul » : seulement ce sur quoi je travaille (main.js choisit quoi garder).
   const boutonSeul = conteneur.querySelector('[data-action="seul-travail"]');
   boutonSeul.addEventListener('click', () => {

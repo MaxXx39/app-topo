@@ -8373,3 +8373,34 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   border-radius: 8px;
   background: var(--fond, #f3f4f6);
 }
+
+/* Vue 3D (0.99.0) : fenêtre presque plein écran, le canvas prend la place. */
+.fenetre-3d {
+  width: min(96vw, 1200px);
+  height: min(90vh, 900px);
+  padding: 10px;
+  border: none;
+  border-radius: 12px;
+}
+
+.fenetre-3d[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.entete-3d {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.toile-3d {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border-radius: 8px;
+  touch-action: none;
+}
