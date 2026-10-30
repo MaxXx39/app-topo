@@ -1,10 +1,13 @@
 // Listes du bouton « Afficher » du plan (demandes du 23 et du 24.10.2026) : une liste par chose
-// levée ou importée, à cocher pour l'afficher, rangées en 3 parties (section) :
-// - 'points' : fichiers importés, « Points ajoutés », levés « Autres », « Points de contrôle », dessins ;
-// - 'surfaces' : surfaces (avec leur contour, leurs lignes, leurs triangles et leur volume),
-//   aussi celles importées d'un LandXML ou d'un DXF ;
-// - 'metres' : métrés (leurs points et leurs mesures : aires, longueurs, nombres), et « Mesures »
-//   (celles faites à la main dans Calculs › Mesures / métrés).
+// levée ou importée, à cocher pour l'afficher. Depuis 0.94.0 (tableau « Affichage » du 29.10.2026),
+// rangées par catégories (section), dans cet ordre (voir SECTIONS) :
+// - 'controle' : les points de contrôle ;
+// - 'leve' : les levés (stock, terrain, recollement, terrassement, surface d'un dessin, levés libres),
+//   avec leurs points, contours, lignes, triangles et volumes ;
+// - 'surface' : les surfaces importées (LandXML, DXF 3D) ;
+// - 'dessin' : les dessins (Calculs › Dessin) ;
+// - 'metre' : les métrés (leurs points et leurs mesures), et « Mesures » (faites à la main) ;
+// - 'points' : « Points Import » : fichiers de points importés et « Points ajoutés ».
 // Les points, contours, lignes, triangles et mesures ne sont dessinés que pour les listes cochées.
 // - une surface (stock, terrain naturel, terrassement) : les points de son contour, de ses lignes
 //   et ses points (tous les points du levé si elle les prend tous) ;
@@ -37,6 +40,16 @@ export const COULEURS_LISTES = [
   ['#000000', 'Noir'],
 ];
 
+// Catégories du menu « Afficher », dans l'ordre, avec leur titre.
+export const SECTIONS = [
+  ['controle', 'Contrôle'],
+  ['leve', 'Levé'],
+  ['surface', 'Surface Import'],
+  ['dessin', 'Dessin'],
+  ['metre', 'Métré'],
+  ['points', 'Points Import'],
+];
+
 const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? []).flatMap((l) => l.noms), ...(s.points ?? [])];
 
 /**
@@ -49,12 +62,13 @@ const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? [])
 export function listesDePoints(projet) {
   const cachees = new Set(projet.listesCachees ?? []);
   const listes = [];
-  const SECTIONS = { fichier: 'points', ajoutes: 'points', autres: 'points', controle: 'points', dessin: 'points', metre: 'metres', mesures: 'metres' };
+  const SECTION_DE = { fichier: 'points', ajoutes: 'points', autres: 'leve', controle: 'controle', dessin: 'dessin', metre: 'metre', mesures: 'metre', importee: 'surface' };
   const couleurs = projet.couleursListes ?? {};
   const ajouter = (id, nom, nature, leveId, noms) => {
-    const section = SECTIONS[nature] ?? 'surfaces';
+    const section = SECTION_DE[nature] ?? 'leve';
     const couleur = nature === 'controle' ? COULEUR_CONTROLE : couleurs[id] ?? (leveId ? couleurs[leveId] : null) ?? null;
-    listes.push({ id, nom, nature, section, leveId, noms, visible: !cachees.has(id), couleur, couleurModifiable: section === 'points' && nature !== 'controle' });
+    // Couleur au choix : Points Import, et Surface Import (changer couleur, tableau « Affichage »).
+    listes.push({ id, nom, nature, section, leveId, noms, visible: !cachees.has(id), couleur, couleurModifiable: section === 'points' || section === 'surface' });
   };
   for (const leve of projet.leves) {
     if (leve.ajoutes) ajouter(leve.id, leve.nom, 'ajoutes', leve.id, null);
@@ -63,7 +77,7 @@ export function listesDePoints(projet) {
   for (const s of projet.surfaces) {
     // Surface LandXML / DXF : pas de points d'un levé, seulement la surface.
     if (estImportee(s)) {
-      ajouter(s.id, s.nom, s.nature ?? 'terrain', null, new Set());
+      ajouter(s.id, s.nom, 'importee', null, new Set());
       continue;
     }
     ajouter(s.id, s.nom, s.nature ?? 'stock', s.leveId, s.tousLesPoints ? null : new Set(nomsDeLaSurface(s)));
@@ -79,7 +93,7 @@ export function listesDePoints(projet) {
   if ((projet.pointsControle ?? []).length > 0) ajouter(LISTE_CONTROLE, 'Points de contrôle', 'controle', null, new Set());
   // Dessins (Calculs › Dessin) : une case par dessin (ses traits et ses sommets, en violet, voir plan/dessins.js).
   for (const dessin of projet.dessins ?? []) ajouter(dessin.id, dessin.nom, 'dessin', null, new Set());
-  const ordre = ['points', 'surfaces', 'metres'];
+  const ordre = SECTIONS.map(([cle]) => cle);
   return listes.sort((a, b) => ordre.indexOf(a.section) - ordre.indexOf(b.section));
 }
 

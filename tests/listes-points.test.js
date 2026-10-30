@@ -22,20 +22,22 @@ function projetEssai() {
 }
 
 describe('Listes de points du plan', () => {
-  it('une liste par fichier, points ajoutés, Autres (Points), surface (Surfaces) et métré (Métrés)', () => {
+  it('rangées par catégories (0.94.0) : Levé (levés et levés libres), Surface Import, Métré, Points Import', () => {
     const listes = listesDePoints(projetEssai());
     expect(listes.map((l) => [l.id, l.nature, l.section])).toEqual([
-      ['f', 'fichier', 'points'], ['a', 'ajoutes', 'points'], ['o1', 'autres', 'points'],
-      ['s1', 'stock', 'surfaces'], ['lx', 'terrain', 'surfaces'],
-      ['m1', 'metre', 'metres'],
+      ['s1', 'stock', 'leve'], ['o1', 'autres', 'leve'],
+      ['lx', 'importee', 'surface'],
+      ['m1', 'metre', 'metre'],
+      ['f', 'fichier', 'points'], ['a', 'ajoutes', 'points'],
     ]);
+    expect(listes.filter((l) => l.couleurModifiable).map((l) => l.id)).toEqual(['lx', 'f', 'a']);
   });
 
   it('mesures dessinées : celles des métrés cochés et, si « Mesures » est cochée, celles faites à la main', () => {
     const projet = projetEssai();
     projet.mesures.push({ id: 'main', contour: [], lignesRupture: [], points: [] });
     let listes = listesDePoints(projet);
-    expect(listes.at(-1).id).toBe(LISTE_MESURES);
+    expect(listes.find((l) => l.id === LISTE_MESURES)?.section).toBe('metre');
     expect(mesuresVisibles(projet, listes).map((m) => m.id)).toEqual(['me', 'main']);
     montrerListe(projet, 'm1', false);
     listes = listesDePoints(projet);
@@ -48,7 +50,7 @@ describe('Listes de points du plan', () => {
     montrerListe(projet, 'f', false);
     montrerListe(projet, 'o1', false);
     // Reste : Stock 1 (b1, b2, h1), Métré 1 (A-ENR-1-1), Points ajoutés (P1).
-    expect(pointsDesListes(projet, listesDePoints(projet)).map((p) => p.nom)).toEqual(['P1', 'b1', 'b2', 'h1', 'A-ENR-1-1']);
+    expect(pointsDesListes(projet, listesDePoints(projet)).map((p) => p.nom)).toEqual(['b1', 'b2', 'h1', 'A-ENR-1-1', 'P1']);
     montrerListe(projet, 'f', true);
     expect(projet.listesCachees).toEqual(['o1']);
   });

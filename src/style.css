@@ -8263,3 +8263,71 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
     transform: rotate(360deg);
   }
 }
+
+/* Plan (0.94.0) : Fond, DXF, Afficher, Seul. */
+.plan-fond .tuile.satellite {
+  opacity: var(--opacite-photo, 1);
+}
+
+.roue-menu {
+  flex: none;
+  min-width: 30px;
+  min-height: 28px;
+  border: 1px solid var(--bordure, #d1d5db);
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.roue-menu[aria-expanded='true'] {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.titre-avec-roue {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.reglages-section,
+.reglette-transparence {
+  display: grid;
+  gap: 4px;
+  margin: 2px 0 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--fond, #f3f4f6);
+}
+
+.reglette-transparence[hidden],
+.reglages-section[hidden] {
+  display: none;
+}
+
+.reglette-transparence input {
+  width: 100%;
+}
+
+.fleche-calques-dxf {
+  flex: none;
+  min-width: 30px;
+  border: none;
+  background: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.calques-dxf-menu {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 6px 28px;
+  font-size: 0.9rem;
+}
+
+.puce-seul.actif {
+  background: #0d9488;
+  color: #ffffff;
+}

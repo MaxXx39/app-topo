@@ -1353,11 +1353,13 @@ function envoyerImplantationAuPlan() {
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
   // « Seulement l'élément à implanter » (0.90.1) : ni levés libres, ni points de contrôle, ni dessins, ni « À implanter ».
   const seul = Boolean(elementSeul());
-  const lignesAutres = seul ? [] : lignesDesAutres();
+  // Bouton « Seul » (0.94.0) : seulement les listes gardées (points de contrôle en mode Contrôle…).
+  const gardees = listesDuTravail(listesDePoints(projet));
+  const lignesAutres = seul ? [] : lignesDesAutres().filter((l) => !gardees || gardees.has(l.id));
   // Points de contrôle : dessinés si leur case « Points de contrôle » est cochée (menu Afficher).
-  const pointsControle = seul || (projet.listesCachees ?? []).includes(LISTE_CONTROLE) ? [] : projet.pointsControle;
-  const dessins = seul ? [] : dessinsVisibles();
-  const aImplanter = seul ? [] : projet.aImplanter;
+  const pointsControle = seul || (gardees && !gardees.has(LISTE_CONTROLE)) || (projet.listesCachees ?? []).includes(LISTE_CONTROLE) ? [] : projet.pointsControle;
+  const dessins = seul ? [] : dessinsVisibles().filter((d) => !gardees || gardees.has(d.id));
+  const aImplanter = seul || gardees ? [] : projet.aImplanter;
   // Mode Contrôler : le point de contrôle vers lequel on guide est la cible du plan.
   const cibleControle = enAutocontrole() && ongletContexte === 'terrain' ? autocontrole.cible : null;
   // Dessins (Calculs › Dessin) : toujours sur le plan ; le dessin en cours avec son pilote.
@@ -1456,7 +1458,7 @@ function lignesDesAutres() {
     const parNom = new Map((projet.leves.find((l) => l.id === autres.leveId)?.points ?? []).map((p) => [p.nom, p]));
     for (const ligne of autres.lignesRupture) {
       const sommets = ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean);
-      if (sommets.length >= 2) lignes.push({ sommets, fermee: Boolean(ligne.fermee), couleur: projet.couleursListes?.[autres.id] ?? null });
+      if (sommets.length >= 2) lignes.push({ id: autres.id, sommets, fermee: Boolean(ligne.fermee), couleur: projet.couleursListes?.[autres.id] ?? null });
     }
   }
   return lignes;
@@ -3599,6 +3601,20 @@ const plan = creerPlan(document.querySelector('#plan'), {
     recalculer();
     enregistrer();
   },
+  // Menu DXF (0.94.0) : un calque d'un plan, coché ou non.
+  quandMontrerCalqueDxf: (id, numero, visible) => {
+    const calque = projet.plansDxf.find((p) => p.id === id)?.calques[numero];
+    if (!calque) return;
+    calque.visible = visible;
+    modifie();
+  },
+  // Bouton « Seul » (0.94.0) : seulement ce sur quoi je travaille (voir listesDuTravail).
+  quandBasculerSeul: (actif) => {
+    seulTravail = actif;
+    recalculer();
+    envoyerImplantationAuPlan();
+    plan.rafraichirImplantation();
+  },
 });
 
 /** Ajoute des photos (réduites) à une surface ou à une mesure : objet.photos. */
@@ -3935,8 +3951,11 @@ function recalculer({ recadrer = false } = {}) {
   // Plan : les listes de points cochées (menu « Points » : surfaces, métrés, Autres, fichiers,
   // points ajoutés) ; leurs points, et seulement les contours, lignes et triangles des surfaces cochées.
   // Pendant une modification (surface, mesure), comme avant : les points et surfaces du levé affiché.
-  const listes = listesDePoints(projet);
-  plan.afficherListesPoints(listes);
+  const toutesLesListes = listesDePoints(projet);
+  plan.afficherListesPoints(toutesLesListes);
+  // Bouton « Seul » : les autres listes sont dessinées comme décochées (le menu ne change pas).
+  const gardees = listesDuTravail(toutesLesListes);
+  const listes = gardees ? toutesLesListes.map((l) => ({ ...l, visible: l.visible && gardees.has(l.id) })) : toutesLesListes;
   plan.afficherCouleursPoints(couleursDesPoints(projet, listes));
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
@@ -4058,13 +4077,30 @@ function basculerModeDessin() {
 }
 let pointsAffiches = null;
 let pointsDesListesMontres = null; // points des listes cochées (avant « Seulement l'élément à implanter »)
+let seulTravail = false; // bouton « Seul » du plan (0.94.0)
+
+/**
+ * Bouton « Seul » (0.94.0) : identifiants des listes à garder sur le plan, ou null (rien à cacher ;
+ * en Implanter, c'est elementSeul qui choisit). Lever : le levé en cours ; Contrôle : les points
+ * de contrôle ; Guidage : la surface suivie ; ailleurs : la liste cochée dans Projet (et ses levés).
+ */
+function listesDuTravail(listes) {
+  if (!seulTravail) return null;
+  if (ongletContexte === 'terrain' && ecranLeve) {
+    if (terrain.mode === 'controler') return null;
+    if (terrain.mode === 'lever') return new Set(stockEnCours() ? [stockEnCours().id] : []);
+    if (terrain.mode === 'autocontrole') return new Set([LISTE_CONTROLE]);
+    if (terrain.mode === 'lame') return new Set(terrain.lame.surfaceId ? [terrain.lame.surfaceId] : []);
+  }
+  return new Set(listes.filter((l) => l.leveId && l.leveId === projet.leveActifId).map((l) => l.id));
+}
 
 /**
  * « Seulement l'élément à implanter » (case de Terrain › Implanter, 0.90.1) : ce qu'il faut garder
  * sur le plan { pointNom, surfaceId } quand la case est cochée et qu'un élément est choisi ; sinon null.
  */
 function elementSeul() {
-  if (!terrain.seulementElement || ongletContexte !== 'terrain' || !ecranLeve || terrain.mode !== 'controler') return null;
+  if (!(terrain.seulementElement || seulTravail) || ongletContexte !== 'terrain' || !ecranLeve || terrain.mode !== 'controler') return null;
   if (terrain.implantation === 'point') return implanter.cible ? { pointNom: implanter.cible.nom, surfaceId: null } : null;
   if (['ligne', 'talus'].includes(terrain.implantation)) return implanter.ligne ? { pointNom: null, surfaceId: terrain.implantation === 'talus' ? terrain.talus.terrainId : null } : null;
   if (terrain.implantation === 'surface') return terrain.surfaceId ? { pointNom: null, surfaceId: terrain.surfaceId } : null;
@@ -4368,8 +4404,18 @@ function allerA(onglet) {
  * Ouvre un projet : il devient le projet affiché, et il est enregistré.
  * Puis on va à l'étape utile (voir etapeUtile).
  */
+let affichageRemisAZero = false;
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
+  // Tableau « Affichage » (0.94.0) : au démarrage, tout est montré (listes, plans DXF et leurs calques).
+  if (!affichageRemisAZero) {
+    affichageRemisAZero = true;
+    projet.listesCachees = [];
+    for (const planDxf of projet.plansDxf ?? []) {
+      planDxf.visible = true;
+      for (const calque of planDxf.calques ?? []) calque.visible = true;
+    }
+  }
   implanter.choix = null;
   implanter.cible = null;
   implanter.pointsLigne = [];
