@@ -5305,6 +5305,19 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   vertical-align: baseline;
 }
 
+/* Forme et couleur d'un libellé dans le choix de Lever : symbole dans une pastille blanche. */
+.symbole-libelle {
+  display: inline-block;
+  min-width: 1.3em;
+  margin-right: 4px;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--texte);
+  font-style: normal;
+  line-height: 1.3;
+  text-align: center;
+}
+
 /* Bouton « Ma position » : parties pleines du dessin (suivi, devant en haut). */
 .plan-boutons svg .plein {
   fill: currentColor;

@@ -32,6 +32,7 @@ import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne
 // Couloir de l'implantation d'une ligne : bandes de chaque côté, plus fines en s'approchant
 // (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
 const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
+import { symboleDeForme } from '../plan/formes.js';
 import { ouvrirFenetrePointTape, ouvrirListePoints } from './fenetres-points.js';
 
 // Mode Contrôler : ce qu'on implante (point, ligne, talus, surface), vue des coupes, longueurs.
@@ -935,9 +936,9 @@ export function creerEcranLeve(conteneur, actions) {
     const liste = donnees.libelles[sorte];
     const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
     return `<div class="libelles-terrain seulement-intermediaire pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
-      <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong>Aucun</strong><span>sans libellé</span></button>
-      ${liste.map(([abreviation, signification, couleur]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
-          <strong>${couleur ? `<i class="pastille-libelle" style="background: ${couleur}"></i>` : ''}${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
+      <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong><i class="symbole-libelle">${symboleDeForme('')}</i>Aucun</strong><span>sans libellé</span></button>
+      ${liste.map(([abreviation, signification, couleur, forme]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
+          <strong><i class="symbole-libelle" ${couleur ? `style="color: ${couleur}"` : ''}>${symboleDeForme(forme)}</i>${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
 
     </div>
 `;

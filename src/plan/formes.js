@@ -57,3 +57,8 @@ export function cheminForme(forme, x, y, r) {
       return null;
   }
 }
+
+/** Symbole (●, ▲, ★…) d'une forme, pour les listes de choix. */
+export function symboleDeForme(forme) {
+  return (FORMES.find(([cle]) => cle === (forme ?? '')) ?? FORMES[0])[1];
+}
