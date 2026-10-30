@@ -53,7 +53,7 @@ import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecr
 import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
-import { lireLibelles, enregistrerLibelles } from './leve/libelles.js';
+import { lireLibelles } from './leve/libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
 import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele } from './topo/ligne-implantation.js';
@@ -79,7 +79,7 @@ import {
   supprimerLevee,
   pointsDeLaLevee,
 } from './topo/leve-direct.js';
-import { segmentCroise, supprimerSegment, ajouterPointExistant, horsDuContour, supprimerPointDuLevee, placeDuPoint, nomDeLigne } from './topo/lignes-levee.js';
+import { segmentCroise, supprimerSegment, ajouterPointExistant, horsDuContour, supprimerPointDuLevee, placeDuPoint, nomDeLigne, suitesLibres, creerLignesDepuisSuites } from './topo/lignes-levee.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
@@ -121,8 +121,6 @@ let pilote = null;
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 // Levé avec le récepteur (appli Android) : levé et stock en cours, rôle du prochain point.
 const leveDirect = { stockId: null, role: 'contour' };
-// Libellés des noms de points (L-HT-1-3, P-RG-2…), gardés sur l'appareil (voir leve/libelles.js).
-let libelles = lireLibelles();
 let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
 let etatRecepteur2 = null; // dernier état du 2e récepteur (essai à 2 RX2, guidage de lame)
 // GPS de la tablette (APK, sans RX2 connecté) : { est, nord, precision } ou null ; seulement pour se localiser.
@@ -907,22 +905,19 @@ const ecranLeve = recepteurDisponible()
         supprimerSegment(stock, index, i);
         modifie();
       },
+      // Lignes depuis les suites de points (0.95.0) : lignes de rupture, ou le contour d'un stock.
+      creerLignesDepuisSuites: (suites, role) => {
+        const stock = stockEnCours();
+        if (!stock || refuserEnLectureSeule()) return;
+        const nombre = creerLignesDepuisSuites(stock, suites, role);
+        afficherMessage(role === 'contour' ? 'Contour créé' : `${nombre} ligne(s) créée(s)`, 3000);
+        modifie();
+      },
       choisirLibelle: (abreviation) => {
         if (leveDirect.role === 'aire') terrain.libelleAire = abreviation;
         else if (['ligne', 'longueur'].includes(leveDirect.role)) terrain.libelleLigne = abreviation;
         else terrain.libellePoint = abreviation;
         retenirReglagesTerrain();
-        recalculer();
-      },
-      enregistrerLibelles: (nouveaux) => {
-        if (nouveaux.lignes.length === 0 || nouveaux.points.length === 0 || nouveaux.aires.length === 0) {
-          alert('Il faut au moins un libellé pour les lignes, un pour les points et un pour les aires.');
-          recalculer();
-          return;
-        }
-        libelles = nouveaux;
-        enregistrerLibelles(libelles);
-        afficherMessage('Libellés enregistrés');
         recalculer();
       },
       choisirMode: choisirModeTerrain,
@@ -2996,7 +2991,7 @@ function rolesDesPoints(leveId) {
 
 /** Libellé des points isolés (celui choisi, sinon le premier de la liste). */
 function libelleDesPoints() {
-  return terrain.libellePoint === '' || libelles.points.some(([abreviation]) => abreviation === terrain.libellePoint) ? terrain.libellePoint : '';
+  return terrain.libellePoint === '' || lireLibelles().points.some(([abreviation]) => abreviation === terrain.libellePoint) ? terrain.libellePoint : '';
 }
 
 /**
@@ -3085,7 +3080,7 @@ async function ajouterPointTouche(nom) {
 function libelleDuRole() {
   if (leveDirect.role === 'contour') return null;
   const sorte = leveDirect.role === 'aire' ? 'aires' : ['ligne', 'longueur'].includes(leveDirect.role) ? 'lignes' : 'points';
-  const liste = libelles[sorte];
+  const liste = lireLibelles()[sorte];
   const voulu = { aires: terrain.libelleAire, lignes: terrain.libelleLigne, points: terrain.libellePoint }[sorte];
   return liste.some(([abreviation]) => abreviation === voulu) ? voulu : '';
 }
@@ -3118,6 +3113,8 @@ function donneesLeve() {
     resume: stock ? resumeStock(stock) : null,
     volume: stock ? volumeDuStock(stock) : null,
     elements: stock ? elementsDuLevee(stock) : null,
+    // Suites de points pas encore dans une ligne (0.95.0) : pour « + Lignes depuis les suites ».
+    suites: stock ? suitesLibres(stock, pointsDuLeve(stock.leveId).map((p) => p.nom)) : [],
     photos: stock?.photos ?? [],
     // Triangles en trop (Intermédiaire) : seulement pour un levé qui a une surface (pas un levé libre).
     triangles: stock && projet.surfaces.includes(stock)
@@ -3180,7 +3177,7 @@ function donneesCommunes() {
   return {
     // Surfaces levées et métrés, avec la date de leur levé (« Stock 2 · 22.10.2026 »).
     stocks: [...surfacesLevees(), ...projet.metres, ...projet.autres].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}`, nature: s.nature ?? 'stock' })),
-    libelles,
+    libelles: lireLibelles(),
     libelleLigne: terrain.libelleLigne,
     libellePoint: terrain.libellePoint,
     libelleAire: terrain.libelleAire,

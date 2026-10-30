@@ -11,7 +11,7 @@
 // ([{ noms, fermee, libelle, numero }]), points (noms des points isolés).
 // Coordonnées : Est, Nord (m, MN95).
 import { pointDansPolygone } from './volume.js';
-import { creerLigne } from './noms.js';
+import { creerLigne, detecterSeries } from './noms.js';
 import { debutDeNom } from './leve-direct.js';
 
 /** Nom affiché d'une ligne : « L-HT-1 » (ou « Ligne 2 » sans libellé). */
@@ -139,4 +139,42 @@ export function supprimerPointDuLevee(leve, surface, nom, objets = []) {
   const avant = leve.points.length;
   if (!utilise) leve.points = leve.points.filter((p) => p.nom !== nom);
   return Boolean(place) || leve.points.length !== avant;
+}
+
+/**
+ * Suites de points du levé qui ne sont encore dans aucune ligne ni dans le contour (0.95.0, demande
+ * du 29.10.2026) : même début de nom et numéros qui se suivent, dans l'ordre de la liste
+ * (b1, b2, b3…) ; un numéro qui manque coupe la suite en deux (voir detecterSeries). Les points
+ * isolés du levé peuvent en faire partie (ils deviennent des points de ligne).
+ * noms : noms des points du levé, dans l'ordre. Renvoie [[noms]] (au moins 2 points chacune).
+ */
+export function suitesLibres(surface, noms) {
+  const pris = new Set([...(surface.contour ?? []), ...(surface.lignesRupture ?? []).flatMap((l) => l.noms)]);
+  return detecterSeries(noms.filter((nom) => !pris.has(nom)));
+}
+
+/**
+ * Crée les lignes choisies à partir de suites (voir suitesLibres) : role 'ligne' (ligne de rupture
+ * ouverte) ou 'contour' (le contour du stock, s'il est encore vide ; une seule suite). Les points
+ * quittent la liste des points isolés. Renvoie le nombre de lignes créées.
+ */
+export function creerLignesDepuisSuites(surface, suites, role = 'ligne') {
+  surface.lignesRupture ??= [];
+  let creees = 0;
+  for (const suite of suites) {
+    if (suite.length < 2) continue;
+    const libres = new Set(suite);
+    surface.points = (surface.points ?? []).filter((nom) => typeof nom !== 'string' || !libres.has(nom));
+    if (role === 'contour' && (surface.contour ?? []).length === 0 && suite.length >= 3) {
+      surface.contour = [...suite];
+    } else {
+      // La ligne vide en cours (créée pour lever) est remplacée par celle-ci.
+      const vide = surface.lignesRupture.findIndex((l) => l.noms.length === 0);
+      const ligne = { ...creerLigne(), noms: [...suite] };
+      if (vide >= 0) surface.lignesRupture.splice(vide, 1, ligne);
+      else surface.lignesRupture.push(ligne);
+    }
+    creees += 1;
+  }
+  return creees;
 }

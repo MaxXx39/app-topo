@@ -16,6 +16,7 @@ import { aAcces, estModeBase } from '../reglages/reglages.js';
 import { demanderCode } from '../outils/code.js';
 import { demanderTexte } from '../outils/choix.js';
 import { ouvrirChoixLevees } from './fenetre-levees.js';
+import { ouvrirFenetreSuites } from './fenetre-suites.js';
 import { htmlControle } from './controle-ecran.js';
 import { htmlLame, rafraichirLame } from './lame-ecran.js';
 import { bulle } from '../aide/bulles.js';
@@ -32,7 +33,6 @@ import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne
 // (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
 const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
 import { ouvrirFenetrePointTape, ouvrirListePoints } from './fenetres-points.js';
-import { ouvrirFenetreLibelles } from './fenetre-libelles.js';
 
 // Mode Contrôler : ce qu'on implante (point, ligne, talus, surface), vue des coupes, longueurs.
 const IMPLANTATIONS = [
@@ -101,7 +101,7 @@ const LETTRES_METRE = { aire: 'A', longueur: 'L' };
 /**
  * Crée l'écran dans "conteneur". Les actions sont faites par main.js via "actions" :
  * ouvrirRecepteur() (fenêtre du récepteur, voir recepteur.js), nouvelleSurface(nature), choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
- * annulerDernierPoint(), choisirLibelle(abréviation), enregistrerLibelles({ lignes, points, aires }),
+ * annulerDernierPoint(), choisirLibelle(abréviation),
  * choisirMode(mode), choisirSurfaceControle(id), choisirVueCoupes(vue),
  * choisirLongueurCoupe(m), choisirExagerationCoupe(facteur), choisirSourceOrientation(source),
  * choisirImplantation(quoi), choisirAccroche(mode), trouverPoint(nom), choisirGuidage('rx2' ou 'nseo'),
@@ -193,16 +193,8 @@ export function creerEcranLeve(conteneur, actions) {
       dessiner();
       return;
     }
-    if (action === 'ouvrirLibelles') {
-      // Fenêtre à part, « Enregistrer » toujours visible en bas (voir fenetre-libelles.js).
-      const sorte = sorteDuRole();
-      const titres = { lignes: 'Libellés des lignes (L-…)', points: 'Libellés des points (P-…)', aires: 'Libellés des aires (A-…)' };
-      ouvrirFenetreLibelles({
-        titre: titres[sorte],
-        liste: donnees.libelles[sorte],
-        couleurParDefaut: { lignes: '#ea580c', points: '#15803d', aires: '#0891b2' }[sorte],
-        enregistrer: (liste) => actions.enregistrerLibelles({ ...donnees.libelles, [sorte]: liste }),
-      });
+    if (action === 'lignesDepuisSuites') {
+      ouvrirFenetreSuites({ suites: donnees.suites, stock: donnees.stock?.nature === 'stock' && (donnees.elements?.contour?.noms.length ?? 0) === 0, creer: (choisies, role) => actions.creerLignesDepuisSuites(choisies, role) });
       return;
     }
     // --- Mode Contrôler ---
@@ -947,8 +939,7 @@ export function creerEcranLeve(conteneur, actions) {
       <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong>Aucun</strong><span>sans libellé</span></button>
       ${liste.map(([abreviation, signification, couleur]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
           <strong>${couleur ? `<i class="pastille-libelle" style="background: ${couleur}"></i>` : ''}${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
-      <button type="button" class="bouton-crayon-libelles seulement-intermediaire" data-action="ouvrirLibelles" title="Modifier les libellés" aria-label="Modifier les libellés">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
+
     </div>
 `;
   }
@@ -1026,7 +1017,12 @@ export function creerEcranLeve(conteneur, actions) {
         </div>`
       : '';
     const elements = listeElements();
-    return elements || triangles || listePhotos ? `<div class="bas-du-leve">${elements}${triangles}${listePhotos}</div>` : '';
+    // Lignes à partir des suites de points (0.95.0, Intermédiaire) : b1, b2, b3… → une ligne.
+    const nbSuites = donnees.suites?.length ?? 0;
+    const suites = nbSuites > 0
+      ? `<div class="ligne-outils seulement-intermediaire"><button type="button" class="bouton-secondaire" data-action="lignesDepuisSuites">+ Lignes depuis les suites de points (${nbSuites})</button></div>`
+      : '';
+    return elements || triangles || listePhotos || suites ? `<div class="bas-du-leve">${suites}${elements}${triangles}${listePhotos}</div>` : '';
   }
 
   /**

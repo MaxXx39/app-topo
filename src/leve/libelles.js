@@ -3,7 +3,11 @@
 // Une liste pour les lignes de rupture (et les longueurs d'un métré), une pour les points isolés
 // (et les points comptés), une pour les aires d'un métré (A-ENR-1-3 : aire d'enrobé n° 1, point 3).
 // Listes de départ (lignes et points validées par l'utilisateur le 22.10.2026, aires proposées
-// ensuite), qu'il complète dans l'appli ; elles sont gardées sur l'appareil (pour tous les projets).
+// ensuite). Depuis 0.95.0 (demande du 30.10.2026) : les libellés de départ ne se modifient pas
+// (seulement leur couleur) ; ceux ajoutés se modifient dans les réglages (Expert) et sont partagés
+// par Drive avec tous les appareils (listes partagées, voir reglages/listes-partagees.js :
+// libelles = { ajoutes: { lignes, points, aires }, couleurs: { lignes: { HT: '#…' }, … } }).
+import { lireListesPartagees, ecrireListesPartagees, surChangementListes } from '../reglages/listes-partagees.js';
 
 export const LIBELLES_DEPART = {
   lignes: [
@@ -58,35 +62,67 @@ export const COULEURS_LIBELLES = [
 
 // Dernière liste lue, pour ne pas relire la mémoire de l'appareil à chaque dessin du plan.
 let enCache = null;
+// Listes partagées changées (ici ou reçues de Drive) : les libellés seront relus.
+surChangementListes(() => (enCache = null));
+
+const SORTES = ['lignes', 'points', 'aires'];
 
 /**
- * Libellés retenus sur l'appareil, ou ceux de départ. Renvoie { lignes, points, aires }
- * ([[abréviation, signification, couleur (facultative)]]), une copie qu'on peut modifier.
+ * Libellés : ceux de départ (fixes, avec leur couleur choisie), puis ceux ajoutés. Renvoie
+ * { lignes, points, aires } ([[abréviation, signification, couleur (facultative)]]), une copie.
  */
 export function lireLibelles() {
-  if (!enCache) enCache = lireMemoire();
+  if (!enCache) enCache = assemblerLibelles(lireListesPartagees().libelles ?? ancienneListe());
   return structuredClone(enCache);
 }
 
-function lireMemoire() {
+/** Abréviations de départ d'une sorte ('lignes', 'points', 'aires') : elles ne se modifient pas. */
+export function abreviationsDepart(sorte) {
+  return new Set(LIBELLES_DEPART[sorte].map(([a]) => a));
+}
+
+/**
+ * Libellés complets à partir de la part partagée { ajoutes, couleurs } : départ (avec couleur),
+ * puis ajoutés (sans ceux qui ont le nom d'un libellé de départ).
+ */
+export function assemblerLibelles(partage) {
+  const resultat = {};
+  for (const sorte of SORTES) {
+    const couleurs = partage?.couleurs?.[sorte] ?? {};
+    const depart = LIBELLES_DEPART[sorte].map(([a, s]) => [a, s, couleurs[a] ?? '']);
+    const fixes = abreviationsDepart(sorte);
+    const ajoutes = (partage?.ajoutes?.[sorte] ?? []).filter(([a]) => a && !fixes.has(a)).map(([a, s, c]) => [a, s ?? '', c ?? '']);
+    resultat[sorte] = [...depart, ...ajoutes];
+  }
+  return resultat;
+}
+
+/** Part à partager d'une liste complète : { ajoutes, couleurs } (les libellés de départ ne gardent que leur couleur). */
+export function partDesLibelles(libelles) {
+  const partage = { ajoutes: {}, couleurs: {} };
+  for (const sorte of SORTES) {
+    const fixes = abreviationsDepart(sorte);
+    partage.ajoutes[sorte] = (libelles[sorte] ?? []).filter(([a]) => !fixes.has(a)).map(([a, s, c]) => [a, s ?? '', c ?? '']);
+    partage.couleurs[sorte] = Object.fromEntries((libelles[sorte] ?? []).filter(([a, , c]) => fixes.has(a) && c).map(([a, , c]) => [a, c]));
+  }
+  return partage;
+}
+
+/** Anciens libellés de cet appareil (avant 0.95.0, « topo-libelles »), en part partagée, ou null. */
+function ancienneListe() {
   try {
     const lus = JSON.parse(localStorage.getItem(CLE_MEMOIRE));
-    // Listes retenues avant les métrés : sans aires, on prend celles de départ.
-    if (lus?.lignes?.length > 0 && lus?.points?.length > 0) return { ...lus, aires: lus.aires?.length > 0 ? lus.aires : structuredClone(LIBELLES_DEPART.aires) };
+    if (lus?.lignes?.length > 0) return partDesLibelles({ lignes: lus.lignes, points: lus.points ?? [], aires: lus.aires ?? [] });
   } catch {
     // Mémoire indisponible ou abîmée : on reprend la liste de départ.
   }
-  return structuredClone(LIBELLES_DEPART);
+  return null;
 }
 
-/** Retient les libellés sur l'appareil. */
+/** Enregistre les libellés : dans les listes partagées (envoyées sur Drive à tous les appareils). */
 export function enregistrerLibelles(libelles) {
-  enCache = structuredClone(libelles);
-  try {
-    localStorage.setItem(CLE_MEMOIRE, JSON.stringify(libelles));
-  } catch {
-    // Mémoire indisponible : la liste ne sera simplement pas retenue.
-  }
+  ecrireListesPartagees({ ...lireListesPartagees(), libelles: partDesLibelles(libelles) });
+  enCache = null;
 }
 
 /** Couleur d'une abréviation dans une liste de libellés, ou null (pas de couleur choisie). */
