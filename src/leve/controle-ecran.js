@@ -45,7 +45,9 @@ function htmlGestion(ac, erreur) {
       <span>Plan</span>${champ('planVert', t.plan.vert, 'vert ≤')}${champ('planOrange', t.plan.orange, 'orange ≤')}
       <span>Hauteur</span>${champ('hauteurVert', t.hauteur.vert, 'vert ≤')}${champ('hauteurOrange', t.hauteur.orange, 'orange ≤')}
     </div>
-    <div class="ligne-outils"><button type="button" class="bouton-secondaire" data-action="enregistrerTolerances">Enregistrer les tolérances</button></div>
+    <label class="delai-controle seulement-expert">Contrôle toutes les (h)
+      <input type="text" inputmode="decimal" data-tolerance="delai" value="${Number(ac.delaiHeures.toFixed(2))}" /></label>
+    <div class="ligne-outils"><button type="button" class="bouton-secondaire" data-action="enregistrerTolerances">Enregistrer</button></div>
     <p class="titre-choix">Points de contrôle (${ac.points.length})</p>
     ${ac.points.map((p) => `<div class="ligne-a-implanter">
         <span><strong>${echapper(p.nom)}</strong> <span class="aide"><span class="coord-en">E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)} · </span>H ${p.altitude != null ? formaterNombre(p.altitude) : '—'}</span></span>
@@ -75,7 +77,5 @@ function htmlHistorique(ac) {
             <span class="aide">(E ${ecart(c.ecarts.est)} · N ${ecart(c.ecarts.nord)})</span></span>
           <input type="text" class="remarque-controle" data-champ="remarque-controle" data-id="${c.id}" value="${echapper(c.remarque ?? '')}" placeholder="remarque" aria-label="Remarque" />
         </div>`)).join('')}
-    <p class="aide">exporter : <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterControles" data-valeur="csv">CSV</button>
-      · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterControles" data-valeur="pdf">PDF</button></p>
   </div>`;
 }

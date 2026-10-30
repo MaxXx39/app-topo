@@ -93,3 +93,26 @@ describe('lignes du levé', () => {
     expect(leve.points.some((q) => q.nom === 'I1')).toBe(true);
   });
 });
+
+describe('lignes depuis les suites de points (0.95.0)', () => {
+  it('trouve les suites libres, coupées là où un numéro manque, et crée les lignes', async () => {
+    const { suitesLibres, creerLignesDepuisSuites } = await import('../src/topo/lignes-levee.js');
+    const surface = { contour: [], lignesRupture: [{ noms: ['h1', 'h2'] }], points: ['b1', 'b2', 'b3', 'x'] };
+    const noms = ['b1', 'b2', 'b3', 'b5', 'b6', 'h1', 'h2', 'x'];
+    const suites = suitesLibres(surface, noms);
+    expect(suites).toEqual([['b1', 'b2', 'b3'], ['b5', 'b6']]);
+    expect(creerLignesDepuisSuites(surface, suites, 'ligne')).toBe(2);
+    expect(surface.lignesRupture.map((l) => l.noms)).toEqual([['h1', 'h2'], ['b1', 'b2', 'b3'], ['b5', 'b6']]);
+    expect(surface.points).toEqual(['x']);
+    expect(suitesLibres(surface, noms)).toEqual([]);
+  });
+
+  it('dans un stock, une suite peut devenir le contour', async () => {
+    const { creerLignesDepuisSuites } = await import('../src/topo/lignes-levee.js');
+    const stock = { contour: [], lignesRupture: [{ noms: [] }], points: [] };
+    creerLignesDepuisSuites(stock, [['c1', 'c2', 'c3', 'c4']], 'contour');
+    expect(stock.contour).toEqual(['c1', 'c2', 'c3', 'c4']);
+    creerLignesDepuisSuites(stock, [['d1', 'd2']], 'ligne');
+    expect(stock.lignesRupture).toEqual([{ noms: ['d1', 'd2'], fermee: false }]);
+  });
+});

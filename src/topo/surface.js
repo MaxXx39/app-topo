@@ -36,6 +36,19 @@ export const NATURES = [
 /** Natures qu'on choisit à l'import d'un fichier (la « Surface » vient seulement d'un dessin). */
 export const NATURES_IMPORT = NATURES.filter(([cle]) => cle !== 'surface' && cle !== 'terrassement');
 
+/**
+ * Surfaces importées sans nature (0.90.0) : elles peuvent servir de stock (volume depuis une
+ * altitude) comme de terrain de référence. Vrai si la surface peut être prise comme stock.
+ */
+export function peutEtreStock(surface) {
+  return surface.nature === 'stock' || estImportee(surface);
+}
+
+/** Vrai si la surface peut être prise comme terrain de référence d'une comparaison. */
+export function peutEtreTerrain(surface) {
+  return surface.nature === 'terrain' || estImportee(surface);
+}
+
 /** Nom affiché d'une nature ('terrain' -> 'Terrain'). */
 export function nomNature(nature) {
   return NATURES.find(([cle]) => cle === nature)?.[1] ?? '';
@@ -60,6 +73,22 @@ export function creerSurface(nom, leveId, nature = 'stock') {
 /** Vrai si la surface a été importée d'un fichier (LandXML, DXF) et non créée à partir de points. */
 export function estImportee(surface) {
   return surface.type === 'landxml' || surface.type === 'dxf' || surface.type === 'dessin';
+}
+
+// Préfixes des noms (0.90.0, demande du 29.10.2026) : « LV- » pour un levé (stock, terrain,
+// recollement, levé libre, métré), « Surf- » pour une surface importée ou faite dans Dessin.
+export const PREFIXE_LEVE = 'LV-';
+export const PREFIXE_SURFACE = 'Surf-';
+
+/** Préfixe du nom de ce levé ou de cette surface. */
+export function prefixeDuNom(objet) {
+  return estImportee(objet) || objet?.nature === 'surface' ? PREFIXE_SURFACE : PREFIXE_LEVE;
+}
+
+/** Nom avec ce préfixe au début (ajouté s'il n'y est pas déjà, majuscules ignorées). */
+export function avecPrefixe(nom, prefixe) {
+  const texte = String(nom ?? '').trim();
+  return texte.toLowerCase().startsWith(prefixe.toLowerCase()) ? texte : `${prefixe}${texte}`;
 }
 
 /** D'où vient une surface importée : « LandXML », « DXF » ou « Dessin » (plateforme ou bâtiment dessiné). */
@@ -149,10 +178,8 @@ export function surfaceImportee(surfaceLue, nomFichier, type = 'landxml') {
   const index = new Map(surfaceLue.points.map((p, i) => [p, i]));
   return {
     id: nouvelIdentifiant(),
-    nom: surfaceLue.nom,
+    nom: avecPrefixe(surfaceLue.nom, PREFIXE_SURFACE),
     type,
-    // Une surface importée est le plus souvent un terrain : l'utilisateur peut changer.
-    nature: 'terrain',
     nomFichier,
     points: surfaceLue.points.map(({ nom, est, nord, altitude }) => ({ nom, est, nord, altitude })),
     faces: surfaceLue.triangles.map((t) => t.map((p) => index.get(p))),

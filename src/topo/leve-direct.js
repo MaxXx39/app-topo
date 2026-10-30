@@ -16,7 +16,7 @@
 // et un nom ne sert qu'une fois dans le projet. L'utilisateur peut changer le nom avant de prendre le point.
 // Un terrain naturel ou un terrassement n'a pas de contour : seulement des lignes de rupture et
 // des points isolés (demande de l'utilisateur).
-import { creerSurface, nouvelIdentifiant, NATURES } from './surface.js';
+import { creerSurface, nouvelIdentifiant, NATURES, avecPrefixe, PREFIXE_LEVE, PREFIXE_SURFACE } from './surface.js';
 import { creerLigne } from './noms.js';
 import { nomsDeLaMesure } from './mesure.js';
 
@@ -86,7 +86,7 @@ export function leveDepuisFichier(projet, leve, nature) {
   leve.direct = true;
   leve.dediee = true;
   const nom = String(leve.nom).replace(/\.[^.]+$/, '') || 'Levé importé';
-  const surface = creerSurface(nom, leve.id, NATURES.some(([cle]) => cle === nature) ? nature : 'stock');
+  const surface = creerSurface(avecPrefixe(nom, PREFIXE_LEVE), leve.id, NATURES.some(([cle]) => cle === nature) ? nature : 'stock');
   projet.surfaces.push(surface);
   nommerListeDeLevee(projet, surface);
   return surface;
@@ -100,8 +100,9 @@ export function leveDepuisFichier(projet, leve, nature) {
  */
 export function creerLeveeDuDessin(projet, dessin, sommets, maintenant = new Date()) {
   const leve = creerListeDeLevee(projet, maintenant);
-  const numeros = projet.surfaces.map((s) => /^Surface (\d+)$/.exec(s.nom)?.[1]).filter(Boolean).map(Number);
-  const surface = creerSurface(`Surface ${Math.max(0, ...numeros) + 1}`, leve.id, 'surface');
+  // Avant 0.90.0 : « Surface N » ; maintenant « Surf-Dessin N ».
+  const numeros = projet.surfaces.map((s) => /^(?:Surf-)?(?:Surface|Dessin) (\d+)$/.exec(s.nom)?.[1]).filter(Boolean).map(Number);
+  const surface = creerSurface(`${PREFIXE_SURFACE}Dessin ${Math.max(0, ...numeros) + 1}`, leve.id, 'surface');
   surface.dessinId = dessin.id;
   surface.tousLesPoints = false;
   surface.lignesRupture = [];
@@ -138,9 +139,9 @@ export function leveDuJour(projet, maintenant = new Date()) {
  */
 export function creerSurfaceDirecte(projet, leve, nature = 'stock') {
   const titre = NATURES.find(([cle]) => cle === nature)?.[1] ?? 'Stock';
-  const modele = new RegExp(`^${titre} (\\d+)$`);
+  const modele = new RegExp(`^(?:${PREFIXE_LEVE})?${titre} (\\d+)$`);
   const numeros = projet.surfaces.map((s) => modele.exec(s.nom)?.[1]).filter(Boolean).map(Number);
-  const surface = creerSurface(`${titre} ${Math.max(0, ...numeros) + 1}`, leve.id, NATURES.some(([cle]) => cle === nature) ? nature : 'stock');
+  const surface = creerSurface(`${PREFIXE_LEVE}${titre} ${Math.max(0, ...numeros) + 1}`, leve.id, NATURES.some(([cle]) => cle === nature) ? nature : 'stock');
   surface.tousLesPoints = false;
   projet.surfaces.push(surface);
   return surface;
@@ -155,8 +156,8 @@ export function creerSurfaceDirecte(projet, leve, nature = 'stock') {
 export function creerAutres(projet, leve) {
   projet.autres ??= [];
   // Anciens noms « Autres N » comptés aussi (avant la version 0.57.1).
-  const numeros = projet.autres.map((a) => /^(?:Autres|Levé libre) (\d+)$/.exec(a.nom)?.[1]).filter(Boolean).map(Number);
-  const autres = { id: nouvelIdentifiant(), nom: `Levé libre ${Math.max(0, ...numeros) + 1}`, nature: 'autres', leveId: leve.id, contour: [], lignesRupture: [], points: [] };
+  const numeros = projet.autres.map((a) => /^(?:LV-)?(?:Autres|Levé libre) (\d+)$/.exec(a.nom)?.[1]).filter(Boolean).map(Number);
+  const autres = { id: nouvelIdentifiant(), nom: `${PREFIXE_LEVE}Levé libre ${Math.max(0, ...numeros) + 1}`, nature: 'autres', leveId: leve.id, contour: [], lignesRupture: [], points: [] };
   projet.autres.push(autres);
   return autres;
 }
@@ -190,11 +191,20 @@ export function nomsDuProjet(projet) {
  * suit pas cette règle.
  */
 export function lireNomLeve(nom) {
-  const element = /^([CLA])-([^-\s]+)-(\d+)-(\d+)$/.exec(String(nom));
-  if (element) return { type: element[1], libelle: element[2], element: Number(element[3]), numero: Number(element[4]) };
-  const point = /^P-([^-\s]+)-(\d+)$/.exec(String(nom));
-  if (point) return { type: 'P', libelle: point[1], element: null, numero: Number(point[2]) };
+  // Libellé facultatif (« Aucun », 0.90.0) : « L-1-3 », « P-5 » (libellé '').
+  const element = /^([CLA])-(?:([^-\s]+)-)?(\d+)-(\d+)$/.exec(String(nom));
+  if (element) return { type: element[1], libelle: element[2] ?? '', element: Number(element[3]), numero: Number(element[4]) };
+  const point = /^P-(?:([^-\s]+)-)?(\d+)$/.exec(String(nom));
+  if (point) return { type: 'P', libelle: point[1] ?? '', element: null, numero: Number(point[2]) };
   return null;
+}
+
+/**
+ * Début d'un nom levé : lettre et libellé (« L-HT- »), ou la lettre seule quand aucun libellé
+ * n'est choisi (« L- », libellé « Aucun », 0.90.0).
+ */
+export function debutDeNom(lettre, libelle) {
+  return libelle ? `${lettre}-${libelle}-` : `${lettre}-`;
 }
 
 /**
@@ -255,8 +265,8 @@ export function preparerLigne(projet, surface, libelle) {
 export function prochainNom(projet, surface, role, libelle) {
   let prefixe;
   if (role === 'contour') prefixe = `C-${LIBELLE_CONTOUR}-${numeroDeContour(projet, surface)}-`;
-  else if (role === 'ligne') prefixe = `L-${libelle}-${preparerLigne(projet, surface, libelle).numero}-`;
-  else prefixe = `P-${libelle}-`;
+  else if (role === 'ligne') prefixe = `${debutDeNom('L', libelle)}${preparerLigne(projet, surface, libelle).numero}-`;
+  else prefixe = debutDeNom('P', libelle);
   return nomSuivant(projet, prefixe);
 }
 

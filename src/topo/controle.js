@@ -2,7 +2,8 @@
 // nouveau un point de contrôle du projet et on compare à ses coordonnées connues.
 // - écarts Est, Nord, en plan et en hauteur (m) ;
 // - couleur selon deux limites par tolérance : vert jusqu'à la 1re, orange jusqu'à la 2e, rouge au-delà ;
-// - rappel : un contrôle réussi (vert ou orange) est demandé chaque jour, puis toutes les 4 heures.
+// - rappel : un contrôle réussi (vert ou orange) est demandé chaque jour, puis toutes les 4 heures
+//   (durée réglable par projet depuis 0.90.0, en Expert : 2 h pour un chantier sensible…).
 
 // Tolérances par défaut (m), choisies par l'utilisateur le 26.10.2026 : plan et hauteur 2 cm / 4 cm.
 export const TOLERANCES_PAR_DEFAUT = { plan: { vert: 0.02, orange: 0.04 }, hauteur: { vert: 0.02, orange: 0.04 } };
@@ -61,12 +62,29 @@ function jourLocal(date) {
  * Vrai s'il faut faire un contrôle : aucun contrôle réussi aujourd'hui, ou le dernier date de
  * 4 heures ou plus. controles : ceux du projet ({ type, resultat, le (date ISO) }) ; maintenant : Date.
  */
-export function controleNecessaire(controles, maintenant = new Date()) {
+export function controleNecessaire(controles, maintenant = new Date(), delaiMs = DELAI_CONTROLE_MS) {
   const reussis = (controles ?? []).filter(estControleReussi).map((c) => new Date(c.le)).filter((d) => !Number.isNaN(d.getTime()));
   if (reussis.length === 0) return true;
   const dernier = new Date(Math.max(...reussis));
   if (jourLocal(dernier) !== jourLocal(maintenant)) return true;
-  return maintenant - dernier >= DELAI_CONTROLE_MS;
+  return maintenant - dernier >= delaiMs;
+}
+
+/** Durée entre deux contrôles de ce projet (ms) : son réglage (heures), sinon 4 heures. */
+export function delaiControleMs(projet) {
+  const heures = Number(projet?.delaiControleHeures);
+  return Number.isFinite(heures) && heures > 0 ? heures * 60 * 60 * 1000 : DELAI_CONTROLE_MS;
+}
+
+/**
+ * Durée entre deux contrôles tapée en heures (« 2 », « 1.5 », « 1,5 ») : { heures } ou { erreur }.
+ * Entre 0.25 h (15 minutes) et 24 h.
+ */
+export function lireDelaiControle(texte) {
+  const valeur = Number(String(texte ?? '').trim().replace(',', '.'));
+  if (String(texte ?? '').trim() === '' || !Number.isFinite(valeur)) return { erreur: 'Durée entre deux contrôles : écris un nombre d\'heures (ex. 2)' };
+  if (valeur < 0.25 || valeur > 24) return { erreur: 'Durée entre deux contrôles : entre 0.25 et 24 heures' };
+  return { heures: valeur };
 }
 
 /**

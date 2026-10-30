@@ -16,7 +16,7 @@ describe('métré', () => {
     const projet = creerProjet();
     const leve = leveDuJour(projet);
     const metre = creerMetre(projet, leve);
-    expect(metre.nom).toBe('Métré 1');
+    expect(metre.nom).toBe('LV-Métré 1');
     expect(prochainNomMetre(projet, metre, 'aire', 'ENR')).toBe('A-ENR-1-1');
     for (const [e, n] of [[0, 0], [10, 0], [10, 10], [0, 10]]) prendre(projet, leve, metre, 'aire', 'ENR', e, n);
     expect(projet.mesures).toHaveLength(1);

@@ -3,7 +3,7 @@
 // L'export (PDF, CSV, DXF, LandXML) est ajouté sous cet écran par main.js.
 import { formaterNombre } from '../topo/format.js';
 import { titreSection } from '../outils/section.js';
-import { estImportee } from '../topo/surface.js';
+import { estImportee, peutEtreStock } from '../topo/surface.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { nouveauVolume, choisirSorte, nomAutomatique, nomDuCalcul, grouperParNature } from './calculs.js';
@@ -154,7 +154,7 @@ function carte({ calcul, resultat, nom }, surfaces, { etiquette, montre }) {
 
   let reglages = '';
   if (sorte === 'stock') {
-    const stocks = surfaces.filter((s) => s.nature === 'stock');
+    const stocks = surfaces.filter((s) => peutEtreStock(s));
     const stock = surfaces.find((s) => s.id === calcul.surface1Id);
     const importe = stock && estImportee(stock);
     const radioBase = (valeur, titre, desactive = false) =>

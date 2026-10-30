@@ -16,6 +16,8 @@
 import { echapper } from '../outils/echapper.js';
 import { demanderCode } from '../outils/code.js';
 import { lireListesPartagees } from './listes-partagees.js';
+import { lireLibelles, enregistrerLibelles, abreviationsDepart } from '../leve/libelles.js';
+import { ouvrirFenetreLibelles } from '../leve/fenetre-libelles.js';
 import { ouvrirFenetreListes } from './fenetre-listes.js';
 
 const CLE = 'topo-reglages';
@@ -139,6 +141,14 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
         <span><strong>Mode téléphone</strong><span class="aide">textes et boutons plus petits</span></span></label>
       <label class="case-reglage"><input type="checkbox" data-reglage="aide" ${aideActive ? 'checked' : ''} />
         <span><strong>Bulles d'aide « ? »</strong></span></label>
+      <div class="case-reglage listes-reglages seulement-expert">
+        <span><strong>Libellés des points</strong><span class="aide">partagés par Drive</span></span>
+        <span class="boutons-libelles">
+          <button type="button" class="bouton-secondaire" data-action="libelles" data-valeur="lignes">Lignes</button>
+          <button type="button" class="bouton-secondaire" data-action="libelles" data-valeur="points">Points</button>
+          <button type="button" class="bouton-secondaire" data-action="libelles" data-valeur="aires">Aires</button>
+        </span>
+      </div>
       <div class="case-reglage listes-reglages seulement-intermediaire">
         <span><strong>Listes partagées</strong><span class="aide" data-zone="compte-listes">${compteListes()}</span></span>
         <button type="button" class="bouton-secondaire" data-action="listes">Modifier</button>
@@ -158,13 +168,8 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
   };
   fenetre.addEventListener('change', (evenement) => {
     const champ = evenement.target.dataset.reglage;
-    if (champ === 'mode') {
-      reglages.mode = evenement.target.value;
-      ecrireReglages(reglages);
-      appliquerReglages(reglages);
-      for (const puce of fenetre.querySelectorAll('.puce-mode')) puce.classList.toggle('actif', puce.contains(evenement.target));
-      changerMode?.();
-    } else if (champ === 'telephone') {
+    if (champ === 'mode') changerModeProtege(evenement.target);
+    else if (champ === 'telephone') {
       reglages.telephone = evenement.target.checked;
       ecrireReglages(reglages);
       appliquerReglages(reglages);
@@ -184,10 +189,31 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       modifierListes();
       return;
     }
+    const libelles = evenement.target.closest('[data-action="libelles"]');
+    if (libelles) {
+      modifierLibelles(libelles.dataset.valeur);
+      return;
+    }
     const bouton = evenement.target.closest('[data-zone="partage"] button[data-action]');
     if (bouton?.dataset.action === 'modifierNomAppareil') modifierNomProtege();
     else if (bouton) partage?.actions[bouton.dataset.action]?.();
   });
+  /** Mode choisi : monter en Expert demande le code de sécurité (0.90.0) ; descendre, non. */
+  async function changerModeProtege(choix) {
+    if (choix.value === 'expert' && reglages.mode !== 'expert' && !deverrouille) {
+      if (!(await demanderCode('Passer en mode Expert'))) {
+        for (const radio of fenetre.querySelectorAll('[data-reglage="mode"]')) radio.checked = radio.value === reglages.mode;
+        return;
+      }
+      deverrouille = true;
+    }
+    reglages.mode = choix.value;
+    ecrireReglages(reglages);
+    appliquerReglages(reglages);
+    for (const puce of fenetre.querySelectorAll('.puce-mode')) puce.classList.toggle('actif', puce.contains(choix));
+    changerMode?.();
+  }
+
   /** Listes partagées (adresses mail, réglages swipos) : protégées par le code de sécurité. */
   async function modifierListes() {
     if (!deverrouille && !(await demanderCode('Listes partagées'))) return;
@@ -195,6 +221,25 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     ouvrirFenetreListes(() => {
       const zone = fenetre.querySelector('[data-zone="compte-listes"]');
       if (zone) zone.textContent = compteListes();
+    });
+  }
+
+  /**
+   * Libellés des points (0.95.0, Expert) : ceux de départ ne se modifient pas (leur couleur oui),
+   * ceux ajoutés oui ; enregistrés dans les listes partagées (Drive).
+   */
+  function modifierLibelles(sorte) {
+    const titres = { lignes: 'Libellés des lignes (L-…)', points: 'Libellés des points (P-…)', aires: 'Libellés des aires (A-…)' };
+    const tous = lireLibelles();
+    ouvrirFenetreLibelles({
+      titre: titres[sorte],
+      liste: tous[sorte],
+      fixes: abreviationsDepart(sorte),
+      couleurParDefaut: { lignes: '#ea580c', points: '#15803d', aires: '#0891b2' }[sorte],
+      enregistrer: (liste) => {
+        enregistrerLibelles({ ...tous, [sorte]: liste });
+        changerMode?.();
+      },
     });
   }
 

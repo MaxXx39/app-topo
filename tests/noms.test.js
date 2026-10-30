@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { lirePoints } from '../src/topo/import-points.js';
-import { lireListeDeNoms, ecrireListeDeNoms, verifierSurface, detecterSeries, nomSuivant } from '../src/topo/noms.js';
+import { lireListeDeNoms, ecrireListeDeNoms, verifierSurface, detecterSeries, nomSuivant, nomPrecedent } from '../src/topo/noms.js';
 import { creerSurface } from '../src/topo/surface.js';
 
 const { points } = lirePoints(readFileSync(new URL('../exemples/stock_export.txt', import.meta.url), 'utf-8'));
@@ -138,5 +138,15 @@ describe('nomSuivant', () => {
   it('renvoie null au dernier point ou sans numéro', () => {
     expect(nomSuivant('P3', ['P1', 'P2', 'P3'])).toBeNull();
     expect(nomSuivant('borne', ['borne', 'borne2'])).toBeNull();
+  });
+});
+
+describe('nomPrecedent', () => {
+  it('donne le point d\'avant (même début, numéro plus petit le plus proche)', () => {
+    expect(nomPrecedent('P2', ['P1', 'P2', 'P3'])).toBe('P1');
+    expect(nomPrecedent('P4', ['P1', 'P4', 'Q3'])).toBe('P1');
+    expect(nomPrecedent('L-HT-1-3', ['L-HT-1-1', 'L-HT-1-2', 'L-HT-2-2'])).toBe('L-HT-1-2');
+    expect(nomPrecedent('P1', ['P1', 'P2'])).toBeNull();
+    expect(nomPrecedent('borne', ['borne'])).toBeNull();
   });
 });

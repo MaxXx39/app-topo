@@ -1,5 +1,10 @@
 package ch.apptopo
 
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.webkit.JavascriptInterface
 import java.util.Base64
 
@@ -164,5 +169,25 @@ class PontAndroid(private val ecran: EcranPrincipal) {
     @JavascriptInterface
     fun activerToucheVolume(actif: Boolean) {
         ecran.activerToucheVolume(actif)
+    }
+
+    /**
+     * Vibration (0.90.0) : durées en millisecondes séparées par des virgules, vibration et pause
+     * l'une après l'autre (ex. "60" ou "80,80,80"). Plus sûr que navigator.vibrate, refusé par la
+     * page quand le point est pris par la touche volume −.
+     */
+    @JavascriptInterface
+    fun vibrer(motif: String) {
+        val durees = motif.split(",").mapNotNull { it.trim().toLongOrNull() }.filter { it in 0..2000 }
+        if (durees.isEmpty()) return
+        val vibreur = if (Build.VERSION.SDK_INT >= 31) {
+            (ecran.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            ecran.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+        if (vibreur == null || !vibreur.hasVibrator()) return
+        // Le motif d'Android commence par une pause : 0 ms, puis vibration, pause, vibration…
+        vibreur.vibrate(VibrationEffect.createWaveform(longArrayOf(0L) + durees.toLongArray(), -1))
     }
 }

@@ -112,3 +112,14 @@ describe('Export du DXF recalé', () => {
     expect(aciLePlusProche('#0000fe')).toBe(5);
   });
 });
+
+describe('étapes du recalage (0.92.0)', () => {
+  it('compte 4 étapes pour 2 points, puis 2 par point en plus', async () => {
+    const { etapeRecalage } = await import('../src/topo/recalage.js');
+    expect(etapeRecalage(0, false)).toEqual({ numero: 1, total: 4, sorte: 'dxf', rang: 1, pret: false });
+    expect(etapeRecalage(0, true)).toMatchObject({ numero: 2, sorte: 'cale', rang: 1 });
+    expect(etapeRecalage(1, false)).toMatchObject({ numero: 3, sorte: 'dxf', rang: 2 });
+    expect(etapeRecalage(1, true)).toMatchObject({ numero: 4, total: 4, sorte: 'cale' });
+    expect(etapeRecalage(2, false)).toMatchObject({ numero: 5, total: 5, pret: true, rang: 3 });
+  });
+});

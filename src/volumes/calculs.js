@@ -20,7 +20,7 @@
 //   auto,          // vrai : créé par l'appli (voir calculsAutomatiques), pas encore modifié à la main
 // }
 // Unités : m, m², m³.
-import { nouvelIdentifiant, estImportee, nomNature, NATURES } from '../topo/surface.js';
+import { nouvelIdentifiant, estImportee, nomNature, NATURES, peutEtreStock, peutEtreTerrain } from '../topo/surface.js';
 import { calculerVolumeSurface } from '../topo/volume.js';
 import { comparerSurfaces } from '../topo/comparaison.js';
 import { formaterNombre } from '../topo/format.js';
@@ -50,8 +50,8 @@ export function choisirSorte(calcul, sorte, surfaces, calculs) {
   if (sorte === 'stock') {
     calcul.uneSeule = true;
     calcul.surface2Id = null;
-    if (!surfaces.some((s) => s.id === calcul.surface1Id && s.nature === 'stock')) {
-      calcul.surface1Id = surfaces.find((s) => s.nature === 'stock')?.id ?? null;
+    if (!surfaces.some((s) => s.id === calcul.surface1Id && peutEtreStock(s))) {
+      calcul.surface1Id = surfaces.find((s) => peutEtreStock(s))?.id ?? null;
     }
     const stock = surfaces.find((s) => s.id === calcul.surface1Id);
     calcul.base = stock && estImportee(stock) ? 'altitude' : (calcul.base ?? 'contour');
@@ -59,7 +59,7 @@ export function choisirSorte(calcul, sorte, surfaces, calculs) {
   } else {
     calcul.uneSeule = false;
     calcul.zone = { type: 'toute' };
-    calcul.surface2Id ??= surfaces.filter((s) => s.nature === 'terrain' && s.id !== calcul.surface1Id).at(-1)?.id ?? null;
+    calcul.surface2Id ??= surfaces.filter((s) => peutEtreTerrain(s) && s.id !== calcul.surface1Id).at(-1)?.id ?? null;
     if (!calcul.nom) calcul.nom = nomDeVolumeLibre(calculs);
   }
 }
@@ -77,7 +77,7 @@ export function preremplir(calcul, surface1, surfaces) {
   calcul.surface1Id = surface1.id;
   calcul.uneSeule = surface1.nature === 'stock' && !estImportee(surface1);
   calcul.base = 'contour';
-  const terrains = surfaces.filter((s) => s.nature === 'terrain' && s.id !== surface1.id);
+  const terrains = surfaces.filter((s) => peutEtreTerrain(s) && s.id !== surface1.id);
   calcul.surface2Id = calcul.uneSeule ? null : (terrains.at(-1)?.id ?? null);
   calcul.zone = { type: 'toute' };
 }

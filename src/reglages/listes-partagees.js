@@ -32,7 +32,9 @@ export function nettoyerListes(listes) {
       motDePasse: String(s.motDePasse ?? ''),
     }))
     .filter((s) => s.hote && s.utilisateur);
-  return { adresses, swipos, modifieLe: listes?.modifieLe ?? null };
+  // Libellés des points (0.95.0, voir leve/libelles.js) : gardés tels quels s'ils existent.
+  const libelles = listes?.libelles && typeof listes.libelles === 'object' ? listes.libelles : undefined;
+  return { adresses, swipos, ...(libelles ? { libelles } : {}), modifieLe: listes?.modifieLe ?? null };
 }
 
 /** Listes de cet appareil. */

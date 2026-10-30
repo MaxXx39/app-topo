@@ -67,7 +67,7 @@ export function accrocher(mode, position, tolerance, { lignes = [], cercles = []
 /**
  * Implantation d'une ligne : le trait du plan DXF le plus proche du doigt (à moins de "tolerance"
  * m), en entier (une polyligne fermée revient à son premier sommet), et le n° du segment touché.
- * Renvoie { sommets: [{ est, nord, altitude }], segment } ou null.
+ * Renvoie { sommets: [{ est, nord, altitude }], segment, ligne (celle des lignes données) } ou null.
  */
 export function accrocherTrait(position, tolerance, lignes = []) {
   let meilleur = null;
@@ -75,10 +75,10 @@ export function accrocherTrait(position, tolerance, lignes = []) {
     const sommets = ligne.ferme && ligne.points.length >= 3 ? [...ligne.points, ligne.points[0]] : ligne.points;
     for (let i = 0; i + 1 < sommets.length; i++) {
       const { d } = projeterSurSegment(position, sommets[i], sommets[i + 1]);
-      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, sommets, segment: i };
+      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, sommets, segment: i, ligne };
     }
   }
-  return meilleur ? { sommets: meilleur.sommets, segment: meilleur.segment } : null;
+  return meilleur ? { sommets: meilleur.sommets, segment: meilleur.segment, ligne: meilleur.ligne } : null;
 }
 
 /**

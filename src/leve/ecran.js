@@ -16,12 +16,13 @@ import { aAcces, estModeBase } from '../reglages/reglages.js';
 import { demanderCode } from '../outils/code.js';
 import { demanderTexte } from '../outils/choix.js';
 import { ouvrirChoixLevees } from './fenetre-levees.js';
+import { ouvrirFenetreSuites } from './fenetre-suites.js';
 import { htmlControle } from './controle-ecran.js';
 import { htmlLame, rafraichirLame } from './lame-ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
 import { formaterNombre } from '../topo/format.js';
-import { ROLES_LEVE } from '../topo/leve-direct.js';
+import { ROLES_LEVE, debutDeNom } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
 import { svgCoupeTalus } from './coupe-talus.js';
@@ -32,7 +33,6 @@ import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne
 // (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
 const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
 import { ouvrirFenetrePointTape, ouvrirListePoints } from './fenetres-points.js';
-import { ouvrirFenetreLibelles } from './fenetre-libelles.js';
 
 // Mode Contrôler : ce qu'on implante (point, ligne, talus, surface), vue des coupes, longueurs.
 const IMPLANTATIONS = [
@@ -65,7 +65,7 @@ const NATURES_TERRAIN = [
 // [mot, nom complet (bulle, lecture d'écran), dessin].
 export const ACCROCHES = {
   // Implantation d'une ligne : la ligne entière du plan DXF (polyligne).
-  trait: ['Ligne DXF', 'Ligne entière du plan DXF (polyligne)', '<path class="repere-trait" d="M3 18 9 8l6 6 6-9" /><circle cx="3" cy="18" r="1.6" /><circle cx="21" cy="5" r="1.6" />'],
+  trait: ['Ligne', 'Ligne entière : DXF, ligne de rupture ou contour d\'un levé, côté de dessin', '<path class="repere-trait" d="M3 18 9 8l6 6 6-9" /><circle cx="3" cy="18" r="1.6" /><circle cx="21" cy="5" r="1.6" />'],
   // Point du projet : le même rond gris que les points du plan, entouré d'ambre (accroché).
   point: ['Point', 'Point du projet (levé ou importé)', '<circle class="anneau-accroche" cx="12" cy="12" r="8" /><circle class="rond-point" cx="12" cy="12" r="4.5" />'],
   sommet: ['Sommet', 'Sommet d\'une ligne du plan DXF', '<path d="M3 20 12 6l9 14" /><rect class="repere" x="9" y="3" width="6" height="6" />'],
@@ -101,13 +101,13 @@ const LETTRES_METRE = { aire: 'A', longueur: 'L' };
 /**
  * Crée l'écran dans "conteneur". Les actions sont faites par main.js via "actions" :
  * ouvrirRecepteur() (fenêtre du récepteur, voir recepteur.js), nouvelleSurface(nature), choisirStock(id), choisirRole(role), nouvelleLigne(), basculerFermeture(), prendrePoint(nom),
- * annulerDernierPoint(), choisirLibelle(abréviation), enregistrerLibelles({ lignes, points, aires }),
+ * annulerDernierPoint(), choisirLibelle(abréviation),
  * choisirMode(mode), choisirSurfaceControle(id), choisirVueCoupes(vue),
  * choisirLongueurCoupe(m), choisirExagerationCoupe(facteur), choisirSourceOrientation(source),
  * choisirImplantation(quoi), choisirAccroche(mode), trouverPoint(nom), choisirGuidage('rx2' ou 'nseo'),
  * implanterChoix({ nom, altitude }),
  * creerPointAImplanter({ nom, altitude }), implanterPoint(id), supprimerPointAImplanter(id),
- * arreterImplantation(), oublierChoix(), enregistrerImplantation(), exporterImplantations(),
+ * arreterImplantation(), oublierChoix(), enregistrerImplantation(),
  * ligne : retirerDernierPointLigne(), implanterPointsLigne(), changerLigne(), choisirSegment('tout',
  * 'segment', 'precedent' ou 'suivant'), inverserLigne(), reglerLigne('decalage', 'debut' ou 'fin', texte)
  * Renvoie { afficher(donnees), prendreDepuisTouche(), enregistrerDepuisTouche(), mettreAJourRecepteur(etat, direct),
@@ -193,16 +193,8 @@ export function creerEcranLeve(conteneur, actions) {
       dessiner();
       return;
     }
-    if (action === 'ouvrirLibelles') {
-      // Fenêtre à part, « Enregistrer » toujours visible en bas (voir fenetre-libelles.js).
-      const sorte = sorteDuRole();
-      const titres = { lignes: 'Libellés des lignes (L-…)', points: 'Libellés des points (P-…)', aires: 'Libellés des aires (A-…)' };
-      ouvrirFenetreLibelles({
-        titre: titres[sorte],
-        liste: donnees.libelles[sorte],
-        couleurParDefaut: { lignes: '#ea580c', points: '#15803d', aires: '#0891b2' }[sorte],
-        enregistrer: (liste) => actions.enregistrerLibelles({ ...donnees.libelles, [sorte]: liste }),
-      });
+    if (action === 'lignesDepuisSuites') {
+      ouvrirFenetreSuites({ suites: donnees.suites, stock: donnees.stock?.nature === 'stock' && (donnees.elements?.contour?.noms.length ?? 0) === 0, creer: (choisies, role) => actions.creerLignesDepuisSuites(choisies, role) });
       return;
     }
     // --- Mode Contrôler ---
@@ -223,7 +215,17 @@ export function creerEcranLeve(conteneur, actions) {
       ouvrirFenetrePointTape({ nomPropose: '', ajouter: (valeurs) => actions.ajouterPointControleTape(valeurs) });
       return;
     }
-    if (action === 'nouvelleSurface') choixNatureOuvert = false;
+    // Nouveau levé (0.90.0) : la fenêtre du nom s'ouvre tout de suite (sinon tous s'appellent pareil).
+    if (action === 'nouvelleSurface') {
+      choixNatureOuvert = false;
+      actions.nouvelleSurface(bouton.dataset.valeur);
+      const levee = donnees.stock;
+      if (!levee) return;
+      demanderTexte({ titre: 'Nom du nouveau levé', valeur: levee.nom }).then((nom) => {
+        if (nom && nom !== levee.nom) actions.renommerLevee(levee.id, nom);
+      });
+      return;
+    }
     if (action === 'implanterChoix' || action === 'creerPointAImplanter') {
       const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`)?.value ?? '';
       actions[action]({ nom: champ('nom-implantation'), altitude: champ('altitude-implantation') });
@@ -251,7 +253,6 @@ export function creerEcranLeve(conteneur, actions) {
     if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.champ === 'surface-lame') actions.choisirSurfaceLame(cible.value);
     else if (cible.dataset.toleranceLame) actions.reglerToleranceLame(cible.dataset.toleranceLame, cible.value);
-    else if (cible.dataset.profilLame) actions.reglerProfilLame(cible.dataset.profilLame, cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
@@ -372,9 +373,7 @@ export function creerEcranLeve(conteneur, actions) {
     const lignes = nordEnHaut
       ? [`${avance >= 0 ? '↑ Avance (Nord)' : '↓ Recule (Sud)'} ${m(avance)}`, `${droite >= 0 ? '→ Droite (Est)' : '← Gauche (Ouest)'} ${m(droite)}`]
       : [`${avance >= 0 ? '↑ Avance' : '↓ Recule'} ${m(avance)}`, `${droite >= 0 ? '→ Droite' : '← Gauche'} ${m(droite)}`];
-    const hauteur = g.ecartAltitude == null
-      ? ''
-      : `<span class="hauteur-guidage ${g.classeAltitude}">${g.ecartAltitude >= 0 ? '↑ Monter' : '↓ Descendre'} ${m(g.ecartAltitude)}</span>`;
+    const hauteur = texteHauteur(g);
     cibleAffichee = cibleSelonDistance(distance, cibleAffichee);
     // Flèche vers le point : par rapport à la direction regardée, sinon par rapport au nord.
     const angle = nordEnHaut ? direction : direction - azimut;
@@ -382,15 +381,23 @@ export function creerEcranLeve(conteneur, actions) {
     // nord toujours marqué dessus ; loin : le plan en haut, la flèche avec les textes.
     const nord = nordEnHaut ? 0 : -azimut;
     montrerCibleEnHaut(haut, cibleAffichee > 0 ? { svg: svgCible(cibleAffichee, avance, droite, couleurCanne(distance), nordEnHaut, nord), classe: g.classe } : null);
-    const dessin = cibleAffichee > 0
-      ? ''
-      : `<svg class="fleche-guidage" viewBox="-20 -20 40 40" aria-hidden="true"><path d="M0 -17 11 6 0 0 -11 6Z" transform="rotate(${angle.toFixed(1)})" /></svg>`;
-    zone.className = `guidage-direct ${g.classe} ${cibleAffichee > 0 ? 'avec-cible' : ''}`;
+    // 0.90.1 : la flèche reste aussi près du point (avec la cible en haut). À gauche avance / droite,
+    // au milieu la flèche, à droite monter / descendre en grand.
+    const dessin = `<svg class="fleche-guidage" viewBox="-20 -20 40 40" aria-hidden="true"><path d="M0 -17 11 6 0 0 -11 6Z" transform="rotate(${angle.toFixed(1)})" /></svg>`;
+    zone.className = `guidage-direct guidage-3 ${g.classe}`;
     zone.innerHTML = `
+      <span class="cote-plan">
+        <span class="lignes-guidage">${lignes.map((texte) => `<span>${texte}</span>`).join('')}</span>
+        <span class="distance-guidage">${formaterNombre(distance)} m${nordEnHaut ? ' · nord en haut' : ''}</span>
+      </span>
       ${dessin}
-      <span class="lignes-guidage">${lignes.map((texte) => `<span>${texte}</span>`).join('')}</span>
-      <span class="distance-guidage">${formaterNombre(distance)} m${nordEnHaut ? ' · nord en haut' : ''}</span>
-      ${hauteur}`;
+      <span class="cote-hauteur">${hauteur}</span>`;
+  }
+
+  /** Monter / descendre (0.90.1) : sur deux lignes, en grand, à droite du guidage ; rien sans altitude. */
+  function texteHauteur(g) {
+    if (g.ecartAltitude == null) return '<span class="hauteur-guidage sans-altitude">pas d\'altitude</span>';
+    return `<span class="hauteur-guidage ${g.classeAltitude}"><span>${g.ecartAltitude >= 0 ? '↑ Monter' : '↓ Descendre'}</span><strong>${formaterNombre(Math.abs(g.ecartAltitude))} m</strong></span>`;
   }
 
   /**
@@ -430,7 +437,7 @@ export function creerEcranLeve(conteneur, actions) {
       if (!cadre) continue;
       const coupe = c?.coupes?.[sens];
       cadre.innerHTML = coupe
-        ? svgCoupeDirecte({ ...TITRES_COUPES[sens], ...coupe, classe: c.classe, sens, exageration: donnees.controle.exagerationCoupe })
+        ? svgCoupeDirecte({ ...TITRES_COUPES[sens], ...coupe, classe: c.classe, sens, exageration: donnees.controle.exagerationCoupe, grille: aAcces('expert') })
         : `<p class="aide">${TITRES_COUPES[sens].titre} : ${c?.messageCoupes ?? 'en attente de la position'}</p>`;
     }
   }
@@ -447,7 +454,7 @@ export function creerEcranLeve(conteneur, actions) {
     const { controle: reglages, surfaces } = donnees;
     // Coupes directes : en Base, dans l'axe seulement (perpendiculaire, longueur et hauteurs dès Intermédiaire).
     const vue = estModeBase() ? 'axe' : reglages.vueCoupes;
-    const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => aAcces('expert') || !IMPLANTATIONS_EXPERT.includes(cle)), reglages.implantation)} ${bulle('implanter')}</div>`;
+    const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => aAcces('expert') || !IMPLANTATIONS_EXPERT.includes(cle)), reglages.implantation)} ${bulle('implanter')}</div>${caseSeulement()}`;
     // Rien de choisi : on le rappelle bien en vue (après « ← », on ne savait plus quoi faire).
     const imp = donnees.implanter;
     if (reglages.implantation === 'point') {
@@ -478,8 +485,14 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="ligne-choix seulement-intermediaire"><span>Coupes</span>${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}</div>
       <div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
       <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
-      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap GNSS'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
       <p class="aide" data-vivant="orientation"></p>`;
+  }
+
+  /** Case « Seulement l'élément à implanter » (0.90.1) : sur le plan, rien d'autre que lui. */
+  function caseSeulement() {
+    const actif = Boolean(donnees.controle.seulementElement);
+    return `<button type="button" class="case-seulement ${actif ? 'actif' : ''}" data-action="basculerSeulementElement" aria-pressed="${actif}">
+      <span class="carre-case" aria-hidden="true">${actif ? '✓' : ''}</span>Seulement l'élément à implanter</button>`;
   }
 
   /** Bandeau sarcelle bien visible : ce qu'il faut faire maintenant (flèche vers le plan). */
@@ -505,7 +518,8 @@ export function creerEcranLeve(conteneur, actions) {
     const outilsPoint = active === 'point'
       ? `<span class="separateur-accroche"></span>
         ${enLigne ? '' : '<button type="button" class="bouton-outil-accroche" data-action="ouvrirFormulairePoint" title="Taper un point (Est, Nord, H)">+ Point</button>'}
-        <button type="button" class="bouton-outil-accroche" data-action="ouvrirListePoints" title="Choisir un point dans la liste du projet">Liste</button>`
+        <button type="button" class="bouton-outil-accroche" data-action="ouvrirListePoints" title="Choisir un point dans la liste du projet">Liste</button>
+        ${enLigne ? '' : '<button type="button" class="bouton-outil-accroche seulement-expert" data-action="basculerPlusProche" title="Le plus proche : implanter le point du plan le plus proche, la cible suit quand tu te déplaces">⌖ Proche</button>'}`
       : '';
     return `<div class="barre-accroche ${enLigne ? 'accroches-ligne' : ''} ${accrochesOuvertes ? 'ouverte' : ''}">
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
@@ -544,12 +558,10 @@ export function creerEcranLeve(conteneur, actions) {
       ${lienExport()}`;
   }
 
-  /** « 3 implantation(s) enregistrée(s) · exporter (CSV) », ou rien. */
+  /** « 3 implantation(s) enregistrée(s) », ou rien (l'export est dans Projet › Exporter, 0.92.1). */
   function lienExport() {
     const nombre = donnees.implanter.nbImplantations;
-    return nombre > 0
-      ? `<p class="aide seulement-expert">${nombre} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
-      : '';
+    return nombre > 0 ? `<p class="aide seulement-expert">${nombre} implantation(s) enregistrée(s)</p>` : '';
   }
 
   /**
@@ -579,14 +591,11 @@ export function creerEcranLeve(conteneur, actions) {
     if (abscisse < 0) le_long = [`−${m(abscisse)}`];
     else if (abscisse > longueur) le_long = [`Après la fin : ${m(abscisse - longueur)}`];
     else le_long = [`début ${m(abscisse)}`, `fin ${m(reste)}`];
-    const hauteur = g.ecartAltitude == null
-      ? ''
-      : `<span class="hauteur-guidage ${g.classeAltitude}">${g.ecartAltitude >= 0 ? '↑ Monter' : '↓ Descendre'} ${m(g.ecartAltitude)}</span>`;
-    zone.className = `guidage-direct guidage-ligne ${g.classe}`;
+    zone.className = `guidage-direct guidage-3 avec-couloir ${g.classe}`;
     zone.innerHTML = `
+      <span class="cote-plan"><span class="lignes-guidage"><span>${sens}</span>${le_long.map((texte) => `<span>${texte}</span>`).join('')}</span></span>
       ${svgCouloir(bandeCouloir, ecart, abscisse, longueur, couleurCanne(Math.abs(ecart)))}
-      <span class="lignes-guidage"><span>${sens}</span>${le_long.map((texte) => `<span>${texte}</span>`).join('')}</span>
-      ${hauteur}`;
+      <span class="cote-hauteur">${texteHauteur(g)}</span>`;
   }
 
   /**
@@ -657,12 +666,15 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="entete-guidage">
         <button type="button" class="bouton-retour" data-action="${ligne ? 'changerLigne' : autocontrole ? 'arreterControle' : 'arreterImplantation'}" title="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}" aria-label="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
+        ${!ligne && !autocontrole && imp.precedent && !imp.plusProche ? `<button type="button" class="bouton-suivant" data-action="implanterPrecedent" title="Implanter le point précédent : ${echapper(imp.precedent)}" aria-label="Point précédent : ${echapper(imp.precedent)}">◀ ${echapper(imp.precedent)}</button>` : ''}
         <p class="titre-vue-guidage">${titre}</p>
         ${ligne ? '<button type="button" class="bouton-retour" data-action="inverserLigne" title="Inverser le sens" aria-label="Inverser le sens">⇄</button>' : ''}
-        ${!ligne && !autocontrole && imp.suivant ? `<button type="button" class="bouton-suivant" data-action="implanterSuivant" title="Implanter le point suivant : ${echapper(imp.suivant)}" aria-label="Point suivant : ${echapper(imp.suivant)}">${echapper(imp.suivant)} ▶</button>` : ''}
+        ${!ligne && !autocontrole ? `<button type="button" class="bouton-suivant bouton-plus-proche seulement-expert ${imp.plusProche ? 'actif' : ''}" data-action="basculerPlusProche" aria-pressed="${imp.plusProche}" title="Le plus proche : la cible suit le point du plan le plus proche">⌖ Proche</button>` : ''}
+        ${!ligne && !autocontrole && imp.suivant && !imp.plusProche ? `<button type="button" class="bouton-suivant" data-action="implanterSuivant" title="Implanter le point suivant : ${echapper(imp.suivant)}" aria-label="Point suivant : ${echapper(imp.suivant)}">${echapper(imp.suivant)} ▶</button>` : ''}
         <button type="button" class="bouton-retour ${ouverts ? 'actif' : ''}" data-action="basculerReglagesGuidage" title="Réglages de l'implantation" aria-label="Réglages de l'implantation" aria-expanded="${ouverts}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>
       </div>
+      ${autocontrole ? '' : caseSeulement()}
       ${ouverts ? (talus ? reglagesTalus() : reglagesGuidage(ligne)) : ''}
       ${ligne ? detailLigne() : detailPoint()}
       ${guidage}
@@ -769,7 +781,6 @@ export function creerEcranLeve(conteneur, actions) {
     const l = imp.ligne;
     return `<div class="reglages-guidage">
       <div class="ligne-choix"><span>Guidage</span>${boutonsChoix('choisirGuidage', GUIDAGES, reglages.guidage)}</div>
-      <div class="ligne-choix"><span>Orientation</span>${boutonsChoix('choisirSourceOrientation', [['rx2', 'Cap GNSS'], ['marche', 'Marche']], reglages.sourceOrientation)}</div>
       ${ligne && l.nbSegments > 1 ? `<div class="ligne-choix"><span>Ligne</span>${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment par segment']], l.segment == null ? 'tout' : 'segment')}</div>` : ''}
       ${ligne ? `<label class="champ-decalage">Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
       <p class="aide" data-vivant="orientation"></p>
@@ -887,7 +898,7 @@ export function creerEcranLeve(conteneur, actions) {
     if (donnees.metre && LETTRES_METRE[donnees.role]) {
       const e = donnees.elementMetre;
       return `<div class="outils-ligne outils-metre">
-        <span>${LETTRES_METRE[donnees.role]}-${echapper(e.libelle)}-${e.numero} · ${e.nbPoints} pt(s)</span>
+        <span>${echapper(debutDeNom(LETTRES_METRE[donnees.role], e.libelle))}${e.numero} · ${e.nbPoints} pt(s)</span>
         <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${e.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle</button>
       </div>`;
     }
@@ -904,7 +915,7 @@ export function creerEcranLeve(conteneur, actions) {
     return `<div class="element-en-cours role-ligne">
       <span class="titre-element">Ligne en cours</span>
       <div class="corps-element">
-        <strong>L-${echapper(ligne.libelle ?? '')}-${ligne.numero}</strong><span>${ligne.nbPoints} pt(s)</span>
+        <strong>${echapper(debutDeNom('L', ligne.libelle))}${ligne.numero}</strong><span>${ligne.nbPoints} pt(s)</span>
         <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle ligne</button>
         <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
           ${ligne.fermee ? '✓ Ligne fermée' : 'Fermer ligne'}</button>
@@ -924,10 +935,10 @@ export function creerEcranLeve(conteneur, actions) {
     const liste = donnees.libelles[sorte];
     const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
     return `<div class="libelles-terrain seulement-intermediaire pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
+      <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong>Aucun</strong><span>sans libellé</span></button>
       ${liste.map(([abreviation, signification, couleur]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
           <strong>${couleur ? `<i class="pastille-libelle" style="background: ${couleur}"></i>` : ''}${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
-      <button type="button" class="bouton-crayon-libelles seulement-intermediaire" data-action="ouvrirLibelles" title="Modifier les libellés" aria-label="Modifier les libellés">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
+
     </div>
 `;
   }
@@ -999,13 +1010,19 @@ export function creerEcranLeve(conteneur, actions) {
           <p class="titre-choix">Photos (${photos.length}) ${bulle('photos')}</p>
           <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
               <img src="${photo.miniature}" alt="${echapper(photo.legende || donnees.stock.nom)}" />
+              <span class="point-photo">📷 ${photo.point ? echapper(photo.point) : photo.attentePoint ? 'prochain point' : '—'}</span>
               <input type="text" data-champ="legende-photo-levee" data-id="${photo.id}" value="${echapper(photo.legende ?? '')}" placeholder="Légende" aria-label="Légende de la photo" />
               <button type="button" class="bouton-lien" data-action="supprimerPhotoLevee" data-valeur="${photo.id}">supprimer</button>
             </figure>`).join('')}</div>
         </div>`
       : '';
     const elements = listeElements();
-    return elements || triangles || listePhotos ? `<div class="bas-du-leve">${elements}${triangles}${listePhotos}</div>` : '';
+    // Lignes à partir des suites de points (0.95.0, Intermédiaire) : b1, b2, b3… → une ligne.
+    const nbSuites = donnees.suites?.length ?? 0;
+    const suites = nbSuites > 0
+      ? `<div class="ligne-outils seulement-intermediaire"><button type="button" class="bouton-secondaire" data-action="lignesDepuisSuites">+ Lignes depuis les suites de points (${nbSuites})</button></div>`
+      : '';
+    return elements || triangles || listePhotos || suites ? `<div class="bas-du-leve">${suites}${elements}${triangles}${listePhotos}</div>` : '';
   }
 
   /**
@@ -1069,7 +1086,7 @@ export function creerEcranLeve(conteneur, actions) {
      */
     prendreDepuisTouche() {
       const bouton = conteneur.querySelector('[data-action="prendre"]');
-      if (!bouton) return 'pas de surface en cours';
+      if (!bouton) return 'pas de levé en cours';
       if (bouton.disabled) return etat?.connecte ? etat.raison ?? 'pas prêt' : 'récepteur non connecté';
       actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '');
       return null;

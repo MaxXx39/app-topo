@@ -176,3 +176,16 @@ describe('dessin des coupes en direct', () => {
     expect(svgCoupeDirecte({ lignes: [], demiLongueur: 5, altitudeCanne: null, titre: 'Axe', gauche: '', droite: '' })).toContain('Pas de surface ici');
   });
 });
+
+describe('point le plus proche (0.90.1)', () => {
+  it('choisit le plus proche, sans changer de cible pour quelques centimètres', async () => {
+    const { pointLePlusProche } = await import('../src/topo/implantation.js');
+    const points = [{ nom: 'A', est: 0, nord: 0 }, { nom: 'B', est: 10, nord: 0 }, { nom: 'C', est: 0, nord: 'x' }];
+    expect(pointLePlusProche({ est: 2, nord: 1 }, points).nom).toBe('A');
+    expect(pointLePlusProche({ est: 8, nord: 0 }, points).nom).toBe('B');
+    // À mi-chemin (B à 4.9 m, A cible à 5.1 m) : on garde A ; plus près de B : on passe à B.
+    expect(pointLePlusProche({ est: 5.1, nord: 0 }, points, points[0]).nom).toBe('A');
+    expect(pointLePlusProche({ est: 6, nord: 0 }, points, points[0]).nom).toBe('B');
+    expect(pointLePlusProche({ est: 0, nord: 0 }, [])).toBeNull();
+  });
+});

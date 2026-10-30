@@ -15,7 +15,6 @@ import { estEnMn95 } from '../topo/dxf-plan.js';
 import { rotationLisible } from '../topo/recalage.js';
 import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '../outils/formulaire-point.js';
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
-import { demanderCode } from '../outils/code.js';
 import { COULEURS_LISTES } from '../plan/listes-points.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
@@ -29,8 +28,8 @@ import { pointsDuDessin } from '../topo/dessin.js';
  * montrerTousCalquesDxf(id, visible), ajouterPointTape({ nom, est, nord, altitude }) (renvoie
  * { erreur } ou rien), commencerPointage() (ajouter des points en touchant le plan DXF),
  * importerPointsControle(fichier) (renvoie { erreur } ou rien), importerSurface(fichier) (renvoie
- * le message à afficher, en HTML), renommerSurfaceProjet(id, nom), supprimerSurfaceProjet(id),
- * exporterListe(type ('leve', 'dessin' ou 'controle'), id)
+ * le message à afficher, en HTML), renommerSurfaceProjet(id, nom), supprimerSurfaceProjet(id).
+ *
  * Renvoie { afficher(projet, dernierImport, dernierPlan) }.
  */
 export function creerEcranImport(conteneur, actions) {
@@ -96,12 +95,10 @@ export function creerEcranImport(conteneur, actions) {
       return;
     }
     if (action === 'supprimer-leve') actions.supprimerLeve(id);
-    else if (action === 'exporter-liste') actions.exporterListe(bouton.dataset.type, id);
     else if (action === 'supprimer-surface-projet') actions.supprimerSurfaceProjet(id);
     else if (action === 'voir-plan') actions.voirPlanDxf(id);
     else if (action === 'supprimer-plan') actions.supprimerPlanDxf(id);
     else if (action === 'recaler-plan') actions.recalerPlanDxf(id);
-    else if (action === 'exporter-plan-recale') actions.exporterPlanRecale(id);
     else if (action === 'annuler-recalage') actions.annulerRecalagePlan(id);
     else if (action === 'tous-calques') actions.montrerTousCalquesDxf(id, bouton.dataset.visible === 'oui');
   });
@@ -109,10 +106,9 @@ export function creerEcranImport(conteneur, actions) {
   conteneur.addEventListener('change', async (evenement) => {
     const cible = evenement.target;
     if (cible.dataset.champ === 'fichier-controle' && cible.files[0]) {
-      // Points de contrôle : protégés par le code de sécurité, demandé une fois le fichier choisi.
+      // Points de contrôle : sans code de sécurité depuis 0.90.0 (demande du 29.10.2026).
       const fichier = cible.files[0];
       cible.value = '';
-      if (!(await demanderCode('Importer des points de contrôle'))) return;
       messageControle = (await actions.importerPointsControle(fichier))?.erreur ?? '';
       if (derniers) afficher(...derniers);
     } else if (cible.dataset.champ === 'couleur-liste') actions.colorerListe(cible.dataset.id, cible.value || null);
@@ -242,20 +238,18 @@ function ligneListe(projet, leve) {
       ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}
       <div class="ligne-outils">
         <span class="aide">${leve.points.length} points${date}</span>
-        <button type="button" class="bouton-lien bouton-lien-neutre seulement-intermediaire" data-action="exporter-liste" data-type="leve" data-id="${leve.id}">exporter</button>
         <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
       </div>
       ${tableauPoints(leve.points, 'Voir les points')}
     </div>`;
 }
 
-/** Surface importée (LandXML, DXF 3D) : nom à changer, nature, fichier d'origine, supprimer. */
+/** Surface importée (LandXML, DXF 3D) : nom à changer, fichier d'origine, supprimer. */
 function ligneSurfaceProjet(surface) {
-  const nature = { stock: 'stock', terrain: 'terrain', recollement: 'recollement', terrassement: 'terrassement' }[surface.nature] ?? '';
   return `<div class="ligne-leve liste-surface-projet">
       <input type="text" class="nom-leve" data-champ="nom-surface-projet" data-id="${surface.id}" value="${echapper(surface.nom)}" aria-label="Nom de la surface" />
       <div class="ligne-outils">
-        <span class="aide">${[nature, surface.type === 'dxf' ? 'DXF' : 'LandXML', surface.nomFichier].filter(Boolean).map(echapper).join(' · ')} · ${surface.faces?.length ?? 0} triangles</span>
+        <span class="aide">${[surface.type === 'dxf' ? 'DXF' : 'LandXML', surface.nomFichier].filter(Boolean).map(echapper).join(' · ')} · ${surface.faces?.length ?? 0} triangles</span>
         <button type="button" class="bouton-lien" data-action="supprimer-surface-projet" data-id="${surface.id}">supprimer</button>
       </div>
     </div>`;
@@ -308,7 +302,7 @@ function listesDessins(projet) {
       const points = pointsDuDessin(dessin, projet.dessins);
       return `<div class="ligne-leve liste-dessin">
       <strong>${echapper(dessin.nom)}</strong>
-      <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span><button type="button" class="bouton-lien bouton-lien-neutre seulement-intermediaire" data-action="exporter-liste" data-type="dessin" data-id="${dessin.id}">exporter</button></div>
+      <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span></div>
       ${tableauPoints(points, 'Voir les points')}
     </div>`;
     })
@@ -321,7 +315,7 @@ function listePointsControle(projet) {
   if (points.length === 0) return '';
   return `<div class="ligne-leve liste-controle">
       <strong>Points de contrôle</strong>
-      <div class="ligne-outils"><span class="aide">${points.length} points</span><button type="button" class="bouton-lien bouton-lien-neutre seulement-intermediaire" data-action="exporter-liste" data-type="controle" data-id="controle">exporter</button></div>
+      <div class="ligne-outils"><span class="aide">${points.length} points</span></div>
       ${tableauPoints(points, 'Voir les points de contrôle')}
     </div>`;
 }
@@ -372,7 +366,6 @@ function etatRecalage(plan) {
     const { gon } = rotationLisible(r.parametres.rotation);
     const ppm = (r.parametres.echelle - 1) * 1e6;
     return `<p class="etat-recalage recale">✓ Recalé en MN95 (${r.paires.filter((p) => p.actif !== false).length} points · rotation ${gon.toFixed(4)} gon · échelle ${ppm >= 0 ? '+' : ''}${ppm.toFixed(0)} ppm)
-      <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporter-plan-recale" data-id="${plan.id}">exporter le DXF recalé</button>
       <button type="button" class="bouton-lien" data-action="annuler-recalage" data-id="${plan.id}">annuler le recalage</button></p>`;
   }
   return plan.bornes && !estEnMn95(plan.bornes) ? '<p class="etat-recalage">Pas en MN95 : « recaler »</p>' : '';

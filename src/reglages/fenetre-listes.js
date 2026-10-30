@@ -67,7 +67,7 @@ export function ouvrirFenetreListes(quandEnregistre = () => {}) {
         ? `Adresse illisible : ${mauvaises.join(', ')}`
         : incomplets > 0 ? `${incomplets} réglage(s) swipos sans serveur ou sans utilisateur` : '';
       if (!erreur) {
-        ecrireListesPartagees({ adresses: lignes, swipos });
+        ecrireListesPartagees({ ...lireListesPartagees(), adresses: lignes, swipos });
         fenetre.close();
         quandEnregistre();
         return;
