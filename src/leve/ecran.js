@@ -107,7 +107,7 @@ const LETTRES_METRE = { aire: 'A', longueur: 'L' };
  * choisirImplantation(quoi), choisirAccroche(mode), trouverPoint(nom), choisirGuidage('rx2' ou 'nseo'),
  * implanterChoix({ nom, altitude }),
  * creerPointAImplanter({ nom, altitude }), implanterPoint(id), supprimerPointAImplanter(id),
- * arreterImplantation(), oublierChoix(), enregistrerImplantation(), exporterImplantations(),
+ * arreterImplantation(), oublierChoix(), enregistrerImplantation(),
  * ligne : retirerDernierPointLigne(), implanterPointsLigne(), changerLigne(), choisirSegment('tout',
  * 'segment', 'precedent' ou 'suivant'), inverserLigne(), reglerLigne('decalage', 'debut' ou 'fin', texte)
  * Renvoie { afficher(donnees), prendreDepuisTouche(), enregistrerDepuisTouche(), mettreAJourRecepteur(etat, direct),
@@ -567,12 +567,10 @@ export function creerEcranLeve(conteneur, actions) {
       ${lienExport()}`;
   }
 
-  /** « 3 implantation(s) enregistrée(s) · exporter (CSV) », ou rien. */
+  /** « 3 implantation(s) enregistrée(s) », ou rien (l'export est dans Projet › Exporter, 0.92.1). */
   function lienExport() {
     const nombre = donnees.implanter.nbImplantations;
-    return nombre > 0
-      ? `<p class="aide seulement-expert">${nombre} implantation(s) enregistrée(s) · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterImplantations">exporter (CSV)</button></p>`
-      : '';
+    return nombre > 0 ? `<p class="aide seulement-expert">${nombre} implantation(s) enregistrée(s)</p>` : '';
   }
 
   /**

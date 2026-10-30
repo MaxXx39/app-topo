@@ -24,6 +24,7 @@ import { creerEcranMesures } from './mesures/ecran.js';
 import { creerEcranDessin } from './dessin/ecran.js';
 import { gisement, directionTournee, passerParSommet, altitudeProchainSommet, altitudeSelonChoix, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt, surfaceDuDessin } from './topo/dessin.js';
 import { creerEcranExportMesures } from './export/ecran-mesures.js';
+import { creerModuleExport } from './export/module.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface } from './topo/coupe.js';
@@ -253,6 +254,7 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau panneau-projet" data-onglet="projets">
         <div id="projets"></div>
         <div id="importer"></div>
+        <div id="exporter-projet"></div>
         <div id="projets-suite"></div>
       </section>
       <section class="panneau" data-onglet="terrain">
@@ -272,12 +274,10 @@ document.querySelector('#app').innerHTML = `
         <h2>Volumes ${bulle('volumes')}</h2>
         <div id="volumes"></div>
         <div id="coupes" class="carte-section seulement-expert"></div>
-        <div id="export" class="carte-section"></div>
       </section>
       <section class="panneau" data-onglet="mesures">
         <h2>Mesures / métrés ${bulle('mesures')}</h2>
         <div id="mesures"></div>
-        <div id="export-mesures" class="carte-section"></div>
       </section>
       <section class="panneau" data-onglet="dessin">
         <h2>Dessin ${bulle('dessin')}</h2>
@@ -471,6 +471,18 @@ function calculDuPlan(surface) {
 
 // --- Écrans ---
 
+// Projet › Exporter (0.92.1) : tous les exports au même endroit (voir export/module.js).
+const moduleExport = creerModuleExport(document.querySelector('#exporter-projet'), {
+  exporterListe: (type, id) => exporterListe(type, id),
+  exporterControles: (format) => exporterControles(format),
+  exporterImplantations: () => exporterImplantations(),
+  exporterPlanRecale: (id) => exporterPlanRecale(id),
+  exporterProjet: () => {
+    const complet = completerProjet(projet);
+    telecharger(new Blob([ecrireFichierProjet(complet)], { type: 'application/json' }), `${nomDeFichierProjet(complet)}.topo.json`);
+  },
+});
+
 const ecranImport = creerEcranImport(document.querySelector('#importer'), {
   importerSurface: (fichier) => importerSurface(fichier),
   colorerListe: (id, couleur) => colorerListe(id, couleur),
@@ -554,12 +566,8 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
   reglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
   recalerPlanDxf: (id) => commencerRecalage(id),
   annulerRecalagePlan: (id) => annulerRecalage(id),
-  exporterPlanRecale: (id) => {
-    const choisi = projet.plansDxf.find((p) => p.id === id);
-    if (!choisi?.recalage?.applique) return;
-    const nom = String(choisi.nom).replace(/\.dxf$/i, '');
-    telecharger(new Blob([octetsDxf(genererDxfPlan(planRecale(choisi)))], { type: 'application/dxf' }), `${nom}_MN95.dxf`);
-  },
+  exporterPlanRecale,
+  exporterListe,
   // Point tapé (nom, Est, Nord, altitude facultative) : rangé dans le levé « Points ajoutés ».
   ajouterPointTape: (valeurs) => {
     const { point, erreur } = ajouterPointAjoute(projet, { ...valeurs, source: 'tape' });
@@ -594,40 +602,6 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), {
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
     editeurSurfaces.charger(projet.surfaces);
     modifie({ recadrer: true });
-  },
-  // Bouton « exporter » d'une liste (Intermédiaire, 0.79.0) : TXT, CSV (toutes les infos) ou DXF, puis
-  // Enregistrer, Envoyer par mail ou autrement (fenêtre « Exporter »).
-  exporterListe: (type, id) => {
-    let points;
-    let titre;
-    let roles = new Map();
-    if (type === 'controle') {
-      points = projet.pointsControle;
-      titre = 'Points de contrôle';
-    } else if (type === 'dessin') {
-      const dessin = dessinDe(id);
-      if (!dessin) return;
-      points = pointsDuDessin(dessin, projet.dessins);
-      titre = dessin.nom;
-    } else {
-      const leve = projet.leves.find((l) => l.id === id);
-      if (!leve) return;
-      points = leve.points;
-      titre = leve.nom;
-      roles = rolesDesPoints(leve.id);
-    }
-    // Nom du fichier : projet_liste, sans l'extension du fichier importé (« stock.csv » -> « stock »).
-    const base = `${nomDeFichierProjet(projet)}_${titre.replace(/\.[a-z0-9]{2,4}$/i, '')}`.replace(/[\\/:*?"<>|]/g, '_');
-    ouvrirFenetreExport({
-      titre,
-      formats: FORMATS_POINTS,
-      fabriquer: (format) => {
-        const { blob, extension } = fichierPoints(points, format, roles);
-        return { blob, nom: `${base}.${extension}` };
-      },
-      enregistrer: enregistrerFichier,
-      message: (texte) => afficherMessage(texte, 5000),
-    });
   },
   // Projet › Surface Projet (0.77.0) : surfaces importées (LandXML, DXF 3D).
   renommerSurfaceProjet: (id, nom) => {
@@ -1248,9 +1222,6 @@ const ecranLeve = recepteurDisponible()
         afficherMessage(`${cible.nom} implanté : écart ${formaterNombre(ecarts.distance)} m${hauteur}`, 4000);
         modifie();
       },
-      exporterImplantations: () => {
-        telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nomDeFichierProjet(projet)}_implantations.csv`);
-      },
       // --- Mode Contrôler (autocontrôle sur les points de contrôle du projet) ---
       controlerPoint: (id) => {
         const point = projet.pointsControle.find((p) => p.id === id);
@@ -1268,11 +1239,6 @@ const ecranLeve = recepteurDisponible()
         if (!controle) return;
         controle.remarque = texte.trim();
         modifie();
-      },
-      exporterControles: (format) => {
-        const nom = `${nomDeFichierProjet(projet)}_controles`;
-        if (format === 'pdf') telecharger(pdfControles(projet), `${nom}.pdf`);
-        else telecharger(new Blob(['\ufeff' + csvControles(projet.controles)], { type: 'text/csv;charset=utf-8' }), `${nom}.csv`);
       },
       enregistrerTolerances: (textes) => {
         const { tolerances, erreur } = lireTolerances(textes);
@@ -1412,6 +1378,65 @@ function envoyerImplantationAuPlan() {
         pointsLigne: enLigne ? implanter.pointsLigne : [],
       }
     : null);
+}
+
+// --- Exports (0.92.1 : tous dans Projet › Exporter, voir export/module.js) ---
+
+/** Plan DXF recalé, en MN95 (fenêtre « Exporter »). */
+function exporterPlanRecale(id) {
+  const choisi = projet.plansDxf.find((p) => p.id === id);
+  if (!choisi?.recalage?.applique) return;
+  const nom = String(choisi.nom).replace(/\.dxf$/i, '');
+  telecharger(new Blob([octetsDxf(genererDxfPlan(planRecale(choisi)))], { type: 'application/dxf' }), `${nom}_MN95.dxf`);
+}
+
+/**
+ * Une liste de points (Intermédiaire, 0.79.0) : TXT, CSV (toutes les infos) ou DXF, puis Enregistrer,
+ * Envoyer par mail ou autrement (fenêtre « Exporter »). type : 'leve', 'dessin' ou 'controle'.
+ */
+function exporterListe(type, id) {
+  let points;
+  let titre;
+  let roles = new Map();
+  if (type === 'controle') {
+    points = projet.pointsControle;
+    titre = 'Points de contrôle';
+  } else if (type === 'dessin') {
+    const dessin = dessinDe(id);
+    if (!dessin) return;
+    points = pointsDuDessin(dessin, projet.dessins);
+    titre = dessin.nom;
+  } else {
+    const leve = projet.leves.find((l) => l.id === id);
+    if (!leve) return;
+    points = leve.points;
+    titre = leve.nom;
+    roles = rolesDesPoints(leve.id);
+  }
+  // Nom du fichier : projet_liste, sans l'extension du fichier importé (« stock.csv » -> « stock »).
+  const base = `${nomDeFichierProjet(projet)}_${titre.replace(/\.[a-z0-9]{2,4}$/i, '')}`.replace(/[\\/:*?"<>|]/g, '_');
+  ouvrirFenetreExport({
+    titre,
+    formats: FORMATS_POINTS,
+    fabriquer: (format) => {
+      const { blob, extension } = fichierPoints(points, format, roles);
+      return { blob, nom: `${base}.${extension}` };
+    },
+    enregistrer: enregistrerFichier,
+    message: (texte) => afficherMessage(texte, 5000),
+  });
+}
+
+/** Implantations enregistrées (CSV). */
+function exporterImplantations() {
+  telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nomDeFichierProjet(projet)}_implantations.csv`);
+}
+
+/** Contrôles et refus du projet : CSV ou PDF. */
+function exporterControles(format) {
+  const nom = `${nomDeFichierProjet(projet)}_controles`;
+  if (format === 'pdf') telecharger(pdfControles(projet), `${nom}.pdf`);
+  else telecharger(new Blob(['\ufeff' + csvControles(projet.controles)], { type: 'text/csv;charset=utf-8' }), `${nom}.csv`);
 }
 
 /** Couleur choisie pour une liste de points (null : la couleur normale). Les points de contrôle restent rouges. */
@@ -3541,6 +3566,7 @@ partage = creerPartage({
     afficherEcranProjet();
     mettreAJourEtatEntete();
     fenetreReglages?.rafraichir();
+    montrerAttenteSynchro();
   },
   message: (texte) => afficherMessage(texte, 4000),
 });
@@ -3753,7 +3779,7 @@ const ecranMesures = creerEcranMesures(document.querySelector('#mesures'), docum
 /** Vrai si cette liste (surface, métré, dessin, levé…) est cochée dans « Afficher ». */
 const estAffichee = (id) => !(projet.listesCachees ?? []).includes(id);
 
-creerEcranExportMesures(document.querySelector('#export-mesures'), {
+creerEcranExportMesures(moduleExport.zone('mesures'), {
   // « Quoi exporter ? » : chaque métré, et chaque mesure faite à la main ; cochés comme « Afficher ».
   obtenirGroupes: () => [
     { titre: 'Métrés', elements: projet.metres.map((m) => ({ id: m.id, nom: m.nom, defaut: estAffichee(m.id) })) },
@@ -3775,6 +3801,9 @@ creerEcranExportMesures(document.querySelector('#export-mesures'), {
   },
 });
 
+// Dans Projet › Exporter, le formulaire des mesures est ouvert d'office (pas de flèche de plus à toucher).
+moduleExport.zone('mesures').querySelector('details')?.setAttribute('open', '');
+
 /** Calculs de volume du projet dont le résultat est connu : [{ calcul, resultat }]. */
 function calculsReussis() {
   return projet.calculs
@@ -3782,7 +3811,7 @@ function calculsReussis() {
     .filter(({ resultat }) => resultat && !resultat.erreurs);
 }
 
-creerEcranExport(document.querySelector('#export'), {
+creerEcranExport(moduleExport.zone('plan'), {
   // « Quoi exporter ? » : volumes, surfaces (par nature), dessins, listes de points ; cochés comme « Afficher ».
   obtenirGroupes: () => {
     const surfacesDe = (natures) => projet.surfaces.filter((s) => (estImportee(s) ? natures.includes('importee') : natures.includes(s.nature ?? 'stock'))).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
@@ -3888,6 +3917,7 @@ function recalculer({ recadrer = false } = {}) {
   ecranMesures.afficher();
   ecranDessin.afficher(donneesDessin());
   ecranImport.afficher(projet, dernierImport, dernierPlan);
+  moduleExport.afficher(projet);
   // Point à implanter de la liste : ses coordonnées à jour (Annuler a pu l'enlever).
   if (implanter.cible?.id) {
     const point = projet.aImplanter.find((p) => p.id === implanter.cible.id);
@@ -4186,8 +4216,53 @@ async function montrerAttenteMain(verrou) {
 
 /** Vrai si un autre appareil a la main sur le projet ouvert : rien ne s'enregistre (0.76.0). */
 function lectureSeule() {
+  // Synchronisation avec Drive en cours (0.92.1) : rien ne se modifie avant qu'elle soit finie.
+  if (partage?.etat.synchroEnCours) return true;
   // Main rendue (0.80.0) : lecture seule aussi, jusqu'à la reprendre (main grise).
   return Boolean(partage?.etat.connecte && (partage.etat.repris?.projetId === projet.id || partage.etat.rendu?.projetId === projet.id));
+}
+
+/**
+ * « En attente de synchronisation » (0.92.1, demande du 29.10.2026) : au démarrage et à l'ouverture
+ * d'un projet, l'écran est bloqué tant que Drive n'a pas été comparé. Après 15 s (pas de réseau…),
+ * « Continuer sans synchroniser » : l'écran se libère, mais le projet reste en lecture seule
+ * jusqu'à la fin de la synchronisation (voir lectureSeule).
+ */
+const ATTENTE_AVANT_CONTINUER = 15_000;
+let attenteSynchro = null; // { element, minuterie, ignoree }
+function montrerAttenteSynchro() {
+  const enCours = Boolean(partage?.etat.synchroEnCours);
+  if (!enCours) {
+    if (attenteSynchro) {
+      clearTimeout(attenteSynchro.minuterie);
+      attenteSynchro.element.remove();
+      attenteSynchro = null;
+    }
+    return;
+  }
+  if (attenteSynchro) return;
+  const element = document.createElement('div');
+  element.className = 'attente-synchro';
+  element.setAttribute('role', 'alertdialog');
+  element.setAttribute('aria-label', 'En attente de synchronisation');
+  element.innerHTML = `<div class="boite-attente-synchro">
+      <span class="roue-attente" aria-hidden="true"></span>
+      <strong>En attente de synchronisation</strong>
+      <span class="aide">Google Drive</span>
+      <button type="button" class="bouton-secondaire" data-action="continuer-sans-synchro" hidden>Continuer sans synchroniser</button>
+    </div>`;
+  element.querySelector('[data-action="continuer-sans-synchro"]').addEventListener('click', () => {
+    element.hidden = true;
+    afficherMessage('Lecture seule tant que Drive n\'est pas synchronisé', 4000);
+  });
+  document.body.append(element);
+  attenteSynchro = {
+    element,
+    minuterie: setTimeout(() => {
+      const bouton = element.querySelector('[data-action="continuer-sans-synchro"]');
+      if (bouton) bouton.hidden = false;
+    }, ATTENTE_AVANT_CONTINUER),
+  };
 }
 
 /** En lecture seule : message et vrai (l'action est refusée). */

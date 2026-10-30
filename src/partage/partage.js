@@ -52,7 +52,19 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     // attente : vrai si cet appareil l'avait (il la reprendra tout seul quand elle sera rendue).
     repris: null,
     rendu: null, // { projetId } : main rendue (ou libre) : lecture seule jusqu'à la reprendre (main grise, 0.80.0)
+    // Connexion ou comparaison avec Drive du projet ouvert en cours (0.92.1) : l'appli montre
+    // « En attente de synchronisation » et ne laisse rien modifier.
+    synchroEnCours: false,
   };
+  let enSynchro = 0;
+  /** Début (+1) ou fin (−1) d'une synchronisation : met à jour etat.synchroEnCours et prévient l'appli. */
+  function compterSynchro(pas) {
+    enSynchro = Math.max(0, enSynchro + pas);
+    const enCours = enSynchro > 0;
+    if (enCours === etat.synchroEnCours) return;
+    etat.synchroEnCours = enCours;
+    quandChange();
+  }
   let synchro = null;
   let minuterie = null;
   let envoiEnCours = null;
@@ -167,6 +179,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       changer('erreur', 'donne d\'abord un nom à cet appareil');
       return;
     }
+    compterSynchro(1);
     changer('connexion', 'connexion à Google…');
     const connexion = creerConnexion();
     synchro = creerSynchro(creerDrive({ obtenirJeton: connexion.obtenirJeton }), appareil());
@@ -183,6 +196,8 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       etat.connecte = false;
       synchro = null;
       changer('erreur', erreur.message);
+    } finally {
+      compterSynchro(-1);
     }
   }
 
@@ -257,6 +272,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     if (!etat.connecte || !synchro) return;
     const projet = obtenirProjet();
     occupe += 1;
+    compterSynchro(1);
     try {
       await rafraichirListe();
       const surDrive = etat.projetsDrive.find((p) => p.projetId === projet.id);
@@ -283,6 +299,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       changer('attente', erreur.message);
     } finally {
       occupe -= 1;
+      compterSynchro(-1);
     }
   }
 

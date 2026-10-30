@@ -77,7 +77,5 @@ function htmlHistorique(ac) {
             <span class="aide">(E ${ecart(c.ecarts.est)} · N ${ecart(c.ecarts.nord)})</span></span>
           <input type="text" class="remarque-controle" data-champ="remarque-controle" data-id="${c.id}" value="${echapper(c.remarque ?? '')}" placeholder="remarque" aria-label="Remarque" />
         </div>`)).join('')}
-    <p class="aide">exporter : <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterControles" data-valeur="csv">CSV</button>
-      · <button type="button" class="bouton-lien bouton-lien-neutre" data-action="exporterControles" data-valeur="pdf">PDF</button></p>
   </div>`;
 }
