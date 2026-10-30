@@ -304,3 +304,18 @@ export function nomsDuRecollement(recollement) {
     ...recollement.conduites.flatMap((c) => c.noeuds.filter((n) => n.point).map((n) => n.point)),
   ])];
 }
+
+/**
+ * Ce qu'on dessine d'un recollement (plan, PDF, DXF) : { troncons: [{ conduite (nom), a, b
+ * ({ est, nord, filEau, nom }), distance, pente, sens }], ouvrages: [{ nom, type, forme, centre,
+ * coins (rect.), tampon, radier, profondeur, diametre }] }. Ouvrages pas finis : pas dessinés.
+ */
+export function traceDuRecollement(recollement, leve) {
+  const troncons = recollement.conduites.flatMap((c) => tronconsConduite(recollement, leve, c)
+    .map((t) => ({ conduite: c.numero ? `T-${recollement.reseau}-${c.numero}` : '', ...t })));
+  const ouvrages = recollement.ouvrages.filter((o) => o.centre).map((o) => ({
+    nom: o.nom, type: o.type, forme: o.forme, centre: o.centre, coins: o.coins ?? null, tampon: o.tampon,
+    diametre: o.diametre ?? null, ...mesuresOuvrage(o),
+  }));
+  return { troncons, ouvrages };
+}

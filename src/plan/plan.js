@@ -405,6 +405,51 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (couleur) element.style.stroke = couleur;
       groupe.append(element);
     }
+    // Recollements de réseaux (0.101.0) : conduites de la couleur du réseau, flèche du sens
+    // d'écoulement et pente au milieu de chaque tronçon ; ouvrages (rond ou cadre) avec leur nom.
+    for (const reseau of implantation.reseaux ?? []) {
+      for (const t of reseau.troncons) {
+        const a = versEcran(t.a.est, t.a.nord, vue);
+        const b = versEcran(t.b.est, t.b.nord, vue);
+        const trait = creerElement('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'conduite-reseau' });
+        trait.style.stroke = reseau.couleur;
+        groupe.append(trait);
+        const longueur = Math.hypot(b.x - a.x, b.y - a.y);
+        if (longueur < 40 || t.pente == null) continue;
+        // Flèche vers le bas de la pente (sens d'écoulement), au milieu.
+        const [de, vers] = t.sens === 'b-a' ? [b, a] : [a, b];
+        const angle = (Math.atan2(vers.y - de.y, vers.x - de.x) * 180) / Math.PI;
+        const milieu = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        if (t.sens !== 'plat') {
+          const fleche = creerElement('path', { d: 'M-7 -6 5 0-7 6Z', class: 'fleche-reseau', transform: `translate(${milieu.x} ${milieu.y}) rotate(${angle})` });
+          fleche.style.fill = reseau.couleur;
+          groupe.append(fleche);
+        }
+        if (longueur < 90) continue;
+        const pente = creerElement('text', { x: milieu.x + 8, y: milieu.y - 8, class: 'pente-reseau' });
+        pente.style.fill = reseau.couleur;
+        pente.textContent = `${t.pente < 0 ? '−' : t.pente > 0 ? '+' : ''}${Math.abs(t.pente).toFixed(2)} %`;
+        groupe.append(pente);
+      }
+      for (const o of reseau.ouvrages) {
+        const centre = versEcran(o.centre.est, o.centre.nord, vue);
+        let forme;
+        if (o.coins) forme = creerElement('path', { d: tracePar(o.coins.map((c) => versEcran(c.est, c.nord, vue)), true), class: 'ouvrage-reseau' });
+        else {
+          // Rayon : celui de la chambre (diamètre en mm) à l'échelle, au moins 6 pixels.
+          const rayon = Math.max(6, ((o.diametre ?? 0) / 2000) * vue.echelle);
+          forme = creerElement('circle', { cx: centre.x, cy: centre.y, r: rayon, class: 'ouvrage-reseau' });
+        }
+        forme.style.stroke = reseau.couleur;
+        groupe.append(forme);
+        // Ouvrage rond : son point porte déjà son nom ; rectangulaire : le nom au centre du cadre.
+        if (!calques.noms || !o.coins) continue;
+        const nom = creerElement('text', { x: centre.x + 10, y: centre.y - 10, class: 'nom-ouvrage-reseau' });
+        nom.style.fill = reseau.couleur;
+        nom.textContent = o.nom;
+        groupe.append(nom);
+      }
+    }
     // Points de contrôle (Terrain › Contrôle) : triangle rouge et nom en rouge.
     for (const point of implantation.pointsControle ?? []) {
       const { x, y } = versEcran(point.est, point.nord, vue);

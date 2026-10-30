@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { filDEauDepuisDessus, penteTroncon, profondeurChambre, radierChambre, chambreDepuisTroisCoins } from '../src/topo/reseau.js';
 import {
   creerRecollement, ajouterPointReseau, prochainNomReseau, conduiteEnCours, nouvelleConduite, tronconsConduite,
-  dernierTroncon, mesuresOuvrage, annulerDernierPointReseau, estOuvrage,
+  dernierTroncon, mesuresOuvrage, annulerDernierPointReseau, estOuvrage, traceDuRecollement,
 } from '../src/topo/reseau.js';
 import { assemblerReseaux, partDesReseaux, RESEAUX_DEPART } from '../src/leve/reseaux.js';
 
@@ -159,5 +159,17 @@ describe('levé de recollement', () => {
     expect(liste).toHaveLength(RESEAUX_DEPART.length + 1);
     expect(liste[0]).toEqual(['EU', 'eaux usées', '#7c3aed']);
     expect(partDesReseaux(liste)).toEqual({ ajoutes: [['FO', 'fibre', '#111827']], couleurs: { EU: '#7c3aed' } });
+  });
+
+  it('tracé à dessiner : tronçons avec le nom de la conduite, ouvrages finis seulement', () => {
+    const essai = projetEssai();
+    lever(essai, 'chambre', 0, 0, 452, { diametre: 1000 });
+    lever(essai, 'tuyau', 10, 0, 450.115, { diametre: 315 });
+    lever(essai, 'regard', 20, 0, 451, { forme: 'rect' });
+    const trace = traceDuRecollement(essai.recollement, essai.leve);
+    expect(trace.troncons).toHaveLength(1);
+    expect(trace.troncons[0]).toMatchObject({ conduite: 'T-EU-1', distance: 10 });
+    expect(trace.ouvrages.map((o) => o.nom)).toEqual(['CH-EU-1']);
+    expect(trace.ouvrages[0]).toMatchObject({ forme: 'ronde', diametre: 1000, tampon: 452 });
   });
 });

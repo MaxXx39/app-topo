@@ -83,7 +83,7 @@ import {
 import { segmentCroise, supprimerSegment, ajouterPointExistant, horsDuContour, supprimerPointDuLevee, placeDuPoint, nomDeLigne, suitesLibres, creerLignesDepuisSuites } from './topo/lignes-levee.js';
 import {
   creerRecollement, ajouterPointReseau, prochainNomReseau, nouvelleConduite, conduiteEnCours, ouvrageEnCours, dernierTroncon,
-  mesuresOuvrage, annulerDernierPointReseau, tronconsConduite, estOuvrage, ELEMENTS_RESEAU,
+  mesuresOuvrage, annulerDernierPointReseau, tronconsConduite, estOuvrage, ELEMENTS_RESEAU, traceDuRecollement,
 } from './topo/reseau.js';
 import { lireReseaux, couleurDuReseau } from './leve/reseaux.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
@@ -1432,6 +1432,7 @@ function envoyerImplantationAuPlan() {
   // Bouton « Seul » (0.94.0) : seulement les listes gardées (points de contrôle en mode Contrôle…).
   const gardees = listesDuTravail(listesDePoints(projet));
   const lignesAutres = seul ? [] : lignesDesAutres().filter((l) => !gardees || gardees.has(l.id));
+  const reseaux = seul ? [] : reseauxDuPlan().filter((r) => !gardees || gardees.has(r.id));
   // Points de contrôle : dessinés si leur case « Points de contrôle » est cochée (menu Afficher).
   const pointsControle = seul || (gardees && !gardees.has(LISTE_CONTROLE)) || (projet.listesCachees ?? []).includes(LISTE_CONTROLE) ? [] : projet.pointsControle;
   const dessins = seul ? [] : dessinsVisibles().filter((d) => !gardees || gardees.has(d.id));
@@ -1440,7 +1441,7 @@ function envoyerImplantationAuPlan() {
   const cibleControle = enAutocontrole() && ongletContexte === 'terrain' ? autocontrole.cible : null;
   // Dessins (Calculs › Dessin) : toujours sur le plan ; le dessin en cours avec son pilote.
   const avecPilote = piloteActif();
-  plan.afficherImplantation(accrocheActive || avecPilote || aImplanter.length > 0 || lignesAutres.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0
+  plan.afficherImplantation(accrocheActive || avecPilote || aImplanter.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0
     ? {
         actif: accrocheActive || avecPilote,
         dessins: dessins.map((d) => ({ ...d, noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom), couleur: projet.couleursListes?.[d.id] ?? null })),
@@ -1449,6 +1450,7 @@ function envoyerImplantationAuPlan() {
         aImplanter,
         pointsControle,
         lignesAutres,
+        reseaux,
         choix: recalage.planId ? (recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : accrocheActive && !enLigne && !enAutocontrole() ? implanter.choix : null,
         cible: cibleControle ?? (accrocheActive && !enLigne && !enAutocontrole() ? implanter.cible : null),
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
@@ -1526,6 +1528,22 @@ function colorerListe(id, couleur) {
 }
 
 /** Lignes des levés « Autres » visibles : [{ sommets: [{ est, nord }], fermee }]. */
+/**
+ * Recollements de réseaux montrés (case cochée dans « Afficher ») : [{ id, nom, couleur, troncons,
+ * ouvrages }] (voir topo/reseau.js traceDuRecollement).
+ */
+function reseauxDuPlan() {
+  const cachees = new Set(projet.listesCachees ?? []);
+  const reseaux = lireReseaux();
+  return projet.reseaux.filter((r) => !cachees.has(r.id)).map((r) => ({
+    id: r.id,
+    nom: r.nom,
+    reseau: r.reseau,
+    couleur: projet.couleursListes?.[r.id] ?? couleurDuReseau(r.reseau, reseaux),
+    ...traceDuRecollement(r, projet.leves.find((l) => l.id === r.leveId) ?? { points: [] }),
+  }));
+}
+
 function lignesDesAutres() {
   const cachees = new Set(projet.listesCachees ?? []);
   const lignes = [];
