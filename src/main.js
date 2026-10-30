@@ -2521,11 +2521,12 @@ function toucherPourImplantation(position, tolerance) {
 }
 
 // --- Recalage d'un plan DXF (Projet › Imports › Recaler ; calculs dans topo/recalage.js) ---
-// recalage : { planId (plan en cours de recalage, ou null), accroche, choix ({ x, y } : point
-// touché sur le DXF d'origine), source ('projet', 'tape', 'rx2'), paires (points de calage
-// { x, y, est, nord, nom, actif }) }. Pendant le recalage, ce plan est montré tel qu'il a été lu.
-// toucherProjet : vrai quand on touche le plan pour prendre un point du projet (ses coordonnées MN95).
-const recalage = { planId: null, accroche: 'sommet', choix: null, source: 'projet', paires: [], toucherProjet: false };
+// recalage : { planId (plan en cours de recalage, ou null), accroche (sur le DXF à recaler), choix
+// ({ x, y } : point touché sur le DXF d'origine), accrocheCale (position calée : 'point' = point levé
+// ou de contrôle, sinon accroche d'un autre DXF), taper (Est / Nord tapés ouverts), paires (points de
+// calage { x, y, est, nord, nom, actif }) }. Pendant le recalage, ce plan est montré tel qu'il a été lu.
+// Étapes écrites (0.92.0) : voir recalage/barre.js.
+const recalage = { planId: null, accroche: 'sommet', choix: null, accrocheCale: 'point', taper: false, paires: [] };
 let barreRecalage = null;
 
 /** Plans DXF du projet tels qu'on les utilise : recalés (sauf celui qu'on est en train de recaler). */
@@ -2545,29 +2546,31 @@ function commencerRecalage(id) {
       recalage.accroche = mode;
       montrerRecalage();
     },
-    choisirSource: (source) => {
-      recalage.source = source;
-      recalage.toucherProjet = false;
+    choisirAccrocheCale: (mode) => {
+      recalage.accrocheCale = mode;
       montrerRecalage();
     },
-    // Prendre le point du projet en le touchant sur le plan : le plan montre les points du projet.
-    toucherPointProjet: () => {
-      const points = pointsDuProjet();
-      if (points.length === 0) {
-        afficherMessage('Aucun point dans le projet', 3000);
+    basculerTaper: () => {
+      recalage.taper = !recalage.taper;
+      montrerRecalage();
+    },
+    // « en toucher un autre » : retour à l'étape du point sur le DXF à recaler.
+    oublierChoix: () => {
+      const loin = recalage.choix && loinDuProjet(recalage.choix.x, recalage.choix.y);
+      recalage.choix = null;
+      montrerRecalage();
+      const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+      if (loin && choisi) plan.cadrerSurPlans([choisi]);
+    },
+    ajouterPaire: ({ est, nord }) => {
+      const e = lireNombreTape(String(est).replace(/\s/g, ''));
+      const n = lireNombreTape(String(nord).replace(/\s/g, ''));
+      if (e == null || n == null) {
+        afficherMessage('Est et Nord : écris deux nombres', 4000);
         return;
       }
-      recalage.toucherProjet = true;
-      plan.cadrerSur(points, 10);
-      montrerRecalage();
+      ajouterPaireCalage({ est: e, nord: n, nom: `E ${formaterNombre(e)} / N ${formaterNombre(n)}` });
     },
-    annulerToucherProjet: () => {
-      recalage.toucherProjet = false;
-      const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
-      if (choisi) plan.cadrerSurPlans([choisi]);
-      montrerRecalage();
-    },
-    ajouterPaire: ajouterPaireCalage,
     prendreAuRx2: () => {
       // Même règle qu'un point levé : RTK fixe et inclinaison prête.
       const reponse = prendrePointRecepteur();
@@ -2602,7 +2605,7 @@ function commencerRecalage(id) {
 function arreterRecalage() {
   recalage.planId = null;
   recalage.choix = null;
-  recalage.toucherProjet = false;
+  recalage.taper = false;
   barreRecalage?.enlever();
   barreRecalage = null;
   recalculer();
@@ -2615,10 +2618,9 @@ function montrerRecalage() {
   barreRecalage.afficher({
     nomPlan: choisi.nom,
     accroche: recalage.accroche,
+    accrocheCale: recalage.accrocheCale,
     choix: recalage.choix,
-    source: recalage.source,
-    groupesPoints: groupesDePoints(),
-    toucherProjet: recalage.toucherProjet,
+    taper: recalage.taper,
     rx2: recepteurDisponible(),
     paires: recalage.paires,
     dejaRecale: Boolean(choisi.recalage?.applique),
@@ -2651,71 +2653,75 @@ function groupesDePointsParListe() {
 }
 
 /**
- * Points du projet rangés par levé (pour la liste du recalage) : [{ titre, noms }], sans nom
- * en double (comme pointsDuProjet).
- */
-function groupesDePoints() {
-  const vus = new Set();
-  const groupes = [...projet.leves.map((l) => ({ titre: l.nom, points: l.points })), { titre: 'À implanter', points: projet.aImplanter }];
-  return groupes
-    .map(({ titre, points }) => ({ titre, noms: points.map((p) => p.nom).filter((nom) => !vus.has(nom) && vus.add(nom)) }))
-    .filter((g) => g.noms.length > 0);
-}
-
-/**
- * Toucher le plan pendant le recalage : on accroche un point du DXF d'origine ; ou, après « Sur le
- * plan », un point du projet (ses coordonnées MN95), qui devient tout de suite un point de calage.
+ * Toucher le plan pendant le recalage (0.92.0) : étape impaire, on accroche un point du DXF à recaler
+ * (tel qu'il a été lu) ; étape paire, sa position calée : un point du projet (levé, contrôle…) avec
+ * l'accroche « Point », sinon une accroche sur un autre plan DXF (déjà en MN95).
  */
 function toucherPourRecalage(position, tolerance) {
-  if (recalage.toucherProjet) {
-    const point = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() });
-    if (!point) {
-      afficherMessage('Aucun point du projet sous le doigt', 3000);
+  const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+  if (!recalage.choix) {
+    const trouve = accrocher(recalage.accroche, position, tolerance, sourcesDesPlans([choisi], position, tolerance));
+    if (!trouve) {
+      afficherMessage('Rien à accrocher sous le doigt sur le DXF à recaler', 3000);
       return;
     }
-    recalage.toucherProjet = false;
-    ajouterPaireCalage({ nomPoint: point.nom });
-    const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
-    if (choisi) plan.cadrerSurPlans([choisi]);
+    recalage.choix = { x: trouve.est, y: trouve.nord };
+    sonValidation();
+    montrerRecalage();
+    cadrerPourPositionCalee();
     return;
   }
-  const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
-  const trouve = accrocher(recalage.accroche, position, tolerance, sourcesDesPlans([choisi], position, tolerance));
+  if (recalage.accrocheCale === 'point') {
+    const point = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() });
+    if (!point) {
+      afficherMessage('Aucun point (levé ou de contrôle) sous le doigt', 3000);
+      return;
+    }
+    ajouterPaireCalage({ est: point.est, nord: point.nord, nom: point.nom });
+    return;
+  }
+  // Accroche sur un autre DXF (pas celui qu'on recale : il n'est pas encore en MN95).
+  const autres = plansDuProjet().filter((p) => p.id !== recalage.planId && p.visible !== false);
+  const trouve = accrocher(recalage.accrocheCale, position, tolerance, sourcesDesPlans(autres, position, tolerance));
   if (!trouve) {
-    afficherMessage('Rien à accrocher sous le doigt', 3000);
+    afficherMessage(autres.length > 0 ? 'Rien à accrocher sous le doigt sur un autre DXF' : 'Aucun autre plan DXF dans le projet', 3000);
     return;
   }
-  recalage.choix = { x: trouve.est, y: trouve.nord };
-  montrerRecalage();
+  ajouterPaireCalage({ est: trouve.est, nord: trouve.nord, nom: `DXF E ${formaterNombre(trouve.est)} / N ${formaterNombre(trouve.nord)}` });
 }
 
 /**
- * Ajoute un point de calage : le point touché sur le DXF et ses coordonnées MN95 (un point du
- * projet par son nom, ou Est / Nord tapés ou pris au RX2).
+ * Ajoute un point de calage : le point touché sur le DXF à recaler et sa position calée MN95
+ * ({ est, nord, nom }). L'étape suivante commence.
  */
-function ajouterPaireCalage({ nomPoint, est, nord, nom }) {
+function ajouterPaireCalage({ est, nord, nom }) {
   if (!recalage.choix) return;
-  let mn95;
-  if (recalage.source === 'projet') {
-    const point = pointsDuProjet().find((p) => p.nom === String(nomPoint ?? '').trim());
-    if (!point) {
-      afficherMessage(`Point « ${nomPoint} » introuvable dans le projet`, 4000);
-      return;
-    }
-    mn95 = { est: point.est, nord: point.nord, nom: point.nom };
-  } else {
-    const e = typeof est === 'number' ? est : lireNombreTape(String(est).replace(/\s/g, ''));
-    const n = typeof nord === 'number' ? nord : lireNombreTape(String(nord).replace(/\s/g, ''));
-    if (e == null || n == null) {
-      afficherMessage('Est et Nord : écris deux nombres', 4000);
-      return;
-    }
-    mn95 = { est: e, nord: n, nom: nom ?? `E ${formaterNombre(e)} / N ${formaterNombre(n)}` };
-  }
-  recalage.paires.push({ x: recalage.choix.x, y: recalage.choix.y, est: mn95.est, nord: mn95.nord, nom: mn95.nom, actif: true });
+  recalage.paires.push({ x: recalage.choix.x, y: recalage.choix.y, est, nord, nom, actif: true });
   recalage.choix = null;
+  recalage.taper = false;
   sonValidation();
+  vibrer(60);
   montrerRecalage();
+  // Retour sur le DXF à recaler pour le point suivant, s'il est loin des points du projet.
+  const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+  if (choisi && loinDuProjet(recalage.paires.at(-1).x, recalage.paires.at(-1).y)) plan.cadrerSurPlans([choisi]);
+}
+
+/**
+ * Vrai si ce point du DXF à recaler (x, y) est à plus de 2 km de tous les points du projet : le DXF
+ * n'est pas encore en MN95 et il faut déplacer la vue entre lui et les points du projet.
+ */
+function loinDuProjet(x, y) {
+  const points = pointsDuProjet();
+  if (points.length === 0) return false;
+  return points.every((p) => Math.hypot(p.est - x, p.nord - y) > 2000);
+}
+
+/** Étape « position calée » : si le DXF est loin, la vue va sur les points du projet (et les autres DXF). */
+function cadrerPourPositionCalee() {
+  if (!recalage.choix || !loinDuProjet(recalage.choix.x, recalage.choix.y)) return;
+  const points = pointsDuProjet();
+  requestAnimationFrame(() => plan.cadrerSur(points, 10));
 }
 
 /** « Appliquer » : le plan est recalé (ses points de calage et les paramètres sont gardés). */

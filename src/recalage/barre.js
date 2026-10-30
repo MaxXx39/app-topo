@@ -1,22 +1,26 @@
-// Barre du recalage d'un plan DXF, posée en bas du plan (comme le pointage) : accroche, point
-// touché sur le DXF, ses coordonnées MN95 (point du projet, tapées ou prises au RX2), liste des
-// points de calage avec leur écart (case pour désactiver un point), paramètres et « Appliquer ».
+// Barre du recalage d'un plan DXF, posée en bas du plan (comme le pointage). Depuis 0.92.0 (demande
+// du 29.10.2026), en étapes écrites, 2 par point de calage (voir etapeRecalage) :
+// 1. touche le 1er point sur le DXF à recaler (accroche sur ce DXF) ;
+// 2. donne sa position calée : touche un point levé ou de contrôle, ou une accroche d'un autre DXF,
+//    ou prends la position du GNSS (ou tape Est / Nord) ;
+// 3. et 4. : la même chose pour le 2e point. Ensuite : écarts et paramètres, « Appliquer », ou
+// d'autres points pour contrôler (écart de chaque point dès 3, case pour en désactiver un).
 // Les calculs sont dans topo/recalage.js ; main.js garde l'état et fait les actions.
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
-import { calculerHelmert, rotationLisible } from '../topo/recalage.js';
+import { calculerHelmert, rotationLisible, etapeRecalage } from '../topo/recalage.js';
 
-const ACCROCHES = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre']];
+// Accroches sur le DXF à recaler (étapes impaires).
+const ACCROCHES_DXF = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre']];
+// Accroches pour la position calée (étapes paires) : point levé ou de contrôle, ou un autre DXF.
+const ACCROCHES_CALE = [['point', 'Point'], ['sommet', 'Sommet DXF'], ['milieu', 'Milieu DXF'], ['ligne', 'Sur ligne DXF'], ['centre', 'Centre DXF']];
 
 /**
- * Crée la barre dans "cadre" (le cadre du plan). actions : choisirAccroche(mode), choisirSource(source),
- * ajouterPaire({ nom, est, nord } ou { nomPoint }), toucherPointProjet(), annulerToucherProjet(),
- * prendreAuRx2(), basculerPaire(index, actif),
- * enleverPaire(index), appliquer(), annulerRecalage(), fermer().
- * Renvoie { afficher(etat), enlever() } ; etat : { nomPlan, accroche, choix ({ x, y } ou null),
- * source ('projet', 'tape', 'rx2'), groupesPoints ([{ titre, noms }] : points du projet par levé),
- * toucherProjet (on touche le plan pour prendre un point du projet), rx2 (vrai dans l'appli Android),
- * paires, dejaRecale }.
+ * Crée la barre dans "cadre" (le cadre du plan). actions : choisirAccroche(mode), choisirAccrocheCale(mode),
+ * ajouterPaire({ est, nord }) (tapés), prendreAuRx2(), basculerTaper(), oublierChoix(),
+ * basculerPaire(index, actif), enleverPaire(index), appliquer(), annulerRecalage(), fermer().
+ * Renvoie { afficher(etat), enlever() } ; etat : { nomPlan, accroche, accrocheCale, choix ({ x, y } ou null),
+ * taper (champs Est / Nord ouverts), rx2 (vrai dans l'appli Android), paires, dejaRecale }.
  */
 export function creerBarreRecalage(cadre, actions) {
   const barre = document.createElement('div');
@@ -29,7 +33,7 @@ export function creerBarreRecalage(cadre, actions) {
     const { action, valeur } = bouton.dataset;
     if (action === 'ajouter') {
       const lire = (champ) => barre.querySelector(`[data-calage="${champ}"]`)?.value ?? '';
-      actions.ajouterPaire({ nomPoint: lire('nom-point'), est: lire('est'), nord: lire('nord') });
+      actions.ajouterPaire({ est: lire('est'), nord: lire('nord') });
     } else if (action === 'enlever') actions.enleverPaire(Number(valeur));
     else actions[action]?.(valeur);
   });
@@ -44,15 +48,14 @@ export function creerBarreRecalage(cadre, actions) {
   return {
     afficher(etat) {
       const helmert = etat.paires.length >= 2 ? calculerHelmert(etat.paires) : null;
+      const etape = etapeRecalage(etat.paires.length, Boolean(etat.choix));
       barre.innerHTML = `
         <div class="ligne-barre-pointage">
           <span class="titre-pointage">Recaler « ${echapper(etat.nomPlan)} »</span>
           <button type="button" class="bouton-lien" data-action="fermer">fermer</button>
         </div>
-        <div class="ligne-barre-pointage">
-          ${ACCROCHES.map(([cle, titre]) => `<button type="button" class="puce-choix ${etat.accroche === cle ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${cle}">${titre}</button>`).join('')}
-        </div>
-        ${etat.choix ? choixMn95(etat) : '<p class="aide-pointage">Touche un coin du plan DXF</p>'}
+        ${texteEtape(etape)}
+        ${etape.sorte === 'dxf' ? accrochesDxf(etat) : positionCalee(etat)}
         ${etat.paires.length > 0 ? tablePaires(etat.paires, helmert) : ''}
         ${helmert ? parametres(helmert) : ''}
         <div class="ligne-barre-pointage">
@@ -66,32 +69,48 @@ export function creerBarreRecalage(cadre, actions) {
   };
 }
 
-/** Point touché sur le DXF, puis ses coordonnées MN95 : point du projet, tapées, ou RX2. */
-function choixMn95(etat) {
-  const sources = [['projet', 'Point du projet'], ['tape', 'E / N tapés'], ...(etat.rx2 ? [['rx2', 'GNSS']] : [])];
-  let saisie;
-  if (etat.source === 'projet' && etat.toucherProjet) {
-    saisie = `<p class="aide-pointage">Touche un point du projet sur le plan</p>
-      <button type="button" class="bouton-lien" data-action="annulerToucherProjet">annuler</button>`;
-  } else if (etat.source === 'projet') {
-    // Liste des points du projet, rangés par levé (pas besoin de connaître le nom), ou sur le plan.
-    saisie = `<label class="large">Point<select data-calage="nom-point">
-        <option value="">— choisir —</option>
-        ${etat.groupesPoints.map((g) => `<optgroup label="${echapper(g.titre)}">${g.noms.map((nom) => `<option value="${echapper(nom)}">${echapper(nom)}</option>`).join('')}</optgroup>`).join('')}
-      </select></label>
-      <button type="button" class="bouton" data-action="ajouter">Ajouter</button>
-      <button type="button" class="puce-choix" data-action="toucherPointProjet">Sur le plan</button>`;
-  } else if (etat.source === 'tape') {
-    saisie = `<label>Est<input type="text" inputmode="decimal" data-calage="est" autocomplete="off" /></label>
-      <label>Nord<input type="text" inputmode="decimal" data-calage="nord" autocomplete="off" /></label>
-      <button type="button" class="bouton" data-action="ajouter">Ajouter</button>`;
+/** « Étape 3 / 4 » et ce qu'il faut faire, en gros (on sait toujours où on en est). */
+function texteEtape(etape) {
+  const ordinal = etape.rang === 1 ? '1er' : `${etape.rang}e`;
+  let texte;
+  if (etape.sorte === 'dxf') {
+    texte = etape.pret
+      ? `Recalage prêt : vérifie les écarts, puis « Appliquer ». Ou, pour contrôler, touche un ${ordinal} point sur le DXF à recaler.`
+      : `Touche le ${ordinal} point sur le DXF à recaler`;
   } else {
-    saisie = '<button type="button" class="bouton" data-action="prendreAuRx2">Prendre au GNSS</button>';
+    texte = `Position calée du ${ordinal} point : touche un point (levé ou de contrôle) ou une accroche d'un autre DXF, ou prends la position du GNSS`;
   }
+  const contexte = etape.pret && etape.sorte === 'dxf' ? `${etape.numero} (facultative)` : `${etape.numero} / ${etape.total}`;
+  return `<p class="etape-recalage etape-${etape.sorte}"><span class="numero-etape">Étape ${contexte}</span>${texte}</p>`;
+}
+
+/** Étapes impaires : accroche sur le DXF à recaler. */
+function accrochesDxf(etat) {
+  return `<div class="ligne-barre-pointage">
+    ${ACCROCHES_DXF.map(([cle, titre]) => `<button type="button" class="puce-choix ${etat.accroche === cle ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${cle}">${titre}</button>`).join('')}
+  </div>`;
+}
+
+/** Étapes paires : le point touché sur le DXF, puis sa position calée (toucher, GNSS ou tapée). */
+function positionCalee(etat) {
+  const taper = etat.taper
+    ? `<div class="ligne-barre-pointage">
+        <label>Est<input type="text" inputmode="decimal" data-calage="est" autocomplete="off" /></label>
+        <label>Nord<input type="text" inputmode="decimal" data-calage="nord" autocomplete="off" /></label>
+        <button type="button" class="bouton" data-action="ajouter">Ajouter</button>
+      </div>`
+    : '';
   return `<div class="choix-pointage">
-    <span class="coordonnees-pointage">DXF : x ${formaterNombre(etat.choix.x)} · y ${formaterNombre(etat.choix.y)} → MN95 :</span>
-    <div class="ligne-barre-pointage">${sources.map(([cle, titre]) => `<button type="button" class="puce-choix ${etat.source === cle ? 'actif' : ''}" data-action="choisirSource" data-valeur="${cle}">${titre}</button>`).join('')}</div>
-    ${saisie}
+    <span class="coordonnees-pointage">Point du DXF : x ${formaterNombre(etat.choix.x)} · y ${formaterNombre(etat.choix.y)}
+      <button type="button" class="bouton-lien bouton-lien-neutre" data-action="oublierChoix">en toucher un autre</button></span>
+    <div class="ligne-barre-pointage">
+      ${ACCROCHES_CALE.map(([cle, titre]) => `<button type="button" class="puce-choix ${etat.accrocheCale === cle ? 'actif' : ''}" data-action="choisirAccrocheCale" data-valeur="${cle}">${titre}</button>`).join('')}
+    </div>
+    <div class="ligne-barre-pointage">
+      ${etat.rx2 ? '<button type="button" class="bouton" data-action="prendreAuRx2">Position GNSS</button>' : ''}
+      <button type="button" class="puce-choix ${etat.taper ? 'actif' : ''}" data-action="basculerTaper">Taper E / N</button>
+    </div>
+    ${taper}
   </div>`;
 }
 

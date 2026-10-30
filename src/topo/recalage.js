@@ -151,3 +151,16 @@ export function planRecale(plan) {
   recales.set(plan, { cle, plan: recale });
   return recale;
 }
+
+/**
+ * Étape du recalage d'un plan DXF (0.92.0, demande du 29.10.2026) : 4 étapes pour 2 points, puis
+ * 2 de plus par point de contrôle.
+ * - étape impaire : toucher le point sur le DXF à recaler (accroche sur ce DXF) ;
+ * - étape paire : donner sa position calée (point levé ou de contrôle, accroche d'un autre DXF, GNSS).
+ * nbPaires : points de calage déjà faits ; choixFait : le point du DXF à recaler est touché.
+ * Renvoie { numero, total, sorte ('dxf' ou 'cale'), rang (n° du point de calage), pret (≥ 2 points) }.
+ */
+export function etapeRecalage(nbPaires, choixFait) {
+  const numero = 2 * nbPaires + (choixFait ? 2 : 1);
+  return { numero, total: Math.max(4, numero), sorte: choixFait ? 'cale' : 'dxf', rang: nbPaires + 1, pret: nbPaires >= 2 };
+}
