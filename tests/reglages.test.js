@@ -48,13 +48,13 @@ describe('modes Base / Intermédiaire / Expert', () => {
 
   it('ancien mode « Confirmé » : devient Expert', async () => {
     const { lireReglages, modeAppli } = await chargerReglages({ 'topo-reglages': JSON.stringify({ mode: 'confirme', telephone: true }) });
-    expect(lireReglages()).toEqual({ telephone: true, mode: 'expert' });
+    expect(lireReglages()).toMatchObject({ telephone: true, mode: 'expert' });
     expect(modeAppli()).toBe('expert');
   });
 
   it('anciens réglages (sans mode) : Intermédiaire, mode téléphone gardé', async () => {
     const { lireReglages } = await chargerReglages({ 'topo-reglages': JSON.stringify({ telephone: true }) });
-    expect(lireReglages()).toEqual({ telephone: true, mode: 'intermediaire' });
+    expect(lireReglages()).toMatchObject({ telephone: true, mode: 'intermediaire' });
   });
 
   it('onglet Lame : montré en Expert seulement (plus de case dans les réglages)', async () => {
@@ -72,10 +72,29 @@ describe('modes Base / Intermédiaire / Expert', () => {
 describe('changement de mode dans les réglages', () => {
   it('écrire un mode le garde dans la mémoire du navigateur', async () => {
     const reglages = await chargerReglages({});
-    const fausseZone = { classList: { toggle() {} }, querySelector: () => null };
+    const fausseZone = { classList: { toggle() {} }, style: { setProperty() {} }, querySelector: () => null };
     globalThis.document = { body: fausseZone, querySelector: () => null };
     reglages.appliquerReglages({ telephone: false, mode: 'expert' });
     expect(reglages.modeAppli()).toBe('expert');
     delete globalThis.document;
+  });
+});
+
+describe('tailles du plan (0.104.0)', () => {
+  it('formes : +20 % au départ (rayon 4,2 au lieu de 3,5), texte normal = 1', async () => {
+    const reglages = await chargerReglages({});
+    expect(reglages.rayonFormes()).toBeCloseTo(4.2, 6);
+    expect(reglages.echelleTexte()).toBe(1);
+  });
+  it('4 tailles choisies sur l\'appareil', async () => {
+    const reglages = await chargerReglages({ 'topo-reglages': JSON.stringify({ tailleFormes: 'tres-grande', tailleTexte: 'petit' }) });
+    expect(reglages.rayonFormes()).toBeCloseTo(4.2 * 1.8, 6);
+    expect(reglages.echelleTexte()).toBe(0.85);
+    expect(reglages.TAILLES_FORMES).toHaveLength(4);
+    expect(reglages.TAILLES_TEXTE).toHaveLength(4);
+  });
+  it('taille inconnue : la normale', async () => {
+    const reglages = await chargerReglages({ 'topo-reglages': JSON.stringify({ tailleFormes: 'xyz', tailleTexte: 'abc' }) });
+    expect(reglages.echelleTexte()).toBe(1);
   });
 });

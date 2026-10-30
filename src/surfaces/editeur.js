@@ -5,7 +5,7 @@
 // cocher des cases, ou toucher les points sur le plan.
 // Une surface importée (LandXML, DXF) ne se modifie pas : on peut la renommer ou la supprimer.
 import { creerLigne, detecterSeries, lireListeDeNoms, verifierSurface } from '../topo/noms.js';
-import { creerSurface, estImportee, origineSurface, NATURES } from '../topo/surface.js';
+import { creerSurface, estImportee, origineSurface, NATURES, avecPrefixe, sansPrefixe, prefixeDuNom } from '../topo/surface.js';
 import { bulle } from '../aide/bulles.js';
 import { echapper } from '../outils/echapper.js';
 import { htmlChoixPoints, resumeListe } from './choix-points.js';
@@ -255,7 +255,8 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
       etat.edition = null;
       etat.suppression = false;
     } else if (cible.dataset.champ === 'nom') {
-      objet.nom = cible.value.trim() || objet.nom;
+      const suite = sansPrefixe(cible.value, prefixeDuNom(objet));
+      objet.nom = suite ? avecPrefixe(suite, prefixeDuNom(objet)) : objet.nom;
     } else if (cible.dataset.champ === 'nature') {
       changerNature(objet, cible.value);
     } else if (cible.dataset.champ === 'fichier-surface') {
@@ -358,7 +359,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
     }
     return `
       <div class="ligne-outils">
-        <label>Nom : <input type="text" data-champ="nom" value="${echapper(objet.nom)}" /></label>
+        <label class="champ-prefixe">Nom : <span class="prefixe-nom">${echapper(prefixeDuNom(objet))}</span><input type="text" data-champ="nom" value="${echapper(sansPrefixe(objet.nom, prefixeDuNom(objet)))}" /></label>
         <button type="button" class="bouton-lien" data-action="supprimer">${textes.supprimer}</button>
       </div>
       <div class="ligne-outils choix-nature" role="radiogroup" aria-label="Nature de la surface">

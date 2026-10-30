@@ -1,6 +1,7 @@
 // Petite fenêtre avec plusieurs boutons au choix (à la place de « OK / Annuler », qui ne dit pas
 // clairement ce qui va se passer). Le premier bouton marqué « principal » est mis en avant.
 import { echapper } from './echapper.js';
+import { sansPrefixe } from '../topo/surface.js';
 
 /**
  * Ouvre la fenêtre et attend le choix. boutons : [{ cle, texte, detail, principal }].
@@ -39,14 +40,19 @@ export function demanderChoix({ titre, texte = '', boutons, signal = null }) {
 /**
  * Petite fenêtre pour taper un texte (ex. renommer un levé) : « OK » ou « Annuler ».
  * Renvoie le texte tapé (sans espaces autour), ou null si annulé.
+ * prefixe (0.104.0, ex. « LV- ») : début du nom, montré à gauche du champ, qu'on ne peut ni modifier
+ * ni effacer ; on ne tape que la suite, et le texte rendu commence toujours par le préfixe (« » si la suite est vide).
  */
-export function demanderTexte({ titre, valeur = '' }) {
+export function demanderTexte({ titre, valeur = '', prefixe = '' }) {
   return new Promise((resoudre) => {
     const fenetre = document.createElement('dialog');
     fenetre.className = 'fenetre-choix';
     fenetre.innerHTML = `
       <h2>${echapper(titre)}</h2>
-      <input type="text" data-champ="texte" value="${echapper(valeur)}" aria-label="${echapper(titre)}" />
+      <div class="champ-prefixe">
+        ${prefixe ? `<span class="prefixe-nom">${echapper(prefixe)}</span>` : ''}
+        <input type="text" data-champ="texte" value="${echapper(prefixe ? sansPrefixe(valeur, prefixe) : valeur)}" aria-label="${echapper(titre)}" />
+      </div>
       <div class="boutons-choix">
         <button type="button" class="bouton" data-cle="ok"><strong>OK</strong></button>
         <button type="button" class="bouton-secondaire" data-cle="annuler"><strong>Annuler</strong></button>
@@ -54,7 +60,9 @@ export function demanderTexte({ titre, valeur = '' }) {
     const champ = fenetre.querySelector('input');
     const finir = (cle) => {
       fenetre.close();
-      resoudre(cle === 'ok' ? champ.value.trim() : null);
+      if (cle !== 'ok') return resoudre(null);
+      const suite = prefixe ? sansPrefixe(champ.value, prefixe) : champ.value.trim();
+      resoudre(prefixe && suite ? `${prefixe}${suite}` : suite);
     };
     fenetre.addEventListener('click', (evenement) => {
       const bouton = evenement.target.closest('button[data-cle]');

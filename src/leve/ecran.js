@@ -24,6 +24,7 @@ import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
 import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE, debutDeNom } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
+import { prefixeDuNom } from '../topo/surface.js';
 import { ELEMENTS_RESEAU } from '../topo/reseau.js';
 import { MATERIAUX } from './reseaux.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
@@ -169,7 +170,7 @@ export function creerEcranLeve(conteneur, actions) {
     }
     // En-tête du levé en cours : renommer (crayon), en reprendre un autre (« Changer »).
     if (action === 'renommerLevee') {
-      demanderTexte({ titre: 'Nom du levé', valeur: donnees.stock.nom }).then((nom) => {
+      demanderTexte({ titre: 'Nom du levé', valeur: donnees.stock.nom, prefixe: prefixeDuNom(donnees.stock) }).then((nom) => {
         if (nom) actions.renommerLevee(donnees.stock.id, nom);
       });
       return;
@@ -243,7 +244,7 @@ export function creerEcranLeve(conteneur, actions) {
       actions.nouvelleSurface(bouton.dataset.valeur);
       const levee = donnees.stock;
       if (!levee) return;
-      demanderTexte({ titre: 'Nom du nouveau levé', valeur: levee.nom }).then((nom) => {
+      demanderTexte({ titre: 'Nom du nouveau levé', valeur: levee.nom, prefixe: prefixeDuNom(levee) }).then((nom) => {
         if (nom && nom !== levee.nom) actions.renommerLevee(levee.id, nom);
       });
       return;

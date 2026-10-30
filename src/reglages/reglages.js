@@ -20,7 +20,13 @@ import { modifierLibellesDeSorte, modifierReseaux } from '../leve/fenetre-libell
 import { ouvrirFenetreListes } from './fenetre-listes.js';
 
 const CLE = 'topo-reglages';
-const PAR_DEFAUT = { telephone: false, mode: 'intermediaire' };
+const PAR_DEFAUT = { telephone: false, mode: 'intermediaire', tailleFormes: 'normale', tailleTexte: 'normal' };
+// Tailles à choisir sur le plan (0.104.0, propres à chaque appareil, tous les modes) : [clé, titre, facteur].
+// Formes des points : « Normale » = l'ancienne taille + 20 % (rayon de départ 3,5 px). Texte (noms et
+// altitudes des points) : « Normal » = la taille d'avant.
+export const TAILLES_FORMES = [['petite', 'Petites', 0.833], ['normale', 'Normales', 1], ['grande', 'Grandes', 1.4], ['tres-grande', 'Très grandes', 1.8]];
+export const TAILLES_TEXTE = [['petit', 'Petit', 0.85], ['normal', 'Normal', 1], ['grand', 'Grand', 1.25], ['tres-grand', 'Très grand', 1.5]];
+const RAYON_FORME_DE_DEPART = 4.2; // 3,5 px + 20 %
 // Les trois modes, du plus simple au plus complet (le rang sert à comparer : aAcces).
 export const MODES = [['base', 'Base'], ['intermediaire', 'Intermédiaire'], ['expert', 'Expert']];
 // Mode retenu (relu une fois, puis gardé ici) : estModeBase() est appelé très souvent par le plan.
@@ -32,7 +38,7 @@ function modeValide(mode) {
   return MODES.some(([cle]) => cle === mode) ? mode : PAR_DEFAUT.mode;
 }
 
-/** Réglages enregistrés : { telephone: vrai / faux, mode: 'base', 'intermediaire' ou 'expert' }. */
+/** Réglages enregistrés : { telephone, mode: 'base', 'intermediaire' ou 'expert', tailleFormes, tailleTexte }. */
 export function lireReglages() {
   try {
     const reglages = { ...PAR_DEFAUT, ...JSON.parse(localStorage.getItem(CLE) ?? '{}') };
@@ -41,6 +47,21 @@ export function lireReglages() {
   } catch {
     return { ...PAR_DEFAUT };
   }
+}
+
+/** Facteur de la taille choisie dans une liste de tailles (1 si inconnue). */
+function facteurDe(tailles, cle) {
+  return tailles.find(([c]) => c === cle)?.[2] ?? 1;
+}
+
+/** Rayon (en pixels) des formes de points sur le plan, selon le réglage de l'appareil. */
+export function rayonFormes() {
+  return RAYON_FORME_DE_DEPART * facteurDe(TAILLES_FORMES, lireReglages().tailleFormes);
+}
+
+/** Facteur de taille du texte du plan (noms et altitudes des points) : 1 = taille de départ. */
+export function echelleTexte() {
+  return facteurDe(TAILLES_TEXTE, lireReglages().tailleTexte);
 }
 
 /** Mode de l'appareil : 'base', 'intermediaire' ou 'expert'. */
@@ -100,6 +121,7 @@ function ecrireReglages(reglages) {
 export function appliquerReglages(reglages = lireReglages()) {
   modeRetenu = modeValide(reglages.mode);
   document.body.classList.toggle('mode-telephone', Boolean(reglages.telephone));
+  document.body.style.setProperty('--echelle-texte', String(facteurDe(TAILLES_TEXTE, reglages.tailleTexte)));
   for (const [cle] of MODES) document.body.classList.toggle(`mode-${cle}`, cle === modeRetenu);
   const bouton = document.querySelector('#bouton-mode');
   if (bouton) {
@@ -138,6 +160,16 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       </div>
       <label class="case-reglage"><input type="checkbox" data-reglage="telephone" ${reglages.telephone ? 'checked' : ''} />
         <span><strong>Mode téléphone</strong><span class="aide">textes et boutons plus petits</span></span></label>
+      <div class="choix-taille" role="radiogroup" aria-label="Taille des formes de points">
+        <span class="titre-taille">Formes des points</span>
+        ${TAILLES_FORMES.map(([cle, titre]) => `<label class="puce-mode ${reglages.tailleFormes === cle ? 'actif' : ''}">
+          <input type="radio" name="taille-formes" data-reglage="tailleFormes" value="${cle}" ${reglages.tailleFormes === cle ? 'checked' : ''} />${titre}</label>`).join('')}
+      </div>
+      <div class="choix-taille" role="radiogroup" aria-label="Taille du texte du plan">
+        <span class="titre-taille">Texte du plan (noms, altitudes)</span>
+        ${TAILLES_TEXTE.map(([cle, titre]) => `<label class="puce-mode ${reglages.tailleTexte === cle ? 'actif' : ''}">
+          <input type="radio" name="taille-texte" data-reglage="tailleTexte" value="${cle}" ${reglages.tailleTexte === cle ? 'checked' : ''} />${titre}</label>`).join('')}
+      </div>
       <label class="case-reglage"><input type="checkbox" data-reglage="aide" ${aideActive ? 'checked' : ''} />
         <span><strong>Bulles d'aide « ? »</strong></span></label>
       <div class="case-reglage listes-reglages seulement-expert">
@@ -180,6 +212,12 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       reglages.telephone = evenement.target.checked;
       ecrireReglages(reglages);
       appliquerReglages(reglages);
+    } else if (champ === 'tailleFormes' || champ === 'tailleTexte') {
+      reglages[champ] = evenement.target.value;
+      ecrireReglages(reglages);
+      appliquerReglages(reglages);
+      for (const puce of fenetre.querySelectorAll(`[data-reglage="${champ}"]`)) puce.closest('.puce-mode').classList.toggle('actif', puce.checked);
+      changerMode?.(); // le plan est redessiné avec les nouvelles tailles
     } else if (champ === 'aide') basculerAide();
     else if (evenement.target.dataset.champ === 'nom-appareil') {
       modifierNom = false;

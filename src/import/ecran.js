@@ -14,6 +14,7 @@ import { titreSection } from '../outils/section.js';
 import { COULEURS_PLANS } from '../plan/dxf-canvas.js';
 import { estEnMn95 } from '../topo/dxf-plan.js';
 import { rotationLisible } from '../topo/recalage.js';
+import { prefixeDuNom, sansPrefixe } from '../topo/surface.js';
 import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '../outils/formulaire-point.js';
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
 import { COULEURS_LISTES } from '../plan/listes-points.js';
@@ -113,7 +114,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
     } else if (cible.dataset.champ === 'couleur-liste') actions.colorerListe(cible.dataset.id, cible.value || null);
     else if (cible.dataset.champ === 'leve-actif') actions.choisirLeve(cible.value);
     else if (cible.dataset.champ === 'nom-leve') actions.renommerLeve(cible.dataset.id, cible.value.trim());
-    else if (cible.dataset.champ === 'nom-surface-projet') actions.renommerSurfaceProjet(cible.dataset.id, cible.value.trim());
+    else if (cible.dataset.champ === 'nom-surface-projet') actions.renommerSurfaceProjet(cible.dataset.id, cible.value.trim()); // (main remet le préfixe)
     else if (cible.dataset.champ === 'fichier-points' && cible.files[0]) {
       await actions.importerPoints(cible.files[0]);
       cible.value = '';
@@ -278,7 +279,7 @@ function ligneListe(projet, leve, nature = null) {
 /** Surface importée (LandXML, DXF 3D) : nom à changer, fichier d'origine, supprimer. */
 function ligneSurfaceProjet(surface) {
   return `<div class="ligne-leve liste-surface-projet">
-      <input type="text" class="nom-leve" data-champ="nom-surface-projet" data-id="${surface.id}" value="${echapper(surface.nom)}" aria-label="Nom de la surface" />
+      <div class="champ-prefixe"><span class="prefixe-nom">${echapper(prefixeDuNom(surface))}</span><input type="text" class="nom-leve" data-champ="nom-surface-projet" data-id="${surface.id}" value="${echapper(sansPrefixe(surface.nom, prefixeDuNom(surface)))}" aria-label="Nom de la surface (après ${echapper(prefixeDuNom(surface))})" /></div>
       <div class="ligne-outils">
         <span class="aide">${[surface.type === 'dxf' ? 'DXF' : 'LandXML', surface.nomFichier].filter(Boolean).map(echapper).join(' · ')} · ${surface.faces?.length ?? 0} triangles</span>
         <button type="button" class="bouton-lien" data-action="supprimer-surface-projet" data-id="${surface.id}">supprimer</button>

@@ -2,7 +2,7 @@
 // au doigt (téléphone) ou à la souris (ordinateur).
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
 import { bulle } from '../aide/bulles.js';
-import { aAcces } from '../reglages/reglages.js';
+import { aAcces, rayonFormes, echelleTexte } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
@@ -102,6 +102,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       <svg class="plan" role="img" aria-label="Plan des points"></svg>
       <div class="plan-attribution" hidden></div>
       <div class="plan-calques">
+        <div class="plan-puces">
         <button type="button" class="puce" data-action="calques" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5" /></svg>
           Fond
@@ -120,6 +121,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         </button>
         <button type="button" class="puce seulement-expert" data-action="vue-3d" title="Vue 3D des levés et surfaces montrés">3D</button>
         ${bulle('plan')}
+        </div>
         <div class="menu-plans-dxf" hidden></div>
         <div class="menu-plans-dxf menu-listes-points" hidden></div>
         <div class="menu-calques" hidden>
@@ -313,13 +315,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const groupeNoms = creerElement('g', { class: 'noms' });
     // Couleur choisie pour le libellé du nom (P-RG-1 : regard en noir…), à la place de celle du rôle.
     const libelles = lireLibelles();
+    const rayon = rayonFormes(); // taille des formes (réglage de l'appareil)
+    const echelle = echelleTexte(); // taille du texte (réglage de l'appareil)
     for (const { point, x, y } of visibles) {
       if (calques.points || rangs.has(point.nom)) {
         // Forme choisie pour le libellé (0.97.0) : rond plein, sinon carré, triangle, croix…
         const forme = formeDuNom(point.nom, libelles);
-        const trace = cheminForme(forme, x, y, 3.5);
+        const trace = cheminForme(forme, x, y, rayon);
         const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}`;
-        const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: 3.5, class: classe });
+        const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: rayon, class: classe });
         // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
         const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? couleursPoints.get(point);
         if (couleur) rond.style.color = couleur;
@@ -327,7 +331,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
       if (rangs.has(point.nom)) {
         // Point de la liste en cours : entouré, avec son numéro d'ordre.
-        groupePoints.append(creerElement('circle', { cx: x, cy: y, r: 8, class: 'selection' }));
+        groupePoints.append(creerElement('circle', { cx: x, cy: y, r: rayon + 4.5, class: 'selection' }));
         const rang = creerElement('text', { x: x - 5, y: y + 16, class: 'rang', 'text-anchor': 'end' });
         rang.textContent = rangs.get(point.nom);
         groupeNoms.append(rang);
@@ -348,8 +352,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         visibles.map(({ x, y }, i) => ({
           x,
           y,
-          largeur: Math.max(...textes[i].map((t) => t.length)) * 6.6,
-          hauteur: textes[i].length * 13,
+          largeur: Math.max(...textes[i].map((t) => t.length)) * 6.6 * echelle,
+          hauteur: textes[i].length * 13 * echelle,
         })),
       );
       places.forEach((place, i) => {
@@ -357,7 +361,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         textes[i].forEach((texte, ligne) => {
           const element = creerElement('text', {
             x: place.x,
-            y: place.y - (textes[i].length - 1 - ligne) * 13 - 2,
+            y: place.y - (textes[i].length - 1 - ligne) * 13 * echelle - 2,
             'text-anchor': place.aGauche ? 'end' : 'start',
             class: calques.noms && ligne === 0 ? '' : 'altitude',
           });

@@ -1057,7 +1057,7 @@ svg.plan {
 }
 
 .plan .noms text {
-  font-size: 11.2px;
+  font-size: calc(11.2px * var(--echelle-texte, 1));
   fill: var(--texte);
   paint-order: stroke;
   stroke: #fbfcfb;
@@ -1139,6 +1139,7 @@ body:has(.barre-edition:not([hidden])) .colonne-gauche {
   position: absolute;
   top: 10px;
   left: 10px;
+  max-width: calc(100% - 66px); /* sans recouvrir les boutons +/− du plan */
 }
 
 button.puce {
@@ -1172,7 +1173,7 @@ button.puce {
 
 .plan .noms text.altitude {
   fill: var(--gris);
-  font-size: 10.2px;
+  font-size: calc(10.2px * var(--echelle-texte, 1));
 }
 
 .plan .ligne-rupture {
@@ -4111,6 +4112,24 @@ svg.plan,
   flex: none;
 }
 
+.choix-taille {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 0 12px;
+}
+
+.choix-taille .titre-taille {
+  flex: 1 0 100%;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.choix-taille .puce-mode {
+  min-height: 38px;
+  font-size: 0.82rem;
+}
+
 .case-reglage {
   display: flex;
   align-items: center;
@@ -4533,8 +4552,12 @@ button.bouton-retour[data-action='inverserLigne'] {
   font-size: 0.85rem;
 }
 
-.plan-calques .puce + .puce {
-  margin-left: 4px;
+/* Les boutons passent à la ligne avant les boutons +/− du plan (le 3D restait caché dessous sur téléphone). */
+.plan-puces {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Liste des plans DXF (onglet Projet) : œil, nom court modifiable, couleur. */
@@ -8756,4 +8779,33 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   font-size: 0.75rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* Nom avec un préfixe fixe (0.104.0) : « LV- » ou « Surf- » à gauche, qu'on ne peut ni modifier ni effacer. */
+.champ-prefixe {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+}
+
+.champ-prefixe .prefixe-nom {
+  flex: none;
+  padding: 0 4px 0 8px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--bordure);
+  border-right: none;
+  border-radius: var(--rayon) 0 0 var(--rayon);
+  background: var(--fond-doux, #eef1ef);
+  font-weight: 700;
+  color: var(--gris);
+  user-select: none;
+}
+
+.champ-prefixe .prefixe-nom + input {
+  flex: 1;
+  min-width: 0;
+  border-radius: 0 var(--rayon) var(--rayon) 0;
 }
