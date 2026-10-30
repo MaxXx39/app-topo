@@ -83,9 +83,10 @@ import {
 import { segmentCroise, supprimerSegment, ajouterPointExistant, horsDuContour, supprimerPointDuLevee, placeDuPoint, nomDeLigne, suitesLibres, creerLignesDepuisSuites } from './topo/lignes-levee.js';
 import {
   creerRecollement, ajouterPointReseau, prochainNomReseau, nouvelleConduite, conduiteEnCours, ouvrageEnCours, dernierTroncon,
-  mesuresOuvrage, annulerDernierPointReseau, tronconsConduite, estOuvrage, ELEMENTS_RESEAU, traceDuRecollement,
+  mesuresOuvrage, annulerDernierPointReseau, tronconsConduite, estOuvrage, ELEMENTS_RESEAU, traceDuRecollement, nomsDuRecollement,
 } from './topo/reseau.js';
 import { lireReseaux, couleurDuReseau } from './leve/reseaux.js';
+import { genererCsvReseaux, genererDxfReseaux, ecrireLandXMLReseaux, pdfReseaux } from './export/reseaux.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
@@ -487,6 +488,7 @@ function calculDuPlan(surface) {
 const moduleExport = creerModuleExport(document.querySelector('#exporter-projet'), {
   exporterListe: (type, id) => exporterListe(type, id),
   exporterControles: (format) => exporterControles(format),
+  exporterReseaux: (format) => exporterReseaux(format),
   exporterImplantations: () => exporterImplantations(),
   exporterPlanRecale: (id) => exporterPlanRecale(id),
   exporterProjet: () => {
@@ -1510,6 +1512,35 @@ function exporterListe(type, id) {
 /** Implantations enregistrées (CSV). */
 function exporterImplantations() {
   telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nomDeFichierProjet(projet)}_implantations.csv`);
+}
+
+/**
+ * Recollements de réseaux (0.101.0) : CSV, DXF, LandXML ou PDF (voir export/reseaux.js), tous les
+ * levés de recollement du projet ensemble.
+ */
+function exporterReseaux(format) {
+  const couleurs = lireReseaux();
+  const reseaux = projet.reseaux.map((r) => {
+    const leve = projet.leves.find((l) => l.id === r.leveId) ?? { points: [] };
+    const noms = new Set(nomsDuRecollement(r));
+    return {
+      nom: r.nom,
+      reseau: r.reseau,
+      couleur: projet.couleursListes?.[r.id] ?? couleurDuReseau(r.reseau, couleurs),
+      trace: traceDuRecollement(r, leve),
+      points: leve.points.filter((p) => noms.has(p.nom)),
+    };
+  });
+  if (reseaux.length === 0) return;
+  const nom = `${nomDeFichierProjet(projet)}_reseaux`;
+  const texte = (contenu, type, extension) => telecharger(new Blob([contenu], { type }), `${nom}.${extension}`);
+  if (format === 'csv') texte('\ufeff' + genererCsvReseaux(reseaux), 'text/csv;charset=utf-8', 'csv');
+  else if (format === 'dxf') texte(octetsDxf(genererDxfReseaux(reseaux)), 'application/dxf', 'dxf');
+  else if (format === 'landxml') texte(ecrireLandXMLReseaux(reseaux, projet.nom || nom), 'application/xml', 'xml');
+  else if (format === 'pdf') {
+    const cartouche = { affaire: projet.cartouche?.affaire, lieu: projet.cartouche?.lieu, date: new Date().toLocaleDateString('fr-CH') };
+    telecharger(pdfReseaux(reseaux, cartouche), `${nom}.pdf`);
+  }
 }
 
 /** Contrôles et refus du projet : CSV ou PDF. */

@@ -189,7 +189,7 @@ export function prochainNomReseau(projet, recollement, element, forme = 'ronde')
 /**
  * Range un point pris avec le récepteur dans le levé de recollement.
  * point = { nom, est, nord, altitude } ; attributs = { element, forme ('ronde' / 'rect', ouvrages),
- * diametre (mm), materiau, remarque }. Un ouvrage rond est fini tout de suite ; un rectangulaire
+ * diametre (mm), materiau, remarque, profondeurFouille (m, tapée) }. Un ouvrage rond est fini tout de suite ; un rectangulaire
  * après son 3e coin. Un ouvrage fini est ajouté à la conduite en cours ; un point de conduite
  * aussi (une conduite commence, depuis le dernier ouvrage, s'il n'y en a pas).
  * Renvoie { point, ouvrage?, conduite? } ou { erreur }.
@@ -197,10 +197,10 @@ export function prochainNomReseau(projet, recollement, element, forme = 'ronde')
 export function ajouterPointReseau(projet, leve, recollement, point, attributs) {
   const nom = String(point.nom ?? '').trim();
   if (!nom) return { erreur: 'donne un nom au point' };
-  const { element, forme = 'ronde', diametre = null, materiau = '', remarque = '' } = attributs;
+  const { element, forme = 'ronde', diametre = null, materiau = '', remarque = '', profondeurFouille = null } = attributs;
   if (!ELEMENTS_RESEAU.some(([cle]) => cle === element)) return { erreur: 'élément inconnu' };
   if (nomsPris(projet).has(nom)) return { erreur: `le nom ${nom} est déjà pris dans ce projet` };
-  const range = { ...point, nom, element, diametre, materiau, remarque };
+  const range = { ...point, nom, element, diametre, materiau, remarque, profondeurFouille };
 
   if (estOuvrage(element)) {
     let ouvrage = ouvrageEnCours(recollement);
@@ -239,19 +239,20 @@ export function ajouterPointReseau(projet, leve, recollement, point, attributs) 
 }
 
 /**
- * Nœud d'une conduite avec sa position et son fil d'eau : { est, nord, filEau (ou null), nom }.
+ * Nœud d'une conduite avec sa position et son fil d'eau : { est, nord, altitude (dessus du tuyau ou
+ * tampon), filEau (ou null), nom, diametre, materiau }.
  * Point de conduite : fil d'eau = dessus − diamètre extérieur ; ouvrage : son radier.
  */
 export function noeudReseau(recollement, leve, noeud) {
   if (noeud.ouvrage) {
     const ouvrage = recollement.ouvrages.find((o) => o.id === noeud.ouvrage);
     if (!ouvrage?.centre) return null;
-    return { ...ouvrage.centre, filEau: radierChambre({ tampon: ouvrage.tampon, radier: ouvrage.radier, saisie: ouvrage.profondeurSaisie }), nom: ouvrage.nom };
+    return { ...ouvrage.centre, altitude: ouvrage.tampon, filEau: radierChambre({ tampon: ouvrage.tampon, radier: ouvrage.radier, saisie: ouvrage.profondeurSaisie }), nom: ouvrage.nom };
   }
   const point = leve.points.find((p) => p.nom === noeud.point);
   if (!point) return null;
   const filEau = point.diametre > 0 && point.altitude != null ? filDEauDepuisDessus(point.altitude, point.diametre) : null;
-  return { est: point.est, nord: point.nord, filEau, nom: point.nom };
+  return { est: point.est, nord: point.nord, altitude: point.altitude, filEau, nom: point.nom, diametre: point.diametre ?? null, materiau: point.materiau ?? '' };
 }
 
 /** Tronçons d'une conduite : [{ a, b, distance, pente, sens }] (voir penteTroncon). */
@@ -315,7 +316,7 @@ export function traceDuRecollement(recollement, leve) {
     .map((t) => ({ conduite: c.numero ? `T-${recollement.reseau}-${c.numero}` : '', ...t })));
   const ouvrages = recollement.ouvrages.filter((o) => o.centre).map((o) => ({
     nom: o.nom, type: o.type, forme: o.forme, centre: o.centre, coins: o.coins ?? null, tampon: o.tampon,
-    diametre: o.diametre ?? null, ...mesuresOuvrage(o),
+    diametre: o.diametre ?? null, materiau: o.materiau ?? '', remarque: o.remarque ?? '', ...mesuresOuvrage(o),
   }));
   return { troncons, ouvrages };
 }

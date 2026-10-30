@@ -16,6 +16,7 @@ const SORTES = [
   ['plan', 'Plan et volumes', 'intermediaire'],
   ['mesures', 'Mesures / métrés', 'intermediaire'],
   ['listes', 'Listes de points', 'intermediaire'],
+  ['reseaux', 'Réseaux (recollement)', 'intermediaire'],
   ['controles', 'Contrôles', ''],
   ['implantations', 'Implantations', 'expert'],
   ['dxf', 'Plans DXF recalés', 'expert'],
@@ -23,7 +24,7 @@ const SORTES = [
 ];
 
 /**
- * Crée le bloc dans "conteneur". actions : exporterListe(type, id), exporterControles(format),
+ * Crée le bloc dans "conteneur". actions : exporterListe(type, id), exporterControles(format), exporterReseaux(format),
  * exporterImplantations(), exporterPlanRecale(id), exporterProjet().
  * Renvoie { zone(cle) (zone d'une partie, pour y poser un formulaire), afficher(projet) }.
  */
@@ -55,6 +56,7 @@ export function creerModuleExport(conteneur, actions) {
     const { export: quoi, type, id, format } = bouton.dataset;
     if (quoi === 'liste') actions.exporterListe(type, id);
     else if (quoi === 'controles') actions.exporterControles(format);
+    else if (quoi === 'reseaux') actions.exporterReseaux(format);
     else if (quoi === 'implantations') actions.exporterImplantations();
     else if (quoi === 'dxf') actions.exporterPlanRecale(id);
     else if (quoi === 'projet') actions.exporterProjet();
@@ -82,6 +84,12 @@ export function creerModuleExport(conteneur, actions) {
     panneau('listes').innerHTML = lignes.length > 0
       ? `<div class="lignes-export">${lignes.map(([nom, detail, attributs]) => `<div class="ligne-export"><span><strong>${echapper(nom)}</strong> <span class="aide">${echapper(detail)}</span></span>${bouton('TXT · CSV · DXF', attributs)}</div>`).join('')}</div>`
       : '<p class="vide">Aucune liste de points.</p>';
+    // Recollements de réseaux (0.101.0) : tous ensemble, un calque (DXF) ou un réseau (LandXML) par levé.
+    const nbReseaux = (projet.reseaux ?? []).length;
+    panneau('reseaux').innerHTML = nbReseaux > 0
+      ? `<p class="aide">${nbReseaux} levé(s) de recollement</p>
+        <div class="ligne-outils">${['CSV', 'DXF', 'LandXML', 'PDF'].map((f) => bouton(f, `data-export="reseaux" data-format="${f.toLowerCase()}"`)).join('')}</div>`
+      : '<p class="vide">Aucun recollement de réseau.</p>';
     const nbControles = projet.controles.length;
     panneau('controles').innerHTML = nbControles > 0
       ? `<p class="aide">${nbControles} contrôle(s) et refus notés dans le projet</p>

@@ -243,6 +243,6 @@ ${blocs.join('\n')}
 }
 
 /** Protège les caractères spéciaux du XML (&, <, >, "). */
-function encoderEntites(texte) {
+export function encoderEntites(texte) {
   return String(texte).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }

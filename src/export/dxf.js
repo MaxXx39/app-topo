@@ -131,7 +131,7 @@ export function genererDxfMesures({ points, mesures }) {
 }
 
 /** Texte complet du fichier DXF : en-tête, calques (nom -> couleur), puis les entités. */
-function ecrireDxf(calques, entites) {
+export function ecrireDxf(calques, entites) {
   const lignes = [
     '0', 'SECTION', '2', 'HEADER', '9', '$ACADVER', '1', 'AC1009', '9', '$INSUNITS', '70', '6', '0', 'ENDSEC',
     '0', 'SECTION', '2', 'TABLES', '0', 'TABLE', '2', 'LAYER', '70', String(calques.size),
@@ -145,7 +145,7 @@ function ecrireDxf(calques, entites) {
 }
 
 /** Codes DXF d'un point : X (10+n), Y (20+n), Z (30+n). */
-function xyz(p, n) {
+export function xyz(p, n) {
   return [String(10 + n), arrondi(p.est), String(20 + n), arrondi(p.nord), String(30 + n), arrondi(p.altitude ?? 0)];
 }
 
@@ -153,17 +153,17 @@ function xyz(p, n) {
  * Texte centré sur un point (hauteur en m, angle en degrés depuis l'Est, sens inverse des aiguilles
  * d'une montre). couleur : numéro de couleur AutoCAD, ou null pour la couleur du calque.
  */
-function texteCentre(p, hauteur, angle, texte, calque, couleur = null) {
+export function texteCentre(p, hauteur, angle, texte, calque, couleur = null) {
   return ['0', 'TEXT', '8', calque, ...codeCouleur(couleur), ...xyz(p, 0), '40', String(hauteur), '1', texte, '50', angle.toFixed(2), '72', '1', ...xyz(p, 1)];
 }
 
 /** Code DXF d'une couleur propre à l'entité (62), ou rien pour garder la couleur du calque. */
-function codeCouleur(couleur) {
+export function codeCouleur(couleur) {
   return couleur === null ? [] : ['62', String(couleur)];
 }
 
 /** Texte sans accent ni signe spécial, lu partout dans un DXF R12 (« Déniv. » -> « Deniv. », « m² » -> « m2 »). */
-function texteAscii(texte) {
+export function texteAscii(texte) {
   return texte
     .replaceAll('²', '2')
     .replaceAll('·', '-')
@@ -177,7 +177,7 @@ function face3D([a, b, c], calque) {
 }
 
 /** Polyligne 3D (fermée ou non). couleur : numéro de couleur AutoCAD, ou null pour la couleur du calque. */
-function polyligne3D(sommets, fermee, calque, couleur = null) {
+export function polyligne3D(sommets, fermee, calque, couleur = null) {
   return [
     ['0', 'POLYLINE', '8', calque, ...codeCouleur(couleur), '66', '1', '10', '0', '20', '0', '30', '0', '70', String(8 + (fermee ? 1 : 0))],
     ...sommets.map((p) => ['0', 'VERTEX', '8', calque, ...codeCouleur(couleur), ...xyz(p, 0), '70', '32']),
@@ -186,7 +186,7 @@ function polyligne3D(sommets, fermee, calque, couleur = null) {
 }
 
 /** Nom de calque accepté par AutoCAD : majuscules, sans accent ni espace. */
-function nomDeCalque(texte) {
+export function nomDeCalque(texte) {
   return texte
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
