@@ -28,7 +28,7 @@ import { creerModuleExport } from './export/module.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface } from './topo/coupe.js';
-import { guidageLame, ligneDeCoupeLame, TOLERANCES_LAME, pointDeProfil, avantDeLaLame, vecteurAzimut, tronconsProfil, bordsDeLaLame } from './topo/lame.js';
+import { guidageLame, ligneDeCoupeLame, TOLERANCES_LAME, pointDeProfil, tronconsProfil, bordsDeLaLame, sensCoupeLame, COUPE_DEVANT, COUPE_DERRIERE } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -145,7 +145,8 @@ const terrain = {
   talus: { horizontal: null, vertical: null, ligneEst: 'haut', cote: 'droite', longueur: null, terrainId: null, altitudeSurfaceId: null },
   // Guidage de lame à 2 RX2 (mode Lame, voir topo/lame.js) : surface suivie, gauche / droite inversés, tolérances (m).
   // Profil en long (0.73.0) : point de la lame ('gauche', 'milieu', 'droite'), longueur devant et derrière (m).
-  lame: { surfaceId: null, inverse: false, tolerances: { ...TOLERANCES_LAME }, pointProfil: 'milieu', devant: 20, derriere: 5 },
+  // Machine (0.100.0) : 'grader' ou 'bull' (sens de la coupe, voir topo/lame.js sensCoupeLame).
+  lame: { surfaceId: null, inverse: false, tolerances: { ...TOLERANCES_LAME }, machine: 'grader' },
   ...lireReglagesTerrain(),
 };
 // Orientation (0.90.1) : toujours le cap du GNSS (la direction de marche sert en secours, sans le dire).
@@ -157,7 +158,7 @@ terrain.libelleLigne = '';
 terrain.libellePoint = '';
 terrain.libelleAire = '';
 // Anciens réglages (avant 0.73.0) : le profil en long prend ses valeurs de départ.
-terrain.lame = { pointProfil: 'milieu', devant: 20, derriere: 5, ...terrain.lame };
+terrain.lame = { machine: 'grader', ...terrain.lame };
 // Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
 // point à implanter en cours ({ id (point de la liste « À implanter », ou null), nom, est, nord, altitude }).
 // Implantation d'une ligne : points choisis pour la faire (pointsLigne : [{ est, nord, altitude, nom }])
@@ -938,19 +939,9 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         afficherMessage(terrain.lame.inverse ? 'Gauche = récepteur 2, droite = récepteur 1' : 'Gauche = récepteur 1, droite = récepteur 2', 3000);
         montrerLame();
       },
-      choisirPointProfil: (point) => {
-        terrain.lame.pointProfil = ['gauche', 'droite'].includes(point) ? point : 'milieu';
-        retenirReglagesTerrain();
-        recalculer();
-      },
-      reglerProfilLame: (cle, texte) => {
-        const metres = lireNombreTape(texte);
-        if (!(metres >= 0 && metres <= 500)) {
-          afficherMessage('Longueur illisible : un nombre de mètres entre 0 et 500', 4000);
-          recalculer();
-          return;
-        }
-        terrain.lame[cle === 'derriere' ? 'derriere' : 'devant'] = metres;
+      // Machine (0.100.0) : Grader (coupe dans le sens de marche) ou Bull (perpendiculaire à la lame).
+      choisirMachine: (machine) => {
+        terrain.lame.machine = machine === 'bull' ? 'bull' : 'grader';
         retenirReglagesTerrain();
         recalculer();
       },
@@ -1984,10 +1975,11 @@ function calculerLame() {
     || (triangles.length === 0 && 'Ce levé n\'a pas encore de triangles')
     || raisonRecepteurLame(etatG, nomG)
     || raisonRecepteurLame(etatD, nomD);
-  if (raison) return { raison, guidage: null, coupe: null, coins };
+  const recepteurs = { gauche: etatG, droite: etatD };
+  if (raison) return { raison, guidage: null, coupe: null, coins, recepteurs };
   if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
   const guidage = guidageLame({ gauche: coins.gauche, droite: coins.droite, altitudeSurface: chercheurLame.chercher, tolerances: terrain.lame.tolerances });
-  if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coupe: null, coins };
+  if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coupe: null, coins, recepteurs };
   const ligne = ligneDeCoupeLame(coins.gauche, coins.droite, 1);
   const coupe = {
     longueur: guidage.largeur + 2,
@@ -1995,30 +1987,32 @@ function calculerLame() {
     gauche: { distance: 1, altitude: coins.gauche.altitude },
     droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
   };
-  return { raison: null, guidage, coupe, coins, bords: bordsDeLaLame(coins.gauche, coins.droite, triangles), profil: profilEnLongLame(coins, triangles) };
+  return { raison: null, guidage, coupe, coins, recepteurs, bords: bordsDeLaLame(coins.gauche, coins.droite, triangles), profil: coupePerpendiculaireLame(coins, triangles) };
 }
 
 /**
- * Profil en long de la lame : depuis le point choisi (gauche, milieu, droite), dans le sens de marche
- * (dernières positions du milieu de la lame ; arrêté : perpendiculaire à la lame, vers l'avant),
- * de "derrière" m derrière à "devant" m devant. Tronçons et ruptures de pente de plus de 0.5 %.
+ * Coupe perpendiculaire de la lame (0.100.0, remplace le profil en long) : depuis le milieu de la
+ * lame, 20 m devant et 10 m derrière ; Bull : perpendiculaire à la lame ; Grader : dans le sens de
+ * marche (dernières positions du milieu), perpendiculaire à la lame à l'arrêt. Tronçons et ruptures
+ * de pente de plus de 0.5 %.
  */
-function profilEnLongLame(coins, triangles) {
+function coupePerpendiculaireLame(coins, triangles) {
   const milieu = pointDeProfil(coins.gauche, coins.droite, 'milieu');
   const maintenant = performance.now();
   historiqueLame.push({ est: milieu.est, nord: milieu.nord, temps: maintenant });
   while (historiqueLame.length > 0 && maintenant - historiqueLame[0].temps > 10_000) historiqueLame.shift();
   const azimut = directionDeMarche(historiqueLame, { distanceMin: 1, dureeMax: 5000 });
-  const sens = azimut == null ? avantDeLaLame(coins.gauche, coins.droite) : vecteurAzimut(azimut);
+  const sens = sensCoupeLame(terrain.lame.machine, coins.gauche, coins.droite, azimut);
   if (!sens) return null;
-  const { devant, derriere, pointProfil } = terrain.lame;
-  const point = pointDeProfil(coins.gauche, coins.droite, pointProfil);
-  const debut = { est: point.est - sens.est * derriere, nord: point.nord - sens.nord * derriere };
-  const fin = { est: point.est + sens.est * devant, nord: point.nord + sens.nord * devant };
+  const devant = COUPE_DEVANT;
+  const derriere = COUPE_DERRIERE;
+  const debut = { est: milieu.est - sens.est * derriere, nord: milieu.nord - sens.nord * derriere };
+  const fin = { est: milieu.est + sens.est * devant, nord: milieu.nord + sens.nord * devant };
   // Distances comptées depuis la lame (négatives derrière).
   const morceaux = profilSurface(triangles, debut, fin).map((m) => m.map((p) => ({ distance: p.distance - derriere, altitude: p.altitude })));
   const { troncons, ruptures } = tronconsProfil(morceaux, 0.5);
-  return { morceaux, troncons, ruptures, devant, derriere, altitude: point.altitude, source: azimut == null ? 'lame' : 'marche' };
+  const enMarche = terrain.lame.machine === 'grader' && azimut != null;
+  return { morceaux, troncons, ruptures, devant, derriere, altitude: milieu.altitude, source: enMarche ? 'marche' : 'lame' };
 }
 
 /** Écran Lame et lame sur le plan, avec les derniers états des 2 récepteurs. */
@@ -3235,9 +3229,7 @@ function donneesCommunes() {
       surfaceId: terrain.lame.surfaceId,
       inverse: terrain.lame.inverse,
       tolerances: terrain.lame.tolerances,
-      pointProfil: terrain.lame.pointProfil,
-      devant: terrain.lame.devant,
-      derriere: terrain.lame.derriere,
+      machine: terrain.lame.machine,
       recepteur2: Boolean(etatRecepteur2?.connecte),
     },
     autocontrole: donneesAutocontrole(),

@@ -124,3 +124,19 @@ describe('bords de la surface dans le prolongement de la lame', () => {
     expect(bords).toEqual({ gauche: null, droite: null });
   });
 });
+
+describe('sens de la coupe de la lame (0.100.0)', () => {
+  it('bull : perpendiculaire à la lame ; grader : sens de marche, ou perpendiculaire à l\'arrêt', async () => {
+    const { sensCoupeLame } = await import('../src/topo/lame.js');
+    // Lame d'ouest (gauche) en est (droite) : l'avant est au nord.
+    const gauche = { est: 0, nord: 0, altitude: 0 };
+    const droite = { est: 3, nord: 0, altitude: 0 };
+    const bull = sensCoupeLame('bull', gauche, droite, 45);
+    expect(bull.est).toBeCloseTo(0);
+    expect(bull.nord).toBeCloseTo(1);
+    const grader = sensCoupeLame('grader', gauche, droite, 45);
+    expect(grader.est).toBeCloseTo(Math.SQRT1_2);
+    expect(grader.nord).toBeCloseTo(Math.SQRT1_2);
+    expect(sensCoupeLame('grader', gauche, droite, null).nord).toBeCloseTo(1);
+  });
+});

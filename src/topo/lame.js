@@ -170,3 +170,22 @@ export function tronconsProfil(morceaux, seuil = 0.5) {
 function tronconEntre(a, b) {
   return { debut: a.distance, fin: b.distance, pente: ((b.altitude - a.altitude) / (b.distance - a.distance)) * 100 };
 }
+
+// --- Coupe perpendiculaire (0.100.0, demande du 30.10.2026 : remplace le profil en long) ---
+
+// Longueurs de la coupe : 20 m devant la lame, 10 m derrière (choix de l'utilisateur).
+export const COUPE_DEVANT = 20;
+export const COUPE_DERRIERE = 10;
+
+/**
+ * Sens de la coupe (vecteur unitaire { est, nord }, vers l'avant), selon la machine :
+ * - 'bull' : la lame est toujours perpendiculaire à l'avancement : coupe perpendiculaire à la lame
+ *   (ligne entre les 2 GNSS) ;
+ * - 'grader' : la lame peut être en biais : coupe dans le sens de marche (azimutMarche, en degrés),
+ *   ou perpendiculaire à la lame si la machine est arrêtée (azimutMarche null).
+ * Renvoie null si la lame est trop courte pour connaître son sens.
+ */
+export function sensCoupeLame(machine, gauche, droite, azimutMarche = null) {
+  if (machine === 'grader' && azimutMarche != null) return vecteurAzimut(azimutMarche);
+  return avantDeLaLame(gauche, droite);
+}

@@ -7110,23 +7110,6 @@ body.mode-telephone .bouton.bouton-prendre {
   color: #ffffff;
 }
 
-/* Terrain › Lame, profil en long (0.73.0) : choix du point, longueurs, pentes, ruptures, niveleuse. */
-.reglages-profil-lame {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin: 10px 0 6px;
-}
-
-.reglages-profil-lame .titre-profil {
-  font-weight: 800;
-}
-
-.reglages-profil-lame input {
-  width: 52px;
-}
-
 .svg-profil-lame {
   max-height: 180px;
 }
@@ -7149,35 +7132,6 @@ body.mode-telephone .bouton.bouton-prendre {
 .svg-coupe-lame .distance-profil {
   fill: #9a3412;
   font-size: 9px;
-}
-
-.svg-coupe-lame .niveleuse path,
-.svg-coupe-lame .niveleuse rect,
-.svg-coupe-lame .niveleuse circle {
-  fill: #f59e0b;
-  stroke: #1b2b36;
-  stroke-width: 1;
-}
-
-.svg-coupe-lame .niveleuse .cabine {
-  fill: #fde68a;
-}
-
-.svg-coupe-lame .niveleuse .mat {
-  fill: none;
-  stroke: #1b2b36;
-  stroke-width: 1.5;
-}
-
-.svg-coupe-lame .niveleuse .antenne {
-  fill: #1d4ed8;
-  stroke: none;
-}
-
-.svg-coupe-lame .niveleuse .lame {
-  fill: none;
-  stroke: #1b2b36;
-  stroke-width: 3;
 }
 
 /* Lecture seule (0.76.0) : un autre appareil a la main. On voit et on implante, mais les boutons
@@ -8403,4 +8357,81 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   min-height: 0;
   border-radius: 8px;
   touch-action: none;
+}
+
+/* Guidage (0.100.0) : Grader / Bull, grosses flèches monter / descendre, état des 2 GNSS, lame jaune. */
+.choix-machine {
+  gap: 18px;
+}
+
+.case-machine {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.case-machine .carre-case {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #1d4ed8;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.case-machine.actif .carre-case {
+  background: #1d4ed8;
+}
+
+.coin-lame {
+  justify-items: center;
+}
+
+.grosse-fleche-lame {
+  width: 72px;
+  height: 86px;
+  fill: currentColor;
+}
+
+.coin-lame .altitude-coin {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.recepteurs-lame {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.recepteur-lame {
+  display: grid;
+  gap: 1px;
+  padding: 6px 8px;
+  border: 1px solid var(--bordure, #e5e7eb);
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.recepteur-lame .statut-vert { color: #15803d; font-weight: 700; }
+.recepteur-lame .statut-orange { color: #c2410c; font-weight: 700; }
+.recepteur-lame .statut-rouge { color: #b91c1c; font-weight: 700; }
+
+.svg-coupe-lame .lame-jaune {
+  fill: rgba(250, 204, 21, 0.45);
+  stroke: #ca8a04;
+  stroke-width: 1;
 }
