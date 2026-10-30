@@ -54,6 +54,7 @@ import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
 import { lireLibelles } from './leve/libelles.js';
+import { modifierLibellesDeSorte } from './leve/fenetre-libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
 import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele } from './topo/ligne-implantation.js';
@@ -926,6 +927,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         retenirReglagesTerrain();
         recalculer();
       },
+      modifierLibelles: (sorte) => modifierLibellesDeSorte(sorte, recalculer),
       choisirMode: choisirModeTerrain,
       // --- Guidage de lame (mode Lame) ---
       choisirSurfaceLame: (id) => {

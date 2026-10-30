@@ -939,7 +939,7 @@ export function creerEcranLeve(conteneur, actions) {
       <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong><i class="symbole-libelle">${symboleDeForme('')}</i>Aucun</strong><span>sans libellé</span></button>
       ${liste.map(([abreviation, signification, couleur, forme]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
           <strong><i class="symbole-libelle" ${couleur ? `style="color: ${couleur}"` : ''}>${symboleDeForme(forme)}</i>${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
-
+      <button type="button" class="bouton-crayon-libelles" data-action="modifierLibelles" data-valeur="${sorte}" title="Ajouter ou modifier des libellés" aria-label="Ajouter ou modifier des libellés">⚙</button>
     </div>
 `;
   }

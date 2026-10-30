@@ -4,7 +4,7 @@
 // la toucher ouvre la palette (ronds de couleur) sous la ligne. Les libellés de départ (fixes) ne
 // se modifient pas et ne s'enlèvent pas : seule leur couleur se change.
 import { echapper } from '../outils/echapper.js';
-import { nettoyerAbreviation, COULEURS_LIBELLES } from './libelles.js';
+import { nettoyerAbreviation, COULEURS_LIBELLES, lireLibelles, enregistrerLibelles, abreviationsDepart } from './libelles.js';
 import { FORMES } from '../plan/formes.js';
 
 /** Nom d'une couleur de la palette (« noir »…), « habituelle » pour pas de couleur choisie. */
@@ -96,4 +96,25 @@ export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b728
   dessiner();
   document.body.append(fenetre);
   fenetre.showModal();
+}
+
+const TITRES_LIBELLES = { lignes: 'Libellés des lignes (L-…)', points: 'Libellés des points (P-…)', aires: 'Libellés des aires (A-…)' };
+
+/**
+ * Modifie la liste de libellés d'une sorte ('lignes', 'points', 'aires') : ceux de départ gardent
+ * leur nom (couleur et forme modifiables), ceux ajoutés se modifient ; enregistré dans les listes
+ * partagées (Drive), donc valable partout. apres() est appelé une fois enregistré.
+ */
+export function modifierLibellesDeSorte(sorte, apres) {
+  const tous = lireLibelles();
+  ouvrirFenetreLibelles({
+    titre: TITRES_LIBELLES[sorte],
+    liste: tous[sorte],
+    fixes: abreviationsDepart(sorte),
+    couleurParDefaut: { lignes: '#ea580c', points: '#15803d', aires: '#0891b2' }[sorte],
+    enregistrer: (liste) => {
+      enregistrerLibelles({ ...tous, [sorte]: liste });
+      apres?.();
+    },
+  });
 }

@@ -42,12 +42,12 @@ export const COULEURS_LISTES = [
 
 // Catégories du menu « Afficher », dans l'ordre, avec leur titre.
 export const SECTIONS = [
-  ['controle', 'Contrôle'],
   ['leve', 'Levé'],
+  ['points', 'Points Import'],
+  ['controle', 'Contrôle'],
   ['surface', 'Surface Import'],
   ['dessin', 'Dessin'],
   ['metre', 'Métré'],
-  ['points', 'Points Import'],
 ];
 
 const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? []).flatMap((l) => l.noms), ...(s.points ?? [])];

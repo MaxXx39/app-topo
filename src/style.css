@@ -5492,6 +5492,24 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   letter-spacing: 0.04em;
 }
 
+/* Titres des catégories du menu « Afficher » : bandeau de couleur pour les repérer. */
+.titre-partie-menu[class*='section-menu-'] {
+  --teinte-section: var(--gris);
+  margin: 10px 0 4px;
+  padding: 5px 8px;
+  border-left: 4px solid var(--teinte-section);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--teinte-section) 16%, var(--surface));
+  color: var(--texte);
+}
+
+.section-menu-leve { --teinte-section: var(--succes); }
+.section-menu-points { --teinte-section: var(--bleu); }
+.section-menu-controle { --teinte-section: var(--rouge); }
+.section-menu-surface { --teinte-section: #7c3aed; }
+.section-menu-dessin { --teinte-section: var(--ambre-fonce); }
+.section-menu-metre { --teinte-section: var(--cyan); }
+
 .pastille-liste.liste-mesures { background: #0891b2; }
 
 /* Libellés du levé : boutons plus petits ; le crayon « modifier » reste toujours visible à droite

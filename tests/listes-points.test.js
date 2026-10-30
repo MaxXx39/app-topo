@@ -22,15 +22,15 @@ function projetEssai() {
 }
 
 describe('Listes de points du plan', () => {
-  it('rangées par catégories (0.94.0) : Levé (levés et levés libres), Surface Import, Métré, Points Import', () => {
+  it('rangées par catégories (0.94.0) : Levé (levés et levés libres), Points Import, Surface Import, Métré', () => {
     const listes = listesDePoints(projetEssai());
     expect(listes.map((l) => [l.id, l.nature, l.section])).toEqual([
       ['s1', 'stock', 'leve'], ['o1', 'autres', 'leve'],
+      ['f', 'fichier', 'points'], ['a', 'ajoutes', 'points'],
       ['lx', 'importee', 'surface'],
       ['m1', 'metre', 'metre'],
-      ['f', 'fichier', 'points'], ['a', 'ajoutes', 'points'],
     ]);
-    expect(listes.filter((l) => l.couleurModifiable).map((l) => l.id)).toEqual(['lx', 'f', 'a']);
+    expect(listes.filter((l) => l.couleurModifiable).map((l) => l.id)).toEqual(['f', 'a', 'lx']);
   });
 
   it('mesures dessinées : celles des métrés cochés et, si « Mesures » est cochée, celles faites à la main', () => {
@@ -50,7 +50,7 @@ describe('Listes de points du plan', () => {
     montrerListe(projet, 'f', false);
     montrerListe(projet, 'o1', false);
     // Reste : Stock 1 (b1, b2, h1), Métré 1 (A-ENR-1-1), Points ajoutés (P1).
-    expect(pointsDesListes(projet, listesDePoints(projet)).map((p) => p.nom)).toEqual(['b1', 'b2', 'h1', 'A-ENR-1-1', 'P1']);
+    expect(pointsDesListes(projet, listesDePoints(projet)).map((p) => p.nom)).toEqual(['b1', 'b2', 'h1', 'P1', 'A-ENR-1-1']);
     montrerListe(projet, 'f', true);
     expect(projet.listesCachees).toEqual(['o1']);
   });
