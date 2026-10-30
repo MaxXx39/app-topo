@@ -19,13 +19,15 @@
 // sur Drive et qu'il n'a pas reçue (par ex. après plus de 15 minutes sans réseau) : il prend
 // d'abord la version de Drive (voir changeAilleurs).
 import { TYPE_DOSSIER } from './drive.js';
-import { projetVersFichiers, fichiersVersProjet, comprimer, decomprimer, empreinte, FICHIER_PROJET } from './fichiers.js';
+import { projetVersFichiers, fichiersVersProjet, comprimer, decomprimer, empreinte, sansContenu, FICHIER_PROJET } from './fichiers.js';
 
 export const NOM_RACINE = 'App Topo';
 export const NOM_PROJETS = 'Configuration Projet';
 // Signe de vie de l'appareil qui a le projet (ms), et durée après laquelle son verrou expire.
 export const SIGNE_DE_VIE = 5 * 60 * 1000;
 export const VERROU_EXPIRE = 15 * 60 * 1000;
+// Un fichier gzip fait au moins 20 octets : en dessous, le fichier de Drive est vide ou abîmé.
+const TAILLE_MIN_GZIP = 20;
 
 /**
  * Vrai si le verrou { appareilId, nom, depuis, vu } compte encore : signe de vie de moins de
@@ -52,10 +54,16 @@ export function changeAilleurs(proprietes, memoire, appareilId) {
   return (proprietes.envoyePar ?? proprietes.verrouPar) !== appareilId;
 }
 
-/** Nom lisible d'un fichier du dossier Drive d'un projet (pour les messages d'erreur). */
-export function decrireFichier(nom) {
+/**
+ * Nom lisible d'un fichier du dossier Drive d'un projet (pour les messages d'erreur) ; projet
+ * (facultatif) donne le nom du plan DXF.
+ */
+export function decrireFichier(nom, projet = null) {
   if (nom === FICHIER_PROJET) return 'fichier du projet';
-  if (nom.startsWith('plan-')) return `plan DXF (${nom})`;
+  if (nom.startsWith('plan-')) {
+    const plan = (projet?.plansDxf ?? []).find((p) => `plan-${p.id}.json.gz` === nom);
+    return plan ? `plan DXF « ${plan.nom} »` : `plan DXF (${nom})`;
+  }
   if (nom.startsWith('photo-')) return `photo (${nom})`;
   return nom;
 }
@@ -141,7 +149,13 @@ export function creerSynchro(drive, appareil) {
         dossier = await drive.creerDossier(court(titre), await racine(), proprietes);
       }
 
-      const existants = new Map((await drive.listerDossier(dossier.id)).map((f) => [f.name, f]));
+      // Fichiers déjà sur Drive ; un même nom en double (ancien envoi interrompu) est mis à part.
+      const existants = new Map();
+      const doubles = [];
+      for (const f of await drive.listerDossier(dossier.id)) {
+        if (existants.has(f.name)) doubles.push(f);
+        else existants.set(f.name, f);
+      }
       const fichiers = projetVersFichiers(projet);
       const empreintes = {};
       // Le projet en dernier : quand il arrive, les plans et les photos sont déjà là.
@@ -149,14 +163,20 @@ export function creerSynchro(drive, appareil) {
       for (const nom of noms) {
         const contenu = fichiers.get(nom);
         empreintes[nom] = await empreinte(contenu);
+        // Plan ou photo illisible quand le projet a été ouvert : la copie de Drive n'est pas touchée.
+        if (sansContenu(nom, contenu)) continue;
         const existant = existants.get(nom);
-        if (existant && memoire?.empreintes?.[nom] === empreintes[nom]) continue; // pas changé
+        const enDouble = doubles.filter((f) => f.name === nom);
+        // Fichier vide ou abîmé sur Drive, ou en double : renvoyé même s'il n'a pas changé ici (0.103.6).
+        const abime = existant?.size != null && Number(existant.size) < TAILLE_MIN_GZIP;
+        if (existant && !abime && !enDouble.length && memoire?.empreintes?.[nom] === empreintes[nom]) continue; // pas changé
         const blob = await comprimer(contenu);
         if (existant) await drive.ecrireContenu(existant.id, new Blob([blob], { type: 'application/gzip' }));
         else await drive.creerFichier(nom, dossier.id, new Blob([blob], { type: 'application/gzip' }));
+        for (const f of enDouble) await drive.supprimer(f.id);
       }
       // Plans ou photos enlevés du projet : à la corbeille de Drive.
-      for (const [nom, fichier] of existants) if (!fichiers.has(nom)) await drive.supprimer(fichier.id);
+      for (const f of [...existants.values(), ...doubles]) if (!fichiers.has(f.name)) await drive.supprimer(f.id);
 
       // Main prise par un autre appareil pendant l'envoi : on ne lui reprend pas le verrou.
       const prisEntreTemps = verrouDe(await drive.decrire(dossier.id));
@@ -166,23 +186,33 @@ export function creerSynchro(drive, appareil) {
       return { memoire: { dossierId: dossier.id, envoyeLe: projet.modifieLe ?? null, distantVu: modifieLe, empreintes } };
     },
 
-    /** Télécharge un projet de Drive. Renvoie { projet, memoire, verrou, modifieLe }. */
+    /**
+     * Télécharge un projet de Drive. Renvoie { projet, memoire, verrou, modifieLe, illisibles }.
+     * Un plan DXF ou une photo illisible n'empêche pas d'ouvrir le projet (0.103.6) : il arrive sans
+     * son contenu et illisibles le nomme (« plan DXF « Axe.dxf » ») ; le fichier du projet, lui, est
+     * indispensable. Un nom en double : le premier fichier lisible est gardé.
+     */
     async telecharger(dossierId) {
       const dossier = await drive.decrire(dossierId);
       const lus = new Map();
+      const erreurs = new Map();
       const empreintes = {};
       for (const fichier of await drive.listerDossier(dossierId)) {
+        if (lus.has(fichier.name)) continue;
         let objet;
         try {
           objet = await decomprimer(await drive.lire(fichier.id));
         } catch (erreur) {
-          // Le message dit quel fichier du dossier Drive pose problème (plan DXF, photo, projet).
-          throw new Error(`${decrireFichier(fichier.name)} : ${erreur.message}`);
+          erreurs.set(fichier.name, erreur.message);
+          continue;
         }
         lus.set(fichier.name, objet);
         empreintes[fichier.name] = await empreinte(objet);
       }
+      // Le message dit quel fichier du dossier Drive pose problème.
+      if (!lus.has(FICHIER_PROJET) && erreurs.has(FICHIER_PROJET)) throw new Error(`${decrireFichier(FICHIER_PROJET)} : ${erreurs.get(FICHIER_PROJET)}`);
       const projet = fichiersVersProjet(lus);
+      const illisibles = [...erreurs.keys()].filter((nom) => !lus.has(nom)).map((nom) => decrireFichier(nom, projet));
       // distantVu : la date de Drive lue avant les fichiers (si un envoi arrive pendant la lecture,
       // il sera vu comme nouveau et relu).
       return {
@@ -190,6 +220,7 @@ export function creerSynchro(drive, appareil) {
         memoire: { dossierId, envoyeLe: projet.modifieLe ?? null, distantVu: dossier.appProperties?.modifieLe ?? null, empreintes },
         verrou: verrouDe(dossier),
         modifieLe: dossier.appProperties?.modifieLe ?? projet.modifieLe ?? null,
+        illisibles,
       };
     },
 

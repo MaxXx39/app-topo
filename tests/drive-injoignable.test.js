@@ -80,7 +80,7 @@ describe('Drive injoignable', () => {
     expect(essais).toBe(1);
   });
 
-  it('ouverture impossible : le message dit quel fichier du dossier Drive pose problème', async () => {
+  it('plan DXF jamais lu (réseau) : le projet s\'ouvre sans lui, et il est nommé (0.103.6)', async () => {
     const drive = fauxDrive();
     const synchro = creerSynchro(drive, { id: 'app-a', nom: 'A' });
     const projet = creerProjet('Essai');
@@ -92,6 +92,8 @@ describe('Drive injoignable', () => {
       if (drive.fichiers.get(id).name.startsWith('plan-')) throw new Error('réponse de Google Drive coupée en cours de route (réseau ?)');
       return lire(id);
     };
-    await expect(synchro.telecharger(memoire.dossierId)).rejects.toThrow('plan DXF (plan-p1.json.gz) : réponse de Google Drive coupée en cours de route (réseau ?)');
+    const lu = await synchro.telecharger(memoire.dossierId);
+    expect(lu.illisibles).toEqual(['plan DXF « Ter A.dxf »']);
+    expect(lu.projet.plansDxf[0].contenu).toBeNull();
   });
 });

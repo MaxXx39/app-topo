@@ -22,7 +22,7 @@ export function fauxDrive() {
   const verifier = () => {
     if (panne.active) throw new Error('Google Drive injoignable (réseau ?)');
   };
-  const copie = (f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, trashed: f.trashed, appProperties: { ...f.appProperties } });
+  const copie = (f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, trashed: f.trashed, appProperties: { ...f.appProperties }, ...(f.contenu !== undefined ? { size: String(f.contenu?.size ?? 0) } : {}) });
   return {
     fichiers,
     ecritures,

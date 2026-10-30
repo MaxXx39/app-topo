@@ -201,6 +201,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     await ouvrirTelecharge(lu, gen);
     if (attente) dernierSigneDeVie = Date.now();
     changer(attente ? 'a-jour' : 'rendu');
+    if (lu.illisibles?.length) message(`Projet mis à jour${sansFichiers(lu)}`);
     quandMainRendue(nom, { repris: Boolean(attente) });
   }
 
@@ -217,6 +218,11 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     const ouvert = obtenirProjet();
     if (ouvert.id === lu.projet.id && ouvert.modifieLe) retenirProjet(lu.projet.id, { ...lu.memoire, envoyeLe: ouvert.modifieLe });
     return true;
+  }
+
+  /** Fin du message d'ouverture quand des plans ou des photos de Drive sont illisibles (0.103.6). */
+  function sansFichiers(lu) {
+    return lu.illisibles?.length ? ` — ouvert sans : ${lu.illisibles.join(', ')} (illisible sur Drive)` : '';
   }
 
   /**
@@ -476,9 +482,10 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       return false;
     }
     if (prendre) dernierSigneDeVie = Date.now();
-    if (absence) message(`Version de Drive ouverte : un autre appareil a modifié le projet pendant ton absence${conflit ? ' (tes changements pas encore envoyés sont remplacés)' : ''}`);
-    else if (conflit) message('Version de Drive ouverte : les changements faits ici depuis le dernier envoi sont remplacés');
-    else if (prendre) message(`Version de Drive ouverte${surDrive.verrou?.nom ? ` (dernier envoi : ${surDrive.verrou.nom})` : ''}`);
+    if (absence) message(`Version de Drive ouverte : un autre appareil a modifié le projet pendant ton absence${conflit ? ' (tes changements pas encore envoyés sont remplacés)' : ''}${sansFichiers(lu)}`);
+    else if (conflit) message(`Version de Drive ouverte : les changements faits ici depuis le dernier envoi sont remplacés${sansFichiers(lu)}`);
+    else if (prendre) message(`Version de Drive ouverte${surDrive.verrou?.nom ? ` (dernier envoi : ${surDrive.verrou.nom})` : ''}${sansFichiers(lu)}`);
+    else if (lu.illisibles?.length) message(`Lecture seule${sansFichiers(lu)}`);
     changer('a-jour');
     return true;
   }
@@ -505,7 +512,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       etat.rendu = null;
       await ouvrirTelecharge(lu, gen);
       dernierSigneDeVie = Date.now();
-      message(`Tu as la main (dernière version envoyée par ${nom})`);
+      message(`Tu as la main (dernière version envoyée par ${nom})${sansFichiers(lu)}`);
       changer('a-jour');
     } catch (erreur) {
       changer('attente', erreur.message);
