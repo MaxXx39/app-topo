@@ -8363,3 +8363,13 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   font-size: 0.8rem;
   font-weight: 700;
 }
+
+/* Export DXF + photo aérienne GeoTIFF (0.98.0). */
+.options-geotiff {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--fond, #f3f4f6);
+}

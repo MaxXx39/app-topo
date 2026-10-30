@@ -12,6 +12,7 @@ import { PALIERS } from '../plan/ecarts.js';
 import { estDansAppliAndroid, enregistrerDansAndroid } from '../android/pont.js';
 import { ouvrirFenetreExport } from './fenetre-export.js';
 import { brancherChoixExport } from './choix-export.js';
+import { emprisePhoto, fabriquerGeotiff, PIXELS_MAX } from './geotiff.js';
 
 // Cases du PDF : [clé, texte, cochée au départ]. « Photos » (celles des surfaces) en dernier.
 const CALQUES = [
@@ -75,6 +76,20 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
       <button type="button" class="bouton-secondaire" data-action="dxf">DXF</button>
       <button type="button" class="bouton-secondaire seulement-expert" data-action="landxml">LandXML</button>
     </div>
+    <div class="options-geotiff">
+      <label class="case"><input type="checkbox" data-champ="geotiff" /> Avec le DXF : photo aérienne swisstopo (GeoTIFF)</label>
+      <div class="champs-export">
+        <label>Marge autour des points (m)<input type="text" inputmode="decimal" data-champ="marge-geotiff" value="30" /></label>
+        <label>Taille du pixel
+          <select data-champ="resolution-geotiff">
+            <option value="0.1">10 cm</option>
+            <option value="0.25">25 cm</option>
+            <option value="0.5">50 cm</option>
+            <option value="1">1 m</option>
+          </select>
+        </label>
+      </div>
+    </div>
     <p class="aide" data-zone="message"></p>
   `;
   const choix = brancherChoixExport(conteneur.querySelector('[data-zone="choix"]'), obtenirGroupes);
@@ -107,7 +122,10 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
         equidistance: plage ? equidistanceAuto(plage.min, plage.max) : null,
         dessins,
       });
-      telecharger(new Blob([texte], { type: 'application/dxf' }), `${nomDeFichier()}.dxf`);
+      // Photo aérienne (0.98.0) : son GeoTIFF est fabriqué quand la fenêtre du DXF se ferme.
+      const avecPhoto = champ('geotiff').checked;
+      const tousLesPoints = [...points, ...surfaces.flatMap((s) => (s.triangles ?? []).flat()), ...(dessins ?? []).flatMap((d) => d.points ?? [])];
+      telecharger(new Blob([texte], { type: 'application/dxf' }), `${nomDeFichier()}.dxf`, avecPhoto ? { quandFerme: () => exporterGeotiff(tousLesPoints) } : {});
       message.textContent = 'DXF téléchargé (coordonnées MN95, altitudes en Z).';
     },
     landxml: () => {
@@ -171,6 +189,37 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     if (bouton) boutons[bouton.dataset.action]();
   });
 
+  /**
+   * GeoTIFF de la photo aérienne swisstopo autour de ces points (marge et taille du pixel choisies),
+   * puis la fenêtre « Exporter » (voir geotiff.js). Internet nécessaire.
+   */
+  async function exporterGeotiff(points) {
+    const marge = Number(String(champ('marge-geotiff').value).replace(',', '.'));
+    const resolution = Number(champ('resolution-geotiff').value);
+    if (!Number.isFinite(marge) || marge < 0 || marge > 500) {
+      message.textContent = 'Photo aérienne : marge illisible (entre 0 et 500 m).';
+      return;
+    }
+    const emprise = emprisePhoto(points, marge, resolution);
+    if (!emprise) {
+      message.textContent = 'Photo aérienne : aucun point à exporter.';
+      return;
+    }
+    if (emprise.largeur * emprise.hauteur > PIXELS_MAX) {
+      message.textContent = `Photo aérienne trop grande (${emprise.largeur} × ${emprise.hauteur} pixels) : choisis un pixel plus grand ou une marge plus petite.`;
+      return;
+    }
+    try {
+      const blob = await fabriquerGeotiff(emprise, resolution, (fait, total) => {
+        message.textContent = `Photo aérienne : morceau ${fait} / ${total}…`;
+      });
+      message.textContent = `Photo aérienne prête : ${Math.round((emprise.estMax - emprise.estMin))} × ${Math.round(emprise.nordMax - emprise.nordMin)} m, GeoTIFF MN95 (source : swisstopo).`;
+      telecharger(blob, `${nomDeFichier()}_swissimage.tif`);
+    } catch (erreur) {
+      message.textContent = `Photo aérienne impossible (pas de connexion ?) : ${erreur.message}`;
+    }
+  }
+
   /** Vérifie qu'il y a quelque chose à exporter, sinon affiche un message. */
   function verifier(volumes) {
     if (volumes.some(({ resultat }) => resultat && !resultat.erreurs)) return true;
@@ -195,8 +244,8 @@ export function dateSuisse(iso) {
  * Un fichier exporté (0.79.0) : la fenêtre « Exporter » (voir fenetre-export.js) propose de
  * l'enregistrer, de l'envoyer par mail ou autrement.
  */
-export function telecharger(blob, nom) {
-  ouvrirFenetreExport({ titre: nom, fabriquer: () => ({ blob, nom }), enregistrer, message: messageExport });
+export function telecharger(blob, nom, { quandFerme = null } = {}) {
+  ouvrirFenetreExport({ titre: nom, fabriquer: () => ({ blob, nom }), enregistrer, message: messageExport, quandFerme });
 }
 
 /** Petit message en bas de l'écran (enregistré, mail…), qui disparaît tout seul. */

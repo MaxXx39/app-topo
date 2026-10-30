@@ -15,9 +15,9 @@ let derniereAdresse = null;
 /**
  * Ouvre la fenêtre. titre : ce qu'on exporte ; formats : [[cle, titre, detail]] ou null ;
  * fabriquer(format) : { blob, nom } (le fichier) ; enregistrer(blob, nom) : téléchargement ;
- * message(texte) : petit message à l'écran.
+ * message(texte) : petit message à l'écran ; quandFerme() : appelé quand la fenêtre se ferme (fichier suivant…).
  */
-export function ouvrirFenetreExport({ titre, formats = null, fabriquer, enregistrer, message }) {
+export function ouvrirFenetreExport({ titre, formats = null, fabriquer, enregistrer, message, quandFerme = null }) {
   const adresses = lireListesPartagees().adresses;
   let format = formats?.[0]?.[0] ?? null;
   const fenetre = document.createElement('dialog');
@@ -68,7 +68,10 @@ export function ouvrirFenetreExport({ titre, formats = null, fabriquer, enregist
     }
     fenetre.close();
   });
-  fenetre.addEventListener('close', () => fenetre.remove());
+  fenetre.addEventListener('close', () => {
+    fenetre.remove();
+    quandFerme?.();
+  });
   document.body.append(fenetre);
   fenetre.showModal();
 }
