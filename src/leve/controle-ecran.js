@@ -28,10 +28,16 @@ export function htmlControle(ac, { gestionOuverte, erreurGestion }) {
     ${ac.points.length === 0
       ? '<p class="vide">Aucun point de contrôle.</p>'
       : `<p class="titre-choix titre-choisir-controle">Choisir un point sur le plan ou dans la liste</p>
-      <div class="points-controle">${ac.points.map((p) => `<button type="button" class="point-controle" data-action="controlerPoint" data-valeur="${p.id}">
+      <div class="points-controle">${ac.points.map((p) => `<div class="cellule-point-controle">
+        <button type="button" class="point-controle" data-action="controlerPoint" data-valeur="${p.id}">
           <strong>${echapper(p.nom)}</strong>
           ${p.dernier ? `<span class="pastille-resultat ${p.dernier.global}">${echapper(dateHeure(p.dernier.le))}</span>` : '<span class="aide">jamais contrôlé</span>'}
-        </button>`).join('')}</div>`}
+        </button>
+        <label class="photo-point-controle seulement-intermediaire" title="Ajouter une photo à ${echapper(p.nom)}" aria-label="Ajouter une photo à ${echapper(p.nom)}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>${p.nbPhotos > 0 ? `<span>${p.nbPhotos}</span>` : ''}
+          <input type="file" data-champ="photo-controle" data-id="${p.id}" accept="image/*" capture="environment" hidden />
+        </label>
+      </div>`).join('')}</div>`}
     ${htmlHistorique(ac)}`;
 }
 

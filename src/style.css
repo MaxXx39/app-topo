@@ -2107,8 +2107,8 @@ th.nombre {
 
 .bouton-projet.gestion-projets {
   border: 2px solid var(--sombre);
-  background: var(--surface);
-  color: var(--sombre);
+  background: var(--sombre);
+  color: #ffffff;
 }
 
 .actions-projets .bouton-secondaire.actif {
@@ -7915,11 +7915,16 @@ body.avec-recepteur .bandeaux-recepteur {
 
 /* 0.88.4 : icône Projet de l'en-tête dans un rectangle ambre (plein quand l'onglet Projet est ouvert). */
 .entete .bouton-onglet-projet {
-  width: 44px;
-  height: 40px;
+  width: 57px;
+  height: 52px;
   border: 2px solid var(--ambre);
   border-radius: 10px;
   color: var(--ambre);
+}
+
+.entete .bouton-onglet-projet svg {
+  width: 26px;
+  height: 26px;
 }
 
 .entete .bouton-onglet-projet.actif {
@@ -8808,4 +8813,56 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   flex: 1;
   min-width: 0;
   border-radius: 0 var(--rayon) var(--rayon) 0;
+}
+
+/* Photos d'un point de contrôle (0.105.0) : petit bouton appareil photo sur la case du point. */
+.cellule-point-controle {
+  position: relative;
+  display: flex;
+}
+
+.cellule-point-controle .point-controle {
+  flex: 1;
+  padding-right: 40px;
+}
+
+.photo-point-controle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1.5px solid var(--ambre);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--sombre);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.photo-point-controle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+/* Photos des points dans « Contenu du projet » : miniatures qui s'ouvrent en grand. */
+.photos-de-la-liste .miniature-photo {
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.photos-de-la-liste .miniature-photo img {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
 }

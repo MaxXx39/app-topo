@@ -94,7 +94,8 @@ export function creerEcranImport(conteneur, contenu, actions) {
       actions.commencerPointage();
       return;
     }
-    if (action === 'supprimer-leve') actions.supprimerLeve(id);
+    if (action === 'voir-photo') actions.voirPhoto(id);
+    else if (action === 'supprimer-leve') actions.supprimerLeve(id);
     else if (action === 'supprimer-surface-projet') actions.supprimerSurfaceProjet(id);
     else if (action === 'voir-plan') actions.voirPlanDxf(id);
     else if (action === 'supprimer-plan') actions.supprimerPlanDxf(id);
@@ -273,7 +274,28 @@ function ligneListe(projet, leve, nature = null) {
         <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
       </div>
       ${tableauPoints(leve.points, 'Voir les points')}
+      ${photosDesPoints(photosDuLeve(projet, leve))}
     </div>`;
+}
+
+/** Photos rattachées aux points d'un levé (rangées avec le levé, voir Lever), seulement celles d'un point de la liste. */
+function photosDuLeve(projet, leve) {
+  const proprietaire = [...(projet.surfaces ?? []), ...(projet.metres ?? []), ...(projet.autres ?? []), ...(projet.reseaux ?? [])].find((o) => o.leveId === leve.id);
+  const noms = new Set(leve.points.map((p) => p.nom));
+  return (proprietaire?.photos ?? []).filter((photo) => photo.point && noms.has(photo.point));
+}
+
+/** Photos des points (miniatures repliables : toucher une photo l'ouvre en grand, avec le nom du point). */
+function photosDesPoints(photos) {
+  if (photos.length === 0) return '';
+  return `<details class="photos-de-la-liste">
+      <summary>Photos des points (${photos.length})</summary>
+      <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
+          <button type="button" class="miniature-photo" data-action="voir-photo" data-id="${photo.id}" aria-label="Voir la photo de ${echapper(photo.point)}"><img src="${photo.miniature}" alt="${echapper(photo.legende || photo.point)}" /></button>
+          <span class="point-photo">📷 ${echapper(photo.point)}</span>
+          ${photo.legende ? `<span class="aide">${echapper(photo.legende)}</span>` : ''}
+        </figure>`).join('')}</div>
+    </details>`;
 }
 
 /** Surface importée (LandXML, DXF 3D) : nom à changer, fichier d'origine, supprimer. */
@@ -349,6 +371,7 @@ function listePointsControle(projet) {
       <strong>Points de contrôle</strong>
       <div class="ligne-outils"><span class="aide">${points.length} points</span></div>
       ${tableauPoints(points, 'Voir les points de contrôle')}
+      ${photosDesPoints((projet.photosControle ?? []).filter((photo) => points.some((p) => p.id === photo.pointId)))}
     </div>`;
 }
 

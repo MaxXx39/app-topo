@@ -34,11 +34,12 @@ function instantane(historique, projet) {
       : objet;
   // Photos des levés (surfaces, métrés, levés libres ; 0.77.0) et des mesures.
   const avecPhotos = Object.fromEntries(CLES_PHOTOS.filter((cle) => projet[cle]).map((cle) => [cle, projet[cle].map(sansImages)]));
+  const photosControle = projet.photosControle ? { photosControle: sansImages({ photos: projet.photosControle }).photos } : {};
   const plansDxf = (projet.plansDxf ?? []).map((plan) => {
     historique.plans.set(plan.id, plan.contenu);
     return { ...plan, contenu: null };
   });
-  return JSON.stringify({ ...projet, ...avecPhotos, plansDxf, modifieLe: null });
+  return JSON.stringify({ ...projet, ...avecPhotos, ...photosControle, plansDxf, modifieLe: null });
 }
 
 /** Relit une étape de l'historique et remet les images des photos. */
@@ -47,6 +48,7 @@ function relire(historique, texte) {
   for (const objet of CLES_PHOTOS.flatMap((cle) => projet[cle] ?? [])) {
     for (const photo of objet.photos ?? []) Object.assign(photo, historique.photos.get(photo.id));
   }
+  for (const photo of projet.photosControle ?? []) Object.assign(photo, historique.photos.get(photo.id));
   for (const plan of projet.plansDxf ?? []) plan.contenu = historique.plans.get(plan.id) ?? null;
   return projet;
 }

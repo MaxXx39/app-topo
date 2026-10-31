@@ -71,6 +71,7 @@ export function creerProjet(nom = '') {
     autres: [],
     listesCachees: [],
     pointsControle: [],
+    photosControle: [],
     tolerancesControle: structuredClone(TOLERANCES_PAR_DEFAUT),
     controles: [],
     dessins: [],
@@ -174,6 +175,7 @@ export function completerProjet(projet) {
   complet.autres ??= [];
   complet.listesCachees ??= []; // listes de points décochées dans le menu « Points » du plan
   complet.pointsControle ??= [];
+  complet.photosControle ??= []; // photos des points de contrôle (0.105.0)
   complet.tolerancesControle ??= structuredClone(TOLERANCES_PAR_DEFAUT);
   complet.controles ??= [];
   complet.dessins ??= [];

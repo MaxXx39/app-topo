@@ -30,13 +30,15 @@ export function projetVersFichiers(projet) {
   // Photos des levés (0.77.0) : aussi pour les métrés et les levés libres.
   const metres = projet.metres ? { metres: projet.metres.map(sansImages) } : {};
   const autres = projet.autres ? { autres: projet.autres.map(sansImages) } : {};
+  // Photos des points de contrôle (0.105.0) : chaque photo est elle-même un objet à alléger.
+  const photosControle = projet.photosControle ? { photosControle: sansImages({ photos: projet.photosControle }).photos } : {};
   const plansDxf = (projet.plansDxf ?? []).map((plan) => {
     fichiers.set(`${prefixePlan}${plan.id}${FIN}`, plan.contenu);
     return { ...plan, contenu: null };
   });
   // Le lien vers Drive est propre à chaque appareil : il ne part pas avec le projet.
   const { drive, ...reste } = projet;
-  fichiers.set(FICHIER_PROJET, { ...reste, surfaces, ...mesures, ...metres, ...autres, plansDxf });
+  fichiers.set(FICHIER_PROJET, { ...reste, surfaces, ...mesures, ...metres, ...autres, ...photosControle, plansDxf });
   return fichiers;
 }
 
@@ -50,6 +52,7 @@ export function fichiersVersProjet(fichiers) {
   for (const objet of [...(projet.surfaces ?? []), ...(projet.mesures ?? []), ...(projet.metres ?? []), ...(projet.autres ?? [])]) {
     for (const photo of objet.photos ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});
   }
+  for (const photo of projet.photosControle ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});
   for (const plan of projet.plansDxf ?? []) plan.contenu = fichiers.get(`${prefixePlan}${plan.id}${FIN}`) ?? null;
   return projet;
 }

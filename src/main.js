@@ -655,6 +655,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     surface.nom = avecPrefixe(suite, prefixeDuNom(surface)); // le préfixe « Surf- » reste toujours
     modifie();
   },
+  voirPhoto: (id) => montrerPhoto(id),
   supprimerSurfaceProjet: (id) => {
     const surface = projet.surfaces.find((s) => s.id === id);
     if (!surface || !confirm(`Supprimer la surface « ${surface.nom} » ?`)) return;
@@ -1334,6 +1335,8 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         montrerImplantation();
         requestAnimationFrame(cadrerSurImplantation);
       },
+      // Photo d'un point de contrôle (0.105.0, Intermédiaire) : rangée dans projet.photosControle.
+      ajouterPhotoControle: (id, fichiers) => ajouterPhotoControle(id, fichiers),
       arreterControle: () => {
         autocontrole.cible = null;
         montrerImplantation();
@@ -1372,6 +1375,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         const point = projet.pointsControle.find((p) => p.id === id);
         if (!point || !confirm(`Enlever ${point.nom} des points de contrôle ?`)) return;
         projet.pointsControle = projet.pointsControle.filter((p) => p.id !== id);
+        projet.photosControle = (projet.photosControle ?? []).filter((ph) => ph.pointId !== id);
         if (autocontrole.cible?.id === id) autocontrole.cible = null;
         modifie();
       },
@@ -1516,6 +1520,10 @@ function exporterListe(type, id) {
   if (type === 'controle') {
     points = projet.pointsControle;
     titre = 'Points de contrôle';
+    photos = (projet.photosControle ?? []).filter((ph) => points.some((p) => p.id === ph.pointId)).map((ph) => {
+      const point = points.find((p) => p.id === ph.pointId);
+      return { ...ph, surface: titre, legende: [ph.point, point.altitude == null ? null : `H ${formaterNombre(point.altitude)}`, ph.legende].filter(Boolean).join(' · ') };
+    });
   } else if (type === 'dessin') {
     const dessin = dessinDe(id);
     if (!dessin) return;
@@ -2366,7 +2374,8 @@ function donneesAutocontrole() {
   return {
     points: projet.pointsControle.map((p) => {
       const dernier = [...controles].reverse().find((c) => c.type === 'mesure' && c.pointId === p.id);
-      return { ...p, dernier: dernier ? { global: dernier.resultat.global, le: dernier.le } : null };
+      const nbPhotos = (projet.photosControle ?? []).filter((ph) => ph.pointId === p.id).length;
+      return { ...p, nbPhotos, dernier: dernier ? { global: dernier.resultat.global, le: dernier.le } : null };
     }),
     cible: autocontrole.cible,
     tolerances: projet.tolerancesControle,
@@ -3217,12 +3226,20 @@ function photosDuPlan(listes) {
       if (point) resultat.push({ id: photo.id, nom: point.nom, est: point.est, nord: point.nord });
     }
   }
+  // Photos des points de contrôle : avec la liste « Contrôle ».
+  if (montrees.has(LISTE_CONTROLE)) {
+    for (const photo of projet.photosControle ?? []) {
+      const point = projet.pointsControle.find((p) => p.id === photo.pointId);
+      if (point) resultat.push({ id: photo.id, nom: point.nom, est: point.est, nord: point.nord });
+    }
+  }
   return resultat;
 }
 
 /** Ouvre une photo en grand (📷 touché sur le plan) : image, point et légende. */
 function montrerPhoto(id) {
-  const photo = [...projet.surfaces, ...projet.metres, ...projet.autres, ...projet.reseaux].flatMap((l) => l.photos ?? []).find((p) => p.id === id);
+  const deControle = (projet.photosControle ?? []).some((p) => p.id === id);
+  const photo = [...projet.surfaces, ...projet.metres, ...projet.autres, ...projet.reseaux].flatMap((l) => l.photos ?? []).concat(projet.photosControle ?? []).find((p) => p.id === id);
   if (!photo) return;
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-photo';
@@ -3230,8 +3247,14 @@ function montrerPhoto(id) {
       <h2>📷 ${echapper(photo.point ?? '')}</h2>
       <img src="${photo.image}" alt="${echapper(photo.legende || photo.point || 'photo')}" />
       ${photo.legende ? `<p>${echapper(photo.legende)}</p>` : ''}
-      <div class="ligne-outils"><button class="bouton">Fermer</button></div>
+      <div class="ligne-outils"><button class="bouton">Fermer</button>${deControle ? '<button type="button" class="bouton-lien" data-cle="supprimer">supprimer la photo</button>' : ''}</div>
     </form>`;
+  fenetre.querySelector('[data-cle="supprimer"]')?.addEventListener('click', () => {
+    if (!confirm('Supprimer cette photo ?')) return;
+    projet.photosControle = projet.photosControle.filter((p) => p.id !== id);
+    fenetre.close();
+    modifie();
+  });
   fenetre.addEventListener('close', () => fenetre.remove());
   document.body.append(fenetre);
   fenetre.showModal();
@@ -3975,6 +3998,25 @@ async function ajouterPhotos(objet, fichiers, { attentePoint = false } = {}) {
   }
   if (erreurs.length > 0) afficherMessage(`Photo refusée. ${erreurs.join(' ; ')}`, 8000);
   else afficherMessage(`${fichiers.length} photo(s) ajoutée(s)`);
+  modifie();
+}
+
+/** Ajoute des photos à un point de contrôle (photo.point = son nom, photo.pointId = son id). */
+async function ajouterPhotoControle(id, fichiers) {
+  const point = projet.pointsControle.find((p) => p.id === id);
+  if (!point) return;
+  afficherMessage('Préparation de la photo…', null);
+  const erreurs = [];
+  for (const fichier of fichiers) {
+    try {
+      const photo = await preparerPhoto(fichier);
+      projet.photosControle = [...(projet.photosControle ?? []), { ...photo, point: point.nom, pointId: point.id }];
+    } catch (erreur) {
+      erreurs.push(`${fichier.name} : ${erreur.message}`);
+    }
+  }
+  if (erreurs.length > 0) afficherMessage(`Photo refusée. ${erreurs.join(' ; ')}`, 8000);
+  else afficherMessage(`Photo ajoutée à ${point.nom}`);
   modifie();
 }
 

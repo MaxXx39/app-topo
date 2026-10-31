@@ -287,7 +287,11 @@ export function creerEcranLeve(conteneur, actions) {
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
-    else if (cible.dataset.champ === 'photo-levee' && cible.files?.length) {
+    else if (cible.dataset.champ === 'photo-controle' && cible.files?.length) {
+      // Photo d'un point de contrôle (0.105.0) : rangée dans le projet, rattachée au point.
+      actions.ajouterPhotoControle(cible.dataset.id, [...cible.files]);
+      cible.value = '';
+    } else if (cible.dataset.champ === 'photo-levee' && cible.files?.length) {
       // Photo du levé (0.77.0) : appareil photo de la tablette, rangée avec le levé en cours.
       actions.ajouterPhotosLevee([...cible.files]);
       cible.value = '';
