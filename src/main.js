@@ -1278,12 +1278,6 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       implanterSuivant: () => implanterPointNomme(nomSuivant(implanter.cible?.nom, pointsDuProjet().map((p) => p.nom))),
       implanterPrecedent: () => implanterPointNomme(nomPrecedent(implanter.cible?.nom, pointsDuProjet().map((p) => p.nom))),
       // « Le plus proche » (Expert, 0.90.1) : la cible suit le point montré sur le plan le plus proche.
-      basculerSeulementElement: () => {
-        terrain.seulementElement = !terrain.seulementElement;
-        retenirReglagesTerrain();
-        recalculer();
-        montrerImplantation();
-      },
       basculerPlusProche: () => {
         terrain.plusProche = !terrain.plusProche;
         retenirReglagesTerrain();
@@ -1465,7 +1459,7 @@ function envoyerImplantationAuPlan() {
   const enLigne = accrocheActive && !pointage.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
-  // « Seulement l'élément à implanter » (0.90.1) : ni levés libres, ni points de contrôle, ni dessins, ni « À implanter ».
+  // Bouton « Seul » en Implanter (0.90.1) : ni levés libres, ni points de contrôle, ni dessins, ni « À implanter ».
   const seul = Boolean(elementSeul());
   // Bouton « Seul » (0.94.0) : seulement les listes gardées (points de contrôle en mode Contrôle…).
   const gardees = listesDuTravail(listesDePoints(projet));
@@ -3973,6 +3967,10 @@ const plan = creerPlan(document.querySelector('#plan'), {
   // Bouton « Seul » (0.94.0) : seulement ce sur quoi je travaille (voir listesDuTravail).
   quandBasculerSeul: (actif) => {
     seulTravail = actif;
+    // Implanter : « Seul » ne montre que l'élément choisi ; sans élément choisi, rien ne change : on le dit.
+    if (actif && ongletContexte === 'terrain' && ecranLeve && terrain.mode === 'controler' && !elementSeul()) {
+      afficherMessage('Seul : choisis d\'abord le point, la ligne ou la surface à implanter', 4000);
+    }
     recalculer();
     envoyerImplantationAuPlan();
     plan.rafraichirImplantation();
@@ -4368,7 +4366,7 @@ function recalculer({ recadrer = false } = {}) {
   } else pointsDuPlan = pointsStables(pointsDesListes(projet, listes));
   // « Le plus proche » choisit parmi les points des listes cochées, même si on n'en montre qu'un.
   pointsDesListesMontres = pointsDuPlan;
-  // « Seulement l'élément à implanter » (0.90.1) : le point, la ligne ou la surface, rien d'autre.
+  // Bouton « Seul » en Implanter : le point, la ligne ou la surface choisi, rien d'autre.
   const seul = elementSeul();
   if (seul) {
     pointsDuPlan = seul.pointNom ? pointsStables(pointsDuPlan.filter((p) => p.nom === seul.pointNom)) : AUCUN_POINT;
@@ -4489,7 +4487,7 @@ function listesDuTravail(listes) {
  * sur le plan { pointNom, surfaceId } quand la case est cochée et qu'un élément est choisi ; sinon null.
  */
 function elementSeul() {
-  if (!(terrain.seulementElement || seulTravail) || ongletContexte !== 'terrain' || !ecranLeve || terrain.mode !== 'controler') return null;
+  if (!seulTravail || ongletContexte !== 'terrain' || !ecranLeve || terrain.mode !== 'controler') return null;
   if (terrain.implantation === 'point') return implanter.cible ? { pointNom: implanter.cible.nom, surfaceId: null } : null;
   if (['ligne', 'talus'].includes(terrain.implantation)) return implanter.ligne ? { pointNom: null, surfaceId: terrain.implantation === 'talus' ? terrain.talus.terrainId : null } : null;
   if (terrain.implantation === 'surface') return terrain.surfaceId ? { pointNom: null, surfaceId: terrain.surfaceId } : null;

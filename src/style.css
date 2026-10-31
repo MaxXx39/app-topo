@@ -8144,37 +8144,6 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
 }
 
 /* « Seulement l'élément à implanter » (0.90.1) : une case à cocher, en sarcelle quand elle est cochée. */
-.case-seulement {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0 4px;
-  padding: 4px 2px;
-  border: none;
-  background: none;
-  color: var(--texte, #1b2b36);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.case-seulement .carre-case {
-  display: inline-grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 2px solid #0d9488;
-  border-radius: 5px;
-  background: #ffffff;
-  color: #ffffff;
-  font-size: 0.9rem;
-  font-weight: 900;
-}
-
-.case-seulement.actif .carre-case {
-  background: #0d9488;
-}
-
 /* Grille des coupes en direct (0.90.1, Expert) : gris discret, sous le profil. */
 .coupe-directe .grille-coupe line,
 .coupe-directe line.grille-coupe {
