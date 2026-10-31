@@ -44,6 +44,7 @@ const IMPLANTATIONS = [
   ['point', 'Point', true],
   ['ligne', 'Ligne', true],
   ['surface', 'Surface', true],
+  ['altitude', 'Altitude', true], // 0.106 : on tape l'altitude voulue, monter / descendre (tous les modes)
   ['talus', 'Talus', true], // tout à droite (demande du 26.10.2026)
 ];
 // Talus : Expert seulement. Base : on ne lève que des « Levé libre » (points seulement).
@@ -282,6 +283,8 @@ export function creerEcranLeve(conteneur, actions) {
     const cible = evenement.target;
     if (cible.dataset.attributReseau) saisieReseau[cible.dataset.attributReseau] = cible.value;
     else if (cible.dataset.ouvrageChamp) actions.reglerOuvrage(cible.dataset.id, cible.dataset.ouvrageChamp, cible.value);
+    else if (cible.dataset.champ === 'altitude-voulue') actions.reglerAltitudeVoulue(cible.value);
+    else if (cible.dataset.champ === 'altitude-cible') actions.reglerAltitudeCible(cible.value);
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.champ === 'surface-lame') actions.choisirSurfaceLame(cible.value);
     else if (cible.dataset.toleranceLame) actions.reglerToleranceLame(cible.dataset.toleranceLame, cible.value);
@@ -459,13 +462,13 @@ export function creerEcranLeve(conteneur, actions) {
     if (zone) {
       if (!c || c.ecart == null) {
         zone.className = 'ecart-direct attente';
-        zone.innerHTML = `<span class="message-ecart">${echapper(c?.message ?? 'Choisis une surface')}</span>`;
+        zone.innerHTML = `<span class="message-ecart">${echapper(c?.message ?? (donnees.controle.implantation === 'altitude' ? 'Tape l\'altitude voulue' : 'Choisis une surface'))}</span>`;
       } else {
         const monter = c.ecart >= 0;
         zone.className = `ecart-direct ${c.classe}`;
         zone.innerHTML = `<span class="fleche-ecart">${monter ? '↑' : '↓'}</span>
           <span class="valeur-ecart">${monter ? 'Monter' : 'Descendre'} ${formaterNombre(Math.abs(c.ecart))} m</span>
-          <span class="detail-ecart">surface ${formaterNombre(c.altitudeSurface)} · canne ${formaterNombre(c.altitudeCanne)}</span>`;
+          <span class="detail-ecart">${donnees.controle.implantation === 'altitude' ? 'voulue' : 'surface'} ${formaterNombre(c.altitudeSurface)} · canne ${formaterNombre(c.altitudeCanne)}</span>`;
       }
     }
     for (const sens of ['perpendiculaire', 'axe']) {
@@ -504,6 +507,11 @@ export function creerEcranLeve(conteneur, actions) {
     if (reglages.implantation === 'talus') {
       const invite = imp.pointsLigne.length > 0 ? '' : invitation('Choisis la ligne du talus (haut ou bas)', 'touche-la sur le plan, ou ses points un à un');
       return barreAccroche() + choixImplantation + invite + implanterLigne() + mesTalus();
+    }
+    if (reglages.implantation === 'altitude') {
+      return `${choixImplantation}
+        <label class="champ-altitude-voulue">Altitude voulue<input type="text" inputmode="decimal" data-champ="altitude-voulue" value="${reglages.altitudeVoulue != null ? Number(reglages.altitudeVoulue).toFixed(3) : ''}" placeholder="ex. 412.350" /></label>
+        <div class="ecart-direct attente" data-vivant="ecart"></div>`;
     }
     return `
       ${choixImplantation}
@@ -818,7 +826,7 @@ export function creerEcranLeve(conteneur, actions) {
   /** Point implanté : coordonnées et altitude, sur une ligne. */
   function detailPoint() {
     const c = cibleGuidee();
-    return `<p class="coordonnees-cible"><span class="coord-en">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>${c.altitude != null ? `<span class="coord-h">H ${formaterNombre(c.altitude)}</span>` : ''}</p>`;
+    return `<p class="coordonnees-cible"><span class="coord-en">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>${donnees.mode === 'autocontrole' ? (c.altitude != null ? `<span class="coord-h">H ${formaterNombre(c.altitude)}</span>` : '') : `<label class="coord-h">H<input type="text" inputmode="decimal" data-champ="altitude-cible" value="${c.altitude != null ? c.altitude.toFixed(3) : ''}" placeholder="—" aria-label="Altitude d'implantation" /></label>`}</p>`;
   }
 
   /**
@@ -1109,7 +1117,7 @@ export function creerEcranLeve(conteneur, actions) {
     const liste = donnees.libelles[sorte];
     const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
     return `<div class="libelles-terrain seulement-intermediaire pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
-      <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong><i class="symbole-libelle" style="color: ${COULEURS_HABITUELLES[sorte]}">${symboleDeForme('')}</i>Aucun</strong><span>sans libellé</span></button>
+      <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong><i class="symbole-libelle" style="color: #000000">${symboleDeForme('')}</i>Aucun</strong><span>sans libellé</span></button>
       ${liste.map(([abreviation, signification, couleur, forme]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
           <strong><i class="symbole-libelle" style="color: ${couleur || COULEURS_HABITUELLES[sorte]}">${symboleDeForme(forme)}</i>${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
       <button type="button" class="bouton-crayon-libelles" data-action="modifierLibelles" data-valeur="${sorte}" title="Ajouter ou modifier des libellés" aria-label="Ajouter ou modifier des libellés">⚙</button>

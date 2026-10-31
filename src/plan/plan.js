@@ -127,7 +127,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <div class="menu-calques" hidden>
           <div class="ligne-menu-plan">
             <label class="case"><input type="checkbox" data-calque="fondSatellite" /> Photo aérienne (swisstopo)</label>
-            <button type="button" class="roue-menu" data-roue="photo" aria-expanded="false" title="Transparence" aria-label="Transparence de la photo">⚙</button>
+            <button type="button" class="roue-menu" data-roue="photo" aria-expanded="false" title="Transparence" aria-label="Transparence de la photo"></button>
           </div>
           <label class="reglette-transparence" data-zone-roue="photo" hidden>Transparence <span data-vivant="transparence">0 %</span>
             <input type="range" min="0" max="100" step="5" value="0" data-calque="transparencePhoto" /></label>
@@ -325,7 +325,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}`;
         const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: rayon, class: classe });
         // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
-        const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? couleursPoints.get(point);
+        const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
         if (couleur) rond.style.color = couleur;
         groupePoints.append(rond);
       }
@@ -1286,17 +1286,18 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       return;
     }
     recadrerQuandVisible = false;
-    // Levé avec le récepteur, encore 0 ou 1 point : environ 60 m de large autour du point
-    // (ou de la position du récepteur), plutôt qu'un zoom extrême sur un seul point.
-    // Sans point : sur la position du récepteur, sinon sur les plans DXF ; sinon pas encore de vue
-    // (elle se fera sur la première position reçue).
-    // Sans point mais avec une surface importée : sur ses sommets (0.83.0).
-    const sommetsImportes = points.length === 0 ? sommetsDesSurfacesImportees() : [];
-    const centre = points.length === 1 ? points[0] : points.length === 0 && sommetsImportes.length === 0 ? position : null;
-    if (centre) vue = { echelle: largeur / 60, estCentre: centre.est, nordCentre: centre.nord, largeur, hauteur };
-    else if (points.length > 0) vue = cadrerSurPoints(points, largeur, hauteur);
-    else if (sommetsImportes.length > 0) vue = cadrerSurPoints(sommetsImportes, largeur, hauteur);
-    else vue = plansDxf.length > 0 ? cadrerSurPoints(coinsDesPlans(plansDxf), largeur, hauteur) : null;
+    // 0.106 : on cadre sur tous les éléments du plan (points, surfaces visibles, plans DXF), sans tenir
+    // compte de la position du récepteur. Un seul élément : environ 60 m de large autour de lui.
+    // Aucun élément : sur la position du récepteur, sinon pas encore de vue (elle se fera sur la
+    // première position reçue).
+    const elements = [
+      ...points,
+      ...dessin.stocks.filter((s) => !dessin.cachees?.has(s)).flatMap((s) => s.points ?? []),
+      ...(plansDxf.length > 0 ? coinsDesPlans(plansDxf) : []),
+    ];
+    if (elements.length === 0) vue = position ? { echelle: largeur / 60, estCentre: position.est, nordCentre: position.nord, largeur, hauteur } : null;
+    else if (elements.length === 1) vue = { echelle: largeur / 60, estCentre: elements[0].est, nordCentre: elements[0].nord, largeur, hauteur };
+    else vue = cadrerSurPoints(elements, largeur, hauteur);
     dessiner();
   }
 
@@ -1432,6 +1433,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
     dessiner();
   }
+  // 0.106 : un menu ouvert (Fond, DXF, Afficher) = bouton surligné + plan un peu grisé, pour comprendre
+  // qu'on est dans ce menu.
+  function signalerMenuOuvert() {
+    const liens = [[boutonCalques, menuCalques], [boutonPlans, menuPlans], [boutonListes, menuListes]];
+    for (const [bouton, menu] of liens) bouton.classList.toggle('actif', !menu.hidden);
+    cadre.classList.toggle('menu-plan-ouvert', liens.some(([, menu]) => !menu.hidden));
+  }
+  const veilleMenus = new MutationObserver(signalerMenuOuvert);
+  for (const menu of [menuCalques, menuPlans, menuListes]) veilleMenus.observe(menu, { attributes: true, attributeFilter: ['hidden'] });
   menuCalques.addEventListener('change', (evenement) => {
     if (evenement.target.dataset.calque) changerCalque(evenement.target);
   });
@@ -1536,7 +1546,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function titreSection(section, titre) {
     const reglages = REGLAGES_SECTIONS[section] ?? [];
     const niveau = reglages.length > 0 && reglages.every(([, , n]) => n === 'expert') ? 'seulement-expert' : '';
-    const roue = reglages.length > 0 ? `<button type="button" class="roue-menu ${niveau}" data-roue="${section}" aria-expanded="false" title="Réglages" aria-label="Réglages ${titre}">⚙</button>` : '';
+    const roue = reglages.length > 0 ? `<button type="button" class="roue-menu ${niveau}" data-roue="${section}" aria-expanded="false" title="Réglages" aria-label="Réglages ${titre}"></button>` : '';
     return `<div class="titre-partie-menu titre-avec-roue section-menu-${section}"><span>${titre}</span>${roue}</div>${reglagesSection(section)}`;
   }
   let signatureListes = null;

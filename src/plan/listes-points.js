@@ -17,7 +17,6 @@
 // Les listes décochées sont rangées dans le projet (projet.listesCachees : leurs identifiants).
 import { estImportee } from '../topo/surface.js';
 import { estLeveDirect } from '../topo/leve-direct.js';
-import { nomsDeLaMesure } from '../topo/mesure.js';
 import { nomsDuRecollement } from '../topo/reseau.js';
 import { couleurDuReseau } from '../leve/reseaux.js';
 
@@ -85,8 +84,9 @@ export function listesDePoints(projet) {
     ajouter(s.id, s.nom, s.nature ?? 'stock', s.leveId, s.tousLesPoints ? null : new Set(nomsDeLaSurface(s)));
   }
   for (const metre of projet.metres ?? []) {
-    const noms = projet.mesures.filter((m) => m.metreId === metre.id).flatMap(nomsDeLaMesure);
-    ajouter(metre.id, metre.nom, 'metre', metre.leveId, new Set(noms));
+    // 0.106 : tous les points levés du métré (avant : seulement ceux déjà dans une mesure terminée,
+    // donc rien à voir ni à toucher pendant le levé).
+    ajouter(metre.id, metre.nom, 'metre', metre.leveId, null);
   }
   // Mesures faites à la main (pas d'un métré) : une seule case, pour leurs traits et leurs valeurs.
   if ((projet.mesures ?? []).some((m) => !m.metreId)) ajouter(LISTE_MESURES, 'Mesures', 'mesures', null, new Set());

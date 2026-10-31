@@ -8283,6 +8283,28 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   color: #ffffff;
 }
 
+/* 0.106 : flèche pour développer (au lieu de la roue crantée) */
+.roue-menu::before {
+  content: '▾';
+}
+
+.roue-menu[aria-expanded='true']::before {
+  content: '▴';
+}
+
+/* 0.106 : menu du plan ouvert (Fond, DXF, Afficher) : bouton surligné, plan grisé */
+.plan-calques .puce.actif {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.plan-cadre.menu-plan-ouvert svg.plan,
+.plan-cadre.menu-plan-ouvert .plan-dxf-canvas,
+.plan-cadre.menu-plan-ouvert .plan-fond {
+  filter: grayscale(0.8) opacity(0.55);
+  transition: filter 0.15s;
+}
+
 .titre-avec-roue {
   display: flex;
   align-items: center;

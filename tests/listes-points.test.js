@@ -49,8 +49,8 @@ describe('Listes de points du plan', () => {
     expect(pointsDesListes(projet, listesDePoints(projet))).toHaveLength(8);
     montrerListe(projet, 'f', false);
     montrerListe(projet, 'o1', false);
-    // Reste : Stock 1 (b1, b2, h1), Métré 1 (A-ENR-1-1), Points ajoutés (P1).
-    expect(pointsDesListes(projet, listesDePoints(projet)).map((p) => p.nom)).toEqual(['b1', 'b2', 'h1', 'P1', 'A-ENR-1-1']);
+    // Reste : Stock 1 (b1, b2, h1), Points ajoutés (P1), Métré 1 : tous les points de son levé (0.106).
+    expect(pointsDesListes(projet, listesDePoints(projet)).map((p) => p.nom)).toEqual(['b1', 'b2', 'h1', 'P1', 'P-RG-1', 'L-HT-1-1', 'A-ENR-1-1']);
     montrerListe(projet, 'f', true);
     expect(projet.listesCachees).toEqual(['o1']);
   });

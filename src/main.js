@@ -145,6 +145,7 @@ const terrain = {
   libellePoint: 'TN', // et pour un point isolé (ou compté)
   libelleAire: 'ENR', // et pour une aire d'un métré
   implantation: 'surface', // mode Implanter : implanter une surface ou un point
+  altitudeVoulue: null, // mode Implanter « Altitude » : altitude tapée (m)
   accroche: 'point', // implantation d'un point : point du projet, sommet, milieu, sur la ligne ou centre (voir topo/accroche.js)
   guidage: 'rx2', // guidage vers le point : 'rx2' (avance / droite selon le cap du RX2) ou 'nseo' (nord / est)
   accrocheLigne: 'trait', // implantation d'une ligne : 'trait' (ligne du plan DXF) ou une accroche de point
@@ -1071,10 +1072,25 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         recalculer();
       },
       choisirImplantation: (quoi) => {
-        const permises = aAcces('expert') ? ['point', 'ligne', 'talus'] : ['point', 'ligne'];
+        const permises = aAcces('expert') ? ['point', 'ligne', 'altitude', 'talus'] : ['point', 'ligne', 'altitude'];
         terrain.implantation = permises.includes(quoi) ? quoi : 'surface';
         retenirReglagesTerrain();
         recalculer();
+      },
+      // 0.106 : altitude voulue du mode « Altitude » (vide = rien à guider)
+      reglerAltitudeVoulue: (texte) => {
+        const lue = lireAltitude(texte);
+        if (lue === undefined) return;
+        terrain.altitudeVoulue = lue;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // 0.106 : on change l'altitude du point en cours d'implantation (le point de la liste n'est pas modifié)
+      reglerAltitudeCible: (texte) => {
+        const lue = lireAltitude(texte);
+        if (lue === undefined || !implanter.cible) return;
+        implanter.cible = { ...implanter.cible, altitude: lue };
+        montrerImplantation();
       },
       // --- Implantation d'une ligne ---
       retirerDernierPointLigne: () => {
@@ -3635,12 +3651,24 @@ function montrerSurfaceControle() {
   if (index >= 0) editeurSurfaces.choisir(index);
 }
 
+/** Mode « Altitude » : seulement monter / descendre pour atteindre l'altitude tapée (pas de position). */
+function calculerAltitudeVoulue(etat) {
+  const voulue = terrain.altitudeVoulue;
+  if (voulue == null) return { message: 'Tape l\'altitude voulue' };
+  const position = etat.connecte && etat.recu ? etat.position : null;
+  if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
+  if (!etat.autorise) return { message: etat.raison ?? 'Position pas fiable' };
+  const ecart = ecartSurface(voulue, position.altitude);
+  return { ecart, classe: classeEcart(ecart), altitudeSurface: voulue, altitudeCanne: position.altitude, message: null };
+}
+
 /**
  * Mode Contrôler, à chaque état du récepteur : de combien monter ou descendre pour être sur la
  * surface choisie, et les coupes autour du récepteur. L'écart n'est donné que si le point serait
  * accepté par la règle de prise de point (RTK fixe et inclinaison prête) ; sinon, la raison.
  */
 function calculerControle(etat, orientation) {
+  if (terrain.implantation === 'altitude') return calculerAltitudeVoulue(etat);
   const surface = projet.surfaces.find((s) => s.id === terrain.surfaceId);
   if (!surface) return { message: 'Choisis une surface' };
   const triangles = trianglesDeSurface(surface.id);
