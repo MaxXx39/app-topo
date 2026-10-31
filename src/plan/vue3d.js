@@ -6,6 +6,7 @@
 import { couleurRVB } from './couleurs.js';
 import { plageAltitudes } from '../topo/courbes.js';
 import { echapper } from '../outils/echapper.js';
+import { mini, maxi } from '../outils/bornes.js';
 
 /** Centre (m) et taille (plus grand côté en plan, m) des triangles. */
 export function cadreScene(triangles) {
@@ -13,8 +14,8 @@ export function cadreScene(triangles) {
   const est = points.map((p) => p.est);
   const nord = points.map((p) => p.nord);
   const alt = points.map((p) => p.altitude ?? 0);
-  const centre = { est: (Math.min(...est) + Math.max(...est)) / 2, nord: (Math.min(...nord) + Math.max(...nord)) / 2, altitude: (Math.min(...alt) + Math.max(...alt)) / 2 };
-  return { centre, taille: Math.max(Math.max(...est) - Math.min(...est), Math.max(...nord) - Math.min(...nord), 1) };
+  const centre = { est: (mini(est) + maxi(est)) / 2, nord: (mini(nord) + maxi(nord)) / 2, altitude: (mini(alt) + maxi(alt)) / 2 };
+  return { centre, taille: Math.max(maxi(est) - mini(est), maxi(nord) - mini(nord), 1) };
 }
 
 /**

@@ -24,6 +24,7 @@ import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
 import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, valeurPrincipale, couleurDeMesure } from '../mesures/valeurs.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
+import { ajouterTous } from '../outils/bornes.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -998,13 +999,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (!estVisible(stock)) return;
       const triangles = dessin.resultats[index]?.trianglesDessus ?? [];
       const importee = stock.type === 'landxml' || stock.type === 'dxf';
-      if (importee ? calques.couleursAltitudeImport : calques.couleursAltitude) pourCouleurs.push(...triangles);
-      if (!importee && calques.courbes) pourCourbes.push(...triangles);
+      if (importee ? calques.couleursAltitudeImport : calques.couleursAltitude) ajouterTous(pourCouleurs, triangles);
+      if (!importee && calques.courbes) ajouterTous(pourCourbes, triangles);
     });
     // La surface affichée (onglet Calculs › Surfaces) est aussi coloriée, et les aires mesurées (onglet Calculs › Mesures).
     const autres = [...(dessin.surface?.triangles ?? []), ...(dessin.mesures ?? []).flatMap(({ resultat }) => resultat?.triangles ?? [])];
-    if (calques.couleursAltitude) pourCouleurs.push(...autres);
-    if (calques.courbes) pourCourbes.push(...autres);
+    if (calques.couleursAltitude) ajouterTous(pourCouleurs, autres);
+    if (calques.courbes) ajouterTous(pourCourbes, autres);
     const triangles = [...pourCouleurs, ...pourCourbes];
     if (triangles.length === 0) return;
     const plage = plageAltitudes(triangles);
@@ -1278,7 +1279,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
-  function toutVoir() {
+  function toutVoir(surTout = false) {
     const { largeur, hauteur } = taille();
     if (largeur === 0 || hauteur === 0) {
       // Plan caché (autre onglet) : on recadrera quand il s'affichera.
@@ -1286,18 +1287,38 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       return;
     }
     recadrerQuandVisible = false;
-    // 0.106 : on cadre sur tous les éléments du plan (points, surfaces visibles, plans DXF), sans tenir
-    // compte de la position du récepteur. Un seul élément : environ 60 m de large autour de lui.
-    // Aucun élément : sur la position du récepteur, sinon pas encore de vue (elle se fera sur la
-    // première position reçue).
-    const elements = [
-      ...points,
-      ...dessin.stocks.filter((s) => !dessin.cachees?.has(s)).flatMap((s) => s.points ?? []),
-      ...(plansDxf.length > 0 ? coinsDesPlans(plansDxf) : []),
-    ];
-    if (elements.length === 0) vue = position ? { echelle: largeur / 60, estCentre: position.est, nordCentre: position.nord, largeur, hauteur } : null;
-    else if (elements.length === 1) vue = { echelle: largeur / 60, estCentre: elements[0].est, nordCentre: elements[0].nord, largeur, hauteur };
-    else vue = cadrerSurPoints(elements, largeur, hauteur);
+    // Bouton « Tout voir » (0.106.1) : tous les éléments montrés (points, surfaces, plans DXF), sans
+    // tenir compte de la position du récepteur.
+    if (surTout) {
+      let elements = [
+        ...points,
+        ...(dessin?.stocks ?? []).filter((s) => !dessin.cachees?.has(s)).flatMap((s) => s.points ?? []),
+        ...(plansDxf.length > 0 ? coinsDesPlans(plansDxf) : []),
+      ].filter((p) => Number.isFinite(p?.est) && Number.isFinite(p?.nord));
+      // Un plan DXF pas encore recalé (coordonnées locales, près de 0 / 0) ferait un cadre de
+      // plusieurs centaines de km : s'il y a des éléments en Suisse (MN95), on ne garde qu'eux.
+      const enSuisse = elements.filter((p) => p.est > 2400000 && p.est < 2900000 && p.nord > 1050000 && p.nord < 1350000);
+      if (enSuisse.length > 0) elements = enSuisse;
+      if (elements.length > 0) {
+        vue = elements.length === 1
+          ? { echelle: largeur / 60, estCentre: elements[0].est, nordCentre: elements[0].nord, largeur, hauteur }
+          : cadrerSurPoints(elements, largeur, hauteur);
+        dessiner();
+        return;
+      }
+    }
+    // Cadrage automatique (ouverture, premiers points) : comme avant 0.106.
+    // Levé avec le récepteur, encore 0 ou 1 point : environ 60 m de large autour du point
+    // (ou de la position du récepteur), plutôt qu'un zoom extrême sur un seul point.
+    // Sans point : sur la position du récepteur, sinon sur les plans DXF ; sinon pas encore de vue
+    // (elle se fera sur la première position reçue).
+    // Sans point mais avec une surface importée : sur ses sommets (0.83.0).
+    const sommetsImportes = points.length === 0 ? sommetsDesSurfacesImportees() : [];
+    const centre = points.length === 1 ? points[0] : points.length === 0 && sommetsImportes.length === 0 ? position : null;
+    if (centre) vue = { echelle: largeur / 60, estCentre: centre.est, nordCentre: centre.nord, largeur, hauteur };
+    else if (points.length > 0) vue = cadrerSurPoints(points, largeur, hauteur);
+    else if (sommetsImportes.length > 0) vue = cadrerSurPoints(sommetsImportes, largeur, hauteur);
+    else vue = plansDxf.length > 0 ? cadrerSurPoints(coinsDesPlans(plansDxf), largeur, hauteur) : null;
     dessiner();
   }
 
@@ -1310,7 +1331,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // --- Boutons ---
   conteneur.querySelector('[data-action="tout-voir"]').addEventListener('click', () => {
     changerSuivi('libre');
-    toutVoir();
+    toutVoir(true);
   });
   conteneur.querySelector('[data-action="zoom-plus"]').addEventListener('click', () => zoomerAuCentre(1.5));
   conteneur.querySelector('[data-action="zoom-moins"]').addEventListener('click', () => zoomerAuCentre(1 / 1.5));

@@ -104,6 +104,7 @@ import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { creerBarreRecalage } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
+import { ajouterTous } from './outils/bornes.js';
 
 // --- État de l'application ---
 let projet = creerProjet(); // projet ouvert
@@ -4530,7 +4531,10 @@ const AUCUN_POINT = [];
 const POINTS_DES_LISTES = [];
 function pointsStables(nouveaux) {
   const pareil = nouveaux.length === POINTS_DES_LISTES.length && nouveaux.every((p, i) => p === POINTS_DES_LISTES[i]);
-  if (!pareil) POINTS_DES_LISTES.splice(0, POINTS_DES_LISTES.length, ...nouveaux);
+  if (!pareil) {
+    POINTS_DES_LISTES.length = 0;
+    ajouterTous(POINTS_DES_LISTES, nouveaux);
+  }
   return POINTS_DES_LISTES;
 }
 let nombrePointsAffiches = 0;

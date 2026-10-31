@@ -9,6 +9,8 @@
 // - Seules les surfaces de type TIN sont lues.
 // - Un triangle marqué i="1" est invisible (exclu de la surface) : on l'ignore.
 
+import { mini, maxi } from '../outils/bornes.js';
+
 /**
  * Lit le texte d'un fichier LandXML.
  * Renvoie { surfaces, erreurs, avertissements } où chaque surface vaut :
@@ -129,12 +131,12 @@ export function resumerSurface(surface) {
   const valeurs = (cle) => sommets.map((p) => p[cle]);
   return {
     surfacePlan,
-    altitudeMin: Math.min(...valeurs('altitude')),
-    altitudeMax: Math.max(...valeurs('altitude')),
-    estMin: Math.min(...valeurs('est')),
-    estMax: Math.max(...valeurs('est')),
-    nordMin: Math.min(...valeurs('nord')),
-    nordMax: Math.max(...valeurs('nord')),
+    altitudeMin: mini(valeurs('altitude')),
+    altitudeMax: maxi(valeurs('altitude')),
+    estMin: mini(valeurs('est')),
+    estMax: maxi(valeurs('est')),
+    nordMin: mini(valeurs('nord')),
+    nordMax: maxi(valeurs('nord')),
   };
 }
 
