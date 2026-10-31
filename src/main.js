@@ -53,7 +53,7 @@ import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecr
 import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
-import { lireLibelles, recreerLibellesManquants } from './leve/libelles.js';
+import { lireLibelles, recreerLibellesManquants, definirLibellesProjet, surLibellesProjet } from './leve/libelles.js';
 import { modifierLibellesDeSorte, modifierReseaux } from './leve/fenetre-libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
@@ -4299,6 +4299,7 @@ function decrireSurface(surface) {
 
 /** Recalcule tout (surfaces, volumes) et met à jour les écrans et le plan. */
 function recalculer({ recadrer = false } = {}) {
+  definirLibellesProjet(projet.libelles); // libellés de ce projet seulement (0.105.6)
   const leve = leveActif(projet);
   // Toujours la même liste vide : une nouvelle liste à chaque fois recadrerait le plan (voir plus bas).
   const points = leve?.points ?? AUCUN_POINT;
@@ -4796,6 +4797,12 @@ function allerA(onglet) {
  * Puis on va à l'étape utile (voir etapeUtile).
  */
 let affichageRemisAZero = false;
+// La fenêtre des libellés range ceux « de ce projet seulement » dans le projet (0.105.6).
+surLibellesProjet((libelles) => {
+  projet.libelles = libelles;
+  modifie();
+});
+
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
   // Tableau « Affichage » (0.94.0) : au démarrage, tout est montré (listes, plans DXF et leurs calques).
@@ -4807,8 +4814,10 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
       for (const calque of planDxf.calques ?? []) calque.visible = true;
     }
   }
-  // Anciens projets : un libellé supprimé de la liste est recréé d'après les noms des points (0.105.5).
-  recreerLibellesManquants(projet.leves.flatMap((l) => l.points.map((p) => p.nom)));
+  // Anciens projets : un libellé absent de la liste mais utilisé par des points est recréé, pour ce projet seulement (0.105.5).
+  definirLibellesProjet(projet.libelles);
+  const recrees = recreerLibellesManquants(projet.leves.flatMap((l) => l.points.map((p) => p.nom)));
+  if (recrees) projet.libelles = recrees;
   implanter.choix = null;
   implanter.cible = null;
   implanter.pointsLigne = [];

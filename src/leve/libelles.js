@@ -73,14 +73,63 @@ const SORTES = ['lignes', 'points', 'aires'];
 // (lignes orange, points vert, aires cyan) : aussi celle des symboles de forme dans Lever.
 export const COULEURS_HABITUELLES = { lignes: '#ea580c', points: '#15803d', aires: '#0891b2' };
 
-/**
- * Libellés : ceux de départ (fixes, avec leur couleur choisie), puis ceux ajoutés. Renvoie
- * { lignes, points, aires } ([[abréviation, signification, couleur (facultative)]]), une copie.
- */
-export function lireLibelles() {
+// Libellés propres au projet ouvert (0.105.6) : { lignes, points, aires } de [abréviation, signification,
+// couleur, forme]. Ils s'ajoutent à ceux « par défaut » (la liste partagée, valable dans tous les projets).
+let duProjet = { lignes: [], points: [], aires: [] };
+let signatureProjet = JSON.stringify(duProjet);
+let quandProjetChange = null;
+
+/** Libellés du projet qui vient de s'ouvrir ou de changer (appelé par main.js) ; sans effet s'ils sont identiques. */
+export function definirLibellesProjet(libelles) {
+  const propres = Object.fromEntries(SORTES.map((sorte) => [sorte, (libelles?.[sorte] ?? []).map(([a, s, c, f]) => [a, s ?? '', couleurAJour(c ?? ''), f ?? ''])]));
+  const signature = JSON.stringify(propres);
+  if (signature === signatureProjet) return;
+  duProjet = propres;
+  signatureProjet = signature;
+}
+
+/** main.js y range les libellés du projet quand la fenêtre des libellés les change : fonction(libelles). */
+export function surLibellesProjet(fonction) {
+  quandProjetChange = fonction;
+}
+
+/** Libellés propres au projet ouvert (une copie). */
+export function lireLibellesProjet() {
+  return structuredClone(duProjet);
+}
+
+/** Enregistre les libellés propres au projet ouvert (ils partent avec le projet, sur Drive aussi). */
+export function enregistrerLibellesProjet(libelles) {
+  definirLibellesProjet(libelles);
+  quandProjetChange?.(structuredClone(duProjet));
+}
+
+/** Libellés « par défaut » seulement (liste partagée, tous les projets) : { lignes, points, aires }. */
+export function lireLibellesParDefaut() {
   if (!enCache) enCache = assemblerLibelles(lireListesPartagees().libelles ?? ancienneListe());
   return structuredClone(enCache);
 }
+
+/**
+ * Libellés : ceux par défaut (de départ, avec leur couleur choisie, puis ajoutés), puis ceux du projet. Renvoie
+ * { lignes, points, aires } ([[abréviation, signification, couleur, forme]]), une copie. Pour l'écran, les exports et le plan :
+ * par défaut, puis ceux du projet (un projet ne
+ * redonne pas une abréviation déjà par défaut).
+ */
+export function lireLibelles() {
+  const defaut = lireLibellesParDefaut();
+  return Object.fromEntries(SORTES.map((sorte) => [sorte, [...defaut[sorte], ...duProjet[sorte].filter(([a]) => !defaut[sorte].some(([d]) => d === a))]]));
+}
+
+/** Libellés pour la fenêtre de modification : [abréviation, signification, couleur, forme, parDéfaut (vrai / faux)]. */
+export function lireLibellesDetail() {
+  const defaut = lireLibellesParDefaut();
+  return Object.fromEntries(SORTES.map((sorte) => [sorte, [
+    ...defaut[sorte].map((l) => [...l, true]),
+    ...duProjet[sorte].filter(([a]) => !defaut[sorte].some(([d]) => d === a)).map((l) => [...l, false]),
+  ]]));
+}
+
 
 /** Abréviations de départ d'une sorte ('lignes', 'points', 'aires') : elles ne se modifient pas. */
 export function abreviationsDepart(sorte) {
@@ -155,19 +204,17 @@ export function libellesManquants(noms, libelles = lireLibelles()) {
   return Object.fromEntries(SORTES.map((cle) => [cle, [...manquants[cle]]]));
 }
 
-/** Recrée (et enregistre) les libellés manquants d'après ces noms de points. Renvoie leur nombre. */
+/**
+ * Recrée les libellés manquants d'après ces noms de points, comme libellés de ce projet seulement
+ * (pas dans la liste par défaut). Renvoie les libellés du projet complétés, ou null s'il n'en manque pas.
+ */
 export function recreerLibellesManquants(noms) {
-  const libelles = lireLibelles();
-  const manquants = libellesManquants(noms, libelles);
-  let nombre = 0;
-  for (const cle of SORTES) {
-    for (const abreviation of manquants[cle]) {
-      libelles[cle].push([abreviation, '', '', '']);
-      nombre += 1;
-    }
-  }
-  if (nombre > 0) enregistrerLibelles(libelles);
-  return nombre;
+  const manquants = libellesManquants(noms, lireLibelles());
+  if (SORTES.every((sorte) => manquants[sorte].length === 0)) return null;
+  const propres = lireLibellesProjet();
+  for (const sorte of SORTES) for (const abreviation of manquants[sorte]) propres[sorte].push([abreviation, '', '', '']);
+  definirLibellesProjet(propres);
+  return propres;
 }
 
 /** Anciens libellés de cet appareil (avant 0.95.0, « topo-libelles »), en part partagée, ou null. */

@@ -28,3 +28,25 @@ describe('libellés modifiables en Expert (0.105.5)', () => {
     expect(COULEURS_HABITUELLES.lignes).toBe('#ea580c');
   });
 });
+
+import { definirLibellesProjet, lireLibelles, lireLibellesDetail, recreerLibellesManquants } from '../src/leve/libelles.js';
+
+describe('libellés par défaut et libellés du projet (0.105.6)', () => {
+  it('les libellés du projet s\'ajoutent après ceux par défaut', () => {
+    definirLibellesProjet({ lignes: [['ZZ', 'occasionnel', '#dc2626', ''], ['HT', 'doublon', '', '']], points: [], aires: [] });
+    const l = lireLibelles();
+    expect(l.lignes.at(-1)[0]).toBe('ZZ');
+    expect(l.lignes.filter(([a]) => a === 'HT')).toHaveLength(1);
+    const detail = lireLibellesDetail().lignes;
+    expect(detail.find(([a]) => a === 'HT')[4]).toBe(true);
+    expect(detail.find(([a]) => a === 'ZZ')[4]).toBe(false);
+    definirLibellesProjet({});
+  });
+  it('un libellé recréé est pour ce projet seulement', () => {
+    definirLibellesProjet({});
+    const propres = recreerLibellesManquants(['L-QQQ-1-1', 'P-RG-1']);
+    expect(propres.lignes.map(([a]) => a)).toEqual(['QQQ']);
+    expect(lireLibellesDetail().lignes.find(([a]) => a === 'QQQ')[4]).toBe(false);
+    definirLibellesProjet({});
+  });
+});
