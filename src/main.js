@@ -4372,7 +4372,9 @@ function recalculer({ recadrer = false } = {}) {
     pointsDuPlan = seul.pointNom ? pointsStables(pointsDuPlan.filter((p) => p.nom === seul.pointNom)) : AUCUN_POINT;
     for (const s of projet.surfaces) if (s.id !== seul.surfaceId) visibles.delete(s);
   }
-  plan.afficherPlansDxf(seul ? [] : plansDuProjet());
+  // Bouton « Seul » dans Lever (0.105.4) : tout est caché (plans DXF, autres levés, imports, mesures, coupes) sauf le fond et le levé en cours.
+  const seulEnLever = seulTravail && ongletContexte === 'terrain' && Boolean(ecranLeve) && terrain.mode === 'lever';
+  plan.afficherPlansDxf(seul || seulEnLever ? [] : plansDuProjet());
   // Ce qui est coché (calques, « Afficher ») vaut dans tous les onglets.
   const dessinDuPlan = {
     ...editeurSurfaces.obtenirDessin(),
@@ -4401,10 +4403,10 @@ function recalculer({ recadrer = false } = {}) {
     traceCoupe,
     // Mesures (aires, longueurs, nombres) des métrés cochés dans « Afficher » (et celles faites à la
     // main si « Mesures » est cochée).
-    mesures: seul ? [] : mesuresDuPlan(listes),
+    mesures: seul || seulEnLever ? [] : mesuresDuPlan(listes),
     mesureActive: null,
   };
-  if (seul) dessinDuPlan.coupes = [];
+  if (seul || seulEnLever) dessinDuPlan.coupes = [];
   if (ongletContexte === 'mesures') {
     // Onglet 3. Mesures : les mesures cochées et celle ouverte ; toucher une mesure la choisit.
     const mesureActive = ecranMesures.mesureActive();
