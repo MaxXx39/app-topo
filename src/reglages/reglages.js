@@ -22,10 +22,10 @@ import { ouvrirFenetreListes } from './fenetre-listes.js';
 const CLE = 'topo-reglages';
 const PAR_DEFAUT = { telephone: false, mode: 'intermediaire', tailleFormes: 'normale', tailleTexte: 'normal' };
 // Tailles à choisir sur le plan (0.104.0, propres à chaque appareil, tous les modes) : [clé, titre, facteur].
-// Formes des points : « Normale » = l'ancienne taille + 20 % (rayon de départ 3,5 px). Texte (noms et
-// altitudes des points) : « Normal » = 75 % de la taille d'origine (0.105.1 : tout a été réduit).
-export const TAILLES_FORMES = [['petite', 'Petites', 0.833], ['normale', 'Normales', 1], ['grande', 'Grandes', 1.4], ['tres-grande', 'Très grandes', 1.8]];
-export const TAILLES_TEXTE = [['petit', 'Petit', 0.6], ['normal', 'Normal', 0.75], ['grand', 'Grand', 1], ['tres-grand', 'Très grand', 1.25]];
+// Formes des points : « Normales » = 70 % de (3,5 px + 20 %), soit 2,94 px (0.105.3 : −30 %). Texte (noms et
+// altitudes des points) : « Normal » = 60 % de la taille d'origine (0.105.3 : −20 % de plus).
+export const TAILLES_FORMES = [['petite', 'Petites', 0.583], ['normale', 'Normales', 0.7], ['grande', 'Grandes', 0.98], ['tres-grande', 'Très grandes', 1.26]];
+export const TAILLES_TEXTE = [['petit', 'Petit', 0.48], ['normal', 'Normal', 0.6], ['grand', 'Grand', 0.8], ['tres-grand', 'Très grand', 1]];
 const RAYON_FORME_DE_DEPART = 4.2; // 3,5 px + 20 %
 // Les trois modes, du plus simple au plus complet (le rang sert à comparer : aAcces).
 export const MODES = [['base', 'Base'], ['intermediaire', 'Intermédiaire'], ['expert', 'Expert']];

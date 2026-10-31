@@ -83,13 +83,13 @@ describe('changement de mode dans les réglages', () => {
 describe('tailles du plan (0.104.0)', () => {
   it('formes : +20 % au départ (rayon 4,2 au lieu de 3,5), texte normal = 0,75', async () => {
     const reglages = await chargerReglages({});
-    expect(reglages.rayonFormes()).toBeCloseTo(4.2, 6);
-    expect(reglages.echelleTexte()).toBe(0.75);
+    expect(reglages.rayonFormes()).toBeCloseTo(4.2 * 0.7, 6);
+    expect(reglages.echelleTexte()).toBe(0.6);
   });
   it('4 tailles choisies sur l\'appareil', async () => {
     const reglages = await chargerReglages({ 'topo-reglages': JSON.stringify({ tailleFormes: 'tres-grande', tailleTexte: 'petit' }) });
-    expect(reglages.rayonFormes()).toBeCloseTo(4.2 * 1.8, 6);
-    expect(reglages.echelleTexte()).toBe(0.6);
+    expect(reglages.rayonFormes()).toBeCloseTo(4.2 * 1.26, 6);
+    expect(reglages.echelleTexte()).toBe(0.48);
     expect(reglages.TAILLES_FORMES).toHaveLength(4);
     expect(reglages.TAILLES_TEXTE).toHaveLength(4);
   });
