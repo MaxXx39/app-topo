@@ -144,7 +144,8 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     },
     pdf: async () => {
       const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos, coupes, dessins } = obtenirDonnees();
-      if (!verifier(volumes)) return;
+      // Sans volume, le PDF montre quand même les points et dessins cochés (levé seul).
+      if (!verifier(volumes, points.length > 0 || dessins.length > 0)) return;
       message.textContent = 'Préparation du PDF…';
       try {
         // La bibliothèque PDF n'est chargée qu'au premier export (l'appli démarre plus vite).
@@ -221,9 +222,9 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
   }
 
   /** Vérifie qu'il y a quelque chose à exporter, sinon affiche un message. */
-  function verifier(volumes) {
-    if (volumes.some(({ resultat }) => resultat && !resultat.erreurs)) return true;
-    message.textContent = 'Aucun volume à exporter.';
+  function verifier(volumes, autreContenu = false) {
+    if (autreContenu || volumes.some(({ resultat }) => resultat && !resultat.erreurs)) return true;
+    message.textContent = autreContenu === false && volumes.length === 0 ? 'Rien de coché à exporter (volume, levé ou dessin).' : 'Aucun volume à exporter.';
     return false;
   }
 
