@@ -36,6 +36,7 @@ import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne
 // (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
 const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
 import { symboleDeForme } from '../plan/formes.js';
+import { COULEURS_HABITUELLES } from './libelles.js';
 import { ouvrirFenetrePointTape, ouvrirListePoints } from './fenetres-points.js';
 
 // Mode Contrôler : ce qu'on implante (point, ligne, talus, surface), vue des coupes, longueurs.
@@ -1108,9 +1109,9 @@ export function creerEcranLeve(conteneur, actions) {
     const liste = donnees.libelles[sorte];
     const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
     return `<div class="libelles-terrain seulement-intermediaire pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
-      <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong><i class="symbole-libelle">${symboleDeForme('')}</i>Aucun</strong><span>sans libellé</span></button>
+      <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong><i class="symbole-libelle" style="color: ${COULEURS_HABITUELLES[sorte]}">${symboleDeForme('')}</i>Aucun</strong><span>sans libellé</span></button>
       ${liste.map(([abreviation, signification, couleur, forme]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
-          <strong><i class="symbole-libelle" ${couleur ? `style="color: ${couleur}"` : ''}>${symboleDeForme(forme)}</i>${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
+          <strong><i class="symbole-libelle" style="color: ${couleur || COULEURS_HABITUELLES[sorte]}">${symboleDeForme(forme)}</i>${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
       <button type="button" class="bouton-crayon-libelles" data-action="modifierLibelles" data-valeur="${sorte}" title="Ajouter ou modifier des libellés" aria-label="Ajouter ou modifier des libellés">⚙</button>
     </div>
 `;

@@ -53,7 +53,7 @@ import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecr
 import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
-import { lireLibelles } from './leve/libelles.js';
+import { lireLibelles, recreerLibellesManquants } from './leve/libelles.js';
 import { modifierLibellesDeSorte, modifierReseaux } from './leve/fenetre-libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
@@ -4807,6 +4807,8 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
       for (const calque of planDxf.calques ?? []) calque.visible = true;
     }
   }
+  // Anciens projets : un libellé supprimé de la liste est recréé d'après les noms des points (0.105.5).
+  recreerLibellesManquants(projet.leves.flatMap((l) => l.points.map((p) => p.nom)));
   implanter.choix = null;
   implanter.cible = null;
   implanter.pointsLigne = [];

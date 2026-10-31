@@ -69,6 +69,10 @@ surChangementListes(() => (enCache = null));
 
 const SORTES = ['lignes', 'points', 'aires'];
 
+// Couleur habituelle de chaque sorte sur le plan quand le libellé n'a pas de couleur choisie
+// (lignes orange, points vert, aires cyan) : aussi celle des symboles de forme dans Lever.
+export const COULEURS_HABITUELLES = { lignes: '#ea580c', points: '#15803d', aires: '#0891b2' };
+
 /**
  * Libellés : ceux de départ (fixes, avec leur couleur choisie), puis ceux ajoutés. Renvoie
  * { lignes, points, aires } ([[abréviation, signification, couleur (facultative)]]), une copie.
@@ -94,6 +98,11 @@ const couleurAJour = (couleur) => ANCIENNES_COULEURS[couleur] ?? couleur;
 export function assemblerLibelles(partage) {
   const resultat = {};
   for (const sorte of SORTES) {
+    // 0.105.5 (Expert) : liste complète modifiable, départ compris ; elle remplace départ + ajoutés.
+    if (Array.isArray(partage?.complet?.[sorte])) {
+      resultat[sorte] = partage.complet[sorte].filter(([a]) => a).map(([a, s, c, f]) => [a, s ?? '', couleurAJour(c ?? ''), f ?? '']);
+      continue;
+    }
     const couleurs = partage?.couleurs?.[sorte] ?? {};
     const formes = partage?.formes?.[sorte] ?? {};
     const depart = LIBELLES_DEPART[sorte].map(([a, s]) => [a, s, couleurAJour(couleurs[a] ?? ''), formes[a] ?? '']);
@@ -109,8 +118,9 @@ export function assemblerLibelles(partage) {
  * gardent que leur couleur et leur forme).
  */
 export function partDesLibelles(libelles) {
-  const partage = { ajoutes: {}, couleurs: {}, formes: {} };
+  const partage = { ajoutes: {}, couleurs: {}, formes: {}, complet: {} };
   for (const sorte of SORTES) {
+    partage.complet[sorte] = (libelles[sorte] ?? []).map(([a, s, c, f]) => [a, s ?? '', c ?? '', f ?? '']);
     const fixes = abreviationsDepart(sorte);
     const liste = libelles[sorte] ?? [];
     partage.ajoutes[sorte] = liste.filter(([a]) => !fixes.has(a)).map(([a, s, c, f]) => [a, s ?? '', c ?? '', f ?? '']);
@@ -126,6 +136,38 @@ export function formeDuNom(nom, libelles = lireLibelles()) {
   if (!decoupe) return '';
   const liste = { P: libelles.points, L: libelles.lignes, A: libelles.aires }[decoupe[1]];
   return (liste ?? []).find(([a]) => a === decoupe[2])?.[3] || '';
+}
+
+/**
+ * Libellés qui manquent à la liste d'après les noms de points d'un projet (0.105.5, anciens projets :
+ * un libellé supprimé est recréé) : { lignes: [abréviations], points: [...], aires: [...] }. Les noms
+ * sans libellé (L-1-3, P-5) et les noms d'un autre genre (C-Stock-1-1) sont ignorés.
+ */
+export function libellesManquants(noms, libelles = lireLibelles()) {
+  const manquants = { lignes: new Set(), points: new Set(), aires: new Set() };
+  const sorte = { L: 'lignes', P: 'points', A: 'aires' };
+  for (const nom of noms) {
+    const decoupe = /^([PLA])-([^-]+)-\d+(-\d+)?$/.exec(String(nom ?? ''));
+    if (!decoupe || /^\d+$/.test(decoupe[2])) continue;
+    const cle = sorte[decoupe[1]];
+    if (!(libelles[cle] ?? []).some(([a]) => a === decoupe[2])) manquants[cle].add(decoupe[2]);
+  }
+  return Object.fromEntries(SORTES.map((cle) => [cle, [...manquants[cle]]]));
+}
+
+/** Recrée (et enregistre) les libellés manquants d'après ces noms de points. Renvoie leur nombre. */
+export function recreerLibellesManquants(noms) {
+  const libelles = lireLibelles();
+  const manquants = libellesManquants(noms, libelles);
+  let nombre = 0;
+  for (const cle of SORTES) {
+    for (const abreviation of manquants[cle]) {
+      libelles[cle].push([abreviation, '', '', '']);
+      nombre += 1;
+    }
+  }
+  if (nombre > 0) enregistrerLibelles(libelles);
+  return nombre;
 }
 
 /** Anciens libellés de cet appareil (avant 0.95.0, « topo-libelles »), en part partagée, ou null. */

@@ -2,9 +2,10 @@
 // un tableau Abrév. | Description | Couleur, qui défile, et en bas, toujours visible, la barre
 // « + Ajouter · annuler · ENREGISTRER » (demande du 24.10.2026). La couleur se voit en pastille ;
 // la toucher ouvre la palette (ronds de couleur) sous la ligne. Les libellés de départ (fixes) ne
-// se modifient pas et ne s'enlèvent pas : seule leur couleur se change.
+// se modifient pas et ne s'enlèvent pas : seule leur couleur se change (sauf en Expert, 0.105.5).
 import { echapper } from '../outils/echapper.js';
-import { nettoyerAbreviation, COULEURS_LIBELLES, lireLibelles, enregistrerLibelles, abreviationsDepart } from './libelles.js';
+import { nettoyerAbreviation, COULEURS_LIBELLES, COULEURS_HABITUELLES, lireLibelles, enregistrerLibelles, abreviationsDepart } from './libelles.js';
+import { aAcces } from '../reglages/reglages.js';
 import { FORMES } from '../plan/formes.js';
 import { lireReseaux, enregistrerReseaux, abreviationsReseauxDepart } from './reseaux.js';
 
@@ -111,8 +112,9 @@ export function modifierLibellesDeSorte(sorte, apres) {
   ouvrirFenetreLibelles({
     titre: TITRES_LIBELLES[sorte],
     liste: tous[sorte],
-    fixes: abreviationsDepart(sorte),
-    couleurParDefaut: { lignes: '#ea580c', points: '#15803d', aires: '#0891b2' }[sorte],
+    // Expert (0.105.5) : les libellés de départ se modifient et s'enlèvent aussi ; sinon, seulement leur couleur et leur forme.
+    fixes: aAcces('expert') ? new Set() : abreviationsDepart(sorte),
+    couleurParDefaut: COULEURS_HABITUELLES[sorte],
     enregistrer: (liste) => {
       enregistrerLibelles({ ...tous, [sorte]: liste });
       apres?.();
