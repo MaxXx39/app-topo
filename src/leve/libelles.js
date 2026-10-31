@@ -52,7 +52,8 @@ export const COULEURS_LIBELLES = [
   ['#6b7280', 'gris', 8],
   ['#2563eb', 'bleu', 5],
   ['#0ea5e9', 'bleu clair', 4],
-  ['#16a34a', 'vert', 3],
+  ['#4ade80', 'vert', 3],
+  ['#166534', 'vert foncé', 94],
   ['#dc2626', 'rouge', 1],
   ['#ea580c', 'orange', 30],
   ['#ca8a04', 'jaune', 2],
@@ -86,14 +87,18 @@ export function abreviationsDepart(sorte) {
  * Libellés complets à partir de la part partagée { ajoutes, couleurs } : départ (avec couleur),
  * puis ajoutés (sans ceux qui ont le nom d'un libellé de départ).
  */
+// Anciennes couleurs retenues par des libellés déjà enregistrés : remplacées par la nouvelle (0.105.1).
+const ANCIENNES_COULEURS = { '#16a34a': '#4ade80' };
+const couleurAJour = (couleur) => ANCIENNES_COULEURS[couleur] ?? couleur;
+
 export function assemblerLibelles(partage) {
   const resultat = {};
   for (const sorte of SORTES) {
     const couleurs = partage?.couleurs?.[sorte] ?? {};
     const formes = partage?.formes?.[sorte] ?? {};
-    const depart = LIBELLES_DEPART[sorte].map(([a, s]) => [a, s, couleurs[a] ?? '', formes[a] ?? '']);
+    const depart = LIBELLES_DEPART[sorte].map(([a, s]) => [a, s, couleurAJour(couleurs[a] ?? ''), formes[a] ?? '']);
     const fixes = abreviationsDepart(sorte);
-    const ajoutes = (partage?.ajoutes?.[sorte] ?? []).filter(([a]) => a && !fixes.has(a)).map(([a, s, c, f]) => [a, s ?? '', c ?? '', f ?? '']);
+    const ajoutes = (partage?.ajoutes?.[sorte] ?? []).filter(([a]) => a && !fixes.has(a)).map(([a, s, c, f]) => [a, s ?? '', couleurAJour(c ?? ''), f ?? '']);
     resultat[sorte] = [...depart, ...ajoutes];
   }
   return resultat;

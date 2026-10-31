@@ -60,5 +60,6 @@ export function cheminForme(forme, x, y, r) {
 
 /** Symbole (●, ▲, ★…) d'une forme, pour les listes de choix. */
 export function symboleDeForme(forme) {
-  return (FORMES.find(([cle]) => cle === (forme ?? '')) ?? FORMES[0])[1];
+  // U+FE0E : demande le dessin « texte » (qui prend la couleur), pas l'emoji de couleur fixe (tablettes Android).
+  return `${(FORMES.find(([cle]) => cle === (forme ?? '')) ?? FORMES[0])[1]}\uFE0E`;
 }

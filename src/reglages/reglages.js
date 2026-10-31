@@ -23,9 +23,9 @@ const CLE = 'topo-reglages';
 const PAR_DEFAUT = { telephone: false, mode: 'intermediaire', tailleFormes: 'normale', tailleTexte: 'normal' };
 // Tailles à choisir sur le plan (0.104.0, propres à chaque appareil, tous les modes) : [clé, titre, facteur].
 // Formes des points : « Normale » = l'ancienne taille + 20 % (rayon de départ 3,5 px). Texte (noms et
-// altitudes des points) : « Normal » = la taille d'avant.
+// altitudes des points) : « Normal » = 75 % de la taille d'origine (0.105.1 : tout a été réduit).
 export const TAILLES_FORMES = [['petite', 'Petites', 0.833], ['normale', 'Normales', 1], ['grande', 'Grandes', 1.4], ['tres-grande', 'Très grandes', 1.8]];
-export const TAILLES_TEXTE = [['petit', 'Petit', 0.85], ['normal', 'Normal', 1], ['grand', 'Grand', 1.25], ['tres-grand', 'Très grand', 1.5]];
+export const TAILLES_TEXTE = [['petit', 'Petit', 0.6], ['normal', 'Normal', 0.75], ['grand', 'Grand', 1], ['tres-grand', 'Très grand', 1.25]];
 const RAYON_FORME_DE_DEPART = 4.2; // 3,5 px + 20 %
 // Les trois modes, du plus simple au plus complet (le rang sert à comparer : aAcces).
 export const MODES = [['base', 'Base'], ['intermediaire', 'Intermédiaire'], ['expert', 'Expert']];

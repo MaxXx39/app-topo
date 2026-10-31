@@ -1757,11 +1757,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function dessinerPhotos() {
     if (!vue || photos.length === 0) return;
     const groupe = creerElement('g', { class: 'photos-plan' });
+    const echelle = echelleTexte();
     for (const photo of photos) {
       const ecran = versEcran(photo.est, photo.nord, vue);
       const { x, y } = decalagePhoto(ecran.x, ecran.y);
-      groupe.append(creerElement('rect', { x: x - 9, y: y - 8, width: 18, height: 15, rx: 4, class: 'fond-photo-plan' }));
-      const texte = creerElement('text', { x, y: y + 4, 'text-anchor': 'middle', class: 'icone-photo-plan' });
+      // Le logo suit la taille du texte du plan (réglage de l'appareil).
+      groupe.append(creerElement('rect', { x: x - 9 * echelle, y: y - 8 * echelle, width: 18 * echelle, height: 15 * echelle, rx: 4 * echelle, class: 'fond-photo-plan' }));
+      const texte = creerElement('text', { x, y: y + 4 * echelle, 'text-anchor': 'middle', class: 'icone-photo-plan' });
       texte.textContent = '📷';
       groupe.append(texte);
     }
