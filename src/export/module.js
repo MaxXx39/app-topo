@@ -81,7 +81,7 @@ export function creerModuleExport(conteneur, actions) {
       ...(projet.pointsControle.length > 0 ? [['Points de contrôle', `${projet.pointsControle.length} points`, 'data-export="liste" data-type="controle" data-id=""']] : []),
     ];
     panneau('listes').innerHTML = lignes.length > 0
-      ? `<div class="lignes-export">${lignes.map(([nom, detail, attributs]) => `<div class="ligne-export"><span><strong>${echapper(nom)}</strong> <span class="aide">${echapper(detail)}</span></span>${bouton('TXT · CSV · DXF', attributs)}</div>`).join('')}</div>`
+      ? `<div class="lignes-export">${lignes.map(([nom, detail, attributs]) => `<div class="ligne-export"><span><strong>${echapper(nom)}</strong> <span class="aide">${echapper(detail)}</span></span>${bouton('TXT · CSV · DXF · PDF', attributs)}</div>`).join('')}</div>`
       : '<p class="vide">Aucune liste de points.</p>';
     // Recollements de réseaux (0.101.0) : tous ensemble, un calque (DXF) ou un réseau (LandXML) par levé.
     const nbReseaux = (projet.reseaux ?? []).length;

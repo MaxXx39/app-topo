@@ -1512,6 +1512,7 @@ function exporterListe(type, id) {
   let points;
   let titre;
   let roles = new Map();
+  let photos = [];
   if (type === 'controle') {
     points = projet.pointsControle;
     titre = 'Points de contrôle';
@@ -1526,13 +1527,33 @@ function exporterListe(type, id) {
     points = leve.points;
     titre = leve.nom;
     roles = rolesDesPoints(leve.id);
+    // Photos rattachées à un point de ce levé (case « avec les photos des points », PDF).
+    const proprietaire = [...projet.surfaces, ...projet.metres, ...projet.autres, ...projet.reseaux].find((o) => o.leveId === leve.id);
+    const parNom = new Map(points.map((p) => [p.nom, p]));
+    photos = (proprietaire?.photos ?? []).filter((ph) => ph.point && parNom.has(ph.point)).map((ph) => ({
+      ...ph,
+      surface: leve.nom,
+      legende: [ph.point, parNom.get(ph.point).altitude == null ? null : `H ${formaterNombre(parNom.get(ph.point).altitude)}`, ph.legende].filter(Boolean).join(' · '),
+    }));
   }
   // Nom du fichier : projet_liste, sans l'extension du fichier importé (« stock.csv » -> « stock »).
   const base = `${nomDeFichierProjet(projet)}_${titre.replace(/\.[a-z0-9]{2,4}$/i, '')}`.replace(/[\\/:*?"<>|]/g, '_');
   ouvrirFenetreExport({
     titre,
     formats: FORMATS_POINTS,
-    fabriquer: (format) => {
+    options: photos.length > 0 ? [{ cle: 'photos', texte: `Avec les photos des points (${photos.length})`, formats: ['pdf'] }] : [],
+    fabriquer: async (format, choix = {}) => {
+      if (format === 'pdf') {
+        const { pdfPoints } = await import('./export/pdf-points.js');
+        const blob = pdfPoints({
+          titre,
+          points,
+          roles,
+          cartouche: { affaire: projet.cartouche?.affaire ?? '', date: new Date().toLocaleDateString('fr-CH') },
+          photos: choix.photos ? photos : [],
+        });
+        return { blob, nom: `${base}.pdf` };
+      }
       const { blob, extension } = fichierPoints(points, format, roles);
       return { blob, nom: `${base}.${extension}` };
     },

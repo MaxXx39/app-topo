@@ -13,7 +13,11 @@ export const FORMATS_POINTS = [
   ['txt', 'TXT', 'nom, Est, Nord, altitude'],
   ['csv', 'CSV', 'toutes les infos (Excel)'],
   ['dxf', 'DXF', 'points, noms, altitudes'],
+  ['pdf', 'PDF', 'tableau avec toutes les infos'],
 ];
+
+// Titres des colonnes des infos complètes (CSV et PDF), dans l'ordre.
+export const TITRES_INFOS = ['Nom', 'Est (m)', 'Nord (m)', 'Altitude (m)', 'Rôle', 'Date', 'Heure', 'Précision H (m)', 'Précision V (m)', 'Qualité', 'Satellites', 'HDOP', 'Âge corrections (s)', 'Inclinaison (°)'];
 
 // Qualité de la position (message GGA du récepteur) : 4 = RTK fixe, 5 = RTK flottant…
 const QUALITES = { 1: 'autonome', 2: 'DGPS', 4: 'RTK fixe', 5: 'RTK flottant' };
@@ -31,32 +35,34 @@ function champ(valeur) {
   return /[;"\r\n]/.test(texte) ? `"${texte.replaceAll('"', '""')}"` : texte;
 }
 
+/** Toutes les infos d'un point, en texte, dans l'ordre de TITRES_INFOS (CSV et PDF). */
+export function infosDuPoint(p, roles = new Map()) {
+  const g = p.gnss ?? {};
+  const pris = g.prisLe ? new Date(g.prisLe) : null;
+  return [
+    p.nom,
+    formaterNombre(p.est),
+    formaterNombre(p.nord),
+    p.altitude == null ? '' : formaterNombre(p.altitude),
+    roles.get(p.nom) ?? '',
+    pris ? pris.toLocaleDateString('fr-CH') : '',
+    pris ? pris.toLocaleTimeString('fr-CH') : '',
+    nombre(g.precisionH),
+    nombre(g.precisionV),
+    QUALITES[g.qualite] ?? (g.qualite ?? ''),
+    g.nbSatellites ?? '',
+    nombre(g.hdop, 1),
+    nombre(g.ageCorrections, 1),
+    nombre(g.inclinaison, 1),
+  ];
+}
+
 /**
  * Texte CSV avec toutes les infos. roles : Map nom -> rôle (« contour », « ligne L-HT-1 »,
  * « point isolé »), facultatif. Date et heure de la prise (heure de Suisse, sur l'appareil).
  */
 export function csvPoints(points, roles = new Map()) {
-  const lignes = [['Nom', 'Est (m)', 'Nord (m)', 'Altitude (m)', 'Rôle', 'Date', 'Heure', 'Précision H (m)', 'Précision V (m)', 'Qualité', 'Satellites', 'HDOP', 'Âge corrections (s)', 'Inclinaison (°)']];
-  for (const p of points) {
-    const g = p.gnss ?? {};
-    const pris = g.prisLe ? new Date(g.prisLe) : null;
-    lignes.push([
-      p.nom,
-      formaterNombre(p.est),
-      formaterNombre(p.nord),
-      p.altitude == null ? '' : formaterNombre(p.altitude),
-      roles.get(p.nom) ?? '',
-      pris ? pris.toLocaleDateString('fr-CH') : '',
-      pris ? pris.toLocaleTimeString('fr-CH') : '',
-      nombre(g.precisionH),
-      nombre(g.precisionV),
-      QUALITES[g.qualite] ?? (g.qualite ?? ''),
-      g.nbSatellites ?? '',
-      nombre(g.hdop, 1),
-      nombre(g.ageCorrections, 1),
-      nombre(g.inclinaison, 1),
-    ]);
-  }
+  const lignes = [TITRES_INFOS, ...points.map((p) => infosDuPoint(p, roles))];
   return lignes.map((ligne) => ligne.map(champ).join(';')).join('\r\n') + '\r\n';
 }
 
