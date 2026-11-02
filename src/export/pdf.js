@@ -101,7 +101,7 @@ export const COULEURS = {
  * { document, echelle, format, messageFond } : document jsPDF, échelle utilisée, format de la
  * première feuille ('a4' ou 'a3'), et un message (fond non mis, plan coupé...) ou null.
  */
-export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [], photos = [], coupes = [], dessins = [] }) {
+export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [], photos = [], coupes = [], dessins = [], levesSeuls = [] }) {
   const choix = { ...CALQUES_PDF, ...calques };
   // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre.
   if (choix.ecarts) choix.couleurs = false;
@@ -139,10 +139,10 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
 
   // Feuille des volumes (sauf s'il n'y a que des comparaisons)
   if (calcules.length > 0 || comparaisonsCalculees.length === 0) {
-    const contenu = contenuDuPlan(calcules, points, coupes, dessins);
+    const contenu = contenuDuPlan(calcules, points, coupes, dessins, levesSeuls);
     nouvelleFeuille(formatDuPlan(contenu.zone));
     dessinerCadres(doc);
-    const plan = await dessinerPlan(doc, calcules, contenu, echelleImposee, choix, coupes, dessins);
+    const plan = await dessinerPlan(doc, calcules, contenu, echelleImposee, choix, coupes, dessins, levesSeuls);
     const yLibre = dessinerColonne(doc, calcules, { ...cartouche, echelle: plan.echelle }, { choix, relief: plan.relief, ecarts: plan.legendeEcarts, comparaisons });
     placerPhotos(yLibre);
     echelle = plan.echelle;
@@ -424,19 +424,25 @@ async function dessinerPageComparaison(doc, { nom, description, resultat }, cart
  * lignes, sommets des triangles), ou tous s'il n'y a aucune surface, et la zone du terrain à
  * dessiner (points montrés et triangles). Renvoie { parNom, pointsMontres, zone } (zone null si vide).
  */
-function contenuDuPlan(calcules, points, coupes = [], dessins = []) {
+function contenuDuPlan(calcules, points, coupes = [], dessins = [], levesSeuls = []) {
   const parNom = new Map(points.map((p) => [p.nom, p]));
   const sommets = calcules.flatMap(({ resultat }) => resultat.trianglesDessus.flat());
   const noms = new Set([
     ...calcules.flatMap(({ stock }) => [...(stock.contour ?? []), ...(stock.lignesRupture ?? []).flatMap((l) => l.noms)]),
     ...sommets.filter((p) => parNom.get(p.nom) === p).map((p) => p.nom),
   ]);
-  const pointsMontres = noms.size > 0 ? [...noms].map((nom) => parNom.get(nom)).filter(Boolean) : points;
+  let pointsMontres = noms.size > 0 ? [...noms].map((nom) => parNom.get(nom)).filter(Boolean) : points;
+  // Levés seuls (0.107.4) : tous leurs points sont montrés.
+  const pointsLeves = levesSeuls.flatMap((l) => l.points);
+  if (pointsLeves.length > 0) {
+    const deja = new Set(pointsMontres);
+    pointsMontres = [...pointsMontres, ...pointsLeves.filter((p) => !deja.has(p))];
+  }
   // Les coupes doivent se voir en entier sur le plan.
   const boutsDesCoupes = coupes.flatMap((coupe) => [coupe.debut, coupe.fin]);
   // Les dessins aussi (plateformes, bâtiments…).
   const sommetsDessins = dessins.flatMap((d) => d.points);
-  return { parNom, pointsMontres, zone: zoneDe([...pointsMontres, ...sommets, ...boutsDesCoupes, ...sommetsDessins]) };
+  return { parNom, pointsMontres, zone: zoneDe([...pointsMontres, ...sommets, ...levesSeuls.flatMap((l) => l.triangles.flat()), ...boutsDesCoupes, ...sommetsDessins]) };
 }
 
 /**
@@ -445,7 +451,7 @@ function contenuDuPlan(calcules, points, coupes = [], dessins = []) {
  * Renvoie { echelle, messageFond, relief, legendeEcarts } (relief : plage d'altitudes et
  * équidistance ; legendeEcarts : paliers remblai / déblai ; pour les légendes).
  */
-async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, echelleImposee, choix, coupes = [], dessins = []) {
+async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, echelleImposee, choix, coupes = [], dessins = [], levesSeuls = []) {
   if (!zone) return { echelle: echelleImposee ?? 500, messageFond: null, relief: null, legendeEcarts: null };
   const projection = preparerProjection(zone, echelleImposee);
   const { echelle, versPapier } = projection;
@@ -457,7 +463,7 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
     : null;
 
   // Couleurs selon l'altitude et courbes de niveau (surface du dessus des stocks)
-  const tousTriangles = calcules.flatMap(({ resultat }) => resultat.trianglesDessus);
+  const tousTriangles = [...calcules.flatMap(({ resultat }) => resultat.trianglesDessus), ...levesSeuls.flatMap((l) => l.triangles)];
   let relief = null;
   if ((choix.couleurs || choix.courbes) && tousTriangles.length > 0) {
     const plage = plageAltitudes(tousTriangles);
@@ -495,8 +501,8 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
   }
 
   // Lignes de rupture puis contours
-  const polyligne = (listeNoms, fermee) => {
-    const sommets = listeNoms.map((nom) => parNom.get(nom)).filter(Boolean).map(versPapier);
+  const polyligne = (listeNoms, fermee, noms = parNom) => {
+    const sommets = listeNoms.map((nom) => noms.get(nom)).filter(Boolean).map(versPapier);
     for (let i = 0; i + 1 < sommets.length; i++) doc.line(sommets[i].x, sommets[i].y, sommets[i + 1].x, sommets[i + 1].y);
     if (fermee && sommets.length >= 3) doc.line(sommets.at(-1).x, sommets.at(-1).y, sommets[0].x, sommets[0].y);
   };
@@ -508,6 +514,17 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
       trait(doc, couleur ? hexEnRvb(couleur) : COULEURS.ligne, 0.25);
       polyligne(ligne.noms, ligne.fermee);
     }
+  }
+  // Levés seuls (0.107.4) : lignes de rupture et contour, avec les points de leur levé.
+  for (const leve of levesSeuls) {
+    const nomsLeve = new Map(leve.points.map((p) => [p.nom, p]));
+    for (const ligne of leve.lignesRupture) {
+      const couleur = couleurDeLigne(ligne, libelles);
+      trait(doc, couleur ? hexEnRvb(couleur) : COULEURS.ligne, 0.25);
+      polyligne(ligne.noms, ligne.fermee, nomsLeve);
+    }
+    trait(doc, COULEURS.contour, 0.35);
+    polyligne(leve.contour, true, nomsLeve);
   }
   trait(doc, COULEURS.contour, 0.35);
   for (const { stock } of calcules) polyligne(stock.contour ?? [], true);

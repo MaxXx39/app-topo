@@ -143,9 +143,9 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
       message.textContent = `LandXML téléchargé (${liste.length} surface(s)).`;
     },
     pdf: async () => {
-      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos, coupes, dessins } = obtenirDonnees();
-      // Sans volume, le PDF montre quand même les points et dessins cochés (levé seul).
-      if (!verifier(volumes, points.length > 0 || dessins.length > 0)) return;
+      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos, coupes, dessins, levesSeuls = [] } = obtenirDonnees();
+      // Sans volume, le PDF montre quand même les points, levés et dessins cochés (levé seul).
+      if (!verifier(volumes, points.length > 0 || dessins.length > 0 || levesSeuls.length > 0)) return;
       message.textContent = 'Préparation du PDF…';
       try {
         // La bibliothèque PDF n'est chargée qu'au premier export (l'appli démarre plus vite).
@@ -168,6 +168,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
           photos,
           coupes,
           dessins,
+          levesSeuls,
           calques,
           cartouche: {
             affaire: obtenirDonnees().cartouche.affaire ?? '',

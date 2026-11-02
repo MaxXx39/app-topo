@@ -4331,6 +4331,20 @@ creerEcranExport(moduleExport.zone('plan'), {
         .filter((c) => choisi(c) && dansUnContour(c))
         .map(({ calcul, resultat }) => ({ nom: nom(calcul), description: descriptionCalcul(calcul, projet.surfaces), resultat })),
       volumes: projet.calculs.filter((c) => selection.has(c.id)).map((calcul) => ({ nom: nom(calcul), base: texteBase(calcul, projet.surfaces), resultat: resultatsCalculs.get(calcul.id) })),
+      // PDF (0.107.4) : levés cochés qui ne sont dans aucun volume coché (« levé seul ») : contour,
+      // lignes de rupture, triangles et points, sans étiquette de volume.
+      levesSeuls: (() => {
+        const dansUnVolume = new Set(principaux.map(({ calcul }) => calcul.surface1Id));
+        return creees
+          .filter((s) => !dansUnVolume.has(s.id))
+          .map((s) => ({
+            nom: s.nom,
+            contour: s.contour ?? [],
+            lignesRupture: s.lignesRupture ?? [],
+            triangles: trianglesDeSurface(s.id),
+            points: projet.leves.find((l) => l.id === s.leveId)?.points ?? [],
+          }));
+      })(),
       // DXF et LandXML : les surfaces cochées, avec ou sans volume.
       dessinSurfaces: {
         stocks: creees,
