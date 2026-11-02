@@ -52,9 +52,10 @@ function preparer(plan) {
     liste.get(teinte).push({ ...objet, ...extra });
   };
   const { traits = [], cercles = [], pleins = [], textes = [] } = plan.contenu ?? {};
-  const preparation = { cle, traits: new Map(), pleins: new Map(), cercles: new Map(), textes: [] };
+  const preparation = { cle, traits: new Map(), pleins: new Map(), hachures: new Map(), cercles: new Map(), textes: [] };
   for (const trait of traits) if (visible(trait)) ranger(preparation.traits, trait, englobant(trait.p));
-  for (const plein of pleins) if (visible(plein)) ranger(preparation.pleins, plein, englobant(plein.p));
+  // Hachures (0.107.3, h = points de chaque contour) : à part, en aplat transparent.
+  for (const plein of pleins) if (visible(plein)) ranger(plein.h ? preparation.hachures : preparation.pleins, plein, englobant(plein.p));
   for (const cercle of cercles) {
     if (visible(cercle)) ranger(preparation.cercles, cercle, { xMin: cercle.x - cercle.r, yMin: cercle.y - cercle.r, xMax: cercle.x + cercle.r, yMax: cercle.y + cercle.r });
   }
@@ -135,6 +136,25 @@ export function dessinerPlansDxf(canvas, plans, vue, densite = 1) {
       ctx.fillStyle = teinte;
       ctx.fill();
     }
+    // Hachures : aplat transparent (on voit dessous), les trous restent vides (règle pair-impair).
+    ctx.globalAlpha = 0.3;
+    for (const [teinte, liste] of preparation.hachures) {
+      ctx.beginPath();
+      for (const hachure of liste) {
+        if (!aDessiner(hachure, zone, e)) continue;
+        const p = hachure.p;
+        let debut = 0;
+        for (const nombre of hachure.h) {
+          ctx.moveTo(p[2 * debut], p[2 * debut + 1]);
+          for (let j = debut + 1; j < debut + nombre; j++) ctx.lineTo(p[2 * j], p[2 * j + 1]);
+          ctx.closePath();
+          debut += nombre;
+        }
+      }
+      ctx.fillStyle = teinte;
+      ctx.fill('evenodd');
+    }
+    ctx.globalAlpha = 1;
     for (const [teinte, liste] of preparation.traits) {
       ctx.beginPath();
       for (const trait of liste) {
