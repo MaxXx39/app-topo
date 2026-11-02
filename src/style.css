@@ -2111,6 +2111,13 @@ th.nombre {
   color: #ffffff;
 }
 
+/* 0.106.2 : « Ouvrir un projet » au démarrage, même couleur que « Ouvrir projet » de l'onglet Projet */
+.fenetre-choix .bouton-secondaire.choix-ouvrir-projet {
+  border: 2px solid var(--sombre);
+  background: var(--sombre);
+  color: #ffffff;
+}
+
 .actions-projets .bouton-secondaire.actif {
   border-color: var(--sombre);
   background: var(--sombre);

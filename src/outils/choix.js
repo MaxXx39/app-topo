@@ -4,7 +4,7 @@ import { echapper } from './echapper.js';
 import { sansPrefixe } from '../topo/surface.js';
 
 /**
- * Ouvre la fenêtre et attend le choix. boutons : [{ cle, texte, detail, principal }].
+ * Ouvre la fenêtre et attend le choix. boutons : [{ cle, texte, detail, principal, classe (facultative) }].
  * Renvoie la clé du bouton touché. signal (AbortSignal, facultatif) : la fenêtre se ferme toute
  * seule quand il est déclenché, et renvoie null.
  */
@@ -16,7 +16,7 @@ export function demanderChoix({ titre, texte = '', boutons, signal = null }) {
       <h2>${echapper(titre)}</h2>
       ${texte ? `<p>${echapper(texte)}</p>` : ''}
       <div class="boutons-choix">
-        ${boutons.map((b) => `<button type="button" class="${b.principal ? 'bouton' : 'bouton-secondaire'}" data-cle="${echapper(b.cle)}">
+        ${boutons.map((b) => `<button type="button" class="${b.principal ? 'bouton' : 'bouton-secondaire'}${b.classe ? ` ${echapper(b.classe)}` : ''}" data-cle="${echapper(b.cle)}">
           <strong>${echapper(b.texte)}</strong>${b.detail ? `<span>${echapper(b.detail)}</span>` : ''}</button>`).join('')}
       </div>`;
     fenetre.addEventListener('click', (evenement) => {

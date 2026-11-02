@@ -4895,7 +4895,7 @@ async function demarrer() {
       titre: 'Que veux-tu faire ?',
       boutons: [
         { cle: 'continuer', texte: `Continuer sur « ${titreProjet(projet)} »`, detail: 'le dernier projet ouvert sur cette tablette', principal: true },
-        { cle: 'ouvrir', texte: 'Ouvrir un projet' },
+        { cle: 'ouvrir', texte: 'Ouvrir un projet', classe: 'choix-ouvrir-projet' },
         ...(aAcces('intermediaire') ? [{ cle: 'nouveau', texte: 'Nouveau projet' }] : []),
       ],
     }) : 'continuer';
