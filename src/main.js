@@ -149,6 +149,7 @@ const terrain = {
   implantation: 'surface', // mode Implanter : implanter une surface ou un point
   altitudeVoulue: null, // mode Implanter « Altitude » : altitude tapée (m)
   bip: true, // 0.107.0 : bip-bip de hauteur (Implanter Altitude / Surface, Guidage)
+  hauteurCanne: null, // 0.107.1 : hauteur de canne réglée dans Emlid Flow (m), seulement montrée (Expert la change)
   accroche: 'point', // implantation d'un point : point du projet, sommet, milieu, sur la ligne ou centre (voir topo/accroche.js)
   guidage: 'rx2', // guidage vers le point : 'rx2' (avance / droite selon le cap du RX2) ou 'nseo' (nord / est)
   accrocheLigne: 'trait', // implantation d'une ligne : 'trait' (ligne du plan DXF) ou une accroche de point
@@ -776,6 +777,20 @@ const boutonRecepteur = recepteurDisponible()
   ? creerBoutonRecepteur(document.createElement('div'), {
       choisirRecepteur,
       reconnecter: reconnecterRecepteur,
+      // Hauteur de canne (0.107.1) : montrée pour contrôle, changée en Expert (comme dans Emlid Flow).
+      lireHauteurCanne: () => terrain.hauteurCanne ?? null,
+      reglerHauteurCanne: (texte) => {
+        const lue = lireAltitude(texte);
+        if (lue === undefined) return false;
+        if (lue != null && (lue < 0 || lue > 10)) {
+          alert(`Hauteur de canne « ${texte} » : entre 0 et 10 m.`);
+          return false;
+        }
+        terrain.hauteurCanne = lue;
+        retenirReglagesTerrain();
+        afficherMessage(lue == null ? 'Hauteur de canne effacée' : `Hauteur de canne : ${lue.toFixed(3)} m`);
+        return true;
+      },
       deconnecter: deconnecterRecepteur,
       // Corrections par internet (swipos) : seulement avec un APK qui sait le faire.
       lireReglagesCorrections: () => (correctionsDisponibles() ? lireReglagesCorrections() : null),
@@ -3778,7 +3793,7 @@ if (recepteurDisponible()) {
     }
     etatRecepteur = etat;
     if (vientDeSeConnecter) proposerControle();
-    mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette);
+    mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette, terrain.hauteurCanne ?? null);
     boutonRecepteur?.mettreAJour(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
     if (terrain.plusProche && aAcces('expert')) viserLePlusProche();

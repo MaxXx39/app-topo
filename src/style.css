@@ -8971,3 +8971,15 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
 .coins-lame.avec-regles {
   grid-template-columns: auto 1fr 1fr auto;
 }
+
+/* 0.107.1 : hauteur de canne (fenêtre du récepteur) */
+.ligne-hauteur-canne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.champ-hauteur-canne input {
+  width: 6em;
+}

@@ -1439,7 +1439,7 @@ function svgCouloir(numero, ecart, abscisse, longueur, couleur) {
  * Bandeaux sous l'en-tête : état du RX2 (RTK, inclinaison) ; sans RX2 connecté mais avec le GPS de
  * la tablette (tablette : { precision } ou null), « GPS tablette ± x m » bien marqué.
  */
-export function mettreAJourBandeaux(etat, tablette = null) {
+export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) {
   let bandeaux = document.querySelector('#bandeaux-recepteur');
   if (!bandeaux) {
     bandeaux = document.createElement('div');
@@ -1491,7 +1491,9 @@ export function mettreAJourBandeaux(etat, tablette = null) {
     inclinaison.className = 'attente';
   } else {
     const angle = etat.inclinaison != null ? ` (${etat.inclinaison.toFixed(0)}°)` : '';
-    inclinaison.textContent = etat.inclinaisonPrete ? `Incl. PRÊTE${angle}` : 'Incl. NON PRÊTE';
+    // Hauteur de canne (0.107.1) : seulement montrée, pour contrôle (réglée en Expert, voir Emlid Flow).
+    const canne = hauteurCanne != null ? ` · canne ${hauteurCanne.toFixed(3)}` : '';
+    inclinaison.textContent = `${etat.inclinaisonPrete ? `Incl. PRÊTE${angle}` : 'Incl. NON PRÊTE'}${canne}`;
     inclinaison.className = etat.inclinaisonPrete ? 'ok' : 'pas-ok';
   }
 }

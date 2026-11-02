@@ -8,7 +8,7 @@ import { demanderCode } from '../outils/code.js';
 import { formaterNombre } from '../topo/format.js';
 import { etatCorrections } from './corrections.js';
 import { bulle } from '../aide/bulles.js';
-import { lameActive } from '../reglages/reglages.js';
+import { lameActive, aAcces } from '../reglages/reglages.js';
 import { lireListesPartagees } from '../reglages/listes-partagees.js';
 
 /**
@@ -75,6 +75,11 @@ export function creerBoutonRecepteur(nav, actions) {
     // Réglage swipos choisi dans la liste partagée : il remplit les cases (puis « Démarrer »).
     fenetre.addEventListener('change', (evenement) => {
       const champ = evenement.target.dataset.champ;
+      if (champ === 'hauteur-canne') {
+        actions.reglerHauteurCanne?.(evenement.target.value);
+        dessiner();
+        return;
+      }
       if (champ !== 'swipos-choisi' && champ !== 'swipos-direct') return;
       const numero = evenement.target.closest('[data-numero]')?.dataset.numero ?? '1';
       const choisi = lireListesPartagees().swipos.find((r) => r.id === evenement.target.value);
@@ -208,6 +213,7 @@ export function creerBoutonRecepteur(nav, actions) {
         <button type="button" class="bouton-retour" data-action="fermer" title="Fermer" aria-label="Fermer">✕</button>
       </div>
       <div class="etat-recepteur" data-vivant="etat-recepteur"></div>
+      ${ligneHauteurCanne()}
       <div class="actions-recepteur" data-vivant="actions-recepteur"></div>
       ${reglages ? choixCorrections(reglages, 1) : ''}
       ${actions.journalNmea ? `<div class="ligne-outils seulement-expert">
@@ -222,6 +228,22 @@ export function creerBoutonRecepteur(nav, actions) {
         </div>` : ''}`;
     rafraichir();
     rafraichir2();
+  }
+
+  /**
+   * Hauteur de canne (0.107.1) : seulement montrée, pour contrôle (le récepteur ne l'envoie pas) ;
+   * en Expert, on la change ici quand on la change dans Emlid Flow.
+   */
+  function ligneHauteurCanne() {
+    if (!actions.lireHauteurCanne) return '';
+    const hauteur = actions.lireHauteurCanne();
+    const texte = hauteur != null ? `${hauteur.toFixed(3)} m` : 'pas réglée';
+    return `<div class="ligne-hauteur-canne">
+      <span>Hauteur de canne</span>
+      ${aAcces('expert')
+        ? `<label class="champ-hauteur-canne"><input type="text" inputmode="decimal" data-champ="hauteur-canne" value="${hauteur != null ? hauteur.toFixed(3) : ''}" placeholder="ex. 1.800" aria-label="Hauteur de canne (m)" /> m</label> ${bulle('hauteurCanne')}`
+        : `<strong>${texte}</strong> ${bulle('hauteurCanne')}`}
+    </div>`;
   }
 
   /** Réglages des corrections NTRIP (swipos), repris d'Emlid Flow, gardés sur la tablette. */
