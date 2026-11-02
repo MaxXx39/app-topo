@@ -69,7 +69,7 @@ export function listesDePoints(projet) {
     const section = SECTION_DE[nature] ?? 'leve';
     const couleur = nature === 'controle' ? COULEUR_CONTROLE : couleurs[id] ?? (leveId ? couleurs[leveId] : null) ?? null;
     // Couleur au choix : Points Import, et Surface Import (changer couleur, tableau « Affichage »).
-    listes.push({ id, nom, nature, section, leveId, noms, visible: !cachees.has(id), couleur, couleurModifiable: section === 'points' || section === 'surface' });
+    listes.push({ id, nom, nature, section, leveId, noms, visible: !cachees.has(id), couleur, couleurModifiable: section === 'points' || section === 'surface' || section === 'leve' });
   };
   for (const leve of projet.leves) {
     if (leve.ajoutes) ajouter(leve.id, leve.nom, 'ajoutes', leve.id, null);

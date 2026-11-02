@@ -54,7 +54,6 @@ const CALQUES_DEPART = {
   contours: true,
   lignes: true,
   contourLeve: true, // 0.110 : bord pointillé + fond léger d'un levé sans contour
-  couleurContour: '', // couleur choisie pour ce bord (vide : la couleur de la nature)
   triangles: false,
   couleursAltitude: false,
   courbes: false,
@@ -916,9 +915,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           .join(' ');
         const elementFond = creerElement('path', { d: fond, class: `fond-leve nature-${stock.nature ?? 'terrain'}${actif ? ' actif' : ''}` });
         const elementBord = creerElement('path', { d: bord, class: `bord-leve nature-${stock.nature ?? 'terrain'}${actif ? ' actif' : ''}` });
-        if (calques.couleurContour) {
-          elementFond.style.setProperty('--couleur-nature', calques.couleurContour);
-          elementBord.style.setProperty('--couleur-nature', calques.couleurContour);
+        // 0.111 : couleur propre à chaque levé (choisie dans la roue ⚙ de Levé ou dans Projet).
+        const couleurDuLeve = couleursDesListes.get(stock.id);
+        if (couleurDuLeve) {
+          elementFond.style.setProperty('--couleur-nature', couleurDuLeve);
+          elementBord.style.setProperty('--couleur-nature', couleurDuLeve);
         }
         groupe.append(elementFond);
         groupe.append(elementBord);
@@ -1551,13 +1552,6 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const pastille = evenement.target.closest('[data-choix-couleur]');
     if (pastille) {
       pastille.closest('details')?.removeAttribute('open');
-      if (pastille.closest('[data-champ-couleur="couleur-contour"]')) {
-        // Couleur du bord pointillé des levés (réglage de l'appareil, pas du projet).
-        calquesChoisis.couleurContour = pastille.dataset.choixCouleur || '';
-        signatureListes = null;
-        dessiner();
-        return;
-      }
       quandColorerListe?.(pastille.dataset.id, pastille.dataset.choixCouleur || null);
       return;
     }
@@ -1592,7 +1586,6 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const niveau = reglages.every(([, , n]) => n === 'expert') ? 'seulement-expert' : '';
     return `<div class="reglages-section ${niveau}" data-zone-roue="${section}" hidden>
       ${reglages.map(([cle, titre, n]) => caseCalque(cle, titre, n ? `seulement-${n}` : '')).join('')}
-      ${section === 'leve' ? `<div class="ligne-couleur-contour"><span>Couleur du contour</span>${paletteCouleur({ couleur: calquesChoisis.couleurContour || null, options: COULEURS_LISTES, attributs: 'data-champ-couleur="couleur-contour"', nom: 'Couleur du contour du levé' })}</div>` : ''}
       ${section === 'leve' ? choixListe('equidistance', EQUIDISTANCES, 'Équidistance des courbes', 'm').replace('class="choix-equidistance"', 'class="choix-equidistance seulement-expert"') : ''}
     </div>`;
   }
