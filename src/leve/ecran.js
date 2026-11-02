@@ -37,6 +37,7 @@ import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne
 const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
 import { symboleDeForme } from '../plan/formes.js';
 import { COULEURS_HABITUELLES } from './libelles.js';
+import { htmlRegleHauteur } from './regle-hauteur.js';
 import { ouvrirFenetrePointTape, ouvrirListePoints } from './fenetres-points.js';
 
 // Mode Contrôler : ce qu'on implante (point, ligne, talus, surface), vue des coupes, longueurs.
@@ -471,6 +472,8 @@ export function creerEcranLeve(conteneur, actions) {
           <span class="detail-ecart">${donnees.controle.implantation === 'altitude' ? 'voulue' : 'surface'} ${formaterNombre(c.altitudeSurface)} · canne ${formaterNombre(c.altitudeCanne)}</span>`;
       }
     }
+    const regle = conteneur.querySelector('[data-vivant="regle"]');
+    if (regle) regle.innerHTML = htmlRegleHauteur(c?.ecart ?? null);
     for (const sens of ['perpendiculaire', 'axe']) {
       const cadre = conteneur.querySelector(`[data-vivant="coupe-${sens}"]`);
       if (!cadre) continue;
@@ -511,7 +514,7 @@ export function creerEcranLeve(conteneur, actions) {
     if (reglages.implantation === 'altitude') {
       return `${choixImplantation}
         <label class="champ-altitude-voulue">Altitude voulue<input type="text" inputmode="decimal" data-champ="altitude-voulue" value="${reglages.altitudeVoulue != null ? Number(reglages.altitudeVoulue).toFixed(3) : ''}" placeholder="ex. 412.350" /></label>
-        <div class="ecart-direct attente" data-vivant="ecart"></div>`;
+        ${ecartEtRegle()}`;
     }
     return `
       ${choixImplantation}
@@ -521,7 +524,7 @@ export function creerEcranLeve(conteneur, actions) {
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === reglages.surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
         : '<p class="vide">Aucune surface.</p>'}
-      <div class="ecart-direct attente" data-vivant="ecart"></div>
+      ${ecartEtRegle()}
       <div class="coupes-directes vue-${vue}">
         ${vue !== 'axe' ? '<div data-vivant="coupe-perpendiculaire"></div>' : ''}
         ${vue !== 'perpendiculaire' ? '<div data-vivant="coupe-axe"></div>' : ''}
@@ -530,6 +533,20 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
       <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
       <p class="aide" data-vivant="orientation"></p>`;
+  }
+
+  /** Écart monter / descendre en grand, avec la règle de hauteur et le bouton du bip à droite (0.107.0). */
+  function ecartEtRegle() {
+    return `<div class="ecart-et-regle">
+      <div class="ecart-direct attente" data-vivant="ecart"></div>
+      <div class="colonne-regle">${boutonBip()}<div data-vivant="regle">${htmlRegleHauteur(null)}</div></div>
+    </div>`;
+  }
+
+  /** Bouton 🔔 / 🔕 : bip-bip de hauteur marche / arrêt (retenu sur cet appareil). */
+  function boutonBip() {
+    const actif = donnees.controle.bip !== false;
+    return `<button type="button" class="bouton-bip ${actif ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${actif}" title="${actif ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${actif ? 'Couper le bip' : 'Remettre le bip'}">${actif ? '🔔' : '🔕'}</button>`;
   }
 
   /** Bandeau sarcelle bien visible : ce qu'il faut faire maintenant (flèche vers le plan). */
@@ -1320,7 +1337,7 @@ export function creerEcranLeve(conteneur, actions) {
     let contenu;
     if (enGuidage) contenu = vueImplantation();
     else if (autocontrole) contenu = htmlControle(donnees.autocontrole, { gestionOuverte: gestionControleOuverte, erreurGestion });
-    else if (donnees.mode === 'lame') contenu = htmlLame(donnees.lame, { reglagesOuverts: reglagesLameOuverts });
+    else if (donnees.mode === 'lame') contenu = htmlLame(donnees.lame, { reglagesOuverts: reglagesLameOuverts, bip: donnees.controle.bip !== false });
     else contenu = donnees.mode === 'controler' ? controle() : priseDePoint();
     conteneur.innerHTML = `
         <div class="ecran-terrain cadre-mode-${donnees.mode}">

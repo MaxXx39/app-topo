@@ -52,3 +52,73 @@ export function vibrer(motif) {
     // Pas de vibreur : le son et le message suffisent.
   }
 }
+
+// --- Bip-bip de hauteur (0.107.0, voir topo/bip.js) ---
+// Aigu = monter, grave = descendre ; son continu (note du milieu) dans la tolérance.
+const NOTE_MONTER = 1320;
+const NOTE_DESCENDRE = 660;
+const NOTE_DEDANS = 990;
+let rythmeEnCours = null; // dernier rythme demandé (voir rythmeBip), ou null
+let minuterieBip = null;
+let continu = null; // { oscillateur, gain } du son continu, ou null
+
+function arreterContinu() {
+  if (!continu) return;
+  try {
+    continu.gain.gain.setTargetAtTime(0, contexte.currentTime, 0.02);
+    continu.oscillateur.stop(contexte.currentTime + 0.1);
+  } catch {
+    // déjà arrêté
+  }
+  continu = null;
+}
+
+function demarrerContinu() {
+  if (continu) return;
+  try {
+    contexte ??= new (window.AudioContext || window.webkitAudioContext)();
+    if (contexte.state === 'suspended') contexte.resume();
+    const oscillateur = contexte.createOscillator();
+    const gain = contexte.createGain();
+    oscillateur.type = 'sine';
+    oscillateur.frequency.value = NOTE_DEDANS;
+    gain.gain.setValueAtTime(0, contexte.currentTime);
+    gain.gain.linearRampToValueAtTime(0.18, contexte.currentTime + 0.03);
+    oscillateur.connect(gain).connect(contexte.destination);
+    oscillateur.start();
+    continu = { oscillateur, gain };
+  } catch {
+    // Pas de son possible : la règle à l'écran suffit.
+  }
+}
+
+/** Un bip, puis le suivant après l'intervalle du rythme en cours (qui change en approchant). */
+function bipSuivant() {
+  minuterieBip = null;
+  const rythme = rythmeEnCours;
+  if (!rythme || rythme.continu) return;
+  jouer([[rythme.monter ? NOTE_MONTER : NOTE_DESCENDRE, 0.07]], 0.25);
+  minuterieBip = setTimeout(bipSuivant, rythme.intervalle);
+}
+
+/**
+ * Pilote le bip-bip : rythme = null (silence), { continu: true } ou { continu: false, monter,
+ * intervalle } (voir topo/bip.js rythmeBip). Appelé à chaque position reçue.
+ */
+export function piloterBip(rythme) {
+  rythmeEnCours = rythme;
+  if (!rythme) {
+    arreterContinu();
+    clearTimeout(minuterieBip);
+    minuterieBip = null;
+    return;
+  }
+  if (rythme.continu) {
+    clearTimeout(minuterieBip);
+    minuterieBip = null;
+    demarrerContinu();
+    return;
+  }
+  arreterContinu();
+  if (minuterieBip == null) bipSuivant();
+}

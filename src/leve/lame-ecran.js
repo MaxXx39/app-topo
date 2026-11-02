@@ -9,6 +9,7 @@
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { formaterNombre } from '../topo/format.js';
+import { htmlRegleHauteur } from './regle-hauteur.js';
 
 // Hauteur de la lame dessinée au-dessus du trait entre les 2 GNSS (m).
 const HAUTEUR_LAME = 0.5;
@@ -32,7 +33,7 @@ const pourcent = (valeur) => {
  * machine ('grader' ou 'bull'), inverse, tolerances: { vert, orange } (m), recepteur2 (vrai si le
  * 2e GNSS est connecté) }.
  */
-export function htmlLame(donnees, { reglagesOuverts = false } = {}) {
+export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) {
   const { surfaces, surfaceId, tolerances } = donnees;
   const cm = (m) => String(Math.round(m * 1000) / 10);
   const machine = donnees.machine === 'bull' ? 'bull' : 'grader';
@@ -48,6 +49,7 @@ export function htmlLame(donnees, { reglagesOuverts = false } = {}) {
           </select>`
         : '<p class="vide">Aucun levé (Terrain › Lever).</p>'}
       <button type="button" class="bouton-secondaire" data-action="inverserLame" title="Inverser gauche et droite">⇄ G / D</button>
+      <button type="button" class="bouton-bip ${bip ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${bip}" title="${bip ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${bip ? 'Couper le bip' : 'Remettre le bip'}">${bip ? '🔔' : '🔕'}</button>
       <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Tolérances">⚙</button>
       ${bulle('lame')}
     </div>
@@ -57,9 +59,11 @@ export function htmlLame(donnees, { reglagesOuverts = false } = {}) {
       </div>` : ''}
     ${donnees.recepteur2 ? '' : '<p class="avertissement">Connecte le 2e GNSS : bouton Récepteur › « Récepteur 2 ».</p>'}
     <p class="raison-lame" data-vivant="lame-raison" hidden></p>
-    <div class="coins-lame">
+    <div class="coins-lame avec-regles">
+      <div class="colonne-regle" data-vivant="lame-regle-gauche">${htmlRegleHauteur(null)}</div>
       <div class="coin-lame attente" data-vivant="lame-gauche"></div>
       <div class="coin-lame attente" data-vivant="lame-droite"></div>
+      <div class="colonne-regle" data-vivant="lame-regle-droite">${htmlRegleHauteur(null)}</div>
     </div>
     <div class="recepteurs-lame">
       <div class="recepteur-lame" data-vivant="lame-gnss-gauche"></div>
@@ -116,6 +120,8 @@ export function rafraichirLame(conteneur, vivant) {
       ${coin?.ecart != null ? grosseFleche(coin.ecart) : ''}
       <strong>${coin ? texteEcartLame(coin.ecart) : '—'}</strong>
       <span class="altitude-coin">H ${position ? formaterNombre(position.altitude) : '—'}</span>`;
+    // Règle de hauteur de ce coin (0.107.0) : à gauche du coin gauche, à droite du coin droit.
+    zone(`lame-regle-${cote}`).innerHTML = htmlRegleHauteur(coin?.ecart ?? null, vivant.toleranceVert ?? 0.02);
     zone(`lame-gnss-${cote}`).innerHTML = texteRecepteur(`GNSS ${cote === 'gauche' ? 'G' : 'D'}`, vivant.recepteurs?.[cote]);
   }
   zone('lame-devers').innerHTML = g

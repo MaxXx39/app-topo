@@ -93,7 +93,8 @@ import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, a
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
-import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer } from './outils/son.js';
+import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip } from './outils/son.js';
+import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
@@ -147,6 +148,7 @@ const terrain = {
   libelleAire: 'ENR', // et pour une aire d'un métré
   implantation: 'surface', // mode Implanter : implanter une surface ou un point
   altitudeVoulue: null, // mode Implanter « Altitude » : altitude tapée (m)
+  bip: true, // 0.107.0 : bip-bip de hauteur (Implanter Altitude / Surface, Guidage)
   accroche: 'point', // implantation d'un point : point du projet, sommet, milieu, sur la ligne ou centre (voir topo/accroche.js)
   guidage: 'rx2', // guidage vers le point : 'rx2' (avance / droite selon le cap du RX2) ou 'nseo' (nord / est)
   accrocheLigne: 'trait', // implantation d'une ligne : 'trait' (ligne du plan DXF) ou une accroche de point
@@ -358,6 +360,7 @@ function afficherOnglet(demande) {
       ecranMesures.arreterModification();
     }
     ongletContexte = nom;
+    if (nom !== 'terrain') piloterBip(null);
     recalculer();
   }
   mettreAJourToucheVolume();
@@ -1076,6 +1079,13 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         const permises = aAcces('expert') ? ['point', 'ligne', 'altitude', 'talus'] : ['point', 'ligne', 'altitude'];
         terrain.implantation = permises.includes(quoi) ? quoi : 'surface';
         retenirReglagesTerrain();
+        recalculer();
+      },
+      // 0.107.0 : bip-bip de hauteur marche / arrêt (retenu sur cet appareil)
+      basculerBip: () => {
+        terrain.bip = terrain.bip === false;
+        retenirReglagesTerrain();
+        if (!terrain.bip) piloterBip(null);
         recalculer();
       },
       // 0.106 : altitude voulue du mode « Altitude » (vide = rien à guider)
@@ -2194,7 +2204,7 @@ function calculerLame() {
     gauche: { distance: 1, altitude: coins.gauche.altitude },
     droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
   };
-  return { raison: null, guidage, coupe, coins, recepteurs, bords: bordsDeLaLame(coins.gauche, coins.droite, triangles), profil: coupePerpendiculaireLame(coins, triangles) };
+  return { raison: null, guidage, coupe, coins, recepteurs, bords: bordsDeLaLame(coins.gauche, coins.droite, triangles), profil: coupePerpendiculaireLame(coins, triangles), toleranceVert: terrain.lame.tolerances.vert };
 }
 
 /**
@@ -2225,11 +2235,33 @@ function coupePerpendiculaireLame(coins, triangles) {
 /** Écran Lame et lame sur le plan, avec les derniers états des 2 récepteurs. */
 function montrerLame() {
   const lame = calculerLame();
+  derniereLame = lame;
   if (lame) ecranLeve.mettreAJourLame(lame);
   const surPlan = lame?.coins && ongletContexte === 'terrain'
     ? { ...lame.coins, classeGauche: lame.guidage?.gauche.classe ?? null, classeDroite: lame.guidage?.droite.classe ?? null }
     : null;
   plan.afficherLame(surPlan);
+}
+
+let derniereLame = null; // dernier calcul du guidage (pour le bip-bip)
+
+/**
+ * Bip-bip de hauteur (0.107.0, voir topo/bip.js) : Implanter Altitude ou Surface (tolérance 2 cm,
+ * comme le vert de l'écart) et Guidage (le coin de lame le plus loin, tolérance « vert » de la lame).
+ * Silence ailleurs, ou si le bip est coupé (bouton 🔔 / 🔕).
+ */
+function mettreAJourBip(controle) {
+  let rythme = null;
+  if (terrain.bip !== false && ongletContexte === 'terrain') {
+    if (terrain.mode === 'controler' && ['surface', 'altitude'].includes(terrain.implantation)) rythme = rythmeBip(controle?.ecart ?? null, 0.02);
+    else if (terrain.mode === 'lame' && derniereLame?.guidage) {
+      const { gauche, droite } = derniereLame.guidage;
+      const ecarts = [gauche?.ecart, droite?.ecart].filter((e) => e != null && Number.isFinite(e));
+      const plusLoin = ecarts.sort((a, b) => Math.abs(b) - Math.abs(a))[0] ?? null;
+      rythme = rythmeBip(plusLoin, terrain.lame.tolerances.vert);
+    }
+  }
+  piloterBip(rythme);
 }
 
 /** Vrai pendant l'autocontrôle (Terrain › Contrôle). */
@@ -3760,6 +3792,7 @@ if (recepteurDisponible()) {
     const implantationTalus = talus ? calculerImplantationTalus(etat) : null;
     ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation, implantationLigne, implantationTalus });
     montrerLame();
+    mettreAJourBip(controle);
     const position = etat.connecte && etat.recu ? etat.position : null;
     // Coupes affichées (mode Implanter) : leur trait en pointillés sur le plan.
     const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
