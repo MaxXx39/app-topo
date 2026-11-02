@@ -112,6 +112,9 @@ export function dessinerPlansDxf(canvas, plans, vue, densite = 1) {
   for (const plan of plans) {
     if (plan.visible === false || !plan.contenu) continue;
     const preparation = preparer(plan);
+    // Transparence choisie pour ce plan (0.110, 0 à 100 %) : s'applique à tout le plan.
+    const opacite = 1 - Math.min(100, Math.max(0, plan.transparence ?? 0)) / 100;
+    if (opacite <= 0) continue;
     // Position de l'origine du plan à l'écran (px CSS), puis zone visible dans le repère du plan.
     const { x: tx, y: ty } = versEcran(plan.origine.est, plan.origine.nord, vue);
     const zone = {
@@ -124,6 +127,7 @@ export function dessinerPlansDxf(canvas, plans, vue, densite = 1) {
     ctx.setTransform(densite * e * cos, -densite * e * sin, -densite * e * sin, -densite * e * cos, densite * tx, densite * ty);
     ctx.lineWidth = 1 / e; // 1 pixel, quel que soit le zoom
     ctx.lineJoin = 'round';
+    ctx.globalAlpha = opacite;
     for (const [teinte, liste] of preparation.pleins) {
       ctx.beginPath();
       for (const plein of liste) {
@@ -137,7 +141,7 @@ export function dessinerPlansDxf(canvas, plans, vue, densite = 1) {
       ctx.fill();
     }
     // Hachures : aplat transparent (on voit dessous), les trous restent vides (règle pair-impair).
-    ctx.globalAlpha = 0.3;
+    ctx.globalAlpha = 0.3 * opacite;
     for (const [teinte, liste] of preparation.hachures) {
       ctx.beginPath();
       for (const hachure of liste) {
@@ -154,7 +158,7 @@ export function dessinerPlansDxf(canvas, plans, vue, densite = 1) {
       ctx.fillStyle = teinte;
       ctx.fill('evenodd');
     }
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = opacite;
     for (const [teinte, liste] of preparation.traits) {
       ctx.beginPath();
       for (const trait of liste) {

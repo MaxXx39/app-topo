@@ -53,7 +53,8 @@ const CALQUES_DEPART = {
   altitudes: true,
   contours: true,
   lignes: true,
-  altitudesLignes: true,
+  contourLeve: true, // 0.110 : bord pointillé + fond léger d'un levé sans contour
+  couleurContour: '', // couleur choisie pour ce bord (vide : la couleur de la nature)
   triangles: false,
   couleursAltitude: false,
   courbes: false,
@@ -66,7 +67,7 @@ const CALQUES_DEPART = {
   autresStocks: true,
 };
 // Réglages réservés à Expert : en dessous, ils gardent leur valeur de départ.
-const CALQUES_EXPERT = new Set(['controleNoms', 'controleAltitudes', 'triangles', 'couleursAltitude', 'courbes', 'altitudesLignes', 'remblaiDeblai', 'volumes', 'palier', 'equidistance']);
+const CALQUES_EXPERT = new Set(['controleNoms', 'controleAltitudes', 'triangles', 'couleursAltitude', 'courbes', 'remblaiDeblai', 'volumes', 'palier', 'equidistance']);
 // Équidistances proposées pour les courbes et les couleurs (m). « auto » : choisie selon la hauteur du stock.
 const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 
@@ -341,14 +342,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
 
     // Noms et altitudes : placés sans chevauchement (les étiquettes sans place sont cachées).
-    // Roue de « Levé » (Expert) : altitudes des points des lignes et des contours cachées.
-    const nomsDesLignes = new Set();
-    if (!calques.altitudesLignes) {
-      for (const autre of dessin.stocks) for (const nom of [...(autre.contour ?? []), ...(autre.lignesRupture ?? []).flatMap((l) => l.noms)]) nomsDesLignes.add(nom);
-    }
+    // Roue de « Levé » : la case « Altitudes » montre ou cache toutes les altitudes (lignes et contours compris).
     if (calques.noms || calques.altitudes) {
       const textes = visibles.map(({ point }) =>
-        [calques.noms ? point.nom : null, calques.altitudes && !nomsDesLignes.has(point.nom) ? formaterNombre(point.altitude) : null].filter(Boolean),
+        [calques.noms ? point.nom : null, calques.altitudes ? formaterNombre(point.altitude) : null].filter(Boolean),
       );
       const places = placerEtiquettes(
         visibles.map(({ x, y }, i) => ({
@@ -724,7 +721,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const densite = Math.min(window.devicePixelRatio || 1, 2);
     const visibles = plansDxf; // affichés ou cachés un par un (menu « Plans »)
     const signature = [vue.echelle, vue.estCentre, vue.nordCentre, vue.largeur, vue.hauteur, vue.rotation ?? 0, densite,
-      ...visibles.map((p) => `${p.id}:${p.visible !== false}:${p.couleur ?? ''}:${p.calques.map((c) => (c.visible ? 1 : 0)).join('')}`)].join('|');
+      ...visibles.map((p) => `${p.id}:${p.visible !== false}:${p.couleur ?? ''}:${p.transparence ?? 0}:${p.calques.map((c) => (c.visible ? 1 : 0)).join('')}`)].join('|');
     if (signature === signatureDxf) return;
     signatureDxf = signature;
     dessinerCanvasDxf(canvasDxf, visibles, vue, densite);
@@ -903,7 +900,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       // Levé sans contour (terrain, recollement… ; 0.90.1) : son bord et un fond léger, même sans le
       // calque Triangles (Expert), pour voir où il s'étend (implantation d'une surface en Base).
       const sansContour = (stock.contour ?? []).length < 3;
-      if (!importee && sansContour && resultat?.trianglesDessus?.length && !(actif && calques.triangles)) {
+      if (!importee && sansContour && calques.contourLeve && resultat?.trianglesDessus?.length && !(actif && calques.triangles)) {
         const enPixels = (p) => versEcran(p.est, p.nord, vue);
         const bord = bordDuStock(resultat.trianglesDessus)
           .map(([p, q]) => {
@@ -917,8 +914,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
             return `M${a.x} ${a.y} L${b.x} ${b.y} L${c.x} ${c.y} Z`;
           })
           .join(' ');
-        groupe.append(creerElement('path', { d: fond, class: `fond-leve nature-${stock.nature ?? 'terrain'}${actif ? ' actif' : ''}` }));
-        groupe.append(creerElement('path', { d: bord, class: `bord-leve nature-${stock.nature ?? 'terrain'}${actif ? ' actif' : ''}` }));
+        const elementFond = creerElement('path', { d: fond, class: `fond-leve nature-${stock.nature ?? 'terrain'}${actif ? ' actif' : ''}` });
+        const elementBord = creerElement('path', { d: bord, class: `bord-leve nature-${stock.nature ?? 'terrain'}${actif ? ' actif' : ''}` });
+        if (calques.couleurContour) {
+          elementFond.style.setProperty('--couleur-nature', calques.couleurContour);
+          elementBord.style.setProperty('--couleur-nature', calques.couleurContour);
+        }
+        groupe.append(elementFond);
+        groupe.append(elementBord);
       }
 
       // Triangles du dessus : stock actif seulement, pour ne pas surcharger.
@@ -1548,6 +1551,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const pastille = evenement.target.closest('[data-choix-couleur]');
     if (pastille) {
       pastille.closest('details')?.removeAttribute('open');
+      if (pastille.closest('[data-champ-couleur="couleur-contour"]')) {
+        // Couleur du bord pointillé des levés (réglage de l'appareil, pas du projet).
+        calquesChoisis.couleurContour = pastille.dataset.choixCouleur || '';
+        signatureListes = null;
+        dessiner();
+        return;
+      }
       quandColorerListe?.(pastille.dataset.id, pastille.dataset.choixCouleur || null);
       return;
     }
@@ -1564,10 +1574,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const REGLAGES_SECTIONS = {
     controle: [['controleNoms', 'ID point', 'expert'], ['controleAltitudes', 'Altitude', 'expert']],
     leve: [
+      ['altitudes', 'Altitudes', ''],
+      ['contourLeve', 'Contour du levé', ''],
       ['triangles', 'Triangles', 'expert'],
       ['couleursAltitude', 'Couleurs selon l\'altitude', 'expert'],
       ['courbes', 'Courbes de niveau', 'expert'],
-      ['altitudesLignes', 'Altitudes des lignes et contours', 'expert'],
     ],
     surface: [['couleursAltitudeImport', 'Couleurs selon l\'altitude', '']],
   };
@@ -1581,6 +1592,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const niveau = reglages.every(([, , n]) => n === 'expert') ? 'seulement-expert' : '';
     return `<div class="reglages-section ${niveau}" data-zone-roue="${section}" hidden>
       ${reglages.map(([cle, titre, n]) => caseCalque(cle, titre, n ? `seulement-${n}` : '')).join('')}
+      ${section === 'leve' ? `<div class="ligne-couleur-contour"><span>Couleur du contour</span>${paletteCouleur({ couleur: calquesChoisis.couleurContour || null, options: COULEURS_LISTES, attributs: 'data-champ-couleur="couleur-contour"', nom: 'Couleur du contour du levé' })}</div>` : ''}
       ${section === 'leve' ? choixListe('equidistance', EQUIDISTANCES, 'Équidistance des courbes', 'm').replace('class="choix-equidistance"', 'class="choix-equidistance seulement-expert"') : ''}
     </div>`;
   }
@@ -1634,6 +1646,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const id = champ.dataset.plan;
     if (!id) return;
     if (champ.dataset.reglage === 'visible') quandReglerPlanDxf?.(id, { visible: champ.checked });
+    else if (champ.dataset.reglage === 'transparence') quandReglerPlanDxf?.(id, { transparence: Number(champ.value) });
     else if (champ.dataset.calqueDxf !== undefined) quandMontrerCalqueDxf?.(id, Number(champ.dataset.calqueDxf), champ.checked);
   });
   // Flèche d'un plan : ses calques, à cocher un par un (0.94.0).
@@ -1652,7 +1665,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   /** Liste des plans DXF du menu « Plans » (refaite quand les plans changent). */
   let signatureMenuPlans = null;
   function remplirMenuPlans() {
-    const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${plan.visible !== false}:${plan.couleur || ''}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
+    const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
     if (signature === signatureMenuPlans) return;
     signatureMenuPlans = signature;
     // Aucun plan : un petit cadre « Aucun DXF » (avant : un trait blanc vide).
@@ -1664,6 +1677,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
           <span>${echapper(plan.nom)}</span></label>
         ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
+        <label class="reglette-transparence reglette-plan">Transparence <span>${plan.transparence ?? 0} %</span>
+          <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /></label>
         ${(plan.calques ?? []).length > 0 ? `<button type="button" class="fleche-calques-dxf" data-deplier-plan="${plan.id}" aria-expanded="${plansDeplies.has(plan.id)}" title="Calques" aria-label="Calques de ${echapper(plan.nom)}">${plansDeplies.has(plan.id) ? '▴' : '▾'}</button>` : ''}
       </div>
       ${plansDeplies.has(plan.id) ? `<div class="calques-dxf-menu">${plan.calques.map((c, numero) => `<label class="case"><input type="checkbox" data-plan="${plan.id}" data-calque-dxf="${numero}" ${c.visible !== false ? 'checked' : ''} /> ${echapper(c.nom)}</label>`).join('')}</div>` : ''}`).join('');
