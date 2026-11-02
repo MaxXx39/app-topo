@@ -8983,3 +8983,22 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
 .champ-hauteur-canne input {
   width: 6em;
 }
+
+/* 0.108.0 : talus jusqu'au terrain (Calculs › Dessin) */
+.talus-dessin {
+  margin: 8px 0;
+}
+
+.reglages-talus-dessin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.champ-talus-dessin {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+}

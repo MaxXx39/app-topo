@@ -15,6 +15,8 @@ import { formaterNombre } from '../topo/format.js';
 import { estFerme } from '../topo/dessin.js';
 import { MODES_ACCROCHE } from '../topo/accroche.js';
 import { ACCROCHES } from '../leve/ecran.js';
+import { PENTES_TALUS } from '../topo/plateforme-talus.js';
+import { demanderTexte } from '../outils/choix.js';
 
 const nombre = (valeur) => (valeur == null ? '' : String(Math.round(valeur * 1000) / 1000));
 
@@ -80,6 +82,18 @@ export function creerEcranDessin(conteneur, actions) {
     else if (champ.dataset.pilote === 'altitude') actions.reglerAltitudePilote(champ.value);
     else if (champ.dataset.pilote === 'pente') actions.reglerPentePilote(champ.value);
     else if (champ.dataset.hauteur) actions.reglerHauteur(id, champ.dataset.hauteur, champ.value);
+    else if (champ.dataset.talus === 'actif') actions.reglerTalusDessin(id, 'actif', champ.checked);
+    else if (champ.dataset.talus) {
+      // « autre… » : on tape la pente (H/V).
+      const cle = champ.dataset.talus;
+      if (champ.value !== 'tapee') {
+        actions.reglerTalusDessin(id, cle, champ.value);
+        return;
+      }
+      demanderTexte({ titre: 'Pente du talus en H/V (ex. 5/4)' }).then((texte) => {
+        actions.reglerTalusDessin(id, texte?.trim() ? cle : 'rien', texte ?? '');
+      });
+    }
     else if (champ.dataset.altitudeSommet != null) actions.altitudeSommet(id, Number(champ.dataset.altitudeSommet), champ.value);
   });
 
@@ -141,7 +155,7 @@ function carteDessin(d, pilote, recepteur, ouverts) {
         <button type="button" class="bouton-secondaire" data-action="dessiner" data-valeur="${d.id}">${d.ferme ? 'Rouvrir et dessiner' : 'Dessiner'}</button>
         <button type="button" class="bouton-lien" data-action="supprimerDessin" data-valeur="${d.id}">supprimer</button>
       </div>`}
-    ${ferme ? htmlSurface(d) : ''}
+    ${ferme ? htmlTalus(d) + htmlSurface(d) : ''}
     ${htmlSommets(d, ouverts.has(d.id))}
   </div>`;
 }
@@ -248,6 +262,37 @@ function htmlSurface(d) {
       <button type="button" class="bouton-secondaire" data-action="creerSurfaceDessin" data-valeur="${d.id}" ${d.empecheSurface ? 'disabled' : ''}>Créer la surface</button>
       ${d.empecheSurface ? `<span class="aide">${echapper(d.empecheSurface)}</span>` : ''}
     </div>`;
+}
+
+/**
+ * Talus jusqu'au terrain (0.108.0) : case « Talus jusqu'au terrain », puis le terrain et la pente
+ * du remblai et du déblai (1/1, 3/2, 2/1, 3/1 ou tapée H/V).
+ */
+function htmlTalus(d) {
+  const t = d.talus ?? {};
+  const actif = Boolean(t.actif);
+  const choixPente = (cle, titre) => {
+    const pente = t[cle] ?? { horizontal: 3, vertical: 2 };
+    const texte = `${nombre(pente.horizontal)}/${nombre(pente.vertical)}`;
+    const connue = PENTES_TALUS.some(([c]) => c === texte);
+    return `<label class="champ-talus-dessin">${titre}
+      <select data-talus="${cle}" data-id="${d.id}" aria-label="Pente du ${titre.toLowerCase()} (H/V)">
+        ${PENTES_TALUS.map(([c]) => `<option value="${c}" ${c === texte ? 'selected' : ''}>${c}</option>`).join('')}
+        <option value="tapee" ${connue ? '' : 'selected'}>${connue ? 'autre…' : texte}</option>
+      </select></label>`;
+  };
+  return `<div class="talus-dessin">
+    <label class="case"><input type="checkbox" data-talus="actif" data-id="${d.id}" ${actif ? 'checked' : ''} /> Talus jusqu'au terrain</label> ${bulle('talusDessin')}
+    ${actif ? `<div class="reglages-talus-dessin">
+        <label class="champ-talus-dessin">Terrain
+          <select data-talus="terrainId" data-id="${d.id}" aria-label="Terrain naturel">
+            ${t.terrainId ? '' : '<option value="">— choisir —</option>'}
+            ${d.terrains.map((s) => `<option value="${s.id}" ${s.id === t.terrainId ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}
+          </select></label>
+        ${choixPente('remblai', 'Remblai')}
+        ${choixPente('deblai', 'Déblai')}
+      </div>` : ''}
+  </div>`;
 }
 
 /** Sommets : nom, Est, Nord, altitude (toujours modifiable : le dessin passe alors « par sommet »). */

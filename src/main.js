@@ -9,7 +9,8 @@ import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
 import { calculerSurface, surfaceImportee, cleTriangle, estImportee, origineSurface, nomNature, nouvelIdentifiant, NATURES_IMPORT, avecPrefixe, sansPrefixe, prefixeDuNom } from './topo/surface.js';
-import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
+import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul, nouveauVolume } from './volumes/calculs.js';
+import { talusDePlateforme, PENTES_TALUS } from './topo/plateforme-talus.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
 import { creerEcranVolumes, texteBase } from './volumes/ecran.js';
@@ -1879,6 +1880,31 @@ function montrerPilote() {
  * modification ; enlevées si le dessin est supprimé. Si le dessin ne donne plus de surface
  * (altitude effacée…), la surface garde sa dernière forme et la raison est notée (erreurDessin).
  */
+/**
+ * Talus d'une plateforme jusqu'au terrain (0.108.0, voir topo/plateforme-talus.js) : null si le
+ * dessin n'en a pas, { erreur } ou le talus calculé. Réglages dans dessin.talus : { actif,
+ * terrainId, remblai: { horizontal, vertical }, deblai: { horizontal, vertical } }.
+ */
+function talusDuDessin(dessin) {
+  const reglage = dessin?.talus;
+  if (!reglage?.actif) return null;
+  const terrain = projet.surfaces.find((s) => s.id === reglage.terrainId);
+  if (!terrain) return { erreur: 'terrain à choisir' };
+  const triangles = trianglesDeSurface(terrain.id);
+  if (triangles.length === 0) return { erreur: `le terrain « ${terrain.nom} » n'a pas de triangles` };
+  return talusDePlateforme(pointsDuDessin(dessin, projet.dessins), { remblai: reglage.remblai, deblai: reglage.deblai }, chercheurAltitude(triangles), { pas: 2 });
+}
+
+/** Volume de la plateforme avec talus : comparée au terrain choisi (créé une fois, puis suivi). */
+function volumeDuTalus(surface, terrainId) {
+  const calcul = projet.calculs.find((c) => c.talusDe === surface.id);
+  if (calcul) {
+    calcul.surface2Id = terrainId;
+    return;
+  }
+  projet.calculs.push({ ...nouveauVolume(), surface1Id: surface.id, uneSeule: false, surface2Id: terrainId, talusDe: surface.id });
+}
+
 function synchroniserSurfacesDessins() {
   const avant = projet.surfaces.length;
   // Dessin supprimé : sa surface part, et la liste de points de son levé « Surface » aussi.
@@ -1892,9 +1918,12 @@ function synchroniserSurfacesDessins() {
     const dessin = dessinDe(surface.dessinId);
     // Levé « Surface » (0.77.0) : les sommets du dessin sont remis dans sa liste (contour).
     if (surface.type === 'points') {
-      surface.erreurDessin = surfaceDuDessin(dessin, projet.dessins).erreur;
+      // Talus jusqu'au terrain (0.108.0) : ses points et ses lignes sont refaits à chaque fois.
+      const talus = talusDuDessin(dessin);
+      surface.erreurDessin = surfaceDuDessin(dessin, projet.dessins).erreur ?? (talus?.erreur ? `talus : ${talus.erreur}` : undefined);
       if (!surface.erreurDessin) delete surface.erreurDessin;
-      synchroniserLeveeDuDessin(projet, surface, pointsDuDessin(dessin, projet.dessins));
+      synchroniserLeveeDuDessin(projet, surface, pointsDuDessin(dessin, projet.dessins), talus);
+      if (talus && !talus.erreur) volumeDuTalus(surface, dessin.talus.terrainId);
       continue;
     }
     const { points, faces, erreur } = surfaceDuDessin(dessin, projet.dessins);
@@ -1937,8 +1966,12 @@ function donneesDessin() {
         // pourquoi on ne peut pas encore la créer.
         surface: surface ? { nom: surface.nom, erreur: surface.erreurDessin ?? null } : null,
         empecheSurface: estFerme(d) ? (surfaceDuDessin(d, projet.dessins).erreur ?? null) : null,
+        // Talus jusqu'au terrain (0.108.0) : réglages et terrains possibles (levés et surfaces avec triangles).
+        talus: d.talus ?? null,
+        terrains: ferme ? projet.surfaces.filter((s) => !s.dessinId && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })) : [],
       };
     }),
+    pentesTalus: PENTES_TALUS,
     pilote,
     recepteur: recepteurDisponible(),
   };
@@ -2142,6 +2175,32 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     const dessin = dessinDe(id);
     if (!dessin) return;
     dessin.hauteur.mode = mode === 'sommets' ? 'sommets' : 'fixe';
+    modifie();
+  },
+  // Talus jusqu'au terrain (0.108.0) : marche / arrêt, terrain, pente du remblai et du déblai.
+  reglerTalusDessin: (id, champ, valeur) => {
+    const dessin = dessinDe(id);
+    if (!dessin) return;
+    const pente = (texte) => {
+      const choisie = PENTES_TALUS.find(([cle]) => cle === texte);
+      if (choisie) return { horizontal: choisie[1], vertical: choisie[2] };
+      // Tapée : « 5/4 » (H/V).
+      const lu = /^\s*(\d+(?:[.,]\d+)?)\s*\/\s*(\d+(?:[.,]\d+)?)\s*$/.exec(String(texte));
+      if (!lu) {
+        afficherMessage(`Pente « ${texte} » illisible : écris H/V, par exemple 5/4`, 4000);
+        return null;
+      }
+      const [h, v] = [Number(lu[1].replace(',', '.')), Number(lu[2].replace(',', '.'))];
+      return h > 0 && v > 0 ? { horizontal: h, vertical: v } : null;
+    };
+    dessin.talus ??= { actif: false, terrainId: null, remblai: { horizontal: 3, vertical: 2 }, deblai: { horizontal: 3, vertical: 2 } };
+    if (champ === 'actif') dessin.talus.actif = Boolean(valeur);
+    else if (champ === 'terrainId') dessin.talus.terrainId = valeur || null;
+    else if (champ === 'remblai' || champ === 'deblai') {
+      const lue = pente(valeur);
+      if (!lue) return;
+      dessin.talus[champ] = lue;
+    }
     modifie();
   },
   reglerHauteur: (id, champ, texte) => {

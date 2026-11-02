@@ -116,15 +116,56 @@ export function creerLeveeDuDessin(projet, dessin, sommets, maintenant = new Dat
 /**
  * Le dessin a changé : ses sommets sont remis dans la liste du levé (coordonnées, altitudes ; ceux
  * enlevés du dessin partent) et forment le contour. Les points levés au RX2 restent.
+ * Avec un talus jusqu'au terrain (0.108.0, talus : résultat de talusDePlateforme, voir
+ * topo/plateforme-talus.js) : les points du talus sont ajoutés (D1-BP-n sur les côtés de la
+ * plateforme, D1-ET-n à l'entrée en terre), le contour est l'entrée en terre, et la plateforme et
+ * les arêtes des angles deviennent des lignes de rupture (marquées « talus », refaites à chaque fois).
  */
-export function synchroniserLeveeDuDessin(projet, surface, sommets) {
+export function synchroniserLeveeDuDessin(projet, surface, sommets, talus = null) {
   const leve = projet.leves.find((l) => l.id === surface.leveId);
   if (!leve) return;
-  const anciens = new Set(surface.contour);
+  const anciens = new Set([...(surface.contour ?? []), ...(surface.talusNoms ?? []), ...(surface.sommetsNoms ?? [])]);
   const nouveaux = new Set(sommets.map((p) => p.nom));
   const autres = leve.points.filter((p) => !anciens.has(p.nom) && !nouveaux.has(p.nom));
-  leve.points = [...sommets.map((p) => ({ nom: p.nom, est: p.est, nord: p.nord, altitude: p.altitude ?? null })), ...autres];
-  surface.contour = sommets.map((p) => p.nom);
+  const lignesGardees = (surface.lignesRupture ?? []).filter((l) => !l.talus);
+  const pointsSommets = sommets.map((p) => ({ nom: p.nom, est: p.est, nord: p.nord, altitude: p.altitude ?? null }));
+  surface.sommetsNoms = sommets.map((p) => p.nom);
+  if (!talus || talus.erreur) {
+    leve.points = [...pointsSommets, ...autres];
+    surface.contour = sommets.map((p) => p.nom);
+    surface.lignesRupture = lignesGardees;
+    delete surface.talusNoms;
+    return;
+  }
+  const prefixe = String(sommets[0]?.nom ?? 'D').replace(/-\d+$/, '');
+  const mm = (v) => Math.round(v * 1000) / 1000;
+  const generes = [];
+  let numeroBord = 0;
+  let numeroEntree = 0;
+  // Haut ou bas du talus côté plateforme : les sommets gardent leur nom.
+  const nomsBord = talus.bord.map((b) => {
+    if (b.sommet != null) return sommets[b.sommet].nom;
+    const nom = `${prefixe}-BP-${++numeroBord}`;
+    generes.push({ nom, est: mm(b.est), nord: mm(b.nord), altitude: mm(b.altitude) });
+    return nom;
+  });
+  // Entrée en terre : un point de passage remblai / déblai (talus de longueur nulle) garde le nom du bord.
+  const nomsEntree = talus.entree.map((e) => {
+    const b = talus.bord[e.bord];
+    if (Math.hypot(e.est - b.est, e.nord - b.nord) < 1e-4) return nomsBord[e.bord];
+    const nom = `${prefixe}-ET-${++numeroEntree}`;
+    generes.push({ nom, est: mm(e.est), nord: mm(e.nord), altitude: mm(e.altitude) });
+    return nom;
+  });
+  leve.points = [...pointsSommets, ...generes, ...autres];
+  surface.talusNoms = generes.map((p) => p.nom);
+  surface.contour = nomsEntree;
+  surface.lignesRupture = [
+    { noms: nomsBord, fermee: true, talus: true },
+    ...talus.aretes.map(([b, e]) => ({ noms: [nomsBord[b], nomsEntree[e]], fermee: false, talus: true })),
+    // Les lignes levées ensuite (Lever) vont dans une ligne à soi, jamais dans celles du talus.
+    ...(lignesGardees.length > 0 ? lignesGardees : [creerLigne()]),
+  ];
 }
 
 /** Levé du jour fait avec le récepteur (créé s'il n'existe pas encore). */
