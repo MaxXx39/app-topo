@@ -151,3 +151,32 @@ describe('zone du talus (plan)', () => {
     expect(zoneTalus(ligne, haut32, { altitudeLigne })).toBeNull();
   });
 });
+
+describe('angle saillant : angle vif (0.107.2)', () => {
+  // Vers l'est puis vers le nord : le côté droit (sud puis est) est à l'extérieur de l'angle.
+  const coude = [
+    { est: E0, nord: N0, altitude: 100 },
+    { est: E0 + 10, nord: N0, altitude: 100 },
+    { est: E0 + 10, nord: N0 + 10, altitude: 100 },
+  ];
+  const altitudeCoude = sourceAltitudeLigne(coude);
+  const haut11 = { horizontal: 1, vertical: 1, ligneEst: 'haut', cote: 'droite', longueur: null };
+
+  it('dans le coin : la plus grande des deux distances perpendiculaires (pas la distance au sommet)', () => {
+    // 3 m à l'est et 2 m au sud du sommet : plan du 2e segment, distance 3 m (le cône aurait donné 3.606 m).
+    const g = guidageTalus({ est: E0 + 13, nord: N0 - 2, altitude: 90 }, coude, haut11, { altitudeLigne: altitudeCoude });
+    expect(g.distance).toBeCloseTo(3, 9);
+    expect(g.altitudeTalusCanne).toBeCloseTo(97, 9);
+    expect(g.direction.est).toBeCloseTo(1, 9);
+  });
+
+  it('le bord du talus passe par l\'arête', () => {
+    const zone = zoneTalus(coude, { ...haut11, longueur: 2 }, { altitudeLigne: altitudeCoude });
+    expect(zone.bord.some((p) => Math.abs(p.est - (E0 + 12)) < 1e-9 && Math.abs(p.nord - (N0 - 2)) < 1e-9)).toBe(true);
+  });
+
+  it('angle rentrant (talus à gauche) : inchangé', () => {
+    const g = guidageTalus({ est: E0 + 8, nord: N0 + 1, altitude: 90 }, coude, { ...haut11, cote: 'gauche' }, { altitudeLigne: altitudeCoude });
+    expect(g.distance).toBeCloseTo(1, 9);
+  });
+});

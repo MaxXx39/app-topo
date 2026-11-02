@@ -24,6 +24,8 @@ export function genererDxfPlan(plan) {
     entites.push(['0', 'SEQEND', '8', nomCalque(trait.c)]);
   }
   for (const plein of contenu.pleins ?? []) {
+    // Hachure (0.107.3) : ses contours sont déjà dans les traits ; l'aplat n'est pas réécrit.
+    if (plein.h) continue;
     // Rangé dans l'ordre du contour (1, 2, 4, 3) : on remet l'ordre « en Z » du DXF.
     const p = plein.p;
     const sommet = (i, code) => [String(10 + code), e(p[2 * i]), String(20 + code), n(p[2 * i + 1]), String(30 + code), '0'];

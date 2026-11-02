@@ -125,3 +125,41 @@ describe('outils du DXF', () => {
     expect(texteDuDxf(ancien)).toContain('rétention');
   });
 });
+
+describe('hachures (HATCH, 0.107.3)', () => {
+  // Carré 10 × 10 (polyligne) avec un trou rond de rayon 2 (une arête « arc ») ; puis un triangle en arêtes « ligne ».
+  const HACHURES = dxf(
+    ...section(
+      'ENTITIES',
+      [0, 'HATCH'], [8, 'BETON'], [10, 0], [20, 0], [30, 0], [210, 0], [220, 0], [230, 1], [2, 'ANSI31'], [70, 0], [71, 0],
+      [91, 2],
+      [92, 2], [72, 0], [73, 1], [93, 4], [10, E], [20, N], [10, E + 10], [20, N], [10, E + 10], [20, N + 10], [10, E], [20, N + 10], [97, 0],
+      [92, 1], [93, 1], [72, 2], [10, E + 5], [20, N + 5], [40, 2], [50, 0], [51, 360], [73, 1], [97, 0],
+      [75, 0], [76, 1], [52, 0], [41, 1], [77, 0], [78, 0], [98, 0],
+      [0, 'HATCH'], [8, 'BETON'], [10, 0], [20, 0], [30, 0], [2, 'SOLID'], [70, 1], [71, 0],
+      [91, 1],
+      [92, 1], [93, 3],
+      [72, 1], [10, E + 20], [20, N], [11, E + 30], [21, N],
+      [72, 1], [10, E + 30], [20, N], [11, E + 25], [21, N + 8],
+      [72, 1], [10, E + 25], [20, N + 8], [11, E + 20], [21, N],
+      [97, 0], [75, 0], [76, 1], [98, 0],
+    ),
+    [0, 'EOF'],
+  );
+  const { plan } = lirePlanDxf(HACHURES, 'hachures.dxf');
+  const hachures = plan.contenu.pleins.filter((p) => p.h);
+
+  it('lit les contours (polyligne, arc, lignes) en aplats avec trous', () => {
+    expect(hachures).toHaveLength(2);
+    expect(hachures[0].h[0]).toBe(4);
+    expect(hachures[0].h.length).toBe(2);
+    // Le trou : tous ses points à 2 m du centre (5, 5 dans le repère du plan).
+    const p = hachures[0].p;
+    for (let j = 4; j < 4 + hachures[0].h[1]; j++) expect(Math.hypot(p[2 * j] - 5, p[2 * j + 1] - 5)).toBeCloseTo(2, 3);
+    expect(hachures[1].h).toEqual([3]);
+  });
+
+  it('ajoute aussi les contours en traits fermés', () => {
+    expect(plan.contenu.traits.filter((t) => t.f)).toHaveLength(3);
+  });
+});

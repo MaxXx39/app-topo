@@ -8,6 +8,22 @@ describe('PDF sans volume (0.104.1)', () => {
     expect(format).toBe('a4');
     expect(document.getNumberOfPages()).toBe(1);
   });
+
+  it('un levé coché sans volume : contour, ligne et triangles dessinés (0.107.4)', async () => {
+    const pts = [
+      { nom: 'C-1', est: 2600100, nord: 1200100, altitude: 500 },
+      { nom: 'C-2', est: 2600140, nord: 1200100, altitude: 501 },
+      { nom: 'C-3', est: 2600140, nord: 1200140, altitude: 502 },
+      { nom: 'C-4', est: 2600100, nord: 1200140, altitude: 501 },
+    ];
+    const leve = { nom: 'LV-Terrain 1', contour: ['C-1', 'C-2', 'C-3', 'C-4'], lignesRupture: [{ noms: ['C-1', 'C-3'], fermee: false }], triangles: [[pts[0], pts[1], pts[2]], [pts[0], pts[2], pts[3]]], points: pts };
+    const cartouche = { affaire: 'x', lieu: '', date: '', dessinePar: '', fichierPoints: '' };
+    const sans = await creerPdf({ stocks: [], resultats: [], points: [], cartouche, calques: { triangles: true } });
+    const avec = await creerPdf({ stocks: [], resultats: [], points: [], cartouche, calques: { triangles: true }, levesSeuls: [leve] });
+    // Plus de traits avec le levé : son contour, sa ligne et ses triangles sont sur le plan.
+    const traits = (doc) => (doc.output().match(/ l\n/g) ?? []).length;
+    expect(traits(avec.document)).toBeGreaterThan(traits(sans.document) + 8);
+  });
 });
 
 import { pdfPoints } from '../src/export/pdf-points.js';

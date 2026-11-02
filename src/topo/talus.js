@@ -7,7 +7,9 @@
 // rencontre le terrain).
 //
 // En chaque endroit, le talus est le plan du segment le plus proche de la ligne (distance en plan
-// à ce segment ; aux angles saillants, la distance au sommet, voir positionSurLigne).
+// à ce segment). Aux angles saillants (0.107.2, validé par l'utilisateur : angle vif, plus de
+// cône) : les plans des deux segments voisins se coupent sur une arête ; la distance est la plus
+// grande des deux distances perpendiculaires aux deux droites (voir angleVif).
 //
 // Terrain : une surface du projet, ou aucune. Sans surface, le sol est supposé plat à l'altitude
 // du bout de canne (méthode des piquets de pente, validée par l'utilisateur le 24.10.2026) :
@@ -16,6 +18,51 @@
 //
 // Coordonnées MN95 Est, Nord (m), altitudes (m), distances en plan (m).
 import { positionSurLigne, altitudeSurLigne, longueurPolyligne, pointALAbscisse } from './ligne-implantation.js';
+
+/**
+ * Direction « côté talus » (longueur 1) du segment i : perpendiculaire, à droite (signe 1) ou à
+ * gauche (signe −1) en regardant vers la fin ; null si le segment est de longueur nulle.
+ */
+function normaleTalus(sommets, i, signe) {
+  const a = sommets[i];
+  const b = sommets[i + 1];
+  const l = Math.hypot(b.est - a.est, b.nord - a.nord);
+  if (l === 0) return null;
+  return { est: ((b.nord - a.nord) / l) * signe, nord: (-(b.est - a.est) / l) * signe };
+}
+
+/** Vrai si le sommet i (entre les segments i − 1 et i) est un angle saillant du côté du talus. */
+function estSaillant(sommets, i, signe) {
+  const a = sommets[i - 1];
+  const b = sommets[i];
+  const c = sommets[i + 1];
+  const vectoriel = (b.est - a.est) * (c.nord - b.nord) - (b.nord - a.nord) * (c.est - b.est);
+  return vectoriel * signe > 1e-12;
+}
+
+/**
+ * Angle vif (0.107.2) : si "position" est dans le coin d'un angle saillant (son point le plus
+ * proche sur la ligne est le sommet k), le talus est le plan du segment voisin dont la droite est
+ * la plus loin. Renvoie { distance (m), direction (côté talus, longueur 1), pied (point de cette
+ * droite en face de la position) } ou null (pas dans le coin d'un angle saillant).
+ */
+export function angleVif(position, sommets, signe, projete) {
+  for (let k = 1; k + 1 < sommets.length; k++) {
+    const s = sommets[k];
+    if (Math.hypot(projete.est - s.est, projete.nord - s.nord) > 1e-6 || !estSaillant(sommets, k, signe)) continue;
+    let meilleur = null;
+    for (const i of [k - 1, k]) {
+      const n = normaleTalus(sommets, i, signe);
+      if (!n) continue;
+      const distance = (position.est - s.est) * n.est + (position.nord - s.nord) * n.nord;
+      if (!meilleur || distance > meilleur.distance) {
+        meilleur = { distance, direction: n, pied: { est: position.est - n.est * distance, nord: position.nord - n.nord * distance } };
+      }
+    }
+    return meilleur;
+  }
+  return null;
+}
 
 /** Vrai si les réglages du talus permettent de le calculer (pente H et V positives). */
 export function talusComplet(reglages) {
@@ -117,9 +164,16 @@ export function guidageTalus(position, sommets, reglages, { altitudeLigne, altit
   const zLigne = altitudeLigne(abscisseBornee, pied);
   if (zLigne == null) return { message: 'Altitude de la ligne inconnue (⚙)' };
   const signe = reglages.cote === 'gauche' ? -1 : 1;
-  const distance = sur.decalage * signe;
+  let distance = sur.decalage * signe;
   // Direction du talus : perpendiculaire au segment, du côté choisi.
-  const direction = { est: sur.droite.est * signe, nord: sur.droite.nord * signe };
+  let direction = { est: sur.droite.est * signe, nord: sur.droite.nord * signe };
+  // Dans le coin d'un angle saillant : angle vif (plan du segment voisin le plus loin).
+  const vif = angleVif(position, sommets, signe, sur.projete);
+  if (vif) {
+    distance = vif.distance;
+    direction = vif.direction;
+    sur.projete = vif.pied;
+  }
   const longueurTalus = reglages.longueur > 0 ? reglages.longueur : null;
   const solPlat = !altitudeTerrain;
   const dansLeTalus = distance >= 0 && (longueurTalus == null || distance <= longueurTalus);
@@ -198,6 +252,26 @@ export function zoneTalus(sommets, reglages, { altitudeLigne, altitudeTerrain = 
       bord.push({ est: point.est + direction.est * distance, nord: point.nord + direction.nord * distance });
     }
     cumul += l;
+    // Angle saillant au bout de ce segment : le bord passe par l'arête (angle vif, 0.107.2).
+    // Le long de l'arête, à t m de chaque droite : sommet + t × (n1 + n2) ÷ (1 + n1·n2).
+    const n2 = i + 2 < sommets.length ? normaleTalus(sommets, i + 1, signe) : null;
+    if (n2 && estSaillant(sommets, i + 1, signe)) {
+      const n1 = { est: direction.est, nord: direction.nord };
+      const produit = 1 + n1.est * n2.est + n1.nord * n2.nord;
+      const z = altitudeLigne(cumul, b);
+      if (produit > 1e-6 && z != null) {
+        const arete = { est: (n1.est + n2.est) / produit, nord: (n1.nord + n2.nord) / produit };
+        let distance = longueurTalus;
+        if (altitudeTerrain) {
+          const entree = entreeEnTerreSurface(b, arete, z, reglages, altitudeTerrain, longueurTalus ?? 200);
+          if (entree != null && (longueurTalus == null || entree < longueurTalus)) distance = entree;
+        }
+        if (distance != null) {
+          ligne.push({ est: b.est, nord: b.nord });
+          bord.push({ est: b.est + arete.est * distance, nord: b.nord + arete.nord * distance });
+        }
+      }
+    }
   }
   return ligne.length >= 2 ? { ligne, bord } : null;
 }

@@ -9,7 +9,8 @@ import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
 import { calculerSurface, surfaceImportee, cleTriangle, estImportee, origineSurface, nomNature, nouvelIdentifiant, NATURES_IMPORT, avecPrefixe, sansPrefixe, prefixeDuNom } from './topo/surface.js';
-import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul } from './volumes/calculs.js';
+import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul, nouveauVolume } from './volumes/calculs.js';
+import { talusDePlateforme, PENTES_TALUS } from './topo/plateforme-talus.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
 import { creerEcranVolumes, texteBase } from './volumes/ecran.js';
@@ -93,7 +94,8 @@ import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, a
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
-import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer } from './outils/son.js';
+import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip } from './outils/son.js';
+import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
@@ -147,6 +149,8 @@ const terrain = {
   libelleAire: 'ENR', // et pour une aire d'un métré
   implantation: 'surface', // mode Implanter : implanter une surface ou un point
   altitudeVoulue: null, // mode Implanter « Altitude » : altitude tapée (m)
+  bip: true, // 0.107.0 : bip-bip de hauteur (Implanter Altitude / Surface, Guidage)
+  hauteurCanne: null, // 0.107.1 : hauteur de canne réglée dans Emlid Flow (m), seulement montrée (Expert la change)
   accroche: 'point', // implantation d'un point : point du projet, sommet, milieu, sur la ligne ou centre (voir topo/accroche.js)
   guidage: 'rx2', // guidage vers le point : 'rx2' (avance / droite selon le cap du RX2) ou 'nseo' (nord / est)
   accrocheLigne: 'trait', // implantation d'une ligne : 'trait' (ligne du plan DXF) ou une accroche de point
@@ -358,6 +362,7 @@ function afficherOnglet(demande) {
       ecranMesures.arreterModification();
     }
     ongletContexte = nom;
+    if (nom !== 'terrain') piloterBip(null);
     recalculer();
   }
   mettreAJourToucheVolume();
@@ -773,6 +778,20 @@ const boutonRecepteur = recepteurDisponible()
   ? creerBoutonRecepteur(document.createElement('div'), {
       choisirRecepteur,
       reconnecter: reconnecterRecepteur,
+      // Hauteur de canne (0.107.1) : montrée pour contrôle, changée en Expert (comme dans Emlid Flow).
+      lireHauteurCanne: () => terrain.hauteurCanne ?? null,
+      reglerHauteurCanne: (texte) => {
+        const lue = lireAltitude(texte);
+        if (lue === undefined) return false;
+        if (lue != null && (lue < 0 || lue > 10)) {
+          alert(`Hauteur de canne « ${texte} » : entre 0 et 10 m.`);
+          return false;
+        }
+        terrain.hauteurCanne = lue;
+        retenirReglagesTerrain();
+        afficherMessage(lue == null ? 'Hauteur de canne effacée' : `Hauteur de canne : ${lue.toFixed(3)} m`);
+        return true;
+      },
       deconnecter: deconnecterRecepteur,
       // Corrections par internet (swipos) : seulement avec un APK qui sait le faire.
       lireReglagesCorrections: () => (correctionsDisponibles() ? lireReglagesCorrections() : null),
@@ -1076,6 +1095,13 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         const permises = aAcces('expert') ? ['point', 'ligne', 'altitude', 'talus'] : ['point', 'ligne', 'altitude'];
         terrain.implantation = permises.includes(quoi) ? quoi : 'surface';
         retenirReglagesTerrain();
+        recalculer();
+      },
+      // 0.107.0 : bip-bip de hauteur marche / arrêt (retenu sur cet appareil)
+      basculerBip: () => {
+        terrain.bip = terrain.bip === false;
+        retenirReglagesTerrain();
+        if (!terrain.bip) piloterBip(null);
         recalculer();
       },
       // 0.106 : altitude voulue du mode « Altitude » (vide = rien à guider)
@@ -1854,6 +1880,31 @@ function montrerPilote() {
  * modification ; enlevées si le dessin est supprimé. Si le dessin ne donne plus de surface
  * (altitude effacée…), la surface garde sa dernière forme et la raison est notée (erreurDessin).
  */
+/**
+ * Talus d'une plateforme jusqu'au terrain (0.108.0, voir topo/plateforme-talus.js) : null si le
+ * dessin n'en a pas, { erreur } ou le talus calculé. Réglages dans dessin.talus : { actif,
+ * terrainId, remblai: { horizontal, vertical }, deblai: { horizontal, vertical } }.
+ */
+function talusDuDessin(dessin) {
+  const reglage = dessin?.talus;
+  if (!reglage?.actif) return null;
+  const terrain = projet.surfaces.find((s) => s.id === reglage.terrainId);
+  if (!terrain) return { erreur: 'terrain à choisir' };
+  const triangles = trianglesDeSurface(terrain.id);
+  if (triangles.length === 0) return { erreur: `le terrain « ${terrain.nom} » n'a pas de triangles` };
+  return talusDePlateforme(pointsDuDessin(dessin, projet.dessins), { remblai: reglage.remblai, deblai: reglage.deblai }, chercheurAltitude(triangles), { pas: 2 });
+}
+
+/** Volume de la plateforme avec talus : comparée au terrain choisi (créé une fois, puis suivi). */
+function volumeDuTalus(surface, terrainId) {
+  const calcul = projet.calculs.find((c) => c.talusDe === surface.id);
+  if (calcul) {
+    calcul.surface2Id = terrainId;
+    return;
+  }
+  projet.calculs.push({ ...nouveauVolume(), surface1Id: surface.id, uneSeule: false, surface2Id: terrainId, talusDe: surface.id });
+}
+
 function synchroniserSurfacesDessins() {
   const avant = projet.surfaces.length;
   // Dessin supprimé : sa surface part, et la liste de points de son levé « Surface » aussi.
@@ -1867,9 +1918,12 @@ function synchroniserSurfacesDessins() {
     const dessin = dessinDe(surface.dessinId);
     // Levé « Surface » (0.77.0) : les sommets du dessin sont remis dans sa liste (contour).
     if (surface.type === 'points') {
-      surface.erreurDessin = surfaceDuDessin(dessin, projet.dessins).erreur;
+      // Talus jusqu'au terrain (0.108.0) : ses points et ses lignes sont refaits à chaque fois.
+      const talus = talusDuDessin(dessin);
+      surface.erreurDessin = surfaceDuDessin(dessin, projet.dessins).erreur ?? (talus?.erreur ? `talus : ${talus.erreur}` : undefined);
       if (!surface.erreurDessin) delete surface.erreurDessin;
-      synchroniserLeveeDuDessin(projet, surface, pointsDuDessin(dessin, projet.dessins));
+      synchroniserLeveeDuDessin(projet, surface, pointsDuDessin(dessin, projet.dessins), talus);
+      if (talus && !talus.erreur) volumeDuTalus(surface, dessin.talus.terrainId);
       continue;
     }
     const { points, faces, erreur } = surfaceDuDessin(dessin, projet.dessins);
@@ -1912,8 +1966,12 @@ function donneesDessin() {
         // pourquoi on ne peut pas encore la créer.
         surface: surface ? { nom: surface.nom, erreur: surface.erreurDessin ?? null } : null,
         empecheSurface: estFerme(d) ? (surfaceDuDessin(d, projet.dessins).erreur ?? null) : null,
+        // Talus jusqu'au terrain (0.108.0) : réglages et terrains possibles (levés et surfaces avec triangles).
+        talus: d.talus ?? null,
+        terrains: ferme ? projet.surfaces.filter((s) => !s.dessinId && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })) : [],
       };
     }),
+    pentesTalus: PENTES_TALUS,
     pilote,
     recepteur: recepteurDisponible(),
   };
@@ -2119,6 +2177,32 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
     dessin.hauteur.mode = mode === 'sommets' ? 'sommets' : 'fixe';
     modifie();
   },
+  // Talus jusqu'au terrain (0.108.0) : marche / arrêt, terrain, pente du remblai et du déblai.
+  reglerTalusDessin: (id, champ, valeur) => {
+    const dessin = dessinDe(id);
+    if (!dessin) return;
+    const pente = (texte) => {
+      const choisie = PENTES_TALUS.find(([cle]) => cle === texte);
+      if (choisie) return { horizontal: choisie[1], vertical: choisie[2] };
+      // Tapée : « 5/4 » (H/V).
+      const lu = /^\s*(\d+(?:[.,]\d+)?)\s*\/\s*(\d+(?:[.,]\d+)?)\s*$/.exec(String(texte));
+      if (!lu) {
+        afficherMessage(`Pente « ${texte} » illisible : écris H/V, par exemple 5/4`, 4000);
+        return null;
+      }
+      const [h, v] = [Number(lu[1].replace(',', '.')), Number(lu[2].replace(',', '.'))];
+      return h > 0 && v > 0 ? { horizontal: h, vertical: v } : null;
+    };
+    dessin.talus ??= { actif: false, terrainId: null, remblai: { horizontal: 3, vertical: 2 }, deblai: { horizontal: 3, vertical: 2 } };
+    if (champ === 'actif') dessin.talus.actif = Boolean(valeur);
+    else if (champ === 'terrainId') dessin.talus.terrainId = valeur || null;
+    else if (champ === 'remblai' || champ === 'deblai') {
+      const lue = pente(valeur);
+      if (!lue) return;
+      dessin.talus[champ] = lue;
+    }
+    modifie();
+  },
   reglerHauteur: (id, champ, texte) => {
     const dessin = dessinDe(id);
     if (!dessin) return;
@@ -2194,7 +2278,7 @@ function calculerLame() {
     gauche: { distance: 1, altitude: coins.gauche.altitude },
     droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
   };
-  return { raison: null, guidage, coupe, coins, recepteurs, bords: bordsDeLaLame(coins.gauche, coins.droite, triangles), profil: coupePerpendiculaireLame(coins, triangles) };
+  return { raison: null, guidage, coupe, coins, recepteurs, bords: bordsDeLaLame(coins.gauche, coins.droite, triangles), profil: coupePerpendiculaireLame(coins, triangles), toleranceVert: terrain.lame.tolerances.vert };
 }
 
 /**
@@ -2225,11 +2309,33 @@ function coupePerpendiculaireLame(coins, triangles) {
 /** Écran Lame et lame sur le plan, avec les derniers états des 2 récepteurs. */
 function montrerLame() {
   const lame = calculerLame();
+  derniereLame = lame;
   if (lame) ecranLeve.mettreAJourLame(lame);
   const surPlan = lame?.coins && ongletContexte === 'terrain'
     ? { ...lame.coins, classeGauche: lame.guidage?.gauche.classe ?? null, classeDroite: lame.guidage?.droite.classe ?? null }
     : null;
   plan.afficherLame(surPlan);
+}
+
+let derniereLame = null; // dernier calcul du guidage (pour le bip-bip)
+
+/**
+ * Bip-bip de hauteur (0.107.0, voir topo/bip.js) : Implanter Altitude ou Surface (tolérance 2 cm,
+ * comme le vert de l'écart) et Guidage (le coin de lame le plus loin, tolérance « vert » de la lame).
+ * Silence ailleurs, ou si le bip est coupé (bouton 🔔 / 🔕).
+ */
+function mettreAJourBip(controle) {
+  let rythme = null;
+  if (terrain.bip !== false && ongletContexte === 'terrain') {
+    if (terrain.mode === 'controler' && ['surface', 'altitude'].includes(terrain.implantation)) rythme = rythmeBip(controle?.ecart ?? null, 0.02);
+    else if (terrain.mode === 'lame' && derniereLame?.guidage) {
+      const { gauche, droite } = derniereLame.guidage;
+      const ecarts = [gauche?.ecart, droite?.ecart].filter((e) => e != null && Number.isFinite(e));
+      const plusLoin = ecarts.sort((a, b) => Math.abs(b) - Math.abs(a))[0] ?? null;
+      rythme = rythmeBip(plusLoin, terrain.lame.tolerances.vert);
+    }
+  }
+  piloterBip(rythme);
 }
 
 /** Vrai pendant l'autocontrôle (Terrain › Contrôle). */
@@ -3746,7 +3852,7 @@ if (recepteurDisponible()) {
     }
     etatRecepteur = etat;
     if (vientDeSeConnecter) proposerControle();
-    mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette);
+    mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette, terrain.hauteurCanne ?? null);
     boutonRecepteur?.mettreAJour(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
     if (terrain.plusProche && aAcces('expert')) viserLePlusProche();
@@ -3760,6 +3866,7 @@ if (recepteurDisponible()) {
     const implantationTalus = talus ? calculerImplantationTalus(etat) : null;
     ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation, implantationLigne, implantationTalus });
     montrerLame();
+    mettreAJourBip(controle);
     const position = etat.connecte && etat.recu ? etat.position : null;
     // Coupes affichées (mode Implanter) : leur trait en pointillés sur le plan.
     const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
@@ -4283,6 +4390,20 @@ creerEcranExport(moduleExport.zone('plan'), {
         .filter((c) => choisi(c) && dansUnContour(c))
         .map(({ calcul, resultat }) => ({ nom: nom(calcul), description: descriptionCalcul(calcul, projet.surfaces), resultat })),
       volumes: projet.calculs.filter((c) => selection.has(c.id)).map((calcul) => ({ nom: nom(calcul), base: texteBase(calcul, projet.surfaces), resultat: resultatsCalculs.get(calcul.id) })),
+      // PDF (0.107.4) : levés cochés qui ne sont dans aucun volume coché (« levé seul ») : contour,
+      // lignes de rupture, triangles et points, sans étiquette de volume.
+      levesSeuls: (() => {
+        const dansUnVolume = new Set(principaux.map(({ calcul }) => calcul.surface1Id));
+        return creees
+          .filter((s) => !dansUnVolume.has(s.id))
+          .map((s) => ({
+            nom: s.nom,
+            contour: s.contour ?? [],
+            lignesRupture: s.lignesRupture ?? [],
+            triangles: trianglesDeSurface(s.id),
+            points: projet.leves.find((l) => l.id === s.leveId)?.points ?? [],
+          }));
+      })(),
       // DXF et LandXML : les surfaces cochées, avec ou sans volume.
       dessinSurfaces: {
         stocks: creees,

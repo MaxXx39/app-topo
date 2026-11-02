@@ -13,7 +13,8 @@
 //   calques: [{ nom, couleur ('#rrggbb'), visible }],
 //   contenu: {
 //     traits:  [{ c (n° du calque), k (couleur, ou null = celle du calque), p: [x, y, x, y…], f (fermé), z: [z…] (si 3D) }],
-//     pleins:  [{ c, k, p }],                                  (aplats : SOLID, TRACE)
+//     pleins:  [{ c, k, p, h }],                               (aplats : SOLID, TRACE ; hachures HATCH
+//              depuis 0.107.3 : h = nombre de points de chaque contour, dessinées en aplat transparent)
 //     cercles: [{ c, k, x, y, r }],
 //     textes:  [{ c, k, x, y, h (hauteur), a (angle °), t (texte), ah (0 gauche, 1 centre, 2 droite), av (0 ligne de base, 1 bas, 2 milieu, 3 haut) }],
 //     points:  [{ c, k, x, y, z }],
@@ -202,6 +203,128 @@ function pointsArc(cx, cy, r, debutDeg, finDeg) {
     points.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
   }
   return points;
+}
+
+/**
+ * Contours d'une hachure (HATCH) : [[[x, y]…], …] dans le repère de l'entité. Les paires suivent
+ * l'ordre du DXF : 91 (nombre de contours), puis pour chaque contour 92 (type : 2 = polyligne,
+ * sinon des arêtes : 1 ligne, 2 arc, 3 ellipse, 4 courbe), ses sommets ou ses arêtes, 97 et les
+ * liens vers les objets d'origine (330). Le motif (traits du motif) n'est pas lu.
+ */
+export function contoursHachure(paires) {
+  let i = paires.findIndex((p) => p.code === 91);
+  if (i < 0) return [];
+  const nombreContours = Number(paires[i].valeur) || 0;
+  i++;
+  const code = () => paires[i]?.code;
+  const lire = () => Number(paires[i++]?.valeur) || 0;
+  /** Avance jusqu'au prochain code "voulu" (sans dépasser les codes "arret"), vrai si trouvé. */
+  const allerA = (voulu, arret = []) => {
+    while (i < paires.length && code() !== voulu) {
+      if (arret.includes(code())) return false;
+      i++;
+    }
+    return i < paires.length;
+  };
+  const contours = [];
+  for (let n = 0; n < nombreContours; n++) {
+    if (!allerA(92)) break;
+    const type = lire();
+    const points = [];
+    if (type & 2) {
+      // Polyligne : 72 (renflements ?), 73 (fermée), 93 (nombre de sommets), puis 10 / 20 (/ 42).
+      let avecRenflements = false;
+      let nombreSommets = 0;
+      while (i < paires.length && code() !== 10) {
+        if (code() === 72) avecRenflements = lire() !== 0;
+        else if (code() === 93) nombreSommets = lire();
+        else i++;
+      }
+      const sommets = [];
+      for (let k = 0; k < nombreSommets && code() === 10; k++) {
+        const x = lire();
+        const y = code() === 20 ? lire() : 0;
+        const renflement = avecRenflements && code() === 42 ? lire() : 0;
+        sommets.push({ x, y, renflement });
+      }
+      sommets.forEach((sommet, k) => {
+        const suivant = sommets[(k + 1) % sommets.length];
+        points.push(...pointsRenflement([sommet.x, sommet.y], [suivant.x, suivant.y], sommet.renflement));
+      });
+    } else {
+      if (!allerA(93, [92])) break;
+      const nombreAretes = lire();
+      for (let a = 0; a < nombreAretes; a++) {
+        if (!allerA(72, [92, 97])) break;
+        const sorte = lire();
+        const champs = {};
+        const prendre = (codes) => {
+          for (const c of codes) {
+            if (code() === c) champs[c] = lire();
+          }
+        };
+        if (sorte === 1) {
+          prendre([10, 20, 11, 21]);
+          points.push([champs[10] ?? 0, champs[20] ?? 0]);
+        } else if (sorte === 2) {
+          prendre([10, 20, 40, 50, 51, 73]);
+          const [cx, cy, r, a0, a1] = [champs[10] ?? 0, champs[20] ?? 0, champs[40] ?? 0, champs[50] ?? 0, champs[51] ?? 0];
+          // Sens horaire (73 = 0) : angles comptés à l'envers.
+          const arc = champs[73] === 0 ? pointsArc(cx, cy, r, -a1, -a0).reverse() : pointsArc(cx, cy, r, a0, a1);
+          points.push(...arc.slice(0, -1));
+        } else if (sorte === 3) {
+          prendre([10, 20, 11, 21, 40, 50, 51, 73]);
+          const [cx, cy, ax, ay, rapport] = [champs[10] ?? 0, champs[20] ?? 0, champs[11] ?? 0, champs[21] ?? 0, champs[40] ?? 1];
+          let debut = ((champs[50] ?? 0) * Math.PI) / 180;
+          let fin = ((champs[51] ?? 360) * Math.PI) / 180;
+          if (champs[73] === 0) [debut, fin] = [-fin, -debut];
+          if (fin <= debut) fin += 2 * Math.PI;
+          const nb = Math.max(8, Math.ceil(((fin - debut) * 180) / Math.PI / PAS_ARC));
+          const morceau = [];
+          for (let j = 0; j < nb; j++) {
+            const t = debut + ((fin - debut) * j) / nb;
+            morceau.push([cx + ax * Math.cos(t) - ay * rapport * Math.sin(t), cy + ay * Math.cos(t) + ax * rapport * Math.sin(t)]);
+          }
+          if (champs[73] === 0) morceau.reverse();
+          points.push(...morceau);
+        } else if (sorte === 4) {
+          // Courbe : 94 (degré), 73, 74, 95 (nœuds), 96 (points de contrôle), 40…, 10 / 20…, puis
+          // 97 (points d'ajustement) 11 / 21… et parfois 12 / 22, 13 / 23 (tangentes).
+          let degre = 3;
+          let nombreNoeuds = 0;
+          let nombreControle = 0;
+          while (i < paires.length && ![40, 10].includes(code())) {
+            if (code() === 94) degre = lire();
+            else if (code() === 95) nombreNoeuds = lire();
+            else if (code() === 96) nombreControle = lire();
+            else i++;
+          }
+          const noeuds = [];
+          for (let k = 0; k < nombreNoeuds && code() === 40; k++) noeuds.push(lire());
+          const controle = [];
+          for (let k = 0; k < nombreControle && code() === 10; k++) {
+            const x = lire();
+            const y = code() === 20 ? lire() : 0;
+            if (code() === 42) lire();
+            controle.push([x, y]);
+          }
+          if (code() === 97) {
+            const nombreAjustement = lire();
+            for (let k = 0; k < nombreAjustement && code() === 11; k++) {
+              lire();
+              if (code() === 21) lire();
+            }
+          }
+          for (const c of [12, 22, 13, 23]) if (code() === c) lire();
+          points.push(...pointsSpline(degre, controle, noeuds));
+        }
+      }
+    }
+    // Points en double à la suite (bout d'une arête = début de la suivante) : on les enlève.
+    const nettoyes = points.filter(([x, y], k) => k === 0 || Math.hypot(x - points[k - 1][0], y - points[k - 1][1]) > 1e-9);
+    contours.push(nettoyes);
+  }
+  return contours;
 }
 
 /**
@@ -470,6 +593,19 @@ function creerLecteur(calquesLus) {
         brut.pleins.push({ c, k, points: sommets });
         break;
       }
+      case 'HATCH': {
+        // Hachure (0.107.3) : ses contours, en aplat transparent (trous compris) et en trait.
+        const contours = contoursHachure(entite.paires)
+          .map((contour) => contour.map(([x, y]) => point(x, y)))
+          .filter((contour) => contour.length >= 3);
+        if (contours.length === 0) {
+          ignores.HATCH = (ignores.HATCH ?? 0) + 1;
+          break;
+        }
+        for (const contour of contours) trait(c, k, contour, true);
+        brut.pleins.push({ c, k, points: contours.flat(), h: contours.map((contour) => contour.length) });
+        break;
+      }
       case 'POINT': {
         const [x, y] = point(nombre(entite, 10), nombre(entite, 20));
         etendre(x, y);
@@ -543,7 +679,7 @@ function creerLecteur(calquesLus) {
     const local = ([x, y]) => [mm(x - origine.est), mm(y - origine.nord)];
     const contenu = {
       traits: brut.traits.map(({ c, k, points, f, z }) => ({ c, k, p: points.flatMap(local), f, ...(z ? { z: z.map(mm) } : {}) })),
-      pleins: brut.pleins.map(({ c, k, points }) => ({ c, k, p: points.flatMap(local) })),
+      pleins: brut.pleins.map(({ c, k, points, h }) => ({ c, k, p: points.flatMap(local), ...(h ? { h } : {}) })),
       cercles: brut.cercles.map(({ c, k, x, y, r }) => ({ c, k, x: mm(x - origine.est), y: mm(y - origine.nord), r: mm(r) })),
       textes: brut.textes.map((texte) => ({ ...texte, x: mm(texte.x - origine.est), y: mm(texte.y - origine.nord), h: mm(texte.h), a: Math.round(texte.a * 100) / 100 })),
       points: brut.points.map(({ c, k, x, y, z }) => ({ c, k, x: mm(x - origine.est), y: mm(y - origine.nord), z: mm(z) })),

@@ -8864,3 +8864,141 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   width: 100%;
   border-radius: 8px;
 }
+
+/* 0.107.0 : règle de hauteur verticale (Implanter Altitude / Surface, Guidage) */
+.ecart-et-regle {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.ecart-et-regle > .ecart-direct {
+  flex: 1;
+}
+
+.colonne-regle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.regle-hauteur {
+  position: relative;
+  width: 36px;
+  flex: 1;
+  min-height: 170px;
+  border: 2px solid #1b2b36;
+  border-radius: 6px;
+  background: #33414c;
+  overflow: hidden;
+}
+
+.regle-hauteur .graduation {
+  position: absolute;
+  right: 0;
+  width: 35%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.regle-hauteur .graduation.milieu {
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #ffffff;
+}
+
+.regle-remplissage {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.regle-remplissage.monter {
+  background: linear-gradient(to bottom, #7f1d1d, var(--rouge));
+}
+
+.regle-remplissage.descendre {
+  background: linear-gradient(to top, #1e3a8a, var(--bleu));
+}
+
+.regle-marque {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  margin-top: -1px;
+  background: #4ade80;
+}
+
+.regle-marque::before,
+.regle-marque::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  border: 7px solid transparent;
+}
+
+.regle-marque::before {
+  left: -2px;
+  border-left-color: #4ade80;
+}
+
+.regle-marque::after {
+  right: -2px;
+  border-right-color: #4ade80;
+}
+
+.regle-hauteur.dedans {
+  background: #14532d;
+}
+
+.bouton-bip {
+  min-width: 34px;
+  min-height: 30px;
+  border: 1px solid var(--bordure, #d1d5db);
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.bouton-bip.coupe {
+  opacity: 0.6;
+}
+
+.coins-lame.avec-regles {
+  grid-template-columns: auto 1fr 1fr auto;
+}
+
+/* 0.107.1 : hauteur de canne (fenêtre du récepteur) */
+.ligne-hauteur-canne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.champ-hauteur-canne input {
+  width: 6em;
+}
+
+/* 0.108.0 : talus jusqu'au terrain (Calculs › Dessin) */
+.talus-dessin {
+  margin: 8px 0;
+}
+
+.reglages-talus-dessin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.champ-talus-dessin {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+}
