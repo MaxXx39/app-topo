@@ -6,7 +6,7 @@ import { aAcces, rayonFormes, echelleTexte } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
-import { bordDeTriangles } from '../topo/surface.js';
+import { bordDeTriangles, estSurfaceFichier } from '../topo/surface.js';
 import { formaterNombre } from '../topo/format.js';
 import { svgDrapeau } from '../outils/drapeaux.js';
 import { traitsDeBarbules } from './barbules.js';
@@ -77,6 +77,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandToucherTriangle(triangle) : appelé quand on touche un triangle de la surface affichée,
  *   en mode suppression de triangles (dessin.modeTriangles)
  * - quandToucherPosition({ est, nord }) : appelé pendant le tracé d'une coupe (dessin.traceCoupe) ;
+ * - quandChangerZone(sommets) : zone Swisstopo changée (sommet ajouté ou glissé ; voir tracerZone) ;
  *   près d'un point levé, la position est celle de ce point
  * - quandToucherMesure(id) : appelé quand on touche une mesure (onglet Calculs › Mesures, hors modification)
  * - quandToucherImplantation({ est, nord }, tolerance) : appelé quand on touche le plan pendant
@@ -85,7 +86,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandBasculerSeul(actif) : bouton « Seul » (seulement ce sur quoi je travaille, 0.94.0)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone } = {}) {
   // Réglages choisis ; « calques » est ce qui est dessiné : en dessous d'Expert, les réglages
   // d'Expert gardent leur valeur de départ.
   const calquesChoisis = { ...CALQUES_DEPART };
@@ -392,7 +393,27 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    * Implantation : points « À implanter » (croix sarcelle et nom), point choisi en touchant le
    * plan (croix ambre) et point à implanter en cours (cercle autour).
    */
+  // Zone de la Surface Swisstopo (0.109.0) : sommets touchés un par un, déplacés en les glissant.
+  // zone : { sommets: [{ est, nord }] } pendant le tracé, sinon null ; glisse : n° du sommet tenu.
+  let zone = null;
+  let glisse = null;
+  function dessinerZone() {
+    svg.querySelector('g.zone-swisstopo')?.remove();
+    if (!zone || !vue) return;
+    const groupe = creerElement('g', { class: 'zone-swisstopo' });
+    const ecran = zone.sommets.map((s) => versEcran(s.est, s.nord, vue));
+    if (ecran.length >= 2) groupe.append(creerElement('path', { d: ecran.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ') + (ecran.length >= 3 ? ' Z' : ''), class: 'contour-zone' }));
+    ecran.forEach((p, i) => {
+      groupe.append(creerElement('circle', { cx: p.x, cy: p.y, r: i === glisse ? 11 : 8, class: 'sommet-zone' }));
+      const numero = creerElement('text', { x: p.x, y: p.y + 4, 'text-anchor': 'middle', class: 'numero-zone' });
+      numero.textContent = String(i + 1);
+      groupe.append(numero);
+    });
+    svg.append(groupe);
+  }
+
   function dessinerImplantation() {
+    dessinerZone();
     svg.querySelector('g.implantation')?.remove();
     if (!implantation || !vue) return;
     const groupe = creerElement('g', { class: 'implantation' });
@@ -825,7 +846,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   /** Sommets des surfaces importées visibles (LandXML, DXF 3D) : pour cadrer un projet sans point. */
   function sommetsDesSurfacesImportees() {
     return dessin.stocks
-      .filter((s) => (s.type === 'landxml' || s.type === 'dxf') && !dessin.cachees?.has(s))
+      .filter((s) => estSurfaceFichier(s) && !dessin.cachees?.has(s))
       .flatMap((s) => s.points ?? []);
   }
 
@@ -856,7 +877,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
       // Surface importée (LandXML, DXF 3D ; 0.83.0, mode Base) : elle n'a pas de contour ; fond
       // léger à la couleur de sa nature, bord en trait plein, triangles avec la case « Triangles ».
-      const importee = stock.type === 'landxml' || stock.type === 'dxf';
+      const importee = estSurfaceFichier(stock);
       if (importee && resultat?.trianglesDessus?.length) {
         const nature = `nature-${stock.nature ?? 'terrassement'}`;
         // Couleur choisie dans « Afficher » (Surface Import, 0.94.0), sinon le bleu habituel.
@@ -998,7 +1019,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     dessin.stocks.forEach((stock, index) => {
       if (!estVisible(stock)) return;
       const triangles = dessin.resultats[index]?.trianglesDessus ?? [];
-      const importee = stock.type === 'landxml' || stock.type === 'dxf';
+      const importee = estSurfaceFichier(stock);
       if (importee ? calques.couleursAltitudeImport : calques.couleursAltitude) ajouterTous(pourCouleurs, triangles);
       if (!importee && calques.courbes) ajouterTous(pourCourbes, triangles);
     });
@@ -1708,10 +1729,32 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const position = positionDansPlan(evenement);
     pointeurs.set(evenement.pointerId, position);
     toucher = pointeurs.size === 1 ? position : null;
+    // Zone Swisstopo : un doigt posé sur un sommet le prend (il suit le doigt au lieu du plan).
+    glisse = null;
+    if (zone && vue && pointeurs.size === 1) {
+      let meilleur = RAYON_TOUCHER;
+      zone.sommets.forEach((s, i) => {
+        const d = distance(position, versEcran(s.est, s.nord, vue));
+        if (d <= meilleur) {
+          meilleur = d;
+          glisse = i;
+        }
+      });
+    }
   });
 
   svg.addEventListener('pointermove', (evenement) => {
     if (!vue || !pointeurs.has(evenement.pointerId)) return;
+    if (glisse !== null && pointeurs.size === 1) {
+      const position = positionDansPlan(evenement);
+      pointeurs.set(evenement.pointerId, position);
+      if (toucher && distance(toucher, position) > 6) toucher = null;
+      if (!toucher) {
+        zone.sommets[glisse] = versTerrain(position.x, position.y, vue);
+        dessinerZone();
+      }
+      return;
+    }
     const avant = [...pointeurs.values()];
     pointeurs.set(evenement.pointerId, positionDansPlan(evenement));
     const apres = [...pointeurs.values()];
@@ -1741,8 +1784,22 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   svg.addEventListener('pointerup', (evenement) => {
     pointeurs.delete(evenement.pointerId);
+    if (zone && glisse !== null) {
+      // Fin du glissement d'un sommet (un simple toucher sur un sommet ne change rien).
+      glisse = null;
+      toucher = null;
+      dessinerZone();
+      quandChangerZone?.(zone.sommets.map((s) => ({ ...s })));
+      if (pointeurs.size === 0) finirLeGeste();
+      return;
+    }
     if (toucher && pointeurs.size === 0) {
-      if (dessin.traceCoupe) {
+      if (zone) {
+        // Zone Swisstopo : toucher le plan ajoute un sommet.
+        zone.sommets.push(versTerrain(toucher.x, toucher.y, vue));
+        dessinerZone();
+        quandChangerZone?.(zone.sommets.map((s) => ({ ...s })));
+      } else if (dessin.traceCoupe) {
         // Tracé d'une coupe : la position touchée (celle du point levé s'il y en a un tout près).
         const point = pointLePlusProche(toucher);
         quandToucherPosition?.(point ? { est: point.est, nord: point.nord } : versTerrain(toucher.x, toucher.y, vue));
@@ -1913,6 +1970,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
      */
     afficherImplantation(nouvelle) {
       implantation = nouvelle;
+    },
+    /** Zone Swisstopo : { sommets: [{ est, nord }] } pour la tracer, null pour l'enlever. */
+    tracerZone(nouvelle) {
+      zone = nouvelle ? { sommets: nouvelle.sommets.map((s) => ({ ...s })) } : null;
+      glisse = null;
+      dessinerZone();
     },
     /** Redessine seulement l'implantation (et la position, par-dessus), sans tout le plan. */
     rafraichirImplantation() {

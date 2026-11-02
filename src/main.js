@@ -5,6 +5,7 @@
 import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { lireLandXML } from './topo/landxml.js';
+import { creerSurfaceSwisstopo } from './import/zone-swisstopo.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
@@ -627,6 +628,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     return null;
   },
   commencerPointage: () => commencerPointage(),
+  commencerSurfaceSwisstopo: () => surfaceSwisstopo.commencer(),
   montrerCalqueDxf: (id, numero, visible) => {
     const calque = projet.plansDxf.find((p) => p.id === id)?.calques[numero];
     if (!calque) return;
@@ -2873,6 +2875,7 @@ function commencerRecalage(id) {
   const choisi = projet.plansDxf.find((p) => p.id === id);
   if (!choisi) return;
   if (pointage.actif) arreterPointage();
+  if (surfaceSwisstopo.actif()) surfaceSwisstopo.arreter();
   recalage.planId = id;
   recalage.choix = null;
   recalage.candidat = null;
@@ -3111,6 +3114,30 @@ function annulerRecalage(id) {
   modifie();
 }
 
+// --- Surface Swisstopo (0.109.0, Projet › Import, Expert) : voir import/zone-swisstopo.js ---
+const surfaceSwisstopo = creerSurfaceSwisstopo({
+  get plan() {
+    return plan;
+  },
+  get cadre() {
+    return document.querySelector('#plan .plan-cadre');
+  },
+  afficherMessage,
+  allerAuPlan: () => {
+    if (estTelephone()) afficherOnglet('plan');
+  },
+  avantDeCommencer: () => {
+    if (pointage.actif) arreterPointage();
+  },
+  nomsPris: () => projet.surfaces.map((s) => s.nom),
+  ajouterSurface: (surface) => {
+    projet.surfaces.push(surface);
+    editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+    editeurSurfaces.choisir(projet.surfaces.length - 1);
+    modifie({ recadrer: true });
+  },
+});
+
 // --- Points ajoutés en touchant le plan DXF (Projet › Imports › Point › Pointer sur le plan DXF) ---
 // pointage : { actif, accroche ('sommet', 'milieu', 'ligne', 'centre'), choix (point touché, à
 // contrôler et valider : { est, nord, altitude }) }. Le plan ne bouge pas : une croix montre le
@@ -3120,6 +3147,7 @@ const ACCROCHES_POINTAGE = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne'
 
 /** Début du pointage : une barre sur le plan (accroche, Terminé) ; sur téléphone, on va au plan. */
 function commencerPointage() {
+  if (surfaceSwisstopo.actif()) surfaceSwisstopo.arreter();
   pointage.actif = true;
   pointage.choix = null;
   dessinerBarrePointage();
@@ -4087,6 +4115,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
   // Couleur d'une liste (menu « Afficher » ; aussi dans Projet › Listes de points).
   quandColorerListe: (id, couleur) => colorerListe(id, couleur),
   quandToucherPhoto: (id) => montrerPhoto(id),
+  quandChangerZone: (sommets) => surfaceSwisstopo.changerZone(sommets),
   quandMontrerListe: (id, visible) => {
     if (id === '*') projet.listesCachees = visible ? [] : listesDePoints(projet).map((l) => l.id);
     else montrerListe(projet, id, visible);

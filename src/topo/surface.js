@@ -72,16 +72,24 @@ export function creerSurface(nom, leveId, nature = 'stock') {
 
 /** Vrai si la surface a été importée d'un fichier (LandXML, DXF) et non créée à partir de points. */
 export function estImportee(surface) {
-  return surface.type === 'landxml' || surface.type === 'dxf' || surface.type === 'dessin';
+  return surface.type === 'landxml' || surface.type === 'dxf' || surface.type === 'dessin' || surface.type === 'swisstopo';
+}
+
+/** Vrai pour une surface venue d'un fichier ou de swisstopo (LandXML, DXF 3D, Surface Swisstopo), pas de Dessin. */
+export function estSurfaceFichier(surface) {
+  return surface?.type === 'landxml' || surface?.type === 'dxf' || surface?.type === 'swisstopo';
 }
 
 // Préfixes des noms (0.90.0, demande du 29.10.2026) : « LV- » pour un levé (stock, terrain,
 // recollement, levé libre, métré), « Surf- » pour une surface importée ou faite dans Dessin.
 export const PREFIXE_LEVE = 'LV-';
 export const PREFIXE_SURFACE = 'Surf-';
+// Surface Swisstopo (0.109.0) : « SWISSTOP 1 », préfixe fixe comme les autres.
+export const PREFIXE_SWISSTOP = 'SWISSTOP ';
 
 /** Préfixe du nom de ce levé ou de cette surface. */
 export function prefixeDuNom(objet) {
+  if (objet?.type === 'swisstopo') return PREFIXE_SWISSTOP;
   return estImportee(objet) || objet?.nature === 'surface' ? PREFIXE_SURFACE : PREFIXE_LEVE;
 }
 
@@ -99,7 +107,7 @@ export function sansPrefixe(nom, prefixe) {
 
 /** D'où vient une surface importée : « LandXML », « DXF » ou « Dessin » (plateforme ou bâtiment dessiné). */
 export function origineSurface(surface) {
-  return { dxf: 'DXF', landxml: 'LandXML', dessin: 'Dessin' }[surface.type] ?? '';
+  return { dxf: 'DXF', landxml: 'LandXML', dessin: 'Dessin', swisstopo: 'swissALTI3D' }[surface.type] ?? '';
 }
 
 /**
