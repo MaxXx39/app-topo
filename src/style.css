@@ -9002,3 +9002,25 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   gap: 2px;
   font-size: 0.85rem;
 }
+
+/* Zone de la Surface Swisstopo (0.109.0) : contour tracé sur le plan, sommets numérotés à glisser. */
+.plan .zone-swisstopo .contour-zone {
+  fill: rgba(220, 38, 38, 0.12);
+  stroke: #dc2626;
+  stroke-width: 2.5;
+  stroke-dasharray: 8 5;
+}
+.plan .zone-swisstopo .sommet-zone {
+  fill: #dc2626;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.plan .zone-swisstopo .numero-zone {
+  fill: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.bouton-swisstopo strong {
+  font-size: 0.86em;
+}
