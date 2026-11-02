@@ -30,7 +30,7 @@ describe('Listes de points du plan', () => {
       ['lx', 'importee', 'surface'],
       ['m1', 'metre', 'metre'],
     ]);
-    expect(listes.filter((l) => l.couleurModifiable).map((l) => l.id)).toEqual(['f', 'a', 'lx']);
+    expect(listes.filter((l) => l.couleurModifiable).map((l) => l.id)).toEqual(['s1', 'o1', 'f', 'a', 'lx']);
   });
 
   it('mesures dessinées : celles des métrés cochés et, si « Mesures » est cochée, celles faites à la main', () => {
