@@ -3771,12 +3771,13 @@ function resumeLigne() {
  * Réglages d'un plan DXF (liste des plans, ou menu « Plans » du plan) : visible (œil), couleur
  * (null = celles du DXF) et nom court (« Bordures »).
  */
-function reglerPlanDxf(id, { visible, couleur, nom }) {
+function reglerPlanDxf(id, { visible, couleur, nom, transparence }) {
   const choisi = projet.plansDxf.find((p) => p.id === id);
   if (!choisi) return;
   if (visible !== undefined) choisi.visible = visible;
   if (couleur !== undefined) choisi.couleur = couleur;
   if (nom !== undefined && nom.trim()) choisi.nom = nom.trim();
+  if (transparence !== undefined) choisi.transparence = Math.min(100, Math.max(0, Math.round(transparence)));
   modifie();
 }
 

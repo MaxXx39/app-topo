@@ -3643,7 +3643,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 /* Points de contrôle (Terrain › Contrôler) : triangle rouge, nom en rouge. */
 .plan .triangle-controle {
   fill: #dc2626;
-  stroke: #ffffff;
+  stroke: #b91c1c;
   stroke-width: 1.5;
 }
 
@@ -8299,17 +8299,10 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   content: '▴';
 }
 
-/* 0.106 : menu du plan ouvert (Fond, DXF, Afficher) : bouton surligné, plan grisé */
+/* 0.106 : menu du plan ouvert (Fond, DXF, Afficher) : bouton surligné (0.110 : le plan n'est plus grisé) */
 .plan-calques .puce.actif {
   background: var(--sombre);
   color: #ffffff;
-}
-
-.plan-cadre.menu-plan-ouvert svg.plan,
-.plan-cadre.menu-plan-ouvert .plan-dxf-canvas,
-.plan-cadre.menu-plan-ouvert .plan-fond {
-  filter: grayscale(0.8) opacity(0.55);
-  transition: filter 0.15s;
 }
 
 .titre-avec-roue {
@@ -9023,4 +9016,57 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
 }
 .bouton-swisstopo strong {
   font-size: 0.86em;
+}
+
+/* 0.110 : transparence d'un plan DXF, couleur du contour des levés. */
+.reglette-plan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  width: 100%;
+  font-size: 0.8rem;
+}
+.reglette-plan input {
+  flex: 1 1 100px;
+}
+.ligne-couleur-contour {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.pastille-liste.liste-controle {
+  width: 0;
+  height: 0;
+  border-radius: 0;
+  background: none;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 11px solid #dc2626;
+}
+body.mode-telephone .entete-levee.levee-en-cours {
+  margin: 4px 0;
+  gap: 2px 6px;
+}
+body.mode-telephone .levee-en-cours .etiquette-levee {
+  font-size: 0.75rem;
+}
+.levee-en-cours .texte-court {
+  display: none;
+}
+body.mode-telephone .levee-en-cours .texte-long {
+  display: none;
+}
+body.mode-telephone .levee-en-cours .texte-court {
+  display: inline;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+body.mode-telephone .levee-en-cours .nom-levee-en-cours {
+  font-size: 1rem;
+}
+body.mode-telephone .levee-en-cours .boutons-levee .bouton-secondaire {
+  min-height: 30px;
+  padding: 2px 8px;
 }

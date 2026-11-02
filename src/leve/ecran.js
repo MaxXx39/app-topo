@@ -1062,7 +1062,7 @@ export function creerEcranLeve(conteneur, actions) {
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
       <span class="boutons-levee">
         <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer</button>
-        <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature">+ Nouveau</button>
+        <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature" aria-label="Nouveau levé"><span class="texte-long">+ Nouveau</span><span class="texte-court">+</span></button>
       </span>
     </div>`;
   }
