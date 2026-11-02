@@ -24,6 +24,7 @@ import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
 import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE, debutDeNom } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
+import { prefixeDuNom } from '../topo/surface.js';
 import { ELEMENTS_RESEAU } from '../topo/reseau.js';
 import { MATERIAUX } from './reseaux.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
@@ -35,6 +36,7 @@ import { MODES_ACCROCHE, CIBLES, cibleSelonDistance, ecartsGuidage, couleurCanne
 // (loin : 10, 5, 2, 1 m, puis les mêmes que les cercles de la cible).
 const BANDES_COULOIR = [[10, 5, 2, 1], ...CIBLES.map((c) => c.cercles)];
 import { symboleDeForme } from '../plan/formes.js';
+import { COULEURS_HABITUELLES } from './libelles.js';
 import { ouvrirFenetrePointTape, ouvrirListePoints } from './fenetres-points.js';
 
 // Mode Contrôler : ce qu'on implante (point, ligne, talus, surface), vue des coupes, longueurs.
@@ -42,6 +44,7 @@ const IMPLANTATIONS = [
   ['point', 'Point', true],
   ['ligne', 'Ligne', true],
   ['surface', 'Surface', true],
+  ['altitude', 'Altitude', true], // 0.106 : on tape l'altitude voulue, monter / descendre (tous les modes)
   ['talus', 'Talus', true], // tout à droite (demande du 26.10.2026)
 ];
 // Talus : Expert seulement. Base : on ne lève que des « Levé libre » (points seulement).
@@ -169,7 +172,7 @@ export function creerEcranLeve(conteneur, actions) {
     }
     // En-tête du levé en cours : renommer (crayon), en reprendre un autre (« Changer »).
     if (action === 'renommerLevee') {
-      demanderTexte({ titre: 'Nom du levé', valeur: donnees.stock.nom }).then((nom) => {
+      demanderTexte({ titre: 'Nom du levé', valeur: donnees.stock.nom, prefixe: prefixeDuNom(donnees.stock) }).then((nom) => {
         if (nom) actions.renommerLevee(donnees.stock.id, nom);
       });
       return;
@@ -243,7 +246,7 @@ export function creerEcranLeve(conteneur, actions) {
       actions.nouvelleSurface(bouton.dataset.valeur);
       const levee = donnees.stock;
       if (!levee) return;
-      demanderTexte({ titre: 'Nom du nouveau levé', valeur: levee.nom }).then((nom) => {
+      demanderTexte({ titre: 'Nom du nouveau levé', valeur: levee.nom, prefixe: prefixeDuNom(levee) }).then((nom) => {
         if (nom && nom !== levee.nom) actions.renommerLevee(levee.id, nom);
       });
       return;
@@ -280,13 +283,19 @@ export function creerEcranLeve(conteneur, actions) {
     const cible = evenement.target;
     if (cible.dataset.attributReseau) saisieReseau[cible.dataset.attributReseau] = cible.value;
     else if (cible.dataset.ouvrageChamp) actions.reglerOuvrage(cible.dataset.id, cible.dataset.ouvrageChamp, cible.value);
+    else if (cible.dataset.champ === 'altitude-voulue') actions.reglerAltitudeVoulue(cible.value);
+    else if (cible.dataset.champ === 'altitude-cible') actions.reglerAltitudeCible(cible.value);
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.champ === 'surface-lame') actions.choisirSurfaceLame(cible.value);
     else if (cible.dataset.toleranceLame) actions.reglerToleranceLame(cible.dataset.toleranceLame, cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
-    else if (cible.dataset.champ === 'photo-levee' && cible.files?.length) {
+    else if (cible.dataset.champ === 'photo-controle' && cible.files?.length) {
+      // Photo d'un point de contrôle (0.105.0) : rangée dans le projet, rattachée au point.
+      actions.ajouterPhotoControle(cible.dataset.id, [...cible.files]);
+      cible.value = '';
+    } else if (cible.dataset.champ === 'photo-levee' && cible.files?.length) {
       // Photo du levé (0.77.0) : appareil photo de la tablette, rangée avec le levé en cours.
       actions.ajouterPhotosLevee([...cible.files]);
       cible.value = '';
@@ -453,13 +462,13 @@ export function creerEcranLeve(conteneur, actions) {
     if (zone) {
       if (!c || c.ecart == null) {
         zone.className = 'ecart-direct attente';
-        zone.innerHTML = `<span class="message-ecart">${echapper(c?.message ?? 'Choisis une surface')}</span>`;
+        zone.innerHTML = `<span class="message-ecart">${echapper(c?.message ?? (donnees.controle.implantation === 'altitude' ? 'Tape l\'altitude voulue' : 'Choisis une surface'))}</span>`;
       } else {
         const monter = c.ecart >= 0;
         zone.className = `ecart-direct ${c.classe}`;
         zone.innerHTML = `<span class="fleche-ecart">${monter ? '↑' : '↓'}</span>
           <span class="valeur-ecart">${monter ? 'Monter' : 'Descendre'} ${formaterNombre(Math.abs(c.ecart))} m</span>
-          <span class="detail-ecart">surface ${formaterNombre(c.altitudeSurface)} · canne ${formaterNombre(c.altitudeCanne)}</span>`;
+          <span class="detail-ecart">${donnees.controle.implantation === 'altitude' ? 'voulue' : 'surface'} ${formaterNombre(c.altitudeSurface)} · canne ${formaterNombre(c.altitudeCanne)}</span>`;
       }
     }
     for (const sens of ['perpendiculaire', 'axe']) {
@@ -484,7 +493,7 @@ export function creerEcranLeve(conteneur, actions) {
     const { controle: reglages, surfaces } = donnees;
     // Coupes directes : en Base, dans l'axe seulement (perpendiculaire, longueur et hauteurs dès Intermédiaire).
     const vue = estModeBase() ? 'axe' : reglages.vueCoupes;
-    const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => aAcces('expert') || !IMPLANTATIONS_EXPERT.includes(cle)), reglages.implantation)} ${bulle('implanter')}</div>${caseSeulement()}`;
+    const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => aAcces('expert') || !IMPLANTATIONS_EXPERT.includes(cle)), reglages.implantation)} ${bulle('implanter')}</div>`;
     // Rien de choisi : on le rappelle bien en vue (après « ← », on ne savait plus quoi faire).
     const imp = donnees.implanter;
     if (reglages.implantation === 'point') {
@@ -498,6 +507,11 @@ export function creerEcranLeve(conteneur, actions) {
     if (reglages.implantation === 'talus') {
       const invite = imp.pointsLigne.length > 0 ? '' : invitation('Choisis la ligne du talus (haut ou bas)', 'touche-la sur le plan, ou ses points un à un');
       return barreAccroche() + choixImplantation + invite + implanterLigne() + mesTalus();
+    }
+    if (reglages.implantation === 'altitude') {
+      return `${choixImplantation}
+        <label class="champ-altitude-voulue">Altitude voulue<input type="text" inputmode="decimal" data-champ="altitude-voulue" value="${reglages.altitudeVoulue != null ? Number(reglages.altitudeVoulue).toFixed(3) : ''}" placeholder="ex. 412.350" /></label>
+        <div class="ecart-direct attente" data-vivant="ecart"></div>`;
     }
     return `
       ${choixImplantation}
@@ -516,13 +530,6 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
       <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
       <p class="aide" data-vivant="orientation"></p>`;
-  }
-
-  /** Case « Seulement l'élément à implanter » (0.90.1) : sur le plan, rien d'autre que lui. */
-  function caseSeulement() {
-    const actif = Boolean(donnees.controle.seulementElement);
-    return `<button type="button" class="case-seulement ${actif ? 'actif' : ''}" data-action="basculerSeulementElement" aria-pressed="${actif}">
-      <span class="carre-case" aria-hidden="true">${actif ? '✓' : ''}</span>Seulement l'élément à implanter</button>`;
   }
 
   /** Bandeau sarcelle bien visible : ce qu'il faut faire maintenant (flèche vers le plan). */
@@ -704,7 +711,6 @@ export function creerEcranLeve(conteneur, actions) {
         <button type="button" class="bouton-retour ${ouverts ? 'actif' : ''}" data-action="basculerReglagesGuidage" title="Réglages de l'implantation" aria-label="Réglages de l'implantation" aria-expanded="${ouverts}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>
       </div>
-      ${autocontrole ? '' : caseSeulement()}
       ${ouverts ? (talus ? reglagesTalus() : reglagesGuidage(ligne)) : ''}
       ${ligne ? detailLigne() : detailPoint()}
       ${guidage}
@@ -820,7 +826,7 @@ export function creerEcranLeve(conteneur, actions) {
   /** Point implanté : coordonnées et altitude, sur une ligne. */
   function detailPoint() {
     const c = cibleGuidee();
-    return `<p class="coordonnees-cible"><span class="coord-en">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>${c.altitude != null ? `<span class="coord-h">H ${formaterNombre(c.altitude)}</span>` : ''}</p>`;
+    return `<p class="coordonnees-cible"><span class="coord-en">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>${donnees.mode === 'autocontrole' ? (c.altitude != null ? `<span class="coord-h">H ${formaterNombre(c.altitude)}</span>` : '') : `<label class="coord-h">H<input type="text" inputmode="decimal" data-champ="altitude-cible" value="${c.altitude != null ? c.altitude.toFixed(3) : ''}" placeholder="—" aria-label="Altitude d'implantation" /></label>`}</p>`;
   }
 
   /**
@@ -1111,9 +1117,9 @@ export function creerEcranLeve(conteneur, actions) {
     const liste = donnees.libelles[sorte];
     const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
     return `<div class="libelles-terrain seulement-intermediaire pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
-      <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong><i class="symbole-libelle">${symboleDeForme('')}</i>Aucun</strong><span>sans libellé</span></button>
+      <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong><i class="symbole-libelle" style="color: #000000">${symboleDeForme('')}</i>Aucun</strong><span>sans libellé</span></button>
       ${liste.map(([abreviation, signification, couleur, forme]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
-          <strong><i class="symbole-libelle" ${couleur ? `style="color: ${couleur}"` : ''}>${symboleDeForme(forme)}</i>${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
+          <strong><i class="symbole-libelle" style="color: ${couleur || COULEURS_HABITUELLES[sorte]}">${symboleDeForme(forme)}</i>${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
       <button type="button" class="bouton-crayon-libelles" data-action="modifierLibelles" data-valeur="${sorte}" title="Ajouter ou modifier des libellés" aria-label="Ajouter ou modifier des libellés">⚙</button>
     </div>
 `;

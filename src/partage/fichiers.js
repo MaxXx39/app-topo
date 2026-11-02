@@ -30,13 +30,15 @@ export function projetVersFichiers(projet) {
   // Photos des levés (0.77.0) : aussi pour les métrés et les levés libres.
   const metres = projet.metres ? { metres: projet.metres.map(sansImages) } : {};
   const autres = projet.autres ? { autres: projet.autres.map(sansImages) } : {};
+  // Photos des points de contrôle (0.105.0) : chaque photo est elle-même un objet à alléger.
+  const photosControle = projet.photosControle ? { photosControle: sansImages({ photos: projet.photosControle }).photos } : {};
   const plansDxf = (projet.plansDxf ?? []).map((plan) => {
     fichiers.set(`${prefixePlan}${plan.id}${FIN}`, plan.contenu);
     return { ...plan, contenu: null };
   });
   // Le lien vers Drive est propre à chaque appareil : il ne part pas avec le projet.
   const { drive, ...reste } = projet;
-  fichiers.set(FICHIER_PROJET, { ...reste, surfaces, ...mesures, ...metres, ...autres, plansDxf });
+  fichiers.set(FICHIER_PROJET, { ...reste, surfaces, ...mesures, ...metres, ...autres, ...photosControle, plansDxf });
   return fichiers;
 }
 
@@ -50,6 +52,7 @@ export function fichiersVersProjet(fichiers) {
   for (const objet of [...(projet.surfaces ?? []), ...(projet.mesures ?? []), ...(projet.metres ?? []), ...(projet.autres ?? [])]) {
     for (const photo of objet.photos ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});
   }
+  for (const photo of projet.photosControle ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});
   for (const plan of projet.plansDxf ?? []) plan.contenu = fichiers.get(`${prefixePlan}${plan.id}${FIN}`) ?? null;
   return projet;
 }
@@ -60,11 +63,40 @@ export async function comprimer(objet) {
   return new Response(flux).blob();
 }
 
-/** Décomprime un Blob (ou ArrayBuffer) gzip et lit le JSON. */
+/**
+ * Décomprime un Blob (ou ArrayBuffer) gzip et lit le JSON. Lance une erreur lisible si le fichier
+ * est vide ou abîmé (0.103.6 : le navigateur disait seulement « Failed to fetch »). Un fichier déjà
+ * décomprimé en route (JSON lisible tel quel) est accepté.
+ */
 export async function decomprimer(donnees) {
   const blob = donnees instanceof Blob ? donnees : new Blob([donnees]);
-  const flux = blob.stream().pipeThrough(new DecompressionStream('gzip'));
-  return JSON.parse(await new Response(flux).text());
+  const octets = new Uint8Array(await blob.arrayBuffer());
+  if (octets.length === 0) throw new Error('fichier vide sur Drive (envoi interrompu ?)');
+  // Un fichier gzip commence toujours par les octets 1f 8b.
+  const estGzip = octets[0] === 0x1f && octets[1] === 0x8b;
+  let texte;
+  if (estGzip) {
+    try {
+      texte = await new Response(new Blob([octets]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    } catch {
+      throw new Error('fichier abîmé sur Drive (incomplet ?)');
+    }
+  } else texte = new TextDecoder().decode(octets);
+  try {
+    return JSON.parse(texte);
+  } catch {
+    throw new Error('fichier abîmé sur Drive (contenu illisible)');
+  }
+}
+
+/**
+ * Vrai si ce fichier n'a pas de contenu sur cet appareil : plan DXF ou photo illisible quand le
+ * projet a été ouvert depuis Drive. On ne l'envoie jamais (la copie de Drive n'est pas écrasée).
+ */
+export function sansContenu(nom, contenu) {
+  if (nom === FICHIER_PROJET) return false;
+  if (contenu == null) return true;
+  return nom.startsWith(prefixePhoto) && !contenu.image && !contenu.miniature;
 }
 
 /**

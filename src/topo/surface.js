@@ -91,6 +91,12 @@ export function avecPrefixe(nom, prefixe) {
   return texte.toLowerCase().startsWith(prefixe.toLowerCase()) ? texte : `${prefixe}${texte}`;
 }
 
+/** Nom sans son préfixe (le début « LV- » ou « Surf- » est retiré s'il y est, majuscules ignorées). */
+export function sansPrefixe(nom, prefixe) {
+  const texte = String(nom ?? '').trim();
+  return texte.toLowerCase().startsWith(prefixe.toLowerCase()) ? texte.slice(prefixe.length).trim() : texte;
+}
+
 /** D'où vient une surface importée : « LandXML », « DXF » ou « Dessin » (plateforme ou bâtiment dessiné). */
 export function origineSurface(surface) {
   return { dxf: 'DXF', landxml: 'LandXML', dessin: 'Dessin' }[surface.type] ?? '';

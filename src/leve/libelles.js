@@ -52,7 +52,8 @@ export const COULEURS_LIBELLES = [
   ['#6b7280', 'gris', 8],
   ['#2563eb', 'bleu', 5],
   ['#0ea5e9', 'bleu clair', 4],
-  ['#16a34a', 'vert', 3],
+  ['#4ade80', 'vert', 3],
+  ['#166534', 'vert foncé', 94],
   ['#dc2626', 'rouge', 1],
   ['#ea580c', 'orange', 30],
   ['#ca8a04', 'jaune', 2],
@@ -68,14 +69,67 @@ surChangementListes(() => (enCache = null));
 
 const SORTES = ['lignes', 'points', 'aires'];
 
-/**
- * Libellés : ceux de départ (fixes, avec leur couleur choisie), puis ceux ajoutés. Renvoie
- * { lignes, points, aires } ([[abréviation, signification, couleur (facultative)]]), une copie.
- */
-export function lireLibelles() {
+// Couleur habituelle de chaque sorte sur le plan quand le libellé n'a pas de couleur choisie
+// (lignes orange, points vert, aires cyan) : aussi celle des symboles de forme dans Lever.
+export const COULEURS_HABITUELLES = { lignes: '#ea580c', points: '#15803d', aires: '#0891b2' };
+
+// Libellés propres au projet ouvert (0.105.6) : { lignes, points, aires } de [abréviation, signification,
+// couleur, forme]. Ils s'ajoutent à ceux « par défaut » (la liste partagée, valable dans tous les projets).
+let duProjet = { lignes: [], points: [], aires: [] };
+let signatureProjet = JSON.stringify(duProjet);
+let quandProjetChange = null;
+
+/** Libellés du projet qui vient de s'ouvrir ou de changer (appelé par main.js) ; sans effet s'ils sont identiques. */
+export function definirLibellesProjet(libelles) {
+  const propres = Object.fromEntries(SORTES.map((sorte) => [sorte, (libelles?.[sorte] ?? []).map(([a, s, c, f]) => [a, s ?? '', couleurAJour(c ?? ''), f ?? ''])]));
+  const signature = JSON.stringify(propres);
+  if (signature === signatureProjet) return;
+  duProjet = propres;
+  signatureProjet = signature;
+}
+
+/** main.js y range les libellés du projet quand la fenêtre des libellés les change : fonction(libelles). */
+export function surLibellesProjet(fonction) {
+  quandProjetChange = fonction;
+}
+
+/** Libellés propres au projet ouvert (une copie). */
+export function lireLibellesProjet() {
+  return structuredClone(duProjet);
+}
+
+/** Enregistre les libellés propres au projet ouvert (ils partent avec le projet, sur Drive aussi). */
+export function enregistrerLibellesProjet(libelles) {
+  definirLibellesProjet(libelles);
+  quandProjetChange?.(structuredClone(duProjet));
+}
+
+/** Libellés « par défaut » seulement (liste partagée, tous les projets) : { lignes, points, aires }. */
+export function lireLibellesParDefaut() {
   if (!enCache) enCache = assemblerLibelles(lireListesPartagees().libelles ?? ancienneListe());
   return structuredClone(enCache);
 }
+
+/**
+ * Libellés : ceux par défaut (de départ, avec leur couleur choisie, puis ajoutés), puis ceux du projet. Renvoie
+ * { lignes, points, aires } ([[abréviation, signification, couleur, forme]]), une copie. Pour l'écran, les exports et le plan :
+ * par défaut, puis ceux du projet (un projet ne
+ * redonne pas une abréviation déjà par défaut).
+ */
+export function lireLibelles() {
+  const defaut = lireLibellesParDefaut();
+  return Object.fromEntries(SORTES.map((sorte) => [sorte, [...defaut[sorte], ...duProjet[sorte].filter(([a]) => !defaut[sorte].some(([d]) => d === a))]]));
+}
+
+/** Libellés pour la fenêtre de modification : [abréviation, signification, couleur, forme, parDéfaut (vrai / faux)]. */
+export function lireLibellesDetail() {
+  const defaut = lireLibellesParDefaut();
+  return Object.fromEntries(SORTES.map((sorte) => [sorte, [
+    ...defaut[sorte].map((l) => [...l, true]),
+    ...duProjet[sorte].filter(([a]) => !defaut[sorte].some(([d]) => d === a)).map((l) => [...l, false]),
+  ]]));
+}
+
 
 /** Abréviations de départ d'une sorte ('lignes', 'points', 'aires') : elles ne se modifient pas. */
 export function abreviationsDepart(sorte) {
@@ -86,14 +140,23 @@ export function abreviationsDepart(sorte) {
  * Libellés complets à partir de la part partagée { ajoutes, couleurs } : départ (avec couleur),
  * puis ajoutés (sans ceux qui ont le nom d'un libellé de départ).
  */
+// Anciennes couleurs retenues par des libellés déjà enregistrés : remplacées par la nouvelle (0.105.1).
+const ANCIENNES_COULEURS = { '#16a34a': '#4ade80' };
+const couleurAJour = (couleur) => ANCIENNES_COULEURS[couleur] ?? couleur;
+
 export function assemblerLibelles(partage) {
   const resultat = {};
   for (const sorte of SORTES) {
+    // 0.105.5 (Expert) : liste complète modifiable, départ compris ; elle remplace départ + ajoutés.
+    if (Array.isArray(partage?.complet?.[sorte])) {
+      resultat[sorte] = partage.complet[sorte].filter(([a]) => a).map(([a, s, c, f]) => [a, s ?? '', couleurAJour(c ?? ''), f ?? '']);
+      continue;
+    }
     const couleurs = partage?.couleurs?.[sorte] ?? {};
     const formes = partage?.formes?.[sorte] ?? {};
-    const depart = LIBELLES_DEPART[sorte].map(([a, s]) => [a, s, couleurs[a] ?? '', formes[a] ?? '']);
+    const depart = LIBELLES_DEPART[sorte].map(([a, s]) => [a, s, couleurAJour(couleurs[a] ?? ''), formes[a] ?? '']);
     const fixes = abreviationsDepart(sorte);
-    const ajoutes = (partage?.ajoutes?.[sorte] ?? []).filter(([a]) => a && !fixes.has(a)).map(([a, s, c, f]) => [a, s ?? '', c ?? '', f ?? '']);
+    const ajoutes = (partage?.ajoutes?.[sorte] ?? []).filter(([a]) => a && !fixes.has(a)).map(([a, s, c, f]) => [a, s ?? '', couleurAJour(c ?? ''), f ?? '']);
     resultat[sorte] = [...depart, ...ajoutes];
   }
   return resultat;
@@ -104,8 +167,9 @@ export function assemblerLibelles(partage) {
  * gardent que leur couleur et leur forme).
  */
 export function partDesLibelles(libelles) {
-  const partage = { ajoutes: {}, couleurs: {}, formes: {} };
+  const partage = { ajoutes: {}, couleurs: {}, formes: {}, complet: {} };
   for (const sorte of SORTES) {
+    partage.complet[sorte] = (libelles[sorte] ?? []).map(([a, s, c, f]) => [a, s ?? '', c ?? '', f ?? '']);
     const fixes = abreviationsDepart(sorte);
     const liste = libelles[sorte] ?? [];
     partage.ajoutes[sorte] = liste.filter(([a]) => !fixes.has(a)).map(([a, s, c, f]) => [a, s ?? '', c ?? '', f ?? '']);
@@ -121,6 +185,36 @@ export function formeDuNom(nom, libelles = lireLibelles()) {
   if (!decoupe) return '';
   const liste = { P: libelles.points, L: libelles.lignes, A: libelles.aires }[decoupe[1]];
   return (liste ?? []).find(([a]) => a === decoupe[2])?.[3] || '';
+}
+
+/**
+ * Libellés qui manquent à la liste d'après les noms de points d'un projet (0.105.5, anciens projets :
+ * un libellé supprimé est recréé) : { lignes: [abréviations], points: [...], aires: [...] }. Les noms
+ * sans libellé (L-1-3, P-5) et les noms d'un autre genre (C-Stock-1-1) sont ignorés.
+ */
+export function libellesManquants(noms, libelles = lireLibelles()) {
+  const manquants = { lignes: new Set(), points: new Set(), aires: new Set() };
+  const sorte = { L: 'lignes', P: 'points', A: 'aires' };
+  for (const nom of noms) {
+    const decoupe = /^([PLA])-([^-]+)-\d+(-\d+)?$/.exec(String(nom ?? ''));
+    if (!decoupe || /^\d+$/.test(decoupe[2])) continue;
+    const cle = sorte[decoupe[1]];
+    if (!(libelles[cle] ?? []).some(([a]) => a === decoupe[2])) manquants[cle].add(decoupe[2]);
+  }
+  return Object.fromEntries(SORTES.map((cle) => [cle, [...manquants[cle]]]));
+}
+
+/**
+ * Recrée les libellés manquants d'après ces noms de points, comme libellés de ce projet seulement
+ * (pas dans la liste par défaut). Renvoie les libellés du projet complétés, ou null s'il n'en manque pas.
+ */
+export function recreerLibellesManquants(noms) {
+  const manquants = libellesManquants(noms, lireLibelles());
+  if (SORTES.every((sorte) => manquants[sorte].length === 0)) return null;
+  const propres = lireLibellesProjet();
+  for (const sorte of SORTES) for (const abreviation of manquants[sorte]) propres[sorte].push([abreviation, '', '', '']);
+  definirLibellesProjet(propres);
+  return propres;
 }
 
 /** Anciens libellés de cet appareil (avant 0.95.0, « topo-libelles »), en part partagée, ou null. */

@@ -1057,7 +1057,7 @@ svg.plan {
 }
 
 .plan .noms text {
-  font-size: 11.2px;
+  font-size: calc(11.2px * var(--echelle-texte, 1));
   fill: var(--texte);
   paint-order: stroke;
   stroke: #fbfcfb;
@@ -1139,6 +1139,7 @@ body:has(.barre-edition:not([hidden])) .colonne-gauche {
   position: absolute;
   top: 10px;
   left: 10px;
+  max-width: calc(100% - 66px); /* sans recouvrir les boutons +/− du plan */
 }
 
 button.puce {
@@ -1172,7 +1173,7 @@ button.puce {
 
 .plan .noms text.altitude {
   fill: var(--gris);
-  font-size: 10.2px;
+  font-size: calc(10.2px * var(--echelle-texte, 1));
 }
 
 .plan .ligne-rupture {
@@ -2106,8 +2107,15 @@ th.nombre {
 
 .bouton-projet.gestion-projets {
   border: 2px solid var(--sombre);
-  background: var(--surface);
-  color: var(--sombre);
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+/* 0.106.2 : « Ouvrir un projet » au démarrage, même couleur que « Ouvrir projet » de l'onglet Projet */
+.fenetre-choix .bouton-secondaire.choix-ouvrir-projet {
+  border: 2px solid var(--sombre);
+  background: var(--sombre);
+  color: #ffffff;
 }
 
 .actions-projets .bouton-secondaire.actif {
@@ -4111,6 +4119,24 @@ svg.plan,
   flex: none;
 }
 
+.choix-taille {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 0 12px;
+}
+
+.choix-taille .titre-taille {
+  flex: 1 0 100%;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.choix-taille .puce-mode {
+  min-height: 38px;
+  font-size: 0.82rem;
+}
+
 .case-reglage {
   display: flex;
   align-items: center;
@@ -4533,8 +4559,12 @@ button.bouton-retour[data-action='inverserLigne'] {
   font-size: 0.85rem;
 }
 
-.plan-calques .puce + .puce {
-  margin-left: 4px;
+/* Les boutons passent à la ligne avant les boutons +/− du plan (le 3D restait caché dessous sur téléphone). */
+.plan-puces {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Liste des plans DXF (onglet Projet) : œil, nom court modifiable, couleur. */
@@ -7892,11 +7922,16 @@ body.avec-recepteur .bandeaux-recepteur {
 
 /* 0.88.4 : icône Projet de l'en-tête dans un rectangle ambre (plein quand l'onglet Projet est ouvert). */
 .entete .bouton-onglet-projet {
-  width: 44px;
-  height: 40px;
+  width: 57px;
+  height: 52px;
   border: 2px solid var(--ambre);
   border-radius: 10px;
   color: var(--ambre);
+}
+
+.entete .bouton-onglet-projet svg {
+  width: 26px;
+  height: 26px;
 }
 
 .entete .bouton-onglet-projet.actif {
@@ -8116,37 +8151,6 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
 }
 
 /* « Seulement l'élément à implanter » (0.90.1) : une case à cocher, en sarcelle quand elle est cochée. */
-.case-seulement {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0 4px;
-  padding: 4px 2px;
-  border: none;
-  background: none;
-  color: var(--texte, #1b2b36);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.case-seulement .carre-case {
-  display: inline-grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 2px solid #0d9488;
-  border-radius: 5px;
-  background: #ffffff;
-  color: #ffffff;
-  font-size: 0.9rem;
-  font-weight: 900;
-}
-
-.case-seulement.actif .carre-case {
-  background: #0d9488;
-}
-
 /* Grille des coupes en direct (0.90.1, Expert) : gris discret, sous le profil. */
 .coupe-directe .grille-coupe line,
 .coupe-directe line.grille-coupe {
@@ -8286,6 +8290,28 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   color: #ffffff;
 }
 
+/* 0.106 : flèche pour développer (au lieu de la roue crantée) */
+.roue-menu::before {
+  content: '▾';
+}
+
+.roue-menu[aria-expanded='true']::before {
+  content: '▴';
+}
+
+/* 0.106 : menu du plan ouvert (Fond, DXF, Afficher) : bouton surligné, plan grisé */
+.plan-calques .puce.actif {
+  background: var(--sombre);
+  color: #ffffff;
+}
+
+.plan-cadre.menu-plan-ouvert svg.plan,
+.plan-cadre.menu-plan-ouvert .plan-dxf-canvas,
+.plan-cadre.menu-plan-ouvert .plan-fond {
+  filter: grayscale(0.8) opacity(0.55);
+  transition: filter 0.15s;
+}
+
 .titre-avec-roue {
   display: flex;
   align-items: center;
@@ -8341,7 +8367,7 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
 }
 
 .plan .icone-photo-plan {
-  font-size: 11px;
+  font-size: calc(11px * var(--echelle-texte, 1));
 }
 
 .fenetre-photo img {
@@ -8756,4 +8782,85 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   font-size: 0.75rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* Nom avec un préfixe fixe (0.104.0) : « LV- » ou « Surf- » à gauche, qu'on ne peut ni modifier ni effacer. */
+.champ-prefixe {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+}
+
+.champ-prefixe .prefixe-nom {
+  flex: none;
+  padding: 0 4px 0 8px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--bordure);
+  border-right: none;
+  border-radius: var(--rayon) 0 0 var(--rayon);
+  background: var(--fond-doux, #eef1ef);
+  font-weight: 700;
+  color: var(--gris);
+  user-select: none;
+}
+
+.champ-prefixe .prefixe-nom + input {
+  flex: 1;
+  min-width: 0;
+  border-radius: 0 var(--rayon) var(--rayon) 0;
+}
+
+/* Photos d'un point de contrôle (0.105.0) : petit bouton appareil photo sur la case du point. */
+.cellule-point-controle {
+  position: relative;
+  display: flex;
+}
+
+.cellule-point-controle .point-controle {
+  flex: 1;
+  padding-right: 40px;
+}
+
+.photo-point-controle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1.5px solid var(--ambre);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--sombre);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.photo-point-controle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+/* Photos des points dans « Contenu du projet » : miniatures qui s'ouvrent en grand. */
+.photos-de-la-liste .miniature-photo {
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.photos-de-la-liste .miniature-photo img {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
 }

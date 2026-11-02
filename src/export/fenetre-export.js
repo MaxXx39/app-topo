@@ -14,10 +14,11 @@ let derniereAdresse = null;
 
 /**
  * Ouvre la fenêtre. titre : ce qu'on exporte ; formats : [[cle, titre, detail]] ou null ;
- * fabriquer(format) : { blob, nom } (le fichier) ; enregistrer(blob, nom) : téléchargement ;
+ * options : [{ cle, texte, formats }] cases à cocher (visibles pour ces formats) ;
+ * fabriquer(format, choix) : { blob, nom } (le fichier ; choix = { cle: vrai / faux }) ; enregistrer(blob, nom) : téléchargement ;
  * message(texte) : petit message à l'écran ; quandFerme() : appelé quand la fenêtre se ferme (fichier suivant…).
  */
-export function ouvrirFenetreExport({ titre, formats = null, fabriquer, enregistrer, message, quandFerme = null }) {
+export function ouvrirFenetreExport({ titre, formats = null, options = [], fabriquer, enregistrer, message, quandFerme = null }) {
   const adresses = lireListesPartagees().adresses;
   let format = formats?.[0]?.[0] ?? null;
   const fenetre = document.createElement('dialog');
@@ -31,6 +32,7 @@ export function ouvrirFenetreExport({ titre, formats = null, fabriquer, enregist
         ${formats.map(([cle, nom, detail]) => `<label class="puce-format ${cle === format ? 'actif' : ''}">
           <input type="radio" name="format-export" value="${cle}" ${cle === format ? 'checked' : ''} /><strong>${nom}</strong><span>${echapper(detail ?? '')}</span></label>`).join('')}
       </div>` : ''}
+    ${options.map((o) => `<label class="case option-export" data-option="${echapper(o.cle)}" ${o.formats.includes(format) ? '' : 'hidden'}><input type="checkbox" data-option-case="${echapper(o.cle)}" /> ${echapper(o.texte)}</label>`).join('')}
     <div class="boutons-choix">
       <button type="button" class="bouton" data-cle="enregistrer"><strong>Enregistrer</strong><span>sur cet appareil</span></button>
       <div class="envoi-mail seulement-intermediaire">
@@ -44,6 +46,7 @@ export function ouvrirFenetreExport({ titre, formats = null, fabriquer, enregist
   fenetre.addEventListener('change', (evenement) => {
     if (evenement.target.name !== 'format-export') return;
     format = evenement.target.value;
+    for (const o of options) fenetre.querySelector(`[data-option="${o.cle}"]`).hidden = !o.formats.includes(format);
     for (const puce of fenetre.querySelectorAll('.puce-format')) puce.classList.toggle('actif', puce.contains(evenement.target));
   });
   fenetre.addEventListener('click', async (evenement) => {
@@ -54,7 +57,8 @@ export function ouvrirFenetreExport({ titre, formats = null, fabriquer, enregist
       fenetre.close();
       return;
     }
-    const { blob, nom } = await fabriquer(format);
+    const choix = Object.fromEntries(options.map((o) => [o.cle, o.formats.includes(format) && fenetre.querySelector(`[data-option-case="${o.cle}"]`).checked]));
+    const { blob, nom } = await fabriquer(format, choix);
     if (cle === 'enregistrer') {
       enregistrer(blob, nom);
       message(`« ${nom} » enregistré`);

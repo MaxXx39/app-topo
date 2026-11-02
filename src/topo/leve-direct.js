@@ -24,8 +24,8 @@ import { nomsDuRecollement } from './reseau.js';
 /** Rôles d'un point levé : [clé, nom affiché]. */
 export const ROLES_LEVE = [
   ['contour', 'Contour'],
-  ['ligne', 'Ligne de rupture'],
-  ['isole', 'Point isolé'],
+  ['ligne', 'Ligne'],
+  ['isole', 'Point'],
 ];
 
 /** Libellé du contour (dans C-Stock-1-1). */

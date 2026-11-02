@@ -19,6 +19,7 @@ import { longueurCoupe } from '../topo/coupe.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne } from '../leve/libelles.js';
 // Logo Perrin, dans le fichier PDF (image JPEG de 406 × 104 pixels, écrite dans le code).
 import logoPerrin from '../assets/logo-perrin.jpg?inline';
+import { mini, maxi } from '../outils/bornes.js';
 
 // Calques du plan imprimé, et leur état par défaut.
 export const CALQUES_PDF = {
@@ -176,7 +177,7 @@ export function zoneDe(sommets) {
   if (sommets.length === 0) return null;
   const ests = sommets.map((p) => p.est);
   const nords = sommets.map((p) => p.nord);
-  return { estMin: Math.min(...ests), estMax: Math.max(...ests), nordMin: Math.min(...nords), nordMax: Math.max(...nords) };
+  return { estMin: mini(ests), estMax: maxi(ests), nordMin: mini(nords), nordMax: maxi(nords) };
 }
 
 export const PHOTOS_PAR_PAGE = 4;

@@ -129,14 +129,17 @@ describe('synchronisation avec Drive', () => {
     expect(verrouActif({ vu: '2026-10-23T09:44:00.000Z' }, maintenant)).toBe(false);
     expect(verrouActif({ depuis: '2026-10-23T08:00:00.000Z' }, maintenant)).toBe(false); // ancien verrou sans « vu »
 
-    // Tablette éteinte depuis 2 heures : le bureau envoie sans être refusé, et prend le verrou.
+    // Tablette éteinte depuis 2 heures : le bureau n'est pas refusé, et prend le verrou.
     const drive = fauxDrive();
     const projet = projetEssai();
     const { memoire } = await creerSynchro(drive, MAX).envoyer(projet, null, 'Essai');
     const dossier = drive.fichiers.get(memoire.dossierId);
     dossier.appProperties.verrouVu = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
     const bureau = creerSynchro(drive, BUREAU);
-    expect((await bureau.envoyer(projet, null)).memoire).toBeTruthy();
+    // Sans avoir reçu la version de Max, le bureau n'écrase rien (0.103.4) ; après l'avoir reçue, il envoie.
+    expect(await bureau.envoyer(projet, null)).toMatchObject({ changeAilleurs: true });
+    const lu = await bureau.telecharger(memoire.dossierId);
+    expect((await bureau.envoyer(lu.projet, lu.memoire)).memoire).toBeTruthy();
     expect(dossier.appProperties.verrouPar).toBe(BUREAU.id);
     // Max se réveille : son signe de vie voit que le bureau a la main.
     expect((await creerSynchro(drive, MAX).signeDeVie(memoire.dossierId)).repris).toMatchObject({ nom: 'PC bureau' });

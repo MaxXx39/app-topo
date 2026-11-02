@@ -44,6 +44,9 @@ export function brancherChoixExport(zone, obtenirGroupes) {
   };
   zone.addEventListener('toggle', (evenement) => {
     if (!evenement.target.matches('.choix-export')) return;
+    // Le bloc redessiné (déjà ouvert) renvoie lui aussi « toggle » : sans ce test, il se redessinait
+    // sans fin et les touchers sur les cases étaient perdus.
+    if (evenement.target.open === ouvert) return;
     ouvert = evenement.target.open;
     if (ouvert) rafraichir(); // la liste du moment (levés, surfaces… ajoutés entre-temps)
   }, true);

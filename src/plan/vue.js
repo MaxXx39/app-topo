@@ -17,12 +17,21 @@ export function cadrerSurPoints(points, largeur, hauteur, marge = 30) {
   if (points.length === 0) {
     return { echelle: 1, estCentre: 0, nordCentre: 0, largeur, hauteur };
   }
-  const ests = points.map((p) => p.est);
-  const nords = points.map((p) => p.nord);
-  const estMin = Math.min(...ests);
-  const estMax = Math.max(...ests);
-  const nordMin = Math.min(...nords);
-  const nordMax = Math.max(...nords);
+  // Bornes calculées par une boucle (0.106.1) : avec Math.min(...liste), une grande surface importée
+  // (des dizaines de milliers de sommets) dépassait la pile du navigateur et figeait le plan.
+  // Les points sans coordonnées lisibles sont ignorés.
+  let estMin = Infinity;
+  let estMax = -Infinity;
+  let nordMin = Infinity;
+  let nordMax = -Infinity;
+  for (const p of points) {
+    if (!Number.isFinite(p?.est) || !Number.isFinite(p?.nord)) continue;
+    if (p.est < estMin) estMin = p.est;
+    if (p.est > estMax) estMax = p.est;
+    if (p.nord < nordMin) nordMin = p.nord;
+    if (p.nord > nordMax) nordMax = p.nord;
+  }
+  if (estMin === Infinity) return { echelle: 1, estCentre: 0, nordCentre: 0, largeur, hauteur };
 
   // On évite une division par zéro si tous les points sont alignés ou confondus.
   const etendueEst = Math.max(estMax - estMin, 1);

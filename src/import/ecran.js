@@ -14,6 +14,7 @@ import { titreSection } from '../outils/section.js';
 import { COULEURS_PLANS } from '../plan/dxf-canvas.js';
 import { estEnMn95 } from '../topo/dxf-plan.js';
 import { rotationLisible } from '../topo/recalage.js';
+import { prefixeDuNom, sansPrefixe } from '../topo/surface.js';
 import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '../outils/formulaire-point.js';
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
 import { COULEURS_LISTES } from '../plan/listes-points.js';
@@ -93,7 +94,8 @@ export function creerEcranImport(conteneur, contenu, actions) {
       actions.commencerPointage();
       return;
     }
-    if (action === 'supprimer-leve') actions.supprimerLeve(id);
+    if (action === 'voir-photo') actions.voirPhoto(id);
+    else if (action === 'supprimer-leve') actions.supprimerLeve(id);
     else if (action === 'supprimer-surface-projet') actions.supprimerSurfaceProjet(id);
     else if (action === 'voir-plan') actions.voirPlanDxf(id);
     else if (action === 'supprimer-plan') actions.supprimerPlanDxf(id);
@@ -113,7 +115,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
     } else if (cible.dataset.champ === 'couleur-liste') actions.colorerListe(cible.dataset.id, cible.value || null);
     else if (cible.dataset.champ === 'leve-actif') actions.choisirLeve(cible.value);
     else if (cible.dataset.champ === 'nom-leve') actions.renommerLeve(cible.dataset.id, cible.value.trim());
-    else if (cible.dataset.champ === 'nom-surface-projet') actions.renommerSurfaceProjet(cible.dataset.id, cible.value.trim());
+    else if (cible.dataset.champ === 'nom-surface-projet') actions.renommerSurfaceProjet(cible.dataset.id, cible.value.trim()); // (main remet le préfixe)
     else if (cible.dataset.champ === 'fichier-points' && cible.files[0]) {
       await actions.importerPoints(cible.files[0]);
       cible.value = '';
@@ -272,13 +274,34 @@ function ligneListe(projet, leve, nature = null) {
         <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
       </div>
       ${tableauPoints(leve.points, 'Voir les points')}
+      ${photosDesPoints(photosDuLeve(projet, leve))}
     </div>`;
+}
+
+/** Photos rattachées aux points d'un levé (rangées avec le levé, voir Lever), seulement celles d'un point de la liste. */
+function photosDuLeve(projet, leve) {
+  const proprietaire = [...(projet.surfaces ?? []), ...(projet.metres ?? []), ...(projet.autres ?? []), ...(projet.reseaux ?? [])].find((o) => o.leveId === leve.id);
+  const noms = new Set(leve.points.map((p) => p.nom));
+  return (proprietaire?.photos ?? []).filter((photo) => photo.point && noms.has(photo.point));
+}
+
+/** Photos des points (miniatures repliables : toucher une photo l'ouvre en grand, avec le nom du point). */
+function photosDesPoints(photos) {
+  if (photos.length === 0) return '';
+  return `<details class="photos-de-la-liste">
+      <summary>Photos des points (${photos.length})</summary>
+      <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
+          <button type="button" class="miniature-photo" data-action="voir-photo" data-id="${photo.id}" aria-label="Voir la photo de ${echapper(photo.point)}"><img src="${photo.miniature}" alt="${echapper(photo.legende || photo.point)}" /></button>
+          <span class="point-photo">📷 ${echapper(photo.point)}</span>
+          ${photo.legende ? `<span class="aide">${echapper(photo.legende)}</span>` : ''}
+        </figure>`).join('')}</div>
+    </details>`;
 }
 
 /** Surface importée (LandXML, DXF 3D) : nom à changer, fichier d'origine, supprimer. */
 function ligneSurfaceProjet(surface) {
   return `<div class="ligne-leve liste-surface-projet">
-      <input type="text" class="nom-leve" data-champ="nom-surface-projet" data-id="${surface.id}" value="${echapper(surface.nom)}" aria-label="Nom de la surface" />
+      <div class="champ-prefixe"><span class="prefixe-nom">${echapper(prefixeDuNom(surface))}</span><input type="text" class="nom-leve" data-champ="nom-surface-projet" data-id="${surface.id}" value="${echapper(sansPrefixe(surface.nom, prefixeDuNom(surface)))}" aria-label="Nom de la surface (après ${echapper(prefixeDuNom(surface))})" /></div>
       <div class="ligne-outils">
         <span class="aide">${[surface.type === 'dxf' ? 'DXF' : 'LandXML', surface.nomFichier].filter(Boolean).map(echapper).join(' · ')} · ${surface.faces?.length ?? 0} triangles</span>
         <button type="button" class="bouton-lien" data-action="supprimer-surface-projet" data-id="${surface.id}">supprimer</button>
@@ -348,6 +371,7 @@ function listePointsControle(projet) {
       <strong>Points de contrôle</strong>
       <div class="ligne-outils"><span class="aide">${points.length} points</span></div>
       ${tableauPoints(points, 'Voir les points de contrôle')}
+      ${photosDesPoints((projet.photosControle ?? []).filter((photo) => points.some((p) => p.id === photo.pointId)))}
     </div>`;
 }
 

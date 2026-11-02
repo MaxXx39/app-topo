@@ -18,9 +18,10 @@ const ACCROCHES_CALE = [['point', 'Point'], ['sommet', 'Sommet DXF'], ['milieu',
 /**
  * Crée la barre dans "cadre" (le cadre du plan). actions : choisirAccroche(mode), choisirAccrocheCale(mode),
  * ajouterPaire({ est, nord }) (tapés), prendreAuRx2(), basculerTaper(), oublierChoix(),
- * basculerPaire(index, actif), enleverPaire(index), appliquer(), annulerRecalage(), fermer().
+ * basculerPaire(index, actif), enleverPaire(index), validerCandidat(), appliquer(), annulerRecalage(), fermer().
  * Renvoie { afficher(etat), enlever() } ; etat : { nomPlan, accroche, accrocheCale, choix ({ x, y } ou null),
- * taper (champs Est / Nord ouverts), rx2 (vrai dans l'appli Android), paires, dejaRecale }.
+ * candidat (point touché, pas encore validé : { x, y, nom } ou null), taper (champs Est / Nord ouverts),
+ * rx2 (vrai dans l'appli Android), paires }.
  */
 export function creerBarreRecalage(cadre, actions) {
   const barre = document.createElement('div');
@@ -56,11 +57,12 @@ export function creerBarreRecalage(cadre, actions) {
         </div>
         ${texteEtape(etape)}
         ${etape.sorte === 'dxf' ? accrochesDxf(etat) : positionCalee(etat)}
+        ${pointTouche(etat.candidat)}
         ${etat.paires.length > 0 ? tablePaires(etat.paires, helmert) : ''}
         ${helmert ? parametres(helmert) : ''}
         <div class="ligne-barre-pointage">
           <button type="button" class="bouton" data-action="appliquer" ${helmert && !helmert.erreur ? '' : 'disabled'}>Appliquer</button>
-          ${etat.dejaRecale ? '<button type="button" class="bouton-lien" data-action="annulerRecalage">annuler le recalage</button>' : ''}
+          <button type="button" class="bouton-lien" data-action="annulerRecalage">annuler le recalage</button>
         </div>`;
     },
     enlever() {
@@ -76,12 +78,24 @@ function texteEtape(etape) {
   if (etape.sorte === 'dxf') {
     texte = etape.pret
       ? `Recalage prêt : vérifie les écarts, puis « Appliquer ». Ou, pour contrôler, touche un ${ordinal} point sur le DXF à recaler.`
-      : `Touche le ${ordinal} point sur le DXF à recaler`;
+      : `Touche le ${ordinal} point sur le DXF à recaler (une croix le montre), puis « Valider »`;
   } else {
-    texte = `Position calée du ${ordinal} point : touche un point (levé ou de contrôle) ou une accroche d'un autre DXF, ou prends la position du GNSS`;
+    texte = `Position calée du ${ordinal} point : touche un point (levé ou de contrôle) ou une accroche d'un autre DXF (une croix le montre, puis « Valider »), ou prends la position du GNSS`;
   }
   const contexte = etape.pret && etape.sorte === 'dxf' ? `${etape.numero} (facultative)` : `${etape.numero} / ${etape.total}`;
   return `<p class="etape-recalage etape-${etape.sorte}"><span class="numero-etape">Étape ${contexte}</span>${texte}</p>`;
+}
+
+/** Point touché sur le plan (croix) : ses coordonnées et « Valider » (0.104.0). */
+function pointTouche(candidat) {
+  if (!candidat) return '';
+  const nom = candidat.nom ? `${echapper(candidat.nom)} · ` : '';
+  return `<div class="choix-pointage point-touche-recalage">
+    <span class="coordonnees-pointage">Point touché (croix) : ${nom}x ${formaterNombre(candidat.x)} · y ${formaterNombre(candidat.y)}</span>
+    <div class="ligne-barre-pointage">
+      <button type="button" class="bouton" data-action="validerCandidat">Valider</button>
+    </div>
+  </div>`;
 }
 
 /** Étapes impaires : accroche sur le DXF à recaler. */

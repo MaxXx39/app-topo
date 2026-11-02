@@ -2,7 +2,7 @@
 // au doigt (téléphone) ou à la souris (ordinateur).
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
 import { bulle } from '../aide/bulles.js';
-import { aAcces } from '../reglages/reglages.js';
+import { aAcces, rayonFormes, echelleTexte } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
@@ -24,6 +24,7 @@ import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
 import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
 import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, valeurPrincipale, couleurDeMesure } from '../mesures/valeurs.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
+import { ajouterTous } from '../outils/bornes.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -102,6 +103,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       <svg class="plan" role="img" aria-label="Plan des points"></svg>
       <div class="plan-attribution" hidden></div>
       <div class="plan-calques">
+        <div class="plan-puces">
         <button type="button" class="puce" data-action="calques" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5" /></svg>
           Fond
@@ -120,12 +122,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         </button>
         <button type="button" class="puce seulement-expert" data-action="vue-3d" title="Vue 3D des levés et surfaces montrés">3D</button>
         ${bulle('plan')}
+        </div>
         <div class="menu-plans-dxf" hidden></div>
         <div class="menu-plans-dxf menu-listes-points" hidden></div>
         <div class="menu-calques" hidden>
           <div class="ligne-menu-plan">
             <label class="case"><input type="checkbox" data-calque="fondSatellite" /> Photo aérienne (swisstopo)</label>
-            <button type="button" class="roue-menu" data-roue="photo" aria-expanded="false" title="Transparence" aria-label="Transparence de la photo">⚙</button>
+            <button type="button" class="roue-menu" data-roue="photo" aria-expanded="false" title="Transparence" aria-label="Transparence de la photo"></button>
           </div>
           <label class="reglette-transparence" data-zone-roue="photo" hidden>Transparence <span data-vivant="transparence">0 %</span>
             <input type="range" min="0" max="100" step="5" value="0" data-calque="transparencePhoto" /></label>
@@ -313,21 +316,23 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const groupeNoms = creerElement('g', { class: 'noms' });
     // Couleur choisie pour le libellé du nom (P-RG-1 : regard en noir…), à la place de celle du rôle.
     const libelles = lireLibelles();
+    const rayon = rayonFormes(); // taille des formes (réglage de l'appareil)
+    const echelle = echelleTexte(); // taille du texte (réglage de l'appareil)
     for (const { point, x, y } of visibles) {
       if (calques.points || rangs.has(point.nom)) {
         // Forme choisie pour le libellé (0.97.0) : rond plein, sinon carré, triangle, croix…
         const forme = formeDuNom(point.nom, libelles);
-        const trace = cheminForme(forme, x, y, 3.5);
+        const trace = cheminForme(forme, x, y, rayon);
         const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}`;
-        const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: 3.5, class: classe });
+        const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: rayon, class: classe });
         // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
-        const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? couleursPoints.get(point);
+        const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
         if (couleur) rond.style.color = couleur;
         groupePoints.append(rond);
       }
       if (rangs.has(point.nom)) {
         // Point de la liste en cours : entouré, avec son numéro d'ordre.
-        groupePoints.append(creerElement('circle', { cx: x, cy: y, r: 8, class: 'selection' }));
+        groupePoints.append(creerElement('circle', { cx: x, cy: y, r: rayon + 4.5, class: 'selection' }));
         const rang = creerElement('text', { x: x - 5, y: y + 16, class: 'rang', 'text-anchor': 'end' });
         rang.textContent = rangs.get(point.nom);
         groupeNoms.append(rang);
@@ -348,8 +353,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         visibles.map(({ x, y }, i) => ({
           x,
           y,
-          largeur: Math.max(...textes[i].map((t) => t.length)) * 6.6,
-          hauteur: textes[i].length * 13,
+          largeur: Math.max(...textes[i].map((t) => t.length)) * 6.6 * echelle,
+          hauteur: textes[i].length * 13 * echelle,
         })),
       );
       places.forEach((place, i) => {
@@ -357,7 +362,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         textes[i].forEach((texte, ligne) => {
           const element = creerElement('text', {
             x: place.x,
-            y: place.y - (textes[i].length - 1 - ligne) * 13 - 2,
+            y: place.y - (textes[i].length - 1 - ligne) * 13 * echelle - 2,
             'text-anchor': place.aGauche ? 'end' : 'start',
             class: calques.noms && ligne === 0 ? '' : 'altitude',
           });
@@ -994,13 +999,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (!estVisible(stock)) return;
       const triangles = dessin.resultats[index]?.trianglesDessus ?? [];
       const importee = stock.type === 'landxml' || stock.type === 'dxf';
-      if (importee ? calques.couleursAltitudeImport : calques.couleursAltitude) pourCouleurs.push(...triangles);
-      if (!importee && calques.courbes) pourCourbes.push(...triangles);
+      if (importee ? calques.couleursAltitudeImport : calques.couleursAltitude) ajouterTous(pourCouleurs, triangles);
+      if (!importee && calques.courbes) ajouterTous(pourCourbes, triangles);
     });
     // La surface affichée (onglet Calculs › Surfaces) est aussi coloriée, et les aires mesurées (onglet Calculs › Mesures).
     const autres = [...(dessin.surface?.triangles ?? []), ...(dessin.mesures ?? []).flatMap(({ resultat }) => resultat?.triangles ?? [])];
-    if (calques.couleursAltitude) pourCouleurs.push(...autres);
-    if (calques.courbes) pourCourbes.push(...autres);
+    if (calques.couleursAltitude) ajouterTous(pourCouleurs, autres);
+    if (calques.courbes) ajouterTous(pourCourbes, autres);
     const triangles = [...pourCouleurs, ...pourCourbes];
     if (triangles.length === 0) return;
     const plage = plageAltitudes(triangles);
@@ -1274,7 +1279,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
-  function toutVoir() {
+  function toutVoir(surTout = false) {
     const { largeur, hauteur } = taille();
     if (largeur === 0 || hauteur === 0) {
       // Plan caché (autre onglet) : on recadrera quand il s'affichera.
@@ -1282,6 +1287,27 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       return;
     }
     recadrerQuandVisible = false;
+    // Bouton « Tout voir » (0.106.1) : tous les éléments montrés (points, surfaces, plans DXF), sans
+    // tenir compte de la position du récepteur.
+    if (surTout) {
+      let elements = [
+        ...points,
+        ...(dessin?.stocks ?? []).filter((s) => !dessin.cachees?.has(s)).flatMap((s) => s.points ?? []),
+        ...(plansDxf.length > 0 ? coinsDesPlans(plansDxf) : []),
+      ].filter((p) => Number.isFinite(p?.est) && Number.isFinite(p?.nord));
+      // Un plan DXF pas encore recalé (coordonnées locales, près de 0 / 0) ferait un cadre de
+      // plusieurs centaines de km : s'il y a des éléments en Suisse (MN95), on ne garde qu'eux.
+      const enSuisse = elements.filter((p) => p.est > 2400000 && p.est < 2900000 && p.nord > 1050000 && p.nord < 1350000);
+      if (enSuisse.length > 0) elements = enSuisse;
+      if (elements.length > 0) {
+        vue = elements.length === 1
+          ? { echelle: largeur / 60, estCentre: elements[0].est, nordCentre: elements[0].nord, largeur, hauteur }
+          : cadrerSurPoints(elements, largeur, hauteur);
+        dessiner();
+        return;
+      }
+    }
+    // Cadrage automatique (ouverture, premiers points) : comme avant 0.106.
     // Levé avec le récepteur, encore 0 ou 1 point : environ 60 m de large autour du point
     // (ou de la position du récepteur), plutôt qu'un zoom extrême sur un seul point.
     // Sans point : sur la position du récepteur, sinon sur les plans DXF ; sinon pas encore de vue
@@ -1305,7 +1331,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // --- Boutons ---
   conteneur.querySelector('[data-action="tout-voir"]').addEventListener('click', () => {
     changerSuivi('libre');
-    toutVoir();
+    toutVoir(true);
   });
   conteneur.querySelector('[data-action="zoom-plus"]').addEventListener('click', () => zoomerAuCentre(1.5));
   conteneur.querySelector('[data-action="zoom-moins"]').addEventListener('click', () => zoomerAuCentre(1 / 1.5));
@@ -1428,6 +1454,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
     dessiner();
   }
+  // 0.106 : un menu ouvert (Fond, DXF, Afficher) = bouton surligné + plan un peu grisé, pour comprendre
+  // qu'on est dans ce menu.
+  function signalerMenuOuvert() {
+    const liens = [[boutonCalques, menuCalques], [boutonPlans, menuPlans], [boutonListes, menuListes]];
+    for (const [bouton, menu] of liens) bouton.classList.toggle('actif', !menu.hidden);
+    cadre.classList.toggle('menu-plan-ouvert', liens.some(([, menu]) => !menu.hidden));
+  }
+  const veilleMenus = new MutationObserver(signalerMenuOuvert);
+  for (const menu of [menuCalques, menuPlans, menuListes]) veilleMenus.observe(menu, { attributes: true, attributeFilter: ['hidden'] });
   menuCalques.addEventListener('change', (evenement) => {
     if (evenement.target.dataset.calque) changerCalque(evenement.target);
   });
@@ -1532,7 +1567,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function titreSection(section, titre) {
     const reglages = REGLAGES_SECTIONS[section] ?? [];
     const niveau = reglages.length > 0 && reglages.every(([, , n]) => n === 'expert') ? 'seulement-expert' : '';
-    const roue = reglages.length > 0 ? `<button type="button" class="roue-menu ${niveau}" data-roue="${section}" aria-expanded="false" title="Réglages" aria-label="Réglages ${titre}">⚙</button>` : '';
+    const roue = reglages.length > 0 ? `<button type="button" class="roue-menu ${niveau}" data-roue="${section}" aria-expanded="false" title="Réglages" aria-label="Réglages ${titre}"></button>` : '';
     return `<div class="titre-partie-menu titre-avec-roue section-menu-${section}"><span>${titre}</span>${roue}</div>${reglagesSection(section)}`;
   }
   let signatureListes = null;
@@ -1753,11 +1788,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function dessinerPhotos() {
     if (!vue || photos.length === 0) return;
     const groupe = creerElement('g', { class: 'photos-plan' });
+    const echelle = echelleTexte();
     for (const photo of photos) {
       const ecran = versEcran(photo.est, photo.nord, vue);
       const { x, y } = decalagePhoto(ecran.x, ecran.y);
-      groupe.append(creerElement('rect', { x: x - 9, y: y - 8, width: 18, height: 15, rx: 4, class: 'fond-photo-plan' }));
-      const texte = creerElement('text', { x, y: y + 4, 'text-anchor': 'middle', class: 'icone-photo-plan' });
+      // Le logo suit la taille du texte du plan (réglage de l'appareil).
+      groupe.append(creerElement('rect', { x: x - 9 * echelle, y: y - 8 * echelle, width: 18 * echelle, height: 15 * echelle, rx: 4 * echelle, class: 'fond-photo-plan' }));
+      const texte = creerElement('text', { x, y: y + 4 * echelle, 'text-anchor': 'middle', class: 'icone-photo-plan' });
       texte.textContent = '📷';
       groupe.append(texte);
     }
