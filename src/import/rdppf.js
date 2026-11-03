@@ -4,7 +4,7 @@
 // contient ; avec GEOMETRY=true, son contour. Le cercle est couvert par une grille de points ;
 // un point déjà dans une parcelle trouvée n'est pas redemandé. Essayé à l'aveugle : les
 // variantes d'adresse (EN = version 2, XY = version 1) sont essayées dans l'ordre.
-import { grilleDuCercle, pasDeGrille, dansAnneau, contoursDeReponse, egridsDuTexte } from '../topo/cadastre.js';
+import { grilleDuCercle, pasDeGrille, dansAnneau, contoursDeReponse, egridsDuTexte, contourDuExtrait } from '../topo/cadastre.js';
 
 export const ADRESSE_RDPPF_VD = 'https://www.rdppf.vd.ch/ws/RdppfSVC.svc';
 const POINTS_MAX = 150; // demandes au plus pour un cercle
@@ -31,6 +31,7 @@ export async function telechargerRdppf(centre, rayon, progres = () => {}, cherch
   let derniere = '';
   let demandes = 0;
   const raisons = [];
+  const egridsFaits = new Set();
   for (const [n, [est, nord]] of grille.entries()) {
     if (anneaux.some((a) => dansAnneau([est, nord], a))) continue;
     progres(`Cadastre Vaud (RDPPF) : point ${n + 1} / ${grille.length}, ${anneaux.length} parcelle(s)…`);
@@ -58,7 +59,15 @@ export async function telechargerRdppf(centre, rayon, progres = () => {}, cherch
         continue;
       }
       variante = i;
-      if (contours.length === 0) derniere = `parcelle ${egrids[0]} trouvée mais sans contour (« ${texte.replace(/\s+/g, ' ').slice(0, 120)} »)`;
+      // 0.112.8 : Vaud répond sans contour (essai du 03.11) : on demande l'extrait de chaque parcelle.
+      if (contours.length === 0) {
+        for (const egrid of egrids) {
+          if (egridsFaits.has(egrid)) continue;
+          egridsFaits.add(egrid);
+          progres(`Cadastre Vaud (RDPPF) : contour de la parcelle ${egrid}…`);
+          contours.push(...(await contourParExtrait(chercher, base, egrid)));
+        }
+      }
       for (const anneau of contours) {
         const cle = anneau.slice(0, 3).map((p) => p.map((v) => v.toFixed(2)).join(',')).join(';') + anneau.length;
         if (vus.has(cle)) continue;
@@ -83,4 +92,44 @@ export function raisonDuService(texte) {
     ?? /"message"\s*:\s*"([^"]*)"/i.exec(texte)?.[1];
   const net = (message ?? texte.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
   return `« ${net.slice(0, 300)} »`;
+}
+
+/** Adresses de l'extrait RDPPF d'une parcelle (avec la géométrie), à essayer dans l'ordre. */
+export function adressesExtrait(base, egrid) {
+  return [
+    `${base}/extract/json/?EGRID=${egrid}&GEOMETRY=true`,
+    `${base}/extract/json/geometry/?EGRID=${egrid}`,
+    `${base}/extract/reduced/json/geometry/${egrid}`,
+    `${base}/extract/xml/?EGRID=${egrid}&GEOMETRY=true`,
+  ];
+}
+
+let varianteExtrait = null; // variante d'adresse de l'extrait qui a marché (gardée pour la suite)
+
+/** Contour d'une parcelle par son extrait RDPPF ; erreur claire (raisons du service) sinon. */
+async function contourParExtrait(chercher, base, egrid) {
+  const adresses = adressesExtrait(base, egrid);
+  const ordre = varianteExtrait === null ? adresses.map((_, i) => i) : [varianteExtrait, ...adresses.map((_, i) => i).filter((i) => i !== varianteExtrait)];
+  const raisons = [];
+  for (const i of ordre) {
+    let texte;
+    try {
+      const reponse = await chercher(adresses[i]);
+      texte = await reponse.text();
+      if (!reponse.ok) {
+        raisons.push(`erreur ${reponse.status} : ${raisonDuService(texte)} (${adresses[i].replace(base, '')})`);
+        continue;
+      }
+    } catch (erreur) {
+      raisons.push(`${erreur.message} (${adresses[i].replace(base, '')})`);
+      continue;
+    }
+    const anneaux = contourDuExtrait(texte);
+    if (anneaux.length > 0) {
+      varianteExtrait = i;
+      return anneaux;
+    }
+    raisons.push(`extrait sans contour « ${texte.replace(/\s+/g, ' ').slice(0, 150)} » (${adresses[i].replace(base, '')})`);
+  }
+  throw new Error(`service RDPPF de Vaud, parcelle ${egrid} : ${raisons.join(' | ')}`);
 }

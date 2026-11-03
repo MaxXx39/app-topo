@@ -257,3 +257,49 @@ export function anneauxDuWkt(texte) {
   }
   return anneaux;
 }
+
+/**
+ * Contour de la parcelle dans un extrait RDPPF (0.112.8) : seulement la partie « RealEstate »
+ * › « Limit » (l'extrait contient aussi les restrictions, avec leurs propres géométries).
+ * JSON (contour en coordonnées, GML ou WKT) ou XML. Renvoie les anneaux, [] si rien.
+ */
+export function contourDuExtrait(texte) {
+  const debut = texte.trimStart()[0];
+  if (debut === '{' || debut === '[') {
+    let objet;
+    try {
+      objet = JSON.parse(texte);
+    } catch {
+      return [];
+    }
+    const trouver = (v, test) => {
+      if (Array.isArray(v)) {
+        for (const x of v) {
+          const r = trouver(x, test);
+          if (r !== undefined) return r;
+        }
+      } else if (v && typeof v === 'object') {
+        for (const [cle, valeur] of Object.entries(v)) if (test(cle)) return valeur;
+        for (const valeur of Object.values(v)) {
+          const r = trouver(valeur, test);
+          if (r !== undefined) return r;
+        }
+      }
+      return undefined;
+    };
+    const bienFonds = trouver(objet, (cle) => /^realestate$/i.test(cle)) ?? objet;
+    const limite = trouver(bienFonds, (cle) => /^limit$/i.test(cle));
+    if (limite === undefined) return [];
+    if (typeof limite === 'string') return contoursDeReponse(limite);
+    const anneaux = anneauxDuJson(limite);
+    if (anneaux.length > 0) return anneaux;
+    // Contour écrit en texte dans le JSON (« posList » : « 2538000 1152000 … », ou GML / WKT).
+    const textes = [];
+    const visiter = (v) => (typeof v === 'string' ? textes.push(v) : v && typeof v === 'object' && Object.values(v).forEach(visiter));
+    visiter(limite);
+    return textes.flatMap((t) => (/^[\d.\s,-]+$/.test(t.trim()) ? [pairesDeNombres(t.trim().split(/[\s,]+/).map(Number), 2)].filter((a) => a.length >= 3) : contoursDeReponse(t)));
+  }
+  const bienFonds = /<(?:\w+:)?RealEstate\b[\s\S]*?<\/(?:\w+:)?RealEstate>/.exec(texte)?.[0] ?? texte;
+  const limite = /<(?:\w+:)?Limit\b[\s\S]*?<\/(?:\w+:)?Limit>/.exec(bienFonds)?.[0];
+  return limite ? contoursDeReponse(limite) : [];
+}

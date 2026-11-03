@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dansAnneau, grilleDuCercle, pasDeGrille, anneauxDuJson, egridsDuTexte, contoursDeReponse } from '../src/topo/cadastre.js';
+import { contourDuExtrait, dansAnneau, grilleDuCercle, pasDeGrille, anneauxDuJson, egridsDuTexte, contoursDeReponse } from '../src/topo/cadastre.js';
 import { telechargerRdppf, adressesGetEgrid, raisonDuService } from '../src/import/rdppf.js';
 
 const carre = (e, n, c) => [[e, n], [e + c, n], [e + c, n + c], [e, n + c], [e, n]];
@@ -45,6 +45,27 @@ describe('cadastre RDPPF (Vaud)', () => {
     const r = await telechargerRdppf({ est: 2538020, nord: 1152020 }, 30, () => {}, chercher, 'https://x');
     expect(r.lignes.length).toBeGreaterThanOrEqual(4);
     expect(adresses.length).toBeLessThan(grilleDuCercle({ est: 0, nord: 0 }, 30, pasDeGrille(30)).length);
+  });
+  it('contour de la parcelle dans un extrait (pas celui des restrictions)', () => {
+    const extrait = { GetExtractByIdResponse: { extract: { RealEstate: { EGRID: 'CH1', Limit: { coordinates: [[carre(2538000, 1152000, 20)]] }, RestrictionOnLandownership: [{ Geometry: { coordinates: [[carre(2539000, 1153000, 5)]] } }] } } } };
+    const anneaux = contourDuExtrait(JSON.stringify(extrait));
+    expect(anneaux).toHaveLength(1);
+    expect(anneaux[0][0]).toEqual([2538000, 1152000]);
+    expect(contourDuExtrait('{"RealEstate":{"Limit":{"surface":{"exterior":{"posList":"2538000 1152000 2538010 1152000 2538010 1152010 2538000 1152000"}}}}}')).toHaveLength(1);
+    const xml = '<Extract><RealEstate><Limit><gml:posList>2538000 1152000 2538010 1152000 2538010 1152010</gml:posList></Limit></RealEstate></Extract>';
+    expect(contourDuExtrait(xml.replace('<gml:posList>', '<gml:LinearRing><gml:posList>').replace('</gml:posList>', '</gml:posList></gml:LinearRing>'))).toHaveLength(1);
+  });
+  it('Vaud : GetEGRID sans contour, puis l\'extrait de la parcelle', async () => {
+    const adresses = [];
+    const chercher = async (adresse) => {
+      adresses.push(adresse);
+      if (adresse.includes('getegrid')) return { ok: true, status: 200, text: async () => '{"Item":[{"egrid":"CH708045688314","number":"440"}]}' };
+      if (adresse.includes('/extract/json/?EGRID=CH708045688314')) return { ok: true, status: 200, text: async () => JSON.stringify({ RealEstate: { Limit: { coordinates: [[carre(2537950, 1151950, 200)]] } } }) };
+      return { ok: false, status: 500, text: async () => 'non' };
+    };
+    const r = await telechargerRdppf({ est: 2538020, nord: 1152020 }, 30, () => {}, chercher, 'https://x');
+    expect(r.lignes).toHaveLength(1);
+    expect(adresses.filter((a) => a.includes('extract'))).toHaveLength(1);
   });
   it('message clair si le service ne répond jamais', async () => {
     const chercher = async () => ({ ok: false, status: 404, text: async () => 'Not found' });
