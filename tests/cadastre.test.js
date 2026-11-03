@@ -3,7 +3,7 @@ import {
   lireGml, ordreEstNord, garderDansLeCercle, pointsDuCadastre, dxfDuCadastre, lireRayon,
   nomDeLaListe, choisirCouches, nomsDesCouches, rectangleAutour,
 } from '../src/topo/cadastre.js';
-import { telechargerCadastre } from '../src/import/cadastre.js';
+import { telechargerCadastre, adressesGetFeature } from '../src/import/cadastre.js';
 import { lirePlanDxf } from '../src/topo/dxf-plan.js';
 
 const GML2 = `<wfs:FeatureCollection xmlns:gml="http://www.opengis.net/gml"><gml:featureMember><ms:Grenzpunkt><ms:geom><gml:Point><gml:coordinates>2538000.500,1152000.250</gml:coordinates></gml:Point></ms:geom></ms:Grenzpunkt></gml:featureMember>
@@ -73,6 +73,24 @@ describe('cadastre', () => {
     const r = await telechargerCadastre({ est: 2538000, nord: 1152000 }, 50, 'VD', () => {}, chercher);
     expect(r.points).toHaveLength(1);
     expect(adresses[1]).toContain('BBOX=2537950.000,1151950.000,2538050.000,1152050.000,EPSG:2056');
+  });
+  it('essaie une autre version du service si la première ne donne rien', async () => {
+    const adresses = [];
+    const chercher = async (adresse) => {
+      adresses.push(adresse);
+      let texte = '<FeatureCollection/>';
+      if (adresse.includes('GetCapabilities')) texte = '<FeatureType><Name>ms:RESF</Name></FeatureType>';
+      else if (adresse.includes('VERSION=2.0.0')) texte = GML2;
+      return { ok: true, status: 200, text: async () => texte };
+    };
+    const r = await telechargerCadastre({ est: 2538000, nord: 1152000 }, 50, 'VD', () => {}, chercher);
+    expect(r.lignes).toHaveLength(1);
+    expect(adresses).toHaveLength(4);
+  });
+  it('montre le début des réponses quand rien ne marche', async () => {
+    const chercher = async (adresse) => ({ ok: true, status: 200, text: async () => (adresse.includes('GetCapabilities') ? '<FeatureType><Name>ms:RESF</Name></FeatureType>' : '<vide/>') });
+    await expect(telechargerCadastre({ est: 2538000, nord: 1152000 }, 50, 'VD', () => {}, chercher)).rejects.toThrow(/ms:RESF 1.0.0 : 7 car. « <vide\/> »/);
+    expect(adressesGetFeature('x', 'a', '1,2,3,4')).toHaveLength(4);
   });
   it('dit les couches trouvées quand aucune ne convient', async () => {
     const chercher = async () => ({ ok: true, status: 200, text: async () => '<FeatureType><Name>ms:Autre</Name></FeatureType>' });

@@ -84,7 +84,12 @@ export function creerCadastreAutour(outils) {
       const recu = await telechargerCadastre(centre, rayon, 'VD', (texte) => outils.afficherMessage(texte, null), outils.chercher);
       const dedans = garderDansLeCercle(recu, centre, rayon);
       const points = pointsDuCadastre(dedans);
-      if (points.length === 0) throw new Error('aucun point limite dans ce cercle (le service ne couvre peut-être pas cet endroit)');
+      if (points.length === 0) {
+        // 0.112.2 : dire ce qui a été reçu, pour comprendre (coordonnées loin du point touché ?).
+        const exemple = recu.points[0] ?? recu.lignes[0]?.[0];
+        const recus = `${recu.points.length} point(s) et ${recu.lignes.length} ligne(s) reçus`;
+        throw new Error(exemple ? `rien dans ce cercle : ${recus}, par ex. E ${exemple[0].toFixed(3)} N ${exemple[1].toFixed(3)} (point touché E ${centre.est.toFixed(3)} N ${centre.nord.toFixed(3)})` : `aucun point limite dans ce cercle (${recus})`);
+      }
       const nom = nomDeLaListe(outils.nomsPris());
       const { plan: planDxf } = dedans.lignes.length > 0 ? lirePlanDxf(dxfDuCadastre(dedans.lignes), nom) : {};
       arreter();
@@ -93,7 +98,7 @@ export function creerCadastreAutour(outils) {
     } catch (erreur) {
       occupe = false;
       if (actif) dessinerBarre();
-      outils.afficherMessage(`Cadastre : ${erreur.message}`, 12000);
+      outils.afficherMessage(`Cadastre : ${erreur.message}`, 30000);
     }
   }
 

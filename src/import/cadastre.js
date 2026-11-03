@@ -28,16 +28,37 @@ export async function telechargerCadastre(centre, rayon, canton = 'VD', progres 
   }
   const r = rectangleAutour(centre, rayon);
   const boite = [r.estMin, r.nordMin, r.estMax, r.nordMax].map((v) => v.toFixed(3)).join(',');
-  const resultat = { points: [], lignes: [], couches };
+  const resultat = { points: [], lignes: [], couches, essais: [] };
   for (const [sorte, nom] of [['points', couches.points], ['parcelles', couches.surfaces]]) {
     if (!nom) continue;
     progres(`Téléchargement ${sorte === 'points' ? 'des points limites' : 'des parcelles'}…`);
-    const adresse = `${service.adresse}?SERVICE=WFS&VERSION=1.0.0&REQUEST=GetFeature&TYPENAME=${encodeURIComponent(nom)}&SRSNAME=EPSG:2056&BBOX=${boite},EPSG:2056&MAXFEATURES=20000`;
-    const lu = lireGml(await (await demander(chercher, adresse)).text());
-    resultat.points.push(...lu.points);
-    resultat.lignes.push(...lu.lignes);
+    // 0.112.2 : plusieurs façons de demander (versions du WFS), on garde la première qui donne quelque chose.
+    for (const adresse of adressesGetFeature(service.adresse, nom, boite)) {
+      const texte = await (await demander(chercher, adresse)).text();
+      const lu = lireGml(texte);
+      if (lu.points.length > 0 || lu.lignes.length > 0) {
+        resultat.points.push(...lu.points);
+        resultat.lignes.push(...lu.lignes);
+        break;
+      }
+      resultat.essais.push(`${nom} ${/VERSION=([\d.]+)/.exec(adresse)[1]} : ${texte.length} car. « ${texte.replace(/\s+/g, ' ').slice(0, 160)} »`);
+    }
+  }
+  if (resultat.points.length === 0 && resultat.lignes.length === 0) {
+    throw new Error(`le service ne renvoie rien (couches ${[couches.points, couches.surfaces].filter(Boolean).join(', ')}). Réponses : ${resultat.essais.slice(0, 3).join(' | ')}`);
   }
   return resultat;
+}
+
+/** Adresses GetFeature à essayer dans l'ordre (WFS 1.0.0, 1.1.0, 2.0.0, puis 1.0.0 le plus simple). */
+export function adressesGetFeature(base, nom, boite) {
+  const couche = encodeURIComponent(nom);
+  return [
+    `${base}?SERVICE=WFS&VERSION=1.0.0&REQUEST=GetFeature&TYPENAME=${couche}&SRSNAME=EPSG:2056&BBOX=${boite},EPSG:2056&MAXFEATURES=20000`,
+    `${base}?SERVICE=WFS&VERSION=1.1.0&REQUEST=GetFeature&TYPENAME=${couche}&SRSNAME=EPSG:2056&BBOX=${boite},EPSG:2056&MAXFEATURES=20000`,
+    `${base}?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=${couche}&SRSNAME=urn:ogc:def:crs:EPSG::2056&BBOX=${boite},urn:ogc:def:crs:EPSG::2056&COUNT=20000`,
+    `${base}?SERVICE=WFS&VERSION=1.0.0&REQUEST=GetFeature&TYPENAME=${couche}&BBOX=${boite}`,
+  ];
 }
 
 /** fetch avec un message clair en cas d'échec. */
