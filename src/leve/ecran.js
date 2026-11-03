@@ -1482,9 +1482,9 @@ function couleurLaterale(classe) {
 /**
  * Couloir vertical (0.118.0, refait en 0.118.1) : un tiers de l'écran à droite, sur toute la hauteur
  * des écarts. La ligne du début (drapeau vert, en bas) à la fin (damier, en haut) ; la canne à sa
- * place le long de la ligne (proportion abscisse / longueur) et sur le côté selon l'écart. Réglettes
- * gris très clair à chaque distance de la bande (BANDES_COULOIR, comme les cercles de la cible :
- * 2 m, 1 m, 50 cm, 20 cm…), la plus large au bord. Fait en blocs HTML placés en % (pas en SVG) pour
+ * place le long de la ligne (proportion abscisse / longueur) et sur le côté selon l'écart. Réglette
+ * gris très clair à la distance la plus large de la bande (BANDES_COULOIR, comme le grand cercle
+ * de la cible : 10 m, 2 m, 1 m, 20 cm), au bord. Fait en blocs HTML placés en % (pas en SVG) pour
  * remplir toute la case sans déformer le rond de la canne. ecart : m, + à droite.
  */
 function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur) {
@@ -1497,13 +1497,11 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur) {
   const top = Math.max(haut - 6, Math.min(bas + 6, bas - part * (bas - haut)));
   const left = 50 + Math.max(-demi, Math.min(demi, (ecart / bandes[0]) * demi));
   const texte = (r) => (r >= 1 ? `${r} m` : `${Math.round(r * 100)} cm`);
-  // Étiquettes à droite seulement, une sur deux plus haut (pour ne pas se chevaucher) ; pas pour un
-  // trait trop près de la ligne (il toucherait le drapeau du début).
-  const reglettes = bandes.map((r, i) => {
-    const dx = (r / bandes[0]) * demi;
-    return `<span class="reglette" style="left: ${(50 - dx).toFixed(1)}%"></span><span class="reglette" style="left: ${(50 + dx).toFixed(1)}%"></span>
-      ${dx < 12 ? '' : `<span class="texte-reglette ${i % 2 ? 'en-bas' : 'en-haut'}${dx > 40 ? ' au-bord' : ''}" style="left: ${(50 + dx).toFixed(1)}%">${texte(r)}</span>`}`;
-  }).join('');
+  // 0.118.2 : seulement la graduation la plus éloignée (la bande la plus large), juste pour un
+  // aperçu de l'échelle ; sa distance écrite en bas à droite.
+  const r = bandes[0];
+  const reglettes = `<span class="reglette" style="left: ${50 - demi}%"></span><span class="reglette" style="left: ${50 + demi}%"></span>
+    <span class="texte-reglette en-bas au-bord" style="left: ${50 + demi}%">${texte(r)}</span>`;
   return `<div class="cadre-couloir" role="img" aria-label="Position de la canne le long de la ligne">
     ${reglettes}
     <span class="trait-couloir" style="top: ${haut}%; bottom: ${100 - bas}%"></span>
