@@ -49,7 +49,7 @@ export async function telechargerRdppf(centre, rayon, progres = () => {}, cherch
           continue;
         }
       } catch {
-        derniere = 'injoignable (réseau ; sur le site internet, le service de Vaud refuse l\'appli : passer par l\'APK Android)';
+        derniere = 'injoignable (réseau ; sur le site internet, le service de Vaud passe par le relais du cadastre : relais pas encore réglé ou injoignable ; sinon passer par l\'APK Android)';
         continue;
       }
       const contours = contoursDeReponse(texte);

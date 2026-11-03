@@ -2,6 +2,7 @@
 //
 // Tout est rangé dans le "projet" ouvert (voir projet/projet.js), enregistré automatiquement
 // sur l'appareil après chaque modification.
+import { adresseParRelais } from './import/relais.js';
 import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { lireLandXML } from './topo/landxml.js';
@@ -3033,6 +3034,16 @@ function groupesDePointsParListe() {
 function toucherPourRecalage(position, tolerance) {
   const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
   if (!recalage.choix) {
+    // « Point » (0.116.0) : un point levé ou de contrôle sert de 1er point (ses coordonnées telles quelles).
+    if (recalage.accroche === 'point') {
+      const point = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() });
+      if (!point) {
+        afficherMessage('Aucun point (levé ou de contrôle) sous le doigt', 3000);
+        return;
+      }
+      proposerCandidat({ sorte: 'dxf', x: point.est, y: point.nord, nom: point.nom });
+      return;
+    }
     const trouve = accrocher(recalage.accroche, position, tolerance, sourcesDesPlans([choisi], position, tolerance));
     if (!trouve) {
       afficherMessage('Rien à accrocher sous le doigt sur le DXF à recaler', 3000);
@@ -3186,7 +3197,8 @@ const cadastreAutour = creerCadastreAutour({
   },
   nomsPris: () => [...projet.leves.map((l) => l.nom), ...projet.plansDxf.map((p) => p.nom)],
   // Dans l'APK, les demandes passent par Android (pas de blocage CORS du service RDPPF de Vaud).
-  chercher: (adresse) => (lectureAndroidDisponible() ? lireParAndroid(adresse) : fetch(adresse)),
+  // Site internet (0.116.0) : le service de Vaud passe par le relais du cadastre (import/relais.js).
+  chercher: (adresse) => (lectureAndroidDisponible() ? lireParAndroid(adresse) : fetch(adresseParRelais(adresse))),
   ajouterCadastre: ({ nom, points, planDxf }) => {
     const leve = ajouterLeve(projet, nom, points);
     // 0.113 : liste marquée « cadastre », cachée au départ (seules les lignes du DXF se voient).
