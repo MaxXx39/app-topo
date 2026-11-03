@@ -5,7 +5,6 @@
 // Sur ligne). Calculs : topo/cadastre.js ; téléchargement : import/cadastre.js.
 import { echapper } from '../outils/echapper.js';
 import { telechargerCadastre } from './cadastre.js';
-import { telechargerRdppf } from './rdppf.js';
 import { lirePlanDxf } from '../topo/dxf-plan.js';
 import { garderDansLeCercle, pointsDuCadastre, dxfDuCadastre, nomDeLaListe, lireRayon, RAYON_DEPART, RAYON_MIN, RAYON_MAX } from '../topo/cadastre.js';
 
@@ -84,13 +83,9 @@ export function creerCadastreAutour(outils) {
     try {
       const progres = (texte) => outils.afficherMessage(texte, null);
       let recu;
-      try {
-        recu = await telechargerCadastre(centre, rayon, 'VD', progres, outils.chercher);
-      } catch (erreur) {
-        // 0.112.4 : pas en accès libre sur geodienste.ch (Vaud) → service RDPPF de Vaud.
-        if (!/accès libre/.test(erreur.message)) throw erreur;
-        recu = await telechargerRdppf(centre, rayon, progres, outils.chercher);
-      }
+      // 0.112.6 : Vaud abandonné (03.11 : pas libre sur geodienste.ch, service RDPPF en erreur 500) ;
+      // le code RDPPF (import/rdppf.js) reste pour plus tard, mais n'est plus appelé.
+      recu = await telechargerCadastre(centre, rayon, 'VD', progres, outils.chercher);
       const dedans = garderDansLeCercle(recu, centre, rayon);
       const points = pointsDuCadastre(dedans);
       if (points.length === 0) {
