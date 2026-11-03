@@ -26,7 +26,12 @@ export function htmlControle(ac, { gestionOuverte, erreurGestion }) {
     ${gestionOuverte ? htmlGestion(ac, erreurGestion) : ''}
     <p class="etat-controle ${ac.necessaire ? 'a-faire' : 'fait'}">${ac.necessaire ? 'Contrôle à faire' : `Dernier contrôle réussi : ${echapper(dateHeure(ac.dernierReussi))}`}</p>
     ${ac.points.length === 0
-      ? '<p class="vide">Aucun point de contrôle.</p>'
+      ? `<div class="controle-vide">
+          <p class="vide">Aucun point de contrôle.</p>
+          <label class="bouton bouton-fichier bouton-importer-controle">+ Importer des points de contrôle
+            <input type="file" data-champ="fichier-controle" accept=".csv,.txt,.pts,.xyz,.dat,.asc,text/csv,text/plain" hidden /></label>
+          ${erreurGestion && !gestionOuverte ? `<p class="erreur">${echapper(erreurGestion)}</p>` : ''}
+        </div>`
       : `<p class="titre-choix titre-choisir-controle">Choisir un point sur le plan ou dans la liste</p>
       <div class="points-controle">${ac.points.map((p) => `<div class="cellule-point-controle">
         <button type="button" class="point-controle" data-action="controlerPoint" data-valeur="${p.id}">

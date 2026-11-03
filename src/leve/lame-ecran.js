@@ -37,10 +37,10 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) 
   const { surfaces, surfaceId, tolerances } = donnees;
   const cm = (m) => String(Math.round(m * 1000) / 10);
   const machine = donnees.machine === 'bull' ? 'bull' : 'grader';
-  const caseMachine = (cle, titre) => `<button type="button" class="case-machine ${machine === cle ? 'actif' : ''}" data-action="choisirMachine" data-valeur="${cle}" aria-pressed="${machine === cle}">
-      <span class="carre-case" aria-hidden="true">${machine === cle ? '✓' : ''}</span>${titre}</button>`;
+  // Grader ou Bull (0.114.0) : deux boutons côte à côte, un seul choisi à la fois.
+  const caseMachine = (cle, titre) => `<button type="button" class="case-machine ${machine === cle ? 'actif' : ''}" role="radio" data-action="choisirMachine" data-valeur="${cle}" aria-checked="${machine === cle}">${titre}</button>`;
   return `<div class="ecran-lame">
-    <div class="ligne-lame choix-machine" role="group" aria-label="Machine">${caseMachine('grader', 'Grader')}${caseMachine('bull', 'Bull')}</div>
+    <div class="ligne-lame choix-machine" role="radiogroup" aria-label="Machine">${caseMachine('grader', 'Grader')}${caseMachine('bull', 'Bull')}</div>
     <div class="ligne-lame">
       ${surfaces.length > 0
         ? `<select data-champ="surface-lame" aria-label="Levé à suivre">
@@ -57,7 +57,7 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) 
         <label>Vert ≤ <input type="text" inputmode="decimal" data-tolerance-lame="vert" value="${cm(tolerances.vert)}" /> cm</label>
         <label>Orange ≤ <input type="text" inputmode="decimal" data-tolerance-lame="orange" value="${cm(tolerances.orange)}" /> cm</label>
       </div>` : ''}
-    ${donnees.recepteur2 ? '' : '<p class="avertissement">Connecte le 2e GNSS : bouton Récepteur › « Récepteur 2 ».</p>'}
+    ${donnees.recepteur2 ? '' : '<button type="button" class="bouton-secondaire bouton-recepteur-2" data-action="ouvrirRecepteur">Connecter le 2e GNSS</button>'}
     <p class="raison-lame" data-vivant="lame-raison" hidden></p>
     <div class="coins-lame avec-regles">
       <div class="colonne-regle" data-vivant="lame-regle-gauche">${htmlRegleHauteur(null)}</div>

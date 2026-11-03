@@ -170,3 +170,14 @@ export function ajouterPointsControle(liste, points, nouvelId) {
   }
   return { ajoutes, deja, sansNom };
 }
+
+/**
+ * Couleur d'une implantation enregistrée (0.114.0, plan de Terrain › Implanter) : mêmes tolérances que
+ * le Contrôle (projet.tolerancesControle), écarts entre le point voulu (cible) et le point mesuré.
+ * Renvoie 'vert', 'orange' ou 'rouge' (null sans cible ou sans mesure).
+ */
+export function couleurImplantation(implantation, tolerances = TOLERANCES_PAR_DEFAUT) {
+  const { cible, mesure } = implantation ?? {};
+  if (!cible || !mesure) return null;
+  return resultatControle(ecartsControle(cible, mesure), tolerances).global ?? null;
+}

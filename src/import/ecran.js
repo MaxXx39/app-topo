@@ -169,6 +169,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
       const plans = projet.plansDxf ?? [];
       conteneur.innerHTML = `<div class="carte-section panneau-onglet-projet panneau-import">
           <p class="titre-panneau-projet">Importer ${bulle('imports')}</p>
+          <p class="titre-groupe-import">Fichiers</p>
           <div class="boutons-imports">
             <label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="18" cy="7" r="1.6" /><circle cx="8" cy="17" r="1.6" /><circle cx="17" cy="17" r="1.6" /></svg>
@@ -190,6 +191,13 @@ export function creerEcranImport(conteneur, contenu, actions) {
               <span><strong>Surface</strong><span class="aide">LandXML, DXF 3D</span></span>
               <input type="file" data-champ="fichier-surface-projet" accept=".xml,.landxml,.dxf,application/xml,text/xml" hidden />
             </label>
+            <button type="button" class="bouton-import ${pointOuvert ? 'actif' : ''}" data-action="ouvrir-point" aria-expanded="${pointOuvert}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle cx="12" cy="12" r="2.5" /></svg>
+              <span><strong>Point</strong><span class="aide">tapé ou sur le DXF</span></span>
+            </button>
+          </div>
+          <p class="titre-groupe-import">En ligne (swisstopo, cadastre)</p>
+          <div class="boutons-imports">
             <button type="button" class="bouton-import bouton-swisstopo" data-action="surface-swisstopo">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 19 9 8l4 6 3-4 6 9z" /><path d="M5 5h4v4H5z" /></svg>
               <span><strong>Surface Swisstopo</strong><span class="aide">swissALTI3D</span></span>
@@ -197,10 +205,6 @@ export function creerEcranImport(conteneur, contenu, actions) {
             <button type="button" class="bouton-import bouton-swisstopo" data-action="cadastre-autour">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9l7 4v8H4z" /><circle cx="12" cy="13" r="2" /></svg>
               <span><strong>Cadastre</strong><span class="aide">autour d'un point</span></span>
-            </button>
-            <button type="button" class="bouton-import ${pointOuvert ? 'actif' : ''}" data-action="ouvrir-point" aria-expanded="${pointOuvert}">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle cx="12" cy="12" r="2.5" /></svg>
-              <span><strong>Point</strong><span class="aide">tapé ou sur le DXF</span></span>
             </button>
           </div>
           ${messageControle ? `<p class="erreur">${echapper(messageControle)}</p>` : ''}

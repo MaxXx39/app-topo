@@ -145,7 +145,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <button type="button" data-action="ma-position" aria-label="Ma position" title="Ma position" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
         </button>
-        <button type="button" data-action="nord-en-haut" class="bouton-nord" aria-label="Nord en haut" title="Nord en haut" hidden>
+        <button type="button" data-action="nord-en-haut" class="bouton-nord" aria-label="Nord en haut" title="Nord en haut">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 16 12H8Z" class="nord" /><path d="M12 22 8 12h8Z" /><text x="12" y="10.5" text-anchor="middle">N</text></svg>
         </button>
       </div>
@@ -476,21 +476,43 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         groupe.append(nom);
       }
     }
-    // Points de contrôle (Terrain › Contrôle) : triangle rouge et nom en rouge.
-    for (const point of implantation.pointsControle ?? []) {
-      const { x, y } = versEcran(point.est, point.nord, vue);
+    // Points de contrôle (Terrain › Contrôle) : triangle rouge et nom en rouge. Noms et altitudes placés
+    // sans se chevaucher (0.114.0) : une étiquette sans place est cachée, elle revient en zoomant.
+    const controles = (implantation.pointsControle ?? []).map((point) => ({ point, ...versEcran(point.est, point.nord, vue) }));
+    for (const { x, y } of controles) {
       groupe.append(creerElement('path', { d: `M${x} ${y - 8}L${x + 7} ${y + 5}H${x - 7}Z`, class: 'triangle-controle' }));
-      if (calques.controleNoms) {
-        const nom = creerElement('text', { x: x + 9, y: y - 6, class: 'nom-controle' });
-        nom.textContent = point.nom;
-        groupe.append(nom);
-      }
-      // Altitude, sous le nom (roue de « Contrôle » en Expert).
-      if (calques.controleAltitudes && point.altitude != null) {
-        const altitude = creerElement('text', { x: x + 9, y: y + (calques.controleNoms ? 7 : -6), class: 'altitude-controle' });
-        altitude.textContent = formaterNombre(point.altitude);
-        groupe.append(altitude);
-      }
+    }
+    const lignesControle = controles.map(({ point }) => [
+      calques.controleNoms ? { texte: point.nom, classe: 'nom-controle' } : null,
+      calques.controleAltitudes && point.altitude != null ? { texte: formaterNombre(point.altitude), classe: 'altitude-controle' } : null,
+    ].filter(Boolean));
+    const placesControle = placerEtiquettes(controles.map(({ x, y }, i) => ({
+      x,
+      y,
+      largeur: Math.max(0, ...lignesControle[i].map((l) => l.texte.length)) * 7.2,
+      hauteur: lignesControle[i].length * 13,
+    })), 7);
+    placesControle.forEach((place, i) => {
+      if (!place) return;
+      lignesControle[i].forEach(({ texte, classe }, ligne) => {
+        const element = creerElement('text', {
+          x: place.x,
+          y: place.y - (lignesControle[i].length - 1 - ligne) * 13 - 2,
+          'text-anchor': place.aGauche ? 'end' : 'start',
+          class: classe,
+        });
+        element.textContent = texte;
+        groupe.append(element);
+      });
+    });
+    // Points implantés (0.114.0) : petit losange vert / orange / rouge selon les tolérances du Contrôle.
+    for (const point of implantation.implantes ?? []) {
+      const { x, y } = versEcran(point.est, point.nord, vue);
+      const marque = creerElement('path', { d: `M${x} ${y - 6}L${x + 6} ${y}L${x} ${y + 6}L${x - 6} ${y}Z`, class: `point-implante implante-${point.couleur ?? 'inconnu'}` });
+      const titre = creerElement('title', {});
+      titre.textContent = point.nom ?? '';
+      marque.append(titre);
+      groupe.append(marque);
     }
     for (const point of implantation.aImplanter ?? []) {
       const { x, y } = croix(point.est, point.nord, 'croix-a-implanter', 7);
@@ -1425,7 +1447,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   /** Boussole du plan : montrée seulement quand le plan n'a pas le nord en haut ; l'aiguille montre le nord. */
   function mettreAJourBoussolePlan() {
     const rotation = vue?.rotation ?? 0;
-    boutonNord.hidden = Math.abs(ecartAngle(rotation, 0)) < 0.5;
+    // Flèche du nord toujours visible (0.114.0) ; la toucher remet le nord en haut si le plan est tourné.
+    boutonNord.hidden = false;
+    boutonNord.classList.toggle('plan-tourne', Math.abs(ecartAngle(rotation, 0)) >= 0.5);
     boutonNord.querySelector('svg').style.transform = `rotate(${(-rotation).toFixed(1)}deg)`;
   }
 

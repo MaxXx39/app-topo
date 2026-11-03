@@ -41,12 +41,23 @@ const COULEURS = [
  *   dessinSurfaces : surfaces affichées, pour le DXF et le LandXML { stocks, resultats, surfaces } ;
  *   cartouche : { affaire, lieu } du projet
  */
+// Formats proposés (0.114.0) : [clé, titre, mode minimum ou ''].
+const FORMATS = [['pdf', 'PDF', ''], ['csv', 'CSV', 'expert'], ['dxf', 'DXF', ''], ['landxml', 'LandXML', 'expert']];
+
 export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: donneesChoisies }) {
 
   conteneur.innerHTML = `
     ${titreSection('exporter', 'Exporter', bulle('exporter'))}
-    <div data-zone="choix" class="seulement-expert"></div>
-    <div class="champs-export">
+    <div class="seulement-expert">
+      <p class="titre-choix titre-etape">Lesquels ?</p>
+      <div data-zone="choix"></div>
+    </div>
+    <p class="titre-choix titre-etape">Format</p>
+    <div class="choix-format-export" role="radiogroup" aria-label="Format">
+      ${FORMATS.map(([cle, titre, niveau]) => `<button type="button" class="puce-choix ${niveau ? `seulement-${niveau}` : ''}" data-format="${cle}">${titre}</button>`).join('')}
+    </div>
+    <p class="titre-choix titre-etape" data-pour="pdf dxf">Options</p>
+    <div class="champs-export" data-pour="pdf">
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">
           <option value="auto">auto (tout le plan sur une A4)</option>
@@ -54,7 +65,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
         </select>
       </label>
     </div>
-    <div class="calques-pdf">
+    <div class="calques-pdf" data-pour="pdf">
       <p class="titre-choix">Contenu du PDF</p>
       <div class="liste-calques-pdf">
         ${CALQUES.map(([cle, titre, coche]) => `<label class="case"><input type="checkbox" data-calque="${cle}" ${coche ? 'checked' : ''} /> ${titre}</label>`).join('')}
@@ -69,14 +80,8 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
         </select>
       </label>
     </div>
-    ${champsCartouche()}
-    <div class="ligne-outils">
-      <button type="button" class="bouton-secondaire" data-action="pdf">PDF</button>
-      <button type="button" class="bouton-secondaire seulement-expert" data-action="csv">CSV</button>
-      <button type="button" class="bouton-secondaire" data-action="dxf">DXF</button>
-      <button type="button" class="bouton-secondaire seulement-expert" data-action="landxml">LandXML</button>
-    </div>
-    <div class="options-geotiff">
+    <div data-pour="pdf">${champsCartouche()}</div>
+    <div class="options-geotiff" data-pour="dxf">
       <label class="case"><input type="checkbox" data-champ="geotiff" /> Avec le DXF : photo aérienne swisstopo (GeoTIFF)</label>
       <div class="champs-export">
         <label>Marge autour des points (m)<input type="text" inputmode="decimal" data-champ="marge-geotiff" value="30" /></label>
@@ -90,6 +95,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
         </label>
       </div>
     </div>
+    <button type="button" class="bouton bouton-exporter" data-action="exporter">Exporter</button>
     <p class="aide" data-zone="message"></p>
   `;
   const choix = brancherChoixExport(conteneur.querySelector('[data-zone="choix"]'), obtenirGroupes);
@@ -186,10 +192,24 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
       }
     },
   };
+  // Format choisi (0.114.0) : ses options seulement, puis le gros bouton « Exporter ».
+  let format = 'pdf';
+  function montrerFormat() {
+    for (const puce of conteneur.querySelectorAll('[data-format]')) puce.classList.toggle('actif', puce.dataset.format === format);
+    for (const bloc of conteneur.querySelectorAll('[data-pour]')) bloc.hidden = !bloc.dataset.pour.split(' ').includes(format);
+    conteneur.querySelector('[data-action="exporter"]').textContent = `Exporter en ${FORMATS.find(([cle]) => cle === format)[1]}`;
+  }
   conteneur.addEventListener('click', (evenement) => {
+    const puce = evenement.target.closest('button[data-format]');
+    if (puce) {
+      format = puce.dataset.format;
+      montrerFormat();
+      return;
+    }
     const bouton = evenement.target.closest('button[data-action]');
-    if (bouton) boutons[bouton.dataset.action]();
+    if (bouton?.dataset.action === 'exporter') boutons[format]();
   });
+  montrerFormat();
 
   /**
    * GeoTIFF de la photo aérienne swisstopo autour de ces points (marge et taille du pixel choisies),

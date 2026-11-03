@@ -9,7 +9,6 @@
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
-import { estDansAppliAndroid } from '../android/pont.js';
 import { titreProjet } from './projet.js';
 import { verrouActif } from '../partage/synchro.js';
 
@@ -130,9 +129,9 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
         </div>
       </section>
     `;
-    // Le partage par Google Drive est dans les réglages (roue de l'en-tête, version 0.54.0).
-    conteneurSuite.innerHTML = `
-      <p class="aide pied-projet">Version de l'appli : ${__VERSION_APPLI__}${estDansAppliAndroid() ? ' (appli Android)' : ''}</p>`;
+    // Le partage par Google Drive est dans les réglages (roue de l'en-tête, version 0.54.0), la version
+    // de l'appli aussi (0.114.0).
+    conteneurSuite.innerHTML = '';
   }
 
   return {

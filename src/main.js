@@ -99,7 +99,7 @@ import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecter
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip } from './outils/son.js';
 import { rythmeBip } from './topo/bip.js';
-import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle } from './topo/controle.js';
+import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, listesCadastre, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
@@ -410,6 +410,8 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
     aideActive: document.body.classList.contains('aide-active'),
     basculerAide: () => document.querySelector('#bouton-aide').click(),
     fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? fermerAppli : null,
+    // Partie « Récepteur » des réglages (appli Android) : ouvre la fenêtre du récepteur.
+    recepteur: estDansAppliAndroid() ? () => document.dispatchEvent(new CustomEvent('ouvrir-recepteur')) : null,
     changerMode: () => {
       adapterAuMode();
       recalculer();
@@ -1255,7 +1257,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         const choisi = { est: trouve.est, nord: trouve.nord, altitude: trouve.altitude ?? null, nom: trouve.nom, mode: 'point' };
         // Ligne : le point s'ajoute à la ligne en préparation (début, fin, puis les suivants).
         if (enImplantationDeLigne()) ajouterPointLigne(choisi);
-        else implanter.choix = choisi;
+        else guiderVersChoix(choisi);
         montrerImplantation();
       },
       oublierChoix: () => {
@@ -1278,8 +1280,10 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           alert(`Le point ${choisi} est déjà dans la liste « À implanter » : choisis un autre nom.`);
           return;
         }
-        projet.aImplanter.push({ id: nouvelIdentifiant(), nom: choisi, est: implanter.choix.est, nord: implanter.choix.nord, altitude: lue });
+        const nouveau = { id: nouvelIdentifiant(), nom: choisi, est: implanter.choix.est, nord: implanter.choix.nord, altitude: lue };
+        projet.aImplanter.push(nouveau);
         implanter.choix = null;
+        if (implanter.cible) implanter.cible = { ...nouveau }; // pendant le guidage : on continue vers ce point
         afficherMessage(`${choisi} ajouté à la liste « À implanter »`);
         modifie();
       },
@@ -1301,7 +1305,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       ajouterPointTape: (valeurs) => {
         const { point, erreur } = ajouterPointAjoute(projet, { ...valeurs, source: 'tape' });
         if (erreur) return { erreur };
-        implanter.choix = { ...point };
+        guiderVersChoix({ ...point });
         afficherMessage(`Point ${point.nom} ajouté`, 2500);
         modifie();
         return null;
@@ -1316,11 +1320,13 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           return;
         }
         implanter.choix = { ...implanter.choix, nom: point.nom };
+        if (implanter.cible && implanter.cible.id == null) implanter.cible.nom = point.nom;
         afficherMessage(`Point ${point.nom} ajouté au projet`, 2500);
         modifie();
       },
       arreterImplantation: () => {
         implanter.cible = null;
+        implanter.choix = null; // ← : on choisit un autre point (0.114.0 : le guidage commence dès le choix)
         // ← : on choisit soi-même le point, « Le plus proche » s'arrête.
         if (terrain.plusProche) {
           terrain.plusProche = false;
@@ -1523,17 +1529,22 @@ function envoyerImplantationAuPlan() {
   const pointsControle = seul || (gardees && !gardees.has(LISTE_CONTROLE)) || (projet.listesCachees ?? []).includes(LISTE_CONTROLE) ? [] : projet.pointsControle;
   const dessins = seul ? [] : dessinsVisibles().filter((d) => !gardees || gardees.has(d.id));
   const aImplanter = seul || gardees ? [] : projet.aImplanter;
+  // Points implantés (0.114.0, Implanter, dès Intermédiaire) : vert / orange / rouge selon les tolérances du Contrôle.
+  const implantes = ongletContexte === 'terrain' && terrain.mode === 'controler' && aAcces('intermediaire') && !seul
+    ? projet.implantations.filter((i) => i.mesure).map((i) => ({ nom: i.nom, est: i.mesure.est, nord: i.mesure.nord, couleur: couleurImplantation(i, projet.tolerancesControle) }))
+    : [];
   // Mode Contrôler : le point de contrôle vers lequel on guide est la cible du plan.
   const cibleControle = enAutocontrole() && ongletContexte === 'terrain' ? autocontrole.cible : null;
   // Dessins (Calculs › Dessin) : toujours sur le plan ; le dessin en cours avec son pilote.
   const avecPilote = piloteActif();
-  plan.afficherImplantation(accrocheActive || avecPilote || aImplanter.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0
+  plan.afficherImplantation(accrocheActive || avecPilote || aImplanter.length > 0 || implantes.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0
     ? {
         actif: accrocheActive || avecPilote,
         dessins: dessins.map((d) => ({ ...d, noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom), couleur: projet.couleursListes?.[d.id] ?? null })),
         actifId: avecPilote ? pilote.dessinId : null,
         pilote: avecPilote ? { direction: pilote.direction, distance: lireNombreTape(pilote.distance) ?? null } : null,
         aImplanter,
+        implantes,
         pointsControle,
         lignesAutres,
         reseaux,
@@ -2453,10 +2464,10 @@ async function proposerControle() {
   const projetDuRappel = projet;
   const aujourdHui = projet.controles.some((c) => estControleReussi(c) && new Date(c.le).toDateString() === new Date().toDateString());
   const texte = aujourdHui ? `Dernier contrôle réussi il y a plus de ${Number((delaiControleMs(projet) / 3600000).toFixed(2))} h.` : 'Aucun contrôle réussi aujourd\'hui.';
-  // Pas de point de contrôle dans le projet : le rappel attire quand même l'attention, avec OK
-  // seulement (rien n'est noté ; demande du 26.10.2026).
+  // Pas de point de contrôle dans le projet : un simple bandeau (0.114.0, avant une fenêtre qui
+  // bloquait l'écran) ; rien n'est noté (demande du 26.10.2026).
   if (projet.pointsControle.length === 0) {
-    await demanderChoix({ titre: 'Faire le contrôle ?', texte: `${texte} Aucun point de contrôle dans ce projet.`, boutons: [{ cle: 'ok', texte: 'OK', principal: true }] });
+    afficherMessage(`${texte} Aucun point de contrôle dans ce projet.`, 6000);
     rappelEnCours = false;
     return;
   }
@@ -2861,8 +2872,18 @@ function toucherPourImplantation(position, tolerance) {
     return;
   }
   const mm = (valeur) => Math.round(valeur * 1000) / 1000;
-  implanter.choix = { ...trouve, est: mm(trouve.est), nord: mm(trouve.nord), altitude: trouve.altitude != null ? mm(trouve.altitude) : null };
+  guiderVersChoix({ ...trouve, est: mm(trouve.est), nord: mm(trouve.nord), altitude: trouve.altitude != null ? mm(trouve.altitude) : null });
   montrerImplantation();
+}
+
+/**
+ * Point choisi (touché sur le plan, pris dans la « Liste » ou tapé) : le guidage commence tout de suite
+ * (0.114.0, plus de bouton « Implanter » à toucher en plus). Le choix est gardé : « + À implanter » et
+ * « + Point du projet » restent sous la cible ; l'altitude se change dans le champ H du guidage.
+ */
+function guiderVersChoix(choix) {
+  implanter.choix = choix;
+  implanter.cible = { id: null, nom: choix.nom || nomProposeImplantation(), est: choix.est, nord: choix.nord, altitude: choix.altitude ?? null };
 }
 
 // --- Recalage d'un plan DXF (Projet › Imports › Recaler ; calculs dans topo/recalage.js) ---
@@ -4297,6 +4318,10 @@ const ecranVolumes = creerEcranVolumes(document.querySelector('#volumes'), {
     if (!window.matchMedia('(min-width: 900px)').matches) afficherOnglet('plan');
   },
   quandChange: () => modifie(),
+  allerLever: () => {
+    choisirModeTerrain('lever');
+    afficherOnglet('terrain');
+  },
 });
 
 // --- Coupes : tracées en touchant le plan deux fois (début, puis fin) ---

@@ -20,7 +20,10 @@ import { modifierLibellesDeSorte, modifierReseaux } from '../leve/fenetre-libell
 import { ouvrirFenetreListes } from './fenetre-listes.js';
 
 const CLE = 'topo-reglages';
-const PAR_DEFAUT = { telephone: false, mode: 'intermediaire', tailleFormes: 'normale', tailleTexte: 'normal' };
+const PAR_DEFAUT = { telephone: false, mode: 'intermediaire', tailleFormes: 'normale', tailleTexte: 'normal', theme: 'normal' };
+// Affichage de l'appareil (0.114.0, tous les modes) : [clé, titre]. « Plein soleil » = fort contraste,
+// textes plus gras ; « Sombre » = fond foncé pour le soir ou les tunnels (classes theme-… sur la page).
+export const THEMES = [['normal', 'Normal'], ['soleil', 'Plein soleil'], ['sombre', 'Sombre']];
 // Tailles à choisir sur le plan (0.104.0, propres à chaque appareil, tous les modes) : [clé, titre, facteur].
 // Formes des points : « Normales » = 70 % de (3,5 px + 20 %), soit 2,94 px (0.105.3 : −30 %). Texte (noms et
 // altitudes des points) : « Normal » = 60 % de la taille d'origine (0.105.3 : −20 % de plus).
@@ -38,7 +41,7 @@ function modeValide(mode) {
   return MODES.some(([cle]) => cle === mode) ? mode : PAR_DEFAUT.mode;
 }
 
-/** Réglages enregistrés : { telephone, mode: 'base', 'intermediaire' ou 'expert', tailleFormes, tailleTexte }. */
+/** Réglages enregistrés : { telephone, mode: 'base', 'intermediaire' ou 'expert', tailleFormes, tailleTexte, theme }. */
 export function lireReglages() {
   try {
     const reglages = { ...PAR_DEFAUT, ...JSON.parse(localStorage.getItem(CLE) ?? '{}') };
@@ -123,6 +126,8 @@ export function appliquerReglages(reglages = lireReglages()) {
   document.body.classList.toggle('mode-telephone', Boolean(reglages.telephone));
   document.body.style.setProperty('--echelle-texte', String(facteurDe(TAILLES_TEXTE, reglages.tailleTexte)));
   for (const [cle] of MODES) document.body.classList.toggle(`mode-${cle}`, cle === modeRetenu);
+  for (const [cle] of THEMES) document.body.classList.toggle(`theme-${cle}`, cle !== 'normal' && cle === reglages.theme);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', reglages.theme === 'sombre' ? '#0a1116' : '#1b2b36');
   const bouton = document.querySelector('#bouton-mode');
   if (bouton) {
     bouton.innerHTML = barresDuMode(modeRetenu);
@@ -131,6 +136,16 @@ export function appliquerReglages(reglages = lireReglages()) {
     bouton.setAttribute('aria-label', texte);
   }
 }
+
+// Parties de la fenêtre des réglages (0.114.0) : [clé, titre, classe du mode]. La dernière ouverte est
+// reprise à la prochaine ouverture (tant que l'appli reste ouverte).
+const PAGES_REGLAGES = [
+  ['affichage', 'Affichage', ''],
+  ['libelles', 'Libellés', 'seulement-intermediaire'],
+  ['drive', 'Drive', ''],
+  ['recepteur', 'Récepteur', ''],
+];
+let pageOuverte = 'affichage';
 
 /** « 2 adresse(s) mail · 1 réglage(s) swipos » (listes partagées). */
 function compteListes() {
@@ -144,8 +159,9 @@ function compteListes() {
  * changerMode() : appelé après un changement de mode (pour redessiner les écrans) }.
  * Renvoie { rafraichir() } : redessine le bloc Partage (son état a changé), tant que la fenêtre est ouverte.
  */
-export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage, changerMode }) {
+export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage, changerMode, recepteur = null }) {
   const reglages = lireReglages();
+  if (!PAGES_REGLAGES.some(([cle]) => cle === pageOuverte) || (pageOuverte === 'recepteur' && !recepteur)) pageOuverte = 'affichage';
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-reglages';
   fenetre.innerHTML = `
@@ -153,6 +169,10 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       ${fermerAppli ? `<button type="button" class="bouton bouton-fermer-appli" data-action="fermer-appli">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>Fermer l'appli</button>` : ''}
       <h2>Réglages de cet appareil</h2>
+      <div class="onglets-reglages" role="tablist" aria-label="Parties des réglages">
+        ${PAGES_REGLAGES.filter(([cle]) => cle !== 'recepteur' || recepteur).map(([cle, titre, classe]) => `<button type="button" role="tab" class="onglet-reglages ${classe} ${cle === pageOuverte ? 'actif' : ''}" data-page-reglages="${cle}" aria-selected="${cle === pageOuverte}">${titre}</button>`).join('')}
+      </div>
+      <div class="page-reglages" data-page="affichage">
       <div class="choix-mode-appli" role="radiogroup" aria-label="Mode de l'appli">
         ${MODES.map(([cle, titre]) => `<label class="puce-mode ${reglages.mode === cle ? 'actif' : ''}">
           <input type="radio" name="mode-appli" data-reglage="mode" value="${cle}" ${reglages.mode === cle ? 'checked' : ''} />
@@ -160,6 +180,11 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       </div>
       <label class="case-reglage"><input type="checkbox" data-reglage="telephone" ${reglages.telephone ? 'checked' : ''} />
         <span><strong>Mode téléphone</strong><span class="aide">textes et boutons plus petits</span></span></label>
+      <div class="choix-taille" role="radiogroup" aria-label="Affichage">
+        <span class="titre-taille">Affichage</span>
+        ${THEMES.map(([cle, titre]) => `<label class="puce-mode ${reglages.theme === cle ? 'actif' : ''}">
+          <input type="radio" name="theme" data-reglage="theme" value="${cle}" ${reglages.theme === cle ? 'checked' : ''} />${titre}</label>`).join('')}
+      </div>
       <div class="choix-taille" role="radiogroup" aria-label="Taille des formes de points">
         <span class="titre-taille">Formes des points</span>
         ${TAILLES_FORMES.map(([cle, titre]) => `<label class="puce-mode ${reglages.tailleFormes === cle ? 'actif' : ''}">
@@ -172,6 +197,8 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       </div>
       <label class="case-reglage"><input type="checkbox" data-reglage="aide" ${aideActive ? 'checked' : ''} />
         <span><strong>Bulles d'aide « ? »</strong></span></label>
+      </div>
+      <div class="page-reglages" data-page="libelles">
       <div class="case-reglage listes-reglages seulement-expert">
         <span><strong>Libellés des points</strong><span class="aide">partagés par Drive</span></span>
         <span class="boutons-libelles">
@@ -190,7 +217,14 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
         <span><strong>Listes partagées</strong><span class="aide" data-zone="compte-listes">${compteListes()}</span></span>
         <button type="button" class="bouton-secondaire" data-action="listes">Modifier</button>
       </div>
-      <div class="partage-reglages" data-zone="partage"></div>
+      </div>
+      <div class="page-reglages" data-page="drive">
+        <div class="partage-reglages" data-zone="partage">${partage ? '' : '<p class="aide">Google Drive n\'est pas disponible ici.</p>'}</div>
+      </div>
+      ${recepteur ? `<div class="page-reglages" data-page="recepteur">
+        <button type="button" class="bouton-secondaire bouton-large" data-action="recepteur">Récepteur GNSS, corrections, hauteur de canne…</button>
+      </div>` : ''}
+      <p class="aide version-reglages">Version de l'appli : ${__VERSION_APPLI__}${recepteur ? ' (appli Android)' : ''}</p>
       <div class="ligne-outils">
         <button class="bouton">OK</button>
       </div>
@@ -212,7 +246,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       reglages.telephone = evenement.target.checked;
       ecrireReglages(reglages);
       appliquerReglages(reglages);
-    } else if (champ === 'tailleFormes' || champ === 'tailleTexte') {
+    } else if (champ === 'tailleFormes' || champ === 'tailleTexte' || champ === 'theme') {
       reglages[champ] = evenement.target.value;
       ecrireReglages(reglages);
       appliquerReglages(reglages);
@@ -224,7 +258,26 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       partage?.actions.nommerAppareil(evenement.target.value.trim());
     }
   });
+  /** Montre une seule partie des réglages (onglet touché). */
+  function montrerPage(cle) {
+    pageOuverte = cle;
+    for (const onglet of fenetre.querySelectorAll('[data-page-reglages]')) {
+      onglet.classList.toggle('actif', onglet.dataset.pageReglages === cle);
+      onglet.setAttribute('aria-selected', String(onglet.dataset.pageReglages === cle));
+    }
+    for (const page of fenetre.querySelectorAll('.page-reglages')) page.hidden = page.dataset.page !== cle;
+  }
   fenetre.addEventListener('click', (evenement) => {
+    const onglet = evenement.target.closest('[data-page-reglages]');
+    if (onglet) {
+      montrerPage(onglet.dataset.pageReglages);
+      return;
+    }
+    if (evenement.target.closest('[data-action="recepteur"]')) {
+      fenetre.close();
+      recepteur?.();
+      return;
+    }
     if (evenement.target.closest('[data-action="fermer-appli"]')) {
       fenetre.close();
       fermerAppli();
@@ -292,6 +345,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
   fenetre.addEventListener('focusout', () => setTimeout(rafraichir, 0));
   fenetre.addEventListener('close', () => fenetre.remove());
   document.body.append(fenetre);
+  montrerPage(pageOuverte);
   fenetre.showModal();
   rafraichir();
   return { rafraichir };
