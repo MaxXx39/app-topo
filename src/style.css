@@ -8997,6 +8997,13 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
 }
 
 /* Zone de la Surface Swisstopo (0.109.0) : contour tracé sur le plan, sommets numérotés à glisser. */
+.plan .zone-swisstopo .cercle-zone {
+  fill: rgba(217, 119, 6, 0.12);
+  stroke: #d97706;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
 .plan .zone-swisstopo .contour-zone {
   fill: rgba(220, 38, 38, 0.12);
   stroke: #dc2626;
@@ -9069,4 +9076,34 @@ body.mode-telephone .levee-en-cours .nom-levee-en-cours {
 body.mode-telephone .levee-en-cours .boutons-levee .bouton-secondaire {
   min-height: 30px;
   padding: 2px 8px;
+}
+
+/* 0.111.1 : mode téléphone, « Lever en cours : nom ✎ », Changer et + sur une seule ligne. */
+body.mode-telephone .entete-levee.levee-en-cours {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+body.mode-telephone .levee-en-cours .etiquette-levee {
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+body.mode-telephone .levee-en-cours .nom-levee-en-cours {
+  font-size: 0.9rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.mode-telephone .levee-en-cours .bouton-crayon-levee {
+  flex: 0 0 auto;
+}
+body.mode-telephone .levee-en-cours .boutons-levee {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+body.mode-telephone .levee-en-cours .boutons-levee .bouton-secondaire {
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 0.85rem;
 }

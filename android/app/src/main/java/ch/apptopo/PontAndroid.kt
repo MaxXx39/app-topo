@@ -6,6 +6,9 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.webkit.JavascriptInterface
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Base64
 
 /**
@@ -189,5 +192,41 @@ class PontAndroid(private val ecran: EcranPrincipal) {
         if (vibreur == null || !vibreur.hasVibrator()) return
         // Le motif d'Android commence par une pause : 0 ms, puis vibration, pause, vibration…
         vibreur.vibrate(VibrationEffect.createWaveform(longArrayOf(0L) + durees.toLongArray(), -1))
+    }
+
+    /**
+     * Cadastre (0.112.5) : lit une adresse internet pour la page, sans la protection CORS du
+     * navigateur (le service RDPPF de Vaud n'autorise pas les autres sites). Seulement en https et
+     * vers les services du cadastre (liste HOTES_CADASTRE). Réponse par
+     * window.recevoirAdresse(numero, { ok, statut, texte } ou { erreur }).
+     */
+    @JavascriptInterface
+    fun lireAdresse(numero: Int, adresse: String) {
+        Thread {
+            val reponse = JSONObject()
+            try {
+                val url = URL(adresse)
+                if (url.protocol != "https" || HOTES_CADASTRE.none { url.host == it || url.host.endsWith(".$it") }) {
+                    throw IllegalArgumentException("adresse non autorisée : ${url.host}")
+                }
+                val connexion = url.openConnection() as HttpURLConnection
+                connexion.connectTimeout = 20000
+                connexion.readTimeout = 45000
+                connexion.setRequestProperty("Accept", "application/json, application/xml, text/xml, */*")
+                val statut = connexion.responseCode
+                val flux = if (statut in 200..299) connexion.inputStream else connexion.errorStream
+                val octets = flux?.use { it.readBytes() } ?: ByteArray(0)
+                connexion.disconnect()
+                if (octets.size > 20_000_000) throw IllegalStateException("réponse trop grande")
+                reponse.put("ok", statut in 200..299).put("statut", statut).put("texte", String(octets, Charsets.UTF_8))
+            } catch (erreur: Exception) {
+                reponse.put("erreur", erreur.message ?: erreur.javaClass.simpleName)
+            }
+            ecran.envoyerALaPage("window.recevoirAdresse && window.recevoirAdresse($numero, $reponse)")
+        }.start()
+    }
+
+    private companion object {
+        val HOTES_CADASTRE = listOf("rdppf.vd.ch", "geodienste.ch")
     }
 }

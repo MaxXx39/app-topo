@@ -6,6 +6,8 @@ import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { lireLandXML } from './topo/landxml.js';
 import { creerSurfaceSwisstopo } from './import/zone-swisstopo.js';
+import { creerCadastreAutour } from './import/zone-cadastre.js';
+import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
@@ -99,7 +101,7 @@ import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip 
 import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, listesCadastre, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
@@ -628,7 +630,14 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     return null;
   },
   commencerPointage: () => commencerPointage(),
-  commencerSurfaceSwisstopo: () => surfaceSwisstopo.commencer(),
+  commencerSurfaceSwisstopo: () => {
+    if (cadastreAutour.actif()) cadastreAutour.arreter();
+    surfaceSwisstopo.commencer();
+  },
+  commencerCadastre: () => {
+    if (surfaceSwisstopo.actif()) surfaceSwisstopo.arreter();
+    cadastreAutour.commencer();
+  },
   montrerCalqueDxf: (id, numero, visible) => {
     const calque = projet.plansDxf.find((p) => p.id === id)?.calques[numero];
     if (!calque) return;
@@ -2876,6 +2885,7 @@ function commencerRecalage(id) {
   if (!choisi) return;
   if (pointage.actif) arreterPointage();
   if (surfaceSwisstopo.actif()) surfaceSwisstopo.arreter();
+  if (cadastreAutour.actif()) cadastreAutour.arreter();
   recalage.planId = id;
   recalage.choix = null;
   recalage.candidat = null;
@@ -3138,6 +3148,34 @@ const surfaceSwisstopo = creerSurfaceSwisstopo({
   },
 });
 
+// --- Cadastre autour d'un point (0.112.0, Projet › Import, Expert) : voir import/zone-cadastre.js ---
+const cadastreAutour = creerCadastreAutour({
+  get plan() {
+    return plan;
+  },
+  get cadre() {
+    return document.querySelector('#plan .plan-cadre');
+  },
+  afficherMessage,
+  allerAuPlan: () => {
+    if (estTelephone()) afficherOnglet('plan');
+  },
+  avantDeCommencer: () => {
+    if (pointage.actif) arreterPointage();
+  },
+  nomsPris: () => [...projet.leves.map((l) => l.nom), ...projet.plansDxf.map((p) => p.nom)],
+  // Dans l'APK, les demandes passent par Android (pas de blocage CORS du service RDPPF de Vaud).
+  chercher: (adresse) => (lectureAndroidDisponible() ? lireParAndroid(adresse) : fetch(adresse)),
+  ajouterCadastre: ({ nom, points, planDxf }) => {
+    const leve = ajouterLeve(projet, nom, points);
+    // 0.113 : liste marquée « cadastre », cachée au départ (seules les lignes du DXF se voient).
+    leve.cadastre = true;
+    projet.listesCachees = [...new Set([...(projet.listesCachees ?? []), leve.id])];
+    if (planDxf) projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...planDxf });
+    modifie({ recadrer: true });
+  },
+});
+
 // --- Points ajoutés en touchant le plan DXF (Projet › Imports › Point › Pointer sur le plan DXF) ---
 // pointage : { actif, accroche ('sommet', 'milieu', 'ligne', 'centre'), choix (point touché, à
 // contrôler et valider : { est, nord, altitude }) }. Le plan ne bouge pas : une croix montre le
@@ -3148,6 +3186,7 @@ const ACCROCHES_POINTAGE = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne'
 /** Début du pointage : une barre sur le plan (accroche, Terminé) ; sur téléphone, on va au plan. */
 function commencerPointage() {
   if (surfaceSwisstopo.actif()) surfaceSwisstopo.arreter();
+  if (cadastreAutour.actif()) cadastreAutour.arreter();
   pointage.actif = true;
   pointage.choix = null;
   dessinerBarrePointage();
@@ -4116,7 +4155,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
   // Couleur d'une liste (menu « Afficher » ; aussi dans Projet › Listes de points).
   quandColorerListe: (id, couleur) => colorerListe(id, couleur),
   quandToucherPhoto: (id) => montrerPhoto(id),
-  quandChangerZone: (sommets) => surfaceSwisstopo.changerZone(sommets),
+  quandChangerZone: (sommets) => (cadastreAutour.actif() ? cadastreAutour.changerZone(sommets) : surfaceSwisstopo.changerZone(sommets)),
   quandMontrerListe: (id, visible) => {
     if (id === '*') projet.listesCachees = visible ? [] : listesDePoints(projet).map((l) => l.id);
     else montrerListe(projet, id, visible);
@@ -4524,6 +4563,7 @@ function recalculer({ recadrer = false } = {}) {
   const gardees = listesDuTravail(toutesLesListes);
   const listes = gardees ? toutesLesListes.map((l) => ({ ...l, visible: l.visible && gardees.has(l.id) })) : toutesLesListes;
   plan.afficherCouleursPoints(couleursDesPoints(projet, listes));
+  plan.afficherPointsImport(pointsDesImports(projet, listes));
   plan.afficherPhotos(photosDuPlan(listes));
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
@@ -4991,7 +5031,8 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   // Tableau « Affichage » (0.94.0) : au démarrage, tout est montré (listes, plans DXF et leurs calques).
   if (!affichageRemisAZero) {
     affichageRemisAZero = true;
-    projet.listesCachees = [];
+    // 0.113 : sauf les listes Cadastre (on voit seulement les lignes de leur plan DXF).
+    projet.listesCachees = listesCadastre(projet);
     for (const planDxf of projet.plansDxf ?? []) {
       planDxf.visible = true;
       for (const calque of planDxf.calques ?? []) calque.visible = true;

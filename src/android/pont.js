@@ -152,3 +152,40 @@ export function lireReglagesCorrections() {
 /** Démarre les corrections : { hote, port, pointDeMontage, utilisateur, motDePasse ('' = garder l'ancien) }. */
 export const demarrerCorrections = (reglages) => window.AppliAndroid.demarrerCorrections(JSON.stringify(reglages));
 export const arreterCorrections = () => window.AppliAndroid.arreterCorrections();
+
+// --- Lecture d'une adresse par l'appli Android (0.112.5, cadastre) : sans la protection CORS du
+// navigateur (le service RDPPF de Vaud n'autorise pas les autres sites). Côté Android :
+// PontAndroid.lireAdresse, seulement vers rdppf.vd.ch et geodienste.ch.
+let numeroDemande = 0;
+const demandesEnCours = new Map();
+
+/** Vrai si l'appli Android sait lire une adresse elle-même. */
+export function lectureAndroidDisponible() {
+  return estDansAppliAndroid() && typeof window.AppliAndroid.lireAdresse === 'function';
+}
+
+/**
+ * Comme fetch(adresse), mais par l'appli Android : promesse d'un objet { ok, status, text() }.
+ * Échec (réseau, adresse refusée, 60 s sans réponse) : erreur comme fetch.
+ */
+export function lireParAndroid(adresse) {
+  if (!window.recevoirAdresse) {
+    window.recevoirAdresse = (numero, reponse) => {
+      const demande = demandesEnCours.get(numero);
+      if (!demande) return;
+      demandesEnCours.delete(numero);
+      clearTimeout(demande.minuterie);
+      if (reponse?.erreur) demande.rater(new Error(reponse.erreur));
+      else demande.tenir({ ok: Boolean(reponse.ok), status: reponse.statut, text: async () => String(reponse.texte ?? '') });
+    };
+  }
+  return new Promise((tenir, rater) => {
+    const numero = ++numeroDemande;
+    const minuterie = setTimeout(() => {
+      demandesEnCours.delete(numero);
+      rater(new Error('pas de réponse en 60 s'));
+    }, 60000);
+    demandesEnCours.set(numero, { tenir, rater, minuterie });
+    window.AppliAndroid.lireAdresse(numero, adresse);
+  });
+}

@@ -1,0 +1,124 @@
+// Cadastre autour d'un point (0.112.0, Projet › Import, mode Expert) : on touche le plan (un point),
+// on donne un rayon en mètres, « Valider » : l'appli demande au service du canton les points
+// limites et les parcelles dans le cercle, puis crée une liste de points « Cadastre N » (points
+// CAD-n, sans altitude) et un plan DXF « Cadastre N » (les limites, pour l'accroche Sommet / Milieu /
+// Sur ligne). Calculs : topo/cadastre.js ; téléchargement : import/cadastre.js.
+import { echapper } from '../outils/echapper.js';
+import { telechargerCadastre } from './cadastre.js';
+import { telechargerRdppf } from './rdppf.js';
+import { lirePlanDxf } from '../topo/dxf-plan.js';
+import { garderDansLeCercle, pointsDuCadastre, dxfDuCadastre, nomDeLaListe, lireRayon, RAYON_DEPART, RAYON_MIN, RAYON_MAX } from '../topo/cadastre.js';
+
+/**
+ * outils : { plan, cadre, afficherMessage(texte, duree), allerAuPlan(), avantDeCommencer(),
+ * nomsPris() (noms des listes de points), ajouterCadastre({ nom, points, planDxf }), chercher }.
+ * Renvoie { commencer(), arreter(), changerZone(sommets), actif() }.
+ */
+export function creerCadastreAutour(outils) {
+  let centre = null; // { est, nord } touché
+  let dejaTrace = false; // cercle déjà donné au plan
+  let actif = false;
+  let occupe = false;
+  let rayonTape = String(RAYON_DEPART);
+  let barre = null;
+
+  function dessinerBarre() {
+    if (!barre) {
+      barre = document.createElement('div');
+      barre.className = 'barre-pointage barre-swisstopo';
+      barre.addEventListener('click', (evenement) => {
+        const action = evenement.target.closest('button[data-action]')?.dataset.action;
+        if (action === 'fermer') arreter();
+        else if (action === 'valider') valider();
+      });
+      barre.addEventListener('input', (evenement) => {
+        if (evenement.target.matches('[data-champ="rayon"]')) {
+          rayonTape = evenement.target.value;
+          // 0.113.1 : le cercle suit le rayon tapé (sans redessiner la barre : le clavier reste ouvert).
+          if (centre) outils.plan.tracerZone({ sommets: [centre], rayon: lireRayon(rayonTape) });
+        }
+      });
+      outils.cadre.append(barre);
+    }
+    barre.innerHTML = `<div class="ligne-barre-pointage">
+        <span class="titre-pointage">Cadastre autour d'un point</span>
+        <button type="button" class="bouton-lien" data-action="fermer" ${occupe ? 'disabled' : ''}>fermer</button>
+      </div>
+      <div class="ligne-barre-pointage">
+        <label>Rayon (m) <input type="text" inputmode="decimal" data-champ="rayon" value="${echapper(rayonTape)}" size="4" ${occupe ? 'disabled' : ''} /></label>
+        <button type="button" class="bouton" data-action="valider" ${!centre || occupe ? 'disabled' : ''}>${occupe ? 'Patiente…' : 'Valider'}</button>
+      </div>
+      ${centre ? '' : `<p class="aide-pointage">${echapper('Touche le plan')}</p>`}`;
+  }
+
+  function commencer() {
+    outils.avantDeCommencer?.();
+    centre = null;
+    dejaTrace = false;
+    actif = true;
+    occupe = false;
+    outils.plan.tracerZone({ sommets: [] });
+    dessinerBarre();
+    outils.allerAuPlan?.();
+  }
+
+  function arreter() {
+    actif = false;
+    centre = null;
+    occupe = false;
+    barre?.remove();
+    barre = null;
+    outils.plan.tracerZone(null);
+  }
+
+  /** Point touché ou glissé sur le plan : seul le dernier compte. */
+  function changerZone(sommets) {
+    if (!actif || occupe || sommets.length === 0) return;
+    centre = { est: sommets[sommets.length - 1].est, nord: sommets[sommets.length - 1].nord };
+    // Un seul point, avec le cercle du rayon (0.113.1). Pas pendant un glissé (le plan garde le
+    // cercle et le déplacement continuerait d'être coupé).
+    if (sommets.length > 1 || !dejaTrace) outils.plan.tracerZone({ sommets: [centre], rayon: lireRayon(rayonTape) });
+    dejaTrace = true;
+    dessinerBarre();
+  }
+
+  async function valider() {
+    const rayon = lireRayon(rayonTape);
+    if (rayon === null) {
+      outils.afficherMessage(`Cadastre : rayon de ${RAYON_MIN} à ${RAYON_MAX} m`, 6000);
+      return;
+    }
+    occupe = true;
+    dessinerBarre();
+    try {
+      const progres = (texte) => outils.afficherMessage(texte, null);
+      let recu;
+      try {
+        recu = await telechargerCadastre(centre, rayon, 'VD', progres, outils.chercher);
+      } catch (erreur) {
+        // Pas en accès libre sur geodienste.ch (Vaud) → service RDPPF de Vaud (APK seulement, CORS).
+        if (!/accès libre/.test(erreur.message)) throw erreur;
+        recu = await telechargerRdppf(centre, rayon, progres, outils.chercher);
+      }
+      const dedans = garderDansLeCercle(recu, centre, rayon);
+      const points = pointsDuCadastre(dedans);
+      if (points.length === 0) {
+        // 0.112.2 : dire ce qui a été reçu, pour comprendre (coordonnées loin du point touché ?).
+        const exemple = recu.points[0] ?? recu.lignes[0]?.[0];
+        const recus = `${recu.points.length} point(s) et ${recu.lignes.length} ligne(s) reçus`;
+        throw new Error(exemple ? `rien dans ce cercle : ${recus}, par ex. E ${exemple[0].toFixed(3)} N ${exemple[1].toFixed(3)} (point touché E ${centre.est.toFixed(3)} N ${centre.nord.toFixed(3)})` : `aucun point limite dans ce cercle (${recus})`);
+      }
+      const nom = nomDeLaListe(outils.nomsPris());
+      const { plan: planDxf } = dedans.lignes.length > 0 ? lirePlanDxf(dxfDuCadastre(dedans.lignes), nom) : {};
+      arreter();
+      outils.ajouterCadastre({ nom, points, planDxf: planDxf ?? null });
+      outils.afficherMessage(`${nom} : ${points.length} point(s) limite(s), ${dedans.lignes.length} ligne(s)`, 6000);
+    } catch (erreur) {
+      occupe = false;
+      if (actif) dessinerBarre();
+      outils.afficherMessage(`Cadastre : ${erreur.message}`, 30000);
+    }
+  }
+
+  return { commencer, arreter, changerZone, actif: () => actif };
+}
