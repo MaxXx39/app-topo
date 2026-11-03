@@ -45,7 +45,7 @@ export async function telechargerRdppf(centre, rayon, progres = () => {}, cherch
           continue;
         }
       } catch {
-        derniere = 'service RDPPF injoignable (réseau, ou le service refuse l\'appli)';
+        derniere = 'injoignable (réseau ; sur le site internet, le service de Vaud refuse l\'appli : passer par l\'APK Android)';
         continue;
       }
       const contours = contoursDeReponse(texte);

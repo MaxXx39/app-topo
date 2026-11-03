@@ -697,6 +697,11 @@ class EcranPrincipal : Activity() {
         }
     }
 
+    /** Exécute un petit script dans la page (réponse d'une demande faite par l'appli Android). */
+    fun envoyerALaPage(script: String) {
+        runOnUiThread { page.evaluateJavascript(script, null) }
+    }
+
     /** Envoie le jeton (ou la raison de l'échec) à la page. */
     private fun envoyerJetonDrive(jeton: String?, raisonSiAbsent: String) {
         val reponse = if (jeton != null) JSONObject().put("ok", true).put("jeton", jeton)

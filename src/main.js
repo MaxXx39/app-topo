@@ -7,6 +7,7 @@ import { lirePoints } from './topo/import-points.js';
 import { lireLandXML } from './topo/landxml.js';
 import { creerSurfaceSwisstopo } from './import/zone-swisstopo.js';
 import { creerCadastreAutour } from './import/zone-cadastre.js';
+import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
@@ -3163,6 +3164,8 @@ const cadastreAutour = creerCadastreAutour({
     if (pointage.actif) arreterPointage();
   },
   nomsPris: () => [...projet.leves.map((l) => l.nom), ...projet.plansDxf.map((p) => p.nom)],
+  // Dans l'APK, les demandes passent par Android (pas de blocage CORS du service RDPPF de Vaud).
+  chercher: (adresse) => (lectureAndroidDisponible() ? lireParAndroid(adresse) : fetch(adresse)),
   ajouterCadastre: ({ nom, points, planDxf }) => {
     ajouterLeve(projet, nom, points);
     if (planDxf) projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...planDxf });
