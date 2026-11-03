@@ -100,7 +100,7 @@ import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecter
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip } from './outils/son.js';
 import { rythmeBip } from './topo/bip.js';
-import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation } from './topo/controle.js';
+import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation, classeTolerance, TOLERANCES_PAR_DEFAUT } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, listesCadastre, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
@@ -186,7 +186,8 @@ terrain.lame = { machine: 'grader', ...terrain.lame };
 // inverse, decalage (m, + à droite), altitudes: { debut, fin } (tapées, ou null) }).
 // Talus : la ligne est implanter.ligne, ses réglages terrain.talus ; talusId : talus de « Mes talus »
 // ouvert (ses changements y sont gardés), ou null.
-const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null, talusId: null };
+// voirLigne (0.118.0) : case « Voir toute la ligne » du plan, décochée au départ et pour chaque nouvelle ligne.
+const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null, talusId: null, voirLigne: false };
 // Mode Contrôler (autocontrôle) : point de contrôle vers lequel on guide ({ id, nom, est, nord, altitude }) ou null.
 const autocontrole = { cible: null };
 const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
@@ -1166,6 +1167,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       },
       changerLigne: () => {
         implanter.ligne = null;
+        implanter.voirLigne = false;
         implanter.talusId = null;
         montrerImplantation();
       },
@@ -1555,6 +1557,10 @@ function envoyerImplantationAuPlan() {
   const cibleControle = enAutocontrole() && ongletContexte === 'terrain' ? autocontrole.cible : null;
   // Dessins (Calculs › Dessin) : toujours sur le plan ; le dessin en cours avec son pilote.
   const avecPilote = piloteActif();
+  // Case « Voir toute la ligne » (0.118.0) : seulement pendant le guidage d'une ligne (pas d'un talus).
+  const guidageLigne = ongletContexte === 'terrain' && enImplantationDeLigne() && !enTalus() && Boolean(implanter.ligne);
+  if (!guidageLigne) implanter.voirLigne = false;
+  plan.voirLigne({ visible: guidageLigne, sommets: guidageLigne && implanter.voirLigne ? implanter.ligne.sommets : null });
   plan.afficherImplantation(accrocheActive || avecPilote || aImplanter.length > 0 || implantes.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0
     ? {
         actif: accrocheActive || avecPilote,
@@ -2584,6 +2590,8 @@ function calculerImplantationLigne(etat) {
   return {
     ligne: g,
     classe: fiable ? classeDistance(Math.abs(g.ecart)) : 'pas-fiable',
+    // Gauche / droite (0.118.0) : vert / orange / rouge selon la tolérance en plan du Contrôle.
+    classeLaterale: fiable ? classeTolerance(g.ecart, projet.tolerancesControle?.plan ?? TOLERANCES_PAR_DEFAUT.plan) : 'pas-fiable',
     ecartAltitude,
     classeAltitude: ecartAltitude == null ? null : classeEcart(ecartAltitude),
     message: null,
@@ -4209,6 +4217,12 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherStock: (index) => editeurSurfaces.choisir(index),
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
   quandToucherImplantation: toucherPourImplantation,
+  // « Voir toute la ligne » (0.118.0) cochée ou décochée (aussi décochée par « Ma position »).
+  quandVoirLigne: (coche) => {
+    implanter.voirLigne = coche && Boolean(implanter.ligne);
+    envoyerImplantationAuPlan();
+    if (!coche) plan.rafraichirImplantation();
+  },
   quandReglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
   // Menu « Points » : cocher / décocher une liste de points ('*' : toutes). Pas une modification
   // du travail (rien à annuler) : on redessine et on enregistre.

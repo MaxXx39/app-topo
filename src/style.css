@@ -9889,3 +9889,167 @@ body.mode-telephone .entete-icone-bouton.bouton-reglages svg { width: 34px; heig
 .bouton-reglages .marche-arret { stroke-width: 2.2; }
 /* Le dessin peut déborder un peu de sa case sans être coupé. */
 .entete-icone-bouton.bouton-reglages svg { overflow: visible; }
+
+/* ===== 0.118.0 : guidage d'une ligne plus clair (maquette n° 3 validée le 03.11) =====
+   Bloc coloré gauche / droite (tolérance en plan du Contrôle) avec le début en grand et la fin en
+   petit, monter / descendre dessous, couloir vertical à droite sur toute la hauteur ; bascule
+   « Toute la polyligne / Segment » ; case « Voir toute la ligne » sur le plan ; même sarcelle pour
+   la ligne sur le plan et dans le couloir. */
+.plan .ligne-a-implanter { stroke: #14b8a6; stroke-width: 5; }
+
+.vue-guidage .guidage-direct.ligne-nette {
+  display: grid;
+  grid-template-columns: 1fr 74px;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 0;
+  padding: 10px;
+  background: var(--sombre);
+  color: #ffffff;
+  text-align: left;
+}
+.ligne-nette .colonne-ecarts { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ligne-nette .bloc-lateral,
+.ligne-nette .bloc-hauteur {
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: #475569;
+  color: #ffffff;
+}
+.ligne-nette .bloc-lateral.vert { background: #16a34a; }
+.ligne-nette .bloc-lateral.orange { background: #f59e0b; color: #1f2937; }
+.ligne-nette .bloc-lateral.rouge { background: #dc2626; }
+.ligne-nette .bloc-lateral.pas-fiable { background: #9ca3af; color: #111827; }
+.ligne-nette .ligne-ecart {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  white-space: nowrap;
+}
+.ligne-nette .ligne-debut { border-top: 1px solid rgba(255, 255, 255, 0.35); margin-top: 6px; padding-top: 6px; }
+.ligne-nette .bloc-lateral.orange .ligne-debut,
+.ligne-nette .bloc-lateral.pas-fiable .ligne-debut { border-top-color: rgba(0, 0, 0, 0.25); }
+.ligne-nette .libelle-ecart {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+.ligne-nette .ligne-ecart strong,
+.ligne-nette .bloc-hauteur strong {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.ligne-nette .icone-fleche {
+  width: 2.2rem;
+  height: 2.2rem;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ligne-nette .libelle-ecart .icone-drapeau { width: 2.1rem; height: 2.4rem; flex-shrink: 0; }
+.ligne-nette .fin-petite {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+.ligne-nette .fin-petite .icone-drapeau { width: 0.9rem; height: 1rem; }
+.ligne-nette .bloc-hauteur { display: flex; align-items: center; justify-content: space-between; gap: 8px; white-space: nowrap; }
+.ligne-nette .bloc-hauteur .libelle-ecart { font-size: 1.2rem; }
+.ligne-nette .bloc-hauteur .icone-fleche { width: 1.9rem; height: 1.9rem; }
+.ligne-nette .bloc-hauteur.vert-clair { background: #86efac; color: #14532d; }
+.ligne-nette .bloc-hauteur.jaune-orange { background: #f59e0b; color: #451a03; }
+.ligne-nette .bloc-hauteur.rouge { background: var(--rouge); color: #ffffff; }
+.ligne-nette .bloc-hauteur.bleu { background: var(--bleu); color: #ffffff; }
+.ligne-nette .bloc-hauteur.sans-altitude { background: transparent; color: #cbd5e1; font-size: 0.95rem; justify-content: center; }
+.ligne-nette .couloir-vertical {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  border-radius: 10px;
+  background: #0f172a;
+}
+.couloir-vertical .trait-couloir { stroke: #14b8a6; stroke-width: 6; }
+.couloir-vertical .bout-couloir { stroke: #e2e8f0; stroke-width: 3; }
+.couloir-vertical .moi { stroke: #ffffff; stroke-width: 3; }
+
+/* Bascule « Toute la polyligne / Segment » : deux moitiés, une seule choisie. */
+.vue-guidage .bascule-segment {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  margin: 4px 0;
+  border-radius: 10px;
+  background: var(--fond);
+}
+.vue-guidage .bascule-segment .puce-choix {
+  flex: 1;
+  margin: 0;
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gris);
+  font-weight: 700;
+}
+.vue-guidage .bascule-segment .puce-choix.actif { background: var(--sarcelle, #0d9488); color: #ffffff; }
+.vue-guidage .titre-vue-guidage .longueur-ligne { font-weight: 400; color: var(--gris); }
+
+/* Réglages ⚙ de la ligne : altitudes du début et de la fin. */
+.reglages-guidage .altitudes-bouts { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.reglages-guidage .altitudes-bouts .icone-drapeau { width: 16px; height: 18px; }
+
+/* Case « Voir toute la ligne » posée sur le plan (en bas à gauche, au-dessus de l'échelle). */
+.plan-cadre .case-voir-ligne {
+  position: absolute;
+  left: 10px;
+  bottom: 34px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1f2937;
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.plan-cadre .case-voir-ligne[hidden] { display: none; }
+.plan-cadre .case-voir-ligne input { width: 20px; height: 20px; margin: 0; accent-color: #0d9488; }
+
+/* 0.118.0 sur téléphone (mode téléphone ou écran étroit) : chiffres et couloir resserrés, tout
+   tient sans déborder et « Enregistrer » reste visible. */
+@media (max-width: 520px) {
+  .vue-guidage .guidage-direct.ligne-nette { grid-template-columns: 1fr 46px; gap: 6px; padding: 6px; }
+  .ligne-nette .bloc-lateral, .ligne-nette .bloc-hauteur { padding: 6px 8px; }
+  .ligne-nette .libelle-ecart, .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 17px; gap: 4px; }
+  .ligne-nette .ligne-ecart strong, .ligne-nette .bloc-hauteur strong { font-size: 27px; }
+  .ligne-nette .icone-fleche, .ligne-nette .bloc-hauteur .icone-fleche { width: 24px; height: 24px; }
+  .ligne-nette .libelle-ecart .icone-drapeau { width: 22px; height: 26px; }
+  .ligne-nette .fin-petite { font-size: 12px; }
+  .ligne-nette .couloir-vertical { min-height: 130px; }
+  .vue-guidage .bascule-segment .puce-choix { min-height: 34px; font-size: 13px; }
+}
+body.mode-telephone .vue-guidage .guidage-direct.ligne-nette { grid-template-columns: 1fr 46px; gap: 6px; padding: 6px; }
+body.mode-telephone .ligne-nette .bloc-lateral, body.mode-telephone .ligne-nette .bloc-hauteur { padding: 6px 8px; }
+body.mode-telephone .ligne-nette .libelle-ecart, body.mode-telephone .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 17px; gap: 4px; }
+body.mode-telephone .ligne-nette .ligne-ecart strong, body.mode-telephone .ligne-nette .bloc-hauteur strong { font-size: 27px; }
+body.mode-telephone .ligne-nette .icone-fleche { width: 24px; height: 24px; }
+body.mode-telephone .ligne-nette .libelle-ecart .icone-drapeau { width: 22px; height: 26px; }
+body.mode-telephone .ligne-nette .fin-petite { font-size: 12px; }
+body.mode-telephone .ligne-nette .couloir-vertical { min-height: 130px; }
+body.mode-telephone .vue-guidage .bascule-segment .puce-choix { min-height: 34px; font-size: 13px; }
+body.mode-telephone .plan-cadre .case-voir-ligne { padding: 5px 10px; font-size: 12px; }

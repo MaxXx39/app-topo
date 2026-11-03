@@ -48,6 +48,48 @@ export function cadrerSurPoints(points, largeur, hauteur, marge = 30) {
   };
 }
 
+/**
+ * Vue qui montre tous les points, le plan tourné de "rotation" degrés (direction du terrain en haut,
+ * voir plus haut) : le cadre est cherché dans le plan tourné, les points sont donc bien au milieu
+ * et le plus grand possible quelle que soit l'orientation (0.118.0, « Voir toute la ligne »).
+ * marge en pixels. Sans point lisible : null.
+ */
+export function cadrerSurPointsTourne(points, largeur, hauteur, rotation = 0, marge = 30) {
+  const lisibles = points.filter((p) => Number.isFinite(p?.est) && Number.isFinite(p?.nord));
+  if (lisibles.length === 0) return null;
+  const { cos, sin } = angleDe({ rotation });
+  // Coordonnées dans le plan tourné (u vers la droite de l'écran, v vers le haut), depuis le 1er point.
+  const origine = lisibles[0];
+  let uMin = Infinity;
+  let uMax = -Infinity;
+  let vMin = Infinity;
+  let vMax = -Infinity;
+  for (const p of lisibles) {
+    const dEst = p.est - origine.est;
+    const dNord = p.nord - origine.nord;
+    const u = dEst * cos - dNord * sin;
+    const v = dEst * sin + dNord * cos;
+    if (u < uMin) uMin = u;
+    if (u > uMax) uMax = u;
+    if (v < vMin) vMin = v;
+    if (v > vMax) vMax = v;
+  }
+  const largeurUtile = Math.max(largeur - 2 * marge, 1);
+  const hauteurUtile = Math.max(hauteur - 2 * marge, 1);
+  const echelle = Math.min(largeurUtile / Math.max(uMax - uMin, 1), hauteurUtile / Math.max(vMax - vMin, 1));
+  // Milieu du cadre, ramené en Est / Nord (rotation inverse).
+  const u = (uMin + uMax) / 2;
+  const v = (vMin + vMax) / 2;
+  return {
+    echelle,
+    estCentre: origine.est + u * cos + v * sin,
+    nordCentre: origine.nord - u * sin + v * cos,
+    largeur,
+    hauteur,
+    rotation,
+  };
+}
+
 /** Cosinus et sinus de la rotation de la vue. */
 function angleDe(vue) {
   const r = ((vue.rotation ?? 0) * Math.PI) / 180;

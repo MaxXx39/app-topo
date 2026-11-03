@@ -1,6 +1,6 @@
 // Affichage du plan : points avec leur nom, zoom et déplacement
 // au doigt (téléphone) ou à la souris (ordinateur).
-import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
+import { cadrerSurPoints, cadrerSurPointsTourne, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
 import { bulle } from '../aide/bulles.js';
 import { aAcces, rayonFormes, echelleTexte } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
@@ -87,7 +87,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandBasculerSeul(actif) : bouton « Seul » (seulement ce sur quoi je travaille, 0.94.0)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne } = {}) {
   // Réglages choisis ; « calques » est ce qui est dessiné : en dessous d'Expert, les réglages
   // d'Expert gardent leur valeur de départ.
   const calquesChoisis = { ...CALQUES_DEPART };
@@ -136,6 +136,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           <label class="case"><input type="checkbox" data-calque="cadastre" /> Cadastre</label>
         </div>
       </div>
+      <label class="case-voir-ligne" hidden><input type="checkbox" data-action="voir-ligne" /> Voir toute la ligne</label>
       <div class="plan-boutons">
         <button type="button" data-action="zoom-plus" aria-label="Zoomer">+</button>
         <button type="button" data-action="zoom-moins" aria-label="Dézoomer">−</button>
@@ -162,6 +163,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const fond = conteneur.querySelector('.plan-fond');
   const canvasDxf = conteneur.querySelector('.plan-dxf-canvas');
   const attribution = conteneur.querySelector('.plan-attribution');
+  const caseVoirLigne = conteneur.querySelector('.case-voir-ligne');
+  caseVoirLigne.querySelector('input').addEventListener('change', (evenement) => quandVoirLigne?.(evenement.target.checked));
   // Images des tuiles affichées, rangées par adresse (pour les réutiliser d'un dessin à l'autre).
   const tuilesAffichees = new Map();
   let fondIndisponible = false;
@@ -176,6 +179,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // recentre et tourne : le devant du RX2 en haut). Déplacer le plan au doigt arrête le suivi
   // (le plan garde son angle ; la boussole du plan le remet nord en haut).
   let suivi = 'libre';
+  // « Voir toute la ligne » (0.118.0, Implanter › Ligne) : sommets de la ligne entière, gardée au
+  // milieu du plan et le plus grand possible, le plan tourné comme le récepteur (cap) ; ou null.
+  let ligneVue = null;
   // Plans DXF en fond (voir topo/dxf-plan.js), dessinés sur un canvas sous le dessin (voir
   // dxf-canvas.js) ; redessinés seulement si la vue ou les plans changent (signatureDxf).
   let plansDxf = [];
@@ -1413,6 +1419,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   // 1er toucher : suivre (nord en haut) ; puis on passe de « nord en haut » à « devant en haut ».
   boutonPosition.addEventListener('click', () => {
+    // « Ma position » reprend la main sur « Voir toute la ligne » (la case se décoche).
+    if (ligneVue) {
+      ligneVue = null;
+      quandVoirLigne?.(false);
+    }
     if (suivi === 'suivre') {
       changerSuivi('cap');
       if (position?.azimut != null) tournerVers(position.azimut);
@@ -1435,6 +1446,20 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   /** Écart entre deux angles (°), entre −180 et 180. */
   function ecartAngle(a, b) {
     return ((((a - b) % 360) + 540) % 360) - 180;
+  }
+
+  /**
+   * « Voir toute la ligne » : la ligne entière au milieu, tournée de "rotation" (cap du récepteur,
+   * sinon l'angle actuel du plan).
+   */
+  function cadrerSurLigne(rotation = vue?.rotation ?? 0) {
+    const { largeur, hauteur } = taille();
+    if (!ligneVue || largeur === 0 || hauteur === 0) return;
+    // Marge de 70 px : les boutons du plan (en haut) et la case (en bas) ne cachent pas les bouts.
+    const cadre = cadrerSurPointsTourne(ligneVue, largeur, hauteur, rotation, 70);
+    if (!cadre) return;
+    vue = cadre;
+    dessiner();
   }
 
   /** Tourne le plan pour que "azimut" (°) soit en haut, centré sur la position. */
@@ -1959,7 +1984,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       return;
     }
     vue = { ...vue, ...nouvelleTaille };
-    dessiner();
+    if (ligneVue) cadrerSurLigne();
+    else dessiner();
   }).observe(svg);
 
   return {
@@ -1983,6 +2009,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const premiere = !position && nouvellePosition;
       position = nouvellePosition;
       boutonPosition.hidden = !position;
+      // « Voir toute la ligne » : on ne tourne (et recadre) que si le cap a changé de plus de 3°.
+      if (ligneVue) {
+        if (position?.azimut != null && vue && Math.abs(ecartAngle(position.azimut, vue.rotation ?? 0)) > 3) cadrerSurLigne(position.azimut);
+        else if (!vue) cadrerSurLigne();
+        else dessinerPosition();
+        return;
+      }
       // Suivi : on ne recentre (et ne redessine tout) que si la position s'approche du bord.
       if (position && suivi === 'cap' && position.azimut != null && vue && Math.abs(ecartAngle(position.azimut, vue.rotation ?? 0)) > 3) tournerVers(position.azimut);
       else if (position && (!vue || (suivi !== 'libre' && loinDuCentre()) || (premiere && points.length === 0))) centrerSurPosition();
@@ -2042,6 +2075,22 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (geste) return;
       dessinerImplantation();
       dessinerPosition();
+    },
+    /**
+     * Case « Voir toute la ligne » (0.118.0) : visible (implantation d'une ligne) et cochée ou non ;
+     * cochée, "sommets" = la ligne entière à garder au milieu du plan, tourné comme le récepteur.
+     */
+    voirLigne({ visible, sommets = null }) {
+      caseVoirLigne.hidden = !visible;
+      const nouvelle = visible && sommets?.length >= 2 ? sommets : null;
+      caseVoirLigne.querySelector('input').checked = Boolean(nouvelle);
+      const avant = ligneVue;
+      ligneVue = nouvelle;
+      if (!nouvelle) return;
+      changerSuivi('libre');
+      // Recadrage seulement si la ligne a changé (pas à chaque redessin de l'écran).
+      const memes = avant && avant.length === nouvelle.length && avant.every((p, i) => p.est === nouvelle[i].est && p.nord === nouvelle[i].nord);
+      if (!memes) cadrerSurLigne(position?.azimut ?? vue?.rotation ?? 0);
     },
     /** Cadre le plan sur ces points [{ est, nord }], sur au moins "minimum" mètres (implantation). */
     cadrerSur(coins, minimum = 10) {
