@@ -101,7 +101,7 @@ import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip 
 import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, listesCadastre, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
@@ -3167,7 +3167,10 @@ const cadastreAutour = creerCadastreAutour({
   // Dans l'APK, les demandes passent par Android (pas de blocage CORS du service RDPPF de Vaud).
   chercher: (adresse) => (lectureAndroidDisponible() ? lireParAndroid(adresse) : fetch(adresse)),
   ajouterCadastre: ({ nom, points, planDxf }) => {
-    ajouterLeve(projet, nom, points);
+    const leve = ajouterLeve(projet, nom, points);
+    // 0.113 : liste marquée « cadastre », cachée au départ (seules les lignes du DXF se voient).
+    leve.cadastre = true;
+    projet.listesCachees = [...new Set([...(projet.listesCachees ?? []), leve.id])];
     if (planDxf) projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...planDxf });
     modifie({ recadrer: true });
   },
@@ -4560,6 +4563,7 @@ function recalculer({ recadrer = false } = {}) {
   const gardees = listesDuTravail(toutesLesListes);
   const listes = gardees ? toutesLesListes.map((l) => ({ ...l, visible: l.visible && gardees.has(l.id) })) : toutesLesListes;
   plan.afficherCouleursPoints(couleursDesPoints(projet, listes));
+  plan.afficherPointsImport(pointsDesImports(projet, listes));
   plan.afficherPhotos(photosDuPlan(listes));
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
@@ -5027,7 +5031,8 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   // Tableau « Affichage » (0.94.0) : au démarrage, tout est montré (listes, plans DXF et leurs calques).
   if (!affichageRemisAZero) {
     affichageRemisAZero = true;
-    projet.listesCachees = [];
+    // 0.113 : sauf les listes Cadastre (on voit seulement les lignes de leur plan DXF).
+    projet.listesCachees = listesCadastre(projet);
     for (const planDxf of projet.plansDxf ?? []) {
       planDxf.visible = true;
       for (const calque of planDxf.calques ?? []) calque.visible = true;

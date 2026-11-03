@@ -5,6 +5,7 @@ import {
 } from '../src/topo/cadastre.js';
 import { telechargerCadastre, adressesGetFeature } from '../src/import/cadastre.js';
 import { lirePlanDxf } from '../src/topo/dxf-plan.js';
+import { listesDePoints, pointsDesImports, listesCadastre } from '../src/plan/listes-points.js';
 
 const GML2 = `<wfs:FeatureCollection xmlns:gml="http://www.opengis.net/gml"><gml:featureMember><ms:Grenzpunkt><ms:geom><gml:Point><gml:coordinates>2538000.500,1152000.250</gml:coordinates></gml:Point></ms:geom></ms:Grenzpunkt></gml:featureMember>
 <gml:featureMember><ms:Liegenschaft><ms:geom><gml:Polygon><gml:outerBoundaryIs><gml:LinearRing><gml:coordinates>2538000.5,1152000.25 2538010,1152000.25 2538010,1152010 2538000.5,1152000.25</gml:coordinates></gml:LinearRing></gml:outerBoundaryIs></gml:Polygon></ms:geom></ms:Liegenschaft></gml:featureMember></wfs:FeatureCollection>`;
@@ -97,5 +98,13 @@ describe('cadastre', () => {
   it('dit les couches trouvées quand aucune ne convient', async () => {
     const chercher = async () => ({ ok: true, status: 200, text: async () => '<FeatureType><Name>ms:Autre</Name></FeatureType>' });
     await expect(telechargerCadastre({ est: 2538000, nord: 1152000 }, 50, 'VD', () => {}, chercher)).rejects.toThrow(/ms:Autre/);
+  });
+  it('listes Cadastre (cachées au départ) et points des Points Import', () => {
+    const a = { nom: 'CAD-1', est: 1, nord: 2 };
+    const projet = { leves: [{ id: 'c', nom: 'Cadastre 1', cadastre: true, points: [a] }, { id: 'f', nom: 'f.csv', points: [{ nom: 'X' }] }], surfaces: [], dessins: [], metres: [], pointsControle: [], listesCachees: [] };
+    expect(listesCadastre(projet)).toEqual(['c']);
+    const points = pointsDesImports(projet, listesDePoints(projet));
+    expect(points.has(a)).toBe(true);
+    expect(points.size).toBe(2);
   });
 });

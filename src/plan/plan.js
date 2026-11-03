@@ -50,6 +50,7 @@ const CALQUES_DEPART = {
   controleAltitudes: true,
   points: true,
   noms: true,
+  nomsImport: true, // 0.113 : noms des Points Import (flèche ▾ de la catégorie)
   altitudes: true,
   contours: true,
   lignes: true,
@@ -129,9 +130,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <div class="menu-calques" hidden>
           <div class="ligne-menu-plan">
             <label class="case"><input type="checkbox" data-calque="fondSatellite" /> Photo aérienne (swisstopo)</label>
-            <button type="button" class="roue-menu" data-roue="photo" aria-expanded="false" title="Transparence" aria-label="Transparence de la photo"></button>
           </div>
-          <label class="reglette-transparence" data-zone-roue="photo" hidden>Transparence <span data-vivant="transparence">0 %</span>
+          <label class="reglette-transparence">Transparence <span data-vivant="transparence">0 %</span>
             <input type="range" min="0" max="100" step="5" value="0" data-calque="transparencePhoto" /></label>
           <label class="case"><input type="checkbox" data-calque="cadastre" /> Cadastre</label>
         </div>
@@ -186,6 +186,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   let implantation = null;
   // Couleur de chaque point d'après sa liste (menu « Afficher » ou Projet, voir listes-points.js) : Map point → couleur.
   let couleursPoints = new Map();
+  let pointsImport = new Set(); // points des listes « Points Import » (leur nom suit la case « Noms »)
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
   let cadreSurfacesImportees = 0; // sommets des surfaces importées sur lesquels on a déjà cadré (projet sans point)
@@ -343,8 +344,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Noms et altitudes : placés sans chevauchement (les étiquettes sans place sont cachées).
     // Roue de « Levé » : la case « Altitudes » montre ou cache toutes les altitudes (lignes et contours compris).
     if (calques.noms || calques.altitudes) {
+      const montrerNom = (point) => calques.noms && (calques.nomsImport || !pointsImport.has(point));
       const textes = visibles.map(({ point }) =>
-        [calques.noms ? point.nom : null, calques.altitudes ? formaterNombre(point.altitude) : null].filter(Boolean),
+        [montrerNom(point) ? point.nom : null, calques.altitudes ? formaterNombre(point.altitude) : null].filter(Boolean),
       );
       const places = placerEtiquettes(
         visibles.map(({ x, y }, i) => ({
@@ -361,11 +363,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
             x: place.x,
             y: place.y - (textes[i].length - 1 - ligne) * 13 * echelle - 2,
             'text-anchor': place.aGauche ? 'end' : 'start',
-            class: calques.noms && ligne === 0 ? '' : 'altitude',
+            class: montrerNom(visibles[i].point) && ligne === 0 ? '' : 'altitude',
           });
           // Nom à la couleur de sa liste, si elle en a une.
           const couleurListe = couleursPoints.get(visibles[i].point);
-          if (couleurListe && calques.noms && ligne === 0) element.style.fill = couleurListe;
+          if (couleurListe && montrerNom(visibles[i].point) && ligne === 0) element.style.fill = couleurListe;
           element.textContent = texte;
           groupeNoms.append(element);
         });
@@ -1574,6 +1576,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       ['couleursAltitude', 'Couleurs selon l\'altitude', 'expert'],
       ['courbes', 'Courbes de niveau', 'expert'],
     ],
+    points: [['nomsImport', 'Noms', '']],
     surface: [['couleursAltitudeImport', 'Couleurs selon l\'altitude', '']],
   };
   const caseCalque = (cle, titre, classe = '') => `<label class="case ${classe}"><input type="checkbox" data-calque="${cle}" ${calquesChoisis[cle] ? 'checked' : ''} /> ${titre}</label>`;
@@ -1962,6 +1965,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     /** Couleur de chaque point d'après sa liste (Map point → couleur, voir couleursDesPoints). */
     afficherCouleursPoints(couleurs) {
       couleursPoints = couleurs;
+    },
+    /** Points des listes « Points Import » (Set) : leur nom suit la case « Noms » de la catégorie. */
+    afficherPointsImport(points) {
+      pointsImport = points;
     },
     /** Plans DXF à dessiner en fond (voir topo/dxf-plan.js). */
     afficherPlansDxf(nouveaux) {

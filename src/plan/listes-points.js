@@ -143,6 +143,21 @@ export function couleursDesPoints(projet, listes) {
   return couleurs;
 }
 
+/** Points des listes « Points Import » (fichiers importés, points ajoutés, cadastre) : Set de points (0.113). */
+export function pointsDesImports(projet, listes) {
+  const points = new Set();
+  for (const liste of listes) {
+    if (liste.section !== 'points' || !liste.leveId) continue;
+    for (const point of projet.leves.find((l) => l.id === liste.leveId)?.points ?? []) points.add(point);
+  }
+  return points;
+}
+
+/** Listes « Cadastre » (cadastre autour d'un point) : cachées au départ, seules leurs lignes DXF se voient (0.113). */
+export function listesCadastre(projet) {
+  return projet.leves.filter((l) => l.cadastre).map((l) => l.id);
+}
+
 /** Coche (visible) ou décoche une liste. */
 export function montrerListe(projet, id, visible) {
   const cachees = new Set(projet.listesCachees ?? []);
