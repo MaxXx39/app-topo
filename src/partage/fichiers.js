@@ -17,6 +17,19 @@ const FIN = '.json.gz';
  */
 export function projetVersFichiers(projet) {
   const fichiers = new Map();
+  // Archives (0.119.0) : leurs photos et plans DXF partent aussi dans leurs propres fichiers.
+  const archives = projet.archives ? { archives: projet.archives.map((a) => ({ ...a, contenu: { ...a.contenu, ...alleger(a.contenu ?? {}, fichiers) } })) } : {};
+  // Le lien vers Drive est propre à chaque appareil : il ne part pas avec le projet.
+  const { drive, ...reste } = projet;
+  fichiers.set(FICHIER_PROJET, { ...reste, ...alleger(projet, fichiers), ...archives });
+  return fichiers;
+}
+
+/**
+ * Parties d'un projet (ou du contenu d'une archive) sans images de photos ni contenu de plan DXF :
+ * ceux-ci sont rangés dans "fichiers". Renvoie seulement les parties présentes.
+ */
+function alleger(projet, fichiers) {
   // Photos des levés et des mesures : l'image part dans son propre fichier.
   const sansImages = (objet) => !objet.photos?.length ? objet : ({
     ...objet,
@@ -25,21 +38,20 @@ export function projetVersFichiers(projet) {
       return { ...photo, image: null, miniature: null };
     }),
   });
-  const surfaces = (projet.surfaces ?? []).map(sansImages);
+  const surfaces = projet.surfaces ? { surfaces: projet.surfaces.map(sansImages) } : {};
   const mesures = projet.mesures ? { mesures: projet.mesures.map(sansImages) } : {};
   // Photos des levés (0.77.0) : aussi pour les métrés et les levés libres.
   const metres = projet.metres ? { metres: projet.metres.map(sansImages) } : {};
   const autres = projet.autres ? { autres: projet.autres.map(sansImages) } : {};
   // Photos des points de contrôle (0.105.0) : chaque photo est elle-même un objet à alléger.
   const photosControle = projet.photosControle ? { photosControle: sansImages({ photos: projet.photosControle }).photos } : {};
-  const plansDxf = (projet.plansDxf ?? []).map((plan) => {
-    fichiers.set(`${prefixePlan}${plan.id}${FIN}`, plan.contenu);
-    return { ...plan, contenu: null };
-  });
-  // Le lien vers Drive est propre à chaque appareil : il ne part pas avec le projet.
-  const { drive, ...reste } = projet;
-  fichiers.set(FICHIER_PROJET, { ...reste, surfaces, ...mesures, ...metres, ...autres, ...photosControle, plansDxf });
-  return fichiers;
+  const plansDxf = projet.plansDxf ? {
+    plansDxf: projet.plansDxf.map((plan) => {
+      fichiers.set(`${prefixePlan}${plan.id}${FIN}`, plan.contenu);
+      return { ...plan, contenu: null };
+    }),
+  } : {};
+  return { ...surfaces, ...mesures, ...metres, ...autres, ...photosControle, ...plansDxf };
 }
 
 /**
@@ -49,12 +61,18 @@ export function projetVersFichiers(projet) {
 export function fichiersVersProjet(fichiers) {
   const projet = structuredClone(fichiers.get(FICHIER_PROJET));
   if (!projet) throw new Error('fichier projet absent du dossier Drive');
+  remettre(projet, fichiers);
+  for (const archive of projet.archives ?? []) remettre(archive.contenu ?? {}, fichiers);
+  return projet;
+}
+
+/** Remet en place les images des photos et le contenu des plans DXF (projet ou contenu d'archive). */
+function remettre(projet, fichiers) {
   for (const objet of [...(projet.surfaces ?? []), ...(projet.mesures ?? []), ...(projet.metres ?? []), ...(projet.autres ?? [])]) {
     for (const photo of objet.photos ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});
   }
   for (const photo of projet.photosControle ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});
   for (const plan of projet.plansDxf ?? []) plan.contenu = fichiers.get(`${prefixePlan}${plan.id}${FIN}`) ?? null;
-  return projet;
 }
 
 /** Comprime un objet en JSON gzip : renvoie un Blob. */

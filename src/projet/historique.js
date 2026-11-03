@@ -22,6 +22,13 @@ export function creerHistorique(limite = LIMITE) {
  * modification) ; les images des photos sont remplacées par leur identifiant et gardées à part.
  */
 function instantane(historique, projet) {
+  // Archives (0.119.0) : leurs photos et plans DXF sont gardés à part, comme ceux du projet.
+  const archives = projet.archives ? { archives: projet.archives.map((a) => ({ ...a, contenu: { ...a.contenu, ...alleger(historique, a.contenu ?? {}) } })) } : {};
+  return JSON.stringify({ ...projet, ...alleger(historique, projet), ...archives, modifieLe: null });
+}
+
+/** Parties du projet (ou d'une archive) sans images ni contenu de plan : ceux-ci vont dans l'historique. */
+function alleger(historique, projet) {
   const sansImages = (objet) =>
     objet.photos?.length
       ? {
@@ -35,22 +42,30 @@ function instantane(historique, projet) {
   // Photos des levés (surfaces, métrés, levés libres ; 0.77.0) et des mesures.
   const avecPhotos = Object.fromEntries(CLES_PHOTOS.filter((cle) => projet[cle]).map((cle) => [cle, projet[cle].map(sansImages)]));
   const photosControle = projet.photosControle ? { photosControle: sansImages({ photos: projet.photosControle }).photos } : {};
-  const plansDxf = (projet.plansDxf ?? []).map((plan) => {
-    historique.plans.set(plan.id, plan.contenu);
-    return { ...plan, contenu: null };
-  });
-  return JSON.stringify({ ...projet, ...avecPhotos, ...photosControle, plansDxf, modifieLe: null });
+  const plansDxf = projet.plansDxf ? {
+    plansDxf: projet.plansDxf.map((plan) => {
+      historique.plans.set(plan.id, plan.contenu);
+      return { ...plan, contenu: null };
+    }),
+  } : {};
+  return { ...avecPhotos, ...photosControle, ...plansDxf };
 }
 
 /** Relit une étape de l'historique et remet les images des photos. */
 function relire(historique, texte) {
   const projet = JSON.parse(texte);
+  remettre(historique, projet);
+  for (const archive of projet.archives ?? []) remettre(historique, archive.contenu ?? {});
+  return projet;
+}
+
+/** Remet les images des photos et le contenu des plans DXF (projet ou contenu d'archive). */
+function remettre(historique, projet) {
   for (const objet of CLES_PHOTOS.flatMap((cle) => projet[cle] ?? [])) {
     for (const photo of objet.photos ?? []) Object.assign(photo, historique.photos.get(photo.id));
   }
   for (const photo of projet.photosControle ?? []) Object.assign(photo, historique.photos.get(photo.id));
   for (const plan of projet.plansDxf ?? []) plan.contenu = historique.plans.get(plan.id) ?? null;
-  return projet;
 }
 
 /** Repart de zéro avec ce projet (à l'ouverture d'un projet). */

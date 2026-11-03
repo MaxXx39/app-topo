@@ -1,5 +1,6 @@
 // Affichage du plan : points avec leur nom, zoom et déplacement
 // au doigt (téléphone) ou à la souris (ordinateur).
+import { creerCapAuto, decisionCapAuto } from './cap-auto.js';
 import { cadrerSurPoints, cadrerSurPointsTourne, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
 import { bulle } from '../aide/bulles.js';
 import { aAcces, rayonFormes, echelleTexte } from '../reglages/reglages.js';
@@ -179,6 +180,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // recentre et tourne : le devant du RX2 en haut). Déplacer le plan au doigt arrête le suivi
   // (le plan garde son angle ; la boussole du plan le remet nord en haut).
   let suivi = 'libre';
+  // Cap automatique (0.119.0, voir cap-auto.js) : mémoire des passages GNSS prêt / pas prêt.
+  const capAuto = creerCapAuto();
   // « Voir toute la ligne » (0.118.0, Implanter › Ligne) : sommets de la ligne entière, gardée au
   // milieu du plan et le plus grand possible, le plan tourné comme le récepteur (cap) ; ou null.
   let ligneVue = null;
@@ -2026,6 +2029,21 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const premiere = !position && nouvellePosition;
       position = nouvellePosition;
       boutonPosition.hidden = !position;
+      // Cap automatique (0.119.0) : GNSS prêt → devant du GNSS en haut ; plus prêt → comme avant.
+      const decision = decisionCapAuto(capAuto, { pret: Boolean(position?.prete) && !position?.tablette, suivi, occupe: Boolean(ligneVue) });
+      if (decision === 'cap') {
+        changerSuivi('cap');
+        if (position.azimut != null && vue) {
+          tournerVers(position.azimut);
+          return;
+        }
+      } else if (decision?.revenir) {
+        changerSuivi(decision.revenir);
+        if (vue) vue = { ...vue, rotation: 0 };
+        if (position && decision.revenir !== 'libre') centrerSurPosition();
+        else dessiner();
+        return;
+      }
       // « Voir toute la ligne » : on ne tourne (et recadre) que si le cap a changé de plus de 3°.
       if (ligneVue) {
         if (position?.azimut != null && vue && Math.abs(ecartAngle(position.azimut, vue.rotation ?? 0)) > 3) cadrerSurLigne(position.azimut);

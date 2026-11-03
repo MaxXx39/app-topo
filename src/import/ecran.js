@@ -21,9 +21,11 @@ import { COULEURS_LISTES, planDuCadastre, couleurDuCadastre } from '../plan/list
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
 import { lireReseaux } from '../leve/reseaux.js';
+import { nomDuType, resumeArchive } from '../projet/archives.js';
 
 /**
  * Crée le panneau « Import » dans "conteneur" et « Contenu du projet » dans "contenu". Les actions sont faites par main.js via "actions" :
+ * archiver(type, id), restaurerArchive(id), supprimerArchive(id) (archives, 0.119.0, voir projet/archives.js),
  * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id),
  * importerPlanDxf(fichier), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
  * recalerPlanDxf(id), exporterPlanRecale(id), annulerRecalagePlan(id),
@@ -105,6 +107,9 @@ export function creerEcranImport(conteneur, contenu, actions) {
       return;
     }
     if (action === 'voir-photo') actions.voirPhoto(id);
+    else if (action === 'archiver') actions.archiver(bouton.dataset.type, id);
+    else if (action === 'restaurer-archive') actions.restaurerArchive(id);
+    else if (action === 'supprimer-archive') actions.supprimerArchive(id);
     else if (action === 'supprimer-leve') actions.supprimerLeve(id);
     else if (action === 'supprimer-cadastre') actions.supprimerCadastre(id);
     else if (action === 'supprimer-surface-projet') actions.supprimerSurfaceProjet(id);
@@ -276,6 +281,7 @@ function blocContenu(projet, calquesOuverts, fermees) {
     categorie('cadastre', 'Cadastre', cadastres.length, cadastres.map((l) => ligneCadastre(projet, l)).join('')),
     categorie('dxf', 'Plans DXF', (projet.plansDxf ?? []).filter((p) => !plansCadastre.has(p.id)).length, listePlansDxf(projet, calquesOuverts, plansCadastre), 'seulement-intermediaire'),
     categorie('dessins', 'Dessins', dessins.length, listesDessins(projet), 'seulement-intermediaire'),
+    categorie('archives', 'Archivés', (projet.archives ?? []).length, listeArchives(projet), 'seulement-expert'),
   ].join('');
   return `<div class="carte-section contenu-projet">
       ${titreSection('leves', 'Contenu du projet', bulle('leves'))}
@@ -300,6 +306,7 @@ function ligneListe(projet, leve, nature = null) {
       ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}
       <div class="ligne-outils">
         <span class="aide">${leve.points.length} points${date}</span>
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="archiver" data-type="leve" data-id="${leve.id}">archiver</button>
         <button type="button" class="bouton-lien" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
       </div>
       ${tableauPoints(leve.points, 'Voir les points')}
@@ -321,6 +328,7 @@ function ligneCadastre(projet, leve) {
       <div class="ligne-outils">
         <span class="aide">${leve.points.length} points${planDxf ? ` · ${planDxf.compte?.objets ?? 0} lignes` : ''}</span>
         ${planDxf ? `<button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${planDxf.id}">voir</button>` : ''}
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="archiver" data-type="cadastre" data-id="${leve.id}">archiver</button>
         <button type="button" class="bouton-lien" data-action="supprimer-cadastre" data-id="${leve.id}">supprimer</button>
       </div>
       ${tableauPoints(leve.points, 'Voir les points')}
@@ -353,6 +361,7 @@ function ligneSurfaceProjet(surface) {
       <div class="champ-prefixe"><span class="prefixe-nom">${echapper(prefixeDuNom(surface))}</span><input type="text" class="nom-leve" data-champ="nom-surface-projet" data-id="${surface.id}" value="${echapper(sansPrefixe(surface.nom, prefixeDuNom(surface)))}" aria-label="Nom de la surface (après ${echapper(prefixeDuNom(surface))})" /></div>
       <div class="ligne-outils">
         <span class="aide">${[origineSurface(surface), surface.nomFichier].filter(Boolean).map(echapper).join(' · ')} · ${surface.faces?.length ?? 0} triangles</span>
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="archiver" data-type="surface" data-id="${surface.id}">archiver</button>
         <button type="button" class="bouton-lien" data-action="supprimer-surface-projet" data-id="${surface.id}">supprimer</button>
       </div>
     </div>`;
@@ -405,7 +414,8 @@ function listesDessins(projet) {
       const points = pointsDuDessin(dessin, projet.dessins);
       return `<div class="ligne-leve liste-dessin">
       <strong>${echapper(dessin.nom)}</strong>
-      <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span></div>
+      <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span>
+        <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="archiver" data-type="dessin" data-id="${dessin.id}">archiver</button></div>
       ${tableauPoints(points, 'Voir les points')}
     </div>`;
     })
@@ -442,7 +452,8 @@ function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${plan.id}">voir</button>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="recaler-plan" data-id="${plan.id}">recaler</button>
-          <button type="button" class="bouton-lien" data-action="supprimer-plan" data-id="${plan.id}">supprimer</button>
+          <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="archiver" data-type="plan" data-id="${plan.id}">archiver</button>
+        <button type="button" class="bouton-lien" data-action="supprimer-plan" data-id="${plan.id}">supprimer</button>
         </div>
         ${etatRecalage(plan)}
         <details data-calques-plan="${plan.id}" ${calquesOuverts.has(plan.id) ? 'open' : ''}>
@@ -461,6 +472,27 @@ function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
       </div>`;
     })
     .join('')}</div>`;
+}
+
+/**
+ * Éléments archivés (0.119.0, Expert) : le plus récent en haut, avec « restaurer » (remis dans le
+ * projet tel quel) et « supprimer » (pour de bon).
+ */
+function listeArchives(projet) {
+  const archives = [...(projet.archives ?? [])].sort((a, b) => String(b.archiveLe ?? '').localeCompare(String(a.archiveLe ?? '')));
+  return `<div class="liste-leves">${archives.map((archive) => {
+    const date = archive.archiveLe ? new Date(archive.archiveLe).toLocaleDateString('fr-CH') : '';
+    const resume = resumeArchive(archive);
+    return `<div class="ligne-leve ligne-archive">
+        <strong class="nom-leve">${echapper(archive.nom ?? '')}</strong>
+        <span class="pastille-nature" style="--couleur-nature: #64748b">${echapper(nomDuType(archive.type))}</span>
+        <div class="ligne-outils">
+          <span class="aide">${[resume, date ? `archivé le ${date}` : ''].filter(Boolean).map(echapper).join(' · ')}</span>
+          <button type="button" class="bouton-lien bouton-lien-neutre" data-action="restaurer-archive" data-id="${archive.id}">restaurer</button>
+          <button type="button" class="bouton-lien" data-action="supprimer-archive" data-id="${archive.id}">supprimer</button>
+        </div>
+      </div>`;
+  }).join('')}</div>`;
 }
 
 /** Recalage d'un plan : recalé (paramètres, export, annuler), ou « pas en MN95 », ou rien. */

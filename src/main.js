@@ -53,6 +53,10 @@ import {
 import * as stockage from './projet/stockage.js';
 import { creerPartage } from './partage/partage.js';
 import * as historique from './projet/historique.js';
+import { archiver, restaurer, supprimerArchive } from './projet/archives.js';
+import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/journal.js';
+import { appareil as appareilDuJournal } from './partage/memoire.js';
+import { ADRESSE_APK, versionPubliee, estPlusRecente } from './outils/mise-a-jour.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
@@ -95,6 +99,7 @@ import { genererCsvReseaux, genererDxfReseaux, ecrireLandXMLReseaux, pdfReseaux 
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
+import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
@@ -429,6 +434,12 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
             reprendreLaMain: () => partage.prendreLaMain(),
             rendreLaMain: () => partage.rendreLaMain('rendue à la main'),
             reprendreApresRendu: () => partage.reprendreApresRendu(),
+            // Recap des contrôles (0.119.0, Expert) : refait tout de suite (sinon une fois par jour).
+            mettreAJourRecap: async () => {
+              afficherMessage('Recap des contrôles : mise à jour…', null);
+              const { erreur } = await partage.mettreAJourRecap({ forcer: true });
+              afficherMessage(erreur ? `Recap impossible : ${erreur}` : 'Recap mis à jour : Drive › App Topo › Recap › Recap App Topo.xlsx', 6000);
+            },
             nommerAppareil: (nom) => {
               partage.nommerAppareil(nom);
               fenetreReglages?.rafraichir();
@@ -695,6 +706,40 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     modifie();
   },
   voirPhoto: (id) => montrerPhoto(id),
+  // Archives (0.119.0, Expert) : l'élément quitte le projet actif, restaurable dans « Archivés ».
+  archiver: (type, id) => {
+    const { archive, erreur } = archiver(projet, type, id);
+    if (erreur) {
+      afficherMessage(`Impossible d'archiver : ${erreur}`, 4000);
+      return;
+    }
+    // Levé en cours ou dessin en cours archivé : on ne le suit plus.
+    if (leveDirect.stockId && !stockEnCours()) {
+      leveDirect.stockId = null;
+      reprendreLeveDirect();
+    }
+    if (pilote && !(projet.dessins ?? []).some((d) => d.id === pilote.dessinId)) pilote = null;
+    editeurSurfaces.charger(projet.surfaces);
+    dernierPlan = null;
+    afficherMessage(`« ${archive.nom} » archivé (Contenu du projet › Archivés)`, 3500);
+    modifie({ recadrer: true });
+  },
+  restaurerArchive: (id) => {
+    const { nom, erreur } = restaurer(projet, id);
+    if (erreur) {
+      afficherMessage(`Impossible de restaurer : ${erreur}`, 4000);
+      return;
+    }
+    editeurSurfaces.charger(projet.surfaces);
+    afficherMessage(`« ${nom} » restauré`, 3000);
+    modifie({ recadrer: true });
+  },
+  supprimerArchive: (id) => {
+    const archive = (projet.archives ?? []).find((a) => a.id === id);
+    if (!archive || !confirm(`Supprimer pour de bon « ${archive.nom} » des archives ?\n\nLa suppression est définitive.`)) return;
+    supprimerArchive(projet, id);
+    modifie();
+  },
   supprimerSurfaceProjet: (id) => {
     const surface = projet.surfaces.find((s) => s.id === id);
     if (!surface || !confirm(`Supprimer la surface « ${surface.nom} » ?`)) return;
@@ -1395,6 +1440,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         const ecarts = ecartsImplantation(cible, mesure);
         const le = new Date().toISOString();
         projet.implantations.push({ id: nouvelIdentifiant(), nom: cible.nom, aImplanterId: cible.id, cible: { est: cible.est, nord: cible.nord, altitude: cible.altitude }, mesure, ecarts, le });
+        noterJournal({ type: 'implantation', controleRecent: controleRecentIci() });
         vibrer(60);
         sonValidation();
         const hauteur = ecarts.dAltitude != null ? ` · dH ${formaterNombre(ecarts.dAltitude)} m` : '';
@@ -2460,6 +2506,21 @@ function nomDeLAppareil() {
 }
 
 /**
+ * Journal de l'appareil (0.119.0, recap des contrôles, voir recap/journal.js) : note ce qui vient
+ * d'être fait dans le projet ouvert (ouverture, point levé, implantation, contrôle).
+ */
+function noterJournal(evenement) {
+  const journal = lireJournal(appareilDuJournal());
+  noter(journal, { id: projet.id, nom: titreProjet(projet) }, evenement);
+  ecrireJournal(journal);
+}
+
+/** Vrai si cet appareil a fait un contrôle de ce projet aujourd'hui, dans la durée du projet. */
+function controleRecentIci() {
+  return aUnControleRecent(projet.controles, nomDeLAppareil(), new Date(), delaiControleMs(projet));
+}
+
+/**
  * « Enregistrer le contrôle » : position vérifiée par l'appli Android (RTK fixe, inclinaison prête),
  * écarts avec le point connu, couleur selon les tolérances du projet ; puis retour à la liste.
  */
@@ -2489,6 +2550,7 @@ function enregistrerControle() {
     remarque: '',
     le: new Date().toISOString(),
   });
+  noterJournal({ type: 'controle', controle: projet.controles.at(-1) });
   if (resultat.global === 'rouge') {
     vibrer([80, 80, 80]);
     sonRefus();
@@ -2549,6 +2611,7 @@ async function proposerControle() {
     return;
   }
   projet.controles.push({ id: nouvelIdentifiant(), type: 'refus', appareil: nomDeLAppareil(), le: new Date().toISOString() });
+  noterJournal({ type: 'controle', controle: projet.controles.at(-1) });
   afficherMessage('Refus enregistré : le géomètre sera au courant', 5000);
   modifie();
 }
@@ -2652,6 +2715,7 @@ function enregistrerImplantationLigne() {
     ligne: { nom: ligne.nom, abscisse: g.abscisse, decalage: g.ecart },
     le: new Date().toISOString(),
   });
+  noterJournal({ type: 'implantation', controleRecent: controleRecentIci() });
   vibrer(60);
   sonValidation();
   const cote = Math.abs(g.ecart) < 0.0005 ? 'sur la ligne' : `${formaterNombre(Math.abs(g.ecart))} m ${g.ecart > 0 ? 'à droite' : 'à gauche'}`;
@@ -2786,6 +2850,7 @@ function enregistrerImplantationTalus() {
     talus: { texte: texteTalus(reglages), distanceVoulue: g.distanceVoulue, auBord: g.auBord, solPlat: g.solPlat },
     le: new Date().toISOString(),
   });
+  noterJournal({ type: 'implantation', controleRecent: controleRecentIci() });
   vibrer(60);
   sonValidation();
   afficherMessage(`${sur[0].toUpperCase()}${sur.slice(1)} ${accord} (+${formaterNombre(g.abscisse)} m) : écart ${formaterNombre(ecarts.distance)} m`, 4000);
@@ -3461,7 +3526,10 @@ async function enregistrerJournalNmea() {
       afficherMessage('Journal NMEA : rien reçu du récepteur', 5000);
       return;
     }
-    afficherMessage(`Journal NMEA : ${texte.trim().split(/\r?\n/).length} lignes`, 3000);
+    // Sortes de phrases reçues (0.119.0) : pour savoir si le récepteur envoie sa batterie.
+    const sortes = sortesDePhrases(texte).map(({ sorte, nombre }) => `${sorte} ×${nombre}`).join(', ');
+    const batterie = lignesBatterie(texte);
+    afficherMessage(`Journal NMEA : ${texte.trim().split(/\r?\n/).length} lignes. Reçu : ${sortes || 'rien de lisible'}. Batterie : ${batterie.length > 0 ? batterie.join(' | ') : 'rien trouvé'}`, 20000);
     const date = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
     const canne = hauteur.trim() ? `_canne-${hauteur.trim().replace(/[^\d.,]/g, '').replace(',', '.')}m` : '';
     telecharger(new Blob([texte], { type: 'text/plain;charset=utf-8' }), `journal-nmea_${date}${canne}.txt`);
@@ -3490,6 +3558,7 @@ function rangerPointPris(resultat) {
     photo.point = resultat.point.nom;
     delete photo.attentePoint;
   }
+  noterJournal({ type: 'point', controleRecent: controleRecentIci() });
   afficherMessage(`Point ${resultat.point.nom} pris${enAttente.length > 0 ? ` · ${enAttente.length} photo(s) rattachée(s)` : ''}`);
   modifie();
 }
@@ -5135,6 +5204,7 @@ surLibellesProjet((libelles) => {
   modifie();
 });
 
+let dernierProjetNote = null; // dernier projet noté « ouvert » dans le journal de l'appareil
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
   // Tableau « Affichage » (0.94.0) : au démarrage, tout est montré (listes, plans DXF et leurs calques).
@@ -5167,6 +5237,12 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   mettreAJourAnnuler();
   if (changerOnglet) afficherOnglet(etapeUtile());
   await enregistrer();
+  // Journal de l'appareil (0.119.0) : une ouverture par projet ouvert (pas à chaque nouvelle
+  // version reçue de Drive pour le même projet).
+  if (projet.id !== dernierProjetNote) {
+    dernierProjetNote = projet.id;
+    noterJournal({ type: 'ouverture' });
+  }
   // RX2 déjà connecté : rappel du contrôle pour ce projet, s'il en faut un.
   if (etatRecepteur?.connecte) proposerControle();
 }
@@ -5179,6 +5255,26 @@ function nouveauProjetSansNom() {
   const nouveau = creerProjet();
   nouveau.nomAuto = nomAutomatique([...resumes.map((r) => r.titre), ...(partage?.etat.projetsDrive ?? []).map((p) => p.titre)]);
   return nouveau;
+}
+
+/**
+ * Mise à jour de l'APK (0.119.0, tous les modes ; seulement dans l'appli Android) : si GitHub a
+ * un APK plus récent, on propose de le télécharger (le navigateur de la tablette le télécharge,
+ * puis Android demande « Installer »). Sans réseau : rien.
+ */
+async function proposerMiseAJour() {
+  if (!estDansAppliAndroid()) return;
+  const publiee = await versionPubliee();
+  if (!publiee || !estPlusRecente(publiee, __VERSION_APPLI__)) return;
+  const choix = await demanderChoix({
+    titre: `Nouvelle version ${publiee} disponible`,
+    texte: `Version installée : ${__VERSION_APPLI__}.`,
+    boutons: [
+      { cle: 'telecharger', texte: 'Télécharger la mise à jour', detail: 'puis toucher « Installer »', principal: true },
+      { cle: 'plus-tard', texte: 'Plus tard' },
+    ],
+  });
+  if (choix === 'telecharger') window.location.href = ADRESSE_APK;
 }
 
 // --- Démarrage : fenêtre « Continuer sur… / Ouvrir un projet / Nouveau projet » (0.84.0) ---
@@ -5209,6 +5305,7 @@ async function demarrer() {
       // Fenêtre fermée sans créer : on reste sur le dernier projet.
       partage.apresOuverture();
     }
+    proposerMiseAJour();
   } catch (erreur) {
     // Base de données indisponible (navigation privée...) : l'appli marche, sans enregistrement.
     console.error(erreur);

@@ -241,6 +241,7 @@ const ETATS_PARTAGE = {
  * Bloc « Partage » : nom de l'appareil, connexion à Drive, état de l'envoi du projet ouvert.
  * Affiché dans la fenêtre des réglages (voir reglages/reglages.js) ; boutons data-action :
  * connecterDrive, deconnecterDrive, envoyerDrive, reprendreLaMain, rendreLaMain, reprendreApresRendu,
+ * mettreAJourRecap (recap Excel des contrôles sur Drive, 0.119.0),
  * modifierNomAppareil ; case
  * data-champ="nom-appareil". Le nom de l'appareil n'est modifiable qu'après le crayon (modifierNom :
  * vrai), avec un avertissement (le changer une fois réglé déconnecte de Drive) ; tant qu'il n'est
@@ -268,6 +269,7 @@ export function blocPartage({ etat, appareil }, { modifierNom = false } = {}) {
            ${['repris', 'rendu'].includes(etat.etat) ? '' : '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="envoyerDrive">envoyer maintenant</button>'}
            ${['repris', 'rendu'].includes(etat.etat) ? '' : '<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="rendreLaMain">rendre la main</button>'}
            ${etat.etat === 'rendu' ? '<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="reprendreApresRendu">reprendre la main</button>' : ''}
+           <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="mettreAJourRecap">recap des contrôles</button>
            <button type="button" class="bouton-lien" data-action="deconnecterDrive">se déconnecter</button>`
         : `<button type="button" class="bouton-secondaire" data-action="connecterDrive" ${appareil.nom ? '' : 'disabled'}>Se connecter à Google Drive</button>`}
     </div>` : ''}
