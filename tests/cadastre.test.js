@@ -58,6 +58,11 @@ describe('cadastre', () => {
     const caps = '<FeatureType><Name>ms:Liegenschaften_Grenzpunkt</Name></FeatureType><FeatureType><Name>ms:Liegenschaften_Liegenschaft</Name></FeatureType><FeatureType><Name>ms:Liegenschaften_ProjLiegenschaft</Name></FeatureType>';
     expect(choisirCouches(nomsDesCouches(caps))).toEqual({ points: 'ms:Liegenschaften_Grenzpunkt', surfaces: 'ms:Liegenschaften_Liegenschaft' });
   });
+  it('reconnaît les codes courts MOpublic (geodienste.ch)', () => {
+    const noms = ['ms:PLNA', 'ms:LCSF', 'ms:LCSFPROJ', 'ms:SOPT', 'ms:CPPT', 'ms:RESFPROJ', 'ms:RESF', 'ms:BPPT'];
+    expect(choisirCouches(noms)).toEqual({ points: 'ms:BPPT', surfaces: 'ms:RESF' });
+    expect(choisirCouches(['LCSF', 'RESF'])).toEqual({ points: null, surfaces: 'RESF' });
+  });
   it('télécharge avec un faux service', async () => {
     const adresses = [];
     const chercher = async (adresse) => {

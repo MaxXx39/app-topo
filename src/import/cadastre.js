@@ -23,7 +23,7 @@ export async function telechargerCadastre(centre, rayon, canton = 'VD', progres 
   const noms = nomsDesCouches(capabilities);
   const couches = choisirCouches(noms);
   if (!couches.points && !couches.surfaces) {
-    const exemples = noms.slice(0, 12).join(', ') || 'aucune';
+    const exemples = noms.join(', ') || 'aucune';
     throw new Error(`pas de couche « points limites » ni « parcelles » reconnue dans ${service.adresse} (couches : ${exemples})`);
   }
   const r = rectangleAutour(centre, rayon);

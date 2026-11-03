@@ -142,10 +142,19 @@ export function nomDeLaListe(nomsPris) {
   return `Cadastre ${numero}`;
 }
 
-/** Noms des couches du service qui conviennent : { points (limites), surfaces (parcelles) }. */
+/**
+ * Noms des couches du service qui conviennent : { points (limites), surfaces (parcelles) }.
+ * Deux façons de nommer : noms longs (Grenzpunkt, Liegenschaft…) ou codes courts du modèle
+ * MOpublic de geodienste.ch (0.112.1 : LCSF, SOPT… ; biens-fonds = RE…SF, points limites = BP… / RE…PT).
+ */
 export function choisirCouches(noms) {
-  const points = noms.find((n) => /grenzpunkt|point.?limite|pointlimite/i.test(n)) ?? null;
-  const surfaces = noms.find((n) => /liegenschaft|bien.?fonds|immeuble|parcelle/i.test(n) && !/proj|punkt|point|grenz|lage|nummer|numero|selbst|recht|bauwerk/i.test(n)) ?? null;
+  const court = (n) => n.replace(/^\w+:/, '').toUpperCase();
+  const points = noms.find((n) => /grenzpunkt|point.?limite|pointlimite|boundary.?point/i.test(n))
+    ?? noms.find((n) => /^BP/.test(court(n)) || /^RE\w*PT$/.test(court(n)))
+    ?? null;
+  const surfaces = noms.find((n) => /liegenschaft|bien.?fonds|immeuble|parcelle|real.?estate/i.test(n) && !/proj|punkt|point|grenz|lage|nummer|numero|selbst|recht|bauwerk/i.test(n))
+    ?? noms.find((n) => /^RE\w*SF$/.test(court(n)) && !/PROJ/.test(court(n)))
+    ?? null;
   return { points, surfaces };
 }
 
