@@ -5,6 +5,7 @@
 :root {
   /* Couleurs de Perrin Groupe : bleu nuit et jaune ambre */
   --sombre: #1b2b36;
+  --encre: #1b2b36; /* texte foncé sur fond clair (devient clair en affichage Sombre, 0.114.0) */
   --sombre-2: #2a3d4a;
   --ambre: #f6ab07;
   --ambre-fonce: #d99300;
@@ -16,6 +17,7 @@
   --gris: #5f6d77;
   --bordure: #dde2e6;
   --rouge: #dc2626;
+  --bordeaux: #9b2c3a; /* couleur du mode Contrôle (0.114.0) : le rouge vif reste pour les alertes */
   --rouge-clair: #fef2f2;
   --orange: #ea580c;
   --jaune-clair: #fffbeb;
@@ -385,7 +387,7 @@ body.aide-active .rond-aide {
 }
 
 .onglets button.actif {
-  color: var(--sombre);
+  color: var(--encre);
 }
 
 .onglets button.actif svg {
@@ -638,7 +640,7 @@ button.bouton {
 
 /* Lien qui ne supprime rien (modifier, dupliquer...) : bleu nuit souligné, pas rouge. */
 .bouton-lien.bouton-lien-neutre {
-  color: var(--sombre);
+  color: var(--encre);
   text-decoration: underline;
 }
 
@@ -670,7 +672,7 @@ input[type='checkbox'],
 input[type='radio'] {
   width: 20px;
   height: 20px;
-  accent-color: var(--sombre);
+  accent-color: var(--encre);
 }
 
 .case {
@@ -758,7 +760,7 @@ input[type='radio'] {
 
 summary {
   cursor: pointer;
-  color: var(--sombre);
+  color: var(--encre);
   font-weight: 600;
   margin: 10px 0;
 }
@@ -876,7 +878,7 @@ th:not(:first-child) {
   border: 1px solid var(--couleur-role, var(--ambre));
   border-radius: 18px;
   background: var(--surface);
-  color: var(--sombre);
+  color: var(--encre);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -2634,15 +2636,15 @@ body.avec-recepteur .bandeaux-recepteur {
   border: 2px solid var(--sombre);
   border-radius: 12px;
   background: transparent;
-  color: var(--sombre);
+  color: var(--encre);
 }
 
 .onglets button.onglet-projets.actif {
-  color: var(--sombre);
+  color: var(--encre);
 }
 
 .onglets button.onglet-projets.actif svg {
-  color: var(--sombre);
+  color: var(--encre);
 }
 
 .panneau-projet {
@@ -2659,11 +2661,11 @@ body.avec-recepteur .bandeaux-recepteur {
 
   .onglets button.onglet-projets.actif {
     background: transparent;
-    color: var(--sombre);
+    color: var(--encre);
   }
 
   .onglets button.onglet-projets.actif svg {
-    color: var(--sombre);
+    color: var(--encre);
   }
 }
 
@@ -3317,7 +3319,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   border: 1px solid var(--bordure);
   border-radius: 10px;
   background: var(--surface);
-  color: var(--sombre);
+  color: var(--encre);
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
@@ -4256,7 +4258,7 @@ body.mode-telephone .onglets button svg {
   --couleur-mode: var(--ambre);
   border: 2px solid var(--couleur-mode);
   background: var(--surface);
-  color: var(--sombre);
+  color: var(--encre);
 }
 
 .bascule-terrain button[data-valeur='controler'] {
@@ -4265,8 +4267,8 @@ body.mode-telephone .onglets button svg {
 }
 
 .bascule-terrain button[data-valeur='autocontrole'] {
-  --couleur-mode: #dc2626;
-  color: #dc2626;
+  --couleur-mode: var(--bordeaux);
+  color: var(--bordeaux);
 }
 
 .bascule-terrain button[data-valeur='lame'] {
@@ -4346,7 +4348,7 @@ body.mode-telephone .onglets button svg {
   border: 1px solid var(--bordure);
   border-radius: 50%;
   background: var(--surface);
-  color: var(--sombre);
+  color: var(--encre);
   cursor: pointer;
 }
 
@@ -4931,7 +4933,7 @@ button.bouton-import {
 }
 
 .panneau[data-onglet='terrain']:has(.cadre-mode-autocontrole) {
-  border-color: #dc2626;
+  border-color: var(--bordeaux);
 }
 
 .panneau[data-onglet='terrain']:has(.cadre-mode-lame) {
@@ -4964,7 +4966,7 @@ button.bouton-import {
     border-bottom: none;
     border-radius: 10px 10px 0 0;
     background: var(--surface);
-    color: var(--sombre);
+    color: var(--encre);
     cursor: pointer;
   }
 
@@ -5582,7 +5584,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   border-radius: 50%;
   background: var(--surface);
   box-shadow: -6px 0 8px var(--surface);
-  color: var(--sombre);
+  color: var(--encre);
   cursor: pointer;
 }
 
@@ -5744,7 +5746,7 @@ button.connexion-terrain[hidden] {
 
 button.connexion-terrain strong {
   margin-left: auto;
-  color: var(--sombre);
+  color: var(--encre);
   text-decoration: underline;
 }
 
@@ -5914,7 +5916,7 @@ body.accroches-ouvertes {
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: var(--sombre);
+  color: var(--encre);
   cursor: pointer;
 }
 
@@ -7051,7 +7053,7 @@ body.mode-telephone .bouton.bouton-prendre {
 
 .bord-lame strong {
   font-size: 1.05rem;
-  color: var(--sombre);
+  color: var(--encre);
 }
 
 .bord-lame.hors strong {
@@ -7255,7 +7257,7 @@ body.lecture-seule :is(
   border: 2px solid var(--ambre);
   border-radius: 12px;
   background: var(--surface);
-  color: var(--sombre);
+  color: var(--encre);
   cursor: pointer;
 }
 
@@ -7672,7 +7674,7 @@ body.lecture-seule .bouton-photo-levee {
 }
 
 .onglets button.onglet-mode-controler { --couleur-mode: #0d9488; }
-.onglets button.onglet-mode-autocontrole { --couleur-mode: #dc2626; }
+.onglets button.onglet-mode-autocontrole { --couleur-mode: var(--bordeaux); }
 .onglets button.onglet-mode-lame { --couleur-mode: #1d4ed8; }
 
 .onglets button[data-mode-terrain].actif {
@@ -7694,7 +7696,7 @@ body[data-mode-terrain] .onglets {
 }
 
 body[data-mode-terrain='controler'] .onglets { --couleur-barre: #0d9488; }
-body[data-mode-terrain='autocontrole'] .onglets { --couleur-barre: #dc2626; }
+body[data-mode-terrain='autocontrole'] .onglets { --couleur-barre: var(--bordeaux); }
 body[data-mode-terrain='lame'] .onglets { --couleur-barre: #1d4ed8; }
 
 /* Barre du récepteur : toujours là, on la touche pour ouvrir la fenêtre du récepteur. */
@@ -7865,12 +7867,12 @@ body.avec-recepteur .bandeaux-recepteur {
   margin: 6px 3px;
   border: 2px solid var(--sombre);
   border-radius: 10px;
-  color: var(--sombre);
+  color: var(--encre);
 }
 
 .onglets button.onglet-calculs svg,
 .onglets button.onglet-plan svg {
-  color: var(--sombre);
+  color: var(--encre);
 }
 
 .onglets button.onglet-calculs.actif,
@@ -7917,7 +7919,7 @@ body.avec-recepteur .bandeaux-recepteur {
 }
 
 .ecran-terrain > .levee-en-cours .nom-levee-en-cours {
-  color: var(--sombre);
+  color: var(--encre);
 }
 
 /* 0.88.4 : icône Projet de l'en-tête dans un rectangle ambre (plein quand l'onglet Projet est ouvert). */
@@ -8828,7 +8830,7 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   border: 1.5px solid var(--ambre);
   border-radius: 8px;
   background: var(--surface);
-  color: var(--sombre);
+  color: var(--encre);
   font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
@@ -9107,3 +9109,697 @@ body.mode-telephone .levee-en-cours .boutons-levee .bouton-secondaire {
   padding: 2px 8px;
   font-size: 0.85rem;
 }
+
+/* ==========================================================================
+   0.114.0 : allure allégée (moins de cadres dans des cadres), affichages « Plein soleil » et « Sombre »
+   ========================================================================== */
+
+/* Écrans de Terrain et de Calculs : un trait de couleur en haut au lieu d'un cadre tout autour. */
+.panneau.actif {
+  box-shadow: none;
+}
+.panneau[data-onglet='terrain'],
+.panneau:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']) {
+  border-width: 4px 0 0;
+}
+/* Blocs intérieurs : fond gris très léger, sans bordure. */
+.carte-section {
+  border: 0;
+  background: color-mix(in srgb, var(--texte) 4%, var(--surface));
+}
+.carte-section.en-edition {
+  border: 0;
+  box-shadow: 0 0 0 2px var(--ambre);
+}
+.categorie-contenu,
+.tableau-defilant,
+.triangles-leve {
+  border: 0;
+  background: transparent;
+}
+.categorie-contenu > summary {
+  background: color-mix(in srgb, var(--texte) 6%, var(--surface));
+}
+.ligne-leve {
+  border-width: 0 0 0 4px;
+  border-color: var(--bordure);
+  background: var(--surface);
+}
+.element-leve {
+  border-width: 0 0 0 3px;
+}
+.cadre-prise {
+  border: 0;
+}
+.groupe-surfaces-volumes,
+.groupe-mesures,
+.groupe-dessin {
+  border: 0;
+  box-shadow: none;
+}
+/* Lever : la couleur du rôle seulement sur l'onglet choisi (plus de cadre de couleur autour). */
+.cadre-role {
+  border-color: transparent;
+}
+/* Liste de contrôle du projet : bordeaux comme le mode Contrôle. */
+.ligne-leve.liste-controle {
+  border-left-color: var(--bordeaux);
+}
+
+/* --- Affichage « Plein soleil » : fort contraste, textes plus gras --- */
+body.theme-soleil {
+  --fond: #ffffff;
+  --gris: #2b3640;
+  --bordure: #7d8a94;
+  --texte: #000000;
+  --encre: #000000;
+  font-weight: 500;
+}
+body.theme-soleil :is(strong, b, h2, h3, button, label, summary) {
+  font-weight: 700;
+}
+body.theme-soleil .onglets button,
+body.theme-soleil .plan-boutons button,
+body.theme-soleil .plan-calques button {
+  border-width: 2px;
+}
+body.theme-soleil svg.plan text {
+  font-weight: 700;
+}
+
+/* --- Affichage « Sombre » : pour le soir ou les tunnels --- */
+body.theme-sombre {
+  --fond: #0e161c;
+  --surface: #18232b;
+  --texte: #e3eaef;
+  --encre: #e3eaef;
+  --gris: #9aa8b3;
+  --bordure: #34444f;
+  --sombre: #2f4352;
+  --ambre-clair: #3b3016;
+  --rouge-clair: #3a1b20;
+  --jaune-clair: #302a14;
+  color-scheme: dark;
+}
+body.theme-sombre .entete {
+  background: #0a1116;
+}
+body.theme-sombre :is(input, select, textarea) {
+  background: #101a21;
+  color: var(--texte);
+  border-color: var(--bordure);
+}
+body.theme-sombre .plan-cadre,
+body.theme-sombre .plan {
+  background: #1b262e;
+}
+body.theme-sombre svg.plan text {
+  stroke: #1b262e;
+}
+body.theme-sombre svg.plan text:not([class*='controle']):not([fill]) {
+  fill: #d3dce2;
+}
+body.theme-sombre .plan .echelle rect {
+  fill: #22303a;
+}
+body.theme-sombre .plan .echelle :is(path, line) {
+  stroke: #d3dce2;
+}
+body.theme-sombre .plan .echelle text {
+  fill: #d3dce2;
+}
+body.theme-sombre :is(.bloc-entete, .etiquette-ouvert, button.bouton:not(.bouton-fermer-appli), .bouton-projet.nouveau-projet) {
+  color: #1b2b36;
+}
+body.theme-sombre dialog {
+  background: var(--surface);
+  color: var(--texte);
+}
+
+/* --- 0.114.0 : en-tête sur une ligne (nom du projet · compte), pour libérer de la hauteur --- */
+.entete-texte {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+.entete-titre {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.entete-etat {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* --- Barre du récepteur (0.114.0) : précision H / V en gros, âge des corrections, clignote si le RTK fixe est perdu --- */
+body.avec-recepteur .bandeaux-recepteur {
+  height: 36px;
+}
+body.avec-recepteur .entete {
+  padding-bottom: 36px;
+}
+.bandeaux-recepteur span[data-bandeau='rtk'] {
+  gap: 10px;
+}
+.bandeaux-recepteur .statut-rtk {
+  flex: 0 1 auto;
+  font-size: 0.8rem;
+}
+.bandeaux-recepteur .precision-rtk {
+  flex: 0 0 auto;
+  gap: 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.bandeaux-recepteur .precision-rtk > span {
+  flex: none;
+}
+.bandeaux-recepteur .info {
+  background: var(--sombre-2);
+}
+.bandeaux-recepteur .fixe-perdu {
+  animation: clignote-fixe 0.8s steps(2, jump-none) infinite;
+}
+@keyframes clignote-fixe {
+  from { background: var(--rouge); }
+  to { background: #7f1d1d; }
+}
+
+/* --- Boutons plus gros pour les gants et le soleil (0.114.0) --- */
+.plan-puces .puce {
+  min-height: 44px;
+  padding: 6px 12px;
+  font-size: 0.95rem;
+}
+.plan-puces .puce svg {
+  width: 20px;
+  height: 20px;
+}
+.plan-boutons button {
+  width: 48px;
+  height: 48px;
+}
+.bouton-taille-plan {
+  min-width: 64px;
+  min-height: 40px;
+}
+/* Barre du bas : icônes plus grosses, noms plus lisibles. */
+.onglets button {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.onglets button svg {
+  width: 26px;
+  height: 26px;
+}
+/* Lever (0.114.0) : l'onglet du rôle choisi est plein (couleur du rôle, texte blanc), le cadre dessous sans bord. */
+.role-leve.choisi {
+  margin-bottom: 0;
+  border-color: var(--couleur-role);
+  border-radius: 10px;
+  background: var(--couleur-role);
+  color: #ffffff;
+}
+.role-leve.choisi svg {
+  color: #ffffff;
+  stroke: currentColor;
+}
+.cadre-role,
+.cadre-role.onglet-premier,
+.cadre-role.onglet-dernier {
+  margin-top: 6px;
+  border-radius: 12px;
+}
+body.theme-sombre .puce {
+  background: rgba(24, 35, 43, 0.95);
+  color: var(--texte);
+}
+body.theme-soleil .plan-cadre { background: #ffffff; }
+body.theme-soleil svg.plan text { fill: #000000; }
+body.theme-soleil svg.plan text.nom-controle { fill: #b91c1c; }
+body.theme-soleil .puce,
+body.theme-soleil .plan-boutons button { border: 2px solid #000000; color: #000000; }
+
+/* --- Lever (0.114.0, 0.115.1) : barre fixe en bas de l'écran, au-dessus de la barre du bas, toujours au
+   même endroit : appareil photo à gauche, nom du prochain point (modifiable), puis « Enreg. Pts ». --- */
+body[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 8px);
+  z-index: 19;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px;
+  border: 2px solid var(--ambre);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+body[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-photo-levee {
+  order: -2;
+  height: auto;
+  min-height: 56px;
+}
+body[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point {
+  order: -1;
+  flex: 0 1 34%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+body[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-prendre {
+  flex: 1 1 auto;
+  min-height: 56px;
+  font-size: 1.2rem;
+}
+body[data-onglet='terrain'][data-mode-terrain='lever'] .panneau[data-onglet='terrain']:has(.cadre-prise .ligne-id-prendre) {
+  margin-bottom: 96px;
+}
+/* Libellés : sur plusieurs lignes (2 lignes visibles, le reste en faisant défiler), la roue ⚙ ne cache plus rien. */
+.libelles-terrain {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  max-height: 104px;
+  overflow-y: auto;
+}
+/* Contrôle sans point (0.114.0) : bouton pour importer les points de contrôle tout de suite. */
+.controle-vide {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 12px 0;
+}
+.bouton-importer-controle {
+  min-height: 52px;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* --- Réglages ⚙ en onglets (0.114.0) : Affichage, Libellés, Drive, Récepteur --- */
+.onglets-reglages {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 12px;
+  border-bottom: 2px solid var(--bordure);
+}
+.onglet-reglages {
+  flex: 1;
+  min-height: 44px;
+  margin-bottom: -2px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--gris);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.onglet-reglages.actif {
+  border-bottom-color: var(--ambre);
+  color: var(--encre);
+}
+.page-reglages[hidden] {
+  display: none;
+}
+.page-reglages .bouton-large {
+  width: 100%;
+  min-height: 52px;
+}
+.version-reglages {
+  margin: 14px 0 0;
+  text-align: center;
+}
+/* Libellés : « Lignes / Points / Aires » sur une seule ligne de 3 boutons. */
+.listes-reglages {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.listes-reglages .boutons-libelles {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+.listes-reglages .boutons-libelles .bouton-secondaire {
+  min-height: 44px;
+}
+
+/* --- Projet (0.114.0) : « + Nouveau projet » et « Ouvrir projet » plus discrets ; en Base, « Ouvrir projet » prend toute la largeur --- */
+.actions-projets .bouton-projet {
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  box-shadow: none;
+  font-size: 0.95rem;
+}
+body.mode-base .actions-projets {
+  grid-template-columns: 1fr;
+}
+
+/* --- Guidage (0.114.0) : chiffres deux fois plus grands sur tablette. Avance / recule et gauche / droite
+   à gauche, la flèche à droite ; monter / descendre en très grand sur toute la largeur dessous. --- */
+@media (min-width: 521px) {
+  .vue-guidage .guidage-direct.guidage-3 {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'plan fleche' 'hauteur hauteur';
+    row-gap: 8px;
+    padding: 12px 16px;
+  }
+  .vue-guidage .guidage-3 .cote-plan {
+    grid-area: plan;
+  }
+  .vue-guidage .guidage-3 :is(.fleche-guidage, .couloir-ligne) {
+    grid-area: fleche;
+  }
+  .vue-guidage .guidage-3 .fleche-guidage {
+    width: 110px;
+    height: 110px;
+  }
+  .vue-guidage .guidage-3 .cote-plan .lignes-guidage {
+    font-size: 2.3rem;
+    line-height: 1.15;
+  }
+  .vue-guidage .guidage-3 .distance-guidage {
+    font-size: 1.05rem;
+  }
+  .vue-guidage .guidage-3 .cote-hauteur {
+    grid-area: hauteur;
+    display: block;
+  }
+  .vue-guidage .guidage-3 .hauteur-guidage {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 16px;
+    font-size: 1.9rem;
+  }
+  .vue-guidage .guidage-3 .hauteur-guidage strong {
+    font-size: 3.8rem;
+    line-height: 1;
+  }
+}
+/* Coordonnées de la cible, champ H et « + À implanter » / « + Point du projet » sur une seule ligne. */
+.ligne-cible {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+}
+.ligne-cible .coordonnees-cible {
+  margin: 0;
+}
+.ligne-cible .options-choix {
+  margin: 0;
+  flex-wrap: nowrap;
+}
+.ligne-cible .options-choix .bouton-secondaire {
+  min-height: 40px;
+  padding: 4px 10px;
+}
+@media (min-width: 521px) {
+  .vue-guidage .guidage-3 .cote-hauteur .hauteur-guidage {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+@media (max-width: 899px) {
+  /* Près du point, la cible prend le haut : le guidage (plus grand depuis 0.114.0) garde 400 px. */
+  body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] {
+    --hauteur-plan-guidage: max(
+      calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * var(--part-plan-guidage, 0.5)),
+      calc(100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets) - 400px)
+    );
+  }
+}
+.ligne-cible .coord-h input {
+  width: 110px;
+}
+@media (min-width: 521px) {
+  .vue-guidage .guidage-direct.guidage-3 {
+    padding: 8px 14px;
+    row-gap: 4px;
+  }
+  .vue-guidage .guidage-3 .fleche-guidage {
+    width: 90px;
+    height: 90px;
+  }
+  .vue-guidage .guidage-3 .cote-hauteur .hauteur-guidage {
+    padding: 4px 14px;
+  }
+}
+/* Points implantés sur le plan (0.114.0) : couleur selon les tolérances du Contrôle. */
+.plan .point-implante {
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+.plan .point-implante.implante-vert { fill: #16a34a; }
+.plan .point-implante.implante-orange { fill: #ea580c; }
+.plan .point-implante.implante-rouge { fill: #dc2626; }
+.plan .point-implante.implante-inconnu { fill: #6b7280; }
+
+/* --- Calculs › Volumes et Mesures sur tablette / téléphone (0.114.0) : le plan en haut, comme dans Terrain
+   (même hauteur, réglée par les flèches ▲ / ▼), pour voir le levé du volume et ses couleurs. --- */
+@media (max-width: 899px) {
+  body:is([data-onglet='volumes'], [data-onglet='mesures']):not(.mode-dessin) {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * var(--part-plan-terrain, 0.35));
+  }
+  body:is([data-onglet='volumes'], [data-onglet='mesures']):not(.mode-dessin) .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: var(--hauteur-plan-terrain);
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+  body:is([data-onglet='volumes'], [data-onglet='mesures']):not(.mode-dessin) .mise-en-page {
+    padding-top: calc(var(--hauteur-plan-terrain) + 12px);
+  }
+  body:is([data-onglet='volumes'], [data-onglet='mesures']):not(.mode-dessin) .boutons-taille-plan {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    z-index: 3;
+    display: flex;
+    gap: 2px;
+    transform: translateX(-50%);
+  }
+}
+/* Volume sans contour (0.114.0) : à compléter, sur un ton calme (pas en rouge). */
+.a-completer {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 10px 12px;
+  border-left: 4px solid var(--ambre);
+  border-radius: 8px;
+  background: var(--ambre-clair);
+}
+.a-completer p {
+  margin: 0;
+}
+
+/* --- Exporter (0.114.0) : étapes numérotées toutes seules (1. Quoi ?, 2. Lesquels ?, 3. Format, 4. Options) --- */
+.module-export {
+  counter-reset: etape;
+}
+.module-export .titre-etape::before {
+  counter-increment: etape;
+  content: counter(etape) '. ';
+}
+.module-export .titre-etape[hidden],
+.module-export [data-pour][hidden] {
+  display: none;
+}
+.choix-format-export {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.choix-format-export .puce-choix {
+  min-height: 44px;
+  min-width: 72px;
+}
+.bouton-exporter {
+  width: 100%;
+  min-height: 56px;
+  margin-top: 14px;
+  font-size: 1.1rem;
+}
+/* Import (0.114.0) : deux groupes de tuiles, « Fichiers » et « En ligne ». */
+.titre-groupe-import {
+  margin: 10px 0 6px;
+  color: var(--gris);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* --- Guidage (0.114.0) : Grader / Bull en deux boutons (un seul choisi), roue ⚙ à la taille de 🔔 et G / D,
+   coins et règles de hauteur plus grands pour remplir l'écran --- */
+.choix-machine {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 2px solid #1d4ed8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.case-machine {
+  justify-content: center;
+  min-height: 48px;
+  border-radius: 0;
+  color: #1d4ed8;
+}
+.case-machine.actif {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+.ecran-lame .ligne-lame :is(.bouton-secondaire, .bouton-bip, .bouton-roue) {
+  min-width: 48px;
+  min-height: 48px;
+  font-size: 1.15rem;
+}
+.ecran-lame .bouton-roue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--encre);
+  cursor: pointer;
+}
+.bouton-recepteur-2 {
+  width: 100%;
+  min-height: 48px;
+  border-color: var(--orange);
+  color: var(--orange);
+  font-weight: 700;
+}
+.ecran-lame .coins-lame.avec-regles .coin-lame {
+  min-height: 240px;
+  align-content: center;
+}
+.ecran-lame .coin-lame strong {
+  font-size: 2rem;
+}
+.ecran-lame .grosse-fleche-lame {
+  width: 96px;
+  height: 116px;
+}
+.ecran-lame .regle-hauteur {
+  min-height: 240px;
+  width: 44px;
+}
+body.theme-sombre .plan .echelle text {
+  stroke: none;
+}
+
+/* ==========================================================================
+   0.115.0 : mode téléphone optimisé (toutes les pages revues sur un écran de 390 × 844)
+   ========================================================================== */
+
+/* Barre du récepteur : un peu plus basse, petite icône. */
+body.mode-telephone.avec-recepteur .bandeaux-recepteur { height: 32px; }
+body.mode-telephone.avec-recepteur .entete { padding-bottom: 32px; }
+body.mode-telephone.avec-recepteur { --hauteur-entete: 74px; }
+body.mode-telephone .bandeaux-recepteur .precision-rtk { font-size: 1rem; gap: 6px; }
+body.mode-telephone .bandeaux-recepteur .statut-rtk { font-size: 0.7rem; }
+body.mode-telephone .bandeaux-recepteur span[data-bandeau='inclinaison'] { font-size: 0.7rem; padding: 0 4px; }
+body.mode-telephone .bandeaux-recepteur .icone-bandeau { width: 16px; height: 16px; margin: 0 4px; padding: 1px 3px; }
+
+/* Barre du bas : icônes et noms lisibles (avant 14 px et 0,68 rem). */
+body.mode-telephone .onglets button { font-size: 11px; font-weight: 700; }
+body.mode-telephone .onglets button svg { flex: none; width: 20px; height: 20px; }
+
+/* Plan : les 5 boutons tiennent sur une ligne, colonne de droite plus fine, flèches ▲ / ▼ plus basses. */
+body.mode-telephone .plan-puces { flex-wrap: nowrap; gap: 4px; }
+body.mode-telephone .plan-puces .puce { min-height: 34px; padding: 4px 8px; gap: 4px; font-size: 0.78rem; }
+body.mode-telephone .plan-puces .puce svg { width: 16px; height: 16px; }
+body.mode-telephone .plan-boutons button { width: 38px; height: 38px; }
+body.mode-telephone .bouton-taille-plan { min-width: 52px; min-height: 28px; }
+
+/* Lever : moins de marges, photo et Enreg. Pts plus compacts. */
+body.mode-telephone .panneau { padding: 10px; }
+body.mode-telephone .cadre-role { padding: 4px 6px 6px; }
+body.mode-telephone .cadre-prise { padding: 10px 8px 8px; margin: 10px 0 6px; gap: 6px; }
+body.mode-telephone .bouton-photo-levee { flex-basis: 46px; min-height: 42px; }
+body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre {
+  left: 8px;
+  right: 8px;
+  gap: 6px;
+  padding: 6px;
+}
+body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre :is(.bouton-prendre, .bouton-photo-levee) {
+  min-height: 48px;
+}
+body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-prendre {
+  font-size: 1.05rem;
+}
+body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .panneau[data-onglet='terrain']:has(.cadre-prise .ligne-id-prendre) {
+  margin-bottom: 80px;
+}
+body.mode-telephone .libelles-terrain { max-height: 92px; }
+
+/* Implanter › Surface : la zone vide « Choisis une surface » moins haute. */
+body.mode-telephone .ecart-direct.attente { min-height: 90px; }
+
+/* Calculs : « Mesures / métrés » sur une ligne. */
+body.mode-telephone .parties-calculs button { font-size: 0.82rem; white-space: nowrap; }
+
+/* Guidage (lame) : ⇄ G / D, 🔔 et ⚙ restent sur la ligne du levé à suivre. */
+body.mode-telephone .ecran-lame .ligne-lame { flex-wrap: nowrap; gap: 4px; }
+body.mode-telephone .ecran-lame .ligne-lame select { min-width: 0; flex: 1 1 auto; }
+body.mode-telephone .ecran-lame .ligne-lame :is(.bouton-secondaire, .bouton-bip, .bouton-roue) {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 2px 6px;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+body.mode-telephone .case-machine { min-height: 40px; }
+body.mode-telephone .bouton-recepteur-2 { min-height: 40px; }
+body.mode-telephone .ecran-lame .coins-lame.avec-regles .coin-lame { min-height: 190px; }
+body.mode-telephone .ecran-lame .regle-hauteur { min-height: 190px; width: 34px; }
+body.mode-telephone .ecran-lame .grosse-fleche-lame { width: 72px; height: 86px; }
+
+/* Guidage d'implantation sur téléphone : comme sur tablette, écarts en gros, monter / descendre dessous. */
+@media (max-width: 520px) {
+  .vue-guidage .guidage-direct.guidage-3 {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'plan fleche' 'hauteur hauteur';
+    row-gap: 4px;
+    padding: 8px 10px;
+  }
+  .vue-guidage .guidage-3 .cote-plan { grid-area: plan; }
+  .vue-guidage .guidage-3 :is(.fleche-guidage, .couloir-ligne) { grid-area: fleche; }
+  .vue-guidage .guidage-3 .fleche-guidage { width: 64px; height: 64px; }
+  .vue-guidage .guidage-3 .cote-plan .lignes-guidage { font-size: 1.45rem; line-height: 1.15; }
+  .vue-guidage .guidage-3 .cote-hauteur { grid-area: hauteur; display: block; }
+  .vue-guidage .guidage-3 .cote-hauteur .hauteur-guidage {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 12px;
+    font-size: 1.25rem;
+  }
+  .vue-guidage .guidage-3 .hauteur-guidage strong { font-size: 2.4rem; line-height: 1; }
+}
+/* Barre du bas un peu plus haute en mode téléphone : icône 20 px + nom 11 px. */
+body.mode-telephone { --hauteur-onglets: 52px; }
+/* Implanter › Surface / Altitude : écart et règle moins hauts (le plan garde la place). */
+body.mode-telephone .ecart-et-regle .regle-hauteur { min-height: 120px; }
+body.mode-telephone .ecart-et-regle > .ecart-direct { min-height: 0; }

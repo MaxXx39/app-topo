@@ -141,3 +141,16 @@ describe('durée entre deux contrôles (0.90.0)', () => {
     expect(controleNecessaire(controles, maintenant, 2 * 3600000)).toBe(true);
   });
 });
+
+describe('couleur des points implantés (tolérances du Contrôle)', () => {
+  it('vert dans 2 cm, orange jusqu\'à 4 cm, rouge au-delà ; la plus mauvaise de plan et hauteur', async () => {
+    const { couleurImplantation } = await import('../src/topo/controle.js');
+    const cible = { est: 2500000, nord: 1100000, altitude: 450 };
+    expect(couleurImplantation({ cible, mesure: { est: 2500000.01, nord: 1100000.01, altitude: 450.01 } })).toBe('vert');
+    expect(couleurImplantation({ cible, mesure: { est: 2500000.03, nord: 1100000, altitude: 450 } })).toBe('orange');
+    expect(couleurImplantation({ cible, mesure: { est: 2500000, nord: 1100000, altitude: 450.05 } })).toBe('rouge');
+    // Sans altitude voulue : seulement l'écart en plan.
+    expect(couleurImplantation({ cible: { est: 2500000, nord: 1100000, altitude: null }, mesure: { est: 2500000.015, nord: 1100000, altitude: 452 } })).toBe('vert');
+    expect(couleurImplantation({ cible: null, mesure: { est: 0, nord: 0 } })).toBeNull();
+  });
+});

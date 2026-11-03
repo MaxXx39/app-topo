@@ -34,11 +34,11 @@ export function creerModuleExport(conteneur, actions) {
   conteneur.innerHTML = `
     <div class="carte-section panneau-onglet-projet module-export">
       <p class="titre-panneau-projet">Exporter ${bulle('exporterProjet')}</p>
-      <p class="titre-choix">1. Quoi ?</p>
+      <p class="titre-choix titre-etape">Quoi ?</p>
       <div class="choix-sorte-export" role="group" aria-label="Quoi exporter">
         ${SORTES.map(([cle, titre, niveau]) => `<button type="button" class="puce-choix ${niveau ? `seulement-${niveau}` : ''}" data-sorte="${cle}">${titre}</button>`).join('')}
       </div>
-      <p class="titre-choix">2. Format</p>
+      <p class="titre-choix titre-etape" data-zone="titre-format">Format</p>
       ${SORTES.map(([cle]) => `<div class="panneau-export" data-panneau="${cle}" hidden></div>`).join('')}
     </div>`;
   const panneau = (cle) => conteneur.querySelector(`[data-panneau="${cle}"]`);
@@ -67,6 +67,8 @@ export function creerModuleExport(conteneur, actions) {
     if (niveau && !aAcces(niveau)) sorte = 'controles';
     for (const bouton of conteneur.querySelectorAll('button[data-sorte]')) bouton.classList.toggle('actif', bouton.dataset.sorte === sorte);
     for (const zone of conteneur.querySelectorAll('[data-panneau]')) zone.hidden = zone.dataset.panneau !== sorte;
+    // Plan et volumes, Mesures : leurs étapes « Lesquels ? », « Format », « Options » sont dans leur formulaire.
+    conteneur.querySelector('[data-zone="titre-format"]').hidden = ['plan', 'mesures'].includes(sorte);
   }
 
   /** Bouton d'export (data-export et ses précisions). */

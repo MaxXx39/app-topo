@@ -10,8 +10,8 @@ import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { calculerHelmert, rotationLisible, etapeRecalage } from '../topo/recalage.js';
 
-// Accroches sur le DXF à recaler (étapes impaires).
-const ACCROCHES_DXF = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre']];
+// Accroches sur le DXF à recaler (étapes impaires) ; « Point » (0.116.0) : un point levé ou de contrôle.
+const ACCROCHES_DXF = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre'], ['point', 'Point']];
 // Accroches pour la position calée (étapes paires) : point levé ou de contrôle, ou un autre DXF.
 const ACCROCHES_CALE = [['point', 'Point'], ['sommet', 'Sommet DXF'], ['milieu', 'Milieu DXF'], ['ligne', 'Sur ligne DXF'], ['centre', 'Centre DXF']];
 
@@ -78,7 +78,7 @@ function texteEtape(etape) {
   if (etape.sorte === 'dxf') {
     texte = etape.pret
       ? `Recalage prêt : vérifie les écarts, puis « Appliquer ». Ou, pour contrôler, touche un ${ordinal} point sur le DXF à recaler.`
-      : `Touche le ${ordinal} point sur le DXF à recaler (une croix le montre), puis « Valider »`;
+      : `Touche le ${ordinal} point sur le DXF à recaler, ou un point levé ou de contrôle avec « Point » (une croix le montre), puis « Valider »`;
   } else {
     texte = `Position calée du ${ordinal} point : touche un point (levé ou de contrôle) ou une accroche d'un autre DXF (une croix le montre, puis « Valider »), ou prends la position du GNSS`;
   }

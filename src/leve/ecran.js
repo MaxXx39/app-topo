@@ -165,6 +165,11 @@ export function creerEcranLeve(conteneur, actions) {
       actions.nouvelleConduite(conteneur.querySelector('[data-champ="depart-conduite"]')?.value ?? '');
       return;
     }
+    // Guidage : « Connecter le 2e GNSS » ouvre la fenêtre du récepteur (Récepteur 2 dedans).
+    if (action === 'ouvrirRecepteur') {
+      document.dispatchEvent(new CustomEvent('ouvrir-recepteur'));
+      return;
+    }
     // Mode Lame : roue ⚙ des tolérances.
     if (action === 'reglagesLame') {
       reglagesLameOuverts = !reglagesLameOuverts;
@@ -205,7 +210,7 @@ export function creerEcranLeve(conteneur, actions) {
       return;
     }
     if (action === 'garderPointChoisi') {
-      actions.garderPointChoisi(conteneur.querySelector('[data-champ="nom-implantation"]')?.value ?? '');
+      actions.garderPointChoisi(conteneur.querySelector('[data-champ="nom-implantation"]')?.value ?? (donnees.implanter.choix?.nom || ''));
       return;
     }
     if (action === 'basculerReglagesGuidage') {
@@ -253,8 +258,9 @@ export function creerEcranLeve(conteneur, actions) {
       return;
     }
     if (action === 'implanterChoix' || action === 'creerPointAImplanter') {
-      const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`)?.value ?? '';
-      actions[action]({ nom: champ('nom-implantation'), altitude: champ('altitude-implantation') });
+      const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`)?.value;
+      // Pendant le guidage (0.114.0) : le nom de la cible et l'altitude du champ H.
+      actions[action]({ nom: champ('nom-implantation') ?? cibleGuidee()?.nom ?? '', altitude: champ('altitude-implantation') ?? champ('altitude-cible') ?? '' });
       return;
     }
     if (action === 'trouverPoint') {
@@ -843,7 +849,11 @@ export function creerEcranLeve(conteneur, actions) {
   /** Point implanté : coordonnées et altitude, sur une ligne. */
   function detailPoint() {
     const c = cibleGuidee();
-    return `<p class="coordonnees-cible"><span class="coord-en">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>${donnees.mode === 'autocontrole' ? (c.altitude != null ? `<span class="coord-h">H ${formaterNombre(c.altitude)}</span>` : '') : `<label class="coord-h">H<input type="text" inputmode="decimal" data-champ="altitude-cible" value="${c.altitude != null ? c.altitude.toFixed(3) : ''}" placeholder="—" aria-label="Altitude d'implantation" /></label>`}</p>`;
+    return `<div class="ligne-cible"><p class="coordonnees-cible"><span class="coord-en">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>${donnees.mode === 'autocontrole' ? (c.altitude != null ? `<span class="coord-h">H ${formaterNombre(c.altitude)}</span>` : '') : `<label class="coord-h">H<input type="text" inputmode="decimal" data-champ="altitude-cible" value="${c.altitude != null ? c.altitude.toFixed(3) : ''}" placeholder="—" aria-label="Altitude d'implantation" /></label>`}</p>
+      ${donnees.mode !== 'autocontrole' && donnees.implanter.choix ? `<div class="ligne-outils options-choix">
+          <button type="button" class="bouton-secondaire seulement-expert" data-action="creerPointAImplanter">+ À implanter</button>
+          ${donnees.implanter.choixDuProjet ? '' : '<button type="button" class="bouton-secondaire" data-action="garderPointChoisi" title="Garder ce point dans le projet (levé « Points ajoutés »)">+ Point du projet</button>'}
+        </div>` : ''}</div>`;
   }
 
   /**
@@ -941,7 +951,7 @@ export function creerEcranLeve(conteneur, actions) {
         <div class="position-leve" data-vivant="position"></div>
         <p class="raison-leve" data-vivant="raison" hidden></p>
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
-          Annuler ${donnees.dernierPoint ? echapper(donnees.dernierPoint) : 'le dernier point'}</button>
+          ↶ Effacer le dernier point${donnees.dernierPoint ? ` (${echapper(donnees.dernierPoint)})` : ''}</button>
       </div>`;
   }
 
@@ -1439,6 +1449,9 @@ function svgCouloir(numero, ecart, abscisse, longueur, couleur) {
  * Bandeaux sous l'en-tête : état du RX2 (RTK, inclinaison) ; sans RX2 connecté mais avec le GPS de
  * la tablette (tablette : { precision } ou null), « GPS tablette ± x m » bien marqué.
  */
+// Vrai dès que le RTK fixe a été reçu une fois : sa perte fait clignoter la barre du récepteur.
+let fixeDejaVu = false;
+
 export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) {
   let bandeaux = document.querySelector('#bandeaux-recepteur');
   if (!bandeaux) {
@@ -1474,26 +1487,31 @@ export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) 
 
   const rtk = bandeaux.querySelector('[data-bandeau="rtk"]');
   const inclinaison = bandeaux.querySelector('[data-bandeau="inclinaison"]');
+  // Âge des corrections (s), à côté de l'inclinaison (0.114.0).
+  const age = etat.ageCorrections != null ? `corr. ${Math.round(etat.ageCorrections)} s` : null;
   if (!etat.recu) {
     rtk.textContent = 'En attente du récepteur…';
     rtk.className = 'attente';
   } else {
     const satellites = etat.nbSatellites != null ? ` · ${etat.nbSatellites} sat` : '';
     const statut = { 4: 'RTK FIXE', 5: 'RTK FLOTTANT' }[etat.qualite] ?? `GNSS : ${etat.libelleQualite ?? '?'}`;
-    // Précision estimée par le RX2 (message GST, m) ; « — » s'il ne l'envoie pas. (Les corrections
-    // « direct » sont dans la fenêtre du récepteur : le bandeau doit tenir sur un téléphone.)
-    const precision = ` · H ${formaterNombre(etat.precisionH)} V ${formaterNombre(etat.precisionV)}`;
-    rtk.textContent = `${statut}${satellites}${precision}`;
-    rtk.className = etat.qualite === 4 ? 'ok' : 'pas-ok';
+    // Précision estimée par le GNSS (message GST, m), en gros (0.114.0) ; « — » s'il ne l'envoie pas.
+    rtk.innerHTML = `<span class="statut-rtk">${echapper(statut)}${satellites}</span>
+      <span class="precision-rtk">H ${formaterNombre(etat.precisionH)} <span>V ${formaterNombre(etat.precisionV)}</span></span>`;
+    // Le RTK fixe était là puis il est perdu : la barre clignote jusqu'à son retour (0.114.0).
+    if (etat.qualite === 4) fixeDejaVu = true;
+    rtk.className = etat.qualite === 4 ? 'ok' : `pas-ok${fixeDejaVu ? ' fixe-perdu' : ''}`;
   }
+  // Inclinaison toujours montrée (0.114.1), avec l'âge des corrections à côté : on voit tout de suite
+  // s'il faut recalibrer la compensation d'inclinaison.
   if (etat.etatInclinaison == null) {
-    inclinaison.textContent = 'Inclinaison : ?';
+    inclinaison.textContent = `Incl. ?${age ? ` · ${age}` : ''}`;
     inclinaison.className = 'attente';
   } else {
     const angle = etat.inclinaison != null ? ` (${etat.inclinaison.toFixed(0)}°)` : '';
     // Hauteur de canne (0.107.1) : seulement montrée, pour contrôle (réglée en Expert, voir Emlid Flow).
     const canne = hauteurCanne != null ? ` · canne ${hauteurCanne.toFixed(3)}` : '';
-    inclinaison.textContent = `${etat.inclinaisonPrete ? `Incl. PRÊTE${angle}` : 'Incl. NON PRÊTE'}${canne}`;
+    inclinaison.textContent = `${etat.inclinaisonPrete ? `Incl. PRÊTE${angle}` : 'Incl. NON PRÊTE'}${age ? ` · ${age}` : ''}${canne}`;
     inclinaison.className = etat.inclinaisonPrete ? 'ok' : 'pas-ok';
   }
 }

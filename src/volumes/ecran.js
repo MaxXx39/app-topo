@@ -15,6 +15,7 @@ import { nouveauVolume, choisirSorte, nomAutomatique, nomDuCalcul, grouperParNat
  * - etiquette(surface) : nom d'une surface dans les listes
  * - obtenirMontre() : id du calcul colorié sur le plan ; montrer(id) : le choisir
  * - quandChange() : après chaque modification
+ * - allerLever() : ouvre Terrain › Lever (bouton « Aller dans Lever » d'un volume sans contour)
  * Renvoie { afficher() }.
  */
 export function creerEcranVolumes(conteneur, options) {
@@ -28,6 +29,10 @@ export function creerEcranVolumes(conteneur, options) {
     const action = bouton.dataset.action;
     if (action === 'montrer') {
       montrer(bouton.dataset.id);
+      return;
+    }
+    if (action === 'aller-lever') {
+      options.allerLever?.();
       return;
     }
     if (action === 'ajouter-volume') {
@@ -219,6 +224,11 @@ function carte({ calcul, resultat, nom }, surfaces, { etiquette, montre }) {
 function detail(calcul, r, surfaces) {
   if (!r) return '';
   if (r.erreurs) {
+    // Il manque seulement le contour du levé (0.114.0) : un message calme et un bouton vers Lever.
+    if (r.erreurs.every((e) => e.includes('contour'))) {
+      return `<div class="a-completer"><p><strong>À compléter</strong> : ajoute un contour au levé (au moins 3 points) dans Lever.</p>
+        <button type="button" class="bouton-secondaire" data-action="aller-lever">Aller dans Lever</button></div>`;
+    }
     return `<div class="erreur"><p><strong>Calcul impossible</strong></p><ul>${r.erreurs.map((e) => `<li>${echapper(e)}</li>`).join('')}</ul></div>`;
   }
   const avertissements = [];
