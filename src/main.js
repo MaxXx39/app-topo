@@ -6,6 +6,7 @@ import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { lireLandXML } from './topo/landxml.js';
 import { creerSurfaceSwisstopo } from './import/zone-swisstopo.js';
+import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
@@ -628,7 +629,14 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     return null;
   },
   commencerPointage: () => commencerPointage(),
-  commencerSurfaceSwisstopo: () => surfaceSwisstopo.commencer(),
+  commencerSurfaceSwisstopo: () => {
+    if (cadastreAutour.actif()) cadastreAutour.arreter();
+    surfaceSwisstopo.commencer();
+  },
+  commencerCadastre: () => {
+    if (surfaceSwisstopo.actif()) surfaceSwisstopo.arreter();
+    cadastreAutour.commencer();
+  },
   montrerCalqueDxf: (id, numero, visible) => {
     const calque = projet.plansDxf.find((p) => p.id === id)?.calques[numero];
     if (!calque) return;
@@ -2876,6 +2884,7 @@ function commencerRecalage(id) {
   if (!choisi) return;
   if (pointage.actif) arreterPointage();
   if (surfaceSwisstopo.actif()) surfaceSwisstopo.arreter();
+  if (cadastreAutour.actif()) cadastreAutour.arreter();
   recalage.planId = id;
   recalage.choix = null;
   recalage.candidat = null;
@@ -3138,6 +3147,29 @@ const surfaceSwisstopo = creerSurfaceSwisstopo({
   },
 });
 
+// --- Cadastre autour d'un point (0.112.0, Projet › Import, Expert) : voir import/zone-cadastre.js ---
+const cadastreAutour = creerCadastreAutour({
+  get plan() {
+    return plan;
+  },
+  get cadre() {
+    return document.querySelector('#plan .plan-cadre');
+  },
+  afficherMessage,
+  allerAuPlan: () => {
+    if (estTelephone()) afficherOnglet('plan');
+  },
+  avantDeCommencer: () => {
+    if (pointage.actif) arreterPointage();
+  },
+  nomsPris: () => [...projet.leves.map((l) => l.nom), ...projet.plansDxf.map((p) => p.nom)],
+  ajouterCadastre: ({ nom, points, planDxf }) => {
+    ajouterLeve(projet, nom, points);
+    if (planDxf) projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...planDxf });
+    modifie({ recadrer: true });
+  },
+});
+
 // --- Points ajoutés en touchant le plan DXF (Projet › Imports › Point › Pointer sur le plan DXF) ---
 // pointage : { actif, accroche ('sommet', 'milieu', 'ligne', 'centre'), choix (point touché, à
 // contrôler et valider : { est, nord, altitude }) }. Le plan ne bouge pas : une croix montre le
@@ -3148,6 +3180,7 @@ const ACCROCHES_POINTAGE = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne'
 /** Début du pointage : une barre sur le plan (accroche, Terminé) ; sur téléphone, on va au plan. */
 function commencerPointage() {
   if (surfaceSwisstopo.actif()) surfaceSwisstopo.arreter();
+  if (cadastreAutour.actif()) cadastreAutour.arreter();
   pointage.actif = true;
   pointage.choix = null;
   dessinerBarrePointage();
@@ -4116,7 +4149,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
   // Couleur d'une liste (menu « Afficher » ; aussi dans Projet › Listes de points).
   quandColorerListe: (id, couleur) => colorerListe(id, couleur),
   quandToucherPhoto: (id) => montrerPhoto(id),
-  quandChangerZone: (sommets) => surfaceSwisstopo.changerZone(sommets),
+  quandChangerZone: (sommets) => (cadastreAutour.actif() ? cadastreAutour.changerZone(sommets) : surfaceSwisstopo.changerZone(sommets)),
   quandMontrerListe: (id, visible) => {
     if (id === '*') projet.listesCachees = visible ? [] : listesDePoints(projet).map((l) => l.id);
     else montrerListe(projet, id, visible);
