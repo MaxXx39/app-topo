@@ -526,7 +526,7 @@ export function creerEcranLeve(conteneur, actions) {
       ${choixImplantation}
       ${surfaces.length > 0
         ? `<select data-champ="surface-controle" aria-label="Surface à contrôler">
-            ${reglages.surfaceId ? '' : '<option value="">— choisir une surface —</option>'}
+            ${surfaces.some((s) => s.id === reglages.surfaceId) ? '' : '<option value="" selected>— choisir une surface —</option>'}
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === reglages.surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
         : '<p class="vide">Aucune surface.</p>'}
