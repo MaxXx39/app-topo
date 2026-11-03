@@ -9341,19 +9341,41 @@ body.theme-soleil svg.plan text.nom-controle { fill: #b91c1c; }
 body.theme-soleil .puce,
 body.theme-soleil .plan-boutons button { border: 2px solid #000000; color: #000000; }
 
-/* --- Lever (0.114.0) : « Enreg. Pts » toujours au même endroit, en bas de l'écran, au-dessus de la barre --- */
-body[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .bouton-prendre {
+/* --- Lever (0.114.0, 0.115.1) : barre fixe en bas de l'écran, au-dessus de la barre du bas, toujours au
+   même endroit : appareil photo à gauche, nom du prochain point (modifiable), puis « Enreg. Pts ». --- */
+body[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre {
   position: fixed;
-  left: 16px;
-  right: 16px;
-  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 10px);
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 8px);
   z-index: 19;
-  min-height: 64px;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px;
+  border: 2px solid var(--ambre);
+  border-radius: 14px;
+  background: var(--surface);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-  font-size: 1.25rem;
 }
-body[data-onglet='terrain'][data-mode-terrain='lever'] .panneau[data-onglet='terrain']:has(.cadre-prise .bouton-prendre) {
-  margin-bottom: 90px;
+body[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-photo-levee {
+  order: -2;
+  height: auto;
+  min-height: 56px;
+}
+body[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point {
+  order: -1;
+  flex: 0 1 34%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+body[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-prendre {
+  flex: 1 1 auto;
+  min-height: 56px;
+  font-size: 1.2rem;
+}
+body[data-onglet='terrain'][data-mode-terrain='lever'] .panneau[data-onglet='terrain']:has(.cadre-prise .ligne-id-prendre) {
+  margin-bottom: 96px;
 }
 /* Libellés : sur plusieurs lignes (2 lignes visibles, le reste en faisant défiler), la roue ⚙ ne cache plus rien. */
 .libelles-terrain {
@@ -9713,14 +9735,20 @@ body.mode-telephone .panneau { padding: 10px; }
 body.mode-telephone .cadre-role { padding: 4px 6px 6px; }
 body.mode-telephone .cadre-prise { padding: 10px 8px 8px; margin: 10px 0 6px; gap: 6px; }
 body.mode-telephone .bouton-photo-levee { flex-basis: 46px; min-height: 42px; }
-body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .bouton-prendre {
-  left: 10px;
-  right: 10px;
-  min-height: 54px;
-  font-size: 1.1rem;
+body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre {
+  left: 8px;
+  right: 8px;
+  gap: 6px;
+  padding: 6px;
 }
-body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .panneau[data-onglet='terrain']:has(.cadre-prise .bouton-prendre) {
-  margin-bottom: 76px;
+body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre :is(.bouton-prendre, .bouton-photo-levee) {
+  min-height: 48px;
+}
+body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-prendre {
+  font-size: 1.05rem;
+}
+body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .panneau[data-onglet='terrain']:has(.cadre-prise .ligne-id-prendre) {
+  margin-bottom: 80px;
 }
 body.mode-telephone .libelles-terrain { max-height: 92px; }
 
