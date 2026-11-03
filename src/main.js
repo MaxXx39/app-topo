@@ -62,7 +62,7 @@ import { lireLibelles, recreerLibellesManquants, definirLibellesProjet, surLibel
 import { modifierLibellesDeSorte, modifierReseaux } from './leve/fenetre-libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
-import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele } from './topo/ligne-implantation.js';
+import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele, ecartAuBout } from './topo/ligne-implantation.js';
 import { MODES_ACCROCHE, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
 import {
   estLeveDirect,
@@ -1557,6 +1557,7 @@ function envoyerImplantationAuPlan() {
   const cibleControle = enAutocontrole() && ongletContexte === 'terrain' ? autocontrole.cible : null;
   // Dessins (Calculs › Dessin) : toujours sur le plan ; le dessin en cours avec son pilote.
   const avecPilote = piloteActif();
+  plan.palirAutour(ongletContexte === 'terrain' ? travailAGarder() : null);
   // Case « Voir toute la ligne » (0.118.0) : seulement pendant le guidage d'une ligne (pas d'un talus).
   const guidageLigne = ongletContexte === 'terrain' && enImplantationDeLigne() && !enTalus() && Boolean(implanter.ligne);
   if (!guidageLigne) implanter.voirLigne = false;
@@ -1784,6 +1785,33 @@ function montrerImplantation() {
   mettreAJourToucheVolume();
   // Début du guidage : le plan (devenu plus grand) se cadre sur le point ou la ligne et la canne.
   if (!avant && document.body.classList.contains('vue-implantation')) requestAnimationFrame(() => requestAnimationFrame(cadrerSurImplantation));
+}
+
+/**
+ * Ce qui reste net sur le plan, le reste à 50 % (0.118.1, Terrain) : { stockId, noms, garderMesures }.
+ * Lever : le levé en cours (ou le métré) et ses points ; Implanter : la ligne, le point ou la surface
+ * choisi ; rien de choisi, ou autre mode : null (tout normal).
+ */
+function travailAGarder() {
+  if (!ecranLeve) return null;
+  if (terrain.mode === 'lever') {
+    const stock = stockEnCours();
+    if (stock) return { stockId: stock.id, noms: pointsDuLeve(stock.leveId).map((p) => p.nom) };
+    const metre = metreEnCours();
+    if (metre) return { stockId: null, noms: pointsDuLeve(metre.leveId).map((p) => p.nom), garderMesures: true };
+    return null;
+  }
+  if (terrain.mode !== 'controler') return null;
+  if (terrain.implantation === 'point') return implanter.cible ? { stockId: null, noms: implanter.cible.nom ? [implanter.cible.nom] : [] } : null;
+  if (['ligne', 'talus'].includes(terrain.implantation)) {
+    if (!implanter.ligne) return null;
+    return { stockId: terrain.implantation === 'talus' ? terrain.talus.terrainId ?? null : null, noms: implanter.ligne.sommets.map((s) => s.nom).filter(Boolean) };
+  }
+  if (terrain.implantation === 'surface') {
+    const surface = projet.surfaces.find((s) => s.id === terrain.surfaceId);
+    return surface ? { stockId: surface.id, noms: surface.leveId ? pointsDuLeve(surface.leveId).map((p) => p.nom) : [] } : null;
+  }
+  return null;
 }
 
 /** Cadre le plan sur ce qu'on implante (point ou ligne) et la position du récepteur. */
@@ -2592,6 +2620,8 @@ function calculerImplantationLigne(etat) {
     classe: fiable ? classeDistance(Math.abs(g.ecart)) : 'pas-fiable',
     // Gauche / droite (0.118.0) : vert / orange / rouge selon la tolérance en plan du Contrôle.
     classeLaterale: fiable ? classeTolerance(g.ecart, projet.tolerancesControle?.plan ?? TOLERANCES_PAR_DEFAUT.plan) : 'pas-fiable',
+    // Début / fin (0.118.1) : même tolérance, sur l'écart au bout le plus proche (vert = arrivé au bout).
+    classeBout: fiable ? classeTolerance(ecartAuBout(g.abscisse, g.longueur), projet.tolerancesControle?.plan ?? TOLERANCES_PAR_DEFAUT.plan) : 'pas-fiable',
     ecartAltitude,
     classeAltitude: ecartAltitude == null ? null : classeEcart(ecartAltitude),
     message: null,

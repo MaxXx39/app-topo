@@ -651,10 +651,12 @@ export function creerEcranLeve(conteneur, actions) {
       ? '<span class="libelle-ecart">Sur la ligne</span>'
       : `<span class="libelle-ecart">${iconeFleche(ecart > 0 ? 'gauche' : 'droite')}${ecart > 0 ? 'Gauche' : 'Droite'}</span>`;
     // Position le long : avant le début, après la fin, ou depuis le début (+ la fin en petit).
+    // 0.118.1 : dans son propre bloc, coloré selon l'écart au bout le plus proche (tolérance en plan
+    // du Contrôle : vert = on est sur le début ou la fin).
     let leLong;
-    if (abscisse < 0) leLong = `<div class="ligne-ecart ligne-debut"><span class="libelle-ecart">${iconeDrapeau('debut')}Avant le début</span><strong>${m(abscisse)}</strong></div>`;
-    else if (abscisse > longueur) leLong = `<div class="ligne-ecart ligne-debut"><span class="libelle-ecart">${iconeDrapeau('fin')}Après la fin</span><strong>${m(abscisse - longueur)}</strong></div>`;
-    else leLong = `<div class="ligne-ecart ligne-debut"><span class="libelle-ecart">${iconeDrapeau('debut')}Début</span><strong>${m(abscisse)}</strong></div>
+    if (abscisse < 0) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}Avant le début</span><strong>${m(abscisse)}</strong></div>`;
+    else if (abscisse > longueur) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('fin')}Après la fin</span><strong>${m(abscisse - longueur)}</strong></div>`;
+    else leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}Début</span><strong>${m(abscisse)}</strong></div>
         <div class="fin-petite">${iconeDrapeau('fin')}fin ${m(reste)}</div>`;
     const hauteur = g.ecartAltitude == null
       ? '<div class="bloc-hauteur sans-altitude">pas d\'altitude</div>'
@@ -664,11 +666,11 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="colonne-ecarts">
         <div class="bloc-lateral ${g.classeLaterale ?? ''}">
           <div class="ligne-ecart">${sens}<strong>${m(ecart)}</strong></div>
-          ${leLong}
         </div>
+        <div class="bloc-lateral bloc-bouts ${g.classeBout ?? ''}">${leLong}</div>
         ${hauteur}
       </div>
-      ${svgCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale))}`;
+      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale))}`;
   }
 
   /**
@@ -1478,26 +1480,39 @@ function couleurLaterale(classe) {
 }
 
 /**
- * Couloir vertical (0.118.0, à droite du guidage, sur toute la hauteur) : la ligne du début (drapeau
- * vert, en bas) à la fin (damier, en haut) ; la canne à sa place le long de la ligne (proportion
- * abscisse / longueur) et sur le côté selon l'écart, avec la même échelle que l'ancien couloir
- * (BANDES_COULOIR : la bande la plus large touche le bord). ecart : m, + à droite.
+ * Couloir vertical (0.118.0, refait en 0.118.1) : un tiers de l'écran à droite, sur toute la hauteur
+ * des écarts. La ligne du début (drapeau vert, en bas) à la fin (damier, en haut) ; la canne à sa
+ * place le long de la ligne (proportion abscisse / longueur) et sur le côté selon l'écart. Réglettes
+ * gris très clair à chaque distance de la bande (BANDES_COULOIR, comme les cercles de la cible :
+ * 2 m, 1 m, 50 cm, 20 cm…), la plus large au bord. Fait en blocs HTML placés en % (pas en SVG) pour
+ * remplir toute la case sans déformer le rond de la canne. ecart : m, + à droite.
  */
-function svgCouloirVertical(numero, ecart, abscisse, longueur, couleur) {
+function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur) {
   const bandes = BANDES_COULOIR[numero];
-  const yFin = 52;
-  const yDebut = 340;
+  const haut = 18; // % : haut du trait (la fin)
+  const bas = 76; // % : bas du trait (le début)
+  const demi = 45; // % de la largeur : la bande la plus large
   const part = longueur > 0 ? abscisse / longueur : 0;
-  // Avant le début ou après la fin : la canne dépasse un peu du trait (jusqu'à 20 unités).
-  const y = Math.max(yFin - 20, Math.min(yDebut + 20, yDebut - part * (yDebut - yFin)));
-  const x = 50 + Math.max(-42, Math.min(42, (ecart / bandes[0]) * 42));
-  return `<svg class="couloir-vertical" viewBox="0 0 100 400" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Position de la canne le long de la ligne">
-    <path d="M50 ${yDebut}V${yFin}" class="trait-couloir" />
-    <path d="M30 ${yDebut}H70M30 ${yFin}H70" class="bout-couloir" />
-    ${svgDrapeau('fin', 40, yFin - 8, 30)}
-    ${svgDrapeau('debut', 42, yDebut + 44, 34)}
-    <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" class="moi" style="fill: ${couleur}" />
-  </svg>`;
+  // Avant le début ou après la fin : la canne dépasse un peu du trait.
+  const top = Math.max(haut - 6, Math.min(bas + 6, bas - part * (bas - haut)));
+  const left = 50 + Math.max(-demi, Math.min(demi, (ecart / bandes[0]) * demi));
+  const texte = (r) => (r >= 1 ? `${r} m` : `${Math.round(r * 100)} cm`);
+  // Étiquettes à droite seulement, une sur deux plus haut (pour ne pas se chevaucher) ; pas pour un
+  // trait trop près de la ligne (il toucherait le drapeau du début).
+  const reglettes = bandes.map((r, i) => {
+    const dx = (r / bandes[0]) * demi;
+    return `<span class="reglette" style="left: ${(50 - dx).toFixed(1)}%"></span><span class="reglette" style="left: ${(50 + dx).toFixed(1)}%"></span>
+      ${dx < 12 ? '' : `<span class="texte-reglette ${i % 2 ? 'en-bas' : 'en-haut'}${dx > 40 ? ' au-bord' : ''}" style="left: ${(50 + dx).toFixed(1)}%">${texte(r)}</span>`}`;
+  }).join('');
+  return `<div class="cadre-couloir" role="img" aria-label="Position de la canne le long de la ligne">
+    ${reglettes}
+    <span class="trait-couloir" style="top: ${haut}%; bottom: ${100 - bas}%"></span>
+    <span class="bout-couloir" style="top: ${haut}%"></span>
+    <span class="bout-couloir" style="top: ${bas}%"></span>
+    <span class="drapeau-couloir fin" style="top: ${haut}%">${iconeDrapeau('fin')}</span>
+    <span class="drapeau-couloir debut" style="top: ${bas}%">${iconeDrapeau('debut')}</span>
+    <span class="moi-couloir" style="left: ${left.toFixed(1)}%; top: ${top.toFixed(1)}%; background: ${couleur}"></span>
+  </div>`;
 }
 
 /**

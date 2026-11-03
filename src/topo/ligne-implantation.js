@@ -157,3 +157,12 @@ export function pointALAbscisse(sommets, abscisse) {
   }
   return null;
 }
+
+/**
+ * Écart au bout le plus proche d'une ligne (m, 0.118.1) : distance le long de la ligne jusqu'au début
+ * ou à la fin, la plus petite des deux. abscisse : position depuis le début (m, négative avant le
+ * début) ; longueur : longueur de la ligne (m). Sert à colorer « Début / fin » (vert = sur un bout).
+ */
+export function ecartAuBout(abscisse, longueur) {
+  return Math.min(Math.abs(abscisse), Math.abs(longueur - abscisse));
+}
