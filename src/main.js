@@ -3204,7 +3204,8 @@ const cadastreAutour = creerCadastreAutour({
     // 0.113 : liste marquée « cadastre », cachée au départ (seules les lignes du DXF se voient).
     leve.cadastre = true;
     projet.listesCachees = [...new Set([...(projet.listesCachees ?? []), leve.id])];
-    if (planDxf) projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...planDxf });
+    // 0.116.3 : lignes du cadastre en violet au départ (modifiable dans la liste des plans DXF).
+    if (planDxf) projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...planDxf, couleur: '#7c3aed' });
     modifie({ recadrer: true });
   },
 });
