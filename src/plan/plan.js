@@ -400,6 +400,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (!zone || !vue) return;
     const groupe = creerElement('g', { class: 'zone-swisstopo' });
     const ecran = zone.sommets.map((s) => versEcran(s.est, s.nord, vue));
+    // Cadastre autour d'un point : le cercle du rayon, pour voir ce qui sera pris avant « Valider ».
+    if (zone.rayon > 0 && ecran.length >= 1) groupe.append(creerElement('circle', { cx: ecran[0].x, cy: ecran[0].y, r: zone.rayon * vue.echelle, class: 'cercle-zone' }));
     if (ecran.length >= 2) groupe.append(creerElement('path', { d: ecran.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ') + (ecran.length >= 3 ? ' Z' : ''), class: 'contour-zone' }));
     ecran.forEach((p, i) => {
       groupe.append(creerElement('circle', { cx: p.x, cy: p.y, r: i === glisse ? 11 : 8, class: 'sommet-zone' }));
@@ -1986,9 +1988,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     afficherImplantation(nouvelle) {
       implantation = nouvelle;
     },
-    /** Zone Swisstopo : { sommets: [{ est, nord }] } pour la tracer, null pour l'enlever. */
+    /**
+     * Zone Swisstopo : { sommets: [{ est, nord }] } pour la tracer, null pour l'enlever.
+     * rayon (m, facultatif, 0.113.1) : cercle autour du 1er sommet (cadastre autour d'un point).
+     */
     tracerZone(nouvelle) {
-      zone = nouvelle ? { sommets: nouvelle.sommets.map((s) => ({ ...s })) } : null;
+      zone = nouvelle ? { sommets: nouvelle.sommets.map((s) => ({ ...s })), rayon: nouvelle.rayon ?? null } : null;
       glisse = null;
       dessinerZone();
     },

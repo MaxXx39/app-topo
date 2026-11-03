@@ -16,6 +16,7 @@ import { garderDansLeCercle, pointsDuCadastre, dxfDuCadastre, nomDeLaListe, lire
  */
 export function creerCadastreAutour(outils) {
   let centre = null; // { est, nord } touché
+  let dejaTrace = false; // cercle déjà donné au plan
   let actif = false;
   let occupe = false;
   let rayonTape = String(RAYON_DEPART);
@@ -31,7 +32,11 @@ export function creerCadastreAutour(outils) {
         else if (action === 'valider') valider();
       });
       barre.addEventListener('input', (evenement) => {
-        if (evenement.target.matches('[data-champ="rayon"]')) rayonTape = evenement.target.value;
+        if (evenement.target.matches('[data-champ="rayon"]')) {
+          rayonTape = evenement.target.value;
+          // 0.113.1 : le cercle suit le rayon tapé (sans redessiner la barre : le clavier reste ouvert).
+          if (centre) outils.plan.tracerZone({ sommets: [centre], rayon: lireRayon(rayonTape) });
+        }
       });
       outils.cadre.append(barre);
     }
@@ -49,6 +54,7 @@ export function creerCadastreAutour(outils) {
   function commencer() {
     outils.avantDeCommencer?.();
     centre = null;
+    dejaTrace = false;
     actif = true;
     occupe = false;
     outils.plan.tracerZone({ sommets: [] });
@@ -69,7 +75,10 @@ export function creerCadastreAutour(outils) {
   function changerZone(sommets) {
     if (!actif || occupe || sommets.length === 0) return;
     centre = { est: sommets[sommets.length - 1].est, nord: sommets[sommets.length - 1].nord };
-    if (sommets.length > 1) outils.plan.tracerZone({ sommets: [centre] });
+    // Un seul point, avec le cercle du rayon (0.113.1). Pas pendant un glissé (le plan garde le
+    // cercle et le déplacement continuerait d'être coupé).
+    if (sommets.length > 1 || !dejaTrace) outils.plan.tracerZone({ sommets: [centre], rayon: lireRayon(rayonTape) });
+    dejaTrace = true;
     dessinerBarre();
   }
 

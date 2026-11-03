@@ -8997,6 +8997,13 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
 }
 
 /* Zone de la Surface Swisstopo (0.109.0) : contour tracé sur le plan, sommets numérotés à glisser. */
+.plan .zone-swisstopo .cercle-zone {
+  fill: rgba(217, 119, 6, 0.12);
+  stroke: #d97706;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
 .plan .zone-swisstopo .contour-zone {
   fill: rgba(220, 38, 38, 0.12);
   stroke: #dc2626;
