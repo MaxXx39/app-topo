@@ -6,9 +6,9 @@
 // WFS 1.0.0 : l'ordre des coordonnées est toujours Est, Nord (pas de piège d'axes).
 import { rectangleAutour, nomsDesCouches, choisirCouches, lireGml } from '../topo/cadastre.js';
 
-/** Services par canton. Genève viendra dans un second temps. */
+/** Services par canton. geodienste.ch couvre toute la Suisse ; essai du 03.11 : Genève marche, Vaud répond vide (pas en accès libre). */
 export const SERVICES = {
-  VD: { canton: 'Vaud', adresse: 'https://geodienste.ch/db/av_0/fra' },
+  VD: { canton: 'mensuration officielle', adresse: 'https://geodienste.ch/db/av_0/fra' },
 };
 
 /**
@@ -45,6 +45,10 @@ export async function telechargerCadastre(centre, rayon, canton = 'VD', progres 
     }
   }
   if (resultat.points.length === 0 && resultat.lignes.length === 0) {
+    // 0.112.3 : réponses valides mais vides = pas de données en accès libre ici (cas de Vaud, essai du 03.11).
+    if (resultat.essais.every((e) => /FeatureCollection/.test(e))) {
+      throw new Error('pas de données en accès libre à cet endroit sur geodienste.ch (Vaud n\'y est pas en accès libre ; Genève marche)');
+    }
     throw new Error(`le service ne renvoie rien (couches ${[couches.points, couches.surfaces].filter(Boolean).join(', ')}). Réponses : ${resultat.essais.slice(0, 3).join(' | ')}`);
   }
   return resultat;

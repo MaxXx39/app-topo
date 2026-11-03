@@ -89,6 +89,8 @@ describe('cadastre', () => {
   });
   it('montre le début des réponses quand rien ne marche', async () => {
     const chercher = async (adresse) => ({ ok: true, status: 200, text: async () => (adresse.includes('GetCapabilities') ? '<FeatureType><Name>ms:RESF</Name></FeatureType>' : '<vide/>') });
+    const vide = async (adresse) => ({ ok: true, status: 200, text: async () => (adresse.includes('GetCapabilities') ? '<FeatureType><Name>ms:RESF</Name></FeatureType>' : '<wfs:FeatureCollection></wfs:FeatureCollection>') });
+    await expect(telechargerCadastre({ est: 2538000, nord: 1152000 }, 50, 'VD', () => {}, vide)).rejects.toThrow(/accès libre/);
     await expect(telechargerCadastre({ est: 2538000, nord: 1152000 }, 50, 'VD', () => {}, chercher)).rejects.toThrow(/ms:RESF 1.0.0 : 7 car. « <vide\/> »/);
     expect(adressesGetFeature('x', 'a', '1,2,3,4')).toHaveLength(4);
   });
