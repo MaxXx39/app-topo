@@ -9880,3 +9880,10 @@ body[data-mode-terrain='lever'] .ecran-terrain > .levee-en-cours .boutons-levee 
 body[data-mode-terrain='lever'] .cadre-role { box-shadow: 0 1px 3px rgba(16, 24, 20, 0.08), 0 4px 12px rgba(16, 24, 20, 0.08); }
 body[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre { box-shadow: 0 -4px 16px rgba(16, 24, 20, 0.12); }
 body[data-mode-terrain='lever'] .bouton-prendre:not(:disabled) { box-shadow: 0 3px 0 var(--ambre-fonce), 0 4px 10px rgba(16, 24, 20, 0.15); }
+
+/* 0.117.1 : roue des réglages et marche / arrêt le plus gros possible, sans agrandir le bandeau. */
+.entete-icone-bouton.bouton-reglages { width: 50px; height: 50px; margin: -4px -6px -4px 0; }
+.entete-icone-bouton.bouton-reglages svg { width: 44px; height: 44px; stroke-width: 1.7; }
+body.mode-telephone .entete-icone-bouton.bouton-reglages { width: 38px; height: 38px; margin: -4px -4px -4px 0; }
+body.mode-telephone .entete-icone-bouton.bouton-reglages svg { width: 34px; height: 34px; }
+.bouton-reglages .marche-arret { stroke-width: 2.2; }
