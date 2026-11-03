@@ -1487,7 +1487,7 @@ export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) 
 
   const rtk = bandeaux.querySelector('[data-bandeau="rtk"]');
   const inclinaison = bandeaux.querySelector('[data-bandeau="inclinaison"]');
-  // Âge des corrections (s) : montré à la place de « Inclinaison : ? » quand le GNSS ne l'envoie pas (0.114.0).
+  // Âge des corrections (s), à côté de l'inclinaison (0.114.0).
   const age = etat.ageCorrections != null ? `corr. ${Math.round(etat.ageCorrections)} s` : null;
   if (!etat.recu) {
     rtk.textContent = 'En attente du récepteur…';
@@ -1502,9 +1502,11 @@ export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) 
     if (etat.qualite === 4) fixeDejaVu = true;
     rtk.className = etat.qualite === 4 ? 'ok' : `pas-ok${fixeDejaVu ? ' fixe-perdu' : ''}`;
   }
+  // Inclinaison toujours montrée (0.114.1), avec l'âge des corrections à côté : on voit tout de suite
+  // s'il faut recalibrer la compensation d'inclinaison.
   if (etat.etatInclinaison == null) {
-    inclinaison.textContent = age ?? 'Inclinaison : ?';
-    inclinaison.className = age ? 'info' : 'attente';
+    inclinaison.textContent = `Incl. ?${age ? ` · ${age}` : ''}`;
+    inclinaison.className = 'attente';
   } else {
     const angle = etat.inclinaison != null ? ` (${etat.inclinaison.toFixed(0)}°)` : '';
     // Hauteur de canne (0.107.1) : seulement montrée, pour contrôle (réglée en Expert, voir Emlid Flow).
