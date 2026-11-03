@@ -86,6 +86,9 @@ class EcranPrincipal : Activity() {
         page.settings.javaScriptEnabled = true
         page.settings.domStorageEnabled = true
         page.settings.allowFileAccess = false
+        // Taille du texte fixe : la « taille de police » d'Android agrandissait tout le texte de l'appli
+        // (noms de la barre du bas coupés sur téléphone). L'appli a ses propres tailles (réglages ⚙).
+        page.settings.textZoom = 100
         page.webViewClient = ClientNavigation()
         page.webChromeClient = ClientPage()
         page.addJavascriptInterface(PontAndroid(this), "AppliAndroid")
