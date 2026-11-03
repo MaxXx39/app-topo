@@ -9683,3 +9683,95 @@ body.mode-base .actions-projets {
 body.theme-sombre .plan .echelle text {
   stroke: none;
 }
+
+/* ==========================================================================
+   0.115.0 : mode téléphone optimisé (toutes les pages revues sur un écran de 390 × 844)
+   ========================================================================== */
+
+/* Barre du récepteur : un peu plus basse, petite icône. */
+body.mode-telephone.avec-recepteur .bandeaux-recepteur { height: 32px; }
+body.mode-telephone.avec-recepteur .entete { padding-bottom: 32px; }
+body.mode-telephone.avec-recepteur { --hauteur-entete: 74px; }
+body.mode-telephone .bandeaux-recepteur .precision-rtk { font-size: 1rem; gap: 6px; }
+body.mode-telephone .bandeaux-recepteur .statut-rtk { font-size: 0.7rem; }
+body.mode-telephone .bandeaux-recepteur span[data-bandeau='inclinaison'] { font-size: 0.7rem; padding: 0 4px; }
+body.mode-telephone .bandeaux-recepteur .icone-bandeau { width: 16px; height: 16px; margin: 0 4px; padding: 1px 3px; }
+
+/* Barre du bas : icônes et noms lisibles (avant 14 px et 0,68 rem). */
+body.mode-telephone .onglets button { font-size: 11px; font-weight: 700; }
+body.mode-telephone .onglets button svg { flex: none; width: 20px; height: 20px; }
+
+/* Plan : les 5 boutons tiennent sur une ligne, colonne de droite plus fine, flèches ▲ / ▼ plus basses. */
+body.mode-telephone .plan-puces { flex-wrap: nowrap; gap: 4px; }
+body.mode-telephone .plan-puces .puce { min-height: 34px; padding: 4px 8px; gap: 4px; font-size: 0.78rem; }
+body.mode-telephone .plan-puces .puce svg { width: 16px; height: 16px; }
+body.mode-telephone .plan-boutons button { width: 38px; height: 38px; }
+body.mode-telephone .bouton-taille-plan { min-width: 52px; min-height: 28px; }
+
+/* Lever : moins de marges, photo et Enreg. Pts plus compacts. */
+body.mode-telephone .panneau { padding: 10px; }
+body.mode-telephone .cadre-role { padding: 4px 6px 6px; }
+body.mode-telephone .cadre-prise { padding: 10px 8px 8px; margin: 10px 0 6px; gap: 6px; }
+body.mode-telephone .bouton-photo-levee { flex-basis: 46px; min-height: 42px; }
+body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .bouton-prendre {
+  left: 10px;
+  right: 10px;
+  min-height: 54px;
+  font-size: 1.1rem;
+}
+body.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .panneau[data-onglet='terrain']:has(.cadre-prise .bouton-prendre) {
+  margin-bottom: 76px;
+}
+body.mode-telephone .libelles-terrain { max-height: 92px; }
+
+/* Implanter › Surface : la zone vide « Choisis une surface » moins haute. */
+body.mode-telephone .ecart-direct.attente { min-height: 90px; }
+
+/* Calculs : « Mesures / métrés » sur une ligne. */
+body.mode-telephone .parties-calculs button { font-size: 0.82rem; white-space: nowrap; }
+
+/* Guidage (lame) : ⇄ G / D, 🔔 et ⚙ restent sur la ligne du levé à suivre. */
+body.mode-telephone .ecran-lame .ligne-lame { flex-wrap: nowrap; gap: 4px; }
+body.mode-telephone .ecran-lame .ligne-lame select { min-width: 0; flex: 1 1 auto; }
+body.mode-telephone .ecran-lame .ligne-lame :is(.bouton-secondaire, .bouton-bip, .bouton-roue) {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 2px 6px;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+body.mode-telephone .case-machine { min-height: 40px; }
+body.mode-telephone .bouton-recepteur-2 { min-height: 40px; }
+body.mode-telephone .ecran-lame .coins-lame.avec-regles .coin-lame { min-height: 190px; }
+body.mode-telephone .ecran-lame .regle-hauteur { min-height: 190px; width: 34px; }
+body.mode-telephone .ecran-lame .grosse-fleche-lame { width: 72px; height: 86px; }
+
+/* Guidage d'implantation sur téléphone : comme sur tablette, écarts en gros, monter / descendre dessous. */
+@media (max-width: 520px) {
+  .vue-guidage .guidage-direct.guidage-3 {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'plan fleche' 'hauteur hauteur';
+    row-gap: 4px;
+    padding: 8px 10px;
+  }
+  .vue-guidage .guidage-3 .cote-plan { grid-area: plan; }
+  .vue-guidage .guidage-3 :is(.fleche-guidage, .couloir-ligne) { grid-area: fleche; }
+  .vue-guidage .guidage-3 .fleche-guidage { width: 64px; height: 64px; }
+  .vue-guidage .guidage-3 .cote-plan .lignes-guidage { font-size: 1.45rem; line-height: 1.15; }
+  .vue-guidage .guidage-3 .cote-hauteur { grid-area: hauteur; display: block; }
+  .vue-guidage .guidage-3 .cote-hauteur .hauteur-guidage {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 12px;
+    font-size: 1.25rem;
+  }
+  .vue-guidage .guidage-3 .hauteur-guidage strong { font-size: 2.4rem; line-height: 1; }
+}
+/* Barre du bas un peu plus haute en mode téléphone : icône 20 px + nom 11 px. */
+body.mode-telephone { --hauteur-onglets: 52px; }
+/* Implanter › Surface / Altitude : écart et règle moins hauts (le plan garde la place). */
+body.mode-telephone .ecart-et-regle .regle-hauteur { min-height: 120px; }
+body.mode-telephone .ecart-et-regle > .ecart-direct { min-height: 0; }
