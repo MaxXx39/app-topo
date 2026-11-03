@@ -162,3 +162,98 @@ export function choisirCouches(noms) {
 export function nomsDesCouches(capabilities) {
   return [...capabilities.matchAll(/<FeatureType\b[\s\S]*?<Name>([^<]+)<\/Name>/g)].map((m) => m[1].trim());
 }
+
+// ---------------------------------------------------------------------------------------------
+// Service RDPPF (0.112.4, Vaud) : on donne un point, il renvoie la ou les parcelles qui le
+// contiennent, avec leur contour. Le cercle est couvert par une grille de points.
+
+/** Vrai si la paire [est, nord] est dans l'anneau (règle pair-impair). */
+export function dansAnneau([x, y], anneau) {
+  let dedans = false;
+  for (let i = 0, j = anneau.length - 1; i < anneau.length; j = i++) {
+    const [xi, yi] = anneau[i];
+    const [xj, yj] = anneau[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) dedans = !dedans;
+  }
+  return dedans;
+}
+
+/**
+ * Points de la grille à interroger dans le cercle : le centre d'abord, puis une grille au pas
+ * "pas" (m) limitée au cercle, des plus proches aux plus loin. Paires [est, nord].
+ */
+export function grilleDuCercle(centre, rayon, pas) {
+  const points = [];
+  const n = Math.ceil(rayon / pas);
+  for (let i = -n; i <= n; i++) {
+    for (let j = -n; j <= n; j++) {
+      if (Math.hypot(i * pas, j * pas) <= rayon) points.push([centre.est + i * pas, centre.nord + j * pas]);
+    }
+  }
+  return points.sort((a, b) => Math.hypot(a[0] - centre.est, a[1] - centre.nord) - Math.hypot(b[0] - centre.est, b[1] - centre.nord));
+}
+
+/** Pas de la grille (m) : environ 10 points par rayon, jamais moins de 8 m. */
+export function pasDeGrille(rayon) {
+  return Math.max(8, rayon / 5);
+}
+
+/** Anneaux (suites de paires [est, nord] en Suisse) trouvés n'importe où dans un objet JSON. */
+export function anneauxDuJson(objet) {
+  const anneaux = [];
+  const estPaire = (v) => Array.isArray(v) && v.length >= 2 && v.length <= 3 && v.every((x) => typeof x === 'number');
+  const visiter = (v) => {
+    if (Array.isArray(v)) {
+      if (v.length >= 3 && v.every(estPaire)) {
+        const paires = v.map((p) => ordreEstNord(p[0], p[1])).filter(Boolean);
+        if (paires.length >= 3) anneaux.push(paires);
+        return;
+      }
+      v.forEach(visiter);
+    } else if (v && typeof v === 'object') {
+      Object.values(v).forEach(visiter);
+    }
+  };
+  visiter(objet);
+  return anneaux;
+}
+
+/** Numéros EGRID trouvés dans une réponse (texte JSON ou XML). */
+export function egridsDuTexte(texte) {
+  return [...new Set(texte.match(/CH\d{12}/g) ?? [])];
+}
+
+/**
+ * Contours des parcelles d'une réponse GetEGRID (JSON ou XML, avec GEOMETRY=true). En JSON :
+ * tous les anneaux trouvés ; en XML : lus comme un GML.
+ */
+export function contoursDeReponse(texte) {
+  const debut = texte.trimStart()[0];
+  if (debut === '{' || debut === '[') {
+    try {
+      const anneaux = anneauxDuJson(JSON.parse(texte));
+      if (anneaux.length > 0) return anneaux;
+    } catch {
+      // pas du JSON lisible : on essaie la suite
+    }
+  }
+  // Contour écrit en GML ou en WKT (« POLYGON ((x y, x y…)) »), aussi à l'intérieur d'un JSON.
+  const net = texte.replace(/\\"/g, '"').replace(/\\\//g, '/');
+  try {
+    const lignes = lireGml(net).lignes;
+    if (lignes.length > 0) return lignes;
+  } catch {
+    // erreur du service : rien à lire
+  }
+  return anneauxDuWkt(net);
+}
+
+/** Anneaux d'un texte WKT (POLYGON / MULTIPOLYGON) : chaque « (x y, x y, …) » le plus intérieur. */
+export function anneauxDuWkt(texte) {
+  const anneaux = [];
+  for (const [, contenu] of texte.matchAll(/\(([^()]+)\)/g)) {
+    const paires = contenu.split(',').map((duo) => duo.trim().split(/\s+/).map(Number)).filter((p) => p.length >= 2).map((p) => ordreEstNord(p[0], p[1])).filter(Boolean);
+    if (paires.length >= 3) anneaux.push(paires);
+  }
+  return anneaux;
+}
