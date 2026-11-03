@@ -2,7 +2,7 @@
 // « Import » (Expert) et « Exporter » (voir export/module.js), un seul ouvert à la fois ; dessous,
 // « Contenu du projet », par catégories repliables (voir blocContenu) :
 // Contrôle, Levés (une liste, nature en pastille), Points importés, Surfaces importées (Expert),
-// Plans DXF (Intermédiaire), Dessins (Intermédiaire).
+// Cadastre (points et lignes ensemble, 0.116.4), Plans DXF (Intermédiaire), Dessins (Intermédiaire).
 // - « Import » : fichier de points, points de contrôle, plan DXF, surface (LandXML ou DXF 3D),
 //   point tapé ;
 // - la liste cochée est affichée sur le plan ; ses points se voient sous elle.
@@ -17,7 +17,7 @@ import { rotationLisible } from '../topo/recalage.js';
 import { prefixeDuNom, sansPrefixe, estSurfaceFichier, origineSurface } from '../topo/surface.js';
 import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '../outils/formulaire-point.js';
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
-import { COULEURS_LISTES } from '../plan/listes-points.js';
+import { COULEURS_LISTES, planDuCadastre, couleurDuCadastre } from '../plan/listes-points.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
 import { lireReseaux } from '../leve/reseaux.js';
@@ -106,6 +106,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
     }
     if (action === 'voir-photo') actions.voirPhoto(id);
     else if (action === 'supprimer-leve') actions.supprimerLeve(id);
+    else if (action === 'supprimer-cadastre') actions.supprimerCadastre(id);
     else if (action === 'supprimer-surface-projet') actions.supprimerSurfaceProjet(id);
     else if (action === 'voir-plan') actions.voirPlanDxf(id);
     else if (action === 'supprimer-plan') actions.supprimerPlanDxf(id);
@@ -138,6 +139,8 @@ export function creerEcranImport(conteneur, contenu, actions) {
     } else if (cible.dataset.champ === 'fichier-plan' && cible.files[0]) {
       await actions.importerPlanDxf(cible.files[0]);
       cible.value = '';
+    } else if (cible.dataset.champ === 'cadastre-points') {
+      actions.montrerPointsCadastre(cible.dataset.id, cible.checked);
     } else if (cible.dataset.champ === 'plan-visible') {
       actions.reglerPlanDxf(cible.dataset.id, { visible: cible.checked });
     } else if (cible.dataset.champ === 'plan-couleur') {
@@ -250,7 +253,10 @@ function natureDeLaListe(projet, leve, couleursReseaux) {
  * (Contrôle d'abord) ; une catégorie vide n'est pas montrée. fermees : catégories repliées.
  */
 function blocContenu(projet, calquesOuverts, fermees) {
-  const listes = projet.leves.filter((l) => !l.direct);
+  // Cadastre (0.116.4) : points et lignes rangés ensemble dans leur catégorie.
+  const cadastres = projet.leves.filter((l) => l.cadastre);
+  const plansCadastre = new Set(cadastres.map((l) => planDuCadastre(projet, l)?.id).filter(Boolean));
+  const listes = projet.leves.filter((l) => !l.direct && !l.cadastre);
   // Levés : le plus récent en haut.
   const levees = projet.leves.filter((l) => l.direct).sort((a, b) => String(b.importeLe ?? '').localeCompare(String(a.importeLe ?? '')));
   const surfacesProjet = projet.surfaces.filter((s) => estSurfaceFichier(s));
@@ -267,7 +273,8 @@ function blocContenu(projet, calquesOuverts, fermees) {
     categorie('leves', 'Levés', levees.length, `<div class="liste-leves">${levees.map((l) => ligneListe(projet, l, natureDeLaListe(projet, l, couleursReseaux))).join('')}</div>`),
     categorie('points', 'Points importés', listes.length, `<div class="liste-leves">${listes.map((l) => ligneListe(projet, l)).join('')}</div>`),
     categorie('surfaces', 'Surfaces importées', surfacesProjet.length, surfacesProjet.map(ligneSurfaceProjet).join(''), 'seulement-expert'),
-    categorie('dxf', 'Plans DXF', (projet.plansDxf ?? []).length, listePlansDxf(projet, calquesOuverts), 'seulement-intermediaire'),
+    categorie('cadastre', 'Cadastre', cadastres.length, cadastres.map((l) => ligneCadastre(projet, l)).join('')),
+    categorie('dxf', 'Plans DXF', (projet.plansDxf ?? []).filter((p) => !plansCadastre.has(p.id)).length, listePlansDxf(projet, calquesOuverts, plansCadastre), 'seulement-intermediaire'),
     categorie('dessins', 'Dessins', dessins.length, listesDessins(projet), 'seulement-intermediaire'),
   ].join('');
   return `<div class="carte-section contenu-projet">
@@ -297,6 +304,26 @@ function ligneListe(projet, leve, nature = null) {
       </div>
       ${tableauPoints(leve.points, 'Voir les points')}
       ${photosDesPoints(photosDuLeve(projet, leve))}
+    </div>`;
+}
+
+/** Un cadastre (0.116.4) : nom, une seule couleur (lignes, points, noms), cases Lignes / Points, voir, supprimer. */
+function ligneCadastre(projet, leve) {
+  const planDxf = planDuCadastre(projet, leve);
+  const pointsVisibles = !(projet.listesCachees ?? []).includes(leve.id);
+  return `<div class="ligne-leve ligne-cadastre">
+      <strong class="nom-leve">${echapper(leve.nom)}</strong>
+      <span class="couleur-liste">${paletteCouleur({ couleur: couleurDuCadastre(planDxf), options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${leve.id}"`, nom: 'Couleur du cadastre' })}</span>
+      <div class="cases-cadastre">
+        ${planDxf ? `<label class="case"><input type="checkbox" data-champ="plan-visible" data-id="${planDxf.id}" ${planDxf.visible !== false ? 'checked' : ''} /> Lignes</label>` : ''}
+        <label class="case"><input type="checkbox" data-champ="cadastre-points" data-id="${leve.id}" ${pointsVisibles ? 'checked' : ''} /> Points</label>
+      </div>
+      <div class="ligne-outils">
+        <span class="aide">${leve.points.length} points${planDxf ? ` · ${planDxf.compte?.objets ?? 0} lignes` : ''}</span>
+        ${planDxf ? `<button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${planDxf.id}">voir</button>` : ''}
+        <button type="button" class="bouton-lien" data-action="supprimer-cadastre" data-id="${leve.id}">supprimer</button>
+      </div>
+      ${tableauPoints(leve.points, 'Voir les points')}
     </div>`;
 }
 
@@ -398,8 +425,8 @@ function listePointsControle(projet) {
 }
 
 /** Plans DXF du projet : nom, nombre d'objets, voir / supprimer, et la liste des calques à cocher. */
-function listePlansDxf(projet, calquesOuverts) {
-  const plans = projet.plansDxf ?? [];
+function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
+  const plans = (projet.plansDxf ?? []).filter((p) => !caches.has(p.id));
   if (plans.length === 0) return '';
   return `<div class="liste-plans-dxf">${plans
     .map((plan) => {

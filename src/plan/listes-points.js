@@ -45,6 +45,7 @@ export const COULEURS_LISTES = [
 export const SECTIONS = [
   ['leve', 'Levé'],
   ['points', 'Points Import'],
+  ['cadastre', 'Cadastre'],
   ['controle', 'Contrôle'],
   ['surface', 'Surface Import'],
   ['dessin', 'Dessin'],
@@ -63,7 +64,7 @@ const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? [])
 export function listesDePoints(projet) {
   const cachees = new Set(projet.listesCachees ?? []);
   const listes = [];
-  const SECTION_DE = { fichier: 'points', ajoutes: 'points', autres: 'leve', controle: 'controle', dessin: 'dessin', metre: 'metre', mesures: 'metre', importee: 'surface' };
+  const SECTION_DE = { cadastre: 'cadastre', fichier: 'points', ajoutes: 'points', autres: 'leve', controle: 'controle', dessin: 'dessin', metre: 'metre', mesures: 'metre', importee: 'surface' };
   const couleurs = projet.couleursListes ?? {};
   const ajouter = (id, nom, nature, leveId, noms) => {
     const section = SECTION_DE[nature] ?? 'leve';
@@ -72,7 +73,12 @@ export function listesDePoints(projet) {
     listes.push({ id, nom, nature, section, leveId, noms, visible: !cachees.has(id), couleur, couleurModifiable: section === 'points' || section === 'surface' || section === 'leve' });
   };
   for (const leve of projet.leves) {
-    if (leve.ajoutes) ajouter(leve.id, leve.nom, 'ajoutes', leve.id, null);
+    // Cadastre (0.116.4) : points et lignes rangés ensemble, une seule couleur (celle du plan DXF).
+    if (leve.cadastre) {
+      const planDxf = planDuCadastre(projet, leve);
+      ajouter(leve.id, leve.nom, 'cadastre', leve.id, null);
+      Object.assign(listes.at(-1), { couleur: couleurDuCadastre(planDxf), planId: planDxf?.id ?? null, lignesVisibles: planDxf ? planDxf.visible !== false : null });
+    } else if (leve.ajoutes) ajouter(leve.id, leve.nom, 'ajoutes', leve.id, null);
     else if (!estLeveDirect(leve)) ajouter(leve.id, leve.nom, 'fichier', leve.id, null);
   }
   for (const s of projet.surfaces) {
@@ -151,6 +157,34 @@ export function pointsDesImports(projet, listes) {
     for (const point of projet.leves.find((l) => l.id === liste.leveId)?.points ?? []) points.add(point);
   }
   return points;
+}
+
+// Couleur d'un cadastre au départ (0.116.3) : lignes, points et noms des points.
+export const COULEUR_CADASTRE = '#7c3aed';
+
+/** Plan DXF des lignes d'un cadastre (lien `cadastre` = id du levé ; anciens projets : même nom), ou null. */
+export function planDuCadastre(projet, leve) {
+  const plans = projet.plansDxf ?? [];
+  return plans.find((p) => p.cadastre === leve.id) ?? plans.find((p) => !p.cadastre && p.nom === leve.nom) ?? null;
+}
+
+/** Couleur d'un cadastre (lignes, points, noms) : celle de son plan DXF, violet au départ. */
+export function couleurDuCadastre(planDxf) {
+  return planDxf?.couleur || COULEUR_CADASTRE;
+}
+
+/** Anciens projets : relie chaque plan DXF de cadastre à son levé (même nom) et lui donne la couleur des points. Renvoie vrai si un lien a été ajouté. */
+export function lierCadastres(projet) {
+  let change = false;
+  for (const leve of projet.leves.filter((l) => l.cadastre)) {
+    const planDxf = planDuCadastre(projet, leve);
+    if (planDxf && (planDxf.cadastre !== leve.id || !planDxf.couleur)) {
+      planDxf.cadastre = leve.id;
+      planDxf.couleur ||= COULEUR_CADASTRE; // même couleur que les points (violet au départ)
+      change = true;
+    }
+  }
+  return change;
 }
 
 /** Listes « Cadastre » (cadastre autour d'un point) : cachées au départ, seules leurs lignes DXF se voient (0.113). */

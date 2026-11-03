@@ -9803,3 +9803,10 @@ body.mode-telephone { --hauteur-onglets: 52px; }
 /* Implanter › Surface / Altitude : écart et règle moins hauts (le plan garde la place). */
 body.mode-telephone .ecart-et-regle .regle-hauteur { min-height: 120px; }
 body.mode-telephone .ecart-et-regle > .ecart-direct { min-height: 0; }
+
+/* 0.116.4 : cadastre (Afficher et Contenu du projet) : lignes et points ensemble, une seule couleur. */
+.ligne-cadastre { flex-wrap: wrap; }
+.ligne-menu-plan.ligne-cadastre { align-items: center; gap: 6px; }
+.ligne-cadastre .nom-cadastre { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cases-cadastre { display: flex; flex-wrap: wrap; gap: 4px 14px; flex-basis: 100%; padding-left: 22px; }
+.ligne-leve .cases-cadastre { padding-left: 0; }

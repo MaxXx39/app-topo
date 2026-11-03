@@ -1573,6 +1573,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     });
   }
   menuListes.addEventListener('change', (evenement) => {
+    const planCadastre = evenement.target.dataset.lignesCadastre;
+    if (planCadastre) quandReglerPlanDxf?.(planCadastre, { visible: evenement.target.checked });
     const id = evenement.target.dataset.liste;
     if (id) quandMontrerListe?.(id, evenement.target.checked);
   });
@@ -1629,7 +1631,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   let couleursDesListes = new Map(); // id d'une liste → couleur choisie (surfaces importées)
   function remplirMenuListes(listes) {
     couleursDesListes = new Map(listes.map((l) => [l.id, l.couleur]));
-    const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}:${l.couleur}`).join('|');
+    const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}:${l.couleur}:${l.lignesVisibles}`).join('|');
     if (signature === signatureListes) return;
     signatureListes = signature;
     const ligne = (l) => `<div class="ligne-menu-plan">
@@ -1637,9 +1639,18 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span>${echapper(l.nom)}</span></label>
         ${l.couleurModifiable ? paletteCouleur({ couleur: l.couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${l.id}"`, nom: `Couleur de ${l.nom}` }) : ''}
       </div>`;
+    // Cadastre (0.116.4) : nom, une couleur pour tout, cases « Lignes » (plan DXF) et « Points ».
+    const ligneCadastre = (l) => `<div class="ligne-menu-plan ligne-cadastre">
+        <span class="pastille-liste" style="background: ${l.couleur}"></span><span class="nom-cadastre">${echapper(l.nom)}</span>
+        ${paletteCouleur({ couleur: l.couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${l.id}"`, nom: `Couleur de ${l.nom}` })}
+        <div class="cases-cadastre">
+          ${l.planId ? `<label class="case"><input type="checkbox" data-lignes-cadastre="${l.planId}" ${l.lignesVisibles ? 'checked' : ''} /> Lignes</label>` : ''}
+          <label class="case"><input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} /> Points</label>
+        </div>
+      </div>`;
     const parties = SECTIONS.map(([section, titre]) => {
       const liste = listes.filter((l) => l.section === section);
-      let html = liste.length > 0 ? titreSection(section, titre) + liste.map(ligne).join('') : '';
+      let html = liste.length > 0 ? titreSection(section, titre) + liste.map(section === 'cadastre' ? ligneCadastre : ligne).join('') : '';
       // Volume (Expert) : juste après les levés ; caché au départ (tableau « Affichage »).
       if (section === 'leve') {
         html += `<div class="seulement-expert"><p class="titre-partie-menu">Volume</p>
@@ -1684,9 +1695,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     ajusterHauteurMenu(menuPlans);
   });
 
+  /** Plans du menu DXF : tous sauf ceux d'un cadastre (rangés dans « Afficher › Cadastre », 0.116.4). */
+  const plansDuMenu = () => plansDxf.filter((plan) => !plan.cadastre);
+
   /** Liste des plans DXF du menu « Plans » (refaite quand les plans changent). */
   let signatureMenuPlans = null;
   function remplirMenuPlans() {
+    // Plans du cadastre : rangés avec leurs points dans « Afficher › Cadastre » (0.116.4).
+    const plansDxf = plansDuMenu();
     const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
     if (signature === signatureMenuPlans) return;
     signatureMenuPlans = signature;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, LISTE_MESURES } from '../src/plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, LISTE_MESURES, planDuCadastre, lierCadastres, COULEUR_CADASTRE } from '../src/plan/listes-points.js';
 
 const pt = (nom) => ({ nom, est: 0, nord: 0, altitude: 0 });
 
@@ -78,5 +78,30 @@ describe('couleur des listes de points', async () => {
     expect(couleurs.get(a)).toBe('#2563eb');
     expect(couleurs.get(b)).toBe('#2563eb');
     expect(couleurs.size).toBe(2);
+  });
+});
+
+describe('Cadastre : points et lignes ensemble, une seule couleur (0.116.4)', () => {
+  const projetCadastre = (plan) => ({ leves: [{ id: 'c', nom: 'Cadastre 1', cadastre: true, points: [pt('CAD-1')] }], surfaces: [], plansDxf: plan ? [plan] : [], listesCachees: ['c'] });
+
+  it('rangé dans la catégorie Cadastre, couleur et visibilité des lignes prises du plan DXF relié', () => {
+    const projet = projetCadastre({ id: 'p', nom: 'Cadastre 1', cadastre: 'c', couleur: '#2563eb', visible: false });
+    const [liste] = listesDePoints(projet);
+    expect(liste).toMatchObject({ section: 'cadastre', couleur: '#2563eb', planId: 'p', lignesVisibles: false, visible: false });
+  });
+
+  it('violet au départ ; un ancien plan du même nom est relié par lierCadastres', () => {
+    const plan = { id: 'p', nom: 'Cadastre 1' };
+    const projet = projetCadastre(plan);
+    expect(planDuCadastre(projet, projet.leves[0])).toBe(plan);
+    expect(listesDePoints(projet)[0].couleur).toBe(COULEUR_CADASTRE);
+    expect(lierCadastres(projet)).toBe(true);
+    expect(plan.cadastre).toBe('c');
+    expect(plan.couleur).toBe(COULEUR_CADASTRE);
+    expect(lierCadastres(projet)).toBe(false);
+  });
+
+  it('sans plan DXF : pas de case Lignes', () => {
+    expect(listesDePoints(projetCadastre(null))[0]).toMatchObject({ planId: null, couleur: COULEUR_CADASTRE });
   });
 });

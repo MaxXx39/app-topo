@@ -102,7 +102,7 @@ import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip 
 import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation } from './topo/controle.js';
 import { pdfControles } from './export/pdf-controles.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, listesCadastre, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, listesCadastre, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
@@ -650,6 +650,23 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
   montrerTousCalquesDxf: (id, visible) => {
     for (const calque of projet.plansDxf.find((p) => p.id === id)?.calques ?? []) calque.visible = visible;
     modifie();
+  },
+  // Cadastre (0.116.4) : points montrés ou non (Projet › Contenu du projet › Cadastre).
+  montrerPointsCadastre: (id, visible) => {
+    montrerListe(projet, id, visible);
+    recalculer();
+    enregistrer();
+  },
+  // Cadastre : supprime ensemble la liste de points et le plan DXF des lignes.
+  supprimerCadastre: (id) => {
+    const leve = projet.leves.find((l) => l.id === id);
+    if (!leve || !confirm(`Supprimer le cadastre « ${leve.nom} » (${leve.points.length} points et ses lignes) ?`)) return;
+    const planDxf = planDuCadastre(projet, leve);
+    projet.leves = projet.leves.filter((l) => l.id !== id);
+    if (planDxf) projet.plansDxf = projet.plansDxf.filter((p) => p.id !== planDxf.id);
+    if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
+    dernierPlan = null;
+    modifie({ recadrer: true });
   },
   supprimerLeve: (id) => {
     const leve = projet.leves.find((l) => l.id === id);
@@ -1673,6 +1690,14 @@ function exporterControles(format) {
 
 /** Couleur choisie pour une liste de points (null : la couleur normale). Les points de contrôle restent rouges. */
 function colorerListe(id, couleur) {
+  // Cadastre (0.116.4) : une seule couleur pour les lignes (plan DXF), les points et leurs noms.
+  const cadastre = projet.leves.find((l) => l.id === id && l.cadastre);
+  const planCadastre = cadastre && planDuCadastre(projet, cadastre);
+  if (planCadastre) {
+    if (projet.couleursListes) delete projet.couleursListes[id];
+    reglerPlanDxf(planCadastre.id, { couleur: couleur || COULEUR_CADASTRE });
+    return;
+  }
   projet.couleursListes ??= {};
   if (couleur) projet.couleursListes[id] = couleur;
   else delete projet.couleursListes[id];
@@ -3205,7 +3230,8 @@ const cadastreAutour = creerCadastreAutour({
     leve.cadastre = true;
     projet.listesCachees = [...new Set([...(projet.listesCachees ?? []), leve.id])];
     // 0.116.3 : lignes du cadastre en violet au départ (modifiable dans la liste des plans DXF).
-    if (planDxf) projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...planDxf, couleur: '#7c3aed' });
+    // 0.116.4 : le plan est relié à sa liste (`cadastre`) : rangés ensemble, une seule couleur.
+    if (planDxf) projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...planDxf, couleur: COULEUR_CADASTRE, cadastre: leve.id });
     modifie({ recadrer: true });
   },
 });
@@ -5076,6 +5102,8 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
       for (const calque of planDxf.calques ?? []) calque.visible = true;
     }
   }
+  // Cadastre (0.116.4) : plan DXF relié à sa liste de points.
+  lierCadastres(projet);
   // Anciens projets : un libellé absent de la liste mais utilisé par des points est recréé, pour ce projet seulement (0.105.5).
   definirLibellesProjet(projet.libelles);
   const recrees = recreerLibellesManquants(projet.leves.flatMap((l) => l.points.map((p) => p.nom)));
