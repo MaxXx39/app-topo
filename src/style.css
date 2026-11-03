@@ -9889,3 +9889,235 @@ body.mode-telephone .entete-icone-bouton.bouton-reglages svg { width: 34px; heig
 .bouton-reglages .marche-arret { stroke-width: 2.2; }
 /* Le dessin peut déborder un peu de sa case sans être coupé. */
 .entete-icone-bouton.bouton-reglages svg { overflow: visible; }
+
+/* ===== 0.118.0 : guidage d'une ligne plus clair (maquette n° 3 validée le 03.11) =====
+   Bloc coloré gauche / droite (tolérance en plan du Contrôle) avec le début en grand et la fin en
+   petit, monter / descendre dessous, couloir vertical à droite sur toute la hauteur ; bascule
+   « Toute la polyligne / Segment » ; case « Voir toute la ligne » sur le plan ; même sarcelle pour
+   la ligne sur le plan et dans le couloir. */
+.plan .ligne-a-implanter { stroke: #14b8a6; stroke-width: 5; }
+
+.vue-guidage .guidage-direct.ligne-nette {
+  display: grid;
+  grid-template-columns: 1fr 74px;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 0;
+  padding: 10px;
+  background: var(--sombre);
+  color: #ffffff;
+  text-align: left;
+}
+.ligne-nette .colonne-ecarts { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ligne-nette .bloc-lateral,
+.ligne-nette .bloc-hauteur {
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: #475569;
+  color: #ffffff;
+}
+.ligne-nette .bloc-lateral.vert { background: #16a34a; }
+.ligne-nette .bloc-lateral.orange { background: #f59e0b; color: #1f2937; }
+.ligne-nette .bloc-lateral.rouge { background: #dc2626; }
+.ligne-nette .bloc-lateral.pas-fiable { background: #9ca3af; color: #111827; }
+.ligne-nette .ligne-ecart {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  white-space: nowrap;
+}
+.ligne-nette .ligne-debut { border-top: 1px solid rgba(255, 255, 255, 0.35); margin-top: 6px; padding-top: 6px; }
+.ligne-nette .bloc-lateral.orange .ligne-debut,
+.ligne-nette .bloc-lateral.pas-fiable .ligne-debut { border-top-color: rgba(0, 0, 0, 0.25); }
+.ligne-nette .libelle-ecart {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+.ligne-nette .ligne-ecart strong,
+.ligne-nette .bloc-hauteur strong {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.ligne-nette .icone-fleche {
+  width: 2.2rem;
+  height: 2.2rem;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ligne-nette .libelle-ecart .icone-drapeau { width: 2.1rem; height: 2.4rem; flex-shrink: 0; }
+.ligne-nette .fin-petite {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+.ligne-nette .fin-petite .icone-drapeau { width: 0.9rem; height: 1rem; }
+.ligne-nette .bloc-hauteur { display: flex; align-items: center; justify-content: space-between; gap: 8px; white-space: nowrap; }
+.ligne-nette .bloc-hauteur .libelle-ecart { font-size: 1.2rem; }
+.ligne-nette .bloc-hauteur .icone-fleche { width: 1.9rem; height: 1.9rem; }
+.ligne-nette .bloc-hauteur.vert-clair { background: #86efac; color: #14532d; }
+.ligne-nette .bloc-hauteur.jaune-orange { background: #f59e0b; color: #451a03; }
+.ligne-nette .bloc-hauteur.rouge { background: var(--rouge); color: #ffffff; }
+.ligne-nette .bloc-hauteur.bleu { background: var(--bleu); color: #ffffff; }
+.ligne-nette .bloc-hauteur.sans-altitude { background: transparent; color: #cbd5e1; font-size: 0.95rem; justify-content: center; }
+.ligne-nette .couloir-vertical {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  border-radius: 10px;
+  background: #0f172a;
+}
+.couloir-vertical .trait-couloir { stroke: #14b8a6; stroke-width: 6; }
+.couloir-vertical .bout-couloir { stroke: #e2e8f0; stroke-width: 3; }
+.couloir-vertical .moi { stroke: #ffffff; stroke-width: 3; }
+
+/* Bascule « Toute la polyligne / Segment » : deux moitiés, une seule choisie. */
+.vue-guidage .bascule-segment {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  margin: 4px 0;
+  border-radius: 10px;
+  background: var(--fond);
+}
+.vue-guidage .bascule-segment .puce-choix {
+  flex: 1;
+  margin: 0;
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gris);
+  font-weight: 700;
+}
+.vue-guidage .bascule-segment .puce-choix.actif { background: var(--sarcelle, #0d9488); color: #ffffff; }
+.vue-guidage .titre-vue-guidage .longueur-ligne { font-weight: 400; color: var(--gris); }
+
+/* Réglages ⚙ de la ligne : altitudes du début et de la fin. */
+.reglages-guidage .altitudes-bouts { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.reglages-guidage .altitudes-bouts .icone-drapeau { width: 16px; height: 18px; }
+
+/* Case « Voir toute la ligne » posée sur le plan (en bas à gauche, au-dessus de l'échelle). */
+.plan-cadre .case-voir-ligne {
+  position: absolute;
+  left: 10px;
+  bottom: 34px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1f2937;
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.plan-cadre .case-voir-ligne[hidden] { display: none; }
+.plan-cadre .case-voir-ligne input { width: 20px; height: 20px; margin: 0; accent-color: #0d9488; }
+
+/* 0.118.0 sur téléphone (mode téléphone ou écran étroit) : chiffres et couloir resserrés, tout
+   tient sans déborder et « Enregistrer » reste visible. */
+@media (max-width: 520px) {
+  .vue-guidage .guidage-direct.ligne-nette { gap: 6px; padding: 6px; }
+  .ligne-nette .bloc-lateral, .ligne-nette .bloc-hauteur { padding: 6px 8px; }
+  .ligne-nette .libelle-ecart, .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 17px; gap: 4px; }
+  .ligne-nette .ligne-ecart strong, .ligne-nette .bloc-hauteur strong { font-size: 27px; }
+  .ligne-nette .icone-fleche, .ligne-nette .bloc-hauteur .icone-fleche { width: 24px; height: 24px; }
+  .ligne-nette .libelle-ecart .icone-drapeau { width: 22px; height: 26px; }
+  .ligne-nette .fin-petite { font-size: 12px; }
+  .ligne-nette .couloir-vertical { min-height: 130px; }
+  .vue-guidage .bascule-segment .puce-choix { min-height: 34px; font-size: 13px; }
+}
+body.mode-telephone .vue-guidage .guidage-direct.ligne-nette { gap: 6px; padding: 6px; }
+body.mode-telephone .ligne-nette .bloc-lateral, body.mode-telephone .ligne-nette .bloc-hauteur { padding: 6px 8px; }
+body.mode-telephone .ligne-nette .libelle-ecart, body.mode-telephone .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 17px; gap: 4px; }
+body.mode-telephone .ligne-nette .ligne-ecart strong, body.mode-telephone .ligne-nette .bloc-hauteur strong { font-size: 27px; }
+body.mode-telephone .ligne-nette .icone-fleche { width: 24px; height: 24px; }
+body.mode-telephone .ligne-nette .libelle-ecart .icone-drapeau { width: 22px; height: 26px; }
+body.mode-telephone .ligne-nette .fin-petite { font-size: 12px; }
+body.mode-telephone .ligne-nette .couloir-vertical { min-height: 130px; }
+body.mode-telephone .vue-guidage .bascule-segment .puce-choix { min-height: 34px; font-size: 13px; }
+body.mode-telephone .plan-cadre .case-voir-ligne { padding: 5px 10px; font-size: 12px; }
+
+/* 0.118.1 : autour du travail (Lever : levé en cours ; Implanter : élément choisi), le reste du plan à 50 %. */
+.plan .pale { opacity: 0.5; }
+.plan-cadre.plan-palir .plan-dxf-canvas { opacity: 0.5; }
+
+/* 0.118.1 : couloir sur le tiers droit (deux tiers pour les écarts), réglettes gris très clair
+   (2 m, 1 m, 50 cm, 20 cm… selon la distance, comme la cible), bloc « Début / fin » à part. */
+.vue-guidage .guidage-direct.ligne-nette { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.couloir-vertical .reglette { stroke: #e2e8f0; stroke-width: 0.8; opacity: 0.35; fill: none; }
+.couloir-vertical .texte-reglette { fill: #cbd5e1; opacity: 0.7; font-size: 11px; text-anchor: middle; }
+.ligne-nette .bloc-bouts.vert { background: #16a34a; }
+.ligne-nette .bloc-bouts.orange { background: #f59e0b; color: #1f2937; }
+.ligne-nette .bloc-bouts.rouge { background: #dc2626; }
+.ligne-nette .ligne-ecart strong { min-width: 0; overflow: hidden; text-overflow: clip; }
+@media (max-width: 520px) {
+  .ligne-nette .colonne-ecarts { gap: 5px; }
+  .ligne-nette .libelle-ecart, .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 13px; gap: 3px; }
+  .ligne-nette .ligne-ecart strong, .ligne-nette .bloc-hauteur strong { font-size: 21px; }
+  .ligne-nette .icone-fleche, .ligne-nette .bloc-hauteur .icone-fleche { width: 19px; height: 19px; }
+  .ligne-nette .libelle-ecart .icone-drapeau { width: 16px; height: 20px; }
+  .ligne-nette .fin-petite { font-size: 11px; }
+  .ligne-nette .bloc-lateral, .ligne-nette .bloc-hauteur { padding: 5px 7px; }
+}
+body.mode-telephone .ligne-nette .colonne-ecarts { gap: 5px; }
+body.mode-telephone .ligne-nette .libelle-ecart, body.mode-telephone .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 13px; gap: 3px; }
+body.mode-telephone .ligne-nette .ligne-ecart strong, body.mode-telephone .ligne-nette .bloc-hauteur strong { font-size: 21px; }
+body.mode-telephone .ligne-nette .icone-fleche { width: 19px; height: 19px; }
+body.mode-telephone .ligne-nette .libelle-ecart .icone-drapeau { width: 16px; height: 20px; }
+body.mode-telephone .ligne-nette .fin-petite { font-size: 11px; }
+body.mode-telephone .ligne-nette .bloc-lateral, body.mode-telephone .ligne-nette .bloc-hauteur { padding: 5px 7px; }
+/* Le couloir suit la hauteur des écarts (il ne pousse plus « Enregistrer » vers le bas). */
+.ligne-nette .cadre-couloir { position: relative; min-height: 150px; border-radius: 10px; background: #0f172a; }
+.ligne-nette .cadre-couloir .couloir-vertical { position: absolute; inset: 0; min-height: 0; background: transparent; }
+.couloir-vertical .texte-reglette { font-size: 15px; }
+@media (max-width: 520px) { .ligne-nette .cadre-couloir { min-height: 110px; } .couloir-vertical .texte-reglette { font-size: 19px; } }
+body.mode-telephone .ligne-nette .cadre-couloir { min-height: 110px; }
+body.mode-telephone .couloir-vertical .texte-reglette { font-size: 19px; }
+/* Couloir en blocs (0.118.1) : remplit toute la case du tiers droit. */
+.ligne-nette .cadre-couloir { overflow: hidden; }
+.cadre-couloir .reglette { position: absolute; top: 18%; bottom: 24%; width: 0; border-left: 1px solid rgba(226, 232, 240, 0.28); }
+.cadre-couloir .texte-reglette { position: absolute; transform: translateX(-50%); font-size: 10px; line-height: 1; color: rgba(203, 213, 225, 0.75); white-space: nowrap; }
+.cadre-couloir .texte-reglette.en-bas { bottom: 2px; }
+.cadre-couloir .texte-reglette.en-haut { bottom: 13px; }
+.cadre-couloir .trait-couloir { position: absolute; left: 50%; width: 6px; margin-left: -3px; background: #14b8a6; border-radius: 3px; }
+.cadre-couloir .bout-couloir { position: absolute; left: 50%; width: 36px; margin-left: -18px; height: 3px; margin-top: -1.5px; background: #e2e8f0; }
+.cadre-couloir .drapeau-couloir { position: absolute; left: 50%; line-height: 0; }
+.cadre-couloir .drapeau-couloir .icone-drapeau { width: 20px; height: 24px; }
+.cadre-couloir .drapeau-couloir.fin { transform: translate(-2px, -100%); margin-top: -3px; }
+.cadre-couloir .drapeau-couloir.debut { transform: translate(-2px, 0); margin-top: 4px; }
+.cadre-couloir .moi-couloir { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 3px solid #ffffff; box-sizing: border-box; }
+@media (max-width: 520px) { .cadre-couloir .texte-reglette { font-size: 8px; } .cadre-couloir .texte-reglette.en-haut { bottom: 10px; } .cadre-couloir .drapeau-couloir .icone-drapeau { width: 15px; height: 18px; } .cadre-couloir .moi-couloir { width: 18px; height: 18px; margin: -9px 0 0 -9px; } }
+body.mode-telephone .cadre-couloir .texte-reglette { font-size: 8px; }
+body.mode-telephone .cadre-couloir .texte-reglette.en-haut { bottom: 10px; }
+body.mode-telephone .cadre-couloir .drapeau-couloir .icone-drapeau { width: 15px; height: 18px; }
+.cadre-couloir .texte-reglette.au-bord { transform: translateX(-100%); }
+
+/* 0.118.3 : sur tablette, textes du guidage de ligne un peu plus grands ; « Début / fin » gris à plus de 1 m d'un bout. */
+.ligne-nette .bloc-bouts.loin { background: #475569; color: #ffffff; }
+@media (min-width: 521px) {
+  body:not(.mode-telephone) .ligne-nette .libelle-ecart { font-size: 1.55rem; }
+  body:not(.mode-telephone) .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 1.4rem; }
+  body:not(.mode-telephone) .ligne-nette .ligne-ecart strong,
+  body:not(.mode-telephone) .ligne-nette .bloc-hauteur strong { font-size: 2.5rem; }
+  body:not(.mode-telephone) .ligne-nette .icone-fleche { width: 2.4rem; height: 2.4rem; }
+  body:not(.mode-telephone) .ligne-nette .libelle-ecart .icone-drapeau { width: 2.3rem; height: 2.6rem; }
+  body:not(.mode-telephone) .ligne-nette .fin-petite { font-size: 1rem; }
+  body:not(.mode-telephone) .ligne-nette .fin-petite .icone-drapeau { width: 1rem; height: 1.15rem; }
+}

@@ -44,7 +44,7 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) 
     <div class="ligne-lame">
       ${surfaces.length > 0
         ? `<select data-champ="surface-lame" aria-label="Levé à suivre">
-            ${surfaceId ? '' : '<option value="">— levé à suivre —</option>'}
+            ${surfaces.some((s) => s.id === surfaceId) ? '' : '<option value="" selected>— levé à suivre —</option>'}
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
         : '<p class="vide">Aucun levé (Terrain › Lever).</p>'}

@@ -1,6 +1,6 @@
 // Affichage du plan : points avec leur nom, zoom et déplacement
 // au doigt (téléphone) ou à la souris (ordinateur).
-import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
+import { cadrerSurPoints, cadrerSurPointsTourne, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
 import { bulle } from '../aide/bulles.js';
 import { aAcces, rayonFormes, echelleTexte } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
@@ -87,7 +87,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandBasculerSeul(actif) : bouton « Seul » (seulement ce sur quoi je travaille, 0.94.0)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne } = {}) {
   // Réglages choisis ; « calques » est ce qui est dessiné : en dessous d'Expert, les réglages
   // d'Expert gardent leur valeur de départ.
   const calquesChoisis = { ...CALQUES_DEPART };
@@ -136,6 +136,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           <label class="case"><input type="checkbox" data-calque="cadastre" /> Cadastre</label>
         </div>
       </div>
+      <label class="case-voir-ligne" hidden><input type="checkbox" data-action="voir-ligne" /> Voir toute la ligne</label>
       <div class="plan-boutons">
         <button type="button" data-action="zoom-plus" aria-label="Zoomer">+</button>
         <button type="button" data-action="zoom-moins" aria-label="Dézoomer">−</button>
@@ -162,6 +163,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const fond = conteneur.querySelector('.plan-fond');
   const canvasDxf = conteneur.querySelector('.plan-dxf-canvas');
   const attribution = conteneur.querySelector('.plan-attribution');
+  const caseVoirLigne = conteneur.querySelector('.case-voir-ligne');
+  caseVoirLigne.querySelector('input').addEventListener('change', (evenement) => quandVoirLigne?.(evenement.target.checked));
   // Images des tuiles affichées, rangées par adresse (pour les réutiliser d'un dessin à l'autre).
   const tuilesAffichees = new Map();
   let fondIndisponible = false;
@@ -176,6 +179,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // recentre et tourne : le devant du RX2 en haut). Déplacer le plan au doigt arrête le suivi
   // (le plan garde son angle ; la boussole du plan le remet nord en haut).
   let suivi = 'libre';
+  // « Voir toute la ligne » (0.118.0, Implanter › Ligne) : sommets de la ligne entière, gardée au
+  // milieu du plan et le plus grand possible, le plan tourné comme le récepteur (cap) ; ou null.
+  let ligneVue = null;
+  // Autour du travail pâli (0.118.1, Lever et Implanter) : { stockId (levé ou surface gardé net, ou
+  // null), noms (Set des points gardés nets) } ; tout le reste du plan (DXF compris) à 50 %. Ou null.
+  let palir = null;
+  let signaturePalir = '';
+  const estPale = (nom) => Boolean(palir) && !palir.noms.has(nom);
   // Plans DXF en fond (voir topo/dxf-plan.js), dessinés sur un canvas sous le dessin (voir
   // dxf-canvas.js) ; redessinés seulement si la vue ou les plans changent (signatureDxf).
   let plansDxf = [];
@@ -325,7 +336,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         // Forme choisie pour le libellé (0.97.0) : rond plein, sinon carré, triangle, croix…
         const forme = formeDuNom(point.nom, libelles);
         const trace = cheminForme(forme, x, y, rayon);
-        const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}`;
+        const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}${estPale(point.nom) ? ' pale' : ''}`;
         const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: rayon, class: classe });
         // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
         const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
@@ -363,7 +374,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
             x: place.x,
             y: place.y - (textes[i].length - 1 - ligne) * 13 * echelle - 2,
             'text-anchor': place.aGauche ? 'end' : 'start',
-            class: montrerNom(visibles[i].point) && ligne === 0 ? '' : 'altitude',
+            class: `${montrerNom(visibles[i].point) && ligne === 0 ? '' : 'altitude'}${estPale(visibles[i].point.nom) ? ' pale' : ''}`,
           });
           // Nom à la couleur de sa liste, si elle en a une.
           const couleurListe = couleursPoints.get(visibles[i].point);
@@ -417,9 +428,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.querySelector('g.implantation')?.remove();
     if (!implantation || !vue) return;
     const groupe = creerElement('g', { class: 'implantation' });
+    // Lignes des autres levés, réseaux, points de contrôle, dessins, implantations faites, « À
+    // implanter » : pâlis autour du travail (0.118.1) ; la ligne, la cible, le talus restent nets.
+    const autres = creerElement('g', { class: palir ? 'pale' : '' });
+    groupe.append(autres);
     const croix = (est, nord, classe, taille) => {
       const { x, y } = versEcran(est, nord, vue);
-      groupe.append(creerElement('path', { d: `M${x - taille} ${y}H${x + taille}M${x} ${y - taille}V${y + taille}`, class: classe }));
+      autres.append(creerElement('path', { d: `M${x - taille} ${y}H${x + taille}M${x} ${y - taille}V${y + taille}`, class: classe }));
       return { x, y };
     };
     // Lignes des levés « Autres » (contrôle, points géomètre…) : trait gris ardoise.
@@ -429,7 +444,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const element = creerElement('path', { d: tracePar(ecran, ligne.fermee), class: 'ligne-autres' });
       const couleur = couleurDuNom(ligne.sommets[0]?.nom, libelles) ?? ligne.couleur;
       if (couleur) element.style.stroke = couleur;
-      groupe.append(element);
+      // Ligne du levé libre en cours (Lever) : nette, même si les autres sont pâlies.
+      (palir && ligne.id === palir.stockId ? groupe : autres).append(element);
     }
     // Recollements de réseaux (0.101.0) : conduites de la couleur du réseau, flèche du sens
     // d'écoulement et pente au milieu de chaque tronçon ; ouvrages (rond ou cadre) avec leur nom.
@@ -439,7 +455,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         const b = versEcran(t.b.est, t.b.nord, vue);
         const trait = creerElement('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'conduite-reseau' });
         trait.style.stroke = reseau.couleur;
-        groupe.append(trait);
+        autres.append(trait);
         const longueur = Math.hypot(b.x - a.x, b.y - a.y);
         if (longueur < 40 || t.pente == null) continue;
         // Flèche vers le bas de la pente (sens d'écoulement), au milieu.
@@ -449,13 +465,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         if (t.sens !== 'plat') {
           const fleche = creerElement('path', { d: 'M-7 -6 5 0-7 6Z', class: 'fleche-reseau', transform: `translate(${milieu.x} ${milieu.y}) rotate(${angle})` });
           fleche.style.fill = reseau.couleur;
-          groupe.append(fleche);
+          autres.append(fleche);
         }
         if (longueur < 90) continue;
         const pente = creerElement('text', { x: milieu.x + 8, y: milieu.y - 8, class: 'pente-reseau' });
         pente.style.fill = reseau.couleur;
         pente.textContent = `${t.pente < 0 ? '−' : t.pente > 0 ? '+' : ''}${Math.abs(t.pente).toFixed(2)} %`;
-        groupe.append(pente);
+        autres.append(pente);
       }
       for (const o of reseau.ouvrages) {
         const centre = versEcran(o.centre.est, o.centre.nord, vue);
@@ -467,20 +483,20 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           forme = creerElement('circle', { cx: centre.x, cy: centre.y, r: rayon, class: 'ouvrage-reseau' });
         }
         forme.style.stroke = reseau.couleur;
-        groupe.append(forme);
+        autres.append(forme);
         // Ouvrage rond : son point porte déjà son nom ; rectangulaire : le nom au centre du cadre.
         if (!calques.noms || !o.coins) continue;
         const nom = creerElement('text', { x: centre.x + 10, y: centre.y - 10, class: 'nom-ouvrage-reseau' });
         nom.style.fill = reseau.couleur;
         nom.textContent = o.nom;
-        groupe.append(nom);
+        autres.append(nom);
       }
     }
     // Points de contrôle (Terrain › Contrôle) : triangle rouge et nom en rouge. Noms et altitudes placés
     // sans se chevaucher (0.114.0) : une étiquette sans place est cachée, elle revient en zoomant.
     const controles = (implantation.pointsControle ?? []).map((point) => ({ point, ...versEcran(point.est, point.nord, vue) }));
     for (const { x, y } of controles) {
-      groupe.append(creerElement('path', { d: `M${x} ${y - 8}L${x + 7} ${y + 5}H${x - 7}Z`, class: 'triangle-controle' }));
+      autres.append(creerElement('path', { d: `M${x} ${y - 8}L${x + 7} ${y + 5}H${x - 7}Z`, class: 'triangle-controle' }));
     }
     const lignesControle = controles.map(({ point }) => [
       calques.controleNoms ? { texte: point.nom, classe: 'nom-controle' } : null,
@@ -502,7 +518,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           class: classe,
         });
         element.textContent = texte;
-        groupe.append(element);
+        autres.append(element);
       });
     });
     // Points implantés (0.114.0) : petit losange vert / orange / rouge selon les tolérances du Contrôle.
@@ -512,14 +528,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const titre = creerElement('title', {});
       titre.textContent = point.nom ?? '';
       marque.append(titre);
-      groupe.append(marque);
+      autres.append(marque);
     }
     for (const point of implantation.aImplanter ?? []) {
       const { x, y } = croix(point.est, point.nord, 'croix-a-implanter', 7);
       if (!calques.noms) continue;
       const nom = creerElement('text', { x: x + 9, y: y - 6, class: 'nom-a-implanter' });
       nom.textContent = point.nom;
-      groupe.append(nom);
+      autres.append(nom);
     }
     // Ligne à implanter : trait sarcelle épais, sa parallèle en pointillés, « Début » et « Fin ».
     const ligne = implantation.ligne;
@@ -889,12 +905,19 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     };
 
     const groupe = creerElement('g', { class: calques.remblaiDeblai ? 'stocks avec-ecarts' : 'stocks' });
-    if (calques.remblaiDeblai) dessinerEcarts(groupe);
-    if (calques.couleursAltitude || calques.courbes || calques.couleursAltitudeImport) dessinerRelief(groupe);
-    dessinerSurface(groupe);
+    // Écarts, relief, surface du calcul : pâlis autour du travail (0.118.1).
+    const dessous = creerElement('g', { class: palir ? 'pale' : '' });
+    groupe.append(dessous);
+    if (calques.remblaiDeblai) dessinerEcarts(dessous);
+    if (calques.couleursAltitude || calques.courbes || calques.couleursAltitudeImport) dessinerRelief(dessous);
+    dessinerSurface(dessous);
+    const groupeStocks = groupe;
     dessin.stocks.forEach((stock, index) => {
       const actif = stock === dessin.stockActif;
       if (!estVisible(stock)) return;
+      // Chaque levé dans son groupe : pâli s'il n'est pas celui sur lequel on travaille (0.118.1).
+      const groupe = creerElement('g', { class: palir && stock.id !== palir.stockId ? 'pale' : '' });
+      groupeStocks.append(groupe);
       const resultat = dessin.resultats[index];
 
       // Surface importée (LandXML, DXF 3D ; 0.83.0, mode Base) : elle n'a pas de contour ; fond
@@ -1157,7 +1180,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /** Coupes A – A', B – B' : trait bleu nuit avec le nom à chaque bout ; début d'une coupe en cours de tracé. */
   function dessinerCoupes() {
-    const groupe = creerElement('g', { class: 'coupes' });
+    const groupe = creerElement('g', { class: palir ? 'coupes pale' : 'coupes' });
     for (const coupe of dessin.coupes ?? []) {
       const a = versEcran(coupe.debut.est, coupe.debut.nord, vue);
       const b = versEcran(coupe.fin.est, coupe.fin.nord, vue);
@@ -1184,7 +1207,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    * (calque « Volume sur chaque surface », dans tous les onglets).
    */
   function dessinerVolumes() {
-    const groupe = creerElement('g', { class: 'volumes' });
+    const groupe = creerElement('g', { class: palir ? 'volumes pale' : 'volumes' });
     dessin.stocks.forEach((stock, index) => {
       const actif = stock === dessin.stockActif;
       if (!estVisible(stock)) return;
@@ -1224,7 +1247,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    */
   function dessinerTracesMesures() {
     if (!dessin.mesures?.length || !(calques.mesures || dessin.modeMesures)) return;
-    const tout = creerElement('g', { class: 'mesures' });
+    const tout = creerElement('g', { class: palir && !palir.garderMesures ? 'mesures pale' : 'mesures' });
     for (const { mesure, resultat } of dessin.mesures) {
       const actif = mesure === dessin.mesureActive ? ' actif' : '';
       // Chaque mesure dans sa couleur.
@@ -1258,7 +1281,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    */
   function dessinerEtiquettesMesures() {
     if (!dessin.mesures?.length || !(calques.mesures || dessin.modeMesures)) return;
-    const tout = creerElement('g', { class: 'etiquettes-mesures' });
+    const tout = creerElement('g', { class: palir && !palir.garderMesures ? 'etiquettes-mesures pale' : 'etiquettes-mesures' });
     for (const { mesure, resultat } of dessin.mesures) {
       if (!resultat || resultat.erreurs) continue;
       const active = mesure === dessin.mesureActive;
@@ -1413,6 +1436,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   // 1er toucher : suivre (nord en haut) ; puis on passe de « nord en haut » à « devant en haut ».
   boutonPosition.addEventListener('click', () => {
+    // « Ma position » reprend la main sur « Voir toute la ligne » (la case se décoche).
+    if (ligneVue) {
+      ligneVue = null;
+      quandVoirLigne?.(false);
+    }
     if (suivi === 'suivre') {
       changerSuivi('cap');
       if (position?.azimut != null) tournerVers(position.azimut);
@@ -1435,6 +1463,20 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   /** Écart entre deux angles (°), entre −180 et 180. */
   function ecartAngle(a, b) {
     return ((((a - b) % 360) + 540) % 360) - 180;
+  }
+
+  /**
+   * « Voir toute la ligne » : la ligne entière au milieu, tournée de "rotation" (cap du récepteur,
+   * sinon l'angle actuel du plan).
+   */
+  function cadrerSurLigne(rotation = vue?.rotation ?? 0) {
+    const { largeur, hauteur } = taille();
+    if (!ligneVue || largeur === 0 || hauteur === 0) return;
+    // Marge de 70 px : les boutons du plan (en haut) et la case (en bas) ne cachent pas les bouts.
+    const cadre = cadrerSurPointsTourne(ligneVue, largeur, hauteur, rotation, 70);
+    if (!cadre) return;
+    vue = cadre;
+    dessiner();
   }
 
   /** Tourne le plan pour que "azimut" (°) soit en haut, centré sur la position. */
@@ -1897,7 +1939,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const decalagePhoto = (x, y) => ({ x: x + 10, y: y - 14 });
   function dessinerPhotos() {
     if (!vue || photos.length === 0) return;
-    const groupe = creerElement('g', { class: 'photos-plan' });
+    const groupe = creerElement('g', { class: palir ? 'photos-plan pale' : 'photos-plan' });
     const echelle = echelleTexte();
     for (const photo of photos) {
       const ecran = versEcran(photo.est, photo.nord, vue);
@@ -1959,7 +2001,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       return;
     }
     vue = { ...vue, ...nouvelleTaille };
-    dessiner();
+    if (ligneVue) cadrerSurLigne();
+    else dessiner();
   }).observe(svg);
 
   return {
@@ -1983,6 +2026,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const premiere = !position && nouvellePosition;
       position = nouvellePosition;
       boutonPosition.hidden = !position;
+      // « Voir toute la ligne » : on ne tourne (et recadre) que si le cap a changé de plus de 3°.
+      if (ligneVue) {
+        if (position?.azimut != null && vue && Math.abs(ecartAngle(position.azimut, vue.rotation ?? 0)) > 3) cadrerSurLigne(position.azimut);
+        else if (!vue) cadrerSurLigne();
+        else dessinerPosition();
+        return;
+      }
       // Suivi : on ne recentre (et ne redessine tout) que si la position s'approche du bord.
       if (position && suivi === 'cap' && position.azimut != null && vue && Math.abs(ecartAngle(position.azimut, vue.rotation ?? 0)) > 3) tournerVers(position.azimut);
       else if (position && (!vue || (suivi !== 'libre' && loinDuCentre()) || (premiere && points.length === 0))) centrerSurPosition();
@@ -2042,6 +2092,34 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (geste) return;
       dessinerImplantation();
       dessinerPosition();
+    },
+    /**
+     * Pâlir autour du travail (0.118.1) : { stockId, noms } = levé (ou surface) et points gardés nets,
+     * tout le reste à 50 % (DXF compris) ; null = tout normal. Dessiné au prochain redessin.
+     */
+    /**
+     * Case « Voir toute la ligne » (0.118.0) : visible (implantation d'une ligne) et cochée ou non ;
+     * cochée, "sommets" = la ligne entière à garder au milieu du plan, tourné comme le récepteur.
+     */
+    palirAutour(nouveau) {
+      const avant = signaturePalir;
+      palir = nouveau ? { stockId: nouveau.stockId ?? null, noms: new Set(nouveau.noms ?? []), garderMesures: Boolean(nouveau.garderMesures) } : null;
+      signaturePalir = palir ? `${palir.stockId}|${palir.garderMesures}|${[...palir.noms].join(',')}` : '';
+      cadre.classList.toggle('plan-palir', Boolean(palir));
+      // Changement : tout le plan est redessiné (les points et les levés aussi, pas seulement l'implantation).
+      if (signaturePalir !== avant && vue) dessiner();
+    },
+    voirLigne({ visible, sommets = null }) {
+      caseVoirLigne.hidden = !visible;
+      const nouvelle = visible && sommets?.length >= 2 ? sommets : null;
+      caseVoirLigne.querySelector('input').checked = Boolean(nouvelle);
+      const avant = ligneVue;
+      ligneVue = nouvelle;
+      if (!nouvelle) return;
+      changerSuivi('libre');
+      // Recadrage seulement si la ligne a changé (pas à chaque redessin de l'écran).
+      const memes = avant && avant.length === nouvelle.length && avant.every((p, i) => p.est === nouvelle[i].est && p.nord === nouvelle[i].nord);
+      if (!memes) cadrerSurLigne(position?.azimut ?? vue?.rotation ?? 0);
     },
     /** Cadre le plan sur ces points [{ est, nord }], sur au moins "minimum" mètres (implantation). */
     cadrerSur(coins, minimum = 10) {

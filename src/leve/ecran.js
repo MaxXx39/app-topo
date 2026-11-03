@@ -526,7 +526,7 @@ export function creerEcranLeve(conteneur, actions) {
       ${choixImplantation}
       ${surfaces.length > 0
         ? `<select data-champ="surface-controle" aria-label="Surface à contrôler">
-            ${reglages.surfaceId ? '' : '<option value="">— choisir une surface —</option>'}
+            ${surfaces.some((s) => s.id === reglages.surfaceId) ? '' : '<option value="" selected>— choisir une surface —</option>'}
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === reglages.surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
         : '<p class="vide">Aucune surface.</p>'}
@@ -643,19 +643,34 @@ export function creerEcranLeve(conteneur, actions) {
     const { ecart, abscisse, longueur, reste } = g.ligne;
     const m = (valeur) => `${formaterNombre(Math.abs(valeur))} m`;
     bandeCouloir = cibleSelonDistance(Math.abs(ecart), bandeCouloir);
+    // 0.118.0 : un bloc coloré (tolérance en plan du Contrôle) avec gauche / droite et le début en
+    // grand, la fin en petit ; dessous monter / descendre ; à droite le couloir sur toute la hauteur.
     // La canne est trop à droite (écart > 0) : il faut aller à gauche.
-    const sens = Math.abs(ecart) < 0.0005 ? 'Sur la ligne' : `${ecart > 0 ? '← Gauche' : '→ Droite'} ${m(ecart)}`;
-    // Position le long : + depuis le début, − avant le début (demande du 23.10.2026). Début et fin sur
-    // deux lignes, de la même taille que gauche / droite (0.84.0).
-    let le_long;
-    if (abscisse < 0) le_long = [`−${m(abscisse)}`];
-    else if (abscisse > longueur) le_long = [`Après la fin : ${m(abscisse - longueur)}`];
-    else le_long = [`début ${m(abscisse)}`, `fin ${m(reste)}`];
-    zone.className = `guidage-direct guidage-3 avec-couloir ${g.classe}`;
+    const surLaLigne = Math.abs(ecart) < 0.0005;
+    const sens = surLaLigne
+      ? '<span class="libelle-ecart">Sur la ligne</span>'
+      : `<span class="libelle-ecart">${iconeFleche(ecart > 0 ? 'gauche' : 'droite')}${ecart > 0 ? 'Gauche' : 'Droite'}</span>`;
+    // Position le long : avant le début, après la fin, ou depuis le début (+ la fin en petit).
+    // 0.118.1 : dans son propre bloc, coloré selon l'écart au bout le plus proche (tolérance en plan
+    // du Contrôle : vert = on est sur le début ou la fin).
+    let leLong;
+    if (abscisse < 0) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}Avant le début</span><strong>${m(abscisse)}</strong></div>`;
+    else if (abscisse > longueur) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('fin')}Après la fin</span><strong>${m(abscisse - longueur)}</strong></div>`;
+    else leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}Début</span><strong>${m(abscisse)}</strong></div>
+        <div class="fin-petite">${iconeDrapeau('fin')}fin ${m(reste)}</div>`;
+    const hauteur = g.ecartAltitude == null
+      ? '<div class="bloc-hauteur sans-altitude">pas d\'altitude</div>'
+      : `<div class="bloc-hauteur ${g.classeAltitude}"><span class="libelle-ecart">${iconeFleche(g.ecartAltitude >= 0 ? 'monter' : 'descendre')}${g.ecartAltitude >= 0 ? 'Monter' : 'Descendre'}</span><strong>${m(g.ecartAltitude)}</strong></div>`;
+    zone.className = 'guidage-direct ligne-nette';
     zone.innerHTML = `
-      <span class="cote-plan"><span class="lignes-guidage"><span>${sens}</span>${le_long.map((texte) => `<span>${texte}</span>`).join('')}</span></span>
-      ${svgCouloir(bandeCouloir, ecart, abscisse, longueur, couleurCanne(Math.abs(ecart)))}
-      <span class="cote-hauteur">${texteHauteur(g)}</span>`;
+      <div class="colonne-ecarts">
+        <div class="bloc-lateral ${g.classeLaterale ?? ''}">
+          <div class="ligne-ecart">${sens}<strong>${m(ecart)}</strong></div>
+        </div>
+        <div class="bloc-lateral bloc-bouts ${g.classeBout ?? ''}">${leLong}</div>
+        ${hauteur}
+      </div>
+      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale))}`;
   }
 
   /**
@@ -707,7 +722,7 @@ export function creerEcranLeve(conteneur, actions) {
     const talus = !autocontrole && reglages.implantation === 'talus';
     const ligne = !autocontrole && (reglages.implantation === 'ligne' || talus);
     let titre = ligne
-      ? `<strong>${echapper(imp.ligne.nom)}</strong> · ${formaterNombre(imp.ligne.longueur)} m`
+      ? `<strong>${echapper(imp.ligne.nom)}</strong> <span class="longueur-ligne">· long. ${formaterNombre(imp.ligne.longueur)} m</span>`
       : `${autocontrole ? 'Contrôle de' : 'Vers'} <strong>${echapper(cibleGuidee().nom ?? 'le point choisi')}</strong>`;
     if (talus) titre = `<strong>${echapper(imp.talus.ouvert ?? 'Talus')}</strong> · ${echapper(imp.talus.texte)}`;
     // Talus pas encore réglé (pente) : les réglages s'ouvrent tout seuls (et restent ouverts).
@@ -735,7 +750,7 @@ export function creerEcranLeve(conteneur, actions) {
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>
       </div>
       ${ouverts ? (talus ? reglagesTalus() : reglagesGuidage(ligne)) : ''}
-      ${ligne ? detailLigne() : detailPoint()}
+      ${talus ? detailLigne() : ligne ? choixLigneNette() : detailPoint()}
       ${guidage}
       <button type="button" class="bouton bouton-prendre ${autocontrole ? '' : 'seulement-intermediaire'}" data-action="enregistrerImplantation" disabled>
         <span>${talus ? 'ENREGISTRER L\'ENTRÉE EN TERRE' : autocontrole ? 'ENREGISTRER LE CONTRÔLE' : 'ENREGISTRER L\'IMPLANTATION'}</span><span class="sous-titre-prendre">ou touche vol −</span>
@@ -840,10 +855,44 @@ export function creerEcranLeve(conteneur, actions) {
     const l = imp.ligne;
     return `<div class="reglages-guidage">
       <div class="ligne-choix"><span>Guidage</span>${boutonsChoix('choisirGuidage', GUIDAGES, reglages.guidage)}</div>
-      ${ligne && l.nbSegments > 1 ? `<div class="ligne-choix"><span>Ligne</span>${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment par segment']], l.segment == null ? 'tout' : 'segment')}</div>` : ''}
+      ${ligne ? altitudesDesBouts() : ''}
       ${ligne ? `<label class="champ-decalage">Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
       <p class="aide" data-vivant="orientation"></p>
     </div>`;
+  }
+
+  /**
+   * Ligne (0.118.0, sans les coordonnées) : bascule « Toute la polyligne / Segment » (ligne de 2
+   * segments ou plus), segment en cours (◀ ▶ et ses deux bouts), décalage parallèle.
+   */
+  function choixLigneNette() {
+    const l = donnees.implanter.ligne;
+    const bascule = l.nbSegments > 1
+      ? `<div class="bascule-segment" role="radiogroup" aria-label="Ligne à implanter">${boutonsChoix('choisirSegment', [['tout', 'Toute la polyligne'], ['segment', 'Segment']], l.segment == null ? 'tout' : 'segment')}</div>`
+      : '';
+    const bouts = [l.debut?.nom, l.fin?.nom].every(Boolean) ? ` · ${echapper(l.debut.nom)} → ${echapper(l.fin.nom)}` : '';
+    const segment = l.segment == null
+      ? ''
+      : `<div class="choix-segment">
+          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="precedent" ${l.segment === 0 ? 'disabled' : ''} aria-label="Segment précédent">◀</button>
+          <span>Segment <strong>${l.segment + 1}</strong> / ${l.nbSegments}${bouts}</span>
+          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="suivant" ${l.segment === l.nbSegments - 1 ? 'disabled' : ''} aria-label="Segment suivant">▶</button>
+        </div>`;
+    return `${bascule}${segment}
+      ${l.decalage ? `<p class="aide">Parallèle à ${formaterNombre(Math.abs(l.decalage))} m ${l.decalage > 0 ? 'à droite' : 'à gauche'}</p>` : ''}`;
+  }
+
+  /**
+   * Réglages ⚙ de la ligne (0.118.0) : altitude du début et de la fin (celle du plan s'il est en 3D,
+   * sinon tapée dès Intermédiaire), puisque les coordonnées ne sont plus sur l'écran.
+   */
+  function altitudesDesBouts() {
+    const l = donnees.implanter.ligne;
+    const lue = (bout, cle) => (l.altitudesDuPlan ? bout.altitude : l.altitudes[cle]);
+    const altitude = (bout, cle) => (l.altitudesDuPlan || estModeBase()
+      ? `<span class="altitude-bout">${iconeDrapeau(cle)} H <strong>${lue(bout, cle) != null ? formaterNombre(lue(bout, cle)) : '—'}</strong></span>`
+      : `<label class="altitude-bout">${iconeDrapeau(cle)} H<input type="text" inputmode="decimal" data-reglage-ligne="${cle}" value="${l.altitudes[cle] == null ? '' : l.altitudes[cle].toFixed(3)}" placeholder="—" aria-label="Altitude ${cle === 'debut' ? 'du début' : 'de la fin'}" /></label>`);
+    return `<div class="altitudes-bouts">${altitude(l.debut, 'debut')}${altitude(l.fin, 'fin')}</div>`;
   }
 
   /** Point implanté : coordonnées et altitude, sur une ligne. */
@@ -1413,32 +1462,55 @@ function svgCible(numero, haut, droite, couleur, nordEnHaut, nord = 0) {
 }
 
 /**
- * Couloir de l'implantation d'une ligne : seulement la ligne (ou sa parallèle) en trait vertical au
- * milieu, du début (en bas) vers la fin (en haut), et la canne (rond de la couleur de la distance) à
- * sa place : à droite si elle est à droite. Pas de bandes autour (demande du 26.10.2026) : la
- * distance écrite et la couleur suffisent ; BANDES_COULOIR ne sert plus qu'à l'échelle (zoom).
- * ecart : décalage de la canne (m, + à droite) ; abscisse, longueur : position le long (m).
+ * Flèche du guidage (0.118.0) : 'gauche', 'droite', 'monter' ou 'descendre' (dessin, couleur du texte).
  */
-function svgCouloir(numero, ecart, abscisse, longueur, couleur) {
+function iconeFleche(sens) {
+  const traits = {
+    gauche: 'M20 12H5M11 5l-7 7 7 7',
+    droite: 'M4 12h15M13 5l7 7-7 7',
+    monter: 'M12 20V5M5 11l7-7 7 7',
+    descendre: 'M12 4v15M5 13l7 7 7-7',
+  };
+  return `<svg class="icone-fleche" viewBox="0 0 24 24" aria-hidden="true"><path d="${traits[sens]}" /></svg>`;
+}
+
+/** Couleur du rond de la canne dans le couloir (0.118.0) : celle de la tolérance en plan. */
+function couleurLaterale(classe) {
+  return { vert: '#16a34a', orange: '#f59e0b', rouge: '#dc2626' }[classe] ?? '#9ca3af';
+}
+
+/**
+ * Couloir vertical (0.118.0, refait en 0.118.1) : un tiers de l'écran à droite, sur toute la hauteur
+ * des écarts. La ligne du début (drapeau vert, en bas) à la fin (damier, en haut) ; la canne à sa
+ * place le long de la ligne (proportion abscisse / longueur) et sur le côté selon l'écart. Réglette
+ * gris très clair à la distance la plus large de la bande (BANDES_COULOIR, comme le grand cercle
+ * de la cible : 10 m, 2 m, 1 m, 20 cm), au bord. Fait en blocs HTML placés en % (pas en SVG) pour
+ * remplir toute la case sans déformer le rond de la canne. ecart : m, + à droite.
+ */
+function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur) {
   const bandes = BANDES_COULOIR[numero];
-  const echelle = 100 / bandes[0]; // la bande la plus large fait 100 unités de chaque côté
+  const haut = 18; // % : haut du trait (la fin)
+  const bas = 76; // % : bas du trait (le début)
+  const demi = 45; // % de la largeur : la bande la plus large
+  const part = longueur > 0 ? abscisse / longueur : 0;
+  // Avant le début ou après la fin : la canne dépasse un peu du trait.
+  const top = Math.max(haut - 6, Math.min(bas + 6, bas - part * (bas - haut)));
+  const left = 50 + Math.max(-demi, Math.min(demi, (ecart / bandes[0]) * demi));
   const texte = (r) => (r >= 1 ? `${r} m` : `${Math.round(r * 100)} cm`);
-  const limiter = (v, max) => Math.max(-max, Math.min(max, v));
-  // La canne est au milieu (en hauteur) ; le début est en dessous de « abscisse », la fin au-dessus.
-  const yDebut = abscisse * echelle;
-  const yFin = (abscisse - longueur) * echelle;
-  const haut = Math.max(yFin, -78);
-  const bas = Math.min(yDebut, 78);
-  const repere = (y, type) => (Math.abs(y) <= 78
-    ? `<path d="M-40 ${y.toFixed(1)}H40" class="bout-couloir" /><g class="drapeau-couloir">${svgDrapeau(type, 44, y + 2, 20)}</g>`
-    : '');
-  return `<svg class="couloir-ligne" viewBox="-120 -94 240 176" role="img" aria-label="Couloir ${texte(bandes[0])}">
-    ${haut < bas ? `<path d="M0 ${bas.toFixed(1)}V${haut.toFixed(1)}" class="trait-couloir" />` : ''}
-    ${repere(yDebut, 'debut')}
-    ${repere(yFin, 'fin')}
-    <g class="drapeau-fin-couloir">${svgDrapeau('fin', -8, -72, 22)}</g>
-    <circle cx="${limiter(ecart * echelle, 112).toFixed(1)}" cy="0" r="9" class="moi" style="fill: ${couleur}" />
-  </svg>`;
+  // 0.118.2 : seulement la graduation la plus éloignée (la bande la plus large), juste pour un
+  // aperçu de l'échelle ; sa distance écrite en bas à droite.
+  const r = bandes[0];
+  const reglettes = `<span class="reglette" style="left: ${50 - demi}%"></span><span class="reglette" style="left: ${50 + demi}%"></span>
+    <span class="texte-reglette en-bas au-bord" style="left: ${50 + demi}%">${texte(r)}</span>`;
+  return `<div class="cadre-couloir" role="img" aria-label="Position de la canne le long de la ligne">
+    ${reglettes}
+    <span class="trait-couloir" style="top: ${haut}%; bottom: ${100 - bas}%"></span>
+    <span class="bout-couloir" style="top: ${haut}%"></span>
+    <span class="bout-couloir" style="top: ${bas}%"></span>
+    <span class="drapeau-couloir fin" style="top: ${haut}%">${iconeDrapeau('fin')}</span>
+    <span class="drapeau-couloir debut" style="top: ${bas}%">${iconeDrapeau('debut')}</span>
+    <span class="moi-couloir" style="left: ${left.toFixed(1)}%; top: ${top.toFixed(1)}%; background: ${couleur}"></span>
+  </div>`;
 }
 
 /**
