@@ -149,7 +149,7 @@ export function couleursDesPoints(projet, listes) {
   return couleurs;
 }
 
-/** Points des listes « Points Import » (fichiers importés, points ajoutés, cadastre) : Set de points (0.113). */
+/** Points des listes « Points Import » (fichiers importés, points ajoutés ; plus le cadastre depuis 0.116.4) : Set de points (0.113). */
 export function pointsDesImports(projet, listes) {
   const points = new Set();
   for (const liste of listes) {
