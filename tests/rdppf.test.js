@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { contourDuExtrait, dansAnneau, grilleDuCercle, pasDeGrille, anneauxDuJson, egridsDuTexte, contoursDeReponse } from '../src/topo/cadastre.js';
+import { anneauxInterlis, contourDuExtrait, dansAnneau, grilleDuCercle, pasDeGrille, anneauxDuJson, egridsDuTexte, contoursDeReponse } from '../src/topo/cadastre.js';
 import { telechargerRdppf, adressesGetEgrid, raisonDuService } from '../src/import/rdppf.js';
 
+const EXTRAIT_ILI = `<GetExtractByIdResponse><data:Extract><data:RealEstate><data:EGRID>CH708045688314</data:EGRID><data:Limit><geom:surface><geom:exterior><geom:polyline>
+<geom:coord><geom:c1>2537950.000</geom:c1><geom:c2>1151950.000</geom:c2></geom:coord>
+<geom:coord><geom:c1>2538150.000</geom:c1><geom:c2>1151950.000</geom:c2></geom:coord>
+<geom:arc><geom:c1>2538150.000</geom:c1><geom:c2>1152150.000</geom:c2><geom:a1>2538180.000</geom:a1><geom:a2>1152050.000</geom:a2></geom:arc>
+<geom:coord><geom:c1>2537950.000</geom:c1><geom:c2>1152150.000</geom:c2></geom:coord>
+<geom:coord><geom:c1>2537950.000</geom:c1><geom:c2>1151950.000</geom:c2></geom:coord>
+</geom:polyline></geom:exterior></geom:surface></data:Limit></data:RealEstate>
+<data:RestrictionOnLandownership><geom:polyline><geom:coord><geom:c1>2539000</geom:c1><geom:c2>1153000</geom:c2></geom:coord></geom:polyline></data:RestrictionOnLandownership></data:Extract></GetExtractByIdResponse>`;
 const carre = (e, n, c) => [[e, n], [e + c, n], [e + c, n + c], [e, n + c], [e, n]];
 
 describe('cadastre RDPPF (Vaud)', () => {
@@ -55,12 +63,18 @@ describe('cadastre RDPPF (Vaud)', () => {
     const xml = '<Extract><RealEstate><Limit><gml:posList>2538000 1152000 2538010 1152000 2538010 1152010</gml:posList></Limit></RealEstate></Extract>';
     expect(contourDuExtrait(xml.replace('<gml:posList>', '<gml:LinearRing><gml:posList>').replace('</gml:posList>', '</gml:posList></gml:LinearRing>'))).toHaveLength(1);
   });
+  it('lit le contour INTERLIS de l\'extrait fédéral (c1 = Est, c2 = Nord, arc par son point d\'arrivée)', () => {
+    const anneaux = contourDuExtrait(EXTRAIT_ILI);
+    expect(anneaux).toHaveLength(1);
+    expect(anneaux[0]).toEqual([[2537950, 1151950], [2538150, 1151950], [2538150, 1152150], [2537950, 1152150], [2537950, 1151950]]);
+    expect(anneauxInterlis('<x/>')).toEqual([]);
+  });
   it('Vaud : GetEGRID sans contour, puis l\'extrait de la parcelle', async () => {
     const adresses = [];
     const chercher = async (adresse) => {
       adresses.push(adresse);
       if (adresse.includes('getegrid')) return { ok: true, status: 200, text: async () => '{"Item":[{"egrid":"CH708045688314","number":"440"}]}' };
-      if (adresse.includes('/extract/json/?EGRID=CH708045688314')) return { ok: true, status: 200, text: async () => JSON.stringify({ RealEstate: { Limit: { coordinates: [[carre(2537950, 1151950, 200)]] } } }) };
+      if (adresse.includes('/extract/xml/?EGRID=CH708045688314')) return { ok: true, status: 200, text: async () => EXTRAIT_ILI };
       return { ok: false, status: 500, text: async () => 'non' };
     };
     const r = await telechargerRdppf({ est: 2538020, nord: 1152020 }, 30, () => {}, chercher, 'https://x');

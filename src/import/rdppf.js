@@ -96,11 +96,10 @@ export function raisonDuService(texte) {
 
 /** Adresses de l'extrait RDPPF d'une parcelle (avec la géométrie), à essayer dans l'ordre. */
 export function adressesExtrait(base, egrid) {
+  // 0.112.9 : le XML d'abord (seul format où Vaud donne le contour, essai du 03.11).
   return [
-    `${base}/extract/json/?EGRID=${egrid}&GEOMETRY=true`,
-    `${base}/extract/json/geometry/?EGRID=${egrid}`,
-    `${base}/extract/reduced/json/geometry/${egrid}`,
     `${base}/extract/xml/?EGRID=${egrid}&GEOMETRY=true`,
+    `${base}/extract/json/?EGRID=${egrid}&GEOMETRY=true`,
   ];
 }
 

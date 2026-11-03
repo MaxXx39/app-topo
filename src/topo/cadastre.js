@@ -301,5 +301,25 @@ export function contourDuExtrait(texte) {
   }
   const bienFonds = /<(?:\w+:)?RealEstate\b[\s\S]*?<\/(?:\w+:)?RealEstate>/.exec(texte)?.[0] ?? texte;
   const limite = /<(?:\w+:)?Limit\b[\s\S]*?<\/(?:\w+:)?Limit>/.exec(bienFonds)?.[0];
-  return limite ? contoursDeReponse(limite) : [];
+  if (!limite) return [];
+  const interlis = anneauxInterlis(limite);
+  return interlis.length > 0 ? interlis : contoursDeReponse(limite);
+}
+
+/**
+ * Anneaux écrits en géométrie INTERLIS (extrait RDPPF 2.0 de la Confédération, 0.112.9) :
+ * <geom:polyline> avec des <geom:coord> ou <geom:arc>, chacun <c1> = Est et <c2> = Nord.
+ * Les arcs sont gardés par leur point d'arrivée (c1, c2) : les sommets sont exacts, l'arc
+ * devient un segment droit (son point milieu a1 / a2 n'est pas un point limite).
+ */
+export function anneauxInterlis(texte) {
+  const lignes = [...texte.matchAll(/<((?:\w+:)?polyline)\b[\s\S]*?<\/\1>/g)].map((m) => m[0]);
+  const morceaux = lignes.length > 0 ? lignes : [texte];
+  const anneaux = [];
+  for (const morceau of morceaux) {
+    const paires = [...morceau.matchAll(/<(?:\w+:)?c1>\s*([-\d.]+)\s*<\/(?:\w+:)?c1>\s*<(?:\w+:)?c2>\s*([-\d.]+)\s*<\/(?:\w+:)?c2>/g)]
+      .map((m) => ordreEstNord(Number(m[1]), Number(m[2]))).filter(Boolean);
+    if (paires.length >= 3) anneaux.push(paires);
+  }
+  return anneaux;
 }
