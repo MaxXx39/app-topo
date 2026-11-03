@@ -2621,7 +2621,8 @@ function calculerImplantationLigne(etat) {
     // Gauche / droite (0.118.0) : vert / orange / rouge selon la tolérance en plan du Contrôle.
     classeLaterale: fiable ? classeTolerance(g.ecart, projet.tolerancesControle?.plan ?? TOLERANCES_PAR_DEFAUT.plan) : 'pas-fiable',
     // Début / fin (0.118.1) : même tolérance, sur l'écart au bout le plus proche (vert = arrivé au bout).
-    classeBout: fiable ? classeTolerance(ecartAuBout(g.abscisse, g.longueur), projet.tolerancesControle?.plan ?? TOLERANCES_PAR_DEFAUT.plan) : 'pas-fiable',
+    // 0.118.3 : gris (« loin ») à plus de 1 m des deux bouts, pour ne pas être rouge tout le temps.
+    classeBout: !fiable ? 'pas-fiable' : ecartAuBout(g.abscisse, g.longueur) > 1 ? 'loin' : classeTolerance(ecartAuBout(g.abscisse, g.longueur), projet.tolerancesControle?.plan ?? TOLERANCES_PAR_DEFAUT.plan),
     ecartAltitude,
     classeAltitude: ecartAltitude == null ? null : classeEcart(ecartAltitude),
     message: null,

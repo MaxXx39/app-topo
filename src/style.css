@@ -10108,3 +10108,16 @@ body.mode-telephone .cadre-couloir .texte-reglette { font-size: 8px; }
 body.mode-telephone .cadre-couloir .texte-reglette.en-haut { bottom: 10px; }
 body.mode-telephone .cadre-couloir .drapeau-couloir .icone-drapeau { width: 15px; height: 18px; }
 .cadre-couloir .texte-reglette.au-bord { transform: translateX(-100%); }
+
+/* 0.118.3 : sur tablette, textes du guidage de ligne un peu plus grands ; « Début / fin » gris à plus de 1 m d'un bout. */
+.ligne-nette .bloc-bouts.loin { background: #475569; color: #ffffff; }
+@media (min-width: 521px) {
+  body:not(.mode-telephone) .ligne-nette .libelle-ecart { font-size: 1.55rem; }
+  body:not(.mode-telephone) .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 1.4rem; }
+  body:not(.mode-telephone) .ligne-nette .ligne-ecart strong,
+  body:not(.mode-telephone) .ligne-nette .bloc-hauteur strong { font-size: 2.5rem; }
+  body:not(.mode-telephone) .ligne-nette .icone-fleche { width: 2.4rem; height: 2.4rem; }
+  body:not(.mode-telephone) .ligne-nette .libelle-ecart .icone-drapeau { width: 2.3rem; height: 2.6rem; }
+  body:not(.mode-telephone) .ligne-nette .fin-petite { font-size: 1rem; }
+  body:not(.mode-telephone) .ligne-nette .fin-petite .icone-drapeau { width: 1rem; height: 1.15rem; }
+}
