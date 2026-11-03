@@ -30,6 +30,7 @@ export async function telechargerRdppf(centre, rayon, progres = () => {}, cherch
   let variante = null; // numéro de la variante d'adresse qui marche
   let derniere = '';
   let demandes = 0;
+  const raisons = [];
   for (const [n, [est, nord]] of grille.entries()) {
     if (anneaux.some((a) => dansAnneau([est, nord], a))) continue;
     progres(`Cadastre Vaud (RDPPF) : point ${n + 1} / ${grille.length}, ${anneaux.length} parcelle(s)…`);
@@ -41,7 +42,9 @@ export async function telechargerRdppf(centre, rayon, progres = () => {}, cherch
         const reponse = await chercher(adresse);
         texte = await reponse.text();
         if (!reponse.ok) {
-          derniere = `erreur ${reponse.status} « ${texte.replace(/\s+/g, ' ').slice(0, 120)} »`;
+          derniere = `erreur ${reponse.status} : ${raisonDuService(texte)} (${adresse.replace(base, '')})`;
+          // 0.112.7 : le service refuse la demande : on garde sa raison et on arrête tout de suite.
+          raisons.push(derniere);
           continue;
         }
       } catch {
@@ -67,8 +70,17 @@ export async function telechargerRdppf(centre, rayon, progres = () => {}, cherch
     // Aucune variante ne marche aux 5 premiers points demandés (un point peut tomber sur une route
     // sans parcelle) : inutile de continuer.
     demandes++;
+    if (variante === null && raisons.length >= adressesGetEgrid(base, 0, 0).length) throw new Error(`service RDPPF de Vaud : ${raisons.join(' | ')}`);
     if (variante === null && demandes >= 5) throw new Error(`service RDPPF de Vaud : ${derniere}`);
   }
   if (anneaux.length === 0) throw new Error(`service RDPPF de Vaud : ${derniere || 'aucune parcelle'}`);
   return { points: [], lignes: anneaux };
+}
+
+/** Raison donnée par le service dans une réponse d'erreur : texte de <Message>, sinon le début de la réponse. */
+export function raisonDuService(texte) {
+  const message = /<(?:\w+:)?Message\b[^>]*>([\s\S]*?)<\/(?:\w+:)?Message>/i.exec(texte)?.[1]
+    ?? /"message"\s*:\s*"([^"]*)"/i.exec(texte)?.[1];
+  const net = (message ?? texte.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+  return `« ${net.slice(0, 300)} »`;
 }

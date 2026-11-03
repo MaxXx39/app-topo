@@ -47,7 +47,7 @@ export async function telechargerCadastre(centre, rayon, canton = 'VD', progres 
   if (resultat.points.length === 0 && resultat.lignes.length === 0) {
     // 0.112.3 : réponses valides mais vides = pas de données en accès libre ici (cas de Vaud, essai du 03.11).
     if (resultat.essais.every((e) => /FeatureCollection/.test(e))) {
-      throw new Error('pas de données en accès libre à cet endroit (Vaud n\'est pas disponible ; Genève marche)');
+      throw new Error('pas de données en accès libre à cet endroit (cas de Vaud)');
     }
     throw new Error(`le service ne renvoie rien (couches ${[couches.points, couches.surfaces].filter(Boolean).join(', ')}). Réponses : ${resultat.essais.slice(0, 3).join(' | ')}`);
   }

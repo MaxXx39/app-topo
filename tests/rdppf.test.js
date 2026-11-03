@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dansAnneau, grilleDuCercle, pasDeGrille, anneauxDuJson, egridsDuTexte, contoursDeReponse } from '../src/topo/cadastre.js';
-import { telechargerRdppf, adressesGetEgrid } from '../src/import/rdppf.js';
+import { telechargerRdppf, adressesGetEgrid, raisonDuService } from '../src/import/rdppf.js';
 
 const carre = (e, n, c) => [[e, n], [e + c, n], [e + c, n + c], [e, n + c], [e, n]];
 
@@ -49,6 +49,12 @@ describe('cadastre RDPPF (Vaud)', () => {
   it('message clair si le service ne répond jamais', async () => {
     const chercher = async () => ({ ok: false, status: 404, text: async () => 'Not found' });
     await expect(telechargerRdppf({ est: 2538020, nord: 1152020 }, 30, () => {}, chercher, 'https://x')).rejects.toThrow(/RDPPF de Vaud : erreur 404/);
+    const xml = '<ErrorResponse xmlns:xsd="x"><Message>Paramètre EN inconnu</Message></ErrorResponse>';
+    expect(raisonDuService(xml)).toBe('« Paramètre EN inconnu »');
+    let n = 0;
+    const erreur500 = async () => { n++; return { ok: false, status: 500, text: async () => xml }; };
+    await expect(telechargerRdppf({ est: 2538020, nord: 1152020 }, 30, () => {}, erreur500, 'https://x')).rejects.toThrow(/Paramètre EN inconnu.*getegrid\/json\/\?EN=/);
+    expect(n).toBe(3);
     expect(adressesGetEgrid('b', 1, 2)[0]).toBe('b/getegrid/json/?EN=1.000,2.000&GEOMETRY=true');
   });
 });
