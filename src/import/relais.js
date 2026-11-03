@@ -3,7 +3,7 @@
 // Cloudflare. Dans l'APK, elles passent par Android (lireParAndroid) et n'utilisent pas le relais.
 
 // Adresse du relais, une fois créé sur Cloudflare (ex. 'https://cadastre-topo.xxx.workers.dev') ; vide = pas de relais.
-export const ADRESSE_RELAIS_CADASTRE = '';
+export const ADRESSE_RELAIS_CADASTRE = 'https://cadastre-topo.topo-perrin.workers.dev/';
 
 // Services qui refusent le navigateur : seulement ceux-là passent par le relais (geodienste.ch accepte le site).
 const HOTES_PAR_RELAIS = ['www.rdppf.vd.ch', 'rdppf.vd.ch'];
