@@ -9803,3 +9803,89 @@ body.mode-telephone { --hauteur-onglets: 52px; }
 /* Implanter › Surface / Altitude : écart et règle moins hauts (le plan garde la place). */
 body.mode-telephone .ecart-et-regle .regle-hauteur { min-height: 120px; }
 body.mode-telephone .ecart-et-regle > .ecart-direct { min-height: 0; }
+
+/* 0.116.4 : cadastre (Afficher et Contenu du projet) : lignes et points ensemble, une seule couleur. */
+.ligne-cadastre { flex-wrap: wrap; }
+.ligne-menu-plan.ligne-cadastre { align-items: center; gap: 6px; }
+.ligne-cadastre .nom-cadastre { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cases-cadastre { display: flex; flex-wrap: wrap; gap: 4px 14px; flex-basis: 100%; padding-left: 22px; }
+.ligne-leve .cases-cadastre { padding-left: 0; }
+
+/* ==========================================================================
+   0.117.0 : Lever plus compact sur tablette (essais validés le 03.11), bandeau « Lever en cours »
+   sombre et ombres douces (cartes et bande du bas, tous les appareils)
+   ========================================================================== */
+
+/* Tablette (pas le mode téléphone, qui a ses propres réglages) : le cadre touche le plan. */
+@media (max-width: 899px) {
+  body:not(.mode-telephone).mode-leve[data-onglet='terrain'][data-mode-terrain='lever'] .mise-en-page {
+    padding-top: calc(var(--hauteur-plan-terrain) + var(--hauteur-bascule, 0px));
+  }
+  body:not(.mode-telephone)[data-mode-terrain='lever'] .panneau[data-onglet='terrain'] {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+}
+/* Marges blanches du haut et du bas réduites de moitié (16 → 8 px). */
+body:not(.mode-telephone)[data-mode-terrain='lever'] .panneau[data-onglet='terrain'] { padding-top: 8px; padding-bottom: 8px; }
+/* Bandeau « Lever en cours » : 42 px, une seule ligne, aligné sur le bas du plan. */
+body:not(.mode-telephone)[data-mode-terrain='lever'] .ecran-terrain > .entete-levee.levee-en-cours {
+  margin: -8px -16px 6px;
+  padding: 3px 10px;
+  flex-wrap: nowrap;
+  min-height: 0;
+}
+body[data-mode-terrain='lever'] .ecran-terrain > .entete-levee.levee-en-cours .nom-levee-en-cours {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body[data-mode-terrain='lever'] .ecran-terrain > .entete-levee.levee-en-cours .boutons-levee { flex: none; }
+body:not(.mode-telephone)[data-mode-terrain='lever'] .ecran-terrain > .levee-en-cours .boutons-levee .bouton-secondaire { min-height: 30px; padding: 2px 10px; }
+/* Onglets Contour / Ligne / Point : 46 px, icône à côté du mot. */
+body:not(.mode-telephone)[data-mode-terrain='lever'] .roles-leve { margin-top: 4px; gap: 6px; }
+body:not(.mode-telephone)[data-mode-terrain='lever'] .role-leve { flex-direction: row; justify-content: center; min-height: 46px; padding: 4px; gap: 8px; font-size: 1rem; }
+body:not(.mode-telephone)[data-mode-terrain='lever'] .role-leve svg { width: 18px; height: 18px; }
+/* Cadres « Ligne en cours » / « Contour en cours » et « Point » plus serrés. */
+body:not(.mode-telephone)[data-mode-terrain='lever'] .cadre-role { margin-top: 0; padding: 2px 6px 4px; }
+body:not(.mode-telephone)[data-mode-terrain='lever'] .element-en-cours { margin: 10px 0 4px; padding: 8px 8px 4px; }
+body:not(.mode-telephone)[data-mode-terrain='lever'] .element-en-cours .corps-element .bouton-secondaire { min-height: 28px; padding: 2px 10px; }
+body:not(.mode-telephone)[data-mode-terrain='lever'] .libelles-terrain { margin-top: 4px; }
+body:not(.mode-telephone)[data-mode-terrain='lever'] .cadre-prise { margin: 10px 0 4px; padding: 10px 8px 6px; gap: 4px; }
+body:not(.mode-telephone)[data-mode-terrain='lever'] .cadre-prise > .bouton-secondaire { padding: 3px 12px; min-height: 0; }
+
+/* Bandeau sombre (tous les appareils) : nom du levé en ambre, boutons arrondis à bord clair. */
+body[data-mode-terrain='lever'] .ecran-terrain > .entete-levee.levee-en-cours {
+  background: var(--sombre);
+  color: #ffffff;
+  border-bottom: 0;
+}
+body[data-mode-terrain='lever'] .ecran-terrain > .levee-en-cours .etiquette-levee {
+  color: #9fb0bb;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+body[data-mode-terrain='lever'] .ecran-terrain > .levee-en-cours .nom-levee-en-cours { color: var(--ambre); }
+body[data-mode-terrain='lever'] .ecran-terrain > .levee-en-cours .bouton-crayon-levee { filter: brightness(1.3); }
+body[data-mode-terrain='lever'] .ecran-terrain > .levee-en-cours .boutons-levee .bouton-secondaire {
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+}
+
+/* Ombres douces : carte du rôle, bande du bas (ID point, Enreg. Pts), bouton Enreg. Pts. */
+body[data-mode-terrain='lever'] .cadre-role { box-shadow: 0 1px 3px rgba(16, 24, 20, 0.08), 0 4px 12px rgba(16, 24, 20, 0.08); }
+body[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre { box-shadow: 0 -4px 16px rgba(16, 24, 20, 0.12); }
+body[data-mode-terrain='lever'] .bouton-prendre:not(:disabled) { box-shadow: 0 3px 0 var(--ambre-fonce), 0 4px 10px rgba(16, 24, 20, 0.15); }
+
+/* 0.117.1 : roue des réglages et marche / arrêt le plus gros possible, sans agrandir le bandeau. */
+.entete-icone-bouton.bouton-reglages { width: 50px; height: 50px; margin: -4px -6px -4px 0; }
+.entete-icone-bouton.bouton-reglages svg { width: 44px; height: 44px; stroke-width: 1.7; }
+body.mode-telephone .entete-icone-bouton.bouton-reglages { width: 38px; height: 38px; margin: -4px -4px -4px 0; }
+body.mode-telephone .entete-icone-bouton.bouton-reglages svg { width: 34px; height: 34px; }
+.bouton-reglages .marche-arret { stroke-width: 2.2; }
+/* Le dessin peut déborder un peu de sa case sans être coupé. */
+.entete-icone-bouton.bouton-reglages svg { overflow: visible; }

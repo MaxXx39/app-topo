@@ -99,12 +99,13 @@ describe('cadastre', () => {
     const chercher = async () => ({ ok: true, status: 200, text: async () => '<FeatureType><Name>ms:Autre</Name></FeatureType>' });
     await expect(telechargerCadastre({ est: 2538000, nord: 1152000 }, 50, 'VD', () => {}, chercher)).rejects.toThrow(/ms:Autre/);
   });
-  it('listes Cadastre (cachées au départ) et points des Points Import', () => {
+  it('listes Cadastre (cachées au départ), rangées à part des Points Import (0.116.4)', () => {
     const a = { nom: 'CAD-1', est: 1, nord: 2 };
     const projet = { leves: [{ id: 'c', nom: 'Cadastre 1', cadastre: true, points: [a] }, { id: 'f', nom: 'f.csv', points: [{ nom: 'X' }] }], surfaces: [], dessins: [], metres: [], pointsControle: [], listesCachees: [] };
     expect(listesCadastre(projet)).toEqual(['c']);
     const points = pointsDesImports(projet, listesDePoints(projet));
-    expect(points.has(a)).toBe(true);
-    expect(points.size).toBe(2);
+    expect(points.has(a)).toBe(false);
+    expect(points.size).toBe(1);
+    expect(listesDePoints(projet).find((l) => l.id === 'c').section).toBe('cadastre');
   });
 });
