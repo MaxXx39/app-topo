@@ -1419,6 +1419,8 @@ export function creerEcranLeve(conteneur, actions) {
     const enGuidage = (autocontrole && Boolean(donnees.autocontrole.cible)) || (donnees.mode === 'controler'
       && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (['ligne', 'talus'].includes(implantation) && Boolean(donnees.implanter.ligne))));
     document.body.classList.toggle('vue-implantation', enGuidage);
+    // 0.123 : Implanter › Surface / Altitude : la règle de hauteur est fixée à droite, sur toute la hauteur sous le plan.
+    document.body.classList.toggle('regle-sous-plan', donnees.mode === 'controler' && !enGuidage && ['surface', 'altitude'].includes(implantation));
     // Barre d'accroche collée sous le plan (téléphone, voir style.css « avec-accroches »).
     const avecAccroches = donnees.mode === 'controler' && !enGuidage && ['point', 'ligne', 'talus'].includes(implantation);
     document.body.classList.toggle('avec-accroches', avecAccroches);

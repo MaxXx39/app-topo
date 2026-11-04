@@ -10371,3 +10371,28 @@ body.mode-telephone .ligne-nette .libelle-ecart, body.mode-telephone .ligne-nett
 body.mode-telephone .ligne-nette .ligne-ecart strong, body.mode-telephone .ligne-nette .bloc-hauteur strong { font-size: 18px; }
 body.mode-telephone .ligne-nette .libelle-ecart .icone-drapeau { width: 14px; height: 18px; }
 body.mode-telephone .ligne-nette .icone-fleche { width: 16px; height: 16px; }
+
+/* Implanter › Surface / Altitude (0.123.0, demande du 04.11) : règle fixe à droite, sur toute la hauteur
+   entre le plan et la barre du bas (elle suit la taille du plan réglée par ▲ / ▼, ne défile pas) ;
+   bandeau monter / descendre 25 % plus haut. */
+@media (max-width: 899px) {
+  body.regle-sous-plan[data-onglet='terrain'] .ecart-et-regle .colonne-regle {
+    position: fixed;
+    top: calc(var(--hauteur-entete) + var(--hauteur-plan-terrain) + 10px);
+    bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 10px);
+    right: 8px;
+    width: 40px;
+    z-index: 9;
+  }
+  body.regle-sous-plan[data-onglet='terrain'] .ecart-et-regle .regle-hauteur { border-radius: 8px; }
+  body.regle-sous-plan[data-onglet='terrain'] .panneau[data-onglet='terrain'] { margin-right: 52px; }
+  body.mode-telephone.regle-sous-plan[data-onglet='terrain'] .ecart-et-regle .colonne-regle { width: 32px; right: 6px; }
+  body.mode-telephone.regle-sous-plan[data-onglet='terrain'] .panneau[data-onglet='terrain'] { margin-right: 42px; }
+  body.regle-sous-plan .ecart-et-regle > .bouton-bip { right: 6px; }
+}
+body.regle-sous-plan .ecart-et-regle > .ecart-direct:not(.attente) { min-height: 75px; padding: 8px 14px; }
+body.regle-sous-plan .ecart-et-regle > .ecart-direct.attente { min-height: 72px; }
+body.regle-sous-plan .ecart-et-regle .ecart-direct .fleche-ecart { font-size: 2.75rem; }
+body.regle-sous-plan .ecart-et-regle .ecart-direct .valeur-ecart { font-size: 1.9rem; }
+body.regle-sous-plan .ecart-et-regle .ecart-direct .detail-ecart { font-size: 0.85rem; }
+body.mode-telephone.regle-sous-plan .ecart-et-regle .ecart-direct .valeur-ecart { font-size: 1.55rem; }
