@@ -58,7 +58,9 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           gh release delete apk-derniere-version --cleanup-tag --yes || true
-          gh release create apk-derniere-version Topo.apk \
+          # Même fichier en double : Topo.apk (lien fixe) et Topo-<version>.apk (la version se lit dans le nom).
+          cp Topo.apk "Topo-${VERSION}.apk"
+          gh release create apk-derniere-version Topo.apk "Topo-${VERSION}.apk" \
             --target "${{ github.sha }}" \
             --title "APK Android - dernière version (${VERSION}, n° ${{ github.run_number }}, ${{ github.ref_name }})" \
-            --notes "Appli Topo pour Android, version ${VERSION} (${{ github.run_number }}). Sur le téléphone : touchez Topo.apk pour le télécharger, puis ouvrez-le pour l'installer."
+            --notes "Appli Topo pour Android, version ${VERSION} (${{ github.run_number }}). Sur le téléphone : touchez Topo.apk (ou Topo-${VERSION}.apk, le même fichier) pour le télécharger, puis ouvrez-le pour l'installer."
