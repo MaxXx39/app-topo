@@ -565,7 +565,8 @@ const moduleExport = creerModuleExport(document.querySelector('#exporter-projet'
   exporterPaquet: async (options, dire) => {
     const resultat = await fabriquerPaquet(projet, options, {
       trianglesDe: (surface) => surfacesCalculees.get(surface.id)?.triangles ?? [],
-      pointsDe: (surface) => pointsDuLeve(surface.leveId),
+      // Une surface Swisstopo (ou importée) garde ses propres points ; sinon ceux de son levé.
+      pointsDe: (surface) => surface.points ?? pointsDuLeve(surface.leveId),
       dire,
     });
     if (resultat.erreur) {
