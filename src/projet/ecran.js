@@ -11,6 +11,7 @@ import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { titreProjet } from './projet.js';
 import { verrouActif } from '../partage/synchro.js';
+import { lireDossiers, regrouperParDossier, dossierDuProjet, SANS_DOSSIER } from './dossiers.js';
 
 /**
  * Crée l'écran Projet dans "conteneur". Les actions sont faites par main.js via "actions" :
@@ -26,6 +27,8 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
   let panneau = null;
   let menuOuvert = null;
   let derniers = null; // dernier projet et liste affichés (pour redessiner après un clic)
+  // Dossiers dépliés dans « Ouvrir projet » (0.125.0) ; au départ, celui du projet ouvert.
+  let dossiersOuverts = null;
   // Tri de la liste : 'date' (dernière modification, ici ou sur Drive) ou 'nom' (A → Z), retenu sur l'appareil.
   let triProjets = 'date';
   try {
@@ -40,8 +43,26 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
     const id = bouton.dataset.id;
     const action = bouton.dataset.action;
     if (action !== 'menu-projet') menuOuvert = null;
+    if (action === 'deplier-dossier') {
+      const cle = bouton.dataset.dossier ?? SANS_DOSSIER;
+      if (dossiersOuverts.has(cle)) dossiersOuverts.delete(cle);
+      else dossiersOuverts.add(cle);
+      if (derniers) dessiner(...derniers);
+      return;
+    }
+    if (['nouveau-dossier', 'renommer-dossier', 'supprimer-dossier'].includes(action)) {
+      actions.gererDossier(action, bouton.dataset.dossier);
+      return;
+    }
+    if (action === 'ranger-projet') {
+      menuOuvert = null;
+      actions.rangerProjet(id);
+      return;
+    }
     if (action === 'panneau') {
       panneau = panneau === bouton.dataset.panneau ? null : bouton.dataset.panneau;
+      // À chaque ouverture de la liste : seul le dossier du projet ouvert est déplié.
+      if (panneau === 'projets' && derniers) dossiersOuverts = new Set([dossierDuProjet(lireDossiers(), derniers[0].id)]);
       if (derniers) dessiner(...derniers);
       conteneur.closest('.panneau')?.scrollIntoView({ block: 'start' });
       window.scrollTo(0, 0);
@@ -110,7 +131,8 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
     const pageGestion = panneau === 'projets';
     conteneur.closest('.panneau')?.classList.toggle('page-gestion-projets', pageGestion);
     if (pageGestion) {
-      conteneur.innerHTML = pageProjets(projet, resumes, partage, menuOuvert, triProjets);
+      if (!dossiersOuverts) dossiersOuverts = new Set([dossierDuProjet(lireDossiers(), projet.id)]);
+      conteneur.innerHTML = pageProjets(projet, resumes, partage, menuOuvert, triProjets, dossiersOuverts);
       return;
     }
     conteneur.innerHTML = `
@@ -126,6 +148,7 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
           <span class="titre-projet-ouvert">${echapper(titreProjet(projet))}
             <button type="button" class="bouton-crayon-projet seulement-expert" data-action="renommerProjet" title="Renommer le projet" aria-label="Renommer le projet">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button></span>
+          ${ligneDossier(projet.id)}
         </div>
       </section>
     `;
@@ -172,8 +195,14 @@ export function projetsReunis(resumes, partage, tri = 'date') {
  * ⋮ : exporter, dupliquer, supprimer de cet appareil, supprimer partout (appareil et Drive).
  * Puis un fichier projet (.topo.json).
  */
-function pageProjets(projet, resumes, partage, menuOuvert, tri) {
+function pageProjets(projet, resumes, partage, menuOuvert, tri, ouverts) {
   const projets = projetsReunis(resumes, partage, tri);
+  const dossiers = lireDossiers();
+  const groupes = regrouperParDossier(projets, dossiers);
+  // Aucun dossier encore : la liste comme avant (pas de « Sans dossier » tout seul).
+  const liste = dossiers.liste.length === 0
+    ? projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert === p.id, partage)).join('')
+    : groupes.map((g) => blocDossier(g, ouverts.has(g.id), projet, menuOuvert, partage)).join('');
   return `<div class="entete-page-projets">
     <button type="button" class="bouton-retour" data-action="panneau" data-panneau="projets" title="Retour au projet ouvert" aria-label="Retour au projet ouvert">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
@@ -181,20 +210,49 @@ function pageProjets(projet, resumes, partage, menuOuvert, tri) {
     ${partage?.etat.connecte ? '<button type="button" class="bouton-retour" data-action="rafraichirDrive" title="Actualiser la liste de Google Drive" aria-label="Actualiser">↻</button>' : ''}
   </div>
   <section class="carte-section panneau-projets">
-    <button type="button" class="bouton-secondaire bouton-nouveau-page seulement-intermediaire" data-action="nouveau">+ Nouveau projet</button>
+    <div class="actions-page-projets">
+      <button type="button" class="bouton-secondaire bouton-nouveau-page seulement-intermediaire" data-action="nouveau">+ Nouveau projet</button>
+      <button type="button" class="bouton-secondaire seulement-expert" data-action="nouveau-dossier">+ Nouveau dossier</button>
+    </div>
     <div class="tri-projets" role="group" aria-label="Trier">
       <span class="aide">Trier :</span>
       <button type="button" class="puce-choix ${tri === 'date' ? 'actif' : ''}" data-action="trier" data-tri="date">Récents</button>
       <button type="button" class="puce-choix ${tri === 'nom' ? 'actif' : ''}" data-action="trier" data-tri="nom">A → Z</button>
     </div>
-    <div class="liste-projets">
-      ${projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert === p.id, partage)).join('')}
-    </div>
+    <div class="liste-projets">${liste}</div>
     <label class="bouton-secondaire bouton-fichier seulement-expert">
       Ouvrir un fichier projet (.topo.json)
       <input type="file" data-champ="fichier-projet" accept=".json,application/json" hidden />
     </label>
   </section>`;
+}
+
+/** Un dossier repliable (0.125.0) : nom, nombre de projets ; dedans ses projets ; renommer / supprimer en Expert. */
+function blocDossier(groupe, ouvert, projet, menuOuvert, partage) {
+  const icone = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z" /></svg>';
+  const vrai = groupe.id !== SANS_DOSSIER;
+  return `<div class="dossier-projets ${ouvert ? 'ouvert' : ''} ${vrai ? '' : 'sans-dossier'}">
+    <button type="button" class="titre-dossier" data-action="deplier-dossier" data-dossier="${echapper(groupe.id)}" aria-expanded="${ouvert}">
+      <span class="fleche-dossier">${ouvert ? '▾' : '▸'}</span>${icone}<strong>${echapper(groupe.nom)}</strong><span class="nombre-dossier">${groupe.projets.length}</span>
+    </button>
+    ${ouvert ? `<div class="contenu-dossier">
+      ${vrai ? `<div class="outils-dossier seulement-expert">
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="renommer-dossier" data-dossier="${echapper(groupe.id)}">renommer</button>
+        <button type="button" class="bouton-lien" data-action="supprimer-dossier" data-dossier="${echapper(groupe.id)}">supprimer</button>
+      </div>` : ''}
+      ${groupe.projets.length > 0 ? groupe.projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert === p.id, partage)).join('') : '<p class="aide vide-dossier">Aucun projet</p>'}
+    </div>` : ''}
+  </div>`;
+}
+
+/** Carte du projet ouvert (0.125.0) : son dossier ; « changer » en Expert (s'il y a des dossiers). */
+function ligneDossier(projetId) {
+  const dossiers = lireDossiers();
+  if (dossiers.liste.length === 0) return '<button type="button" class="dossier-projet-ouvert seulement-expert" data-action="ranger-projet" data-id="' + echapper(projetId) + '">📁 ranger dans un dossier</button>';
+  const id = dossierDuProjet(dossiers, projetId);
+  const nom = dossiers.liste.find((d) => d.id === id)?.nom ?? 'Sans dossier';
+  return `<span class="dossier-projet-ouvert">📁 ${echapper(nom)}
+    <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="ranger-projet" data-id="${echapper(projetId)}">changer</button></span>`;
 }
 
 /** Une ligne : on la touche pour ouvrir le projet ; ⋮ ouvre le menu. */
@@ -217,6 +275,7 @@ function ligneProjet(p, estOuvert, menu, partage) {
     </button>
     <button type="button" class="bouton-menu-projet" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
     ${menu ? `<div class="menu-projet">
+      <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="ranger-projet" data-id="${p.id}">ranger dans un dossier</button>
       ${p.local ? `<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="exporter" data-id="${p.id}">exporter (.topo.json)</button>
         <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="dupliquer" data-id="${p.id}">dupliquer</button>
         <button type="button" class="bouton-lien seulement-expert" data-action="supprimer-projet" data-id="${p.id}">supprimer de cet appareil</button>` : ''}

@@ -10470,3 +10470,32 @@ body.sur-site .fenetre-choix p { white-space: pre-line; }
 body.sur-site .onglets button[data-mode-terrain] span, body.sur-site .onglets button.onglet-calculs span, body.sur-site .onglets button.onglet-projets span { font-size: 0.74rem; white-space: nowrap; }
 body.sur-site .onglets button[data-mode-terrain] { padding: 0 2px; }
 body.sur-site .onglets button[data-mode-terrain] svg { width: 16px; height: 16px; }
+
+/* Dossiers de projets (0.125.0) : « Ouvrir projet » en dossiers repliables ; dossier du projet ouvert. */
+.actions-page-projets { display: flex; flex-wrap: wrap; gap: 8px; }
+.dossier-projets { border-radius: 10px; margin-top: 6px; background: color-mix(in srgb, var(--ambre) 7%, var(--surface)); }
+.dossier-projets.sans-dossier { background: var(--fond); }
+.dossier-projets .titre-dossier {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: var(--encre);
+  font: inherit;
+  font-size: 1rem;
+  text-align: left;
+  cursor: pointer;
+}
+.dossier-projets .titre-dossier svg { width: 22px; height: 22px; flex: none; fill: color-mix(in srgb, var(--ambre) 35%, transparent); stroke: var(--ambre); stroke-width: 2; stroke-linejoin: round; }
+.dossier-projets .fleche-dossier { width: 14px; color: var(--gris); }
+.dossier-projets .nombre-dossier { margin-left: auto; min-width: 26px; padding: 1px 8px; border-radius: 999px; background: var(--sombre); color: #ffffff; font-size: 0.8rem; font-weight: 700; text-align: center; }
+.dossier-projets .contenu-dossier { padding: 0 8px 8px; }
+.dossier-projets .outils-dossier { display: flex; gap: 14px; justify-content: flex-end; padding: 0 4px 4px; }
+.dossier-projets .vide-dossier { margin: 4px 8px; }
+.dossier-projet-ouvert { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: 0.9rem; font-weight: 600; color: var(--encre); }
+button.dossier-projet-ouvert { border: none; background: none; padding: 0; font: inherit; font-size: 0.9rem; text-decoration: underline; cursor: pointer; }
+.fenetre-champs select { width: 100%; min-height: 40px; margin-top: 4px; font: inherit; }

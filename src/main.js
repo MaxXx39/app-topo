@@ -60,6 +60,8 @@ import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
+import { surChangementListes } from './reglages/listes-partagees.js';
+import { lireDossiers, ecrireDossiers, dossiersTries, dossierDuProjet, ajouterDossier, renommerDossier, supprimerDossier, rangerProjet, SANS_DOSSIER } from './projet/dossiers.js';
 import { imageAvecDessins, ouvrirEditeurDessin, photosAvecDessins } from './photos/annotation.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
@@ -4401,18 +4403,48 @@ if (recepteurDisponible()) {
  * Nouveau projet (0.74.0) : une fenêtre (affaire, désignation) ; le projet n'est créé qu'avec
  * « OK » (fenêtre fermée : rien ne change). On reste sur l'onglet Projet. Renvoie vrai si créé.
  */
+const NOUVEAU_DOSSIER = '+nouveau';
+
+/** Choix d'un dossier pour une liste (0.125.0) : les dossiers, « Sans dossier », et en Expert « + Nouveau dossier… ». */
+function choixDeDossiers() {
+  return [
+    ...dossiersTries(lireDossiers()).map((d) => [d.id, d.nom]),
+    [SANS_DOSSIER, 'Sans dossier'],
+    ...(aAcces('expert') ? [[NOUVEAU_DOSSIER, '+ Nouveau dossier…']] : []),
+  ];
+}
+
+/** Demande le nom d'un nouveau dossier et le crée ; renvoie son id, ou null. */
+async function creerDossierDemande() {
+  const nom = await demanderTexte({ titre: 'Nouveau dossier', texte: 'Nom du dossier (ex. Maxime)', valeur: '' });
+  if (nom == null) return null;
+  const resultat = ajouterDossier(lireDossiers(), nom);
+  if (resultat.erreur) {
+    afficherMessage(resultat.erreur, 4000);
+    return null;
+  }
+  ecrireDossiers(resultat.dossiers);
+  return resultat.id;
+}
+
 async function creerNouveauProjet() {
+  // Dossier proposé : celui du projet ouvert juste avant (0.125.0).
+  const avecDossiers = lireDossiers().liste.length > 0 || aAcces('expert');
   const valeurs = await demanderChamps({
     titre: 'Nouveau projet',
     champs: [
       { cle: 'affaire', titre: 'Affaire', exemple: 'ex. 10 203' },
       { cle: 'lieu', titre: 'Désignation', exemple: 'ex. Gland, plateforme Migros' },
+      ...(avecDossiers ? [{ cle: 'dossier', titre: 'Dossier', choix: choixDeDossiers(), valeur: dossierDuProjet(lireDossiers(), projet.id) }] : []),
     ],
   });
   if (!valeurs) return false;
   const nouveau = nouveauProjetSansNom();
   nouveau.cartouche.affaire = valeurs.affaire;
   nouveau.cartouche.lieu = valeurs.lieu;
+  let dossier = valeurs.dossier ?? SANS_DOSSIER;
+  if (dossier === NOUVEAU_DOSSIER) dossier = (await creerDossierDemande()) ?? SANS_DOSSIER;
+  if (dossier) ecrireDossiers(rangerProjet(lireDossiers(), nouveau.id, dossier));
   await changerDeProjet(() => ouvrir(nouveau, { changerOnglet: false }));
   afficherOnglet('projets');
   afficherMessage(`Projet « ${titreProjet(nouveau)} » créé`);
@@ -4429,6 +4461,51 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
     modifie();
   },
   // Crayon à côté du projet ouvert (0.84.0) : affaire et désignation dans une fenêtre, comme au « Nouveau projet ».
+  // Dossiers de projets (0.125.0, Expert) : ranger un projet, créer / renommer / supprimer un dossier.
+  rangerProjet: async (id) => {
+    if (!aAcces('expert')) return;
+    const actuel = dossierDuProjet(lireDossiers(), id);
+    const choix = await demanderChoix({
+      titre: 'Ranger dans le dossier',
+      boutons: [
+        ...choixDeDossiers().map(([cle, texte]) => ({ cle: cle || 'sans', texte: `${texte}${cle === actuel && cle !== NOUVEAU_DOSSIER ? ' ✓' : ''}`, principal: cle === actuel })),
+        { cle: 'fermer', texte: 'Fermer' },
+      ],
+    });
+    if (!choix || choix === 'fermer') return;
+    let dossier = choix === 'sans' ? SANS_DOSSIER : choix;
+    if (dossier === NOUVEAU_DOSSIER) {
+      dossier = await creerDossierDemande();
+      if (dossier == null) return;
+    }
+    ecrireDossiers(rangerProjet(lireDossiers(), id, dossier));
+    afficherEcranProjet();
+  },
+  gererDossier: async (action, dossierId) => {
+    if (!aAcces('expert')) return;
+    const dossiers = lireDossiers();
+    if (action === 'nouveau-dossier') await creerDossierDemande();
+    else if (action === 'renommer-dossier') {
+      const actuel = dossiers.liste.find((d) => d.id === dossierId);
+      if (!actuel) return;
+      const nom = await demanderTexte({ titre: 'Renommer le dossier', valeur: actuel.nom });
+      if (nom == null) return;
+      const resultat = renommerDossier(dossiers, dossierId, nom);
+      if (resultat.erreur) afficherMessage(resultat.erreur, 4000);
+      else ecrireDossiers(resultat.dossiers);
+    } else if (action === 'supprimer-dossier') {
+      const existants = [...resumes.map((r) => r.id), ...(partage?.etat.projetsDrive ?? []).map((p) => p.projetId)];
+      const resultat = supprimerDossier(dossiers, dossierId, existants);
+      if (resultat.erreur) {
+        afficherMessage(resultat.erreur, 5000);
+        return;
+      }
+      const nom = dossiers.liste.find((d) => d.id === dossierId)?.nom ?? '';
+      if (!confirm(`Supprimer le dossier « ${nom} » ?`)) return;
+      ecrireDossiers(resultat.dossiers);
+    }
+    afficherEcranProjet();
+  },
   modifierProjet: async () => {
     if (refuserEnLectureSeule()) return;
     const valeurs = await demanderChamps({
@@ -4513,6 +4590,9 @@ async function supprimerDeLAppareil(id) {
 }
 
 /** Onglet Projet, avec l'état du partage par Drive. */
+// Dossiers de projets (0.125.0) : un autre appareil a changé le classement (listes partagées reçues de Drive).
+surChangementListes(() => afficherEcranProjet());
+
 function afficherEcranProjet() {
   ecranProjet.afficher(projet, resumes, partage ? { etat: partage.etat, appareil: partage.appareil() } : null);
 }

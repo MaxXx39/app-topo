@@ -96,12 +96,15 @@ export function demanderChamps({ titre, champs }) {
         <h2>${echapper(titre)}</h2>
         <button type="button" class="bouton-retour" data-cle="fermer" title="Fermer" aria-label="Fermer">✕</button>
       </div>
-      ${champs.map((c) => `<label>${echapper(c.titre)}<input type="text" data-champ="${echapper(c.cle)}" value="${echapper(c.valeur ?? '')}" placeholder="${echapper(c.exemple ?? '')}" /></label>`).join('')}
+      ${champs.map((c) => (c.choix
+        // Liste à choix (0.125.0, ex. le dossier d'un nouveau projet) : choix = [[valeur, texte], ...].
+        ? `<label>${echapper(c.titre)}<select data-champ="${echapper(c.cle)}">${c.choix.map(([v, t]) => `<option value="${echapper(v)}" ${v === (c.valeur ?? '') ? 'selected' : ''}>${echapper(t)}</option>`).join('')}</select></label>`
+        : `<label>${echapper(c.titre)}<input type="text" data-champ="${echapper(c.cle)}" value="${echapper(c.valeur ?? '')}" placeholder="${echapper(c.exemple ?? '')}" /></label>`)).join('')}
       <div class="boutons-choix">
         <button type="button" class="bouton" data-cle="ok"><strong>OK</strong></button>
       </div>`;
     const finir = (cle) => {
-      const valeurs = Object.fromEntries([...fenetre.querySelectorAll('input[data-champ]')].map((champ) => [champ.dataset.champ, champ.value.trim()]));
+      const valeurs = Object.fromEntries([...fenetre.querySelectorAll('input[data-champ], select[data-champ]')].map((champ) => [champ.dataset.champ, champ.value.trim()]));
       fenetre.close();
       resoudre(cle === 'ok' ? valeurs : null);
     };
