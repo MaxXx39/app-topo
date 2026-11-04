@@ -21,13 +21,34 @@ import { creerSynchro, choisirVersion, verrouActif, SIGNE_DE_VIE } from './synch
 import { creerConnexion, connexionPossible } from './connexion.js';
 import { appareil, nommerAppareil, etaitConnecte, retenirConnexion, memoireProjet, retenirProjet } from './memoire.js';
 import { estDansAppliAndroid } from '../android/pont.js';
+import { lireJournal, jourLocal } from '../recap/journal.js';
+import { ongletsDuRecap } from '../recap/recap.js';
+import { creerXlsx } from '../recap/xlsx.js';
 import { lireListesPartagees, ecrireListesPartagees, surChangementListes, versionAGarder } from '../reglages/listes-partagees.js';
 
 const DELAI_ENVOI = 30_000; // après une modification (ms)
 const DELAI_NOUVEL_ESSAI = 60_000; // après un échec (pas de réseau…)
 const VERIFICATION = 30_000; // le verrou du projet ouvert est relu toutes les 30 s
 const LISTES = 10 * 60_000; // listes partagées (adresses, swipos) relues toutes les 10 minutes
+const JOURNAL_RECAP = 30 * 60_000; // journal de l'appareil envoyé sur Drive 30 min au plus souvent
+const CLE_RECAP = 'topo-recap-fait'; // jour du dernier recap Excel écrit par cet appareil
 const NOUVELLE_CONNEXION = 60_000; // APK : connexion ratée faute de réseau, nouvel essai dans 1 minute
+
+/** Petite mémoire de l'appareil (localStorage), sans jamais planter. */
+function lireMemoire(cle) {
+  try {
+    return localStorage.getItem(cle);
+  } catch {
+    return null;
+  }
+}
+function ecrireMemoire(cle, valeur) {
+  try {
+    localStorage.setItem(cle, valeur);
+  } catch {
+    // mémoire indisponible : le recap sera simplement refait
+  }
+}
 
 /** Vrai si l'erreur vient du réseau (pas d'un refus de Google ni d'une fenêtre annulée). */
 export const erreurDeReseau = (erreur) => /injoignable|ne répond pas|réseau|network|code 7\b/i.test(erreur?.message ?? '');
@@ -108,6 +129,9 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
   // Listes partagées (0.79.0) : relues à la connexion et toutes les 10 minutes ; une modification
   // faite ici part tout de suite sur Drive.
   setInterval(() => synchroniserListes().catch(() => {}), LISTES);
+  // Recap (0.119.0) : journal de cet appareil envoyé toutes les 30 min au plus, recap Excel refait
+  // une fois par jour (le premier appareil connecté du jour s'en charge).
+  setInterval(() => mettreAJourRecap(), LISTES);
   surChangementListes((listes, { depuisDrive }) => {
     if (!depuisDrive && etat.connecte && synchro) synchro.ecrireListes(listes).catch(() => {});
   });
@@ -260,6 +284,37 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     return connexionEnCours;
   }
 
+  /**
+   * Recap des contrôles (0.119.0, voir recap/) : envoie le journal de cet appareil sur Drive (30 min
+   * au plus souvent), puis, une fois par jour (ou "forcer"), relit les journaux de tous les appareils
+   * et réécrit « App Topo › Recap › Recap App Topo.xlsx ». Renvoie { fait } ou { erreur }, sans
+   * jamais lancer d'erreur (le travail continue sans recap).
+   */
+  let recapEnCours = null;
+  let dernierJournal = 0;
+  function mettreAJourRecap({ forcer = false } = {}) {
+    if (!etat.connecte || !synchro) return Promise.resolve({ erreur: 'Drive n\'est pas connecté' });
+    if (recapEnCours) return recapEnCours;
+    const travail = async () => {
+      const jour = jourLocal(new Date());
+      const aRefaire = forcer || lireMemoire(CLE_RECAP) !== jour;
+      if (!aRefaire && Date.now() - dernierJournal < JOURNAL_RECAP) return {};
+      await synchro.ecrireJournal(lireJournal(appareil()));
+      dernierJournal = Date.now();
+      if (!aRefaire) return {};
+      const journaux = await synchro.lireJournaux();
+      await synchro.ecrireRecap(creerXlsx(ongletsDuRecap(journaux)));
+      ecrireMemoire(CLE_RECAP, jour);
+      return { fait: true };
+    };
+    recapEnCours = travail()
+      .catch((erreur) => ({ erreur: erreur.message ?? String(erreur) }))
+      .finally(() => {
+        recapEnCours = null;
+      });
+    return recapEnCours;
+  }
+
   async function connecterUneFois() {
     if (!appareil().nom) {
       changer('erreur', 'donne d\'abord un nom à cet appareil');
@@ -276,6 +331,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       await rafraichirListe();
       changer('a-jour');
       synchroniserListes().catch(() => {});
+      mettreAJourRecap();
       // Choix du projet pas encore fait (fenêtre de démarrage) : rien n'est comparé ni pris pour l'instant.
       if (!choixEnAttente) await apresOuverture();
     } catch (erreur) {
@@ -358,6 +414,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
         }
         retenirProjet(projet.id, resultat.memoire);
         etat.derniereSynchro = new Date();
+        mettreAJourRecap();
         // Premier envoi de ce projet : il apparaît maintenant sur Drive (☁ dans la liste).
         if (!etat.projetsDrive.some((p) => p.projetId === projet.id)) await rafraichirListe().catch(() => {});
         changer('a-jour');
@@ -560,6 +617,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       quandChange();
     },
     appareil,
+    mettreAJourRecap,
 
     /** Au démarrage de l'appli : se reconnecte si on l'était (dans l'APK, sans rien demander). */
     demarrer({ choixEnAttente: attente = false } = {}) {

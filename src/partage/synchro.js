@@ -23,6 +23,10 @@ import { projetVersFichiers, fichiersVersProjet, comprimer, decomprimer, emprein
 
 export const NOM_RACINE = 'App Topo';
 export const NOM_PROJETS = 'Configuration Projet';
+// Recap (0.119.0) : journaux des appareils et fichier Excel de la semaine.
+export const NOM_RECAP = 'Recap';
+export const NOM_FICHIER_RECAP = 'Recap App Topo.xlsx';
+const TYPE_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 // Signe de vie de l'appareil qui a le projet (ms), et durée après laquelle son verrou expire.
 export const SIGNE_DE_VIE = 5 * 60 * 1000;
 export const VERROU_EXPIRE = 15 * 60 * 1000;
@@ -116,7 +120,59 @@ export function creerSynchro(drive, appareil) {
     return { verrouPar: appareil.id, verrouNom: court(appareil.nom), verrouDepuis: maintenant, verrouVu: maintenant };
   };
 
+  // Recap (0.119.0) : dossier « App Topo › Recap » (créé au premier besoin).
+  let recapId = null;
+  async function dossierRecap() {
+    if (recapId) return recapId;
+    await racine();
+    const trouves = await drive.lister(`'${appTopoId}' in parents and mimeType = '${TYPE_DOSSIER}' and appProperties has { key='topo' and value='recap' }`);
+    recapId = trouves[0]?.id ?? (await drive.creerDossier(NOM_RECAP, appTopoId, { topo: 'recap' })).id;
+    return recapId;
+  }
+
   return {
+    /**
+     * Recap (0.119.0) : écrit le journal de cet appareil (voir recap/journal.js) dans « App Topo ›
+     * Recap » (un fichier par appareil, créé au premier envoi).
+     */
+    async ecrireJournal(journal) {
+      const dossier = await dossierRecap();
+      const trouves = await drive.lister(`'${dossier}' in parents and appProperties has { key='journal' and value='${appareil.id}' }`);
+      const blob = new Blob([await comprimer(journal)], { type: 'application/gzip' });
+      if (trouves[0]) await drive.ecrireContenu(trouves[0].id, blob);
+      else {
+        const cree = await drive.creerFichier(`journal-${appareil.id}.json.gz`, dossier, blob);
+        await drive.modifier(cree.id, { proprietes: { topo: 'journal', journal: appareil.id, nom: court(appareil.nom) } });
+      }
+    },
+
+    /** Recap : journaux de tous les appareils (un journal illisible est sauté). */
+    async lireJournaux() {
+      const dossier = await dossierRecap();
+      const fichiers = await drive.lister(`'${dossier}' in parents and appProperties has { key='topo' and value='journal' }`);
+      const journaux = [];
+      for (const fichier of fichiers) {
+        try {
+          journaux.push(await decomprimer(await drive.lire(fichier.id)));
+        } catch {
+          // fichier abîmé : le recap se fait sans lui
+        }
+      }
+      return journaux;
+    },
+
+    /** Recap : écrit le fichier Excel (octets) « Recap App Topo.xlsx » dans « App Topo › Recap ». */
+    async ecrireRecap(octets) {
+      const dossier = await dossierRecap();
+      const blob = new Blob([octets], { type: TYPE_XLSX });
+      const trouves = await drive.lister(`'${dossier}' in parents and appProperties has { key='topo' and value='recap-xlsx' }`);
+      if (trouves[0]) await drive.ecrireContenu(trouves[0].id, blob);
+      else {
+        const cree = await drive.creerFichier(NOM_FICHIER_RECAP, dossier, blob);
+        await drive.modifier(cree.id, { proprietes: { topo: 'recap-xlsx' } });
+      }
+    },
+
     /** Projets sur Drive : [{ dossierId, projetId, titre, modifieLe, envoyePar, verrou: { appareilId, nom, depuis } ou null }]. */
     async listerProjets() {
       const parent = await racine();

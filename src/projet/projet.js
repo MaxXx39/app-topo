@@ -34,6 +34,7 @@
 //              'points'), ferme (type 'dessin' : « Fermer la figure »), sommets: [{ est, nord, altitude }],
 //              hauteur: { mode ('fixe', 'sommets'), altitude, pente: { pourcent, cote, depuis } ou null } }],
 //                                   // Calculs › Dessin (voir topo/dessin.js)
+//   archives: [{ id, type, nom, archiveLe, contenu }],  // éléments archivés (voir projet/archives.js)
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé. De même pour une mesure.
@@ -63,6 +64,7 @@ export function creerProjet(nom = '') {
     mesures: [],
     cartouche: { affaire: '', lieu: '', dessinePar: '', date: '' },
     plansDxf: [],
+    archives: [],                   // éléments archivés (0.119.0, voir projet/archives.js)
     aImplanter: [],
     talus: [],
     implantations: [],
@@ -168,6 +170,7 @@ export function completerProjet(projet) {
   const complet = { ...vide, ...projet, version: VERSION, cartouche: { ...vide.cartouche, ...projet.cartouche } };
   complet.leves ??= [];
   complet.plansDxf ??= [];
+  complet.archives ??= []; // éléments archivés (0.119.0)
   complet.aImplanter ??= [];
   complet.talus ??= [];
   complet.implantations ??= [];

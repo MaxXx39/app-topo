@@ -53,6 +53,9 @@ import {
 import * as stockage from './projet/stockage.js';
 import { creerPartage } from './partage/partage.js';
 import * as historique from './projet/historique.js';
+import { archiver, restaurer, supprimerArchive } from './projet/archives.js';
+import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/journal.js';
+import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
@@ -95,6 +98,7 @@ import { genererCsvReseaux, genererDxfReseaux, ecrireLandXMLReseaux, pdfReseaux 
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
+import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
@@ -244,11 +248,23 @@ const MODES_TERRAIN = [
 ];
 // Sur le site (0.96.0, demande du 29.10.2026) : Lever seulement, pour modifier les levés (lignes,
 // contours, triangles en trop, suites de points, photos) ; pas de prise de point sans récepteur.
-const ONGLETS = [
-  ...(recepteurDisponible() ? MODES_TERRAIN : MODES_TERRAIN.filter((m) => m.cle === 'lever')).map((m) => ({ ...m, nom: 'terrain', mode: m.cle })),
-  { nom: 'calculs', titre: 'Calculs' },
-  { nom: 'plan', titre: 'Plan' },
-];
+// 0.120.0 : sur le site, 3 pages bien marquées « Projet | Édition Lever | Calculs » (le plan reste à droite) ;
+// « Lever » y devient « Édition Lever » (plus de récepteur : on édite les levés).
+const ONGLETS = recepteurDisponible()
+  ? [
+      ...MODES_TERRAIN.map((m) => ({ ...m, nom: 'terrain', mode: m.cle })),
+      { nom: 'calculs', titre: 'Calculs' },
+      { nom: 'plan', titre: 'Plan' },
+    ]
+  : [
+      { nom: 'projets', titre: 'Projet' },
+      ...MODES_TERRAIN.filter((m) => m.cle === 'lever').map((m) => ({ ...m, nom: 'terrain', mode: m.cle, titre: 'Édition Lever' })),
+      { nom: 'calculs', titre: 'Calculs' },
+      { nom: 'plan', titre: 'Plan' },
+    ];
+if (!recepteurDisponible()) document.body.classList.add('sur-site');
+// Ajout manuel d'un point en touchant le plan (voir plus bas « Édition Lever sur le site ») ; déclaré ici car afficherOnglet le lit.
+const ajoutLevee = { actif: false, accroche: 'point', choix: null };
 // Les parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Volumes, Mesures /
 // métrés, Dessin. Plus de « Surfaces » (0.77.0, demande du 27.10.2026) : tout se fait dans
 // Terrain › Lever ; son panneau reste caché (l'éditeur garde le levé affiché et les triangles en trop).
@@ -276,6 +292,7 @@ document.querySelector('#app').innerHTML = `
   <div class="mise-en-page">
     <div class="colonne-gauche">
       <section class="panneau panneau-projet" data-onglet="projets">
+        <h2 class="titre-page seulement-site">Projet</h2>
         <div id="projets"></div>
         <div class="onglets-projet" role="group" aria-label="Import et export">
           <button type="button" class="onglet-projet seulement-expert" data-onglet-projet="import" aria-pressed="false">
@@ -289,6 +306,7 @@ document.querySelector('#app').innerHTML = `
         <div id="projets-suite"></div>
       </section>
       <section class="panneau" data-onglet="terrain">
+        <h2 class="titre-page seulement-site">Édition Lever</h2>
         <div id="leve-direct"></div>
       </section>
       <nav class="parties-calculs" aria-label="Calculs">
@@ -341,6 +359,8 @@ function afficherOnglet(demande) {
   const nom = demande === 'calculs' ? partieCalculs : demande;
   // Drive : on travaille sur le projet de départ (fenêtre de démarrage) : il est comparé à Drive.
   if (nom !== 'projets') partage?.choixFait();
+  // Ajout manuel (0.120.0) : on le quitte en changeant de page (le plan en fait partie).
+  if (ajoutLevee.actif && nom !== 'terrain' && nom !== 'plan') arreterAjout();
   if (estPartieCalculs(nom)) partieCalculs = nom;
   for (const panneau of document.querySelectorAll('.panneau[data-onglet]')) {
     panneau.classList.toggle('actif', panneau.dataset.onglet === nom);
@@ -429,6 +449,12 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
             reprendreLaMain: () => partage.prendreLaMain(),
             rendreLaMain: () => partage.rendreLaMain('rendue à la main'),
             reprendreApresRendu: () => partage.reprendreApresRendu(),
+            // Recap des contrôles (0.119.0, Expert) : refait tout de suite (sinon une fois par jour).
+            mettreAJourRecap: async () => {
+              afficherMessage('Recap des contrôles : mise à jour…', null);
+              const { erreur } = await partage.mettreAJourRecap({ forcer: true });
+              afficherMessage(erreur ? `Recap impossible : ${erreur}` : 'Recap mis à jour : Drive › App Topo › Recap › Recap App Topo.xlsx', 6000);
+            },
             nommerAppareil: (nom) => {
               partage.nommerAppareil(nom);
               fenetreReglages?.rafraichir();
@@ -695,6 +721,40 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     modifie();
   },
   voirPhoto: (id) => montrerPhoto(id),
+  // Archives (0.119.0, Expert) : l'élément quitte le projet actif, restaurable dans « Archivés ».
+  archiver: (type, id) => {
+    const { archive, erreur } = archiver(projet, type, id);
+    if (erreur) {
+      afficherMessage(`Impossible d'archiver : ${erreur}`, 4000);
+      return;
+    }
+    // Levé en cours ou dessin en cours archivé : on ne le suit plus.
+    if (leveDirect.stockId && !stockEnCours()) {
+      leveDirect.stockId = null;
+      reprendreLeveDirect();
+    }
+    if (pilote && !(projet.dessins ?? []).some((d) => d.id === pilote.dessinId)) pilote = null;
+    editeurSurfaces.charger(projet.surfaces);
+    dernierPlan = null;
+    afficherMessage(`« ${archive.nom} » archivé (Contenu du projet › Archivés)`, 3500);
+    modifie({ recadrer: true });
+  },
+  restaurerArchive: (id) => {
+    const { nom, erreur } = restaurer(projet, id);
+    if (erreur) {
+      afficherMessage(`Impossible de restaurer : ${erreur}`, 4000);
+      return;
+    }
+    editeurSurfaces.charger(projet.surfaces);
+    afficherMessage(`« ${nom} » restauré`, 3000);
+    modifie({ recadrer: true });
+  },
+  supprimerArchive: (id) => {
+    const archive = (projet.archives ?? []).find((a) => a.id === id);
+    if (!archive || !confirm(`Supprimer pour de bon « ${archive.nom} » des archives ?\n\nLa suppression est définitive.`)) return;
+    supprimerArchive(projet, id);
+    modifie();
+  },
   supprimerSurfaceProjet: (id) => {
     const surface = projet.surfaces.find((s) => s.id === id);
     if (!surface || !confirm(`Supprimer la surface « ${surface.nom} » ?`)) return;
@@ -931,6 +991,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       },
       choisirRole: (role) => {
         leveDirect.role = role;
+        if (ajoutLevee.actif) dessinerBarreAjout();
         recalculer();
       },
       // Recollement : nouvelle conduite, depuis l'ouvrage choisi (id) ou de nulle part ('').
@@ -1014,6 +1075,8 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         stock.trianglesSupprimes = [];
         modifie();
       },
+      commencerAjout,
+      arreterAjout,
       prendrePoint: (nom, attributs = {}) => {
         if (refuserEnLectureSeule()) return;
         const leve = leveEnCours();
@@ -1395,6 +1458,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         const ecarts = ecartsImplantation(cible, mesure);
         const le = new Date().toISOString();
         projet.implantations.push({ id: nouvelIdentifiant(), nom: cible.nom, aImplanterId: cible.id, cible: { est: cible.est, nord: cible.nord, altitude: cible.altitude }, mesure, ecarts, le });
+        noterJournal({ type: 'implantation', controleRecent: controleRecentIci() });
         vibrer(60);
         sonValidation();
         const hauteur = ecarts.dAltitude != null ? ` · dH ${formaterNombre(ecarts.dAltitude)} m` : '';
@@ -1535,8 +1599,8 @@ function nomProposeImplantation() {
  */
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
-  const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || Boolean(recalage.planId);
-  const enLigne = accrocheActive && !pointage.actif && enImplantationDeLigne();
+  const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId);
+  const enLigne = accrocheActive && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
   // Bouton « Seul » en Implanter (0.90.1) : ni levés libres, ni points de contrôle, ni dessins, ni « À implanter ».
@@ -1573,8 +1637,8 @@ function envoyerImplantationAuPlan() {
         pointsControle,
         lignesAutres,
         reseaux,
-        choix: recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : accrocheActive && !enLigne && !enAutocontrole() ? implanter.choix : null,
-        cible: cibleControle ?? (accrocheActive && !enLigne && !enAutocontrole() ? implanter.cible : null),
+        choix: recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : accrocheActive && !enLigne && !enAutocontrole() ? implanter.choix : null,
+        cible: cibleControle ?? (accrocheActive && !enLigne && !enAutocontrole() && !ajoutLevee.actif ? implanter.cible : null),
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : [],
@@ -2460,6 +2524,21 @@ function nomDeLAppareil() {
 }
 
 /**
+ * Journal de l'appareil (0.119.0, recap des contrôles, voir recap/journal.js) : note ce qui vient
+ * d'être fait dans le projet ouvert (ouverture, point levé, implantation, contrôle).
+ */
+function noterJournal(evenement) {
+  const journal = lireJournal(appareilDuJournal());
+  noter(journal, { id: projet.id, nom: titreProjet(projet) }, evenement);
+  ecrireJournal(journal);
+}
+
+/** Vrai si cet appareil a fait un contrôle de ce projet aujourd'hui, dans la durée du projet. */
+function controleRecentIci() {
+  return aUnControleRecent(projet.controles, nomDeLAppareil(), new Date(), delaiControleMs(projet));
+}
+
+/**
  * « Enregistrer le contrôle » : position vérifiée par l'appli Android (RTK fixe, inclinaison prête),
  * écarts avec le point connu, couleur selon les tolérances du projet ; puis retour à la liste.
  */
@@ -2489,6 +2568,7 @@ function enregistrerControle() {
     remarque: '',
     le: new Date().toISOString(),
   });
+  noterJournal({ type: 'controle', controle: projet.controles.at(-1) });
   if (resultat.global === 'rouge') {
     vibrer([80, 80, 80]);
     sonRefus();
@@ -2549,6 +2629,7 @@ async function proposerControle() {
     return;
   }
   projet.controles.push({ id: nouvelIdentifiant(), type: 'refus', appareil: nomDeLAppareil(), le: new Date().toISOString() });
+  noterJournal({ type: 'controle', controle: projet.controles.at(-1) });
   afficherMessage('Refus enregistré : le géomètre sera au courant', 5000);
   modifie();
 }
@@ -2652,6 +2733,7 @@ function enregistrerImplantationLigne() {
     ligne: { nom: ligne.nom, abscisse: g.abscisse, decalage: g.ecart },
     le: new Date().toISOString(),
   });
+  noterJournal({ type: 'implantation', controleRecent: controleRecentIci() });
   vibrer(60);
   sonValidation();
   const cote = Math.abs(g.ecart) < 0.0005 ? 'sur la ligne' : `${formaterNombre(Math.abs(g.ecart))} m ${g.ecart > 0 ? 'à droite' : 'à gauche'}`;
@@ -2786,6 +2868,7 @@ function enregistrerImplantationTalus() {
     talus: { texte: texteTalus(reglages), distanceVoulue: g.distanceVoulue, auBord: g.auBord, solPlat: g.solPlat },
     le: new Date().toISOString(),
   });
+  noterJournal({ type: 'implantation', controleRecent: controleRecentIci() });
   vibrer(60);
   sonValidation();
   afficherMessage(`${sur[0].toUpperCase()}${sur.slice(1)} ${accord} (+${formaterNombre(g.abscisse)} m) : écart ${formaterNombre(ecarts.distance)} m`, 4000);
@@ -2921,6 +3004,10 @@ function toucherPourImplantation(position, tolerance) {
   }
   if (pointage.actif) {
     toucherPourPointage(position, tolerance);
+    return;
+  }
+  if (ajoutLevee.actif) {
+    toucherPourAjout(position, tolerance);
     return;
   }
   if (enImplantationDeLigne()) {
@@ -3284,6 +3371,7 @@ const ACCROCHES_POINTAGE = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne'
 
 /** Début du pointage : une barre sur le plan (accroche, Terminé) ; sur téléphone, on va au plan. */
 function commencerPointage() {
+  if (ajoutLevee.actif) arreterAjout();
   if (surfaceSwisstopo.actif()) surfaceSwisstopo.arreter();
   if (cadastreAutour.actif()) cadastreAutour.arreter();
   pointage.actif = true;
@@ -3379,6 +3467,162 @@ function validerPointage() {
   modifie();
 }
 
+// --- Édition Lever sur le site (0.120.0) : ajouter un point ou une ligne en touchant le plan ---
+// ajoutLevee : { actif, accroche ('point', 'sommet', 'milieu', 'ligne', 'centre'), choix (point touché, à
+// contrôler et valider : { est, nord, altitude }) }. Même principe que le pointage ci-dessus, mais le
+// point entre dans le levé en cours avec le rôle choisi dans Lever (point isolé, ligne, contour ; métré).
+// Pour une ligne ou un contour : chaque « Valider » ajoute un point à la suite.
+const ACCROCHES_AJOUT = [['point', 'Point'], ...ACCROCHES_POINTAGE];
+const TITRES_ROLE_AJOUT = { isole: 'Point isolé', ligne: 'Ligne', contour: 'Contour', aire: 'Aire', longueur: 'Longueur', compte: 'Point compté' };
+
+/** Nom proposé pour le prochain point ajouté (le même que pour un point pris au récepteur). */
+function nomProposeAjout() {
+  const stock = stockEnCours();
+  const metre = metreEnCours();
+  if (stock) return prochainNom(projet, stock, leveDirect.role, libelleDuRole());
+  if (metre) return prochainNomMetre(projet, metre, leveDirect.role, libelleDuRole());
+  return '';
+}
+
+function commencerAjout() {
+  if (refuserEnLectureSeule()) return;
+  if (!leveEnCours() || !(stockEnCours() || metreEnCours())) {
+    afficherMessage('Choisis d\'abord un levé (le recollement n\'a pas d\'ajout par accroche)', 4000);
+    return;
+  }
+  if (pointage.actif) arreterPointage();
+  if (surfaceSwisstopo.actif()) surfaceSwisstopo.arreter();
+  if (cadastreAutour.actif()) cadastreAutour.arreter();
+  ajoutLevee.actif = true;
+  ajoutLevee.choix = null;
+  dessinerBarreAjout();
+  if (estTelephone()) afficherOnglet('plan');
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+  recalculer();
+}
+
+function arreterAjout() {
+  if (!ajoutLevee.actif) return;
+  ajoutLevee.actif = false;
+  ajoutLevee.choix = null;
+  document.querySelector('.barre-ajout')?.remove();
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+  recalculer();
+}
+
+/** Barre posée en bas du plan : accroche, puis le point touché (nom, H, Valider). */
+function dessinerBarreAjout() {
+  let barre = document.querySelector('.barre-ajout');
+  if (!barre) {
+    barre = document.createElement('div');
+    barre.className = 'barre-pointage barre-ajout';
+    barre.addEventListener('click', (evenement) => {
+      const bouton = evenement.target.closest('button[data-action]');
+      if (!bouton) return;
+      const action = bouton.dataset.action;
+      if (action === 'accroche-ajout') {
+        ajoutLevee.accroche = bouton.dataset.valeur;
+        dessinerBarreAjout();
+      } else if (action === 'valider-ajout') validerAjout();
+      else if (action === 'oublier-ajout') {
+        ajoutLevee.choix = null;
+        dessinerBarreAjout();
+        envoyerImplantationAuPlan();
+        plan.rafraichirImplantation();
+      } else if (action === 'fin-ajout') arreterAjout();
+    });
+    barre.addEventListener('keydown', (evenement) => {
+      if (evenement.key === 'Enter') validerAjout();
+    });
+    document.querySelector('#plan .plan-cadre').append(barre);
+  }
+  const c = ajoutLevee.choix;
+  const role = TITRES_ROLE_AJOUT[leveDirect.role] ?? 'Point';
+  barre.innerHTML = `<div class="ligne-barre-pointage">
+      <strong class="titre-ajout">Ajout : ${echapper(role)}</strong>
+      ${ACCROCHES_AJOUT.map(([cle, titre]) => `<button type="button" class="puce-choix ${ajoutLevee.accroche === cle ? 'actif' : ''}" data-action="accroche-ajout" data-valeur="${cle}">${titre}</button>`).join('')}
+      <button type="button" class="bouton" data-action="fin-ajout">Terminé</button>
+    </div>
+    ${c ? `<div class="choix-pointage">
+      <span class="coordonnees-pointage">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>
+      <label>Nom<input type="text" data-pointage="nom" value="${echapper(nomProposeAjout())}" autocomplete="off" autocapitalize="characters" /></label>
+      <label>H<input type="text" inputmode="decimal" data-pointage="altitude" value="${c.altitude != null ? c.altitude.toFixed(3) : ''}" placeholder="altitude" /></label>
+      <button type="button" class="bouton" data-action="valider-ajout">Valider</button>
+      <button type="button" class="bouton-lien bouton-lien-neutre" data-action="oublier-ajout">annuler</button>
+    </div>` : `<p class="aide-pointage">Touche le plan (accroche : ${echapper(ACCROCHES_AJOUT.find(([cle]) => cle === ajoutLevee.accroche)?.[1] ?? '')})</p>`}`;
+}
+
+/** Toucher du plan pendant l'ajout : le point accroché est montré (croix), à valider. */
+function toucherPourAjout(position, tolerance) {
+  const sources = ajoutLevee.accroche === 'point'
+    ? { lignes: [], cercles: [], points: pointsDuProjet() }
+    : sourcesDesPlans(plansDuProjet(), position, tolerance);
+  const trouve = accrocher(ajoutLevee.accroche, position, tolerance, sources);
+  if (!trouve) {
+    const quoi = { point: 'Aucun point du projet', sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', centre: 'Aucun cercle' }[ajoutLevee.accroche];
+    afficherMessage(`${quoi} sous le doigt`, 3000);
+    return;
+  }
+  const mm = (valeur) => Math.round(valeur * 1000) / 1000;
+  ajoutLevee.choix = { est: mm(trouve.est), nord: mm(trouve.nord), altitude: trouve.altitude != null ? mm(trouve.altitude) : null };
+  dessinerBarreAjout();
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+}
+
+/**
+ * « Valider » : le point montré entre dans le levé en cours (rôle choisi dans Lever), après les mêmes
+ * contrôles qu'un point pris au récepteur (hors contour, croisement de lignes). Sans altitude, seul
+ * le levé libre l'accepte : les autres levés servent à des surfaces et des volumes.
+ */
+async function validerAjout() {
+  if (!ajoutLevee.choix || refuserEnLectureSeule()) return;
+  const barre = document.querySelector('.barre-ajout');
+  const nomTape = barre.querySelector('[data-pointage="nom"]').value.trim();
+  const altitude = lireNombreTape(barre.querySelector('[data-pointage="altitude"]').value);
+  if (altitude === undefined) {
+    afficherMessage('Altitude illisible : écris un nombre en mètres', 4000);
+    return;
+  }
+  const leve = leveEnCours();
+  const stock = stockEnCours();
+  const metre = metreEnCours();
+  if (!leve || !(stock || metre)) return;
+  if (altitude === null && (metre || stock.nature !== 'autres')) {
+    afficherMessage('Altitude manquante : tape-la dans « H » (seul le levé libre accepte un point sans altitude)', 5000);
+    return;
+  }
+  const point = { est: ajoutLevee.choix.est, nord: ajoutLevee.choix.nord, altitude, source: 'accroche' };
+  let resultat;
+  if (metre) {
+    resultat = ajouterPointMetre(projet, leve, metre, leveDirect.role, libelleDuRole(), { ...point, nom: nomTape || prochainNomMetre(projet, metre, leveDirect.role, libelleDuRole()) });
+  } else {
+    const role = await controlerPlacePoint(stock, leveDirect.role, point);
+    if (!role) return;
+    const nomVoulu = role === leveDirect.role ? nomTape : '';
+    const libelle = role === leveDirect.role ? libelleDuRole() : libelleDesPoints();
+    resultat = ajouterPointDirect(leve, stock, role, { ...point, nom: nomVoulu || prochainNom(projet, stock, role, libelle) }, nomsDuProjet(projet));
+  }
+  if (resultat.erreur) {
+    refuser(`Point refusé : ${resultat.erreur}`);
+    return;
+  }
+  ajoutLevee.choix = null;
+  // Photos prises juste avant : rattachées à ce point, comme pour un point pris au récepteur.
+  const enAttente = (leveeEnCours()?.photos ?? []).filter((photo) => photo.attentePoint);
+  for (const photo of enAttente) {
+    photo.point = resultat.point.nom;
+    delete photo.attentePoint;
+  }
+  vibrer(40);
+  sonValidation();
+  afficherMessage(`Point ${resultat.point.nom} ajouté${enAttente.length > 0 ? ` · ${enAttente.length} photo(s) rattachée(s)` : ''}`, 2500);
+  dessinerBarreAjout();
+  modifie();
+}
+
 /**
  * Implantation d'un point, à chaque état du récepteur : ce qu'il reste à faire pour être dessus.
  * Sans position fiable (pas de RTK fixe ou inclinaison pas prête), le guidage est donné en gris,
@@ -3431,7 +3675,7 @@ function rolesDuMode(stock) {
 
 /** Vrai quand toucher un point du plan l'ajoute à la ligne ou au contour en cours (Terrain › Lever, Intermédiaire et Expert). */
 function toucherPourLever() {
-  return Boolean(ecranLeve) && ongletContexte === 'terrain' && terrain.mode === 'lever' && aAcces('intermediaire')
+  return Boolean(ecranLeve) && !ajoutLevee.actif && ongletContexte === 'terrain' && terrain.mode === 'lever' && aAcces('intermediaire')
     && Boolean(stockEnCours()) && ['ligne', 'contour'].includes(leveDirect.role) && !editeurSurfaces.enSuppression();
 }
 
@@ -3461,7 +3705,10 @@ async function enregistrerJournalNmea() {
       afficherMessage('Journal NMEA : rien reçu du récepteur', 5000);
       return;
     }
-    afficherMessage(`Journal NMEA : ${texte.trim().split(/\r?\n/).length} lignes`, 3000);
+    // Sortes de phrases reçues (0.119.0) : pour savoir si le récepteur envoie sa batterie.
+    const sortes = sortesDePhrases(texte).map(({ sorte, nombre }) => `${sorte} ×${nombre}`).join(', ');
+    const batterie = lignesBatterie(texte);
+    afficherMessage(`Journal NMEA : ${texte.trim().split(/\r?\n/).length} lignes. Reçu : ${sortes || 'rien de lisible'}. Batterie : ${batterie.length > 0 ? batterie.join(' | ') : 'rien trouvé'}`, 20000);
     const date = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
     const canne = hauteur.trim() ? `_canne-${hauteur.trim().replace(/[^\d.,]/g, '').replace(',', '.')}m` : '';
     telecharger(new Blob([texte], { type: 'text/plain;charset=utf-8' }), `journal-nmea_${date}${canne}.txt`);
@@ -3490,6 +3737,7 @@ function rangerPointPris(resultat) {
     photo.point = resultat.point.nom;
     delete photo.attentePoint;
   }
+  noterJournal({ type: 'point', controleRecent: controleRecentIci() });
   afficherMessage(`Point ${resultat.point.nom} pris${enAttente.length > 0 ? ` · ${enAttente.length} photo(s) rattachée(s)` : ''}`);
   modifie();
 }
@@ -3828,6 +4076,8 @@ function donneesCommunes() {
     libellePoint: terrain.libellePoint,
     libelleAire: terrain.libelleAire,
     mode: terrain.mode,
+    recepteur: recepteurDisponible(),
+    ajoutActif: ajoutLevee.actif,
     controle: terrain,
     // Mode Lame : surfaces (terrassement d'abord), surface suivie, tolérances, 2e RX2 connecté ?
     lame: {
@@ -5135,6 +5385,7 @@ surLibellesProjet((libelles) => {
   modifie();
 });
 
+let dernierProjetNote = null; // dernier projet noté « ouvert » dans le journal de l'appareil
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
   // Tableau « Affichage » (0.94.0) : au démarrage, tout est montré (listes, plans DXF et leurs calques).
@@ -5167,6 +5418,12 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   mettreAJourAnnuler();
   if (changerOnglet) afficherOnglet(etapeUtile());
   await enregistrer();
+  // Journal de l'appareil (0.119.0) : une ouverture par projet ouvert (pas à chaque nouvelle
+  // version reçue de Drive pour le même projet).
+  if (projet.id !== dernierProjetNote) {
+    dernierProjetNote = projet.id;
+    noterJournal({ type: 'ouverture' });
+  }
   // RX2 déjà connecté : rappel du contrôle pour ce projet, s'il en faut un.
   if (etatRecepteur?.connecte) proposerControle();
 }

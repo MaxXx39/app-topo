@@ -984,6 +984,24 @@ export function creerEcranLeve(conteneur, actions) {
 
   /** Cadre « Point » : ID point, photo, Enreg. Pts, position, refus et « Annuler » (tous les levés). */
   function cadrePrise() {
+    // Sur le site (0.120.0) : pas de récepteur ni d'Enreg. Pts ; on ajoute un point (ou les points d'une
+    // ligne) en touchant le plan avec une accroche (barre posée sur le plan, voir main.js › ajoutLevee).
+    if (!donnees.recepteur) {
+      return `<div class="cadre-prise cadre-ajout">
+        <span class="titre-cadre-prise">Ajout</span>
+        <div class="ligne-ajout">
+          <label class="bouton-photo-levee" title="Photo du levé" aria-label="Photo du levé">
+            <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>
+            <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
+          </label>
+          <button type="button" class="bouton bouton-ajouter" data-action="${donnees.ajoutActif ? 'arreterAjout' : 'commencerAjout'}">
+            ${donnees.ajoutActif ? 'Terminé' : '+ Ajouter par accroche'}
+          </button>
+        </div>
+        <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
+          ↶ Effacer le dernier point${donnees.dernierPoint ? ` (${echapper(donnees.dernierPoint)})` : ''}</button>
+      </div>`;
+    }
     return `<div class="cadre-prise">
         <span class="titre-cadre-prise">Point</span>
         <div class="ligne-id-prendre">
