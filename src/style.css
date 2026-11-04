@@ -10224,3 +10224,192 @@ body.sur-site[data-onglet='terrain'] .titre-page { border-bottom-color: var(--am
 }
 .plan .coupes .poignee-coupe { cursor: grab; stroke: #ffffff; stroke-width: 1.5; }
 .puce-coupe svg { stroke: currentColor; fill: none; }
+
+/* ==========================================================================
+   0.123.0 : récepteur dans l'en-tête, Réglages dans la barre du bas, bandeau GNSS lisible
+   ========================================================================== */
+
+/* Bouton Récepteur de l'en-tête (APK) : l'icône du récepteur dans un rond de la couleur de l'état. */
+.entete-icone-bouton.bouton-recepteur-entete { width: 44px; height: 44px; margin: -4px 0; }
+.entete-icone-bouton.bouton-recepteur-entete span { display: none; }
+.entete-icone-bouton.bouton-recepteur-entete svg {
+  box-sizing: border-box;
+  width: 38px;
+  height: 38px;
+  padding: 7px;
+  border-radius: 50%;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+.entete .bouton-recepteur.couleur-gris svg { background: #6b7280; }
+.entete .bouton-recepteur.couleur-vert svg { background: #16a34a; }
+.entete .bouton-recepteur.couleur-orange svg { background: #f59e0b; }
+.entete .bouton-recepteur.couleur-rouge svg { background: #dc2626; }
+body.mode-telephone .entete-icone-bouton.bouton-recepteur-entete { width: 32px; height: 32px; margin: -2px 0; }
+body.mode-telephone .entete-icone-bouton.bouton-recepteur-entete svg { width: 28px; height: 28px; padding: 5px; }
+
+/* Réglages dans la barre du bas, à gauche de Lever : étroit, comme l'icône Plan. */
+.onglets button.onglet-reglages-bas { flex: 0 0 auto; min-width: 54px; padding: 0 4px; }
+body.mode-telephone .onglets button.onglet-reglages-bas { min-width: 46px; }
+.onglets button.onglet-reglages-bas span { font-size: 0.66rem; }
+.onglets button.onglet-mode-lever, .onglets button.onglet-mode-controler, .onglets button.onglet-mode-autocontrole, .onglets button.onglet-mode-lame { min-width: 0; }
+.onglets button.onglet-plan { flex: 0 1 auto; min-width: 54px; padding: 0 4px; }
+
+/* Bandeau GNSS : les textes passent à la ligne au lieu d'être coupés à droite. */
+.bandeaux-recepteur span[data-bandeau='rtk'] { flex: 0 1 auto; min-width: 0; padding: 0 8px; }
+.bandeaux-recepteur span[data-bandeau='inclinaison'] {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 6px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.1;
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+.bandeaux-recepteur .statut-rtk { white-space: normal; text-align: center; line-height: 1.05; }
+body.mode-telephone .bandeaux-recepteur span[data-bandeau='inclinaison'] { font-size: 0.62rem; }
+.bandeaux-recepteur .icone-bandeau { display: none; }
+
+/* Fenêtre des réglages (0.123.0) : bandeau tout en haut, hauteur adaptée à l'écran, « Fermer l'appli » discret en bas. */
+.fenetre-reglages {
+  width: min(94vw, 460px);
+  height: min(86dvh, 640px);
+  max-height: calc(100dvh - 24px);
+  margin: auto;
+  padding: 0 16px 14px;
+}
+.fenetre-reglages .titre-reglages { margin: 0 -16px 10px; flex: 0 0 auto; }
+.fenetre-reglages .onglets-reglages { overflow-x: auto; scrollbar-width: none; }
+.fenetre-reglages .onglets-reglages::-webkit-scrollbar { display: none; }
+.fenetre-reglages .onglet-reglages { flex: 1 0 auto; padding: 0 10px; white-space: nowrap; }
+.fenetre-reglages .bouton-fermer-appli {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  margin: 8px 0 0;
+  border: 2px solid var(--rouge);
+  border-radius: 12px;
+  background: none;
+  color: var(--rouge);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.fenetre-reglages .bouton-fermer-appli svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.fenetre-reglages .bouton-fermer-appli:active { background: var(--rouge); color: #ffffff; }
+
+/* Implanter › Surface / Altitude (0.123.0) : bandeau d'écart bas (flèche centrée sur le texte), règle fixe à droite sur toute sa hauteur. */
+.ecart-et-regle { position: relative; align-items: stretch; gap: 6px; }
+.ecart-et-regle > .ecart-direct { min-height: 0; padding: 6px 12px; row-gap: 0; align-items: center; }
+.ecart-et-regle .ecart-direct .fleche-ecart { grid-row: span 2; align-self: center; justify-self: center; font-size: 2.2rem; }
+.ecart-et-regle .ecart-direct .valeur-ecart { align-self: end; font-size: 1.5rem; line-height: 1.1; }
+.ecart-et-regle .ecart-direct .detail-ecart { align-self: start; font-size: 0.75rem; line-height: 1.2; }
+.ecart-et-regle .ecart-direct.attente { min-height: 58px; }
+.ecart-et-regle .colonne-regle { flex: 0 0 38px; align-self: stretch; display: flex; }
+.ecart-et-regle .colonne-regle > div { flex: 1; display: flex; }
+.ecart-et-regle .regle-hauteur { flex: 1; width: 100%; min-height: 0; }
+.ecart-et-regle > .bouton-bip { position: absolute; top: 4px; right: 48px; z-index: 1; min-width: 28px; min-height: 26px; padding: 0; font-size: 0.9rem; opacity: 0.9; }
+body.mode-telephone .ecart-et-regle .regle-hauteur { min-height: 0; }
+body.mode-telephone .ecart-et-regle .colonne-regle { flex-basis: 32px; }
+body.mode-telephone .ecart-et-regle .ecart-direct .valeur-ecart { font-size: 1.25rem; }
+body.mode-telephone .ecart-et-regle > .bouton-bip { right: 40px; }
+
+/* Implanter › Ligne (0.123.0) : textes plus petits (plus de chevauchement), « Tourne-toi de x° » en tête. */
+.ligne-nette .colonne-ecarts { gap: 5px; }
+.ligne-nette .bloc-lateral, .ligne-nette .bloc-hauteur { padding: 5px 8px; }
+.ligne-nette .libelle-ecart, .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 0.95rem; gap: 4px; }
+.ligne-nette .ligne-ecart strong, .ligne-nette .bloc-hauteur strong { font-size: 1.6rem; }
+.ligne-nette .icone-fleche, .ligne-nette .bloc-hauteur .icone-fleche { width: 1.5rem; height: 1.5rem; }
+.ligne-nette .libelle-ecart .icone-drapeau { width: 1.5rem; height: 1.7rem; }
+.ligne-nette .fin-petite { font-size: 0.75rem; }
+.ligne-nette .ligne-ecart { min-width: 0; gap: 4px; }
+.ligne-nette .ligne-ecart strong { flex: 0 1 auto; }
+.ligne-nette .libelle-ecart { min-width: 0; white-space: nowrap; }
+.ligne-nette .bloc-virage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: #334155;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+.ligne-nette .bloc-virage strong { font-size: 1.1rem; }
+.ligne-nette .bloc-virage .icone-virage { width: 1.7rem; height: 1.7rem; stroke-width: 2.8; }
+.ligne-nette .bloc-virage.dans-axe { background: #16a34a; }
+body.mode-telephone .ligne-nette .libelle-ecart, body.mode-telephone .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 14px; }
+body.mode-telephone .ligne-nette .ligne-ecart strong, body.mode-telephone .ligne-nette .bloc-hauteur strong { font-size: 22px; }
+body.mode-telephone .ligne-nette .bloc-virage { font-size: 12px; }
+body.mode-telephone .ligne-nette .icone-fleche, body.mode-telephone .ligne-nette .bloc-hauteur .icone-fleche { width: 20px; height: 20px; }
+body.mode-telephone .ligne-nette .libelle-ecart .icone-drapeau { width: 18px; height: 22px; }
+.onglets button.onglet-reglages-bas svg { overflow: visible; }
+.onglets button.onglet-reglages-bas .marche-arret { stroke-width: 2.2; }
+.onglets button.onglet-reglages-bas svg { width: 30px; height: 30px; }
+body.mode-telephone .onglets button.onglet-reglages-bas svg { width: 26px; height: 26px; }
+.ecart-et-regle .colonne-regle { align-items: stretch; }
+.ecart-et-regle .colonne-regle > div { width: 100%; }
+.ecart-et-regle > .ecart-direct:not(.attente) { min-height: 60px; }
+.fenetre-reglages .pied-reglages { display: flex; gap: 10px; align-items: stretch; margin-top: 8px; }
+.fenetre-reglages .pied-reglages .bouton-fermer-appli { flex: 1 1 auto; width: auto; margin: 0; }
+.fenetre-reglages .pied-reglages .bouton { min-width: 90px; }
+.fenetre-reglages .mise-a-jour-reglages { text-align: center; }
+/* Téléphone (0.123.0) : Réglages en icône seule, boutons serrés, textes de la ligne plus petits. */
+body.mode-telephone .onglets button.onglet-reglages-bas { min-width: 34px; padding: 0 2px; }
+body.mode-telephone .onglets button.onglet-reglages-bas span { display: none; }
+body.mode-telephone .onglets button.onglet-plan { min-width: 40px; padding: 0 2px; }
+body.mode-telephone .onglets button[data-mode-terrain] { margin-left: 1px; margin-right: 1px; padding: 0 1px; }
+body.mode-telephone .onglets button span { letter-spacing: -0.02em; }
+body.mode-telephone .ligne-nette .libelle-ecart, body.mode-telephone .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 12px; }
+body.mode-telephone .ligne-nette .ligne-ecart strong, body.mode-telephone .ligne-nette .bloc-hauteur strong { font-size: 18px; }
+body.mode-telephone .ligne-nette .libelle-ecart .icone-drapeau { width: 14px; height: 18px; }
+body.mode-telephone .ligne-nette .icone-fleche { width: 16px; height: 16px; }
+
+/* Implanter › Surface / Altitude (0.123.0, demande du 04.11) : règle fixe à droite, sur toute la hauteur
+   entre le plan et la barre du bas (elle suit la taille du plan réglée par ▲ / ▼, ne défile pas) ;
+   bandeau monter / descendre 25 % plus haut. */
+@media (max-width: 899px) {
+  body.regle-sous-plan[data-onglet='terrain'] .ecart-et-regle .colonne-regle {
+    position: fixed;
+    top: calc(var(--hauteur-entete) + var(--hauteur-plan-terrain) + 10px);
+    bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 10px);
+    right: 8px;
+    width: 40px;
+    z-index: 9;
+  }
+  body.regle-sous-plan[data-onglet='terrain'] .ecart-et-regle .regle-hauteur { border-radius: 8px; }
+  body.regle-sous-plan[data-onglet='terrain'] .panneau[data-onglet='terrain'] { margin-right: 52px; }
+  body.mode-telephone.regle-sous-plan[data-onglet='terrain'] .ecart-et-regle .colonne-regle { width: 32px; right: 6px; }
+  body.mode-telephone.regle-sous-plan[data-onglet='terrain'] .panneau[data-onglet='terrain'] { margin-right: 42px; }
+  body.regle-sous-plan .ecart-et-regle > .bouton-bip { right: 6px; }
+}
+body.regle-sous-plan .ecart-et-regle > .ecart-direct:not(.attente) { min-height: 75px; padding: 8px 14px; }
+body.regle-sous-plan .ecart-et-regle > .ecart-direct.attente { min-height: 72px; }
+body.regle-sous-plan .ecart-et-regle .ecart-direct .fleche-ecart { font-size: 2.75rem; }
+body.regle-sous-plan .ecart-et-regle .ecart-direct .valeur-ecart { font-size: 1.9rem; }
+body.regle-sous-plan .ecart-et-regle .ecart-direct .detail-ecart { font-size: 0.85rem; }
+body.mode-telephone.regle-sous-plan .ecart-et-regle .ecart-direct .valeur-ecart { font-size: 1.55rem; }
+/* Implanter › Ligne (0.123.0) : échelle du couloir en haut à droite, flèche pour se tourner + degrés en bas à droite. */
+.cadre-couloir .texte-reglette.en-haut-coin { top: 3px; bottom: auto; }
+.cadre-couloir .virage-couloir {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  color: #ffffff;
+  line-height: 1;
+}
+.cadre-couloir .virage-couloir .icone-virage { width: 34px; height: 34px; stroke-width: 2.8; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+.cadre-couloir .virage-couloir strong { font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+body.mode-telephone .cadre-couloir .virage-couloir .icone-virage { width: 24px; height: 24px; }
+body.mode-telephone .cadre-couloir .virage-couloir strong { font-size: 12px; }

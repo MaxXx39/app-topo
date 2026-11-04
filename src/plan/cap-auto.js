@@ -1,33 +1,24 @@
-// Cap automatique (0.119.0, tous les modes) : dès que le GNSS est connecté et que son inclinaison
-// est PRÊTE, le plan suit la position, devant du GNSS en haut (« cap »). Quand l'inclinaison n'est
-// plus prête ou que le GNSS est déconnecté, le plan revient à l'orientation d'avant.
-// Seuls les changements (prêt → pas prêt, pas prêt → prêt) déclenchent quelque chose : si
-// l'utilisateur change lui-même l'orientation entre-temps, on ne revient pas sur son choix.
+// Cap automatique (0.119.0, refait en 0.123.0, tous les modes) : dès que le GNSS est connecté et que son
+// inclinaison est PRÊTE, le plan suit la position, devant du GNSS en haut (« cap »). Sinon (pas
+// d'inclinaison, GNSS déconnecté, GPS tablette), le plan suit la position avec le nord en haut.
+// Seuls les changements (et le tout premier état) déclenchent quelque chose : si l'utilisateur
+// déplace le plan lui-même entre-temps, on ne reprend pas la main avant le prochain changement.
 
-/** Mémoire de départ : GNSS pas prêt, rien à rendre. */
+/** Mémoire de départ : état pas encore connu. */
 export function creerCapAuto() {
-  return { pret: false, avant: null };
+  return { pret: null };
 }
 
 /**
  * Décide quoi faire à chaque nouvelle position. memoire : voir creerCapAuto (modifiée ici) ;
  * pret : GNSS connecté et inclinaison prête ; suivi : orientation actuelle du plan ('libre',
  * 'suivre' ou 'cap') ; occupe : vrai si le plan est tenu par autre chose (« Voir toute la ligne »).
- * Renvoie null (rien à faire), 'cap' (passer en cap) ou { revenir: suivi } (revenir à ce suivi).
+ * Renvoie null (rien à faire), 'cap' (passer en cap) ou { revenir: 'suivre' } (nord en haut).
  */
 export function decisionCapAuto(memoire, { pret, suivi, occupe = false }) {
-  // L'utilisateur a quitté le cap lui-même : on oublie l'orientation d'avant.
-  if (memoire.avant !== null && suivi !== 'cap') memoire.avant = null;
-  let action = null;
-  if (pret && !memoire.pret) {
-    if (suivi !== 'cap' && !occupe) {
-      memoire.avant = suivi;
-      action = 'cap';
-    }
-  } else if (!pret && memoire.pret && memoire.avant !== null) {
-    action = { revenir: memoire.avant };
-    memoire.avant = null;
-  }
+  const change = memoire.pret !== pret;
   memoire.pret = pret;
-  return action;
+  if (!change) return null;
+  if (pret) return suivi !== 'cap' && !occupe ? 'cap' : null;
+  return suivi === 'suivre' ? null : { revenir: 'suivre' };
 }

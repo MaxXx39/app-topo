@@ -89,8 +89,8 @@ const GUIDAGES = [
   ['nseo', 'N-S-E-O'],
 ];
 const TITRES_COUPES = {
-  perpendiculaire: { titre: 'Perpendiculaire', gauche: '← gauche', droite: 'droite →' },
-  axe: { titre: 'Dans l\'axe', gauche: '← derrière', droite: 'devant →' },
+  perpendiculaire: { titre: 'Coupe perpendiculaire', gauche: '← gauche', droite: 'droite →' },
+  axe: { titre: 'Coupe dans l\'axe', gauche: '← derrière', droite: 'devant →' },
 };
 
 // Petit dessin de chaque rôle, comme dans Calculs › Surfaces (contour rouge, ligne orange, point
@@ -497,12 +497,17 @@ export function creerEcranLeve(conteneur, actions) {
       .join('');
   }
 
+  /** Bandeau Point / Ligne / Surface… (0.123.0 : gardé aussi pendant le guidage, plus besoin de revenir en arrière). */
+  function bandeauImplantation() {
+    return `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => aAcces('expert') || !IMPLANTATIONS_EXPERT.includes(cle)), donnees.controle.implantation)} ${bulle('implanter')}</div>`;
+  }
+
   /** Mode Contrôler : quoi implanter, surface, écart en grand, coupes et leurs réglages. */
   function controle() {
     const { controle: reglages, surfaces } = donnees;
     // Coupes directes : en Base, dans l'axe seulement (perpendiculaire, longueur et hauteurs dès Intermédiaire).
     const vue = estModeBase() ? 'axe' : reglages.vueCoupes;
-    const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => aAcces('expert') || !IMPLANTATIONS_EXPERT.includes(cle)), reglages.implantation)} ${bulle('implanter')}</div>`;
+    const choixImplantation = bandeauImplantation();
     // Rien de choisi : on le rappelle bien en vue (après « ← », on ne savait plus quoi faire).
     const imp = donnees.implanter;
     if (reglages.implantation === 'point') {
@@ -545,7 +550,8 @@ export function creerEcranLeve(conteneur, actions) {
   function ecartEtRegle() {
     return `<div class="ecart-et-regle">
       <div class="ecart-direct attente" data-vivant="ecart"></div>
-      <div class="colonne-regle">${boutonBip()}<div data-vivant="regle">${htmlRegleHauteur(null)}</div></div>
+      ${boutonBip()}
+      <div class="colonne-regle"><div data-vivant="regle">${htmlRegleHauteur(null)}</div></div>
     </div>`;
   }
 
@@ -661,6 +667,11 @@ export function creerEcranLeve(conteneur, actions) {
     const hauteur = g.ecartAltitude == null
       ? '<div class="bloc-hauteur sans-altitude">pas d\'altitude</div>'
       : `<div class="bloc-hauteur ${g.classeAltitude}"><span class="libelle-ecart">${iconeFleche(g.ecartAltitude >= 0 ? 'monter' : 'descendre')}${g.ecartAltitude >= 0 ? 'Monter' : 'Descendre'}</span><strong>${m(g.ecartAltitude)}</strong></div>`;
+    // 0.123 : se tourner pour être dans l'axe de la ligne : flèche en rond (gauche / droite) et les degrés,
+    // dans le couloir, en bas à droite ; rien quand on est dans l'axe à ±5° près.
+    const degres = g.virage != null ? Math.round(Math.abs(g.virage)) : null;
+    const virage = degres == null || degres <= 5 ? ''
+      : `<span class="virage-couloir" title="Tourne-toi de ${degres}° vers la ${g.virage > 0 ? 'droite' : 'gauche'}">${iconeVirage(g.virage > 0 ? 'droite' : 'gauche')}<strong>${degres}°</strong></span>`;
     zone.className = 'guidage-direct ligne-nette';
     zone.innerHTML = `
       <div class="colonne-ecarts">
@@ -670,7 +681,7 @@ export function creerEcranLeve(conteneur, actions) {
         <div class="bloc-lateral bloc-bouts ${g.classeBout ?? ''}">${leLong}</div>
         ${hauteur}
       </div>
-      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale))}`;
+      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale), virage)}`;
   }
 
   /**
@@ -738,6 +749,7 @@ export function creerEcranLeve(conteneur, actions) {
           ${reglages.guidage === 'nseo' ? boussole() : ''}
         </div>`;
     return `<div class="vue-guidage">
+      ${autocontrole ? '' : bandeauImplantation()}
       <div class="entete-guidage">
         <button type="button" class="bouton-retour" data-action="${ligne ? 'changerLigne' : autocontrole ? 'arreterControle' : 'arreterImplantation'}" title="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}" aria-label="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
@@ -1406,6 +1418,8 @@ export function creerEcranLeve(conteneur, actions) {
     const enGuidage = (autocontrole && Boolean(donnees.autocontrole.cible)) || (donnees.mode === 'controler'
       && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (['ligne', 'talus'].includes(implantation) && Boolean(donnees.implanter.ligne))));
     document.body.classList.toggle('vue-implantation', enGuidage);
+    // 0.123 : Implanter › Surface / Altitude : la règle de hauteur est fixée à droite, sur toute la hauteur sous le plan.
+    document.body.classList.toggle('regle-sous-plan', donnees.mode === 'controler' && !enGuidage && ['surface', 'altitude'].includes(implantation));
     // Barre d'accroche collée sous le plan (téléphone, voir style.css « avec-accroches »).
     const avecAccroches = donnees.mode === 'controler' && !enGuidage && ['point', 'ligne', 'talus'].includes(implantation);
     document.body.classList.toggle('avec-accroches', avecAccroches);
@@ -1492,6 +1506,12 @@ function iconeFleche(sens) {
   return `<svg class="icone-fleche" viewBox="0 0 24 24" aria-hidden="true"><path d="${traits[sens]}" /></svg>`;
 }
 
+/** Flèche en rond (0.123) : se tourner vers la droite ou la gauche. */
+function iconeVirage(sens) {
+  const trait = sens === 'droite' ? 'M20 12a8 8 0 1 1-3-6.2M20 4v5h-5' : 'M4 12a8 8 0 1 0 3-6.2M4 4v5h5';
+  return `<svg class="icone-fleche icone-virage" viewBox="0 0 24 24" aria-hidden="true"><path d="${trait}" /></svg>`;
+}
+
 /** Couleur du rond de la canne dans le couloir (0.118.0) : celle de la tolérance en plan. */
 function couleurLaterale(classe) {
   return { vert: '#16a34a', orange: '#f59e0b', rouge: '#dc2626' }[classe] ?? '#9ca3af';
@@ -1505,7 +1525,7 @@ function couleurLaterale(classe) {
  * de la cible : 10 m, 2 m, 1 m, 20 cm), au bord. Fait en blocs HTML placés en % (pas en SVG) pour
  * remplir toute la case sans déformer le rond de la canne. ecart : m, + à droite.
  */
-function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur) {
+function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage = '') {
   const bandes = BANDES_COULOIR[numero];
   const haut = 18; // % : haut du trait (la fin)
   const bas = 76; // % : bas du trait (le début)
@@ -1516,10 +1536,10 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur) {
   const left = 50 + Math.max(-demi, Math.min(demi, (ecart / bandes[0]) * demi));
   const texte = (r) => (r >= 1 ? `${r} m` : `${Math.round(r * 100)} cm`);
   // 0.118.2 : seulement la graduation la plus éloignée (la bande la plus large), juste pour un
-  // aperçu de l'échelle ; sa distance écrite en bas à droite.
+  // aperçu de l'échelle ; sa distance écrite en haut à droite (0.123 : en bas, la flèche pour se tourner).
   const r = bandes[0];
   const reglettes = `<span class="reglette" style="left: ${50 - demi}%"></span><span class="reglette" style="left: ${50 + demi}%"></span>
-    <span class="texte-reglette en-bas au-bord" style="left: ${50 + demi}%">${texte(r)}</span>`;
+    <span class="texte-reglette en-haut-coin au-bord" style="left: ${50 + demi}%">${texte(r)}</span>`;
   return `<div class="cadre-couloir" role="img" aria-label="Position de la canne le long de la ligne">
     ${reglettes}
     <span class="trait-couloir" style="top: ${haut}%; bottom: ${100 - bas}%"></span>
@@ -1528,6 +1548,7 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur) {
     <span class="drapeau-couloir fin" style="top: ${haut}%">${iconeDrapeau('fin')}</span>
     <span class="drapeau-couloir debut" style="top: ${bas}%">${iconeDrapeau('debut')}</span>
     <span class="moi-couloir" style="left: ${left.toFixed(1)}%; top: ${top.toFixed(1)}%; background: ${couleur}"></span>
+    ${virage}
   </div>`;
 }
 

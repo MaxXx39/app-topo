@@ -51,6 +51,7 @@ const CALQUES_DEPART = {
   controleAltitudes: true,
   points: true,
   noms: true,
+  nomsLeve: true, // 0.123 : noms des points levés (roue ⚙ de Levé)
   nomsImport: true, // 0.113 : noms des Points Import (flèche ▾ de la catégorie)
   altitudes: true,
   contours: true,
@@ -125,10 +126,6 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <button type="button" class="puce" data-action="listes-points" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
           Afficher
-        </button>
-        <button type="button" class="puce puce-coupe seulement-intermediaire" data-action="coupe" title="Tracer une coupe A – A' sur le plan (puis glisser ses bouts)">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18 20 6" /><circle cx="4" cy="18" r="2" /><circle cx="20" cy="6" r="2" /></svg>
-          Coupe
         </button>
         <button type="button" class="puce puce-seul" data-action="seul-travail" aria-pressed="false" title="Seulement ce sur quoi je travaille">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></svg>
@@ -371,7 +368,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Noms et altitudes : placés sans chevauchement (les étiquettes sans place sont cachées).
     // Roue de « Levé » : la case « Altitudes » montre ou cache toutes les altitudes (lignes et contours compris).
     if (calques.noms || calques.altitudes) {
-      const montrerNom = (point) => calques.noms && (calques.nomsImport || !pointsImport.has(point));
+      const montrerNom = (point) => calques.noms && (pointsImport.has(point) ? calques.nomsImport : calques.nomsLeve);
       const textes = visibles.map(({ point }) =>
         [montrerNom(point) ? point.nom : null, calques.altitudes ? formaterNombre(point.altitude) : null].filter(Boolean),
       );
@@ -1483,7 +1480,6 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   }
 
   // --- Boutons ---
-  conteneur.querySelector('[data-action="coupe"]').addEventListener('click', () => quandCreerCoupe?.());
   conteneur.querySelector('[data-action="tout-voir"]').addEventListener('click', () => {
     changerSuivi('libre');
     toutVoir(true);
@@ -1724,6 +1720,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const REGLAGES_SECTIONS = {
     controle: [['controleNoms', 'ID point', 'expert'], ['controleAltitudes', 'Altitude', 'expert']],
     leve: [
+      ['nomsLeve', 'Noms', ''],
       ['altitudes', 'Altitudes', ''],
       ['contourLeve', 'Contour du levé', ''],
       ['triangles', 'Triangles', 'expert'],
@@ -2275,6 +2272,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     cadrerSur(coins, minimum = 10) {
       const { largeur, hauteur } = taille();
       if (largeur === 0 || hauteur === 0 || coins.length === 0) return;
+      // 0.123 : le suivi de la position (cap ou nord en haut) reste : on zoome seulement pour que
+      // les points tiennent autour de la position, au milieu de l'écran.
+      if (position && suivi !== 'libre') {
+        const loin = Math.min(300, Math.max(minimum / 2, ...coins.map((c) => Math.hypot(c.est - position.est, c.nord - position.nord))));
+        const echelle = (Math.min(largeur, hauteur) / 2 - 40) / loin;
+        vue = vue ? { ...vue, echelle } : { echelle, estCentre: position.est, nordCentre: position.nord, largeur, hauteur };
+        centrerSurPosition();
+        return;
+      }
       changerSuivi('libre');
       const cadre = cadrerSurPoints(coins, largeur, hauteur, 40);
       vue = { ...cadre, echelle: Math.min(cadre.echelle, Math.min(largeur, hauteur) / minimum) };
