@@ -167,8 +167,6 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
   fenetre.className = 'fenetre-reglages';
   fenetre.innerHTML = `
     <form method="dialog">
-      ${fermerAppli ? `<button type="button" class="bouton bouton-fermer-appli" data-action="fermer-appli">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>Fermer l'appli</button>` : ''}
       <h2 class="titre-reglages">Réglages · <span data-titre-page>${PAGES_REGLAGES.find(([cle]) => cle === pageOuverte)?.[1] ?? ''}</span></h2>
       <div class="onglets-reglages" role="tablist" aria-label="Parties des réglages">
         ${PAGES_REGLAGES.filter(([cle]) => cle !== 'recepteur' || recepteur).map(([cle, titre, classe]) => `<button type="button" role="tab" class="onglet-reglages ${classe} ${cle === pageOuverte ? 'actif' : ''}" data-page-reglages="${cle}" aria-selected="${cle === pageOuverte}">${titre}</button>`).join('')}
@@ -226,6 +224,8 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
         <button type="button" class="bouton-secondaire bouton-large" data-action="recepteur">Récepteur GNSS, corrections, hauteur de canne…</button>
       </div>` : ''}
       <p class="aide version-reglages">Version de l'appli : ${__VERSION_APPLI__}${recepteur ? ' (appli Android)' : ''}</p>
+      ${fermerAppli ? `<button type="button" class="bouton-fermer-appli" data-action="fermer-appli">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>Fermer l'appli</button>` : ''}
       ${recepteur ? `<div class="mise-a-jour-reglages">
         <button type="button" class="bouton-lien bouton-lien-neutre" data-action="chercher-mise-a-jour">Chercher une mise à jour</button>
         <span class="aide" data-zone="mise-a-jour" role="status"></span>

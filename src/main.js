@@ -279,6 +279,12 @@ const boutonPartie = ([cle, titre]) => `<button type="button" data-partie="${cle
 const estPartieCalculs = (nom) => PARTIES_CALCULS.some(([cle]) => cle === nom);
 let partieCalculs = 'volumes'; // dernière partie affichée dans Calculs
 
+// Réglages (0.123.0) : à gauche de la barre du bas (avant, roue dans l'en-tête). Pas de data-onglet : il ouvre la fenêtre des réglages.
+const BOUTON_REGLAGES = `<button type="button" id="bouton-reglages" class="onglet-reglages-bas" title="Réglages, Drive, aide" aria-label="Réglages">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg>
+    <span>Réglages</span>
+  </button>`;
+
 /** Bouton d'un onglet (icône + titre). */
 const boutonOnglet = (o) => o.mode
   ? `<button type="button" data-mode-terrain="${o.mode}" class="onglet-terrain onglet-mode-${o.mode} ${o.niveau ? `seulement-${o.niveau}` : ''}">
@@ -349,7 +355,7 @@ document.querySelector('#app').innerHTML = `
       </div>
     </section>
   </div>
-  <nav class="onglets" aria-label="Onglets">${ONGLETS.map(boutonOnglet).join('')}</nav>
+  <nav class="onglets" aria-label="Onglets">${BOUTON_REGLAGES}${ONGLETS.map(boutonOnglet).join('')}</nav>
 `;
 
 /**
@@ -884,7 +890,8 @@ function ajouterSurfaceLevee(nature) {
 // Récepteur (appli Android) : la barre d'état sous l'en-tête l'ouvre ; fenêtre pour
 // connecter / couper le récepteur et régler les corrections NTRIP (voir leve/recepteur.js).
 const boutonRecepteur = recepteurDisponible()
-  ? creerBoutonRecepteur(document.createElement('div'), {
+  ? creerBoutonRecepteur(document.querySelector('.entete'), {
+      classeBouton: 'entete-icone-bouton bouton-recepteur-entete',
       choisirRecepteur,
       reconnecter: reconnecterRecepteur,
       // Hauteur de canne (0.107.1) : montrée pour contrôle, changée en Expert (comme dans Emlid Flow).
@@ -2723,7 +2730,7 @@ function sommetsDeLaLigne() {
  * Implantation d'une ligne, à chaque état du récepteur : décalage par rapport à la ligne (ou à sa
  * parallèle), position le long, altitude. Gris si la position n'est pas fiable.
  */
-function calculerImplantationLigne(etat) {
+function calculerImplantationLigne(etat, orientation = null) {
   const ligne = implanter.ligne;
   if (!ligne) return null;
   const position = etat.connecte && etat.recu ? etat.position : null;
@@ -2742,8 +2749,22 @@ function calculerImplantationLigne(etat) {
     classeBout: !fiable ? 'pas-fiable' : ecartAuBout(g.abscisse, g.longueur) > 1 ? 'loin' : classeTolerance(ecartAuBout(g.abscisse, g.longueur), projet.tolerancesControle?.plan ?? TOLERANCES_PAR_DEFAUT.plan),
     ecartAltitude,
     classeAltitude: ecartAltitude == null ? null : classeEcart(ecartAltitude),
+    // 0.123 : de combien de degrés se tourner pour être dans l'axe de la ligne (+ = vers la droite) ; null sans cap.
+    virage: virageVersLigne(orientation?.azimut ?? null, sommetsDeLaLigne(), g.segment),
     message: null,
   };
+}
+
+/**
+ * Angle à tourner (degrés, + = vers la droite, de -180 à 180) pour que le devant du GNSS soit dans
+ * l'axe du segment de la ligne (dans le sens de l'implantation). null si le cap est inconnu.
+ */
+function virageVersLigne(azimut, sommets, segment) {
+  const a = sommets[segment];
+  const b = sommets[segment + 1];
+  if (azimut == null || !a || !b) return null;
+  const axe = (Math.atan2(b.est - a.est, b.nord - a.nord) * 180) / Math.PI;
+  return ((((axe - azimut) % 360) + 540) % 360) - 180;
 }
 
 /** « Enregistrer l'implantation » sur une ligne : position mesurée, abscisse, décalage, écarts. */
@@ -4315,7 +4336,7 @@ if (recepteurDisponible()) {
     let implantation = enPoint ? calculerImplantation(etat, orientation) : null;
     if (enAutocontrole() && autocontrole.cible) implantation = calculerImplantation(etat, orientation, autocontrole.cible);
     const talus = enTalus();
-    const implantationLigne = enLigne && !talus ? calculerImplantationLigne(etat) : null;
+    const implantationLigne = enLigne && !talus ? calculerImplantationLigne(etat, orientation) : null;
     const implantationTalus = talus ? calculerImplantationTalus(etat) : null;
     ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation, implantationLigne, implantationTalus });
     montrerLame();
@@ -4469,6 +4490,8 @@ async function changerDeProjet(ouvrirAutre) {
   partage?.apresOuverture();
 }
 
+let renduParInactivite = false; // 0.123 : main rendue par le site après 5 min (reprise au premier geste, même en Expert)
+let fermerPopupLectureSeule = null;
 partage = creerPartage({
   obtenirProjet: () => projet,
   titreDe: (p) => titreProjet(p),
@@ -4510,6 +4533,11 @@ partage = creerPartage({
     mettreAJourEtatEntete();
     fenetreReglages?.rafraichir();
     montrerAttenteSynchro();
+    // Main reprise : le popup « Lecture seule » se ferme (0.123).
+    if (partage?.etat.rendu?.projetId !== projet.id) {
+      renduParInactivite = false;
+      fermerPopupLectureSeule?.();
+    }
   },
   message: (texte) => afficherMessage(texte, 4000),
 });
@@ -4524,8 +4552,6 @@ document.addEventListener('visibilitychange', () => {
 
 const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPosition: toucherPourCoupe,
-  // Coupe tracée et déplacée sur le plan (0.122.0, Intermédiaire) : bouton « Coupe », puis glisser A, A', B, B'.
-  quandCreerCoupe: creerCoupeSurPlan,
   peutDeplacerCoupe: () => !refuserEnLectureSeule(),
   quandDeplacerCoupe: (id, bout, position) => {
     const coupe = projet.coupes.find((c) => c.id === id);
@@ -5357,11 +5383,26 @@ let derniereActivite = Date.now();
 // Base et Intermédiaire (0.90.0) : la main ne se touche pas ; après 5 minutes sans activité, elle
 // est reprise toute seule au premier geste.
 let derniereReprise = 0;
+/** Popup « Lecture seule » (0.123) : se ferme toute seule dès que la main est reprise. */
+async function montrerPopupLectureSeule() {
+  if (fermerPopupLectureSeule) return;
+  const arret = new AbortController();
+  fermerPopupLectureSeule = () => arret.abort();
+  const choix = await demanderChoix({
+    titre: 'Lecture seule',
+    texte: 'Tu n\'as plus la main sur le projet (5 minutes sans activité). Touche l\'écran pour la reprendre.',
+    boutons: [{ cle: 'reprendre', texte: 'Reprendre la main', principal: true }],
+    signal: arret.signal,
+  });
+  fermerPopupLectureSeule = null;
+  if (choix === 'reprendre') partage?.reprendreApresRendu();
+}
 for (const evenement of ['pointerdown', 'keydown', 'wheel']) {
   document.addEventListener(evenement, () => {
     derniereActivite = Date.now();
     // Une seule demande à la fois (la reprise passe par Drive) : pas plus d'une toutes les 10 s.
-    if (aAcces('expert') || partage?.etat.rendu?.projetId !== projet.id || Date.now() - derniereReprise < 10_000) return;
+    // Expert : la main se reprend toute seule seulement après un repos du site (0.123, popup ci-dessous).
+    if ((aAcces('expert') && !renduParInactivite) || partage?.etat.rendu?.projetId !== projet.id || Date.now() - derniereReprise < 10_000) return;
     derniereReprise = Date.now();
     partage.reprendreApresRendu();
   }, { passive: true, capture: true });
@@ -5370,7 +5411,11 @@ setInterval(() => {
   if (estDansAppliAndroid() || !partage?.etat.connecte) return;
   if (Date.now() - derniereActivite < INACTIVITE) return;
   if (partage.etat.rendu?.projetId === projet.id || partage.etat.repris?.projetId === projet.id) return;
-  partage.rendreLaMain('rendue après 5 minutes sans activité');
+  partage.rendreLaMain('rendue après 5 minutes sans activité').then(() => {
+    if (partage.etat.rendu?.projetId !== projet.id) return;
+    renduParInactivite = true;
+    montrerPopupLectureSeule();
+  });
 }, 30_000);
 
 /** Petit message sous l'en-tête, qui disparaît tout seul après "duree" millisecondes (null : il reste). */

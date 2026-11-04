@@ -43,7 +43,7 @@ const ICONE = '<path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><
 export function creerBoutonRecepteur(nav, actions) {
   const bouton = document.createElement('button');
   bouton.type = 'button';
-  bouton.className = 'bouton-recepteur couleur-gris';
+  bouton.className = `bouton-recepteur couleur-gris${actions.classeBouton ? ` ${actions.classeBouton}` : ''}`;
   bouton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONE}</svg><span>Récepteur</span>`;
   nav.append(bouton);
 
@@ -357,7 +357,7 @@ export function creerBoutonRecepteur(nav, actions) {
       if (fenetre && !reglagesOuverts && !etat?.connecte && nouvelEtat?.connecte) fenetre.close();
       etat = nouvelEtat;
       const couleur = couleurRecepteur(etat);
-      bouton.className = `bouton-recepteur couleur-${couleur}`;
+      bouton.className = `bouton-recepteur couleur-${couleur}${actions.classeBouton ? ` ${actions.classeBouton}` : ''}`;
       bouton.title = `Récepteur : ${TEXTES_COULEURS[couleur]}`;
       rafraichir();
     },

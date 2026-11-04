@@ -89,8 +89,8 @@ const GUIDAGES = [
   ['nseo', 'N-S-E-O'],
 ];
 const TITRES_COUPES = {
-  perpendiculaire: { titre: 'Perpendiculaire', gauche: '← gauche', droite: 'droite →' },
-  axe: { titre: 'Dans l\'axe', gauche: '← derrière', droite: 'devant →' },
+  perpendiculaire: { titre: 'Coupe perpendiculaire', gauche: '← gauche', droite: 'droite →' },
+  axe: { titre: 'Coupe dans l\'axe', gauche: '← derrière', droite: 'devant →' },
 };
 
 // Petit dessin de chaque rôle, comme dans Calculs › Surfaces (contour rouge, ligne orange, point
@@ -497,12 +497,17 @@ export function creerEcranLeve(conteneur, actions) {
       .join('');
   }
 
+  /** Bandeau Point / Ligne / Surface… (0.123.0 : gardé aussi pendant le guidage, plus besoin de revenir en arrière). */
+  function bandeauImplantation() {
+    return `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => aAcces('expert') || !IMPLANTATIONS_EXPERT.includes(cle)), donnees.controle.implantation)} ${bulle('implanter')}</div>`;
+  }
+
   /** Mode Contrôler : quoi implanter, surface, écart en grand, coupes et leurs réglages. */
   function controle() {
     const { controle: reglages, surfaces } = donnees;
     // Coupes directes : en Base, dans l'axe seulement (perpendiculaire, longueur et hauteurs dès Intermédiaire).
     const vue = estModeBase() ? 'axe' : reglages.vueCoupes;
-    const choixImplantation = `<div class="choix-implantation-type" role="group" aria-label="Implanter">${boutonsChoix('choisirImplantation', IMPLANTATIONS.filter(([cle]) => aAcces('expert') || !IMPLANTATIONS_EXPERT.includes(cle)), reglages.implantation)} ${bulle('implanter')}</div>`;
+    const choixImplantation = bandeauImplantation();
     // Rien de choisi : on le rappelle bien en vue (après « ← », on ne savait plus quoi faire).
     const imp = donnees.implanter;
     if (reglages.implantation === 'point') {
@@ -545,7 +550,8 @@ export function creerEcranLeve(conteneur, actions) {
   function ecartEtRegle() {
     return `<div class="ecart-et-regle">
       <div class="ecart-direct attente" data-vivant="ecart"></div>
-      <div class="colonne-regle">${boutonBip()}<div data-vivant="regle">${htmlRegleHauteur(null)}</div></div>
+      ${boutonBip()}
+      <div class="colonne-regle"><div data-vivant="regle">${htmlRegleHauteur(null)}</div></div>
     </div>`;
   }
 
@@ -661,9 +667,15 @@ export function creerEcranLeve(conteneur, actions) {
     const hauteur = g.ecartAltitude == null
       ? '<div class="bloc-hauteur sans-altitude">pas d\'altitude</div>'
       : `<div class="bloc-hauteur ${g.classeAltitude}"><span class="libelle-ecart">${iconeFleche(g.ecartAltitude >= 0 ? 'monter' : 'descendre')}${g.ecartAltitude >= 0 ? 'Monter' : 'Descendre'}</span><strong>${m(g.ecartAltitude)}</strong></div>`;
+    // 0.123 : « Tourne-toi de x° vers la droite / gauche » pour être dans l'axe de la ligne.
+    const degres = g.virage != null ? Math.round(Math.abs(g.virage)) : null;
+    const dansLAxe = degres != null && degres < 3;
+    const virage = degres == null ? ''
+      : `<div class="bloc-virage ${dansLAxe ? 'dans-axe' : ''}">${dansLAxe ? iconeFleche('monter') : iconeVirage(g.virage > 0 ? 'droite' : 'gauche')}<span>${dansLAxe ? 'Dans l\'axe de la ligne' : `Tourne-toi de <strong>${degres}°</strong> vers la ${g.virage > 0 ? 'droite' : 'gauche'}`}</span></div>`;
     zone.className = 'guidage-direct ligne-nette';
     zone.innerHTML = `
       <div class="colonne-ecarts">
+        ${virage}
         <div class="bloc-lateral ${g.classeLaterale ?? ''}">
           <div class="ligne-ecart">${sens}<strong>${m(ecart)}</strong></div>
         </div>
@@ -738,6 +750,7 @@ export function creerEcranLeve(conteneur, actions) {
           ${reglages.guidage === 'nseo' ? boussole() : ''}
         </div>`;
     return `<div class="vue-guidage">
+      ${autocontrole ? '' : bandeauImplantation()}
       <div class="entete-guidage">
         <button type="button" class="bouton-retour" data-action="${ligne ? 'changerLigne' : autocontrole ? 'arreterControle' : 'arreterImplantation'}" title="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}" aria-label="Choisir ${ligne ? 'une autre ligne' : 'un autre point'}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
@@ -1490,6 +1503,12 @@ function iconeFleche(sens) {
     descendre: 'M12 4v15M5 13l7 7 7-7',
   };
   return `<svg class="icone-fleche" viewBox="0 0 24 24" aria-hidden="true"><path d="${traits[sens]}" /></svg>`;
+}
+
+/** Flèche en rond (0.123) : se tourner vers la droite ou la gauche. */
+function iconeVirage(sens) {
+  const trait = sens === 'droite' ? 'M20 12a8 8 0 1 1-3-6.2M20 4v5h-5' : 'M4 12a8 8 0 1 0 3-6.2M4 4v5h5';
+  return `<svg class="icone-fleche icone-virage" viewBox="0 0 24 24" aria-hidden="true"><path d="${trait}" /></svg>`;
 }
 
 /** Couleur du rond de la canne dans le couloir (0.118.0) : celle de la tolérance en plan. */
