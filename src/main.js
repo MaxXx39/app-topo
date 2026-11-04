@@ -377,6 +377,7 @@ function afficherOnglet(demande) {
   // Ajout manuel (0.120.0) : on le quitte en changeant de page (le plan en fait partie).
   if (ajoutLevee.actif && nom !== 'terrain' && nom !== 'plan') arreterAjout();
   if (estPartieCalculs(nom)) partieCalculs = nom;
+  const entreDansCalculs = (nom === 'volumes' || nom === 'mesures') && !['volumes', 'mesures', 'dessin'].includes(ongletContexte);
   for (const panneau of document.querySelectorAll('.panneau[data-onglet]')) {
     panneau.classList.toggle('actif', panneau.dataset.onglet === nom);
   }
@@ -407,7 +408,22 @@ function afficherOnglet(demande) {
   }
   mettreAJourToucheVolume();
   rattraperEcrans();
+  // 0.126.0 : le suivi de la position revient tout seul dans Terrain ; Calculs cadre sur le volume.
+  plan.retourAutomatiqueDuSuivi(ongletContexte === 'terrain');
+  if (entreDansCalculs) cadrerSurCalculs();
   window.scrollTo(0, 0);
+}
+
+/**
+ * Calculs › Volumes ou Mesures (0.126.0) : le plan cadre sur le volume montré (ou le premier),
+ * sinon sur tous les points affichés, au lieu de suivre la position du GNSS.
+ */
+function cadrerSurCalculs() {
+  const calcul = projet.calculs.find((c) => c.id === calculMontre) ?? projet.calculs[0];
+  const surfaces = calcul ? [calcul.surface1Id, calcul.surface2Id].map((id) => projet.surfaces.find((s) => s.id === id)).filter(Boolean) : [];
+  let coins = surfaces.flatMap((s) => (estImportee(s) ? (s.points ?? []) : pointsDuLeve(s.leveId)));
+  if (coins.length === 0) coins = pointsAffiches ?? [];
+  if (coins.length > 0) plan.cadrerSur(coins, 10, { libre: true });
 }
 document.querySelector('.onglets').addEventListener('click', (evenement) => {
   const mode = evenement.target.closest('button[data-mode-terrain]');
@@ -985,6 +1001,31 @@ for (const bouton of document.querySelectorAll('[data-taille-plan]')) {
     }
   });
 }
+
+// 0.126.0 : écran court (peu de choses sous le plan) → le plan s'agrandit pour remplir l'écran
+// (--part-plan-auto, jamais moins que la part choisie par ▲ / ▼, au plus 80 %). Recalculé dès que
+// le contenu sous le plan change de taille (ResizeObserver).
+function ajusterPlanAuContenu() {
+  const disponible = window.innerHeight - (document.querySelector('header')?.offsetHeight ?? 0) - (document.querySelector('.onglets')?.offsetHeight ?? 0);
+  const colonne = document.querySelector('.colonne-gauche');
+  if (!colonne || disponible <= 0) return;
+  // Bande fixe « ID point / Enreg. Pts » de Lever : elle prend aussi de la place en bas.
+  const bande = document.querySelector('.cadre-prise .ligne-id-prendre');
+  const hauteurBande = bande && getComputedStyle(bande).position === 'fixed' ? bande.offsetHeight + 12 : 0;
+  const part = (disponible - colonne.getBoundingClientRect().height - hauteurBande - 24) / disponible;
+  const auto = Math.min(PART_PLAN.max, Math.max(0, Math.round(part * 100) / 100));
+  if (document.body.style.getPropertyValue('--part-plan-auto') !== String(auto)) document.body.style.setProperty('--part-plan-auto', String(auto));
+}
+let ajustementPrevu = false;
+new ResizeObserver(() => {
+  if (ajustementPrevu) return;
+  ajustementPrevu = true;
+  requestAnimationFrame(() => {
+    ajustementPrevu = false;
+    ajusterPlanAuContenu();
+  });
+}).observe(document.querySelector('.colonne-gauche'));
+window.addEventListener('resize', () => requestAnimationFrame(ajusterPlanAuContenu));
 
 // Lever existe aussi sur le site depuis 0.96.0 (sans récepteur : modifier les levés).
 const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
@@ -4886,7 +4927,7 @@ async function importerSurface(fichier) {
     // Plus de question « Stock, Terrain… ? » (0.90.0) : la nature ne servait à rien.
     for (const surface of surfaces) projet.surfaces.push(surfaceImportee(surface, fichier.name, type));
     const messages = [...erreurs, ...avertissements];
-    message = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} » : voir Surface Projet, plus bas.</p>
+    message = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} » : voir Surfaces importées, plus bas.</p>
       ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
     editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
     if (surfaces.length > 0) editeurSurfaces.choisir(projet.surfaces.length - 1);
@@ -5466,11 +5507,12 @@ function mettreAJourEtatEntete() {
   // Titre : affaire - lieu (ou le nom, sinon « Projet sans nom 2 »…).
   document.querySelector('#titre-projet').textContent = titreProjet(projet);
 
-  const points = leveActif(projet)?.points ?? AUCUN_POINT;
+  // 0.126.0 : tous les points du projet (levés, listes importées, points de contrôle), pas seulement la liste choisie.
+  const nombrePoints = projet.leves.reduce((total, leve) => total + (leve.points?.length ?? 0), 0) + (projet.pointsControle?.length ?? 0);
   const drive = partage?.etat.connecte
     ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive', rendu: 'Drive : main rendue' }[partage.etat.etat] ?? 'Drive : en attente'
     : '';
-  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${points.length} points`, `${surfacesAffichees().length + projet.reseaux.length} levé(s)`, drive].filter(Boolean).join(' · ');
+  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${nombrePoints} points`, `${surfacesAffichees().length + projet.reseaux.length} levé(s)`, drive].filter(Boolean).join(' · ');
 
   // Verrou du partage : main verte (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
   // (un autre appareil l'a ; toucher = prendre la main). Rien sans Drive.

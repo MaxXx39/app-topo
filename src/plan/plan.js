@@ -97,6 +97,10 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandBasculerSeul(actif) : bouton « Seul » (seulement ce sur quoi je travaille, 0.94.0)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
+// Retour automatique du suivi (0.126.0) : 5 s sans toucher le plan, ou 2 m parcourus.
+const DELAI_RETOUR_SUIVI = 5000;
+const DISTANCE_RETOUR_SUIVI = 2;
+
 export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
   // Réglages choisis ; « calques » est ce qui est dessiné : en dessous d'Expert, les réglages
   // d'Expert gardent leur valeur de départ.
@@ -1533,6 +1537,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   // --- Boutons ---
   conteneur.querySelector('[data-action="tout-voir"]').addEventListener('click', () => {
+    armerRetourSuivi();
     changerSuivi('libre');
     toutVoir(true);
   });
@@ -1632,7 +1637,37 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   /** Arrête le suivi de la position (le plan a été déplacé au doigt). */
   function arreterSuivi() {
+    armerRetourSuivi();
     changerSuivi('libre');
+  }
+
+  // Retour automatique du suivi (0.126.0, demande du 05.11) : le plan déplacé au doigt (pour choisir
+  // un élément à implanter…) reprend le suivi d'avant au bout de DELAI_RETOUR_SUIVI sans toucher le
+  // plan, ou dès que la position s'est déplacée de DISTANCE_RETOUR_SUIVI. Seulement là où main.js
+  // l'allume (onglet Terrain). retourSuivi = { mode, depuis: position au moment de l'arrêt } ou null.
+  let retourSuivi = null;
+  let retourSuiviActif = false;
+  let dernierToucher = 0;
+  function armerRetourSuivi() {
+    if (suivi !== 'libre') retourSuivi = { mode: suivi, depuis: position ? { est: position.est, nord: position.nord } : null };
+    dernierToucher = performance.now();
+  }
+  /** Vrai si le suivi a été repris (le plan est alors redessiné). */
+  function reprendreSuiviSiBesoin() {
+    if (!retourSuivi || !retourSuiviActif || suivi !== 'libre' || !position || pointeurs.size > 0 || ligneVue) return false;
+    const attente = performance.now() - dernierToucher >= DELAI_RETOUR_SUIVI;
+    const depuis = retourSuivi.depuis;
+    const parti = depuis && Math.hypot(position.est - depuis.est, position.nord - depuis.nord) >= DISTANCE_RETOUR_SUIVI;
+    if (!attente && !parti) return false;
+    const mode = retourSuivi.mode;
+    retourSuivi = null;
+    changerSuivi(mode);
+    if (mode === 'cap' && position.azimut != null && vue) tournerVers(position.azimut);
+    else {
+      if (vue && mode !== 'cap') vue = { ...vue, rotation: 0 };
+      centrerSurPosition();
+    }
+    return true;
   }
 
   // --- Menu des calques ---
@@ -1921,6 +1956,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     (evenement) => {
       if (!vue) return;
       evenement.preventDefault();
+      dernierToucher = performance.now();
       const { x, y } = positionDansPlan(evenement);
       vue = zoomer(vue, evenement.deltaY < 0 ? 1.2 : 1 / 1.2, x, y);
       // 0.126.0 : plusieurs crans de molette de suite = un seul dessin par image affichée.
@@ -1970,6 +2006,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   }
 
   svg.addEventListener('pointerdown', (evenement) => {
+    dernierToucher = performance.now();
     svg.setPointerCapture(evenement.pointerId);
     const position = positionDansPlan(evenement);
     pointeurs.set(evenement.pointerId, position);
@@ -2231,6 +2268,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         else dessiner();
         return;
       }
+      if (reprendreSuiviSiBesoin()) return;
       // « Voir toute la ligne » : on ne tourne (et recadre) que si le cap a changé de plus de 3°.
       if (ligneVue) {
         if (position?.azimut != null && vue && Math.abs(ecartAngle(position.azimut, vue.rotation ?? 0)) > 3) cadrerSurLigne(position.azimut);
@@ -2330,13 +2368,25 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const memes = avant && avant.length === nouvelle.length && avant.every((p, i) => p.est === nouvelle[i].est && p.nord === nouvelle[i].nord);
       if (!memes) cadrerSurLigne(position?.azimut ?? vue?.rotation ?? 0);
     },
-    /** Cadre le plan sur ces points [{ est, nord }], sur au moins "minimum" mètres (implantation). */
-    cadrerSur(coins, minimum = 10) {
+    /**
+     * Retour automatique du suivi (0.126.0) : allumé dans l'onglet Terrain, éteint ailleurs. En le
+     * rallumant, un suivi arrêté ailleurs (cadrage de Calculs) reprend à la prochaine position.
+     */
+    retourAutomatiqueDuSuivi(actif) {
+      if (actif && !retourSuiviActif) dernierToucher = 0;
+      retourSuiviActif = Boolean(actif);
+    },
+    /**
+     * Cadre le plan sur ces points [{ est, nord }], sur au moins "minimum" mètres (implantation).
+     * libre (0.126.0, Calculs) : le suivi de la position s'arrête (il reprendra en revenant dans Terrain).
+     */
+    cadrerSur(coins, minimum = 10, { libre = false } = {}) {
       const { largeur, hauteur } = taille();
       if (largeur === 0 || hauteur === 0 || coins.length === 0) return;
+      if (libre) armerRetourSuivi();
       // 0.123 : le suivi de la position (cap ou nord en haut) reste : on zoome seulement pour que
       // les points tiennent autour de la position, au milieu de l'écran.
-      if (position && suivi !== 'libre') {
+      if (position && suivi !== 'libre' && !libre) {
         const loin = Math.min(300, Math.max(minimum / 2, ...coins.map((c) => Math.hypot(c.est - position.est, c.nord - position.nord))));
         const echelle = (Math.min(largeur, hauteur) / 2 - 40) / loin;
         vue = vue ? { ...vue, echelle } : { echelle, estCentre: position.est, nordCentre: position.nord, largeur, hauteur };
@@ -2345,7 +2395,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
       changerSuivi('libre');
       const cadre = cadrerSurPoints(coins, largeur, hauteur, 40);
-      vue = { ...cadre, echelle: Math.min(cadre.echelle, Math.min(largeur, hauteur) / minimum) };
+      vue = { ...cadre, rotation: 0, echelle: Math.min(cadre.echelle, Math.min(largeur, hauteur) / minimum) };
       dessiner();
     },
     /** Cadre le plan sur ces plans DXF (bouton « voir »). */
