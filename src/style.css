@@ -10137,3 +10137,48 @@ body:not(.mode-intermediaire) .archive-comme-suppression {
   gap: 8px;
   margin: 4px 0 8px;
 }
+
+/* 0.120.0 : sur le site, 3 pages « Projet | Édition Lever | Calculs » bien marquées (page choisie sur fond ambre)
+   et un titre en haut de chaque page ; ajout d'un point en touchant le plan (Édition Lever). */
+.seulement-site { display: none; }
+body.sur-site .seulement-site { display: block; }
+.titre-page {
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 3px solid var(--ambre);
+  color: var(--encre);
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+/* Une couleur par page, comme la barre de l'APK : Projet (bleu nuit), Édition Lever (ambre), Calculs (rose) ;
+   la page choisie est pleine. Les trois boutons ont la même largeur. */
+body.sur-site .onglets button.onglet-projets,
+body.sur-site .onglets button.onglet-calculs,
+body.sur-site .onglets button[data-mode-terrain] {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 6px 3px;
+  padding: 0 3px;
+  border-radius: 10px;
+}
+body.sur-site .onglets button.onglet-projets {
+  border: 2px solid var(--sombre);
+  background: transparent;
+  color: var(--sombre);
+}
+body.sur-site .onglets button.onglet-projets svg { color: var(--sombre); }
+body.sur-site .onglets button.onglet-projets.actif { background: var(--sombre); color: #ffffff; }
+body.sur-site .onglets button.onglet-projets.actif svg { color: #ffffff; }
+@media (min-width: 900px) {
+  body.sur-site .onglets button.onglet-projets,
+  body.sur-site .onglets button.onglet-calculs,
+  body.sur-site .onglets button[data-mode-terrain] { margin: 0 3px; }
+  body.sur-site .onglets button.onglet-projets.actif { background: var(--sombre); color: #ffffff; }
+}
+/* Titre de la page, souligné de la couleur de la page. */
+body.sur-site[data-onglet='projets'] .titre-page { border-bottom-color: var(--sombre); }
+body.sur-site[data-onglet='terrain'] .titre-page { border-bottom-color: var(--ambre); }
+.cadre-ajout .bouton-ajouter { flex: 1; }
+.barre-ajout .titre-ajout { align-self: center; margin-right: 4px; white-space: nowrap; }
+.cadre-ajout .ligne-ajout { display: flex; align-items: stretch; gap: 8px; margin-bottom: 8px; }
