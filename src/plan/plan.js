@@ -1,5 +1,6 @@
 // Affichage du plan : points avec leur nom, zoom et déplacement
 // au doigt (téléphone) ou à la souris (ordinateur).
+import { SEUIL_POINTS_CANVAS, dessinerPointsCanvas, effacerPointsCanvas } from './points-canvas.js';
 import { creerCapAuto, decisionCapAuto } from './cap-auto.js';
 import { cadrerSurPoints, cadrerSurPointsTourne, versEcran, versTerrain, deplacer, zoomer, barreEchelle, zoneVisible } from './vue.js';
 import { bulle } from '../aide/bulles.js';
@@ -111,6 +112,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     <div class="plan-cadre">
       <div class="plan-fond" aria-hidden="true"></div>
       <canvas class="plan-dxf-canvas" aria-hidden="true"></canvas>
+      <canvas class="plan-dxf-canvas plan-points-canvas" aria-hidden="true"></canvas>
       <svg class="plan" role="img" aria-label="Plan des points"></svg>
       <div class="plan-attribution" hidden></div>
       <div class="plan-calques">
@@ -170,7 +172,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const menuListes = conteneur.querySelector('.menu-listes-points');
   const cadre = conteneur.querySelector('.plan-cadre');
   const fond = conteneur.querySelector('.plan-fond');
-  const canvasDxf = conteneur.querySelector('.plan-dxf-canvas');
+  const canvasDxf = conteneur.querySelector('.plan-dxf-canvas:not(.plan-points-canvas)');
+  // 0.126.0 : points sur canvas quand beaucoup sont visibles (voir points-canvas.js).
+  const canvasPoints = conteneur.querySelector('.plan-points-canvas');
+  let pointsSurCanvas = false;
   const attribution = conteneur.querySelector('.plan-attribution');
   const caseVoirLigne = conteneur.querySelector('.case-voir-ligne');
   caseVoirLigne.querySelector('input').addEventListener('change', (evenement) => quandVoirLigne?.(evenement.target.checked));
@@ -260,14 +265,45 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     return !dessin.cachees?.has(stock) && (stock === dessin.stockActif || calques.autresStocks);
   }
 
+  /** Couleur de chaque rôle de point telle que style.css la donne (thème compris), pour le canvas. */
+  function couleursDesRoles() {
+    const roles = ['', 'role-contour', 'role-base', 'role-ligne', 'role-dessus', 'role-mesure'];
+    const groupe = creerElement('g', { class: 'points' });
+    const ronds = roles.map((role) => {
+      const rond = creerElement('circle', { class: role, r: 1 });
+      groupe.append(rond);
+      return rond;
+    });
+    svg.append(groupe);
+    const couleurs = new Map(roles.map((role, i) => [role, getComputedStyle(ronds[i]).color]));
+    groupe.remove();
+    return couleurs;
+  }
+
   // Légendes remplies pendant le dessin : relief (couleurs, équidistance) et remblai / déblai.
   let legende = null;
   let legendeEcarts = null;
 
   /** Redessine tout le plan avec la vue actuelle. */
+  // 0.126.0 (vitesse) : plusieurs demandes de suite (redessiner, pâlir, nouveau point) = un seul dessin,
+  // fait juste après (avant l'affichage de l'écran). Un dessin immédiat annule celui qui était prévu.
+  let dessinPrevu = false;
+  function dessinerBientot() {
+    if (dessinPrevu) return;
+    dessinPrevu = true;
+    queueMicrotask(() => {
+      if (dessinPrevu) dessiner();
+    });
+  }
+
   function dessiner() {
+    dessinPrevu = false;
     if (geste) return; // redessiné à la fin du geste
     svg.replaceChildren();
+    if (pointsSurCanvas) {
+      effacerPointsCanvas(canvasPoints);
+      pointsSurCanvas = false;
+    }
     legende = null;
     legendeEcarts = null;
     dessinerFond();
@@ -344,17 +380,25 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const libelles = lireLibelles();
     const rayon = rayonFormes(); // taille des formes (réglage de l'appareil)
     const echelle = echelleTexte(); // taille du texte (réglage de l'appareil)
+    // 0.126.0 : beaucoup de points visibles → dessinés sur le canvas (couleurs des rôles lues dans style.css).
+    const versCanvas = visibles.length > SEUIL_POINTS_CANVAS;
+    const couleursRoles = versCanvas ? couleursDesRoles() : null;
+    const pourCanvas = [];
     for (const { point, x, y } of visibles) {
       if (calques.points || rangs.has(point.nom)) {
         // Forme choisie pour le libellé (0.97.0) : rond plein, sinon carré, triangle, croix…
         const forme = formeDuNom(point.nom, libelles);
         const trace = cheminForme(forme, x, y, rayon);
-        const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}${estPale(point.nom) ? ' pale' : ''}`;
-        const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: rayon, class: classe });
         // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
         const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
-        if (couleur) rond.style.color = couleur;
-        groupePoints.append(rond);
+        if (versCanvas) {
+          pourCanvas.push({ x, y, trace, trait: formeEnTrait(forme), pale: estPale(point.nom), couleur: couleur ?? couleursRoles.get(classes.get(point.nom) ?? '') });
+        } else {
+          const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}${estPale(point.nom) ? ' pale' : ''}`;
+          const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: rayon, class: classe });
+          if (couleur) rond.style.color = couleur;
+          groupePoints.append(rond);
+        }
       }
       if (rangs.has(point.nom)) {
         // Point de la liste en cours : entouré, avec son numéro d'ordre.
@@ -363,6 +407,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         rang.textContent = rangs.get(point.nom);
         groupeNoms.append(rang);
       }
+    }
+
+    if (versCanvas) {
+      dessinerPointsCanvas(canvasPoints, pourCanvas, { rayon, largeur: vue.largeur, hauteur: vue.hauteur, densite: Math.min(window.devicePixelRatio || 1, 2) });
+      pointsSurCanvas = true;
+    } else if (pointsSurCanvas) {
+      effacerPointsCanvas(canvasPoints);
+      pointsSurCanvas = false;
     }
 
     // Noms et altitudes : placés sans chevauchement (les étiquettes sans place sont cachées).
@@ -1863,6 +1915,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   });
 
   // --- Molette de la souris : zoom autour du curseur ---
+  let zoomMolettePrevu = false;
   svg.addEventListener(
     'wheel',
     (evenement) => {
@@ -1870,7 +1923,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       evenement.preventDefault();
       const { x, y } = positionDansPlan(evenement);
       vue = zoomer(vue, evenement.deltaY < 0 ? 1.2 : 1 / 1.2, x, y);
-      dessiner();
+      // 0.126.0 : plusieurs crans de molette de suite = un seul dessin par image affichée.
+      if (!zoomMolettePrevu) {
+        zoomMolettePrevu = true;
+        requestAnimationFrame(() => {
+          zoomMolettePrevu = false;
+          dessiner();
+        });
+      }
     },
     { passive: false },
   );
@@ -1894,6 +1954,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.style.transform = transformation;
     fond.style.transform = transformation;
     canvasDxf.style.transform = transformation;
+    canvasPoints.style.transform = transformation;
   }
 
   /** Fin du geste : on enlève la transformation et on redessine pour de bon. */
@@ -1904,6 +1965,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.style.transform = '';
     fond.style.transform = '';
     canvasDxf.style.transform = '';
+    canvasPoints.style.transform = '';
     dessiner();
   }
 
@@ -2143,7 +2205,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     mettreAJourPoints(nouveauxPoints) {
       points = nouveauxPoints;
       if (!vue) toutVoir();
-      else dessiner();
+      else dessinerBientot();
     },
     /**
      * Position du récepteur { est, nord, prete, azimut, coupes } (ou null : on la cache ; azimut null :
@@ -2254,7 +2316,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       signaturePalir = palir ? `${palir.stockId}|${palir.garderMesures}|${[...palir.noms].join(',')}` : '';
       cadre.classList.toggle('plan-palir', Boolean(palir));
       // Changement : tout le plan est redessiné (les points et les levés aussi, pas seulement l'implantation).
-      if (signaturePalir !== avant && vue) dessiner();
+      if (signaturePalir !== avant && vue) dessinerBientot();
     },
     voirLigne({ visible, sommets = null }) {
       caseVoirLigne.hidden = !visible;
@@ -2305,7 +2367,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         return;
       }
       // Onglet 3. Mesures : le menu ne propose pas les calques des surfaces.
-      dessiner();
+      dessinerBientot();
     },
   };
 }

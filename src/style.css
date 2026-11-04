@@ -10499,3 +10499,17 @@ body.sur-site .onglets button[data-mode-terrain] svg { width: 16px; height: 16px
 .dossier-projet-ouvert { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: 0.9rem; font-weight: 600; color: var(--encre); }
 button.dossier-projet-ouvert { border: none; background: none; padding: 0; font: inherit; font-size: 0.9rem; text-decoration: underline; cursor: pointer; }
 .fenetre-champs select { width: 100%; min-height: 40px; margin-top: 4px; font: inherit; }
+
+/* --- 0.126.0 (retour d'essai sur tablette lente, 05.11) --- */
+/* Points sur canvas (beaucoup de points) : déjà pâlis un par un, le canvas ne l'est pas en plus. */
+.plan-cadre.plan-palir .plan-points-canvas { opacity: 1; }
+/* Messages : en bas, au-dessus de la barre du bas (et de la bande « Enreg. Pts » dans Lever), fermés d'un toucher. */
+.message-flottant {
+  top: auto;
+  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 12px);
+  pointer-events: auto;
+  cursor: pointer;
+}
+body[data-onglet='terrain'][data-mode-terrain='lever'] .message-flottant {
+  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 96px);
+}

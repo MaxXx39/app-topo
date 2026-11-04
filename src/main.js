@@ -98,7 +98,6 @@ import {
   mesuresOuvrage, annulerDernierPointReseau, tronconsConduite, estOuvrage, ELEMENTS_RESEAU, traceDuRecollement, nomsDuRecollement,
 } from './topo/reseau.js';
 import { lireReseaux, couleurDuReseau } from './leve/reseaux.js';
-import { genererCsvReseaux, genererDxfReseaux, ecrireLandXMLReseaux, pdfReseaux } from './export/reseaux.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
@@ -109,7 +108,6 @@ import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } fr
 import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip } from './outils/son.js';
 import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation, classeTolerance, TOLERANCES_PAR_DEFAUT } from './topo/controle.js';
-import { pdfControles } from './export/pdf-controles.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, listesCadastre, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
@@ -120,6 +118,10 @@ import { fabriquerPaquet } from './export/paquet.js';
 import { creerBarreRecalage } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
 import { ajouterTous } from './outils/bornes.js';
+
+// Écrans en attente d'être redessinés (0.126.0, voir afficherSiVisible) : nom → { element, fonction }.
+const ecransEnAttente = new Map();
+const estAffiche = (element) => !element || element.getClientRects().length > 0;
 
 // --- État de l'application ---
 let projet = creerProjet(); // projet ouvert
@@ -404,6 +406,7 @@ function afficherOnglet(demande) {
     recalculer();
   }
   mettreAJourToucheVolume();
+  rattraperEcrans();
   window.scrollTo(0, 0);
 }
 document.querySelector('.onglets').addEventListener('click', (evenement) => {
@@ -563,6 +566,7 @@ function montrerOngletProjet(onglet = ongletProjet) {
     bouton.classList.toggle('actif', actif);
     bouton.setAttribute('aria-pressed', String(actif));
   }
+  rattraperEcrans();
 }
 document.querySelector('.onglets-projet').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('[data-onglet-projet]');
@@ -572,8 +576,8 @@ document.querySelector('.onglets-projet').addEventListener('click', (evenement) 
 
 const moduleExport = creerModuleExport(document.querySelector('#exporter-projet'), {
   exporterListe: (type, id) => exporterListe(type, id),
-  exporterControles: (format) => exporterControles(format),
-  exporterReseaux: (format) => exporterReseaux(format),
+  exporterControles: (format) => exporterControles(format).catch((e) => alert(`Export impossible : ${e.message ?? e}.`)),
+  exporterReseaux: (format) => exporterReseaux(format).catch((e) => alert(`Export impossible : ${e.message ?? e}.`)),
   exporterImplantations: () => exporterImplantations(),
   exporterPlanRecale: (id) => exporterPlanRecale(id),
   // Cadastre · Swisstopo · photo en un clic (0.121.0) : ZIP avec le DXF et le GeoTIFF.
@@ -1771,7 +1775,7 @@ function exporterImplantations() {
  * Recollements de réseaux (0.101.0) : CSV, DXF, LandXML ou PDF (voir export/reseaux.js), tous les
  * levés de recollement du projet ensemble.
  */
-function exporterReseaux(format) {
+async function exporterReseaux(format) {
   const couleurs = lireReseaux();
   const reseaux = projet.reseaux.map((r) => {
     const leve = projet.leves.find((l) => l.id === r.leveId) ?? { points: [] };
@@ -1785,6 +1789,8 @@ function exporterReseaux(format) {
     };
   });
   if (reseaux.length === 0) return;
+  // 0.126.0 : module (et bibliothèque PDF) chargé seulement au moment de l'export.
+  const { genererCsvReseaux, genererDxfReseaux, ecrireLandXMLReseaux, pdfReseaux } = await import('./export/reseaux.js');
   const nom = `${nomDeFichierProjet(projet)}_reseaux`;
   const texte = (contenu, type, extension) => telecharger(new Blob([contenu], { type }), `${nom}.${extension}`);
   if (format === 'csv') texte('\ufeff' + genererCsvReseaux(reseaux), 'text/csv;charset=utf-8', 'csv');
@@ -1797,9 +1803,12 @@ function exporterReseaux(format) {
 }
 
 /** Contrôles et refus du projet : CSV ou PDF. */
-function exporterControles(format) {
+async function exporterControles(format) {
   const nom = `${nomDeFichierProjet(projet)}_controles`;
-  if (format === 'pdf') telecharger(pdfControles(projet), `${nom}.pdf`);
+  if (format === 'pdf') {
+    const { pdfControles } = await import('./export/pdf-controles.js'); // chargé à la demande (0.126.0)
+    telecharger(pdfControles(projet), `${nom}.pdf`);
+  }
   else telecharger(new Blob(['\ufeff' + csvControles(projet.controles)], { type: 'text/csv;charset=utf-8' }), `${nom}.csv`);
 }
 
@@ -5147,6 +5156,27 @@ function decrireSurface(surface) {
 
 // --- Calculs et affichage ---
 
+/**
+ * Écrans redessinés seulement quand ils se voient (0.126.0, vitesse sur tablette lente) : un écran
+ * caché (autre onglet) est noté « en attente » et redessiné dès qu'il réapparaît (rattraperEcrans).
+ */
+function afficherSiVisible(nom, element, fonction) {
+  if (estAffiche(element)) {
+    ecransEnAttente.delete(nom);
+    fonction();
+  } else ecransEnAttente.set(nom, { element, fonction });
+}
+function rattraperEcrans() {
+  for (const [nom, { element, fonction }] of [...ecransEnAttente]) {
+    if (!estAffiche(element)) continue;
+    ecransEnAttente.delete(nom);
+    fonction();
+  }
+}
+// Filet de sécurité : après chaque toucher et chaque changement de taille, les écrans devenus visibles sont redessinés.
+document.addEventListener('click', () => setTimeout(rattraperEcrans, 0), true);
+window.addEventListener('resize', () => setTimeout(rattraperEcrans, 0));
+
 /** Recalcule tout (surfaces, volumes) et met à jour les écrans et le plan. */
 function recalculer({ recadrer = false } = {}) {
   definirLibellesProjet(projet.libelles); // libellés de ce projet seulement (0.105.6)
@@ -5164,12 +5194,14 @@ function recalculer({ recadrer = false } = {}) {
   mettreAJourEtatEntete();
 
   editeurSurfaces.rafraichir();
-  ecranVolumes.afficher();
-  ecranCoupes.afficher();
+  // 0.126.0 (vitesse) : les écrans cachés (Projet, Volumes…) ne sont redessinés qu'en les ouvrant.
+  const panneauProjet = document.querySelector('.panneau[data-onglet="projets"]');
+  afficherSiVisible('volumes', document.querySelector('.panneau[data-onglet="volumes"]'), () => ecranVolumes.afficher());
+  afficherSiVisible('coupes', document.querySelector('.panneau[data-onglet="volumes"]'), () => ecranCoupes.afficher());
   ecranMesures.afficher();
   ecranDessin.afficher(donneesDessin());
-  ecranImport.afficher(projet, dernierImport, dernierPlan);
-  moduleExport.afficher(projet);
+  afficherSiVisible('import', panneauProjet, () => ecranImport.afficher(projet, dernierImport, dernierPlan));
+  afficherSiVisible('export', panneauProjet, () => moduleExport.afficher(projet));
   montrerOngletProjet();
   // Point à implanter de la liste : ses coordonnées à jour (Annuler a pu l'enlever).
   if (implanter.cible?.id) {
@@ -5178,7 +5210,7 @@ function recalculer({ recadrer = false } = {}) {
   }
   envoyerImplantationAuPlan();
   ecranLeve?.afficher(donneesLeve());
-  afficherEcranProjet();
+  afficherSiVisible('projet', panneauProjet, afficherEcranProjet);
   // Téléphone, onglet Terrain : le plan reste en haut de l'écran (voir style.css), plus petit
   // en mode Implanter pour laisser la place aux coupes.
   document.body.classList.toggle('mode-leve', Boolean(ecranLeve));
@@ -5612,6 +5644,8 @@ function afficherMessage(texte, duree = 2000) {
     zone.id = 'message-flottant';
     zone.className = 'message-flottant';
     zone.setAttribute('role', 'status');
+    // 0.126.0 : en bas de l'écran, fermé d'un toucher (avant : en haut, il cachait des boutons).
+    zone.addEventListener('click', () => (zone.hidden = true));
     document.body.append(zone);
   }
   zone.textContent = texte;
@@ -5628,7 +5662,7 @@ async function enregistrer() {
     // Seul le résumé du projet ouvert change : on ne relit pas tous les projets de l'appareil
     // (trop lent avec des plans DXF et des photos).
     mettreAJourResume(projet);
-    afficherEcranProjet();
+    afficherSiVisible('projet', document.querySelector('.panneau[data-onglet="projets"]'), afficherEcranProjet);
     partage?.projetEnregistre();
   } catch (erreur) {
     console.error(erreur);

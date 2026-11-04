@@ -278,6 +278,7 @@ function messageExport(texte) {
     zone.id = 'message-export';
     zone.className = 'message-flottant';
     zone.setAttribute('role', 'status');
+    zone.addEventListener('click', () => (zone.hidden = true)); // fermé d'un toucher (0.126.0)
     document.body.append(zone);
   }
   zone.textContent = texte;

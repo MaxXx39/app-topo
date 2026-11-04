@@ -25,9 +25,18 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         // Fichiers gardés sur l'appareil pour marcher sans connexion (dont le logo Perrin).
         globPatterns: ['**/*.{js,css,html,svg,png,jpg}'],
-        // La lecture des photos HEIC (bibliothèque heic-to) pèse environ 3 Mo : on la garde
-        // quand même sur l'appareil, pour ajouter des photos sans connexion sur le chantier.
+        // 0.126.0 : la lecture des photos HEIC (bibliothèque heic-to, environ 3 Mo) n'est plus
+        // téléchargée à l'installation ; elle l'est à la première photo HEIC, puis gardée sur
+        // l'appareil (runtimeCaching ci-dessous) pour marcher ensuite sans connexion.
+        globIgnores: ['**/heic-to-*.js'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        runtimeCaching: [
+          {
+            urlPattern: /\/assets\/heic-to-[^/]+\.js$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'lecture-heic', expiration: { maxEntries: 2 } },
+          },
+        ],
       },
       manifest: {
         name: 'Topo - Volumes de stocks',

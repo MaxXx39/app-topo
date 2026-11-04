@@ -10,7 +10,23 @@
  * Renvoie, pour chaque étiquette, { x, y, aGauche } (coin bas-gauche du texte) ou null si cachée.
  */
 export function placerEtiquettes(etiquettes, ecart = 5) {
-  const occupees = [];
+  // 0.126.0 (vitesse) : les étiquettes déjà placées sont rangées dans une grille de cases de
+  // TAILLE_CASE px : on ne compare qu'avec celles des cases touchées (avant : avec toutes).
+  const grille = new Map();
+  const cases = (boite) => {
+    const liste = [];
+    for (let i = Math.floor(boite.gauche / TAILLE_CASE); i <= Math.floor(boite.droite / TAILLE_CASE); i++) {
+      for (let j = Math.floor(boite.haut / TAILLE_CASE); j <= Math.floor(boite.bas / TAILLE_CASE); j++) liste.push(`${i},${j}`);
+    }
+    return liste;
+  };
+  const libre = (boite) => cases(boite).every((cle) => !(grille.get(cle) ?? []).some((autre) => seChevauchent(boite, autre)));
+  const occuper = (boite) => {
+    for (const cle of cases(boite)) {
+      if (!grille.has(cle)) grille.set(cle, []);
+      grille.get(cle).push(boite);
+    }
+  };
   return etiquettes.map(({ x, y, largeur, hauteur }) => {
     const essais = [
       { gauche: x + ecart, haut: y - ecart - hauteur, aGauche: false }, // à droite, au-dessus
@@ -20,14 +36,15 @@ export function placerEtiquettes(etiquettes, ecart = 5) {
     ];
     for (const essai of essais) {
       const boite = { gauche: essai.gauche, haut: essai.haut, droite: essai.gauche + largeur, bas: essai.haut + hauteur };
-      if (!occupees.some((autre) => seChevauchent(boite, autre))) {
-        occupees.push(boite);
+      if (libre(boite)) {
+        occuper(boite);
         return { x: essai.aGauche ? essai.gauche + largeur : essai.gauche, y: boite.bas, aGauche: essai.aGauche };
       }
     }
     return null;
   });
 }
+const TAILLE_CASE = 64;
 
 function seChevauchent(a, b) {
   return a.gauche < b.droite && b.gauche < a.droite && a.haut < b.bas && b.haut < a.bas;
