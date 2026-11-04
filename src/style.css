@@ -2603,7 +2603,7 @@ body.avec-recepteur .bandeaux-recepteur {
    une part de l'écran (--part-plan-terrain, réglée par les flèches ▲ / ▼ sous le plan, 0.71.0). */
 @media (max-width: 899px) {
   body.mode-leve[data-onglet='terrain'] {
-    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * var(--part-plan-terrain, 0.35));
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(var(--part-plan-terrain, 0.35), var(--part-plan-auto, 0)));
   }
 
   body.mode-leve[data-onglet='terrain'] .panneau-plan {
@@ -9567,7 +9567,7 @@ body.mode-base .actions-projets {
    (même hauteur, réglée par les flèches ▲ / ▼), pour voir le levé du volume et ses couleurs. --- */
 @media (max-width: 899px) {
   body:is([data-onglet='volumes'], [data-onglet='mesures']):not(.mode-dessin) {
-    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * var(--part-plan-terrain, 0.35));
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(var(--part-plan-terrain, 0.35), var(--part-plan-auto, 0)));
   }
   body:is([data-onglet='volumes'], [data-onglet='mesures']):not(.mode-dessin) .panneau-plan {
     display: block;
@@ -10499,3 +10499,54 @@ body.sur-site .onglets button[data-mode-terrain] svg { width: 16px; height: 16px
 .dossier-projet-ouvert { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: 0.9rem; font-weight: 600; color: var(--encre); }
 button.dossier-projet-ouvert { border: none; background: none; padding: 0; font: inherit; font-size: 0.9rem; text-decoration: underline; cursor: pointer; }
 .fenetre-champs select { width: 100%; min-height: 40px; margin-top: 4px; font: inherit; }
+
+/* --- 0.126.0 (retour d'essai sur tablette lente, 05.11) --- */
+/* Points sur canvas (beaucoup de points) : déjà pâlis un par un, le canvas ne l'est pas en plus. */
+.plan-cadre.plan-palir .plan-points-canvas { opacity: 1; }
+/* Messages : en bas, au-dessus de la barre du bas (et de la bande « Enreg. Pts » dans Lever), fermés d'un toucher. */
+.message-flottant {
+  top: auto;
+  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 12px);
+  pointer-events: auto;
+  cursor: pointer;
+}
+body[data-onglet='terrain'][data-mode-terrain='lever'] .message-flottant {
+  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 96px);
+}
+/* Cibles d'au moins 44 px (doigts gantés) : liens « archiver / supprimer », ✕ des points, dossier, cloche. */
+.bouton-lien {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 4px 8px;
+}
+/* « archiver » et « supprimer » côte à côte : bien séparés, pour ne pas toucher l'un pour l'autre. */
+.bouton-lien + .bouton-lien { margin-left: 12px; }
+button.dossier-projet-ouvert { min-height: 44px; }
+.ecart-et-regle > .bouton-bip { min-width: 44px; min-height: 44px; font-size: 1.1rem; }
+body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height: 40px; }
+/* Calculs › Volumes choisi : rose comme Calculs (avant : ambre, la couleur de Lever). */
+.parties-calculs .groupe-surfaces-volumes button.actif {
+  background: #db2777;
+  color: #ffffff;
+}
+/* Implanter › Altitude : « Altitude ici » à côté du champ (0.126.0). */
+.ligne-altitude-voulue { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.ligne-altitude-voulue .champ-altitude-voulue { flex: 1 1 200px; margin: 0; }
+.ligne-altitude-voulue .bouton-altitude-ici { min-height: 44px; white-space: nowrap; }
+/* Implanter › Ligne : moins de place entre le plan et le guidage (0.126.0, demande du 05.11). */
+.vue-guidage .ligne-segment { display: flex; align-items: center; gap: 8px; margin: 2px 0 4px; }
+.vue-guidage .ligne-segment .bascule-segment { flex: 1 1 auto; margin: 0; }
+.vue-guidage .ligne-segment .choix-segment { flex: none; margin: 0; gap: 6px; }
+.vue-guidage .ligne-segment .choix-segment .bouton-secondaire { min-width: 44px; min-height: 40px; padding: 0 8px; }
+.vue-guidage .entete-guidage { margin-bottom: 2px; }
+.vue-guidage .choix-implantation-type { margin-bottom: 4px; }
+/* Vue 3D (0.126.0) : élément à voir, couleurs, transparence, zoom et vue de départ. */
+.fenetre-3d .entete-3d select { min-height: 44px; max-width: 45%; font: inherit; font-weight: 700; }
+.fenetre-3d .outils-3d { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 6px 0; }
+.fenetre-3d .bascule-3d { display: flex; gap: 4px; }
+.fenetre-3d .bascule-3d .puce-choix { min-height: 40px; }
+.fenetre-3d .zoom-3d { display: flex; gap: 6px; margin-left: auto; }
+.fenetre-3d .zoom-3d .bouton-secondaire { min-width: 44px; min-height: 44px; font-size: 1.1rem; }

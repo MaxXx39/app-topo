@@ -64,5 +64,12 @@ export function brancherChoixExport(zone, obtenirGroupes) {
     rafraichir();
   });
   rafraichir();
+  // 0.126.0 : la liste (et son compteur « n / m ») est refaite chaque fois qu'elle réapparaît à l'écran
+  // (avant : « 0 / 0 » restait affiché après des imports faits pendant qu'elle était cachée).
+  if (typeof IntersectionObserver === 'function') {
+    new IntersectionObserver((entrees) => {
+      if (entrees.some((e) => e.isIntersecting) && !ouvert) rafraichir();
+    }).observe(zone);
+  }
   return { selection: () => selectionExport(obtenirGroupes(), changes), rafraichir };
 }

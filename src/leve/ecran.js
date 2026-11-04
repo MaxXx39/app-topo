@@ -524,7 +524,10 @@ export function creerEcranLeve(conteneur, actions) {
     }
     if (reglages.implantation === 'altitude') {
       return `${choixImplantation}
-        <label class="champ-altitude-voulue">Altitude voulue<input type="text" inputmode="decimal" data-champ="altitude-voulue" value="${reglages.altitudeVoulue != null ? Number(reglages.altitudeVoulue).toFixed(3) : ''}" placeholder="ex. 412.350" /></label>
+        <div class="ligne-altitude-voulue">
+          <label class="champ-altitude-voulue">Altitude voulue<input type="text" inputmode="decimal" data-champ="altitude-voulue" value="${reglages.altitudeVoulue != null ? Number(reglages.altitudeVoulue).toFixed(3) : ''}" placeholder="ex. 412.350" /></label>
+          <button type="button" class="bouton-secondaire bouton-altitude-ici" data-action="prendreAltitudeIci">📍 Altitude ici</button>
+        </div>
         ${ecartEtRegle()}`;
     }
     return `
@@ -879,18 +882,19 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function choixLigneNette() {
     const l = donnees.implanter.ligne;
+    // 0.126.0 (demande du 05.11) : bascule et segment sur UNE ligne, pour laisser la place au guidage.
     const bascule = l.nbSegments > 1
-      ? `<div class="bascule-segment" role="radiogroup" aria-label="Ligne à implanter">${boutonsChoix('choisirSegment', [['tout', 'Toute la polyligne'], ['segment', 'Segment']], l.segment == null ? 'tout' : 'segment')}</div>`
+      ? `<div class="bascule-segment" role="radiogroup" aria-label="Ligne à implanter">${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment']], l.segment == null ? 'tout' : 'segment')}</div>`
       : '';
-    const bouts = [l.debut?.nom, l.fin?.nom].every(Boolean) ? ` · ${echapper(l.debut.nom)} → ${echapper(l.fin.nom)}` : '';
+    const bouts = [l.debut?.nom, l.fin?.nom].every(Boolean) ? `${echapper(l.debut.nom)} → ${echapper(l.fin.nom)}` : '';
     const segment = l.segment == null
       ? ''
-      : `<div class="choix-segment">
+      : `<div class="choix-segment" title="${bouts}">
           <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="precedent" ${l.segment === 0 ? 'disabled' : ''} aria-label="Segment précédent">◀</button>
-          <span>Segment <strong>${l.segment + 1}</strong> / ${l.nbSegments}${bouts}</span>
+          <span><strong>${l.segment + 1}</strong> / ${l.nbSegments}</span>
           <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="suivant" ${l.segment === l.nbSegments - 1 ? 'disabled' : ''} aria-label="Segment suivant">▶</button>
         </div>`;
-    return `${bascule}${segment}
+    return `${bascule || segment ? `<div class="ligne-segment">${bascule}${segment}</div>` : ''}
       ${l.decalage ? `<p class="aide">Parallèle à ${formaterNombre(Math.abs(l.decalage))} m ${l.decalage > 0 ? 'à droite' : 'à gauche'}</p>` : ''}`;
   }
 

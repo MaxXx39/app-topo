@@ -60,6 +60,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
   let derniers = null;
   let messageControle = ''; // erreur du dernier import de points de contrôle
   ecouter('toggle', (evenement) => {
+    if (evenement.target.classList?.contains('points-de-la-liste')) remplirTableauOuvert(evenement.target);
     const id = evenement.target.dataset?.calquesPlan;
     if (!id) return;
     if (evenement.target.open) calquesOuverts.add(id);
@@ -225,6 +226,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
           ${dernierPlan ? messagePlan(dernierPlan) : ''}
           ${messageSurface}
         </div>`;
+      tableauxEnAttente.clear();
       contenu.innerHTML = blocContenu(projet, calquesOuverts, categoriesFermees);
   }
 }
@@ -392,18 +394,36 @@ function choixCouleur(id, couleur) {
 }
 
 /** Tableau repliable de points (nom, Est, Nord, altitude), sous leur liste. */
+// 0.126.0 (vitesse) : les lignes du tableau ne sont écrites qu'à l'ouverture de « Voir les points »
+// (avant : 8 000 lignes cachées refaites à chaque point levé). Points en attente, par numéro de tableau.
+const tableauxEnAttente = new Map();
+let numeroTableau = 0;
+
+/** Lignes HTML d'un tableau de points (nom, Est, Nord, altitude). */
+export function lignesTableauPoints(points) {
+  const n = (valeur) => (valeur == null ? '—' : formaterNombre(valeur));
+  return points.map((p) => `<tr><td>${echapper(p.nom)}</td><td>${n(p.est)}</td><td>${n(p.nord)}</td><td>${n(p.altitude)}</td></tr>`).join('');
+}
+
+/** Remplit le tableau d'un « Voir les points » qu'on vient d'ouvrir (appelé par l'écouteur « toggle »). */
+function remplirTableauOuvert(details) {
+  const corps = details.querySelector('tbody[data-tableau]');
+  if (!details.open || !corps || corps.dataset.rempli) return;
+  corps.innerHTML = lignesTableauPoints(tableauxEnAttente.get(corps.dataset.tableau) ?? []);
+  corps.dataset.rempli = '1';
+}
+
 function tableauPoints(points, titre) {
   if (points.length === 0) return '';
-  const n = (valeur) => (valeur == null ? '—' : formaterNombre(valeur));
+  numeroTableau += 1;
+  tableauxEnAttente.set(String(numeroTableau), points);
   return `
     <details class="points-de-la-liste">
       <summary>${titre} (${points.length})</summary>
       <div class="tableau-defilant">
         <table>
           <thead><tr><th>Nom</th><th>Est (m)</th><th>Nord (m)</th><th>Altitude (m)</th></tr></thead>
-          <tbody>
-            ${points.map((p) => `<tr><td>${echapper(p.nom)}</td><td>${n(p.est)}</td><td>${n(p.nord)}</td><td>${n(p.altitude)}</td></tr>`).join('')}
-          </tbody>
+          <tbody data-tableau="${numeroTableau}"></tbody>
         </table>
       </div>
     </details>`;
