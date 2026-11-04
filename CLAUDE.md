@@ -44,6 +44,7 @@ docs/                tableau des modes (xlsx) ; exemples/ = fichiers de référe
 - APK : https://github.com/MaxXx39/app-topo/releases/download/apk-derniere-version/Topo.apk (lien fixe) ; **0.122.1** : la release contient aussi le même fichier nommé `Topo-<version>.apk`.
 
 ## Conventions de code
+- **Découpage de `main.js` (décidé le 05.11)** : petit à petit, au fil des demandes : quand une demande touche une partie (Implanter, récepteur, exports…), on sort cette partie de `main.js` dans son propre fichier (même comportement, rien de visible ne change), avec les tests et un essai Playwright. Jamais de gros découpage d'un coup.
 - Code et commentaires **simples, en français**, noms clairs. Une fonction de calcul = courte, commentée (rôle, unités), **avec un test**, dans `src/topo/`.
 - Coordonnées **Est, Nord, altitude** (sauf lecture LandXML : Nord, Est, altitude), tout en **MN95**, mètres ; aucune conversion dans l'appli web (l'APK convertit GNSS et GPS tablette en MN95 / RAN95). Nombres : point décimal, 3 décimales.
 - Messages d'erreur compréhensibles, jamais d'échec silencieux. Pas de phrases d'explication dans les écrans : l'aide est dans les bulles (`textes.js`, apostrophes `\'`).
