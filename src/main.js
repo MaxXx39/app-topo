@@ -1499,6 +1499,8 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       },
       // Photo d'un point de contrôle (0.105.0, Intermédiaire) : rangée dans projet.photosControle.
       ajouterPhotoControle: (id, fichiers) => ajouterPhotoControle(id, fichiers),
+      // 0.123.1 : le point a déjà des photos : « Prendre » une photo ou « Voir » celles qu'il a.
+      photoPointControle: (id) => choisirPrendreOuVoir(id),
       arreterControle: () => {
         autocontrole.cible = null;
         montrerImplantation();
@@ -4631,6 +4633,41 @@ async function ajouterPhotos(objet, fichiers, { attentePoint = false } = {}) {
 }
 
 /** Ajoute des photos à un point de contrôle (photo.point = son nom, photo.pointId = son id). */
+async function choisirPrendreOuVoir(id) {
+  const point = projet.pointsControle.find((p) => p.id === id);
+  if (!point) return;
+  const photos = (projet.photosControle ?? []).filter((ph) => ph.pointId === id);
+  const choix = await demanderChoix({
+    titre: `Photos de ${point.nom}`,
+    boutons: [
+      { cle: 'voir', texte: `Voir (${photos.length})`, principal: true },
+      { cle: 'prendre', texte: 'Prendre une photo' },
+      { cle: 'fermer', texte: 'Fermer' },
+    ],
+  });
+  if (choix === 'voir') {
+    if (photos.length === 1) {
+      montrerPhoto(photos[0].id);
+      return;
+    }
+    const laquelle = await demanderChoix({
+      titre: `Photos de ${point.nom}`,
+      boutons: [...photos.map((ph, i) => ({ cle: ph.id, texte: `Photo ${i + 1}`, detail: ph.legende || '' })), { cle: 'fermer', texte: 'Fermer' }],
+    });
+    if (laquelle && laquelle !== 'fermer') montrerPhoto(laquelle);
+  } else if (choix === 'prendre') {
+    // L'appareil photo s'ouvre (fichier choisi dans un champ caché, comme le bouton sans photo).
+    const champ = document.createElement('input');
+    champ.type = 'file';
+    champ.accept = 'image/*';
+    champ.setAttribute('capture', 'environment');
+    champ.addEventListener('change', () => {
+      if (champ.files?.length) ajouterPhotoControle(id, [...champ.files]);
+    });
+    champ.click();
+  }
+}
+
 async function ajouterPhotoControle(id, fichiers) {
   const point = projet.pointsControle.find((p) => p.id === id);
   if (!point) return;
