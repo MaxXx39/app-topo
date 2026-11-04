@@ -36,7 +36,9 @@ export function nettoyerListes(listes) {
   const libelles = listes?.libelles && typeof listes.libelles === 'object' ? listes.libelles : undefined;
   // Réseaux du recollement (0.101.0, voir leve/reseaux.js) : gardés tels quels s'ils existent.
   const reseaux = listes?.reseaux && typeof listes.reseaux === 'object' ? listes.reseaux : undefined;
-  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(reseaux ? { reseaux } : {}), modifieLe: listes?.modifieLe ?? null };
+  // Dossiers de projets (0.125.0, voir projet/dossiers.js) : gardés tels quels s'ils existent.
+  const dossiers = listes?.dossiers && typeof listes.dossiers === 'object' ? listes.dossiers : undefined;
+  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(reseaux ? { reseaux } : {}), ...(dossiers ? { dossiers } : {}), modifieLe: listes?.modifieLe ?? null };
 }
 
 /** Listes de cet appareil. */

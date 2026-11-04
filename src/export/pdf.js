@@ -5,6 +5,7 @@
 // à part seulement s'il n'y a pas la place).
 // Le plan est dessiné en traits (vectoriel) : il reste net à l'impression et au zoom.
 // Toutes les mesures sur la feuille sont en millimètres.
+import { photosAvecDessins } from '../photos/annotation.js';
 import { jsPDF } from 'jspdf';
 import { formaterNombre } from '../topo/format.js';
 import { placerEtiquettes, pointInterieur } from '../plan/etiquettes.js';
@@ -132,7 +133,8 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
   const comparaisonsCalculees = comparaisons.filter(({ resultat }) => resultat && !resultat.erreurs && resultat.trianglesEcart?.length > 0);
   let echelle = null;
   // Photos encore à placer : sous la légende de la première feuille si elles y tiennent.
-  let photosAPlacer = choix.photos ? photos : [];
+  // Photos avec leurs dessins (cercle, flèche…) incrustés (0.124.0).
+  let photosAPlacer = choix.photos ? await photosAvecDessins(photos) : [];
   const placerPhotos = (yLibre) => {
     if (photosAPlacer.length > 0 && dessinerPhotosColonne(doc, photosAPlacer, yLibre)) photosAPlacer = [];
   };

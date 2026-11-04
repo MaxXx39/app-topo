@@ -38,10 +38,14 @@ export function htmlControle(ac, { gestionOuverte, erreurGestion }) {
           <strong>${echapper(p.nom)}</strong>
           ${p.dernier ? `<span class="pastille-resultat ${p.dernier.global}">${echapper(dateHeure(p.dernier.le))}</span>` : '<span class="aide">jamais contrôlé</span>'}
         </button>
-        <label class="photo-point-controle seulement-intermediaire" title="Ajouter une photo à ${echapper(p.nom)}" aria-label="Ajouter une photo à ${echapper(p.nom)}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>${p.nbPhotos > 0 ? `<span>${p.nbPhotos}</span>` : ''}
+${p.nbPhotos > 0
+          // 0.123.1 : avec des photos, le bouton propose « Prendre » ou « Voir » ; sans photo, il ouvre l'appareil directement.
+          ? `<button type="button" class="photo-point-controle seulement-intermediaire" data-action="photoPointControle" data-valeur="${p.id}" title="Photos de ${echapper(p.nom)} : prendre ou voir" aria-label="Photos de ${echapper(p.nom)} : prendre ou voir">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg><span>${p.nbPhotos}</span></button>`
+          : `<label class="photo-point-controle seulement-intermediaire" title="Ajouter une photo à ${echapper(p.nom)}" aria-label="Ajouter une photo à ${echapper(p.nom)}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
           <input type="file" data-champ="photo-controle" data-id="${p.id}" accept="image/*" capture="environment" hidden />
-        </label>
+        </label>`}
       </div>`).join('')}</div>`}
     ${htmlHistorique(ac)}`;
 }
