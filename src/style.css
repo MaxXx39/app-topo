@@ -10121,3 +10121,10 @@ body.mode-telephone .cadre-couloir .drapeau-couloir .icone-drapeau { width: 15px
   body:not(.mode-telephone) .ligne-nette .fin-petite { font-size: 1rem; }
   body:not(.mode-telephone) .ligne-nette .fin-petite .icone-drapeau { width: 1rem; height: 1.15rem; }
 }
+
+/* 0.119.1 : en Intermédiaire, « supprimer » archive (l'élément reste récupérable dans « Archivés »).
+   Base et Expert : pas de bouton « supprimer » qui archive ; Expert : suppression vraie à côté d'« archiver ». */
+body.mode-intermediaire .suppression-vraie,
+body:not(.mode-intermediaire) .archive-comme-suppression {
+  display: none;
+}
