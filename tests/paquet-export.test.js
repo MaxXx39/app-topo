@@ -29,6 +29,16 @@ describe('ZIP cadastre + swisstopo', () => {
     expect(texte).toContain('_swisstopo_points.txt');
     expect(texte).toContain('SW-1');
   });
+  it('TXT : tous les points de la surface (ID, X, Y, Z séparés par des tabulations)', async () => {
+    const surfaces = [{ id: 'sw', type: 'swisstopo', points: [{ nom: 'SW-1', est: 2500000.5, nord: 1100000, altitude: 400.25 }, { nom: 'SW-2', est: 2500010, nord: 1100005.125, altitude: 401 }] }];
+    const projetSw = { ...projet, leves: [], surfaces };
+    // Comme main.js : les points sont ceux de la surface elle-même.
+    const r = await fabriquerPaquet(projetSw, { cadastre: false, swisstopo: true, photo: false }, { trianglesDe: () => [], pointsDe: (s) => s.points });
+    const octets = new Uint8Array(await r.blob.arrayBuffer());
+    const texte = new TextDecoder('latin1').decode(octets);
+    expect(texte).toContain('SW-1\t2500000.500\t1100000.000\t400.250');
+    expect(texte).toContain('SW-2\t2500010.000\t1100005.125\t401.000');
+  });
   it('points du cadastre sur demande', async () => {
     const r = await fabriquerPaquet(projet, { cadastre: true, cadastrePoints: true, swisstopo: false, photo: false }, aidesTxt);
     expect(await lire(r)).toContain('CADASTRE_POINTS');
