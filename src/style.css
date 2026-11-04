@@ -10543,3 +10543,10 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
 .vue-guidage .ligne-segment .choix-segment .bouton-secondaire { min-width: 44px; min-height: 40px; padding: 0 8px; }
 .vue-guidage .entete-guidage { margin-bottom: 2px; }
 .vue-guidage .choix-implantation-type { margin-bottom: 4px; }
+/* Vue 3D (0.126.0) : élément à voir, couleurs, transparence, zoom et vue de départ. */
+.fenetre-3d .entete-3d select { min-height: 44px; max-width: 45%; font: inherit; font-weight: 700; }
+.fenetre-3d .outils-3d { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 6px 0; }
+.fenetre-3d .bascule-3d { display: flex; gap: 4px; }
+.fenetre-3d .bascule-3d .puce-choix { min-height: 40px; }
+.fenetre-3d .zoom-3d { display: flex; gap: 6px; margin-left: auto; }
+.fenetre-3d .zoom-3d .bouton-secondaire { min-width: 44px; min-height: 44px; font-size: 1.1rem; }

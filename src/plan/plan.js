@@ -1751,8 +1751,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   appliquerTransparence(); // transparence de départ (60 %)
   // Vue 3D (0.99.0, Expert) : les triangles des levés et surfaces montrés sur le plan.
   conteneur.querySelector('[data-action="vue-3d"]').addEventListener('click', () => {
-    const triangles = dessin.stocks.flatMap((stock, index) => (estVisible(stock) ? dessin.resultats[index]?.trianglesDessus ?? [] : []));
-    ouvrirVue3d(triangles, dessin.stocks.filter((stock) => estVisible(stock)).map((s) => s.nom).join(', ') || 'Vue 3D');
+    // 0.126.0 : un élément par levé / surface (choix « Tout » ou un seul dans la fenêtre 3D).
+    const elements = dessin.stocks
+      .map((stock, index) => ({ nom: stock.nom, triangles: estVisible(stock) ? dessin.resultats[index]?.trianglesDessus ?? [] : [] }))
+      .filter((e) => e.triangles.length > 0);
+    ouvrirVue3d(elements, 'Vue 3D');
   });
   // « Seul » : seulement ce sur quoi je travaille (main.js choisit quoi garder).
   const boutonSeul = conteneur.querySelector('[data-action="seul-travail"]');
