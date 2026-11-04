@@ -10352,3 +10352,22 @@ body.mode-telephone .ligne-nette .icone-fleche, body.mode-telephone .ligne-nette
 body.mode-telephone .ligne-nette .libelle-ecart .icone-drapeau { width: 18px; height: 22px; }
 .onglets button.onglet-reglages-bas svg { overflow: visible; }
 .onglets button.onglet-reglages-bas .marche-arret { stroke-width: 2.2; }
+.onglets button.onglet-reglages-bas svg { width: 30px; height: 30px; }
+body.mode-telephone .onglets button.onglet-reglages-bas svg { width: 26px; height: 26px; }
+.ecart-et-regle .colonne-regle { align-items: stretch; }
+.ecart-et-regle .colonne-regle > div { width: 100%; }
+.ecart-et-regle > .ecart-direct:not(.attente) { min-height: 60px; }
+.fenetre-reglages .pied-reglages { display: flex; gap: 10px; align-items: stretch; margin-top: 8px; }
+.fenetre-reglages .pied-reglages .bouton-fermer-appli { flex: 1 1 auto; width: auto; margin: 0; }
+.fenetre-reglages .pied-reglages .bouton { min-width: 90px; }
+.fenetre-reglages .mise-a-jour-reglages { text-align: center; }
+/* Téléphone (0.123.0) : Réglages en icône seule, boutons serrés, textes de la ligne plus petits. */
+body.mode-telephone .onglets button.onglet-reglages-bas { min-width: 34px; padding: 0 2px; }
+body.mode-telephone .onglets button.onglet-reglages-bas span { display: none; }
+body.mode-telephone .onglets button.onglet-plan { min-width: 40px; padding: 0 2px; }
+body.mode-telephone .onglets button[data-mode-terrain] { margin-left: 1px; margin-right: 1px; padding: 0 1px; }
+body.mode-telephone .onglets button span { letter-spacing: -0.02em; }
+body.mode-telephone .ligne-nette .libelle-ecart, body.mode-telephone .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 12px; }
+body.mode-telephone .ligne-nette .ligne-ecart strong, body.mode-telephone .ligne-nette .bloc-hauteur strong { font-size: 18px; }
+body.mode-telephone .ligne-nette .libelle-ecart .icone-drapeau { width: 14px; height: 18px; }
+body.mode-telephone .ligne-nette .icone-fleche { width: 16px; height: 16px; }

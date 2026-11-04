@@ -224,13 +224,13 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
         <button type="button" class="bouton-secondaire bouton-large" data-action="recepteur">Récepteur GNSS, corrections, hauteur de canne…</button>
       </div>` : ''}
       <p class="aide version-reglages">Version de l'appli : ${__VERSION_APPLI__}${recepteur ? ' (appli Android)' : ''}</p>
-      ${fermerAppli ? `<button type="button" class="bouton-fermer-appli" data-action="fermer-appli">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>Fermer l'appli</button>` : ''}
       ${recepteur ? `<div class="mise-a-jour-reglages">
         <button type="button" class="bouton-lien bouton-lien-neutre" data-action="chercher-mise-a-jour">Chercher une mise à jour</button>
         <span class="aide" data-zone="mise-a-jour" role="status"></span>
       </div>` : ''}
-      <div class="ligne-outils">
+      <div class="ligne-outils pied-reglages">
+  ${fermerAppli ? `<button type="button" class="bouton-fermer-appli" data-action="fermer-appli">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>Fermer l'appli</button>` : ''}
         <button class="bouton">OK</button>
       </div>
     </form>`;

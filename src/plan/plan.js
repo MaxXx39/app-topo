@@ -2272,6 +2272,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     cadrerSur(coins, minimum = 10) {
       const { largeur, hauteur } = taille();
       if (largeur === 0 || hauteur === 0 || coins.length === 0) return;
+      // 0.123 : le suivi de la position (cap ou nord en haut) reste : on zoome seulement pour que
+      // les points tiennent autour de la position, au milieu de l'écran.
+      if (position && suivi !== 'libre') {
+        const loin = Math.min(300, Math.max(minimum / 2, ...coins.map((c) => Math.hypot(c.est - position.est, c.nord - position.nord))));
+        const echelle = (Math.min(largeur, hauteur) / 2 - 40) / loin;
+        vue = vue ? { ...vue, echelle } : { echelle, estCentre: position.est, nordCentre: position.nord, largeur, hauteur };
+        centrerSurPosition();
+        return;
+      }
       changerSuivi('libre');
       const cadre = cadrerSurPoints(coins, largeur, hauteur, 40);
       vue = { ...cadre, echelle: Math.min(cadre.echelle, Math.min(largeur, hauteur) / minimum) };
