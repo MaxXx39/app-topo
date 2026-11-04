@@ -1284,6 +1284,25 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         retenirReglagesTerrain();
         recalculer();
       },
+      // 0.126.0 (demande du 05.11) : « Altitude ici » : l'altitude mesurée par le GNSS là où est la canne
+      // (mêmes vérifications qu'un point : RTK fixe, inclinaison prête) devient l'altitude voulue.
+      prendreAltitudeIci: () => {
+        const reponse = prendrePointRecepteur();
+        if (!reponse.ok) {
+          refuser(`Altitude non prise : ${reponse.raison}`);
+          return;
+        }
+        const altitude = Number(reponse.point.altitude);
+        if (!Number.isFinite(altitude)) {
+          refuser('Altitude non prise : le GNSS ne donne pas d\'altitude');
+          return;
+        }
+        terrain.altitudeVoulue = Math.round(altitude * 1000) / 1000;
+        retenirReglagesTerrain();
+        sonValidation();
+        afficherMessage(`Altitude voulue : ${terrain.altitudeVoulue.toFixed(3)} (mesurée ici)`);
+        recalculer();
+      },
       // 0.106 : on change l'altitude du point en cours d'implantation (le point de la liste n'est pas modifié)
       reglerAltitudeCible: (texte) => {
         const lue = lireAltitude(texte);

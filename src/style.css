@@ -10532,3 +10532,14 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
   background: #db2777;
   color: #ffffff;
 }
+/* Implanter › Altitude : « Altitude ici » à côté du champ (0.126.0). */
+.ligne-altitude-voulue { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.ligne-altitude-voulue .champ-altitude-voulue { flex: 1 1 200px; margin: 0; }
+.ligne-altitude-voulue .bouton-altitude-ici { min-height: 44px; white-space: nowrap; }
+/* Implanter › Ligne : moins de place entre le plan et le guidage (0.126.0, demande du 05.11). */
+.vue-guidage .ligne-segment { display: flex; align-items: center; gap: 8px; margin: 2px 0 4px; }
+.vue-guidage .ligne-segment .bascule-segment { flex: 1 1 auto; margin: 0; }
+.vue-guidage .ligne-segment .choix-segment { flex: none; margin: 0; gap: 6px; }
+.vue-guidage .ligne-segment .choix-segment .bouton-secondaire { min-width: 44px; min-height: 40px; padding: 0 8px; }
+.vue-guidage .entete-guidage { margin-bottom: 2px; }
+.vue-guidage .choix-implantation-type { margin-bottom: 4px; }
