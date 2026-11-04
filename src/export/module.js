@@ -19,6 +19,7 @@ const SORTES = [
   ['controles', 'Contrôles', ''],
   ['implantations', 'Implantations', 'expert'],
   ['dxf', 'Plans DXF recalés', 'expert'],
+  ['paquet', 'Cadastre · Swisstopo · photo', 'expert'],
   ['projet', 'Fichier projet', 'expert'],
 ];
 
@@ -59,6 +60,17 @@ export function creerModuleExport(conteneur, actions) {
     else if (quoi === 'implantations') actions.exporterImplantations();
     else if (quoi === 'dxf') actions.exporterPlanRecale(id);
     else if (quoi === 'projet') actions.exporterProjet();
+    else if (quoi === 'paquet') actions.exporterPaquet({ ...choixPaquet }, (texte) => { const zone = panneau('paquet').querySelector('[data-zone="message-paquet"]'); if (zone) zone.textContent = texte; });
+  });
+  // Choix du paquet (cases, marge, pixel), gardés quand le panneau est redessiné.
+  const choixPaquet = { cadastre: true, swisstopo: true, photo: true, marge: 30, resolution: 0.25 };
+  conteneur.addEventListener('change', (evenement) => {
+    const champ = evenement.target.closest('[data-paquet]');
+    if (!champ) return;
+    const cle = champ.dataset.paquet;
+    if (champ.type === 'checkbox') choixPaquet[cle] = champ.checked;
+    else if (cle === 'marge') choixPaquet.marge = Math.min(500, Math.max(0, Number(String(champ.value).replace(',', '.')) || 0));
+    else choixPaquet[cle] = Number(champ.value);
   });
 
   /** Montre la partie choisie (bouton allumé, sa zone visible) ; une partie d'un mode plus haut → Contrôles. */
@@ -104,6 +116,21 @@ export function creerModuleExport(conteneur, actions) {
     panneau('dxf').innerHTML = recales.length > 0
       ? `<div class="lignes-export">${recales.map((p) => `<div class="ligne-export"><span><strong>${echapper(p.nom)}</strong> <span class="aide">recalé en MN95</span></span>${bouton('DXF', `data-export="dxf" data-id="${p.id}"`)}</div>`).join('')}</div>`
       : '<p class="vide">Aucun plan DXF recalé.</p>';
+    const nbCadastres = projet.leves.filter((l) => l.cadastre).length;
+    const nbSwisstopo = projet.surfaces.filter((x) => x.type === 'swisstopo').length;
+    const case1 = (cle, texte) => `<label class="case"><input type="checkbox" data-paquet="${cle}" ${choixPaquet[cle] ? 'checked' : ''} /> ${texte}</label>`;
+    panneau('paquet').innerHTML = `<p class="aide">un seul clic : un fichier ZIP avec un DXF (un calque par élément) et la photo aérienne géoréférencée</p>
+      ${case1('cadastre', `Cadastre importé : lignes et points <span class="aide">(${nbCadastres})</span>`)}
+      ${case1('swisstopo', `Surface Swisstopo en 3D <span class="aide">(${nbSwisstopo})</span>`)}
+      ${case1('photo', 'Photo aérienne swisstopo (GeoTIFF, internet nécessaire)')}
+      <div class="champs-export">
+        <label>Marge de la photo (m)<input type="text" inputmode="decimal" data-paquet="marge" value="${choixPaquet.marge}" /></label>
+        <label>Taille du pixel
+          <select data-paquet="resolution">${[[0.1, '10 cm'], [0.25, '25 cm'], [0.5, '50 cm'], [1, '1 m']].map(([v, t]) => `<option value="${v}" ${v === choixPaquet.resolution ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        </label>
+      </div>
+      <div class="ligne-outils">${bouton('Exporter en ZIP', 'data-export="paquet"')}</div>
+      <p class="aide" data-zone="message-paquet"></p>`;
     panneau('projet').innerHTML = `<p class="aide">tout le projet, pour l'ouvrir sur un autre appareil sans Drive</p>
       <div class="ligne-outils">${bouton('Fichier projet (.topo.json)', 'data-export="projet"')}</div>`;
     montrerSorte();

@@ -118,7 +118,7 @@ export function crc32(octets) {
 }
 
 /** Zip (Uint8Array) de fichiers [[nom, octets]], sans compression. */
-function zipper(fichiers) {
+export function zipper(fichiers) {
   const morceaux = [];
   const central = [];
   let position = 0;

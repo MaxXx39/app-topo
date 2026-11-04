@@ -169,7 +169,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     <form method="dialog">
       ${fermerAppli ? `<button type="button" class="bouton bouton-fermer-appli" data-action="fermer-appli">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>Fermer l'appli</button>` : ''}
-      <h2>Réglages de cet appareil</h2>
+      <h2 class="titre-reglages">Réglages · <span data-titre-page>${PAGES_REGLAGES.find(([cle]) => cle === pageOuverte)?.[1] ?? ''}</span></h2>
       <div class="onglets-reglages" role="tablist" aria-label="Parties des réglages">
         ${PAGES_REGLAGES.filter(([cle]) => cle !== 'recepteur' || recepteur).map(([cle, titre, classe]) => `<button type="button" role="tab" class="onglet-reglages ${classe} ${cle === pageOuverte ? 'actif' : ''}" data-page-reglages="${cle}" aria-selected="${cle === pageOuverte}">${titre}</button>`).join('')}
       </div>
@@ -271,6 +271,8 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       onglet.setAttribute('aria-selected', String(onglet.dataset.pageReglages === cle));
     }
     for (const page of fenetre.querySelectorAll('.page-reglages')) page.hidden = page.dataset.page !== cle;
+    const titre = fenetre.querySelector('[data-titre-page]');
+    if (titre) titre.textContent = PAGES_REGLAGES.find(([c]) => c === cle)?.[1] ?? '';
   }
   fenetre.addEventListener('click', (evenement) => {
     const onglet = evenement.target.closest('[data-page-reglages]');
