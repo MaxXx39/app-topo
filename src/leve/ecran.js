@@ -667,22 +667,21 @@ export function creerEcranLeve(conteneur, actions) {
     const hauteur = g.ecartAltitude == null
       ? '<div class="bloc-hauteur sans-altitude">pas d\'altitude</div>'
       : `<div class="bloc-hauteur ${g.classeAltitude}"><span class="libelle-ecart">${iconeFleche(g.ecartAltitude >= 0 ? 'monter' : 'descendre')}${g.ecartAltitude >= 0 ? 'Monter' : 'Descendre'}</span><strong>${m(g.ecartAltitude)}</strong></div>`;
-    // 0.123 : « Tourne-toi de x° vers la droite / gauche » pour être dans l'axe de la ligne.
+    // 0.123 : se tourner pour être dans l'axe de la ligne : flèche en rond (gauche / droite) et les degrés,
+    // dans le couloir, en bas à droite ; rien quand on est dans l'axe à ±5° près.
     const degres = g.virage != null ? Math.round(Math.abs(g.virage)) : null;
-    const dansLAxe = degres != null && degres < 3;
-    const virage = degres == null ? ''
-      : `<div class="bloc-virage ${dansLAxe ? 'dans-axe' : ''}">${dansLAxe ? iconeFleche('monter') : iconeVirage(g.virage > 0 ? 'droite' : 'gauche')}<span>${dansLAxe ? 'Dans l\'axe de la ligne' : `Tourne-toi de <strong>${degres}°</strong> vers la ${g.virage > 0 ? 'droite' : 'gauche'}`}</span></div>`;
+    const virage = degres == null || degres <= 5 ? ''
+      : `<span class="virage-couloir" title="Tourne-toi de ${degres}° vers la ${g.virage > 0 ? 'droite' : 'gauche'}">${iconeVirage(g.virage > 0 ? 'droite' : 'gauche')}<strong>${degres}°</strong></span>`;
     zone.className = 'guidage-direct ligne-nette';
     zone.innerHTML = `
       <div class="colonne-ecarts">
-        ${virage}
         <div class="bloc-lateral ${g.classeLaterale ?? ''}">
           <div class="ligne-ecart">${sens}<strong>${m(ecart)}</strong></div>
         </div>
         <div class="bloc-lateral bloc-bouts ${g.classeBout ?? ''}">${leLong}</div>
         ${hauteur}
       </div>
-      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale))}`;
+      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale), virage)}`;
   }
 
   /**
@@ -1526,7 +1525,7 @@ function couleurLaterale(classe) {
  * de la cible : 10 m, 2 m, 1 m, 20 cm), au bord. Fait en blocs HTML placés en % (pas en SVG) pour
  * remplir toute la case sans déformer le rond de la canne. ecart : m, + à droite.
  */
-function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur) {
+function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage = '') {
   const bandes = BANDES_COULOIR[numero];
   const haut = 18; // % : haut du trait (la fin)
   const bas = 76; // % : bas du trait (le début)
@@ -1537,10 +1536,10 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur) {
   const left = 50 + Math.max(-demi, Math.min(demi, (ecart / bandes[0]) * demi));
   const texte = (r) => (r >= 1 ? `${r} m` : `${Math.round(r * 100)} cm`);
   // 0.118.2 : seulement la graduation la plus éloignée (la bande la plus large), juste pour un
-  // aperçu de l'échelle ; sa distance écrite en bas à droite.
+  // aperçu de l'échelle ; sa distance écrite en haut à droite (0.123 : en bas, la flèche pour se tourner).
   const r = bandes[0];
   const reglettes = `<span class="reglette" style="left: ${50 - demi}%"></span><span class="reglette" style="left: ${50 + demi}%"></span>
-    <span class="texte-reglette en-bas au-bord" style="left: ${50 + demi}%">${texte(r)}</span>`;
+    <span class="texte-reglette en-haut-coin au-bord" style="left: ${50 + demi}%">${texte(r)}</span>`;
   return `<div class="cadre-couloir" role="img" aria-label="Position de la canne le long de la ligne">
     ${reglettes}
     <span class="trait-couloir" style="top: ${haut}%; bottom: ${100 - bas}%"></span>
@@ -1549,6 +1548,7 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur) {
     <span class="drapeau-couloir fin" style="top: ${haut}%">${iconeDrapeau('fin')}</span>
     <span class="drapeau-couloir debut" style="top: ${bas}%">${iconeDrapeau('debut')}</span>
     <span class="moi-couloir" style="left: ${left.toFixed(1)}%; top: ${top.toFixed(1)}%; background: ${couleur}"></span>
+    ${virage}
   </div>`;
 }
 

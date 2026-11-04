@@ -10396,3 +10396,20 @@ body.regle-sous-plan .ecart-et-regle .ecart-direct .fleche-ecart { font-size: 2.
 body.regle-sous-plan .ecart-et-regle .ecart-direct .valeur-ecart { font-size: 1.9rem; }
 body.regle-sous-plan .ecart-et-regle .ecart-direct .detail-ecart { font-size: 0.85rem; }
 body.mode-telephone.regle-sous-plan .ecart-et-regle .ecart-direct .valeur-ecart { font-size: 1.55rem; }
+/* Implanter › Ligne (0.123.0) : échelle du couloir en haut à droite, flèche pour se tourner + degrés en bas à droite. */
+.cadre-couloir .texte-reglette.en-haut-coin { top: 3px; bottom: auto; }
+.cadre-couloir .virage-couloir {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  color: #ffffff;
+  line-height: 1;
+}
+.cadre-couloir .virage-couloir .icone-virage { width: 34px; height: 34px; stroke-width: 2.8; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+.cadre-couloir .virage-couloir strong { font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+body.mode-telephone .cadre-couloir .virage-couloir .icone-virage { width: 24px; height: 24px; }
+body.mode-telephone .cadre-couloir .virage-couloir strong { font-size: 12px; }
