@@ -918,6 +918,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     dessin.stocks.forEach((stock, index) => {
       const actif = stock === dessin.stockActif;
       if (!estVisible(stock)) return;
+      // Suppression de triangles (0.120.1) : seule la surface en cours d'édition est dessinée (pas les triangles des autres).
+      if (dessin.modeTriangles && !actif) return;
       // Chaque levé dans son groupe : pâli s'il n'est pas celui sur lequel on travaille (0.118.1).
       const groupe = creerElement('g', { class: palir && stock.id !== palir.stockId ? 'pale' : '' });
       groupeStocks.append(groupe);
@@ -1055,7 +1057,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           return `M${a.x} ${a.y} L${b.x} ${b.y} L${c.x} ${c.y} Z`;
         })
         .join(' ');
-    if (calques.triangles && surface.triangles.length > 0) {
+    // Pendant la suppression au doigt, les triangles sont montrés d'office (même si la case « Triangles » est décochée).
+    if ((calques.triangles || dessin.modeTriangles) && surface.triangles.length > 0) {
       groupe.append(creerElement('path', { d: trace(surface.triangles), class: 'surface-triangles' }));
     }
     if (surface.trianglesRetires.length > 0) {
