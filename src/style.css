@@ -10350,3 +10350,5 @@ body.mode-telephone .ligne-nette .ligne-ecart strong, body.mode-telephone .ligne
 body.mode-telephone .ligne-nette .bloc-virage { font-size: 12px; }
 body.mode-telephone .ligne-nette .icone-fleche, body.mode-telephone .ligne-nette .bloc-hauteur .icone-fleche { width: 20px; height: 20px; }
 body.mode-telephone .ligne-nette .libelle-ecart .icone-drapeau { width: 18px; height: 22px; }
+.onglets button.onglet-reglages-bas svg { overflow: visible; }
+.onglets button.onglet-reglages-bas .marche-arret { stroke-width: 2.2; }
