@@ -112,6 +112,7 @@ import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
 import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
+import { fabriquerPaquet } from './export/paquet.js';
 import { creerBarreRecalage } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
 import { ajouterTous } from './outils/bornes.js';
@@ -560,6 +561,20 @@ const moduleExport = creerModuleExport(document.querySelector('#exporter-projet'
   exporterReseaux: (format) => exporterReseaux(format),
   exporterImplantations: () => exporterImplantations(),
   exporterPlanRecale: (id) => exporterPlanRecale(id),
+  // Cadastre · Swisstopo · photo en un clic (0.121.0) : ZIP avec le DXF et le GeoTIFF.
+  exporterPaquet: async (options, dire) => {
+    const resultat = await fabriquerPaquet(projet, options, {
+      trianglesDe: (surface) => surfacesCalculees.get(surface.id)?.triangles ?? [],
+      pointsDe: (surface) => pointsDuLeve(surface.leveId),
+      dire,
+    });
+    if (resultat.erreur) {
+      dire(resultat.erreur);
+      return;
+    }
+    dire(`Prêt : ${resultat.nom}`);
+    telecharger(resultat.blob, resultat.nom);
+  },
   exporterProjet: () => {
     const complet = completerProjet(projet);
     telecharger(new Blob([ecrireFichierProjet(complet)], { type: 'application/json' }), `${nomDeFichierProjet(complet)}.topo.json`);
