@@ -10207,3 +10207,20 @@ body.sur-site[data-onglet='terrain'] .titre-page { border-bottom-color: var(--am
 .fenetre-reglages .page-reglages:not([hidden]) { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .fenetre-reglages .onglets-reglages { flex: 0 0 auto; }
 .fenetre-reglages .version-reglages { flex: 0 0 auto; }
+
+/* 0.122.0 : points et altitudes des surfaces importées (cases de Surface Import dans « Afficher »). */
+.plan .points-surface .point-surface { fill: #1d4ed8; stroke: #ffffff; stroke-width: 0.6; }
+.plan .points-surface text.altitude { fill: var(--gris); }
+
+/* 0.122.0 : pente écrite dans un talus de Dessin (à côté des barbules), poignées des coupes plus grosses à saisir. */
+.plan .implantation .pente-talus {
+  fill: #7c2d12;
+  font-size: calc(11px * var(--echelle-texte, 1));
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.plan .coupes .poignee-coupe { cursor: grab; stroke: #ffffff; stroke-width: 1.5; }
+.puce-coupe svg { stroke: currentColor; fill: none; }

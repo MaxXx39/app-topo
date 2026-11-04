@@ -12,9 +12,10 @@ import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee, origineSurface, nomNature, nouvelIdentifiant, NATURES_IMPORT, avecPrefixe, sansPrefixe, prefixeDuNom } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, estSurfaceFichier, origineSurface, nomNature, nouvelIdentifiant, NATURES_IMPORT, avecPrefixe, sansPrefixe, prefixeDuNom } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul, nouveauVolume } from './volumes/calculs.js';
 import { talusDePlateforme, PENTES_TALUS } from './topo/plateforme-talus.js';
+import { tranchesDeTalus } from './topo/tranches-talus.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
 import { creerEcranVolumes, texteBase } from './volumes/ecran.js';
@@ -24,7 +25,7 @@ import { ouvrirFenetreExport } from './export/fenetre-export.js';
 import { FORMATS_POINTS, fichierPoints } from './export/points.js';
 import { creerEcranProjet, blocPartage } from './projet/ecran.js';
 import { creerEcranImport } from './import/ecran.js';
-import { creerEcranCoupes } from './coupes/ecran.js';
+import { creerEcranCoupes, nouvelleCoupe } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
 import { creerEcranDessin } from './dessin/ecran.js';
 import { gisement, directionTournee, passerParSommet, altitudeProchainSommet, altitudeSelonChoix, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt, surfaceDuDessin } from './topo/dessin.js';
@@ -323,7 +324,7 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="volumes">
         <h2>Volumes ${bulle('volumes')}</h2>
         <div id="volumes"></div>
-        <div id="coupes" class="carte-section seulement-expert"></div>
+        <div id="coupes" class="carte-section seulement-intermediaire"></div>
       </section>
       <section class="panneau" data-onglet="mesures">
         <h2>Mesures / métrés ${bulle('mesures')}</h2>
@@ -1645,6 +1646,8 @@ function envoyerImplantationAuPlan() {
   plan.afficherImplantation(accrocheActive || avecPilote || aImplanter.length > 0 || implantes.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0
     ? {
         actif: accrocheActive || avecPilote,
+        // Talus des dessins : barbules du haut vers le bas et pente écrite dedans (0.122.0).
+        talusDessins: dessins.flatMap((d) => tranchesDuDessin(d)),
         dessins: dessins.map((d) => ({ ...d, noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom), couleur: projet.couleursListes?.[d.id] ?? null })),
         actifId: avecPilote ? pilote.dessinId : null,
         pilote: avecPilote ? { direction: pilote.direction, distance: lireNombreTape(pilote.distance) ?? null } : null,
@@ -2055,6 +2058,23 @@ function talusDuDessin(dessin) {
   const triangles = trianglesDeSurface(terrain.id);
   if (triangles.length === 0) return { erreur: `le terrain « ${terrain.nom} » n'a pas de triangles` };
   return talusDePlateforme(pointsDuDessin(dessin, projet.dessins), { remblai: reglage.remblai, deblai: reglage.deblai }, chercheurAltitude(triangles), { pas: 2 });
+}
+
+// Tranches de talus des dessins pour le plan (barbules et pente), gardées tant que le dessin, ses réglages
+// et son terrain ne changent pas : id du dessin → { signature, tranches }.
+const tranchesTalusDessins = new Map();
+
+/** Tranches de talus d'un dessin à dessiner sur le plan (0.122.0) : [] sans talus ou si le calcul échoue. */
+function tranchesDuDessin(dessin) {
+  const reglage = dessin?.talus;
+  if (!reglage?.actif) return [];
+  const sommets = pointsDuDessin(dessin, projet.dessins);
+  const signature = JSON.stringify([sommets.map((p) => [p.est, p.nord, p.altitude]), reglage, surfacesCalculees.get(reglage.terrainId)?.triangles?.length ?? 0]);
+  const gardee = tranchesTalusDessins.get(dessin.id);
+  if (gardee?.signature === signature) return gardee.tranches;
+  const tranches = tranchesDeTalus(talusDuDessin(dessin), { remblai: reglage.remblai, deblai: reglage.deblai });
+  tranchesTalusDessins.set(dessin.id, { signature, tranches });
+  return tranches;
 }
 
 /** Volume de la plateforme avec talus : comparée au terrain choisi (créé une fois, puis suivi). */
@@ -4504,6 +4524,15 @@ document.addEventListener('visibilitychange', () => {
 
 const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPosition: toucherPourCoupe,
+  // Coupe tracée et déplacée sur le plan (0.122.0, Intermédiaire) : bouton « Coupe », puis glisser A, A', B, B'.
+  quandCreerCoupe: creerCoupeSurPlan,
+  peutDeplacerCoupe: () => !refuserEnLectureSeule(),
+  quandDeplacerCoupe: (id, bout, position) => {
+    const coupe = projet.coupes.find((c) => c.id === id);
+    if (!coupe) return;
+    coupe[bout] = position;
+    modifie();
+  },
   // Un point touché va à la liste en cours : celle d'une mesure (onglet Calculs › Mesures) ou d'une surface.
   quandToucherPoint: (nom) => {
     if (ongletContexte === 'mesures') ecranMesures.toucherPoint(nom);
@@ -4693,6 +4722,22 @@ function commencerTrace(coupe) {
 }
 
 /** Abandonne le tracé en cours (la coupe garde sa position d'avant). */
+/** Bouton « Coupe » du plan : commence une nouvelle coupe (2 au plus), ou abandonne le tracé en cours. */
+function creerCoupeSurPlan() {
+  if (traceCoupe) {
+    arreterTrace();
+    return;
+  }
+  if (refuserEnLectureSeule()) return;
+  const nouvelle = nouvelleCoupe(projet);
+  if (!nouvelle) {
+    afficherMessage('Il y a déjà 2 coupes (A et B) : glisse leurs bouts sur le plan, ou supprime-en une dans Calculs › Volumes', 5000);
+    return;
+  }
+  modifie();
+  commencerTrace(nouvelle);
+}
+
 function arreterTrace() {
   traceCoupe = null;
   afficherMessage('Tracé annulé');
@@ -4939,6 +4984,8 @@ function recalculer({ recadrer = false } = {}) {
   const listes = gardees ? toutesLesListes.map((l) => ({ ...l, visible: l.visible && gardees.has(l.id) })) : toutesLesListes;
   plan.afficherCouleursPoints(couleursDesPoints(projet, listes));
   plan.afficherPointsImport(pointsDesImports(projet, listes));
+  // Points des surfaces importées (visibles dans « Afficher ») : cases Points / Altitudes de Surface Import (0.122.0).
+  plan.afficherPointsSurfaces(projet.surfaces.filter((s) => estSurfaceFichier(s) && !(projet.listesCachees ?? []).includes(s.id)).flatMap((s) => s.points ?? []));
   plan.afficherPhotos(photosDuPlan(listes));
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
