@@ -1,4 +1,5 @@
-// Dessin sur une photo (0.124.0, Intermédiaire) : cercle, flèche et trait libre en couleur, pour montrer un détail.
+// Dessin sur une photo (0.124.0, Intermédiaire) : cercle, flèche et trait libre en couleur, pour montrer un détail ;
+// outil « Déplacer » (0.125.1) : toucher un dessin le choisit (halo blanc), on le glisse au doigt.
 //
 // Les dessins sont rangés avec la photo (photo.dessins) et la photo d'origine n'est jamais modifiée :
 // on peut les rouvrir, en effacer, en ajouter. Chaque dessin a des positions entre 0 et 1
@@ -39,6 +40,44 @@ export function pointeFleche(a, b, largeur, hauteur, longueur) {
 export function dessinValide(forme, largeur, hauteur) {
   if (forme.type === 'trait') return forme.points.length >= 2;
   return Math.hypot((forme.b.x - forme.a.x) * largeur, (forme.b.y - forme.a.y) * hauteur) >= 6;
+}
+
+/** Distance (pixels) d'un point p à un segment a-b, tout en pixels. */
+function distanceSegment(p, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/**
+ * Dessin touché au doigt (0.125.1) : indice du dessin le plus récent sous le point p (positions de 0
+ * à 1), ou -1. Un cercle se prend sur son bord ou à l'intérieur ; une flèche ou un trait, à moins de
+ * "tolerance" pixels.
+ */
+export function formeSousLeDoigt(formes, p, largeur, hauteur, tolerance) {
+  const px = (q) => ({ x: q.x * largeur, y: q.y * hauteur });
+  const doigt = px(p);
+  for (let i = formes.length - 1; i >= 0; i--) {
+    const f = formes[i];
+    if (f.type === 'cercle') {
+      const centre = px(f.a);
+      if (Math.hypot(doigt.x - centre.x, doigt.y - centre.y) <= rayonCercle(f.a, f.b, largeur, hauteur) + tolerance) return i;
+    } else if (f.type === 'fleche') {
+      if (distanceSegment(doigt, px(f.a), px(f.b)) <= tolerance) return i;
+    } else if (f.type === 'trait') {
+      for (let k = 0; k + 1 < f.points.length; k++) if (distanceSegment(doigt, px(f.points[k]), px(f.points[k + 1])) <= tolerance) return i;
+    }
+  }
+  return -1;
+}
+
+/** Le même dessin décalé de dx, dy (positions de 0 à 1). */
+export function deplacerForme(forme, dx, dy) {
+  const bouger = (q) => ({ x: q.x + dx, y: q.y + dy });
+  if (forme.type === 'trait') return { ...forme, points: forme.points.map(bouger) };
+  return { ...forme, a: bouger(forme.a), b: bouger(forme.b) };
 }
 
 /** Épaisseur du trait (pixels) pour une photo de cette taille : environ 0,6 % du grand côté, au moins 3 px. */
@@ -141,6 +180,8 @@ export function ouvrirEditeurDessin(photo, depart = []) {
     let outil = 'cercle';
     let couleur = COULEURS_DESSIN[0][1];
     let enCours = null;
+    let deplacement = null; // outil Déplacer : { index, depart (doigt), forme (avant) }
+    let choisi = -1; // dessin montré comme choisi (outil Déplacer)
     const fenetre = document.createElement('dialog');
     fenetre.className = 'fenetre-dessin-photo';
     fenetre.innerHTML = `
@@ -149,6 +190,7 @@ export function ouvrirEditeurDessin(photo, depart = []) {
           <button type="button" class="outil-dessin actif" data-outil="cercle" title="Cercle"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /></svg>Cercle</button>
           <button type="button" class="outil-dessin" data-outil="fleche" title="Flèche"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 19 5M10 5h9v9" /></svg>Flèche</button>
           <button type="button" class="outil-dessin" data-outil="trait" title="Trait libre"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16c3-8 6 4 9-4s5-3 7-4" /></svg>Trait</button>
+          <button type="button" class="outil-dessin" data-outil="deplacer" title="Déplacer un dessin"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3 9 6M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" /></svg>Déplacer</button>
         </div>
         <div class="groupe-dessin-photo" role="group" aria-label="Couleur">
           ${COULEURS_DESSIN.map(([nom, hex], i) => `<button type="button" class="couleur-dessin ${i === 0 ? 'actif' : ''}" data-couleur="${hex}" style="background:${hex}" title="${nom}" aria-label="${nom}"></button>`).join('')}
@@ -170,6 +212,14 @@ export function ouvrirEditeurDessin(photo, depart = []) {
       if (!image.naturalWidth) return;
       ctx.clearRect(0, 0, canevas.width, canevas.height);
       ctx.drawImage(image, 0, 0, canevas.width, canevas.height);
+      // Dessin choisi (outil Déplacer) : un halo blanc dessous, pour bien le voir.
+      if (choisi >= 0 && formes[choisi]) {
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.filter = `blur(${Math.max(2, epaisseurTrait(canevas.width, canevas.height))}px)`;
+        dessinerFormes(ctx, [{ ...formes[choisi], couleur: '#ffffff' }], canevas.width, canevas.height);
+        ctx.restore();
+      }
       dessinerFormes(ctx, enCours ? [...formes, enCours] : formes, canevas.width, canevas.height);
     };
     const ajuster = () => {
@@ -196,10 +246,24 @@ export function ouvrirEditeurDessin(photo, depart = []) {
     canevas.addEventListener('pointerdown', (evenement) => {
       canevas.setPointerCapture(evenement.pointerId);
       const p = position(evenement);
+      if (outil === 'deplacer') {
+        // Tolérance du doigt : environ 2 % du grand côté de la photo.
+        const tolerance = Math.max(canevas.width, canevas.height) * 0.02;
+        choisi = formeSousLeDoigt(formes, p, canevas.width, canevas.height, tolerance);
+        deplacement = choisi >= 0 ? { index: choisi, depart: p, forme: formes[choisi] } : null;
+        redessiner();
+        return;
+      }
       enCours = outil === 'trait' ? { type: 'trait', couleur, points: [p] } : { type: outil, couleur, a: p, b: p };
       redessiner();
     });
     canevas.addEventListener('pointermove', (evenement) => {
+      if (deplacement) {
+        const p = position(evenement);
+        formes[deplacement.index] = deplacerForme(deplacement.forme, p.x - deplacement.depart.x, p.y - deplacement.depart.y);
+        redessiner();
+        return;
+      }
       if (!enCours) return;
       const p = position(evenement);
       if (enCours.type === 'trait') enCours.points.push(p);
@@ -207,6 +271,7 @@ export function ouvrirEditeurDessin(photo, depart = []) {
       redessiner();
     });
     const finir = () => {
+      deplacement = null;
       if (!enCours) return;
       if (dessinValide(enCours, canevas.width, canevas.height)) formes.push(enCours);
       enCours = null;
@@ -222,15 +287,19 @@ export function ouvrirEditeurDessin(photo, depart = []) {
       if (!bouton) return;
       if (bouton.dataset.outil) {
         outil = bouton.dataset.outil;
+        choisi = -1;
+        redessiner();
         fenetre.querySelectorAll('.outil-dessin').forEach((b) => b.classList.toggle('actif', b === bouton));
       } else if (bouton.dataset.couleur) {
         couleur = bouton.dataset.couleur;
         fenetre.querySelectorAll('.couleur-dessin').forEach((b) => b.classList.toggle('actif', b === bouton));
       } else if (bouton.dataset.action === 'effacer-dernier') {
         formes.pop();
+        choisi = -1;
         redessiner();
       } else if (bouton.dataset.action === 'tout-effacer') {
         formes.length = 0;
+        choisi = -1;
         redessiner();
       } else if (bouton.dataset.action === 'valider') {
         fenetre.close();

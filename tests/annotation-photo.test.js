@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rayonCercle, pointeFleche, dessinValide, epaisseurTrait } from '../src/photos/annotation.js';
+import { rayonCercle, pointeFleche, dessinValide, epaisseurTrait, formeSousLeDoigt, deplacerForme } from '../src/photos/annotation.js';
 
 describe('dessin sur une photo', () => {
   it('rayon du cercle en pixels', () => {
@@ -31,5 +31,25 @@ describe('dessin sur une photo', () => {
   it('épaisseur : 0,6 % du grand côté, au moins 3 pixels', () => {
     expect(epaisseurTrait(1600, 1200)).toBe(10);
     expect(epaisseurTrait(240, 180)).toBe(3);
+  });
+
+  it('dessin sous le doigt : le plus récent d\'abord, cercle par son intérieur, flèche et trait à la tolérance près', () => {
+    const formes = [
+      { type: 'cercle', a: { x: 0.5, y: 0.5 }, b: { x: 0.6, y: 0.5 } },
+      { type: 'fleche', a: { x: 0.1, y: 0.1 }, b: { x: 0.3, y: 0.1 } },
+      { type: 'trait', points: [{ x: 0.5, y: 0.45 }, { x: 0.7, y: 0.45 }] },
+    ];
+    expect(formeSousLeDoigt(formes, { x: 0.52, y: 0.5 }, 1000, 1000, 10)).toBe(0);
+    expect(formeSousLeDoigt(formes, { x: 0.2, y: 0.105 }, 1000, 1000, 10)).toBe(1);
+    expect(formeSousLeDoigt(formes, { x: 0.55, y: 0.45 }, 1000, 1000, 10)).toBe(2); // dans le cercle aussi, mais le trait est plus récent
+    expect(formeSousLeDoigt(formes, { x: 0.9, y: 0.9 }, 1000, 1000, 10)).toBe(-1);
+  });
+
+  it('déplacer garde la forme et la taille', () => {
+    expect(deplacerForme({ type: 'cercle', couleur: 'r', a: { x: 0.5, y: 0.5 }, b: { x: 0.6, y: 0.5 } }, 0.1, -0.2))
+      .toEqual({ type: 'cercle', couleur: 'r', a: { x: 0.6, y: 0.3 }, b: { x: 0.7, y: 0.3 } });
+    const trait = deplacerForme({ type: 'trait', points: [{ x: 0, y: 0 }, { x: 0.1, y: 0.1 }] }, 0.5, 0.5);
+    expect(trait.points[0].x).toBeCloseTo(0.5);
+    expect(trait.points[1].y).toBeCloseTo(0.6);
   });
 });
