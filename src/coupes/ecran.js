@@ -11,6 +11,15 @@ import { preparerDessinCoupe, coupeEnSvg, texteEchellesCoupe, couleurCoupe } fro
 
 export const COUPES_MAX = 2;
 const NOMS_COUPES = ['A', 'B'];
+
+/** Nouvelle coupe (A puis B) ajoutée au projet, ou null s'il y en a déjà 2. Sa position se trace ensuite sur le plan. */
+export function nouvelleCoupe(projet) {
+  if (projet.coupes.length >= COUPES_MAX) return null;
+  const nom = NOMS_COUPES.find((n) => !projet.coupes.some((c) => c.nom === n));
+  const nouvelle = { id: nouvelIdentifiant(), nom, debut: null, fin: null, exageration: 1, dansPdf: false };
+  projet.coupes.push(nouvelle);
+  return nouvelle;
+}
 // Taille du dessin à l'écran (mm de la viewBox, mis à la largeur de l'écran).
 const DESSIN = { largeur: 120, hauteur: 80 };
 
@@ -34,10 +43,8 @@ export function creerEcranCoupes(conteneur, options) {
     const coupe = projet.coupes.find((c) => c.id === bouton.dataset.id);
     const action = bouton.dataset.action;
     if (action === 'ajouter-coupe') {
-      if (projet.coupes.length >= COUPES_MAX) return;
-      const nom = NOMS_COUPES.find((n) => !projet.coupes.some((c) => c.nom === n));
-      const nouvelle = { id: nouvelIdentifiant(), nom, debut: null, fin: null, exageration: 1, dansPdf: false };
-      projet.coupes.push(nouvelle);
+      const nouvelle = nouvelleCoupe(projet);
+      if (!nouvelle) return;
       quandChange();
       commencerTrace(nouvelle);
     } else if (action === 'retracer' && coupe) {

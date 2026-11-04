@@ -64,6 +64,11 @@ const CALQUES_DEPART = {
   volumes: false,
   palier: 'auto',
   couleursAltitudeImport: false,
+  // 0.122.0 : Surface Import (flèche d'Afficher, Intermédiaire) : triangles, courbes de niveau, points, altitudes.
+  trianglesImport: false,
+  courbesImport: false,
+  pointsSurface: false,
+  altitudesSurface: false,
   mesures: true,
   autresStocks: true,
 };
@@ -79,6 +84,8 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandToucherTriangle(triangle) : appelé quand on touche un triangle de la surface affichée,
  *   en mode suppression de triangles (dessin.modeTriangles)
  * - quandToucherPosition({ est, nord }) : appelé pendant le tracé d'une coupe (dessin.traceCoupe) ;
+ * - quandCreerCoupe() : bouton « Coupe » touché (0.122.0, Intermédiaire) ; quandDeplacerCoupe(id, 'debut' ou 'fin', { est, nord }) :
+ *   une extrémité de coupe glissée au doigt ; peutDeplacerCoupe() : faux en lecture seule ;
  * - quandChangerZone(sommets) : zone Swisstopo changée (sommet ajouté ou glissé ; voir tracerZone) ;
  *   près d'un point levé, la position est celle de ce point
  * - quandToucherMesure(id) : appelé quand on touche une mesure (onglet Calculs › Mesures, hors modification)
@@ -88,7 +95,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandBasculerSeul(actif) : bouton « Seul » (seulement ce sur quoi je travaille, 0.94.0)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
   // Réglages choisis ; « calques » est ce qui est dessiné : en dessous d'Expert, les réglages
   // d'Expert gardent leur valeur de départ.
   const calquesChoisis = { ...CALQUES_DEPART };
@@ -118,6 +125,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <button type="button" class="puce" data-action="listes-points" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
           Afficher
+        </button>
+        <button type="button" class="puce puce-coupe seulement-intermediaire" data-action="coupe" title="Tracer une coupe A – A' sur le plan (puis glisser ses bouts)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18 20 6" /><circle cx="4" cy="18" r="2" /><circle cx="20" cy="6" r="2" /></svg>
+          Coupe
         </button>
         <button type="button" class="puce puce-seul" data-action="seul-travail" aria-pressed="false" title="Seulement ce sur quoi je travaille">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></svg>
@@ -201,6 +212,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // Couleur de chaque point d'après sa liste (menu « Afficher » ou Projet, voir listes-points.js) : Map point → couleur.
   let couleursPoints = new Map();
   let pointsImport = new Set(); // points des listes « Points Import » (leur nom suit la case « Noms »)
+  let pointsSurfaces = []; // 0.122.0 : points des surfaces importées montrées (cases Points / Altitudes de Surface Import)
   // Vrai si le plan doit être recadré dès qu'il devient visible (il est caché dans un autre onglet).
   let recadrerQuandVisible = false;
   let cadreSurfacesImportees = 0; // sommets des surfaces importées sur lesquels on a déjà cadré (projet sans point)
@@ -270,6 +282,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Sans point, une surface importée (LandXML, DXF 3D) se dessine quand même (0.83.0).
     if (vue && points.length === 0 && sommetsDesSurfacesImportees().length > 0) {
       dessinerStocks();
+      dessinerPointsSurfaces();
       dessinerBarreEchelle();
       dessinerImplantation();
       dessinerPosition();
@@ -390,6 +403,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
     dessinerTracesMesures();
     svg.append(groupePoints, groupeNoms);
+    dessinerPointsSurfaces();
     dessinerEtiquettesMesures();
     dessinerCoupes();
     if (calques.volumes) dessinerVolumes();
@@ -409,6 +423,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // zone : { sommets: [{ est, nord }] } pendant le tracé, sinon null ; glisse : n° du sommet tenu.
   let zone = null;
   let glisse = null;
+  let glisseCoupe = null; // 0.122.0 : { coupe, bout, bouge } pendant qu'un bout de coupe est glissé au doigt
   function dessinerZone() {
     svg.querySelector('g.zone-swisstopo')?.remove();
     if (!zone || !vue) return;
@@ -539,6 +554,19 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const nom = creerElement('text', { x: x + 9, y: y - 6, class: 'nom-a-implanter' });
       nom.textContent = point.nom;
       autres.append(nom);
+    }
+    // Talus d'un dessin (0.122.0) : barbules (traits longs et courts) du haut vers le bas du talus, et la pente écrite dedans.
+    for (const tranche of implantation.talusDessins ?? []) {
+      const haut = tranche.haut.map((p) => versEcran(p.est, p.nord, vue));
+      const bas = tranche.bas.map((p) => versEcran(p.est, p.nord, vue));
+      const d = traitsDeBarbules(haut, bas, 9);
+      if (d) groupe.append(creerElement('path', { d, class: 'barbules-talus' }));
+      if (tranche.pente) {
+        const m = versEcran(tranche.milieu.est, tranche.milieu.nord, vue);
+        const texte = creerElement('text', { x: m.x, y: m.y + 4, 'text-anchor': 'middle', class: 'pente-talus' });
+        texte.textContent = tranche.pente;
+        groupe.append(texte);
+      }
     }
     // Ligne à implanter : trait sarcelle épais, sa parallèle en pointillés, « Début » et « Fin ».
     const ligne = implantation.ligne;
@@ -913,7 +941,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const dessous = creerElement('g', { class: palir ? 'pale' : '' });
     groupe.append(dessous);
     if (calques.remblaiDeblai) dessinerEcarts(dessous);
-    if (calques.couleursAltitude || calques.courbes || calques.couleursAltitudeImport) dessinerRelief(dessous);
+    if (calques.couleursAltitude || calques.courbes || calques.couleursAltitudeImport || calques.courbesImport) dessinerRelief(dessous);
     dessinerSurface(dessous);
     const groupeStocks = groupe;
     dessin.stocks.forEach((stock, index) => {
@@ -941,7 +969,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
             return `M${a.x} ${a.y} L${b.x} ${b.y} L${c.x} ${c.y} Z`;
           })
           .join(' ');
-        groupe.append(creerElement('path', { d: traces, class: `surface-importee ${nature}${calques.triangles ? ' avec-triangles' : ''}`, style }));
+        groupe.append(creerElement('path', { d: traces, class: `surface-importee ${nature}${calques.trianglesImport ? ' avec-triangles' : ''}`, style }));
         const bord = bordDuStock(resultat.trianglesDessus)
           .map(([p, q]) => {
             const [a, b] = [enPixels(p), enPixels(q)];
@@ -1015,6 +1043,36 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   }
 
   /**
+   * Points (ronds) et altitudes des surfaces importées (0.122.0, cases « Points » et « Altitudes » de Surface
+   * Import). Seulement ceux qui sont à l'écran, et pas plus de 4000 points (800 altitudes) pour rester fluide :
+   * zoomer en montre davantage.
+   */
+  function dessinerPointsSurfaces() {
+    if (!vue || pointsSurfaces.length === 0 || !(calques.pointsSurface || calques.altitudesSurface)) return;
+    const groupe = creerElement('g', { class: 'points-surface' });
+    const rayon = rayonFormes();
+    const echelle = echelleTexte();
+    let ronds = 0;
+    let textes = 0;
+    for (const point of pointsSurfaces) {
+      const { x, y } = versEcran(point.est, point.nord, vue);
+      if (x < -20 || y < -20 || x > vue.largeur + 20 || y > vue.hauteur + 20) continue;
+      if (calques.pointsSurface && ronds < 4000) {
+        ronds += 1;
+        groupe.append(creerElement('circle', { cx: x, cy: y, r: rayon * 0.8, class: 'point-surface' }));
+      }
+      if (calques.altitudesSurface && textes < 800 && Number.isFinite(point.altitude)) {
+        textes += 1;
+        const texte = creerElement('text', { x: x + rayon + 2, y: y - 2, class: 'altitude' });
+        texte.style.fontSize = `${10.2 * echelle}px`;
+        texte.textContent = formaterNombre(point.altitude);
+        groupe.append(texte);
+      }
+    }
+    svg.append(groupe);
+  }
+
+  /**
    * Remblai en rouge et déblai en jaune, par paliers de hauteur : sur la comparaison affichée
    * s'ils sont donnés, sinon sur les surfaces visibles (calcul de volume de chacune).
    */
@@ -1081,7 +1139,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const triangles = dessin.resultats[index]?.trianglesDessus ?? [];
       const importee = estSurfaceFichier(stock);
       if (importee ? calques.couleursAltitudeImport : calques.couleursAltitude) ajouterTous(pourCouleurs, triangles);
-      if (!importee && calques.courbes) ajouterTous(pourCourbes, triangles);
+      if (importee ? calques.courbesImport : calques.courbes) ajouterTous(pourCourbes, triangles);
     });
     // La surface affichée (onglet Calculs › Surfaces) est aussi coloriée, et les aires mesurées (onglet Calculs › Mesures).
     const autres = [...(dessin.surface?.triangles ?? []), ...(dessin.mesures ?? []).flatMap(({ resultat }) => resultat?.triangles ?? [])];
@@ -1196,7 +1254,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const longueur = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       const [ux, uy] = [(b.x - a.x) / longueur, (b.y - a.y) / longueur];
       for (const [bout, texte, sens] of [[a, coupe.nom, -1], [b, `${coupe.nom}'`, 1]]) {
-        groupe.append(creerElement('circle', { cx: bout.x, cy: bout.y, r: 4 }));
+        groupe.append(creerElement('circle', { cx: bout.x, cy: bout.y, r: 6, class: 'poignee-coupe' }));
         const etiquette = creerElement('text', { x: bout.x + sens * ux * 14, y: bout.y + sens * uy * 14 + 5, 'text-anchor': 'middle' });
         etiquette.textContent = texte;
         groupe.append(etiquette);
@@ -1207,6 +1265,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       groupe.append(creerElement('circle', { cx: a.x, cy: a.y, r: 7, class: 'debut-trace' }));
     }
     svg.append(groupe);
+  }
+
+  /** Redessine seulement les coupes (pendant qu'on glisse un de leurs bouts). */
+  function rafraichirCoupes() {
+    svg.querySelector('g.coupes')?.remove();
+    dessinerCoupes();
   }
 
   /**
@@ -1361,11 +1425,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   }
 
   /**
-   * Vue d'un projet encore vide (0.121.1) : Gland (VD), environ 600 m de large, pour pouvoir toucher le
+   * Vue d'un projet encore vide (0.121.1) : le point 2509468 / 1141162 (Gland, VD), environ 600 m de large, pour pouvoir toucher le
    * fond (photo, cadastre) et partir de là. Coordonnées approchées en MN95 (Est, Nord), mètres.
    */
   function vueDeDepart(largeur, hauteur) {
-    return { echelle: largeur / 600, estCentre: 2506500, nordCentre: 1139800, largeur, hauteur };
+    return { echelle: largeur / 600, estCentre: 2509468, nordCentre: 1141162, largeur, hauteur };
   }
 
   function toutVoir(surTout = false) {
@@ -1419,6 +1483,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   }
 
   // --- Boutons ---
+  conteneur.querySelector('[data-action="coupe"]').addEventListener('click', () => quandCreerCoupe?.());
   conteneur.querySelector('[data-action="tout-voir"]').addEventListener('click', () => {
     changerSuivi('libre');
     toutVoir(true);
@@ -1550,6 +1615,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function changerCalque(champ) {
     const cle = champ.dataset.calque;
     calquesChoisis[cle] = champ.type === 'checkbox' ? champ.checked : champ.type === 'range' ? Number(champ.value) : champ.value;
+    // Un même réglage à deux endroits (équidistance de Levé et de Surface Import) : les deux restent d'accord.
+    for (const autre of conteneur.querySelectorAll(`select[data-calque="${cle}"]`)) if (autre !== champ) autre.value = champ.value;
     // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre : un seul à la fois.
     const exclusifs = { remblaiDeblai: 'couleursAltitude', couleursAltitude: 'remblaiDeblai' };
     const autre = exclusifs[cle];
@@ -1664,7 +1731,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       ['courbes', 'Courbes de niveau', 'expert'],
     ],
     points: [['nomsImport', 'Noms', '']],
-    surface: [['couleursAltitudeImport', 'Couleurs selon l\'altitude', '']],
+    surface: [
+      ['couleursAltitudeImport', 'Couleurs selon l\'altitude', ''],
+      ['trianglesImport', 'Triangles', 'intermediaire'],
+      ['courbesImport', 'Courbes de niveau', 'intermediaire'],
+      ['pointsSurface', 'Points', 'intermediaire'],
+      ['altitudesSurface', 'Altitudes', 'intermediaire'],
+    ],
   };
   const caseCalque = (cle, titre, classe = '') => `<label class="case ${classe}"><input type="checkbox" data-calque="${cle}" ${calquesChoisis[cle] ? 'checked' : ''} /> ${titre}</label>`;
   const choixListe = (cle, valeurs, titre, unite) => `<label class="choix-equidistance">${titre}
@@ -1677,6 +1750,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     return `<div class="reglages-section ${niveau}" data-zone-roue="${section}" hidden>
       ${reglages.map(([cle, titre, n]) => caseCalque(cle, titre, n ? `seulement-${n}` : '')).join('')}
       ${section === 'leve' ? choixListe('equidistance', EQUIDISTANCES, 'Équidistance des courbes', 'm').replace('class="choix-equidistance"', 'class="choix-equidistance seulement-expert"') : ''}
+      ${section === 'surface' ? choixListe('equidistance', EQUIDISTANCES, 'Équidistance des courbes', 'm').replace('class="choix-equidistance"', 'class="choix-equidistance seulement-intermediaire"') : ''}
     </div>`;
   }
   /** Titre d'une catégorie, avec sa roue s'il y a des réglages. */
@@ -1841,6 +1915,22 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const position = positionDansPlan(evenement);
     pointeurs.set(evenement.pointerId, position);
     toucher = pointeurs.size === 1 ? position : null;
+    // Coupe (0.122.0) : un doigt posé sur le A, A', B ou B' d'une coupe le prend (il suit le doigt).
+    glisseCoupe = null;
+    if (!zone && !dessin.traceCoupe && vue && pointeurs.size === 1 && (dessin.coupes?.length ?? 0) > 0) {
+      let meilleur = RAYON_TOUCHER;
+      for (const coupe of dessin.coupes ?? []) {
+        for (const bout of ['debut', 'fin']) {
+          const d = distance(position, versEcran(coupe[bout].est, coupe[bout].nord, vue));
+          if (d <= meilleur) {
+            meilleur = d;
+            glisseCoupe = { coupe, bout, bouge: false };
+          }
+        }
+      }
+      // Lecture seule : on ne prend pas le bout (le plan se déplace comme d'habitude).
+      if (glisseCoupe && !(peutDeplacerCoupe?.() ?? true)) glisseCoupe = null;
+    }
     // Zone Swisstopo : un doigt posé sur un sommet le prend (il suit le doigt au lieu du plan).
     glisse = null;
     if (zone && vue && pointeurs.size === 1) {
@@ -1857,6 +1947,20 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   svg.addEventListener('pointermove', (evenement) => {
     if (!vue || !pointeurs.has(evenement.pointerId)) return;
+    if (glisseCoupe && pointeurs.size === 1) {
+      const position = positionDansPlan(evenement);
+      pointeurs.set(evenement.pointerId, position);
+      if (toucher && distance(toucher, position) > 6) toucher = null;
+      if (!toucher) {
+        // Le bout s'accroche au point levé le plus proche, sinon il suit le doigt (arrondi au mm).
+        const proche = pointLePlusProche(position);
+        const terrain = proche ? { est: proche.est, nord: proche.nord } : versTerrain(position.x, position.y, vue);
+        glisseCoupe.coupe[glisseCoupe.bout] = { est: Math.round(terrain.est * 1000) / 1000, nord: Math.round(terrain.nord * 1000) / 1000 };
+        glisseCoupe.bouge = true;
+        rafraichirCoupes();
+      }
+      return;
+    }
     if (glisse !== null && pointeurs.size === 1) {
       const position = positionDansPlan(evenement);
       pointeurs.set(evenement.pointerId, position);
@@ -1896,6 +2000,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   svg.addEventListener('pointerup', (evenement) => {
     pointeurs.delete(evenement.pointerId);
+    if (glisseCoupe) {
+      // Fin du glissement : la coupe garde sa nouvelle place (un simple toucher ne change rien).
+      const fini = glisseCoupe;
+      glisseCoupe = null;
+      toucher = null;
+      if (fini.bouge) quandDeplacerCoupe?.(fini.coupe.id, fini.bout, { ...fini.coupe[fini.bout] });
+      if (pointeurs.size === 0) finirLeGeste();
+      return;
+    }
     if (zone && glisse !== null) {
       // Fin du glissement d'un sommet (un simple toucher sur un sommet ne change rien).
       glisse = null;
@@ -1947,6 +2060,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   });
   svg.addEventListener('pointercancel', (evenement) => {
     pointeurs.delete(evenement.pointerId);
+    glisseCoupe = null;
     toucher = null;
     if (pointeurs.size === 0) finirLeGeste();
   });
@@ -2091,6 +2205,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       couleursPoints = couleurs;
     },
     /** Points des listes « Points Import » (Set) : leur nom suit la case « Noms » de la catégorie. */
+    /** Points des surfaces importées visibles (cases « Points » et « Altitudes » de Surface Import). */
+    afficherPointsSurfaces(liste) {
+      pointsSurfaces = liste;
+    },
     afficherPointsImport(points) {
       pointsImport = points;
     },
