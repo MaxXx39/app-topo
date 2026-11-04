@@ -44,9 +44,9 @@ const METRES_AUTOUR_DE_MOI = 20;
 // - Surface Import : couleurs selon l'altitude (roue, tous les modes) ;
 // - Métré : traits et valeurs des mesures.
 const CALQUES_DEPART = {
-  fondSatellite: false,
+  fondSatellite: true, // 0.121.1 : photo aérienne affichée au départ, transparente à 60 %
   cadastre: false,
-  transparencePhoto: 0,
+  transparencePhoto: 60,
   controleNoms: true,
   controleAltitudes: true,
   points: true,
@@ -130,10 +130,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <div class="menu-plans-dxf menu-listes-points" hidden></div>
         <div class="menu-calques" hidden>
           <div class="ligne-menu-plan">
-            <label class="case"><input type="checkbox" data-calque="fondSatellite" /> Photo aérienne (swisstopo)</label>
+            <label class="case"><input type="checkbox" data-calque="fondSatellite" checked /> Photo aérienne (swisstopo)</label>
           </div>
-          <label class="reglette-transparence">Transparence <span data-vivant="transparence">0 %</span>
-            <input type="range" min="0" max="100" step="5" value="0" data-calque="transparencePhoto" /></label>
+          <label class="reglette-transparence">Transparence <span data-vivant="transparence">60 %</span>
+            <input type="range" min="0" max="100" step="5" value="60" data-calque="transparencePhoto" /></label>
           <label class="case"><input type="checkbox" data-calque="cadastre" /> Cadastre</label>
         </div>
       </div>
@@ -793,7 +793,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const voulues = new Set();
 
     // Sans point, une surface importée suffit aussi à placer le fond (0.90.0).
-    if (vue && (points.length > 0 || position || plansDxf.length > 0 || sommetsDesSurfacesImportees().length > 0) && couches.length > 0) {
+    // 0.121.1 : même sans rien dans le projet, la vue de départ (Gland) montre le fond.
+    if (vue && couches.length > 0) {
       const z = niveauDeZoom(1 / vue.echelle, window.devicePixelRatio || 1);
       // Zone vue (plus grande que l'écran quand le plan est tourné).
       const tuiles = tuilesPourZone(zoneVisible(vue), z);
@@ -1359,6 +1360,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
+  /**
+   * Vue d'un projet encore vide (0.121.1) : Gland (VD), environ 600 m de large, pour pouvoir toucher le
+   * fond (photo, cadastre) et partir de là. Coordonnées approchées en MN95 (Est, Nord), mètres.
+   */
+  function vueDeDepart(largeur, hauteur) {
+    return { echelle: largeur / 600, estCentre: 2506500, nordCentre: 1139800, largeur, hauteur };
+  }
+
   function toutVoir(surTout = false) {
     const { largeur, hauteur } = taille();
     if (largeur === 0 || hauteur === 0) {
@@ -1398,7 +1407,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (centre) vue = { echelle: largeur / 60, estCentre: centre.est, nordCentre: centre.nord, largeur, hauteur };
     else if (points.length > 0) vue = cadrerSurPoints(points, largeur, hauteur);
     else if (sommetsImportes.length > 0) vue = cadrerSurPoints(sommetsImportes, largeur, hauteur);
-    else vue = plansDxf.length > 0 ? cadrerSurPoints(coinsDesPlans(plansDxf), largeur, hauteur) : null;
+    else if (plansDxf.length > 0) vue = cadrerSurPoints(coinsDesPlans(plansDxf), largeur, hauteur);
+    else vue = vueDeDepart(largeur, hauteur);
     dessiner();
   }
 
@@ -1588,6 +1598,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function appliquerTransparence() {
     fond.style.setProperty('--opacite-photo', String(1 - calquesChoisis.transparencePhoto / 100));
   }
+  appliquerTransparence(); // transparence de départ (60 %)
   // Vue 3D (0.99.0, Expert) : les triangles des levés et surfaces montrés sur le plan.
   conteneur.querySelector('[data-action="vue-3d"]').addEventListener('click', () => {
     const triangles = dessin.stocks.flatMap((stock, index) => (estVisible(stock) ? dessin.resultats[index]?.trianglesDessus ?? [] : []));
