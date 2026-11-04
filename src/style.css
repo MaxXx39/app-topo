@@ -10413,3 +10413,60 @@ body.mode-telephone.regle-sous-plan .ecart-et-regle .ecart-direct .valeur-ecart 
 .cadre-couloir .virage-couloir strong { font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 body.mode-telephone .cadre-couloir .virage-couloir .icone-virage { width: 24px; height: 24px; }
 body.mode-telephone .cadre-couloir .virage-couloir strong { font-size: 12px; }
+
+/* 0.124.0 : Contrôle sur le site : consultation (pas d'ajout de photo, pas de mesure) ; titre de la page bordeaux. */
+body.sur-site label.photo-point-controle { display: none; }
+body.sur-site[data-onglet='terrain'][data-mode-terrain='autocontrole'] .titre-page { border-bottom-color: var(--bordeaux); }
+body.sur-site .fenetre-choix p { white-space: pre-line; }
+
+/* Dessin sur une photo (0.124.0) : écran plein, outils en haut, photo au milieu, actions en bas. */
+.fenetre-dessin-photo {
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: #111827;
+  color: #ffffff;
+}
+.fenetre-dessin-photo[open] { display: flex; flex-direction: column; }
+.fenetre-dessin-photo .barre-dessin-photo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 8px 10px;
+  background: #1f2937;
+}
+.fenetre-dessin-photo .groupe-dessin-photo { display: flex; gap: 6px; align-items: center; }
+.fenetre-dessin-photo .espace-dessin-photo { flex: 1 1 auto; }
+.fenetre-dessin-photo .zone-dessin-photo { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 6px; }
+.fenetre-dessin-photo canvas { display: block; touch-action: none; background: #000000; border-radius: 6px; cursor: crosshair; }
+.fenetre-dessin-photo .outil-dessin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 64px;
+  min-height: 52px;
+  padding: 4px 8px;
+  border: 2px solid #4b5563;
+  border-radius: 10px;
+  background: #111827;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.fenetre-dessin-photo .outil-dessin svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.fenetre-dessin-photo .outil-dessin.actif { border-color: var(--ambre); background: #374151; }
+.fenetre-dessin-photo .couleur-dessin { width: 44px; height: 44px; border: 3px solid #4b5563; border-radius: 50%; cursor: pointer; }
+.fenetre-dessin-photo .couleur-dessin.actif { border-color: #ffffff; box-shadow: 0 0 0 3px var(--ambre); }
+.fenetre-dessin-photo .bouton-secondaire { background: #374151; border-color: #4b5563; color: #ffffff; }
+.fenetre-photo .ligne-outils { flex-wrap: wrap; gap: 8px; }
+body.sur-site .onglets button[data-mode-terrain] span, body.sur-site .onglets button.onglet-calculs span, body.sur-site .onglets button.onglet-projets span { font-size: 0.74rem; white-space: nowrap; }
+body.sur-site .onglets button[data-mode-terrain] { padding: 0 2px; }
+body.sur-site .onglets button[data-mode-terrain] svg { width: 16px; height: 16px; }

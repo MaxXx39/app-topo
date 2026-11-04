@@ -60,6 +60,7 @@ import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
+import { imageAvecDessins, ouvrirEditeurDessin, photosAvecDessins } from './photos/annotation.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
 import { lireLibelles, recreerLibellesManquants, definirLibellesProjet, surLibellesProjet } from './leve/libelles.js';
@@ -261,6 +262,8 @@ const ONGLETS = recepteurDisponible()
   : [
       { nom: 'projets', titre: 'Projet' },
       ...MODES_TERRAIN.filter((m) => m.cle === 'lever').map((m) => ({ ...m, nom: 'terrain', mode: m.cle, titre: 'Édition Lever' })),
+      // 0.124 : Contrôle sur le site (Intermédiaire) : consultation des points, photos et historique, sans mesure.
+      ...MODES_TERRAIN.filter((m) => m.cle === 'autocontrole').map((m) => ({ ...m, nom: 'terrain', mode: m.cle, niveau: 'intermediaire' })),
       { nom: 'calculs', titre: 'Calculs' },
       { nom: 'plan', titre: 'Plan' },
     ];
@@ -314,7 +317,7 @@ document.querySelector('#app').innerHTML = `
         <div id="projets-suite"></div>
       </section>
       <section class="panneau" data-onglet="terrain">
-        <h2 class="titre-page seulement-site">Édition Lever</h2>
+        <h2 class="titre-page seulement-site" id="titre-terrain">Édition Lever</h2>
         <div id="leve-direct"></div>
       </section>
       <nav class="parties-calculs" aria-label="Calculs">
@@ -414,6 +417,9 @@ document.querySelector('.onglets').addEventListener('click', (evenement) => {
 /** Boutons Lever / Implanter / Contrôle / Guidage de la barre du bas : celui du mode en cours est actif. */
 function majBoutonsTerrain() {
   const dansTerrain = document.body.dataset.onglet === 'terrain';
+  // Site (0.124) : le titre de la page suit le mode (Édition Lever ou Contrôle).
+  const titreTerrain = document.querySelector('#titre-terrain');
+  if (titreTerrain) titreTerrain.textContent = terrain.mode === 'autocontrole' ? 'Contrôle' : 'Édition Lever';
   if (dansTerrain) document.body.dataset.modeTerrain = terrain.mode;
   else delete document.body.dataset.modeTerrain;
   for (const bouton of document.querySelectorAll('.onglets button[data-mode-terrain]')) {
@@ -1493,6 +1499,10 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       controlerPoint: (id) => {
         const point = projet.pointsControle.find((p) => p.id === id);
         if (!point) return;
+        if (!recepteurDisponible()) {
+          fichePointControle(point);
+          return;
+        }
         autocontrole.cible = { ...point };
         montrerImplantation();
         requestAnimationFrame(cadrerSurImplantation);
@@ -1500,7 +1510,11 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       // Photo d'un point de contrôle (0.105.0, Intermédiaire) : rangée dans projet.photosControle.
       ajouterPhotoControle: (id, fichiers) => ajouterPhotoControle(id, fichiers),
       // 0.123.1 : le point a déjà des photos : « Prendre » une photo ou « Voir » celles qu'il a.
-      photoPointControle: (id) => choisirPrendreOuVoir(id),
+      photoPointControle: (id) => {
+        const point = projet.pointsControle.find((p) => p.id === id);
+        if (!recepteurDisponible() && point) fichePointControle(point);
+        else choisirPrendreOuVoir(id);
+      },
       arreterControle: () => {
         autocontrole.cible = null;
         montrerImplantation();
@@ -1734,7 +1748,7 @@ function exporterListe(type, id) {
           points,
           roles,
           cartouche: { affaire: projet.cartouche?.affaire ?? '', date: new Date().toLocaleDateString('fr-CH') },
-          photos: choix.photos ? photos : [],
+          photos: choix.photos ? await photosAvecDessins(photos) : [],
         });
         return { blob, nom: `${base}.pdf` };
       }
@@ -2685,6 +2699,10 @@ function toucherPourControle(position, tolerance) {
   const point = trouve && projet.pointsControle.find((p) => p.nom === trouve.nom);
   if (!point) {
     afficherMessage('Aucun point de contrôle sous le doigt', 3000);
+    return;
+  }
+  if (!recepteurDisponible()) {
+    fichePointControle(point);
     return;
   }
   autocontrole.cible = { ...point };
@@ -3837,8 +3855,25 @@ function montrerPhoto(id) {
       <h2>📷 ${echapper(photo.point ?? '')}</h2>
       <img src="${photo.image}" alt="${echapper(photo.legende || photo.point || 'photo')}" />
       ${photo.legende ? `<p>${echapper(photo.legende)}</p>` : ''}
-      <div class="ligne-outils"><button class="bouton">Fermer</button>${deControle ? '<button type="button" class="bouton-lien" data-cle="supprimer">supprimer la photo</button>' : ''}</div>
+      <div class="ligne-outils"><button class="bouton">Fermer</button><button type="button" class="bouton-secondaire seulement-intermediaire" data-cle="dessiner">✎ Dessiner</button>${deControle ? '<button type="button" class="bouton-lien" data-cle="supprimer">supprimer la photo</button>' : ''}</div>
     </form>`;
+  // Dessins (0.124.0, Intermédiaire) : cercle, flèche, trait ; la photo d'origine reste intacte.
+  if (photo.dessins?.length) {
+    imageAvecDessins(photo).then((src) => {
+      if (src) fenetre.querySelector('img').src = src;
+    }).catch(() => {});
+  }
+  fenetre.querySelector('[data-cle="dessiner"]').addEventListener('click', async () => {
+    if (refuserEnLectureSeule()) return;
+    fenetre.close();
+    const dessins = await ouvrirEditeurDessin(photo, photo.dessins ?? []);
+    if (dessins) {
+      if (dessins.length > 0) photo.dessins = dessins;
+      else delete photo.dessins;
+      modifie();
+    }
+    montrerPhoto(id);
+  });
   fenetre.querySelector('[data-cle="supprimer"]')?.addEventListener('click', () => {
     if (!confirm('Supprimer cette photo ?')) return;
     projet.photosControle = projet.photosControle.filter((p) => p.id !== id);
@@ -4633,6 +4668,39 @@ async function ajouterPhotos(objet, fichiers, { attentePoint = false } = {}) {
 }
 
 /** Ajoute des photos à un point de contrôle (photo.point = son nom, photo.pointId = son id). */
+/** Site (0.124) : fiche d'un point de contrôle : position, derniers contrôles, photos (sans mesure, pas de GNSS). */
+async function fichePointControle(point) {
+  const photos = (projet.photosControle ?? []).filter((ph) => ph.pointId === point.id);
+  const controles = projet.controles.filter((c) => c.type === 'mesure' && c.pointId === point.id).slice(-3).reverse();
+  const MOTS = { vert: 'OK', orange: 'Limite', rouge: 'Hors tolérance' };
+  const ecart = (v) => (v == null ? '—' : `${formaterNombre(v)} m`);
+  const texte = [
+    `E ${formaterNombre(point.est)} · N ${formaterNombre(point.nord)} · H ${point.altitude != null ? formaterNombre(point.altitude) : '—'}`,
+    ...(controles.length > 0
+      ? controles.map((c) => `${new Date(c.le).toLocaleDateString('fr-CH')} : ${MOTS[c.resultat.global]} (plan ${ecart(c.ecarts.plan)}, haut. ${ecart(c.ecarts.hauteur)})`)
+      : ['Jamais contrôlé']),
+  ].join('\n');
+  plan.cadrerSur([{ est: point.est, nord: point.nord }], 10);
+  const choix = await demanderChoix({
+    titre: point.nom,
+    texte,
+    boutons: [
+      ...(photos.length > 0 ? [{ cle: 'voir', texte: `Voir les photos (${photos.length})`, principal: true }] : []),
+      { cle: 'fermer', texte: 'Fermer' },
+    ],
+  });
+  if (choix !== 'voir') return;
+  if (photos.length === 1) {
+    montrerPhoto(photos[0].id);
+    return;
+  }
+  const laquelle = await demanderChoix({
+    titre: `Photos de ${point.nom}`,
+    boutons: [...photos.map((ph, i) => ({ cle: ph.id, texte: `Photo ${i + 1}`, detail: ph.legende || '' })), { cle: 'fermer', texte: 'Fermer' }],
+  });
+  if (laquelle && laquelle !== 'fermer') montrerPhoto(laquelle);
+}
+
 async function choisirPrendreOuVoir(id) {
   const point = projet.pointsControle.find((p) => p.id === id);
   if (!point) return;
