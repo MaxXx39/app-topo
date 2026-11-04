@@ -63,13 +63,14 @@ export function creerModuleExport(conteneur, actions) {
     else if (quoi === 'paquet') actions.exporterPaquet({ ...choixPaquet }, (texte) => { const zone = panneau('paquet').querySelector('[data-zone="message-paquet"]'); if (zone) zone.textContent = texte; });
   });
   // Choix du paquet (cases, marge, pixel), gardés quand le panneau est redessiné.
-  const choixPaquet = { cadastre: true, swisstopo: true, photo: true, marge: 30, resolution: 0.25 };
+  const choixPaquet = { cadastre: true, cadastrePoints: false, swisstopo: true, formatSurface: 'txt', photo: true, marge: 30, resolution: 0.1 };
   conteneur.addEventListener('change', (evenement) => {
     const champ = evenement.target.closest('[data-paquet]');
     if (!champ) return;
     const cle = champ.dataset.paquet;
     if (champ.type === 'checkbox') choixPaquet[cle] = champ.checked;
     else if (cle === 'marge') choixPaquet.marge = Math.min(500, Math.max(0, Number(String(champ.value).replace(',', '.')) || 0));
+    else if (cle === 'formatSurface') choixPaquet.formatSurface = champ.value;
     else choixPaquet[cle] = Number(champ.value);
   });
 
@@ -119,9 +120,15 @@ export function creerModuleExport(conteneur, actions) {
     const nbCadastres = projet.leves.filter((l) => l.cadastre).length;
     const nbSwisstopo = projet.surfaces.filter((x) => x.type === 'swisstopo').length;
     const case1 = (cle, texte) => `<label class="case"><input type="checkbox" data-paquet="${cle}" ${choixPaquet[cle] ? 'checked' : ''} /> ${texte}</label>`;
-    panneau('paquet').innerHTML = `<p class="aide">un seul clic : un fichier ZIP avec un DXF (un calque par élément) et la photo aérienne géoréférencée</p>
-      ${case1('cadastre', `Cadastre importé : lignes et points <span class="aide">(${nbCadastres})</span>`)}
-      ${case1('swisstopo', `Surface Swisstopo en 3D <span class="aide">(${nbSwisstopo})</span>`)}
+    panneau('paquet').innerHTML = `<p class="aide">un seul clic : un fichier ZIP avec le cadastre en DXF, la surface Swisstopo (TXT de points ou DXF 3D) et la photo aérienne géoréférencée</p>
+      ${case1('cadastre', `Cadastre importé : les lignes <span class="aide">(${nbCadastres})</span>`)}
+      ${case1('cadastrePoints', 'Avec les points du cadastre')}
+      ${case1('swisstopo', `Surface Swisstopo <span class="aide">(${nbSwisstopo})</span>`)}
+      <div class="champs-export">
+        <label>Surface Swisstopo en
+          <select data-paquet="formatSurface">${[['txt', 'TXT (points)'], ['dxf', 'DXF (faces 3D)']].map(([v, t]) => `<option value="${v}" ${v === choixPaquet.formatSurface ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        </label>
+      </div>
       ${case1('photo', 'Photo aérienne swisstopo (GeoTIFF, internet nécessaire)')}
       <div class="champs-export">
         <label>Marge de la photo (m)<input type="text" inputmode="decimal" data-paquet="marge" value="${choixPaquet.marge}" /></label>

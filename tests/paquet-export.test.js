@@ -14,18 +14,33 @@ const tri = [[{ est: 2500000, nord: 1100000, altitude: 400 }, { est: 2500010, no
 const aides = { trianglesDe: () => tri, pointsDe: () => [] };
 
 describe('ZIP cadastre + swisstopo', () => {
-  it('fabrique un ZIP avec le DXF', async () => {
-    const r = await fabriquerPaquet(projet, { cadastre: true, swisstopo: true, photo: false }, aides);
+  const pointsSurface = [{ nom: 'SW-1', est: 2500000, nord: 1100000, altitude: 400 }];
+  const aidesTxt = { trianglesDe: () => tri, pointsDe: () => pointsSurface };
+  const lire = async (r) => new TextDecoder('latin1').decode(new Uint8Array(await r.blob.arrayBuffer()));
+
+  it('au départ : lignes du cadastre en DXF (sans points), surface en TXT', async () => {
+    const r = await fabriquerPaquet(projet, { cadastre: true, swisstopo: true, photo: false }, aidesTxt);
     expect(r.erreur).toBeUndefined();
-    expect(r.nom.endsWith('.zip')).toBe(true);
-    const octets = new Uint8Array(await r.blob.arrayBuffer());
-    expect(String.fromCharCode(...octets.slice(0, 2))).toBe('PK');
-    const texte = new TextDecoder('latin1').decode(octets);
+    const texte = await lire(r);
+    expect(texte.startsWith('PK')).toBe(true);
     expect(texte).toContain('CADASTRE_LIGNES');
+    expect(texte).not.toContain('CADASTRE_POINTS');
+    expect(texte).not.toContain('SWISSTOPO_3D');
+    expect(texte).toContain('_swisstopo_points.txt');
+    expect(texte).toContain('SW-1');
+  });
+  it('points du cadastre sur demande', async () => {
+    const r = await fabriquerPaquet(projet, { cadastre: true, cadastrePoints: true, swisstopo: false, photo: false }, aidesTxt);
+    expect(await lire(r)).toContain('CADASTRE_POINTS');
+  });
+  it('surface en DXF sur demande', async () => {
+    const r = await fabriquerPaquet(projet, { cadastre: false, swisstopo: true, formatSurface: 'dxf', photo: false }, aidesTxt);
+    const texte = await lire(r);
     expect(texte).toContain('SWISSTOPO_3D');
+    expect(texte).not.toContain('_swisstopo_points.txt');
   });
   it('refuse quand rien n\'est coché', async () => {
-    const r = await fabriquerPaquet(projet, { cadastre: false, swisstopo: false, photo: true }, aides);
+    const r = await fabriquerPaquet(projet, { cadastre: false, swisstopo: false, photo: true }, aidesTxt);
     expect(r.erreur).toMatch(/Rien à exporter/);
   });
 });

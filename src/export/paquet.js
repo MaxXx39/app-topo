@@ -3,6 +3,7 @@
 import { zipper } from '../recap/xlsx.js';
 import { genererDxfPaquet } from './pack-dxf.js';
 import { octetsDxf } from './dxf-recale.js';
+import { txtPoints } from './points.js';
 import { emprisePhoto, fabriquerGeotiff, PIXELS_MAX } from './geotiff.js';
 import { planDuCadastre } from '../plan/listes-points.js';
 import { nomDeFichierProjet } from '../projet/projet.js';
@@ -27,12 +28,25 @@ export async function fabriquerPaquet(projet, options, { trianglesDe, pointsDe, 
   if (cadastresVoulus.length + surfacesVoulues.length === 0) return { erreur: 'Rien à exporter : coche le cadastre ou la surface Swisstopo (ou importe-les d\'abord).' };
   const fichiers = [];
   const base = nomDeFichierProjet(projet);
-  dire('DXF : écriture…');
-  const texte = genererDxfPaquet({
-    cadastres: cadastresVoulus,
-    swisstopo: surfacesVoulues.map((s) => ({ triangles: trianglesDe(s) ?? [] })),
-  });
-  fichiers.push([`${base}_cadastre_swisstopo.dxf`, octetsDxf(texte)]);
+  // Surface Swisstopo : en TXT (points, au départ) ou en DXF (faces 3D, dans le même DXF que le cadastre).
+  const surfaceEnDxf = options.formatSurface === 'dxf';
+  // Cadastre : les lignes seulement ; les points (CAD-n) sur demande.
+  const pourDxf = cadastresVoulus.map(({ leve, plan }) => ({ leve: options.cadastrePoints ? leve : { ...leve, points: [] }, plan }));
+  const dxfSurface = surfaceEnDxf ? surfacesVoulues : [];
+  const contenuDxf = pourDxf.some(({ leve, plan }) => plan || leve.points.length > 0) || dxfSurface.length > 0;
+  if (contenuDxf) {
+    dire('DXF : écriture…');
+    const texte = genererDxfPaquet({
+      cadastres: pourDxf,
+      swisstopo: dxfSurface.map((s) => ({ triangles: trianglesDe(s) ?? [] })),
+    });
+    fichiers.push([`${base}_cadastre_swisstopo.dxf`, octetsDxf(texte)]);
+  }
+  if (surfacesVoulues.length > 0 && !surfaceEnDxf) {
+    const points = surfacesVoulues.flatMap((s) => pointsDe(s) ?? []);
+    fichiers.push([`${base}_swisstopo_points.txt`, new TextEncoder().encode(txtPoints(points))]);
+  }
+  if (fichiers.length === 0) return { erreur: 'Rien à exporter : le cadastre n\'a pas de lignes (coche « Points du cadastre » si tu veux ses points).' };
   if (options.photo) {
     // La photo couvre tous les points exportés (cadastre et surface), avec la marge choisie.
     const points = [...cadastresVoulus.flatMap(({ leve }) => leve.points), ...surfacesVoulues.flatMap((s) => pointsDe(s) ?? [])];
