@@ -10182,3 +10182,28 @@ body.sur-site[data-onglet='terrain'] .titre-page { border-bottom-color: var(--am
 .cadre-ajout .bouton-ajouter { flex: 1; }
 .barre-ajout .titre-ajout { align-self: center; margin-right: 4px; white-space: nowrap; }
 .cadre-ajout .ligne-ajout { display: flex; align-items: stretch; gap: 8px; margin-bottom: 8px; }
+
+/* 0.120.2 : fenêtre des réglages ⚙ à hauteur fixe (elle ne bouge plus d'un onglet à l'autre : le contenu défile),
+   fond coloré et titre en bandeau (« Réglages · page »). */
+.fenetre-reglages {
+  height: min(88vh, 640px);
+  max-height: 88vh;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--sombre) 12%, var(--surface));
+  color: var(--encre);
+}
+.fenetre-reglages[open] { display: flex; flex-direction: column; }
+.fenetre-reglages > form { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.fenetre-reglages .titre-reglages {
+  margin: -18px -18px 12px;
+  padding: 14px 18px;
+  background: var(--sombre);
+  color: #ffffff;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 4px solid var(--ambre);
+}
+.fenetre-reglages .page-reglages:not([hidden]) { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.fenetre-reglages .onglets-reglages { flex: 0 0 auto; }
+.fenetre-reglages .version-reglages { flex: 0 0 auto; }
