@@ -18,6 +18,7 @@ import { demanderCode } from '../outils/code.js';
 import { lireListesPartagees } from './listes-partagees.js';
 import { modifierLibellesDeSorte, modifierReseaux } from '../leve/fenetre-libelles.js';
 import { ouvrirFenetreListes } from './fenetre-listes.js';
+import { ADRESSE_APK, versionPubliee, estPlusRecente } from '../outils/mise-a-jour.js';
 
 const CLE = 'topo-reglages';
 const PAR_DEFAUT = { telephone: false, mode: 'intermediaire', tailleFormes: 'normale', tailleTexte: 'normal', theme: 'normal' };
@@ -225,6 +226,10 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
         <button type="button" class="bouton-secondaire bouton-large" data-action="recepteur">Récepteur GNSS, corrections, hauteur de canne…</button>
       </div>` : ''}
       <p class="aide version-reglages">Version de l'appli : ${__VERSION_APPLI__}${recepteur ? ' (appli Android)' : ''}</p>
+      ${recepteur ? `<div class="mise-a-jour-reglages">
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="chercher-mise-a-jour">Chercher une mise à jour</button>
+        <span class="aide" data-zone="mise-a-jour" role="status"></span>
+      </div>` : ''}
       <div class="ligne-outils">
         <button class="bouton">OK</button>
       </div>
@@ -296,10 +301,27 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       modifierLibelles(libelles.dataset.valeur);
       return;
     }
+    if (evenement.target.closest('[data-action="chercher-mise-a-jour"]')) {
+      chercherMiseAJour();
+      return;
+    }
     const bouton = evenement.target.closest('[data-zone="partage"] button[data-action]');
     if (bouton?.dataset.action === 'modifierNomAppareil') modifierNomProtege();
     else if (bouton) partage?.actions[bouton.dataset.action]?.();
   });
+  /**
+   * Mise à jour de l'APK (0.119.3) : compare la version installée à celle du dernier APK publié
+   * sur GitHub ; si elle est plus récente, un lien télécharge Topo.apk (Android demande « Installer »).
+   */
+  async function chercherMiseAJour() {
+    const zone = fenetre.querySelector('[data-zone="mise-a-jour"]');
+    zone.textContent = 'Recherche…';
+    const publiee = await versionPubliee();
+    if (!publiee) zone.textContent = 'Impossible de savoir (pas de réseau ?)';
+    else if (!estPlusRecente(publiee, __VERSION_APPLI__)) zone.textContent = `À jour (version ${__VERSION_APPLI__})`;
+    else zone.innerHTML = `Version ${publiee} disponible : <a href="${ADRESSE_APK}">télécharger</a>, puis toucher « Installer »`;
+  }
+
   /** Mode choisi : monter en Expert demande le code de sécurité (0.90.0) ; descendre, non. */
   async function changerModeProtege(choix) {
     if (choix.value === 'expert' && reglages.mode !== 'expert' && !deverrouille) {

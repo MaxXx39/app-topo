@@ -1,8 +1,8 @@
-// Mise à jour de l'APK (0.119.0, tous les modes) : au démarrage, l'appli Android regarde sur GitHub
-// la version du dernier APK publié (release « apk-derniere-version », dont le titre contient le
-// numéro : « APK Android - dernière version (0.119.0, n° 412, main) »). Si elle est plus récente,
-// une fenêtre propose de la télécharger : le lien s'ouvre dans le navigateur de la tablette, qui
-// télécharge Topo.apk ; on touche ensuite « Installer » (Android le demande toujours).
+// Mise à jour de l'APK (0.119.0 ; 0.119.3 : plus de fenêtre au démarrage, un bouton dans les réglages ⚙,
+// sous la version de l'appli) : on lit sur GitHub la version du dernier APK publié (release
+// « apk-derniere-version », dont le titre contient le numéro : « APK Android - dernière version
+// (0.119.0, n° 412, main) »). Plus récente : un lien télécharge Topo.apk (dans le navigateur de la
+// tablette), puis on touche « Installer » (Android le demande toujours).
 
 export const ADRESSE_APK = 'https://github.com/MaxXx39/app-topo/releases/download/apk-derniere-version/Topo.apk';
 const ADRESSE_RELEASE = 'https://api.github.com/repos/MaxXx39/app-topo/releases/tags/apk-derniere-version';

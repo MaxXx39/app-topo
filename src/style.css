@@ -10128,3 +10128,12 @@ body:not(.mode-expert) .suppression-vraie,
 body:not(.mode-intermediaire) .archive-comme-suppression {
   display: none;
 }
+
+/* 0.119.3 : mise à jour de l'APK, sous la version de l'appli (réglages ⚙). */
+.mise-a-jour-reglages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+}

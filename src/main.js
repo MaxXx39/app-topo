@@ -56,7 +56,6 @@ import * as historique from './projet/historique.js';
 import { archiver, restaurer, supprimerArchive } from './projet/archives.js';
 import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/journal.js';
 import { appareil as appareilDuJournal } from './partage/memoire.js';
-import { ADRESSE_APK, versionPubliee, estPlusRecente } from './outils/mise-a-jour.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
@@ -5257,26 +5256,6 @@ function nouveauProjetSansNom() {
   return nouveau;
 }
 
-/**
- * Mise à jour de l'APK (0.119.0, tous les modes ; seulement dans l'appli Android) : si GitHub a
- * un APK plus récent, on propose de le télécharger (le navigateur de la tablette le télécharge,
- * puis Android demande « Installer »). Sans réseau : rien.
- */
-async function proposerMiseAJour() {
-  if (!estDansAppliAndroid()) return;
-  const publiee = await versionPubliee();
-  if (!publiee || !estPlusRecente(publiee, __VERSION_APPLI__)) return;
-  const choix = await demanderChoix({
-    titre: `Nouvelle version ${publiee} disponible`,
-    texte: `Version installée : ${__VERSION_APPLI__}.`,
-    boutons: [
-      { cle: 'telecharger', texte: 'Télécharger la mise à jour', detail: 'puis toucher « Installer »', principal: true },
-      { cle: 'plus-tard', texte: 'Plus tard' },
-    ],
-  });
-  if (choix === 'telecharger') window.location.href = ADRESSE_APK;
-}
-
 // --- Démarrage : fenêtre « Continuer sur… / Ouvrir un projet / Nouveau projet » (0.84.0) ---
 // L'appli s'ouvre sur l'onglet Projet. Le dernier projet ouvert sur cet appareil (sinon le plus
 // récent) est chargé tout de suite ; Drive ne le compare qu'après le choix.
@@ -5305,7 +5284,6 @@ async function demarrer() {
       // Fenêtre fermée sans créer : on reste sur le dernier projet.
       partage.apresOuverture();
     }
-    proposerMiseAJour();
   } catch (erreur) {
     // Base de données indisponible (navigation privée...) : l'appli marche, sans enregistrement.
     console.error(erreur);
