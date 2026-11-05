@@ -12,7 +12,8 @@ import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { dxfDuPdf, lireEchelle } from './topo/pdf-dxf.js';
-import { chargerPdfjs, ouvrirPdf, contenuDeLaPage } from './import/pdf.js';
+import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
+import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
 import { formaterNombre } from './topo/format.js';
 import { calculerSurface, surfaceImportee, cleTriangle, estImportee, estSurfaceFichier, origineSurface, nomNature, nouvelIdentifiant, NATURES_IMPORT, avecPrefixe, sansPrefixe, prefixeDuNom } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul, nouveauVolume } from './volumes/calculs.js';
@@ -688,6 +689,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     }
   },
   // 0.129.0 : plan PDF (Expert, Projet › Import) : les traits du PDF deviennent un plan DXF.
+  // 0.130.0 : un PDF sans traits (scanné) devient une image en fond, recalée avec « Manuel ».
   importerPlanPdf: async (fichier) => {
     let doc = null;
     try {
@@ -695,37 +697,56 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       const pdfjs = await chargerPdfjs();
       doc = await ouvrirPdf(pdfjs, new Uint8Array(await fichier.arrayBuffer()));
       const pages = doc.numPages;
-      afficherMessage(`PDF ouvert : ${pages} page(s)`, 1500);
+      let page = 1;
+      if (pages > 1) {
+        afficherMessage(`PDF ouvert : ${pages} pages`, 1500);
+        const choix = await demanderChamps({ titre: `Plan PDF « ${fichier.name} »`, champs: [{ cle: 'page', titre: `Page (1 à ${pages})`, valeur: '1' }] });
+        if (!choix) return;
+        page = Number(choix.page);
+        if (!Number.isInteger(page) || page < 1 || page > pages) throw new Error(`page « ${choix.page} » : choisis un nombre de 1 à ${pages}`);
+      }
+
+      afficherMessage(`Lecture du PDF (page ${page})…`, null);
+      await new Promise((fin) => setTimeout(fin, 30));
+      const contenu = await contenuDeLaPage(doc, page, pdfjs.OPS);
+      // Vectoriel → traits ; sans traits mais avec une image (scanné) → image (choix d'office, validé le 05.11).
+      const enImage = contenu.traits.length === 0 && contenu.textes.length === 0;
+      if (enImage && contenu.images === 0) throw new Error('aucun trait ni image sur cette page');
+      afficherMessage(enImage ? 'PDF scanné : il sera posé en image' : `PDF en traits : ${contenu.traits.length} traits`, 2500);
       const valeurs = await demanderChamps({
-        titre: `Plan PDF « ${fichier.name} »`,
+        titre: `Plan PDF « ${fichier.name} »${enImage ? ' (image)' : ''}`,
         champs: [
-          ...(pages > 1 ? [{ cle: 'page', titre: `Page (1 à ${pages})`, valeur: '1' }] : []),
           { cle: 'echelle', titre: 'Échelle du plan 1:', valeur: '', exemple: '500 (vide si inconnue)' },
+          ...(enImage ? [{ cle: 'nettete', titre: 'Netteté de l\'image', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART }] : []),
         ],
       });
       if (!valeurs) return;
-      const page = pages > 1 ? Number(valeurs.page) : 1;
-      if (!Number.isInteger(page) || page < 1 || page > pages) throw new Error(`page « ${valeurs.page} » : choisis un nombre de 1 à ${pages}`);
       const { echelle, erreur: erreurEchelle } = lireEchelle(valeurs.echelle);
       if (erreurEchelle) throw new Error(erreurEchelle);
 
-      afficherMessage(`Lecture des traits du PDF (page ${page})…`, null);
-      await new Promise((fin) => setTimeout(fin, 30));
-      const contenu = await contenuDeLaPage(doc, page, pdfjs.OPS);
-      if (contenu.traits.length === 0 && contenu.textes.length === 0) {
-        throw new Error(contenu.images > 0
-          ? 'ce PDF ne contient qu\'une image (plan scanné ou photographié) : il n\'y a pas de traits à lire'
-          : 'aucun trait trouvé sur cette page');
-      }
       const nom = pages > 1 ? `${fichier.name} (page ${page})` : fichier.name;
-      const { plan: lu, erreur } = lirePlanDxf(dxfDuPdf(contenu, echelle), nom);
-      if (erreur || !lu.bornes) throw new Error(erreur ?? 'aucun objet dessiné trouvé');
-      const avertissements = ['Plan PDF : il n\'est pas en MN95, touche « recaler » sur le plan pour le mettre en place.'];
+      const avertissements = [`Plan PDF : il n'est pas en MN95, touche « recaler » sur le plan pour le mettre en place${enImage ? ' (accroche « Manuel » : loupe)' : ''}.`];
       if (!echelle) avertissements.push('Sans échelle : le plan est à la taille de la feuille, le recalage trouvera l\'échelle.');
-      if (contenu.images > 0) avertissements.push(`${contenu.images} image(s) du PDF non reprise(s) (seuls les traits et les textes sont lus).`);
-      projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, pdf: { page, echelle } });
+      let lu;
+      if (enImage) {
+        const rendu = facteurDeRendu(contenu.largeur, contenu.hauteur, valeurs.nettete);
+        afficherMessage(`Image de la page (${rendu.dpi} dpi)…`, null);
+        await new Promise((fin) => setTimeout(fin, 30));
+        const image = await imageDeLaPage(doc, page, rendu.facteur);
+        lu = planImagePdf({ nom, largeurPt: image.largeurPt, hauteurPt: image.hauteurPt, echelle, donnees: image.donnees, pixels: image.pixels });
+        const octets = image.donnees.length * 0.75;
+        const taille = octets >= 1e6 ? `${(octets / 1e6).toFixed(1)} Mo` : `${Math.max(1, Math.round(octets / 1e3))} Ko`;
+        if (rendu.reduite) avertissements.push(`Page très grande : image réduite à ${rendu.dpi} dpi (${image.pixels.largeur} × ${image.pixels.hauteur} pixels).`);
+        avertissements.push(`Image de ${taille} (envoyée avec le projet sur Drive).`);
+      } else {
+        const lecture = lirePlanDxf(dxfDuPdf(contenu, echelle), nom);
+        if (lecture.erreur || !lecture.plan.bornes) throw new Error(lecture.erreur ?? 'aucun objet dessiné trouvé');
+        lu = lecture.plan;
+        if (contenu.images > 0) avertissements.push(`${contenu.images} image(s) du PDF non reprise(s) (seuls les traits et les textes sont lus).`);
+      }
+      projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, pdf: { page, echelle, image: enImage } });
       dernierPlan = { nom, avertissements };
-      afficherMessage(`Plan PDF « ${nom} » importé : ${lu.compte.objets} objets`, 4000);
+      afficherMessage(`Plan PDF « ${nom} » importé${enImage ? ' en image' : ` : ${lu.compte.objets} objets`}`, 4000);
       modifie();
     } catch (erreur) {
       dernierPlan = { nom: fichier.name, erreur: erreur.message };
@@ -3244,7 +3265,10 @@ function guiderVersChoix(choix) {
 // calage { x, y, est, nord, nom, actif }) }. candidat (0.104.0) : le point touché sur le plan, montré par une
 // croix, pas encore validé ({ sorte: 'dxf' ou 'cale', x, y, nom }) ; « Valider » le prend en compte. Pendant le recalage, ce plan est montré tel qu'il a été lu.
 // Étapes écrites (0.92.0) : voir recalage/barre.js.
-const recalage = { planId: null, accroche: 'sommet', choix: null, candidat: null, accrocheCale: 'point', taper: false, paires: [] };
+const recalage = { planId: null, accroche: 'sommet', choix: null, candidat: null, accrocheCale: 'point', taper: false, paires: [], zoomLoupe: 4, etapeLoupe: null };
+
+/** Plan PDF : 'image' (scanné), 'traits' (vectoriel), sinon null (DXF). */
+const sortePdf = (plan) => (plan?.pdf ? (plan.pdf.image ? 'image' : 'traits') : null);
 let barreRecalage = null;
 
 /** Plans DXF du projet tels qu'on les utilise : recalés (sauf celui qu'on est en train de recaler). */
@@ -3262,9 +3286,25 @@ function commencerRecalage(id) {
   recalage.choix = null;
   recalage.candidat = null;
   recalage.paires = (choisi.recalage?.paires ?? []).map((p) => ({ ...p }));
+  // Accroche « Manuel » (0.130.0) : seulement pour un plan PDF ; d'office pour un PDF scanné.
+  recalage.etapeLoupe = null;
+  if (sortePdf(choisi) === 'image') recalage.accroche = 'manuel';
+  else if (!sortePdf(choisi) && recalage.accroche === 'manuel') recalage.accroche = 'sommet';
   barreRecalage ??= creerBarreRecalage(document.querySelector('#plan .plan-cadre'), {
     choisirAccroche: (mode) => {
       recalage.accroche = mode;
+      recalage.candidat = null;
+      recalage.etapeLoupe = null;
+      montrerRecalage();
+    },
+    // Réglage fin de la loupe : un pixel de la loupe par toucher.
+    deplacerLoupe: (sens) => {
+      const [dx, dy] = { haut: [0, -1], bas: [0, 1], gauche: [-1, 0], droite: [1, 0] }[sens] ?? [0, 0];
+      plan.loupe.deplacerDe(dx, dy);
+    },
+    zoomLoupe: (zoom) => {
+      recalage.zoomLoupe = Number(zoom) || 4;
+      plan.loupe.changerZoom(recalage.zoomLoupe);
       montrerRecalage();
     },
     choisirAccrocheCale: (mode) => {
@@ -3330,6 +3370,8 @@ function arreterRecalage() {
   recalage.choix = null;
   recalage.candidat = null;
   recalage.taper = false;
+  recalage.etapeLoupe = null;
+  plan.loupe.cacher();
   barreRecalage?.enlever();
   barreRecalage = null;
   recalculer();
@@ -3341,6 +3383,8 @@ function montrerRecalage() {
   if (!choisi || !barreRecalage) return;
   barreRecalage.afficher({
     nomPlan: choisi.nom,
+    pdf: sortePdf(choisi),
+    zoomLoupe: recalage.zoomLoupe,
     accroche: recalage.accroche,
     accrocheCale: recalage.accrocheCale,
     choix: recalage.choix,
@@ -3349,8 +3393,30 @@ function montrerRecalage() {
     rx2: recepteurDisponible(),
     paires: recalage.paires,
   });
+  // Après la barre : la loupe se place au-dessus d'elle (sa hauteur est alors connue).
+  montrerLoupe();
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
+}
+
+/**
+ * Loupe de l'accroche « Manuel » (0.130.0) : visible aux étapes impaires (point sur le plan PDF à
+ * recaler) ; au milieu du plan au début de chaque étape ; doigt levé = point touché (croix, « Valider »).
+ */
+function montrerLoupe() {
+  const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+  if (!choisi || !sortePdf(choisi) || recalage.accroche !== 'manuel' || recalage.choix) {
+    plan.loupe.cacher();
+    recalage.etapeLoupe = null;
+    return;
+  }
+  const etape = recalage.paires.length;
+  plan.loupe.montrer({
+    recentrer: recalage.etapeLoupe !== etape,
+    zoom: recalage.zoomLoupe,
+    quandLache: ({ est, nord }) => proposerCandidat({ sorte: 'dxf', x: est, y: nord, nom: 'Manuel' }),
+  });
+  recalage.etapeLoupe = etape;
 }
 
 /**
@@ -3392,6 +3458,11 @@ function toucherPourRecalage(position, tolerance) {
         return;
       }
       proposerCandidat({ sorte: 'dxf', x: point.est, y: point.nord, nom: point.nom });
+      return;
+    }
+    // « Manuel » : toucher le plan y pose la loupe (le point se règle ensuite avec la main).
+    if (recalage.accroche === 'manuel') {
+      plan.loupe.placerSur(position.est, position.nord);
       return;
     }
     const trouve = accrocher(recalage.accroche, position, tolerance, sourcesDesPlans([choisi], position, tolerance));

@@ -179,3 +179,28 @@ export async function contenuDeLaPage(doc, numero, OPS) {
   page.cleanup();
   return { traits, textes, calques, images, largeur: vue.width, hauteur: vue.height };
 }
+
+/**
+ * Photographie la page "numero" (0.130.0, plan scanné) avec l'agrandissement "facteur" (1 = 72 dpi).
+ * Renvoie { donnees (« data:image/jpeg;base64,… »), pixels: { largeur, hauteur }, largeurPt, hauteurPt }.
+ * Fond blanc (un PDF sans fond serait transparent, donc noir en JPEG).
+ */
+export async function imageDeLaPage(doc, numero, facteur) {
+  const page = await doc.getPage(numero);
+  const vue = page.getViewport({ scale: facteur });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.floor(vue.width));
+  canvas.height = Math.max(1, Math.floor(vue.height));
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: ctx, canvas, viewport: vue, background: '#ffffff' }).promise;
+  const donnees = canvas.toDataURL('image/jpeg', 0.85);
+  const taille = page.getViewport({ scale: 1 });
+  const resultat = { donnees, pixels: { largeur: canvas.width, hauteur: canvas.height }, largeurPt: taille.width, hauteurPt: taille.height };
+  // On rend la mémoire de l'image tout de suite (grandes images sur tablette).
+  canvas.width = 0;
+  canvas.height = 0;
+  page.cleanup();
+  return resultat;
+}

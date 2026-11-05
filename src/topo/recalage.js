@@ -1,3 +1,5 @@
+import { coinsDeLImage } from './pdf-image.js';
+
 // Recalage d'un plan DXF qui n'est pas en MN95 (coordonnées locales d'un plan d'architecte,
 // d'un plan décalé…). Méthode validée par l'utilisateur (23.10.2026) : transformation de Helmert
 // complète à 4 paramètres (déplacement Est et Nord, rotation, échelle), seulement en plan :
@@ -111,6 +113,9 @@ export function recalerContenu(plan, parametres) {
     borner(c.x + c.r, c.y + c.r);
   }
   for (const objet of [...absolu.textes, ...absolu.points]) borner(objet.x, objet.y);
+  // Image d'un PDF scanné (0.130.0) : ses 4 coins transformés comptent aussi.
+  const imageAbsolue = contenu.image ? imageRecalee(contenu.image, origine, parametres) : null;
+  if (imageAbsolue) for (const [e, n] of coinsDeLImage(imageAbsolue)) borner(e, n);
   if (!Number.isFinite(estMin)) return { origine: { ...origine }, bornes: plan.bornes, contenu };
   const nouvelle = { est: Math.floor(estMin), nord: Math.floor(nordMin) };
   // 3. Coordonnées par rapport à la nouvelle origine, au mm.
@@ -126,8 +131,38 @@ export function recalerContenu(plan, parametres) {
       cercles: absolu.cercles.map((c) => ({ ...relatif(c), r: mm(c.r) })),
       textes: absolu.textes.map((t) => ({ ...relatif(t), h: mm(t.h), a: Math.round(t.a * 100) / 100 })),
       points: absolu.points.map(relatif),
+      ...(imageAbsolue ? { image: decalerImage(imageAbsolue, nouvelle) } : {}),
     },
   };
+}
+
+/**
+ * Image d'un plan PDF scanné, recalée (0.130.0) : la transformation de Helmert devient une
+ * matrice [a, b, c, d, e, f] (x' = a·x + c·y + e, y' = b·x + d·y + f) qui va du repère de l'image
+ * (coin bas gauche en 0, 0, m) aux coordonnées MN95. Une matrice déjà présente est gardée (appliquée avant).
+ */
+export function imageRecalee(image, origine, { a, b, tEst, tNord }) {
+  // Point de l'image (x, y) → plan lu : (origine + x, origine + y) → MN95 par Helmert.
+  const helmert = [a, b, -b, a, a * origine.est - b * origine.nord + tEst, b * origine.est + a * origine.nord + tNord];
+  return { ...image, matrice: image.matrice ? composerMatrices(helmert, image.matrice) : helmert };
+}
+
+/** Même image, dans le repère d'une autre origine (coordonnées par rapport à « origine »). */
+function decalerImage(image, origine) {
+  const m = image.matrice;
+  return { ...image, matrice: [m[0], m[1], m[2], m[3], m[4] - origine.est, m[5] - origine.nord] };
+}
+
+/** Matrice qui applique d'abord « m2 » puis « m1 ». */
+function composerMatrices(m1, m2) {
+  return [
+    m1[0] * m2[0] + m1[2] * m2[1],
+    m1[1] * m2[0] + m1[3] * m2[1],
+    m1[0] * m2[2] + m1[2] * m2[3],
+    m1[1] * m2[2] + m1[3] * m2[3],
+    m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+    m1[1] * m2[4] + m1[3] * m2[5] + m1[5],
+  ];
 }
 
 const xy = ({ est, nord }) => ({ x: est, y: nord });

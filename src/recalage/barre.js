@@ -18,8 +18,8 @@ const ACCROCHES_CALE = [['point', 'Point'], ['sommet', 'Sommet DXF'], ['milieu',
 /**
  * Crée la barre dans "cadre" (le cadre du plan). actions : choisirAccroche(mode), choisirAccrocheCale(mode),
  * ajouterPaire({ est, nord }) (tapés), prendreAuRx2(), basculerTaper(), oublierChoix(),
- * basculerPaire(index, actif), enleverPaire(index), validerCandidat(), appliquer(), annulerRecalage(), fermer().
- * Renvoie { afficher(etat), enlever() } ; etat : { nomPlan, accroche, accrocheCale, choix ({ x, y } ou null),
+ * basculerPaire(index, actif), enleverPaire(index), deplacerLoupe(sens), zoomLoupe(zoom), validerCandidat(), appliquer(), annulerRecalage(), fermer().
+ * Renvoie { afficher(etat), enlever() } ; etat : { nomPlan, pdf ('image', 'traits' ou null, 0.130.0), zoomLoupe, accroche, accrocheCale, choix ({ x, y } ou null),
  * candidat (point touché, pas encore validé : { x, y, nom } ou null), taper (champs Est / Nord ouverts),
  * rx2 (vrai dans l'appli Android), paires }.
  */
@@ -55,7 +55,7 @@ export function creerBarreRecalage(cadre, actions) {
           <span class="titre-pointage">Recaler « ${echapper(etat.nomPlan)} »</span>
           <button type="button" class="bouton-lien" data-action="fermer">fermer</button>
         </div>
-        ${texteEtape(etape)}
+        ${texteEtape(etape, etat.accroche === 'manuel')}
         ${etape.sorte === 'dxf' ? accrochesDxf(etat) : positionCalee(etat)}
         ${pointTouche(etat.candidat)}
         ${etat.paires.length > 0 ? tablePaires(etat.paires, helmert) : ''}
@@ -72,13 +72,14 @@ export function creerBarreRecalage(cadre, actions) {
 }
 
 /** « Étape 3 / 4 » et ce qu'il faut faire, en gros (on sait toujours où on en est). */
-function texteEtape(etape) {
+function texteEtape(etape, manuel = false) {
   const ordinal = etape.rang === 1 ? '1er' : `${etape.rang}e`;
   let texte;
   if (etape.sorte === 'dxf') {
     texte = etape.pret
       ? `Recalage prêt : vérifie les écarts, puis « Appliquer ». Ou, pour contrôler, touche un ${ordinal} point sur le DXF à recaler.`
       : `Touche le ${ordinal} point sur le DXF à recaler, ou un point levé ou de contrôle avec « Point » (une croix le montre), puis « Valider »`;
+    if (!etape.pret && manuel) texte = `Tire la main : mets la croix de la loupe sur le ${ordinal} point du plan à recaler, puis « Valider »`;
   } else {
     texte = `Position calée du ${ordinal} point : touche un point (levé ou de contrôle) ou une accroche d'un autre DXF (une croix le montre, puis « Valider »), ou prends la position du GNSS`;
   }
@@ -98,11 +99,38 @@ function pointTouche(candidat) {
   </div>`;
 }
 
-/** Étapes impaires : accroche sur le DXF à recaler. */
+// Main de l'accroche « Manuel » (0.130.0).
+const MAIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" /></svg>';
+// Zooms de la loupe proposés.
+export const ZOOMS_LOUPE = [2, 4, 8];
+
+/**
+ * Accroches proposées aux étapes impaires : etat.pdf = 'image' (PDF scanné : seulement « Manuel »
+ * et « Point »), 'traits' (PDF vectoriel : toutes + « Manuel »), sinon (DXF) : sans « Manuel ».
+ */
+export function accrochesProposees(pdf) {
+  const manuel = ['manuel', 'Manuel'];
+  if (pdf === 'image') return [manuel, ACCROCHES_DXF.find(([cle]) => cle === 'point')];
+  if (pdf === 'traits') return [...ACCROCHES_DXF, manuel];
+  return ACCROCHES_DXF;
+}
+
+/** Étapes impaires : accroche sur le DXF à recaler ; « Manuel » : flèches du réglage fin et zoom. */
 function accrochesDxf(etat) {
-  return `<div class="ligne-barre-pointage">
-    ${ACCROCHES_DXF.map(([cle, titre]) => `<button type="button" class="puce-choix ${etat.accroche === cle ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${cle}">${titre}</button>`).join('')}
-  </div>`;
+  const puces = accrochesProposees(etat.pdf).map(([cle, titre]) => `<button type="button" class="puce-choix ${cle === 'manuel' ? 'puce-manuel' : ''} ${etat.accroche === cle ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${cle}">${cle === 'manuel' ? MAIN : ''}${titre}</button>`).join('');
+  const reglage = etat.accroche === 'manuel' ? `<div class="reglage-loupe">
+      <div class="fleches-loupe">
+        <span></span><button type="button" class="bouton-fleche-loupe" data-action="deplacerLoupe" data-valeur="haut" aria-label="Monter la croix">▲</button><span></span>
+        <button type="button" class="bouton-fleche-loupe" data-action="deplacerLoupe" data-valeur="gauche" aria-label="Croix à gauche">◀</button>
+        <button type="button" class="bouton-fleche-loupe" data-action="deplacerLoupe" data-valeur="bas" aria-label="Descendre la croix">▼</button>
+        <button type="button" class="bouton-fleche-loupe" data-action="deplacerLoupe" data-valeur="droite" aria-label="Croix à droite">▶</button>
+      </div>
+      <div class="zooms-loupe">
+        <span>Zoom</span>
+        ${ZOOMS_LOUPE.map((z) => `<button type="button" class="puce-choix ${etat.zoomLoupe === z ? 'actif' : ''}" data-action="zoomLoupe" data-valeur="${z}">×${z}</button>`).join('')}
+      </div>
+    </div>` : '';
+  return `<div class="ligne-barre-pointage">${puces}</div>${reglage}`;
 }
 
 /** Étapes paires : le point touché sur le DXF, puis sa position calée (toucher, GNSS ou tapée). */

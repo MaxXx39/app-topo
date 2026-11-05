@@ -88,6 +88,44 @@ export function aDessiner(objet, zone, echelle) {
   return Math.max(objet.xMax - objet.xMin, objet.yMax - objet.yMin) * echelle >= TAILLE_MINIMALE;
 }
 
+// Images des plans PDF scannés (0.130.0), rangées par contenu : décodées une seule fois.
+const images = new Map();
+let quandImagePrete = null;
+
+/** Fonction appelée quand une image de plan finit de se charger (pour redessiner le plan). */
+export function surImageChargee(fonction) {
+  quandImagePrete = fonction;
+}
+
+/** Image prête à dessiner, ou null (elle se charge : surImageChargee sera appelée). */
+function imageDuPlan(donnees) {
+  let image = images.get(donnees);
+  if (!image) {
+    image = new Image();
+    image.addEventListener('load', () => quandImagePrete?.());
+    image.src = donnees;
+    images.set(donnees, image);
+  }
+  return image.complete && image.naturalWidth > 0 ? image : null;
+}
+
+/**
+ * Image d'un plan PDF scanné (contenu.image : { donnees, largeur, hauteur (m), matrice }), dans le
+ * repère du plan déjà posé sur le contexte (y vers le haut) : coin bas gauche en (0, 0).
+ */
+function dessinerImage(ctx, image) {
+  if (!image?.donnees) return;
+  const chargee = imageDuPlan(image.donnees);
+  if (!chargee) return;
+  ctx.save();
+  if (image.matrice) ctx.transform(...image.matrice);
+  // L'image est rangée du haut vers le bas : on la retourne pour le repère du plan.
+  ctx.transform(1, 0, 0, -1, 0, image.hauteur);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(chargee, 0, 0, image.largeur, image.hauteur);
+  ctx.restore();
+}
+
 /**
  * Dessine les plans DXF sur le canvas. vue : { echelle (px/m), estCentre, nordCentre, largeur,
  * hauteur, rotation } (voir vue.js) ; densite : pixels de l'écran par pixel CSS. Seuls les plans visibles
@@ -128,6 +166,7 @@ export function dessinerPlansDxf(canvas, plans, vue, densite = 1) {
     ctx.lineWidth = 1 / e; // 1 pixel, quel que soit le zoom
     ctx.lineJoin = 'round';
     ctx.globalAlpha = opacite;
+    dessinerImage(ctx, plan.contenu.image);
     for (const [teinte, liste] of preparation.pleins) {
       ctx.beginPath();
       for (const plein of liste) {
