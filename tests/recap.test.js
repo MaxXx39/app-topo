@@ -42,3 +42,28 @@ describe('recap des contrôles', () => {
     expect(nomColonne(27)).toBe('AB');
   });
 });
+
+describe('recap : écarts hors tolérance colorés (0.127.0)', () => {
+  it('colore en orange et en rouge, laisse les bons écarts sans couleur', async () => {
+    const { celluleEcart } = await import('../src/recap/recap.js');
+    const tol = { vert: 0.02, orange: 0.04 };
+    expect(celluleEcart(0.012, null, tol)).toBe(0.012);
+    expect(celluleEcart(0.03, null, tol)).toEqual({ v: 0.03, style: 'orange' });
+    expect(celluleEcart(-0.05, null, tol)).toEqual({ v: -0.05, style: 'rouge' });
+    // La couleur notée au moment du contrôle (tolérances du projet) l'emporte.
+    expect(celluleEcart(0.03, 'vert', tol)).toBe(0.03);
+    expect(celluleEcart(0.03, 'rouge', tol)).toEqual({ v: 0.03, style: 'rouge' });
+    expect(celluleEcart(null, null, tol)).toBe(null);
+  });
+  it('le journal garde la couleur du contrôle, la ligne du recap la colore', () => {
+    const projet = { id: 'p1', nom: '10203' };
+    const t = journalVide({ id: 'a1', nom: 'T1' });
+    const le = new Date(2026, 10, 3, 7, 45);
+    noter(t, projet, { type: 'controle', controle: { id: 'c1', type: 'mesure', nom: 'PC1', ecarts: { est: 0.01, nord: 0.01, plan: 0.06, hauteur: 0.03 }, resultat: { plan: 'rouge', hauteur: 'orange', global: 'rouge' }, le: le.toISOString() } }, le);
+    const ligne = ongletsDuRecap([t], new Date(2026, 10, 4, 6, 0))[1].lignes.find((l) => l[4] === 'PC1');
+    expect(ligne[7]).toEqual({ v: 0.06, style: 'rouge' });
+    expect(ligne[8]).toEqual({ v: 0.03, style: 'orange' });
+    const xml = new TextDecoder().decode(creerXlsx([{ nom: 'a', lignes: [[{ v: 0.06, style: 'rouge' }]] }]));
+    expect(xml).toContain('<c r="A1" s="5"><v>0.06</v></c>');
+  });
+});

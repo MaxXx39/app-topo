@@ -10550,3 +10550,53 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
 .fenetre-3d .bascule-3d .puce-choix { min-height: 40px; }
 .fenetre-3d .zoom-3d { display: flex; gap: 6px; margin-left: auto; }
 .fenetre-3d .zoom-3d .bouton-secondaire { min-width: 44px; min-height: 44px; font-size: 1.1rem; }
+
+/* --- 0.127.0 (demandes du 05.11) --- */
+/* Réglages : onglet choisi teinté, gros trait ambre dessous, les autres grisés. */
+.onglet-reglages { opacity: 0.6; border-bottom-width: 4px; border-radius: 10px 10px 0 0; }
+.onglet-reglages.actif {
+  opacity: 1;
+  border-bottom-color: var(--ambre);
+  background: color-mix(in srgb, var(--ambre) 22%, transparent);
+  color: var(--encre);
+}
+/* « Ouvrir projet » : blanc à contour ambre (plus bleu nuit presque noir). */
+.bouton-projet.gestion-projets {
+  background: var(--surface);
+  color: var(--encre);
+  border: 2px solid var(--ambre);
+  box-shadow: none;
+}
+.bouton-projet.gestion-projets svg { color: var(--ambre); stroke: var(--ambre); }
+/* « Contenu du projet » : cadre bien visible, titre en bandeau sombre. */
+#contenu-projet > .contenu-projet, .contenu-projet {
+  border: 3px solid var(--sombre);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+/* Implanter (tablette / téléphone) : moins de place entre le plan et le choix Point / Ligne / Surface, bandeau monter / descendre collé sous le plan. */
+@media (max-width: 899px) {
+  body[data-onglet='terrain'][data-mode-terrain='controler'] .mise-en-page { padding-top: calc(var(--hauteur-plan-terrain) + 2px); }
+  body[data-onglet='terrain'][data-mode-terrain='controler'] .panneau[data-onglet='terrain'] { padding-top: 6px; }
+  body[data-onglet='terrain'][data-mode-terrain='controler'] .choix-implantation-type { margin-bottom: 6px; }
+  body[data-onglet='terrain'][data-mode-terrain='controler'] .choix-implantation-type .puce-choix { min-height: 32px; }
+  body.regle-sous-plan[data-onglet='terrain'] .ecart-et-regle {
+    position: sticky;
+    top: calc(var(--hauteur-entete) + var(--hauteur-plan-terrain) + 2px);
+    z-index: 8;
+    padding: 2px 0 4px;
+    background: var(--surface);
+  }
+}
+/* Titre « Contenu du projet » : bandeau sombre sur toute la largeur du cadre. */
+.contenu-projet > .titre-bloc:first-child {
+  margin: -12px -14px 10px;
+  padding: 10px 14px;
+  background: var(--sombre);
+  color: #ffffff;
+  font-size: 0.95rem;
+  border-radius: 10px 10px 0 0;
+}
+.contenu-projet > .titre-bloc:first-child svg { color: #ffffff; stroke: #ffffff; }

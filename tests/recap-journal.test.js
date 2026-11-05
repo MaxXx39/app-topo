@@ -22,14 +22,16 @@ describe('journal de l\'appareil', () => {
     expect(j.jours[0].sansControle).toEqual({ points: 2, implantations: 0, depuis: premier.toISOString() });
   });
 
-  it('garde chaque contrôle avec ses écarts, sans verdict', () => {
+  it('garde chaque contrôle avec ses écarts et sa couleur (jamais d\'avis)', () => {
     const j = journalVide();
     const le = new Date(2026, 10, 3, 7, 45).toISOString();
     noter(j, projet, { type: 'controle', controle: { id: 'c1', type: 'mesure', nom: 'PC1', ecarts: { est: 0.01, nord: -0.005, plan: 0.011, hauteur: 0.02 }, le } }, new Date(le));
     noter(j, projet, { type: 'controle', controle: { id: 'c2', type: 'refus', le } }, new Date(le));
     expect(j.controles).toHaveLength(2);
     expect(j.controles[0]).toMatchObject({ point: 'PC1', projet: '10203 Carrière', type: 'mesure' });
-    expect(j.controles[0].resultat).toBeUndefined();
+    // Sans couleur donnée : rien noté (le recap calculera avec 2 cm / 4 cm) ; jamais de « global » ni d'avis.
+    expect(j.controles[0].resultat).toBeNull();
+    expect(j.controles[0]).not.toHaveProperty('avis');
     expect(j.jours[0].controles).toBe(1);
   });
 
