@@ -24,7 +24,7 @@ import { estDansAppliAndroid } from '../android/pont.js';
 import { lireJournal, jourLocal } from '../recap/journal.js';
 import { ongletsDuRecap } from '../recap/recap.js';
 import { creerXlsx } from '../recap/xlsx.js';
-import { lireListesPartagees, ecrireListesPartagees, surChangementListes, versionAGarder } from '../reglages/listes-partagees.js';
+import { lireListesPartagees, ecrireListesPartagees, surChangementListes, fusionnerListes } from '../reglages/listes-partagees.js';
 
 const DELAI_ENVOI = 30_000; // après une modification (ms)
 const DELAI_NOUVEL_ESSAI = 60_000; // après un échec (pas de réseau…)
@@ -128,22 +128,32 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
 
   // Listes partagées (0.79.0) : relues à la connexion et toutes les 10 minutes ; une modification
   // faite ici part tout de suite sur Drive.
-  setInterval(() => synchroniserListes().catch(() => {}), LISTES);
+  setInterval(() => synchroniserListes().catch((erreur) => signalerListes(erreur)), LISTES);
   // Recap (0.119.0) : journal de cet appareil envoyé toutes les 30 min au plus, recap Excel refait
   // une fois par jour (le premier appareil connecté du jour s'en charge).
   setInterval(() => mettreAJourRecap(), LISTES);
   surChangementListes((listes, { depuisDrive }) => {
-    if (!depuisDrive && etat.connecte && synchro) synchro.ecrireListes(listes).catch(() => {});
+    // Une modification ici est fusionnée avec Drive (partie par partie) avant l'envoi, jamais écrasée.
+    if (!depuisDrive && etat.connecte && synchro) synchroniserListes().catch((erreur) => signalerListes(erreur));
   });
+
+  /** Échec de la synchro des listes partagées : jamais silencieux (message en bas de l'écran). */
+  function signalerListes(erreur) {
+    message?.(`Listes partagées (dossiers…) pas synchronisées : ${erreur?.message ?? erreur}`);
+  }
 
   /** Garde la version la plus récente des listes partagées, ici ou sur Drive. */
   async function synchroniserListes() {
     if (!etat.connecte || !synchro) return;
     const local = lireListesPartagees();
     const distant = await synchro.lireListes();
-    const garder = versionAGarder(local.modifieLe, distant?.modifieLe ?? null);
-    if (garder === 'drive') ecrireListesPartagees(distant.listes, { modifieLe: distant.modifieLe, depuisDrive: true });
-    else if (garder === 'local') await synchro.ecrireListes(local);
+    if (!distant) {
+      if (local.modifieLe) await synchro.ecrireListes(local);
+      return;
+    }
+    const { listes, changeLocal, changeDistant } = fusionnerListes(local, { ...distant.listes, modifieLe: distant.listes?.modifieLe ?? distant.modifieLe });
+    if (changeLocal) ecrireListesPartagees(listes, { modifieLe: listes.modifieLe, depuisDrive: true });
+    if (changeDistant) await synchro.ecrireListes(listes);
   }
 
   async function verifierVerrou() {
@@ -330,7 +340,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       retenirConnexion(true);
       await rafraichirListe();
       changer('a-jour');
-      synchroniserListes().catch(() => {});
+      synchroniserListes().catch((erreur) => signalerListes(erreur));
       mettreAJourRecap();
       // Choix du projet pas encore fait (fenêtre de démarrage) : rien n'est comparé ni pris pour l'instant.
       if (!choixEnAttente) await apresOuverture();

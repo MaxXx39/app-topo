@@ -38,7 +38,45 @@ export function nettoyerListes(listes) {
   const reseaux = listes?.reseaux && typeof listes.reseaux === 'object' ? listes.reseaux : undefined;
   // Dossiers de projets (0.125.0, voir projet/dossiers.js) : gardés tels quels s'ils existent.
   const dossiers = listes?.dossiers && typeof listes.dossiers === 'object' ? listes.dossiers : undefined;
-  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(reseaux ? { reseaux } : {}), ...(dossiers ? { dossiers } : {}), modifieLe: listes?.modifieLe ?? null };
+  // Date de dernière modification de chaque partie (0.136.0) : sert à fusionner partie par partie.
+  const dates = {};
+  for (const [partie, date] of Object.entries(listes?.dates ?? {})) if (PARTIES.includes(partie) && date) dates[partie] = String(date);
+  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(reseaux ? { reseaux } : {}), ...(dossiers ? { dossiers } : {}), dates, modifieLe: listes?.modifieLe ?? null };
+}
+
+/** Les parties des listes, chacune avec sa propre date de modification (0.136.0). */
+export const PARTIES = ['adresses', 'swipos', 'libelles', 'reseaux', 'dossiers'];
+
+const existe = (listes, partie) => (Array.isArray(listes?.[partie]) ? listes[partie].length > 0 : listes?.[partie] !== undefined);
+
+/** Date d'une partie ; pour une liste sans dates (avant 0.136.0), la date de toute la liste si la partie existe. */
+function dateDeLaPartie(listes, partie) {
+  return listes?.dates?.[partie] ?? (existe(listes, partie) ? listes?.modifieLe ?? '' : '');
+}
+
+/**
+ * Fusionne deux versions des listes partie par partie (0.136.0) : pour chaque partie, la plus
+ * récente gagne (égalité : celle de cet appareil). Ainsi une modification des adresses sur un
+ * appareil n'efface plus les dossiers créés sur un autre. Renvoie { listes, changeLocal, changeDistant }.
+ */
+export function fusionnerListes(local, distant) {
+  const a = nettoyerListes(local);
+  const b = nettoyerListes(distant);
+  const fusion = { dates: {} };
+  for (const partie of PARTIES) {
+    const dateLocale = dateDeLaPartie(a, partie);
+    const dateDistante = dateDeLaPartie(b, partie);
+    const prendreDistant = dateDistante > dateLocale;
+    const source = prendreDistant ? b : a;
+    if (source[partie] !== undefined && (existe(source, partie) || dateDeLaPartie(source, partie))) fusion[partie] = source[partie];
+    const date = prendreDistant ? dateDistante : dateLocale;
+    if (date) fusion.dates[partie] = date;
+  }
+  const dates = Object.values(fusion.dates);
+  fusion.modifieLe = dates.length > 0 ? dates.reduce((x, y) => (x > y ? x : y)) : null;
+  const propres = nettoyerListes(fusion);
+  const signature = (l) => JSON.stringify(PARTIES.map((p) => [l[p] ?? null, dateDeLaPartie(l, p)]));
+  return { listes: propres, changeLocal: signature(propres) !== signature(a), changeDistant: signature(propres) !== signature(b) };
 }
 
 /** Listes de cet appareil. */
@@ -56,6 +94,15 @@ export function lireListesPartagees() {
  */
 export function ecrireListesPartagees(listes, { modifieLe = new Date().toISOString(), depuisDrive = false } = {}) {
   const propres = { ...nettoyerListes(listes), modifieLe };
+  if (!depuisDrive) {
+    // Une partie qui change ici prend la date de la modification ; les autres gardent la leur.
+    const avant = lireListesPartagees();
+    const dates = { ...propres.dates };
+    for (const partie of PARTIES) {
+      if (JSON.stringify(propres[partie] ?? null) !== JSON.stringify(avant[partie] ?? null)) dates[partie] = modifieLe;
+    }
+    propres.dates = dates;
+  }
   try {
     localStorage.setItem(CLE, JSON.stringify(propres));
   } catch {
