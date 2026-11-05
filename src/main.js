@@ -11,7 +11,7 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
-import { dxfDuPdf, lireEchelle } from './topo/pdf-dxf.js';
+import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
 import { formaterNombre } from './topo/format.js';
@@ -724,7 +724,9 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       const { echelle, erreur: erreurEchelle } = lireEchelle(valeurs.echelle);
       if (erreurEchelle) throw new Error(erreurEchelle);
 
-      const nom = pages > 1 ? `${fichier.name} (page ${page})` : fichier.name;
+      // Préfixe fixe « PDF- » (0.132.0) ; « .pdf » est enlevé (le préfixe le dit déjà).
+      const base = fichier.name.replace(/\.pdf$/i, '');
+      const nom = avecPrefixe(pages > 1 ? `${base} (page ${page})` : base, PREFIXE_PDF);
       const avertissements = [`Plan PDF : il n'est pas en MN95, touche « recaler » sur le plan pour le mettre en place${enImage ? ' (accroche « Manuel » : loupe)' : ''}.`];
       if (!echelle) avertissements.push('Sans échelle : le plan est à la taille de la feuille, le recalage trouvera l\'échelle.');
       let lu;
@@ -4489,7 +4491,8 @@ function reglerPlanDxf(id, { visible, couleur, nom, transparence }) {
   if (!choisi) return;
   if (visible !== undefined) choisi.visible = visible;
   if (couleur !== undefined) choisi.couleur = couleur;
-  if (nom !== undefined && nom.trim()) choisi.nom = nom.trim();
+  // Plan PDF (0.132.0) : le préfixe « PDF- » reste devant, quoi qu'on tape.
+  if (nom !== undefined && sansPrefixe(nom, choisi.pdf ? PREFIXE_PDF : '').trim()) choisi.nom = choisi.pdf ? avecPrefixe(nom, PREFIXE_PDF) : nom.trim();
   if (transparence !== undefined) choisi.transparence = Math.min(100, Math.max(0, Math.round(transparence)));
   // Seulement montrer / cacher : réglage de la tablette (0.128.1), permis aussi en lecture seule.
   if (couleur === undefined && nom === undefined && transparence === undefined) affichageModifie();

@@ -11,6 +11,9 @@
  * Le plan n'est pas en MN95 : il faut ensuite le recaler (étapes du recalage).
  */
 
+/** Préfixe fixe du nom d'un plan PDF (0.132.0), comme « LV- » et « Surf- » : « PDF-plan de situation ». */
+export const PREFIXE_PDF = 'PDF-';
+
 /** Longueur d'un point PDF sur la feuille, en mètres. */
 export const POINT_PDF_EN_M = 0.0254 / 72;
 

@@ -3,7 +3,7 @@
 import { genererCsv } from './csv.js';
 import { genererDxf } from './dxf.js';
 import { ECHELLES } from './echelle.js';
-import { ecrireLandXML } from '../topo/landxml.js';
+import { ecrireLandXML, geometrieDeSurface } from '../topo/landxml.js';
 import { plageAltitudes, equidistanceAuto } from '../topo/courbes.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
@@ -56,7 +56,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     <div class="choix-format-export" role="radiogroup" aria-label="Format">
       ${FORMATS.map(([cle, titre, niveau]) => `<button type="button" class="puce-choix ${niveau ? `seulement-${niveau}` : ''}" data-format="${cle}">${titre}</button>`).join('')}
     </div>
-    <p class="titre-choix titre-etape" data-pour="pdf dxf">Options</p>
+    <p class="titre-choix titre-etape" data-pour="pdf dxf landxml">Options</p>
     <div class="champs-export" data-pour="pdf">
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">
@@ -81,6 +81,9 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
       </label>
     </div>
     <div data-pour="pdf">${champsCartouche()}</div>
+    <div data-pour="landxml">
+      <label class="case"><input type="checkbox" data-champ="landxml-contour" checked /> Avec le contour et les lignes de rupture du levé</label>
+    </div>
     <div class="options-geotiff" data-pour="dxf">
       <label class="case"><input type="checkbox" data-champ="geotiff" /> Avec le DXF : photo aérienne swisstopo (GeoTIFF)</label>
       <div class="champs-export">
@@ -135,10 +138,13 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
       message.textContent = 'DXF téléchargé (coordonnées MN95, altitudes en Z).';
     },
     landxml: () => {
-      const { nomProjet, dessinSurfaces } = obtenirDonnees();
+      const { nomProjet, dessinSurfaces, points } = obtenirDonnees();
       const { stocks, resultats, surfaces } = dessinSurfaces;
+      // 0.133.0 : contour et lignes de rupture du levé dans le fichier (SourceData), pour les logiciels
+      // qui refont la triangulation à l'import (Mensura) : sans eux, ils recréent des triangles retirés.
+      const avecContour = champ('landxml-contour').checked;
       const liste = [
-        ...stocks.map((stock, i) => ({ nom: stock.nom, triangles: resultats[i]?.trianglesDessus ?? [] })),
+        ...stocks.map((stock, i) => ({ nom: stock.nom, triangles: resultats[i]?.trianglesDessus ?? [], ...(avecContour ? geometrieDeSurface(stock, points) : {}) })),
         ...surfaces,
       ].filter((s) => s.triangles.length > 0);
       if (liste.length === 0) {

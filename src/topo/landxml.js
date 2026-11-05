@@ -196,14 +196,61 @@ function numeroDeLigne(texte, position) {
 }
 
 /**
+ * Contour et lignes de rupture d'un levé, avec leurs altitudes, pour le LandXML (0.133.0) :
+ * { contour: [point…] (≥ 3 points ou []), lignesRupture: [{ points, fermee }] (≥ 2 points) }.
+ * - surface : { contour: [noms], lignesRupture: [{ noms, fermee }] } (levé créé dans l'appli) ;
+ * - points : points du levé { nom, est, nord, altitude } ; un nom absent ou sans altitude est ignoré.
+ */
+export function geometrieDeSurface(surface, points) {
+  const parNom = new Map();
+  for (const p of points) if (!parNom.has(p.nom) && Number.isFinite(p.altitude)) parNom.set(p.nom, p);
+  const liste = (noms) => (noms ?? []).map((nom) => parNom.get(nom)).filter(Boolean);
+  const contour = liste(surface.contour);
+  return {
+    contour: contour.length >= 3 ? contour : [],
+    lignesRupture: (surface.lignesRupture ?? [])
+      .map((ligne) => ({ points: liste(ligne.noms), fermee: Boolean(ligne.fermee) }))
+      .filter((ligne) => ligne.points.length >= 2),
+  };
+}
+
+/** Liste de points en texte LandXML (PntList3D) : « Nord Est altitude » pour chaque point, 3 décimales. */
+function listeDePoints(points) {
+  return points.map((p) => `${p.nord.toFixed(3)} ${p.est.toFixed(3)} ${p.altitude.toFixed(3)}`).join(' ');
+}
+
+/**
+ * Données sources d'une surface : contour (Boundary, fermé d'office) et lignes de rupture (Breakline ;
+ * une ligne fermée repasse par son premier point). Les logiciels qui refont la triangulation à l'import
+ * (Mensura…) s'en servent pour ne pas relier au-delà du contour ni traverser les lignes.
+ */
+function donneesSources({ contour = [], lignesRupture = [] }) {
+  const blocs = [];
+  if (contour.length >= 3) {
+    blocs.push(`        <Boundaries>
+          <Boundary bndType="outer" edgeTrim="true"><PntList3D>${listeDePoints(contour)}</PntList3D></Boundary>
+        </Boundaries>`);
+  }
+  if (lignesRupture.length > 0) {
+    const lignes = lignesRupture.map(({ points, fermee }) => {
+      const suite = fermee && points.length >= 3 ? [...points, points[0]] : points;
+      return `          <Breakline brkType="standard"><PntList3D>${listeDePoints(suite)}</PntList3D></Breakline>`;
+    });
+    blocs.push(`        <Breaklines>\n${lignes.join('\n')}\n        </Breaklines>`);
+  }
+  return blocs.length > 0 ? `      <SourceData>\n${blocs.join('\n')}\n      </SourceData>\n` : '';
+}
+
+/**
  * Écrit un fichier LandXML 1.1 contenant une ou plusieurs surfaces TIN.
- * - surfaces : liste de { nom, triangles } (triangles = 3 points { nom?, est, nord, altitude })
+ * - surfaces : liste de { nom, triangles, contour?, lignesRupture? } (triangles = 3 points { nom?, est, nord, altitude } ;
+ *   contour et lignesRupture : voir geometrieDeSurface, écrits dans SourceData s'ils sont donnés)
  * Les points identiques (au mm près) sont partagés entre triangles. Comme dans tout
  * fichier LandXML, les coordonnées sont écrites dans l'ordre Nord, Est, altitude.
  */
 export function ecrireLandXML(surfaces, nomProjet = 'Topo') {
   const date = new Date().toISOString();
-  const blocs = surfaces.map(({ nom, triangles }) => {
+  const blocs = surfaces.map(({ nom, triangles, contour, lignesRupture }) => {
     const ids = new Map();
     const lignesPoints = [];
     const idDuPoint = (p) => {
@@ -220,7 +267,7 @@ export function ecrireLandXML(surfaces, nomProjet = 'Topo') {
     let aire = 0;
     for (const [a, b, c] of triangles) aire += Math.abs((b.est - a.est) * (c.nord - a.nord) - (c.est - a.est) * (b.nord - a.nord)) / 2;
     return `    <Surface name="${encoderEntites(nom)}">
-      <Definition surfType="TIN" area2DSurf="${aire.toFixed(3)}">
+${donneesSources({ contour, lignesRupture })}      <Definition surfType="TIN" area2DSurf="${aire.toFixed(3)}">
         <Pnts>
 ${lignesPoints.join('\n')}
         </Pnts>

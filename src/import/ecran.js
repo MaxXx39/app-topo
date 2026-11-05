@@ -15,6 +15,7 @@ import { COULEURS_PLANS } from '../plan/dxf-canvas.js';
 import { estEnMn95 } from '../topo/dxf-plan.js';
 import { rotationLisible } from '../topo/recalage.js';
 import { prefixeDuNom, sansPrefixe, estSurfaceFichier, origineSurface } from '../topo/surface.js';
+import { PREFIXE_PDF } from '../topo/pdf-dxf.js';
 import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '../outils/formulaire-point.js';
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
 import { COULEURS_LISTES, planDuCadastre, couleurDuCadastre } from '../plan/listes-points.js';
@@ -478,7 +479,10 @@ function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
       return `<div class="ligne-plan-dxf ${plan.visible === false ? 'plan-cache' : ''}">
         <div class="entete-plan-dxf">
           <label class="oeil-plan" title="Afficher / cacher le plan"><input type="checkbox" data-champ="plan-visible" data-id="${plan.id}" ${plan.visible !== false ? 'checked' : ''} aria-label="Afficher le plan" /></label>
-          <input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />
+          ${plan.pdf
+    // Plan PDF (0.132.0) : préfixe « PDF- » fixe à gauche du nom, comme « LV- » et « Surf- ».
+    ? `<div class="champ-prefixe"><span class="prefixe-nom">${echapper(PREFIXE_PDF)}</span><input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(sansPrefixe(plan.nom, PREFIXE_PDF))}" aria-label="Nom du plan (après ${echapper(PREFIXE_PDF)})" /></div>`
+    : `<input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />`}
           ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: 'Couleur du plan' })}
         </div>
         <div class="ligne-outils">

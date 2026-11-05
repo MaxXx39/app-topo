@@ -162,3 +162,19 @@ describe('calques d\'un PDF d\'AutoCAD (contenu optionnel)', () => {
     expect(contenu.calques).toEqual([{ nom: 'Axe', visible: true }, { nom: 'Cotes', visible: false }]);
   });
 });
+
+describe('préfixe fixe « PDF- » (0.132.0)', () => {
+  it('ajouté à l\'ouverture aux plans PDF déjà importés, pas aux plans DXF', async () => {
+    const { prefixerNoms } = await import('../src/projet/projet.js');
+    const projet = {
+      surfaces: [], leves: [],
+      plansDxf: [
+        { id: 'a', nom: 'plan-essai.pdf (page 1)', pdf: { page: 1 } },
+        { id: 'b', nom: 'PDF-deja', pdf: { page: 1 } },
+        { id: 'c', nom: 'Bordures' },
+      ],
+    };
+    prefixerNoms(projet);
+    expect(projet.plansDxf.map((p) => p.nom)).toEqual(['PDF-plan-essai.pdf (page 1)', 'PDF-deja', 'Bordures']);
+  });
+});
