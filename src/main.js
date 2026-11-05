@@ -724,11 +724,11 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     const calque = projet.plansDxf.find((p) => p.id === id)?.calques[numero];
     if (!calque) return;
     calque.visible = visible;
-    modifie();
+    affichageModifie();
   },
   montrerTousCalquesDxf: (id, visible) => {
     for (const calque of projet.plansDxf.find((p) => p.id === id)?.calques ?? []) calque.visible = visible;
-    modifie();
+    affichageModifie();
   },
   // Cadastre (0.116.4) : points montrés ou non (Projet › Contenu du projet › Cadastre).
   montrerPointsCadastre: (id, visible) => {
@@ -4332,6 +4332,21 @@ function reglerPlanDxf(id, { visible, couleur, nom, transparence }) {
   if (couleur !== undefined) choisi.couleur = couleur;
   if (nom !== undefined && nom.trim()) choisi.nom = nom.trim();
   if (transparence !== undefined) choisi.transparence = Math.min(100, Math.max(0, Math.round(transparence)));
+  // Seulement montrer / cacher : réglage de la tablette (0.128.1), permis aussi en lecture seule.
+  if (couleur === undefined && nom === undefined && transparence === undefined) affichageModifie();
+  else modifie();
+}
+
+/**
+ * Plan DXF ou calque montré / caché (0.128.1) : c'est l'affichage de cette tablette (voir
+ * projet/affichage-appareil.js), donc permis même sans la main sur le projet (lecture seule).
+ */
+function affichageModifie() {
+  noterAffichage(projet);
+  if (lectureSeule()) {
+    recalculer();
+    return;
+  }
   modifie();
 }
 
@@ -4780,7 +4795,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
     const calque = projet.plansDxf.find((p) => p.id === id)?.calques[numero];
     if (!calque) return;
     calque.visible = visible;
-    modifie();
+    affichageModifie();
   },
   // Bouton « Seul » (0.94.0) : seulement ce sur quoi je travaille (voir listesDuTravail).
   quandBasculerSeul: (actif) => {
@@ -5464,6 +5479,7 @@ function modifie(options) {
   // Lecture seule : la modification est défaite tout de suite (retour à l'état d'avant).
   if (lectureSeule()) {
     projet = completerProjet(historique.relireActuel(modifications));
+    appliquerAffichage(projet); // l'affichage de la tablette n'est pas une modification refusée (0.128.1)
     editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
     recalculer(options);
     refuserEnLectureSeule();
