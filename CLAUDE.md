@@ -19,9 +19,9 @@
 ```
 src/main.js          point d'entrée, état, liaison des écrans (gros fichier : chercher avec grep)
 src/topo/            calculs de topo (volume, coupe, mesure, implantation, talus, accroche, recalage,
-                     contrôle, dessin, lame, levé direct, métré, DXF…)
+                     contrôle, dessin, lame, levé direct, métré, DXF, PDF → DXF / image…)
 src/import/          lecture CSV Emlid, TXT, LandXML, DXF ; écran de l'onglet Projet
-src/plan/            plan SVG/canvas (vue, fonds swisstopo, DXF, listes de points, dessins)
+src/plan/            plan SVG/canvas (vue, fonds swisstopo, DXF, listes de points, dessins, loupe « Manuel »)
 src/surfaces/ volumes/ mesures/ coupes/ photos/ dessin/   écrans et logique de Calculs
 src/leve/            Terrain (lever, implanter, contrôle, guidage/lame, récepteur, croquis, fenêtres)
 src/recalage/ export/ projet/ partage/ (Drive)   recalage DXF ; exports ; projets (IndexedDB) ; synchro
@@ -65,8 +65,8 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Tableau de référence : `docs/modes-base-intermediaire-expert.xlsx` (à relire avant de coder). Règle : Base ⇒ Intermédiaire ⇒ Expert (une fonction cochée plus bas l'est plus haut).
 - Code (`reglages/reglages.js`) : `modeAppli()`, `aAcces('intermediaire' | 'expert')`, `estModeBase()`, `lameActive()` (= Expert) ; HTML : classes `.seulement-intermediaire` / `.seulement-expert` ; calques du plan : propriété `niveau`. **Nouvelle fonction : demander le mode, puis poser la classe ou `aAcces`.**
 - **Base** : ouvrir un projet, Drive, points isolés (« Levé libre »), implanter point / ligne / surface (sans « Enregistrer l'implantation », coupes dans l'axe), Contrôle, récepteur, GPS tablette, plan (fonds, plans DXF, « Afficher »).
-- **Intermédiaire** en plus : créer un projet, lignes / contours, toutes les natures de levé (Stock, Terrain, Recollement, Métré), libellés, triangles en trop, couleurs et exports de listes, Calculs (volumes, mesures), exports PDF / DXF, mail, listes partagées, réglage swipos.
-- **Expert** en plus : bloc Import (dont « Surface Swisstopo », 0.109), exporter / dupliquer / supprimer un projet, Surface Projet, export CSV / LandXML, « Quoi exporter ? », prendre la main, talus, « À implanter », coupes, Dessin, **Guidage** (ex-Lame) et 2e récepteur, réglages NTRIP, journal NMEA, supprimer un levé, calque Triangles.
+- **Intermédiaire** en plus : créer un projet, lignes / contours, toutes les natures de levé (Stock, Terrain, Recollement, Métré), libellés, triangles en trop, couleurs et exports de listes, accroche « Manuel » d'Implanter › Point (0.131), Calculs (volumes, mesures), exports PDF / DXF, mail, listes partagées, réglage swipos.
+- **Expert** en plus : bloc Import (dont « Surface Swisstopo », 0.109, et « Plan PDF » avec « Manuel » au recalage, 0.129-0.130), exporter / dupliquer / supprimer un projet, Surface Projet, export CSV / LandXML, « Quoi exporter ? », prendre la main, talus, « À implanter », coupes, Dessin, **Guidage** (ex-Lame) et 2e récepteur, réglages NTRIP, journal NMEA, supprimer un levé, calque Triangles.
 - Choix pris en codant le tableau (validés le 02.11) : « Relancer NTRIP » dans tous les modes sans code ; « Enregistrer » de la fenêtre Exporter en Base (mail / « autrement » dès Intermédiaire) ; options de ligne à l'implantation et export du contrôle en Base ; code de sécurité inchangé.
 - **Code de sécurité** (`outils/code.js`, tous modes ; simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert (0.90), nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle (tolérances, points, durée), prendre la main (Drive), listes partagées. Import de points de contrôle dans Projet : **sans** code (0.90).
 
@@ -107,6 +107,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - **À essayer sur la tablette (0.119)** : cap automatique, bouton de mise à jour dans ⚙, recap Excel sur Drive (deux appareils), journal NMEA (batterie du RX2 : rien trouvé = pas faisable). Écran de la tablette à distance : TeamViewer / AnyDesk (rien à développer, 03.11).
 - **Relais du cadastre** (0.116, `relais/cadastre-worker.js` à coller dans un Worker Cloudflare gratuit de l'utilisateur ; `import/relais.js`, `adresseParRelais`, constante `ADRESSE_RELAIS_CADASTRE` = https://cadastre-topo.topo-perrin.workers.dev/ (0.116.1, Worker de l'utilisateur)) : sur le site, seules les demandes à rdppf.vd.ch passent par le relais (geodienste.ch accepte le site) ; l'APK passe toujours par Android. **Validé le 03.11 : Vaud marche sur le site** par le relais (relais injoignable depuis le cloud de développement : essais chez l'utilisateur).
 - **Cadastre autour d'un point** : Genève marche (03.11). **Vaud marche dans l'APK** (validé 03.11, 0.112.9 ; points justes) **et sur le site par le relais** (validé 03.11, 0.116.1) : pas libre sur geodienste.ch ; service RDPPF refusé par le navigateur (CORS) puis erreur 500 via Android ; 0.112.7 : RDPPF rappelé, arrêt au premier point refusé avec la raison `<Message>` du service en entier (`raisonDuService`) et l'adresse essayée, pour trouver le bon format.
+- **Publié le 05.11 (PR #72, 0.129 → 0.131)** : Plan PDF en traits, PDF scanné en image, accroche « Manuel » (recalage PDF et Implanter › Point) ; à essayer sur la tablette (voir plus haut).
 - **Publié le 03.11 (PR #56, 0.114 → 0.116.1) et validé par l'utilisateur** (« tout fonctionne ») : allure tablette, mode téléphone, bande fixe de Lever, « Point » à l'étape 1 du recalage, relais du cadastre.
 - **À essayer** : Surface Swisstopo (0.109.0) avec le vrai swisstopo (réseau, CORS, compression du GeoTIFF).
 - Point du 02.11.2026 (liste soldée) : bip-bip et règle (0.107.0), hauteur de canne (0.107.1), talus angle vif (0.107.2), hachures DXF (0.107.3), PDF levé seul (0.107.4), plateforme avec talus (0.108.0).
