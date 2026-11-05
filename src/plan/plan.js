@@ -16,7 +16,8 @@ import { pointALAbscisse } from '../topo/ligne-implantation.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne, formeDuNom } from '../leve/libelles.js';
 import { cheminForme, formeEnTrait } from './formes.js';
 import { ouvrirVue3d } from './vue3d.js';
-import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS } from './dxf-canvas.js';
+import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS, surImageChargee } from './dxf-canvas.js';
+import { creerLoupe } from './loupe.js';
 import { echapper } from '../outils/echapper.js';
 import { COULEURS_LISTES, SECTIONS } from './listes-points.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
@@ -186,6 +187,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // Images des tuiles affichées, rangées par adresse (pour les réutiliser d'un dessin à l'autre).
   const tuilesAffichees = new Map();
   let fondIndisponible = false;
+  // Loupe de l'accroche « Manuel » (0.130.0, recalage d'un plan PDF) : voir loupe.js.
+  const loupe = creerLoupe(cadre, { lireVue: () => vue, lirePlans: () => plansDxf });
+  // Image d'un plan PDF scanné chargée : on redessine les plans (et la loupe).
+  surImageChargee(() => {
+    signatureDxf = '';
+    dessinerBientot();
+    loupe.redessiner();
+  });
 
   let points = [];
   let vue = null;
@@ -847,6 +856,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const visibles = plansDxf; // affichés ou cachés un par un (menu « Plans »)
     const signature = [vue.echelle, vue.estCentre, vue.nordCentre, vue.largeur, vue.hauteur, vue.rotation ?? 0, densite,
       ...visibles.map((p) => `${p.id}:${p.visible !== false}:${p.couleur ?? ''}:${p.transparence ?? 0}:${p.calques.map((c) => (c.visible ? 1 : 0)).join('')}`)].join('|');
+    loupe.redessiner();
     if (signature === signatureDxf) return;
     signatureDxf = signature;
     dessinerCanvasDxf(canvasDxf, visibles, vue, densite);
@@ -2236,6 +2246,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   }).observe(svg);
 
   return {
+    /** Loupe de l'accroche « Manuel » (0.130.0) : voir loupe.js (montrer, cacher, deplacerDe, changerZoom, placerSur). */
+    loupe,
     /** Affiche une nouvelle liste de points et cadre le plan dessus. */
     afficherPoints(nouveauxPoints) {
       points = nouveauxPoints;

@@ -27,7 +27,7 @@ import { nomDuType, resumeArchive } from '../projet/archives.js';
  * Crée le panneau « Import » dans "conteneur" et « Contenu du projet » dans "contenu". Les actions sont faites par main.js via "actions" :
  * archiver(type, id), restaurerArchive(id), supprimerArchive(id) (archives, 0.119.0, voir projet/archives.js),
  * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id),
- * importerPlanDxf(fichier), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
+ * importerPlanDxf(fichier), importerPlanPdf(fichier), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
  * recalerPlanDxf(id), exporterPlanRecale(id), annulerRecalagePlan(id),
  * montrerCalqueDxf(id, n° du calque, visible),
  * montrerTousCalquesDxf(id, visible), ajouterPointTape({ nom, est, nord, altitude }) (renvoie
@@ -145,6 +145,10 @@ export function creerEcranImport(conteneur, contenu, actions) {
     } else if (cible.dataset.champ === 'fichier-plan' && cible.files[0]) {
       await actions.importerPlanDxf(cible.files[0]);
       cible.value = '';
+    } else if (cible.dataset.champ === 'fichier-plan-pdf' && cible.files[0]) {
+      const fichier = cible.files[0];
+      cible.value = '';
+      await actions.importerPlanPdf(fichier);
     } else if (cible.dataset.champ === 'cadastre-points') {
       actions.montrerPointsCadastre(cible.dataset.id, cible.checked);
     } else if (cible.dataset.champ === 'plan-visible') {
@@ -194,6 +198,11 @@ export function creerEcranImport(conteneur, contenu, actions) {
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21 21 3M3 9l6-6M15 21l6-6M3 15h6v6" /></svg>
               <span><strong>Plan DXF</strong><span class="aide">fond de plan</span></span>
               <input type="file" data-champ="fichier-plan" accept=".dxf,application/dxf" hidden />
+            </label>
+            <label class="bouton-import">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v15H6z" /><path d="M14 2v6h6" /><path d="M9 17l3-5 3 3" /></svg>
+              <span><strong>Plan PDF</strong><span class="aide">PDF en traits</span></span>
+              <input type="file" data-champ="fichier-plan-pdf" accept=".pdf,application/pdf" hidden />
             </label>
             <label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17 9 7l5 6 3-4 4 8z" /><path d="M3 17h18" /></svg>

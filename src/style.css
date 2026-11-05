@@ -10600,3 +10600,123 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
   border-radius: 10px 10px 0 0;
 }
 .contenu-projet > .titre-bloc:first-child svg { color: #ffffff; stroke: #ffffff; }
+
+/* ---------------------------------------------------------------------------------------------
+   0.130.0 : accroche « Manuel » du recalage d'un plan PDF (loupe + main, maquettes 2 et 4 du 05.11)
+   --------------------------------------------------------------------------------------------- */
+.loupe-manuelle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 128px;
+  height: 128px;
+  z-index: 2; /* sous la barre du recalage (3) : ses boutons restent toujours utilisables */
+  touch-action: none;
+  pointer-events: none;
+}
+.loupe-manuelle[hidden] { display: none; }
+.loupe-rond {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #ffffff;
+  border: 4px solid var(--ambre);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  cursor: grab;
+}
+.loupe-rond canvas,
+.loupe-croix {
+  position: absolute;
+  inset: -4px;
+  width: 128px;
+  height: 128px;
+}
+.loupe-croix line,
+.loupe-croix circle {
+  stroke: var(--rouge);
+  stroke-width: 1.6;
+  fill: none;
+}
+.loupe-manuelle.posee .loupe-rond { border-color: var(--succes); }
+.loupe-manuelle.posee .loupe-croix line,
+.loupe-manuelle.posee .loupe-croix circle { stroke: var(--succes); stroke-width: 1.8; }
+.loupe-zoom {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--sombre);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  padding: 0 4px;
+}
+/* Tige entre la loupe et la main (en diagonale vers le bas à droite). */
+.loupe-tige {
+  position: absolute;
+  left: 64px;
+  top: 64px;
+  width: 140px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 5px;
+  background: var(--sombre);
+  transform-origin: 0 50%;
+  transform: rotate(45deg);
+}
+.loupe-poignee {
+  position: absolute;
+  left: calc(64px + 116px - 30px);
+  top: calc(64px + 116px - 30px);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: none;
+  background: var(--ambre);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+.loupe-poignee svg {
+  width: 32px;
+  height: 32px;
+  fill: none;
+  stroke: var(--sombre);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.loupe-manuelle.glisse .loupe-poignee,
+.loupe-manuelle.glisse .loupe-rond { cursor: grabbing; }
+.puce-choix.puce-manuel { display: inline-flex; align-items: center; gap: 4px; }
+.puce-choix.puce-manuel svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.puce-choix.puce-manuel.actif { background: var(--ambre-clair); border: 2px solid var(--ambre); color: var(--sombre); }
+.reglage-loupe {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 4px 0;
+}
+.fleches-loupe {
+  display: grid;
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(2, 40px);
+  gap: 4px;
+}
+.bouton-fleche-loupe {
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--texte);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.zooms-loupe { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--gris); }
