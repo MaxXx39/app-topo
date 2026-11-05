@@ -39,6 +39,7 @@
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé. De même pour une mesure.
 import { nouvelIdentifiant, estImportee, avecPrefixe, prefixeDuNom } from '../topo/surface.js';
+import { PREFIXE_PDF } from '../topo/pdf-dxf.js';
 import { calculsDUnAncienProjet } from '../volumes/calculs.js';
 import { TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
 
@@ -213,6 +214,10 @@ export function prefixerNoms(projet) {
     const liste = objet.leveId ? projet.leves.find((l) => l.id === objet.leveId) : null;
     if (liste?.dediee && liste.nom === objet.nom) liste.nom = nom;
     objet.nom = nom;
+  }
+  // Plans PDF importés avant 0.132.0 : le préfixe fixe « PDF- » est ajouté.
+  for (const plan of projet.plansDxf ?? []) {
+    if (plan.pdf) plan.nom = avecPrefixe(plan.nom, PREFIXE_PDF);
   }
 }
 

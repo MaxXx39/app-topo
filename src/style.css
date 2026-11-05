@@ -10720,3 +10720,7 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
   cursor: pointer;
 }
 .zooms-loupe { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--gris); }
+
+/* 0.132.0 : nom d'un plan PDF (liste des plans) : préfixe « PDF- » fixe, le champ prend la place restante. */
+.entete-plan-dxf .champ-prefixe { flex: 1; min-width: 0; width: auto; }
+.entete-plan-dxf .champ-prefixe .nom-plan-dxf { flex: 1; min-width: 0; }
