@@ -11,6 +11,8 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
+import { dxfDuPdf, lireEchelle } from './topo/pdf-dxf.js';
+import { chargerPdfjs, ouvrirPdf, contenuDeLaPage } from './import/pdf.js';
 import { formaterNombre } from './topo/format.js';
 import { calculerSurface, surfaceImportee, cleTriangle, estImportee, estSurfaceFichier, origineSurface, nomNature, nouvelIdentifiant, NATURES_IMPORT, avecPrefixe, sansPrefixe, prefixeDuNom } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul, nouveauVolume } from './volumes/calculs.js';
@@ -683,6 +685,54 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       dernierPlan = { nom: fichier.name, erreur: erreur.message };
       afficherMessage('Plan non importé');
       recalculer();
+    }
+  },
+  // 0.129.0 : plan PDF (Expert, Projet › Import) : les traits du PDF deviennent un plan DXF.
+  importerPlanPdf: async (fichier) => {
+    let doc = null;
+    try {
+      afficherMessage(`Ouverture du PDF « ${fichier.name} »…`, null);
+      const pdfjs = await chargerPdfjs();
+      doc = await ouvrirPdf(pdfjs, new Uint8Array(await fichier.arrayBuffer()));
+      const pages = doc.numPages;
+      afficherMessage(`PDF ouvert : ${pages} page(s)`, 1500);
+      const valeurs = await demanderChamps({
+        titre: `Plan PDF « ${fichier.name} »`,
+        champs: [
+          ...(pages > 1 ? [{ cle: 'page', titre: `Page (1 à ${pages})`, valeur: '1' }] : []),
+          { cle: 'echelle', titre: 'Échelle du plan 1:', valeur: '', exemple: '500 (vide si inconnue)' },
+        ],
+      });
+      if (!valeurs) return;
+      const page = pages > 1 ? Number(valeurs.page) : 1;
+      if (!Number.isInteger(page) || page < 1 || page > pages) throw new Error(`page « ${valeurs.page} » : choisis un nombre de 1 à ${pages}`);
+      const { echelle, erreur: erreurEchelle } = lireEchelle(valeurs.echelle);
+      if (erreurEchelle) throw new Error(erreurEchelle);
+
+      afficherMessage(`Lecture des traits du PDF (page ${page})…`, null);
+      await new Promise((fin) => setTimeout(fin, 30));
+      const contenu = await contenuDeLaPage(doc, page, pdfjs.OPS);
+      if (contenu.traits.length === 0 && contenu.textes.length === 0) {
+        throw new Error(contenu.images > 0
+          ? 'ce PDF ne contient qu\'une image (plan scanné ou photographié) : il n\'y a pas de traits à lire'
+          : 'aucun trait trouvé sur cette page');
+      }
+      const nom = pages > 1 ? `${fichier.name} (page ${page})` : fichier.name;
+      const { plan: lu, erreur } = lirePlanDxf(dxfDuPdf(contenu, echelle), nom);
+      if (erreur || !lu.bornes) throw new Error(erreur ?? 'aucun objet dessiné trouvé');
+      const avertissements = ['Plan PDF : il n\'est pas en MN95, touche « recaler » sur le plan pour le mettre en place.'];
+      if (!echelle) avertissements.push('Sans échelle : le plan est à la taille de la feuille, le recalage trouvera l\'échelle.');
+      if (contenu.images > 0) avertissements.push(`${contenu.images} image(s) du PDF non reprise(s) (seuls les traits et les textes sont lus).`);
+      projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, pdf: { page, echelle } });
+      dernierPlan = { nom, avertissements };
+      afficherMessage(`Plan PDF « ${nom} » importé : ${lu.compte.objets} objets`, 4000);
+      modifie();
+    } catch (erreur) {
+      dernierPlan = { nom: fichier.name, erreur: erreur.message };
+      afficherMessage(`Plan PDF non importé : ${erreur.message}`, 8000);
+      recalculer();
+    } finally {
+      doc?.loadingTask?.destroy();
     }
   },
   voirPlanDxf: (id) => {

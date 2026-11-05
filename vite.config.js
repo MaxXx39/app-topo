@@ -28,13 +28,19 @@ export default defineConfig(({ mode }) => ({
         // 0.126.0 : la lecture des photos HEIC (bibliothèque heic-to, environ 3 Mo) n'est plus
         // téléchargée à l'installation ; elle l'est à la première photo HEIC, puis gardée sur
         // l'appareil (runtimeCaching ci-dessous) pour marcher ensuite sans connexion.
-        globIgnores: ['**/heic-to-*.js'],
+        // 0.129.0 : même chose pour la lecture des plans PDF (pdf.js, environ 1,8 Mo).
+        globIgnores: ['**/heic-to-*.js', '**/pdf.min-*.js', '**/pdf.worker.min-*'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: /\/assets\/heic-to-[^/]+\.js$/,
             handler: 'CacheFirst',
             options: { cacheName: 'lecture-heic', expiration: { maxEntries: 2 } },
+          },
+          {
+            urlPattern: /\/assets\/pdf\.(min|worker\.min)-[^/]+\.m?js$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'lecture-pdf', expiration: { maxEntries: 6 } },
           },
         ],
       },
