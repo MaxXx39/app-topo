@@ -630,6 +630,19 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         groupe.append(texte);
       }
     }
+    // Talus d'une surface (0.135.0) : pendant le choix des côtés, chaque côté du contour est un trait à
+    // toucher (choisi = épais ambre, déjà réglé = brun) avec son numéro (C1…) quand il n'y en a pas trop.
+    const cotesTalus = implantation.cotesTalus ?? [];
+    for (const c of cotesTalus) {
+      const a = versEcran(c.a.est, c.a.nord, vue);
+      const b = versEcran(c.b.est, c.b.nord, vue);
+      groupe.append(creerElement('path', { d: `M${a.x} ${a.y}L${b.x} ${b.y}`, class: `cote-talus${c.regle ? ' regle' : ''}${c.choisi ? ' choisi' : ''}` }));
+      if (cotesTalus.length <= 80 || c.choisi) {
+        const numero = creerElement('text', { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 5, 'text-anchor': 'middle', class: 'numero-cote-talus' });
+        numero.textContent = `C${c.numero}`;
+        groupe.append(numero);
+      }
+    }
     // Ligne à implanter : trait sarcelle épais, sa parallèle en pointillés, « Début » et « Fin ».
     const ligne = implantation.ligne;
     // Talus : zone brune entre la ligne et l'entrée en terre (ou le bord), le bord en pointillés,
