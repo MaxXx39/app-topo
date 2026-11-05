@@ -5738,6 +5738,8 @@ function recalculer({ recadrer = false } = {}) {
   ecranMesures.afficher();
   ecranDessin.afficher(donneesDessin());
   ecranTalusSurface.afficher(donneesTalusSurfaces());
+  // Choix des côtés d'un talus (0.135.0) : sur tablette / téléphone, le plan passe en haut de Dessin (voir style.css).
+  document.body.classList.toggle('en-choix-cotes-talus', choixCotesTalusActif());
   afficherSiVisible('import', panneauProjet, () => ecranImport.afficher(projet, dernierImport, dernierPlan));
   afficherSiVisible('export', panneauProjet, () => moduleExport.afficher(projet));
   montrerOngletProjet();

@@ -10756,3 +10756,33 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
 .groupes-talus { margin: 6px 0 0; padding-left: 18px; font-size: 0.9rem; }
 .groupes-talus .talus-erreur { color: var(--rouge, #dc2626); }
 .groupes-talus .talus-aChercher { color: #92400e; }
+/* Choix des côtés d'un talus sur tablette / téléphone : le plan en haut de Dessin, comme Volumes (0.114.0). */
+@media (max-width: 899px) {
+  body.en-choix-cotes-talus[data-onglet='dessin'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(var(--part-plan-terrain, 0.35), var(--part-plan-auto, 0)));
+  }
+  body.en-choix-cotes-talus[data-onglet='dessin'] .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: var(--hauteur-plan-terrain);
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+  body.en-choix-cotes-talus[data-onglet='dessin'] .mise-en-page {
+    padding-top: calc(var(--hauteur-plan-terrain) + 12px);
+  }
+  body.en-choix-cotes-talus[data-onglet='dessin'] .boutons-taille-plan {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    z-index: 3;
+    display: flex;
+    gap: 2px;
+    transform: translateX(-50%);
+  }
+}
