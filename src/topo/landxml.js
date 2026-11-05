@@ -295,3 +295,23 @@ ${blocs.join('\n')}
 export function encoderEntites(texte) {
   return String(texte).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
+
+/**
+ * Réunit plusieurs surfaces lues (ex. une par plateforme dans un export Mensura) en une seule :
+ * triangles, points, lignes de rupture et contours mis bout à bout (0.134.0).
+ * Une seule surface (ou aucune) est rendue telle quelle. Le nom est celui du fichier, sans « .xml ».
+ */
+export function fusionnerSurfaces(surfaces, nom) {
+  if (surfaces.length <= 1) return surfaces;
+  const annoncees = surfaces.map((s) => s.surfaceAnnoncee);
+  return [{
+    nom,
+    description: `${surfaces.length} surfaces réunies : ${surfaces.map((s) => s.nom).join(', ')}`,
+    points: surfaces.flatMap((s) => s.points),
+    triangles: surfaces.flatMap((s) => s.triangles),
+    lignesRupture: surfaces.flatMap((s) => s.lignesRupture),
+    contours: surfaces.flatMap((s) => s.contours),
+    trianglesInvisibles: surfaces.reduce((somme, s) => somme + s.trianglesInvisibles, 0),
+    surfaceAnnoncee: annoncees.every(Number.isFinite) ? annoncees.reduce((a, b) => a + b, 0) : null,
+  }];
+}

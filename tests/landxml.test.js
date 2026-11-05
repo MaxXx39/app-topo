@@ -142,3 +142,21 @@ describe('levé complet : triangle supprimé + contour dans le LandXML (0.133.0)
     expect(xml).toContain('<Breakline brkType="standard"><PntList3D>0.000 0.000 10.000 5.000 5.000 12.000</PntList3D></Breakline>');
   });
 });
+
+describe('fusionnerSurfaces', () => {
+  const surface = (nom, n, aire) => ({ nom, description: '', points: Array(n).fill({}), triangles: Array(n).fill([]), lignesRupture: [[1]], contours: [], trianglesInvisibles: 1, surfaceAnnoncee: aire });
+  it('réunit plusieurs surfaces en une seule', async () => {
+    const { fusionnerSurfaces } = await import('../src/topo/landxml.js');
+    const r = fusionnerSurfaces([surface('P1', 2, 10), surface('P2', 3, 5)], 'projet');
+    expect(r).toHaveLength(1);
+    expect(r[0].nom).toBe('projet');
+    expect(r[0].triangles).toHaveLength(5);
+    expect(r[0].lignesRupture).toHaveLength(2);
+    expect(r[0].surfaceAnnoncee).toBe(15);
+  });
+  it('laisse une surface seule telle quelle', async () => {
+    const { fusionnerSurfaces } = await import('../src/topo/landxml.js');
+    const s = [surface('P1', 2, 10)];
+    expect(fusionnerSurfaces(s, 'x')).toBe(s);
+  });
+});
