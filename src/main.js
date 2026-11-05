@@ -108,7 +108,8 @@ import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } fr
 import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip } from './outils/son.js';
 import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation, classeTolerance, TOLERANCES_PAR_DEFAUT } from './topo/controle.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, listesCadastre, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
+import { noterAffichage, appliquerAffichage } from './projet/affichage-appareil.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
@@ -5716,6 +5717,7 @@ function afficherMessage(texte, duree = 2000) {
 }
 
 async function enregistrer() {
+  noterAffichage(projet); // affichage gardé par appareil (0.128)
   projet.modifieLe = new Date().toISOString();
   try {
     await stockage.enregistrerProjet(projet);
@@ -5766,7 +5768,6 @@ function allerA(onglet) {
  * Ouvre un projet : il devient le projet affiché, et il est enregistré.
  * Puis on va à l'étape utile (voir etapeUtile).
  */
-let affichageRemisAZero = false;
 // La fenêtre des libellés range ceux « de ce projet seulement » dans le projet (0.105.6).
 surLibellesProjet((libelles) => {
   projet.libelles = libelles;
@@ -5776,16 +5777,9 @@ surLibellesProjet((libelles) => {
 let dernierProjetNote = null; // dernier projet noté « ouvert » dans le journal de l'appareil
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
-  // Tableau « Affichage » (0.94.0) : au démarrage, tout est montré (listes, plans DXF et leurs calques).
-  if (!affichageRemisAZero) {
-    affichageRemisAZero = true;
-    // 0.113 : sauf les listes Cadastre (on voit seulement les lignes de leur plan DXF).
-    projet.listesCachees = listesCadastre(projet);
-    for (const planDxf of projet.plansDxf ?? []) {
-      planDxf.visible = true;
-      for (const calque of planDxf.calques ?? []) calque.visible = true;
-    }
-  }
+  // 0.128 : listes de points et plans / calques DXF masqués = choix de CET appareil, gardés au
+  // redémarrage et jamais repris d'une autre tablette (aussi pour une version reçue de Drive).
+  appliquerAffichage(projet);
   // Cadastre (0.116.4) : plan DXF relié à sa liste de points.
   lierCadastres(projet);
   // Anciens projets : un libellé absent de la liste mais utilisé par des points est recréé, pour ce projet seulement (0.105.5).
