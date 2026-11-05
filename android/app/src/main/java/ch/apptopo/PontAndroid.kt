@@ -1,6 +1,8 @@
 package ch.apptopo
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -172,6 +174,28 @@ class PontAndroid(private val ecran: EcranPrincipal) {
     @JavascriptInterface
     fun activerToucheVolume(actif: Boolean) {
         ecran.activerToucheVolume(actif)
+    }
+
+    /**
+     * Partage d'écran (0.136.1) : ouvre AnyDesk (com.anydesk.anydeskandroid) pour que le bureau voie
+     * l'écran de la tablette et prenne la main. Pas installé : la fiche de Google Play s'ouvre.
+     */
+    @JavascriptInterface
+    fun ouvrirAnydesk() {
+        ecran.runOnUiThread {
+            val paquet = "com.anydesk.anydeskandroid"
+            try {
+                val ouverture = ecran.packageManager.getLaunchIntentForPackage(paquet)
+                if (ouverture != null) {
+                    ecran.startActivity(ouverture)
+                } else {
+                    ecran.message("AnyDesk n'est pas installé : installation proposée.")
+                    ecran.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$paquet")))
+                }
+            } catch (erreur: Exception) {
+                ecran.message("Impossible d'ouvrir AnyDesk : ${erreur.message ?: "erreur inconnue"}")
+            }
+        }
     }
 
     /**
