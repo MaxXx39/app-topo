@@ -5,7 +5,7 @@
 import { adresseParRelais } from './import/relais.js';
 import './style.css';
 import { lirePoints } from './topo/import-points.js';
-import { lireLandXML } from './topo/landxml.js';
+import { lireLandXML, fusionnerSurfaces } from './topo/landxml.js';
 import { creerSurfaceSwisstopo } from './import/zone-swisstopo.js';
 import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
@@ -5120,7 +5120,11 @@ async function importerSurface(fichier) {
   try {
     const texte = await fichier.text();
     const type = /\.dxf$/i.test(fichier.name) ? 'dxf' : 'landxml';
-    const { surfaces, erreurs, avertissements } = type === 'dxf' ? lireDXF(texte) : lireLandXML(texte);
+    const lu = type === 'dxf' ? lireDXF(texte) : lireLandXML(texte);
+    const { erreurs, avertissements } = lu;
+    // LandXML (0.134.0) : toutes les surfaces du fichier (ex. une par plateforme Mensura) en une seule.
+    const surfaces = type === 'dxf' ? lu.surfaces : fusionnerSurfaces(lu.surfaces, fichier.name.replace(/\.[^.]+$/, ''));
+    if (surfaces.length < lu.surfaces.length) avertissements.push(`${lu.surfaces.length} surfaces du fichier réunies en une seule`);
     // Plus de question « Stock, Terrain… ? » (0.90.0) : la nature ne servait à rien.
     for (const surface of surfaces) projet.surfaces.push(surfaceImportee(surface, fichier.name, type));
     const messages = [...erreurs, ...avertissements];
