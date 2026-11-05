@@ -72,12 +72,15 @@ export function creerSurface(nom, leveId, nature = 'stock') {
 
 /** Vrai si la surface a été importée d'un fichier (LandXML, DXF) et non créée à partir de points. */
 export function estImportee(surface) {
-  return surface.type === 'landxml' || surface.type === 'dxf' || surface.type === 'dessin' || surface.type === 'swisstopo';
+  return surface.type === 'landxml' || surface.type === 'dxf' || surface.type === 'dessin' || surface.type === 'swisstopo' || surface.type === 'talus';
 }
 
-/** Vrai pour une surface venue d'un fichier ou de swisstopo (LandXML, DXF 3D, Surface Swisstopo), pas de Dessin. */
+/**
+ * Vrai pour une surface venue d'un fichier ou de swisstopo (LandXML, DXF 3D, Surface Swisstopo), pas de Dessin.
+ * 0.135.0 : aussi une surface importée avec ses talus (type 'talus', voir topo/talus-cotes.js), rangée avec elles.
+ */
 export function estSurfaceFichier(surface) {
-  return surface?.type === 'landxml' || surface?.type === 'dxf' || surface?.type === 'swisstopo';
+  return surface?.type === 'landxml' || surface?.type === 'dxf' || surface?.type === 'swisstopo' || surface?.type === 'talus';
 }
 
 // Préfixes des noms (0.90.0, demande du 29.10.2026) : « LV- » pour un levé (stock, terrain,
@@ -107,7 +110,7 @@ export function sansPrefixe(nom, prefixe) {
 
 /** D'où vient une surface importée : « LandXML », « DXF » ou « Dessin » (plateforme ou bâtiment dessiné). */
 export function origineSurface(surface) {
-  return { dxf: 'DXF', landxml: 'LandXML', dessin: 'Dessin', swisstopo: 'swissALTI3D' }[surface.type] ?? '';
+  return { dxf: 'DXF', landxml: 'LandXML', dessin: 'Dessin', swisstopo: 'swissALTI3D', talus: 'Talus' }[surface.type] ?? '';
 }
 
 /**

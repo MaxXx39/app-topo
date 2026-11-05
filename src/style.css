@@ -10724,3 +10724,35 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
 /* 0.132.0 : nom d'un plan PDF (liste des plans) : préfixe « PDF- » fixe, le champ prend la place restante. */
 .entete-plan-dxf .champ-prefixe { flex: 1; min-width: 0; width: auto; }
 .entete-plan-dxf .champ-prefixe .nom-plan-dxf { flex: 1; min-width: 0; }
+
+/* ==========================================================================
+   0.135.0 : talus d'une surface importée (Calculs › Dessin) : côtés à toucher sur le plan, cartes
+   ========================================================================== */
+.plan .implantation .cote-talus {
+  fill: none;
+  stroke: #64748b;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 2 4;
+}
+.plan .implantation .cote-talus.regle { stroke: #92400e; stroke-dasharray: none; }
+.plan .implantation .cote-talus.choisi { stroke: #f59e0b; stroke-width: 7; stroke-dasharray: none; }
+.plan .implantation .numero-cote-talus {
+  fill: #334155;
+  font-size: calc(10px * var(--echelle-texte, 1));
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+#talus-surfaces { margin-top: 16px; }
+#talus-surfaces h3 { margin: 0 0 8px; }
+.carte-talus-surface { margin: 10px 0; padding: 8px 0; border-top: 3px solid #92400e; }
+.entete-talus-surface { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.choix-cotes-talus { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.carte-talus-surface .champ-talus-dessin input { width: 7em; }
+.groupes-talus { margin: 6px 0 0; padding-left: 18px; font-size: 0.9rem; }
+.groupes-talus .talus-erreur { color: var(--rouge, #dc2626); }
+.groupes-talus .talus-aChercher { color: #92400e; }

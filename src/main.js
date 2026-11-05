@@ -15,10 +15,11 @@ import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee, estSurfaceFichier, origineSurface, nomNature, nouvelIdentifiant, NATURES_IMPORT, avecPrefixe, sansPrefixe, prefixeDuNom } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, estSurfaceFichier, origineSurface, nomNature, nouvelIdentifiant, NATURES_IMPORT, avecPrefixe, sansPrefixe, prefixeDuNom, PREFIXE_SURFACE } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul, nouveauVolume } from './volumes/calculs.js';
 import { talusDePlateforme, PENTES_TALUS } from './topo/plateforme-talus.js';
-import { tranchesDeTalus } from './topo/tranches-talus.js';
+import { tranchesDeTalus, texteDePente } from './topo/tranches-talus.js';
+import { contourDeSurface, talusParCotes, surfaceAvecTalus, tranchesDesCotes, tronconsAImplanter, reglageComplet } from './topo/talus-cotes.js';
 import { creerPlan } from './plan/plan.js';
 import { creerEditeurSurfaces } from './surfaces/editeur.js';
 import { creerEcranVolumes, texteBase } from './volumes/ecran.js';
@@ -31,6 +32,7 @@ import { creerEcranImport } from './import/ecran.js';
 import { creerEcranCoupes, nouvelleCoupe } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
 import { creerEcranDessin } from './dessin/ecran.js';
+import { creerEcranTalusSurface } from './dessin/talus-surface.js';
 import { gisement, directionTournee, passerParSommet, altitudeProchainSommet, altitudeSelonChoix, pointSelonGisement, rectangle, airePolygone, longueursCotes, estFerme, altitudesDuDessin, nomDessin, pointsDuDessin, cotesDuDessin, coteSousLeDoigt, surfaceDuDessin } from './topo/dessin.js';
 import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { creerModuleExport } from './export/module.js';
@@ -350,6 +352,7 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="dessin">
         <h2>Dessin ${bulle('dessin')}</h2>
         <div id="dessins"></div>
+        <div id="talus-surfaces" class="carte-section"></div>
       </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
       <div id="barre-mesures" class="barre-edition" hidden></div>
@@ -1473,6 +1476,8 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         retenirReglagesTerrain();
         montrerImplantation();
       },
+      // Talus d'une surface importée (0.135.0) : un tronçon (côtés réglés pareil) à implanter.
+      ouvrirTalusSurface: (valeur) => ouvrirTalusSurface(valeur),
       supprimerTalus: (id) => {
         const talus = projet.talus.find((t) => t.id === id);
         if (!talus || !confirm(`Enlever ${talus.nom} de « Mes talus » ?`)) return;
@@ -1824,6 +1829,10 @@ function envoyerImplantationAuPlan() {
   // Points de contrôle : dessinés si leur case « Points de contrôle » est cochée (menu Afficher).
   const pointsControle = seul || (gardees && !gardees.has(LISTE_CONTROLE)) || (projet.listesCachees ?? []).includes(LISTE_CONTROLE) ? [] : projet.pointsControle;
   const dessins = seul ? [] : dessinsVisibles().filter((d) => !gardees || gardees.has(d.id));
+  // Talus des surfaces importées (0.135.0) : barbules, et côtés à choisir pendant le choix.
+  const choixCotes = choixCotesTalusActif();
+  const talusSurfaces = seul && !choixCotes ? [] : tranchesDesTalusSurfaces();
+  const cotesTalus = cotesTalusPourPlan();
   const aImplanter = seul || gardees ? [] : projet.aImplanter;
   // Points implantés (0.114.0, Implanter, dès Intermédiaire) : vert / orange / rouge selon les tolérances du Contrôle.
   const implantes = ongletContexte === 'terrain' && terrain.mode === 'controler' && aAcces('intermediaire') && !seul
@@ -1838,11 +1847,12 @@ function envoyerImplantationAuPlan() {
   const guidageLigne = ongletContexte === 'terrain' && enImplantationDeLigne() && !enTalus() && Boolean(implanter.ligne);
   if (!guidageLigne) implanter.voirLigne = false;
   plan.voirLigne({ visible: guidageLigne, sommets: guidageLigne && implanter.voirLigne ? implanter.ligne.sommets : null });
-  plan.afficherImplantation(accrocheActive || avecPilote || aImplanter.length > 0 || implantes.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0
+  plan.afficherImplantation(accrocheActive || avecPilote || choixCotes || aImplanter.length > 0 || implantes.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0 || talusSurfaces.length > 0
     ? {
-        actif: accrocheActive || avecPilote,
-        // Talus des dessins : barbules du haut vers le bas et pente écrite dedans (0.122.0).
-        talusDessins: dessins.flatMap((d) => tranchesDuDessin(d)),
+        actif: accrocheActive || avecPilote || choixCotes,
+        // Talus des dessins : barbules du haut vers le bas et pente écrite dedans (0.122.0) ; aussi ceux des surfaces (0.135.0).
+        talusDessins: [...dessins.flatMap((d) => tranchesDuDessin(d)), ...talusSurfaces],
+        cotesTalus,
         dessins: dessins.map((d) => ({ ...d, noms: pointsDuDessin(d, projet.dessins).map((p) => p.nom), couleur: projet.couleursListes?.[d.id] ?? null })),
         actifId: avecPilote ? pilote.dessinId : null,
         pilote: avecPilote ? { direction: pilote.direction, distance: lireNombreTape(pilote.distance) ?? null } : null,
@@ -2320,6 +2330,285 @@ function synchroniserSurfacesDessins() {
     surface.faces = faces;
   }
   if (projet.surfaces.length !== avant) editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+}
+
+// --- Talus d'une surface importée (0.135.0, Calculs › Dessin, Expert ; calculs dans topo/talus-cotes.js) ---
+// Une surface de talus : { id, nom, type: 'talus', sourceId (la surface importée), terrainId (terrain de
+// référence, ou null), reglages: { n° du côté: { horizontal, vertical, sens, longueur, altitudeSol } },
+// points, faces } : la surface importée + ses talus, refaite à chaque réglage (comme une surface importée
+// pour le reste de l'appli : volumes, Implanter › Surface, exports, Drive).
+const talusSurface = { actifId: null, choisis: new Set() };
+// Calcul gardé tant que la surface importée, le terrain et les réglages ne changent pas : id → { signature, resultat, ecrit }.
+const calculsTalusSurfaces = new Map();
+const contoursDesSources = new WeakMap();
+
+/** Contour extérieur (sens trigonométrique) d'une surface importée : [{ nom, est, nord, altitude }]. */
+function contourDeLaSource(source) {
+  if (!source?.faces || !source.points) return [];
+  if (!contoursDesSources.has(source.faces)) {
+    contoursDesSources.set(source.faces, contourDeSurface(source.faces.map((f) => f.map((i) => source.points[i]))));
+  }
+  return contoursDesSources.get(source.faces);
+}
+
+/** Empreinte rapide de triangles (pour savoir si un terrain a changé). */
+function empreinteTriangles(triangles) {
+  let somme = 0;
+  for (const t of triangles) somme += t[0].est + t[1].nord + (t[2].altitude ?? 0);
+  return `${triangles.length}:${somme.toFixed(3)}`;
+}
+
+/** Talus d'une surface de talus : { contour, talus } ou { erreur }. */
+function calculDuTalusSurface(surface) {
+  const source = projet.surfaces.find((s) => s.id === surface.sourceId);
+  if (!source) return { erreur: 'surface importée introuvable (supprimée ou archivée ?)' };
+  const contour = contourDeLaSource(source);
+  if (contour.length < 3) return { erreur: `contour de « ${source.nom} » introuvable` };
+  const trianglesTerrain = surface.terrainId ? trianglesDeSurface(surface.terrainId) : [];
+  const signature = JSON.stringify([source.points.length, source.faces.length, surface.terrainId, empreinteTriangles(trianglesTerrain), surface.reglages ?? {}]);
+  const garde = calculsTalusSurfaces.get(surface.id);
+  if (garde?.signature === signature) return garde.resultat;
+  let perimetre = 0;
+  contour.forEach((p, i) => {
+    const q = contour[(i + 1) % contour.length];
+    perimetre += Math.hypot(q.est - p.est, q.nord - p.nord);
+  });
+  const talus = talusParCotes(contour, surface.reglages ?? {}, { altitudeTerrain: trianglesTerrain.length ? altitudeDeSurface(surface.terrainId) : null, pas: Math.max(1, perimetre / 400) });
+  const resultat = talus.erreur ? { erreur: talus.erreur } : { contour, talus, source };
+  calculsTalusSurfaces.set(surface.id, { signature, resultat, ecrit: false });
+  return resultat;
+}
+
+/** Surfaces de talus remises à jour (points et faces) quand leur calcul a changé ; sinon rien. */
+function synchroniserTalusSurfaces() {
+  for (const surface of projet.surfaces) {
+    if (surface.type !== 'talus') continue;
+    const calcul = calculDuTalusSurface(surface);
+    if (calcul.erreur) {
+      surface.erreurTalus = calcul.erreur;
+      continue;
+    }
+    delete surface.erreurTalus;
+    const garde = calculsTalusSurfaces.get(surface.id);
+    if (garde.ecrit && surface.points?.length) continue;
+    const { points, faces } = surfaceAvecTalus(calcul.source.points, calcul.source.faces, calcul.talus);
+    surface.points = points;
+    surface.faces = faces;
+    surface.nomFichier = calcul.source.nom;
+    garde.ecrit = true;
+  }
+}
+
+/** Vrai pendant le choix des côtés d'un talus sur le plan (Calculs › Dessin). */
+function choixCotesTalusActif() {
+  return Boolean(talusSurface.actifId) && ongletContexte === 'dessin' && aAcces('expert') && projet.surfaces.some((s) => s.id === talusSurface.actifId);
+}
+
+/** Côtés du contour pour le plan pendant le choix : [{ a, b, numero, choisi, regle }]. */
+function cotesTalusPourPlan() {
+  if (!choixCotesTalusActif()) return [];
+  const surface = projet.surfaces.find((s) => s.id === talusSurface.actifId);
+  const calcul = calculDuTalusSurface(surface);
+  if (calcul.erreur) return [];
+  const { contour } = calcul;
+  return contour.map((a, k) => ({ a, b: contour[(k + 1) % contour.length], numero: k + 1, choisi: talusSurface.choisis.has(k), regle: reglageComplet(surface.reglages?.[k]) }));
+}
+
+/** Toucher le plan pendant le choix des côtés : le côté le plus proche (sous le doigt) est choisi ou enlevé. */
+function toucherCoteTalus(position, tolerance) {
+  const cotes = cotesTalusPourPlan();
+  let meilleur = null;
+  for (const c of cotes) {
+    const dx = c.b.est - c.a.est;
+    const dy = c.b.nord - c.a.nord;
+    const l2 = dx * dx + dy * dy;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((position.est - c.a.est) * dx + (position.nord - c.a.nord) * dy) / l2)) : 0;
+    const d = Math.hypot(position.est - (c.a.est + dx * t), position.nord - (c.a.nord + dy * t));
+    if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, k: c.numero - 1 };
+  }
+  if (!meilleur) {
+    afficherMessage('Aucun côté de la surface sous le doigt', 2500);
+    return;
+  }
+  if (talusSurface.choisis.has(meilleur.k)) talusSurface.choisis.delete(meilleur.k);
+  else talusSurface.choisis.add(meilleur.k);
+  recalculer();
+}
+
+/** Talus des surfaces montrées, pour le plan (barbules et pente). */
+function tranchesDesTalusSurfaces() {
+  const cachees = new Set(projet.listesCachees ?? []);
+  return projet.surfaces
+    .filter((s) => s.type === 'talus' && (!cachees.has(s.id) || s.id === talusSurface.actifId))
+    .flatMap((s) => {
+      const calcul = calculDuTalusSurface(s);
+      return calcul.erreur ? [] : tranchesDesCotes(calcul.talus, s.reglages);
+    });
+}
+
+/** Côtés numérotés « C1 », « C1–C4 » (n° à partir de 1). */
+function texteCotes(cotes) {
+  return cotes.length === 1 ? `C${cotes[0] + 1}` : `C${cotes[0] + 1}–C${cotes.at(-1) + 1}`;
+}
+
+/** Réglage en mots : « 3/2 · remblai · 2 m », « 2/1 · auto · terrain ». */
+function texteReglageTalus(reglage, avecTerrain) {
+  const sens = { auto: 'auto', remblai: 'remblai', deblai: 'déblai' }[reglage.sens ?? 'auto'];
+  const fin = reglage.longueur > 0
+    ? `${formaterNombre(reglage.longueur)} m`
+    : avecTerrain ? 'jusqu\'au terrain' : reglage.altitudeSol != null ? `sol à ${formaterNombre(reglage.altitudeSol)} m` : 'entrée en terre sur le terrain';
+  return `${texteDePente(reglage)} · ${sens} · ${fin}`;
+}
+
+/** Données de l'écran « Talus d'une surface ». */
+function donneesTalusSurfaces() {
+  const talus = projet.surfaces.filter((s) => s.type === 'talus').map((s) => {
+    const calcul = calculDuTalusSurface(s);
+    const nombreCotes = calcul.contour?.length ?? 0;
+    const troncons = calcul.contour ? tronconsAImplanter(calcul.contour, s.reglages ?? {}, calcul.talus) : [];
+    const etats = new Map((calcul.talus?.cotes ?? []).map((c) => [c.cote, c]));
+    const enChoix = talusSurface.actifId === s.id && choixCotesTalusActif();
+    const choisis = enChoix ? [...talusSurface.choisis].sort((a, b) => a - b) : [];
+    return {
+      id: s.id,
+      nom: s.nom,
+      sourceId: s.sourceId,
+      terrainId: s.terrainId ?? null,
+      enChoix,
+      choisis: choisis.length,
+      cleChoix: choisis.join(','),
+      reglage: choisis.map((k) => s.reglages?.[k]).find(reglageComplet) ?? null,
+      nombreCotes,
+      erreur: calcul.erreur ?? null,
+      groupes: troncons.map((t) => {
+        const resultats = t.cotes.map((k) => etats.get(k)).filter(Boolean);
+        const erreur = resultats.find((c) => c.etat === 'erreur');
+        const aChercher = resultats.some((c) => c.etat === 'aChercher');
+        return {
+          cotes: texteCotes(t.cotes),
+          texte: `${texteReglageTalus(t.reglage, Boolean(s.terrainId))}${(t.reglage.sens ?? 'auto') === 'auto' && t.nature ? ` · en ${t.nature === 'deblai' ? 'déblai' : 'remblai'}` : ''}`,
+          etat: erreur ? 'erreur' : aChercher ? 'aChercher' : 'ok',
+          message: erreur?.message ?? (aChercher ? 'à chercher sur le terrain' : null),
+        };
+      }),
+    };
+  });
+  return {
+    sources: projet.surfaces.filter((s) => estSurfaceFichier(s) && s.type !== 'talus').map((s) => ({ id: s.id, nom: s.nom })),
+    terrains: projet.surfaces.filter((s) => trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
+    talus,
+  };
+}
+
+const ecranTalusSurface = creerEcranTalusSurface(document.querySelector('#talus-surfaces'), {
+  nouveauTalusSurface: (sourceId) => {
+    const source = projet.surfaces.find((s) => s.id === sourceId);
+    if (!source || refuserEnLectureSeule()) return;
+    const surface = { id: nouvelIdentifiant(), nom: avecPrefixe(`${sansPrefixe(source.nom, PREFIXE_SURFACE)} talus`, PREFIXE_SURFACE), type: 'talus', sourceId, terrainId: null, reglages: {}, nomFichier: source.nom, points: source.points.map((p) => ({ ...p })), faces: source.faces.map((f) => [...f]) };
+    projet.surfaces.push(surface);
+    talusSurface.actifId = surface.id;
+    talusSurface.choisis = new Set();
+    editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+    afficherMessage('Touche les côtés de la surface sur le plan', 3000);
+    modifie();
+  },
+  choisirCotesTalus: (id) => {
+    if (talusSurface.actifId === id && choixCotesTalusActif()) {
+      talusSurface.actifId = null;
+      talusSurface.choisis = new Set();
+    } else {
+      talusSurface.actifId = id;
+      talusSurface.choisis = new Set();
+      afficherMessage('Touche les côtés de la surface sur le plan', 3000);
+    }
+    recalculer();
+  },
+  toutChoisirTalus: (id) => {
+    const surface = projet.surfaces.find((s) => s.id === id);
+    const n = surface ? calculDuTalusSurface(surface).contour?.length ?? 0 : 0;
+    talusSurface.choisis = new Set(Array.from({ length: n }, (_, k) => k));
+    recalculer();
+  },
+  rienChoisirTalus: () => {
+    talusSurface.choisis = new Set();
+    recalculer();
+  },
+  appliquerTalus: (id, reglage) => {
+    const surface = projet.surfaces.find((s) => s.id === id);
+    if (!surface || talusSurface.choisis.size === 0) return;
+    if (!reglageComplet(reglage)) {
+      afficherMessage('Pente du talus à choisir', 3000);
+      return;
+    }
+    surface.reglages ??= {};
+    const propre = { horizontal: reglage.horizontal, vertical: reglage.vertical, sens: ['remblai', 'deblai'].includes(reglage.sens) ? reglage.sens : 'auto', longueur: reglage.longueur > 0 ? reglage.longueur : null, altitudeSol: Number.isFinite(reglage.altitudeSol) ? reglage.altitudeSol : null };
+    for (const k of talusSurface.choisis) surface.reglages[k] = { ...propre };
+    modifie();
+  },
+  enleverTalus: (id) => {
+    const surface = projet.surfaces.find((s) => s.id === id);
+    if (!surface) return;
+    for (const k of talusSurface.choisis) delete surface.reglages?.[k];
+    modifie();
+  },
+  reglerTerrainTalus: (id, terrainId) => {
+    const surface = projet.surfaces.find((s) => s.id === id);
+    if (!surface) return;
+    surface.terrainId = terrainId || null;
+    modifie();
+  },
+  supprimerTalusSurface: (id) => {
+    const surface = projet.surfaces.find((s) => s.id === id);
+    if (!surface || !confirm(`Supprimer « ${surface.nom} » (la surface importée reste) ?`)) return;
+    projet.surfaces = projet.surfaces.filter((s) => s.id !== id);
+    if (talusSurface.actifId === id) talusSurface.actifId = null;
+    editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+    modifie();
+  },
+});
+
+/**
+ * Talus des surfaces, à implanter (Terrain › Implanter › Talus) : un par tronçon (côtés voisins
+ * réglés pareil). [{ valeur: « id:n° du tronçon », nom, texte }].
+ */
+function talusDesSurfacesAImplanter() {
+  return projet.surfaces.filter((s) => s.type === 'talus').flatMap((s) => {
+    const calcul = calculDuTalusSurface(s);
+    if (!calcul.contour) return [];
+    const nature = { remblai: ' · en remblai', deblai: ' · en déblai' };
+    // Sens « auto » : un tronçon par passage du remblai au déblai (Implanter doit savoir si la ligne est le haut ou le bas).
+    return tronconsAImplanter(calcul.contour, s.reglages ?? {}, calcul.talus).map((t, i) => ({ valeur: `${s.id}:${i}`, nom: `${s.nom} · ${texteCotes(t.cotes)}`, texte: `${texteReglageTalus(t.reglage, Boolean(s.terrainId))}${(t.reglage.sens ?? 'auto') === 'auto' ? nature[t.nature] ?? '' : ''}` }));
+  });
+}
+
+/**
+ * Ouvre un tronçon de talus d'une surface dans Implanter › Talus : la ligne = les côtés (sens du
+ * contour, talus à droite), les réglages = pente, haut / bas (remblai / déblai ; auto : selon le
+ * terrain au milieu du tronçon), longueur et terrain de référence (sans terrain : sol plat à la canne).
+ */
+function ouvrirTalusSurface(valeur) {
+  const [id, numero] = String(valeur).split(':');
+  const surface = projet.surfaces.find((s) => s.id === id);
+  const calcul = surface ? calculDuTalusSurface(surface) : null;
+  const troncon = calcul?.contour ? tronconsAImplanter(calcul.contour, surface.reglages ?? {}, calcul.talus)[Number(numero)] : null;
+  if (!troncon) return;
+  const { reglage } = troncon;
+  let ligneEst = (troncon.nature ?? reglage.sens) === 'deblai' ? 'bas' : 'haut';
+  if (troncon.nature == null && (reglage.sens ?? 'auto') === 'auto') {
+    const altitudeDuTerrain = altitudeDeSurface(surface.terrainId);
+    const m = troncon.sommets[Math.floor(troncon.sommets.length / 2)];
+    const zTerrain = altitudeDuTerrain?.(m.est, m.nord);
+    if (zTerrain != null) ligneEst = m.altitude >= zTerrain ? 'haut' : 'bas';
+    else afficherMessage('Sens « auto » sans terrain : talus pris depuis le haut (remblai), à vérifier', 4000);
+  }
+  const mm = (x) => Math.round(x * 1000) / 1000;
+  const sommets = troncon.sommets.map((p) => ({ est: mm(p.est), nord: mm(p.nord), altitude: p.altitude != null ? mm(p.altitude) : null, ...(p.nom ? { nom: p.nom } : {}) }));
+  implanter.ligne = nouvelleLigneAImplanter(`${surface.nom} · ${texteCotes(troncon.cotes)}`, sommets, null);
+  implanter.pointsLigne = [];
+  implanter.talusId = null;
+  terrain.talus = { ...terrain.talus, horizontal: reglage.horizontal, vertical: reglage.vertical, ligneEst, cote: 'droite', longueur: reglage.longueur ?? null, terrainId: surface.terrainId ?? null, altitudeSurfaceId: null };
+  retenirReglagesTerrain();
+  montrerImplantation();
 }
 
 /** Sommets de tous les dessins, prêts à implanter (« PF1-1 »…, avec leur altitude). */
@@ -3245,6 +3534,11 @@ function pointsDuProjet() {
  * (« Point » : les points du projet ; les autres : le plan DXF).
  */
 function toucherPourImplantation(position, tolerance) {
+  // Choix des côtés d'un talus de surface (Calculs › Dessin, 0.135.0).
+  if (choixCotesTalusActif()) {
+    toucherCoteTalus(position, tolerance);
+    return;
+  }
   if (piloteActif()) {
     toucherPourDessin(position, tolerance);
     return;
@@ -4443,6 +4737,7 @@ function donneesCommunes() {
         texte: textePente(terrain.talus),
         ouvert: projet.talus.find((t) => t.id === implanter.talusId)?.nom ?? null,
         mesTalus: projet.talus.map((t) => ({ id: t.id, nom: t.nom, texte: `${textePente(t.reglages)} · ${t.reglages.ligneEst === 'bas' ? 'depuis le bas' : 'depuis le haut'} · à ${t.reglages.cote}` })),
+        talusSurfaces: talusDesSurfacesAImplanter(),
       },
       nomPointAjoute: nomPointAjoute(projet),
       // Point choisi qui est déjà un point du projet (pas de « + Point du projet »).
@@ -5442,6 +5737,7 @@ function recalculer({ recadrer = false } = {}) {
   afficherSiVisible('coupes', document.querySelector('.panneau[data-onglet="volumes"]'), () => ecranCoupes.afficher());
   ecranMesures.afficher();
   ecranDessin.afficher(donneesDessin());
+  ecranTalusSurface.afficher(donneesTalusSurfaces());
   afficherSiVisible('import', panneauProjet, () => ecranImport.afficher(projet, dernierImport, dernierPlan));
   afficherSiVisible('export', panneauProjet, () => moduleExport.afficher(projet));
   montrerOngletProjet();
@@ -5652,6 +5948,7 @@ function modifie(options) {
     return;
   }
   synchroniserSurfacesDessins();
+  synchroniserTalusSurfaces();
   prefixerNoms(projet);
   // Une surface supprimée : ses calculs de volume disparaissent avec elle.
   projet.calculs = nettoyerCalculs(projet.calculs, projet.surfaces);

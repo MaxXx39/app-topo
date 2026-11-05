@@ -522,7 +522,7 @@ export function creerEcranLeve(conteneur, actions) {
     }
     if (reglages.implantation === 'talus') {
       const invite = imp.pointsLigne.length > 0 ? '' : invitation('Choisis la ligne du talus (haut ou bas)', 'touche-la sur le plan, ou ses points un à un');
-      return barreAccroche() + choixImplantation + invite + implanterLigne() + mesTalus();
+      return barreAccroche() + choixImplantation + invite + implanterLigne() + mesTalus() + talusDesSurfaces();
     }
     if (reglages.implantation === 'altitude') {
       return `${choixImplantation}
@@ -826,6 +826,19 @@ export function creerEcranLeve(conteneur, actions) {
             <button type="button" class="bouton-lien bouton-lien-neutre" data-action="ouvrirTalus" data-valeur="${t.id}"><strong>${echapper(t.nom)}</strong></button>
             <span class="aide">${echapper(t.texte)}</span>
             <button type="button" class="bouton-lien" data-action="supprimerTalus" data-valeur="${t.id}" aria-label="Supprimer ${echapper(t.nom)}">×</button>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  /** Talus des surfaces importées (0.135.0, Calculs › Dessin) : toucher = implanter ce tronçon. */
+  function talusDesSurfaces() {
+    const liste = donnees.implanter.talus.talusSurfaces ?? [];
+    if (liste.length === 0) return '';
+    return `<div class="liste-a-implanter">
+        <p class="titre-choix">Talus des surfaces</p>
+        ${liste.map((t) => `<div class="ligne-a-implanter">
+            <button type="button" class="bouton-lien bouton-lien-neutre" data-action="ouvrirTalusSurface" data-valeur="${echapper(t.valeur)}"><strong>${echapper(t.nom)}</strong></button>
+            <span class="aide">${echapper(t.texte)}</span>
           </div>`).join('')}
       </div>`;
   }
