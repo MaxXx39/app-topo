@@ -84,6 +84,8 @@ export function noter(journal, projet, evenement, maintenant = new Date()) {
       type: c.type,
       point: c.nom ?? null,
       ecarts: c.ecarts ?? null,
+      // Couleurs du contrôle (vert / orange / rouge, d'après les tolérances du projet à ce moment-là), pour le recap (0.127.0).
+      resultat: c.resultat ? { plan: c.resultat.plan ?? null, hauteur: c.resultat.hauteur ?? null } : null,
       remarque: c.remarque ?? '',
     });
   }

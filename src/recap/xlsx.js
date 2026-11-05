@@ -42,7 +42,7 @@ function nomOnglet(nom, pris) {
  * Renvoie le XML de la cellule.
  */
 function cellule(valeur, reference) {
-  const styles = { normal: 0, gras: 1, titre: 2, nombre: 3 };
+  const styles = { normal: 0, gras: 1, titre: 2, nombre: 3, orange: 4, rouge: 5 };
   let v = valeur;
   let style = 'normal';
   if (v && typeof v === 'object') {
@@ -51,7 +51,7 @@ function cellule(valeur, reference) {
   }
   if (v == null || v === '') return style === 'normal' ? '' : `<c r="${reference}" s="${styles[style]}"/>`;
   if (typeof v === 'number' && Number.isFinite(v)) {
-    const s = style === 'normal' && !Number.isInteger(v) ? styles.nombre : styles[style] ?? 0;
+    const s = style === 'normal' && !Number.isInteger(v) ? styles.nombre : styles[style] ?? 0; // orange / rouge : écart hors tolérance (0.127.0)
     return `<c r="${reference}" s="${s}"><v>${v}</v></c>`;
   }
   return `<c r="${reference}" s="${styles[style] ?? 0}" t="inlineStr"><is><t xml:space="preserve">${xml(v)}</t></is></c>`;
@@ -71,10 +71,10 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="1"><numFmt numFmtId="164" formatCode="0.000"/></numFmts>
 <fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts>
-<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE5E7EB"/><bgColor indexed="64"/></patternFill></fill></fills>
+<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE5E7EB"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFDBA74"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF87171"/><bgColor indexed="64"/></patternFill></fill></fills>
 <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs>
+<cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="0" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFill="1"/><xf numFmtId="164" fontId="1" fillId="4" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/></cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
 

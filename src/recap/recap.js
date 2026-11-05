@@ -1,13 +1,15 @@
 // Recap Excel de la semaine (0.119.0) : fabriqué à partir des journaux de tous les appareils
 // (voir recap/journal.js), envoyé sur Drive (« App Topo › Recap › Recap App Topo.xlsx »).
 // Le but premier : savoir qui fait les contrôles, qui ne les fait pas, avec leurs écarts.
-// L'appli ne juge pas les contrôles (pas de « OK » ni de couleur) : c'est le géomètre qui
-// arbitre, dans la colonne « Avis » laissée vide.
+// L'appli ne donne pas d'avis (pas de « OK ») : c'est le géomètre qui arbitre, dans la colonne
+// « Avis » laissée vide. Depuis 0.127.0, les écarts hors tolérance sont seulement colorés
+// (orange : au-dessus de la 1re limite, rouge : hors tolérance), comme dans Contrôle.
 //
 // Onglets : « Synthèse » (une ligne par semaine et par appareil), puis un onglet par semaine
 // (la plus récente d'abord, 8 au plus) avec : Contrôles, Travail sans contrôle, Activité.
 
 import { jourLocal } from './journal.js';
+import { classeTolerance, TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
 
 const SEMAINES_MONTREES = 8;
 
@@ -48,6 +50,17 @@ function duree(debut, fin) {
 const m3 = (valeur) => (Number.isFinite(valeur) ? Math.round(valeur * 1000) / 1000 : null);
 
 const gras = (v) => ({ v, style: 'gras' });
+
+/**
+ * Cellule d'un écart (plan ou hauteur) : colorée en orange ou en rouge si l'écart dépasse la tolérance.
+ * classe : couleur notée au moment du contrôle (tolérances du projet), sinon calculée avec 2 cm / 4 cm.
+ */
+export function celluleEcart(valeur, classe, tolerance) {
+  const nombre = m3(valeur);
+  if (nombre == null) return nombre;
+  const couleur = classe ?? classeTolerance(valeur, tolerance);
+  return couleur === 'orange' || couleur === 'rouge' ? { v: nombre, style: couleur } : nombre;
+}
 
 /** Nom affiché d'un appareil (son nom, sinon son identifiant). */
 const nomAppareil = (journal) => journal.appareil || journal.appareilId || 'appareil sans nom';
@@ -115,6 +128,7 @@ function ongletSemaine(s, misAJour) {
   const lignes = [
     [{ v: `Semaine ${s.numero} ${s.annee} : du ${dateSuisse(s.lundi)} au ${dateSuisse(s.dimanche)}`, style: 'titre' }],
     [`Mis à jour le ${misAJour}.`],
+    ['Écarts colorés : orange = au-dessus de la 1re limite, rouge = hors tolérance (limites du projet, 2 cm / 4 cm au départ). La colonne « Avis » reste à toi.'],
     [],
     [{ v: 'Contrôles', style: 'titre' }],
     ['Date', 'Heure', 'Projet', 'Appareil', 'Point', 'Écart Est (m)', 'Écart Nord (m)', 'Écart plan (m)', 'Écart hauteur (m)', 'Remarque', 'Avis'].map(gras),
@@ -122,7 +136,7 @@ function ongletSemaine(s, misAJour) {
   const controles = [...s.controles].sort(parDate);
   for (const c of controles) {
     if (c.type === 'refus') lignes.push([dateSuisse(c.jour), heure(c.le), c.projet, c.appareil, 'Rappel refusé', null, null, null, null, c.remarque || '', '']);
-    else lignes.push([dateSuisse(c.jour), heure(c.le), c.projet, c.appareil, c.point ?? '', m3(c.ecarts?.est), m3(c.ecarts?.nord), m3(c.ecarts?.plan), m3(c.ecarts?.hauteur), c.remarque || '', '']);
+    else lignes.push([dateSuisse(c.jour), heure(c.le), c.projet, c.appareil, c.point ?? '', m3(c.ecarts?.est), m3(c.ecarts?.nord), celluleEcart(c.ecarts?.plan, c.resultat?.plan, TOLERANCES_PAR_DEFAUT.plan), celluleEcart(c.ecarts?.hauteur, c.resultat?.hauteur, TOLERANCES_PAR_DEFAUT.hauteur), c.remarque || '', '']);
   }
   if (controles.length === 0) lignes.push(['Aucun contrôle cette semaine.']);
   lignes.push([], [{ v: 'Travail sans contrôle', style: 'titre' }]);
