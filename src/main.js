@@ -1485,7 +1485,8 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           montrerImplantation();
           return;
         }
-        terrain.accroche = MODES_ACCROCHE.includes(mode) ? mode : 'point';
+        // « Manuel » (0.131.0, Intermédiaire) : loupe + main, point visé sans accroche.
+        terrain.accroche = MODES_ACCROCHE.includes(mode) || (mode === 'manuel' && aAcces('intermediaire')) ? mode : 'point';
         retenirReglagesTerrain();
         montrerImplantation();
       },
@@ -1775,6 +1776,37 @@ function nomProposeImplantation() {
  * Implantation d'un point : toucher le plan accroche un point (seulement depuis l'onglet Terrain).
  * Les points « À implanter » restent visibles sur le plan dans les autres onglets.
  */
+// Loupe de l'accroche « Manuel » dans Implanter › Point (0.131.0, Intermédiaire, demande du 05.11).
+let loupeImplantation = false;
+
+/**
+ * Montre la loupe pendant l'implantation d'un point avec l'accroche « Manuel » (onglet Terrain),
+ * la cache sinon. Doigt levé : le point visé (sans altitude) devient la cible, le guidage commence.
+ * Le recalage d'un plan PDF garde sa propre loupe (voir montrerLoupe).
+ */
+function gererLoupeImplantation() {
+  if (recalage.planId) {
+    loupeImplantation = false;
+    return;
+  }
+  const voulue = ongletContexte === 'terrain' && enImplantationDePoint() && terrain.accroche === 'manuel' && aAcces('intermediaire');
+  if (!voulue) {
+    if (loupeImplantation) plan.loupe.cacher();
+    loupeImplantation = false;
+    return;
+  }
+  plan.loupe.montrer({
+    recentrer: !loupeImplantation,
+    zoom: 4,
+    quandLache: ({ est, nord }) => {
+      const mm = (valeur) => Math.round(valeur * 1000) / 1000;
+      guiderVersChoix({ est: mm(est), nord: mm(nord), altitude: null, nom: implanter.choix?.mode === 'manuel' ? implanter.choix.nom : nomProposeImplantation(), mode: 'manuel' });
+      montrerImplantation();
+    },
+  });
+  loupeImplantation = true;
+}
+
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
   const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId);
@@ -1824,6 +1856,7 @@ function envoyerImplantationAuPlan() {
         pointsLigne: enLigne ? implanter.pointsLigne : [],
       }
     : null);
+  gererLoupeImplantation();
 }
 
 // --- Exports (0.92.1 : tous dans Projet › Exporter, voir export/module.js) ---
@@ -3232,6 +3265,11 @@ function toucherPourImplantation(position, tolerance) {
   }
   if (enImplantationDeLigne()) {
     toucherPourLigne(position, tolerance);
+    return;
+  }
+  // « Manuel » : toucher le plan y pose la loupe (le point visé devient la cible).
+  if (terrain.accroche === 'manuel') {
+    if (aAcces('intermediaire')) plan.loupe.placerSur(position.est, position.nord);
     return;
   }
   const sources = terrain.accroche === 'point'

@@ -82,6 +82,8 @@ export const ACCROCHES = {
   milieu: ['Milieu', 'Milieu d\'un segment du plan DXF', '<path d="M2 17h20" /><circle cx="2.5" cy="17" r="1.5" /><circle cx="21.5" cy="17" r="1.5" /><path class="repere" d="M12 8l5 9H7z" />'],
   ligne: ['Sur ligne', 'Sur une ligne du plan DXF (endroit le plus proche)', '<path d="M3 21 21 3" /><path class="repere" d="M8 8l8 8M16 8l-8 8" />'],
   centre: ['Centre', 'Centre d\'un cercle du plan DXF', '<circle cx="12" cy="12" r="9" /><circle class="repere" cx="12" cy="12" r="2.5" />'],
+  // 0.131.0 : « Manuel » (Intermédiaire, implantation d'un point) : loupe + main, point visé sans accroche.
+  manuel: ['Manuel', 'Manuel : loupe et main, le centre de la croix est le point visé', '<path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path class="repere" d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />'],
 };
 // Guidage vers le point : par rapport au cap du RX2 (avance / droite) ou nord / sud / est / ouest.
 const GUIDAGES = [
@@ -581,7 +583,8 @@ export function creerEcranLeve(conteneur, actions) {
     const { implanter: imp } = donnees;
     // Ligne : on peut aussi prendre une ligne entière du plan DXF.
     const enLigne = ['ligne', 'talus'].includes(donnees.controle.implantation);
-    const modes = enLigne ? ['trait', ...MODES_ACCROCHE] : MODES_ACCROCHE;
+    // « Manuel » (0.131.0) : implantation d'un point seulement, dès Intermédiaire.
+    const modes = enLigne ? ['trait', ...MODES_ACCROCHE] : (donnees.controle.implantation === 'point' ? [...MODES_ACCROCHE, 'manuel'] : MODES_ACCROCHE);
     const active = enLigne ? imp.accrocheLigne : imp.accroche;
     // Accroche « Point » : un point tapé (+ Point, pas pour une ligne) ou choisi dans la liste.
     const outilsPoint = active === 'point'
@@ -594,7 +597,7 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
         ${modes.map((mode) => {
           const [mot, nom, dessin] = ACCROCHES[mode];
-          return `<button type="button" class="bouton-accroche ${active === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${nom}" aria-label="${nom}" aria-pressed="${active === mode}">
+          return `<button type="button" class="bouton-accroche ${mode === 'manuel' ? 'seulement-intermediaire' : ''} ${active === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${nom}" aria-label="${nom}" aria-pressed="${active === mode}">
             <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span class="mot-accroche">${mot}</span></button>`;
         }).join('')}
         ${outilsPoint}
