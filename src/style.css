@@ -10831,3 +10831,16 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
   font-weight: 700;
   font-size: 0.95rem;
 }
+
+/* 0.136.3 : « Fermer l'appli » bien visible (rouge plein, texte blanc, plus grand) */
+.fenetre-reglages .bouton-fermer-appli,
+.fenetre-reglages .pied-reglages .bouton-fermer-appli {
+  min-height: 52px;
+  border: 2px solid #991b1b;
+  background: var(--rouge);
+  color: #ffffff;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 6px rgba(153, 27, 27, 0.45);
+}
+.fenetre-reglages .bouton-fermer-appli svg { width: 26px; height: 26px; stroke-width: 2.8; }
+.fenetre-reglages .bouton-fermer-appli:active { background: #991b1b; color: #ffffff; }
