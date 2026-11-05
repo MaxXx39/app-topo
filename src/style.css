@@ -10786,3 +10786,19 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
     transform: translateX(-50%);
   }
 }
+
+/* 0.136.1 : bouton « Partage écran » (ouvre AnyDesk) à côté du mode téléphone */
+.ligne-telephone-ecran {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--bordure);
+}
+.ligne-telephone-ecran .case-reglage {
+  flex: 1;
+  border-top: 0;
+}
+.ligne-telephone-ecran .bouton-secondaire {
+  flex: none;
+  min-height: 44px;
+}

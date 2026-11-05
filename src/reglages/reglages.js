@@ -14,6 +14,7 @@
 //   les appareils (voir listes-partagees.js) ;
 // - « Fermer l'appli » (appli Android seulement), en rouge tout en haut.
 import { echapper } from '../outils/echapper.js';
+import { anydeskDisponible, ouvrirAnydesk } from '../android/pont.js';
 import { demanderCode } from '../outils/code.js';
 import { lireListesPartagees } from './listes-partagees.js';
 import { modifierLibellesDeSorte, modifierReseaux } from '../leve/fenetre-libelles.js';
@@ -177,8 +178,11 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
           <input type="radio" name="mode-appli" data-reglage="mode" value="${cle}" ${reglages.mode === cle ? 'checked' : ''} />
           ${barresDuMode(cle)}${titre}</label>`).join('')}
       </div>
+      <div class="ligne-telephone-ecran">
       <label class="case-reglage"><input type="checkbox" data-reglage="telephone" ${reglages.telephone ? 'checked' : ''} />
         <span><strong>Mode téléphone</strong><span class="aide">textes et boutons plus petits</span></span></label>
+      ${anydeskDisponible() ? '<button type="button" class="bouton-secondaire" data-action="partage-ecran">Partage écran</button>' : ''}
+      </div>
       <div class="choix-taille" role="radiogroup" aria-label="Affichage">
         <span class="titre-taille">Affichage</span>
         ${THEMES.map(([cle, titre]) => `<label class="puce-mode ${reglages.theme === cle ? 'actif' : ''}">
@@ -301,6 +305,10 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     const libelles = evenement.target.closest('[data-action="libelles"]');
     if (libelles) {
       modifierLibelles(libelles.dataset.valeur);
+      return;
+    }
+    if (evenement.target.closest('[data-action="partage-ecran"]')) {
+      ouvrirAnydesk();
       return;
     }
     if (evenement.target.closest('[data-action="chercher-mise-a-jour"]')) {

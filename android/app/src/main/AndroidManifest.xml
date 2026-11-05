@@ -20,6 +20,11 @@
     <!-- Petite vibration quand un point est pris -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Android 11 et plus : nécessaire pour retrouver AnyDesk (bouton « Partage écran ») -->
+    <queries>
+        <package android:name="com.anydesk.anydeskandroid" />
+    </queries>
+
     <application
         android:icon="@mipmap/ic_lanceur"
         android:label="@string/nom_appli"

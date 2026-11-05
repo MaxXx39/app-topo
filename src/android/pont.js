@@ -189,3 +189,14 @@ export function lireParAndroid(adresse) {
     window.AppliAndroid.lireAdresse(numero, adresse);
   });
 }
+
+// --- Partage d'écran (0.136.1) : ouvre AnyDesk (installé sur la tablette) pour que le bureau voie
+// l'écran et prenne la main. Côté Android : PontAndroid.ouvrirAnydesk.
+
+/** Vrai si cet APK sait ouvrir AnyDesk (un ancien APK n'a pas la fonction). */
+export function anydeskDisponible() {
+  return estDansAppliAndroid() && typeof window.AppliAndroid.ouvrirAnydesk === 'function';
+}
+
+/** Ouvre AnyDesk ; s'il n'est pas installé, Android propose de l'installer. */
+export const ouvrirAnydesk = () => window.AppliAndroid.ouvrirAnydesk();
