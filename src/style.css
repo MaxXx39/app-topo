@@ -10802,3 +10802,32 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
   flex: none;
   min-height: 44px;
 }
+
+/* 0.136.2 : « Partage écran » dans un cadre orange « ⚠ Aide » */
+.cadre-aide-ecran {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px 10px;
+  border: 2px solid #ea580c;
+  border-radius: 10px;
+  background: #fff7ed;
+}
+.titre-aide-ecran {
+  color: #c2410c;
+  font-weight: 800;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.bouton-aide-ecran {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #ea580c;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+}

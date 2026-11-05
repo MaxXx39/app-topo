@@ -181,7 +181,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       <div class="ligne-telephone-ecran">
       <label class="case-reglage"><input type="checkbox" data-reglage="telephone" ${reglages.telephone ? 'checked' : ''} />
         <span><strong>Mode téléphone</strong><span class="aide">textes et boutons plus petits</span></span></label>
-      ${anydeskDisponible() ? '<button type="button" class="bouton-secondaire" data-action="partage-ecran">Partage écran</button>' : ''}
+      ${anydeskDisponible() ? '<div class="cadre-aide-ecran"><span class="titre-aide-ecran">⚠ Aide</span><button type="button" class="bouton-aide-ecran" data-action="partage-ecran">Partage écran</button></div>' : ''}
       </div>
       <div class="choix-taille" role="radiogroup" aria-label="Affichage">
         <span class="titre-taille">Affichage</span>
