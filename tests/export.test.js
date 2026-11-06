@@ -59,7 +59,8 @@ describe('choisirFormat', () => {
     // Place du dessin : A4 173 × 160 mm, A3 296 × 247 mm.
     expect(choisirFormat(59, 91, 1000)).toEqual({ format: 'a4', depasse: false }); // 59 × 91 mm
     expect(choisirFormat(59, 91, 500)).toEqual({ format: 'a3', depasse: false }); // 118 × 182 mm
-    expect(choisirFormat(59, 91, 200)).toEqual({ format: 'a3', depasse: true }); // 295 × 455 mm
+    expect(choisirFormat(59, 91, 200)).toEqual({ format: 'a1', depasse: false }); // 295 × 455 mm (0.151.0 : jusqu'à A0)
+    expect(choisirFormat(59, 91, 200, { papiers: ['a4', 'a3'] })).toEqual({ format: 'a3', depasse: true });
   });
 
   it('mise en page : même colonne de droite, plan plus grand en A3', () => {
@@ -104,10 +105,24 @@ describe('creerPdf - levé du 20/05/2026', async () => {
     expect(impose.messageFond).toBeNull();
   });
 
-  it('avertit si le plan dépasse même l\'A3', async () => {
-    const impose = await creerPdf({ stocks, resultats, points, cartouche, echelleImposee: 200 });
+  it('avertit si le plan dépasse le papier choisi', async () => {
+    const impose = await creerPdf({ stocks, resultats, points, cartouche, echelleImposee: 200, papier: 'a3' });
     expect(impose.format).toBe('a3');
     expect(impose.messageFond).toContain('dépasse la feuille A3');
+  });
+
+  it('prend une feuille plus grande pour tenir à l\'échelle choisie (0.151.0)', async () => {
+    const impose = await creerPdf({ stocks, resultats, points, cartouche, echelleImposee: 200 });
+    expect(['a2', 'a1', 'a0']).toContain(impose.format);
+    expect(impose.messageFond ?? '').not.toContain('dépasse');
+  });
+
+  it('papier choisi et portrait : la feuille est en hauteur (0.151.0)', async () => {
+    const portrait = await creerPdf({ stocks, resultats, points, cartouche, papier: 'a3', orientation: 'portrait' });
+    expect(portrait.format).toBe('a3');
+    const { width, height } = portrait.document.internal.pageSize;
+    expect(Math.round(width)).toBe(297);
+    expect(Math.round(height)).toBe(420);
   });
 
   it('écrit les volumes et le cartouche', () => {

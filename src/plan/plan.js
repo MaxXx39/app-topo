@@ -792,8 +792,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (position.delta) {
       const d = versEcran(position.delta.est, position.delta.nord, vue);
       groupe.append(creerElement('line', { x1: x, y1: y, x2: d.x, y2: d.y, class: 'trait-delta' }));
-      groupe.append(creerElement('path', { d: `M${d.x - 9} ${d.y - 9} L${d.x + 9} ${d.y + 9} M${d.x - 9} ${d.y + 9} L${d.x + 9} ${d.y - 9}`, class: 'delta-point' }));
-      groupe.append(creerElement('circle', { cx: d.x, cy: d.y, r: 12, class: 'delta-point' }));
+      // 0.151.0 : une simple croix (le rond cachait le point).
+      groupe.append(creerElement('path', { d: `M${d.x - 7} ${d.y - 7} L${d.x + 7} ${d.y + 7} M${d.x - 7} ${d.y + 7} L${d.x + 7} ${d.y - 7}`, class: 'delta-point' }));
     }
     // Implantation d'une ligne : distances écrites le long de la ligne et sur la perpendiculaire.
     if (position.cotesLigne) dessinerCotesLigne(groupe, position.cotesLigne, { x, y }, position.vers);

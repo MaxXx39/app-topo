@@ -31,23 +31,34 @@ export function barreEchellePapier(echelle, longueurMaxMm = 50) {
   return { metres, mm: (metres * 1000) / echelle };
 }
 
-// Formats de feuille (paysage), en mm.
+// Formats de feuille (paysage), en mm. 0.151.0 : A2, A1 et A0 en plus.
 export const FORMATS_PAPIER = {
   a4: { largeur: 297, hauteur: 210 },
   a3: { largeur: 420, hauteur: 297 },
+  a2: { largeur: 594, hauteur: 420 },
+  a1: { largeur: 841, hauteur: 594 },
+  a0: { largeur: 1189, hauteur: 841 },
 };
+// Du plus petit au plus grand : l'ordre dans lequel on essaie les feuilles.
+export const ORDRE_PAPIERS = ['a4', 'a3', 'a2', 'a1', 'a0'];
 // Largeur de la colonne de droite du PDF (titre, volumes, légende, cartouche), en mm.
 export const LARGEUR_COLONNE = 80;
 
+/** Taille de la feuille (mm) selon l'orientation ('paysage' ou 'portrait'). */
+export function tailleFeuille(format, orientation = 'paysage') {
+  const { largeur, hauteur } = FORMATS_PAPIER[format] ?? FORMATS_PAPIER.a4;
+  return orientation === 'portrait' ? { largeur: hauteur, hauteur: largeur } : { largeur, hauteur };
+}
+
 /**
- * Mise en page d'une feuille paysage (mm) : la feuille, le cadre du plan à gauche et la
- * colonne de droite. Sur une A4 : plan de 193 × 190 mm ; sur une A3 : 316 × 277 mm.
+ * Mise en page d'une feuille (mm) : la feuille, le cadre du plan à gauche et la colonne de droite.
+ * Sur une A4 paysage : plan de 193 × 190 mm ; sur une A3 paysage : 316 × 277 mm.
  */
-export function miseEnPage(format) {
-  const feuille = FORMATS_PAPIER[format];
+export function miseEnPage(format, orientation = 'paysage') {
+  const feuille = tailleFeuille(format, orientation);
   const colonneX = feuille.largeur - 10 - LARGEUR_COLONNE;
   return {
-    page: { largeur: feuille.largeur, hauteur: feuille.hauteur, marge: 8 },
+    page: { largeur: feuille.largeur, hauteur: feuille.hauteur, marge: 8, orientation },
     cadrePlan: { x: 10, y: 10, largeur: colonneX - 4 - 10, hauteur: feuille.hauteur - 20 },
     colonne: { x: colonneX, largeur: LARGEUR_COLONNE },
   };
@@ -57,25 +68,35 @@ export function miseEnPage(format) {
  * Place pour le dessin dans le cadre du plan (mm) : on garde une marge autour,
  * et de la place en bas pour la barre d'échelle.
  */
-export function placeDuDessin(format) {
-  const { cadrePlan } = miseEnPage(format);
+export function placeDuDessin(format, orientation = 'paysage') {
+  const { cadrePlan } = miseEnPage(format, orientation);
   return { largeur: cadrePlan.largeur - 20, hauteur: cadrePlan.hauteur - 30 };
 }
 
+/** Vrai si une zone du terrain (m) tient sur la feuille à l'échelle 1:echelle. */
+function tient(largeurTerrain, hauteurTerrain, echelle, format, orientation) {
+  const place = placeDuDessin(format, orientation);
+  return (largeurTerrain * 1000) / echelle <= place.largeur && (hauteurTerrain * 1000) / echelle <= place.hauteur;
+}
+
 /**
- * Format de la feuille pour dessiner une zone du terrain à une échelle donnée :
- * A4 si le plan y tient, sinon A3 ; si même l'A3 est trop petite, A3 et depasse = vrai
- * (le plan est alors coupé au cadre). Échelle automatique (null) : toujours A4.
- * - largeurTerrain, hauteurTerrain : taille de la zone (m) ; echelle : 500 pour 1:500
- * Renvoie { format: 'a4' ou 'a3', depasse }.
+ * Format de la feuille pour dessiner une zone du terrain (0.151.0 : trois façons de choisir) :
+ * - papier et échelle « auto » (papier 'auto', echelle null) : A4 ; l'échelle sera la plus
+ *   détaillée qui fait tout tenir (choisirEchelle) ;
+ * - papier choisi, échelle auto : ce papier ; l'échelle sera la plus détaillée qui y tient ;
+ * - papier auto, échelle choisie : la plus petite feuille (A4 → A0) où le plan tient à cette échelle ;
+ *   si même l'A0 est trop petite : A0 et depasse = vrai (plan coupé au cadre) ;
+ * - les deux choisis : ce papier, depasse = vrai si le plan n'y tient pas.
+ * - largeurTerrain, hauteurTerrain : taille de la zone (m) ; echelle : 500 pour 1:500, ou null
+ * Renvoie { format: 'a4'…'a0', depasse }.
  */
-export function choisirFormat(largeurTerrain, hauteurTerrain, echelle) {
-  if (!echelle) return { format: 'a4', depasse: false };
-  for (const format of ['a4', 'a3']) {
-    const place = placeDuDessin(format);
-    if ((largeurTerrain * 1000) / echelle <= place.largeur && (hauteurTerrain * 1000) / echelle <= place.hauteur) {
-      return { format, depasse: false };
-    }
+export function choisirFormat(largeurTerrain, hauteurTerrain, echelle, { papier = 'auto', orientation = 'paysage', papiers = ORDRE_PAPIERS } = {}) {
+  if (papier && papier !== 'auto') {
+    return { format: papier, depasse: Boolean(echelle) && !tient(largeurTerrain, hauteurTerrain, echelle, papier, orientation) };
   }
-  return { format: 'a3', depasse: true };
+  if (!echelle) return { format: 'a4', depasse: false };
+  for (const format of papiers) {
+    if (tient(largeurTerrain, hauteurTerrain, echelle, format, orientation)) return { format, depasse: false };
+  }
+  return { format: papiers.at(-1), depasse: true };
 }

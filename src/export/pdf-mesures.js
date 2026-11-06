@@ -49,7 +49,7 @@ const COULEUR_COURBES = [107, 79, 42];
  * - calques : cases cochées (voir CALQUES_PDF_MESURES)
  * Renvoie { document, echelle, format, messageFond } (comme creerPdf).
  */
-export async function creerPdfMesures({ mesures, points, cartouche, echelleImposee = null, calques = {} }) {
+export async function creerPdfMesures({ mesures, points, cartouche, echelleImposee = null, papier = 'auto', orientation = 'paysage', calques = {} }) {
   const choix = { ...CALQUES_PDF_MESURES, ...calques };
   const messages = [];
 
@@ -59,14 +59,15 @@ export async function creerPdfMesures({ mesures, points, cartouche, echelleImpos
   const pointsMontres = [...noms].map((nom) => parNom.get(nom)).filter(Boolean);
   const zone = zoneDe(pointsMontres);
 
-  let format = 'a4';
-  if (zone && echelleImposee) {
-    const choixFormat = choisirFormat(zone.estMax - zone.estMin, zone.nordMax - zone.nordMin, echelleImposee);
+  // Papier et orientation (0.151.0) : voir choisirFormat.
+  let format = papier && papier !== 'auto' ? papier : 'a4';
+  if (zone) {
+    const choixFormat = choisirFormat(zone.estMax - zone.estMin, zone.nordMax - zone.nordMin, echelleImposee, { papier, orientation });
     format = choixFormat.format;
-    if (choixFormat.depasse) messages.push(`à l'échelle 1:${echelleImposee}, le plan dépasse la feuille A3 : il est coupé au cadre (choisis une échelle plus petite)`);
+    if (choixFormat.depasse) messages.push(`à l'échelle 1:${echelleImposee}, le plan dépasse la feuille ${format.toUpperCase()} : il est coupé au cadre (choisis une échelle plus petite ou un papier plus grand)`);
   }
-  const mise = appliquerFormat(format);
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format });
+  const mise = appliquerFormat(format, orientation);
+  const doc = new jsPDF({ orientation: orientation === 'portrait' ? 'portrait' : 'landscape', unit: 'mm', format });
   doc.setFont('helvetica', 'normal');
   dessinerCadres(doc);
 
@@ -131,7 +132,7 @@ export async function creerPdfMesures({ mesures, points, cartouche, echelleImpos
     doc.addPage('a4', 'landscape');
     dessinerPagePhotos(doc, photos.slice(debut, debut + PHOTOS_PAR_PAGE), cartouche);
   }
-  return { document: doc, echelle, format, messageFond: messages.join(' ; ') || null };
+  return { document: doc, echelle, format, orientation, messageFond: messages.join(' ; ') || null };
 }
 
 /**

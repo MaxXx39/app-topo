@@ -1,24 +1,28 @@
-// Onglet Terrain › Guidage (0.70.0, mode Expert ; refait en 0.100.0, demande du 29.10.2026) :
-// guidage d'une lame avec 2 GNSS (calculs dans topo/lame.js). En haut : la machine (Grader ou Bull)
-// et la surface à suivre ; puis, pour chaque coin, une grosse flèche monter / descendre (toujours là,
-// même dans la tolérance) avec l'écart et l'altitude du GNSS ; l'état des 2 récepteurs (satellites,
-// précision H / V, inclinaison) ; le dévers ; la coupe vue de derrière (trait entre les 2 GNSS, la
-// lame en rectangle jaune de 50 cm) ; la coupe perpendiculaire, 20 m devant et 10 m derrière (Bull :
-// perpendiculaire à la lame ; Grader : dans le sens de marche).
+// Onglet Terrain › Guidage (0.70.0, mode Expert ; refait en 0.100.0 et 0.151.0, demandes du 29.10 et
+// du 06.11.2026) : guidage d'une lame (Grader, Bull) ou d'un râteau (calculs dans topo/lame.js et
+// topo/outil.js). En haut : la machine et la surface à suivre ; tous les réglages dans ⚙ (nombre de
+// GNSS, inverser G / D, distances de l'outil, axe G – D, tolérances). Puis deux coupes du même modèle :
+// - coupe G – D (sur l'axe G – D, à « axe » m du GNSS) : écart à gauche et à droite en petit au-dessus,
+//   règle de hauteur à gauche, la coupe au milieu (surface, pentes du projet, trait de l'outil), règle à
+//   droite ; dessous le dévers et les bords de la surface ;
+// - coupe Arr – Av (au milieu de l'outil, perpendiculaire) : pareil, l'arrière à gauche, l'avant à droite.
 // Les nombres changent 5 fois par seconde sans redessiner l'écran (rafraichirLame).
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { formaterNombre } from '../topo/format.js';
 import { htmlRegleHauteur } from './regle-hauteur.js';
 
-// Hauteur de la lame dessinée au-dessus du trait entre les 2 GNSS (m).
-const HAUTEUR_LAME = 0.5;
-
 /** Texte d'un écart de coin (m) : « monter 3.2 cm », « descendre 1.0 cm » ; « hors surface ». */
 export function texteEcartLame(ecart) {
   if (ecart == null) return 'hors surface';
   const cm = (Math.abs(ecart) * 100).toFixed(1);
   return ecart >= 0 ? `monter ${cm} cm` : `descendre ${cm} cm`;
+}
+
+/** Écart sans mot (0.151.1 : la flèche suffit) : « 3.2 cm » ; « hors surface ». */
+function texteCm(ecart) {
+  if (ecart == null) return 'hors surface';
+  return `${(Math.abs(ecart) * 100).toFixed(1)} cm`;
 }
 
 /** Dévers (%) avec son signe et 2 décimales. */
@@ -28,10 +32,13 @@ const pourcent = (valeur) => {
   return `${valeur > 0 ? '+' : '−'}${Math.abs(valeur).toFixed(2)} %`;
 };
 
+// Les deux coupes : [clé, titre, nom du bout de gauche, nom du bout de droite].
+const COUPES = [['gd', 'Coupe G – D', 'G', 'D'], ['long', 'Coupe Arr – Av', 'Arr', 'Av']];
+
 /**
  * Écran (sans les nombres en direct). donnees : { surfaces: [{ id, etiquette }], surfaceId,
- * machine ('grader' ou 'bull'), inverse, tolerances: { vert, orange } (m), recepteur2 (vrai si le
- * 2e GNSS est connecté) }.
+ * machine ('grader', 'bull' ou 'rateau'), inverse, tolerances: { vert, orange } (m), recepteur2 (vrai
+ * si le 2e GNSS est connecté), unGnss, outil: { gauche, droite, avant, arriere, axe } }.
  */
 export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) {
   const { surfaces, surfaceId, tolerances } = donnees;
@@ -40,24 +47,37 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) 
   // Outil à 1 GNSS (0.142.0) : râteau, ou Bull réglé sur 1 GNSS ; distances depuis le bas du mât.
   const unGnss = Boolean(donnees.unGnss);
   const outil = donnees.outil ?? {};
-  const champOutil = (cle, titre) => `<label>${titre} <input type="text" inputmode="decimal" data-outil="${cle}" value="${outil[cle] ? Number(outil[cle]).toFixed(3) : ''}" placeholder="0.000" /> m</label>`;
+  const valeur = (cle) => (outil[cle] == null || outil[cle] === '' ? '' : Number(outil[cle]).toFixed(3));
+  const champOutil = (cle, titre, attente = '0.000') => `<label>${titre} <input type="text" inputmode="decimal" data-outil="${cle}" value="${valeur(cle)}" placeholder="${attente}" /> m</label>`;
+  // Réglages (0.151.0 : tous dans ⚙).
   const nombreGnss = machine === 'bull'
     ? `<div class="ligne-lame choix-gnss" role="radiogroup" aria-label="Nombre de GNSS">
         <button type="button" class="case-machine petite ${unGnss ? 'actif' : ''}" role="radio" data-action="choisirRecepteursBull" data-valeur="1" aria-checked="${unGnss}">1 GNSS</button>
         <button type="button" class="case-machine petite ${unGnss ? '' : 'actif'}" role="radio" data-action="choisirRecepteursBull" data-valeur="2" aria-checked="${!unGnss}">2 GNSS</button>
       </div>`
     : '';
-  const reglagesOutil = unGnss
-    ? `<div class="reglages-outil"><p class="titre-choix">Depuis le bas du GNSS jusqu'au bord ${machine === 'rateau' ? 'du râteau' : 'de la lame'}</p>
-        ${champOutil('gauche', 'Gauche')}${champOutil('droite', 'Droite')}${machine === 'rateau' ? `${champOutil('avant', 'Avant')}${champOutil('arriere', 'Arrière')}` : ''}</div>`
-    : '';
-  // Distances pas encore tapées : les réglages sont montrés d'office.
-  if (unGnss && !(Number(outil.gauche) + Number(outil.droite) > 0.1)) reglagesOuverts = true;
-  // Grader ou Bull (0.114.0) : deux boutons côte à côte, un seul choisi à la fois.
+  const bords = unGnss
+    ? `<p class="titre-choix">Depuis le bas du GNSS jusqu'au bord ${machine === 'rateau' ? 'du râteau' : 'de la lame'}</p>
+        ${champOutil('gauche', 'Gauche')}${champOutil('droite', 'Droite')}`
+    : '<button type="button" class="bouton-secondaire" data-action="inverserLame" title="Inverser gauche et droite">⇄ Inverser G / D</button>';
+  const reglages = `<div class="reglages-lame-tous">
+      ${nombreGnss}
+      <div class="reglages-outil">${bords}</div>
+      <div class="reglages-outil">
+        <p class="titre-choix">Coupes (depuis ${unGnss ? 'le GNSS' : 'la ligne des GNSS'})</p>
+        ${champOutil('axe', 'Axe G – D', machine === 'rateau' ? 'milieu' : '0.000')}
+        <span class="aide">− derrière, + devant</span>
+        ${champOutil('avant', 'Avant')}${champOutil('arriere', 'Arrière')}
+      </div>
+      <div class="reglages-lame">
+        <label>Vert ≤ <input type="text" inputmode="decimal" data-tolerance-lame="vert" value="${cm(tolerances.vert)}" /> cm</label>
+        <label>Orange ≤ <input type="text" inputmode="decimal" data-tolerance-lame="orange" value="${cm(tolerances.orange)}" /> cm</label>
+      </div>
+    </div>`;
+  // Grader, Bull ou Râteau (0.114.0) : boutons côte à côte, un seul choisi à la fois.
   const caseMachine = (cle, titre) => `<button type="button" class="case-machine ${machine === cle ? 'actif' : ''}" role="radio" data-action="choisirMachine" data-valeur="${cle}" aria-checked="${machine === cle}">${titre}</button>`;
   return `<div class="ecran-lame">
     <div class="ligne-lame choix-machine" role="radiogroup" aria-label="Machine">${caseMachine('grader', 'Grader')}${caseMachine('bull', 'Bull')}${caseMachine('rateau', 'Râteau')}</div>
-    ${nombreGnss}
     <div class="ligne-lame">
       ${surfaces.length > 0
         ? `<select data-champ="surface-lame" aria-label="Levé à suivre">
@@ -65,60 +85,40 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) 
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
         : '<p class="vide">Aucun levé (Terrain › Lever).</p>'}
-      ${unGnss ? '' : '<button type="button" class="bouton-secondaire" data-action="inverserLame" title="Inverser gauche et droite">⇄ G / D</button>'}
       <button type="button" class="bouton-bip ${bip ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${bip}" title="${bip ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${bip ? 'Couper le bip' : 'Remettre le bip'}">${bip ? '🔔' : '🔕'}</button>
       <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Réglages">⚙</button>
       ${bulle('lame')}
     </div>
-    ${reglagesOuverts ? `${reglagesOutil}<div class="reglages-lame">
-        <label>Vert ≤ <input type="text" inputmode="decimal" data-tolerance-lame="vert" value="${cm(tolerances.vert)}" /> cm</label>
-        <label>Orange ≤ <input type="text" inputmode="decimal" data-tolerance-lame="orange" value="${cm(tolerances.orange)}" /> cm</label>
-      </div>` : ''}
+    ${reglagesOuverts ? reglages : ''}
     ${donnees.recepteur2 || unGnss ? '' : '<button type="button" class="bouton-secondaire bouton-recepteur-2" data-action="ouvrirRecepteur">Connecter le 2e GNSS</button>'}
     <p class="raison-lame" data-vivant="lame-raison" hidden></p>
-    <div class="coins-lame avec-regles">
-      <div class="colonne-regle" data-vivant="lame-regle-gauche">${htmlRegleHauteur(null)}</div>
-      <div class="coin-lame attente" data-vivant="lame-gauche"></div>
-      <div class="coin-lame attente" data-vivant="lame-droite"></div>
-      <div class="colonne-regle" data-vivant="lame-regle-droite">${htmlRegleHauteur(null)}</div>
-    </div>
-    <div class="recepteurs-lame">
-      <div class="recepteur-lame" data-vivant="lame-gnss-gauche"></div>
-      <div class="recepteur-lame" data-vivant="lame-gnss-droite"></div>
-    </div>
-    <p class="devers-lame" data-vivant="lame-devers">Dévers —</p>
-    <div class="coupe-lame-bords">
-      <div class="bord-lame bord-gauche" data-vivant="lame-bord-gauche"></div>
-      <div class="coupe-lame" data-vivant="lame-coupe"></div>
-      <div class="bord-lame bord-droite" data-vivant="lame-bord-droite"></div>
-    </div>
-    <div class="profil-lame" data-vivant="lame-profil"></div>
+    ${COUPES.map(([cle, titre]) => `<section class="bloc-coupe-guidage" data-coupe="${cle}">
+        <div class="tete-coupe-guidage">
+          <div class="ecart-coupe attente" data-vivant="lame-${cle}-gauche"></div>
+          <span class="titre-coupe-guidage">${titre}</span>
+          <div class="ecart-coupe attente" data-vivant="lame-${cle}-droite"></div>
+        </div>
+        <div class="corps-coupe-guidage">
+          <div class="colonne-regle" data-vivant="lame-${cle}-regle-gauche">${htmlRegleHauteur(null)}</div>
+          <div class="coupe-guidage" data-vivant="lame-${cle}-coupe"></div>
+          <div class="colonne-regle" data-vivant="lame-${cle}-regle-droite">${htmlRegleHauteur(null)}</div>
+        </div>
+        <p class="pied-coupe-guidage" data-vivant="lame-${cle}-pied"></p>
+      </section>`).join('')}
   </div>`;
 }
 
-/** Grosse flèche monter (vers le haut) ou descendre (vers le bas), en SVG. */
-function grosseFleche(ecart) {
+/** Petite flèche monter (vers le haut) ou descendre (vers le bas), en SVG. */
+function petiteFleche(ecart) {
   const haut = ecart >= 0;
-  return `<svg class="grosse-fleche-lame" viewBox="0 0 40 48" aria-hidden="true"><path d="${haut ? 'M20 2 38 24H27V46H13V24H2Z' : 'M20 46 38 24H27V2H13V24H2Z'}" /></svg>`;
-}
-
-/** État d'un récepteur (comme la fenêtre du récepteur seul) : statut, satellites, précision, inclinaison. */
-function texteRecepteur(titre, etat) {
-  if (!etat?.connecte) return `<strong>${titre}</strong><span>non connecté</span>`;
-  if (!etat.recu) return `<strong>${titre}</strong><span>en attente…</span>`;
-  const statut = { 4: 'RTK FIXE', 5: 'RTK FLOTTANT' }[etat.qualite] ?? `GNSS ${etat.libelleQualite ?? '?'}`;
-  const classe = etat.qualite === 4 ? (etat.inclinaisonPrete ? 'vert' : 'orange') : etat.qualite === 5 ? 'orange' : 'rouge';
-  return `<strong>${titre}</strong>
-    <span class="statut-lame statut-${classe}">${statut}${etat.nbSatellites != null ? ` · ${etat.nbSatellites} sat.` : ''}</span>
-    <span>H ${formaterNombre(etat.precisionH)} · V ${formaterNombre(etat.precisionV)}</span>
-    <span>Inclinaison ${etat.inclinaisonPrete ? `prête${etat.inclinaison != null ? ` (${Math.round(etat.inclinaison)}°)` : ''}` : 'pas prête'}</span>`;
+  return `<svg class="fleche-coupe" viewBox="0 0 40 48" aria-hidden="true"><path d="${haut ? 'M20 2 38 24H27V46H13V24H2Z' : 'M20 46 38 24H27V2H13V24H2Z'}" /></svg>`;
 }
 
 /**
- * Met à jour les nombres en direct dans "conteneur". vivant : { raison (texte, ou null),
- * guidage (voir topo/lame.js guidageLame) ou null, coins: { gauche, droite } (positions des GNSS)
- * ou null, recepteurs: { gauche, droite } (états des 2 GNSS), coupe: { longueur, profils, gauche,
- * droite } ou null, bords (voir bordsDeLaLame) ou null, profil (coupe perpendiculaire) ou null }.
+ * Met à jour les nombres en direct dans "conteneur". vivant : { raison (texte, ou null), guidage
+ * (axe G – D, voir topo/lame.js guidageLame) ou null, long (axe Arr – Av : gauche = arrière, droite =
+ * avant, devers = pente vers l'avant) ou null, coupe et coupeLong (voir coupeEntre) ou null, bords
+ * (voir bordsDeLaLame) ou null, unGnss, toleranceVert }.
  */
 export function rafraichirLame(conteneur, vivant) {
   const zone = (nom) => conteneur.querySelector(`[data-vivant="${nom}"]`);
@@ -127,128 +127,87 @@ export function rafraichirLame(conteneur, vivant) {
   raison.hidden = !vivant.raison;
   raison.textContent = vivant.raison ?? '';
   const g = vivant.raison ? null : vivant.guidage;
-  for (const cote of ['gauche', 'droite']) {
-    const element = zone(`lame-${cote}`);
-    const coin = g?.[cote];
-    const position = vivant.coins?.[cote];
-    // Flèche toujours là, même dans la tolérance (verte) ; altitude du GNSS dessous.
-    element.className = `coin-lame ${coin?.classe ? `ecart-${coin.classe}` : 'attente'}`;
-    element.innerHTML = `<span class="titre-coin">${cote === 'gauche' ? 'Gauche' : 'Droite'}</span>
-      ${coin?.ecart != null ? grosseFleche(coin.ecart) : ''}
-      <strong>${coin ? texteEcartLame(coin.ecart) : '—'}</strong>
-      <span class="altitude-coin">H ${position ? formaterNombre(position.altitude) : '—'}</span>`;
-    // Règle de hauteur de ce coin (0.107.0) : à gauche du coin gauche, à droite du coin droit.
-    zone(`lame-regle-${cote}`).innerHTML = htmlRegleHauteur(coin?.ecart ?? null, vivant.toleranceVert ?? 0.02);
-    // Outil à 1 GNSS (0.142.0) : un seul récepteur, montré une fois.
-    const cellule = zone(`lame-gnss-${cote}`);
-    cellule.hidden = Boolean(vivant.unGnss) && cote === 'droite';
-    cellule.innerHTML = texteRecepteur(vivant.unGnss ? 'GNSS' : `GNSS ${cote === 'gauche' ? 'G' : 'D'}`, vivant.recepteurs?.[cote]);
+  const donnees = { gd: { guidage: g, coupe: vivant.coupe }, long: { guidage: g ? vivant.long : null, coupe: vivant.coupeLong } };
+  for (const [cle, , nomGauche, nomDroite] of COUPES) {
+    const { guidage, coupe } = donnees[cle];
+    for (const [cote, nom] of [['gauche', nomGauche], ['droite', nomDroite]]) {
+      const point = guidage?.[cote];
+      const element = zone(`lame-${cle}-${cote}`);
+      element.className = `ecart-coupe ${point?.classe ? `ecart-${point.classe}` : 'attente'}`;
+      element.innerHTML = `<span class="nom-bout">${nom}</span>${point?.ecart != null ? petiteFleche(point.ecart) : ''}<strong>${point ? texteCm(point.ecart) : '—'}</strong>`;
+      // Règle de hauteur (0.107.0) : à gauche du bout gauche, à droite du bout droit.
+      zone(`lame-${cle}-regle-${cote}`).innerHTML = htmlRegleHauteur(point?.ecart ?? null, vivant.toleranceVert ?? 0.02);
+    }
+    zone(`lame-${cle}-coupe`).innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite]) : '';
   }
-  // Outil à 1 GNSS (0.142.0) : écart au centre de l'outil en plus.
-  const centre = g?.centre ? `Centre <strong>${texteEcartLame(g.centre.ecart)}</strong> · ` : '';
-  zone('lame-devers').innerHTML = g
-    ? `${centre}Dévers <strong>${pourcent(g.devers)}</strong> · voulu <strong>${pourcent(g.deversVoulu)}</strong>${g.ecartDevers == null ? '' : ` · écart ${pourcent(g.ecartDevers)}`} · lame ${formaterNombre(g.largeur)} m`
-    : 'Dévers —';
-  zone('lame-coupe').innerHTML = g && vivant.coupe ? svgCoupeLame(vivant.coupe, g) : '';
-  // Bords de la surface dans le prolongement de la lame (0.75.0) : distance (négative hors surface) et altitude.
-  for (const cote of ['gauche', 'droite']) {
-    const element = zone(`lame-bord-${cote}`);
-    const bord = g ? vivant.bords?.[cote] : null;
-    element.classList.toggle('hors', Boolean(bord && bord.distance < 0));
-    element.innerHTML = bord
-      ? `<span class="titre-bord">${cote === 'gauche' ? '◂ bord' : 'bord ▸'}</span><strong>${bord.distance < 0 ? '−' : ''}${Math.abs(bord.distance).toFixed(2)} m</strong><span>H ${formaterNombre(bord.altitude)}</span>`
-      : '';
-  }
-  const profil = zone('lame-profil');
-  if (profil) profil.innerHTML = g && vivant.profil ? svgCoupePerpendiculaire(vivant.profil) : '';
+  // Sous la coupe G – D : dévers (et écart au centre d'un outil à 1 GNSS), bords de la surface.
+  const fleche = (e) => (e == null ? '' : e >= 0 ? '↑ ' : '↓ ');
+  const centre = g?.centre ? `Centre <strong>${fleche(g.centre.ecart)}${texteCm(g.centre.ecart)}</strong> · ` : '';
+  const bord = (cote) => {
+    const b = g ? vivant.bords?.[cote] : null;
+    return b ? `<span class="${b.distance < 0 ? 'hors' : ''}">${cote === 'gauche' ? '◂ bord' : 'bord ▸'} ${b.distance < 0 ? '−' : ''}${Math.abs(b.distance).toFixed(2)} m</span>` : '';
+  };
+  zone('lame-gd-pied').innerHTML = g
+    ? `${bord('gauche')}<span>${centre}Dévers <strong>${pourcent(g.devers)}</strong> · voulu <strong>${pourcent(g.deversVoulu)}</strong></span>${bord('droite')}`
+    : '';
+  const l = g ? vivant.long : null;
+  zone('lame-long-pied').innerHTML = l
+    ? `<span>Pente vers l'avant <strong>${pourcent(l.devers)}</strong> · voulue <strong>${pourcent(l.deversVoulu)}</strong></span>`
+    : '';
 }
 
 /**
- * Coupe perpendiculaire (sens donné par la machine, avant à droite) : la surface, la pente de chaque
- * tronçon, les ruptures de pente (trait et distance), la lame (rectangle jaune de 50 cm) à 0 m.
- * profil : { morceaux, troncons, ruptures, devant, derriere (m), altitude (de la lame), source }.
+ * Coupe verticale de la surface (même dessin pour G – D et Arr – Av) : la surface (trait brun), la
+ * pente du projet de chaque tronçon (texte), les ruptures de pente, et le trait de l'outil entre ses
+ * deux bouts (de la couleur du plus grand écart). Hauteurs agrandies pour voir les centimètres.
+ * coupe : voir topo/lame.js coupeEntre ; guidage : { gauche, droite } (classes) ; noms : [gauche, droite].
  */
-export function svgCoupePerpendiculaire(profil) {
-  const largeur = 340;
-  const hauteur = 150;
-  const marge = 16;
-  const { morceaux, troncons, ruptures, devant, derriere, altitude } = profil;
-  const altitudes = [altitude, altitude + HAUTEUR_LAME, ...morceaux.flat().map((p) => p.altitude)];
-  const milieu = (Math.min(...altitudes) + Math.max(...altitudes)) / 2;
-  const etendue = Math.max(0.5, Math.max(...altitudes) - Math.min(...altitudes)) * 1.4;
-  const x = (d) => marge + ((d + derriere) / (devant + derriere)) * (largeur - 2 * marge);
-  const y = (z) => hauteur / 2 + 10 - ((z - milieu) / etendue) * (hauteur - 2 * marge - 20);
+export function svgCoupeGuidage(coupe, guidage, noms) {
+  const largeur = 300;
+  const hauteur = 140;
+  const marge = 12;
+  const { longueur, morceaux, troncons, ruptures, a, b } = coupe;
+  const altitudes = [a.altitude, b.altitude, ...morceaux.flat().map((p) => p.altitude)].filter((z) => z != null);
+  const bas = Math.min(...altitudes);
+  const haut = Math.max(...altitudes);
+  const milieu = (bas + haut) / 2;
+  const etendue = Math.max(0.2, haut - bas) * 1.4;
+  const x = (d) => marge + (d / longueur) * (largeur - 2 * marge);
+  const y = (z) => hauteur / 2 - ((z - milieu) / etendue) * (hauteur - 2 * marge - 16);
   const surface = morceaux
     .map((m) => `<path class="surface-coupe-lame" d="M${m.map((p) => `${x(p.distance).toFixed(1)} ${y(p.altitude).toFixed(1)}`).join('L')}" />`)
     .join('');
-  // Pente au milieu de chaque tronçon assez long à l'écran, sous la ligne.
+  // Pente du projet au milieu de chaque tronçon assez long à l'écran, sous la ligne.
+  const altitudeA = (d) => {
+    const m = morceaux.find((k) => k[0].distance <= d && k.at(-1).distance >= d) ?? [];
+    const i = m.findIndex((p) => p.distance >= d);
+    const p1 = m[Math.max(0, i - 1)];
+    const p2 = m[i];
+    return p1 && p2 && p2.distance > p1.distance ? p1.altitude + ((d - p1.distance) / (p2.distance - p1.distance)) * (p2.altitude - p1.altitude) : milieu;
+  };
   const pentes = troncons
-    .filter((t) => x(t.fin) - x(t.debut) > 34)
+    .filter((t) => x(t.fin) - x(t.debut) > 40)
     .map((t) => {
       const d = (t.debut + t.fin) / 2;
-      const morceau = morceaux.find((m) => m[0].distance <= d && m.at(-1).distance >= d) ?? [];
-      const i = morceau.findIndex((p) => p.distance >= d);
-      const a = morceau[Math.max(0, i - 1)];
-      const b = morceau[i];
-      const z = a && b && b.distance > a.distance ? a.altitude + ((d - a.distance) / (b.distance - a.distance)) * (b.altitude - a.altitude) : altitude;
-      return `<text x="${x(d).toFixed(1)}" y="${(y(z) + 15).toFixed(1)}" text-anchor="middle" class="pente-profil">${t.pente >= 0 ? '+' : '−'}${Math.abs(t.pente).toFixed(1)} %</text>`;
+      return `<text x="${x(d).toFixed(1)}" y="${(y(altitudeA(d)) + 16).toFixed(1)}" text-anchor="middle" class="pente-profil">${Math.abs(t.pente) < 0.05 ? '' : t.pente > 0 ? '+' : '−'}${Math.abs(t.pente).toFixed(1)} %</text>`;
     })
     .join('');
-  // Distances des ruptures : une seule tous les 36 pixels au moins (sinon elles se chevauchent).
-  let dernierTexte = -Infinity;
   const marques = ruptures
-    .map((d) => {
-      const xd = x(d);
-      const texte = xd - dernierTexte >= 36 ? `<text x="${xd.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle" class="distance-profil">${d.toFixed(1)} m</text>` : '';
-      if (texte) dernierTexte = xd;
-      return `<line class="rupture-profil" x1="${xd.toFixed(1)}" y1="${marge}" x2="${xd.toFixed(1)}" y2="${hauteur - 14}" />${texte}`;
-    })
+    .map((d) => `<line class="rupture-profil" x1="${x(d).toFixed(1)}" y1="${marge}" x2="${x(d).toFixed(1)}" y2="${hauteur - 14}" />`)
     .join('');
-  // La lame vue de côté : un rectangle jaune de 50 cm, son bas au tranchant.
-  const lame = `<rect class="lame-jaune" x="${(x(0) - 3).toFixed(1)}" y="${y(altitude + HAUTEUR_LAME).toFixed(1)}" width="6" height="${(y(altitude) - y(altitude + HAUTEUR_LAME)).toFixed(1)}" />`;
-  const titre = profil.source === 'marche' ? 'sens de marche' : 'perpendiculaire à la lame';
-  return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-profil-lame" role="img" aria-label="Coupe ${titre}">
+  const classes = [guidage.gauche?.classe, guidage.droite?.classe];
+  const pire = classes.find((c) => c === 'rouge') ?? classes.find((c) => c === 'orange') ?? 'vert';
+  const [xa, xb] = [x(a.distance), x(b.distance)];
+  const [ya, yb] = [y(a.altitude), y(b.altitude)];
+  return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-coupe-guidage" role="img" aria-label="Coupe ${noms[0]} – ${noms[1]}">
     ${marques}
     ${surface}
     ${pentes}
-    ${lame}
-    <text x="4" y="12" class="note-coupe-lame">−${derriere} m · ${titre} · +${devant} m →</text>
-    <text x="${largeur - 4}" y="12" text-anchor="end" class="note-coupe-lame">hauteurs agrandies</text>
-  </svg>`;
-}
-
-/**
- * Coupe vue de derrière la lame (gauche à gauche) : la surface (trait brun), le trait entre les 2
- * GNSS (de la couleur du plus grand écart) et la lame : un rectangle jaune un peu transparent de
- * 50 cm, parallèle à ce trait. Hauteurs agrandies pour voir les centimètres.
- */
-export function svgCoupeLame(coupe, guidage) {
-  const largeur = 320;
-  const hauteur = 130;
-  const marge = 14;
-  const { longueur, profils, gauche, droite } = coupe;
-  const altitudes = [gauche.altitude, droite.altitude, gauche.altitude + HAUTEUR_LAME, droite.altitude + HAUTEUR_LAME, ...profils.flat().map((p) => p.altitude)];
-  const milieu = (Math.min(...altitudes) + Math.max(...altitudes)) / 2;
-  const etendue = Math.max(0.2, Math.max(...altitudes) - Math.min(...altitudes)) * 1.3;
-  const x = (d) => marge + (d / longueur) * (largeur - 2 * marge);
-  const y = (z) => hauteur / 2 - ((z - milieu) / etendue) * (hauteur - 2 * marge);
-  const surface = profils
-    .map((morceau) => `<path class="surface-coupe-lame" d="M${morceau.map((p) => `${x(p.distance).toFixed(1)} ${y(p.altitude).toFixed(1)}`).join('L')}" />`)
-    .join('');
-  const classes = [guidage.gauche, guidage.droite].map((c) => c.classe);
-  const pire = classes.find((c) => c === 'rouge') ?? classes.find((c) => c === 'orange') ?? 'vert';
-  const xg = x(gauche.distance);
-  const xd = x(droite.distance);
-  const [yg, yd] = [y(gauche.altitude), y(droite.altitude)];
-  const [ygh, ydh] = [y(gauche.altitude + HAUTEUR_LAME), y(droite.altitude + HAUTEUR_LAME)];
-  return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame" role="img" aria-label="Coupe vue de derrière la lame">
-    ${surface}
-    <path class="lame-jaune" d="M${xg.toFixed(1)} ${yg.toFixed(1)}L${xd.toFixed(1)} ${yd.toFixed(1)}L${xd.toFixed(1)} ${ydh.toFixed(1)}L${xg.toFixed(1)} ${ygh.toFixed(1)}Z" />
-    <line class="lame-coupe lame-${pire}" x1="${xg.toFixed(1)}" y1="${yg.toFixed(1)}" x2="${xd.toFixed(1)}" y2="${yd.toFixed(1)}" />
-    <circle class="coin-coupe-lame" cx="${xg.toFixed(1)}" cy="${yg.toFixed(1)}" r="5" />
-    <circle class="coin-coupe-lame" cx="${xd.toFixed(1)}" cy="${yd.toFixed(1)}" r="5" />
-    <text x="${xg.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">G</text>
-    <text x="${xd.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">D</text>
-    <text x="${largeur - 4}" y="12" text-anchor="end" class="note-coupe-lame">hauteurs agrandies</text>
+    <line class="lame-coupe lame-${pire}" x1="${xa.toFixed(1)}" y1="${ya.toFixed(1)}" x2="${xb.toFixed(1)}" y2="${yb.toFixed(1)}" />
+    <circle class="coin-coupe-lame" cx="${xa.toFixed(1)}" cy="${ya.toFixed(1)}" r="5" />
+    <circle class="coin-coupe-lame" cx="${xb.toFixed(1)}" cy="${yb.toFixed(1)}" r="5" />
+    <text x="${xa.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">${noms[0]}</text>
+    <text x="${xb.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">${noms[1]}</text>
+    <text x="${largeur - 4}" y="11" text-anchor="end" class="note-coupe-lame">hauteurs agrandies</text>
   </svg>`;
 }

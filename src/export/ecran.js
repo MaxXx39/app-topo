@@ -2,7 +2,7 @@
 // boutons PDF, CSV, DXF et LandXML.
 import { genererCsv } from './csv.js';
 import { genererDxf } from './dxf.js';
-import { ECHELLES } from './echelle.js';
+import { champsMiseEnPage, lireMiseEnPage, resumeMiseEnPage, texteFeuille } from './mise-en-page.js';
 import { ecrireLandXML, geometrieDeSurface } from '../topo/landxml.js';
 import { plageAltitudes, equidistanceAuto } from '../topo/courbes.js';
 import { bulle } from '../aide/bulles.js';
@@ -58,14 +58,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     </div>
     <details class="options-export" data-pour="pdf dxf landxml">
     <summary><span data-zone="resume-options"></span> <span class="lien-modifier">modifier ▾</span></summary>
-    <div class="champs-export" data-pour="pdf">
-      <label>Échelle du plan (PDF)
-        <select data-champ="echelle">
-          <option value="auto">auto (tout le plan sur une A4)</option>
-          ${ECHELLES.map((e) => `<option value="${e}">1:${e}</option>`).join('')}
-        </select>
-      </label>
-    </div>
+    <div data-pour="pdf">${champsMiseEnPage()}</div>
     <div class="calques-pdf" data-pour="pdf">
       <p class="titre-choix">Contenu du PDF</p>
       <div class="liste-calques-pdf">
@@ -170,7 +163,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
       try {
         // La bibliothèque PDF n'est chargée qu'au premier export (l'appli démarre plus vite).
         const { creerPdf } = await import('./pdf.js');
-        const echelleChoisie = champ('echelle').value;
+        const miseEnPage = lireMiseEnPage(conteneur);
         const calques = Object.fromEntries(
           [...conteneur.querySelectorAll('[data-calque]')].map((caseACocher) => [caseACocher.dataset.calque, caseACocher.checked]),
         );
@@ -180,7 +173,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
         calques.couleurs = couleurs === 'couleurs';
         calques.photoAttenuee = true;
         calques.palier = champ('palier').value;
-        const { document, echelle, format, messageFond } = await creerPdf({
+        const { document, echelle, format, orientation, messageFond } = await creerPdf({
           stocks,
           resultats,
           points,
@@ -197,10 +190,12 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
             dessinePar: lireCartouche(conteneur).dessinePar,
             fichierPoints,
           },
-          echelleImposee: echelleChoisie === 'auto' ? null : Number(echelleChoisie),
+          ...miseEnPage,
         });
-        telecharger(document.output('blob'), `${nomDeFichier()}.pdf`);
-        message.textContent = `PDF téléchargé (${format.toUpperCase()}, plan à l'échelle 1:${echelle}).${messageFond ? ` Attention : ${messageFond}.` : ''}`;
+        // 0.151.0 : papier et échelle obtenus, mis en évidence dans la fenêtre Exporter et l'aperçu.
+        const feuille = texteFeuille(format, orientation, echelle);
+        telecharger(document.output('blob'), `${nomDeFichier()}.pdf`, { resume: feuille });
+        message.textContent = `PDF prêt : ${feuille}.${messageFond ? ` Attention : ${messageFond}.` : ''}`;
       } catch (erreur) {
         message.textContent = `Impossible de créer le PDF : ${erreur.message}`;
       }
@@ -214,10 +209,10 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     if (!zone) return;
     let texte = '';
     if (format === 'pdf') {
-      const echelle = champ('echelle').value;
+      const miseEnPage = resumeMiseEnPage(lireMiseEnPage(conteneur));
       const cases = CALQUES.filter(([cle]) => conteneur.querySelector(`[data-calque="${cle}"]`)?.checked).map(([, titre]) => titre.toLowerCase());
       const couleurs = COULEURS.find(([cle]) => conteneur.querySelector(`[data-couleurs="${cle}"]`)?.checked)?.[1] ?? '';
-      texte = [echelle === 'auto' ? 'A4 auto' : `1:${echelle}`, cases.join(', ') || 'sans options', `couleurs : ${couleurs.toLowerCase()}`].join(' · ');
+      texte = [miseEnPage, cases.join(', ') || 'sans options', `couleurs : ${couleurs.toLowerCase()}`].join(' · ');
     } else if (format === 'dxf') texte = champ('geotiff').checked ? 'avec la photo aérienne (GeoTIFF)' : 'sans photo aérienne';
     else if (format === 'landxml') texte = champ('landxml-contour').checked ? 'avec contour et lignes de rupture' : 'triangles seulement';
     zone.textContent = texte;
@@ -333,8 +328,8 @@ export function dateSuisse(iso) {
  * Un fichier exporté (0.79.0) : la fenêtre « Exporter » (voir fenetre-export.js) propose de
  * l'enregistrer, de l'envoyer par mail ou autrement.
  */
-export function telecharger(blob, nom, { quandFerme = null } = {}) {
-  ouvrirFenetreExport({ titre: nom, fabriquer: () => ({ blob, nom }), enregistrer, message: messageExport, quandFerme });
+export function telecharger(blob, nom, { quandFerme = null, resume = null } = {}) {
+  ouvrirFenetreExport({ titre: nom, resume, fabriquer: () => ({ blob, nom }), enregistrer, message: messageExport, quandFerme });
 }
 
 /** Petit message en bas de l'écran (enregistré, mail…), qui disparaît tout seul. */

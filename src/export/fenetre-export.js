@@ -18,9 +18,11 @@ let derniereAdresse = null;
  * fabriquer(format, choix) : { blob, nom } (le fichier ; choix = { cle: vrai / faux }) ; enregistrer(blob, nom) : téléchargement ;
  * message(texte) : petit message à l'écran ; quandFerme() : appelé quand la fenêtre se ferme (fichier suivant…).
  */
-export function ouvrirFenetreExport({ titre, formats = null, options = [], fabriquer, enregistrer, message, quandFerme = null }) {
+export function ouvrirFenetreExport({ titre, resume = null, formats = null, options = [], fabriquer, enregistrer, message, quandFerme = null }) {
   const adresses = lireListesPartagees().adresses;
   let format = formats?.[0]?.[0] ?? null;
+  // Aperçu (0.151.0) : pour un PDF (format « pdf », ou fichier unique en .pdf).
+  const estPdf = () => (formats ? format === 'pdf' : /\.pdf$/i.test(titre));
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-choix fenetre-export';
   fenetre.innerHTML = `
@@ -32,8 +34,10 @@ export function ouvrirFenetreExport({ titre, formats = null, options = [], fabri
         ${formats.map(([cle, nom, detail]) => `<label class="puce-format ${cle === format ? 'actif' : ''}">
           <input type="radio" name="format-export" value="${cle}" ${cle === format ? 'checked' : ''} /><strong>${nom}</strong><span>${echapper(detail ?? '')}</span></label>`).join('')}
       </div>` : ''}
+    ${resume ? `<p class="resume-export">${echapper(resume)}</p>` : ''}
     ${options.map((o) => `<label class="case option-export" data-option="${echapper(o.cle)}" ${o.formats.includes(format) ? '' : 'hidden'}><input type="checkbox" data-option-case="${echapper(o.cle)}" /> ${echapper(o.texte)}</label>`).join('')}
     <div class="boutons-choix">
+      <button type="button" class="bouton-secondaire bouton-apercu-pdf" data-cle="apercu" ${estPdf() ? '' : 'hidden'}><strong>👁 Aperçu</strong><span>voir le PDF avant de l'exporter</span></button>
       <button type="button" class="bouton" data-cle="enregistrer"><strong>Enregistrer</strong><span>sur cet appareil</span></button>
       <div class="envoi-mail seulement-intermediaire">
         ${adresses.length > 0
@@ -48,6 +52,7 @@ export function ouvrirFenetreExport({ titre, formats = null, options = [], fabri
     format = evenement.target.value;
     for (const o of options) fenetre.querySelector(`[data-option="${o.cle}"]`).hidden = !o.formats.includes(format);
     for (const puce of fenetre.querySelectorAll('.puce-format')) puce.classList.toggle('actif', puce.contains(evenement.target));
+    fenetre.querySelector('[data-cle="apercu"]').hidden = !estPdf();
   });
   fenetre.addEventListener('click', async (evenement) => {
     const bouton = evenement.target.closest('button[data-cle]');
@@ -59,6 +64,12 @@ export function ouvrirFenetreExport({ titre, formats = null, options = [], fabri
     }
     const choix = Object.fromEntries(options.map((o) => [o.cle, o.formats.includes(format) && fenetre.querySelector(`[data-option-case="${o.cle}"]`).checked]));
     const { blob, nom } = await fabriquer(format, choix);
+    if (cle === 'apercu') {
+      // L'aperçu se pose par-dessus ; « Exporter » ou « Fermer » ramène ici (Enregistrer, mail…).
+      const { montrerApercuPdf } = await import('./apercu-pdf.js');
+      await montrerApercuPdf(blob, { titre: nom, resume });
+      return;
+    }
     if (cle === 'enregistrer') {
       enregistrer(blob, nom);
       message(`« ${nom} » enregistré`);

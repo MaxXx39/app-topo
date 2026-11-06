@@ -131,6 +131,7 @@ export function creerEcranLeve(conteneur, actions) {
   let choixNatureOuvert = false; // « + Nouvelle » touché : on choisit stock, terrain naturel ou terrassement
   let direct = null; // orientation et contrôle calculés par main.js à chaque état du récepteur
   let cibleAffichee = 0; // cible montrée près du point à implanter (0 : aucune, voir CIBLES)
+  let planEnGrandDemande = false; // 0.151.0 : encart du plan touché, le plan reprend sa place
   let bandeCouloir = 0; // échelle du couloir de la ligne (n° dans BANDES_COULOIR)
   let capBoussole = null; // dernier cap de la boussole de la tablette (°), ou null
   let reglagesGuidageOuverts = false; // roue ⚙ de l'écran de guidage
@@ -475,7 +476,12 @@ export function creerEcranLeve(conteneur, actions) {
    * Cible en haut de l'écran (à la place du plan, voir style.css « cible-en-haut »), ou rien.
    * cible : { svg, classe (couleur de la distance) } ou null.
    */
-  function montrerCibleEnHaut(zone, cible) {
+  function montrerCibleEnHaut(zone, cibleDemandee) {
+    // 0.151.0 : encart du plan touché = plan en grand (la cible revient avec « ◎ Cible », ou
+    // d'office quand on repasse au-delà de 2 m / qu'on change de point).
+    if (!cibleDemandee) planEnGrandDemande = false;
+    document.body.classList.toggle('cible-masquee', Boolean(zone && cibleDemandee && planEnGrandDemande));
+    const cible = planEnGrandDemande ? null : cibleDemandee;
     const avant = document.body.classList.contains('cible-en-haut');
     document.body.classList.toggle('cible-en-haut', Boolean(zone && cible));
     // 0.138.0 : le plan devient (ou n'est plus) un encart en haut à droite : main.js le recadre.
@@ -619,6 +625,21 @@ export function creerEcranLeve(conteneur, actions) {
         <button type="button" class="bouton-outil-accroche" data-action="ouvrirListePoints" title="Choisir un point dans la liste du projet">Liste</button>
         ${enLigne ? '' : '<button type="button" class="bouton-outil-accroche seulement-expert" data-action="basculerPlusProche" title="Le plus proche : implanter le point du plan le plus proche, la cible suit quand tu te déplaces">⌖ Proche</button>'}`
       : '';
+    // « Manuel » (0.151.0) : flèches (1 pixel de la loupe) et zoom ×2 / ×4 / ×8, comme au recalage.
+    const outilsManuel = active === 'manuel' && !enLigne
+      ? `<div class="reglage-loupe reglage-loupe-implantation">
+          <div class="fleches-loupe">
+            <span></span><button type="button" class="bouton-fleche-loupe" data-action="deplacerLoupe" data-valeur="haut" aria-label="Monter la croix">▲</button><span></span>
+            <button type="button" class="bouton-fleche-loupe" data-action="deplacerLoupe" data-valeur="gauche" aria-label="Croix à gauche">◀</button>
+            <button type="button" class="bouton-fleche-loupe" data-action="deplacerLoupe" data-valeur="bas" aria-label="Descendre la croix">▼</button>
+            <button type="button" class="bouton-fleche-loupe" data-action="deplacerLoupe" data-valeur="droite" aria-label="Croix à droite">▶</button>
+          </div>
+          <div class="zooms-loupe">
+            <span>Zoom</span>
+            ${[2, 4, 8].map((z) => `<button type="button" class="puce-choix ${imp.zoomLoupe === z ? 'actif' : ''}" data-action="zoomLoupe" data-valeur="${z}">×${z}</button>`).join('')}
+          </div>
+        </div>`
+      : '';
     return `<div class="barre-accroche ${enLigne ? 'accroches-ligne' : ''} ${accrochesOuvertes ? 'ouverte' : ''}">
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
         ${modes.map((mode) => {
@@ -630,6 +651,7 @@ export function creerEcranLeve(conteneur, actions) {
         <button type="button" class="bouton-deplier-accroches" data-action="basculerAccroches" title="${accrochesOuvertes ? 'Cacher' : 'Voir'} les noms" aria-label="${accrochesOuvertes ? 'Cacher' : 'Voir'} les noms des accroches" aria-expanded="${accrochesOuvertes}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${accrochesOuvertes ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}" /></svg></button>
       </div>
+      ${outilsManuel}
     </div>`;
   }
 
@@ -746,7 +768,7 @@ export function creerEcranLeve(conteneur, actions) {
             <button type="button" class="bouton bouton-implanter" data-action="implanterChoix">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></svg>Implanter</button>
             <button type="button" class="bouton-secondaire seulement-expert" data-action="creerPointAImplanter">+ À implanter</button>
-            ${imp.choixDuProjet ? '' : '<button type="button" class="bouton-secondaire" data-action="garderPointChoisi" title="Garder ce point dans le projet (levé « Points ajoutés »)">+ Point du projet</button>'}
+            ${imp.choixDuProjet ? '' : '<button type="button" class="bouton-secondaire seulement-expert" data-action="garderPointChoisi" title="Garder ce point dans le projet (levé « Points ajoutés »)">+ Point du projet</button>'}
           </div>
         </div>`
       : '';
@@ -972,7 +994,7 @@ export function creerEcranLeve(conteneur, actions) {
     return `<div class="ligne-cible"><p class="coordonnees-cible"><span class="coord-en">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>${donnees.mode === 'autocontrole' ? (c.altitude != null ? `<span class="coord-h">H ${formaterNombre(c.altitude)}</span>` : '') : `<label class="coord-h">H<input type="text" inputmode="decimal" data-champ="altitude-cible" value="${c.altitude != null ? c.altitude.toFixed(3) : ''}" placeholder="—" aria-label="Altitude d'implantation" /></label>`}</p>
       ${donnees.mode !== 'autocontrole' && donnees.implanter.choix ? `<div class="ligne-outils options-choix">
           <button type="button" class="bouton-secondaire seulement-expert" data-action="creerPointAImplanter">+ À implanter</button>
-          ${donnees.implanter.choixDuProjet ? '' : '<button type="button" class="bouton-secondaire" data-action="garderPointChoisi" title="Garder ce point dans le projet (levé « Points ajoutés »)">+ Point du projet</button>'}
+          ${donnees.implanter.choixDuProjet ? '' : '<button type="button" class="bouton-secondaire seulement-expert" data-action="garderPointChoisi" title="Garder ce point dans le projet (levé « Points ajoutés »)">+ Point du projet</button>'}
         </div>` : ''}</div>`;
   }
 
@@ -1060,9 +1082,8 @@ export function creerEcranLeve(conteneur, actions) {
   function ligneDelta() {
     const d = donnees.delta ?? { sens: 'droite', distance: '', z: '' };
     // 0.141.0 : la ligne de réglage n'est montrée qu'après le bouton « Δ Delta » (ou si un delta est tapé).
-    if (!d.ouvert && !d.actif) {
-      return '<button type="button" class="bouton-secondaire bouton-ouvrir-delta seulement-intermediaire" data-action="reglerDelta" data-champ-delta="ouvrir" title="Décaler le prochain point">Δ Delta</button>';
-    }
+    // 0.151.0 : fermé = petit bouton « Δ » à droite de la position (voir cadrePrise).
+    if (!d.ouvert && !d.actif) return '';
     const sens = (cle, mot) => `<button type="button" class="bouton-sens-delta ${d.sens === cle ? 'actif' : ''}" data-action="reglerDelta" data-champ-delta="sens" data-valeur="${cle}" aria-pressed="${d.sens === cle}">${mot}</button>`;
     return `<div class="ligne-delta seulement-intermediaire ${d.actif ? 'actif' : ''}">
         <span class="titre-delta" title="Décaler le prochain point">Δ</span>
@@ -1106,7 +1127,10 @@ export function creerEcranLeve(conteneur, actions) {
             <span>Enreg. Pts</span><span class="sous-titre-prendre">ou touche vol −</span>
           </button>
         </div>
-        <div class="position-leve" data-vivant="position"></div>
+        <div class="ligne-position-delta">
+          <div class="position-leve" data-vivant="position"></div>
+          ${donnees.delta?.ouvert || donnees.delta?.actif ? '' : '<button type="button" class="bouton-ouvrir-delta seulement-intermediaire" data-action="reglerDelta" data-champ-delta="ouvrir" title="Décaler le prochain point (delta)" aria-label="Delta : décaler le prochain point">Δ</button>'}
+        </div>
         ${ligneDelta()}
         <p class="raison-leve" data-vivant="raison" hidden></p>
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
@@ -1421,6 +1445,11 @@ export function creerEcranLeve(conteneur, actions) {
   }
 
   return {
+    /** 0.151.0 : plan en grand à la place de la cible (oui), ou retour de la cible (non). */
+    planEnGrand(oui) {
+      planEnGrandDemande = Boolean(oui);
+      rafraichirImplantation();
+    },
     /**
      * Redessine l'écran. donnees : { leve (levé de la surface en cours), stocks (surfaces levées :
      * [{ id, nom }]), stock (surface en cours), role, libelles ({ lignes, points }), libelleLigne,
