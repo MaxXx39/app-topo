@@ -517,11 +517,11 @@ export function creerEcranLeve(conteneur, actions) {
       return barreAccroche() + choixImplantation + invite + implanterPoint();
     }
     if (reglages.implantation === 'ligne') {
-      const invite = imp.pointsLigne.length > 0 ? '' : invitation('Choisis la ligne à implanter', 'touche-la sur le plan, ou ses points un à un');
+      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Choisis la ligne à implanter', 'touche-la sur le plan, ou ses points un à un');
       return barreAccroche() + choixImplantation + invite + implanterLigne();
     }
     if (reglages.implantation === 'talus') {
-      const invite = imp.pointsLigne.length > 0 ? '' : invitation('Choisis la ligne du talus (haut ou bas)', 'touche-la sur le plan, ou ses points un à un');
+      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Choisis la ligne du talus (haut ou bas)', 'touche-la sur le plan, ou ses points un à un');
       return barreAccroche() + choixImplantation + invite + implanterLigne() + mesTalus() + talusDesSurfaces();
     }
     if (reglages.implantation === 'altitude') {
@@ -616,6 +616,18 @@ export function creerEcranLeve(conteneur, actions) {
     const { implanter: imp } = donnees;
     const points = imp.pointsLigne;
     const role = (i) => (i === 0 ? `${iconeDrapeau('debut')} Début` : i === points.length - 1 ? `${iconeDrapeau('fin')} Fin` : `${i + 1}`);
+    // 0.137.0 : ligne touchée sur le plan : fiche (nom, longueur) et « Implanter » avant le guidage.
+    const fiche = imp.ligneAValider && imp.ligne
+      ? `<div class="choix-implantation fiche-ligne">
+          <p class="coordonnees-choix"><strong>${echapper(imp.ligne.nom)}</strong> <span class="aide">· long. ${formaterNombre(imp.ligne.longueur)} m</span></p>
+          <div class="ligne-outils">
+            <button type="button" class="bouton bouton-implanter" data-action="implanterLigneChoisie">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></svg>Implanter</button>
+            <button type="button" class="bouton-lien bouton-lien-neutre" data-action="changerLigne">en toucher une autre</button>
+          </div>
+        </div>`
+      : '';
+    if (fiche) return `${fiche}${lienExport()}`;
     return `
       <div class="points-ligne">
         <p class="titre-choix">Points de la ligne</p>
@@ -1436,7 +1448,7 @@ export function creerEcranLeve(conteneur, actions) {
     const { implantation } = donnees.controle;
     const autocontrole = donnees.mode === 'autocontrole';
     const enGuidage = (autocontrole && Boolean(donnees.autocontrole.cible)) || (donnees.mode === 'controler'
-      && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (['ligne', 'talus'].includes(implantation) && Boolean(donnees.implanter.ligne))));
+      && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (['ligne', 'talus'].includes(implantation) && Boolean(donnees.implanter.ligne) && !donnees.implanter.ligneAValider)));
     document.body.classList.toggle('vue-implantation', enGuidage);
     // 0.123 : Implanter › Surface / Altitude : la règle de hauteur est fixée à droite, sur toute la hauteur sous le plan.
     document.body.classList.toggle('regle-sous-plan', donnees.mode === 'controler' && !enGuidage && ['surface', 'altitude'].includes(implantation));

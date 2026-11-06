@@ -204,7 +204,8 @@ terrain.lame = { machine: 'grader', ...terrain.lame };
 // Talus : la ligne est implanter.ligne, ses réglages terrain.talus ; talusId : talus de « Mes talus »
 // ouvert (ses changements y sont gardés), ou null.
 // voirLigne (0.118.0) : case « Voir toute la ligne » du plan, décochée au départ et pour chaque nouvelle ligne.
-const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null, talusId: null, voirLigne: false };
+// ligneAValider (0.137.0) : ligne touchée sur le plan, montrée en fiche, pas encore implantée (bouton « Implanter »).
+const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null, ligneAValider: false, talusId: null, voirLigne: false };
 // Mode Contrôler (autocontrôle) : point de contrôle vers lequel on guide ({ id, nom, est, nord, altitude }) ou null.
 const autocontrole = { cible: null };
 const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
@@ -1397,12 +1398,19 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         if (points.length < 2) return;
         const nom = (p, i) => p.nom ?? `P${i + 1}`;
         implanter.ligne = nouvelleLigneAImplanter(`${nom(points[0], 0)} → ${nom(points.at(-1), points.length - 1)}`, points, null);
+        implanter.ligneAValider = false;
         implanter.talusId = null;
         implanter.pointsLigne = [];
         montrerImplantation();
       },
+      // Fiche de la ligne touchée (0.137.0) : « Implanter » lance le guidage, « en toucher une autre » l'oublie.
+      implanterLigneChoisie: () => {
+        implanter.ligneAValider = false;
+        montrerImplantation();
+      },
       changerLigne: () => {
         implanter.ligne = null;
+        implanter.ligneAValider = false;
         implanter.voirLigne = false;
         implanter.talusId = null;
         montrerImplantation();
@@ -1528,7 +1536,8 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         if (!implanter.choix || lue === undefined) return;
         const { est, nord } = implanter.choix;
         implanter.cible = { id: null, nom: nom.trim() || nomProposeImplantation(), est, nord, altitude: lue };
-        implanter.choix = null;
+        // Le choix reste (« + À implanter », « + Point du projet » sous la cible pendant le guidage).
+        implanter.choix = { ...implanter.choix, nom: implanter.cible.nom, altitude: lue };
         montrerImplantation();
       },
       creerPointAImplanter: ({ nom, altitude }) => {
@@ -1844,7 +1853,9 @@ function envoyerImplantationAuPlan() {
   const avecPilote = piloteActif();
   plan.palirAutour(ongletContexte === 'terrain' ? travailAGarder() : null);
   // Case « Voir toute la ligne » (0.118.0) : seulement pendant le guidage d'une ligne (pas d'un talus).
-  const guidageLigne = ongletContexte === 'terrain' && enImplantationDeLigne() && !enTalus() && Boolean(implanter.ligne);
+  const guidageLigne = ongletContexte === 'terrain' && enImplantationDeLigne() && !enTalus() && Boolean(implanter.ligne) && !implanter.ligneAValider;
+  // 0.137.0 : point ou ligne choisi mais pas encore « Implanter » : le plan reste où il est (pas de retour du suivi).
+  plan.suspendreSuivi(ongletContexte === 'terrain' && ((enImplantationDePoint() && Boolean(implanter.choix) && !implanter.cible) || (enImplantationDeLigne() && Boolean(implanter.ligne) && implanter.ligneAValider)));
   if (!guidageLigne) implanter.voirLigne = false;
   plan.voirLigne({ visible: guidageLigne, sommets: guidageLigne && implanter.voirLigne ? implanter.ligne.sommets : null });
   plan.afficherImplantation(accrocheActive || avecPilote || choixCotes || aImplanter.length > 0 || implantes.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0 || talusSurfaces.length > 0
@@ -2604,6 +2615,7 @@ function ouvrirTalusSurface(valeur) {
   const mm = (x) => Math.round(x * 1000) / 1000;
   const sommets = troncon.sommets.map((p) => ({ est: mm(p.est), nord: mm(p.nord), altitude: p.altitude != null ? mm(p.altitude) : null, ...(p.nom ? { nom: p.nom } : {}) }));
   implanter.ligne = nouvelleLigneAImplanter(`${surface.nom} · ${texteCotes(troncon.cotes)}`, sommets, null);
+  implanter.ligneAValider = false;
   implanter.pointsLigne = [];
   implanter.talusId = null;
   terrain.talus = { ...terrain.talus, horizontal: reglage.horizontal, vertical: reglage.vertical, ligneEst, cote: 'droite', longueur: reglage.longueur ?? null, terrainId: surface.terrainId ?? null, altitudeSurfaceId: null };
@@ -3465,6 +3477,7 @@ function toucherPourLigne(position, tolerance) {
     const cote = coteSousLeDoigt(position, tolerance, dessinsVisibles().flatMap((d) => cotesDuDessin(d, projet.dessins)));
     if (cote) {
       implanter.ligne = nouvelleLigneAImplanter(cote.nom, cote.sommets.map(mm), null);
+      implanter.ligneAValider = true;
       implanter.talusId = null;
       implanter.pointsLigne = [];
       montrerImplantation();
@@ -3475,6 +3488,7 @@ function toucherPourLigne(position, tolerance) {
     const deLeve = accrocherTrait(position, tolerance, lignesLeves);
     if (deLeve) {
       implanter.ligne = nouvelleLigneAImplanter(deLeve.ligne.nom, deLeve.sommets.map(mm), deLeve.segment);
+      implanter.ligneAValider = true;
       implanter.talusId = null;
       implanter.pointsLigne = [];
       montrerImplantation();
@@ -3488,6 +3502,7 @@ function toucherPourLigne(position, tolerance) {
     const sommets = trouve.sommets.map(mm);
     const nombre = sommets.length - 1;
     implanter.ligne = nouvelleLigneAImplanter(`Ligne DXF (${nombre} segment${nombre > 1 ? 's' : ''})`, sommets, trouve.segment);
+    implanter.ligneAValider = true;
     implanter.talusId = null;
     implanter.pointsLigne = [];
   } else {
@@ -3583,13 +3598,13 @@ function toucherPourImplantation(position, tolerance) {
 }
 
 /**
- * Point choisi (touché sur le plan, pris dans la « Liste » ou tapé) : le guidage commence tout de suite
- * (0.114.0, plus de bouton « Implanter » à toucher en plus). Le choix est gardé : « + À implanter » et
- * « + Point du projet » restent sous la cible ; l'altitude se change dans le champ H du guidage.
+ * Point choisi (touché sur le plan, pris dans la « Liste » ou tapé) : 0.137.0 (demande du 05.11) : il est
+ * montré dans une fiche (nom, altitude) avec le bouton « Implanter » ; le guidage commence seulement
+ * après ce bouton (implanterChoix), et le plan reste où il est pour voir ce qu'on a touché.
  */
 function guiderVersChoix(choix) {
   implanter.choix = choix;
-  implanter.cible = { id: null, nom: choix.nom || nomProposeImplantation(), est: choix.est, nord: choix.nord, altitude: choix.altitude ?? null };
+  implanter.cible = null;
 }
 
 // --- Recalage d'un plan DXF (Projet › Imports › Recaler ; calculs dans topo/recalage.js) ---
@@ -4730,6 +4745,7 @@ function donneesCommunes() {
       accrocheLigne: terrain.accrocheLigne,
       pointsLigne: implanter.pointsLigne,
       ligne: implanter.ligne ? resumeLigne() : null,
+      ligneAValider: Boolean(implanter.ligne) && implanter.ligneAValider,
       // Talus : réglages, talus de « Mes talus » ouvert (nom) et la liste.
       talus: {
         reglages: terrain.talus,
@@ -4917,8 +4933,8 @@ if (recepteurDisponible()) {
     let implantation = enPoint ? calculerImplantation(etat, orientation) : null;
     if (enAutocontrole() && autocontrole.cible) implantation = calculerImplantation(etat, orientation, autocontrole.cible);
     const talus = enTalus();
-    const implantationLigne = enLigne && !talus ? calculerImplantationLigne(etat, orientation) : null;
-    const implantationTalus = talus ? calculerImplantationTalus(etat) : null;
+    const implantationLigne = enLigne && !talus && !implanter.ligneAValider ? calculerImplantationLigne(etat, orientation) : null;
+    const implantationTalus = talus && !implanter.ligneAValider ? calculerImplantationTalus(etat) : null;
     ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation, implantationLigne, implantationTalus });
     montrerLame();
     mettreAJourBip(controle);
@@ -6271,6 +6287,7 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   implanter.cible = null;
   implanter.pointsLigne = [];
   implanter.ligne = null;
+  implanter.ligneAValider = false;
   implanter.talusId = null;
   autocontrole.cible = null;
   dernierImport = null;

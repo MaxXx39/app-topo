@@ -1671,13 +1671,16 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   let retourSuivi = null;
   let retourSuiviActif = false;
   let dernierToucher = 0;
+  // 0.137.0 : un point ou une ligne choisi en Implanter, pas encore validé : le suivi est arrêté et ne
+  // revient pas tout seul (on voit ce qu'on a touché) ; « Implanter » le rend tout de suite.
+  let suiviSuspendu = false;
   function armerRetourSuivi() {
     if (suivi !== 'libre') retourSuivi = { mode: suivi, depuis: position ? { est: position.est, nord: position.nord } : null };
     dernierToucher = performance.now();
   }
   /** Vrai si le suivi a été repris (le plan est alors redessiné). */
   function reprendreSuiviSiBesoin() {
-    if (!retourSuivi || !retourSuiviActif || suivi !== 'libre' || !position || pointeurs.size > 0 || ligneVue) return false;
+    if (suiviSuspendu || !retourSuivi || !retourSuiviActif || suivi !== 'libre' || !position || pointeurs.size > 0 || ligneVue) return false;
     const attente = performance.now() - dernierToucher >= DELAI_RETOUR_SUIVI;
     const depuis = retourSuivi.depuis;
     const parti = depuis && Math.hypot(position.est - depuis.est, position.nord - depuis.nord) >= DISTANCE_RETOUR_SUIVI;
@@ -2282,14 +2285,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       position = nouvellePosition;
       boutonPosition.hidden = !position;
       // Cap automatique (0.119.0) : GNSS prêt → devant du GNSS en haut ; plus prêt → comme avant.
-      const decision = decisionCapAuto(capAuto, { pret: Boolean(position?.prete) && !position?.tablette, suivi, occupe: Boolean(ligneVue) });
+      const decision = decisionCapAuto(capAuto, { pret: Boolean(position?.prete) && !position?.tablette, suivi, occupe: Boolean(ligneVue) || suiviSuspendu });
       if (decision === 'cap') {
         changerSuivi('cap');
         if (position.azimut != null && vue) {
           tournerVers(position.azimut);
           return;
         }
-      } else if (decision?.revenir) {
+      } else if (decision?.revenir && !suiviSuspendu) {
         changerSuivi(decision.revenir);
         if (vue) vue = { ...vue, rotation: 0 };
         if (position && decision.revenir !== 'libre') centrerSurPosition();
@@ -2400,6 +2403,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
      * Retour automatique du suivi (0.126.0) : allumé dans l'onglet Terrain, éteint ailleurs. En le
      * rallumant, un suivi arrêté ailleurs (cadrage de Calculs) reprend à la prochaine position.
      */
+    /** Choix en attente (0.137.0) : vrai = le plan ne suit plus la position ; faux = le suivi d'avant revient tout de suite. */
+    suspendreSuivi(oui) {
+      if (oui === suiviSuspendu) return;
+      if (oui) {
+        if (suivi !== 'libre') arreterSuivi();
+        suiviSuspendu = true;
+        return;
+      }
+      suiviSuspendu = false;
+      dernierToucher = 0;
+    },
     retourAutomatiqueDuSuivi(actif) {
       if (actif && !retourSuiviActif) dernierToucher = 0;
       retourSuiviActif = Boolean(actif);
