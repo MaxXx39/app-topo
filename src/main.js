@@ -65,6 +65,7 @@ import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
 import { pointAvecDelta, deltaActif } from './topo/delta.js';
+import { ligneDecalee, rangerLigneDecalee } from './topo/ligne-decalee.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { surChangementListes } from './reglages/listes-partagees.js';
 import { lireDossiers, ecrireDossiers, dossiersTries, dossierDuProjet, ajouterDossier, renommerDossier, supprimerDossier, rangerProjet, SANS_DOSSIER } from './projet/dossiers.js';
@@ -155,7 +156,7 @@ const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 const leveDirect = { stockId: null, role: 'contour' };
 // Delta du prochain point levé (0.139.0, Intermédiaire) : sens 'gauche' / 'droite' (selon le cap du GNSS),
 // distance et Z tapés (texte) ; remis à zéro après chaque point enregistré (un seul point à la fois).
-const deltaLeve = { sens: 'droite', distance: '', z: '' };
+const deltaLeve = { sens: 'droite', distance: '', z: '', ouvert: false }; // ouvert : ligne de réglage montrée (bouton « Δ Delta »)
 // Dernier cap du GNSS calculé (degrés), pour décaler le point au moment de l'enregistrer.
 let dernierAzimut = null;
 
@@ -1259,9 +1260,11 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       reglerDelta: (champ, valeur, redessiner = true) => {
         if (champ === 'sens') deltaLeve.sens = valeur === 'gauche' ? 'gauche' : 'droite';
         else if (champ === 'distance' || champ === 'z') deltaLeve[champ] = String(valeur ?? '');
+        else if (champ === 'ouvrir') deltaLeve.ouvert = !deltaLeve.ouvert;
         else if (champ === 'effacer') {
           deltaLeve.distance = '';
           deltaLeve.z = '';
+          deltaLeve.ouvert = false;
         }
         if (redessiner) ecranLeve?.afficher(donneesLeve());
       },
@@ -1297,6 +1300,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           gnss = { ...gnss, delta: { ...delta, azimut: dernierAzimut != null ? Math.round(dernierAzimut * 10) / 10 : null } };
           deltaLeve.distance = '';
           deltaLeve.z = '';
+          deltaLeve.ouvert = false;
         }
         const point = { est, nord, altitude, gnss: { ...gnss, prisLe: new Date().toISOString() } };
         if (recollement) {
@@ -1453,6 +1457,42 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       implanterLigneChoisie: () => {
         implanter.ligneAValider = false;
         montrerImplantation();
+      },
+      // Décaler la ligne choisie (0.141.0, Intermédiaire) : copie décalée (gauche / droite selon le sens
+      // de la ligne, Z ±) rangée dans « LV-Lignes décalées » ; elle devient la ligne choisie.
+      decalerLigneChoisie: async () => {
+        if (!implanter.ligne || !aAcces('intermediaire') || refuserEnLectureSeule()) return;
+        const valeurs = await demanderChamps({
+          titre: `Décaler ${implanter.ligne.nom}`,
+          champs: [
+            { cle: 'sens', titre: 'Côté (en regardant vers la fin)', choix: [['droite', 'Droite ▶'], ['gauche', '◀ Gauche']], valeur: 'droite' },
+            { cle: 'distance', titre: 'Distance (m)', exemple: '1.500' },
+            { cle: 'z', titre: 'Z ± (m)', exemple: '0.000' },
+          ],
+        });
+        if (!valeurs) return;
+        const lire = (texte) => (String(texte ?? '').trim() === '' ? 0 : Number(String(texte).replace(',', '.')));
+        const distance = lire(valeurs.distance);
+        const dz = lire(valeurs.z);
+        if (!Number.isFinite(distance) || !Number.isFinite(dz)) {
+          alert('Distance ou Z mal tapé : un nombre avec un point, par exemple 1.500.');
+          return;
+        }
+        if (distance === 0 && dz === 0) {
+          afficherMessage('Rien à décaler (distance et Z à 0)', 3000);
+          return;
+        }
+        const decalee = ligneDecalee(implanter.ligne.sommets, valeurs.sens === 'gauche' ? -Math.abs(distance) : Math.abs(distance), dz);
+        const resultat = rangerLigneDecalee(projet, decalee, nomsDuProjet(projet));
+        if (resultat.erreur) {
+          alert(`Ligne non créée : ${resultat.erreur}.`);
+          return;
+        }
+        const sommets = resultat.points.map((p) => ({ ...p }));
+        implanter.ligne = nouvelleLigneAImplanter(`${resultat.points[0].nom.replace(/-1$/, '')} (${resultat.ligne.noms.length} pts)`, decalee.fermee ? [...sommets, { ...sommets[0] }] : sommets, null);
+        implanter.ligneAValider = true;
+        afficherMessage(`Ligne décalée créée dans « ${resultat.levee.nom} »`, 3000);
+        modifie();
       },
       changerLigne: () => {
         implanter.ligne = null;

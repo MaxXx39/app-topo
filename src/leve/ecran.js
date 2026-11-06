@@ -642,6 +642,7 @@ export function creerEcranLeve(conteneur, actions) {
           <div class="ligne-outils">
             <button type="button" class="bouton bouton-implanter" data-action="implanterLigneChoisie">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></svg>Implanter</button>
+            <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="decalerLigneChoisie" title="Créer une copie décalée de cette ligne">Décaler…</button>
             <button type="button" class="bouton-lien bouton-lien-neutre" data-action="changerLigne">en toucher une autre</button>
           </div>
         </div>`
@@ -1051,6 +1052,10 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function ligneDelta() {
     const d = donnees.delta ?? { sens: 'droite', distance: '', z: '' };
+    // 0.141.0 : la ligne de réglage n'est montrée qu'après le bouton « Δ Delta » (ou si un delta est tapé).
+    if (!d.ouvert && !d.actif) {
+      return '<button type="button" class="bouton-secondaire bouton-ouvrir-delta seulement-intermediaire" data-action="reglerDelta" data-champ-delta="ouvrir" title="Décaler le prochain point">Δ Delta</button>';
+    }
     const sens = (cle, mot) => `<button type="button" class="bouton-sens-delta ${d.sens === cle ? 'actif' : ''}" data-action="reglerDelta" data-champ-delta="sens" data-valeur="${cle}" aria-pressed="${d.sens === cle}">${mot}</button>`;
     return `<div class="ligne-delta seulement-intermediaire ${d.actif ? 'actif' : ''}">
         <span class="titre-delta" title="Décaler le prochain point">Δ</span>

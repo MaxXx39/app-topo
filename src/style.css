@@ -10927,3 +10927,5 @@ body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 1
 /* 0.140.0 : appareil photo de tout le levé dans le bandeau « Lever en cours ». */
 .levee-en-cours .bouton-photo-globale { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; min-width: 40px; }
 .levee-en-cours .bouton-photo-globale svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
+/* 0.141.0 : bouton qui montre la ligne du delta. */
+.bouton-ouvrir-delta { margin: 4px 0; color: #9a3412; border-color: #ea580c; font-weight: 800; min-height: 40px; }
