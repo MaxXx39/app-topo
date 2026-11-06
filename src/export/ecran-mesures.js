@@ -35,7 +35,7 @@ export function creerEcranExportMesures(conteneur, { obtenirGroupes, obtenirDonn
   conteneur.innerHTML = `
     <details class="export-repliable">
     <summary>${titreSection('exporter', 'Exporter les mesures', bulle('exporterMesures'))}</summary>
-    <div class="seulement-expert">
+    <div>
       <p class="titre-choix titre-etape">Lesquels ?</p>
       <div data-zone="choix"></div>
     </div>

@@ -10942,3 +10942,17 @@ body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 1
 /* 0.144.0 : une seule coupe, bascule et ⚙ au-dessus. */
 .choix-coupe { display: flex; align-items: center; gap: 8px; }
 .choix-coupe .bouton-roue { margin-left: auto; }
+
+/* 0.146.0 : Exporter simplifié (tuiles Plan / Points / Contrôles / Autres, options repliées). */
+.tuiles-export { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tuile-export { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 64px; border: 2px solid #cbd5e1; border-radius: 14px; background: var(--surface, #fff); color: var(--encre); font-size: 1rem; padding: 6px; }
+.tuile-export small { font-size: 0.72rem; color: #64748b; font-weight: 600; }
+.tuile-export.actif { background: #1e293b; border-color: #1e293b; color: #fff; }
+.tuile-export.actif small { color: #cbd5e1; }
+.autres-export { margin-top: 8px; }
+.options-export { background: var(--surface-2, #f1f5f9); border-radius: 12px; padding: 8px 12px; margin: 10px 0; }
+.options-export > summary { cursor: pointer; display: flex; justify-content: space-between; gap: 8px; font-size: 0.92rem; list-style: none; }
+.options-export > summary::-webkit-details-marker { display: none; }
+.lien-modifier { color: #0f766e; font-weight: 700; text-decoration: underline; white-space: nowrap; }
+body.mode-telephone .tuiles-export { grid-template-columns: repeat(2, 1fr); }
+.autres-export[hidden], .options-export[hidden] { display: none; }

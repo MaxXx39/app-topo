@@ -48,7 +48,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
 
   conteneur.innerHTML = `
     ${titreSection('exporter', 'Exporter', bulle('exporter'))}
-    <div class="seulement-expert">
+    <div>
       <p class="titre-choix titre-etape">Lesquels ?</p>
       <div data-zone="choix"></div>
     </div>
@@ -56,7 +56,8 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     <div class="choix-format-export" role="radiogroup" aria-label="Format">
       ${FORMATS.map(([cle, titre, niveau]) => `<button type="button" class="puce-choix ${niveau ? `seulement-${niveau}` : ''}" data-format="${cle}">${titre}</button>`).join('')}
     </div>
-    <p class="titre-choix titre-etape" data-pour="pdf dxf landxml">Options</p>
+    <details class="options-export" data-pour="pdf dxf landxml">
+    <summary><span data-zone="resume-options"></span> <span class="lien-modifier">modifier ▾</span></summary>
     <div class="champs-export" data-pour="pdf">
       <label>Échelle du plan (PDF)
         <select data-champ="echelle">
@@ -98,10 +99,17 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
         </label>
       </div>
     </div>
+    </details>
     <button type="button" class="bouton bouton-exporter" data-action="exporter">Exporter</button>
     <p class="aide" data-zone="message"></p>
   `;
   const choix = brancherChoixExport(conteneur.querySelector('[data-zone="choix"]'), obtenirGroupes);
+  // 0.146.0 : réglages retenus sur l'appareil (format, échelle, cases, couleurs, palier, options DXF / LandXML).
+  remettreReglages(conteneur);
+  conteneur.addEventListener('change', () => {
+    retenirReglages(conteneur, format);
+    resumer();
+  });
   // Ce qui est exporté : seulement ce qui est coché dans « Quoi exporter ? ».
   const obtenirDonnees = () => donneesChoisies(choix.selection());
   const champ = (nom) => conteneur.querySelector(`[data-champ="${nom}"]`);
@@ -199,8 +207,23 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     },
   };
   // Format choisi (0.114.0) : ses options seulement, puis le gros bouton « Exporter ».
-  let format = 'pdf';
+  let format = FORMATS.some(([cle]) => cle === reglagesRetenus().format) ? reglagesRetenus().format : 'pdf';
+  /** Résumé des options en une ligne (0.146.0), les cases restent repliées sous « modifier ». */
+  function resumer() {
+    const zone = conteneur.querySelector('[data-zone="resume-options"]');
+    if (!zone) return;
+    let texte = '';
+    if (format === 'pdf') {
+      const echelle = champ('echelle').value;
+      const cases = CALQUES.filter(([cle]) => conteneur.querySelector(`[data-calque="${cle}"]`)?.checked).map(([, titre]) => titre.toLowerCase());
+      const couleurs = COULEURS.find(([cle]) => conteneur.querySelector(`[data-couleurs="${cle}"]`)?.checked)?.[1] ?? '';
+      texte = [echelle === 'auto' ? 'A4 auto' : `1:${echelle}`, cases.join(', ') || 'sans options', `couleurs : ${couleurs.toLowerCase()}`].join(' · ');
+    } else if (format === 'dxf') texte = champ('geotiff').checked ? 'avec la photo aérienne (GeoTIFF)' : 'sans photo aérienne';
+    else if (format === 'landxml') texte = champ('landxml-contour').checked ? 'avec contour et lignes de rupture' : 'triangles seulement';
+    zone.textContent = texte;
+  }
   function montrerFormat() {
+    resumer();
     for (const puce of conteneur.querySelectorAll('[data-format]')) puce.classList.toggle('actif', puce.dataset.format === format);
     for (const bloc of conteneur.querySelectorAll('[data-pour]')) bloc.hidden = !bloc.dataset.pour.split(' ').includes(format);
     conteneur.querySelector('[data-action="exporter"]').textContent = `Exporter en ${FORMATS.find(([cle]) => cle === format)[1]}`;
@@ -209,6 +232,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     const puce = evenement.target.closest('button[data-format]');
     if (puce) {
       format = puce.dataset.format;
+      retenirReglages(conteneur, format);
       montrerFormat();
       return;
     }
@@ -263,6 +287,43 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
 }
 
 /** '2026-05-20' -> '20.05.2026' */
+const CLE_REGLAGES = 'topo-export-plan';
+
+/** Réglages d'export retenus sur l'appareil (0.146.0) : {} si rien ou mémoire indisponible. */
+function reglagesRetenus() {
+  try {
+    return JSON.parse(localStorage.getItem(CLE_REGLAGES) ?? '{}') ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/** Retient le format et toutes les cases / listes du formulaire (sauf le cartouche, retenu à part). */
+function retenirReglages(conteneur, format) {
+  const champs = {};
+  for (const element of conteneur.querySelectorAll('[data-calque], [data-couleurs], select[data-champ], input[data-champ]')) {
+    const cle = element.dataset.calque ? `calque:${element.dataset.calque}` : element.dataset.couleurs ? `couleurs:${element.dataset.couleurs}` : `champ:${element.dataset.champ}`;
+    champs[cle] = element.type === 'checkbox' || element.type === 'radio' ? element.checked : element.value;
+  }
+  try {
+    localStorage.setItem(CLE_REGLAGES, JSON.stringify({ format, champs }));
+  } catch {
+    // Mémoire indisponible : les réglages reviendront simplement au départ.
+  }
+}
+
+/** Remet les réglages retenus dans le formulaire. */
+function remettreReglages(conteneur) {
+  const { champs } = reglagesRetenus();
+  if (!champs) return;
+  for (const element of conteneur.querySelectorAll('[data-calque], [data-couleurs], select[data-champ], input[data-champ]')) {
+    const cle = element.dataset.calque ? `calque:${element.dataset.calque}` : element.dataset.couleurs ? `couleurs:${element.dataset.couleurs}` : `champ:${element.dataset.champ}`;
+    if (!(cle in champs)) continue;
+    if (element.type === 'checkbox' || element.type === 'radio') element.checked = Boolean(champs[cle]);
+    else if (element.tagName === 'SELECT' ? [...element.options].some((o) => o.value === champs[cle]) : true) element.value = champs[cle];
+  }
+}
+
 export function dateSuisse(iso) {
   const [annee, mois, jour] = iso.split('-');
   return annee && mois && jour ? `${jour}.${mois}.${annee}` : '';
