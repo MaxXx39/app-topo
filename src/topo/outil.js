@@ -36,23 +36,30 @@ export function axesOutil({ cap, inclinaison = 0, directionInclinaison = 0 }) {
 /**
  * Points de l'outil. position : { est, nord, altitude } (bas du mât) ; orientation : { cap,
  * inclinaison, directionInclinaison } (°) ; dimensions : { gauche, droite, avant, arriere } (m, ≥ 0).
- * Renvoie { gauche, droite, centre (milieu de l'outil : bouts gauche et droit et centre à mi-longueur),
- * coins: [avant-gauche, avant-droite, arrière-droite, arrière-gauche] } en MN95, ou null.
+ * dimensions.axe (0.151.0, facultatif) : place de l'axe gauche – droite, en m depuis le GNSS (+ devant).
+ * Renvoie { gauche, droite, centre (bouts gauche et droit et centre, sur l'axe gauche – droite),
+ * avant, arriere (bouts au milieu de la largeur), coins: [avant-gauche, avant-droite, arrière-droite,
+ * arrière-gauche] } en MN95, ou null.
  */
 export function pointsOutil(position, orientation, dimensions) {
   const axes = axesOutil(orientation);
   if (!axes || !position) return null;
-  const { gauche = 0, droite = 0, avant = 0, arriere = 0 } = dimensions;
+  const { gauche = 0, droite = 0, avant = 0, arriere = 0, axe = null } = dimensions;
   const point = (a, b) => ({
     est: mm(position.est + a * axes.f.e + b * axes.r.e),
     nord: mm(position.nord + a * axes.f.n + b * axes.r.n),
     altitude: position.altitude == null ? null : mm(position.altitude + a * axes.f.z + b * axes.r.z),
   });
-  const milieu = (avant - arriere) / 2;
+  // Axe gauche – droite (0.151.0) : à "axe" m du GNSS (− derrière, + devant) ; sinon à mi-longueur.
+  const milieu = Number.isFinite(axe) ? axe : (avant - arriere) / 2;
+  const lateral = (droite - gauche) / 2; // axe avant – arrière : au milieu de la largeur de l'outil
   return {
     gauche: point(milieu, -gauche),
     droite: point(milieu, droite),
-    centre: point(milieu, (droite - gauche) / 2),
+    centre: point(milieu, lateral),
+    // Bouts avant et arrière de l'outil, au milieu de sa largeur (coupe Arr – Av, 0.151.0).
+    avant: point(avant, lateral),
+    arriere: point(-arriere, lateral),
     coins: [point(avant, -gauche), point(avant, droite), point(-arriere, droite), point(-arriere, -gauche)],
   };
 }

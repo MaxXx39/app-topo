@@ -39,7 +39,7 @@ import { creerModuleExport } from './export/module.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface } from './topo/coupe.js';
-import { guidageLame, ligneDeCoupeLame, TOLERANCES_LAME, pointDeProfil, tronconsProfil, bordsDeLaLame, sensCoupeLame, COUPE_DEVANT, COUPE_DERRIERE } from './topo/lame.js';
+import { guidageLame, TOLERANCES_LAME, pointDeProfil, bordsDeLaLame, sensCoupeLame, pointsGuidageLame, coupeEntre } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -225,6 +225,9 @@ terrain.lame = { machine: 'grader', ...terrain.lame };
 // depuis le bas du mât jusqu'aux bords de chaque outil (m).
 terrain.lame.recepteursBull = terrain.lame.recepteursBull === 1 ? 1 : 2;
 terrain.lame.outils = { rateau: { gauche: 0, droite: 0, avant: 0, arriere: 0 }, bull: { gauche: 0, droite: 0, avant: 0, arriere: 0 }, ...(terrain.lame.outils ?? {}) };
+// 0.151.0 : coupe Arr – Av des lames (Grader, Bull) : 1 m devant et 1 m derrière au départ.
+terrain.lame.outils.grader ??= { avant: 1, arriere: 1, axe: 0 };
+if (!(terrain.lame.outils.bull.avant > 0) && !(terrain.lame.outils.bull.arriere > 0)) terrain.lame.outils.bull = { ...terrain.lame.outils.bull, avant: 1, arriere: 1 };
 
 /** Vrai si la machine choisie est guidée par un seul GNSS (râteau, ou Bull réglé sur 1 GNSS). */
 function outilAUnGnss() {
@@ -1421,10 +1424,24 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         recalculer();
       },
       // Distances de l'outil à 1 GNSS (m, depuis le bas du mât) : gauche, droite, avant, arrière.
+      // 0.151.0 : aussi l'axe G – D (m depuis le GNSS, − derrière) et la machine Grader.
       reglerOutil: (champ, texte) => {
-        const machine = terrain.lame.machine === 'rateau' ? 'rateau' : 'bull';
-        if (!['gauche', 'droite', 'avant', 'arriere'].includes(champ)) return;
-        const valeur = String(texte ?? '').trim() === '' ? 0 : lireNombreTape(texte);
+        const machine = ['bull', 'rateau'].includes(terrain.lame.machine) ? terrain.lame.machine : 'grader';
+        if (!['gauche', 'droite', 'avant', 'arriere', 'axe'].includes(champ)) return;
+        const vide = String(texte ?? '').trim() === '';
+        if (champ === 'axe') {
+          const axe = vide ? (machine === 'rateau' ? null : 0) : lireNombreTape(texte);
+          if (axe !== null && (!Number.isFinite(axe) || Math.abs(axe) > 30)) {
+            afficherMessage('Axe illisible : un nombre de mètres entre −30 et 30 (− derrière, + devant), par exemple 0.500', 4000);
+            recalculer();
+            return;
+          }
+          terrain.lame.outils[machine] = { ...terrain.lame.outils[machine], axe };
+          retenirReglagesTerrain();
+          recalculer();
+          return;
+        }
+        const valeur = vide ? 0 : lireNombreTape(texte);
         if (valeur == null || !Number.isFinite(valeur) || valeur < 0 || valeur > 30) {
           afficherMessage('Distance illisible : un nombre de mètres entre 0 et 30, par exemple 1.250', 4000);
           recalculer();
@@ -3101,47 +3118,41 @@ function raisonRecepteurLame(etat, nom) {
 }
 
 /**
- * Guidage de la lame avec les 2 derniers états reçus : { raison (texte ou null), guidage, coupe,
- * coins: { gauche, droite } (positions, pour le plan) }, ou null hors du mode Lame.
+ * Guidage de la lame avec les 2 derniers états reçus : { raison (texte ou null), guidage (axe G – D),
+ * long (axe Arr – Av), coupe (G – D), coupeLong (Arr – Av), coins: { gauche, droite } (pour le plan) },
+ * ou null hors du mode Lame.
  */
 function calculerLame() {
   if (!ecranLeve || terrain.mode !== 'lame' || !lameActive()) return null;
   if (outilAUnGnss()) return calculerOutilUnGnss();
   const [etatG, etatD] = terrain.lame.inverse ? [etatRecepteur2, etatRecepteur] : [etatRecepteur, etatRecepteur2];
   const [nomG, nomD] = terrain.lame.inverse ? ['Gauche (récepteur 2)', 'Droite (récepteur 1)'] : ['Gauche (récepteur 1)', 'Droite (récepteur 2)'];
-  const coins = etatG?.position && etatD?.position ? { gauche: etatG.position, droite: etatD.position } : null;
+  const lame = etatG?.position && etatD?.position ? { gauche: etatG.position, droite: etatD.position } : null;
   const surface = projet.surfaces.find((s) => s.id === terrain.lame.surfaceId);
   const triangles = surface ? trianglesDeSurface(surface.id) : [];
   const raison = (!surface && 'Choisis le levé à suivre')
     || (triangles.length === 0 && 'Ce levé n\'a pas encore de triangles')
     || raisonRecepteurLame(etatG, nomG)
     || raisonRecepteurLame(etatD, nomD);
-  const recepteurs = { gauche: etatG, droite: etatD };
-  if (raison) return { raison, guidage: null, coupe: null, coins, recepteurs };
-  if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
-  const guidage = guidageLame({ gauche: coins.gauche, droite: coins.droite, altitudeSurface: chercheurLame.chercher, tolerances: terrain.lame.tolerances });
-  if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coupe: null, coins, recepteurs };
-  const ligne = ligneDeCoupeLame(coins.gauche, coins.droite, 1);
-  const coupe = {
-    longueur: guidage.largeur + 2,
-    profils: profilSurface(triangles, ligne.debut, ligne.fin),
-    gauche: { distance: 1, altitude: coins.gauche.altitude },
-    droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
-  };
-  return { raison: null, guidage, coupe, coins, recepteurs, bords: bordsDeLaLame(coins.gauche, coins.droite, triangles), profil: coupePerpendiculaireLame(coins, triangles), toleranceVert: terrain.lame.tolerances.vert };
+  if (raison) return { raison, guidage: null, coins: lame };
+  // 0.151.0 : axe G – D à « axe » m de la lame, coupe Arr – Av au milieu (Bull : perpendiculaire à
+  // la lame ; Grader : sens de marche, perpendiculaire à la lame à l'arrêt).
+  const sens = sensAvantLame(lame);
+  if (!sens) return { raison: 'les deux récepteurs sont au même endroit', guidage: null, coins: lame };
+  const points = pointsGuidageLame(lame.gauche, lame.droite, sens, reglagesOutilLame());
+  return guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite });
 }
 
 /**
- * Outil à 1 GNSS (0.142.0) : râteau ou Bull à 1 récepteur. Les bouts gauche / droit (à mi-longueur de
- * l'outil) jouent le rôle des 2 GNSS du Bull ; mêmes écarts, dévers et coupes. Voir topo/outil.js.
+ * Outil à 1 GNSS (0.142.0) : râteau ou Bull à 1 récepteur. Les bouts gauche / droit (sur l'axe G – D)
+ * jouent le rôle des 2 GNSS du Bull ; mêmes écarts, dévers et coupes. Voir topo/outil.js.
  */
 function calculerOutilUnGnss() {
   const etat = etatRecepteur;
   const machine = terrain.lame.machine === 'rateau' ? 'rateau' : 'bull';
-  const dims = machine === 'bull' ? { ...terrain.lame.outils.bull, avant: 0, arriere: 0 } : terrain.lame.outils.rateau;
+  const dims = reglagesOutilLame();
   const surface = projet.surfaces.find((s) => s.id === terrain.lame.surfaceId);
   const triangles = surface ? trianglesDeSurface(surface.id) : [];
-  const recepteurs = { gauche: etat, droite: etat };
   const penche = (etat?.inclinaison ?? 0) > 0.2;
   const raison = (!surface && 'Choisis le levé à suivre')
     || (triangles.length === 0 && 'Ce levé n\'a pas encore de triangles')
@@ -3150,49 +3161,69 @@ function calculerOutilUnGnss() {
     || (etat.cap == null && 'GNSS : pas de cap reçu')
     || (penche && etat.directionInclinaison == null && 'GNSS : direction de l\'inclinaison pas reçue (mets l\'APK à jour)')
     || (!(dims.gauche + dims.droite > 0.1) && `Tape les distances de l'outil (⚙ : gauche, droite${machine === 'rateau' ? ', avant, arrière' : ''})`);
-  if (raison) return { raison, guidage: null, coupe: null, coins: null, recepteurs, unGnss: true };
+  if (raison) return { raison, guidage: null, coins: null, unGnss: true };
   const points = pointsOutil(etat.position, { cap: etat.cap, inclinaison: etat.inclinaison ?? 0, directionInclinaison: etat.directionInclinaison ?? 0 }, dims);
-  const coins = { gauche: points.gauche, droite: points.droite, contour: machine === 'rateau' ? points.coins : null };
-  if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
-  const guidage = guidageLame({ gauche: coins.gauche, droite: coins.droite, altitudeSurface: chercheurLame.chercher, tolerances: terrain.lame.tolerances });
-  if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coupe: null, coins, recepteurs, unGnss: true };
-  // Écart au centre de l'outil (même formule qu'un coin : altitude de la surface − altitude du point).
-  const surfaceCentre = chercheurLame.chercher(points.centre.est, points.centre.nord);
-  guidage.centre = { ecart: surfaceCentre == null ? null : surfaceCentre - points.centre.altitude };
-  const ligne = ligneDeCoupeLame(coins.gauche, coins.droite, 1);
-  const coupe = {
-    longueur: guidage.largeur + 2,
-    profils: profilSurface(triangles, ligne.debut, ligne.fin),
-    gauche: { distance: 1, altitude: coins.gauche.altitude },
-    droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
-  };
-  return { raison: null, guidage, coupe, coins, recepteurs, unGnss: true, bords: bordsDeLaLame(coins.gauche, coins.droite, triangles), profil: coupePerpendiculaireLame(coins, triangles), toleranceVert: terrain.lame.tolerances.vert };
+  const resultat = guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite, contour: machine === 'rateau' ? points.coins : null });
+  if (resultat.guidage) {
+    // Écart au centre de l'outil (même formule qu'un coin : altitude de la surface − altitude du point).
+    const surfaceCentre = chercheurLame.chercher(points.centre.est, points.centre.nord);
+    resultat.guidage.centre = { ecart: surfaceCentre == null ? null : surfaceCentre - points.centre.altitude };
+  }
+  return { ...resultat, unGnss: true };
 }
 
 /**
- * Coupe perpendiculaire de la lame (0.100.0, remplace le profil en long) : depuis le milieu de la
- * lame, 20 m devant et 10 m derrière ; Bull : perpendiculaire à la lame ; Grader : dans le sens de
- * marche (dernières positions du milieu), perpendiculaire à la lame à l'arrêt. Tronçons et ruptures
- * de pente de plus de 0.5 %.
+ * Réglages de l'outil de la machine choisie (m) : gauche, droite (outil à 1 GNSS), avant, arrière
+ * (longueur de la coupe Arr – Av depuis le GNSS) et axe (place de l'axe G – D, + devant ; râteau :
+ * mi-longueur s'il n'est pas tapé).
  */
-function coupePerpendiculaireLame(coins, triangles) {
-  const milieu = pointDeProfil(coins.gauche, coins.droite, 'milieu');
+function reglagesOutilLame() {
+  const machine = ['bull', 'rateau'].includes(terrain.lame.machine) ? terrain.lame.machine : 'grader';
+  const r = terrain.lame.outils[machine] ?? {};
+  const nombre = (v, defaut) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : defaut);
+  return {
+    gauche: nombre(r.gauche, 0),
+    droite: nombre(r.droite, 0),
+    avant: nombre(r.avant, 0),
+    arriere: nombre(r.arriere, 0),
+    axe: machine === 'rateau' ? (r.axe == null ? null : nombre(r.axe, null)) : nombre(r.axe, 0),
+  };
+}
+
+/**
+ * Écarts et coupes des 4 points guidés (0.151.0) : gauche, droite (axe G – D), arriere, avant
+ * (axe Arr – Av). coins : ce qui est montré sur le plan.
+ */
+function guidageDesPoints(points, triangles, coins) {
+  if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
+  const tolerances = terrain.lame.tolerances;
+  const guidage = guidageLame({ gauche: points.gauche, droite: points.droite, altitudeSurface: chercheurLame.chercher, tolerances });
+  if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coins };
+  // Arr – Av : mêmes calculs, l'arrière à gauche ; le « dévers » est alors la pente vers l'avant.
+  const long = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface: chercheurLame.chercher, tolerances });
+  return {
+    raison: null,
+    guidage,
+    long: long.erreur ? null : long,
+    coupe: coupeEntre(triangles, points.gauche, points.droite, 1),
+    coupeLong: long.erreur ? null : coupeEntre(triangles, points.arriere, points.avant, 1),
+    coins,
+    bords: bordsDeLaLame(points.gauche, points.droite, triangles),
+    toleranceVert: tolerances.vert,
+  };
+}
+
+/**
+ * Sens « vers l'avant » d'une lame à 2 GNSS : Bull = perpendiculaire à la lame ; Grader = sens de
+ * marche (dernières positions du milieu), perpendiculaire à la lame à l'arrêt.
+ */
+function sensAvantLame(lame) {
+  const milieu = pointDeProfil(lame.gauche, lame.droite, 'milieu');
   const maintenant = performance.now();
   historiqueLame.push({ est: milieu.est, nord: milieu.nord, temps: maintenant });
   while (historiqueLame.length > 0 && maintenant - historiqueLame[0].temps > 10_000) historiqueLame.shift();
   const azimut = directionDeMarche(historiqueLame, { distanceMin: 1, dureeMax: 5000 });
-  // Râteau : comme le Bull, coupe perpendiculaire à l'outil (dans son axe avant / arrière).
-  const sens = sensCoupeLame(terrain.lame.machine === 'rateau' ? 'bull' : terrain.lame.machine, coins.gauche, coins.droite, azimut);
-  if (!sens) return null;
-  const devant = COUPE_DEVANT;
-  const derriere = COUPE_DERRIERE;
-  const debut = { est: milieu.est - sens.est * derriere, nord: milieu.nord - sens.nord * derriere };
-  const fin = { est: milieu.est + sens.est * devant, nord: milieu.nord + sens.nord * devant };
-  // Distances comptées depuis la lame (négatives derrière).
-  const morceaux = profilSurface(triangles, debut, fin).map((m) => m.map((p) => ({ distance: p.distance - derriere, altitude: p.altitude })));
-  const { troncons, ruptures } = tronconsProfil(morceaux, 0.5);
-  const enMarche = terrain.lame.machine === 'grader' && azimut != null;
-  return { morceaux, troncons, ruptures, devant, derriere, altitude: milieu.altitude, source: enMarche ? 'marche' : 'lame' };
+  return sensCoupeLame(terrain.lame.machine, lame.gauche, lame.droite, azimut);
 }
 
 /** Écran Lame et lame sur le plan, avec les derniers états des 2 récepteurs. */
@@ -4935,7 +4966,7 @@ function donneesCommunes() {
       recepteur2: Boolean(etatRecepteur2?.connecte),
       recepteursBull: terrain.lame.recepteursBull,
       unGnss: outilAUnGnss(),
-      outil: terrain.lame.machine === 'rateau' ? terrain.lame.outils.rateau : terrain.lame.outils.bull,
+      outil: terrain.lame.outils[['bull', 'rateau'].includes(terrain.lame.machine) ? terrain.lame.machine : 'grader'],
     },
     autocontrole: donneesAutocontrole(),
     // Seulement les levés et surfaces qui ont des triangles (0.90.1 : pas les levés vides), plus la surface choisie.

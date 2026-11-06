@@ -1,6 +1,6 @@
 // Tests du guidage de lame à 2 RX2 (formules validées par l'utilisateur le 26.10.2026).
 import { describe, it, expect } from 'vitest';
-import { guidageLame, classeEcartLame, deversEntre, ligneDeCoupeLame, bordsDeLaLame } from '../src/topo/lame.js';
+import { guidageLame, classeEcartLame, deversEntre, ligneDeCoupeLame, bordsDeLaLame, pointsGuidageLame, coupeEntre } from '../src/topo/lame.js';
 
 // Surface plane qui monte de 2 % vers l'Est : altitude 450 en Est 2500000.
 const surface = (est) => 450 + 0.02 * (est - 2500000);
@@ -138,5 +138,41 @@ describe('sens de la coupe de la lame (0.100.0)', () => {
     expect(grader.est).toBeCloseTo(Math.SQRT1_2);
     expect(grader.nord).toBeCloseTo(Math.SQRT1_2);
     expect(sensCoupeLame('grader', gauche, droite, null).nord).toBeCloseTo(1);
+  });
+});
+
+describe('coupes G – D et Arr – Av (0.151.0)', () => {
+  const gauche = { est: 2500000, nord: 1100000, altitude: 450 };
+  const droite = { est: 2500004, nord: 1100000, altitude: 450.1 };
+  const nord = { est: 0, nord: 1 };
+
+  it('points guidés : axe décalé vers l\'avant, avant / arrière au milieu de la lame', () => {
+    const p = pointsGuidageLame(gauche, droite, nord, { axe: 1.5, avant: 2, arriere: 1 });
+    expect(p.gauche).toEqual({ est: 2500000, nord: 1100001.5, altitude: 450 });
+    expect(p.droite).toEqual({ est: 2500004, nord: 1100001.5, altitude: 450.1 });
+    expect(p.avant.est).toBeCloseTo(2500002, 9);
+    expect(p.avant.nord).toBeCloseTo(1100002, 9);
+    expect(p.avant.altitude).toBeCloseTo(450.05, 9);
+    expect(p.arriere.nord).toBeCloseTo(1099999, 9);
+  });
+
+  it('coupe entre deux points : pente du projet de la surface (2 % vers l\'Est)', () => {
+    // Deux triangles : carré de 20 m autour, plan qui monte de 2 % vers l'Est.
+    const z = (est) => 450 + 0.02 * (est - 2500000);
+    const p = (est, nord) => ({ est, nord, altitude: z(est) });
+    const triangles = [
+      [p(2499990, 1099990), p(2500010, 1099990), p(2500010, 1100010)],
+      [p(2499990, 1099990), p(2500010, 1100010), p(2499990, 1100010)],
+    ];
+    const c = coupeEntre(triangles, gauche, droite, 1);
+    expect(c.longueur).toBeCloseTo(6, 9);
+    expect(c.a.distance).toBe(1);
+    expect(c.b.distance).toBeCloseTo(5, 9);
+    expect(c.troncons.length).toBe(1);
+    expect(c.troncons[0].pente).toBeCloseTo(2, 6);
+  });
+
+  it('pas de coupe si les deux points sont au même endroit', () => {
+    expect(coupeEntre([], gauche, gauche)).toBeNull();
   });
 });

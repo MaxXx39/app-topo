@@ -189,3 +189,45 @@ export function sensCoupeLame(machine, gauche, droite, azimutMarche = null) {
   if (machine === 'grader' && azimutMarche != null) return vecteurAzimut(azimutMarche);
   return avantDeLaLame(gauche, droite);
 }
+
+// --- Coupes G – D et Arr – Av (0.151.0, demande du 06.11 : même modèle pour Grader, Bull et Râteau) ---
+
+/**
+ * Points guidés d'une lame à 2 GNSS (Grader, Bull). gauche, droite : coins de la lame (positions des
+ * GNSS) ; sens : vecteur unitaire { est, nord } vers l'avant ; axe : place de l'axe gauche – droite en
+ * m depuis la lame (+ devant, − derrière) ; avant, arriere : longueurs de la coupe Arr – Av depuis
+ * l'axe des GNSS (m). Les altitudes restent celles de la lame (la lame est droite, d'avant en arrière).
+ * Renvoie { gauche, droite, avant, arriere } (MN95).
+ */
+export function pointsGuidageLame(gauche, droite, sens, { axe = 0, avant = 1, arriere = 1 } = {}) {
+  const decale = (p, d, altitude = p.altitude) => ({ est: p.est + sens.est * d, nord: p.nord + sens.nord * d, altitude });
+  const centre = pointDeProfil(gauche, droite, 'milieu');
+  return {
+    gauche: decale(gauche, axe),
+    droite: decale(droite, axe),
+    avant: decale(centre, avant),
+    arriere: decale(centre, -arriere),
+  };
+}
+
+/**
+ * Coupe verticale de la surface entre deux points a (à gauche du dessin) et b (à droite), prolongée
+ * de "marge" m de chaque côté. Renvoie { longueur (m), morceaux (profilSurface, distances depuis le
+ * début), troncons et ruptures (pentes du projet, voir tronconsProfil), a, b: { distance, altitude } }
+ * ou null si a et b sont au même endroit.
+ */
+export function coupeEntre(triangles, a, b, marge = 1) {
+  const ligne = ligneDeCoupeLame(a, b, marge);
+  if (!ligne) return null;
+  const largeur = Math.hypot(b.est - a.est, b.nord - a.nord);
+  const morceaux = profilSurface(triangles, ligne.debut, ligne.fin);
+  const { troncons, ruptures } = tronconsProfil(morceaux, 0.5);
+  return {
+    longueur: largeur + 2 * marge,
+    morceaux,
+    troncons,
+    ruptures,
+    a: { distance: marge, altitude: a.altitude },
+    b: { distance: marge + largeur, altitude: b.altitude },
+  };
+}

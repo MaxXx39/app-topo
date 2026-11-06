@@ -4,7 +4,8 @@
 // la bande de Lever reprend sa place dans le cadre, et le champ touché est ramené au milieu.
 //
 // Clavier ouvert = un champ de texte a la main ET la hauteur de la fenêtre a baissé d'au moins
-// 20 % par rapport à la plus grande hauteur vue (dans la même orientation).
+// 20 % par rapport à la plus grande hauteur vue (pour la même largeur : le clavier ne change pas la
+// largeur, tourner la tablette oui).
 
 const BAISSE_MIN = 0.8;
 
@@ -22,13 +23,12 @@ function hauteurVisible() {
 
 export function suivreClavier() {
   let hauteurMax = hauteurVisible();
-  let paysage = window.innerWidth > window.innerHeight;
+  let largeur = window.innerWidth;
 
   function verifier() {
-    const nouveauPaysage = window.innerWidth > window.innerHeight;
-    if (nouveauPaysage !== paysage) {
-      // Orientation changée : on repart de la hauteur actuelle.
-      paysage = nouveauPaysage;
+    if (window.innerWidth !== largeur) {
+      // Tablette tournée : on repart de la hauteur actuelle.
+      largeur = window.innerWidth;
       hauteurMax = hauteurVisible();
     }
     const champ = document.activeElement;

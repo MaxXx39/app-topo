@@ -35,3 +35,19 @@ describe('pointsOutil', () => {
     expect(pointsOutil(bas, { cap: null }, dims)).toBeNull();
   });
 });
+
+describe('pointsOutil : axe G – D et bouts avant / arrière (0.151.0)', () => {
+  it('axe à 2 m devant le GNSS, cap nord : G et D 2 m au nord ; avant / arrière au milieu de la largeur', () => {
+    const r = pointsOutil(bas, { cap: 0, inclinaison: 0, directionInclinaison: 0 }, { ...dims, axe: 2 });
+    expect(r.gauche).toEqual({ est: 2499999.5, nord: 1200002, altitude: 400 });
+    expect(r.droite).toEqual({ est: 2500001.5, nord: 1200002, altitude: 400 });
+    expect(r.avant).toEqual({ est: 2500000.5, nord: 1200000.4, altitude: 400 });
+    expect(r.arriere).toEqual({ est: 2500000.5, nord: 1199999.4, altitude: 400 });
+  });
+
+  it('axe négatif = derrière le GNSS', () => {
+    const r = pointsOutil(bas, { cap: 90 }, { ...dims, axe: -1 });
+    expect(r.gauche.est).toBeCloseTo(2499999, 9);
+    expect(r.gauche.nord).toBeCloseTo(1200000.5, 9);
+  });
+});
