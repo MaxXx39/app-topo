@@ -329,7 +329,9 @@ export function creerDao(d) {
   function ranger() {
     const plan = planDao();
     if (!plan || !etat.enCours) return;
-    plan.dao.objets.push({ ...etat.enCours, calque: etat.calque });
+    // Cote et étiquette (0.150.0) : écrites à la hauteur de texte choisie en dernier (1 m au départ).
+    const hauteur = ['cote', 'etiquette'].includes(etat.enCours.sorte) ? { hauteur: etat.hauteurTexte } : {};
+    plan.dao.objets.push({ ...etat.enCours, ...hauteur, calque: etat.calque });
     etat.enCours = null;
     refaire(plan);
     d.enregistrer();

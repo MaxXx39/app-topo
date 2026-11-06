@@ -16,6 +16,8 @@ export const OUTILS_DAO = [
   ['arc', 'Arc 3 pts', 3],
   ['point', 'Point', 1],
   ['texte', 'Texte', 1],
+  ['cote', 'Cote', 2],
+  ['etiquette', 'Étiquette', 1],
 ];
 export const COULEURS_CALQUES_DAO = ['#e11d48', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#111827'];
 
@@ -80,6 +82,20 @@ export function pointsDeLArc(debut, milieu, fin) {
   return points;
 }
 
+/**
+ * Cote entre a et b (0.150.0) : longueur à plat (m) et, si les deux ont une altitude, différence de
+ * hauteur (b − a, m) et pente (%) = différence ÷ longueur à plat × 100. Angle du texte (degrés, sens
+ * trigonométrique depuis l'est), ramené entre −90 et 90 pour se lire de gauche à droite.
+ */
+export function valeursCote(a, b) {
+  const longueur = Math.hypot(b.est - a.est, b.nord - a.nord);
+  const dh = a.altitude != null && b.altitude != null ? b.altitude - a.altitude : null;
+  let angle = (Math.atan2(b.nord - a.nord, b.est - a.est) * 180) / Math.PI;
+  if (angle > 90) angle -= 180;
+  if (angle < -90) angle += 180;
+  return { longueur, dh, pente: dh != null && longueur > 0 ? (dh / longueur) * 100 : null, angle };
+}
+
 /** Les 4 coins d'un rectangle (côtés Est / Nord) donné par deux coins opposés (fermé ensuite). */
 export function coinsDuRectangle(a, b) {
   return [a, { est: b.est, nord: a.nord, altitude: null }, b, { est: a.est, nord: b.nord, altitude: null }];
@@ -127,6 +143,25 @@ export function refaireContenuDao(plan, provisoire = null, selection = null) {
     } else if (objet.sorte === 'point' && a) {
       borner(a);
       contenu.points.push({ c, k, x: mm(a.est - o.est), y: mm(a.nord - o.nord), z: a.altitude != null ? mm(a.altitude) : 0 });
+    } else if (objet.sorte === 'cote' && b) {
+      // Trait de cote, petits traits perpendiculaires aux bouts, longueur écrite au milieu (au-dessus).
+      const h = objet.hauteur ?? 0.5;
+      const v = valeursCote(a, b);
+      const l = v.longueur || 1;
+      const n = { est: (-(b.nord - a.nord) / l) * h * 0.4, nord: ((b.est - a.est) / l) * h * 0.4 };
+      const sansZ = (p) => ({ est: p.est, nord: p.nord, altitude: null });
+      trait([sansZ(a), sansZ(b)], c);
+      for (const bout of [a, b]) trait([{ est: bout.est - n.est, nord: bout.nord - n.nord, altitude: null }, { est: bout.est + n.est, nord: bout.nord + n.nord, altitude: null }], c);
+      const milieu = { est: (a.est + b.est) / 2, nord: (a.nord + b.nord) / 2 };
+      const texte = [v.longueur.toFixed(3), v.dh != null ? `Δh ${v.dh >= 0 ? '+' : ''}${v.dh.toFixed(3)} · ${v.pente.toFixed(2)} %` : ''].filter(Boolean).join('  ');
+      contenu.textes.push({ c, k, x: mm(milieu.est + n.est * 0.5 - o.est), y: mm(milieu.nord + n.nord * 0.5 - o.nord), h, a: Math.round(v.angle * 100) / 100, t: texte, ah: 1, av: 1 });
+    } else if (objet.sorte === 'etiquette' && a) {
+      // Étiquette d'un point : petite croix, E / N puis H écrits à droite.
+      const h = objet.hauteur ?? 0.5;
+      trait([{ est: a.est - h * 0.3, nord: a.nord, altitude: null }, { est: a.est + h * 0.3, nord: a.nord, altitude: null }], c);
+      trait([{ est: a.est, nord: a.nord - h * 0.3, altitude: null }, { est: a.est, nord: a.nord + h * 0.3, altitude: null }], c);
+      contenu.textes.push({ c, k, x: mm(a.est + h * 0.5 - o.est), y: mm(a.nord + h * 0.1 - o.nord), h, a: 0, t: `E ${a.est.toFixed(3)}  N ${a.nord.toFixed(3)}`, ah: 0, av: 1 });
+      if (a.altitude != null) contenu.textes.push({ c, k, x: mm(a.est + h * 0.5 - o.est), y: mm(a.nord - h * 0.1 - o.nord), h, a: 0, t: `H ${a.altitude.toFixed(3)}`, ah: 0, av: 3 });
     } else if (objet.sorte === 'texte' && a && objet.texte) {
       borner(a);
       contenu.textes.push({ c, k, x: mm(a.est - o.est), y: mm(a.nord - o.nord), h: objet.hauteur ?? 0.5, a: 0, t: objet.texte, ah: 0, av: 0 });
@@ -143,6 +178,7 @@ export function refaireContenuDao(plan, provisoire = null, selection = null) {
 /** Points du tracé d'un objet (pour mesurer une distance, chercher une limite) ; fermé : 1er point répété. */
 export function traceObjet(objet) {
   const [a, b, c] = objet.points;
+  if (objet.sorte === 'cote' && b) return [a, b];
   if (objet.sorte === 'ligne' || objet.sorte === 'polyligne') return objet.ferme && objet.points.length > 2 ? [...objet.points, objet.points[0]] : objet.points;
   if (objet.sorte === 'rectangle' && b) {
     const coins = coinsDuRectangle(a, b);

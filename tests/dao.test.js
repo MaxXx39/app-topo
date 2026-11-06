@@ -107,3 +107,25 @@ describe('DAO étape 3 : outils topo', () => {
     expect(r.points).toHaveLength(4);
   });
 });
+
+import { valeursCote } from '../src/topo/dao.js';
+
+describe('DAO étape 4 : cotes et étiquettes', () => {
+  it('valeurs d\'une cote : longueur à plat, Δh, pente, angle lisible', () => {
+    const v = valeursCote(p(0, 0, 400), p(-3, -4, 401));
+    expect(v.longueur).toBe(5);
+    expect(v.dh).toBe(1);
+    expect(v.pente).toBe(20);
+    expect(v.angle).toBeGreaterThanOrEqual(-90);
+    expect(v.angle).toBeLessThanOrEqual(90);
+    expect(valeursCote(p(0, 0), p(10, 0)).dh).toBeNull();
+  });
+  it('cote et étiquette dans le contenu', () => {
+    const plan = creerPlanDao('d', { est: 0, nord: 0 });
+    plan.dao.objets.push({ sorte: 'cote', calque: 0, hauteur: 0.5, points: [p(0, 0), p(12.3456, 0)] });
+    plan.dao.objets.push({ sorte: 'etiquette', calque: 0, hauteur: 0.5, points: [p(5, 5, 431.2)] });
+    refaireContenuDao(plan);
+    expect(plan.contenu.traits).toHaveLength(5); // cote : trait + 2 bouts ; étiquette : croix (2)
+    expect(plan.contenu.textes.map((t) => t.t)).toEqual(['12.346', 'E 5.000  N 5.000', 'H 431.200']);
+  });
+});
