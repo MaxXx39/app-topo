@@ -16,6 +16,7 @@ import { pointALAbscisse } from '../topo/ligne-implantation.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne, formeDuNom } from '../leve/libelles.js';
 import { cheminForme, formeEnTrait } from './formes.js';
 import { ouvrirVue3d } from './vue3d.js';
+import { lignesDesPlans } from '../topo/drapage.js';
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS, surImageChargee } from './dxf-canvas.js';
 import { creerLoupe } from './loupe.js';
 import { echapper } from '../outils/echapper.js';
@@ -138,7 +139,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></svg>
           Seul
         </button>
-        <button type="button" class="puce seulement-expert" data-action="vue-3d" title="Vue 3D des levés et surfaces montrés">3D</button>
+        <button type="button" class="puce seulement-intermediaire" data-action="vue-3d" title="Vue 3D des levés et surfaces montrés">3D</button>
         ${bulle('plan')}
         </div>
         <div class="menu-plans-dxf" hidden></div>
@@ -1787,13 +1788,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     fond.style.setProperty('--opacite-photo', String(1 - calquesChoisis.transparencePhoto / 100));
   }
   appliquerTransparence(); // transparence de départ (60 %)
-  // Vue 3D (0.99.0, Expert) : les triangles des levés et surfaces montrés sur le plan.
+  // Vue 3D (0.99.0 ; Intermédiaire depuis 0.143.0) : les triangles des levés et surfaces montrés sur le plan.
   conteneur.querySelector('[data-action="vue-3d"]').addEventListener('click', () => {
     // 0.126.0 : un élément par levé / surface (choix « Tout » ou un seul dans la fenêtre 3D).
     const elements = dessin.stocks
       .map((stock, index) => ({ nom: stock.nom, triangles: estVisible(stock) ? dessin.resultats[index]?.trianglesDessus ?? [] : [] }))
       .filter((e) => e.triangles.length > 0);
-    ouvrirVue3d(elements, 'Vue 3D');
+    // 0.143.0 : lignes des plans DXF montrés, posées sur la surface dans la 3D.
+    ouvrirVue3d(elements, 'Vue 3D', { lignesDxf: lignesDesPlans(plansDxf.filter((plan) => !plan.cadastre || plan.visible !== false)) });
   });
   // « Seul » : seulement ce sur quoi je travaille (main.js choisit quoi garder).
   const boutonSeul = conteneur.querySelector('[data-action="seul-travail"]');

@@ -10939,3 +10939,6 @@ body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 1
 .reglages-outil input { width: 80px; min-height: 40px; text-align: right; }
 .plan .contour-outil { fill: rgba(250, 204, 21, 0.35); stroke: #a16207; stroke-width: 2; }
 .ecran-lame .choix-machine { grid-template-columns: repeat(3, 1fr); }
+/* 0.144.0 : une seule coupe, bascule et ⚙ au-dessus. */
+.choix-coupe { display: flex; align-items: center; gap: 8px; }
+.choix-coupe .bouton-roue { margin-left: auto; }

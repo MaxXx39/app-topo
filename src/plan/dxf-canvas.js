@@ -167,6 +167,8 @@ export function dessinerPlansDxf(canvas, plans, vue, densite = 1) {
     ctx.lineJoin = 'round';
     ctx.globalAlpha = opacite;
     dessinerImage(ctx, plan.contenu.image);
+    // PDF « aspect du PDF » (0.145.0) : seulement l'image ; les traits restent invisibles (accroches).
+    if (plan.traitsInvisibles) continue;
     for (const [teinte, liste] of preparation.pleins) {
       ctx.beginPath();
       for (const plein of liste) {

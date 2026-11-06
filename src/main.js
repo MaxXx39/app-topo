@@ -180,7 +180,7 @@ const CLE_TERRAIN = 'topo-terrain';
 const terrain = {
   mode: 'lever',
   surfaceId: null,
-  vueCoupes: 'les2',
+  vueCoupes: 'perpendiculaire',
   demiLongueur: 5,
   exagerationCoupe: 1,
   sourceOrientation: 'rx2',
@@ -214,6 +214,8 @@ terrain.libelleLigne = '';
 terrain.libellePoint = '';
 terrain.libelleAire = '';
 // Anciens réglages (avant 0.73.0) : le profil en long prend ses valeurs de départ.
+// 0.144.0 : une seule coupe à la fois (l'ancien « Les 2 » devient « Perpendiculaire »).
+if (terrain.vueCoupes !== 'axe') terrain.vueCoupes = 'perpendiculaire';
 terrain.lame = { machine: 'grader', ...terrain.lame };
 // 0.142.0 : outil à 1 GNSS (râteau, ou Bull à 1 récepteur) : nombre de GNSS du Bull et distances
 // depuis le bas du mât jusqu'aux bords de chaque outil (m).
@@ -749,7 +751,10 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         titre: `Plan PDF « ${fichier.name} »${enImage ? ' (image)' : ''}`,
         champs: [
           { cle: 'echelle', titre: 'Échelle du plan 1:', valeur: '', exemple: '500 (vide si inconnue)' },
-          ...(enImage ? [{ cle: 'nettete', titre: 'Netteté de l\'image', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART }] : []),
+          // 0.145.0 (liste du 05.11, point 10, à essayer) : PDF en traits montré comme le PDF (image de la
+          // page), ses traits restant invisibles pour les accroches ; ou en traits comme un DXF (avant).
+          ...(enImage ? [] : [{ cle: 'aspect', titre: 'Affichage', choix: [['image', 'Aspect du PDF (image + accroches)'], ['traits', 'Traits (comme un DXF)']], valeur: 'image' }]),
+          { cle: 'nettete', titre: 'Netteté de l\'image', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART },
         ],
       });
       if (!valeurs) return;
@@ -776,6 +781,18 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         const lecture = lirePlanDxf(dxfDuPdf(contenu, echelle), nom);
         if (lecture.erreur || !lecture.plan.bornes) throw new Error(lecture.erreur ?? 'aucun objet dessiné trouvé');
         lu = lecture.plan;
+        if (valeurs.aspect === 'image') {
+          // Image de la page posée sous les traits : son coin en bas à gauche est l'origine de la page,
+          // les traits sont rangés depuis l'origine du plan lu (décalage par la matrice de l'image).
+          const rendu = facteurDeRendu(contenu.largeur, contenu.hauteur, valeurs.nettete);
+          afficherMessage(`Image de la page (${rendu.dpi} dpi)…`, null);
+          await new Promise((fin) => setTimeout(fin, 30));
+          const image = await imageDeLaPage(doc, page, rendu.facteur);
+          const page2 = planImagePdf({ nom, largeurPt: image.largeurPt, hauteurPt: image.hauteurPt, echelle, donnees: image.donnees, pixels: image.pixels });
+          lu.contenu.image = { ...page2.contenu.image, matrice: [1, 0, 0, 1, -lu.origine.est, -lu.origine.nord] };
+          lu.traitsInvisibles = true;
+          avertissements.push('Aspect du PDF : on voit l\'image de la page ; ses traits sont invisibles mais servent aux accroches (Sommet, Milieu, Ligne…).');
+        }
         if (contenu.images > 0) avertissements.push(`${contenu.images} image(s) du PDF non reprise(s) (seuls les traits et les textes sont lus).`);
       }
       projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, pdf: { page, echelle, image: enImage } });
@@ -1835,7 +1852,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         recalculer();
       },
       choisirVueCoupes: (vue) => {
-        terrain.vueCoupes = ['les2', 'perpendiculaire', 'axe'].includes(vue) ? vue : 'les2';
+        terrain.vueCoupes = vue === 'axe' ? 'axe' : 'perpendiculaire';
         retenirReglagesTerrain();
         recalculer();
       },
@@ -5106,7 +5123,8 @@ if (recepteurDisponible()) {
     mettreAJourBip(controle);
     const position = etat.connecte && etat.recu ? etat.position : null;
     // Coupes affichées (mode Implanter) : leur trait en pointillés sur le plan.
-    const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
+    // 0.144.0 : une seule coupe (en Base, toujours dans l'axe).
+    const vues = estModeBase() || terrain.vueCoupes === 'axe' ? ['axe'] : ['perpendiculaire'];
     // Seulement dans l'onglet Terrain (ailleurs, la croix des coupes n'a rien à faire sur le plan).
     const traits = controle?.coupes && ongletContexte === 'terrain' ? vues.map((sens) => ({ sens, debut: controle.coupes[sens].debut, fin: controle.coupes[sens].fin })) : [];
     // Ligne : trait en pointillés jusqu'au point de la ligne en face de la canne.
