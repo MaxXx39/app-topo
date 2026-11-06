@@ -51,8 +51,8 @@ const IMPLANTATIONS = [
 // Talus : Expert seulement. Base : on ne lève que des « Levé libre » (points seulement).
 const IMPLANTATIONS_EXPERT = ['talus'];
 const NATURES_BASE = ['autres'];
+// 0.144.0 (liste du 05.11, point 5) : une seule coupe à la fois (plus de « Les 2 »).
 const VUES_COUPES = [
-  ['les2', 'Les 2'],
   ['perpendiculaire', 'Perpendiculaire'],
   ['axe', 'Dans l\'axe'],
 ];
@@ -134,6 +134,7 @@ export function creerEcranLeve(conteneur, actions) {
   let bandeCouloir = 0; // échelle du couloir de la ligne (n° dans BANDES_COULOIR)
   let capBoussole = null; // dernier cap de la boussole de la tablette (°), ou null
   let reglagesGuidageOuverts = false; // roue ⚙ de l'écran de guidage
+  let reglagesCoupesOuverts = false; // roue ⚙ des coupes d'Implanter › Surface (0.144.0)
   const elementsOuverts = new Set(); // lignes du levé dépliées en bas de Lever ('contour', 'ligne-2', 'isoles')
   let accrochesOuvertes = false; // flèche de la barre d'accroche : les noms sous les dessins
   let gestionControleOuverte = false; // mode Contrôler : roue ⚙ (après le code de sécurité)
@@ -213,6 +214,11 @@ export function creerEcranLeve(conteneur, actions) {
     }
     if (action === 'garderPointChoisi') {
       actions.garderPointChoisi(conteneur.querySelector('[data-champ="nom-implantation"]')?.value ?? (donnees.implanter.choix?.nom || ''));
+      return;
+    }
+    if (action === 'basculerReglagesCoupes') {
+      reglagesCoupesOuverts = !reglagesCoupesOuverts;
+      dessiner();
       return;
     }
     if (action === 'basculerReglagesGuidage') {
@@ -528,7 +534,7 @@ export function creerEcranLeve(conteneur, actions) {
   function controle() {
     const { controle: reglages, surfaces } = donnees;
     // Coupes directes : en Base, dans l'axe seulement (perpendiculaire, longueur et hauteurs dès Intermédiaire).
-    const vue = estModeBase() ? 'axe' : reglages.vueCoupes;
+    const vue = estModeBase() ? 'axe' : (reglages.vueCoupes === 'axe' ? 'axe' : 'perpendiculaire');
     const choixImplantation = bandeauImplantation();
     // Rien de choisi : on le rappelle bien en vue (après « ← », on ne savait plus quoi faire).
     const imp = donnees.implanter;
@@ -561,13 +567,13 @@ export function creerEcranLeve(conteneur, actions) {
           </select>`
         : '<p class="vide">Aucune surface.</p>'}
       ${ecartEtRegle()}
+      <div class="ligne-choix choix-coupe seulement-intermediaire">${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}
+        <button type="button" class="bouton-roue ${reglagesCoupesOuverts ? 'actif' : ''}" data-action="basculerReglagesCoupes" aria-label="Réglages des coupes" aria-expanded="${reglagesCoupesOuverts}">⚙</button></div>
+      ${reglagesCoupesOuverts ? `<div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
+      <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>` : ''}
       <div class="coupes-directes vue-${vue}">
-        ${vue !== 'axe' ? '<div data-vivant="coupe-perpendiculaire"></div>' : ''}
-        ${vue !== 'perpendiculaire' ? '<div data-vivant="coupe-axe"></div>' : ''}
+        <div data-vivant="coupe-${vue}"></div>
       </div>
-      <div class="ligne-choix seulement-intermediaire"><span>Coupes</span>${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}</div>
-      <div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
-      <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
       <p class="aide" data-vivant="orientation"></p>`;
   }
 

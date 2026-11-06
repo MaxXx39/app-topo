@@ -180,7 +180,7 @@ const CLE_TERRAIN = 'topo-terrain';
 const terrain = {
   mode: 'lever',
   surfaceId: null,
-  vueCoupes: 'les2',
+  vueCoupes: 'perpendiculaire',
   demiLongueur: 5,
   exagerationCoupe: 1,
   sourceOrientation: 'rx2',
@@ -214,6 +214,8 @@ terrain.libelleLigne = '';
 terrain.libellePoint = '';
 terrain.libelleAire = '';
 // Anciens réglages (avant 0.73.0) : le profil en long prend ses valeurs de départ.
+// 0.144.0 : une seule coupe à la fois (l'ancien « Les 2 » devient « Perpendiculaire »).
+if (terrain.vueCoupes !== 'axe') terrain.vueCoupes = 'perpendiculaire';
 terrain.lame = { machine: 'grader', ...terrain.lame };
 // 0.142.0 : outil à 1 GNSS (râteau, ou Bull à 1 récepteur) : nombre de GNSS du Bull et distances
 // depuis le bas du mât jusqu'aux bords de chaque outil (m).
@@ -1835,7 +1837,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         recalculer();
       },
       choisirVueCoupes: (vue) => {
-        terrain.vueCoupes = ['les2', 'perpendiculaire', 'axe'].includes(vue) ? vue : 'les2';
+        terrain.vueCoupes = vue === 'axe' ? 'axe' : 'perpendiculaire';
         retenirReglagesTerrain();
         recalculer();
       },
@@ -5106,7 +5108,8 @@ if (recepteurDisponible()) {
     mettreAJourBip(controle);
     const position = etat.connecte && etat.recu ? etat.position : null;
     // Coupes affichées (mode Implanter) : leur trait en pointillés sur le plan.
-    const vues = { les2: ['perpendiculaire', 'axe'], perpendiculaire: ['perpendiculaire'], axe: ['axe'] }[terrain.vueCoupes] ?? [];
+    // 0.144.0 : une seule coupe (en Base, toujours dans l'axe).
+    const vues = estModeBase() || terrain.vueCoupes === 'axe' ? ['axe'] : ['perpendiculaire'];
     // Seulement dans l'onglet Terrain (ailleurs, la croix des coupes n'a rien à faire sur le plan).
     const traits = controle?.coupes && ongletContexte === 'terrain' ? vues.map((sens) => ({ sens, debut: controle.coupes[sens].debut, fin: controle.coupes[sens].fin })) : [];
     // Ligne : trait en pointillés jusqu'au point de la ligne en face de la canne.
