@@ -881,7 +881,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const densite = Math.min(window.devicePixelRatio || 1, 2);
     const visibles = plansDxf; // affichés ou cachés un par un (menu « Plans »)
     const signature = [vue.echelle, vue.estCentre, vue.nordCentre, vue.largeur, vue.hauteur, vue.rotation ?? 0, densite,
-      ...visibles.map((p) => `${p.id}:${p.visible !== false}:${p.couleur ?? ''}:${p.transparence ?? 0}:${p.calques.map((c) => (c.visible ? 1 : 0)).join('')}`)].join('|');
+      ...visibles.map((p) => `${p.id}:${p.revision ?? 0}:${p.visible !== false}:${p.couleur ?? ''}:${p.transparence ?? 0}:${p.calques.map((c) => `${c.visible ? 1 : 0}${c.couleur ?? ''}`).join('')}`)].join('|');
     loupe.redessiner();
     if (signature === signatureDxf) return;
     signatureDxf = signature;
@@ -2361,7 +2361,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       // (Le canvas se redessine de lui-même si les plans ont changé : voir signatureDxf.)
       remplirMenuPlans();
       // Premier plan sans levé : on cadre dessus. Sinon, le dessin suit (redessiner, juste après).
-      if (!vue || (avant === 0 && points.length === 0 && !position)) toutVoir();
+      // Le dessin DAO (0.147.0) ne recadre jamais : on est en train de dessiner sur la vue.
+      if (!vue || (avant === 0 && points.length === 0 && !position && plansDxf.some((plan) => !plan.dao))) toutVoir();
     },
     /**
      * Implantation d'un point (voir « implantation » plus haut), ou null quand on n'implante pas.

@@ -132,9 +132,10 @@ export function creerModuleExport(conteneur, actions) {
     panneau('implantations').innerHTML = nbImplantations > 0
       ? `<p class="aide">${nbImplantations} implantation(s) enregistrée(s)</p><div class="ligne-outils">${bouton('CSV', 'data-export="implantations"')}</div>`
       : '<p class="vide">Aucune implantation enregistrée.</p>';
-    const recales = (projet.plansDxf ?? []).filter((p) => p.recalage?.applique);
+    // 0.147.0 : le dessin DAO (déjà en MN95) s'exporte ici aussi.
+    const recales = (projet.plansDxf ?? []).filter((p) => p.recalage?.applique || (p.dao && p.dao.objets?.length));
     panneau('dxf').innerHTML = recales.length > 0
-      ? `<div class="lignes-export">${recales.map((p) => `<div class="ligne-export"><span><strong>${echapper(p.nom)}</strong> <span class="aide">recalé en MN95</span></span>${bouton('DXF', `data-export="dxf" data-id="${p.id}"`)}</div>`).join('')}</div>`
+      ? `<div class="lignes-export">${recales.map((p) => `<div class="ligne-export"><span><strong>${echapper(p.nom)}</strong> <span class="aide">${p.dao ? 'dessin DAO, MN95' : 'recalé en MN95'}</span></span>${bouton('DXF', `data-export="dxf" data-id="${p.id}"`)}</div>`).join('')}</div>`
       : '<p class="vide">Aucun plan DXF recalé.</p>';
     const nbCadastres = projet.leves.filter((l) => l.cadastre).length;
     const nbSwisstopo = projet.surfaces.filter((x) => x.type === 'swisstopo').length;

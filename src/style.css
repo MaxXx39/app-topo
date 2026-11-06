@@ -10956,3 +10956,8 @@ body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 1
 .lien-modifier { color: #0f766e; font-weight: 700; text-decoration: underline; white-space: nowrap; }
 body.mode-telephone .tuiles-export { grid-template-columns: repeat(2, 1fr); }
 .autres-export[hidden], .options-export[hidden] { display: none; }
+/* 0.147.0 : DAO (barre sur le plan, bouton dans Calculs › Dessin). */
+.barre-dao .ligne-barre-pointage { flex-wrap: wrap; gap: 4px; }
+.barre-dao .puce-choix.petite { min-height: 34px; padding: 4px 10px; font-size: 0.82rem; }
+.barre-dao .calque-dao { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 0.85rem; }
+.bouton-dao { margin: 6px 0 10px; }
