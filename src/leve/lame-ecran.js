@@ -19,6 +19,12 @@ export function texteEcartLame(ecart) {
   return ecart >= 0 ? `monter ${cm} cm` : `descendre ${cm} cm`;
 }
 
+/** Écart sans mot (0.151.1 : la flèche suffit) : « 3.2 cm » ; « hors surface ». */
+function texteCm(ecart) {
+  if (ecart == null) return 'hors surface';
+  return `${(Math.abs(ecart) * 100).toFixed(1)} cm`;
+}
+
 /** Dévers (%) avec son signe et 2 décimales. */
 const pourcent = (valeur) => {
   if (valeur == null) return '—';
@@ -128,14 +134,15 @@ export function rafraichirLame(conteneur, vivant) {
       const point = guidage?.[cote];
       const element = zone(`lame-${cle}-${cote}`);
       element.className = `ecart-coupe ${point?.classe ? `ecart-${point.classe}` : 'attente'}`;
-      element.innerHTML = `<span class="nom-bout">${nom}</span>${point?.ecart != null ? petiteFleche(point.ecart) : ''}<strong>${point ? texteEcartLame(point.ecart) : '—'}</strong>`;
+      element.innerHTML = `<span class="nom-bout">${nom}</span>${point?.ecart != null ? petiteFleche(point.ecart) : ''}<strong>${point ? texteCm(point.ecart) : '—'}</strong>`;
       // Règle de hauteur (0.107.0) : à gauche du bout gauche, à droite du bout droit.
       zone(`lame-${cle}-regle-${cote}`).innerHTML = htmlRegleHauteur(point?.ecart ?? null, vivant.toleranceVert ?? 0.02);
     }
     zone(`lame-${cle}-coupe`).innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite]) : '';
   }
   // Sous la coupe G – D : dévers (et écart au centre d'un outil à 1 GNSS), bords de la surface.
-  const centre = g?.centre ? `Centre <strong>${texteEcartLame(g.centre.ecart)}</strong> · ` : '';
+  const fleche = (e) => (e == null ? '' : e >= 0 ? '↑ ' : '↓ ');
+  const centre = g?.centre ? `Centre <strong>${fleche(g.centre.ecart)}${texteCm(g.centre.ecart)}</strong> · ` : '';
   const bord = (cote) => {
     const b = g ? vivant.bords?.[cote] : null;
     return b ? `<span class="${b.distance < 0 ? 'hors' : ''}">${cote === 'gauche' ? '◂ bord' : 'bord ▸'} ${b.distance < 0 ? '−' : ''}${Math.abs(b.distance).toFixed(2)} m</span>` : '';
