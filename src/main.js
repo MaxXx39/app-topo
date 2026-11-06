@@ -751,7 +751,10 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         titre: `Plan PDF « ${fichier.name} »${enImage ? ' (image)' : ''}`,
         champs: [
           { cle: 'echelle', titre: 'Échelle du plan 1:', valeur: '', exemple: '500 (vide si inconnue)' },
-          ...(enImage ? [{ cle: 'nettete', titre: 'Netteté de l\'image', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART }] : []),
+          // 0.145.0 (liste du 05.11, point 10, à essayer) : PDF en traits montré comme le PDF (image de la
+          // page), ses traits restant invisibles pour les accroches ; ou en traits comme un DXF (avant).
+          ...(enImage ? [] : [{ cle: 'aspect', titre: 'Affichage', choix: [['image', 'Aspect du PDF (image + accroches)'], ['traits', 'Traits (comme un DXF)']], valeur: 'image' }]),
+          { cle: 'nettete', titre: 'Netteté de l\'image', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART },
         ],
       });
       if (!valeurs) return;
@@ -778,6 +781,18 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         const lecture = lirePlanDxf(dxfDuPdf(contenu, echelle), nom);
         if (lecture.erreur || !lecture.plan.bornes) throw new Error(lecture.erreur ?? 'aucun objet dessiné trouvé');
         lu = lecture.plan;
+        if (valeurs.aspect === 'image') {
+          // Image de la page posée sous les traits : son coin en bas à gauche est l'origine de la page,
+          // les traits sont rangés depuis l'origine du plan lu (décalage par la matrice de l'image).
+          const rendu = facteurDeRendu(contenu.largeur, contenu.hauteur, valeurs.nettete);
+          afficherMessage(`Image de la page (${rendu.dpi} dpi)…`, null);
+          await new Promise((fin) => setTimeout(fin, 30));
+          const image = await imageDeLaPage(doc, page, rendu.facteur);
+          const page2 = planImagePdf({ nom, largeurPt: image.largeurPt, hauteurPt: image.hauteurPt, echelle, donnees: image.donnees, pixels: image.pixels });
+          lu.contenu.image = { ...page2.contenu.image, matrice: [1, 0, 0, 1, -lu.origine.est, -lu.origine.nord] };
+          lu.traitsInvisibles = true;
+          avertissements.push('Aspect du PDF : on voit l\'image de la page ; ses traits sont invisibles mais servent aux accroches (Sommet, Milieu, Ligne…).');
+        }
         if (contenu.images > 0) avertissements.push(`${contenu.images} image(s) du PDF non reprise(s) (seuls les traits et les textes sont lus).`);
       }
       projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, pdf: { page, echelle, image: enImage } });
