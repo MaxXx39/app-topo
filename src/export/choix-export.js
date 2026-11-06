@@ -21,7 +21,7 @@ export function htmlChoixExport(groupes, changes, ouvert = false) {
   const total = groupes.reduce((n, g) => n + g.elements.length, 0);
   const pleins = groupes.filter((g) => g.elements.length > 0);
   return `<details class="choix-export" ${ouvert ? 'open' : ''}>
-    <summary>Quoi exporter ? <span class="aide">${choisis.size} / ${total}</span></summary>
+    <summary>${choisis.size} / ${total} choisi(s) <span class="lien-modifier">choisir ▾</span></summary>
     ${pleins.length === 0 ? '<p class="vide">Rien à exporter.</p>' : pleins.map((g) => `<p class="titre-partie-menu">${echapper(g.titre)}</p>
       ${g.elements.map((e) => `<label class="case"><input type="checkbox" data-choix-export="${echapper(e.id)}" ${choisis.has(e.id) ? 'checked' : ''} /> ${echapper(e.nom)}</label>`).join('')}`).join('')}
     <div class="ligne-outils">

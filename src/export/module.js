@@ -11,6 +11,8 @@ import { bulle } from '../aide/bulles.js';
 import { aAcces } from '../reglages/reglages.js';
 
 // [clé, titre, mode minimum (classe seulement-…), ou '' pour tous les modes].
+// 0.146.0 : Plan, Points et Contrôles en grosses tuiles ; le reste derrière « Autres ▾ ».
+const PRINCIPALES = { plan: 'levés, volumes', listes: 'listes', controles: 'écarts' };
 const SORTES = [
   ['plan', 'Plan et volumes', 'intermediaire'],
   ['mesures', 'Mesures / métrés', 'intermediaire'],
@@ -32,12 +34,17 @@ export function creerModuleExport(conteneur, actions) {
   // Au départ : « Plan et volumes » (Intermédiaire et Expert), « Contrôles » en Base.
   let sorte = aAcces('intermediaire') ? 'plan' : 'controles';
   let derniers = null;
+  let autresOuverts = false;
   conteneur.innerHTML = `
     <div class="carte-section panneau-onglet-projet module-export">
       <p class="titre-panneau-projet">Exporter ${bulle('exporterProjet')}</p>
       <p class="titre-choix titre-etape">Quoi ?</p>
-      <div class="choix-sorte-export" role="group" aria-label="Quoi exporter">
-        ${SORTES.map(([cle, titre, niveau]) => `<button type="button" class="puce-choix ${niveau ? `seulement-${niveau}` : ''}" data-sorte="${cle}">${titre}</button>`).join('')}
+      <div class="tuiles-export" role="group" aria-label="Quoi exporter">
+        ${SORTES.filter(([cle]) => PRINCIPALES[cle]).map(([cle, titre, niveau]) => `<button type="button" class="tuile-export ${niveau ? `seulement-${niveau}` : ''}" data-sorte="${cle}"><strong>${cle === 'listes' ? 'Points' : cle === 'plan' ? 'Plan' : titre}</strong><small>${PRINCIPALES[cle]}</small></button>`).join('')}
+        <button type="button" class="tuile-export" data-action="autres" aria-expanded="false"><strong>Autres ▾</strong><small>mesures, réseaux…</small></button>
+      </div>
+      <div class="choix-sorte-export autres-export" role="group" aria-label="Autres exports" hidden>
+        ${SORTES.filter(([cle]) => !PRINCIPALES[cle]).map(([cle, titre, niveau]) => `<button type="button" class="puce-choix ${niveau ? `seulement-${niveau}` : ''}" data-sorte="${cle}">${titre}</button>`).join('')}
       </div>
       <p class="titre-choix titre-etape" data-zone="titre-format">Format</p>
       ${SORTES.map(([cle]) => `<div class="panneau-export" data-panneau="${cle}" hidden></div>`).join('')}
@@ -45,6 +52,11 @@ export function creerModuleExport(conteneur, actions) {
   const panneau = (cle) => conteneur.querySelector(`[data-panneau="${cle}"]`);
 
   conteneur.addEventListener('click', (evenement) => {
+    if (evenement.target.closest('[data-action="autres"]')) {
+      autresOuverts = !autresOuverts;
+      montrerSorte();
+      return;
+    }
     const choix = evenement.target.closest('button[data-sorte]');
     if (choix) {
       sorte = choix.dataset.sorte;
@@ -79,6 +91,13 @@ export function creerModuleExport(conteneur, actions) {
     const niveau = SORTES.find(([cle]) => cle === sorte)?.[2];
     if (niveau && !aAcces(niveau)) sorte = 'controles';
     for (const bouton of conteneur.querySelectorAll('button[data-sorte]')) bouton.classList.toggle('actif', bouton.dataset.sorte === sorte);
+    // « Autres » : ouvert à la demande, ou tant qu'une de ses parties est choisie.
+    const dansAutres = !PRINCIPALES[sorte];
+    const ouvert = autresOuverts || dansAutres;
+    conteneur.querySelector('.autres-export').hidden = !ouvert;
+    const tuileAutres = conteneur.querySelector('[data-action="autres"]');
+    tuileAutres.classList.toggle('actif', dansAutres);
+    tuileAutres.setAttribute('aria-expanded', String(ouvert));
     for (const zone of conteneur.querySelectorAll('[data-panneau]')) zone.hidden = zone.dataset.panneau !== sorte;
     // Plan et volumes, Mesures : leurs étapes « Lesquels ? », « Format », « Options » sont dans leur formulaire.
     conteneur.querySelector('[data-zone="titre-format"]').hidden = ['plan', 'mesures'].includes(sorte);
@@ -113,9 +132,10 @@ export function creerModuleExport(conteneur, actions) {
     panneau('implantations').innerHTML = nbImplantations > 0
       ? `<p class="aide">${nbImplantations} implantation(s) enregistrée(s)</p><div class="ligne-outils">${bouton('CSV', 'data-export="implantations"')}</div>`
       : '<p class="vide">Aucune implantation enregistrée.</p>';
-    const recales = (projet.plansDxf ?? []).filter((p) => p.recalage?.applique);
+    // 0.147.0 : le dessin DAO (déjà en MN95) s'exporte ici aussi.
+    const recales = (projet.plansDxf ?? []).filter((p) => p.recalage?.applique || (p.dao && p.dao.objets?.length));
     panneau('dxf').innerHTML = recales.length > 0
-      ? `<div class="lignes-export">${recales.map((p) => `<div class="ligne-export"><span><strong>${echapper(p.nom)}</strong> <span class="aide">recalé en MN95</span></span>${bouton('DXF', `data-export="dxf" data-id="${p.id}"`)}</div>`).join('')}</div>`
+      ? `<div class="lignes-export">${recales.map((p) => `<div class="ligne-export"><span><strong>${echapper(p.nom)}</strong> <span class="aide">${p.dao ? 'dessin DAO, MN95' : 'recalé en MN95'}</span></span>${bouton('DXF', `data-export="dxf" data-id="${p.id}"`)}</div>`).join('')}</div>`
       : '<p class="vide">Aucun plan DXF recalé.</p>';
     const nbCadastres = projet.leves.filter((l) => l.cadastre).length;
     const nbSwisstopo = projet.surfaces.filter((x) => x.type === 'swisstopo').length;

@@ -40,7 +40,8 @@ const preparations = new WeakMap();
  * cercles, textes: [objet] }. Chaque trait reçoit son rectangle englobant (m, repère du plan).
  */
 function preparer(plan) {
-  const cle = `${plan.couleur || ''}|${plan.calques.map((c) => (c.visible ? 1 : 0)).join('')}`;
+  // revision (0.147.0) : un plan DAO change de contenu ; elle force une nouvelle préparation.
+  const cle = `${plan.couleur || ''}|${plan.revision ?? 0}|${plan.calques.map((c) => `${c.visible ? 1 : 0}${c.couleur ?? ''}`).join('')}`;
   const enCache = preparations.get(plan);
   if (enCache?.cle === cle) return enCache;
   const visible = (objet) => plan.calques[objet.c]?.visible !== false;

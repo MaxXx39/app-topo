@@ -67,6 +67,7 @@ import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecr
 import { pointAvecDelta, deltaActif } from './topo/delta.js';
 import { ligneDecalee, rangerLigneDecalee } from './topo/ligne-decalee.js';
 import { pointsOutil } from './topo/outil.js';
+import { creerDao } from './dao/dao.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { surChangementListes } from './reglages/listes-partagees.js';
 import { lireDossiers, ecrireDossiers, dossiersTries, dossierDuProjet, ajouterDossier, renommerDossier, supprimerDossier, rangerProjet, SANS_DOSSIER } from './projet/dossiers.js';
@@ -382,6 +383,7 @@ document.querySelector('#app').innerHTML = `
       </section>
       <section class="panneau" data-onglet="dessin">
         <h2>Dessin ${bulle('dessin')}</h2>
+        <button type="button" class="bouton seulement-expert bouton-dao" id="bouton-dao">✏ DAO : dessiner sur le plan</button>
         <div id="dessins"></div>
         <div id="talus-surfaces" class="carte-section"></div>
       </section>
@@ -430,6 +432,8 @@ function afficherOnglet(demande) {
   document.querySelector('#bouton-projet').classList.toggle('actif', nom === 'projets');
   majBoutonsTerrain();
   if (nom !== 'plan' && nom !== 'dessin') pilote = null;
+  // DAO (0.147.0) : seulement dans Calculs › Dessin (et le plan sur téléphone).
+  if (nom !== 'plan' && nom !== 'dessin' && daoAppli?.actif()) daoAppli.arreter();
   if (nom !== 'plan' && nom !== ongletContexte) {
     // Triangles en trop (Terrain › Lever) : on arrête en quittant l'onglet.
     if (ongletContexte === 'terrain') editeurSurfaces.arreterModification();
@@ -1958,7 +1962,7 @@ function gererLoupeImplantation() {
 
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
-  const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId);
+  const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(daoAppli?.actif());
   const enLigne = accrocheActive && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
@@ -2005,7 +2009,7 @@ function envoyerImplantationAuPlan() {
         pointsControle,
         lignesAutres,
         reseaux,
-        choix: recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : accrocheActive && !enLigne && !enAutocontrole() ? implanter.choix : null,
+        choix: daoAppli?.actif() ? daoAppli.dernierPoint() : recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : accrocheActive && !enLigne && !enAutocontrole() ? implanter.choix : null,
         cible: cibleControle ?? (accrocheActive && !enLigne && !enAutocontrole() && !ajoutLevee.actif ? implanter.cible : null),
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
@@ -2020,7 +2024,8 @@ function envoyerImplantationAuPlan() {
 /** Plan DXF recalé, en MN95 (fenêtre « Exporter »). */
 function exporterPlanRecale(id) {
   const choisi = projet.plansDxf.find((p) => p.id === id);
-  if (!choisi?.recalage?.applique) return;
+  // Dessin DAO (0.147.0) : déjà en MN95, exporté tel quel.
+  if (!choisi?.recalage?.applique && !choisi?.dao) return;
   const nom = String(choisi.nom).replace(/\.dxf$/i, '');
   telecharger(new Blob([octetsDxf(genererDxfPlan(planRecale(choisi)))], { type: 'application/dxf' }), `${nom}_MN95.dxf`);
 }
@@ -3733,6 +3738,10 @@ function toucherPourImplantation(position, tolerance) {
     toucherCoteTalus(position, tolerance);
     return;
   }
+  if (daoAppli?.actif()) {
+    daoAppli.toucher(position, tolerance);
+    return;
+  }
   if (piloteActif()) {
     toucherPourDessin(position, tolerance);
     return;
@@ -5413,6 +5422,8 @@ document.addEventListener('visibilitychange', () => {
   else partage.verifierMaintenant();
 });
 
+// DAO (0.147.0, Expert) : voir dao/dao.js ; créée après le plan (plus bas).
+let daoAppli = null;
 const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPosition: toucherPourCoupe,
   peutDeplacerCoupe: () => !refuserEnLectureSeule(),
@@ -5469,6 +5480,39 @@ const plan = creerPlan(document.querySelector('#plan'), {
     envoyerImplantationAuPlan();
     plan.rafraichirImplantation();
   },
+});
+
+// DAO (0.147.0, Expert, Calculs › Dessin) : dessiner des objets sur le plan (voir dao/dao.js).
+daoAppli = creerDao({
+  cadre: () => document.querySelector('#plan .plan-cadre'),
+  projet: () => projet,
+  nouvelId: () => nouvelIdentifiant(),
+  accrocher: (mode, position, tolerance) => {
+    const sources = mode === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansDuProjet(), position, tolerance);
+    return accrocher(mode, position, tolerance, sources);
+  },
+  demanderTexte,
+  demanderChamps,
+  confirmer: (texte) => confirm(texte),
+  surfaces: () => projet.surfaces.filter((x) => trianglesDeSurface(x.id).length > 0).map((x) => [x.id, x.nom]),
+  altitudeSur: (id) => {
+    const triangles = trianglesDeSurface(id);
+    return triangles.length > 0 ? chercheurAltitude(triangles) : null;
+  },
+  traitSous: (position, tolerance) => accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes)?.sommets ?? null,
+  message: (texte, duree) => afficherMessage(texte, duree),
+  redessiner: () => recalculer(),
+  enregistrer: () => modifie(),
+  lectureSeule: () => refuserEnLectureSeule(),
+});
+document.querySelector('#bouton-dao').addEventListener('click', () => {
+  if (daoAppli.actif()) {
+    daoAppli.arreter();
+    return;
+  }
+  if (!aAcces('expert')) return;
+  if (estTelephone()) afficherOnglet('plan');
+  daoAppli.commencer();
 });
 
 /**
