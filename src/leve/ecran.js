@@ -309,6 +309,7 @@ export function creerEcranLeve(conteneur, actions) {
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.champ === 'surface-lame') actions.choisirSurfaceLame(cible.value);
     else if (cible.dataset.toleranceLame) actions.reglerToleranceLame(cible.dataset.toleranceLame, cible.value);
+    else if (cible.dataset.outil) actions.reglerOutil(cible.dataset.outil, cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
@@ -1505,7 +1506,12 @@ export function creerEcranLeve(conteneur, actions) {
     let contenu;
     if (enGuidage) contenu = vueImplantation();
     else if (autocontrole) contenu = htmlControle(donnees.autocontrole, { gestionOuverte: gestionControleOuverte, erreurGestion });
-    else if (donnees.mode === 'lame') contenu = htmlLame(donnees.lame, { reglagesOuverts: reglagesLameOuverts, bip: donnees.controle.bip !== false });
+    else if (donnees.mode === 'lame') {
+      // Outil à 1 GNSS sans ses distances (0.142.0) : réglages ouverts, et ils le restent pendant la saisie.
+      const outil = donnees.lame.outil ?? {};
+      if (donnees.lame.unGnss && !(Number(outil.gauche) + Number(outil.droite) > 0.1)) reglagesLameOuverts = true;
+      contenu = htmlLame(donnees.lame, { reglagesOuverts: reglagesLameOuverts, bip: donnees.controle.bip !== false });
+    }
     else contenu = donnees.mode === 'controler' ? controle() : priseDePoint();
     conteneur.innerHTML = `
         <div class="ecran-terrain cadre-mode-${donnees.mode}">

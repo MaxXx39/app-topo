@@ -66,6 +66,7 @@ import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
 import { pointAvecDelta, deltaActif } from './topo/delta.js';
 import { ligneDecalee, rangerLigneDecalee } from './topo/ligne-decalee.js';
+import { pointsOutil } from './topo/outil.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { surChangementListes } from './reglages/listes-partagees.js';
 import { lireDossiers, ecrireDossiers, dossiersTries, dossierDuProjet, ajouterDossier, renommerDossier, supprimerDossier, rangerProjet, SANS_DOSSIER } from './projet/dossiers.js';
@@ -214,6 +215,15 @@ terrain.libellePoint = '';
 terrain.libelleAire = '';
 // Anciens réglages (avant 0.73.0) : le profil en long prend ses valeurs de départ.
 terrain.lame = { machine: 'grader', ...terrain.lame };
+// 0.142.0 : outil à 1 GNSS (râteau, ou Bull à 1 récepteur) : nombre de GNSS du Bull et distances
+// depuis le bas du mât jusqu'aux bords de chaque outil (m).
+terrain.lame.recepteursBull = terrain.lame.recepteursBull === 1 ? 1 : 2;
+terrain.lame.outils = { rateau: { gauche: 0, droite: 0, avant: 0, arriere: 0 }, bull: { gauche: 0, droite: 0, avant: 0, arriere: 0 }, ...(terrain.lame.outils ?? {}) };
+
+/** Vrai si la machine choisie est guidée par un seul GNSS (râteau, ou Bull réglé sur 1 GNSS). */
+function outilAUnGnss() {
+  return terrain.lame.machine === 'rateau' || (terrain.lame.machine === 'bull' && terrain.lame.recepteursBull === 1);
+}
 // Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
 // point à implanter en cours ({ id (point de la liste « À implanter », ou null), nom, est, nord, altitude }).
 // Implantation d'une ligne : points choisis pour la faire (pointsLigne : [{ est, nord, altitude, nom }])
@@ -1376,7 +1386,27 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       },
       // Machine (0.100.0) : Grader (coupe dans le sens de marche) ou Bull (perpendiculaire à la lame).
       choisirMachine: (machine) => {
-        terrain.lame.machine = machine === 'bull' ? 'bull' : 'grader';
+        terrain.lame.machine = ['bull', 'rateau'].includes(machine) ? machine : 'grader';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // Bull : 1 ou 2 GNSS (0.142.0).
+      choisirRecepteursBull: (nombre) => {
+        terrain.lame.recepteursBull = Number(nombre) === 1 ? 1 : 2;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // Distances de l'outil à 1 GNSS (m, depuis le bas du mât) : gauche, droite, avant, arrière.
+      reglerOutil: (champ, texte) => {
+        const machine = terrain.lame.machine === 'rateau' ? 'rateau' : 'bull';
+        if (!['gauche', 'droite', 'avant', 'arriere'].includes(champ)) return;
+        const valeur = String(texte ?? '').trim() === '' ? 0 : lireNombreTape(texte);
+        if (valeur == null || !Number.isFinite(valeur) || valeur < 0 || valeur > 30) {
+          afficherMessage('Distance illisible : un nombre de mètres entre 0 et 30, par exemple 1.250', 4000);
+          recalculer();
+          return;
+        }
+        terrain.lame.outils[machine] = { ...terrain.lame.outils[machine], [champ]: valeur };
         retenirReglagesTerrain();
         recalculer();
       },
@@ -3033,6 +3063,7 @@ function raisonRecepteurLame(etat, nom) {
  */
 function calculerLame() {
   if (!ecranLeve || terrain.mode !== 'lame' || !lameActive()) return null;
+  if (outilAUnGnss()) return calculerOutilUnGnss();
   const [etatG, etatD] = terrain.lame.inverse ? [etatRecepteur2, etatRecepteur] : [etatRecepteur, etatRecepteur2];
   const [nomG, nomD] = terrain.lame.inverse ? ['Gauche (récepteur 2)', 'Droite (récepteur 1)'] : ['Gauche (récepteur 1)', 'Droite (récepteur 2)'];
   const coins = etatG?.position && etatD?.position ? { gauche: etatG.position, droite: etatD.position } : null;
@@ -3058,6 +3089,44 @@ function calculerLame() {
 }
 
 /**
+ * Outil à 1 GNSS (0.142.0) : râteau ou Bull à 1 récepteur. Les bouts gauche / droit (à mi-longueur de
+ * l'outil) jouent le rôle des 2 GNSS du Bull ; mêmes écarts, dévers et coupes. Voir topo/outil.js.
+ */
+function calculerOutilUnGnss() {
+  const etat = etatRecepteur;
+  const machine = terrain.lame.machine === 'rateau' ? 'rateau' : 'bull';
+  const dims = machine === 'bull' ? { ...terrain.lame.outils.bull, avant: 0, arriere: 0 } : terrain.lame.outils.rateau;
+  const surface = projet.surfaces.find((s) => s.id === terrain.lame.surfaceId);
+  const triangles = surface ? trianglesDeSurface(surface.id) : [];
+  const recepteurs = { gauche: etat, droite: etat };
+  const penche = (etat?.inclinaison ?? 0) > 0.2;
+  const raison = (!surface && 'Choisis le levé à suivre')
+    || (triangles.length === 0 && 'Ce levé n\'a pas encore de triangles')
+    || raisonRecepteurLame(etat, 'GNSS')
+    || (!etat.inclinaisonPrete && 'GNSS : inclinaison pas prête (le cap et la pente de l\'outil en dépendent)')
+    || (etat.cap == null && 'GNSS : pas de cap reçu')
+    || (penche && etat.directionInclinaison == null && 'GNSS : direction de l\'inclinaison pas reçue (mets l\'APK à jour)')
+    || (!(dims.gauche + dims.droite > 0.1) && `Tape les distances de l'outil (⚙ : gauche, droite${machine === 'rateau' ? ', avant, arrière' : ''})`);
+  if (raison) return { raison, guidage: null, coupe: null, coins: null, recepteurs, unGnss: true };
+  const points = pointsOutil(etat.position, { cap: etat.cap, inclinaison: etat.inclinaison ?? 0, directionInclinaison: etat.directionInclinaison ?? 0 }, dims);
+  const coins = { gauche: points.gauche, droite: points.droite, contour: machine === 'rateau' ? points.coins : null };
+  if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
+  const guidage = guidageLame({ gauche: coins.gauche, droite: coins.droite, altitudeSurface: chercheurLame.chercher, tolerances: terrain.lame.tolerances });
+  if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coupe: null, coins, recepteurs, unGnss: true };
+  // Écart au centre de l'outil (même formule qu'un coin : altitude de la surface − altitude du point).
+  const surfaceCentre = chercheurLame.chercher(points.centre.est, points.centre.nord);
+  guidage.centre = { ecart: surfaceCentre == null ? null : surfaceCentre - points.centre.altitude };
+  const ligne = ligneDeCoupeLame(coins.gauche, coins.droite, 1);
+  const coupe = {
+    longueur: guidage.largeur + 2,
+    profils: profilSurface(triangles, ligne.debut, ligne.fin),
+    gauche: { distance: 1, altitude: coins.gauche.altitude },
+    droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
+  };
+  return { raison: null, guidage, coupe, coins, recepteurs, unGnss: true, bords: bordsDeLaLame(coins.gauche, coins.droite, triangles), profil: coupePerpendiculaireLame(coins, triangles), toleranceVert: terrain.lame.tolerances.vert };
+}
+
+/**
  * Coupe perpendiculaire de la lame (0.100.0, remplace le profil en long) : depuis le milieu de la
  * lame, 20 m devant et 10 m derrière ; Bull : perpendiculaire à la lame ; Grader : dans le sens de
  * marche (dernières positions du milieu), perpendiculaire à la lame à l'arrêt. Tronçons et ruptures
@@ -3069,7 +3138,8 @@ function coupePerpendiculaireLame(coins, triangles) {
   historiqueLame.push({ est: milieu.est, nord: milieu.nord, temps: maintenant });
   while (historiqueLame.length > 0 && maintenant - historiqueLame[0].temps > 10_000) historiqueLame.shift();
   const azimut = directionDeMarche(historiqueLame, { distanceMin: 1, dureeMax: 5000 });
-  const sens = sensCoupeLame(terrain.lame.machine, coins.gauche, coins.droite, azimut);
+  // Râteau : comme le Bull, coupe perpendiculaire à l'outil (dans son axe avant / arrière).
+  const sens = sensCoupeLame(terrain.lame.machine === 'rateau' ? 'bull' : terrain.lame.machine, coins.gauche, coins.droite, azimut);
   if (!sens) return null;
   const devant = COUPE_DEVANT;
   const derriere = COUPE_DERRIERE;
@@ -4816,6 +4886,9 @@ function donneesCommunes() {
       tolerances: terrain.lame.tolerances,
       machine: terrain.lame.machine,
       recepteur2: Boolean(etatRecepteur2?.connecte),
+      recepteursBull: terrain.lame.recepteursBull,
+      unGnss: outilAUnGnss(),
+      outil: terrain.lame.machine === 'rateau' ? terrain.lame.outils.rateau : terrain.lame.outils.bull,
     },
     autocontrole: donneesAutocontrole(),
     // Seulement les levés et surfaces qui ont des triangles (0.90.1 : pas les levés vides), plus la surface choisie.

@@ -10929,3 +10929,13 @@ body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 1
 .levee-en-cours .bouton-photo-globale svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
 /* 0.141.0 : bouton qui montre la ligne du delta. */
 .bouton-ouvrir-delta { margin: 4px 0; color: #9a3412; border-color: #ea580c; font-weight: 800; min-height: 40px; }
+
+/* 0.142.0 : Guidage › Râteau et Bull à 1 GNSS. */
+.choix-gnss { display: flex; gap: 6px; }
+.case-machine.petite { min-height: 40px; font-size: 0.9rem; }
+.reglages-outil { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 6px 0; }
+.reglages-outil .titre-choix { width: 100%; margin: 0; }
+.reglages-outil label { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+.reglages-outil input { width: 80px; min-height: 40px; text-align: right; }
+.plan .contour-outil { fill: rgba(250, 204, 21, 0.35); stroke: #a16207; stroke-width: 2; }
+.ecran-lame .choix-machine { grid-template-columns: repeat(3, 1fr); }

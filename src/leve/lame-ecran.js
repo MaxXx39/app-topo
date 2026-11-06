@@ -36,11 +36,28 @@ const pourcent = (valeur) => {
 export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) {
   const { surfaces, surfaceId, tolerances } = donnees;
   const cm = (m) => String(Math.round(m * 1000) / 10);
-  const machine = donnees.machine === 'bull' ? 'bull' : 'grader';
+  const machine = ['bull', 'rateau'].includes(donnees.machine) ? donnees.machine : 'grader';
+  // Outil à 1 GNSS (0.142.0) : râteau, ou Bull réglé sur 1 GNSS ; distances depuis le bas du mât.
+  const unGnss = Boolean(donnees.unGnss);
+  const outil = donnees.outil ?? {};
+  const champOutil = (cle, titre) => `<label>${titre} <input type="text" inputmode="decimal" data-outil="${cle}" value="${outil[cle] ? Number(outil[cle]).toFixed(3) : ''}" placeholder="0.000" /> m</label>`;
+  const nombreGnss = machine === 'bull'
+    ? `<div class="ligne-lame choix-gnss" role="radiogroup" aria-label="Nombre de GNSS">
+        <button type="button" class="case-machine petite ${unGnss ? 'actif' : ''}" role="radio" data-action="choisirRecepteursBull" data-valeur="1" aria-checked="${unGnss}">1 GNSS</button>
+        <button type="button" class="case-machine petite ${unGnss ? '' : 'actif'}" role="radio" data-action="choisirRecepteursBull" data-valeur="2" aria-checked="${!unGnss}">2 GNSS</button>
+      </div>`
+    : '';
+  const reglagesOutil = unGnss
+    ? `<div class="reglages-outil"><p class="titre-choix">Depuis le bas du GNSS jusqu'au bord ${machine === 'rateau' ? 'du râteau' : 'de la lame'}</p>
+        ${champOutil('gauche', 'Gauche')}${champOutil('droite', 'Droite')}${machine === 'rateau' ? `${champOutil('avant', 'Avant')}${champOutil('arriere', 'Arrière')}` : ''}</div>`
+    : '';
+  // Distances pas encore tapées : les réglages sont montrés d'office.
+  if (unGnss && !(Number(outil.gauche) + Number(outil.droite) > 0.1)) reglagesOuverts = true;
   // Grader ou Bull (0.114.0) : deux boutons côte à côte, un seul choisi à la fois.
   const caseMachine = (cle, titre) => `<button type="button" class="case-machine ${machine === cle ? 'actif' : ''}" role="radio" data-action="choisirMachine" data-valeur="${cle}" aria-checked="${machine === cle}">${titre}</button>`;
   return `<div class="ecran-lame">
-    <div class="ligne-lame choix-machine" role="radiogroup" aria-label="Machine">${caseMachine('grader', 'Grader')}${caseMachine('bull', 'Bull')}</div>
+    <div class="ligne-lame choix-machine" role="radiogroup" aria-label="Machine">${caseMachine('grader', 'Grader')}${caseMachine('bull', 'Bull')}${caseMachine('rateau', 'Râteau')}</div>
+    ${nombreGnss}
     <div class="ligne-lame">
       ${surfaces.length > 0
         ? `<select data-champ="surface-lame" aria-label="Levé à suivre">
@@ -48,16 +65,16 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) 
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
         : '<p class="vide">Aucun levé (Terrain › Lever).</p>'}
-      <button type="button" class="bouton-secondaire" data-action="inverserLame" title="Inverser gauche et droite">⇄ G / D</button>
+      ${unGnss ? '' : '<button type="button" class="bouton-secondaire" data-action="inverserLame" title="Inverser gauche et droite">⇄ G / D</button>'}
       <button type="button" class="bouton-bip ${bip ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${bip}" title="${bip ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${bip ? 'Couper le bip' : 'Remettre le bip'}">${bip ? '🔔' : '🔕'}</button>
-      <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Tolérances">⚙</button>
+      <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Réglages">⚙</button>
       ${bulle('lame')}
     </div>
-    ${reglagesOuverts ? `<div class="reglages-lame">
+    ${reglagesOuverts ? `${reglagesOutil}<div class="reglages-lame">
         <label>Vert ≤ <input type="text" inputmode="decimal" data-tolerance-lame="vert" value="${cm(tolerances.vert)}" /> cm</label>
         <label>Orange ≤ <input type="text" inputmode="decimal" data-tolerance-lame="orange" value="${cm(tolerances.orange)}" /> cm</label>
       </div>` : ''}
-    ${donnees.recepteur2 ? '' : '<button type="button" class="bouton-secondaire bouton-recepteur-2" data-action="ouvrirRecepteur">Connecter le 2e GNSS</button>'}
+    ${donnees.recepteur2 || unGnss ? '' : '<button type="button" class="bouton-secondaire bouton-recepteur-2" data-action="ouvrirRecepteur">Connecter le 2e GNSS</button>'}
     <p class="raison-lame" data-vivant="lame-raison" hidden></p>
     <div class="coins-lame avec-regles">
       <div class="colonne-regle" data-vivant="lame-regle-gauche">${htmlRegleHauteur(null)}</div>
@@ -122,10 +139,15 @@ export function rafraichirLame(conteneur, vivant) {
       <span class="altitude-coin">H ${position ? formaterNombre(position.altitude) : '—'}</span>`;
     // Règle de hauteur de ce coin (0.107.0) : à gauche du coin gauche, à droite du coin droit.
     zone(`lame-regle-${cote}`).innerHTML = htmlRegleHauteur(coin?.ecart ?? null, vivant.toleranceVert ?? 0.02);
-    zone(`lame-gnss-${cote}`).innerHTML = texteRecepteur(`GNSS ${cote === 'gauche' ? 'G' : 'D'}`, vivant.recepteurs?.[cote]);
+    // Outil à 1 GNSS (0.142.0) : un seul récepteur, montré une fois.
+    const cellule = zone(`lame-gnss-${cote}`);
+    cellule.hidden = Boolean(vivant.unGnss) && cote === 'droite';
+    cellule.innerHTML = texteRecepteur(vivant.unGnss ? 'GNSS' : `GNSS ${cote === 'gauche' ? 'G' : 'D'}`, vivant.recepteurs?.[cote]);
   }
+  // Outil à 1 GNSS (0.142.0) : écart au centre de l'outil en plus.
+  const centre = g?.centre ? `Centre <strong>${texteEcartLame(g.centre.ecart)}</strong> · ` : '';
   zone('lame-devers').innerHTML = g
-    ? `Dévers <strong>${pourcent(g.devers)}</strong> · voulu <strong>${pourcent(g.deversVoulu)}</strong>${g.ecartDevers == null ? '' : ` · écart ${pourcent(g.ecartDevers)}`} · lame ${formaterNombre(g.largeur)} m`
+    ? `${centre}Dévers <strong>${pourcent(g.devers)}</strong> · voulu <strong>${pourcent(g.deversVoulu)}</strong>${g.ecartDevers == null ? '' : ` · écart ${pourcent(g.ecartDevers)}`} · lame ${formaterNombre(g.largeur)} m`
     : 'Dévers —';
   zone('lame-coupe').innerHTML = g && vivant.coupe ? svgCoupeLame(vivant.coupe, g) : '';
   // Bords de la surface dans le prolongement de la lame (0.75.0) : distance (négative hors surface) et altitude.

@@ -732,6 +732,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const g = versEcran(lame.gauche.est, lame.gauche.nord, vue);
     const d = versEcran(lame.droite.est, lame.droite.nord, vue);
     const groupe = creerElement('g', { class: 'lame-plan' });
+    // Râteau (0.142.0) : le contour de l'outil (4 coins) en plus du trait entre les bouts gauche et droit.
+    if (lame.contour?.length === 4) {
+      const coins = lame.contour.map((c) => versEcran(c.est, c.nord, vue));
+      groupe.append(creerElement('polygon', { points: coins.map((c) => `${c.x},${c.y}`).join(' '), class: 'contour-outil' }));
+    }
     groupe.append(creerElement('line', { x1: g.x, y1: g.y, x2: d.x, y2: d.y, class: 'trait-lame' }));
     for (const [p, classe, lettre] of [[g, lame.classeGauche, 'G'], [d, lame.classeDroite, 'D']]) {
       groupe.append(creerElement('circle', { cx: p.x, cy: p.y, r: 8, class: `coin-lame-plan ${classe ? `ecart-${classe}` : ''}` }));
