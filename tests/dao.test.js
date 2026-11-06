@@ -39,3 +39,37 @@ describe('DAO', () => {
     expect(plan.bornes).toEqual({ estMin: 2500001, nordMin: 1200001, estMax: 2500011, nordMax: 1200007 });
   });
 });
+
+import { objetSousLeDoigt, transformerObjet, translation, rotation, miroir, decalerObjet, prolongerJusqua } from '../src/topo/dao.js';
+
+describe('DAO étape 2 : modifier', () => {
+  const ligne = { sorte: 'ligne', points: [p(0, 0, 400), p(10, 0, 401)] };
+  const cercle = { sorte: 'cercle', points: [p(20, 20), p(22, 20)] };
+  it('objet sous le doigt', () => {
+    expect(objetSousLeDoigt([ligne, cercle], p(5, 0.3), 0.5)).toBe(0);
+    expect(objetSousLeDoigt([ligne, cercle], p(20, 22.2), 0.5)).toBe(1);
+    expect(objetSousLeDoigt([ligne, cercle], p(50, 50), 0.5)).toBe(-1);
+  });
+  it('déplacer, tourner (horaire), miroir', () => {
+    expect(transformerObjet(ligne, translation(p(0, 0), p(1, 2))).points[1]).toEqual({ est: 11, nord: 2, altitude: 401 });
+    // 90° horaire autour de (0,0) : l'est (10, 0) passe au sud (0, -10).
+    expect(transformerObjet(ligne, rotation(p(0, 0), 90, true)).points[1]).toMatchObject({ est: 0, nord: -10 });
+    expect(transformerObjet(ligne, rotation(p(0, 0), 90, false)).points[1]).toMatchObject({ est: 0, nord: 10 });
+    // Miroir par l'axe nord-sud passant par x = 5.
+    expect(transformerObjet(ligne, miroir(p(5, 0), p(5, 10))).points[1]).toMatchObject({ est: 0, nord: 0 });
+  });
+  it('décaler une ligne (droite = sud en allant vers l\'est) et un cercle', () => {
+    expect(decalerObjet(ligne, 2).points.map((x) => [x.est, x.nord])).toEqual([[0, -2], [10, -2]]);
+    const grand = decalerObjet(cercle, 1);
+    expect(Math.hypot(grand.points[1].est - 20, grand.points[1].nord - 20)).toBeCloseTo(3, 6);
+    expect(decalerObjet(cercle, -5)).toBeNull();
+  });
+  it('prolonger jusqu\'à une limite, et couper', () => {
+    const mur = [p(15, -5), p(15, 5)];
+    const long = prolongerJusqua(ligne, p(9, 0), mur);
+    expect(long.points[1]).toEqual({ est: 15, nord: 0, altitude: 401.5 });
+    const court = prolongerJusqua(ligne, p(9, 0), [p(6, -5), p(6, 5)]);
+    expect(court.points[1].est).toBe(6);
+    expect(prolongerJusqua(ligne, p(9, 0), [p(0, 5), p(10, 5)])).toBeNull();
+  });
+});

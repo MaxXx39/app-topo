@@ -10961,3 +10961,4 @@ body.mode-telephone .tuiles-export { grid-template-columns: repeat(2, 1fr); }
 .barre-dao .puce-choix.petite { min-height: 34px; padding: 4px 10px; font-size: 0.82rem; }
 .barre-dao .calque-dao { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 0.85rem; }
 .bouton-dao { margin: 6px 0 10px; }
+.barre-dao .effacer-dao { border-color: #dc2626; color: #dc2626; }

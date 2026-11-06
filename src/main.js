@@ -5493,6 +5493,8 @@ daoAppli = creerDao({
   },
   demanderTexte,
   demanderChamps,
+  confirmer: (texte) => confirm(texte),
+  traitSous: (position, tolerance) => accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes)?.sommets ?? null,
   message: (texte, duree) => afficherMessage(texte, duree),
   redessiner: () => recalculer(),
   enregistrer: () => modifie(),
