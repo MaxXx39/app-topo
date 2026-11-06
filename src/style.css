@@ -10924,3 +10924,6 @@ body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 1
 .ligne-delta .champ-delta input { width: 78px; min-height: 40px; font-size: 1rem; text-align: right; }
 .plan .delta-point { fill: none; stroke: #ea580c; stroke-width: 3; }
 .plan .trait-delta { stroke: #ea580c; stroke-width: 2; stroke-dasharray: 5 4; }
+/* 0.140.0 : appareil photo de tout le levé dans le bandeau « Lever en cours ». */
+.levee-en-cours .bouton-photo-globale { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; min-width: 40px; }
+.levee-en-cours .bouton-photo-globale svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; }

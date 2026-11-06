@@ -316,6 +316,10 @@ export function creerEcranLeve(conteneur, actions) {
       // Photo d'un point de contrôle (0.105.0) : rangée dans le projet, rattachée au point.
       actions.ajouterPhotoControle(cible.dataset.id, [...cible.files]);
       cible.value = '';
+    } else if (cible.dataset.champ === 'photo-levee-globale' && cible.files?.length) {
+      // Photo de tout le levé (0.140.0, Intermédiaire) : pas rattachée à un point.
+      actions.ajouterPhotosLeveeGlobale([...cible.files]);
+      cible.value = '';
     } else if (cible.dataset.champ === 'photo-levee' && cible.files?.length) {
       // Photo du levé (0.77.0) : appareil photo de la tablette, rangée avec le levé en cours.
       actions.ajouterPhotosLevee([...cible.files]);
@@ -1214,6 +1218,10 @@ export function creerEcranLeve(conteneur, actions) {
       <button type="button" class="bouton-crayon-levee" data-action="renommerLevee" title="Renommer" aria-label="Renommer le levé">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
       <span class="boutons-levee">
+        <label class="bouton-secondaire bouton-photo-globale seulement-intermediaire" title="Photo de tout le levé (pas d'un point)" aria-label="Photo de tout le levé">
+          <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>
+          <input type="file" data-champ="photo-levee-globale" accept="image/*" capture="environment" hidden />
+        </label>
         <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer</button>
         <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature" aria-label="Nouveau levé"><span class="texte-long">+ Nouveau</span><span class="texte-court">+</span></button>
       </span>
@@ -1346,7 +1354,7 @@ export function creerEcranLeve(conteneur, actions) {
           <p class="titre-choix">Photos (${photos.length}) ${bulle('photos')}</p>
           <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
               <img src="${photo.miniature}" alt="${echapper(photo.legende || donnees.stock.nom)}" />
-              <span class="point-photo">📷 ${photo.point ? echapper(photo.point) : photo.attentePoint ? 'prochain point' : '—'}</span>
+              <span class="point-photo">📷 ${photo.point ? echapper(photo.point) : photo.attentePoint ? 'prochain point' : 'tout le levé'}</span>
               <input type="text" data-champ="legende-photo-levee" data-id="${photo.id}" value="${echapper(photo.legende ?? '')}" placeholder="Légende" aria-label="Légende de la photo" />
               <button type="button" class="bouton-lien" data-action="supprimerPhotoLevee" data-valeur="${photo.id}">supprimer</button>
             </figure>`).join('')}</div>

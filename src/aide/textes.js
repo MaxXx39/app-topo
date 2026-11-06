@@ -58,7 +58,7 @@ export const TEXTES_AIDE = {
   trianglesEnTrop:
     'Mode Expert, en bas de Terrain › Lever. Sans contour, le levé relie les points extérieurs et peut créer des triangles en trop. « Supprimer au doigt », puis touche un triangle sur le plan pour l\'enlever ; le toucher à nouveau le remet. « Terminer » quand c\'est fini ; « tout rétablir » remet tous les triangles.',
   photos:
-    'Photos du levé : appareil photo à gauche de « Enreg. Pts ». Une photo prise attend le prochain point enregistré et prend son nom (« 📷 prochain point », puis « 📷 P-12 »). Sur le plan, un 📷 à côté du point : le toucher ouvre la photo en grand. Elles sont gardées dans le projet (et sur Drive), et mises dans le PDF avec le nom du point devant la légende.',
+    'Photos du levé : appareil photo à gauche de « Enreg. Pts ». Une photo prise attend le prochain point enregistré et prend son nom (« 📷 prochain point », puis « 📷 P-12 »). Sur le plan, un 📷 à côté du point : le toucher ouvre la photo en grand. Dès Intermédiaire, l\'appareil photo du bandeau « Lever en cours » prend une photo de tout le levé (stock, terrain… pas d\'un point) : « 📷 tout le levé » ; elle se voit dans Projet › Contenu du projet (toucher pour l\'ouvrir et dessiner dessus) et part dans les PDF (Plan et volumes, liste de points avec les photos). Elles sont gardées dans le projet (et sur Drive), et mises dans le PDF avec le nom du point devant la légende.',
   photosMesure:
     'Prends une photo (ou choisis-la dans la galerie) : elle est réduite et rangée avec la mesure, dans le projet. Ajoute une légende. Elles sont imprimées à la fin du PDF des mesures si la case « Photos des mesures » est cochée.',
   importerSurface:

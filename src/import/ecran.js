@@ -353,17 +353,19 @@ function ligneCadastre(projet, leve) {
 function photosDuLeve(projet, leve) {
   const proprietaire = [...(projet.surfaces ?? []), ...(projet.metres ?? []), ...(projet.autres ?? []), ...(projet.reseaux ?? [])].find((o) => o.leveId === leve.id);
   const noms = new Set(leve.points.map((p) => p.nom));
-  return (proprietaire?.photos ?? []).filter((photo) => photo.point && noms.has(photo.point));
+  // 0.140.0 : aussi les photos de tout le levé (sans point), en premier.
+  const photos = proprietaire?.photos ?? [];
+  return [...photos.filter((photo) => !photo.point && !photo.attentePoint), ...photos.filter((photo) => photo.point && noms.has(photo.point))];
 }
 
 /** Photos des points (miniatures repliables : toucher une photo l'ouvre en grand, avec le nom du point). */
 function photosDesPoints(photos) {
   if (photos.length === 0) return '';
   return `<details class="photos-de-la-liste">
-      <summary>Photos des points (${photos.length})</summary>
+      <summary>Photos (${photos.length})</summary>
       <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
-          <button type="button" class="miniature-photo" data-action="voir-photo" data-id="${photo.id}" aria-label="Voir la photo de ${echapper(photo.point)}"><img src="${photo.miniature}" alt="${echapper(photo.legende || photo.point)}" /></button>
-          <span class="point-photo">📷 ${echapper(photo.point)}</span>
+          <button type="button" class="miniature-photo" data-action="voir-photo" data-id="${photo.id}" aria-label="Voir la photo de ${echapper(photo.point ?? 'tout le levé')}"><img src="${photo.miniature}" alt="${echapper(photo.legende || photo.point || 'Photo du levé')}" /></button>
+          <span class="point-photo">📷 ${echapper(photo.point ?? 'tout le levé')}</span>
           ${photo.legende ? `<span class="aide">${echapper(photo.legende)}</span>` : ''}
         </figure>`).join('')}</div>
     </details>`;

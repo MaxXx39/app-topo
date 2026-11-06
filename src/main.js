@@ -1221,6 +1221,12 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         // 0.96.0 : la photo attend le prochain point enregistré, et prend son nom (voir rangerPointPris).
         ajouterPhotos(levee, fichiers, { attentePoint: true });
       },
+      // Photo de tout le levé (0.140.0, Intermédiaire, bandeau « Lever en cours ») : sans point.
+      ajouterPhotosLeveeGlobale: (fichiers) => {
+        const levee = leveeEnCours();
+        if (!levee || refuserEnLectureSeule()) return;
+        ajouterPhotos(levee, fichiers);
+      },
       legendePhotoLevee: (id, legende) => {
         const photo = (leveeEnCours())?.photos?.find((p) => p.id === id);
         if (!photo) return;
@@ -1967,6 +1973,9 @@ function exporterListe(type, id) {
       surface: leve.nom,
       legende: [ph.point, parNom.get(ph.point).altitude == null ? null : `H ${formaterNombre(parNom.get(ph.point).altitude)}`, ph.legende].filter(Boolean).join(' · '),
     }));
+    // Photos de tout le levé (0.140.0) : d'abord, avec « levé » devant la légende.
+    const globales = (proprietaire?.photos ?? []).filter((ph) => !ph.point && !ph.attentePoint).map((ph) => ({ ...ph, surface: leve.nom, legende: ['Photo du levé', ph.legende].filter(Boolean).join(' · ') }));
+    photos = [...globales, ...photos];
   }
   // Nom du fichier : projet_liste, sans l'extension du fichier importé (« stock.csv » -> « stock »).
   const base = `${nomDeFichierProjet(projet)}_${titre.replace(/\.[a-z0-9]{2,4}$/i, '')}`.replace(/[\\/:*?"<>|]/g, '_');
@@ -4437,7 +4446,7 @@ function montrerPhoto(id) {
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-photo';
   fenetre.innerHTML = `<form method="dialog">
-      <h2>📷 ${echapper(photo.point ?? '')}</h2>
+      <h2>📷 ${echapper(photo.point ?? 'Photo du levé')}</h2>
       <img src="${photo.image}" alt="${echapper(photo.legende || photo.point || 'photo')}" />
       ${photo.legende ? `<p>${echapper(photo.legende)}</p>` : ''}
       <div class="ligne-outils"><button class="bouton">Fermer</button><button type="button" class="bouton-secondaire seulement-intermediaire" data-cle="dessiner">✎ Dessiner</button>${deControle ? '<button type="button" class="bouton-lien" data-cle="supprimer">supprimer la photo</button>' : ''}</div>
