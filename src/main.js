@@ -2119,6 +2119,9 @@ function travailAGarder() {
   return null;
 }
 
+// 0.138.0 : la cible prend le haut (plan en encart) ou le rend : le plan se recadre sur le point et la canne.
+document.addEventListener('cible-en-haut', () => requestAnimationFrame(() => requestAnimationFrame(cadrerSurImplantation)));
+
 /** Cadre le plan sur ce qu'on implante (point ou ligne) et la position du récepteur. */
 function cadrerSurImplantation() {
   let coins = implanter.ligne && ['ligne', 'talus'].includes(terrain.implantation) ? [...implanter.ligne.sommets] : implanter.cible ? [implanter.cible] : [];

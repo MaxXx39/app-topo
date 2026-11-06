@@ -10844,3 +10844,71 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
 }
 .fenetre-reglages .bouton-fermer-appli svg { width: 26px; height: 26px; stroke-width: 2.8; }
 .fenetre-reglages .bouton-fermer-appli:active { background: #991b1b; color: #ffffff; }
+
+/* 0.138.0 (liste du 05.11, point 3) : près du point (cible en haut, moins de 2 m), le plan reste visible
+   en petit, en haut à droite de la cible, sans ses boutons. Plus loin : le plan comme avant. */
+@media (max-width: 899px) {
+  body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .panneau-plan {
+    top: calc(var(--hauteur-entete) + 8px);
+    left: auto;
+    right: 8px;
+    width: min(38vw, 300px);
+    height: min(calc(var(--hauteur-plan-guidage) * 0.42), 260px);
+    z-index: 13;
+    border: 3px solid #0d9488;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  }
+
+  body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .panneau-plan :is(.plan-calques, .plan-boutons, .boutons-taille-plan, .case-voir-ligne, .plan-attribution) {
+    display: none;
+  }
+}
+
+/* 0.138.0 (liste du 05.11, point 7) : barre du récepteur en 4 cases (état RTK, Z du bout de la canne,
+   hauteur de canne, inclinaison) ; l'important en gros, le détail en petit dessous, rien de coupé. */
+body.avec-recepteur .bandeaux-recepteur { height: 38px; gap: 2px; background: #0f172a; }
+body.avec-recepteur .entete { padding-bottom: 38px; }
+.bandeaux-recepteur .case-recepteur {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  line-height: 1.05;
+  overflow: hidden;
+  padding: 0 4px;
+}
+.bandeaux-recepteur .case-recepteur[hidden] { display: none; }
+.bandeaux-recepteur .case-recepteur b {
+  font-size: 18px;
+  font-weight: 800;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.bandeaux-recepteur .case-recepteur small {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+.bandeaux-recepteur .case-recepteur.attente b { font-size: 14px; }
+.bandeaux-recepteur [data-bandeau='z'] { flex-grow: 1.35; }
+.bandeaux-recepteur [data-bandeau='canne'] { flex-grow: 0.8; }
+.bandeaux-recepteur [data-bandeau='inclinaison'] { flex-grow: 1.3; }
+.bandeaux-recepteur .case-recepteur.info { background: #1e293b; }
+.bandeaux-recepteur .case-recepteur.info-canne { background: #334155; }
+.bandeaux-recepteur .case-recepteur.ok { background: var(--succes); }
+.bandeaux-recepteur .case-recepteur.pas-ok { background: var(--rouge); }
+.bandeaux-recepteur .case-recepteur.attente { background: var(--gris); }
+.bandeaux-recepteur .case-recepteur.tablette { background: #64748b; }
+body.mode-telephone.avec-recepteur .bandeaux-recepteur { height: 34px; }
+body.mode-telephone.avec-recepteur .entete { padding-bottom: 34px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur { padding: 0 2px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur b { font-size: 14px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur small { font-size: 9.5px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 12px; }

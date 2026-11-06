@@ -453,7 +453,10 @@ export function creerEcranLeve(conteneur, actions) {
    * cible : { svg, classe (couleur de la distance) } ou null.
    */
   function montrerCibleEnHaut(zone, cible) {
+    const avant = document.body.classList.contains('cible-en-haut');
     document.body.classList.toggle('cible-en-haut', Boolean(zone && cible));
+    // 0.138.0 : le plan devient (ou n'est plus) un encart en haut à droite : main.js le recadre.
+    if (avant !== document.body.classList.contains('cible-en-haut')) document.dispatchEvent(new CustomEvent('cible-en-haut'));
     if (!zone) return;
     zone.hidden = !cible;
     if (!cible) {
@@ -1603,58 +1606,68 @@ export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) 
     bandeaux.className = 'bandeaux-recepteur';
     bandeaux.setAttribute('role', 'status');
     bandeaux.title = 'Récepteur : toucher pour connecter ou régler';
-    // Petite icône de récepteur (+ flèche) : on comprend qu'on peut toucher la barre (0.86.0).
-    bandeaux.innerHTML = `<span data-bandeau="rtk"></span><span data-bandeau="inclinaison"></span>
-      <svg class="icone-bandeau" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><ellipse cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" /></svg>`;
+    // 0.138.0 (liste du 05.11, point 7) : 4 cases, chacune avec l'important en gros et le détail en petit dessous :
+    // état RTK (satellites), Z du bout de la canne (précision H / V), hauteur de canne, inclinaison (angle, âge des corrections).
+    bandeaux.innerHTML = ['rtk', 'z', 'canne', 'inclinaison'].map((cle) => `<div class="case-recepteur" data-bandeau="${cle}"><b></b><small></small></div>`).join('');
     bandeaux.addEventListener('click', () => document.dispatchEvent(new CustomEvent('ouvrir-recepteur')));
     document.querySelector('.entete').append(bandeaux);
   }
   // Toujours visible (appli Android) : c'est l'accès au récepteur.
   document.body.classList.add('avec-recepteur');
+  const cases = Object.fromEntries([...bandeaux.querySelectorAll('[data-bandeau]')].map((c) => [c.dataset.bandeau, c]));
+  /** Remplit une case : texte en gros, détail en petit, classe de couleur ; null = case cachée. */
+  const remplir = (cle, grand, petit = '', classe = 'info') => {
+    const c = cases[cle];
+    c.hidden = grand == null;
+    c.className = `case-recepteur ${classe}`;
+    c.querySelector('b').textContent = grand ?? '';
+    c.querySelector('small').textContent = petit;
+    c.querySelector('small').hidden = !petit;
+  };
+  const canne = hauteurCanne != null ? formaterNombre(hauteurCanne) : null;
   if (!etat?.connecte && !tablette) {
-    const [rtk, inclinaison] = bandeaux.querySelectorAll('[data-bandeau]');
-    rtk.textContent = 'Récepteur non connecté';
-    rtk.className = 'attente';
-    inclinaison.textContent = 'Toucher pour connecter';
-    inclinaison.className = 'attente';
+    remplir('rtk', 'Récepteur non connecté', '', 'attente');
+    remplir('z', null);
+    remplir('canne', null);
+    remplir('inclinaison', 'Toucher pour connecter', '', 'attente');
     return;
   }
   if (!etat?.connecte) {
-    const [rtk, inclinaison] = bandeaux.querySelectorAll('[data-bandeau]');
-    rtk.textContent = `GPS TABLETTE · ± ${Math.max(1, Math.round(tablette.precision ?? 0))} m`;
-    rtk.className = 'tablette';
-    inclinaison.textContent = 'GNSS non connecté';
-    inclinaison.className = 'attente';
+    remplir('rtk', 'GPS TABLETTE', `± ${Math.max(1, Math.round(tablette.precision ?? 0))} m`, 'tablette');
+    remplir('z', null);
+    remplir('canne', null);
+    remplir('inclinaison', 'GNSS non connecté', '', 'attente');
     return;
   }
-
-  const rtk = bandeaux.querySelector('[data-bandeau="rtk"]');
-  const inclinaison = bandeaux.querySelector('[data-bandeau="inclinaison"]');
-  // Âge des corrections (s), à côté de l'inclinaison (0.114.0).
-  const age = etat.ageCorrections != null ? `corr. ${Math.round(etat.ageCorrections)} s` : null;
+  const age = etat.ageCorrections != null ? `corr. ${Math.round(etat.ageCorrections)} s` : '';
   if (!etat.recu) {
-    rtk.textContent = 'En attente du récepteur…';
-    rtk.className = 'attente';
+    remplir('rtk', 'En attente…', '', 'attente');
+    remplir('z', 'Z —', '', 'info');
   } else {
-    const satellites = etat.nbSatellites != null ? ` · ${etat.nbSatellites} sat` : '';
-    const statut = { 4: 'RTK FIXE', 5: 'RTK FLOTTANT' }[etat.qualite] ?? `GNSS : ${etat.libelleQualite ?? '?'}`;
-    // Précision estimée par le GNSS (message GST, m), en gros (0.114.0) ; « — » s'il ne l'envoie pas.
-    rtk.innerHTML = `<span class="statut-rtk">${echapper(statut)}${satellites}</span>
-      <span class="precision-rtk">H ${formaterNombre(etat.precisionH)} <span>V ${formaterNombre(etat.precisionV)}</span></span>`;
-    // Le RTK fixe était là puis il est perdu : la barre clignote jusqu'à son retour (0.114.0).
+    const statut = { 1: 'AUTONOME', 2: 'DGPS', 4: 'FIXE', 5: 'FLOTTANT' }[etat.qualite] ?? (etat.libelleQualite ?? '?').toUpperCase();
+    // Le RTK fixe était là puis il est perdu : la case clignote jusqu'à son retour (0.114.0).
     if (etat.qualite === 4) fixeDejaVu = true;
-    rtk.className = etat.qualite === 4 ? 'ok' : `pas-ok${fixeDejaVu ? ' fixe-perdu' : ''}`;
+    remplir('rtk', statut, etat.nbSatellites != null ? `${etat.nbSatellites} sat` : '', etat.qualite === 4 ? 'ok' : `pas-ok${fixeDejaVu ? ' fixe-perdu' : ''}`);
+    // Z = altitude du bout de la canne envoyée par le GNSS (position compensée), comme partout dans l'appli.
+    const z = etat.position?.altitude;
+    const precision = etat.precisionH != null || etat.precisionV != null ? `H ${formaterNombre(etat.precisionH)} V ${formaterNombre(etat.precisionV)}` : '';
+    remplir('z', `Z ${z != null ? formaterNombre(z) : '—'}`, precision, 'info');
   }
-  // Inclinaison toujours montrée (0.114.1), avec l'âge des corrections à côté : on voit tout de suite
-  // s'il faut recalibrer la compensation d'inclinaison.
+  // Hauteur de canne (0.107.1) : seulement montrée, pour contrôle (tapée en Expert dans la fenêtre du récepteur).
+  remplir('canne', canne ?? '—', 'canne', 'info-canne');
+  // Inclinaison toujours montrée (0.114.1) : on voit tout de suite s'il faut recalibrer.
   if (etat.etatInclinaison == null) {
-    inclinaison.textContent = `Incl. ?${age ? ` · ${age}` : ''}`;
-    inclinaison.className = 'attente';
+    remplir('inclinaison', '?', ['incl.', age].filter(Boolean).join(' · '), 'attente');
   } else {
-    const angle = etat.inclinaison != null ? ` (${etat.inclinaison.toFixed(0)}°)` : '';
-    // Hauteur de canne (0.107.1) : seulement montrée, pour contrôle (réglée en Expert, voir Emlid Flow).
-    const canne = hauteurCanne != null ? ` · canne ${hauteurCanne.toFixed(3)}` : '';
-    inclinaison.textContent = `${etat.inclinaisonPrete ? `Incl. PRÊTE${angle}` : 'Incl. NON PRÊTE'}${age ? ` · ${age}` : ''}${canne}`;
-    inclinaison.className = etat.inclinaisonPrete ? 'ok' : 'pas-ok';
+    const angle = etat.inclinaison != null ? `${etat.inclinaison.toFixed(0)}°` : '';
+    remplir('inclinaison', etat.inclinaisonPrete ? 'PRÊTE' : 'NON PRÊTE', [`incl. ${angle}`.trim(), age].filter(Boolean).join(' · '), etat.inclinaisonPrete ? 'ok' : 'pas-ok');
+  }
+  // Tablette : « Incl. » devant, en gros (place suffisante) ; téléphone : seulement dans le détail.
+  const motIncl = cases.inclinaison.querySelector('b');
+  if (!document.body.classList.contains('mode-telephone')) {
+    motIncl.textContent = `Incl. ${motIncl.textContent}`;
+    const detail = cases.inclinaison.querySelector('small');
+    detail.textContent = detail.textContent.replace(/^incl\.\s*(· )?/, '');
+    detail.hidden = !detail.textContent;
   }
 }
