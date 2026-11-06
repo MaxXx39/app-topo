@@ -4,7 +4,7 @@
 // ajoute un point à l'objet en cours ; il est rangé quand il a ses points (polyligne : « Terminer »).
 // Calculs dans topo/dao.js ; le dessin est un plan du projet (projet.plansDxf, champ `dao`).
 import { echapper } from '../outils/echapper.js';
-import { OUTILS_DAO, COULEURS_CALQUES_DAO, pointsDeLOutil, creerPlanDao, refaireContenuDao, objetSousLeDoigt, transformerObjet, translation, rotation, miroir, decalerObjet, prolongerJusqua, traceObjet } from '../topo/dao.js';
+import { OUTILS_DAO, COULEURS_CALQUES_DAO, pointsDeLOutil, creerPlanDao, refaireContenuDao, objetSousLeDoigt, transformerObjet, translation, rotation, miroir, decalerObjet, prolongerJusqua, traceObjet, deltaZObjet, sansAltitudes, projeterObjet, altitudesEntre, decalerAvecPente } from '../topo/dao.js';
 
 // Étape 2 (0.148.0) : actions sur les objets choisis (outil « Sélection ») et leurs consignes.
 const ACTIONS_DAO = [
@@ -15,13 +15,16 @@ const ACTIONS_DAO = [
   ['decaler', 'Décaler', []],
   ['prolonger', 'Prolonger / couper', ['Touche la limite (ligne, cercle, trait d\'un plan)']],
 ];
+// Étape 3 (0.149.0) : outils topo sur les objets choisis.
+const OUTILS_TOPO_DAO = [['deltaz', 'Delta Z'], ['pente', 'Décaler + pente'], ['projeter', 'Projeter sur surface'], ['entre', 'Z début / fin'], ['plat', '2D']];
 const ACCROCHES_DAO = [['libre', 'Libre'], ['point', 'Point'], ['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre']];
 
 /**
  * Crée la DAO. d : { cadre (élément du plan où poser la barre), projet() (projet ouvert),
  * nouvelId(), accrocher(mode, position, tolerance) → point { est, nord, altitude } ou null,
  * demanderTexte({ titre, valeur }), demanderChamps({ titre, champs }), confirmer(texte),
- * traitSous(position, tolerance) → points d'un trait de plan sous le doigt, ou null, message(texte, duree), redessiner() (sans enregistrer),
+ * traitSous(position, tolerance) → points d'un trait de plan sous le doigt, ou null,
+ * surfaces() → [[id, nom]] (levés et surfaces avec triangles), altitudeSur(id) → fonction (est, nord) → altitude ou null, message(texte, duree), redessiner() (sans enregistrer),
  * enregistrer() (modifié : enregistrer et redessiner), lectureSeule() (vrai = refusé) }.
  * Renvoie { actif(), commencer(), arreter(), toucher(position, tolerance), dernierPoint() }.
  */
@@ -79,6 +82,10 @@ export function creerDao(d) {
           ${ACTIONS_DAO.filter(([cle]) => cle !== 'prolonger' || unSeulTrait).map(([cle, titre]) => `<button type="button" class="puce-choix petite ${etat.action?.sorte === cle ? 'actif' : ''}" data-dao="action" data-valeur="${cle}">${titre}</button>`).join('')}
           <button type="button" class="puce-choix petite effacer-dao" data-dao="effacer-choix">Effacer</button>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-dao="deselectionner">tout retirer</button>
+        </div>
+        <div class="ligne-barre-pointage actions-dao">
+          <span class="titre-topo-dao">Topo :</span>
+          ${OUTILS_TOPO_DAO.map(([cle, titre]) => `<button type="button" class="puce-choix petite" data-dao="topo" data-valeur="${cle}">${titre}</button>`).join('')}
         </div>`
       : '';
     barre.innerHTML = `<div class="ligne-barre-pointage">
@@ -127,6 +134,9 @@ export function creerDao(d) {
         etat.action = null;
         await decaler(plan);
       }
+    } else if (action === 'topo' && plan) {
+      if (d.lectureSeule()) return;
+      await outilTopo(plan, valeur);
     } else if (action === 'deselectionner') {
       etat.selection.clear();
       etat.action = null;
@@ -200,6 +210,83 @@ export function creerDao(d) {
     refaire(plan);
     d.enregistrer();
     dessinerBarre();
+  }
+
+  /** Nombre tapé (virgule acceptée), ou null s'il est illisible. */
+  const nombre = (texte) => {
+    const n = Number(String(texte ?? '').trim().replace(',', '.'));
+    return String(texte ?? '').trim() !== '' && Number.isFinite(n) ? n : null;
+  };
+
+  /** Outils topo (étape 3) sur les objets choisis. */
+  async function outilTopo(plan, outil) {
+    const choisis = [...etat.selection];
+    const remplacer = (f) => {
+      choisis.forEach((i) => { plan.dao.objets[i] = f(plan.dao.objets[i]); });
+      refaire(plan);
+      d.enregistrer();
+    };
+    if (outil === 'plat') {
+      if (d.confirmer(`Enlever les altitudes de ${choisis.length} objet(s) ?`)) remplacer(sansAltitudes);
+      return;
+    }
+    if (outil === 'deltaz') {
+      const choix = await d.demanderChamps({ titre: 'Delta Z', champs: [{ cle: 'dz', titre: 'Delta Z (m, + plus haut, − plus bas)', valeur: '' }] });
+      const dz = nombre(choix?.dz);
+      if (choix && dz == null) d.message('Delta Z illisible : par exemple -0.250', 3500);
+      else if (dz != null) remplacer((o) => deltaZObjet(o, dz));
+      return;
+    }
+    if (outil === 'entre') {
+      const choix = await d.demanderChamps({ titre: 'Altitudes du début et de la fin', champs: [{ cle: 'debut', titre: 'Altitude du début (m)', valeur: '' }, { cle: 'fin', titre: 'Altitude de la fin (m)', valeur: '' }] });
+      const z1 = nombre(choix?.debut);
+      const z2 = nombre(choix?.fin);
+      if (choix && (z1 == null || z2 == null)) d.message('Altitude illisible : par exemple 431.250', 3500);
+      else if (z1 != null && z2 != null) remplacer((o) => altitudesEntre(o, z1, z2));
+      return;
+    }
+    if (outil === 'projeter') {
+      const surfaces = d.surfaces();
+      if (surfaces.length === 0) {
+        d.message('Aucun levé ni surface avec des triangles dans le projet', 3500);
+        return;
+      }
+      const choix = await d.demanderChamps({ titre: 'Projeter sur une surface', champs: [
+        { cle: 'surface', titre: 'Surface', choix: surfaces, valeur: surfaces[0][0] },
+        { cle: 'pas', titre: 'Ajouter un point tous les … m (vide : les sommets seulement)', valeur: '' },
+      ] });
+      if (!choix) return;
+      const pas = nombre(choix.pas) ?? 0;
+      const altitudeA = d.altitudeSur(choix.surface);
+      if (!altitudeA) return;
+      remplacer((o) => projeterObjet(o, altitudeA, Math.max(0, pas)));
+      return;
+    }
+    if (outil === 'pente') {
+      const choix = await d.demanderChamps({ titre: 'Décaler avec une pente', champs: [
+        { cle: 'distance', titre: 'Distance à plat (m)', valeur: '1.000' },
+        { cle: 'cote', titre: 'Côté', choix: [['droite', 'À droite'], ['gauche', 'À gauche']], valeur: 'droite' },
+        { cle: 'pente', titre: 'Pente (%, + monte, − descend)', valeur: '' },
+      ] });
+      const distance = Math.abs(nombre(choix?.distance) ?? 0);
+      const pente = nombre(choix?.pente);
+      if (!choix) return;
+      if (!distance || pente == null) {
+        d.message('Distance ou pente illisible : par exemple 2.000 et -3', 3500);
+        return;
+      }
+      const signe = choix.cote === 'gauche' ? -1 : 1;
+      const copies = choisis.map((i) => decalerAvecPente(plan.dao.objets[i], signe * distance, pente)).filter(Boolean);
+      if (copies.length === 0) {
+        d.message('Rien à décaler : il faut des objets avec des altitudes (lignes, polylignes, cercles…)', 4000);
+        return;
+      }
+      const debut = plan.dao.objets.length;
+      plan.dao.objets.push(...copies);
+      etat.selection = new Set(copies.map((_, n) => debut + n));
+      refaire(plan);
+      d.enregistrer();
+    }
   }
 
   /** Un point de plus pour l'action en cours ; quand elle a ses points, elle est faite. */

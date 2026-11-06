@@ -286,3 +286,73 @@ export function prolongerJusqua(objet, pres, limite) {
   const points = finVoulue ? [...pts.slice(0, -1), nouveau] : [nouveau, ...pts.slice(1)];
   return { ...objet, points };
 }
+
+// --- Étape 3 (0.149.0) : outils topo sur les objets ---
+
+/** Rectangle et arc deviennent une polyligne (pour leur donner des altitudes sommet par sommet). */
+export function versPolyligne(objet) {
+  if (objet.sorte === 'rectangle' && objet.points[1]) return { ...objet, sorte: 'polyligne', ferme: true, points: coinsDuRectangle(objet.points[0], objet.points[1]) };
+  if (objet.sorte === 'arc' && objet.points[2]) return { ...objet, sorte: 'polyligne', ferme: false, points: pointsDeLArc(...objet.points).map((p) => ({ est: mm(p.est), nord: mm(p.nord), altitude: p.altitude != null ? mm(p.altitude) : null })) };
+  return objet;
+}
+
+/** Delta Z : "dz" m ajoutés à chaque altitude (un point sans altitude le reste). */
+export function deltaZObjet(objet, dz) {
+  return { ...objet, points: objet.points.map((p) => ({ ...p, altitude: p.altitude == null ? null : mm(p.altitude + dz) })) };
+}
+
+/** 2D : plus aucune altitude. */
+export function sansAltitudes(objet) {
+  return { ...objet, points: objet.points.map((p) => ({ ...p, altitude: null })) };
+}
+
+/**
+ * Projeter sur une surface : chaque sommet prend l'altitude de la surface (altitudeA(est, nord), null
+ * hors surface : le sommet garde la sienne). pas > 0 : des sommets sont ajoutés tous les "pas" m le long
+ * des segments (ligne, polyligne ; rectangle et arc deviennent des polylignes).
+ */
+export function projeterObjet(objet, altitudeA, pas = 0) {
+  const o = versPolyligne(objet);
+  let points = o.points;
+  if (pas > 0 && (o.sorte === 'ligne' || o.sorte === 'polyligne') && points.length >= 2) {
+    const trace = o.ferme ? [...points, points[0]] : points;
+    const denses = [];
+    for (let i = 0; i + 1 < trace.length; i++) {
+      const a = trace[i];
+      const b = trace[i + 1];
+      const n = Math.max(1, Math.ceil(Math.hypot(b.est - a.est, b.nord - a.nord) / pas));
+      for (let k = 0; k < n; k++) denses.push({ est: mm(a.est + ((b.est - a.est) * k) / n), nord: mm(a.nord + ((b.nord - a.nord) * k) / n), altitude: k === 0 ? a.altitude : null });
+    }
+    if (!o.ferme) denses.push(trace.at(-1));
+    points = denses;
+  }
+  return { ...o, sorte: o.sorte === 'ligne' && points.length > 2 ? 'polyligne' : o.sorte, points: points.map((p) => {
+    const z = altitudeA(p.est, p.nord);
+    return { ...p, altitude: z != null ? mm(z) : p.altitude ?? null };
+  }) };
+}
+
+/**
+ * Altitudes entre 2 valeurs : "zDebut" au premier sommet, "zFin" au dernier, entre les deux en
+ * proportion de la distance à plat parcourue le long du tracé (pente constante). Ligne et polyligne
+ * (rectangle, arc : convertis) ; cercle, point, texte : tous à zDebut.
+ */
+export function altitudesEntre(objet, zDebut, zFin) {
+  const o = versPolyligne(objet);
+  if (!(o.sorte === 'ligne' || o.sorte === 'polyligne') || o.points.length < 2) return { ...o, points: o.points.map((p) => ({ ...p, altitude: mm(zDebut) })) };
+  const cumul = [0];
+  for (let i = 1; i < o.points.length; i++) cumul.push(cumul[i - 1] + Math.hypot(o.points[i].est - o.points[i - 1].est, o.points[i].nord - o.points[i - 1].nord));
+  const total = cumul.at(-1) || 1;
+  return { ...o, points: o.points.map((p, i) => ({ ...p, altitude: mm(zDebut + ((zFin - zDebut) * cumul[i]) / total) })) };
+}
+
+/**
+ * Décaler avec pente : copie parallèle à "distance" m (+ droite, − gauche, comme decalerObjet), dont
+ * les altitudes changent de |distance| × pente ÷ 100 (pente en %, + = la copie est plus haute).
+ * Null si l'objet ne se décale pas ou n'a pas d'altitude.
+ */
+export function decalerAvecPente(objet, distance, pente) {
+  const copie = decalerObjet(objet, distance);
+  if (!copie || !copie.points.some((p) => p.altitude != null)) return null;
+  return deltaZObjet(copie, (Math.abs(distance) * pente) / 100);
+}

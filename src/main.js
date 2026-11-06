@@ -5494,6 +5494,11 @@ daoAppli = creerDao({
   demanderTexte,
   demanderChamps,
   confirmer: (texte) => confirm(texte),
+  surfaces: () => projet.surfaces.filter((x) => trianglesDeSurface(x.id).length > 0).map((x) => [x.id, x.nom]),
+  altitudeSur: (id) => {
+    const triangles = trianglesDeSurface(id);
+    return triangles.length > 0 ? chercheurAltitude(triangles) : null;
+  },
   traitSous: (position, tolerance) => accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes)?.sommets ?? null,
   message: (texte, duree) => afficherMessage(texte, duree),
   redessiner: () => recalculer(),

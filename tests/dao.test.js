@@ -73,3 +73,37 @@ describe('DAO étape 2 : modifier', () => {
     expect(prolongerJusqua(ligne, p(9, 0), [p(0, 5), p(10, 5)])).toBeNull();
   });
 });
+
+import { deltaZObjet, sansAltitudes, projeterObjet, altitudesEntre, decalerAvecPente, versPolyligne } from '../src/topo/dao.js';
+
+describe('DAO étape 3 : outils topo', () => {
+  const poly = { sorte: 'polyligne', points: [p(0, 0, 400), p(10, 0, 401), p(10, 10, null)] };
+  it('delta Z et 2D', () => {
+    expect(deltaZObjet(poly, -0.25).points.map((x) => x.altitude)).toEqual([399.75, 400.75, null]);
+    expect(sansAltitudes(poly).points.every((x) => x.altitude === null)).toBe(true);
+  });
+  it('projeter sur une surface plane inclinée, avec et sans points ajoutés', () => {
+    const surface = (est, nord) => 500 + est / 10 + nord / 100;
+    expect(projeterObjet(poly, surface).points.map((x) => x.altitude)).toEqual([500, 501, 501.1]);
+    const dense = projeterObjet({ sorte: 'ligne', points: [p(0, 0), p(10, 0)] }, surface, 2.5);
+    expect(dense.sorte).toBe('polyligne');
+    expect(dense.points.map((x) => x.est)).toEqual([0, 2.5, 5, 7.5, 10]);
+    expect(dense.points[2].altitude).toBe(500.5);
+    // Hors surface : l'altitude d'avant reste.
+    expect(projeterObjet(poly, () => null).points[0].altitude).toBe(400);
+  });
+  it('altitudes entre 2 valeurs, en proportion de la distance', () => {
+    expect(altitudesEntre(poly, 400, 402).points.map((x) => x.altitude)).toEqual([400, 401, 402]);
+  });
+  it('décaler avec pente : 2 m à droite, pente −50 % → 1 m plus bas', () => {
+    const r = decalerAvecPente({ sorte: 'ligne', points: [p(0, 0, 400), p(10, 0, 400)] }, 2, -50);
+    expect(r.points.map((x) => [x.nord, x.altitude])).toEqual([[-2, 399], [-2, 399]]);
+    expect(decalerAvecPente({ sorte: 'ligne', points: [p(0, 0), p(10, 0)] }, 2, 10)).toBeNull();
+  });
+  it('rectangle → polyligne fermée', () => {
+    const r = versPolyligne({ sorte: 'rectangle', points: [p(0, 0), p(2, 1)] });
+    expect(r.sorte).toBe('polyligne');
+    expect(r.ferme).toBe(true);
+    expect(r.points).toHaveLength(4);
+  });
+});
