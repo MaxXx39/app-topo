@@ -7,6 +7,8 @@ import { couleurRVB } from './couleurs.js';
 import { plageAltitudes } from '../topo/courbes.js';
 import { echapper } from '../outils/echapper.js';
 import { mini, maxi } from '../outils/bornes.js';
+import { draperLignes } from '../topo/drapage.js';
+import { chercheurAltitude } from '../topo/implantation.js';
 
 /** Centre (m) et taille (plus grand côté en plan, m) des triangles. */
 export function cadreScene(triangles) {
@@ -125,6 +127,23 @@ export function dessinerScene(contexte, triangles, vue, plage, { couleurs = 'alt
   contexte.globalAlpha = 1;
 }
 
+/** Lignes DXF posées sur la surface (0.143.0) : un trait de leur couleur, juste au-dessus des triangles. */
+export function dessinerLignes3d(contexte, morceaux, vue, ratio = 1) {
+  contexte.lineWidth = 2 * ratio;
+  contexte.lineJoin = 'round';
+  for (const morceau of morceaux) {
+    contexte.strokeStyle = morceau.couleur;
+    contexte.beginPath();
+    morceau.points.forEach((p, i) => {
+      const e = projeter({ ...p, altitude: p.altitude + 0.05 }, vue);
+      if (i === 0) contexte.moveTo(e.x, e.y);
+      else contexte.lineTo(e.x, e.y);
+    });
+    contexte.stroke();
+  }
+  contexte.lineWidth = 1;
+}
+
 /** Flèche du nord (en haut à droite) et barre d'échelle (en bas à gauche), par-dessus la scène. */
 function dessinerReperes(contexte, vue, ratio) {
   const nord = directionNord(vue);
@@ -182,7 +201,7 @@ function dessinerReperes(contexte, vue, ratio) {
  * si les éléments sont loin les uns des autres), les couleurs (altitude ou par élément), la
  * transparence, le zoom (+ / −, doigts, molette) et « Vue de départ ».
  */
-export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D') {
+export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf = [] } = {}) {
   const elements = Array.isArray(elementsOuTriangles[0]) ? [{ nom: titre, triangles: elementsOuTriangles }] : elementsOuTriangles.filter((e) => e.triangles.length > 0);
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-3d';
@@ -205,6 +224,7 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D') {
         ${elements.length > 1 ? '<button type="button" class="puce-choix" data-couleurs="element">Par élément</button>' : ''}
       </div>
       <label class="case"><input type="checkbox" data-champ="transparent" /> Transparent</label>
+      ${lignesDxf.length > 0 ? '<label class="case"><input type="checkbox" data-champ="lignes-dxf" checked /> Lignes DXF</label>' : ''}
       <span class="zoom-3d">
         <button type="button" class="bouton-secondaire" data-action="zoom-moins" aria-label="Dézoomer">−</button>
         <button type="button" class="bouton-secondaire" data-action="zoom-plus" aria-label="Zoomer">+</button>
@@ -227,6 +247,8 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D') {
   let elementDe = () => 0;
   let cadre = null;
   let plage = null;
+  let drapees = [];
+  let voirLignes = true;
   const vue = { azimut: 0, inclinaison: 35, exageration: 2, centre: null, echelle: 1, largeur: 0, hauteur: 0 };
   const reglages = { couleurs: 'altitude', transparent: false };
   let zoom = 1;
@@ -243,6 +265,8 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D') {
     cadre = cadreScene(triangles);
     plage = plageAltitudes(triangles);
     vue.centre = cadre.centre;
+    // 0.143.0 : lignes des plans DXF montrés, posées sur les triangles choisis.
+    drapees = lignesDxf.length > 0 && triangles.length > 0 ? draperLignes(lignesDxf, chercheurAltitude(triangles), { pas: Math.max(0.5, cadre.taille / 400) }) : [];
   };
   const depart = () => {
     vue.azimut = 0;
@@ -260,6 +284,7 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D') {
     vue.echelle = (0.75 * Math.min(vue.largeur, vue.hauteur) / cadre.taille) * zoom;
     const contexte = toile.getContext('2d');
     dessinerScene(contexte, triangles, vue, plage, { ...reglages, elementDe });
+    if (voirLignes) dessinerLignes3d(contexte, drapees, vue, ratio);
     dessinerReperes(contexte, vue, ratio);
   };
   selecteur?.addEventListener('change', () => {
@@ -279,6 +304,10 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D') {
     if (action === 'zoom-moins') zoom = Math.max(0.2, zoom / 1.4);
     if (action === 'depart') depart();
     if (couleurs || action) dessiner();
+  });
+  fenetre.querySelector('[data-champ="lignes-dxf"]')?.addEventListener('change', (evenement) => {
+    voirLignes = evenement.target.checked;
+    dessiner();
   });
   fenetre.querySelector('[data-champ="transparent"]').addEventListener('change', (evenement) => {
     reglages.transparent = evenement.target.checked;
