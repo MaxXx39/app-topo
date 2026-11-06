@@ -106,7 +106,7 @@ class EtatRecepteur {
     /**
      * État envoyé à la page (src/android/pont.js) :
      * { connecte, bluetooth, recu, qualite, libelleQualite, nbSatellites, hdop, ageCorrections,
-     *   etatInclinaison, inclinaisonPrete, inclinaison, cap, position: { est, nord, altitude } ou null,
+     *   etatInclinaison, inclinaisonPrete, inclinaison, directionInclinaison, cap, position: { est, nord, altitude } ou null,
      *   precisionH, precisionV (m, message GST récent, sinon null), erreurConversion, autorise, raison }
      */
     fun enJson(nomDernierRecepteur: String?): String {
@@ -134,6 +134,8 @@ class EtatRecepteur {
             put("etatInclinaison", if (etcRecent) compensation!!.etat ?: JSONObject.NULL else JSONObject.NULL)
             put("inclinaisonPrete", etcRecent && compensation!!.estActive)
             put("inclinaison", if (etcRecent) compensation!!.inclinaisonDeg ?: JSONObject.NULL else JSONObject.NULL)
+            // Direction vers laquelle le haut du mât penche (°, champ 5 de ETC) : pour l'outil à 1 GNSS (0.142.0).
+            put("directionInclinaison", if (etcRecent) compensation!!.directionInclinaisonDeg ?: JSONObject.NULL else JSONObject.NULL)
             // Cap du récepteur (°), seulement quand la compensation est prête (champ vide sinon).
             put("cap", if (etcRecent && compensation!!.estActive) compensation.capDeg ?: JSONObject.NULL else JSONObject.NULL)
             // Précision H / V (m), seulement si un GST récent est arrivé.

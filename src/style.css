@@ -10802,3 +10802,140 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
   flex: none;
   min-height: 44px;
 }
+
+/* 0.136.2 : « Partage écran » dans un cadre orange « ⚠ Aide » */
+.cadre-aide-ecran {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px 10px;
+  border: 2px solid #ea580c;
+  border-radius: 10px;
+  background: #fff7ed;
+}
+.titre-aide-ecran {
+  color: #c2410c;
+  font-weight: 800;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.bouton-aide-ecran {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #ea580c;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+/* 0.136.3 : « Fermer l'appli » bien visible (rouge plein, texte blanc, plus grand) */
+.fenetre-reglages .bouton-fermer-appli,
+.fenetre-reglages .pied-reglages .bouton-fermer-appli {
+  min-height: 52px;
+  border: 2px solid #991b1b;
+  background: var(--rouge);
+  color: #ffffff;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 6px rgba(153, 27, 27, 0.45);
+}
+.fenetre-reglages .bouton-fermer-appli svg { width: 26px; height: 26px; stroke-width: 2.8; }
+.fenetre-reglages .bouton-fermer-appli:active { background: #991b1b; color: #ffffff; }
+
+/* 0.138.0 (liste du 05.11, point 3) : près du point (cible en haut, moins de 2 m), le plan reste visible
+   en petit, en haut à droite de la cible, sans ses boutons. Plus loin : le plan comme avant. */
+@media (max-width: 899px) {
+  body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .panneau-plan {
+    top: calc(var(--hauteur-entete) + 8px);
+    left: auto;
+    right: 8px;
+    width: min(38vw, 300px);
+    height: min(calc(var(--hauteur-plan-guidage) * 0.42), 260px);
+    z-index: 13;
+    border: 3px solid #0d9488;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  }
+
+  body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .panneau-plan :is(.plan-calques, .plan-boutons, .boutons-taille-plan, .case-voir-ligne, .plan-attribution) {
+    display: none;
+  }
+}
+
+/* 0.138.0 (liste du 05.11, point 7) : barre du récepteur en 4 cases (état RTK, Z du bout de la canne,
+   hauteur de canne, inclinaison) ; l'important en gros, le détail en petit dessous, rien de coupé. */
+body.avec-recepteur .bandeaux-recepteur { height: 38px; gap: 2px; background: #0f172a; }
+body.avec-recepteur .entete { padding-bottom: 38px; }
+.bandeaux-recepteur .case-recepteur {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  line-height: 1.05;
+  overflow: hidden;
+  padding: 0 4px;
+}
+.bandeaux-recepteur .case-recepteur[hidden] { display: none; }
+.bandeaux-recepteur .case-recepteur b {
+  font-size: 18px;
+  font-weight: 800;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.bandeaux-recepteur .case-recepteur small {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+.bandeaux-recepteur .case-recepteur.attente b { font-size: 14px; }
+.bandeaux-recepteur [data-bandeau='z'] { flex-grow: 1.35; }
+.bandeaux-recepteur [data-bandeau='canne'] { flex-grow: 0.8; }
+.bandeaux-recepteur [data-bandeau='inclinaison'] { flex-grow: 1.3; }
+.bandeaux-recepteur .case-recepteur.info { background: #1e293b; }
+.bandeaux-recepteur .case-recepteur.info-canne { background: #334155; }
+.bandeaux-recepteur .case-recepteur.ok { background: var(--succes); }
+.bandeaux-recepteur .case-recepteur.pas-ok { background: var(--rouge); }
+.bandeaux-recepteur .case-recepteur.attente { background: var(--gris); }
+.bandeaux-recepteur .case-recepteur.tablette { background: #64748b; }
+body.mode-telephone.avec-recepteur .bandeaux-recepteur { height: 34px; }
+body.mode-telephone.avec-recepteur .entete { padding-bottom: 34px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur { padding: 0 2px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur b { font-size: 14px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur small { font-size: 9.5px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 12px; }
+
+/* 0.139.0 (liste du 05.11, point 1) : delta du prochain point levé (Intermédiaire), orange quand il décale. */
+.ligne-delta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0; padding: 4px 6px; border-radius: 10px; background: var(--surface-2, #f1f5f9); }
+.ligne-delta.actif { background: #fed7aa; box-shadow: inset 0 0 0 2px #ea580c; }
+.ligne-delta .titre-delta { font-weight: 900; font-size: 1.2rem; color: #ea580c; padding: 0 4px; }
+.ligne-delta .sens-delta { display: inline-flex; border: 2px solid #ea580c; border-radius: 10px; overflow: hidden; }
+.ligne-delta .bouton-sens-delta { min-height: 40px; min-width: 52px; border: 0; background: #ffffff; color: #9a3412; font-weight: 800; }
+.ligne-delta .bouton-sens-delta.actif { background: #ea580c; color: #ffffff; }
+.ligne-delta .champ-delta { display: inline-flex; align-items: center; gap: 4px; font-size: 0.85rem; font-weight: 700; color: var(--encre); }
+.ligne-delta .champ-delta input { width: 78px; min-height: 40px; font-size: 1rem; text-align: right; }
+.plan .delta-point { fill: none; stroke: #ea580c; stroke-width: 3; }
+.plan .trait-delta { stroke: #ea580c; stroke-width: 2; stroke-dasharray: 5 4; }
+/* 0.140.0 : appareil photo de tout le levé dans le bandeau « Lever en cours ». */
+.levee-en-cours .bouton-photo-globale { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; min-width: 40px; }
+.levee-en-cours .bouton-photo-globale svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
+/* 0.141.0 : bouton qui montre la ligne du delta. */
+.bouton-ouvrir-delta { margin: 4px 0; color: #9a3412; border-color: #ea580c; font-weight: 800; min-height: 40px; }
+
+/* 0.142.0 : Guidage › Râteau et Bull à 1 GNSS. */
+.choix-gnss { display: flex; gap: 6px; }
+.case-machine.petite { min-height: 40px; font-size: 0.9rem; }
+.reglages-outil { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 6px 0; }
+.reglages-outil .titre-choix { width: 100%; margin: 0; }
+.reglages-outil label { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+.reglages-outil input { width: 80px; min-height: 40px; text-align: right; }
+.plan .contour-outil { fill: rgba(250, 204, 21, 0.35); stroke: #a16207; stroke-width: 2; }
+.ecran-lame .choix-machine { grid-template-columns: repeat(3, 1fr); }

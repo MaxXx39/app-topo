@@ -64,6 +64,9 @@ import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/jo
 import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
+import { pointAvecDelta, deltaActif } from './topo/delta.js';
+import { ligneDecalee, rangerLigneDecalee } from './topo/ligne-decalee.js';
+import { pointsOutil } from './topo/outil.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { surChangementListes } from './reglages/listes-partagees.js';
 import { lireDossiers, ecrireDossiers, dossiersTries, dossierDuProjet, ajouterDossier, renommerDossier, supprimerDossier, rangerProjet, SANS_DOSSIER } from './projet/dossiers.js';
@@ -152,6 +155,22 @@ let pilote = null;
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 // Levé avec le récepteur (appli Android) : levé et stock en cours, rôle du prochain point.
 const leveDirect = { stockId: null, role: 'contour' };
+// Delta du prochain point levé (0.139.0, Intermédiaire) : sens 'gauche' / 'droite' (selon le cap du GNSS),
+// distance et Z tapés (texte) ; remis à zéro après chaque point enregistré (un seul point à la fois).
+const deltaLeve = { sens: 'droite', distance: '', z: '', ouvert: false }; // ouvert : ligne de réglage montrée (bouton « Δ Delta »)
+// Dernier cap du GNSS calculé (degrés), pour décaler le point au moment de l'enregistrer.
+let dernierAzimut = null;
+
+/** Delta tapé, en mètres : { lateral (+ = droite), z } ; un nombre mal tapé compte pour 0. */
+function deltaEnMetres() {
+  if (!aAcces('intermediaire')) return { lateral: 0, z: 0 };
+  const lire = (texte) => {
+    const n = Number(String(texte ?? '').replace(',', '.').trim());
+    return Number.isFinite(n) ? n : 0;
+  };
+  const distance = Math.abs(lire(deltaLeve.distance));
+  return { lateral: deltaLeve.sens === 'gauche' ? -distance : distance, z: lire(deltaLeve.z) };
+}
 let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
 let etatRecepteur2 = null; // dernier état du 2e récepteur (essai à 2 RX2, guidage de lame)
 // GPS de la tablette (APK, sans RX2 connecté) : { est, nord, precision } ou null ; seulement pour se localiser.
@@ -196,6 +215,15 @@ terrain.libellePoint = '';
 terrain.libelleAire = '';
 // Anciens réglages (avant 0.73.0) : le profil en long prend ses valeurs de départ.
 terrain.lame = { machine: 'grader', ...terrain.lame };
+// 0.142.0 : outil à 1 GNSS (râteau, ou Bull à 1 récepteur) : nombre de GNSS du Bull et distances
+// depuis le bas du mât jusqu'aux bords de chaque outil (m).
+terrain.lame.recepteursBull = terrain.lame.recepteursBull === 1 ? 1 : 2;
+terrain.lame.outils = { rateau: { gauche: 0, droite: 0, avant: 0, arriere: 0 }, bull: { gauche: 0, droite: 0, avant: 0, arriere: 0 }, ...(terrain.lame.outils ?? {}) };
+
+/** Vrai si la machine choisie est guidée par un seul GNSS (râteau, ou Bull réglé sur 1 GNSS). */
+function outilAUnGnss() {
+  return terrain.lame.machine === 'rateau' || (terrain.lame.machine === 'bull' && terrain.lame.recepteursBull === 1);
+}
 // Implantation d'un point : point choisi en touchant le plan ({ est, nord, altitude, nom, mode }) et
 // point à implanter en cours ({ id (point de la liste « À implanter », ou null), nom, est, nord, altitude }).
 // Implantation d'une ligne : points choisis pour la faire (pointsLigne : [{ est, nord, altitude, nom }])
@@ -204,7 +232,8 @@ terrain.lame = { machine: 'grader', ...terrain.lame };
 // Talus : la ligne est implanter.ligne, ses réglages terrain.talus ; talusId : talus de « Mes talus »
 // ouvert (ses changements y sont gardés), ou null.
 // voirLigne (0.118.0) : case « Voir toute la ligne » du plan, décochée au départ et pour chaque nouvelle ligne.
-const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null, talusId: null, voirLigne: false };
+// ligneAValider (0.137.0) : ligne touchée sur le plan, montrée en fiche, pas encore implantée (bouton « Implanter »).
+const implanter = { choix: null, cible: null, pointsLigne: [], ligne: null, ligneAValider: false, talusId: null, voirLigne: false };
 // Mode Contrôler (autocontrôle) : point de contrôle vers lequel on guide ({ id, nom, est, nord, altitude }) ou null.
 const autocontrole = { cible: null };
 const suiviOrientation = creerSuiviOrientation(terrain.sourceOrientation);
@@ -1203,6 +1232,12 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         // 0.96.0 : la photo attend le prochain point enregistré, et prend son nom (voir rangerPointPris).
         ajouterPhotos(levee, fichiers, { attentePoint: true });
       },
+      // Photo de tout le levé (0.140.0, Intermédiaire, bandeau « Lever en cours ») : sans point.
+      ajouterPhotosLeveeGlobale: (fichiers) => {
+        const levee = leveeEnCours();
+        if (!levee || refuserEnLectureSeule()) return;
+        ajouterPhotos(levee, fichiers);
+      },
       legendePhotoLevee: (id, legende) => {
         const photo = (leveeEnCours())?.photos?.find((p) => p.id === id);
         if (!photo) return;
@@ -1231,6 +1266,18 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       },
       commencerAjout,
       arreterAjout,
+      // Delta du prochain point (0.139.0) : sens gauche / droite, distance, Z ; « effacer » remet à zéro.
+      reglerDelta: (champ, valeur, redessiner = true) => {
+        if (champ === 'sens') deltaLeve.sens = valeur === 'gauche' ? 'gauche' : 'droite';
+        else if (champ === 'distance' || champ === 'z') deltaLeve[champ] = String(valeur ?? '');
+        else if (champ === 'ouvrir') deltaLeve.ouvert = !deltaLeve.ouvert;
+        else if (champ === 'effacer') {
+          deltaLeve.distance = '';
+          deltaLeve.z = '';
+          deltaLeve.ouvert = false;
+        }
+        if (redessiner) ecranLeve?.afficher(donneesLeve());
+      },
       prendrePoint: (nom, attributs = {}) => {
         if (refuserEnLectureSeule()) return;
         const leve = leveEnCours();
@@ -1250,7 +1297,21 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           refuser(`Point refusé : ${reponse.raison}`);
           return;
         }
-        const { est, nord, altitude, ...gnss } = reponse.point;
+        let { est, nord, altitude, ...gnss } = reponse.point;
+        // Delta (0.139.0) : seule la position décalée est gardée (le décalage est noté avec le GNSS).
+        const delta = deltaEnMetres();
+        if (deltaActif(delta)) {
+          const decale = pointAvecDelta({ est, nord, altitude }, delta, dernierAzimut);
+          if (!decale) {
+            refuser('Point refusé : pas de cap du GNSS pour le décalage gauche / droite');
+            return;
+          }
+          ({ est, nord, altitude } = decale);
+          gnss = { ...gnss, delta: { ...delta, azimut: dernierAzimut != null ? Math.round(dernierAzimut * 10) / 10 : null } };
+          deltaLeve.distance = '';
+          deltaLeve.z = '';
+          deltaLeve.ouvert = false;
+        }
         const point = { est, nord, altitude, gnss: { ...gnss, prisLe: new Date().toISOString() } };
         if (recollement) {
           const element = leveDirect.role;
@@ -1325,7 +1386,27 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       },
       // Machine (0.100.0) : Grader (coupe dans le sens de marche) ou Bull (perpendiculaire à la lame).
       choisirMachine: (machine) => {
-        terrain.lame.machine = machine === 'bull' ? 'bull' : 'grader';
+        terrain.lame.machine = ['bull', 'rateau'].includes(machine) ? machine : 'grader';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // Bull : 1 ou 2 GNSS (0.142.0).
+      choisirRecepteursBull: (nombre) => {
+        terrain.lame.recepteursBull = Number(nombre) === 1 ? 1 : 2;
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // Distances de l'outil à 1 GNSS (m, depuis le bas du mât) : gauche, droite, avant, arrière.
+      reglerOutil: (champ, texte) => {
+        const machine = terrain.lame.machine === 'rateau' ? 'rateau' : 'bull';
+        if (!['gauche', 'droite', 'avant', 'arriere'].includes(champ)) return;
+        const valeur = String(texte ?? '').trim() === '' ? 0 : lireNombreTape(texte);
+        if (valeur == null || !Number.isFinite(valeur) || valeur < 0 || valeur > 30) {
+          afficherMessage('Distance illisible : un nombre de mètres entre 0 et 30, par exemple 1.250', 4000);
+          recalculer();
+          return;
+        }
+        terrain.lame.outils[machine] = { ...terrain.lame.outils[machine], [champ]: valeur };
         retenirReglagesTerrain();
         recalculer();
       },
@@ -1397,12 +1478,55 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         if (points.length < 2) return;
         const nom = (p, i) => p.nom ?? `P${i + 1}`;
         implanter.ligne = nouvelleLigneAImplanter(`${nom(points[0], 0)} → ${nom(points.at(-1), points.length - 1)}`, points, null);
+        implanter.ligneAValider = false;
         implanter.talusId = null;
         implanter.pointsLigne = [];
         montrerImplantation();
       },
+      // Fiche de la ligne touchée (0.137.0) : « Implanter » lance le guidage, « en toucher une autre » l'oublie.
+      implanterLigneChoisie: () => {
+        implanter.ligneAValider = false;
+        montrerImplantation();
+      },
+      // Décaler la ligne choisie (0.141.0, Intermédiaire) : copie décalée (gauche / droite selon le sens
+      // de la ligne, Z ±) rangée dans « LV-Lignes décalées » ; elle devient la ligne choisie.
+      decalerLigneChoisie: async () => {
+        if (!implanter.ligne || !aAcces('intermediaire') || refuserEnLectureSeule()) return;
+        const valeurs = await demanderChamps({
+          titre: `Décaler ${implanter.ligne.nom}`,
+          champs: [
+            { cle: 'sens', titre: 'Côté (en regardant vers la fin)', choix: [['droite', 'Droite ▶'], ['gauche', '◀ Gauche']], valeur: 'droite' },
+            { cle: 'distance', titre: 'Distance (m)', exemple: '1.500' },
+            { cle: 'z', titre: 'Z ± (m)', exemple: '0.000' },
+          ],
+        });
+        if (!valeurs) return;
+        const lire = (texte) => (String(texte ?? '').trim() === '' ? 0 : Number(String(texte).replace(',', '.')));
+        const distance = lire(valeurs.distance);
+        const dz = lire(valeurs.z);
+        if (!Number.isFinite(distance) || !Number.isFinite(dz)) {
+          alert('Distance ou Z mal tapé : un nombre avec un point, par exemple 1.500.');
+          return;
+        }
+        if (distance === 0 && dz === 0) {
+          afficherMessage('Rien à décaler (distance et Z à 0)', 3000);
+          return;
+        }
+        const decalee = ligneDecalee(implanter.ligne.sommets, valeurs.sens === 'gauche' ? -Math.abs(distance) : Math.abs(distance), dz);
+        const resultat = rangerLigneDecalee(projet, decalee, nomsDuProjet(projet));
+        if (resultat.erreur) {
+          alert(`Ligne non créée : ${resultat.erreur}.`);
+          return;
+        }
+        const sommets = resultat.points.map((p) => ({ ...p }));
+        implanter.ligne = nouvelleLigneAImplanter(`${resultat.points[0].nom.replace(/-1$/, '')} (${resultat.ligne.noms.length} pts)`, decalee.fermee ? [...sommets, { ...sommets[0] }] : sommets, null);
+        implanter.ligneAValider = true;
+        afficherMessage(`Ligne décalée créée dans « ${resultat.levee.nom} »`, 3000);
+        modifie();
+      },
       changerLigne: () => {
         implanter.ligne = null;
+        implanter.ligneAValider = false;
         implanter.voirLigne = false;
         implanter.talusId = null;
         montrerImplantation();
@@ -1528,7 +1652,8 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         if (!implanter.choix || lue === undefined) return;
         const { est, nord } = implanter.choix;
         implanter.cible = { id: null, nom: nom.trim() || nomProposeImplantation(), est, nord, altitude: lue };
-        implanter.choix = null;
+        // Le choix reste (« + À implanter », « + Point du projet » sous la cible pendant le guidage).
+        implanter.choix = { ...implanter.choix, nom: implanter.cible.nom, altitude: lue };
         montrerImplantation();
       },
       creerPointAImplanter: ({ nom, altitude }) => {
@@ -1844,7 +1969,9 @@ function envoyerImplantationAuPlan() {
   const avecPilote = piloteActif();
   plan.palirAutour(ongletContexte === 'terrain' ? travailAGarder() : null);
   // Case « Voir toute la ligne » (0.118.0) : seulement pendant le guidage d'une ligne (pas d'un talus).
-  const guidageLigne = ongletContexte === 'terrain' && enImplantationDeLigne() && !enTalus() && Boolean(implanter.ligne);
+  const guidageLigne = ongletContexte === 'terrain' && enImplantationDeLigne() && !enTalus() && Boolean(implanter.ligne) && !implanter.ligneAValider;
+  // 0.137.0 : point ou ligne choisi mais pas encore « Implanter » : le plan reste où il est (pas de retour du suivi).
+  plan.suspendreSuivi(ongletContexte === 'terrain' && ((enImplantationDePoint() && Boolean(implanter.choix) && !implanter.cible) || (enImplantationDeLigne() && Boolean(implanter.ligne) && implanter.ligneAValider)));
   if (!guidageLigne) implanter.voirLigne = false;
   plan.voirLigne({ visible: guidageLigne, sommets: guidageLigne && implanter.voirLigne ? implanter.ligne.sommets : null });
   plan.afficherImplantation(accrocheActive || avecPilote || choixCotes || aImplanter.length > 0 || implantes.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0 || talusSurfaces.length > 0
@@ -1916,6 +2043,9 @@ function exporterListe(type, id) {
       surface: leve.nom,
       legende: [ph.point, parNom.get(ph.point).altitude == null ? null : `H ${formaterNombre(parNom.get(ph.point).altitude)}`, ph.legende].filter(Boolean).join(' · '),
     }));
+    // Photos de tout le levé (0.140.0) : d'abord, avec « levé » devant la légende.
+    const globales = (proprietaire?.photos ?? []).filter((ph) => !ph.point && !ph.attentePoint).map((ph) => ({ ...ph, surface: leve.nom, legende: ['Photo du levé', ph.legende].filter(Boolean).join(' · ') }));
+    photos = [...globales, ...photos];
   }
   // Nom du fichier : projet_liste, sans l'extension du fichier importé (« stock.csv » -> « stock »).
   const base = `${nomDeFichierProjet(projet)}_${titre.replace(/\.[a-z0-9]{2,4}$/i, '')}`.replace(/[\\/:*?"<>|]/g, '_');
@@ -2107,6 +2237,9 @@ function travailAGarder() {
   }
   return null;
 }
+
+// 0.138.0 : la cible prend le haut (plan en encart) ou le rend : le plan se recadre sur le point et la canne.
+document.addEventListener('cible-en-haut', () => requestAnimationFrame(() => requestAnimationFrame(cadrerSurImplantation)));
 
 /** Cadre le plan sur ce qu'on implante (point ou ligne) et la position du récepteur. */
 function cadrerSurImplantation() {
@@ -2604,6 +2737,7 @@ function ouvrirTalusSurface(valeur) {
   const mm = (x) => Math.round(x * 1000) / 1000;
   const sommets = troncon.sommets.map((p) => ({ est: mm(p.est), nord: mm(p.nord), altitude: p.altitude != null ? mm(p.altitude) : null, ...(p.nom ? { nom: p.nom } : {}) }));
   implanter.ligne = nouvelleLigneAImplanter(`${surface.nom} · ${texteCotes(troncon.cotes)}`, sommets, null);
+  implanter.ligneAValider = false;
   implanter.pointsLigne = [];
   implanter.talusId = null;
   terrain.talus = { ...terrain.talus, horizontal: reglage.horizontal, vertical: reglage.vertical, ligneEst, cote: 'droite', longueur: reglage.longueur ?? null, terrainId: surface.terrainId ?? null, altitudeSurfaceId: null };
@@ -2929,6 +3063,7 @@ function raisonRecepteurLame(etat, nom) {
  */
 function calculerLame() {
   if (!ecranLeve || terrain.mode !== 'lame' || !lameActive()) return null;
+  if (outilAUnGnss()) return calculerOutilUnGnss();
   const [etatG, etatD] = terrain.lame.inverse ? [etatRecepteur2, etatRecepteur] : [etatRecepteur, etatRecepteur2];
   const [nomG, nomD] = terrain.lame.inverse ? ['Gauche (récepteur 2)', 'Droite (récepteur 1)'] : ['Gauche (récepteur 1)', 'Droite (récepteur 2)'];
   const coins = etatG?.position && etatD?.position ? { gauche: etatG.position, droite: etatD.position } : null;
@@ -2954,6 +3089,44 @@ function calculerLame() {
 }
 
 /**
+ * Outil à 1 GNSS (0.142.0) : râteau ou Bull à 1 récepteur. Les bouts gauche / droit (à mi-longueur de
+ * l'outil) jouent le rôle des 2 GNSS du Bull ; mêmes écarts, dévers et coupes. Voir topo/outil.js.
+ */
+function calculerOutilUnGnss() {
+  const etat = etatRecepteur;
+  const machine = terrain.lame.machine === 'rateau' ? 'rateau' : 'bull';
+  const dims = machine === 'bull' ? { ...terrain.lame.outils.bull, avant: 0, arriere: 0 } : terrain.lame.outils.rateau;
+  const surface = projet.surfaces.find((s) => s.id === terrain.lame.surfaceId);
+  const triangles = surface ? trianglesDeSurface(surface.id) : [];
+  const recepteurs = { gauche: etat, droite: etat };
+  const penche = (etat?.inclinaison ?? 0) > 0.2;
+  const raison = (!surface && 'Choisis le levé à suivre')
+    || (triangles.length === 0 && 'Ce levé n\'a pas encore de triangles')
+    || raisonRecepteurLame(etat, 'GNSS')
+    || (!etat.inclinaisonPrete && 'GNSS : inclinaison pas prête (le cap et la pente de l\'outil en dépendent)')
+    || (etat.cap == null && 'GNSS : pas de cap reçu')
+    || (penche && etat.directionInclinaison == null && 'GNSS : direction de l\'inclinaison pas reçue (mets l\'APK à jour)')
+    || (!(dims.gauche + dims.droite > 0.1) && `Tape les distances de l'outil (⚙ : gauche, droite${machine === 'rateau' ? ', avant, arrière' : ''})`);
+  if (raison) return { raison, guidage: null, coupe: null, coins: null, recepteurs, unGnss: true };
+  const points = pointsOutil(etat.position, { cap: etat.cap, inclinaison: etat.inclinaison ?? 0, directionInclinaison: etat.directionInclinaison ?? 0 }, dims);
+  const coins = { gauche: points.gauche, droite: points.droite, contour: machine === 'rateau' ? points.coins : null };
+  if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
+  const guidage = guidageLame({ gauche: coins.gauche, droite: coins.droite, altitudeSurface: chercheurLame.chercher, tolerances: terrain.lame.tolerances });
+  if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coupe: null, coins, recepteurs, unGnss: true };
+  // Écart au centre de l'outil (même formule qu'un coin : altitude de la surface − altitude du point).
+  const surfaceCentre = chercheurLame.chercher(points.centre.est, points.centre.nord);
+  guidage.centre = { ecart: surfaceCentre == null ? null : surfaceCentre - points.centre.altitude };
+  const ligne = ligneDeCoupeLame(coins.gauche, coins.droite, 1);
+  const coupe = {
+    longueur: guidage.largeur + 2,
+    profils: profilSurface(triangles, ligne.debut, ligne.fin),
+    gauche: { distance: 1, altitude: coins.gauche.altitude },
+    droite: { distance: 1 + guidage.largeur, altitude: coins.droite.altitude },
+  };
+  return { raison: null, guidage, coupe, coins, recepteurs, unGnss: true, bords: bordsDeLaLame(coins.gauche, coins.droite, triangles), profil: coupePerpendiculaireLame(coins, triangles), toleranceVert: terrain.lame.tolerances.vert };
+}
+
+/**
  * Coupe perpendiculaire de la lame (0.100.0, remplace le profil en long) : depuis le milieu de la
  * lame, 20 m devant et 10 m derrière ; Bull : perpendiculaire à la lame ; Grader : dans le sens de
  * marche (dernières positions du milieu), perpendiculaire à la lame à l'arrêt. Tronçons et ruptures
@@ -2965,7 +3138,8 @@ function coupePerpendiculaireLame(coins, triangles) {
   historiqueLame.push({ est: milieu.est, nord: milieu.nord, temps: maintenant });
   while (historiqueLame.length > 0 && maintenant - historiqueLame[0].temps > 10_000) historiqueLame.shift();
   const azimut = directionDeMarche(historiqueLame, { distanceMin: 1, dureeMax: 5000 });
-  const sens = sensCoupeLame(terrain.lame.machine, coins.gauche, coins.droite, azimut);
+  // Râteau : comme le Bull, coupe perpendiculaire à l'outil (dans son axe avant / arrière).
+  const sens = sensCoupeLame(terrain.lame.machine === 'rateau' ? 'bull' : terrain.lame.machine, coins.gauche, coins.droite, azimut);
   if (!sens) return null;
   const devant = COUPE_DEVANT;
   const derriere = COUPE_DERRIERE;
@@ -3465,6 +3639,7 @@ function toucherPourLigne(position, tolerance) {
     const cote = coteSousLeDoigt(position, tolerance, dessinsVisibles().flatMap((d) => cotesDuDessin(d, projet.dessins)));
     if (cote) {
       implanter.ligne = nouvelleLigneAImplanter(cote.nom, cote.sommets.map(mm), null);
+      implanter.ligneAValider = true;
       implanter.talusId = null;
       implanter.pointsLigne = [];
       montrerImplantation();
@@ -3475,6 +3650,7 @@ function toucherPourLigne(position, tolerance) {
     const deLeve = accrocherTrait(position, tolerance, lignesLeves);
     if (deLeve) {
       implanter.ligne = nouvelleLigneAImplanter(deLeve.ligne.nom, deLeve.sommets.map(mm), deLeve.segment);
+      implanter.ligneAValider = true;
       implanter.talusId = null;
       implanter.pointsLigne = [];
       montrerImplantation();
@@ -3488,6 +3664,7 @@ function toucherPourLigne(position, tolerance) {
     const sommets = trouve.sommets.map(mm);
     const nombre = sommets.length - 1;
     implanter.ligne = nouvelleLigneAImplanter(`Ligne DXF (${nombre} segment${nombre > 1 ? 's' : ''})`, sommets, trouve.segment);
+    implanter.ligneAValider = true;
     implanter.talusId = null;
     implanter.pointsLigne = [];
   } else {
@@ -3583,13 +3760,13 @@ function toucherPourImplantation(position, tolerance) {
 }
 
 /**
- * Point choisi (touché sur le plan, pris dans la « Liste » ou tapé) : le guidage commence tout de suite
- * (0.114.0, plus de bouton « Implanter » à toucher en plus). Le choix est gardé : « + À implanter » et
- * « + Point du projet » restent sous la cible ; l'altitude se change dans le champ H du guidage.
+ * Point choisi (touché sur le plan, pris dans la « Liste » ou tapé) : 0.137.0 (demande du 05.11) : il est
+ * montré dans une fiche (nom, altitude) avec le bouton « Implanter » ; le guidage commence seulement
+ * après ce bouton (implanterChoix), et le plan reste où il est pour voir ce qu'on a touché.
  */
 function guiderVersChoix(choix) {
   implanter.choix = choix;
-  implanter.cible = { id: null, nom: choix.nom || nomProposeImplantation(), est: choix.est, nord: choix.nord, altitude: choix.altitude ?? null };
+  implanter.cible = null;
 }
 
 // --- Recalage d'un plan DXF (Projet › Imports › Recaler ; calculs dans topo/recalage.js) ---
@@ -4379,7 +4556,7 @@ function montrerPhoto(id) {
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-photo';
   fenetre.innerHTML = `<form method="dialog">
-      <h2>📷 ${echapper(photo.point ?? '')}</h2>
+      <h2>📷 ${echapper(photo.point ?? 'Photo du levé')}</h2>
       <img src="${photo.image}" alt="${echapper(photo.legende || photo.point || 'photo')}" />
       ${photo.legende ? `<p>${echapper(photo.legende)}</p>` : ''}
       <div class="ligne-outils"><button class="bouton">Fermer</button><button type="button" class="bouton-secondaire seulement-intermediaire" data-cle="dessiner">✎ Dessiner</button>${deControle ? '<button type="button" class="bouton-lien" data-cle="supprimer">supprimer la photo</button>' : ''}</div>
@@ -4689,6 +4866,7 @@ function donneesReseau(recollement) {
 /** Données de l'onglet Terrain communes aux surfaces et aux métrés. */
 function donneesCommunes() {
   return {
+    delta: { ...deltaLeve, actif: deltaActif(deltaEnMetres()) },
     // Surfaces levées et métrés, avec la date de leur levé (« Stock 2 · 22.10.2026 »).
     stocks: [...surfacesLevees(), ...projet.metres, ...projet.autres, ...projet.reseaux].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}`, nature: s.nature ?? 'stock' })),
     libelles: lireLibelles(),
@@ -4708,6 +4886,9 @@ function donneesCommunes() {
       tolerances: terrain.lame.tolerances,
       machine: terrain.lame.machine,
       recepteur2: Boolean(etatRecepteur2?.connecte),
+      recepteursBull: terrain.lame.recepteursBull,
+      unGnss: outilAUnGnss(),
+      outil: terrain.lame.machine === 'rateau' ? terrain.lame.outils.rateau : terrain.lame.outils.bull,
     },
     autocontrole: donneesAutocontrole(),
     // Seulement les levés et surfaces qui ont des triangles (0.90.1 : pas les levés vides), plus la surface choisie.
@@ -4730,6 +4911,7 @@ function donneesCommunes() {
       accrocheLigne: terrain.accrocheLigne,
       pointsLigne: implanter.pointsLigne,
       ligne: implanter.ligne ? resumeLigne() : null,
+      ligneAValider: Boolean(implanter.ligne) && implanter.ligneAValider,
       // Talus : réglages, talus de « Mes talus » ouvert (nom) et la liste.
       talus: {
         reglages: terrain.talus,
@@ -4917,8 +5099,8 @@ if (recepteurDisponible()) {
     let implantation = enPoint ? calculerImplantation(etat, orientation) : null;
     if (enAutocontrole() && autocontrole.cible) implantation = calculerImplantation(etat, orientation, autocontrole.cible);
     const talus = enTalus();
-    const implantationLigne = enLigne && !talus ? calculerImplantationLigne(etat, orientation) : null;
-    const implantationTalus = talus ? calculerImplantationTalus(etat) : null;
+    const implantationLigne = enLigne && !talus && !implanter.ligneAValider ? calculerImplantationLigne(etat, orientation) : null;
+    const implantationTalus = talus && !implanter.ligneAValider ? calculerImplantationTalus(etat) : null;
     ecranLeve.mettreAJourRecepteur(etat, { orientation, controle, implantation, implantationLigne, implantationTalus });
     montrerLame();
     mettreAJourBip(controle);
@@ -4932,8 +5114,12 @@ if (recepteurDisponible()) {
     const vers = implantationLigne?.ligne?.cible ?? (implantationTalus?.message ? null : implantationTalus?.talus?.cible) ?? null;
     const cotes = implantationTalus ? cotesTalus(implantationTalus) : cotesLigne(implantationLigne);
     // Sans RX2 connecté : la position du GPS de la tablette, en gris avec son cercle de précision.
+    dernierAzimut = orientation.azimut ?? null;
+    // Delta en cours (Lever) : le point décalé se voit sur le plan avant Enreg. Pts.
+    const delta = deltaEnMetres();
+    const decale = position && ongletContexte === 'terrain' && terrain.mode === 'lever' && deltaActif(delta) ? pointAvecDelta(position, delta, orientation.azimut) : null;
     const tablette = !etat.connecte && positionTablette ? { est: positionTablette.est, nord: positionTablette.nord, prete: false, tablette: true, precision: positionTablette.precision, azimut: null } : null;
-    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotes } : tablette);
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotes, delta: decale } : tablette);
   });
   // GPS de la tablette : gardé ici, montré avec l'état suivant du RX2 (5 fois par seconde).
   ecouterPositionTablette((position) => {
@@ -6271,6 +6457,7 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   implanter.cible = null;
   implanter.pointsLigne = [];
   implanter.ligne = null;
+  implanter.ligneAValider = false;
   implanter.talusId = null;
   autocontrole.cible = null;
   dernierImport = null;

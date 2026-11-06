@@ -732,6 +732,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const g = versEcran(lame.gauche.est, lame.gauche.nord, vue);
     const d = versEcran(lame.droite.est, lame.droite.nord, vue);
     const groupe = creerElement('g', { class: 'lame-plan' });
+    // Râteau (0.142.0) : le contour de l'outil (4 coins) en plus du trait entre les bouts gauche et droit.
+    if (lame.contour?.length === 4) {
+      const coins = lame.contour.map((c) => versEcran(c.est, c.nord, vue));
+      groupe.append(creerElement('polygon', { points: coins.map((c) => `${c.x},${c.y}`).join(' '), class: 'contour-outil' }));
+    }
     groupe.append(creerElement('line', { x1: g.x, y1: g.y, x2: d.x, y2: d.y, class: 'trait-lame' }));
     for (const [p, classe, lettre] of [[g, lame.classeGauche, 'G'], [d, lame.classeDroite, 'D']]) {
       groupe.append(creerElement('circle', { cx: p.x, cy: p.y, r: 8, class: `coin-lame-plan ${classe ? `ecart-${classe}` : ''}` }));
@@ -782,6 +787,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }));
     }
     groupe.append(creerElement('circle', { cx: x, cy: y, r: 6 }));
+    // Delta (0.139.0) : le point qui sera enregistré, décalé de la canne (croix orange, trait pointillé).
+    if (position.delta) {
+      const d = versEcran(position.delta.est, position.delta.nord, vue);
+      groupe.append(creerElement('line', { x1: x, y1: y, x2: d.x, y2: d.y, class: 'trait-delta' }));
+      groupe.append(creerElement('path', { d: `M${d.x - 9} ${d.y - 9} L${d.x + 9} ${d.y + 9} M${d.x - 9} ${d.y + 9} L${d.x + 9} ${d.y - 9}`, class: 'delta-point' }));
+      groupe.append(creerElement('circle', { cx: d.x, cy: d.y, r: 12, class: 'delta-point' }));
+    }
     // Implantation d'une ligne : distances écrites le long de la ligne et sur la perpendiculaire.
     if (position.cotesLigne) dessinerCotesLigne(groupe, position.cotesLigne, { x, y }, position.vers);
     svg.append(groupe);
@@ -1671,13 +1683,16 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   let retourSuivi = null;
   let retourSuiviActif = false;
   let dernierToucher = 0;
+  // 0.137.0 : un point ou une ligne choisi en Implanter, pas encore validé : le suivi est arrêté et ne
+  // revient pas tout seul (on voit ce qu'on a touché) ; « Implanter » le rend tout de suite.
+  let suiviSuspendu = false;
   function armerRetourSuivi() {
     if (suivi !== 'libre') retourSuivi = { mode: suivi, depuis: position ? { est: position.est, nord: position.nord } : null };
     dernierToucher = performance.now();
   }
   /** Vrai si le suivi a été repris (le plan est alors redessiné). */
   function reprendreSuiviSiBesoin() {
-    if (!retourSuivi || !retourSuiviActif || suivi !== 'libre' || !position || pointeurs.size > 0 || ligneVue) return false;
+    if (suiviSuspendu || !retourSuivi || !retourSuiviActif || suivi !== 'libre' || !position || pointeurs.size > 0 || ligneVue) return false;
     const attente = performance.now() - dernierToucher >= DELAI_RETOUR_SUIVI;
     const depuis = retourSuivi.depuis;
     const parti = depuis && Math.hypot(position.est - depuis.est, position.nord - depuis.nord) >= DISTANCE_RETOUR_SUIVI;
@@ -2282,14 +2297,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       position = nouvellePosition;
       boutonPosition.hidden = !position;
       // Cap automatique (0.119.0) : GNSS prêt → devant du GNSS en haut ; plus prêt → comme avant.
-      const decision = decisionCapAuto(capAuto, { pret: Boolean(position?.prete) && !position?.tablette, suivi, occupe: Boolean(ligneVue) });
+      const decision = decisionCapAuto(capAuto, { pret: Boolean(position?.prete) && !position?.tablette, suivi, occupe: Boolean(ligneVue) || suiviSuspendu });
       if (decision === 'cap') {
         changerSuivi('cap');
         if (position.azimut != null && vue) {
           tournerVers(position.azimut);
           return;
         }
-      } else if (decision?.revenir) {
+      } else if (decision?.revenir && !suiviSuspendu) {
         changerSuivi(decision.revenir);
         if (vue) vue = { ...vue, rotation: 0 };
         if (position && decision.revenir !== 'libre') centrerSurPosition();
@@ -2400,6 +2415,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
      * Retour automatique du suivi (0.126.0) : allumé dans l'onglet Terrain, éteint ailleurs. En le
      * rallumant, un suivi arrêté ailleurs (cadrage de Calculs) reprend à la prochaine position.
      */
+    /** Choix en attente (0.137.0) : vrai = le plan ne suit plus la position ; faux = le suivi d'avant revient tout de suite. */
+    suspendreSuivi(oui) {
+      if (oui === suiviSuspendu) return;
+      if (oui) {
+        if (suivi !== 'libre') arreterSuivi();
+        suiviSuspendu = true;
+        return;
+      }
+      suiviSuspendu = false;
+      dernierToucher = 0;
+    },
     retourAutomatiqueDuSuivi(actif) {
       if (actif && !retourSuiviActif) dernierToucher = 0;
       retourSuiviActif = Boolean(actif);

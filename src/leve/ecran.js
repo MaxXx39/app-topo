@@ -277,6 +277,10 @@ export function creerEcranLeve(conteneur, actions) {
       actions.reglerTalus(bouton.dataset.champTalus, bouton.dataset.valeur);
       return;
     }
+    if (action === 'reglerDelta') {
+      actions.reglerDelta(bouton.dataset.champDelta, bouton.dataset.valeur);
+      return;
+    }
     if (action === 'prendre') actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '', attributsReseau());
     else if (action === 'role') actions.choisirRole(bouton.dataset.role);
     else actions[action]?.(bouton.dataset.valeur);
@@ -286,6 +290,14 @@ export function creerEcranLeve(conteneur, actions) {
   conteneur.addEventListener('input', (evenement) => {
     const champ = evenement.target.dataset?.attributReseau;
     if (champ) saisieReseau[champ] = evenement.target.value;
+    // Delta (0.139.0) : gardé à chaque frappe, sans redessiner (Enreg. Pts reste touchable tout de suite).
+    const delta = evenement.target.dataset?.delta;
+    if (delta) {
+      actions.reglerDelta(delta, evenement.target.value, false);
+      const cadre = conteneur.querySelector('.ligne-delta');
+      const valeurs = [...conteneur.querySelectorAll('[data-delta]')].map((c) => Number(c.value.replace(',', '.')));
+      cadre?.classList.toggle('actif', valeurs.some((v) => Number.isFinite(v) && v !== 0));
+    }
   });
 
   conteneur.addEventListener('change', (evenement) => {
@@ -297,12 +309,17 @@ export function creerEcranLeve(conteneur, actions) {
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.champ === 'surface-lame') actions.choisirSurfaceLame(cible.value);
     else if (cible.dataset.toleranceLame) actions.reglerToleranceLame(cible.dataset.toleranceLame, cible.value);
+    else if (cible.dataset.outil) actions.reglerOutil(cible.dataset.outil, cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
     else if (cible.dataset.champ === 'photo-controle' && cible.files?.length) {
       // Photo d'un point de contrôle (0.105.0) : rangée dans le projet, rattachée au point.
       actions.ajouterPhotoControle(cible.dataset.id, [...cible.files]);
+      cible.value = '';
+    } else if (cible.dataset.champ === 'photo-levee-globale' && cible.files?.length) {
+      // Photo de tout le levé (0.140.0, Intermédiaire) : pas rattachée à un point.
+      actions.ajouterPhotosLeveeGlobale([...cible.files]);
       cible.value = '';
     } else if (cible.dataset.champ === 'photo-levee' && cible.files?.length) {
       // Photo du levé (0.77.0) : appareil photo de la tablette, rangée avec le levé en cours.
@@ -453,7 +470,10 @@ export function creerEcranLeve(conteneur, actions) {
    * cible : { svg, classe (couleur de la distance) } ou null.
    */
   function montrerCibleEnHaut(zone, cible) {
+    const avant = document.body.classList.contains('cible-en-haut');
     document.body.classList.toggle('cible-en-haut', Boolean(zone && cible));
+    // 0.138.0 : le plan devient (ou n'est plus) un encart en haut à droite : main.js le recadre.
+    if (avant !== document.body.classList.contains('cible-en-haut')) document.dispatchEvent(new CustomEvent('cible-en-haut'));
     if (!zone) return;
     zone.hidden = !cible;
     if (!cible) {
@@ -517,11 +537,11 @@ export function creerEcranLeve(conteneur, actions) {
       return barreAccroche() + choixImplantation + invite + implanterPoint();
     }
     if (reglages.implantation === 'ligne') {
-      const invite = imp.pointsLigne.length > 0 ? '' : invitation('Choisis la ligne à implanter', 'touche-la sur le plan, ou ses points un à un');
+      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Choisis la ligne à implanter', 'touche-la sur le plan, ou ses points un à un');
       return barreAccroche() + choixImplantation + invite + implanterLigne();
     }
     if (reglages.implantation === 'talus') {
-      const invite = imp.pointsLigne.length > 0 ? '' : invitation('Choisis la ligne du talus (haut ou bas)', 'touche-la sur le plan, ou ses points un à un');
+      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Choisis la ligne du talus (haut ou bas)', 'touche-la sur le plan, ou ses points un à un');
       return barreAccroche() + choixImplantation + invite + implanterLigne() + mesTalus() + talusDesSurfaces();
     }
     if (reglages.implantation === 'altitude') {
@@ -616,6 +636,19 @@ export function creerEcranLeve(conteneur, actions) {
     const { implanter: imp } = donnees;
     const points = imp.pointsLigne;
     const role = (i) => (i === 0 ? `${iconeDrapeau('debut')} Début` : i === points.length - 1 ? `${iconeDrapeau('fin')} Fin` : `${i + 1}`);
+    // 0.137.0 : ligne touchée sur le plan : fiche (nom, longueur) et « Implanter » avant le guidage.
+    const fiche = imp.ligneAValider && imp.ligne
+      ? `<div class="choix-implantation fiche-ligne">
+          <p class="coordonnees-choix"><strong>${echapper(imp.ligne.nom)}</strong> <span class="aide">· long. ${formaterNombre(imp.ligne.longueur)} m</span></p>
+          <div class="ligne-outils">
+            <button type="button" class="bouton bouton-implanter" data-action="implanterLigneChoisie">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></svg>Implanter</button>
+            <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="decalerLigneChoisie" title="Créer une copie décalée de cette ligne">Décaler…</button>
+            <button type="button" class="bouton-lien bouton-lien-neutre" data-action="changerLigne">en toucher une autre</button>
+          </div>
+        </div>`
+      : '';
+    if (fiche) return `${fiche}${lienExport()}`;
     return `
       <div class="points-ligne">
         <p class="titre-choix">Points de la ligne</p>
@@ -1014,6 +1047,26 @@ export function creerEcranLeve(conteneur, actions) {
     return { diametre: lire('diametre'), materiau: lire('materiau'), profondeurFouille: lire('profondeurFouille'), remarque: lire('remarque') };
   }
 
+  /**
+   * Delta du prochain point (0.139.0, Intermédiaire) : gauche / droite selon le cap du GNSS, distance et Z.
+   * Orange quand il décale le point ; le point décalé se voit sur le plan ; remis à zéro après le point.
+   */
+  function ligneDelta() {
+    const d = donnees.delta ?? { sens: 'droite', distance: '', z: '' };
+    // 0.141.0 : la ligne de réglage n'est montrée qu'après le bouton « Δ Delta » (ou si un delta est tapé).
+    if (!d.ouvert && !d.actif) {
+      return '<button type="button" class="bouton-secondaire bouton-ouvrir-delta seulement-intermediaire" data-action="reglerDelta" data-champ-delta="ouvrir" title="Décaler le prochain point">Δ Delta</button>';
+    }
+    const sens = (cle, mot) => `<button type="button" class="bouton-sens-delta ${d.sens === cle ? 'actif' : ''}" data-action="reglerDelta" data-champ-delta="sens" data-valeur="${cle}" aria-pressed="${d.sens === cle}">${mot}</button>`;
+    return `<div class="ligne-delta seulement-intermediaire ${d.actif ? 'actif' : ''}">
+        <span class="titre-delta" title="Décaler le prochain point">Δ</span>
+        <span class="sens-delta" role="group" aria-label="Côté du décalage">${sens('gauche', '◀ G')}${sens('droite', 'D ▶')}</span>
+        <label class="champ-delta">dist.<input type="text" inputmode="decimal" data-delta="distance" value="${echapper(d.distance)}" placeholder="0.000" autocomplete="off" /></label>
+        <label class="champ-delta">Z ±<input type="text" inputmode="decimal" data-delta="z" value="${echapper(d.z)}" placeholder="0.000" autocomplete="off" /></label>
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="reglerDelta" data-champ-delta="effacer" aria-label="Remettre le delta à zéro">×</button>
+      </div>`;
+  }
+
   /** Cadre « Point » : ID point, photo, Enreg. Pts, position, refus et « Annuler » (tous les levés). */
   function cadrePrise() {
     // Sur le site (0.120.0) : pas de récepteur ni d'Enreg. Pts ; on ajoute un point (ou les points d'une
@@ -1048,6 +1101,7 @@ export function creerEcranLeve(conteneur, actions) {
           </button>
         </div>
         <div class="position-leve" data-vivant="position"></div>
+        ${ligneDelta()}
         <p class="raison-leve" data-vivant="raison" hidden></p>
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
           ↶ Effacer le dernier point${donnees.dernierPoint ? ` (${echapper(donnees.dernierPoint)})` : ''}</button>
@@ -1170,6 +1224,10 @@ export function creerEcranLeve(conteneur, actions) {
       <button type="button" class="bouton-crayon-levee" data-action="renommerLevee" title="Renommer" aria-label="Renommer le levé">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button>
       <span class="boutons-levee">
+        <label class="bouton-secondaire bouton-photo-globale seulement-intermediaire" title="Photo de tout le levé (pas d'un point)" aria-label="Photo de tout le levé">
+          <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>
+          <input type="file" data-champ="photo-levee-globale" accept="image/*" capture="environment" hidden />
+        </label>
         <button type="button" class="bouton-secondaire" data-action="changerLevee" ${donnees.stocks.length > 1 || !estModeBase() ? '' : 'disabled'}>Changer</button>
         <button type="button" class="bouton-secondaire" data-action="ouvrirChoixNature" aria-label="Nouveau levé"><span class="texte-long">+ Nouveau</span><span class="texte-court">+</span></button>
       </span>
@@ -1302,7 +1360,7 @@ export function creerEcranLeve(conteneur, actions) {
           <p class="titre-choix">Photos (${photos.length}) ${bulle('photos')}</p>
           <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
               <img src="${photo.miniature}" alt="${echapper(photo.legende || donnees.stock.nom)}" />
-              <span class="point-photo">📷 ${photo.point ? echapper(photo.point) : photo.attentePoint ? 'prochain point' : '—'}</span>
+              <span class="point-photo">📷 ${photo.point ? echapper(photo.point) : photo.attentePoint ? 'prochain point' : 'tout le levé'}</span>
               <input type="text" data-champ="legende-photo-levee" data-id="${photo.id}" value="${echapper(photo.legende ?? '')}" placeholder="Légende" aria-label="Légende de la photo" />
               <button type="button" class="bouton-lien" data-action="supprimerPhotoLevee" data-valeur="${photo.id}">supprimer</button>
             </figure>`).join('')}</div>
@@ -1436,7 +1494,7 @@ export function creerEcranLeve(conteneur, actions) {
     const { implantation } = donnees.controle;
     const autocontrole = donnees.mode === 'autocontrole';
     const enGuidage = (autocontrole && Boolean(donnees.autocontrole.cible)) || (donnees.mode === 'controler'
-      && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (['ligne', 'talus'].includes(implantation) && Boolean(donnees.implanter.ligne))));
+      && ((implantation === 'point' && Boolean(donnees.implanter.cible)) || (['ligne', 'talus'].includes(implantation) && Boolean(donnees.implanter.ligne) && !donnees.implanter.ligneAValider)));
     document.body.classList.toggle('vue-implantation', enGuidage);
     // 0.123 : Implanter › Surface / Altitude : la règle de hauteur est fixée à droite, sur toute la hauteur sous le plan.
     document.body.classList.toggle('regle-sous-plan', donnees.mode === 'controler' && !enGuidage && ['surface', 'altitude'].includes(implantation));
@@ -1448,7 +1506,12 @@ export function creerEcranLeve(conteneur, actions) {
     let contenu;
     if (enGuidage) contenu = vueImplantation();
     else if (autocontrole) contenu = htmlControle(donnees.autocontrole, { gestionOuverte: gestionControleOuverte, erreurGestion });
-    else if (donnees.mode === 'lame') contenu = htmlLame(donnees.lame, { reglagesOuverts: reglagesLameOuverts, bip: donnees.controle.bip !== false });
+    else if (donnees.mode === 'lame') {
+      // Outil à 1 GNSS sans ses distances (0.142.0) : réglages ouverts, et ils le restent pendant la saisie.
+      const outil = donnees.lame.outil ?? {};
+      if (donnees.lame.unGnss && !(Number(outil.gauche) + Number(outil.droite) > 0.1)) reglagesLameOuverts = true;
+      contenu = htmlLame(donnees.lame, { reglagesOuverts: reglagesLameOuverts, bip: donnees.controle.bip !== false });
+    }
     else contenu = donnees.mode === 'controler' ? controle() : priseDePoint();
     conteneur.innerHTML = `
         <div class="ecran-terrain cadre-mode-${donnees.mode}">
@@ -1591,58 +1654,68 @@ export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) 
     bandeaux.className = 'bandeaux-recepteur';
     bandeaux.setAttribute('role', 'status');
     bandeaux.title = 'Récepteur : toucher pour connecter ou régler';
-    // Petite icône de récepteur (+ flèche) : on comprend qu'on peut toucher la barre (0.86.0).
-    bandeaux.innerHTML = `<span data-bandeau="rtk"></span><span data-bandeau="inclinaison"></span>
-      <svg class="icone-bandeau" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><ellipse cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" /></svg>`;
+    // 0.138.0 (liste du 05.11, point 7) : 4 cases, chacune avec l'important en gros et le détail en petit dessous :
+    // état RTK (satellites), Z du bout de la canne (précision H / V), hauteur de canne, inclinaison (angle, âge des corrections).
+    bandeaux.innerHTML = ['rtk', 'z', 'canne', 'inclinaison'].map((cle) => `<div class="case-recepteur" data-bandeau="${cle}"><b></b><small></small></div>`).join('');
     bandeaux.addEventListener('click', () => document.dispatchEvent(new CustomEvent('ouvrir-recepteur')));
     document.querySelector('.entete').append(bandeaux);
   }
   // Toujours visible (appli Android) : c'est l'accès au récepteur.
   document.body.classList.add('avec-recepteur');
+  const cases = Object.fromEntries([...bandeaux.querySelectorAll('[data-bandeau]')].map((c) => [c.dataset.bandeau, c]));
+  /** Remplit une case : texte en gros, détail en petit, classe de couleur ; null = case cachée. */
+  const remplir = (cle, grand, petit = '', classe = 'info') => {
+    const c = cases[cle];
+    c.hidden = grand == null;
+    c.className = `case-recepteur ${classe}`;
+    c.querySelector('b').textContent = grand ?? '';
+    c.querySelector('small').textContent = petit;
+    c.querySelector('small').hidden = !petit;
+  };
+  const canne = hauteurCanne != null ? formaterNombre(hauteurCanne) : null;
   if (!etat?.connecte && !tablette) {
-    const [rtk, inclinaison] = bandeaux.querySelectorAll('[data-bandeau]');
-    rtk.textContent = 'Récepteur non connecté';
-    rtk.className = 'attente';
-    inclinaison.textContent = 'Toucher pour connecter';
-    inclinaison.className = 'attente';
+    remplir('rtk', 'Récepteur non connecté', '', 'attente');
+    remplir('z', null);
+    remplir('canne', null);
+    remplir('inclinaison', 'Toucher pour connecter', '', 'attente');
     return;
   }
   if (!etat?.connecte) {
-    const [rtk, inclinaison] = bandeaux.querySelectorAll('[data-bandeau]');
-    rtk.textContent = `GPS TABLETTE · ± ${Math.max(1, Math.round(tablette.precision ?? 0))} m`;
-    rtk.className = 'tablette';
-    inclinaison.textContent = 'GNSS non connecté';
-    inclinaison.className = 'attente';
+    remplir('rtk', 'GPS TABLETTE', `± ${Math.max(1, Math.round(tablette.precision ?? 0))} m`, 'tablette');
+    remplir('z', null);
+    remplir('canne', null);
+    remplir('inclinaison', 'GNSS non connecté', '', 'attente');
     return;
   }
-
-  const rtk = bandeaux.querySelector('[data-bandeau="rtk"]');
-  const inclinaison = bandeaux.querySelector('[data-bandeau="inclinaison"]');
-  // Âge des corrections (s), à côté de l'inclinaison (0.114.0).
-  const age = etat.ageCorrections != null ? `corr. ${Math.round(etat.ageCorrections)} s` : null;
+  const age = etat.ageCorrections != null ? `corr. ${Math.round(etat.ageCorrections)} s` : '';
   if (!etat.recu) {
-    rtk.textContent = 'En attente du récepteur…';
-    rtk.className = 'attente';
+    remplir('rtk', 'En attente…', '', 'attente');
+    remplir('z', 'Z —', '', 'info');
   } else {
-    const satellites = etat.nbSatellites != null ? ` · ${etat.nbSatellites} sat` : '';
-    const statut = { 4: 'RTK FIXE', 5: 'RTK FLOTTANT' }[etat.qualite] ?? `GNSS : ${etat.libelleQualite ?? '?'}`;
-    // Précision estimée par le GNSS (message GST, m), en gros (0.114.0) ; « — » s'il ne l'envoie pas.
-    rtk.innerHTML = `<span class="statut-rtk">${echapper(statut)}${satellites}</span>
-      <span class="precision-rtk">H ${formaterNombre(etat.precisionH)} <span>V ${formaterNombre(etat.precisionV)}</span></span>`;
-    // Le RTK fixe était là puis il est perdu : la barre clignote jusqu'à son retour (0.114.0).
+    const statut = { 1: 'AUTONOME', 2: 'DGPS', 4: 'FIXE', 5: 'FLOTTANT' }[etat.qualite] ?? (etat.libelleQualite ?? '?').toUpperCase();
+    // Le RTK fixe était là puis il est perdu : la case clignote jusqu'à son retour (0.114.0).
     if (etat.qualite === 4) fixeDejaVu = true;
-    rtk.className = etat.qualite === 4 ? 'ok' : `pas-ok${fixeDejaVu ? ' fixe-perdu' : ''}`;
+    remplir('rtk', statut, etat.nbSatellites != null ? `${etat.nbSatellites} sat` : '', etat.qualite === 4 ? 'ok' : `pas-ok${fixeDejaVu ? ' fixe-perdu' : ''}`);
+    // Z = altitude du bout de la canne envoyée par le GNSS (position compensée), comme partout dans l'appli.
+    const z = etat.position?.altitude;
+    const precision = etat.precisionH != null || etat.precisionV != null ? `H ${formaterNombre(etat.precisionH)} V ${formaterNombre(etat.precisionV)}` : '';
+    remplir('z', `Z ${z != null ? formaterNombre(z) : '—'}`, precision, 'info');
   }
-  // Inclinaison toujours montrée (0.114.1), avec l'âge des corrections à côté : on voit tout de suite
-  // s'il faut recalibrer la compensation d'inclinaison.
+  // Hauteur de canne (0.107.1) : seulement montrée, pour contrôle (tapée en Expert dans la fenêtre du récepteur).
+  remplir('canne', canne ?? '—', 'canne', 'info-canne');
+  // Inclinaison toujours montrée (0.114.1) : on voit tout de suite s'il faut recalibrer.
   if (etat.etatInclinaison == null) {
-    inclinaison.textContent = `Incl. ?${age ? ` · ${age}` : ''}`;
-    inclinaison.className = 'attente';
+    remplir('inclinaison', '?', ['incl.', age].filter(Boolean).join(' · '), 'attente');
   } else {
-    const angle = etat.inclinaison != null ? ` (${etat.inclinaison.toFixed(0)}°)` : '';
-    // Hauteur de canne (0.107.1) : seulement montrée, pour contrôle (réglée en Expert, voir Emlid Flow).
-    const canne = hauteurCanne != null ? ` · canne ${hauteurCanne.toFixed(3)}` : '';
-    inclinaison.textContent = `${etat.inclinaisonPrete ? `Incl. PRÊTE${angle}` : 'Incl. NON PRÊTE'}${age ? ` · ${age}` : ''}${canne}`;
-    inclinaison.className = etat.inclinaisonPrete ? 'ok' : 'pas-ok';
+    const angle = etat.inclinaison != null ? `${etat.inclinaison.toFixed(0)}°` : '';
+    remplir('inclinaison', etat.inclinaisonPrete ? 'PRÊTE' : 'NON PRÊTE', [`incl. ${angle}`.trim(), age].filter(Boolean).join(' · '), etat.inclinaisonPrete ? 'ok' : 'pas-ok');
+  }
+  // Tablette : « Incl. » devant, en gros (place suffisante) ; téléphone : seulement dans le détail.
+  const motIncl = cases.inclinaison.querySelector('b');
+  if (!document.body.classList.contains('mode-telephone')) {
+    motIncl.textContent = `Incl. ${motIncl.textContent}`;
+    const detail = cases.inclinaison.querySelector('small');
+    detail.textContent = detail.textContent.replace(/^incl\.\s*(· )?/, '');
+    detail.hidden = !detail.textContent;
   }
 }
