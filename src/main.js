@@ -64,6 +64,7 @@ import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/jo
 import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
+import { pointAvecDelta, deltaActif } from './topo/delta.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { surChangementListes } from './reglages/listes-partagees.js';
 import { lireDossiers, ecrireDossiers, dossiersTries, dossierDuProjet, ajouterDossier, renommerDossier, supprimerDossier, rangerProjet, SANS_DOSSIER } from './projet/dossiers.js';
@@ -152,6 +153,22 @@ let pilote = null;
 const modifications = historique.creerHistorique(); // pour Annuler / Rétablir
 // Levé avec le récepteur (appli Android) : levé et stock en cours, rôle du prochain point.
 const leveDirect = { stockId: null, role: 'contour' };
+// Delta du prochain point levé (0.139.0, Intermédiaire) : sens 'gauche' / 'droite' (selon le cap du GNSS),
+// distance et Z tapés (texte) ; remis à zéro après chaque point enregistré (un seul point à la fois).
+const deltaLeve = { sens: 'droite', distance: '', z: '' };
+// Dernier cap du GNSS calculé (degrés), pour décaler le point au moment de l'enregistrer.
+let dernierAzimut = null;
+
+/** Delta tapé, en mètres : { lateral (+ = droite), z } ; un nombre mal tapé compte pour 0. */
+function deltaEnMetres() {
+  if (!aAcces('intermediaire')) return { lateral: 0, z: 0 };
+  const lire = (texte) => {
+    const n = Number(String(texte ?? '').replace(',', '.').trim());
+    return Number.isFinite(n) ? n : 0;
+  };
+  const distance = Math.abs(lire(deltaLeve.distance));
+  return { lateral: deltaLeve.sens === 'gauche' ? -distance : distance, z: lire(deltaLeve.z) };
+}
 let etatRecepteur = null; // dernier état reçu du récepteur (voir android/pont.js)
 let etatRecepteur2 = null; // dernier état du 2e récepteur (essai à 2 RX2, guidage de lame)
 // GPS de la tablette (APK, sans RX2 connecté) : { est, nord, precision } ou null ; seulement pour se localiser.
@@ -1232,6 +1249,16 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       },
       commencerAjout,
       arreterAjout,
+      // Delta du prochain point (0.139.0) : sens gauche / droite, distance, Z ; « effacer » remet à zéro.
+      reglerDelta: (champ, valeur, redessiner = true) => {
+        if (champ === 'sens') deltaLeve.sens = valeur === 'gauche' ? 'gauche' : 'droite';
+        else if (champ === 'distance' || champ === 'z') deltaLeve[champ] = String(valeur ?? '');
+        else if (champ === 'effacer') {
+          deltaLeve.distance = '';
+          deltaLeve.z = '';
+        }
+        if (redessiner) ecranLeve?.afficher(donneesLeve());
+      },
       prendrePoint: (nom, attributs = {}) => {
         if (refuserEnLectureSeule()) return;
         const leve = leveEnCours();
@@ -1251,7 +1278,20 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           refuser(`Point refusé : ${reponse.raison}`);
           return;
         }
-        const { est, nord, altitude, ...gnss } = reponse.point;
+        let { est, nord, altitude, ...gnss } = reponse.point;
+        // Delta (0.139.0) : seule la position décalée est gardée (le décalage est noté avec le GNSS).
+        const delta = deltaEnMetres();
+        if (deltaActif(delta)) {
+          const decale = pointAvecDelta({ est, nord, altitude }, delta, dernierAzimut);
+          if (!decale) {
+            refuser('Point refusé : pas de cap du GNSS pour le décalage gauche / droite');
+            return;
+          }
+          ({ est, nord, altitude } = decale);
+          gnss = { ...gnss, delta: { ...delta, azimut: dernierAzimut != null ? Math.round(dernierAzimut * 10) / 10 : null } };
+          deltaLeve.distance = '';
+          deltaLeve.z = '';
+        }
         const point = { est, nord, altitude, gnss: { ...gnss, prisLe: new Date().toISOString() } };
         if (recollement) {
           const element = leveDirect.role;
@@ -4707,6 +4747,7 @@ function donneesReseau(recollement) {
 /** Données de l'onglet Terrain communes aux surfaces et aux métrés. */
 function donneesCommunes() {
   return {
+    delta: { ...deltaLeve, actif: deltaActif(deltaEnMetres()) },
     // Surfaces levées et métrés, avec la date de leur levé (« Stock 2 · 22.10.2026 »).
     stocks: [...surfacesLevees(), ...projet.metres, ...projet.autres, ...projet.reseaux].map((s) => ({ id: s.id, nom: `${s.nom} · ${jourDuLeve(s.leveId)}`, nature: s.nature ?? 'stock' })),
     libelles: lireLibelles(),
@@ -4951,8 +4992,12 @@ if (recepteurDisponible()) {
     const vers = implantationLigne?.ligne?.cible ?? (implantationTalus?.message ? null : implantationTalus?.talus?.cible) ?? null;
     const cotes = implantationTalus ? cotesTalus(implantationTalus) : cotesLigne(implantationLigne);
     // Sans RX2 connecté : la position du GPS de la tablette, en gris avec son cercle de précision.
+    dernierAzimut = orientation.azimut ?? null;
+    // Delta en cours (Lever) : le point décalé se voit sur le plan avant Enreg. Pts.
+    const delta = deltaEnMetres();
+    const decale = position && ongletContexte === 'terrain' && terrain.mode === 'lever' && deltaActif(delta) ? pointAvecDelta(position, delta, orientation.azimut) : null;
     const tablette = !etat.connecte && positionTablette ? { est: positionTablette.est, nord: positionTablette.nord, prete: false, tablette: true, precision: positionTablette.precision, azimut: null } : null;
-    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotes } : tablette);
+    plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotes, delta: decale } : tablette);
   });
   // GPS de la tablette : gardé ici, montré avec l'état suivant du RX2 (5 fois par seconde).
   ecouterPositionTablette((position) => {

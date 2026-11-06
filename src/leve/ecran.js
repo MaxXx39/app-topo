@@ -277,6 +277,10 @@ export function creerEcranLeve(conteneur, actions) {
       actions.reglerTalus(bouton.dataset.champTalus, bouton.dataset.valeur);
       return;
     }
+    if (action === 'reglerDelta') {
+      actions.reglerDelta(bouton.dataset.champDelta, bouton.dataset.valeur);
+      return;
+    }
     if (action === 'prendre') actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '', attributsReseau());
     else if (action === 'role') actions.choisirRole(bouton.dataset.role);
     else actions[action]?.(bouton.dataset.valeur);
@@ -286,6 +290,14 @@ export function creerEcranLeve(conteneur, actions) {
   conteneur.addEventListener('input', (evenement) => {
     const champ = evenement.target.dataset?.attributReseau;
     if (champ) saisieReseau[champ] = evenement.target.value;
+    // Delta (0.139.0) : gardé à chaque frappe, sans redessiner (Enreg. Pts reste touchable tout de suite).
+    const delta = evenement.target.dataset?.delta;
+    if (delta) {
+      actions.reglerDelta(delta, evenement.target.value, false);
+      const cadre = conteneur.querySelector('.ligne-delta');
+      const valeurs = [...conteneur.querySelectorAll('[data-delta]')].map((c) => Number(c.value.replace(',', '.')));
+      cadre?.classList.toggle('actif', valeurs.some((v) => Number.isFinite(v) && v !== 0));
+    }
   });
 
   conteneur.addEventListener('change', (evenement) => {
@@ -1029,6 +1041,22 @@ export function creerEcranLeve(conteneur, actions) {
     return { diametre: lire('diametre'), materiau: lire('materiau'), profondeurFouille: lire('profondeurFouille'), remarque: lire('remarque') };
   }
 
+  /**
+   * Delta du prochain point (0.139.0, Intermédiaire) : gauche / droite selon le cap du GNSS, distance et Z.
+   * Orange quand il décale le point ; le point décalé se voit sur le plan ; remis à zéro après le point.
+   */
+  function ligneDelta() {
+    const d = donnees.delta ?? { sens: 'droite', distance: '', z: '' };
+    const sens = (cle, mot) => `<button type="button" class="bouton-sens-delta ${d.sens === cle ? 'actif' : ''}" data-action="reglerDelta" data-champ-delta="sens" data-valeur="${cle}" aria-pressed="${d.sens === cle}">${mot}</button>`;
+    return `<div class="ligne-delta seulement-intermediaire ${d.actif ? 'actif' : ''}">
+        <span class="titre-delta" title="Décaler le prochain point">Δ</span>
+        <span class="sens-delta" role="group" aria-label="Côté du décalage">${sens('gauche', '◀ G')}${sens('droite', 'D ▶')}</span>
+        <label class="champ-delta">dist.<input type="text" inputmode="decimal" data-delta="distance" value="${echapper(d.distance)}" placeholder="0.000" autocomplete="off" /></label>
+        <label class="champ-delta">Z ±<input type="text" inputmode="decimal" data-delta="z" value="${echapper(d.z)}" placeholder="0.000" autocomplete="off" /></label>
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="reglerDelta" data-champ-delta="effacer" aria-label="Remettre le delta à zéro">×</button>
+      </div>`;
+  }
+
   /** Cadre « Point » : ID point, photo, Enreg. Pts, position, refus et « Annuler » (tous les levés). */
   function cadrePrise() {
     // Sur le site (0.120.0) : pas de récepteur ni d'Enreg. Pts ; on ajoute un point (ou les points d'une
@@ -1063,6 +1091,7 @@ export function creerEcranLeve(conteneur, actions) {
           </button>
         </div>
         <div class="position-leve" data-vivant="position"></div>
+        ${ligneDelta()}
         <p class="raison-leve" data-vivant="raison" hidden></p>
         <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
           ↶ Effacer le dernier point${donnees.dernierPoint ? ` (${echapper(donnees.dernierPoint)})` : ''}</button>

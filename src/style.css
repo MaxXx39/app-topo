@@ -10912,3 +10912,15 @@ body.mode-telephone .bandeaux-recepteur .case-recepteur { padding: 0 2px; }
 body.mode-telephone .bandeaux-recepteur .case-recepteur b { font-size: 14px; }
 body.mode-telephone .bandeaux-recepteur .case-recepteur small { font-size: 9.5px; }
 body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 12px; }
+
+/* 0.139.0 (liste du 05.11, point 1) : delta du prochain point levé (Intermédiaire), orange quand il décale. */
+.ligne-delta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0; padding: 4px 6px; border-radius: 10px; background: var(--surface-2, #f1f5f9); }
+.ligne-delta.actif { background: #fed7aa; box-shadow: inset 0 0 0 2px #ea580c; }
+.ligne-delta .titre-delta { font-weight: 900; font-size: 1.2rem; color: #ea580c; padding: 0 4px; }
+.ligne-delta .sens-delta { display: inline-flex; border: 2px solid #ea580c; border-radius: 10px; overflow: hidden; }
+.ligne-delta .bouton-sens-delta { min-height: 40px; min-width: 52px; border: 0; background: #ffffff; color: #9a3412; font-weight: 800; }
+.ligne-delta .bouton-sens-delta.actif { background: #ea580c; color: #ffffff; }
+.ligne-delta .champ-delta { display: inline-flex; align-items: center; gap: 4px; font-size: 0.85rem; font-weight: 700; color: var(--encre); }
+.ligne-delta .champ-delta input { width: 78px; min-height: 40px; font-size: 1rem; text-align: right; }
+.plan .delta-point { fill: none; stroke: #ea580c; stroke-width: 3; }
+.plan .trait-delta { stroke: #ea580c; stroke-width: 2; stroke-dasharray: 5 4; }
