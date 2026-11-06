@@ -64,6 +64,9 @@ import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/jo
 import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
+import { creerEncartPlan } from './plan/encart.js';
+import { creerBoutonImplanterPlan } from './plan/bouton-implanter.js';
+import { suivreClavier } from './outils/clavier.js';
 import { pointAvecDelta, deltaActif } from './topo/delta.js';
 import { ligneDecalee, rangerLigneDecalee } from './topo/ligne-decalee.js';
 import { pointsOutil } from './topo/outil.js';
@@ -1630,6 +1633,16 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         if (implanter.talusId === id) implanter.talusId = null;
         modifie();
       },
+      // Loupe « Manuel » d'Implanter › Point (0.151.0) : réglage fin et zoom.
+      deplacerLoupe: (sens) => {
+        const [dx, dy] = { haut: [0, -1], bas: [0, 1], gauche: [-1, 0], droite: [1, 0] }[sens] ?? [0, 0];
+        plan.loupe.deplacerDe(dx, dy);
+      },
+      zoomLoupe: (zoom) => {
+        terrain.zoomLoupe = Number(zoom) || 4;
+        plan.loupe.changerZoom(terrain.zoomLoupe);
+        montrerImplantation();
+      },
       choisirAccroche: (mode) => {
         if (enImplantationDeLigne()) {
           terrain.accrocheLigne = mode === 'trait' || MODES_ACCROCHE.includes(mode) ? mode : 'trait';
@@ -1950,7 +1963,7 @@ function gererLoupeImplantation() {
   }
   plan.loupe.montrer({
     recentrer: !loupeImplantation,
-    zoom: 4,
+    zoom: terrain.zoomLoupe ?? 4,
     quandLache: ({ est, nord }) => {
       const mm = (valeur) => Math.round(valeur * 1000) / 1000;
       guiderVersChoix({ est: mm(est), nord: mm(nord), altitude: null, nom: implanter.choix?.mode === 'manuel' ? implanter.choix.nom : nomProposeImplantation(), mode: 'manuel' });
@@ -2262,6 +2275,14 @@ function travailAGarder() {
 
 // 0.138.0 : la cible prend le haut (plan en encart) ou le rend : le plan se recadre sur le point et la canne.
 document.addEventListener('cible-en-haut', () => requestAnimationFrame(() => requestAnimationFrame(cadrerSurImplantation)));
+// 0.151.0 : bouton « Implanter » en bas à droite du plan (point ou ligne choisi).
+creerBoutonImplanterPlan(document.querySelector('.panneau-plan'), document.querySelector('#leve-direct'));
+// 0.151.0 : encart du plan déplaçable, + / −, toucher = plan en grand (voir plan/encart.js).
+creerEncartPlan(document.querySelector('.panneau-plan'), {
+  quandToucher: () => ecranLeve.planEnGrand(true),
+  quandCible: () => ecranLeve.planEnGrand(false),
+  zoomer: (facteur) => document.querySelector(`#plan [data-action="${facteur > 1 ? 'zoom-plus' : 'zoom-moins'}"]`)?.click(),
+});
 
 /** Cadre le plan sur ce qu'on implante (point ou ligne) et la position du récepteur. */
 function cadrerSurImplantation() {
@@ -4921,6 +4942,7 @@ function donneesCommunes() {
     surfaces: projet.surfaces.filter((s) => s.id === terrain.surfaceId || trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
     implanter: {
       accroche: terrain.accroche,
+      zoomLoupe: terrain.zoomLoupe ?? 4,
       choix: implanter.choix,
       cible: implanter.cible,
       nomPropose: nomProposeImplantation(),
@@ -5284,10 +5306,10 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   // Nouveau projet (0.74.0) : une fenêtre (affaire, désignation) ; le projet n'est créé qu'avec
   // « OK » (fenêtre fermée : rien ne change). On reste sur l'onglet Projet.
   nouveauProjet: () => creerNouveauProjet(),
-  ouvrirProjet: async (id) => {
+  ouvrirProjet: (id) => avecChargement(async () => {
     const lu = await stockage.lireProjet(id);
     if (lu) await changerDeProjet(() => ouvrir(completerProjet(lu)));
-  },
+  }),
   dupliquerProjet: async (id) => {
     const lu = id === projet.id ? projet : await stockage.lireProjet(id);
     if (lu) await changerDeProjet(() => ouvrir(dupliquerProjet(completerProjet(lu), lu.nom ? `${lu.nom} (copie)` : 'copie'), { changerOnglet: false }));
@@ -5328,7 +5350,7 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   nommerAppareil: (nom) => partage.nommerAppareil(nom),
   envoyerDrive: () => partage.envoyerMaintenant(),
   reprendreLaMain: () => partage.prendreLaMain(),
-  ouvrirDrive: (dossierId) => partage.ouvrirDepuisDrive(dossierId),
+  ouvrirDrive: (dossierId) => avecChargement(() => partage.ouvrirDepuisDrive(dossierId)),
   rafraichirDrive: () => partage.rafraichirListe().catch((erreur) => afficherMessage(`Drive : ${erreur.message}`, 4000)),
 }, document.querySelector('#projets-suite'));
 
@@ -5357,9 +5379,37 @@ function afficherEcranProjet() {
  * rendu (verrou), puis le nouveau est comparé à sa version de Drive.
  */
 async function changerDeProjet(ouvrirAutre) {
-  partage?.avantDeChanger(); // en arrière-plan : l'autre projet s'ouvre sans attendre internet
-  await ouvrirAutre();
-  partage?.apresOuverture();
+  await avecChargement(async () => {
+    partage?.avantDeChanger(); // en arrière-plan : l'autre projet s'ouvre sans attendre internet
+    await ouvrirAutre();
+    partage?.apresOuverture();
+  });
+}
+
+/**
+ * « Chargement du projet… » (0.151.0, demande du 06.11) : écran plein et opaque pendant qu'un autre
+ * projet s'ouvre, pour ne plus voir l'ancien projet le temps que le nouveau charge. Les fenêtres
+ * (prise de main, erreurs) passent au-dessus (elles sont dans la couche du haut du navigateur).
+ */
+let chargementsEnCours = 0;
+async function avecChargement(travail) {
+  chargementsEnCours += 1;
+  let ecran = document.querySelector('.ecran-chargement');
+  if (!ecran) {
+    ecran = document.createElement('div');
+    ecran.className = 'ecran-chargement';
+    ecran.setAttribute('role', 'status');
+    ecran.innerHTML = '<span class="roue-attente" aria-hidden="true"></span><strong>Chargement du projet…</strong>';
+    document.body.append(ecran);
+  }
+  // Laisse le navigateur dessiner l'écran avant le travail (sinon il n'apparaît qu'à la fin).
+  await new Promise((fin) => requestAnimationFrame(() => setTimeout(fin, 0)));
+  try {
+    return await travail();
+  } finally {
+    chargementsEnCours -= 1;
+    if (chargementsEnCours === 0) ecran.remove();
+  }
 }
 
 let renduParInactivite = false; // 0.123 : main rendue par le site après 5 min (reprise au premier geste, même en Expert)
@@ -6586,4 +6636,5 @@ async function demarrer() {
     document.querySelector('#etat').textContent = 'Attention : enregistrement impossible sur cet appareil';
   }
 }
+suivreClavier();
 demarrer();

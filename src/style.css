@@ -10928,7 +10928,10 @@ body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 1
 .levee-en-cours .bouton-photo-globale { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; min-width: 40px; }
 .levee-en-cours .bouton-photo-globale svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
 /* 0.141.0 : bouton qui montre la ligne du delta. */
-.bouton-ouvrir-delta { margin: 4px 0; color: #9a3412; border-color: #ea580c; font-weight: 800; min-height: 40px; }
+/* 0.151.0 : petit bouton « Δ » à droite de la position du point. */
+.ligne-position-delta { display: flex; align-items: center; gap: 8px; }
+.ligne-position-delta > .position-leve { flex: 1; min-width: 0; margin: 0; gap: 0 10px; font-size: 0.85rem; }
+.bouton-ouvrir-delta { flex: none; width: 34px; height: 30px; padding: 0; border: 2px solid #ea580c; border-radius: 8px; background: #ffffff; color: #ea580c; font-weight: 900; font-size: 1rem; line-height: 1; }
 
 /* 0.142.0 : Guidage › Râteau et Bull à 1 GNSS. */
 .choix-gnss { display: flex; gap: 6px; }
@@ -10963,3 +10966,121 @@ body.mode-telephone .tuiles-export { grid-template-columns: repeat(2, 1fr); }
 .bouton-dao { margin: 6px 0 10px; }
 .barre-dao .effacer-dao { border-color: #dc2626; color: #dc2626; }
 .barre-dao .titre-topo-dao { font-weight: 800; color: #fbbf24; }
+
+/* 0.151.0 : « Chargement du projet… » : écran plein et opaque pendant l'ouverture d'un autre projet. */
+.ecran-chargement {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  background: var(--fond, #f1f5f9);
+  color: var(--encre, #1b2b36);
+  font-size: 1.1rem;
+}
+
+/* 0.151.0 : encart du plan pendant la cible : légère transparence, déplaçable (appui long), + / −,
+   toucher = plan en grand ; aucun point ne se choisit dans l'encart (couche « capture »). */
+.encart-capture,
+.bouton-revenir-cible {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .panneau-plan {
+    opacity: 0.78;
+    transform: translate(var(--encart-x, 0px), var(--encart-y, 0px));
+    touch-action: none;
+  }
+
+  body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .panneau-plan.encart-deplace {
+    opacity: 0.95;
+    outline: 3px dashed #f59e0b;
+  }
+
+  body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .encart-capture {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    touch-action: none;
+  }
+
+  .encart-zoom {
+    position: absolute;
+    left: 4px;
+    bottom: 4px;
+    display: flex;
+    gap: 4px;
+  }
+
+  .encart-zoom button {
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #0f172a;
+    font-size: 1.2rem;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  }
+
+  body.mode-leve.vue-implantation.cible-masquee[data-onglet='terrain'] .bouton-revenir-cible {
+    display: block;
+    position: absolute;
+    left: 8px;
+    bottom: 56px;
+    z-index: 25;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 22px;
+    background: #0d9488;
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* 0.151.0 : clavier ouvert (outils/clavier.js) : la barre du bas se cache et la bande de Lever reprend
+   sa place dans le cadre « Point » (elle ne cache plus le champ qu'on tape). */
+body.clavier-ouvert .onglets {
+  display: none;
+}
+body.clavier-ouvert[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre {
+  position: static;
+  box-shadow: none;
+}
+
+/* 0.151.0 : « Implanter » en bas à droite du plan (le bouton de la fiche est caché). */
+.bouton-implanter.sur-le-plan {
+  display: none;
+}
+.bouton.bouton-implanter.bouton-implanter-plan {
+  display: none;
+}
+body[data-onglet='terrain'] .bouton.bouton-implanter.bouton-implanter-plan:not([hidden]) {
+  position: absolute;
+  right: 64px;
+  bottom: 10px;
+  z-index: 22;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 24px;
+  font-size: 1.1rem;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+.bouton-implanter-plan svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
