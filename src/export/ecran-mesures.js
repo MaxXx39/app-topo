@@ -3,7 +3,7 @@
 // Cartouche : dessiné par et date ici, affaire et lieu du projet (onglet Projet).
 import { genererCsvMesures } from './csv.js';
 import { genererDxfMesures } from './dxf.js';
-import { ECHELLES } from './echelle.js';
+import { champsMiseEnPage, lireMiseEnPage, texteFeuille } from './mise-en-page.js';
 import { telecharger, dateSuisse } from './ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
@@ -44,14 +44,7 @@ export function creerEcranExportMesures(conteneur, { obtenirGroupes, obtenirDonn
       ${FORMATS.map(([cle, titre, niveau]) => `<button type="button" class="puce-choix ${niveau ? `seulement-${niveau}` : ''}" data-format="${cle}">${titre}</button>`).join('')}
     </div>
     <p class="titre-choix titre-etape" data-pour="pdf">Options</p>
-    <div class="champs-export" data-pour="pdf">
-      <label>Échelle du plan (PDF)
-        <select data-champ="echelle">
-          <option value="auto">auto (tout le plan sur une A4)</option>
-          ${ECHELLES.map((e) => `<option value="${e}">1:${e}</option>`).join('')}
-        </select>
-      </label>
-    </div>
+    <div data-pour="pdf">${champsMiseEnPage()}</div>
     <div class="calques-pdf" data-pour="pdf">
       <p class="titre-choix">Contenu du PDF</p>
       <div class="liste-calques-pdf">
@@ -108,12 +101,12 @@ export function creerEcranExportMesures(conteneur, { obtenirGroupes, obtenirDonn
       try {
         // La bibliothèque PDF n'est chargée qu'au premier export (l'appli démarre plus vite).
         const { creerPdfMesures } = await import('./pdf-mesures.js');
-        const echelleChoisie = conteneur.querySelector('[data-champ="echelle"]').value;
+        const miseEnPage = lireMiseEnPage(conteneur);
         const calques = Object.fromEntries(
           [...conteneur.querySelectorAll('[data-calque]')].map((caseACocher) => [caseACocher.dataset.calque, caseACocher.checked]),
         );
         calques.photoAttenuee = true;
-        const { document, echelle, format, messageFond } = await creerPdfMesures({
+        const { document, echelle, format, orientation, messageFond } = await creerPdfMesures({
           mesures,
           points,
           calques,
@@ -124,10 +117,11 @@ export function creerEcranExportMesures(conteneur, { obtenirGroupes, obtenirDonn
             dessinePar: lireCartouche(conteneur).dessinePar,
             fichierPoints,
           },
-          echelleImposee: echelleChoisie === 'auto' ? null : Number(echelleChoisie),
+          ...miseEnPage,
         });
-        telecharger(document.output('blob'), `${nomDeFichier()}.pdf`);
-        message.textContent = `PDF des mesures téléchargé (${format.toUpperCase()}, plan à l'échelle 1:${echelle}).${messageFond ? ` Attention : ${messageFond}.` : ''}`;
+        const feuille = texteFeuille(format, orientation, echelle);
+        telecharger(document.output('blob'), `${nomDeFichier()}.pdf`, { resume: feuille });
+        message.textContent = `PDF des mesures prêt : ${feuille}.${messageFond ? ` Attention : ${messageFond}.` : ''}`;
       } catch (erreur) {
         message.textContent = `Impossible de créer le PDF : ${erreur.message}`;
       }

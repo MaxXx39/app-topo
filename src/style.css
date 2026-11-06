@@ -11084,3 +11084,81 @@ body[data-onglet='terrain'] .bouton.bouton-implanter.bouton-implanter-plan:not([
   stroke: currentColor;
   stroke-width: 2;
 }
+
+/* 0.151.0 : aperçu d'un PDF avant l'export, et papier / échelle obtenus mis en évidence. */
+.fenetre-apercu-pdf {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #475569;
+}
+.fenetre-apercu-pdf[open] {
+  display: flex;
+  flex-direction: column;
+}
+.fenetre-apercu-pdf::backdrop {
+  background: rgba(15, 23, 42, 0.7);
+}
+.entete-apercu-pdf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface, #ffffff);
+  color: var(--encre, #1b2b36);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.titres-apercu-pdf {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.nom-apercu-pdf {
+  overflow: hidden;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gris, #5f6d77);
+}
+.resume-apercu-pdf,
+.resume-export {
+  align-self: flex-start;
+  margin: 2px 0 0;
+  padding: 2px 10px;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 800;
+  font-size: 1rem;
+}
+.resume-export {
+  margin: 0 0 8px;
+}
+.pages-apercu-pdf {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px;
+}
+.pages-apercu-pdf .aide {
+  color: #e2e8f0;
+}
+.page-apercu-pdf {
+  max-width: 100%;
+  height: auto;
+  background: #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+.champs-mise-en-page {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}

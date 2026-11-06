@@ -55,8 +55,8 @@ let Y_CARTOUCHE;
  * Prend la mise en page d'un format de feuille ('a4' ou 'a3'), pour les dessins qui suivent.
  * Renvoie { page, cadrePlan, colonne, yCartouche } (mm), pour les autres PDF (mesures).
  */
-export function appliquerFormat(format) {
-  const mise = miseEnPage(format);
+export function appliquerFormat(format, orientation = 'paysage') {
+  const mise = miseEnPage(format, orientation);
   PAGE = mise.page;
   CADRE_PLAN = mise.cadrePlan;
   COLONNE = mise.colonne;
@@ -102,7 +102,7 @@ export const COULEURS = {
  * { document, echelle, format, messageFond } : document jsPDF, échelle utilisée, format de la
  * première feuille ('a4' ou 'a3'), et un message (fond non mis, plan coupé...) ou null.
  */
-export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, calques = {}, comparaisons = [], photos = [], coupes = [], dessins = [], levesSeuls = [] }) {
+export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, papier = 'auto', orientation = 'paysage', calques = {}, comparaisons = [], photos = [], coupes = [], dessins = [], levesSeuls = [] }) {
   const choix = { ...CALQUES_PDF, ...calques };
   // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre.
   if (choix.ecarts) choix.couleurs = false;
@@ -110,21 +110,23 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
   // Le document est créé avec sa première feuille, dont le format dépend du plan.
   let doc = null;
   let premierFormat = null;
-  const nouvelleFeuille = (format) => {
-    appliquerFormat(format);
+  // Feuilles des plans : papier et orientation choisis (0.151.0) ; coupes et photos : A4 paysage.
+  const nouvelleFeuille = (format, sens = 'paysage') => {
+    appliquerFormat(format, sens);
+    const orientationPdf = sens === 'portrait' ? 'portrait' : 'landscape';
     if (!doc) {
-      doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format });
+      doc = new jsPDF({ orientation: orientationPdf, unit: 'mm', format });
       doc.setFont('helvetica', 'normal');
       premierFormat = format;
     } else {
-      doc.addPage(format, 'landscape');
+      doc.addPage(format, orientationPdf);
     }
   };
-  /** Format de la feuille d'un plan (A4, sinon A3), et avertissement si le plan dépasse même l'A3. */
+  /** Format de la feuille d'un plan (voir choisirFormat), et avertissement si le plan dépasse la feuille. */
   const formatDuPlan = (zone) => {
-    if (!zone) return 'a4';
-    const { format, depasse } = choisirFormat(zone.estMax - zone.estMin, zone.nordMax - zone.nordMin, echelleImposee);
-    const alerte = `à l'échelle 1:${echelleImposee}, le plan dépasse la feuille A3 : il est coupé au cadre (choisis une échelle plus petite)`;
+    if (!zone) return papier && papier !== 'auto' ? papier : 'a4';
+    const { format, depasse } = choisirFormat(zone.estMax - zone.estMin, zone.nordMax - zone.nordMin, echelleImposee, { papier, orientation });
+    const alerte = `à l'échelle 1:${echelleImposee}, le plan dépasse la feuille ${format.toUpperCase()} : il est coupé au cadre (choisis une échelle plus petite ou un papier plus grand)`;
     if (depasse && !messages.includes(alerte)) messages.push(alerte);
     return format;
   };
@@ -142,7 +144,7 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
   // Feuille des volumes (sauf s'il n'y a que des comparaisons)
   if (calcules.length > 0 || comparaisonsCalculees.length === 0) {
     const contenu = contenuDuPlan(calcules, points, coupes, dessins, levesSeuls);
-    nouvelleFeuille(formatDuPlan(contenu.zone));
+    nouvelleFeuille(formatDuPlan(contenu.zone), orientation);
     dessinerCadres(doc);
     const plan = await dessinerPlan(doc, calcules, contenu, echelleImposee, choix, coupes, dessins, levesSeuls);
     const yLibre = dessinerColonne(doc, calcules, { ...cartouche, echelle: plan.echelle }, { choix, relief: plan.relief, ecarts: plan.legendeEcarts, comparaisons });
@@ -153,7 +155,7 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
 
   // Une feuille par calcul dans un contour : remblai (rouge) et déblai (jaune)
   for (const comparaison of comparaisonsCalculees) {
-    nouvelleFeuille(formatDuPlan(zoneDe(comparaison.resultat.trianglesEcart.flat())));
+    nouvelleFeuille(formatDuPlan(zoneDe(comparaison.resultat.trianglesEcart.flat())), orientation);
     dessinerCadres(doc);
     const page = await dessinerPageComparaison(doc, comparaison, cartouche, echelleImposee, choix);
     placerPhotos(page.yLibre);
@@ -171,7 +173,7 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
     nouvelleFeuille('a4');
     dessinerPagePhotos(doc, photosAPlacer.slice(debut, debut + PHOTOS_PAR_PAGE), cartouche);
   }
-  return { document: doc, echelle, format: premierFormat, messageFond: messages.join(' ; ') || null };
+  return { document: doc, echelle, format: premierFormat, orientation, messageFond: messages.join(' ; ') || null };
 }
 
 /** Zone du terrain couverte par des points { est, nord } : { estMin, estMax, nordMin, nordMax } (m), ou null. */
