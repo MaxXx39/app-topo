@@ -1,6 +1,6 @@
 // Tests des courbes de niveau et des bandes de couleur.
 import { describe, it, expect } from 'vitest';
-import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../src/topo/courbes.js';
+import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes, estMaitresse, chainerCourbes, cotesDesCourbes, texteCote } from '../src/topo/courbes.js';
 import { airePolygone } from '../src/topo/volume.js';
 
 const pt = (est, nord, altitude) => ({ est, nord, altitude });
@@ -60,5 +60,43 @@ describe('equidistanceAuto et plageAltitudes', () => {
 
   it('trouve les altitudes extrêmes', () => {
     expect(plageAltitudes(pyramide)).toEqual({ min: 0, max: 3 });
+  });
+});
+
+describe('courbes maîtresses et cotes (0.154.0)', () => {
+  it('une courbe sur 5 est maîtresse', () => {
+    expect(estMaitresse(411, 0.5)).toBe(false);
+    expect(estMaitresse(412.5, 0.5)).toBe(true);
+    expect(estMaitresse(415, 1)).toBe(true);
+    expect(estMaitresse(414, 1)).toBe(false);
+  });
+
+  it('les segments bout à bout deviennent une seule ligne', () => {
+    const p = (est, nord) => ({ est, nord });
+    const segments = [
+      { altitude: 400, a: p(10, 0), b: p(20, 0) },
+      { altitude: 400, a: p(0, 0), b: p(10, 0) },
+      { altitude: 400, a: p(30, 0), b: p(20, 0) },
+      { altitude: 401, a: p(0, 5), b: p(5, 5) },
+    ];
+    const lignes = chainerCourbes(segments);
+    const l400 = lignes.find((l) => l.altitude === 400);
+    expect(lignes.length).toBe(2);
+    expect(l400.points.length).toBe(4);
+    expect(Math.abs(l400.points[0].est - l400.points.at(-1).est)).toBe(30);
+  });
+
+  it('une cote tous les 20 m, la 1re à 10 m, texte jamais à l\'envers', () => {
+    const ligne = { altitude: 405, points: [{ est: 50, nord: 0 }, { est: 0, nord: 0 }] }; // vers l'ouest
+    const cotes = cotesDesCourbes([ligne], 20);
+    expect(cotes.map((c) => c.est)).toEqual([40, 20, 0]);
+    expect(Math.abs(cotes[0].angle)).toBeLessThanOrEqual(90);
+    expect(cotesDesCourbes([{ altitude: 1, points: [{ est: 0, nord: 0 }, { est: 5, nord: 0 }] }], 20)).toEqual([]);
+  });
+
+  it('texte de la cote', () => {
+    expect(texteCote(412)).toBe('412');
+    expect(texteCote(412.5)).toBe('412.5');
+    expect(texteCote(412.25000001)).toBe('412.25');
   });
 });

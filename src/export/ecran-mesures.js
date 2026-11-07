@@ -3,6 +3,7 @@
 // Cartouche : dessiné par et date ici, affaire et lieu du projet (onglet Projet).
 import { genererCsvMesures } from './csv.js';
 import { genererDxfMesures } from './dxf.js';
+import { EQUIDISTANCES_PDF } from './mise-en-page.js';
 import { brancherFeuillePrevue, champsMiseEnPage, lireMiseEnPage, texteFeuille } from './mise-en-page.js';
 import { contenuDesMesures } from './zone-plan.js';
 import { telecharger, dateSuisse } from './ecran.js';
@@ -50,7 +51,12 @@ export function creerEcranExportMesures(conteneur, { obtenirGroupes, obtenirDonn
       <p class="titre-choix">Contenu du PDF</p>
       <div class="liste-calques-pdf">
         ${CALQUES.map(([cle, titre, coche]) => `<label class="case"><input type="checkbox" data-calque="${cle}" ${coche ? 'checked' : ''} /> ${titre}</label>`).join('')}
-      </div>
+</div>
+      <label class="choix-equidistance seulement-intermediaire">Équidistance des courbes
+        <select data-champ="equidistance-pdf">
+          ${EQUIDISTANCES_PDF.map((e) => `<option value="${e}">${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
+        </select>
+      </label>
     </div>
     <div data-pour="pdf">${champsCartouche()}</div>
     <p class="feuille-prevue" data-pour="pdf" data-zone="feuille-prevue"></p>
@@ -108,6 +114,9 @@ export function creerEcranExportMesures(conteneur, { obtenirGroupes, obtenirDonn
           [...conteneur.querySelectorAll('[data-calque]')].map((caseACocher) => [caseACocher.dataset.calque, caseACocher.checked]),
         );
         calques.photoAttenuee = true;
+        // 0.154.0 : équidistance des courbes (auto ou choisie, dès Intermédiaire).
+        const equidistance = conteneur.querySelector('[data-champ="equidistance-pdf"]')?.value ?? 'auto';
+        if (equidistance !== 'auto') calques.equidistance = Number(equidistance);
         const { document, echelle, format, orientation, messageFond } = await creerPdfMesures({
           mesures,
           points,

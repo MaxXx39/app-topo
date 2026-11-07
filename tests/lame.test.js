@@ -1,6 +1,6 @@
 // Tests du guidage de lame à 2 RX2 (formules validées par l'utilisateur le 26.10.2026).
 import { describe, it, expect } from 'vitest';
-import { guidageLame, classeEcartLame, deversEntre, ligneDeCoupeLame, bordsDeLaLame, pointsGuidageLame, coupeEntre } from '../src/topo/lame.js';
+import { guidageLame, classeEcartLame, deversEntre, ligneDeCoupeLame, bordsDeLaLame, pointsGuidageLame, coupeEntre, coupeMilieuLame, ecartAUneLigne } from '../src/topo/lame.js';
 
 // Surface plane qui monte de 2 % vers l'Est : altitude 450 en Est 2500000.
 const surface = (est) => 450 + 0.02 * (est - 2500000);
@@ -181,5 +181,30 @@ describe('coupes G – D et Arr – Av (0.151.0)', () => {
 
   it('pas de coupe si les deux points sont au même endroit', () => {
     expect(coupeEntre([], gauche, gauche)).toBeNull();
+  });
+});
+
+describe('lame vue de côté : un seul point, le milieu du bas de la lame (0.153.1)', () => {
+  it('milieu des 2 bouts, coupe de 2 m derrière à 2 m devant', () => {
+    const r = coupeMilieuLame({ est: 0, nord: 0, altitude: 400 }, { est: 4, nord: 0, altitude: 400.2 }, { est: 0, nord: 1 }, 2, 3);
+    expect(r.milieu).toEqual({ est: 2, nord: 0, altitude: 400.1 });
+    expect(r.arriere.nord).toBe(-2);
+    expect(r.avant.nord).toBe(3);
+  });
+});
+
+describe('suivre une ligne : écart en plan sur l\'axe G – D (0.154.0)', () => {
+  const G = { est: 0, nord: 0 };
+  const D = { est: 3, nord: 0 };
+  const ligne = [{ est: 4.2, nord: -10 }, { est: 4.2, nord: 10 }]; // ligne nord-sud en Est 4.2
+  it('ligne à droite du bout D : + 1.2 m ; du bout G : + 4.2 m', () => {
+    expect(ecartAUneLigne(D, G, D, ligne)).toBeCloseTo(1.2, 9);
+    expect(ecartAUneLigne(G, G, D, ligne)).toBeCloseTo(4.2, 9);
+  });
+  it('ligne à gauche : écart négatif', () => {
+    expect(ecartAUneLigne(G, G, D, [{ est: -0.5, nord: -5 }, { est: -0.5, nord: 5 }])).toBeCloseTo(-0.5, 9);
+  });
+  it('ligne qui ne croise pas l\'axe : null', () => {
+    expect(ecartAUneLigne(G, G, D, [{ est: 5, nord: 2 }, { est: 6, nord: 9 }])).toBeNull();
   });
 });

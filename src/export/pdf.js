@@ -10,7 +10,7 @@ import { jsPDF } from 'jspdf';
 import { formaterNombre } from '../topo/format.js';
 import { placerEtiquettes, pointInterieur } from '../plan/etiquettes.js';
 import { choisirEchelle, barreEchellePapier, choisirFormat, miseEnPage } from './echelle.js';
-import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
+import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes, estMaitresse, chainerCourbes, cotesDesCourbes, texteCote } from '../topo/courbes.js';
 import { couleurRVB } from '../plan/couleurs.js';
 import { zonesRemblaiDeblai } from '../plan/ecarts.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from '../plan/fond.js';
@@ -452,13 +452,14 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
       doc.restoreGraphicsState();
     }
     if (choix.courbes) {
-      for (const { altitude, a, b } of courbesDeNiveau(tousTriangles, equidistance)) {
-        const rang = altitude / (5 * equidistance);
-        trait(doc, [107, 79, 42], Math.abs(rang - Math.round(rang)) < 1e-6 ? 0.25 : 0.1);
+      const segments = courbesDeNiveau(tousTriangles, equidistance);
+      for (const { altitude, a, b } of segments) {
+        trait(doc, [107, 79, 42], estMaitresse(altitude, equidistance) ? 0.35 : 0.1);
         const pa = versPapier(a);
         const pb = versPapier(b);
         doc.line(pa.x, pa.y, pb.x, pb.y);
       }
+      ecrireCotesCourbes(doc, segments, equidistance, versPapier);
     }
   }
 
@@ -1055,4 +1056,29 @@ function dessinerCoupePdf(doc, dessin, ox, oy) {
 export function trait(doc, couleur, epaisseur) {
   doc.setDrawColor(...couleur);
   doc.setLineWidth(epaisseur);
+}
+
+/**
+ * Cotes des courbes maîtresses (0.154.0) : altitude tous les 20 m le long de la courbe, dans son
+ * sens (jamais à l'envers), centrée sur la courbe. segments : sortie de courbesDeNiveau.
+ */
+export function ecrireCotesCourbes(doc, segments, equidistance, versPapier) {
+  const maitresses = segments.filter((s) => estMaitresse(s.altitude, equidistance));
+  const cotes = cotesDesCourbes(chainerCourbes(maitresses), 20);
+  if (cotes.length === 0) return;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5);
+  doc.setTextColor(107, 79, 42);
+  for (const cote of cotes.slice(0, 1500)) {
+    const p = versPapier(cote);
+    const texte = texteCote(cote.altitude);
+    const largeur = doc.getTextWidth(texte);
+    const r = (cote.angle * Math.PI) / 180;
+    // Centré : on recule d'une demi-largeur le long de la courbe, et d'un demi-corps vers le bas.
+    const x = p.x - (largeur / 2) * Math.cos(r) + 0.6 * Math.sin(r);
+    const y = p.y + (largeur / 2) * Math.sin(r) + 0.6 * Math.cos(r);
+    doc.text(texte, x, y, { angle: cote.angle });
+  }
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...COULEURS.texte);
 }

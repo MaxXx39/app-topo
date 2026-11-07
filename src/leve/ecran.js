@@ -142,6 +142,7 @@ export function creerEcranLeve(conteneur, actions) {
   let gestionControleOuverte = false; // mode Contrôler : roue ⚙ (après le code de sécurité)
   let erreurGestion = ''; // mode Contrôler : erreur de la gestion (tolérances, fichier, point tapé)
   let reglagesLameOuverts = false; // mode Lame : roue ⚙ (tolérances)
+  let machineChoisie = false; // 0.153.0 : Guidage : machine choisie (sinon l'écran de choix est montré)
   let choixReseauOuvert = false; // « Recollement » touché : on choisit le réseau (EU, EC…)
   // Recollement : ce qui est tapé à côté du point, gardé quand l'écran se redessine (la fouille et la
   // remarque repartent vides après chaque point ; diamètre et matériau sont gardés par main.js).
@@ -173,6 +174,18 @@ export function creerEcranLeve(conteneur, actions) {
     // Guidage : « Connecter le 2e GNSS » ouvre la fenêtre du récepteur (Récepteur 2 dedans).
     if (action === 'ouvrirRecepteur') {
       document.dispatchEvent(new CustomEvent('ouvrir-recepteur'));
+      return;
+    }
+    // Guidage (0.153.0) : la machine choisie, on passe au guidage ; ← revient au choix.
+    if (action === 'choisirMachine') {
+      machineChoisie = true;
+      actions.choisirMachine(bouton.dataset.valeur);
+      return;
+    }
+    if (action === 'retourChoixMachine') {
+      machineChoisie = false;
+      reglagesLameOuverts = false;
+      dessiner();
       return;
     }
     // Mode Lame : roue ⚙ des tolérances.
@@ -1523,6 +1536,13 @@ export function creerEcranLeve(conteneur, actions) {
       tournerBoussole();
     },
 
+    /** Guidage (0.153.0) : retour à l'écran de choix de la machine (onglet Guidage touché). */
+    revenirAuChoixMachine() {
+      machineChoisie = false;
+      reglagesLameOuverts = false;
+      dessiner();
+    },
+
     /** Mode Lame : nombres en direct (voir lame-ecran.js rafraichirLame). */
     mettreAJourLame(vivant) {
       if (donnees?.mode === 'lame') rafraichirLame(conteneur, vivant);
@@ -1557,10 +1577,9 @@ export function creerEcranLeve(conteneur, actions) {
     if (enGuidage) contenu = vueImplantation();
     else if (autocontrole) contenu = htmlControle(donnees.autocontrole, { gestionOuverte: gestionControleOuverte, erreurGestion });
     else if (donnees.mode === 'lame') {
-      // Outil à 1 GNSS sans ses distances (0.142.0) : réglages ouverts, et ils le restent pendant la saisie.
-      const outil = donnees.lame.outil ?? {};
-      if (donnees.lame.unGnss && !(Number(outil.gauche) + Number(outil.droite) > 0.1)) reglagesLameOuverts = true;
-      contenu = htmlLame(donnees.lame, { reglagesOuverts: reglagesLameOuverts, bip: donnees.controle.bip !== false });
+      // 0.153.0 : réglages jamais ouverts d'office (la roue ⚙ les montre ; le message rappelle ce qui manque) ;
+      // d'abord le choix de la machine (Grader, Bull, Râteau), puis le guidage sans ce bandeau (← pour revenir).
+      contenu = htmlLame(donnees.lame, { reglagesOuverts: reglagesLameOuverts, bip: donnees.controle.bip !== false, choixMachine: !machineChoisie });
     }
     else contenu = donnees.mode === 'controler' ? controle() : priseDePoint();
     conteneur.innerHTML = `

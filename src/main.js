@@ -39,7 +39,7 @@ import { creerModuleExport } from './export/module.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface, decalerProfil } from './topo/coupe.js';
-import { guidageLame, TOLERANCES_LAME, pointDeProfil, bordsDeLaLame, sensCoupeLame, pointsGuidageLame, coupeEntre } from './topo/lame.js';
+import { guidageLame, TOLERANCES_LAME, pointDeProfil, bordsDeLaLame, sensCoupeLame, pointsGuidageLame, coupeEntre, coupeMilieuLame, avantDeLaLame, classeEcartLame, ecartAUneLigne } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -482,6 +482,8 @@ function cadrerSurCalculs() {
 document.querySelector('.onglets').addEventListener('click', (evenement) => {
   const mode = evenement.target.closest('button[data-mode-terrain]');
   if (mode) {
+    // Guidage (0.153.0) : toucher l'onglet ramène toujours au choix de la machine.
+    if (mode.dataset.modeTerrain === 'lame') ecranLeve?.revenirAuChoixMachine();
     choisirModeTerrain(mode.dataset.modeTerrain);
     afficherOnglet('terrain');
     return;
@@ -1438,9 +1440,31 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         deltaSurface = 0;
         recalculer();
       },
+      // Lignes suivies (0.154.0) : bouton « Lignes » (choix sur le plan), bout G / D, enlever.
+      choisirLignesGuidage: () => {
+        lignesGuidage.choix = !lignesGuidage.choix;
+        if (lignesGuidage.choix) afficherMessage('Touche une ligne sur le plan (2 au plus)', 4000);
+        recalculer();
+      },
+      boutLigneGuidage: (valeur) => {
+        const [index, bout] = String(valeur).split(':');
+        const ligne = lignesGuidage.liste[Number(index)];
+        if (ligne) ligne.bout = bout === 'gauche' ? 'gauche' : 'droite';
+        recalculer();
+      },
+      enleverLigneGuidage: (index) => {
+        lignesGuidage.liste.splice(Number(index), 1);
+        recalculer();
+      },
       // Vue du Guidage et coupe montrée (0.152.0, dans ⚙).
       choisirVueLame: (vue) => {
         terrain.lame.vue = ['plan1', 'plan2', 'coupes'].includes(vue) ? vue : 'plan2';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // Triangles et valeurs (0.153.1) : à côté de la règle (B) ou posés sur la règle (C).
+      choisirIndicLame: (cle) => {
+        terrain.lame.indic = cle === 'regle' ? 'regle' : 'exterieur';
         retenirReglagesTerrain();
         recalculer();
       },
@@ -2037,7 +2061,7 @@ function gererLoupeImplantation() {
 
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
-  const accrocheActive = ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(daoAppli?.actif());
+  const accrocheActive = choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(daoAppli?.actif());
   const enLigne = accrocheActive && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
@@ -2045,7 +2069,9 @@ function envoyerImplantationAuPlan() {
   const seul = Boolean(elementSeul());
   // Bouton « Seul » (0.94.0) : seulement les listes gardées (points de contrôle en mode Contrôle…).
   const gardees = listesDuTravail(listesDePoints(projet));
-  const lignesAutres = seul ? [] : lignesDesAutres().filter((l) => !gardees || gardees.has(l.id));
+  // Lignes suivies en Guidage (0.154.0) : en violet.
+  const lignesSuivies = ongletContexte === 'terrain' && terrain.mode === 'lame' ? lignesGuidage.liste.map((l) => ({ id: 'ligne-guidage', sommets: l.sommets, fermee: false, couleur: '#7c3aed' })) : [];
+  const lignesAutres = [...(seul ? [] : lignesDesAutres().filter((l) => !gardees || gardees.has(l.id))), ...lignesSuivies];
   const reseaux = seul ? [] : reseauxDuPlan().filter((r) => !gardees || gardees.has(r.id));
   // Points de contrôle : dessinés si leur case « Points de contrôle » est cochée (menu Afficher).
   const pointsControle = seul || (gardees && !gardees.has(LISTE_CONTROLE)) || (projet.listesCachees ?? []).includes(LISTE_CONTROLE) ? [] : projet.pointsControle;
@@ -3147,6 +3173,29 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   },
 });
 
+// Lignes suivies en Guidage (0.154.0, Expert) : 2 au plus, choisies en touchant le plan (toutes les
+// lignes : plans DXF, levés, dessins) ; pour chacune, le bout de l'outil mesuré (G ou D). En mémoire
+// seulement (oubliées au redémarrage).
+const lignesGuidage = { liste: [], choix: false };
+function choixLignesGuidageActif() {
+  return lignesGuidage.choix && ongletContexte === 'terrain' && terrain.mode === 'lame' && lameActive();
+}
+
+/** Toucher du plan pendant le choix des lignes du Guidage : la ligne touchée est ajoutée (2 au plus). */
+function toucherPourLigneGuidage(position, tolerance) {
+  const lignes = avecToutesLesLignes('croisement', sourcesDesPlans(plansDuProjet(), position, tolerance)).lignes;
+  const trouve = accrocherTrait(position, tolerance, lignes);
+  if (!trouve) {
+    afficherMessage('Aucune ligne sous le doigt (plan DXF, levé, dessin)', 3000);
+    return;
+  }
+  if (lignesGuidage.liste.length >= 2) lignesGuidage.liste.shift();
+  lignesGuidage.liste.push({ sommets: trouve.sommets.map((p) => ({ est: p.est, nord: p.nord })), bout: 'droite' });
+  sonValidation();
+  if (lignesGuidage.liste.length >= 2) lignesGuidage.choix = false;
+  recalculer();
+}
+
 // Delta Z de la surface (0.152.0, dès Intermédiaire) : la surface suivie est montée (+) ou descendue
 // (−) de ce décalage, en Implanter › Surface et en Guidage ; jamais enregistré : 0 à chaque démarrage.
 let deltaSurface = 0;
@@ -3189,7 +3238,7 @@ function calculerLame() {
   const sens = sensAvantLame(lame);
   if (!sens) return { raison: 'les deux récepteurs sont au même endroit', guidage: null, coins: lame };
   const points = pointsGuidageLame(lame.gauche, lame.droite, sens, reglagesOutilLame());
-  return guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite });
+  return guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite }, sens);
 }
 
 /**
@@ -3212,7 +3261,9 @@ function calculerOutilUnGnss() {
     || (!(dims.gauche + dims.droite > 0.1) && `Tape les distances de l'outil (⚙ : gauche, droite${machine === 'rateau' ? ', avant, arrière' : ''})`);
   if (raison) return { raison, guidage: null, coins: null, unGnss: true };
   const points = pointsOutil(etat.position, { cap: etat.cap, inclinaison: etat.inclinaison ?? 0, directionInclinaison: etat.directionInclinaison ?? 0 }, dims);
-  const resultat = guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite, contour: machine === 'rateau' ? points.coins : null });
+  // Bull à 1 GNSS : lame vue de côté = un seul point (le milieu), avant = perpendiculaire à la lame.
+  const sensLame = machine === 'bull' ? avantDeLaLame(points.gauche, points.droite) : null;
+  const resultat = guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite, contour: machine === 'rateau' ? points.coins : null }, sensLame);
   if (resultat.guidage) {
     // Écart au centre de l'outil (même formule qu'un coin : altitude de la surface − altitude du point).
     const surfaceBase = chercheurLame.chercher(points.centre.est, points.centre.nord);
@@ -3244,7 +3295,7 @@ function reglagesOutilLame() {
  * Écarts et coupes des 4 points guidés (0.151.0) : gauche, droite (axe G – D), arriere, avant
  * (axe Arr – Av). coins : ce qui est montré sur le plan.
  */
-function guidageDesPoints(points, triangles, coins) {
+function guidageDesPoints(points, triangles, coins, sensLame = null) {
   if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
   const tolerances = terrain.lame.tolerances;
   // Delta Z de la surface (0.152.0) : la surface suivie est décalée ; la surface de base reste sur les coupes.
@@ -3255,16 +3306,46 @@ function guidageDesPoints(points, triangles, coins) {
   } : chercheurLame.chercher;
   const guidage = guidageLame({ gauche: points.gauche, droite: points.droite, altitudeSurface, tolerances });
   if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coins };
-  // Arr – Av : mêmes calculs, l'arrière à gauche ; le « dévers » est alors la pente vers l'avant.
-  const long = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface, tolerances });
   // Coupes : l'outil + 1 m à gauche / droite et 2 m devant / derrière au départ (0.152.0).
   const marges = terrain.lame.marges;
+  const coupe = coupeDecalee(coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]), delta);
+  let long;
+  let coupeLong;
+  if (sensLame) {
+    // Lame (Grader, Bull, 0.153.1) : vue de côté, un seul point = le milieu du bas de la lame ; le
+    // terrain de « derrière » m derrière à « devant » m devant ; l'écart au milieu seulement.
+    const { milieu, arriere, avant } = coupeMilieuLame(points.gauche, points.droite, sensLame, marges.derriere, marges.devant);
+    const surfaceMilieu = altitudeSurface(milieu.est, milieu.nord);
+    const ecart = surfaceMilieu == null ? null : surfaceMilieu - milieu.altitude;
+    long = { milieu: { ecart, classe: classeEcartLame(ecart, tolerances) } };
+    const brute = coupeEntre(triangles, arriere, avant, 0);
+    coupeLong = brute ? coupeDecalee({ ...brute, centre: { distance: marges.derriere, altitude: milieu.altitude } }, delta) : null;
+  } else {
+    // Râteau : Arr – Av comme G – D, l'arrière à gauche ; le « dévers » est la pente vers l'avant.
+    const calcul = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface, tolerances });
+    long = calcul.erreur ? null : calcul;
+    coupeLong = calcul.erreur ? null : coupeDecalee(coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]), delta);
+  }
+  // Lignes suivies (0.154.0) : écart en plan du bout choisi à la ligne, sur l'axe G – D, et place du
+  // croisement sur la coupe G – D (distance depuis le début de la coupe).
+  const lignes = lignesGuidage.liste.map((l, i) => {
+    const bout = l.bout === 'gauche' ? points.gauche : points.droite;
+    const ecart = ecartAUneLigne(bout, points.gauche, points.droite, l.sommets);
+    return {
+      nom: `L${i + 1}`,
+      bout: l.bout,
+      ecart,
+      classe: ecart == null ? null : classeEcartLame(ecart, tolerances),
+      surCoupe: ecart == null ? null : marges.gauche + (l.bout === 'gauche' ? 0 : guidage.largeur) + ecart,
+    };
+  });
   return {
     raison: null,
     guidage,
-    long: long.erreur ? null : long,
-    coupe: coupeDecalee(coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]), delta),
-    coupeLong: long.erreur ? null : coupeDecalee(coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]), delta),
+    long,
+    lignes,
+    coupe,
+    coupeLong,
     coins,
     bords: bordsDeLaLame(points.gauche, points.droite, triangles),
     toleranceVert: tolerances.vert,
@@ -3862,6 +3943,10 @@ function toucherPourImplantation(position, tolerance) {
   // Choix des côtés d'un talus de surface (Calculs › Dessin, 0.135.0).
   if (choixCotesTalusActif()) {
     toucherCoteTalus(position, tolerance);
+    return;
+  }
+  if (choixLignesGuidageActif()) {
+    toucherPourLigneGuidage(position, tolerance);
     return;
   }
   if (daoAppli?.actif()) {
@@ -5201,6 +5286,9 @@ function donneesCommunes() {
       recepteursBull: terrain.lame.recepteursBull,
       unGnss: outilAUnGnss(),
       vue: terrain.lame.vue,
+      indic: terrain.lame.indic === 'regle' ? 'regle' : 'exterieur',
+      lignes: lignesGuidage.liste.map((l, i) => ({ nom: `L${i + 1}`, bout: l.bout })),
+      choixLignes: lignesGuidage.choix,
       deltaSurface,
       coupeSeule: terrain.lame.coupeSeule,
       marges: terrain.lame.marges,

@@ -1248,7 +1248,20 @@ button.puce {
 }
 
 .plan .courbe.maitresse {
-  stroke-width: 1.8;
+  stroke-width: 2.4;
+}
+
+/* 0.154.0 : cotes des courbes maîtresses (altitude tous les 20 m, dans le sens de la courbe). */
+.plan .cote-courbe {
+  fill: #6b4f2a;
+  font-size: calc(11px * var(--echelle-texte, 1) / 0.6);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 3px;
+  pointer-events: none;
 }
 
 .plan .legende rect:first-child {
@@ -11464,3 +11477,55 @@ body.mode-telephone .ecart-coupe strong { font-size: 0.95rem; }
 svg .profil-base { fill: none; stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 5 4; }
 svg .texte-delta-surface { fill: #c2410c; font-weight: 800; }
 .ligne-delta-surface input { width: 80px; }
+
+/* 0.153.0 : Guidage : choix de la machine en grand au départ, puis « ← Grader » pour y revenir. */
+.choix-machine-depart {
+  display: grid;
+  gap: 12px;
+  padding: 8px 0 16px;
+}
+.grosse-machine {
+  min-height: 72px;
+  border: 3px solid #1d4ed8;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #1d4ed8;
+  font-size: 1.4rem;
+  font-weight: 900;
+}
+.grosse-machine.actif {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+.bouton-retour-machine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 2px solid #1d4ed8;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1d4ed8;
+  font-size: 1.05rem;
+}
+/* 0.153.1 : lame vue de côté : un seul écart (milieu de la lame), le côté droit est caché. */
+.corps-coupe-guidage > .masque { visibility: hidden; }
+/* 0.154.0 : lignes suivies en Guidage : bandeau par ligne (écart en plan), trait violet sur la coupe G – D. */
+.bouton-lignes-guidage { min-height: 48px; padding: 0 10px; border: 2px solid #7c3aed; border-radius: 10px; background: #ffffff; color: #6d28d9; font-weight: 800; }
+.bouton-lignes-guidage.actif { background: #7c3aed; color: #ffffff; }
+.lignes-guidage { margin: 0 0 6px; }
+.bandeaux-lignes { display: grid; gap: 6px; }
+.bandeau-ligne { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border: 2px solid #7c3aed; border-radius: 10px; background: #f5f3ff; color: #4c1d95; }
+.bandeau-ligne.ecart-vert { border-color: #16a34a; background: #dcfce7; color: #166534; }
+.bandeau-ligne.ecart-orange { border-color: #ea580c; background: #ffedd5; color: #9a3412; }
+.bandeau-ligne.ecart-rouge { border-color: #dc2626; background: #fee2e2; color: #991b1b; }
+.bandeau-ligne .nom-ligne { padding: 2px 6px; border-radius: 6px; background: #7c3aed; color: #ffffff; font-weight: 900; }
+.bandeau-ligne .bouts-ligne { display: inline-flex; gap: 4px; }
+.bandeau-ligne .ecart-ligne { margin-left: auto; font-size: 1.3rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.puce-choix.petite { min-height: 32px; padding: 0 8px; font-size: 0.8rem; }
+svg .ligne-suivie-coupe { stroke: #7c3aed; stroke-width: 2.5; stroke-dasharray: 6 4; }
+svg .nom-ligne-coupe { fill: #7c3aed; font-weight: 900; font-size: 11px; }
+/* 0.155.0 : silhouette de la machine dans les coupes du Guidage (gris clair, derrière). */
+svg .silhouette-outil { fill: #94a3b8; opacity: 0.3; pointer-events: none; }
+svg .silhouette-outil .vitre-silhouette { fill: #ffffff; opacity: 0.6; }

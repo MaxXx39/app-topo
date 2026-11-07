@@ -11,14 +11,14 @@
 // - DESSINS : dessins de Calculs › Dessin (contours et lignes en 3D, sommets) ; DESSINS_NOMS : PF1-1…
 //
 // Le DXF des mesures (onglet Calculs › Mesures, voir genererDxfMesures) est un fichier à part, sans volume.
-import { courbesDeNiveau } from '../topo/courbes.js';
+import { courbesDeNiveau, estMaitresse, chainerCourbes, cotesDesCourbes, texteCote } from '../topo/courbes.js';
 import { formaterNombre } from '../topo/format.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne, aciDeCouleurLibelle } from '../leve/libelles.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
 import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, aciDeMesure } from '../mesures/valeurs.js';
 
 // Couleurs AutoCAD (numéros) : 1 rouge, 2 jaune, 3 vert, 4 cyan, 5 bleu, 6 magenta, 7 blanc/noir, 8 gris, 30 orange.
-const COULEURS = { POINTS: 7, NOMS: 8, ALTITUDES: 5, CONTOURS: 1, LIGNES_RUPTURE: 30, COURBES: 32 };
+const COULEURS = { POINTS: 7, NOMS: 8, ALTITUDES: 5, CONTOURS: 1, LIGNES_RUPTURE: 30, COURBES: 32, COURBES_MAITRESSES: 32, COURBES_COTES: 32 };
 
 /**
  * Construit le texte du fichier DXF.
@@ -31,7 +31,7 @@ const COULEURS = { POINTS: 7, NOMS: 8, ALTITUDES: 5, CONTOURS: 1, LIGNES_RUPTURE
  */
 export function genererDxf({ points, stocks = [], resultats = [], surfaces = [], equidistance = null, dessins = [] }) {
   const entites = [];
-  const calques = new Map(Object.entries(COULEURS).filter(([nom]) => nom !== 'COURBES' || equidistance));
+  const calques = new Map(Object.entries(COULEURS).filter(([nom]) => !nom.startsWith('COURBES') || equidistance));
   const parNom = new Map(points.map((p) => [p.nom, p]));
 
   // Couleur du libellé (P-RG-1 : regard en noir…) sur le point et sa ligne, sinon celle du calque.
@@ -56,8 +56,16 @@ export function genererDxf({ points, stocks = [], resultats = [], surfaces = [],
       calques.set(calque, 8);
       for (const t of triangles) entites.push(face3D(t, calque));
       if (equidistance) {
-        for (const { altitude, a, b } of courbesDeNiveau(triangles, equidistance)) {
-          entites.push(['0', 'LINE', '8', 'COURBES', ...xyz({ ...a, altitude }, 0), ...xyz({ ...b, altitude }, 1)]);
+        // 0.154.0 : une courbe sur 5 (maîtresse) sur son calque, en trait épais (0,50 mm), avec son
+        // altitude écrite tous les 20 m dans le sens de la courbe (calque COURBES_COTES).
+        const segments = courbesDeNiveau(triangles, equidistance);
+        for (const { altitude, a, b } of segments) {
+          const maitresse = estMaitresse(altitude, equidistance);
+          entites.push(['0', 'LINE', '8', maitresse ? 'COURBES_MAITRESSES' : 'COURBES', ...(maitresse ? ['370', '50'] : []), ...xyz({ ...a, altitude }, 0), ...xyz({ ...b, altitude }, 1)]);
+        }
+        const maitresses = segments.filter((seg) => estMaitresse(seg.altitude, equidistance));
+        for (const cote of cotesDesCourbes(chainerCourbes(maitresses), 20)) {
+          entites.push(texteCentre({ est: cote.est, nord: cote.nord, altitude: cote.altitude }, 0.5, cote.angle, texteCote(cote.altitude), 'COURBES_COTES'));
         }
       }
     }

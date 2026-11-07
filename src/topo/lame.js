@@ -236,3 +236,46 @@ export function coupeEntre(triangles, a, b, marges = 1) {
     b: { distance: avant + largeur, altitude: b.altitude },
   };
 }
+
+/**
+ * Lame (Grader, Bull) vue de côté (0.153.1, demande du 07.11 : pas de points Av / Arr inventés) :
+ * le milieu du bas de la lame (moyenne des 2 bouts, altitude comprise) et les bouts de la coupe
+ * Arr – Av, "derriere" m derrière et "devant" m devant ce milieu, dans le sens "sens" ({ est, nord },
+ * longueur 1, vers l'avant). Renvoie { milieu, arriere, avant } (MN95).
+ */
+export function coupeMilieuLame(gauche, droite, sens, derriere = 2, devant = 2) {
+  const milieu = pointDeProfil(gauche, droite, 'milieu');
+  const bout = (d) => ({ est: milieu.est + sens.est * d, nord: milieu.nord + sens.nord * d, altitude: milieu.altitude });
+  return { milieu, arriere: bout(-derriere), avant: bout(devant) };
+}
+
+/**
+ * Suivre une ligne en Guidage (0.154.0, Expert, demande du 07.11) : où la ligne (polyligne, en plan)
+ * croise l'axe G – D de l'outil, mesuré depuis un bout de l'outil. bout : { est, nord } (bout G ou D) ;
+ * gauche, droite : les 2 bouts (donnent la direction de l'axe) ; sommets : [{ est, nord }] de la ligne.
+ * Renvoie l'écart en plan (m, + = la ligne est à droite du bout, − = à gauche), le croisement le plus
+ * proche si la ligne croise l'axe plusieurs fois, ou null si elle ne le croise pas.
+ */
+export function ecartAUneLigne(bout, gauche, droite, sommets) {
+  const largeur = Math.hypot(droite.est - gauche.est, droite.nord - gauche.nord);
+  if (largeur < LARGEUR_MIN || sommets.length < 2) return null;
+  const ux = (droite.est - gauche.est) / largeur;
+  const uy = (droite.nord - gauche.nord) / largeur;
+  let meilleur = null;
+  for (let i = 1; i < sommets.length; i++) {
+    const a = sommets[i - 1];
+    const b = sommets[i];
+    const sx = b.est - a.est;
+    const sy = b.nord - a.nord;
+    const det = ux * -sy - uy * -sx;
+    if (Math.abs(det) < 1e-12) continue; // segment parallèle à l'axe
+    // bout + t·u = a + s·(b − a)
+    const dx = a.est - bout.est;
+    const dy = a.nord - bout.nord;
+    const t = (dx * -sy - dy * -sx) / det;
+    const s = (ux * dy - uy * dx) / det;
+    if (s < -1e-9 || s > 1 + 1e-9) continue;
+    if (meilleur === null || Math.abs(t) < Math.abs(meilleur)) meilleur = t;
+  }
+  return meilleur;
+}
