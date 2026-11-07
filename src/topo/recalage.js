@@ -199,3 +199,69 @@ export function etapeRecalage(nbPaires, choixFait) {
   const numero = 2 * nbPaires + (choixFait ? 2 : 1);
   return { numero, total: Math.max(4, numero), sorte: choixFait ? 'cale' : 'dxf', rang: nbPaires + 1, pret: nbPaires >= 2 };
 }
+
+// --- Calage par axes (0.152.0, Expert, demande du 07.11) ---------------------------------------
+// Deux lignes sur le plan à caler et les deux mêmes lignes déjà en MN95 (autre plan, levé, dessin, ou
+// ligne entre 2 points). Le croisement des 2 lignes du plan va sur le croisement des 2 lignes MN95 ;
+// la rotation est prise sur la 1re ligne (choix de l'utilisateur) ; la 2e ligne sert de contrôle
+// (écart d'angle montré). L'échelle n'est pas donnée par 2 lignes : 1, ou mise à l'échelle avant
+// (2 points du plan et leur distance réelle). Une ligne n'a pas de sens : la rotation est connue à
+// 180° près ; on prend celle qui tourne le moins, « Tourner de 180° » donne l'autre.
+
+/** Croisement des droites (infinies) a1-b1 et a2-b2, points { x, y } : { x, y } ou null si parallèles. */
+export function croisementDroites(a1, b1, a2, b2) {
+  const rx = b1.x - a1.x;
+  const ry = b1.y - a1.y;
+  const sx = b2.x - a2.x;
+  const sy = b2.y - a2.y;
+  const det = rx * sy - ry * sx;
+  const longueurs = Math.hypot(rx, ry) * Math.hypot(sx, sy);
+  if (longueurs === 0 || Math.abs(det) / longueurs < Math.sin((0.5 * Math.PI) / 180)) return null; // moins de 0,5° : parallèles
+  const t = ((a2.x - a1.x) * sy - (a2.y - a1.y) * sx) / det;
+  return { x: a1.x + rx * t, y: a1.y + ry * t };
+}
+
+/** Angle ramené dans ]−π/2, π/2] (une droite n'a pas de sens). */
+function angleDeDroite(angle) {
+  let a = angle % Math.PI;
+  if (a <= -Math.PI / 2) a += Math.PI;
+  if (a > Math.PI / 2) a -= Math.PI;
+  return a;
+}
+
+/**
+ * Échelle d'un plan par 2 points (x, y du plan) et leur distance réelle (m) : distance ÷ longueur
+ * sur le plan. Renvoie le facteur, ou null (points confondus, distance pas positive).
+ */
+export function echelleParDeuxPoints(p1, p2, distance) {
+  const longueur = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  if (!(longueur > 1e-6) || !(distance > 0)) return null;
+  return distance / longueur;
+}
+
+/**
+ * Calage par axes. lignesPlan : [l1, l2] et lignesCalees : [L1, L2], chaque ligne { a, b } avec des
+ * points { x, y } (plan) ou { est, nord } (MN95). echelle : facteur (1 au départ) ; tourne : vrai pour
+ * la rotation à 180° de l'autre. Renvoie les paramètres de Helmert { a, b, tEst, tNord, echelle,
+ * rotation } (mêmes que calculerHelmert) avec ecartAngle (rad : angle MN95 de la 2e ligne − angle de la
+ * 2e ligne du plan une fois tournée, ramené à ±90°), croisementPlan { x, y }, croisementCale
+ * { est, nord }, ou { erreur }.
+ */
+export function calageParAxes(lignesPlan, lignesCalees, { echelle = 1, tourne = false } = {}) {
+  const versXy = (p) => ('x' in p ? p : { x: p.est, y: p.nord });
+  const [l1, l2] = lignesPlan.map((l) => ({ a: versXy(l.a), b: versXy(l.b) }));
+  const [m1, m2] = lignesCalees.map((l) => ({ a: versXy(l.a), b: versXy(l.b) }));
+  if (!l1 || !l2 || !m1 || !m2) return { erreur: 'il faut 2 lignes sur le plan et 2 lignes calées' };
+  const P = croisementDroites(l1.a, l1.b, l2.a, l2.b);
+  if (!P) return { erreur: 'les 2 lignes du plan à caler sont parallèles (ou presque) : pas de croisement' };
+  const Q = croisementDroites(m1.a, m1.b, m2.a, m2.b);
+  if (!Q) return { erreur: 'les 2 lignes calées sont parallèles (ou presque) : pas de croisement' };
+  const angle = (l) => Math.atan2(l.b.y - l.a.y, l.b.x - l.a.x);
+  const rotation = angleDeDroite(angle(m1) - angle(l1)) + (tourne ? Math.PI : 0);
+  const ecartAngle = angleDeDroite(angle(m2) - (angle(l2) + rotation));
+  const a = echelle * Math.cos(rotation);
+  const b = echelle * Math.sin(rotation);
+  const tEst = Q.x - (a * P.x - b * P.y);
+  const tNord = Q.y - (b * P.x + a * P.y);
+  return { a, b, tEst, tNord, echelle, rotation, ecartAngle, croisementPlan: P, croisementCale: { est: Q.x, nord: Q.y } };
+}

@@ -122,13 +122,13 @@ import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation, classeTolerance, TOLERANCES_PAR_DEFAUT } from './topo/controle.js';
 import { noterAffichage, appliquerAffichage } from './projet/affichage-appareil.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
-import { calculerHelmert, planRecale } from './topo/recalage.js';
+import { calculerHelmert, planRecale, calageParAxes, echelleParDeuxPoints } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
 import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { fabriquerPaquet } from './export/paquet.js';
-import { creerBarreRecalage } from './recalage/barre.js';
+import { creerBarreRecalage, etapeAxes } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
 import { ajouterTous } from './outils/bornes.js';
 
@@ -3928,7 +3928,13 @@ function guiderVersChoix(choix) {
 // calage { x, y, est, nord, nom, actif }) }. candidat (0.104.0) : le point touché sur le plan, montré par une
 // croix, pas encore validé ({ sorte: 'dxf' ou 'cale', x, y, nom }) ; « Valider » le prend en compte. Pendant le recalage, ce plan est montré tel qu'il a été lu.
 // Étapes écrites (0.92.0) : voir recalage/barre.js.
-const recalage = { planId: null, accroche: 'sommet', choix: null, candidat: null, accrocheCale: 'point', taper: false, paires: [], zoomLoupe: 4, etapeLoupe: null };
+const recalage = { planId: null, accroche: 'sommet', choix: null, candidat: null, accrocheCale: 'point', taper: false, paires: [], zoomLoupe: 4, etapeLoupe: null, methode: 'points', axes: null };
+
+// Calage par axes (0.152.0, Expert) : lignes du plan à caler et lignes calées ({ a, b } : points
+// { x, y } du plan / { est, nord } MN95), échelle, 180°, façon (« ligne » touchée ou « points »).
+function axesVides() {
+  return { lignesPlan: [], lignesCalees: [], echelle: 1, tourne: false, facon: 'ligne', premier: null, miseEchelle: null };
+}
 
 /** Plan PDF : 'image' (scanné), 'traits' (vectoriel), sinon null (DXF). */
 const sortePdf = (plan) => (plan?.pdf ? (plan.pdf.image ? 'image' : 'traits') : null);
@@ -3949,6 +3955,8 @@ function commencerRecalage(id) {
   recalage.choix = null;
   recalage.candidat = null;
   recalage.paires = (choisi.recalage?.paires ?? []).map((p) => ({ ...p }));
+  recalage.methode = choisi.recalage?.axes && aAcces('expert') ? 'axes' : 'points';
+  recalage.axes = axesVides();
   // Accroche « Manuel » (0.130.0) : seulement pour un plan PDF ; d'office pour un PDF scanné.
   recalage.etapeLoupe = null;
   if (sortePdf(choisi) === 'image') recalage.accroche = 'manuel';
@@ -4015,6 +4023,41 @@ function commencerRecalage(id) {
     },
     validerCandidat: validerCandidatRecalage,
     appliquer: appliquerRecalage,
+    // --- Calage par axes (0.152.0, Expert) ---
+    choisirMethode: (methode) => {
+      recalage.methode = methode === 'axes' && aAcces('expert') ? 'axes' : 'points';
+      recalage.candidat = null;
+      montrerRecalage();
+    },
+    choisirFaconAxes: (facon) => {
+      recalage.axes.facon = facon === 'points' ? 'points' : 'ligne';
+      recalage.axes.premier = null;
+      montrerRecalage();
+    },
+    commencerEchelle: () => {
+      recalage.axes.miseEchelle = { points: [] };
+      montrerRecalage();
+    },
+    annulerEchelle: () => {
+      recalage.axes.miseEchelle = null;
+      montrerRecalage();
+    },
+    echelleUn: () => {
+      recalage.axes.echelle = 1;
+      montrerRecalage();
+    },
+    tournerAxes: () => {
+      recalage.axes.tourne = !recalage.axes.tourne;
+      montrerRecalage();
+    },
+    effacerLigneAxes: () => {
+      const { lignesPlan, lignesCalees } = recalage.axes;
+      recalage.axes.premier = null;
+      if (lignesPlan.length > lignesCalees.length) lignesPlan.pop();
+      else lignesCalees.pop();
+      montrerRecalage();
+    },
+    appliquerAxes: appliquerCalageAxes,
     annulerRecalage: () => annulerRecalage(recalage.planId),
     fermer: () => {
       const enregistrees = JSON.stringify(projet.plansDxf.find((p) => p.id === recalage.planId)?.recalage?.paires ?? []);
@@ -4055,6 +4098,8 @@ function montrerRecalage() {
     taper: recalage.taper,
     rx2: recepteurDisponible(),
     paires: recalage.paires,
+    methode: recalage.methode,
+    axes: recalage.axes,
   });
   // Après la barre : la loupe se place au-dessus d'elle (sa hauteur est alors connue).
   montrerLoupe();
@@ -4068,7 +4113,7 @@ function montrerRecalage() {
  */
 function montrerLoupe() {
   const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
-  if (!choisi || !sortePdf(choisi) || recalage.accroche !== 'manuel' || recalage.choix) {
+  if (!choisi || !sortePdf(choisi) || recalage.accroche !== 'manuel' || recalage.choix || recalage.methode === 'axes') {
     plan.loupe.cacher();
     recalage.etapeLoupe = null;
     return;
@@ -4112,6 +4157,10 @@ function groupesDePointsParListe() {
  */
 function toucherPourRecalage(position, tolerance) {
   const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+  if (recalage.methode === 'axes') {
+    toucherPourAxes(choisi, position, tolerance);
+    return;
+  }
   if (!recalage.choix) {
     // « Point » (0.116.0) : un point levé ou de contrôle sert de 1er point (ses coordonnées telles quelles).
     if (recalage.accroche === 'point') {
@@ -4221,6 +4270,116 @@ function appliquerRecalage() {
   arreterRecalage();
   modifie();
   afficherMessage(`Plan « ${choisi.nom} » recalé`, 3000);
+  requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+}
+
+/**
+ * Calage par axes (0.152.0, Expert) : un toucher prend une ligne (trait touché, ou 2 points l'un après
+ * l'autre) sur le plan à caler ou parmi les lignes déjà calées, selon l'étape (voir etapeAxes) ; ou un
+ * point de la mise à l'échelle.
+ */
+function toucherPourAxes(choisi, position, tolerance) {
+  const axes = recalage.axes;
+  const etape = etapeAxes(axes);
+  const surLePlan = Boolean(axes.miseEchelle) || etape.cote === 'plan';
+  if (!axes.miseEchelle && etape.numero === 5) return;
+  // Lignes et accroches : sur le plan à caler (tel qu'il a été lu), ou déjà en MN95 (autres plans DXF
+  // montrés, levés, dessins, points du projet).
+  const autres = () => plansDuProjet().filter((p) => p.id !== recalage.planId && p.visible !== false);
+  const accrocherPoint = () => {
+    const mode = surLePlan ? recalage.accroche : recalage.accrocheCale;
+    if (mode === 'point') return accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() });
+    if (mode === 'manuel') return { est: position.est, nord: position.nord };
+    const sources = surLePlan ? sourcesDesPlans([choisi], position, tolerance) : avecToutesLesLignes('croisement', sourcesDesPlans(autres(), position, tolerance));
+    return accrocher(mode, position, tolerance, sources);
+  };
+  if (axes.miseEchelle) {
+    const point = accrocherPoint();
+    if (!point) {
+      afficherMessage('Rien à accrocher sous le doigt sur le plan à caler', 3000);
+      return;
+    }
+    axes.miseEchelle.points.push({ x: point.est, y: point.nord });
+    sonValidation();
+    if (axes.miseEchelle.points.length < 2) {
+      montrerRecalage();
+      return;
+    }
+    const [p1, p2] = axes.miseEchelle.points;
+    const longueur = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    demanderTexte({ titre: 'Distance réelle entre les 2 points (m)', valeur: longueur.toFixed(3) }).then((texte) => {
+      const distance = texte == null ? null : lireNombreTape(texte);
+      const echelle = distance == null ? null : echelleParDeuxPoints(p1, p2, distance);
+      axes.miseEchelle = null;
+      if (texte != null && !echelle) afficherMessage('Distance illisible : un nombre de mètres plus grand que 0', 4000);
+      if (echelle) {
+        axes.echelle = echelle;
+        afficherMessage(`Échelle du plan : ${echelle.toFixed(6)}`, 3000);
+      }
+      montrerRecalage();
+    });
+    return;
+  }
+  let ligne = null;
+  if (axes.facon === 'points') {
+    const point = accrocherPoint();
+    if (!point) {
+      afficherMessage(surLePlan ? 'Rien à accrocher sous le doigt sur le plan à caler' : 'Rien à accrocher sous le doigt (autre plan, levé, point)', 3000);
+      return;
+    }
+    const p = surLePlan ? { x: point.est, y: point.nord } : { est: point.est, nord: point.nord };
+    if (!axes.premier) {
+      axes.premier = p;
+      sonValidation();
+      montrerRecalage();
+      return;
+    }
+    ligne = { a: axes.premier, b: p };
+    axes.premier = null;
+  } else {
+    const lignes = surLePlan
+      ? sourcesDesPlans([choisi], position, tolerance).lignes
+      : avecToutesLesLignes('croisement', sourcesDesPlans(autres(), position, tolerance)).lignes;
+    const trouve = accrocherTrait(position, tolerance, lignes);
+    if (!trouve) {
+      afficherMessage(surLePlan ? 'Aucun trait sous le doigt sur le plan à caler' : 'Aucune ligne calée sous le doigt (autre plan, levé, dessin)', 3000);
+      return;
+    }
+    const a = trouve.sommets[trouve.segment];
+    const b = trouve.sommets[trouve.segment + 1];
+    ligne = surLePlan ? { a: { x: a.est, y: a.nord }, b: { x: b.est, y: b.nord } } : { a: { est: a.est, nord: a.nord }, b: { est: b.est, nord: b.nord } };
+  }
+  (surLePlan ? axes.lignesPlan : axes.lignesCalees).push(ligne);
+  sonValidation();
+  vibrer(60);
+  montrerRecalage();
+  // Plan à caler loin de la Suisse (pas encore en MN95) : la vue passe d'un côté à l'autre.
+  if (choisi && !estEnMn95(choisi.bornes) && etapeAxes(axes).numero < 5) {
+    if (surLePlan) {
+      const calees = autres();
+      const points = pointsDuProjet();
+      requestAnimationFrame(() => (calees.length > 0 ? plan.cadrerSurPlans(calees) : points.length > 0 && plan.cadrerSur(points, 10)));
+    } else requestAnimationFrame(() => plan.cadrerSurPlans([choisi]));
+  }
+}
+
+/** « Appliquer » du calage par axes : mêmes paramètres qu'un recalage par points (Helmert). */
+function appliquerCalageAxes() {
+  const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+  const { lignesPlan, lignesCalees, echelle, tourne } = recalage.axes;
+  const r = calageParAxes(lignesPlan, lignesCalees, { echelle, tourne });
+  if (!choisi || r.erreur) return;
+  const { a, b, tEst, tNord, rotation, ecartAngle } = r;
+  choisi.recalage = {
+    paires: [],
+    axes: { lignesPlan, lignesCalees, echelle, tourne, ecartAngle },
+    parametres: { a, b, tEst, tNord, echelle, rotation },
+    applique: true,
+    le: new Date().toISOString(),
+  };
+  arreterRecalage();
+  modifie();
+  afficherMessage(`Plan « ${choisi.nom} » calé par axes`, 3000);
   requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
 }
 
