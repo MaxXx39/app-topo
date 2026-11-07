@@ -100,3 +100,12 @@ export function cotesLongueur(longueur) {
 export function cotesAltitude(altitudeMin, altitudeMax) {
   return [0, 1, 2, 3, 4].map((i) => altitudeMin + ((altitudeMax - altitudeMin) * i) / 4);
 }
+
+/**
+ * Profil décalé en hauteur (0.152.0, « delta Z » d'une surface en Implanter › Surface et Guidage) :
+ * chaque altitude + delta (m, + = plus haut). morceaux : liste de listes de { distance, altitude }.
+ */
+export function decalerProfil(morceaux, delta) {
+  if (!delta) return morceaux;
+  return morceaux.map((m) => m.map((p) => ({ ...p, altitude: p.altitude + delta })));
+}

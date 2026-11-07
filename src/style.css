@@ -11283,6 +11283,184 @@ body[data-onglet='terrain'] .bouton.bouton-implanter.bouton-implanter-plan:not([
 .pied-coupe-guidage .hors {
   color: #b91c1c;
 }
-body.mode-telephone .corps-coupe-guidage { grid-template-columns: 32px minmax(0, 1fr) 32px; }
-body.mode-telephone .corps-coupe-guidage .regle-hauteur { width: 30px; min-height: 120px; }
+body.mode-telephone .corps-coupe-guidage { grid-template-columns: 26px 40px minmax(0, 1fr) 40px 26px; gap: 3px; }
+body.mode-telephone .corps-coupe-guidage .regle-hauteur { width: 24px; min-height: 120px; }
 body.mode-telephone .ecart-coupe strong { font-size: 0.95rem; }
+
+/* 0.152.0 : zoom de l'aperçu PDF (− / +, pincer) et papier / échelle annoncés avant l'export. */
+.zoom-apercu-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.zoom-apercu-pdf button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+.zoom-apercu-pdf span {
+  min-width: 34px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.pages-apercu-pdf {
+  touch-action: pan-x pan-y;
+}
+.pages-apercu-pdf.zoome {
+  align-items: flex-start;
+}
+.pages-apercu-pdf.zoome .page-apercu-pdf {
+  max-width: none;
+}
+.feuille-prevue {
+  margin: 8px 0 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 800;
+}
+.feuille-prevue.depasse {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.entete-apercu-pdf { flex-wrap: wrap; }
+
+/* 0.152.0 (essai B validé) : Implanter : la barre d'accroche n'est plus collée sous le plan, elle est
+   dans le cadre, sous Point / Ligne / Surface ; bandeau d'invite sur une seule ligne courte. */
+@media (max-width: 899px) {
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .barre-accroche {
+    position: static;
+    height: auto;
+    margin: 0 0 6px;
+    border: 1px solid var(--bordure);
+    border-radius: 10px;
+    box-shadow: none;
+  }
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .mise-en-page {
+    padding-top: calc(var(--hauteur-plan-terrain) + var(--hauteur-bascule) + 4px);
+  }
+}
+.choix-implantation-type + .barre-accroche {
+  margin-top: 6px;
+}
+.invite-choix.invite-courte {
+  padding: 4px 10px;
+  gap: 8px;
+}
+.invite-choix.invite-courte svg {
+  width: 20px;
+  height: 20px;
+}
+.invite-choix.invite-courte strong {
+  overflow: hidden;
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 0.152.0 : Guidage : vues (plan + 1 coupe, plan + 2 coupes côte à côte, 2 coupes sans plan) et, à
+   côté de chaque règle, un triangle (pointe en haut = monter, en bas = descendre) en haut et la valeur
+   en bas. Essai A (au départ) : règle | triangle et valeur | coupe | triangle et valeur | règle ;
+   essai B (.essai-exterieur) : triangle et valeur | règle | coupe | règle | triangle et valeur ;
+   essai C (.essai-sur-regle) : triangle et valeur posés sur la règle. */
+.coupes-guidage.vue-plan2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.bloc-coupe-guidage .titre-coupe-guidage {
+  margin: 0 0 2px;
+  text-align: center;
+}
+.corps-coupe-guidage {
+  grid-template-columns: 34px 48px minmax(0, 1fr) 48px 34px;
+  gap: 4px;
+}
+.vue-plan2 .corps-coupe-guidage {
+  grid-template-columns: 26px 40px minmax(0, 1fr) 40px 26px;
+  gap: 3px;
+}
+.vue-plan2 .corps-coupe-guidage .regle-hauteur {
+  width: 24px;
+  min-height: 140px;
+}
+.vue-plan1 .corps-coupe-guidage .regle-hauteur,
+.vue-coupes .corps-coupe-guidage .regle-hauteur {
+  min-height: 190px;
+}
+.indic-coupe {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 4px 0;
+  border-radius: 10px;
+  background: var(--surface-2, #f1f5f9);
+  color: var(--gris);
+  font-variant-numeric: tabular-nums;
+}
+.indic-coupe.ecart-vert { background: #dcfce7; color: #166534; }
+.indic-coupe.ecart-orange { background: #ffedd5; color: #9a3412; }
+.indic-coupe.ecart-rouge { background: #fee2e2; color: #991b1b; }
+.indic-coupe .triangle-coupe {
+  width: 34px;
+  height: 30px;
+  fill: currentColor;
+}
+.indic-coupe .triangle-vide {
+  height: 30px;
+}
+.indic-coupe strong {
+  margin-top: auto;
+  font-size: 1.15rem;
+  line-height: 1.1;
+}
+.indic-coupe .unite-coupe {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.indic-coupe .nom-bout {
+  font-size: 0.75rem;
+  font-weight: 900;
+  opacity: 0.75;
+}
+.vue-plan2 .indic-coupe .triangle-coupe { width: 28px; height: 24px; }
+.vue-plan2 .indic-coupe strong { font-size: 0.95rem; }
+/* Essai B : triangle et valeur à l'extérieur des règles. */
+.essai-exterieur .corps-coupe-guidage > :nth-child(1) { order: 2; }
+.essai-exterieur .corps-coupe-guidage > :nth-child(2) { order: 1; }
+.essai-exterieur .corps-coupe-guidage > :nth-child(3) { order: 3; }
+.essai-exterieur .corps-coupe-guidage > :nth-child(4) { order: 5; }
+.essai-exterieur .corps-coupe-guidage > :nth-child(5) { order: 4; }
+.essai-exterieur .corps-coupe-guidage { grid-template-columns: 48px 34px minmax(0, 1fr) 34px 48px; }
+.essai-exterieur .vue-plan2 .corps-coupe-guidage { grid-template-columns: 40px 26px minmax(0, 1fr) 26px 40px; }
+/* Essai C : sur la règle (même case), règle plus large. */
+.essai-sur-regle .corps-coupe-guidage { grid-template-columns: 52px minmax(0, 1fr) 52px; }
+.essai-sur-regle .corps-coupe-guidage > :nth-child(1),
+.essai-sur-regle .corps-coupe-guidage > :nth-child(2) { grid-column: 1; grid-row: 1; }
+.essai-sur-regle .corps-coupe-guidage > :nth-child(3) { grid-column: 2; grid-row: 1; }
+.essai-sur-regle .corps-coupe-guidage > :nth-child(4),
+.essai-sur-regle .corps-coupe-guidage > :nth-child(5) { grid-column: 3; grid-row: 1; }
+.essai-sur-regle .corps-coupe-guidage .regle-hauteur { width: 52px; }
+.essai-sur-regle .indic-coupe { z-index: 2; background: transparent !important; color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); pointer-events: none; }
+.essai-sur-regle .indic-coupe .triangle-coupe { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
+/* Vue « 2 coupes sans plan » : le plan est caché, le cadre monte en haut. */
+@media (max-width: 899px) {
+  body.guidage-sans-plan[data-onglet='terrain'] .panneau-plan,
+  body.guidage-sans-plan[data-onglet='terrain'] .boutons-taille-plan {
+    display: none !important;
+  }
+  body.guidage-sans-plan[data-onglet='terrain'] .mise-en-page {
+    padding-top: 8px !important;
+  }
+}
+.vue-coupes .corps-coupe-guidage .regle-hauteur { min-height: 240px; }
+/* 0.152.0 : delta Z de la surface : surface de base en gris pointillé, valeur du delta en orange. */
+svg .profil-base { fill: none; stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 5 4; }
+svg .texte-delta-surface { fill: #c2410c; font-weight: 800; }
+.ligne-delta-surface input { width: 80px; }

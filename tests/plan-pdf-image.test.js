@@ -67,7 +67,7 @@ describe('accroches du recalage', () => {
   it('« Manuel » seulement pour un plan PDF ; PDF scanné : Manuel et Point', () => {
     const cles = (pdf) => accrochesProposees(pdf).map(([cle]) => cle);
     expect(cles(null)).not.toContain('manuel');
-    expect(cles('traits')).toEqual(['sommet', 'milieu', 'ligne', 'centre', 'point', 'manuel']);
+    expect(cles('traits')).toEqual(['sommet', 'milieu', 'ligne', 'croisement', 'centre', 'point', 'manuel']);
     expect(cles('image')).toEqual(['manuel', 'point']);
   });
 });

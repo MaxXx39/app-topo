@@ -81,6 +81,7 @@ export const ACCROCHES = {
   sommet: ['Sommet', 'Sommet d\'une ligne du plan DXF', '<path d="M3 20 12 6l9 14" /><rect class="repere" x="9" y="3" width="6" height="6" />'],
   milieu: ['Milieu', 'Milieu d\'un segment du plan DXF', '<path d="M2 17h20" /><circle cx="2.5" cy="17" r="1.5" /><circle cx="21.5" cy="17" r="1.5" /><path class="repere" d="M12 8l5 9H7z" />'],
   ligne: ['Sur ligne', 'Sur une ligne du plan DXF (endroit le plus proche)', '<path d="M3 21 21 3" /><path class="repere" d="M8 8l8 8M16 8l-8 8" />'],
+  croisement: ['Croisem.', 'Croisement de 2 lignes (sans altitude)', '<path d="M4 4 20 20M20 4 4 20" /><circle class="repere" cx="12" cy="12" r="3" />'],
   centre: ['Centre', 'Centre d\'un cercle du plan DXF', '<circle cx="12" cy="12" r="9" /><circle class="repere" cx="12" cy="12" r="2.5" />'],
   // 0.131.0 : « Manuel » (Intermédiaire, implantation d'un point) : loupe + main, point visé sans accroche.
   manuel: ['Manuel', 'Manuel : loupe et main, le centre de la croix est le point visé', '<path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path class="repere" d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />'],
@@ -317,6 +318,8 @@ export function creerEcranLeve(conteneur, actions) {
     else if (cible.dataset.champ === 'surface-lame') actions.choisirSurfaceLame(cible.value);
     else if (cible.dataset.toleranceLame) actions.reglerToleranceLame(cible.dataset.toleranceLame, cible.value);
     else if (cible.dataset.outil) actions.reglerOutil(cible.dataset.outil, cible.value);
+    else if (cible.dataset.margeLame) actions.reglerMargeLame(cible.dataset.margeLame, cible.value);
+    else if (cible.dataset.champ === 'delta-surface') actions.reglerDeltaSurface(cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
@@ -545,16 +548,16 @@ export function creerEcranLeve(conteneur, actions) {
     // Rien de choisi : on le rappelle bien en vue (après « ← », on ne savait plus quoi faire).
     const imp = donnees.implanter;
     if (reglages.implantation === 'point') {
-      const invite = imp.choix ? '' : invitation('Choisis le point à implanter', 'touche-le sur le plan, ou « Liste »');
-      return barreAccroche() + choixImplantation + invite + implanterPoint();
+      const invite = imp.choix ? '' : invitation('Touche un point sur le plan');
+      return choixImplantation + barreAccroche() + invite + implanterPoint();
     }
     if (reglages.implantation === 'ligne') {
-      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Choisis la ligne à implanter', 'touche-la sur le plan, ou ses points un à un');
-      return barreAccroche() + choixImplantation + invite + implanterLigne();
+      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Touche une ligne sur le plan');
+      return choixImplantation + barreAccroche() + invite + implanterLigne();
     }
     if (reglages.implantation === 'talus') {
-      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Choisis la ligne du talus (haut ou bas)', 'touche-la sur le plan, ou ses points un à un');
-      return barreAccroche() + choixImplantation + invite + implanterLigne() + mesTalus() + talusDesSurfaces();
+      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Touche la ligne du talus sur le plan');
+      return choixImplantation + barreAccroche() + invite + implanterLigne() + mesTalus() + talusDesSurfaces();
     }
     if (reglages.implantation === 'altitude') {
       return `${choixImplantation}
@@ -576,11 +579,21 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="ligne-choix choix-coupe seulement-intermediaire">${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}
         <button type="button" class="bouton-roue ${reglagesCoupesOuverts ? 'actif' : ''}" data-action="basculerReglagesCoupes" aria-label="Réglages des coupes" aria-expanded="${reglagesCoupesOuverts}">⚙</button></div>
       ${reglagesCoupesOuverts ? `<div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
-      <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>` : ''}
+      <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
+      ${champDeltaSurface(donnees.deltaSurface)}` : ''}
       <div class="coupes-directes vue-${vue}">
         <div data-vivant="coupe-${vue}"></div>
       </div>
       <p class="aide" data-vivant="orientation"></p>`;
+  }
+
+  /** Delta Z de la surface (0.152.0, dès Intermédiaire) : champ (m, + = plus haut) et bouton « 0 ». */
+  function champDeltaSurface(delta) {
+    return `<div class="ligne-choix seulement-intermediaire ligne-delta-surface">
+        <label>Δ Z surface <input type="text" inputmode="decimal" data-champ="delta-surface" value="${delta ? Number(delta).toFixed(3) : ''}" placeholder="0.000" /> m</label>
+        <button type="button" class="bouton-secondaire" data-action="deltaSurfaceZero" ${delta ? '' : 'disabled'}>0</button>
+        <span class="aide">+ plus haut</span>
+      </div>`;
   }
 
   /** Écart monter / descendre en grand, avec la règle de hauteur et le bouton du bip à droite (0.107.0). */
@@ -598,11 +611,11 @@ export function creerEcranLeve(conteneur, actions) {
     return `<button type="button" class="bouton-bip ${actif ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${actif}" title="${actif ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${actif ? 'Couper le bip' : 'Remettre le bip'}">${actif ? '🔔' : '🔕'}</button>`;
   }
 
-  /** Bandeau sarcelle bien visible : ce qu'il faut faire maintenant (flèche vers le plan). */
-  function invitation(titre, detail) {
-    return `<div class="invite-choix" role="status">
+  /** Bandeau sarcelle : ce qu'il faut faire maintenant (flèche vers le plan) ; 0.152.0 : une seule ligne courte. */
+  function invitation(titre) {
+    return `<div class="invite-choix invite-courte" role="status">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6" /></svg>
-      <span><strong>${titre}</strong><span>${detail}</span></span>
+      <strong>${titre}</strong>
     </div>`;
   }
 
@@ -1538,6 +1551,8 @@ export function creerEcranLeve(conteneur, actions) {
     document.body.classList.toggle('avec-accroches', avecAccroches);
     document.body.classList.toggle('accroches-ouvertes', avecAccroches && accrochesOuvertes);
     if (!enGuidage || (!autocontrole && implantation !== 'point')) document.body.classList.remove('cible-en-haut');
+    // Guidage (0.152.0) : vue « 2 coupes sans plan » : le plan est caché.
+    document.body.classList.toggle('guidage-sans-plan', donnees.mode === 'lame' && donnees.lame?.vue === 'coupes');
     let contenu;
     if (enGuidage) contenu = vueImplantation();
     else if (autocontrole) contenu = htmlControle(donnees.autocontrole, { gestionOuverte: gestionControleOuverte, erreurGestion });

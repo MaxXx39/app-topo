@@ -212,22 +212,27 @@ export function pointsGuidageLame(gauche, droite, sens, { axe = 0, avant = 1, ar
 
 /**
  * Coupe verticale de la surface entre deux points a (à gauche du dessin) et b (à droite), prolongée
- * de "marge" m de chaque côté. Renvoie { longueur (m), morceaux (profilSurface, distances depuis le
- * début), troncons et ruptures (pentes du projet, voir tronconsProfil), a, b: { distance, altitude } }
- * ou null si a et b sont au même endroit.
+ * de "marges" m : un nombre (des deux côtés) ou [avant a, après b] (0.152.0 : 1 m à gauche et à
+ * droite, 2 m devant et derrière, réglables). Renvoie { longueur (m), morceaux (profilSurface,
+ * distances depuis le début), troncons et ruptures (pentes du projet, voir tronconsProfil),
+ * a, b: { distance, altitude } } ou null si a et b sont au même endroit.
  */
-export function coupeEntre(triangles, a, b, marge = 1) {
-  const ligne = ligneDeCoupeLame(a, b, marge);
-  if (!ligne) return null;
+export function coupeEntre(triangles, a, b, marges = 1) {
+  const [avant, apres] = Array.isArray(marges) ? marges.map((m) => Math.max(0, Number(m) || 0)) : [marges, marges];
   const largeur = Math.hypot(b.est - a.est, b.nord - a.nord);
-  const morceaux = profilSurface(triangles, ligne.debut, ligne.fin);
+  if (largeur < LARGEUR_MIN) return null;
+  const ue = (b.est - a.est) / largeur;
+  const un = (b.nord - a.nord) / largeur;
+  const debut = { est: a.est - ue * avant, nord: a.nord - un * avant };
+  const fin = { est: b.est + ue * apres, nord: b.nord + un * apres };
+  const morceaux = profilSurface(triangles, debut, fin);
   const { troncons, ruptures } = tronconsProfil(morceaux, 0.5);
   return {
-    longueur: largeur + 2 * marge,
+    longueur: largeur + avant + apres,
     morceaux,
     troncons,
     ruptures,
-    a: { distance: marge, altitude: a.altitude },
-    b: { distance: marge + largeur, altitude: b.altitude },
+    a: { distance: avant, altitude: a.altitude },
+    b: { distance: avant + largeur, altitude: b.altitude },
   };
 }

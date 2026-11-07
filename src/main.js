@@ -38,7 +38,7 @@ import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { creerModuleExport } from './export/module.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
-import { profilSurface } from './topo/coupe.js';
+import { profilSurface, decalerProfil } from './topo/coupe.js';
 import { guidageLame, TOLERANCES_LAME, pointDeProfil, bordsDeLaLame, sensCoupeLame, pointsGuidageLame, coupeEntre } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
@@ -122,13 +122,13 @@ import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation, classeTolerance, TOLERANCES_PAR_DEFAUT } from './topo/controle.js';
 import { noterAffichage, appliquerAffichage } from './projet/affichage-appareil.js';
 import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
-import { calculerHelmert, planRecale } from './topo/recalage.js';
+import { calculerHelmert, planRecale, calageParAxes, echelleParDeuxPoints } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
 import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { fabriquerPaquet } from './export/paquet.js';
-import { creerBarreRecalage } from './recalage/barre.js';
+import { creerBarreRecalage, etapeAxes } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
 import { ajouterTous } from './outils/bornes.js';
 
@@ -227,6 +227,12 @@ terrain.lame.recepteursBull = terrain.lame.recepteursBull === 1 ? 1 : 2;
 terrain.lame.outils = { rateau: { gauche: 0, droite: 0, avant: 0, arriere: 0 }, bull: { gauche: 0, droite: 0, avant: 0, arriere: 0 }, ...(terrain.lame.outils ?? {}) };
 // 0.151.0 : coupe Arr – Av des lames (Grader, Bull) : 1 m devant et 1 m derrière au départ.
 terrain.lame.outils.grader ??= { avant: 1, arriere: 1, axe: 0 };
+// 0.152.0 : vue du Guidage ('plan1' : plan + une coupe ; 'plan2' : plan + 2 coupes côte à côte ;
+// 'coupes' : 2 coupes l'une sous l'autre, sans plan), coupe de la vue 'plan1' ('gd' ou 'long') et
+// longueur des coupes au-delà de l'outil (m) : 1 m à gauche et à droite, 2 m devant et derrière.
+terrain.lame.vue = ['plan1', 'plan2', 'coupes'].includes(terrain.lame.vue) ? terrain.lame.vue : 'plan2';
+terrain.lame.coupeSeule = terrain.lame.coupeSeule === 'long' ? 'long' : 'gd';
+terrain.lame.marges = { gauche: 1, droite: 1, devant: 2, derriere: 2, ...(terrain.lame.marges ?? {}) };
 if (!(terrain.lame.outils.bull.avant > 0) && !(terrain.lame.outils.bull.arriere > 0)) terrain.lame.outils.bull = { ...terrain.lame.outils.bull, avant: 1, arriere: 1 };
 
 /** Vrai si la machine choisie est guidée par un seul GNSS (râteau, ou Bull réglé sur 1 GNSS). */
@@ -1417,6 +1423,45 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         retenirReglagesTerrain();
         recalculer();
       },
+      // Delta Z de la surface (0.152.0) : tapé (m, + = plus haut) ou remis à 0.
+      reglerDeltaSurface: (texte) => {
+        const valeur = String(texte ?? '').trim() === '' ? 0 : lireNombreTape(texte);
+        if (valeur == null || !Number.isFinite(valeur) || Math.abs(valeur) > 50) {
+          afficherMessage('Delta Z illisible : un nombre de mètres entre −50 et 50, par exemple 0.250 ou −0.100', 4000);
+          recalculer();
+          return;
+        }
+        deltaSurface = valeur;
+        recalculer();
+      },
+      deltaSurfaceZero: () => {
+        deltaSurface = 0;
+        recalculer();
+      },
+      // Vue du Guidage et coupe montrée (0.152.0, dans ⚙).
+      choisirVueLame: (vue) => {
+        terrain.lame.vue = ['plan1', 'plan2', 'coupes'].includes(vue) ? vue : 'plan2';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      choisirCoupeLame: (cle) => {
+        terrain.lame.coupeSeule = cle === 'long' ? 'long' : 'gd';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // Longueur des coupes au-delà de l'outil (m, 0 à 50) : gauche, droite, devant, derrière.
+      reglerMargeLame: (cle, texte) => {
+        if (!['gauche', 'droite', 'devant', 'derriere'].includes(cle)) return;
+        const valeur = String(texte ?? '').trim() === '' ? 0 : lireNombreTape(texte);
+        if (valeur == null || !Number.isFinite(valeur) || valeur < 0 || valeur > 50) {
+          afficherMessage('Longueur illisible : un nombre de mètres entre 0 et 50, par exemple 2', 4000);
+          recalculer();
+          return;
+        }
+        terrain.lame.marges = { ...terrain.lame.marges, [cle]: valeur };
+        retenirReglagesTerrain();
+        recalculer();
+      },
       // Bull : 1 ou 2 GNSS (0.142.0).
       choisirRecepteursBull: (nombre) => {
         terrain.lame.recepteursBull = Number(nombre) === 1 ? 1 : 2;
@@ -2416,9 +2461,9 @@ function toucherPourDessin(position, tolerance) {
     const lignesDessins = projet.dessins.filter((d) => d.type !== 'points' && d.sommets.length >= 2).map((d) => ({ points: d.sommets, ferme: estFerme(d) && d.sommets.length >= 3 }));
     sources = { ...dxf, lignes: [...dxf.lignes, ...lignesDessins] };
   }
-  const trouve = accrocher(accroche, position, tolerance, sources);
+  const trouve = accrocher(accroche, position, tolerance, avecToutesLesLignes(accroche, sources));
   if (!trouve) {
-    const quoi = { point: 'aucun point', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[accroche];
+    const quoi = { point: 'aucun point', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', croisement: 'aucun croisement de lignes', centre: 'aucun cercle' }[accroche];
     afficherMessage(`${quoi[0].toUpperCase()}${quoi.slice(1)} sous le doigt`, 3000);
     return;
   }
@@ -3102,6 +3147,10 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   },
 });
 
+// Delta Z de la surface (0.152.0, dès Intermédiaire) : la surface suivie est montée (+) ou descendue
+// (−) de ce décalage, en Implanter › Surface et en Guidage ; jamais enregistré : 0 à chaque démarrage.
+let deltaSurface = 0;
+
 // --- Guidage de lame à 2 RX2 (Terrain › Lame, voir topo/lame.js et leve/lame-ecran.js) ---
 
 // Recherche rapide de l'altitude de la surface suivie (refaite quand ses triangles changent).
@@ -3166,7 +3215,8 @@ function calculerOutilUnGnss() {
   const resultat = guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite, contour: machine === 'rateau' ? points.coins : null });
   if (resultat.guidage) {
     // Écart au centre de l'outil (même formule qu'un coin : altitude de la surface − altitude du point).
-    const surfaceCentre = chercheurLame.chercher(points.centre.est, points.centre.nord);
+    const surfaceBase = chercheurLame.chercher(points.centre.est, points.centre.nord);
+    const surfaceCentre = surfaceBase == null ? null : surfaceBase + deltaSurface;
     resultat.guidage.centre = { ecart: surfaceCentre == null ? null : surfaceCentre - points.centre.altitude };
   }
   return { ...resultat, unGnss: true };
@@ -3197,20 +3247,34 @@ function reglagesOutilLame() {
 function guidageDesPoints(points, triangles, coins) {
   if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
   const tolerances = terrain.lame.tolerances;
-  const guidage = guidageLame({ gauche: points.gauche, droite: points.droite, altitudeSurface: chercheurLame.chercher, tolerances });
+  // Delta Z de la surface (0.152.0) : la surface suivie est décalée ; la surface de base reste sur les coupes.
+  const delta = deltaSurface;
+  const altitudeSurface = delta ? (est, nord) => {
+    const z = chercheurLame.chercher(est, nord);
+    return z == null ? null : z + delta;
+  } : chercheurLame.chercher;
+  const guidage = guidageLame({ gauche: points.gauche, droite: points.droite, altitudeSurface, tolerances });
   if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coins };
   // Arr – Av : mêmes calculs, l'arrière à gauche ; le « dévers » est alors la pente vers l'avant.
-  const long = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface: chercheurLame.chercher, tolerances });
+  const long = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface, tolerances });
+  // Coupes : l'outil + 1 m à gauche / droite et 2 m devant / derrière au départ (0.152.0).
+  const marges = terrain.lame.marges;
   return {
     raison: null,
     guidage,
     long: long.erreur ? null : long,
-    coupe: coupeEntre(triangles, points.gauche, points.droite, 1),
-    coupeLong: long.erreur ? null : coupeEntre(triangles, points.arriere, points.avant, 1),
+    coupe: coupeDecalee(coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]), delta),
+    coupeLong: long.erreur ? null : coupeDecalee(coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]), delta),
     coins,
     bords: bordsDeLaLame(points.gauche, points.droite, triangles),
     toleranceVert: tolerances.vert,
   };
+}
+
+/** Coupe du Guidage avec la surface décalée de "delta" (m) ; la surface de base gardée à part. */
+function coupeDecalee(coupe, delta) {
+  if (!coupe || !delta) return coupe;
+  return { ...coupe, morceauxBase: coupe.morceaux, morceaux: decalerProfil(coupe.morceaux, delta), delta };
 }
 
 /**
@@ -3705,6 +3769,16 @@ function lignesDesLeves() {
   return lignes;
 }
 
+/**
+ * Accroche « Croisement » (0.152.0) : toutes les lignes comptent (plans DXF montrés, lignes de rupture
+ * et contours des levés montrés, côtés des dessins) ; ajoutées aux sources d'une autre accroche.
+ */
+function avecToutesLesLignes(mode, sources) {
+  if (mode !== 'croisement') return sources;
+  const dessins = dessinsVisibles().filter((d) => d.type !== 'points' && d.sommets.length >= 2).map((d) => ({ points: d.sommets, ferme: estFerme(d) && d.sommets.length >= 3 }));
+  return { ...sources, lignes: [...(sources.lignes ?? []), ...lignesDesLeves(), ...dessins] };
+}
+
 /** Toucher du plan pendant l'implantation d'une ligne : une ligne du DXF, ou un point de plus. */
 function toucherPourLigne(position, tolerance) {
   const mm = (p) => ({ ...p, est: Math.round(p.est * 1000) / 1000, nord: Math.round(p.nord * 1000) / 1000, altitude: p.altitude != null ? Math.round(p.altitude * 1000) / 1000 : null });
@@ -3745,7 +3819,7 @@ function toucherPourLigne(position, tolerance) {
     const sources = terrain.accrocheLigne === 'point'
       ? { lignes: [], cercles: [], points: pointsDuProjet() }
       : sourcesDesPlans(plansDuProjet(), position, tolerance);
-    const trouve = accrocher(terrain.accrocheLigne, position, tolerance, sources);
+    const trouve = accrocher(terrain.accrocheLigne, position, tolerance, avecToutesLesLignes(terrain.accrocheLigne, sources));
     if (!trouve) {
       afficherMessage('Rien sous le doigt', 3000);
       return;
@@ -3826,9 +3900,9 @@ function toucherPourImplantation(position, tolerance) {
   const sources = terrain.accroche === 'point'
     ? { lignes: [], cercles: [], points: pointsDuProjet() }
     : sourcesDesPlans(plansDuProjet(), position, tolerance);
-  const trouve = accrocher(terrain.accroche, position, tolerance, sources);
+  const trouve = accrocher(terrain.accroche, position, tolerance, avecToutesLesLignes(terrain.accroche, sources));
   if (!trouve) {
-    const quoi = { point: 'aucun point du projet', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[terrain.accroche];
+    const quoi = { point: 'aucun point du projet', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', croisement: 'aucun croisement de lignes', centre: 'aucun cercle' }[terrain.accroche];
     afficherMessage(`${quoi[0].toUpperCase()}${quoi.slice(1)} sous le doigt`, 3000);
     return;
   }
@@ -3854,7 +3928,13 @@ function guiderVersChoix(choix) {
 // calage { x, y, est, nord, nom, actif }) }. candidat (0.104.0) : le point touché sur le plan, montré par une
 // croix, pas encore validé ({ sorte: 'dxf' ou 'cale', x, y, nom }) ; « Valider » le prend en compte. Pendant le recalage, ce plan est montré tel qu'il a été lu.
 // Étapes écrites (0.92.0) : voir recalage/barre.js.
-const recalage = { planId: null, accroche: 'sommet', choix: null, candidat: null, accrocheCale: 'point', taper: false, paires: [], zoomLoupe: 4, etapeLoupe: null };
+const recalage = { planId: null, accroche: 'sommet', choix: null, candidat: null, accrocheCale: 'point', taper: false, paires: [], zoomLoupe: 4, etapeLoupe: null, methode: 'points', axes: null };
+
+// Calage par axes (0.152.0, Expert) : lignes du plan à caler et lignes calées ({ a, b } : points
+// { x, y } du plan / { est, nord } MN95), échelle, 180°, façon (« ligne » touchée ou « points »).
+function axesVides() {
+  return { lignesPlan: [], lignesCalees: [], echelle: 1, tourne: false, facon: 'ligne', premier: null, miseEchelle: null };
+}
 
 /** Plan PDF : 'image' (scanné), 'traits' (vectoriel), sinon null (DXF). */
 const sortePdf = (plan) => (plan?.pdf ? (plan.pdf.image ? 'image' : 'traits') : null);
@@ -3875,6 +3955,8 @@ function commencerRecalage(id) {
   recalage.choix = null;
   recalage.candidat = null;
   recalage.paires = (choisi.recalage?.paires ?? []).map((p) => ({ ...p }));
+  recalage.methode = choisi.recalage?.axes && aAcces('expert') ? 'axes' : 'points';
+  recalage.axes = axesVides();
   // Accroche « Manuel » (0.130.0) : seulement pour un plan PDF ; d'office pour un PDF scanné.
   recalage.etapeLoupe = null;
   if (sortePdf(choisi) === 'image') recalage.accroche = 'manuel';
@@ -3941,6 +4023,41 @@ function commencerRecalage(id) {
     },
     validerCandidat: validerCandidatRecalage,
     appliquer: appliquerRecalage,
+    // --- Calage par axes (0.152.0, Expert) ---
+    choisirMethode: (methode) => {
+      recalage.methode = methode === 'axes' && aAcces('expert') ? 'axes' : 'points';
+      recalage.candidat = null;
+      montrerRecalage();
+    },
+    choisirFaconAxes: (facon) => {
+      recalage.axes.facon = facon === 'points' ? 'points' : 'ligne';
+      recalage.axes.premier = null;
+      montrerRecalage();
+    },
+    commencerEchelle: () => {
+      recalage.axes.miseEchelle = { points: [] };
+      montrerRecalage();
+    },
+    annulerEchelle: () => {
+      recalage.axes.miseEchelle = null;
+      montrerRecalage();
+    },
+    echelleUn: () => {
+      recalage.axes.echelle = 1;
+      montrerRecalage();
+    },
+    tournerAxes: () => {
+      recalage.axes.tourne = !recalage.axes.tourne;
+      montrerRecalage();
+    },
+    effacerLigneAxes: () => {
+      const { lignesPlan, lignesCalees } = recalage.axes;
+      recalage.axes.premier = null;
+      if (lignesPlan.length > lignesCalees.length) lignesPlan.pop();
+      else lignesCalees.pop();
+      montrerRecalage();
+    },
+    appliquerAxes: appliquerCalageAxes,
     annulerRecalage: () => annulerRecalage(recalage.planId),
     fermer: () => {
       const enregistrees = JSON.stringify(projet.plansDxf.find((p) => p.id === recalage.planId)?.recalage?.paires ?? []);
@@ -3981,6 +4098,8 @@ function montrerRecalage() {
     taper: recalage.taper,
     rx2: recepteurDisponible(),
     paires: recalage.paires,
+    methode: recalage.methode,
+    axes: recalage.axes,
   });
   // Après la barre : la loupe se place au-dessus d'elle (sa hauteur est alors connue).
   montrerLoupe();
@@ -3994,7 +4113,7 @@ function montrerRecalage() {
  */
 function montrerLoupe() {
   const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
-  if (!choisi || !sortePdf(choisi) || recalage.accroche !== 'manuel' || recalage.choix) {
+  if (!choisi || !sortePdf(choisi) || recalage.accroche !== 'manuel' || recalage.choix || recalage.methode === 'axes') {
     plan.loupe.cacher();
     recalage.etapeLoupe = null;
     return;
@@ -4038,6 +4157,10 @@ function groupesDePointsParListe() {
  */
 function toucherPourRecalage(position, tolerance) {
   const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+  if (recalage.methode === 'axes') {
+    toucherPourAxes(choisi, position, tolerance);
+    return;
+  }
   if (!recalage.choix) {
     // « Point » (0.116.0) : un point levé ou de contrôle sert de 1er point (ses coordonnées telles quelles).
     if (recalage.accroche === 'point') {
@@ -4073,7 +4196,7 @@ function toucherPourRecalage(position, tolerance) {
   }
   // Accroche sur un autre DXF (pas celui qu'on recale : il n'est pas encore en MN95).
   const autres = plansDuProjet().filter((p) => p.id !== recalage.planId && p.visible !== false);
-  const trouve = accrocher(recalage.accrocheCale, position, tolerance, sourcesDesPlans(autres, position, tolerance));
+  const trouve = accrocher(recalage.accrocheCale, position, tolerance, avecToutesLesLignes(recalage.accrocheCale, sourcesDesPlans(autres, position, tolerance)));
   if (!trouve) {
     afficherMessage(autres.length > 0 ? 'Rien à accrocher sous le doigt sur un autre DXF' : 'Aucun autre plan DXF dans le projet', 3000);
     return;
@@ -4147,6 +4270,116 @@ function appliquerRecalage() {
   arreterRecalage();
   modifie();
   afficherMessage(`Plan « ${choisi.nom} » recalé`, 3000);
+  requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+}
+
+/**
+ * Calage par axes (0.152.0, Expert) : un toucher prend une ligne (trait touché, ou 2 points l'un après
+ * l'autre) sur le plan à caler ou parmi les lignes déjà calées, selon l'étape (voir etapeAxes) ; ou un
+ * point de la mise à l'échelle.
+ */
+function toucherPourAxes(choisi, position, tolerance) {
+  const axes = recalage.axes;
+  const etape = etapeAxes(axes);
+  const surLePlan = Boolean(axes.miseEchelle) || etape.cote === 'plan';
+  if (!axes.miseEchelle && etape.numero === 5) return;
+  // Lignes et accroches : sur le plan à caler (tel qu'il a été lu), ou déjà en MN95 (autres plans DXF
+  // montrés, levés, dessins, points du projet).
+  const autres = () => plansDuProjet().filter((p) => p.id !== recalage.planId && p.visible !== false);
+  const accrocherPoint = () => {
+    const mode = surLePlan ? recalage.accroche : recalage.accrocheCale;
+    if (mode === 'point') return accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() });
+    if (mode === 'manuel') return { est: position.est, nord: position.nord };
+    const sources = surLePlan ? sourcesDesPlans([choisi], position, tolerance) : avecToutesLesLignes('croisement', sourcesDesPlans(autres(), position, tolerance));
+    return accrocher(mode, position, tolerance, sources);
+  };
+  if (axes.miseEchelle) {
+    const point = accrocherPoint();
+    if (!point) {
+      afficherMessage('Rien à accrocher sous le doigt sur le plan à caler', 3000);
+      return;
+    }
+    axes.miseEchelle.points.push({ x: point.est, y: point.nord });
+    sonValidation();
+    if (axes.miseEchelle.points.length < 2) {
+      montrerRecalage();
+      return;
+    }
+    const [p1, p2] = axes.miseEchelle.points;
+    const longueur = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    demanderTexte({ titre: 'Distance réelle entre les 2 points (m)', valeur: longueur.toFixed(3) }).then((texte) => {
+      const distance = texte == null ? null : lireNombreTape(texte);
+      const echelle = distance == null ? null : echelleParDeuxPoints(p1, p2, distance);
+      axes.miseEchelle = null;
+      if (texte != null && !echelle) afficherMessage('Distance illisible : un nombre de mètres plus grand que 0', 4000);
+      if (echelle) {
+        axes.echelle = echelle;
+        afficherMessage(`Échelle du plan : ${echelle.toFixed(6)}`, 3000);
+      }
+      montrerRecalage();
+    });
+    return;
+  }
+  let ligne = null;
+  if (axes.facon === 'points') {
+    const point = accrocherPoint();
+    if (!point) {
+      afficherMessage(surLePlan ? 'Rien à accrocher sous le doigt sur le plan à caler' : 'Rien à accrocher sous le doigt (autre plan, levé, point)', 3000);
+      return;
+    }
+    const p = surLePlan ? { x: point.est, y: point.nord } : { est: point.est, nord: point.nord };
+    if (!axes.premier) {
+      axes.premier = p;
+      sonValidation();
+      montrerRecalage();
+      return;
+    }
+    ligne = { a: axes.premier, b: p };
+    axes.premier = null;
+  } else {
+    const lignes = surLePlan
+      ? sourcesDesPlans([choisi], position, tolerance).lignes
+      : avecToutesLesLignes('croisement', sourcesDesPlans(autres(), position, tolerance)).lignes;
+    const trouve = accrocherTrait(position, tolerance, lignes);
+    if (!trouve) {
+      afficherMessage(surLePlan ? 'Aucun trait sous le doigt sur le plan à caler' : 'Aucune ligne calée sous le doigt (autre plan, levé, dessin)', 3000);
+      return;
+    }
+    const a = trouve.sommets[trouve.segment];
+    const b = trouve.sommets[trouve.segment + 1];
+    ligne = surLePlan ? { a: { x: a.est, y: a.nord }, b: { x: b.est, y: b.nord } } : { a: { est: a.est, nord: a.nord }, b: { est: b.est, nord: b.nord } };
+  }
+  (surLePlan ? axes.lignesPlan : axes.lignesCalees).push(ligne);
+  sonValidation();
+  vibrer(60);
+  montrerRecalage();
+  // Plan à caler loin de la Suisse (pas encore en MN95) : la vue passe d'un côté à l'autre.
+  if (choisi && !estEnMn95(choisi.bornes) && etapeAxes(axes).numero < 5) {
+    if (surLePlan) {
+      const calees = autres();
+      const points = pointsDuProjet();
+      requestAnimationFrame(() => (calees.length > 0 ? plan.cadrerSurPlans(calees) : points.length > 0 && plan.cadrerSur(points, 10)));
+    } else requestAnimationFrame(() => plan.cadrerSurPlans([choisi]));
+  }
+}
+
+/** « Appliquer » du calage par axes : mêmes paramètres qu'un recalage par points (Helmert). */
+function appliquerCalageAxes() {
+  const choisi = projet.plansDxf.find((p) => p.id === recalage.planId);
+  const { lignesPlan, lignesCalees, echelle, tourne } = recalage.axes;
+  const r = calageParAxes(lignesPlan, lignesCalees, { echelle, tourne });
+  if (!choisi || r.erreur) return;
+  const { a, b, tEst, tNord, rotation, ecartAngle } = r;
+  choisi.recalage = {
+    paires: [],
+    axes: { lignesPlan, lignesCalees, echelle, tourne, ecartAngle },
+    parametres: { a, b, tEst, tNord, echelle, rotation },
+    applique: true,
+    le: new Date().toISOString(),
+  };
+  arreterRecalage();
+  modifie();
+  afficherMessage(`Plan « ${choisi.nom} » calé par axes`, 3000);
   requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
 }
 
@@ -4226,7 +4459,7 @@ const cadastreAutour = creerCadastreAutour({
 // contrôler et valider : { est, nord, altitude }) }. Le plan ne bouge pas : une croix montre le
 // point, on vérifie, on donne son nom, puis « Valider ».
 const pointage = { actif: false, accroche: 'sommet', choix: null };
-const ACCROCHES_POINTAGE = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre']];
+const ACCROCHES_POINTAGE = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['centre', 'Centre']];
 
 /** Début du pointage : une barre sur le plan (accroche, Terminé) ; sur téléphone, on va au plan. */
 function commencerPointage() {
@@ -4291,9 +4524,9 @@ function dessinerBarrePointage() {
 
 /** Toucher du plan pendant le pointage : le point accroché est montré (croix), à valider. */
 function toucherPourPointage(position, tolerance) {
-  const trouve = accrocher(pointage.accroche, position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance));
+  const trouve = accrocher(pointage.accroche, position, tolerance, avecToutesLesLignes(pointage.accroche, sourcesDesPlans(plansDuProjet(), position, tolerance)));
   if (!trouve) {
-    const quoi = { sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', centre: 'Aucun cercle' }[pointage.accroche];
+    const quoi = { sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[pointage.accroche];
     afficherMessage(`${quoi} sous le doigt`, 3000);
     return;
   }
@@ -4418,9 +4651,9 @@ function toucherPourAjout(position, tolerance) {
   const sources = ajoutLevee.accroche === 'point'
     ? { lignes: [], cercles: [], points: pointsDuProjet() }
     : sourcesDesPlans(plansDuProjet(), position, tolerance);
-  const trouve = accrocher(ajoutLevee.accroche, position, tolerance, sources);
+  const trouve = accrocher(ajoutLevee.accroche, position, tolerance, avecToutesLesLignes(ajoutLevee.accroche, sources));
   if (!trouve) {
-    const quoi = { point: 'Aucun point du projet', sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', centre: 'Aucun cercle' }[ajoutLevee.accroche];
+    const quoi = { point: 'Aucun point du projet', sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[ajoutLevee.accroche];
     afficherMessage(`${quoi} sous le doigt`, 3000);
     return;
   }
@@ -4956,6 +5189,7 @@ function donneesCommunes() {
     recepteur: recepteurDisponible(),
     ajoutActif: ajoutLevee.actif,
     controle: terrain,
+    deltaSurface, // 0.152.0 : delta Z de la surface (Implanter › Surface)
     // Mode Lame : surfaces (terrassement d'abord), surface suivie, tolérances, 2e RX2 connecté ?
     lame: {
       surfaces: [...projet.surfaces].sort((a, b) => Number(['terrassement', 'surface'].includes(b.nature)) - Number(['terrassement', 'surface'].includes(a.nature))).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
@@ -4966,6 +5200,10 @@ function donneesCommunes() {
       recepteur2: Boolean(etatRecepteur2?.connecte),
       recepteursBull: terrain.lame.recepteursBull,
       unGnss: outilAUnGnss(),
+      vue: terrain.lame.vue,
+      deltaSurface,
+      coupeSeule: terrain.lame.coupeSeule,
+      marges: terrain.lame.marges,
       outil: terrain.lame.outils[['bull', 'rateau'].includes(terrain.lame.machine) ? terrain.lame.machine : 'grader'],
     },
     autocontrole: donneesAutocontrole(),
@@ -5099,7 +5337,9 @@ function calculerControle(etat, orientation) {
   const position = etat.connecte && etat.recu ? etat.position : null;
   if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
 
-  const altitudeSurface = altitudeSurSurface(triangles, position.est, position.nord);
+  const altitudeBase = altitudeSurSurface(triangles, position.est, position.nord);
+  const delta = aAcces('intermediaire') ? deltaSurface : 0;
+  const altitudeSurface = altitudeBase == null ? null : altitudeBase + delta;
   const fiable = Boolean(etat.autorise);
   let message = null;
   if (!fiable) message = etat.raison ?? 'Position pas fiable';
@@ -5111,10 +5351,13 @@ function calculerControle(etat, orientation) {
   const coupes = {};
   for (const sens of ['perpendiculaire', 'axe']) {
     const { debut, fin } = extremitesCoupe(position, azimut, terrain.demiLongueur, sens);
+    const base = profilSurface(triangles, debut, fin);
     coupes[sens] = {
       debut,
       fin,
-      lignes: profilSurface(triangles, debut, fin),
+      lignes: decalerProfil(base, delta),
+      lignesBase: delta ? base : null,
+      delta,
       demiLongueur: terrain.demiLongueur,
       altitudeCanne: fiable ? position.altitude : null,
     };
@@ -5570,7 +5813,7 @@ daoAppli = creerDao({
   nouvelId: () => nouvelIdentifiant(),
   accrocher: (mode, position, tolerance) => {
     const sources = mode === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansDuProjet(), position, tolerance);
-    return accrocher(mode, position, tolerance, sources);
+    return accrocher(mode, position, tolerance, avecToutesLesLignes(mode, sources));
   },
   demanderTexte,
   demanderChamps,

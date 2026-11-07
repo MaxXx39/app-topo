@@ -8,12 +8,12 @@
 // Les calculs sont dans topo/recalage.js ; main.js garde l'état et fait les actions.
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
-import { calculerHelmert, rotationLisible, etapeRecalage } from '../topo/recalage.js';
+import { calculerHelmert, rotationLisible, etapeRecalage, calageParAxes } from '../topo/recalage.js';
 
 // Accroches sur le DXF à recaler (étapes impaires) ; « Point » (0.116.0) : un point levé ou de contrôle.
-const ACCROCHES_DXF = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre'], ['point', 'Point']];
+const ACCROCHES_DXF = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['centre', 'Centre'], ['point', 'Point']];
 // Accroches pour la position calée (étapes paires) : point levé ou de contrôle, ou un autre DXF.
-const ACCROCHES_CALE = [['point', 'Point'], ['sommet', 'Sommet DXF'], ['milieu', 'Milieu DXF'], ['ligne', 'Sur ligne DXF'], ['centre', 'Centre DXF']];
+const ACCROCHES_CALE = [['point', 'Point'], ['sommet', 'Sommet DXF'], ['milieu', 'Milieu DXF'], ['ligne', 'Sur ligne DXF'], ['croisement', 'Croisement'], ['centre', 'Centre DXF']];
 
 /**
  * Crée la barre dans "cadre" (le cadre du plan). actions : choisirAccroche(mode), choisirAccrocheCale(mode),
@@ -48,6 +48,21 @@ export function creerBarreRecalage(cadre, actions) {
 
   return {
     afficher(etat) {
+      // 0.152.0 (Expert) : par points (Helmert) ou par axes (2 lignes et 2 lignes calées).
+      const methode = `<div class="ligne-barre-pointage choix-methode-recalage seulement-expert">
+          <button type="button" class="puce-choix ${etat.methode !== 'axes' ? 'actif' : ''}" data-action="choisirMethode" data-valeur="points">Par points</button>
+          <button type="button" class="puce-choix ${etat.methode === 'axes' ? 'actif' : ''}" data-action="choisirMethode" data-valeur="axes">Par axes (2 lignes)</button>
+        </div>`;
+      if (etat.methode === 'axes') {
+        barre.innerHTML = `
+          <div class="ligne-barre-pointage">
+            <span class="titre-pointage">Recaler « ${echapper(etat.nomPlan)} »</span>
+            <button type="button" class="bouton-lien" data-action="fermer">fermer</button>
+          </div>
+          ${methode}
+          ${htmlAxes(etat)}`;
+        return;
+      }
       const helmert = etat.paires.length >= 2 ? calculerHelmert(etat.paires) : null;
       const etape = etapeRecalage(etat.paires.length, Boolean(etat.choix));
       barre.innerHTML = `
@@ -55,6 +70,7 @@ export function creerBarreRecalage(cadre, actions) {
           <span class="titre-pointage">Recaler « ${echapper(etat.nomPlan)} »</span>
           <button type="button" class="bouton-lien" data-action="fermer">fermer</button>
         </div>
+        ${methode}
         ${texteEtape(etape, etat.accroche === 'manuel')}
         ${etape.sorte === 'dxf' ? accrochesDxf(etat) : positionCalee(etat)}
         ${pointTouche(etat.candidat)}
@@ -181,4 +197,70 @@ function parametres(helmert) {
     Rotation ${gon.toFixed(4)} gon (${degres.toFixed(4)}°) · Échelle ${helmert.echelle.toFixed(6)} (${ppm >= 0 ? '+' : ''}${ppm.toFixed(0)} ppm)
     ${helmert.ecartType != null ? `<br />Écart-type ${formaterNombre(helmert.ecartType)} m` : '<br />2 points : solution exacte (pas de contrôle)'}
   </p>`;
+}
+
+// --- Calage par axes (0.152.0, Expert) -----------------------------------------------------------
+// Étapes : 1. ligne 1 sur le plan à caler ; 2. la même ligne en MN95 ; 3. ligne 2 sur le plan ;
+// 4. la même ligne en MN95 ; ensuite le résultat. Une ligne : touchée (un trait), ou entre 2 points.
+// Avant, si besoin : mise à l'échelle (2 points du plan et leur distance réelle).
+
+/** Étape du calage par axes : { numero (1 à 4, ou 5 = prêt), cote ('plan' ou 'cale'), rang (1 ou 2) }. */
+export function etapeAxes(axes) {
+  const n = axes.lignesPlan.length + axes.lignesCalees.length;
+  if (n >= 4) return { numero: 5, cote: null, rang: null };
+  return { numero: n + 1, cote: n % 2 === 0 ? 'plan' : 'cale', rang: Math.floor(n / 2) + 1 };
+}
+
+function htmlAxes(etat) {
+  const { axes } = etat;
+  const etape = etapeAxes(axes);
+  const puce = (action, cle, titre, actif) => `<button type="button" class="puce-choix ${actif ? 'actif' : ''}" data-action="${action}" data-valeur="${cle}">${titre}</button>`;
+  // Mise à l'échelle en cours : 2 points sur le plan à caler, puis la distance.
+  if (axes.miseEchelle) {
+    const n = axes.miseEchelle.points.length;
+    return `<p class="etape-recalage etape-dxf"><span class="numero-etape">Mise à l'échelle</span>Touche le ${n === 0 ? '1er' : '2e'} point sur le plan à caler (puis tu tapes leur distance réelle)</p>
+      ${accrochesDxf(etat)}
+      <div class="ligne-barre-pointage"><button type="button" class="bouton-lien" data-action="annulerEchelle">annuler la mise à l'échelle</button></div>`;
+  }
+  const echelle = `<div class="ligne-barre-pointage">
+      <span>Échelle ${axes.echelle.toFixed(6)}</span>
+      <button type="button" class="bouton-secondaire" data-action="commencerEchelle">Mettre à l'échelle</button>
+      ${axes.echelle !== 1 ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="echelleUn">échelle 1</button>' : ''}
+    </div>`;
+  const faite = (l) => (l ? '✓' : '—');
+  const liste = `<p class="aide lignes-axes">Plan : ligne 1 ${faite(axes.lignesPlan[0])} · ligne 2 ${faite(axes.lignesPlan[1])} — calées : ligne 1 ${faite(axes.lignesCalees[0])} · ligne 2 ${faite(axes.lignesCalees[1])}
+      ${axes.lignesPlan.length + axes.lignesCalees.length > 0 ? '<button type="button" class="bouton-lien" data-action="effacerLigneAxes">effacer la dernière</button>' : ''}</p>`;
+  if (etape.numero === 5) {
+    const r = calageParAxes(axes.lignesPlan, axes.lignesCalees, { echelle: axes.echelle, tourne: axes.tourne });
+    const resultat = r.erreur
+      ? `<p class="erreur-recalage">${echapper(r.erreur)}</p>`
+      : (() => {
+        const { gon, degres } = rotationLisible(r.rotation);
+        const ecart = rotationLisible(r.ecartAngle);
+        return `<p class="parametres-recalage">
+          Croisement calé en E ${formaterNombre(r.croisementCale.est)} · N ${formaterNombre(r.croisementCale.nord)}<br />
+          Rotation ${gon.toFixed(4)} gon (${degres.toFixed(4)}°) · Échelle ${r.echelle.toFixed(6)}<br />
+          <strong>Écart d'angle de la ligne 2 : ${ecart.gon.toFixed(4)} gon (${ecart.degres.toFixed(3)}°)</strong>
+        </p>`;
+      })();
+    return `<p class="etape-recalage etape-dxf"><span class="numero-etape">Résultat</span>Calé sur la ligne 1 ; la ligne 2 sert de contrôle. Vérifie, puis « Appliquer ».</p>
+      ${echelle}${liste}${resultat}
+      <div class="ligne-barre-pointage">
+        <button type="button" class="bouton-secondaire" data-action="tournerAxes">Tourner de 180°</button>
+        <button type="button" class="bouton" data-action="appliquerAxes" ${r.erreur ? 'disabled' : ''}>Appliquer</button>
+        <button type="button" class="bouton-lien" data-action="annulerRecalage">annuler le recalage</button>
+      </div>`;
+  }
+  const texte = etape.cote === 'plan'
+    ? `Ligne ${etape.rang} sur le plan à caler : ${axes.facon === 'points' ? `touche ${axes.premier ? 'le 2e point' : 'le 1er point'}` : 'touche un trait'}`
+    : `La même ligne ${etape.rang} déjà calée (autre plan, levé, dessin) : ${axes.facon === 'points' ? `touche ${axes.premier ? 'le 2e point' : 'le 1er point'}` : 'touche un trait'}`;
+  const accroches = axes.facon === 'points'
+    ? (etape.cote === 'plan' ? accrochesDxf(etat) : `<div class="ligne-barre-pointage">${ACCROCHES_CALE.map(([cle, titre]) => puce('choisirAccrocheCale', cle, titre, etat.accrocheCale === cle)).join('')}</div>`)
+    : '';
+  return `<p class="etape-recalage etape-${etape.cote === 'plan' ? 'dxf' : 'cale'}"><span class="numero-etape">Étape ${etape.numero} / 4</span>${texte}</p>
+    <div class="ligne-barre-pointage">${puce('choisirFaconAxes', 'ligne', 'Toucher une ligne', axes.facon !== 'points')}${puce('choisirFaconAxes', 'points', 'Ligne entre 2 points', axes.facon === 'points')}</div>
+    ${accroches}
+    ${etape.numero === 1 ? echelle : ''}
+    ${liste}
+    <div class="ligne-barre-pointage"><button type="button" class="bouton-lien" data-action="annulerRecalage">annuler le recalage</button></div>`;
 }

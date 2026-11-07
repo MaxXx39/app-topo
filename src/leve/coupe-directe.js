@@ -43,11 +43,11 @@ export function valeursGrille(debut, fin, pas) {
  * - titre, gauche, droite : textes (ex. « Perpendiculaire », « gauche », « droite »)
  * - grille : vrai pour la grille grise en longueur et en hauteur (Expert)
  */
-export function svgCoupeDirecte({ lignes, demiLongueur, altitudeCanne, classe, exageration = 1, sens = '', titre, gauche, droite, grille = false }) {
+export function svgCoupeDirecte({ lignes, lignesBase = null, delta = 0, demiLongueur, altitudeCanne, classe, exageration = 1, sens = '', titre, gauche, droite, grille = false }) {
   const longueur = 2 * demiLongueur;
   const largeurUtile = LARGEUR - MARGES.gauche - MARGES.droite;
   const pixelsParMetre = (largeurUtile / longueur) * (exageration === 2 ? 2 : 1);
-  const altitudes = [...lignes.flat().map((p) => p.altitude), ...(altitudeCanne != null ? [altitudeCanne] : [])];
+  const altitudes = [...lignes.flat().map((p) => p.altitude), ...(lignesBase ?? []).flat().map((p) => p.altitude), ...(altitudeCanne != null ? [altitudeCanne] : [])];
 
   // Hauteur du dessin : celle du relief à cette échelle, entre le minimum et le maximum.
   const bas0 = altitudes.length > 0 ? Math.min(...altitudes) - MARGE_ALTITUDE : 0;
@@ -90,6 +90,10 @@ export function svgCoupeDirecte({ lignes, demiLongueur, altitudeCanne, classe, e
     })
     .join('');
 
+  // Delta Z (0.152.0) : la surface de base en gris pointillé, sous la surface décalée.
+  const base = (lignesBase ?? []).map((ligne) => `<polyline points="${ligne.map((p) => `${x(p.distance).toFixed(1)},${y(p.altitude).toFixed(1)}`).join(' ')}" class="profil-base" />`).join('');
+  const texteDelta = delta ? `<text x="${LARGEUR - MARGES.droite}" y="26" class="cote texte-delta-surface" text-anchor="end">Δ ${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(3)} m</text>` : '';
+
   // Le récepteur au milieu : trait vertical (sa position) et bout de canne (au bord s'il sort du dessin).
   const milieu = x(demiLongueur);
   let canne = `<line x1="${milieu}" y1="${MARGES.haut}" x2="${milieu}" y2="${yBas}" class="axe-canne" />`;
@@ -108,7 +112,8 @@ export function svgCoupeDirecte({ lignes, demiLongueur, altitudeCanne, classe, e
     <line x1="${MARGES.gauche}" y1="${yBas}" x2="${LARGEUR - MARGES.droite}" y2="${yBas}" class="base-coupe" />
     <text x="${milieu}" y="${hauteur - 4}" class="cote" text-anchor="middle">${demiLongueur} m | ${demiLongueur} m</text>
     ${traitsGrille}
-    <g clip-path="url(#${cadre})">${profils}</g>
+    ${texteDelta}
+    <g clip-path="url(#${cadre})">${base}${profils}</g>
     ${canne}
   </svg>`;
 }

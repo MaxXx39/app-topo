@@ -1,7 +1,7 @@
 // Tests des exports (CSV, échelle du plan imprimé).
 import { describe, it, expect } from 'vitest';
 import { genererCsv } from '../src/export/csv.js';
-import { choisirEchelle, barreEchellePapier, choisirFormat, miseEnPage } from '../src/export/echelle.js';
+import { choisirEchelle, barreEchellePapier, choisirFormat, miseEnPage, feuillePrevue } from '../src/export/echelle.js';
 import { disposerPhotos } from '../src/export/pdf.js';
 import { pointsDeReference, surfaceDeReference, volumeDeReference, STOCKS_REFERENCE } from './outils.js';
 
@@ -322,5 +322,21 @@ describe('dessins dans le PDF', async () => {
     ];
     const { document } = await creerPdf({ stocks: [], resultats: [], points: [], cartouche: {}, dessins: [{ ferme: true, lignes: true, points }] });
     expect(document.output()).toContain('BAT1-2');
+  });
+});
+
+describe('feuillePrevue (0.152.0) : papier et échelle annoncés avant l\'export', () => {
+  const zone = { estMin: 0, estMax: 59, nordMin: 0, nordMax: 91 };
+  it('tout auto : A4, échelle la plus détaillée qui tient', () => {
+    expect(feuillePrevue(zone, {})).toEqual({ format: 'a4', orientation: 'paysage', echelle: 1000, depasse: false });
+  });
+  it('échelle choisie : la plus petite feuille où le plan tient', () => {
+    expect(feuillePrevue(zone, { echelleImposee: 500 }).format).toBe('a3');
+  });
+  it('papier choisi : l\'échelle qui tient sur ce papier', () => {
+    expect(feuillePrevue(zone, { papier: 'a3' }).echelle).toBe(500);
+  });
+  it('sans zone : rien', () => {
+    expect(feuillePrevue(null, {})).toBeNull();
   });
 });

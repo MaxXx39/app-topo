@@ -1,6 +1,6 @@
 // Tests de l'implantation d'un point : accroche (sommet, milieu, sur la ligne, centre), guidage, écarts.
 import { describe, it, expect } from 'vitest';
-import { accrocherTrait, accrocher, projeterSurSegment, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, sourcesDesPlans, csvImplantations, cibleSelonDistance, ecartsGuidage, couleurCanne } from '../src/topo/accroche.js';
+import { accrocherTrait, accrocher, projeterSurSegment, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, sourcesDesPlans, csvImplantations, cibleSelonDistance, ecartsGuidage, couleurCanne, croisementSegments } from '../src/topo/accroche.js';
 
 const p = (est, nord, altitude = null) => ({ est, nord, altitude });
 // Une ligne en L : (0,0) → (10,0) → (10,10), et une chambre de rayon 0.4 en (5, 5).
@@ -184,5 +184,33 @@ describe('cibles et sens du guidage', () => {
     expect(rx2.nordEnHaut).toBe(false);
     expect(ecartsGuidage(g, 'nseo')).toMatchObject({ haut: 3, droite: 4, nordEnHaut: true });
     expect(ecartsGuidage(guidage(p(0, 0), p(4, 3)), 'rx2')).toMatchObject({ haut: 3, droite: 4, nordEnHaut: true });
+  });
+});
+
+describe('accroche « croisement » de 2 lignes (0.152.0)', () => {
+  const p = (est, nord, altitude = 400) => ({ est, nord, altitude });
+  // Une croix : ligne est-ouest et ligne nord-sud qui se croisent en (10, 10).
+  const lignes = [
+    { points: [p(0, 10), p(20, 10)], ferme: false },
+    { points: [p(10, 0), p(10, 20)], ferme: false },
+  ];
+  it('trouve le croisement près du doigt, sans altitude', () => {
+    expect(accrocher('croisement', { est: 10.3, nord: 9.8 }, 0.5, { lignes })).toEqual({ est: 10, nord: 10, altitude: null, mode: 'croisement' });
+  });
+  it('rien si le croisement est trop loin du doigt', () => {
+    expect(accrocher('croisement', { est: 12, nord: 10 }, 0.5, { lignes })).toBeNull();
+  });
+  it('deux segments qui se suivent dans une ligne ne comptent pas (sommet)', () => {
+    const coin = [{ points: [p(0, 0), p(10, 0), p(10, 10)], ferme: false }];
+    expect(accrocher('croisement', { est: 10, nord: 0 }, 0.5, { lignes: coin })).toBeNull();
+  });
+  it('une ligne qui se recoupe elle-même compte', () => {
+    const boucle = [{ points: [p(0, 0), p(10, 10), p(10, 0), p(0, 10)], ferme: false }];
+    const r = accrocher('croisement', { est: 5, nord: 5.2 }, 0.5, { lignes: boucle });
+    expect(r.est).toBeCloseTo(5, 9);
+    expect(r.nord).toBeCloseTo(5, 9);
+  });
+  it('croisementSegments : parallèles = null', () => {
+    expect(croisementSegments(p(0, 0), p(10, 0), p(0, 1), p(10, 1))).toBeNull();
   });
 });

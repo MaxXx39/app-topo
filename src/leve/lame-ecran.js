@@ -34,6 +34,8 @@ const pourcent = (valeur) => {
 
 // Les deux coupes : [clé, titre, nom du bout de gauche, nom du bout de droite].
 const COUPES = [['gd', 'Coupe G – D', 'G', 'D'], ['long', 'Coupe Arr – Av', 'Arr', 'Av']];
+// Vues du Guidage (0.152.0, choisies dans ⚙) : [clé, titre].
+const VUES = [['plan1', 'Plan + 1 coupe'], ['plan2', 'Plan + 2 coupes'], ['coupes', '2 coupes sans plan']];
 
 /**
  * Écran (sans les nombres en direct). donnees : { surfaces: [{ id, etiquette }], surfaceId,
@@ -58,16 +60,35 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) 
     : '';
   const bords = unGnss
     ? `<p class="titre-choix">Depuis le bas du GNSS jusqu'au bord ${machine === 'rateau' ? 'du râteau' : 'de la lame'}</p>
-        ${champOutil('gauche', 'Gauche')}${champOutil('droite', 'Droite')}`
+        ${champOutil('gauche', 'Gauche')}${champOutil('droite', 'Droite')}${machine === 'rateau' ? `${champOutil('avant', 'Avant')}${champOutil('arriere', 'Arrière')}` : ''}`
     : '<button type="button" class="bouton-secondaire" data-action="inverserLame" title="Inverser gauche et droite">⇄ Inverser G / D</button>';
+  const vue = ['plan1', 'plan2', 'coupes'].includes(donnees.vue) ? donnees.vue : 'plan2';
+  const coupeSeule = donnees.coupeSeule === 'long' ? 'long' : 'gd';
+  const marges = donnees.marges ?? { gauche: 1, droite: 1, devant: 2, derriere: 2 };
+  const puce = (action, cle, titre, actif) => `<button type="button" class="puce-choix ${actif ? 'actif' : ''}" data-action="${action}" data-valeur="${cle}" aria-pressed="${actif}">${titre}</button>`;
+  const champMarge = (cle, titre) => `<label>${titre} <input type="text" inputmode="decimal" data-marge-lame="${cle}" value="${Number(marges[cle] ?? 0).toFixed(1)}" /> m</label>`;
   const reglages = `<div class="reglages-lame-tous">
+      <div class="reglages-outil">
+        <p class="titre-choix">Vue</p>
+        ${VUES.map(([cle, titre]) => puce('choisirVueLame', cle, titre, vue === cle)).join('')}
+        ${vue === 'plan1' ? `<span class="aide">coupe :</span>${puce('choisirCoupeLame', 'gd', 'G – D', coupeSeule === 'gd')}${puce('choisirCoupeLame', 'long', 'Arr – Av', coupeSeule === 'long')}` : ''}
+      </div>
       ${nombreGnss}
       <div class="reglages-outil">${bords}</div>
       <div class="reglages-outil">
-        <p class="titre-choix">Coupes (depuis ${unGnss ? 'le GNSS' : 'la ligne des GNSS'})</p>
+        <p class="titre-choix">Axes (depuis ${unGnss ? 'le GNSS' : 'la ligne des GNSS'})</p>
         ${champOutil('axe', 'Axe G – D', machine === 'rateau' ? 'milieu' : '0.000')}
         <span class="aide">− derrière, + devant</span>
-        ${champOutil('avant', 'Avant')}${champOutil('arriere', 'Arrière')}
+        ${machine === 'rateau' ? '' : `${champOutil('avant', 'Point Av')}${champOutil('arriere', 'Point Arr')}`}
+      </div>
+      <div class="reglages-outil">
+        <p class="titre-choix">Longueur des coupes au-delà de l'outil</p>
+        ${champMarge('gauche', 'Gauche')}${champMarge('droite', 'Droite')}${champMarge('devant', 'Devant')}${champMarge('derriere', 'Derrière')}
+      </div>
+      <div class="reglages-outil">
+        <label>Δ Z surface <input type="text" inputmode="decimal" data-champ="delta-surface" value="${donnees.deltaSurface ? Number(donnees.deltaSurface).toFixed(3) : ''}" placeholder="0.000" /> m</label>
+        <button type="button" class="bouton-secondaire" data-action="deltaSurfaceZero" ${donnees.deltaSurface ? '' : 'disabled'}>0</button>
+        <span class="aide">+ plus haut</span>
       </div>
       <div class="reglages-lame">
         <label>Vert ≤ <input type="text" inputmode="decimal" data-tolerance-lame="vert" value="${cm(tolerances.vert)}" /> cm</label>
@@ -92,26 +113,26 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) 
     ${reglagesOuverts ? reglages : ''}
     ${donnees.recepteur2 || unGnss ? '' : '<button type="button" class="bouton-secondaire bouton-recepteur-2" data-action="ouvrirRecepteur">Connecter le 2e GNSS</button>'}
     <p class="raison-lame" data-vivant="lame-raison" hidden></p>
-    ${COUPES.map(([cle, titre]) => `<section class="bloc-coupe-guidage" data-coupe="${cle}">
-        <div class="tete-coupe-guidage">
-          <div class="ecart-coupe attente" data-vivant="lame-${cle}-gauche"></div>
-          <span class="titre-coupe-guidage">${titre}</span>
-          <div class="ecart-coupe attente" data-vivant="lame-${cle}-droite"></div>
-        </div>
+    <div class="coupes-guidage vue-${vue}">
+      ${COUPES.filter(([cle]) => vue !== 'plan1' || cle === coupeSeule).map(([cle, titre]) => `<section class="bloc-coupe-guidage" data-coupe="${cle}">
+        <p class="titre-coupe-guidage">${titre}</p>
         <div class="corps-coupe-guidage">
           <div class="colonne-regle" data-vivant="lame-${cle}-regle-gauche">${htmlRegleHauteur(null)}</div>
+          <div class="indic-coupe gauche attente" data-vivant="lame-${cle}-gauche"></div>
           <div class="coupe-guidage" data-vivant="lame-${cle}-coupe"></div>
+          <div class="indic-coupe droite attente" data-vivant="lame-${cle}-droite"></div>
           <div class="colonne-regle" data-vivant="lame-${cle}-regle-droite">${htmlRegleHauteur(null)}</div>
         </div>
         <p class="pied-coupe-guidage" data-vivant="lame-${cle}-pied"></p>
       </section>`).join('')}
+    </div>
   </div>`;
 }
 
-/** Petite flèche monter (vers le haut) ou descendre (vers le bas), en SVG. */
-function petiteFleche(ecart) {
+/** Triangle pointe en haut (monter) ou en bas (descendre), en SVG (0.152.0, à côté de la règle). */
+function triangle(ecart) {
   const haut = ecart >= 0;
-  return `<svg class="fleche-coupe" viewBox="0 0 40 48" aria-hidden="true"><path d="${haut ? 'M20 2 38 24H27V46H13V24H2Z' : 'M20 46 38 24H27V2H13V24H2Z'}" /></svg>`;
+  return `<svg class="triangle-coupe" viewBox="0 0 40 36" aria-hidden="true"><path d="${haut ? 'M20 2 38 34H2Z' : 'M20 34 38 2H2Z'}" /></svg>`;
 }
 
 /**
@@ -130,15 +151,24 @@ export function rafraichirLame(conteneur, vivant) {
   const donnees = { gd: { guidage: g, coupe: vivant.coupe }, long: { guidage: g ? vivant.long : null, coupe: vivant.coupeLong } };
   for (const [cle, , nomGauche, nomDroite] of COUPES) {
     const { guidage, coupe } = donnees[cle];
+    if (!zone(`lame-${cle}-coupe`)) continue; // vue à une seule coupe
     for (const [cote, nom] of [['gauche', nomGauche], ['droite', nomDroite]]) {
       const point = guidage?.[cote];
       const element = zone(`lame-${cle}-${cote}`);
-      element.className = `ecart-coupe ${point?.classe ? `ecart-${point.classe}` : 'attente'}`;
-      element.innerHTML = `<span class="nom-bout">${nom}</span>${point?.ecart != null ? petiteFleche(point.ecart) : ''}<strong>${point ? texteCm(point.ecart) : '—'}</strong>`;
+      // 0.152.0 : triangle en haut (pointe en haut = monter), valeur en bas, nom du bout dessous.
+      element.className = `indic-coupe ${cote} ${point?.classe ? `ecart-${point.classe}` : 'attente'}`;
+      element.innerHTML = `${point?.ecart != null ? triangle(point.ecart) : '<span class="triangle-vide"></span>'}
+        <strong>${point?.ecart != null ? (Math.abs(point.ecart) * 100).toFixed(1) : '—'}</strong>
+        <span class="unite-coupe">${point?.ecart != null ? 'cm' : (point ? 'hors' : '')}</span>
+        <span class="nom-bout">${nom}</span>`;
       // Règle de hauteur (0.107.0) : à gauche du bout gauche, à droite du bout droit.
       zone(`lame-${cle}-regle-${cote}`).innerHTML = htmlRegleHauteur(point?.ecart ?? null, vivant.toleranceVert ?? 0.02);
     }
-    zone(`lame-${cle}-coupe`).innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite]) : '';
+    // Hauteur du dessin selon la vue (0.152.0) : plus haute sans plan, plus étroite à 2 coupes côte à côte.
+    const cadre = zone(`lame-${cle}-coupe`);
+    const vue = cadre.closest('.coupes-guidage')?.classList;
+    const hauteur = vue?.contains('vue-coupes') ? 230 : vue?.contains('vue-plan2') ? 220 : 150;
+    cadre.innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite], hauteur) : '';
   }
   // Sous la coupe G – D : dévers (et écart au centre d'un outil à 1 GNSS), bords de la surface.
   const fleche = (e) => (e == null ? '' : e >= 0 ? '↑ ' : '↓ ');
@@ -147,11 +177,13 @@ export function rafraichirLame(conteneur, vivant) {
     const b = g ? vivant.bords?.[cote] : null;
     return b ? `<span class="${b.distance < 0 ? 'hors' : ''}">${cote === 'gauche' ? '◂ bord' : 'bord ▸'} ${b.distance < 0 ? '−' : ''}${Math.abs(b.distance).toFixed(2)} m</span>` : '';
   };
-  zone('lame-gd-pied').innerHTML = g
+  const piedGd = zone('lame-gd-pied');
+  if (piedGd) piedGd.innerHTML = g
     ? `${bord('gauche')}<span>${centre}Dévers <strong>${pourcent(g.devers)}</strong> · voulu <strong>${pourcent(g.deversVoulu)}</strong></span>${bord('droite')}`
     : '';
   const l = g ? vivant.long : null;
-  zone('lame-long-pied').innerHTML = l
+  const piedLong = zone('lame-long-pied');
+  if (piedLong) piedLong.innerHTML = l
     ? `<span>Pente vers l'avant <strong>${pourcent(l.devers)}</strong> · voulue <strong>${pourcent(l.deversVoulu)}</strong></span>`
     : '';
 }
@@ -162,21 +194,22 @@ export function rafraichirLame(conteneur, vivant) {
  * deux bouts (de la couleur du plus grand écart). Hauteurs agrandies pour voir les centimètres.
  * coupe : voir topo/lame.js coupeEntre ; guidage : { gauche, droite } (classes) ; noms : [gauche, droite].
  */
-export function svgCoupeGuidage(coupe, guidage, noms) {
+export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140) {
   const largeur = 300;
-  const hauteur = 140;
   const marge = 12;
-  const { longueur, morceaux, troncons, ruptures, a, b } = coupe;
-  const altitudes = [a.altitude, b.altitude, ...morceaux.flat().map((p) => p.altitude)].filter((z) => z != null);
+  const { longueur, morceaux, troncons, ruptures, a, b, morceauxBase = null, delta = 0 } = coupe;
+  const altitudes = [a.altitude, b.altitude, ...morceaux.flat().map((p) => p.altitude), ...(morceauxBase ?? []).flat().map((p) => p.altitude)].filter((z) => z != null);
   const bas = Math.min(...altitudes);
   const haut = Math.max(...altitudes);
   const milieu = (bas + haut) / 2;
   const etendue = Math.max(0.2, haut - bas) * 1.4;
   const x = (d) => marge + (d / longueur) * (largeur - 2 * marge);
   const y = (z) => hauteur / 2 - ((z - milieu) / etendue) * (hauteur - 2 * marge - 16);
-  const surface = morceaux
-    .map((m) => `<path class="surface-coupe-lame" d="M${m.map((p) => `${x(p.distance).toFixed(1)} ${y(p.altitude).toFixed(1)}`).join('L')}" />`)
-    .join('');
+  const trace = (m) => `M${m.map((p) => `${x(p.distance).toFixed(1)} ${y(p.altitude).toFixed(1)}`).join('L')}`;
+  // Delta Z (0.152.0) : surface de base en gris pointillé, surface décalée en brun.
+  const base = (morceauxBase ?? []).map((m) => `<path class="profil-base" d="${trace(m)}" />`).join('');
+  const surface = base + morceaux.map((m) => `<path class="surface-coupe-lame" d="${trace(m)}" />`).join('');
+  const texteDelta = delta ? `<text x="4" y="11" class="note-coupe-lame texte-delta-surface">Δ ${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(3)} m</text>` : '';
   // Pente du projet au milieu de chaque tronçon assez long à l'écran, sous la ligne.
   const altitudeA = (d) => {
     const m = morceaux.find((k) => k[0].distance <= d && k.at(-1).distance >= d) ?? [];
@@ -209,5 +242,6 @@ export function svgCoupeGuidage(coupe, guidage, noms) {
     <text x="${xa.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">${noms[0]}</text>
     <text x="${xb.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">${noms[1]}</text>
     <text x="${largeur - 4}" y="11" text-anchor="end" class="note-coupe-lame">hauteurs agrandies</text>
+    ${texteDelta}
   </svg>`;
 }

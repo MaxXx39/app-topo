@@ -3,7 +3,7 @@
 // - papier choisi, échelle auto : l'échelle la plus détaillée qui tient sur ce papier ;
 // - échelle choisie, papier auto : la plus petite feuille (A4 → A0) où le plan tient.
 // Paysage au départ.
-import { ECHELLES, ORDRE_PAPIERS } from './echelle.js';
+import { ECHELLES, ORDRE_PAPIERS, feuillePrevue } from './echelle.js';
 
 /** Champs « Papier », « Orientation » et « Échelle » (HTML). */
 export function champsMiseEnPage() {
@@ -55,4 +55,33 @@ export function resumeMiseEnPage({ papier, orientation, echelleImposee }) {
 /** Ce qui a été fait, mis en évidence : « A3 paysage · échelle 1:500 ». */
 export function texteFeuille(format, orientation, echelle) {
   return `${String(format).toUpperCase()} ${orientation ?? 'paysage'} · échelle 1:${echelle}`;
+}
+
+/**
+ * Ligne « PDF : A3 paysage · échelle 1:500 » au-dessus du bouton Exporter (0.152.0) : refaite à
+ * chaque changement (papier, orientation, échelle, choix) et quand le formulaire devient visible.
+ * prevoir() renvoie la zone du terrain de la première feuille, ou null.
+ */
+export function brancherFeuillePrevue(conteneur, prevoir, estPdf) {
+  const ligne = conteneur.querySelector('[data-zone="feuille-prevue"]');
+  if (!ligne) return () => {};
+  const mettreAJour = () => {
+    if (!estPdf() || !ligne.isConnected) return;
+    let zone = null;
+    try {
+      zone = prevoir();
+    } catch {
+      zone = null;
+    }
+    const f = feuillePrevue(zone, lireMiseEnPage(conteneur));
+    ligne.classList.toggle('depasse', Boolean(f?.depasse));
+    ligne.textContent = f ? `PDF : ${texteFeuille(f.format, f.orientation, f.echelle)}${f.depasse ? ' · le plan dépasse la feuille' : ''}` : 'PDF : rien à dessiner (coche un levé, un volume…)';
+  };
+  conteneur.addEventListener('change', () => setTimeout(mettreAJour, 0));
+  conteneur.addEventListener('click', () => setTimeout(mettreAJour, 0));
+  // Formulaire montré (onglet Exporter ouvert, tuile choisie) : recalculé.
+  new IntersectionObserver((entrees) => {
+    if (entrees.some((e) => e.isIntersecting)) mettreAJour();
+  }).observe(ligne);
+  return mettreAJour;
 }

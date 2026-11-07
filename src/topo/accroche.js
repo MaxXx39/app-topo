@@ -6,10 +6,12 @@
 // - 'sommet'  : le sommet (ou l'extrémité) de ligne le plus proche du doigt, et les points du plan DXF ;
 // - 'milieu'  : le milieu du segment de ligne touché ;
 // - 'ligne'   : l'endroit de la ligne le plus proche du doigt (projection sur le segment) ;
-// - 'centre'  : le centre du cercle touché (sur le cercle ou dedans).
+// - 'centre'  : le centre du cercle touché (sur le cercle ou dedans) ;
+// - 'croisement' (0.152.0, tous les modes) : le croisement de 2 lignes le plus proche du doigt, sans
+//   altitude (demande du 07.11 : « aucune »).
 // Coordonnées MN95 Est, Nord (m) ; altitude (m) ou null si inconnue (plan en 2D).
 
-export const MODES_ACCROCHE = ['point', 'sommet', 'milieu', 'ligne', 'centre'];
+export const MODES_ACCROCHE = ['point', 'sommet', 'milieu', 'ligne', 'croisement', 'centre'];
 
 /**
  * Cherche le point accroché près de "position" ({ est, nord }), à moins de "tolerance" m.
@@ -45,6 +47,11 @@ export function accrocher(mode, position, tolerance, { lignes = [], cercles = []
     return meilleur ? { est: meilleur.p.est, nord: meilleur.p.nord, altitude: meilleur.p.altitude ?? null, mode, nom: meilleur.nom } : null;
   }
 
+  if (mode === 'croisement') {
+    const trouve = croisementProche(position, tolerance, lignes);
+    return trouve ? { est: trouve.est, nord: trouve.nord, altitude: null, mode } : null;
+  }
+
   // 'milieu' et 'ligne' : le segment le plus proche du doigt.
   let meilleur = null;
   for (const ligne of lignes) {
@@ -62,6 +69,59 @@ export function accrocher(mode, position, tolerance, { lignes = [], cercles = []
   const { a, b } = meilleur;
   const altitude = a.altitude != null && b.altitude != null ? a.altitude + (b.altitude - a.altitude) * t : null;
   return { est: a.est + (b.est - a.est) * t, nord: a.nord + (b.nord - a.nord) * t, altitude, mode };
+}
+
+/**
+ * Croisement de deux segments a-b et c-d (plan, Est / Nord) : { est, nord } ou null s'ils ne se
+ * croisent pas (parallèles, ou croisement hors des segments).
+ */
+export function croisementSegments(a, b, c, d) {
+  const rx = b.est - a.est;
+  const ry = b.nord - a.nord;
+  const sx = d.est - c.est;
+  const sy = d.nord - c.nord;
+  const det = rx * sy - ry * sx;
+  if (Math.abs(det) < 1e-12) return null;
+  const t = ((c.est - a.est) * sy - (c.nord - a.nord) * sx) / det;
+  const u = ((c.est - a.est) * ry - (c.nord - a.nord) * rx) / det;
+  const marge = 1e-9;
+  if (t < -marge || t > 1 + marge || u < -marge || u > 1 + marge) return null;
+  return { est: a.est + rx * t, nord: a.nord + ry * t };
+}
+
+/**
+ * Croisement de 2 lignes le plus proche de "position", à moins de "tolerance" m (lignes : comme
+ * accrocher). Deux segments qui se suivent dans la même ligne (ils se touchent à leur sommet) ne
+ * comptent pas : c'est un sommet, pas un croisement. Renvoie { est, nord, d } ou null.
+ */
+export function croisementProche(position, tolerance, lignes = []) {
+  // Segments près du doigt seulement (le croisement est à moins de "tolerance" du doigt).
+  const proches = [];
+  lignes.forEach((ligne, l) => {
+    const sommets = ligne.points;
+    const nombre = ligne.ferme ? sommets.length : sommets.length - 1;
+    for (let i = 0; i < nombre; i++) {
+      const a = sommets[i];
+      const b = sommets[(i + 1) % sommets.length];
+      if (projeterSurSegment(position, a, b).d <= tolerance) proches.push({ a, b, l, i, n: nombre, ferme: ligne.ferme });
+    }
+  });
+  let meilleur = null;
+  for (let j = 0; j < proches.length; j++) {
+    for (let k = j + 1; k < proches.length; k++) {
+      const s1 = proches[j];
+      const s2 = proches[k];
+      if (s1.l === s2.l) {
+        const ecart = Math.abs(s1.i - s2.i);
+        if (ecart === 1 || (s1.ferme && ecart === s1.n - 1)) continue; // segments voisins
+      }
+      const x = croisementSegments(s1.a, s1.b, s2.a, s2.b);
+      if (!x) continue;
+      const d = Math.hypot(x.est - position.est, x.nord - position.nord);
+      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { ...x, d };
+    }
+  }
+  return meilleur;
 }
 
 /**
