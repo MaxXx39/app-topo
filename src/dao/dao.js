@@ -17,7 +17,7 @@ const ACTIONS_DAO = [
 ];
 // Étape 3 (0.149.0) : outils topo sur les objets choisis.
 const OUTILS_TOPO_DAO = [['deltaz', 'Delta Z'], ['pente', 'Décaler + pente'], ['projeter', 'Projeter sur surface'], ['entre', 'Z début / fin'], ['plat', '2D']];
-const ACCROCHES_DAO = [['libre', 'Libre'], ['point', 'Point'], ['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre']];
+const ACCROCHES_DAO = [['libre', 'Libre'], ['point', 'Point'], ['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['centre', 'Centre']];
 
 /**
  * Crée la DAO. d : { cadre (élément du plan où poser la barre), projet() (projet ouvert),

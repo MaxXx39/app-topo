@@ -11,9 +11,9 @@ import { formaterNombre } from '../topo/format.js';
 import { calculerHelmert, rotationLisible, etapeRecalage } from '../topo/recalage.js';
 
 // Accroches sur le DXF à recaler (étapes impaires) ; « Point » (0.116.0) : un point levé ou de contrôle.
-const ACCROCHES_DXF = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre'], ['point', 'Point']];
+const ACCROCHES_DXF = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['centre', 'Centre'], ['point', 'Point']];
 // Accroches pour la position calée (étapes paires) : point levé ou de contrôle, ou un autre DXF.
-const ACCROCHES_CALE = [['point', 'Point'], ['sommet', 'Sommet DXF'], ['milieu', 'Milieu DXF'], ['ligne', 'Sur ligne DXF'], ['centre', 'Centre DXF']];
+const ACCROCHES_CALE = [['point', 'Point'], ['sommet', 'Sommet DXF'], ['milieu', 'Milieu DXF'], ['ligne', 'Sur ligne DXF'], ['croisement', 'Croisement'], ['centre', 'Centre DXF']];
 
 /**
  * Crée la barre dans "cadre" (le cadre du plan). actions : choisirAccroche(mode), choisirAccrocheCale(mode),

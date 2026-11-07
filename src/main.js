@@ -2461,9 +2461,9 @@ function toucherPourDessin(position, tolerance) {
     const lignesDessins = projet.dessins.filter((d) => d.type !== 'points' && d.sommets.length >= 2).map((d) => ({ points: d.sommets, ferme: estFerme(d) && d.sommets.length >= 3 }));
     sources = { ...dxf, lignes: [...dxf.lignes, ...lignesDessins] };
   }
-  const trouve = accrocher(accroche, position, tolerance, sources);
+  const trouve = accrocher(accroche, position, tolerance, avecToutesLesLignes(accroche, sources));
   if (!trouve) {
-    const quoi = { point: 'aucun point', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[accroche];
+    const quoi = { point: 'aucun point', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', croisement: 'aucun croisement de lignes', centre: 'aucun cercle' }[accroche];
     afficherMessage(`${quoi[0].toUpperCase()}${quoi.slice(1)} sous le doigt`, 3000);
     return;
   }
@@ -3769,6 +3769,16 @@ function lignesDesLeves() {
   return lignes;
 }
 
+/**
+ * Accroche « Croisement » (0.152.0) : toutes les lignes comptent (plans DXF montrés, lignes de rupture
+ * et contours des levés montrés, côtés des dessins) ; ajoutées aux sources d'une autre accroche.
+ */
+function avecToutesLesLignes(mode, sources) {
+  if (mode !== 'croisement') return sources;
+  const dessins = dessinsVisibles().filter((d) => d.type !== 'points' && d.sommets.length >= 2).map((d) => ({ points: d.sommets, ferme: estFerme(d) && d.sommets.length >= 3 }));
+  return { ...sources, lignes: [...(sources.lignes ?? []), ...lignesDesLeves(), ...dessins] };
+}
+
 /** Toucher du plan pendant l'implantation d'une ligne : une ligne du DXF, ou un point de plus. */
 function toucherPourLigne(position, tolerance) {
   const mm = (p) => ({ ...p, est: Math.round(p.est * 1000) / 1000, nord: Math.round(p.nord * 1000) / 1000, altitude: p.altitude != null ? Math.round(p.altitude * 1000) / 1000 : null });
@@ -3809,7 +3819,7 @@ function toucherPourLigne(position, tolerance) {
     const sources = terrain.accrocheLigne === 'point'
       ? { lignes: [], cercles: [], points: pointsDuProjet() }
       : sourcesDesPlans(plansDuProjet(), position, tolerance);
-    const trouve = accrocher(terrain.accrocheLigne, position, tolerance, sources);
+    const trouve = accrocher(terrain.accrocheLigne, position, tolerance, avecToutesLesLignes(terrain.accrocheLigne, sources));
     if (!trouve) {
       afficherMessage('Rien sous le doigt', 3000);
       return;
@@ -3890,9 +3900,9 @@ function toucherPourImplantation(position, tolerance) {
   const sources = terrain.accroche === 'point'
     ? { lignes: [], cercles: [], points: pointsDuProjet() }
     : sourcesDesPlans(plansDuProjet(), position, tolerance);
-  const trouve = accrocher(terrain.accroche, position, tolerance, sources);
+  const trouve = accrocher(terrain.accroche, position, tolerance, avecToutesLesLignes(terrain.accroche, sources));
   if (!trouve) {
-    const quoi = { point: 'aucun point du projet', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', centre: 'aucun cercle' }[terrain.accroche];
+    const quoi = { point: 'aucun point du projet', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', croisement: 'aucun croisement de lignes', centre: 'aucun cercle' }[terrain.accroche];
     afficherMessage(`${quoi[0].toUpperCase()}${quoi.slice(1)} sous le doigt`, 3000);
     return;
   }
@@ -4137,7 +4147,7 @@ function toucherPourRecalage(position, tolerance) {
   }
   // Accroche sur un autre DXF (pas celui qu'on recale : il n'est pas encore en MN95).
   const autres = plansDuProjet().filter((p) => p.id !== recalage.planId && p.visible !== false);
-  const trouve = accrocher(recalage.accrocheCale, position, tolerance, sourcesDesPlans(autres, position, tolerance));
+  const trouve = accrocher(recalage.accrocheCale, position, tolerance, avecToutesLesLignes(recalage.accrocheCale, sourcesDesPlans(autres, position, tolerance)));
   if (!trouve) {
     afficherMessage(autres.length > 0 ? 'Rien à accrocher sous le doigt sur un autre DXF' : 'Aucun autre plan DXF dans le projet', 3000);
     return;
@@ -4290,7 +4300,7 @@ const cadastreAutour = creerCadastreAutour({
 // contrôler et valider : { est, nord, altitude }) }. Le plan ne bouge pas : une croix montre le
 // point, on vérifie, on donne son nom, puis « Valider ».
 const pointage = { actif: false, accroche: 'sommet', choix: null };
-const ACCROCHES_POINTAGE = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['centre', 'Centre']];
+const ACCROCHES_POINTAGE = [['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['centre', 'Centre']];
 
 /** Début du pointage : une barre sur le plan (accroche, Terminé) ; sur téléphone, on va au plan. */
 function commencerPointage() {
@@ -4355,9 +4365,9 @@ function dessinerBarrePointage() {
 
 /** Toucher du plan pendant le pointage : le point accroché est montré (croix), à valider. */
 function toucherPourPointage(position, tolerance) {
-  const trouve = accrocher(pointage.accroche, position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance));
+  const trouve = accrocher(pointage.accroche, position, tolerance, avecToutesLesLignes(pointage.accroche, sourcesDesPlans(plansDuProjet(), position, tolerance)));
   if (!trouve) {
-    const quoi = { sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', centre: 'Aucun cercle' }[pointage.accroche];
+    const quoi = { sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[pointage.accroche];
     afficherMessage(`${quoi} sous le doigt`, 3000);
     return;
   }
@@ -4482,9 +4492,9 @@ function toucherPourAjout(position, tolerance) {
   const sources = ajoutLevee.accroche === 'point'
     ? { lignes: [], cercles: [], points: pointsDuProjet() }
     : sourcesDesPlans(plansDuProjet(), position, tolerance);
-  const trouve = accrocher(ajoutLevee.accroche, position, tolerance, sources);
+  const trouve = accrocher(ajoutLevee.accroche, position, tolerance, avecToutesLesLignes(ajoutLevee.accroche, sources));
   if (!trouve) {
-    const quoi = { point: 'Aucun point du projet', sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', centre: 'Aucun cercle' }[ajoutLevee.accroche];
+    const quoi = { point: 'Aucun point du projet', sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[ajoutLevee.accroche];
     afficherMessage(`${quoi} sous le doigt`, 3000);
     return;
   }
@@ -5644,7 +5654,7 @@ daoAppli = creerDao({
   nouvelId: () => nouvelIdentifiant(),
   accrocher: (mode, position, tolerance) => {
     const sources = mode === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansDuProjet(), position, tolerance);
-    return accrocher(mode, position, tolerance, sources);
+    return accrocher(mode, position, tolerance, avecToutesLesLignes(mode, sources));
   },
   demanderTexte,
   demanderChamps,
