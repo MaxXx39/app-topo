@@ -38,7 +38,7 @@ import { creerEcranExportMesures } from './export/ecran-mesures.js';
 import { creerModuleExport } from './export/module.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
-import { profilSurface } from './topo/coupe.js';
+import { profilSurface, decalerProfil } from './topo/coupe.js';
 import { guidageLame, TOLERANCES_LAME, pointDeProfil, bordsDeLaLame, sensCoupeLame, pointsGuidageLame, coupeEntre } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
@@ -1421,6 +1421,21 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       choisirMachine: (machine) => {
         terrain.lame.machine = ['bull', 'rateau'].includes(machine) ? machine : 'grader';
         retenirReglagesTerrain();
+        recalculer();
+      },
+      // Delta Z de la surface (0.152.0) : tapé (m, + = plus haut) ou remis à 0.
+      reglerDeltaSurface: (texte) => {
+        const valeur = String(texte ?? '').trim() === '' ? 0 : lireNombreTape(texte);
+        if (valeur == null || !Number.isFinite(valeur) || Math.abs(valeur) > 50) {
+          afficherMessage('Delta Z illisible : un nombre de mètres entre −50 et 50, par exemple 0.250 ou −0.100', 4000);
+          recalculer();
+          return;
+        }
+        deltaSurface = valeur;
+        recalculer();
+      },
+      deltaSurfaceZero: () => {
+        deltaSurface = 0;
         recalculer();
       },
       // Vue du Guidage et coupe montrée (0.152.0, dans ⚙).
@@ -3132,6 +3147,10 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
   },
 });
 
+// Delta Z de la surface (0.152.0, dès Intermédiaire) : la surface suivie est montée (+) ou descendue
+// (−) de ce décalage, en Implanter › Surface et en Guidage ; jamais enregistré : 0 à chaque démarrage.
+let deltaSurface = 0;
+
 // --- Guidage de lame à 2 RX2 (Terrain › Lame, voir topo/lame.js et leve/lame-ecran.js) ---
 
 // Recherche rapide de l'altitude de la surface suivie (refaite quand ses triangles changent).
@@ -3196,7 +3215,8 @@ function calculerOutilUnGnss() {
   const resultat = guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite, contour: machine === 'rateau' ? points.coins : null });
   if (resultat.guidage) {
     // Écart au centre de l'outil (même formule qu'un coin : altitude de la surface − altitude du point).
-    const surfaceCentre = chercheurLame.chercher(points.centre.est, points.centre.nord);
+    const surfaceBase = chercheurLame.chercher(points.centre.est, points.centre.nord);
+    const surfaceCentre = surfaceBase == null ? null : surfaceBase + deltaSurface;
     resultat.guidage.centre = { ecart: surfaceCentre == null ? null : surfaceCentre - points.centre.altitude };
   }
   return { ...resultat, unGnss: true };
@@ -3227,22 +3247,34 @@ function reglagesOutilLame() {
 function guidageDesPoints(points, triangles, coins) {
   if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
   const tolerances = terrain.lame.tolerances;
-  const guidage = guidageLame({ gauche: points.gauche, droite: points.droite, altitudeSurface: chercheurLame.chercher, tolerances });
+  // Delta Z de la surface (0.152.0) : la surface suivie est décalée ; la surface de base reste sur les coupes.
+  const delta = deltaSurface;
+  const altitudeSurface = delta ? (est, nord) => {
+    const z = chercheurLame.chercher(est, nord);
+    return z == null ? null : z + delta;
+  } : chercheurLame.chercher;
+  const guidage = guidageLame({ gauche: points.gauche, droite: points.droite, altitudeSurface, tolerances });
   if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coins };
   // Arr – Av : mêmes calculs, l'arrière à gauche ; le « dévers » est alors la pente vers l'avant.
-  const long = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface: chercheurLame.chercher, tolerances });
+  const long = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface, tolerances });
   // Coupes : l'outil + 1 m à gauche / droite et 2 m devant / derrière au départ (0.152.0).
   const marges = terrain.lame.marges;
   return {
     raison: null,
     guidage,
     long: long.erreur ? null : long,
-    coupe: coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]),
-    coupeLong: long.erreur ? null : coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]),
+    coupe: coupeDecalee(coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]), delta),
+    coupeLong: long.erreur ? null : coupeDecalee(coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]), delta),
     coins,
     bords: bordsDeLaLame(points.gauche, points.droite, triangles),
     toleranceVert: tolerances.vert,
   };
+}
+
+/** Coupe du Guidage avec la surface décalée de "delta" (m) ; la surface de base gardée à part. */
+function coupeDecalee(coupe, delta) {
+  if (!coupe || !delta) return coupe;
+  return { ...coupe, morceauxBase: coupe.morceaux, morceaux: decalerProfil(coupe.morceaux, delta), delta };
 }
 
 /**
@@ -4988,6 +5020,7 @@ function donneesCommunes() {
     recepteur: recepteurDisponible(),
     ajoutActif: ajoutLevee.actif,
     controle: terrain,
+    deltaSurface, // 0.152.0 : delta Z de la surface (Implanter › Surface)
     // Mode Lame : surfaces (terrassement d'abord), surface suivie, tolérances, 2e RX2 connecté ?
     lame: {
       surfaces: [...projet.surfaces].sort((a, b) => Number(['terrassement', 'surface'].includes(b.nature)) - Number(['terrassement', 'surface'].includes(a.nature))).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
@@ -4999,6 +5032,7 @@ function donneesCommunes() {
       recepteursBull: terrain.lame.recepteursBull,
       unGnss: outilAUnGnss(),
       vue: terrain.lame.vue,
+      deltaSurface,
       coupeSeule: terrain.lame.coupeSeule,
       marges: terrain.lame.marges,
       outil: terrain.lame.outils[['bull', 'rateau'].includes(terrain.lame.machine) ? terrain.lame.machine : 'grader'],
@@ -5134,7 +5168,9 @@ function calculerControle(etat, orientation) {
   const position = etat.connecte && etat.recu ? etat.position : null;
   if (!position) return { message: etat.connecte ? 'En attente de la position…' : 'Récepteur non connecté' };
 
-  const altitudeSurface = altitudeSurSurface(triangles, position.est, position.nord);
+  const altitudeBase = altitudeSurSurface(triangles, position.est, position.nord);
+  const delta = aAcces('intermediaire') ? deltaSurface : 0;
+  const altitudeSurface = altitudeBase == null ? null : altitudeBase + delta;
   const fiable = Boolean(etat.autorise);
   let message = null;
   if (!fiable) message = etat.raison ?? 'Position pas fiable';
@@ -5146,10 +5182,13 @@ function calculerControle(etat, orientation) {
   const coupes = {};
   for (const sens of ['perpendiculaire', 'axe']) {
     const { debut, fin } = extremitesCoupe(position, azimut, terrain.demiLongueur, sens);
+    const base = profilSurface(triangles, debut, fin);
     coupes[sens] = {
       debut,
       fin,
-      lignes: profilSurface(triangles, debut, fin),
+      lignes: decalerProfil(base, delta),
+      lignesBase: delta ? base : null,
+      delta,
       demiLongueur: terrain.demiLongueur,
       altitudeCanne: fiable ? position.altitude : null,
     };

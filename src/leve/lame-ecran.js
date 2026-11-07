@@ -85,6 +85,11 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) 
         <p class="titre-choix">Longueur des coupes au-delà de l'outil</p>
         ${champMarge('gauche', 'Gauche')}${champMarge('droite', 'Droite')}${champMarge('devant', 'Devant')}${champMarge('derriere', 'Derrière')}
       </div>
+      <div class="reglages-outil">
+        <label>Δ Z surface <input type="text" inputmode="decimal" data-champ="delta-surface" value="${donnees.deltaSurface ? Number(donnees.deltaSurface).toFixed(3) : ''}" placeholder="0.000" /> m</label>
+        <button type="button" class="bouton-secondaire" data-action="deltaSurfaceZero" ${donnees.deltaSurface ? '' : 'disabled'}>0</button>
+        <span class="aide">+ plus haut</span>
+      </div>
       <div class="reglages-lame">
         <label>Vert ≤ <input type="text" inputmode="decimal" data-tolerance-lame="vert" value="${cm(tolerances.vert)}" /> cm</label>
         <label>Orange ≤ <input type="text" inputmode="decimal" data-tolerance-lame="orange" value="${cm(tolerances.orange)}" /> cm</label>
@@ -192,17 +197,19 @@ export function rafraichirLame(conteneur, vivant) {
 export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140) {
   const largeur = 300;
   const marge = 12;
-  const { longueur, morceaux, troncons, ruptures, a, b } = coupe;
-  const altitudes = [a.altitude, b.altitude, ...morceaux.flat().map((p) => p.altitude)].filter((z) => z != null);
+  const { longueur, morceaux, troncons, ruptures, a, b, morceauxBase = null, delta = 0 } = coupe;
+  const altitudes = [a.altitude, b.altitude, ...morceaux.flat().map((p) => p.altitude), ...(morceauxBase ?? []).flat().map((p) => p.altitude)].filter((z) => z != null);
   const bas = Math.min(...altitudes);
   const haut = Math.max(...altitudes);
   const milieu = (bas + haut) / 2;
   const etendue = Math.max(0.2, haut - bas) * 1.4;
   const x = (d) => marge + (d / longueur) * (largeur - 2 * marge);
   const y = (z) => hauteur / 2 - ((z - milieu) / etendue) * (hauteur - 2 * marge - 16);
-  const surface = morceaux
-    .map((m) => `<path class="surface-coupe-lame" d="M${m.map((p) => `${x(p.distance).toFixed(1)} ${y(p.altitude).toFixed(1)}`).join('L')}" />`)
-    .join('');
+  const trace = (m) => `M${m.map((p) => `${x(p.distance).toFixed(1)} ${y(p.altitude).toFixed(1)}`).join('L')}`;
+  // Delta Z (0.152.0) : surface de base en gris pointillé, surface décalée en brun.
+  const base = (morceauxBase ?? []).map((m) => `<path class="profil-base" d="${trace(m)}" />`).join('');
+  const surface = base + morceaux.map((m) => `<path class="surface-coupe-lame" d="${trace(m)}" />`).join('');
+  const texteDelta = delta ? `<text x="4" y="11" class="note-coupe-lame texte-delta-surface">Δ ${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(3)} m</text>` : '';
   // Pente du projet au milieu de chaque tronçon assez long à l'écran, sous la ligne.
   const altitudeA = (d) => {
     const m = morceaux.find((k) => k[0].distance <= d && k.at(-1).distance >= d) ?? [];
@@ -235,5 +242,6 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140) {
     <text x="${xa.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">${noms[0]}</text>
     <text x="${xb.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">${noms[1]}</text>
     <text x="${largeur - 4}" y="11" text-anchor="end" class="note-coupe-lame">hauteurs agrandies</text>
+    ${texteDelta}
   </svg>`;
 }

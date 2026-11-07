@@ -1,6 +1,6 @@
 // Tests des coupes (profils le long d'une ligne).
 import { describe, it, expect } from 'vitest';
-import { profilSurface, longueurCoupe, cotesLongueur, cotesAltitude } from '../src/topo/coupe.js';
+import { profilSurface, longueurCoupe, cotesLongueur, cotesAltitude, decalerProfil } from '../src/topo/coupe.js';
 import { pt, pointsDeReference, volumeDeReference, STOCKS_REFERENCE } from './outils.js';
 
 // Carré de 10 m × 10 m en 2 triangles, en pente : altitude = 100 + Est local (1 m par m).
@@ -119,5 +119,17 @@ describe('grille des coupes en direct (0.90.1)', () => {
     const sans = svgCoupeDirecte({ lignes, demiLongueur: 5, altitudeCanne: 450.5, classe: null, titre: 'A', gauche: 'g', droite: 'd' });
     expect((avec.match(/class="grille-coupe"/g) ?? []).length).toBeGreaterThan(10);
     expect(sans).not.toContain('grille-coupe');
+  });
+});
+
+describe('decalerProfil (0.152.0, delta Z de la surface)', () => {
+  const morceaux = [[{ distance: 0, altitude: 400 }, { distance: 2, altitude: 401 }]];
+  it('ajoute le delta à chaque altitude, sans toucher l\'original', () => {
+    const d = decalerProfil(morceaux, 0.25);
+    expect(d[0].map((p) => p.altitude)).toEqual([400.25, 401.25]);
+    expect(morceaux[0][0].altitude).toBe(400);
+  });
+  it('delta nul : le même profil', () => {
+    expect(decalerProfil(morceaux, 0)).toBe(morceaux);
   });
 });

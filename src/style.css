@@ -11460,3 +11460,7 @@ body.mode-telephone .ecart-coupe strong { font-size: 0.95rem; }
   }
 }
 .vue-coupes .corps-coupe-guidage .regle-hauteur { min-height: 240px; }
+/* 0.152.0 : delta Z de la surface : surface de base en gris pointillé, valeur du delta en orange. */
+svg .profil-base { fill: none; stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 5 4; }
+svg .texte-delta-surface { fill: #c2410c; font-weight: 800; }
+.ligne-delta-surface input { width: 80px; }

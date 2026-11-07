@@ -318,6 +318,7 @@ export function creerEcranLeve(conteneur, actions) {
     else if (cible.dataset.toleranceLame) actions.reglerToleranceLame(cible.dataset.toleranceLame, cible.value);
     else if (cible.dataset.outil) actions.reglerOutil(cible.dataset.outil, cible.value);
     else if (cible.dataset.margeLame) actions.reglerMargeLame(cible.dataset.margeLame, cible.value);
+    else if (cible.dataset.champ === 'delta-surface') actions.reglerDeltaSurface(cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
@@ -577,11 +578,21 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="ligne-choix choix-coupe seulement-intermediaire">${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}
         <button type="button" class="bouton-roue ${reglagesCoupesOuverts ? 'actif' : ''}" data-action="basculerReglagesCoupes" aria-label="Réglages des coupes" aria-expanded="${reglagesCoupesOuverts}">⚙</button></div>
       ${reglagesCoupesOuverts ? `<div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
-      <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>` : ''}
+      <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
+      ${champDeltaSurface(donnees.deltaSurface)}` : ''}
       <div class="coupes-directes vue-${vue}">
         <div data-vivant="coupe-${vue}"></div>
       </div>
       <p class="aide" data-vivant="orientation"></p>`;
+  }
+
+  /** Delta Z de la surface (0.152.0, dès Intermédiaire) : champ (m, + = plus haut) et bouton « 0 ». */
+  function champDeltaSurface(delta) {
+    return `<div class="ligne-choix seulement-intermediaire ligne-delta-surface">
+        <label>Δ Z surface <input type="text" inputmode="decimal" data-champ="delta-surface" value="${delta ? Number(delta).toFixed(3) : ''}" placeholder="0.000" /> m</label>
+        <button type="button" class="bouton-secondaire" data-action="deltaSurfaceZero" ${delta ? '' : 'disabled'}>0</button>
+        <span class="aide">+ plus haut</span>
+      </div>`;
   }
 
   /** Écart monter / descendre en grand, avec la règle de hauteur et le bouton du bip à droite (0.107.0). */
