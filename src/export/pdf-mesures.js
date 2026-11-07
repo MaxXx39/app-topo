@@ -6,7 +6,7 @@
 import { jsPDF } from 'jspdf';
 import { choisirFormat } from './echelle.js';
 import { contenuDesMesures } from './zone-plan.js';
-import { courbesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
+import { courbesDeNiveau, equidistanceAuto, plageAltitudes, estMaitresse } from '../topo/courbes.js';
 import { VALEURS, NOM_TYPE, lignesEtiquette, texteMorceau, placeEtiquetteMesure, couleurDeMesure, rvbDeCouleur } from '../mesures/valeurs.js';
 import {
   appliquerFormat,
@@ -22,6 +22,7 @@ import {
   dessinerPagePhotos,
   PHOTOS_PAR_PAGE,
   trait,
+  ecrireCotesCourbes,
 } from './pdf.js';
 
 // Cases du PDF des mesures, et leur état par défaut.
@@ -141,14 +142,15 @@ function dessinerPlanMesures(doc, mesures, pointsMontres, { versPapier, echelle 
   let equidistance = null;
   if (choix.courbes && triangles.length > 0) {
     const plage = plageAltitudes(triangles);
-    equidistance = equidistanceAuto(plage.min, plage.max);
-    for (const { altitude, a, b } of courbesDeNiveau(triangles, equidistance)) {
-      const rang = altitude / (5 * equidistance);
-      trait(doc, COULEUR_COURBES, Math.abs(rang - Math.round(rang)) < 1e-6 ? 0.25 : 0.1);
+    equidistance = choix.equidistance ?? equidistanceAuto(plage.min, plage.max);
+    const segments = courbesDeNiveau(triangles, equidistance);
+    for (const { altitude, a, b } of segments) {
+      trait(doc, COULEUR_COURBES, estMaitresse(altitude, equidistance) ? 0.35 : 0.1);
       const pa = versPapier(a);
       const pb = versPapier(b);
       doc.line(pa.x, pa.y, pb.x, pb.y);
     }
+    ecrireCotesCourbes(doc, segments, equidistance, versPapier);
   }
 
   // Aires : fond léger de leur couleur, puis contours, lignes de rupture et longueurs en trait plein (0.71.0)

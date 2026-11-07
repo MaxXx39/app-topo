@@ -85,3 +85,6 @@ export function brancherFeuillePrevue(conteneur, prevoir, estPdf) {
   }).observe(ligne);
   return mettreAJour;
 }
+
+// Équidistances des courbes proposées dans les exports PDF (0.154.0, dès Intermédiaire), en m.
+export const EQUIDISTANCES_PDF = ['auto', '0.1', '0.2', '0.25', '0.5', '1', '2', '5'];

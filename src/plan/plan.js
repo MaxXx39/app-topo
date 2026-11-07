@@ -25,7 +25,17 @@ import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
-import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
+import { courbesDeNiveau, bandesDeNiveau, equidistanceAuto, plageAltitudes, estMaitresse, chainerCourbes, cotesDesCourbes, texteCote } from '../topo/courbes.js';
+
+// Cotes des courbes maîtresses (0.154.0) : gardées tant que les triangles et l'équidistance ne changent pas.
+let cacheCotes = { triangles: null, nombre: 0, equidistance: null, cotes: [] };
+function cotesEnCache(triangles, equidistance) {
+  if (cacheCotes.triangles !== triangles[0] || cacheCotes.nombre !== triangles.length || cacheCotes.equidistance !== equidistance) {
+    const maitresses = courbesDeNiveau(triangles, equidistance).filter((s) => estMaitresse(s.altitude, equidistance));
+    cacheCotes = { triangles: triangles[0], nombre: triangles.length, equidistance, cotes: cotesDesCourbes(chainerCourbes(maitresses), 20) };
+  }
+  return cacheCotes.cotes;
+}
 import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, valeurPrincipale, couleurDeMesure } from '../mesures/valeurs.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
 import { ajouterTous } from '../outils/bornes.js';
@@ -1271,6 +1281,24 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (traits.normale.length > 0) groupe.append(creerElement('path', { d: traits.normale.join(' '), class: 'courbe' }));
       if (traits.maitresse.length > 0) {
         groupe.append(creerElement('path', { d: traits.maitresse.join(' '), class: 'courbe maitresse' }));
+      }
+      // Cotes des courbes maîtresses (0.154.0) : altitude tous les 20 m, dans le sens de la courbe ;
+      // calculées une fois par surface / équidistance, seules celles à l'écran sont dessinées (400 au plus).
+      const cotes = cotesEnCache(pourCourbes, equidistance);
+      let nombre = 0;
+      for (const cote of cotes) {
+        const p = versPixels(cote);
+        if (p.x < 0 || p.y < 0 || p.x > vue.largeur || p.y > vue.hauteur) continue;
+        if (++nombre > 400) break;
+        // Angle à l'écran (le plan peut être tourné) : d'après un 2e point 1 m plus loin sur la courbe.
+        const r = (cote.angle * Math.PI) / 180;
+        const q = versPixels({ est: cote.est + Math.cos(r), nord: cote.nord + Math.sin(r) });
+        let tourne = (Math.atan2(q.y - p.y, q.x - p.x) * 180) / Math.PI;
+        if (tourne > 90) tourne -= 180;
+        if (tourne < -90) tourne += 180;
+        const texte = creerElement('text', { x: p.x.toFixed(1), y: p.y.toFixed(1), class: 'cote-courbe', transform: `rotate(${tourne.toFixed(1)} ${p.x.toFixed(1)} ${p.y.toFixed(1)})` });
+        texte.textContent = texteCote(cote.altitude);
+        groupe.append(texte);
       }
     }
 

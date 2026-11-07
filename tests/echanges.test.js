@@ -15,7 +15,11 @@ describe('genererDxf', () => {
 
   it('contient un point, un nom et une altitude par point levé', () => {
     expect(compter('POINT')).toBe(115);
-    expect(compter('TEXT')).toBe(2 * 115);
+    // 0.154.0 : en plus, les cotes des courbes maîtresses (calque COURBES_COTES, compté une fois dans la table).
+    const cotes = compter('COURBES_COTES') - 1;
+    expect(cotes).toBeGreaterThan(0);
+    expect(compter('TEXT')).toBe(2 * 115 + cotes);
+    expect(compter('COURBES_MAITRESSES')).toBeGreaterThan(1);
     expect(compter('ALTITUDES')).toBe(115 + 1); // 115 textes + la définition du calque
     // Altitude du premier point (b1), avec 3 décimales
     const premiere = lignes.indexOf('ALTITUDES', lignes.indexOf('ENTITIES'));

@@ -2,6 +2,7 @@
 // boutons PDF, CSV, DXF et LandXML.
 import { genererCsv } from './csv.js';
 import { genererDxf } from './dxf.js';
+import { EQUIDISTANCES_PDF } from './mise-en-page.js';
 import { brancherFeuillePrevue, champsMiseEnPage, lireMiseEnPage, resumeMiseEnPage, texteFeuille } from './mise-en-page.js';
 import { zonePremiereFeuille } from './zone-plan.js';
 import { ecrireLandXML, geometrieDeSurface } from '../topo/landxml.js';
@@ -69,6 +70,11 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
         <span>Couleurs :</span>
         ${COULEURS.map(([cle, titre, coche]) => `<label class="case"><input type="radio" name="couleurs-pdf" data-couleurs="${cle}" ${coche ? 'checked' : ''} /> ${titre}</label>`).join('')}
       </div>
+<label class="choix-equidistance seulement-intermediaire">Équidistance des courbes
+        <select data-champ="equidistance-pdf">
+          ${EQUIDISTANCES_PDF.map((e) => `<option value="${e}">${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
+        </select>
+      </label>
       <label class="choix-equidistance">Palier déblai / remblai
         <select data-champ="palier">
           ${PALIERS.map((e) => `<option value="${e}">${e === 'auto' ? 'auto' : `${e} m`}</option>`).join('')}
@@ -175,6 +181,9 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
         calques.couleurs = couleurs === 'couleurs';
         calques.photoAttenuee = true;
         calques.palier = champ('palier').value;
+        // 0.154.0 : équidistance des courbes (auto ou choisie, dès Intermédiaire).
+        const equidistance = conteneur.querySelector('[data-champ="equidistance-pdf"]')?.value ?? 'auto';
+        if (equidistance !== 'auto') calques.equidistance = Number(equidistance);
         const { document, echelle, format, orientation, messageFond } = await creerPdf({
           stocks,
           resultats,
