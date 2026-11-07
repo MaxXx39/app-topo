@@ -172,6 +172,13 @@ describe('coupes G – D et Arr – Av (0.151.0)', () => {
     expect(c.troncons[0].pente).toBeCloseTo(2, 6);
   });
 
+  it('marges différentes avant / après (0.152.0)', () => {
+    const c = coupeEntre([], gauche, droite, [2, 0.5]);
+    expect(c.longueur).toBeCloseTo(6.5, 9);
+    expect(c.a.distance).toBe(2);
+    expect(c.b.distance).toBeCloseTo(6, 9);
+  });
+
   it('pas de coupe si les deux points sont au même endroit', () => {
     expect(coupeEntre([], gauche, gauche)).toBeNull();
   });

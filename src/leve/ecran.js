@@ -317,6 +317,7 @@ export function creerEcranLeve(conteneur, actions) {
     else if (cible.dataset.champ === 'surface-lame') actions.choisirSurfaceLame(cible.value);
     else if (cible.dataset.toleranceLame) actions.reglerToleranceLame(cible.dataset.toleranceLame, cible.value);
     else if (cible.dataset.outil) actions.reglerOutil(cible.dataset.outil, cible.value);
+    else if (cible.dataset.margeLame) actions.reglerMargeLame(cible.dataset.margeLame, cible.value);
     else if (cible.dataset.reglageLigne) actions.reglerLigne(cible.dataset.reglageLigne, cible.value);
     else if (cible.dataset.reglageTalus) actions.reglerTalus(cible.dataset.reglageTalus, cible.value);
     else if (cible.dataset.champ === 'remarque-controle') actions.remarqueControle(cible.dataset.id, cible.value);
@@ -1538,6 +1539,8 @@ export function creerEcranLeve(conteneur, actions) {
     document.body.classList.toggle('avec-accroches', avecAccroches);
     document.body.classList.toggle('accroches-ouvertes', avecAccroches && accrochesOuvertes);
     if (!enGuidage || (!autocontrole && implantation !== 'point')) document.body.classList.remove('cible-en-haut');
+    // Guidage (0.152.0) : vue « 2 coupes sans plan » : le plan est caché.
+    document.body.classList.toggle('guidage-sans-plan', donnees.mode === 'lame' && donnees.lame?.vue === 'coupes');
     let contenu;
     if (enGuidage) contenu = vueImplantation();
     else if (autocontrole) contenu = htmlControle(donnees.autocontrole, { gestionOuverte: gestionControleOuverte, erreurGestion });

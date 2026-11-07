@@ -227,6 +227,12 @@ terrain.lame.recepteursBull = terrain.lame.recepteursBull === 1 ? 1 : 2;
 terrain.lame.outils = { rateau: { gauche: 0, droite: 0, avant: 0, arriere: 0 }, bull: { gauche: 0, droite: 0, avant: 0, arriere: 0 }, ...(terrain.lame.outils ?? {}) };
 // 0.151.0 : coupe Arr – Av des lames (Grader, Bull) : 1 m devant et 1 m derrière au départ.
 terrain.lame.outils.grader ??= { avant: 1, arriere: 1, axe: 0 };
+// 0.152.0 : vue du Guidage ('plan1' : plan + une coupe ; 'plan2' : plan + 2 coupes côte à côte ;
+// 'coupes' : 2 coupes l'une sous l'autre, sans plan), coupe de la vue 'plan1' ('gd' ou 'long') et
+// longueur des coupes au-delà de l'outil (m) : 1 m à gauche et à droite, 2 m devant et derrière.
+terrain.lame.vue = ['plan1', 'plan2', 'coupes'].includes(terrain.lame.vue) ? terrain.lame.vue : 'plan2';
+terrain.lame.coupeSeule = terrain.lame.coupeSeule === 'long' ? 'long' : 'gd';
+terrain.lame.marges = { gauche: 1, droite: 1, devant: 2, derriere: 2, ...(terrain.lame.marges ?? {}) };
 if (!(terrain.lame.outils.bull.avant > 0) && !(terrain.lame.outils.bull.arriere > 0)) terrain.lame.outils.bull = { ...terrain.lame.outils.bull, avant: 1, arriere: 1 };
 
 /** Vrai si la machine choisie est guidée par un seul GNSS (râteau, ou Bull réglé sur 1 GNSS). */
@@ -1414,6 +1420,30 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       // Machine (0.100.0) : Grader (coupe dans le sens de marche) ou Bull (perpendiculaire à la lame).
       choisirMachine: (machine) => {
         terrain.lame.machine = ['bull', 'rateau'].includes(machine) ? machine : 'grader';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // Vue du Guidage et coupe montrée (0.152.0, dans ⚙).
+      choisirVueLame: (vue) => {
+        terrain.lame.vue = ['plan1', 'plan2', 'coupes'].includes(vue) ? vue : 'plan2';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      choisirCoupeLame: (cle) => {
+        terrain.lame.coupeSeule = cle === 'long' ? 'long' : 'gd';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // Longueur des coupes au-delà de l'outil (m, 0 à 50) : gauche, droite, devant, derrière.
+      reglerMargeLame: (cle, texte) => {
+        if (!['gauche', 'droite', 'devant', 'derriere'].includes(cle)) return;
+        const valeur = String(texte ?? '').trim() === '' ? 0 : lireNombreTape(texte);
+        if (valeur == null || !Number.isFinite(valeur) || valeur < 0 || valeur > 50) {
+          afficherMessage('Longueur illisible : un nombre de mètres entre 0 et 50, par exemple 2', 4000);
+          recalculer();
+          return;
+        }
+        terrain.lame.marges = { ...terrain.lame.marges, [cle]: valeur };
         retenirReglagesTerrain();
         recalculer();
       },
@@ -3201,12 +3231,14 @@ function guidageDesPoints(points, triangles, coins) {
   if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coins };
   // Arr – Av : mêmes calculs, l'arrière à gauche ; le « dévers » est alors la pente vers l'avant.
   const long = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface: chercheurLame.chercher, tolerances });
+  // Coupes : l'outil + 1 m à gauche / droite et 2 m devant / derrière au départ (0.152.0).
+  const marges = terrain.lame.marges;
   return {
     raison: null,
     guidage,
     long: long.erreur ? null : long,
-    coupe: coupeEntre(triangles, points.gauche, points.droite, 1),
-    coupeLong: long.erreur ? null : coupeEntre(triangles, points.arriere, points.avant, 1),
+    coupe: coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]),
+    coupeLong: long.erreur ? null : coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]),
     coins,
     bords: bordsDeLaLame(points.gauche, points.droite, triangles),
     toleranceVert: tolerances.vert,
@@ -4966,6 +4998,9 @@ function donneesCommunes() {
       recepteur2: Boolean(etatRecepteur2?.connecte),
       recepteursBull: terrain.lame.recepteursBull,
       unGnss: outilAUnGnss(),
+      vue: terrain.lame.vue,
+      coupeSeule: terrain.lame.coupeSeule,
+      marges: terrain.lame.marges,
       outil: terrain.lame.outils[['bull', 'rateau'].includes(terrain.lame.machine) ? terrain.lame.machine : 'grader'],
     },
     autocontrole: donneesAutocontrole(),
