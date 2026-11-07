@@ -11,6 +11,7 @@ import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { formaterNombre } from '../topo/format.js';
 import { htmlRegleHauteur } from './regle-hauteur.js';
+import { silhouetteOutil } from './silhouettes.js';
 
 /** Texte d'un écart de coin (m) : « monter 3.2 cm », « descendre 1.0 cm » ; « hors surface ». */
 export function texteEcartLame(ecart) {
@@ -108,7 +109,7 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
     </div>`;
   }
   const nomMachine = { grader: 'Grader', bull: 'Bull', rateau: 'Râteau' }[machine];
-  return `<div class="ecran-lame ${indic === 'regle' ? 'essai-sur-regle' : 'essai-exterieur'} ${machine === 'rateau' ? '' : 'lame-un-point'}">
+  return `<div data-machine="${machine}" class="ecran-lame ${indic === 'regle' ? 'essai-sur-regle' : 'essai-exterieur'} ${machine === 'rateau' ? '' : 'lame-un-point'}">
     <div class="ligne-lame">
       <button type="button" class="bouton-retour-machine" data-action="retourChoixMachine" aria-label="Changer de machine" title="Changer de machine">← <strong>${nomMachine}</strong></button>
       ${surfaces.length > 0
@@ -163,6 +164,22 @@ function htmlLignesSuivies(donnees) {
   </div>`;
 }
 
+/**
+ * Place de la silhouette (0.155.0) : au milieu du trait de l'outil, tournée selon le VRAI dévers (pas
+ * celui des hauteurs agrandies), à la largeur du tranchant, mais jamais plus haute que 70 % de la
+ * coupe ni plus petite que la moitié (un râteau court reste lisible).
+ */
+function placeSilhouette(a, b, x, y, hauteur) {
+  const xa = x(a.distance);
+  const xb = x(b.distance);
+  const pixelsParMetre = Math.abs(xb - xa) / Math.max(1e-6, Math.abs(b.distance - a.distance));
+  const angle = (Math.atan2(-(b.altitude - a.altitude) * pixelsParMetre, xb - xa) * 180) / Math.PI;
+  const yMilieu = (y(a.altitude) + y(b.altitude)) / 2;
+  // La plus haute silhouette fait environ 110 de haut au-dessus du tranchant : elle doit tenir au-dessus.
+  const echelle = Math.max(0.35, Math.min(Math.abs(xb - xa) / 80, (yMilieu - 4) / 110));
+  return { x: (xa + xb) / 2, y: yMilieu, angle, echelle };
+}
+
 /** Triangle pointe en haut (monter) ou en bas (descendre), en SVG (0.152.0, à côté de la règle). */
 function triangle(ecart) {
   const haut = ecart >= 0;
@@ -210,7 +227,8 @@ export function rafraichirLame(conteneur, vivant) {
     const vue = cadre.closest('.coupes-guidage')?.classList;
     const hauteur = vue?.contains('vue-coupes') ? 230 : vue?.contains('vue-plan2') ? 220 : 150;
     const marquesLignes = cle === 'gd' ? (vivant.lignes ?? []).filter((l) => l.surCoupe != null) : [];
-    cadre.innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite], hauteur, marquesLignes) : '';
+    const machine = cadre.closest('.ecran-lame')?.dataset.machine ?? 'grader';
+    cadre.innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite], hauteur, marquesLignes, { machine, vue: cle }) : '';
   }
   // Lignes suivies (0.154.0) : écart en plan, flèche vers la ligne (◀ à gauche, ▶ à droite).
   (g ? vivant.lignes ?? [] : []).forEach((l, i) => {
@@ -244,7 +262,7 @@ export function rafraichirLame(conteneur, vivant) {
  * deux bouts (de la couleur du plus grand écart). Hauteurs agrandies pour voir les centimètres.
  * coupe : voir topo/lame.js coupeEntre ; guidage : { gauche, droite } (classes) ; noms : [gauche, droite].
  */
-export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []) {
+export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = [], outil = null) {
   const largeur = 300;
   const marge = 12;
   const { longueur, morceaux, troncons, ruptures, a, b, morceauxBase = null, delta = 0 } = coupe;
@@ -284,8 +302,10 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []
     // Lame vue de côté (0.153.1) : le terrain et un seul point, le bas de la lame (pas de trait).
     const xc = x(coupe.centre.distance);
     const yc = y(coupe.centre.altitude);
+    // Silhouette de côté (0.155.0) : taille fixe à l'écran (les hauteurs agrandies ne la déforment pas).
+    const machineDeCote = outil ? silhouetteOutil(outil.machine, 'long', { x: xc, y: yc, echelle: Math.max(0.35, Math.min(0.7, (yc - 4) / 110)) }) : '';
     return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-coupe-guidage" role="img" aria-label="Coupe Arr – Av : bas de la lame">
-      ${marques}${surface}${pentes}
+      ${machineDeCote}${marques}${surface}${pentes}
       <circle class="coin-coupe-lame point-lame-${pire}" cx="${xc.toFixed(1)}" cy="${yc.toFixed(1)}" r="6" />
       <text x="6" y="${hauteur - 3}">◂ Arr</text>
       <text x="${largeur - 6}" y="${hauteur - 3}" text-anchor="end">Av ▸</text>
@@ -306,6 +326,7 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []
     })
     .join('');
   return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-coupe-guidage" role="img" aria-label="Coupe ${noms[0]} – ${noms[1]}">
+    ${outil ? silhouetteOutil(outil.machine, outil.vue, placeSilhouette(a, b, x, y, hauteur)) : ''}
     ${marques}
     ${surface}
     ${pentes}

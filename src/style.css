@@ -11526,3 +11526,6 @@ svg .texte-delta-surface { fill: #c2410c; font-weight: 800; }
 .puce-choix.petite { min-height: 32px; padding: 0 8px; font-size: 0.8rem; }
 svg .ligne-suivie-coupe { stroke: #7c3aed; stroke-width: 2.5; stroke-dasharray: 6 4; }
 svg .nom-ligne-coupe { fill: #7c3aed; font-weight: 900; font-size: 11px; }
+/* 0.155.0 : silhouette de la machine dans les coupes du Guidage (gris clair, derrière). */
+svg .silhouette-outil { fill: #94a3b8; opacity: 0.3; pointer-events: none; }
+svg .silhouette-outil .vitre-silhouette { fill: #ffffff; opacity: 0.6; }
