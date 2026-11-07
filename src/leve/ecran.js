@@ -545,16 +545,16 @@ export function creerEcranLeve(conteneur, actions) {
     // Rien de choisi : on le rappelle bien en vue (après « ← », on ne savait plus quoi faire).
     const imp = donnees.implanter;
     if (reglages.implantation === 'point') {
-      const invite = imp.choix ? '' : invitation('Choisis le point à implanter', 'touche-le sur le plan, ou « Liste »');
-      return barreAccroche() + choixImplantation + invite + implanterPoint();
+      const invite = imp.choix ? '' : invitation('Touche un point sur le plan');
+      return choixImplantation + barreAccroche() + invite + implanterPoint();
     }
     if (reglages.implantation === 'ligne') {
-      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Choisis la ligne à implanter', 'touche-la sur le plan, ou ses points un à un');
-      return barreAccroche() + choixImplantation + invite + implanterLigne();
+      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Touche une ligne sur le plan');
+      return choixImplantation + barreAccroche() + invite + implanterLigne();
     }
     if (reglages.implantation === 'talus') {
-      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Choisis la ligne du talus (haut ou bas)', 'touche-la sur le plan, ou ses points un à un');
-      return barreAccroche() + choixImplantation + invite + implanterLigne() + mesTalus() + talusDesSurfaces();
+      const invite = imp.pointsLigne.length > 0 || imp.ligneAValider ? '' : invitation('Touche la ligne du talus sur le plan');
+      return choixImplantation + barreAccroche() + invite + implanterLigne() + mesTalus() + talusDesSurfaces();
     }
     if (reglages.implantation === 'altitude') {
       return `${choixImplantation}
@@ -598,11 +598,11 @@ export function creerEcranLeve(conteneur, actions) {
     return `<button type="button" class="bouton-bip ${actif ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${actif}" title="${actif ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${actif ? 'Couper le bip' : 'Remettre le bip'}">${actif ? '🔔' : '🔕'}</button>`;
   }
 
-  /** Bandeau sarcelle bien visible : ce qu'il faut faire maintenant (flèche vers le plan). */
-  function invitation(titre, detail) {
-    return `<div class="invite-choix" role="status">
+  /** Bandeau sarcelle : ce qu'il faut faire maintenant (flèche vers le plan) ; 0.152.0 : une seule ligne courte. */
+  function invitation(titre) {
+    return `<div class="invite-choix invite-courte" role="status">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6" /></svg>
-      <span><strong>${titre}</strong><span>${detail}</span></span>
+      <strong>${titre}</strong>
     </div>`;
   }
 

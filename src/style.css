@@ -11328,3 +11328,36 @@ body.mode-telephone .ecart-coupe strong { font-size: 0.95rem; }
   color: #991b1b;
 }
 .entete-apercu-pdf { flex-wrap: wrap; }
+
+/* 0.152.0 (essai B validé) : Implanter : la barre d'accroche n'est plus collée sous le plan, elle est
+   dans le cadre, sous Point / Ligne / Surface ; bandeau d'invite sur une seule ligne courte. */
+@media (max-width: 899px) {
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .barre-accroche {
+    position: static;
+    height: auto;
+    margin: 0 0 6px;
+    border: 1px solid var(--bordure);
+    border-radius: 10px;
+    box-shadow: none;
+  }
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .mise-en-page {
+    padding-top: calc(var(--hauteur-plan-terrain) + var(--hauteur-bascule) + 4px);
+  }
+}
+.choix-implantation-type + .barre-accroche {
+  margin-top: 6px;
+}
+.invite-choix.invite-courte {
+  padding: 4px 10px;
+  gap: 8px;
+}
+.invite-choix.invite-courte svg {
+  width: 20px;
+  height: 20px;
+}
+.invite-choix.invite-courte strong {
+  overflow: hidden;
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
