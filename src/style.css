@@ -11496,3 +11496,5 @@ svg .texte-delta-surface { fill: #c2410c; font-weight: 800; }
   color: #1d4ed8;
   font-size: 1.05rem;
 }
+/* 0.153.1 : lame vue de côté : un seul écart (milieu de la lame), le côté droit est caché. */
+.corps-coupe-guidage > .masque { visibility: hidden; }

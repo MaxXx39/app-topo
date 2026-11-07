@@ -39,7 +39,7 @@ import { creerModuleExport } from './export/module.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface, decalerProfil } from './topo/coupe.js';
-import { guidageLame, TOLERANCES_LAME, pointDeProfil, bordsDeLaLame, sensCoupeLame, pointsGuidageLame, coupeEntre } from './topo/lame.js';
+import { guidageLame, TOLERANCES_LAME, pointDeProfil, bordsDeLaLame, sensCoupeLame, pointsGuidageLame, coupeEntre, coupeMilieuLame, avantDeLaLame, classeEcartLame } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
   creerProjet,
@@ -1443,6 +1443,12 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       // Vue du Guidage et coupe montrée (0.152.0, dans ⚙).
       choisirVueLame: (vue) => {
         terrain.lame.vue = ['plan1', 'plan2', 'coupes'].includes(vue) ? vue : 'plan2';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // Triangles et valeurs (0.153.1) : à côté de la règle (B) ou posés sur la règle (C).
+      choisirIndicLame: (cle) => {
+        terrain.lame.indic = cle === 'regle' ? 'regle' : 'exterieur';
         retenirReglagesTerrain();
         recalculer();
       },
@@ -3191,7 +3197,7 @@ function calculerLame() {
   const sens = sensAvantLame(lame);
   if (!sens) return { raison: 'les deux récepteurs sont au même endroit', guidage: null, coins: lame };
   const points = pointsGuidageLame(lame.gauche, lame.droite, sens, reglagesOutilLame());
-  return guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite });
+  return guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite }, sens);
 }
 
 /**
@@ -3214,7 +3220,9 @@ function calculerOutilUnGnss() {
     || (!(dims.gauche + dims.droite > 0.1) && `Tape les distances de l'outil (⚙ : gauche, droite${machine === 'rateau' ? ', avant, arrière' : ''})`);
   if (raison) return { raison, guidage: null, coins: null, unGnss: true };
   const points = pointsOutil(etat.position, { cap: etat.cap, inclinaison: etat.inclinaison ?? 0, directionInclinaison: etat.directionInclinaison ?? 0 }, dims);
-  const resultat = guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite, contour: machine === 'rateau' ? points.coins : null });
+  // Bull à 1 GNSS : lame vue de côté = un seul point (le milieu), avant = perpendiculaire à la lame.
+  const sensLame = machine === 'bull' ? avantDeLaLame(points.gauche, points.droite) : null;
+  const resultat = guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite, contour: machine === 'rateau' ? points.coins : null }, sensLame);
   if (resultat.guidage) {
     // Écart au centre de l'outil (même formule qu'un coin : altitude de la surface − altitude du point).
     const surfaceBase = chercheurLame.chercher(points.centre.est, points.centre.nord);
@@ -3246,7 +3254,7 @@ function reglagesOutilLame() {
  * Écarts et coupes des 4 points guidés (0.151.0) : gauche, droite (axe G – D), arriere, avant
  * (axe Arr – Av). coins : ce qui est montré sur le plan.
  */
-function guidageDesPoints(points, triangles, coins) {
+function guidageDesPoints(points, triangles, coins, sensLame = null) {
   if (chercheurLame.triangles !== triangles) chercheurLame = { triangles, chercher: chercheurAltitude(triangles) };
   const tolerances = terrain.lame.tolerances;
   // Delta Z de la surface (0.152.0) : la surface suivie est décalée ; la surface de base reste sur les coupes.
@@ -3257,16 +3265,32 @@ function guidageDesPoints(points, triangles, coins) {
   } : chercheurLame.chercher;
   const guidage = guidageLame({ gauche: points.gauche, droite: points.droite, altitudeSurface, tolerances });
   if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coins };
-  // Arr – Av : mêmes calculs, l'arrière à gauche ; le « dévers » est alors la pente vers l'avant.
-  const long = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface, tolerances });
   // Coupes : l'outil + 1 m à gauche / droite et 2 m devant / derrière au départ (0.152.0).
   const marges = terrain.lame.marges;
+  const coupe = coupeDecalee(coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]), delta);
+  let long;
+  let coupeLong;
+  if (sensLame) {
+    // Lame (Grader, Bull, 0.153.1) : vue de côté, un seul point = le milieu du bas de la lame ; le
+    // terrain de « derrière » m derrière à « devant » m devant ; l'écart au milieu seulement.
+    const { milieu, arriere, avant } = coupeMilieuLame(points.gauche, points.droite, sensLame, marges.derriere, marges.devant);
+    const surfaceMilieu = altitudeSurface(milieu.est, milieu.nord);
+    const ecart = surfaceMilieu == null ? null : surfaceMilieu - milieu.altitude;
+    long = { milieu: { ecart, classe: classeEcartLame(ecart, tolerances) } };
+    const brute = coupeEntre(triangles, arriere, avant, 0);
+    coupeLong = brute ? coupeDecalee({ ...brute, centre: { distance: marges.derriere, altitude: milieu.altitude } }, delta) : null;
+  } else {
+    // Râteau : Arr – Av comme G – D, l'arrière à gauche ; le « dévers » est la pente vers l'avant.
+    const calcul = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface, tolerances });
+    long = calcul.erreur ? null : calcul;
+    coupeLong = calcul.erreur ? null : coupeDecalee(coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]), delta);
+  }
   return {
     raison: null,
     guidage,
-    long: long.erreur ? null : long,
-    coupe: coupeDecalee(coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]), delta),
-    coupeLong: long.erreur ? null : coupeDecalee(coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]), delta),
+    long,
+    coupe,
+    coupeLong,
     coins,
     bords: bordsDeLaLame(points.gauche, points.droite, triangles),
     toleranceVert: tolerances.vert,
@@ -5203,6 +5227,7 @@ function donneesCommunes() {
       recepteursBull: terrain.lame.recepteursBull,
       unGnss: outilAUnGnss(),
       vue: terrain.lame.vue,
+      indic: terrain.lame.indic === 'regle' ? 'regle' : 'exterieur',
       deltaSurface,
       coupeSeule: terrain.lame.coupeSeule,
       marges: terrain.lame.marges,

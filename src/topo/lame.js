@@ -236,3 +236,15 @@ export function coupeEntre(triangles, a, b, marges = 1) {
     b: { distance: avant + largeur, altitude: b.altitude },
   };
 }
+
+/**
+ * Lame (Grader, Bull) vue de côté (0.153.1, demande du 07.11 : pas de points Av / Arr inventés) :
+ * le milieu du bas de la lame (moyenne des 2 bouts, altitude comprise) et les bouts de la coupe
+ * Arr – Av, "derriere" m derrière et "devant" m devant ce milieu, dans le sens "sens" ({ est, nord },
+ * longueur 1, vers l'avant). Renvoie { milieu, arriere, avant } (MN95).
+ */
+export function coupeMilieuLame(gauche, droite, sens, derriere = 2, devant = 2) {
+  const milieu = pointDeProfil(gauche, droite, 'milieu');
+  const bout = (d) => ({ est: milieu.est + sens.est * d, nord: milieu.nord + sens.nord * d, altitude: milieu.altitude });
+  return { milieu, arriere: bout(-derriere), avant: bout(devant) };
+}

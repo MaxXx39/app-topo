@@ -1,6 +1,6 @@
 // Tests du guidage de lame à 2 RX2 (formules validées par l'utilisateur le 26.10.2026).
 import { describe, it, expect } from 'vitest';
-import { guidageLame, classeEcartLame, deversEntre, ligneDeCoupeLame, bordsDeLaLame, pointsGuidageLame, coupeEntre } from '../src/topo/lame.js';
+import { guidageLame, classeEcartLame, deversEntre, ligneDeCoupeLame, bordsDeLaLame, pointsGuidageLame, coupeEntre, coupeMilieuLame } from '../src/topo/lame.js';
 
 // Surface plane qui monte de 2 % vers l'Est : altitude 450 en Est 2500000.
 const surface = (est) => 450 + 0.02 * (est - 2500000);
@@ -181,5 +181,14 @@ describe('coupes G – D et Arr – Av (0.151.0)', () => {
 
   it('pas de coupe si les deux points sont au même endroit', () => {
     expect(coupeEntre([], gauche, gauche)).toBeNull();
+  });
+});
+
+describe('lame vue de côté : un seul point, le milieu du bas de la lame (0.153.1)', () => {
+  it('milieu des 2 bouts, coupe de 2 m derrière à 2 m devant', () => {
+    const r = coupeMilieuLame({ est: 0, nord: 0, altitude: 400 }, { est: 4, nord: 0, altitude: 400.2 }, { est: 0, nord: 1 }, 2, 3);
+    expect(r.milieu).toEqual({ est: 2, nord: 0, altitude: 400.1 });
+    expect(r.arriere.nord).toBe(-2);
+    expect(r.avant.nord).toBe(3);
   });
 });

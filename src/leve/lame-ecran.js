@@ -64,6 +64,7 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
     : '<button type="button" class="bouton-secondaire" data-action="inverserLame" title="Inverser gauche et droite">⇄ Inverser G / D</button>';
   const vue = ['plan1', 'plan2', 'coupes'].includes(donnees.vue) ? donnees.vue : 'plan2';
   const coupeSeule = donnees.coupeSeule === 'long' ? 'long' : 'gd';
+  const indic = donnees.indic === 'regle' ? 'regle' : 'exterieur';
   const marges = donnees.marges ?? { gauche: 1, droite: 1, devant: 2, derriere: 2 };
   const puce = (action, cle, titre, actif) => `<button type="button" class="puce-choix ${actif ? 'actif' : ''}" data-action="${action}" data-valeur="${cle}" aria-pressed="${actif}">${titre}</button>`;
   const champMarge = (cle, titre) => `<label>${titre} <input type="text" inputmode="decimal" data-marge-lame="${cle}" value="${Number(marges[cle] ?? 0).toFixed(1)}" /> m</label>`;
@@ -73,12 +74,16 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
         ${VUES.map(([cle, titre]) => puce('choisirVueLame', cle, titre, vue === cle)).join('')}
         ${vue === 'plan1' ? `<span class="aide">coupe :</span>${puce('choisirCoupeLame', 'gd', 'G – D', coupeSeule === 'gd')}${puce('choisirCoupeLame', 'long', 'Arr – Av', coupeSeule === 'long')}` : ''}
       </div>
+      <div class="reglages-outil">
+        <p class="titre-choix">Triangles et valeurs</p>
+        ${puce('choisirIndicLame', 'exterieur', 'À côté de la règle', indic !== 'regle')}${puce('choisirIndicLame', 'regle', 'Sur la règle', indic === 'regle')}
+      </div>
       ${nombreGnss}
       <div class="reglages-outil">${bords}</div>
       <div class="reglages-outil">
         ${champOutil('axe', `${machine === 'rateau' ? 'Râteau' : 'Lame'} depuis GNSS`, machine === 'rateau' ? 'milieu' : '0.000')}
         <span class="aide">− derrière, + devant</span>
-        ${machine === 'rateau' ? '' : `${champOutil('avant', 'Point Av')}${champOutil('arriere', 'Point Arr')}`}
+
       </div>
       <div class="reglages-outil">
         <p class="titre-choix">Longueur des coupes au-delà de l'outil</p>
@@ -103,7 +108,7 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
     </div>`;
   }
   const nomMachine = { grader: 'Grader', bull: 'Bull', rateau: 'Râteau' }[machine];
-  return `<div class="ecran-lame">
+  return `<div class="ecran-lame ${indic === 'regle' ? 'essai-sur-regle' : 'essai-exterieur'} ${machine === 'rateau' ? '' : 'lame-un-point'}">
     <div class="ligne-lame">
       <button type="button" class="bouton-retour-machine" data-action="retourChoixMachine" aria-label="Changer de machine" title="Changer de machine">← <strong>${nomMachine}</strong></button>
       ${surfaces.length > 0
@@ -158,8 +163,15 @@ export function rafraichirLame(conteneur, vivant) {
   for (const [cle, , nomGauche, nomDroite] of COUPES) {
     const { guidage, coupe } = donnees[cle];
     if (!zone(`lame-${cle}-coupe`)) continue; // vue à une seule coupe
-    for (const [cote, nom] of [['gauche', nomGauche], ['droite', nomDroite]]) {
-      const point = guidage?.[cote];
+    // Lame vue de côté (0.153.1) : un seul écart, au milieu du bas de la lame (côté gauche), rien à droite.
+    const milieu = cle === 'long' && guidage?.milieu;
+    for (const [cote, nom] of [['gauche', milieu ? 'Milieu' : nomGauche], ['droite', nomDroite]]) {
+      const point = milieu ? (cote === 'gauche' ? guidage.milieu : null) : guidage?.[cote];
+      if (milieu && cote === 'droite') {
+        zone(`lame-${cle}-${cote}`).classList.add('masque');
+        zone(`lame-${cle}-regle-${cote}`).classList.add('masque');
+        continue;
+      }
       const element = zone(`lame-${cle}-${cote}`);
       // 0.152.0 : triangle en haut (pointe en haut = monter), valeur en bas, nom du bout dessous.
       element.className = `indic-coupe ${cote} ${point?.classe ? `ecart-${point.classe}` : 'attente'}`;
@@ -187,7 +199,7 @@ export function rafraichirLame(conteneur, vivant) {
   if (piedGd) piedGd.innerHTML = g
     ? `${bord('gauche')}<span>${centre}Dévers <strong>${pourcent(g.devers)}</strong> · voulu <strong>${pourcent(g.deversVoulu)}</strong></span>${bord('droite')}`
     : '';
-  const l = g ? vivant.long : null;
+  const l = g && !vivant.long?.milieu ? vivant.long : null;
   const piedLong = zone('lame-long-pied');
   if (piedLong) piedLong.innerHTML = l
     ? `<span>Pente vers l'avant <strong>${pourcent(l.devers)}</strong> · voulue <strong>${pourcent(l.deversVoulu)}</strong></span>`
@@ -204,7 +216,7 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140) {
   const largeur = 300;
   const marge = 12;
   const { longueur, morceaux, troncons, ruptures, a, b, morceauxBase = null, delta = 0 } = coupe;
-  const altitudes = [a.altitude, b.altitude, ...morceaux.flat().map((p) => p.altitude), ...(morceauxBase ?? []).flat().map((p) => p.altitude)].filter((z) => z != null);
+  const altitudes = [a?.altitude, b?.altitude, coupe.centre?.altitude, ...morceaux.flat().map((p) => p.altitude), ...(morceauxBase ?? []).flat().map((p) => p.altitude)].filter((z) => z != null);
   const bas = Math.min(...altitudes);
   const haut = Math.max(...altitudes);
   const milieu = (bas + haut) / 2;
@@ -234,8 +246,22 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140) {
   const marques = ruptures
     .map((d) => `<line class="rupture-profil" x1="${x(d).toFixed(1)}" y1="${marge}" x2="${x(d).toFixed(1)}" y2="${hauteur - 14}" />`)
     .join('');
-  const classes = [guidage.gauche?.classe, guidage.droite?.classe];
+  const classes = [guidage.gauche?.classe, guidage.droite?.classe, guidage.milieu?.classe];
   const pire = classes.find((c) => c === 'rouge') ?? classes.find((c) => c === 'orange') ?? 'vert';
+  if (coupe.centre) {
+    // Lame vue de côté (0.153.1) : le terrain et un seul point, le bas de la lame (pas de trait).
+    const xc = x(coupe.centre.distance);
+    const yc = y(coupe.centre.altitude);
+    return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-coupe-guidage" role="img" aria-label="Coupe Arr – Av : bas de la lame">
+      ${marques}${surface}${pentes}
+      <circle class="coin-coupe-lame point-lame-${pire}" cx="${xc.toFixed(1)}" cy="${yc.toFixed(1)}" r="6" />
+      <text x="6" y="${hauteur - 3}">◂ Arr</text>
+      <text x="${largeur - 6}" y="${hauteur - 3}" text-anchor="end">Av ▸</text>
+      <text x="${xc.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle" class="note-coupe-lame">bas de lame</text>
+      <text x="${largeur - 4}" y="11" text-anchor="end" class="note-coupe-lame">hauteurs agrandies</text>
+      ${texteDelta}
+    </svg>`;
+  }
   const [xa, xb] = [x(a.distance), x(b.distance)];
   const [ya, yb] = [y(a.altitude), y(b.altitude)];
   return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-coupe-guidage" role="img" aria-label="Coupe ${noms[0]} – ${noms[1]}">
