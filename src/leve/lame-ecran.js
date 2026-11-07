@@ -42,7 +42,7 @@ const VUES = [['plan1', 'Plan + 1 coupe'], ['plan2', 'Plan + 2 coupes'], ['coupe
  * machine ('grader', 'bull' ou 'rateau'), inverse, tolerances: { vert, orange } (m), recepteur2 (vrai
  * si le 2e GNSS est connecté), unGnss, outil: { gauche, droite, avant, arriere, axe } }.
  */
-export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) {
+export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMachine = false } = {}) {
   const { surfaces, surfaceId, tolerances } = donnees;
   const cm = (m) => String(Math.round(m * 1000) / 10);
   const machine = ['bull', 'rateau'].includes(donnees.machine) ? donnees.machine : 'grader';
@@ -76,8 +76,7 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) 
       ${nombreGnss}
       <div class="reglages-outil">${bords}</div>
       <div class="reglages-outil">
-        <p class="titre-choix">Axes (depuis ${unGnss ? 'le GNSS' : 'la ligne des GNSS'})</p>
-        ${champOutil('axe', 'Axe G – D', machine === 'rateau' ? 'milieu' : '0.000')}
+        ${champOutil('axe', `${machine === 'rateau' ? 'Râteau' : 'Lame'} depuis GNSS`, machine === 'rateau' ? 'milieu' : '0.000')}
         <span class="aide">− derrière, + devant</span>
         ${machine === 'rateau' ? '' : `${champOutil('avant', 'Point Av')}${champOutil('arriere', 'Point Arr')}`}
       </div>
@@ -95,11 +94,18 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true } = {}) 
         <label>Orange ≤ <input type="text" inputmode="decimal" data-tolerance-lame="orange" value="${cm(tolerances.orange)}" /> cm</label>
       </div>
     </div>`;
-  // Grader, Bull ou Râteau (0.114.0) : boutons côte à côte, un seul choisi à la fois.
-  const caseMachine = (cle, titre) => `<button type="button" class="case-machine ${machine === cle ? 'actif' : ''}" role="radio" data-action="choisirMachine" data-valeur="${cle}" aria-checked="${machine === cle}">${titre}</button>`;
+  // 0.153.0 : d'abord le choix de la machine, en grand ; ensuite le guidage, sans ce bandeau.
+  if (choixMachine) {
+    const grosse = (cle, titre) => `<button type="button" class="grosse-machine ${machine === cle ? 'actif' : ''}" data-action="choisirMachine" data-valeur="${cle}">${titre}</button>`;
+    return `<div class="ecran-lame choix-machine-depart">
+      <p class="titre-choix">Quelle machine ?</p>
+      ${grosse('grader', 'Grader')}${grosse('bull', 'Bull')}${grosse('rateau', 'Râteau')}
+    </div>`;
+  }
+  const nomMachine = { grader: 'Grader', bull: 'Bull', rateau: 'Râteau' }[machine];
   return `<div class="ecran-lame">
-    <div class="ligne-lame choix-machine" role="radiogroup" aria-label="Machine">${caseMachine('grader', 'Grader')}${caseMachine('bull', 'Bull')}${caseMachine('rateau', 'Râteau')}</div>
     <div class="ligne-lame">
+      <button type="button" class="bouton-retour-machine" data-action="retourChoixMachine" aria-label="Changer de machine" title="Changer de machine">← <strong>${nomMachine}</strong></button>
       ${surfaces.length > 0
         ? `<select data-champ="surface-lame" aria-label="Levé à suivre">
             ${surfaces.some((s) => s.id === surfaceId) ? '' : '<option value="" selected>— levé à suivre —</option>'}

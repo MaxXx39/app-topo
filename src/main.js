@@ -482,6 +482,8 @@ function cadrerSurCalculs() {
 document.querySelector('.onglets').addEventListener('click', (evenement) => {
   const mode = evenement.target.closest('button[data-mode-terrain]');
   if (mode) {
+    // Guidage (0.153.0) : toucher l'onglet ramène toujours au choix de la machine.
+    if (mode.dataset.modeTerrain === 'lame') ecranLeve?.revenirAuChoixMachine();
     choisirModeTerrain(mode.dataset.modeTerrain);
     afficherOnglet('terrain');
     return;

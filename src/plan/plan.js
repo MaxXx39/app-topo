@@ -1693,7 +1693,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   }
   /** Vrai si le suivi a été repris (le plan est alors redessiné). */
   function reprendreSuiviSiBesoin() {
-    if (suiviSuspendu || !retourSuivi || !retourSuiviActif || suivi !== 'libre' || !position || pointeurs.size > 0 || ligneVue) return false;
+    if (suiviSuspendu || !retourSuivi || !retourSuiviActif || suivi !== 'libre' || !position || position.tablette || pointeurs.size > 0 || ligneVue) return false;
     const attente = performance.now() - dernierToucher >= DELAI_RETOUR_SUIVI;
     const depuis = retourSuivi.depuis;
     const parti = depuis && Math.hypot(position.est - depuis.est, position.nord - depuis.nord) >= DISTANCE_RETOUR_SUIVI;
@@ -2299,7 +2299,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       position = nouvellePosition;
       boutonPosition.hidden = !position;
       // Cap automatique (0.119.0) : GNSS prêt → devant du GNSS en haut ; plus prêt → comme avant.
-      const decision = decisionCapAuto(capAuto, { pret: Boolean(position?.prete) && !position?.tablette, suivi, occupe: Boolean(ligneVue) || suiviSuspendu });
+      // 0.153.0 : GPS de la tablette (sans GNSS) : aucun centrage automatique (cap auto, retour du
+      // suivi, première position) ; seul « Ma position » fait suivre.
+      const gpsInterne = Boolean(position?.tablette);
+      const decision = gpsInterne ? null : decisionCapAuto(capAuto, { pret: Boolean(position?.prete), suivi, occupe: Boolean(ligneVue) || suiviSuspendu });
       if (decision === 'cap') {
         changerSuivi('cap');
         if (position.azimut != null && vue) {
@@ -2323,7 +2326,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
       // Suivi : on ne recentre (et ne redessine tout) que si la position s'approche du bord.
       if (position && suivi === 'cap' && position.azimut != null && vue && Math.abs(ecartAngle(position.azimut, vue.rotation ?? 0)) > 3) tournerVers(position.azimut);
-      else if (position && (!vue || (suivi !== 'libre' && loinDuCentre()) || (premiere && points.length === 0))) centrerSurPosition();
+      else if (position && (!vue || (suivi !== 'libre' && loinDuCentre()) || (premiere && points.length === 0 && !gpsInterne))) centrerSurPosition();
       else dessinerPosition();
     },
     /**
