@@ -3,7 +3,8 @@
 // Cartouche : dessiné par et date ici, affaire et lieu du projet (onglet Projet).
 import { genererCsvMesures } from './csv.js';
 import { genererDxfMesures } from './dxf.js';
-import { champsMiseEnPage, lireMiseEnPage, texteFeuille } from './mise-en-page.js';
+import { brancherFeuillePrevue, champsMiseEnPage, lireMiseEnPage, texteFeuille } from './mise-en-page.js';
+import { contenuDesMesures } from './zone-plan.js';
 import { telecharger, dateSuisse } from './ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
@@ -52,6 +53,7 @@ export function creerEcranExportMesures(conteneur, { obtenirGroupes, obtenirDonn
       </div>
     </div>
     <div data-pour="pdf">${champsCartouche()}</div>
+    <p class="feuille-prevue" data-pour="pdf" data-zone="feuille-prevue"></p>
     <button type="button" class="bouton bouton-exporter" data-action="exporter">Exporter</button>
     <p class="aide" data-zone="message"></p>
     </details>
@@ -145,4 +147,7 @@ export function creerEcranExportMesures(conteneur, { obtenirGroupes, obtenirDonn
     if (bouton?.dataset.action === 'exporter') boutons[format]();
   });
   montrerFormat();
+  // 0.152.0 : papier et échelle du futur PDF, en direct.
+  const feuilleAJour = brancherFeuillePrevue(conteneur, () => contenuDesMesures(obtenirDonnees().mesures ?? [], obtenirDonnees().points ?? []).zone, () => format === 'pdf');
+  feuilleAJour();
 }

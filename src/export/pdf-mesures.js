@@ -5,13 +5,12 @@
 // Toutes les mesures sur la feuille sont en millimètres.
 import { jsPDF } from 'jspdf';
 import { choisirFormat } from './echelle.js';
+import { contenuDesMesures } from './zone-plan.js';
 import { courbesDeNiveau, equidistanceAuto, plageAltitudes } from '../topo/courbes.js';
-import { nomsDeLaMesure } from '../topo/mesure.js';
 import { VALEURS, NOM_TYPE, lignesEtiquette, texteMorceau, placeEtiquetteMesure, couleurDeMesure, rvbDeCouleur } from '../mesures/valeurs.js';
 import {
   appliquerFormat,
   COULEURS,
-  zoneDe,
   dessinerCadres,
   preparerProjection,
   preparerCadrePlan,
@@ -54,10 +53,7 @@ export async function creerPdfMesures({ mesures, points, cartouche, echelleImpos
   const messages = [];
 
   // Points montrés : ceux des mesures (sommets et points des triangles des aires).
-  const parNom = new Map(points.map((p) => [p.nom, p]));
-  const noms = new Set(mesures.flatMap(({ mesure, resultat }) => [...nomsDeLaMesure(mesure), ...(resultat.triangles ?? []).flat().map((p) => p.nom)]));
-  const pointsMontres = [...noms].map((nom) => parNom.get(nom)).filter(Boolean);
-  const zone = zoneDe(pointsMontres);
+  const { pointsMontres, zone } = contenuDesMesures(mesures, points);
 
   // Papier et orientation (0.151.0) : voir choisirFormat.
   let format = papier && papier !== 'auto' ? papier : 'a4';

@@ -100,3 +100,19 @@ export function choisirFormat(largeurTerrain, hauteurTerrain, echelle, { papier 
   }
   return { format: papiers.at(-1), depasse: true };
 }
+
+/**
+ * Feuille que donnera le PDF (0.152.0, annoncée avant l'export) : zone du terrain (m) et choix
+ * { papier ('auto', 'a4'…), orientation, echelleImposee (ou null) }. Mêmes règles que creerPdf :
+ * format par choisirFormat, échelle imposée ou la plus détaillée qui tient dans la place du dessin.
+ * Renvoie { format, orientation, echelle, depasse }, ou null sans zone.
+ */
+export function feuillePrevue(zone, { papier = 'auto', orientation = 'paysage', echelleImposee = null } = {}) {
+  if (!zone) return null;
+  const largeur = zone.estMax - zone.estMin;
+  const hauteur = zone.nordMax - zone.nordMin;
+  const { format, depasse } = choisirFormat(largeur, hauteur, echelleImposee, { papier, orientation });
+  const place = placeDuDessin(format, orientation);
+  const echelle = echelleImposee ?? choisirEchelle(largeur, hauteur, place.largeur, place.hauteur);
+  return { format, orientation, echelle, depasse };
+}

@@ -11286,3 +11286,45 @@ body[data-onglet='terrain'] .bouton.bouton-implanter.bouton-implanter-plan:not([
 body.mode-telephone .corps-coupe-guidage { grid-template-columns: 32px minmax(0, 1fr) 32px; }
 body.mode-telephone .corps-coupe-guidage .regle-hauteur { width: 30px; min-height: 120px; }
 body.mode-telephone .ecart-coupe strong { font-size: 0.95rem; }
+
+/* 0.152.0 : zoom de l'aperçu PDF (− / +, pincer) et papier / échelle annoncés avant l'export. */
+.zoom-apercu-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.zoom-apercu-pdf button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+.zoom-apercu-pdf span {
+  min-width: 34px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.pages-apercu-pdf {
+  touch-action: pan-x pan-y;
+}
+.pages-apercu-pdf.zoome {
+  align-items: flex-start;
+}
+.pages-apercu-pdf.zoome .page-apercu-pdf {
+  max-width: none;
+}
+.feuille-prevue {
+  margin: 8px 0 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 800;
+}
+.feuille-prevue.depasse {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.entete-apercu-pdf { flex-wrap: wrap; }

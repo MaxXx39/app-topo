@@ -2,7 +2,8 @@
 // boutons PDF, CSV, DXF et LandXML.
 import { genererCsv } from './csv.js';
 import { genererDxf } from './dxf.js';
-import { champsMiseEnPage, lireMiseEnPage, resumeMiseEnPage, texteFeuille } from './mise-en-page.js';
+import { brancherFeuillePrevue, champsMiseEnPage, lireMiseEnPage, resumeMiseEnPage, texteFeuille } from './mise-en-page.js';
+import { zonePremiereFeuille } from './zone-plan.js';
 import { ecrireLandXML, geometrieDeSurface } from '../topo/landxml.js';
 import { plageAltitudes, equidistanceAuto } from '../topo/courbes.js';
 import { bulle } from '../aide/bulles.js';
@@ -93,6 +94,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
       </div>
     </div>
     </details>
+    <p class="feuille-prevue" data-pour="pdf" data-zone="feuille-prevue"></p>
     <button type="button" class="bouton bouton-exporter" data-action="exporter">Exporter</button>
     <p class="aide" data-zone="message"></p>
   `;
@@ -235,6 +237,9 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     if (bouton?.dataset.action === 'exporter') boutons[format]();
   });
   montrerFormat();
+  // 0.152.0 : papier et échelle du futur PDF, en direct.
+  const feuilleAJour = brancherFeuillePrevue(conteneur, () => zonePremiereFeuille(obtenirDonnees()), () => format === 'pdf');
+  feuilleAJour();
 
   /**
    * GeoTIFF de la photo aérienne swisstopo autour de ces points (marge et taille du pixel choisies),

@@ -20,7 +20,9 @@ import { longueurCoupe } from '../topo/coupe.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne } from '../leve/libelles.js';
 // Logo Perrin, dans le fichier PDF (image JPEG de 406 × 104 pixels, écrite dans le code).
 import logoPerrin from '../assets/logo-perrin.jpg?inline';
-import { mini, maxi } from '../outils/bornes.js';
+import { contenuDuPlan, zoneDe } from './zone-plan.js';
+
+export { zoneDe };
 
 // Calques du plan imprimé, et leur état par défaut.
 export const CALQUES_PDF = {
@@ -174,14 +176,6 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
     dessinerPagePhotos(doc, photosAPlacer.slice(debut, debut + PHOTOS_PAR_PAGE), cartouche);
   }
   return { document: doc, echelle, format: premierFormat, orientation, messageFond: messages.join(' ; ') || null };
-}
-
-/** Zone du terrain couverte par des points { est, nord } : { estMin, estMax, nordMin, nordMax } (m), ou null. */
-export function zoneDe(sommets) {
-  if (sommets.length === 0) return null;
-  const ests = sommets.map((p) => p.est);
-  const nords = sommets.map((p) => p.nord);
-  return { estMin: mini(ests), estMax: maxi(ests), nordMin: mini(nords), nordMax: maxi(nords) };
 }
 
 export const PHOTOS_PAR_PAGE = 4;
@@ -423,31 +417,6 @@ async function dessinerPageComparaison(doc, { nom, description, resultat }, cart
   return { echelle: projection.echelle, messageFond, yLibre: y };
 }
 
-/**
- * Ce que montre le plan principal : points du levé qui servent aux surfaces calculées (contour,
- * lignes, sommets des triangles), ou tous s'il n'y a aucune surface, et la zone du terrain à
- * dessiner (points montrés et triangles). Renvoie { parNom, pointsMontres, zone } (zone null si vide).
- */
-function contenuDuPlan(calcules, points, coupes = [], dessins = [], levesSeuls = []) {
-  const parNom = new Map(points.map((p) => [p.nom, p]));
-  const sommets = calcules.flatMap(({ resultat }) => resultat.trianglesDessus.flat());
-  const noms = new Set([
-    ...calcules.flatMap(({ stock }) => [...(stock.contour ?? []), ...(stock.lignesRupture ?? []).flatMap((l) => l.noms)]),
-    ...sommets.filter((p) => parNom.get(p.nom) === p).map((p) => p.nom),
-  ]);
-  let pointsMontres = noms.size > 0 ? [...noms].map((nom) => parNom.get(nom)).filter(Boolean) : points;
-  // Levés seuls (0.107.4) : tous leurs points sont montrés.
-  const pointsLeves = levesSeuls.flatMap((l) => l.points);
-  if (pointsLeves.length > 0) {
-    const deja = new Set(pointsMontres);
-    pointsMontres = [...pointsMontres, ...pointsLeves.filter((p) => !deja.has(p))];
-  }
-  // Les coupes doivent se voir en entier sur le plan.
-  const boutsDesCoupes = coupes.flatMap((coupe) => [coupe.debut, coupe.fin]);
-  // Les dessins aussi (plateformes, bâtiments…).
-  const sommetsDessins = dessins.flatMap((d) => d.points);
-  return { parNom, pointsMontres, zone: zoneDe([...pointsMontres, ...sommets, ...levesSeuls.flatMap((l) => l.triangles.flat()), ...boutsDesCoupes, ...sommetsDessins]) };
-}
 
 /**
  * Dessine le plan dans son cadre, à l'échelle normalisée qui fait tout tenir (ou imposée),
