@@ -118,11 +118,13 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
           </select>`
         : '<p class="vide">Aucun levé (Terrain › Lever).</p>'}
       <button type="button" class="bouton-bip ${bip ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${bip}" title="${bip ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${bip ? 'Couper le bip' : 'Remettre le bip'}">${bip ? '🔔' : '🔕'}</button>
+      <button type="button" class="bouton-lignes-guidage seulement-expert ${donnees.choixLignes ? 'actif' : ''}" data-action="choisirLignesGuidage" title="Choisir 1 ou 2 lignes à suivre">Lignes${(donnees.lignes ?? []).length ? ` (${donnees.lignes.length})` : ''}</button>
       <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Réglages">⚙</button>
       ${bulle('lame')}
     </div>
     ${reglagesOuverts ? reglages : ''}
     ${donnees.recepteur2 || unGnss ? '' : '<button type="button" class="bouton-secondaire bouton-recepteur-2" data-action="ouvrirRecepteur">Connecter le 2e GNSS</button>'}
+    ${htmlLignesSuivies(donnees)}
     <p class="raison-lame" data-vivant="lame-raison" hidden></p>
     <div class="coupes-guidage vue-${vue}">
       ${COUPES.filter(([cle]) => vue !== 'plan1' || cle === coupeSeule).map(([cle, titre]) => `<section class="bloc-coupe-guidage" data-coupe="${cle}">
@@ -137,6 +139,27 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
         <p class="pied-coupe-guidage" data-vivant="lame-${cle}-pied"></p>
       </section>`).join('')}
     </div>
+  </div>`;
+}
+
+/**
+ * Lignes suivies (0.154.0, Expert) : pendant le choix, le rappel « touche une ligne » ; pour chaque
+ * ligne, son bandeau (écart en plan, rempli en direct), le bout mesuré (G / D) et × pour l'enlever.
+ */
+function htmlLignesSuivies(donnees) {
+  const lignes = donnees.lignes ?? [];
+  if (!donnees.choixLignes && lignes.length === 0) return '';
+  const choix = donnees.choixLignes
+    ? `<p class="invite-choix invite-courte"><strong>Touche une ligne sur le plan (2 au plus)</strong> <button type="button" class="bouton-lien" data-action="choisirLignesGuidage">terminé</button></p>`
+    : '';
+  const bout = (i, cle, titre, actif) => `<button type="button" class="puce-choix petite ${actif ? 'actif' : ''}" data-action="boutLigneGuidage" data-valeur="${i}:${cle}">${titre}</button>`;
+  return `<div class="lignes-guidage">${choix}
+    <div class="bandeaux-lignes">${lignes.map((l, i) => `<div class="bandeau-ligne attente" data-vivant="lame-ligne-${i}">
+        <span class="nom-ligne">${l.nom}</span>
+        <span class="bouts-ligne">${bout(i, 'gauche', 'bout G', l.bout === 'gauche')}${bout(i, 'droite', 'bout D', l.bout !== 'gauche')}</span>
+        <strong class="ecart-ligne">—</strong>
+        <button type="button" class="bouton-lien" data-action="enleverLigneGuidage" data-valeur="${i}" aria-label="Enlever ${l.nom}">×</button>
+      </div>`).join('')}</div>
   </div>`;
 }
 
@@ -186,8 +209,17 @@ export function rafraichirLame(conteneur, vivant) {
     const cadre = zone(`lame-${cle}-coupe`);
     const vue = cadre.closest('.coupes-guidage')?.classList;
     const hauteur = vue?.contains('vue-coupes') ? 230 : vue?.contains('vue-plan2') ? 220 : 150;
-    cadre.innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite], hauteur) : '';
+    const marquesLignes = cle === 'gd' ? (vivant.lignes ?? []).filter((l) => l.surCoupe != null) : [];
+    cadre.innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite], hauteur, marquesLignes) : '';
   }
+  // Lignes suivies (0.154.0) : écart en plan, flèche vers la ligne (◀ à gauche, ▶ à droite).
+  (g ? vivant.lignes ?? [] : []).forEach((l, i) => {
+    const bandeau = zone(`lame-ligne-${i}`);
+    if (!bandeau) return;
+    bandeau.className = `bandeau-ligne ${l.classe ? `ecart-${l.classe}` : 'attente'}`;
+    const ecart = bandeau.querySelector('.ecart-ligne');
+    if (ecart) ecart.textContent = l.ecart == null ? 'pas de croisement' : `${l.ecart < 0 ? '◀ ' : ''}${Math.abs(l.ecart).toFixed(2)} m${l.ecart > 0 ? ' ▶' : ''}`;
+  });
   // Sous la coupe G – D : dévers (et écart au centre d'un outil à 1 GNSS), bords de la surface.
   const fleche = (e) => (e == null ? '' : e >= 0 ? '↑ ' : '↓ ');
   const centre = g?.centre ? `Centre <strong>${fleche(g.centre.ecart)}${texteCm(g.centre.ecart)}</strong> · ` : '';
@@ -212,7 +244,7 @@ export function rafraichirLame(conteneur, vivant) {
  * deux bouts (de la couleur du plus grand écart). Hauteurs agrandies pour voir les centimètres.
  * coupe : voir topo/lame.js coupeEntre ; guidage : { gauche, droite } (classes) ; noms : [gauche, droite].
  */
-export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140) {
+export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []) {
   const largeur = 300;
   const marge = 12;
   const { longueur, morceaux, troncons, ruptures, a, b, morceauxBase = null, delta = 0 } = coupe;
@@ -264,10 +296,20 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140) {
   }
   const [xa, xb] = [x(a.distance), x(b.distance)];
   const [ya, yb] = [y(a.altitude), y(b.altitude)];
+  // Lignes suivies (0.154.0) : trait violet pointillé là où elles croisent la coupe, avec leur nom.
+  // Hors de la coupe : le nom au bord, avec une flèche vers la ligne.
+  const traitsLignes = lignes
+    .map((l) => {
+      if (l.surCoupe < 0) return `<text class="nom-ligne-coupe" x="4" y="24">◀ ${l.nom}</text>`;
+      if (l.surCoupe > longueur) return `<text class="nom-ligne-coupe" x="${largeur - 4}" y="24" text-anchor="end">${l.nom} ▶</text>`;
+      return `<line class="ligne-suivie-coupe" x1="${x(l.surCoupe).toFixed(1)}" y1="14" x2="${x(l.surCoupe).toFixed(1)}" y2="${hauteur - 16}" /><text class="nom-ligne-coupe" x="${x(l.surCoupe).toFixed(1)}" y="24" text-anchor="middle">${l.nom}</text>`;
+    })
+    .join('');
   return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-coupe-guidage" role="img" aria-label="Coupe ${noms[0]} – ${noms[1]}">
     ${marques}
     ${surface}
     ${pentes}
+    ${traitsLignes}
     <line class="lame-coupe lame-${pire}" x1="${xa.toFixed(1)}" y1="${ya.toFixed(1)}" x2="${xb.toFixed(1)}" y2="${yb.toFixed(1)}" />
     <circle class="coin-coupe-lame" cx="${xa.toFixed(1)}" cy="${ya.toFixed(1)}" r="5" />
     <circle class="coin-coupe-lame" cx="${xb.toFixed(1)}" cy="${yb.toFixed(1)}" r="5" />
