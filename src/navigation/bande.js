@@ -28,6 +28,8 @@ const svg = (trace) => `<svg viewBox="0 0 24 24" aria-hidden="true">${trace}</sv
  * - info() : HTML de la zone du milieu (déjà échappé), ou '' ;
  * - projet() : { titre, detail } du projet ouvert ;
  * - changerProjet(), nouveauProjet() (ou null si le mode ne le permet pas) ;
+ * - comptes() : ligne en petit sous Import / Exporter / Contenu (ex. « 3 levés · 2 DXF ») ; detailTuile(cle) :
+ *   ligne en petit sous le nom d'une tuile (ex. date du dernier contrôle) ;
  * - sousApplisDe(cle) : [[cle, titre]] écrites en petit sur la tuile (toucher = ouvrir dessus) ;
  * - reglages(), fermerAppli (ou null : pas de bouton) : pied de la page Applications ; avantPage() : juste
  *   avant d'ouvrir la page (fermer la page des réglages) ;
@@ -232,7 +234,7 @@ export function creerNavigation(nav, actions) {
     const tuile = evenement.target.closest('[data-appli]');
     if (tuile) {
       fermerPage();
-      actions.ouvrirAppli(tuile.dataset.appli, sous?.dataset.sous ?? null);
+      actions.ouvrirAppli(tuile.dataset.appli, sous?.dataset.sous ?? null, true);
     }
   }
 
@@ -259,11 +261,14 @@ export function creerNavigation(nav, actions) {
     element.style.top = `${Math.max(0, entete?.getBoundingClientRect().bottom ?? 0)}px`;
   }
 
+  const comptes0 = () => actions.comptes?.() ?? '';
+
   function dessinerPage() {
     const favoris = lireFavoris();
     const { titre, detail } = actions.projet();
-    dernierProjet = JSON.stringify({ titre, detail });
+    dernierProjet = JSON.stringify([{ titre, detail }, comptes0()]);
     const courante = actions.courante();
+    const comptes = actions.comptes?.() ?? '';
     const nouveau = actions.nouveauProjet
       ? '<button type="button" class="bouton-bandeau-projet nouveau" data-projet="nouveau">+ Nouveau</button>'
       : '';
@@ -288,7 +293,9 @@ export function creerNavigation(nav, actions) {
           </div>
         </div>
         <div class="parties-projet-applis">${parties}</div>
+        ${comptes ? `<p class="comptes-projet-applis">${echapper(comptes)}</p>` : ''}
       </div>
+      <div class="zone-tuiles-applis">
       <h2 class="titre-applis">Applications ${bulle('applications')}</h2>
       <div class="tuiles-applis">
         ${ordonner(actions.applis(), lireOrdre()).map((a) => `
@@ -297,6 +304,10 @@ export function creerNavigation(nav, actions) {
             ${svg(a.icone)}
             <span class="nom-tuile">${echapper(actions.titre?.(a) ?? a.titre)}</span>
             ${(() => {
+              const detail = actions.detailTuile?.(a.cle) ?? '';
+              return detail ? `<small class="detail-tuile">${echapper(detail)}</small>` : '';
+            })()}
+            ${(() => {
               const sous = actions.sousApplisDe?.(a.cle) ?? [];
               return sous.length > 0 ? `<span class="sous-tuile">${sous.map(([c, t]) => `<button type="button" data-sous="${c}">${echapper(t)}</button>`).join('')}</span>` : '';
             })()}
@@ -304,9 +315,10 @@ export function creerNavigation(nav, actions) {
               aria-pressed="${favoris.includes(a.cle)}" aria-label="Favori de la roue">★</button>
           </div>`).join('')}
       </div>
+      </div>
       <div class="pied-applis">
-        <button type="button" class="bouton-pied-applis" data-pied="reglages">${svg(ICONE_REGLAGES)}Réglages</button>
         ${actions.fermerAppli ? `<button type="button" class="bouton-pied-applis fermer" data-pied="fermer">${svg('<path d="M12 3v9" /><path d="M6.3 7.3a8 8 0 1 0 11.4 0" />')}Fermer l'appli</button>` : ''}
+        <button type="button" class="bouton-pied-applis" data-pied="reglages">${svg(ICONE_REGLAGES)}Réglages</button>
       </div>`;
   }
 
@@ -344,7 +356,7 @@ export function creerNavigation(nav, actions) {
   function mettreAJour() {
     // Page ouverte avant que le projet soit chargé (démarrage) : son encadré suit le nom du projet.
     if (pageOuverte && !deplacement) {
-      const projet = JSON.stringify(actions.projet());
+      const projet = JSON.stringify([actions.projet(), actions.comptes?.() ?? '']);
       if (projet !== dernierProjet) dessinerPage();
     }
     const courante = pageOuverte ? null : actions.courante();

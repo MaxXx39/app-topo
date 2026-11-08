@@ -154,6 +154,35 @@ export function projeterSurSegment(p, a, b) {
 }
 
 /**
+ * Accroche « perpendiculaire » (0.162.0, Expert) : "depuis" est le point déjà posé ; on touche une ligne
+ * (le segment le plus proche du doigt, à moins de "tolerance" m) et le nouveau point est le pied de la
+ * perpendiculaire menée de "depuis" sur la droite de ce segment (la droite peut dépasser le segment).
+ * Altitude : interpolée le long du segment si le pied tombe dessus et que ses deux bouts en ont une,
+ * sinon null (jamais inventée). Renvoie { est, nord, altitude, distance (de depuis au pied) } ou null.
+ */
+export function piedPerpendiculaire(depuis, position, tolerance, lignes = []) {
+  let meilleur = null;
+  for (const ligne of lignes) {
+    const sommets = ligne.ferme && ligne.points.length >= 3 ? [...ligne.points, ligne.points[0]] : ligne.points;
+    for (let i = 0; i + 1 < sommets.length; i++) {
+      const { d } = projeterSurSegment(position, sommets[i], sommets[i + 1]);
+      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, a: sommets[i], b: sommets[i + 1] };
+    }
+  }
+  if (!meilleur) return null;
+  const { a, b } = meilleur;
+  const dx = b.est - a.est;
+  const dy = b.nord - a.nord;
+  const longueur2 = dx * dx + dy * dy;
+  if (longueur2 === 0) return null;
+  const t = ((depuis.est - a.est) * dx + (depuis.nord - a.nord) * dy) / longueur2;
+  const est = a.est + dx * t;
+  const nord = a.nord + dy * t;
+  const altitude = t >= 0 && t <= 1 && a.altitude != null && b.altitude != null ? a.altitude + (b.altitude - a.altitude) * t : null;
+  return { est, nord, altitude, distance: Math.hypot(depuis.est - est, depuis.nord - nord) };
+}
+
+/**
  * Ce qu'il reste à faire pour aller de la position à la cible (m) :
  * - nord, est : écarts sur la carte (positifs vers le nord, vers l'est) ;
  * - avance, droite : les mêmes dans la direction regardée (azimut en degrés depuis le nord, sens

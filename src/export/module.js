@@ -15,7 +15,6 @@ import { aAcces } from '../reglages/reglages.js';
 const PRINCIPALES = { plan: 'levés, volumes', listes: 'listes', controles: 'écarts' };
 const SORTES = [
   ['plan', 'Plan et volumes', 'intermediaire'],
-  ['mesures', 'Mesures / métrés', 'intermediaire'],
   ['listes', 'Listes de points', 'intermediaire'],
   ['reseaux', 'Réseaux (recollement)', 'intermediaire'],
   ['controles', 'Contrôles', ''],

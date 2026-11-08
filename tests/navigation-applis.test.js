@@ -15,7 +15,7 @@ describe('applications proposées', () => {
     expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('base') }))).toEqual(['lever', 'implanter', 'controle', 'plan', 'recepteur']);
   });
   it('APK en Expert : toutes', () => {
-    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('expert') }))).toEqual(['lever', 'implanter', 'mesure', 'controle', 'guidage', 'calculs', 'plan', 'recepteur']);
+    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('expert') }))).toEqual(['lever', 'recollement', 'metre', 'implanter', 'mesure', 'controle', 'guidage', 'calculs', 'plan', 'recepteur']);
   });
   it('site : pas d\'Implanter, de Guidage ni de Récepteur ; Contrôle dès Intermédiaire', () => {
     expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('base') }))).toEqual(['lever', 'plan']);
@@ -30,9 +30,14 @@ describe('application en cours', () => {
     expect(appliCourante('terrain', 'controler')).toBe('implanter');
     expect(appliCourante('terrain', 'autocontrole')).toBe('controle');
     expect(appliCourante('terrain', 'lame')).toBe('guidage');
-    expect(appliCourante('mesures', 'lame')).toBe('calculs');
     expect(appliCourante('plan', 'lever')).toBe('plan');
     expect(appliCourante('mesure-rapide', 'lever')).toBe('mesure');
+  });
+  it('Lever, Recollement et Métré : trois applications sur le même écran (0.161.0)', () => {
+    expect(appliCourante('terrain', 'lever', 'leve')).toBe('lever');
+    expect(appliCourante('terrain', 'lever', 'reseau')).toBe('recollement');
+    expect(appliCourante('terrain', 'lever', 'metre')).toBe('metre');
+    expect(appliCourante('terrain', 'controler', 'metre')).toBe('implanter');
   });
 });
 

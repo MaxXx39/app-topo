@@ -416,7 +416,11 @@ export function creerDao(d) {
       etat.enCours = null;
       refaire(plan);
     }
-    if (barre) barre.hidden = true;
+    // 0.161.0 : la barre est retirée (un « hidden » était écrasé par le style de la barre et elle restait sur le plan).
+    if (barre) {
+      barre.remove();
+      barre = null;
+    }
     d.redessiner();
   }
 

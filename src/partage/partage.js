@@ -19,7 +19,7 @@
 import { creerDrive } from './drive.js';
 import { creerSynchro, choisirVersion, verrouActif, SIGNE_DE_VIE } from './synchro.js';
 import { creerConnexion, connexionPossible } from './connexion.js';
-import { appareil, nommerAppareil, etaitConnecte, retenirConnexion, memoireProjet, retenirProjet } from './memoire.js';
+import { appareil, nommerAppareil, nommerUtilisateur, etaitConnecte, retenirConnexion, memoireProjet, retenirProjet } from './memoire.js';
 import { estDansAppliAndroid } from '../android/pont.js';
 import { lireJournal, jourLocal } from '../recap/journal.js';
 import { ongletsDuRecap } from '../recap/recap.js';
@@ -624,6 +624,10 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
     rafraichirListe,
     nommerAppareil(nom) {
       nommerAppareil(nom);
+      quandChange();
+    },
+    nommerUtilisateur(nom) {
+      nommerUtilisateur(nom);
       quandChange();
     },
     appareil,

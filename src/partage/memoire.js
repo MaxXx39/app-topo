@@ -37,6 +37,11 @@ export function nommerAppareil(nom) {
   ecrire(CLE_APPAREIL, { ...appareil(), nom: String(nom).trim().slice(0, 40) });
 }
 
+/** Personne qui utilise la tablette en ce moment (0.162.0) : sans effet sur Drive, seulement noté au journal du recap. */
+export function nommerUtilisateur(nom) {
+  ecrire(CLE_APPAREIL, { ...appareil(), utilisateur: String(nom).trim().slice(0, 40) });
+}
+
 export const etaitConnecte = () => lire(CLE_CONNECTE, false) === true;
 export const retenirConnexion = (connecte) => ecrire(CLE_CONNECTE, Boolean(connecte));
 
