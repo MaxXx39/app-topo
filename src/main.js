@@ -116,6 +116,8 @@ import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, a
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
+import { creerNavigation } from './navigation/bande.js';
+import { applisDisponibles, appliCourante } from './navigation/applis.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip } from './outils/son.js';
 import { rythmeBip } from './topo/bip.js';
@@ -211,7 +213,7 @@ const terrain = {
 };
 // Orientation (0.90.1) : toujours le cap du GNSS (la direction de marche sert en secours, sans le dire).
 terrain.sourceOrientation = 'rx2';
-// Site sans récepteur : seulement le mode Lever (voir ONGLETS).
+// Site sans récepteur : seulement le mode Lever (et Contrôle en consultation).
 if (!recepteurDisponible()) terrain.mode = 'lever';
 // Libellé « Aucun » (0.90.0) choisi à chaque démarrage de l'appli.
 terrain.libelleLigne = '';
@@ -281,47 +283,17 @@ function retenirReglagesTerrain() {
 }
 
 // --- Mise en page : onglets ---
-// Projet (le chantier : levés importés, cartouche, fichier projet), Terrain (levé avec le récepteur,
-// seulement dans l'appli Android), Calculs (Surfaces, Volumes, Mesures : un seul affiché à la fois,
-// choisi en haut de l'onglet) et Plan (en plein écran sur téléphone, toujours à droite sur ordinateur).
-const ICONES = {
-  projets: '<path d="M3 7h6l2 2h10v10H3z" />',
-  // Terrain : une canne GNSS (antenne en haut, pointe en bas).
-  terrain: '<path d="M12 8v13M8 5a4 2 0 0 0 8 0a4 2 0 0 0-8 0M10 21h4" />',
-  calculs: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
-  plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
-};
+// Projet (le chantier : levés importés, fichier projet), Terrain (Lever, Implanter, Contrôle, Guidage),
+// Calculs (Volumes, Mesures, Dessin : un seul affiché à la fois) et Plan (en plein écran sur téléphone,
+// toujours à droite sur ordinateur). On passe de l'un à l'autre par la bande du bas (0.156.0).
 // Main ouverte (on a la main sur le projet), dessinée en traits comme les autres icônes.
 const ICONE_MAIN = '<path d="M18 11V6a2 2 0 0 0-4 0v5" /><path d="M14 10V4a2 2 0 0 0-4 0v6" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />';
 
-// Barre du bas (0.86.0) : les 4 modes de Terrain (Lever, Implanter, Contrôle, Guidage ; appli Android
-// seulement), puis Calculs et Plan. L'onglet Projet est l'icône en haut à gauche ; le récepteur
-// s'ouvre en touchant la barre d'état du récepteur, sous l'en-tête.
-const MODES_TERRAIN = [
-  { cle: 'lever', titre: 'Lever', icone: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle cx="12" cy="12" r="2.5" />' },
-  { cle: 'controler', titre: 'Implanter', icone: '<circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" />' },
-  { cle: 'autocontrole', titre: 'Contrôle', icone: '<path d="m5 12 5 5 9-10" />' },
-  { cle: 'lame', titre: 'Guidage', icone: '<path d="M12 4v16M6 10l6-6 6 6M6 14l6 6 6-6" />', niveau: 'expert' },
-];
-// Sur le site (0.96.0, demande du 29.10.2026) : Lever seulement, pour modifier les levés (lignes,
-// contours, triangles en trop, suites de points, photos) ; pas de prise de point sans récepteur.
-// 0.120.0 : sur le site, 3 pages bien marquées « Projet | Édition Lever | Calculs » (le plan reste à droite) ;
-// « Lever » y devient « Édition Lever » (plus de récepteur : on édite les levés).
-const ONGLETS = recepteurDisponible()
-  ? [
-      ...MODES_TERRAIN.map((m) => ({ ...m, nom: 'terrain', mode: m.cle })),
-      { nom: 'calculs', titre: 'Calculs' },
-      { nom: 'plan', titre: 'Plan' },
-    ]
-  : [
-      { nom: 'projets', titre: 'Projet' },
-      ...MODES_TERRAIN.filter((m) => m.cle === 'lever').map((m) => ({ ...m, nom: 'terrain', mode: m.cle, titre: 'Édition Lever' })),
-      // 0.124 : Contrôle sur le site (Intermédiaire) : consultation des points, photos et historique, sans mesure.
-      ...MODES_TERRAIN.filter((m) => m.cle === 'autocontrole').map((m) => ({ ...m, nom: 'terrain', mode: m.cle, niveau: 'intermediaire' })),
-      { nom: 'calculs', titre: 'Calculs' },
-      { nom: 'plan', titre: 'Plan' },
-    ];
+// 0.156.0 (demande du 08.11) : la barre du bas à 7 boutons est remplacée par la bande du bas
+// (navigation/bande.js : bouton « application | sous-application », page Applications, roue des favoris).
 if (!recepteurDisponible()) document.body.classList.add('sur-site');
+// Bande du bas (créée juste après la page, voir « Bande du bas et page Applications »).
+let navigation = null;
 // Ajout manuel d'un point en touchant le plan (voir plus bas « Édition Lever sur le site ») ; déclaré ici car afficherOnglet le lit.
 const ajoutLevee = { actif: false, accroche: 'point', choix: null };
 // Les parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Volumes, Mesures /
@@ -335,23 +307,6 @@ const PARTIES_CALCULS = [
 const boutonPartie = ([cle, titre]) => `<button type="button" data-partie="${cle}">${titre}</button>`;
 const estPartieCalculs = (nom) => PARTIES_CALCULS.some(([cle]) => cle === nom);
 let partieCalculs = 'volumes'; // dernière partie affichée dans Calculs
-
-// Réglages (0.123.0) : à gauche de la barre du bas (avant, roue dans l'en-tête). Pas de data-onglet : il ouvre la fenêtre des réglages.
-const BOUTON_REGLAGES = `<button type="button" id="bouton-reglages" class="onglet-reglages-bas" title="Réglages, Drive et fermer l'appli" aria-label="Réglages et fermer l'appli">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><g transform="translate(0.7 0.7) scale(0.68)"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></g><path class="marche-arret" d="M18 12v4.5M14.4 14.2a5 5 0 1 0 7.2 0" /></svg>
-    <span>Réglages</span>
-  </button>`;
-
-/** Bouton d'un onglet (icône + titre). */
-const boutonOnglet = (o) => o.mode
-  ? `<button type="button" data-mode-terrain="${o.mode}" class="onglet-terrain onglet-mode-${o.mode} ${o.niveau ? `seulement-${o.niveau}` : ''}">
-    <svg viewBox="0 0 24 24" aria-hidden="true">${o.icone}</svg>
-    <span>${o.titre}</span>
-  </button>`
-  : `<button type="button" data-onglet="${o.nom}" class="onglet-${o.nom}">
-    <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[o.nom]}</svg>
-    <span>${o.titre}</span>
-  </button>`;
 
 document.querySelector('#app').innerHTML = `
   <div class="mise-en-page">
@@ -414,8 +369,110 @@ document.querySelector('#app').innerHTML = `
       </div>
     </section>
   </div>
-  <nav class="onglets" aria-label="Onglets">${BOUTON_REGLAGES}${ONGLETS.map(boutonOnglet).join('')}</nav>
+  <nav class="bande-appli" id="bande-appli" aria-label="Applications"></nav>
 `;
+
+// --- Bande du bas et page Applications (0.156.0, demande du 08.11) ---
+
+/** Nom d'une application à l'écran (sur le site, « Lever » s'appelle « Édition Lever »). */
+const titreAppli = (appli) => (!recepteurDisponible() && appli?.titreSite ? appli.titreSite : (appli?.titre ?? ''));
+
+/** Boutons d'un écran lus comme sous-applications : [{ cle, titre, actif }]. */
+function sousApplisDesBoutons(selecteur, cle, actif) {
+  return [...document.querySelectorAll(selecteur)].map((b) => ({ cle: cle(b), titre: b.textContent.trim(), actif: actif(b) }));
+}
+
+/**
+ * Sous-applications de l'application affichée : Lever = rôle du prochain point (Contour, Ligne,
+ * Point ; métré : Aire, Longueur, Point compté), Implanter = Point / Ligne / Surface / Talus / Altitude,
+ * Guidage = machine, Calculs = Volumes / Mesures / Dessin. Lues sur les boutons de l'écran : le mode
+ * (Base, Intermédiaire, Expert) est donc respecté comme avant.
+ */
+function sousApplis() {
+  const cle = appliCourante(document.body.dataset.onglet, terrain.mode);
+  if (cle === 'lever') return sousApplisDesBoutons('#leve-direct .roles-leve .role-leve', (b) => b.dataset.role, (b) => b.classList.contains('choisi'));
+  if (cle === 'implanter') return sousApplisDesBoutons('#leve-direct .choix-implantation-type .puce-choix', (b) => b.dataset.valeur, (b) => b.classList.contains('actif'));
+  if (cle === 'guidage') return [['grader', 'Grader'], ['bull', 'Bull'], ['rateau', 'Râteau']].map(([c, titre]) => ({ cle: c, titre, actif: terrain.lame.machine === c }));
+  if (cle === 'calculs') {
+    return PARTIES_CALCULS.filter(([c]) => c !== 'dessin' || aAcces('expert')).map(([c, titre]) => ({ cle: c, titre, actif: partieCalculs === c }));
+  }
+  return [];
+}
+
+function choisirSousAppli(cle) {
+  const appli = appliCourante(document.body.dataset.onglet, terrain.mode);
+  const conteneur = document.querySelector('#leve-direct');
+  if (appli === 'lever') conteneur.querySelector(`.roles-leve [data-role="${CSS.escape(cle)}"]`)?.click();
+  else if (appli === 'implanter') conteneur.querySelector(`.choix-implantation-type .puce-choix[data-valeur="${CSS.escape(cle)}"]`)?.click();
+  else if (appli === 'guidage') {
+    // Comme toucher la machine sur l'écran de choix (il est redessiné tout de suite).
+    ecranLeve.revenirAuChoixMachine();
+    conteneur.querySelector(`.grosse-machine[data-valeur="${CSS.escape(cle)}"]`)?.click();
+  } else if (appli === 'calculs') afficherOnglet(cle);
+}
+
+/** Zone du milieu de la bande : pour l'instant le levé en cours ou le point visé (à définir par sous-application). */
+function infoAppli() {
+  const cle = appliCourante(document.body.dataset.onglet, terrain.mode);
+  let texte = '';
+  if (cle === 'lever') {
+    const leve = [...projet.surfaces, ...(projet.metres ?? [])].find((s) => s.id === leveDirect.stockId);
+    texte = leve?.nom ?? '';
+  } else if (cle === 'implanter') texte = implanter.cible?.nom ?? implanter.ligne?.nom ?? '';
+  else if (cle === 'controle') texte = autocontrole.cible?.nom ?? '';
+  return texte ? `<span class="texte-info-appli">${echapper(texte)}</span>` : '';
+}
+
+/** Ouvre une application (tuile de la page Applications ou bulle de la roue des favoris). */
+function ouvrirAppli(cle) {
+  const modes = { lever: 'lever', implanter: 'controler', controle: 'autocontrole', guidage: 'lame' };
+  if (modes[cle]) {
+    // Guidage (0.153.0) : on revient toujours au choix de la machine, comme avant avec l'onglet.
+    if (cle === 'guidage') ecranLeve?.revenirAuChoixMachine();
+    choisirModeTerrain(modes[cle]);
+    afficherOnglet('terrain');
+  } else if (cle === 'calculs') afficherOnglet('calculs');
+  else if (cle === 'plan') afficherOnglet('plan');
+  else if (cle === 'projet') afficherOnglet('projets');
+  else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur'));
+  else if (cle === 'reglages') ouvrirFenetreReglages();
+}
+
+navigation = creerNavigation(document.querySelector('#bande-appli'), {
+  applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces })
+    // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile.
+    .filter((a) => a.cle !== 'plan' || !window.matchMedia('(min-width: 900px)').matches),
+  courante: () => appliCourante(document.body.dataset.onglet, terrain.mode),
+  titre: titreAppli,
+  sousApplis,
+  choisirSousAppli,
+  info: infoAppli,
+  ouvrirAppli,
+  projet: () => ({
+    titre: document.querySelector('#titre-projet')?.textContent ?? 'Projet',
+    detail: document.querySelector('#etat')?.textContent ?? '',
+  }),
+  pageProjet: () => afficherOnglet('projets'),
+  changerProjet: () => {
+    afficherOnglet('projets');
+    document.querySelector('#projets [data-action="panneau"][data-panneau="projets"]')?.click();
+  },
+  get nouveauProjet() {
+    return aAcces('intermediaire') ? () => creerNouveauProjet() : null;
+  },
+  message: (texte) => afficherMessage(texte, 4000),
+  vibrer: () => vibrer(40),
+});
+// Lever, Implanter… redessinent leurs boutons (rôle, Point / Ligne…) : la bande suit (une fois par image au plus).
+let bandePrevue = false;
+new MutationObserver(() => {
+  if (bandePrevue) return;
+  bandePrevue = true;
+  requestAnimationFrame(() => {
+    bandePrevue = false;
+    navigation.mettreAJour();
+  });
+}).observe(document.querySelector('#leve-direct'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 
 /**
  * Affiche un onglet ('projets', 'terrain', 'plan') ou une partie de Calculs ('surfaces',
@@ -433,15 +490,11 @@ function afficherOnglet(demande) {
   for (const panneau of document.querySelectorAll('.panneau[data-onglet]')) {
     panneau.classList.toggle('actif', panneau.dataset.onglet === nom);
   }
-  const ongletVisible = estPartieCalculs(nom) ? 'calculs' : nom;
-  for (const bouton of document.querySelectorAll('.onglets button[data-onglet]')) {
-    bouton.classList.toggle('actif', bouton.dataset.onglet === ongletVisible);
-  }
   for (const bouton of document.querySelectorAll('.parties-calculs button')) {
     bouton.classList.toggle('actif', bouton.dataset.partie === nom);
   }
   document.body.dataset.onglet = nom;
-  document.querySelector('#bouton-projet').classList.toggle('actif', nom === 'projets');
+  navigation?.fermer();
   majBoutonsTerrain();
   if (nom !== 'plan' && nom !== 'dessin') pilote = null;
   // DAO (0.147.0) : seulement dans Calculs › Dessin (et le plan sur téléphone).
@@ -465,6 +518,7 @@ function afficherOnglet(demande) {
   // 0.126.0 : le suivi de la position revient tout seul dans Terrain ; Calculs cadre sur le volume.
   plan.retourAutomatiqueDuSuivi(ongletContexte === 'terrain');
   if (entreDansCalculs) cadrerSurCalculs();
+  navigation?.mettreAJour();
   window.scrollTo(0, 0);
 }
 
@@ -479,19 +533,7 @@ function cadrerSurCalculs() {
   if (coins.length === 0) coins = pointsAffiches ?? [];
   if (coins.length > 0) plan.cadrerSur(coins, 10, { libre: true });
 }
-document.querySelector('.onglets').addEventListener('click', (evenement) => {
-  const mode = evenement.target.closest('button[data-mode-terrain]');
-  if (mode) {
-    // Guidage (0.153.0) : toucher l'onglet ramène toujours au choix de la machine.
-    if (mode.dataset.modeTerrain === 'lame') ecranLeve?.revenirAuChoixMachine();
-    choisirModeTerrain(mode.dataset.modeTerrain);
-    afficherOnglet('terrain');
-    return;
-  }
-  const bouton = evenement.target.closest('button[data-onglet]');
-  if (bouton) afficherOnglet(bouton.dataset.onglet);
-});
-/** Boutons Lever / Implanter / Contrôle / Guidage de la barre du bas : celui du mode en cours est actif. */
+/** Mode de Terrain en cours noté sur la page (body.dataset.modeTerrain) et bouton de la bande du bas à jour. */
 function majBoutonsTerrain() {
   const dansTerrain = document.body.dataset.onglet === 'terrain';
   // Site (0.124) : le titre de la page suit le mode (Édition Lever ou Contrôle).
@@ -499,9 +541,7 @@ function majBoutonsTerrain() {
   if (titreTerrain) titreTerrain.textContent = terrain.mode === 'autocontrole' ? 'Contrôle' : 'Édition Lever';
   if (dansTerrain) document.body.dataset.modeTerrain = terrain.mode;
   else delete document.body.dataset.modeTerrain;
-  for (const bouton of document.querySelectorAll('.onglets button[data-mode-terrain]')) {
-    bouton.classList.toggle('actif', dansTerrain && bouton.dataset.modeTerrain === terrain.mode);
-  }
+  navigation?.mettreAJour();
 }
 document.querySelector('.parties-calculs').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-partie]');
@@ -510,15 +550,15 @@ document.querySelector('.parties-calculs').addEventListener('click', (evenement)
 installerAide(document.querySelector('#bouton-aide'));
 // Toucher le projet ouvert (en-tête) : on va à l'onglet Projet.
 document.querySelector('#entete-projet').addEventListener('click', () => afficherOnglet('projets'));
-document.querySelector('#bouton-projet').addEventListener('click', () => afficherOnglet('projets'));
 
 // Réglages de cet appareil (roue ⚙) : mode Base / Intermédiaire / Expert, mode téléphone, bulles d'aide, nom de l'appareil.
 appliquerReglages();
 // Les barres de l'en-tête (1 verte = Base, 2 jaunes = Intermédiaire, 3 rouges = Expert) ouvrent aussi les réglages.
-document.querySelector('#bouton-mode').addEventListener('click', () => document.querySelector('#bouton-reglages').click());
+document.querySelector('#bouton-mode').addEventListener('click', () => ouvrirFenetreReglages());
 // Fenêtre des réglages ouverte (pour y redessiner l'état du partage Drive), ou null.
 let fenetreReglages = null;
-document.querySelector('#bouton-reglages').addEventListener('click', () => {
+/** Fenêtre des réglages ⚙ (0.156.0 : tuile « Réglages » de la page Applications, ou la pyramide du mode). */
+function ouvrirFenetreReglages() {
   fenetreReglages = ouvrirReglages({
     aideActive: document.body.classList.contains('aide-active'),
     basculerAide: () => document.querySelector('#bouton-aide').click(),
@@ -554,7 +594,7 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
         }
       : null,
   });
-});
+}
 
 /**
  * On quitte ce que le nouveau mode cache (onglet Calculs en Base, Dessin, guidage de lame et talus
@@ -1147,7 +1187,7 @@ for (const bouton of document.querySelectorAll('[data-taille-plan]')) {
 // (--part-plan-auto, jamais moins que la part choisie par ▲ / ▼, au plus 80 %). Recalculé dès que
 // le contenu sous le plan change de taille (ResizeObserver).
 function ajusterPlanAuContenu() {
-  const disponible = window.innerHeight - (document.querySelector('header')?.offsetHeight ?? 0) - (document.querySelector('.onglets')?.offsetHeight ?? 0);
+  const disponible = window.innerHeight - (document.querySelector('header')?.offsetHeight ?? 0) - (document.querySelector('.bande-appli')?.offsetHeight ?? 0);
   const colonne = document.querySelector('.colonne-gauche');
   if (!colonne || disponible <= 0) return;
   // Bande fixe « ID point / Enreg. Pts » de Lever : elle prend aussi de la place en bas.
