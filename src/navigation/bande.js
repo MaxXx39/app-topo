@@ -13,6 +13,7 @@ import { bulle } from '../aide/bulles.js';
 import { appliDeCle, lireFavoris, ecrireFavoris, basculerFavori, MAX_FAVORIS, lireOrdre, ecrireOrdre, ordonner } from './applis.js';
 
 const DUREE_APPUI_LONG = 500; // ms avant que la roue des favoris s'ouvre
+const ICONE_REGLAGES = '<circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />';
 const ICONE_APPLIS = '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />';
 
 const svg = (trace) => `<svg viewBox="0 0 24 24" aria-hidden="true">${trace}</svg>`;
@@ -26,7 +27,9 @@ const svg = (trace) => `<svg viewBox="0 0 24 24" aria-hidden="true">${trace}</sv
  * - choisirSousAppli(cle) ; ouvrirAppli(cle) ;
  * - info() : HTML de la zone du milieu (déjà échappé), ou '' ;
  * - projet() : { titre, detail } du projet ouvert ;
- * - pageProjet(), changerProjet(), nouveauProjet() (ou null si le mode ne le permet pas) ;
+ * - changerProjet(), nouveauProjet() (ou null si le mode ne le permet pas) ;
+ * - sousApplisDe(cle) : [[cle, titre]] écrites en petit sur la tuile (toucher = ouvrir dessus) ;
+ * - reglages(), fermerAppli (ou null : pas de bouton) : pied de la page Applications ;
  * - partieProjet('import' | 'export' | 'contenu') : page Projet ouverte sur cette partie ; importPermis() ;
  * - agir(cle) : bouton de la zone du milieu touché (data-nav="action", ex. « prendre » = Enreg. Pts) ;
  * - message(texte) : message court à l'écran ; vibrer() (facultatif).
@@ -38,6 +41,7 @@ export function creerNavigation(nav, actions) {
   let derniereSignature = '';
   let minuterie = null;
   let appuiLongFait = false;
+  let dernierProjet = ''; // nom du projet montré dans l'encadré de la page
   // Déplacement d'une tuile (appui long) : { tuile, minuterie, x, y, actif }.
   let deplacement = null;
 
@@ -203,20 +207,28 @@ export function creerNavigation(nav, actions) {
       dessinerPage();
       return;
     }
+    // 0.159.0 : Réglages et « Fermer l'appli » (pied de la page, pas des applications).
+    const pied = evenement.target.closest('[data-pied]');
+    if (pied) {
+      if (pied.dataset.pied === 'reglages') actions.reglages?.();
+      else actions.fermerAppli?.();
+      return;
+    }
     const projet = evenement.target.closest('[data-projet]');
     if (projet) {
       fermerPage();
       const quoi = projet.dataset.projet;
-      if (quoi === 'page') actions.pageProjet();
-      else if (quoi === 'changer') actions.changerProjet();
+      if (quoi === 'changer') actions.changerProjet();
       else if (quoi === 'nouveau') actions.nouveauProjet?.();
       else actions.partieProjet?.(quoi);
       return;
     }
+    // Une sous-application écrite en petit sur la tuile : on ouvre l'application directement dessus.
+    const sous = evenement.target.closest('[data-sous]');
     const tuile = evenement.target.closest('[data-appli]');
     if (tuile) {
       fermerPage();
-      actions.ouvrirAppli(tuile.dataset.appli);
+      actions.ouvrirAppli(tuile.dataset.appli, sous?.dataset.sous ?? null);
     }
   }
 
@@ -245,6 +257,7 @@ export function creerNavigation(nav, actions) {
   function dessinerPage() {
     const favoris = lireFavoris();
     const { titre, detail } = actions.projet();
+    dernierProjet = JSON.stringify({ titre, detail });
     const courante = actions.courante();
     const nouveau = actions.nouveauProjet
       ? '<button type="button" class="bouton-bandeau-projet nouveau" data-projet="nouveau">+ Nouveau</button>'
@@ -255,19 +268,22 @@ export function creerNavigation(nav, actions) {
       partie('export', 'Exporter', '<path d="M12 3v12M7 8l5-5 5 5M4 21h16" />'),
       partie('contenu', 'Contenu du projet', '<circle cx="6" cy="6" r="1.6" /><circle cx="18" cy="6" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="6" cy="18" r="1.6" /><circle cx="18" cy="18" r="1.6" />'),
     ].join('');
+    // 0.159.0 : tout ce qui touche au projet dans un seul encadré ; chaque bouton ouvre sa page.
     page.innerHTML = `
-      <div class="bandeau-projet-applis">
-        <button type="button" class="texte-bandeau-projet" data-projet="page">
-          <small>Projet en cours</small>
-          <b>${echapper(titre)}</b>
-          ${detail ? `<span>${echapper(detail)}</span>` : ''}
-        </button>
-        <div class="boutons-bandeau-projet">
-          <button type="button" class="bouton-bandeau-projet" data-projet="changer">Changer</button>
-          ${nouveau}
+      <div class="cadre-projet-applis">
+        <div class="bandeau-projet-applis">
+          <div class="texte-bandeau-projet">
+            <small>Projet en cours</small>
+            <b>${echapper(titre)}</b>
+            ${detail ? `<span>${echapper(detail)}</span>` : ''}
+          </div>
+          <div class="boutons-bandeau-projet">
+            <button type="button" class="bouton-bandeau-projet" data-projet="changer">Changer</button>
+            ${nouveau}
+          </div>
         </div>
+        <div class="parties-projet-applis">${parties}</div>
       </div>
-      <div class="parties-projet-applis">${parties}</div>
       <h2 class="titre-applis">Applications ${bulle('applications')}</h2>
       <div class="tuiles-applis">
         ${ordonner(actions.applis(), lireOrdre()).map((a) => `
@@ -275,9 +291,17 @@ export function creerNavigation(nav, actions) {
             style="--couleur-appli: ${a.couleur}; --texte-appli: ${a.texte}">
             ${svg(a.icone)}
             <span class="nom-tuile">${echapper(actions.titre?.(a) ?? a.titre)}</span>
+            ${(() => {
+              const sous = actions.sousApplisDe?.(a.cle) ?? [];
+              return sous.length > 0 ? `<span class="sous-tuile">${sous.map(([c, t]) => `<button type="button" data-sous="${c}">${echapper(t)}</button>`).join('')}</span>` : '';
+            })()}
             <button type="button" class="coche-favori ${favoris.includes(a.cle) ? 'coche' : ''}" data-favori="${a.cle}"
               aria-pressed="${favoris.includes(a.cle)}" aria-label="Favori de la roue">★</button>
           </div>`).join('')}
+      </div>
+      <div class="pied-applis">
+        <button type="button" class="bouton-pied-applis" data-pied="reglages">${svg(ICONE_REGLAGES)}Réglages</button>
+        ${actions.fermerAppli ? `<button type="button" class="bouton-pied-applis fermer" data-pied="fermer">${svg('<path d="M12 3v9" /><path d="M6.3 7.3a8 8 0 1 0 11.4 0" />')}Fermer l'appli</button>` : ''}
       </div>`;
   }
 
@@ -313,6 +337,11 @@ export function creerNavigation(nav, actions) {
 
   /** Redessine la bande si quelque chose a changé (appelé souvent : comparaison d'une signature). */
   function mettreAJour() {
+    // Page ouverte avant que le projet soit chargé (démarrage) : son encadré suit le nom du projet.
+    if (pageOuverte && !deplacement) {
+      const projet = JSON.stringify(actions.projet());
+      if (projet !== dernierProjet) dessinerPage();
+    }
     const courante = pageOuverte ? null : actions.courante();
     const appli = courante ? appliDeCle(courante) : null;
     const sous = appli ? actions.sousApplis() : [];

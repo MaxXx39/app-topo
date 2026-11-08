@@ -63,7 +63,7 @@ import { archiver, restaurer, supprimerArchive } from './projet/archives.js';
 import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/journal.js';
 import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { bulle, installerAide } from './aide/bulles.js';
-import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
+import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE, ACCROCHES } from './leve/ecran.js';
 import { creerEncartPlan } from './plan/encart.js';
 import { creerBoutonImplanterPlan } from './plan/bouton-implanter.js';
 import { suivreClavier } from './outils/clavier.js';
@@ -132,6 +132,7 @@ import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
 import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
+import { dessinerPlansDxf } from './plan/dxf-canvas.js';
 import { fabriquerPaquet } from './export/paquet.js';
 import { creerBarreRecalage, etapeAxes } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
@@ -318,7 +319,7 @@ document.querySelector('#app').innerHTML = `
   <div class="mise-en-page">
     <div class="colonne-gauche">
       <section class="panneau panneau-projet" data-onglet="projets">
-        <h2 class="titre-page seulement-site">Projet</h2>
+        <h2 class="titre-partie-projet" id="titre-partie-projet">Contenu du projet</h2>
         <div id="projets"></div>
         <div class="onglets-projet" role="group" aria-label="Import et export">
           <button type="button" class="onglet-projet seulement-expert" data-onglet-projet="import" aria-pressed="false">
@@ -385,7 +386,11 @@ document.querySelector('#app').innerHTML = `
 // --- Bande du bas et page Applications (0.156.0, demande du 08.11) ---
 
 /** Nom d'une application à l'écran (sur le site, « Lever » s'appelle « Édition Lever »). */
-const titreAppli = (appli) => (!recepteurDisponible() && appli?.titreSite ? appli.titreSite : (appli?.titre ?? ''));
+const titreAppli = (appli) => {
+  // Pages du projet (0.159.0) : le bouton porte le nom de la page (Projets, Import, Exporter, Contenu).
+  if (appli?.cle === 'projet') return { ouvrir: 'Projets', import: 'Import', export: 'Exporter', contenu: 'Contenu' }[document.body.dataset.partieProjet] ?? 'Projet';
+  return !recepteurDisponible() && appli?.titreSite ? appli.titreSite : (appli?.titre ?? '');
+};
 
 /** Boutons d'un écran lus comme sous-applications : [{ cle, titre, actif }]. */
 function sousApplisDesBoutons(selecteur, cle, actif) {
@@ -495,7 +500,16 @@ function agirDepuisBande(cle) {
 // --- Mesure rapide (0.158.0, dès Intermédiaire, demande du 08.11, formules validées) ---
 // Points touchés sur le plan (accroche) ou pris au GNSS (bouton de la bande), résultats en direct sur le
 // plan et sous le plan ; rien d'enregistré sauf « Enregistrer » (levé libre « LV-Mesures rapides »).
-const ACCROCHES_MESURE = [['point', 'Point'], ['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['centre', 'Centre'], ['libre', 'Libre']];
+// 0.159.0 : la barre d'accroche d'Implanter (icônes), puis Libre et GNSS (lever au récepteur, appli Android).
+const ACCROCHES_MESURE_EN_PLUS = {
+  libre: ['Libre', 'Libre : l\'endroit touché, sans altitude', '<path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle class="repere" cx="12" cy="12" r="2.5" />'],
+  gnss: ['GNSS', 'Lever au récepteur : « + Point GNSS » en bas', '<path d="M8.5 3.2a5 5 0 0 1 7 0" /><ellipse class="repere" cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" />'],
+};
+const accrochesMesure = () => [
+  ...MODES_ACCROCHE.map((cle) => [cle, ...ACCROCHES[cle]]),
+  ['libre', ...ACCROCHES_MESURE_EN_PLUS.libre],
+  ...(recepteurDisponible() ? [['gnss', ...ACCROCHES_MESURE_EN_PLUS.gnss]] : []),
+];
 
 /** Vrai quand la Mesure rapide est l'écran de travail (le plan lui envoie ses touchers). */
 function mesureRapideActive() {
@@ -508,7 +522,7 @@ function afficherMesureRapide() {
   for (const [cle, n] of [['points', mesure.points.length], ['cotes', mesure.cotes.length]]) {
     mesureRapideEtat.pages[cle] = Math.min(mesureRapideEtat.pages[cle], nombreDePages(n) - 1);
   }
-  document.querySelector('#mesure-rapide').innerHTML = htmlMesureRapide({ mesure, accroche: mesureRapideEtat.accroche, accroches: ACCROCHES_MESURE, pages: mesureRapideEtat.pages });
+  document.querySelector('#mesure-rapide').innerHTML = htmlMesureRapide({ mesure, accroche: mesureRapideEtat.accroche, accroches: accrochesMesure(), pages: mesureRapideEtat.pages });
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
   navigation?.mettreAJour();
@@ -527,6 +541,10 @@ function ajouterPointMesure(point) {
 /** Toucher du plan : le point accroché (point du projet, sommet, milieu…) ou, en « Libre », l'endroit touché. */
 function toucherPourMesureRapide(position, tolerance) {
   const accroche = mesureRapideEtat.accroche;
+  if (accroche === 'gnss') {
+    afficherMessage('Accroche GNSS : touche « + Point GNSS » en bas', 3000);
+    return;
+  }
   if (accroche === 'libre') {
     ajouterPointMesure({ est: position.est, nord: position.nord, altitude: null });
     return;
@@ -541,9 +559,12 @@ function toucherPourMesureRapide(position, tolerance) {
   ajouterPointMesure({ nom: accroche === 'point' ? trouve.nom : '', est: trouve.est, nord: trouve.nord, altitude: trouve.altitude ?? null });
 }
 
-/** Bande du bas de la Mesure rapide (appli Android) : « + Point GNSS », prêt en RTK fixe avec l'inclinaison prête. */
+/**
+ * Bande du bas de la Mesure rapide (appli Android, accroche GNSS) : « + Point GNSS », prêt en RTK fixe
+ * avec l'inclinaison prête (validé le 08.11 : seulement le fixe).
+ */
 function mesureRapideBande() {
-  if (!recepteurDisponible()) return '';
+  if (!recepteurDisponible() || mesureRapideEtat.accroche !== 'gnss') return '';
   const pret = Boolean(etatRecepteur?.connecte && etatRecepteur.recu && etatRecepteur.position && etatRecepteur.qualite === 4 && etatRecepteur.inclinaisonPrete);
   return boutonDeBande('mesure-gnss', '+ Point GNSS', pret ? '' : 'RTK fixe et inclinaison prête', !pret);
 }
@@ -591,18 +612,61 @@ function enregistrerMesureRapide() {
   modifie();
 }
 
+/**
+ * Fond du croquis du PDF (0.159.0, demande du 08.11) : la photo aérienne swisstopo (WMS, réseau) et / ou
+ * les plans DXF affichés, dessinés à l'échelle du croquis, en une image JPEG (data URL), ou null.
+ */
+async function fondDuCroquisMesure(mesure, { photo, plans }) {
+  const { cadreDuCroquis, LARGEUR_CROQUIS, HAUTEUR_CROQUIS } = await import('./export/mesure-rapide.js');
+  const { zone, estCentre, nordCentre } = cadreDuCroquis(mesure.points);
+  const pixelsParMm = 6; // environ 150 dpi
+  const largeur = Math.round(LARGEUR_CROQUIS * pixelsParMm);
+  const hauteur = Math.round(HAUTEUR_CROQUIS * pixelsParMm);
+  const toile = document.createElement('canvas');
+  toile.width = largeur;
+  toile.height = hauteur;
+  const ctx = toile.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, largeur, hauteur);
+  if (photo) {
+    try {
+      const { adresseMorceau } = await import('./export/geotiff.js');
+      const reponse = await fetch(adresseMorceau(zone.estMin, zone.nordMin, zone.estMax, zone.nordMax, largeur, hauteur));
+      if (!reponse.ok) throw new Error(`swisstopo a répondu ${reponse.status}`);
+      ctx.drawImage(await createImageBitmap(await reponse.blob()), 0, 0, largeur, hauteur);
+    } catch (erreur) {
+      afficherMessage(`Photo swisstopo non chargée (réseau ?) : PDF sans photo. ${erreur.message ?? ''}`, 6000);
+    }
+  }
+  if (plans) {
+    const visibles = plansDuProjet().filter((p) => p.visible !== false);
+    const vue = { estCentre, nordCentre, echelle: largeur / (zone.estMax - zone.estMin), largeur, hauteur, rotation: 0 };
+    const toilePlans = document.createElement('canvas');
+    dessinerPlansDxf(toilePlans, visibles, vue, 1);
+    ctx.drawImage(toilePlans, 0, 0);
+  }
+  return toile.toDataURL('image/jpeg', 0.85);
+}
+
 /** « Exporter » : PDF (croquis + tableaux) ou DXF (points, lignes, textes), puis la fenêtre Exporter. */
 function exporterMesureRapide() {
   const mesure = mesureRapide(mesureRapideEtat.points);
   if (mesure.points.length === 0) return;
   const base = `${nomDeFichierProjet(projet)}_mesure-rapide`.replace(/[\\/:*?"<>|]/g, '_');
+  const avecPlans = plansDuProjet().some((p) => p.visible !== false);
   ouvrirFenetreExport({
     titre: 'Mesure rapide',
     formats: [['pdf', 'PDF', 'croquis et tableaux'], ['dxf', 'DXF', 'points, lignes et textes']],
-    fabriquer: async (format) => {
+    // 0.159.0 : fond du croquis du PDF : photo swisstopo et plans DXF affichés.
+    options: [
+      { cle: 'photo', texte: 'Photo aérienne swisstopo en fond', formats: ['pdf'] },
+      ...(avecPlans ? [{ cle: 'plans', texte: 'Plans DXF affichés en fond', formats: ['pdf'] }] : []),
+    ],
+    fabriquer: async (format, choix = {}) => {
       const { pdfMesureRapide, dxfMesureRapide } = await import('./export/mesure-rapide.js');
       if (format === 'pdf') {
-        return { blob: pdfMesureRapide({ mesure, titre: `Mesure rapide · ${titreProjet(projet)}`, cartouche: { affaire: projet.cartouche?.affaire ?? '', date: new Date().toLocaleDateString('fr-CH') } }), nom: `${base}.pdf` };
+        const fond = choix.photo || choix.plans ? await fondDuCroquisMesure(mesure, { photo: choix.photo, plans: choix.plans }) : null;
+        return { blob: pdfMesureRapide({ mesure, fond, titre: `Mesure rapide · ${titreProjet(projet)}`, cartouche: { affaire: projet.cartouche?.affaire ?? '', date: new Date().toLocaleDateString('fr-CH') } }), nom: `${base}.pdf` };
       }
       return { blob: new Blob([octetsDxf(dxfMesureRapide(mesure))], { type: 'application/dxf' }), nom: `${base}.dxf` };
     },
@@ -611,32 +675,55 @@ function exporterMesureRapide() {
   });
 }
 
-/** Page Projet ouverte sur Import, Exporter ou le contenu du projet (boutons de la page Applications). */
+// Pages du projet (0.159.0, demande du 08.11) : il n'y a plus d'application « Projet » ; chaque bouton
+// de l'encadré du projet (page Applications) ouvre sa page à part : la liste des projets (« Changer »),
+// Import, Exporter ou le contenu du projet (body[data-partie-projet], le reste de l'onglet est caché).
+const TITRES_PARTIES_PROJET = { ouvrir: 'Projets', import: 'Import', export: 'Exporter', contenu: 'Contenu du projet' };
+
+/** Page du projet : 'ouvrir' (liste des projets), 'import', 'export' ou 'contenu'. */
 function ouvrirPartieProjet(quoi) {
-  afficherOnglet('projets');
-  if (quoi === 'contenu') {
-    montrerOngletProjet(null);
-    requestAnimationFrame(() => document.querySelector('#contenu-projet')?.scrollIntoView({ block: 'start' }));
-    return;
-  }
-  montrerOngletProjet(quoi);
-  requestAnimationFrame(() => document.querySelector('.onglets-projet')?.scrollIntoView({ block: 'start' }));
+  afficherOnglet('projets', { partie: quoi });
+  if (quoi === 'ouvrir') {
+    // La page « Ouvrir projet » (liste, dossiers, + Nouveau) de l'écran Projet.
+    if (!document.querySelector('.panneau-projet')?.classList.contains('page-gestion-projets')) {
+      document.querySelector('#projets [data-action="panneau"][data-panneau="projets"]')?.click();
+    }
+  } else montrerOngletProjet(quoi === 'contenu' ? null : quoi);
+  window.scrollTo(0, 0);
 }
 
-/** Ouvre une application (tuile de la page Applications ou bulle de la roue des favoris). */
-function ouvrirAppli(cle) {
+/**
+ * Sous-applications écrites en petit sur les tuiles de la page Applications (toucher = ouvrir
+ * l'application dessus) ; toucher le reste de la tuile ouvre la dernière sous-application utilisée.
+ */
+function sousApplisDe(cle) {
+  if (cle === 'implanter') {
+    return [['point', 'Point'], ['ligne', 'Ligne'], ['surface', 'Surface'], ['altitude', 'Altitude'], ...(aAcces('expert') ? [['talus', 'Talus']] : [])];
+  }
+  if (cle === 'guidage') return [['grader', 'Grader'], ['bull', 'Bull'], ['rateau', 'Râteau']];
+  if (cle === 'calculs') return PARTIES_CALCULS.filter(([c]) => c !== 'dessin' || aAcces('expert')).map(([c, titre]) => [c, titre.replace(' / métrés', '')]);
+  return [];
+}
+
+/** Ouvre une application (tuile, sous-application d'une tuile, ou bulle de la roue des favoris). */
+function ouvrirAppli(cle, sous = null) {
   const modes = { lever: 'lever', implanter: 'controler', controle: 'autocontrole', guidage: 'lame' };
   if (modes[cle]) {
     // Guidage (0.153.0) : on revient toujours au choix de la machine, comme avant avec l'onglet.
     if (cle === 'guidage') ecranLeve?.revenirAuChoixMachine();
     choisirModeTerrain(modes[cle]);
     afficherOnglet('terrain');
-  } else if (cle === 'calculs') afficherOnglet('calculs');
+  } else if (cle === 'calculs') afficherOnglet(sous ?? 'calculs');
   else if (cle === 'plan') afficherOnglet('plan');
   else if (cle === 'mesure') afficherOnglet('mesure-rapide');
-  else if (cle === 'projet') afficherOnglet('projets');
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur'));
-  else if (cle === 'reglages') ouvrirFenetreReglages();
+  if (sous && cle !== 'calculs') {
+    // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
+    choisirSousAppli(sous);
+    requestAnimationFrame(() => {
+      if (!sousApplis().find((s) => s.cle === sous)?.actif) choisirSousAppli(sous);
+    });
+  }
 }
 
 navigation = creerNavigation(document.querySelector('#bande-appli'), {
@@ -653,14 +740,13 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
     titre: document.querySelector('#titre-projet')?.textContent ?? 'Projet',
     detail: document.querySelector('#etat')?.textContent ?? '',
   }),
-  pageProjet: () => afficherOnglet('projets'),
   partieProjet: ouvrirPartieProjet,
+  sousApplisDe,
+  reglages: () => ouvrirFenetreReglages(),
+  fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? () => fermerAppli() : null,
   importPermis: () => aAcces('expert'),
   agir: agirDepuisBande,
-  changerProjet: () => {
-    afficherOnglet('projets');
-    document.querySelector('#projets [data-action="panneau"][data-panneau="projets"]')?.click();
-  },
+  changerProjet: () => ouvrirPartieProjet('ouvrir'),
   get nouveauProjet() {
     return aAcces('intermediaire') ? () => creerNouveauProjet() : null;
   },
@@ -685,8 +771,15 @@ document.querySelector('#leve-direct').addEventListener('input', () => navigatio
  * 'volumes', 'mesures' ; 'calculs' : la dernière partie affichée). Sur ordinateur, le plan reste
  * toujours visible à droite.
  */
-function afficherOnglet(demande) {
+function afficherOnglet(demande, { partie = null } = {}) {
   const nom = demande === 'calculs' ? partieCalculs : demande;
+  // 0.159.0 : l'onglet Projet n'est plus montré en entier : une de ses pages (voir ouvrirPartieProjet) ;
+  // demandé sans page (après l'ouverture d'un projet…), c'est la page Applications qui s'ouvre.
+  if (nom === 'projets') {
+    document.body.dataset.partieProjet = partie ?? 'contenu';
+    const titre = document.querySelector('#titre-partie-projet');
+    if (titre) titre.textContent = TITRES_PARTIES_PROJET[partie ?? 'contenu'];
+  }
   // Drive : on travaille sur le projet de départ (fenêtre de démarrage) : il est comparé à Drive.
   if (nom !== 'projets') partage?.choixFait();
   // Ajout manuel (0.120.0) : on le quitte en changeant de page (le plan en fait partie).
@@ -727,6 +820,7 @@ function afficherOnglet(demande) {
   if (nom === 'mesure-rapide') afficherMesureRapide();
   navigation?.mettreAJour();
   window.scrollTo(0, 0);
+  if (nom === 'projets' && !partie) navigation?.ouvrirPage();
 }
 
 /**
@@ -756,7 +850,12 @@ document.querySelector('.parties-calculs').addEventListener('click', (evenement)
 });
 installerAide(document.querySelector('#bouton-aide'));
 // Toucher le projet ouvert (en-tête) : on va à l'onglet Projet.
-document.querySelector('#entete-projet').addEventListener('click', () => afficherOnglet('projets'));
+// 0.159.0 : toucher le nom du projet (en-tête) ouvre la page Applications (encadré du projet en haut).
+document.querySelector('#entete-projet').addEventListener('click', () => navigation.ouvrirPage());
+// Page « Ouvrir projet » : sa flèche ← ramène à la page Applications (il n'y a plus de page Projet entière).
+document.querySelector('#projets').addEventListener('click', (evenement) => {
+  if (document.body.dataset.partieProjet === 'ouvrir' && evenement.target.closest('.entete-page-projets .bouton-retour[data-panneau="projets"]')) navigation.ouvrirPage();
+});
 
 // Réglages de cet appareil (roue ⚙) : mode Base / Intermédiaire / Expert, mode téléphone, bulles d'aide, nom de l'appareil.
 appliquerReglages();
@@ -2309,7 +2408,9 @@ function gererLoupeImplantation() {
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
   const accrocheActive = mesureRapideActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(daoAppli?.actif());
-  const enLigne = accrocheActive && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
+  // 0.159.0 : les applications sont indépendantes : la Mesure rapide ne montre rien d'Implanter.
+  const mesure = mesureRapideActive();
+  const enLigne = accrocheActive && !mesure && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
   // Bouton « Seul » en Implanter (0.90.1) : ni levés libres, ni points de contrôle, ni dessins, ni « À implanter ».
@@ -2357,8 +2458,8 @@ function envoyerImplantationAuPlan() {
         pointsControle,
         lignesAutres,
         reseaux,
-        choix: daoAppli?.actif() ? daoAppli.dernierPoint() : recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : accrocheActive && !enLigne && !enAutocontrole() ? implanter.choix : null,
-        cible: cibleControle ?? (accrocheActive && !enLigne && !enAutocontrole() && !ajoutLevee.actif ? implanter.cible : null),
+        choix: daoAppli?.actif() ? daoAppli.dernierPoint() : recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : accrocheActive && !mesure && !enLigne && !enAutocontrole() ? implanter.choix : null,
+        cible: cibleControle ?? (accrocheActive && !mesure && !enLigne && !enAutocontrole() && !ajoutLevee.actif ? implanter.cible : null),
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : [],
@@ -6927,6 +7028,8 @@ function mettreAJourEtatEntete() {
     : '';
   // 0.157.0 (demande du 08.11) : plus le nombre de points et de levés, seulement le sous-titre et Drive.
   document.querySelector('#etat').textContent = [sousTitreProjet(projet), drive].filter(Boolean).join(' · ');
+  // La page Applications ouverte montre le projet à jour dans son encadré.
+  navigation?.mettreAJour();
 
   // Verrou du partage : main verte (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
   // (un autre appareil l'a ; toucher = prendre la main). Rien sans Drive.
@@ -6978,10 +7081,7 @@ async function montrerAttenteMain(verrou) {
     ],
     signal: fermetureAttente.signal,
   });
-  if (choix === 'autre') {
-    afficherOnglet('projets');
-    document.querySelector('#projets [data-panneau="projets"]')?.click();
-  }
+  if (choix === 'autre') ouvrirPartieProjet('ouvrir');
 }
 
 /** Vrai si un autre appareil a la main sur le projet ouvert : rien ne s'enregistre (0.76.0). */
@@ -7136,8 +7236,6 @@ function mettreAJourResume(lequel) {
   resumes = [resumerProjet(lequel), ...resumes.filter((r) => r.id !== lequel.id)].sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
 }
 
-/** Étape où reprendre le travail : Terrain dans l'APK ; sinon Volumes si le projet a des points, sinon Projet. */
-const etapeUtile = () => (recepteurDisponible() ? 'terrain' : leveActif(projet) ? 'volumes' : 'projets');
 
 /**
  * Va à un onglet, ou à la liste des levés ('leves') : onglet Terrain dans l'appli Android s'il n'y
@@ -7152,15 +7250,13 @@ function allerA(onglet) {
     afficherOnglet('terrain');
     return;
   }
-  afficherOnglet('projets');
-  // Import ouvert (Expert), sinon le contenu du projet.
-  if (aAcces('expert')) montrerOngletProjet('import');
-  requestAnimationFrame(() => document.querySelector(aAcces('expert') ? '.onglets-projet' : '#contenu-projet')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  // Import (Expert), sinon le contenu du projet : sa page à part (0.159.0).
+  ouvrirPartieProjet(aAcces('expert') ? 'import' : 'contenu');
 }
 
 /**
  * Ouvre un projet : il devient le projet affiché, et il est enregistré.
- * Puis on va à l'étape utile (voir etapeUtile).
+ * Puis on va à la page Applications (0.159.0).
  */
 // La fenêtre des libellés range ceux « de ce projet seulement » dans le projet (0.105.6).
 surLibellesProjet((libelles) => {
@@ -7193,7 +7289,8 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   recalculer({ recadrer: true });
   historique.reinitialiser(modifications, projet);
   mettreAJourAnnuler();
-  if (changerOnglet) afficherOnglet(etapeUtile());
+  // 0.159.0 : après l'ouverture d'un projet, la page Applications (menu de départ).
+  if (changerOnglet) afficherOnglet('projets');
   await enregistrer();
   // Journal de l'appareil (0.119.0) : une ouverture par projet ouvert (pas à chaque nouvelle
   // version reçue de Drive pour le même projet).
@@ -7240,7 +7337,7 @@ async function demarrer() {
     partage.demarrer({ choixEnAttente: choix !== 'continuer' });
     // 0.157.0 : la page Applications est le menu de départ.
     if (choix === 'continuer') navigation.ouvrirPage();
-    if (choix === 'ouvrir') document.querySelector('#projets [data-panneau="projets"]')?.click();
+    if (choix === 'ouvrir') ouvrirPartieProjet('ouvrir');
     else if (choix === 'nouveau' && !(await creerNouveauProjet())) {
       // Fenêtre fermée sans créer : on reste sur le dernier projet.
       partage.apresOuverture();

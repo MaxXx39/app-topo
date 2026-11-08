@@ -200,7 +200,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const tuilesAffichees = new Map();
   let fondIndisponible = false;
   // Loupe de l'accroche « Manuel » (0.130.0, recalage d'un plan PDF) : voir loupe.js.
-  const loupe = creerLoupe(cadre, { lireVue: () => vue, lirePlans: () => plansDxf });
+  // 0.159.0 : la loupe montre aussi la photo aérienne quand elle est affichée sur le plan (avec sa transparence).
+  const loupe = creerLoupe(cadre, {
+    lireVue: () => vue,
+    lirePlans: () => plansDxf,
+    lireFond: () => (calques.fondSatellite ? { url: FONDS.satellite.url, opacite: 1 - (calquesChoisis.transparencePhoto ?? 0) / 100 } : null),
+  });
   // Image d'un plan PDF scanné chargée : on redessine les plans (et la loupe).
   surImageChargee(() => {
     signatureDxf = '';

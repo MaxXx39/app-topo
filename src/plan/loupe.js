@@ -2,12 +2,14 @@
 // posée sur le plan, avec une croix au centre, et une poignée (une main) en bas à droite.
 // On tire la main au doigt : le centre de la croix est le point visé, le doigt ne le cache jamais.
 // Doigt levé : la croix passe au vert, les flèches ▲▼◀▶ la déplacent d'un pixel de la loupe,
-// le zoom se change (×2, ×4, ×8). Seulement pour recaler un plan PDF (Expert).
+// le zoom se change (×2, ×4, ×8). Recalage d'un plan PDF (Expert) et Implanter › Point (Intermédiaire).
 //
 // La loupe dessine elle-même les plans DXF / PDF grossis (même dessin que le plan, plus zoomé) :
-// l'image reste nette, au lieu d'agrandir les pixels de l'écran.
-import { versEcran, versTerrain } from './vue.js';
+// l'image reste nette, au lieu d'agrandir les pixels de l'écran. 0.159.0 : dessous, la photo aérienne
+// swisstopo (tuiles plus détaillées) quand elle est affichée sur le plan.
+import { versEcran, versTerrain, zoneVisible } from './vue.js';
 import { dessinerPlansDxf } from './dxf-canvas.js';
+import { niveauDeZoom, tuilesPourZone } from './fond.js';
 
 /** Rayon de la loupe et distance (en x et en y) entre son centre et celui de la poignée (px). */
 export const RAYON_LOUPE = 64;
@@ -41,7 +43,7 @@ export function departDeLaLoupe(largeur, hauteur, libre = hauteur) {
  * Crée la loupe dans "cadre" (le cadre du plan). lireVue() : vue du plan ; lirePlans() : plans DXF
  * affichés. Renvoie { montrer, cacher, actif, redessiner, deplacerDe, changerZoom, placerSur }.
  */
-export function creerLoupe(cadre, { lireVue, lirePlans }) {
+export function creerLoupe(cadre, { lireVue, lirePlans, lireFond = () => null }) {
   const boite = document.createElement('div');
   boite.className = 'loupe-manuelle';
   boite.hidden = true;
@@ -49,7 +51,8 @@ export function creerLoupe(cadre, { lireVue, lirePlans }) {
   boite.innerHTML = `
     <div class="loupe-tige" aria-hidden="true"></div>
     <div class="loupe-rond" role="img" aria-label="Loupe : le point visé est au centre de la croix">
-      <canvas></canvas>
+      <canvas class="loupe-photo"></canvas>
+      <canvas class="loupe-plans"></canvas>
       <svg class="loupe-croix" viewBox="0 0 ${2 * r} ${2 * r}" aria-hidden="true">
         <line x1="8" y1="${r}" x2="${r - 7}" y2="${r}" /><line x1="${r + 7}" y1="${r}" x2="${2 * r - 8}" y2="${r}" />
         <line x1="${r}" y1="8" x2="${r}" y2="${r - 7}" /><line x1="${r}" y1="${r + 7}" x2="${r}" y2="${2 * r - 8}" />
@@ -59,7 +62,10 @@ export function creerLoupe(cadre, { lireVue, lirePlans }) {
     </div>
     <button type="button" class="loupe-poignee" aria-label="Déplacer la loupe">${MAIN}</button>`;
   cadre.append(boite);
-  const canvas = boite.querySelector('canvas');
+  const canvas = boite.querySelector('.loupe-plans');
+  const toilePhoto = boite.querySelector('.loupe-photo');
+  // Tuiles de la photo déjà demandées (adresse → image) ; une tuile chargée redessine la loupe.
+  const imagesPhoto = new Map();
   const texteZoom = boite.querySelector('.loupe-zoom');
 
   /** Hauteur du plan au-dessus de la barre posée en bas (recalage), en px. */
@@ -88,8 +94,48 @@ export function creerLoupe(cadre, { lireVue, lirePlans }) {
     placer();
     const densite = Math.min(window.devicePixelRatio || 1, 2);
     const vueLoupe = { ...vue, largeur: 2 * r, hauteur: 2 * r, echelle: vue.echelle * zoom, estCentre: cible.est, nordCentre: cible.nord };
+    dessinerPhoto(vueLoupe, densite);
     dessinerPlansDxf(canvas, lirePlans(), vueLoupe, densite);
     texteZoom.textContent = `×${zoom}`;
+  }
+
+  /** Photo aérienne sous les plans : chaque tuile posée par ses coins (le plan peut être tourné). */
+  function dessinerPhoto(vueLoupe, densite) {
+    const fond = lireFond();
+    const taille = Math.round(2 * r * densite);
+    if (toilePhoto.width !== taille) {
+      toilePhoto.width = taille;
+      toilePhoto.height = taille;
+    }
+    const ctx = toilePhoto.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, taille, taille);
+    toilePhoto.hidden = !fond;
+    if (!fond) return;
+    const z = niveauDeZoom(1 / vueLoupe.echelle, densite);
+    const tuiles = tuilesPourZone(zoneVisible(vueLoupe), z);
+    if (tuiles.length > 16) return;
+    ctx.globalAlpha = Math.max(0, Math.min(1, fond.opacite));
+    for (const tuile of tuiles) {
+      const adresse = fond.url(tuile.z, tuile.colonne, tuile.ligne);
+      let image = imagesPhoto.get(adresse);
+      if (!image) {
+        image = new Image();
+        image.onload = redessiner;
+        image.src = adresse;
+        imagesPhoto.set(adresse, image);
+        if (imagesPhoto.size > 64) imagesPhoto.delete(imagesPhoto.keys().next().value);
+      }
+      if (!image.complete || !image.naturalWidth) continue;
+      const a = versEcran(tuile.est, tuile.nord, vueLoupe);
+      const b = versEcran(tuile.est + tuile.cote, tuile.nord, vueLoupe);
+      const c = versEcran(tuile.est, tuile.nord - tuile.cote, vueLoupe);
+      const n = image.naturalWidth;
+      ctx.setTransform(((b.x - a.x) / n) * densite, ((b.y - a.y) / n) * densite, ((c.x - a.x) / n) * densite, ((c.y - a.y) / n) * densite, a.x * densite, a.y * densite);
+      ctx.drawImage(image, 0, 0);
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
   }
 
   function redessiner() {

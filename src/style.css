@@ -12038,3 +12038,66 @@ body.mode-telephone .tableau-mesure-rapide table { font-size: 11px; }
 .plan .cote-mesure-rapide { font-size: 13px; text-anchor: middle; }
 .plan .nom-mesure-rapide { font-size: 12px; }
 .plan .surface-mesure-rapide { font-size: 15px; text-anchor: middle; }
+
+/* ==========================================================================
+   0.159.0 (demandes du 08.11) : menu (encadré du projet, sous-applications sur les tuiles, Réglages et
+   Fermer à part), pages du projet, bouton récepteur sans fond carré, applications indépendantes.
+   ========================================================================== */
+/* Bouton Récepteur : seulement le rond de couleur, sans carré sombre autour. */
+body .entete .entete-icone-bouton.bouton-recepteur-entete,
+body.mode-telephone .entete .entete-icone-bouton.bouton-recepteur-entete { background: transparent; }
+/* « Implanter » posé sur le plan : seulement dans Implanter (pas dans la Mesure rapide, Calculs…). */
+body:not([data-onglet='terrain']) .bouton-implanter-plan { display: none !important; }
+
+/* Encadré du projet : bandeau + Import / Exporter / Contenu ensemble. */
+.cadre-projet-applis { padding: 10px; border-radius: 18px; background: #1b2b36; }
+.cadre-projet-applis .bandeau-projet-applis { padding: 4px 4px 10px; border-radius: 0; background: none; }
+.cadre-projet-applis .parties-projet-applis { margin-top: 0; }
+.cadre-projet-applis .bouton-partie-projet { border-color: rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.1); color: #ffffff; }
+
+/* Sous-applications en petit sur les tuiles (toucher = ouvrir l'application dessus). */
+.tuile-appli .sous-tuile { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: 100%; }
+.tuile-appli .sous-tuile button {
+  min-height: 30px;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+body.mode-telephone .tuile-appli .sous-tuile button { min-height: 26px; padding: 1px 6px; font-size: 10px; }
+
+/* Pied de la page Applications : Réglages (une page à part, pas une application) et Fermer l'appli. */
+.pied-applis { display: flex; gap: 10px; margin-top: 18px; }
+.bouton-pied-applis {
+  flex: 1 1 0;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px solid #64748b;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--encre);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.bouton-pied-applis svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bouton-pied-applis.fermer { border-color: #dc2626; background: #dc2626; color: #ffffff; }
+body.mode-telephone .bouton-pied-applis { min-height: 42px; font-size: 13px; }
+
+/* Pages du projet : une seule partie de l'onglet Projet à la fois (liste des projets, Import, Exporter, Contenu). */
+.titre-partie-projet { margin: 0 0 10px; font-size: 20px; color: var(--encre); }
+body[data-partie-projet] .panneau-projet > :not(.titre-partie-projet) { display: none !important; }
+body[data-partie-projet='ouvrir'] .panneau-projet > :is(#projets, #projets-suite) { display: block !important; }
+body[data-partie-projet='ouvrir'] .panneau-projet > .titre-partie-projet { display: none; }
+body[data-partie-projet='import'] .panneau-projet > #importer:not([hidden]) { display: block !important; }
+body[data-partie-projet='export'] .panneau-projet > #exporter-projet:not([hidden]) { display: block !important; }
+body[data-partie-projet='contenu'] .panneau-projet > #contenu-projet { display: block !important; }

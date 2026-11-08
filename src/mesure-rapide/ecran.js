@@ -1,5 +1,6 @@
-// Écran de la Mesure rapide (0.158.0, dès Intermédiaire, demande du 08.11) : sous le plan, l'accroche
-// (Point, Sommet, Milieu, Sur ligne, Croisement, Centre, Libre), le résumé en gros (1 point : X Y Z et
+// Écran de la Mesure rapide (0.158.0, dès Intermédiaire, demande du 08.11) : sous le plan, la barre
+// d'accroche (0.159.0 : la même qu'Implanter, à icônes : Point, Sommet, Milieu, Sur ligne, Croisement,
+// Centre, puis Libre et, dans l'appli Android, GNSS = lever au récepteur), le résumé en gros (1 point : X Y Z et
 // nom ; 2 points : longueurs, altitudes, Δh, pente ; 3 points et plus : périmètres et surfaces), puis
 // les tableaux des points et des côtés, page par page s'il y a trop de lignes, et les boutons
 // « ↶ Dernier point », « Remise à 0 », « Enregistrer », « Exporter » (PDF / DXF).
@@ -41,21 +42,25 @@ function tableauPagine(cle, titre, entetes, lignes, page) {
 }
 
 /**
- * HTML de l'écran. { mesure (voir topo/mesure-rapide.js), accroche, accroches: [[cle, titre]],
+ * HTML de l'écran. { mesure (voir topo/mesure-rapide.js), accroche, accroches: [[cle, mot, nom, dessin]],
  * pages: { points, cotes }, lectureSeule }.
  */
 export function htmlMesureRapide({ mesure, accroche, accroches, pages, lectureSeule = false }) {
   const n = mesure.points.length;
-  const puces = accroches.map(([cle, titre]) => `<button type="button" class="puce-choix ${accroche === cle ? 'actif' : ''}" data-action="accroche-mesure" data-valeur="${cle}">${titre}</button>`).join('');
+  const boutons = accroches.map(([cle, mot, nom, dessin]) => `<button type="button" class="bouton-accroche ${accroche === cle ? 'actif' : ''}" data-action="accroche-mesure" data-valeur="${cle}" title="${nom}" aria-label="${nom}" aria-pressed="${accroche === cle}">
+      <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span class="mot-accroche">${mot}</span></button>`).join('');
   const resume = n > 0
     ? `<div class="resume-mesure-rapide">${lignesResume(mesure).map(([libelle, valeur]) => `<div><span>${echapper(libelle)}</span><strong>${echapper(valeur)}</strong></div>`).join('')}</div>`
-    : '<p class="invite-mesure-rapide"><strong>Touche un point sur le plan</strong></p>';
+    : `<p class="invite-mesure-rapide"><strong>${accroche === 'gnss' ? 'Touche « + Point GNSS » en bas' : 'Touche un point sur le plan'}</strong></p>`;
   const points = tableauPagine('points', `Points (${n})`, ['N°', 'Nom', 'Est', 'Nord', 'H'],
     mesure.points.map((p, i) => [String(i + 1), p.nom || '—', nombre(p.est), nombre(p.nord), nombre(p.altitude)]), pages.points);
   const cotes = tableauPagine('cotes', `Côtés (${mesure.cotes.length})`, ['Côté', 'L 2D', 'L 3D', 'Δh', 'Pente'],
     mesure.cotes.map((c) => [`${c.de} → ${c.a}`, nombre(c.longueur2d), nombre(c.longueur3d), nombre(c.deltaH), pente(c.pente)]), pages.cotes);
   return `<div class="ecran-mesure-rapide">
-      <div class="accroches-mesure-rapide" role="group" aria-label="Accroche">${puces} ${bulle('mesureRapide')}</div>
+      <div class="barre-accroche ouverte barre-accroche-mesure">
+        <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend">${boutons}</div>
+        ${bulle('mesureRapide')}
+      </div>
       ${resume}
       <div class="boutons-mesure-rapide">
         <button type="button" class="bouton-secondaire" data-action="effacer-dernier-mesure" ${n === 0 ? 'disabled' : ''}>↶ Dernier point</button>

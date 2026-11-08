@@ -10,6 +10,10 @@ import { COULEURS } from './pdf.js';
 import { ecrireDxf, xyz, texteCentre, texteAscii, polyligne3D } from './dxf.js';
 
 const MARGE = 15; // mm
+// Cadre du croquis sur la feuille (mm) ; 0.159.0 : une image de fond (photo swisstopo et / ou plans DXF)
+// peut y être posée, faite à la même échelle (voir cadreDuCroquis).
+export const LARGEUR_CROQUIS = 210 - 2 * MARGE;
+export const HAUTEUR_CROQUIS = 110;
 const VIOLET = [124, 58, 237];
 
 const nombre = (valeur) => (valeur == null ? '—' : formaterNombre(valeur));
@@ -42,8 +46,27 @@ export function lignesResume(mesure) {
 /** Nom affiché d'un point de la mesure : son nom s'il en a un, sinon son numéro. */
 const nomDuPoint = (p, i) => p.nom || String(i + 1);
 
-/** PDF de la mesure. { mesure, titre, cartouche: { affaire, date } } → Blob. */
-export function pdfMesureRapide({ mesure, titre = 'Mesure rapide', cartouche = {} }) {
+/**
+ * Échelle et centre du croquis : { echelle (mm de feuille par m), estCentre, nordCentre, zone } où zone =
+ * { estMin, estMax, nordMin, nordMax } couvre tout le cadre (pour fabriquer l'image de fond).
+ */
+export function cadreDuCroquis(points, l = LARGEUR_CROQUIS, h = HAUTEUR_CROQUIS) {
+  const est = points.map((p) => p.est);
+  const nord = points.map((p) => p.nord);
+  const [eMin, eMax, nMin, nMax] = [Math.min(...est), Math.max(...est), Math.min(...nord), Math.max(...nord)];
+  const etendue = Math.max(eMax - eMin, nMax - nMin, 1);
+  const echelle = Math.min((l - 24) / Math.max(eMax - eMin, etendue * 0.2), (h - 24) / Math.max(nMax - nMin, etendue * 0.2));
+  const estCentre = (eMin + eMax) / 2;
+  const nordCentre = (nMin + nMax) / 2;
+  const [demiL, demiH] = [l / 2 / echelle, h / 2 / echelle];
+  return { echelle, estCentre, nordCentre, zone: { estMin: estCentre - demiL, estMax: estCentre + demiL, nordMin: nordCentre - demiH, nordMax: nordCentre + demiH } };
+}
+
+/**
+ * PDF de la mesure. { mesure, titre, cartouche: { affaire, date }, fond: image JPEG (data URL) du
+ * cadre entier ou null } → Blob.
+ */
+export function pdfMesureRapide({ mesure, titre = 'Mesure rapide', cartouche = {}, fond = null }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const largeur = 210 - 2 * MARGE;
   let y = 18;
@@ -58,7 +81,7 @@ export function pdfMesureRapide({ mesure, titre = 'Mesure rapide', cartouche = {
   doc.setFillColor(...COULEURS.ambre);
   doc.rect(MARGE, y + 2, 24, 0.9, 'F');
   y += 8;
-  y = croquis(doc, mesure, MARGE, y, largeur, 110) + 6;
+  y = croquis(doc, mesure, MARGE, y, largeur, HAUTEUR_CROQUIS, fond) + 6;
   // Résumé.
   doc.setTextColor(...COULEURS.texte);
   doc.setFontSize(10);
@@ -82,16 +105,13 @@ export function pdfMesureRapide({ mesure, titre = 'Mesure rapide', cartouche = {
 }
 
 /** Croquis de la mesure dans le cadre (x, y, l, h) mm, à l'échelle, nord en haut. Renvoie le bas du cadre. */
-function croquis(doc, { points, cotes }, x, y, l, h) {
+function croquis(doc, { points, cotes }, x, y, l, h, fond = null) {
+  if (fond) doc.addImage(fond, 'JPEG', x, y, l, h);
   doc.setDrawColor(...COULEURS.triangle);
   doc.setLineWidth(0.2);
   doc.rect(x, y, l, h);
-  const est = points.map((p) => p.est);
-  const nord = points.map((p) => p.nord);
-  const [eMin, eMax, nMin, nMax] = [Math.min(...est), Math.max(...est), Math.min(...nord), Math.max(...nord)];
-  const etendue = Math.max(eMax - eMin, nMax - nMin, 1);
-  const echelle = Math.min((l - 24) / Math.max(eMax - eMin, etendue * 0.2), (h - 24) / Math.max(nMax - nMin, etendue * 0.2));
-  const versPage = (p) => [x + l / 2 + (p.est - (eMin + eMax) / 2) * echelle, y + h / 2 - (p.nord - (nMin + nMax) / 2) * echelle];
+  const { echelle, estCentre, nordCentre } = cadreDuCroquis(points, l, h);
+  const versPage = (p) => [x + l / 2 + (p.est - estCentre) * echelle, y + h / 2 - (p.nord - nordCentre) * echelle];
   doc.setDrawColor(...VIOLET);
   doc.setLineWidth(0.5);
   doc.setFontSize(7);

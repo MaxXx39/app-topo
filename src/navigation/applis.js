@@ -7,6 +7,7 @@
 // Une application : cle, titre, couleur (fond du bouton), texte (couleur du texte sur ce fond),
 // icone (tracé SVG 24 × 24), niveau ('intermediaire' / 'expert' : mode minimum), apk (vrai : seulement
 // dans l'appli Android, avec un récepteur), site (vrai : aussi sur le site), titreSite (nom sur le site).
+// 0.159.0 : Réglages n'est plus une application (bouton à part en bas de la page Applications).
 export const APPLIS = [
   {
     cle: 'lever',
@@ -78,14 +79,6 @@ export const APPLIS = [
     apk: true,
     icone: '<path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><ellipse cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" />',
   },
-  {
-    cle: 'reglages',
-    titre: 'Réglages',
-    couleur: '#64748b',
-    texte: '#ffffff',
-    site: true,
-    icone: '<circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />',
-  },
 ];
 
 // Le projet n'est pas une tuile (il a son bandeau en haut de la page Applications), mais c'est
@@ -132,7 +125,7 @@ export function appliCourante(onglet, modeTerrain) {
 
 export const CLE_FAVORIS = 'topo-favoris-applis';
 export const FAVORIS_DEPART = ['lever', 'implanter', 'plan'];
-export const MAX_FAVORIS = 5;
+export const MAX_FAVORIS = 4; // 0.159.0 : 4 au plus (demande du 08.11)
 
 /** Favoris retenus sur cet appareil (clés d'applications connues, 5 au plus), sinon ceux de départ. */
 export function lireFavoris(stockage = globalThis.localStorage) {

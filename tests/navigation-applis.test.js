@@ -12,14 +12,14 @@ const cles = (liste) => liste.map((a) => a.cle);
 
 describe('applications proposées', () => {
   it('APK en Base : sans Calculs ni Guidage', () => {
-    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('base') }))).toEqual(['lever', 'implanter', 'controle', 'plan', 'recepteur', 'reglages']);
+    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('base') }))).toEqual(['lever', 'implanter', 'controle', 'plan', 'recepteur']);
   });
   it('APK en Expert : toutes', () => {
-    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('expert') }))).toEqual(['lever', 'implanter', 'mesure', 'controle', 'guidage', 'calculs', 'plan', 'recepteur', 'reglages']);
+    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('expert') }))).toEqual(['lever', 'implanter', 'mesure', 'controle', 'guidage', 'calculs', 'plan', 'recepteur']);
   });
   it('site : pas d\'Implanter, de Guidage ni de Récepteur ; Contrôle dès Intermédiaire', () => {
-    expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('base') }))).toEqual(['lever', 'plan', 'reglages']);
-    expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('intermediaire') }))).toEqual(['lever', 'mesure', 'controle', 'calculs', 'plan', 'reglages']);
+    expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('base') }))).toEqual(['lever', 'plan']);
+    expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('intermediaire') }))).toEqual(['lever', 'mesure', 'controle', 'calculs', 'plan']);
   });
 });
 
@@ -48,15 +48,16 @@ describe('favoris de la roue', () => {
     expect(lireFavoris(memoire({ [CLE_FAVORIS]: '["lever","inconnue","plan"]' }))).toEqual(['lever', 'plan']);
     expect(lireFavoris(memoire({ [CLE_FAVORIS]: 'abîmé' }))).toEqual(FAVORIS_DEPART);
   });
-  it('cocher, décocher, 5 au plus', () => {
+  it('cocher, décocher, 4 au plus', () => {
     let liste = ['lever'];
     ({ liste } = basculerFavori(liste, 'plan'));
     expect(liste).toEqual(['lever', 'plan']);
     ({ liste } = basculerFavori(liste, 'lever'));
     expect(liste).toEqual(['plan']);
-    const pleine = ['lever', 'implanter', 'plan', 'controle', 'calculs'];
+    const pleine = ['lever', 'implanter', 'plan', 'controle'];
     expect(pleine).toHaveLength(MAX_FAVORIS);
-    expect(basculerFavori(pleine, 'reglages')).toEqual({ liste: pleine, refuse: true });
+    expect(MAX_FAVORIS).toBe(4);
+    expect(basculerFavori(pleine, 'calculs')).toEqual({ liste: pleine, refuse: true });
   });
 });
 
