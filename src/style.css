@@ -11943,3 +11943,98 @@ body.mode-telephone .bouton-partie-projet svg { width: 16px; height: 16px; }
   -webkit-touch-callout: none;
 }
 body.appui-en-cours { -webkit-user-select: none; user-select: none; }
+
+/* ==========================================================================
+   0.158.0 (demandes du 08.11) : zone du milieu (Implanter, Enregistrer, DAO) et Mesure rapide.
+   ========================================================================== */
+/* Le vrai bouton relayé par la bande est caché (la bande le touche à sa place). */
+body[data-relais='implanter'] .bouton-implanter-plan { display: none !important; }
+body[data-relais='enregistrer'] #leve-direct [data-action='enregistrerImplantation'] { display: none; }
+body[data-relais='dao'] #bouton-dao { display: none; }
+.bande-appli .bouton-enreg-bande.relais-implanter,
+.bande-appli .bouton-enreg-bande.relais-enregistrer { background: #0d9488; color: #ffffff; }
+body[data-mode-terrain='autocontrole'] .bande-appli .bouton-enreg-bande.relais-enregistrer { background: var(--bordeaux); }
+.bande-appli .bouton-enreg-bande.relais-dao { background: #db2777; color: #ffffff; }
+.bande-appli .bouton-enreg-bande.relais-mesure-gnss { background: #7c3aed; color: #ffffff; }
+.bande-appli .bouton-enreg-bande:is(.relais-implanter, .relais-enregistrer, .relais-dao, .relais-mesure-gnss):disabled { background: #475569; color: rgba(255, 255, 255, 0.6); }
+.bande-appli .bouton-enreg-bande:is(.relais-implanter, .relais-enregistrer, .relais-dao, .relais-mesure-gnss) small { color: inherit; }
+.bande-appli .bouton-enreg-bande.relais-enregistrer span { font-size: 18px; }
+body.mode-telephone .bande-appli .bouton-enreg-bande.relais-enregistrer span { font-size: 14px; }
+
+/* Mesure rapide : le plan en haut sur tablette / téléphone, comme Calculs › Volumes. */
+@media (max-width: 899px) {
+  body[data-onglet='mesure-rapide'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(var(--part-plan-terrain, 0.45), var(--part-plan-auto, 0)));
+  }
+  body[data-onglet='mesure-rapide'] .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: var(--hauteur-plan-terrain);
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+  body[data-onglet='mesure-rapide'] .mise-en-page { padding-top: calc(var(--hauteur-plan-terrain) + 12px); }
+  body[data-onglet='mesure-rapide'] .boutons-taille-plan {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    z-index: 3;
+    display: flex;
+    gap: 2px;
+    transform: translateX(-50%);
+  }
+}
+.panneau[data-onglet='mesure-rapide'] { border-top: 4px solid #7c3aed; }
+.panneau[data-onglet='mesure-rapide'] > h2 { color: #7c3aed; }
+.accroches-mesure-rapide { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.invite-mesure-rapide { margin: 12px 0; text-align: center; color: var(--gris); }
+.resume-mesure-rapide {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.resume-mesure-rapide > div {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #7c3aed 9%, var(--surface));
+}
+.resume-mesure-rapide span { font-size: 12px; color: var(--gris); }
+.resume-mesure-rapide strong { font-size: 22px; font-weight: 900; color: var(--encre); font-variant-numeric: tabular-nums; }
+.boutons-mesure-rapide { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+.boutons-mesure-rapide > * { flex: 1 1 auto; min-height: 44px; }
+.tableau-mesure-rapide { margin-top: 10px; }
+.titre-tableau-mesure { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.pages-mesure { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.pages-mesure button { min-width: 44px; min-height: 40px; }
+.tableau-mesure-rapide table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.tableau-mesure-rapide th { text-align: left; font-size: 12px; color: var(--gris); border-bottom: 2px solid var(--bordure); padding: 4px; }
+.tableau-mesure-rapide td { padding: 6px 4px; border-bottom: 1px solid var(--bordure); }
+/* Chiffres alignés à droite (le n° du côté / du point et le nom à gauche). */
+.tableau-mesure-rapide :is(th, td):not(:first-child) { text-align: right; }
+.tableau-mesure-rapide [data-tableau='points'] :is(th, td):nth-child(2) { text-align: left; }
+body.mode-telephone .resume-mesure-rapide strong { font-size: 16px; }
+body.mode-telephone .tableau-mesure-rapide table { font-size: 11px; }
+
+/* Mesure rapide sur le plan : violet, longueurs au milieu des côtés, surface au milieu. */
+.plan .fond-mesure-rapide { fill: rgba(124, 58, 237, 0.12); stroke: none; }
+.plan .trait-mesure-rapide { stroke: #7c3aed; stroke-width: 3; }
+.plan .trait-mesure-rapide.fermeture { stroke-dasharray: 8 5; }
+.plan .point-mesure-rapide { fill: #7c3aed; stroke: #ffffff; stroke-width: 2; }
+.plan :is(.cote-mesure-rapide, .nom-mesure-rapide, .surface-mesure-rapide) {
+  fill: #4c1d95;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3.5px;
+}
+.plan .cote-mesure-rapide { font-size: 13px; text-anchor: middle; }
+.plan .nom-mesure-rapide { font-size: 12px; }
+.plan .surface-mesure-rapide { font-size: 15px; text-anchor: middle; }

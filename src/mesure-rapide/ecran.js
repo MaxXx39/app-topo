@@ -1,0 +1,69 @@
+// Écran de la Mesure rapide (0.158.0, dès Intermédiaire, demande du 08.11) : sous le plan, l'accroche
+// (Point, Sommet, Milieu, Sur ligne, Croisement, Centre, Libre), le résumé en gros (1 point : X Y Z et
+// nom ; 2 points : longueurs, altitudes, Δh, pente ; 3 points et plus : périmètres et surfaces), puis
+// les tableaux des points et des côtés, page par page s'il y a trop de lignes, et les boutons
+// « ↶ Dernier point », « Remise à 0 », « Enregistrer », « Exporter » (PDF / DXF).
+// Rien n'est enregistré tant qu'on ne touche pas « Enregistrer ». Le tout est rendu en HTML ;
+// les actions passent par data-action (voir main.js « Mesure rapide »).
+import { echapper } from '../outils/echapper.js';
+import { formaterNombre } from '../topo/format.js';
+import { lignesResume } from '../export/mesure-rapide.js';
+import { bulle } from '../aide/bulles.js';
+
+export const LIGNES_PAR_PAGE = 6;
+
+const nombre = (valeur) => (valeur == null ? '—' : formaterNombre(valeur));
+const pente = (valeur) => (valeur == null ? '—' : `${valeur.toFixed(2)} %`);
+
+/** Nombre de pages d'un tableau de n lignes. */
+export function nombreDePages(n, parPage = LIGNES_PAR_PAGE) {
+  return Math.max(1, Math.ceil(n / parPage));
+}
+
+/** Tableau d'une page, avec ◀ page ▶ s'il y en a plusieurs. */
+function tableauPagine(cle, titre, entetes, lignes, page) {
+  if (lignes.length === 0) return '';
+  const pages = nombreDePages(lignes.length);
+  const p = Math.min(Math.max(0, page), pages - 1);
+  const morceau = lignes.slice(p * LIGNES_PAR_PAGE, (p + 1) * LIGNES_PAR_PAGE);
+  const navigation = pages > 1
+    ? `<span class="pages-mesure">
+        <button type="button" class="bouton-secondaire" data-action="page-mesure" data-tableau="${cle}" data-sens="-1" ${p === 0 ? 'disabled' : ''} aria-label="Page précédente">◀</button>
+        ${p + 1} / ${pages}
+        <button type="button" class="bouton-secondaire" data-action="page-mesure" data-tableau="${cle}" data-sens="1" ${p === pages - 1 ? 'disabled' : ''} aria-label="Page suivante">▶</button>
+      </span>`
+    : '';
+  return `<div class="tableau-mesure-rapide">
+      <div class="titre-tableau-mesure"><strong>${titre}</strong>${navigation}</div>
+      <table data-tableau="${cle}"><thead><tr>${entetes.map((t) => `<th>${t}</th>`).join('')}</tr></thead>
+      <tbody>${morceau.map((ligne) => `<tr>${ligne.map((v) => `<td>${echapper(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    </div>`;
+}
+
+/**
+ * HTML de l'écran. { mesure (voir topo/mesure-rapide.js), accroche, accroches: [[cle, titre]],
+ * pages: { points, cotes }, lectureSeule }.
+ */
+export function htmlMesureRapide({ mesure, accroche, accroches, pages, lectureSeule = false }) {
+  const n = mesure.points.length;
+  const puces = accroches.map(([cle, titre]) => `<button type="button" class="puce-choix ${accroche === cle ? 'actif' : ''}" data-action="accroche-mesure" data-valeur="${cle}">${titre}</button>`).join('');
+  const resume = n > 0
+    ? `<div class="resume-mesure-rapide">${lignesResume(mesure).map(([libelle, valeur]) => `<div><span>${echapper(libelle)}</span><strong>${echapper(valeur)}</strong></div>`).join('')}</div>`
+    : '<p class="invite-mesure-rapide"><strong>Touche un point sur le plan</strong></p>';
+  const points = tableauPagine('points', `Points (${n})`, ['N°', 'Nom', 'Est', 'Nord', 'H'],
+    mesure.points.map((p, i) => [String(i + 1), p.nom || '—', nombre(p.est), nombre(p.nord), nombre(p.altitude)]), pages.points);
+  const cotes = tableauPagine('cotes', `Côtés (${mesure.cotes.length})`, ['Côté', 'L 2D', 'L 3D', 'Δh', 'Pente'],
+    mesure.cotes.map((c) => [`${c.de} → ${c.a}`, nombre(c.longueur2d), nombre(c.longueur3d), nombre(c.deltaH), pente(c.pente)]), pages.cotes);
+  return `<div class="ecran-mesure-rapide">
+      <div class="accroches-mesure-rapide" role="group" aria-label="Accroche">${puces} ${bulle('mesureRapide')}</div>
+      ${resume}
+      <div class="boutons-mesure-rapide">
+        <button type="button" class="bouton-secondaire" data-action="effacer-dernier-mesure" ${n === 0 ? 'disabled' : ''}>↶ Dernier point</button>
+        <button type="button" class="bouton-secondaire" data-action="remise-a-zero-mesure" ${n === 0 ? 'disabled' : ''}>Remise à 0</button>
+        <button type="button" class="bouton" data-action="enregistrer-mesure" ${n === 0 || lectureSeule ? 'disabled' : ''}>Enregistrer</button>
+        <button type="button" class="bouton" data-action="exporter-mesure" ${n === 0 ? 'disabled' : ''}>Exporter</button>
+      </div>
+      ${cotes}
+      ${points}
+    </div>`;
+}

@@ -26,6 +26,16 @@ export const APPLIS = [
     icone: '<circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" />',
   },
   {
+    // Mesure rapide (0.158.0, dès Intermédiaire) : points touchés sur le plan ou pris au GNSS.
+    cle: 'mesure',
+    titre: 'Mesure rapide',
+    couleur: '#7c3aed',
+    texte: '#ffffff',
+    site: true,
+    niveau: 'intermediaire',
+    icone: '<path d="M3 17 17 3l4 4L7 21z" /><path d="m7 13 2 2M10 10l2 2M13 7l2 2" />',
+  },
+  {
     cle: 'controle',
     titre: 'Contrôle',
     couleur: '#9b2c3a',
@@ -112,6 +122,7 @@ export function applisDisponibles({ avecRecepteur, aAcces }) {
 export function appliCourante(onglet, modeTerrain) {
   if (onglet === 'projets') return 'projet';
   if (onglet === 'plan') return 'plan';
+  if (onglet === 'mesure-rapide') return 'mesure';
   if (['volumes', 'mesures', 'dessin', 'surfaces', 'calculs'].includes(onglet)) return 'calculs';
   if (onglet === 'terrain') return { controler: 'implanter', autocontrole: 'controle', lame: 'guidage' }[modeTerrain] ?? 'lever';
   return 'projet';

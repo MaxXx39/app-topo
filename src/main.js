@@ -117,6 +117,9 @@ import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { creerNavigation } from './navigation/bande.js';
+import { mesureRapide } from './topo/mesure-rapide.js';
+import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
+import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
 import { applisDisponibles, appliCourante } from './navigation/applis.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip } from './outils/son.js';
@@ -294,6 +297,9 @@ const ICONE_MAIN = '<path d="M18 11V6a2 2 0 0 0-4 0v5" /><path d="M14 10V4a2 2 0
 if (!recepteurDisponible()) document.body.classList.add('sur-site');
 // Bande du bas (créée juste après la page, voir « Bande du bas et page Applications »).
 let navigation = null;
+// Mesure rapide (0.158.0, dès Intermédiaire) : points choisis (jamais enregistrés tant qu'on ne touche pas
+// « Enregistrer »), accroche du toucher, page de chaque tableau.
+const mesureRapideEtat = { points: [], accroche: 'point', pages: { points: 0, cotes: 0 } };
 // Ajout manuel d'un point en touchant le plan (voir plus bas « Édition Lever sur le site ») ; déclaré ici car afficherOnglet le lit.
 const ajoutLevee = { actif: false, accroche: 'point', choix: null };
 // Les parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Volumes, Mesures /
@@ -354,6 +360,10 @@ document.querySelector('#app').innerHTML = `
         <div id="dessins"></div>
         <div id="talus-surfaces" class="carte-section"></div>
       </section>
+      <section class="panneau" data-onglet="mesure-rapide">
+        <h2>Mesure rapide</h2>
+        <div id="mesure-rapide"></div>
+      </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
       <div id="barre-mesures" class="barre-edition" hidden></div>
     </div>
@@ -408,24 +418,197 @@ function choisirSousAppli(cle) {
   } else if (appli === 'calculs') afficherOnglet(cle);
 }
 
+/** Gros bouton de la zone du milieu : il touche le vrai bouton de l'écran (caché, voir body[data-relais]). */
+function boutonDeBande(cle, titre, detail, desactive = false) {
+  return `<button type="button" class="bouton-enreg-bande relais-${cle}" data-nav="action" data-cle="${cle}" ${desactive ? 'disabled' : ''}>
+    <span>${echapper(titre)}</span>${detail ? `<small>${echapper(detail)}</small>` : ''}</button>`;
+}
+
+// Vrais boutons de l'écran relayés par la zone du milieu (clé → sélecteur).
+const RELAIS_BANDE = {
+  prendre: '#leve-direct .cadre-prise .bouton-prendre',
+  implanter: '#leve-direct [data-action="implanterChoix"].bouton-implanter, #leve-direct [data-action="implanterLigneChoisie"].bouton-implanter',
+  enregistrer: '#leve-direct [data-action="enregistrerImplantation"]',
+  dao: '#bouton-dao',
+};
+
 /**
- * Zone du milieu de la bande (0.157.0) : Lever (appli Android) = le bouton Enreg. Pts (il touche le
- * vrai bouton de l'écran, caché : mêmes contrôles, même touche volume −) avec le nom du prochain point ;
- * ailleurs rien pour l'instant (à définir sous-application par sous-application) : la bande s'efface.
+ * Zone du milieu de la bande (0.157.0 / 0.158.0, validé le 08.11) : un gros bouton qui touche le vrai
+ * bouton de l'écran (mêmes contrôles, même touche volume −) :
+ * - Lever (appli Android) : Enreg. Pts + nom du prochain point ;
+ * - Implanter : « Implanter » + nom du point et altitude (ou nom de la ligne) quand un élément est choisi ;
+ *   Point en guidage (dès Intermédiaire) : « Enregistrer l'implantation » ;
+ * - Contrôle : « Enregistrer le contrôle » quand un point est visé ;
+ * - Calculs › Dessin (Expert) : « DAO » ;
+ * - Mesure rapide : voir mesureRapideBande ;
+ * ailleurs rien : la bande s'efface. Note aussi quel bouton est relayé (body[data-relais]) pour cacher l'original.
  */
 function infoAppli() {
+  const html = contenuBande();
+  const relais = /data-cle="([a-z-]+)"/.exec(html)?.[1];
+  if (relais) document.body.dataset.relais = relais;
+  else delete document.body.dataset.relais;
+  return html;
+}
+
+function contenuBande() {
   const cle = appliCourante(document.body.dataset.onglet, terrain.mode);
-  if (cle !== 'lever') return '';
-  const prendre = document.querySelector('#leve-direct .cadre-prise .bouton-prendre');
-  if (!prendre) return '';
-  const nom = document.querySelector('#leve-direct .cadre-prise [data-champ="nom-point"]')?.value ?? '';
-  return `<button type="button" class="bouton-enreg-bande" data-nav="action" data-cle="prendre" ${prendre.disabled ? 'disabled' : ''}>
-    <span>Enreg. Pts</span>${nom ? `<small>${echapper(nom)}</small>` : ''}</button>`;
+  const trouver = (relais) => document.querySelector(RELAIS_BANDE[relais]);
+  if (cle === 'lever') {
+    const prendre = trouver('prendre');
+    if (!prendre) return '';
+    return boutonDeBande('prendre', 'Enreg. Pts', document.querySelector('#leve-direct .cadre-prise [data-champ="nom-point"]')?.value ?? '', prendre.disabled);
+  }
+  if (cle === 'implanter') {
+    if (trouver('implanter')) {
+      if (implanter.ligneAValider && implanter.ligne) return boutonDeBande('implanter', 'Implanter', implanter.ligne.nom);
+      const nom = document.querySelector('#leve-direct [data-champ="nom-implantation"]')?.value.trim() || implanter.choix?.nom || '';
+      const altitude = document.querySelector('#leve-direct [data-champ="altitude-implantation"]')?.value.trim() ?? '';
+      return boutonDeBande('implanter', 'Implanter', [nom, altitude ? `H ${altitude}` : ''].filter(Boolean).join(' · '));
+    }
+    const enregistrer = trouver('enregistrer');
+    if (enregistrer && terrain.implantation === 'point' && aAcces('intermediaire')) {
+      return boutonDeBande('enregistrer', 'Enregistrer l\'implantation', implanter.cible?.nom ?? '', enregistrer.disabled);
+    }
+    return '';
+  }
+  if (cle === 'controle') {
+    const enregistrer = trouver('enregistrer');
+    return enregistrer && autocontrole.cible ? boutonDeBande('enregistrer', 'Enregistrer le contrôle', autocontrole.cible.nom, enregistrer.disabled) : '';
+  }
+  if (cle === 'calculs' && document.body.dataset.onglet === 'dessin' && aAcces('expert')) {
+    return boutonDeBande('dao', daoAppli?.actif() ? 'Quitter la DAO' : 'DAO', 'dessiner sur le plan');
+  }
+  if (cle === 'mesure') return mesureRapideBande();
+  return '';
 }
 
 /** Bouton de la zone du milieu touché. */
 function agirDepuisBande(cle) {
-  if (cle === 'prendre') document.querySelector('#leve-direct .cadre-prise .bouton-prendre')?.click();
+  if (cle.startsWith('mesure-')) {
+    agirMesureRapide(cle);
+    return;
+  }
+  document.querySelector(RELAIS_BANDE[cle])?.click();
+}
+
+// --- Mesure rapide (0.158.0, dès Intermédiaire, demande du 08.11, formules validées) ---
+// Points touchés sur le plan (accroche) ou pris au GNSS (bouton de la bande), résultats en direct sur le
+// plan et sous le plan ; rien d'enregistré sauf « Enregistrer » (levé libre « LV-Mesures rapides »).
+const ACCROCHES_MESURE = [['point', 'Point'], ['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['centre', 'Centre'], ['libre', 'Libre']];
+
+/** Vrai quand la Mesure rapide est l'écran de travail (le plan lui envoie ses touchers). */
+function mesureRapideActive() {
+  return ongletContexte === 'mesure-rapide' && aAcces('intermediaire');
+}
+
+/** Redessine l'écran (sous le plan), le plan et la bande. */
+function afficherMesureRapide() {
+  const mesure = mesureRapide(mesureRapideEtat.points);
+  for (const [cle, n] of [['points', mesure.points.length], ['cotes', mesure.cotes.length]]) {
+    mesureRapideEtat.pages[cle] = Math.min(mesureRapideEtat.pages[cle], nombreDePages(n) - 1);
+  }
+  document.querySelector('#mesure-rapide').innerHTML = htmlMesureRapide({ mesure, accroche: mesureRapideEtat.accroche, accroches: ACCROCHES_MESURE, pages: mesureRapideEtat.pages });
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+  navigation?.mettreAJour();
+}
+
+/** Ajoute un point à la mesure (les tableaux passent à leur dernière page). */
+function ajouterPointMesure(point) {
+  const mm = (valeur) => Math.round(valeur * 1000) / 1000;
+  mesureRapideEtat.points.push({ nom: point.nom ?? '', est: mm(point.est), nord: mm(point.nord), altitude: point.altitude != null ? mm(point.altitude) : null });
+  const mesure = mesureRapide(mesureRapideEtat.points);
+  mesureRapideEtat.pages = { points: nombreDePages(mesure.points.length) - 1, cotes: nombreDePages(mesure.cotes.length) - 1 };
+  vibrer(30);
+  afficherMesureRapide();
+}
+
+/** Toucher du plan : le point accroché (point du projet, sommet, milieu…) ou, en « Libre », l'endroit touché. */
+function toucherPourMesureRapide(position, tolerance) {
+  const accroche = mesureRapideEtat.accroche;
+  if (accroche === 'libre') {
+    ajouterPointMesure({ est: position.est, nord: position.nord, altitude: null });
+    return;
+  }
+  const sources = accroche === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansDuProjet(), position, tolerance);
+  const trouve = accrocher(accroche, position, tolerance, avecToutesLesLignes(accroche, sources));
+  if (!trouve) {
+    const quoi = { point: 'Aucun point du projet', sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[accroche];
+    afficherMessage(`${quoi} sous le doigt`, 3000);
+    return;
+  }
+  ajouterPointMesure({ nom: accroche === 'point' ? trouve.nom : '', est: trouve.est, nord: trouve.nord, altitude: trouve.altitude ?? null });
+}
+
+/** Bande du bas de la Mesure rapide (appli Android) : « + Point GNSS », prêt en RTK fixe avec l'inclinaison prête. */
+function mesureRapideBande() {
+  if (!recepteurDisponible()) return '';
+  const pret = Boolean(etatRecepteur?.connecte && etatRecepteur.recu && etatRecepteur.position && etatRecepteur.qualite === 4 && etatRecepteur.inclinaisonPrete);
+  return boutonDeBande('mesure-gnss', '+ Point GNSS', pret ? '' : 'RTK fixe et inclinaison prête', !pret);
+}
+
+function agirMesureRapide(cle) {
+  if (cle !== 'mesure-gnss') return;
+  const position = etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null;
+  if (!position || etatRecepteur.qualite !== 4 || !etatRecepteur.inclinaisonPrete) {
+    refuser('Point GNSS refusé : il faut le RTK fixe et l\'inclinaison prête');
+    return;
+  }
+  ajouterPointMesure({ est: position.est, nord: position.nord, altitude: position.altitude ?? null });
+}
+
+document.querySelector('#mesure-rapide').addEventListener('click', (evenement) => {
+  const bouton = evenement.target.closest('button[data-action]');
+  if (!bouton || bouton.disabled) return;
+  const action = bouton.dataset.action;
+  if (action === 'accroche-mesure') {
+    mesureRapideEtat.accroche = bouton.dataset.valeur;
+    afficherMesureRapide();
+  } else if (action === 'page-mesure') {
+    mesureRapideEtat.pages[bouton.dataset.tableau] += Number(bouton.dataset.sens);
+    afficherMesureRapide();
+  } else if (action === 'effacer-dernier-mesure') {
+    mesureRapideEtat.points.pop();
+    afficherMesureRapide();
+  } else if (action === 'remise-a-zero-mesure') {
+    mesureRapideEtat.points = [];
+    mesureRapideEtat.pages = { points: 0, cotes: 0 };
+    afficherMesureRapide();
+  } else if (action === 'enregistrer-mesure') enregistrerMesureRapide();
+  else if (action === 'exporter-mesure') exporterMesureRapide();
+});
+
+/** « Enregistrer » : la mesure va dans le levé libre « LV-Mesures rapides » (points MR-n-…, ligne fermée dès 3 points). */
+function enregistrerMesureRapide() {
+  if (mesureRapideEtat.points.length === 0 || refuserEnLectureSeule()) return;
+  const resultat = rangerMesureRapide(projet, mesureRapideEtat.points, nomsDuProjet(projet));
+  if (resultat.erreur) {
+    alert(`Mesure non enregistrée : ${resultat.erreur}.`);
+    return;
+  }
+  afficherMessage(`Mesure enregistrée dans « ${resultat.levee.nom} » (points MR-${resultat.numero}-…)`, 4000);
+  modifie();
+}
+
+/** « Exporter » : PDF (croquis + tableaux) ou DXF (points, lignes, textes), puis la fenêtre Exporter. */
+function exporterMesureRapide() {
+  const mesure = mesureRapide(mesureRapideEtat.points);
+  if (mesure.points.length === 0) return;
+  const base = `${nomDeFichierProjet(projet)}_mesure-rapide`.replace(/[\\/:*?"<>|]/g, '_');
+  ouvrirFenetreExport({
+    titre: 'Mesure rapide',
+    formats: [['pdf', 'PDF', 'croquis et tableaux'], ['dxf', 'DXF', 'points, lignes et textes']],
+    fabriquer: async (format) => {
+      const { pdfMesureRapide, dxfMesureRapide } = await import('./export/mesure-rapide.js');
+      if (format === 'pdf') {
+        return { blob: pdfMesureRapide({ mesure, titre: `Mesure rapide · ${titreProjet(projet)}`, cartouche: { affaire: projet.cartouche?.affaire ?? '', date: new Date().toLocaleDateString('fr-CH') } }), nom: `${base}.pdf` };
+      }
+      return { blob: new Blob([octetsDxf(dxfMesureRapide(mesure))], { type: 'application/dxf' }), nom: `${base}.dxf` };
+    },
+    enregistrer: enregistrerFichier,
+    message: (texte) => afficherMessage(texte, 5000),
+  });
 }
 
 /** Page Projet ouverte sur Import, Exporter ou le contenu du projet (boutons de la page Applications). */
@@ -450,6 +633,7 @@ function ouvrirAppli(cle) {
     afficherOnglet('terrain');
   } else if (cle === 'calculs') afficherOnglet('calculs');
   else if (cle === 'plan') afficherOnglet('plan');
+  else if (cle === 'mesure') afficherOnglet('mesure-rapide');
   else if (cle === 'projet') afficherOnglet('projets');
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur'));
   else if (cle === 'reglages') ouvrirFenetreReglages();
@@ -540,6 +724,7 @@ function afficherOnglet(demande) {
   // 0.126.0 : le suivi de la position revient tout seul dans Terrain ; Calculs cadre sur le volume.
   plan.retourAutomatiqueDuSuivi(ongletContexte === 'terrain');
   if (entreDansCalculs) cadrerSurCalculs();
+  if (nom === 'mesure-rapide') afficherMesureRapide();
   navigation?.mettreAJour();
   window.scrollTo(0, 0);
 }
@@ -2123,7 +2308,7 @@ function gererLoupeImplantation() {
 
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
-  const accrocheActive = choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(daoAppli?.actif());
+  const accrocheActive = mesureRapideActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(daoAppli?.actif());
   const enLigne = accrocheActive && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
@@ -2177,6 +2362,7 @@ function envoyerImplantationAuPlan() {
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : [],
+        mesureRapide: mesureRapideActive() ? mesureRapide(mesureRapideEtat.points) : null,
       }
     : null);
   gererLoupeImplantation();
@@ -4002,6 +4188,11 @@ function pointsDuProjet() {
  * (« Point » : les points du projet ; les autres : le plan DXF).
  */
 function toucherPourImplantation(position, tolerance) {
+  // Mesure rapide (0.158.0) : le point touché (selon l'accroche) s'ajoute à la mesure.
+  if (mesureRapideActive()) {
+    toucherPourMesureRapide(position, tolerance);
+    return;
+  }
   // Choix des côtés d'un talus de surface (Calculs › Dessin, 0.135.0).
   if (choixCotesTalusActif()) {
     toucherCoteTalus(position, tolerance);
@@ -5560,6 +5751,8 @@ if (recepteurDisponible()) {
       vibrer(fixMaintenant ? 60 : [200, 100, 200]);
     }
     etatRecepteur = etat;
+    // Mesure rapide : « + Point GNSS » de la bande suit l'état du récepteur (prêt ou non).
+    if (ongletContexte === 'mesure-rapide') navigation?.mettreAJour();
     if (vientDeSeConnecter) proposerControle();
     mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette, terrain.hauteurCanne ?? null);
     boutonRecepteur?.mettreAJour(etat);
@@ -5980,13 +6173,12 @@ daoAppli = creerDao({
   lectureSeule: () => refuserEnLectureSeule(),
 });
 document.querySelector('#bouton-dao').addEventListener('click', () => {
-  if (daoAppli.actif()) {
-    daoAppli.arreter();
-    return;
+  if (daoAppli.actif()) daoAppli.arreter();
+  else if (aAcces('expert')) {
+    if (estTelephone()) afficherOnglet('plan');
+    daoAppli.commencer();
   }
-  if (!aAcces('expert')) return;
-  if (estTelephone()) afficherOnglet('plan');
-  daoAppli.commencer();
+  navigation?.mettreAJour();
 });
 
 /**
