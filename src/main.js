@@ -63,7 +63,7 @@ import { archiver, restaurer, supprimerArchive } from './projet/archives.js';
 import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/journal.js';
 import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { bulle, installerAide } from './aide/bulles.js';
-import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE } from './leve/ecran.js';
+import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE, ACCROCHES } from './leve/ecran.js';
 import { creerEncartPlan } from './plan/encart.js';
 import { creerBoutonImplanterPlan } from './plan/bouton-implanter.js';
 import { suivreClavier } from './outils/clavier.js';
@@ -116,6 +116,11 @@ import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, a
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
+import { creerNavigation } from './navigation/bande.js';
+import { mesureRapide } from './topo/mesure-rapide.js';
+import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
+import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
+import { applisDisponibles, appliCourante } from './navigation/applis.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip } from './outils/son.js';
 import { rythmeBip } from './topo/bip.js';
@@ -127,6 +132,7 @@ import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
 import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
+import { dessinerPlansDxf } from './plan/dxf-canvas.js';
 import { fabriquerPaquet } from './export/paquet.js';
 import { creerBarreRecalage, etapeAxes } from './recalage/barre.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
@@ -211,7 +217,7 @@ const terrain = {
 };
 // Orientation (0.90.1) : toujours le cap du GNSS (la direction de marche sert en secours, sans le dire).
 terrain.sourceOrientation = 'rx2';
-// Site sans récepteur : seulement le mode Lever (voir ONGLETS).
+// Site sans récepteur : seulement le mode Lever (et Contrôle en consultation).
 if (!recepteurDisponible()) terrain.mode = 'lever';
 // Libellé « Aucun » (0.90.0) choisi à chaque démarrage de l'appli.
 terrain.libelleLigne = '';
@@ -281,47 +287,20 @@ function retenirReglagesTerrain() {
 }
 
 // --- Mise en page : onglets ---
-// Projet (le chantier : levés importés, cartouche, fichier projet), Terrain (levé avec le récepteur,
-// seulement dans l'appli Android), Calculs (Surfaces, Volumes, Mesures : un seul affiché à la fois,
-// choisi en haut de l'onglet) et Plan (en plein écran sur téléphone, toujours à droite sur ordinateur).
-const ICONES = {
-  projets: '<path d="M3 7h6l2 2h10v10H3z" />',
-  // Terrain : une canne GNSS (antenne en haut, pointe en bas).
-  terrain: '<path d="M12 8v13M8 5a4 2 0 0 0 8 0a4 2 0 0 0-8 0M10 21h4" />',
-  calculs: '<path d="M2 19 9 7l4 6 2-3 7 9z" />',
-  plan: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
-};
+// Projet (le chantier : levés importés, fichier projet), Terrain (Lever, Implanter, Contrôle, Guidage),
+// Calculs (Volumes, Mesures, Dessin : un seul affiché à la fois) et Plan (en plein écran sur téléphone,
+// toujours à droite sur ordinateur). On passe de l'un à l'autre par la bande du bas (0.156.0).
 // Main ouverte (on a la main sur le projet), dessinée en traits comme les autres icônes.
 const ICONE_MAIN = '<path d="M18 11V6a2 2 0 0 0-4 0v5" /><path d="M14 10V4a2 2 0 0 0-4 0v6" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />';
 
-// Barre du bas (0.86.0) : les 4 modes de Terrain (Lever, Implanter, Contrôle, Guidage ; appli Android
-// seulement), puis Calculs et Plan. L'onglet Projet est l'icône en haut à gauche ; le récepteur
-// s'ouvre en touchant la barre d'état du récepteur, sous l'en-tête.
-const MODES_TERRAIN = [
-  { cle: 'lever', titre: 'Lever', icone: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle cx="12" cy="12" r="2.5" />' },
-  { cle: 'controler', titre: 'Implanter', icone: '<circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" />' },
-  { cle: 'autocontrole', titre: 'Contrôle', icone: '<path d="m5 12 5 5 9-10" />' },
-  { cle: 'lame', titre: 'Guidage', icone: '<path d="M12 4v16M6 10l6-6 6 6M6 14l6 6 6-6" />', niveau: 'expert' },
-];
-// Sur le site (0.96.0, demande du 29.10.2026) : Lever seulement, pour modifier les levés (lignes,
-// contours, triangles en trop, suites de points, photos) ; pas de prise de point sans récepteur.
-// 0.120.0 : sur le site, 3 pages bien marquées « Projet | Édition Lever | Calculs » (le plan reste à droite) ;
-// « Lever » y devient « Édition Lever » (plus de récepteur : on édite les levés).
-const ONGLETS = recepteurDisponible()
-  ? [
-      ...MODES_TERRAIN.map((m) => ({ ...m, nom: 'terrain', mode: m.cle })),
-      { nom: 'calculs', titre: 'Calculs' },
-      { nom: 'plan', titre: 'Plan' },
-    ]
-  : [
-      { nom: 'projets', titre: 'Projet' },
-      ...MODES_TERRAIN.filter((m) => m.cle === 'lever').map((m) => ({ ...m, nom: 'terrain', mode: m.cle, titre: 'Édition Lever' })),
-      // 0.124 : Contrôle sur le site (Intermédiaire) : consultation des points, photos et historique, sans mesure.
-      ...MODES_TERRAIN.filter((m) => m.cle === 'autocontrole').map((m) => ({ ...m, nom: 'terrain', mode: m.cle, niveau: 'intermediaire' })),
-      { nom: 'calculs', titre: 'Calculs' },
-      { nom: 'plan', titre: 'Plan' },
-    ];
+// 0.156.0 (demande du 08.11) : la barre du bas à 7 boutons est remplacée par la bande du bas
+// (navigation/bande.js : bouton « application | sous-application », page Applications, roue des favoris).
 if (!recepteurDisponible()) document.body.classList.add('sur-site');
+// Bande du bas (créée juste après la page, voir « Bande du bas et page Applications »).
+let navigation = null;
+// Mesure rapide (0.158.0, dès Intermédiaire) : points choisis (jamais enregistrés tant qu'on ne touche pas
+// « Enregistrer »), accroche du toucher, page de chaque tableau.
+const mesureRapideEtat = { points: [], accroche: 'point', pages: { points: 0, cotes: 0 } };
 // Ajout manuel d'un point en touchant le plan (voir plus bas « Édition Lever sur le site ») ; déclaré ici car afficherOnglet le lit.
 const ajoutLevee = { actif: false, accroche: 'point', choix: null };
 // Les parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Volumes, Mesures /
@@ -336,28 +315,11 @@ const boutonPartie = ([cle, titre]) => `<button type="button" data-partie="${cle
 const estPartieCalculs = (nom) => PARTIES_CALCULS.some(([cle]) => cle === nom);
 let partieCalculs = 'volumes'; // dernière partie affichée dans Calculs
 
-// Réglages (0.123.0) : à gauche de la barre du bas (avant, roue dans l'en-tête). Pas de data-onglet : il ouvre la fenêtre des réglages.
-const BOUTON_REGLAGES = `<button type="button" id="bouton-reglages" class="onglet-reglages-bas" title="Réglages, Drive et fermer l'appli" aria-label="Réglages et fermer l'appli">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><g transform="translate(0.7 0.7) scale(0.68)"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></g><path class="marche-arret" d="M18 12v4.5M14.4 14.2a5 5 0 1 0 7.2 0" /></svg>
-    <span>Réglages</span>
-  </button>`;
-
-/** Bouton d'un onglet (icône + titre). */
-const boutonOnglet = (o) => o.mode
-  ? `<button type="button" data-mode-terrain="${o.mode}" class="onglet-terrain onglet-mode-${o.mode} ${o.niveau ? `seulement-${o.niveau}` : ''}">
-    <svg viewBox="0 0 24 24" aria-hidden="true">${o.icone}</svg>
-    <span>${o.titre}</span>
-  </button>`
-  : `<button type="button" data-onglet="${o.nom}" class="onglet-${o.nom}">
-    <svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[o.nom]}</svg>
-    <span>${o.titre}</span>
-  </button>`;
-
 document.querySelector('#app').innerHTML = `
   <div class="mise-en-page">
     <div class="colonne-gauche">
       <section class="panneau panneau-projet" data-onglet="projets">
-        <h2 class="titre-page seulement-site">Projet</h2>
+        <h2 class="titre-partie-projet" id="titre-partie-projet">Contenu du projet</h2>
         <div id="projets"></div>
         <div class="onglets-projet" role="group" aria-label="Import et export">
           <button type="button" class="onglet-projet seulement-expert" data-onglet-projet="import" aria-pressed="false">
@@ -399,6 +361,10 @@ document.querySelector('#app').innerHTML = `
         <div id="dessins"></div>
         <div id="talus-surfaces" class="carte-section"></div>
       </section>
+      <section class="panneau" data-onglet="mesure-rapide">
+        <h2>Mesure rapide</h2>
+        <div id="mesure-rapide"></div>
+      </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
       <div id="barre-mesures" class="barre-edition" hidden></div>
     </div>
@@ -414,16 +380,409 @@ document.querySelector('#app').innerHTML = `
       </div>
     </section>
   </div>
-  <nav class="onglets" aria-label="Onglets">${BOUTON_REGLAGES}${ONGLETS.map(boutonOnglet).join('')}</nav>
+  <nav class="bande-appli" id="bande-appli" aria-label="Applications"></nav>
 `;
+
+// --- Bande du bas et page Applications (0.156.0, demande du 08.11) ---
+
+/** Nom d'une application à l'écran (sur le site, « Lever » s'appelle « Édition Lever »). */
+const titreAppli = (appli) => {
+  // Pages du projet (0.159.0) : le bouton porte le nom de la page (Projets, Import, Exporter, Contenu).
+  if (appli?.cle === 'projet') return { ouvrir: 'Projets', import: 'Import', export: 'Exporter', contenu: 'Contenu' }[document.body.dataset.partieProjet] ?? 'Projet';
+  return !recepteurDisponible() && appli?.titreSite ? appli.titreSite : (appli?.titre ?? '');
+};
+
+/** Boutons d'un écran lus comme sous-applications : [{ cle, titre, actif }]. */
+function sousApplisDesBoutons(selecteur, cle, actif) {
+  return [...document.querySelectorAll(selecteur)].map((b) => ({ cle: cle(b), titre: b.textContent.trim(), actif: actif(b) }));
+}
+
+/**
+ * Sous-applications de l'application affichée : Implanter = Point / Ligne / Surface / Talus / Altitude,
+ * Guidage = machine, Calculs = Volumes / Mesures / Dessin (0.157.0 : pas le rôle de Lever, il reste
+ * sur l'écran). Lues sur les boutons de l'écran : le mode (Base, Intermédiaire, Expert) est donc respecté.
+ */
+function sousApplis() {
+  const cle = appliCourante(document.body.dataset.onglet, terrain.mode);
+  if (cle === 'implanter') return sousApplisDesBoutons('#leve-direct .choix-implantation-type .puce-choix', (b) => b.dataset.valeur, (b) => b.classList.contains('actif'));
+  if (cle === 'guidage') return [['grader', 'Grader'], ['bull', 'Bull'], ['rateau', 'Râteau']].map(([c, titre]) => ({ cle: c, titre, actif: terrain.lame.machine === c }));
+  if (cle === 'calculs') {
+    return PARTIES_CALCULS.filter(([c]) => c !== 'dessin' || aAcces('expert')).map(([c, titre]) => ({ cle: c, titre, actif: partieCalculs === c }));
+  }
+  return [];
+}
+
+function choisirSousAppli(cle) {
+  const appli = appliCourante(document.body.dataset.onglet, terrain.mode);
+  const conteneur = document.querySelector('#leve-direct');
+  if (appli === 'implanter') conteneur.querySelector(`.choix-implantation-type .puce-choix[data-valeur="${CSS.escape(cle)}"]`)?.click();
+  else if (appli === 'guidage') {
+    // Comme toucher la machine sur l'écran de choix (il est redessiné tout de suite).
+    ecranLeve.revenirAuChoixMachine();
+    conteneur.querySelector(`.grosse-machine[data-valeur="${CSS.escape(cle)}"]`)?.click();
+  } else if (appli === 'calculs') afficherOnglet(cle);
+}
+
+/** Gros bouton de la zone du milieu : il touche le vrai bouton de l'écran (caché, voir body[data-relais]). */
+function boutonDeBande(cle, titre, detail, desactive = false) {
+  return `<button type="button" class="bouton-enreg-bande relais-${cle}" data-nav="action" data-cle="${cle}" ${desactive ? 'disabled' : ''}>
+    <span>${echapper(titre)}</span>${detail ? `<small>${echapper(detail)}</small>` : ''}</button>`;
+}
+
+// Vrais boutons de l'écran relayés par la zone du milieu (clé → sélecteur).
+const RELAIS_BANDE = {
+  prendre: '#leve-direct .cadre-prise .bouton-prendre',
+  implanter: '#leve-direct [data-action="implanterChoix"].bouton-implanter, #leve-direct [data-action="implanterLigneChoisie"].bouton-implanter',
+  enregistrer: '#leve-direct [data-action="enregistrerImplantation"]',
+  dao: '#bouton-dao',
+};
+
+/**
+ * Zone du milieu de la bande (0.157.0 / 0.158.0, validé le 08.11) : un gros bouton qui touche le vrai
+ * bouton de l'écran (mêmes contrôles, même touche volume −) :
+ * - Lever (appli Android) : Enreg. Pts + nom du prochain point ;
+ * - Implanter : « Implanter » + nom du point et altitude (ou nom de la ligne) quand un élément est choisi ;
+ *   Point en guidage (dès Intermédiaire) : « Enregistrer l'implantation » ;
+ * - Contrôle : « Enregistrer le contrôle » quand un point est visé ;
+ * - Calculs › Dessin (Expert) : « DAO » ;
+ * - Mesure rapide : voir mesureRapideBande ;
+ * ailleurs rien : la bande s'efface. Note aussi quel bouton est relayé (body[data-relais]) pour cacher l'original.
+ */
+function infoAppli() {
+  const html = contenuBande();
+  const relais = /data-cle="([a-z-]+)"/.exec(html)?.[1];
+  if (relais) document.body.dataset.relais = relais;
+  else delete document.body.dataset.relais;
+  return html;
+}
+
+function contenuBande() {
+  const cle = appliCourante(document.body.dataset.onglet, terrain.mode);
+  const trouver = (relais) => document.querySelector(RELAIS_BANDE[relais]);
+  if (cle === 'lever') {
+    const prendre = trouver('prendre');
+    if (!prendre) return '';
+    return boutonDeBande('prendre', 'Enreg. Pts', document.querySelector('#leve-direct .cadre-prise [data-champ="nom-point"]')?.value ?? '', prendre.disabled);
+  }
+  if (cle === 'implanter') {
+    if (trouver('implanter')) {
+      if (implanter.ligneAValider && implanter.ligne) return boutonDeBande('implanter', 'Implanter', implanter.ligne.nom);
+      const nom = document.querySelector('#leve-direct [data-champ="nom-implantation"]')?.value.trim() || implanter.choix?.nom || '';
+      const altitude = document.querySelector('#leve-direct [data-champ="altitude-implantation"]')?.value.trim() ?? '';
+      return boutonDeBande('implanter', 'Implanter', [nom, altitude ? `H ${altitude}` : ''].filter(Boolean).join(' · '));
+    }
+    const enregistrer = trouver('enregistrer');
+    if (enregistrer && terrain.implantation === 'point' && aAcces('intermediaire')) {
+      return boutonDeBande('enregistrer', 'Enregistrer l\'implantation', implanter.cible?.nom ?? '', enregistrer.disabled);
+    }
+    return '';
+  }
+  if (cle === 'controle') {
+    const enregistrer = trouver('enregistrer');
+    return enregistrer && autocontrole.cible ? boutonDeBande('enregistrer', 'Enregistrer le contrôle', autocontrole.cible.nom, enregistrer.disabled) : '';
+  }
+  if (cle === 'calculs' && document.body.dataset.onglet === 'dessin' && aAcces('expert')) {
+    return boutonDeBande('dao', daoAppli?.actif() ? 'Quitter la DAO' : 'DAO', 'dessiner sur le plan');
+  }
+  if (cle === 'mesure') return mesureRapideBande();
+  return '';
+}
+
+/** Bouton de la zone du milieu touché. */
+function agirDepuisBande(cle) {
+  if (cle.startsWith('mesure-')) {
+    agirMesureRapide(cle);
+    return;
+  }
+  document.querySelector(RELAIS_BANDE[cle])?.click();
+}
+
+// --- Mesure rapide (0.158.0, dès Intermédiaire, demande du 08.11, formules validées) ---
+// Points touchés sur le plan (accroche) ou pris au GNSS (bouton de la bande), résultats en direct sur le
+// plan et sous le plan ; rien d'enregistré sauf « Enregistrer » (levé libre « LV-Mesures rapides »).
+// 0.159.0 : la barre d'accroche d'Implanter (icônes), puis Libre et GNSS (lever au récepteur, appli Android).
+const ACCROCHES_MESURE_EN_PLUS = {
+  libre: ['Libre', 'Libre : l\'endroit touché, sans altitude', '<path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle class="repere" cx="12" cy="12" r="2.5" />'],
+  gnss: ['GNSS', 'Lever au récepteur : « + Point GNSS » en bas', '<path d="M8.5 3.2a5 5 0 0 1 7 0" /><ellipse class="repere" cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" />'],
+};
+const accrochesMesure = () => [
+  ...MODES_ACCROCHE.map((cle) => [cle, ...ACCROCHES[cle]]),
+  ['libre', ...ACCROCHES_MESURE_EN_PLUS.libre],
+  ...(recepteurDisponible() ? [['gnss', ...ACCROCHES_MESURE_EN_PLUS.gnss]] : []),
+];
+
+/** Vrai quand la Mesure rapide est l'écran de travail (le plan lui envoie ses touchers). */
+function mesureRapideActive() {
+  return ongletContexte === 'mesure-rapide' && aAcces('intermediaire');
+}
+
+/** Redessine l'écran (sous le plan), le plan et la bande. */
+function afficherMesureRapide() {
+  const mesure = mesureRapide(mesureRapideEtat.points);
+  for (const [cle, n] of [['points', mesure.points.length], ['cotes', mesure.cotes.length]]) {
+    mesureRapideEtat.pages[cle] = Math.min(mesureRapideEtat.pages[cle], nombreDePages(n) - 1);
+  }
+  document.querySelector('#mesure-rapide').innerHTML = htmlMesureRapide({ mesure, accroche: mesureRapideEtat.accroche, accroches: accrochesMesure(), pages: mesureRapideEtat.pages });
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+  navigation?.mettreAJour();
+}
+
+/** Ajoute un point à la mesure (les tableaux passent à leur dernière page). */
+function ajouterPointMesure(point) {
+  const mm = (valeur) => Math.round(valeur * 1000) / 1000;
+  mesureRapideEtat.points.push({ nom: point.nom ?? '', est: mm(point.est), nord: mm(point.nord), altitude: point.altitude != null ? mm(point.altitude) : null });
+  const mesure = mesureRapide(mesureRapideEtat.points);
+  mesureRapideEtat.pages = { points: nombreDePages(mesure.points.length) - 1, cotes: nombreDePages(mesure.cotes.length) - 1 };
+  vibrer(30);
+  afficherMesureRapide();
+}
+
+/** Toucher du plan : le point accroché (point du projet, sommet, milieu…) ou, en « Libre », l'endroit touché. */
+function toucherPourMesureRapide(position, tolerance) {
+  const accroche = mesureRapideEtat.accroche;
+  if (accroche === 'gnss') {
+    afficherMessage('Accroche GNSS : touche « + Point GNSS » en bas', 3000);
+    return;
+  }
+  if (accroche === 'libre') {
+    ajouterPointMesure({ est: position.est, nord: position.nord, altitude: null });
+    return;
+  }
+  const sources = accroche === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansDuProjet(), position, tolerance);
+  const trouve = accrocher(accroche, position, tolerance, avecToutesLesLignes(accroche, sources));
+  if (!trouve) {
+    const quoi = { point: 'Aucun point du projet', sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[accroche];
+    afficherMessage(`${quoi} sous le doigt`, 3000);
+    return;
+  }
+  ajouterPointMesure({ nom: accroche === 'point' ? trouve.nom : '', est: trouve.est, nord: trouve.nord, altitude: trouve.altitude ?? null });
+}
+
+/**
+ * Bande du bas de la Mesure rapide (appli Android, accroche GNSS) : « + Point GNSS », prêt en RTK fixe
+ * avec l'inclinaison prête (validé le 08.11 : seulement le fixe).
+ */
+function mesureRapideBande() {
+  if (!recepteurDisponible() || mesureRapideEtat.accroche !== 'gnss') return '';
+  const pret = Boolean(etatRecepteur?.connecte && etatRecepteur.recu && etatRecepteur.position && etatRecepteur.qualite === 4 && etatRecepteur.inclinaisonPrete);
+  return boutonDeBande('mesure-gnss', '+ Point GNSS', pret ? '' : 'RTK fixe et inclinaison prête', !pret);
+}
+
+function agirMesureRapide(cle) {
+  if (cle !== 'mesure-gnss') return;
+  const position = etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null;
+  if (!position || etatRecepteur.qualite !== 4 || !etatRecepteur.inclinaisonPrete) {
+    refuser('Point GNSS refusé : il faut le RTK fixe et l\'inclinaison prête');
+    return;
+  }
+  ajouterPointMesure({ est: position.est, nord: position.nord, altitude: position.altitude ?? null });
+}
+
+document.querySelector('#mesure-rapide').addEventListener('click', (evenement) => {
+  const bouton = evenement.target.closest('button[data-action]');
+  if (!bouton || bouton.disabled) return;
+  const action = bouton.dataset.action;
+  if (action === 'accroche-mesure') {
+    mesureRapideEtat.accroche = bouton.dataset.valeur;
+    afficherMesureRapide();
+  } else if (action === 'page-mesure') {
+    mesureRapideEtat.pages[bouton.dataset.tableau] += Number(bouton.dataset.sens);
+    afficherMesureRapide();
+  } else if (action === 'effacer-dernier-mesure') {
+    mesureRapideEtat.points.pop();
+    afficherMesureRapide();
+  } else if (action === 'remise-a-zero-mesure') {
+    mesureRapideEtat.points = [];
+    mesureRapideEtat.pages = { points: 0, cotes: 0 };
+    afficherMesureRapide();
+  } else if (action === 'enregistrer-mesure') enregistrerMesureRapide();
+  else if (action === 'exporter-mesure') exporterMesureRapide();
+});
+
+/** « Enregistrer » : la mesure va dans le levé libre « LV-Mesures rapides » (points MR-n-…, ligne fermée dès 3 points). */
+function enregistrerMesureRapide() {
+  if (mesureRapideEtat.points.length === 0 || refuserEnLectureSeule()) return;
+  const resultat = rangerMesureRapide(projet, mesureRapideEtat.points, nomsDuProjet(projet));
+  if (resultat.erreur) {
+    alert(`Mesure non enregistrée : ${resultat.erreur}.`);
+    return;
+  }
+  afficherMessage(`Mesure enregistrée dans « ${resultat.levee.nom} » (points MR-${resultat.numero}-…)`, 4000);
+  modifie();
+}
+
+/**
+ * Fond du croquis du PDF (0.159.0, demande du 08.11) : la photo aérienne swisstopo (WMS, réseau) et / ou
+ * les plans DXF affichés, dessinés à l'échelle du croquis, en une image JPEG (data URL), ou null.
+ */
+async function fondDuCroquisMesure(mesure, { photo, plans }) {
+  const { cadreDuCroquis, LARGEUR_CROQUIS, HAUTEUR_CROQUIS } = await import('./export/mesure-rapide.js');
+  const { zone, estCentre, nordCentre } = cadreDuCroquis(mesure.points);
+  const pixelsParMm = 6; // environ 150 dpi
+  const largeur = Math.round(LARGEUR_CROQUIS * pixelsParMm);
+  const hauteur = Math.round(HAUTEUR_CROQUIS * pixelsParMm);
+  const toile = document.createElement('canvas');
+  toile.width = largeur;
+  toile.height = hauteur;
+  const ctx = toile.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, largeur, hauteur);
+  if (photo) {
+    try {
+      const { adresseMorceau } = await import('./export/geotiff.js');
+      const reponse = await fetch(adresseMorceau(zone.estMin, zone.nordMin, zone.estMax, zone.nordMax, largeur, hauteur));
+      if (!reponse.ok) throw new Error(`swisstopo a répondu ${reponse.status}`);
+      ctx.drawImage(await createImageBitmap(await reponse.blob()), 0, 0, largeur, hauteur);
+    } catch (erreur) {
+      afficherMessage(`Photo swisstopo non chargée (réseau ?) : PDF sans photo. ${erreur.message ?? ''}`, 6000);
+    }
+  }
+  if (plans) {
+    const visibles = plansDuProjet().filter((p) => p.visible !== false);
+    const vue = { estCentre, nordCentre, echelle: largeur / (zone.estMax - zone.estMin), largeur, hauteur, rotation: 0 };
+    const toilePlans = document.createElement('canvas');
+    dessinerPlansDxf(toilePlans, visibles, vue, 1);
+    ctx.drawImage(toilePlans, 0, 0);
+  }
+  return toile.toDataURL('image/jpeg', 0.85);
+}
+
+/** « Exporter » : PDF (croquis + tableaux) ou DXF (points, lignes, textes), puis la fenêtre Exporter. */
+function exporterMesureRapide() {
+  const mesure = mesureRapide(mesureRapideEtat.points);
+  if (mesure.points.length === 0) return;
+  const base = `${nomDeFichierProjet(projet)}_mesure-rapide`.replace(/[\\/:*?"<>|]/g, '_');
+  const avecPlans = plansDuProjet().some((p) => p.visible !== false);
+  ouvrirFenetreExport({
+    titre: 'Mesure rapide',
+    formats: [['pdf', 'PDF', 'croquis et tableaux'], ['dxf', 'DXF', 'points, lignes et textes']],
+    // 0.159.0 : fond du croquis du PDF : photo swisstopo et plans DXF affichés.
+    options: [
+      { cle: 'photo', texte: 'Photo aérienne swisstopo en fond', formats: ['pdf'] },
+      ...(avecPlans ? [{ cle: 'plans', texte: 'Plans DXF affichés en fond', formats: ['pdf'] }] : []),
+    ],
+    fabriquer: async (format, choix = {}) => {
+      const { pdfMesureRapide, dxfMesureRapide } = await import('./export/mesure-rapide.js');
+      if (format === 'pdf') {
+        const fond = choix.photo || choix.plans ? await fondDuCroquisMesure(mesure, { photo: choix.photo, plans: choix.plans }) : null;
+        return { blob: pdfMesureRapide({ mesure, fond, titre: `Mesure rapide · ${titreProjet(projet)}`, cartouche: { affaire: projet.cartouche?.affaire ?? '', date: new Date().toLocaleDateString('fr-CH') } }), nom: `${base}.pdf` };
+      }
+      return { blob: new Blob([octetsDxf(dxfMesureRapide(mesure))], { type: 'application/dxf' }), nom: `${base}.dxf` };
+    },
+    enregistrer: enregistrerFichier,
+    message: (texte) => afficherMessage(texte, 5000),
+  });
+}
+
+// Pages du projet (0.159.0, demande du 08.11) : il n'y a plus d'application « Projet » ; chaque bouton
+// de l'encadré du projet (page Applications) ouvre sa page à part : la liste des projets (« Changer »),
+// Import, Exporter ou le contenu du projet (body[data-partie-projet], le reste de l'onglet est caché).
+const TITRES_PARTIES_PROJET = { ouvrir: 'Projets', import: 'Import', export: 'Exporter', contenu: 'Contenu du projet' };
+
+/** Page du projet : 'ouvrir' (liste des projets), 'import', 'export' ou 'contenu'. */
+function ouvrirPartieProjet(quoi) {
+  afficherOnglet('projets', { partie: quoi });
+  if (quoi === 'ouvrir') {
+    // La page « Ouvrir projet » (liste, dossiers, + Nouveau) de l'écran Projet.
+    if (!document.querySelector('.panneau-projet')?.classList.contains('page-gestion-projets')) {
+      document.querySelector('#projets [data-action="panneau"][data-panneau="projets"]')?.click();
+    }
+  } else montrerOngletProjet(quoi === 'contenu' ? null : quoi);
+  window.scrollTo(0, 0);
+}
+
+/**
+ * Sous-applications écrites en petit sur les tuiles de la page Applications (toucher = ouvrir
+ * l'application dessus) ; toucher le reste de la tuile ouvre la dernière sous-application utilisée.
+ */
+function sousApplisDe(cle) {
+  if (cle === 'implanter') {
+    return [['point', 'Point'], ['ligne', 'Ligne'], ['surface', 'Surface'], ['altitude', 'Altitude'], ...(aAcces('expert') ? [['talus', 'Talus']] : [])];
+  }
+  if (cle === 'guidage') return [['grader', 'Grader'], ['bull', 'Bull'], ['rateau', 'Râteau']];
+  if (cle === 'calculs') return PARTIES_CALCULS.filter(([c]) => c !== 'dessin' || aAcces('expert')).map(([c, titre]) => [c, titre.replace(' / métrés', '')]);
+  return [];
+}
+
+/** Ouvre une application (tuile, sous-application d'une tuile, ou bulle de la roue des favoris). */
+function ouvrirAppli(cle, sous = null) {
+  fenetreReglages?.fermer?.();
+  const modes = { lever: 'lever', implanter: 'controler', controle: 'autocontrole', guidage: 'lame' };
+  if (modes[cle]) {
+    // Guidage (0.153.0) : on revient toujours au choix de la machine, comme avant avec l'onglet.
+    if (cle === 'guidage') ecranLeve?.revenirAuChoixMachine();
+    choisirModeTerrain(modes[cle]);
+    afficherOnglet('terrain');
+  } else if (cle === 'calculs') afficherOnglet(sous ?? 'calculs');
+  else if (cle === 'plan') afficherOnglet('plan');
+  else if (cle === 'mesure') afficherOnglet('mesure-rapide');
+  else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur'));
+  if (sous && cle !== 'calculs') {
+    // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
+    choisirSousAppli(sous);
+    requestAnimationFrame(() => {
+      if (!sousApplis().find((s) => s.cle === sous)?.actif) choisirSousAppli(sous);
+    });
+  }
+}
+
+navigation = creerNavigation(document.querySelector('#bande-appli'), {
+  applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces })
+    // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile.
+    .filter((a) => a.cle !== 'plan' || !window.matchMedia('(min-width: 900px)').matches),
+  courante: () => appliCourante(document.body.dataset.onglet, terrain.mode),
+  titre: titreAppli,
+  sousApplis,
+  choisirSousAppli,
+  info: infoAppli,
+  ouvrirAppli,
+  projet: () => ({
+    titre: document.querySelector('#titre-projet')?.textContent ?? 'Projet',
+    detail: document.querySelector('#etat')?.textContent ?? '',
+  }),
+  partieProjet: ouvrirPartieProjet,
+  sousApplisDe,
+  reglages: () => ouvrirFenetreReglages(),
+  // La page Applications s'ouvre par-dessus tout : la page des réglages se ferme.
+  avantPage: () => fenetreReglages?.fermer?.(),
+  fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? () => fermerAppli() : null,
+  importPermis: () => aAcces('expert'),
+  agir: agirDepuisBande,
+  changerProjet: () => ouvrirPartieProjet('ouvrir'),
+  get nouveauProjet() {
+    return aAcces('intermediaire') ? () => creerNouveauProjet() : null;
+  },
+  message: (texte) => afficherMessage(texte, 4000),
+  vibrer: () => vibrer(40),
+});
+// Lever, Implanter… redessinent leurs boutons (rôle, Point / Ligne…) : la bande suit (une fois par image au plus).
+let bandePrevue = false;
+new MutationObserver(() => {
+  if (bandePrevue) return;
+  bandePrevue = true;
+  requestAnimationFrame(() => {
+    bandePrevue = false;
+    navigation.mettreAJour();
+  });
+}).observe(document.querySelector('#leve-direct'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'disabled'] });
+// Le nom du prochain point tapé suit dans le bouton Enreg. Pts de la bande.
+document.querySelector('#leve-direct').addEventListener('input', () => navigation.mettreAJour());
 
 /**
  * Affiche un onglet ('projets', 'terrain', 'plan') ou une partie de Calculs ('surfaces',
  * 'volumes', 'mesures' ; 'calculs' : la dernière partie affichée). Sur ordinateur, le plan reste
  * toujours visible à droite.
  */
-function afficherOnglet(demande) {
+function afficherOnglet(demande, { partie = null } = {}) {
   const nom = demande === 'calculs' ? partieCalculs : demande;
+  // 0.159.0 : l'onglet Projet n'est plus montré en entier : une de ses pages (voir ouvrirPartieProjet) ;
+  // demandé sans page (après l'ouverture d'un projet…), c'est la page Applications qui s'ouvre.
+  if (nom === 'projets') {
+    document.body.dataset.partieProjet = partie ?? 'contenu';
+    const titre = document.querySelector('#titre-partie-projet');
+    if (titre) titre.textContent = TITRES_PARTIES_PROJET[partie ?? 'contenu'];
+  }
   // Drive : on travaille sur le projet de départ (fenêtre de démarrage) : il est comparé à Drive.
   if (nom !== 'projets') partage?.choixFait();
   // Ajout manuel (0.120.0) : on le quitte en changeant de page (le plan en fait partie).
@@ -433,15 +792,11 @@ function afficherOnglet(demande) {
   for (const panneau of document.querySelectorAll('.panneau[data-onglet]')) {
     panneau.classList.toggle('actif', panneau.dataset.onglet === nom);
   }
-  const ongletVisible = estPartieCalculs(nom) ? 'calculs' : nom;
-  for (const bouton of document.querySelectorAll('.onglets button[data-onglet]')) {
-    bouton.classList.toggle('actif', bouton.dataset.onglet === ongletVisible);
-  }
   for (const bouton of document.querySelectorAll('.parties-calculs button')) {
     bouton.classList.toggle('actif', bouton.dataset.partie === nom);
   }
   document.body.dataset.onglet = nom;
-  document.querySelector('#bouton-projet').classList.toggle('actif', nom === 'projets');
+  navigation?.fermer();
   majBoutonsTerrain();
   if (nom !== 'plan' && nom !== 'dessin') pilote = null;
   // DAO (0.147.0) : seulement dans Calculs › Dessin (et le plan sur téléphone).
@@ -465,7 +820,10 @@ function afficherOnglet(demande) {
   // 0.126.0 : le suivi de la position revient tout seul dans Terrain ; Calculs cadre sur le volume.
   plan.retourAutomatiqueDuSuivi(ongletContexte === 'terrain');
   if (entreDansCalculs) cadrerSurCalculs();
+  if (nom === 'mesure-rapide') afficherMesureRapide();
+  navigation?.mettreAJour();
   window.scrollTo(0, 0);
+  if (nom === 'projets' && !partie) navigation?.ouvrirPage();
 }
 
 /**
@@ -479,19 +837,7 @@ function cadrerSurCalculs() {
   if (coins.length === 0) coins = pointsAffiches ?? [];
   if (coins.length > 0) plan.cadrerSur(coins, 10, { libre: true });
 }
-document.querySelector('.onglets').addEventListener('click', (evenement) => {
-  const mode = evenement.target.closest('button[data-mode-terrain]');
-  if (mode) {
-    // Guidage (0.153.0) : toucher l'onglet ramène toujours au choix de la machine.
-    if (mode.dataset.modeTerrain === 'lame') ecranLeve?.revenirAuChoixMachine();
-    choisirModeTerrain(mode.dataset.modeTerrain);
-    afficherOnglet('terrain');
-    return;
-  }
-  const bouton = evenement.target.closest('button[data-onglet]');
-  if (bouton) afficherOnglet(bouton.dataset.onglet);
-});
-/** Boutons Lever / Implanter / Contrôle / Guidage de la barre du bas : celui du mode en cours est actif. */
+/** Mode de Terrain en cours noté sur la page (body.dataset.modeTerrain) et bouton de la bande du bas à jour. */
 function majBoutonsTerrain() {
   const dansTerrain = document.body.dataset.onglet === 'terrain';
   // Site (0.124) : le titre de la page suit le mode (Édition Lever ou Contrôle).
@@ -499,9 +845,7 @@ function majBoutonsTerrain() {
   if (titreTerrain) titreTerrain.textContent = terrain.mode === 'autocontrole' ? 'Contrôle' : 'Édition Lever';
   if (dansTerrain) document.body.dataset.modeTerrain = terrain.mode;
   else delete document.body.dataset.modeTerrain;
-  for (const bouton of document.querySelectorAll('.onglets button[data-mode-terrain]')) {
-    bouton.classList.toggle('actif', dansTerrain && bouton.dataset.modeTerrain === terrain.mode);
-  }
+  navigation?.mettreAJour();
 }
 document.querySelector('.parties-calculs').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-partie]');
@@ -509,17 +853,27 @@ document.querySelector('.parties-calculs').addEventListener('click', (evenement)
 });
 installerAide(document.querySelector('#bouton-aide'));
 // Toucher le projet ouvert (en-tête) : on va à l'onglet Projet.
-document.querySelector('#entete-projet').addEventListener('click', () => afficherOnglet('projets'));
-document.querySelector('#bouton-projet').addEventListener('click', () => afficherOnglet('projets'));
+// 0.159.0 : toucher le nom du projet (en-tête) ouvre la page Applications (encadré du projet en haut).
+document.querySelector('#entete-projet').addEventListener('click', () => navigation.ouvrirPage());
+// Page « Ouvrir projet » : sa flèche ← ramène à la page Applications (il n'y a plus de page Projet entière).
+document.querySelector('#projets').addEventListener('click', (evenement) => {
+  if (document.body.dataset.partieProjet === 'ouvrir' && evenement.target.closest('.entete-page-projets .bouton-retour[data-panneau="projets"]')) navigation.ouvrirPage();
+});
 
 // Réglages de cet appareil (roue ⚙) : mode Base / Intermédiaire / Expert, mode téléphone, bulles d'aide, nom de l'appareil.
 appliquerReglages();
 // Les barres de l'en-tête (1 verte = Base, 2 jaunes = Intermédiaire, 3 rouges = Expert) ouvrent aussi les réglages.
-document.querySelector('#bouton-mode').addEventListener('click', () => document.querySelector('#bouton-reglages').click());
+document.querySelector('#bouton-mode').addEventListener('click', () => ouvrirFenetreReglages());
 // Fenêtre des réglages ouverte (pour y redessiner l'état du partage Drive), ou null.
 let fenetreReglages = null;
-document.querySelector('#bouton-reglages').addEventListener('click', () => {
+/** Fenêtre des réglages ⚙ (0.156.0 : tuile « Réglages » de la page Applications, ou la pyramide du mode). */
+function ouvrirFenetreReglages() {
+  // 0.160.0 : une vraie page (plein écran) ; « ← » ramène à la page Applications.
+  fenetreReglages?.fermer?.();
+  navigation?.fermer();
   fenetreReglages = ouvrirReglages({
+    enPage: true,
+    quandRetour: () => navigation.ouvrirPage(),
     aideActive: document.body.classList.contains('aide-active'),
     basculerAide: () => document.querySelector('#bouton-aide').click(),
     fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? fermerAppli : null,
@@ -554,7 +908,7 @@ document.querySelector('#bouton-reglages').addEventListener('click', () => {
         }
       : null,
   });
-});
+}
 
 /**
  * On quitte ce que le nouveau mode cache (onglet Calculs en Base, Dessin, guidage de lame et talus
@@ -1147,7 +1501,7 @@ for (const bouton of document.querySelectorAll('[data-taille-plan]')) {
 // (--part-plan-auto, jamais moins que la part choisie par ▲ / ▼, au plus 80 %). Recalculé dès que
 // le contenu sous le plan change de taille (ResizeObserver).
 function ajusterPlanAuContenu() {
-  const disponible = window.innerHeight - (document.querySelector('header')?.offsetHeight ?? 0) - (document.querySelector('.onglets')?.offsetHeight ?? 0);
+  const disponible = window.innerHeight - (document.querySelector('header')?.offsetHeight ?? 0) - (document.querySelector('.bande-appli')?.offsetHeight ?? 0);
   const colonne = document.querySelector('.colonne-gauche');
   if (!colonne || disponible <= 0) return;
   // Bande fixe « ID point / Enreg. Pts » de Lever : elle prend aussi de la place en bas.
@@ -2061,8 +2415,10 @@ function gererLoupeImplantation() {
 
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
-  const accrocheActive = choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(daoAppli?.actif());
-  const enLigne = accrocheActive && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
+  const accrocheActive = mesureRapideActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(daoAppli?.actif());
+  // 0.159.0 : les applications sont indépendantes : la Mesure rapide ne montre rien d'Implanter.
+  const mesure = mesureRapideActive();
+  const enLigne = accrocheActive && !mesure && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
   // Bouton « Seul » en Implanter (0.90.1) : ni levés libres, ni points de contrôle, ni dessins, ni « À implanter ».
@@ -2070,7 +2426,7 @@ function envoyerImplantationAuPlan() {
   // Bouton « Seul » (0.94.0) : seulement les listes gardées (points de contrôle en mode Contrôle…).
   const gardees = listesDuTravail(listesDePoints(projet));
   // Lignes suivies en Guidage (0.154.0) : en violet.
-  const lignesSuivies = ongletContexte === 'terrain' && terrain.mode === 'lame' ? lignesGuidage.liste.map((l) => ({ id: 'ligne-guidage', sommets: l.sommets, fermee: false, couleur: '#7c3aed' })) : [];
+  const lignesSuivies = ongletContexte === 'terrain' && terrain.mode === 'lame' ? lignesGuidage.liste.map((l, i) => ({ id: 'ligne-guidage', sommets: l.sommets, fermee: false, couleur: ['#7c3aed', '#ea580c'][i] })) : [];
   const lignesAutres = [...(seul ? [] : lignesDesAutres().filter((l) => !gardees || gardees.has(l.id))), ...lignesSuivies];
   const reseaux = seul ? [] : reseauxDuPlan().filter((r) => !gardees || gardees.has(r.id));
   // Points de contrôle : dessinés si leur case « Points de contrôle » est cochée (menu Afficher).
@@ -2110,11 +2466,12 @@ function envoyerImplantationAuPlan() {
         pointsControle,
         lignesAutres,
         reseaux,
-        choix: daoAppli?.actif() ? daoAppli.dernierPoint() : recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : accrocheActive && !enLigne && !enAutocontrole() ? implanter.choix : null,
-        cible: cibleControle ?? (accrocheActive && !enLigne && !enAutocontrole() && !ajoutLevee.actif ? implanter.cible : null),
+        choix: daoAppli?.actif() ? daoAppli.dernierPoint() : recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : accrocheActive && !mesure && !enLigne && !enAutocontrole() ? implanter.choix : null,
+        cible: cibleControle ?? (accrocheActive && !mesure && !enLigne && !enAutocontrole() && !ajoutLevee.actif ? implanter.cible : null),
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : [],
+        mesureRapide: mesureRapideActive() ? mesureRapide(mesureRapideEtat.points) : null,
       }
     : null);
   gererLoupeImplantation();
@@ -3176,7 +3533,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
 // Lignes suivies en Guidage (0.154.0, Expert) : 2 au plus, choisies en touchant le plan (toutes les
 // lignes : plans DXF, levés, dessins) ; pour chacune, le bout de l'outil mesuré (G ou D). En mémoire
 // seulement (oubliées au redémarrage).
-const lignesGuidage = { liste: [], choix: false };
+const lignesGuidage = { liste: [], choix: false }; // 0.157.0 : L1 violet, L2 orange (plan, coupe G – D, bandeau)
 function choixLignesGuidageActif() {
   return lignesGuidage.choix && ongletContexte === 'terrain' && terrain.mode === 'lame' && lameActive();
 }
@@ -3940,6 +4297,11 @@ function pointsDuProjet() {
  * (« Point » : les points du projet ; les autres : le plan DXF).
  */
 function toucherPourImplantation(position, tolerance) {
+  // Mesure rapide (0.158.0) : le point touché (selon l'accroche) s'ajoute à la mesure.
+  if (mesureRapideActive()) {
+    toucherPourMesureRapide(position, tolerance);
+    return;
+  }
   // Choix des côtés d'un talus de surface (Calculs › Dessin, 0.135.0).
   if (choixCotesTalusActif()) {
     toucherCoteTalus(position, tolerance);
@@ -5498,6 +5860,8 @@ if (recepteurDisponible()) {
       vibrer(fixMaintenant ? 60 : [200, 100, 200]);
     }
     etatRecepteur = etat;
+    // Mesure rapide : « + Point GNSS » de la bande suit l'état du récepteur (prêt ou non).
+    if (ongletContexte === 'mesure-rapide') navigation?.mettreAJour();
     if (vientDeSeConnecter) proposerControle();
     mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette, terrain.hauteurCanne ?? null);
     boutonRecepteur?.mettreAJour(etat);
@@ -5918,13 +6282,12 @@ daoAppli = creerDao({
   lectureSeule: () => refuserEnLectureSeule(),
 });
 document.querySelector('#bouton-dao').addEventListener('click', () => {
-  if (daoAppli.actif()) {
-    daoAppli.arreter();
-    return;
+  if (daoAppli.actif()) daoAppli.arreter();
+  else if (aAcces('expert')) {
+    if (estTelephone()) afficherOnglet('plan');
+    daoAppli.commencer();
   }
-  if (!aAcces('expert')) return;
-  if (estTelephone()) afficherOnglet('plan');
-  daoAppli.commencer();
+  navigation?.mettreAJour();
 });
 
 /**
@@ -6663,17 +7026,18 @@ document.addEventListener('keydown', (evenement) => {
   evenement.preventDefault();
 });
 
-/** Ligne sous le titre du projet (en-tête) : nom, points, surfaces, et l'état de Drive si connecté. */
+/** Ligne sous le titre du projet (en-tête) : sous-titre et l'état de Drive si connecté. */
 function mettreAJourEtatEntete() {
   // Titre : affaire - lieu (ou le nom, sinon « Projet sans nom 2 »…).
   document.querySelector('#titre-projet').textContent = titreProjet(projet);
 
-  // 0.126.0 : tous les points du projet (levés, listes importées, points de contrôle), pas seulement la liste choisie.
-  const nombrePoints = projet.leves.reduce((total, leve) => total + (leve.points?.length ?? 0), 0) + (projet.pointsControle?.length ?? 0);
   const drive = partage?.etat.connecte
     ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive', rendu: 'Drive : main rendue' }[partage.etat.etat] ?? 'Drive : en attente'
     : '';
-  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${nombrePoints} points`, `${surfacesAffichees().length + projet.reseaux.length} levé(s)`, drive].filter(Boolean).join(' · ');
+  // 0.157.0 (demande du 08.11) : plus le nombre de points et de levés, seulement le sous-titre et Drive.
+  document.querySelector('#etat').textContent = [sousTitreProjet(projet), drive].filter(Boolean).join(' · ');
+  // La page Applications ouverte montre le projet à jour dans son encadré.
+  navigation?.mettreAJour();
 
   // Verrou du partage : main verte (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
   // (un autre appareil l'a ; toucher = prendre la main). Rien sans Drive.
@@ -6725,10 +7089,7 @@ async function montrerAttenteMain(verrou) {
     ],
     signal: fermetureAttente.signal,
   });
-  if (choix === 'autre') {
-    afficherOnglet('projets');
-    document.querySelector('#projets [data-panneau="projets"]')?.click();
-  }
+  if (choix === 'autre') ouvrirPartieProjet('ouvrir');
 }
 
 /** Vrai si un autre appareil a la main sur le projet ouvert : rien ne s'enregistre (0.76.0). */
@@ -6883,8 +7244,6 @@ function mettreAJourResume(lequel) {
   resumes = [resumerProjet(lequel), ...resumes.filter((r) => r.id !== lequel.id)].sort((a, b) => b.modifieLe.localeCompare(a.modifieLe));
 }
 
-/** Étape où reprendre le travail : Terrain dans l'APK ; sinon Volumes si le projet a des points, sinon Projet. */
-const etapeUtile = () => (recepteurDisponible() ? 'terrain' : leveActif(projet) ? 'volumes' : 'projets');
 
 /**
  * Va à un onglet, ou à la liste des levés ('leves') : onglet Terrain dans l'appli Android s'il n'y
@@ -6899,15 +7258,13 @@ function allerA(onglet) {
     afficherOnglet('terrain');
     return;
   }
-  afficherOnglet('projets');
-  // Import ouvert (Expert), sinon le contenu du projet.
-  if (aAcces('expert')) montrerOngletProjet('import');
-  requestAnimationFrame(() => document.querySelector(aAcces('expert') ? '.onglets-projet' : '#contenu-projet')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  // Import (Expert), sinon le contenu du projet : sa page à part (0.159.0).
+  ouvrirPartieProjet(aAcces('expert') ? 'import' : 'contenu');
 }
 
 /**
  * Ouvre un projet : il devient le projet affiché, et il est enregistré.
- * Puis on va à l'étape utile (voir etapeUtile).
+ * Puis on va à la page Applications (0.159.0).
  */
 // La fenêtre des libellés range ceux « de ce projet seulement » dans le projet (0.105.6).
 surLibellesProjet((libelles) => {
@@ -6940,7 +7297,8 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   recalculer({ recadrer: true });
   historique.reinitialiser(modifications, projet);
   mettreAJourAnnuler();
-  if (changerOnglet) afficherOnglet(etapeUtile());
+  // 0.159.0 : après l'ouverture d'un projet, la page Applications (menu de départ).
+  if (changerOnglet) afficherOnglet('projets');
   await enregistrer();
   // Journal de l'appareil (0.119.0) : une ouverture par projet ouvert (pas à chaque nouvelle
   // version reçue de Drive pour le même projet).
@@ -6985,7 +7343,9 @@ async function demarrer() {
     }) : 'continuer';
     // Partage : on se reconnecte à Drive si on l'était (le projet ouvert est alors comparé à Drive).
     partage.demarrer({ choixEnAttente: choix !== 'continuer' });
-    if (choix === 'ouvrir') document.querySelector('#projets [data-panneau="projets"]')?.click();
+    // 0.157.0 : la page Applications est le menu de départ.
+    if (choix === 'continuer') navigation.ouvrirPage();
+    if (choix === 'ouvrir') ouvrirPartieProjet('ouvrir');
     else if (choix === 'nouveau' && !(await creerNouveauProjet())) {
       // Fenêtre fermée sans créer : on reste sur le dernier projet.
       partage.apresOuverture();

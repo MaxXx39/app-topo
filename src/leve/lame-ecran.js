@@ -156,7 +156,7 @@ function htmlLignesSuivies(donnees) {
   const bout = (i, cle, titre, actif) => `<button type="button" class="puce-choix petite ${actif ? 'actif' : ''}" data-action="boutLigneGuidage" data-valeur="${i}:${cle}">${titre}</button>`;
   return `<div class="lignes-guidage">${choix}
     <div class="bandeaux-lignes">${lignes.map((l, i) => `<div class="bandeau-ligne attente" data-vivant="lame-ligne-${i}">
-        <span class="nom-ligne">${l.nom}</span>
+        <span class="nom-ligne couleur-${l.nom}">${l.nom}</span>
         <span class="bouts-ligne">${bout(i, 'gauche', 'bout G', l.bout === 'gauche')}${bout(i, 'droite', 'bout D', l.bout !== 'gauche')}</span>
         <strong class="ecart-ligne">—</strong>
         <button type="button" class="bouton-lien" data-action="enleverLigneGuidage" data-valeur="${i}" aria-label="Enlever ${l.nom}">×</button>
@@ -316,13 +316,16 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []
   }
   const [xa, xb] = [x(a.distance), x(b.distance)];
   const [ya, yb] = [y(a.altitude), y(b.altitude)];
-  // Lignes suivies (0.154.0) : trait violet pointillé là où elles croisent la coupe, avec leur nom.
+  // Lignes suivies (0.154.0) : trait pointillé là où elles croisent la coupe, avec leur nom.
   // Hors de la coupe : le nom au bord, avec une flèche vers la ligne.
   const traitsLignes = lignes
     .map((l) => {
-      if (l.surCoupe < 0) return `<text class="nom-ligne-coupe" x="4" y="24">◀ ${l.nom}</text>`;
-      if (l.surCoupe > longueur) return `<text class="nom-ligne-coupe" x="${largeur - 4}" y="24" text-anchor="end">${l.nom} ▶</text>`;
-      return `<line class="ligne-suivie-coupe" x1="${x(l.surCoupe).toFixed(1)}" y1="14" x2="${x(l.surCoupe).toFixed(1)}" y2="${hauteur - 16}" /><text class="nom-ligne-coupe" x="${x(l.surCoupe).toFixed(1)}" y="24" text-anchor="middle">${l.nom}</text>`;
+      // 0.157.0 : une couleur par ligne (L1 violet, L2 orange), comme sur le plan et dans le bandeau.
+      // Deux lignes hors de la coupe du même côté : la 2e est écrite plus bas.
+      const yNom = l.nom === 'L2' ? 38 : 24;
+      if (l.surCoupe < 0) return `<text class="nom-ligne-coupe couleur-${l.nom}" x="4" y="${yNom}">◀ ${l.nom}</text>`;
+      if (l.surCoupe > longueur) return `<text class="nom-ligne-coupe couleur-${l.nom}" x="${largeur - 4}" y="${yNom}" text-anchor="end">${l.nom} ▶</text>`;
+      return `<line class="ligne-suivie-coupe couleur-${l.nom}" x1="${x(l.surCoupe).toFixed(1)}" y1="14" x2="${x(l.surCoupe).toFixed(1)}" y2="${hauteur - 16}" /><text class="nom-ligne-coupe couleur-${l.nom}" x="${x(l.surCoupe).toFixed(1)}" y="${yNom}" text-anchor="middle">${l.nom}</text>`;
     })
     .join('');
   return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-coupe-guidage" role="img" aria-label="Coupe ${noms[0]} – ${noms[1]}">

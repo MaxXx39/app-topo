@@ -6,6 +6,7 @@ import { cadrerSurPoints, cadrerSurPointsTourne, versEcran, versTerrain, deplace
 import { bulle } from '../aide/bulles.js';
 import { aAcces, rayonFormes, echelleTexte } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
+import { dessinerMesureRapide } from './mesure-rapide.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { bordDeTriangles, estSurfaceFichier } from '../topo/surface.js';
@@ -199,7 +200,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const tuilesAffichees = new Map();
   let fondIndisponible = false;
   // Loupe de l'accroche « Manuel » (0.130.0, recalage d'un plan PDF) : voir loupe.js.
-  const loupe = creerLoupe(cadre, { lireVue: () => vue, lirePlans: () => plansDxf });
+  // 0.159.0 : la loupe montre aussi la photo aérienne quand elle est affichée sur le plan (avec sa transparence).
+  const loupe = creerLoupe(cadre, {
+    lireVue: () => vue,
+    lirePlans: () => plansDxf,
+    lireFond: () => (calques.fondSatellite ? { url: FONDS.satellite.url, opacite: 1 - (calquesChoisis.transparencePhoto ?? 0) / 100 } : null),
+  });
   // Image d'un plan PDF scanné chargée : on redessine les plans (et la loupe).
   surImageChargee(() => {
     signatureDxf = '';
@@ -730,6 +736,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (choix) croix(choix.est, choix.nord, 'croix-choix', 12);
     // Dessins (Calculs › Dessin) et, pour celui en cours, le pilote.
     dessinerDessins(groupe, implantation, (est, nord) => versEcran(est, nord, vue), creerElement, 1 / vue.echelle, calques.noms);
+    // Mesure rapide (0.158.0) : points, côtés, longueurs et surface.
+    dessinerMesureRapide(groupe, implantation.mesureRapide, (est, nord) => versEcran(est, nord, vue), creerElement);
     svg.append(groupe);
   }
 

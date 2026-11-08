@@ -11526,6 +11526,617 @@ svg .texte-delta-surface { fill: #c2410c; font-weight: 800; }
 .puce-choix.petite { min-height: 32px; padding: 0 8px; font-size: 0.8rem; }
 svg .ligne-suivie-coupe { stroke: #7c3aed; stroke-width: 2.5; stroke-dasharray: 6 4; }
 svg .nom-ligne-coupe { fill: #7c3aed; font-weight: 900; font-size: 11px; }
+/* 0.157.0 : la 2e ligne suivie en orange (la 1re reste violette). */
+.bandeau-ligne .nom-ligne.couleur-L2 { background: #ea580c; }
+svg .ligne-suivie-coupe.couleur-L2 { stroke: #ea580c; }
+svg .nom-ligne-coupe.couleur-L2 { fill: #ea580c; }
 /* 0.155.0 : silhouette de la machine dans les coupes du Guidage (gris clair, derrière). */
 svg .silhouette-outil { fill: #94a3b8; opacity: 0.3; pointer-events: none; }
 svg .silhouette-outil .vitre-silhouette { fill: #ffffff; opacity: 0.6; }
+
+/* ==========================================================================
+   0.156.0 (demande du 08.11) : bande du bas (bouton « application | sous-application » + infos),
+   page Applications (bandeau du projet + tuiles avec étoile des favoris), roue des favoris (appui long),
+   en-tête sans l'icône Projet, bouton Récepteur grand, à cheval sur l'en-tête et la barre du récepteur.
+   ========================================================================== */
+:root { --hauteur-bande: 72px; --hauteur-onglets: var(--hauteur-bande); }
+body.mode-telephone { --hauteur-bande: 56px; --hauteur-onglets: var(--hauteur-bande); }
+
+.bande-appli {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  height: calc(var(--hauteur-bande) + env(safe-area-inset-bottom));
+  padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+  background: #1b2b36;
+  border-top: 4px solid var(--couleur-appli, #1b2b36);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.bouton-appli {
+  flex: none;
+  display: flex;
+  max-width: 62%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--couleur-appli);
+  color: var(--texte-appli);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.bouton-appli.neutre { background: #334155; color: #ffffff; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25); }
+.bande-appli button {
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+.partie-appli {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 16px 0 12px;
+  font-size: 18px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.partie-appli span { overflow: hidden; text-overflow: ellipsis; }
+.bande-appli svg,
+.page-applis .tuile-appli > svg,
+.roue-favoris svg {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.partie-appli svg { width: 28px; height: 28px; }
+.partie-sous {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.18) !important;
+  border-left: 2px solid rgba(255, 255, 255, 0.4) !important;
+}
+.partie-sous span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.partie-sous.ouverte { background: rgba(0, 0, 0, 0.38) !important; }
+.fleche-sous { font-size: 14px; opacity: 0.85; }
+.zone-info-appli {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #0f1c25;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 800;
+}
+.texte-info-appli { padding: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.choix-sous-appli {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.choix-sous-appli::-webkit-scrollbar { display: none; }
+.bande-appli .choix-sous-appli button {
+  flex: 1 0 auto;
+  min-width: 76px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: #0f1c25;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+}
+.bande-appli .choix-sous-appli button.actif { background: var(--couleur-appli); color: var(--texte-appli); }
+/* Bande déroulée : l'application garde son nom en court (icône seule) pour laisser la place aux choix. */
+.bande-appli.deroulee .partie-appli span { display: none; }
+
+body.mode-telephone .bande-appli { padding: 5px 6px calc(5px + env(safe-area-inset-bottom)); gap: 6px; }
+body.mode-telephone .partie-appli { font-size: 15px; padding: 0 10px 0 8px; gap: 6px; }
+body.mode-telephone .partie-appli svg { width: 22px; height: 22px; }
+body.mode-telephone .partie-sous { font-size: 13px; padding: 0 8px; }
+body.mode-telephone .zone-info-appli { font-size: 14px; }
+body.mode-telephone .bande-appli .choix-sous-appli button { min-width: 60px; padding: 0 8px; font-size: 13px; }
+
+/* Cachée comme l'ancienne barre : clavier ouvert, dessin sur téléphone (on sort avec « Terminé »). */
+body.clavier-ouvert .bande-appli { display: none; }
+@media (max-width: 899px) {
+  body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures'], [data-onglet='dessin']) .bande-appli { display: none; }
+}
+
+/* Ordinateur et tablette en largeur : la bande se place où étaient les onglets, en haut à gauche. */
+@media (min-width: 900px) {
+  .bande-appli {
+    top: calc(var(--hauteur-entete) + 12px);
+    bottom: auto;
+    left: 16px;
+    right: auto;
+    width: 440px;
+    height: 48px;
+    padding: 4px;
+    border-top: none;
+    border-radius: var(--rayon);
+    box-shadow: var(--ombre);
+  }
+  .partie-appli { font-size: 15px; }
+  .partie-appli svg { width: 20px; height: 20px; }
+  .partie-sous, .bande-appli .choix-sous-appli button, .zone-info-appli { font-size: 14px; }
+}
+
+/* Point / Ligne / Surface… d'Implanter et Volumes / Mesures / Dessin de Calculs : dans la bande. */
+#leve-direct .choix-implantation-type .puce-choix { display: none; }
+#leve-direct .choix-implantation-type:not(:has(.rond-aide)) { display: none; }
+body:not(.aide-active) #leve-direct .choix-implantation-type { display: none; }
+.titre-applis { margin: 16px 2px 0; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gris); display: flex; align-items: center; gap: 8px; }
+.parties-calculs { display: none !important; }
+
+/* --- Page Applications --- */
+.page-applis {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom));
+  z-index: 19;
+  overflow-y: auto;
+  padding: 14px 14px 24px;
+  background: var(--fond);
+}
+.page-applis[hidden] { display: none; }
+@media (min-width: 900px) {
+  .page-applis { left: 16px; right: auto; width: 440px; bottom: 16px; margin-top: 68px; border-radius: var(--rayon); box-shadow: var(--ombre); }
+}
+.bandeau-projet-applis {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #1b2b36;
+  color: #ffffff;
+}
+.texte-bandeau-projet {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.texte-bandeau-projet small { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; }
+.texte-bandeau-projet b { max-width: 100%; font-size: 22px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.texte-bandeau-projet span { max-width: 100%; font-size: 13px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.boutons-bandeau-projet { flex: none; display: flex; gap: 8px; }
+.bouton-bandeau-projet {
+  min-height: 48px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1b2b36;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.bouton-bandeau-projet.nouveau { background: var(--ambre); }
+.tuiles-applis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 40vw), 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.tuile-appli {
+  position: relative;
+  min-height: 124px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 8px;
+  border-radius: 18px;
+  background: var(--couleur-appli);
+  color: var(--texte-appli);
+  font-size: 20px;
+  font-weight: 800;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.tuile-appli > svg { width: 40px; height: 40px; }
+.tuile-appli.en-cours { outline: 4px solid var(--encre); outline-offset: 3px; }
+.coche-favori {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 42px;
+  height: 42px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.12);
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0.5;
+  cursor: pointer;
+}
+.coche-favori.coche { opacity: 1; background: #ffffff; border-color: #ffffff; color: #f59e0b; }
+body.mode-telephone .tuile-appli { min-height: 96px; font-size: 15px; }
+body.mode-telephone .tuile-appli > svg { width: 30px; height: 30px; }
+body.mode-telephone .coche-favori { width: 34px; height: 34px; font-size: 16px; }
+body.mode-telephone .texte-bandeau-projet b { font-size: 17px; }
+body.mode-telephone .bouton-bandeau-projet { min-height: 40px; padding: 0 10px; font-size: 13px; }
+
+/* --- Roue des favoris (appui long sur l'application) --- */
+.roue-favoris { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.55); }
+.roue-favoris[hidden] { display: none; }
+.bulle-favori {
+  position: absolute;
+  width: 88px;
+  height: 88px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: var(--couleur-appli);
+  color: var(--texte-appli);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.bulle-favori svg { width: 30px; height: 30px; }
+body.mode-telephone .bulle-favori { width: 66px; height: 66px; font-size: 10px; }
+body.mode-telephone .bulle-favori svg { width: 22px; height: 22px; }
+
+/* --- En-tête : plus d'icône Projet (page Applications), nom du projet en petit --- */
+.entete .entete-texte .entete-titre { font-size: 15px; }
+.entete .entete-texte .entete-etat { font-size: 12px; }
+body.mode-telephone .entete .entete-texte .entete-titre { font-size: 13px; }
+body.mode-telephone .entete .entete-texte .entete-etat { font-size: 10.5px; }
+
+/* Bouton Récepteur (APK) : deux fois plus grand, à cheval sur l'en-tête et la barre du récepteur
+   (qui est raccourcie d'autant). */
+.entete:has(.bouton-recepteur-entete) { --largeur-recepteur: 96px; padding-right: calc(var(--largeur-recepteur) + 10px); }
+body.mode-telephone .entete:has(.bouton-recepteur-entete) { --largeur-recepteur: 68px; }
+body .entete .entete-icone-bouton.bouton-recepteur-entete,
+body.mode-telephone .entete .entete-icone-bouton.bouton-recepteur-entete {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: var(--largeur-recepteur);
+  height: auto;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  background: #0f172a;
+}
+body .entete .entete-icone-bouton.bouton-recepteur-entete svg { width: 76px; height: 76px; padding: 13px; }
+body.mode-telephone .entete .entete-icone-bouton.bouton-recepteur-entete svg { width: 58px; height: 58px; padding: 10px; }
+body.avec-recepteur .entete:has(.bouton-recepteur-entete) .bandeaux-recepteur { right: var(--largeur-recepteur); }
+
+/* ==========================================================================
+   0.157.0 (demandes du 08.11) : bande vide = seul le bouton reste (zone de travail jusqu'en bas),
+   Enreg. Pts de Lever dans la bande, Import / Exporter / Contenu dans la page Applications,
+   tuiles déplaçables (appui long), aucune sélection de texte à l'appui long.
+   ========================================================================== */
+body.bande-vide { --hauteur-onglets: 0px; }
+body.bande-vide .bande-appli {
+  right: auto;
+  background: transparent;
+  border-top-color: transparent;
+  pointer-events: none;
+}
+body.bande-vide .bande-appli .bouton-appli { max-width: calc(100vw - 16px); pointer-events: auto; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45); }
+/* Les pages qui défilent gardent de la place sous leur dernier élément pour ne pas finir sous le bouton. */
+body.bande-vide .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 24px); }
+body.bande-vide .page-applis { padding-bottom: calc(var(--hauteur-bande) + 24px); }
+@media (min-width: 900px) {
+  body.bande-vide .bande-appli { width: auto; box-shadow: none; }
+  body.bande-vide .mise-en-page { padding-bottom: 16px; }
+}
+
+/* Enreg. Pts dans la bande (Lever, appli Android) : la ligne ID point / photo reste dans le cadre « Point ». */
+.bande-appli .bouton-enreg-bande {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 12px;
+  background: var(--ambre);
+  color: #1b2b36;
+  font-size: 22px;
+  font-weight: 900;
+}
+.bande-appli .bouton-enreg-bande small { font-size: 14px; font-weight: 700; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bande-appli .bouton-enreg-bande:disabled { background: #fde7b0; color: rgba(27, 43, 54, 0.55); }
+.zone-info-appli:has(.bouton-enreg-bande) { background: none; }
+body.mode-telephone .bande-appli .bouton-enreg-bande { font-size: 17px; gap: 6px; }
+body.mode-telephone .bande-appli .bouton-enreg-bande small { font-size: 11px; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre,
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre {
+  position: static;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: none;
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-prendre { display: none; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point { flex: 1 1 auto; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .panneau[data-onglet='terrain']:has(.cadre-prise .ligne-id-prendre),
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .panneau[data-onglet='terrain']:has(.cadre-prise .ligne-id-prendre) {
+  margin-bottom: 0;
+}
+
+/* Page Applications : Import / Exporter / Contenu du projet sous le bandeau du projet. */
+.parties-projet-applis { display: flex; gap: 8px; margin-top: 8px; }
+.bouton-partie-projet {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 2px solid #1b2b36;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--encre);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.bouton-partie-projet svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+body.mode-telephone .bouton-partie-projet { min-height: 42px; font-size: 12px; gap: 4px; padding: 0 4px; }
+body.mode-telephone .bouton-partie-projet svg { width: 16px; height: 16px; }
+
+/* Tuile déplacée (appui long) : soulevée ; les autres un peu pâlies. */
+.page-applis.deplacement .tuile-appli { opacity: 0.6; }
+.page-applis.deplacement .tuile-appli.en-deplacement { opacity: 1; transform: scale(1.06); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); z-index: 2; }
+.page-applis.deplacement { touch-action: none; }
+
+/* Appui long : jamais de texte sélectionné ni de menu d'Android. */
+.bande-appli, .bande-appli *, .page-applis, .page-applis *, .roue-favoris, .roue-favoris * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+body.appui-en-cours { -webkit-user-select: none; user-select: none; }
+
+/* ==========================================================================
+   0.158.0 (demandes du 08.11) : zone du milieu (Implanter, Enregistrer, DAO) et Mesure rapide.
+   ========================================================================== */
+/* Le vrai bouton relayé par la bande est caché (la bande le touche à sa place). */
+body[data-relais='implanter'] .bouton-implanter-plan { display: none !important; }
+body[data-relais='enregistrer'] #leve-direct [data-action='enregistrerImplantation'] { display: none; }
+body[data-relais='dao'] #bouton-dao { display: none; }
+.bande-appli .bouton-enreg-bande.relais-implanter,
+.bande-appli .bouton-enreg-bande.relais-enregistrer { background: #0d9488; color: #ffffff; }
+body[data-mode-terrain='autocontrole'] .bande-appli .bouton-enreg-bande.relais-enregistrer { background: var(--bordeaux); }
+.bande-appli .bouton-enreg-bande.relais-dao { background: #db2777; color: #ffffff; }
+.bande-appli .bouton-enreg-bande.relais-mesure-gnss { background: #7c3aed; color: #ffffff; }
+.bande-appli .bouton-enreg-bande:is(.relais-implanter, .relais-enregistrer, .relais-dao, .relais-mesure-gnss):disabled { background: #475569; color: rgba(255, 255, 255, 0.6); }
+.bande-appli .bouton-enreg-bande:is(.relais-implanter, .relais-enregistrer, .relais-dao, .relais-mesure-gnss) small { color: inherit; }
+.bande-appli .bouton-enreg-bande.relais-enregistrer span { font-size: 18px; }
+body.mode-telephone .bande-appli .bouton-enreg-bande.relais-enregistrer span { font-size: 14px; }
+
+/* Mesure rapide : le plan en haut sur tablette / téléphone, comme Calculs › Volumes. */
+@media (max-width: 899px) {
+  body[data-onglet='mesure-rapide'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(var(--part-plan-terrain, 0.45), var(--part-plan-auto, 0)));
+  }
+  body[data-onglet='mesure-rapide'] .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: var(--hauteur-plan-terrain);
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+  body[data-onglet='mesure-rapide'] .mise-en-page { padding-top: calc(var(--hauteur-plan-terrain) + 12px); }
+  body[data-onglet='mesure-rapide'] .boutons-taille-plan {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    z-index: 3;
+    display: flex;
+    gap: 2px;
+    transform: translateX(-50%);
+  }
+}
+.panneau[data-onglet='mesure-rapide'] { border-top: 4px solid #7c3aed; }
+.panneau[data-onglet='mesure-rapide'] > h2 { color: #7c3aed; }
+.accroches-mesure-rapide { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.invite-mesure-rapide { margin: 12px 0; text-align: center; color: var(--gris); }
+.resume-mesure-rapide {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.resume-mesure-rapide > div {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #7c3aed 9%, var(--surface));
+}
+.resume-mesure-rapide span { font-size: 12px; color: var(--gris); }
+.resume-mesure-rapide strong { font-size: 22px; font-weight: 900; color: var(--encre); font-variant-numeric: tabular-nums; }
+.boutons-mesure-rapide { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+.boutons-mesure-rapide > * { flex: 1 1 auto; min-height: 44px; }
+.tableau-mesure-rapide { margin-top: 10px; }
+.titre-tableau-mesure { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.pages-mesure { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.pages-mesure button { min-width: 44px; min-height: 40px; }
+.tableau-mesure-rapide table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.tableau-mesure-rapide th { text-align: left; font-size: 12px; color: var(--gris); border-bottom: 2px solid var(--bordure); padding: 4px; }
+.tableau-mesure-rapide td { padding: 6px 4px; border-bottom: 1px solid var(--bordure); }
+/* Chiffres alignés à droite (le n° du côté / du point et le nom à gauche). */
+.tableau-mesure-rapide :is(th, td):not(:first-child) { text-align: right; }
+.tableau-mesure-rapide [data-tableau='points'] :is(th, td):nth-child(2) { text-align: left; }
+body.mode-telephone .resume-mesure-rapide strong { font-size: 16px; }
+body.mode-telephone .tableau-mesure-rapide table { font-size: 11px; }
+
+/* Mesure rapide sur le plan : violet, longueurs au milieu des côtés, surface au milieu. */
+.plan .fond-mesure-rapide { fill: rgba(124, 58, 237, 0.12); stroke: none; }
+.plan .trait-mesure-rapide { stroke: #7c3aed; stroke-width: 3; }
+.plan .trait-mesure-rapide.fermeture { stroke-dasharray: 8 5; }
+.plan .point-mesure-rapide { fill: #7c3aed; stroke: #ffffff; stroke-width: 2; }
+.plan :is(.cote-mesure-rapide, .nom-mesure-rapide, .surface-mesure-rapide) {
+  fill: #4c1d95;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3.5px;
+}
+.plan .cote-mesure-rapide { font-size: 13px; text-anchor: middle; }
+.plan .nom-mesure-rapide { font-size: 12px; }
+.plan .surface-mesure-rapide { font-size: 15px; text-anchor: middle; }
+
+/* ==========================================================================
+   0.159.0 (demandes du 08.11) : menu (encadré du projet, sous-applications sur les tuiles, Réglages et
+   Fermer à part), pages du projet, bouton récepteur sans fond carré, applications indépendantes.
+   ========================================================================== */
+/* Bouton Récepteur : seulement le rond de couleur, sans carré sombre autour. */
+body .entete .entete-icone-bouton.bouton-recepteur-entete,
+body.mode-telephone .entete .entete-icone-bouton.bouton-recepteur-entete { background: transparent; }
+/* « Implanter » posé sur le plan : seulement dans Implanter (pas dans la Mesure rapide, Calculs…). */
+body:not([data-onglet='terrain']) .bouton-implanter-plan { display: none !important; }
+
+/* Encadré du projet : bandeau + Import / Exporter / Contenu ensemble. */
+.cadre-projet-applis { padding: 10px; border-radius: 18px; background: #1b2b36; }
+.cadre-projet-applis .bandeau-projet-applis { padding: 4px 4px 10px; border-radius: 0; background: none; }
+.cadre-projet-applis .parties-projet-applis { margin-top: 0; }
+.cadre-projet-applis .bouton-partie-projet { border-color: rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.1); color: #ffffff; }
+
+/* Sous-applications en petit sur les tuiles (toucher = ouvrir l'application dessus). */
+.tuile-appli .sous-tuile { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: 100%; }
+.tuile-appli .sous-tuile button {
+  min-height: 30px;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+body.mode-telephone .tuile-appli .sous-tuile button { min-height: 26px; padding: 1px 6px; font-size: 10px; }
+
+/* Pied de la page Applications : Réglages (une page à part, pas une application) et Fermer l'appli. */
+.pied-applis { display: flex; gap: 10px; margin-top: 18px; }
+.bouton-pied-applis {
+  flex: 1 1 0;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px solid #64748b;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--encre);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.bouton-pied-applis svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bouton-pied-applis.fermer { border-color: #dc2626; background: #dc2626; color: #ffffff; }
+body.mode-telephone .bouton-pied-applis { min-height: 42px; font-size: 13px; }
+
+/* Pages du projet : une seule partie de l'onglet Projet à la fois (liste des projets, Import, Exporter, Contenu). */
+.titre-partie-projet { margin: 0 0 10px; font-size: 20px; color: var(--encre); }
+body[data-partie-projet] .panneau-projet > :not(.titre-partie-projet) { display: none !important; }
+body[data-partie-projet='ouvrir'] .panneau-projet > :is(#projets, #projets-suite) { display: block !important; }
+body[data-partie-projet='ouvrir'] .panneau-projet > .titre-partie-projet { display: none; }
+body[data-partie-projet='import'] .panneau-projet > #importer:not([hidden]) { display: block !important; }
+body[data-partie-projet='export'] .panneau-projet > #exporter-projet:not([hidden]) { display: block !important; }
+body[data-partie-projet='contenu'] .panneau-projet > #contenu-projet { display: block !important; }
+
+/* ==========================================================================
+   0.160.0 (demande du 08.11) : Réglages = vraie page plein écran (entre l'en-tête et la bande du bas).
+   ========================================================================== */
+dialog.fenetre-reglages.en-page[open] {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom));
+  z-index: 19;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0 16px 14px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+body.bande-vide dialog.fenetre-reglages.en-page[open] { padding-bottom: calc(var(--hauteur-bande) + 14px); }
+dialog.fenetre-reglages.en-page .titre-reglages { display: flex; align-items: center; gap: 10px; margin: 0 -16px 10px; }
+.retour-reglages {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  background: none;
+  color: #ffffff;
+  cursor: pointer;
+}
+.retour-reglages svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+@media (min-width: 900px) {
+  dialog.fenetre-reglages.en-page[open] { left: 16px; right: auto; width: 440px; bottom: 16px; margin-top: 68px; border-radius: var(--rayon); box-shadow: var(--ombre); }
+}

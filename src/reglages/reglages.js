@@ -161,14 +161,16 @@ function compteListes() {
  * changerMode() : appelé après un changement de mode (pour redessiner les écrans) }.
  * Renvoie { rafraichir() } : redessine le bloc Partage (son état a changé), tant que la fenêtre est ouverte.
  */
-export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage, changerMode, recepteur = null }) {
+// 0.160.0 (demande du 08.11) : enPage = vraie page plein écran (entre l'en-tête et la bande du bas) au lieu
+// d'une fenêtre ; « ← » en haut la ferme et appelle quandRetour (retour à la page Applications).
+export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage, changerMode, recepteur = null, enPage = false, quandRetour = null }) {
   const reglages = lireReglages();
   if (!PAGES_REGLAGES.some(([cle]) => cle === pageOuverte) || (pageOuverte === 'recepteur' && !recepteur)) pageOuverte = 'affichage';
   const fenetre = document.createElement('dialog');
-  fenetre.className = 'fenetre-reglages';
+  fenetre.className = `fenetre-reglages${enPage ? ' en-page' : ''}`;
   fenetre.innerHTML = `
     <form method="dialog">
-      <h2 class="titre-reglages">Réglages · <span data-titre-page>${PAGES_REGLAGES.find(([cle]) => cle === pageOuverte)?.[1] ?? ''}</span></h2>
+      <h2 class="titre-reglages">${enPage ? '<button type="button" class="retour-reglages" data-action="retour-reglages" aria-label="Retour aux applications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>' : ''}Réglages · <span data-titre-page>${PAGES_REGLAGES.find(([cle]) => cle === pageOuverte)?.[1] ?? ''}</span></h2>
       <div class="onglets-reglages" role="tablist" aria-label="Parties des réglages">
         ${PAGES_REGLAGES.filter(([cle]) => cle !== 'recepteur' || recepteur).map(([cle, titre, classe]) => `<button type="button" role="tab" class="onglet-reglages ${classe} ${cle === pageOuverte ? 'actif' : ''}" data-page-reglages="${cle}" aria-selected="${cle === pageOuverte}">${titre}</button>`).join('')}
       </div>
@@ -235,7 +237,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       <div class="ligne-outils pied-reglages">
   ${fermerAppli ? `<button type="button" class="bouton-fermer-appli" data-action="fermer-appli">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>Fermer l'appli</button>` : ''}
-        <button class="bouton">OK</button>
+        ${enPage ? "" : "<button class=\"bouton\">OK</button>"}
       </div>
     </form>`;
   const zonePartage = fenetre.querySelector('[data-zone="partage"]');
@@ -282,6 +284,11 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     const onglet = evenement.target.closest('[data-page-reglages]');
     if (onglet) {
       montrerPage(onglet.dataset.pageReglages);
+      return;
+    }
+    if (evenement.target.closest('[data-action="retour-reglages"]')) {
+      fenetre.close();
+      quandRetour?.();
       return;
     }
     if (evenement.target.closest('[data-action="recepteur"]')) {
@@ -378,7 +385,11 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
   fenetre.addEventListener('close', () => fenetre.remove());
   document.body.append(fenetre);
   montrerPage(pageOuverte);
-  fenetre.showModal();
+  if (enPage) {
+    // Page : sous l'en-tête (sa hauteur change avec la barre du récepteur), sans fond grisé.
+    fenetre.style.top = `${Math.max(0, document.querySelector('.entete')?.getBoundingClientRect().bottom ?? 0)}px`;
+    fenetre.show();
+  } else fenetre.showModal();
   rafraichir();
-  return { rafraichir };
+  return { rafraichir, fermer: () => fenetre.open && fenetre.close(), ouverte: () => fenetre.open };
 }

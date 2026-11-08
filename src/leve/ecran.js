@@ -644,10 +644,10 @@ export function creerEcranLeve(conteneur, actions) {
     // « Manuel » (0.131.0) : implantation d'un point seulement, dès Intermédiaire.
     const modes = enLigne ? ['trait', ...MODES_ACCROCHE] : (donnees.controle.implantation === 'point' ? [...MODES_ACCROCHE, 'manuel'] : MODES_ACCROCHE);
     const active = enLigne ? imp.accrocheLigne : imp.accroche;
-    // Accroche « Point » : un point tapé (+ Point, pas pour une ligne) ou choisi dans la liste.
+    // Accroche « Point » : un point tapé (+ Point, pas pour une ligne ; 0.159.0 : Expert) ou choisi dans la liste.
     const outilsPoint = active === 'point'
       ? `<span class="separateur-accroche"></span>
-        ${enLigne ? '' : '<button type="button" class="bouton-outil-accroche" data-action="ouvrirFormulairePoint" title="Taper un point (Est, Nord, H)">+ Point</button>'}
+        ${enLigne ? '' : '<button type="button" class="bouton-outil-accroche seulement-expert" data-action="ouvrirFormulairePoint" title="Taper un point (Est, Nord, H)">+ Point</button>'}
         <button type="button" class="bouton-outil-accroche" data-action="ouvrirListePoints" title="Choisir un point dans la liste du projet">Liste</button>
         ${enLigne ? '' : '<button type="button" class="bouton-outil-accroche seulement-expert" data-action="basculerPlusProche" title="Le plus proche : implanter le point du plan le plus proche, la cible suit quand tu te déplaces">⌖ Proche</button>'}`
       : '';
