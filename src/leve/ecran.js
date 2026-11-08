@@ -80,7 +80,8 @@ export const ACCROCHES = {
   point: ['Point', 'Point du projet (levé ou importé)', '<circle class="anneau-accroche" cx="12" cy="12" r="8" /><circle class="rond-point" cx="12" cy="12" r="4.5" />'],
   sommet: ['Sommet', 'Sommet d\'une ligne du plan DXF', '<path d="M3 20 12 6l9 14" /><rect class="repere" x="9" y="3" width="6" height="6" />'],
   milieu: ['Milieu', 'Milieu d\'un segment du plan DXF', '<path d="M2 17h20" /><circle cx="2.5" cy="17" r="1.5" /><circle cx="21.5" cy="17" r="1.5" /><path class="repere" d="M12 8l5 9H7z" />'],
-  ligne: ['Sur ligne', 'Sur une ligne du plan DXF (endroit le plus proche)', '<path d="M3 21 21 3" /><path class="repere" d="M8 8l8 8M16 8l-8 8" />'],
+  // 0.161.0 : la ligne, le point touché à côté (petit rond) et le point le plus proche sur la ligne (pas au milieu).
+  ligne: ['Sur ligne', 'Sur une ligne du plan DXF (endroit le plus proche)', '<path d="M3 20 21 4" /><circle cx="6" cy="8" r="1.4" /><path d="M6.6 9.3 9.4 14.2" stroke-dasharray="1.6 1.6" /><circle class="repere" cx="10.2" cy="13.6" r="2.6" />'],
   croisement: ['Croisem.', 'Croisement de 2 lignes (sans altitude)', '<path d="M4 4 20 20M20 4 4 20" /><circle class="repere" cx="12" cy="12" r="3" />'],
   centre: ['Centre', 'Centre d\'un cercle du plan DXF', '<circle cx="12" cy="12" r="9" /><circle class="repere" cx="12" cy="12" r="2.5" />'],
   // 0.131.0 : « Manuel » (Intermédiaire, implantation d'un point) : loupe + main, point visé sans accroche.
@@ -1071,11 +1072,13 @@ export function creerEcranLeve(conteneur, actions) {
 
   /** Choix de ce que l'on va lever : une nouvelle surface de cette nature. */
   function choixNature() {
-    if (choixReseauOuvert) return choixReseau();
+    // 0.161.0 : Lever = Stock / Terrain / Libre ; Recollement et Métré sont des applications à part.
+    if (choixReseauOuvert || donnees.famille === 'reseau') return choixReseau();
+    const permises = donnees.famille === 'metre' ? ['metre'] : ['stock', 'terrain', 'autres'];
     return `<div class="choix-nature">
-      <p class="titre-choix">Que lèves-tu ?</p>
+      <p class="titre-choix">${donnees.famille === 'metre' ? 'Nouveau métré' : 'Que lèves-tu ?'}</p>
       <div class="natures-terrain">
-        ${NATURES_TERRAIN.filter(([cle]) => !['surface', 'recollement'].includes(cle) && (!estModeBase() || NATURES_BASE.includes(cle))).map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}">${titre}</button>`).join('')}
+        ${NATURES_TERRAIN.filter(([cle]) => permises.includes(cle) && (!estModeBase() || NATURES_BASE.includes(cle))).map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}">${titre}</button>`).join('')}
       </div>
       ${donnees.stock ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerChoixNature">annuler</button>' : ''}
     </div>`;
@@ -1090,7 +1093,7 @@ export function creerEcranLeve(conteneur, actions) {
           data-action="nouvelleSurface" data-valeur="reseau:${echapper(abreviation)}"><strong>${echapper(abreviation)}</strong> <span>${echapper(description)}</span></button>`).join('')}
       </div>
       <button type="button" class="bouton-lien bouton-lien-neutre" data-action="modifierReseaux">+ Ajouter ou modifier des réseaux</button>
-      <button type="button" class="bouton-lien bouton-lien-neutre" data-action="${donnees.stock ? 'fermerChoixNature' : 'ouvrirChoixNature'}">annuler</button>
+      ${donnees.stock ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerChoixNature">annuler</button>' : ''}
     </div>`;
   }
 

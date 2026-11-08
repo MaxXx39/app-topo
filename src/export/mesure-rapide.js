@@ -7,6 +7,7 @@
 import { jsPDF } from 'jspdf';
 import { formaterNombre } from '../topo/format.js';
 import { COULEURS } from './pdf.js';
+import { ECHELLES, barreEchellePapier } from './echelle.js';
 import { ecrireDxf, xyz, texteCentre, texteAscii, polyligne3D } from './dxf.js';
 
 const MARGE = 15; // mm
@@ -15,6 +16,8 @@ const MARGE = 15; // mm
 export const LARGEUR_CROQUIS = 210 - 2 * MARGE;
 export const HAUTEUR_CROQUIS = 110;
 const VIOLET = [124, 58, 237];
+// Échelles du croquis : celles du plan imprimé, avec des plus grandes pour les petites mesures.
+const ECHELLES_MESURE = [1, 2, 5, 10, 20, 25, 50, ...ECHELLES];
 
 const nombre = (valeur) => (valeur == null ? '—' : formaterNombre(valeur));
 const pente = (valeur) => (valeur == null ? '—' : `${valeur.toFixed(2)} %`);
@@ -55,11 +58,14 @@ export function cadreDuCroquis(points, l = LARGEUR_CROQUIS, h = HAUTEUR_CROQUIS)
   const nord = points.map((p) => p.nord);
   const [eMin, eMax, nMin, nMax] = [Math.min(...est), Math.max(...est), Math.min(...nord), Math.max(...nord)];
   const etendue = Math.max(eMax - eMin, nMax - nMin, 1);
-  const echelle = Math.min((l - 24) / Math.max(eMax - eMin, etendue * 0.2), (h - 24) / Math.max(nMax - nMin, etendue * 0.2));
+  const ajustee = Math.min((l - 24) / Math.max(eMax - eMin, etendue * 0.2), (h - 24) / Math.max(nMax - nMin, etendue * 0.2));
+  // 0.161.0 : échelle normalisée (1:50, 1:100…), la plus grande qui laisse tout dans le cadre.
+  const denominateur = ECHELLES_MESURE.find((e) => 1000 / e <= ajustee) ?? ECHELLES_MESURE.at(-1);
+  const echelle = 1000 / denominateur;
   const estCentre = (eMin + eMax) / 2;
   const nordCentre = (nMin + nMax) / 2;
   const [demiL, demiH] = [l / 2 / echelle, h / 2 / echelle];
-  return { echelle, estCentre, nordCentre, zone: { estMin: estCentre - demiL, estMax: estCentre + demiL, nordMin: nordCentre - demiH, nordMax: nordCentre + demiH } };
+  return { echelle, denominateur, estCentre, nordCentre, zone: { estMin: estCentre - demiL, estMax: estCentre + demiL, nordMin: nordCentre - demiH, nordMax: nordCentre + demiH } };
 }
 
 /**
@@ -110,7 +116,7 @@ function croquis(doc, { points, cotes }, x, y, l, h, fond = null) {
   doc.setDrawColor(...COULEURS.triangle);
   doc.setLineWidth(0.2);
   doc.rect(x, y, l, h);
-  const { echelle, estCentre, nordCentre } = cadreDuCroquis(points, l, h);
+  const { echelle, denominateur, estCentre, nordCentre } = cadreDuCroquis(points, l, h);
   const versPage = (p) => [x + l / 2 + (p.est - estCentre) * echelle, y + h / 2 - (p.nord - nordCentre) * echelle];
   doc.setDrawColor(...VIOLET);
   doc.setLineWidth(0.5);
@@ -135,6 +141,17 @@ function croquis(doc, { points, cotes }, x, y, l, h, fond = null) {
   doc.line(x + l - 8, y + 5, x + l - 10, y + 8);
   doc.line(x + l - 8, y + 5, x + l - 6, y + 8);
   doc.text('N', x + l - 8, y + 18, { align: 'center' });
+  // Échelle (0.161.0) : « Échelle 1:500 » et une barre ronde (en bas à gauche du cadre).
+  const barre = barreEchellePapier(denominateur, 40);
+  doc.setLineWidth(0.4);
+  doc.line(x + 4, y + h - 8, x + 4 + barre.mm, y + h - 8);
+  doc.line(x + 4, y + h - 9.5, x + 4, y + h - 6.5);
+  doc.line(x + 4 + barre.mm, y + h - 9.5, x + 4 + barre.mm, y + h - 6.5);
+  doc.setFontSize(8);
+  doc.text(`${barre.metres} m`, x + 4 + barre.mm / 2, y + h - 10, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Échelle 1:${denominateur}`, x + 4, y + h - 3);
+  doc.setFont('helvetica', 'normal');
   return y + h;
 }
 

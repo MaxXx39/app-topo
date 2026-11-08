@@ -61,9 +61,10 @@ export function creerBoutonRecepteur(nav, actions) {
 
   bouton.addEventListener('click', ouvrir);
 
-  /** Ouvre la fenêtre du récepteur. */
-  function ouvrir() {
+  /** Ouvre la fenêtre du récepteur. options.quandFerme : appelé à la fermeture (0.161.0 : retour au menu). */
+  function ouvrir(options) {
     fenetre?.close();
+    const apresFermeture = typeof options?.quandFerme === 'function' ? options.quandFerme : null;
     fenetre = document.createElement('dialog');
     fenetre.className = 'fenetre-recepteur';
     fenetre.addEventListener('click', quandClic);
@@ -103,6 +104,7 @@ export function creerBoutonRecepteur(nav, actions) {
       reglagesOuverts = false;
       reglages2Ouverts = false;
       deverrouille = false;
+      apresFermeture?.();
     });
     document.body.append(fenetre);
     dessiner();

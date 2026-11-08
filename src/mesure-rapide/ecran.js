@@ -2,8 +2,8 @@
 // d'accroche (0.159.0 : la même qu'Implanter, à icônes : Point, Sommet, Milieu, Sur ligne, Croisement,
 // Centre, puis Libre et, dans l'appli Android, GNSS = lever au récepteur), le résumé en gros (1 point : X Y Z et
 // nom ; 2 points : longueurs, altitudes, Δh, pente ; 3 points et plus : périmètres et surfaces), puis
-// les tableaux des points et des côtés, page par page s'il y a trop de lignes, et les boutons
-// « ↶ Dernier point », « Remise à 0 », « Enregistrer », « Exporter » (PDF / DXF).
+// les tableaux des points et des côtés, page par page s'il y a trop de lignes. 0.161.0 : les boutons
+// (↶ Annuler + nom du dernier point, RAZ, Enreg., Export) sont dans la bande du bas (voir main.js).
 // Rien n'est enregistré tant qu'on ne touche pas « Enregistrer ». Le tout est rendu en HTML ;
 // les actions passent par data-action (voir main.js « Mesure rapide »).
 import { echapper } from '../outils/echapper.js';
@@ -43,9 +43,9 @@ function tableauPagine(cle, titre, entetes, lignes, page) {
 
 /**
  * HTML de l'écran. { mesure (voir topo/mesure-rapide.js), accroche, accroches: [[cle, mot, nom, dessin]],
- * pages: { points, cotes }, lectureSeule }.
+ * pages: { points, cotes } }.
  */
-export function htmlMesureRapide({ mesure, accroche, accroches, pages, lectureSeule = false }) {
+export function htmlMesureRapide({ mesure, accroche, accroches, pages }) {
   const n = mesure.points.length;
   const boutons = accroches.map(([cle, mot, nom, dessin]) => `<button type="button" class="bouton-accroche ${accroche === cle ? 'actif' : ''}" data-action="accroche-mesure" data-valeur="${cle}" title="${nom}" aria-label="${nom}" aria-pressed="${accroche === cle}">
       <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span class="mot-accroche">${mot}</span></button>`).join('');
@@ -62,12 +62,6 @@ export function htmlMesureRapide({ mesure, accroche, accroches, pages, lectureSe
         ${bulle('mesureRapide')}
       </div>
       ${resume}
-      <div class="boutons-mesure-rapide">
-        <button type="button" class="bouton-secondaire" data-action="effacer-dernier-mesure" ${n === 0 ? 'disabled' : ''}>↶ Dernier point</button>
-        <button type="button" class="bouton-secondaire" data-action="remise-a-zero-mesure" ${n === 0 ? 'disabled' : ''}>Remise à 0</button>
-        <button type="button" class="bouton" data-action="enregistrer-mesure" ${n === 0 || lectureSeule ? 'disabled' : ''}>Enregistrer</button>
-        <button type="button" class="bouton" data-action="exporter-mesure" ${n === 0 ? 'disabled' : ''}>Exporter</button>
-      </div>
       ${cotes}
       ${points}
     </div>`;
