@@ -12275,3 +12275,7 @@ body.reglages-en-page dialog.fenetre-reglages.en-page[open] { bottom: env(safe-a
 body.mode-telephone .tuile-appli { min-height: 76px; font-size: 14px; }
 body.mode-telephone .tuile-appli > svg { width: 20px; height: 20px; }
 body.mode-telephone .tuile-appli .coche-favori { width: 24px; height: 24px; font-size: 11px; }
+/* 0.162.2 : Mesure rapide, loupe « Manuel » : flèches, zoom et « + Ajouter ce point ». */
+.reglage-loupe-mesure { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+.reglage-loupe-mesure .ajouter-manuel-mesure { flex: 1 1 160px; min-height: 48px; background: #7c3aed; color: #ffffff; font-weight: 800; }
+.reglage-loupe-mesure .ajouter-manuel-mesure:disabled { opacity: 0.45; }

@@ -305,7 +305,7 @@ if (!recepteurDisponible()) document.body.classList.add('sur-site');
 let navigation = null;
 // Mesure rapide (0.158.0, dès Intermédiaire) : points choisis (jamais enregistrés tant qu'on ne touche pas
 // « Enregistrer »), accroche du toucher, page de chaque tableau.
-const mesureRapideEtat = { points: [], accroche: 'point', pages: { points: 0, cotes: 0 } };
+const mesureRapideEtat = { points: [], accroche: 'point', pages: { points: 0, cotes: 0 }, candidat: null };
 // Ajout manuel d'un point en touchant le plan (voir plus bas « Édition Lever sur le site ») ; déclaré ici car afficherOnglet le lit.
 const ajoutLevee = { actif: false, accroche: 'point', choix: null };
 // Les parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Volumes, Mesures /
@@ -580,7 +580,8 @@ const accrochesMesure = () => [
   ...MODES_ACCROCHE.map((cle) => [cle, ...ACCROCHES[cle]]),
   // 0.162.0 : « Perp. » (Expert) : le 2e point est le pied de la perpendiculaire menée du 1er point sur la ligne touchée.
   ...(aAcces('expert') ? [['perpendiculaire', ...ACCROCHES_MESURE_EN_PLUS.perpendiculaire]] : []),
-  ['libre', ...ACCROCHES_MESURE_EN_PLUS.libre],
+  // 0.162.2 (demande du 08.11) : la loupe « Manuel » remplace « Libre » (point visé sans altitude).
+  ['manuel', ...ACCROCHES.manuel],
   ...(recepteurDisponible() ? [['gnss', ...ACCROCHES_MESURE_EN_PLUS.gnss]] : []),
 ];
 
@@ -595,7 +596,11 @@ function afficherMesureRapide() {
   for (const [cle, n] of [['points', mesure.points.length], ['cotes', mesure.cotes.length]]) {
     mesureRapideEtat.pages[cle] = Math.min(mesureRapideEtat.pages[cle], nombreDePages(n) - 1);
   }
-  document.querySelector('#mesure-rapide').innerHTML = htmlMesureRapide({ mesure, accroche: mesureRapideEtat.accroche, accroches: accrochesMesure(), pages: mesureRapideEtat.pages });
+  if (mesureRapideEtat.accroche === 'libre') mesureRapideEtat.accroche = 'manuel';
+  document.querySelector('#mesure-rapide').innerHTML = htmlMesureRapide({
+    mesure, accroche: mesureRapideEtat.accroche, accroches: accrochesMesure(), pages: mesureRapideEtat.pages,
+    manuel: { candidat: Boolean(mesureRapideEtat.candidat), zoom: terrain.zoomLoupe ?? 4 },
+  });
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
   navigation?.mettreAJour();
@@ -618,8 +623,9 @@ function toucherPourMesureRapide(position, tolerance) {
     afficherMessage('Accroche GNSS : touche « + Point GNSS » en bas', 3000);
     return;
   }
-  if (accroche === 'libre') {
-    ajouterPointMesure({ est: position.est, nord: position.nord, altitude: null });
+  // « Manuel » : toucher le plan y pose la loupe ; « Ajouter ce point » l'ajoute à la mesure.
+  if (accroche === 'manuel' || accroche === 'libre') {
+    plan.loupe.placerSur(position.est, position.nord);
     return;
   }
   if (accroche === 'perpendiculaire') {
@@ -628,7 +634,7 @@ function toucherPourMesureRapide(position, tolerance) {
       afficherMessage('Perpendiculaire : pose d\'abord un premier point (autre accroche)', 3500);
       return;
     }
-    const pied = piedPerpendiculaire(dernier, position, tolerance, avecToutesLesLignes('croisement', sourcesDesPlans(plansDuProjet(), position, tolerance)));
+    const pied = piedPerpendiculaire(dernier, position, tolerance, avecToutesLesLignes('croisement', sourcesDesPlans(plansDuProjet(), position, tolerance)).lignes);
     if (!pied) {
       afficherMessage('Aucune ligne sous le doigt', 3000);
       return;
@@ -701,6 +707,18 @@ document.querySelector('#mesure-rapide').addEventListener('click', (evenement) =
   const action = bouton.dataset.action;
   if (action === 'accroche-mesure') {
     mesureRapideEtat.accroche = bouton.dataset.valeur;
+    mesureRapideEtat.candidat = null;
+    afficherMesureRapide();
+  } else if (action === 'ajouter-manuel-mesure' && mesureRapideEtat.candidat) {
+    const { est, nord } = mesureRapideEtat.candidat;
+    mesureRapideEtat.candidat = null;
+    ajouterPointMesure({ est, nord, altitude: null });
+  } else if (action === 'deplacer-loupe-mesure') {
+    const [dx, dy] = { haut: [0, -1], bas: [0, 1], gauche: [-1, 0], droite: [1, 0] }[bouton.dataset.valeur] ?? [0, 0];
+    plan.loupe.deplacerDe(dx, dy);
+  } else if (action === 'zoom-loupe-mesure') {
+    terrain.zoomLoupe = Number(bouton.dataset.valeur) || 4;
+    plan.loupe.changerZoom(terrain.zoomLoupe);
     afficherMesureRapide();
   } else if (action === 'page-mesure') {
     mesureRapideEtat.pages[bouton.dataset.tableau] += Number(bouton.dataset.sens);
@@ -2539,6 +2557,23 @@ let loupeImplantation = false;
 function gererLoupeImplantation() {
   if (recalage.planId) {
     loupeImplantation = false;
+    return;
+  }
+  // Mesure rapide (0.162.2) : la loupe remplace « Libre » ; doigt levé = point candidat, « Ajouter ce point » l'ajoute.
+  if (mesureRapideActive() && mesureRapideEtat.accroche === 'manuel') {
+    const premiere = !loupeImplantation;
+    plan.loupe.montrer({
+      recentrer: premiere,
+      zoom: terrain.zoomLoupe ?? 4,
+      quandLache: ({ est, nord }) => {
+        const mm = (valeur) => Math.round(valeur * 1000) / 1000;
+        const avant = Boolean(mesureRapideEtat.candidat);
+        mesureRapideEtat.candidat = { est: mm(est), nord: mm(nord) };
+        // Le bouton « Ajouter ce point » s'allume la première fois (pas de redessin à chaque flèche).
+        if (!avant) afficherMesureRapide();
+      },
+    });
+    loupeImplantation = true;
     return;
   }
   const voulue = ongletContexte === 'terrain' && enImplantationDePoint() && terrain.accroche === 'manuel' && aAcces('intermediaire');
