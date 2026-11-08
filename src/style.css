@@ -12206,3 +12206,57 @@ body.levee-en-bande .levee-en-cours { justify-content: flex-end; }
 .bande-appli .bouton-bande-mesure:disabled { background: #475569; color: rgba(255, 255, 255, 0.5); }
 body.mode-telephone .bande-appli .bouton-bande-mesure { font-size: 12px; }
 body.mode-telephone .bande-appli .bouton-bande-mesure small { font-size: 9px; }
+
+/* ==========================================================================
+   0.162.0 (demandes du 08.11, soir) : bande de Lever (nom + photo / Changer / +, Enreg. Pts fixe au-dessus,
+   à droite), bande d'Implanter (nom, E / N / Z, petit « Enr. »), plus de cadre sur la dernière application,
+   Réglages sans la bande du bas.
+   ========================================================================== */
+.tuile-appli.en-cours { outline: none; }
+body.reglages-en-page .bande-appli { display: none; }
+body.reglages-en-page dialog.fenetre-reglages.en-page[open] { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+
+/* Lever : le nom du levé, puis les 3 petits boutons ; la rangée de l'écran est cachée. */
+body.levee-en-bande .levee-en-cours { display: none !important; }
+.zone-levee { gap: 6px; }
+.boutons-levee-bande { flex: none; display: flex; gap: 5px; align-items: stretch; }
+.bande-appli .petit-bouton-levee {
+  min-width: 40px; padding: 0 8px; display: flex; align-items: center; justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.35); border-radius: 12px; background: #0f1c25; color: #ffffff;
+  font-size: 13px; font-weight: 800;
+}
+.bande-appli .petit-bouton-levee svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bande-appli .petit-bouton-levee:disabled { opacity: 0.4; }
+body.mode-telephone .bande-appli .petit-bouton-levee { min-width: 32px; padding: 0 5px; font-size: 11px; }
+body.mode-telephone .bande-appli .petit-bouton-levee svg { width: 18px; height: 18px; }
+/* Enreg. Pts : fixe au-dessus de la bande, à droite. */
+.zone-levee .bouton-enreg-bande.relais-prendre {
+  position: fixed; right: 12px; bottom: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 10px);
+  flex: none; width: 168px; min-height: 64px; flex-direction: column; gap: 0; z-index: 21;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+body.mode-telephone .zone-levee .bouton-enreg-bande.relais-prendre { width: 138px; min-height: 54px; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 90px); }
+
+/* Implanter : nom du point à droite du bouton de l'application, E / N / Z en tout petit, « Enr. » à droite. */
+.zone-info-appli:has(.zone-cible-bande) { background: none; justify-content: stretch; }
+.zone-cible-bande { flex: 1; min-width: 0; align-self: stretch; display: flex; gap: 6px; }
+.cible-bande { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 10px; border-radius: 12px; background: #0f1c25; }
+.cible-bande b { font-size: 17px; font-weight: 900; color: #5eead4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cible-bande small { font-size: 10px; font-weight: 700; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.mode-telephone .cible-bande b { font-size: 14px; }
+body.mode-telephone .cible-bande small { font-size: 9px; }
+.zone-cible-bande .bouton-enreg-bande.petit { flex: 0 0 64px; font-size: 16px; }
+body.mode-telephone .zone-cible-bande .bouton-enreg-bande.petit { flex-basis: 52px; font-size: 13px; }
+.bande-appli .bouton-enreg-bande.relais-enregistrer.petit span { font-size: 16px; }
+.levee-bande { overflow: hidden; }
+@media (max-width: 520px) {
+  .zone-levee .titre-levee-bande { display: none; }
+  .zone-levee .nom-levee-bande { font-size: 15px; }
+  .bande-appli .petit-bouton-levee { min-width: 34px; padding: 0 6px; font-size: 12px; gap: 0; }
+  .boutons-levee-bande { gap: 4px; }
+  .bande-appli .petit-bouton-levee svg { width: 20px; height: 20px; }
+}
+body.reglages-en-page dialog.fenetre-reglages.en-page[open] { bottom: env(safe-area-inset-bottom); }
+.cible-bande small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.15; }
+.ligne-cible .coord-h { gap: 8px; }

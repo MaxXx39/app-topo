@@ -23,7 +23,7 @@ export function jourLocal(date) {
 
 /** Journal vide pour cet appareil. */
 export function journalVide(appareil = { id: '', nom: '' }) {
-  return { appareilId: appareil.id, appareil: appareil.nom, modifieLe: null, jours: [], controles: [] };
+  return { appareilId: appareil.id, appareil: appareil.nom, utilisateur: appareil.utilisateur ?? '', modifieLe: null, jours: [], controles: [] };
 }
 
 /**
@@ -44,9 +44,12 @@ export function aUnControleRecent(controles, nomAppareil, maintenant, delaiMs) {
 /** Ligne du jour pour ce projet (créée si besoin). */
 function ligneDuJour(journal, projet, maintenant) {
   const jour = jourLocal(maintenant);
-  let ligne = journal.jours.find((j) => j.jour === jour && j.projetId === projet.id);
+  // 0.162.0 : le nom de la tablette et l'utilisateur du moment sont notés dans chaque ligne (changer
+  // d'utilisateur ne change pas ce qui a déjà été noté) ; une ligne par jour, projet et utilisateur.
+  const utilisateur = journal.utilisateur ?? '';
+  let ligne = journal.jours.find((j) => j.jour === jour && j.projetId === projet.id && (j.utilisateur ?? '') === utilisateur && (j.appareil ?? journal.appareil) === journal.appareil);
   if (!ligne) {
-    ligne = { jour, projetId: projet.id, projet: projet.nom, ouvertures: 0, debut: maintenant.toISOString(), fin: maintenant.toISOString(), points: 0, implantations: 0, controles: 0, sansControle: { points: 0, implantations: 0, depuis: null } };
+    ligne = { jour, projetId: projet.id, projet: projet.nom, appareil: journal.appareil, utilisateur, ouvertures: 0, debut: maintenant.toISOString(), fin: maintenant.toISOString(), points: 0, implantations: 0, controles: 0, sansControle: { points: 0, implantations: 0, depuis: null } };
     journal.jours.push(ligne);
   }
   ligne.projet = projet.nom || ligne.projet;
@@ -78,6 +81,8 @@ export function noter(journal, projet, evenement, maintenant = new Date()) {
     if (c.type === 'mesure') ligne.controles += 1;
     journal.controles.push({
       id: c.id,
+      appareil: journal.appareil,
+      utilisateur: journal.utilisateur ?? '',
       le: c.le ?? maintenant.toISOString(),
       projetId: projet.id,
       projet: projet.nom,
@@ -105,7 +110,7 @@ function oublierAnciens(journal, maintenant) {
 export function lireJournal(appareil) {
   try {
     const lu = JSON.parse(localStorage.getItem(CLE) ?? 'null');
-    if (lu && Array.isArray(lu.jours) && Array.isArray(lu.controles)) return { ...lu, appareilId: appareil.id, appareil: appareil.nom };
+    if (lu && Array.isArray(lu.jours) && Array.isArray(lu.controles)) return { ...lu, appareilId: appareil.id, appareil: appareil.nom, utilisateur: appareil.utilisateur ?? '' };
   } catch {
     // illisible : on repart d'un journal vide
   }

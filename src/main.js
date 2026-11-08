@@ -81,7 +81,7 @@ import { modifierLibellesDeSorte, modifierReseaux } from './leve/fenetre-libelle
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
 import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele, ecartAuBout } from './topo/ligne-implantation.js';
-import { MODES_ACCROCHE, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
+import { MODES_ACCROCHE, piedPerpendiculaire, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
 import {
   estLeveDirect,
   creerListeDeLevee,
@@ -476,7 +476,14 @@ const RELAIS_BANDE = {
   enregistrer: '#leve-direct [data-action="enregistrerImplantation"]',
   dao: '#bouton-dao',
   'renommer-levee': '#leve-direct .levee-en-cours .bouton-crayon-levee',
+  // 0.162.0 : photo, Changer et + du levé en cours sont dans la bande (la rangée de l'écran est cachée).
+  'photo-levee': '#leve-direct .levee-en-cours input[data-champ="photo-levee-globale"]',
+  'changer-levee': '#leve-direct .levee-en-cours [data-action="changerLevee"]',
+  'nouveau-levee': '#leve-direct .levee-en-cours [data-action="ouvrirChoixNature"]',
 };
+// Boutons de la bande qui ne cachent aucun bouton d'origine (body[data-relais] ne les note pas).
+const RELAIS_SANS_CACHE = ['renommer-levee', 'photo-levee', 'changer-levee', 'nouveau-levee'];
+const ICONE_PHOTO_BANDE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>';
 
 /**
  * Zone du milieu de la bande (0.157.0 / 0.158.0, validé le 08.11) : un gros bouton qui touche le vrai
@@ -491,7 +498,7 @@ const RELAIS_BANDE = {
  */
 function infoAppli() {
   const html = contenuBande();
-  const relais = [...html.matchAll(/data-cle="([a-z-]+)"/g)].map((m) => m[1]).find((cle) => cle !== 'renommer-levee');
+  const relais = [...html.matchAll(/data-cle="([a-z-]+)"/g)].map((m) => m[1]).find((cle) => !RELAIS_SANS_CACHE.includes(cle));
   if (relais) document.body.dataset.relais = relais;
   else delete document.body.dataset.relais;
   document.body.classList.toggle('levee-en-bande', html.includes('levee-bande'));
@@ -502,11 +509,21 @@ function contenuBande() {
   const cle = appliCourante(document.body.dataset.onglet, terrain.mode, familleLeve);
   const trouver = (relais) => document.querySelector(RELAIS_BANDE[relais]);
   if (cle === 'lever' || cle === 'recollement' || cle === 'metre') {
-    // 0.161.0 : « Levé en cours : nom ✎ » à droite du bouton de l'application, puis Enreg. Pts (appli Android).
+    // 0.162.0 : « Levé en cours : nom ✎ », puis photo / Changer / + dans la bande ; Enreg. Pts (appli Android)
+    // est un gros bouton fixe au-dessus de la bande, à droite.
     const levee = leveeEnCours();
+    const petit = (cleBouton, contenu, titre) => {
+      const vrai = trouver(cleBouton);
+      return `<button type="button" class="petit-bouton-levee" data-nav="action" data-cle="${cleBouton}" title="${titre}" aria-label="${titre}" ${!vrai || vrai.disabled ? 'disabled' : ''}>${contenu}</button>`;
+    };
     const bloc = levee
       ? `<div class="levee-bande"><span class="titre-levee-bande">${cle === 'metre' ? 'Métré' : 'Levé'} en cours</span>
-          <button type="button" class="nom-levee-bande" data-nav="action" data-cle="renommer-levee" title="Renommer">${echapper(levee.nom)} ✎</button></div>`
+          <button type="button" class="nom-levee-bande" data-nav="action" data-cle="renommer-levee" title="Renommer">${echapper(levee.nom)} ✎</button></div>
+        <div class="boutons-levee-bande">
+          ${trouver('photo-levee') && aAcces('intermediaire') ? petit('photo-levee', ICONE_PHOTO_BANDE, 'Photo de tout le levé') : ''}
+          ${trouver('changer-levee') ? petit('changer-levee', 'Changer', 'Changer de levé') : ''}
+          ${trouver('nouveau-levee') ? petit('nouveau-levee', '+', 'Nouveau levé') : ''}
+        </div>`
       : '';
     const prendre = trouver('prendre');
     const enreg = prendre ? boutonDeBande('prendre', 'Enreg. Pts', document.querySelector('#leve-direct .cadre-prise [data-champ="nom-point"]')?.value ?? '', prendre.disabled) : '';
@@ -520,8 +537,13 @@ function contenuBande() {
       return boutonDeBande('implanter', 'Implanter', [nom, altitude ? `H ${altitude}` : ''].filter(Boolean).join(' · '));
     }
     const enregistrer = trouver('enregistrer');
-    if (enregistrer && terrain.implantation === 'point' && aAcces('intermediaire')) {
-      return boutonDeBande('enregistrer', 'Enregistrer l\'implantation', implanter.cible?.nom ?? '', enregistrer.disabled);
+    if (enregistrer && terrain.implantation === 'point' && implanter.cible) {
+      // 0.162.0 : nom du point, E / N en tout petit et Z s'il existe dans la bande ; petit bouton « Enr. »
+      // (dès Intermédiaire) à droite.
+      const c = implanter.cible;
+      const detail = `E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}${c.altitude != null ? ` · Z ${formaterNombre(c.altitude)}` : ''}`;
+      return `<div class="zone-cible-bande"><div class="cible-bande"><b>${echapper(c.nom ?? '')}</b><small>${echapper(detail)}</small></div>
+        ${aAcces('intermediaire') ? `<button type="button" class="bouton-enreg-bande petit relais-enregistrer" data-nav="action" data-cle="enregistrer" title="Enregistrer l'implantation" aria-label="Enregistrer l'implantation" ${enregistrer.disabled ? 'disabled' : ''}><span>Enr.</span></button>` : ''}</div>`;
     }
     return '';
   }
@@ -551,10 +573,13 @@ function agirDepuisBande(cle) {
 // 0.159.0 : la barre d'accroche d'Implanter (icônes), puis Libre et GNSS (lever au récepteur, appli Android).
 const ACCROCHES_MESURE_EN_PLUS = {
   libre: ['Libre', 'Libre : l\'endroit touché, sans altitude', '<path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle class="repere" cx="12" cy="12" r="2.5" />'],
+  perpendiculaire: ['Perp.', 'Perpendiculaire (Expert) : touche une ligne, le point est le pied de la perpendiculaire depuis le dernier point', '<path d="M3 19h18M8 19V6" /><path d="M8 14h5v5" /><circle class="repere" cx="8" cy="5" r="2" />'],
   gnss: ['GNSS', 'Lever au récepteur : « + Point GNSS » en bas', '<path d="M8.5 3.2a5 5 0 0 1 7 0" /><ellipse class="repere" cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" />'],
 };
 const accrochesMesure = () => [
   ...MODES_ACCROCHE.map((cle) => [cle, ...ACCROCHES[cle]]),
+  // 0.162.0 : « Perp. » (Expert) : le 2e point est le pied de la perpendiculaire menée du 1er point sur la ligne touchée.
+  ...(aAcces('expert') ? [['perpendiculaire', ...ACCROCHES_MESURE_EN_PLUS.perpendiculaire]] : []),
   ['libre', ...ACCROCHES_MESURE_EN_PLUS.libre],
   ...(recepteurDisponible() ? [['gnss', ...ACCROCHES_MESURE_EN_PLUS.gnss]] : []),
 ];
@@ -595,6 +620,20 @@ function toucherPourMesureRapide(position, tolerance) {
   }
   if (accroche === 'libre') {
     ajouterPointMesure({ est: position.est, nord: position.nord, altitude: null });
+    return;
+  }
+  if (accroche === 'perpendiculaire') {
+    const dernier = mesureRapideEtat.points.at(-1);
+    if (!dernier) {
+      afficherMessage('Perpendiculaire : pose d\'abord un premier point (autre accroche)', 3500);
+      return;
+    }
+    const pied = piedPerpendiculaire(dernier, position, tolerance, avecToutesLesLignes('croisement', sourcesDesPlans(plansDuProjet(), position, tolerance)));
+    if (!pied) {
+      afficherMessage('Aucune ligne sous le doigt', 3000);
+      return;
+    }
+    ajouterPointMesure({ nom: '', est: pied.est, nord: pied.nord, altitude: pied.altitude });
     return;
   }
   const sources = accroche === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansDuProjet(), position, tolerance);
@@ -999,6 +1038,10 @@ function ouvrirFenetreReglages() {
             },
             nommerAppareil: (nom) => {
               partage.nommerAppareil(nom);
+              fenetreReglages?.rafraichir();
+            },
+            nommerUtilisateur: (nom) => {
+              partage.nommerUtilisateur(nom);
               fenetreReglages?.rafraichir();
             },
           },

@@ -64,6 +64,11 @@ export function celluleEcart(valeur, classe, tolerance) {
 
 /** Nom affiché d'un appareil (son nom, sinon son identifiant). */
 const nomAppareil = (journal) => journal.appareil || journal.appareilId || 'appareil sans nom';
+/** Appareil et utilisateur d'une ligne du journal (0.162.0 : notés au moment de la ligne ; les anciennes lignes prennent le nom actuel). */
+const qui = (element, journal) => {
+  const appareil = element.appareil || nomAppareil(journal);
+  return element.utilisateur ? `${appareil} (${element.utilisateur})` : appareil;
+};
 
 /**
  * Onglets du recap (voir recap/xlsx.js) à partir des journaux [{ appareilId, appareil, jours,
@@ -79,11 +84,10 @@ export function ongletsDuRecap(journaux, maintenant = new Date()) {
     return semaines.get(cle);
   };
   for (const journal of journaux) {
-    const appareil = nomAppareil(journal);
-    for (const ligne of journal.jours ?? []) semaine(ligne.jour).jours.push({ ...ligne, appareil });
+    for (const ligne of journal.jours ?? []) semaine(ligne.jour).jours.push({ ...ligne, appareil: qui(ligne, journal) });
     for (const c of journal.controles ?? []) {
       const d = new Date(c.le);
-      if (!Number.isNaN(d.getTime())) semaine(jourLocal(d)).controles.push({ ...c, appareil, jour: jourLocal(d) });
+      if (!Number.isNaN(d.getTime())) semaine(jourLocal(d)).controles.push({ ...c, appareil: qui(c, journal), jour: jourLocal(d) });
     }
   }
   const triees = [...semaines.values()].sort((a, b) => b.cle.localeCompare(a.cle)).slice(0, SEMAINES_MONTREES);

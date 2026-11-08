@@ -306,7 +306,7 @@ const ETATS_PARTAGE = {
  * vrai), avec un avertissement (le changer une fois réglé déconnecte de Drive) ; tant qu'il n'est
  * pas donné, la case est ouverte.
  */
-export function blocPartage({ etat, appareil }, { modifierNom = false } = {}) {
+export function blocPartage({ etat, appareil }, { modifierNom = false, modifierUtilisateur = false } = {}) {
   const [texte, classe] = ETATS_PARTAGE[etat.etat] ?? ['?', ''];
   const heure = etat.etat === 'a-jour' && etat.derniereSynchro ? ` · ${etat.derniereSynchro.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}` : '';
   const reprise = etat.etat === 'repris' && etat.repris
@@ -322,6 +322,11 @@ export function blocPartage({ etat, appareil }, { modifierNom = false } = {}) {
       : `<p class="nom-appareil-fixe"><span>Cet appareil</span><strong>${echapper(appareil.nom)}</strong>
           <button type="button" class="bouton-crayon-libelles" data-action="modifierNomAppareil" title="Modifier le nom de l'appareil" aria-label="Modifier le nom de l'appareil">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button></p>`}
+    ${appareil.nom ? (modifierUtilisateur
+      ? `<label class="nom-appareil">Utilisateur <input type="text" data-champ="utilisateur" value="${echapper(appareil.utilisateur ?? '')}" placeholder="ex. Dupont" /></label>`
+      : `<p class="nom-appareil-fixe"><span>Utilisateur</span><strong>${echapper(appareil.utilisateur || '—')}</strong>
+          <button type="button" class="bouton-crayon-libelles" data-action="modifierUtilisateur" title="Changer l'utilisateur de la tablette" aria-label="Changer l'utilisateur de la tablette">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button></p>`) : ''}
     ${etat.possible ? `<div class="ligne-outils">
       ${etat.connecte
         ? `<span class="etat-partage ${classe}">${texte}${heure}</span>

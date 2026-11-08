@@ -241,6 +241,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       </div>
     </form>`;
   const zonePartage = fenetre.querySelector('[data-zone="partage"]');
+  let modifierUtilisateur = false; // crayon de l'utilisateur de la tablette (0.162.0)
   let modifierNom = false; // crayon touché : le nom de l'appareil devient modifiable
   let deverrouille = false; // bon code tapé (voir outils/code.js) : vaut jusqu'à la fermeture de la fenêtre
   // On ne redessine pas pendant qu'on tape le nom de l'appareil (le curseur serait perdu). Un lien
@@ -248,7 +249,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
   const rafraichir = () => {
     const enSaisie = zonePartage.contains(document.activeElement) && document.activeElement.matches('input');
     if (!partage || !fenetre.open || enSaisie) return;
-    zonePartage.innerHTML = partage.html({ modifierNom });
+    zonePartage.innerHTML = partage.html({ modifierNom, modifierUtilisateur });
   };
   fenetre.addEventListener('change', (evenement) => {
     const champ = evenement.target.dataset.reglage;
@@ -264,7 +265,10 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       for (const puce of fenetre.querySelectorAll(`[data-reglage="${champ}"]`)) puce.closest('.puce-mode').classList.toggle('actif', puce.checked);
       changerMode?.(); // le plan est redessiné avec les nouvelles tailles
     } else if (champ === 'aide') basculerAide();
-    else if (evenement.target.dataset.champ === 'nom-appareil') {
+    else if (evenement.target.dataset.champ === 'utilisateur') {
+      modifierUtilisateur = false;
+      partage?.actions.nommerUtilisateur(evenement.target.value.trim());
+    } else if (evenement.target.dataset.champ === 'nom-appareil') {
       modifierNom = false;
       partage?.actions.nommerAppareil(evenement.target.value.trim());
     }
@@ -324,6 +328,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     }
     const bouton = evenement.target.closest('[data-zone="partage"] button[data-action]');
     if (bouton?.dataset.action === 'modifierNomAppareil') modifierNomProtege();
+    if (bouton?.dataset.action === 'modifierUtilisateur') modifierUtilisateurProtege();
     else if (bouton) partage?.actions[bouton.dataset.action]?.();
   });
   /**
@@ -373,12 +378,21 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     modifierLibellesDeSorte(sorte, () => changerMode?.());
   }
 
+  /** Crayon de l'utilisateur de la tablette : protégé par le code, comme le nom de l'appareil (0.162.0). */
+  async function modifierUtilisateurProtege() {
+    if (!deverrouille && !(await demanderCode('Changer l\'utilisateur de la tablette'))) return;
+    deverrouille = true;
+    modifierUtilisateur = true;
+    zonePartage.innerHTML = partage.html({ modifierNom, modifierUtilisateur });
+    zonePartage.querySelector('[data-champ="utilisateur"]')?.focus();
+  }
+
   /** Crayon du nom de l'appareil : protégé par le code (demandé une fois par ouverture de la fenêtre). */
   async function modifierNomProtege() {
     if (!deverrouille && !(await demanderCode('Modifier le nom de l\'appareil'))) return;
     deverrouille = true;
     modifierNom = true;
-    zonePartage.innerHTML = partage.html({ modifierNom });
+    zonePartage.innerHTML = partage.html({ modifierNom, modifierUtilisateur });
     zonePartage.querySelector('[data-champ="nom-appareil"]')?.focus();
   }
   fenetre.addEventListener('focusout', () => setTimeout(rafraichir, 0));
@@ -389,6 +403,9 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     // Page : sous l'en-tête (sa hauteur change avec la barre du récepteur), sans fond grisé.
     fenetre.style.top = `${Math.max(0, document.querySelector('.entete')?.getBoundingClientRect().bottom ?? 0)}px`;
     fenetre.show();
+    // 0.162.0 : pas de bande du bas (le bouton de la dernière application) dans la page Réglages.
+    document.body.classList.add('reglages-en-page');
+    fenetre.addEventListener('close', () => document.body.classList.remove('reglages-en-page'));
   } else fenetre.showModal();
   rafraichir();
   return { rafraichir, fermer: () => fenetre.open && fenetre.close(), ouverte: () => fenetre.open };

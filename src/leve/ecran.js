@@ -828,7 +828,9 @@ export function creerEcranLeve(conteneur, actions) {
     const ligne = !autocontrole && (reglages.implantation === 'ligne' || talus);
     let titre = ligne
       ? `<strong>${echapper(imp.ligne.nom)}</strong> <span class="longueur-ligne">· long. ${formaterNombre(imp.ligne.longueur)} m</span>`
-      : `${autocontrole ? 'Contrôle de' : 'Vers'} <strong>${echapper(cibleGuidee().nom ?? 'le point choisi')}</strong>`;
+      : autocontrole
+        ? `Contrôle de <strong>${echapper(cibleGuidee().nom ?? 'le point choisi')}</strong>`
+        : ''; // 0.162.0 : le nom du point implanté est dans la bande du bas (avec E / N / Z)
     if (talus) titre = `<strong>${echapper(imp.talus.ouvert ?? 'Talus')}</strong> · ${echapper(imp.talus.texte)}`;
     // Talus pas encore réglé (pente) : les réglages s'ouvrent tout seuls (et restent ouverts).
     if (talus && !imp.talus.complet) reglagesGuidageOuverts = true;
@@ -1018,7 +1020,7 @@ export function creerEcranLeve(conteneur, actions) {
   /** Point implanté : coordonnées et altitude, sur une ligne. */
   function detailPoint() {
     const c = cibleGuidee();
-    return `<div class="ligne-cible"><p class="coordonnees-cible"><span class="coord-en">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>${donnees.mode === 'autocontrole' ? (c.altitude != null ? `<span class="coord-h">H ${formaterNombre(c.altitude)}</span>` : '') : `<label class="coord-h">H<input type="text" inputmode="decimal" data-champ="altitude-cible" value="${c.altitude != null ? c.altitude.toFixed(3) : ''}" placeholder="—" aria-label="Altitude d'implantation" /></label>`}</p>
+    return `<div class="ligne-cible"><p class="coordonnees-cible">${donnees.mode === 'autocontrole' ? `<span class="coord-en">E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}</span>` : ''}${donnees.mode === 'autocontrole' ? (c.altitude != null ? `<span class="coord-h">H ${formaterNombre(c.altitude)}</span>` : '') : `<label class="coord-h">H<input type="text" inputmode="decimal" data-champ="altitude-cible" value="${c.altitude != null ? c.altitude.toFixed(3) : ''}" placeholder="—" aria-label="Altitude d'implantation" /></label>`}</p>
       ${donnees.mode !== 'autocontrole' && donnees.implanter.choix ? `<div class="ligne-outils options-choix">
           <button type="button" class="bouton-secondaire seulement-expert" data-action="creerPointAImplanter">+ À implanter</button>
           ${donnees.implanter.choixDuProjet ? '' : '<button type="button" class="bouton-secondaire seulement-expert" data-action="garderPointChoisi" title="Garder ce point dans le projet (levé « Points ajoutés »)">+ Point du projet</button>'}

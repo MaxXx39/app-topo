@@ -1,6 +1,6 @@
 // Tests de l'implantation d'un point : accroche (sommet, milieu, sur la ligne, centre), guidage, écarts.
 import { describe, it, expect } from 'vitest';
-import { accrocherTrait, accrocher, projeterSurSegment, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, sourcesDesPlans, csvImplantations, cibleSelonDistance, ecartsGuidage, couleurCanne, croisementSegments } from '../src/topo/accroche.js';
+import { accrocherTrait, accrocher, projeterSurSegment, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, sourcesDesPlans, csvImplantations, cibleSelonDistance, ecartsGuidage, couleurCanne, croisementSegments, piedPerpendiculaire } from '../src/topo/accroche.js';
 
 const p = (est, nord, altitude = null) => ({ est, nord, altitude });
 // Une ligne en L : (0,0) → (10,0) → (10,10), et une chambre de rayon 0.4 en (5, 5).
@@ -212,5 +212,24 @@ describe('accroche « croisement » de 2 lignes (0.152.0)', () => {
   });
   it('croisementSegments : parallèles = null', () => {
     expect(croisementSegments(p(0, 0), p(10, 0), p(0, 1), p(10, 1))).toBeNull();
+  });
+});
+
+describe('accroche « perpendiculaire » (0.162.0)', () => {
+  const ligne = { points: [{ est: 0, nord: 0, altitude: 10 }, { est: 10, nord: 0, altitude: 20 }], ferme: false };
+  it('donne le pied de la perpendiculaire sur la ligne touchée, avec l\'altitude interpolée', () => {
+    const pied = piedPerpendiculaire({ est: 4, nord: 3 }, { est: 6, nord: 0.2 }, 1, [ligne]);
+    expect(pied.est).toBeCloseTo(4, 6);
+    expect(pied.nord).toBeCloseTo(0, 6);
+    expect(pied.altitude).toBeCloseTo(14, 6);
+    expect(pied.distance).toBeCloseTo(3, 6);
+  });
+  it('prolonge la droite au-delà du segment, sans altitude', () => {
+    const pied = piedPerpendiculaire({ est: 15, nord: 2 }, { est: 9, nord: 0 }, 1, [ligne]);
+    expect(pied.est).toBeCloseTo(15, 6);
+    expect(pied.altitude).toBeNull();
+  });
+  it('rien si aucune ligne n\'est sous le doigt', () => {
+    expect(piedPerpendiculaire({ est: 4, nord: 3 }, { est: 5, nord: 5 }, 1, [ligne])).toBeNull();
   });
 });
