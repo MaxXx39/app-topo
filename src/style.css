@@ -12101,3 +12101,42 @@ body[data-partie-projet='ouvrir'] .panneau-projet > .titre-partie-projet { displ
 body[data-partie-projet='import'] .panneau-projet > #importer:not([hidden]) { display: block !important; }
 body[data-partie-projet='export'] .panneau-projet > #exporter-projet:not([hidden]) { display: block !important; }
 body[data-partie-projet='contenu'] .panneau-projet > #contenu-projet { display: block !important; }
+
+/* ==========================================================================
+   0.160.0 (demande du 08.11) : Réglages = vraie page plein écran (entre l'en-tête et la bande du bas).
+   ========================================================================== */
+dialog.fenetre-reglages.en-page[open] {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom));
+  z-index: 19;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0 16px 14px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+body.bande-vide dialog.fenetre-reglages.en-page[open] { padding-bottom: calc(var(--hauteur-bande) + 14px); }
+dialog.fenetre-reglages.en-page .titre-reglages { display: flex; align-items: center; gap: 10px; margin: 0 -16px 10px; }
+.retour-reglages {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  background: none;
+  color: #ffffff;
+  cursor: pointer;
+}
+.retour-reglages svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+@media (min-width: 900px) {
+  dialog.fenetre-reglages.en-page[open] { left: 16px; right: auto; width: 440px; bottom: 16px; margin-top: 68px; border-radius: var(--rayon); box-shadow: var(--ombre); }
+}

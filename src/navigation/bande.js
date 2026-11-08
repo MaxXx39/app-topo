@@ -29,7 +29,8 @@ const svg = (trace) => `<svg viewBox="0 0 24 24" aria-hidden="true">${trace}</sv
  * - projet() : { titre, detail } du projet ouvert ;
  * - changerProjet(), nouveauProjet() (ou null si le mode ne le permet pas) ;
  * - sousApplisDe(cle) : [[cle, titre]] écrites en petit sur la tuile (toucher = ouvrir dessus) ;
- * - reglages(), fermerAppli (ou null : pas de bouton) : pied de la page Applications ;
+ * - reglages(), fermerAppli (ou null : pas de bouton) : pied de la page Applications ; avantPage() : juste
+ *   avant d'ouvrir la page (fermer la page des réglages) ;
  * - partieProjet('import' | 'export' | 'contenu') : page Projet ouverte sur cette partie ; importPermis() ;
  * - agir(cle) : bouton de la zone du milieu touché (data-nav="action", ex. « prendre » = Enreg. Pts) ;
  * - message(texte) : message court à l'écran ; vibrer() (facultatif).
@@ -210,7 +211,10 @@ export function creerNavigation(nav, actions) {
     // 0.159.0 : Réglages et « Fermer l'appli » (pied de la page, pas des applications).
     const pied = evenement.target.closest('[data-pied]');
     if (pied) {
-      if (pied.dataset.pied === 'reglages') actions.reglages?.();
+      if (pied.dataset.pied === 'reglages') {
+        fermerPage();
+        actions.reglages?.();
+      }
       else actions.fermerAppli?.();
       return;
     }
@@ -233,6 +237,7 @@ export function creerNavigation(nav, actions) {
   }
 
   function ouvrirPage() {
+    actions.avantPage?.();
     pageOuverte = true;
     dessinerPage();
     placerSousEntete(page);

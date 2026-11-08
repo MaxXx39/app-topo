@@ -707,6 +707,7 @@ function sousApplisDe(cle) {
 
 /** Ouvre une application (tuile, sous-application d'une tuile, ou bulle de la roue des favoris). */
 function ouvrirAppli(cle, sous = null) {
+  fenetreReglages?.fermer?.();
   const modes = { lever: 'lever', implanter: 'controler', controle: 'autocontrole', guidage: 'lame' };
   if (modes[cle]) {
     // Guidage (0.153.0) : on revient toujours au choix de la machine, comme avant avec l'onglet.
@@ -743,6 +744,8 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
   partieProjet: ouvrirPartieProjet,
   sousApplisDe,
   reglages: () => ouvrirFenetreReglages(),
+  // La page Applications s'ouvre par-dessus tout : la page des réglages se ferme.
+  avantPage: () => fenetreReglages?.fermer?.(),
   fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? () => fermerAppli() : null,
   importPermis: () => aAcces('expert'),
   agir: agirDepuisBande,
@@ -865,7 +868,12 @@ document.querySelector('#bouton-mode').addEventListener('click', () => ouvrirFen
 let fenetreReglages = null;
 /** Fenêtre des réglages ⚙ (0.156.0 : tuile « Réglages » de la page Applications, ou la pyramide du mode). */
 function ouvrirFenetreReglages() {
+  // 0.160.0 : une vraie page (plein écran) ; « ← » ramène à la page Applications.
+  fenetreReglages?.fermer?.();
+  navigation?.fermer();
   fenetreReglages = ouvrirReglages({
+    enPage: true,
+    quandRetour: () => navigation.ouvrirPage(),
     aideActive: document.body.classList.contains('aide-active'),
     basculerAide: () => document.querySelector('#bouton-aide').click(),
     fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? fermerAppli : null,
