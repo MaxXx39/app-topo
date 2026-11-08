@@ -11526,6 +11526,10 @@ svg .texte-delta-surface { fill: #c2410c; font-weight: 800; }
 .puce-choix.petite { min-height: 32px; padding: 0 8px; font-size: 0.8rem; }
 svg .ligne-suivie-coupe { stroke: #7c3aed; stroke-width: 2.5; stroke-dasharray: 6 4; }
 svg .nom-ligne-coupe { fill: #7c3aed; font-weight: 900; font-size: 11px; }
+/* 0.157.0 : la 2e ligne suivie en orange (la 1re reste violette). */
+.bandeau-ligne .nom-ligne.couleur-L2 { background: #ea580c; }
+svg .ligne-suivie-coupe.couleur-L2 { stroke: #ea580c; }
+svg .nom-ligne-coupe.couleur-L2 { fill: #ea580c; }
 /* 0.155.0 : silhouette de la machine dans les coupes du Guidage (gris clair, derrière). */
 svg .silhouette-outil { fill: #94a3b8; opacity: 0.3; pointer-events: none; }
 svg .silhouette-outil .vitre-silhouette { fill: #ffffff; opacity: 0.6; }
@@ -11535,8 +11539,8 @@ svg .silhouette-outil .vitre-silhouette { fill: #ffffff; opacity: 0.6; }
    page Applications (bandeau du projet + tuiles avec étoile des favoris), roue des favoris (appui long),
    en-tête sans l'icône Projet, bouton Récepteur grand, à cheval sur l'en-tête et la barre du récepteur.
    ========================================================================== */
-:root { --hauteur-onglets: 72px; }
-body.mode-telephone { --hauteur-onglets: 56px; }
+:root { --hauteur-bande: 72px; --hauteur-onglets: var(--hauteur-bande); }
+body.mode-telephone { --hauteur-bande: 56px; --hauteur-onglets: var(--hauteur-bande); }
 
 .bande-appli {
   position: fixed;
@@ -11547,7 +11551,7 @@ body.mode-telephone { --hauteur-onglets: 56px; }
   display: flex;
   align-items: stretch;
   gap: 8px;
-  height: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom));
+  height: calc(var(--hauteur-bande) + env(safe-area-inset-bottom));
   padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
   background: #1b2b36;
   border-top: 4px solid var(--couleur-appli, #1b2b36);
@@ -11847,3 +11851,95 @@ body.mode-telephone .entete .entete-icone-bouton.bouton-recepteur-entete {
 body .entete .entete-icone-bouton.bouton-recepteur-entete svg { width: 76px; height: 76px; padding: 13px; }
 body.mode-telephone .entete .entete-icone-bouton.bouton-recepteur-entete svg { width: 58px; height: 58px; padding: 10px; }
 body.avec-recepteur .entete:has(.bouton-recepteur-entete) .bandeaux-recepteur { right: var(--largeur-recepteur); }
+
+/* ==========================================================================
+   0.157.0 (demandes du 08.11) : bande vide = seul le bouton reste (zone de travail jusqu'en bas),
+   Enreg. Pts de Lever dans la bande, Import / Exporter / Contenu dans la page Applications,
+   tuiles déplaçables (appui long), aucune sélection de texte à l'appui long.
+   ========================================================================== */
+body.bande-vide { --hauteur-onglets: 0px; }
+body.bande-vide .bande-appli {
+  right: auto;
+  background: transparent;
+  border-top-color: transparent;
+  pointer-events: none;
+}
+body.bande-vide .bande-appli .bouton-appli { max-width: calc(100vw - 16px); pointer-events: auto; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45); }
+/* Les pages qui défilent gardent de la place sous leur dernier élément pour ne pas finir sous le bouton. */
+body.bande-vide .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 24px); }
+body.bande-vide .page-applis { padding-bottom: calc(var(--hauteur-bande) + 24px); }
+@media (min-width: 900px) {
+  body.bande-vide .bande-appli { width: auto; box-shadow: none; }
+  body.bande-vide .mise-en-page { padding-bottom: 16px; }
+}
+
+/* Enreg. Pts dans la bande (Lever, appli Android) : la ligne ID point / photo reste dans le cadre « Point ». */
+.bande-appli .bouton-enreg-bande {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 12px;
+  background: var(--ambre);
+  color: #1b2b36;
+  font-size: 22px;
+  font-weight: 900;
+}
+.bande-appli .bouton-enreg-bande small { font-size: 14px; font-weight: 700; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bande-appli .bouton-enreg-bande:disabled { background: #fde7b0; color: rgba(27, 43, 54, 0.55); }
+.zone-info-appli:has(.bouton-enreg-bande) { background: none; }
+body.mode-telephone .bande-appli .bouton-enreg-bande { font-size: 17px; gap: 6px; }
+body.mode-telephone .bande-appli .bouton-enreg-bande small { font-size: 11px; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre,
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre {
+  position: static;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: none;
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-prendre { display: none; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point { flex: 1 1 auto; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .panneau[data-onglet='terrain']:has(.cadre-prise .ligne-id-prendre),
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .panneau[data-onglet='terrain']:has(.cadre-prise .ligne-id-prendre) {
+  margin-bottom: 0;
+}
+
+/* Page Applications : Import / Exporter / Contenu du projet sous le bandeau du projet. */
+.parties-projet-applis { display: flex; gap: 8px; margin-top: 8px; }
+.bouton-partie-projet {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 2px solid #1b2b36;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--encre);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.bouton-partie-projet svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+body.mode-telephone .bouton-partie-projet { min-height: 42px; font-size: 12px; gap: 4px; padding: 0 4px; }
+body.mode-telephone .bouton-partie-projet svg { width: 16px; height: 16px; }
+
+/* Tuile déplacée (appui long) : soulevée ; les autres un peu pâlies. */
+.page-applis.deplacement .tuile-appli { opacity: 0.6; }
+.page-applis.deplacement .tuile-appli.en-deplacement { opacity: 1; transform: scale(1.06); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); z-index: 2; }
+.page-applis.deplacement { touch-action: none; }
+
+/* Appui long : jamais de texte sélectionné ni de menu d'Android. */
+.bande-appli, .bande-appli *, .page-applis, .page-applis *, .roue-favoris, .roue-favoris * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+body.appui-en-cours { -webkit-user-select: none; user-select: none; }

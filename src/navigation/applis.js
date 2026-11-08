@@ -152,3 +152,38 @@ export function basculerFavori(liste, cle) {
   if (liste.length >= MAX_FAVORIS) return { liste, refuse: true };
   return { liste: [...liste, cle], refuse: false };
 }
+
+// --- Ordre des tuiles (0.157.0 : appui long sur une tuile pour la déplacer), gardé par tablette ---
+
+export const CLE_ORDRE = 'topo-ordre-applis';
+
+/** Ordre retenu sur cet appareil (liste de clés), ou [] (ordre de départ). */
+export function lireOrdre(stockage = globalThis.localStorage) {
+  try {
+    const lu = JSON.parse(stockage?.getItem(CLE_ORDRE) ?? 'null');
+    return Array.isArray(lu) ? lu.filter((cle) => typeof cle === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Retient l'ordre des tuiles sur cet appareil. */
+export function ecrireOrdre(liste, stockage = globalThis.localStorage) {
+  try {
+    stockage?.setItem(CLE_ORDRE, JSON.stringify(liste));
+  } catch {
+    // Mémoire indisponible : l'ordre ne sera pas retenu.
+  }
+}
+
+/**
+ * Range les applications selon l'ordre retenu : celles de l'ordre d'abord (dans cet ordre), puis
+ * les autres à la fin, dans l'ordre de départ (une application qui apparaît, par exemple en passant en Expert).
+ */
+export function ordonner(applis, ordre) {
+  const rang = (a) => {
+    const i = ordre.indexOf(a.cle);
+    return i < 0 ? Infinity : i;
+  };
+  return applis.map((a, depart) => ({ a, depart })).sort((x, y) => rang(x.a) - rang(y.a) || x.depart - y.depart).map(({ a }) => a);
+}

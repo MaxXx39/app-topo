@@ -4,10 +4,13 @@
 // - toucher l'application ouvre la page « Applications » (bandeau du projet, puis les tuiles) ;
 // - toucher la sous-application déroule la bande : on choisit une autre sous-application ;
 // - appui long sur l'application : la roue des favoris (5 au plus, cochés sur les tuiles, par tablette) ;
-// - au milieu, une zone d'infos propre à chaque application (à définir sous-application par sous-application).
+// - au milieu, une zone d'infos propre à chaque application (à définir sous-application par sous-application) ;
+//   0.157.0 : Lever y met le bouton Enreg. Pts ; rien à y mettre = la bande disparaît, seul le bouton
+//   reste en bas à gauche et la zone de travail descend jusqu'en bas (classe body.bande-vide) ;
+// - page Applications = menu de départ ; appui long sur une tuile = la déplacer (ordre gardé par tablette).
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
-import { appliDeCle, lireFavoris, ecrireFavoris, basculerFavori, MAX_FAVORIS } from './applis.js';
+import { appliDeCle, lireFavoris, ecrireFavoris, basculerFavori, MAX_FAVORIS, lireOrdre, ecrireOrdre, ordonner } from './applis.js';
 
 const DUREE_APPUI_LONG = 500; // ms avant que la roue des favoris s'ouvre
 const ICONE_APPLIS = '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />';
@@ -24,8 +27,10 @@ const svg = (trace) => `<svg viewBox="0 0 24 24" aria-hidden="true">${trace}</sv
  * - info() : HTML de la zone du milieu (déjà échappé), ou '' ;
  * - projet() : { titre, detail } du projet ouvert ;
  * - pageProjet(), changerProjet(), nouveauProjet() (ou null si le mode ne le permet pas) ;
+ * - partieProjet('import' | 'export' | 'contenu') : page Projet ouverte sur cette partie ; importPermis() ;
+ * - agir(cle) : bouton de la zone du milieu touché (data-nav="action", ex. « prendre » = Enreg. Pts) ;
  * - message(texte) : message court à l'écran ; vibrer() (facultatif).
- * Renvoie { mettreAJour(), fermer() }.
+ * Renvoie { mettreAJour(), fermer(), ouvrirPage(), pageOuverte() }.
  */
 export function creerNavigation(nav, actions) {
   let pageOuverte = false;
@@ -33,6 +38,8 @@ export function creerNavigation(nav, actions) {
   let derniereSignature = '';
   let minuterie = null;
   let appuiLongFait = false;
+  // Déplacement d'une tuile (appui long) : { tuile, minuterie, x, y, actif }.
+  let deplacement = null;
 
   // --- Page « Applications » ---
   const page = document.createElement('section');
@@ -53,14 +60,33 @@ export function creerNavigation(nav, actions) {
     if (!evenement.target.closest('[data-nav="appli"]') || pageOuverte) return;
     appuiLongFait = false;
     clearTimeout(minuterie);
+    document.body.classList.add('appui-en-cours');
     minuterie = setTimeout(() => {
       appuiLongFait = true;
+      sansSelection();
       actions.vibrer?.();
       ouvrirRoue();
     }, DUREE_APPUI_LONG);
   });
-  for (const fin of ['pointerup', 'pointercancel', 'pointerleave']) nav.addEventListener(fin, () => clearTimeout(minuterie));
+  for (const fin of ['pointerup', 'pointercancel', 'pointerleave']) {
+    nav.addEventListener(fin, () => {
+      clearTimeout(minuterie);
+      document.body.classList.remove('appui-en-cours');
+    });
+  }
+  // L'appui long d'Android sélectionne le texte et ouvre un menu : jamais sur la bande, la page ou la roue.
+  for (const zone of [nav, page, roue]) {
+    zone.addEventListener('contextmenu', (evenement) => evenement.preventDefault());
+    zone.addEventListener('selectstart', (evenement) => evenement.preventDefault());
+  }
   page.addEventListener('click', quandClicPage);
+  page.addEventListener('pointerdown', debutDeplacement);
+  page.addEventListener('pointermove', suiteDeplacement);
+  for (const fin of ['pointerup', 'pointercancel']) page.addEventListener(fin, finDeplacement);
+  // Pendant un déplacement, le doigt ne fait pas défiler la page.
+  page.addEventListener('touchmove', (evenement) => {
+    if (deplacement?.actif) evenement.preventDefault();
+  }, { passive: false });
   roue.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('[data-appli]');
     fermerRoue();
@@ -98,10 +124,76 @@ export function creerNavigation(nav, actions) {
       deroulee = false;
       actions.choisirSousAppli(bouton.dataset.cle);
       mettreAJour();
+      return;
+    }
+    if (quoi === 'action') actions.agir?.(bouton.dataset.cle);
+  }
+
+  /** Enlève une sélection de texte faite par l'appui long. */
+  function sansSelection() {
+    try {
+      window.getSelection()?.removeAllRanges();
+    } catch {
+      // rien à enlever
     }
   }
 
+  // --- Déplacer une tuile : appui long, puis glisser ; l'ordre est gardé sur la tablette ---
+  function debutDeplacement(evenement) {
+    const tuile = evenement.target.closest('.tuile-appli');
+    if (!tuile || evenement.target.closest('[data-favori]')) return;
+    clearTimeout(deplacement?.minuterie);
+    deplacement = { tuile, x: evenement.clientX, y: evenement.clientY, actif: false, fait: false };
+    deplacement.minuterie = setTimeout(() => {
+      deplacement.actif = true;
+      sansSelection();
+      actions.vibrer?.();
+      tuile.classList.add('en-deplacement');
+      page.classList.add('deplacement');
+      try {
+        tuile.setPointerCapture?.(evenement.pointerId);
+      } catch {
+        // pas grave : le doigt reste suivi par la page
+      }
+    }, DUREE_APPUI_LONG);
+  }
+
+  function suiteDeplacement(evenement) {
+    if (!deplacement) return;
+    if (!deplacement.actif) {
+      // Le doigt bouge avant l'appui long : c'est un défilement, pas un déplacement.
+      if (Math.hypot(evenement.clientX - deplacement.x, evenement.clientY - deplacement.y) > 10) {
+        clearTimeout(deplacement.minuterie);
+        deplacement = null;
+      }
+      return;
+    }
+    const sous = document.elementFromPoint(evenement.clientX, evenement.clientY)?.closest('.tuile-appli');
+    const { tuile } = deplacement;
+    if (!sous || sous === tuile || sous.parentNode !== tuile.parentNode) return;
+    const tuiles = [...tuile.parentNode.children];
+    // Posée avant la tuile survolée si on recule, après si on avance.
+    if (tuiles.indexOf(sous) < tuiles.indexOf(tuile)) sous.before(tuile);
+    else sous.after(tuile);
+    deplacement.fait = true;
+  }
+
+  function finDeplacement() {
+    if (!deplacement) return;
+    clearTimeout(deplacement.minuterie);
+    if (deplacement.actif) {
+      deplacement.tuile.classList.remove('en-deplacement');
+      page.classList.remove('deplacement');
+      ecrireOrdre([...page.querySelectorAll('.tuile-appli')].map((t) => t.dataset.appli));
+      // Le toucher qui finit le déplacement n'ouvre pas l'application.
+      appuiLongFait = true;
+      setTimeout(() => { appuiLongFait = false; }, 400);
+    }
+    deplacement = null;
+  }
+
   function quandClicPage(evenement) {
+    if (appuiLongFait) return;
     const favori = evenement.target.closest('[data-favori]');
     if (favori) {
       evenement.stopPropagation();
@@ -118,6 +210,7 @@ export function creerNavigation(nav, actions) {
       if (quoi === 'page') actions.pageProjet();
       else if (quoi === 'changer') actions.changerProjet();
       else if (quoi === 'nouveau') actions.nouveauProjet?.();
+      else actions.partieProjet?.(quoi);
       return;
     }
     const tuile = evenement.target.closest('[data-appli]');
@@ -156,21 +249,28 @@ export function creerNavigation(nav, actions) {
     const nouveau = actions.nouveauProjet
       ? '<button type="button" class="bouton-bandeau-projet nouveau" data-projet="nouveau">+ Nouveau</button>'
       : '';
+    const partie = (cle, titre, icone) => `<button type="button" class="bouton-partie-projet" data-projet="${cle}">${svg(icone)}${titre}</button>`;
+    const parties = [
+      actions.importPermis?.() ? partie('import', 'Import', '<path d="M12 15V3M7 10l5 5 5-5M4 21h16" />') : '',
+      partie('export', 'Exporter', '<path d="M12 3v12M7 8l5-5 5 5M4 21h16" />'),
+      partie('contenu', 'Contenu du projet', '<circle cx="6" cy="6" r="1.6" /><circle cx="18" cy="6" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="6" cy="18" r="1.6" /><circle cx="18" cy="18" r="1.6" />'),
+    ].join('');
     page.innerHTML = `
       <div class="bandeau-projet-applis">
         <button type="button" class="texte-bandeau-projet" data-projet="page">
           <small>Projet en cours</small>
           <b>${echapper(titre)}</b>
-          <span>${echapper(detail)}</span>
+          ${detail ? `<span>${echapper(detail)}</span>` : ''}
         </button>
         <div class="boutons-bandeau-projet">
           <button type="button" class="bouton-bandeau-projet" data-projet="changer">Changer</button>
           ${nouveau}
         </div>
       </div>
+      <div class="parties-projet-applis">${parties}</div>
       <h2 class="titre-applis">Applications ${bulle('applications')}</h2>
       <div class="tuiles-applis">
-        ${actions.applis().map((a) => `
+        ${ordonner(actions.applis(), lireOrdre()).map((a) => `
           <div class="tuile-appli ${a.cle === courante ? 'en-cours' : ''}" data-appli="${a.cle}" role="button" tabindex="0"
             style="--couleur-appli: ${a.couleur}; --texte-appli: ${a.texte}">
             ${svg(a.icone)}
@@ -218,6 +318,10 @@ export function creerNavigation(nav, actions) {
     const sous = appli ? actions.sousApplis() : [];
     if (sous.length === 0) deroulee = false;
     const info = appli ? actions.info() : '';
+    // Rien à montrer au milieu : la bande s'efface, seul le bouton reste (la zone de travail s'agrandit).
+    const vide = !info && !deroulee;
+    document.body.classList.toggle('bande-vide', vide);
+    document.body.classList.toggle('bande-action', info.includes('data-nav="action"'));
     const signature = JSON.stringify([courante, sous, info, deroulee, actions.titre?.(appli ?? {}) ?? '']);
     if (signature === derniereSignature) return;
     derniereSignature = signature;
@@ -231,10 +335,11 @@ export function creerNavigation(nav, actions) {
       : '';
     const milieu = deroulee
       ? `<div class="choix-sous-appli" role="group">${sous.map((s) => `<button type="button" class="${s.actif ? 'actif' : ''}" data-nav="choix-sous" data-cle="${echapper(s.cle)}">${echapper(s.titre)}</button>`).join('')}</div>`
-      : `<div class="zone-info-appli">${info}</div>`;
+      : (vide ? '' : `<div class="zone-info-appli">${info}</div>`);
     nav.style.setProperty('--couleur-appli', appli?.couleur ?? '#1b2b36');
     nav.style.setProperty('--texte-appli', appli?.texte ?? '#ffffff');
     nav.classList.toggle('deroulee', deroulee);
+    nav.classList.toggle('vide', vide);
     nav.innerHTML = `<div class="bouton-appli ${appli ? '' : 'neutre'}">${partieAppli}${partieSous}</div>${milieu}`;
   }
 
@@ -246,5 +351,9 @@ export function creerNavigation(nav, actions) {
       if (pageOuverte) fermerPage();
     },
     pageOuverte: () => pageOuverte,
+    /** Ouvre la page Applications (menu de départ). */
+    ouvrirPage() {
+      if (!pageOuverte) ouvrirPage();
+    },
   };
 }

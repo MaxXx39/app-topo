@@ -383,14 +383,12 @@ function sousApplisDesBoutons(selecteur, cle, actif) {
 }
 
 /**
- * Sous-applications de l'application affichée : Lever = rôle du prochain point (Contour, Ligne,
- * Point ; métré : Aire, Longueur, Point compté), Implanter = Point / Ligne / Surface / Talus / Altitude,
- * Guidage = machine, Calculs = Volumes / Mesures / Dessin. Lues sur les boutons de l'écran : le mode
- * (Base, Intermédiaire, Expert) est donc respecté comme avant.
+ * Sous-applications de l'application affichée : Implanter = Point / Ligne / Surface / Talus / Altitude,
+ * Guidage = machine, Calculs = Volumes / Mesures / Dessin (0.157.0 : pas le rôle de Lever, il reste
+ * sur l'écran). Lues sur les boutons de l'écran : le mode (Base, Intermédiaire, Expert) est donc respecté.
  */
 function sousApplis() {
   const cle = appliCourante(document.body.dataset.onglet, terrain.mode);
-  if (cle === 'lever') return sousApplisDesBoutons('#leve-direct .roles-leve .role-leve', (b) => b.dataset.role, (b) => b.classList.contains('choisi'));
   if (cle === 'implanter') return sousApplisDesBoutons('#leve-direct .choix-implantation-type .puce-choix', (b) => b.dataset.valeur, (b) => b.classList.contains('actif'));
   if (cle === 'guidage') return [['grader', 'Grader'], ['bull', 'Bull'], ['rateau', 'Râteau']].map(([c, titre]) => ({ cle: c, titre, actif: terrain.lame.machine === c }));
   if (cle === 'calculs') {
@@ -402,8 +400,7 @@ function sousApplis() {
 function choisirSousAppli(cle) {
   const appli = appliCourante(document.body.dataset.onglet, terrain.mode);
   const conteneur = document.querySelector('#leve-direct');
-  if (appli === 'lever') conteneur.querySelector(`.roles-leve [data-role="${CSS.escape(cle)}"]`)?.click();
-  else if (appli === 'implanter') conteneur.querySelector(`.choix-implantation-type .puce-choix[data-valeur="${CSS.escape(cle)}"]`)?.click();
+  if (appli === 'implanter') conteneur.querySelector(`.choix-implantation-type .puce-choix[data-valeur="${CSS.escape(cle)}"]`)?.click();
   else if (appli === 'guidage') {
     // Comme toucher la machine sur l'écran de choix (il est redessiné tout de suite).
     ecranLeve.revenirAuChoixMachine();
@@ -411,16 +408,36 @@ function choisirSousAppli(cle) {
   } else if (appli === 'calculs') afficherOnglet(cle);
 }
 
-/** Zone du milieu de la bande : pour l'instant le levé en cours ou le point visé (à définir par sous-application). */
+/**
+ * Zone du milieu de la bande (0.157.0) : Lever (appli Android) = le bouton Enreg. Pts (il touche le
+ * vrai bouton de l'écran, caché : mêmes contrôles, même touche volume −) avec le nom du prochain point ;
+ * ailleurs rien pour l'instant (à définir sous-application par sous-application) : la bande s'efface.
+ */
 function infoAppli() {
   const cle = appliCourante(document.body.dataset.onglet, terrain.mode);
-  let texte = '';
-  if (cle === 'lever') {
-    const leve = [...projet.surfaces, ...(projet.metres ?? [])].find((s) => s.id === leveDirect.stockId);
-    texte = leve?.nom ?? '';
-  } else if (cle === 'implanter') texte = implanter.cible?.nom ?? implanter.ligne?.nom ?? '';
-  else if (cle === 'controle') texte = autocontrole.cible?.nom ?? '';
-  return texte ? `<span class="texte-info-appli">${echapper(texte)}</span>` : '';
+  if (cle !== 'lever') return '';
+  const prendre = document.querySelector('#leve-direct .cadre-prise .bouton-prendre');
+  if (!prendre) return '';
+  const nom = document.querySelector('#leve-direct .cadre-prise [data-champ="nom-point"]')?.value ?? '';
+  return `<button type="button" class="bouton-enreg-bande" data-nav="action" data-cle="prendre" ${prendre.disabled ? 'disabled' : ''}>
+    <span>Enreg. Pts</span>${nom ? `<small>${echapper(nom)}</small>` : ''}</button>`;
+}
+
+/** Bouton de la zone du milieu touché. */
+function agirDepuisBande(cle) {
+  if (cle === 'prendre') document.querySelector('#leve-direct .cadre-prise .bouton-prendre')?.click();
+}
+
+/** Page Projet ouverte sur Import, Exporter ou le contenu du projet (boutons de la page Applications). */
+function ouvrirPartieProjet(quoi) {
+  afficherOnglet('projets');
+  if (quoi === 'contenu') {
+    montrerOngletProjet(null);
+    requestAnimationFrame(() => document.querySelector('#contenu-projet')?.scrollIntoView({ block: 'start' }));
+    return;
+  }
+  montrerOngletProjet(quoi);
+  requestAnimationFrame(() => document.querySelector('.onglets-projet')?.scrollIntoView({ block: 'start' }));
 }
 
 /** Ouvre une application (tuile de la page Applications ou bulle de la roue des favoris). */
@@ -453,6 +470,9 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
     detail: document.querySelector('#etat')?.textContent ?? '',
   }),
   pageProjet: () => afficherOnglet('projets'),
+  partieProjet: ouvrirPartieProjet,
+  importPermis: () => aAcces('expert'),
+  agir: agirDepuisBande,
   changerProjet: () => {
     afficherOnglet('projets');
     document.querySelector('#projets [data-action="panneau"][data-panneau="projets"]')?.click();
@@ -472,7 +492,9 @@ new MutationObserver(() => {
     bandePrevue = false;
     navigation.mettreAJour();
   });
-}).observe(document.querySelector('#leve-direct'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+}).observe(document.querySelector('#leve-direct'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'disabled'] });
+// Le nom du prochain point tapé suit dans le bouton Enreg. Pts de la bande.
+document.querySelector('#leve-direct').addEventListener('input', () => navigation.mettreAJour());
 
 /**
  * Affiche un onglet ('projets', 'terrain', 'plan') ou une partie de Calculs ('surfaces',
@@ -2110,7 +2132,7 @@ function envoyerImplantationAuPlan() {
   // Bouton « Seul » (0.94.0) : seulement les listes gardées (points de contrôle en mode Contrôle…).
   const gardees = listesDuTravail(listesDePoints(projet));
   // Lignes suivies en Guidage (0.154.0) : en violet.
-  const lignesSuivies = ongletContexte === 'terrain' && terrain.mode === 'lame' ? lignesGuidage.liste.map((l) => ({ id: 'ligne-guidage', sommets: l.sommets, fermee: false, couleur: '#7c3aed' })) : [];
+  const lignesSuivies = ongletContexte === 'terrain' && terrain.mode === 'lame' ? lignesGuidage.liste.map((l, i) => ({ id: 'ligne-guidage', sommets: l.sommets, fermee: false, couleur: ['#7c3aed', '#ea580c'][i] })) : [];
   const lignesAutres = [...(seul ? [] : lignesDesAutres().filter((l) => !gardees || gardees.has(l.id))), ...lignesSuivies];
   const reseaux = seul ? [] : reseauxDuPlan().filter((r) => !gardees || gardees.has(r.id));
   // Points de contrôle : dessinés si leur case « Points de contrôle » est cochée (menu Afficher).
@@ -3216,7 +3238,7 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
 // Lignes suivies en Guidage (0.154.0, Expert) : 2 au plus, choisies en touchant le plan (toutes les
 // lignes : plans DXF, levés, dessins) ; pour chacune, le bout de l'outil mesuré (G ou D). En mémoire
 // seulement (oubliées au redémarrage).
-const lignesGuidage = { liste: [], choix: false };
+const lignesGuidage = { liste: [], choix: false }; // 0.157.0 : L1 violet, L2 orange (plan, coupe G – D, bandeau)
 function choixLignesGuidageActif() {
   return lignesGuidage.choix && ongletContexte === 'terrain' && terrain.mode === 'lame' && lameActive();
 }
@@ -6703,17 +6725,16 @@ document.addEventListener('keydown', (evenement) => {
   evenement.preventDefault();
 });
 
-/** Ligne sous le titre du projet (en-tête) : nom, points, surfaces, et l'état de Drive si connecté. */
+/** Ligne sous le titre du projet (en-tête) : sous-titre et l'état de Drive si connecté. */
 function mettreAJourEtatEntete() {
   // Titre : affaire - lieu (ou le nom, sinon « Projet sans nom 2 »…).
   document.querySelector('#titre-projet').textContent = titreProjet(projet);
 
-  // 0.126.0 : tous les points du projet (levés, listes importées, points de contrôle), pas seulement la liste choisie.
-  const nombrePoints = projet.leves.reduce((total, leve) => total + (leve.points?.length ?? 0), 0) + (projet.pointsControle?.length ?? 0);
   const drive = partage?.etat.connecte
     ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive', rendu: 'Drive : main rendue' }[partage.etat.etat] ?? 'Drive : en attente'
     : '';
-  document.querySelector('#etat').textContent = [sousTitreProjet(projet), `${nombrePoints} points`, `${surfacesAffichees().length + projet.reseaux.length} levé(s)`, drive].filter(Boolean).join(' · ');
+  // 0.157.0 (demande du 08.11) : plus le nombre de points et de levés, seulement le sous-titre et Drive.
+  document.querySelector('#etat').textContent = [sousTitreProjet(projet), drive].filter(Boolean).join(' · ');
 
   // Verrou du partage : main verte (on a la main) ou « 🔒 Lecture seule · Tablette Paul » en rouge
   // (un autre appareil l'a ; toucher = prendre la main). Rien sans Drive.
@@ -7025,6 +7046,8 @@ async function demarrer() {
     }) : 'continuer';
     // Partage : on se reconnecte à Drive si on l'était (le projet ouvert est alors comparé à Drive).
     partage.demarrer({ choixEnAttente: choix !== 'continuer' });
+    // 0.157.0 : la page Applications est le menu de départ.
+    if (choix === 'continuer') navigation.ouvrirPage();
     if (choix === 'ouvrir') document.querySelector('#projets [data-panneau="projets"]')?.click();
     else if (choix === 'nouveau' && !(await creerNouveauProjet())) {
       // Fenêtre fermée sans créer : on reste sur le dernier projet.

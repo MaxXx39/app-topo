@@ -1,6 +1,6 @@
 // Navigation 0.156.0 : liste des applications, application en cours, favoris de la roue (par tablette).
 import { describe, it, expect } from 'vitest';
-import { applisDisponibles, appliCourante, lireFavoris, ecrireFavoris, basculerFavori, FAVORIS_DEPART, MAX_FAVORIS, CLE_FAVORIS } from '../src/navigation/applis.js';
+import { applisDisponibles, appliCourante, lireFavoris, ecrireFavoris, basculerFavori, FAVORIS_DEPART, MAX_FAVORIS, CLE_FAVORIS, lireOrdre, ecrireOrdre, ordonner, CLE_ORDRE } from '../src/navigation/applis.js';
 
 /** Petite mémoire qui imite localStorage. */
 function memoire(depart = {}) {
@@ -56,5 +56,22 @@ describe('favoris de la roue', () => {
     const pleine = ['lever', 'implanter', 'plan', 'controle', 'calculs'];
     expect(pleine).toHaveLength(MAX_FAVORIS);
     expect(basculerFavori(pleine, 'reglages')).toEqual({ liste: pleine, refuse: true });
+  });
+});
+
+describe('ordre des tuiles (appui long pour déplacer)', () => {
+  const applis = ['lever', 'implanter', 'controle', 'plan'].map((cle) => ({ cle }));
+  it('sans ordre retenu : ordre de départ', () => {
+    expect(cles(ordonner(applis, []))).toEqual(['lever', 'implanter', 'controle', 'plan']);
+  });
+  it('ordre retenu d\'abord, les nouvelles à la fin dans l\'ordre de départ', () => {
+    expect(cles(ordonner(applis, ['plan', 'lever']))).toEqual(['plan', 'lever', 'implanter', 'controle']);
+    expect(cles(ordonner(applis, ['guidage', 'controle']))).toEqual(['controle', 'lever', 'implanter', 'plan']);
+  });
+  it('retenu sur l\'appareil', () => {
+    const m = memoire();
+    ecrireOrdre(['plan', 'lever'], m);
+    expect(lireOrdre(m)).toEqual(['plan', 'lever']);
+    expect(lireOrdre(memoire({ [CLE_ORDRE]: 'abîmé' }))).toEqual([]);
   });
 });
