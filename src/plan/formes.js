@@ -43,7 +43,7 @@ export function cheminForme(forme, x, y, r) {
     case 'nuage': {
       // Rond en pointillés (0.180.3, demande du 09.11) : un cercle régulier de 13 px de diamètre, comme le triangle
       // des points de contrôle ; les tirets sont donnés par la classe .forme-nuage (style.css).
-      const R = 8.5;
+      const R = 7;
       const sommets = [];
       for (let i = 0; i <= 36; i++) {
         const angle = (i / 36) * Math.PI * 2;

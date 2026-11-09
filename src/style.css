@@ -13242,7 +13242,7 @@ body.clavier-ouvert .bandeau-annotation { bottom: 8px; }
 .titre-liste-annotation { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
 /* 0.180.0 : points d'Annotation = un rond tracé à la main (trait fin, 14 px). */
-.plan .points .forme-nuage { stroke-width: 3.2; stroke-linecap: butt; stroke-dasharray: 6 3.6; }
+.plan .points .forme-nuage { stroke-width: 1.6; stroke-linecap: butt; stroke-dasharray: 3.6 4; }
 
 /* 0.181.0 (demande du 09.11) : Annotation harmonisée avec Lever : plan réglable par ▲ / ▼ (même part que Lever, 30 à 70 %), une seule rangée
    sous le plan (⚙ | consigne | aide), boutons de la fiche et lignes de la liste dans le même style, trait de couleur partout. */

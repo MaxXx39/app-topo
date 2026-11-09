@@ -92,12 +92,12 @@ describe('annotations : nuage et exports', () => {
   const projet = projetVide();
   const { point } = ajouterAnnotation(projet, { est: 2500000, nord: 1100000, altitude: null, source: 'tablette', precision: 2.4, remarques: ['fissure', 'à revoir'] }, new Set(), jour);
 
-  it('le nuage est un rond tracé à la main, en trait fin, de 17 px environ (0.184.0)', () => {
+  it('le nuage est un rond tracé à la main, en trait fin, de 14 px environ (0.184.1)', () => {
     const d = cheminForme('nuage', 100, 100, 5);
     expect(d).toMatch(/^M/);
     const xs = [...d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[1]));
-    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(15);
-    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(19);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(12);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(16);
     expect(formeEnTrait('nuage')).toBe(true);
   });
 
