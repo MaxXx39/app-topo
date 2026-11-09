@@ -7331,11 +7331,24 @@ function mettreAJourEtatEntete() {
   // orange bien visible dans tous les autres cas (envoi, attente, main rendue…).
   const pastilleDrive = document.querySelector('#etat-drive');
   pastilleDrive.hidden = !drive;
-  // 0.174.0 : tablette « Drive ✓ », téléphone seulement l'icône (☁ + ✓ à jour, … en cours, ! autre) ; le texte complet reste dans l'info-bulle.
-  const court = partage?.etat.connecte ? `☁${{ 'a-jour': '✓', envoi: '…' }[partage.etat.etat] ?? '!'}` : '';
-  pastilleDrive.innerHTML = drive ? `<span class="t-long">${echapper(drive)}</span><span class="t-court">${court}</span>` : '';
+  // 0.174.1 (demande du 09.11) : partout (tablette et téléphone) seulement un nuage avec un symbole dedans et une couleur :
+  // vert + ✓ à jour, orange + ⟳ envoi / connexion, gris + pause (main rendue, lecture seule), rouge + ! (erreur, attente).
+  const etatDrive = partage?.etat.connecte ? partage.etat.etat : null;
+  const SYMBOLES = {
+    'a-jour': ['ok', '<path d="M8.6 14.2l2.4 2.4 4.6-4.8" />'],
+    envoi: ['envoi', '<path d="M12 17v-6M9.5 13.2L12 10.6l2.5 2.6" />'],
+    connexion: ['envoi', '<path d="M12 17v-6M9.5 13.2L12 10.6l2.5 2.6" />'],
+    rendu: ['pause', '<path d="M10.2 11.5v5M13.8 11.5v5" />'],
+    repris: ['pause', '<path d="M10.2 11.5v5M13.8 11.5v5" />'],
+  };
+  const [classeDrive, symbole] = SYMBOLES[etatDrive] ?? ['alerte', '<path d="M12 11v3.2M12 16.8v.1" />'];
+  pastilleDrive.hidden = !drive;
+  pastilleDrive.classList.remove('etat-drive-ok', 'etat-drive-envoi', 'etat-drive-pause', 'etat-drive-alerte');
+  pastilleDrive.classList.add(`etat-drive-${classeDrive}`);
+  pastilleDrive.innerHTML = drive
+    ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path class="nuage" d="M7 18a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 9.2 4.4 4.4 0 0 1 17.5 18z" />${symbole}</svg>`
+    : '';
   pastilleDrive.title = drive;
-  pastilleDrive.classList.toggle('etat-drive-ok', partage?.etat.etat === 'a-jour');
   // La page Applications ouverte montre le projet à jour dans son encadré.
   navigation?.mettreAJour();
 
