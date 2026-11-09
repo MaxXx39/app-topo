@@ -29,6 +29,14 @@ export function estPlusRecente(a, b) {
  * illisible : on ne dérange pas l'utilisateur pour ça). lire : fonction comme fetch (pour les tests).
  */
 export async function versionPubliee(lire = fetch) {
+  return (await apkPublie(lire))?.version ?? null;
+}
+
+/**
+ * Dernier APK publié : { version, adresse } ou null. L'adresse est celle du fichier qui porte le numéro
+ * (« Topo-0.174.1.apk », demande du 09.11), sinon le lien fixe « Topo.apk ».
+ */
+export async function apkPublie(lire = fetch) {
   try {
     const controle = new AbortController();
     const minuterie = setTimeout(() => controle.abort(), 15000);
@@ -36,7 +44,11 @@ export async function versionPubliee(lire = fetch) {
     clearTimeout(minuterie);
     if (!reponse.ok) return null;
     const release = await reponse.json();
-    return versionDuTitre(release?.name);
+    const version = versionDuTitre(release?.name);
+    if (!version) return null;
+    const nom = `Topo-${version}.apk`;
+    const fichier = (release?.assets ?? []).find((a) => a?.name === nom);
+    return { version, adresse: fichier?.browser_download_url ?? ADRESSE_APK };
   } catch {
     return null;
   }

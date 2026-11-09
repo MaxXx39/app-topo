@@ -19,7 +19,7 @@ import { demanderCode } from '../outils/code.js';
 import { lireListesPartagees } from './listes-partagees.js';
 import { modifierLibellesDeSorte, modifierReseaux } from '../leve/fenetre-libelles.js';
 import { ouvrirFenetreListes } from './fenetre-listes.js';
-import { ADRESSE_APK, versionPubliee, estPlusRecente } from '../outils/mise-a-jour.js';
+import { apkPublie, estPlusRecente } from '../outils/mise-a-jour.js';
 
 const CLE = 'topo-reglages';
 const PAR_DEFAUT = { telephone: false, mode: 'intermediaire', tailleFormes: 'normale', tailleTexte: 'normal', theme: 'normal' };
@@ -344,10 +344,10 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
   async function chercherMiseAJour() {
     const zone = fenetre.querySelector('[data-zone="mise-a-jour"]');
     zone.textContent = 'Recherche…';
-    const publiee = await versionPubliee();
-    if (!publiee) zone.textContent = 'Impossible de savoir (pas de réseau ?)';
-    else if (!estPlusRecente(publiee, __VERSION_APPLI__)) zone.textContent = `À jour (version ${__VERSION_APPLI__})`;
-    else zone.innerHTML = `Version ${publiee} disponible : <a href="${ADRESSE_APK}">télécharger</a>, puis toucher « Installer »`;
+    const apk = await apkPublie();
+    if (!apk) zone.textContent = 'Impossible de savoir (pas de réseau ?)';
+    else if (!estPlusRecente(apk.version, __VERSION_APPLI__)) zone.textContent = `À jour (version ${__VERSION_APPLI__})`;
+    else zone.innerHTML = `Version ${apk.version} disponible : <a href="${apk.adresse}">télécharger Topo-${apk.version}.apk</a>, puis toucher « Installer »`;
   }
 
   /** Mode choisi : monter en Expert demande le code de sécurité (0.90.0) ; descendre, non. */

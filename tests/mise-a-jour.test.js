@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { versionDuTitre, estPlusRecente, versionPubliee } from '../src/outils/mise-a-jour.js';
+import { versionDuTitre, estPlusRecente, versionPubliee, apkPublie } from '../src/outils/mise-a-jour.js';
 
 describe('mise à jour de l\'APK', () => {
   it('lit la version dans le titre de la release', () => {
@@ -20,5 +20,12 @@ describe('mise à jour de l\'APK', () => {
     expect(await versionPubliee(async () => { throw new Error('hors ligne'); })).toBe(null);
     const lire = async () => ({ ok: true, json: async () => ({ name: 'APK Android - dernière version (0.120.1, n° 5, main)' }) });
     expect(await versionPubliee(lire)).toBe('0.120.1');
+  });
+
+  it('donne le lien du fichier qui porte le numéro de version, sinon le lien fixe', async () => {
+    const avec = async () => ({ ok: true, json: async () => ({ name: 'APK (0.120.1, n° 5, main)', assets: [{ name: 'Topo.apk', browser_download_url: 'https://x/Topo.apk' }, { name: 'Topo-0.120.1.apk', browser_download_url: 'https://x/Topo-0.120.1.apk' }] }) });
+    expect(await apkPublie(avec)).toEqual({ version: '0.120.1', adresse: 'https://x/Topo-0.120.1.apk' });
+    const sans = async () => ({ ok: true, json: async () => ({ name: 'APK (0.120.1, n° 5, main)', assets: [] }) });
+    expect((await apkPublie(sans)).adresse).toMatch(/Topo\.apk$/);
   });
 });
