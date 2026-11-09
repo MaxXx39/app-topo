@@ -12648,3 +12648,27 @@ body.mode-telephone .bande-appli :is(.liste-bande, .champ-bande) { font-size: 13
 .bande-appli .bouton-enreg-bande.relais-lignes-guidage.actif { background: #7c3aed; color: #ffffff; }
 .bande-appli .bouton-enreg-bande:is(.relais-altitude-ici, .relais-lignes-guidage) span { font-size: 16px; white-space: nowrap; }
 body.mode-telephone .bande-appli .bouton-enreg-bande:is(.relais-altitude-ici, .relais-lignes-guidage) span { font-size: 13px; }
+
+/* ==========================================================================
+   0.167.1 (choix du 09.11 : mixte B + C) : bandeau de Lever : pastilles rondes colorées (photo bleue, ↶ violet,
+   Δ orange) sur fond neutre ; « ID point » dans un cadre jaune (liseret du haut, du bas et de gauche) qui rejoint
+   Enreg. Pts, jaune aussi.
+   ========================================================================== */
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] { --pastille: 42px; }
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] { --pastille: 38px; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-photo-levee,
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"],
+body.bande-action:not(.mode-telephone)[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .bouton-ouvrir-delta {
+  --teinte: #2563eb;
+  border: none;
+  color: var(--teinte);
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--teinte) 16%, var(--surface)) calc(var(--pastille) / 2 - 0.5px), transparent calc(var(--pastille) / 2)), var(--surface);
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"] { --teinte: #7c3aed; }
+body.bande-action:not(.mode-telephone)[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .bouton-ouvrir-delta { --teinte: #ea580c; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point {
+  box-sizing: border-box;
+  border: 4px solid var(--ambre);
+  border-right: none;
+  background: color-mix(in srgb, var(--ambre) 10%, var(--surface));
+}
