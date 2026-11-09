@@ -26,15 +26,30 @@ export const NATURES_BORDURE_DEPART = ['Haute', 'Basse', 'Bordurette', 'Caniveau
  * (sinon natures de bordures).
  */
 export const LIBELLES_CHANTIER_DEPART = [
-  { abreviation: 'CH', nom: 'Chambre', couleur: '#2563eb', forme: 'carre', reseau: true, ouvrage: true, modes: ['tampon', 'fe'], champs: ['profondeur', 'diametre', 'remarque'] },
-  { abreviation: 'GR', nom: 'Grille', couleur: '#7c3aed', forme: 'carre', reseau: true, ouvrage: true, modes: ['tampon', 'fe'], champs: ['profondeur', 'diametre', 'remarque'] },
-  { abreviation: 'T', nom: 'Tuyau', couleur: '#ea580c', forme: 'rond', reseau: true, ouvrage: false, modes: ['dessus', 'fe'], champs: ['diametre', 'materiau', 'remarque'] },
-  { abreviation: 'CV', nom: 'Cap de vanne', couleur: '#dc2626', forme: 'triangle', reseau: true, ouvrage: false, modes: [], champs: ['diametre', 'remarque'] },
-  { abreviation: 'BO', nom: 'Borne', couleur: '#15803d', forme: 'losange', reseau: true, ouvrage: false, modes: [], champs: ['remarque'] },
-  { abreviation: 'CB', nom: 'Câble', couleur: '#0891b2', forme: 'rond', reseau: true, ouvrage: false, modes: [], champs: ['diametre', 'remarque'] },
-  { abreviation: 'FO', nom: 'Fourreau', couleur: '#b45309', forme: 'rond', reseau: true, ouvrage: false, modes: ['dessus', 'fe'], champs: ['diametre', 'materiau', 'remarque'] },
-  { abreviation: 'BD', nom: 'Bordures', couleur: '#5f6d77', forme: 'rond', reseau: false, ouvrage: false, modes: [], champs: ['remarque'] },
+  { abreviation: 'CH', nom: 'Chambre', court: 'Chamb.', forme: 'carre', reseau: true, ouvrage: true, modes: ['tampon', 'fe'], champs: ['profondeur', 'diametre', 'remarque'] },
+  { abreviation: 'GR', nom: 'Grille', court: 'Gril.', forme: 'carre-vide', reseau: true, ouvrage: true, modes: ['tampon', 'fe'], champs: ['profondeur', 'diametre', 'remarque'] },
+  { abreviation: 'T', nom: 'Tuyau', court: 'Tuyau', forme: '', reseau: true, ouvrage: false, modes: ['dessus', 'fe'], champs: ['diametre', 'materiau', 'remarque'] },
+  { abreviation: 'CV', nom: 'Cap de vanne', court: 'Cap de v.', forme: 'triangle', reseau: true, ouvrage: false, modes: [], champs: ['diametre', 'remarque'] },
+  { abreviation: 'BO', nom: 'Borne', court: 'Born.', forme: 'losange', reseau: true, ouvrage: false, modes: [], champs: ['remarque'] },
+  { abreviation: 'CB', nom: 'Câble', court: 'Cabl.', forme: 'croix', reseau: true, ouvrage: false, modes: [], champs: ['diametre', 'remarque'] },
+  { abreviation: 'FO', nom: 'Fourreau', court: 'Four.', forme: 'rond-vide', reseau: true, ouvrage: false, modes: ['dessus', 'fe'], champs: ['diametre', 'materiau', 'remarque'] },
+  { abreviation: 'BD', nom: 'Bordures', court: 'Bord.', forme: 'triangle-bas', reseau: false, ouvrage: false, modes: [], champs: ['remarque'] },
 ];
+
+/**
+ * Couleur des points selon la nature (demande du 09.11 : la forme vient du libellé, la couleur de la nature).
+ * Réseaux : mêmes couleurs que le Recollement (EU rouge, EC bleu, Gaz jaune, Elec orange, CAD rose, Swisscom vert) ;
+ * ESP, Éclairage et les bordures : propositions, modifiables en Expert (bibliothèque du chantier).
+ */
+export const COULEURS_NATURES_DEPART = {
+  EU: '#dc2626', EC: '#2563eb', ESP: '#7c3aed', Swisscom: '#16a34a', Gaz: '#ca8a04', Elec: '#ea580c', CAD: '#db2777', 'Éclairage': '#92400e', Autre: '#6b7280',
+  Haute: '#475569', Basse: '#94a3b8', Bordurette: '#a16207', Caniveau: '#0891b2', Volige: '#78350f',
+};
+
+/** Couleur d'une nature (celle de la liste donnée, sinon celle de départ, sinon gris). */
+export function couleurDeNature(nature, couleurs = {}) {
+  return couleurs[nature] || COULEURS_NATURES_DEPART[nature] || '#6b7280';
+}
 
 /** Vrai si le libellé est un tuyau (le Ø extérieur donne le fil d'eau quand on lève le dessus). */
 const estTuyau = (libelle) => libelle.modes?.[0] === 'dessus';

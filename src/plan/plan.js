@@ -9,6 +9,7 @@ import { dessinerDessins } from './dessins.js';
 import { dessinerMesureRapide } from './mesure-rapide.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { texteDuPoint } from '../topo/chantier.js';
+import { lireLibellesChantier, lireNaturesChantier, couleurNatureChantier } from '../leve/libelles-chantier.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { bordDeTriangles, estSurfaceFichier } from '../topo/surface.js';
 import { formaterNombre } from '../topo/format.js';
@@ -411,6 +412,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Couleur choisie pour le libellé du nom (P-RG-1 : regard en noir…), à la place de celle du rôle.
     const libelles = lireLibelles();
     const rayon = rayonFormes(); // taille des formes (réglage de l'appareil)
+    const chantierLib = lireLibellesChantier();
+    const couleursNat = lireNaturesChantier().couleurs;
     const echelle = echelleTexte(); // taille du texte (réglage de l'appareil)
     // 0.126.0 : beaucoup de points visibles → dessinés sur le canvas (couleurs des rôles lues dans style.css).
     const versCanvas = visibles.length > SEUIL_POINTS_CANVAS;
@@ -419,10 +422,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     for (const { point, x, y } of visibles) {
       if (calques.points || rangs.has(point.nom)) {
         // Forme choisie pour le libellé (0.97.0) : rond plein, sinon carré, triangle, croix…
-        const forme = formeDuNom(point.nom, libelles);
+        // Levé chantier (0.175.5) : la forme vient du libellé du point, la couleur de sa nature.
+        const lib = point.chantier ? chantierLib.find((l) => l.abreviation === point.chantier.libelle) : null;
+        const forme = point.chantier ? lib?.forme ?? '' : formeDuNom(point.nom, libelles);
         const trace = cheminForme(forme, x, y, rayon);
         // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
-        const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
+        const couleur = point.chantier ? couleurNatureChantier(point.chantier.nature, couleursNat) : classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
         if (versCanvas) {
           pourCanvas.push({ x, y, trace, trait: formeEnTrait(forme), pale: estPale(point.nom), couleur: couleur ?? couleursRoles.get(classes.get(point.nom) ?? '') });
         } else {

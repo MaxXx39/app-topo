@@ -76,7 +76,7 @@ import { lireDossiers, ecrireDossiers, dossiersTries, dossierDuProjet, ajouterDo
 import { imageAvecDessins, ouvrirEditeurDessin, photosAvecDessins } from './photos/annotation.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
-import { lireLibellesChantier, lireNaturesChantier, libelleChantier } from './leve/libelles-chantier.js';
+import { lireLibellesChantier, lireNaturesChantier, libelleChantier, couleurNatureChantier } from './leve/libelles-chantier.js';
 import { lireAttributsChantier, altitudesDuPoint, cadreDeTroisCoins, RAYON_TAMPON_ROND } from './topo/chantier.js';
 import { lireLibelles, recreerLibellesManquants, definirLibellesProjet, surLibellesProjet } from './leve/libelles.js';
 import { modifierLibellesDeSorte, modifierReseaux } from './leve/fenetre-libelles.js';
@@ -2978,16 +2978,17 @@ function reseauxDuPlan() {
 function formesDuChantier() {
   const cachees = new Set(projet.listesCachees ?? []);
   const libelles = lireLibellesChantier();
+  const couleurs = lireNaturesChantier().couleurs;
   const formes = [];
   for (const chantier of projet.autres.filter((a) => a.nature === 'chantier' && !cachees.has(a.id))) {
     const points = projet.leves.find((l) => l.id === chantier.leveId)?.points ?? [];
     for (const p of points) {
       const c = p.chantier;
       if (!c || c.forme !== 'ronde' || !libelles.find((l) => l.abreviation === c.libelle)?.ouvrage) continue;
-      formes.push({ id: chantier.id, est: p.est, nord: p.nord, rayon: RAYON_TAMPON_ROND, couleur: libelles.find((l) => l.abreviation === c.libelle).couleur });
+      formes.push({ id: chantier.id, est: p.est, nord: p.nord, rayon: RAYON_TAMPON_ROND, couleur: couleurNatureChantier(c.nature, couleurs) });
     }
     for (const cadre of chantier.cadres ?? []) {
-      if (cadre.coins) formes.push({ id: chantier.id, coins: cadre.coins, couleur: libelleChantier(cadre.libelle, libelles).couleur });
+      if (cadre.coins) formes.push({ id: chantier.id, coins: cadre.coins, couleur: couleurNatureChantier(cadre.nature, couleurs) });
     }
   }
   return formes;
@@ -5889,13 +5890,14 @@ const ROLES_DU_METRE = ['aire', 'longueur', 'compte'];
 function donneesChantier(stock) {
   const libelles = lireLibellesChantier();
   const libelle = libelleChantier(terrain.chantier.libelle, libelles);
-  const natures = lireNaturesChantier()[libelle.reseau ? 'reseau' : 'bordure'];
+  const toutesNatures = lireNaturesChantier();
+  const natures = toutesNatures[libelle.reseau ? 'reseau' : 'bordure'];
   const nature = natures.includes(terrain.chantier.nature) ? terrain.chantier.nature : natures[0];
   const mode = libelle.modes.includes(terrain.chantier.mode) ? terrain.chantier.mode : libelle.modes[0] ?? '';
   const cadre = (stock.cadres ?? []).find((c) => c.noms.length < 3 && c.libelle === libelle.abreviation);
   const dernier = (stock.cadres ?? []).filter((c) => c.noms.length === 3).at(-1);
   return {
-    libelles, libelle, natures, nature, mode, forme: libelle.ouvrage ? terrain.chantier.forme : 'ronde',
+    libelles, libelle, natures, nature, mode, couleursNatures: Object.fromEntries(natures.map((n) => [n, couleurNatureChantier(n, toutesNatures.couleurs)])), forme: libelle.ouvrage ? terrain.chantier.forme : 'ronde',
     diametre: terrain.chantier.diametre, profondeur: terrain.chantier.profondeur, materiau: terrain.chantier.materiau, remarque: terrain.chantier.remarque,
     coinsFaits: cadre?.noms.length ?? 0,
     dernierCadre: dernier ? { nom: dernier.noms[0].replace(/-\d+$/, ''), longueur: dernier.longueur, largeur: dernier.largeur, direction: dernier.direction, ecart: dernier.ecartAngleDroit } : null,

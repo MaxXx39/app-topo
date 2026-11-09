@@ -119,3 +119,17 @@ describe('export du Levé chantier', () => {
     expect(blob.size).toBeGreaterThan(1000);
   });
 });
+
+import { couleurDeNature, LIBELLES_CHANTIER_DEPART as DEPART } from '../src/topo/chantier.js';
+
+describe('forme du libellé, couleur de la nature', () => {
+  it('couleur de départ, personnalisée ou grise', () => {
+    expect(couleurDeNature('EU')).toBe('#dc2626');
+    expect(couleurDeNature('EU', { EU: '#112233' })).toBe('#112233');
+    expect(couleurDeNature('Inconnue')).toBe('#6b7280');
+  });
+  it('chaque libellé de départ a une forme et un nom court', () => {
+    expect(DEPART.map((l) => l.court)).toEqual(['Chamb.', 'Gril.', 'Tuyau', 'Cap de v.', 'Born.', 'Cabl.', 'Four.', 'Bord.']);
+    expect(new Set(DEPART.map((l) => l.forme)).size).toBe(DEPART.length);
+  });
+});

@@ -13018,14 +13018,19 @@ dialog.fenetre-chantier { width: min(96vw, 760px); max-height: 92vh; padding: 0;
 dialog.fenetre-chantier[open] { display: flex; }
 dialog.fenetre-chantier h2 { margin: 0; padding: 12px 14px; background: var(--sombre); color: #ffffff; font-size: 1rem; }
 .corps-chantier { overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
-.ligne-bibliotheque { display: grid; grid-template-columns: 1.4fr 0.7fr 44px 1fr; gap: 6px; align-items: center; padding: 8px; border-radius: 10px; background: rgba(95, 109, 119, 0.08); }
+.ligne-bibliotheque { display: grid; grid-template-columns: 1.4fr 1fr 0.7fr 0.8fr; gap: 6px; align-items: center; padding: 8px; border-radius: 10px; background: rgba(95, 109, 119, 0.08); }
 .ligne-bibliotheque input[type="text"], .ligne-bibliotheque input:not([type]), .ligne-bibliotheque select, .natures-bibliotheque textarea { min-height: 36px; border: 1.5px solid var(--bordure); border-radius: 8px; padding: 2px 6px; background: var(--surface); color: var(--encre, var(--texte)); font: inherit; min-width: 0; }
 .ligne-bibliotheque input[type="color"] { width: 44px; height: 36px; padding: 0; border: 1.5px solid var(--bordure); border-radius: 8px; }
 .ligne-bibliotheque .coche { grid-column: span 2; display: flex; gap: 6px; align-items: center; font-size: 0.8rem; }
 .champs-bibliotheque { grid-column: 1 / -1; display: flex; gap: 12px; flex-wrap: wrap; }
 .champs-bibliotheque .coche { grid-column: auto; }
 .actions-ligne { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; }
+.aide-chantier { margin: 0; font-size: 0.8rem; color: var(--gris); }
 .natures-bibliotheque { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.groupe-natures { display: flex; flex-direction: column; gap: 4px; }
+.ligne-nature { display: flex; align-items: center; gap: 6px; }
+.ligne-nature input[data-n="nom"] { flex: 1; min-width: 0; min-height: 34px; border: 1.5px solid var(--bordure); border-radius: 8px; padding: 2px 6px; background: var(--surface); color: var(--encre, var(--texte)); font: inherit; }
+.ligne-nature input[type="color"] { width: 38px; height: 34px; padding: 0; border: 1.5px solid var(--bordure); border-radius: 8px; }
 .natures-bibliotheque label { display: flex; flex-direction: column; gap: 4px; font-weight: 700; font-size: 0.8rem; }
 @media (max-width: 520px) { .ligne-bibliotheque { grid-template-columns: 1fr 1fr; } .natures-bibliotheque { grid-template-columns: 1fr; } }
 
@@ -13040,3 +13045,34 @@ dialog.fenetre-chantier h2 { margin: 0; padding: 12px 14px; background: var(--so
   .chantier-leve .libelles-terrain.pour-chantier .symbole-libelle { display: none; }
   .chantier-leve .libelles-terrain.pour-chantier .puce-libelle strong { font-size: 0.62rem; }
 }
+
+/* ===== 0.175.5 : Levé chantier compact (maquette validée le 09.11, style B) ===== */
+.chantier-leve { gap: 4px; }
+.rangee-chantier { position: relative; display: flex; align-items: center; }
+.defile-chantier { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+.defile-chantier::-webkit-scrollbar { display: none; }
+.fleche-chantier { flex: none; width: 26px; height: 30px; margin-left: 2px; border: 0; border-radius: 8px; background: var(--sombre); color: var(--ambre); font-weight: 900; font-size: 15px; display: grid; place-items: center; }
+.fleche-chantier[hidden] { display: none; }
+.chip-chantier { flex: none; height: 30px; padding: 0 9px; border-radius: 8px; border: 1.5px solid var(--bordure); background: var(--surface); color: var(--encre, var(--texte)); font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.chip-chantier .symbole-libelle { font-style: normal; font-size: 0.85rem; line-height: 1; }
+.chip-chantier.actif { background: var(--sombre); border-color: var(--sombre); color: #ffffff; }
+.nat-chantier { flex: none; height: 26px; padding: 0 9px; border-radius: 999px; border: 1.5px solid var(--bordure); background: var(--surface); color: var(--encre, var(--texte)); font-weight: 600; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.nat-chantier i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.nat-chantier.actif { background: var(--sombre); border-color: var(--sombre); color: #ffffff; }
+.reglages-chantier { display: flex; gap: 8px; align-items: center; }
+.mini-bascule { display: inline-flex; gap: 2px; padding: 2px; border-radius: 10px; background: rgba(95, 109, 119, 0.18); }
+.mini-bascule button { height: 26px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--gris); font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.mini-bascule button.actif { background: var(--surface); color: var(--encre, var(--texte)); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 -3px 0 var(--ambre); }
+.ico-forme { width: 12px; height: 12px; border: 2px solid currentColor; display: inline-block; box-sizing: border-box; }
+.ico-forme.rond { border-radius: 50%; }
+.ico-forme.carre { border-radius: 2px; }
+.attributs-chantier { display: flex; gap: 5px; align-items: stretch; }
+.attributs-chantier .champ-chantier { flex-direction: row; align-items: center; gap: 4px; height: 34px; border: 1.5px solid var(--bordure); border-radius: 8px; background: var(--surface); padding: 0 7px; min-width: 0; }
+.attributs-chantier .champ-chantier.manque { border-color: var(--rouge); background: var(--rouge-clair); }
+.attributs-chantier .champ-chantier span { font-size: 0.65rem; font-weight: 800; color: var(--gris); flex: none; }
+.attributs-chantier .champ-chantier input, .attributs-chantier .champ-chantier select { border: 0; outline: 0; background: transparent; min-height: 0; height: 100%; padding: 0; font-size: 0.9rem; width: 100%; min-width: 0; color: var(--encre, var(--texte)); }
+.attributs-chantier .champ-chantier.d, .attributs-chantier .champ-chantier.p { flex: 0 0 76px; }
+.attributs-chantier .champ-chantier.m { flex: 0 0 84px; }
+.attributs-chantier .champ-chantier.r { flex: 1; }
+.calcul-chantier { margin: 0; padding: 0 2px; background: transparent; font-size: 0.7rem; font-weight: 700; color: var(--ambre-fonce); }
+.calcul-chantier.erreur { color: var(--rouge); }

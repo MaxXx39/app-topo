@@ -2,7 +2,8 @@
 // (EU, EC… / Haute, Basse…), à part des libellés des autres levés, modifiables en Expert et partagées
 // par Drive (listes partagées, partie « chantier » = { libelles, natures: { reseau, bordure } }).
 // Sans rien de partagé : les listes de départ (topo/chantier.js).
-import { LIBELLES_CHANTIER_DEPART, NATURES_RESEAU_DEPART, NATURES_BORDURE_DEPART } from '../topo/chantier.js';
+import { LIBELLES_CHANTIER_DEPART, NATURES_RESEAU_DEPART, NATURES_BORDURE_DEPART, couleurDeNature } from '../topo/chantier.js';
+import { FORMES } from '../plan/formes.js';
 import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-partagees.js';
 
 /** Remet un libellé en ordre : abréviation sans tiret ni espace, champs et modes connus. Renvoie null si inutilisable. */
@@ -15,8 +16,10 @@ export function nettoyerLibelle(l) {
   return {
     abreviation,
     nom,
-    couleur: /^#[0-9a-f]{6}$/i.test(l?.couleur ?? '') ? l.couleur : '#5f6d77',
-    forme: ['rond', 'carre', 'triangle', 'losange'].includes(l?.forme) ? l.forme : 'rond',
+    // Nom court (rangée de Lever) : par défaut, le nom lui-même.
+    court: String(l?.court ?? '').trim() || nom,
+    // Forme du point sur le plan (celle du libellé) ; les anciennes valeurs « rond » deviennent le rond plein.
+    forme: FORMES.some(([cle]) => cle === l?.forme) ? l.forme : '',
     reseau: l?.reseau !== false,
     ouvrage: Boolean(l?.ouvrage),
     modes: (l?.modes ?? []).filter((m) => modesPermis.includes(m)),
@@ -31,14 +34,16 @@ export function lireLibellesChantier() {
   return structuredClone(propres.length > 0 ? propres : LIBELLES_CHANTIER_DEPART);
 }
 
-/** Natures du Levé chantier : { reseau: [...], bordure: [...] }. */
+/** Natures du Levé chantier : { reseau: [...], bordure: [...], couleurs: { nature: '#rrggbb' } }. */
 export function lireNaturesChantier() {
   const n = lireListesPartagees().chantier?.natures;
   const liste = (valeur, depart) => {
     const propre = [...new Set((Array.isArray(valeur) ? valeur : []).map((t) => String(t).trim()).filter(Boolean))];
     return propre.length > 0 ? propre : [...depart];
   };
-  return { reseau: liste(n?.reseau, NATURES_RESEAU_DEPART), bordure: liste(n?.bordure, NATURES_BORDURE_DEPART) };
+  const couleurs = {};
+  for (const [nom, c] of Object.entries(n?.couleurs ?? {})) if (/^#[0-9a-f]{6}$/i.test(c)) couleurs[nom] = c;
+  return { reseau: liste(n?.reseau, NATURES_RESEAU_DEPART), bordure: liste(n?.bordure, NATURES_BORDURE_DEPART), couleurs };
 }
 
 /** Enregistre libellés et natures dans les listes partagées (envoyées sur Drive à tous les appareils). */
@@ -52,4 +57,9 @@ export function enregistrerBibliothequeChantier({ libelles, natures }) {
 /** Libellé de cette abréviation (ou le premier de la liste s'il n'existe plus). */
 export function libelleChantier(abreviation, libelles = lireLibellesChantier()) {
   return libelles.find((l) => l.abreviation === abreviation) ?? libelles[0];
+}
+
+/** Couleur des points d'une nature (voir COULEURS_NATURES_DEPART). */
+export function couleurNatureChantier(nature, couleurs = lireNaturesChantier().couleurs) {
+  return couleurDeNature(nature, couleurs);
 }

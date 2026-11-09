@@ -170,6 +170,12 @@ export function creerEcranLeve(conteneur, actions) {
   }, true);
 
   conteneur.addEventListener('click', (evenement) => {
+    const fleche = evenement.target.closest('[data-fleche]');
+    if (fleche) {
+      const defile = conteneur.querySelector(`[data-defile="${fleche.dataset.fleche}"]`);
+      defile?.scrollBy({ left: defile.clientWidth * 0.7, behavior: 'smooth' });
+      return;
+    }
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton || bouton.disabled) return;
     const { action } = bouton.dataset;
@@ -311,6 +317,7 @@ export function creerEcranLeve(conteneur, actions) {
       actions.reglerTalus(bouton.dataset.champTalus, bouton.dataset.valeur);
       return;
     }
+    // (voir plus bas : flèches › des rangées du Chantier)
     if (action === 'reglerChantier') {
       actions.reglerChantier(bouton.dataset.champChantier, bouton.dataset.valeur);
       return;
@@ -1396,20 +1403,24 @@ export function creerEcranLeve(conteneur, actions) {
   }
 
   /**
-   * Levé chantier (0.175.0) : libellé (Chambre, Tuyau…), nature (EU, EC…), puis le cadre du libellé : ce que touche le GNSS
-   * (Dessus / Tampon / Fil d'eau), forme d'un ouvrage (ronde 1 point, rectangulaire 3 coins), Ø, profondeur, matériau, remarque.
+   * Levé chantier (0.175.0, compact en 0.175.5, maquette validée le 09.11) : une rangée de libellés (noms courts, flèche › si
+   * trop nombreux), une rangée de natures, puis sur une ligne la forme d'un ouvrage (Rond / Carré) et ce que touche le GNSS
+   * (Dessus / Tampon / FE), puis les attributs (Ø, profondeur, matériau, remarque) sur une seule ligne. La FORME du point
+   * sur le plan vient du libellé, sa COULEUR de la nature.
    */
   function cadreChantier() {
     const c = donnees.chantier;
     const l = c.libelle;
-    const symbole = (lib) => `<i class="symbole-libelle" style="color: ${lib.couleur}">${symboleDeForme(lib.forme)}</i>`;
+    const couleurNature = c.couleursNatures[c.nature] ?? '#6b7280';
     const bouton = (champ, valeur, texte, actif) => `<button type="button" class="${actif ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="${champ}" data-valeur="${echapper(valeur)}" aria-pressed="${actif}">${texte}</button>`;
-    const nomsMode = { dessus: 'Dessus', tampon: 'Tampon', fe: 'Fil d\'eau' };
-    const champ = (nom, titre, valeur, { mode = 'decimal', facultatif = false, large = false } = {}) => `<label class="champ-chantier ${large ? 'large' : ''}"><span>${titre}${facultatif ? '' : ''}</span>
-        <input type="text" inputmode="${mode}" data-chantier="${nom}" value="${echapper(valeur)}" autocomplete="off" /></label>`;
-    const diametre = l.ouvrage ? 'Ø tuyau arrivant (mm), facultatif' : l.modes[0] === 'dessus' ? `Ø ext. (mm)${c.mode === 'dessus' ? ' *' : ''}` : 'Ø (mm)';
-    const calcule = l.modes[0] === 'dessus' && c.mode === 'dessus' && Number(String(c.diametre).replace(',', '.')) > 0
-      ? '<p class="calcul-chantier">Fil d\'eau = dessus − Ø extérieur</p>'
+    const nomsMode = { dessus: 'Dessus', tampon: 'Tampon', fe: 'FE' };
+    const rangee = (cle, contenu, aide) => `<div class="rangee-chantier"><div class="defile-chantier" data-defile="${cle}">${contenu}</div><button type="button" class="fleche-chantier" data-fleche="${cle}" hidden aria-label="${aide}">›</button></div>`;
+    const champ = (nom, titre, valeur, classe, { mode = 'decimal', indice = '' } = {}) => `<label class="champ-chantier ${classe}"><span>${titre}</span>
+        <input type="text" inputmode="${mode}" data-chantier="${nom}" value="${echapper(valeur)}" placeholder="${echapper(indice)}" autocomplete="off" /></label>`;
+    const diametreRequis = l.modes[0] === 'dessus' && c.mode === 'dessus';
+    const diametreVide = !(Number(String(c.diametre).replace(',', '.')) > 0);
+    const calcul = l.modes[0] === 'dessus' && c.mode === 'dessus'
+      ? (diametreVide ? '<p class="calcul-chantier erreur">Le Ø est obligatoire pour lever le dessus</p>' : '<p class="calcul-chantier">FE = dessus − Ø extérieur</p>')
       : l.ouvrage && c.mode === 'tampon' ? '<p class="calcul-chantier">Radier = tampon − profondeur</p>' : '';
     const coins = l.ouvrage && c.forme === 'rect'
       ? `<p class="suivi-cadre">${[1, 2, 3].map((i) => `<span class="coin ${c.coinsFaits >= i ? 'fait' : c.coinsFaits + 1 === i ? 'en-cours' : ''}">${i}</span>`).join('')} Coin ${Math.min(c.coinsFaits + 1, 3)} sur 3, dans n'importe quel ordre</p>`
@@ -1417,25 +1428,22 @@ export function creerEcranLeve(conteneur, actions) {
     const dernier = c.dernierCadre && l.ouvrage
       ? `<p class="dernier-cadre">Dernier cadre ${echapper(c.dernierCadre.nom)} : ${c.dernierCadre.longueur.toFixed(2)} × ${c.dernierCadre.largeur.toFixed(2)} m · direction ${c.dernierCadre.direction.toFixed(1)}° · angle droit à ${c.dernierCadre.ecart.toFixed(1)}°</p>`
       : '';
+    const reglages = [
+      l.ouvrage ? `<span class="mini-bascule">${bouton('forme', 'ronde', '<i class="ico-forme rond"></i>Rond', c.forme === 'ronde')}${bouton('forme', 'rect', '<i class="ico-forme carre"></i>Carré', c.forme === 'rect')}</span>` : '',
+      l.modes.length > 1 ? `<span class="mini-bascule">${l.modes.map((m) => bouton('mode', m, nomsMode[m], m === c.mode)).join('')}</span>` : '',
+    ].join('');
+    const materiaux = MATERIAUX.includes(c.materiau) || !c.materiau ? MATERIAUX : [...MATERIAUX, c.materiau];
     return `<div class="chantier-leve" role="group" aria-label="Ce que l'on lève sur le chantier">
-      <div class="libelles-terrain pour-chantier">
-        ${c.libelles.map((lib) => `<button type="button" class="puce-libelle ${lib.abreviation === l.abreviation ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="libelle" data-valeur="${echapper(lib.abreviation)}"><strong>${symbole(lib)}${echapper(lib.nom)}</strong></button>`).join('')}
+      ${rangee('libelles', c.libelles.map((lib) => `<button type="button" class="chip-chantier ${lib.abreviation === l.abreviation ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="libelle" data-valeur="${echapper(lib.abreviation)}" title="${echapper(lib.nom)}"><i class="symbole-libelle" style="color: ${couleurNature}">${symboleDeForme(lib.forme)}</i>${echapper(lib.court || lib.nom)}</button>`).join('') + '<button type="button" class="bouton-crayon-libelles seulement-expert" data-action="modifierChantier" title="Modifier la bibliothèque du chantier" aria-label="Modifier la bibliothèque du chantier">⚙</button>', 'Plus de libellés')}
+      ${rangee('natures', c.natures.map((n) => `<button type="button" class="nat-chantier ${n === c.nature ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="nature" data-valeur="${echapper(n)}"><i style="background: ${c.couleursNatures[n] ?? '#6b7280'}"></i>${echapper(n)}</button>`).join(''), 'Plus de natures')}
+      ${reglages ? `<div class="reglages-chantier">${reglages}${bulle('chantier')}</div>` : ''}
+      <div class="attributs-chantier">
+        ${l.champs.includes('diametre') ? champ('diametre', 'Ø', c.diametre, `d ${diametreRequis && diametreVide ? 'manque' : ''}`, { mode: 'numeric', indice: l.ouvrage ? 'tuyau' : 'mm' }) : ''}
+        ${l.champs.includes('profondeur') && c.mode === 'tampon' ? champ('profondeur', 'Prof.', c.profondeur, 'p') : ''}
+        ${l.champs.includes('materiau') ? `<label class="champ-chantier m"><select data-chantier="materiau" aria-label="Matériau">${materiaux.map((m) => `<option ${m === c.materiau ? 'selected' : ''}>${echapper(m)}</option>`).join('')}</select></label>` : ''}
+        ${l.champs.includes('remarque') ? champ('remarque', 'Rem.', c.remarque, 'r', { mode: 'text', indice: 'facultatif' }) : ''}
       </div>
-      <p class="titre-choix">Nature</p>
-      <div class="natures-chantier">${c.natures.map((n) => bouton('nature', n, echapper(n), n === c.nature)).join('')}</div>
-      <div class="cadre-attributs-chantier" style="--couleur-libelle: ${l.couleur}">
-        <strong class="titre-attributs">${echapper(l.nom)} · ${echapper(c.nature)} ${bulle('chantier')}<button type="button" class="bouton-crayon-libelles seulement-expert" data-action="modifierChantier" title="Modifier la bibliothèque du chantier" aria-label="Modifier la bibliothèque du chantier">⚙</button></strong>
-        ${l.ouvrage ? `<div class="bascule-chantier">${bouton('forme', 'ronde', '● Ronde · 1 point', c.forme === 'ronde')}${bouton('forme', 'rect', '▭ Carrée / rect. · 3 coins', c.forme === 'rect')}</div>` : ''}
-        ${l.modes.length > 1 ? `<div class="bascule-chantier">${l.modes.map((m) => bouton('mode', m, `${m === l.modes[0] ? 'Je lève : ' : ''}${nomsMode[m]}`, m === c.mode)).join('')}</div>` : ''}
-        <div class="champs-chantier">
-          ${l.champs.includes('diametre') ? champ('diametre', diametre, c.diametre, { mode: 'numeric' }) : ''}
-          ${l.champs.includes('profondeur') && c.mode === 'tampon' ? champ('profondeur', 'Profondeur (m)', c.profondeur) : ''}
-          ${l.champs.includes('materiau') ? champ('materiau', 'Matériau', c.materiau, { mode: 'text' }) : ''}
-          ${l.champs.includes('remarque') ? champ('remarque', 'Remarque', c.remarque, { mode: 'text', large: true }) : ''}
-        </div>
-        ${calcule}${coins}
-      </div>
-      ${dernier}
+      ${calcul}${coins}${dernier}
     </div>`;
   }
 
@@ -1662,6 +1670,18 @@ export function creerEcranLeve(conteneur, actions) {
         </div>`;
     rafraichirVivant();
     tournerBoussole();
+    majFlechesChantier();
+  }
+
+  /** Flèches › des rangées de libellés et de natures du Chantier : visibles seulement s'il reste du contenu à droite. */
+  function majFlechesChantier() {
+    for (const defile of conteneur.querySelectorAll('[data-defile]')) {
+      const fleche = conteneur.querySelector(`[data-fleche="${defile.dataset.defile}"]`);
+      if (!fleche) continue;
+      const maj = () => { fleche.hidden = !(defile.scrollWidth > defile.clientWidth + 2 && defile.scrollLeft + defile.clientWidth < defile.scrollWidth - 2); };
+      maj();
+      defile.addEventListener('scroll', maj, { passive: true });
+    }
   }
 
   /** Tourne l'aiguille de la boussole selon le dernier cap de la tablette. */
