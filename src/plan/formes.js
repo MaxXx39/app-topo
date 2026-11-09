@@ -21,7 +21,7 @@ export const FORMES = [
 
 /** Vrai si la forme se dessine en trait seulement (vide, croix). */
 export function formeEnTrait(forme) {
-  return /-vide$/.test(forme ?? '') || forme === 'croix' || forme === 'croix-45';
+  return /-vide$/.test(forme ?? '') || forme === 'croix' || forme === 'croix-45' || forme === 'nuage';
 }
 
 /**
@@ -40,6 +40,13 @@ export function cheminForme(forme, x, y, r) {
       return polygone([[x, y + r * 1.2], [x + r * 1.1, y - r * 0.8], [x - r * 1.1, y - r * 0.8]]);
     case 'losange':
       return polygone([[x, y - r * 1.3], [x + r * 1.3, y], [x, y + r * 1.3], [x - r * 1.3, y]]);
+    case 'nuage': {
+      // Nuage (0.180.0, points d'Annotation) : contour seulement, gros (au moins 10 px d'unité : ~ 24 px de large).
+      const u = Math.max(r * 2.8, 14);
+      const pt = (dx, dy) => `${f(x + dx * u)} ${f(y + dy * u)}`;
+      const arc = (rayon, dx, dy) => `A${f(rayon * u)} ${f(rayon * u)} 0 0 1 ${pt(dx, dy)}`;
+      return `M${pt(-0.8, 0.5)}${arc(0.42, -0.9, -0.15)}${arc(0.5, -0.4, -0.55)}${arc(0.55, 0.35, -0.5)}${arc(0.45, 0.9, 0.05)}${arc(0.42, 0.8, 0.5)}Z`;
+    }
     case 'croix':
       return `M${f(x - r * 1.3)} ${f(y)}L${f(x + r * 1.3)} ${f(y)}M${f(x)} ${f(y - r * 1.3)}L${f(x)} ${f(y + r * 1.3)}`;
     case 'croix-45':

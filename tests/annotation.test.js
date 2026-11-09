@@ -82,3 +82,38 @@ describe('annotations', () => {
     expect(liste.nom).toBe('Annot-20261108');
   });
 });
+
+import { cheminForme, formeEnTrait } from '../src/plan/formes.js';
+import { csvPoints, infosAnnotation, avecAnnotation } from '../src/export/points.js';
+import { genererDxf } from '../src/export/dxf.js';
+import { pdfPoints } from '../src/export/pdf-points.js';
+
+describe('annotations : nuage et exports', () => {
+  const projet = projetVide();
+  const { point } = ajouterAnnotation(projet, { est: 2500000, nord: 1100000, altitude: null, source: 'tablette', precision: 2.4, remarques: ['fissure', 'à revoir'] }, new Set(), jour);
+
+  it('le nuage est une forme en contour, assez grande', () => {
+    const d = cheminForme('nuage', 100, 100, 5);
+    expect(d).toMatch(/^M.*A.*Z$/);
+    expect(formeEnTrait('nuage')).toBe(true);
+  });
+
+  it('CSV : colonnes propres, remarques séparées par « | »', () => {
+    expect(avecAnnotation([point])).toBe(true);
+    const lignes = csvPoints([point]).trim().split('\r\n');
+    expect(lignes[0]).toBe('Nom;Est (m);Nord (m);Altitude (m);Date;Heure;Prise;Précision (m);Remarques');
+    expect(lignes[1]).toContain('GPS tablette;2.40;fissure | à revoir');
+    expect(infosAnnotation(point)[2]).toBe('1100000.000');
+  });
+
+  it('DXF : les remarques sont sur le calque ANNOT_REMARQUES', () => {
+    const dxf = genererDxf({ points: [point] });
+    expect(dxf).toContain('ANNOT_REMARQUES');
+    expect(dxf).toContain('fissure | à revoir');
+  });
+
+  it('PDF : se fabrique avec les colonnes des annotations', async () => {
+    const blob = pdfPoints({ titre: 'Annot-20261109', points: [point] });
+    expect(blob.size).toBeGreaterThan(500);
+  });
+});

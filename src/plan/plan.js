@@ -9,6 +9,8 @@ import { dessinerDessins } from './dessins.js';
 import { dessinerMesureRapide } from './mesure-rapide.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { texteDuPoint } from '../topo/chantier.js';
+// Couleur des nuages d'Annotation (vert sarcelle de l'application ; au choix dans « Afficher »).
+const COULEUR_ANNOTATION = '#0f766e';
 import { lireLibellesChantier, lireNaturesChantier, couleurNatureChantier } from '../leve/libelles-chantier.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { bordDeTriangles, estSurfaceFichier } from '../topo/surface.js';
@@ -424,14 +426,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         // Forme choisie pour le libellé (0.97.0) : rond plein, sinon carré, triangle, croix…
         // Levé chantier (0.175.5) : la forme vient du libellé du point, la couleur de sa nature.
         const lib = point.chantier ? chantierLib.find((l) => l.abreviation === point.chantier.libelle) : null;
-        const forme = point.chantier ? lib?.forme ?? '' : formeDuNom(point.nom, libelles);
+        // Annotation (0.180.0) : un nuage, juste le contour, assez gros (comme un point de contrôle).
+        const forme = point.annotation ? 'nuage' : point.chantier ? lib?.forme ?? '' : formeDuNom(point.nom, libelles);
         const trace = cheminForme(forme, x, y, rayon);
         // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
-        const couleur = point.chantier ? couleurNatureChantier(point.chantier.nature, couleursNat) : classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
+        const couleur = point.annotation ? couleursPoints.get(point) ?? COULEUR_ANNOTATION : point.chantier ? couleurNatureChantier(point.chantier.nature, couleursNat) : classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
         if (versCanvas) {
           pourCanvas.push({ x, y, trace, trait: formeEnTrait(forme), pale: estPale(point.nom), couleur: couleur ?? couleursRoles.get(classes.get(point.nom) ?? '') });
         } else {
-          const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}${estPale(point.nom) ? ' pale' : ''}`;
+          const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}${point.annotation ? ' forme-nuage' : ''}${estPale(point.nom) ? ' pale' : ''}`;
           const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: rayon, class: classe });
           if (couleur) rond.style.color = couleur;
           groupePoints.append(rond);

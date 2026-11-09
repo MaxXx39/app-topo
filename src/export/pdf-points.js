@@ -2,7 +2,7 @@
 // les infos connues de chaque point (mêmes colonnes que le CSV), sur A4 paysage, autant de feuilles
 // que nécessaire. Option : des feuilles de photos à la suite (les photos rattachées aux points).
 import { jsPDF } from 'jspdf';
-import { TITRES_INFOS, TITRES_CHANTIER, infosDuPoint, avecChantier, infosChantier } from './points.js';
+import { TITRES_INFOS, TITRES_CHANTIER, TITRES_ANNOTATION, infosDuPoint, avecChantier, infosChantier, avecAnnotation, infosAnnotation } from './points.js';
 import { appliquerFormat, dessinerPagePhotos, PHOTOS_PAR_PAGE, COULEURS } from './pdf.js';
 
 const MARGE = 10; // mm
@@ -13,6 +13,8 @@ const COLONNES = [
 ];
 // Levé chantier (0.175.0) : colonnes propres (total 277 mm), sans les précisions GNSS.
 const COLONNES_CHANTIER = [['g', 27], ['d', 24], ['d', 24], ['d', 19], ['g', 14], ['g', 20], ['g', 15], ['d', 12], ['d', 10], ['d', 20], ['d', 17], ['d', 17], ['d', 15], ['g', 18], ['d', 9], ['g', 16]];
+// Annotations (0.180.0) : colonnes propres (total 277 mm), les remarques ont la plus grande place.
+const COLONNES_ANNOTATION = [['g', 30], ['d', 24], ['d', 24], ['d', 19], ['g', 20], ['g', 14], ['g', 20], ['d', 14], ['g', 112]];
 const TITRES_PDF_CHANTIER = [...TITRES_INFOS.slice(0, 4), ...TITRES_CHANTIER];
 const TITRES = [...TITRES_INFOS.map((t) => t.replace('Précision', 'Préc.').replace('Âge corrections', 'Âge corr.').replace('Satellites', 'Sat.')), 'Photo'];
 
@@ -24,9 +26,10 @@ export function pdfPoints({ titre, points, roles = new Map(), cartouche = {}, ph
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const avecPhoto = new Set(photos.map((p) => p.point).filter(Boolean));
   let page = 0;
-  const chantier = avecChantier(points);
-  const colonnes = chantier ? COLONNES_CHANTIER : COLONNES;
-  const titres = chantier ? TITRES_PDF_CHANTIER : TITRES;
+  const annotation = avecAnnotation(points);
+  const chantier = !annotation && avecChantier(points);
+  const colonnes = annotation ? COLONNES_ANNOTATION : chantier ? COLONNES_CHANTIER : COLONNES;
+  const titres = annotation ? TITRES_ANNOTATION : chantier ? TITRES_PDF_CHANTIER : TITRES;
   const feuille = () => {
     if (page++ > 0) doc.addPage('a4', 'landscape');
     doc.setTextColor(...COULEURS.texte);
@@ -45,7 +48,7 @@ export function pdfPoints({ titre, points, roles = new Map(), cartouche = {}, ph
   let y = feuille();
   for (const p of points) {
     if (y > 210 - MARGE - HAUTEUR_LIGNE) y = feuille();
-    ligne(doc, y, chantier ? [...infosDuPoint(p, roles).slice(0, 4), ...infosChantier(p)] : [...infosDuPoint(p, roles), avecPhoto.has(p.nom) ? 'oui' : ''], false, colonnes);
+    ligne(doc, y, annotation ? infosAnnotation(p) : chantier ? [...infosDuPoint(p, roles).slice(0, 4), ...infosChantier(p)] : [...infosDuPoint(p, roles), avecPhoto.has(p.nom) ? 'oui' : ''], false, colonnes);
     y += HAUTEUR_LIGNE;
   }
   if (points.length === 0) {

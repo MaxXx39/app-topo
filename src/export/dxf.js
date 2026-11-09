@@ -48,6 +48,7 @@ export function genererDxf({ points, stocks = [], resultats = [], surfaces = [],
   }
 
   if (chantier || points.some((p) => p.chantier)) ecrireChantierDxf({ points, chantier, calques, entites });
+  if (points.some((p) => p.annotation)) ecrireAnnotationsDxf({ points, calques, entites });
 
   stocks.forEach((stock, i) => {
     const contour = (stock.contour ?? []).map((nom) => parNom.get(nom)).filter(Boolean);
@@ -142,6 +143,19 @@ export function genererDxfMesures({ points, mesures }) {
     }
   }
   return ecrireDxf(calques, entites);
+}
+
+/**
+ * Annotations dans le DXF (0.180.0) : les remarques de chaque point (séparées par « | ») sur le calque ANNOT_REMARQUES,
+ * sous le nom et l'altitude. Les points et leurs noms sont déjà sur POINTS / NOMS.
+ */
+function ecrireAnnotationsDxf({ points, calques, entites }) {
+  for (const p of points) {
+    const texte = (p.annotation?.remarques ?? []).join(' | ');
+    if (!texte) continue;
+    if (!calques.has('ANNOT_REMARQUES')) calques.set('ANNOT_REMARQUES', 3);
+    entites.push(['0', 'TEXT', '8', 'ANNOT_REMARQUES', ...xyz({ ...p, est: p.est + 0.2, nord: p.nord - 0.9 }, 0), '40', '0.25', '1', texte]);
+  }
 }
 
 /**

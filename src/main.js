@@ -912,6 +912,22 @@ function afficherAnnotation() {
   navigation?.mettreAJour();
 }
 
+/** Annotation la plus proche du toucher (à « tolerance » mètres au plus), ou null. */
+function annotationSousLeDoigt(position, tolerance) {
+  let meilleure = null;
+  let distanceMin = Math.max(tolerance ?? 0, 0);
+  for (const liste of listesAnnotation(projet)) {
+    for (const point of projet.leves.find((l) => l.id === liste.leveId)?.points ?? []) {
+      const distance = Math.hypot(point.est - position.est, point.nord - position.nord);
+      if (distance <= distanceMin) {
+        distanceMin = distance;
+        meilleure = point;
+      }
+    }
+  }
+  return meilleure;
+}
+
 /** Position du prochain point (mode Loupe : à chaque doigt levé ; GNSS / Tablette : au toucher du bouton). */
 function poserPositionAnnotation({ est, nord, altitude, source, precision }) {
   const avant = annotationEtat.position;
@@ -5091,7 +5107,10 @@ function toucherPourImplantation(position, tolerance) {
   }
   // Annotation (0.177.0) : en mode Loupe, toucher le plan y pose la loupe.
   if (annotationActive()) {
-    if (annotationEtat.mode === 'loupe') plan.loupe.placerSur(position.est, position.nord);
+    // Toucher un nuage = ouvrir la fiche de cette annotation ; sinon, en mode Manuel, la loupe se pose là.
+    const proche = annotationSousLeDoigt(position, tolerance);
+    if (proche) ouvrirAnnotation(proche.nom);
+    else if (annotationEtat.mode === 'loupe') plan.loupe.placerSur(position.est, position.nord);
     return;
   }
   // Choix des côtés d'un talus de surface (Calculs › Dessin, 0.135.0).

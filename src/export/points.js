@@ -31,6 +31,25 @@ export function infosChantier(p) {
   return [c.libelle ?? '', c.nature ?? '', c.forme === 'rect' ? '3 coins' : c.forme === 'ronde' ? '1 point' : '', c.diametre ?? '', c.diametreInterieur ?? '', nombre(c.altitudeLevee), nombre(c.filEau), nombre(c.radier), nombre(c.profondeur, 2), c.materiau ?? '', c.nombre ?? '', c.remarque ?? ''];
 }
 
+// Annotations (0.180.0) : colonnes propres quand un point est une annotation (point.annotation) : prise (loupe, GNSS, GPS
+// tablette), précision, date et heure de la prise, remarques (séparées par « | »).
+export const TITRES_ANNOTATION = ['Nom', 'Est (m)', 'Nord (m)', 'Altitude (m)', 'Date', 'Heure', 'Prise', 'Précision (m)', 'Remarques'];
+const PRISES = { loupe: 'loupe', gnss: 'GNSS', tablette: 'GPS tablette' };
+
+/** Vrai si un des points est une annotation. */
+export const avecAnnotation = (points) => points.some((p) => p.annotation);
+
+/** Infos d'une annotation, en texte, dans l'ordre de TITRES_ANNOTATION. */
+export function infosAnnotation(p) {
+  const a = p.annotation ?? {};
+  const le = a.le ? new Date(a.le) : null;
+  return [
+    p.nom, formaterNombre(p.est), formaterNombre(p.nord), p.altitude == null ? '' : formaterNombre(p.altitude),
+    le ? le.toLocaleDateString('fr-CH') : '', le ? le.toLocaleTimeString('fr-CH') : '',
+    PRISES[a.source] ?? '', nombre(a.precision, 2), (a.remarques ?? []).join(' | '),
+  ];
+}
+
 // Qualité de la position (message GGA du récepteur) : 4 = RTK fixe, 5 = RTK flottant…
 const QUALITES = { 1: 'autonome', 2: 'DGPS', 4: 'RTK fixe', 5: 'RTK flottant' };
 
@@ -74,6 +93,7 @@ export function infosDuPoint(p, roles = new Map()) {
  * « point isolé »), facultatif. Date et heure de la prise (heure de Suisse, sur l'appareil).
  */
 export function csvPoints(points, roles = new Map()) {
+  if (avecAnnotation(points)) return [TITRES_ANNOTATION, ...points.map(infosAnnotation)].map((ligne) => ligne.map(champ).join(';')).join('\r\n') + '\r\n';
   const chantier = avecChantier(points);
   const lignes = [chantier ? [...TITRES_INFOS, ...TITRES_CHANTIER] : TITRES_INFOS, ...points.map((p) => (chantier ? [...infosDuPoint(p, roles), ...infosChantier(p)] : infosDuPoint(p, roles)))];
   return lignes.map((ligne) => ligne.map(champ).join(';')).join('\r\n') + '\r\n';
