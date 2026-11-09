@@ -120,3 +120,13 @@ describe('annotations : nuage et exports', () => {
     expect(blob.size).toBeGreaterThan(500);
   });
 });
+
+import { htmlEncadreAnnotation } from '../src/annotation/encadre.js';
+describe('encadré d\'une annotation', () => {
+  it('montre le nom, les remarques et les photos, et échappe le texte', () => {
+    const html = htmlEncadreAnnotation({ nom: 'Pt<1>', date: '09.11.2026 10:00', remarques: ['a & b'], photos: [{ id: 'p1', miniature: 'x.jpg' }] });
+    expect(html).toContain('Pt&lt;1&gt;');
+    expect(html).toContain('a &amp; b');
+    expect(html).toContain('data-id="p1"');
+  });
+});

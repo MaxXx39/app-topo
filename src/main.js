@@ -124,6 +124,7 @@ import { mesureRapide } from './topo/mesure-rapide.js';
 import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
 import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
+import { htmlEncadreAnnotation } from './annotation/encadre.js';
 import { ajouterAnnotation, trouverAnnotation, supprimerAnnotation, listesAnnotation, nettoyerRemarques, precisionSuffisante, estAnnotation, nomProposeAnnotation, dernierAnnotation, PRECISION_TABLETTE_DEPART } from './topo/annotation.js';
 import { applisDisponibles, appliCourante } from './navigation/applis.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
@@ -1030,6 +1031,37 @@ async function ajouterPhotosBandeauAnnotation(fichiers) {
   afficherAnnotation();
 }
 
+/** Encadré posé sur le plan quand on touche une annotation (nom, date, remarques, photos). */
+function fermerEncadreAnnotation() {
+  document.querySelector('#encadre-annotation-plan')?.remove();
+}
+function montrerEncadreAnnotation(nom) {
+  const trouve = trouverAnnotation(projet, nom);
+  fermerEncadreAnnotation();
+  if (!trouve) return;
+  const { point, liste } = trouve;
+  const boite = document.createElement('div');
+  boite.id = 'encadre-annotation-plan';
+  boite.innerHTML = htmlEncadreAnnotation({
+    nom, date: dateHeure(point.annotation?.le), remarques: point.annotation?.remarques ?? [],
+    photos: (liste.photos ?? []).filter((p) => p.point === nom),
+  });
+  const zone = document.querySelector('.panneau-plan')?.getBoundingClientRect();
+  boite.style.cssText = `position: fixed; z-index: 40; left: 8px; right: 8px; bottom: ${Math.max(8, window.innerHeight - (zone?.bottom ?? window.innerHeight) + 34)}px; display: flex; justify-content: center; pointer-events: none;`;
+  boite.addEventListener('click', (evenement) => {
+    const bouton = evenement.target.closest('[data-action]');
+    if (!bouton) return;
+    if (bouton.dataset.action === 'fermer-encadre') fermerEncadreAnnotation();
+    else if (bouton.dataset.action === 'photo-encadre') montrerPhoto(bouton.dataset.id);
+    else if (bouton.dataset.action === 'modifier-encadre') {
+      fermerEncadreAnnotation();
+      if (ongletContexte !== 'annotation') afficherOnglet('annotation');
+      ouvrirAnnotation(nom);
+    }
+  });
+  document.body.append(boite);
+}
+
 /** Ouvre la fiche d'un point d'annotation déjà enregistré (remarques et photos modifiables). */
 function ouvrirAnnotation(nom) {
   const trouve = trouverAnnotation(projet, nom);
@@ -1442,6 +1474,7 @@ function afficherOnglet(demande, { partie = null } = {}) {
   // DAO (0.147.0) : seulement dans Calculs › Dessin (et le plan sur téléphone).
   if (nom !== 'plan' && nom !== 'dessin' && daoAppli?.actif()) daoAppli.arreter();
   // Annotation (0.180.3) : en quittant l'application, la loupe « Manuel » disparaît (sinon elle recouvre le plan).
+  if (ongletAvant !== nom) fermerEncadreAnnotation();
   if (ongletAvant === 'annotation' && nom !== 'annotation') {
     annotationEtat.mode = null;
     plan.loupe.cacher();
@@ -5116,8 +5149,11 @@ function toucherPourImplantation(position, tolerance) {
   if (annotationActive()) {
     // Toucher un nuage = ouvrir la fiche de cette annotation ; sinon, en mode Manuel, la loupe se pose là.
     const proche = annotationSousLeDoigt(position, tolerance);
-    if (proche) ouvrirAnnotation(proche.nom);
-    else if (annotationEtat.mode === 'loupe') plan.loupe.placerSur(position.est, position.nord);
+    if (proche) montrerEncadreAnnotation(proche.nom);
+    else {
+      fermerEncadreAnnotation();
+      if (annotationEtat.mode === 'loupe') plan.loupe.placerSur(position.est, position.nord);
+    }
     return;
   }
   // Choix des côtés d'un talus de surface (Calculs › Dessin, 0.135.0).
@@ -7131,8 +7167,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherAnnotation: (position, tolerance) => {
     const point = annotationSousLeDoigt(position, tolerance);
     if (!point) return false;
-    if (ongletContexte !== 'annotation') afficherOnglet('annotation');
-    ouvrirAnnotation(point.nom);
+    montrerEncadreAnnotation(point.nom);
     return true;
   },
   // « Voir toute la ligne » (0.118.0) cochée ou décochée (aussi décochée par « Ma position »).
