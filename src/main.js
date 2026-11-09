@@ -7219,7 +7219,13 @@ function mettreAJourEtatEntete() {
     ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive', rendu: 'Drive : main rendue' }[partage.etat.etat] ?? 'Drive : en attente'
     : '';
   // 0.157.0 (demande du 08.11) : plus le nombre de points et de levés, seulement le sous-titre et Drive.
-  document.querySelector('#etat').textContent = [sousTitreProjet(projet), drive].filter(Boolean).join(' · ');
+  document.querySelector('#etat').textContent = sousTitreProjet(projet);
+  // 0.165.0 : l'état de Drive est une pastille à gauche de la main ; discrète quand tout est à jour,
+  // orange bien visible dans tous les autres cas (envoi, attente, main rendue…).
+  const pastilleDrive = document.querySelector('#etat-drive');
+  pastilleDrive.hidden = !drive;
+  pastilleDrive.textContent = drive;
+  pastilleDrive.classList.toggle('etat-drive-ok', partage?.etat.etat === 'a-jour');
   // La page Applications ouverte montre le projet à jour dans son encadré.
   navigation?.mettreAJour();
 

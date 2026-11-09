@@ -12342,3 +12342,47 @@ body.mode-telephone :is(.bouton-roue, .bouton-bip) { min-width: 36px; min-height
 body[data-onglet='terrain'] .mise-en-page, body[data-onglet='volumes'] .mise-en-page { padding-left: 6px; padding-right: 6px; }
 /* B6 · la place du bouton en bas à gauche est réservée, sans marge en trop. */
 #leve-direct p.aide, #leve-direct [data-vivant='orientation'] { margin: 2px 0; line-height: 1.25; }
+
+/* 0.165.0 : état de Drive à gauche de la main (vert discret si à jour, orange bien visible sinon). */
+.etat-drive {
+  cursor: default;
+  font-size: 0.8rem;
+  padding: 3px 10px;
+  background: #f59e0b;
+  color: #1f1300;
+}
+.etat-drive.etat-drive-ok {
+  background: rgba(134, 239, 172, 0.18);
+  color: #86efac;
+}
+
+/* 0.165.0 (demande du 09.11) : la barre d'accroche est collée au plan (Mesure rapide) : plus d'espace perdu
+   entre le plan et la barre (marge de la page et marge haute du cadre). */
+@media (max-width: 899px) {
+  body[data-onglet='mesure-rapide'] .mise-en-page { padding-top: var(--hauteur-plan-terrain); }
+  body[data-onglet='mesure-rapide'] .panneau[data-onglet='mesure-rapide'] {
+    padding-top: 4px;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+}
+@media (max-width: 899px) {
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .mise-en-page {
+    padding-top: calc(var(--hauteur-plan-terrain) + var(--hauteur-bascule));
+  }
+  body.mode-leve.avec-accroches[data-onglet='terrain'] .panneau.actif {
+    padding-top: 4px;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+}
+
+/* 0.165.0 (essai demandé le 09.11) : légère transparence sous les boutons zoom / position du plan
+   (on voit le plan à travers) ; Plein soleil garde des boutons pleins pour le contraste. */
+body:not(.theme-soleil) .plan-boutons {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(2px);
+}
+body:not(.theme-soleil) .plan-boutons button:not(.actif) {
+  background: transparent;
+}
