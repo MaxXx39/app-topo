@@ -526,7 +526,7 @@ function contenuBande() {
         </div>`
       : '';
     const prendre = trouver('prendre');
-    const enreg = prendre ? boutonDeBande('prendre', 'Enreg. Pts', document.querySelector('#leve-direct .cadre-prise [data-champ="nom-point"]')?.value ?? '', prendre.disabled) : '';
+    const enreg = prendre ? boutonDeBande('prendre', 'Enreg. (Vol. −)', document.querySelector('#leve-direct .cadre-prise [data-champ="nom-point"]')?.value ?? '', prendre.disabled) : '';
     return bloc || enreg ? `<div class="zone-levee">${bloc}${enreg}</div>` : '';
   }
   if (cle === 'implanter') {
@@ -4518,6 +4518,11 @@ function toucherPourImplantation(position, tolerance) {
   }
   if (enImplantationDeLigne()) {
     toucherPourLigne(position, tolerance);
+    return;
+  }
+  // 0.163.0 : pendant l'implantation d'un point, toucher un autre point ne change rien : on passe par « ← ».
+  if (terrain.mode === 'controler' && terrain.implantation === 'point' && implanter.cible) {
+    afficherMessage('Implantation en cours : touche ← (en haut à gauche du guidage) pour changer de point', 2500);
     return;
   }
   // « Manuel » : toucher le plan y pose la loupe (le point visé devient la cible).

@@ -44,7 +44,7 @@ export function installerAide(boutonAide) {
     fenetre.hidden = false;
     rondOuvert = rond;
     const cadre = rond.getBoundingClientRect();
-    const largeur = Math.min(320, window.innerWidth - 24);
+    const largeur = Math.min(360, window.innerWidth - 24);
     fenetre.style.width = `${largeur}px`;
     const gauche = Math.min(Math.max(12, cadre.left + cadre.width / 2 - largeur / 2), window.innerWidth - largeur - 12);
     fenetre.style.left = `${gauche}px`;

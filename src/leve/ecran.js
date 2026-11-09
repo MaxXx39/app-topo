@@ -1155,7 +1155,7 @@ export function creerEcranLeve(conteneur, actions) {
             <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
           </label>
           <button type="button" class="bouton bouton-prendre" data-action="prendre" title="Enregistrer le point (ou touche volume −)" disabled>
-            <span>Enreg. Pts</span><span class="sous-titre-prendre">ou touche vol −</span>
+            <span>Enreg. (Vol. −)</span>
           </button>
         </div>
         <div class="ligne-position-delta">

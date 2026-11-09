@@ -106,13 +106,66 @@ class EcranPrincipal : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // 0.163.0 : retour au premier plan : la page repart ; si tout avait été coupé (plus de 5 min), on reconnecte.
+        minuterie.removeCallbacks(couperEnArrierePlan)
+        page.onResume()
+        page.resumeTimers()
         minuterie.post(envoyerEtat)
+        if (toutCoupe) reprendreApresCoupure()
     }
 
     override fun onPause() {
         super.onPause()
         minuterie.removeCallbacks(envoyerEtat)
         positionTablette.arreter()
+        // 0.163.0 (batterie, demande du 09.11) : en arrière-plan, la page web est mise en pause tout de suite ;
+        // après 5 minutes, Bluetooth et corrections sont coupés aussi (ils reprennent au retour).
+        page.onPause()
+        page.pauseTimers()
+        minuterie.removeCallbacks(couperEnArrierePlan)
+        minuterie.postDelayed(couperEnArrierePlan, DELAI_COUPURE_ARRIERE_PLAN_MS)
+    }
+
+    // Batterie : état d'avant la coupure de l'arrière-plan, pour tout remettre au retour.
+    private var toutCoupe = false
+    private var recepteur1Coupe = false
+    private var recepteur2Coupe = false
+    private var corrections1Coupees = false
+    private var corrections2Coupees = false
+
+    private val couperEnArrierePlan = Runnable {
+        if (isFinishing || toutCoupe) return@Runnable
+        recepteur1Coupe = recepteur.connecte
+        recepteur2Coupe = recepteur2.connecte
+        corrections1Coupees = preferencesCorrections(1).getBoolean(CLE_CORRECTIONS_ACTIVES, false)
+        corrections2Coupees = preferencesCorrections(2).getBoolean(CLE_CORRECTIONS_ACTIVES, false)
+        recepteur.corrections.arreter()
+        recepteur2.corrections.arreter()
+        recepteur.bluetooth.deconnecter()
+        recepteur2.bluetooth.deconnecter()
+        recepteur.oublier("en pause (appli en arrière-plan)")
+        recepteur2.oublier("en pause (appli en arrière-plan)")
+        toutCoupe = true
+    }
+
+    /** Retour après une coupure de l'arrière-plan : récepteurs et corrections comme avant. */
+    private fun reprendreApresCoupure() {
+        toutCoupe = false
+        if (recepteur1Coupe) reconnecterRecepteur()
+        if (recepteur2Coupe) reconnecterRecepteur2()
+        if (corrections1Coupees) reglagesCorrections()?.let { recepteur.corrections.demarrer(it) }
+        if (corrections2Coupees && modeCorrections2() == "ntrip") reglagesCorrections(2)?.let { recepteur2.corrections.demarrer(it) }
+    }
+
+    /** Reconnecte le 2e récepteur (essai à 2 récepteurs) à son dernier appareil. */
+    private fun reconnecterRecepteur2() {
+        val adresse = preferences().getString(CLE_DERNIER_RECEPTEUR_2, null) ?: return
+        val adaptateur = adaptateurBluetooth { reconnecterRecepteur2() } ?: return
+        try {
+            recepteur2.bluetooth.connecter(adaptateur.getRemoteDevice(adresse))
+        } catch (erreur: IllegalArgumentException) {
+            // Appareil introuvable : on laisse le 2e récepteur non connecté.
+        }
     }
 
     override fun onDestroy() {
@@ -425,7 +478,7 @@ class EcranPrincipal : Activity() {
                 }
                 @SuppressLint("MissingPermission")
                 val nom = appareil.name ?: appareil.address
-                preferences().edit().putString(CLE_NOM_RECEPTEUR_2, nom).apply()
+                preferences().edit().putString(CLE_NOM_RECEPTEUR_2, nom).putString(CLE_DERNIER_RECEPTEUR_2, appareil.address).apply()
                 recepteur2.bluetooth.connecter(appareil)
             }
             .setNegativeButton("Annuler", null)
@@ -761,6 +814,9 @@ class EcranPrincipal : Activity() {
         // Accès à Google Drive : seulement les fichiers créés par l'appli.
         private const val PORTEE_DRIVE = "https://www.googleapis.com/auth/drive.file"
         private const val CLE_DERNIER_RECEPTEUR = "dernier_recepteur"
+        private const val CLE_DERNIER_RECEPTEUR_2 = "dernier_recepteur_2"
+        /** Après ce temps en arrière-plan, Bluetooth et corrections sont coupés (batterie, 0.163.0). */
+        private const val DELAI_COUPURE_ARRIERE_PLAN_MS = 5 * 60 * 1000L
         private const val CLE_NOM_RECEPTEUR = "nom_dernier_recepteur"
         private const val CLE_NOM_RECEPTEUR_2 = "nom_recepteur_2"
         private const val CLE_MODE_CORRECTIONS = "mode"

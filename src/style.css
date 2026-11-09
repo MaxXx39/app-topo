@@ -12279,3 +12279,41 @@ body.mode-telephone .tuile-appli .coche-favori { width: 24px; height: 24px; font
 .reglage-loupe-mesure { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
 .reglage-loupe-mesure .ajouter-manuel-mesure { flex: 1 1 160px; min-height: 48px; background: #7c3aed; color: #ffffff; font-weight: 800; }
 .reglage-loupe-mesure .ajouter-manuel-mesure:disabled { opacity: 0.45; }
+
+
+/* ==========================================================================
+   0.163.0 (demandes du 09.11) : boutons de départ plus hauts sur tablette, fond léger sous le pied du menu,
+   retour des Réglages bien visible, implantation : bouton retour en évidence.
+   ========================================================================== */
+body:not(.mode-telephone) .fenetre-choix .boutons-choix button { min-height: 72px; padding: 16px 18px; align-content: center; }
+body:not(.mode-telephone) .fenetre-choix .boutons-choix button strong { font-size: 1.25rem; }
+.page-applis .pied-applis { background: rgba(100, 116, 139, 0.14); border-radius: 16px; padding: 10px; margin-top: 10px; }
+.retour-reglages {
+  width: 52px; height: 48px; border: none; border-radius: 12px;
+  background: var(--ambre, #f59e0b); color: #1b2b36;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.retour-reglages svg { width: 30px; height: 30px; stroke-width: 3; }
+.retour-reglages:active { filter: brightness(0.9); }
+
+/* ← de l'implantation (point, ligne, contrôle) : large, ambre, bien visible. */
+.entete-guidage .bouton-retour[data-action='arreterImplantation'],
+.entete-guidage .bouton-retour[data-action='changerLigne'],
+.entete-guidage .bouton-retour[data-action='arreterControle'] {
+  width: 52px; height: 44px; border: none; border-radius: 12px;
+  background: var(--ambre); color: #1b2b36; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.entete-guidage .bouton-retour[data-action='arreterImplantation'] svg,
+.entete-guidage .bouton-retour[data-action='changerLigne'] svg,
+.entete-guidage .bouton-retour[data-action='arreterControle'] svg { width: 28px; height: 28px; stroke-width: 3; }
+body.mode-telephone .entete-guidage .bouton-retour[data-action='arreterImplantation'],
+body.mode-telephone .entete-guidage .bouton-retour[data-action='changerLigne'],
+body.mode-telephone .entete-guidage .bouton-retour[data-action='arreterControle'] { width: 44px; height: 38px; }
+
+/* 0.163.0 : images des machines (de derrière et de côté) sur les gros boutons du choix de la machine. */
+.grosse-machine { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 16px; }
+.grosse-machine .images-machine { display: flex; align-items: flex-end; gap: 14px; }
+.grosse-machine .images-machine svg { height: 58px; width: auto; }
+.grosse-machine svg .silhouette-outil { fill: currentColor; opacity: 0.75; }
+.grosse-machine svg .silhouette-outil .vitre-silhouette { fill: #ffffff; opacity: 0.9; }
+.grosse-machine.actif svg .silhouette-outil .vitre-silhouette { fill: #1d4ed8; }
