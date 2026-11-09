@@ -123,7 +123,7 @@ import { creerNavigation } from './navigation/bande.js';
 import { mesureRapide } from './topo/mesure-rapide.js';
 import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
 import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
-import { htmlAnnotation, textePosition } from './annotation/ecran.js';
+import { htmlAnnotation, textePosition, dateHeure } from './annotation/ecran.js';
 import { ajouterAnnotation, trouverAnnotation, supprimerAnnotation, listesAnnotation, nettoyerRemarques, precisionSuffisante, estAnnotation, PRECISION_TABLETTE_DEPART } from './topo/annotation.js';
 import { applisDisponibles, appliCourante } from './navigation/applis.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
@@ -627,6 +627,7 @@ function contenuBande() {
     return boutonDeBande('dao', daoAppli?.actif() ? 'Quitter la DAO' : 'DAO', 'dessiner sur le plan');
   }
   if (cle === 'mesure') return mesureRapideBande();
+  if (cle === 'annotation') return annotationBande();
   return '';
 }
 
@@ -634,6 +635,10 @@ function contenuBande() {
 function agirDepuisBande(cle) {
   if (cle.startsWith('mesure-')) {
     agirMesureRapide(cle);
+    return;
+  }
+  if (cle.startsWith('annotation-')) {
+    agirAnnotation(cle);
     return;
   }
   document.querySelector(RELAIS_BANDE[cle])?.click();
@@ -775,14 +780,13 @@ function agirMesureRapide(cle) {
 // --- Annotation (0.177.0, Intermédiaire et Expert, demande du 09.11) ---
 // Un point posé sur le plan (loupe), pris au récepteur (GNSS) ou au GPS de la tablette (précision 3 m au plus, réglable),
 // avec des remarques et des photos. Rangé dans la liste du jour « Anot-AAAAMMJJ » (points A-n, voir topo/annotation.js).
-const annotationEtat = { mode: 'loupe', brouillon: null };
+const annotationEtat = { mode: null, brouillon: null }; // mode : 'loupe' quand « Manuel » est choisi
 
 /** Vrai quand l'Annotation est l'écran de travail. */
 function annotationActive() {
   return ongletContexte === 'annotation' && aAcces('intermediaire');
 }
 
-const modesAnnotation = () => (recepteurDisponible() ? ['loupe', 'gnss', 'tablette'] : ['loupe']);
 const precisionTabletteMax = () => terrain.precisionTablette ?? PRECISION_TABLETTE_DEPART;
 const arrondirMm = (valeur) => Math.round(valeur * 1000) / 1000;
 
@@ -794,14 +798,73 @@ function etatTabletteAnnotation() {
   return { ok, texte: `Précision ±${Number.isFinite(precision) ? formaterNombre(precision) : '?'} m · ${ok ? 'assez précis' : `il faut ${formaterNombre(precisionTabletteMax())} m ou mieux`}` };
 }
 
-/** Précision du GPS de la tablette mise à jour sans redessiner la fiche (5 fois par seconde). */
+/** Précision du GPS de la tablette mise à jour sans redessiner la fiche (5 fois par seconde) ; la bande suit. */
 function majPrecisionAnnotation() {
-  if (!annotationActive() || annotationEtat.mode !== 'tablette' || annotationEtat.brouillon) return;
-  const etat = etatTabletteAnnotation();
+  if (!annotationActive()) return;
   const texte = document.querySelector('#annotation [data-champ="precision-tablette"]');
+  const etat = etatTabletteAnnotation();
   if (texte && texte.textContent !== etat.texte) texte.textContent = etat.texte;
-  const bouton = document.querySelector('#annotation [data-action="prendre-tablette-annotation"]');
-  if (bouton) bouton.disabled = !etat.ok;
+  navigation?.mettreAJour();
+}
+
+/** Pourquoi le bouton GNSS est grisé (texte court), ou '' s'il est utilisable. */
+function raisonGnssAnnotation() {
+  if (!recepteurDisponible()) return 'appli Android';
+  if (!etatRecepteur?.connecte) return 'non connecté';
+  if (!etatRecepteur.recu || !etatRecepteur.position) return 'pas de position';
+  if (etatRecepteur.qualite !== 4) return 'pas en RTK fixe';
+  if (!etatRecepteur.inclinaisonPrete) return 'incl. non prête';
+  return '';
+}
+
+/** Pourquoi le bouton GPS tablette est grisé (texte court), ou '' s'il est utilisable. */
+function raisonTabletteAnnotation() {
+  if (!recepteurDisponible()) return 'appli Android';
+  if (!positionTablette) return 'pas de GPS';
+  const precision = positionTablette.precision;
+  if (!precisionSuffisante(precision, precisionTabletteMax())) return `±${Number.isFinite(precision) ? Math.ceil(precision) : '?'} m, ${precisionTabletteMax()} m voulu`;
+  return '';
+}
+
+/**
+ * Bande du bas d'Annotation (0.178.0) : trois boutons à droite du bouton d'application, Manuel / GNSS / GPS tablette
+ * (grisés avec la raison écrite dessous quand ils ne sont pas utilisables) ; une fois une position prise, un petit
+ * bouton « Enreg. point » apparaît juste au-dessus de la bande, à droite, comme Enreg. Pts de Lever.
+ */
+function annotationBande() {
+  const bouton = (cle, classe, titre, raison) => `<button type="button" class="bouton-bande-mesure ${classe}" data-nav="action" data-cle="${cle}" ${raison ? 'disabled' : ''}>
+      <span>${echapper(titre)}</span>${raison ? `<small>${echapper(raison)}</small>` : ''}</button>`;
+  const b = annotationEtat.brouillon;
+  const enreg = b && !b.edition
+    ? `<button type="button" class="bouton-enreg-bande relais-annotation" data-nav="action" data-cle="annotation-enregistrer" title="Enregistrer le point"><span>Enreg. point</span><small>${echapper(b.source === 'gnss' ? 'GNSS' : b.source === 'tablette' ? 'GPS tablette' : 'Manuel')}</small></button>`
+    : '';
+  return `<div class="boutons-bande-mesure boutons-bande-annotation">
+    ${bouton('annotation-manuel', annotationEtat.mode === 'loupe' ? 'manuel actif' : 'manuel', 'Manuel', '')}
+    ${bouton('annotation-gnss', 'gnss', 'GNSS', raisonGnssAnnotation())}
+    ${bouton('annotation-tablette', 'tablette', 'GPS tablette', raisonTabletteAnnotation())}
+    ${enreg}
+  </div>`;
+}
+
+/** Bouton de la bande touché : Manuel (loupe), GNSS, GPS tablette ou Enreg. point. */
+function agirAnnotation(cle) {
+  if (cle === 'annotation-enregistrer') return enregistrerAnnotation();
+  if (annotationEtat.brouillon?.edition) {
+    afficherMessage(`Ferme d'abord la fiche de ${annotationEtat.brouillon.nom}`, 3000);
+    return undefined;
+  }
+  lireFormulaireAnnotation();
+  if (cle === 'annotation-manuel') {
+    annotationEtat.mode = 'loupe';
+    afficherAnnotation();
+  } else if (cle === 'annotation-gnss') {
+    annotationEtat.mode = null;
+    prendreGnssAnnotation();
+  } else if (cle === 'annotation-tablette') {
+    annotationEtat.mode = null;
+    prendreTabletteAnnotation();
+  }
+  return undefined;
 }
 
 /** Photos du point en cours (nouveau : en mémoire ; modifié : celles de sa liste). */
@@ -821,17 +884,15 @@ function lireFormulaireAnnotation() {
 }
 
 function afficherAnnotation() {
+  // Triées par date : la plus récente d'abord.
   const liste = listesAnnotation(projet).flatMap((l) => (projet.leves.find((v) => v.id === l.leveId)?.points ?? []).map((p) => ({ l, p })))
-    .reverse().map(({ l, p }) => ({
-      nom: p.nom, source: p.annotation?.source, remarques: p.annotation?.remarques?.length ?? 0,
+    .sort((a, b) => String(b.p.annotation?.le ?? '').localeCompare(String(a.p.annotation?.le ?? ''))).map(({ l, p }) => ({
+      nom: p.nom, source: p.annotation?.source, remarques: p.annotation?.remarques?.length ?? 0, date: dateHeure(p.annotation?.le),
       photos: (l.photos ?? []).filter((ph) => ph.point === p.nom).length, premiere: p.annotation?.remarques?.[0] ?? '',
     }));
-  const modes = modesAnnotation();
-  if (!modes.includes(annotationEtat.mode)) annotationEtat.mode = 'loupe';
   document.querySelector('#annotation').innerHTML = htmlAnnotation({
-    modes, mode: annotationEtat.mode, brouillon: annotationEtat.brouillon, photos: photosDuBrouillonAnnotation(),
+    mode: annotationEtat.mode, brouillon: annotationEtat.brouillon, photos: photosDuBrouillonAnnotation(),
     manuel: { zoom: terrain.zoomLoupe ?? 4 },
-    gnss: { pret: Boolean(etatRecepteur?.connecte && etatRecepteur.recu && etatRecepteur.position && etatRecepteur.qualite === 4 && etatRecepteur.inclinaisonPrete) },
     tablette: { ...etatTabletteAnnotation(), maximum: precisionTabletteMax() }, liste,
   });
   envoyerImplantationAuPlan();
@@ -960,11 +1021,7 @@ document.querySelector('#annotation').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-action]');
   if (!bouton || bouton.disabled) return;
   const action = bouton.dataset.action;
-  if (action === 'mode-annotation') {
-    lireFormulaireAnnotation();
-    annotationEtat.mode = bouton.dataset.valeur;
-    afficherAnnotation();
-  } else if (action === 'deplacer-loupe-annotation') {
+  if (action === 'deplacer-loupe-annotation') {
     const [dx, dy] = { haut: [0, -1], bas: [0, 1], gauche: [-1, 0], droite: [1, 0] }[bouton.dataset.valeur] ?? [0, 0];
     plan.loupe.deplacerDe(dx, dy);
   } else if (action === 'zoom-loupe-annotation') {
@@ -972,9 +1029,7 @@ document.querySelector('#annotation').addEventListener('click', (evenement) => {
     plan.loupe.changerZoom(terrain.zoomLoupe);
     lireFormulaireAnnotation();
     afficherAnnotation();
-  } else if (action === 'prendre-gnss-annotation') prendreGnssAnnotation();
-  else if (action === 'prendre-tablette-annotation') prendreTabletteAnnotation();
-  else if (action === 'ajouter-remarque') {
+  } else if (action === 'ajouter-remarque') {
     lireFormulaireAnnotation();
     annotationEtat.brouillon?.remarques.push('');
     afficherAnnotation();
@@ -6570,7 +6625,7 @@ if (recepteurDisponible()) {
     }
     etatRecepteur = etat;
     // Mesure rapide : « + Point GNSS » de la bande suit l'état du récepteur (prêt ou non).
-    if (ongletContexte === 'mesure-rapide') navigation?.mettreAJour();
+    if (ongletContexte === 'mesure-rapide' || ongletContexte === 'annotation') navigation?.mettreAJour();
     if (vientDeSeConnecter) proposerControle();
     mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette, terrain.hauteurCanne ?? null);
     boutonRecepteur?.mettreAJour(etat);

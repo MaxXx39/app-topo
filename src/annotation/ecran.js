@@ -43,17 +43,8 @@ function htmlFiche(b, photos) {
     </div>`;
 }
 
-/** Zone de position selon le mode choisi. */
-function htmlPosition({ mode, manuel, gnss, tablette }) {
-  if (mode === 'gnss') {
-    return `<div class="position-annotation"><button type="button" class="bouton" data-action="prendre-gnss-annotation" ${gnss.pret ? '' : 'disabled'}>📍 Prendre la position du récepteur</button>
-      <small>${gnss.pret ? 'RTK fixe, inclinaison prête' : 'Il faut le RTK fixe et l\'inclinaison prête'}</small></div>`;
-  }
-  if (mode === 'tablette') {
-    return `<div class="position-annotation"><button type="button" class="bouton" data-action="prendre-tablette-annotation" ${tablette.ok ? '' : 'disabled'}>📍 Prendre la position de la tablette</button>
-      <small data-champ="precision-tablette">${echapper(tablette.texte)}</small>
-      <label class="reglage-precision-annotation">Précision demandée (m, au mieux) <input type="number" inputmode="decimal" min="0.5" max="50" step="0.5" value="${tablette.maximum}" data-champ="precision-tablette-max" /></label></div>`;
-  }
+/** Réglage fin de la loupe (mode Manuel) : flèches et zoom. */
+function htmlLoupe(manuel) {
   return `<div class="reglage-loupe reglage-loupe-annotation">
       <div class="fleches-loupe">
         <span></span><button type="button" class="bouton-fleche-loupe" data-action="deplacer-loupe-annotation" data-valeur="haut" aria-label="Monter la croix">▲</button><span></span>
@@ -67,20 +58,32 @@ function htmlPosition({ mode, manuel, gnss, tablette }) {
     </div>`;
 }
 
+/** Date et heure d'un point : « 09.11.2026 14:32 » (vide si inconnue). */
+export function dateHeure(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const deux = (n) => String(n).padStart(2, '0');
+  return `${deux(d.getDate())}.${deux(d.getMonth() + 1)}.${d.getFullYear()} ${deux(d.getHours())}:${deux(d.getMinutes())}`;
+}
+
 /**
- * HTML de l'écran. { modes: ['loupe', 'gnss', 'tablette'] permis, mode, brouillon (ou null), photos (du brouillon),
- * manuel: { zoom }, gnss: { pret }, tablette: { ok, texte }, liste: [{ nom, remarques, photos, source, premiere }] }.
+ * HTML de l'écran. { mode ('loupe' quand « Manuel » est choisi dans la bande, sinon null), brouillon (ou null),
+ * photos (du brouillon), manuel: { zoom }, tablette: { texte, maximum },
+ * liste: [{ nom, remarques, photos, source, premiere, date }] (la plus récente d'abord) }.
+ * Les boutons Manuel / GNSS / GPS tablette et « Enreg. point » sont dans la bande du bas (voir main.js).
  */
-export function htmlAnnotation({ modes, mode, brouillon, photos = [], manuel, gnss, tablette, liste }) {
-  const puces = modes.length > 1
-    ? `<div class="modes-annotation" role="group" aria-label="Comment placer le point">${modes.map((m) => `<button type="button" class="puce-choix ${mode === m ? 'actif' : ''}" data-action="mode-annotation" data-valeur="${m}">${MODES[m]}</button>`).join('')}</div>`
-    : '';
+export function htmlAnnotation({ mode, brouillon, photos = [], manuel, tablette, liste }) {
   const lignes = liste.map((a) => `<button type="button" class="ligne-annotation ${brouillon?.edition && brouillon.nom === a.nom ? 'actif' : ''}" data-action="ouvrir-annotation" data-nom="${echapper(a.nom)}">
-      <strong>${echapper(a.nom)}</strong><span>${echapper(a.premiere || '—')}</span><small>${a.remarques} rem. · ${a.photos} photo(s) · ${echapper(SOURCES[a.source] ?? '')}</small></button>`).join('');
+      <strong>${echapper(a.nom)}</strong><span>${echapper(a.premiere || '—')}</span><small>${echapper(a.date)} · ${a.remarques} rem. · ${a.photos} photo(s) · ${echapper(SOURCES[a.source] ?? '')}</small></button>`).join('');
+  const invite = mode === 'loupe'
+    ? 'Touche le plan, place la croix, puis lève le doigt'
+    : 'Choisis Manuel, GNSS ou GPS tablette en bas';
   return `<div class="ecran-annotation">
-      <div class="entete-annotation">${puces}${bulle('annotation')}</div>
-      ${!brouillon || (!brouillon.edition && mode === 'loupe') ? htmlPosition({ mode, manuel, gnss, tablette }) : ''}
-      ${brouillon ? htmlFiche(brouillon, photos) : `<p class="invite-annotation"><strong>${mode === 'loupe' ? 'Touche le plan, place la croix, puis lève le doigt' : 'Prends la position, puis ajoute remarques et photos'}</strong></p>`}
-      ${liste.length > 0 ? `<div class="liste-annotation"><div class="titre-liste-annotation"><strong>Annotations (${liste.length})</strong></div>${lignes}</div>` : ''}
+      <div class="entete-annotation"><label class="reglage-precision-annotation">GPS tablette : précision demandée (m, au mieux)
+        <input type="number" inputmode="decimal" min="0.5" max="50" step="0.5" value="${tablette.maximum}" data-champ="precision-tablette-max" /></label>${bulle('annotation')}</div>
+      <small class="precision-annotation" data-champ="precision-tablette">${echapper(tablette.texte)}</small>
+      ${mode === 'loupe' && !brouillon?.edition ? htmlLoupe(manuel) : ''}
+      ${brouillon ? htmlFiche(brouillon, photos) : `<p class="invite-annotation"><strong>${invite}</strong></p>`}
+      ${liste.length > 0 ? `<div class="liste-annotation"><div class="titre-liste-annotation"><strong>Annotations (${liste.length}) · par date</strong></div>${lignes}</div>` : ''}
     </div>`;
 }

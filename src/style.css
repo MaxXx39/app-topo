@@ -13184,3 +13184,19 @@ body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever
 .ligne-annotation.actif { border-color: #0f766e; background: color-mix(in srgb, #0f766e 12%, var(--surface)); }
 .ligne-annotation span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ligne-annotation small { grid-column: 1 / -1; color: var(--gris); }
+
+/* 0.178.0 (demande du 09.11) : bande d'Annotation : Manuel / GNSS / GPS tablette (grisés avec la raison dessous),
+   et un petit « Enreg. point » fixe au-dessus de la bande, à droite, comme Enreg. Pts de Lever. */
+.bande-appli .boutons-bande-annotation .bouton-bande-mesure { flex: 1 1 0; background: #0f766e; color: #ffffff; }
+.bande-appli .boutons-bande-annotation .bouton-bande-mesure.manuel.actif { background: var(--ambre); color: #1b2b36; }
+.bande-appli .boutons-bande-annotation .bouton-bande-mesure:disabled { background: #475569; color: rgba(255, 255, 255, 0.55); }
+.bande-appli .boutons-bande-annotation .bouton-bande-mesure small { white-space: normal; line-height: 1.05; text-align: center; font-size: 10px; }
+.boutons-bande-annotation .bouton-enreg-bande.relais-annotation {
+  position: fixed; right: 12px; bottom: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 10px);
+  flex: none; width: 150px; min-height: 52px; flex-direction: column; gap: 0; z-index: 21;
+  background: var(--ambre); color: #1b2b36; font-size: 18px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+body.mode-telephone .boutons-bande-annotation .bouton-enreg-bande.relais-annotation { width: 124px; min-height: 46px; font-size: 15px; }
+body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 80px); }
+.precision-annotation { color: var(--gris); font-size: 13px; }
