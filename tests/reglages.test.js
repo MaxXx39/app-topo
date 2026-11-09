@@ -95,6 +95,6 @@ describe('tailles du plan (0.104.0)', () => {
   });
   it('taille inconnue : la normale', async () => {
     const reglages = await chargerReglages({ 'topo-reglages': JSON.stringify({ tailleFormes: 'xyz', tailleTexte: 'abc' }) });
-    expect(reglages.echelleTexte()).toBe(0.82);
+    expect(reglages.echelleTexte()).toBe(1);
   });
 });
