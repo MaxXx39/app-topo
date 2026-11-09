@@ -8,7 +8,7 @@ export const TEXTES_AIDE = {
   applications:
     'Menu de départ : touche une tuile (ou sa sous-application en petit) pour ouvrir l\'application. Appui long = déplacer la tuile ; ★ = favori. Réglages et « Fermer l\'appli » en bas.',
   projets:
-    'Projets enregistrés sur cet appareil (📱) ou sur Drive (☁). « Changer » les liste, « + Nouveau » en crée un, ⋮ exporte, duplique ou supprime. Réglages de l\'appareil : tuile Réglages du menu.',
+    'Projets enregistrés sur cet appareil (📱) ou sur Drive (☁). « Changer » les liste, « + Nouveau » en crée un, ⋮ renomme (projet ouvert), exporte, duplique ou supprime. Réglages de l\'appareil : tuile Réglages du menu.',
   lame:
     'Guidage (Expert) : choisis la machine puis la surface à suivre. Flèches : monter ou descendre ; vert ≤ 2 cm, orange ≤ 5 cm. Réglages dans ⚙ (1 ou 2 GNSS, G / D, distances, vues).',
   partage:

@@ -275,6 +275,7 @@ function ligneProjet(p, estOuvert, menu, partage) {
     </button>
     <button type="button" class="bouton-menu-projet" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
     ${menu ? `<div class="menu-projet">
+      ${estOuvert ? '<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="renommerProjet">renommer</button>' : ''}
       <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="ranger-projet" data-id="${p.id}">ranger dans un dossier</button>
       ${p.local ? `<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="exporter" data-id="${p.id}">exporter (.topo.json)</button>
         <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="dupliquer" data-id="${p.id}">dupliquer</button>
