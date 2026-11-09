@@ -80,6 +80,7 @@ import { lireLibellesChantier, lireNaturesChantier, libelleChantier } from './le
 import { lireAttributsChantier, altitudesDuPoint, cadreDeTroisCoins, RAYON_TAMPON_ROND } from './topo/chantier.js';
 import { lireLibelles, recreerLibellesManquants, definirLibellesProjet, surLibellesProjet } from './leve/libelles.js';
 import { modifierLibellesDeSorte, modifierReseaux } from './leve/fenetre-libelles.js';
+import { ouvrirFenetreChantier } from './leve/fenetre-chantier.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
 import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele, ecartAuBout } from './topo/ligne-implantation.js';
@@ -2047,6 +2048,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         recalculer();
       },
       modifierLibelles: (sorte) => modifierLibellesDeSorte(sorte, recalculer),
+      modifierChantier: () => ouvrirFenetreChantier(recalculer),
       choisirMode: choisirModeTerrain,
       // --- Guidage de lame (mode Lame) ---
       choisirSurfaceLame: (id) => {

@@ -1424,7 +1424,7 @@ export function creerEcranLeve(conteneur, actions) {
       <p class="titre-choix">Nature</p>
       <div class="natures-chantier">${c.natures.map((n) => bouton('nature', n, echapper(n), n === c.nature)).join('')}</div>
       <div class="cadre-attributs-chantier" style="--couleur-libelle: ${l.couleur}">
-        <strong class="titre-attributs">${echapper(l.nom)} · ${echapper(c.nature)}</strong>
+        <strong class="titre-attributs">${echapper(l.nom)} · ${echapper(c.nature)} ${bulle('chantier')}<button type="button" class="bouton-crayon-libelles seulement-expert" data-action="modifierChantier" title="Modifier la bibliothèque du chantier" aria-label="Modifier la bibliothèque du chantier">⚙</button></strong>
         ${l.ouvrage ? `<div class="bascule-chantier">${bouton('forme', 'ronde', '● Ronde · 1 point', c.forme === 'ronde')}${bouton('forme', 'rect', '▭ Carrée / rect. · 3 coins', c.forme === 'rect')}</div>` : ''}
         ${l.modes.length > 1 ? `<div class="bascule-chantier">${l.modes.map((m) => bouton('mode', m, `${m === l.modes[0] ? 'Je lève : ' : ''}${nomsMode[m]}`, m === c.mode)).join('')}</div>` : ''}
         <div class="champs-chantier">

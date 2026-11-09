@@ -55,6 +55,8 @@ export const TEXTES_AIDE = {
     'Contour, lignes et points isolés du levé en cours : touche un nom pour voir ses points. ✕ supprime un point ; ✂ coupe une ligne entre deux points.',
   journalNmea:
     'Expert. Enregistre 1 minute de ce que le GNSS envoie (NMEA) pour vérifier hauteur de canne, inclinaison ou batterie. Un résumé des messages reçus s\'affiche à la fin.',
+  chantier:
+    'Levé chantier : choisis le libellé (Chambre, Tuyau…) et la nature (EU, EC…). Tuyau : lève le dessus (le Ø est obligatoire, le fil d\'eau est calculé) ou le fil d\'eau. Chambre / grille : 1 point (ronde) ou 3 coins (rectangle), Ø du tuyau qui arrive facultatif.',
   trianglesEnTrop:
     'Expert. Sans contour, le levé peut créer des triangles en trop : « Supprimer au doigt », touche un triangle (retoucher = le remettre), puis « Terminer ».',
   photos:

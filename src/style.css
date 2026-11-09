@@ -13013,3 +13013,18 @@ body.mode-telephone .etat-drive svg { width: 20px; height: 20px; }
 .entete-levee.nature-chantier,
 .bouton-nature.nature-chantier { --couleur-nature: #ea580c; }
 .ligne-levee.nature-chantier { --couleur-nature: #ea580c; }
+.titre-attributs { display: flex; align-items: center; justify-content: space-between; }
+dialog.fenetre-chantier { width: min(96vw, 760px); max-height: 92vh; padding: 0; border: 0; border-radius: var(--rayon); display: flex; flex-direction: column; background: var(--surface); color: var(--encre, var(--texte)); }
+dialog.fenetre-chantier[open] { display: flex; }
+dialog.fenetre-chantier h2 { margin: 0; padding: 12px 14px; background: var(--sombre); color: #ffffff; font-size: 1rem; }
+.corps-chantier { overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.ligne-bibliotheque { display: grid; grid-template-columns: 1.4fr 0.7fr 44px 1fr; gap: 6px; align-items: center; padding: 8px; border-radius: 10px; background: rgba(95, 109, 119, 0.08); }
+.ligne-bibliotheque input[type="text"], .ligne-bibliotheque input:not([type]), .ligne-bibliotheque select, .natures-bibliotheque textarea { min-height: 36px; border: 1.5px solid var(--bordure); border-radius: 8px; padding: 2px 6px; background: var(--surface); color: var(--encre, var(--texte)); font: inherit; min-width: 0; }
+.ligne-bibliotheque input[type="color"] { width: 44px; height: 36px; padding: 0; border: 1.5px solid var(--bordure); border-radius: 8px; }
+.ligne-bibliotheque .coche { grid-column: span 2; display: flex; gap: 6px; align-items: center; font-size: 0.8rem; }
+.champs-bibliotheque { grid-column: 1 / -1; display: flex; gap: 12px; flex-wrap: wrap; }
+.champs-bibliotheque .coche { grid-column: auto; }
+.actions-ligne { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; }
+.natures-bibliotheque { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.natures-bibliotheque label { display: flex; flex-direction: column; gap: 4px; font-weight: 700; font-size: 0.8rem; }
+@media (max-width: 520px) { .ligne-bibliotheque { grid-template-columns: 1fr 1fr; } .natures-bibliotheque { grid-template-columns: 1fr; } }
