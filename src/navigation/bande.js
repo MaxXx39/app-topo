@@ -14,6 +14,7 @@ import { appliDeCle, lireFavoris, ecrireFavoris, basculerFavori, MAX_FAVORIS, li
 
 const DUREE_APPUI_LONG = 500; // ms avant que la roue des favoris s'ouvre
 const ICONE_REGLAGES = '<circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />';
+const ICONE_LISTE = '<path d="M4 6h16M4 12h16M4 18h16" />';
 const ICONE_APPLIS = '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />';
 
 const svg = (trace) => `<svg viewBox="0 0 24 24" aria-hidden="true">${trace}</svg>`;
@@ -373,7 +374,7 @@ export function creerNavigation(nav, actions) {
     derniereSignature = signature;
     const active = sous.find((s) => s.actif) ?? null;
     const partieAppli = appli
-      ? `<button type="button" class="partie-appli" data-nav="appli" title="Applications (appui long : favoris)">${svg(appli.icone)}<span>${echapper(actions.titre?.(appli) ?? appli.titre)}</span></button>`
+      ? `<button type="button" class="partie-appli" data-nav="appli" title="Menu des applications (appui long : favoris)">${svg(ICONE_LISTE)}<span>${echapper(actions.titre?.(appli) ?? appli.titre)}</span></button>`
       : `<button type="button" class="partie-appli applis" data-nav="appli" title="Revenir">${svg(ICONE_APPLIS)}<span>Applications</span></button>`;
     const partieSous = sous.length > 0
       ? `<button type="button" class="partie-sous ${deroulee ? 'ouverte' : ''}" data-nav="sous" aria-expanded="${deroulee}">

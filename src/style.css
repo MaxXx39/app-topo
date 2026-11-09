@@ -12279,3 +12279,66 @@ body.mode-telephone .tuile-appli .coche-favori { width: 24px; height: 24px; font
 .reglage-loupe-mesure { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
 .reglage-loupe-mesure .ajouter-manuel-mesure { flex: 1 1 160px; min-height: 48px; background: #7c3aed; color: #ffffff; font-weight: 800; }
 .reglage-loupe-mesure .ajouter-manuel-mesure:disabled { opacity: 0.45; }
+
+
+/* ==========================================================================
+   0.163.0 (demandes du 09.11) : boutons de départ plus hauts sur tablette, fond léger sous le pied du menu,
+   retour des Réglages bien visible, implantation : bouton retour en évidence.
+   ========================================================================== */
+body:not(.mode-telephone) .fenetre-choix .boutons-choix button { min-height: 72px; padding: 16px 18px; align-content: center; }
+body:not(.mode-telephone) .fenetre-choix .boutons-choix button strong { font-size: 1.25rem; }
+.page-applis .pied-applis { background: rgba(100, 116, 139, 0.14); border-radius: 16px; padding: 10px; margin-top: 10px; }
+.retour-reglages {
+  width: 52px; height: 48px; border: none; border-radius: 12px;
+  background: var(--ambre, #f59e0b); color: #1b2b36;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.retour-reglages svg { width: 30px; height: 30px; stroke-width: 3; }
+.retour-reglages:active { filter: brightness(0.9); }
+
+/* ← de l'implantation (point, ligne, contrôle) : large, ambre, bien visible. */
+.entete-guidage .bouton-retour[data-action='arreterImplantation'],
+.entete-guidage .bouton-retour[data-action='changerLigne'],
+.entete-guidage .bouton-retour[data-action='arreterControle'] {
+  width: 52px; height: 44px; border: none; border-radius: 12px;
+  background: var(--ambre); color: #1b2b36; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.entete-guidage .bouton-retour[data-action='arreterImplantation'] svg,
+.entete-guidage .bouton-retour[data-action='changerLigne'] svg,
+.entete-guidage .bouton-retour[data-action='arreterControle'] svg { width: 28px; height: 28px; stroke-width: 3; }
+body.mode-telephone .entete-guidage .bouton-retour[data-action='arreterImplantation'],
+body.mode-telephone .entete-guidage .bouton-retour[data-action='changerLigne'],
+body.mode-telephone .entete-guidage .bouton-retour[data-action='arreterControle'] { width: 44px; height: 38px; }
+
+/* 0.163.0 : images des machines (de derrière et de côté) sur les gros boutons du choix de la machine. */
+.grosse-machine { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 16px; }
+.grosse-machine .images-machine { display: flex; align-items: flex-end; gap: 14px; }
+.grosse-machine .images-machine svg { height: 58px; width: auto; }
+.grosse-machine svg .silhouette-outil { fill: currentColor; opacity: 0.75; }
+.grosse-machine svg .silhouette-outil .vitre-silhouette { fill: #ffffff; opacity: 0.9; }
+.grosse-machine.actif svg .silhouette-outil .vitre-silhouette { fill: #1d4ed8; }
+
+/* ==========================================================================
+   0.164.0 (harmonisation + place gagnée, demandes du 09.11)
+   ========================================================================== */
+/* A2 · Boutons d'action de la bande du bas : même hauteur, même arrondi, même écriture dans toutes les applications. */
+.bande-appli :is(.bouton-enreg-bande, .bouton-bande-mesure) {
+  min-height: 52px; border-radius: 14px; font-size: 17px; font-weight: 800; line-height: 1.15;
+}
+.bande-appli :is(.bouton-enreg-bande, .bouton-bande-mesure) small { font-size: 12px; font-weight: 700; }
+.bande-appli .petit-bouton-levee { min-height: 44px; border-radius: 14px; }
+.zone-cible-bande .bouton-enreg-bande.petit { flex: 0 0 76px; font-size: 17px; }
+body.mode-telephone .bande-appli :is(.bouton-enreg-bande, .bouton-bande-mesure) { min-height: 42px; font-size: 14px; }
+body.mode-telephone .bande-appli :is(.bouton-enreg-bande, .bouton-bande-mesure) small { font-size: 10px; }
+/* A3 · Titres de cadre : même taille et même marge (Volumes, Points de contrôle, Quelle machine ?…). */
+.titre-choix, .panneau[data-onglet='volumes'] > h2 { margin: 2px 0 8px; font-size: 17px; font-weight: 800; color: var(--encre); }
+/* A4 · Roue ⚙, cloche 🔔 et ← : même taille partout. */
+.bouton-roue, .bouton-bip { min-width: 44px; min-height: 44px; border-radius: 12px; }
+body.mode-telephone :is(.bouton-roue, .bouton-bip) { min-width: 36px; min-height: 36px; }
+.ecart-et-regle > .bouton-bip { min-width: 36px; min-height: 36px; }
+/* B3 · cadre du bas collé au plan, flèches ▲ ▼ sur le coin du plan. */
+.boutons-taille-plan { opacity: 0.92; }
+/* B4 · marges du cadre du bas réduites. */
+body[data-onglet='terrain'] .mise-en-page, body[data-onglet='volumes'] .mise-en-page { padding-left: 6px; padding-right: 6px; }
+/* B6 · la place du bouton en bas à gauche est réservée, sans marge en trop. */
+#leve-direct p.aide, #leve-direct [data-vivant='orientation'] { margin: 2px 0; line-height: 1.25; }

@@ -13,6 +13,11 @@ import { formaterNombre } from '../topo/format.js';
 import { htmlRegleHauteur } from './regle-hauteur.js';
 import { silhouetteOutil } from './silhouettes.js';
 
+/** Petit dessin de la machine (vue de derrière « gd » ou de côté « long ») pour l'écran de choix. */
+function imageMachine(machine, vue, boite) {
+  return `<svg viewBox="${boite}" aria-hidden="true">${silhouetteOutil(machine, vue, { x: 0, y: 0 })}</svg>`;
+}
+
 /** Texte d'un écart de coin (m) : « monter 3.2 cm », « descendre 1.0 cm » ; « hors surface ». */
 export function texteEcartLame(ecart) {
   if (ecart == null) return 'hors surface';
@@ -102,7 +107,8 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
     </div>`;
   // 0.153.0 : d'abord le choix de la machine, en grand ; ensuite le guidage, sans ce bandeau.
   if (choixMachine) {
-    const grosse = (cle, titre) => `<button type="button" class="grosse-machine ${machine === cle ? 'actif' : ''}" data-action="choisirMachine" data-valeur="${cle}">${titre}</button>`;
+    const grosse = (cle, titre) => `<button type="button" class="grosse-machine ${machine === cle ? 'actif' : ''}" data-action="choisirMachine" data-valeur="${cle}">
+      <span class="images-machine">${imageMachine(cle, 'gd', '-55 -150 110 160')}${imageMachine(cle, 'long', '-160 -150 285 160')}</span><span>${titre}</span></button>`;
     return `<div class="ecran-lame choix-machine-depart">
       <p class="titre-choix">Quelle machine ?</p>
       ${grosse('grader', 'Grader')}${grosse('bull', 'Bull')}${grosse('rateau', 'Râteau')}

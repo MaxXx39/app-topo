@@ -235,8 +235,6 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
         <span class="aide" data-zone="mise-a-jour" role="status"></span>
       </div>` : ''}
       <div class="ligne-outils pied-reglages">
-  ${fermerAppli ? `<button type="button" class="bouton-fermer-appli" data-action="fermer-appli">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" /><path d="M6.3 6.8a8 8 0 1 0 11.4 0" /></svg>Fermer l'appli</button>` : ''}
         ${enPage ? "" : "<button class=\"bouton\">OK</button>"}
       </div>
     </form>`;
