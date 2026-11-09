@@ -41,15 +41,19 @@ export function cheminForme(forme, x, y, r) {
     case 'losange':
       return polygone([[x, y - r * 1.3], [x + r * 1.3, y], [x, y + r * 1.3], [x - r * 1.3, y]]);
     case 'nuage': {
-      // Rond tracé à la main (0.180.1, demande du 09.11) : une boucle en trait fin, un peu irrégulière, qui
-      // se croise à la fin. Taille fixe de 14 px de large, comme le triangle des points de contrôle.
-      const R = 7;
+      // Rond tracé à la main (0.180.2, demande du 09.11, d'après le croquis) : un vrai rond, puis la fin de
+      // la boucle dépasse le départ et s'écarte un peu vers l'extérieur. Trait fin, environ 13 px de diamètre.
+      const R = 6.5;
+      const tour = Math.PI * 2;
+      const queue = 0.9; // radians dépassés après le tour complet
       const sommets = [];
-      const pas = 28;
+      const pas = 48;
       for (let i = 0; i <= pas; i++) {
-        const t = (i / pas) * (Math.PI * 2 + 0.5);
-        const rayon = R * (1 + 0.07 * Math.sin(3 * t + 1) + 0.04 * Math.cos(5 * t));
-        sommets.push([x + rayon * Math.cos(t - Math.PI / 2), y + rayon * 0.9 * Math.sin(t - Math.PI / 2)]);
+        const t = (i / pas) * (tour + queue);
+        const extra = Math.max(0, t - tour) / queue; // 0 sur le rond, 0 → 1 sur la queue
+        const rayon = R + 1.6 * extra * extra;
+        const angle = t + 0.8 - Math.PI / 2;
+        sommets.push([x + rayon * Math.cos(angle), y + rayon * Math.sin(angle)]);
       }
       return `M${sommets.map(([px, py]) => `${f(px)} ${f(py)}`).join('L')}`;
     }
