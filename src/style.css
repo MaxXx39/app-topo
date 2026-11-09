@@ -13028,3 +13028,15 @@ dialog.fenetre-chantier h2 { margin: 0; padding: 12px 14px; background: var(--so
 .natures-bibliotheque { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .natures-bibliotheque label { display: flex; flex-direction: column; gap: 4px; font-weight: 700; font-size: 0.8rem; }
 @media (max-width: 520px) { .ligne-bibliotheque { grid-template-columns: 1fr 1fr; } .natures-bibliotheque { grid-template-columns: 1fr; } }
+
+/* 0.175.4 (demande du 09.11) : libellés et natures du Chantier chacun sur UNE ligne (texte qui s'adapte à la largeur ;
+   si vraiment trop étroit, la ligne défile de côté). */
+.chantier-leve .libelles-terrain.pour-chantier { display: flex; flex-wrap: nowrap; gap: 3px; overflow-x: auto; scrollbar-width: none; }
+.chantier-leve .libelles-terrain.pour-chantier .puce-libelle { flex: 1 1 auto; min-width: 0; padding: 2px 4px; }
+.chantier-leve .libelles-terrain.pour-chantier .puce-libelle strong { display: flex; align-items: center; justify-content: center; gap: 2px; white-space: nowrap; font-size: clamp(0.56rem, 1.75vw, 0.8rem); }
+.chantier-leve .natures-chantier { flex-wrap: nowrap; gap: 3px; overflow-x: auto; scrollbar-width: none; }
+.chantier-leve .natures-chantier button { flex: 1 1 auto; min-width: 0; padding: 4px 5px; white-space: nowrap; font-size: clamp(0.56rem, 1.75vw, 0.8rem); }
+@media (max-width: 520px) {
+  .chantier-leve .libelles-terrain.pour-chantier .symbole-libelle { display: none; }
+  .chantier-leve .libelles-terrain.pour-chantier .puce-libelle strong { font-size: 0.62rem; }
+}
