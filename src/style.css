@@ -13241,5 +13241,5 @@ body.mode-telephone .bouton-enreg-annotation { flex-basis: 100px; font-size: 15p
 body.clavier-ouvert .bandeau-annotation { bottom: 8px; }
 .titre-liste-annotation { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
-/* 0.180.0 : points d'Annotation = un nuage (contour seulement), un peu plus épais pour qu'on le voie bien. */
-.plan .points .forme-nuage { stroke-width: 2.6; stroke-linejoin: round; }
+/* 0.180.0 : points d'Annotation = un rond tracé à la main (trait fin, 14 px). */
+.plan .points .forme-nuage { stroke-width: 1.2; stroke-linecap: round; }

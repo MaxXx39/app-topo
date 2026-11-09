@@ -41,11 +41,17 @@ export function cheminForme(forme, x, y, r) {
     case 'losange':
       return polygone([[x, y - r * 1.3], [x + r * 1.3, y], [x, y + r * 1.3], [x - r * 1.3, y]]);
     case 'nuage': {
-      // Nuage (0.180.0, points d'Annotation) : contour seulement, gros (au moins 10 px d'unité : ~ 24 px de large).
-      const u = Math.max(r * 2.8, 14);
-      const pt = (dx, dy) => `${f(x + dx * u)} ${f(y + dy * u)}`;
-      const arc = (rayon, dx, dy) => `A${f(rayon * u)} ${f(rayon * u)} 0 0 1 ${pt(dx, dy)}`;
-      return `M${pt(-0.8, 0.5)}${arc(0.42, -0.9, -0.15)}${arc(0.5, -0.4, -0.55)}${arc(0.55, 0.35, -0.5)}${arc(0.45, 0.9, 0.05)}${arc(0.42, 0.8, 0.5)}Z`;
+      // Rond tracé à la main (0.180.1, demande du 09.11) : une boucle en trait fin, un peu irrégulière, qui
+      // se croise à la fin. Taille fixe de 14 px de large, comme le triangle des points de contrôle.
+      const R = 7;
+      const sommets = [];
+      const pas = 28;
+      for (let i = 0; i <= pas; i++) {
+        const t = (i / pas) * (Math.PI * 2 + 0.5);
+        const rayon = R * (1 + 0.07 * Math.sin(3 * t + 1) + 0.04 * Math.cos(5 * t));
+        sommets.push([x + rayon * Math.cos(t - Math.PI / 2), y + rayon * 0.9 * Math.sin(t - Math.PI / 2)]);
+      }
+      return `M${sommets.map(([px, py]) => `${f(px)} ${f(py)}`).join('L')}`;
     }
     case 'croix':
       return `M${f(x - r * 1.3)} ${f(y)}L${f(x + r * 1.3)} ${f(y)}M${f(x)} ${f(y - r * 1.3)}L${f(x)} ${f(y + r * 1.3)}`;
