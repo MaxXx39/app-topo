@@ -12711,3 +12711,39 @@ body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise
 .bouton-nature small { font-size: 0.72rem; font-weight: 600; opacity: 0.85; }
 body.clavier-ouvert { --hauteur-plan-terrain: 0px !important; --hauteur-plan-guidage: 0px !important; }
 body.clavier-ouvert .panneau-plan { display: none !important; }
+
+/* 0.168.1 (choix du 09.11 : proposition C) : choix de la surface dans la bande : fond clair teinté de la couleur de
+   l'application (sarcelle pour Implanter, bleu pour Guidage), bord de cette couleur, texte sombre, grosse flèche ronde. */
+.bande-appli .levee-bande.surface-bande {
+  background: color-mix(in srgb, var(--couleur-appli, #0d9488) 10%, #ffffff);
+  border: 3px solid var(--couleur-appli, #0d9488);
+  padding-right: 62px;
+}
+.surface-bande .titre-levee-bande { color: color-mix(in srgb, var(--couleur-appli, #0d9488) 70%, #000000); opacity: 1; }
+.bande-appli .surface-bande .liste-bande { color: #12332f; font-size: 17px; padding-right: 0; }
+.surface-bande::after {
+  content: '▾';
+  right: 8px;
+  bottom: auto;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--couleur-appli, #0d9488);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 900;
+}
+body.mode-telephone .bande-appli .surface-bande .liste-bande { font-size: 14px; }
+
+/* 0.168.1 : fenêtre Delta sur une seule ligne (dès 520 px de large) : Δ Delta | G / D | dist. | Z ± | grande croix. */
+@media (min-width: 521px) {
+  .ligne-delta { display: flex; flex-wrap: nowrap; align-items: center; gap: 12px; }
+  .ligne-delta .rang-delta { display: contents; }
+  .ligne-delta .titre-delta { flex: none; }
+  .ligne-delta .bouton-fermer-delta { margin-left: auto; align-self: stretch; flex: none; }
+}
