@@ -475,6 +475,9 @@ const RELAIS_BANDE = {
   implanter: '#leve-direct [data-action="implanterChoix"].bouton-implanter, #leve-direct [data-action="implanterLigneChoisie"].bouton-implanter',
   enregistrer: '#leve-direct [data-action="enregistrerImplantation"]',
   dao: '#bouton-dao',
+  // 0.167.0 : Implanter › Altitude (bouton « Alti ici ») et Guidage (choix des lignes) sont dans la bande.
+  'altitude-ici': '#leve-direct [data-action="prendreAltitudeIci"]',
+  'lignes-guidage': '#leve-direct .bouton-lignes-guidage',
   'renommer-levee': '#leve-direct .levee-en-cours .bouton-crayon-levee',
   // 0.162.0 : photo, Changer et + du levé en cours sont dans la bande (la rangée de l'écran est cachée).
   'photo-levee': '#leve-direct .levee-en-cours input[data-champ="photo-levee-globale"]',
@@ -502,7 +505,30 @@ function infoAppli() {
   if (relais) document.body.dataset.relais = relais;
   else delete document.body.dataset.relais;
   document.body.classList.toggle('levee-en-bande', html.includes('levee-bande'));
+  // 0.167.0 : le choix de la surface est dans la bande : la liste de l'écran est cachée (elle sert de relais).
+  document.body.classList.toggle('surface-en-bande', html.includes('data-nav-champ="surface-'));
   return html;
+}
+
+/**
+ * 0.167.0 (demande du 09.11) : choix de la surface dans la bande, à la manière de « Levé en cours » : petit titre,
+ * puis le nom de la surface choisie en ambre (liste déroulante). Les options sont lues sur la vraie liste de l'écran
+ * (cachée) ; un choix la change (champDepuisBande).
+ */
+function selecteurSurfaceBande(champ, titre) {
+  const liste = document.querySelector(`#leve-direct select[data-champ="${champ}"]`);
+  if (!liste) return '';
+  const options = [...liste.options].map((o) => `<option value="${echapper(o.value)}" ${o.selected ? 'selected' : ''}>${echapper(o.textContent.trim())}</option>`).join('');
+  return `<div class="levee-bande surface-bande"><span class="titre-levee-bande">${titre}</span>
+    <select class="liste-bande" data-nav-champ="${champ}" aria-label="${titre}">${options}</select></div>`;
+}
+
+/** Un choix fait dans la bande : on le reporte sur le vrai champ de l'écran (mêmes contrôles). */
+function champDepuisBande(cle, valeur) {
+  const champ = document.querySelector(`#leve-direct [data-champ="${cle}"]`);
+  if (!champ) return;
+  champ.value = valeur;
+  champ.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function contenuBande() {
@@ -536,6 +562,19 @@ function contenuBande() {
       const altitude = document.querySelector('#leve-direct [data-champ="altitude-implantation"]')?.value.trim() ?? '';
       return boutonDeBande('implanter', 'Implanter', [nom, altitude ? `H ${altitude}` : ''].filter(Boolean).join(' · '));
     }
+    // 0.167.0 : Surface : la surface choisie ; Altitude : le champ « altitude voulue » et « Alti ici ».
+    if (terrain.implantation === 'surface') {
+      const surface = selecteurSurfaceBande('surface-controle', 'Surface');
+      return surface ? `<div class="zone-levee">${surface}</div>` : '';
+    }
+    if (terrain.implantation === 'altitude') {
+      const champ = document.querySelector('#leve-direct [data-champ="altitude-voulue"]');
+      const ici = trouver('altitude-ici');
+      if (!champ || !ici) return '';
+      return `<div class="zone-levee"><div class="levee-bande altitude-bande"><span class="titre-levee-bande">Altitude voulue</span>
+        <input type="text" inputmode="decimal" class="champ-bande" data-nav-champ="altitude-voulue" value="${echapper(champ.value)}" placeholder="ex. 412.350" aria-label="Altitude voulue" /></div>
+        <button type="button" class="bouton-enreg-bande relais-altitude-ici" data-nav="action" data-cle="altitude-ici" ${ici.disabled ? 'disabled' : ''}><span>📍 Alti ici</span></button></div>`;
+    }
     const enregistrer = trouver('enregistrer');
     if (enregistrer && terrain.implantation === 'point' && implanter.cible) {
       // 0.162.0 : nom du point, E / N en tout petit et Z s'il existe dans la bande ; petit bouton « Enr. »
@@ -546,6 +585,17 @@ function contenuBande() {
         ${aAcces('intermediaire') ? `<button type="button" class="bouton-enreg-bande petit relais-enregistrer" data-nav="action" data-cle="enregistrer" title="Enregistrer l'implantation" aria-label="Enregistrer l'implantation" ${enregistrer.disabled ? 'disabled' : ''}><span>Enr.</span></button>` : ''}</div>`;
     }
     return '';
+  }
+  if (cle === 'guidage') {
+    // 0.167.0 : la surface à suivre (plus « levé à suivre ») et le choix des lignes (Expert) dans la bande.
+    const surface = selecteurSurfaceBande('surface-lame', 'Surface à suivre');
+    if (!surface) return '';
+    const lignes = trouver('lignes-guidage');
+    const nombre = lignes?.textContent.match(/\((\d+)\)/)?.[1];
+    const boutonLignes = lignes
+      ? `<button type="button" class="bouton-enreg-bande petit relais-lignes-guidage ${lignes.classList.contains('actif') ? 'actif' : ''}" data-nav="action" data-cle="lignes-guidage" title="Choisir 1 ou 2 lignes à suivre"><span>Lignes${nombre ? ` (${nombre})` : ''}</span></button>`
+      : '';
+    return `<div class="zone-levee">${surface}${boutonLignes}</div>`;
   }
   if (cle === 'controle') {
     const enregistrer = trouver('enregistrer');
@@ -908,6 +958,7 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
   fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? () => fermerAppli() : null,
   importPermis: () => aAcces('expert'),
   agir: agirDepuisBande,
+  choisir: champDepuisBande,
   changerProjet: () => ouvrirPartieProjet('ouvrir'),
   get nouveauProjet() {
     return aAcces('intermediaire') ? () => creerNouveauProjet() : null;
@@ -1688,7 +1739,15 @@ function ajusterPlanAuContenu() {
   // Bande fixe « ID point / Enreg. Pts » de Lever : elle prend aussi de la place en bas.
   const bande = document.querySelector('.cadre-prise .ligne-id-prendre');
   const hauteurBande = bande && getComputedStyle(bande).position === 'fixed' ? bande.offsetHeight + 12 : 0;
-  const part = (disponible - colonne.getBoundingClientRect().height - hauteurBande - 24) / disponible;
+  // 0.167.0 : dans Lever (APK), le plan prend tout sauf l'essentiel du rôle choisi (Contour : « Contour en cours » ;
+  // Ligne : « Ligne en cours » avec ses boutons et libellés ; Point : les libellés) ; le reste (comptes, triangles)
+  // défile sous le bandeau. La ligne E / N posée au-dessus du bandeau est comptée pour ne rien cacher.
+  const bas = colonne.getBoundingClientRect();
+  const essentiel = [...document.querySelectorAll('#leve-direct .cadre-role .element-en-cours, #leve-direct .cadre-role .libelles-terrain')].find((e) => e.offsetParent !== null);
+  const enNord = document.querySelector('.ligne-position-delta');
+  const hauteurEnNord = bande && essentiel && enNord && getComputedStyle(enNord).position === 'fixed' ? enNord.offsetHeight + 4 : 0;
+  const utile = bande && essentiel && getComputedStyle(bande).position === 'fixed' ? essentiel.getBoundingClientRect().bottom - bas.top + 6 : bas.height;
+  const part = (disponible - utile - hauteurBande - hauteurEnNord - 24) / disponible;
   const auto = Math.min(PART_PLAN.max, Math.max(0, Math.round(part * 100) / 100));
   if (document.body.style.getPropertyValue('--part-plan-auto') !== String(auto)) document.body.style.setProperty('--part-plan-auto', String(auto));
 }
@@ -3779,7 +3838,7 @@ function calculerLame() {
   const lame = etatG?.position && etatD?.position ? { gauche: etatG.position, droite: etatD.position } : null;
   const surface = projet.surfaces.find((s) => s.id === terrain.lame.surfaceId);
   const triangles = surface ? trianglesDeSurface(surface.id) : [];
-  const raison = (!surface && 'Choisis le levé à suivre')
+  const raison = (!surface && 'Choisis la surface à suivre')
     || (triangles.length === 0 && 'Ce levé n\'a pas encore de triangles')
     || raisonRecepteurLame(etatG, nomG)
     || raisonRecepteurLame(etatD, nomD);
@@ -3803,7 +3862,7 @@ function calculerOutilUnGnss() {
   const surface = projet.surfaces.find((s) => s.id === terrain.lame.surfaceId);
   const triangles = surface ? trianglesDeSurface(surface.id) : [];
   const penche = (etat?.inclinaison ?? 0) > 0.2;
-  const raison = (!surface && 'Choisis le levé à suivre')
+  const raison = (!surface && 'Choisis la surface à suivre')
     || (triangles.length === 0 && 'Ce levé n\'a pas encore de triangles')
     || raisonRecepteurLame(etat, 'GNSS')
     || (!etat.inclinaisonPrete && 'GNSS : inclinaison pas prête (le cap et la pente de l\'outil en dépendent)')

@@ -6,13 +6,13 @@ import { htmlLame } from '../src/leve/lame-ecran.js';
 describe('liste des surfaces avec un choix oublié', () => {
   const donnees = (surfaceId) => ({ surfaces: [{ id: 'a', etiquette: 'LV-Terrain 1' }], surfaceId, tolerances: {}, machine: 'grader' });
 
-  it('propose « — levé à suivre — » quand la surface choisie n\'existe plus', () => {
+  it('propose « — surface à suivre — » quand la surface choisie n\'existe plus', () => {
     const html = htmlLame(donnees('supprimee'));
-    expect(html).toContain('— levé à suivre —');
+    expect(html).toContain('— surface à suivre —');
   });
 
   it('ne le propose plus quand la surface choisie existe', () => {
     const html = htmlLame(donnees('a'));
-    expect(html).not.toContain('— levé à suivre —');
+    expect(html).not.toContain('— surface à suivre —');
   });
 });

@@ -114,16 +114,14 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
       ${grosse('grader', 'Grader')}${grosse('bull', 'Bull')}${grosse('rateau', 'Râteau')}
     </div>`;
   }
-  const nomMachine = { grader: 'Grader', bull: 'Bull', rateau: 'Râteau' }[machine];
   return `<div data-machine="${machine}" class="ecran-lame ${indic === 'regle' ? 'essai-sur-regle' : 'essai-exterieur'} ${machine === 'rateau' ? '' : 'lame-un-point'}">
     <div class="ligne-lame">
-      <button type="button" class="bouton-retour-machine" data-action="retourChoixMachine" aria-label="Changer de machine" title="Changer de machine">← <strong>${nomMachine}</strong></button>
       ${surfaces.length > 0
-        ? `<select data-champ="surface-lame" aria-label="Levé à suivre">
-            ${surfaces.some((s) => s.id === surfaceId) ? '' : '<option value="" selected>— levé à suivre —</option>'}
+        ? `<select data-champ="surface-lame" aria-label="Surface à suivre">
+            ${surfaces.some((s) => s.id === surfaceId) ? '' : '<option value="" selected>— surface à suivre —</option>'}
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
-        : '<p class="vide">Aucun levé (Terrain › Lever).</p>'}
+        : '<p class="vide">Aucune surface.</p>'}
       <button type="button" class="bouton-bip ${bip ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${bip}" title="${bip ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${bip ? 'Couper le bip' : 'Remettre le bip'}">${bip ? '🔔' : '🔕'}</button>
       <button type="button" class="bouton-lignes-guidage seulement-expert ${donnees.choixLignes ? 'actif' : ''}" data-action="choisirLignesGuidage" title="Choisir 1 ou 2 lignes à suivre">Lignes${(donnees.lignes ?? []).length ? ` (${donnees.lignes.length})` : ''}</button>
       <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Réglages">⚙</button>

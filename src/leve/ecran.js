@@ -139,7 +139,9 @@ export function creerEcranLeve(conteneur, actions) {
   let reglagesGuidageOuverts = false; // roue ⚙ de l'écran de guidage
   let reglagesCoupesOuverts = false; // roue ⚙ des coupes d'Implanter › Surface (0.144.0)
   const elementsOuverts = new Set(); // lignes du levé dépliées en bas de Lever ('contour', 'ligne-2', 'isoles')
-  let accrochesOuvertes = false; // flèche de la barre d'accroche : les noms sous les dessins
+  let accrochesChoisies = false; // flèche de la barre d'accroche : les noms sous les dessins
+  // 0.167.0 : en Base les noms des accroches restent affichés, sans flèche pour les replier.
+  const accrochesOuvertes = () => estModeBase() || accrochesChoisies;
   let gestionControleOuverte = false; // mode Contrôler : roue ⚙ (après le code de sécurité)
   let erreurGestion = ''; // mode Contrôler : erreur de la gestion (tolérances, fichier, point tapé)
   let reglagesLameOuverts = false; // mode Lame : roue ⚙ (tolérances)
@@ -224,7 +226,7 @@ export function creerEcranLeve(conteneur, actions) {
       return;
     }
     if (action === 'basculerAccroches') {
-      accrochesOuvertes = !accrochesOuvertes;
+      accrochesChoisies = !accrochesChoisies;
       dessiner();
       return;
     }
@@ -667,7 +669,7 @@ export function creerEcranLeve(conteneur, actions) {
           </div>
         </div>`
       : '';
-    return `<div class="barre-accroche ${enLigne ? 'accroches-ligne' : ''} ${accrochesOuvertes ? 'ouverte' : ''}">
+    return `<div class="barre-accroche ${enLigne ? 'accroches-ligne' : ''} ${accrochesOuvertes() ? 'ouverte' : ''}">
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
         ${modes.map((mode) => {
           const [mot, nom, dessin] = ACCROCHES[mode];
@@ -675,8 +677,8 @@ export function creerEcranLeve(conteneur, actions) {
             <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span class="mot-accroche">${mot}</span></button>`;
         }).join('')}
         ${outilsPoint}
-        <button type="button" class="bouton-deplier-accroches" data-action="basculerAccroches" title="${accrochesOuvertes ? 'Cacher' : 'Voir'} les noms" aria-label="${accrochesOuvertes ? 'Cacher' : 'Voir'} les noms des accroches" aria-expanded="${accrochesOuvertes}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${accrochesOuvertes ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}" /></svg></button>
+        ${estModeBase() ? '' : `<button type="button" class="bouton-deplier-accroches" data-action="basculerAccroches" title="${accrochesOuvertes() ? 'Cacher' : 'Voir'} les noms" aria-label="${accrochesOuvertes() ? 'Cacher' : 'Voir'} les noms des accroches" aria-expanded="${accrochesOuvertes()}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${accrochesOuvertes() ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}" /></svg></button>`}
       </div>
       ${outilsManuel}
     </div>`;
@@ -1575,7 +1577,7 @@ export function creerEcranLeve(conteneur, actions) {
     // Barre d'accroche collée sous le plan (téléphone, voir style.css « avec-accroches »).
     const avecAccroches = donnees.mode === 'controler' && !enGuidage && ['point', 'ligne', 'talus'].includes(implantation);
     document.body.classList.toggle('avec-accroches', avecAccroches);
-    document.body.classList.toggle('accroches-ouvertes', avecAccroches && accrochesOuvertes);
+    document.body.classList.toggle('accroches-ouvertes', avecAccroches && accrochesOuvertes());
     if (!enGuidage || (!autocontrole && implantation !== 'point')) document.body.classList.remove('cible-en-haut');
     // Guidage (0.152.0) : vue « 2 coupes sans plan » : le plan est caché.
     document.body.classList.toggle('guidage-sans-plan', donnees.mode === 'lame' && donnees.lame?.vue === 'coupes');

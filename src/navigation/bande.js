@@ -35,6 +35,7 @@ const svg = (trace) => `<svg viewBox="0 0 24 24" aria-hidden="true">${trace}</sv
  * - reglages(), fermerAppli (ou null : pas de bouton) : pied de la page Applications ; avantPage() : juste
  *   avant d'ouvrir la page (fermer la page des réglages) ;
  * - partieProjet('import' | 'export' | 'contenu') : page Projet ouverte sur cette partie ; importPermis() ;
+ * - choisir(champ, valeur) : liste ou champ de la zone du milieu changé (data-nav-champ) ;
  * - agir(cle) : bouton de la zone du milieu touché (data-nav="action", ex. « prendre » = Enreg. Pts) ;
  * - message(texte) : message court à l'écran ; vibrer() (facultatif).
  * Renvoie { mettreAJour(), fermer(), ouvrirPage(), pageOuverte() }.
@@ -136,6 +137,12 @@ export function creerNavigation(nav, actions) {
     }
     if (quoi === 'action') actions.agir?.(bouton.dataset.cle);
   }
+
+  // 0.167.0 : liste ou champ de la zone du milieu (surface à suivre, altitude voulue) : le choix est transmis.
+  nav.addEventListener('change', (evenement) => {
+    const champ = evenement.target.closest?.('[data-nav-champ]');
+    if (champ) actions.choisir?.(champ.dataset.navChamp, champ.value);
+  });
 
   /** Enlève une sélection de texte faite par l'appui long. */
   function sansSelection() {

@@ -12389,7 +12389,7 @@ body:not(.theme-soleil) .plan-boutons button:not(.actif) {
 
 /* 0.166.0 : le plan ne descend jamais sous 40 % de la zone de travail (50 % dans la Mesure rapide). */
 body { --part-plan-min: 0.4; }
-body[data-onglet='mesure-rapide'] { --part-plan-min: 0.5; }
+body[data-onglet='mesure-rapide'] { --part-plan-min: 0.55; }
 
 /* ==========================================================================
    0.166.0 (maquette B choisie le 09.11, tous les modes) : Lever (APK) : un seul bandeau collé au-dessus de la
@@ -12584,3 +12584,67 @@ body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever
 body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > :is([data-action="annulerDernierPoint"], .ligne-delta, .raison-leve),
 body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta,
 body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .bouton-ouvrir-delta { position: static; }
+
+/* ==========================================================================
+   0.167.0 (demandes du 09.11) : Lever : texte « Levé en cours » réduit, moins d'espace entre le plan et
+   Contour / Ligne / Point, boutons « + Nouvelle ligne » et « Fermer ligne » plus grands (la hauteur du plan se règle
+   dans ajusterPlanAuContenu : elle laisse voir l'essentiel du rôle choisi).
+   ========================================================================== */
+.titre-levee-bande { font-size: 10px; }
+.bande-appli .nom-levee-bande { font-size: 15px; }
+body.mode-telephone .nom-levee-bande { font-size: 12.5px; }
+@media (max-width: 520px) {
+  .zone-levee .nom-levee-bande { font-size: 13.5px; }
+}
+body[data-onglet='terrain'][data-mode-terrain='lever'] section.panneau.actif { padding-top: 2px; }
+body[data-onglet='terrain'][data-mode-terrain='lever'] .roles-leve { margin-top: 0; }
+body:not(.mode-telephone)[data-mode-terrain='lever'] .element-en-cours .corps-element .bouton-secondaire { min-height: 40px; padding: 4px 14px; font-size: 0.95rem; }
+body.mode-telephone[data-mode-terrain='lever'] .element-en-cours .corps-element .bouton-secondaire { min-height: 36px; padding: 3px 10px; font-size: 0.88rem; }
+
+/* 0.167.0 (demande du 09.11) : Mesure rapide : le plan est fixe à 55 % de la zone de travail (plus de ▲ / ▼). */
+@media (max-width: 899px) {
+  body[data-onglet='mesure-rapide'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * 0.55);
+  }
+  body[data-onglet='mesure-rapide'] .boutons-taille-plan { display: none; }
+}
+
+/* ==========================================================================
+   0.167.0 (demandes du 09.11) : Implanter › Surface et Altitude, Guidage : le choix de la surface (ou « Altitude
+   voulue » + « Alti ici », ou « Surface à suivre » + « Lignes ») est dans la bande, à droite du bouton de
+   l'application, comme « Levé en cours ». Les vrais champs de l'écran restent cachés (ils servent de relais).
+   ========================================================================== */
+body.surface-en-bande #leve-direct :is(select[data-champ='surface-controle'], select[data-champ='surface-lame']) { display: none; }
+body[data-relais='altitude-ici'] #leve-direct .ligne-altitude-voulue { display: none; }
+body[data-relais='lignes-guidage'] #leve-direct .bouton-lignes-guidage { display: none; }
+.surface-bande, .altitude-bande { position: relative; }
+.bande-appli .liste-bande,
+.bande-appli .champ-bande {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #fbbf24;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.bande-appli .liste-bande option { color: #1b2b36; background: #ffffff; }
+.bande-appli .champ-bande::placeholder { color: rgba(251, 191, 36, 0.45); font-weight: 700; }
+.bande-appli .liste-bande { cursor: pointer; padding-right: 16px; background: none; }
+.surface-bande::after { content: '▾'; position: absolute; right: 10px; bottom: 10px; color: #fbbf24; pointer-events: none; font-size: 13px; }
+body.mode-telephone .bande-appli :is(.liste-bande, .champ-bande) { font-size: 13px; }
+.zone-levee .bouton-enreg-bande:is(.relais-altitude-ici, .relais-lignes-guidage) { flex: 0 0 34%; }
+.zone-levee .bouton-enreg-bande.relais-lignes-guidage { flex-basis: 30%; }
+.bande-appli .bouton-enreg-bande.relais-lignes-guidage.actif { background: #7c3aed; color: #ffffff; }
+.bande-appli .bouton-enreg-bande:is(.relais-altitude-ici, .relais-lignes-guidage) span { font-size: 16px; white-space: nowrap; }
+body.mode-telephone .bande-appli .bouton-enreg-bande:is(.relais-altitude-ici, .relais-lignes-guidage) span { font-size: 13px; }
