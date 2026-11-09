@@ -2616,7 +2616,7 @@ body.avec-recepteur .bandeaux-recepteur {
    une part de l'écran (--part-plan-terrain, réglée par les flèches ▲ / ▼ sous le plan, 0.71.0). */
 @media (max-width: 899px) {
   body.mode-leve[data-onglet='terrain'] {
-    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(var(--part-plan-terrain, 0.35), var(--part-plan-auto, 0)));
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(max(var(--part-plan-terrain, 0.35), var(--part-plan-min, 0.4)), var(--part-plan-auto, 0)));
   }
 
   body.mode-leve[data-onglet='terrain'] .panneau-plan {
@@ -4311,7 +4311,7 @@ body.mode-telephone .onglets button svg {
 
   /* Écran de guidage : le plan prend la moitié de la place, la vue rapprochée l'autre moitié. */
   body.mode-leve.vue-implantation[data-onglet='terrain'] {
-    --hauteur-plan-guidage: calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * var(--part-plan-guidage, 0.5));
+    --hauteur-plan-guidage: calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * max(var(--part-plan-guidage, 0.5), var(--part-plan-min, 0.4)));
     --hauteur-plan-terrain: var(--hauteur-plan-guidage);
   }
 
@@ -5277,7 +5277,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   /* Cible affichée : elle prend la place laissée par les textes (plus de la moitié de l'écran). */
   body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] {
     --hauteur-plan-guidage: max(
-      calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * var(--part-plan-guidage, 0.5)),
+      calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * max(var(--part-plan-guidage, 0.5), var(--part-plan-min, 0.4))),
       calc(100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets) - 290px)
     );
   }
@@ -9545,7 +9545,7 @@ body.mode-base .actions-projets {
   /* Près du point, la cible prend le haut : le guidage (plus grand depuis 0.114.0) garde 400 px. */
   body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] {
     --hauteur-plan-guidage: max(
-      calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * var(--part-plan-guidage, 0.5)),
+      calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * max(var(--part-plan-guidage, 0.5), var(--part-plan-min, 0.4))),
       calc(100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets) - 400px)
     );
   }
@@ -9580,7 +9580,7 @@ body.mode-base .actions-projets {
    (même hauteur, réglée par les flèches ▲ / ▼), pour voir le levé du volume et ses couleurs. --- */
 @media (max-width: 899px) {
   body:is([data-onglet='volumes'], [data-onglet='mesures']):not(.mode-dessin) {
-    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(var(--part-plan-terrain, 0.35), var(--part-plan-auto, 0)));
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(max(var(--part-plan-terrain, 0.35), var(--part-plan-min, 0.4)), var(--part-plan-auto, 0)));
   }
   body:is([data-onglet='volumes'], [data-onglet='mesures']):not(.mode-dessin) .panneau-plan {
     display: block;
@@ -10772,7 +10772,7 @@ body.mode-telephone .ecart-et-regle > .bouton-bip { min-width: 40px; min-height:
 /* Choix des côtés d'un talus sur tablette / téléphone : le plan en haut de Dessin, comme Volumes (0.114.0). */
 @media (max-width: 899px) {
   body.en-choix-cotes-talus[data-onglet='dessin'] {
-    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(var(--part-plan-terrain, 0.35), var(--part-plan-auto, 0)));
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(max(var(--part-plan-terrain, 0.35), var(--part-plan-min, 0.4)), var(--part-plan-auto, 0)));
   }
   body.en-choix-cotes-talus[data-onglet='dessin'] .panneau-plan {
     display: block;
@@ -11964,7 +11964,7 @@ body.mode-telephone .bande-appli .bouton-enreg-bande.relais-enregistrer span { f
 /* Mesure rapide : le plan en haut sur tablette / téléphone, comme Calculs › Volumes. */
 @media (max-width: 899px) {
   body[data-onglet='mesure-rapide'] {
-    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(var(--part-plan-terrain, 0.45), var(--part-plan-auto, 0)));
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(max(var(--part-plan-terrain, 0.45), var(--part-plan-min, 0.4)), var(--part-plan-auto, 0)));
   }
   body[data-onglet='mesure-rapide'] .panneau-plan {
     display: block;
@@ -12386,3 +12386,7 @@ body:not(.theme-soleil) .plan-boutons {
 body:not(.theme-soleil) .plan-boutons button:not(.actif) {
   background: transparent;
 }
+
+/* 0.166.0 : le plan ne descend jamais sous 40 % de la zone de travail (50 % dans la Mesure rapide). */
+body { --part-plan-min: 0.4; }
+body[data-onglet='mesure-rapide'] { --part-plan-min: 0.5; }

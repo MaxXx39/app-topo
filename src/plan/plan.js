@@ -2306,7 +2306,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       toutVoir();
       return;
     }
-    vue = { ...vue, ...nouvelleTaille };
+    // 0.166.0 : le dessin reste accroché en haut à gauche (le haut du plan ne bouge pas quand on
+    // change la hauteur avec ▲ / ▼) : le nouveau centre est le point du terrain qui se trouvait
+    // à cet endroit de l'écran avant le changement.
+    const nouveauCentre = versTerrain(nouvelleTaille.largeur / 2, nouvelleTaille.hauteur / 2, vue);
+    vue = { ...vue, ...nouvelleTaille, estCentre: nouveauCentre.est, nordCentre: nouveauCentre.nord };
     if (ligneVue) cadrerSurLigne();
     else dessiner();
   }).observe(svg);
@@ -2314,6 +2318,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   return {
     /** Loupe de l'accroche « Manuel » (0.130.0) : voir loupe.js (montrer, cacher, deplacerDe, changerZoom, placerSur). */
     loupe,
+    /** Opacité de la photo aérienne du plan (0 à 1), ou null si elle n'est pas affichée (0.166.0 : PDF de la Mesure rapide). */
+    opacitePhoto: () => (calques.fondSatellite ? 1 - (calquesChoisis.transparencePhoto ?? 0) / 100 : null),
     /** Affiche une nouvelle liste de points et cadre le plan dessus. */
     afficherPoints(nouveauxPoints) {
       points = nouveauxPoints;
