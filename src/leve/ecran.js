@@ -68,6 +68,7 @@ const NATURES_TERRAIN = [
   // Ancien recollement (comme Terrain) : plus proposé, les levés déjà faits restent.
   ['recollement', 'Recollement (ancien)'],
   ['metre', 'Métré'],
+  ['chantier', 'Levé chantier'], // 0.175.0 : éléments en cours de chantier (Intermédiaire)
   ['autres', 'Levé libre'],
   // Surface d'un dessin (Calculs › Dessin) : pas créée ici, mais on la complète au RX2.
   ['surface', 'Surface'],
@@ -77,6 +78,7 @@ const DETAIL_NATURE = {
   stock: 'Lever de stock',
   terrain: 'Lever de terrain naturel',
   terrassement: 'Lever terrassement en cours / fini',
+  chantier: 'Éléments en cours de chantier',
   autres: 'Autres',
 };
 // Accroches : un dessin (en gris ce qu'on touche, en ambre l'endroit accroché) et un mot dessous.
@@ -309,6 +311,10 @@ export function creerEcranLeve(conteneur, actions) {
       actions.reglerTalus(bouton.dataset.champTalus, bouton.dataset.valeur);
       return;
     }
+    if (action === 'reglerChantier') {
+      actions.reglerChantier(bouton.dataset.champChantier, bouton.dataset.valeur);
+      return;
+    }
     if (action === 'reglerDelta') {
       actions.reglerDelta(bouton.dataset.champDelta, bouton.dataset.valeur);
       return;
@@ -323,6 +329,8 @@ export function creerEcranLeve(conteneur, actions) {
     const champ = evenement.target.dataset?.attributReseau;
     if (champ) saisieReseau[champ] = evenement.target.value;
     // Delta (0.139.0) : gardé à chaque frappe, sans redessiner (Enreg. Pts reste touchable tout de suite).
+    const champChantier = evenement.target.dataset?.chantier;
+    if (champChantier) actions.reglerChantier(champChantier, evenement.target.value, false);
     const delta = evenement.target.dataset?.delta;
     if (delta) {
       actions.reglerDelta(delta, evenement.target.value, false);
@@ -1086,7 +1094,7 @@ export function creerEcranLeve(conteneur, actions) {
   function choixNature() {
     // 0.161.0 : Lever = Stock / Terrain / Libre ; Recollement et Métré sont des applications à part.
     if (choixReseauOuvert || donnees.famille === 'reseau') return choixReseau();
-    const permises = donnees.famille === 'metre' ? ['metre'] : ['stock', 'terrain', 'terrassement', 'autres'];
+    const permises = donnees.famille === 'metre' ? ['metre'] : ['stock', 'terrain', 'terrassement', 'chantier', 'autres'];
     return `<div class="choix-nature">
       <p class="titre-choix">${donnees.famille === 'metre' ? 'Nouveau métré' : 'Que lèves-tu ?'}</p>
       <div class="natures-terrain">
@@ -1373,6 +1381,7 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function choixLibelle() {
     if (donnees.role === 'contour') return '';
+    if (donnees.chantier) return cadreChantier();
     // Liste de libellés selon le rôle : aires (métré), lignes (lignes de rupture, longueurs), points.
     const sorte = sorteDuRole();
     const liste = donnees.libelles[sorte];
@@ -1384,6 +1393,50 @@ export function creerEcranLeve(conteneur, actions) {
       <button type="button" class="bouton-crayon-libelles" data-action="modifierLibelles" data-valeur="${sorte}" title="Ajouter ou modifier des libellés" aria-label="Ajouter ou modifier des libellés">⚙</button>
     </div>
 `;
+  }
+
+  /**
+   * Levé chantier (0.175.0) : libellé (Chambre, Tuyau…), nature (EU, EC…), puis le cadre du libellé : ce que touche le GNSS
+   * (Dessus / Tampon / Fil d'eau), forme d'un ouvrage (ronde 1 point, rectangulaire 3 coins), Ø, profondeur, matériau, remarque.
+   */
+  function cadreChantier() {
+    const c = donnees.chantier;
+    const l = c.libelle;
+    const symbole = (lib) => `<i class="symbole-libelle" style="color: ${lib.couleur}">${symboleDeForme(lib.forme)}</i>`;
+    const bouton = (champ, valeur, texte, actif) => `<button type="button" class="${actif ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="${champ}" data-valeur="${echapper(valeur)}" aria-pressed="${actif}">${texte}</button>`;
+    const nomsMode = { dessus: 'Dessus', tampon: 'Tampon', fe: 'Fil d\'eau' };
+    const champ = (nom, titre, valeur, { mode = 'decimal', facultatif = false, large = false } = {}) => `<label class="champ-chantier ${large ? 'large' : ''}"><span>${titre}${facultatif ? '' : ''}</span>
+        <input type="text" inputmode="${mode}" data-chantier="${nom}" value="${echapper(valeur)}" autocomplete="off" /></label>`;
+    const diametre = l.ouvrage ? 'Ø tuyau arrivant (mm), facultatif' : l.modes[0] === 'dessus' ? `Ø ext. (mm)${c.mode === 'dessus' ? ' *' : ''}` : 'Ø (mm)';
+    const calcule = l.modes[0] === 'dessus' && c.mode === 'dessus' && Number(String(c.diametre).replace(',', '.')) > 0
+      ? '<p class="calcul-chantier">Fil d\'eau = dessus − Ø extérieur</p>'
+      : l.ouvrage && c.mode === 'tampon' ? '<p class="calcul-chantier">Radier = tampon − profondeur</p>' : '';
+    const coins = l.ouvrage && c.forme === 'rect'
+      ? `<p class="suivi-cadre">${[1, 2, 3].map((i) => `<span class="coin ${c.coinsFaits >= i ? 'fait' : c.coinsFaits + 1 === i ? 'en-cours' : ''}">${i}</span>`).join('')} Coin ${Math.min(c.coinsFaits + 1, 3)} sur 3, dans n'importe quel ordre</p>`
+      : '';
+    const dernier = c.dernierCadre && l.ouvrage
+      ? `<p class="dernier-cadre">Dernier cadre ${echapper(c.dernierCadre.nom)} : ${c.dernierCadre.longueur.toFixed(2)} × ${c.dernierCadre.largeur.toFixed(2)} m · direction ${c.dernierCadre.direction.toFixed(1)}° · angle droit à ${c.dernierCadre.ecart.toFixed(1)}°</p>`
+      : '';
+    return `<div class="chantier-leve" role="group" aria-label="Ce que l'on lève sur le chantier">
+      <div class="libelles-terrain pour-chantier">
+        ${c.libelles.map((lib) => `<button type="button" class="puce-libelle ${lib.abreviation === l.abreviation ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="libelle" data-valeur="${echapper(lib.abreviation)}"><strong>${symbole(lib)}${echapper(lib.nom)}</strong></button>`).join('')}
+      </div>
+      <p class="titre-choix">Nature</p>
+      <div class="natures-chantier">${c.natures.map((n) => bouton('nature', n, echapper(n), n === c.nature)).join('')}</div>
+      <div class="cadre-attributs-chantier" style="--couleur-libelle: ${l.couleur}">
+        <strong class="titre-attributs">${echapper(l.nom)} · ${echapper(c.nature)}</strong>
+        ${l.ouvrage ? `<div class="bascule-chantier">${bouton('forme', 'ronde', '● Ronde · 1 point', c.forme === 'ronde')}${bouton('forme', 'rect', '▭ Carrée / rect. · 3 coins', c.forme === 'rect')}</div>` : ''}
+        ${l.modes.length > 1 ? `<div class="bascule-chantier">${l.modes.map((m) => bouton('mode', m, `${m === l.modes[0] ? 'Je lève : ' : ''}${nomsMode[m]}`, m === c.mode)).join('')}</div>` : ''}
+        <div class="champs-chantier">
+          ${l.champs.includes('diametre') ? champ('diametre', diametre, c.diametre, { mode: 'numeric' }) : ''}
+          ${l.champs.includes('profondeur') && c.mode === 'tampon' ? champ('profondeur', 'Profondeur (m)', c.profondeur) : ''}
+          ${l.champs.includes('materiau') ? champ('materiau', 'Matériau', c.materiau, { mode: 'text' }) : ''}
+          ${l.champs.includes('remarque') ? champ('remarque', 'Remarque', c.remarque, { mode: 'text', large: true }) : ''}
+        </div>
+        ${calcule}${coins}
+      </div>
+      ${dernier}
+    </div>`;
   }
 
   /** Liste de libellés du rôle choisi : 'aires' (métré), 'lignes' (lignes, longueurs) ou 'points'. */

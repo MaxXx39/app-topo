@@ -12980,3 +12980,36 @@ body.mode-telephone .entete-pastilles .pastille-entete { min-height: 24px; }
 .etat-drive.etat-drive-alerte { background: #dc2626; color: #ffffff; }
 body.mode-telephone .etat-drive { padding: 2px 5px; min-height: 24px; }
 body.mode-telephone .etat-drive svg { width: 20px; height: 20px; }
+
+/* ===== 0.175.0 : Levé chantier (libellé, nature, attributs) ===== */
+.chantier-leve { display: flex; flex-direction: column; gap: 8px; }
+.chantier-leve .titre-choix { margin: 0; }
+.natures-chantier { display: flex; flex-wrap: wrap; gap: 6px; }
+.natures-chantier button {
+  min-height: 36px; padding: 4px 12px; border-radius: 999px; border: 1.5px solid var(--bordure);
+  background: var(--surface); color: var(--encre, var(--texte)); font-weight: 600; font-size: 0.85rem;
+}
+.natures-chantier button.actif { background: var(--sombre); color: #ffffff; border-color: var(--sombre); }
+.cadre-attributs-chantier {
+  background: var(--surface); border-radius: var(--rayon); padding: 10px;
+  border-top: 4px solid var(--couleur-libelle, var(--orange)); box-shadow: var(--ombre);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.cadre-attributs-chantier .titre-attributs { font-size: 0.95rem; color: var(--encre, var(--texte)); }
+.bascule-chantier { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 10px; background: rgba(95, 109, 119, 0.18); }
+.bascule-chantier button { min-height: 40px; border: 0; border-radius: 8px; background: transparent; font-weight: 700; color: var(--gris); }
+.bascule-chantier button.actif { background: var(--sombre); color: var(--ambre); }
+.champs-chantier { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.champ-chantier { display: flex; flex-direction: column; gap: 2px; font-size: 0.7rem; font-weight: 700; color: var(--gris); }
+.champ-chantier.large { grid-column: 1 / -1; }
+.champ-chantier input { min-height: 40px; font-size: 1rem; font-weight: 700; border: 1.5px solid var(--bordure); border-radius: 9px; padding: 4px 8px; color: var(--encre, var(--texte)); background: var(--surface); }
+.calcul-chantier { margin: 0; padding: 6px 8px; border-radius: 8px; background: var(--ambre-clair); color: #7a5a00; font-weight: 600; font-size: 0.8rem; }
+.suivi-cadre { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; }
+.suivi-cadre .coin { width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; color: #ffffff; background: #c3ccd2; font-weight: 800; }
+.suivi-cadre .coin.fait { background: var(--succes); }
+.suivi-cadre .coin.en-cours { background: var(--orange); }
+.dernier-cadre { margin: 0; font-size: 0.78rem; color: var(--gris); }
+/* Levé chantier : orange (couleur du libellé Tuyau, proche du rôle Ligne). */
+.entete-levee.nature-chantier,
+.bouton-nature.nature-chantier { --couleur-nature: #ea580c; }
+.ligne-levee.nature-chantier { --couleur-nature: #ea580c; }

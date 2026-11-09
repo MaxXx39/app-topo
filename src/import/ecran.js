@@ -248,6 +248,7 @@ const NATURES_LEVEES = {
   terrassement: ['Terrassement', '#2563eb'],
   recollement: ['Recollement (ancien)', '#db2777'],
   metre: ['Métré', '#0891b2'],
+  chantier: ['Levé chantier', '#ea580c'],
   autres: ['Levé libre', '#475569'],
   surface: ['Surface', '#7c3aed'],
 };

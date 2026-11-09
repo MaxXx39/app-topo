@@ -76,6 +76,8 @@ import { lireDossiers, ecrireDossiers, dossiersTries, dossierDuProjet, ajouterDo
 import { imageAvecDessins, ouvrirEditeurDessin, photosAvecDessins } from './photos/annotation.js';
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
+import { lireLibellesChantier, lireNaturesChantier, libelleChantier } from './leve/libelles-chantier.js';
+import { lireAttributsChantier, altitudesDuPoint, cadreDeTroisCoins } from './topo/chantier.js';
 import { lireLibelles, recreerLibellesManquants, definirLibellesProjet, surLibellesProjet } from './leve/libelles.js';
 import { modifierLibellesDeSorte, modifierReseaux } from './leve/fenetre-libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
@@ -91,6 +93,7 @@ import {
   synchroniserLeveeDuDessin,
   creerSurfaceDirecte,
   creerAutres,
+  creerChantier,
   prochainNom,
   nomsDuProjet,
   rolesPermis,
@@ -169,7 +172,7 @@ let familleLeve = 'leve';
 /** Famille d'un levé d'après sa nature. */
 const familleDeNature = (nature) => (nature === 'reseau' ? 'reseau' : nature === 'metre' ? 'metre' : 'leve');
 /** Sous-application de Lever (Stock / Terrain / Terrass. / Libre) d'après la nature d'un levé. */
-const sousAppliDeNature = (nature) => (nature === 'stock' ? 'stock' : nature === 'autres' ? 'autres' : nature === 'terrassement' ? 'terrassement' : 'terrain');
+const sousAppliDeNature = (nature) => (nature === 'stock' ? 'stock' : nature === 'autres' ? 'autres' : nature === 'chantier' ? 'chantier' : nature === 'terrassement' ? 'terrassement' : 'terrain');
 // Delta du prochain point levé (0.139.0, Intermédiaire) : sens 'gauche' / 'droite' (selon le cap du GNSS),
 // distance et Z tapés (texte) ; remis à zéro après chaque point enregistré (un seul point à la fois).
 const deltaLeve = { sens: 'droite', distance: '', z: '', ouvert: false }; // ouvert : ligne de réglage montrée (bouton « Δ Delta »)
@@ -220,6 +223,8 @@ const terrain = {
   reseau: { diametre: null, materiau: 'PVC', diametreOuvrage: null, materiauOuvrage: 'Béton', forme: 'ronde' },
   ...lireReglagesTerrain(),
 };
+// Levé chantier (0.175.0) : derniers choix (libellé, nature, mode d'altitude, forme, Ø, matériau…) gardés d'un point à l'autre.
+terrain.chantier = { libelle: 'T', nature: 'EU', mode: '', forme: 'ronde', diametre: '', profondeur: '', materiau: 'PVC', remarque: '', ...terrain.chantier };
 // Orientation (0.90.1) : toujours le cap du GNSS (la direction de marche sert en secours, sans le dire).
 terrain.sourceOrientation = 'rx2';
 // Site sans récepteur : seulement le mode Lever (et Contrôle en consultation).
@@ -422,7 +427,7 @@ function sousApplis() {
 
 /** Sous-applications de Lever (0.161.0) : natures permises par le mode. */
 function sousApplisDeLever() {
-  return [['stock', 'Stock'], ['terrain', 'Terrain'], ['terrassement', 'Terrass.'], ['autres', 'Libre']].filter(([c]) => aAcces('intermediaire') || c === 'autres');
+  return [['stock', 'Stock'], ['terrain', 'Terrain'], ['terrassement', 'Terrass.'], ['chantier', 'Chantier'], ['autres', 'Libre']].filter(([c]) => aAcces('intermediaire') || c === 'autres');
 }
 
 /**
@@ -1616,6 +1621,15 @@ function reprendreLeveDirect() {
 function ajouterSurfaceLevee(nature) {
   // Chaque levé a sa propre liste de points, à son nom (0.77.0).
   const leve = creerListeDeLevee(projet);
+  if (nature === 'chantier') {
+    const chantier = creerChantier(projet, leve);
+    nommerListeDeLevee(projet, chantier);
+    projet.leveActifId = leve.id;
+    leveDirect.stockId = chantier.id;
+    leveDirect.role = 'isole';
+    modifie({ recadrer: true });
+    return;
+  }
   if (nature === 'autres') {
     const autres = creerAutres(projet, leve);
     nommerListeDeLevee(projet, autres);
@@ -1925,6 +1939,12 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           refuser(`Point refusé : ${reseau.erreur}`);
           return;
         }
+        // Levé chantier (0.175.0) : nature, Ø obligatoire en « Dessus »… vérifiés avant de lire le GNSS.
+        const chantier = stock?.nature === 'chantier' ? lireAttributsChantier(libelleChantier(terrain.chantier.libelle), terrain.chantier) : null;
+        if (chantier?.erreur) {
+          refuser(`Point refusé : ${chantier.erreur}`);
+          return;
+        }
         // Position vérifiée par l'appli Android au moment du toucher : RTK fixe et inclinaison prête.
         const reponse = prendrePointRecepteur();
         if (!reponse.ok) {
@@ -1962,6 +1982,11 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           rangerPointPris(ajouterPointMetre(projet, leve, metre, leveDirect.role, libelleDuRole(), { ...point, nom: nom.trim() || prochainNomMetre(projet, metre, leveDirect.role, libelleDuRole()) }));
           return;
         }
+        // Levé chantier : attributs, altitude gardée (fil d'eau, radier) et cadre d'un ouvrage à 3 coins.
+        if (chantier) {
+          prendrePointChantier(leve, stock, nom, point, chantier.attributs);
+          return;
+        }
         // Contour du stock et croisements (0.78.0) : le point peut finir en point isolé, ou être refusé.
         controlerPlacePoint(stock, leveDirect.role, point).then((role) => {
           if (!role) return;
@@ -1996,6 +2021,21 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         const nombre = creerLignesDepuisSuites(stock, suites, role);
         afficherMessage(role === 'contour' ? 'Contour créé' : `${nombre} ligne(s) créée(s)`, 3000);
         modifie();
+      },
+      // Levé chantier : un champ du cadre de saisie (libellé, nature, mode, forme, Ø, profondeur, matériau, remarque).
+      reglerChantier: (champ, valeur, redessiner = true) => {
+        if (!(champ in terrain.chantier)) return;
+        terrain.chantier[champ] = String(valeur ?? '');
+        // Changer de libellé : les natures et les champs changent, on repart avec la forme ronde.
+        if (champ === 'libelle') {
+          terrain.chantier.forme = 'ronde';
+          terrain.chantier.mode = '';
+          const libelle = libelleChantier(valeur);
+          const natures = lireNaturesChantier()[libelle.reseau ? 'reseau' : 'bordure'];
+          if (!natures.includes(terrain.chantier.nature)) terrain.chantier.nature = natures[0];
+        }
+        retenirReglagesTerrain();
+        if (redessiner) recalculer();
       },
       choisirLibelle: (abreviation) => {
         if (leveDirect.role === 'aire') terrain.libelleAire = abreviation;
@@ -2591,6 +2631,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           modifie();
           return;
         }
+        for (const c of projet.autres) if (c.cadres) c.cadres = c.cadres.map((cadre) => ({ ...cadre, noms: cadre.noms.filter((n) => n !== dernier.nom) })).filter((cadre) => cadre.noms.length > 0);
         annulerDernierPoint(leve, [...projet.surfaces, ...projet.autres]);
         retirerPointDesMesures(projet, dernier.nom); // aire, longueur ou point compté d'un métré
         afficherMessage(`Point ${dernier.nom} effacé`);
@@ -5558,6 +5599,44 @@ function refuser(texte) {
 }
 
 /** Point rangé dans le levé (ou refusé) : vibration, son et message, puis enregistrement. */
+/**
+ * Point du Levé chantier (0.175.0) : le libellé (abréviation) donne le nom (P-CH-1, L-T-1-3), l'altitude gardée est
+ * le fil d'eau ou le radier quand on le connaît (l'altitude levée reste dans point.chantier.altitudeLevee).
+ * Ouvrage en 3 coins : les 3 points sont des points isolés ; au 3e, le cadre (taille, direction) est calculé et gardé.
+ */
+function prendrePointChantier(leve, stock, nomVoulu, point, attributs) {
+  const alt = altitudesDuPoint(point.altitude, attributs);
+  const rect = attributs.forme === 'rect';
+  const role = rect ? 'isole' : leveDirect.role;
+  const finir = (roleFinal) => {
+    const nom = (roleFinal === role && nomVoulu.trim()) || prochainNom(projet, stock, roleFinal, attributs.libelle);
+    const resultat = ajouterPointDirect(leve, stock, roleFinal, {
+      ...point, nom, altitude: alt.altitude, chantier: { ...attributs, altitudeLevee: alt.altitudeLevee, filEau: alt.filEau, radier: alt.radier },
+    }, nomsDuProjet(projet));
+    if (resultat.erreur) return rangerPointPris(resultat);
+    if (rect) {
+      stock.cadres ??= [];
+      let cadre = stock.cadres.find((c) => c.noms.length < 3 && c.libelle === attributs.libelle);
+      if (!cadre) stock.cadres.push((cadre = { id: nouvelIdentifiant(), libelle: attributs.libelle, nature: attributs.nature, noms: [] }));
+      cadre.noms.push(nom);
+      resultat.point.chantier.cadre = cadre.id;
+      if (cadre.noms.length === 3) {
+        try {
+          const c = cadreDeTroisCoins(cadre.noms.map((n) => leve.points.find((p) => p.nom === n)));
+          Object.assign(cadre, { coins: c.coins, centre: c.centre, longueur: c.longueur, largeur: c.largeur, direction: c.direction, tampon: c.tampon, ecartAngleDroit: c.ecartAngleDroit });
+          if (c.ecartAngleDroit > 3) afficherMessage(`Cadre fini, mais l'angle droit s'écarte de ${c.ecartAngleDroit.toFixed(1)}° : vérifie les coins`, 5000);
+        } catch (erreur) {
+          afficherMessage(`Cadre impossible : ${erreur.message}`, 5000);
+        }
+      }
+    }
+    rangerPointPris(resultat);
+  };
+  controlerPlacePoint(stock, role, point).then((roleFinal) => {
+    if (roleFinal) finir(roleFinal);
+  });
+}
+
 function rangerPointPris(resultat) {
   if (resultat.erreur) {
     refuser(`Point refusé : ${resultat.erreur}`);
@@ -5744,6 +5823,7 @@ async function ajouterPointTouche(nom) {
 /** Libellé utilisé pour le rôle en cours (dans la liste ; sinon le premier de la liste). */
 function libelleDuRole() {
   if (leveDirect.role === 'contour') return null;
+  if (stockEnCours()?.nature === 'chantier') return libelleChantier(terrain.chantier.libelle).abreviation;
   const sorte = leveDirect.role === 'aire' ? 'aires' : ['ligne', 'longueur'].includes(leveDirect.role) ? 'lignes' : 'points';
   const liste = lireLibelles()[sorte];
   const voulu = { aires: terrain.libelleAire, lignes: terrain.libelleLigne, points: terrain.libellePoint }[sorte];
@@ -5752,6 +5832,23 @@ function libelleDuRole() {
 
 /** Rôles d'un point levé dans un métré. */
 const ROLES_DU_METRE = ['aire', 'longueur', 'compte'];
+
+/** Données du cadre « Chantier » de Lever (voir leve/ecran.js) : libellés, natures, choix en cours, cadre commencé. */
+function donneesChantier(stock) {
+  const libelles = lireLibellesChantier();
+  const libelle = libelleChantier(terrain.chantier.libelle, libelles);
+  const natures = lireNaturesChantier()[libelle.reseau ? 'reseau' : 'bordure'];
+  const nature = natures.includes(terrain.chantier.nature) ? terrain.chantier.nature : natures[0];
+  const mode = libelle.modes.includes(terrain.chantier.mode) ? terrain.chantier.mode : libelle.modes[0] ?? '';
+  const cadre = (stock.cadres ?? []).find((c) => c.noms.length < 3 && c.libelle === libelle.abreviation);
+  const dernier = (stock.cadres ?? []).filter((c) => c.noms.length === 3).at(-1);
+  return {
+    libelles, libelle, natures, nature, mode, forme: libelle.ouvrage ? terrain.chantier.forme : 'ronde',
+    diametre: terrain.chantier.diametre, profondeur: terrain.chantier.profondeur, materiau: terrain.chantier.materiau, remarque: terrain.chantier.remarque,
+    coinsFaits: cadre?.noms.length ?? 0,
+    dernierCadre: dernier ? { nom: dernier.noms[0].replace(/-\d+$/, ''), longueur: dernier.longueur, largeur: dernier.largeur, direction: dernier.direction, ecart: dernier.ecartAngleDroit } : null,
+  };
+}
 
 /** Ce que montre l'onglet Terrain (voir leve/ecran.js). */
 function donneesLeve() {
@@ -5783,6 +5880,8 @@ function donneesLeve() {
     // Suites de points pas encore dans une ligne (0.95.0) : pour « + Lignes depuis les suites ».
     suites: stock ? suitesLibres(stock, pointsDuLeve(stock.leveId).map((p) => p.nom)) : [],
     photos: stock?.photos ?? [],
+    // Levé chantier (0.175.0) : bibliothèque et derniers choix, pour le cadre de saisie des attributs.
+    chantier: stock?.nature === 'chantier' ? donneesChantier(stock) : null,
     // Triangles en trop (Intermédiaire) : seulement pour un levé qui a une surface (pas un levé libre).
     triangles: stock && projet.surfaces.includes(stock)
       ? { actif: editeurSurfaces.enSuppression() && editeurSurfaces.objetActif() === stock, supprimes: stock.trianglesSupprimes?.length ?? 0 }
