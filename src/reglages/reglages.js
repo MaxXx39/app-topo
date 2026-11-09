@@ -129,8 +129,8 @@ let ecouteLargeur = false;
 export function appliquerReglages(reglages = lireReglages()) {
   modeRetenu = modeValide(reglages.mode);
   // 0.173.0 : un écran étroit (moins de 500 px de large, un téléphone) est toujours en mode téléphone.
-  document.body.classList.toggle('mode-telephone', Boolean(reglages.telephone) || window.innerWidth < LARGEUR_TELEPHONE);
-  if (!ecouteLargeur) {
+  document.body.classList.toggle('mode-telephone', Boolean(reglages.telephone) || (typeof window !== 'undefined' && window.innerWidth < LARGEUR_TELEPHONE));
+  if (!ecouteLargeur && typeof window !== 'undefined') {
     ecouteLargeur = true;
     window.addEventListener('resize', () => appliquerReglages());
   }
