@@ -11,7 +11,7 @@ export function nettoyerLibelle(l) {
   const abreviation = String(l?.abreviation ?? '').replace(/[-\s]/g, '').trim();
   const nom = String(l?.nom ?? '').trim();
   if (!abreviation || !nom) return null;
-  const champsPermis = ['diametre', 'profondeur', 'materiau', 'remarque'];
+  const champsPermis = ['diametre', 'gaine', 'nombre', 'profondeur', 'materiau', 'remarque'];
   const modesPermis = ['dessus', 'tampon', 'fe'];
   return {
     abreviation,

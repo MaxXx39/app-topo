@@ -225,7 +225,7 @@ const terrain = {
   ...lireReglagesTerrain(),
 };
 // Levé chantier (0.175.0) : derniers choix (libellé, nature, mode d'altitude, forme, Ø, matériau…) gardés d'un point à l'autre.
-terrain.chantier = { libelle: 'T', nature: 'EU', mode: '', forme: 'ronde', diametre: '', profondeur: '', materiau: 'PVC', remarque: '', ...terrain.chantier };
+terrain.chantier = { libelle: 'T', nature: 'EU', mode: '', forme: 'ronde', diametre: '', gaine: '', nombre: '1', profondeur: '', materiau: 'PVC', remarque: '', ...terrain.chantier };
 // Orientation (0.90.1) : toujours le cap du GNSS (la direction de marche sert en secours, sans le dire).
 terrain.sourceOrientation = 'rx2';
 // Site sans récepteur : seulement le mode Lever (et Contrôle en consultation).
@@ -2047,6 +2047,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           terrain.chantier.forme = 'ronde';
           terrain.chantier.mode = '';
           terrain.chantier.diametre = '';
+          terrain.chantier.gaine = '';
           terrain.chantier.profondeur = '';
           const libelle = libelleChantier(valeur);
           const natures = lireNaturesChantier()[libelle.reseau ? 'reseau' : 'bordure'];
@@ -5898,7 +5899,7 @@ function donneesChantier(stock) {
   const dernier = (stock.cadres ?? []).filter((c) => c.noms.length === 3).at(-1);
   return {
     libelles, libelle, natures, nature, mode, couleursNatures: Object.fromEntries(natures.map((n) => [n, couleurNatureChantier(n, toutesNatures.couleurs)])), forme: libelle.ouvrage ? terrain.chantier.forme : 'ronde',
-    diametre: terrain.chantier.diametre, profondeur: terrain.chantier.profondeur, materiau: terrain.chantier.materiau, remarque: terrain.chantier.remarque,
+    diametre: terrain.chantier.diametre, gaine: terrain.chantier.gaine, nombre: terrain.chantier.nombre, profondeur: terrain.chantier.profondeur, materiau: terrain.chantier.materiau, remarque: terrain.chantier.remarque,
     coinsFaits: cadre?.noms.length ?? 0,
     dernierCadre: dernier ? { nom: dernier.noms[0].replace(/-\d+$/, ''), longueur: dernier.longueur, largeur: dernier.largeur, direction: dernier.direction, ecart: dernier.ecartAngleDroit } : null,
   };

@@ -9,6 +9,13 @@
 // Coordonnées MN95 Est, Nord, altitude (m) ; diamètres en mm.
 import { filDEauDepuisDessus, chambreDepuisTroisCoins } from './reseau.js';
 
+/** Diamètres proposés (mm) pour un tuyau, une conduite qui arrive à un ouvrage… (demande du 09.11). */
+export const DIAMETRES_LISTE = [80, 100, 125, 160, 200, 250, 315, 400, 500, 600, 800, 1000];
+/** Gaines des câbles et fourreaux : [Ø intérieur, Ø extérieur] en mm (« 80 / 92 ») ; le Ø extérieur sert au fil d'eau. À confirmer : intérieur / extérieur. */
+export const GAINES_LISTE = [[80, 92], [100, 112], [120, 132], [148, 163], [195, 214]];
+/** Nombre de câbles ou de fourreaux côte à côte. */
+export const NOMBRES_LISTE = [1, 2, 3, 4, 5, 6];
+
 /** Préfixe du nom d'un levé chantier. */
 export const PREFIXE_CHANTIER = 'LV-Chant ';
 /** Rayon (m) du cercle d'un tampon rond dessiné sur le plan (arbitraire : 60 cm de diamètre, demande du 09.11). */
@@ -31,8 +38,8 @@ export const LIBELLES_CHANTIER_DEPART = [
   { abreviation: 'T', nom: 'Tuyau', court: 'Tuyau', forme: '', reseau: true, ouvrage: false, modes: ['dessus', 'fe'], champs: ['diametre', 'materiau', 'remarque'] },
   { abreviation: 'CV', nom: 'Cap de vanne', court: 'Cap de v.', forme: 'triangle', reseau: true, ouvrage: false, modes: [], champs: ['diametre', 'remarque'] },
   { abreviation: 'BO', nom: 'Borne', court: 'Born.', forme: 'losange', reseau: true, ouvrage: false, modes: [], champs: ['remarque'] },
-  { abreviation: 'CB', nom: 'Câble', court: 'Cabl.', forme: 'croix', reseau: true, ouvrage: false, modes: [], champs: ['diametre', 'remarque'] },
-  { abreviation: 'FO', nom: 'Fourreau', court: 'Four.', forme: 'rond-vide', reseau: true, ouvrage: false, modes: ['dessus', 'fe'], champs: ['diametre', 'materiau', 'remarque'] },
+  { abreviation: 'CB', nom: 'Câble', court: 'Cabl.', forme: 'croix', reseau: true, ouvrage: false, modes: [], champs: ['gaine', 'nombre', 'remarque'] },
+  { abreviation: 'FO', nom: 'Fourreau', court: 'Four.', forme: 'rond-vide', reseau: true, ouvrage: false, modes: ['dessus', 'fe'], champs: ['gaine', 'nombre', 'materiau', 'remarque'] },
   { abreviation: 'BD', nom: 'Bordures', court: 'Bord.', forme: 'triangle-bas', reseau: false, ouvrage: false, modes: [], champs: ['remarque'] },
 ];
 
@@ -76,6 +83,18 @@ export function lireAttributsChantier(libelle, saisie = {}) {
     if (d.faux || (d.n !== undefined && d.n <= 0)) return { erreur: 'le Ø doit être un nombre de mm plus grand que 0' };
     if (d.vide && estTuyau(libelle) && mode === 'dessus') return { erreur: 'le Ø est obligatoire pour lever le dessus du tuyau' };
     if (!d.vide) attributs.diametre = d.n;
+  }
+  // Câble / fourreau : gaine « Ø int. / Ø ext. » (le Ø extérieur donne le fil d'eau) et nombre.
+  if (libelle.champs.includes('gaine')) {
+    const [int, ext] = String(saisie.gaine ?? '').split('/').map((t) => Number(t));
+    if (Number.isFinite(int) && Number.isFinite(ext) && ext > 0) {
+      attributs.diametreInterieur = int;
+      attributs.diametre = ext;
+    } else if (estTuyau(libelle) && mode === 'dessus') return { erreur: 'la gaine (Ø) est obligatoire pour lever le dessus' };
+  }
+  if (libelle.champs.includes('nombre')) {
+    const n = Math.round(Number(saisie.nombre));
+    if (Number.isFinite(n) && n >= 1) attributs.nombre = n;
   }
   if (libelle.champs.includes('profondeur') && mode === 'tampon') {
     const p = nombre(saisie.profondeur);
@@ -126,7 +145,8 @@ export function cadreDeTroisCoins(points) {
 /** Texte court écrit à côté d'un point sur le plan et dans le DXF : « Ø300 · FE 432.150 », « Prof. 2.40 · Radier 429.800 ». */
 export function texteDuPoint(attributs, altitudes = {}) {
   const parties = [];
-  if (attributs.diametre != null) parties.push(`Ø${attributs.diametre}`);
+  if (attributs.diametre != null) parties.push(`Ø${attributs.diametre}${attributs.nombre > 1 ? ` ×${attributs.nombre}` : ''}`);
+  else if (attributs.nombre > 1) parties.push(`×${attributs.nombre}`);
   if (attributs.profondeur != null) parties.push(`Prof. ${attributs.profondeur.toFixed(2)}`);
   if (altitudes.filEau != null) parties.push(`FE ${altitudes.filEau.toFixed(3)}`);
   if (altitudes.radier != null) parties.push(`Radier ${altitudes.radier.toFixed(3)}`);

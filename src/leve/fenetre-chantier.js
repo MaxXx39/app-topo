@@ -7,7 +7,7 @@ import { LIBELLES_CHANTIER_DEPART, NATURES_RESEAU_DEPART, NATURES_BORDURE_DEPART
 import { FORMES } from '../plan/formes.js';
 
 const MODES = [['', 'aucun'], ['dessus,fe', 'Dessus / Fil d\'eau'], ['tampon,fe', 'Tampon / Fil d\'eau']];
-const CHAMPS = [['diametre', 'Ø'], ['profondeur', 'Prof.'], ['materiau', 'Matér.'], ['remarque', 'Rem.']];
+const CHAMPS = [['diametre', 'Ø'], ['gaine', 'Gaine'], ['nombre', 'Nb'], ['profondeur', 'Prof.'], ['materiau', 'Matér.'], ['remarque', 'Rem.']];
 
 /** Ouvre la fenêtre ; apres() est appelé une fois la bibliothèque enregistrée. */
 export function ouvrirFenetreChantier(apres) {

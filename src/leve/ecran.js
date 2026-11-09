@@ -27,6 +27,7 @@ import { ROLES_METRE } from '../topo/metre.js';
 import { prefixeDuNom } from '../topo/surface.js';
 import { ELEMENTS_RESEAU } from '../topo/reseau.js';
 import { MATERIAUX } from './reseaux.js';
+import { DIAMETRES_LISTE, GAINES_LISTE, NOMBRES_LISTE } from '../topo/chantier.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
 import { svgCoupeTalus } from './coupe-talus.js';
 import { svgCroquisTalus } from './croquis-talus.js';
@@ -1418,7 +1419,7 @@ export function creerEcranLeve(conteneur, actions) {
     const champ = (nom, titre, valeur, classe, { mode = 'decimal', indice = '' } = {}) => `<label class="champ-chantier ${classe}"><span>${titre}</span>
         <input type="text" inputmode="${mode}" data-chantier="${nom}" value="${echapper(valeur)}" placeholder="${echapper(indice)}" autocomplete="off" /></label>`;
     const diametreRequis = l.modes[0] === 'dessus' && c.mode === 'dessus';
-    const diametreVide = !(Number(String(c.diametre).replace(',', '.')) > 0);
+    const diametreVide = l.champs.includes('gaine') ? !c.gaine : !(Number(String(c.diametre).replace(',', '.')) > 0);
     const calcul = l.modes[0] === 'dessus' && c.mode === 'dessus'
       ? (diametreVide ? '<p class="calcul-chantier erreur">Le Ø est obligatoire pour lever le dessus</p>' : '<p class="calcul-chantier">FE = dessus − Ø extérieur</p>')
       : l.ouvrage && c.mode === 'tampon' ? '<p class="calcul-chantier">Radier = tampon − profondeur</p>' : '';
@@ -1433,15 +1434,22 @@ export function creerEcranLeve(conteneur, actions) {
       l.modes.length > 1 ? `<span class="mini-bascule">${l.modes.map((m) => bouton('mode', m, nomsMode[m], m === c.mode)).join('')}</span>` : '',
     ].join('');
     const materiaux = MATERIAUX.includes(c.materiau) || !c.materiau ? MATERIAUX : [...MATERIAUX, c.materiau];
+    const liste = (nom, titre, options, valeur, classe, vide) => `<label class="champ-chantier ${classe}"><span>${titre}</span><select data-chantier="${nom}" aria-label="${echapper(titre)}">${vide ? '<option value="">—</option>' : ''}${options.map(([v, t]) => `<option value="${v}" ${String(v) === String(valeur) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
+    // Ø : liste (une valeur tapée avant, absente de la liste, reste proposée).
+    const diametres = DIAMETRES_LISTE.map((d) => [d, d]);
+    if (c.diametre && !DIAMETRES_LISTE.includes(Number(c.diametre))) diametres.push([c.diametre, c.diametre]);
     return `<div class="chantier-leve" role="group" aria-label="Ce que l'on lève sur le chantier">
       ${rangee('libelles', c.libelles.map((lib) => `<button type="button" class="chip-chantier ${lib.abreviation === l.abreviation ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="libelle" data-valeur="${echapper(lib.abreviation)}" title="${echapper(lib.nom)}"><i class="symbole-libelle" style="color: ${couleurNature}">${symboleDeForme(lib.forme)}</i>${echapper(lib.court || lib.nom)}</button>`).join('') + '<button type="button" class="bouton-crayon-libelles seulement-expert" data-action="modifierChantier" title="Modifier la bibliothèque du chantier" aria-label="Modifier la bibliothèque du chantier">⚙</button>', 'Plus de libellés')}
       ${rangee('natures', c.natures.map((n) => `<button type="button" class="nat-chantier ${n === c.nature ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="nature" data-valeur="${echapper(n)}"><i style="background: ${c.couleursNatures[n] ?? '#6b7280'}"></i>${echapper(n)}</button>`).join(''), 'Plus de natures')}
       ${reglages ? `<div class="reglages-chantier">${reglages}${bulle('chantier')}</div>` : ''}
       <div class="attributs-chantier">
-        ${l.champs.includes('diametre') ? champ('diametre', 'Ø', c.diametre, `d ${diametreRequis && diametreVide ? 'manque' : ''}`, { mode: 'numeric', indice: l.ouvrage ? 'tuyau' : 'mm' }) : ''}
+        ${l.champs.includes('diametre') ? liste('diametre', 'Ø', diametres, c.diametre, `d ${diametreRequis && diametreVide ? 'manque' : ''}`, true) : ''}
+        ${l.champs.includes('gaine') ? liste('gaine', 'Ø', GAINES_LISTE.map(([i, x]) => [`${i}/${x}`, `${i} / ${x}`]), c.gaine, `g ${diametreRequis && !c.gaine ? 'manque' : ''}`, true) : ''}
+        ${l.champs.includes('nombre') ? liste('nombre', 'Nb', NOMBRES_LISTE.map((n) => [n, n]), c.nombre, 'n', false) : ''}
         ${l.champs.includes('profondeur') && c.mode === 'tampon' ? champ('profondeur', 'Prof.', c.profondeur, 'p') : ''}
         ${l.champs.includes('materiau') ? `<label class="champ-chantier m"><select data-chantier="materiau" aria-label="Matériau">${materiaux.map((m) => `<option ${m === c.materiau ? 'selected' : ''}>${echapper(m)}</option>`).join('')}</select></label>` : ''}
         ${l.champs.includes('remarque') ? champ('remarque', 'Rem.', c.remarque, 'r', { mode: 'text', indice: 'facultatif' }) : ''}
+        <label class="bouton-photo-levee photo-chantier" title="Photo du prochain point" aria-label="Photo du prochain point"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg><input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden /></label>
       </div>
       ${calcul}${coins}${dernier}
     </div>`;

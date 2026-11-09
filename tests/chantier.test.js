@@ -103,7 +103,7 @@ describe('export du Levé chantier', () => {
     expect(avecChantier(points)).toBe(true);
     const lignes = csvPoints(points).trim().split('\r\n');
     expect(lignes[0]).toContain('Fil d\'eau (m);Radier (m)');
-    expect(lignes[1]).toContain(';T;EU;;300;432.450;432.150;;;PVC;');
+    expect(lignes[1]).toContain(';T;EU;;300;;432.450;432.150;;;PVC;;');
     expect(csvPoints([{ nom: 'P-1', est: 1, nord: 2, altitude: 3 }])).not.toContain('Libellé');
   });
   it('DXF : calque par libellé et nature, texte et ligne', () => {
@@ -131,5 +131,27 @@ describe('forme du libellé, couleur de la nature', () => {
   it('chaque libellé de départ a une forme et un nom court', () => {
     expect(DEPART.map((l) => l.court)).toEqual(['Chamb.', 'Gril.', 'Tuyau', 'Cap de v.', 'Born.', 'Cabl.', 'Four.', 'Bord.']);
     expect(new Set(DEPART.map((l) => l.forme)).size).toBe(DEPART.length);
+  });
+});
+
+import { DIAMETRES_LISTE, GAINES_LISTE } from '../src/topo/chantier.js';
+
+describe('gaines, nombre et listes de diamètres', () => {
+  it('listes demandées le 09.11', () => {
+    expect(DIAMETRES_LISTE).toEqual([80, 100, 125, 160, 200, 250, 315, 400, 500, 600, 800, 1000]);
+    expect(GAINES_LISTE).toEqual([[80, 92], [100, 112], [120, 132], [148, 163], [195, 214]]);
+  });
+  it('fourreau levé sur le dessus : gaine obligatoire, Ø extérieur = fil d\'eau', () => {
+    const fo = LIBELLES_CHANTIER_DEPART.find((l) => l.abreviation === 'FO');
+    expect(lireAttributsChantier(fo, { nature: 'Elec', mode: 'dessus' }).erreur).toMatch(/gaine/);
+    const r = lireAttributsChantier(fo, { nature: 'Elec', mode: 'dessus', gaine: '100/112', nombre: '3' });
+    expect(r.attributs).toMatchObject({ diametre: 112, diametreInterieur: 100, nombre: 3 });
+    expect(altitudesDuPoint(432.5, r.attributs).filEau).toBeCloseTo(432.388, 9);
+  });
+  it('câble : gaine et nombre facultatifs, texte « Ø112 ×3 »', () => {
+    const cb = LIBELLES_CHANTIER_DEPART.find((l) => l.abreviation === 'CB');
+    const r = lireAttributsChantier(cb, { nature: 'Swisscom', gaine: '120/132', nombre: 2 });
+    expect(texteDuPoint(r.attributs, {})).toBe('Ø132 ×2');
+    expect(lireAttributsChantier(cb, { nature: 'Swisscom' }).attributs.diametre).toBeUndefined();
   });
 });

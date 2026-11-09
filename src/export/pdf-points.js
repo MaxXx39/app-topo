@@ -12,7 +12,7 @@ const COLONNES = [
   ['g', 27], ['d', 24], ['d', 24], ['d', 19], ['g', 33], ['g', 19], ['g', 16], ['d', 14], ['d', 14], ['g', 19], ['d', 11], ['d', 11], ['d', 15], ['d', 13], ['g', 18],
 ];
 // Levé chantier (0.175.0) : colonnes propres (total 277 mm), sans les précisions GNSS.
-const COLONNES_CHANTIER = [['g', 27], ['d', 24], ['d', 24], ['d', 19], ['g', 14], ['g', 20], ['g', 15], ['d', 12], ['d', 20], ['d', 17], ['d', 17], ['d', 15], ['g', 18], ['g', 35]];
+const COLONNES_CHANTIER = [['g', 27], ['d', 24], ['d', 24], ['d', 19], ['g', 14], ['g', 20], ['g', 15], ['d', 12], ['d', 10], ['d', 20], ['d', 17], ['d', 17], ['d', 15], ['g', 18], ['d', 9], ['g', 16]];
 const TITRES_PDF_CHANTIER = [...TITRES_INFOS.slice(0, 4), ...TITRES_CHANTIER];
 const TITRES = [...TITRES_INFOS.map((t) => t.replace('Précision', 'Préc.').replace('Âge corrections', 'Âge corr.').replace('Satellites', 'Sat.')), 'Photo'];
 

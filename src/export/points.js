@@ -20,7 +20,7 @@ export const FORMATS_POINTS = [
 export const TITRES_INFOS = ['Nom', 'Est (m)', 'Nord (m)', 'Altitude (m)', 'Rôle', 'Date', 'Heure', 'Précision H (m)', 'Précision V (m)', 'Qualité', 'Satellites', 'HDOP', 'Âge corrections (s)', 'Inclinaison (°)'];
 
 // Levé chantier (0.175.0) : colonnes en plus quand un point porte des attributs (point.chantier).
-export const TITRES_CHANTIER = ['Libellé', 'Nature', 'Forme', 'Ø (mm)', 'Altitude levée (m)', 'Fil d\'eau (m)', 'Radier (m)', 'Profondeur (m)', 'Matériau', 'Remarque'];
+export const TITRES_CHANTIER = ['Libellé', 'Nature', 'Forme', 'Ø (mm)', 'Ø int. (mm)', 'Altitude levée (m)', 'Fil d\'eau (m)', 'Radier (m)', 'Profondeur (m)', 'Matériau', 'Nombre', 'Remarque'];
 
 /** Vrai si un des points est un point du Levé chantier. */
 export const avecChantier = (points) => points.some((p) => p.chantier);
@@ -28,7 +28,7 @@ export const avecChantier = (points) => points.some((p) => p.chantier);
 /** Attributs d'un point du Levé chantier, en texte, dans l'ordre de TITRES_CHANTIER. */
 export function infosChantier(p) {
   const c = p.chantier ?? {};
-  return [c.libelle ?? '', c.nature ?? '', c.forme === 'rect' ? '3 coins' : c.forme === 'ronde' ? '1 point' : '', c.diametre ?? '', nombre(c.altitudeLevee), nombre(c.filEau), nombre(c.radier), nombre(c.profondeur, 2), c.materiau ?? '', c.remarque ?? ''];
+  return [c.libelle ?? '', c.nature ?? '', c.forme === 'rect' ? '3 coins' : c.forme === 'ronde' ? '1 point' : '', c.diametre ?? '', c.diametreInterieur ?? '', nombre(c.altitudeLevee), nombre(c.filEau), nombre(c.radier), nombre(c.profondeur, 2), c.materiau ?? '', c.nombre ?? '', c.remarque ?? ''];
 }
 
 // Qualité de la position (message GGA du récepteur) : 4 = RTK fixe, 5 = RTK flottant…
