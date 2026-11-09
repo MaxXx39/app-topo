@@ -12477,3 +12477,110 @@ body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever
   min-height: var(--hauteur-bandeau-point);
   box-shadow: none;
 }
+
+/* ==========================================================================
+   0.166.2 (demandes du 09.11) : Lever (APK) : plus de cadre « Point ». Dans le bandeau : photo | ↶ (annuler le
+   dernier point) | [Δ, tablette dès Intermédiaire] | nom | Enreg. E / N en discret au-dessus ; le panneau du Δ
+   s'ouvre au-dessus. Téléphone : le Δ est un bouton rond du plan.
+   ========================================================================== */
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] {
+  --gauche-bandeau-point: 12px;
+  --largeur-bouton-bandeau: 52px;
+}
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] {
+  --gauche-bandeau-point: 8px;
+  --largeur-bouton-bandeau: 46px;
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise {
+  display: contents;
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > .titre-cadre-prise { display: none; }
+/* ↶ entre la photo et le nom */
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"] {
+  position: fixed;
+  z-index: 20;
+  left: calc(var(--gauche-bandeau-point) + var(--hauteur-bandeau-point));
+  bottom: var(--bas-bandeau-point);
+  width: var(--largeur-bouton-bandeau);
+  height: var(--hauteur-bandeau-point);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-left: 2px solid var(--surface);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--encre) 12%, var(--surface));
+  color: var(--encre);
+  font-size: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::before { content: '↶'; font-size: 28px; font-weight: 900; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]:disabled { opacity: 0.35; }
+/* Le nom laisse la place à ↶ (et au Δ sur tablette dès Intermédiaire). */
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point { margin-left: var(--largeur-bouton-bandeau); }
+body.bande-action.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point { margin-left: var(--largeur-bouton-bandeau); }
+body.bande-action:not(.mode-telephone):not(.mode-base)[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point { margin-left: calc(var(--largeur-bouton-bandeau) * 2); }
+/* Δ dans le bandeau (tablette, dès Intermédiaire) */
+body.bande-action:not(.mode-telephone)[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .bouton-ouvrir-delta {
+  position: fixed;
+  z-index: 20;
+  left: calc(var(--gauche-bandeau-point) + var(--hauteur-bandeau-point) + var(--largeur-bouton-bandeau));
+  bottom: var(--bas-bandeau-point);
+  width: var(--largeur-bouton-bandeau);
+  height: var(--hauteur-bandeau-point);
+  border: none;
+  border-left: 2px solid var(--surface);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--encre) 12%, var(--surface));
+  font-size: 26px;
+}
+/* Téléphone : pas de Δ dans le bandeau (bouton rond du plan à la place) */
+body.bande-action.mode-telephone[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .bouton-ouvrir-delta { display: none; }
+/* Bouton Δ du plan : seulement téléphone + Lever (APK) + dès Intermédiaire */
+.plan-boutons .bouton-delta-plan { display: none; color: #ea580c; font-weight: 900; font-size: 20px; }
+body.mode-telephone.bande-action:not(.mode-base)[data-onglet='terrain'][data-mode-terrain='lever'] .plan-boutons .bouton-delta-plan { display: block; }
+/* E / N en discret juste au-dessus du bandeau (le H est dans la barre du récepteur) */
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta {
+  position: fixed;
+  z-index: 20;
+  left: calc(var(--gauche-bandeau-point) + 6px);
+  bottom: calc(var(--bas-bandeau-point) + var(--hauteur-bandeau-point) + 2px);
+  margin: 0;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  pointer-events: none;
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .bouton-ouvrir-delta { pointer-events: auto; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .position-leve { font-size: 11px; opacity: 0.75; gap: 0 10px; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .position-leve span:nth-child(3) { display: none; }
+/* Panneau du Δ et message de refus : posés au-dessus (sous la ligne E / N) */
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > .ligne-delta {
+  position: fixed;
+  z-index: 20;
+  left: var(--gauche-bandeau-point);
+  right: var(--gauche-bandeau-point);
+  bottom: calc(var(--bas-bandeau-point) + var(--hauteur-bandeau-point) + 22px);
+  margin: 0;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > .raison-leve {
+  position: fixed;
+  z-index: 18;
+  left: var(--gauche-bandeau-point);
+  right: var(--gauche-bandeau-point);
+  bottom: calc(var(--bas-bandeau-point) + var(--hauteur-bandeau-point) + 22px);
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  font-size: 12px;
+}
+/* Clavier ouvert : tout revient dans le flux */
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise { display: block; }
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > :is([data-action="annulerDernierPoint"], .ligne-delta, .raison-leve),
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta,
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .bouton-ouvrir-delta { position: static; }

@@ -1164,7 +1164,8 @@ export function creerEcranLeve(conteneur, actions) {
         </div>
         ${ligneDelta()}
         <p class="raison-leve" data-vivant="raison" hidden></p>
-        <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}>
+        <button type="button" class="bouton-secondaire" data-action="annulerDernierPoint" ${donnees.dernierPoint ? '' : 'disabled'}
+          title="Effacer le dernier point${donnees.dernierPoint ? ` (${echapper(donnees.dernierPoint)})` : ''}" aria-label="Effacer le dernier point">
           ↶ Effacer le dernier point${donnees.dernierPoint ? ` (${echapper(donnees.dernierPoint)})` : ''}</button>
       </div>`;
   }

@@ -2912,6 +2912,10 @@ function travailAGarder() {
 document.addEventListener('cible-en-haut', () => requestAnimationFrame(() => requestAnimationFrame(cadrerSurImplantation)));
 // 0.151.0 : bouton « Implanter » en bas à droite du plan (point ou ligne choisi).
 creerBoutonImplanterPlan(document.querySelector('.panneau-plan'), document.querySelector('#leve-direct'));
+// 0.166.2 : sur téléphone (Lever, dès Intermédiaire) le Δ est un bouton rond du plan ; il touche le vrai bouton « Δ ».
+document.querySelector('.panneau-plan [data-action="delta-plan"]')?.addEventListener('click', () => {
+  document.querySelector('#leve-direct .bouton-ouvrir-delta')?.click();
+});
 // 0.151.0 : encart du plan déplaçable, + / −, toucher = plan en grand (voir plan/encart.js).
 creerEncartPlan(document.querySelector('.panneau-plan'), {
   quandToucher: () => ecranLeve.planEnGrand(true),
