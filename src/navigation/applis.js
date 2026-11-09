@@ -23,7 +23,7 @@ export const APPLIS = [
     cle: 'recollement',
     titre: 'Recollement',
     court: 'Recoll.', // 0.172.0 : écrit ainsi en mode téléphone
-    couleur: '#4d7c0f',
+    couleur: '#16a34a',
     texte: '#ffffff',
     site: true,
     niveau: 'expert',
@@ -32,7 +32,7 @@ export const APPLIS = [
   {
     cle: 'metre',
     titre: 'Métré',
-    couleur: '#c2410c',
+    couleur: '#ea580c',
     texte: '#ffffff',
     site: true,
     niveau: 'expert',
@@ -62,7 +62,7 @@ export const APPLIS = [
     cle: 'annotation',
     titre: 'Annotation',
     court: 'Annot.',
-    couleur: '#0f766e',
+    couleur: '#7c4a1e',
     texte: '#ffffff',
     site: true,
     niveau: 'intermediaire',
@@ -106,8 +106,8 @@ export const APPLIS = [
   {
     cle: 'recepteur',
     titre: 'Récepteur',
-    couleur: '#0284c7',
-    texte: '#ffffff',
+    couleur: '#38bdf8',
+    texte: '#0c4a6e',
     apk: true,
     icone: '<path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><ellipse cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" />',
   },
