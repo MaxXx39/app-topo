@@ -80,9 +80,10 @@ export function htmlBandeauAnnotation({ nom, remarque, photos, position, dernier
       <button type="button" class="pastille-annotation retour" data-action="effacer-dernier-annotation" ${dernier ? '' : 'disabled'}
         title="Effacer le dernier point${dernier ? ` (${echapper(dernier)})` : ''}" aria-label="Effacer le dernier point">↶</button>
       <div class="champs-annotation-bandeau">
-        <label class="id-annotation"><span>ID annotation</span>
-          <input type="text" data-champ="nom-annotation" value="${echapper(nom)}" autocomplete="off" aria-label="Nom de l'annotation" /></label>
-        <input type="text" class="remarque-bandeau" data-champ="remarque-annotation" value="${echapper(remarque)}" placeholder="Remarque" autocomplete="off" aria-label="Remarque" />
+        <label class="id-annotation ligne-champ-annotation">
+          <input type="text" data-champ="nom-annotation" value="${echapper(nom)}" placeholder="Nom libre" autocomplete="off" aria-label="Nom libre de l'annotation" /></label>
+        <label class="ligne-champ-annotation">
+          <input type="text" class="remarque-bandeau" data-champ="remarque-annotation" value="${echapper(remarque)}" placeholder="Remarque" autocomplete="off" aria-label="Remarque" /></label>
       </div>
       <button type="button" class="bouton-enreg-annotation" data-action="enregistrer-annotation" ${position ? '' : 'disabled'} title="Enregistrer le point">
         <span>Enreg. point</span><small>${position ? echapper(SOURCES[position.source] ?? '') : 'prends une position'}</small></button>

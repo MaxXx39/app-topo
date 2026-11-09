@@ -869,7 +869,7 @@ function agirAnnotation(cle) {
 function lireBandeauAnnotation() {
   const nom = document.querySelector('#annotation [data-champ="nom-annotation"]');
   const remarque = document.querySelector('#annotation [data-champ="remarque-annotation"]');
-  if (nom) annotationEtat.nom = nom.value === nomProposeAffiche() ? '' : nom.value;
+  if (nom) annotationEtat.nom = nom.value;
   if (remarque) annotationEtat.remarque = remarque.value;
 }
 
@@ -904,7 +904,7 @@ function afficherAnnotation() {
     manuel: { zoom: terrain.zoomLoupe ?? 4 },
     tablette: { ...etatTabletteAnnotation(), maximum: precisionTabletteMax() }, liste, reglages: annotationEtat.reglages, tri: annotationEtat.tri,
   })}${htmlBandeauAnnotation({
-    nom: annotationEtat.nom || nomProposeAffiche(), remarque: annotationEtat.remarque, photos: annotationEtat.photos.length,
+    nom: annotationEtat.nom, remarque: annotationEtat.remarque, photos: annotationEtat.photos.length,
     position: annotationEtat.position, dernier: dernier?.nom ?? '',
   })}`;
   envoyerImplantationAuPlan();

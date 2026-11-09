@@ -13254,3 +13254,15 @@ body.clavier-ouvert .bandeau-annotation { bottom: 8px; }
 .boutons-annotation > .bouton-secondaire { border-radius: 14px; font-weight: 700; }
 .ligne-annotation { border-radius: 12px; border-left: 4px solid #0f766e; }
 .titre-liste-annotation strong { color: #0f766e; }
+
+/* 0.182.0 (demande du 09.11) : bandeau d'Annotation plus haut : deux lignes distinctes, « Nom libre » (plus de nom « Annot-n »
+   proposé dans le champ) puis « Remarque ». */
+.bandeau-annotation { height: 100px; }
+body.mode-telephone .bandeau-annotation { height: 90px; }
+.champs-annotation-bandeau { gap: 6px; padding: 6px 8px; justify-content: stretch; }
+.ligne-champ-annotation { display: flex; flex: 1 1 0; min-height: 0; margin: 0; align-items: center; box-sizing: border-box;
+  padding: 0 8px; border: 1px solid color-mix(in srgb, var(--encre) 28%, transparent); border-radius: 8px; background: var(--surface); }
+.bandeau-annotation .ligne-champ-annotation input[type='text'] { font-size: 17px; font-weight: 700; min-height: 0; border: none; padding: 0; }
+.bandeau-annotation .ligne-champ-annotation .remarque-bandeau { font-size: 15px; font-weight: 500; border-top: none; padding-top: 0; }
+body.mode-telephone .bandeau-annotation .ligne-champ-annotation input[type='text'] { font-size: 15px; }
+body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 130px); }
