@@ -118,7 +118,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 const DELAI_RETOUR_SUIVI = 5000;
 const DISTANCE_RETOUR_SUIVI = 2;
 
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
   // Réglages choisis ; « calques » est ce qui est dessiné : en dessous d'Expert, les réglages
   // d'Expert gardent leur valeur de départ.
   const calquesChoisis = { ...CALQUES_DEPART };
@@ -2244,8 +2244,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       } else {
         // Un 📷 (photo rattachée à un point, 0.96.0) ouvre la photo ; sinon, toucher l'intérieur d'un stock le choisit.
         const photo = photoSousLeDoigt(toucher);
+        // Annotation (0.180.3) : toucher un point d'annotation ouvre sa fiche (vrai = trouvé).
         if (photo) quandToucherPhoto?.(photo.id);
-        else {
+        else if (quandToucherAnnotation?.(versTerrain(toucher.x, toucher.y, vue), RAYON_TOUCHER / vue.echelle)) {
+          // fiche ouverte
+        } else {
           const index = stockSousLeDoigt(toucher);
           if (index >= 0) quandToucherStock?.(index);
         }

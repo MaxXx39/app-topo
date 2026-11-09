@@ -563,6 +563,15 @@ export function dessinerPointsPdf(doc, pointsMontres, versPapier, echelle, choix
   // Couleur du libellé du nom (P-RG-1 : regard en noir…), sinon la couleur du texte.
   const libelles = lireLibelles();
   positions.forEach(({ x, y }, i) => {
+    // Point d'annotation (0.180.3) : rond en pointillés sarcelle, comme à l'écran.
+    if (pointsMontres[i].annotation) {
+      doc.setDrawColor(...hexEnRvb('#0f766e'));
+      doc.setLineWidth(0.3);
+      doc.setLineDashPattern([0.9, 0.6], 0);
+      doc.circle(x, y, 1.7, 'S');
+      doc.setLineDashPattern([], 0);
+      return;
+    }
     const couleur = couleurDuNom(pointsMontres[i].nom, libelles);
     doc.setFillColor(...(couleur ? hexEnRvb(couleur) : COULEURS.texte));
     doc.circle(x, y, 0.3, 'F');

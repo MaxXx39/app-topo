@@ -1414,6 +1414,7 @@ document.querySelector('#leve-direct').addEventListener('input', () => navigatio
  * toujours visible à droite.
  */
 function afficherOnglet(demande, { partie = null } = {}) {
+  const ongletAvant = document.body.dataset.onglet; // Annotation : on sait qu'on la quitte
   const nom = demande === 'calculs' ? partieCalculs : demande;
   // 0.159.0 : l'onglet Projet n'est plus montré en entier : une de ses pages (voir ouvrirPartieProjet) ;
   // demandé sans page (après l'ouverture d'un projet…), c'est la page Applications qui s'ouvre.
@@ -1440,6 +1441,12 @@ function afficherOnglet(demande, { partie = null } = {}) {
   if (nom !== 'plan' && nom !== 'dessin') pilote = null;
   // DAO (0.147.0) : seulement dans Calculs › Dessin (et le plan sur téléphone).
   if (nom !== 'plan' && nom !== 'dessin' && daoAppli?.actif()) daoAppli.arreter();
+  // Annotation (0.180.3) : en quittant l'application, la loupe « Manuel » disparaît (sinon elle recouvre le plan).
+  if (ongletAvant === 'annotation' && nom !== 'annotation') {
+    annotationEtat.mode = null;
+    plan.loupe.cacher();
+    loupeImplantation = false;
+  }
   if (nom !== 'plan' && nom !== ongletContexte) {
     // Triangles en trop (Terrain › Lever) : on arrête en quittant l'onglet.
     if (ongletContexte === 'terrain') editeurSurfaces.arreterModification();
@@ -7120,6 +7127,14 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherStock: (index) => editeurSurfaces.choisir(index),
   quandToucherTriangle: (triangle) => editeurSurfaces.basculerTriangle(cleTriangle(triangle)),
   quandToucherImplantation: toucherPourImplantation,
+  // Appli Plan (0.180.3) : toucher un point d'annotation ouvre sa fiche dans l'application Annotation.
+  quandToucherAnnotation: (position, tolerance) => {
+    const point = annotationSousLeDoigt(position, tolerance);
+    if (!point) return false;
+    if (ongletContexte !== 'annotation') afficherOnglet('annotation');
+    ouvrirAnnotation(point.nom);
+    return true;
+  },
   // « Voir toute la ligne » (0.118.0) cochée ou décochée (aussi décochée par « Ma position »).
   quandVoirLigne: (coche) => {
     implanter.voirLigne = coche && Boolean(implanter.ligne);
