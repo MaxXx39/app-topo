@@ -1731,7 +1731,7 @@ if (boutonRecepteur && recepteur2Disponible()) {
 // Pendant le guidage d'une implantation (0.84.0), le plan a sa propre part (la moitié au départ).
 const CLE_PLAN_TERRAIN = 'topo-plan-terrain-part';
 const CLE_PLAN_GUIDAGE = 'topo-plan-guidage-part';
-const PART_PLAN = { pas: 0.15, min: 0.4, max: 0.92, depart: 0.35, departGuidage: 0.5 };
+const PART_PLAN = { pas: 0.15, min: 0.2, max: 0.65, depart: 0.35, departGuidage: 0.5 };
 const partsPlan = { terrain: PART_PLAN.depart, guidage: PART_PLAN.departGuidage };
 for (const [sorte, cle, variable] of [['terrain', CLE_PLAN_TERRAIN, '--part-plan-terrain'], ['guidage', CLE_PLAN_GUIDAGE, '--part-plan-guidage']]) {
   try {

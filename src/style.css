@@ -12390,8 +12390,8 @@ body:not(.theme-soleil) .plan-boutons button:not(.actif) {
   background: transparent;
 }
 
-/* 0.166.0 : le plan ne descend jamais sous 40 % de la zone de travail (50 % dans la Mesure rapide). */
-body { --part-plan-min: 0.4; }
+/* 0.175.1 : le plan peut redescendre jusqu'à 20 % et ne dépasse jamais 65 % (les infos sous le plan gardent au moins 35 %) ; Mesure rapide : plan fixe. */
+body { --part-plan-min: 0.2; }
 body[data-onglet='mesure-rapide'] { --part-plan-min: 0.55; }
 
 /* ==========================================================================
