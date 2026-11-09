@@ -13051,23 +13051,23 @@ dialog.fenetre-chantier h2 { margin: 0; padding: 12px 14px; background: var(--so
 .rangee-chantier { position: relative; display: flex; align-items: center; }
 .defile-chantier { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
 .defile-chantier::-webkit-scrollbar { display: none; }
-.fleche-chantier { flex: none; width: 28px; height: 35px; margin-left: 2px; border: 0; border-radius: 8px; background: var(--sombre); color: var(--ambre); font-weight: 900; font-size: 15px; display: grid; place-items: center; }
+.fleche-chantier { flex: none; width: 30px; height: 39px; margin-left: 2px; border: 0; border-radius: 8px; background: var(--sombre); color: var(--ambre); font-weight: 900; font-size: 15px; display: grid; place-items: center; }
 .fleche-chantier[hidden] { display: none; }
-.chip-chantier { flex: none; height: 35px; padding: 0 9px; border-radius: 8px; border: 1.5px solid var(--bordure); background: var(--surface); color: var(--encre, var(--texte)); font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.chip-chantier { flex: none; height: 39px; padding: 0 9px; border-radius: 8px; border: 1.5px solid var(--bordure); background: var(--surface); color: var(--encre, var(--texte)); font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .chip-chantier .symbole-libelle { font-style: normal; font-size: 0.85rem; line-height: 1; }
 .chip-chantier.actif { background: var(--sombre); border-color: var(--sombre); color: #ffffff; }
-.nat-chantier { flex: none; height: 30px; padding: 0 9px; border-radius: 999px; border: 1.5px solid var(--bordure); background: var(--surface); color: var(--encre, var(--texte)); font-weight: 600; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.nat-chantier { flex: none; height: 33px; padding: 0 9px; border-radius: 999px; border: 1.5px solid var(--bordure); background: var(--surface); color: var(--encre, var(--texte)); font-weight: 600; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .nat-chantier i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .nat-chantier.actif { background: var(--sombre); border-color: var(--sombre); color: #ffffff; }
 .reglages-chantier { display: flex; gap: 8px; align-items: center; }
 .mini-bascule { display: inline-flex; gap: 2px; padding: 2px; border-radius: 10px; background: rgba(95, 109, 119, 0.18); }
-.mini-bascule button { height: 31px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--gris); font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.mini-bascule button { height: 34px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--gris); font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .mini-bascule button.actif { background: var(--surface); color: var(--encre, var(--texte)); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 -3px 0 var(--ambre); }
 .ico-forme { width: 12px; height: 12px; border: 2px solid currentColor; display: inline-block; box-sizing: border-box; }
 .ico-forme.rond { border-radius: 50%; }
 .ico-forme.carre { border-radius: 2px; }
 .attributs-chantier { display: flex; gap: 5px; align-items: stretch; }
-.attributs-chantier .champ-chantier { flex-direction: row; align-items: center; gap: 4px; height: 39px; border: 1.5px solid var(--bordure); border-radius: 8px; background: var(--surface); padding: 0 7px; min-width: 0; }
+.attributs-chantier .champ-chantier { flex-direction: row; align-items: center; gap: 4px; height: 43px; border: 1.5px solid var(--bordure); border-radius: 8px; background: var(--surface); padding: 0 7px; min-width: 0; }
 .attributs-chantier .champ-chantier.manque { border-color: var(--rouge); background: var(--rouge-clair); }
 .attributs-chantier .champ-chantier span { font-size: 0.65rem; font-weight: 800; color: var(--gris); flex: none; }
 .attributs-chantier .champ-chantier input, .attributs-chantier .champ-chantier select { border: 0; outline: 0; background: transparent; min-height: 0; height: 100%; padding: 0; font-size: 0.9rem; width: 100%; min-width: 0; color: var(--encre, var(--texte)); }
@@ -13075,7 +13075,7 @@ dialog.fenetre-chantier h2 { margin: 0; padding: 12px 14px; background: var(--so
 .attributs-chantier .champ-chantier.m { flex: 0 0 84px; }
 .attributs-chantier .champ-chantier.g { flex: 0 0 104px; }
 .attributs-chantier .champ-chantier.n { flex: 0 0 62px; }
-.attributs-chantier .photo-chantier { flex: 0 0 39px; height: 39px; width: 39px; min-height: 0; padding: 0; display: grid; place-items: center; border-radius: 8px; }
+.attributs-chantier .photo-chantier { flex: 0 0 43px; height: 43px; width: 43px; min-height: 0; padding: 0; display: grid; place-items: center; border-radius: 8px; }
 .attributs-chantier .photo-chantier svg { width: 22px; height: 22px; }
 .attributs-chantier .champ-chantier.r { flex: 1; }
 .calcul-chantier { margin: 0; padding: 0 2px; background: transparent; font-size: 0.7rem; font-weight: 700; color: var(--ambre-fonce); }
