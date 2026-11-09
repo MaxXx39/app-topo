@@ -1,5 +1,5 @@
 // Annotations (0.177.0, Intermédiaire et Expert, demande du 09.11) : des points posés sur le plan avec une ou
-// plusieurs remarques et des photos. Pas un levé : liste « Anot-AAAAMMJJ » (une par jour, date collée), points « A-n ».
+// plusieurs remarques et des photos. Pas un levé : liste « Annot-AAAAMMJJ » (une par jour, date collée), points « Annot-n » (nom modifiable à la main).
 // Rangée dans projet.autres (nature 'annotation') avec sa liste de points propre, comme un levé libre : le plan,
 // les photos (📷), Drive, l'historique, l'archivage et les exports de listes marchent déjà.
 // Un point : { nom, est, nord, altitude (ou null), annotation: { source 'loupe' | 'gnss' | 'tablette', precision (m, ou null),
@@ -14,7 +14,7 @@ export const PRECISION_TABLETTE_DEPART = 3;
 /** Vrai pour une liste d'annotations. */
 export const estAnnotation = (objet) => objet?.nature === 'annotation';
 
-/** Nom de départ de la liste du jour : « Anot-20261109 ». */
+/** Nom de départ de la liste du jour : « Annot-20261109 ». */
 export function nomListeAnnotation(maintenant = new Date()) {
   return `${PREFIXE_ANNOTATION}${dateDuJourCollee(maintenant)}`;
 }
@@ -47,20 +47,34 @@ export function nettoyerRemarques(remarques) {
   return (remarques ?? []).map((r) => String(r ?? '').trim()).filter(Boolean);
 }
 
+/** Numéro le plus haut des points « Annot-n » du projet (les anciens « A-n » comptent aussi). */
+function dernierNumero(projet) {
+  const numeros = projet.autres.filter(estAnnotation).flatMap((a) => projet.leves.find((l) => l.id === a.leveId)?.points ?? [])
+    .map((p) => /^(?:Annot|A)-(\d+)$/.exec(p.nom)?.[1]).filter(Boolean).map(Number);
+  return Math.max(0, ...numeros);
+}
+
+/** Nom proposé pour le prochain point : « Annot-1 », « Annot-2 »… (jamais un nom déjà pris). */
+export function nomProposeAnnotation(projet, nomsPris = new Set()) {
+  projet.autres ??= [];
+  let numero = dernierNumero(projet) + 1;
+  while (nomsPris.has(`Annot-${numero}`)) numero += 1;
+  return `Annot-${numero}`;
+}
+
 /**
  * Ajoute un point d'annotation à la liste du jour. donnees : { est, nord, altitude, source, precision, remarques,
- * photos (photos déjà préparées, rangées dans la liste avec photo.point = nom du point) }. nomsPris : noms déjà
- * utilisés dans le projet (jamais deux fois le même nom). Renvoie { liste, point }.
+ * nom (tapé à la main, facultatif : sinon « Annot-n »), photos (déjà préparées, rangées dans la liste avec
+ * photo.point = nom du point) }. nomsPris : noms déjà utilisés dans le projet (jamais deux fois le même nom).
+ * Renvoie { liste, point } ou { erreur }.
  */
 export function ajouterAnnotation(projet, donnees, nomsPris = new Set(), maintenant = new Date()) {
+  const tape = String(donnees.nom ?? '').trim();
+  if (tape && nomsPris.has(tape)) return { erreur: `Le nom « ${tape} » existe déjà` };
   const liste = listeAnnotationDuJour(projet, maintenant);
   const leve = projet.leves.find((l) => l.id === liste.leveId);
-  const numeros = projet.autres.filter(estAnnotation).flatMap((a) => projet.leves.find((l) => l.id === a.leveId)?.points ?? [])
-    .map((p) => /^A-(\d+)$/.exec(p.nom)?.[1]).filter(Boolean).map(Number);
-  let numero = Math.max(0, ...numeros) + 1;
-  while (nomsPris.has(`A-${numero}`)) numero += 1;
   const point = {
-    nom: `A-${numero}`,
+    nom: tape || nomProposeAnnotation(projet, nomsPris),
     est: donnees.est,
     nord: donnees.nord,
     altitude: donnees.altitude ?? null,
@@ -70,6 +84,17 @@ export function ajouterAnnotation(projet, donnees, nomsPris = new Set(), mainten
   liste.points.push(point.nom);
   liste.photos = [...(liste.photos ?? []), ...(donnees.photos ?? []).map((p) => ({ ...p, point: point.nom }))];
   return { liste, point };
+}
+
+/** Point d'annotation le plus récent du projet (d'après sa date de prise), ou null. */
+export function dernierAnnotation(projet) {
+  let meilleur = null;
+  for (const liste of listesAnnotation(projet)) {
+    for (const point of projet.leves.find((l) => l.id === liste.leveId)?.points ?? []) {
+      if (!meilleur || String(point.annotation?.le ?? '') >= String(meilleur.annotation?.le ?? '')) meilleur = point;
+    }
+  }
+  return meilleur;
 }
 
 /** Liste et point d'annotation de ce nom (ou null). */

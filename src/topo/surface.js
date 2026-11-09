@@ -89,8 +89,8 @@ export const PREFIXE_LEVE = 'LV-';
 export const PREFIXE_SURFACE = 'Surf-';
 // Surface Swisstopo (0.109.0) : « SWISSTOP 1 », préfixe fixe comme les autres.
 export const PREFIXE_SWISSTOP = 'SWISSTOP ';
-// Annotations (0.177.0) : « Anot-20261109 », préfixe fixe, jamais « LV- » (ce n'est pas un levé).
-export const PREFIXE_ANNOTATION_LISTE = 'Anot-';
+// Annotations (0.177.0, renommé 0.179.0) : « Annot-20261109 », préfixe fixe, jamais « LV- » (ce n'est pas un levé).
+export const PREFIXE_ANNOTATION_LISTE = 'Annot-';
 
 /** Préfixe du nom de ce levé ou de cette surface. */
 export function prefixeDuNom(objet) {

@@ -13191,14 +13191,7 @@ body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever
 .bande-appli .boutons-bande-annotation .bouton-bande-mesure.manuel.actif { background: var(--ambre); color: #1b2b36; }
 .bande-appli .boutons-bande-annotation .bouton-bande-mesure:disabled { background: #475569; color: rgba(255, 255, 255, 0.55); }
 .bande-appli .boutons-bande-annotation .bouton-bande-mesure small { white-space: normal; line-height: 1.05; text-align: center; font-size: 10px; }
-.boutons-bande-annotation .bouton-enreg-bande.relais-annotation {
-  position: fixed; right: 12px; bottom: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 10px);
-  flex: none; width: 150px; min-height: 52px; flex-direction: column; gap: 0; z-index: 21;
-  background: var(--ambre); color: #1b2b36; font-size: 18px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-}
-body.mode-telephone .boutons-bande-annotation .bouton-enreg-bande.relais-annotation { width: 124px; min-height: 46px; font-size: 15px; }
-body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 80px); }
+body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 104px); }
 .precision-annotation { color: var(--gris); font-size: 13px; }
 
 /* 0.178.1 : réglage de la précision du GPS tablette derrière un petit engrenage (Annotation). */
@@ -13206,3 +13199,44 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .bouton-engrenage-annotation { width: 36px; height: 36px; min-height: 36px; padding: 0; border: 1px solid var(--bordure); border-radius: 50%; background: var(--surface); font-size: 18px; line-height: 1; color: var(--gris); }
 .bouton-engrenage-annotation.actif { border-color: #0f766e; color: #0f766e; }
 .reglages-annotation { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, #0f766e 8%, var(--surface)); }
+
+/* ==========================================================================
+   0.179.0 (demande du 09.11) : bandeau d'Annotation, comme celui de Lever : photo (bleu) | ↶ (violet) | ID + remarque
+   (cadre jaune, un peu plus épais) | Enreg. point (jaune), fixé au-dessus de la bande du bas.
+   ========================================================================== */
+.bandeau-annotation {
+  position: fixed; left: 12px; right: 12px; bottom: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 10px); z-index: 19;
+  height: 76px; box-sizing: border-box; display: flex; align-items: stretch; gap: 0; overflow: hidden;
+  border-radius: 16px; background: var(--surface); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  --pastille: 42px;
+}
+body.mode-telephone .bandeau-annotation { left: 8px; right: 8px; height: 68px; --pastille: 38px; }
+.bandeau-annotation .pastille-annotation {
+  position: relative; flex: 0 0 56px; display: flex; align-items: center; justify-content: center; margin: 0; padding: 0;
+  border: none; border-radius: 0; font-size: 26px; font-weight: 900; line-height: 1; cursor: pointer; --teinte: #2563eb; color: var(--teinte);
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--teinte) 16%, var(--surface)) calc(var(--pastille) / 2 - 0.5px), transparent calc(var(--pastille) / 2)), var(--surface);
+}
+body.mode-telephone .bandeau-annotation .pastille-annotation { flex-basis: 46px; font-size: 22px; }
+.bandeau-annotation .pastille-annotation.retour { --teinte: #7c3aed; }
+.bandeau-annotation .pastille-annotation:disabled { opacity: 0.35; }
+.bandeau-annotation .pastille-annotation svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; }
+.bandeau-annotation .badge-photos { position: absolute; top: 8px; right: 4px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 9px; background: #dc2626; color: #ffffff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; }
+.champs-annotation-bandeau {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 3px 10px; box-sizing: border-box;
+  border: 4px solid var(--ambre); border-right: none; background: color-mix(in srgb, var(--ambre) 10%, var(--surface));
+}
+.id-annotation { display: flex; flex-direction: column; margin: 0; }
+.id-annotation > span { font-size: 10px; color: var(--encre); opacity: 0.65; line-height: 1.1; }
+.bandeau-annotation input[type='text'] { width: 100%; min-width: 0; box-sizing: border-box; border: none; background: none; box-shadow: none; padding: 0; color: var(--encre); }
+.bandeau-annotation .id-annotation input { font-size: 20px; font-weight: 900; min-height: 26px; }
+.bandeau-annotation .remarque-bandeau { font-size: 15px; min-height: 24px; border-top: 1px solid color-mix(in srgb, var(--encre) 18%, transparent); padding-top: 2px; }
+body.mode-telephone .bandeau-annotation .id-annotation input { font-size: 17px; }
+.bouton-enreg-annotation {
+  flex: 0 0 124px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 4px;
+  border: none; border-radius: 0; background: var(--ambre); color: #1b2b36; font-size: 18px; font-weight: 900;
+}
+.bouton-enreg-annotation small { font-size: 11px; font-weight: 700; opacity: 0.8; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bouton-enreg-annotation:disabled { background: #fde7b0; color: rgba(27, 43, 54, 0.55); }
+body.mode-telephone .bouton-enreg-annotation { flex-basis: 100px; font-size: 15px; }
+body.clavier-ouvert .bandeau-annotation { bottom: 8px; }
+.titre-liste-annotation { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

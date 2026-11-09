@@ -1,7 +1,8 @@
-// Écran de l'application Annotation (0.177.0, Intermédiaire et Expert, demande du 09.11) : sous le plan, le choix
-// de la façon de placer le point (Loupe = on le place sur le plan, GNSS = position du récepteur, Tablette = GPS
-// interne s'il est assez précis), puis la fiche du point en cours (position, remarques, photos) et la liste des
-// annotations du projet. Tout est rendu en HTML ; les actions passent par data-action (voir main.js « Annotation »).
+// Écran de l'application Annotation (0.177.0, Intermédiaire et Expert, demande du 09.11 ; 0.179.0 : bandeau comme Lever).
+// Sous le plan : le réglage du GPS tablette (engrenage), le réglage fin de la loupe (mode Manuel), la fiche d'un point
+// déjà enregistré (remarques, photos) et la liste des annotations triée par date. Le bandeau fixe en bas (photo, ↶,
+// ID + remarque, Enreg. point) est construit par htmlBandeauAnnotation. Tout est rendu en HTML ; les actions passent
+// par data-action (voir main.js « Annotation »).
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
@@ -23,7 +24,7 @@ export function textePosition(point) {
 function htmlFiche(b, photos) {
   const remarques = b.remarques.length > 0 ? b.remarques : [''];
   return `<div class="fiche-annotation">
-      <div class="titre-fiche-annotation"><strong>${b.edition ? echapper(b.nom) : 'Nouveau point'}</strong>
+      <div class="titre-fiche-annotation"><strong>${echapper(b.nom)}</strong>
         <span data-champ="position-annotation">${echapper(textePosition(b))}</span></div>
       <div class="remarques-annotation">
         ${remarques.map((r, i) => `<textarea rows="2" data-champ="remarque" data-index="${i}" placeholder="Remarque ${i + 1}" aria-label="Remarque ${i + 1}">${echapper(r)}</textarea>`).join('')}
@@ -36,9 +37,9 @@ function htmlFiche(b, photos) {
           <input type="file" data-champ="photo-annotation" accept="image/*" capture="environment" multiple hidden /></label>
       </div>
       <div class="boutons-annotation">
-        <button type="button" class="bouton" data-action="enregistrer-annotation">${b.edition ? 'Enregistrer les changements' : 'Enregistrer le point'}</button>
-        <button type="button" class="bouton-secondaire" data-action="fermer-annotation">${b.edition ? 'Fermer' : 'Annuler'}</button>
-        ${b.edition ? '<button type="button" class="bouton-secondaire suppression-vraie" data-action="supprimer-annotation">Supprimer</button>' : ''}
+        <button type="button" class="bouton" data-action="enregistrer-fiche-annotation">Enregistrer les changements</button>
+        <button type="button" class="bouton-secondaire" data-action="fermer-annotation">Fermer</button>
+        <button type="button" class="bouton-secondaire suppression-vraie" data-action="supprimer-annotation">Supprimer</button>
       </div>
     </div>`;
 }
@@ -67,13 +68,34 @@ export function dateHeure(iso) {
 }
 
 /**
- * HTML de l'écran. { mode ('loupe' quand « Manuel » est choisi dans la bande, sinon null), brouillon (ou null),
- * photos (du brouillon), manuel: { zoom }, tablette: { texte, maximum },
- * liste: [{ nom, remarques, photos, source, premiere, date }] (la plus récente d'abord) }.
- * Les boutons Manuel / GNSS / GPS tablette et « Enreg. point » sont dans la bande du bas (voir main.js).
+ * HTML du bandeau fixe du bas : photo | ↶ (efface le dernier point) | ID + remarque | Enreg. point.
+ * { nom (affiché dans l'ID), remarque, photos (nombre de photos du prochain point), position (ou null : Enreg. grisé),
+ * dernier (nom du dernier point enregistré, ou '') }.
  */
-export function htmlAnnotation({ mode, brouillon, photos = [], manuel, tablette, liste, reglages = false }) {
-  const lignes = liste.map((a) => `<button type="button" class="ligne-annotation ${brouillon?.edition && brouillon.nom === a.nom ? 'actif' : ''}" data-action="ouvrir-annotation" data-nom="${echapper(a.nom)}">
+export function htmlBandeauAnnotation({ nom, remarque, photos, position, dernier }) {
+  return `<div class="bandeau-annotation">
+      <label class="pastille-annotation photo" title="Photo du prochain point (puis on peut dessiner dessus)" aria-label="Photo du prochain point">
+        <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>${photos > 0 ? `<span class="badge-photos">${photos}</span>` : ''}
+        <input type="file" data-champ="photo-annotation-bandeau" accept="image/*" capture="environment" multiple hidden /></label>
+      <button type="button" class="pastille-annotation retour" data-action="effacer-dernier-annotation" ${dernier ? '' : 'disabled'}
+        title="Effacer le dernier point${dernier ? ` (${echapper(dernier)})` : ''}" aria-label="Effacer le dernier point">↶</button>
+      <div class="champs-annotation-bandeau">
+        <label class="id-annotation"><span>ID annotation</span>
+          <input type="text" data-champ="nom-annotation" value="${echapper(nom)}" autocomplete="off" aria-label="Nom de l'annotation" /></label>
+        <input type="text" class="remarque-bandeau" data-champ="remarque-annotation" value="${echapper(remarque)}" placeholder="Remarque" autocomplete="off" aria-label="Remarque" />
+      </div>
+      <button type="button" class="bouton-enreg-annotation" data-action="enregistrer-annotation" ${position ? '' : 'disabled'} title="Enregistrer le point">
+        <span>Enreg. point</span><small>${position ? echapper(SOURCES[position.source] ?? '') : 'prends une position'}</small></button>
+    </div>`;
+}
+
+/**
+ * HTML de l'écran. { mode ('loupe' quand « Manuel » est choisi dans la bande, sinon null), fiche (point rouvert, ou null),
+ * photos (de la fiche), manuel: { zoom }, tablette: { texte, maximum }, reglages, tri ('recent' | 'ancien'),
+ * liste: [{ nom, remarques, photos, source, premiere, date }] (déjà triée) }.
+ */
+export function htmlAnnotation({ mode, fiche, photos = [], manuel, tablette, liste, reglages = false, tri = 'recent' }) {
+  const lignes = liste.map((a) => `<button type="button" class="ligne-annotation ${fiche?.nom === a.nom ? 'actif' : ''}" data-action="ouvrir-annotation" data-nom="${echapper(a.nom)}">
       <strong>${echapper(a.nom)}</strong><span>${echapper(a.premiere || '—')}</span><small>${echapper(a.date)} · ${a.remarques} rem. · ${a.photos} photo(s) · ${echapper(SOURCES[a.source] ?? '')}</small></button>`).join('');
   const invite = mode === 'loupe'
     ? 'Touche le plan, place la croix, puis lève le doigt'
@@ -83,8 +105,9 @@ export function htmlAnnotation({ mode, brouillon, photos = [], manuel, tablette,
       ${reglages ? `<div class="reglages-annotation"><label class="reglage-precision-annotation">GPS tablette : précision demandée (m, au mieux)
         <input type="number" inputmode="decimal" min="0.5" max="50" step="0.5" value="${tablette.maximum}" data-champ="precision-tablette-max" /></label>
         <small class="precision-annotation" data-champ="precision-tablette">${echapper(tablette.texte)}</small></div>` : ''}
-      ${mode === 'loupe' && !brouillon?.edition ? htmlLoupe(manuel) : ''}
-      ${brouillon ? htmlFiche(brouillon, photos) : `<p class="invite-annotation"><strong>${invite}</strong></p>`}
-      ${liste.length > 0 ? `<div class="liste-annotation"><div class="titre-liste-annotation"><strong>Annotations (${liste.length}) · par date</strong></div>${lignes}</div>` : ''}
+      ${mode === 'loupe' ? htmlLoupe(manuel) : ''}
+      ${fiche ? htmlFiche(fiche, photos) : `<p class="invite-annotation"><strong>${invite}</strong></p>`}
+      ${liste.length > 0 ? `<div class="liste-annotation"><div class="titre-liste-annotation"><strong>Annotations (${liste.length})</strong>
+        <button type="button" class="bouton-lien" data-action="trier-annotation" title="Changer l'ordre de la liste">Trier par date : ${tri === 'recent' ? 'récent d\'abord ▾' : 'ancien d\'abord ▴'}</button></div>${lignes}</div>` : ''}
     </div>`;
 }

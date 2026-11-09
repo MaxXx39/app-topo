@@ -209,6 +209,13 @@ export function completerProjet(projet) {
  */
 export function prefixerNoms(projet) {
   for (const objet of [...projet.surfaces, ...(projet.metres ?? []), ...(projet.reseaux ?? []), ...(projet.autres ?? [])]) {
+    // Annotations d'avant 0.179.0 : « Anot-… » devient « Annot-… ».
+    if (objet.nature === 'annotation' && /^Anot-/i.test(objet.nom)) {
+      const liste = objet.leveId ? projet.leves.find((l) => l.id === objet.leveId) : null;
+      const neuf = String(objet.nom).replace(/^Anot-/i, 'Annot-');
+      if (liste?.dediee && liste.nom === objet.nom) liste.nom = neuf;
+      objet.nom = neuf;
+    }
     const nom = avecPrefixe(objet.nom, prefixeDuNom(objet));
     if (nom === objet.nom) continue;
     const liste = objet.leveId ? projet.leves.find((l) => l.id === objet.leveId) : null;
