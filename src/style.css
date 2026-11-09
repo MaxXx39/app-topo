@@ -13080,3 +13080,19 @@ dialog.fenetre-chantier h2 { margin: 0; padding: 12px 14px; background: var(--so
 .attributs-chantier .champ-chantier.r { flex: 1; }
 .calcul-chantier { margin: 0; padding: 0 2px; background: transparent; font-size: 0.7rem; font-weight: 700; color: var(--ambre-fonce); }
 .calcul-chantier.erreur { color: var(--rouge); }
+
+/* ===== 0.175.7 (demande du 09.11) : bas de l'écran Lever =====
+   « + » (nouveau levé) de la bande et ↶ du bandeau 1/3 plus grands ; liseré jaune qui entoure aussi la gauche du bandeau
+   (photo, ↶, Δ) et rejoint le cadre jaune de l'ID point. */
+.bande-appli .petit-bouton-levee[data-cle="nouveau-levee"] { min-width: 53px; min-height: 58px; font-size: 24px; }
+.bande-appli .petit-bouton-levee[data-cle="nouveau-levee"] svg { width: 29px; height: 29px; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::before { font-size: 37px; }
+/* Liseré jaune autour du groupe photo | ↶ | Δ : dessiné par ↶ (fixe comme les deux autres, au-dessus d'eux), il part de la photo et finit contre le cadre jaune de l'ID point. */
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"] { z-index: 22; overflow: visible; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--hauteur-bandeau-point)); pointer-events: none; box-sizing: border-box;
+  width: calc(var(--hauteur-bandeau-point) + var(--largeur-bouton-bandeau));
+  border: 4px solid var(--ambre); border-right: none; border-radius: 12px 0 0 12px;
+}
+body.bande-action:not(.mode-telephone):not(.mode-base)[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::after { width: calc(var(--hauteur-bandeau-point) + var(--largeur-bouton-bandeau) * 2); }
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::after { display: none; }
