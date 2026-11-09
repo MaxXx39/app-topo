@@ -12961,3 +12961,11 @@ body.mode-telephone .bouton-partie-projet { min-height: 32px; font-size: 11px; }
 body.mode-telephone .comptes-projet-applis { font-size: 9.5px; margin: 4px 0 0; }
 body.mode-telephone .pied-applis { padding: 5px; margin-top: 4px; gap: 6px; }
 body.mode-telephone .pied-applis button { min-height: 34px; font-size: 12px; }
+
+/* 0.174.0 (demande du 09.11) : Drive et la main côte à côte (plus l'un au-dessus de l'autre : mal affiché et on ne pouvait pas
+   toucher l'un ou l'autre) ; en mode téléphone, Drive est seulement une icône. */
+.entete-pastilles { flex-direction: row; align-items: center; gap: 6px; max-width: none; }
+.entete-pastilles .pastille-entete { min-height: 28px; display: inline-flex; align-items: center; justify-content: center; }
+body.mode-telephone .entete-pastilles { gap: 4px; }
+body.mode-telephone .etat-drive { padding: 2px 7px; font-size: 13px; min-height: 24px; }
+body.mode-telephone .entete-pastilles .pastille-entete { min-height: 24px; }

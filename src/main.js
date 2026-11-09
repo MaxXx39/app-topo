@@ -7331,7 +7331,10 @@ function mettreAJourEtatEntete() {
   // orange bien visible dans tous les autres cas (envoi, attente, main rendue…).
   const pastilleDrive = document.querySelector('#etat-drive');
   pastilleDrive.hidden = !drive;
-  pastilleDrive.textContent = drive;
+  // 0.174.0 : tablette « Drive ✓ », téléphone seulement l'icône (☁ + ✓ à jour, … en cours, ! autre) ; le texte complet reste dans l'info-bulle.
+  const court = partage?.etat.connecte ? `☁${{ 'a-jour': '✓', envoi: '…' }[partage.etat.etat] ?? '!'}` : '';
+  pastilleDrive.innerHTML = drive ? `<span class="t-long">${echapper(drive)}</span><span class="t-court">${court}</span>` : '';
+  pastilleDrive.title = drive;
   pastilleDrive.classList.toggle('etat-drive-ok', partage?.etat.etat === 'a-jour');
   // La page Applications ouverte montre le projet à jour dans son encadré.
   navigation?.mettreAJour();
