@@ -45,7 +45,7 @@ function tableauPagine(cle, titre, entetes, lignes, page) {
  * HTML de l'écran. { mesure (voir topo/mesure-rapide.js), accroche, accroches: [[cle, mot, nom, dessin]],
  * pages: { points, cotes } }.
  */
-export function htmlMesureRapide({ mesure, accroche, accroches, pages, manuel = { candidat: false, zoom: 4 } }) {
+export function htmlMesureRapide({ mesure, accroche, accroches, pages, manuel = { candidat: false, zoom: 4 }, accrochesOuvertes = false }) {
   const n = mesure.points.length;
   const boutons = accroches.map(([cle, mot, nom, dessin]) => `<button type="button" class="bouton-accroche ${accroche === cle ? 'actif' : ''}" data-action="accroche-mesure" data-valeur="${cle}" title="${nom}" aria-label="${nom}" aria-pressed="${accroche === cle}">
       <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span class="mot-accroche">${mot}</span></button>`).join('');
@@ -57,8 +57,11 @@ export function htmlMesureRapide({ mesure, accroche, accroches, pages, manuel = 
   const cotes = tableauPagine('cotes', `Côtés (${mesure.cotes.length})`, ['Côté', 'L 2D', 'L 3D', 'Δh', 'Pente'],
     mesure.cotes.map((c) => [`${c.de} → ${c.a}`, nombre(c.longueur2d), nombre(c.longueur3d), nombre(c.deltaH), pente(c.pente)]), pages.cotes);
   return `<div class="ecran-mesure-rapide">
-      <div class="barre-accroche ouverte barre-accroche-mesure">
-        <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend">${boutons}</div>
+      <div class="barre-accroche barre-accroche-mesure ${accrochesOuvertes ? 'ouverte' : ''}">
+        <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend">${boutons}
+          <button type="button" class="bouton-deplier-accroches" data-action="basculer-accroches-mesure" title="${accrochesOuvertes ? 'Cacher' : 'Voir'} les noms" aria-label="${accrochesOuvertes ? 'Cacher' : 'Voir'} les noms des accroches" aria-expanded="${accrochesOuvertes}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${accrochesOuvertes ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}" /></svg></button>
+        </div>
         ${bulle('mesureRapide')}
       </div>
       ${accroche === 'manuel' ? `<div class="reglage-loupe reglage-loupe-mesure">

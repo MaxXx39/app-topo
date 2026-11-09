@@ -599,7 +599,7 @@ function afficherMesureRapide() {
   if (mesureRapideEtat.accroche === 'libre') mesureRapideEtat.accroche = 'manuel';
   document.querySelector('#mesure-rapide').innerHTML = htmlMesureRapide({
     mesure, accroche: mesureRapideEtat.accroche, accroches: accrochesMesure(), pages: mesureRapideEtat.pages,
-    manuel: { candidat: Boolean(mesureRapideEtat.candidat), zoom: terrain.zoomLoupe ?? 4 },
+    manuel: { candidat: Boolean(mesureRapideEtat.candidat), zoom: terrain.zoomLoupe ?? 4 }, accrochesOuvertes: Boolean(mesureRapideEtat.accrochesOuvertes),
   });
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
@@ -705,7 +705,10 @@ document.querySelector('#mesure-rapide').addEventListener('click', (evenement) =
   const bouton = evenement.target.closest('button[data-action]');
   if (!bouton || bouton.disabled) return;
   const action = bouton.dataset.action;
-  if (action === 'accroche-mesure') {
+  if (action === 'basculer-accroches-mesure') {
+    mesureRapideEtat.accrochesOuvertes = !mesureRapideEtat.accrochesOuvertes;
+    afficherMesureRapide();
+  } else if (action === 'accroche-mesure') {
     mesureRapideEtat.accroche = bouton.dataset.valeur;
     mesureRapideEtat.candidat = null;
     afficherMesureRapide();
@@ -1643,7 +1646,7 @@ if (boutonRecepteur && recepteur2Disponible()) {
 // Pendant le guidage d'une implantation (0.84.0), le plan a sa propre part (la moitié au départ).
 const CLE_PLAN_TERRAIN = 'topo-plan-terrain-part';
 const CLE_PLAN_GUIDAGE = 'topo-plan-guidage-part';
-const PART_PLAN = { pas: 0.15, min: 0.2, max: 0.8, depart: 0.35, departGuidage: 0.5 };
+const PART_PLAN = { pas: 0.15, min: 0.2, max: 0.92, depart: 0.35, departGuidage: 0.5 };
 const partsPlan = { terrain: PART_PLAN.depart, guidage: PART_PLAN.departGuidage };
 for (const [sorte, cle, variable] of [['terrain', CLE_PLAN_TERRAIN, '--part-plan-terrain'], ['guidage', CLE_PLAN_GUIDAGE, '--part-plan-guidage']]) {
   try {

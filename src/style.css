@@ -12317,3 +12317,28 @@ body.mode-telephone .entete-guidage .bouton-retour[data-action='arreterControle'
 .grosse-machine svg .silhouette-outil { fill: currentColor; opacity: 0.75; }
 .grosse-machine svg .silhouette-outil .vitre-silhouette { fill: #ffffff; opacity: 0.9; }
 .grosse-machine.actif svg .silhouette-outil .vitre-silhouette { fill: #1d4ed8; }
+
+/* ==========================================================================
+   0.164.0 (harmonisation + place gagnée, demandes du 09.11)
+   ========================================================================== */
+/* A2 · Boutons d'action de la bande du bas : même hauteur, même arrondi, même écriture dans toutes les applications. */
+.bande-appli :is(.bouton-enreg-bande, .bouton-bande-mesure) {
+  min-height: 52px; border-radius: 14px; font-size: 17px; font-weight: 800; line-height: 1.15;
+}
+.bande-appli :is(.bouton-enreg-bande, .bouton-bande-mesure) small { font-size: 12px; font-weight: 700; }
+.bande-appli .petit-bouton-levee { min-height: 44px; border-radius: 14px; }
+.zone-cible-bande .bouton-enreg-bande.petit { flex: 0 0 76px; font-size: 17px; }
+body.mode-telephone .bande-appli :is(.bouton-enreg-bande, .bouton-bande-mesure) { min-height: 42px; font-size: 14px; }
+body.mode-telephone .bande-appli :is(.bouton-enreg-bande, .bouton-bande-mesure) small { font-size: 10px; }
+/* A3 · Titres de cadre : même taille et même marge (Volumes, Points de contrôle, Quelle machine ?…). */
+.titre-choix, .panneau[data-onglet='volumes'] > h2 { margin: 2px 0 8px; font-size: 17px; font-weight: 800; color: var(--encre); }
+/* A4 · Roue ⚙, cloche 🔔 et ← : même taille partout. */
+.bouton-roue, .bouton-bip { min-width: 44px; min-height: 44px; border-radius: 12px; }
+body.mode-telephone :is(.bouton-roue, .bouton-bip) { min-width: 36px; min-height: 36px; }
+.ecart-et-regle > .bouton-bip { min-width: 36px; min-height: 36px; }
+/* B3 · cadre du bas collé au plan, flèches ▲ ▼ sur le coin du plan. */
+.boutons-taille-plan { opacity: 0.92; }
+/* B4 · marges du cadre du bas réduites. */
+body[data-onglet='terrain'] .mise-en-page, body[data-onglet='volumes'] .mise-en-page { padding-left: 6px; padding-right: 6px; }
+/* B6 · la place du bouton en bas à gauche est réservée, sans marge en trop. */
+#leve-direct p.aide, #leve-direct [data-vivant='orientation'] { margin: 2px 0; line-height: 1.25; }
