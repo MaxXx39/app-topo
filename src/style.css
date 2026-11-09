@@ -12743,7 +12743,14 @@ body.mode-telephone .bande-appli .surface-bande .liste-bande { font-size: 14px; 
 /* 0.168.1 : fenêtre Delta sur une seule ligne (dès 520 px de large) : Δ Delta | G / D | dist. | Z ± | grande croix. */
 @media (min-width: 521px) {
   .ligne-delta { display: flex; flex-wrap: nowrap; align-items: center; gap: 12px; }
-  .ligne-delta .rang-delta { display: contents; }
   .ligne-delta .titre-delta { flex: none; }
   .ligne-delta .bouton-fermer-delta { margin-left: auto; align-self: stretch; flex: none; }
+}
+
+/* 0.168.2 : dans la fenêtre Delta, « G / D + dist. » dans un encadré et « Z ± » dans un autre. */
+.ligne-delta .rang-delta {
+  padding: 4px 8px;
+  border: 2px solid color-mix(in srgb, #ea580c 45%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, #ea580c 5%, var(--surface));
 }
