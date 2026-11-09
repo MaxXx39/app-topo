@@ -8,6 +8,7 @@ import { aAcces, rayonFormes, echelleTexte } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
 import { dessinerMesureRapide } from './mesure-rapide.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
+import { texteDuPoint } from '../topo/chantier.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { bordDeTriangles, estSurfaceFichier } from '../topo/surface.js';
 import { formaterNombre } from '../topo/format.js';
@@ -453,7 +454,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (calques.noms || calques.altitudes) {
       const montrerNom = (point) => calques.noms && (pointsImport.has(point) ? calques.nomsImport : calques.nomsLeve);
       const textes = visibles.map(({ point }) =>
-        [montrerNom(point) ? point.nom : null, calques.altitudes ? formaterNombre(point.altitude) : null].filter(Boolean),
+        [montrerNom(point) ? point.nom : null, calques.altitudes ? formaterNombre(point.altitude) : null, calques.altitudes && point.chantier ? texteDuPoint(point.chantier, point.chantier) : null].filter(Boolean),
       );
       const places = placerEtiquettes(
         visibles.map(({ x, y }, i) => ({
@@ -589,6 +590,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         nom.textContent = o.nom;
         autres.append(nom);
       }
+    }
+    // Levé chantier (0.175.0) : ouvrage rond = cercle de 60 cm (arbitraire), rectangulaire = son cadre à l'échelle.
+    for (const forme of implantation.chantiers ?? []) {
+      const element = forme.coins
+        ? creerElement('path', { d: tracePar(forme.coins.map((c) => versEcran(c.est, c.nord, vue)), true), class: 'ouvrage-reseau' })
+        : (() => {
+            const c = versEcran(forme.est, forme.nord, vue);
+            return creerElement('circle', { cx: c.x, cy: c.y, r: Math.max(5, forme.rayon * vue.echelle), class: 'ouvrage-reseau' });
+          })();
+      element.style.stroke = forme.couleur;
+      autres.append(element);
     }
     // Points de contrôle (Terrain › Contrôle) : triangle rouge et nom en rouge. Noms et altitudes placés
     // sans se chevaucher (0.114.0) : une étiquette sans place est cachée, elle revient en zoomant.

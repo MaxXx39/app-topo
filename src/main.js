@@ -77,7 +77,7 @@ import { imageAvecDessins, ouvrirEditeurDessin, photosAvecDessins } from './phot
 import { creerSuiviOrientation } from './leve/orientation.js';
 import { ecouterBoussole } from './leve/boussole.js';
 import { lireLibellesChantier, lireNaturesChantier, libelleChantier } from './leve/libelles-chantier.js';
-import { lireAttributsChantier, altitudesDuPoint, cadreDeTroisCoins } from './topo/chantier.js';
+import { lireAttributsChantier, altitudesDuPoint, cadreDeTroisCoins, RAYON_TAMPON_ROND } from './topo/chantier.js';
 import { lireLibelles, recreerLibellesManquants, definirLibellesProjet, surLibellesProjet } from './leve/libelles.js';
 import { modifierLibellesDeSorte, modifierReseaux } from './leve/fenetre-libelles.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
@@ -2030,6 +2030,8 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         if (champ === 'libelle') {
           terrain.chantier.forme = 'ronde';
           terrain.chantier.mode = '';
+          terrain.chantier.diametre = '';
+          terrain.chantier.profondeur = '';
           const libelle = libelleChantier(valeur);
           const natures = lireNaturesChantier()[libelle.reseau ? 'reseau' : 'bordure'];
           if (!natures.includes(terrain.chantier.nature)) terrain.chantier.nature = natures[0];
@@ -2738,6 +2740,7 @@ function envoyerImplantationAuPlan() {
   const lignesSuivies = ongletContexte === 'terrain' && terrain.mode === 'lame' ? lignesGuidage.liste.map((l) => ({ id: 'ligne-guidage', sommets: l.sommets, fermee: false, couleur: ['#7c3aed', '#ea580c'][l.place] })) : [];
   const lignesAutres = [...(seul ? [] : lignesDesAutres().filter((l) => !gardees || gardees.has(l.id))), ...lignesSuivies];
   const reseaux = seul ? [] : reseauxDuPlan().filter((r) => !gardees || gardees.has(r.id));
+  const chantiers = seul ? [] : formesDuChantier().filter((f) => !gardees || gardees.has(f.id));
   // Points de contrôle : dessinés si leur case « Points de contrôle » est cochée (menu Afficher).
   const pointsControle = seul || (gardees && !gardees.has(LISTE_CONTROLE)) || (projet.listesCachees ?? []).includes(LISTE_CONTROLE) ? [] : projet.pointsControle;
   const dessins = seul ? [] : dessinsVisibles().filter((d) => !gardees || gardees.has(d.id));
@@ -2761,7 +2764,7 @@ function envoyerImplantationAuPlan() {
   plan.suspendreSuivi(ongletContexte === 'terrain' && ((enImplantationDePoint() && Boolean(implanter.choix) && !implanter.cible) || (enImplantationDeLigne() && Boolean(implanter.ligne) && implanter.ligneAValider)));
   if (!guidageLigne) implanter.voirLigne = false;
   plan.voirLigne({ visible: guidageLigne, sommets: guidageLigne && implanter.voirLigne ? implanter.ligne.sommets : null });
-  plan.afficherImplantation(accrocheActive || avecPilote || choixCotes || aImplanter.length > 0 || implantes.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0 || talusSurfaces.length > 0
+  plan.afficherImplantation(accrocheActive || avecPilote || choixCotes || aImplanter.length > 0 || implantes.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || chantiers.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0 || talusSurfaces.length > 0
     ? {
         actif: accrocheActive || avecPilote || choixCotes,
         // Talus des dessins : barbules du haut vers le bas et pente écrite dedans (0.122.0) ; aussi ceux des surfaces (0.135.0).
@@ -2775,6 +2778,7 @@ function envoyerImplantationAuPlan() {
         pointsControle,
         lignesAutres,
         reseaux,
+        chantiers,
         choix: daoAppli?.actif() ? daoAppli.dernierPoint() : recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : accrocheActive && !mesure && !enLigne && !enAutocontrole() ? implanter.choix : null,
         cible: cibleControle ?? (accrocheActive && !mesure && !enLigne && !enAutocontrole() && !ajoutLevee.actif ? implanter.cible : null),
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
@@ -2854,7 +2858,16 @@ function exporterListe(type, id) {
         });
         return { blob, nom: `${base}.pdf` };
       }
-      const { blob, extension } = fichierPoints(points, format, roles);
+      // Levé chantier : lignes et cadres par libellé et nature dans le DXF.
+      const chantierDuLeve = projet.autres.find((a) => a.nature === 'chantier' && a.leveId === (type === 'dessin' ? null : id));
+      const parNomChantier = new Map(points.map((p) => [p.nom, p]));
+      const chantier = chantierDuLeve
+        ? {
+            lignes: chantierDuLeve.lignesRupture.filter((l) => l.noms.length >= 2).map((l) => ({ noms: l.noms, fermee: Boolean(l.fermee), libelle: l.libelle, nature: parNomChantier.get(l.noms[0])?.chantier?.nature ?? '' })),
+            cadres: (chantierDuLeve.cadres ?? []).filter((c) => c.coins),
+          }
+        : null;
+      const { blob, extension } = fichierPoints(points, format, roles, chantier);
       return { blob, nom: `${base}.${extension}` };
     },
     enregistrer: enregistrerFichier,
@@ -2939,6 +2952,28 @@ function reseauxDuPlan() {
     couleur: projet.couleursListes?.[r.id] ?? couleurDuReseau(r.reseau, reseaux),
     ...traceDuRecollement(r, projet.leves.find((l) => l.id === r.leveId) ?? { points: [] }),
   }));
+}
+
+/**
+ * Ouvrages des levés chantier visibles (0.175.0) : un cercle de 60 cm autour d'un tampon rond (chambre, grille),
+ * le cadre mesuré pour un ouvrage à 3 coins. [{ id, est, nord, rayon, couleur } ou { id, coins, couleur }].
+ */
+function formesDuChantier() {
+  const cachees = new Set(projet.listesCachees ?? []);
+  const libelles = lireLibellesChantier();
+  const formes = [];
+  for (const chantier of projet.autres.filter((a) => a.nature === 'chantier' && !cachees.has(a.id))) {
+    const points = projet.leves.find((l) => l.id === chantier.leveId)?.points ?? [];
+    for (const p of points) {
+      const c = p.chantier;
+      if (!c || c.forme !== 'ronde' || !libelles.find((l) => l.abreviation === c.libelle)?.ouvrage) continue;
+      formes.push({ id: chantier.id, est: p.est, nord: p.nord, rayon: RAYON_TAMPON_ROND, couleur: libelles.find((l) => l.abreviation === c.libelle).couleur });
+    }
+    for (const cadre of chantier.cadres ?? []) {
+      if (cadre.coins) formes.push({ id: chantier.id, coins: cadre.coins, couleur: libelleChantier(cadre.libelle, libelles).couleur });
+    }
+  }
+  return formes;
 }
 
 function lignesDesAutres() {

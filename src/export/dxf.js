@@ -14,6 +14,8 @@
 import { courbesDeNiveau, estMaitresse, chainerCourbes, cotesDesCourbes, texteCote } from '../topo/courbes.js';
 import { formaterNombre } from '../topo/format.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne, aciDeCouleurLibelle } from '../leve/libelles.js';
+import { lireLibellesChantier } from '../leve/libelles-chantier.js';
+import { texteDuPoint, calqueChantier } from '../topo/chantier.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
 import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, aciDeMesure } from '../mesures/valeurs.js';
 
@@ -26,10 +28,12 @@ const COULEURS = { POINTS: 7, NOMS: 8, ALTITUDES: 5, CONTOURS: 1, LIGNES_RUPTURE
  * - stocks, resultats : surfaces dont le volume est calculé, et leurs volumes (resultats[i].trianglesDessus)
  * - surfaces : liste de { nom, triangles }
  * - equidistance : équidistance des courbes de niveau (m), ou null pour ne pas en mettre
+ * - chantier : Levé chantier (0.175.0) { lignes: [{ noms, fermee, libelle, nature }], cadres: [{ coins, libelle, nature }] } : un calque
+ *   CHANT_<libellé>_<nature> par libellé et nature (lignes 3D, cadres), et CHANT_…_TXT pour le texte « Ø300 · FE 432.150 » à côté des points
  * - dessins : [{ ferme, lignes (vrai : relier les sommets), points: [{ nom, est, nord, altitude }] }]
  *   (Calculs › Dessin ; altitude inconnue écrite à 0)
  */
-export function genererDxf({ points, stocks = [], resultats = [], surfaces = [], equidistance = null, dessins = [] }) {
+export function genererDxf({ points, stocks = [], resultats = [], surfaces = [], equidistance = null, dessins = [], chantier = null }) {
   const entites = [];
   const calques = new Map(Object.entries(COULEURS).filter(([nom]) => !nom.startsWith('COURBES') || equidistance));
   const parNom = new Map(points.map((p) => [p.nom, p]));
@@ -42,6 +46,8 @@ export function genererDxf({ points, stocks = [], resultats = [], surfaces = [],
     // Altitude sous le nom (texte de 0.25 m de haut)
     entites.push(['0', 'TEXT', '8', 'ALTITUDES', ...xyz({ ...p, est: p.est + 0.2, nord: p.nord - 0.4 }, 0), '40', '0.25', '1', formaterNombre(p.altitude)]);
   }
+
+  if (chantier || points.some((p) => p.chantier)) ecrireChantierDxf({ points, chantier, calques, entites });
 
   stocks.forEach((stock, i) => {
     const contour = (stock.contour ?? []).map((nom) => parNom.get(nom)).filter(Boolean);
@@ -136,6 +142,40 @@ export function genererDxfMesures({ points, mesures }) {
     }
   }
   return ecrireDxf(calques, entites);
+}
+
+/**
+ * Levé chantier dans le DXF (0.175.0) : points sur le calque CHANT_<libellé>_<nature>, leur texte (Ø, FE, profondeur…)
+ * sur CHANT_…_TXT, lignes 3D et cadres sur le calque de leur libellé et nature.
+ */
+function ecrireChantierDxf({ points, chantier, calques, entites }) {
+  const libelles = lireLibellesChantier();
+  const calque = (abreviation, nature) => calqueChantier(libelles.find((l) => l.abreviation === abreviation)?.nom ?? abreviation, nature);
+  const parNom = new Map(points.map((p) => [p.nom, p]));
+  const ajouter = (nom, couleur) => { if (!calques.has(nom)) calques.set(nom, couleur); };
+  for (const p of points) {
+    const c = p.chantier;
+    if (!c) continue;
+    const nomCalque = calque(c.libelle, c.nature);
+    ajouter(nomCalque, 30);
+    entites.push(['0', 'POINT', '8', nomCalque, ...xyz(p, 0)]);
+    const texte = texteDuPoint(c, c);
+    if (!texte) continue;
+    ajouter(`${nomCalque}_TXT`, 8);
+    entites.push(['0', 'TEXT', '8', `${nomCalque}_TXT`, ...xyz({ ...p, est: p.est + 0.2, nord: p.nord - 0.9 }, 0), '40', '0.25', '1', texte]);
+  }
+  for (const ligne of chantier?.lignes ?? []) {
+    const sommets = ligne.noms.map((nom) => parNom.get(nom)).filter(Boolean);
+    const nomCalque = calque(ligne.libelle, ligne.nature);
+    ajouter(nomCalque, 30);
+    if (sommets.length >= 2) entites.push(...polyligne3D(sommets, ligne.fermee, nomCalque));
+  }
+  for (const cadre of chantier?.cadres ?? []) {
+    if (!cadre.coins) continue;
+    const nomCalque = calque(cadre.libelle, cadre.nature);
+    ajouter(nomCalque, 30);
+    entites.push(...polyligne3D(cadre.coins.map((k) => ({ ...k, altitude: cadre.tampon ?? 0 })), true, nomCalque));
+  }
 }
 
 /** Texte complet du fichier DXF : en-tête, calques (nom -> couleur), puis les entités. */

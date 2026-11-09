@@ -88,3 +88,34 @@ describe('textes et calques', () => {
     expect(calqueChantier('Tuyau', 'EU')).toBe('CHANT_TUYAU_EU');
   });
 });
+
+import { csvPoints, avecChantier } from '../src/export/points.js';
+import { genererDxf } from '../src/export/dxf.js';
+import { pdfPoints } from '../src/export/pdf-points.js';
+
+describe('export du Levé chantier', () => {
+  const points = [
+    { nom: 'L-T-1-1', est: 100, nord: 200, altitude: 432.15, chantier: { libelle: 'T', nature: 'EU', mode: 'dessus', diametre: 300, altitudeLevee: 432.45, filEau: 432.15, materiau: 'PVC' } },
+    { nom: 'L-T-1-2', est: 105, nord: 201, altitude: 432.1, chantier: { libelle: 'T', nature: 'EU', mode: 'dessus', diametre: 300, altitudeLevee: 432.4, filEau: 432.1, materiau: 'PVC' } },
+    { nom: 'P-CH-1', est: 110, nord: 202, altitude: 430.7, chantier: { libelle: 'CH', nature: 'EU', mode: 'tampon', forme: 'ronde', profondeur: 2.4, altitudeLevee: 433.1, radier: 430.7 } },
+  ];
+  it('CSV : colonnes d\'attributs seulement s\'il y a des points chantier', () => {
+    expect(avecChantier(points)).toBe(true);
+    const lignes = csvPoints(points).trim().split('\r\n');
+    expect(lignes[0]).toContain('Fil d\'eau (m);Radier (m)');
+    expect(lignes[1]).toContain(';T;EU;;300;432.450;432.150;;;PVC;');
+    expect(csvPoints([{ nom: 'P-1', est: 1, nord: 2, altitude: 3 }])).not.toContain('Libellé');
+  });
+  it('DXF : calque par libellé et nature, texte et ligne', () => {
+    const dxf = genererDxf({ points, chantier: { lignes: [{ noms: ['L-T-1-1', 'L-T-1-2'], fermee: false, libelle: 'T', nature: 'EU' }], cadres: [] } });
+    expect(dxf).toContain('CHANT_TUYAU_EU');
+    expect(dxf).toContain('CHANT_TUYAU_EU_TXT');
+    expect(dxf).toContain('Ø300 · FE 432.150');
+    expect(dxf).toContain('CHANT_CHAMBRE_EU_TXT');
+    expect(dxf).toContain('Prof. 2.40 · Radier 430.700');
+  });
+  it('PDF : se fabrique avec les colonnes chantier', () => {
+    const blob = pdfPoints({ titre: 'LV-Chant 1', points });
+    expect(blob.size).toBeGreaterThan(1000);
+  });
+});

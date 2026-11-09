@@ -2,7 +2,7 @@
 // les infos connues de chaque point (mêmes colonnes que le CSV), sur A4 paysage, autant de feuilles
 // que nécessaire. Option : des feuilles de photos à la suite (les photos rattachées aux points).
 import { jsPDF } from 'jspdf';
-import { TITRES_INFOS, infosDuPoint } from './points.js';
+import { TITRES_INFOS, TITRES_CHANTIER, infosDuPoint, avecChantier, infosChantier } from './points.js';
 import { appliquerFormat, dessinerPagePhotos, PHOTOS_PAR_PAGE, COULEURS } from './pdf.js';
 
 const MARGE = 10; // mm
@@ -11,6 +11,9 @@ const HAUTEUR_LIGNE = 5.2;
 const COLONNES = [
   ['g', 27], ['d', 24], ['d', 24], ['d', 19], ['g', 33], ['g', 19], ['g', 16], ['d', 14], ['d', 14], ['g', 19], ['d', 11], ['d', 11], ['d', 15], ['d', 13], ['g', 18],
 ];
+// Levé chantier (0.175.0) : colonnes propres (total 277 mm), sans les précisions GNSS.
+const COLONNES_CHANTIER = [['g', 27], ['d', 24], ['d', 24], ['d', 19], ['g', 14], ['g', 20], ['g', 15], ['d', 12], ['d', 20], ['d', 17], ['d', 17], ['d', 15], ['g', 18], ['g', 35]];
+const TITRES_PDF_CHANTIER = [...TITRES_INFOS.slice(0, 4), ...TITRES_CHANTIER];
 const TITRES = [...TITRES_INFOS.map((t) => t.replace('Précision', 'Préc.').replace('Âge corrections', 'Âge corr.').replace('Satellites', 'Sat.')), 'Photo'];
 
 /**
@@ -21,6 +24,9 @@ export function pdfPoints({ titre, points, roles = new Map(), cartouche = {}, ph
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const avecPhoto = new Set(photos.map((p) => p.point).filter(Boolean));
   let page = 0;
+  const chantier = avecChantier(points);
+  const colonnes = chantier ? COLONNES_CHANTIER : COLONNES;
+  const titres = chantier ? TITRES_PDF_CHANTIER : TITRES;
   const feuille = () => {
     if (page++ > 0) doc.addPage('a4', 'landscape');
     doc.setTextColor(...COULEURS.texte);
@@ -34,12 +40,12 @@ export function pdfPoints({ titre, points, roles = new Map(), cartouche = {}, ph
     doc.setTextColor(...COULEURS.gris);
     const entete = [cartouche.affaire ? `Affaire ${cartouche.affaire}` : null, `${points.length} point(s)`, cartouche.date || null].filter(Boolean).join(' · ');
     doc.text(entete, 297 - MARGE, 14, { align: 'right' });
-    return enteteTableau(doc, 24);
+    return enteteTableau(doc, 24, titres, colonnes);
   };
   let y = feuille();
   for (const p of points) {
     if (y > 210 - MARGE - HAUTEUR_LIGNE) y = feuille();
-    ligne(doc, y, [...infosDuPoint(p, roles), avecPhoto.has(p.nom) ? 'oui' : ''], false);
+    ligne(doc, y, chantier ? [...infosDuPoint(p, roles).slice(0, 4), ...infosChantier(p)] : [...infosDuPoint(p, roles), avecPhoto.has(p.nom) ? 'oui' : ''], false, colonnes);
     y += HAUTEUR_LIGNE;
   }
   if (points.length === 0) {
@@ -58,20 +64,20 @@ export function pdfPoints({ titre, points, roles = new Map(), cartouche = {}, ph
 }
 
 /** Ligne de titres du tableau (fond gris) ; renvoie le y de la première ligne de points. */
-function enteteTableau(doc, y) {
+function enteteTableau(doc, y, titres, colonnes) {
   doc.setFillColor(232, 236, 239);
   doc.rect(MARGE, y - 3.8, 277, HAUTEUR_LIGNE, 'F');
-  ligne(doc, y, TITRES, true);
+  ligne(doc, y, titres, true, colonnes);
   return y + HAUTEUR_LIGNE;
 }
 
 /** Une ligne de texte, une case par colonne (texte coupé s'il ne tient pas). */
-function ligne(doc, y, textes, gras) {
+function ligne(doc, y, textes, gras, colonnes) {
   doc.setFont('helvetica', gras ? 'bold' : 'normal');
   doc.setFontSize(6.8);
   doc.setTextColor(...COULEURS.texte);
   let x = MARGE;
-  COLONNES.forEach(([aligne, largeur], i) => {
+  colonnes.forEach(([aligne, largeur], i) => {
     const texte = doc.splitTextToSize(String(textes[i] ?? ''), largeur - 2)[0] ?? '';
     doc.text(texte, aligne === 'd' ? x + largeur - 1 : x + 1, y, { align: aligne === 'd' ? 'right' : 'left' });
     x += largeur;
