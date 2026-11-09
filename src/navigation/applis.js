@@ -22,6 +22,7 @@ export const APPLIS = [
     // Recollement et Métré (0.161.0, demande du 08.11, Expert) : sortis de Lever, chacun son écran de levé.
     cle: 'recollement',
     titre: 'Recollement',
+    court: 'Recoll.', // 0.172.0 : écrit ainsi en mode téléphone
     couleur: '#4d7c0f',
     texte: '#ffffff',
     site: true,
@@ -49,6 +50,7 @@ export const APPLIS = [
     // Mesure rapide (0.158.0, dès Intermédiaire) : points touchés sur le plan ou pris au GNSS.
     cle: 'mesure',
     titre: 'Mesure rapide',
+    court: 'Mesure',
     couleur: '#7c3aed',
     texte: '#ffffff',
     site: true,

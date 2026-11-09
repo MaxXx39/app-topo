@@ -130,7 +130,7 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
       </div>
     </div>
     ${reglagesOuverts ? reglages : ''}
-    ${donnees.recepteur2 || unGnss ? '' : '<button type="button" class="bouton-secondaire bouton-recepteur-2" data-action="ouvrirRecepteur">Connecter le 2e GNSS</button>'}
+    ${donnees.recepteur2 || unGnss ? '' : '<button type="button" class="bouton-secondaire bouton-recepteur-2" data-action="ouvrirRecepteur"><span class="t-long">Connecter le 2e GNSS</span><span class="t-court">+ 2e GNSS</span></button>'}
     ${htmlLignesSuivies(donnees)}
     <p class="raison-lame" data-vivant="lame-raison" hidden></p>
     <div class="coupes-guidage vue-${vue}">

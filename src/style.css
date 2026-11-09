@@ -12884,3 +12884,53 @@ body.mode-telephone .carte-ligne-guidage .ecart-ligne { font-size: 0.9rem; }
 .zone-levee .bouton-enreg-bande.relais-ligne-guidage { flex: 0 0 64px; }
 .svg-coupe-guidage .texte-pente-engin { font-size: 12px; font-weight: 900; fill: #1e3a8a; }
 .svg-coupe-guidage .texte-pente-terrain { font-size: 11px; font-weight: 800; fill: #92400e; }
+
+/* ==========================================================================
+   0.172.0 (demande du 09.11) : mode téléphone encore plus petit, dans toutes les applications : base des « rem » à
+   13 px (au lieu de 16 : tous les textes et espaces écrits en rem baissent de 19 %), bande du bas, en-tête et barre du
+   récepteur, boutons du plan, menu et tuiles réduits.
+   ========================================================================== */
+html:has(body.mode-telephone) { font-size: 13px; }
+body.mode-telephone { --hauteur-bande: 46px; }
+body.mode-telephone.avec-recepteur { --hauteur-entete: 64px; }
+body.mode-telephone.avec-recepteur .entete { padding-bottom: 28px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur b { font-size: 12.5px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur small { font-size: 8.5px; }
+body.mode-telephone .entete .entete-texte .entete-titre { font-size: 12px; }
+body.mode-telephone .entete:has(.bouton-recepteur-entete) { --largeur-recepteur: 56px; }
+body.mode-telephone .entete .entete-icone-bouton.bouton-recepteur-entete svg { width: 48px; height: 48px; padding: 8px; }
+body.mode-telephone .entete-icone-bouton { width: 20px; height: 20px; }
+body.mode-telephone .plan-boutons button { width: 32px; height: 32px; }
+body.mode-telephone .plan-puces .puce { min-height: 28px; padding: 2px 7px; font-size: 0.72rem; }
+body.mode-telephone .plan-puces .puce svg { width: 14px; height: 14px; }
+/* bande du bas */
+body.mode-telephone .partie-appli { font-size: 13px; padding: 0 8px 0 6px; gap: 4px; }
+body.mode-telephone .partie-appli svg { width: 18px; height: 18px; }
+body.mode-telephone .partie-sous { font-size: 12px; padding: 0 6px; }
+body.mode-telephone .bande-appli .bouton-enreg-bande { font-size: 14px; }
+body.mode-telephone .bande-appli .choix-sous-appli button { font-size: 12px; }
+body.mode-telephone .zone-info-appli { font-size: 12px; }
+/* menu des applications */
+body.mode-telephone .tuile-appli { min-height: 62px; font-size: 13px; }
+body.mode-telephone .tuile-appli > svg { width: 18px; height: 18px; }
+body.mode-telephone .tuile-appli .sous-tuile button { min-height: 22px; padding: 0 5px; font-size: 9.5px; }
+body.mode-telephone .tuile-appli .detail-tuile { font-size: 9px; }
+/* Abréviations : forme longue partout, forme courte seulement en mode téléphone. */
+.t-court { display: none; }
+body.mode-telephone .t-long { display: none; }
+body.mode-telephone .t-court { display: inline; }
+/* Lever, Implanter, messages : espaces vides réduits. */
+body.mode-telephone .role-leve { min-height: 36px; padding: 4px 6px; font-size: 13px; }
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] { --hauteur-bandeau-point: 46px; --largeur-enreg-point: 104px; --largeur-bouton-bandeau: 42px; }
+body.mode-telephone.bande-action .zone-levee .bouton-enreg-bande.relais-prendre { width: 104px; min-height: 46px; }
+body.mode-telephone .puce-libelle { min-height: 28px; padding: 2px 6px; }
+body.mode-telephone .ecart-et-regle .regle-hauteur { min-height: 90px; }
+body.mode-telephone .message-bas, body.mode-telephone #message { font-size: 12px; padding: 6px 12px; }
+body.mode-telephone .ecran-terrain, body.mode-telephone .panneau { --espace: 6px; }
+body.mode-telephone .panneau :is(h2, h3) { font-size: 14px; margin: 4px 0; }
+body.mode-telephone .role-leve { flex-direction: row; gap: 6px; }
+body.mode-telephone .tuile-appli { min-height: 56px; }
+body.mode-telephone .page-applis { --espace-tuiles: 6px; }
+body.mode-telephone .cadre-projet-applis { padding: 8px 10px; }
+body.mode-telephone .fenetre-reglages :is(.bouton-choix-mode, .puce-reglage, .choix-reglage button, .onglets-reglages button) { min-height: 32px; font-size: 12px; }
+body.mode-telephone .fenetre-reglages { font-size: 12px; }

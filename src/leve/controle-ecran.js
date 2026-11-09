@@ -28,7 +28,7 @@ export function htmlControle(ac, { gestionOuverte, erreurGestion }) {
     ${ac.points.length === 0
       ? `<div class="controle-vide">
           <p class="vide">Aucun point de contrôle.</p>
-          <label class="bouton bouton-fichier bouton-importer-controle">+ Importer des points de contrôle
+          <label class="bouton bouton-fichier bouton-importer-controle"><span class="t-long">+ Importer des points de contrôle</span><span class="t-court">+ Importer</span>
             <input type="file" data-champ="fichier-controle" accept=".csv,.txt,.pts,.xyz,.dat,.asc,text/csv,text/plain" hidden /></label>
           ${erreurGestion && !gestionOuverte ? `<p class="erreur">${echapper(erreurGestion)}</p>` : ''}
         </div>`

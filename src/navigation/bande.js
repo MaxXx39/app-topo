@@ -40,6 +40,12 @@ const svg = (trace) => `<svg viewBox="0 0 24 24" aria-hidden="true">${trace}</sv
  * - message(texte) : message court à l'écran ; vibrer() (facultatif).
  * Renvoie { mettreAJour(), fermer(), ouvrirPage(), pageOuverte() }.
  */
+/** Titre d'application : en mode téléphone, la forme courte (`court`) si elle existe (0.172.0). */
+function titreAbrege(appli, titre) {
+  if (!appli?.court || titre !== appli.titre) return echapper(titre);
+  return `<span class="t-long">${echapper(titre)}</span><span class="t-court">${echapper(appli.court)}</span>`;
+}
+
 export function creerNavigation(nav, actions) {
   let pageOuverte = false;
   let deroulee = false;
@@ -383,7 +389,7 @@ export function creerNavigation(nav, actions) {
     derniereSignature = signature;
     const active = sous.find((s) => s.actif) ?? null;
     const partieAppli = appli
-      ? `<button type="button" class="partie-appli" data-nav="appli" title="Menu des applications (appui long : favoris)">${svg(ICONE_LISTE)}<span>${echapper(actions.titre?.(appli) ?? appli.titre)}</span></button>`
+      ? `<button type="button" class="partie-appli" data-nav="appli" title="Menu des applications (appui long : favoris)">${svg(ICONE_LISTE)}<span>${titreAbrege(appli, actions.titre?.(appli) ?? appli.titre)}</span></button>`
       : `<button type="button" class="partie-appli applis" data-nav="appli" title="Revenir">${svg(ICONE_APPLIS)}<span>Applications</span></button>`;
     // 0.171.0 : Lever : la nature du levé en cours est seulement écrite (pas de bouton, rien ne se déroule).
     const infoSeule = sous.length > 0 && sous.every((x) => x.info);

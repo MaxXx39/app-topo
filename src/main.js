@@ -465,9 +465,11 @@ function choisirSousAppli(cle) {
 }
 
 /** Gros bouton de la zone du milieu : il touche le vrai bouton de l'écran (caché, voir body[data-relais]). */
-function boutonDeBande(cle, titre, detail, desactive = false) {
+function boutonDeBande(cle, titre, detail, desactive = false, court = null) {
+  // 0.172.0 : `court` = texte du mode téléphone (voir .t-long / .t-court).
+  const texte = court ? `<span class="t-long">${echapper(titre)}</span><span class="t-court">${echapper(court)}</span>` : echapper(titre);
   return `<button type="button" class="bouton-enreg-bande relais-${cle}" data-nav="action" data-cle="${cle}" ${desactive ? 'disabled' : ''}>
-    <span>${echapper(titre)}</span>${detail ? `<small>${echapper(detail)}</small>` : ''}</button>`;
+    <span>${texte}</span>${detail ? `<small>${echapper(detail)}</small>` : ''}</button>`;
 }
 
 // Vrais boutons de l'écran relayés par la zone du milieu (clé → sélecteur).
@@ -558,7 +560,7 @@ function contenuBande() {
         </div>`
       : '';
     const prendre = trouver('prendre');
-    const enreg = prendre ? boutonDeBande('prendre', 'Enreg. (Vol. −)', document.querySelector('#leve-direct .cadre-prise [data-champ="nom-point"]')?.value ?? '', prendre.disabled) : '';
+    const enreg = prendre ? boutonDeBande('prendre', 'Enreg. (Vol. −)', document.querySelector('#leve-direct .cadre-prise [data-champ="nom-point"]')?.value ?? '', prendre.disabled, 'Enreg.') : '';
     return bloc || enreg ? `<div class="zone-levee">${bloc}${enreg}</div>` : '';
   }
   if (cle === 'implanter') {
@@ -608,7 +610,7 @@ function contenuBande() {
   }
   if (cle === 'controle') {
     const enregistrer = trouver('enregistrer');
-    return enregistrer && autocontrole.cible ? boutonDeBande('enregistrer', 'Enregistrer le contrôle', autocontrole.cible.nom, enregistrer.disabled) : '';
+    return enregistrer && autocontrole.cible ? boutonDeBande('enregistrer', 'Enregistrer le contrôle', autocontrole.cible.nom, enregistrer.disabled, 'Enreg.') : '';
   }
   if (cle === 'calculs' && document.body.dataset.onglet === 'dessin' && aAcces('expert')) {
     return boutonDeBande('dao', daoAppli?.actif() ? 'Quitter la DAO' : 'DAO', 'dessiner sur le plan');
@@ -722,13 +724,13 @@ function mesureRapideBande() {
   const pret = Boolean(etatRecepteur?.connecte && etatRecepteur.recu && etatRecepteur.position && etatRecepteur.qualite === 4 && etatRecepteur.inclinaisonPrete);
   // 0.171.0 : Annuler (nom du dernier point), RAZ, Export (qui propose aussi d'enregistrer dans le levé), puis tout à droite
   // « Enreg. (Vol −) » = le point GNSS.
-  const bouton = (cle, classe, titre, detail = '', desactive = false) => `<button type="button" class="bouton-bande-mesure ${classe}" data-nav="action" data-cle="${cle}" ${desactive ? 'disabled' : ''}>
-      <span>${echapper(titre)}</span>${detail ? `<small>${echapper(detail)}</small>` : ''}</button>`;
+  const bouton = (cle, classe, titre, detail = '', desactive = false, court = null) => `<button type="button" class="bouton-bande-mesure ${classe}" data-nav="action" data-cle="${cle}" ${desactive ? 'disabled' : ''}>
+      <span>${court ? `<span class="t-long">${echapper(titre)}</span><span class="t-court">${echapper(court)}</span>` : echapper(titre)}</span>${detail ? `<small>${echapper(detail)}</small>` : ''}</button>`;
   return `<div class="boutons-bande-mesure">
     ${bouton('mesure-annuler', 'annuler', '↶ Annuler', dernier ? (dernier.nom || `point ${n}`) : '', n === 0)}
     ${bouton('mesure-raz', 'raz', 'RAZ', '', n === 0)}
     ${bouton('mesure-export', 'export', 'Export', '', n === 0)}
-    ${gnss ? bouton('mesure-gnss', 'relais-mesure-gnss', 'Enreg. (Vol −)', pret ? '' : 'RTK fixe + incl.', !pret) : ''}
+    ${gnss ? bouton('mesure-gnss', 'relais-mesure-gnss', 'Enreg. (Vol −)', pret ? '' : 'RTK fixe + incl.', !pret, 'Enreg.') : ''}
   </div>`;
 }
 
