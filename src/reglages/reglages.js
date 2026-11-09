@@ -123,9 +123,17 @@ function ecrireReglages(reglages) {
  * Applique les réglages à la page : classes mode-telephone et mode-base / mode-intermediaire /
  * mode-expert, pyramide du mode dans l'en-tête.
  */
+const LARGEUR_TELEPHONE = 500;
+let ecouteLargeur = false;
+
 export function appliquerReglages(reglages = lireReglages()) {
   modeRetenu = modeValide(reglages.mode);
-  document.body.classList.toggle('mode-telephone', Boolean(reglages.telephone));
+  // 0.173.0 : un écran étroit (moins de 500 px de large, un téléphone) est toujours en mode téléphone.
+  document.body.classList.toggle('mode-telephone', Boolean(reglages.telephone) || window.innerWidth < LARGEUR_TELEPHONE);
+  if (!ecouteLargeur) {
+    ecouteLargeur = true;
+    window.addEventListener('resize', () => appliquerReglages());
+  }
   document.body.style.setProperty('--echelle-texte', String(facteurDe(TAILLES_TEXTE, reglages.tailleTexte)));
   for (const [cle] of MODES) document.body.classList.toggle(`mode-${cle}`, cle === modeRetenu);
   for (const [cle] of THEMES) document.body.classList.toggle(`theme-${cle}`, cle !== 'normal' && cle === reglages.theme);

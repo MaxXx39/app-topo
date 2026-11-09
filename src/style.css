@@ -12934,3 +12934,30 @@ body.mode-telephone .page-applis { --espace-tuiles: 6px; }
 body.mode-telephone .cadre-projet-applis { padding: 8px 10px; }
 body.mode-telephone .fenetre-reglages :is(.bouton-choix-mode, .puce-reglage, .choix-reglage button, .onglets-reglages button) { min-height: 32px; font-size: 12px; }
 body.mode-telephone .fenetre-reglages { font-size: 12px; }
+
+/* 0.173.0 (retour du 09.11, téléphone réel) : plus jamais de défilement de côté ; textes du bandeau récepteur qui
+   rentrent (retour à la ligne, taille réduite). */
+html, body { overflow-x: hidden; max-width: 100%; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur { min-width: 0; overflow: hidden; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur b,
+body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 11.5px; white-space: normal; line-height: 1.1; overflow-wrap: anywhere; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur small { white-space: normal; line-height: 1; }
+body.mode-telephone .entete .entete-texte { min-width: 0; }
+
+/* Menu en mode téléphone : tout doit tenir sur l'écran (tuiles basses, sous-applications en petit, encadré du projet serré). */
+body.mode-telephone .tuiles-applis { grid-auto-rows: auto; gap: 6px; }
+body.mode-telephone .tuile-appli { min-height: 0; padding: 6px 6px 7px; font-size: 12px; gap: 2px; }
+body.mode-telephone .tuile-appli > svg { width: 16px; height: 16px; }
+body.mode-telephone .tuile-appli .sous-tuile { gap: 3px; margin-top: 2px; }
+body.mode-telephone .tuile-appli .sous-tuile button { min-height: 18px; padding: 0 4px; font-size: 8.5px; }
+body.mode-telephone .tuile-appli [data-favori] { transform: scale(0.65); transform-origin: top right; }
+body.mode-telephone .page-applis { padding: 6px 8px; }
+body.mode-telephone .page-applis h2, body.mode-telephone .page-applis .titre-section-applis { font-size: 10px; margin: 6px 2px 4px; }
+body.mode-telephone .bandeau-projet-applis { padding: 2px 2px 6px; gap: 6px; }
+body.mode-telephone .texte-bandeau-projet small { display: none; }
+body.mode-telephone .texte-bandeau-projet b { font-size: 13px; }
+body.mode-telephone .bouton-bandeau-projet { min-height: 32px; padding: 0 10px; font-size: 12px; }
+body.mode-telephone .bouton-partie-projet { min-height: 32px; font-size: 11px; }
+body.mode-telephone .comptes-projet-applis { font-size: 9.5px; margin: 4px 0 0; }
+body.mode-telephone .pied-applis { padding: 5px; margin-top: 4px; gap: 6px; }
+body.mode-telephone .pied-applis button { min-height: 34px; font-size: 12px; }
