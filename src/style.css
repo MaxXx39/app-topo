@@ -12754,3 +12754,36 @@ body.mode-telephone .bande-appli .surface-bande .liste-bande { font-size: 14px; 
   border-radius: 12px;
   background: color-mix(in srgb, #ea580c 5%, var(--surface));
 }
+
+/* 0.169.0 (demande du 09.11) : « Levé en cours » dans la même présentation que le choix de la surface : fond clair
+   teinté, bord de la couleur de l'application, texte sombre ; la flèche ronde remplace le bouton « Changer ». */
+.bande-appli .levee-bande.levee-choix {
+  position: relative;
+  background: color-mix(in srgb, var(--couleur-appli, #d99300) 12%, #ffffff);
+  border: 3px solid var(--couleur-appli, #d99300);
+  padding-right: 62px;
+}
+.levee-choix .titre-levee-bande { color: color-mix(in srgb, var(--couleur-appli, #d99300) 65%, #000000); opacity: 1; }
+.bande-appli .levee-choix .nom-levee-bande { color: #2a1f05; }
+.bande-appli .levee-choix .fleche-levee-bande {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--couleur-appli, #d99300);
+  color: var(--texte-appli, #ffffff);
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+body.mode-telephone .bande-appli .levee-choix .fleche-levee-bande { width: 36px; height: 36px; font-size: 20px; }
+body.mode-telephone .bande-appli .levee-bande.levee-choix { padding-right: 50px; }
