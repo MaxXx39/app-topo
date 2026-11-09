@@ -68,7 +68,7 @@ import { creerBoutonImplanterPlan } from './plan/bouton-implanter.js';
 import { suivreClavier } from './outils/clavier.js';
 import { pointAvecDelta, deltaActif } from './topo/delta.js';
 import { ligneDecalee, rangerLigneDecalee } from './topo/ligne-decalee.js';
-import { pointsOutil } from './topo/outil.js';
+import { pointsOutil, penteEngin } from './topo/outil.js';
 import { creerDao } from './dao/dao.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { surChangementListes } from './reglages/listes-partagees.js';
@@ -409,7 +409,8 @@ function sousApplis() {
   if (cle === 'lever') {
     // 0.161.0 : Stock / Terrain / Libre = la nature du levé en cours (Base : seulement Libre).
     const actuelle = leveeEnCours() ? sousAppliDeNature(leveeEnCours().nature) : null;
-    return sousApplisDeLever().map(([c, titre]) => ({ cle: c, titre, actif: c === actuelle }));
+    // 0.171.0 : simple information (la nature du levé en cours), le toucher ne fait rien (`info`).
+    return sousApplisDeLever().map(([c, titre]) => ({ cle: c, titre, actif: c === actuelle, info: true }));
   }
   if (cle === 'implanter') return sousApplisDesBoutons('#leve-direct .choix-implantation-type .puce-choix', (b) => b.dataset.valeur, (b) => b.classList.contains('actif'));
   if (cle === 'guidage') return [['grader', 'Grader'], ['bull', 'Bull'], ['rateau', 'Râteau']].map(([c, titre]) => ({ cle: c, titre, actif: terrain.lame.machine === c }));
@@ -477,7 +478,9 @@ const RELAIS_BANDE = {
   dao: '#bouton-dao',
   // 0.167.0 : Implanter › Altitude (bouton « Alti ici ») et Guidage (choix des lignes) sont dans la bande.
   'altitude-ici': '#leve-direct [data-action="prendreAltitudeIci"]',
-  'lignes-guidage': '#leve-direct .bouton-lignes-guidage',
+  // 0.171.0 (maquette B) : L1 (bord G) et L2 (bord D) du Guidage : touchent les cases de l'écran (qui restent visibles).
+  'ligne-guidage-0': '#leve-direct [data-action="choisirLignesGuidage"][data-valeur="0"]',
+  'ligne-guidage-1': '#leve-direct [data-action="choisirLignesGuidage"][data-valeur="1"]',
   'renommer-levee': '#leve-direct .levee-en-cours .bouton-crayon-levee',
   // 0.162.0 : photo, Changer et + du levé en cours sont dans la bande (la rangée de l'écran est cachée).
   'photo-levee': '#leve-direct .levee-en-cours input[data-champ="photo-levee-globale"]',
@@ -485,7 +488,7 @@ const RELAIS_BANDE = {
   'nouveau-levee': '#leve-direct .levee-en-cours [data-action="ouvrirChoixNature"]',
 };
 // Boutons de la bande qui ne cachent aucun bouton d'origine (body[data-relais] ne les note pas).
-const RELAIS_SANS_CACHE = ['renommer-levee', 'photo-levee', 'changer-levee', 'nouveau-levee'];
+const RELAIS_SANS_CACHE = ['ligne-guidage-0', 'ligne-guidage-1', 'renommer-levee', 'photo-levee', 'changer-levee', 'nouveau-levee'];
 const ICONE_PHOTO_BANDE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>';
 
 /**
@@ -593,11 +596,14 @@ function contenuBande() {
     // 0.167.0 : la surface à suivre (plus « levé à suivre ») et le choix des lignes (Expert) dans la bande.
     const surface = selecteurSurfaceBande('surface-lame', 'Surface à suivre');
     if (!surface) return '';
-    const lignes = trouver('lignes-guidage');
-    const nombre = lignes?.textContent.match(/\((\d+)\)/)?.[1];
-    const boutonLignes = lignes
-      ? `<button type="button" class="bouton-enreg-bande petit relais-lignes-guidage ${lignes.classList.contains('actif') ? 'actif' : ''}" data-nav="action" data-cle="lignes-guidage" title="Choisir 1 ou 2 lignes à suivre"><span>Lignes${nombre ? ` (${nombre})` : ''}</span></button>`
-      : '';
+    // 0.171.0 (maquette B) : L1 (violet, bord G) et L2 (orange, bord D) : toucher = choisir la ligne sur le plan.
+    const placeEnChoix = lignesGuidage.choix;
+    const boutonLigne = (place) => {
+      if (!trouver(`ligne-guidage-${place}`)) return '';
+      const choisie = lignesGuidage.liste.some((l) => l.place === place);
+      return `<button type="button" class="bouton-enreg-bande petit relais-ligne-guidage place-${place} ${placeEnChoix === place ? 'actif' : ''}" data-nav="action" data-cle="ligne-guidage-${place}" title="Choisir la ligne L${place + 1} (bord ${place === 0 ? 'gauche' : 'droit'}) sur le plan"><span>L${place + 1}${choisie ? ' ✓' : ''}</span></button>`;
+    };
+    const boutonLignes = `${boutonLigne(0)}${boutonLigne(1)}`;
     return `<div class="zone-levee">${surface}${boutonLignes}</div>`;
   }
   if (cle === 'controle') {
@@ -714,15 +720,15 @@ function mesureRapideBande() {
   const dernier = mesureRapideEtat.points.at(-1);
   const gnss = recepteurDisponible() && mesureRapideEtat.accroche === 'gnss';
   const pret = Boolean(etatRecepteur?.connecte && etatRecepteur.recu && etatRecepteur.position && etatRecepteur.qualite === 4 && etatRecepteur.inclinaisonPrete);
-  // 0.161.0 : « + Point GNSS » (accroche GNSS), Annuler (nom du dernier point), RAZ, Enreg., Export.
+  // 0.171.0 : Annuler (nom du dernier point), RAZ, Export (qui propose aussi d'enregistrer dans le levé), puis tout à droite
+  // « Enreg. (Vol −) » = le point GNSS.
   const bouton = (cle, classe, titre, detail = '', desactive = false) => `<button type="button" class="bouton-bande-mesure ${classe}" data-nav="action" data-cle="${cle}" ${desactive ? 'disabled' : ''}>
       <span>${echapper(titre)}</span>${detail ? `<small>${echapper(detail)}</small>` : ''}</button>`;
   return `<div class="boutons-bande-mesure">
-    ${gnss ? bouton('mesure-gnss', 'relais-mesure-gnss', '+ GNSS', pret ? '' : 'RTK fixe + incl.', !pret) : ''}
     ${bouton('mesure-annuler', 'annuler', '↶ Annuler', dernier ? (dernier.nom || `point ${n}`) : '', n === 0)}
     ${bouton('mesure-raz', 'raz', 'RAZ', '', n === 0)}
-    ${bouton('mesure-enreg', 'enreg', 'Enreg.', '', n === 0)}
     ${bouton('mesure-export', 'export', 'Export', '', n === 0)}
+    ${gnss ? bouton('mesure-gnss', 'relais-mesure-gnss', 'Enreg. (Vol −)', pret ? '' : 'RTK fixe + incl.', !pret) : ''}
   </div>`;
 }
 
@@ -742,7 +748,6 @@ function remettreMesureAZero() {
 function agirMesureRapide(cle) {
   if (cle === 'mesure-annuler') return annulerDernierPointMesure();
   if (cle === 'mesure-raz') return remettreMesureAZero();
-  if (cle === 'mesure-enreg') return enregistrerMesureRapide();
   if (cle === 'mesure-export') return exporterMesureRapide();
   if (cle !== 'mesure-gnss') return undefined;
   const position = etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null;
@@ -765,6 +770,7 @@ document.querySelector('#mesure-rapide').addEventListener('click', (evenement) =
     mesureRapideEtat.accroche = bouton.dataset.valeur;
     mesureRapideEtat.candidat = null;
     afficherMesureRapide();
+    mettreAJourToucheVolume();
   } else if (action === 'ajouter-manuel-mesure' && mesureRapideEtat.candidat) {
     const { est, nord } = mesureRapideEtat.candidat;
     mesureRapideEtat.candidat = null;
@@ -846,6 +852,8 @@ function exporterMesureRapide() {
     titre: 'Mesure rapide',
     formats: [['pdf', 'PDF', 'croquis et tableaux'], ['dxf', 'DXF', 'points, lignes et textes']],
     // 0.159.0 : fond du croquis du PDF : photo swisstopo et plans DXF affichés.
+    // 0.171.0 : « Enregistrer dans le levé » (avant : bouton « Enreg. » de la bande, pris par le point GNSS).
+    boutonsEnPlus: [{ titre: 'Enregistrer dans le levé', detail: 'LV-Mesures rapides (points MR-n)', faire: enregistrerMesureRapide }],
     options: [
       { cle: 'photo', texte: 'Photo aérienne swisstopo en fond', formats: ['pdf'] },
       ...(avecPlans ? [{ cle: 'plans', texte: 'Plans DXF affichés en fond', formats: ['pdf'] }] : []),
@@ -2029,20 +2037,16 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         deltaSurface = 0;
         recalculer();
       },
-      // Lignes suivies (0.154.0) : bouton « Lignes » (choix sur le plan), bout G / D, enlever.
-      choisirLignesGuidage: () => {
-        lignesGuidage.choix = !lignesGuidage.choix;
-        if (lignesGuidage.choix) afficherMessage('Touche une ligne sur le plan (2 au plus)', 4000);
+      // Lignes suivies (0.154.0 ; 0.171.0, maquette B) : L1 = bord G, L2 = bord D ; toucher la case (ou L1 / L2 de la bande)
+      // puis la ligne sur le plan ; × pour l'enlever.
+      choisirLignesGuidage: (valeur) => {
+        const place = Number(valeur) === 1 ? 1 : 0;
+        lignesGuidage.choix = lignesGuidage.choix === place ? null : place;
+        if (lignesGuidage.choix !== null) afficherMessage(`Touche la ligne L${place + 1} sur le plan`, 4000);
         recalculer();
       },
-      boutLigneGuidage: (valeur) => {
-        const [index, bout] = String(valeur).split(':');
-        const ligne = lignesGuidage.liste[Number(index)];
-        if (ligne) ligne.bout = bout === 'gauche' ? 'gauche' : 'droite';
-        recalculer();
-      },
-      enleverLigneGuidage: (index) => {
-        lignesGuidage.liste.splice(Number(index), 1);
+      enleverLigneGuidage: (valeur) => {
+        lignesGuidage.liste = lignesGuidage.liste.filter((l) => l.place !== Number(valeur));
         recalculer();
       },
       // Vue du Guidage et coupe montrée (0.152.0, dans ⚙).
@@ -2688,7 +2692,7 @@ function envoyerImplantationAuPlan() {
   // Bouton « Seul » (0.94.0) : seulement les listes gardées (points de contrôle en mode Contrôle…).
   const gardees = listesDuTravail(listesDePoints(projet));
   // Lignes suivies en Guidage (0.154.0) : en violet.
-  const lignesSuivies = ongletContexte === 'terrain' && terrain.mode === 'lame' ? lignesGuidage.liste.map((l, i) => ({ id: 'ligne-guidage', sommets: l.sommets, fermee: false, couleur: ['#7c3aed', '#ea580c'][i] })) : [];
+  const lignesSuivies = ongletContexte === 'terrain' && terrain.mode === 'lame' ? lignesGuidage.liste.map((l) => ({ id: 'ligne-guidage', sommets: l.sommets, fermee: false, couleur: ['#7c3aed', '#ea580c'][l.place] })) : [];
   const lignesAutres = [...(seul ? [] : lignesDesAutres().filter((l) => !gardees || gardees.has(l.id))), ...lignesSuivies];
   const reseaux = seul ? [] : reseauxDuPlan().filter((r) => !gardees || gardees.has(r.id));
   // Points de contrôle : dessinés si leur case « Points de contrôle » est cochée (menu Afficher).
@@ -3799,9 +3803,10 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
 // Lignes suivies en Guidage (0.154.0, Expert) : 2 au plus, choisies en touchant le plan (toutes les
 // lignes : plans DXF, levés, dessins) ; pour chacune, le bout de l'outil mesuré (G ou D). En mémoire
 // seulement (oubliées au redémarrage).
-const lignesGuidage = { liste: [], choix: false }; // 0.157.0 : L1 violet, L2 orange (plan, coupe G – D, bandeau)
+// 0.171.0 : `place` = 0 (L1, bord G, violet) ou 1 (L2, bord D, orange) ; `choix` = place en cours de choix, ou null.
+const lignesGuidage = { liste: [], choix: null };
 function choixLignesGuidageActif() {
-  return lignesGuidage.choix && ongletContexte === 'terrain' && terrain.mode === 'lame' && lameActive();
+  return lignesGuidage.choix !== null && ongletContexte === 'terrain' && terrain.mode === 'lame' && lameActive();
 }
 
 /** Toucher du plan pendant le choix des lignes du Guidage : la ligne touchée est ajoutée (2 au plus). */
@@ -3812,10 +3817,11 @@ function toucherPourLigneGuidage(position, tolerance) {
     afficherMessage('Aucune ligne sous le doigt (plan DXF, levé, dessin)', 3000);
     return;
   }
-  if (lignesGuidage.liste.length >= 2) lignesGuidage.liste.shift();
-  lignesGuidage.liste.push({ sommets: trouve.sommets.map((p) => ({ est: p.est, nord: p.nord })), bout: 'droite' });
+  const place = lignesGuidage.choix;
+  lignesGuidage.liste = lignesGuidage.liste.filter((l) => l.place !== place);
+  lignesGuidage.liste.push({ place, sommets: trouve.sommets.map((p) => ({ est: p.est, nord: p.nord })), bout: place === 0 ? 'gauche' : 'droite' });
   sonValidation();
-  if (lignesGuidage.liste.length >= 2) lignesGuidage.choix = false;
+  lignesGuidage.choix = null;
   recalculer();
 }
 
@@ -3861,7 +3867,17 @@ function calculerLame() {
   const sens = sensAvantLame(lame);
   if (!sens) return { raison: 'les deux récepteurs sont au même endroit', guidage: null, coins: lame };
   const points = pointsGuidageLame(lame.gauche, lame.droite, sens, reglagesOutilLame());
-  return guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite }, sens);
+  return { ...guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite }, sens), penteEngin: penteDeLEngin() };
+}
+
+/**
+ * Pente de l'engin (0.171.0) : celle du 1er GNSS (1 GNSS : le seul ; 2 GNSS : « la pente du 1er », demande du 09.11),
+ * en % vers l'avant (+ = nez en l'air), ou null (pas de cap ou d'inclinaison prête).
+ */
+function penteDeLEngin() {
+  const e = etatRecepteur;
+  if (!e?.connecte || !e.inclinaisonPrete || e.cap == null) return null;
+  return penteEngin({ cap: e.cap, inclinaison: e.inclinaison ?? 0, directionInclinaison: e.directionInclinaison ?? 0 });
 }
 
 /**
@@ -3893,7 +3909,7 @@ function calculerOutilUnGnss() {
     const surfaceCentre = surfaceBase == null ? null : surfaceBase + deltaSurface;
     resultat.guidage.centre = { ecart: surfaceCentre == null ? null : surfaceCentre - points.centre.altitude };
   }
-  return { ...resultat, unGnss: true };
+  return { ...resultat, unGnss: true, penteEngin: penteDeLEngin() };
 }
 
 /**
@@ -3951,11 +3967,12 @@ function guidageDesPoints(points, triangles, coins, sensLame = null) {
   }
   // Lignes suivies (0.154.0) : écart en plan du bout choisi à la ligne, sur l'axe G – D, et place du
   // croisement sur la coupe G – D (distance depuis le début de la coupe).
-  const lignes = lignesGuidage.liste.map((l, i) => {
+  const lignes = [...lignesGuidage.liste].sort((a, b) => a.place - b.place).map((l) => {
     const bout = l.bout === 'gauche' ? points.gauche : points.droite;
     const ecart = ecartAUneLigne(bout, points.gauche, points.droite, l.sommets);
     return {
-      nom: `L${i + 1}`,
+      nom: `L${l.place + 1}`,
+      slot: l.place,
       bout: l.bout,
       ecart,
       classe: ecart == null ? null : classeEcartLame(ecart, tolerances),
@@ -5465,10 +5482,16 @@ function mettreAJourToucheVolume() {
   const dansTerrain = document.body.dataset.onglet === 'terrain';
   const lever = dansTerrain && terrain.mode === 'lever' && Boolean(stockEnCours() || metreEnCours());
   const implanterAvecTouche = dansTerrain && ((enImplantationDePoint() && Boolean(implanter.cible)) || (enImplantationDeLigne() && Boolean(implanter.ligne)) || (enAutocontrole() && Boolean(autocontrole.cible)));
-  const actif = lever || implanterAvecTouche;
+  // 0.171.0 : Mesure rapide avec l'accroche GNSS : la touche prend le point (bouton « Enreg. (Vol −) » de la bande).
+  const mesureGnss = () => ongletContexte === 'mesure-rapide' && recepteurDisponible() && mesureRapideEtat.accroche === 'gnss';
+  const actif = lever || implanterAvecTouche || mesureGnss();
   if (actif === toucheVolumeActive) return;
   toucheVolumeActive = actif;
   regleToucheVolume(actif, () => {
+    if (mesureGnss()) {
+      agirMesureRapide('mesure-gnss');
+      return;
+    }
     if (refuserEnLectureSeule()) return;
     const enImplantation = enImplantationDePoint() || enImplantationDeLigne() || enAutocontrole();
     const refus = enImplantation ? ecranLeve.enregistrerDepuisTouche() : ecranLeve.prendreDepuisTouche();
@@ -5923,7 +5946,7 @@ function donneesCommunes() {
       unGnss: outilAUnGnss(),
       vue: terrain.lame.vue,
       indic: terrain.lame.indic === 'regle' ? 'regle' : 'exterieur',
-      lignes: lignesGuidage.liste.map((l, i) => ({ nom: `L${i + 1}`, bout: l.bout })),
+      lignes: lignesGuidage.liste.map((l) => ({ nom: `L${l.place + 1}`, slot: l.place, bout: l.bout })),
       choixLignes: lignesGuidage.choix,
       deltaSurface,
       coupeSeule: terrain.lame.coupeSeule,

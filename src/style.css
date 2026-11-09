@@ -9545,8 +9545,11 @@ body.mode-base .actions-projets {
   /* Près du point, la cible prend le haut : le guidage (plus grand depuis 0.114.0) garde 400 px. */
   body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] {
     --hauteur-plan-guidage: max(
-      calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * max(var(--part-plan-guidage, 0.5), var(--part-plan-min, 0.4))),
-      calc(100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets) - 400px)
+      170px,
+      min(
+        calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * max(var(--part-plan-guidage, 0.5), var(--part-plan-min, 0.4))),
+        calc(100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets) - 370px)
+      )
     );
   }
 }
@@ -11659,7 +11662,7 @@ body.mode-telephone .zone-info-appli { font-size: 14px; }
 body.mode-telephone .bande-appli .choix-sous-appli button { min-width: 60px; padding: 0 8px; font-size: 13px; }
 
 /* Cachée comme l'ancienne barre : clavier ouvert, dessin sur téléphone (on sort avec « Terminé »). */
-body.clavier-ouvert .bande-appli { display: none; }
+body.clavier-ouvert .bande-appli:not(:focus-within) { display: none; }
 @media (max-width: 899px) {
   body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures'], [data-onglet='dessin']) .bande-appli { display: none; }
 }
@@ -12616,7 +12619,7 @@ body.mode-telephone[data-mode-terrain='lever'] .element-en-cours .corps-element 
    ========================================================================== */
 body.surface-en-bande #leve-direct :is(select[data-champ='surface-controle'], select[data-champ='surface-lame']) { display: none; }
 body[data-relais='altitude-ici'] #leve-direct .ligne-altitude-voulue { display: none; }
-body[data-relais='lignes-guidage'] #leve-direct .bouton-lignes-guidage { display: none; }
+
 .surface-bande, .altitude-bande { position: relative; }
 .bande-appli .liste-bande,
 .bande-appli .champ-bande {
@@ -12808,3 +12811,76 @@ dialog.fenetre-reglages.en-page[open] { z-index: 40; }
 .ecran-lame .choix-coupes-bandeau .puce-choix { min-height: 40px; padding: 4px 12px; white-space: nowrap; }
 body.mode-telephone .ecran-lame .choix-coupes-bandeau .puce-choix { min-height: 32px; padding: 3px 8px; font-size: 11px; }
 .svg-coupe-guidage { overflow: hidden; }
+
+/* ==========================================================================
+   0.171.0 (demandes du 09.11, 11h30-11h41, suite)
+   ========================================================================== */
+.partie-sous.info { cursor: default; pointer-events: none; }
+
+/* 0.171.0 (demande du 09.11, 11h37) : « Altitude voulue » et « Alti ici » dans la même présentation que le choix de
+   la surface et « Enr. » : fond clair teinté sarcelle, bord sarcelle, texte sombre ; bouton sarcelle. */
+.bande-appli .levee-bande.altitude-bande {
+  background: color-mix(in srgb, var(--couleur-appli, #0d9488) 10%, #ffffff);
+  border: 3px solid var(--couleur-appli, #0d9488);
+}
+.altitude-bande .titre-levee-bande { color: color-mix(in srgb, var(--couleur-appli, #0d9488) 70%, #000000); opacity: 1; }
+.bande-appli .altitude-bande .champ-bande { color: #12332f; font-size: 19px; }
+.bande-appli .altitude-bande .champ-bande::placeholder { color: rgba(18, 51, 47, 0.4); }
+.bande-appli .bouton-enreg-bande.relais-altitude-ici { background: #0d9488; color: #ffffff; }
+.bande-appli .bouton-enreg-bande.relais-altitude-ici:disabled { background: #475569; color: rgba(255, 255, 255, 0.6); }
+
+/* 0.171.0 (bug du 09.11, 11h35) : clavier ouvert dans Lever : tout revient dans le flux, bien rangé (ID point en
+   haut, panneau du Δ, puis ↶ et E / N), sans ombre ni fond qui se chevauchent. */
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  margin: 0 0 8px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > .ligne-id-prendre { order: 1; flex: 1 1 100%; margin: 0; padding-right: 0; }
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > .ligne-delta { order: 2; flex: 1 1 100%; margin: 0; box-shadow: none; }
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"] {
+  order: 3; flex: 0 0 52px; width: 52px; height: 44px; border: none; border-radius: 12px; margin: 0;
+}
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > .ligne-position-delta { order: 4; flex: 1 1 0; margin: 0; }
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > .raison-leve { order: 5; flex: 1 1 100%; margin: 0; }
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point { margin-left: 0; }
+
+/* 0.171.0 (demande du 09.11) : Implanter (guidage d'une ligne…) sans rien au milieu de la bande : le bouton seul de la bande
+   ne cache plus le bas de l'écran (« Enregistrer l'implantation », monter / descendre) : la zone de travail s'arrête au-dessus. */
+body.bande-vide.vue-implantation[data-onglet='terrain'] { --hauteur-onglets: calc(var(--hauteur-bande) + 8px); }
+
+/* 0.171.0 (maquette B du 09.11) : Guidage : L1 (bord G, violet) et L2 (bord D, orange) sur une seule rangée, au-dessus
+   des coupes ; les mêmes L1 / L2 dans la bande du bas (à la place de « Lignes »). */
+.ecran-lame .cartes-lignes { display: flex; gap: 8px; margin: 0 0 8px; }
+.carte-ligne-guidage { flex: 1 1 0; min-width: 0; display: flex; align-items: center; border: 2px solid #94a3b8; border-radius: 12px; background: #f8fafc; color: #334155; }
+.carte-ligne-guidage.sans-ligne { border-style: dashed; }
+.carte-ligne-guidage.en-choix { border-color: #7c3aed; background: #f5f3ff; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25); }
+.carte-ligne-guidage.choisie { border-color: #7c3aed; background: #f5f3ff; color: #4c1d95; }
+.carte-ligne-guidage:has(.couleur-L2).choisie, .carte-ligne-guidage:has(.couleur-L2).en-choix { border-color: #ea580c; background: #fff7ed; color: #9a3412; }
+.carte-ligne-guidage.ecart-vert { border-color: #16a34a !important; background: #dcfce7 !important; color: #166534 !important; }
+.carte-ligne-guidage.ecart-orange { border-color: #ea580c !important; background: #ffedd5 !important; color: #9a3412 !important; }
+.carte-ligne-guidage.ecart-rouge { border-color: #dc2626 !important; background: #fee2e2 !important; color: #991b1b !important; }
+.carte-ligne-guidage .corps-carte-ligne {
+  flex: 1; min-width: 0; min-height: 48px; display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+  border: none; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.carte-ligne-guidage .nom-ligne { padding: 2px 7px; border-radius: 7px; background: #7c3aed; color: #ffffff; font-weight: 900; font-size: 1rem; }
+.carte-ligne-guidage .nom-ligne.couleur-L2 { background: #ea580c; }
+.carte-ligne-guidage small { font-size: 0.7rem; font-weight: 700; opacity: 0.75; white-space: nowrap; }
+.carte-ligne-guidage .ecart-ligne { margin-left: auto; font-size: 1.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.carte-ligne-guidage.sans-ligne .ecart-ligne { font-size: 0.85rem; font-weight: 700; }
+.carte-ligne-guidage .bouton-lien { flex: none; padding: 0 10px; color: inherit; }
+body.mode-telephone .carte-ligne-guidage .ecart-ligne { font-size: 0.9rem; }
+.bande-appli .bouton-enreg-bande.relais-ligne-guidage { flex: 0 0 auto; min-width: 64px; color: #ffffff; background: #7c3aed; }
+.bande-appli .bouton-enreg-bande.relais-ligne-guidage.place-1 { background: #ea580c; }
+.bande-appli .bouton-enreg-bande.relais-ligne-guidage.actif { outline: 3px solid #ffffff; outline-offset: -3px; }
+.bande-appli .bouton-enreg-bande.relais-ligne-guidage span { font-size: 17px; white-space: nowrap; }
+.zone-levee .bouton-enreg-bande.relais-ligne-guidage { flex: 0 0 64px; }
+.svg-coupe-guidage .texte-pente-engin { font-size: 12px; font-weight: 900; fill: #1e3a8a; }
+.svg-coupe-guidage .texte-pente-terrain { font-size: 11px; font-weight: 800; fill: #92400e; }

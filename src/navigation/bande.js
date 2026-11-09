@@ -378,12 +378,18 @@ export function creerNavigation(nav, actions) {
     document.body.classList.toggle('bande-action', info.includes('data-nav="action"'));
     const signature = JSON.stringify([courante, sous, info, deroulee, actions.titre?.(appli ?? {}) ?? '']);
     if (signature === derniereSignature) return;
+    // 0.171.0 : on tape dans un champ de la bande (altitude voulue) : on ne la redessine pas (le clavier se fermerait).
+    if (document.activeElement?.tagName === 'INPUT' && nav.contains(document.activeElement)) return;
     derniereSignature = signature;
     const active = sous.find((s) => s.actif) ?? null;
     const partieAppli = appli
       ? `<button type="button" class="partie-appli" data-nav="appli" title="Menu des applications (appui long : favoris)">${svg(ICONE_LISTE)}<span>${echapper(actions.titre?.(appli) ?? appli.titre)}</span></button>`
       : `<button type="button" class="partie-appli applis" data-nav="appli" title="Revenir">${svg(ICONE_APPLIS)}<span>Applications</span></button>`;
-    const partieSous = sous.length > 0
+    // 0.171.0 : Lever : la nature du levé en cours est seulement écrite (pas de bouton, rien ne se déroule).
+    const infoSeule = sous.length > 0 && sous.every((x) => x.info);
+    const partieSous = infoSeule
+      ? (active ? `<span class="partie-sous info"><span>${echapper(active.titre)}</span></span>` : '')
+      : sous.length > 0
       ? `<button type="button" class="partie-sous ${deroulee ? 'ouverte' : ''}" data-nav="sous" aria-expanded="${deroulee}">
           <span>${echapper(active?.titre ?? 'Choisir')}</span><span class="fleche-sous">${deroulee ? '▸' : '▾'}</span></button>`
       : '';
