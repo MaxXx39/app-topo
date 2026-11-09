@@ -1771,7 +1771,7 @@ function ajusterPlanAuContenu() {
   // Ligne : « Ligne en cours » avec ses boutons et libellés ; Point : les libellés) ; le reste (comptes, triangles)
   // défile sous le bandeau. La ligne E / N posée au-dessus du bandeau est comptée pour ne rien cacher.
   const bas = colonne.getBoundingClientRect();
-  const essentiel = [...document.querySelectorAll('#leve-direct .cadre-role .element-en-cours, #leve-direct .cadre-role .libelles-terrain')].find((e) => e.offsetParent !== null);
+  const essentiel = [...document.querySelectorAll('#leve-direct .cadre-role .element-en-cours, #leve-direct .cadre-role .chantier-leve, #leve-direct .cadre-role .libelles-terrain')].find((e) => e.offsetParent !== null);
   const enNord = document.querySelector('.ligne-position-delta');
   const hauteurEnNord = bande && essentiel && enNord && getComputedStyle(enNord).position === 'fixed' ? enNord.offsetHeight + 4 : 0;
   const utile = bande && essentiel && getComputedStyle(bande).position === 'fixed' ? essentiel.getBoundingClientRect().bottom - bas.top + 6 : bas.height;

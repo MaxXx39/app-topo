@@ -12937,7 +12937,7 @@ body.mode-telephone .fenetre-reglages { font-size: 12px; }
 
 /* 0.173.0 (retour du 09.11, téléphone réel) : plus jamais de défilement de côté ; textes du bandeau récepteur qui
    rentrent (retour à la ligne, taille réduite). */
-html, body { overflow-x: hidden; max-width: 100%; }
+html, body { overflow-x: clip; max-width: 100%; }
 body.mode-telephone .bandeaux-recepteur .case-recepteur { min-width: 0; overflow: hidden; }
 body.mode-telephone .bandeaux-recepteur .case-recepteur b,
 body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 11.5px; white-space: normal; line-height: 1.1; overflow-wrap: anywhere; }
@@ -12999,10 +12999,10 @@ body.mode-telephone .etat-drive svg { width: 20px; height: 20px; }
 .bascule-chantier { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 10px; background: rgba(95, 109, 119, 0.18); }
 .bascule-chantier button { min-height: 40px; border: 0; border-radius: 8px; background: transparent; font-weight: 700; color: var(--gris); }
 .bascule-chantier button.actif { background: var(--sombre); color: var(--ambre); }
-.champs-chantier { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.champ-chantier { display: flex; flex-direction: column; gap: 2px; font-size: 0.7rem; font-weight: 700; color: var(--gris); }
+.champs-chantier { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.champ-chantier { min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 0.7rem; font-weight: 700; color: var(--gris); }
 .champ-chantier.large { grid-column: 1 / -1; }
-.champ-chantier input { min-height: 40px; font-size: 1rem; font-weight: 700; border: 1.5px solid var(--bordure); border-radius: 9px; padding: 4px 8px; color: var(--encre, var(--texte)); background: var(--surface); }
+.champ-chantier input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 40px; font-size: 1rem; font-weight: 700; border: 1.5px solid var(--bordure); border-radius: 9px; padding: 4px 8px; color: var(--encre, var(--texte)); background: var(--surface); }
 .calcul-chantier { margin: 0; padding: 6px 8px; border-radius: 8px; background: var(--ambre-clair); color: #7a5a00; font-weight: 600; font-size: 0.8rem; }
 .suivi-cadre { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; }
 .suivi-cadre .coin { width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; color: #ffffff; background: #c3ccd2; font-weight: 800; }
