@@ -29,8 +29,8 @@ export const THEMES = [['normal', 'Normal'], ['soleil', 'Plein soleil'], ['sombr
 // Tailles à choisir sur le plan (0.104.0, propres à chaque appareil, tous les modes) : [clé, titre, facteur].
 // Formes des points : « Normales » = 70 % de (3,5 px + 20 %), soit 2,94 px (0.105.3 : −30 %). Texte (noms et
 // altitudes des points) : « Normal » = 60 % de la taille d'origine (0.105.3 : −20 % de plus).
-export const TAILLES_FORMES = [['petite', 'Petites', 0.583], ['normale', 'Normales', 0.7], ['grande', 'Grandes', 0.98], ['tres-grande', 'Très grandes', 1.26]];
-export const TAILLES_TEXTE = [['petit', 'Petit', 0.48], ['normal', 'Normal', 0.6], ['grand', 'Grand', 0.8], ['tres-grand', 'Très grand', 1]];
+export const TAILLES_FORMES = [['petite', 'Petites', 0.583], ['normale', 'Normales', 1.019], ['grande', 'Grandes', 1.454], ['tres-grande', 'Très grandes', 1.89]];
+export const TAILLES_TEXTE = [['petit', 'Petit', 0.48], ['normal', 'Normal', 0.82], ['grand', 'Grand', 1.16], ['tres-grand', 'Très grand', 1.5]];
 const RAYON_FORME_DE_DEPART = 4.2; // 3,5 px + 20 %
 // Les trois modes, du plus simple au plus complet (le rang sert à comparer : aAcces).
 export const MODES = [['base', 'Base'], ['intermediaire', 'Intermédiaire'], ['expert', 'Expert']];
@@ -393,6 +393,13 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     zonePartage.innerHTML = partage.html({ modifierNom, modifierUtilisateur });
     zonePartage.querySelector('[data-champ="nom-appareil"]')?.focus();
   }
+  // « Entrée » dans un champ (utilisateur, nom de l'appareil…) valide le champ sans fermer la page (0.165.0).
+  fenetre.addEventListener('keydown', (evenement) => {
+    if (evenement.key === 'Enter' && evenement.target.matches('input:not([type="radio"]):not([type="checkbox"])')) {
+      evenement.preventDefault();
+      evenement.target.blur();
+    }
+  });
   fenetre.addEventListener('focusout', () => setTimeout(rafraichir, 0));
   fenetre.addEventListener('close', () => fenetre.remove());
   document.body.append(fenetre);

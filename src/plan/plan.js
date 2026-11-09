@@ -174,6 +174,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <button type="button" data-action="ma-position" aria-label="Ma position" title="Ma position" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
         </button>
+        <button type="button" data-action="delta-plan" class="bouton-delta-plan" aria-label="Delta : décaler le prochain point" title="Delta : décaler le prochain point">Δ</button>
         <button type="button" data-action="nord-en-haut" class="bouton-nord" aria-label="Nord en haut" title="Nord en haut">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 16 12H8Z" class="nord" /><path d="M12 22 8 12h8Z" /><text x="12" y="10.5" text-anchor="middle">N</text></svg>
         </button>
@@ -2306,7 +2307,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       toutVoir();
       return;
     }
-    vue = { ...vue, ...nouvelleTaille };
+    // 0.166.0 : le dessin reste accroché en haut à gauche (le haut du plan ne bouge pas quand on
+    // change la hauteur avec ▲ / ▼) : le nouveau centre est le point du terrain qui se trouvait
+    // à cet endroit de l'écran avant le changement.
+    const nouveauCentre = versTerrain(nouvelleTaille.largeur / 2, nouvelleTaille.hauteur / 2, vue);
+    vue = { ...vue, ...nouvelleTaille, estCentre: nouveauCentre.est, nordCentre: nouveauCentre.nord };
     if (ligneVue) cadrerSurLigne();
     else dessiner();
   }).observe(svg);
@@ -2314,6 +2319,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   return {
     /** Loupe de l'accroche « Manuel » (0.130.0) : voir loupe.js (montrer, cacher, deplacerDe, changerZoom, placerSur). */
     loupe,
+    /** Opacité de la photo aérienne du plan (0 à 1), ou null si elle n'est pas affichée (0.166.0 : PDF de la Mesure rapide). */
+    opacitePhoto: () => (calques.fondSatellite ? 1 - (calquesChoisis.transparencePhoto ?? 0) / 100 : null),
     /** Affiche une nouvelle liste de points et cadre le plan dessus. */
     afficherPoints(nouveauxPoints) {
       points = nouveauxPoints;

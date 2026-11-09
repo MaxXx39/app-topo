@@ -762,7 +762,10 @@ async function fondDuCroquisMesure(mesure, { photo, plans }) {
       const { adresseMorceau } = await import('./export/geotiff.js');
       const reponse = await fetch(adresseMorceau(zone.estMin, zone.nordMin, zone.estMax, zone.nordMax, largeur, hauteur));
       if (!reponse.ok) throw new Error(`swisstopo a répondu ${reponse.status}`);
+      // 0.166.0 : la photo garde la transparence réglée dans Fond (sur le blanc du papier).
+      ctx.globalAlpha = plan.opacitePhoto() ?? 1;
       ctx.drawImage(await createImageBitmap(await reponse.blob()), 0, 0, largeur, hauteur);
+      ctx.globalAlpha = 1;
     } catch (erreur) {
       afficherMessage(`Photo swisstopo non chargée (réseau ?) : PDF sans photo. ${erreur.message ?? ''}`, 6000);
     }
@@ -772,7 +775,10 @@ async function fondDuCroquisMesure(mesure, { photo, plans }) {
     const vue = { estCentre, nordCentre, echelle: largeur / (zone.estMax - zone.estMin), largeur, hauteur, rotation: 0 };
     const toilePlans = document.createElement('canvas');
     dessinerPlansDxf(toilePlans, visibles, vue, 1);
+    // 0.166.0 : plans DXF à 80 % de transparence (20 % d'opacité).
+    ctx.globalAlpha = 0.2;
     ctx.drawImage(toilePlans, 0, 0);
+    ctx.globalAlpha = 1;
   }
   return toile.toDataURL('image/jpeg', 0.85);
 }
@@ -1646,7 +1652,7 @@ if (boutonRecepteur && recepteur2Disponible()) {
 // Pendant le guidage d'une implantation (0.84.0), le plan a sa propre part (la moitié au départ).
 const CLE_PLAN_TERRAIN = 'topo-plan-terrain-part';
 const CLE_PLAN_GUIDAGE = 'topo-plan-guidage-part';
-const PART_PLAN = { pas: 0.15, min: 0.2, max: 0.92, depart: 0.35, departGuidage: 0.5 };
+const PART_PLAN = { pas: 0.15, min: 0.4, max: 0.92, depart: 0.35, departGuidage: 0.5 };
 const partsPlan = { terrain: PART_PLAN.depart, guidage: PART_PLAN.departGuidage };
 for (const [sorte, cle, variable] of [['terrain', CLE_PLAN_TERRAIN, '--part-plan-terrain'], ['guidage', CLE_PLAN_GUIDAGE, '--part-plan-guidage']]) {
   try {
@@ -2906,6 +2912,10 @@ function travailAGarder() {
 document.addEventListener('cible-en-haut', () => requestAnimationFrame(() => requestAnimationFrame(cadrerSurImplantation)));
 // 0.151.0 : bouton « Implanter » en bas à droite du plan (point ou ligne choisi).
 creerBoutonImplanterPlan(document.querySelector('.panneau-plan'), document.querySelector('#leve-direct'));
+// 0.166.2 : sur téléphone (Lever, dès Intermédiaire) le Δ est un bouton rond du plan ; il touche le vrai bouton « Δ ».
+document.querySelector('.panneau-plan [data-action="delta-plan"]')?.addEventListener('click', () => {
+  document.querySelector('#leve-direct .bouton-ouvrir-delta')?.click();
+});
 // 0.151.0 : encart du plan déplaçable, + / −, toucher = plan en grand (voir plan/encart.js).
 creerEncartPlan(document.querySelector('.panneau-plan'), {
   quandToucher: () => ecranLeve.planEnGrand(true),
@@ -7219,7 +7229,13 @@ function mettreAJourEtatEntete() {
     ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive', rendu: 'Drive : main rendue' }[partage.etat.etat] ?? 'Drive : en attente'
     : '';
   // 0.157.0 (demande du 08.11) : plus le nombre de points et de levés, seulement le sous-titre et Drive.
-  document.querySelector('#etat').textContent = [sousTitreProjet(projet), drive].filter(Boolean).join(' · ');
+  document.querySelector('#etat').textContent = sousTitreProjet(projet);
+  // 0.165.0 : l'état de Drive est une pastille à gauche de la main ; discrète quand tout est à jour,
+  // orange bien visible dans tous les autres cas (envoi, attente, main rendue…).
+  const pastilleDrive = document.querySelector('#etat-drive');
+  pastilleDrive.hidden = !drive;
+  pastilleDrive.textContent = drive;
+  pastilleDrive.classList.toggle('etat-drive-ok', partage?.etat.etat === 'a-jour');
   // La page Applications ouverte montre le projet à jour dans son encadré.
   navigation?.mettreAJour();
 
