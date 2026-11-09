@@ -200,7 +200,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 
 - **0.175.11 (demande du 09.11)** : boutons **Rond / Carré** et **Tampon / FE** du Chantier plus larges (marge 10 → 16 px, 64 px au moins).
 
-- **0.176.0 (demande du 09.11, tous les modes)** : nom de départ d'un **nouveau levé** (Stock, Terrain, Terrassement, Chantier, Libre…) = `LV-` + date du jour collée `AAAAMMJJ` (`dateDuJourCollee` de `topo/surface.js`, ex. `LV-20261109`), modifiable ensuite.
+- **0.176.0 (demande du 09.11, tous les modes)** : nom de départ d'un **nouveau levé** (Stock, Terrain, Terrassement, Chantier, Libre…) = `LV-` + date du jour collée `AAAAMMJJ` (`dateDuJourCollee` de `topo/surface.js`, ex. `LV-20261109`), modifiable ensuite. **Surface Swisstopo** : nom de départ `SWISSTOP MNT3D` (`prochainNom` de `import/zone-swisstopo.js` ; `MNT3D 2`, 3… si pris), modifiable ; préfixe `SWISSTOP ` toujours fixe.
 
 ## Reste / à valider
 - **Navigation 0.156-0.160 (08.11), publiée le 08.11** : à essayer sur la tablette (appui long avec gants, roue, déplacer une tuile, sous-applications des tuiles, pages du projet, page Réglages, Enreg. Pts / Implanter / Enregistrer dans la bande, bouton récepteur, orthophoto dans la loupe, PDF de la Mesure rapide avec la photo : swisstopo inaccessible depuis le cloud de développement). **À définir avec l'utilisateur** : infos de la zone du milieu, sous-application par sous-application (liste et recommandations envoyées le 08.11). **Mesure rapide** : faite en 0.158.0 (voir Écrans) ; à essayer sur la tablette (accroches, + Point GNSS, PDF / DXF dans Mensura). Démarrage : la fenêtre « Que veux-tu faire ? » reste (validé le 08.11).

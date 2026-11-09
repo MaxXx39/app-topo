@@ -7,3 +7,11 @@ describe('dateDuJourCollee', () => {
     expect(dateDuJourCollee(new Date(2026, 0, 5))).toBe('20260105');
   });
 });
+
+import { prochainNom } from '../src/import/zone-swisstopo.js';
+describe('nom de départ Swisstopo', () => {
+  it('MNT3D, puis numéroté si pris', () => {
+    expect(prochainNom([])).toBe('SWISSTOP MNT3D');
+    expect(prochainNom(['SWISSTOP MNT3D'])).toBe('SWISSTOP MNT3D 2');
+  });
+});
