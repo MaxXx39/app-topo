@@ -15,7 +15,7 @@ import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
 import { formaterNombre } from './topo/format.js';
-import { calculerSurface, surfaceImportee, cleTriangle, estImportee, estSurfaceFichier, origineSurface, nomNature, nouvelIdentifiant, NATURES_IMPORT, avecPrefixe, sansPrefixe, prefixeDuNom, PREFIXE_SURFACE } from './topo/surface.js';
+import { calculerSurface, surfaceImportee, cleTriangle, estImportee, estSurfaceFichier, origineSurface, nomNature, nouvelIdentifiant, NATURES_IMPORT, avecPrefixe, sansPrefixe, prefixeDuNom, dateDuJourCollee, PREFIXE_SURFACE } from './topo/surface.js';
 import { calculsAutomatiques, calculerVolume, nettoyerCalculs, nomDuCalcul, descriptionCalcul, nouveauVolume } from './volumes/calculs.js';
 import { talusDePlateforme, PENTES_TALUS } from './topo/plateforme-talus.js';
 import { tranchesDeTalus, texteDePente } from './topo/tranches-talus.js';
@@ -447,7 +447,7 @@ function choisirNatureDeLever(sous) {
   ajouterSurfaceLevee(sous);
   const nouvelle = leveeEnCours();
   if (!nouvelle) return;
-  demanderTexte({ titre: 'Nom du nouveau levé', valeur: nouvelle.nom, prefixe: prefixeDuNom(nouvelle) }).then((nom) => {
+  demanderTexte({ titre: 'Nom du nouveau levé', valeur: avecPrefixe(dateDuJourCollee(), prefixeDuNom(nouvelle)), prefixe: prefixeDuNom(nouvelle) }).then((nom) => {
     if (nom && nom !== nouvelle.nom) {
       const suite = sansPrefixe(nom, prefixeDuNom(nouvelle));
       if (!suite) return;

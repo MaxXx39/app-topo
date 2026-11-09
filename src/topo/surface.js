@@ -96,6 +96,12 @@ export function prefixeDuNom(objet) {
   return estImportee(objet) || objet?.nature === 'surface' ? PREFIXE_SURFACE : PREFIXE_LEVE;
 }
 
+/** Date du jour collée : année, mois, jour, sans espace ni tiret (ex. 20261109). Nom de départ d'un nouveau levé (0.176.0). */
+export function dateDuJourCollee(date = new Date()) {
+  const deux = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}${deux(date.getMonth() + 1)}${deux(date.getDate())}`;
+}
+
 /** Nom avec ce préfixe au début (ajouté s'il n'y est pas déjà, majuscules ignorées). */
 export function avecPrefixe(nom, prefixe) {
   const texte = String(nom ?? '').trim();

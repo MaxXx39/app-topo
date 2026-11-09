@@ -24,7 +24,7 @@ import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
 import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE, debutDeNom } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
-import { prefixeDuNom } from '../topo/surface.js';
+import { prefixeDuNom, avecPrefixe, dateDuJourCollee } from '../topo/surface.js';
 import { ELEMENTS_RESEAU } from '../topo/reseau.js';
 import { MATERIAUX } from './reseaux.js';
 import { DIAMETRES_LISTE, GAINES_LISTE, NOMBRES_LISTE } from '../topo/chantier.js';
@@ -295,7 +295,7 @@ export function creerEcranLeve(conteneur, actions) {
       actions.nouvelleSurface(bouton.dataset.valeur);
       const levee = donnees.stock;
       if (!levee) return;
-      demanderTexte({ titre: 'Nom du nouveau levé', valeur: levee.nom, prefixe: prefixeDuNom(levee) }).then((nom) => {
+      demanderTexte({ titre: 'Nom du nouveau levé', valeur: avecPrefixe(dateDuJourCollee(), prefixeDuNom(levee)), prefixe: prefixeDuNom(levee) }).then((nom) => {
         if (nom && nom !== levee.nom) actions.renommerLevee(levee.id, nom);
       });
       return;
