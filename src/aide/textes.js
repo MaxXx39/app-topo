@@ -3,6 +3,8 @@
 
 // 0.163.0 : chaque bulle tient en 4 lignes au plus (demande du 09.11).
 export const TEXTES_AIDE = {
+  annotation:
+    'Annotation : pose un point (loupe sur le plan, position du récepteur, ou GPS de la tablette s\'il est à 3 m ou mieux), puis écris des remarques et ajoute des photos. Liste « Anot-date », points A-n.',
   mesureRapide:
     'Mesure rapide : touche des points sur le plan (accroche en bas, ou GNSS). 2 points : longueur, Δh, pente. 3 et plus : périmètre, surface. « Enregistrer » ou « Exporter » (PDF, DXF).',
   applications:

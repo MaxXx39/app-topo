@@ -13130,3 +13130,57 @@ body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever
 .chip-chantier .symbole-libelle { margin-right: 0; }
 .nat-chantier { gap: 2px; }
 .mini-bascule button { gap: 2px; }
+
+/* ==========================================================================
+   0.177.0 (demande du 09.11) : application Annotation (points avec remarques et photos).
+   Le plan est en haut sur tablette / téléphone, fixe à 45 % de la zone de travail, comme la Mesure rapide.
+   ========================================================================== */
+@media (max-width: 899px) {
+  body[data-onglet='annotation'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * 0.45);
+  }
+  body[data-onglet='annotation'] .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: var(--hauteur-plan-terrain);
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+  body[data-onglet='annotation'] .mise-en-page { padding-top: var(--hauteur-plan-terrain); }
+  body[data-onglet='annotation'] .panneau[data-onglet='annotation'] { padding-top: 4px; border-top-left-radius: 0; border-top-right-radius: 0; }
+  body[data-onglet='annotation'] .boutons-taille-plan { display: none; }
+}
+.panneau[data-onglet='annotation'] { border-top: 4px solid #0f766e; }
+.ecran-annotation { display: flex; flex-direction: column; gap: 10px; }
+.entete-annotation { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.modes-annotation { display: flex; gap: 6px; flex-wrap: wrap; }
+.modes-annotation .puce-choix.actif { background: #0f766e; border-color: #0f766e; color: #ffffff; }
+.invite-annotation { margin: 8px 0; text-align: center; color: var(--gris); }
+.position-annotation { display: flex; flex-direction: column; gap: 6px; }
+.position-annotation .bouton { min-height: 48px; }
+.position-annotation small, .reglage-precision-annotation { color: var(--gris); font-size: 13px; }
+.reglage-precision-annotation input { width: 72px; min-height: 36px; margin-left: 6px; }
+.fiche-annotation { display: flex; flex-direction: column; gap: 10px; border-left: 4px solid #0f766e; padding-left: 10px; }
+.titre-fiche-annotation { display: flex; flex-direction: column; gap: 2px; }
+.titre-fiche-annotation span { font-size: 13px; color: var(--gris); font-variant-numeric: tabular-nums; }
+.remarques-annotation { display: flex; flex-direction: column; gap: 6px; }
+.remarques-annotation textarea { width: 100%; min-height: 56px; font: inherit; padding: 8px; box-sizing: border-box; }
+.photos-annotation { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vignette-annotation { position: relative; display: inline-block; }
+.vignette-annotation .miniature { border: 0; padding: 0; background: none; }
+.vignette-annotation img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; display: block; }
+.vignette-annotation .enlever { position: absolute; top: -8px; right: -8px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: #dc2626; color: #ffffff; font-size: 18px; line-height: 1; }
+.bouton-photo-annotation { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; cursor: pointer; }
+.bouton-photo-annotation svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; }
+.boutons-annotation { display: flex; flex-wrap: wrap; gap: 8px; }
+.boutons-annotation > * { flex: 1 1 auto; min-height: 48px; }
+.liste-annotation { display: flex; flex-direction: column; gap: 4px; }
+.ligne-annotation { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; text-align: left; padding: 8px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); min-height: 44px; }
+.ligne-annotation.actif { border-color: #0f766e; background: color-mix(in srgb, #0f766e 12%, var(--surface)); }
+.ligne-annotation span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ligne-annotation small { grid-column: 1 / -1; color: var(--gris); }

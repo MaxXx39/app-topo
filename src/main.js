@@ -123,6 +123,8 @@ import { creerNavigation } from './navigation/bande.js';
 import { mesureRapide } from './topo/mesure-rapide.js';
 import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
 import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
+import { htmlAnnotation, textePosition } from './annotation/ecran.js';
+import { ajouterAnnotation, trouverAnnotation, supprimerAnnotation, listesAnnotation, nettoyerRemarques, precisionSuffisante, estAnnotation, PRECISION_TABLETTE_DEPART } from './topo/annotation.js';
 import { applisDisponibles, appliCourante } from './navigation/applis.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
 import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip } from './outils/son.js';
@@ -171,7 +173,7 @@ const leveDirect = { stockId: null, role: 'contour' };
 // 0.161.0 : l'écran Lever sert trois applications : 'leve' (Stock, Terrain, Libre), 'reseau' (Recollement), 'metre' (Métré).
 let familleLeve = 'leve';
 /** Famille d'un levé d'après sa nature. */
-const familleDeNature = (nature) => (nature === 'reseau' ? 'reseau' : nature === 'metre' ? 'metre' : 'leve');
+const familleDeNature = (nature) => (nature === 'reseau' ? 'reseau' : nature === 'metre' ? 'metre' : nature === 'annotation' ? 'annotation' : 'leve');
 /** Sous-application de Lever (Stock / Terrain / Terrass. / Libre) d'après la nature d'un levé. */
 const sousAppliDeNature = (nature) => (nature === 'stock' ? 'stock' : nature === 'autres' ? 'autres' : nature === 'chantier' ? 'chantier' : nature === 'terrassement' ? 'terrassement' : 'terrain');
 // Delta du prochain point levé (0.139.0, Intermédiaire) : sens 'gauche' / 'droite' (selon le cap du GNSS),
@@ -373,6 +375,9 @@ document.querySelector('#app').innerHTML = `
       <section class="panneau" data-onglet="mesure-rapide">
         <div id="mesure-rapide"></div>
       </section>
+      <section class="panneau" data-onglet="annotation">
+        <div id="annotation"></div>
+      </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
       <div id="barre-mesures" class="barre-edition" hidden></div>
     </div>
@@ -437,7 +442,7 @@ function sousApplisDeLever() {
  */
 function choisirNatureDeLever(sous) {
   const nature = (l) => sousAppliDeNature(l.nature);
-  const levees = [...surfacesLevees(), ...projet.autres].filter((l) => nature(l) === sous);
+  const levees = [...surfacesLevees(), ...projet.autres].filter((l) => !estAnnotation(l) && nature(l) === sous);
   const choisie = levees.filter((l) => l.leveId === projet.leveActifId).at(-1) ?? levees.at(-1);
   if (choisie) {
     if (choisie.id !== leveDirect.stockId) choisirLevee(choisie.id);
@@ -767,6 +772,238 @@ function agirMesureRapide(cle) {
   return undefined;
 }
 
+// --- Annotation (0.177.0, Intermédiaire et Expert, demande du 09.11) ---
+// Un point posé sur le plan (loupe), pris au récepteur (GNSS) ou au GPS de la tablette (précision 3 m au plus, réglable),
+// avec des remarques et des photos. Rangé dans la liste du jour « Anot-AAAAMMJJ » (points A-n, voir topo/annotation.js).
+const annotationEtat = { mode: 'loupe', brouillon: null };
+
+/** Vrai quand l'Annotation est l'écran de travail. */
+function annotationActive() {
+  return ongletContexte === 'annotation' && aAcces('intermediaire');
+}
+
+const modesAnnotation = () => (recepteurDisponible() ? ['loupe', 'gnss', 'tablette'] : ['loupe']);
+const precisionTabletteMax = () => terrain.precisionTablette ?? PRECISION_TABLETTE_DEPART;
+const arrondirMm = (valeur) => Math.round(valeur * 1000) / 1000;
+
+/** Texte et état du GPS de la tablette (précision en direct). */
+function etatTabletteAnnotation() {
+  if (!positionTablette) return { ok: false, texte: 'Pas de position GPS de la tablette' };
+  const precision = positionTablette.precision;
+  const ok = precisionSuffisante(precision, precisionTabletteMax());
+  return { ok, texte: `Précision ±${Number.isFinite(precision) ? formaterNombre(precision) : '?'} m · ${ok ? 'assez précis' : `il faut ${formaterNombre(precisionTabletteMax())} m ou mieux`}` };
+}
+
+/** Précision du GPS de la tablette mise à jour sans redessiner la fiche (5 fois par seconde). */
+function majPrecisionAnnotation() {
+  if (!annotationActive() || annotationEtat.mode !== 'tablette' || annotationEtat.brouillon) return;
+  const etat = etatTabletteAnnotation();
+  const texte = document.querySelector('#annotation [data-champ="precision-tablette"]');
+  if (texte && texte.textContent !== etat.texte) texte.textContent = etat.texte;
+  const bouton = document.querySelector('#annotation [data-action="prendre-tablette-annotation"]');
+  if (bouton) bouton.disabled = !etat.ok;
+}
+
+/** Photos du point en cours (nouveau : en mémoire ; modifié : celles de sa liste). */
+function photosDuBrouillonAnnotation() {
+  const b = annotationEtat.brouillon;
+  if (!b) return [];
+  if (!b.edition) return b.photos;
+  return (trouverAnnotation(projet, b.nom)?.liste.photos ?? []).filter((p) => p.point === b.nom);
+}
+
+/** Recopie les remarques tapées dans le point en cours (avant tout redessin). */
+function lireFormulaireAnnotation() {
+  const b = annotationEtat.brouillon;
+  if (!b) return;
+  const champs = [...document.querySelectorAll('#annotation [data-champ="remarque"]')];
+  if (champs.length > 0) b.remarques = champs.map((c) => c.value);
+}
+
+function afficherAnnotation() {
+  const liste = listesAnnotation(projet).flatMap((l) => (projet.leves.find((v) => v.id === l.leveId)?.points ?? []).map((p) => ({ l, p })))
+    .reverse().map(({ l, p }) => ({
+      nom: p.nom, source: p.annotation?.source, remarques: p.annotation?.remarques?.length ?? 0,
+      photos: (l.photos ?? []).filter((ph) => ph.point === p.nom).length, premiere: p.annotation?.remarques?.[0] ?? '',
+    }));
+  const modes = modesAnnotation();
+  if (!modes.includes(annotationEtat.mode)) annotationEtat.mode = 'loupe';
+  document.querySelector('#annotation').innerHTML = htmlAnnotation({
+    modes, mode: annotationEtat.mode, brouillon: annotationEtat.brouillon, photos: photosDuBrouillonAnnotation(),
+    manuel: { zoom: terrain.zoomLoupe ?? 4 },
+    gnss: { pret: Boolean(etatRecepteur?.connecte && etatRecepteur.recu && etatRecepteur.position && etatRecepteur.qualite === 4 && etatRecepteur.inclinaisonPrete) },
+    tablette: { ...etatTabletteAnnotation(), maximum: precisionTabletteMax() }, liste,
+  });
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+  navigation?.mettreAJour();
+}
+
+/** Position du point en cours (mode Loupe : à chaque doigt levé ; GNSS / Tablette : au toucher du bouton). */
+function poserPositionAnnotation({ est, nord, altitude, source, precision }) {
+  const mm = arrondirMm;
+  const position = { est: mm(est), nord: mm(nord), altitude: altitude != null ? mm(altitude) : null, source, precision: precision ?? null };
+  const nouvelle = !annotationEtat.brouillon;
+  if (nouvelle) annotationEtat.brouillon = { ...position, remarques: [''], photos: [] };
+  else if (annotationEtat.brouillon.edition) return;
+  else Object.assign(annotationEtat.brouillon, position);
+  if (nouvelle || source !== 'loupe') afficherAnnotation();
+  else {
+    const texte = document.querySelector('#annotation [data-champ="position-annotation"]');
+    if (texte) texte.textContent = textePosition(annotationEtat.brouillon);
+  }
+}
+
+function prendreGnssAnnotation() {
+  const position = etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null;
+  if (!position || etatRecepteur.qualite !== 4 || !etatRecepteur.inclinaisonPrete) {
+    refuser('Point GNSS refusé : il faut le RTK fixe et l\'inclinaison prête');
+    return;
+  }
+  vibrer(30);
+  poserPositionAnnotation({ est: position.est, nord: position.nord, altitude: position.altitude ?? null, source: 'gnss', precision: etatRecepteur.precisionH ?? null });
+}
+
+function prendreTabletteAnnotation() {
+  if (!positionTablette) {
+    refuser('Pas de position GPS de la tablette');
+    return;
+  }
+  if (!precisionSuffisante(positionTablette.precision, precisionTabletteMax())) {
+    refuser(`GPS de la tablette trop imprécis (±${formaterNombre(positionTablette.precision)} m) : ${formaterNombre(precisionTabletteMax())} m ou mieux`);
+    return;
+  }
+  vibrer(30);
+  poserPositionAnnotation({ est: positionTablette.est, nord: positionTablette.nord, altitude: null, source: 'tablette', precision: positionTablette.precision });
+}
+
+/** Ouvre la fiche d'un point d'annotation déjà enregistré. */
+function ouvrirAnnotation(nom) {
+  const trouve = trouverAnnotation(projet, nom);
+  if (!trouve) return;
+  lireFormulaireAnnotation();
+  const { point } = trouve;
+  annotationEtat.brouillon = {
+    edition: true, nom, est: point.est, nord: point.nord, altitude: point.altitude ?? null,
+    source: point.annotation?.source, precision: point.annotation?.precision ?? null,
+    remarques: [...(point.annotation?.remarques ?? [])],
+  };
+  afficherAnnotation();
+}
+
+function enregistrerAnnotation() {
+  if (refuserEnLectureSeule()) return;
+  lireFormulaireAnnotation();
+  const b = annotationEtat.brouillon;
+  if (!b) return;
+  if (b.edition) {
+    const trouve = trouverAnnotation(projet, b.nom);
+    if (trouve) trouve.point.annotation.remarques = nettoyerRemarques(b.remarques);
+    afficherMessage(`${b.nom} modifié`);
+  } else {
+    const { point } = ajouterAnnotation(projet, b, nomsDuProjet(projet));
+    afficherMessage(`${point.nom} enregistré`);
+  }
+  annotationEtat.brouillon = null;
+  modifie();
+  afficherAnnotation();
+}
+
+async function supprimerAnnotationEnCours() {
+  const b = annotationEtat.brouillon;
+  if (!b?.edition || refuserEnLectureSeule()) return;
+  const choix = await demanderChoix({ titre: `Supprimer ${b.nom} ?`, texte: 'Le point, ses remarques et ses photos seront enlevés.', boutons: [{ cle: 'oui', texte: 'Supprimer', principal: true }, { cle: 'non', texte: 'Garder' }] });
+  if (choix !== 'oui') return;
+  supprimerAnnotation(projet, b.nom);
+  annotationEtat.brouillon = null;
+  modifie();
+  afficherAnnotation();
+}
+
+async function ajouterPhotosAnnotation(fichiers) {
+  const b = annotationEtat.brouillon;
+  if (!b || fichiers.length === 0 || (b.edition && refuserEnLectureSeule())) return;
+  lireFormulaireAnnotation();
+  afficherMessage('Préparation de la photo…', null);
+  const erreurs = [];
+  for (const fichier of fichiers) {
+    try {
+      const photo = await preparerPhoto(fichier);
+      if (b.edition) {
+        const trouve = trouverAnnotation(projet, b.nom);
+        if (trouve) trouve.liste.photos = [...(trouve.liste.photos ?? []), { ...photo, point: b.nom }];
+      } else b.photos.push(photo);
+    } catch (erreur) {
+      erreurs.push(`${fichier.name} : ${erreur.message}`);
+    }
+  }
+  if (erreurs.length > 0) afficherMessage(`Photo refusée. ${erreurs.join(' ; ')}`, 8000);
+  else afficherMessage(`${fichiers.length} photo(s) ajoutée(s)`);
+  if (b.edition) modifie();
+  afficherAnnotation();
+}
+
+function enleverPhotoAnnotation(id) {
+  const b = annotationEtat.brouillon;
+  if (!b) return;
+  lireFormulaireAnnotation();
+  if (b.edition) {
+    if (refuserEnLectureSeule()) return;
+    const trouve = trouverAnnotation(projet, b.nom);
+    if (trouve) trouve.liste.photos = (trouve.liste.photos ?? []).filter((p) => p.id !== id);
+    modifie();
+  } else b.photos = b.photos.filter((p) => p.id !== id);
+  afficherAnnotation();
+}
+
+document.querySelector('#annotation').addEventListener('click', (evenement) => {
+  const bouton = evenement.target.closest('button[data-action]');
+  if (!bouton || bouton.disabled) return;
+  const action = bouton.dataset.action;
+  if (action === 'mode-annotation') {
+    lireFormulaireAnnotation();
+    annotationEtat.mode = bouton.dataset.valeur;
+    afficherAnnotation();
+  } else if (action === 'deplacer-loupe-annotation') {
+    const [dx, dy] = { haut: [0, -1], bas: [0, 1], gauche: [-1, 0], droite: [1, 0] }[bouton.dataset.valeur] ?? [0, 0];
+    plan.loupe.deplacerDe(dx, dy);
+  } else if (action === 'zoom-loupe-annotation') {
+    terrain.zoomLoupe = Number(bouton.dataset.valeur) || 4;
+    plan.loupe.changerZoom(terrain.zoomLoupe);
+    lireFormulaireAnnotation();
+    afficherAnnotation();
+  } else if (action === 'prendre-gnss-annotation') prendreGnssAnnotation();
+  else if (action === 'prendre-tablette-annotation') prendreTabletteAnnotation();
+  else if (action === 'ajouter-remarque') {
+    lireFormulaireAnnotation();
+    annotationEtat.brouillon?.remarques.push('');
+    afficherAnnotation();
+    document.querySelector('#annotation [data-champ="remarque"]:last-of-type')?.focus();
+  } else if (action === 'enregistrer-annotation') enregistrerAnnotation();
+  else if (action === 'fermer-annotation') {
+    annotationEtat.brouillon = null;
+    afficherAnnotation();
+  } else if (action === 'supprimer-annotation') supprimerAnnotationEnCours();
+  else if (action === 'ouvrir-annotation') ouvrirAnnotation(bouton.dataset.nom);
+  else if (action === 'voir-photo-annotation') montrerPhoto(bouton.dataset.id);
+  else if (action === 'enlever-photo-annotation') enleverPhotoAnnotation(bouton.dataset.id);
+});
+document.querySelector('#annotation').addEventListener('change', (evenement) => {
+  const precision = evenement.target.closest('input[data-champ="precision-tablette-max"]');
+  if (precision) {
+    const valeur = Number(String(precision.value).replace(',', '.'));
+    terrain.precisionTablette = Number.isFinite(valeur) && valeur > 0 ? Math.min(valeur, 50) : PRECISION_TABLETTE_DEPART;
+    retenirReglagesTerrain();
+    afficherAnnotation();
+    return;
+  }
+  const champ = evenement.target.closest('input[data-champ="photo-annotation"]');
+  if (!champ) return;
+  const fichiers = [...champ.files];
+  champ.value = '';
+  ajouterPhotosAnnotation(fichiers);
+});
+
 document.querySelector('#mesure-rapide').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-action]');
   if (!bouton || bouton.disabled) return;
@@ -924,6 +1161,7 @@ function ouvrirAppli(cle, sous = null, depuisMenu = false) {
   } else if (cle === 'calculs') afficherOnglet(sous ?? 'calculs');
   else if (cle === 'plan') afficherOnglet('plan');
   else if (cle === 'mesure') afficherOnglet('mesure-rapide');
+  else if (cle === 'annotation') afficherOnglet('annotation');
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur', { detail: { retourMenu: depuisMenu } }));
   if (sous && cle !== 'calculs') {
     // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
@@ -1050,6 +1288,7 @@ function afficherOnglet(demande, { partie = null } = {}) {
   plan.retourAutomatiqueDuSuivi(ongletContexte === 'terrain');
   if (entreDansCalculs) cadrerSurCalculs();
   if (nom === 'mesure-rapide') afficherMesureRapide();
+  if (nom === 'annotation') afficherAnnotation();
   navigation?.mettreAJour();
   window.scrollTo(0, 0);
   if (nom === 'projets' && !partie) navigation?.ouvrirPage();
@@ -1610,7 +1849,7 @@ function reprendreLeveDirect() {
   const enCours = leveeEnCours();
   if (enCours && familleDeNature(enCours.nature) === familleLeve) return;
   // Levés de la famille de l'application affichée (Lever, Recollement ou Métré), le plus récent d'abord choisi.
-  const levees = familleLeve === 'reseau' ? projet.reseaux : familleLeve === 'metre' ? projet.metres : [...surfacesLevees(), ...projet.autres];
+  const levees = familleLeve === 'reseau' ? projet.reseaux : familleLeve === 'metre' ? projet.metres : [...surfacesLevees(), ...projet.autres.filter((a) => !estAnnotation(a))];
   const choisie = levees.filter((s) => s.leveId === projet.leveActifId).at(-1) ?? levees.at(-1);
   leveDirect.stockId = choisie?.id ?? null;
 }
@@ -2724,6 +2963,17 @@ function gererLoupeImplantation() {
     loupeImplantation = true;
     return;
   }
+  // Annotation (0.177.0) : mode Loupe ; doigt levé = position du point en cours (nouvelle fiche si besoin).
+  if (annotationActive() && annotationEtat.mode === 'loupe' && !annotationEtat.brouillon?.edition) {
+    const premiere = !loupeImplantation;
+    plan.loupe.montrer({
+      recentrer: premiere,
+      zoom: terrain.zoomLoupe ?? 4,
+      quandLache: ({ est, nord }) => poserPositionAnnotation({ est, nord, altitude: null, source: 'loupe', precision: null }),
+    });
+    loupeImplantation = true;
+    return;
+  }
   const voulue = ongletContexte === 'terrain' && enImplantationDePoint() && terrain.accroche === 'manuel' && aAcces('intermediaire');
   if (!voulue) {
     if (loupeImplantation) plan.loupe.cacher();
@@ -2744,9 +2994,9 @@ function gererLoupeImplantation() {
 
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
-  const accrocheActive = mesureRapideActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(daoAppli?.actif());
+  const accrocheActive = mesureRapideActive() || annotationActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(daoAppli?.actif());
   // 0.159.0 : les applications sont indépendantes : la Mesure rapide ne montre rien d'Implanter.
-  const mesure = mesureRapideActive();
+  const mesure = mesureRapideActive() || annotationActive();
   const enLigne = accrocheActive && !mesure && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
@@ -4682,6 +4932,11 @@ function toucherPourImplantation(position, tolerance) {
     toucherPourMesureRapide(position, tolerance);
     return;
   }
+  // Annotation (0.177.0) : en mode Loupe, toucher le plan y pose la loupe.
+  if (annotationActive()) {
+    if (annotationEtat.mode === 'loupe' && !annotationEtat.brouillon?.edition) plan.loupe.placerSur(position.est, position.nord);
+    return;
+  }
   // Choix des côtés d'un talus de surface (Calculs › Dessin, 0.135.0).
   if (choixCotesTalusActif()) {
     toucherCoteTalus(position, tolerance);
@@ -6353,6 +6608,7 @@ if (recepteurDisponible()) {
   // GPS de la tablette : gardé ici, montré avec l'état suivant du RX2 (5 fois par seconde).
   ecouterPositionTablette((position) => {
     positionTablette = position && Number.isFinite(position.est) && Number.isFinite(position.nord) ? position : null;
+    majPrecisionAnnotation();
   });
 }
 

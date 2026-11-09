@@ -58,6 +58,17 @@ export const APPLIS = [
     icone: '<path d="M3 17 17 3l4 4L7 21z" /><path d="m7 13 2 2M10 10l2 2M13 7l2 2" />',
   },
   {
+    // Annotation (0.177.0, dès Intermédiaire) : points avec remarques et photos (loupe, récepteur ou GPS tablette).
+    cle: 'annotation',
+    titre: 'Annotation',
+    court: 'Annot.',
+    couleur: '#0f766e',
+    texte: '#ffffff',
+    site: true,
+    niveau: 'intermediaire',
+    icone: '<path d="M4 4h16v12H9l-5 4z" /><path d="M8 9h8M8 12h5" />',
+  },
+  {
     cle: 'controle',
     titre: 'Contrôle',
     couleur: '#9b2c3a',
@@ -138,6 +149,7 @@ export function appliCourante(onglet, modeTerrain, familleLever = 'leve') {
   if (onglet === 'projets') return 'projet';
   if (onglet === 'plan') return 'plan';
   if (onglet === 'mesure-rapide') return 'mesure';
+  if (onglet === 'annotation') return 'annotation';
   if (['volumes', 'mesures', 'dessin', 'surfaces', 'calculs'].includes(onglet)) return 'calculs';
   if (onglet === 'terrain') {
     const lever = { reseau: 'recollement', metre: 'metre' }[familleLever] ?? 'lever'; // 0.161.0
