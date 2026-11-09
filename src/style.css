@@ -13242,7 +13242,7 @@ body.clavier-ouvert .bandeau-annotation { bottom: 8px; }
 .titre-liste-annotation { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
 /* 0.180.0 : points d'Annotation = un rond tracé à la main (trait fin, 14 px). */
-.plan .points .forme-nuage { stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: 3.4 2.2; }
+.plan .points .forme-nuage { stroke-width: 3.2; stroke-linecap: butt; stroke-dasharray: 6 3.6; }
 
 /* 0.181.0 (demande du 09.11) : Annotation harmonisée avec Lever : plan réglable par ▲ / ▼ (même part que Lever, 30 à 70 %), une seule rangée
    sous le plan (⚙ | consigne | aide), boutons de la fiche et lignes de la liste dans le même style, trait de couleur partout. */
@@ -13279,3 +13279,8 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .photos-encadre-annotation { display: flex; flex-wrap: wrap; gap: 8px; }
 .photos-encadre-annotation .miniature { border: 0; padding: 0; background: none; }
 .photos-encadre-annotation img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; display: block; }
+
+/* 0.184.0 (demande du 09.11) : dessin sur photo : outil Texte (zone de saisie au-dessus de la photo). */
+.saisie-texte-dessin { display: flex; gap: 8px; padding: 6px 8px; align-items: center; }
+.saisie-texte-dessin[hidden] { display: none; }
+.saisie-texte-dessin input { flex: 1; min-width: 0; min-height: 44px; font-size: 16px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--bordure); }

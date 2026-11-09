@@ -462,7 +462,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (calques.noms || calques.altitudes) {
       const montrerNom = (point) => calques.noms && (pointsImport.has(point) ? calques.nomsImport : calques.nomsLeve);
       const textes = visibles.map(({ point }) =>
-        [montrerNom(point) ? point.nom : null, calques.altitudes ? formaterNombre(point.altitude) : null, calques.altitudes && point.chantier ? texteDuPoint(point.chantier, point.chantier) : null].filter(Boolean),
+        [montrerNom(point) ? point.nom : null, calques.altitudes && point.altitude != null ? formaterNombre(point.altitude) : null, calques.altitudes && point.chantier ? texteDuPoint(point.chantier, point.chantier) : null].filter(Boolean),
       );
       const places = placerEtiquettes(
         visibles.map(({ x, y }, i) => ({

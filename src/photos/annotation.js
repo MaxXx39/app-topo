@@ -8,12 +8,21 @@
 // - cercle : { type: 'cercle', couleur, a: centre, b: un point du cercle }
 // - flèche : { type: 'fleche', couleur, a: queue, b: pointe }
 // - trait  : { type: 'trait', couleur, points: [{ x, y }, ...] }
+// - texte  : { type: 'texte', couleur, a: début du texte (milieu de la ligne), texte } (0.184.0)
 export const COULEURS_DESSIN = [
   ['rouge', '#ef4444'],
   ['jaune', '#facc15'],
   ['vert', '#22c55e'],
+  ['bleu', '#2563eb'],
+  ['noir', '#000000'],
   ['blanc', '#ffffff'],
 ];
+
+/** Taille (pixels) d'un texte sur une photo : environ 4,5 % du grand côté. */
+export const tailleTexte = (largeur, hauteur) => Math.max(14, Math.round(Math.max(largeur, hauteur) * 0.045));
+
+/** Liseré qui contraste avec la couleur : clair pour le noir et le bleu, sombre pour les autres. */
+export const liseréPour = (couleur) => (['#000000', '#2563eb'].includes(couleur) ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.45)');
 
 /** Rayon (en pixels) d'un cercle dessiné de a (centre) à b, sur une photo largeur × hauteur. */
 export function rayonCercle(a, b, largeur, hauteur) {
@@ -38,6 +47,7 @@ export function pointeFleche(a, b, largeur, hauteur, longueur) {
 
 /** Dessin « assez grand pour compter » (un simple toucher ne crée rien). */
 export function dessinValide(forme, largeur, hauteur) {
+  if (forme.type === 'texte') return Boolean(String(forme.texte ?? '').trim());
   if (forme.type === 'trait') return forme.points.length >= 2;
   return Math.hypot((forme.b.x - forme.a.x) * largeur, (forme.b.y - forme.a.y) * hauteur) >= 6;
 }
@@ -61,7 +71,12 @@ export function formeSousLeDoigt(formes, p, largeur, hauteur, tolerance) {
   const doigt = px(p);
   for (let i = formes.length - 1; i >= 0; i--) {
     const f = formes[i];
-    if (f.type === 'cercle') {
+    if (f.type === 'texte') {
+      // Zone du texte : largeur d'environ 0,6 × taille par lettre, hauteur = taille (autour de son point de départ).
+      const taille = tailleTexte(largeur, hauteur);
+      const debut = px(f.a);
+      if (doigt.x >= debut.x - tolerance && doigt.x <= debut.x + String(f.texte).length * taille * 0.6 + tolerance && Math.abs(doigt.y - debut.y) <= taille / 2 + tolerance) return i;
+    } else if (f.type === 'cercle') {
       const centre = px(f.a);
       if (Math.hypot(doigt.x - centre.x, doigt.y - centre.y) <= rayonCercle(f.a, f.b, largeur, hauteur) + tolerance) return i;
     } else if (f.type === 'fleche') {
@@ -77,6 +92,7 @@ export function formeSousLeDoigt(formes, p, largeur, hauteur, tolerance) {
 export function deplacerForme(forme, dx, dy) {
   const bouger = (q) => ({ x: q.x + dx, y: q.y + dy });
   if (forme.type === 'trait') return { ...forme, points: forme.points.map(bouger) };
+  if (forme.type === 'texte') return { ...forme, a: bouger(forme.a) };
   return { ...forme, a: bouger(forme.a), b: bouger(forme.b) };
 }
 
@@ -98,7 +114,7 @@ export function dessinerFormes(ctx, formes, largeur, hauteur) {
     // Un fin liseré sombre, pour que le blanc et le jaune se voient aussi sur une photo claire.
     const tracer = (chemin) => {
       ctx.save();
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.strokeStyle = liseréPour(forme.couleur);
       ctx.lineWidth = epaisseur + 2;
       chemin();
       ctx.stroke();
@@ -106,6 +122,17 @@ export function dessinerFormes(ctx, formes, largeur, hauteur) {
       chemin();
       ctx.stroke();
     };
+    if (forme.type === 'texte') {
+      // Texte : lettres de la couleur choisie avec un contour qui contraste.
+      const taille = tailleTexte(largeur, hauteur);
+      ctx.font = `bold ${taille}px sans-serif`;
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = Math.max(3, taille / 6);
+      ctx.strokeStyle = liseréPour(forme.couleur);
+      ctx.strokeText(forme.texte, forme.a.x * largeur, forme.a.y * hauteur);
+      ctx.fillText(forme.texte, forme.a.x * largeur, forme.a.y * hauteur);
+      continue;
+    }
     if (forme.type === 'cercle') {
       const r = rayonCercle(forme.a, forme.b, largeur, hauteur);
       tracer(() => {
@@ -190,11 +217,17 @@ export function ouvrirEditeurDessin(photo, depart = []) {
           <button type="button" class="outil-dessin actif" data-outil="cercle" title="Cercle"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /></svg>Cercle</button>
           <button type="button" class="outil-dessin" data-outil="fleche" title="Flèche"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 19 5M10 5h9v9" /></svg>Flèche</button>
           <button type="button" class="outil-dessin" data-outil="trait" title="Trait libre"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16c3-8 6 4 9-4s5-3 7-4" /></svg>Trait</button>
+          <button type="button" class="outil-dessin" data-outil="texte" title="Texte"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6V4h14v2M12 4v16M9 20h6" /></svg>Texte</button>
           <button type="button" class="outil-dessin" data-outil="deplacer" title="Déplacer un dessin"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3 9 6M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" /></svg>Déplacer</button>
         </div>
         <div class="groupe-dessin-photo" role="group" aria-label="Couleur">
           ${COULEURS_DESSIN.map(([nom, hex], i) => `<button type="button" class="couleur-dessin ${i === 0 ? 'actif' : ''}" data-couleur="${hex}" style="background:${hex}" title="${nom}" aria-label="${nom}"></button>`).join('')}
         </div>
+      </div>
+      <div class="saisie-texte-dessin" hidden>
+        <input type="text" maxlength="60" placeholder="Texte à écrire sur la photo" aria-label="Texte à écrire sur la photo" autocomplete="off" />
+        <button type="button" class="bouton" data-action="ok-texte">OK</button>
+        <button type="button" class="bouton-secondaire" data-action="annuler-texte">Annuler</button>
       </div>
       <div class="zone-dessin-photo"><canvas></canvas></div>
       <div class="barre-dessin-photo">
@@ -243,6 +276,29 @@ export function ouvrirEditeurDessin(photo, depart = []) {
         y: Math.min(1, Math.max(0, (evenement.clientY - cadre.top) / cadre.height)),
       };
     };
+    // Texte : une zone de saisie (pas de fenêtre du navigateur, qui n'existe pas toujours dans l'appli Android).
+    let texteEn = null; // position du texte en attente
+    const saisie = fenetre.querySelector('.saisie-texte-dessin');
+    const champTexte = saisie.querySelector('input');
+    const demanderTexte = (p) => {
+      texteEn = p;
+      champTexte.value = '';
+      saisie.hidden = false;
+      champTexte.focus();
+    };
+    const finirTexte = (valider) => {
+      const tape = champTexte.value.trim();
+      if (valider && tape && texteEn) formes.push({ type: 'texte', couleur, a: texteEn, texte: tape });
+      texteEn = null;
+      saisie.hidden = true;
+      redessiner();
+    };
+    champTexte.addEventListener('keydown', (evenement) => {
+      if (evenement.key === 'Enter') {
+        evenement.preventDefault();
+        finirTexte(true);
+      }
+    });
     canevas.addEventListener('pointerdown', (evenement) => {
       canevas.setPointerCapture(evenement.pointerId);
       const p = position(evenement);
@@ -252,6 +308,11 @@ export function ouvrirEditeurDessin(photo, depart = []) {
         choisi = formeSousLeDoigt(formes, p, canevas.width, canevas.height, tolerance);
         deplacement = choisi >= 0 ? { index: choisi, depart: p, forme: formes[choisi] } : null;
         redessiner();
+        return;
+      }
+      if (outil === 'texte') {
+        // Un toucher : on tape le texte (une ligne) qui s'écrit à cet endroit, dans la couleur choisie.
+        demanderTexte(p);
         return;
       }
       enCours = outil === 'trait' ? { type: 'trait', couleur, points: [p] } : { type: outil, couleur, a: p, b: p };
@@ -293,6 +354,10 @@ export function ouvrirEditeurDessin(photo, depart = []) {
       } else if (bouton.dataset.couleur) {
         couleur = bouton.dataset.couleur;
         fenetre.querySelectorAll('.couleur-dessin').forEach((b) => b.classList.toggle('actif', b === bouton));
+      } else if (bouton.dataset.action === 'ok-texte') {
+        finirTexte(true);
+      } else if (bouton.dataset.action === 'annuler-texte') {
+        finirTexte(false);
       } else if (bouton.dataset.action === 'effacer-dernier') {
         formes.pop();
         choisi = -1;
