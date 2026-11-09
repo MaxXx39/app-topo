@@ -10,7 +10,7 @@ import { dessinerMesureRapide } from './mesure-rapide.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { texteDuPoint } from '../topo/chantier.js';
 // Couleur des nuages d'Annotation (vert sarcelle de l'application ; au choix dans « Afficher »).
-const COULEUR_ANNOTATION = '#0f766e';
+const COULEUR_ANNOTATION = '#7c4a1e';
 import { lireLibellesChantier, lireNaturesChantier, couleurNatureChantier } from '../leve/libelles-chantier.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { bordDeTriangles, estSurfaceFichier } from '../topo/surface.js';

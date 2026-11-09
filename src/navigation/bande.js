@@ -404,6 +404,9 @@ export function creerNavigation(nav, actions) {
       : (vide ? '' : `<div class="zone-info-appli">${info}</div>`);
     nav.style.setProperty('--couleur-appli', appli?.couleur ?? '#1b2b36');
     nav.style.setProperty('--texte-appli', appli?.texte ?? '#ffffff');
+    // 0.185.0 : aussi sur la page, pour que les cadres et titres des écrans suivent la couleur de l'appli.
+    document.body.style.setProperty('--couleur-appli', appli?.couleur ?? '#1b2b36');
+    document.body.style.setProperty('--texte-appli', appli?.texte ?? '#ffffff');
     nav.classList.toggle('deroulee', deroulee);
     nav.classList.toggle('vide', vide);
     nav.innerHTML = `<div class="bouton-appli ${appli ? '' : 'neutre'}">${partieAppli}${partieSous}</div>${milieu}`;

@@ -565,7 +565,7 @@ export function dessinerPointsPdf(doc, pointsMontres, versPapier, echelle, choix
   positions.forEach(({ x, y }, i) => {
     // Point d'annotation (0.180.3) : rond en pointillés sarcelle, comme à l'écran.
     if (pointsMontres[i].annotation) {
-      doc.setDrawColor(...hexEnRvb('#0f766e'));
+      doc.setDrawColor(...hexEnRvb('#7c4a1e'));
       doc.setLineWidth(0.25);
       doc.setLineDashPattern([0.8, 1], 0);
       doc.circle(x, y, 1.7, 'S');

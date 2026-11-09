@@ -3060,7 +3060,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 .bouton-nature.nature-metre {
-  --couleur-nature: #0891b2;
+  --couleur-nature: #ea580c;
 }
 
 .choix-nature {
@@ -3098,7 +3098,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 .bouton-nature.nature-recollement {
-  --couleur-nature: #db2777;
+  --couleur-nature: #16a34a;
 }
 
 .bouton-nature.nature-reseau {
@@ -4859,7 +4859,7 @@ button.bouton-import {
 }
 
 .entete-levee.nature-recollement {
-  --couleur-nature: #db2777;
+  --couleur-nature: #16a34a;
 }
 
 .entete-levee.nature-terrassement {
@@ -4871,7 +4871,7 @@ button.bouton-import {
 }
 
 .entete-levee.nature-metre {
-  --couleur-nature: #0891b2;
+  --couleur-nature: #ea580c;
 }
 
 /* « Levé libre » (contrôle, points géomètre… ; « autres » dans le code) : gris ardoise. */
@@ -4938,19 +4938,19 @@ button.bouton-import {
 /* Contenu de l'onglet Terrain encadré à la couleur du mode (0.64.0) : ambre (Lever), sarcelle
    (Implanter), rouge (Contrôle). */
 .panneau[data-onglet='terrain'] {
-  border: 2px solid var(--ambre);
+  border: 2px solid var(--couleur-appli, var(--ambre));
 }
 
 .panneau[data-onglet='terrain']:has(.cadre-mode-controler) {
-  border-color: #0d9488;
+  border-color: var(--couleur-appli, #0d9488);
 }
 
 .panneau[data-onglet='terrain']:has(.cadre-mode-autocontrole) {
-  border-color: var(--bordeaux);
+  border-color: var(--couleur-appli, var(--bordeaux));
 }
 
 .panneau[data-onglet='terrain']:has(.cadre-mode-lame) {
-  border-color: #1d4ed8;
+  border-color: var(--couleur-appli, #1d4ed8);
 }
 
 /* Flèches ▲ / ▼ sous le plan (téléphone, onglet Terrain) : plus petit / plus grand. */
@@ -5053,7 +5053,7 @@ button.bouton-import {
 .pastille-liste.liste-stock { background: #b45309; }
 .pastille-liste.liste-terrain { background: #15803d; }
 .pastille-liste.liste-terrassement { background: #2563eb; }
-.pastille-liste.liste-metre { background: #0891b2; }
+.pastille-liste.liste-metre { background: #ea580c; }
 .pastille-liste.liste-autres { background: #475569; }
 .pastille-liste.liste-fichier { background: var(--sombre); }
 .pastille-liste.liste-ajoutes { background: #7c3aed; }
@@ -5480,10 +5480,10 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 }
 
 .ligne-levee.nature-terrain { --couleur-nature: #15803d; }
-.ligne-levee.nature-recollement { --couleur-nature: #db2777; }
+.ligne-levee.nature-recollement { --couleur-nature: #16a34a; }
 .ligne-levee.nature-terrassement { --couleur-nature: #2563eb; }
 .ligne-levee.nature-surface { --couleur-nature: #7c3aed; }
-.ligne-levee.nature-metre { --couleur-nature: #0891b2; }
+.ligne-levee.nature-metre { --couleur-nature: #ea580c; }
 .ligne-levee.nature-autres { --couleur-nature: #475569; }
 
 .choisir-levee {
@@ -7517,7 +7517,7 @@ body.lecture-seule .bouton-photo-levee {
 
 .plan .nature-stock { --couleur-nature: #b45309; }
 .plan .nature-terrain { --couleur-nature: #15803d; }
-.plan .nature-recollement { --couleur-nature: #db2777; }
+.plan .nature-recollement { --couleur-nature: #16a34a; }
 .plan .nature-terrassement { --couleur-nature: #2563eb; }
 .plan .nature-surface { --couleur-nature: #7c3aed; }
 
@@ -13155,17 +13155,17 @@ body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever
   body[data-onglet='annotation'] .mise-en-page { padding-top: var(--hauteur-plan-terrain); }
   body[data-onglet='annotation'] .panneau[data-onglet='annotation'] { padding-top: 4px; border-top-left-radius: 0; border-top-right-radius: 0; }
 }
-.panneau[data-onglet='annotation'] { border-top: 4px solid #0f766e; }
+.panneau[data-onglet='annotation'] { border-top: 4px solid #7c4a1e; }
 .ecran-annotation { display: flex; flex-direction: column; gap: 10px; }
 .entete-annotation { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
 .modes-annotation { display: flex; gap: 6px; flex-wrap: wrap; }
-.modes-annotation .puce-choix.actif { background: #0f766e; border-color: #0f766e; color: #ffffff; }
+.modes-annotation .puce-choix.actif { background: #7c4a1e; border-color: #7c4a1e; color: #ffffff; }
 .invite-annotation { margin: 8px 0; text-align: center; color: var(--gris); }
 .position-annotation { display: flex; flex-direction: column; gap: 6px; }
 .position-annotation .bouton { min-height: 48px; }
 .position-annotation small, .reglage-precision-annotation { color: var(--gris); font-size: 13px; }
 .reglage-precision-annotation input { width: 72px; min-height: 36px; margin-left: 6px; }
-.fiche-annotation { display: flex; flex-direction: column; gap: 10px; border-left: 4px solid #0f766e; padding-left: 10px; }
+.fiche-annotation { display: flex; flex-direction: column; gap: 10px; border-left: 4px solid #7c4a1e; padding-left: 10px; }
 .titre-fiche-annotation { display: flex; flex-direction: column; gap: 2px; }
 .titre-fiche-annotation span { font-size: 13px; color: var(--gris); font-variant-numeric: tabular-nums; }
 .remarques-annotation { display: flex; flex-direction: column; gap: 6px; }
@@ -13181,13 +13181,13 @@ body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever
 .boutons-annotation > * { flex: 1 1 auto; min-height: 48px; }
 .liste-annotation { display: flex; flex-direction: column; gap: 4px; }
 .ligne-annotation { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; text-align: left; padding: 8px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); min-height: 44px; }
-.ligne-annotation.actif { border-color: #0f766e; background: color-mix(in srgb, #0f766e 12%, var(--surface)); }
+.ligne-annotation.actif { border-color: #7c4a1e; background: color-mix(in srgb, #7c4a1e 12%, var(--surface)); }
 .ligne-annotation span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ligne-annotation small { grid-column: 1 / -1; color: var(--gris); }
 
 /* 0.178.0 (demande du 09.11) : bande d'Annotation : Manuel / GNSS / GPS tablette (grisés avec la raison dessous),
    et un petit « Enreg. point » fixe au-dessus de la bande, à droite, comme Enreg. Pts de Lever. */
-.bande-appli .boutons-bande-annotation .bouton-bande-mesure { flex: 1 1 0; background: #0f766e; color: #ffffff; }
+.bande-appli .boutons-bande-annotation .bouton-bande-mesure { flex: 1 1 0; background: #7c4a1e; color: #ffffff; }
 .bande-appli .boutons-bande-annotation .bouton-bande-mesure.manuel.actif { background: var(--ambre); color: #1b2b36; }
 .bande-appli .boutons-bande-annotation .bouton-bande-mesure:disabled { background: #475569; color: rgba(255, 255, 255, 0.55); }
 .bande-appli .boutons-bande-annotation .bouton-bande-mesure small { white-space: normal; line-height: 1.05; text-align: center; font-size: 10px; }
@@ -13197,8 +13197,8 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 /* 0.178.1 : réglage de la précision du GPS tablette derrière un petit engrenage (Annotation). */
 .entete-annotation { justify-content: flex-end; }
 .bouton-engrenage-annotation { width: 36px; height: 36px; min-height: 36px; padding: 0; border: 1px solid var(--bordure); border-radius: 50%; background: var(--surface); font-size: 18px; line-height: 1; color: var(--gris); }
-.bouton-engrenage-annotation.actif { border-color: #0f766e; color: #0f766e; }
-.reglages-annotation { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, #0f766e 8%, var(--surface)); }
+.bouton-engrenage-annotation.actif { border-color: #7c4a1e; color: #7c4a1e; }
+.reglages-annotation { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, #7c4a1e 8%, var(--surface)); }
 
 /* ==========================================================================
    0.179.0 (demande du 09.11) : bandeau d'Annotation, comme celui de Lever : photo (bleu) | ↶ (violet) | ID + remarque
@@ -13249,11 +13249,11 @@ body.clavier-ouvert .bandeau-annotation { bottom: 8px; }
 .entete-annotation { justify-content: space-between; min-height: 40px; }
 .entete-annotation .invite-annotation { flex: 1; margin: 0; text-align: center; font-size: 0.95rem; }
 .fiche-annotation { border-left: 0; padding-left: 0; }
-.fiche-annotation .titre-fiche-annotation strong { color: #0f766e; font-size: 1.05rem; }
-.boutons-annotation > .bouton { background: #0f766e; color: #ffffff; border-radius: 14px; font-weight: 800; }
+.fiche-annotation .titre-fiche-annotation strong { color: #7c4a1e; font-size: 1.05rem; }
+.boutons-annotation > .bouton { background: #7c4a1e; color: #ffffff; border-radius: 14px; font-weight: 800; }
 .boutons-annotation > .bouton-secondaire { border-radius: 14px; font-weight: 700; }
-.ligne-annotation { border-radius: 12px; border-left: 4px solid #0f766e; }
-.titre-liste-annotation strong { color: #0f766e; }
+.ligne-annotation { border-radius: 12px; border-left: 4px solid #7c4a1e; }
+.titre-liste-annotation strong { color: #7c4a1e; }
 
 /* 0.182.0 (demande du 09.11) : bandeau d'Annotation plus haut : deux lignes distinctes, « Nom libre » (plus de nom « Annot-n »
    proposé dans le champ) puis « Remarque ». */
@@ -13269,10 +13269,10 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 
 /* 0.183.0 (demande du 09.11) : encadré d'une annotation touchée sur le plan (Plan et Annotation) : nom, remarques, photos. */
 .encadre-annotation { pointer-events: auto; width: min(100%, 360px); box-sizing: border-box; padding: 10px 12px; border-radius: 14px;
-  background: var(--surface); color: var(--encre); border-left: 5px solid #0f766e; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  background: var(--surface); color: var(--encre); border-left: 5px solid #7c4a1e; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
   display: flex; flex-direction: column; gap: 6px; max-height: 45vh; overflow-y: auto; }
 .entete-encadre-annotation { display: flex; align-items: center; gap: 8px; }
-.entete-encadre-annotation strong { font-size: 1.05rem; color: #0f766e; }
+.entete-encadre-annotation strong { font-size: 1.05rem; color: #7c4a1e; }
 .entete-encadre-annotation span { flex: 1; font-size: 12px; opacity: 0.7; }
 .fermer-encadre-annotation { width: 36px; height: 36px; border: none; border-radius: 50%; background: color-mix(in srgb, var(--encre) 10%, transparent); font-size: 22px; line-height: 1; color: var(--encre); }
 .encadre-annotation ul { margin: 0; padding-left: 18px; font-size: 14px; }
