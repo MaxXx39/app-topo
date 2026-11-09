@@ -13096,3 +13096,23 @@ body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise
 }
 body.bande-action:not(.mode-telephone):not(.mode-base)[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::after { width: calc(var(--hauteur-bandeau-point) + var(--largeur-bouton-bandeau) * 2); }
 body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::after { display: none; }
+
+/* ===== 0.175.9 (demande du 09.11) : Réglages : chaque réglage dans son propre rectangle blanc, avec un trait de couleur à gauche
+   (avant : tout gris, on s'y perdait). ===== */
+.fenetre-reglages .page-reglages:not([hidden]) { display: flex; flex-direction: column; gap: 10px; }
+.fenetre-reglages .page-reglages > .choix-mode-appli,
+.fenetre-reglages .page-reglages > .ligne-telephone-ecran,
+.fenetre-reglages .page-reglages > .choix-taille,
+.fenetre-reglages .page-reglages > .case-reglage,
+.fenetre-reglages .page-reglages > .bouton-large,
+.fenetre-reglages .page-reglages .partage-reglages .carte-section {
+  background: var(--surface); border: 1.5px solid var(--bordure); border-left: 6px solid var(--ambre); border-radius: 12px;
+  padding: 10px 12px; margin: 0; box-shadow: var(--ombre); box-sizing: border-box;
+}
+.fenetre-reglages .page-reglages > .choix-mode-appli { border-left-color: var(--sombre); }
+.fenetre-reglages .page-reglages > .ligne-telephone-ecran { border-left-color: #0891b2; }
+.fenetre-reglages .page-reglages > .choix-taille { border-left-color: #7c3aed; }
+.fenetre-reglages .page-reglages > .case-reglage { border-left-color: var(--succes); }
+.fenetre-reglages .page-reglages .partage-reglages { display: flex; flex-direction: column; gap: 10px; }
+.fenetre-reglages .page-reglages .partage-reglages .carte-section { border-left-color: #0ea5e9; }
+.fenetre-reglages .page-reglages > .choix-taille .titre-taille { display: block; margin-bottom: 6px; font-weight: 800; }
