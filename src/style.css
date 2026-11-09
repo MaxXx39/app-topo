@@ -12390,3 +12390,90 @@ body:not(.theme-soleil) .plan-boutons button:not(.actif) {
 /* 0.166.0 : le plan ne descend jamais sous 40 % de la zone de travail (50 % dans la Mesure rapide). */
 body { --part-plan-min: 0.4; }
 body[data-onglet='mesure-rapide'] { --part-plan-min: 0.5; }
+
+/* ==========================================================================
+   0.166.0 (maquette B choisie le 09.11, tous les modes) : Lever (APK) : un seul bandeau collé au-dessus de la
+   bande du bas : photo à gauche, nom du point (modifiable) au milieu, Enreg. Pts orange collé à droite.
+   Le vrai bouton « Enreg. » reste caché, le gros bouton de la bande le touche (voir RELAIS_BANDE).
+   ========================================================================== */
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] {
+  --hauteur-bandeau-point: 64px;
+  --largeur-enreg-point: 168px;
+  --bas-bandeau-point: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 10px);
+}
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] {
+  --hauteur-bandeau-point: 56px;
+  --largeur-enreg-point: 132px;
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre,
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: var(--bas-bandeau-point);
+  z-index: 19;
+  height: var(--hauteur-bandeau-point);
+  box-sizing: border-box;
+  padding: 0 var(--largeur-enreg-point) 0 0;
+  gap: 0;
+  align-items: stretch;
+  overflow: hidden;
+  border: none;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre { left: 8px; right: 8px; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-photo-levee {
+  order: -2;
+  flex: 0 0 var(--hauteur-bandeau-point);
+  width: var(--hauteur-bandeau-point);
+  min-height: 0;
+  height: auto;
+  border: none;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--encre) 12%, var(--surface));
+  color: var(--encre);
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-photo-levee svg { width: 30px; height: 30px; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point {
+  order: -1;
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+  padding: 4px 12px;
+  border-left: 2px solid color-mix(in srgb, var(--encre) 15%, var(--surface));
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point > span { font-size: 11px; color: var(--encre); opacity: 0.65; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .nom-point {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--encre);
+  font-size: 24px;
+  font-weight: 900;
+  box-shadow: none;
+}
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .nom-point { font-size: 19px; }
+/* Enreg. Pts : collé à droite du bandeau (même hauteur, coins arrondis à droite seulement). */
+body.bande-action .zone-levee .bouton-enreg-bande.relais-prendre {
+  right: 12px;
+  bottom: var(--bas-bandeau-point);
+  width: var(--largeur-enreg-point);
+  height: var(--hauteur-bandeau-point);
+  min-height: 0;
+  border-radius: 0 16px 16px 0;
+  box-shadow: none;
+}
+body.mode-telephone.bande-action .zone-levee .bouton-enreg-bande.relais-prendre { right: 8px; }
+body.bande-action .zone-levee .bouton-enreg-bande.relais-prendre small { display: none; }
+body.mode-telephone.bande-action .zone-levee .bouton-enreg-bande.relais-prendre span { font-size: 16px; }
+/* Clavier ouvert : le bandeau reprend sa place dans le cadre « Point » (rien ne cache le champ). */
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre {
+  position: static;
+  left: auto;
+  right: auto;
+  height: auto;
+  min-height: var(--hauteur-bandeau-point);
+  box-shadow: none;
+}
