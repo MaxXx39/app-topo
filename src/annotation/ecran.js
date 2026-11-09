@@ -72,16 +72,17 @@ export function dateHeure(iso) {
  * liste: [{ nom, remarques, photos, source, premiere, date }] (la plus récente d'abord) }.
  * Les boutons Manuel / GNSS / GPS tablette et « Enreg. point » sont dans la bande du bas (voir main.js).
  */
-export function htmlAnnotation({ mode, brouillon, photos = [], manuel, tablette, liste }) {
+export function htmlAnnotation({ mode, brouillon, photos = [], manuel, tablette, liste, reglages = false }) {
   const lignes = liste.map((a) => `<button type="button" class="ligne-annotation ${brouillon?.edition && brouillon.nom === a.nom ? 'actif' : ''}" data-action="ouvrir-annotation" data-nom="${echapper(a.nom)}">
       <strong>${echapper(a.nom)}</strong><span>${echapper(a.premiere || '—')}</span><small>${echapper(a.date)} · ${a.remarques} rem. · ${a.photos} photo(s) · ${echapper(SOURCES[a.source] ?? '')}</small></button>`).join('');
   const invite = mode === 'loupe'
     ? 'Touche le plan, place la croix, puis lève le doigt'
     : 'Choisis Manuel, GNSS ou GPS tablette en bas';
   return `<div class="ecran-annotation">
-      <div class="entete-annotation"><label class="reglage-precision-annotation">GPS tablette : précision demandée (m, au mieux)
-        <input type="number" inputmode="decimal" min="0.5" max="50" step="0.5" value="${tablette.maximum}" data-champ="precision-tablette-max" /></label>${bulle('annotation')}</div>
-      <small class="precision-annotation" data-champ="precision-tablette">${echapper(tablette.texte)}</small>
+      <div class="entete-annotation"><button type="button" class="bouton-engrenage-annotation ${reglages ? 'actif' : ''}" data-action="basculer-reglages-annotation" title="Réglage du GPS de la tablette" aria-label="Réglage du GPS de la tablette" aria-expanded="${reglages}">⚙</button>${bulle('annotation')}</div>
+      ${reglages ? `<div class="reglages-annotation"><label class="reglage-precision-annotation">GPS tablette : précision demandée (m, au mieux)
+        <input type="number" inputmode="decimal" min="0.5" max="50" step="0.5" value="${tablette.maximum}" data-champ="precision-tablette-max" /></label>
+        <small class="precision-annotation" data-champ="precision-tablette">${echapper(tablette.texte)}</small></div>` : ''}
       ${mode === 'loupe' && !brouillon?.edition ? htmlLoupe(manuel) : ''}
       ${brouillon ? htmlFiche(brouillon, photos) : `<p class="invite-annotation"><strong>${invite}</strong></p>`}
       ${liste.length > 0 ? `<div class="liste-annotation"><div class="titre-liste-annotation"><strong>Annotations (${liste.length}) · par date</strong></div>${lignes}</div>` : ''}

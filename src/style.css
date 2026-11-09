@@ -13200,3 +13200,9 @@ body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever
 body.mode-telephone .boutons-bande-annotation .bouton-enreg-bande.relais-annotation { width: 124px; min-height: 46px; font-size: 15px; }
 body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 80px); }
 .precision-annotation { color: var(--gris); font-size: 13px; }
+
+/* 0.178.1 : réglage de la précision du GPS tablette derrière un petit engrenage (Annotation). */
+.entete-annotation { justify-content: flex-end; }
+.bouton-engrenage-annotation { width: 36px; height: 36px; min-height: 36px; padding: 0; border: 1px solid var(--bordure); border-radius: 50%; background: var(--surface); font-size: 18px; line-height: 1; color: var(--gris); }
+.bouton-engrenage-annotation.actif { border-color: #0f766e; color: #0f766e; }
+.reglages-annotation { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, #0f766e 8%, var(--surface)); }

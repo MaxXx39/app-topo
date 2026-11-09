@@ -780,7 +780,7 @@ function agirMesureRapide(cle) {
 // --- Annotation (0.177.0, Intermédiaire et Expert, demande du 09.11) ---
 // Un point posé sur le plan (loupe), pris au récepteur (GNSS) ou au GPS de la tablette (précision 3 m au plus, réglable),
 // avec des remarques et des photos. Rangé dans la liste du jour « Anot-AAAAMMJJ » (points A-n, voir topo/annotation.js).
-const annotationEtat = { mode: null, brouillon: null }; // mode : 'loupe' quand « Manuel » est choisi
+const annotationEtat = { mode: null, brouillon: null, reglages: false }; // mode : 'loupe' quand « Manuel » est choisi
 
 /** Vrai quand l'Annotation est l'écran de travail. */
 function annotationActive() {
@@ -893,7 +893,7 @@ function afficherAnnotation() {
   document.querySelector('#annotation').innerHTML = htmlAnnotation({
     mode: annotationEtat.mode, brouillon: annotationEtat.brouillon, photos: photosDuBrouillonAnnotation(),
     manuel: { zoom: terrain.zoomLoupe ?? 4 },
-    tablette: { ...etatTabletteAnnotation(), maximum: precisionTabletteMax() }, liste,
+    tablette: { ...etatTabletteAnnotation(), maximum: precisionTabletteMax() }, liste, reglages: annotationEtat.reglages,
   });
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
@@ -1021,7 +1021,11 @@ document.querySelector('#annotation').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-action]');
   if (!bouton || bouton.disabled) return;
   const action = bouton.dataset.action;
-  if (action === 'deplacer-loupe-annotation') {
+  if (action === 'basculer-reglages-annotation') {
+    lireFormulaireAnnotation();
+    annotationEtat.reglages = !annotationEtat.reglages;
+    afficherAnnotation();
+  } else if (action === 'deplacer-loupe-annotation') {
     const [dx, dy] = { haut: [0, -1], bas: [0, 1], gauche: [-1, 0], droite: [1, 0] }[bouton.dataset.valeur] ?? [0, 0];
     plan.loupe.deplacerDe(dx, dy);
   } else if (action === 'zoom-loupe-annotation') {
