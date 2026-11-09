@@ -13243,3 +13243,19 @@ body.clavier-ouvert .bandeau-annotation { bottom: 8px; }
 
 /* 0.180.0 : points d'Annotation = un rond tracé à la main (trait fin, 14 px). */
 .plan .points .forme-nuage { stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: 3.4 2.2; }
+
+/* 0.181.0 (demande du 09.11) : Annotation harmonisée avec Mesure rapide / Implanter : plan fixe à 55 %, une seule rangée
+   sous le plan (⚙ | consigne | aide), boutons de la fiche et lignes de la liste dans le même style, trait de couleur partout. */
+@media (max-width: 899px) {
+  body[data-onglet='annotation'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * 0.55);
+  }
+}
+.entete-annotation { justify-content: space-between; min-height: 40px; }
+.entete-annotation .invite-annotation { flex: 1; margin: 0; text-align: center; font-size: 0.95rem; }
+.fiche-annotation { border-left: 0; padding-left: 0; }
+.fiche-annotation .titre-fiche-annotation strong { color: #0f766e; font-size: 1.05rem; }
+.boutons-annotation > .bouton { background: #0f766e; color: #ffffff; border-radius: 14px; font-weight: 800; }
+.boutons-annotation > .bouton-secondaire { border-radius: 14px; font-weight: 700; }
+.ligne-annotation { border-radius: 12px; border-left: 4px solid #0f766e; }
+.titre-liste-annotation strong { color: #0f766e; }

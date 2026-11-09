@@ -101,12 +101,13 @@ export function htmlAnnotation({ mode, fiche, photos = [], manuel, tablette, lis
     ? 'Touche le plan, place la croix, puis lève le doigt'
     : 'Choisis Manuel, GNSS ou GPS tablette en bas';
   return `<div class="ecran-annotation">
-      <div class="entete-annotation"><button type="button" class="bouton-engrenage-annotation ${reglages ? 'actif' : ''}" data-action="basculer-reglages-annotation" title="Réglage du GPS de la tablette" aria-label="Réglage du GPS de la tablette" aria-expanded="${reglages}">⚙</button>${bulle('annotation')}</div>
+      <div class="entete-annotation"><button type="button" class="bouton-engrenage-annotation ${reglages ? 'actif' : ''}" data-action="basculer-reglages-annotation" title="Réglage du GPS de la tablette" aria-label="Réglage du GPS de la tablette" aria-expanded="${reglages}">⚙</button>
+        ${fiche ? '<span class="invite-annotation"></span>' : `<span class="invite-annotation"><strong>${invite}</strong></span>`}${bulle('annotation')}</div>
       ${reglages ? `<div class="reglages-annotation"><label class="reglage-precision-annotation">GPS tablette : précision demandée (m, au mieux)
         <input type="number" inputmode="decimal" min="0.5" max="50" step="0.5" value="${tablette.maximum}" data-champ="precision-tablette-max" /></label>
         <small class="precision-annotation" data-champ="precision-tablette">${echapper(tablette.texte)}</small></div>` : ''}
       ${mode === 'loupe' ? htmlLoupe(manuel) : ''}
-      ${fiche ? htmlFiche(fiche, photos) : `<p class="invite-annotation"><strong>${invite}</strong></p>`}
+      ${fiche ? htmlFiche(fiche, photos) : ''}
       ${liste.length > 0 ? `<div class="liste-annotation"><div class="titre-liste-annotation"><strong>Annotations (${liste.length})</strong>
         <button type="button" class="bouton-lien" data-action="trier-annotation" title="Changer l'ordre de la liste">Trier par date : ${tri === 'recent' ? 'récent d\'abord ▾' : 'ancien d\'abord ▴'}</button></div>${lignes}</div>` : ''}
     </div>`;
