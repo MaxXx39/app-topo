@@ -12672,3 +12672,42 @@ body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise
   border-right: none;
   background: color-mix(in srgb, var(--ambre) 10%, var(--surface));
 }
+
+/* ==========================================================================
+   0.168.0 (demandes du 09.11) : fenêtre Delta (titre « Δ Delta », côté + distance séparés de Z ±, grande croix sur
+   toute la hauteur) ; clavier ouvert = le plan est caché dans tous les modes (le champ tapé reste visible) ;
+   « Que lèves-tu ? » : petit texte sous chaque choix.
+   ========================================================================== */
+.ligne-delta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 6px 0 6px 10px;
+  overflow: hidden;
+}
+.ligne-delta .titre-delta { grid-column: 1; display: flex; align-items: center; gap: 8px; font-size: 1.05rem; font-weight: 900; color: #c2410c; padding: 0; }
+.ligne-delta .titre-delta i { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #ffedd5; color: #ea580c; font-style: normal; font-size: 1.2rem; }
+.ligne-delta .rang-delta { grid-column: 1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ligne-delta .bouton-fermer-delta {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: stretch;
+  width: 76px;
+  min-height: 0;
+  margin: -6px 0;
+  border: none;
+  border-left: 3px solid color-mix(in srgb, #ea580c 40%, transparent);
+  border-radius: 0;
+  background: color-mix(in srgb, #ea580c 14%, var(--surface));
+  color: #c2410c;
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+.bouton-nature { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 8px; }
+.bouton-nature small { font-size: 0.72rem; font-weight: 600; opacity: 0.85; }
+body.clavier-ouvert { --hauteur-plan-terrain: 0px !important; --hauteur-plan-guidage: 0px !important; }
+body.clavier-ouvert .panneau-plan { display: none !important; }

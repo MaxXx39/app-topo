@@ -62,6 +62,7 @@ export const LONGUEURS_COUPE = [2, 5, 10, 20];
 const NATURES_TERRAIN = [
   ['stock', 'Stock'],
   ['terrain', 'Terrain'], // terrain naturel et terrassement fusionnés (0.87.0)
+  ['terrassement', 'Terrassement'], // 0.168.0 : de nouveau proposé (demande du 09.11)
   // Recollement de réseaux (0.101.0, voir topo/reseau.js) : un levé par réseau (EU, EC…).
   ['reseau', 'Recollement'],
   // Ancien recollement (comme Terrain) : plus proposé, les levés déjà faits restent.
@@ -71,6 +72,13 @@ const NATURES_TERRAIN = [
   // Surface d'un dessin (Calculs › Dessin) : pas créée ici, mais on la complète au RX2.
   ['surface', 'Surface'],
 ];
+// Petit texte sous chaque choix de « Que lèves-tu ? » (0.168.0).
+const DETAIL_NATURE = {
+  stock: 'Lever de stock',
+  terrain: 'Lever de terrain naturel',
+  terrassement: 'Lever terrassement en cours / fini',
+  autres: 'Autres',
+};
 // Accroches : un dessin (en gris ce qu'on touche, en ambre l'endroit accroché) et un mot dessous.
 // [mot, nom complet (bulle, lecture d'écran), dessin].
 export const ACCROCHES = {
@@ -1078,11 +1086,11 @@ export function creerEcranLeve(conteneur, actions) {
   function choixNature() {
     // 0.161.0 : Lever = Stock / Terrain / Libre ; Recollement et Métré sont des applications à part.
     if (choixReseauOuvert || donnees.famille === 'reseau') return choixReseau();
-    const permises = donnees.famille === 'metre' ? ['metre'] : ['stock', 'terrain', 'autres'];
+    const permises = donnees.famille === 'metre' ? ['metre'] : ['stock', 'terrain', 'terrassement', 'autres'];
     return `<div class="choix-nature">
       <p class="titre-choix">${donnees.famille === 'metre' ? 'Nouveau métré' : 'Que lèves-tu ?'}</p>
       <div class="natures-terrain">
-        ${NATURES_TERRAIN.filter(([cle]) => permises.includes(cle) && (!estModeBase() || NATURES_BASE.includes(cle))).map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}">${titre}</button>`).join('')}
+        ${NATURES_TERRAIN.filter(([cle]) => permises.includes(cle) && (!estModeBase() || NATURES_BASE.includes(cle))).map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}"><span>${titre}</span>${DETAIL_NATURE[cle] ? `<small>${DETAIL_NATURE[cle]}</small>` : ''}</button>`).join('')}
       </div>
       ${donnees.stock ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerChoixNature">annuler</button>' : ''}
     </div>`;
@@ -1118,12 +1126,17 @@ export function creerEcranLeve(conteneur, actions) {
     // 0.151.0 : fermé = petit bouton « Δ » à droite de la position (voir cadrePrise).
     if (!d.ouvert && !d.actif) return '';
     const sens = (cle, mot) => `<button type="button" class="bouton-sens-delta ${d.sens === cle ? 'actif' : ''}" data-action="reglerDelta" data-champ-delta="sens" data-valeur="${cle}" aria-pressed="${d.sens === cle}">${mot}</button>`;
+    // 0.168.0 : « Δ Delta » en titre, côté + distance sur une ligne, Z ± sur une autre, grande croix sur toute la hauteur.
     return `<div class="ligne-delta seulement-intermediaire ${d.actif ? 'actif' : ''}">
-        <span class="titre-delta" title="Décaler le prochain point">Δ</span>
-        <span class="sens-delta" role="group" aria-label="Côté du décalage">${sens('gauche', '◀ G')}${sens('droite', 'D ▶')}</span>
-        <label class="champ-delta">dist.<input type="text" inputmode="decimal" data-delta="distance" value="${echapper(d.distance)}" placeholder="0.000" autocomplete="off" /></label>
-        <label class="champ-delta">Z ±<input type="text" inputmode="decimal" data-delta="z" value="${echapper(d.z)}" placeholder="0.000" autocomplete="off" /></label>
-        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="reglerDelta" data-champ-delta="effacer" aria-label="Remettre le delta à zéro">×</button>
+        <span class="titre-delta" title="Décaler le prochain point"><i>Δ</i> Delta</span>
+        <div class="rang-delta rang-lateral">
+          <span class="sens-delta" role="group" aria-label="Côté du décalage">${sens('gauche', '◀ G')}${sens('droite', 'D ▶')}</span>
+          <label class="champ-delta">dist.<input type="text" inputmode="decimal" data-delta="distance" value="${echapper(d.distance)}" placeholder="0.000" autocomplete="off" /></label>
+        </div>
+        <div class="rang-delta rang-z">
+          <label class="champ-delta">Z ±<input type="text" inputmode="decimal" data-delta="z" value="${echapper(d.z)}" placeholder="0.000" autocomplete="off" /></label>
+        </div>
+        <button type="button" class="bouton-fermer-delta" data-action="reglerDelta" data-champ-delta="effacer" title="Fermer le delta (remis à zéro)" aria-label="Fermer le delta (remis à zéro)">×</button>
       </div>`;
   }
 

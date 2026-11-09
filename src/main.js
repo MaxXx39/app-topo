@@ -168,8 +168,8 @@ const leveDirect = { stockId: null, role: 'contour' };
 let familleLeve = 'leve';
 /** Famille d'un levé d'après sa nature. */
 const familleDeNature = (nature) => (nature === 'reseau' ? 'reseau' : nature === 'metre' ? 'metre' : 'leve');
-/** Sous-application de Lever (Stock / Terrain / Libre) d'après la nature d'un levé. */
-const sousAppliDeNature = (nature) => (nature === 'stock' ? 'stock' : nature === 'autres' ? 'autres' : 'terrain');
+/** Sous-application de Lever (Stock / Terrain / Terrass. / Libre) d'après la nature d'un levé. */
+const sousAppliDeNature = (nature) => (nature === 'stock' ? 'stock' : nature === 'autres' ? 'autres' : nature === 'terrassement' ? 'terrassement' : 'terrain');
 // Delta du prochain point levé (0.139.0, Intermédiaire) : sens 'gauche' / 'droite' (selon le cap du GNSS),
 // distance et Z tapés (texte) ; remis à zéro après chaque point enregistré (un seul point à la fois).
 const deltaLeve = { sens: 'droite', distance: '', z: '', ouvert: false }; // ouvert : ligne de réglage montrée (bouton « Δ Delta »)
@@ -421,7 +421,7 @@ function sousApplis() {
 
 /** Sous-applications de Lever (0.161.0) : natures permises par le mode. */
 function sousApplisDeLever() {
-  return [['stock', 'Stock'], ['terrain', 'Terrain'], ['autres', 'Libre']].filter(([c]) => aAcces('intermediaire') || c === 'autres');
+  return [['stock', 'Stock'], ['terrain', 'Terrain'], ['terrassement', 'Terrass.'], ['autres', 'Libre']].filter(([c]) => aAcces('intermediaire') || c === 'autres');
 }
 
 /**
