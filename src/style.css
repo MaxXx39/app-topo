@@ -13061,7 +13061,7 @@ dialog.fenetre-chantier h2 { margin: 0; padding: 12px 14px; background: var(--so
 .nat-chantier.actif { background: var(--sombre); border-color: var(--sombre); color: #ffffff; }
 .reglages-chantier { display: flex; gap: 8px; align-items: center; }
 .mini-bascule { display: inline-flex; gap: 2px; padding: 2px; border-radius: 10px; background: rgba(95, 109, 119, 0.18); }
-.mini-bascule button { height: 37px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--gris); font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.mini-bascule button { height: 37px; padding: 0 16px; min-width: 64px; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--gris); font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .mini-bascule button.actif { background: var(--surface); color: var(--encre, var(--texte)); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 -3px 0 var(--ambre); }
 .ico-forme { width: 12px; height: 12px; border: 2px solid currentColor; display: inline-block; box-sizing: border-box; }
 .ico-forme.rond { border-radius: 50%; }
