@@ -1731,12 +1731,20 @@ if (boutonRecepteur && recepteur2Disponible()) {
 // Pendant le guidage d'une implantation (0.84.0), le plan a sa propre part (la moitié au départ).
 const CLE_PLAN_TERRAIN = 'topo-plan-terrain-part';
 const CLE_PLAN_GUIDAGE = 'topo-plan-guidage-part';
-const PART_PLAN = { pas: 0.15, min: 0.2, max: 0.65, depart: 0.35, departGuidage: 0.5 };
+// 0.175.3 (demande du 09.11) : Lever / Terrain entre 30 % et 70 % (les infos sous le plan gardent 30 % au moins), guidage d'une
+// implantation entre 30 % et 85 % ; une part choisie avec ▲ / ▼ (ou retenue) est respectée : l'agrandissement automatique ne la change plus.
+const PART_PLAN = { pas: 0.15, min: 0.3, max: 0.7, depart: 0.35, departGuidage: 0.5, maxGuidage: 0.85 };
 const partsPlan = { terrain: PART_PLAN.depart, guidage: PART_PLAN.departGuidage };
+const bornesPlan = (sorte) => [PART_PLAN.min, sorte === 'guidage' ? PART_PLAN.maxGuidage : PART_PLAN.max];
+let partTerrainChoisie = false; // vrai dès que la part a été choisie (▲ / ▼ ou retenue sur l'appareil)
 for (const [sorte, cle, variable] of [['terrain', CLE_PLAN_TERRAIN, '--part-plan-terrain'], ['guidage', CLE_PLAN_GUIDAGE, '--part-plan-guidage']]) {
   try {
     const lue = Number(localStorage.getItem(cle));
-    if (lue >= PART_PLAN.min && lue <= PART_PLAN.max) partsPlan[sorte] = lue;
+    const [mini, maxi] = bornesPlan(sorte);
+    if (localStorage.getItem(cle) !== null && lue >= mini && lue <= maxi) {
+      partsPlan[sorte] = lue;
+      if (sorte === 'terrain') partTerrainChoisie = true;
+    }
   } catch {
     // stockage refusé : hauteur de départ
   }
@@ -1746,8 +1754,15 @@ for (const bouton of document.querySelectorAll('[data-taille-plan]')) {
   bouton.addEventListener('click', () => {
     const enGuidage = document.body.classList.contains('vue-implantation');
     const sorte = enGuidage ? 'guidage' : 'terrain';
-    const voulue = partsPlan[sorte] + Number(bouton.dataset.taillePlan) * PART_PLAN.pas;
-    partsPlan[sorte] = Math.round(Math.min(PART_PLAN.max, Math.max(PART_PLAN.min, voulue)) * 100) / 100;
+    // Part vraiment montrée (l'agrandissement automatique peut l'avoir dépassée) : on part d'elle.
+    const actuelle = sorte === 'terrain' ? Math.max(partsPlan.terrain, Number(document.body.style.getPropertyValue('--part-plan-auto')) || 0) : partsPlan.guidage;
+    const [mini, maxi] = bornesPlan(sorte);
+    const voulue = actuelle + Number(bouton.dataset.taillePlan) * PART_PLAN.pas;
+    partsPlan[sorte] = Math.round(Math.min(maxi, Math.max(mini, voulue)) * 100) / 100;
+    if (sorte === 'terrain') {
+      partTerrainChoisie = true;
+      document.body.style.setProperty('--part-plan-auto', '0');
+    }
     document.body.style.setProperty(enGuidage ? '--part-plan-guidage' : '--part-plan-terrain', String(partsPlan[sorte]));
     try {
       localStorage.setItem(enGuidage ? CLE_PLAN_GUIDAGE : CLE_PLAN_TERRAIN, String(partsPlan[sorte]));
@@ -1776,7 +1791,7 @@ function ajusterPlanAuContenu() {
   const hauteurEnNord = bande && essentiel && enNord && getComputedStyle(enNord).position === 'fixed' ? enNord.offsetHeight + 4 : 0;
   const utile = bande && essentiel && getComputedStyle(bande).position === 'fixed' ? essentiel.getBoundingClientRect().bottom - bas.top + 6 : bas.height;
   const part = (disponible - utile - hauteurBande - hauteurEnNord - 24) / disponible;
-  const auto = Math.min(PART_PLAN.max, Math.max(0, Math.round(part * 100) / 100));
+  const auto = partTerrainChoisie ? 0 : Math.min(PART_PLAN.max, Math.max(0, Math.round(part * 100) / 100));
   if (document.body.style.getPropertyValue('--part-plan-auto') !== String(auto)) document.body.style.setProperty('--part-plan-auto', String(auto));
 }
 let ajustementPrevu = false;
