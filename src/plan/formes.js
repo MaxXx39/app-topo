@@ -21,7 +21,7 @@ export const FORMES = [
 
 /** Vrai si la forme se dessine en trait seulement (vide, croix). */
 export function formeEnTrait(forme) {
-  return /-vide$/.test(forme ?? '') || forme === 'croix' || forme === 'croix-45';
+  return /-vide$/.test(forme ?? '') || forme === 'croix' || forme === 'croix-45' || forme === 'nuage';
 }
 
 /**
@@ -40,6 +40,17 @@ export function cheminForme(forme, x, y, r) {
       return polygone([[x, y + r * 1.2], [x + r * 1.1, y - r * 0.8], [x - r * 1.1, y - r * 0.8]]);
     case 'losange':
       return polygone([[x, y - r * 1.3], [x + r * 1.3, y], [x, y + r * 1.3], [x - r * 1.3, y]]);
+    case 'nuage': {
+      // Rond en pointillés (0.180.3, demande du 09.11) : un cercle régulier de 13 px de diamètre, comme le triangle
+      // des points de contrôle ; les tirets sont donnés par la classe .forme-nuage (style.css).
+      const R = 7;
+      const sommets = [];
+      for (let i = 0; i <= 36; i++) {
+        const angle = (i / 36) * Math.PI * 2;
+        sommets.push([x + R * Math.cos(angle), y + R * Math.sin(angle)]);
+      }
+      return `M${sommets.map(([px, py]) => `${f(px)} ${f(py)}`).join('L')}`;
+    }
     case 'croix':
       return `M${f(x - r * 1.3)} ${f(y)}L${f(x + r * 1.3)} ${f(y)}M${f(x)} ${f(y - r * 1.3)}L${f(x)} ${f(y + r * 1.3)}`;
     case 'croix-45':

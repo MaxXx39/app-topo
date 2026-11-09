@@ -36,16 +36,18 @@ export function nettoyerListes(listes) {
   const libelles = listes?.libelles && typeof listes.libelles === 'object' ? listes.libelles : undefined;
   // Réseaux du recollement (0.101.0, voir leve/reseaux.js) : gardés tels quels s'ils existent.
   const reseaux = listes?.reseaux && typeof listes.reseaux === 'object' ? listes.reseaux : undefined;
+  // Bibliothèque du Levé chantier (0.175.0, voir leve/libelles-chantier.js) : gardée telle quelle si elle existe.
+  const chantier = listes?.chantier && typeof listes.chantier === 'object' ? listes.chantier : undefined;
   // Dossiers de projets (0.125.0, voir projet/dossiers.js) : gardés tels quels s'ils existent.
   const dossiers = listes?.dossiers && typeof listes.dossiers === 'object' ? listes.dossiers : undefined;
   // Date de dernière modification de chaque partie (0.136.0) : sert à fusionner partie par partie.
   const dates = {};
   for (const [partie, date] of Object.entries(listes?.dates ?? {})) if (PARTIES.includes(partie) && date) dates[partie] = String(date);
-  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(reseaux ? { reseaux } : {}), ...(dossiers ? { dossiers } : {}), dates, modifieLe: listes?.modifieLe ?? null };
+  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(reseaux ? { reseaux } : {}), ...(chantier ? { chantier } : {}), ...(dossiers ? { dossiers } : {}), dates, modifieLe: listes?.modifieLe ?? null };
 }
 
 /** Les parties des listes, chacune avec sa propre date de modification (0.136.0). */
-export const PARTIES = ['adresses', 'swipos', 'libelles', 'reseaux', 'dossiers'];
+export const PARTIES = ['adresses', 'swipos', 'libelles', 'reseaux', 'chantier', 'dossiers'];
 
 const existe = (listes, partie) => (Array.isArray(listes?.[partie]) ? listes[partie].length > 0 : listes?.[partie] !== undefined);
 

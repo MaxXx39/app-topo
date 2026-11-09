@@ -63,3 +63,17 @@ export function pointsOutil(position, orientation, dimensions) {
     coins: [point(avant, -gauche), point(avant, droite), point(-arriere, droite), point(-arriere, -gauche)],
   };
 }
+
+/**
+ * Pente de l'engin (0.171.0, demande du 09.11 : « pour 1 GNSS l'inclinaison du GNSS, pour 2 GNSS la pente du 1er »),
+ * en % le long de l'avant : + = l'avant est plus haut (nez en l'air), − = l'avant est plus bas.
+ * Même convention que les axes de l'outil ci-dessus (À VALIDER sur le terrain) : l'avant f est dans le plan du
+ * cap et perpendiculaire au mât, pente = f.z ÷ longueur à plat de f × 100. Renvoie null sans cap.
+ */
+export function penteEngin({ cap, inclinaison = 0, directionInclinaison = 0 }) {
+  const axes = axesOutil({ cap, inclinaison, directionInclinaison });
+  if (!axes) return null;
+  const plat = Math.hypot(axes.f.e, axes.f.n);
+  if (plat < 1e-9) return null;
+  return Math.round((axes.f.z / plat) * 10000) / 100;
+}

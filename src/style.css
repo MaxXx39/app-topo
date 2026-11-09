@@ -3060,7 +3060,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 .bouton-nature.nature-metre {
-  --couleur-nature: #0891b2;
+  --couleur-nature: #ea580c;
 }
 
 .choix-nature {
@@ -3098,7 +3098,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
 }
 
 .bouton-nature.nature-recollement {
-  --couleur-nature: #db2777;
+  --couleur-nature: #16a34a;
 }
 
 .bouton-nature.nature-reseau {
@@ -4859,7 +4859,7 @@ button.bouton-import {
 }
 
 .entete-levee.nature-recollement {
-  --couleur-nature: #db2777;
+  --couleur-nature: #16a34a;
 }
 
 .entete-levee.nature-terrassement {
@@ -4871,7 +4871,7 @@ button.bouton-import {
 }
 
 .entete-levee.nature-metre {
-  --couleur-nature: #0891b2;
+  --couleur-nature: #ea580c;
 }
 
 /* « Levé libre » (contrôle, points géomètre… ; « autres » dans le code) : gris ardoise. */
@@ -4938,19 +4938,19 @@ button.bouton-import {
 /* Contenu de l'onglet Terrain encadré à la couleur du mode (0.64.0) : ambre (Lever), sarcelle
    (Implanter), rouge (Contrôle). */
 .panneau[data-onglet='terrain'] {
-  border: 2px solid var(--ambre);
+  border: 2px solid var(--couleur-appli, var(--ambre));
 }
 
 .panneau[data-onglet='terrain']:has(.cadre-mode-controler) {
-  border-color: #0d9488;
+  border-color: var(--couleur-appli, #0d9488);
 }
 
 .panneau[data-onglet='terrain']:has(.cadre-mode-autocontrole) {
-  border-color: var(--bordeaux);
+  border-color: var(--couleur-appli, var(--bordeaux));
 }
 
 .panneau[data-onglet='terrain']:has(.cadre-mode-lame) {
-  border-color: #1d4ed8;
+  border-color: var(--couleur-appli, #1d4ed8);
 }
 
 /* Flèches ▲ / ▼ sous le plan (téléphone, onglet Terrain) : plus petit / plus grand. */
@@ -4959,7 +4959,8 @@ button.bouton-import {
 }
 
 @media (max-width: 899px) {
-  body.mode-leve[data-onglet='terrain'] .boutons-taille-plan {
+  body.mode-leve[data-onglet='terrain'] .boutons-taille-plan,
+  body[data-onglet='annotation'] .boutons-taille-plan {
     position: absolute;
     bottom: 0;
     left: 50%;
@@ -5052,7 +5053,7 @@ button.bouton-import {
 .pastille-liste.liste-stock { background: #b45309; }
 .pastille-liste.liste-terrain { background: #15803d; }
 .pastille-liste.liste-terrassement { background: #2563eb; }
-.pastille-liste.liste-metre { background: #0891b2; }
+.pastille-liste.liste-metre { background: #ea580c; }
 .pastille-liste.liste-autres { background: #475569; }
 .pastille-liste.liste-fichier { background: var(--sombre); }
 .pastille-liste.liste-ajoutes { background: #7c3aed; }
@@ -5479,10 +5480,10 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 }
 
 .ligne-levee.nature-terrain { --couleur-nature: #15803d; }
-.ligne-levee.nature-recollement { --couleur-nature: #db2777; }
+.ligne-levee.nature-recollement { --couleur-nature: #16a34a; }
 .ligne-levee.nature-terrassement { --couleur-nature: #2563eb; }
 .ligne-levee.nature-surface { --couleur-nature: #7c3aed; }
-.ligne-levee.nature-metre { --couleur-nature: #0891b2; }
+.ligne-levee.nature-metre { --couleur-nature: #ea580c; }
 .ligne-levee.nature-autres { --couleur-nature: #475569; }
 
 .choisir-levee {
@@ -7516,7 +7517,7 @@ body.lecture-seule .bouton-photo-levee {
 
 .plan .nature-stock { --couleur-nature: #b45309; }
 .plan .nature-terrain { --couleur-nature: #15803d; }
-.plan .nature-recollement { --couleur-nature: #db2777; }
+.plan .nature-recollement { --couleur-nature: #16a34a; }
 .plan .nature-terrassement { --couleur-nature: #2563eb; }
 .plan .nature-surface { --couleur-nature: #7c3aed; }
 
@@ -9545,8 +9546,11 @@ body.mode-base .actions-projets {
   /* Près du point, la cible prend le haut : le guidage (plus grand depuis 0.114.0) garde 400 px. */
   body.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] {
     --hauteur-plan-guidage: max(
-      calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * max(var(--part-plan-guidage, 0.5), var(--part-plan-min, 0.4))),
-      calc(100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets) - 400px)
+      170px,
+      min(
+        calc((100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets)) * max(var(--part-plan-guidage, 0.5), var(--part-plan-min, 0.4))),
+        calc(100svh - var(--hauteur-entete) - var(--hauteur-bascule) - var(--hauteur-onglets) - 370px)
+      )
     );
   }
 }
@@ -11659,7 +11663,7 @@ body.mode-telephone .zone-info-appli { font-size: 14px; }
 body.mode-telephone .bande-appli .choix-sous-appli button { min-width: 60px; padding: 0 8px; font-size: 13px; }
 
 /* Cachée comme l'ancienne barre : clavier ouvert, dessin sur téléphone (on sort avec « Terminé »). */
-body.clavier-ouvert .bande-appli { display: none; }
+body.clavier-ouvert .bande-appli:not(:focus-within) { display: none; }
 @media (max-width: 899px) {
   body.mode-dessin:is([data-onglet='surfaces'], [data-onglet='mesures'], [data-onglet='dessin']) .bande-appli { display: none; }
 }
@@ -12387,9 +12391,9 @@ body:not(.theme-soleil) .plan-boutons button:not(.actif) {
   background: transparent;
 }
 
-/* 0.166.0 : le plan ne descend jamais sous 40 % de la zone de travail (50 % dans la Mesure rapide). */
-body { --part-plan-min: 0.4; }
-body[data-onglet='mesure-rapide'] { --part-plan-min: 0.5; }
+/* 0.175.1 : le plan peut redescendre jusqu'à 20 % et ne dépasse jamais 65 % (les infos sous le plan gardent au moins 35 %) ; Mesure rapide : plan fixe. */
+body { --part-plan-min: 0.3; }
+body[data-onglet='mesure-rapide'] { --part-plan-min: 0.55; }
 
 /* ==========================================================================
    0.166.0 (maquette B choisie le 09.11, tous les modes) : Lever (APK) : un seul bandeau collé au-dessus de la
@@ -12584,3 +12588,699 @@ body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever
 body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > :is([data-action="annulerDernierPoint"], .ligne-delta, .raison-leve),
 body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta,
 body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .bouton-ouvrir-delta { position: static; }
+
+/* ==========================================================================
+   0.167.0 (demandes du 09.11) : Lever : texte « Levé en cours » réduit, moins d'espace entre le plan et
+   Contour / Ligne / Point, boutons « + Nouvelle ligne » et « Fermer ligne » plus grands (la hauteur du plan se règle
+   dans ajusterPlanAuContenu : elle laisse voir l'essentiel du rôle choisi).
+   ========================================================================== */
+.titre-levee-bande { font-size: 10px; }
+.bande-appli .nom-levee-bande { font-size: 15px; }
+body.mode-telephone .nom-levee-bande { font-size: 12.5px; }
+@media (max-width: 520px) {
+  .zone-levee .nom-levee-bande { font-size: 13.5px; }
+}
+body[data-onglet='terrain'][data-mode-terrain='lever'] section.panneau.actif { padding-top: 2px; }
+body[data-onglet='terrain'][data-mode-terrain='lever'] .roles-leve { margin-top: 0; }
+body:not(.mode-telephone)[data-mode-terrain='lever'] .element-en-cours .corps-element .bouton-secondaire { min-height: 40px; padding: 4px 14px; font-size: 0.95rem; }
+body.mode-telephone[data-mode-terrain='lever'] .element-en-cours .corps-element .bouton-secondaire { min-height: 36px; padding: 3px 10px; font-size: 0.88rem; }
+
+/* 0.167.0 (demande du 09.11) : Mesure rapide : le plan est fixe à 55 % de la zone de travail (plus de ▲ / ▼). */
+@media (max-width: 899px) {
+  body[data-onglet='mesure-rapide'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * 0.55);
+  }
+  body[data-onglet='mesure-rapide'] .boutons-taille-plan { display: none; }
+}
+
+/* ==========================================================================
+   0.167.0 (demandes du 09.11) : Implanter › Surface et Altitude, Guidage : le choix de la surface (ou « Altitude
+   voulue » + « Alti ici », ou « Surface à suivre » + « Lignes ») est dans la bande, à droite du bouton de
+   l'application, comme « Levé en cours ». Les vrais champs de l'écran restent cachés (ils servent de relais).
+   ========================================================================== */
+body.surface-en-bande #leve-direct :is(select[data-champ='surface-controle'], select[data-champ='surface-lame']) { display: none; }
+body[data-relais='altitude-ici'] #leve-direct .ligne-altitude-voulue { display: none; }
+
+.surface-bande, .altitude-bande { position: relative; }
+.bande-appli .liste-bande,
+.bande-appli .champ-bande {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #fbbf24;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.bande-appli .liste-bande option { color: #1b2b36; background: #ffffff; }
+.bande-appli .champ-bande::placeholder { color: rgba(251, 191, 36, 0.45); font-weight: 700; }
+.bande-appli .liste-bande { cursor: pointer; padding-right: 16px; background: none; }
+.surface-bande::after { content: '▾'; position: absolute; right: 10px; bottom: 10px; color: #fbbf24; pointer-events: none; font-size: 13px; }
+body.mode-telephone .bande-appli :is(.liste-bande, .champ-bande) { font-size: 13px; }
+.zone-levee .bouton-enreg-bande:is(.relais-altitude-ici, .relais-lignes-guidage) { flex: 0 0 34%; }
+.zone-levee .bouton-enreg-bande.relais-lignes-guidage { flex-basis: 30%; }
+.bande-appli .bouton-enreg-bande.relais-lignes-guidage.actif { background: #7c3aed; color: #ffffff; }
+.bande-appli .bouton-enreg-bande:is(.relais-altitude-ici, .relais-lignes-guidage) span { font-size: 16px; white-space: nowrap; }
+body.mode-telephone .bande-appli .bouton-enreg-bande:is(.relais-altitude-ici, .relais-lignes-guidage) span { font-size: 13px; }
+
+/* ==========================================================================
+   0.167.1 (choix du 09.11 : mixte B + C) : bandeau de Lever : pastilles rondes colorées (photo bleue, ↶ violet,
+   Δ orange) sur fond neutre ; « ID point » dans un cadre jaune (liseret du haut, du bas et de gauche) qui rejoint
+   Enreg. Pts, jaune aussi.
+   ========================================================================== */
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] { --pastille: 42px; }
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] { --pastille: 38px; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .bouton-photo-levee,
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"],
+body.bande-action:not(.mode-telephone)[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .bouton-ouvrir-delta {
+  --teinte: #2563eb;
+  border: none;
+  color: var(--teinte);
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--teinte) 16%, var(--surface)) calc(var(--pastille) / 2 - 0.5px), transparent calc(var(--pastille) / 2)), var(--surface);
+}
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"] { --teinte: #7c3aed; }
+body.bande-action:not(.mode-telephone)[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta > .bouton-ouvrir-delta { --teinte: #ea580c; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point {
+  box-sizing: border-box;
+  border: 4px solid var(--ambre);
+  border-right: none;
+  background: color-mix(in srgb, var(--ambre) 10%, var(--surface));
+}
+
+/* ==========================================================================
+   0.168.0 (demandes du 09.11) : fenêtre Delta (titre « Δ Delta », côté + distance séparés de Z ±, grande croix sur
+   toute la hauteur) ; clavier ouvert = le plan est caché dans tous les modes (le champ tapé reste visible) ;
+   « Que lèves-tu ? » : petit texte sous chaque choix.
+   ========================================================================== */
+.ligne-delta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 6px 0 6px 10px;
+  overflow: hidden;
+}
+.ligne-delta .titre-delta { grid-column: 1; display: flex; align-items: center; gap: 8px; font-size: 1.05rem; font-weight: 900; color: #c2410c; padding: 0; }
+.ligne-delta .titre-delta i { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #ffedd5; color: #ea580c; font-style: normal; font-size: 1.2rem; }
+.ligne-delta .rang-delta { grid-column: 1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ligne-delta .bouton-fermer-delta {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: stretch;
+  width: 76px;
+  min-height: 0;
+  margin: -6px 0;
+  border: none;
+  border-left: 3px solid color-mix(in srgb, #ea580c 40%, transparent);
+  border-radius: 0;
+  background: color-mix(in srgb, #ea580c 14%, var(--surface));
+  color: #c2410c;
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+.bouton-nature { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 8px; }
+.bouton-nature small { font-size: 0.72rem; font-weight: 600; opacity: 0.85; }
+body.clavier-ouvert { --hauteur-plan-terrain: 0px !important; --hauteur-plan-guidage: 0px !important; }
+body.clavier-ouvert .panneau-plan { display: none !important; }
+
+/* 0.168.1 (choix du 09.11 : proposition C) : choix de la surface dans la bande : fond clair teinté de la couleur de
+   l'application (sarcelle pour Implanter, bleu pour Guidage), bord de cette couleur, texte sombre, grosse flèche ronde. */
+.bande-appli .levee-bande.surface-bande {
+  background: color-mix(in srgb, var(--couleur-appli, #0d9488) 10%, #ffffff);
+  border: 3px solid var(--couleur-appli, #0d9488);
+  padding-right: 62px;
+}
+.surface-bande .titre-levee-bande { color: color-mix(in srgb, var(--couleur-appli, #0d9488) 70%, #000000); opacity: 1; }
+.bande-appli .surface-bande .liste-bande { color: #12332f; font-size: 17px; padding-right: 0; }
+.surface-bande::after {
+  content: '▾';
+  right: 8px;
+  bottom: auto;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--couleur-appli, #0d9488);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 900;
+}
+body.mode-telephone .bande-appli .surface-bande .liste-bande { font-size: 14px; }
+
+/* 0.168.1 : fenêtre Delta sur une seule ligne (dès 520 px de large) : Δ Delta | G / D | dist. | Z ± | grande croix. */
+@media (min-width: 521px) {
+  .ligne-delta { display: flex; flex-wrap: nowrap; align-items: center; gap: 12px; }
+  .ligne-delta .titre-delta { flex: none; }
+  .ligne-delta .bouton-fermer-delta { margin-left: auto; align-self: stretch; flex: none; }
+}
+
+/* 0.168.2 : dans la fenêtre Delta, « G / D + dist. » dans un encadré et « Z ± » dans un autre. */
+.ligne-delta .rang-delta {
+  padding: 4px 8px;
+  border: 2px solid color-mix(in srgb, #ea580c 45%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, #ea580c 5%, var(--surface));
+}
+
+/* 0.169.0 (demande du 09.11) : « Levé en cours » dans la même présentation que le choix de la surface : fond clair
+   teinté, bord de la couleur de l'application, texte sombre ; la flèche ronde remplace le bouton « Changer ». */
+.bande-appli .levee-bande.levee-choix {
+  position: relative;
+  background: color-mix(in srgb, var(--couleur-appli, #d99300) 12%, #ffffff);
+  border: 3px solid var(--couleur-appli, #d99300);
+  padding-right: 62px;
+}
+.levee-choix .titre-levee-bande { color: color-mix(in srgb, var(--couleur-appli, #d99300) 65%, #000000); opacity: 1; }
+.bande-appli .levee-choix .nom-levee-bande { color: #2a1f05; }
+.bande-appli .levee-choix .fleche-levee-bande {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--couleur-appli, #d99300);
+  color: var(--texte-appli, #ffffff);
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+body.mode-telephone .bande-appli .levee-choix .fleche-levee-bande { width: 36px; height: 36px; font-size: 20px; }
+body.mode-telephone .bande-appli .levee-bande.levee-choix { padding-right: 50px; }
+
+/* ==========================================================================
+   0.170.0 (demandes du 09.11, 11h) : la liste du choix de la surface couvre tout le bloc (flèche comprise) ;
+   Réglages au-dessus des boutons fixes de Lever.
+   ========================================================================== */
+.surface-bande .valeur-liste-bande {
+  display: block; font-size: 17px; font-weight: 900; color: #12332f;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+}
+body.mode-telephone .surface-bande .valeur-liste-bande { font-size: 14px; }
+.bande-appli .surface-bande .liste-bande {
+  position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2;
+  opacity: 0; padding: 0; cursor: pointer;
+}
+.bande-appli .surface-bande .liste-bande option { opacity: 1; }
+dialog.fenetre-reglages.en-page[open] { z-index: 40; }
+/* 0.170.0 : choix des coupes dans la rangée de la sonnette (G – D, Arr – Av, 2 coupes). */
+.ecran-lame .choix-coupes-bandeau { margin-left: auto; display: flex; gap: 6px; flex-wrap: nowrap; }
+.ecran-lame .choix-coupes-bandeau .puce-choix { min-height: 40px; padding: 4px 12px; white-space: nowrap; }
+body.mode-telephone .ecran-lame .choix-coupes-bandeau .puce-choix { min-height: 32px; padding: 3px 8px; font-size: 11px; }
+.svg-coupe-guidage { overflow: hidden; }
+
+/* ==========================================================================
+   0.171.0 (demandes du 09.11, 11h30-11h41, suite)
+   ========================================================================== */
+.partie-sous.info { cursor: default; pointer-events: none; }
+
+/* 0.171.0 (demande du 09.11, 11h37) : « Altitude voulue » et « Alti ici » dans la même présentation que le choix de
+   la surface et « Enr. » : fond clair teinté sarcelle, bord sarcelle, texte sombre ; bouton sarcelle. */
+.bande-appli .levee-bande.altitude-bande {
+  background: color-mix(in srgb, var(--couleur-appli, #0d9488) 10%, #ffffff);
+  border: 3px solid var(--couleur-appli, #0d9488);
+}
+.altitude-bande .titre-levee-bande { color: color-mix(in srgb, var(--couleur-appli, #0d9488) 70%, #000000); opacity: 1; }
+.bande-appli .altitude-bande .champ-bande { color: #12332f; font-size: 19px; }
+.bande-appli .altitude-bande .champ-bande::placeholder { color: rgba(18, 51, 47, 0.4); }
+.bande-appli .bouton-enreg-bande.relais-altitude-ici { background: #0d9488; color: #ffffff; }
+.bande-appli .bouton-enreg-bande.relais-altitude-ici:disabled { background: #475569; color: rgba(255, 255, 255, 0.6); }
+
+/* 0.171.0 (bug du 09.11, 11h35) : clavier ouvert dans Lever : tout revient dans le flux, bien rangé (ID point en
+   haut, panneau du Δ, puis ↶ et E / N), sans ombre ni fond qui se chevauchent. */
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  margin: 0 0 8px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > .ligne-id-prendre { order: 1; flex: 1 1 100%; margin: 0; padding-right: 0; }
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > .ligne-delta { order: 2; flex: 1 1 100%; margin: 0; box-shadow: none; }
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"] {
+  order: 3; flex: 0 0 52px; width: 52px; height: 44px; border: none; border-radius: 12px; margin: 0;
+}
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > .ligne-position-delta { order: 4; flex: 1 1 0; margin: 0; }
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > .raison-leve { order: 5; flex: 1 1 100%; margin: 0; }
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point { margin-left: 0; }
+
+/* 0.171.0 (demande du 09.11) : Implanter (guidage d'une ligne…) sans rien au milieu de la bande : le bouton seul de la bande
+   ne cache plus le bas de l'écran (« Enregistrer l'implantation », monter / descendre) : la zone de travail s'arrête au-dessus. */
+body.bande-vide.vue-implantation[data-onglet='terrain'] { --hauteur-onglets: calc(var(--hauteur-bande) + 8px); }
+
+/* 0.171.0 (maquette B du 09.11) : Guidage : L1 (bord G, violet) et L2 (bord D, orange) sur une seule rangée, au-dessus
+   des coupes ; les mêmes L1 / L2 dans la bande du bas (à la place de « Lignes »). */
+.ecran-lame .cartes-lignes { display: flex; gap: 8px; margin: 0 0 8px; }
+.carte-ligne-guidage { flex: 1 1 0; min-width: 0; display: flex; align-items: center; border: 2px solid #94a3b8; border-radius: 12px; background: #f8fafc; color: #334155; }
+.carte-ligne-guidage.sans-ligne { border-style: dashed; }
+.carte-ligne-guidage.en-choix { border-color: #7c3aed; background: #f5f3ff; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25); }
+.carte-ligne-guidage.choisie { border-color: #7c3aed; background: #f5f3ff; color: #4c1d95; }
+.carte-ligne-guidage:has(.couleur-L2).choisie, .carte-ligne-guidage:has(.couleur-L2).en-choix { border-color: #ea580c; background: #fff7ed; color: #9a3412; }
+.carte-ligne-guidage.ecart-vert { border-color: #16a34a !important; background: #dcfce7 !important; color: #166534 !important; }
+.carte-ligne-guidage.ecart-orange { border-color: #ea580c !important; background: #ffedd5 !important; color: #9a3412 !important; }
+.carte-ligne-guidage.ecart-rouge { border-color: #dc2626 !important; background: #fee2e2 !important; color: #991b1b !important; }
+.carte-ligne-guidage .corps-carte-ligne {
+  flex: 1; min-width: 0; min-height: 48px; display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+  border: none; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.carte-ligne-guidage .nom-ligne { padding: 2px 7px; border-radius: 7px; background: #7c3aed; color: #ffffff; font-weight: 900; font-size: 1rem; }
+.carte-ligne-guidage .nom-ligne.couleur-L2 { background: #ea580c; }
+.carte-ligne-guidage small { font-size: 0.7rem; font-weight: 700; opacity: 0.75; white-space: nowrap; }
+.carte-ligne-guidage .ecart-ligne { margin-left: auto; font-size: 1.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.carte-ligne-guidage.sans-ligne .ecart-ligne { font-size: 0.85rem; font-weight: 700; }
+.carte-ligne-guidage .bouton-lien { flex: none; padding: 0 10px; color: inherit; }
+body.mode-telephone .carte-ligne-guidage .ecart-ligne { font-size: 0.9rem; }
+.bande-appli .bouton-enreg-bande.relais-ligne-guidage { flex: 0 0 auto; min-width: 64px; color: #ffffff; background: #7c3aed; }
+.bande-appli .bouton-enreg-bande.relais-ligne-guidage.place-1 { background: #ea580c; }
+.bande-appli .bouton-enreg-bande.relais-ligne-guidage.actif { outline: 3px solid #ffffff; outline-offset: -3px; }
+.bande-appli .bouton-enreg-bande.relais-ligne-guidage span { font-size: 17px; white-space: nowrap; }
+.zone-levee .bouton-enreg-bande.relais-ligne-guidage { flex: 0 0 64px; }
+.svg-coupe-guidage .texte-pente-engin { font-size: 12px; font-weight: 900; fill: #1e3a8a; }
+.svg-coupe-guidage .texte-pente-terrain { font-size: 11px; font-weight: 800; fill: #92400e; }
+
+/* ==========================================================================
+   0.172.0 (demande du 09.11) : mode téléphone encore plus petit, dans toutes les applications : base des « rem » à
+   13 px (au lieu de 16 : tous les textes et espaces écrits en rem baissent de 19 %), bande du bas, en-tête et barre du
+   récepteur, boutons du plan, menu et tuiles réduits.
+   ========================================================================== */
+html:has(body.mode-telephone) { font-size: 13px; }
+body.mode-telephone { --hauteur-bande: 46px; }
+body.mode-telephone.avec-recepteur { --hauteur-entete: 64px; }
+body.mode-telephone.avec-recepteur .entete { padding-bottom: 28px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur b { font-size: 12.5px; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur small { font-size: 8.5px; }
+body.mode-telephone .entete .entete-texte .entete-titre { font-size: 12px; }
+body.mode-telephone .entete:has(.bouton-recepteur-entete) { --largeur-recepteur: 56px; }
+body.mode-telephone .entete .entete-icone-bouton.bouton-recepteur-entete svg { width: 48px; height: 48px; padding: 8px; }
+body.mode-telephone .entete-icone-bouton { width: 20px; height: 20px; }
+body.mode-telephone .plan-boutons button { width: 32px; height: 32px; }
+body.mode-telephone .plan-puces .puce { min-height: 28px; padding: 2px 7px; font-size: 0.72rem; }
+body.mode-telephone .plan-puces .puce svg { width: 14px; height: 14px; }
+/* bande du bas */
+body.mode-telephone .partie-appli { font-size: 13px; padding: 0 8px 0 6px; gap: 4px; }
+body.mode-telephone .partie-appli svg { width: 18px; height: 18px; }
+body.mode-telephone .partie-sous { font-size: 12px; padding: 0 6px; }
+body.mode-telephone .bande-appli .bouton-enreg-bande { font-size: 14px; }
+body.mode-telephone .bande-appli .choix-sous-appli button { font-size: 12px; }
+body.mode-telephone .zone-info-appli { font-size: 12px; }
+/* menu des applications */
+body.mode-telephone .tuile-appli { min-height: 62px; font-size: 13px; }
+body.mode-telephone .tuile-appli > svg { width: 18px; height: 18px; }
+body.mode-telephone .tuile-appli .sous-tuile button { min-height: 22px; padding: 0 5px; font-size: 9.5px; }
+body.mode-telephone .tuile-appli .detail-tuile { font-size: 9px; }
+/* Abréviations : forme longue partout, forme courte seulement en mode téléphone. */
+.t-court { display: none; }
+body.mode-telephone .t-long { display: none; }
+body.mode-telephone .t-court { display: inline; }
+/* Lever, Implanter, messages : espaces vides réduits. */
+body.mode-telephone .role-leve { min-height: 36px; padding: 4px 6px; font-size: 13px; }
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] { --hauteur-bandeau-point: 46px; --largeur-enreg-point: 104px; --largeur-bouton-bandeau: 42px; }
+body.mode-telephone.bande-action .zone-levee .bouton-enreg-bande.relais-prendre { width: 104px; min-height: 46px; }
+body.mode-telephone .puce-libelle { min-height: 28px; padding: 2px 6px; }
+body.mode-telephone .ecart-et-regle .regle-hauteur { min-height: 90px; }
+body.mode-telephone .message-bas, body.mode-telephone #message { font-size: 12px; padding: 6px 12px; }
+body.mode-telephone .ecran-terrain, body.mode-telephone .panneau { --espace: 6px; }
+body.mode-telephone .panneau :is(h2, h3) { font-size: 14px; margin: 4px 0; }
+body.mode-telephone .role-leve { flex-direction: row; gap: 6px; }
+body.mode-telephone .tuile-appli { min-height: 56px; }
+body.mode-telephone .page-applis { --espace-tuiles: 6px; }
+body.mode-telephone .cadre-projet-applis { padding: 8px 10px; }
+body.mode-telephone .fenetre-reglages :is(.bouton-choix-mode, .puce-reglage, .choix-reglage button, .onglets-reglages button) { min-height: 32px; font-size: 12px; }
+body.mode-telephone .fenetre-reglages { font-size: 12px; }
+
+/* 0.173.0 (retour du 09.11, téléphone réel) : plus jamais de défilement de côté ; textes du bandeau récepteur qui
+   rentrent (retour à la ligne, taille réduite). */
+html, body { overflow-x: clip; max-width: 100%; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur { min-width: 0; overflow: hidden; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur b,
+body.mode-telephone .bandeaux-recepteur .case-recepteur.attente b { font-size: 11.5px; white-space: normal; line-height: 1.1; overflow-wrap: anywhere; }
+body.mode-telephone .bandeaux-recepteur .case-recepteur small { white-space: normal; line-height: 1; }
+body.mode-telephone .entete .entete-texte { min-width: 0; }
+
+/* Menu en mode téléphone : tout doit tenir sur l'écran (tuiles basses, sous-applications en petit, encadré du projet serré). */
+body.mode-telephone .tuiles-applis { grid-auto-rows: auto; gap: 6px; }
+body.mode-telephone .tuile-appli { min-height: 0; padding: 6px 6px 7px; font-size: 12px; gap: 2px; }
+body.mode-telephone .tuile-appli > svg { width: 16px; height: 16px; }
+body.mode-telephone .tuile-appli .sous-tuile { gap: 3px; margin-top: 2px; }
+body.mode-telephone .tuile-appli .sous-tuile button { min-height: 18px; padding: 0 4px; font-size: 8.5px; }
+body.mode-telephone .tuile-appli [data-favori] { transform: scale(0.65); transform-origin: top right; }
+body.mode-telephone .page-applis { padding: 6px 8px; }
+body.mode-telephone .page-applis h2, body.mode-telephone .page-applis .titre-section-applis { font-size: 10px; margin: 6px 2px 4px; }
+body.mode-telephone .bandeau-projet-applis { padding: 2px 2px 6px; gap: 6px; }
+body.mode-telephone .texte-bandeau-projet small { display: none; }
+body.mode-telephone .texte-bandeau-projet b { font-size: 13px; }
+body.mode-telephone .bouton-bandeau-projet { min-height: 32px; padding: 0 10px; font-size: 12px; }
+body.mode-telephone .bouton-partie-projet { min-height: 32px; font-size: 11px; }
+body.mode-telephone .comptes-projet-applis { font-size: 9.5px; margin: 4px 0 0; }
+body.mode-telephone .pied-applis { padding: 5px; margin-top: 4px; gap: 6px; }
+body.mode-telephone .pied-applis button { min-height: 34px; font-size: 12px; }
+
+/* 0.174.0 (demande du 09.11) : Drive et la main côte à côte (plus l'un au-dessus de l'autre : mal affiché et on ne pouvait pas
+   toucher l'un ou l'autre) ; en mode téléphone, Drive est seulement une icône. */
+.entete-pastilles { flex-direction: row; align-items: center; gap: 6px; max-width: none; }
+.entete-pastilles .pastille-entete { min-height: 28px; display: inline-flex; align-items: center; justify-content: center; }
+body.mode-telephone .entete-pastilles { gap: 4px; }
+body.mode-telephone .etat-drive { padding: 2px 7px; font-size: 13px; min-height: 24px; }
+body.mode-telephone .entete-pastilles .pastille-entete { min-height: 24px; }
+
+/* 0.174.1 : Drive = un nuage et un symbole dedans, une couleur par état (tablette et téléphone). */
+.etat-drive { padding: 3px 7px; font-size: 0; line-height: 0; min-height: 28px; }
+.etat-drive svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.etat-drive .nuage { fill: color-mix(in srgb, currentColor 18%, transparent); }
+.etat-drive.etat-drive-ok { background: rgba(134, 239, 172, 0.18); color: #86efac; }
+.etat-drive.etat-drive-envoi { background: #f59e0b; color: #1f1300; }
+.etat-drive.etat-drive-pause { background: rgba(148, 163, 184, 0.3); color: #e2e8f0; }
+.etat-drive.etat-drive-alerte { background: #dc2626; color: #ffffff; }
+body.mode-telephone .etat-drive { padding: 2px 5px; min-height: 24px; }
+body.mode-telephone .etat-drive svg { width: 20px; height: 20px; }
+
+/* ===== 0.175.0 : Levé chantier (libellé, nature, attributs) ===== */
+.chantier-leve { display: flex; flex-direction: column; gap: 8px; }
+.chantier-leve .titre-choix { margin: 0; }
+.natures-chantier { display: flex; flex-wrap: wrap; gap: 6px; }
+.natures-chantier button {
+  min-height: 36px; padding: 4px 12px; border-radius: 999px; border: 1.5px solid var(--bordure);
+  background: var(--surface); color: var(--encre, var(--texte)); font-weight: 600; font-size: 0.85rem;
+}
+.natures-chantier button.actif { background: var(--sombre); color: #ffffff; border-color: var(--sombre); }
+.cadre-attributs-chantier {
+  background: var(--surface); border-radius: var(--rayon); padding: 10px;
+  border-top: 4px solid var(--couleur-libelle, var(--orange)); box-shadow: var(--ombre);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.cadre-attributs-chantier .titre-attributs { font-size: 0.95rem; color: var(--encre, var(--texte)); }
+.bascule-chantier { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 10px; background: rgba(95, 109, 119, 0.18); }
+.bascule-chantier button { min-height: 40px; border: 0; border-radius: 8px; background: transparent; font-weight: 700; color: var(--gris); }
+.bascule-chantier button.actif { background: var(--sombre); color: var(--ambre); }
+.champs-chantier { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.champ-chantier { min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 0.7rem; font-weight: 700; color: var(--gris); }
+.champ-chantier.large { grid-column: 1 / -1; }
+.champ-chantier input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 40px; font-size: 1rem; font-weight: 700; border: 1.5px solid var(--bordure); border-radius: 9px; padding: 4px 8px; color: var(--encre, var(--texte)); background: var(--surface); }
+.calcul-chantier { margin: 0; padding: 6px 8px; border-radius: 8px; background: var(--ambre-clair); color: #7a5a00; font-weight: 600; font-size: 0.8rem; }
+.suivi-cadre { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; }
+.suivi-cadre .coin { width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; color: #ffffff; background: #c3ccd2; font-weight: 800; }
+.suivi-cadre .coin.fait { background: var(--succes); }
+.suivi-cadre .coin.en-cours { background: var(--orange); }
+.dernier-cadre { margin: 0; font-size: 0.78rem; color: var(--gris); }
+/* Levé chantier : orange (couleur du libellé Tuyau, proche du rôle Ligne). */
+.entete-levee.nature-chantier,
+.bouton-nature.nature-chantier { --couleur-nature: #ea580c; }
+.ligne-levee.nature-chantier { --couleur-nature: #ea580c; }
+.titre-attributs { display: flex; align-items: center; justify-content: space-between; }
+dialog.fenetre-chantier { width: min(96vw, 760px); max-height: 92vh; padding: 0; border: 0; border-radius: var(--rayon); display: flex; flex-direction: column; background: var(--surface); color: var(--encre, var(--texte)); }
+dialog.fenetre-chantier[open] { display: flex; }
+dialog.fenetre-chantier h2 { margin: 0; padding: 12px 14px; background: var(--sombre); color: #ffffff; font-size: 1rem; }
+.corps-chantier { overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.ligne-bibliotheque { display: grid; grid-template-columns: 1.4fr 1fr 0.7fr 0.8fr; gap: 6px; align-items: center; padding: 8px; border-radius: 10px; background: rgba(95, 109, 119, 0.08); }
+.ligne-bibliotheque input[type="text"], .ligne-bibliotheque input:not([type]), .ligne-bibliotheque select, .natures-bibliotheque textarea { min-height: 36px; border: 1.5px solid var(--bordure); border-radius: 8px; padding: 2px 6px; background: var(--surface); color: var(--encre, var(--texte)); font: inherit; min-width: 0; }
+.ligne-bibliotheque input[type="color"] { width: 44px; height: 36px; padding: 0; border: 1.5px solid var(--bordure); border-radius: 8px; }
+.ligne-bibliotheque .coche { grid-column: span 2; display: flex; gap: 6px; align-items: center; font-size: 0.8rem; }
+.champs-bibliotheque { grid-column: 1 / -1; display: flex; gap: 12px; flex-wrap: wrap; }
+.champs-bibliotheque .coche { grid-column: auto; }
+.actions-ligne { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; }
+.aide-chantier { margin: 0; font-size: 0.8rem; color: var(--gris); }
+.natures-bibliotheque { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.groupe-natures { display: flex; flex-direction: column; gap: 4px; }
+.ligne-nature { display: flex; align-items: center; gap: 6px; }
+.ligne-nature input[data-n="nom"] { flex: 1; min-width: 0; min-height: 34px; border: 1.5px solid var(--bordure); border-radius: 8px; padding: 2px 6px; background: var(--surface); color: var(--encre, var(--texte)); font: inherit; }
+.ligne-nature input[type="color"] { width: 38px; height: 34px; padding: 0; border: 1.5px solid var(--bordure); border-radius: 8px; }
+.natures-bibliotheque label { display: flex; flex-direction: column; gap: 4px; font-weight: 700; font-size: 0.8rem; }
+@media (max-width: 520px) { .ligne-bibliotheque { grid-template-columns: 1fr 1fr; } .natures-bibliotheque { grid-template-columns: 1fr; } }
+
+/* 0.175.4 (demande du 09.11) : libellés et natures du Chantier chacun sur UNE ligne (texte qui s'adapte à la largeur ;
+   si vraiment trop étroit, la ligne défile de côté). */
+.chantier-leve .libelles-terrain.pour-chantier { display: flex; flex-wrap: nowrap; gap: 3px; overflow-x: auto; scrollbar-width: none; }
+.chantier-leve .libelles-terrain.pour-chantier .puce-libelle { flex: 1 1 auto; min-width: 0; padding: 2px 4px; }
+.chantier-leve .libelles-terrain.pour-chantier .puce-libelle strong { display: flex; align-items: center; justify-content: center; gap: 2px; white-space: nowrap; font-size: clamp(0.56rem, 1.75vw, 0.8rem); }
+.chantier-leve .natures-chantier { flex-wrap: nowrap; gap: 3px; overflow-x: auto; scrollbar-width: none; }
+.chantier-leve .natures-chantier button { flex: 1 1 auto; min-width: 0; padding: 4px 5px; white-space: nowrap; font-size: clamp(0.56rem, 1.75vw, 0.8rem); }
+@media (max-width: 520px) {
+  .chantier-leve .libelles-terrain.pour-chantier .symbole-libelle { display: none; }
+  .chantier-leve .libelles-terrain.pour-chantier .puce-libelle strong { font-size: 0.62rem; }
+}
+
+/* ===== 0.175.5 : Levé chantier compact (maquette validée le 09.11, style B) ===== */
+.chantier-leve { gap: 5px; }
+.rangee-chantier { position: relative; display: flex; align-items: center; }
+.defile-chantier { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+.defile-chantier::-webkit-scrollbar { display: none; }
+.fleche-chantier { flex: none; width: 32px; height: 43px; margin-left: 2px; border: 0; border-radius: 8px; background: var(--sombre); color: var(--ambre); font-weight: 900; font-size: 15px; display: grid; place-items: center; }
+.fleche-chantier[hidden] { display: none; }
+.chip-chantier { flex: none; height: 43px; padding: 0 9px; border-radius: 8px; border: 1.5px solid var(--bordure); background: var(--surface); color: var(--encre, var(--texte)); font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.chip-chantier .symbole-libelle { font-style: normal; font-size: 0.85rem; line-height: 1; }
+.chip-chantier.actif { background: var(--sombre); border-color: var(--sombre); color: #ffffff; }
+.nat-chantier { flex: none; height: 36px; padding: 0 9px; border-radius: 999px; border: 1.5px solid var(--bordure); background: var(--surface); color: var(--encre, var(--texte)); font-weight: 600; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.nat-chantier i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.nat-chantier.actif { background: var(--sombre); border-color: var(--sombre); color: #ffffff; }
+.reglages-chantier { display: flex; gap: 8px; align-items: center; }
+.mini-bascule { display: inline-flex; gap: 2px; padding: 2px; border-radius: 10px; background: rgba(95, 109, 119, 0.18); }
+.mini-bascule button { height: 37px; padding: 0 16px; min-width: 64px; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--gris); font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.mini-bascule button.actif { background: var(--surface); color: var(--encre, var(--texte)); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 -3px 0 var(--ambre); }
+.ico-forme { width: 12px; height: 12px; border: 2px solid currentColor; display: inline-block; box-sizing: border-box; }
+.ico-forme.rond { border-radius: 50%; }
+.ico-forme.carre { border-radius: 2px; }
+.attributs-chantier { display: flex; gap: 5px; align-items: stretch; }
+.attributs-chantier .champ-chantier { flex-direction: row; align-items: center; gap: 4px; height: 47px; border: 1.5px solid var(--bordure); border-radius: 8px; background: var(--surface); padding: 0 7px; min-width: 0; }
+.attributs-chantier .champ-chantier.manque { border-color: var(--rouge); background: var(--rouge-clair); }
+.attributs-chantier .champ-chantier span { font-size: 0.65rem; font-weight: 800; color: var(--gris); flex: none; }
+.attributs-chantier .champ-chantier input, .attributs-chantier .champ-chantier select { border: 0; outline: 0; background: transparent; min-height: 0; height: 100%; padding: 0; font-size: 0.9rem; width: 100%; min-width: 0; color: var(--encre, var(--texte)); }
+.attributs-chantier .champ-chantier.d, .attributs-chantier .champ-chantier.p { flex: 0 0 76px; }
+.attributs-chantier .champ-chantier.m { flex: 0 0 84px; }
+.attributs-chantier .champ-chantier.g { flex: 0 0 104px; }
+.attributs-chantier .champ-chantier.n { flex: 0 0 62px; }
+.attributs-chantier .photo-chantier { flex: 0 0 47px; height: 47px; width: 47px; min-height: 0; padding: 0; display: grid; place-items: center; border-radius: 8px; }
+.attributs-chantier .photo-chantier svg { width: 22px; height: 22px; }
+.attributs-chantier .champ-chantier.r { flex: 1; }
+.calcul-chantier { margin: 0; padding: 0 2px; background: transparent; font-size: 0.7rem; font-weight: 700; color: var(--ambre-fonce); }
+.calcul-chantier.erreur { color: var(--rouge); }
+
+/* ===== 0.175.7 (demande du 09.11) : bas de l'écran Lever =====
+   « + » (nouveau levé) de la bande et ↶ du bandeau 1/3 plus grands ; liseré jaune qui entoure aussi la gauche du bandeau
+   (photo, ↶, Δ) et rejoint le cadre jaune de l'ID point. */
+.bande-appli .petit-bouton-levee[data-cle="nouveau-levee"] { min-width: 53px; min-height: 58px; font-size: 24px; }
+.bande-appli .petit-bouton-levee[data-cle="nouveau-levee"] svg { width: 29px; height: 29px; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::before { font-size: 37px; }
+/* Liseré jaune autour du groupe photo | ↶ | Δ : dessiné par ↶ (fixe comme les deux autres, au-dessus d'eux), il part de la photo et finit contre le cadre jaune de l'ID point. */
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"] { z-index: 22; overflow: visible; }
+body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--hauteur-bandeau-point)); pointer-events: none; box-sizing: border-box;
+  width: calc(var(--hauteur-bandeau-point) + var(--largeur-bouton-bandeau));
+  border: 4px solid var(--ambre); border-right: none; border-radius: 12px 0 0 12px;
+}
+body.bande-action:not(.mode-telephone):not(.mode-base)[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::after { width: calc(var(--hauteur-bandeau-point) + var(--largeur-bouton-bandeau) * 2); }
+body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::after { display: none; }
+
+/* ===== 0.175.9 (demande du 09.11) : Réglages : chaque réglage dans son propre rectangle blanc, avec un trait de couleur à gauche
+   (avant : tout gris, on s'y perdait). ===== */
+.fenetre-reglages .page-reglages:not([hidden]) { display: flex; flex-direction: column; gap: 10px; }
+.fenetre-reglages .page-reglages > .choix-mode-appli,
+.fenetre-reglages .page-reglages > .ligne-telephone-ecran,
+.fenetre-reglages .page-reglages > .choix-taille,
+.fenetre-reglages .page-reglages > .case-reglage,
+.fenetre-reglages .page-reglages > .bouton-large,
+.fenetre-reglages .page-reglages .partage-reglages .carte-section {
+  background: var(--surface); border: 1.5px solid var(--bordure); border-left: 6px solid var(--ambre); border-radius: 12px;
+  padding: 10px 12px; margin: 0; box-shadow: var(--ombre); box-sizing: border-box;
+}
+.fenetre-reglages .page-reglages > .choix-mode-appli { border-left-color: var(--sombre); }
+.fenetre-reglages .page-reglages > .ligne-telephone-ecran { border-left-color: #0891b2; }
+.fenetre-reglages .page-reglages > .choix-taille { border-left-color: #7c3aed; }
+.fenetre-reglages .page-reglages > .case-reglage { border-left-color: var(--succes); }
+.fenetre-reglages .page-reglages .partage-reglages { display: flex; flex-direction: column; gap: 10px; }
+.fenetre-reglages .page-reglages .partage-reglages .carte-section { border-left-color: #0ea5e9; }
+.fenetre-reglages .page-reglages > .choix-taille .titre-taille { display: block; margin-bottom: 6px; font-weight: 800; }
+
+/* ===== 0.175.10 (demande du 09.11) ===== */
+/* Photo de la bande (Levé en cours) 1/3 plus large. */
+.bande-appli .petit-bouton-levee[data-cle="photo-levee"] { min-width: 53px; }
+/* Appareil photo de « Rem. » : mêmes couleurs que celui du bandeau Enreg. (rond bleu clair, icône bleue, sans bord). */
+.attributs-chantier .photo-chantier {
+  --teinte: #2563eb; border: none; color: var(--teinte);
+  background: color-mix(in srgb, var(--teinte) 16%, var(--surface));
+}
+/* Forme et texte des libellés / natures / bascules : espace réduit de plus de moitié. */
+.chip-chantier { gap: 1px; }
+.chip-chantier .symbole-libelle { margin-right: 0; }
+.nat-chantier { gap: 2px; }
+.mini-bascule button { gap: 2px; }
+
+/* ==========================================================================
+   0.177.0 (demande du 09.11) : application Annotation (points avec remarques et photos).
+   Le plan est en haut sur tablette / téléphone, fixe à 45 % de la zone de travail, comme la Mesure rapide.
+   ========================================================================== */
+@media (max-width: 899px) {
+  body[data-onglet='annotation'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(var(--part-plan-terrain, 0.35), var(--part-plan-min, 0.3)));
+  }
+  body[data-onglet='annotation'] .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: var(--hauteur-plan-terrain);
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+  body[data-onglet='annotation'] .mise-en-page { padding-top: var(--hauteur-plan-terrain); }
+  body[data-onglet='annotation'] .panneau[data-onglet='annotation'] { padding-top: 4px; border-top-left-radius: 0; border-top-right-radius: 0; }
+}
+.panneau[data-onglet='annotation'] { border-top: 4px solid #7c4a1e; }
+.ecran-annotation { display: flex; flex-direction: column; gap: 10px; }
+.entete-annotation { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.modes-annotation { display: flex; gap: 6px; flex-wrap: wrap; }
+.modes-annotation .puce-choix.actif { background: #7c4a1e; border-color: #7c4a1e; color: #ffffff; }
+.invite-annotation { margin: 8px 0; text-align: center; color: var(--gris); }
+.position-annotation { display: flex; flex-direction: column; gap: 6px; }
+.position-annotation .bouton { min-height: 48px; }
+.position-annotation small, .reglage-precision-annotation { color: var(--gris); font-size: 13px; }
+.reglage-precision-annotation input { width: 72px; min-height: 36px; margin-left: 6px; }
+.fiche-annotation { display: flex; flex-direction: column; gap: 10px; border-left: 4px solid #7c4a1e; padding-left: 10px; }
+.titre-fiche-annotation { display: flex; flex-direction: column; gap: 2px; }
+.titre-fiche-annotation span { font-size: 13px; color: var(--gris); font-variant-numeric: tabular-nums; }
+.remarques-annotation { display: flex; flex-direction: column; gap: 6px; }
+.remarques-annotation textarea { width: 100%; min-height: 56px; font: inherit; padding: 8px; box-sizing: border-box; }
+.photos-annotation { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vignette-annotation { position: relative; display: inline-block; }
+.vignette-annotation .miniature { border: 0; padding: 0; background: none; }
+.vignette-annotation img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; display: block; }
+.vignette-annotation .enlever { position: absolute; top: -8px; right: -8px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: #dc2626; color: #ffffff; font-size: 18px; line-height: 1; }
+.bouton-photo-annotation { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; cursor: pointer; }
+.bouton-photo-annotation svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; }
+.boutons-annotation { display: flex; flex-wrap: wrap; gap: 8px; }
+.boutons-annotation > * { flex: 1 1 auto; min-height: 48px; }
+.liste-annotation { display: flex; flex-direction: column; gap: 4px; }
+.ligne-annotation { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; text-align: left; padding: 8px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); min-height: 44px; }
+.ligne-annotation.actif { border-color: #7c4a1e; background: color-mix(in srgb, #7c4a1e 12%, var(--surface)); }
+.ligne-annotation span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ligne-annotation small { grid-column: 1 / -1; color: var(--gris); }
+
+/* 0.178.0 (demande du 09.11) : bande d'Annotation : Manuel / GNSS / GPS tablette (grisés avec la raison dessous),
+   et un petit « Enreg. point » fixe au-dessus de la bande, à droite, comme Enreg. Pts de Lever. */
+.bande-appli .boutons-bande-annotation .bouton-bande-mesure { flex: 1 1 0; background: #7c4a1e; color: #ffffff; }
+.bande-appli .boutons-bande-annotation .bouton-bande-mesure.manuel.actif { background: var(--ambre); color: #1b2b36; }
+.bande-appli .boutons-bande-annotation .bouton-bande-mesure:disabled { background: #475569; color: rgba(255, 255, 255, 0.55); }
+.bande-appli .boutons-bande-annotation .bouton-bande-mesure small { white-space: normal; line-height: 1.05; text-align: center; font-size: 10px; }
+body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 104px); }
+.precision-annotation { color: var(--gris); font-size: 13px; }
+
+/* 0.178.1 : réglage de la précision du GPS tablette derrière un petit engrenage (Annotation). */
+.entete-annotation { justify-content: flex-end; }
+.bouton-engrenage-annotation { width: 36px; height: 36px; min-height: 36px; padding: 0; border: 1px solid var(--bordure); border-radius: 50%; background: var(--surface); font-size: 18px; line-height: 1; color: var(--gris); }
+.bouton-engrenage-annotation.actif { border-color: #7c4a1e; color: #7c4a1e; }
+.reglages-annotation { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, #7c4a1e 8%, var(--surface)); }
+
+/* ==========================================================================
+   0.179.0 (demande du 09.11) : bandeau d'Annotation, comme celui de Lever : photo (bleu) | ↶ (violet) | ID + remarque
+   (cadre jaune, un peu plus épais) | Enreg. point (jaune), fixé au-dessus de la bande du bas.
+   ========================================================================== */
+.bandeau-annotation {
+  position: fixed; left: 12px; right: 12px; bottom: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 10px); z-index: 19;
+  height: 76px; box-sizing: border-box; display: flex; align-items: stretch; gap: 0; overflow: hidden;
+  border-radius: 16px; background: var(--surface); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  --pastille: 42px;
+}
+body.mode-telephone .bandeau-annotation { left: 8px; right: 8px; height: 68px; --pastille: 38px; }
+.bandeau-annotation .pastille-annotation {
+  position: relative; flex: 0 0 56px; display: flex; align-items: center; justify-content: center; margin: 0; padding: 0;
+  border: none; border-radius: 0; font-size: 26px; font-weight: 900; line-height: 1; cursor: pointer; --teinte: #2563eb; color: var(--teinte);
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--teinte) 16%, var(--surface)) calc(var(--pastille) / 2 - 0.5px), transparent calc(var(--pastille) / 2)), var(--surface);
+}
+body.mode-telephone .bandeau-annotation .pastille-annotation { flex-basis: 46px; font-size: 22px; }
+.bandeau-annotation .pastille-annotation.retour { --teinte: #7c3aed; }
+.bandeau-annotation .pastille-annotation:disabled { opacity: 0.35; }
+.bandeau-annotation .pastille-annotation svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; }
+.bandeau-annotation .badge-photos { position: absolute; top: 8px; right: 4px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 9px; background: #dc2626; color: #ffffff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; }
+.champs-annotation-bandeau {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 3px 10px; box-sizing: border-box;
+  border: 4px solid var(--ambre); border-right: none; background: color-mix(in srgb, var(--ambre) 10%, var(--surface));
+}
+.id-annotation { display: flex; flex-direction: column; margin: 0; }
+.id-annotation > span { font-size: 10px; color: var(--encre); opacity: 0.65; line-height: 1.1; }
+.bandeau-annotation input[type='text'] { width: 100%; min-width: 0; box-sizing: border-box; border: none; background: none; box-shadow: none; padding: 0; color: var(--encre); }
+.bandeau-annotation .id-annotation input { font-size: 20px; font-weight: 900; min-height: 26px; }
+.bandeau-annotation .remarque-bandeau { font-size: 15px; min-height: 24px; border-top: 1px solid color-mix(in srgb, var(--encre) 18%, transparent); padding-top: 2px; }
+body.mode-telephone .bandeau-annotation .id-annotation input { font-size: 17px; }
+.bouton-enreg-annotation {
+  flex: 0 0 124px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 4px;
+  border: none; border-radius: 0; background: var(--ambre); color: #1b2b36; font-size: 18px; font-weight: 900;
+}
+.bouton-enreg-annotation small { font-size: 11px; font-weight: 700; opacity: 0.8; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bouton-enreg-annotation:disabled { background: #fde7b0; color: rgba(27, 43, 54, 0.55); }
+body.mode-telephone .bouton-enreg-annotation { flex-basis: 100px; font-size: 15px; }
+body.clavier-ouvert .bandeau-annotation { bottom: 8px; }
+.titre-liste-annotation { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+/* 0.180.0 : points d'Annotation = un rond tracé à la main (trait fin, 14 px). */
+.plan .points .forme-nuage { stroke-width: 1.6; stroke-linecap: butt; stroke-dasharray: 3.6 4; }
+
+/* 0.181.0 (demande du 09.11) : Annotation harmonisée avec Lever : plan réglable par ▲ / ▼ (même part que Lever, 30 à 70 %), une seule rangée
+   sous le plan (⚙ | consigne | aide), boutons de la fiche et lignes de la liste dans le même style, trait de couleur partout. */
+.entete-annotation { justify-content: space-between; min-height: 40px; }
+.entete-annotation .invite-annotation { flex: 1; margin: 0; text-align: center; font-size: 0.95rem; }
+.fiche-annotation { border-left: 0; padding-left: 0; }
+.fiche-annotation .titre-fiche-annotation strong { color: #7c4a1e; font-size: 1.05rem; }
+.boutons-annotation > .bouton { background: #7c4a1e; color: #ffffff; border-radius: 14px; font-weight: 800; }
+.boutons-annotation > .bouton-secondaire { border-radius: 14px; font-weight: 700; }
+.ligne-annotation { border-radius: 12px; border-left: 4px solid #7c4a1e; }
+.titre-liste-annotation strong { color: #7c4a1e; }
+
+/* 0.182.0 (demande du 09.11) : bandeau d'Annotation plus haut : deux lignes distinctes, « Nom libre » (plus de nom « Annot-n »
+   proposé dans le champ) puis « Remarque ». */
+.bandeau-annotation { height: 100px; }
+body.mode-telephone .bandeau-annotation { height: 90px; }
+.champs-annotation-bandeau { gap: 6px; padding: 6px 8px; justify-content: stretch; }
+.ligne-champ-annotation { display: flex; flex: 1 1 0; min-height: 0; margin: 0; align-items: center; box-sizing: border-box;
+  padding: 0 8px; border: 1px solid color-mix(in srgb, var(--encre) 28%, transparent); border-radius: 8px; background: var(--surface); }
+.bandeau-annotation .ligne-champ-annotation input[type='text'] { font-size: 17px; font-weight: 700; min-height: 0; border: none; padding: 0; }
+.bandeau-annotation .ligne-champ-annotation .remarque-bandeau { font-size: 15px; font-weight: 500; border-top: none; padding-top: 0; }
+body.mode-telephone .bandeau-annotation .ligne-champ-annotation input[type='text'] { font-size: 15px; }
+body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 130px); }
+
+/* 0.183.0 (demande du 09.11) : encadré d'une annotation touchée sur le plan (Plan et Annotation) : nom, remarques, photos. */
+.encadre-annotation { pointer-events: auto; width: min(100%, 360px); box-sizing: border-box; padding: 10px 12px; border-radius: 14px;
+  background: var(--surface); color: var(--encre); border-left: 5px solid #7c4a1e; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  display: flex; flex-direction: column; gap: 6px; max-height: 45vh; overflow-y: auto; }
+.entete-encadre-annotation { display: flex; align-items: center; gap: 8px; }
+.entete-encadre-annotation strong { font-size: 1.05rem; color: #7c4a1e; }
+.entete-encadre-annotation span { flex: 1; font-size: 12px; opacity: 0.7; }
+.fermer-encadre-annotation { width: 36px; height: 36px; border: none; border-radius: 50%; background: color-mix(in srgb, var(--encre) 10%, transparent); font-size: 22px; line-height: 1; color: var(--encre); }
+.encadre-annotation ul { margin: 0; padding-left: 18px; font-size: 14px; }
+.photos-encadre-annotation { display: flex; flex-wrap: wrap; gap: 8px; }
+.photos-encadre-annotation .miniature { border: 0; padding: 0; background: none; }
+.photos-encadre-annotation img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; display: block; }
+
+/* 0.184.0 (demande du 09.11) : dessin sur photo : outil Texte (zone de saisie au-dessus de la photo). */
+.saisie-texte-dessin { display: flex; gap: 8px; padding: 6px 8px; align-items: center; }
+.saisie-texte-dessin[hidden] { display: none; }
+.saisie-texte-dessin input { flex: 1; min-width: 0; min-height: 44px; font-size: 16px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--bordure); }

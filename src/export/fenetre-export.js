@@ -16,9 +16,10 @@ let derniereAdresse = null;
  * Ouvre la fenêtre. titre : ce qu'on exporte ; formats : [[cle, titre, detail]] ou null ;
  * options : [{ cle, texte, formats }] cases à cocher (visibles pour ces formats) ;
  * fabriquer(format, choix) : { blob, nom } (le fichier ; choix = { cle: vrai / faux }) ; enregistrer(blob, nom) : téléchargement ;
+ * boutonsEnPlus : [{ titre, detail, faire }] boutons d'une autre action (0.171.0 : « Enregistrer dans le levé » de la Mesure rapide) ;
  * message(texte) : petit message à l'écran ; quandFerme() : appelé quand la fenêtre se ferme (fichier suivant…).
  */
-export function ouvrirFenetreExport({ titre, resume = null, formats = null, options = [], fabriquer, enregistrer, message, quandFerme = null }) {
+export function ouvrirFenetreExport({ titre, resume = null, formats = null, options = [], boutonsEnPlus = [], fabriquer, enregistrer, message, quandFerme = null }) {
   const adresses = lireListesPartagees().adresses;
   let format = formats?.[0]?.[0] ?? null;
   // Aperçu (0.151.0) : pour un PDF (format « pdf », ou fichier unique en .pdf).
@@ -37,6 +38,7 @@ export function ouvrirFenetreExport({ titre, resume = null, formats = null, opti
     ${resume ? `<p class="resume-export">${echapper(resume)}</p>` : ''}
     ${options.map((o) => `<label class="case option-export" data-option="${echapper(o.cle)}" ${o.formats.includes(format) ? '' : 'hidden'}><input type="checkbox" data-option-case="${echapper(o.cle)}" /> ${echapper(o.texte)}</label>`).join('')}
     <div class="boutons-choix">
+      ${boutonsEnPlus.map((b, i) => `<button type="button" class="bouton-secondaire" data-cle="plus-${i}"><strong>${echapper(b.titre)}</strong><span>${echapper(b.detail ?? '')}</span></button>`).join('')}
       <button type="button" class="bouton-secondaire bouton-apercu-pdf" data-cle="apercu" ${estPdf() ? '' : 'hidden'}><strong>👁 Aperçu</strong><span>voir le PDF avant de l'exporter</span></button>
       <button type="button" class="bouton" data-cle="enregistrer"><strong>Enregistrer</strong><span>sur cet appareil</span></button>
       <div class="envoi-mail seulement-intermediaire">
@@ -60,6 +62,11 @@ export function ouvrirFenetreExport({ titre, resume = null, formats = null, opti
     const cle = bouton.dataset.cle;
     if (cle === 'fermer') {
       fenetre.close();
+      return;
+    }
+    if (cle.startsWith('plus-')) {
+      fenetre.close();
+      boutonsEnPlus[Number(cle.slice(5))]?.faire();
       return;
     }
     const choix = Object.fromEntries(options.map((o) => [o.cle, o.formats.includes(format) && fenetre.querySelector(`[data-option-case="${o.cle}"]`).checked]));

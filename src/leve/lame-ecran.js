@@ -114,23 +114,23 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
       ${grosse('grader', 'Grader')}${grosse('bull', 'Bull')}${grosse('rateau', 'Râteau')}
     </div>`;
   }
-  const nomMachine = { grader: 'Grader', bull: 'Bull', rateau: 'Râteau' }[machine];
   return `<div data-machine="${machine}" class="ecran-lame ${indic === 'regle' ? 'essai-sur-regle' : 'essai-exterieur'} ${machine === 'rateau' ? '' : 'lame-un-point'}">
     <div class="ligne-lame">
-      <button type="button" class="bouton-retour-machine" data-action="retourChoixMachine" aria-label="Changer de machine" title="Changer de machine">← <strong>${nomMachine}</strong></button>
       ${surfaces.length > 0
-        ? `<select data-champ="surface-lame" aria-label="Levé à suivre">
-            ${surfaces.some((s) => s.id === surfaceId) ? '' : '<option value="" selected>— levé à suivre —</option>'}
+        ? `<select data-champ="surface-lame" aria-label="Surface à suivre">
+            ${surfaces.some((s) => s.id === surfaceId) ? '' : '<option value="" selected>— surface à suivre —</option>'}
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
-        : '<p class="vide">Aucun levé (Terrain › Lever).</p>'}
+        : '<p class="vide">Aucune surface.</p>'}
       <button type="button" class="bouton-bip ${bip ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${bip}" title="${bip ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${bip ? 'Couper le bip' : 'Remettre le bip'}">${bip ? '🔔' : '🔕'}</button>
-      <button type="button" class="bouton-lignes-guidage seulement-expert ${donnees.choixLignes ? 'actif' : ''}" data-action="choisirLignesGuidage" title="Choisir 1 ou 2 lignes à suivre">Lignes${(donnees.lignes ?? []).length ? ` (${donnees.lignes.length})` : ''}</button>
       <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Réglages">⚙</button>
       ${bulle('lame')}
+      <div class="choix-coupes-bandeau" role="group" aria-label="Coupes montrées">
+        ${puce('choisirCoupesBandeau', 'gd', 'G – D', vue === 'plan1' && coupeSeule === 'gd')}${puce('choisirCoupesBandeau', 'long', 'Arr – Av', vue === 'plan1' && coupeSeule === 'long')}${puce('choisirCoupesBandeau', 'deux', '2 coupes', vue !== 'plan1')}
+      </div>
     </div>
     ${reglagesOuverts ? reglages : ''}
-    ${donnees.recepteur2 || unGnss ? '' : '<button type="button" class="bouton-secondaire bouton-recepteur-2" data-action="ouvrirRecepteur">Connecter le 2e GNSS</button>'}
+    ${donnees.recepteur2 || unGnss ? '' : '<button type="button" class="bouton-secondaire bouton-recepteur-2" data-action="ouvrirRecepteur"><span class="t-long">Connecter le 2e GNSS</span><span class="t-court">+ 2e GNSS</span></button>'}
     ${htmlLignesSuivies(donnees)}
     <p class="raison-lame" data-vivant="lame-raison" hidden></p>
     <div class="coupes-guidage vue-${vue}">
@@ -150,40 +150,36 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
 }
 
 /**
- * Lignes suivies (0.154.0, Expert) : pendant le choix, le rappel « touche une ligne » ; pour chaque
- * ligne, son bandeau (écart en plan, rempli en direct), le bout mesuré (G / D) et × pour l'enlever.
+ * Lignes suivies (0.154.0, Expert ; 0.171.0, maquette B du 09.11) : une seule rangée de deux cases, L1 (bord G) et
+ * L2 (bord D). Toucher une case = choisir (ou changer) sa ligne sur le plan ; × l'enlève. L'écart en plan est rempli
+ * en direct. Les mêmes cases sont aussi dans la bande du bas (L1 / L2), qui touchent ces boutons.
  */
 function htmlLignesSuivies(donnees) {
   const lignes = donnees.lignes ?? [];
-  if (!donnees.choixLignes && lignes.length === 0) return '';
-  const choix = donnees.choixLignes
-    ? `<p class="invite-choix invite-courte"><strong>Touche une ligne sur le plan (2 au plus)</strong> <button type="button" class="bouton-lien" data-action="choisirLignesGuidage">terminé</button></p>`
-    : '';
-  const bout = (i, cle, titre, actif) => `<button type="button" class="puce-choix petite ${actif ? 'actif' : ''}" data-action="boutLigneGuidage" data-valeur="${i}:${cle}">${titre}</button>`;
-  return `<div class="lignes-guidage">${choix}
-    <div class="bandeaux-lignes">${lignes.map((l, i) => `<div class="bandeau-ligne attente" data-vivant="lame-ligne-${i}">
-        <span class="nom-ligne couleur-${l.nom}">${l.nom}</span>
-        <span class="bouts-ligne">${bout(i, 'gauche', 'bout G', l.bout === 'gauche')}${bout(i, 'droite', 'bout D', l.bout !== 'gauche')}</span>
-        <strong class="ecart-ligne">—</strong>
-        <button type="button" class="bouton-lien" data-action="enleverLigneGuidage" data-valeur="${i}" aria-label="Enlever ${l.nom}">×</button>
-      </div>`).join('')}</div>
-  </div>`;
+  const enChoix = donnees.choixLignes;
+  const carte = (slot) => {
+    const l = lignes.find((x) => x.slot === slot);
+    const nom = `L${slot + 1}`;
+    const texte = l ? '—' : enChoix === slot ? 'touche le plan' : '+ choisir';
+    return `<div class="carte-ligne-guidage ${l ? 'choisie attente' : 'sans-ligne'} ${enChoix === slot ? 'en-choix' : ''}" data-vivant="lame-ligne-${slot}">
+      <button type="button" class="corps-carte-ligne" data-action="choisirLignesGuidage" data-valeur="${slot}" aria-label="Choisir la ligne ${nom}">
+        <span class="nom-ligne couleur-${nom}">${nom}</span><small>${slot === 0 ? 'bord G' : 'bord D'}</small><strong class="ecart-ligne">${texte}</strong></button>
+      ${l ? `<button type="button" class="bouton-lien" data-action="enleverLigneGuidage" data-valeur="${slot}" aria-label="Enlever ${nom}">×</button>` : ''}
+    </div>`;
+  };
+  return `<div class="cartes-lignes seulement-expert">${carte(0)}${carte(1)}</div>`;
 }
 
 /**
- * Place de la silhouette (0.155.0) : au milieu du trait de l'outil, tournée selon le VRAI dévers (pas
- * celui des hauteurs agrandies), à la largeur du tranchant, mais jamais plus haute que 70 % de la
- * coupe ni plus petite que la moitié (un râteau court reste lisible).
+ * Place de la silhouette (0.170.0, demande du 09.11) : au milieu du trait de l'outil, TOUJOURS à la largeur
+ * G – D (le tranchant = de G à D) et tournée comme le trait dessiné (hauteurs agrandies comprises, pour
+ * qu'elle suive la ligne rouge). Ce qui dépasse en haut est simplement coupé par le cadre.
  */
-function placeSilhouette(a, b, x, y, hauteur) {
-  const xa = x(a.distance);
-  const xb = x(b.distance);
-  const pixelsParMetre = Math.abs(xb - xa) / Math.max(1e-6, Math.abs(b.distance - a.distance));
-  const angle = (Math.atan2(-(b.altitude - a.altitude) * pixelsParMetre, xb - xa) * 180) / Math.PI;
-  const yMilieu = (y(a.altitude) + y(b.altitude)) / 2;
-  // La plus haute silhouette fait environ 110 de haut au-dessus du tranchant : elle doit tenir au-dessus.
-  const echelle = Math.max(0.35, Math.min(Math.abs(xb - xa) / 80, (yMilieu - 4) / 110));
-  return { x: (xa + xb) / 2, y: yMilieu, angle, echelle };
+function placeSilhouette(a, b, x, y) {
+  const [xa, xb, ya, yb] = [x(a.distance), x(b.distance), y(a.altitude), y(b.altitude)];
+  const angle = (Math.atan2(yb - ya, xb - xa) * 180) / Math.PI;
+  const largeur = Math.hypot(xb - xa, yb - ya);
+  return { x: (xa + xb) / 2, y: (ya + yb) / 2, angle, echelle: Math.max(0.05, largeur / 80) };
 }
 
 /** Triangle pointe en haut (monter) ou en bas (descendre), en SVG (0.152.0, à côté de la règle). */
@@ -234,14 +230,14 @@ export function rafraichirLame(conteneur, vivant) {
     const hauteur = vue?.contains('vue-coupes') ? 230 : vue?.contains('vue-plan2') ? 220 : 150;
     const marquesLignes = cle === 'gd' ? (vivant.lignes ?? []).filter((l) => l.surCoupe != null) : [];
     const machine = cadre.closest('.ecran-lame')?.dataset.machine ?? 'grader';
-    cadre.innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite], hauteur, marquesLignes, { machine, vue: cle }) : '';
+    cadre.innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite], hauteur, marquesLignes, { machine, vue: cle, penteEngin: vivant.penteEngin ?? null }) : '';
   }
-  // Lignes suivies (0.154.0) : écart en plan, flèche vers la ligne (◀ à gauche, ▶ à droite).
-  (g ? vivant.lignes ?? [] : []).forEach((l, i) => {
-    const bandeau = zone(`lame-ligne-${i}`);
-    if (!bandeau) return;
-    bandeau.className = `bandeau-ligne ${l.classe ? `ecart-${l.classe}` : 'attente'}`;
-    const ecart = bandeau.querySelector('.ecart-ligne');
+  // Lignes suivies : écart en plan dans la case L1 (bord G) ou L2 (bord D), flèche vers la ligne (◀ à gauche, ▶ à droite).
+  (g ? vivant.lignes ?? [] : []).forEach((l) => {
+    const carte = zone(`lame-ligne-${l.slot}`);
+    if (!carte) return;
+    carte.className = `carte-ligne-guidage choisie ${l.classe ? `ecart-${l.classe}` : 'attente'}`;
+    const ecart = carte.querySelector('.ecart-ligne');
     if (ecart) ecart.textContent = l.ecart == null ? 'pas de croisement' : `${l.ecart < 0 ? '◀ ' : ''}${Math.abs(l.ecart).toFixed(2)} m${l.ecart > 0 ? ' ▶' : ''}`;
   });
   // Sous la coupe G – D : dévers (et écart au centre d'un outil à 1 GNSS), bords de la surface.
@@ -308,10 +304,21 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []
     // Lame vue de côté (0.153.1) : le terrain et un seul point, le bas de la lame (pas de trait).
     const xc = x(coupe.centre.distance);
     const yc = y(coupe.centre.altitude);
-    // Silhouette de côté (0.155.0) : taille fixe à l'écran (les hauteurs agrandies ne la déforment pas).
-    const machineDeCote = outil ? silhouetteOutil(outil.machine, 'long', { x: xc, y: yc, echelle: Math.max(0.35, Math.min(0.7, (yc - 4) / 110)) }) : '';
+    // Silhouette de côté (0.155.0) : taille fixe à l'écran (les hauteurs agrandies ne la déforment pas) ; 0.171.0 : inclinée
+    // comme l'engin (pente du 1er GNSS, vraie pente, avant à droite : avant plus haut = rotation vers le haut).
+    const pente = outil?.penteEngin;
+    const angleEngin = pente == null ? 0 : -(Math.atan(pente / 100) * 180) / Math.PI;
+    const machineDeCote = outil ? silhouetteOutil(outil.machine, 'long', { x: xc, y: yc, angle: angleEngin, echelle: Math.max(0.35, Math.min(0.7, (yc - 4) / 110)) }) : '';
+    // Pentes du terrain derrière et devant la lame (surface suivie, avec le delta Z), en % : + = ça monte vers l'avant.
+    const pentePar = (d1, d2) => (d2 - d1 > 0.2 ? ((altitudeA(d2) - altitudeA(d1)) / (d2 - d1)) * 100 : null);
+    const signe = (v) => (v == null ? '—' : `${Math.abs(v) < 0.05 ? '' : v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)} %`);
+    const derriere = pentePar(0, coupe.centre.distance);
+    const devant = pentePar(coupe.centre.distance, longueur);
+    const texteEngin = outil ? `<text x="${largeur * 0.4}" y="12" text-anchor="middle" class="texte-pente-engin">Engin ${pente == null ? '—' : signe(pente)}</text>` : '';
+    const textesPentes = `<text x="6" y="${hauteur - 17}" class="note-coupe-lame texte-pente-terrain">derrière ${signe(derriere)}</text>
+      <text x="${largeur - 6}" y="${hauteur - 17}" text-anchor="end" class="note-coupe-lame texte-pente-terrain">devant ${signe(devant)}</text>`;
     return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-coupe-guidage" role="img" aria-label="Coupe Arr – Av : bas de la lame">
-      ${machineDeCote}${marques}${surface}${pentes}
+      ${machineDeCote}${marques}${surface}${pentes}${texteEngin}${textesPentes}
       <circle class="coin-coupe-lame point-lame-${pire}" cx="${xc.toFixed(1)}" cy="${yc.toFixed(1)}" r="6" />
       <text x="6" y="${hauteur - 3}">◂ Arr</text>
       <text x="${largeur - 6}" y="${hauteur - 3}" text-anchor="end">Av ▸</text>
@@ -335,7 +342,7 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []
     })
     .join('');
   return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-coupe-guidage" role="img" aria-label="Coupe ${noms[0]} – ${noms[1]}">
-    ${outil ? silhouetteOutil(outil.machine, outil.vue, placeSilhouette(a, b, x, y, hauteur)) : ''}
+    ${outil ? silhouetteOutil(outil.machine, outil.vue, placeSilhouette(a, b, x, y)) : ''}
     ${marques}
     ${surface}
     ${pentes}

@@ -50,6 +50,7 @@ export const SECTIONS = [
   ['surface', 'Surface Import'],
   ['dessin', 'Dessin'],
   ['metre', 'Métré'],
+  ['annotation', 'Annotations'],
 ];
 
 const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? []).flatMap((l) => l.noms), ...(s.points ?? [])];
@@ -64,7 +65,7 @@ const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? [])
 export function listesDePoints(projet) {
   const cachees = new Set(projet.listesCachees ?? []);
   const listes = [];
-  const SECTION_DE = { cadastre: 'cadastre', fichier: 'points', ajoutes: 'points', autres: 'leve', controle: 'controle', dessin: 'dessin', metre: 'metre', mesures: 'metre', importee: 'surface' };
+  const SECTION_DE = { cadastre: 'cadastre', fichier: 'points', ajoutes: 'points', autres: 'leve', annotation: 'annotation', controle: 'controle', dessin: 'dessin', metre: 'metre', mesures: 'metre', importee: 'surface' };
   const couleurs = projet.couleursListes ?? {};
   const ajouter = (id, nom, nature, leveId, noms) => {
     const section = SECTION_DE[nature] ?? 'leve';
@@ -96,7 +97,7 @@ export function listesDePoints(projet) {
   }
   // Mesures faites à la main (pas d'un métré) : une seule case, pour leurs traits et leurs valeurs.
   if ((projet.mesures ?? []).some((m) => !m.metreId)) ajouter(LISTE_MESURES, 'Mesures', 'mesures', null, new Set());
-  for (const autres of projet.autres ?? []) ajouter(autres.id, autres.nom, 'autres', autres.leveId, new Set(nomsDeLaSurface(autres)));
+  for (const autres of projet.autres ?? []) ajouter(autres.id, autres.nom, autres.nature === 'annotation' ? 'annotation' : 'autres', autres.leveId, new Set(nomsDeLaSurface(autres)));
   // Recollements de réseaux (0.101.0) : leurs points, de la couleur du réseau (sauf couleur choisie).
   for (const r of projet.reseaux ?? []) {
     ajouter(r.id, r.nom, 'reseau', r.leveId, new Set(nomsDuRecollement(r)));

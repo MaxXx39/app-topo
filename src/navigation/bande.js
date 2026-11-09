@@ -35,10 +35,17 @@ const svg = (trace) => `<svg viewBox="0 0 24 24" aria-hidden="true">${trace}</sv
  * - reglages(), fermerAppli (ou null : pas de bouton) : pied de la page Applications ; avantPage() : juste
  *   avant d'ouvrir la page (fermer la page des réglages) ;
  * - partieProjet('import' | 'export' | 'contenu') : page Projet ouverte sur cette partie ; importPermis() ;
+ * - choisir(champ, valeur) : liste ou champ de la zone du milieu changé (data-nav-champ) ;
  * - agir(cle) : bouton de la zone du milieu touché (data-nav="action", ex. « prendre » = Enreg. Pts) ;
  * - message(texte) : message court à l'écran ; vibrer() (facultatif).
  * Renvoie { mettreAJour(), fermer(), ouvrirPage(), pageOuverte() }.
  */
+/** Titre d'application : en mode téléphone, la forme courte (`court`) si elle existe (0.172.0). */
+function titreAbrege(appli, titre) {
+  if (!appli?.court || titre !== appli.titre) return echapper(titre);
+  return `<span class="t-long">${echapper(titre)}</span><span class="t-court">${echapper(appli.court)}</span>`;
+}
+
 export function creerNavigation(nav, actions) {
   let pageOuverte = false;
   let deroulee = false;
@@ -136,6 +143,12 @@ export function creerNavigation(nav, actions) {
     }
     if (quoi === 'action') actions.agir?.(bouton.dataset.cle);
   }
+
+  // 0.167.0 : liste ou champ de la zone du milieu (surface à suivre, altitude voulue) : le choix est transmis.
+  nav.addEventListener('change', (evenement) => {
+    const champ = evenement.target.closest?.('[data-nav-champ]');
+    if (champ) actions.choisir?.(champ.dataset.navChamp, champ.value);
+  });
 
   /** Enlève une sélection de texte faite par l'appui long. */
   function sansSelection() {
@@ -371,12 +384,18 @@ export function creerNavigation(nav, actions) {
     document.body.classList.toggle('bande-action', info.includes('data-nav="action"'));
     const signature = JSON.stringify([courante, sous, info, deroulee, actions.titre?.(appli ?? {}) ?? '']);
     if (signature === derniereSignature) return;
+    // 0.171.0 : on tape dans un champ de la bande (altitude voulue) : on ne la redessine pas (le clavier se fermerait).
+    if (document.activeElement?.tagName === 'INPUT' && nav.contains(document.activeElement)) return;
     derniereSignature = signature;
     const active = sous.find((s) => s.actif) ?? null;
     const partieAppli = appli
-      ? `<button type="button" class="partie-appli" data-nav="appli" title="Menu des applications (appui long : favoris)">${svg(ICONE_LISTE)}<span>${echapper(actions.titre?.(appli) ?? appli.titre)}</span></button>`
+      ? `<button type="button" class="partie-appli" data-nav="appli" title="Menu des applications (appui long : favoris)">${svg(ICONE_LISTE)}<span>${titreAbrege(appli, actions.titre?.(appli) ?? appli.titre)}</span></button>`
       : `<button type="button" class="partie-appli applis" data-nav="appli" title="Revenir">${svg(ICONE_APPLIS)}<span>Applications</span></button>`;
-    const partieSous = sous.length > 0
+    // 0.171.0 : Lever : la nature du levé en cours est seulement écrite (pas de bouton, rien ne se déroule).
+    const infoSeule = sous.length > 0 && sous.every((x) => x.info);
+    const partieSous = infoSeule
+      ? (active ? `<span class="partie-sous info"><span>${echapper(active.titre)}</span></span>` : '')
+      : sous.length > 0
       ? `<button type="button" class="partie-sous ${deroulee ? 'ouverte' : ''}" data-nav="sous" aria-expanded="${deroulee}">
           <span>${echapper(active?.titre ?? 'Choisir')}</span><span class="fleche-sous">${deroulee ? '▸' : '▾'}</span></button>`
       : '';
@@ -385,6 +404,9 @@ export function creerNavigation(nav, actions) {
       : (vide ? '' : `<div class="zone-info-appli">${info}</div>`);
     nav.style.setProperty('--couleur-appli', appli?.couleur ?? '#1b2b36');
     nav.style.setProperty('--texte-appli', appli?.texte ?? '#ffffff');
+    // 0.185.0 : aussi sur la page, pour que les cadres et titres des écrans suivent la couleur de l'appli.
+    document.body.style.setProperty('--couleur-appli', appli?.couleur ?? '#1b2b36');
+    document.body.style.setProperty('--texte-appli', appli?.texte ?? '#ffffff');
     nav.classList.toggle('deroulee', deroulee);
     nav.classList.toggle('vide', vide);
     nav.innerHTML = `<div class="bouton-appli ${appli ? '' : 'neutre'}">${partieAppli}${partieSous}</div>${milieu}`;

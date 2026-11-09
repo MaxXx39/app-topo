@@ -204,6 +204,18 @@ export function creerAutres(projet, leve) {
   return autres;
 }
 
+/**
+ * Levé chantier (0.175.0) : comme un levé libre (lignes et points isolés, sans surface) mais ses points portent des
+ * attributs (point.chantier : libellé, nature, Ø, profondeur…) ; nommé « LV-Chant N ». cadres : ouvrages levés en 3 coins.
+ */
+export function creerChantier(projet, leve) {
+  projet.autres ??= [];
+  const numeros = projet.autres.map((a) => /^LV-Chant (\d+)$/.exec(a.nom)?.[1]).filter(Boolean).map(Number);
+  const chantier = { id: nouvelIdentifiant(), nom: `LV-Chant ${Math.max(0, ...numeros) + 1}`, nature: 'chantier', leveId: leve.id, contour: [], lignesRupture: [], points: [], cadres: [] };
+  projet.autres.push(chantier);
+  return chantier;
+}
+
 /** Ligne de rupture en cours du stock (la dernière ; créée s'il n'y en a pas). */
 export function ligneEnCours(surface) {
   if (surface.lignesRupture.length === 0) surface.lignesRupture.push(creerLigne());

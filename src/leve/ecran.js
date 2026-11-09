@@ -24,9 +24,10 @@ import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
 import { formaterNombre } from '../topo/format.js';
 import { ROLES_LEVE, debutDeNom } from '../topo/leve-direct.js';
 import { ROLES_METRE } from '../topo/metre.js';
-import { prefixeDuNom } from '../topo/surface.js';
+import { prefixeDuNom, avecPrefixe, dateDuJourCollee } from '../topo/surface.js';
 import { ELEMENTS_RESEAU } from '../topo/reseau.js';
 import { MATERIAUX } from './reseaux.js';
+import { DIAMETRES_LISTE, GAINES_LISTE, NOMBRES_LISTE } from '../topo/chantier.js';
 import { svgCoupeDirecte } from './coupe-directe.js';
 import { svgCoupeTalus } from './coupe-talus.js';
 import { svgCroquisTalus } from './croquis-talus.js';
@@ -62,15 +63,25 @@ export const LONGUEURS_COUPE = [2, 5, 10, 20];
 const NATURES_TERRAIN = [
   ['stock', 'Stock'],
   ['terrain', 'Terrain'], // terrain naturel et terrassement fusionnés (0.87.0)
+  ['terrassement', 'Terrassement'], // 0.168.0 : de nouveau proposé (demande du 09.11)
   // Recollement de réseaux (0.101.0, voir topo/reseau.js) : un levé par réseau (EU, EC…).
   ['reseau', 'Recollement'],
   // Ancien recollement (comme Terrain) : plus proposé, les levés déjà faits restent.
   ['recollement', 'Recollement (ancien)'],
   ['metre', 'Métré'],
+  ['chantier', 'Levé chantier'], // 0.175.0 : éléments en cours de chantier (Intermédiaire)
   ['autres', 'Levé libre'],
   // Surface d'un dessin (Calculs › Dessin) : pas créée ici, mais on la complète au RX2.
   ['surface', 'Surface'],
 ];
+// Petit texte sous chaque choix de « Que lèves-tu ? » (0.168.0).
+const DETAIL_NATURE = {
+  stock: 'Lever de stock',
+  terrain: 'Lever de terrain naturel',
+  terrassement: 'Lever terrassement en cours / fini',
+  chantier: 'Éléments en cours de chantier',
+  autres: 'Autres',
+};
 // Accroches : un dessin (en gris ce qu'on touche, en ambre l'endroit accroché) et un mot dessous.
 // [mot, nom complet (bulle, lecture d'écran), dessin].
 export const ACCROCHES = {
@@ -139,7 +150,9 @@ export function creerEcranLeve(conteneur, actions) {
   let reglagesGuidageOuverts = false; // roue ⚙ de l'écran de guidage
   let reglagesCoupesOuverts = false; // roue ⚙ des coupes d'Implanter › Surface (0.144.0)
   const elementsOuverts = new Set(); // lignes du levé dépliées en bas de Lever ('contour', 'ligne-2', 'isoles')
-  let accrochesOuvertes = false; // flèche de la barre d'accroche : les noms sous les dessins
+  let accrochesChoisies = false; // flèche de la barre d'accroche : les noms sous les dessins
+  // 0.167.0 : en Base les noms des accroches restent affichés, sans flèche pour les replier.
+  const accrochesOuvertes = () => estModeBase() || accrochesChoisies;
   let gestionControleOuverte = false; // mode Contrôler : roue ⚙ (après le code de sécurité)
   let erreurGestion = ''; // mode Contrôler : erreur de la gestion (tolérances, fichier, point tapé)
   let reglagesLameOuverts = false; // mode Lame : roue ⚙ (tolérances)
@@ -158,6 +171,12 @@ export function creerEcranLeve(conteneur, actions) {
   }, true);
 
   conteneur.addEventListener('click', (evenement) => {
+    const fleche = evenement.target.closest('[data-fleche]');
+    if (fleche) {
+      const defile = conteneur.querySelector(`[data-defile="${fleche.dataset.fleche}"]`);
+      defile?.scrollBy({ left: defile.clientWidth * 0.7, behavior: 'smooth' });
+      return;
+    }
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton || bouton.disabled) return;
     const { action } = bouton.dataset;
@@ -224,7 +243,7 @@ export function creerEcranLeve(conteneur, actions) {
       return;
     }
     if (action === 'basculerAccroches') {
-      accrochesOuvertes = !accrochesOuvertes;
+      accrochesChoisies = !accrochesChoisies;
       dessiner();
       return;
     }
@@ -276,7 +295,7 @@ export function creerEcranLeve(conteneur, actions) {
       actions.nouvelleSurface(bouton.dataset.valeur);
       const levee = donnees.stock;
       if (!levee) return;
-      demanderTexte({ titre: 'Nom du nouveau levé', valeur: levee.nom, prefixe: prefixeDuNom(levee) }).then((nom) => {
+      demanderTexte({ titre: 'Nom du nouveau levé', valeur: avecPrefixe(dateDuJourCollee(), prefixeDuNom(levee)), prefixe: prefixeDuNom(levee) }).then((nom) => {
         if (nom && nom !== levee.nom) actions.renommerLevee(levee.id, nom);
       });
       return;
@@ -299,6 +318,11 @@ export function creerEcranLeve(conteneur, actions) {
       actions.reglerTalus(bouton.dataset.champTalus, bouton.dataset.valeur);
       return;
     }
+    // (voir plus bas : flèches › des rangées du Chantier)
+    if (action === 'reglerChantier') {
+      actions.reglerChantier(bouton.dataset.champChantier, bouton.dataset.valeur);
+      return;
+    }
     if (action === 'reglerDelta') {
       actions.reglerDelta(bouton.dataset.champDelta, bouton.dataset.valeur);
       return;
@@ -313,6 +337,8 @@ export function creerEcranLeve(conteneur, actions) {
     const champ = evenement.target.dataset?.attributReseau;
     if (champ) saisieReseau[champ] = evenement.target.value;
     // Delta (0.139.0) : gardé à chaque frappe, sans redessiner (Enreg. Pts reste touchable tout de suite).
+    const champChantier = evenement.target.dataset?.chantier;
+    if (champChantier) actions.reglerChantier(champChantier, evenement.target.value, false);
     const delta = evenement.target.dataset?.delta;
     if (delta) {
       actions.reglerDelta(delta, evenement.target.value, false);
@@ -667,7 +693,7 @@ export function creerEcranLeve(conteneur, actions) {
           </div>
         </div>`
       : '';
-    return `<div class="barre-accroche ${enLigne ? 'accroches-ligne' : ''} ${accrochesOuvertes ? 'ouverte' : ''}">
+    return `<div class="barre-accroche ${enLigne ? 'accroches-ligne' : ''} ${accrochesOuvertes() ? 'ouverte' : ''}">
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
         ${modes.map((mode) => {
           const [mot, nom, dessin] = ACCROCHES[mode];
@@ -675,8 +701,8 @@ export function creerEcranLeve(conteneur, actions) {
             <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span class="mot-accroche">${mot}</span></button>`;
         }).join('')}
         ${outilsPoint}
-        <button type="button" class="bouton-deplier-accroches" data-action="basculerAccroches" title="${accrochesOuvertes ? 'Cacher' : 'Voir'} les noms" aria-label="${accrochesOuvertes ? 'Cacher' : 'Voir'} les noms des accroches" aria-expanded="${accrochesOuvertes}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${accrochesOuvertes ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}" /></svg></button>
+        ${estModeBase() ? '' : `<button type="button" class="bouton-deplier-accroches" data-action="basculerAccroches" title="${accrochesOuvertes() ? 'Cacher' : 'Voir'} les noms" aria-label="${accrochesOuvertes() ? 'Cacher' : 'Voir'} les noms des accroches" aria-expanded="${accrochesOuvertes()}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${accrochesOuvertes() ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}" /></svg></button>`}
       </div>
       ${outilsManuel}
     </div>`;
@@ -1076,11 +1102,11 @@ export function creerEcranLeve(conteneur, actions) {
   function choixNature() {
     // 0.161.0 : Lever = Stock / Terrain / Libre ; Recollement et Métré sont des applications à part.
     if (choixReseauOuvert || donnees.famille === 'reseau') return choixReseau();
-    const permises = donnees.famille === 'metre' ? ['metre'] : ['stock', 'terrain', 'autres'];
+    const permises = donnees.famille === 'metre' ? ['metre'] : ['stock', 'terrain', 'terrassement', 'chantier', 'autres'];
     return `<div class="choix-nature">
       <p class="titre-choix">${donnees.famille === 'metre' ? 'Nouveau métré' : 'Que lèves-tu ?'}</p>
       <div class="natures-terrain">
-        ${NATURES_TERRAIN.filter(([cle]) => permises.includes(cle) && (!estModeBase() || NATURES_BASE.includes(cle))).map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}">${titre}</button>`).join('')}
+        ${NATURES_TERRAIN.filter(([cle]) => permises.includes(cle) && (!estModeBase() || NATURES_BASE.includes(cle))).map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}"><span>${titre}</span>${DETAIL_NATURE[cle] ? `<small>${DETAIL_NATURE[cle]}</small>` : ''}</button>`).join('')}
       </div>
       ${donnees.stock ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerChoixNature">annuler</button>' : ''}
     </div>`;
@@ -1116,12 +1142,17 @@ export function creerEcranLeve(conteneur, actions) {
     // 0.151.0 : fermé = petit bouton « Δ » à droite de la position (voir cadrePrise).
     if (!d.ouvert && !d.actif) return '';
     const sens = (cle, mot) => `<button type="button" class="bouton-sens-delta ${d.sens === cle ? 'actif' : ''}" data-action="reglerDelta" data-champ-delta="sens" data-valeur="${cle}" aria-pressed="${d.sens === cle}">${mot}</button>`;
+    // 0.168.0 : « Δ Delta » en titre, côté + distance sur une ligne, Z ± sur une autre, grande croix sur toute la hauteur.
     return `<div class="ligne-delta seulement-intermediaire ${d.actif ? 'actif' : ''}">
-        <span class="titre-delta" title="Décaler le prochain point">Δ</span>
-        <span class="sens-delta" role="group" aria-label="Côté du décalage">${sens('gauche', '◀ G')}${sens('droite', 'D ▶')}</span>
-        <label class="champ-delta">dist.<input type="text" inputmode="decimal" data-delta="distance" value="${echapper(d.distance)}" placeholder="0.000" autocomplete="off" /></label>
-        <label class="champ-delta">Z ±<input type="text" inputmode="decimal" data-delta="z" value="${echapper(d.z)}" placeholder="0.000" autocomplete="off" /></label>
-        <button type="button" class="bouton-lien bouton-lien-neutre" data-action="reglerDelta" data-champ-delta="effacer" aria-label="Remettre le delta à zéro">×</button>
+        <span class="titre-delta" title="Décaler le prochain point"><i>Δ</i> Delta</span>
+        <div class="rang-delta rang-lateral">
+          <span class="sens-delta" role="group" aria-label="Côté du décalage">${sens('gauche', '◀ G')}${sens('droite', 'D ▶')}</span>
+          <label class="champ-delta">dist.<input type="text" inputmode="decimal" data-delta="distance" value="${echapper(d.distance)}" placeholder="0.000" autocomplete="off" /></label>
+        </div>
+        <div class="rang-delta rang-z">
+          <label class="champ-delta">Z ±<input type="text" inputmode="decimal" data-delta="z" value="${echapper(d.z)}" placeholder="0.000" autocomplete="off" /></label>
+        </div>
+        <button type="button" class="bouton-fermer-delta" data-action="reglerDelta" data-champ-delta="effacer" title="Fermer le delta (remis à zéro)" aria-label="Fermer le delta (remis à zéro)">×</button>
       </div>`;
   }
 
@@ -1358,6 +1389,7 @@ export function creerEcranLeve(conteneur, actions) {
    */
   function choixLibelle() {
     if (donnees.role === 'contour') return '';
+    if (donnees.chantier) return cadreChantier();
     // Liste de libellés selon le rôle : aires (métré), lignes (lignes de rupture, longueurs), points.
     const sorte = sorteDuRole();
     const liste = donnees.libelles[sorte];
@@ -1369,6 +1401,58 @@ export function creerEcranLeve(conteneur, actions) {
       <button type="button" class="bouton-crayon-libelles" data-action="modifierLibelles" data-valeur="${sorte}" title="Ajouter ou modifier des libellés" aria-label="Ajouter ou modifier des libellés">⚙</button>
     </div>
 `;
+  }
+
+  /**
+   * Levé chantier (0.175.0, compact en 0.175.5, maquette validée le 09.11) : une rangée de libellés (noms courts, flèche › si
+   * trop nombreux), une rangée de natures, puis sur une ligne la forme d'un ouvrage (Rond / Carré) et ce que touche le GNSS
+   * (Dessus / Tampon / FE), puis les attributs (Ø, profondeur, matériau, remarque) sur une seule ligne. La FORME du point
+   * sur le plan vient du libellé, sa COULEUR de la nature.
+   */
+  function cadreChantier() {
+    const c = donnees.chantier;
+    const l = c.libelle;
+    const couleurNature = c.couleursNatures[c.nature] ?? '#6b7280';
+    const bouton = (champ, valeur, texte, actif) => `<button type="button" class="${actif ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="${champ}" data-valeur="${echapper(valeur)}" aria-pressed="${actif}">${texte}</button>`;
+    const nomsMode = { dessus: 'Dessus', tampon: 'Tampon', fe: 'FE' };
+    const rangee = (cle, contenu, aide) => `<div class="rangee-chantier"><div class="defile-chantier" data-defile="${cle}">${contenu}</div><button type="button" class="fleche-chantier" data-fleche="${cle}" hidden aria-label="${aide}">›</button></div>`;
+    const champ = (nom, titre, valeur, classe, { mode = 'decimal', indice = '' } = {}) => `<label class="champ-chantier ${classe}"><span>${titre}</span>
+        <input type="text" inputmode="${mode}" data-chantier="${nom}" value="${echapper(valeur)}" placeholder="${echapper(indice)}" autocomplete="off" /></label>`;
+    const diametreRequis = l.modes[0] === 'dessus' && c.mode === 'dessus';
+    const diametreVide = l.champs.includes('gaine') ? !c.gaine : !(Number(String(c.diametre).replace(',', '.')) > 0);
+    const calcul = l.modes[0] === 'dessus' && c.mode === 'dessus'
+      ? (diametreVide ? '<p class="calcul-chantier erreur">Le Ø est obligatoire pour lever le dessus</p>' : '<p class="calcul-chantier">FE = dessus − Ø extérieur</p>')
+      : l.ouvrage && c.mode === 'tampon' ? '<p class="calcul-chantier">Radier = tampon − profondeur</p>' : '';
+    const coins = l.ouvrage && c.forme === 'rect'
+      ? `<p class="suivi-cadre">${[1, 2, 3].map((i) => `<span class="coin ${c.coinsFaits >= i ? 'fait' : c.coinsFaits + 1 === i ? 'en-cours' : ''}">${i}</span>`).join('')} Coin ${Math.min(c.coinsFaits + 1, 3)} sur 3, dans n'importe quel ordre</p>`
+      : '';
+    const dernier = c.dernierCadre && l.ouvrage
+      ? `<p class="dernier-cadre">Dernier cadre ${echapper(c.dernierCadre.nom)} : ${c.dernierCadre.longueur.toFixed(2)} × ${c.dernierCadre.largeur.toFixed(2)} m · direction ${c.dernierCadre.direction.toFixed(1)}° · angle droit à ${c.dernierCadre.ecart.toFixed(1)}°</p>`
+      : '';
+    const reglages = [
+      l.ouvrage ? `<span class="mini-bascule">${bouton('forme', 'ronde', '<i class="ico-forme rond"></i>Rond', c.forme === 'ronde')}${bouton('forme', 'rect', '<i class="ico-forme carre"></i>Carré', c.forme === 'rect')}</span>` : '',
+      l.modes.length > 1 ? `<span class="mini-bascule">${l.modes.map((m) => bouton('mode', m, nomsMode[m], m === c.mode)).join('')}</span>` : '',
+    ].join('');
+    const materiaux = MATERIAUX.includes(c.materiau) || !c.materiau ? MATERIAUX : [...MATERIAUX, c.materiau];
+    const liste = (nom, titre, options, valeur, classe, vide) => `<label class="champ-chantier ${classe}"><span>${titre}</span><select data-chantier="${nom}" aria-label="${echapper(titre)}">${vide ? '<option value="">—</option>' : ''}${options.map(([v, t]) => `<option value="${v}" ${String(v) === String(valeur) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
+    // Ø : liste (une valeur tapée avant, absente de la liste, reste proposée).
+    const diametres = DIAMETRES_LISTE.map((d) => [d, d]);
+    if (c.diametre && !DIAMETRES_LISTE.includes(Number(c.diametre))) diametres.push([c.diametre, c.diametre]);
+    return `<div class="chantier-leve" role="group" aria-label="Ce que l'on lève sur le chantier">
+      ${rangee('libelles', c.libelles.map((lib) => `<button type="button" class="chip-chantier ${lib.abreviation === l.abreviation ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="libelle" data-valeur="${echapper(lib.abreviation)}" title="${echapper(lib.nom)}"><i class="symbole-libelle" style="color: ${couleurNature}">${symboleDeForme(lib.forme)}</i>${echapper(lib.court || lib.nom)}</button>`).join('') + '<button type="button" class="bouton-crayon-libelles seulement-expert" data-action="modifierChantier" title="Modifier la bibliothèque du chantier" aria-label="Modifier la bibliothèque du chantier">⚙</button>', 'Plus de libellés')}
+      ${rangee('natures', c.natures.map((n) => `<button type="button" class="nat-chantier ${n === c.nature ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="nature" data-valeur="${echapper(n)}"><i style="background: ${c.couleursNatures[n] ?? '#6b7280'}"></i>${echapper(n)}</button>`).join(''), 'Plus de natures')}
+      ${reglages ? `<div class="reglages-chantier">${reglages}${bulle('chantier')}</div>` : ''}
+      <div class="attributs-chantier">
+        ${l.champs.includes('diametre') ? liste('diametre', 'Ø', diametres, c.diametre, `d ${diametreRequis && diametreVide ? 'manque' : ''}`, true) : ''}
+        ${l.champs.includes('gaine') ? liste('gaine', 'Ø', GAINES_LISTE.map(([i, x]) => [`${i}/${x}`, `${i} / ${x}`]), c.gaine, `g ${diametreRequis && !c.gaine ? 'manque' : ''}`, true) : ''}
+        ${l.champs.includes('nombre') ? liste('nombre', 'Nb', NOMBRES_LISTE.map((n) => [n, n]), c.nombre, 'n', false) : ''}
+        ${l.champs.includes('profondeur') && c.mode === 'tampon' ? champ('profondeur', 'Prof.', c.profondeur, 'p') : ''}
+        ${l.champs.includes('materiau') ? `<label class="champ-chantier m"><select data-chantier="materiau" aria-label="Matériau">${materiaux.map((m) => `<option ${m === c.materiau ? 'selected' : ''}>${echapper(m)}</option>`).join('')}</select></label>` : ''}
+        ${l.champs.includes('remarque') ? champ('remarque', 'Rem.', c.remarque, 'r', { mode: 'text', indice: 'facultatif' }) : ''}
+        <label class="bouton-photo-levee photo-chantier" title="Photo du prochain point" aria-label="Photo du prochain point"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg><input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden /></label>
+      </div>
+      ${calcul}${coins}${dernier}
+    </div>`;
   }
 
   /** Liste de libellés du rôle choisi : 'aires' (métré), 'lignes' (lignes, longueurs) ou 'points'. */
@@ -1575,7 +1659,7 @@ export function creerEcranLeve(conteneur, actions) {
     // Barre d'accroche collée sous le plan (téléphone, voir style.css « avec-accroches »).
     const avecAccroches = donnees.mode === 'controler' && !enGuidage && ['point', 'ligne', 'talus'].includes(implantation);
     document.body.classList.toggle('avec-accroches', avecAccroches);
-    document.body.classList.toggle('accroches-ouvertes', avecAccroches && accrochesOuvertes);
+    document.body.classList.toggle('accroches-ouvertes', avecAccroches && accrochesOuvertes());
     if (!enGuidage || (!autocontrole && implantation !== 'point')) document.body.classList.remove('cible-en-haut');
     // Guidage (0.152.0) : vue « 2 coupes sans plan » : le plan est caché.
     document.body.classList.toggle('guidage-sans-plan', donnees.mode === 'lame' && donnees.lame?.vue === 'coupes');
@@ -1594,6 +1678,18 @@ export function creerEcranLeve(conteneur, actions) {
         </div>`;
     rafraichirVivant();
     tournerBoussole();
+    majFlechesChantier();
+  }
+
+  /** Flèches › des rangées de libellés et de natures du Chantier : visibles seulement s'il reste du contenu à droite. */
+  function majFlechesChantier() {
+    for (const defile of conteneur.querySelectorAll('[data-defile]')) {
+      const fleche = conteneur.querySelector(`[data-fleche="${defile.dataset.defile}"]`);
+      if (!fleche) continue;
+      const maj = () => { fleche.hidden = !(defile.scrollWidth > defile.clientWidth + 2 && defile.scrollLeft + defile.clientWidth < defile.scrollWidth - 2); };
+      maj();
+      defile.addEventListener('scroll', maj, { passive: true });
+    }
   }
 
   /** Tourne l'aiguille de la boussole selon le dernier cap de la tablette. */

@@ -89,11 +89,20 @@ export const PREFIXE_LEVE = 'LV-';
 export const PREFIXE_SURFACE = 'Surf-';
 // Surface Swisstopo (0.109.0) : « SWISSTOP 1 », préfixe fixe comme les autres.
 export const PREFIXE_SWISSTOP = 'SWISSTOP ';
+// Annotations (0.177.0, renommé 0.179.0) : « Annot-20261109 », préfixe fixe, jamais « LV- » (ce n'est pas un levé).
+export const PREFIXE_ANNOTATION_LISTE = 'Annot-';
 
 /** Préfixe du nom de ce levé ou de cette surface. */
 export function prefixeDuNom(objet) {
   if (objet?.type === 'swisstopo') return PREFIXE_SWISSTOP;
+  if (objet?.nature === 'annotation') return PREFIXE_ANNOTATION_LISTE;
   return estImportee(objet) || objet?.nature === 'surface' ? PREFIXE_SURFACE : PREFIXE_LEVE;
+}
+
+/** Date du jour collée : année, mois, jour, sans espace ni tiret (ex. 20261109). Nom de départ d'un nouveau levé (0.176.0). */
+export function dateDuJourCollee(date = new Date()) {
+  const deux = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}${deux(date.getMonth() + 1)}${deux(date.getDate())}`;
 }
 
 /** Nom avec ce préfixe au début (ajouté s'il n'y est pas déjà, majuscules ignorées). */

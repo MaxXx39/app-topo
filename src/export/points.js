@@ -19,6 +19,37 @@ export const FORMATS_POINTS = [
 // Titres des colonnes des infos complètes (CSV et PDF), dans l'ordre.
 export const TITRES_INFOS = ['Nom', 'Est (m)', 'Nord (m)', 'Altitude (m)', 'Rôle', 'Date', 'Heure', 'Précision H (m)', 'Précision V (m)', 'Qualité', 'Satellites', 'HDOP', 'Âge corrections (s)', 'Inclinaison (°)'];
 
+// Levé chantier (0.175.0) : colonnes en plus quand un point porte des attributs (point.chantier).
+export const TITRES_CHANTIER = ['Libellé', 'Nature', 'Forme', 'Ø (mm)', 'Ø int. (mm)', 'Altitude levée (m)', 'Fil d\'eau (m)', 'Radier (m)', 'Profondeur (m)', 'Matériau', 'Nombre', 'Remarque'];
+
+/** Vrai si un des points est un point du Levé chantier. */
+export const avecChantier = (points) => points.some((p) => p.chantier);
+
+/** Attributs d'un point du Levé chantier, en texte, dans l'ordre de TITRES_CHANTIER. */
+export function infosChantier(p) {
+  const c = p.chantier ?? {};
+  return [c.libelle ?? '', c.nature ?? '', c.forme === 'rect' ? '3 coins' : c.forme === 'ronde' ? '1 point' : '', c.diametre ?? '', c.diametreInterieur ?? '', nombre(c.altitudeLevee), nombre(c.filEau), nombre(c.radier), nombre(c.profondeur, 2), c.materiau ?? '', c.nombre ?? '', c.remarque ?? ''];
+}
+
+// Annotations (0.180.0) : colonnes propres quand un point est une annotation (point.annotation) : prise (loupe, GNSS, GPS
+// tablette), précision, date et heure de la prise, remarques (séparées par « | »).
+export const TITRES_ANNOTATION = ['Nom', 'Est (m)', 'Nord (m)', 'Altitude (m)', 'Date', 'Heure', 'Prise', 'Précision (m)', 'Remarques'];
+const PRISES = { loupe: 'loupe', gnss: 'GNSS', tablette: 'GPS tablette' };
+
+/** Vrai si un des points est une annotation. */
+export const avecAnnotation = (points) => points.some((p) => p.annotation);
+
+/** Infos d'une annotation, en texte, dans l'ordre de TITRES_ANNOTATION. */
+export function infosAnnotation(p) {
+  const a = p.annotation ?? {};
+  const le = a.le ? new Date(a.le) : null;
+  return [
+    p.nom, formaterNombre(p.est), formaterNombre(p.nord), p.altitude == null ? '' : formaterNombre(p.altitude),
+    le ? le.toLocaleDateString('fr-CH') : '', le ? le.toLocaleTimeString('fr-CH') : '',
+    PRISES[a.source] ?? '', nombre(a.precision, 2), (a.remarques ?? []).join(' | '),
+  ];
+}
+
 // Qualité de la position (message GGA du récepteur) : 4 = RTK fixe, 5 = RTK flottant…
 const QUALITES = { 1: 'autonome', 2: 'DGPS', 4: 'RTK fixe', 5: 'RTK flottant' };
 
@@ -62,18 +93,20 @@ export function infosDuPoint(p, roles = new Map()) {
  * « point isolé »), facultatif. Date et heure de la prise (heure de Suisse, sur l'appareil).
  */
 export function csvPoints(points, roles = new Map()) {
-  const lignes = [TITRES_INFOS, ...points.map((p) => infosDuPoint(p, roles))];
+  if (avecAnnotation(points)) return [TITRES_ANNOTATION, ...points.map(infosAnnotation)].map((ligne) => ligne.map(champ).join(';')).join('\r\n') + '\r\n';
+  const chantier = avecChantier(points);
+  const lignes = [chantier ? [...TITRES_INFOS, ...TITRES_CHANTIER] : TITRES_INFOS, ...points.map((p) => (chantier ? [...infosDuPoint(p, roles), ...infosChantier(p)] : infosDuPoint(p, roles)))];
   return lignes.map((ligne) => ligne.map(champ).join(';')).join('\r\n') + '\r\n';
 }
 
 /** Texte DXF des points (calques POINTS, NOMS, ALTITUDES). */
-export function dxfPoints(points) {
-  return genererDxf({ points });
+export function dxfPoints(points, chantier = null) {
+  return genererDxf({ points, chantier });
 }
 
 /** Fichier de la liste dans ce format : { blob, extension }. */
-export function fichierPoints(points, format, roles) {
+export function fichierPoints(points, format, roles, chantier = null) {
   if (format === 'csv') return { blob: new Blob(['﻿' + csvPoints(points, roles)], { type: 'text/csv;charset=utf-8' }), extension: 'csv' };
-  if (format === 'dxf') return { blob: new Blob([dxfPoints(points)], { type: 'application/dxf' }), extension: 'dxf' };
+  if (format === 'dxf') return { blob: new Blob([dxfPoints(points, chantier)], { type: 'application/dxf' }), extension: 'dxf' };
   return { blob: new Blob([txtPoints(points)], { type: 'text/plain;charset=utf-8' }), extension: 'txt' };
 }

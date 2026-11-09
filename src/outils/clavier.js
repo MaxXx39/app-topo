@@ -39,7 +39,11 @@ export function suivreClavier() {
     document.body.classList.toggle('clavier-ouvert', ouvert);
     if (ouvert && !avant) {
       // Le champ tapé revient au milieu de ce qui reste visible.
+      // (0.168.0 : le plan est caché clavier ouvert, la page se recale : on ramène le champ une 2e fois après.)
       requestAnimationFrame(() => champ.scrollIntoView({ block: 'center', behavior: 'auto' }));
+      setTimeout(() => {
+        if (document.activeElement === champ) champ.scrollIntoView({ block: 'center', behavior: 'auto' });
+      }, 250);
     }
   }
 

@@ -8,6 +8,10 @@ import { aAcces, rayonFormes, echelleTexte } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
 import { dessinerMesureRapide } from './mesure-rapide.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
+import { texteDuPoint } from '../topo/chantier.js';
+// Couleur des nuages d'Annotation (vert sarcelle de l'application ; au choix dans « Afficher »).
+const COULEUR_ANNOTATION = '#7c4a1e';
+import { lireLibellesChantier, lireNaturesChantier, couleurNatureChantier } from '../leve/libelles-chantier.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { bordDeTriangles, estSurfaceFichier } from '../topo/surface.js';
 import { formaterNombre } from '../topo/format.js';
@@ -114,7 +118,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 const DELAI_RETOUR_SUIVI = 5000;
 const DISTANCE_RETOUR_SUIVI = 2;
 
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
   // Réglages choisis ; « calques » est ce qui est dessiné : en dessous d'Expert, les réglages
   // d'Expert gardent leur valeur de départ.
   const calquesChoisis = { ...CALQUES_DEPART };
@@ -410,6 +414,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Couleur choisie pour le libellé du nom (P-RG-1 : regard en noir…), à la place de celle du rôle.
     const libelles = lireLibelles();
     const rayon = rayonFormes(); // taille des formes (réglage de l'appareil)
+    const chantierLib = lireLibellesChantier();
+    const couleursNat = lireNaturesChantier().couleurs;
     const echelle = echelleTexte(); // taille du texte (réglage de l'appareil)
     // 0.126.0 : beaucoup de points visibles → dessinés sur le canvas (couleurs des rôles lues dans style.css).
     const versCanvas = visibles.length > SEUIL_POINTS_CANVAS;
@@ -418,14 +424,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     for (const { point, x, y } of visibles) {
       if (calques.points || rangs.has(point.nom)) {
         // Forme choisie pour le libellé (0.97.0) : rond plein, sinon carré, triangle, croix…
-        const forme = formeDuNom(point.nom, libelles);
+        // Levé chantier (0.175.5) : la forme vient du libellé du point, la couleur de sa nature.
+        const lib = point.chantier ? chantierLib.find((l) => l.abreviation === point.chantier.libelle) : null;
+        // Annotation (0.180.0) : un nuage, juste le contour, assez gros (comme un point de contrôle).
+        const forme = point.annotation ? 'nuage' : point.chantier ? lib?.forme ?? '' : formeDuNom(point.nom, libelles);
         const trace = cheminForme(forme, x, y, rayon);
         // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
-        const couleur = classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
+        const couleur = point.annotation ? couleursPoints.get(point) ?? COULEUR_ANNOTATION : point.chantier ? couleurNatureChantier(point.chantier.nature, couleursNat) : classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
         if (versCanvas) {
           pourCanvas.push({ x, y, trace, trait: formeEnTrait(forme), pale: estPale(point.nom), couleur: couleur ?? couleursRoles.get(classes.get(point.nom) ?? '') });
         } else {
-          const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}${estPale(point.nom) ? ' pale' : ''}`;
+          const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}${point.annotation ? ' forme-nuage' : ''}${estPale(point.nom) ? ' pale' : ''}`;
           const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: rayon, class: classe });
           if (couleur) rond.style.color = couleur;
           groupePoints.append(rond);
@@ -453,7 +462,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (calques.noms || calques.altitudes) {
       const montrerNom = (point) => calques.noms && (pointsImport.has(point) ? calques.nomsImport : calques.nomsLeve);
       const textes = visibles.map(({ point }) =>
-        [montrerNom(point) ? point.nom : null, calques.altitudes ? formaterNombre(point.altitude) : null].filter(Boolean),
+        [montrerNom(point) ? point.nom : null, calques.altitudes && point.altitude != null ? formaterNombre(point.altitude) : null, calques.altitudes && point.chantier ? texteDuPoint(point.chantier, point.chantier) : null].filter(Boolean),
       );
       const places = placerEtiquettes(
         visibles.map(({ x, y }, i) => ({
@@ -589,6 +598,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         nom.textContent = o.nom;
         autres.append(nom);
       }
+    }
+    // Levé chantier (0.175.0) : ouvrage rond = cercle de 60 cm (arbitraire), rectangulaire = son cadre à l'échelle.
+    for (const forme of implantation.chantiers ?? []) {
+      const element = forme.coins
+        ? creerElement('path', { d: tracePar(forme.coins.map((c) => versEcran(c.est, c.nord, vue)), true), class: 'ouvrage-reseau' })
+        : (() => {
+            const c = versEcran(forme.est, forme.nord, vue);
+            return creerElement('circle', { cx: c.x, cy: c.y, r: Math.max(5, forme.rayon * vue.echelle), class: 'ouvrage-reseau' });
+          })();
+      element.style.stroke = forme.couleur;
+      autres.append(element);
     }
     // Points de contrôle (Terrain › Contrôle) : triangle rouge et nom en rouge. Noms et altitudes placés
     // sans se chevaucher (0.114.0) : une étiquette sans place est cachée, elle revient en zoomant.
@@ -2224,8 +2244,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       } else {
         // Un 📷 (photo rattachée à un point, 0.96.0) ouvre la photo ; sinon, toucher l'intérieur d'un stock le choisit.
         const photo = photoSousLeDoigt(toucher);
+        // Annotation (0.180.3) : toucher un point d'annotation ouvre sa fiche (vrai = trouvé).
         if (photo) quandToucherPhoto?.(photo.id);
-        else {
+        else if (quandToucherAnnotation?.(versTerrain(toucher.x, toucher.y, vue), RAYON_TOUCHER / vue.echelle)) {
+          // fiche ouverte
+        } else {
           const index = stockSousLeDoigt(toucher);
           if (index >= 0) quandToucherStock?.(index);
         }

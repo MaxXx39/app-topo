@@ -19,7 +19,7 @@ import { demanderCode } from '../outils/code.js';
 import { lireListesPartagees } from './listes-partagees.js';
 import { modifierLibellesDeSorte, modifierReseaux } from '../leve/fenetre-libelles.js';
 import { ouvrirFenetreListes } from './fenetre-listes.js';
-import { ADRESSE_APK, versionPubliee, estPlusRecente } from '../outils/mise-a-jour.js';
+import { apkPublie, estPlusRecente } from '../outils/mise-a-jour.js';
 
 const CLE = 'topo-reglages';
 const PAR_DEFAUT = { telephone: false, mode: 'intermediaire', tailleFormes: 'normale', tailleTexte: 'normal', theme: 'normal' };
@@ -123,9 +123,17 @@ function ecrireReglages(reglages) {
  * Applique les réglages à la page : classes mode-telephone et mode-base / mode-intermediaire /
  * mode-expert, pyramide du mode dans l'en-tête.
  */
+const LARGEUR_TELEPHONE = 500;
+let ecouteLargeur = false;
+
 export function appliquerReglages(reglages = lireReglages()) {
   modeRetenu = modeValide(reglages.mode);
-  document.body.classList.toggle('mode-telephone', Boolean(reglages.telephone));
+  // 0.173.0 : un écran étroit (moins de 500 px de large, un téléphone) est toujours en mode téléphone.
+  document.body.classList.toggle('mode-telephone', Boolean(reglages.telephone) || (typeof window !== 'undefined' && window.innerWidth < LARGEUR_TELEPHONE));
+  if (!ecouteLargeur && typeof window !== 'undefined') {
+    ecouteLargeur = true;
+    window.addEventListener('resize', () => appliquerReglages());
+  }
   document.body.style.setProperty('--echelle-texte', String(facteurDe(TAILLES_TEXTE, reglages.tailleTexte)));
   for (const [cle] of MODES) document.body.classList.toggle(`mode-${cle}`, cle === modeRetenu);
   for (const [cle] of THEMES) document.body.classList.toggle(`theme-${cle}`, cle !== 'normal' && cle === reglages.theme);
@@ -336,10 +344,10 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
   async function chercherMiseAJour() {
     const zone = fenetre.querySelector('[data-zone="mise-a-jour"]');
     zone.textContent = 'Recherche…';
-    const publiee = await versionPubliee();
-    if (!publiee) zone.textContent = 'Impossible de savoir (pas de réseau ?)';
-    else if (!estPlusRecente(publiee, __VERSION_APPLI__)) zone.textContent = `À jour (version ${__VERSION_APPLI__})`;
-    else zone.innerHTML = `Version ${publiee} disponible : <a href="${ADRESSE_APK}">télécharger</a>, puis toucher « Installer »`;
+    const apk = await apkPublie();
+    if (!apk) zone.textContent = 'Impossible de savoir (pas de réseau ?)';
+    else if (!estPlusRecente(apk.version, __VERSION_APPLI__)) zone.textContent = `À jour (version ${__VERSION_APPLI__})`;
+    else zone.innerHTML = `Version ${apk.version} disponible : <a href="${apk.adresse}">télécharger Topo-${apk.version}.apk</a>, puis toucher « Installer »`;
   }
 
   /** Mode choisi : monter en Expert demande le code de sécurité (0.90.0) ; descendre, non. */

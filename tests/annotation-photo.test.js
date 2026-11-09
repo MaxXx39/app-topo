@@ -53,3 +53,20 @@ describe('dessin sur une photo', () => {
     expect(trait.points[1].y).toBeCloseTo(0.6);
   });
 });
+
+import { dessinValide as dessinValideTexte, deplacerForme as deplacerTexte, formeSousLeDoigt as touchePourTexte, COULEURS_DESSIN as COULEURS } from '../src/photos/annotation.js';
+describe('dessin sur photo : texte, bleu et noir (0.184.0)', () => {
+  it('propose le bleu et le noir', () => {
+    const noms = COULEURS.map(([nom]) => nom);
+    expect(noms).toContain('bleu');
+    expect(noms).toContain('noir');
+  });
+  it('un texte vide ne compte pas, un texte se déplace et se touche', () => {
+    expect(dessinValideTexte({ type: 'texte', texte: '  ', a: { x: 0.5, y: 0.5 } }, 1000, 800)).toBe(false);
+    const t = { type: 'texte', couleur: '#000000', texte: 'fissure', a: { x: 0.5, y: 0.5 } };
+    expect(dessinValideTexte(t, 1000, 800)).toBe(true);
+    expect(deplacerTexte(t, 0.1, 0).a.x).toBeCloseTo(0.6);
+    expect(touchePourTexte([t], { x: 0.52, y: 0.5 }, 1000, 800, 10)).toBe(0);
+    expect(touchePourTexte([t], { x: 0.9, y: 0.9 }, 1000, 800, 10)).toBe(-1);
+  });
+});

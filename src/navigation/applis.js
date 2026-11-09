@@ -13,7 +13,7 @@ export const APPLIS = [
     cle: 'lever',
     titre: 'Lever',
     titreSite: 'Édition Lever',
-    couleur: '#d98a00',
+    couleur: '#eab308',
     texte: '#ffffff',
     site: true,
     icone: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle cx="12" cy="12" r="2.5" />',
@@ -22,7 +22,8 @@ export const APPLIS = [
     // Recollement et Métré (0.161.0, demande du 08.11, Expert) : sortis de Lever, chacun son écran de levé.
     cle: 'recollement',
     titre: 'Recollement',
-    couleur: '#4d7c0f',
+    court: 'Recoll.', // 0.172.0 : écrit ainsi en mode téléphone
+    couleur: '#16a34a',
     texte: '#ffffff',
     site: true,
     niveau: 'expert',
@@ -31,7 +32,7 @@ export const APPLIS = [
   {
     cle: 'metre',
     titre: 'Métré',
-    couleur: '#c2410c',
+    couleur: '#ea580c',
     texte: '#ffffff',
     site: true,
     niveau: 'expert',
@@ -49,11 +50,23 @@ export const APPLIS = [
     // Mesure rapide (0.158.0, dès Intermédiaire) : points touchés sur le plan ou pris au GNSS.
     cle: 'mesure',
     titre: 'Mesure rapide',
+    court: 'Mesure',
     couleur: '#7c3aed',
     texte: '#ffffff',
     site: true,
     niveau: 'intermediaire',
     icone: '<path d="M3 17 17 3l4 4L7 21z" /><path d="m7 13 2 2M10 10l2 2M13 7l2 2" />',
+  },
+  {
+    // Annotation (0.177.0, dès Intermédiaire) : points avec remarques et photos (loupe, récepteur ou GPS tablette).
+    cle: 'annotation',
+    titre: 'Annotation',
+    court: 'Annot.',
+    couleur: '#7c4a1e',
+    texte: '#ffffff',
+    site: true,
+    niveau: 'intermediaire',
+    icone: '<path d="M4 4h16v12H9l-5 4z" /><path d="M8 9h8M8 12h5" />',
   },
   {
     cle: 'controle',
@@ -93,8 +106,8 @@ export const APPLIS = [
   {
     cle: 'recepteur',
     titre: 'Récepteur',
-    couleur: '#0284c7',
-    texte: '#ffffff',
+    couleur: '#38bdf8',
+    texte: '#0c4a6e',
     apk: true,
     icone: '<path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><ellipse cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" />',
   },
@@ -136,6 +149,7 @@ export function appliCourante(onglet, modeTerrain, familleLever = 'leve') {
   if (onglet === 'projets') return 'projet';
   if (onglet === 'plan') return 'plan';
   if (onglet === 'mesure-rapide') return 'mesure';
+  if (onglet === 'annotation') return 'annotation';
   if (['volumes', 'mesures', 'dessin', 'surfaces', 'calculs'].includes(onglet)) return 'calculs';
   if (onglet === 'terrain') {
     const lever = { reseau: 'recollement', metre: 'metre' }[familleLever] ?? 'lever'; // 0.161.0

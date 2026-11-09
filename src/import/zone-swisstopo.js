@@ -145,10 +145,10 @@ export function creerSurfaceSwisstopo(outils) {
   return { commencer, arreter, changerZone, actif: () => sommets !== null };
 }
 
-/** Nom proposé : « SWISSTOP 1 », ou le numéro suivant s'il est déjà pris. */
+/** Nom proposé (0.176.0) : « SWISSTOP MNT3D », puis « SWISSTOP MNT3D 2 », 3… s'il est déjà pris. */
 export function prochainNom(noms) {
   const pris = new Set(noms.map((n) => String(n).toUpperCase()));
-  let numero = 1;
-  while (pris.has(`${PREFIXE_SWISSTOP}${numero}`)) numero++;
-  return `${PREFIXE_SWISSTOP}${numero}`;
+  let nom = `${PREFIXE_SWISSTOP}MNT3D`;
+  for (let numero = 2; pris.has(nom); numero++) nom = `${PREFIXE_SWISSTOP}MNT3D ${numero}`;
+  return nom;
 }
