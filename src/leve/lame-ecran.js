@@ -126,6 +126,9 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
       <button type="button" class="bouton-lignes-guidage seulement-expert ${donnees.choixLignes ? 'actif' : ''}" data-action="choisirLignesGuidage" title="Choisir 1 ou 2 lignes à suivre">Lignes${(donnees.lignes ?? []).length ? ` (${donnees.lignes.length})` : ''}</button>
       <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Réglages">⚙</button>
       ${bulle('lame')}
+      <div class="choix-coupes-bandeau" role="group" aria-label="Coupes montrées">
+        ${puce('choisirCoupesBandeau', 'gd', 'G – D', vue === 'plan1' && coupeSeule === 'gd')}${puce('choisirCoupesBandeau', 'long', 'Arr – Av', vue === 'plan1' && coupeSeule === 'long')}${puce('choisirCoupesBandeau', 'deux', '2 coupes', vue !== 'plan1')}
+      </div>
     </div>
     ${reglagesOuverts ? reglages : ''}
     ${donnees.recepteur2 || unGnss ? '' : '<button type="button" class="bouton-secondaire bouton-recepteur-2" data-action="ouvrirRecepteur">Connecter le 2e GNSS</button>'}
@@ -169,19 +172,15 @@ function htmlLignesSuivies(donnees) {
 }
 
 /**
- * Place de la silhouette (0.155.0) : au milieu du trait de l'outil, tournée selon le VRAI dévers (pas
- * celui des hauteurs agrandies), à la largeur du tranchant, mais jamais plus haute que 70 % de la
- * coupe ni plus petite que la moitié (un râteau court reste lisible).
+ * Place de la silhouette (0.170.0, demande du 09.11) : au milieu du trait de l'outil, TOUJOURS à la largeur
+ * G – D (le tranchant = de G à D) et tournée comme le trait dessiné (hauteurs agrandies comprises, pour
+ * qu'elle suive la ligne rouge). Ce qui dépasse en haut est simplement coupé par le cadre.
  */
-function placeSilhouette(a, b, x, y, hauteur) {
-  const xa = x(a.distance);
-  const xb = x(b.distance);
-  const pixelsParMetre = Math.abs(xb - xa) / Math.max(1e-6, Math.abs(b.distance - a.distance));
-  const angle = (Math.atan2(-(b.altitude - a.altitude) * pixelsParMetre, xb - xa) * 180) / Math.PI;
-  const yMilieu = (y(a.altitude) + y(b.altitude)) / 2;
-  // La plus haute silhouette fait environ 110 de haut au-dessus du tranchant : elle doit tenir au-dessus.
-  const echelle = Math.max(0.35, Math.min(Math.abs(xb - xa) / 80, (yMilieu - 4) / 110));
-  return { x: (xa + xb) / 2, y: yMilieu, angle, echelle };
+function placeSilhouette(a, b, x, y) {
+  const [xa, xb, ya, yb] = [x(a.distance), x(b.distance), y(a.altitude), y(b.altitude)];
+  const angle = (Math.atan2(yb - ya, xb - xa) * 180) / Math.PI;
+  const largeur = Math.hypot(xb - xa, yb - ya);
+  return { x: (xa + xb) / 2, y: (ya + yb) / 2, angle, echelle: Math.max(0.05, largeur / 80) };
 }
 
 /** Triangle pointe en haut (monter) ou en bas (descendre), en SVG (0.152.0, à côté de la règle). */
@@ -333,7 +332,7 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []
     })
     .join('');
   return `<svg viewBox="0 0 ${largeur} ${hauteur}" class="svg-coupe-lame svg-coupe-guidage" role="img" aria-label="Coupe ${noms[0]} – ${noms[1]}">
-    ${outil ? silhouetteOutil(outil.machine, outil.vue, placeSilhouette(a, b, x, y, hauteur)) : ''}
+    ${outil ? silhouetteOutil(outil.machine, outil.vue, placeSilhouette(a, b, x, y)) : ''}
     ${marques}
     ${surface}
     ${pentes}

@@ -12787,3 +12787,24 @@ body.mode-telephone .bande-appli .surface-bande .liste-bande { font-size: 14px; 
 }
 body.mode-telephone .bande-appli .levee-choix .fleche-levee-bande { width: 36px; height: 36px; font-size: 20px; }
 body.mode-telephone .bande-appli .levee-bande.levee-choix { padding-right: 50px; }
+
+/* ==========================================================================
+   0.170.0 (demandes du 09.11, 11h) : la liste du choix de la surface couvre tout le bloc (flèche comprise) ;
+   Réglages au-dessus des boutons fixes de Lever.
+   ========================================================================== */
+.surface-bande .valeur-liste-bande {
+  display: block; font-size: 17px; font-weight: 900; color: #12332f;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+}
+body.mode-telephone .surface-bande .valeur-liste-bande { font-size: 14px; }
+.bande-appli .surface-bande .liste-bande {
+  position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2;
+  opacity: 0; padding: 0; cursor: pointer;
+}
+.bande-appli .surface-bande .liste-bande option { opacity: 1; }
+dialog.fenetre-reglages.en-page[open] { z-index: 40; }
+/* 0.170.0 : choix des coupes dans la rangée de la sonnette (G – D, Arr – Av, 2 coupes). */
+.ecran-lame .choix-coupes-bandeau { margin-left: auto; display: flex; gap: 6px; flex-wrap: nowrap; }
+.ecran-lame .choix-coupes-bandeau .puce-choix { min-height: 40px; padding: 4px 12px; white-space: nowrap; }
+body.mode-telephone .ecran-lame .choix-coupes-bandeau .puce-choix { min-height: 32px; padding: 3px 8px; font-size: 11px; }
+.svg-coupe-guidage { overflow: hidden; }

@@ -519,7 +519,10 @@ function selecteurSurfaceBande(champ, titre) {
   const liste = document.querySelector(`#leve-direct select[data-champ="${champ}"]`);
   if (!liste) return '';
   const options = [...liste.options].map((o) => `<option value="${echapper(o.value)}" ${o.selected ? 'selected' : ''}>${echapper(o.textContent.trim())}</option>`).join('');
+  // 0.170.0 : la liste (transparente) couvre tout le bloc, flèche ronde comprise : un toucher n'importe où l'ouvre.
+  const choisie = [...liste.options].find((o) => o.selected) ?? liste.options[0];
   return `<div class="levee-bande surface-bande"><span class="titre-levee-bande">${titre}</span>
+    <span class="valeur-liste-bande">${echapper(choisie?.textContent.trim() ?? '')}</span>
     <select class="liste-bande" data-nav-champ="${champ}" aria-label="${titre}">${options}</select></div>`;
 }
 
@@ -2051,6 +2054,16 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       // Triangles et valeurs (0.153.1) : à côté de la règle (B) ou posés sur la règle (C).
       choisirIndicLame: (cle) => {
         terrain.lame.indic = cle === 'regle' ? 'regle' : 'exterieur';
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      // 0.170.0 : choix rapide dans le bandeau de la sonnette : G – D, Arr – Av ou les 2 coupes (avec le plan).
+      choisirCoupesBandeau: (cle) => {
+        if (cle === 'deux') terrain.lame.vue = terrain.lame.vue === 'coupes' ? 'coupes' : 'plan2';
+        else {
+          terrain.lame.vue = 'plan1';
+          terrain.lame.coupeSeule = cle === 'long' ? 'long' : 'gd';
+        }
         retenirReglagesTerrain();
         recalculer();
       },
