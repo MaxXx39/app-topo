@@ -3088,7 +3088,8 @@ function envoyerImplantationAuPlan() {
   // Case « Voir toute la ligne » (0.118.0) : seulement pendant le guidage d'une ligne (pas d'un talus).
   const guidageLigne = ongletContexte === 'terrain' && enImplantationDeLigne() && !enTalus() && Boolean(implanter.ligne) && !implanter.ligneAValider;
   // 0.137.0 : point ou ligne choisi mais pas encore « Implanter » : le plan reste où il est (pas de retour du suivi).
-  plan.suspendreSuivi(ongletContexte === 'terrain' && ((enImplantationDePoint() && Boolean(implanter.choix) && !implanter.cible) || (enImplantationDeLigne() && Boolean(implanter.ligne) && implanter.ligneAValider)));
+  // Annotation en mode Manuel (0.178.2) : le plan ne suit pas la position (on place la loupe où on veut).
+  plan.suspendreSuivi((annotationActive() && annotationEtat.mode === 'loupe') || (ongletContexte === 'terrain' && ((enImplantationDePoint() && Boolean(implanter.choix) && !implanter.cible) || (enImplantationDeLigne() && Boolean(implanter.ligne) && implanter.ligneAValider))));
   if (!guidageLigne) implanter.voirLigne = false;
   plan.voirLigne({ visible: guidageLigne, sommets: guidageLigne && implanter.voirLigne ? implanter.ligne.sommets : null });
   plan.afficherImplantation(accrocheActive || avecPilote || choixCotes || aImplanter.length > 0 || implantes.length > 0 || lignesAutres.length > 0 || reseaux.length > 0 || chantiers.length > 0 || pointsControle.length > 0 || cibleControle || dessins.length > 0 || talusSurfaces.length > 0
