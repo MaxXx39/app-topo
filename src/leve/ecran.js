@@ -801,7 +801,7 @@ export function creerEcranLeve(conteneur, actions) {
         <div class="bloc-lateral bloc-bouts ${g.classeBout ?? ''}">${leLong}</div>
         ${hauteur}
       </div>
-      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale), virage)}`;
+      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale), virage, { sansFleche: surLaLigne || g.classeLaterale === 'vert' })}`;
   }
 
   /**
@@ -1780,7 +1780,7 @@ function couleurLaterale(classe) {
  * de la cible : 10 m, 2 m, 1 m, 20 cm), au bord. Fait en blocs HTML placés en % (pas en SVG) pour
  * remplir toute la case sans déformer le rond de la canne. ecart : m, + à droite.
  */
-function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage = '') {
+function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage = '', { sansFleche = false } = {}) {
   const bandes = BANDES_COULOIR[numero];
   const haut = 18; // % : haut du trait (la fin)
   const bas = 76; // % : bas du trait (le début)
@@ -1795,6 +1795,12 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage 
   const r = bandes[0];
   const reglettes = `<span class="reglette" style="left: ${50 - demi}%"></span><span class="reglette" style="left: ${50 + demi}%"></span>
     <span class="texte-reglette en-haut-coin au-bord" style="left: ${50 + demi}%">${texte(r)}</span>`;
+  // 0.189.1 (maquette A du 10.11, tous les modes) : flèche perpendiculaire à la ligne, de la canne vers la ligne (du côté où il
+  // faut aller), grosse pointe pour bien voir le sens ; l'écart écrit au-dessus. Cachée quand on est dans la tolérance.
+  const versGauche = ecart > 0;
+  const largeurFleche = Math.abs(left - 50);
+  const flecheCouloir = sansFleche || largeurFleche < 0.5 ? ''
+    : `<span class="fleche-couloir ${versGauche ? 'vers-gauche' : 'vers-droite'}" style="left: ${Math.min(left, 50).toFixed(1)}%; width: ${largeurFleche.toFixed(1)}%; top: ${top.toFixed(1)}%; --couleur-fleche: ${couleur}"><b class="mot-fleche">${ecart === 0 ? '' : texte(Math.abs(ecart))}</b><i class="pointe"></i><i class="tige"></i></span>`;
   return `<div class="cadre-couloir" role="img" aria-label="Position de la canne le long de la ligne">
     ${reglettes}
     <span class="trait-couloir" style="top: ${haut}%; bottom: ${100 - bas}%"></span>
@@ -1802,6 +1808,7 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage 
     <span class="bout-couloir" style="top: ${bas}%"></span>
     <span class="drapeau-couloir fin" style="top: ${haut}%">${iconeDrapeau('fin')}</span>
     <span class="drapeau-couloir debut" style="top: ${bas}%">${iconeDrapeau('debut')}</span>
+    ${flecheCouloir}
     <span class="moi-couloir" style="left: ${left.toFixed(1)}%; top: ${top.toFixed(1)}%; background: ${couleur}"></span>
     ${virage}
   </div>`;

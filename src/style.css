@@ -13301,3 +13301,13 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 
 /* 0.189.0 : pastille du milieu (2 cm) plus foncée sur la cible de 20 cm */
 .cible-implantation.cible-3 .anneau-centre { fill-opacity: 0.45; }
+
+/* 0.189.1 : flèche perpendiculaire du guidage de ligne (couloir), de la canne vers la ligne */
+.cadre-couloir .fleche-couloir { position: absolute; display: flex; align-items: center; transform: translateY(-50%); min-width: 30px; pointer-events: none; }
+.cadre-couloir .fleche-couloir .tige { flex: 1; height: 6px; background: var(--couleur-fleche); border-radius: 3px; }
+.cadre-couloir .fleche-couloir .pointe { flex: none; width: 0; height: 0; border-top: 13px solid transparent; border-bottom: 13px solid transparent; }
+.cadre-couloir .fleche-couloir.vers-gauche { flex-direction: row; margin-left: 0; padding-right: 14px; }
+.cadre-couloir .fleche-couloir.vers-gauche .pointe { border-right: 20px solid var(--couleur-fleche); }
+.cadre-couloir .fleche-couloir.vers-droite { flex-direction: row-reverse; padding-left: 14px; }
+.cadre-couloir .fleche-couloir.vers-droite .pointe { border-left: 20px solid var(--couleur-fleche); }
+.cadre-couloir .fleche-couloir .mot-fleche { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font-size: 0.95rem; font-weight: 800; color: var(--couleur-fleche); text-shadow: 0 0 3px #fff, 0 0 3px #fff; }
