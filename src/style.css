@@ -13321,3 +13321,12 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 /* 0.189.3 : boutons de coupe d'Implanter › Surface avec symbole, un peu plus larges */
 .choix-coupe .puce-choix { display: inline-flex; align-items: center; gap: 6px; min-width: 150px; min-height: 48px; padding: 0 12px; }
 .choix-coupe .symbole-coupe { width: 34px; height: 34px; flex: none; }
+
+/* 0.190.0 : coupes d'Implanter : cadre fixe, boutons d'échelle posés sur la coupe (largeur en haut à droite, hauteurs au milieu à droite) */
+.zone-coupe { position: relative; }
+.echelle-coupe { position: absolute; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 22px; background: #0f766e; color: #fff; font-weight: 800; font-size: 0.8rem; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }
+.echelle-coupe button { width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #fff; font-size: 1.2rem; font-weight: 800; }
+.echelle-coupe span { min-width: 44px; text-align: center; }
+.echelle-coupe.largeur-coupe { top: 4px; right: 4px; }
+.echelle-coupe.hauteur-coupe { right: 4px; top: 50%; transform: translateY(-50%); flex-direction: column; }
+.echelle-coupe.hauteur-coupe span { min-width: 0; }

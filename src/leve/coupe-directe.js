@@ -1,16 +1,11 @@
 // Dessin d'une coupe en direct (onglet Terrain, mode Implanter) : le profil de la surface sur
 // quelques mètres de part et d'autre du récepteur, et le bout de canne dessus (SVG).
-// Hauteurs à la même échelle que les longueurs (×1), ou deux fois plus grandes (×2), au choix.
-// La hauteur du dessin suit le relief (entre un minimum et un maximum) ; au-delà, il est coupé.
+// 0.190.0 : cadre fixe (hauteur = 0,8 × largeur), bout de canne au milieu ; échelle des hauteurs ×1, ×1,5, ×2 ou ×3.
 
 // Largeur du dessin (unités du SVG, il s'adapte ensuite à la largeur de l'écran) et marges.
 const LARGEUR = 340;
 const MARGES = { gauche: 46, droite: 8, haut: 18, bas: 18 };
-// Hauteur de la zone du profil (unités du SVG) : au moins / au plus.
-const HAUTEUR_PROFIL_MIN = 80;
-const HAUTEUR_PROFIL_MAX = 220;
-// Marge au-dessus et au-dessous du relief (m).
-const MARGE_ALTITUDE = 0.1;
+const RAPPORT_HAUTEUR = 0.8; // hauteur du cadre = 0,8 × sa largeur
 
 // Grille (0.90.1, Expert) : un trait gris tous les mètres ; plus espacé (2, 5, 10 m…) si les traits
 // seraient à moins de ECART_GRILLE_MIN unités du SVG l'un de l'autre.
@@ -43,16 +38,17 @@ export function valeursGrille(debut, fin, pas) {
  * - titre, gauche, droite : textes (ex. « Perpendiculaire », « gauche », « droite »)
  * - grille : vrai pour la grille grise en longueur et en hauteur (Expert)
  */
-export function svgCoupeDirecte({ lignes, lignesBase = null, delta = 0, demiLongueur, altitudeCanne, classe, exageration = 1, sens = '', titre, gauche, droite, grille = false }) {
+export function svgCoupeDirecte({ lignes, lignesBase = null, delta = 0, demiLongueur, altitudeCanne, classe, exageration = 1, sens = '', titre, gauche, droite, grille = true }) {
+  // 0.190.0 (maquette B du 10.11) : cadre FIXE (hauteur = 0,8 × largeur : 4 m pour 5 m, 8 m pour 10 m…), le bout de canne
+  // toujours au milieu ; seule l'échelle change (largeur 5 / 10 / 20 m…, hauteurs ×1, ×1,5, ×2, ×3).
   const longueur = 2 * demiLongueur;
   const largeurUtile = LARGEUR - MARGES.gauche - MARGES.droite;
-  const pixelsParMetre = (largeurUtile / longueur) * (exageration === 2 ? 2 : 1);
+  const hauteurUtile = Math.round(largeurUtile * RAPPORT_HAUTEUR);
+  const pixelsParMetreX = largeurUtile / longueur;
+  const pixelsParMetre = pixelsParMetreX * (Number(exageration) > 0 ? Number(exageration) : 1);
   const altitudes = [...lignes.flat().map((p) => p.altitude), ...(lignesBase ?? []).flat().map((p) => p.altitude), ...(altitudeCanne != null ? [altitudeCanne] : [])];
-
-  // Hauteur du dessin : celle du relief à cette échelle, entre le minimum et le maximum.
-  const bas0 = altitudes.length > 0 ? Math.min(...altitudes) - MARGE_ALTITUDE : 0;
-  const haut0 = altitudes.length > 0 ? Math.max(...altitudes) + MARGE_ALTITUDE : 1;
-  const hauteurUtile = Math.min(Math.max((haut0 - bas0) * pixelsParMetre, HAUTEUR_PROFIL_MIN), HAUTEUR_PROFIL_MAX);
+  const bas0 = altitudes.length > 0 ? Math.min(...altitudes) : 0;
+  const haut0 = altitudes.length > 0 ? Math.max(...altitudes) : 1;
   const hauteur = hauteurUtile + MARGES.haut + MARGES.bas;
   const classes = `coupe-directe ${sens ? `coupe-${sens}` : ''}`;
   const entete = `<text x="${MARGES.gauche}" y="12" class="titre-coupe">${titre}</text>
@@ -63,9 +59,9 @@ export function svgCoupeDirecte({ lignes, lignesBase = null, delta = 0, demiLong
       <text x="${LARGEUR / 2}" y="${hauteur / 2}" text-anchor="middle" class="vide-coupe">Pas de surface ici</text></svg>`;
   }
 
-  // Altitudes montrées : tout le relief s'il tient ; sinon, centré sur le bout de canne.
+  // Altitudes montrées : centrées sur le bout de canne (sinon sur le milieu du relief).
   const etendue = hauteurUtile / pixelsParMetre;
-  const centre = haut0 - bas0 <= etendue || altitudeCanne == null ? (haut0 + bas0) / 2 : altitudeCanne;
+  const centre = altitudeCanne != null ? altitudeCanne : (haut0 + bas0) / 2;
   const haut = centre + etendue / 2;
   const bas = centre - etendue / 2;
   const x = (distance) => MARGES.gauche + (distance / longueur) * largeurUtile;
@@ -106,7 +102,6 @@ export function svgCoupeDirecte({ lignes, lignesBase = null, delta = 0, demiLong
   return `<svg viewBox="0 0 ${LARGEUR} ${hauteur.toFixed(0)}" class="${classes}">
     <defs><clipPath id="${cadre}"><rect x="${MARGES.gauche}" y="${MARGES.haut}" width="${largeurUtile}" height="${hauteurUtile}" /></clipPath></defs>
     ${entete}
-    <text x="${LARGEUR - MARGES.droite}" y="12" class="cote" text-anchor="end">hauteurs ×${exageration === 2 ? 2 : 1}</text>
     <text x="${MARGES.gauche - 4}" y="${MARGES.haut + 4}" class="cote" text-anchor="end">${haut.toFixed(2)}</text>
     <text x="${MARGES.gauche - 4}" y="${yBas}" class="cote" text-anchor="end">${bas.toFixed(2)}</text>
     <line x1="${MARGES.gauche}" y1="${yBas}" x2="${LARGEUR - MARGES.droite}" y2="${yBas}" class="base-coupe" />
@@ -117,3 +112,17 @@ export function svgCoupeDirecte({ lignes, lignesBase = null, delta = 0, demiLong
     ${canne}
   </svg>`;
 }
+
+/**
+ * Boutons d'échelle d'une coupe (0.190.0, maquette B du 10.11, dès Intermédiaire) : « − 10 m + » (largeur de la coupe, la hauteur
+ * suit : 0,8 × la largeur) et ▲ ×1,5 ▼ (échelle des hauteurs). Posés sur la coupe, hors de la zone qui se redessine
+ * 5 fois par seconde (sinon un appui serait perdu).
+ */
+export function controlesEchelleCoupe(texteLargeur, exageration, actionLargeur, actionHauteur, idLargeur = '') {
+  const texte = (n) => String(n).replace('.', ',');
+  return `<div class="echelle-coupe largeur-coupe seulement-intermediaire" role="group" aria-label="Largeur de la coupe">
+      <button type="button" data-action="${actionLargeur}" data-valeur="-1" aria-label="Coupe moins large">−</button><span ${idLargeur ? `data-vivant="${idLargeur}"` : ''}>${texteLargeur}</span><button type="button" data-action="${actionLargeur}" data-valeur="1" aria-label="Coupe plus large">+</button></div>
+    <div class="echelle-coupe hauteur-coupe seulement-intermediaire" role="group" aria-label="Échelle des hauteurs">
+      <button type="button" data-action="${actionHauteur}" data-valeur="1" aria-label="Hauteurs plus grandes">▲</button><span>×${texte(exageration)}</span><button type="button" data-action="${actionHauteur}" data-valeur="-1" aria-label="Hauteurs plus petites">▼</button></div>`;
+}
+

@@ -62,7 +62,7 @@ import { archiver, restaurer, supprimerArchive } from './projet/archives.js';
 import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/journal.js';
 import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { bulle, installerAide } from './aide/bulles.js';
-import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE, ACCROCHES } from './leve/ecran.js';
+import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE, EXAGERATIONS_COUPE, ACCROCHES } from './leve/ecran.js';
 import { creerEncartPlan } from './plan/encart.js';
 import { creerBoutonImplanterPlan } from './plan/bouton-implanter.js';
 import { suivreClavier } from './outils/clavier.js';
@@ -253,6 +253,9 @@ terrain.lame.outils.grader ??= { avant: 1, arriere: 1, axe: 0 };
 terrain.lame.vue = ['plan1', 'plan2', 'coupes'].includes(terrain.lame.vue) ? terrain.lame.vue : 'plan2';
 terrain.lame.coupeSeule = terrain.lame.coupeSeule === 'long' ? 'long' : 'gd';
 terrain.lame.marges = { gauche: 1, droite: 1, devant: 2, derriere: 2, ...(terrain.lame.marges ?? {}) };
+// 0.190.0 : échelle des coupes du Guidage : largeur (facteur appliqué aux marges) et hauteurs (×1 à ×3).
+terrain.lame.zoomMarges = terrain.lame.zoomMarges ?? 1;
+terrain.lame.exagerationCoupe = terrain.lame.exagerationCoupe ?? 1;
 if (!(terrain.lame.outils.bull.avant > 0) && !(terrain.lame.outils.bull.arriere > 0)) terrain.lame.outils.bull = { ...terrain.lame.outils.bull, avant: 1, arriere: 1 };
 
 /** Vrai si la machine choisie est guidée par un seul GNSS (râteau, ou Bull réglé sur 1 GNSS). */
@@ -3094,6 +3097,27 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         retenirReglagesTerrain();
         recalculer();
       },
+      // 0.190.0 : boutons − / + de la largeur de la coupe et ▲ / ▼ de l'échelle des hauteurs (Implanter › Surface).
+      changerLargeurCoupe: (pas) => {
+        terrain.demiLongueur = voisinDansListe(LONGUEURS_COUPE, terrain.demiLongueur, Number(pas));
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      changerLargeurCoupeLame: (pas) => {
+        terrain.lame.zoomMarges = voisinDansListe([0.5, 1, 2, 4], terrain.lame.zoomMarges ?? 1, Number(pas));
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      changerHauteurCoupeLame: (pas) => {
+        terrain.lame.exagerationCoupe = voisinDansListe(EXAGERATIONS_COUPE, terrain.lame.exagerationCoupe ?? 1, Number(pas));
+        retenirReglagesTerrain();
+        recalculer();
+      },
+      changerHauteurCoupe: (pas) => {
+        terrain.exagerationCoupe = voisinDansListe(EXAGERATIONS_COUPE, terrain.exagerationCoupe, Number(pas));
+        retenirReglagesTerrain();
+        recalculer();
+      },
       choisirSourceOrientation: (source) => {
         terrain.sourceOrientation = source === 'marche' ? 'marche' : 'rx2';
         suiviOrientation.changerSource(terrain.sourceOrientation);
@@ -4407,6 +4431,13 @@ function validerLigneGuidage() {
   recalculer();
 }
 
+/** Valeur voisine dans une liste croissante : pas = +1 (suivante) ou −1 (précédente), bornée aux extrémités. */
+function voisinDansListe(liste, valeur, pas) {
+  let i = liste.findIndex((v) => v === Number(valeur));
+  if (i < 0) i = liste.reduce((meilleur, v, k) => (Math.abs(v - valeur) < Math.abs(liste[meilleur] - valeur) ? k : meilleur), 0);
+  return liste[Math.max(0, Math.min(liste.length - 1, i + (pas > 0 ? 1 : -1)))];
+}
+
 // Delta Z de la surface (0.152.0, dès Intermédiaire) : la surface suivie est montée (+) ou descendue
 // (−) de ce décalage, en Implanter › Surface et en Guidage ; jamais enregistré : 0 à chaque démarrage.
 let deltaSurface = 0;
@@ -4449,7 +4480,7 @@ function calculerLame() {
   const sens = sensAvantLame(lame);
   if (!sens) return { raison: 'les deux récepteurs sont au même endroit', guidage: null, coins: lame };
   const points = pointsGuidageLame(lame.gauche, lame.droite, sens, reglagesOutilLame());
-  return { ...guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite }, sens), penteEngin: penteDeLEngin() };
+  return { ...guidageDesPoints(points, triangles, { gauche: points.gauche, droite: points.droite }, sens), penteEngin: penteDeLEngin(), exageration: terrain.lame.exagerationCoupe };
 }
 
 /**
@@ -4491,7 +4522,7 @@ function calculerOutilUnGnss() {
     const surfaceCentre = surfaceBase == null ? null : surfaceBase + deltaSurface;
     resultat.guidage.centre = { ecart: surfaceCentre == null ? null : surfaceCentre - points.centre.altitude };
   }
-  return { ...resultat, unGnss: true, penteEngin: penteDeLEngin() };
+  return { ...resultat, unGnss: true, penteEngin: penteDeLEngin(), exageration: terrain.lame.exagerationCoupe };
 }
 
 /**
@@ -4528,7 +4559,9 @@ function guidageDesPoints(points, triangles, coins, sensLame = null) {
   const guidage = guidageLame({ gauche: points.gauche, droite: points.droite, altitudeSurface, tolerances });
   if (guidage.erreur) return { raison: guidage.erreur, guidage: null, coins };
   // Coupes : l'outil + 1 m à gauche / droite et 2 m devant / derrière au départ (0.152.0).
-  const marges = terrain.lame.marges;
+  // 0.190.0 : les boutons − / + de la coupe multiplient les marges (la coupe est plus ou moins large autour de l'outil).
+  const facteurMarges = terrain.lame.zoomMarges ?? 1;
+  const marges = Object.fromEntries(Object.entries(terrain.lame.marges).map(([cle, valeur]) => [cle, Math.max(valeur, 0.5) * facteurMarges]));
   const coupe = coupeDecalee(coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]), delta);
   let long;
   let coupeLong;
@@ -6606,6 +6639,7 @@ function donneesCommunes() {
       deltaSurface,
       coupeSeule: terrain.lame.coupeSeule,
       marges: terrain.lame.marges,
+      exagerationCoupe: terrain.lame.exagerationCoupe,
       outil: terrain.lame.outils[['bull', 'rateau'].includes(terrain.lame.machine) ? terrain.lame.machine : 'grader'],
     },
     autocontrole: donneesAutocontrole(),

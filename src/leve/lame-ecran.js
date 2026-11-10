@@ -12,6 +12,7 @@ import { bulle } from '../aide/bulles.js';
 import { formaterNombre } from '../topo/format.js';
 import { htmlRegleHauteur } from './regle-hauteur.js';
 import { silhouetteOutil } from './silhouettes.js';
+import { controlesEchelleCoupe } from './coupe-directe.js';
 
 /** Petit dessin de la machine (vue de derrière « gd » ou de côté « long ») pour l'écran de choix. */
 function imageMachine(machine, vue, boite) {
@@ -139,7 +140,10 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
         <div class="corps-coupe-guidage">
           <div class="colonne-regle" data-vivant="lame-${cle}-regle-gauche">${htmlRegleHauteur(null)}</div>
           <div class="indic-coupe gauche attente" data-vivant="lame-${cle}-gauche"></div>
-          <div class="coupe-guidage" data-vivant="lame-${cle}-coupe"></div>
+          <div class="coupe-guidage zone-coupe">
+            <div data-vivant="lame-${cle}-coupe"></div>
+            ${controlesEchelleCoupe('', donnees.exagerationCoupe ?? 1, 'changerLargeurCoupeLame', 'changerHauteurCoupeLame', `lame-${cle}-largeur`)}
+          </div>
           <div class="indic-coupe droite attente" data-vivant="lame-${cle}-droite"></div>
           <div class="colonne-regle" data-vivant="lame-${cle}-regle-droite">${htmlRegleHauteur(null)}</div>
         </div>
@@ -229,9 +233,11 @@ export function rafraichirLame(conteneur, vivant) {
     const cadre = zone(`lame-${cle}-coupe`);
     const vue = cadre.closest('.coupes-guidage')?.classList;
     const hauteur = vue?.contains('vue-coupes') ? 230 : vue?.contains('vue-plan2') ? 220 : 150;
+    const etiquetteLargeur = zone(`lame-${cle}-largeur`);
+    if (etiquetteLargeur && coupe) etiquetteLargeur.textContent = `${String(Math.round((coupe.longueur ?? 0) * 10) / 10).replace('.', ',')} m`;
     const marquesLignes = cle === 'gd' ? (vivant.lignes ?? []).filter((l) => l.surCoupe != null) : [];
     const machine = cadre.closest('.ecran-lame')?.dataset.machine ?? 'grader';
-    cadre.innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite], hauteur, marquesLignes, { machine, vue: cle, penteEngin: vivant.penteEngin ?? null }) : '';
+    cadre.innerHTML = guidage && coupe ? svgCoupeGuidage(coupe, guidage, [nomGauche, nomDroite], hauteur, marquesLignes, { machine, vue: cle, penteEngin: vivant.penteEngin ?? null, exageration: vivant.exageration ?? 1 }) : '';
   }
   // Lignes suivies : écart en plan dans la case L1 (bord G) ou L2 (bord D), flèche vers la ligne (◀ à gauche, ▶ à droite).
   (g ? vivant.lignes ?? [] : []).forEach((l) => {
@@ -272,10 +278,12 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []
   const marge = 12;
   const { longueur, morceaux, troncons, ruptures, a, b, morceauxBase = null, delta = 0 } = coupe;
   const altitudes = [a?.altitude, b?.altitude, coupe.centre?.altitude, ...morceaux.flat().map((p) => p.altitude), ...(morceauxBase ?? []).flat().map((p) => p.altitude)].filter((z) => z != null);
-  const bas = Math.min(...altitudes);
-  const haut = Math.max(...altitudes);
-  const milieu = (bas + haut) / 2;
-  const etendue = Math.max(0.2, haut - bas) * 1.4;
+  // 0.190.0 (maquette B du 10.11) : cadre FIXE, centré sur l'outil (milieu de la lame, ou du bas de lame vu de côté) ; échelle des
+  // hauteurs = celle des longueurs × l'agrandissement choisi (×1, ×1,5, ×2, ×3).
+  const exageration = Number(outil?.exageration) > 0 ? Number(outil.exageration) : 1;
+  const altitudeOutil = coupe.centre?.altitude ?? (a?.altitude != null && b?.altitude != null ? (a.altitude + b.altitude) / 2 : null);
+  const milieu = altitudeOutil ?? (Math.min(...altitudes) + Math.max(...altitudes)) / 2;
+  const etendue = (hauteur - 2 * marge - 16) / (((largeur - 2 * marge) / longueur) * exageration);
   const x = (d) => marge + (d / longueur) * (largeur - 2 * marge);
   const y = (z) => hauteur / 2 - ((z - milieu) / etendue) * (hauteur - 2 * marge - 16);
   const trace = (m) => `M${m.map((p) => `${x(p.distance).toFixed(1)} ${y(p.altitude).toFixed(1)}`).join('L')}`;
@@ -326,7 +334,7 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []
       <text x="6" y="${hauteur - 3}">◂ Arr</text>
       <text x="${largeur - 6}" y="${hauteur - 3}" text-anchor="end">Av ▸</text>
       <text x="${xc.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle" class="note-coupe-lame">bas de lame</text>
-      <text x="${largeur - 4}" y="11" text-anchor="end" class="note-coupe-lame">hauteurs agrandies</text>
+      
       ${texteDelta}
     </svg>`;
   }
@@ -355,7 +363,7 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []
     <circle class="coin-coupe-lame" cx="${xb.toFixed(1)}" cy="${yb.toFixed(1)}" r="5" />
     <text x="${xa.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">${noms[0]}</text>
     <text x="${xb.toFixed(1)}" y="${hauteur - 3}" text-anchor="middle">${noms[1]}</text>
-    <text x="${largeur - 4}" y="11" text-anchor="end" class="note-coupe-lame">hauteurs agrandies</text>
+    
     ${texteDelta}
   </svg>`;
 }

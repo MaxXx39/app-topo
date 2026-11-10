@@ -28,7 +28,7 @@ import { prefixeDuNom, avecPrefixe, dateDuJourCollee } from '../topo/surface.js'
 import { ELEMENTS_RESEAU } from '../topo/reseau.js';
 import { MATERIAUX } from './reseaux.js';
 import { DIAMETRES_LISTE, GAINES_LISTE, NOMBRES_LISTE } from '../topo/chantier.js';
-import { svgCoupeDirecte } from './coupe-directe.js';
+import { svgCoupeDirecte, controlesEchelleCoupe } from './coupe-directe.js';
 import { svgCoupeTalus } from './coupe-talus.js';
 import { svgCroquisTalus } from './croquis-talus.js';
 import { penteSignee } from '../topo/talus.js';
@@ -61,7 +61,9 @@ const VUES_COUPES = [
   ['perpendiculaire', `${symboleCoupe('M5 22H35', '#7c3aed')}<span>Perpendiculaire</span>`],
   ['axe', `${symboleCoupe('M20 4V36', '#db2777')}<span>Dans l\'axe</span>`],
 ];
-export const LONGUEURS_COUPE = [2, 5, 10, 20];
+// 0.190.0 : demi-longueurs (m de chaque côté) : coupes de 5, 10, 20 ou 40 m de large ; échelles de hauteur ×1 à ×3.
+export const LONGUEURS_COUPE = [2.5, 5, 10, 20];
+export const EXAGERATIONS_COUPE = [1, 1.5, 2, 3];
 // Ce que l'on lève : une surface (même choix que « + Nouvelle surface » dans Calculs › Surfaces)
 // ou un métré (aires, longueurs, points comptés : des mesures de Calculs › Mesures / métrés).
 const NATURES_TERRAIN = [
@@ -622,11 +624,12 @@ export function creerEcranLeve(conteneur, actions) {
       ${ecartEtRegle()}
       <div class="ligne-choix choix-coupe seulement-intermediaire">${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}
         <button type="button" class="bouton-roue ${reglagesCoupesOuverts ? 'actif' : ''}" data-action="basculerReglagesCoupes" aria-label="Réglages des coupes" aria-expanded="${reglagesCoupesOuverts}">⚙</button></div>
-      ${reglagesCoupesOuverts ? `<div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
-      <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
-      ${champDeltaSurface(donnees.deltaSurface)}` : ''}
+      ${reglagesCoupesOuverts ? champDeltaSurface(donnees.deltaSurface) : ''}
       <div class="coupes-directes vue-${vue}">
-        <div data-vivant="coupe-${vue}"></div>
+        <div class="zone-coupe">
+          <div data-vivant="coupe-${vue}"></div>
+          ${controlesEchelleCoupe(`${String(2 * reglages.demiLongueur).replace('.', ',')} m`, reglages.exagerationCoupe, 'changerLargeurCoupe', 'changerHauteurCoupe')}
+        </div>
       </div>
       <p class="aide" data-vivant="orientation"></p>`;
   }
