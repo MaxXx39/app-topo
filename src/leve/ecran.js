@@ -53,9 +53,13 @@ const IMPLANTATIONS = [
 const IMPLANTATIONS_EXPERT = ['talus'];
 const NATURES_BASE = ['autres'];
 // 0.144.0 (liste du 05.11, point 5) : une seule coupe à la fois (plus de « Les 2 »).
+// 0.189.3 (maquette A du 10.11) : symbole dans chaque bouton : flèche grise = ma direction, trait = la coupe, de la couleur
+// qu'elle a sur le plan (perpendiculaire violet, dans l'axe rose).
+const FLECHE_MARCHE = '<path d="M20 34V8M13 15l7-8 7 8" fill="none" stroke="#475569" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+const symboleCoupe = (trait, couleur) => `<svg class="symbole-coupe" viewBox="0 0 40 40" aria-hidden="true">${FLECHE_MARCHE}<path d="${trait}" stroke="${couleur}" stroke-width="4" stroke-linecap="round" fill="none"/></svg>`;
 const VUES_COUPES = [
-  ['perpendiculaire', 'Perpendiculaire'],
-  ['axe', 'Dans l\'axe'],
+  ['perpendiculaire', `${symboleCoupe('M5 22H35', '#7c3aed')}<span>Perpendiculaire</span>`],
+  ['axe', `${symboleCoupe('M20 4V36', '#db2777')}<span>Dans l\'axe</span>`],
 ];
 export const LONGUEURS_COUPE = [2, 5, 10, 20];
 // Ce que l'on lève : une surface (même choix que « + Nouvelle surface » dans Calculs › Surfaces)
