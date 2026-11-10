@@ -5,16 +5,26 @@
 import { lireNomLeve } from '../topo/leve-direct.js';
 import { dateDuPoint, jourDuPoint } from '../topo/date-point.js';
 
-/** Catégories : [clé, titre, couleur de la pastille]. */
+/**
+ * Catégories : [clé, titre, couleur de la pastille]. 0.197.0 : un levé est rangé par sa nature (Libre, Stock, Terrain,
+ * Terrassement, Métré, Chantier), à côté de Contrôle, Recollement, Annotation et des points Importés. Le cadastre est dans
+ * « Plans ». Un bouton n'est montré que si le projet a du contenu dans cette catégorie.
+ */
 export const CATEGORIES_POINTS = [
   ['controle', 'Contrôle', '#b91c1c'],
-  ['leve', 'Levé', '#eab308'],
-  ['import', 'Import', '#2563eb'],
-  ['annotation', 'Annotation', '#7c4a1e'],
+  ['libre', 'Levé libre', '#eab308'],
+  ['stock', 'Stock', '#b45309'],
+  ['terrain', 'Terrain', '#15803d'],
+  ['terrassement', 'Terrassement', '#0891b2'],
+  ['metre', 'Métré', '#ea580c'],
   ['chantier', 'Chantier', '#0f766e'],
   ['recollement', 'Recollement', '#16a34a'],
-  ['cadastre', 'Cadastre', '#7c3aed'],
+  ['annotation', 'Annotation', '#7c4a1e'],
+  ['import', 'Importés', '#2563eb'],
 ];
+
+/** Catégories de points qui sont des levés (tout sauf Contrôle et Importés). */
+export const CATEGORIES_LEVES = ['libre', 'stock', 'terrain', 'terrassement', 'metre', 'chantier', 'recollement', 'annotation'];
 
 /** Colonnes : [clé, titre, valeur numérique ?]. */
 export const COLONNES_POINTS = [
@@ -31,15 +41,20 @@ export const COLONNES_POINTS = [
   ['liste', 'Liste', false],
 ];
 
-/** Catégorie d'une liste de points (levé du projet) : 'import', 'cadastre', 'annotation', 'chantier', 'recollement' ou 'leve'. */
+/**
+ * Catégorie d'une liste de points (levé du projet) : 'import', 'annotation', 'chantier', 'recollement', 'metre', 'stock',
+ * 'terrain', 'terrassement' ou 'libre'. Le cadastre n'est pas dans le tableau (null : il est dans « Plans »).
+ */
 export function categorieDeListe(projet, leve) {
-  if (leve.cadastre) return 'cadastre';
+  if (leve.cadastre) return null;
   if (!leve.direct) return 'import';
+  if ((projet.reseaux ?? []).some((r) => r.leveId === leve.id)) return 'recollement';
   const proprietaire = proprietaireDeListe(projet, leve);
-  if (proprietaire?.nature === 'annotation') return 'annotation';
-  if (proprietaire?.nature === 'chantier') return 'chantier';
-  if (proprietaire?.nature === 'reseau' || (projet.reseaux ?? []).some((r) => r.leveId === leve.id)) return 'recollement';
-  return 'leve';
+  const nature = proprietaire?.nature ?? (proprietaire ? 'stock' : 'libre');
+  if (nature === 'reseau' || nature === 'recollement') return 'recollement';
+  if (['annotation', 'chantier', 'metre', 'stock', 'terrain', 'terrassement'].includes(nature)) return nature;
+  // Surface du Dessin (rangée dans les surfaces) ou levé libre.
+  return (projet.surfaces ?? []).some((o) => o.leveId === leve.id) ? 'stock' : 'libre';
 }
 
 /** Objet qui possède une liste (surface, métré, chantier, annotation, réseau) : il garde les photos. */
@@ -51,7 +66,10 @@ function proprietaireDeListe(projet, leve) {
 export function listesDuTableau(projet) {
   const listes = [];
   if ((projet.pointsControle ?? []).length > 0) listes.push({ id: 'controle', nom: 'Points de contrôle', categorie: 'controle', nombre: projet.pointsControle.length });
-  for (const leve of projet.leves ?? []) if (leve.points.length > 0) listes.push({ id: leve.id, nom: leve.nom, categorie: categorieDeListe(projet, leve), nombre: leve.points.length });
+  for (const leve of projet.leves ?? []) {
+    const categorie = categorieDeListe(projet, leve);
+    if (categorie && leve.points.length > 0) listes.push({ id: leve.id, nom: leve.nom, categorie, nombre: leve.points.length });
+  }
   return listes;
 }
 
@@ -101,7 +119,7 @@ export function lignesDuTableau(projet, { categories, listesDecochees = new Set(
   }
   for (const leve of projet.leves ?? []) {
     const categorie = categorieDeListe(projet, leve);
-    if (!aGarder(leve.id, categorie)) continue;
+    if (!categorie || !aGarder(leve.id, categorie)) continue;
     const photos = proprietaireDeListe(projet, leve)?.photos ?? [];
     for (const p of leve.points) lignes.push(ligneDuPoint(p, categorie, leve, photos));
   }

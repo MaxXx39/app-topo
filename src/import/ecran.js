@@ -25,7 +25,7 @@ import { lireReseaux } from '../leve/reseaux.js';
 import { dateHeureDuPoint, jourDuPoint, trierParDate } from '../topo/date-point.js';
 import { nomDuType, resumeArchive } from '../projet/archives.js';
 import { lireTypesDxf, couleurDuType } from '../topo/types-dxf.js';
-import { CATEGORIES_POINTS, COLONNES_POINTS, listesDuTableau, lignesDuTableau, trierLignes, texteDate, csvDuTableau } from './tableau-points.js';
+import { CATEGORIES_POINTS, CATEGORIES_LEVES, COLONNES_POINTS, listesDuTableau, lignesDuTableau, trierLignes, texteDate, csvDuTableau } from './tableau-points.js';
 
 /**
  * Crée le panneau « Import » dans "conteneur" et « Contenu du projet » dans "contenu". Les actions sont faites par main.js via "actions" :
@@ -67,6 +67,8 @@ export function creerEcranImport(conteneur, contenu, actions) {
   const filtreDate = { ordre: 'recent', jour: '', jourPoints: '' };
   // 0.191.0 : tableau « Points » : catégories choisies (null = départ : Levé), listes décochées, tri par colonne, jour.
   const tableauEtat = { categories: null, listesDecochees: new Set(), colonne: 'date', asc: false, jour: '' };
+  // 0.197.0 : une page à la fois dans « Contenu » : 'points' (liste de points), 'plans', 'surfaces' ou 'archives'.
+  let vue = 'points';
   ecouter('toggle', (evenement) => {
     if (evenement.target.classList?.contains('points-de-la-liste')) remplirTableauOuvert(evenement.target);
     const id = evenement.target.dataset?.calquesPlan;
@@ -257,7 +259,12 @@ export function creerEcranImport(conteneur, contenu, actions) {
     tableauEtat.listesDecochees = new Set();
     if (derniers) afficher(...derniers);
   }
-  return { afficher, choisirCategories };
+  /** 0.197.0 : page du contenu à montrer : 'points', 'plans', 'surfaces' ou 'archives'. */
+  function choisirVue(quelle) {
+    vue = ['points', 'plans', 'surfaces', 'archives'].includes(quelle) ? quelle : 'points';
+    if (derniers) afficher(...derniers);
+  }
+  return { afficher, choisirCategories, choisirVue };
 
   /**
    * Redessine le bloc. dernierImport : résultat du dernier import de points, ou null ;
@@ -324,7 +331,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
           ${messageSurface}
         </div>`;
       tableauxEnAttente.clear();
-      contenu.innerHTML = blocContenu(projet, calquesOuverts, categoriesFermees, filtreDate, tableauEtat);
+      contenu.innerHTML = blocContenu(projet, calquesOuverts, categoriesFermees, filtreDate, tableauEtat, vue);
   }
 }
 
@@ -357,60 +364,42 @@ function natureDeLaListe(projet, leve, couleursReseaux) {
  * « Contenu du projet » (0.103.0) : une catégorie repliable par sorte, dans l'ordre demandé
  * (Contrôle d'abord) ; une catégorie vide n'est pas montrée. fermees : catégories repliées.
  */
-export function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordre: 'recent', jour: '' }, tableau = { categories: null, listesDecochees: new Set(), colonne: 'date', asc: false, jour: '' }) {
+export function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordre: 'recent', jour: '' }, tableau = { categories: null, listesDecochees: new Set(), colonne: 'date', asc: false, jour: '' }, vue = 'points') {
   // Cadastre (0.116.4) : points et lignes rangés ensemble dans leur catégorie.
   const cadastres = projet.leves.filter((l) => l.cadastre);
   const plansCadastre = new Set(cadastres.map((l) => planDuCadastre(projet, l)?.id).filter(Boolean));
-  // Levés et points importés : triés par date (le plus récent en haut au départ), un jour au choix (0.186.0).
-  const sens = filtreDate.ordre === 'ancien' ? -1 : 1;
-  const parDate = (a, b) => sens * String(b.importeLe ?? '').localeCompare(String(a.importeLe ?? ''));
-  const jourDe = (l) => String(l.jour ?? l.importeLe ?? '').slice(0, 10);
-  const garde = (l) => !filtreDate.jour || jourDe(l) === filtreDate.jour;
-  const listes = projet.leves.filter((l) => !l.direct && !l.cadastre && garde(l)).sort(parDate);
-  const nombreListes = projet.leves.filter((l) => !l.direct && !l.cadastre).length;
-  const barreDate = `<div class="barre-date-listes seulement-intermediaire"><button type="button" class="bouton-lien" data-action="trier-listes-date" title="Changer l'ordre des listes">Trier par date : ${filtreDate.ordre === 'recent' ? 'récent d\'abord ▾' : 'ancien d\'abord ▴'}</button>
-    <label class="aide">Jour <input type="date" data-champ="jour-listes" value="${echapper(filtreDate.jour)}" aria-label="Chercher les listes d'un jour" /></label>
-    ${filtreDate.jour ? '<button type="button" class="bouton-lien" data-action="effacer-jour-listes">tout voir</button>' : ''}</div>`;
-  const aucune = '<p class="vide">Aucune liste ce jour-là.</p>';
-  const levees = projet.leves.filter((l) => l.direct && garde(l)).sort(parDate);
-  const nombreLevees = projet.leves.filter((l) => l.direct).length;
   const surfacesProjet = projet.surfaces.filter((s) => estSurfaceFichier(s));
   const dessins = (projet.dessins ?? []).filter((d) => d.sommets.length > 0);
-  const couleursReseaux = new Map(lireReseaux().map(([a, , c]) => [a, c]));
-  // 0.187.0 : tous les points du projet dans une seule liste, triés par date, avec recherche d'un jour.
-  const tousLesPoints = () => {
-    const tous = [];
-    for (const leve of projet.leves) for (const p of leve.points) tous.push({ ...p, listeNom: leve.nom });
-    return filtreDate.jourPoints ? tous.filter((p) => jourDuPoint(p) === filtreDate.jourPoints) : tous;
-  };
-  const nombreTousPoints = projet.leves.reduce((total, l) => total + l.points.length, 0);
-  const barrePoints = `<div class="barre-date-listes"><label class="aide">Jour <input type="date" data-champ="jour-points" value="${echapper(filtreDate.jourPoints)}" aria-label="Chercher les points d'un jour" /></label>
-    ${filtreDate.jourPoints ? '<button type="button" class="bouton-lien" data-action="effacer-jour-points">tout voir</button>' : ''}</div>`;
   const categorie = (cle, titre, nombre, html, mode = '') => (nombre > 0
     ? `<details class="categorie-contenu ${mode}" data-categorie="${cle}" ${fermees.has(cle) ? '' : 'open'}>
         <summary><span>${titre}</span><span class="nombre-categorie">${nombre}</span></summary>
         ${html}
       </details>`
     : '');
-  const contenu = [
-    categorie('surfaces', 'Surfaces importées', surfacesProjet.length, surfacesProjet.map(ligneSurfaceProjet).join(''), 'seulement-expert'),
-    categorie('tableau-points', 'Points (tableau)', listesDuTableau(projet).reduce((total, l) => total + l.nombre, 0), blocTableauPoints(projet, tableau)),
-    categorie('cadastre', 'Cadastre', cadastres.length, cadastres.map((l) => ligneCadastre(projet, l)).join('')),
-    categorie('dxf', 'Plans DXF', (projet.plansDxf ?? []).filter((p) => !plansCadastre.has(p.id)).length, listePlansDxf(projet, calquesOuverts, plansCadastre), 'seulement-intermediaire'),
-    categorie('dessins', 'Dessins', dessins.length, listesDessins(projet), 'seulement-intermediaire'),
-    categorie('archives', 'Archivés', (projet.archives ?? []).length, listeArchives(projet), 'seulement-intermediaire'),
-  ].join('');
+  // 0.197.0 : une page par bouton du menu (Liste de points, Plans, Surfaces importées, Archives), plus rien de mélangé.
+  const pages = {
+    points: ['Liste de points', () => (listesDuTableau(projet).length > 0 ? blocTableauPoints(projet, tableau) : '')],
+    plans: ['Plans', () => [
+      categorie('dxf', 'Plans DXF et PDF', (projet.plansDxf ?? []).filter((p) => !plansCadastre.has(p.id)).length, listePlansDxf(projet, calquesOuverts, plansCadastre)),
+      categorie('cadastre', 'Cadastre', cadastres.length, cadastres.map((l) => ligneCadastre(projet, l)).join('')),
+      categorie('dessins', 'Dessins', dessins.length, listesDessins(projet), 'seulement-intermediaire'),
+    ].join('')],
+    surfaces: ['Surfaces importées', () => surfacesProjet.map(ligneSurfaceProjet).join('')],
+    archives: ['Archives', () => ((projet.archives ?? []).length > 0 ? listeArchives(projet) : '')],
+  };
+  const [titre, corps] = pages[vue] ?? pages.points;
   return `<div class="carte-section contenu-projet">
-      ${titreSection('leves', 'Contenu du projet', bulle('leves'))}
-      ${contenu || '<p class="vide">Rien dans ce projet pour l\'instant.</p>'}
+      ${titreSection('leves', titre, bulle('leves'))}
+      ${corps() || '<p class="vide">Rien ici pour l\'instant.</p>'}
     </div>`;
 }
 
-/** Catégories choisies du tableau : au départ « Levé » (sinon la première catégorie qui a des points). */
+/** Catégories choisies du tableau : au départ tous les levés (sinon la première catégorie qui a des points). */
 function categoriesChoisies(projet, etat) {
   if (etat.categories) return etat.categories;
   const presentes = new Set(listesDuTableau(projet ?? { leves: [] }).map((l) => l.categorie));
-  return new Set(presentes.has('leve') ? ['leve'] : [CATEGORIES_POINTS.map(([c]) => c).find((c) => presentes.has(c))].filter(Boolean));
+  const leves = CATEGORIES_LEVES.filter((c) => presentes.has(c));
+  return new Set(leves.length > 0 ? leves : [CATEGORIES_POINTS.map(([c]) => c).find((c) => presentes.has(c))].filter(Boolean));
 }
 
 /** Lignes du tableau pour l'état choisi (catégories, listes, jour), triées. */
@@ -690,7 +679,7 @@ function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
         <div class="ligne-outils">
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${plan.id}">voir</button>
-          <button type="button" class="bouton-lien bouton-lien-neutre" data-action="recaler-plan" data-id="${plan.id}">recaler</button>
+          <button type="button" class="bouton-lien bouton-lien-neutre seulement-intermediaire" data-action="recaler-plan" data-id="${plan.id}">recaler</button>
           <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="archiver" data-type="plan" data-id="${plan.id}">archiver</button>
         <button type="button" class="bouton-lien archive-comme-suppression" data-action="archiver" data-type="plan" data-id="${plan.id}">supprimer</button>
         <button type="button" class="bouton-lien suppression-vraie" data-action="supprimer-plan" data-id="${plan.id}">supprimer</button>

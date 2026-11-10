@@ -406,7 +406,7 @@ document.querySelector('#app').innerHTML = `
 /** Nom d'une application à l'écran (sur le site, « Lever » s'appelle « Édition Lever »). */
 const titreAppli = (appli) => {
   // Pages du projet (0.159.0) : le bouton porte le nom de la page (Projets, Import, Exporter, Contenu).
-  if (appli?.cle === 'projet') return { ouvrir: 'Projets', import: 'Import', export: 'Exporter', contenu: 'Contenu' }[document.body.dataset.partieProjet] ?? 'Projet';
+  if (appli?.cle === 'projet') return { ouvrir: 'Projets', import: 'Import', export: 'Exporter', contenu: 'Contenu', points: 'Liste de points', plans: 'Plans', surfaces: 'Surfaces', archives: 'Archives' }[document.body.dataset.partieProjet] ?? 'Projet';
   return !recepteurDisponible() && appli?.titreSite ? appli.titreSite : (appli?.titre ?? '');
 };
 
@@ -1333,17 +1333,29 @@ function exporterMesureRapide() {
 // Pages du projet (0.159.0, demande du 08.11) : il n'y a plus d'application « Projet » ; chaque bouton
 // de l'encadré du projet (page Applications) ouvre sa page à part : la liste des projets (« Changer »),
 // Import, Exporter ou le contenu du projet (body[data-partie-projet], le reste de l'onglet est caché).
-const TITRES_PARTIES_PROJET = { ouvrir: 'Projets', nouveau: 'Nouveau projet', import: 'Import', export: 'Exporter', contenu: 'Contenu du projet' };
+const TITRES_PARTIES_PROJET = { ouvrir: 'Projets', nouveau: 'Nouveau projet', import: 'Import', export: 'Exporter', contenu: 'Contenu du projet', points: 'Liste de points', plans: 'Plans', surfaces: 'Surfaces importées', archives: 'Archives' };
+const PAGES_CONTENU = ['points', 'plans', 'surfaces', 'archives'];
+// 0.197.0 : bouton « liste » des tuiles : les catégories de points montrées (Lever : tous les levés de terrain).
+const CATEGORIES_TUILES = {
+  lever: ['libre', 'stock', 'terrain', 'terrassement', 'chantier'],
+  mesure: ['libre'],
+  metre: ['metre'],
+  recollement: ['recollement'],
+  annotation: ['annotation'],
+  controle: ['controle'],
+};
 
-/** Page du projet : 'ouvrir' (liste des projets), 'import', 'export' ou 'contenu'. */
+/** Page du projet : 'ouvrir' (liste des projets), 'import', 'export' ou une page du contenu ('points', 'plans', 'surfaces', 'archives'). */
 function ouvrirPartieProjet(quoi) {
+  if (quoi === 'contenu') quoi = 'points'; // ancien nom
+  if (PAGES_CONTENU.includes(quoi)) ecranImport?.choisirVue(quoi);
   afficherOnglet('projets', { partie: quoi });
   if (quoi === 'ouvrir') {
     // La page « Ouvrir projet » (liste, dossiers, + Nouveau) de l'écran Projet.
     if (!document.querySelector('.panneau-projet')?.classList.contains('page-gestion-projets')) {
       document.querySelector('#projets [data-action="panneau"][data-panneau="projets"]')?.click();
     }
-  } else montrerOngletProjet(quoi === 'contenu' || quoi === 'nouveau' ? null : quoi);
+  } else montrerOngletProjet(PAGES_CONTENU.includes(quoi) || quoi === 'nouveau' ? null : quoi);
   window.scrollTo(0, 0);
 }
 
@@ -1409,12 +1421,12 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
   comptes: comptesDuProjet,
   detailTuile: detailDeTuile,
   // 0.195.0 : bouton « liste » des tuiles Lever, Annotation, Contrôle… : le tableau « Points » avec leur catégorie.
-  categorieListe: (cle) => ({ lever: 'leve', mesure: 'leve', metre: 'leve', recollement: 'recollement', annotation: 'annotation', controle: 'controle' })[cle] ?? null,
+  categorieListe: (cle) => CATEGORIES_TUILES[cle] ?? null,
   ouvrirListe: (cle) => {
-    const categorie = { lever: 'leve', mesure: 'leve', metre: 'leve', recollement: 'recollement', annotation: 'annotation', controle: 'controle' }[cle];
-    if (!categorie) return;
-    ecranImport.choisirCategories([categorie]);
-    ouvrirPartieProjet('contenu');
+    const categories = CATEGORIES_TUILES[cle];
+    if (!categories) return;
+    ecranImport.choisirCategories(categories);
+    ouvrirPartieProjet('points');
   },
   applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces })
     // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile.
@@ -8366,7 +8378,7 @@ function allerA(onglet) {
     return;
   }
   // Import (Expert), sinon le contenu du projet : sa page à part (0.159.0).
-  ouvrirPartieProjet(aAcces('expert') ? 'import' : 'contenu');
+  ouvrirPartieProjet(aAcces('expert') ? 'import' : 'points');
 }
 
 /**

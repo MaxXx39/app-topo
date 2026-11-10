@@ -17,7 +17,7 @@ describe('blocContenu', () => {
     expect(html).not.toContain('data-categorie="leves"');
     expect(html).not.toContain('data-categorie="points"');
     expect(html).not.toContain('data-categorie="controle"');
-    expect(html).toContain('data-categorie="tableau-points"');
+    expect(html).toContain('Liste de points');
     expect(html).toContain('Gérer les listes choisies');
     expect(html).toContain('--couleur-liste: #ff0000'); // la liste garde sa couleur
   });
@@ -26,11 +26,24 @@ describe('blocContenu', () => {
     const projet = creerProjet('t');
     projet.leves.push({ id: 'a', nom: 'A', direct: true, importeLe: '2026-11-01T10:00:00Z', points: [{ nom: 'P1', est: 1, nord: 2, altitude: 3, gnss: { prisLe: '2026-11-01T10:00:00Z' } }] });
     const html = blocContenu(projet, new Set(), new Set());
-    expect(html).toContain('Points (tableau)');
+    expect(html).toContain('Liste de points');
     expect(html).toContain('data-action="tp-categorie"');
     expect(html).toContain('data-champ="tp-jour"');
     expect(html).toContain('data-action="tp-tri"');
     expect(html).toContain('data-action="tp-exporter"');
     expect(html).toContain('>P1<');
+  });
+
+  it('0.197.0 : une page par bouton (Plans, Surfaces importées, Archives), plus rien de mélangé', () => {
+    const projet = creerProjet('t');
+    projet.leves.push({ id: 'a', nom: 'A', direct: true, importeLe: '2026-11-01T10:00:00Z', points: [{ nom: 'P1', est: 1, nord: 2, altitude: 3 }] });
+    const tableau = { categories: null, listesDecochees: new Set(), colonne: 'date', asc: false, jour: '' };
+    const filtre = { ordre: 'recent', jour: '' };
+    const plans = blocContenu(projet, new Set(), new Set(), filtre, tableau, 'plans');
+    expect(plans).toContain('Plans');
+    expect(plans).not.toContain('data-action="tp-categorie"');
+    expect(blocContenu(projet, new Set(), new Set(), filtre, tableau, 'surfaces')).toContain('Rien ici');
+    expect(blocContenu(projet, new Set(), new Set(), filtre, tableau, 'archives')).toContain('Archives');
+    expect(blocContenu(projet, new Set(), new Set(), filtre, tableau, 'points')).toContain('data-action="tp-categorie"');
   });
 });

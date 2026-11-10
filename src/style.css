@@ -13421,3 +13421,16 @@ body.mode-telephone .bande-appli .cadre-levee .fleche-levee-bande { width: 30px;
 body.mode-telephone .bande-appli .cadre-levee .nom-levee-bande { font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 body.mode-telephone .bande-appli .cadre-levee .petit-bouton-levee { min-height: 0; height: auto; align-self: stretch; }
 body.mode-telephone .bande-appli .cadre-levee { flex: 1 1 0; min-width: 0; }
+
+/* 0.197.0 : encadré du projet en deux moitiés : Import / Exporter à gauche, pages du contenu à droite (Archives plus petit). */
+.cadre-projet-applis .parties-projet-applis { align-items: stretch; }
+.colonne-parties-projet { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.colonne-parties-projet .bouton-partie-projet { flex: 1 1 auto; }
+.colonne-parties-projet .bouton-partie-projet.petit { flex: 0 0 auto; min-height: 34px; font-size: 12px; }
+.colonne-parties-projet .bouton-partie-projet.petit svg { width: 16px; height: 16px; }
+body.mode-telephone .colonne-parties-projet { gap: 5px; }
+body.mode-telephone .colonne-parties-projet .bouton-partie-projet.petit { min-height: 26px; font-size: 10.5px; }
+body[data-partie-projet='points'] .panneau-projet > #contenu-projet,
+body[data-partie-projet='plans'] .panneau-projet > #contenu-projet,
+body[data-partie-projet='surfaces'] .panneau-projet > #contenu-projet,
+body[data-partie-projet='archives'] .panneau-projet > #contenu-projet { display: block !important; }
