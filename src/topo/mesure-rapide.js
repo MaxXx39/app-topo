@@ -99,10 +99,12 @@ export function trianglesDuPolygone(points) {
  * de / a = numéros des points (1, 2…). 2 points : un côté. 3 points et plus : la figure est fermée
  * (dernier côté = du dernier point au premier). longueur2d / longueur3d = total des côtés (le périmètre si fermée).
  */
-export function mesureRapide(points) {
+export function mesureRapide(points, { fermee = true } = {}) {
   const n = points.length;
   const cotes = [];
-  const nombreCotes = n >= 3 ? n : Math.max(0, n - 1);
+  // 0.186.0 : dès 3 points, figure fermée (défaut) ou ligne ouverte 1-2-3-4 (sans côté de fermeture ni surface).
+  const ouverte = n >= 3 && !fermee;
+  const nombreCotes = n >= 3 && !ouverte ? n : Math.max(0, n - 1);
   for (let i = 0; i < nombreCotes; i += 1) {
     const j = (i + 1) % n;
     cotes.push({ de: i + 1, a: j + 1, ...valeursCote(points[i], points[j]) });
@@ -111,7 +113,7 @@ export function mesureRapide(points) {
   const total2d = cotes.length > 0 ? somme('longueur2d') : null;
   const total3d = cotes.length > 0 ? somme('longueur3d') : null;
   let ferme = null;
-  if (n >= 3) {
+  if (n >= 3 && !ouverte) {
     const avecAltitudes = points.every(aAltitude);
     ferme = {
       perimetre2d: total2d,
@@ -120,5 +122,5 @@ export function mesureRapide(points) {
       surface3d: avecAltitudes ? trianglesDuPolygone(points).reduce((total, [a, b, c]) => total + surfaceTriangle3d(points[a], points[b], points[c]), 0) : null,
     };
   }
-  return { points, cotes, longueur2d: total2d, longueur3d: total3d, ferme };
+  return { points, cotes, longueur2d: total2d, longueur3d: total3d, ferme, ouverte };
 }

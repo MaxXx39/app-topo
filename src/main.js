@@ -314,7 +314,7 @@ if (!recepteurDisponible()) document.body.classList.add('sur-site');
 let navigation = null;
 // Mesure rapide (0.158.0, dès Intermédiaire) : points choisis (jamais enregistrés tant qu'on ne touche pas
 // « Enregistrer »), accroche du toucher, page de chaque tableau.
-const mesureRapideEtat = { points: [], accroche: 'point', pages: { points: 0, cotes: 0 }, candidat: null };
+const mesureRapideEtat = { points: [], accroche: 'point', pages: { points: 0, cotes: 0 }, candidat: null, fermee: true };
 // Ajout manuel d'un point en touchant le plan (voir plus bas « Édition Lever sur le site ») ; déclaré ici car afficherOnglet le lit.
 const ajoutLevee = { actif: false, accroche: 'point', choix: null };
 // Les parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Volumes, Mesures /
@@ -670,14 +670,14 @@ function mesureRapideActive() {
 
 /** Redessine l'écran (sous le plan), le plan et la bande. */
 function afficherMesureRapide() {
-  const mesure = mesureRapide(mesureRapideEtat.points);
+  const mesure = mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee });
   for (const [cle, n] of [['points', mesure.points.length], ['cotes', mesure.cotes.length]]) {
     mesureRapideEtat.pages[cle] = Math.min(mesureRapideEtat.pages[cle], nombreDePages(n) - 1);
   }
   if (mesureRapideEtat.accroche === 'libre') mesureRapideEtat.accroche = 'manuel';
   document.querySelector('#mesure-rapide').innerHTML = htmlMesureRapide({
     mesure, accroche: mesureRapideEtat.accroche, accroches: accrochesMesure(), pages: mesureRapideEtat.pages,
-    manuel: { candidat: Boolean(mesureRapideEtat.candidat), zoom: terrain.zoomLoupe ?? 4 }, accrochesOuvertes: Boolean(mesureRapideEtat.accrochesOuvertes),
+    manuel: { candidat: Boolean(mesureRapideEtat.candidat), zoom: terrain.zoomLoupe ?? 4 }, fermee: mesureRapideEtat.fermee, accrochesOuvertes: Boolean(mesureRapideEtat.accrochesOuvertes),
   });
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
@@ -688,7 +688,7 @@ function afficherMesureRapide() {
 function ajouterPointMesure(point) {
   const mm = (valeur) => Math.round(valeur * 1000) / 1000;
   mesureRapideEtat.points.push({ nom: point.nom ?? '', est: mm(point.est), nord: mm(point.nord), altitude: point.altitude != null ? mm(point.altitude) : null });
-  const mesure = mesureRapide(mesureRapideEtat.points);
+  const mesure = mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee });
   mesureRapideEtat.pages = { points: nombreDePages(mesure.points.length) - 1, cotes: nombreDePages(mesure.cotes.length) - 1 };
   vibrer(30);
   afficherMesureRapide();
@@ -760,6 +760,7 @@ function annulerDernierPointMesure() {
 /** Remise à zéro de la mesure. */
 function remettreMesureAZero() {
   mesureRapideEtat.points = [];
+  mesureRapideEtat.fermee = true;
   mesureRapideEtat.pages = { points: 0, cotes: 0 };
   afficherMesureRapide();
 }
@@ -1215,6 +1216,10 @@ document.querySelector('#mesure-rapide').addEventListener('click', (evenement) =
   if (action === 'basculer-accroches-mesure') {
     mesureRapideEtat.accrochesOuvertes = !mesureRapideEtat.accrochesOuvertes;
     afficherMesureRapide();
+  } else if (action === 'basculer-ferme-mesure') {
+    mesureRapideEtat.fermee = !mesureRapideEtat.fermee;
+    mesureRapideEtat.pages.cotes = nombreDePages(mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee }).cotes.length) - 1;
+    afficherMesureRapide();
   } else if (action === 'accroche-mesure') {
     mesureRapideEtat.accroche = bouton.dataset.valeur;
     mesureRapideEtat.candidat = null;
@@ -1240,7 +1245,7 @@ document.querySelector('#mesure-rapide').addEventListener('click', (evenement) =
 /** « Enregistrer » : la mesure va dans le levé libre « LV-Mesures rapides » (points MR-n-…, ligne fermée dès 3 points). */
 function enregistrerMesureRapide() {
   if (mesureRapideEtat.points.length === 0 || refuserEnLectureSeule()) return;
-  const resultat = rangerMesureRapide(projet, mesureRapideEtat.points, nomsDuProjet(projet));
+  const resultat = rangerMesureRapide(projet, mesureRapideEtat.points, nomsDuProjet(projet), { fermee: mesureRapideEtat.fermee });
   if (resultat.erreur) {
     alert(`Mesure non enregistrée : ${resultat.erreur}.`);
     return;
@@ -1293,7 +1298,7 @@ async function fondDuCroquisMesure(mesure, { photo, plans }) {
 
 /** « Exporter » : PDF (croquis + tableaux) ou DXF (points, lignes, textes), puis la fenêtre Exporter. */
 function exporterMesureRapide() {
-  const mesure = mesureRapide(mesureRapideEtat.points);
+  const mesure = mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee });
   if (mesure.points.length === 0) return;
   const base = `${nomDeFichierProjet(projet)}_mesure-rapide`.replace(/[\\/:*?"<>|]/g, '_');
   const avecPlans = plansDuProjet().some((p) => p.visible !== false);
@@ -3265,7 +3270,7 @@ function envoyerImplantationAuPlan() {
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : [],
-        mesureRapide: mesureRapideActive() ? mesureRapide(mesureRapideEtat.points) : null,
+        mesureRapide: mesureRapideActive() ? mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee }) : null,
       }
     : null);
   gererLoupeImplantation();

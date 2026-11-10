@@ -60,6 +60,8 @@ export function creerEcranImport(conteneur, contenu, actions) {
   let erreurPoint = '';
   let derniers = null;
   let messageControle = ''; // erreur du dernier import de points de contrôle
+  // 0.186.0 : tri par date (récent d'abord ou ancien d'abord) et recherche d'un jour pour les listes de points (Intermédiaire).
+  const filtreDate = { ordre: 'recent', jour: '' };
   ecouter('toggle', (evenement) => {
     if (evenement.target.classList?.contains('points-de-la-liste')) remplirTableauOuvert(evenement.target);
     const id = evenement.target.dataset?.calquesPlan;
@@ -81,6 +83,16 @@ export function creerEcranImport(conteneur, contenu, actions) {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
     const { action, id } = bouton.dataset;
+    if (action === 'trier-listes-date') {
+      filtreDate.ordre = filtreDate.ordre === 'recent' ? 'ancien' : 'recent';
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'effacer-jour-listes') {
+      filtreDate.jour = '';
+      if (derniers) afficher(...derniers);
+      return;
+    }
     if (action === 'ouvrir-point') {
       pointOuvert = !pointOuvert;
       erreurPoint = '';
@@ -123,6 +135,11 @@ export function creerEcranImport(conteneur, contenu, actions) {
   });
 
   ecouter('change', async (evenement) => {
+    if (evenement.target.matches?.('[data-champ="jour-listes"]')) {
+      filtreDate.jour = evenement.target.value;
+      if (derniers) afficher(...derniers);
+      return;
+    }
     const cible = evenement.target;
     if (cible.dataset.champ === 'fichier-controle' && cible.files[0]) {
       // Points de contrôle : sans code de sécurité depuis 0.90.0 (demande du 29.10.2026).
@@ -237,7 +254,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
           ${messageSurface}
         </div>`;
       tableauxEnAttente.clear();
-      contenu.innerHTML = blocContenu(projet, calquesOuverts, categoriesFermees);
+      contenu.innerHTML = blocContenu(projet, calquesOuverts, categoriesFermees, filtreDate);
   }
 }
 
@@ -270,13 +287,23 @@ function natureDeLaListe(projet, leve, couleursReseaux) {
  * « Contenu du projet » (0.103.0) : une catégorie repliable par sorte, dans l'ordre demandé
  * (Contrôle d'abord) ; une catégorie vide n'est pas montrée. fermees : catégories repliées.
  */
-function blocContenu(projet, calquesOuverts, fermees) {
+function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordre: 'recent', jour: '' }) {
   // Cadastre (0.116.4) : points et lignes rangés ensemble dans leur catégorie.
   const cadastres = projet.leves.filter((l) => l.cadastre);
   const plansCadastre = new Set(cadastres.map((l) => planDuCadastre(projet, l)?.id).filter(Boolean));
-  const listes = projet.leves.filter((l) => !l.direct && !l.cadastre);
-  // Levés : le plus récent en haut.
-  const levees = projet.leves.filter((l) => l.direct).sort((a, b) => String(b.importeLe ?? '').localeCompare(String(a.importeLe ?? '')));
+  const listes = projet.leves.filter((l) => !l.direct && !l.cadastre && garde(l)).sort(parDate);
+  const nombreListes = projet.leves.filter((l) => !l.direct && !l.cadastre).length;
+  const barreDate = `<div class="barre-date-listes seulement-intermediaire"><button type="button" class="bouton-lien" data-action="trier-listes-date" title="Changer l'ordre des listes">Trier par date : ${filtreDate.ordre === 'recent' ? 'récent d\'abord ▾' : 'ancien d\'abord ▴'}</button>
+    <label class="aide">Jour <input type="date" data-champ="jour-listes" value="${echapper(filtreDate.jour)}" aria-label="Chercher les listes d'un jour" /></label>
+    ${filtreDate.jour ? '<button type="button" class="bouton-lien" data-action="effacer-jour-listes">tout voir</button>' : ''}</div>`;
+  const aucune = '<p class="vide">Aucune liste ce jour-là.</p>';
+  // Levés et points importés : triés par date (le plus récent en haut au départ), un jour au choix (0.186.0).
+  const sens = filtreDate.ordre === 'ancien' ? -1 : 1;
+  const parDate = (a, b) => sens * String(b.importeLe ?? '').localeCompare(String(a.importeLe ?? ''));
+  const jourDe = (l) => String(l.jour ?? l.importeLe ?? '').slice(0, 10);
+  const garde = (l) => !filtreDate.jour || jourDe(l) === filtreDate.jour;
+  const levees = projet.leves.filter((l) => l.direct && garde(l)).sort(parDate);
+  const nombreLevees = projet.leves.filter((l) => l.direct).length;
   const surfacesProjet = projet.surfaces.filter((s) => estSurfaceFichier(s));
   const dessins = (projet.dessins ?? []).filter((d) => d.sommets.length > 0);
   const couleursReseaux = new Map(lireReseaux().map(([a, , c]) => [a, c]));
@@ -288,8 +315,8 @@ function blocContenu(projet, calquesOuverts, fermees) {
     : '');
   const contenu = [
     categorie('controle', 'Contrôle', (projet.pointsControle ?? []).length, listePointsControle(projet)),
-    categorie('leves', 'Levés', levees.length, `<div class="liste-leves">${levees.map((l) => ligneListe(projet, l, natureDeLaListe(projet, l, couleursReseaux))).join('')}</div>`),
-    categorie('points', 'Points importés', listes.length, `<div class="liste-leves">${listes.map((l) => ligneListe(projet, l)).join('')}</div>`),
+    categorie('leves', 'Levés', nombreLevees, `${barreDate}<div class="liste-leves">${levees.length === 0 ? aucune : ''}${levees.map((l) => ligneListe(projet, l, natureDeLaListe(projet, l, couleursReseaux))).join('')}</div>`),
+    categorie('points', 'Points importés', nombreListes, `${barreDate}<div class="liste-leves">${listes.length === 0 ? aucune : ''}${listes.map((l) => ligneListe(projet, l)).join('')}</div>`),
     categorie('surfaces', 'Surfaces importées', surfacesProjet.length, surfacesProjet.map(ligneSurfaceProjet).join(''), 'seulement-expert'),
     categorie('cadastre', 'Cadastre', cadastres.length, cadastres.map((l) => ligneCadastre(projet, l)).join('')),
     categorie('dxf', 'Plans DXF', (projet.plansDxf ?? []).filter((p) => !plansCadastre.has(p.id)).length, listePlansDxf(projet, calquesOuverts, plansCadastre), 'seulement-intermediaire'),

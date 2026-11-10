@@ -13284,3 +13284,8 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .saisie-texte-dessin { display: flex; gap: 8px; padding: 6px 8px; align-items: center; }
 .saisie-texte-dessin[hidden] { display: none; }
 .saisie-texte-dessin input { flex: 1; min-width: 0; min-height: 44px; font-size: 16px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--bordure); }
+
+/* 0.186.0 : tri et recherche par date des listes de points (Contenu du projet). */
+.barre-date-listes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 4px 0 8px; }
+.barre-date-listes input[type="date"] { min-height: 36px; margin-left: 4px; }
+.bascule-ferme-mesure { margin: 6px 0; min-height: 44px; }
