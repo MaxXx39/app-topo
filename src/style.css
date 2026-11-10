@@ -13473,3 +13473,14 @@ body.theme-sombre { --bande-a: #22313c; --bande-b: #18232b; --sep-tableau: #4b5d
 .puce-liste-points { border-radius: 8px; min-height: 34px; padding: 0 10px 0 8px; font-size: 0.85rem; font-weight: 600; }
 .puce-liste-points .pastille-liste-puce { border-radius: 3px; width: 13px; height: 13px; }
 .puce-liste-points small { opacity: 0.7; }
+
+/* 0.203.0 (maquette A, choisie le 10.11) : Import vert, Exporter orange ; les 4 pages du contenu dans un encadré clair, boutons blancs à icône colorée. */
+.cadre-projet-applis .bouton-partie-projet[data-projet='import'] { background: #16a34a; border-color: #15803d; color: #ffffff; }
+.cadre-projet-applis .bouton-partie-projet[data-projet='export'] { background: #ea580c; border-color: #c2410c; color: #ffffff; }
+.cadre-projet-applis .grille-parties-projet { padding: 6px; gap: 6px; border-radius: 14px; background: #f1f5f9; }
+.cadre-projet-applis .grille-parties-projet .bouton-partie-projet { background: #ffffff; border: 2px solid #cbd5e1; color: #1b2b36; }
+.cadre-projet-applis .bouton-partie-projet[data-projet='points'] svg { color: #ca8a04; }
+.cadre-projet-applis .bouton-partie-projet[data-projet='plans'] svg { color: #0891b2; }
+.cadre-projet-applis .bouton-partie-projet[data-projet='surfaces'] svg { color: #16a34a; }
+.cadre-projet-applis .bouton-partie-projet[data-projet='archives'] svg { color: #64748b; }
+body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; gap: 4px; }
