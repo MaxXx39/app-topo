@@ -25,7 +25,7 @@ import { lireReseaux } from '../leve/reseaux.js';
 import { dateHeureDuPoint, jourDuPoint, trierParDate } from '../topo/date-point.js';
 import { nomDuType, resumeArchive } from '../projet/archives.js';
 import { lireTypesDxf, couleurDuType } from '../topo/types-dxf.js';
-import { CATEGORIES_POINTS, CATEGORIES_LEVES, COLONNES_POINTS, listesDuTableau, lignesDuTableau, trierLignes, texteDate, csvDuTableau } from './tableau-points.js';
+import { CATEGORIES_POINTS, CATEGORIES_LEVES, COLONNES_POINTS, ordreColonnes, deplacerColonne, listesDuTableau, lignesDuTableau, trierLignes, texteDate, csvDuTableau } from './tableau-points.js';
 
 /**
  * Crée le panneau « Import » dans "conteneur" et « Contenu du projet » dans "contenu". Les actions sont faites par main.js via "actions" :
@@ -67,6 +67,17 @@ export function creerEcranImport(conteneur, contenu, actions) {
   const filtreDate = { ordre: 'recent', jour: '', jourPoints: '' };
   // 0.191.0 : tableau « Points » : catégories choisies (null = départ : Levé), listes décochées, tri par colonne, jour.
   const tableauEtat = { categories: null, listesDecochees: new Set(), colonne: 'date', asc: false, jour: '' };
+  // 0.198.0 : ordre des colonnes du tableau (retenu par tablette) ; « Colonnes » montre les flèches de déplacement.
+  const CLE_COLONNES = 'topo-colonnes-points';
+  const lireOrdre = () => {
+    try { return ordreColonnes(JSON.parse(localStorage.getItem(CLE_COLONNES) ?? '[]')); } catch { return ordreColonnes([]); }
+  };
+  const ecrireOrdre = (ordre) => {
+    tableauEtat.ordre = ordre;
+    try { localStorage.setItem(CLE_COLONNES, JSON.stringify(ordre.filter((c) => c !== 'nom'))); } catch { /* réglage non gardé : tant pis */ }
+  };
+  tableauEtat.ordre = lireOrdre();
+  tableauEtat.organiser = false;
   // 0.197.0 : une page à la fois dans « Contenu » : 'points' (liste de points), 'plans', 'surfaces' ou 'archives'.
   let vue = 'points';
   ecouter('toggle', (evenement) => {
@@ -105,6 +116,22 @@ export function creerEcranImport(conteneur, contenu, actions) {
     if (action === 'tp-liste') {
       if (tableauEtat.listesDecochees.has(id)) tableauEtat.listesDecochees.delete(id);
       else tableauEtat.listesDecochees.add(id);
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'tp-organiser') {
+      tableauEtat.organiser = !tableauEtat.organiser;
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'tp-colonne') {
+      const sens = bouton.dataset.sens === 'premier' ? 'premier' : Number(bouton.dataset.sens);
+      ecrireOrdre(deplacerColonne(tableauEtat.ordre, bouton.dataset.col, sens));
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'tp-ordre-depart') {
+      ecrireOrdre(ordreColonnes([]));
       if (derniers) afficher(...derniers);
       return;
     }
@@ -433,13 +460,32 @@ function blocTableauPoints(projet, etat) {
   const lignes = lignesTriees(projet, etat);
   const titres = new Map(CATEGORIES_POINTS.map(([cle, titre]) => [cle, titre]));
   const n = (v) => (v == null ? '—' : formaterNombre(v));
-  const entete = COLONNES_POINTS.map(([cle, titre]) => `<th class="${etat.colonne === cle ? 'tri' : ''}"><button type="button" class="bouton-lien" data-action="tp-tri" data-col="${cle}">${titre}${etat.colonne === cle ? (etat.asc ? ' ▴' : ' ▾') : ''}</button></th>`).join('');
-  const corps = lignes.slice(0, LIGNES_MAX_TABLEAU).map((l) => `<tr>
-      <td><span class="pastille-categorie" style="background: ${couleurDeListe.get(l.listeId) ?? couleurs.get(l.categorie)}" title="${echapper(titres.get(l.categorie) ?? '')}"></span>${echapper(l.nom)}</td>
-      <td>${echapper(l.libelle)}</td><td class="n">${n(l.est)}</td><td class="n">${n(l.nord)}</td><td class="n">${n(l.altitude)}</td>
-      <td class="n">${echapper(l.precision)}</td><td>${echapper(texteDate(l.date))}</td><td>${echapper(l.tablette)}</td><td>${echapper(l.remarque)}</td>
-      <td>${l.photoId ? `<button type="button" class="bouton-lien" data-action="voir-photo" data-id="${l.photoId}" aria-label="Voir la photo de ${echapper(l.nom)}">📷 ${l.photos}</button>` : ''}</td>
-      <td>${echapper(l.liste)}</td></tr>`).join('');
+  const ordre = ordreColonnes(etat.ordre);
+  const titreDe = new Map(COLONNES_POINTS.map(([cle, titre]) => [cle, titre]));
+  const mobiles = ordre.filter((c) => c !== 'nom');
+  const fleches = (cle) => {
+    if (cle === 'nom') return '';
+    const i = mobiles.indexOf(cle);
+    const bouton = (sens, texte, titre, inactif) => `<button type="button" class="bouton-fleche-colonne" data-action="tp-colonne" data-col="${cle}" data-sens="${sens}" aria-label="${titre} : ${titreDe.get(cle)}" title="${titre}" ${inactif ? 'disabled' : ''}>${texte}</button>`;
+    return `<span class="fleches-colonne">${bouton('premier', '⏮', 'Tout à gauche (après le nom)', i === 0)}${bouton(-1, '◀', 'Vers la gauche', i === 0)}${bouton(1, '▶', 'Vers la droite', i === mobiles.length - 1)}</span>`;
+  };
+  const entete = ordre.map((cle) => `<th class="${etat.colonne === cle ? 'tri' : ''}${cle === 'nom' ? ' colonne-nom' : ''}">${etat.organiser
+    ? `<span class="titre-colonne-organiser">${titreDe.get(cle)}</span>${fleches(cle)}`
+    : `<button type="button" class="bouton-lien" data-action="tp-tri" data-col="${cle}">${titreDe.get(cle)}${etat.colonne === cle ? (etat.asc ? ' ▴' : ' ▾') : ''}</button>`}</th>`).join('');
+  const cellules = (l) => ({
+    nom: `<td class="colonne-nom"><span class="pastille-categorie" style="background: ${couleurDeListe.get(l.listeId) ?? couleurs.get(l.categorie)}" title="${echapper(titres.get(l.categorie) ?? '')}"></span>${echapper(l.nom)}</td>`,
+    libelle: `<td>${echapper(l.libelle)}</td>`,
+    est: `<td class="n">${n(l.est)}</td>`,
+    nord: `<td class="n">${n(l.nord)}</td>`,
+    altitude: `<td class="n">${n(l.altitude)}</td>`,
+    precision: `<td class="n">${echapper(l.precision)}</td>`,
+    date: `<td>${echapper(texteDate(l.date))}</td>`,
+    tablette: `<td>${echapper(l.tablette)}</td>`,
+    remarque: `<td>${echapper(l.remarque)}</td>`,
+    photos: `<td>${l.photoId ? `<button type="button" class="bouton-lien" data-action="voir-photo" data-id="${l.photoId}" aria-label="Voir la photo de ${echapper(l.nom)}">📷 ${l.photos}</button>` : ''}</td>`,
+    liste: `<td>${echapper(l.liste)}</td>`,
+  });
+  const corps = lignes.slice(0, LIGNES_MAX_TABLEAU).map((l) => { const c = cellules(l); return `<tr>${ordre.map((cle) => c[cle]).join('')}</tr>`; }).join('');
   const reste = lignes.length - LIGNES_MAX_TABLEAU;
   // Gestion des listes choisies (renommer, archiver / supprimer, couleur, photos) : elle était dans les anciennes catégories Levés / Points importés.
   const couleursReseaux = new Map(lireReseaux().map(([a, , c]) => [a, c]));
@@ -454,6 +500,8 @@ function blocTableauPoints(projet, etat) {
         <span class="aide">${lignes.length} point${lignes.length > 1 ? 's' : ''}</span>
         <label class="aide">Jour <input type="date" data-champ="tp-jour" value="${echapper(etat.jour)}" aria-label="Montrer les points d'un jour" /></label>
         ${etat.jour ? '<button type="button" class="bouton-lien" data-action="tp-effacer-jour">tout voir</button>' : ''}
+        <button type="button" class="bouton-secondaire ${etat.organiser ? 'actif' : ''}" data-action="tp-organiser" aria-pressed="${etat.organiser}">${etat.organiser ? 'Terminé' : '⇄ Colonnes'}</button>
+        ${etat.organiser ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="tp-ordre-depart">Remettre l\'ordre de départ</button>' : ''}
         <button type="button" class="bouton-secondaire bouton-exporter-tableau" data-action="tp-exporter" ${lignes.length === 0 ? 'disabled' : ''}>Exporter la sélection (CSV)</button>
       </div>
       <div class="tableau-defilant tableau-points-grand"><table><thead><tr>${entete}</tr></thead><tbody>${corps || '<tr><td colspan="11">Choisis une catégorie.</td></tr>'}</tbody></table></div>

@@ -46,4 +46,21 @@ describe('blocContenu', () => {
     expect(blocContenu(projet, new Set(), new Set(), filtre, tableau, 'archives')).toContain('Archives');
     expect(blocContenu(projet, new Set(), new Set(), filtre, tableau, 'points')).toContain('data-action="tp-categorie"');
   });
+
+  it('0.198.0 : colonnes déplaçables, « Nom » toujours en premier', () => {
+    const projet = creerProjet('t');
+    projet.leves.push({ id: 'a', nom: 'A', direct: true, importeLe: '2026-11-01T10:00:00Z', points: [{ nom: 'P1', est: 1, nord: 2, altitude: 3 }] });
+    const filtre = { ordre: 'recent', jour: '' };
+    const etat = { categories: null, listesDecochees: new Set(), colonne: 'date', asc: false, jour: '', ordre: ['photos', 'est'], organiser: true };
+    const html = blocContenu(projet, new Set(), new Set(), filtre, etat, 'points');
+    expect(html).toContain('data-action="tp-colonne"');
+    expect(html).toContain('Terminé');
+    const titres = [...html.matchAll(/<th[^>]*>.*?<\/th>/g)].map((m) => m[0].replace(/<[^>]+>/g, '').trim());
+    expect(titres[0]).toMatch(/^Nom/);
+    expect(titres[1]).toMatch(/^Photo/);
+    expect(titres[2]).toMatch(/^E/);
+    const normal = blocContenu(projet, new Set(), new Set(), filtre, { ...etat, organiser: false }, 'points');
+    expect(normal).toContain('data-action="tp-tri"');
+    expect(normal).toContain('⇄ Colonnes');
+  });
 });

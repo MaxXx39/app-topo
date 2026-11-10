@@ -42,6 +42,28 @@ export const COLONNES_POINTS = [
 ];
 
 /**
+ * Ordre des colonnes à l'écran (0.198.0) : « Nom » reste toujours à gauche ; les autres suivent l'ordre choisi (liste de
+ * clés), les colonnes inconnues sont ignorées et les colonnes oubliées se rangent à la fin dans l'ordre de départ.
+ * (L'export CSV garde toujours l'ordre de départ.)
+ */
+export function ordreColonnes(choisi = []) {
+  const depart = COLONNES_POINTS.map(([cle]) => cle).filter((cle) => cle !== 'nom');
+  const gardees = (Array.isArray(choisi) ? choisi : []).filter((cle, i, tout) => depart.includes(cle) && tout.indexOf(cle) === i);
+  return ['nom', ...gardees, ...depart.filter((cle) => !gardees.includes(cle))];
+}
+
+/** Déplace une colonne : sens -1 (vers la gauche), 1 (vers la droite) ou 'premier' (juste après « Nom »). « Nom » ne bouge pas. */
+export function deplacerColonne(ordre, cle, sens) {
+  const mobiles = ordreColonnes(ordre).filter((c) => c !== 'nom');
+  const i = mobiles.indexOf(cle);
+  if (i < 0) return ordreColonnes(ordre);
+  mobiles.splice(i, 1);
+  const j = sens === 'premier' ? 0 : Math.max(0, Math.min(mobiles.length, i + sens));
+  mobiles.splice(j, 0, cle);
+  return ['nom', ...mobiles];
+}
+
+/**
  * Catégorie d'une liste de points (levé du projet) : 'import', 'annotation', 'chantier', 'recollement', 'metre', 'stock',
  * 'terrain', 'terrassement' ou 'libre'. Le cadastre n'est pas dans le tableau (null : il est dans « Plans »).
  */

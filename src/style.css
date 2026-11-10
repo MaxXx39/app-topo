@@ -13434,3 +13434,12 @@ body[data-partie-projet='points'] .panneau-projet > #contenu-projet,
 body[data-partie-projet='plans'] .panneau-projet > #contenu-projet,
 body[data-partie-projet='surfaces'] .panneau-projet > #contenu-projet,
 body[data-partie-projet='archives'] .panneau-projet > #contenu-projet { display: block !important; }
+
+/* 0.198.0 : colonnes du tableau de points déplaçables (« ⇄ Colonnes »), « Nom » reste fixe à gauche même en faisant défiler. */
+.tableau-points-grand th.colonne-nom, .tableau-points-grand td.colonne-nom { position: sticky; left: 0; z-index: 2; background: var(--surface, #f8fafc); box-shadow: 1px 0 0 #cbd5e1; }
+.tableau-points-grand th.colonne-nom { z-index: 3; background: #e2e8f0; }
+.tableau-points-grand th .titre-colonne-organiser { display: block; font-weight: 800; }
+.fleches-colonne { display: flex; gap: 4px; margin-top: 4px; }
+.bouton-fleche-colonne { min-width: 40px; min-height: 40px; border: 2px solid #1b2b36; border-radius: 10px; background: #ffffff; color: #1b2b36; font-size: 15px; font-weight: 800; cursor: pointer; }
+.bouton-fleche-colonne:disabled { opacity: 0.3; cursor: default; }
+.bouton-secondaire.actif[data-action='tp-organiser'] { background: #1b2b36; color: #ffffff; }

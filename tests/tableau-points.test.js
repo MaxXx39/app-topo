@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { categorieDeListe, listesDuTableau, lignesDuTableau, trierLignes, csvDuTableau } from '../src/import/tableau-points.js';
+import { ordreColonnes, deplacerColonne, categorieDeListe, listesDuTableau, lignesDuTableau, trierLignes, csvDuTableau } from '../src/import/tableau-points.js';
 
 function projetExemple() {
   return {
@@ -100,5 +100,28 @@ describe('liste de chaque point (0.192.0)', () => {
     const carte = listeDesPoints(projet, listes);
     expect(carte.get(p1)).toBe('b');
     expect(carte.get(p2)).toBe('b');
+  });
+});
+
+describe('ordre des colonnes (0.198.0)', () => {
+  it('« Nom » reste à gauche, les colonnes oubliées ou inconnues sont rangées', () => {
+    expect(ordreColonnes([])[0]).toBe('nom');
+    expect(ordreColonnes(['photos', 'inconnue', 'photos', 'nom', 'est']).slice(0, 3)).toEqual(['nom', 'photos', 'est']);
+    expect(ordreColonnes(['photos']).length).toBe(11);
+    expect(ordreColonnes(null)[0]).toBe('nom');
+  });
+
+  it('déplacer une colonne : gauche, droite, tout à gauche ; Nom ne bouge pas', () => {
+    const depart = ordreColonnes([]);
+    expect(deplacerColonne(depart, 'photos', 'premier').slice(0, 2)).toEqual(['nom', 'photos']);
+    expect(deplacerColonne(depart, 'libelle', 1).slice(0, 3)).toEqual(['nom', 'est', 'libelle']);
+    expect(deplacerColonne(depart, 'libelle', -1)).toEqual(depart); // déjà la première après le nom
+    expect(deplacerColonne(depart, 'liste', 1)).toEqual(depart); // déjà la dernière
+    expect(deplacerColonne(depart, 'nom', 'premier')).toEqual(depart);
+  });
+
+  it('l\'export CSV garde toujours l\'ordre de départ', () => {
+    const csv = csvDuTableau([]);
+    expect(csv.split('\r\n')[0]).toBe('Nom;Libellé;E;N;H;Préc. H / V;Date;Tablette;Remarque;Photo;Liste;Catégorie');
   });
 });
