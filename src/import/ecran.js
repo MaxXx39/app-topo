@@ -24,6 +24,7 @@ import { pointsDuDessin } from '../topo/dessin.js';
 import { lireReseaux } from '../leve/reseaux.js';
 import { dateHeureDuPoint, jourDuPoint, trierParDate } from '../topo/date-point.js';
 import { nomDuType, resumeArchive } from '../projet/archives.js';
+import { lireTypesDxf, couleurDuType } from '../topo/types-dxf.js';
 import { CATEGORIES_POINTS, COLONNES_POINTS, listesDuTableau, lignesDuTableau, trierLignes, texteDate, csvDuTableau } from './tableau-points.js';
 
 /**
@@ -87,6 +88,10 @@ export function creerEcranImport(conteneur, contenu, actions) {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
     const { action, id } = bouton.dataset;
+    if (action === 'modifier-types-dxf') {
+      actions.modifierTypesDxf();
+      return;
+    }
     if (action === 'tp-categorie') {
       const choisies = categoriesChoisies(derniers?.[0], tableauEtat);
       if (choisies.has(bouton.dataset.cle)) choisies.delete(bouton.dataset.cle);
@@ -230,6 +235,8 @@ export function creerEcranImport(conteneur, contenu, actions) {
       actions.reglerPlanDxf(cible.dataset.id, { visible: cible.checked });
     } else if (cible.dataset.champ === 'plan-couleur') {
       actions.reglerPlanDxf(cible.dataset.id, { couleur: cible.value || null });
+    } else if (cible.dataset.champ === 'plan-type') {
+      actions.reglerPlanDxf(cible.dataset.id, { type: cible.value });
     } else if (cible.dataset.champ === 'plan-nom') {
       actions.reglerPlanDxf(cible.dataset.id, { nom: cible.value });
     } else if (cible.dataset.champ === 'calque-dxf') {
@@ -646,11 +653,21 @@ function listePointsControle(projet) {
     </div>`;
 }
 
+/** Type d'un plan DXF (0.194.0) : petite pastille avec son nom ; en Expert, une liste pour le changer. */
+function typeDuPlan(plan, types) {
+  const pastille = plan.type ? `<span class="pastille-type-dxf" style="background: ${couleurDuType(plan.type, types)}">${echapper(plan.type)}</span>` : '';
+  const options = [['', '— aucun —'], ...types.map((t) => [t.nom, t.nom])];
+  if (plan.type && !types.some((t) => t.nom === plan.type)) options.push([plan.type, plan.type]);
+  const liste = `<label class="type-plan-dxf seulement-expert">Type <select data-champ="plan-type" data-id="${plan.id}">${options.map(([v, t]) => `<option value="${echapper(v)}" ${v === (plan.type ?? '') ? 'selected' : ''}>${echapper(t)}</option>`).join('')}</select></label>`;
+  return `<div class="ligne-type-dxf">${pastille}${liste}</div>`;
+}
+
 /** Plans DXF du projet : nom, nombre d'objets, voir / supprimer, et la liste des calques à cocher. */
 function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
   const plans = (projet.plansDxf ?? []).filter((p) => !caches.has(p.id));
   if (plans.length === 0) return '';
-  return `<div class="liste-plans-dxf">${plans
+  const types = lireTypesDxf();
+  return `<div class="liste-plans-dxf"><div class="ligne-outils seulement-expert"><button type="button" class="bouton-lien bouton-lien-neutre" data-action="modifier-types-dxf">Modifier les types</button></div>${plans
     .map((plan) => {
       const prefixe = prefixeCommun(plan.calques.map((c) => c.nom));
       const visibles = plan.calques.filter((c) => c.visible).length;
@@ -663,6 +680,7 @@ function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
     : `<input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />`}
           ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: 'Couleur du plan' })}
         </div>
+        ${typeDuPlan(plan, types)}
         <div class="ligne-outils">
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${plan.id}">voir</button>

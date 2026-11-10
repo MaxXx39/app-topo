@@ -13374,3 +13374,9 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .puce-liste-points.choisie { background: var(--couleur-liste, #1e293b); border-color: var(--couleur-liste, #1e293b); }
 .gerer-listes { margin-top: 8px; border-top: 1px solid #cbd5e1; padding-top: 6px; }
 .gerer-listes > summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
+
+/* 0.194.0 : type d'un plan DXF (pastille avec son nom) */
+.pastille-type-dxf { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 10px; color: #ffffff; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+.ligne-type-dxf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 4px; }
+.type-plan-dxf { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+.type-plan-dxf select { min-height: 40px; }

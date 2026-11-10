@@ -11,6 +11,7 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
+import { lireTypesDxf, enregistrerTypesDxf, nettoyerTypes } from './topo/types-dxf.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -1762,6 +1763,20 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     if (leve && nom) leve.nom = nom;
     modifie();
   },
+  // 0.194.0 (Expert) : modifier la liste des types de plans DXF (partagée par Drive).
+  modifierTypesDxf: async () => {
+    const actuels = lireTypesDxf().map((t) => t.nom).join(', ');
+    const texte = await demanderTexte({ titre: 'Types de plans DXF (séparés par des virgules)', valeur: actuels });
+    if (texte == null) return;
+    const noms = nettoyerTypes(texte);
+    if (noms.length === 0) {
+      afficherMessage('Il faut au moins un type', 4000);
+      return;
+    }
+    enregistrerTypesDxf(noms);
+    afficherMessage('Types enregistrés (partagés par Drive)', 3000);
+    recalculer();
+  },
   importerPlanDxf: async (fichier) => {
     afficherMessage(`Lecture du plan « ${fichier.name} »…`, null);
     // On laisse le message s'afficher avant la lecture (quelques secondes pour un gros plan).
@@ -1780,10 +1795,27 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       }
       const ignores = Object.entries(lu.compte.ignores);
       if (ignores.length > 0) avertissements.push(`Non affiché(s) : ${ignores.map(([type, n]) => `${n} ${type}`).join(', ')} (hachures, images… : seuls les traits, textes, cercles et aplats sont lus).`);
-      projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu });
-      dernierPlan = { nom: fichier.name, avertissements };
-      afficherMessage(`Plan « ${fichier.name} » importé : ${lu.compte.objets} objets`, 4000);
+      // 0.194.0 (Expert) : nom, type (GEOOFF, TER, CANA…) et recalage au choix, avant de ranger le plan.
+      const types = lireTypesDxf();
+      const choix = await demanderChamps({
+        titre: `Plan « ${fichier.name} »`,
+        champs: [
+          { cle: 'nom', titre: 'Nom du plan', valeur: lu.nom ?? fichier.name.replace(/\.dxf$/i, '') },
+          { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...types.map((t) => [t.nom, t.nom])], valeur: '' },
+          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant']], valeur: 'non' },
+        ],
+      });
+      if (!choix) {
+        afficherMessage('Plan non importé');
+        recalculer();
+        return;
+      }
+      const nouveau = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, nom: choix.nom || lu.nom, type: choix.type || '' };
+      projet.plansDxf.push(nouveau);
+      dernierPlan = { nom: nouveau.nom, avertissements };
+      afficherMessage(`Plan « ${nouveau.nom} » importé : ${lu.compte.objets} objets`, 4000);
       modifie();
+      if (choix.recaler === 'oui') commencerRecalage(nouveau.id);
     } catch (erreur) {
       dernierPlan = { nom: fichier.name, erreur: erreur.message };
       afficherMessage('Plan non importé');
@@ -6727,7 +6759,7 @@ function resumeLigne() {
  * Réglages d'un plan DXF (liste des plans, ou menu « Plans » du plan) : visible (œil), couleur
  * (null = celles du DXF) et nom court (« Bordures »).
  */
-function reglerPlanDxf(id, { visible, couleur, nom, transparence }) {
+function reglerPlanDxf(id, { visible, couleur, nom, transparence, type }) {
   const choisi = projet.plansDxf.find((p) => p.id === id);
   if (!choisi) return;
   if (visible !== undefined) choisi.visible = visible;
@@ -6736,7 +6768,8 @@ function reglerPlanDxf(id, { visible, couleur, nom, transparence }) {
   if (nom !== undefined && sansPrefixe(nom, choisi.pdf ? PREFIXE_PDF : '').trim()) choisi.nom = choisi.pdf ? avecPrefixe(nom, PREFIXE_PDF) : nom.trim();
   if (transparence !== undefined) choisi.transparence = Math.min(100, Math.max(0, Math.round(transparence)));
   // Seulement montrer / cacher : réglage de la tablette (0.128.1), permis aussi en lecture seule.
-  if (couleur === undefined && nom === undefined && transparence === undefined) affichageModifie();
+  if (type !== undefined) choisi.type = String(type);
+  if (couleur === undefined && nom === undefined && transparence === undefined && type === undefined) affichageModifie();
   else modifie();
 }
 
