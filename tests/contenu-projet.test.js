@@ -4,7 +4,7 @@ import { blocContenu } from '../src/import/ecran.js';
 import { creerProjet } from '../src/projet/projet.js';
 
 describe('blocContenu', () => {
-  it('0.193.0 : plus de catégories Contrôle / Levés / Points importés en double ; la gestion est sous le tableau', () => {
+  it('0.193.0 : plus de catégories Contrôle / Levés / Points importés en double ; la gestion est dans « Gérer »', () => {
     const projet = creerProjet('t');
     const pt = { nom: 'P1', est: 1, nord: 2, altitude: 3 };
     projet.leves.push(
@@ -18,7 +18,8 @@ describe('blocContenu', () => {
     expect(html).not.toContain('data-categorie="points"');
     expect(html).not.toContain('data-categorie="controle"');
     expect(html).toContain('Liste de points');
-    expect(html).toContain('Gérer les listes choisies');
+    expect(html).toContain('data-action="gerer-ouvrir"');
+    expect(html).not.toContain('Gérer les listes choisies');
     expect(html).toContain('--couleur-liste: #ff0000'); // la liste garde sa couleur
   });
 
@@ -66,5 +67,51 @@ describe('blocContenu', () => {
     const normal = blocContenu(projet, new Set(), new Set(), filtre, { ...etat, organiser: false }, 'points');
     expect(normal).toContain('data-action="tp-tri"');
     expect(normal).toContain('⇄ Colonnes');
+  });
+
+  it('0.205.0 : page « Gérer » : une ligne par liste avec son ⚙, menu déplié au toucher', () => {
+    const projet = creerProjet('t');
+    projet.pointsControle = [{ id: 'c1', nom: 'C1', est: 1, nord: 2, altitude: 3 }];
+    projet.leves.push(
+      { id: 'a', nom: 'LV-Stock 1', direct: true, importeLe: '2026-11-01T10:00:00Z', points: [{ nom: 'P1', est: 1, nord: 2, altitude: 3 }] },
+      { id: 'i', nom: 'points.csv', importeLe: '2026-11-02T10:00:00Z', points: [{ nom: 'I1', est: 1, nord: 2, altitude: 3 }] },
+    );
+    projet.surfaces.push({ id: 's1', nom: 'LV-Stock 1', leveId: 'a', nature: 'stock', points: [], faces: [] });
+    const tableau = { categories: null, listesDecochees: new Set(), colonne: 'date', asc: false, jour: '' };
+    const filtre = { ordre: 'recent', jour: '' };
+    const ferme = blocContenu(projet, new Set(), new Set(), filtre, tableau, 'points', { gerer: true, menusOuverts: new Set() });
+    expect(ferme).toContain('Gérer · Liste de points');
+    expect(ferme).toContain('data-action="gerer-fermer"');
+    expect(ferme.match(/data-action="gerer-menu"/g)).toHaveLength(3); // contrôle, levé, liste importée
+    expect(ferme).not.toContain('menu-ligne-gerer');
+    expect(ferme).not.toContain('Voir les points');
+    const ouvert = blocContenu(projet, new Set(), new Set(), filtre, tableau, 'points', { gerer: true, menusOuverts: new Set(['points:a']) });
+    expect(ouvert).toContain('menu-ligne-gerer');
+    expect(ouvert).toContain('data-champ="nom-leve"');
+    expect(ouvert).toContain('data-action="exporter-liste" data-type="leve" data-id="a"');
+    expect(ouvert).toContain('data-action="archiver"');
+    expect(ouvert).not.toContain('Dupliquer');
+    // En bas du tableau normal, plus de gestion.
+    expect(blocContenu(projet, new Set(), new Set(), filtre, tableau, 'points')).not.toContain('data-action="archiver"');
+  });
+
+  it('0.205.0 : « Gérer » aussi pour Plans, Surfaces importées et Archives', () => {
+    const projet = creerProjet('t');
+    projet.plansDxf = [{ id: 'p1', nom: 'plan.dxf', visible: true, calques: [], compte: { objets: 4 } }];
+    projet.surfaces.push({ id: 'f1', nom: 'Surf-ter', faces: [1, 2], nomFichier: 'ter.xml', origine: 'fichier', points: [] });
+    projet.archives = [{ id: 'z1', type: 'leve', nom: 'vieux', archiveLe: '2026-11-01T10:00:00Z', donnees: {} }];
+    const tableau = { categories: null, listesDecochees: new Set(), colonne: 'date', asc: false, jour: '' };
+    const filtre = { ordre: 'recent', jour: '' };
+    const gerer = (vue, ouverts) => blocContenu(projet, new Set(), new Set(), filtre, tableau, vue, { gerer: true, menusOuverts: new Set(ouverts) });
+    const plans = gerer('plans', ['plans:p1']);
+    expect(plans).toContain('Gérer · Plans');
+    expect(plans).toContain('data-champ="plan-nom"');
+    expect(plans).toContain('data-action="voir-plan"');
+    expect(plans).toContain('data-action="recaler-plan"');
+    expect(blocContenu(projet, new Set(), new Set(), filtre, tableau, 'plans')).not.toContain('data-action="recaler-plan"');
+    expect(gerer('archives', ['archives:z1'])).toContain('data-action="restaurer-archive"');
+    for (const vue of ['plans', 'surfaces', 'archives']) {
+      expect(blocContenu(projet, new Set(), new Set(), filtre, tableau, vue)).toContain('data-action="gerer-ouvrir"');
+    }
   });
 });

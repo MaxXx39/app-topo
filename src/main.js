@@ -1746,6 +1746,8 @@ const moduleExport = creerModuleExport(document.querySelector('#exporter-projet'
 });
 
 const ecranImport = creerEcranImport(document.querySelector('#importer'), document.querySelector('#contenu-projet'), {
+  exporterListe: (type, id) => exporterListe(type, id),
+  exporterPlanRecale: (id) => exporterPlanRecale(id),
   importerSurface: (fichier) => importerSurface(fichier),
   colorerListe: (id, couleur) => colorerListe(id, couleur),
   importerPointsControle: (fichier) => importerPointsControle(fichier),

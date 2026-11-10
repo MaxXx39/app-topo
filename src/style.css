@@ -13494,3 +13494,25 @@ body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; 
 .puce-liste-points { gap: 0; border: 2px solid color-mix(in srgb, var(--couleur-categorie, #94a3b8) 45%, var(--surface, #ffffff)); background: var(--surface, #ffffff); color: var(--gris, #64748b); font-weight: 600; }
 .puce-liste-points.choisie { background: color-mix(in srgb, var(--couleur-liste, #94a3b8) 24%, var(--surface, #ffffff)); border-color: color-mix(in srgb, var(--couleur-categorie, #94a3b8) 60%, var(--surface, #ffffff)); color: var(--encre, #0f172a); }
 .puce-liste-points small { margin-left: 6px; }
+
+/* 0.205.0 : page « Gérer » des pages du projet : une ligne par élément, un ⚙ qui déplie son menu. */
+.entete-page-contenu { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.entete-page-contenu .titre-bloc { flex: 1 1 auto; min-width: 0; margin: 0; }
+.bouton-gerer { flex: none; min-height: 40px; padding: 0 16px; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; font: inherit; font-weight: 800; cursor: pointer; }
+.bouton-retour-gerer { flex: none; width: 44px; min-height: 40px; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
+.page-gerer .entete-page-contenu { justify-content: flex-start; }
+.ligne-gerer { margin: 8px 0; border: 2px solid var(--bordure, #cbd5e1); border-radius: 12px; background: var(--surface, #ffffff); }
+.ligne-gerer.ouverte { border-color: #1b2b36; }
+.entete-ligne-gerer { display: flex; align-items: center; gap: 10px; padding: 8px 10px; }
+.pastille-gerer { flex: none; width: 14px; height: 14px; border-radius: 50%; }
+.texte-ligne-gerer { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.texte-ligne-gerer strong { overflow-wrap: anywhere; }
+.nature-ligne-gerer { font-size: 0.75rem; font-weight: 700; padding: 1px 8px; border-radius: 10px; background: color-mix(in srgb, var(--gris, #64748b) 18%, var(--surface, #ffffff)); color: var(--encre, #0f172a); }
+.texte-ligne-gerer .aide { flex-basis: 100%; }
+.bouton-engrenage { flex: none; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; cursor: pointer; }
+.bouton-engrenage svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ligne-gerer.ouverte .bouton-engrenage { background: #1b2b36; color: #ffffff; }
+.menu-ligne-gerer { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px 10px; border-top: 1px solid var(--bordure, #cbd5e1); }
+.champ-gerer { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.champ-gerer input[type='text'], .champ-gerer .champ-prefixe { flex: 1 1 auto; min-width: 0; }
+.actions-ligne-gerer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
