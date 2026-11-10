@@ -380,9 +380,6 @@ export function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordr
       </details>`
     : '');
   const contenu = [
-    categorie('controle', 'Contrôle', (projet.pointsControle ?? []).length, listePointsControle(projet)),
-    categorie('leves', 'Levés', nombreLevees, `${barreDate}<div class="liste-leves">${levees.length === 0 ? aucune : ''}${levees.map((l) => ligneListe(projet, l, natureDeLaListe(projet, l, couleursReseaux))).join('')}</div>`),
-    categorie('points', 'Points importés', nombreListes, `${barreDate}<div class="liste-leves">${listes.length === 0 ? aucune : ''}${listes.map((l) => ligneListe(projet, l)).join('')}</div>`),
     categorie('surfaces', 'Surfaces importées', surfacesProjet.length, surfacesProjet.map(ligneSurfaceProjet).join(''), 'seulement-expert'),
     categorie('tableau-points', 'Points (tableau)', listesDuTableau(projet).reduce((total, l) => total + l.nombre, 0), blocTableauPoints(projet, tableau)),
     categorie('cadastre', 'Cadastre', cadastres.length, cadastres.map((l) => ligneCadastre(projet, l)).join('')),
@@ -420,26 +417,34 @@ const LIGNES_MAX_TABLEAU = 400;
 function blocTableauPoints(projet, etat) {
   const choisies = categoriesChoisies(projet, etat);
   const listes = listesDuTableau(projet);
+  const couleurs = new Map(CATEGORIES_POINTS.map(([cle, , couleur]) => [cle, couleur]));
+  // Chaque liste garde sa couleur (celle choisie pour le levé, sinon celle de sa catégorie) : puces et points du tableau.
+  const couleurDeListe = new Map(listes.map((l) => [l.id, projet.couleursListes?.[l.id] ?? couleurs.get(l.categorie)]));
   const nombreParCategorie = new Map();
   for (const l of listes) nombreParCategorie.set(l.categorie, (nombreParCategorie.get(l.categorie) ?? 0) + l.nombre);
   const boutons = CATEGORIES_POINTS.filter(([cle]) => nombreParCategorie.has(cle))
     .map(([cle, titre, couleur]) => `<button type="button" class="categorie-points ${choisies.has(cle) ? 'choisie' : ''}" style="--couleur-categorie: ${couleur}" data-action="tp-categorie" data-cle="${cle}" aria-pressed="${choisies.has(cle)}">${titre} <small>${nombreParCategorie.get(cle)}</small></button>`).join('');
   const dansLaSelection = listes.filter((l) => choisies.has(l.categorie));
   const puces = dansLaSelection.length > 1
-    ? `<div class="listes-points-choix" role="group" aria-label="Listes de points à montrer"><span class="aide">Listes :</span>${dansLaSelection.map((l) => `<button type="button" class="puce-liste-points ${etat.listesDecochees.has(l.id) ? '' : 'choisie'}" data-action="tp-liste" data-id="${echapper(l.id)}" aria-pressed="${!etat.listesDecochees.has(l.id)}">${echapper(l.nom)} <small>${l.nombre}</small></button>`).join('')}</div>`
+    ? `<div class="listes-points-choix" role="group" aria-label="Listes de points à montrer"><span class="aide">Listes :</span>${dansLaSelection.map((l) => `<button type="button" class="puce-liste-points ${etat.listesDecochees.has(l.id) ? '' : 'choisie'}" style="--couleur-liste: ${couleurDeListe.get(l.id)}" data-action="tp-liste" data-id="${echapper(l.id)}" aria-pressed="${!etat.listesDecochees.has(l.id)}"><i class="pastille-liste-puce"></i>${echapper(l.nom)} <small>${l.nombre}</small></button>`).join('')}</div>`
     : '';
   const lignes = lignesTriees(projet, etat);
-  const couleurs = new Map(CATEGORIES_POINTS.map(([cle, , couleur]) => [cle, couleur]));
   const titres = new Map(CATEGORIES_POINTS.map(([cle, titre]) => [cle, titre]));
   const n = (v) => (v == null ? '—' : formaterNombre(v));
   const entete = COLONNES_POINTS.map(([cle, titre]) => `<th class="${etat.colonne === cle ? 'tri' : ''}"><button type="button" class="bouton-lien" data-action="tp-tri" data-col="${cle}">${titre}${etat.colonne === cle ? (etat.asc ? ' ▴' : ' ▾') : ''}</button></th>`).join('');
   const corps = lignes.slice(0, LIGNES_MAX_TABLEAU).map((l) => `<tr>
-      <td><span class="pastille-categorie" style="background: ${couleurs.get(l.categorie)}" title="${echapper(titres.get(l.categorie) ?? '')}"></span>${echapper(l.nom)}</td>
+      <td><span class="pastille-categorie" style="background: ${couleurDeListe.get(l.listeId) ?? couleurs.get(l.categorie)}" title="${echapper(titres.get(l.categorie) ?? '')}"></span>${echapper(l.nom)}</td>
       <td>${echapper(l.libelle)}</td><td class="n">${n(l.est)}</td><td class="n">${n(l.nord)}</td><td class="n">${n(l.altitude)}</td>
       <td class="n">${echapper(l.precision)}</td><td>${echapper(texteDate(l.date))}</td><td>${echapper(l.tablette)}</td><td>${echapper(l.remarque)}</td>
       <td>${l.photoId ? `<button type="button" class="bouton-lien" data-action="voir-photo" data-id="${l.photoId}" aria-label="Voir la photo de ${echapper(l.nom)}">📷 ${l.photos}</button>` : ''}</td>
       <td>${echapper(l.liste)}</td></tr>`).join('');
   const reste = lignes.length - LIGNES_MAX_TABLEAU;
+  // Gestion des listes choisies (renommer, archiver / supprimer, couleur, photos) : elle était dans les anciennes catégories Levés / Points importés.
+  const couleursReseaux = new Map(lireReseaux().map(([a, , c]) => [a, c]));
+  const gerables = (projet.leves ?? []).filter((l) => !l.cadastre && dansLaSelection.some((d) => d.id === l.id));
+  const gerer = gerables.length > 0 || (choisies.has('controle') && (projet.pointsControle ?? []).length > 0)
+    ? `<details class="gerer-listes"><summary>Gérer les listes choisies</summary>${choisies.has('controle') && (projet.pointsControle ?? []).length > 0 ? listePointsControle(projet) : ''}<div class="liste-leves">${gerables.map((l) => ligneListe(projet, l, l.direct ? natureDeLaListe(projet, l, couleursReseaux) : null, { sansTableau: true })).join('')}</div></details>`
+    : '';
   return `<div class="tableau-points-projet">
       <div class="categories-points" role="group" aria-label="Catégories de points">${boutons}</div>
       ${puces}
@@ -451,6 +456,7 @@ function blocTableauPoints(projet, etat) {
       </div>
       <div class="tableau-defilant tableau-points-grand"><table><thead><tr>${entete}</tr></thead><tbody>${corps || '<tr><td colspan="11">Choisis une catégorie.</td></tr>'}</tbody></table></div>
       ${reste > 0 ? `<p class="aide">${reste} lignes de plus : choisis une liste ou un jour, ou exporte la sélection.</p>` : ''}
+      ${gerer}
     </div>`;
 }
 
@@ -458,7 +464,7 @@ function blocTableauPoints(projet, etat) {
  * Une liste de points : case pour l'afficher, nom (celui d'un levé se change dans Terrain › Lever),
  * couleur, nombre de points (et date de création pour un levé), supprimer, voir les points.
  */
-function ligneListe(projet, leve, nature = null) {
+function ligneListe(projet, leve, nature = null, { sansTableau = false } = {}) {
   const actif = leve.id === projet.leveActifId;
   const pastille = nature ? `<span class="pastille-nature" style="--couleur-nature: ${nature.couleur}">${echapper(nature.nom)}</span>` : '';
   const date = leve.direct && leve.importeLe ? ` · créé le ${new Date(leve.importeLe).toLocaleDateString('fr-CH')}` : '';
@@ -475,7 +481,7 @@ function ligneListe(projet, leve, nature = null) {
         <button type="button" class="bouton-lien archive-comme-suppression" data-action="archiver" data-type="leve" data-id="${leve.id}">supprimer</button>
         <button type="button" class="bouton-lien suppression-vraie" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
       </div>
-      ${tableauPoints(leve.points, 'Voir les points')}
+      ${sansTableau ? '' : tableauPoints(leve.points, 'Voir les points')}
       ${photosDesPoints(photosDuLeve(projet, leve))}
     </div>`;
 }

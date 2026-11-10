@@ -13367,3 +13367,10 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .menu-listes-points .couleur-liste-menu { display: flex; align-items: center; gap: 6px; min-height: 40px; }
 .menu-listes-points .titre-reglages-section { padding: 0 10px; }
 .note-fond { font-size: 0.8rem; margin: 2px 0 6px; }
+
+/* 0.193.0 : puces de listes à la couleur de leur liste */
+.puce-liste-points { display: inline-flex; align-items: center; gap: 6px; border-color: var(--couleur-liste, #94a3b8); }
+.puce-liste-points .pastille-liste-puce { width: 12px; height: 12px; border-radius: 50%; background: var(--couleur-liste, #94a3b8); border: 2px solid #ffffff; box-shadow: 0 0 0 1px var(--couleur-liste, #94a3b8); flex: none; }
+.puce-liste-points.choisie { background: var(--couleur-liste, #1e293b); border-color: var(--couleur-liste, #1e293b); }
+.gerer-listes { margin-top: 8px; border-top: 1px solid #cbd5e1; padding-top: 6px; }
+.gerer-listes > summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
