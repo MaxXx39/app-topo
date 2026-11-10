@@ -13468,3 +13468,8 @@ body.theme-sombre { --bande-a: #22313c; --bande-b: #18232b; --sep-tableau: #4b5d
 /* 0.201.0 : puces de listes encadrées à la couleur de leur catégorie (la pastille garde la couleur de la liste). */
 .puce-liste-points { border: 3px solid var(--couleur-categorie, #94a3b8); }
 .puce-liste-points.choisie { border-color: var(--couleur-categorie, #1e293b); }
+
+/* 0.202.0 : les listes ne ressemblent plus aux catégories : catégories = pilules rondes, listes = étiquettes rectangulaires à coins peu arrondis, pastille carrée. */
+.puce-liste-points { border-radius: 8px; min-height: 34px; padding: 0 10px 0 8px; font-size: 0.85rem; font-weight: 600; }
+.puce-liste-points .pastille-liste-puce { border-radius: 3px; width: 13px; height: 13px; }
+.puce-liste-points small { opacity: 0.7; }
