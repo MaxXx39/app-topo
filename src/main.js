@@ -8130,6 +8130,40 @@ function refuserEnLectureSeule() {
   return true;
 }
 
+// Pastille « Contrôle à refaire » (0.188.1, demande du 10.11) : toujours à l'écran, sous la barre du récepteur, tant que
+// cette tablette n'a pas fait son contrôle (récepteur connecté) ; elle n'apparaît qu'après 10 s de « contrôle à faire »
+// de suite (pas de clignotement à l'ouverture ou à la connexion). La toucher ouvre Terrain › Contrôle.
+const DELAI_PASTILLE_CONTROLE_MS = 10_000;
+let controleAFaireDepuis = null;
+function mettreAJourPastilleControle() {
+  let pastille = document.querySelector('#pastille-controle');
+  const enControle = ongletContexte === 'terrain' && terrain.mode === 'autocontrole';
+  const afaire = recepteurDisponible() && Boolean(etatRecepteur?.connecte) && Boolean(projet) && !enControle
+    && controleNecessaire(projet.controles, new Date(), delaiControleMs(projet), nomDeLAppareil());
+  if (!afaire) controleAFaireDepuis = null;
+  else if (controleAFaireDepuis == null) controleAFaireDepuis = Date.now();
+  const visible = afaire && Date.now() - controleAFaireDepuis >= DELAI_PASTILLE_CONTROLE_MS;
+  if (!visible) {
+    pastille?.remove();
+    return;
+  }
+  if (pastille) return;
+  pastille = document.createElement('button');
+  pastille.id = 'pastille-controle';
+  pastille.type = 'button';
+  pastille.className = 'pastille-controle';
+  pastille.textContent = 'Contrôle à refaire';
+  pastille.setAttribute('aria-label', 'Contrôle à refaire : ouvrir le Contrôle');
+  pastille.addEventListener('click', () => {
+    terrain.mode = 'autocontrole';
+    retenirReglagesTerrain();
+    afficherOnglet('terrain');
+    recalculer();
+  });
+  (document.querySelector('.entete') ?? document.body).append(pastille);
+}
+setInterval(mettreAJourPastilleControle, 1000);
+
 // Rappel du contrôle aussi pendant le travail (0.90.0) : GNSS connecté, une fois la durée entre deux
 // contrôles passée depuis le dernier rappel (pas seulement à la connexion du récepteur).
 setInterval(() => {
