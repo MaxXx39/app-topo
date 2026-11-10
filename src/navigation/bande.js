@@ -295,8 +295,8 @@ export function creerNavigation(nav, actions) {
       ? '<button type="button" class="bouton-bandeau-projet nouveau" data-projet="nouveau">+ Nouveau</button>'
       : '';
     const partie = (cle, titre, icone) => `<button type="button" class="bouton-partie-projet" data-projet="${cle}">${svg(icone)}${titre}</button>`;
-    // 0.197.0 : à gauche Import et Exporter ; à droite les pages du contenu (Liste de points, Plans, Surfaces importées en
-    // Expert) et un petit bouton Archives (dès Intermédiaire).
+    // 0.197.0 / 0.200.0 : une ligne Import | Exporter, puis les pages du contenu deux par deux (Liste de points, Plans, Surfaces
+    // importées en Expert, Archives dès Intermédiaire).
     const expert = actions.importPermis?.();
     const gauche = [
       expert ? partie('import', 'Import', '<path d="M12 15V3M7 10l5 5 5-5M4 21h16" />') : '',
@@ -306,9 +306,9 @@ export function creerNavigation(nav, actions) {
       partie('points', 'Liste de points', '<path d="M8 6h13M8 12h13M8 18h13" /><circle cx="3.5" cy="6" r="1.2" /><circle cx="3.5" cy="12" r="1.2" /><circle cx="3.5" cy="18" r="1.2" />'),
       partie('plans', 'Plans', '<path d="M3 21 21 3M3 9l6-6M15 21l6-6M3 15h6v6" />'),
       expert ? partie('surfaces', 'Surfaces importées', '<path d="M3 17 9 7l5 6 3-4 4 8z" /><path d="M3 17h18" />') : '',
-      `<button type="button" class="bouton-partie-projet petit seulement-intermediaire" data-projet="archives">${svg('<path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4" />')}Archives</button>`,
+      `<button type="button" class="bouton-partie-projet seulement-intermediaire" data-projet="archives">${svg('<path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4" />')}Archives</button>`,
     ].join('');
-    const parties = `<div class="colonne-parties-projet">${gauche}</div><div class="colonne-parties-projet">${droite}</div>`;
+    const parties = `<div class="rangee-parties-projet">${gauche}</div><div class="grille-parties-projet">${droite}</div>`;
     // 0.159.0 : tout ce qui touche au projet dans un seul encadré ; chaque bouton ouvre sa page.
     page.innerHTML = `
       <div class="cadre-projet-applis">

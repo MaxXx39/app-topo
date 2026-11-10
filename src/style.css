@@ -13422,14 +13422,16 @@ body.mode-telephone .bande-appli .cadre-levee .nom-levee-bande { font-size: 12px
 body.mode-telephone .bande-appli .cadre-levee .petit-bouton-levee { min-height: 0; height: auto; align-self: stretch; }
 body.mode-telephone .bande-appli .cadre-levee { flex: 1 1 0; min-width: 0; }
 
-/* 0.197.0 : encadré du projet en deux moitiés : Import / Exporter à gauche, pages du contenu à droite (Archives plus petit). */
-.cadre-projet-applis .parties-projet-applis { align-items: stretch; }
-.colonne-parties-projet { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.colonne-parties-projet .bouton-partie-projet { flex: 1 1 auto; }
-.colonne-parties-projet .bouton-partie-projet.petit { flex: 0 0 auto; min-height: 34px; font-size: 12px; }
-.colonne-parties-projet .bouton-partie-projet.petit svg { width: 16px; height: 16px; }
-body.mode-telephone .colonne-parties-projet { gap: 5px; }
-body.mode-telephone .colonne-parties-projet .bouton-partie-projet.petit { min-height: 26px; font-size: 10.5px; }
+/* 0.200.0 : encadré du projet : Import | Exporter sur une ligne, puis les pages du contenu deux par deux (moins de hauteur). */
+.cadre-projet-applis .parties-projet-applis { flex-direction: column; align-items: stretch; gap: 8px; }
+.rangee-parties-projet { display: flex; gap: 8px; }
+.grille-parties-projet { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rangee-parties-projet .bouton-partie-projet, .grille-parties-projet .bouton-partie-projet { flex: 1 1 0; min-height: 44px; font-size: 14px; }
+.grille-parties-projet .bouton-partie-projet { font-size: 13px; }
+.grille-parties-projet .bouton-partie-projet svg, .rangee-parties-projet .bouton-partie-projet svg { width: 20px; height: 20px; }
+body.mode-telephone .parties-projet-applis, body.mode-telephone .rangee-parties-projet, body.mode-telephone .grille-parties-projet { gap: 5px; }
+body.mode-telephone .rangee-parties-projet .bouton-partie-projet, body.mode-telephone .grille-parties-projet .bouton-partie-projet { min-height: 32px; font-size: 11px; gap: 4px; padding: 0 4px; }
+body.mode-telephone .grille-parties-projet .bouton-partie-projet svg, body.mode-telephone .rangee-parties-projet .bouton-partie-projet svg { width: 15px; height: 15px; }
 body[data-partie-projet='points'] .panneau-projet > #contenu-projet,
 body[data-partie-projet='plans'] .panneau-projet > #contenu-projet,
 body[data-partie-projet='surfaces'] .panneau-projet > #contenu-projet,
