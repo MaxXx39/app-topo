@@ -13443,3 +13443,6 @@ body[data-partie-projet='archives'] .panneau-projet > #contenu-projet { display:
 .bouton-fleche-colonne { min-width: 40px; min-height: 40px; border: 2px solid #1b2b36; border-radius: 10px; background: #ffffff; color: #1b2b36; font-size: 15px; font-weight: 800; cursor: pointer; }
 .bouton-fleche-colonne:disabled { opacity: 0.3; cursor: default; }
 .bouton-secondaire.actif[data-action='tp-organiser'] { background: #1b2b36; color: #ffffff; }
+
+/* 0.199.0 : carte nationale cochée à la main (par-dessus la photo) : sa propre transparence. */
+.plan-fond .tuile.carte.carte-manuelle { opacity: var(--opacite-carte, 0.4); }
