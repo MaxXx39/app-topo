@@ -3481,7 +3481,14 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   opacity: 0.85;
 }
 
-.cible-implantation .anneau-centre {
+.cible-implantation .pastille-centre {
+  fill: currentColor;
+  fill-opacity: 0.5;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+.cible-implantation .anneau-centre-ancien {
   fill: currentColor;
   fill-opacity: 0.12;
 }
@@ -13300,7 +13307,6 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .pastille-controle { position: absolute; top: 100%; right: 8px; margin-top: 4px; z-index: 30; min-height: 32px; padding: 0 12px; border: 0; border-radius: 16px; background: #ea580c; color: #fff; font-weight: 700; font-size: 0.85rem; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
 
 /* 0.189.0 : pastille du milieu (2 cm) plus foncée sur la cible de 20 cm */
-.cible-implantation.cible-3 .anneau-centre { fill-opacity: 0.45; }
 
 /* 0.189.1 : flèche perpendiculaire du guidage de ligne (couloir), de la canne vers la ligne */
 .cadre-couloir .fleche-couloir { position: absolute; display: flex; align-items: center; transform: translateY(-50%); min-width: 30px; pointer-events: none; }

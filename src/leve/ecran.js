@@ -1738,7 +1738,8 @@ function svgCible(numero, haut, droite, couleur, nordEnHaut, nord = 0) {
   const marqueNord = `<g class="nord-cible" transform="rotate(${nord.toFixed(1)})">
       <path d="M0 -118 7 -104H-7Z" /><text y="-91" text-anchor="middle" transform="rotate(${(-nord).toFixed(1)} 0 -95)">N</text></g>`;
   return `<svg class="cible-implantation cible-${numero}" viewBox="-124 -124 248 248" role="img" aria-label="Cible ${texteRayon(cercles[0])}">
-    ${cercles.map((r, i) => `<circle r="${r * echelle}" class="anneau anneau-${i}${i === cercles.length - 1 ? ' anneau-centre' : ''}" />`).join('')}
+    ${cercles.map((r, i) => `<circle r="${r * echelle}" class="anneau anneau-${i}" />`).join('')}
+    <circle r="${Math.max(0.02 * echelle, 4).toFixed(1)}" class="pastille-centre" />
     ${cercles.map((r) => `<text x="${(r * echelle * Math.SQRT1_2 + 2).toFixed(1)}" y="${(r * echelle * Math.SQRT1_2 + 12).toFixed(1)}" class="rayon">${texteRayon(r)}</text>`).join('')}
     <path d="M-110 0H110M0 -110V110" class="axes" />
     ${nordEnHaut ? '' : '<text x="-122" y="-112" class="haut-cible">▲ devant</text>'}
