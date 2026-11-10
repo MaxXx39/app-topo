@@ -287,21 +287,21 @@ function natureDeLaListe(projet, leve, couleursReseaux) {
  * « Contenu du projet » (0.103.0) : une catégorie repliable par sorte, dans l'ordre demandé
  * (Contrôle d'abord) ; une catégorie vide n'est pas montrée. fermees : catégories repliées.
  */
-function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordre: 'recent', jour: '' }) {
+export function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordre: 'recent', jour: '' }) {
   // Cadastre (0.116.4) : points et lignes rangés ensemble dans leur catégorie.
   const cadastres = projet.leves.filter((l) => l.cadastre);
   const plansCadastre = new Set(cadastres.map((l) => planDuCadastre(projet, l)?.id).filter(Boolean));
+  // Levés et points importés : triés par date (le plus récent en haut au départ), un jour au choix (0.186.0).
+  const sens = filtreDate.ordre === 'ancien' ? -1 : 1;
+  const parDate = (a, b) => sens * String(b.importeLe ?? '').localeCompare(String(a.importeLe ?? ''));
+  const jourDe = (l) => String(l.jour ?? l.importeLe ?? '').slice(0, 10);
+  const garde = (l) => !filtreDate.jour || jourDe(l) === filtreDate.jour;
   const listes = projet.leves.filter((l) => !l.direct && !l.cadastre && garde(l)).sort(parDate);
   const nombreListes = projet.leves.filter((l) => !l.direct && !l.cadastre).length;
   const barreDate = `<div class="barre-date-listes seulement-intermediaire"><button type="button" class="bouton-lien" data-action="trier-listes-date" title="Changer l'ordre des listes">Trier par date : ${filtreDate.ordre === 'recent' ? 'récent d\'abord ▾' : 'ancien d\'abord ▴'}</button>
     <label class="aide">Jour <input type="date" data-champ="jour-listes" value="${echapper(filtreDate.jour)}" aria-label="Chercher les listes d'un jour" /></label>
     ${filtreDate.jour ? '<button type="button" class="bouton-lien" data-action="effacer-jour-listes">tout voir</button>' : ''}</div>`;
   const aucune = '<p class="vide">Aucune liste ce jour-là.</p>';
-  // Levés et points importés : triés par date (le plus récent en haut au départ), un jour au choix (0.186.0).
-  const sens = filtreDate.ordre === 'ancien' ? -1 : 1;
-  const parDate = (a, b) => sens * String(b.importeLe ?? '').localeCompare(String(a.importeLe ?? ''));
-  const jourDe = (l) => String(l.jour ?? l.importeLe ?? '').slice(0, 10);
-  const garde = (l) => !filtreDate.jour || jourDe(l) === filtreDate.jour;
   const levees = projet.leves.filter((l) => l.direct && garde(l)).sort(parDate);
   const nombreLevees = projet.leves.filter((l) => l.direct).length;
   const surfacesProjet = projet.surfaces.filter((s) => estSurfaceFichier(s));
