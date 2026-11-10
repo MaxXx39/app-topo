@@ -455,7 +455,7 @@ function blocTableauPoints(projet, etat) {
     .map(([cle, titre, couleur]) => `<button type="button" class="categorie-points ${choisies.has(cle) ? 'choisie' : ''}" style="--couleur-categorie: ${couleur}" data-action="tp-categorie" data-cle="${cle}" aria-pressed="${choisies.has(cle)}">${titre} <small>${nombreParCategorie.get(cle)}</small></button>`).join('');
   const dansLaSelection = listes.filter((l) => choisies.has(l.categorie));
   const puces = dansLaSelection.length > 1
-    ? `<div class="listes-points-choix" role="group" aria-label="Listes de points à montrer"><span class="aide">Listes :</span>${dansLaSelection.map((l) => `<button type="button" class="puce-liste-points ${etat.listesDecochees.has(l.id) ? '' : 'choisie'}" style="--couleur-liste: ${couleurDeListe.get(l.id)}" data-action="tp-liste" data-id="${echapper(l.id)}" aria-pressed="${!etat.listesDecochees.has(l.id)}"><i class="pastille-liste-puce"></i>${echapper(l.nom)} <small>${l.nombre}</small></button>`).join('')}</div>`
+    ? `<div class="listes-points-choix" role="group" aria-label="Listes de points à montrer"><span class="aide">Listes :</span>${dansLaSelection.map((l) => `<button type="button" class="puce-liste-points ${etat.listesDecochees.has(l.id) ? '' : 'choisie'}" style="--couleur-liste: ${couleurDeListe.get(l.id)}; --couleur-categorie: ${couleurs.get(l.categorie)}" data-action="tp-liste" data-id="${echapper(l.id)}" aria-pressed="${!etat.listesDecochees.has(l.id)}"><i class="pastille-liste-puce"></i>${echapper(l.nom)} <small>${l.nombre}</small></button>`).join('')}</div>`
     : '';
   const lignes = lignesTriees(projet, etat);
   const titres = new Map(CATEGORIES_POINTS.map(([cle, titre]) => [cle, titre]));
@@ -473,7 +473,7 @@ function blocTableauPoints(projet, etat) {
     ? `<span class="titre-colonne-organiser">${titreDe.get(cle)}</span>${fleches(cle)}`
     : `<button type="button" class="bouton-lien" data-action="tp-tri" data-col="${cle}">${titreDe.get(cle)}${etat.colonne === cle ? (etat.asc ? ' ▴' : ' ▾') : ''}</button>`}</th>`).join('');
   const cellules = (l) => ({
-    nom: `<td class="colonne-nom"><span class="pastille-categorie" style="background: ${couleurDeListe.get(l.listeId) ?? couleurs.get(l.categorie)}" title="${echapper(titres.get(l.categorie) ?? '')}"></span>${echapper(l.nom)}</td>`,
+    nom: `<td class="colonne-nom" style="--couleur-categorie: ${couleurs.get(l.categorie)}"><span class="pastille-categorie" style="background: ${couleurDeListe.get(l.listeId) ?? couleurs.get(l.categorie)}" title="${echapper(titres.get(l.categorie) ?? '')}"></span>${echapper(l.nom)}</td>`,
     libelle: `<td>${echapper(l.libelle)}</td>`,
     est: `<td class="n">${n(l.est)}</td>`,
     nord: `<td class="n">${n(l.nord)}</td>`,

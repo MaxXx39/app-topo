@@ -13422,16 +13422,19 @@ body.mode-telephone .bande-appli .cadre-levee .nom-levee-bande { font-size: 12px
 body.mode-telephone .bande-appli .cadre-levee .petit-bouton-levee { min-height: 0; height: auto; align-self: stretch; }
 body.mode-telephone .bande-appli .cadre-levee { flex: 1 1 0; min-width: 0; }
 
-/* 0.200.0 : encadré du projet : Import | Exporter sur une ligne, puis les pages du contenu deux par deux (moins de hauteur). */
-.cadre-projet-applis .parties-projet-applis { flex-direction: column; align-items: stretch; gap: 8px; }
-.rangee-parties-projet { display: flex; gap: 8px; }
-.grille-parties-projet { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.rangee-parties-projet .bouton-partie-projet, .grille-parties-projet .bouton-partie-projet { flex: 1 1 0; min-height: 44px; font-size: 14px; }
-.grille-parties-projet .bouton-partie-projet { font-size: 13px; }
-.grille-parties-projet .bouton-partie-projet svg, .rangee-parties-projet .bouton-partie-projet svg { width: 20px; height: 20px; }
-body.mode-telephone .parties-projet-applis, body.mode-telephone .rangee-parties-projet, body.mode-telephone .grille-parties-projet { gap: 5px; }
-body.mode-telephone .rangee-parties-projet .bouton-partie-projet, body.mode-telephone .grille-parties-projet .bouton-partie-projet { min-height: 32px; font-size: 11px; gap: 4px; padding: 0 4px; }
-body.mode-telephone .grille-parties-projet .bouton-partie-projet svg, body.mode-telephone .rangee-parties-projet .bouton-partie-projet svg { width: 15px; height: 15px; }
+/* 0.201.0 : encadré du projet coupé en deux : à gauche Import | Exporter côte à côte (hauts), à droite les pages du contenu deux par deux. */
+.cadre-projet-applis .parties-projet-applis { flex-direction: row; align-items: stretch; gap: 8px; }
+.moitie-gauche-projet { flex: 1 1 0; min-width: 0; display: flex; gap: 8px; }
+.grille-parties-projet { flex: 1 1 0; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.moitie-gauche-projet .bouton-partie-projet { flex: 1 1 0; flex-direction: column; gap: 6px; font-size: 14px; }
+.moitie-gauche-projet .bouton-partie-projet svg { width: 28px; height: 28px; }
+.grille-parties-projet .bouton-partie-projet { min-height: 44px; flex-direction: column; gap: 2px; font-size: 11.5px; line-height: 1.1; text-align: center; padding: 2px 4px; }
+.grille-parties-projet .bouton-partie-projet svg { width: 20px; height: 20px; }
+body.mode-telephone .cadre-projet-applis .parties-projet-applis, body.mode-telephone .moitie-gauche-projet, body.mode-telephone .grille-parties-projet { gap: 5px; }
+body.mode-telephone .moitie-gauche-projet .bouton-partie-projet { font-size: 11px; gap: 3px; }
+body.mode-telephone .moitie-gauche-projet .bouton-partie-projet svg { width: 20px; height: 20px; }
+body.mode-telephone .grille-parties-projet .bouton-partie-projet { min-height: 34px; font-size: 9.5px; gap: 1px; }
+body.mode-telephone .grille-parties-projet .bouton-partie-projet svg { width: 14px; height: 14px; }
 body[data-partie-projet='points'] .panneau-projet > #contenu-projet,
 body[data-partie-projet='plans'] .panneau-projet > #contenu-projet,
 body[data-partie-projet='surfaces'] .panneau-projet > #contenu-projet,
@@ -13448,3 +13451,20 @@ body[data-partie-projet='archives'] .panneau-projet > #contenu-projet { display:
 
 /* 0.199.0 : carte nationale cochée à la main (par-dessus la photo) : sa propre transparence. */
 .plan-fond .tuile.carte.carte-manuelle { opacity: var(--opacite-carte, 0.4); }
+
+/* 0.201.0 : tableau de points : séparateurs de colonnes, une colonne sur deux d'un gris clair / blanc cassé, séparateurs de lignes. */
+body { --bande-a: #e9eef3; --bande-b: #fbfaf6; --sep-tableau: #94a3b8; --entete-tableau: #cfd8e1; }
+body.theme-sombre { --bande-a: #22313c; --bande-b: #18232b; --sep-tableau: #4b5d6b; --entete-tableau: #2f4352; }
+.tableau-points-grand th, .tableau-points-grand td { border-right: 1px solid var(--sep-tableau); }
+.tableau-points-grand th:last-child, .tableau-points-grand td:last-child { border-right: 0; }
+.tableau-points-grand td { border-bottom: 1px solid var(--sep-tableau); }
+.tableau-points-grand td:nth-child(odd) { background: var(--bande-a); }
+.tableau-points-grand td:nth-child(even) { background: var(--bande-b); }
+.tableau-points-grand th { background: var(--entete-tableau); border-bottom: 2px solid var(--sep-tableau); }
+.tableau-points-grand th.tri { background: var(--sep-tableau); }
+.tableau-points-grand th.colonne-nom, .tableau-points-grand td.colonne-nom { box-shadow: 2px 0 0 var(--sep-tableau); }
+.tableau-points-grand td.colonne-nom { background: var(--bande-a); border-left: 6px solid var(--couleur-categorie, transparent); }
+.tableau-points-grand th.colonne-nom { background: var(--entete-tableau); }
+/* 0.201.0 : puces de listes encadrées à la couleur de leur catégorie (la pastille garde la couleur de la liste). */
+.puce-liste-points { border: 3px solid var(--couleur-categorie, #94a3b8); }
+.puce-liste-points.choisie { border-color: var(--couleur-categorie, #1e293b); }
