@@ -162,7 +162,7 @@ export function creerNavigation(nav, actions) {
   // --- Déplacer une tuile : appui long, puis glisser ; l'ordre est gardé sur la tablette ---
   function debutDeplacement(evenement) {
     const tuile = evenement.target.closest('.tuile-appli');
-    if (!tuile || evenement.target.closest('[data-favori]')) return;
+    if (!tuile || evenement.target.closest('[data-favori], [data-liste-appli]')) return;
     clearTimeout(deplacement?.minuterie);
     deplacement = { tuile, x: evenement.clientX, y: evenement.clientY, actif: false, fait: false };
     deplacement.minuterie = setTimeout(() => {
@@ -222,6 +222,14 @@ export function creerNavigation(nav, actions) {
       if (refuse) actions.message(`${MAX_FAVORIS} favoris au plus : décoche d'abord une autre application.`);
       else ecrireFavoris(liste);
       dessinerPage();
+      return;
+    }
+    // 0.195.0 : bouton « liste » d'une tuile : le tableau des points, avec la catégorie de l'application cochée.
+    const liste = evenement.target.closest('[data-liste-appli]');
+    if (liste) {
+      evenement.stopPropagation();
+      fermerPage();
+      actions.ouvrirListe?.(liste.dataset.listeAppli);
       return;
     }
     // 0.159.0 : Réglages et « Fermer l'appli » (pied de la page, pas des applications).
@@ -315,8 +323,10 @@ export function creerNavigation(nav, actions) {
         ${ordonner(actions.applis(), lireOrdre()).map((a) => `
           <div class="tuile-appli ${a.cle === courante ? 'en-cours' : ''}" data-appli="${a.cle}" role="button" tabindex="0"
             style="--couleur-appli: ${a.couleur}; --texte-appli: ${a.texte}">
-            ${svg(a.icone)}
-            <span class="nom-tuile">${echapper(actions.titre?.(a) ?? a.titre)}</span>
+            <span class="tete-tuile">
+              <span class="nom-et-icone">${svg(a.icone)}<span class="nom-tuile">${echapper(actions.titre?.(a) ?? a.titre)}</span></span>
+              ${actions.categorieListe?.(a.cle) ? `<button type="button" class="bouton-liste-tuile" data-liste-appli="${a.cle}" aria-label="Liste des points : ${echapper(a.titre)}" title="Liste des points">${svg('<path d="M8 6h13M8 12h13M8 18h13" /><circle cx="3.5" cy="6" r="1.2" /><circle cx="3.5" cy="12" r="1.2" /><circle cx="3.5" cy="18" r="1.2" />')}</button>` : '<span></span>'}
+            </span>
             ${(() => {
               const detail = actions.detailTuile?.(a.cle) ?? '';
               return detail ? `<small class="detail-tuile">${echapper(detail)}</small>` : '';

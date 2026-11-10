@@ -11602,6 +11602,7 @@ body.mode-telephone { --hauteur-bande: 56px; --hauteur-onglets: var(--hauteur-ba
 .partie-appli span { overflow: hidden; text-overflow: ellipsis; }
 .bande-appli svg,
 .page-applis .tuile-appli > svg,
+.page-applis .tuile-appli .nom-et-icone > svg,
 .roue-favoris svg {
   flex: none;
   fill: none;
@@ -11783,6 +11784,7 @@ body:not(.aide-active) #leve-direct .choix-implantation-type { display: none; }
   user-select: none;
 }
 .tuile-appli > svg { width: 40px; height: 40px; }
+.tuile-appli .nom-et-icone > svg { width: 40px; height: 40px; }
 .tuile-appli.en-cours { outline: 4px solid var(--encre); outline-offset: 3px; }
 .coche-favori {
   position: absolute;
@@ -11802,6 +11804,7 @@ body:not(.aide-active) #leve-direct .choix-implantation-type { display: none; }
 .coche-favori.coche { opacity: 1; background: #ffffff; border-color: #ffffff; color: #f59e0b; }
 body.mode-telephone .tuile-appli { min-height: 96px; font-size: 15px; }
 body.mode-telephone .tuile-appli > svg { width: 30px; height: 30px; }
+body.mode-telephone .tuile-appli .nom-et-icone > svg { width: 30px; height: 30px; }
 body.mode-telephone .coche-favori { width: 34px; height: 34px; font-size: 16px; }
 body.mode-telephone .texte-bandeau-projet b { font-size: 17px; }
 body.mode-telephone .bouton-bandeau-projet { min-height: 40px; padding: 0 10px; font-size: 13px; }
@@ -12279,12 +12282,14 @@ body.reglages-en-page dialog.fenetre-reglages.en-page[open] { bottom: env(safe-a
   background-color: var(--couleur-appli);
 }
 .tuile-appli > svg { width: 24px; height: 24px; }
+.tuile-appli .nom-et-icone > svg { width: 24px; height: 24px; }
 .tuile-appli .coche-favori { width: 28px; height: 28px; font-size: 13px; top: 5px; right: 5px; }
 .tuile-appli .sous-tuile button { min-height: 24px; padding: 1px 6px; font-size: 11px; }
 .tuile-appli .detail-tuile { font-size: 10px; }
 .tuiles-applis { gap: 8px; }
 body.mode-telephone .tuile-appli { min-height: 76px; font-size: 14px; }
 body.mode-telephone .tuile-appli > svg { width: 20px; height: 20px; }
+body.mode-telephone .tuile-appli .nom-et-icone > svg { width: 20px; height: 20px; }
 body.mode-telephone .tuile-appli .coche-favori { width: 24px; height: 24px; font-size: 11px; }
 /* 0.162.2 : Mesure rapide, loupe « Manuel » : flèches, zoom et « + Ajouter ce point ». */
 .reglage-loupe-mesure { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
@@ -12921,6 +12926,7 @@ body.mode-telephone .zone-info-appli { font-size: 12px; }
 /* menu des applications */
 body.mode-telephone .tuile-appli { min-height: 62px; font-size: 13px; }
 body.mode-telephone .tuile-appli > svg { width: 18px; height: 18px; }
+body.mode-telephone .tuile-appli .nom-et-icone > svg { width: 18px; height: 18px; }
 body.mode-telephone .tuile-appli .sous-tuile button { min-height: 22px; padding: 0 5px; font-size: 9.5px; }
 body.mode-telephone .tuile-appli .detail-tuile { font-size: 9px; }
 /* Abréviations : forme longue partout, forme courte seulement en mode téléphone. */
@@ -12956,6 +12962,7 @@ body.mode-telephone .entete .entete-texte { min-width: 0; }
 body.mode-telephone .tuiles-applis { grid-auto-rows: auto; gap: 6px; }
 body.mode-telephone .tuile-appli { min-height: 0; padding: 6px 6px 7px; font-size: 12px; gap: 2px; }
 body.mode-telephone .tuile-appli > svg { width: 16px; height: 16px; }
+body.mode-telephone .tuile-appli .nom-et-icone > svg { width: 16px; height: 16px; }
 body.mode-telephone .tuile-appli .sous-tuile { gap: 3px; margin-top: 2px; }
 body.mode-telephone .tuile-appli .sous-tuile button { min-height: 18px; padding: 0 4px; font-size: 8.5px; }
 body.mode-telephone .tuile-appli [data-favori] { transform: scale(0.65); transform-origin: top right; }
@@ -13380,3 +13387,11 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .ligne-type-dxf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 4px; }
 .type-plan-dxf { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
 .type-plan-dxf select { min-height: 40px; }
+
+/* 0.195.0 : tuile du menu : le haut en 3 parts, nom (avec son icône) centré sur les 2 de gauche, bouton « liste » dans la 3e */
+.tuile-appli .tete-tuile { width: 100%; display: grid; grid-template-columns: 2fr 1fr; align-items: center; gap: 4px; }
+.tuile-appli .nom-et-icone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; }
+.tuile-appli .bouton-liste-tuile { justify-self: center; width: 44px; height: 44px; border: 2px solid currentColor; border-radius: 12px; background: rgba(0, 0, 0, 0.14); color: inherit; display: grid; place-items: center; padding: 0; }
+.tuile-appli .bouton-liste-tuile svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.tuile-appli .coche-favori { left: 5px; right: auto; }
+body.mode-telephone .tuile-appli .bouton-liste-tuile { width: 36px; height: 36px; }

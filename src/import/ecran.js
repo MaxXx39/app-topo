@@ -251,7 +251,13 @@ export function creerEcranImport(conteneur, contenu, actions) {
     conteneur.querySelector('[data-action="ajouterPointTape"]')?.click();
   });
 
-  return { afficher };
+  /** 0.195.0 : ne montre dans le tableau « Points » que ces catégories (bouton liste d'une tuile du menu). */
+  function choisirCategories(cles) {
+    tableauEtat.categories = new Set(cles);
+    tableauEtat.listesDecochees = new Set();
+    if (derniers) afficher(...derniers);
+  }
+  return { afficher, choisirCategories };
 
   /**
    * Redessine le bloc. dernierImport : résultat du dernier import de points, ou null ;

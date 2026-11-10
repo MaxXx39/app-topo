@@ -1407,6 +1407,14 @@ function detailDeTuile(cle) {
 navigation = creerNavigation(document.querySelector('#bande-appli'), {
   comptes: comptesDuProjet,
   detailTuile: detailDeTuile,
+  // 0.195.0 : bouton « liste » des tuiles Lever, Annotation, Contrôle… : le tableau « Points » avec leur catégorie.
+  categorieListe: (cle) => ({ lever: 'leve', mesure: 'leve', metre: 'leve', recollement: 'recollement', annotation: 'annotation', controle: 'controle' })[cle] ?? null,
+  ouvrirListe: (cle) => {
+    const categorie = { lever: 'leve', mesure: 'leve', metre: 'leve', recollement: 'recollement', annotation: 'annotation', controle: 'controle' }[cle];
+    if (!categorie) return;
+    ecranImport.choisirCategories([categorie]);
+    ouvrirPartieProjet('contenu');
+  },
   applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces })
     // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile.
     .filter((a) => a.cle !== 'plan' || !window.matchMedia('(min-width: 900px)').matches),
