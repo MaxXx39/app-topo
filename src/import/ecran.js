@@ -22,6 +22,7 @@ import { COULEURS_LISTES, planDuCadastre, couleurDuCadastre } from '../plan/list
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
 import { lireReseaux } from '../leve/reseaux.js';
+import { dateHeureDuPoint, jourDuPoint, trierParDate } from '../topo/date-point.js';
 import { nomDuType, resumeArchive } from '../projet/archives.js';
 
 /**
@@ -61,7 +62,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
   let derniers = null;
   let messageControle = ''; // erreur du dernier import de points de contrôle
   // 0.186.0 : tri par date (récent d'abord ou ancien d'abord) et recherche d'un jour pour les listes de points (Intermédiaire).
-  const filtreDate = { ordre: 'recent', jour: '' };
+  const filtreDate = { ordre: 'recent', jour: '', jourPoints: '' };
   ecouter('toggle', (evenement) => {
     if (evenement.target.classList?.contains('points-de-la-liste')) remplirTableauOuvert(evenement.target);
     const id = evenement.target.dataset?.calquesPlan;
@@ -83,6 +84,16 @@ export function creerEcranImport(conteneur, contenu, actions) {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
     const { action, id } = bouton.dataset;
+    if (action === 'trier-points-date') {
+      triPoints = { liste: 'recent', recent: 'ancien', ancien: 'liste' }[triPoints];
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'effacer-jour-points') {
+      filtreDate.jourPoints = '';
+      if (derniers) afficher(...derniers);
+      return;
+    }
     if (action === 'trier-listes-date') {
       filtreDate.ordre = filtreDate.ordre === 'recent' ? 'ancien' : 'recent';
       if (derniers) afficher(...derniers);
@@ -135,6 +146,11 @@ export function creerEcranImport(conteneur, contenu, actions) {
   });
 
   ecouter('change', async (evenement) => {
+    if (evenement.target.matches?.('[data-champ="jour-points"]')) {
+      filtreDate.jourPoints = evenement.target.value;
+      if (derniers) afficher(...derniers);
+      return;
+    }
     if (evenement.target.matches?.('[data-champ="jour-listes"]')) {
       filtreDate.jour = evenement.target.value;
       if (derniers) afficher(...derniers);
@@ -307,6 +323,15 @@ export function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordr
   const surfacesProjet = projet.surfaces.filter((s) => estSurfaceFichier(s));
   const dessins = (projet.dessins ?? []).filter((d) => d.sommets.length > 0);
   const couleursReseaux = new Map(lireReseaux().map(([a, , c]) => [a, c]));
+  // 0.187.0 : tous les points du projet dans une seule liste, triés par date, avec recherche d'un jour.
+  const tousLesPoints = () => {
+    const tous = [];
+    for (const leve of projet.leves) for (const p of leve.points) tous.push({ ...p, listeNom: leve.nom });
+    return filtreDate.jourPoints ? tous.filter((p) => jourDuPoint(p) === filtreDate.jourPoints) : tous;
+  };
+  const nombreTousPoints = projet.leves.reduce((total, l) => total + l.points.length, 0);
+  const barrePoints = `<div class="barre-date-listes"><label class="aide">Jour <input type="date" data-champ="jour-points" value="${echapper(filtreDate.jourPoints)}" aria-label="Chercher les points d'un jour" /></label>
+    ${filtreDate.jourPoints ? '<button type="button" class="bouton-lien" data-action="effacer-jour-points">tout voir</button>' : ''}</div>`;
   const categorie = (cle, titre, nombre, html, mode = '') => (nombre > 0
     ? `<details class="categorie-contenu ${mode}" data-categorie="${cle}" ${fermees.has(cle) ? '' : 'open'}>
         <summary><span>${titre}</span><span class="nombre-categorie">${nombre}</span></summary>
@@ -318,6 +343,7 @@ export function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordr
     categorie('leves', 'Levés', nombreLevees, `${barreDate}<div class="liste-leves">${levees.length === 0 ? aucune : ''}${levees.map((l) => ligneListe(projet, l, natureDeLaListe(projet, l, couleursReseaux))).join('')}</div>`),
     categorie('points', 'Points importés', nombreListes, `${barreDate}<div class="liste-leves">${listes.length === 0 ? aucune : ''}${listes.map((l) => ligneListe(projet, l)).join('')}</div>`),
     categorie('surfaces', 'Surfaces importées', surfacesProjet.length, surfacesProjet.map(ligneSurfaceProjet).join(''), 'seulement-expert'),
+    categorie('tous-points', 'Tous les points (par date)', nombreTousPoints, `${barrePoints}${tableauPoints(tousLesPoints, 'Voir les points', { avecListe: true, total: nombreTousPoints, parDate: true })}`, 'seulement-intermediaire'),
     categorie('cadastre', 'Cadastre', cadastres.length, cadastres.map((l) => ligneCadastre(projet, l)).join('')),
     categorie('dxf', 'Plans DXF', (projet.plansDxf ?? []).filter((p) => !plansCadastre.has(p.id)).length, listePlansDxf(projet, calquesOuverts, plansCadastre), 'seulement-intermediaire'),
     categorie('dessins', 'Dessins', dessins.length, listesDessins(projet), 'seulement-intermediaire'),
@@ -439,30 +465,47 @@ function choixCouleur(id, couleur) {
 const tableauxEnAttente = new Map();
 let numeroTableau = 0;
 
-/** Lignes HTML d'un tableau de points (nom, Est, Nord, altitude). */
-export function lignesTableauPoints(points) {
+/** Lignes HTML d'un tableau de points (nom, [liste], Est, Nord, altitude, [date et heure]). */
+export function lignesTableauPoints(points, { date = false, avecListe = false } = {}) {
   const n = (valeur) => (valeur == null ? '—' : formaterNombre(valeur));
-  return points.map((p) => `<tr><td>${echapper(p.nom)}</td><td>${n(p.est)}</td><td>${n(p.nord)}</td><td>${n(p.altitude)}</td></tr>`).join('');
+  return points.map((p) => `<tr><td>${echapper(p.nom)}</td>${avecListe ? `<td>${echapper(p.listeNom ?? '')}</td>` : ''}<td>${n(p.est)}</td><td>${n(p.nord)}</td><td>${n(p.altitude)}</td>${date ? `<td class="seulement-intermediaire">${echapper(dateHeureDuPoint(p))}</td>` : ''}</tr>`).join('');
 }
 
 /** Remplit le tableau d'un « Voir les points » qu'on vient d'ouvrir (appelé par l'écouteur « toggle »). */
 function remplirTableauOuvert(details) {
   const corps = details.querySelector('tbody[data-tableau]');
   if (!details.open || !corps || corps.dataset.rempli) return;
-  corps.innerHTML = lignesTableauPoints(tableauxEnAttente.get(corps.dataset.tableau) ?? []);
+  const attente = tableauxEnAttente.get(corps.dataset.tableau);
+  corps.innerHTML = attente ? lignesTableauPoints(attente.points(), attente) : '';
   corps.dataset.rempli = '1';
 }
 
-function tableauPoints(points, titre) {
-  if (points.length === 0) return '';
+// 0.187.0 : tri des points par date (bouton « Date » de l'en-tête des tableaux) : 'liste' (ordre de la liste),
+// 'recent' ou 'ancien' ; les points sans date (importés, tapés) restent à la fin.
+let triPoints = 'liste';
+const TEXTE_TRI = { liste: 'Date', recent: 'Date ▾', ancien: 'Date ▴' };
+
+/**
+ * Tableau repliable de points. options : date (colonne Date, Intermédiaire), avecListe (colonne Liste,
+ * pour « tous les points »). points peut être une liste ou une fonction (calculée à l'ouverture).
+ */
+function tableauPoints(points, titre, { date = true, avecListe = false, total = null, parDate = false } = {}) {
+  // parDate : tri par date d'office (liste de tous les points), « Date » garde alors le plus récent d'abord.
+  const ordre = () => (parDate && triPoints === 'liste' ? 'recent' : triPoints);
+  const nombre = total ?? (typeof points === 'function' ? 0 : points.length);
+  if (typeof points !== 'function' && points.length === 0) return '';
   numeroTableau += 1;
-  tableauxEnAttente.set(String(numeroTableau), points);
+  const fournir = typeof points === 'function' ? points : () => points;
+  tableauxEnAttente.set(String(numeroTableau), { points: () => (date ? trierParDate(fournir(), ordre()) : fournir()), date, avecListe });
+  const colonneDate = date
+    ? `<th class="seulement-intermediaire"><button type="button" class="bouton-lien" data-action="trier-points-date" title="Trier les points par date">${TEXTE_TRI[ordre()]}</button></th>`
+    : '';
   return `
     <details class="points-de-la-liste">
-      <summary>${titre} (${points.length})</summary>
+      <summary>${titre}${nombre ? ` (${nombre})` : ''}</summary>
       <div class="tableau-defilant">
         <table>
-          <thead><tr><th>Nom</th><th>Est (m)</th><th>Nord (m)</th><th>Altitude (m)</th></tr></thead>
+          <thead><tr><th>Nom</th>${avecListe ? '<th>Liste</th>' : ''}<th>Est (m)</th><th>Nord (m)</th><th>Altitude (m)</th>${colonneDate}</tr></thead>
           <tbody data-tableau="${numeroTableau}"></tbody>
         </table>
       </div>
@@ -480,7 +523,7 @@ function listesDessins(projet) {
       <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span>
         <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="archiver" data-type="dessin" data-id="${dessin.id}">archiver</button>
         <button type="button" class="bouton-lien archive-comme-suppression" data-action="archiver" data-type="dessin" data-id="${dessin.id}">supprimer</button></div>
-      ${tableauPoints(points, 'Voir les points')}
+      ${tableauPoints(points, 'Voir les points', { date: false })}
     </div>`;
     })
     .join('');
@@ -493,7 +536,7 @@ function listePointsControle(projet) {
   return `<div class="ligne-leve liste-controle">
       <strong>Points de contrôle</strong>
       <div class="ligne-outils"><span class="aide">${points.length} points</span></div>
-      ${tableauPoints(points, 'Voir les points de contrôle')}
+      ${tableauPoints(points, 'Voir les points de contrôle', { date: false })}
       ${photosDesPoints((projet.photosControle ?? []).filter((photo) => points.some((p) => p.id === photo.pointId)))}
     </div>`;
 }

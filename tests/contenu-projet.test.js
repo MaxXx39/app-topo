@@ -20,4 +20,13 @@ describe('blocContenu', () => {
     expect(jour).toContain('value="A"');
     expect(jour).not.toContain('value="B"');
   });
+
+  it('propose « Tous les points (par date) » avec le champ Jour', () => {
+    const projet = creerProjet('t');
+    projet.leves.push({ id: 'a', nom: 'A', direct: true, importeLe: '2026-11-01T10:00:00Z', points: [{ nom: 'P1', est: 1, nord: 2, altitude: 3, gnss: { prisLe: '2026-11-01T10:00:00Z' } }] });
+    const html = blocContenu(projet, new Set(), new Set());
+    expect(html).toContain('Tous les points (par date)');
+    expect(html).toContain('data-champ="jour-points"');
+    expect(html).toContain('data-action="trier-points-date"');
+  });
 });

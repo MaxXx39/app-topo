@@ -26,6 +26,7 @@ import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS, surImageChargee 
 import { creerLoupe } from './loupe.js';
 import { echapper } from '../outils/echapper.js';
 import { COULEURS_LISTES, SECTIONS } from './listes-points.js';
+import { jourDuPoint } from '../topo/date-point.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
@@ -65,6 +66,7 @@ const CALQUES_DEPART = {
   fondSatellite: true, // 0.121.1 : photo aérienne affichée au départ, transparente à 60 %
   cadastre: false,
   transparencePhoto: 60,
+  jourPoints: '', // 0.187.0 : seulement les points pris ce jour (« AAAA-MM-JJ »), vide = tous
   controleNoms: true,
   controleAltitudes: true,
   points: true,
@@ -401,8 +403,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
     // Points visibles à l'écran, ceux du stock actif en premier (leurs noms sont prioritaires).
     const visibles = [];
+    const jourChoisi = calquesChoisis.jourPoints;
     for (const point of points) {
       if (nomsCaches.has(point.nom)) continue;
+      if (jourChoisi && jourDuPoint(point) !== jourChoisi) continue; // 0.187.0 : points d'un jour (sans date = cachés)
       const { x, y } = versEcran(point.est, point.nord, vue);
       if (x < -50 || y < -50 || x > vue.largeur + 50 || y > vue.hauteur + 50) continue;
       visibles.push({ point, x, y, prioritaire: rangs.has(point.nom) || classes.has(point.nom) });
@@ -1881,6 +1885,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
     });
   }
+  menuListes.addEventListener('click', (evenement) => {
+    if (!evenement.target.closest('[data-jour-effacer]')) return;
+    calquesChoisis.jourPoints = '';
+    const champ = menuListes.querySelector('[data-calque="jourPoints"]');
+    if (champ) champ.value = '';
+    dessiner();
+  });
   menuListes.addEventListener('change', (evenement) => {
     const planCadastre = evenement.target.dataset.lignesCadastre;
     if (planCadastre) quandReglerPlanDxf?.(planCadastre, { visible: evenement.target.checked });
@@ -1977,7 +1988,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
       return html;
     });
-    menuListes.innerHTML = `${parties.join('') || '<p class="menu-vide">Rien à afficher</p>'}
+    const jourPoints = `<div class="seulement-intermediaire jour-points-menu"><p class="titre-partie-menu">Points d'un jour</p>
+      <label class="case"><input type="date" data-calque="jourPoints" value="${echapper(calquesChoisis.jourPoints ?? '')}" aria-label="Montrer seulement les points pris ce jour" />
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-jour-effacer="oui">tout voir</button></label></div>`;
+    menuListes.innerHTML = `${parties.join('') || '<p class="menu-vide">Rien à afficher</p>'}${jourPoints}
       <div class="ligne-outils"><button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="oui">tout</button>
         <button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="non">rien</button></div>`;
     montrerRoues();

@@ -38,7 +38,7 @@ export const TEXTES_AIDE = {
   importer:
     'Fichier de points : CSV Emlid ou TXT (nom, Est, Nord, altitude), en MN95. Les lignes illisibles sont signalées avec leur numéro.',
   leves:
-    'Contenu du projet par catégories (touche un titre pour replier). Contrôle, Levés, Points importés, Surfaces, Plans DXF, Dessins. La case coche ce qui s\'affiche ; « Voir les points » ouvre le détail.',
+    'Contenu du projet par catégories (touche un titre pour replier). Contrôle, Levés, Points importés, Surfaces, Plans DXF, Dessins. La case coche ce qui s\'affiche ; « Voir les points » ouvre le détail ; touche « Date » pour trier par date. « Tous les points » : un jour au choix.',
   surfaces:
     'Une surface (stock, terrain, terrassement) se crée avec les points d\'un levé (contour, lignes de rupture, points) ou s\'importe (LandXML, DXF). Touche-la sur le plan pour la choisir.',
   nature:
