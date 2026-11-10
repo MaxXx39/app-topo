@@ -78,7 +78,7 @@ export function ajouterAnnotation(projet, donnees, nomsPris = new Set(), mainten
     est: donnees.est,
     nord: donnees.nord,
     altitude: donnees.altitude ?? null,
-    annotation: { source: donnees.source, precision: donnees.precision ?? null, le: maintenant.toISOString(), remarques: nettoyerRemarques(donnees.remarques) },
+    annotation: { source: donnees.source, appareil: donnees.appareil || undefined, precision: donnees.precision ?? null, le: maintenant.toISOString(), remarques: nettoyerRemarques(donnees.remarques) },
   };
   leve.points.push(point);
   liste.points.push(point.nom);

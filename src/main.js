@@ -976,7 +976,7 @@ function enregistrerAnnotation() {
     refuser('Prends d\'abord une position (Manuel, GNSS ou GPS tablette)');
     return;
   }
-  const resultat = ajouterAnnotation(projet, { ...position, nom: annotationEtat.nom, remarques: [annotationEtat.remarque], photos: annotationEtat.photos }, nomsDuProjet(projet));
+  const resultat = ajouterAnnotation(projet, { ...position, appareil: nomDeLAppareil(), nom: annotationEtat.nom, remarques: [annotationEtat.remarque], photos: annotationEtat.photos }, nomsDuProjet(projet));
   if (resultat.erreur) {
     refuser(resultat.erreur);
     return;
@@ -1893,9 +1893,20 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
   annulerRecalagePlan: (id) => annulerRecalage(id),
   exporterPlanRecale,
   exporterListe,
+  // 0.191.0 : « Exporter la sélection (CSV) » du tableau « Points » de Contenu du projet.
+  exporterTableauPoints: (csv, nombre) => {
+    const base = `${nomDeFichierProjet(projet)}_points`.replace(/[\\/:*?"<>|]/g, '_');
+    ouvrirFenetreExport({
+      titre: `Points (${nombre})`,
+      formats: [['csv', 'CSV', 'la sélection du tableau (Excel)']],
+      fabriquer: async () => ({ blob: new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }), nom: `${base}.csv` }),
+      enregistrer: enregistrerFichier,
+      message: (texte) => afficherMessage(texte, 5000),
+    });
+  },
   // Point tapé (nom, Est, Nord, altitude facultative) : rangé dans le levé « Points ajoutés ».
   ajouterPointTape: (valeurs) => {
-    const { point, erreur } = ajouterPointAjoute(projet, { ...valeurs, source: 'tape' });
+    const { point, erreur } = ajouterPointAjoute(projet, { ...valeurs, source: 'tape', appareil: nomDeLAppareil() });
     if (erreur) return { erreur };
     afficherMessage(`Point ${point.nom} ajouté`, 2500);
     modifie();
@@ -2441,7 +2452,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           deltaLeve.z = '';
           deltaLeve.ouvert = false;
         }
-        const point = { est, nord, altitude, gnss: { ...gnss, prisLe: new Date().toISOString() } };
+        const point = { est, nord, altitude, gnss: { ...gnss, prisLe: new Date().toISOString(), appareil: nomDeLAppareil() } };
         if (recollement) {
           const element = leveDirect.role;
           const suffixe = estOuvrage(element) ? 'Ouvrage' : '';
@@ -2933,7 +2944,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       },
       // Point tapé (Terrain › Implanter › + Point) : ajouté au projet, puis choisi pour l'implanter.
       ajouterPointTape: (valeurs) => {
-        const { point, erreur } = ajouterPointAjoute(projet, { ...valeurs, source: 'tape' });
+        const { point, erreur } = ajouterPointAjoute(projet, { ...valeurs, source: 'tape', appareil: nomDeLAppareil() });
         if (erreur) return { erreur };
         guiderVersChoix({ ...point });
         afficherMessage(`Point ${point.nom} ajouté`, 2500);
@@ -2944,7 +2955,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       garderPointChoisi: (nom) => {
         if (!implanter.choix) return;
         const { est, nord, altitude } = implanter.choix;
-        const { point, erreur } = ajouterPointAjoute(projet, { nom: nom.trim() || nomPointAjoute(projet), est, nord, altitude, source: 'dxf' });
+        const { point, erreur } = ajouterPointAjoute(projet, { nom: nom.trim() || nomPointAjoute(projet), est, nord, altitude, source: 'dxf', appareil: nomDeLAppareil() });
         if (erreur) {
           alert(`Point non ajouté : ${erreur}.`);
           return;
@@ -5910,7 +5921,7 @@ function validerPointage() {
     afficherMessage('Altitude illisible : écris un nombre, ou laisse vide', 4000);
     return;
   }
-  const { point, erreur } = ajouterPointAjoute(projet, { ...pointage.choix, nom, altitude, source: 'dxf' });
+  const { point, erreur } = ajouterPointAjoute(projet, { ...pointage.choix, nom, altitude, source: 'dxf', appareil: nomDeLAppareil() });
   if (erreur) {
     afficherMessage(`Point non ajouté : ${erreur}`, 4000);
     return;
@@ -6049,7 +6060,7 @@ async function validerAjout() {
     afficherMessage('Altitude manquante : tape-la dans « H » (seul le levé libre accepte un point sans altitude)', 5000);
     return;
   }
-  const point = { est: ajoutLevee.choix.est, nord: ajoutLevee.choix.nord, altitude, source: 'accroche' };
+  const point = { est: ajoutLevee.choix.est, nord: ajoutLevee.choix.nord, altitude, source: 'accroche', creeLe: new Date().toISOString(), creePar: nomDeLAppareil() };
   let resultat;
   if (metre) {
     resultat = ajouterPointMetre(projet, leve, metre, leveDirect.role, libelleDuRole(), { ...point, nom: nomTape || prochainNomMetre(projet, metre, leveDirect.role, libelleDuRole()) });

@@ -21,12 +21,15 @@ describe('blocContenu', () => {
     expect(jour).not.toContain('value="B"');
   });
 
-  it('propose « Tous les points (par date) » avec le champ Jour', () => {
+  it('0.191.0 : propose le tableau « Points » (catégories, jour, tri, export)', () => {
     const projet = creerProjet('t');
     projet.leves.push({ id: 'a', nom: 'A', direct: true, importeLe: '2026-11-01T10:00:00Z', points: [{ nom: 'P1', est: 1, nord: 2, altitude: 3, gnss: { prisLe: '2026-11-01T10:00:00Z' } }] });
     const html = blocContenu(projet, new Set(), new Set());
-    expect(html).toContain('Tous les points (par date)');
-    expect(html).toContain('data-champ="jour-points"');
-    expect(html).toContain('data-action="trier-points-date"');
+    expect(html).toContain('Points (tableau)');
+    expect(html).toContain('data-action="tp-categorie"');
+    expect(html).toContain('data-champ="tp-jour"');
+    expect(html).toContain('data-action="tp-tri"');
+    expect(html).toContain('data-action="tp-exporter"');
+    expect(html).toContain('>P1<');
   });
 });

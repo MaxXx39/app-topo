@@ -13330,3 +13330,24 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .echelle-coupe.largeur-coupe { top: 4px; right: 4px; }
 .echelle-coupe.hauteur-coupe { right: 4px; top: 50%; transform: translateY(-50%); flex-direction: column; }
 .echelle-coupe.hauteur-coupe span { min-width: 0; }
+
+/* 0.191.0 : tableau « Points » de Contenu du projet (catégories en boutons, puces de listes, tri par colonne) */
+.tableau-points-projet .categories-points, .tableau-points-projet .listes-points-choix { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
+.categorie-points { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 2px solid var(--couleur-categorie, #475569); background: #ffffff; color: var(--encre, #0f172a); font-weight: 700; }
+.categorie-points.choisie { background: var(--couleur-categorie, #1e293b); color: #ffffff; }
+.categorie-points small { opacity: 0.75; font-weight: 600; }
+.puce-liste-points { min-height: 36px; padding: 0 10px; border-radius: 18px; border: 2px solid #94a3b8; background: #ffffff; color: var(--encre, #0f172a); font-weight: 600; }
+.puce-liste-points.choisie { background: #1e293b; border-color: #1e293b; color: #ffffff; }
+.barre-tableau-points { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
+.barre-tableau-points .bouton-exporter-tableau { margin-left: auto; min-height: 44px; }
+.tableau-points-grand { max-height: 420px; overflow: auto; }
+.tableau-points-grand table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.tableau-points-grand th { position: sticky; top: 0; background: #e2e8f0; text-align: left; white-space: nowrap; }
+.tableau-points-grand th.tri { background: #cbd5e1; }
+.tableau-points-grand th .bouton-lien, .tableau-points-grand td .bouton-lien { min-height: 36px; }
+.tableau-points-grand td { padding: 5px 6px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+.tableau-points-grand td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.pastille-categorie { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+
+.tableau-points-grand th .bouton-lien { color: var(--encre, #0f172a); font-weight: 800; }
+.tableau-points-grand td:nth-child(2) { text-align: left; }

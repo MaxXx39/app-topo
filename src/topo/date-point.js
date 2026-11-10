@@ -3,7 +3,8 @@
 
 /** Date de prise d'un point (texte ISO) ou null. */
 export function dateDuPoint(point) {
-  return point?.gnss?.prisLe ?? point?.annotation?.le ?? null;
+  // 0.191.0 : un point tapé ou accroché garde sa date de création (creeLe).
+  return point?.gnss?.prisLe ?? point?.annotation?.le ?? point?.creeLe ?? null;
 }
 
 /** Jour local d'un point « AAAA-MM-JJ » (celui d'un champ date), ou null s'il n'a pas de date. */
