@@ -209,3 +209,17 @@ export function mesuresVisibles(projet, listes) {
   const visibles = new Set(listes.filter((l) => l.visible).map((l) => l.id));
   return (projet.mesures ?? []).filter((m) => visibles.has(m.metreId ?? LISTE_MESURES));
 }
+
+/** Liste de chaque point dessiné (la première liste cochée qui le contient) : Map point → id de la liste (0.192.0, réglages par liste). */
+export function listeDesPoints(projet, listes) {
+  const carte = new Map();
+  for (const liste of listes) {
+    if (!liste.visible || !liste.leveId) continue;
+    const leve = projet.leves.find((l) => l.id === liste.leveId);
+    for (const point of leve?.points ?? []) {
+      if (liste.noms && !liste.noms.has(point.nom)) continue;
+      if (!carte.has(point)) carte.set(point, liste.id);
+    }
+  }
+  return carte;
+}

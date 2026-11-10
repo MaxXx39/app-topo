@@ -132,7 +132,7 @@ import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip 
 import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation, classeTolerance, TOLERANCES_PAR_DEFAUT } from './topo/controle.js';
 import { noterAffichage, appliquerAffichage } from './projet/affichage-appareil.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale, calageParAxes, echelleParDeuxPoints } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
@@ -7254,7 +7254,13 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandToucherPhoto: (id) => montrerPhoto(id),
   quandChangerZone: (sommets) => (cadastreAutour.actif() ? cadastreAutour.changerZone(sommets) : surfaceSwisstopo.changerZone(sommets)),
   quandMontrerListe: (id, visible) => {
-    if (id === '*') projet.listesCachees = visible ? [] : listesDePoints(projet).map((l) => l.id);
+    if (typeof id === 'string' && id.startsWith('section:')) {
+      // 0.192.0 : case d'une catégorie d'Afficher : toutes ses listes d'un coup.
+      const ids = new Set(listesDePoints(projet).filter((l) => l.section === id.slice(8)).map((l) => l.id));
+      const cachees = new Set(projet.listesCachees ?? []);
+      for (const un of ids) (visible ? cachees.delete(un) : cachees.add(un));
+      projet.listesCachees = [...cachees];
+    } else if (id === '*') projet.listesCachees = visible ? [] : listesDePoints(projet).map((l) => l.id);
     else montrerListe(projet, id, visible);
     recalculer();
     enregistrer();
@@ -7791,6 +7797,7 @@ function recalculer({ recadrer = false } = {}) {
   const gardees = listesDuTravail(toutesLesListes);
   const listes = gardees ? toutesLesListes.map((l) => ({ ...l, visible: l.visible && gardees.has(l.id) })) : toutesLesListes;
   plan.afficherCouleursPoints(couleursDesPoints(projet, listes));
+  plan.afficherListeDesPoints(listeDesPoints(projet, listes));
   plan.afficherPointsImport(pointsDesImports(projet, listes));
   // Points des surfaces importées (visibles dans « Afficher ») : cases Points / Altitudes de Surface Import (0.122.0).
   plan.afficherPointsSurfaces(projet.surfaces.filter((s) => estSurfaceFichier(s) && !(projet.listesCachees ?? []).includes(s.id)).flatMap((s) => s.points ?? []));

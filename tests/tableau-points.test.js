@@ -71,3 +71,16 @@ describe('tableau des points (0.191.0)', () => {
     expect(csv).toContain('1.000;');
   });
 });
+
+describe('liste de chaque point (0.192.0)', () => {
+  it('première liste cochée qui contient le point, ignore les listes cachées', async () => {
+    const { listeDesPoints } = await import('../src/plan/listes-points.js');
+    const p1 = { nom: 'P1' };
+    const p2 = { nom: 'P2' };
+    const projet = { leves: [{ id: 'a', points: [p1] }, { id: 'b', points: [p1, p2] }] };
+    const listes = [{ id: 'a', visible: false, leveId: 'a', noms: null }, { id: 'b', visible: true, leveId: 'b', noms: null }];
+    const carte = listeDesPoints(projet, listes);
+    expect(carte.get(p1)).toBe('b');
+    expect(carte.get(p2)).toBe('b');
+  });
+});

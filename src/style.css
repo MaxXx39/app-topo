@@ -13351,3 +13351,19 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 
 .tableau-points-grand th .bouton-lien { color: var(--encre, #0f172a); font-weight: 800; }
 .tableau-points-grand td:nth-child(2) { text-align: left; }
+
+/* 0.192.0 : Afficher : catégories dépliables avec case « tout », listes dépliables avec leurs réglages */
+.menu-listes-points .categorie-affichage { border: 1px solid #cbd5e1; border-radius: 10px; margin: 6px 0; overflow: hidden; background: #fff; }
+.menu-listes-points .categorie-affichage > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 10px; background: #f1f5f9; font-weight: 800; cursor: pointer; }
+.menu-listes-points .categorie-affichage > summary::-webkit-details-marker, .menu-listes-points .liste-depliable > summary::-webkit-details-marker { display: none; }
+.menu-listes-points .categorie-affichage > summary::after, .menu-listes-points .liste-depliable > summary::after { content: "▾"; margin-left: auto; padding: 0 8px; color: #475569; }
+.menu-listes-points .categorie-affichage[open] > summary::after, .menu-listes-points .liste-depliable[open] > summary::after { content: "▴"; }
+.menu-listes-points .categorie-affichage input[type="checkbox"] { width: 22px; height: 22px; flex: none; }
+.menu-listes-points .liste-depliable { border-top: 1px solid #e2e8f0; }
+.menu-listes-points .liste-depliable > summary { list-style: none; display: flex; align-items: center; min-height: 48px; padding: 0 8px; cursor: pointer; }
+.menu-listes-points .liste-depliable > summary .oeil-plan { flex: 1; min-width: 0; }
+.menu-listes-points .reglages-liste { display: flex; flex-wrap: wrap; gap: 2px 14px; padding: 0 10px 8px 40px; align-items: center; }
+.menu-listes-points .reglages-liste .case { min-height: 40px; }
+.menu-listes-points .couleur-liste-menu { display: flex; align-items: center; gap: 6px; min-height: 40px; }
+.menu-listes-points .titre-reglages-section { padding: 0 10px; }
+.note-fond { font-size: 0.8rem; margin: 2px 0 6px; }
