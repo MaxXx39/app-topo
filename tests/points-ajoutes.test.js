@@ -14,7 +14,9 @@ describe('Points ajoutés (tapés ou pris sur un plan DXF)', () => {
   it('range les points dans le levé « Points ajoutés », créé au premier point', () => {
     const projet = projetVide();
     const { point } = ajouterPointAjoute(projet, { nom: '', est: 2507360, nord: 1140620, altitude: null, source: 'dxf' });
-    expect(point).toEqual({ nom: 'P1', est: 2507360, nord: 1140620, altitude: null, ajoute: 'dxf' });
+    expect(point).toMatchObject({ nom: 'P1', est: 2507360, nord: 1140620, altitude: null, ajoute: 'dxf' });
+    // 0.191.0 : date de création notée (et la tablette si elle est donnée)
+    expect(point.creeLe).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     const leve = leveDesPointsAjoutes(projet);
     expect(leve.nom).toBe('Points ajoutés');
     expect(projet.leveActifId).toBe(leve.id); // seul levé du projet : il est affiché

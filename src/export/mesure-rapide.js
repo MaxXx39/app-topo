@@ -37,6 +37,9 @@ export function lignesResume(mesure) {
       ['Δh', `${nombre(c.deltaH)} m`], ['Pente', pente(c.pente)],
     ];
   }
+  if (points.length >= 3 && !ferme) {
+    return [['Longueur 2D', `${nombre(mesure.longueur2d)} m`], ['Longueur 3D', `${nombre(mesure.longueur3d)} m`]];
+  }
   if (points.length >= 3) {
     return [
       ['Périmètre 2D', `${nombre(ferme.perimetre2d)} m`], ['Périmètre 3D', `${nombre(ferme.perimetre3d)} m`],
@@ -204,7 +207,7 @@ export function dxfMesureRapide(mesure) {
     entites.push(['0', 'TEXT', '8', 'MESURE_NOMS', ...xyz({ est: p.est + 0.2, nord: p.nord + 0.2, altitude: p.altitude }, 0), '40', '0.3', '1', texteAscii(nomDuPoint(p, i))]);
   });
   if (mesure.points.length >= 2) {
-    entites.push(...polyligne3D(mesure.points, mesure.points.length >= 3, 'MESURE_LIGNES'));
+    entites.push(...polyligne3D(mesure.points, Boolean(mesure.ferme), 'MESURE_LIGNES'));
     for (const c of mesure.cotes) {
       const a = mesure.points[c.de - 1];
       const b = mesure.points[c.a - 1];

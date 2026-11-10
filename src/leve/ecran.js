@@ -28,7 +28,7 @@ import { prefixeDuNom, avecPrefixe, dateDuJourCollee } from '../topo/surface.js'
 import { ELEMENTS_RESEAU } from '../topo/reseau.js';
 import { MATERIAUX } from './reseaux.js';
 import { DIAMETRES_LISTE, GAINES_LISTE, NOMBRES_LISTE } from '../topo/chantier.js';
-import { svgCoupeDirecte } from './coupe-directe.js';
+import { svgCoupeDirecte, controlesEchelleCoupe } from './coupe-directe.js';
 import { svgCoupeTalus } from './coupe-talus.js';
 import { svgCroquisTalus } from './croquis-talus.js';
 import { penteSignee } from '../topo/talus.js';
@@ -53,11 +53,17 @@ const IMPLANTATIONS = [
 const IMPLANTATIONS_EXPERT = ['talus'];
 const NATURES_BASE = ['autres'];
 // 0.144.0 (liste du 05.11, point 5) : une seule coupe à la fois (plus de « Les 2 »).
+// 0.189.3 (maquette A du 10.11) : symbole dans chaque bouton : flèche grise = ma direction, trait = la coupe, de la couleur
+// qu'elle a sur le plan (perpendiculaire violet, dans l'axe rose).
+const FLECHE_MARCHE = '<path d="M20 34V8M13 15l7-8 7 8" fill="none" stroke="#475569" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+const symboleCoupe = (trait, couleur) => `<svg class="symbole-coupe" viewBox="0 0 40 40" aria-hidden="true">${FLECHE_MARCHE}<path d="${trait}" stroke="${couleur}" stroke-width="4" stroke-linecap="round" fill="none"/></svg>`;
 const VUES_COUPES = [
-  ['perpendiculaire', 'Perpendiculaire'],
-  ['axe', 'Dans l\'axe'],
+  ['perpendiculaire', `${symboleCoupe('M5 22H35', '#7c3aed')}<span>Perpendiculaire</span>`],
+  ['axe', `${symboleCoupe('M20 4V36', '#db2777')}<span>Dans l\'axe</span>`],
 ];
-export const LONGUEURS_COUPE = [2, 5, 10, 20];
+// 0.190.0 : demi-longueurs (m de chaque côté) : coupes de 5, 10, 20 ou 40 m de large ; échelles de hauteur ×1 à ×3.
+export const LONGUEURS_COUPE = [2.5, 5, 10, 20];
+export const EXAGERATIONS_COUPE = [1, 1.5, 2, 3];
 // Ce que l'on lève : une surface (même choix que « + Nouvelle surface » dans Calculs › Surfaces)
 // ou un métré (aires, longueurs, points comptés : des mesures de Calculs › Mesures / métrés).
 const NATURES_TERRAIN = [
@@ -618,11 +624,12 @@ export function creerEcranLeve(conteneur, actions) {
       ${ecartEtRegle()}
       <div class="ligne-choix choix-coupe seulement-intermediaire">${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}
         <button type="button" class="bouton-roue ${reglagesCoupesOuverts ? 'actif' : ''}" data-action="basculerReglagesCoupes" aria-label="Réglages des coupes" aria-expanded="${reglagesCoupesOuverts}">⚙</button></div>
-      ${reglagesCoupesOuverts ? `<div class="ligne-choix seulement-intermediaire"><span>Longueur</span>${boutonsChoix('choisirLongueurCoupe', LONGUEURS_COUPE.map((m) => [m, `${m} m`]), reglages.demiLongueur)}<span class="aide">de chaque côté</span></div>
-      <div class="ligne-choix seulement-intermediaire"><span>Hauteurs</span>${boutonsChoix('choisirExagerationCoupe', [[1, '×1'], [2, '×2']], reglages.exagerationCoupe)}</div>
-      ${champDeltaSurface(donnees.deltaSurface)}` : ''}
+      ${reglagesCoupesOuverts ? champDeltaSurface(donnees.deltaSurface) : ''}
       <div class="coupes-directes vue-${vue}">
-        <div data-vivant="coupe-${vue}"></div>
+        <div class="zone-coupe">
+          <div data-vivant="coupe-${vue}"></div>
+          ${controlesEchelleCoupe(`${String(2 * reglages.demiLongueur).replace('.', ',')} m`, reglages.exagerationCoupe, 'changerLargeurCoupe', 'changerHauteurCoupe')}
+        </div>
       </div>
       <p class="aide" data-vivant="orientation"></p>`;
   }
@@ -801,7 +808,7 @@ export function creerEcranLeve(conteneur, actions) {
         <div class="bloc-lateral bloc-bouts ${g.classeBout ?? ''}">${leLong}</div>
         ${hauteur}
       </div>
-      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale), virage)}`;
+      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale), virage, { sansFleche: surLaLigne || g.classeLaterale === 'vert' })}`;
   }
 
   /**
@@ -1019,13 +1026,14 @@ export function creerEcranLeve(conteneur, actions) {
       ? `<div class="bascule-segment" role="radiogroup" aria-label="Ligne à implanter">${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment']], l.segment == null ? 'tout' : 'segment')}</div>`
       : '';
     const bouts = [l.debut?.nom, l.fin?.nom].every(Boolean) ? `${echapper(l.debut.nom)} → ${echapper(l.fin.nom)}` : '';
-    const segment = l.segment == null
-      ? ''
-      : `<div class="choix-segment" title="${bouts}">
-          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="precedent" ${l.segment === 0 ? 'disabled' : ''} aria-label="Segment précédent">◀</button>
-          <span><strong>${l.segment + 1}</strong> / ${l.nbSegments}</span>
-          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="suivant" ${l.segment === l.nbSegments - 1 ? 'disabled' : ''} aria-label="Segment suivant">▶</button>
-        </div>`;
+    // 0.188.0 : la place des flèches est toujours réservée (cachées sur « Toute ») : rien ne bouge quand on bascule.
+    const segment = l.nbSegments > 1
+      ? `<div class="choix-segment${l.segment == null ? ' reserve' : ''}" title="${bouts}" ${l.segment == null ? 'aria-hidden="true" inert' : ''}>
+          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="precedent" ${l.segment == null || l.segment === 0 ? 'disabled' : ''} aria-label="Segment précédent">◀</button>
+          <span><strong>${(l.segment ?? 0) + 1}</strong> / ${l.nbSegments}</span>
+          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="suivant" ${l.segment == null || l.segment === l.nbSegments - 1 ? 'disabled' : ''} aria-label="Segment suivant">▶</button>
+        </div>`
+      : '';
     return `${bascule || segment ? `<div class="ligne-segment">${bascule}${segment}</div>` : ''}
       ${l.decalage ? `<p class="aide">Parallèle à ${formaterNombre(Math.abs(l.decalage))} m ${l.decalage > 0 ? 'à droite' : 'à gauche'}</p>` : ''}`;
   }
@@ -1443,10 +1451,10 @@ export function creerEcranLeve(conteneur, actions) {
       ${rangee('natures', c.natures.map((n) => `<button type="button" class="nat-chantier ${n === c.nature ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="nature" data-valeur="${echapper(n)}"><i style="background: ${c.couleursNatures[n] ?? '#6b7280'}"></i>${echapper(n)}</button>`).join(''), 'Plus de natures')}
       ${reglages ? `<div class="reglages-chantier">${reglages}${bulle('chantier')}</div>` : ''}
       <div class="attributs-chantier">
-        ${l.champs.includes('diametre') ? liste('diametre', 'Ø', diametres, c.diametre, `d ${diametreRequis && diametreVide ? 'manque' : ''}`, true) : ''}
+        ${l.champs.includes('diametre') ? liste('diametre', l.ouvrage ? 'Ø tuyau' : 'Ø', diametres, c.diametre, `d ${diametreRequis && diametreVide ? 'manque' : ''}`, true) : ''}
         ${l.champs.includes('gaine') ? liste('gaine', 'Ø', GAINES_LISTE.map(([i, x]) => [`${i}/${x}`, `${i} / ${x}`]), c.gaine, `g ${diametreRequis && !c.gaine ? 'manque' : ''}`, true) : ''}
         ${l.champs.includes('nombre') ? liste('nombre', 'Nb', NOMBRES_LISTE.map((n) => [n, n]), c.nombre, 'n', false) : ''}
-        ${l.champs.includes('profondeur') && c.mode === 'tampon' ? champ('profondeur', 'Prof.', c.profondeur, 'p') : ''}
+        ${l.champs.includes('profondeur') && c.mode === 'tampon' ? champ('profondeur', 'Prof. (m)', c.profondeur, 'p', { indice: '1,25' }) : ''}
         ${l.champs.includes('materiau') ? `<label class="champ-chantier m"><select data-chantier="materiau" aria-label="Matériau">${materiaux.map((m) => `<option ${m === c.materiau ? 'selected' : ''}>${echapper(m)}</option>`).join('')}</select></label>` : ''}
         ${l.champs.includes('remarque') ? champ('remarque', 'Rem.', c.remarque, 'r', { mode: 'text', indice: 'facultatif' }) : ''}
         <label class="bouton-photo-levee photo-chantier" title="Photo du prochain point" aria-label="Photo du prochain point"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg><input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden /></label>
@@ -1738,6 +1746,7 @@ function svgCible(numero, haut, droite, couleur, nordEnHaut, nord = 0) {
       <path d="M0 -118 7 -104H-7Z" /><text y="-91" text-anchor="middle" transform="rotate(${(-nord).toFixed(1)} 0 -95)">N</text></g>`;
   return `<svg class="cible-implantation cible-${numero}" viewBox="-124 -124 248 248" role="img" aria-label="Cible ${texteRayon(cercles[0])}">
     ${cercles.map((r, i) => `<circle r="${r * echelle}" class="anneau anneau-${i}" />`).join('')}
+    <circle r="${Math.max(0.02 * echelle, 4).toFixed(1)}" class="pastille-centre" />
     ${cercles.map((r) => `<text x="${(r * echelle * Math.SQRT1_2 + 2).toFixed(1)}" y="${(r * echelle * Math.SQRT1_2 + 12).toFixed(1)}" class="rayon">${texteRayon(r)}</text>`).join('')}
     <path d="M-110 0H110M0 -110V110" class="axes" />
     ${nordEnHaut ? '' : '<text x="-122" y="-112" class="haut-cible">▲ devant</text>'}
@@ -1779,7 +1788,7 @@ function couleurLaterale(classe) {
  * de la cible : 10 m, 2 m, 1 m, 20 cm), au bord. Fait en blocs HTML placés en % (pas en SVG) pour
  * remplir toute la case sans déformer le rond de la canne. ecart : m, + à droite.
  */
-function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage = '') {
+function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage = '', { sansFleche = false } = {}) {
   const bandes = BANDES_COULOIR[numero];
   const haut = 18; // % : haut du trait (la fin)
   const bas = 76; // % : bas du trait (le début)
@@ -1794,6 +1803,12 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage 
   const r = bandes[0];
   const reglettes = `<span class="reglette" style="left: ${50 - demi}%"></span><span class="reglette" style="left: ${50 + demi}%"></span>
     <span class="texte-reglette en-haut-coin au-bord" style="left: ${50 + demi}%">${texte(r)}</span>`;
+  // 0.189.1 (maquette A du 10.11, tous les modes) : flèche perpendiculaire à la ligne, de la canne vers la ligne (du côté où il
+  // faut aller), grosse pointe pour bien voir le sens ; l'écart écrit au-dessus. Cachée quand on est dans la tolérance.
+  const versGauche = ecart > 0;
+  const largeurFleche = Math.abs(left - 50);
+  const flecheCouloir = sansFleche || largeurFleche < 0.5 ? ''
+    : `<span class="fleche-couloir ${versGauche ? 'vers-gauche' : 'vers-droite'}" style="left: ${Math.min(left, 50).toFixed(1)}%; width: ${largeurFleche.toFixed(1)}%; top: ${top.toFixed(1)}%; --couleur-fleche: ${couleur}"><b class="mot-fleche">${ecart === 0 ? '' : texte(Math.abs(ecart))}</b><i class="pointe"></i><i class="tige"></i></span>`;
   return `<div class="cadre-couloir" role="img" aria-label="Position de la canne le long de la ligne">
     ${reglettes}
     <span class="trait-couloir" style="top: ${haut}%; bottom: ${100 - bas}%"></span>
@@ -1801,6 +1816,7 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage 
     <span class="bout-couloir" style="top: ${bas}%"></span>
     <span class="drapeau-couloir fin" style="top: ${haut}%">${iconeDrapeau('fin')}</span>
     <span class="drapeau-couloir debut" style="top: ${bas}%">${iconeDrapeau('debut')}</span>
+    ${flecheCouloir}
     <span class="moi-couloir" style="left: ${left.toFixed(1)}%; top: ${top.toFixed(1)}%; background: ${couleur}"></span>
     ${virage}
   </div>`;

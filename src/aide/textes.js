@@ -6,7 +6,7 @@ export const TEXTES_AIDE = {
   annotation:
     'Annotation : pose un point (Manuel = loupe sur le plan, GNSS, ou GPS tablette à 3 m ou mieux). En bas : photo (on peut dessiner dessus), ↶ efface le dernier, ID et remarque, Enreg. point. Liste « Annot-date ».',
   mesureRapide:
-    'Mesure rapide : touche des points sur le plan (accroche en bas, ou GNSS). 2 points : longueur, Δh, pente. 3 et plus : périmètre, surface. « Enregistrer » ou « Exporter » (PDF, DXF).',
+    'Mesure rapide : touche des points sur le plan (accroche en bas, ou GNSS). 2 points : longueur, Δh, pente. 3 et plus : case « Figure fermée » (périmètre, surface) ou ligne ouverte (longueur du chemin). « Enregistrer » ou « Exporter » (PDF, DXF).',
   applications:
     'Menu de départ : touche une tuile (ou sa sous-application en petit) pour ouvrir l\'application. Appui long = déplacer la tuile ; ★ = favori. Réglages et « Fermer l\'appli » en bas.',
   projets:
@@ -38,7 +38,7 @@ export const TEXTES_AIDE = {
   importer:
     'Fichier de points : CSV Emlid ou TXT (nom, Est, Nord, altitude), en MN95. Les lignes illisibles sont signalées avec leur numéro.',
   leves:
-    'Contenu du projet par catégories (touche un titre pour replier). Contrôle, Levés, Points importés, Surfaces, Plans DXF, Dessins. La case coche ce qui s\'affiche ; « Voir les points » ouvre le détail.',
+    'Contenu du projet par catégories (touche un titre pour replier). Contrôle, Levés, Points importés, Surfaces, Plans DXF, Dessins. La case coche ce qui s\'affiche ; « Voir les points » ouvre le détail ; touche « Date » pour trier par date. « Points (tableau) » : touche des boutons de catégories (Contrôle, Levé, Import…), puis les listes à montrer ; touche un titre de colonne pour trier ; « Exporter la sélection » donne un CSV.',
   surfaces:
     'Une surface (stock, terrain, terrassement) se crée avec les points d\'un levé (contour, lignes de rupture, points) ou s\'importe (LandXML, DXF). Touche-la sur le plan pour la choisir.',
   nature:

@@ -103,3 +103,24 @@ describe('enregistrer et exporter', () => {
     expect(dxf).not.toMatch(/[^\x00-\x7f]/); // R12 : texte sans accent ni Δ
   });
 });
+
+describe('ligne ouverte (0.186.0)', () => {
+  const pts = [p(0, 0, 0), p(10, 0, 1), p(10, 10, 2), p(0, 10, 3)];
+  it('ouverte : 3 côtés, pas de fermeture ni de surface', () => {
+    const m = mesureRapide(pts, { fermee: false });
+    expect(m.cotes).toHaveLength(3);
+    expect(m.ferme).toBeNull();
+    expect(m.longueur2d).toBeCloseTo(30, 9);
+    expect(lignesResume(m).map((l) => l[0])).toEqual(['Longueur 2D', 'Longueur 3D']);
+  });
+  it('fermée (défaut) : 4 côtés et surface', () => {
+    const m = mesureRapide(pts);
+    expect(m.cotes).toHaveLength(4);
+    expect(m.ferme.surface2d).toBeCloseTo(100, 9);
+  });
+  it('enregistrée : ligne non fermée si la case est décochée', () => {
+    const projet = creerProjet('t');
+    const r = rangerMesureRapide(projet, pts, new Set(), { fermee: false });
+    expect(r.levee.lignesRupture[0].fermee).toBe(false);
+  });
+});

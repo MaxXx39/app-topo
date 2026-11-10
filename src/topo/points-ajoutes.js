@@ -41,7 +41,7 @@ export function lireNombreTape(texte) {
  * point : { nom, est, nord, altitude (ou null), source ('tape' ou 'dxf') }.
  * Renvoie { point } ou { erreur } (message compréhensible).
  */
-export function ajouterPointAjoute(projet, { nom, est, nord, altitude = null, source = 'tape' }) {
+export function ajouterPointAjoute(projet, { nom, est, nord, altitude = null, source = 'tape', appareil = '' }) {
   const nomPropre = String(nom ?? '').trim() || nomPointAjoute(projet);
   if (!Number.isFinite(est) || !Number.isFinite(nord)) return { erreur: 'Est et Nord : écris deux nombres, par exemple 2507360.125' };
   if (altitude != null && !Number.isFinite(altitude)) return { erreur: 'altitude illisible : écris un nombre, ou laisse vide' };
@@ -53,7 +53,8 @@ export function ajouterPointAjoute(projet, { nom, est, nord, altitude = null, so
     // Premier levé du projet : il devient le levé affiché.
     if (!projet.leveActifId) projet.leveActifId = leve.id;
   }
-  const point = { nom: nomPropre, est, nord, altitude: altitude ?? null, ajoute: source };
+  // 0.191.0 : date de création et tablette (jamais inventées pour les anciens points).
+  const point = { nom: nomPropre, est, nord, altitude: altitude ?? null, ajoute: source, creeLe: new Date().toISOString(), creePar: appareil || undefined };
   leve.points.push(point);
   return { point };
 }

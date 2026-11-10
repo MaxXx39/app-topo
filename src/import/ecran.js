@@ -22,7 +22,10 @@ import { COULEURS_LISTES, planDuCadastre, couleurDuCadastre } from '../plan/list
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
 import { lireReseaux } from '../leve/reseaux.js';
+import { dateHeureDuPoint, jourDuPoint, trierParDate } from '../topo/date-point.js';
 import { nomDuType, resumeArchive } from '../projet/archives.js';
+import { lireTypesDxf, couleurDuType } from '../topo/types-dxf.js';
+import { CATEGORIES_POINTS, COLONNES_POINTS, listesDuTableau, lignesDuTableau, trierLignes, texteDate, csvDuTableau } from './tableau-points.js';
 
 /**
  * Crée le panneau « Import » dans "conteneur" et « Contenu du projet » dans "contenu". Les actions sont faites par main.js via "actions" :
@@ -60,6 +63,10 @@ export function creerEcranImport(conteneur, contenu, actions) {
   let erreurPoint = '';
   let derniers = null;
   let messageControle = ''; // erreur du dernier import de points de contrôle
+  // 0.186.0 : tri par date (récent d'abord ou ancien d'abord) et recherche d'un jour pour les listes de points (Intermédiaire).
+  const filtreDate = { ordre: 'recent', jour: '', jourPoints: '' };
+  // 0.191.0 : tableau « Points » : catégories choisies (null = départ : Levé), listes décochées, tri par colonne, jour.
+  const tableauEtat = { categories: null, listesDecochees: new Set(), colonne: 'date', asc: false, jour: '' };
   ecouter('toggle', (evenement) => {
     if (evenement.target.classList?.contains('points-de-la-liste')) remplirTableauOuvert(evenement.target);
     const id = evenement.target.dataset?.calquesPlan;
@@ -81,6 +88,63 @@ export function creerEcranImport(conteneur, contenu, actions) {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
     const { action, id } = bouton.dataset;
+    if (action === 'modifier-types-dxf') {
+      actions.modifierTypesDxf();
+      return;
+    }
+    if (action === 'tp-categorie') {
+      const choisies = categoriesChoisies(derniers?.[0], tableauEtat);
+      if (choisies.has(bouton.dataset.cle)) choisies.delete(bouton.dataset.cle);
+      else choisies.add(bouton.dataset.cle);
+      tableauEtat.categories = choisies;
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'tp-liste') {
+      if (tableauEtat.listesDecochees.has(id)) tableauEtat.listesDecochees.delete(id);
+      else tableauEtat.listesDecochees.add(id);
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'tp-tri') {
+      const colonne = bouton.dataset.col;
+      if (tableauEtat.colonne === colonne) tableauEtat.asc = !tableauEtat.asc;
+      else {
+        tableauEtat.colonne = colonne;
+        tableauEtat.asc = colonne !== 'date';
+      }
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'tp-effacer-jour') {
+      tableauEtat.jour = '';
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'tp-exporter') {
+      if (derniers) actions.exporterTableauPoints(csvDuTableau(lignesTriees(derniers[0], tableauEtat)), lignesTriees(derniers[0], tableauEtat).length);
+      return;
+    }
+    if (action === 'trier-points-date') {
+      triPoints = { liste: 'recent', recent: 'ancien', ancien: 'liste' }[triPoints];
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'effacer-jour-points') {
+      filtreDate.jourPoints = '';
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'trier-listes-date') {
+      filtreDate.ordre = filtreDate.ordre === 'recent' ? 'ancien' : 'recent';
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (action === 'effacer-jour-listes') {
+      filtreDate.jour = '';
+      if (derniers) afficher(...derniers);
+      return;
+    }
     if (action === 'ouvrir-point') {
       pointOuvert = !pointOuvert;
       erreurPoint = '';
@@ -123,6 +187,21 @@ export function creerEcranImport(conteneur, contenu, actions) {
   });
 
   ecouter('change', async (evenement) => {
+    if (evenement.target.matches?.('[data-champ="tp-jour"]')) {
+      tableauEtat.jour = evenement.target.value;
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (evenement.target.matches?.('[data-champ="jour-points"]')) {
+      filtreDate.jourPoints = evenement.target.value;
+      if (derniers) afficher(...derniers);
+      return;
+    }
+    if (evenement.target.matches?.('[data-champ="jour-listes"]')) {
+      filtreDate.jour = evenement.target.value;
+      if (derniers) afficher(...derniers);
+      return;
+    }
     const cible = evenement.target;
     if (cible.dataset.champ === 'fichier-controle' && cible.files[0]) {
       // Points de contrôle : sans code de sécurité depuis 0.90.0 (demande du 29.10.2026).
@@ -156,6 +235,8 @@ export function creerEcranImport(conteneur, contenu, actions) {
       actions.reglerPlanDxf(cible.dataset.id, { visible: cible.checked });
     } else if (cible.dataset.champ === 'plan-couleur') {
       actions.reglerPlanDxf(cible.dataset.id, { couleur: cible.value || null });
+    } else if (cible.dataset.champ === 'plan-type') {
+      actions.reglerPlanDxf(cible.dataset.id, { type: cible.value });
     } else if (cible.dataset.champ === 'plan-nom') {
       actions.reglerPlanDxf(cible.dataset.id, { nom: cible.value });
     } else if (cible.dataset.champ === 'calque-dxf') {
@@ -170,7 +251,13 @@ export function creerEcranImport(conteneur, contenu, actions) {
     conteneur.querySelector('[data-action="ajouterPointTape"]')?.click();
   });
 
-  return { afficher };
+  /** 0.195.0 : ne montre dans le tableau « Points » que ces catégories (bouton liste d'une tuile du menu). */
+  function choisirCategories(cles) {
+    tableauEtat.categories = new Set(cles);
+    tableauEtat.listesDecochees = new Set();
+    if (derniers) afficher(...derniers);
+  }
+  return { afficher, choisirCategories };
 
   /**
    * Redessine le bloc. dernierImport : résultat du dernier import de points, ou null ;
@@ -237,7 +324,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
           ${messageSurface}
         </div>`;
       tableauxEnAttente.clear();
-      contenu.innerHTML = blocContenu(projet, calquesOuverts, categoriesFermees);
+      contenu.innerHTML = blocContenu(projet, calquesOuverts, categoriesFermees, filtreDate, tableauEtat);
   }
 }
 
@@ -270,16 +357,35 @@ function natureDeLaListe(projet, leve, couleursReseaux) {
  * « Contenu du projet » (0.103.0) : une catégorie repliable par sorte, dans l'ordre demandé
  * (Contrôle d'abord) ; une catégorie vide n'est pas montrée. fermees : catégories repliées.
  */
-function blocContenu(projet, calquesOuverts, fermees) {
+export function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordre: 'recent', jour: '' }, tableau = { categories: null, listesDecochees: new Set(), colonne: 'date', asc: false, jour: '' }) {
   // Cadastre (0.116.4) : points et lignes rangés ensemble dans leur catégorie.
   const cadastres = projet.leves.filter((l) => l.cadastre);
   const plansCadastre = new Set(cadastres.map((l) => planDuCadastre(projet, l)?.id).filter(Boolean));
-  const listes = projet.leves.filter((l) => !l.direct && !l.cadastre);
-  // Levés : le plus récent en haut.
-  const levees = projet.leves.filter((l) => l.direct).sort((a, b) => String(b.importeLe ?? '').localeCompare(String(a.importeLe ?? '')));
+  // Levés et points importés : triés par date (le plus récent en haut au départ), un jour au choix (0.186.0).
+  const sens = filtreDate.ordre === 'ancien' ? -1 : 1;
+  const parDate = (a, b) => sens * String(b.importeLe ?? '').localeCompare(String(a.importeLe ?? ''));
+  const jourDe = (l) => String(l.jour ?? l.importeLe ?? '').slice(0, 10);
+  const garde = (l) => !filtreDate.jour || jourDe(l) === filtreDate.jour;
+  const listes = projet.leves.filter((l) => !l.direct && !l.cadastre && garde(l)).sort(parDate);
+  const nombreListes = projet.leves.filter((l) => !l.direct && !l.cadastre).length;
+  const barreDate = `<div class="barre-date-listes seulement-intermediaire"><button type="button" class="bouton-lien" data-action="trier-listes-date" title="Changer l'ordre des listes">Trier par date : ${filtreDate.ordre === 'recent' ? 'récent d\'abord ▾' : 'ancien d\'abord ▴'}</button>
+    <label class="aide">Jour <input type="date" data-champ="jour-listes" value="${echapper(filtreDate.jour)}" aria-label="Chercher les listes d'un jour" /></label>
+    ${filtreDate.jour ? '<button type="button" class="bouton-lien" data-action="effacer-jour-listes">tout voir</button>' : ''}</div>`;
+  const aucune = '<p class="vide">Aucune liste ce jour-là.</p>';
+  const levees = projet.leves.filter((l) => l.direct && garde(l)).sort(parDate);
+  const nombreLevees = projet.leves.filter((l) => l.direct).length;
   const surfacesProjet = projet.surfaces.filter((s) => estSurfaceFichier(s));
   const dessins = (projet.dessins ?? []).filter((d) => d.sommets.length > 0);
   const couleursReseaux = new Map(lireReseaux().map(([a, , c]) => [a, c]));
+  // 0.187.0 : tous les points du projet dans une seule liste, triés par date, avec recherche d'un jour.
+  const tousLesPoints = () => {
+    const tous = [];
+    for (const leve of projet.leves) for (const p of leve.points) tous.push({ ...p, listeNom: leve.nom });
+    return filtreDate.jourPoints ? tous.filter((p) => jourDuPoint(p) === filtreDate.jourPoints) : tous;
+  };
+  const nombreTousPoints = projet.leves.reduce((total, l) => total + l.points.length, 0);
+  const barrePoints = `<div class="barre-date-listes"><label class="aide">Jour <input type="date" data-champ="jour-points" value="${echapper(filtreDate.jourPoints)}" aria-label="Chercher les points d'un jour" /></label>
+    ${filtreDate.jourPoints ? '<button type="button" class="bouton-lien" data-action="effacer-jour-points">tout voir</button>' : ''}</div>`;
   const categorie = (cle, titre, nombre, html, mode = '') => (nombre > 0
     ? `<details class="categorie-contenu ${mode}" data-categorie="${cle}" ${fermees.has(cle) ? '' : 'open'}>
         <summary><span>${titre}</span><span class="nombre-categorie">${nombre}</span></summary>
@@ -287,10 +393,8 @@ function blocContenu(projet, calquesOuverts, fermees) {
       </details>`
     : '');
   const contenu = [
-    categorie('controle', 'Contrôle', (projet.pointsControle ?? []).length, listePointsControle(projet)),
-    categorie('leves', 'Levés', levees.length, `<div class="liste-leves">${levees.map((l) => ligneListe(projet, l, natureDeLaListe(projet, l, couleursReseaux))).join('')}</div>`),
-    categorie('points', 'Points importés', listes.length, `<div class="liste-leves">${listes.map((l) => ligneListe(projet, l)).join('')}</div>`),
     categorie('surfaces', 'Surfaces importées', surfacesProjet.length, surfacesProjet.map(ligneSurfaceProjet).join(''), 'seulement-expert'),
+    categorie('tableau-points', 'Points (tableau)', listesDuTableau(projet).reduce((total, l) => total + l.nombre, 0), blocTableauPoints(projet, tableau)),
     categorie('cadastre', 'Cadastre', cadastres.length, cadastres.map((l) => ligneCadastre(projet, l)).join('')),
     categorie('dxf', 'Plans DXF', (projet.plansDxf ?? []).filter((p) => !plansCadastre.has(p.id)).length, listePlansDxf(projet, calquesOuverts, plansCadastre), 'seulement-intermediaire'),
     categorie('dessins', 'Dessins', dessins.length, listesDessins(projet), 'seulement-intermediaire'),
@@ -302,11 +406,78 @@ function blocContenu(projet, calquesOuverts, fermees) {
     </div>`;
 }
 
+/** Catégories choisies du tableau : au départ « Levé » (sinon la première catégorie qui a des points). */
+function categoriesChoisies(projet, etat) {
+  if (etat.categories) return etat.categories;
+  const presentes = new Set(listesDuTableau(projet ?? { leves: [] }).map((l) => l.categorie));
+  return new Set(presentes.has('leve') ? ['leve'] : [CATEGORIES_POINTS.map(([c]) => c).find((c) => presentes.has(c))].filter(Boolean));
+}
+
+/** Lignes du tableau pour l'état choisi (catégories, listes, jour), triées. */
+function lignesTriees(projet, etat) {
+  const lignes = lignesDuTableau(projet, { categories: categoriesChoisies(projet, etat), listesDecochees: etat.listesDecochees, jour: etat.jour });
+  return trierLignes(lignes, etat.colonne, etat.asc);
+}
+
+// Au plus ce nombre de lignes à l'écran (le reste : filtrer par catégorie, liste ou jour, ou exporter).
+const LIGNES_MAX_TABLEAU = 400;
+
+/**
+ * Tableau « Points » (0.191.0, Base) : boutons de catégories (plusieurs possibles, foncés quand ils sont choisis), puis les
+ * listes de ces catégories (une puce par liste, on peut en décocher), un jour au choix, le tableau avec tri par colonne et
+ * « Exporter la sélection (CSV) ».
+ */
+function blocTableauPoints(projet, etat) {
+  const choisies = categoriesChoisies(projet, etat);
+  const listes = listesDuTableau(projet);
+  const couleurs = new Map(CATEGORIES_POINTS.map(([cle, , couleur]) => [cle, couleur]));
+  // Chaque liste garde sa couleur (celle choisie pour le levé, sinon celle de sa catégorie) : puces et points du tableau.
+  const couleurDeListe = new Map(listes.map((l) => [l.id, projet.couleursListes?.[l.id] ?? couleurs.get(l.categorie)]));
+  const nombreParCategorie = new Map();
+  for (const l of listes) nombreParCategorie.set(l.categorie, (nombreParCategorie.get(l.categorie) ?? 0) + l.nombre);
+  const boutons = CATEGORIES_POINTS.filter(([cle]) => nombreParCategorie.has(cle))
+    .map(([cle, titre, couleur]) => `<button type="button" class="categorie-points ${choisies.has(cle) ? 'choisie' : ''}" style="--couleur-categorie: ${couleur}" data-action="tp-categorie" data-cle="${cle}" aria-pressed="${choisies.has(cle)}">${titre} <small>${nombreParCategorie.get(cle)}</small></button>`).join('');
+  const dansLaSelection = listes.filter((l) => choisies.has(l.categorie));
+  const puces = dansLaSelection.length > 1
+    ? `<div class="listes-points-choix" role="group" aria-label="Listes de points à montrer"><span class="aide">Listes :</span>${dansLaSelection.map((l) => `<button type="button" class="puce-liste-points ${etat.listesDecochees.has(l.id) ? '' : 'choisie'}" style="--couleur-liste: ${couleurDeListe.get(l.id)}" data-action="tp-liste" data-id="${echapper(l.id)}" aria-pressed="${!etat.listesDecochees.has(l.id)}"><i class="pastille-liste-puce"></i>${echapper(l.nom)} <small>${l.nombre}</small></button>`).join('')}</div>`
+    : '';
+  const lignes = lignesTriees(projet, etat);
+  const titres = new Map(CATEGORIES_POINTS.map(([cle, titre]) => [cle, titre]));
+  const n = (v) => (v == null ? '—' : formaterNombre(v));
+  const entete = COLONNES_POINTS.map(([cle, titre]) => `<th class="${etat.colonne === cle ? 'tri' : ''}"><button type="button" class="bouton-lien" data-action="tp-tri" data-col="${cle}">${titre}${etat.colonne === cle ? (etat.asc ? ' ▴' : ' ▾') : ''}</button></th>`).join('');
+  const corps = lignes.slice(0, LIGNES_MAX_TABLEAU).map((l) => `<tr>
+      <td><span class="pastille-categorie" style="background: ${couleurDeListe.get(l.listeId) ?? couleurs.get(l.categorie)}" title="${echapper(titres.get(l.categorie) ?? '')}"></span>${echapper(l.nom)}</td>
+      <td>${echapper(l.libelle)}</td><td class="n">${n(l.est)}</td><td class="n">${n(l.nord)}</td><td class="n">${n(l.altitude)}</td>
+      <td class="n">${echapper(l.precision)}</td><td>${echapper(texteDate(l.date))}</td><td>${echapper(l.tablette)}</td><td>${echapper(l.remarque)}</td>
+      <td>${l.photoId ? `<button type="button" class="bouton-lien" data-action="voir-photo" data-id="${l.photoId}" aria-label="Voir la photo de ${echapper(l.nom)}">📷 ${l.photos}</button>` : ''}</td>
+      <td>${echapper(l.liste)}</td></tr>`).join('');
+  const reste = lignes.length - LIGNES_MAX_TABLEAU;
+  // Gestion des listes choisies (renommer, archiver / supprimer, couleur, photos) : elle était dans les anciennes catégories Levés / Points importés.
+  const couleursReseaux = new Map(lireReseaux().map(([a, , c]) => [a, c]));
+  const gerables = (projet.leves ?? []).filter((l) => !l.cadastre && dansLaSelection.some((d) => d.id === l.id));
+  const gerer = gerables.length > 0 || (choisies.has('controle') && (projet.pointsControle ?? []).length > 0)
+    ? `<details class="gerer-listes"><summary>Gérer les listes choisies</summary>${choisies.has('controle') && (projet.pointsControle ?? []).length > 0 ? listePointsControle(projet) : ''}<div class="liste-leves">${gerables.map((l) => ligneListe(projet, l, l.direct ? natureDeLaListe(projet, l, couleursReseaux) : null, { sansTableau: true })).join('')}</div></details>`
+    : '';
+  return `<div class="tableau-points-projet">
+      <div class="categories-points" role="group" aria-label="Catégories de points">${boutons}</div>
+      ${puces}
+      <div class="barre-tableau-points">
+        <span class="aide">${lignes.length} point${lignes.length > 1 ? 's' : ''}</span>
+        <label class="aide">Jour <input type="date" data-champ="tp-jour" value="${echapper(etat.jour)}" aria-label="Montrer les points d'un jour" /></label>
+        ${etat.jour ? '<button type="button" class="bouton-lien" data-action="tp-effacer-jour">tout voir</button>' : ''}
+        <button type="button" class="bouton-secondaire bouton-exporter-tableau" data-action="tp-exporter" ${lignes.length === 0 ? 'disabled' : ''}>Exporter la sélection (CSV)</button>
+      </div>
+      <div class="tableau-defilant tableau-points-grand"><table><thead><tr>${entete}</tr></thead><tbody>${corps || '<tr><td colspan="11">Choisis une catégorie.</td></tr>'}</tbody></table></div>
+      ${reste > 0 ? `<p class="aide">${reste} lignes de plus : choisis une liste ou un jour, ou exporte la sélection.</p>` : ''}
+      ${gerer}
+    </div>`;
+}
+
 /**
  * Une liste de points : case pour l'afficher, nom (celui d'un levé se change dans Terrain › Lever),
  * couleur, nombre de points (et date de création pour un levé), supprimer, voir les points.
  */
-function ligneListe(projet, leve, nature = null) {
+function ligneListe(projet, leve, nature = null, { sansTableau = false } = {}) {
   const actif = leve.id === projet.leveActifId;
   const pastille = nature ? `<span class="pastille-nature" style="--couleur-nature: ${nature.couleur}">${echapper(nature.nom)}</span>` : '';
   const date = leve.direct && leve.importeLe ? ` · créé le ${new Date(leve.importeLe).toLocaleDateString('fr-CH')}` : '';
@@ -323,7 +494,7 @@ function ligneListe(projet, leve, nature = null) {
         <button type="button" class="bouton-lien archive-comme-suppression" data-action="archiver" data-type="leve" data-id="${leve.id}">supprimer</button>
         <button type="button" class="bouton-lien suppression-vraie" data-action="supprimer-leve" data-id="${leve.id}">supprimer</button>
       </div>
-      ${tableauPoints(leve.points, 'Voir les points')}
+      ${sansTableau ? '' : tableauPoints(leve.points, 'Voir les points')}
       ${photosDesPoints(photosDuLeve(projet, leve))}
     </div>`;
 }
@@ -412,30 +583,47 @@ function choixCouleur(id, couleur) {
 const tableauxEnAttente = new Map();
 let numeroTableau = 0;
 
-/** Lignes HTML d'un tableau de points (nom, Est, Nord, altitude). */
-export function lignesTableauPoints(points) {
+/** Lignes HTML d'un tableau de points (nom, [liste], Est, Nord, altitude, [date et heure]). */
+export function lignesTableauPoints(points, { date = false, avecListe = false } = {}) {
   const n = (valeur) => (valeur == null ? '—' : formaterNombre(valeur));
-  return points.map((p) => `<tr><td>${echapper(p.nom)}</td><td>${n(p.est)}</td><td>${n(p.nord)}</td><td>${n(p.altitude)}</td></tr>`).join('');
+  return points.map((p) => `<tr><td>${echapper(p.nom)}</td>${avecListe ? `<td>${echapper(p.listeNom ?? '')}</td>` : ''}<td>${n(p.est)}</td><td>${n(p.nord)}</td><td>${n(p.altitude)}</td>${date ? `<td class="seulement-intermediaire">${echapper(dateHeureDuPoint(p))}</td>` : ''}</tr>`).join('');
 }
 
 /** Remplit le tableau d'un « Voir les points » qu'on vient d'ouvrir (appelé par l'écouteur « toggle »). */
 function remplirTableauOuvert(details) {
   const corps = details.querySelector('tbody[data-tableau]');
   if (!details.open || !corps || corps.dataset.rempli) return;
-  corps.innerHTML = lignesTableauPoints(tableauxEnAttente.get(corps.dataset.tableau) ?? []);
+  const attente = tableauxEnAttente.get(corps.dataset.tableau);
+  corps.innerHTML = attente ? lignesTableauPoints(attente.points(), attente) : '';
   corps.dataset.rempli = '1';
 }
 
-function tableauPoints(points, titre) {
-  if (points.length === 0) return '';
+// 0.187.0 : tri des points par date (bouton « Date » de l'en-tête des tableaux) : 'liste' (ordre de la liste),
+// 'recent' ou 'ancien' ; les points sans date (importés, tapés) restent à la fin.
+let triPoints = 'liste';
+const TEXTE_TRI = { liste: 'Date', recent: 'Date ▾', ancien: 'Date ▴' };
+
+/**
+ * Tableau repliable de points. options : date (colonne Date, Intermédiaire), avecListe (colonne Liste,
+ * pour « tous les points »). points peut être une liste ou une fonction (calculée à l'ouverture).
+ */
+function tableauPoints(points, titre, { date = true, avecListe = false, total = null, parDate = false } = {}) {
+  // parDate : tri par date d'office (liste de tous les points), « Date » garde alors le plus récent d'abord.
+  const ordre = () => (parDate && triPoints === 'liste' ? 'recent' : triPoints);
+  const nombre = total ?? (typeof points === 'function' ? 0 : points.length);
+  if (typeof points !== 'function' && points.length === 0) return '';
   numeroTableau += 1;
-  tableauxEnAttente.set(String(numeroTableau), points);
+  const fournir = typeof points === 'function' ? points : () => points;
+  tableauxEnAttente.set(String(numeroTableau), { points: () => (date ? trierParDate(fournir(), ordre()) : fournir()), date, avecListe });
+  const colonneDate = date
+    ? `<th class="seulement-intermediaire"><button type="button" class="bouton-lien" data-action="trier-points-date" title="Trier les points par date">${TEXTE_TRI[ordre()]}</button></th>`
+    : '';
   return `
     <details class="points-de-la-liste">
-      <summary>${titre} (${points.length})</summary>
+      <summary>${titre}${nombre ? ` (${nombre})` : ''}</summary>
       <div class="tableau-defilant">
         <table>
-          <thead><tr><th>Nom</th><th>Est (m)</th><th>Nord (m)</th><th>Altitude (m)</th></tr></thead>
+          <thead><tr><th>Nom</th>${avecListe ? '<th>Liste</th>' : ''}<th>Est (m)</th><th>Nord (m)</th><th>Altitude (m)</th>${colonneDate}</tr></thead>
           <tbody data-tableau="${numeroTableau}"></tbody>
         </table>
       </div>
@@ -453,7 +641,7 @@ function listesDessins(projet) {
       <div class="ligne-outils"><span class="aide">${points.length} points · dessin</span>
         <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="archiver" data-type="dessin" data-id="${dessin.id}">archiver</button>
         <button type="button" class="bouton-lien archive-comme-suppression" data-action="archiver" data-type="dessin" data-id="${dessin.id}">supprimer</button></div>
-      ${tableauPoints(points, 'Voir les points')}
+      ${tableauPoints(points, 'Voir les points', { date: false })}
     </div>`;
     })
     .join('');
@@ -466,16 +654,26 @@ function listePointsControle(projet) {
   return `<div class="ligne-leve liste-controle">
       <strong>Points de contrôle</strong>
       <div class="ligne-outils"><span class="aide">${points.length} points</span></div>
-      ${tableauPoints(points, 'Voir les points de contrôle')}
+      ${tableauPoints(points, 'Voir les points de contrôle', { date: false })}
       ${photosDesPoints((projet.photosControle ?? []).filter((photo) => points.some((p) => p.id === photo.pointId)))}
     </div>`;
+}
+
+/** Type d'un plan DXF (0.194.0) : petite pastille avec son nom ; en Expert, une liste pour le changer. */
+function typeDuPlan(plan, types) {
+  const pastille = plan.type ? `<span class="pastille-type-dxf" style="background: ${couleurDuType(plan.type, types)}">${echapper(plan.type)}</span>` : '';
+  const options = [['', '— aucun —'], ...types.map((t) => [t.nom, t.nom])];
+  if (plan.type && !types.some((t) => t.nom === plan.type)) options.push([plan.type, plan.type]);
+  const liste = `<label class="type-plan-dxf seulement-expert">Type <select data-champ="plan-type" data-id="${plan.id}">${options.map(([v, t]) => `<option value="${echapper(v)}" ${v === (plan.type ?? '') ? 'selected' : ''}>${echapper(t)}</option>`).join('')}</select></label>`;
+  return `<div class="ligne-type-dxf">${pastille}${liste}</div>`;
 }
 
 /** Plans DXF du projet : nom, nombre d'objets, voir / supprimer, et la liste des calques à cocher. */
 function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
   const plans = (projet.plansDxf ?? []).filter((p) => !caches.has(p.id));
   if (plans.length === 0) return '';
-  return `<div class="liste-plans-dxf">${plans
+  const types = lireTypesDxf();
+  return `<div class="liste-plans-dxf"><div class="ligne-outils seulement-expert"><button type="button" class="bouton-lien bouton-lien-neutre" data-action="modifier-types-dxf">Modifier les types</button></div>${plans
     .map((plan) => {
       const prefixe = prefixeCommun(plan.calques.map((c) => c.nom));
       const visibles = plan.calques.filter((c) => c.visible).length;
@@ -488,6 +686,7 @@ function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
     : `<input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />`}
           ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: 'Couleur du plan' })}
         </div>
+        ${typeDuPlan(plan, types)}
         <div class="ligne-outils">
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${plan.id}">voir</button>

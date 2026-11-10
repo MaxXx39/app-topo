@@ -10,13 +10,13 @@ import { formaterNombre } from '../topo/format.js';
 export function dessinerMesureRapide(groupe, mesure, versEcran, creer) {
   if (!mesure || mesure.points.length === 0) return;
   const ecran = mesure.points.map((p) => versEcran(p.est, p.nord));
-  if (ecran.length >= 3) {
+  if (mesure.ferme) {
     groupe.append(creer('path', { d: `M${ecran.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('L')}Z`, class: 'fond-mesure-rapide' }));
   }
   for (const c of mesure.cotes) {
     const a = ecran[c.de - 1];
     const b = ecran[c.a - 1];
-    const fermeture = mesure.points.length >= 3 && c.a === 1;
+    const fermeture = Boolean(mesure.ferme) && c.a === 1;
     groupe.append(creer('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: `trait-mesure-rapide ${fermeture ? 'fermeture' : ''}` }));
     let angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
     if (angle > 90) angle -= 180;

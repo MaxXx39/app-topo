@@ -26,7 +26,9 @@ import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS, surImageChargee 
 import { creerLoupe } from './loupe.js';
 import { echapper } from '../outils/echapper.js';
 import { COULEURS_LISTES, SECTIONS } from './listes-points.js';
+import { jourDuPoint } from '../topo/date-point.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
+import { couleurDuType } from '../topo/types-dxf.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
@@ -62,9 +64,10 @@ const METRES_AUTOUR_DE_MOI = 20;
 // - Surface Import : couleurs selon l'altitude (roue, tous les modes) ;
 // - Métré : traits et valeurs des mesures.
 const CALQUES_DEPART = {
-  fondSatellite: true, // 0.121.1 : photo aérienne affichée au départ, transparente à 60 %
+  fondSatellite: false, // 0.192.0 : fond décoché au départ (photo, ou carte nationale au-delà de 3 km), transparent à 60 % quand on le coche
   cadastre: false,
   transparencePhoto: 60,
+  jourPoints: '', // 0.187.0 : seulement les points pris ce jour (« AAAA-MM-JJ »), vide = tous
   controleNoms: true,
   controleAltitudes: true,
   points: true,
@@ -94,6 +97,8 @@ const CALQUES_DEPART = {
 // Réglages réservés à Expert : en dessous, ils gardent leur valeur de départ.
 const CALQUES_EXPERT = new Set(['controleNoms', 'controleAltitudes', 'triangles', 'couleursAltitude', 'courbes', 'remblaiDeblai', 'volumes', 'palier', 'equidistance']);
 // Équidistances proposées pour les courbes et les couleurs (m). « auto » : choisie selon la hauteur du stock.
+// Largeur visible (m) au-delà de laquelle le fond devient la carte nationale (0.192.0).
+const LARGEUR_CARTE_NATIONALE = 3000;
 const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 
 /**
@@ -119,9 +124,21 @@ const DELAI_RETOUR_SUIVI = 5000;
 const DISTANCE_RETOUR_SUIVI = 2;
 
 export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
+  // Réglage d'une liste : son choix, sinon celui de départ (en dessous d'Expert, les réglages d'Expert gardent leur valeur de départ).
+  const reglageListe = (cle, id) => {
+    const choix = id != null ? reglagesListe.get(id) : null;
+    if (choix && cle in choix && (!CALQUES_EXPERT.has(cle) || aAcces('expert'))) return choix[cle];
+    return calques[cle];
+  };
+  // Vrai si ce réglage est actif pour au moins une liste (choix global ou d'une liste).
+  const reglageActifQuelquePart = (cle) => calques[cle] || [...reglagesListe.values()].some((choix) => choix[cle] && (!CALQUES_EXPERT.has(cle) || aAcces('expert')));
   // Réglages choisis ; « calques » est ce qui est dessiné : en dessous d'Expert, les réglages
   // d'Expert gardent leur valeur de départ.
   const calquesChoisis = { ...CALQUES_DEPART };
+  // 0.192.0 : réglages par liste (Afficher › flèche d'un levé) : id de la liste → { clé du calque: vrai / faux }. Une clé absente = le réglage
+  // de départ de la catégorie ; en mémoire seulement (tout revient au départ à chaque démarrage).
+  const reglagesListe = new Map();
+  const listeDesPoints = new Map(); // point → id de sa liste (voir afficherListeDesPoints)
   const calques = new Proxy(calquesChoisis, {
     get: (cible, cle) => (CALQUES_EXPERT.has(cle) && !aAcces('expert') ? CALQUES_DEPART[cle] : cible[cle]),
   });
@@ -161,7 +178,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <div class="menu-plans-dxf menu-listes-points" hidden></div>
         <div class="menu-calques" hidden>
           <div class="ligne-menu-plan">
-            <label class="case"><input type="checkbox" data-calque="fondSatellite" checked /> Photo aérienne (swisstopo)</label>
+            <label class="case"><input type="checkbox" data-calque="fondSatellite" /> Fond de plan (swisstopo)</label>
+            <p class="aide note-fond" data-vivant="fond-mode">Photo aérienne ; au-delà de 3 km de large : carte nationale.</p>
           </div>
           <label class="reglette-transparence">Transparence <span data-vivant="transparence">60 %</span>
             <input type="range" min="0" max="100" step="5" value="60" data-calque="transparencePhoto" /></label>
@@ -401,8 +419,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
     // Points visibles à l'écran, ceux du stock actif en premier (leurs noms sont prioritaires).
     const visibles = [];
+    const jourChoisi = calquesChoisis.jourPoints;
     for (const point of points) {
       if (nomsCaches.has(point.nom)) continue;
+      if (jourChoisi && jourDuPoint(point) !== jourChoisi) continue; // 0.187.0 : points d'un jour (sans date = cachés)
       const { x, y } = versEcran(point.est, point.nord, vue);
       if (x < -50 || y < -50 || x > vue.largeur + 50 || y > vue.hauteur + 50) continue;
       visibles.push({ point, x, y, prioritaire: rangs.has(point.nom) || classes.has(point.nom) });
@@ -460,9 +480,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Noms et altitudes : placés sans chevauchement (les étiquettes sans place sont cachées).
     // Roue de « Levé » : la case « Altitudes » montre ou cache toutes les altitudes (lignes et contours compris).
     if (calques.noms || calques.altitudes) {
-      const montrerNom = (point) => calques.noms && (pointsImport.has(point) ? calques.nomsImport : calques.nomsLeve);
+      const idListe = (point) => listeDesPoints.get(point);
+      const montrerNom = (point) => calques.noms && (pointsImport.has(point) ? reglageListe('nomsImport', idListe(point)) : reglageListe('nomsLeve', idListe(point)));
+      const montrerAltitude = (point) => calques.altitudes && reglageListe('altitudes', idListe(point));
       const textes = visibles.map(({ point }) =>
-        [montrerNom(point) ? point.nom : null, calques.altitudes && point.altitude != null ? formaterNombre(point.altitude) : null, calques.altitudes && point.chantier ? texteDuPoint(point.chantier, point.chantier) : null].filter(Boolean),
+        [montrerNom(point) ? point.nom : null, montrerAltitude(point) && point.altitude != null ? formaterNombre(point.altitude) : null, montrerAltitude(point) && point.chantier ? texteDuPoint(point.chantier, point.chantier) : null].filter(Boolean),
       );
       const places = placerEtiquettes(
         visibles.map(({ x, y }, i) => ({
@@ -945,7 +967,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    * Seules les tuiles visibles à l'écran sont chargées (connexion internet nécessaire).
    */
   function dessinerFond() {
-    const couches = Object.keys(FONDS).filter((nom) => calques[nom === 'satellite' ? 'fondSatellite' : nom]);
+    // 0.192.0 : au-delà de 3 km de large visible, la carte nationale (villes, noms) remplace la photo aérienne.
+    const largeurVisible = vue ? vue.largeur / vue.echelle : 0;
+    const carteNationale = largeurVisible > LARGEUR_CARTE_NATIONALE;
+    const couches = [];
+    if (calques.fondSatellite) couches.push(carteNationale ? 'carte' : 'satellite');
+    if (calques.cadastre) couches.push('cadastre');
+    const noteFond = conteneur.querySelector('[data-vivant="fond-mode"]');
+    if (noteFond) noteFond.textContent = carteNationale ? 'Carte nationale (plus de 3 km de large)' : 'Photo aérienne ; au-delà de 3 km de large : carte nationale.';
     const voulues = new Set();
 
     // Sans point, une surface importée suffit aussi à placer le fond (0.90.0).
@@ -967,7 +996,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
                 fondIndisponible = true;
                 afficherAttribution(couches);
               });
-              image.className = `tuile ${nom}`;
+              image.className = `tuile ${nom === 'carte' ? 'satellite carte' : nom}`;
               tuilesAffichees.set(adresse, image);
               fond.append(image);
             }
@@ -1069,7 +1098,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const dessous = creerElement('g', { class: palir ? 'pale' : '' });
     groupe.append(dessous);
     if (calques.remblaiDeblai) dessinerEcarts(dessous);
-    if (calques.couleursAltitude || calques.courbes || calques.couleursAltitudeImport || calques.courbesImport) dessinerRelief(dessous);
+    if (['couleursAltitude', 'courbes', 'couleursAltitudeImport', 'courbesImport'].some(reglageActifQuelquePart)) dessinerRelief(dessous);
     dessinerSurface(dessous);
     const groupeStocks = groupe;
     dessin.stocks.forEach((stock, index) => {
@@ -1097,7 +1126,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
             return `M${a.x} ${a.y} L${b.x} ${b.y} L${c.x} ${c.y} Z`;
           })
           .join(' ');
-        groupe.append(creerElement('path', { d: traces, class: `surface-importee ${nature}${calques.trianglesImport ? ' avec-triangles' : ''}`, style }));
+        groupe.append(creerElement('path', { d: traces, class: `surface-importee ${nature}${reglageListe('trianglesImport', stock.id) ? ' avec-triangles' : ''}`, style }));
         const bord = bordDuStock(resultat.trianglesDessus)
           .map(([p, q]) => {
             const [a, b] = [enPixels(p), enPixels(q)];
@@ -1110,7 +1139,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       // Levé sans contour (terrain, recollement… ; 0.90.1) : son bord et un fond léger, même sans le
       // calque Triangles (Expert), pour voir où il s'étend (implantation d'une surface en Base).
       const sansContour = (stock.contour ?? []).length < 3;
-      if (!importee && sansContour && calques.contourLeve && resultat?.trianglesDessus?.length && !(actif && calques.triangles)) {
+      if (!importee && sansContour && reglageListe('contourLeve', stock.id) && resultat?.trianglesDessus?.length && !(actif && reglageListe('triangles', stock.id))) {
         const enPixels = (p) => versEcran(p.est, p.nord, vue);
         const bord = bordDuStock(resultat.trianglesDessus)
           .map(([p, q]) => {
@@ -1137,7 +1166,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
 
       // Triangles du dessus : stock actif seulement, pour ne pas surcharger.
-      if (!importee && actif && calques.triangles && resultat?.trianglesDessus) {
+      if (!importee && actif && reglageListe('triangles', stock.id) && resultat?.trianglesDessus) {
         const traits = resultat.trianglesDessus
           .map((triangle) => {
             const [a, b, c] = triangle.map((p) => versEcran(p.est, p.nord, vue));
@@ -1156,7 +1185,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           const trace = chemin(ligne.noms, ligne.fermee);
           if (!trace) continue;
           const element = creerElement('path', { d: trace, class: actif ? 'ligne-rupture actif' : 'ligne-rupture' });
-          const couleur = couleurDeLigne(ligne, libelles);
+          // 0.188.0 (Levé chantier) : la ligne prend la couleur de la nature (réseau) de son premier point.
+          const natureChantier = stock.nature === 'chantier' ? (stock.points ?? []).find((p) => p.nom === ligne.noms[0])?.chantier?.nature : null;
+          const couleur = natureChantier ? couleurNatureChantier(natureChantier) : couleurDeLigne(ligne, libelles);
           if (couleur) element.style.stroke = couleur;
           groupe.append(element);
         }
@@ -1266,8 +1297,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       if (!estVisible(stock)) return;
       const triangles = dessin.resultats[index]?.trianglesDessus ?? [];
       const importee = estSurfaceFichier(stock);
-      if (importee ? calques.couleursAltitudeImport : calques.couleursAltitude) ajouterTous(pourCouleurs, triangles);
-      if (importee ? calques.courbesImport : calques.courbes) ajouterTous(pourCourbes, triangles);
+      if (reglageListe(importee ? 'couleursAltitudeImport' : 'couleursAltitude', stock.id)) ajouterTous(pourCouleurs, triangles);
+      if (reglageListe(importee ? 'courbesImport' : 'courbes', stock.id)) ajouterTous(pourCourbes, triangles);
     });
     // La surface affichée (onglet Calculs › Surfaces) est aussi coloriée, et les aires mesurées (onglet Calculs › Mesures).
     const autres = [...(dessin.surface?.triangles ?? []), ...(dessin.mesures ?? []).flatMap(({ resultat }) => resultat?.triangles ?? [])];
@@ -1699,6 +1730,25 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function cadrerSurLigne(rotation = vue?.rotation ?? 0) {
     const { largeur, hauteur } = taille();
     if (!ligneVue || largeur === 0 || hauteur === 0) return;
+    // 0.188.0 : avec une position, le plan reste centré sur elle (suivi gardé) et le zoom est celui qui
+    // montre toute la ligne autour de ma position, sans changer l'orientation du plan.
+    if (position && vue) {
+      const { cos, sin } = { cos: Math.cos(((vue.rotation ?? 0) * Math.PI) / 180), sin: Math.sin(((vue.rotation ?? 0) * Math.PI) / 180) };
+      let uMax = 1;
+      let vMax = 1;
+      for (const p of ligneVue) {
+        const dEst = p.est - position.est;
+        const dNord = p.nord - position.nord;
+        uMax = Math.max(uMax, Math.abs(dEst * cos - dNord * sin));
+        vMax = Math.max(vMax, Math.abs(dEst * sin + dNord * cos));
+      }
+      const echelle = Math.min((largeur / 2 - 70) / uMax, (hauteur / 2 - 70) / vMax);
+      if (echelle > 0) {
+        vue = { ...vue, echelle, estCentre: position.est, nordCentre: position.nord };
+        dessiner();
+        return;
+      }
+    }
     // Marge de 70 px : les boutons du plan (en haut) et la case (en bas) ne cachent pas les bouts.
     const cadre = cadrerSurPointsTourne(ligneVue, largeur, hauteur, rotation, 70);
     if (!cadre) return;
@@ -1881,6 +1931,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
     });
   }
+  menuListes.addEventListener('click', (evenement) => {
+    if (!evenement.target.closest('[data-jour-effacer]')) return;
+    calquesChoisis.jourPoints = '';
+    const champ = menuListes.querySelector('[data-calque="jourPoints"]');
+    if (champ) champ.value = '';
+    dessiner();
+  });
   menuListes.addEventListener('change', (evenement) => {
     const planCadastre = evenement.target.dataset.lignesCadastre;
     if (planCadastre) quandReglerPlanDxf?.(planCadastre, { visible: evenement.target.checked });
@@ -1906,6 +1963,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // Réglages de chaque catégorie : [clé du calque, texte, niveau] ; niveau 'expert' ou '' (tous).
   const REGLAGES_SECTIONS = {
     controle: [['controleNoms', 'ID point', 'expert'], ['controleAltitudes', 'Altitude', 'expert']],
+    // 0.192.0 : Levé, Points Import et Surface Import ont leurs réglages PAR LISTE (REGLAGES_LISTE) ; il ne reste ici que les
+    // points et altitudes de Surface Import (pour toutes les surfaces).
+    surface: [
+      ['pointsSurface', 'Points', 'intermediaire'],
+      ['altitudesSurface', 'Altitudes', 'intermediaire'],
+    ],
+  };
+  // Réglages d'une liste (flèche de sa ligne, 0.192.0) : [clé du calque, texte, niveau] ; niveau '' = tous les modes.
+  const REGLAGES_LISTE = {
     leve: [
       ['nomsLeve', 'Noms', ''],
       ['altitudes', 'Altitudes', ''],
@@ -1919,10 +1985,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       ['couleursAltitudeImport', 'Couleurs selon l\'altitude', ''],
       ['trianglesImport', 'Triangles', 'intermediaire'],
       ['courbesImport', 'Courbes de niveau', 'intermediaire'],
-      ['pointsSurface', 'Points', 'intermediaire'],
-      ['altitudesSurface', 'Altitudes', 'intermediaire'],
     ],
   };
+  // Catégories et listes dépliées (gardées quand le menu est refait).
+  const sectionsOuvertes = new Set(['leve']);
+  const listesOuvertes = new Set();
   const caseCalque = (cle, titre, classe = '') => `<label class="case ${classe}"><input type="checkbox" data-calque="${cle}" ${calquesChoisis[cle] ? 'checked' : ''} /> ${titre}</label>`;
   const choixListe = (cle, valeurs, titre, unite) => `<label class="choix-equidistance">${titre}
       <select data-calque="${cle}">${valeurs.map((e) => `<option value="${e}" ${calquesChoisis[cle] === e ? 'selected' : ''}>${e === 'auto' ? 'auto' : `${e} ${unite}`}</option>`).join('')}</select></label>`;
@@ -1938,6 +2005,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     </div>`;
   }
   /** Titre d'une catégorie, avec sa roue s'il y a des réglages. */
+  function titreSectionRoue(section, titre) {
+    const reglages = REGLAGES_SECTIONS[section] ?? [];
+    if (reglages.length === 0) return '';
+    return `<div class="titre-avec-roue titre-reglages-section"><span>Réglages</span><button type="button" class="roue-menu" data-roue="${section}" aria-expanded="false" title="Réglages" aria-label="Réglages ${titre}"></button></div>${reglagesSection(section)}`;
+  }
   function titreSection(section, titre) {
     const reglages = REGLAGES_SECTIONS[section] ?? [];
     const niveau = reglages.length > 0 && reglages.every(([, , n]) => n === 'expert') ? 'seulement-expert' : '';
@@ -1951,11 +2023,19 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}:${l.couleur}:${l.lignesVisibles}`).join('|');
     if (signature === signatureListes) return;
     signatureListes = signature;
-    const ligne = (l) => `<div class="ligne-menu-plan">
-        <label class="oeil-plan"><input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} />
-          <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span>${echapper(l.nom)}</span></label>
-        ${l.couleurModifiable ? paletteCouleur({ couleur: l.couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${l.id}"`, nom: `Couleur de ${l.nom}` }) : ''}
-      </div>`;
+    // 0.192.0 : une ligne par liste : case, pastille de couleur, nom ; la flèche déplie ses réglages (noms, altitudes, triangles…) et sa couleur.
+    const ligne = (l) => {
+      const reglages = REGLAGES_LISTE[l.section] ?? [];
+      const entete = `<input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} aria-label="Afficher ${echapper(l.nom)}" />
+          <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span class="nom-liste-menu">${echapper(l.nom)}</span>`;
+      if (reglages.length === 0 && !l.couleurModifiable) return `<div class="ligne-menu-plan"><label class="oeil-plan">${entete}</label></div>`;
+      const cases = reglages.map(([cle, titre, n]) => `<label class="case ${n ? `seulement-${n}` : ''}"><input type="checkbox" data-reglage-liste="${cle}" data-id="${l.id}" ${reglageListe(cle, l.id) ? 'checked' : ''} /> ${titre}</label>`).join('');
+      const couleur = l.couleurModifiable ? `<div class="couleur-liste-menu"><span>Couleur</span>${paletteCouleur({ couleur: l.couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${l.id}"`, nom: `Couleur de ${l.nom}` })}</div>` : '';
+      return `<details class="liste-depliable" data-liste-ouverte="${l.id}" ${listesOuvertes.has(l.id) ? 'open' : ''}>
+          <summary class="ligne-menu-plan"><span class="oeil-plan">${entete}</span></summary>
+          <div class="reglages-liste">${cases}${couleur}</div>
+        </details>`;
+    };
     // Cadastre (0.116.4) : nom, une couleur pour tout, cases « Lignes » (plan DXF) et « Points ».
     const ligneCadastre = (l) => `<div class="ligne-menu-plan ligne-cadastre">
         <span class="pastille-liste" style="background: ${l.couleur}"></span><span class="nom-cadastre">${echapper(l.nom)}</span>
@@ -1967,7 +2047,20 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       </div>`;
     const parties = SECTIONS.map(([section, titre]) => {
       const liste = listes.filter((l) => l.section === section);
-      let html = liste.length > 0 ? titreSection(section, titre) + liste.map(section === 'cadastre' ? ligneCadastre : ligne).join('') : '';
+      let html = '';
+      if (liste.length > 0) {
+        const visibles = liste.filter((l) => l.visible).length;
+        const equidistance = section === 'leve'
+          ? choixListe('equidistance', EQUIDISTANCES, 'Équidistance des courbes', 'm').replace('class="choix-equidistance"', 'class="choix-equidistance seulement-expert"')
+          : section === 'surface'
+            ? choixListe('equidistance', EQUIDISTANCES, 'Équidistance des courbes', 'm').replace('class="choix-equidistance"', 'class="choix-equidistance seulement-intermediaire"')
+            : '';
+        html = `<details class="categorie-affichage section-menu-${section}" data-section-ouverte="${section}" ${sectionsOuvertes.has(section) ? 'open' : ''}>
+          <summary class="titre-partie-menu"><input type="checkbox" data-section-toutes="${section}" data-etat="${visibles === 0 ? 'rien' : visibles === liste.length ? 'tout' : 'partiel'}" ${visibles === liste.length ? 'checked' : ''} aria-label="Tout afficher ou cacher : ${titre}" />
+            <span>${titre}</span><span class="nombre-categorie">${liste.length}</span></summary>
+          ${titreSectionRoue(section, titre)}${equidistance}${liste.map(section === 'cadastre' ? ligneCadastre : ligne).join('')}
+        </details>`;
+      }
       // Volume (Expert) : juste après les levés ; caché au départ (tableau « Affichage »).
       if (section === 'leve') {
         html += `<div class="seulement-expert"><p class="titre-partie-menu">Volume</p>
@@ -1977,13 +2070,33 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
       return html;
     });
-    menuListes.innerHTML = `${parties.join('') || '<p class="menu-vide">Rien à afficher</p>'}
+    const jourPoints = `<div class="seulement-intermediaire jour-points-menu"><p class="titre-partie-menu">Points d'un jour</p>
+      <label class="case"><input type="date" data-calque="jourPoints" value="${echapper(calquesChoisis.jourPoints ?? '')}" aria-label="Montrer seulement les points pris ce jour" />
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-jour-effacer="oui">tout voir</button></label></div>`;
+    menuListes.innerHTML = `${parties.join('') || '<p class="menu-vide">Rien à afficher</p>'}${jourPoints}
       <div class="ligne-outils"><button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="oui">tout</button>
         <button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="non">rien</button></div>`;
+    for (const caseSection of menuListes.querySelectorAll('[data-section-toutes]')) caseSection.indeterminate = caseSection.dataset.etat === 'partiel';
     montrerRoues();
   }
+  // Dépliés / repliés : gardés quand le menu est refait ; un toucher dans l'en-tête (case) ne déplie pas.
+  menuListes.addEventListener('toggle', (evenement) => {
+    const d = evenement.target;
+    if (d.dataset?.sectionOuverte) (d.open ? sectionsOuvertes.add(d.dataset.sectionOuverte) : sectionsOuvertes.delete(d.dataset.sectionOuverte));
+    if (d.dataset?.listeOuverte) (d.open ? listesOuvertes.add(d.dataset.listeOuverte) : listesOuvertes.delete(d.dataset.listeOuverte));
+  }, true);
   menuListes.addEventListener('change', (evenement) => {
-    if (evenement.target.dataset.calque) changerCalque(evenement.target);
+    const cible = evenement.target;
+    if (cible.dataset.calque) changerCalque(cible);
+    // Réglage d'une liste (0.192.0) : noms, altitudes, triangles… pour cette liste seulement.
+    if (cible.dataset.reglageListe) {
+      const id = cible.dataset.id;
+      reglagesListe.set(id, { ...(reglagesListe.get(id) ?? {}), [cible.dataset.reglageListe]: cible.checked });
+      // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre (comme avant) : géré seulement au niveau global.
+      dessiner();
+    }
+    // Case d'une catégorie : toutes ses listes d'un coup.
+    if (cible.dataset.sectionToutes) quandMontrerListe?.(`section:${cible.dataset.sectionToutes}`, cible.checked);
   });
   menuPlans.addEventListener('click', (evenement) => {
     const pastille = evenement.target.closest('[data-choix-couleur]');
@@ -2020,7 +2133,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function remplirMenuPlans() {
     // Plans du cadastre : rangés avec leurs points dans « Afficher › Cadastre » (0.116.4).
     const plansDxf = plansDuMenu();
-    const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
+    const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${plan.type || ''}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
     if (signature === signatureMenuPlans) return;
     signatureMenuPlans = signature;
     // Aucun plan : un petit cadre « Aucun DXF » (avant : un trait blanc vide).
@@ -2030,7 +2143,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
     menuPlans.innerHTML = plansDxf.map((plan) => `<div class="ligne-menu-plan">
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
-          <span>${echapper(plan.nom)}</span></label>
+          <span>${echapper(plan.nom)}</span>${plan.type ? `<span class="pastille-type-dxf" style="background: ${couleurDuType(plan.type)}">${echapper(plan.type)}</span>` : ''}</label>
         ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
         <label class="reglette-transparence reglette-plan">Transparence <span>${plan.transparence ?? 0} %</span>
           <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /></label>
@@ -2411,6 +2524,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     afficherPhotos(nouvelles) {
       photos = nouvelles;
     },
+    /** 0.192.0 : liste de chaque point (Map point → id de liste), pour les réglages par liste (noms, altitudes). */
+    afficherListeDesPoints(carte) {
+      listeDesPoints.clear();
+      for (const [point, id] of carte) listeDesPoints.set(point, id);
+    },
     /** Couleur de chaque point d'après sa liste (Map point → couleur, voir couleursDesPoints). */
     afficherCouleursPoints(couleurs) {
       couleursPoints = couleurs;
@@ -2478,7 +2596,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const avant = ligneVue;
       ligneVue = nouvelle;
       if (!nouvelle) return;
-      changerSuivi('libre');
+      // 0.188.0 : le suivi de la position n'est plus coupé ; seulement un zoom qui montre ma position et toute la ligne.
       // Recadrage seulement si la ligne a changé (pas à chaque redessin de l'écran).
       const memes = avant && avant.length === nouvelle.length && avant.every((p, i) => p.est === nouvelle[i].est && p.nord === nouvelle[i].nord);
       if (!memes) cadrerSurLigne(position?.azimut ?? vue?.rotation ?? 0);

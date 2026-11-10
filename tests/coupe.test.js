@@ -116,7 +116,7 @@ describe('grille des coupes en direct (0.90.1)', () => {
     expect(valeursGrille(449.37, 451.2, 1)).toEqual([450, 451]);
     const lignes = [[{ distance: 0, altitude: 450 }, { distance: 10, altitude: 451 }]];
     const avec = svgCoupeDirecte({ lignes, demiLongueur: 5, altitudeCanne: 450.5, classe: null, titre: 'A', gauche: 'g', droite: 'd', grille: true });
-    const sans = svgCoupeDirecte({ lignes, demiLongueur: 5, altitudeCanne: 450.5, classe: null, titre: 'A', gauche: 'g', droite: 'd' });
+    const sans = svgCoupeDirecte({ lignes, demiLongueur: 5, altitudeCanne: 450.5, classe: null, titre: 'A', gauche: 'g', droite: 'd', grille: false });
     expect((avec.match(/class="grille-coupe"/g) ?? []).length).toBeGreaterThan(10);
     expect(sans).not.toContain('grille-coupe');
   });

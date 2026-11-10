@@ -45,7 +45,7 @@ function tableauPagine(cle, titre, entetes, lignes, page) {
  * HTML de l'écran. { mesure (voir topo/mesure-rapide.js), accroche, accroches: [[cle, mot, nom, dessin]],
  * pages: { points, cotes } }.
  */
-export function htmlMesureRapide({ mesure, accroche, accroches, pages, manuel = { candidat: false, zoom: 4 }, accrochesOuvertes = false }) {
+export function htmlMesureRapide({ mesure, accroche, accroches, pages, manuel = { candidat: false, zoom: 4 }, accrochesOuvertes = false, fermee = true }) {
   const n = mesure.points.length;
   const boutons = accroches.map(([cle, mot, nom, dessin]) => `<button type="button" class="bouton-accroche ${accroche === cle ? 'actif' : ''}" data-action="accroche-mesure" data-valeur="${cle}" title="${nom}" aria-label="${nom}" aria-pressed="${accroche === cle}">
       <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span class="mot-accroche">${mot}</span></button>`).join('');
@@ -76,6 +76,7 @@ export function htmlMesureRapide({ mesure, accroche, accroches, pages, manuel = 
           </div>
           <button type="button" class="bouton ajouter-manuel-mesure" data-action="ajouter-manuel-mesure" ${manuel.candidat ? '' : 'disabled'}>+ Ajouter ce point</button>
         </div>` : ''}
+      ${n >= 3 ? `<button type="button" class="bouton-secondaire bascule-ferme-mesure" data-action="basculer-ferme-mesure" role="switch" aria-checked="${fermee}">${fermee ? '☑' : '☐'} Figure fermée (1-2-3-1)</button>` : ''}
       ${resume}
       ${cotes}
       ${points}
