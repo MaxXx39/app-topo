@@ -164,7 +164,7 @@ function htmlLignesSuivies(donnees) {
     return `<div class="carte-ligne-guidage ${l ? 'choisie attente' : 'sans-ligne'} ${enChoix === slot ? 'en-choix' : ''}" data-vivant="lame-ligne-${slot}">
       <button type="button" class="corps-carte-ligne" data-action="choisirLignesGuidage" data-valeur="${slot}" aria-label="Choisir la ligne ${nom}">
         <span class="nom-ligne couleur-${nom}">${nom}</span><small>${slot === 0 ? 'bord G' : 'bord D'}</small><strong class="ecart-ligne">${texte}</strong></button>
-      ${l ? `<button type="button" class="bouton-lien" data-action="enleverLigneGuidage" data-valeur="${slot}" aria-label="Enlever ${nom}">×</button>` : ''}
+      ${donnees.candidatLigne === slot ? `<button type="button" class="bouton-valider-ligne" data-action="validerLigneGuidage" aria-label="Valider la ligne ${nom}">✓ Valider</button>` : l ? `<button type="button" class="bouton-lien" data-action="enleverLigneGuidage" data-valeur="${slot}" aria-label="Enlever ${nom}">×</button>` : ''}
     </div>`;
   };
   return `<div class="cartes-lignes seulement-expert">${carte(0)}${carte(1)}</div>`;
@@ -178,7 +178,8 @@ function htmlLignesSuivies(donnees) {
 function placeSilhouette(a, b, x, y) {
   const [xa, xb, ya, yb] = [x(a.distance), x(b.distance), y(a.altitude), y(b.altitude)];
   const angle = (Math.atan2(yb - ya, xb - xa) * 180) / Math.PI;
-  const largeur = Math.hypot(xb - xa, yb - ya);
+  // 0.188.0 : échelle fixe = largeur de l'outil à l'écran (écart horizontal) ; les hauteurs agrandies ne la changent plus.
+  const largeur = Math.abs(xb - xa);
   return { x: (xa + xb) / 2, y: (ya + yb) / 2, angle, echelle: Math.max(0.05, largeur / 80) };
 }
 
@@ -244,7 +245,9 @@ export function rafraichirLame(conteneur, vivant) {
   const fleche = (e) => (e == null ? '' : e >= 0 ? '↑ ' : '↓ ');
   const centre = g?.centre ? `Centre <strong>${fleche(g.centre.ecart)}${texteCm(g.centre.ecart)}</strong> · ` : '';
   const bord = (cote) => {
-    const b = g ? vivant.bords?.[cote] : null;
+    // 0.188.0 : quand une ligne est suivie de ce côté (L1 = gauche, L2 = droite), on n'écrit plus le bord de la surface.
+    const ligneDeCeCote = (vivant.lignes ?? []).some((l) => l.slot === (cote === 'gauche' ? 0 : 1));
+    const b = g && !ligneDeCeCote ? vivant.bords?.[cote] : null;
     return b ? `<span class="${b.distance < 0 ? 'hors' : ''}">${cote === 'gauche' ? '◂ bord' : 'bord ▸'} ${b.distance < 0 ? '−' : ''}${Math.abs(b.distance).toFixed(2)} m</span>` : '';
   };
   const piedGd = zone('lame-gd-pied');
@@ -308,7 +311,7 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []
     // comme l'engin (pente du 1er GNSS, vraie pente, avant à droite : avant plus haut = rotation vers le haut).
     const pente = outil?.penteEngin;
     const angleEngin = pente == null ? 0 : -(Math.atan(pente / 100) * 180) / Math.PI;
-    const machineDeCote = outil ? silhouetteOutil(outil.machine, 'long', { x: xc, y: yc, angle: angleEngin, echelle: Math.max(0.35, Math.min(0.7, (yc - 4) / 110)) }) : '';
+    const machineDeCote = outil ? silhouetteOutil(outil.machine, 'long', { x: xc, y: yc, angle: angleEngin, echelle: 0.55 }) : '';
     // Pentes du terrain derrière et devant la lame (surface suivie, avec le delta Z), en % : + = ça monte vers l'avant.
     const pentePar = (d1, d2) => (d2 - d1 > 0.2 ? ((altitudeA(d2) - altitudeA(d1)) / (d2 - d1)) * 100 : null);
     const signe = (v) => (v == null ? '—' : `${Math.abs(v) < 0.05 ? '' : v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)} %`);

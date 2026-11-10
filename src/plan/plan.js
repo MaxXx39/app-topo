@@ -1160,7 +1160,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           const trace = chemin(ligne.noms, ligne.fermee);
           if (!trace) continue;
           const element = creerElement('path', { d: trace, class: actif ? 'ligne-rupture actif' : 'ligne-rupture' });
-          const couleur = couleurDeLigne(ligne, libelles);
+          // 0.188.0 (Levé chantier) : la ligne prend la couleur de la nature (réseau) de son premier point.
+          const natureChantier = stock.nature === 'chantier' ? (stock.points ?? []).find((p) => p.nom === ligne.noms[0])?.chantier?.nature : null;
+          const couleur = natureChantier ? couleurNatureChantier(natureChantier) : couleurDeLigne(ligne, libelles);
           if (couleur) element.style.stroke = couleur;
           groupe.append(element);
         }
@@ -1703,6 +1705,25 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function cadrerSurLigne(rotation = vue?.rotation ?? 0) {
     const { largeur, hauteur } = taille();
     if (!ligneVue || largeur === 0 || hauteur === 0) return;
+    // 0.188.0 : avec une position, le plan reste centré sur elle (suivi gardé) et le zoom est celui qui
+    // montre toute la ligne autour de ma position, sans changer l'orientation du plan.
+    if (position && vue) {
+      const { cos, sin } = { cos: Math.cos(((vue.rotation ?? 0) * Math.PI) / 180), sin: Math.sin(((vue.rotation ?? 0) * Math.PI) / 180) };
+      let uMax = 1;
+      let vMax = 1;
+      for (const p of ligneVue) {
+        const dEst = p.est - position.est;
+        const dNord = p.nord - position.nord;
+        uMax = Math.max(uMax, Math.abs(dEst * cos - dNord * sin));
+        vMax = Math.max(vMax, Math.abs(dEst * sin + dNord * cos));
+      }
+      const echelle = Math.min((largeur / 2 - 70) / uMax, (hauteur / 2 - 70) / vMax);
+      if (echelle > 0) {
+        vue = { ...vue, echelle, estCentre: position.est, nordCentre: position.nord };
+        dessiner();
+        return;
+      }
+    }
     // Marge de 70 px : les boutons du plan (en haut) et la case (en bas) ne cachent pas les bouts.
     const cadre = cadrerSurPointsTourne(ligneVue, largeur, hauteur, rotation, 70);
     if (!cadre) return;
@@ -2492,7 +2513,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const avant = ligneVue;
       ligneVue = nouvelle;
       if (!nouvelle) return;
-      changerSuivi('libre');
+      // 0.188.0 : le suivi de la position n'est plus coupé ; seulement un zoom qui montre ma position et toute la ligne.
       // Recadrage seulement si la ligne a changé (pas à chaque redessin de l'écran).
       const memes = avant && avant.length === nouvelle.length && avant.every((p, i) => p.est === nouvelle[i].est && p.nord === nouvelle[i].nord);
       if (!memes) cadrerSurLigne(position?.azimut ?? vue?.rotation ?? 0);

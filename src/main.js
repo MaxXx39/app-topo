@@ -617,8 +617,8 @@ function contenuBande() {
       const choisie = lignesGuidage.liste.some((l) => l.place === place);
       return `<button type="button" class="bouton-enreg-bande petit relais-ligne-guidage place-${place} ${placeEnChoix === place ? 'actif' : ''}" data-nav="action" data-cle="ligne-guidage-${place}" title="Choisir la ligne L${place + 1} (bord ${place === 0 ? 'gauche' : 'droit'}) sur le plan"><span>L${place + 1}${choisie ? ' ✓' : ''}</span></button>`;
     };
-    const boutonLignes = `${boutonLigne(0)}${boutonLigne(1)}`;
-    return `<div class="zone-levee">${surface}${boutonLignes}</div>`;
+    // 0.188.0 : L1 / L2 ne sont plus répétés dans la bande (seulement dans l'écran du Guidage).
+    return `<div class="zone-levee">${surface}</div>`;
   }
   if (cle === 'controle') {
     const enregistrer = trouver('enregistrer');
@@ -2350,7 +2350,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         const levee = leveeEnCours();
         if (!levee || refuserEnLectureSeule()) return;
         // 0.96.0 : la photo attend le prochain point enregistré, et prend son nom (voir rangerPointPris).
-        ajouterPhotos(levee, fichiers, { attentePoint: true });
+        ajouterPhotos(levee, fichiers, { attentePoint: true, dessiner: levee.nature === 'chantier' });
       },
       // Photo de tout le levé (0.140.0, Intermédiaire, bandeau « Lever en cours ») : sans point.
       ajouterPhotosLeveeGlobale: (fichiers) => {
@@ -2560,9 +2560,11 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       choisirLignesGuidage: (valeur) => {
         const place = Number(valeur) === 1 ? 1 : 0;
         lignesGuidage.choix = lignesGuidage.choix === place ? null : place;
+        lignesGuidage.candidat = null;
         if (lignesGuidage.choix !== null) afficherMessage(`Touche la ligne L${place + 1} sur le plan`, 4000);
         recalculer();
       },
+      validerLigneGuidage: () => validerLigneGuidage(),
       enleverLigneGuidage: (valeur) => {
         lignesGuidage.liste = lignesGuidage.liste.filter((l) => l.place !== Number(valeur));
         recalculer();
@@ -3016,8 +3018,10 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           return;
         }
         autocontrole.cible = { ...point };
+        // 0.188.0 : déjà en guidage, on change de point en gardant le zoom (le cadrage ne se fait qu'au début du guidage).
+        const dejaEnGuidage = document.body.classList.contains('vue-implantation');
         montrerImplantation();
-        requestAnimationFrame(cadrerSurImplantation);
+        if (!dejaEnGuidage) requestAnimationFrame(cadrerSurImplantation);
       },
       // Photo d'un point de contrôle (0.105.0, Intermédiaire) : rangée dans projet.photosControle.
       ajouterPhotoControle: (id, fichiers) => ajouterPhotoControle(id, fichiers),
@@ -3222,7 +3226,7 @@ function envoyerImplantationAuPlan() {
   // Bouton « Seul » (0.94.0) : seulement les listes gardées (points de contrôle en mode Contrôle…).
   const gardees = listesDuTravail(listesDePoints(projet));
   // Lignes suivies en Guidage (0.154.0) : en violet.
-  const lignesSuivies = ongletContexte === 'terrain' && terrain.mode === 'lame' ? lignesGuidage.liste.map((l) => ({ id: 'ligne-guidage', sommets: l.sommets, fermee: false, couleur: ['#7c3aed', '#ea580c'][l.place] })) : [];
+  const lignesSuivies = ongletContexte === 'terrain' && terrain.mode === 'lame' ? [...lignesGuidage.liste, ...(lignesGuidage.candidat ? [lignesGuidage.candidat] : [])].map((l) => ({ id: 'ligne-guidage', sommets: l.sommets, fermee: false, couleur: ['#7c3aed', '#ea580c'][l.place] })) : [];
   const lignesAutres = [...(seul ? [] : lignesDesAutres().filter((l) => !gardees || gardees.has(l.id))), ...lignesSuivies];
   const reseaux = seul ? [] : reseauxDuPlan().filter((r) => !gardees || gardees.has(r.id));
   const chantiers = seul ? [] : formesDuChantier().filter((f) => !gardees || gardees.has(f.id));
@@ -3488,8 +3492,10 @@ function implanterPointNomme(nom) {
   const dansLaListe = projet.aImplanter.find((p) => p.nom === nom);
   implanter.cible = { id: dansLaListe?.id ?? null, nom, est: point.est, nord: point.nord, altitude: point.altitude ?? null };
   implanter.choix = null;
+  // 0.188.0 : déjà en guidage, on change de point en gardant le zoom (le cadrage ne se fait qu'au début du guidage).
+  const dejaEnGuidage = document.body.classList.contains('vue-implantation');
   montrerImplantation();
-  requestAnimationFrame(cadrerSurImplantation);
+  if (!dejaEnGuidage) requestAnimationFrame(cadrerSurImplantation);
 }
 
 /**
@@ -4369,7 +4375,8 @@ const ecranDessin = creerEcranDessin(document.querySelector('#dessins'), {
 // lignes : plans DXF, levés, dessins) ; pour chacune, le bout de l'outil mesuré (G ou D). En mémoire
 // seulement (oubliées au redémarrage).
 // 0.171.0 : `place` = 0 (L1, bord G, violet) ou 1 (L2, bord D, orange) ; `choix` = place en cours de choix, ou null.
-const lignesGuidage = { liste: [], choix: null };
+// 0.188.0 : candidat = ligne touchée mais pas encore validée ({ place, sommets }).
+const lignesGuidage = { liste: [], choix: null, candidat: null };
 function choixLignesGuidageActif() {
   return lignesGuidage.choix !== null && ongletContexte === 'terrain' && terrain.mode === 'lame' && lameActive();
 }
@@ -4382,11 +4389,21 @@ function toucherPourLigneGuidage(position, tolerance) {
     afficherMessage('Aucune ligne sous le doigt (plan DXF, levé, dessin)', 3000);
     return;
   }
-  const place = lignesGuidage.choix;
-  lignesGuidage.liste = lignesGuidage.liste.filter((l) => l.place !== place);
-  lignesGuidage.liste.push({ place, sommets: trouve.sommets.map((p) => ({ est: p.est, nord: p.nord })), bout: place === 0 ? 'gauche' : 'droite' });
+  // 0.188.0 : toucher = proposer la ligne (en pointillé sur le plan) ; elle n'est gardée qu'avec « Valider ».
+  lignesGuidage.candidat = { place: lignesGuidage.choix, sommets: trouve.sommets.map((p) => ({ est: p.est, nord: p.nord })) };
+  afficherMessage('Ligne touchée : touche « Valider » (ou une autre ligne)', 3000);
+  recalculer();
+}
+
+/** Valide la ligne touchée : elle est gardée et on sort du choix. */
+function validerLigneGuidage() {
+  const c = lignesGuidage.candidat;
+  if (!c) return;
+  lignesGuidage.liste = lignesGuidage.liste.filter((l) => l.place !== c.place);
+  lignesGuidage.liste.push({ place: c.place, sommets: c.sommets, bout: c.place === 0 ? 'gauche' : 'droite' });
   sonValidation();
   lignesGuidage.choix = null;
+  lignesGuidage.candidat = null;
   recalculer();
 }
 
@@ -4722,7 +4739,7 @@ function enregistrerControle() {
 let rappelEnCours = false;
 let dernierRappel = 0; // date du dernier rappel montré (ms)
 async function proposerControle() {
-  if (!ecranLeve || rappelEnCours || !controleNecessaire(projet.controles, new Date(), delaiControleMs(projet))) return;
+  if (!ecranLeve || rappelEnCours || !controleNecessaire(projet.controles, new Date(), delaiControleMs(projet), nomDeLAppareil())) return;
   rappelEnCours = true;
   dernierRappel = Date.now();
   const projetDuRappel = projet;
@@ -4771,8 +4788,10 @@ function toucherPourControle(position, tolerance) {
     return;
   }
   autocontrole.cible = { ...point };
+  // 0.188.0 : déjà en guidage, on change de point en gardant le zoom (le cadrage ne se fait qu'au début du guidage).
+  const dejaEnGuidage = document.body.classList.contains('vue-implantation');
   montrerImplantation();
-  requestAnimationFrame(cadrerSurImplantation);
+  if (!dejaEnGuidage) requestAnimationFrame(cadrerSurImplantation);
 }
 
 /** Données de l'écran Terrain › Contrôle (voir leve/controle-ecran.js). */
@@ -4789,7 +4808,7 @@ function donneesAutocontrole() {
     tolerances: projet.tolerancesControle,
     controles: [...controles].sort((a, b) => (a.le < b.le ? 1 : -1)).slice(0, 30),
     nbControles: controles.length,
-    necessaire: controleNecessaire(controles, new Date(), delaiControleMs(projet)),
+    necessaire: controleNecessaire(controles, new Date(), delaiControleMs(projet), nomDeLAppareil()),
     delaiHeures: delaiControleMs(projet) / 3600000,
     dernierReussi: dates.at(-1) ?? null,
   };
@@ -6583,6 +6602,7 @@ function donneesCommunes() {
       indic: terrain.lame.indic === 'regle' ? 'regle' : 'exterieur',
       lignes: lignesGuidage.liste.map((l) => ({ nom: `L${l.place + 1}`, slot: l.place, bout: l.bout })),
       choixLignes: lignesGuidage.choix,
+      candidatLigne: lignesGuidage.candidat ? lignesGuidage.candidat.place : null,
       deltaSurface,
       coupeSeule: terrain.lame.coupeSeule,
       marges: terrain.lame.marges,
@@ -7250,7 +7270,7 @@ document.querySelector('#bouton-dao').addEventListener('click', () => {
  * Ajoute des photos (réduites) à une surface ou à une mesure : objet.photos. attentePoint : la photo
  * sera rattachée au prochain point enregistré dans ce levé (photo.point = son nom).
  */
-async function ajouterPhotos(objet, fichiers, { attentePoint = false } = {}) {
+async function ajouterPhotos(objet, fichiers, { attentePoint = false, dessiner = false } = {}) {
   // La conversion d'une photo HEIC prend quelques secondes : le message reste affiché jusqu'à la fin.
   afficherMessage('Préparation de la photo…', null);
   const erreurs = [];
@@ -7259,6 +7279,11 @@ async function ajouterPhotos(objet, fichiers, { attentePoint = false } = {}) {
       const photo = await preparerPhoto(fichier);
       if (attentePoint) photo.attentePoint = true;
       objet.photos = [...(objet.photos ?? []), photo];
+      // 0.188.0 (Levé chantier) : l'éditeur de dessin s'ouvre juste après la photo (fermé sans dessin : la photo reste telle quelle).
+      if (dessiner) {
+        afficherMessage('Photo prise', 1500);
+        await dessinerSurPhoto(photo);
+      }
     } catch (erreur) {
       erreurs.push(`${fichier.name} : ${erreur.message}`);
     }

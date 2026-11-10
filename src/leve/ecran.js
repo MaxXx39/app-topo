@@ -1019,13 +1019,14 @@ export function creerEcranLeve(conteneur, actions) {
       ? `<div class="bascule-segment" role="radiogroup" aria-label="Ligne à implanter">${boutonsChoix('choisirSegment', [['tout', 'Toute'], ['segment', 'Segment']], l.segment == null ? 'tout' : 'segment')}</div>`
       : '';
     const bouts = [l.debut?.nom, l.fin?.nom].every(Boolean) ? `${echapper(l.debut.nom)} → ${echapper(l.fin.nom)}` : '';
-    const segment = l.segment == null
-      ? ''
-      : `<div class="choix-segment" title="${bouts}">
-          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="precedent" ${l.segment === 0 ? 'disabled' : ''} aria-label="Segment précédent">◀</button>
-          <span><strong>${l.segment + 1}</strong> / ${l.nbSegments}</span>
-          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="suivant" ${l.segment === l.nbSegments - 1 ? 'disabled' : ''} aria-label="Segment suivant">▶</button>
-        </div>`;
+    // 0.188.0 : la place des flèches est toujours réservée (cachées sur « Toute ») : rien ne bouge quand on bascule.
+    const segment = l.nbSegments > 1
+      ? `<div class="choix-segment${l.segment == null ? ' reserve' : ''}" title="${bouts}" ${l.segment == null ? 'aria-hidden="true" inert' : ''}>
+          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="precedent" ${l.segment == null || l.segment === 0 ? 'disabled' : ''} aria-label="Segment précédent">◀</button>
+          <span><strong>${(l.segment ?? 0) + 1}</strong> / ${l.nbSegments}</span>
+          <button type="button" class="bouton-secondaire" data-action="choisirSegment" data-valeur="suivant" ${l.segment == null || l.segment === l.nbSegments - 1 ? 'disabled' : ''} aria-label="Segment suivant">▶</button>
+        </div>`
+      : '';
     return `${bascule || segment ? `<div class="ligne-segment">${bascule}${segment}</div>` : ''}
       ${l.decalage ? `<p class="aide">Parallèle à ${formaterNombre(Math.abs(l.decalage))} m ${l.decalage > 0 ? 'à droite' : 'à gauche'}</p>` : ''}`;
   }
@@ -1443,10 +1444,10 @@ export function creerEcranLeve(conteneur, actions) {
       ${rangee('natures', c.natures.map((n) => `<button type="button" class="nat-chantier ${n === c.nature ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="nature" data-valeur="${echapper(n)}"><i style="background: ${c.couleursNatures[n] ?? '#6b7280'}"></i>${echapper(n)}</button>`).join(''), 'Plus de natures')}
       ${reglages ? `<div class="reglages-chantier">${reglages}${bulle('chantier')}</div>` : ''}
       <div class="attributs-chantier">
-        ${l.champs.includes('diametre') ? liste('diametre', 'Ø', diametres, c.diametre, `d ${diametreRequis && diametreVide ? 'manque' : ''}`, true) : ''}
+        ${l.champs.includes('diametre') ? liste('diametre', l.ouvrage ? 'Ø tuyau' : 'Ø', diametres, c.diametre, `d ${diametreRequis && diametreVide ? 'manque' : ''}`, true) : ''}
         ${l.champs.includes('gaine') ? liste('gaine', 'Ø', GAINES_LISTE.map(([i, x]) => [`${i}/${x}`, `${i} / ${x}`]), c.gaine, `g ${diametreRequis && !c.gaine ? 'manque' : ''}`, true) : ''}
         ${l.champs.includes('nombre') ? liste('nombre', 'Nb', NOMBRES_LISTE.map((n) => [n, n]), c.nombre, 'n', false) : ''}
-        ${l.champs.includes('profondeur') && c.mode === 'tampon' ? champ('profondeur', 'Prof.', c.profondeur, 'p') : ''}
+        ${l.champs.includes('profondeur') && c.mode === 'tampon' ? champ('profondeur', 'Prof. (m)', c.profondeur, 'p', { indice: '1,25' }) : ''}
         ${l.champs.includes('materiau') ? `<label class="champ-chantier m"><select data-chantier="materiau" aria-label="Matériau">${materiaux.map((m) => `<option ${m === c.materiau ? 'selected' : ''}>${echapper(m)}</option>`).join('')}</select></label>` : ''}
         ${l.champs.includes('remarque') ? champ('remarque', 'Rem.', c.remarque, 'r', { mode: 'text', indice: 'facultatif' }) : ''}
         <label class="bouton-photo-levee photo-chantier" title="Photo du prochain point" aria-label="Photo du prochain point"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg><input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden /></label>

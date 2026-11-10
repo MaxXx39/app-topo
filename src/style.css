@@ -13289,3 +13289,9 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .barre-date-listes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 4px 0 8px; }
 .barre-date-listes input[type="date"] { min-height: 36px; margin-left: 4px; }
 .bascule-ferme-mesure { margin: 6px 0; min-height: 44px; }
+
+/* 0.188.0 : place des flèches de segment réservée (cachées quand « Toute » est choisi) */
+.vue-guidage .ligne-segment .choix-segment.reserve { visibility: hidden; }
+
+/* 0.188.0 : « Valider » de la ligne touchée dans le Guidage */
+.carte-ligne-guidage .bouton-valider-ligne { min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: #16a34a; color: #fff; font-weight: 700; }

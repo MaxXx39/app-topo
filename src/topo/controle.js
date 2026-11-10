@@ -62,8 +62,11 @@ function jourLocal(date) {
  * Vrai s'il faut faire un contrôle : aucun contrôle réussi aujourd'hui, ou le dernier date de
  * 4 heures ou plus. controles : ceux du projet ({ type, resultat, le (date ISO) }) ; maintenant : Date.
  */
-export function controleNecessaire(controles, maintenant = new Date(), delaiMs = DELAI_CONTROLE_MS) {
-  const reussis = (controles ?? []).filter(estControleReussi).map((c) => new Date(c.le)).filter((d) => !Number.isNaN(d.getTime()));
+export function controleNecessaire(controles, maintenant = new Date(), delaiMs = DELAI_CONTROLE_MS, appareil) {
+  // 0.188.0 : si l'appareil est donné, seuls comptent les contrôles de CETTE tablette (une autre tablette
+  // sur le même chantier le même jour doit refaire son contrôle) ; un ancien contrôle sans nom d'appareil compte.
+  const deCetAppareil = (c) => appareil === undefined || !c.appareil || c.appareil === appareil;
+  const reussis = (controles ?? []).filter(estControleReussi).filter(deCetAppareil).map((c) => new Date(c.le)).filter((d) => !Number.isNaN(d.getTime()));
   if (reussis.length === 0) return true;
   const dernier = new Date(Math.max(...reussis));
   if (jourLocal(dernier) !== jourLocal(maintenant)) return true;

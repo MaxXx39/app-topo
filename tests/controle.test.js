@@ -76,6 +76,13 @@ describe('rappel du contrôle', () => {
   it('un contrôle orange compte comme réussi', () => {
     expect(controleNecessaire([{ type: 'mesure', resultat: { global: 'orange' }, le: le(8) }], new Date(2026, 9, 26, 9))).toBe(false);
   });
+
+  it('0.188.0 : un contrôle d\'une autre tablette ne compte pas, un ancien sans nom compte', () => {
+    const autre = { type: 'mesure', resultat: { global: 'vert' }, le: le(8), appareil: 'Tablette B' };
+    expect(controleNecessaire([autre], new Date(2026, 9, 26, 9), undefined, 'Tablette A')).toBe(true);
+    expect(controleNecessaire([autre], new Date(2026, 9, 26, 9), undefined, 'Tablette B')).toBe(false);
+    expect(controleNecessaire([reussi(le(8))], new Date(2026, 9, 26, 9), undefined, 'Tablette A')).toBe(false);
+  });
 });
 
 describe('tolérances tapées (cm)', () => {
