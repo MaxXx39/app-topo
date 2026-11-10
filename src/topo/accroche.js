@@ -237,8 +237,10 @@ export function classeDistance(distance) {
 // cible dont le centre est le point ; elle « zoome » en dessous de 1 m, puis de 20 cm.
 // [distance où elle commence (m), rayons des cercles (m), du plus grand au plus petit].
 export const CIBLES = [
-  { jusqua: 2, cercles: [2, 1.5, 1, 0.5] },
-  { jusqua: 1, cercles: [1, 0.75, 0.5, 0.25] },
+  // 0.189.0 (demande du 10.11) : 2 m presque sans cercle intermédiaire, 1 m avec 50 cm, 20 cm avec 10 et 5 cm ;
+  // la pastille du milieu (le dernier cercle) est pleine.
+  { jusqua: 2, cercles: [2, 1] },
+  { jusqua: 1, cercles: [1, 0.5] },
   { jusqua: 0.2, cercles: [0.2, 0.1, 0.05, 0.02] },
 ];
 // Marge pour ne pas passer sans cesse d'une cible à l'autre quand on est juste à la limite (5 %).

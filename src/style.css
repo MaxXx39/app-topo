@@ -3481,7 +3481,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   opacity: 0.85;
 }
 
-.cible-implantation .anneau-3 {
+.cible-implantation .anneau-centre {
   fill: currentColor;
   fill-opacity: 0.12;
 }
@@ -13298,3 +13298,6 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 
 /* 0.188.1 : pastille « Contrôle à refaire » sous la barre du récepteur */
 .pastille-controle { position: absolute; top: 100%; right: 8px; margin-top: 4px; z-index: 30; min-height: 32px; padding: 0 12px; border: 0; border-radius: 16px; background: #ea580c; color: #fff; font-weight: 700; font-size: 0.85rem; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+
+/* 0.189.0 : pastille du milieu (2 cm) plus foncée sur la cible de 20 cm */
+.cible-implantation.cible-3 .anneau-centre { fill-opacity: 0.45; }
