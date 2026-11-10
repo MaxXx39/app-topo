@@ -13395,3 +13395,29 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .tuile-appli .bouton-liste-tuile svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
 .tuile-appli .coche-favori { left: 5px; right: auto; }
 body.mode-telephone .tuile-appli .bouton-liste-tuile { width: 36px; height: 36px; }
+
+/* 0.196.0 (maquette B du 10.11) : « Levé en cours » : un seul cadre, liseré et fond de la couleur de l'application, qui réunit
+   l'appareil photo, le nom du levé et le « + », séparés par un trait de la même couleur. */
+.zone-levee .cadre-levee {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: stretch; overflow: hidden;
+  border: 3px solid var(--couleur-appli, #d99300); border-radius: 14px;
+  background: color-mix(in srgb, var(--couleur-appli, #d99300) 12%, #ffffff);
+}
+.zone-levee .cadre-levee .levee-bande.levee-choix { flex: 1 1 0; border: 0; border-radius: 0; background: transparent; }
+.bande-appli .cadre-levee .petit-bouton-levee {
+  flex: none; min-width: 54px; border: 0; border-radius: 0; background: transparent; color: var(--encre, #1e293b); font-size: 26px; font-weight: 900;
+}
+.bande-appli .cadre-levee .petit-bouton-levee[data-cle="photo-levee"] { color: #0284c7; border-right: 3px solid var(--couleur-appli, #d99300); }
+.bande-appli .cadre-levee .petit-bouton-levee[data-cle="nouveau-levee"] { border-left: 3px solid var(--couleur-appli, #d99300); }
+.bande-appli .cadre-levee .petit-bouton-levee svg { width: 26px; height: 26px; }
+body.mode-telephone .bande-appli .cadre-levee .petit-bouton-levee { min-width: 40px; font-size: 22px; }
+body.mode-telephone .bande-appli .cadre-levee .petit-bouton-levee svg { width: 22px; height: 22px; }
+
+/* 0.196.0 : téléphone : le cadre « Levé en cours » tient dans la bande (photo et « + » toujours visibles) */
+body.mode-telephone .bande-appli .cadre-levee .petit-bouton-levee { min-width: 34px; padding: 0 2px; font-size: 20px; }
+body.mode-telephone .bande-appli .cadre-levee .petit-bouton-levee svg { width: 20px; height: 20px; }
+body.mode-telephone .zone-levee .cadre-levee .levee-bande.levee-choix { padding: 0 40px 0 6px; min-width: 0; }
+body.mode-telephone .bande-appli .cadre-levee .fleche-levee-bande { width: 30px; height: 30px; right: 4px; font-size: 16px; }
+body.mode-telephone .bande-appli .cadre-levee .nom-levee-bande { font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+body.mode-telephone .bande-appli .cadre-levee .petit-bouton-levee { min-height: 0; height: auto; align-self: stretch; }
+body.mode-telephone .bande-appli .cadre-levee { flex: 1 1 0; min-width: 0; }

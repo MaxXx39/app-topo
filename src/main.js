@@ -566,12 +566,13 @@ function contenuBande() {
       const vrai = trouver(cleBouton);
       return `<button type="button" class="petit-bouton-levee" data-nav="action" data-cle="${cleBouton}" title="${titre}" aria-label="${titre}" ${!vrai || vrai.disabled ? 'disabled' : ''}>${contenu}</button>`;
     };
+    // 0.196.0 (maquette B du 10.11) : un seul cadre (liseré et fond de « Levé en cours ») qui réunit photo | Levé en cours | « + ».
     const bloc = levee
-      ? `<div class="levee-bande levee-choix"><span class="titre-levee-bande">${cle === 'metre' ? 'Métré' : 'Levé'} en cours</span>
+      ? `<div class="cadre-levee">
+          ${trouver('photo-levee') && aAcces('intermediaire') ? petit('photo-levee', ICONE_PHOTO_BANDE, 'Photo de tout le levé') : ''}
+          <div class="levee-bande levee-choix"><span class="titre-levee-bande">${cle === 'metre' ? 'Métré' : 'Levé'} en cours</span>
           <button type="button" class="nom-levee-bande" data-nav="action" data-cle="renommer-levee" title="Renommer">${echapper(levee.nom)} ✎</button>
           ${trouver('changer-levee') ? `<button type="button" class="fleche-levee-bande" data-nav="action" data-cle="changer-levee" title="Changer de levé" aria-label="Changer de levé" ${trouver('changer-levee').disabled ? 'disabled' : ''}>▾</button>` : ''}</div>
-        <div class="boutons-levee-bande">
-          ${trouver('photo-levee') && aAcces('intermediaire') ? petit('photo-levee', ICONE_PHOTO_BANDE, 'Photo de tout le levé') : ''}
           ${trouver('nouveau-levee') ? petit('nouveau-levee', '+', 'Nouveau levé') : ''}
         </div>`
       : '';
