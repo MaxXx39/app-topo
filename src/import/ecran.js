@@ -454,8 +454,9 @@ function blocTableauPoints(projet, etat) {
   const boutons = CATEGORIES_POINTS.filter(([cle]) => nombreParCategorie.has(cle))
     .map(([cle, titre, couleur]) => `<button type="button" class="categorie-points ${choisies.has(cle) ? 'choisie' : ''}" style="--couleur-categorie: ${couleur}" data-action="tp-categorie" data-cle="${cle}" aria-pressed="${choisies.has(cle)}">${titre} <small>${nombreParCategorie.get(cle)}</small></button>`).join('');
   const dansLaSelection = listes.filter((l) => choisies.has(l.categorie));
-  const puces = dansLaSelection.length > 1
-    ? `<div class="listes-points-choix" role="group" aria-label="Listes de points à montrer"><span class="aide">Listes :</span>${dansLaSelection.map((l) => `<button type="button" class="puce-liste-points ${etat.listesDecochees.has(l.id) ? '' : 'choisie'}" style="--couleur-liste: ${couleurDeListe.get(l.id)}; --couleur-categorie: ${couleurs.get(l.categorie)}" data-action="tp-liste" data-id="${echapper(l.id)}" aria-pressed="${!etat.listesDecochees.has(l.id)}"><i class="pastille-liste-puce"></i>${echapper(l.nom)} <small>${l.nombre}</small></button>`).join('')}</div>`
+  // 0.204.0 : les listes dans leur propre encadré titré (étiquettes pastel, sans pastille) ; les natures dans un autre.
+  const puces = dansLaSelection.length > 0
+    ? `<div class="encadre-points encadre-listes" role="group" aria-label="Listes de points à montrer"><p class="titre-encadre-points">Listes</p><div class="puces-listes">${dansLaSelection.map((l) => `<button type="button" class="puce-liste-points ${etat.listesDecochees.has(l.id) ? '' : 'choisie'}" style="--couleur-liste: ${couleurDeListe.get(l.id)}; --couleur-categorie: ${couleurs.get(l.categorie)}" data-action="tp-liste" data-id="${echapper(l.id)}" aria-pressed="${!etat.listesDecochees.has(l.id)}">${echapper(l.nom)} <small>${l.nombre}</small></button>`).join('')}</div></div>`
     : '';
   const lignes = lignesTriees(projet, etat);
   const titres = new Map(CATEGORIES_POINTS.map(([cle, titre]) => [cle, titre]));
@@ -494,7 +495,7 @@ function blocTableauPoints(projet, etat) {
     ? `<details class="gerer-listes"><summary>Gérer les listes choisies</summary>${choisies.has('controle') && (projet.pointsControle ?? []).length > 0 ? listePointsControle(projet) : ''}<div class="liste-leves">${gerables.map((l) => ligneListe(projet, l, l.direct ? natureDeLaListe(projet, l, couleursReseaux) : null, { sansTableau: true })).join('')}</div></details>`
     : '';
   return `<div class="tableau-points-projet">
-      <div class="categories-points" role="group" aria-label="Catégories de points">${boutons}</div>
+      <div class="encadre-points encadre-natures"><p class="titre-encadre-points">Natures</p><div class="categories-points" role="group" aria-label="Natures de points">${boutons}</div></div>
       ${puces}
       <div class="barre-tableau-points">
         <span class="aide">${lignes.length} point${lignes.length > 1 ? 's' : ''}</span>

@@ -12,14 +12,14 @@ import { dateDuPoint, jourDuPoint } from '../topo/date-point.js';
  */
 export const CATEGORIES_POINTS = [
   ['controle', 'Contrôle', '#b91c1c'],
-  ['libre', 'LV-Libre', '#eab308'],
-  ['stock', 'LV-Stock', '#92400e'],
-  ['terrain', 'LV-Terrain', '#16a34a'],
-  ['terrassement', 'LV-Terrassement', '#0ea5e9'],
-  ['metre', 'LV-Métré', '#f97316'],
-  ['chantier', 'LV-Chantier', '#0f766e'],
-  ['recollement', 'LV-Recollement', '#db2777'],
-  ['annotation', 'LV-Annotation', '#7c3aed'],
+  ['libre', 'Levé libre', '#eab308'],
+  ['stock', 'Levé stock', '#92400e'],
+  ['terrain', 'Levé terrain', '#16a34a'],
+  ['terrassement', 'Levé terrassement', '#0ea5e9'],
+  ['metre', 'Levé métré', '#f97316'],
+  ['chantier', 'Levé chantier', '#0f766e'],
+  ['recollement', 'Levé recollement', '#db2777'],
+  ['annotation', 'Levé annotation', '#7c3aed'],
   ['import', 'Importés', '#2563eb'],
 ];
 

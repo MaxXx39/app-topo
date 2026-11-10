@@ -27,6 +27,10 @@ describe('blocContenu', () => {
     projet.leves.push({ id: 'a', nom: 'A', direct: true, importeLe: '2026-11-01T10:00:00Z', points: [{ nom: 'P1', est: 1, nord: 2, altitude: 3, gnss: { prisLe: '2026-11-01T10:00:00Z' } }] });
     const html = blocContenu(projet, new Set(), new Set());
     expect(html).toContain('Liste de points');
+    expect(html).toContain('Natures');
+    expect(html).toContain('Listes');
+    expect(html).toContain('Levé libre');
+    expect(html).not.toContain('LV-Libre');
     expect(html).toContain('data-action="tp-categorie"');
     expect(html).toContain('data-champ="tp-jour"');
     expect(html).toContain('data-action="tp-tri"');

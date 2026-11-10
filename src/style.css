@@ -13458,8 +13458,8 @@ body.theme-sombre { --bande-a: #22313c; --bande-b: #18232b; --sep-tableau: #4b5d
 .tableau-points-grand th, .tableau-points-grand td { border-right: 1px solid var(--sep-tableau); }
 .tableau-points-grand th:last-child, .tableau-points-grand td:last-child { border-right: 0; }
 .tableau-points-grand td { border-bottom: 1px solid var(--sep-tableau); }
-.tableau-points-grand td:nth-child(odd) { background: var(--bande-a); }
-.tableau-points-grand td:nth-child(even) { background: var(--bande-b); }
+.tableau-points-grand tbody tr:nth-child(odd) td { background: var(--bande-a); }
+.tableau-points-grand tbody tr:nth-child(even) td { background: var(--bande-b); }
 .tableau-points-grand th { background: var(--entete-tableau); border-bottom: 2px solid var(--sep-tableau); }
 .tableau-points-grand th.tri { background: var(--sep-tableau); }
 .tableau-points-grand th.colonne-nom, .tableau-points-grand td.colonne-nom { box-shadow: 2px 0 0 var(--sep-tableau); }
@@ -13484,3 +13484,13 @@ body.theme-sombre { --bande-a: #22313c; --bande-b: #18232b; --sep-tableau: #4b5d
 .cadre-projet-applis .bouton-partie-projet[data-projet='surfaces'] svg { color: #16a34a; }
 .cadre-projet-applis .bouton-partie-projet[data-projet='archives'] svg { color: #64748b; }
 body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; gap: 4px; }
+
+/* 0.204.0 : deux encadrés titrés (Natures, Listes) ; étiquettes de listes en pastel, sans pastille. */
+.encadre-points { margin: 8px 0; padding: 8px 10px 10px; border: 2px solid var(--bordure, #cbd5e1); border-radius: 12px; }
+.encadre-points + .encadre-points { margin-top: 12px; }
+.titre-encadre-points { margin: 0 0 6px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gris, #64748b); }
+.puces-listes { display: flex; flex-wrap: wrap; gap: 6px; }
+.puce-liste-points .pastille-liste-puce { display: none; }
+.puce-liste-points { gap: 0; border: 2px solid color-mix(in srgb, var(--couleur-categorie, #94a3b8) 45%, var(--surface, #ffffff)); background: var(--surface, #ffffff); color: var(--gris, #64748b); font-weight: 600; }
+.puce-liste-points.choisie { background: color-mix(in srgb, var(--couleur-liste, #94a3b8) 24%, var(--surface, #ffffff)); border-color: color-mix(in srgb, var(--couleur-categorie, #94a3b8) 60%, var(--surface, #ffffff)); color: var(--encre, #0f172a); }
+.puce-liste-points small { margin-left: 6px; }
