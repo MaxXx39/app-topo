@@ -13635,3 +13635,14 @@ body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; 
   color: #b91c1c;
   font-weight: 800;
 }
+
+/* 0.210.0 : flèche + texte de l'écart sur le plan (Implanter › Ligne), collés à la ligne ; couleur de la tolérance. */
+.plan .texte-fleche-ecart {
+  font-size: 13px;
+}
+
+.plan .pointe-ecart {
+  stroke: #ffffff;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}

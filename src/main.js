@@ -3720,7 +3720,8 @@ function cotesLigne(implantationLigne) {
   if (!l || implantationLigne.message || !implanter.ligne) return null;
   const sommets = sommetsDeLaLigne();
   const trace = implanter.ligne.decalage ? ligneParallele(sommets, implanter.ligne.decalage) : sommets;
-  return { sommets: trace, abscisse: l.abscisse, longueur: l.longueur, ecart: l.ecart };
+  // 0.210.0 : fleche + classe (tolérance) pour la flèche de l'écart sur le plan ; le talus garde le texte seul.
+  return { sommets: trace, abscisse: l.abscisse, longueur: l.longueur, ecart: l.ecart, fleche: true, classe: implantationLigne.classeLaterale };
 }
 
 /**

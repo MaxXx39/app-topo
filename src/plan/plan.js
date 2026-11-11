@@ -25,6 +25,7 @@ import { traitsDeBarbules } from './barbules.js';
 import { pointALAbscisse } from '../topo/ligne-implantation.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne, formeDuNom } from '../leve/libelles.js';
 import { centrePointLeger, cheminControle, cheminForme, formeEnTrait, rayonPointLeger } from './formes.js';
+import { couleurFlecheEcart, placerFlecheEcart } from './fleche-ecart.js';
 import { ouvrirVue3d } from './vue3d.js';
 import { lignesDesPlans } from '../topo/drapage.js';
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS, surImageChargee } from './dxf-canvas.js';
@@ -970,10 +971,28 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const ny = (b.x - a.x) / l;
       groupe.append(creerElement('line', { x1: p.x - nx * 9, y1: p.y - ny * 9, x2: p.x + nx * 9, y2: p.y + ny * 9, class: 'repere-pied' }));
     }
-    // Écart de la canne, écrit sur la perpendiculaire.
+    // Écart de la canne. 0.210.0 (ligne) : une flèche collée à la ligne et son texte, juste au-dessus du trait pointillé de la
+    // perpendiculaire, couleur de la tolérance ; sur la ligne ou pour un talus : le texte posé le long de la perpendiculaire.
     if (vers) {
       const cible = ecran(vers);
-      texteLeLong(canne, cible, Math.abs(ecart) < 0.0005 ? 'sur la ligne' : m(ecart), 'cote-ecart');
+      const place = cotes.fleche && Math.abs(ecart) >= 0.0005 ? placerFlecheEcart(cible, canne) : null;
+      if (!place) {
+        texteLeLong(canne, cible, Math.abs(ecart) < 0.0005 ? 'sur la ligne' : m(ecart), 'cote-ecart');
+      } else {
+        const couleur = couleurFlecheEcart(cotes.classe);
+        const signe = place.retourne ? -1 : 1; // retourné : la flèche finit le bloc, pointe contre la ligne
+        const bloc = creerElement('g', { class: 'fleche-ecart', transform: `translate(${place.x.toFixed(1)} ${place.y.toFixed(1)}) rotate(${place.angle.toFixed(1)})` });
+        // Décalé de 12 px vers le haut (sens de lecture) pour ne pas recouvrir le trait pointillé de la perpendiculaire.
+        const interieur = creerElement('g', { transform: 'translate(0 -12)' });
+        const pointe = creerElement('polygon', { points: `0,0 ${15 * signe},-8 ${15 * signe},8`, class: 'pointe-ecart' });
+        pointe.style.fill = couleur;
+        const texte = creerElement('text', { x: 19 * signe, y: 4.5, 'text-anchor': place.retourne ? 'end' : 'start', class: 'cote-ligne texte-fleche-ecart' });
+        texte.style.fill = couleur;
+        texte.textContent = m(ecart);
+        interieur.append(pointe, texte);
+        bloc.append(interieur);
+        groupe.append(bloc);
+      }
     }
   }
 
