@@ -2003,6 +2003,24 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     dernierPlan = null;
     modifie({ recadrer: true });
   },
+  // 0.208.0 : retirer un point de la liste « Points de contrôle » depuis la page Gérer (Intermédiaire, sans code).
+  enleverPointControle: (id) => {
+    const point = projet.pointsControle.find((p) => p.id === id);
+    if (!point || !confirm(`Enlever ${point.nom} des points de contrôle ?`)) return;
+    projet.pointsControle = projet.pointsControle.filter((p) => p.id !== id);
+    projet.photosControle = (projet.photosControle ?? []).filter((ph) => ph.pointId !== id);
+    if (autocontrole.cible?.id === id) autocontrole.cible = null;
+    modifie();
+  },
+  // 0.208.0 : supprimer toute la liste « Points de contrôle » (Expert). L'historique des contrôles est gardé.
+  supprimerListeControle: () => {
+    const nombre = projet.pointsControle.length;
+    if (nombre === 0 || !confirm(`Supprimer la liste « Points de contrôle » (${nombre} points) ? L'historique des contrôles est gardé.`)) return;
+    projet.pointsControle = [];
+    projet.photosControle = [];
+    autocontrole.cible = null;
+    modifie();
+  },
   supprimerLeve: (id) => {
     const leve = projet.leves.find((l) => l.id === id);
     const levees = [...projet.surfaces, ...projet.metres, ...projet.autres, ...projet.reseaux].filter((s) => s.leveId === id);

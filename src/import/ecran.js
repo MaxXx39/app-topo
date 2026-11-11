@@ -229,6 +229,8 @@ export function creerEcranImport(conteneur, contenu, actions) {
     else if (action === 'restaurer-archive') actions.restaurerArchive(id);
     else if (action === 'supprimer-archive') actions.supprimerArchive(id);
     else if (action === 'supprimer-leve') actions.supprimerLeve(id);
+    else if (action === 'enlever-point-controle') actions.enleverPointControle(id);
+    else if (action === 'supprimer-liste-controle') actions.supprimerListeControle();
     else if (action === 'supprimer-cadastre') actions.supprimerCadastre(id);
     else if (action === 'supprimer-surface-projet') actions.supprimerSurfaceProjet(id);
     else if (action === 'voir-plan') actions.voirPlanDxf(id);
@@ -463,8 +465,13 @@ function pageGerer(projet, vue, ouverts) {
       const photosControle = (projet.photosControle ?? []).filter((photo) => controle.some((p) => p.id === photo.pointId));
       lignes.push(ligneGerer({
         cle: 'points:controle', titre: 'Points de contrôle', nature: 'Contrôle', couleur: couleurs.get('controle'), info: `${controle.length} points`, ouverts,
+        // 0.208.0 : un × par point (Intermédiaire, sans code) ; supprimer toute la liste (Expert).
         menu: `${photosDesPoints(photosControle)}
-          <div class="actions-ligne-gerer"><button type="button" class="bouton-secondaire seulement-intermediaire" data-action="exporter-liste" data-type="controle" data-id="controle">Exporter</button></div>`,
+          <div class="liste-points-gerer seulement-intermediaire">${controle.map((p) => `<div class="ligne-point-gerer"><span>${echapper(p.nom)}</span><button type="button" class="bouton-lien" data-action="enlever-point-controle" data-id="${echapper(p.id)}" aria-label="Enlever ${echapper(p.nom)}">×</button></div>`).join('')}</div>
+          <div class="actions-ligne-gerer">
+            <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="exporter-liste" data-type="controle" data-id="controle">Exporter</button>
+            <button type="button" class="bouton-lien suppression-vraie seulement-expert" data-action="supprimer-liste-controle" data-id="controle">Supprimer la liste</button>
+          </div>`,
       }));
     }
     for (const leve of projet.leves ?? []) {

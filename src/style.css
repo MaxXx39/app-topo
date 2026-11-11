@@ -13608,3 +13608,22 @@ body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; 
   vertical-align: middle;
   margin-left: 6px;
 }
+
+/* 0.208.0 : points de contrôle dans la page Gérer : un × par point. */
+.liste-points-gerer {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.ligne-point-gerer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #ffffff;
+}
