@@ -1032,6 +1032,28 @@ svg.plan {
   stroke-width: 1.8;
 }
 
+/* 0.206.0 (demande du 11.11, variante C choisie) : tous les points ont un liseré noir fin, et une légère ombre.
+   Pleines : le liseré est peint sous la couleur (paint-order), il se voit en bordure fine.
+   Vides et croix : un trait noir plus large passe sous la couleur (.forme-liseret, placé juste avant la forme). */
+.plan .points :is(circle, path):not(.forme-trait, .forme-liseret, .selection) {
+  stroke: #000000;
+  stroke-width: 1.2;
+  paint-order: stroke;
+}
+
+.plan .points .forme-liseret,
+.plan .points-controle .forme-liseret {
+  fill: none;
+  stroke: #000000;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.plan .points {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+}
+
 .plan .points .role-contour {
   color: var(--rouge);
 }
@@ -3662,11 +3684,18 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   stroke-linecap: round;
 }
 
-/* Points de contrôle (Terrain › Contrôler) : triangle rouge, nom en rouge. */
-.plan .triangle-controle {
-  fill: #dc2626;
-  stroke: #b91c1c;
-  stroke-width: 1.5;
+/* Points de contrôle (Terrain › Contrôler) : triangle vide rouge avec un x dedans, nom en rouge (0.206.0).
+   Le triangle vide pointe en haut est réservé à ces points. */
+.plan .points-controle {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+}
+
+.plan .points-controle .controle-forme {
+  fill: none;
+  stroke: #dc2626;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .plan .nom-controle {
@@ -13256,7 +13285,6 @@ body.clavier-ouvert .bandeau-annotation { bottom: 8px; }
 .titre-liste-annotation { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
 /* 0.180.0 : points d'Annotation = un rond tracé à la main (trait fin, 14 px). */
-.plan .points .forme-nuage { stroke-width: 1.6; stroke-linecap: butt; stroke-dasharray: 3.6 4; }
 
 /* 0.181.0 (demande du 09.11) : Annotation harmonisée avec Lever : plan réglable par ▲ / ▼ (même part que Lever, 30 à 70 %), une seule rangée
    sous le plan (⚙ | consigne | aide), boutons de la fiche et lignes de la liste dans le même style, trait de couleur partout. */

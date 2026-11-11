@@ -92,13 +92,14 @@ describe('annotations : nuage et exports', () => {
   const projet = projetVide();
   const { point } = ajouterAnnotation(projet, { est: 2500000, nord: 1100000, altitude: null, source: 'tablette', precision: 2.4, remarques: ['fissure', 'à revoir'] }, new Set(), jour);
 
-  it('le nuage est un rond tracé à la main, en trait fin, de 14 px environ (0.184.1)', () => {
-    const d = cheminForme('nuage', 100, 100, 5);
+  it('la forme d\'annotation est une bulle (0.206.0) : rectangle arrondi avec une encoche, en trait', () => {
+    const d = cheminForme('bulle', 100, 100, 5);
     expect(d).toMatch(/^M/);
+    expect(d).toContain('Q');
     const xs = [...d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[1]));
-    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(12);
-    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(16);
-    expect(formeEnTrait('nuage')).toBe(true);
+    // Largeur 2,8 r = 14 px pour un rayon de 5 px.
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(14, 0);
+    expect(formeEnTrait('bulle')).toBe(true);
   });
 
   it('CSV : colonnes propres, remarques séparées par « | »', () => {

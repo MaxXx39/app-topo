@@ -39,7 +39,6 @@ export function dessinerPointsCanvas(canvas, points, { rayon, largeur, hauteur, 
   ctx.clearRect(0, 0, l, h);
   if (points.length === 0) return;
   ctx.setTransform(densite, 0, 0, densite, 0, 0);
-  ctx.lineWidth = 1.8;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   for (const [cle, groupe] of grouperPoints(points)) {
@@ -53,12 +52,27 @@ export function dessinerPointsCanvas(canvas, points, { rayon, largeur, hauteur, 
       }
     }
     ctx.globalAlpha = pale === '1' ? 0.5 : 1;
+    // 0.206.0 : même rendu que sur le SVG (style.css) : liseré noir fin, et une légère ombre sous les pleins.
     if (trait === '1') {
+      // Forme vide ou croix : un liseré noir plus large passe dessous, la couleur reste par-dessus.
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 3;
+      ctx.stroke(chemin);
       ctx.strokeStyle = couleur;
+      ctx.lineWidth = 1.8;
       ctx.stroke(chemin);
     } else {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+      ctx.shadowBlur = 2;
+      ctx.shadowOffsetY = 1;
       ctx.fillStyle = couleur;
       ctx.fill(chemin);
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1.2;
+      ctx.stroke(chemin);
     }
   }
   ctx.globalAlpha = 1;
