@@ -230,6 +230,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
     else if (action === 'supprimer-archive') actions.supprimerArchive(id);
     else if (action === 'supprimer-leve') actions.supprimerLeve(id);
     else if (action === 'enlever-point-controle') actions.enleverPointControle(id);
+    else if (action === 'tp-supprimer-point') actions.supprimerPointListe(id, bouton.dataset.nom);
     else if (action === 'supprimer-liste-controle') actions.supprimerListeControle();
     else if (action === 'supprimer-cadastre') actions.supprimerCadastre(id);
     else if (action === 'supprimer-surface-projet') actions.supprimerSurfaceProjet(id);
@@ -618,7 +619,7 @@ function blocTableauPoints(projet, etat) {
     ? `<span class="titre-colonne-organiser">${titreDe.get(cle)}</span>${fleches(cle)}`
     : `<button type="button" class="bouton-lien" data-action="tp-tri" data-col="${cle}">${titreDe.get(cle)}${etat.colonne === cle ? (etat.asc ? ' ▴' : ' ▾') : ''}</button>`}</th>`).join('');
   const cellules = (l) => ({
-    nom: `<td class="colonne-nom" style="--couleur-categorie: ${couleurs.get(l.categorie)}"><span class="pastille-categorie" style="background: ${couleurDeListe.get(l.listeId) ?? couleurs.get(l.categorie)}" title="${echapper(titres.get(l.categorie) ?? '')}"></span>${echapper(l.nom)}</td>`,
+    nom: `<td class="colonne-nom" style="--couleur-categorie: ${couleurs.get(l.categorie)}"><span class="pastille-categorie" style="background: ${couleurDeListe.get(l.listeId) ?? couleurs.get(l.categorie)}" title="${echapper(titres.get(l.categorie) ?? '')}"></span>${echapper(l.nom)}<button type="button" class="bouton-lien supprimer-point-tableau seulement-intermediaire" data-action="tp-supprimer-point" data-id="${echapper(l.listeId)}" data-nom="${echapper(l.nom)}" aria-label="Supprimer le point ${echapper(l.nom)}" title="Supprimer ce point">×</button></td>`,
     libelle: `<td>${echapper(l.libelle)}</td>`,
     est: `<td class="n">${n(l.est)}</td>`,
     nord: `<td class="n">${n(l.nord)}</td>`,

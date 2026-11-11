@@ -275,26 +275,33 @@ export function mesuresOuvrage(ouvrage) {
   return { profondeur: profondeurChambre(valeurs), radier: radierChambre(valeurs) };
 }
 
+/**
+ * Enlève un point (par son nom) du recollement : de ses conduites, et de son ouvrage (0.209.0 : n'importe quel point,
+ * plus seulement le dernier). Un ouvrage sans point disparaît ; une chambre rectangulaire redevient incomplète.
+ */
+export function retirerPointReseau(recollement, nom) {
+  for (const conduite of recollement.conduites) conduite.noeuds = conduite.noeuds.filter((n) => n.point !== nom);
+  const ouvrage = recollement.ouvrages.find((o) => o.points.includes(nom));
+  if (!ouvrage) return;
+  ouvrage.points = ouvrage.points.filter((n) => n !== nom);
+  if (ouvrage.points.length === 0) {
+    recollement.ouvrages = recollement.ouvrages.filter((o) => o !== ouvrage);
+    for (const conduite of recollement.conduites) conduite.noeuds = conduite.noeuds.filter((n) => n.ouvrage !== ouvrage.id);
+    if (recollement.enCours.ouvrage === ouvrage.id) recollement.enCours.ouvrage = null;
+  } else if (ouvrage.forme === 'rect') {
+    // Chambre rectangulaire redevenue incomplète : on reprend ses coins.
+    for (const conduite of recollement.conduites) conduite.noeuds = conduite.noeuds.filter((n) => n.ouvrage !== ouvrage.id);
+    Object.assign(ouvrage, { centre: null, coins: undefined, tampon: null });
+    recollement.enCours.ouvrage = ouvrage.id;
+  }
+}
+
 /** Enlève le dernier point levé du recollement (et de sa conduite ou de son ouvrage). Renvoie le point ou null. */
 export function annulerDernierPointReseau(recollement, leve) {
   const point = leve.points.at(-1);
   if (!point) return null;
   leve.points.pop();
-  for (const conduite of recollement.conduites) conduite.noeuds = conduite.noeuds.filter((n) => n.point !== point.nom);
-  const ouvrage = recollement.ouvrages.find((o) => o.points.includes(point.nom));
-  if (ouvrage) {
-    ouvrage.points = ouvrage.points.filter((n) => n !== point.nom);
-    if (ouvrage.points.length === 0) {
-      recollement.ouvrages = recollement.ouvrages.filter((o) => o !== ouvrage);
-      for (const conduite of recollement.conduites) conduite.noeuds = conduite.noeuds.filter((n) => n.ouvrage !== ouvrage.id);
-      if (recollement.enCours.ouvrage === ouvrage.id) recollement.enCours.ouvrage = null;
-    } else if (ouvrage.forme === 'rect') {
-      // Chambre rectangulaire redevenue incomplète : on reprend ses coins.
-      for (const conduite of recollement.conduites) conduite.noeuds = conduite.noeuds.filter((n) => n.ouvrage !== ouvrage.id);
-      Object.assign(ouvrage, { centre: null, coins: undefined, tampon: null });
-      recollement.enCours.ouvrage = ouvrage.id;
-    }
-  }
+  retirerPointReseau(recollement, point.nom);
   return point;
 }
 

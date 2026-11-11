@@ -13627,3 +13627,11 @@ body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; 
   border-radius: 8px;
   background: #ffffff;
 }
+
+/* 0.209.0 : × pour supprimer un point seul, dans la colonne du nom du tableau de points. */
+.supprimer-point-tableau {
+  margin-left: 6px;
+  padding: 0 6px;
+  color: #b91c1c;
+  font-weight: 800;
+}
