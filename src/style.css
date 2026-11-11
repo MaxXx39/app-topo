@@ -1035,10 +1035,65 @@ svg.plan {
 /* 0.206.0 (demande du 11.11, variante C choisie) : tous les points ont un liseré noir fin, et une légère ombre.
    Pleines : le liseré est peint sous la couleur (paint-order), il se voit en bordure fine.
    Vides et croix : un trait noir plus large passe sous la couleur (.forme-liseret, placé juste avant la forme). */
-.plan .points :is(circle, path):not(.forme-trait, .forme-liseret, .selection) {
+.plan .points :is(circle, path):not(.forme-trait, .forme-liseret, .selection, .point-leger) {
   stroke: #000000;
   stroke-width: 1.2;
   paint-order: stroke;
+}
+
+/* 0.207.0 : petit point léger au centre des formes vides, de la couleur de la forme, sans liseré. */
+.plan .points .point-leger {
+  fill: currentColor;
+  stroke: none;
+}
+
+.plan .points-controle .controle-point {
+  fill: #dc2626;
+  stroke: none;
+}
+
+/* 0.207.0 : aperçu d'une forme dans les listes de choix (libellés, Lever, levé chantier) : même style que le plan. */
+.apercu-forme {
+  display: inline-block;
+  width: 1.4em;
+  height: 1.4em;
+  vertical-align: -0.25em;
+}
+
+.apercu-forme svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+}
+
+.apercu-forme .apercu-plein {
+  fill: currentColor;
+  stroke: #000000;
+  stroke-width: 1;
+  paint-order: stroke;
+}
+
+.apercu-forme .apercu-liseret {
+  fill: none;
+  stroke: #000000;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.apercu-forme .apercu-vide {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.apercu-forme .apercu-point {
+  fill: currentColor;
+  stroke: none;
 }
 
 .plan .points .forme-liseret,
@@ -13544,3 +13599,10 @@ body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; 
 .champ-gerer { display: flex; align-items: center; gap: 8px; font-weight: 700; }
 .champ-gerer input[type='text'], .champ-gerer .champ-prefixe { flex: 1 1 auto; min-width: 0; }
 .actions-ligne-gerer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* 0.207.0 : aperçu à côté d'une liste de choix de forme (libellés, levé chantier). */
+.apercu-ligne {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 6px;
+}

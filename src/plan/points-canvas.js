@@ -44,11 +44,17 @@ export function dessinerPointsCanvas(canvas, points, { rayon, largeur, hauteur, 
   for (const [cle, groupe] of grouperPoints(points)) {
     const [couleur, trait, pale] = cle.split('|');
     const chemin = new Path2D();
+    // 0.207.0 : petit point léger au centre des formes vides (même couleur).
+    const pointsLegers = new Path2D();
     for (const p of groupe) {
       if (p.trace) chemin.addPath(new Path2D(p.trace));
       else {
         chemin.moveTo(p.x + rayon, p.y);
         chemin.arc(p.x, p.y, rayon, 0, Math.PI * 2);
+      }
+      if (p.centre) {
+        pointsLegers.moveTo(p.centre.x + p.centre.r, p.centre.y);
+        pointsLegers.arc(p.centre.x, p.centre.y, p.centre.r, 0, Math.PI * 2);
       }
     }
     ctx.globalAlpha = pale === '1' ? 0.5 : 1;
@@ -61,6 +67,8 @@ export function dessinerPointsCanvas(canvas, points, { rayon, largeur, hauteur, 
       ctx.strokeStyle = couleur;
       ctx.lineWidth = 1.8;
       ctx.stroke(chemin);
+      ctx.fillStyle = couleur;
+      ctx.fill(pointsLegers);
     } else {
       ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
       ctx.shadowBlur = 2;

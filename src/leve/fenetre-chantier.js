@@ -4,7 +4,7 @@
 import { echapper } from '../outils/echapper.js';
 import { lireLibellesChantier, lireNaturesChantier, enregistrerBibliothequeChantier } from './libelles-chantier.js';
 import { LIBELLES_CHANTIER_DEPART, NATURES_RESEAU_DEPART, NATURES_BORDURE_DEPART, couleurDeNature } from '../topo/chantier.js';
-import { FORMES } from '../plan/formes.js';
+import { FORMES, symboleDeForme } from '../plan/formes.js';
 
 const MODES = [['', 'aucun'], ['dessus,fe', 'Dessus / Fil d\'eau'], ['tampon,fe', 'Tampon / Fil d\'eau']];
 const CHAMPS = [['diametre', 'Ø'], ['gaine', 'Gaine'], ['nombre', 'Nb'], ['profondeur', 'Prof.'], ['materiau', 'Matér.'], ['remarque', 'Rem.']];
@@ -51,7 +51,7 @@ export function ouvrirFenetreChantier(apres) {
           <input data-f="nom" value="${echapper(l.nom)}" aria-label="Nom" placeholder="Nom" />
           <input data-f="court" value="${echapper(l.court ?? l.nom)}" maxlength="10" aria-label="Nom court (rangée de Lever)" placeholder="Nom court" />
           <input data-f="abreviation" value="${echapper(l.abreviation)}" maxlength="6" aria-label="Abréviation (début du nom des points)" placeholder="Abrév." autocapitalize="characters" />
-          <select data-f="forme" aria-label="Forme du point">${FORMES.map(([c, s]) => `<option value="${c}" ${c === l.forme ? 'selected' : ''}>${s}</option>`).join('')}</select>
+          <select data-f="forme" aria-label="Forme du point">${FORMES.map(([c, , nom]) => `<option value="${c}" ${c === l.forme ? 'selected' : ''}>${nom}</option>`).join('')}</select><span class="apercu-ligne" data-apercu>${symboleDeForme(l.forme)}</span>
           <select data-f="type" aria-label="Natures proposées"><option value="reseau" ${l.reseau ? 'selected' : ''}>Réseaux</option><option value="bordure" ${l.reseau ? '' : 'selected'}>Bordures</option></select>
           <label class="coche"><input data-f="ouvrage" type="checkbox" ${l.ouvrage ? 'checked' : ''} /> Ouvrage (1 point ou 3 coins)</label>
           <select data-f="modes" aria-label="Altitude levée">${MODES.map(([c, n]) => `<option value="${c}" ${c === l.modes.join(',') ? 'selected' : ''}>${n}</option>`).join('')}</select>
@@ -71,6 +71,12 @@ export function ouvrirFenetreChantier(apres) {
         <button type="button" class="bouton bouton-enregistrer" data-action="enregistrer">Enregistrer</button>
       </div>`;
   }
+
+  // 0.207.0 : l'aperçu de la forme suit la liste (même style que le plan).
+  fenetre.addEventListener('change', (evenement) => {
+    if (evenement.target.dataset.f !== 'forme') return;
+    evenement.target.parentElement.querySelector('[data-apercu]').innerHTML = symboleDeForme(evenement.target.value);
+  });
 
   fenetre.addEventListener('click', (evenement) => {
     const bouton = evenement.target.closest('button[data-action]');

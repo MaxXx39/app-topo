@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cheminControle, cheminForme, formeEnTrait, FORMES } from '../src/plan/formes.js';
+import { apercuForme, centrePointLeger, cheminControle, cheminForme, formeEnTrait, formeVide, FORMES, rayonPointLeger, symboleDeForme } from '../src/plan/formes.js';
 
 describe('formes des points (0.97.0)', () => {
   it('donne un tracé pour chaque forme, sauf le rond', () => {
@@ -37,13 +37,35 @@ describe('formes 0.206.0 : triangles vides réservés, bulle, point de contrôle
     expect(formeEnTrait('bulle')).toBe(true);
   });
 
-  it('le point de contrôle : triangle vide pointe en haut, avec un x dedans, de la taille r', () => {
-    const { triangle, croix } = cheminControle(0, 0, 4);
+  it('le point de contrôle : triangle vide pointe en haut, avec un point léger au centre (0.207.0, sans x)', () => {
+    const { triangle, point, rayonPoint } = cheminControle(0, 0, 4);
     // Pointe en haut : le sommet est à y = -1,2 r, la base à y = +0,8 r.
     expect(triangle).toBe(cheminForme('triangle', 0, 0, 4));
     expect(triangle).toContain('M0.0 -4.8');
-    // Le x est dans le triangle, plus petit (0,45 r), centré un peu plus bas (y + 0,2 r).
-    expect(croix).toMatch(/^M/);
-    expect(croix).toContain('M-1.8 -1.0');
+    // Le point léger est au centre du triangle, un peu plus bas que le centre du cadre.
+    expect(point.x).toBe(0);
+    expect(point.y).toBeCloseTo(0.532, 3);
+    expect(rayonPoint).toBe(rayonPointLeger(4));
+  });
+
+  it('point léger : seulement dans les formes vides, 30 % du rayon (1,2 px au moins)', () => {
+    expect(formeVide('carre-vide')).toBe(true);
+    expect(formeVide('rond-vide')).toBe(true);
+    expect(formeVide('bulle')).toBe(true);
+    expect(formeVide('carre')).toBe(false);
+    expect(formeVide('croix')).toBe(false);
+    expect(centrePointLeger('carre', 10, 10, 4)).toBeNull();
+    expect(centrePointLeger('carre-vide', 10, 10, 4)).toEqual({ x: 10, y: 10 });
+    expect(centrePointLeger('bulle', 10, 10, 5)).toEqual({ x: 10, y: 9 });
+    expect(rayonPointLeger(4)).toBeCloseTo(1.2, 5);
+    expect(rayonPointLeger(10)).toBeCloseTo(3, 5);
+  });
+
+  it('les listes de choix ont un nom en clair, et l\'aperçu dessiné suit le même style', () => {
+    for (const [, , nom] of FORMES) expect(nom).toBeTruthy();
+    expect(symboleDeForme('carre-vide')).toBe(apercuForme('carre-vide'));
+    expect(apercuForme('carre-vide')).toContain('apercu-point');
+    expect(apercuForme('carre')).not.toContain('apercu-point');
+    expect(apercuForme('croix')).not.toContain('apercu-point');
   });
 });

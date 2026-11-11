@@ -5,24 +5,41 @@
 // le triangle vide pointe en bas n'est plus proposé. Les anciens libellés qui les gardent les montrent encore.
 // Annotation : une bulle (rectangle à bord arrondi avec une encoche), forme « bulle ».
 
-// [clé, symbole] dans l'ordre de la liste de choix (le symbole est montré à la place du nom).
+// [clé, symbole, nom] dans l'ordre de la liste de choix. 0.207.0 : la liste montre le nom, et un aperçu
+// dessiné (même style que le plan) s'affiche à côté ; le symbole texte ne sert plus.
 export const FORMES = [
-  ['', '●'],
-  ['rond-vide', '○'],
-  ['carre', '■'],
-  ['carre-vide', '□'],
-  ['triangle', '▲'],
-  ['triangle-bas', '▼'],
-  ['losange', '◆'],
-  ['losange-vide', '◇'],
-  ['croix', '✚'],
-  ['croix-45', '✖'],
-  ['etoile', '★'],
+  ['', '●', 'Rond plein'],
+  ['rond-vide', '○', 'Rond vide'],
+  ['carre', '■', 'Carré plein'],
+  ['carre-vide', '□', 'Carré vide'],
+  ['triangle', '▲', 'Triangle pointe en haut'],
+  ['triangle-bas', '▼', 'Triangle pointe en bas'],
+  ['losange', '◆', 'Losange plein'],
+  ['losange-vide', '◇', 'Losange vide'],
+  ['croix', '✚', 'Croix'],
+  ['croix-45', '✖', 'Croix tournée'],
+  ['etoile', '★', 'Étoile'],
 ];
 
 /** Vrai si la forme se dessine en trait seulement (vide, croix, bulle). */
 export function formeEnTrait(forme) {
   return /-vide$/.test(forme ?? '') || forme === 'croix' || forme === 'croix-45' || forme === 'bulle';
+}
+
+/** Vrai pour une forme vide (contour seul, sans croix) : elle reçoit un petit point léger au centre (0.207.0). */
+export function formeVide(forme) {
+  return /-vide$/.test(forme ?? '') || forme === 'bulle';
+}
+
+/** Rayon du petit point léger au centre d'une forme vide : 30 % de r, 1,2 px au moins. */
+export function rayonPointLeger(r) {
+  return Math.max(1.2, r * 0.3);
+}
+
+/** Centre du point léger d'une forme vide en (x, y), ou null si la forme n'est pas vide. La bulle : au-dessus du milieu. */
+export function centrePointLeger(forme, x, y, r) {
+  if (!formeVide(forme)) return null;
+  return forme === 'bulle' ? { x, y: y - 0.2 * r } : { x, y };
 }
 
 /**
@@ -73,18 +90,43 @@ export function cheminForme(forme, x, y, r) {
 }
 
 /**
- * Point de contrôle (0.206.0) : triangle vide pointe en haut, avec un petit x dedans, de même taille r que les
- * autres formes. Renvoie les deux tracés : { triangle, croix } (à dessiner en trait, couleur du contrôle).
+ * Point de contrôle (0.207.0) : triangle vide pointe en haut, avec un petit point léger au centre du triangle
+ * (plus de x). Le contrôle est 1,5 fois plus gros que les autres formes : r est déjà la taille voulue.
+ * Renvoie { triangle (tracé en trait), point ({x, y}), rayonPoint (rayon du point léger) }.
  */
 export function cheminControle(x, y, r) {
   return {
     triangle: cheminForme('triangle', x, y, r),
-    croix: cheminForme('croix-45', x, y + 0.2 * r, 0.45 * r),
+    point: { x, y: y + 0.133 * r }, // centre du triangle (à peu près le centre de gravité)
+    rayonPoint: rayonPointLeger(r),
   };
 }
 
-/** Symbole (●, ▲, ★…) d'une forme, pour les listes de choix. */
+/**
+ * Aperçu dessiné d'une forme (0.207.0), même style que le plan : liseré noir, ombre légère, point léger dans
+ * les formes vides. Prend la couleur du texte (currentColor) : à mettre dans une balise qui a la couleur voulue.
+ */
+export function apercuForme(forme) {
+  const r = 6;
+  const trace = cheminForme(forme ?? '', 12, 12, r);
+  const vide = formeEnTrait(forme);
+  let corps;
+  if (trace === null) {
+    // Rond : cercle (plein, ou vide avec liseré).
+    corps = vide
+      ? `<circle cx="12" cy="12" r="${r}" class="apercu-liseret" /><circle cx="12" cy="12" r="${r}" class="apercu-vide" />`
+      : `<circle cx="12" cy="12" r="${r}" class="apercu-plein" />`;
+  } else {
+    corps = vide
+      ? `<path d="${trace}" class="apercu-liseret" /><path d="${trace}" class="apercu-vide" />`
+      : `<path d="${trace}" class="apercu-plein" />`;
+  }
+  const centre = centrePointLeger(forme ?? '', 12, 12, r);
+  if (centre) corps += `<circle cx="${centre.x}" cy="${centre.y}" r="${rayonPointLeger(r)}" class="apercu-point" />`;
+  return `<span class="apercu-forme" aria-hidden="true"><svg viewBox="0 0 24 24">${corps}</svg></span>`;
+}
+
+/** Aperçu d'une forme pour les listes de choix et les boutons (0.207.0 : remplace le symbole texte). */
 export function symboleDeForme(forme) {
-  // U+FE0E : demande le dessin « texte » (qui prend la couleur), pas l'emoji de couleur fixe (tablettes Android).
-  return `${(FORMES.find(([cle]) => cle === (forme ?? '')) ?? FORMES[0])[1]}\uFE0E`;
+  return apercuForme(forme ?? '');
 }
