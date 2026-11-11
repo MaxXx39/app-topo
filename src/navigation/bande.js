@@ -34,7 +34,7 @@ const svg = (trace) => `<svg viewBox="0 0 24 24" aria-hidden="true">${trace}</sv
  * - sousApplisDe(cle) : [[cle, titre]] écrites en petit sur la tuile (toucher = ouvrir dessus) ;
  * - reglages(), fermerAppli (ou null : pas de bouton) : pied de la page Applications ; avantPage() : juste
  *   avant d'ouvrir la page (fermer la page des réglages) ;
- * - partieProjet('import' | 'export' | 'contenu') : page Projet ouverte sur cette partie ; importPermis() ;
+ * - partieProjet('import' | 'export' | 'points' | 'plans' | 'surfaces' | 'archives') : page Projet ouverte sur cette partie ; importPermis() ;
  * - choisir(champ, valeur) : liste ou champ de la zone du milieu changé (data-nav-champ) ;
  * - agir(cle) : bouton de la zone du milieu touché (data-nav="action", ex. « prendre » = Enreg. Pts) ;
  * - message(texte) : message court à l'écran ; vibrer() (facultatif).
@@ -295,11 +295,20 @@ export function creerNavigation(nav, actions) {
       ? '<button type="button" class="bouton-bandeau-projet nouveau" data-projet="nouveau">+ Nouveau</button>'
       : '';
     const partie = (cle, titre, icone) => `<button type="button" class="bouton-partie-projet" data-projet="${cle}">${svg(icone)}${titre}</button>`;
-    const parties = [
-      actions.importPermis?.() ? partie('import', 'Import', '<path d="M12 15V3M7 10l5 5 5-5M4 21h16" />') : '',
+    // 0.197.0 / 0.201.0 : moitié gauche = Import | Exporter côte à côte ; moitié droite = les pages du contenu deux par deux
+    // (Liste de points, Plans, Surfaces importées en Expert, Archives dès Intermédiaire).
+    const expert = actions.importPermis?.();
+    const gauche = [
+      expert ? partie('import', 'Import', '<path d="M12 15V3M7 10l5 5 5-5M4 21h16" />') : '',
       partie('export', 'Exporter', '<path d="M12 3v12M7 8l5-5 5 5M4 21h16" />'),
-      partie('contenu', 'Contenu du projet', '<circle cx="6" cy="6" r="1.6" /><circle cx="18" cy="6" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="6" cy="18" r="1.6" /><circle cx="18" cy="18" r="1.6" />'),
     ].join('');
+    const droite = [
+      partie('points', 'Liste de points', '<path d="M8 6h13M8 12h13M8 18h13" /><circle cx="3.5" cy="6" r="1.2" /><circle cx="3.5" cy="12" r="1.2" /><circle cx="3.5" cy="18" r="1.2" />'),
+      partie('plans', 'Plans', '<path d="M3 21 21 3M3 9l6-6M15 21l6-6M3 15h6v6" />'),
+      expert ? partie('surfaces', 'Surfaces importées', '<path d="M3 17 9 7l5 6 3-4 4 8z" /><path d="M3 17h18" />') : '',
+      `<button type="button" class="bouton-partie-projet seulement-intermediaire" data-projet="archives">${svg('<path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4" />')}Archives</button>`,
+    ].join('');
+    const parties = `<div class="moitie-gauche-projet">${gauche}</div><div class="grille-parties-projet">${droite}</div>`;
     // 0.159.0 : tout ce qui touche au projet dans un seul encadré ; chaque bouton ouvre sa page.
     page.innerHTML = `
       <div class="cadre-projet-applis">

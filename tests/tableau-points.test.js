@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { categorieDeListe, listesDuTableau, lignesDuTableau, trierLignes, csvDuTableau } from '../src/import/tableau-points.js';
+import { ordreColonnes, deplacerColonne, categorieDeListe, listesDuTableau, lignesDuTableau, trierLignes, csvDuTableau } from '../src/import/tableau-points.js';
 
 function projetExemple() {
   return {
@@ -26,20 +26,38 @@ describe('tableau des points (0.191.0)', () => {
   it('range chaque liste dans sa catégorie', () => {
     const p = projetExemple();
     const cat = (id) => categorieDeListe(p, p.leves.find((l) => l.id === id));
-    expect([cat('l1'), cat('i1'), cat('a1'), cat('h1')]).toEqual(['leve', 'import', 'annotation', 'chantier']);
+    expect([cat('l1'), cat('i1'), cat('a1'), cat('h1')]).toEqual(['libre', 'import', 'annotation', 'chantier']);
     expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'l1', 'l2', 'i1', 'a1', 'h1']);
+  });
+
+  it('0.197.0 : un levé est rangé par sa nature ; le cadastre n\'est pas dans le tableau', () => {
+    const p = projetExemple();
+    p.leves.push(
+      { id: 's1', nom: 'LV-Stock 1', direct: true, points: [{ nom: 'S-1', est: 1, nord: 1, altitude: 1 }] },
+      { id: 't1', nom: 'LV-Terrain 1', direct: true, points: [{ nom: 'T-1', est: 1, nord: 1, altitude: 1 }] },
+      { id: 'm1', nom: 'LV-Métré 1', direct: true, points: [{ nom: 'M-1', est: 1, nord: 1, altitude: 1 }] },
+      { id: 'r1', nom: 'LV-EU 1', direct: true, points: [{ nom: 'R-1', est: 1, nord: 1, altitude: 1 }] },
+      { id: 'k1', nom: 'Cadastre', cadastre: true, direct: true, points: [{ nom: 'K-1', est: 1, nord: 1, altitude: 1 }] },
+    );
+    p.surfaces.push({ id: 'os', nature: 'stock', leveId: 's1' }, { id: 'ot', nature: 'terrain', leveId: 't1' });
+    p.metres.push({ id: 'om', nature: 'metre', leveId: 'm1' });
+    p.reseaux.push({ id: 'or', nature: 'reseau', reseau: 'EU', leveId: 'r1' });
+    const cat = (id) => categorieDeListe(p, p.leves.find((l) => l.id === id));
+    expect([cat('s1'), cat('t1'), cat('m1'), cat('r1'), cat('k1')]).toEqual(['stock', 'terrain', 'metre', 'recollement', null]);
+    expect(listesDuTableau(p).some((l) => l.id === 'k1')).toBe(false);
+    expect(lignesDuTableau(p, { categories: new Set(['stock', 'terrain', 'metre', 'recollement']) }).map((l) => l.nom).sort()).toEqual(['M-1', 'R-1', 'S-1', 'T-1']);
   });
 
   it('plusieurs catégories, et on peut décocher une liste', () => {
     const p = projetExemple();
-    expect(lignesDuTableau(p, { categories: new Set(['leve']) }).map((l) => l.nom).sort()).toEqual(['P-2', 'P-3', 'P-HT-1']);
-    expect(lignesDuTableau(p, { categories: new Set(['leve', 'import']), listesDecochees: new Set(['l2']) }).map((l) => l.nom).sort()).toEqual(['IMP-1', 'P-2', 'P-HT-1']);
+    expect(lignesDuTableau(p, { categories: new Set(['libre']) }).map((l) => l.nom).sort()).toEqual(['P-2', 'P-3', 'P-HT-1']);
+    expect(lignesDuTableau(p, { categories: new Set(['libre', 'import']), listesDecochees: new Set(['l2']) }).map((l) => l.nom).sort()).toEqual(['IMP-1', 'P-2', 'P-HT-1']);
     expect(lignesDuTableau(p, { categories: new Set(['controle']) })[0]).toMatchObject({ nom: 'CTRL-1', photos: 1, photoId: 'phc' });
   });
 
   it('libellé, précision, tablette, remarque, photo', () => {
     const p = projetExemple();
-    const l = Object.fromEntries(lignesDuTableau(p, { categories: new Set(['leve', 'annotation', 'chantier']) }).map((x) => [x.nom, x]));
+    const l = Object.fromEntries(lignesDuTableau(p, { categories: new Set(['libre', 'annotation', 'chantier']) }).map((x) => [x.nom, x]));
     expect(l['P-HT-1']).toMatchObject({ libelle: 'HT', precision: '0.012 / 0.020', tablette: '9533' });
     expect(l['P-2']).toMatchObject({ tablette: '9534', date: '2026-11-10T09:00:00' }); // point tapé : date de création
     expect(l['Annot-1']).toMatchObject({ remarque: 'fissure | à revoir', photos: 1, tablette: '9533' });
@@ -49,13 +67,13 @@ describe('tableau des points (0.191.0)', () => {
 
   it('jour choisi : seuls les points datés de ce jour', () => {
     const p = projetExemple();
-    const noms = lignesDuTableau(p, { categories: new Set(['leve', 'import']), jour: '2026-11-09' }).map((l) => l.nom);
+    const noms = lignesDuTableau(p, { categories: new Set(['libre', 'import']), jour: '2026-11-09' }).map((l) => l.nom);
     expect(noms).toEqual(['P-HT-1']);
   });
 
   it('tri par colonne : les valeurs vides restent à la fin', () => {
     const p = projetExemple();
-    const lignes = lignesDuTableau(p, { categories: new Set(['leve']) });
+    const lignes = lignesDuTableau(p, { categories: new Set(['libre']) });
     expect(trierLignes(lignes, 'altitude', true).map((l) => l.nom)).toEqual(['P-HT-1', 'P-3', 'P-2']);
     expect(trierLignes(lignes, 'altitude', false).map((l) => l.nom)).toEqual(['P-3', 'P-HT-1', 'P-2']);
     expect(trierLignes(lignes, 'date', false).map((l) => l.nom)).toEqual(['P-2', 'P-HT-1', 'P-3']);
@@ -64,7 +82,7 @@ describe('tableau des points (0.191.0)', () => {
   it('CSV : titres, 3 décimales, guillemets', () => {
     const p = projetExemple();
     p.leves[0].points[0].nom = 'P;1';
-    const csv = csvDuTableau(trierLignes(lignesDuTableau(p, { categories: new Set(['leve']) }), 'nom', true));
+    const csv = csvDuTableau(trierLignes(lignesDuTableau(p, { categories: new Set(['libre']) }), 'nom', true));
     const [titres, ...lignes] = csv.trim().split('\r\n');
     expect(titres).toBe('Nom;Libellé;E;N;H;Préc. H / V;Date;Tablette;Remarque;Photo;Liste;Catégorie');
     expect(lignes.some((l) => l.startsWith('"P;1";'))).toBe(true);
@@ -82,5 +100,28 @@ describe('liste de chaque point (0.192.0)', () => {
     const carte = listeDesPoints(projet, listes);
     expect(carte.get(p1)).toBe('b');
     expect(carte.get(p2)).toBe('b');
+  });
+});
+
+describe('ordre des colonnes (0.198.0)', () => {
+  it('« Nom » reste à gauche, les colonnes oubliées ou inconnues sont rangées', () => {
+    expect(ordreColonnes([])[0]).toBe('nom');
+    expect(ordreColonnes(['photos', 'inconnue', 'photos', 'nom', 'est']).slice(0, 3)).toEqual(['nom', 'photos', 'est']);
+    expect(ordreColonnes(['photos']).length).toBe(11);
+    expect(ordreColonnes(null)[0]).toBe('nom');
+  });
+
+  it('déplacer une colonne : gauche, droite, tout à gauche ; Nom ne bouge pas', () => {
+    const depart = ordreColonnes([]);
+    expect(deplacerColonne(depart, 'photos', 'premier').slice(0, 2)).toEqual(['nom', 'photos']);
+    expect(deplacerColonne(depart, 'libelle', 1).slice(0, 3)).toEqual(['nom', 'est', 'libelle']);
+    expect(deplacerColonne(depart, 'libelle', -1)).toEqual(depart); // déjà la première après le nom
+    expect(deplacerColonne(depart, 'liste', 1)).toEqual(depart); // déjà la dernière
+    expect(deplacerColonne(depart, 'nom', 'premier')).toEqual(depart);
+  });
+
+  it('l\'export CSV garde toujours l\'ordre de départ', () => {
+    const csv = csvDuTableau([]);
+    expect(csv.split('\r\n')[0]).toBe('Nom;Libellé;E;N;H;Préc. H / V;Date;Tablette;Remarque;Photo;Liste;Catégorie');
   });
 });

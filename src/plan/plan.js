@@ -67,6 +67,8 @@ const CALQUES_DEPART = {
   fondSatellite: false, // 0.192.0 : fond décoché au départ (photo, ou carte nationale au-delà de 3 km), transparent à 60 % quand on le coche
   cadastre: false,
   transparencePhoto: 60,
+  carteNationale: false, // 0.199.0 : carte nationale cochée à la main : posée par-dessus la photo, décochée au départ
+  transparenceCarte: 60,
   jourPoints: '', // 0.187.0 : seulement les points pris ce jour (« AAAA-MM-JJ »), vide = tous
   controleNoms: true,
   controleAltitudes: true,
@@ -183,6 +185,11 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           </div>
           <label class="reglette-transparence">Transparence <span data-vivant="transparence">60 %</span>
             <input type="range" min="0" max="100" step="5" value="60" data-calque="transparencePhoto" /></label>
+          <div class="ligne-menu-plan">
+            <label class="case"><input type="checkbox" data-calque="carteNationale" /> Carte nationale (par-dessus la photo)</label>
+          </div>
+          <label class="reglette-transparence">Transparence de la carte <span data-vivant="transparence-carte">60 %</span>
+            <input type="range" min="0" max="100" step="5" value="60" data-calque="transparenceCarte" /></label>
           <label class="case"><input type="checkbox" data-calque="cadastre" /> Cadastre</label>
         </div>
       </div>
@@ -972,6 +979,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const carteNationale = largeurVisible > LARGEUR_CARTE_NATIONALE;
     const couches = [];
     if (calques.fondSatellite) couches.push(carteNationale ? 'carte' : 'satellite');
+    // 0.199.0 : carte nationale cochée à la main : par-dessus la photo (une seule fois si la photo est déjà devenue carte au-delà de 3 km).
+    if (calques.carteNationale && !couches.includes('carte')) couches.push('carte');
     if (calques.cadastre) couches.push('cadastre');
     const noteFond = conteneur.querySelector('[data-vivant="fond-mode"]');
     if (noteFond) noteFond.textContent = carteNationale ? 'Carte nationale (plus de 3 km de large)' : 'Photo aérienne ; au-delà de 3 km de large : carte nationale.';
@@ -1000,6 +1009,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
               tuilesAffichees.set(adresse, image);
               fond.append(image);
             }
+            // La carte cochée à la main a sa propre transparence (celle de la carte qui remplace la photo suit la photo).
+            if (nom === 'carte') image.classList.toggle('carte-manuelle', Boolean(calques.carteNationale));
             // Position arrondie au pixel, un pixel de plus pour éviter les fentes entre tuiles.
             const coin = versEcran(tuile.est, tuile.nord, vue);
             const cote = tuile.cote * vue.echelle;
@@ -1024,7 +1035,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
     }
     if (voulues.size === 0) fondIndisponible = false;
-    cadre.classList.toggle('avec-photo', calques.fondSatellite);
+    cadre.classList.toggle('avec-photo', calques.fondSatellite || calques.carteNationale);
     afficherAttribution(couches);
   }
 
@@ -1854,8 +1865,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const caseAutre = conteneur.querySelector(`[data-calque="${autre}"]`);
       if (caseAutre) caseAutre.checked = false;
     }
-    if (cle === 'transparencePhoto') {
+    if (cle === 'transparencePhoto' || cle === 'transparenceCarte') {
       conteneur.querySelector('[data-vivant="transparence"]').textContent = `${calquesChoisis.transparencePhoto} %`;
+      conteneur.querySelector('[data-vivant="transparence-carte"]').textContent = `${calquesChoisis.transparenceCarte} %`;
       appliquerTransparence();
       return;
     }
@@ -1893,6 +1905,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   /** Photo aérienne plus ou moins transparente (0 % : normale, 100 % : invisible). */
   function appliquerTransparence() {
     fond.style.setProperty('--opacite-photo', String(1 - calquesChoisis.transparencePhoto / 100));
+    fond.style.setProperty('--opacite-carte', String(1 - calquesChoisis.transparenceCarte / 100));
   }
   appliquerTransparence(); // transparence de départ (60 %)
   // Vue 3D (0.99.0 ; Intermédiaire depuis 0.143.0) : les triangles des levés et surfaces montrés sur le plan.

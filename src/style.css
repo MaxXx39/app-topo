@@ -13421,3 +13421,98 @@ body.mode-telephone .bande-appli .cadre-levee .fleche-levee-bande { width: 30px;
 body.mode-telephone .bande-appli .cadre-levee .nom-levee-bande { font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 body.mode-telephone .bande-appli .cadre-levee .petit-bouton-levee { min-height: 0; height: auto; align-self: stretch; }
 body.mode-telephone .bande-appli .cadre-levee { flex: 1 1 0; min-width: 0; }
+
+/* 0.201.0 : encadré du projet coupé en deux : à gauche Import | Exporter côte à côte (hauts), à droite les pages du contenu deux par deux. */
+.cadre-projet-applis .parties-projet-applis { flex-direction: row; align-items: stretch; gap: 8px; }
+.moitie-gauche-projet { flex: 1 1 0; min-width: 0; display: flex; gap: 8px; }
+.grille-parties-projet { flex: 1 1 0; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.moitie-gauche-projet .bouton-partie-projet { flex: 1 1 0; flex-direction: column; gap: 6px; font-size: 14px; }
+.moitie-gauche-projet .bouton-partie-projet svg { width: 28px; height: 28px; }
+.grille-parties-projet .bouton-partie-projet { min-height: 44px; flex-direction: column; gap: 2px; font-size: 11.5px; line-height: 1.1; text-align: center; padding: 2px 4px; }
+.grille-parties-projet .bouton-partie-projet svg { width: 20px; height: 20px; }
+body.mode-telephone .cadre-projet-applis .parties-projet-applis, body.mode-telephone .moitie-gauche-projet, body.mode-telephone .grille-parties-projet { gap: 5px; }
+body.mode-telephone .moitie-gauche-projet .bouton-partie-projet { font-size: 11px; gap: 3px; }
+body.mode-telephone .moitie-gauche-projet .bouton-partie-projet svg { width: 20px; height: 20px; }
+body.mode-telephone .grille-parties-projet .bouton-partie-projet { min-height: 34px; font-size: 9.5px; gap: 1px; }
+body.mode-telephone .grille-parties-projet .bouton-partie-projet svg { width: 14px; height: 14px; }
+body[data-partie-projet='points'] .panneau-projet > #contenu-projet,
+body[data-partie-projet='plans'] .panneau-projet > #contenu-projet,
+body[data-partie-projet='surfaces'] .panneau-projet > #contenu-projet,
+body[data-partie-projet='archives'] .panneau-projet > #contenu-projet { display: block !important; }
+
+/* 0.198.0 : colonnes du tableau de points déplaçables (« ⇄ Colonnes »), « Nom » reste fixe à gauche même en faisant défiler. */
+.tableau-points-grand th.colonne-nom, .tableau-points-grand td.colonne-nom { position: sticky; left: 0; z-index: 2; background: var(--surface, #f8fafc); box-shadow: 1px 0 0 #cbd5e1; }
+.tableau-points-grand th.colonne-nom { z-index: 3; background: #e2e8f0; }
+.tableau-points-grand th .titre-colonne-organiser { display: block; font-weight: 800; }
+.fleches-colonne { display: flex; gap: 4px; margin-top: 4px; }
+.bouton-fleche-colonne { min-width: 40px; min-height: 40px; border: 2px solid #1b2b36; border-radius: 10px; background: #ffffff; color: #1b2b36; font-size: 15px; font-weight: 800; cursor: pointer; }
+.bouton-fleche-colonne:disabled { opacity: 0.3; cursor: default; }
+.bouton-secondaire.actif[data-action='tp-organiser'] { background: #1b2b36; color: #ffffff; }
+
+/* 0.199.0 : carte nationale cochée à la main (par-dessus la photo) : sa propre transparence. */
+.plan-fond .tuile.carte.carte-manuelle { opacity: var(--opacite-carte, 0.4); }
+
+/* 0.201.0 : tableau de points : séparateurs de colonnes, une colonne sur deux d'un gris clair / blanc cassé, séparateurs de lignes. */
+body { --bande-a: #e9eef3; --bande-b: #fbfaf6; --sep-tableau: #94a3b8; --entete-tableau: #cfd8e1; }
+body.theme-sombre { --bande-a: #22313c; --bande-b: #18232b; --sep-tableau: #4b5d6b; --entete-tableau: #2f4352; }
+.tableau-points-grand th, .tableau-points-grand td { border-right: 1px solid var(--sep-tableau); }
+.tableau-points-grand th:last-child, .tableau-points-grand td:last-child { border-right: 0; }
+.tableau-points-grand td { border-bottom: 1px solid var(--sep-tableau); }
+.tableau-points-grand tbody tr:nth-child(odd) td { background: var(--bande-a); }
+.tableau-points-grand tbody tr:nth-child(even) td { background: var(--bande-b); }
+.tableau-points-grand th { background: var(--entete-tableau); border-bottom: 2px solid var(--sep-tableau); }
+.tableau-points-grand th.tri { background: var(--sep-tableau); }
+.tableau-points-grand th.colonne-nom, .tableau-points-grand td.colonne-nom { box-shadow: 2px 0 0 var(--sep-tableau); }
+.tableau-points-grand td.colonne-nom { background: var(--bande-a); border-left: 6px solid var(--couleur-categorie, transparent); }
+.tableau-points-grand th.colonne-nom { background: var(--entete-tableau); }
+/* 0.201.0 : puces de listes encadrées à la couleur de leur catégorie (la pastille garde la couleur de la liste). */
+.puce-liste-points { border: 3px solid var(--couleur-categorie, #94a3b8); }
+.puce-liste-points.choisie { border-color: var(--couleur-categorie, #1e293b); }
+
+/* 0.202.0 : les listes ne ressemblent plus aux catégories : catégories = pilules rondes, listes = étiquettes rectangulaires à coins peu arrondis, pastille carrée. */
+.puce-liste-points { border-radius: 8px; min-height: 34px; padding: 0 10px 0 8px; font-size: 0.85rem; font-weight: 600; }
+.puce-liste-points .pastille-liste-puce { border-radius: 3px; width: 13px; height: 13px; }
+.puce-liste-points small { opacity: 0.7; }
+
+/* 0.203.0 (maquette A, choisie le 10.11) : Import vert, Exporter orange ; les 4 pages du contenu dans un encadré clair, boutons blancs à icône colorée. */
+.cadre-projet-applis .bouton-partie-projet[data-projet='import'] { background: #16a34a; border-color: #15803d; color: #ffffff; }
+.cadre-projet-applis .bouton-partie-projet[data-projet='export'] { background: #ea580c; border-color: #c2410c; color: #ffffff; }
+.cadre-projet-applis .grille-parties-projet { padding: 6px; gap: 6px; border-radius: 14px; background: #f1f5f9; }
+.cadre-projet-applis .grille-parties-projet .bouton-partie-projet { background: #ffffff; border: 2px solid #cbd5e1; color: #1b2b36; }
+.cadre-projet-applis .bouton-partie-projet[data-projet='points'] svg { color: #ca8a04; }
+.cadre-projet-applis .bouton-partie-projet[data-projet='plans'] svg { color: #0891b2; }
+.cadre-projet-applis .bouton-partie-projet[data-projet='surfaces'] svg { color: #16a34a; }
+.cadre-projet-applis .bouton-partie-projet[data-projet='archives'] svg { color: #64748b; }
+body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; gap: 4px; }
+
+/* 0.204.0 : deux encadrés titrés (Natures, Listes) ; étiquettes de listes en pastel, sans pastille. */
+.encadre-points { margin: 8px 0; padding: 8px 10px 10px; border: 2px solid var(--bordure, #cbd5e1); border-radius: 12px; }
+.encadre-points + .encadre-points { margin-top: 12px; }
+.titre-encadre-points { margin: 0 0 6px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gris, #64748b); }
+.puces-listes { display: flex; flex-wrap: wrap; gap: 6px; }
+.puce-liste-points .pastille-liste-puce { display: none; }
+.puce-liste-points { gap: 0; border: 2px solid color-mix(in srgb, var(--couleur-categorie, #94a3b8) 45%, var(--surface, #ffffff)); background: var(--surface, #ffffff); color: var(--gris, #64748b); font-weight: 600; }
+.puce-liste-points.choisie { background: color-mix(in srgb, var(--couleur-liste, #94a3b8) 24%, var(--surface, #ffffff)); border-color: color-mix(in srgb, var(--couleur-categorie, #94a3b8) 60%, var(--surface, #ffffff)); color: var(--encre, #0f172a); }
+.puce-liste-points small { margin-left: 6px; }
+
+/* 0.205.0 : page « Gérer » des pages du projet : une ligne par élément, un ⚙ qui déplie son menu. */
+.entete-page-contenu { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.entete-page-contenu .titre-bloc { flex: 1 1 auto; min-width: 0; margin: 0; }
+.bouton-gerer { flex: none; min-height: 40px; padding: 0 16px; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; font: inherit; font-weight: 800; cursor: pointer; }
+.bouton-retour-gerer { flex: none; width: 44px; min-height: 40px; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
+.page-gerer .entete-page-contenu { justify-content: flex-start; }
+.ligne-gerer { margin: 8px 0; border: 2px solid var(--bordure, #cbd5e1); border-radius: 12px; background: var(--surface, #ffffff); }
+.ligne-gerer.ouverte { border-color: #1b2b36; }
+.entete-ligne-gerer { display: flex; align-items: center; gap: 10px; padding: 8px 10px; }
+.pastille-gerer { flex: none; width: 14px; height: 14px; border-radius: 50%; }
+.texte-ligne-gerer { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.texte-ligne-gerer strong { overflow-wrap: anywhere; }
+.nature-ligne-gerer { font-size: 0.75rem; font-weight: 700; padding: 1px 8px; border-radius: 10px; background: color-mix(in srgb, var(--gris, #64748b) 18%, var(--surface, #ffffff)); color: var(--encre, #0f172a); }
+.texte-ligne-gerer .aide { flex-basis: 100%; }
+.bouton-engrenage { flex: none; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; cursor: pointer; }
+.bouton-engrenage svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ligne-gerer.ouverte .bouton-engrenage { background: #1b2b36; color: #ffffff; }
+.menu-ligne-gerer { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px 10px; border-top: 1px solid var(--bordure, #cbd5e1); }
+.champ-gerer { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.champ-gerer input[type='text'], .champ-gerer .champ-prefixe { flex: 1 1 auto; min-width: 0; }
+.actions-ligne-gerer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

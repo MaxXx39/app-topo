@@ -38,7 +38,7 @@ export const TEXTES_AIDE = {
   importer:
     'Fichier de points : CSV Emlid ou TXT (nom, Est, Nord, altitude), en MN95. Les lignes illisibles sont signalées avec leur numéro.',
   leves:
-    'Contenu du projet par catégories (touche un titre pour replier). Contrôle, Levés, Points importés, Surfaces, Plans DXF, Dessins. La case coche ce qui s\'affiche ; « Voir les points » ouvre le détail ; touche « Date » pour trier par date. « Points (tableau) » : touche des boutons de catégories (Contrôle, Levé, Import…), puis les listes à montrer ; touche un titre de colonne pour trier ; « Exporter la sélection » donne un CSV.',
+    'Pages du projet (boutons de la page Applications). « Liste de points » : touche des boutons de catégories (Stock, Terrain, Chantier, Contrôle, Importés…), puis les listes à montrer ; touche un titre de colonne pour trier ; « ⇄ Colonnes » : des flèches ◀ ▶ (et ⏮ « tout à gauche ») déplacent les colonnes ; « Nom » reste toujours à gauche et l\'ordre est gardé sur cette tablette. « Exporter la sélection » donne un CSV (toujours dans le même ordre). « Gérer » (à droite du titre de chaque page) : toutes les lignes avec un ⚙ pour renommer, changer la couleur, exporter, archiver ou supprimer. « Plans » : plans DXF et PDF, cadastre, dessins. « Surfaces importées » (Expert). « Archives » : ce qui a été archivé, avec « restaurer ».',
   surfaces:
     'Une surface (stock, terrain, terrassement) se crée avec les points d\'un levé (contour, lignes de rupture, points) ou s\'importe (LandXML, DXF). Touche-la sur le plan pour la choisir.',
   nature:
@@ -86,5 +86,5 @@ export const TEXTES_AIDE = {
   dessin:
     'DAO (Expert) : « ✏ DAO » pose une barre sur le plan : dessiner, accrocher, calques, sélectionner (déplacer, copier, tourner…), outils topo (Δ Z, pente, projeter). Exporté en DXF.',
   plan:
-    'Pince pour zoomer, glisse pour déplacer. Fond (photo, cadastre), DXF, Afficher, Seul, Coupe, 3D, ▲ ▼ (taille). La flèche du nord remet le nord en haut.',
+    'Pince pour zoomer, glisse pour déplacer. Fond (photo aérienne, carte nationale cochable par-dessus la photo avec sa transparence, cadastre ; au-delà de 3 km de large la photo devient la carte), DXF, Afficher, Seul, Coupe, 3D, ▲ ▼ (taille). La flèche du nord remet le nord en haut.',
 };
