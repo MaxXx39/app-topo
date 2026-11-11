@@ -72,7 +72,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Choix pris en codant le tableau (validés le 02.11) : « Relancer NTRIP » dans tous les modes sans code ; « Enregistrer » de la fenêtre Exporter en Base (mail / « autrement » dès Intermédiaire) ; options de ligne à l'implantation et export du contrôle en Base ; code de sécurité inchangé.
 - **Code de sécurité** (`outils/code.js`, tous modes ; simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert (0.90), nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle (tolérances, points, durée), prendre la main (Drive), listes partagées. Import de points de contrôle dans Projet : **sans** code (0.90).
 
-## Fonctionnalités (état à la 0.207.0)
+## Fonctionnalités (état à la 0.207.1)
 Le détail version par version est dans l'historique git (`git log`) ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête

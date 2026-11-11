@@ -366,7 +366,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (geste) return; // redessiné à la fin du geste
     dessinerCouches();
     // 0.207.0 : les lignes (levé, implantation, mesures) passent sous les points, puis les noms passent au-dessus.
-    for (const element of svg.querySelectorAll('.points, .points-controle, .noms')) svg.append(element);
+    for (const element of svg.querySelectorAll('.points, .points-controle, .points-legers, .noms')) svg.append(element);
   }
 
   function dessinerCouches() {
@@ -449,6 +449,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
     const groupePoints = creerElement('g', { class: 'points' });
     const groupeNoms = creerElement('g', { class: 'noms' });
+    // 0.207.0 : les points légers sont hors du groupe des points (qui a une ombre) : sinon l'ombre les entoure d'un liseré.
+    const groupeLegers = creerElement('g', { class: 'points-legers' });
     // Couleur choisie pour le libellé du nom (P-RG-1 : regard en noir…), à la place de celle du rôle.
     const libelles = lireLibelles();
     const rayon = rayonFormes(); // taille des formes (réglage de l'appareil)
@@ -483,7 +485,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           if (centre) {
             const leger = creerElement('circle', { cx: centre.x, cy: centre.y, r: rayonPointLeger(rayon), class: `${classes.get(point.nom) ?? ''} point-leger${estPale(point.nom) ? ' pale' : ''}` });
             if (couleur) leger.style.color = couleur;
-            groupePoints.append(leger);
+            groupeLegers.append(leger);
           }
         }
       }
@@ -540,7 +542,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
 
     dessinerTracesMesures();
-    svg.append(groupePoints, groupeNoms);
+    svg.append(groupePoints, groupeLegers, groupeNoms);
     dessinerPointsSurfaces();
     dessinerEtiquettesMesures();
     dessinerCoupes();
@@ -662,19 +664,20 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Points de contrôle (Terrain › Contrôle) : triangle rouge et nom en rouge. Noms et altitudes placés
     // sans se chevaucher (0.114.0) : une étiquette sans place est cachée, elle revient en zoomant.
     const controles = (implantation.pointsControle ?? []).map((point) => ({ point, ...versEcran(point.est, point.nord, vue) }));
-    // 0.207.0 : triangle vide pointe en haut, avec un petit point léger au centre, 1,5 fois plus gros que les
-    // autres formes, liseré noir. Suit le palissement de la couche (pale) comme le reste.
+    // 0.207.0 : triangle vide pointe en haut, 1,5 fois plus gros que les autres formes, liseré noir. Le point léger
+    // garde la taille des autres points (hors du groupe ombré). Suit le palissement de la couche (pale).
     const groupeControle = creerElement('g', { class: palir ? 'points-controle pale' : 'points-controle' });
+    const groupeLegersControle = creerElement('g', { class: palir ? 'points-legers pale' : 'points-legers' });
     const rayonControle = rayonFormes() * 1.5;
     for (const { x, y } of controles) {
       const forme = cheminControle(x, y, rayonControle);
       groupeControle.append(
         liseretDessous(forme.triangle, x, y, rayonControle),
         creerElement('path', { d: forme.triangle, class: 'controle-forme' }),
-        creerElement('circle', { cx: forme.point.x, cy: forme.point.y, r: forme.rayonPoint, class: 'controle-point' }),
       );
+      groupeLegersControle.append(creerElement('circle', { cx: forme.point.x, cy: forme.point.y, r: rayonPointLeger(rayonFormes()), class: 'controle-point' }));
     }
-    autres.append(groupeControle);
+    autres.append(groupeControle, groupeLegersControle);
     const lignesControle = controles.map(({ point }) => [
       calques.controleNoms ? { texte: point.nom, classe: 'nom-controle' } : null,
       calques.controleAltitudes && point.altitude != null ? { texte: formaterNombre(point.altitude), classe: 'altitude-controle' } : null,

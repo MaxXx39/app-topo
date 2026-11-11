@@ -1042,12 +1042,13 @@ svg.plan {
 }
 
 /* 0.207.0 : petit point léger au centre des formes vides, de la couleur de la forme, sans liseré. */
-.plan .points .point-leger {
+.plan .points-legers circle {
+  color: #9aa5a0;
   fill: currentColor;
   stroke: none;
 }
 
-.plan .points-controle .controle-point {
+.plan .points-legers .controle-point {
   fill: #dc2626;
   stroke: none;
 }
@@ -1065,7 +1066,6 @@ svg.plan {
   width: 100%;
   height: 100%;
   overflow: visible;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
 }
 
 .apercu-forme .apercu-plein {
@@ -1073,6 +1073,7 @@ svg.plan {
   stroke: #000000;
   stroke-width: 1;
   paint-order: stroke;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
 }
 
 .apercu-forme .apercu-liseret {
@@ -1081,6 +1082,7 @@ svg.plan {
   stroke-width: 3;
   stroke-linejoin: round;
   stroke-linecap: round;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
 }
 
 .apercu-forme .apercu-vide {
@@ -1109,23 +1111,23 @@ svg.plan {
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
 }
 
-.plan .points .role-contour {
+.plan :is(.points, .points-legers) .role-contour {
   color: var(--rouge);
 }
 
-.plan .points .role-base {
+.plan :is(.points, .points-legers) .role-base {
   color: var(--bleu);
 }
 
-.plan .points .role-ligne {
+.plan :is(.points, .points-legers) .role-ligne {
   color: var(--orange);
 }
 
-.plan .points .role-dessus {
+.plan :is(.points, .points-legers) .role-dessus {
   color: var(--succes);
 }
 
-.plan .points .role-mesure {
+.plan :is(.points, .points-legers) .role-mesure {
   color: var(--couleur-mesure, var(--cyan));
 }
 
