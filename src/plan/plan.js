@@ -11,6 +11,11 @@ import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { texteDuPoint } from '../topo/chantier.js';
 // Couleur des nuages d'Annotation (vert sarcelle de l'application ; au choix dans « Afficher »).
 const COULEUR_ANNOTATION = '#7c4a1e';
+
+/** Liseré noir passé sous une forme vide (0.206.0) : même tracé, plus large, en noir. */
+function liseretDessous(trace, x, y, rayon) {
+  return trace ? creerElement('path', { d: trace, class: 'forme-liseret' }) : creerElement('circle', { cx: x, cy: y, r: rayon, class: 'forme-liseret' });
+}
 import { lireLibellesChantier, lireNaturesChantier, couleurNatureChantier } from '../leve/libelles-chantier.js';
 import { pointDansPolygone } from '../topo/volume.js';
 import { bordDeTriangles, estSurfaceFichier } from '../topo/surface.js';
@@ -19,7 +24,7 @@ import { svgDrapeau } from '../outils/drapeaux.js';
 import { traitsDeBarbules } from './barbules.js';
 import { pointALAbscisse } from '../topo/ligne-implantation.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne, formeDuNom } from '../leve/libelles.js';
-import { cheminForme, formeEnTrait } from './formes.js';
+import { centrePointLeger, cheminControle, cheminForme, formeEnTrait, rayonPointLeger } from './formes.js';
 import { ouvrirVue3d } from './vue3d.js';
 import { lignesDesPlans } from '../topo/drapage.js';
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS, surImageChargee } from './dxf-canvas.js';
@@ -359,6 +364,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function dessiner() {
     dessinPrevu = false;
     if (geste) return; // redessiné à la fin du geste
+    dessinerCouches();
+    // 0.207.0 : les lignes (levé, implantation, mesures) passent sous les points, puis les noms passent au-dessus.
+    for (const element of svg.querySelectorAll('.points, .points-controle, .points-legers, .noms')) svg.append(element);
+  }
+
+  function dessinerCouches() {
     svg.replaceChildren();
     if (pointsSurCanvas) {
       effacerPointsCanvas(canvasPoints);
@@ -438,6 +449,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
     const groupePoints = creerElement('g', { class: 'points' });
     const groupeNoms = creerElement('g', { class: 'noms' });
+    // 0.207.0 : les points légers sont hors du groupe des points (qui a une ombre) : sinon l'ombre les entoure d'un liseré.
+    const groupeLegers = creerElement('g', { class: 'points-legers' });
     // Couleur choisie pour le libellé du nom (P-RG-1 : regard en noir…), à la place de celle du rôle.
     const libelles = lireLibelles();
     const rayon = rayonFormes(); // taille des formes (réglage de l'appareil)
@@ -453,18 +466,27 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         // Forme choisie pour le libellé (0.97.0) : rond plein, sinon carré, triangle, croix…
         // Levé chantier (0.175.5) : la forme vient du libellé du point, la couleur de sa nature.
         const lib = point.chantier ? chantierLib.find((l) => l.abreviation === point.chantier.libelle) : null;
-        // Annotation (0.180.0) : un nuage, juste le contour, assez gros (comme un point de contrôle).
-        const forme = point.annotation ? 'nuage' : point.chantier ? lib?.forme ?? '' : formeDuNom(point.nom, libelles);
+        // Annotation (0.206.0) : une bulle (rectangle arrondi avec une encoche), juste le contour.
+        const forme = point.annotation ? 'bulle' :point.chantier ? lib?.forme ?? '' : formeDuNom(point.nom, libelles);
         const trace = cheminForme(forme, x, y, rayon);
         // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
         const couleur = point.annotation ? couleursPoints.get(point) ?? COULEUR_ANNOTATION : point.chantier ? couleurNatureChantier(point.chantier.nature, couleursNat) : classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
+        // 0.207.0 : une forme vide garde un petit point léger au centre (même couleur).
+        const centre = centrePointLeger(forme, x, y, rayon);
         if (versCanvas) {
-          pourCanvas.push({ x, y, trace, trait: formeEnTrait(forme), pale: estPale(point.nom), couleur: couleur ?? couleursRoles.get(classes.get(point.nom) ?? '') });
+          pourCanvas.push({ x, y, trace, trait: formeEnTrait(forme), pale: estPale(point.nom), couleur: couleur ?? couleursRoles.get(classes.get(point.nom) ?? ''), centre: centre ? { ...centre, r: rayonPointLeger(rayon) } : null });
         } else {
-          const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}${point.annotation ? ' forme-nuage' : ''}${estPale(point.nom) ? ' pale' : ''}`;
+          const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}${estPale(point.nom) ? ' pale' : ''}`;
           const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: rayon, class: classe });
           if (couleur) rond.style.color = couleur;
+          // 0.206.0 : une forme vide (ou une croix, une bulle) a un liseré noir dessous.
+          if (formeEnTrait(forme)) groupePoints.append(liseretDessous(trace, x, y, rayon));
           groupePoints.append(rond);
+          if (centre) {
+            const leger = creerElement('circle', { cx: centre.x, cy: centre.y, r: rayonPointLeger(rayon), class: `${classes.get(point.nom) ?? ''} point-leger${estPale(point.nom) ? ' pale' : ''}` });
+            if (couleur) leger.style.color = couleur;
+            groupeLegers.append(leger);
+          }
         }
       }
       if (rangs.has(point.nom)) {
@@ -520,7 +542,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
 
     dessinerTracesMesures();
-    svg.append(groupePoints, groupeNoms);
+    svg.append(groupePoints, groupeLegers, groupeNoms);
     dessinerPointsSurfaces();
     dessinerEtiquettesMesures();
     dessinerCoupes();
@@ -642,9 +664,20 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Points de contrôle (Terrain › Contrôle) : triangle rouge et nom en rouge. Noms et altitudes placés
     // sans se chevaucher (0.114.0) : une étiquette sans place est cachée, elle revient en zoomant.
     const controles = (implantation.pointsControle ?? []).map((point) => ({ point, ...versEcran(point.est, point.nord, vue) }));
+    // 0.207.0 : triangle vide pointe en haut, 1,5 fois plus gros que les autres formes, liseré noir. Le point léger
+    // garde la taille des autres points (hors du groupe ombré). Suit le palissement de la couche (pale).
+    const groupeControle = creerElement('g', { class: palir ? 'points-controle pale' : 'points-controle' });
+    const groupeLegersControle = creerElement('g', { class: palir ? 'points-legers pale' : 'points-legers' });
+    const rayonControle = rayonFormes() * 1.5;
     for (const { x, y } of controles) {
-      autres.append(creerElement('path', { d: `M${x} ${y - 8}L${x + 7} ${y + 5}H${x - 7}Z`, class: 'triangle-controle' }));
+      const forme = cheminControle(x, y, rayonControle);
+      groupeControle.append(
+        liseretDessous(forme.triangle, x, y, rayonControle),
+        creerElement('path', { d: forme.triangle, class: 'controle-forme' }),
+      );
+      groupeLegersControle.append(creerElement('circle', { cx: forme.point.x, cy: forme.point.y, r: rayonPointLeger(rayonFormes()), class: 'controle-point' }));
     }
+    autres.append(groupeControle, groupeLegersControle);
     const lignesControle = controles.map(({ point }) => [
       calques.controleNoms ? { texte: point.nom, classe: 'nom-controle' } : null,
       calques.controleAltitudes && point.altitude != null ? { texte: formaterNombre(point.altitude), classe: 'altitude-controle' } : null,

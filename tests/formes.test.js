@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cheminForme, formeEnTrait, FORMES } from '../src/plan/formes.js';
+import { apercuForme, centrePointLeger, cheminControle, cheminForme, formeEnTrait, formeVide, FORMES, rayonPointLeger, symboleDeForme } from '../src/plan/formes.js';
 
 describe('formes des points (0.97.0)', () => {
   it('donne un tracé pour chaque forme, sauf le rond', () => {
@@ -18,5 +18,54 @@ describe('formes des points (0.97.0)', () => {
     expect(formeEnTrait('croix')).toBe(true);
     expect(formeEnTrait('carre')).toBe(false);
     expect(formeEnTrait('')).toBe(false);
+  });
+});
+
+describe('formes 0.206.0 : triangles vides réservés, bulle, point de contrôle', () => {
+  it('les triangles vides ne sont plus proposés pour les libellés (réservés aux contrôles)', () => {
+    const cles = FORMES.map(([cle]) => cle);
+    expect(cles).not.toContain('triangle-vide');
+    expect(cles).not.toContain('triangle-bas-vide');
+    expect(cles).toContain('triangle');
+    expect(cles).toContain('triangle-bas');
+  });
+
+  it('la bulle d\'annotation est un tracé arrondi, en trait', () => {
+    const d = cheminForme('bulle', 0, 0, 4);
+    expect(d).toMatch(/^M/);
+    expect(d.endsWith('Z')).toBe(true);
+    expect(formeEnTrait('bulle')).toBe(true);
+  });
+
+  it('le point de contrôle : triangle vide pointe en haut, avec un point léger au centre (0.207.0, sans x)', () => {
+    const { triangle, point, rayonPoint } = cheminControle(0, 0, 4);
+    // Pointe en haut : le sommet est à y = -1,2 r, la base à y = +0,8 r.
+    expect(triangle).toBe(cheminForme('triangle', 0, 0, 4));
+    expect(triangle).toContain('M0.0 -4.8');
+    // Le point léger est au centre du triangle, un peu plus bas que le centre du cadre.
+    expect(point.x).toBe(0);
+    expect(point.y).toBeCloseTo(0.532, 3);
+    expect(rayonPoint).toBe(rayonPointLeger(4));
+  });
+
+  it('point léger : seulement dans les formes vides, 30 % du rayon (1,2 px au moins)', () => {
+    expect(formeVide('carre-vide')).toBe(true);
+    expect(formeVide('rond-vide')).toBe(true);
+    expect(formeVide('bulle')).toBe(true);
+    expect(formeVide('carre')).toBe(false);
+    expect(formeVide('croix')).toBe(false);
+    expect(centrePointLeger('carre', 10, 10, 4)).toBeNull();
+    expect(centrePointLeger('carre-vide', 10, 10, 4)).toEqual({ x: 10, y: 10 });
+    expect(centrePointLeger('bulle', 10, 10, 5)).toEqual({ x: 10, y: 9 });
+    expect(rayonPointLeger(4)).toBeCloseTo(1.2, 5);
+    expect(rayonPointLeger(10)).toBeCloseTo(3, 5);
+  });
+
+  it('les listes de choix ont un nom en clair, et l\'aperçu dessiné suit le même style', () => {
+    for (const [, , nom] of FORMES) expect(nom).toBeTruthy();
+    expect(symboleDeForme('carre-vide')).toBe(apercuForme('carre-vide'));
+    expect(apercuForme('carre-vide')).toContain('apercu-point');
+    expect(apercuForme('carre')).not.toContain('apercu-point');
+    expect(apercuForme('croix')).not.toContain('apercu-point');
   });
 });

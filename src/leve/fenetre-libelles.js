@@ -6,7 +6,7 @@
 import { echapper } from '../outils/echapper.js';
 import { nettoyerAbreviation, COULEURS_LIBELLES, COULEURS_HABITUELLES, lireLibellesDetail, lireLibellesParDefaut, lireLibellesProjet, enregistrerLibelles, enregistrerLibellesProjet } from './libelles.js';
 import { aAcces } from '../reglages/reglages.js';
-import { FORMES } from '../plan/formes.js';
+import { FORMES, symboleDeForme } from '../plan/formes.js';
 import { lireReseaux, enregistrerReseaux, abreviationsReseauxDepart } from './reseaux.js';
 
 /** Nom d'une couleur de la palette (« noir »…), « habituelle » pour pas de couleur choisie. */
@@ -52,7 +52,7 @@ export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b728
               <td><input type="text" data-libelle="description" value="${echapper(description)}" aria-label="Description" ${fixes.has(abreviation) ? 'readonly' : ''} /></td>
               <td><button type="button" class="pastille-couleur ${couleur ? '' : 'habituelle'}" data-libelle="couleur" data-couleur="${couleur}" data-action="palette" data-valeur="${i}"
                 style="background: ${couleur || couleurParDefaut}" title="${nomCouleur(couleur)}" aria-label="Couleur : ${nomCouleur(couleur)}" aria-expanded="${paletteOuverte === i}"></button></td>
-              ${avecForme ? `<td><select data-libelle="forme" aria-label="Forme du point" class="select-forme">${FORMES.map(([cle, nom]) => `<option value="${cle}" ${cle === forme ? 'selected' : ''}>${nom}</option>`).join('')}</select></td>` : ''}
+              ${avecForme ? `<td><select data-libelle="forme" aria-label="Forme du point" class="select-forme">${FORMES.map(([cle, , nom]) => `<option value="${cle}" ${cle === forme ? 'selected' : ''}>${nom}</option>`).join('')}</select><span class="apercu-ligne" data-apercu style="color: ${couleur || couleurParDefaut}">${symboleDeForme(forme)}</span></td>` : ''}
  ${avecDefaut ? `<td><input type="checkbox" data-libelle="defaut" ${defaut ? 'checked' : ''} aria-label="Par défaut dans tous les projets" /></td>
               <td class="fleches-libelle"><button type="button" class="bouton-lien" data-action="monter" data-valeur="${i}" ${i > 0 && lignes[i - 1][4] === defaut ? '' : 'disabled'} aria-label="Monter">▲</button><button type="button" class="bouton-lien" data-action="descendre" data-valeur="${i}" ${i < lignes.length - 1 && lignes[i + 1][4] === defaut ? '' : 'disabled'} aria-label="Descendre">▼</button></td>` : ''}
               <td>${fixes.has(abreviation) ? '' : `<button type="button" class="bouton-lien" data-action="enlever" data-valeur="${i}" aria-label="Enlever">×</button>`}</td>
@@ -110,6 +110,12 @@ export function ouvrirFenetreLibelles({ titre, liste, couleurParDefaut = '#6b728
       fenetre.close();
       enregistrer(propre);
     }
+  });
+  // 0.207.0 : l'aperçu de la forme suit la liste (même style que le plan).
+  fenetre.addEventListener('change', (evenement) => {
+    if (evenement.target.dataset.libelle !== 'forme') return;
+    const ligne = evenement.target.closest('[data-ligne]');
+    ligne.querySelector('[data-apercu]').innerHTML = symboleDeForme(evenement.target.value);
   });
   // Coche « par défaut » changée : la ligne passe dans l'autre groupe.
   fenetre.addEventListener('change', (evenement) => {
