@@ -660,6 +660,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const element = creerElement('path', { d: tracePar(ecran, ligne.fermee), class: 'ligne-autres' });
       const couleur = couleurDuNom(ligne.sommets[0]?.nom, libelles) ?? ligne.couleur;
       if (couleur) element.style.stroke = couleur;
+      if (ligne.epaisseur) element.style.strokeWidth = String(ligne.epaisseur); // 0.223.0 : lignes du calage par axes
       // Ligne du levé libre en cours (Lever) : nette, même si les autres sont pâlies.
       (palir && ligne.id === palir.stockId ? groupe : autres).append(element);
     }
