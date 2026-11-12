@@ -107,6 +107,7 @@ const CALQUES_DEPART = {
 const CALQUES_EXPERT = new Set(['controleNoms', 'controleAltitudes', 'triangles', 'couleursAltitude', 'courbes', 'remblaiDeblai', 'volumes', 'palier', 'equidistance']);
 // Équidistances proposées pour les courbes et les couleurs (m). « auto » : choisie selon la hauteur du stock.
 // Largeur visible (m) au-delà de laquelle le fond devient la carte nationale (0.192.0).
+const ZOOM_MAX_CARTE = 26; // 0.224.0 : niveau de zoom le plus détaillé demandé pour la carte nationale (0,5 m par pixel ; à valider avec swisstopo)
 const LARGEUR_CARTE_NATIONALE = 2000; // 0.213.0 : 2 km de large visible (avant 3 km)
 const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 
@@ -1055,14 +1056,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     // Sans point, une surface importée suffit aussi à placer le fond (0.90.0).
     // 0.121.1 : même sans rien dans le projet, la vue de départ (Gland) montre le fond.
     if (vue && couches.length > 0) {
-      const z = niveauDeZoom(1 / vue.echelle, window.devicePixelRatio || 1);
+      const zIdeal = niveauDeZoom(1 / vue.echelle, window.devicePixelRatio || 1);
       // Zone vue (plus grande que l'écran quand le plan est tourné).
-      const tuiles = tuilesPourZone(zoneVisible(vue), z);
+      const zone = zoneVisible(vue);
       const rotationTuile = vue.rotation ? `rotate(${(-vue.rotation).toFixed(2)}deg)` : '';
       // Garde-fou : on ne charge pas des centaines d'images d'un coup.
-      if (tuiles.length <= 300) {
+      // 0.224.0 : la carte nationale n'a pas de tuiles aux niveaux les plus détaillés (elles restaient blanches quand on zoomait) :
+      // on s'arrête au niveau ZOOM_MAX_CARTE et la tuile est simplement agrandie.
+      const zCouche = (nom) => (nom === 'carte' ? Math.min(zIdeal, ZOOM_MAX_CARTE) : zIdeal);
+      if (tuilesPourZone(zone, zIdeal).length <= 300) {
         couches.forEach((nom, ordre) => {
-          for (const tuile of tuiles) {
+          for (const tuile of tuilesPourZone(zone, zCouche(nom))) {
             const adresse = FONDS[nom].url(tuile.z, tuile.colonne, tuile.ligne);
             voulues.add(adresse);
             let image = tuilesAffichees.get(adresse);
