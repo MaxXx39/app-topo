@@ -30,6 +30,7 @@ export function moyennerPoints(lectures, dureeS) {
     altitude: avecAltitude ? moyenne(lectures.map((p) => p.altitude)) : null,
     precisionH: pire('precisionH'),
     precisionV: pire('precisionV'),
+    pdop: pire('pdop'), // 0.220.0 : le plus mauvais PDOP des lectures (null si le récepteur n'en donne pas)
     mesureDuree: { dureeS, lectures: lectures.length, ecartMaxPlan: Math.max(...lectures.map((p) => Math.hypot(p.est - est, p.nord - nord))) },
   };
 }

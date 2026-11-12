@@ -9,7 +9,7 @@ const MARGE = 10; // mm
 const HAUTEUR_LIGNE = 5.2;
 // Largeur et alignement des colonnes (mm ; total 277 = largeur utile de l'A4 paysage). g = gauche, d = droite.
 const COLONNES = [
-  ['g', 27], ['d', 24], ['d', 24], ['d', 19], ['g', 33], ['g', 19], ['g', 16], ['d', 14], ['d', 14], ['g', 19], ['d', 11], ['d', 11], ['d', 15], ['d', 13], ['g', 18],
+  ['g', 27], ['d', 24], ['d', 24], ['d', 19], ['g', 27], ['g', 17], ['g', 16], ['d', 14], ['d', 14], ['g', 17], ['d', 11], ['d', 11], ['d', 11], ['d', 15], ['d', 13], ['g', 17],
 ];
 // Levé chantier (0.175.0) : colonnes propres (total 277 mm), sans les précisions GNSS.
 const COLONNES_CHANTIER = [['g', 27], ['d', 24], ['d', 24], ['d', 19], ['g', 14], ['g', 20], ['g', 15], ['d', 12], ['d', 10], ['d', 20], ['d', 17], ['d', 17], ['d', 15], ['g', 18], ['d', 9], ['g', 16]];

@@ -133,7 +133,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 // chaque geste sur le plan (poser, bouger, relâcher, molette) remet le délai de 5 s à zéro.
 const DELAI_RETOUR_SUIVI = 5000;
 
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
+export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
   // Réglage d'une liste : son choix, sinon celui de départ (en dessous d'Expert, les réglages d'Expert gardent leur valeur de départ).
   const reglageListe = (cle, id) => {
     const choix = id != null ? reglagesListe.get(id) : null;
@@ -2402,6 +2402,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         if (photo) quandToucherPhoto?.(photo.id);
         else if (quandToucherAnnotation?.(versTerrain(toucher.x, toucher.y, vue), RAYON_TOUCHER / vue.echelle)) {
           // fiche ouverte
+        } else if (quandToucherFichePoint?.(pointLePlusProche(toucher))) {
+          // 0.220.0 : fiche du point touché ouverte (toucher le plan ailleurs la ferme)
         } else {
           const index = stockSousLeDoigt(toucher);
           if (index >= 0) quandToucherStock?.(index);

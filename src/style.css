@@ -13598,3 +13598,10 @@ body.theme-sombre .resultat-controle-plan.rouge, body.theme-sombre .etat-control
 .bouton-masquees { display: block; margin: 10px auto 0; padding: 8px 14px; border: 1px dashed var(--bordure, #94a3b8); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 0.9em; }
 .tuile-appli.pret-a-deplacer { outline: 3px dashed #fff; outline-offset: -6px; animation: pret-deplacer 1s ease-in-out infinite; }
 @keyframes pret-deplacer { 50% { opacity: 0.7; } }
+
+/* 0.220.0 : fiche d'un point touché sur le plan. */
+.fiche-point { border-left-color: #0ea5e9; }
+.fiche-point .entete-encadre-annotation strong { color: inherit; }
+.table-fiche-point { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table-fiche-point th { text-align: left; font-weight: 500; opacity: 0.7; padding: 2px 8px 2px 0; white-space: nowrap; }
+.table-fiche-point td { padding: 2px 0; font-weight: 600; font-variant-numeric: tabular-nums; }

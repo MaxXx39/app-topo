@@ -125,6 +125,7 @@ import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
 import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
 import { htmlEncadreAnnotation } from './annotation/encadre.js';
+import { lignesFichePoint, htmlFichePoint } from './plan/fiche-point.js';
 import { ajouterAnnotation, trouverAnnotation, supprimerAnnotation, listesAnnotation, nettoyerRemarques, precisionSuffisante, estAnnotation, nomProposeAnnotation, dernierAnnotation, PRECISION_TABLETTE_DEPART } from './topo/annotation.js';
 import { applisDisponibles, appliCourante } from './navigation/applis.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
@@ -1131,6 +1132,31 @@ function montrerEncadreAnnotation(nom) {
     }
   });
   document.body.append(boite);
+}
+
+/** Ferme la fiche d'un point touché sur le plan (0.220.0). */
+function fermerFichePoint() {
+  document.querySelector('#fiche-point-plan')?.remove();
+}
+
+/**
+ * 0.220.0 : toucher un point sur le plan (sans autre geste en cours) ouvre sa fiche (coordonnées, date, précisions, PDOP…) ;
+ * toucher le plan ailleurs la ferme. Renvoie vrai si la fiche est ouverte.
+ */
+function montrerFichePoint(point) {
+  fermerFichePoint();
+  if (!point) return false;
+  const liste = projet.leves.find((l) => l.points.some((p) => p.nom === point.nom && p.est === point.est && p.nord === point.nord));
+  const boite = document.createElement('div');
+  boite.id = 'fiche-point-plan';
+  boite.innerHTML = htmlFichePoint({ nom: point.nom, liste: liste?.nom ?? '', lignes: lignesFichePoint(point) });
+  const zone = document.querySelector('.panneau-plan')?.getBoundingClientRect();
+  boite.style.cssText = `position: fixed; z-index: 40; left: 8px; right: 8px; bottom: ${Math.max(8, window.innerHeight - (zone?.bottom ?? window.innerHeight) + 34)}px; display: flex; justify-content: center; pointer-events: none;`;
+  boite.addEventListener('click', (evenement) => {
+    if (evenement.target.closest('[data-action="fermer-fiche"]')) fermerFichePoint();
+  });
+  document.body.append(boite);
+  return true;
 }
 
 /** Ouvre la fiche d'un point d'annotation déjà enregistré (remarques et photos modifiables). */
@@ -7351,6 +7377,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
     montrerEncadreAnnotation(point.nom);
     return true;
   },
+  quandToucherFichePoint: (point) => montrerFichePoint(point),
   // « Voir toute la ligne » (0.118.0) cochée ou décochée (aussi décochée par « Ma position »).
   quandVoirLigne: (coche) => {
     implanter.voirLigne = coche && Boolean(implanter.ligne);

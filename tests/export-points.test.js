@@ -9,7 +9,7 @@ const points = [
     est: 2500000.1234,
     nord: 1150000.5,
     altitude: 400.25,
-    gnss: { qualite: 4, nbSatellites: 21, hdop: 0.62, ageCorrections: 1.2, inclinaison: 3.4, precisionH: 0.012, precisionV: 0.018, prisLe: '2026-10-27T08:15:30.000Z' },
+    gnss: { qualite: 4, nbSatellites: 21, hdop: 0.62, pdop: 1.46, ageCorrections: 1.2, inclinaison: 3.4, precisionH: 0.012, precisionV: 0.018, prisLe: '2026-10-27T08:15:30.000Z' },
   },
   { nom: 'P;1', est: 2500010, nord: 1150010, altitude: null },
 ];
@@ -25,10 +25,10 @@ describe('export d\'une liste de points', () => {
 
   it('CSV : en-tête, rôle, date, heure, précisions, qualité RTK, satellites…', () => {
     const lignes = csvPoints(points, new Map([['C-Stock-1-1', 'contour']])).trim().split('\r\n');
-    expect(lignes[0]).toBe('Nom;Est (m);Nord (m);Altitude (m);Rôle;Date;Heure;Précision H (m);Précision V (m);Qualité;Satellites;HDOP;Âge corrections (s);Inclinaison (°)');
+    expect(lignes[0]).toBe('Nom;Est (m);Nord (m);Altitude (m);Rôle;Date;Heure;Précision H (m);Précision V (m);Qualité;Satellites;HDOP;PDOP;Âge corrections (s);Inclinaison (°)');
     const champs = lignes[1].split(';');
     expect(champs.slice(0, 5)).toEqual(['C-Stock-1-1', '2500000.123', '1150000.500', '400.250', 'contour']);
-    expect(champs.slice(7)).toEqual(['0.012', '0.018', 'RTK fixe', '21', '0.6', '1.2', '3.4']);
+    expect(champs.slice(7)).toEqual(['0.012', '0.018', 'RTK fixe', '21', '0.6', '1.5', '1.2', '3.4']);
     // Un nom avec un point-virgule est mis entre guillemets.
     expect(lignes[2].startsWith('"P;1";2500010.000;1150010.000;;')).toBe(true);
   });

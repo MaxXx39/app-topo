@@ -8,10 +8,12 @@ import ch.apptopo.noyau.leve.Autorisation
 import ch.apptopo.noyau.leve.autoriserPriseDePoint
 import ch.apptopo.noyau.nmea.EtatCompensation
 import ch.apptopo.noyau.nmea.PositionGga
+import ch.apptopo.noyau.nmea.DilutionGsa
 import ch.apptopo.noyau.nmea.PrecisionGst
 import ch.apptopo.noyau.nmea.libelleQualite
 import ch.apptopo.noyau.nmea.lireEtc
 import ch.apptopo.noyau.nmea.lireGga
+import ch.apptopo.noyau.nmea.lireGsa
 import ch.apptopo.noyau.nmea.lireGst
 import ch.apptopo.noyau.nmea.lirePhraseNmea
 import ch.apptopo.noyau.ntrip.ClientNtrip
@@ -62,6 +64,9 @@ class EtatRecepteur {
     // Précision estimée par le récepteur (message GST), si le RX2 l'envoie.
     @Volatile private var dernierePrecision: PrecisionGst? = null
     @Volatile private var heureGstMs: Long? = null
+    // Dilution de précision (message GSA, 0.220.0) : PDOP, HDOP, VDOP.
+    @Volatile private var derniereDilution: DilutionGsa? = null
+    @Volatile private var heureGsaMs: Long? = null
     @Volatile private var erreurConversion: String? = null
 
     // Journal NMEA (0.82.0, mode Confirmé) : toutes les lignes reçues, telles quelles, pendant un
@@ -99,6 +104,8 @@ class EtatRecepteur {
         heureEtcMs = null
         dernierePrecision = null
         heureGstMs = null
+        derniereDilution = null
+        heureGsaMs = null
         connecte = false
         etatBluetooth = texte
     }
@@ -142,6 +149,7 @@ class EtatRecepteur {
             val precision = dernierePrecision.takeIf { (age(heureGstMs) ?: Long.MAX_VALUE) <= DELAI_RECENT_MS }
             put("precisionH", precision?.horizontaleM ?: JSONObject.NULL)
             put("precisionV", precision?.verticaleM ?: JSONObject.NULL)
+            put("pdop", pdopRecent() ?: JSONObject.NULL)
             put("erreurConversion", erreurConversion ?: JSONObject.NULL)
             put("autorise", autorisation.autorise)
             put("raison", autorisation.raison)
@@ -184,10 +192,15 @@ class EtatRecepteur {
             val precision = dernierePrecision.takeIf { (age(heureGstMs) ?: Long.MAX_VALUE) <= DELAI_RECENT_MS }
             put("precisionH", precision?.horizontaleM ?: JSONObject.NULL)
             put("precisionV", precision?.verticaleM ?: JSONObject.NULL)
+            put("pdop", pdopRecent() ?: JSONObject.NULL)
             put("heureUtc", mesure.gga.heureUtc)
         }
         return JSONObject().put("ok", true).put("point", point).toString()
     }
+
+    /** PDOP du dernier GSA, seulement s'il est récent (sinon null : on n'invente rien). */
+    private fun pdopRecent(): Double? =
+        derniereDilution?.takeIf { (age(heureGsaMs) ?: Long.MAX_VALUE) <= DELAI_RECENT_MS }?.pdop
 
     private fun positionEnJson(position: PositionSuisse) =
         JSONObject().put("est", position.est).put("nord", position.nord).put("altitude", position.altitude)
@@ -212,6 +225,13 @@ class EtatRecepteur {
             "GST" -> {
                 dernierePrecision = lireGst(phrase)
                 heureGstMs = maintenant
+            }
+            "GSA" -> {
+                // Un GSA par système satellite : on garde le dernier qui a un PDOP (la valeur est la même pour tous).
+                lireGsa(phrase)?.takeIf { it.pdop != null }?.let {
+                    derniereDilution = it
+                    heureGsaMs = maintenant
+                }
             }
         }
     }

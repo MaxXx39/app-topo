@@ -46,7 +46,7 @@ export function recepteurDisponible() {
  * EtatRecepteur.enJson côté Kotlin : { connecte, bluetooth, dernierRecepteur, recu, qualite,
  * libelleQualite, nbSatellites, hdop, ageCorrections, etatInclinaison, inclinaisonPrete,
  * inclinaison, cap (°, orientation du RX2, à confirmer), position: { est, nord, altitude } ou null,
- * precisionH, precisionV (m, message GST du RX2, ou null),
+ * precisionH, precisionV (m, message GST du RX2, ou null), pdop (message GSA, 0.220.0, ou null),
  * erreurConversion, autorise, raison }.
  */
 export function ecouterRecepteur(fonction) {
