@@ -141,6 +141,8 @@ import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { dessinerPlansDxf } from './plan/dxf-canvas.js';
 import { fabriquerPaquet } from './export/paquet.js';
 import { creerBarreRecalage, etapeAxes } from './recalage/barre.js';
+import { creerBarreControlePlan } from './recalage/barre-controle.js';
+import { resultatControlePlan } from './topo/controle-plan.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
 import { ajouterTous } from './outils/bornes.js';
 
@@ -1944,6 +1946,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       afficherMessage(`Plan « ${nouveau.nom} » importé : ${lu.compte.objets} objets`, 4000);
       modifie();
       if (choix.recaler === 'oui') commencerRecalage(nouveau.id);
+      else if (choix.recaler === 'cale') commencerControlePlan(nouveau.id); // 0.218.0 : plan déjà calé : contrôle tout de suite
     } catch (erreur) {
       dernierPlan = { nom: fichier.name, erreur: erreur.message };
       afficherMessage('Plan non importé');
@@ -2034,6 +2037,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       afficherMessage(`Plan PDF « ${nom} » importé${enImage ? ' en image' : ` : ${lu.compte.objets} objets`}`, 4000);
       modifie();
       if (valeurs.recaler === 'oui') commencerRecalage(nouveauPlan.id);
+      else if (valeurs.recaler === 'cale') commencerControlePlan(nouveauPlan.id);
     } catch (erreur) {
       dernierPlan = { nom: fichier.name, erreur: erreur.message };
       afficherMessage(`Plan PDF non importé : ${erreur.message}`, 8000);
@@ -2057,6 +2061,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
   },
   reglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
   recalerPlanDxf: (id) => commencerRecalage(id),
+  controlerPlanDxf: (id) => commencerControlePlan(id),
   annulerRecalagePlan: (id) => annulerRecalage(id),
   exporterPlanRecale,
   exporterListe,
@@ -3303,7 +3308,7 @@ let loupeImplantation = false;
  * Le recalage d'un plan PDF garde sa propre loupe (voir montrerLoupe).
  */
 function gererLoupeImplantation() {
-  if (recalage.planId) {
+  if (recalage.planId || controlePlan.planId) {
     loupeImplantation = false;
     return;
   }
@@ -3355,7 +3360,7 @@ function gererLoupeImplantation() {
 
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
-  const accrocheActive = mesureRapideActive() || annotationActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(daoAppli?.actif());
+  const accrocheActive = mesureRapideActive() || annotationActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(controlePlan.planId) || Boolean(daoAppli?.actif());
   // 0.159.0 : les applications sont indépendantes : la Mesure rapide ne montre rien d'Implanter.
   const mesure = mesureRapideActive() || annotationActive();
   const enLigne = accrocheActive && !mesure && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
@@ -3407,7 +3412,7 @@ function envoyerImplantationAuPlan() {
         pointsControle,
         lignesAutres,
         chantiers,
-        choix: daoAppli?.actif() ? daoAppli.dernierPoint() : recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : mesureRapideActive() && mesureRapideEtat.accroche === 'centrepts' ? centrePtsCalcule() : accrocheActive && !mesure && !enLigne && !enAutocontrole() ? implanter.choix : null,
+        choix: daoAppli?.actif() ? daoAppli.dernierPoint() : controlePlan.planId ? controlePlan.pointPlan : recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : mesureRapideActive() && mesureRapideEtat.accroche === 'centrepts' ? centrePtsCalcule() : accrocheActive && !mesure && !enLigne && !enAutocontrole() ? implanter.choix : null,
         cible: cibleControle ?? (accrocheActive && !mesure && !enLigne && !enAutocontrole() && !ajoutLevee.actif ? implanter.cible : null),
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
@@ -5307,6 +5312,10 @@ function toucherPourImplantation(position, tolerance) {
     toucherPourControle(position, tolerance);
     return;
   }
+  if (controlePlan.planId) {
+    toucherPourControlePlan(position, tolerance);
+    return;
+  }
   if (recalage.planId) {
     toucherPourRecalage(position, tolerance);
     return;
@@ -5710,10 +5719,12 @@ function appliquerRecalage() {
   if (!choisi || helmert.erreur) return;
   const { a, b, tEst, tNord, echelle, rotation } = helmert;
   choisi.recalage = { paires: recalage.paires.map((p) => ({ ...p })), parametres: { a, b, tEst, tNord, echelle, rotation }, applique: true, le: new Date().toISOString() };
+  delete choisi.controle; // le plan a bougé : l'ancien contrôle ne vaut plus
   arreterRecalage();
   modifie();
   afficherMessage(`Plan « ${choisi.nom} » recalé`, 3000);
   requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+  commencerControlePlan(choisi.id); // 0.218.0 : le contrôle suit le recalage
 }
 
 /**
@@ -5820,10 +5831,12 @@ function appliquerCalageAxes() {
     applique: true,
     le: new Date().toISOString(),
   };
+  delete choisi.controle;
   arreterRecalage();
   modifie();
   afficherMessage(`Plan « ${choisi.nom} » calé par axes`, 3000);
   requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+  commencerControlePlan(choisi.id);
 }
 
 /**
@@ -5837,9 +5850,115 @@ function annulerRecalage(id) {
   const quelqueChose = Boolean(choisi.recalage) || (enCours && (recalage.paires.length > 0 || recalage.choix || recalage.candidat));
   if (quelqueChose && !confirm(`Annuler le recalage de « ${choisi.nom} » ? Le plan revient à sa position d'origine et les points de calage sont effacés.`)) return;
   delete choisi.recalage;
+  delete choisi.controle;
   if (enCours) arreterRecalage();
   else recalculer();
   modifie();
+}
+
+// --- Contrôle d'un plan (0.218.0, demande du 12.11) : voir recalage/barre-controle.js et topo/controle-plan.js ---
+// Un plan « déjà calé » est contrôlé tout de suite après l'import, un plan recalé à la fin du recalage : on touche un point du plan,
+// puis le point connu qui lui correspond ; l'écart (mm) est gardé sur le plan (plan.controle). Sans point connu : plan « non contrôlé ».
+const controlePlan = { planId: null, accroche: 'sommet', pointPlan: null, resultat: null };
+let barreControlePlan = null;
+
+function commencerControlePlan(id) {
+  const choisi = projet.plansDxf.find((p) => p.id === id);
+  if (!choisi) return;
+  if (pointsDuProjet().length === 0) {
+    choisi.controle = { saute: true, raison: 'aucun point connu', le: new Date().toISOString() };
+    modifie();
+    afficherMessage('Plan non contrôlé : le projet n\'a encore aucun point connu (levé ou de contrôle). Le contrôle reste à faire depuis la liste des plans.', 7000);
+    return;
+  }
+  if (pointage.actif) arreterPointage();
+  if (recalage.planId) arreterRecalage();
+  Object.assign(controlePlan, { planId: id, accroche: 'sommet', pointPlan: null, resultat: null });
+  barreControlePlan?.enlever();
+  barreControlePlan = creerBarreControlePlan(document.querySelector('#plan .plan-cadre'), {
+    choisirAccroche: (mode) => {
+      controlePlan.accroche = mode;
+      montrerControlePlan();
+    },
+    reprendre: () => {
+      controlePlan.pointPlan = null;
+      controlePlan.resultat = null;
+      montrerControlePlan();
+    },
+    recommencer: () => {
+      controlePlan.pointPlan = null;
+      controlePlan.resultat = null;
+      montrerControlePlan();
+    },
+    valider: () => {
+      const plan1 = projet.plansDxf.find((p) => p.id === controlePlan.planId);
+      if (plan1 && controlePlan.resultat) {
+        plan1.controle = { ...controlePlan.resultat };
+        afficherMessage(controlePlan.resultat.couleur === 'rouge' ? 'Contrôle gardé : écart supérieur à 15 mm' : 'Contrôle du plan enregistré', 4000);
+      }
+      arreterControlePlan();
+      modifie();
+    },
+    recaler: () => {
+      const idPlan = controlePlan.planId;
+      arreterControlePlan();
+      commencerRecalage(idPlan);
+    },
+    plusTard: () => {
+      const plan1 = projet.plansDxf.find((p) => p.id === controlePlan.planId);
+      if (plan1 && !plan1.controle) plan1.controle = { saute: true, raison: 'reporté', le: new Date().toISOString() };
+      arreterControlePlan();
+      modifie();
+      afficherMessage('Plan non contrôlé : « Contrôler » dans la liste des plans', 5000);
+    },
+  });
+  if (estTelephone()) afficherOnglet('plan');
+  recalculer();
+  requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+  montrerControlePlan();
+}
+
+function arreterControlePlan() {
+  controlePlan.planId = null;
+  controlePlan.pointPlan = null;
+  controlePlan.resultat = null;
+  barreControlePlan?.enlever();
+  barreControlePlan = null;
+  recalculer();
+}
+
+function montrerControlePlan() {
+  const choisi = projet.plansDxf.find((p) => p.id === controlePlan.planId);
+  if (!choisi || !barreControlePlan) return;
+  barreControlePlan.afficher({ nomPlan: choisi.nom, accroche: controlePlan.accroche, pointPlan: controlePlan.pointPlan, resultat: controlePlan.resultat });
+  envoyerImplantationAuPlan();
+  plan.rafraichirImplantation();
+}
+
+/** Toucher le plan pendant le contrôle : étape 1 un point du plan, étape 2 le point connu (ensuite l'écart). */
+function toucherPourControlePlan(position, tolerance) {
+  const choisi = projet.plansDxf.find((p) => p.id === controlePlan.planId);
+  if (!choisi || controlePlan.resultat) return;
+  if (!controlePlan.pointPlan) {
+    const trouve = accrocher(controlePlan.accroche, position, tolerance, sourcesDesPlans([planRecale(choisi)], position, tolerance));
+    if (!trouve) {
+      afficherMessage('Rien à accrocher sous le doigt sur ce plan', 3000);
+      return;
+    }
+    controlePlan.pointPlan = { est: trouve.est, nord: trouve.nord };
+    sonValidation();
+    montrerControlePlan();
+    return;
+  }
+  const connu = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() });
+  if (!connu) {
+    afficherMessage('Aucun point connu (levé ou de contrôle) sous le doigt', 3000);
+    return;
+  }
+  controlePlan.resultat = resultatControlePlan(controlePlan.pointPlan, connu);
+  sonValidation();
+  vibrer(60);
+  montrerControlePlan();
 }
 
 // --- Surface Swisstopo (0.109.0, Projet › Import, Expert) : voir import/zone-swisstopo.js ---

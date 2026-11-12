@@ -13582,3 +13582,14 @@ body.theme-sombre .note-fenetre.note-alerte { background: #7c2d12; color: #fed7a
 /* 0.217.0 : « 🔒 Ouvert sur xxx » bien visible dans la liste des projets et sur la carte. */
 .verrou-drive { display: inline-block; margin-top: 2px; padding: 2px 8px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-weight: 700; }
 body.theme-sombre .verrou-drive { background: #7f1d1d; color: #fecaca; }
+
+/* 0.218.0 : contrôle d'un plan (écart en mm : vert ≤ 2, orange ≤ 15, rouge au-delà). */
+.resultat-controle-plan { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; padding: 8px 10px; border-radius: 8px; }
+.resultat-controle-plan strong { font-size: 1.3em; }
+.resultat-controle-plan.vert, .etat-controle-plan.vert { background: #dcfce7; color: #166534; }
+.resultat-controle-plan.orange, .etat-controle-plan.orange { background: #ffedd5; color: #9a3412; }
+.resultat-controle-plan.rouge, .etat-controle-plan.rouge { background: #fee2e2; color: #991b1b; }
+.etat-controle-plan { margin: 4px 0; padding: 4px 8px; border-radius: 6px; font-size: 0.9em; font-weight: 600; }
+body.theme-sombre .resultat-controle-plan.vert, body.theme-sombre .etat-controle-plan.vert { background: #14532d; color: #bbf7d0; }
+body.theme-sombre .resultat-controle-plan.orange, body.theme-sombre .etat-controle-plan.orange { background: #7c2d12; color: #fed7aa; }
+body.theme-sombre .resultat-controle-plan.rouge, body.theme-sombre .etat-controle-plan.rouge { background: #7f1d1d; color: #fecaca; }

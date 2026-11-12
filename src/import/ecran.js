@@ -13,6 +13,7 @@ import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { COULEURS_PLANS } from '../plan/dxf-canvas.js';
 import { estEnMn95 } from '../topo/dxf-plan.js';
+import { resumeControlePlan } from '../topo/controle-plan.js';
 import { rotationLisible } from '../topo/recalage.js';
 import { prefixeDuNom, sansPrefixe, estSurfaceFichier, origineSurface } from '../topo/surface.js';
 import { PREFIXE_PDF } from '../topo/pdf-dxf.js';
@@ -31,7 +32,7 @@ import { CATEGORIES_POINTS, CATEGORIES_LEVES, COLONNES_POINTS, categorieDeListe,
  * archiver(type, id), restaurerArchive(id), supprimerArchive(id) (archives, 0.119.0, voir projet/archives.js),
  * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id),
  * importerPlanDxf(fichier), importerPlanPdf(fichier), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
- * recalerPlanDxf(id), exporterPlanRecale(id), annulerRecalagePlan(id),
+ * recalerPlanDxf(id), controlerPlanDxf(id) (0.218.0), exporterPlanRecale(id), annulerRecalagePlan(id),
  * montrerCalqueDxf(id, n° du calque, visible),
  * montrerTousCalquesDxf(id, visible), ajouterPointTape({ nom, est, nord, altitude }) (renvoie
  * { erreur } ou rien), commencerPointage() (ajouter des points en touchant le plan DXF),
@@ -240,6 +241,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
     else if (action === 'supprimer-plan') actions.supprimerPlanDxf(id);
     else if (action === 'recaler-plan') actions.recalerPlanDxf(id);
     else if (action === 'annuler-recalage') actions.annulerRecalagePlan(id);
+    else if (action === 'controler-plan') actions.controlerPlanDxf(id);
     else if (action === 'tous-calques') actions.montrerTousCalquesDxf(id, bouton.dataset.visible === 'oui');
   });
 
@@ -820,6 +822,7 @@ function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${plan.id}">voir</button>
         </div>
         ${etatRecalage(plan)}
+        ${etatControle(plan)}
         <details data-calques-plan="${plan.id}" ${calquesOuverts.has(plan.id) ? 'open' : ''}>
           <summary>Calques</summary>
           <div class="ligne-outils">
@@ -869,6 +872,17 @@ function etatRecalage(plan) {
   // 0.214.0 : plan importé avec le choix « Non (déjà calé) » : rien à recaler.
   if (plan.dejaCale) return '<p class="etat-recalage recale">✓ Déjà calé (importé tel quel)</p>';
   return plan.bornes && !estEnMn95(plan.bornes) ? '<p class="etat-recalage">Pas en MN95 : « recaler »</p>' : '';
+}
+
+/** Contrôle d'un plan en place (0.218.0) : écart mesuré sur un point connu, ou « non contrôlé » ; bouton « Contrôler ». */
+function etatControle(plan) {
+  const enPlace = plan.recalage?.applique || plan.dejaCale || (plan.bornes && estEnMn95(plan.bornes));
+  if (!enPlace) return '';
+  const c = plan.controle;
+  const texte = c ? resumeControlePlan(c) : 'Non contrôlé';
+  const classe = !c || c.saute ? 'orange' : c.couleur;
+  return `<p class="etat-controle-plan ${classe}">${c && !c.saute ? '✓' : '⚠'} ${echapper(texte)}
+    <button type="button" class="bouton-lien" data-action="controler-plan" data-id="${plan.id}">${c && !c.saute ? 'recontrôler' : 'contrôler'}</button></p>`;
 }
 
 /**
