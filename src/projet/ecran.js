@@ -63,6 +63,8 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
       panneau = panneau === bouton.dataset.panneau ? null : bouton.dataset.panneau;
       // À chaque ouverture de la liste : seul le dossier du projet ouvert est déplié.
       if (panneau === 'projets' && derniers) dossiersOuverts = new Set([dossierDuProjet(lireDossiers(), derniers[0].id)]);
+      // 0.217.0 : la liste de Drive est relue à chaque ouverture (sinon « ouvert sur xxx » pouvait rester périmé sur la tablette).
+      if (panneau === 'projets') actions.rafraichirDriveEnDouce?.();
       if (derniers) dessiner(...derniers);
       conteneur.closest('.panneau')?.scrollIntoView({ block: 'start' });
       window.scrollTo(0, 0);
@@ -266,7 +268,7 @@ function ligneProjet(p, estOuvert, menu, partage) {
     p.sousTitre ? echapper(p.sousTitre) : '',
     date,
     p.local ? `${compter(p.local.nombreLeves, 'levé')} · ${compter(p.local.nombreSurfaces, 'surface')}` : '',
-    ailleurs ? `<span class="verrou-drive">ouvert sur ${echapper(verrou.nom)}</span>` : '',
+    ailleurs ? `<span class="verrou-drive">🔒 Ouvert sur ${echapper(verrou.nom)}</span>` : '',
   ].filter(Boolean).join(' · ');
   const ouvrir = estOuvert ? 'disabled' : p.local ? `data-action="ouvrir" data-id="${p.id}"` : `data-action="ouvrir-drive" data-id="${p.drive.dossierId}"`;
   return `<div class="ligne-projet ${estOuvert ? 'projet-ouvert' : ''}">

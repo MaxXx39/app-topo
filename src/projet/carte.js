@@ -3,6 +3,7 @@
 // (le centre de la boîte qui entoure son contenu, voir topo/centre-projet.js) ; on la touche pour le choisir, puis « Ouvrir ».
 // Un filtre par dossier. Les projets sans position (rien en Suisse, ou projet Drive jamais ouvert depuis la mise à jour) sont comptés à part.
 import { echapper } from '../outils/echapper.js';
+import { verrouActif } from '../partage/synchro.js';
 import { FONDS, niveauDeZoom, tuilesPourZone } from '../plan/fond.js';
 import { lireDossiers, dossierDuProjet, SANS_DOSSIER } from './dossiers.js';
 import { deplacerVue, fondSelonLargeur, vueSurCentres, versEcran, zoneVisible, zoomerVue } from './carte-vue.js';
@@ -11,9 +12,10 @@ const MAX_TUILES = 300;
 
 /**
  * Ouvre la carte par-dessus l'appli. projets : liste de projetsReunis ({ id, titre, modifieLe, centre, local, drive }) ;
- * options : { ouvertId (projet ouvert), quandOuvrir(projet) (l'utilisateur touche « Ouvrir ») }. Renvoie { fermer() }.
+ * options : { ouvertId (projet ouvert), appareilId (cet appareil : un projet verrouillé par un autre est marqué 🔒), quandOuvrir(projet)
+ * (l'utilisateur touche « Ouvrir ») }. Renvoie { fermer(), miseAJour(projets) } (miseAJour : la liste de Drive vient d'être relue).
  */
-export function ouvrirCarteProjets(projets, { ouvertId = null, quandOuvrir }) {
+export function ouvrirCarteProjets(projets, { ouvertId = null, appareilId = null, quandOuvrir }) {
   const dossiers = lireDossiers();
   const fond = document.createElement('div');
   fond.className = 'carte-projets';
@@ -50,6 +52,11 @@ export function ouvrirCarteProjets(projets, { ouvertId = null, quandOuvrir }) {
   let tuiles = new Map(); // adresse → image
   let fondIndisponible = false;
 
+  // Nom de l'appareil qui a la main sur ce projet (Drive), si ce n'est pas celui-ci ; sinon null (0.217.0).
+  const ouvertAilleurs = (p) => {
+    const verrou = p.drive?.verrou;
+    return verrou && verrou.appareilId !== appareilId && verrouActif(verrou) ? verrou.nom ?? '?' : null;
+  };
   const visibles = () => projets.filter((p) => p.centre && (filtre === '' || dossierDuProjet(dossiers, p.id) === filtre));
   const taille = () => ({ largeur: zone.clientWidth || 1, hauteur: zone.clientHeight || 1 });
 
@@ -101,7 +108,7 @@ export function ouvrirCarteProjets(projets, { ouvertId = null, quandOuvrir }) {
       const { x, y } = versEcran(vue, largeur, hauteur, p.centre.est, p.centre.nord);
       if (x < -150 || y < -40 || x > largeur + 150 || y > hauteur + 40) return '';
       return `<button type="button" class="etiquette-carte-projet ${p.id === choisi ? 'choisie' : ''} ${p.id === ouvertId ? 'ouvert' : ''}" data-projet="${echapper(p.id)}"
-        style="left: ${x.toFixed(1)}px; top: ${y.toFixed(1)}px"><span class="repere-carte-projet"></span><span class="nom-carte-projet">${echapper(p.titre)}</span></button>`;
+        style="left: ${x.toFixed(1)}px; top: ${y.toFixed(1)}px"><span class="repere-carte-projet"></span><span class="nom-carte-projet">${ouvertAilleurs(p) ? '🔒 ' : ''}${echapper(p.titre)}</span></button>`;
     }).join('');
   }
 
@@ -113,7 +120,8 @@ export function ouvrirCarteProjets(projets, { ouvertId = null, quandOuvrir }) {
     const nomDossier = dossier === SANS_DOSSIER ? '' : (liste.find((d) => d.id === dossier)?.nom ?? '');
     const date = p.modifieLe ? new Date(p.modifieLe).toLocaleDateString('fr-CH') : '';
     fiche.innerHTML = `<div class="texte-fiche-carte"><strong>${echapper(p.titre)}</strong>
-        <span class="aide">${[nomDossier ? `📁 ${echapper(nomDossier)}` : '', date, `${p.local ? '📱' : ''}${p.drive ? '☁' : ''}`].filter(Boolean).join(' · ')}</span></div>
+        <span class="aide">${[nomDossier ? `📁 ${echapper(nomDossier)}` : '', date, `${p.local ? '📱' : ''}${p.drive ? '☁' : ''}`].filter(Boolean).join(' · ')}</span>
+        ${ouvertAilleurs(p) ? `<span class="verrou-drive">🔒 Ouvert sur ${echapper(ouvertAilleurs(p))}</span>` : ''}</div>
       <button type="button" class="bouton" data-action="ouvrir-carte" ${p.id === ouvertId ? 'disabled' : ''}>${p.id === ouvertId ? 'Projet ouvert' : 'Ouvrir'}</button>`;
   }
 
@@ -220,7 +228,15 @@ export function ouvrirCarteProjets(projets, { ouvertId = null, quandOuvrir }) {
   });
   const auRedimensionnement = () => vue && dessiner();
   window.addEventListener('resize', auRedimensionnement);
-  return { fermer };
+  return {
+    fermer,
+    miseAJour(nouveaux) {
+      projets = nouveaux;
+      if (!vue) return;
+      dessinerEtiquettes();
+      dessinerFiche();
+    },
+  };
 }
 
 const distanceEntre = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);

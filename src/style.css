@@ -13572,3 +13572,13 @@ body.mode-telephone .instruction-regle.proche b { font-size: 0.75rem; }
 .texte-fiche-carte strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sans-position-carte { margin: 0; padding: 4px 14px calc(6px + env(safe-area-inset-bottom, 0px)); font-size: 0.75rem; color: #5f6d77; background: #ffffff; }
 .sans-position-carte:empty { display: none; }
+
+/* 0.217.0 : ligne colorée sous le titre d'une fenêtre (import d'un plan : déjà en MN95 ou à recaler). */
+.note-fenetre { margin: 4px 0 8px; padding: 8px 10px; border-radius: 8px; font-size: 0.9em; font-weight: 600; }
+.note-fenetre.note-ok { background: #dcfce7; color: #166534; }
+.note-fenetre.note-alerte { background: #ffedd5; color: #9a3412; }
+body.theme-sombre .note-fenetre.note-ok { background: #14532d; color: #bbf7d0; }
+body.theme-sombre .note-fenetre.note-alerte { background: #7c2d12; color: #fed7aa; }
+/* 0.217.0 : « 🔒 Ouvert sur xxx » bien visible dans la liste des projets et sur la carte. */
+.verrou-drive { display: inline-block; margin-top: 2px; padding: 2px 8px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-weight: 700; }
+body.theme-sombre .verrou-drive { background: #7f1d1d; color: #fecaca; }

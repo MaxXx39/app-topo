@@ -1657,10 +1657,15 @@ document.querySelector('#bouton-mode').addEventListener('click', () => ouvrirFen
 function ouvrirCarteDesProjets() {
   const projets = projetsReunis(resumes, partage ? { etat: partage.etat, appareil: partage.appareil() } : null, 'date');
   navigation?.fermer();
-  ouvrirCarteProjets(projets, {
+  const carte = ouvrirCarteProjets(projets, {
     ouvertId: projet.id,
+    appareilId: partage?.appareil().id ?? null,
     quandOuvrir: (p) => (p.local ? actionsProjet.ouvrirProjet(p.id) : actionsProjet.ouvrirDrive(p.drive.dossierId)),
   });
+  // La liste de Drive est relue à l'ouverture : « 🔒 ouvert sur xxx » est à jour, la carte se redessine.
+  if (partage?.etat.connecte) {
+    partage.rafraichirListe().then(() => carte.miseAJour(projetsReunis(resumes, { etat: partage.etat, appareil: partage.appareil() }, 'date'))).catch(() => {});
+  }
 }
 
 let fenetreReglages = null;
@@ -1914,13 +1919,18 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       if (ignores.length > 0) avertissements.push(`Non affiché(s) : ${ignores.map(([type, n]) => `${n} ${type}`).join(', ')} (hachures, images… : seuls les traits, textes, cercles et aplats sont lus).`);
       // 0.194.0 (Expert) : nom, type (GEOOFF, TER, CANA…) et recalage au choix, avant de ranger le plan.
       const types = lireTypesDxf();
+      // 0.217.0 : la fenêtre dit si le plan est déjà en coordonnées suisses (MN95) ou non, et propose le recalage qui va avec.
+      const dejaEnMn95 = estEnMn95(lu.bornes);
       const choix = await demanderChamps({
         titre: `Plan « ${fichier.name} »`,
+        note: dejaEnMn95
+          ? { ton: 'ok', texte: '✓ Coordonnées suisses (MN95) : le plan semble déjà en place.' }
+          : { ton: 'alerte', texte: '⚠ Pas en coordonnées suisses (MN95) : le plan est à recaler.' },
         champs: [
           { cle: 'nom', titre: 'Nom du plan', valeur: lu.nom ?? fichier.name.replace(/\.dxf$/i, '') },
           { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...types.map((t) => [t.nom, t.nom])], valeur: '' },
           // 0.214.0 : « Non (déjà calé) » : le plan est déjà en MN95, rien à recaler ni à signaler.
-          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: 'non' },
+          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: dejaEnMn95 ? 'cale' : 'oui' },
         ],
       });
       if (!choix) {
@@ -1965,8 +1975,10 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       const enImage = contenu.traits.length === 0 && contenu.textes.length === 0;
       if (enImage && contenu.images === 0) throw new Error('aucun trait ni image sur cette page');
       afficherMessage(enImage ? 'PDF scanné : il sera posé en image' : `PDF en traits : ${contenu.traits.length} traits`, 2500);
+      // 0.217.0 : comme pour un DXF, la fenêtre le dit : un PDF est une page (en points), jamais en coordonnées suisses.
       const valeurs = await demanderChamps({
         titre: `Plan PDF « ${fichier.name} »${enImage ? ' (image)' : ''}`,
+        note: { ton: 'alerte', texte: '⚠ Un PDF n\'est pas en coordonnées suisses (MN95) : le plan est à recaler.' },
         champs: [
           { cle: 'echelle', titre: 'Échelle du plan 1:', valeur: '', exemple: '500 (vide si inconnue)' },
           // 0.145.0 (liste du 05.11, point 10, à essayer) : PDF en traits montré comme le PDF (image de la
@@ -7030,6 +7042,8 @@ const actionsProjet = {
   envoyerDrive: () => partage.envoyerMaintenant(),
   reprendreLaMain: () => partage.prendreLaMain(),
   ouvrirDrive: (dossierId) => avecChargement(() => partage.ouvrirDepuisDrive(dossierId)),
+  // 0.217.0 : relecture silencieuse de la liste de Drive (ouverture de la liste des projets) ; pas de message si ça échoue.
+  rafraichirDriveEnDouce: () => { if (partage?.etat.connecte) partage.rafraichirListe().catch(() => {}); },
   rafraichirDrive: () => partage.rafraichirListe().catch((erreur) => afficherMessage(`Drive : ${erreur.message}`, 4000)),
 };
 const ecranProjet = creerEcranProjet(document.querySelector('#projets'), actionsProjet, document.querySelector('#projets-suite'));

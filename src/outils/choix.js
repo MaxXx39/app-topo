@@ -84,10 +84,11 @@ export function demanderTexte({ titre, valeur = '', prefixe = '' }) {
 
 /**
  * Petite fenêtre avec plusieurs cases à remplir puis « OK » (ex. nouveau projet : affaire,
- * désignation). champs : [{ cle, titre, exemple, valeur (texte déjà là, facultatif) }]. Renvoie { cle: texte tapé } avec OK, ou null
+ * désignation). champs : [{ cle, titre, exemple, valeur (texte déjà là, facultatif) }]. note (0.217.0, facultative) :
+ * { texte, ton: 'ok' | 'alerte' } = une ligne colorée sous le titre (ex. « ✓ déjà en coordonnées suisses »). Renvoie { cle: texte tapé } avec OK, ou null
  * si la fenêtre est fermée (✕, touche retour, Échap) : rien n'est fait.
  */
-export function demanderChamps({ titre, champs }) {
+export function demanderChamps({ titre, champs, note = null }) {
   return new Promise((resoudre) => {
     const fenetre = document.createElement('dialog');
     fenetre.className = 'fenetre-choix fenetre-champs';
@@ -96,6 +97,7 @@ export function demanderChamps({ titre, champs }) {
         <h2>${echapper(titre)}</h2>
         <button type="button" class="bouton-retour" data-cle="fermer" title="Fermer" aria-label="Fermer">✕</button>
       </div>
+      ${note ? `<p class="note-fenetre note-${note.ton === 'ok' ? 'ok' : 'alerte'}">${echapper(note.texte)}</p>` : ''}
       ${champs.map((c) => (c.choix
         // Liste à choix (0.125.0, ex. le dossier d'un nouveau projet) : choix = [[valeur, texte], ...].
         ? `<label>${echapper(c.titre)}<select data-champ="${echapper(c.cle)}">${c.choix.map(([v, t]) => `<option value="${echapper(v)}" ${v === (c.valeur ?? '') ? 'selected' : ''}>${echapper(t)}</option>`).join('')}</select></label>`
