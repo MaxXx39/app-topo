@@ -1,11 +1,11 @@
 // Dessin d'une coupe en direct (onglet Terrain, mode Implanter) : le profil de la surface sur
 // quelques mètres de part et d'autre du récepteur, et le bout de canne dessus (SVG).
-// 0.190.0 : cadre fixe, bout de canne au milieu ; échelle des hauteurs ×0,5 à ×3. 0.210.0 : cadre 25 % moins haut (hauteur = 0,6 × largeur).
+// 0.190.0 : cadre fixe, bout de canne au milieu ; échelle des hauteurs ×0,5 à ×3. 0.210.0 : cadre 25 % moins haut ; 0.212.0 : encore 25 % moins haut (hauteur = 0,45 × largeur).
 
 // Largeur du dessin (unités du SVG, il s'adapte ensuite à la largeur de l'écran) et marges.
 const LARGEUR = 340;
 const MARGES = { gauche: 46, droite: 8, haut: 18, bas: 18 };
-const RAPPORT_HAUTEUR = 0.6; // hauteur du cadre = 0,6 × sa largeur (0.210.0, demande du 11.11 : 3 m pour 5 m de large à ×1, avant 4 m)
+const RAPPORT_HAUTEUR = 0.45; // hauteur du cadre = 0,45 × sa largeur (0.212.0, demande du 12.11 : 2,25 m pour 5 m de large à ×1 ; 0.210 : 0,6 ; avant : 0,8)
 
 // Grille (0.90.1, Expert) : un trait gris tous les mètres ; plus espacé (2, 5, 10 m…) si les traits
 // seraient à moins de ECART_GRILLE_MIN unités du SVG l'un de l'autre.
@@ -39,7 +39,7 @@ export function valeursGrille(debut, fin, pas) {
  * - grille : vrai pour la grille grise en longueur et en hauteur (Expert)
  */
 export function svgCoupeDirecte({ lignes, lignesBase = null, delta = 0, demiLongueur, altitudeCanne, classe, exageration = 1, sens = '', titre, gauche, droite, grille = true }) {
-  // 0.190.0 (maquette B du 10.11) : cadre FIXE (hauteur = 0,6 × largeur : 3 m pour 5 m, 6 m pour 10 m…), le bout de canne
+  // 0.190.0 (maquette B du 10.11) : cadre FIXE (hauteur = 0,45 × largeur : 2,25 m pour 5 m, 4,5 m pour 10 m…), le bout de canne
   // toujours au milieu ; seule l'échelle change (largeur 5 / 10 / 20 m…, hauteurs ×0,5, ×0,75, ×1, ×1,5, ×2, ×3).
   const longueur = 2 * demiLongueur;
   const largeurUtile = LARGEUR - MARGES.gauche - MARGES.droite;
@@ -115,7 +115,7 @@ export function svgCoupeDirecte({ lignes, lignesBase = null, delta = 0, demiLong
 
 /**
  * Boutons d'échelle d'une coupe (0.190.0, maquette B du 10.11, dès Intermédiaire) : « − 10 m + » (largeur de la coupe, la hauteur
- * suit : 0,6 × la largeur) et ▲ ×1,5 ▼ (échelle des hauteurs). Posés sur la coupe, hors de la zone qui se redessine
+ * suit : 0,45 × la largeur) et ▲ ×1,5 ▼ (échelle des hauteurs). Posés sur la coupe, hors de la zone qui se redessine
  * 5 fois par seconde (sinon un appui serait perdu).
  */
 export function controlesEchelleCoupe(texteLargeur, exageration, actionLargeur, actionHauteur, idLargeur = '') {

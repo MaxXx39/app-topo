@@ -19,7 +19,6 @@
 import { creerSurface, nouvelIdentifiant, NATURES, avecPrefixe, PREFIXE_LEVE, PREFIXE_SURFACE } from './surface.js';
 import { creerLigne } from './noms.js';
 import { nomsDeLaMesure } from './mesure.js';
-import { nomsDuRecollement } from './reseau.js';
 
 /** Rôles d'un point levé : [clé, nom affiché]. */
 export const ROLES_LEVE = [
@@ -279,11 +278,6 @@ export function numeroElementLibre(projet, type, libelle, sauf = null) {
       if (ligne !== sauf && ligne.libelle === libelle && ligne.numero) plusGrand = Math.max(plusGrand, ligne.numero);
     }
   }
-  // Aires et longueurs des métrés (voir topo/metre.js) : leur numéro est réservé aussi.
-  const typeDeMesure = { A: 'aire', L: 'longueur' }[type];
-  for (const mesure of projet.mesures ?? []) {
-    if (mesure.metreId && mesure.type === typeDeMesure && mesure.libelle === libelle && mesure.numero) plusGrand = Math.max(plusGrand, mesure.numero);
-  }
   return plusGrand + 1;
 }
 
@@ -385,14 +379,14 @@ export function resumeStock(surface) {
   };
 }
 
-// --- Supprimer un levé du Terrain (surface levée, métré ou levé libre) et ses points ---
+// --- Supprimer un levé du Terrain (surface levée ou levé libre) et ses points ---
 
 /** Noms des points d'une surface ou d'un levé libre (contour, lignes, points choisis). */
 const nomsDeLaLevee = (objet) => [...(objet.contour ?? []), ...(objet.lignesRupture ?? []).flatMap((l) => l.noms), ...(objet.points ?? []).filter((p) => typeof p === 'string')];
 
-/** Le levé (surface, métré ou levé libre) d'identifiant "id", avec la liste où il est rangé ; ou null. */
+/** Le levé (surface ou levé libre) d'identifiant "id", avec la liste où il est rangé ; ou null. */
 function trouverLevee(projet, id) {
-  for (const cle of ['surfaces', 'metres', 'autres', 'reseaux']) {
+  for (const cle of ['surfaces', 'autres']) {
     const objet = (projet[cle] ?? []).find((o) => o.id === id);
     if (objet) return { objet, cle };
   }
@@ -400,28 +394,26 @@ function trouverLevee(projet, id) {
 }
 
 /**
- * Points qui partent avec ce levé : les siens (pour un métré, ceux de ses mesures), sauf ceux
- * qu'utilise encore une autre surface, un autre levé libre ou une autre mesure du même levé du jour.
- * Renvoie [nom].
+ * Points qui partent avec ce levé : les siens, sauf ceux qu'utilise encore une autre surface, un
+ * autre levé libre ou une autre mesure du même levé du jour. Renvoie [nom].
  */
 export function pointsDeLaLevee(projet, id) {
   const trouve = trouverLevee(projet, id);
   if (!trouve) return [];
-  const { objet, cle } = trouve;
-  const propres = cle === 'metres' ? projet.mesures.filter((m) => m.metreId === id).flatMap(nomsDeLaMesure)
-    : cle === 'reseaux' ? nomsDuRecollement(objet) : nomsDeLaLevee(objet);
+  const { objet } = trouve;
+  const propres = nomsDeLaLevee(objet);
   const memeLeve = (o) => o.leveId === objet.leveId && o.id !== id;
   const utilises = new Set([
     ...projet.surfaces.filter(memeLeve).flatMap(nomsDeLaLevee),
     ...(projet.autres ?? []).filter(memeLeve).flatMap(nomsDeLaLevee),
-    ...projet.mesures.filter((m) => m.leveId === objet.leveId && m.metreId !== id).flatMap(nomsDeLaMesure),
+    ...projet.mesures.filter((m) => m.leveId === objet.leveId).flatMap(nomsDeLaMesure),
   ]);
   return [...new Set(propres)].filter((nom) => !utilises.has(nom));
 }
 
 /**
- * Supprime un levé du Terrain : la surface (ou le métré et ses mesures, ou le levé libre) et ses
- * points (voir pointsDeLaLevee) ; le levé du jour, s'il n'a plus rien, part aussi.
+ * Supprime un levé du Terrain : la surface (ou le levé libre) et ses points (voir pointsDeLaLevee) ;
+ * le levé du jour, s'il n'a plus rien, part aussi.
  * Renvoie { nom, points (nombre de points enlevés) } ou null s'il n'existe pas.
  */
 export function supprimerLevee(projet, id) {
@@ -430,11 +422,10 @@ export function supprimerLevee(projet, id) {
   const { objet, cle } = trouve;
   const aRetirer = new Set(pointsDeLaLevee(projet, id));
   projet[cle] = projet[cle].filter((o) => o.id !== id);
-  if (cle === 'metres') projet.mesures = projet.mesures.filter((m) => m.metreId !== id);
   const leve = projet.leves.find((l) => l.id === objet.leveId);
   if (leve) {
     leve.points = leve.points.filter((p) => !aRetirer.has(p.nom));
-    const encoreUtilise = [...projet.surfaces, ...(projet.metres ?? []), ...(projet.autres ?? []), ...(projet.reseaux ?? []), ...projet.mesures].some((o) => o.leveId === leve.id);
+    const encoreUtilise = [...projet.surfaces, ...(projet.autres ?? []), ...projet.mesures].some((o) => o.leveId === leve.id);
     if (leve.points.length === 0 && !encoreUtilise) projet.leves = projet.leves.filter((l) => l !== leve);
   }
   return { nom: objet.nom, points: aRetirer.size };

@@ -17,7 +17,7 @@ import { echapper } from '../outils/echapper.js';
 import { anydeskDisponible, ouvrirAnydesk } from '../android/pont.js';
 import { demanderCode } from '../outils/code.js';
 import { lireListesPartagees } from './listes-partagees.js';
-import { modifierLibellesDeSorte, modifierReseaux } from '../leve/fenetre-libelles.js';
+import { modifierLibellesDeSorte } from '../leve/fenetre-libelles.js';
 import { ouvrirFenetreListes } from './fenetre-listes.js';
 import { apkPublie, estPlusRecente } from '../outils/mise-a-jour.js';
 
@@ -220,12 +220,6 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
           <button type="button" class="bouton-secondaire" data-action="libelles" data-valeur="aires">Aires</button>
         </span>
       </div>
-      <div class="case-reglage listes-reglages seulement-expert">
-        <span><strong>Réseaux du recollement</strong><span class="aide">partagés par Drive</span></span>
-        <span class="boutons-libelles">
-          <button type="button" class="bouton-secondaire" data-action="reseaux">Réseaux</button>
-        </span>
-      </div>
       <div class="case-reglage listes-reglages seulement-intermediaire">
         <span><strong>Listes partagées</strong><span class="aide" data-zone="compte-listes">${compteListes()}</span></span>
         <button type="button" class="bouton-secondaire" data-action="listes">Modifier</button>
@@ -313,10 +307,6 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     }
     if (evenement.target.closest('[data-action="listes"]')) {
       modifierListes();
-      return;
-    }
-    if (evenement.target.closest('[data-action="reseaux"]')) {
-      modifierReseaux(() => changerMode?.());
       return;
     }
     const libelles = evenement.target.closest('[data-action="libelles"]');

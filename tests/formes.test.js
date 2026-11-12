@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { apercuForme, centrePointLeger, cheminControle, cheminForme, formeEnTrait, formeVide, FORMES, rayonPointLeger, symboleDeForme } from '../src/plan/formes.js';
+import { apercuForme, centrePointLeger, cheminControle, cheminForme, formeEnTrait, formeVide, FORMES, marqueCentre, rayonPointLeger, symboleDeForme } from '../src/plan/formes.js';
 
 describe('formes des points (0.97.0)', () => {
   it('donne un tracé pour chaque forme, sauf le rond', () => {
@@ -67,5 +67,24 @@ describe('formes 0.206.0 : triangles vides réservés, bulle, point de contrôle
     expect(apercuForme('carre-vide')).toContain('apercu-point');
     expect(apercuForme('carre')).not.toContain('apercu-point');
     expect(apercuForme('croix')).not.toContain('apercu-point');
+  });
+});
+
+describe('marque au centre d\'un point selon son type (0.212.0)', () => {
+  it('levé = rond noir, importé = carré noir, dessiné = losange noir, contrôle = triangle rouge', () => {
+    expect(marqueCentre('leve', 10, 10, 10)).toMatchObject({ forme: 'rond', chemin: null, couleur: '#000000', r: rayonPointLeger(10) });
+    expect(marqueCentre('import', 10, 10, 10)).toMatchObject({ forme: 'carre', couleur: '#000000' });
+    expect(marqueCentre('dessin', 10, 10, 10)).toMatchObject({ forme: 'losange', couleur: '#000000' });
+    expect(marqueCentre('controle', 10, 10, 10)).toMatchObject({ forme: 'triangle', couleur: '#dc2626' });
+  });
+
+  it('annotation (ou type inconnu) : rien', () => {
+    expect(marqueCentre('annotation', 10, 10, 10)).toBeNull();
+    expect(marqueCentre('autre', 10, 10, 10)).toBeNull();
+  });
+
+  it('le carré est à la taille de l\'ancien point léger, centré', () => {
+    const r = rayonPointLeger(10); // 3 px
+    expect(marqueCentre('import', 10, 10, 10).chemin).toBe(`M${(10 - r).toFixed(1)} ${(10 - r).toFixed(1)}L${(10 + r).toFixed(1)} ${(10 - r).toFixed(1)}L${(10 + r).toFixed(1)} ${(10 + r).toFixed(1)}L${(10 - r).toFixed(1)} ${(10 + r).toFixed(1)}Z`);
   });
 });

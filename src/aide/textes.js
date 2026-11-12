@@ -42,7 +42,7 @@ export const TEXTES_AIDE = {
   surfaces:
     'Une surface (stock, terrain, terrassement) se crée avec les points d\'un levé (contour, lignes de rupture, points) ou s\'importe (LandXML, DXF). Touche-la sur le plan pour la choisir.',
   nature:
-    'Ce que représente le levé : Stock, Terrain, Recollement… À choisir d\'abord ; il donne le nom automatique. Modifiable plus tard (« C\'est : »).',
+    'Ce que représente le levé : Stock, Terrain, Chantier… À choisir d\'abord ; il donne le nom automatique. Modifiable plus tard (« C\'est : »).',
   contour:
     'Bord de la surface, dans l\'ordre ; le polygone se ferme tout seul. Seul l\'intérieur est gardé. Sans contour, le bord suit les points extérieurs.',
   ligne:
@@ -51,8 +51,6 @@ export const TEXTES_AIDE = {
     'Points isolés ou caractéristiques, ni sur le contour ni sur une ligne. Par défaut, tous ceux du contour sont pris ; décoche pour les choisir un par un.',
   choisirPoints:
     'Choisis les points : une série proposée, une liste tapée (« b100 à b116, b120 »), le plan (retoucher = retirer) ou la liste cochée.',
-  recollement:
-    'Un levé par réseau (EU, EC, AEP…). Choisis l\'élément (ouvrage, tuyau, vanne…) puis prends le point. Fil d\'eau = dessus − diamètre. Exports PDF, DXF, CSV, LandXML.',
   lignesLevee:
     'Contour, lignes et points isolés du levé en cours : touche un nom pour voir ses points. ✕ supprime un point ; ✂ coupe une ligne entre deux points.',
   journalNmea:

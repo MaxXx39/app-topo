@@ -10,7 +10,7 @@ export const SEUIL_POINTS_CANVAS = 1500;
 /**
  * Regroupe les points par façon de les dessiner (couleur, trait ou plein, pâli), pour peindre
  * chaque groupe d'un seul coup (bien plus rapide qu'un point à la fois).
- * points : [{ x, y, trace (chemin SVG ou null = rond), trait (vrai = forme vide / croix), couleur, pale }]
+ * points : [{ x, y, trace (chemin SVG ou null = rond), trait (vrai = forme vide / croix), couleur, pale, marque (voir marqueCentre) }]
  * Renvoie une Map "couleur|trait|pale" → liste de points.
  */
 export function grouperPoints(points) {
@@ -81,6 +81,18 @@ export function dessinerPointsCanvas(canvas, points, { rayon, largeur, hauteur, 
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 1.2;
       ctx.stroke(chemin);
+    }
+  }
+  // 0.212.0 : marque au centre selon le type (levé = rond noir, importé = carré noir), par-dessus les formes.
+  for (const p of points) {
+    if (!p.marque) continue;
+    ctx.globalAlpha = p.pale ? 0.5 : 1;
+    ctx.fillStyle = p.marque.couleur;
+    if (p.marque.chemin) ctx.fill(new Path2D(p.marque.chemin));
+    else {
+      ctx.beginPath();
+      ctx.arc(p.marque.x, p.marque.y, p.marque.r, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
   ctx.globalAlpha = 1;

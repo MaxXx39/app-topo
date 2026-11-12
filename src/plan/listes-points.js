@@ -2,23 +2,20 @@
 // levée ou importée, à cocher pour l'afficher. Depuis 0.94.0 (tableau « Affichage » du 29.10.2026),
 // rangées par catégories (section), dans cet ordre (voir SECTIONS) :
 // - 'controle' : les points de contrôle ;
-// - 'leve' : les levés (stock, terrain, recollement, terrassement, surface d'un dessin, levés libres),
+// - 'leve' : les levés (stock, terrain, terrassement, chantier, surface d'un dessin, levés libres),
 //   avec leurs points, contours, lignes, triangles et volumes ;
 // - 'surface' : les surfaces importées (LandXML, DXF 3D) ;
 // - 'dessin' : les dessins (Calculs › Dessin) ;
-// - 'metre' : les métrés (leurs points et leurs mesures), et « Mesures » (faites à la main) ;
+// - 'mesures' : « Mesures » (aires, longueurs et points comptés faits à la main, dans Calculs › Mesures) ;
 // - 'points' : « Points Import » : fichiers de points importés et « Points ajoutés ».
 // Les points, contours, lignes, triangles et mesures ne sont dessinés que pour les listes cochées.
 // - une surface (stock, terrain naturel, terrassement) : les points de son contour, de ses lignes
 //   et ses points (tous les points du levé si elle les prend tous) ;
-// - un métré : les points de ses aires, longueurs et points comptés ;
 // - un levé « Autres » : ses lignes et ses points ;
 // - un fichier de points importé, et le levé « Points ajoutés » : tous leurs points.
 // Les listes décochées sont rangées dans le projet (projet.listesCachees : leurs identifiants).
 import { estImportee } from '../topo/surface.js';
 import { estLeveDirect } from '../topo/leve-direct.js';
-import { nomsDuRecollement } from '../topo/reseau.js';
-import { couleurDuReseau } from '../leve/reseaux.js';
 
 // Identifiant de la case « Mesures » (mesures faites à la main).
 export const LISTE_MESURES = 'mesures-calculs';
@@ -49,15 +46,15 @@ export const SECTIONS = [
   ['controle', 'Contrôle'],
   ['surface', 'Surface Import'],
   ['dessin', 'Dessin'],
-  ['metre', 'Métré'],
+  ['mesures', 'Mesures'],
   ['annotation', 'Annotations'],
 ];
 
 const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? []).flatMap((l) => l.noms), ...(s.points ?? [])];
 
 /**
- * Listes du projet : [{ id, nom, nature ('stock', 'terrain', 'terrassement', 'metre', 'mesures',
- * 'autres', 'fichier', 'ajoutes', 'controle', 'dessin'), section ('points', 'surfaces', 'metres'),
+ * Listes du projet : [{ id, nom, nature ('stock', 'terrain', 'terrassement', 'mesures',
+ * 'autres', 'fichier', 'ajoutes', 'controle', 'dessin'), section ('points', 'surfaces', 'mesures'),
  * leveId (ou null : pas de points à dessiner), noms (Set des noms de points, ou null = tous ceux du
  * levé), visible, couleur (choisie pour la liste, ou pour son levé dans Projet ; ou null),
  * couleurModifiable (vrai pour les listes de la partie « Points », sauf les points de contrôle) }].
@@ -65,7 +62,7 @@ const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? [])
 export function listesDePoints(projet) {
   const cachees = new Set(projet.listesCachees ?? []);
   const listes = [];
-  const SECTION_DE = { cadastre: 'cadastre', fichier: 'points', ajoutes: 'points', autres: 'leve', annotation: 'annotation', controle: 'controle', dessin: 'dessin', metre: 'metre', mesures: 'metre', importee: 'surface' };
+  const SECTION_DE = { cadastre: 'cadastre', fichier: 'points', ajoutes: 'points', autres: 'leve', annotation: 'annotation', controle: 'controle', dessin: 'dessin', mesures: 'mesures', importee: 'surface' };
   const couleurs = projet.couleursListes ?? {};
   const ajouter = (id, nom, nature, leveId, noms) => {
     const section = SECTION_DE[nature] ?? 'leve';
@@ -90,19 +87,9 @@ export function listesDePoints(projet) {
     }
     ajouter(s.id, s.nom, s.nature ?? 'stock', s.leveId, s.tousLesPoints ? null : new Set(nomsDeLaSurface(s)));
   }
-  for (const metre of projet.metres ?? []) {
-    // 0.106 : tous les points levés du métré (avant : seulement ceux déjà dans une mesure terminée,
-    // donc rien à voir ni à toucher pendant le levé).
-    ajouter(metre.id, metre.nom, 'metre', metre.leveId, null);
-  }
-  // Mesures faites à la main (pas d'un métré) : une seule case, pour leurs traits et leurs valeurs.
-  if ((projet.mesures ?? []).some((m) => !m.metreId)) ajouter(LISTE_MESURES, 'Mesures', 'mesures', null, new Set());
+  // Mesures faites à la main (Calculs › Mesures) : une seule case, pour leurs traits et leurs valeurs.
+  if ((projet.mesures ?? []).length > 0) ajouter(LISTE_MESURES, 'Mesures', 'mesures', null, new Set());
   for (const autres of projet.autres ?? []) ajouter(autres.id, autres.nom, autres.nature === 'annotation' ? 'annotation' : 'autres', autres.leveId, new Set(nomsDeLaSurface(autres)));
-  // Recollements de réseaux (0.101.0) : leurs points, de la couleur du réseau (sauf couleur choisie).
-  for (const r of projet.reseaux ?? []) {
-    ajouter(r.id, r.nom, 'reseau', r.leveId, new Set(nomsDuRecollement(r)));
-    listes.at(-1).couleur ??= couleurDuReseau(r.reseau);
-  }
   // Points de contrôle : pas dans un levé, dessinés à part (triangles rouges, voir plan.js).
   if ((projet.pointsControle ?? []).length > 0) ajouter(LISTE_CONTROLE, 'Points de contrôle', 'controle', null, new Set());
   // Dessins (Calculs › Dessin) : une case par dessin (ses traits et ses sommets, en violet, voir plan/dessins.js).
@@ -202,12 +189,11 @@ export function montrerListe(projet, id, visible) {
 }
 
 /**
- * Mesures à dessiner sur le plan (hors de l'onglet des mesures) : celles des métrés cochés, et
- * celles faites à la main si « Mesures » est cochée.
+ * Mesures à dessiner sur le plan (hors de l'onglet des mesures) : celles-ci, si « Mesures » est cochée.
  */
 export function mesuresVisibles(projet, listes) {
   const visibles = new Set(listes.filter((l) => l.visible).map((l) => l.id));
-  return (projet.mesures ?? []).filter((m) => visibles.has(m.metreId ?? LISTE_MESURES));
+  return (projet.mesures ?? []).filter(() => visibles.has(LISTE_MESURES));
 }
 
 /** Liste de chaque point dessiné (la première liste cochée qui le contient) : Map point → id de la liste (0.192.0, réglages par liste). */

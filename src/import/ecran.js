@@ -671,7 +671,7 @@ function ligneCadastre(projet, leve) {
 
 /** Photos rattachées aux points d'un levé (rangées avec le levé, voir Lever), seulement celles d'un point de la liste. */
 function photosDuLeve(projet, leve) {
-  const proprietaire = [...(projet.surfaces ?? []), ...(projet.metres ?? []), ...(projet.autres ?? []), ...(projet.reseaux ?? [])].find((o) => o.leveId === leve.id);
+  const proprietaire = [...(projet.surfaces ?? []), ...(projet.autres ?? [])].find((o) => o.leveId === leve.id);
   const noms = new Set(leve.points.map((p) => p.nom));
   // 0.140.0 : aussi les photos de tout le levé (sans point), en premier.
   const photos = proprietaire?.photos ?? [];

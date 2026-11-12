@@ -1060,6 +1060,15 @@ svg.plan {
   stroke: none;
 }
 
+/* 0.212.0 : marque noire au centre d'un point selon son type : levé = rond, importé = carré, dessiné = losange
+   (le contrôle a un triangle rouge ci-dessus, l'annotation n'a rien). */
+.plan .marque-centre,
+.plan .points-legers .marque-centre {
+  fill: #000000;
+  stroke: none;
+  pointer-events: none;
+}
+
 /* 0.207.0 : aperçu d'une forme dans les listes de choix (libellés, Lever, levé chantier) : même style que le plan. */
 .apercu-forme {
   display: inline-block;
@@ -2624,18 +2633,11 @@ body.avec-recepteur .bandeaux-recepteur {
   --couleur-role: var(--succes);
 }
 
-/* Métré : aire, longueur, point compté, en cyan (la couleur des mesures). */
 .role-leve:is(.role-aire, .role-longueur, .role-compte) {
   --couleur-role: #0891b2;
 }
 
-.outils-ligne.outils-metre {
-  border-left-color: #0891b2;
-}
 
-.libelles-terrain.dans-metre .puce-libelle {
-  --couleur-libelle: #0891b2;
-}
 
 .role-leve.choisi {
   background: var(--couleur-role);
@@ -3145,9 +3147,6 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   display: none !important;
 }
 
-.bouton-nature.nature-metre {
-  --couleur-nature: #ea580c;
-}
 
 .choix-nature {
   margin: 8px 0;
@@ -3183,13 +3182,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   --couleur-nature: #15803d;
 }
 
-.bouton-nature.nature-recollement {
-  --couleur-nature: #16a34a;
-}
 
-.bouton-nature.nature-reseau {
-  --couleur-nature: #db2777;
-}
 
 .bouton-nature.nature-terrassement {
   --couleur-nature: #2563eb;
@@ -4954,13 +4947,7 @@ button.bouton-import {
   --couleur-nature: #15803d;
 }
 
-.entete-levee.nature-reseau {
-  --couleur-nature: #db2777;
-}
 
-.entete-levee.nature-recollement {
-  --couleur-nature: #16a34a;
-}
 
 .entete-levee.nature-terrassement {
   --couleur-nature: #2563eb;
@@ -4970,9 +4957,6 @@ button.bouton-import {
   --couleur-nature: #7c3aed;
 }
 
-.entete-levee.nature-metre {
-  --couleur-nature: #ea580c;
-}
 
 /* « Levé libre » (contrôle, points géomètre… ; « autres » dans le code) : gris ardoise. */
 .entete-levee.nature-autres,
@@ -5153,7 +5137,6 @@ button.bouton-import {
 .pastille-liste.liste-stock { background: #b45309; }
 .pastille-liste.liste-terrain { background: #15803d; }
 .pastille-liste.liste-terrassement { background: #2563eb; }
-.pastille-liste.liste-metre { background: #ea580c; }
 .pastille-liste.liste-autres { background: #475569; }
 .pastille-liste.liste-fichier { background: var(--sombre); }
 .pastille-liste.liste-ajoutes { background: #7c3aed; }
@@ -5580,10 +5563,8 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 }
 
 .ligne-levee.nature-terrain { --couleur-nature: #15803d; }
-.ligne-levee.nature-recollement { --couleur-nature: #16a34a; }
 .ligne-levee.nature-terrassement { --couleur-nature: #2563eb; }
 .ligne-levee.nature-surface { --couleur-nature: #7c3aed; }
-.ligne-levee.nature-metre { --couleur-nature: #ea580c; }
 .ligne-levee.nature-autres { --couleur-nature: #475569; }
 
 .choisir-levee {
@@ -5662,7 +5643,6 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 .section-menu-controle { --teinte-section: var(--rouge); }
 .section-menu-surface { --teinte-section: #7c3aed; }
 .section-menu-dessin { --teinte-section: var(--ambre-fonce); }
-.section-menu-metre { --teinte-section: var(--cyan); }
 
 .pastille-liste.liste-mesures { background: #0891b2; }
 
@@ -7617,7 +7597,6 @@ body.lecture-seule .bouton-photo-levee {
 
 .plan .nature-stock { --couleur-nature: #b45309; }
 .plan .nature-terrain { --couleur-nature: #15803d; }
-.plan .nature-recollement { --couleur-nature: #16a34a; }
 .plan .nature-terrassement { --couleur-nature: #2563eb; }
 .plan .nature-surface { --couleur-nature: #7c3aed; }
 
@@ -8610,173 +8589,7 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   stroke-width: 1;
 }
 
-/* --- Recollement de réseaux (0.101.0) : réseaux, éléments, attributs, bandeau, ouvrages --- */
-.choix-reseau .bouton-reseau span {
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.reseaux-leve,
-.elements-reseau {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  margin: 0 0 8px;
-}
-
-.puce-reseau {
-  --couleur-reseau: var(--gris);
-  min-height: 34px;
-  padding: 4px 10px;
-  border: 2px solid var(--couleur-reseau);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--couleur-reseau);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.puce-reseau.actif {
-  background: var(--couleur-reseau);
-  color: #ffffff;
-}
-
-.puce-nouveau-reseau {
-  min-width: 34px;
-  font-size: 1.1rem;
-}
-
-.reseaux-leve .bouton-crayon-libelles {
-  position: static;
-  margin-left: auto;
-  box-shadow: none;
-}
-
-.puce-element {
-  min-height: 34px;
-  padding: 4px 10px;
-  border: 1.5px solid var(--bordure);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--texte);
-  cursor: pointer;
-}
-
-.puce-element.element-ouvrage {
-  font-weight: 700;
-}
-
-.puce-element.actif {
-  border-color: var(--sombre);
-  background: var(--sombre);
-  color: #ffffff;
-}
-
-.cadre-reseau {
-  padding: 10px;
-  border: 2px solid var(--couleur-reseau);
-  border-radius: var(--rayon);
-}
-
-.cadre-reseau .conduite-en-cours {
-  --couleur-role: var(--couleur-reseau);
-}
-
-.coins-ouvrage {
-  margin: 4px 0 8px;
-  color: var(--couleur-reseau);
-}
-
-.attributs-reseau {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 6px;
-  margin: 8px 0;
-}
-
-.attribut-reseau {
-  display: grid;
-  gap: 2px;
-  font-size: 0.75rem;
-  color: var(--gris);
-}
-
-.attribut-reseau input,
-.attribut-reseau select {
-  min-height: 34px;
-  width: 100%;
-  font-size: 0.95rem;
-}
-
-.bandeau-reseau {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin: 8px 0;
-  padding: 8px 10px;
-  border-left: 4px solid var(--couleur-reseau);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--couleur-reseau) 10%, var(--surface));
-}
-
-.pente-troncon {
-  font-weight: 700;
-}
-
-.sens-ecoulement {
-  white-space: nowrap;
-}
-
-.mesures-ouvrage {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  align-items: center;
-  padding: 6px 0;
-}
-
-.mesures-ouvrage label {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.mesures-ouvrage input {
-  width: 6.5em;
-}
-
-.alerte-ouvrage {
-  color: var(--rouge);
-}
-
-.troncon-reseau {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 2px 10px;
-}
-
-/* Recollement sur le plan : conduites, flèches de pente, ouvrages. */
-.conduite-reseau {
-  stroke-width: 3;
-  stroke-linecap: round;
-}
-
-.fleche-reseau {
-  stroke: #ffffff;
-  stroke-width: 1;
-}
-
-.pente-reseau,
-.nom-ouvrage-reseau {
-  font-size: 11px;
-  font-weight: 700;
-  paint-order: stroke;
-  stroke: #ffffff;
-  stroke-width: 3px;
-}
-
+/* Ouvrage du Levé chantier sur le plan (cercle ou cadre d'une chambre) ; le Recollement a été supprimé en 0.212.0. */
 .ouvrage-reseau {
   fill: rgba(255, 255, 255, 0.85);
   stroke-width: 2.5;

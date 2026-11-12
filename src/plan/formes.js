@@ -43,6 +43,30 @@ export function centrePointLeger(forme, x, y, r) {
 }
 
 /**
+ * Marque au centre d'un point selon son type (0.212.0, demande du 12.11) : levé = rond noir, importé = carré noir,
+ * dessiné = losange noir, contrôle = triangle rouge ; annoté = rien. Même taille que l'ancien point léger (rayonPointLeger).
+ */
+export const MARQUES_CENTRE = { leve: 'rond', import: 'carre', dessin: 'losange', controle: 'triangle' };
+
+/**
+ * Marque du centre pour un point de ce type, centrée en (x, y) ; r = rayon des formes (pixels).
+ * Renvoie { type, forme ('rond', 'carre', 'losange', 'triangle'), x, y, r (rayon du rond), chemin (tracé SVG ; null pour le rond),
+ * couleur } ou null (annoté ou type inconnu : rien).
+ */
+export function marqueCentre(type, x, y, r) {
+  const forme = MARQUES_CENTRE[type];
+  if (!forme) return null;
+  const rp = rayonPointLeger(r);
+  const f = (v) => v.toFixed(1);
+  const polygone = (sommets) => `M${sommets.map(([px, py]) => `${f(px)} ${f(py)}`).join('L')}Z`;
+  let chemin = null;
+  if (forme === 'carre') chemin = polygone([[x - rp, y - rp], [x + rp, y - rp], [x + rp, y + rp], [x - rp, y + rp]]);
+  else if (forme === 'losange') chemin = polygone([[x, y - rp * 1.4], [x + rp * 1.4, y], [x, y + rp * 1.4], [x - rp * 1.4, y]]);
+  else if (forme === 'triangle') chemin = polygone([[x, y - rp * 1.4], [x + rp * 1.3, y + rp * 0.9], [x - rp * 1.3, y + rp * 0.9]]);
+  return { type, forme, x, y, r: rp, chemin, couleur: type === 'controle' ? '#dc2626' : '#000000' };
+}
+
+/**
  * Tracé SVG (attribut d) d'une forme centrée en (x, y), de « rayon » r (pixels). Le rond n'a pas de
  * tracé ici (cercle SVG) : renvoie null pour '' et 'rond-vide'.
  */

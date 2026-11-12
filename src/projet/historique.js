@@ -7,7 +7,7 @@
 // On les garde une seule fois (par leur identifiant) et on les remet en place quand on revient à une étape.
 
 // Parties du projet qui ont des photos (leurs images sont gardées une seule fois).
-const CLES_PHOTOS = ['surfaces', 'mesures', 'metres', 'autres'];
+const CLES_PHOTOS = ['surfaces', 'mesures', 'autres'];
 
 /** Nombre de retours en arrière possibles, par défaut. */
 const LIMITE = 50;

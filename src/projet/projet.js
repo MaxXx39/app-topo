@@ -19,9 +19,6 @@
 //   talus: [{ id, nom, ligne: { nom, sommets, segment, inverse, altitudes: { debut, fin } },
 //            reglages: { horizontal, vertical, ligneEst ('haut', 'bas'), cote ('droite', 'gauche'),
 //                        longueur (m ou null), terrainId, altitudeSurfaceId } }],  // « Mes talus » (voir topo/talus.js)
-//   metres: [{ id, nom, nature: 'metre', leveId, enCours }],   // métrés levés (voir topo/metre.js)
-//   reseaux: [{ id, nom, nature: 'reseau', reseau (EU…), leveId, ouvrages, conduites, enCours }],  // recollements
-//                                   // de réseaux (voir topo/reseau.js)
 //   autres: [{ id, nom, nature: 'autres', leveId, contour: [], lignesRupture, points }],  // levés « Autres »
 //                                   // (contrôle, points géomètre… : lignes et points, pas de surface ni de volume)
 //   implantations: [{ id, nom, cible: { est, nord, altitude }, mesure: { est, nord, altitude, gnss },
@@ -42,6 +39,7 @@ import { nouvelIdentifiant, estImportee, avecPrefixe, prefixeDuNom } from '../to
 import { PREFIXE_PDF } from '../topo/pdf-dxf.js';
 import { calculsDUnAncienProjet } from '../volumes/calculs.js';
 import { TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
+import { retirerMetreEtRecollement } from './retrait-metre-recollement.js';
 
 export const FORMAT = 'topo-projet';
 // Version 2 : calculs de volume (onglets Volumes et Comparer réunis) et nature des surfaces.
@@ -69,8 +67,6 @@ export function creerProjet(nom = '') {
     aImplanter: [],
     talus: [],
     implantations: [],
-    metres: [],
-    reseaux: [],
     autres: [],
     listesCachees: [],
     pointsControle: [],
@@ -175,8 +171,8 @@ export function completerProjet(projet) {
   complet.aImplanter ??= [];
   complet.talus ??= [];
   complet.implantations ??= [];
-  complet.metres ??= [];
-  complet.reseaux ??= [];
+  // 0.212.0 : Métré et Recollement supprimés : leurs données sont retirées (projet/retrait-metre-recollement.js).
+  retirerMetreEtRecollement(complet);
   complet.autres ??= [];
   complet.listesCachees ??= []; // listes de points décochées dans le menu « Points » du plan
   complet.pointsControle ??= [];
@@ -208,7 +204,7 @@ export function completerProjet(projet) {
  * points propre à un levé prend le même nom.
  */
 export function prefixerNoms(projet) {
-  for (const objet of [...projet.surfaces, ...(projet.metres ?? []), ...(projet.reseaux ?? []), ...(projet.autres ?? [])]) {
+  for (const objet of [...projet.surfaces, ...(projet.autres ?? [])]) {
     // Annotations d'avant 0.179.0 : « Anot-… » devient « Annot-… ».
     if (objet.nature === 'annotation' && /^Anot-/i.test(objet.nom)) {
       const liste = objet.leveId ? projet.leves.find((l) => l.id === objet.leveId) : null;

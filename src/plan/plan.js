@@ -24,7 +24,7 @@ import { svgDrapeau } from '../outils/drapeaux.js';
 import { traitsDeBarbules } from './barbules.js';
 import { pointALAbscisse } from '../topo/ligne-implantation.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne, formeDuNom } from '../leve/libelles.js';
-import { centrePointLeger, cheminControle, cheminForme, formeEnTrait, rayonPointLeger } from './formes.js';
+import { centrePointLeger, cheminControle, cheminForme, formeEnTrait, marqueCentre, rayonPointLeger } from './formes.js';
 import { couleurFlecheEcart, placerFlecheEcart } from './fleche-ecart.js';
 import { ouvrirVue3d } from './vue3d.js';
 import { lignesDesPlans } from '../topo/drapage.js';
@@ -68,7 +68,7 @@ const METRES_AUTOUR_DE_MOI = 20;
 //   triangles, couleurs selon l'altitude, courbes de niveau, altitudes des lignes et contours ;
 // - Volume (Expert) : déblai / remblai, étiquette du volume (cachés au départ) ;
 // - Surface Import : couleurs selon l'altitude (roue, tous les modes) ;
-// - Métré : traits et valeurs des mesures.
+// - Mesures : traits et valeurs des mesures (Calculs › Mesures).
 const CALQUES_DEPART = {
   fondSatellite: false, // 0.192.0 : fond décoché au départ (photo, ou carte nationale au-delà de 3 km), transparent à 60 % quand on le coche
   cadastre: false,
@@ -473,10 +473,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         const trace = cheminForme(forme, x, y, rayon);
         // Couleur du libellé d'abord (plus précise), sinon celle de la liste.
         const couleur = point.annotation ? couleursPoints.get(point) ?? COULEUR_ANNOTATION : point.chantier ? couleurNatureChantier(point.chantier.nature, couleursNat) : classes.get(point.nom) === 'role-mesure' ? null : couleurDuNom(point.nom, libelles) ?? (/^[PLA]-\d+(-\d+)?$/.test(point.nom ?? '') ? '#000000' : couleursPoints.get(point));
-        // 0.207.0 : une forme vide garde un petit point léger au centre (même couleur).
-        const centre = centrePointLeger(forme, x, y, rayon);
+        // 0.212.0 : une marque noire au centre selon le type (levé = rond, importé = carré) ; l'annotation n'en a pas
+        // et garde le petit point léger de sa bulle (0.207.0 : une forme vide a un petit point léger au centre).
+        const marque = marqueCentre(point.annotation ? 'annotation' : pointsImport.has(point) ? 'import' : 'leve', x, y, rayon);
+        const centre = marque ? null : centrePointLeger(forme, x, y, rayon);
         if (versCanvas) {
-          pourCanvas.push({ x, y, trace, trait: formeEnTrait(forme), pale: estPale(point.nom), couleur: couleur ?? couleursRoles.get(classes.get(point.nom) ?? ''), centre: centre ? { ...centre, r: rayonPointLeger(rayon) } : null });
+          pourCanvas.push({ x, y, trace, trait: formeEnTrait(forme), pale: estPale(point.nom), couleur: couleur ?? couleursRoles.get(classes.get(point.nom) ?? ''), centre: centre ? { ...centre, r: rayonPointLeger(rayon) } : null, marque });
         } else {
           const classe = `${classes.get(point.nom) ?? ''}${formeEnTrait(forme) ? ' forme-trait' : ''}${estPale(point.nom) ? ' pale' : ''}`;
           const rond = trace ? creerElement('path', { d: trace, class: classe }) : creerElement('circle', { cx: x, cy: y, r: rayon, class: classe });
@@ -484,6 +486,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           // 0.206.0 : une forme vide (ou une croix, une bulle) a un liseré noir dessous.
           if (formeEnTrait(forme)) groupePoints.append(liseretDessous(trace, x, y, rayon));
           groupePoints.append(rond);
+          if (marque) {
+            const reperage = `marque-centre${estPale(point.nom) ? ' pale' : ''}`;
+            groupeLegers.append(marque.chemin ? creerElement('path', { d: marque.chemin, class: reperage }) : creerElement('circle', { cx: x, cy: y, r: marque.r, class: reperage }));
+          }
           if (centre) {
             const leger = creerElement('circle', { cx: centre.x, cy: centre.y, r: rayonPointLeger(rayon), class: `${classes.get(point.nom) ?? ''} point-leger${estPale(point.nom) ? ' pale' : ''}` });
             if (couleur) leger.style.color = couleur;
@@ -615,51 +621,6 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       // Ligne du levé libre en cours (Lever) : nette, même si les autres sont pâlies.
       (palir && ligne.id === palir.stockId ? groupe : autres).append(element);
     }
-    // Recollements de réseaux (0.101.0) : conduites de la couleur du réseau, flèche du sens
-    // d'écoulement et pente au milieu de chaque tronçon ; ouvrages (rond ou cadre) avec leur nom.
-    for (const reseau of implantation.reseaux ?? []) {
-      for (const t of reseau.troncons) {
-        const a = versEcran(t.a.est, t.a.nord, vue);
-        const b = versEcran(t.b.est, t.b.nord, vue);
-        const trait = creerElement('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'conduite-reseau' });
-        trait.style.stroke = reseau.couleur;
-        autres.append(trait);
-        const longueur = Math.hypot(b.x - a.x, b.y - a.y);
-        if (longueur < 40 || t.pente == null) continue;
-        // Flèche vers le bas de la pente (sens d'écoulement), au milieu.
-        const [de, vers] = t.sens === 'b-a' ? [b, a] : [a, b];
-        const angle = (Math.atan2(vers.y - de.y, vers.x - de.x) * 180) / Math.PI;
-        const milieu = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-        if (t.sens !== 'plat') {
-          const fleche = creerElement('path', { d: 'M-7 -6 5 0-7 6Z', class: 'fleche-reseau', transform: `translate(${milieu.x} ${milieu.y}) rotate(${angle})` });
-          fleche.style.fill = reseau.couleur;
-          autres.append(fleche);
-        }
-        if (longueur < 90) continue;
-        const pente = creerElement('text', { x: milieu.x + 8, y: milieu.y - 8, class: 'pente-reseau' });
-        pente.style.fill = reseau.couleur;
-        pente.textContent = `${t.pente < 0 ? '−' : t.pente > 0 ? '+' : ''}${Math.abs(t.pente).toFixed(2)} %`;
-        autres.append(pente);
-      }
-      for (const o of reseau.ouvrages) {
-        const centre = versEcran(o.centre.est, o.centre.nord, vue);
-        let forme;
-        if (o.coins) forme = creerElement('path', { d: tracePar(o.coins.map((c) => versEcran(c.est, c.nord, vue)), true), class: 'ouvrage-reseau' });
-        else {
-          // Rayon : celui de la chambre (diamètre en mm) à l'échelle, au moins 6 pixels.
-          const rayon = Math.max(6, ((o.diametre ?? 0) / 2000) * vue.echelle);
-          forme = creerElement('circle', { cx: centre.x, cy: centre.y, r: rayon, class: 'ouvrage-reseau' });
-        }
-        forme.style.stroke = reseau.couleur;
-        autres.append(forme);
-        // Ouvrage rond : son point porte déjà son nom ; rectangulaire : le nom au centre du cadre.
-        if (!calques.noms || !o.coins) continue;
-        const nom = creerElement('text', { x: centre.x + 10, y: centre.y - 10, class: 'nom-ouvrage-reseau' });
-        nom.style.fill = reseau.couleur;
-        nom.textContent = o.nom;
-        autres.append(nom);
-      }
-    }
     // Levé chantier (0.175.0) : ouvrage rond = cercle de 60 cm (arbitraire), rectangulaire = son cadre à l'échelle.
     for (const forme of implantation.chantiers ?? []) {
       const element = forme.coins
@@ -685,7 +646,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         liseretDessous(forme.triangle, x, y, rayonControle),
         creerElement('path', { d: forme.triangle, class: 'controle-forme' }),
       );
-      groupeLegersControle.append(creerElement('circle', { cx: forme.point.x, cy: forme.point.y, r: rayonPointLeger(rayonFormes()), class: 'controle-point' }));
+      // 0.212.0 : le centre d'un point de contrôle est un petit triangle rouge (avant : un point rouge).
+      groupeLegersControle.append(creerElement('path', { d: marqueCentre('controle', forme.point.x, forme.point.y, rayonFormes()).chemin, class: 'controle-point' }));
     }
     autres.append(groupeControle, groupeLegersControle);
     const lignesControle = controles.map(({ point }) => [
@@ -828,7 +790,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     }
     if (choix) croix(choix.est, choix.nord, 'croix-choix', 12);
     // Dessins (Calculs › Dessin) et, pour celui en cours, le pilote.
-    dessinerDessins(groupe, implantation, (est, nord) => versEcran(est, nord, vue), creerElement, 1 / vue.echelle, calques.noms);
+    dessinerDessins(groupe, implantation, (est, nord) => versEcran(est, nord, vue), creerElement, 1 / vue.echelle, calques.noms, rayonFormes());
     // Mesure rapide (0.158.0) : points, côtés, longueurs et surface.
     dessinerMesureRapide(groupe, implantation.mesureRapide, (est, nord) => versEcran(est, nord, vue), creerElement);
     svg.append(groupe);
@@ -1208,7 +1170,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         groupe.append(creerElement('path', { d: bord, class: `bord-surface-importee ${nature}`, style }));
       }
 
-      // Levé sans contour (terrain, recollement… ; 0.90.1) : son bord et un fond léger, même sans le
+      // Levé sans contour (terrain… ; 0.90.1) : son bord et un fond léger, même sans le
       // calque Triangles (Expert), pour voir où il s'étend (implantation d'une surface en Base).
       const sansContour = (stock.contour ?? []).length < 3;
       if (!importee && sansContour && reglageListe('contourLeve', stock.id) && resultat?.trianglesDessus?.length && !(actif && reglageListe('triangles', stock.id))) {

@@ -14,43 +14,42 @@ function projetEssai() {
       { id: 's1', nom: 'Stock 1', nature: 'stock', leveId: 'f', contour: ['b1', 'b2'], lignesRupture: [{ noms: ['h1'] }], points: [], tousLesPoints: false },
       { id: 'lx', nom: 'Terrain', type: 'landxml', nature: 'terrain', points: [] },
     ],
-    metres: [{ id: 'm1', nom: 'Métré 1', leveId: 'j' }],
-    mesures: [{ id: 'me', metreId: 'm1', contour: ['A-ENR-1-1'], lignesRupture: [], points: [] }],
+    mesures: [{ id: 'me', contour: ['A-ENR-1-1'], lignesRupture: [], points: [] }],
     autres: [{ id: 'o1', nom: 'Autres 1', leveId: 'j', contour: [], lignesRupture: [{ noms: ['L-HT-1-1'] }], points: ['P-RG-1'] }],
     listesCachees: [],
   };
 }
 
 describe('Listes de points du plan', () => {
-  it('rangées par catégories (0.94.0) : Levé (levés et levés libres), Points Import, Surface Import, Métré', () => {
+  it('rangées par catégories (0.94.0) : Levé (levés et levés libres), Points Import, Surface Import, Mesures', () => {
     const listes = listesDePoints(projetEssai());
     expect(listes.map((l) => [l.id, l.nature, l.section])).toEqual([
       ['s1', 'stock', 'leve'], ['o1', 'autres', 'leve'],
       ['f', 'fichier', 'points'], ['a', 'ajoutes', 'points'],
       ['lx', 'importee', 'surface'],
-      ['m1', 'metre', 'metre'],
+      [LISTE_MESURES, 'mesures', 'mesures'],
     ]);
     expect(listes.filter((l) => l.couleurModifiable).map((l) => l.id)).toEqual(['s1', 'o1', 'f', 'a', 'lx']);
   });
 
-  it('mesures dessinées : celles des métrés cochés et, si « Mesures » est cochée, celles faites à la main', () => {
+  it('mesures dessinées : seulement si « Mesures » est cochée', () => {
     const projet = projetEssai();
     projet.mesures.push({ id: 'main', contour: [], lignesRupture: [], points: [] });
     let listes = listesDePoints(projet);
-    expect(listes.find((l) => l.id === LISTE_MESURES)?.section).toBe('metre');
+    expect(listes.find((l) => l.id === LISTE_MESURES)?.section).toBe('mesures');
     expect(mesuresVisibles(projet, listes).map((m) => m.id)).toEqual(['me', 'main']);
-    montrerListe(projet, 'm1', false);
+    montrerListe(projet, LISTE_MESURES, false);
     listes = listesDePoints(projet);
-    expect(mesuresVisibles(projet, listes).map((m) => m.id)).toEqual(['main']);
+    expect(mesuresVisibles(projet, listes)).toEqual([]);
   });
 
   it('dessine seulement les points des listes cochées, chacun une fois', () => {
     const projet = projetEssai();
-    expect(pointsDesListes(projet, listesDePoints(projet))).toHaveLength(8);
+    expect(pointsDesListes(projet, listesDePoints(projet))).toHaveLength(7);
     montrerListe(projet, 'f', false);
     montrerListe(projet, 'o1', false);
-    // Reste : Stock 1 (b1, b2, h1), Points ajoutés (P1), Métré 1 : tous les points de son levé (0.106).
-    expect(pointsDesListes(projet, listesDePoints(projet)).map((p) => p.nom)).toEqual(['b1', 'b2', 'h1', 'P1', 'P-RG-1', 'L-HT-1-1', 'A-ENR-1-1']);
+    // Reste : Stock 1 (b1, b2, h1) et Points ajoutés (P1).
+    expect(pointsDesListes(projet, listesDePoints(projet)).map((p) => p.nom)).toEqual(['b1', 'b2', 'h1', 'P1']);
     montrerListe(projet, 'f', true);
     expect(projet.listesCachees).toEqual(['o1']);
   });
@@ -63,7 +62,7 @@ describe('couleur des listes de points', async () => {
     const b = { nom: 'b', est: 1, nord: 1 };
     const projet = {
       leves: [{ id: 'f1', nom: 'fichier.csv', points: [a, b] }, { id: 'f2', nom: 'autre.csv', points: [{ nom: 'c', est: 2, nord: 2 }] }],
-      surfaces: [], metres: [], mesures: [], autres: [],
+      surfaces: [], mesures: [], autres: [],
       pointsControle: [{ id: 'k', nom: 'PF1', est: 0, nord: 0 }],
       couleursListes: { f1: '#2563eb', 'points-controle': '#16a34a' },
       listesCachees: [],
