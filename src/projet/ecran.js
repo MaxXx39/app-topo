@@ -175,14 +175,15 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
  */
 export function projetsReunis(resumes, partage, tri = 'date') {
   const parId = new Map();
-  for (const r of resumes) parId.set(r.id, { id: r.id, titre: r.titre ?? r.nom, sousTitre: r.sousTitre, modifieLe: r.modifieLe, local: r, drive: null });
+  for (const r of resumes) parId.set(r.id, { id: r.id, titre: r.titre ?? r.nom, sousTitre: r.sousTitre, modifieLe: r.modifieLe, centre: r.centre ?? null, local: r, drive: null });
   if (partage?.etat.connecte) {
     for (const p of partage.etat.projetsDrive) {
       const deja = parId.get(p.projetId);
       if (deja) {
         deja.drive = p;
+        deja.centre ??= p.centre ?? null; // le centre de l'appareil d'abord, sinon celui de Drive
         if (String(p.modifieLe ?? '') > String(deja.modifieLe ?? '')) deja.modifieLe = p.modifieLe;
-      } else parId.set(p.projetId, { id: p.projetId, titre: p.titre, sousTitre: '', modifieLe: p.modifieLe ?? '', local: null, drive: p });
+      } else parId.set(p.projetId, { id: p.projetId, titre: p.titre, sousTitre: '', modifieLe: p.modifieLe ?? '', centre: p.centre ?? null, local: null, drive: p });
     }
   }
   const liste = [...parId.values()];

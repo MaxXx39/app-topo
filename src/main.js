@@ -28,7 +28,8 @@ import { preparerPhoto } from './photos/photo.js';
 import { creerEcranExport, telecharger, enregistrer as enregistrerFichier } from './export/ecran.js';
 import { ouvrirFenetreExport } from './export/fenetre-export.js';
 import { FORMATS_POINTS, fichierPoints } from './export/points.js';
-import { creerEcranProjet, blocPartage } from './projet/ecran.js';
+import { creerEcranProjet, blocPartage, projetsReunis } from './projet/ecran.js';
+import { ouvrirCarteProjets } from './projet/carte.js';
 import { creerEcranImport } from './import/ecran.js';
 import { creerEcranCoupes, nouvelleCoupe } from './coupes/ecran.js';
 import { creerEcranMesures } from './mesures/ecran.js';
@@ -1511,6 +1512,8 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
   partieProjet: ouvrirPartieProjet,
   sousApplisDe,
   reglages: () => ouvrirFenetreReglages(),
+  // 0.216.0 : carte de tous les projets (bouton à gauche de « Changer »).
+  carteProjets: () => ouvrirCarteDesProjets(),
   // La page Applications s'ouvre par-dessus tout : la page des réglages se ferme.
   avantPage: () => fenetreReglages?.fermer?.(),
   fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? () => fermerAppli() : null,
@@ -1650,6 +1653,16 @@ appliquerReglages();
 // Les barres de l'en-tête (1 verte = Base, 2 jaunes = Intermédiaire, 3 rouges = Expert) ouvrent aussi les réglages.
 document.querySelector('#bouton-mode').addEventListener('click', () => ouvrirFenetreReglages());
 // Fenêtre des réglages ouverte (pour y redessiner l'état du partage Drive), ou null.
+/** Carte des projets (0.216.0, Base) : les projets de cet appareil et de Drive, placés à leur centre sur le fond swisstopo. */
+function ouvrirCarteDesProjets() {
+  const projets = projetsReunis(resumes, partage ? { etat: partage.etat, appareil: partage.appareil() } : null, 'date');
+  navigation?.fermer();
+  ouvrirCarteProjets(projets, {
+    ouvertId: projet.id,
+    quandOuvrir: (p) => (p.local ? actionsProjet.ouvrirProjet(p.id) : actionsProjet.ouvrirDrive(p.drive.dossierId)),
+  });
+}
+
 let fenetreReglages = null;
 /** Fenêtre des réglages ⚙ (0.156.0 : tuile « Réglages » de la page Applications, ou la pyramide du mode). */
 function ouvrirFenetreReglages(page = null) {
@@ -6894,7 +6907,7 @@ document.querySelector('#nouveau-projet').addEventListener('keydown', (evenement
   if (evenement.key === 'Enter' && evenement.target.matches('input')) validerNouveauProjet();
 });
 
-const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
+const actionsProjet = {
   renommer: (nom) => {
     projet.nom = nom; // facultatif : le projet se reconnaît à son affaire et son lieu
     modifie();
@@ -7018,7 +7031,8 @@ const ecranProjet = creerEcranProjet(document.querySelector('#projets'), {
   reprendreLaMain: () => partage.prendreLaMain(),
   ouvrirDrive: (dossierId) => avecChargement(() => partage.ouvrirDepuisDrive(dossierId)),
   rafraichirDrive: () => partage.rafraichirListe().catch((erreur) => afficherMessage(`Drive : ${erreur.message}`, 4000)),
-}, document.querySelector('#projets-suite'));
+};
+const ecranProjet = creerEcranProjet(document.querySelector('#projets'), actionsProjet, document.querySelector('#projets-suite'));
 
 /** Supprime un projet de cet appareil ; si c'était le projet ouvert, on en ouvre un autre. */
 async function supprimerDeLAppareil(id) {

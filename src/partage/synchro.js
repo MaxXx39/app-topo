@@ -19,6 +19,7 @@
 // sur Drive et qu'il n'a pas reçue (par ex. après plus de 15 minutes sans réseau) : il prend
 // d'abord la version de Drive (voir changeAilleurs).
 import { TYPE_DOSSIER } from './drive.js';
+import { centreDuProjet, texteDuCentre, centreDuTexte } from '../topo/centre-projet.js';
 import { projetVersFichiers, fichiersVersProjet, comprimer, decomprimer, empreinte, sansContenu, FICHIER_PROJET } from './fichiers.js';
 
 export const NOM_RACINE = 'App Topo';
@@ -181,7 +182,7 @@ export function creerSynchro(drive, appareil) {
         // Sans date de modification, le premier envoi n'est pas fini (dossier créé, fichiers pas tous
         // arrivés) : il n'y a encore rien à ouvrir, le projet n'est pas proposé.
         .filter((d) => d.appProperties?.projetId && d.appProperties?.modifieLe)
-        .map((d) => ({ dossierId: d.id, projetId: d.appProperties.projetId, titre: d.appProperties.titre ?? d.name, modifieLe: d.appProperties.modifieLe ?? null, envoyePar: d.appProperties.envoyePar ?? null, verrou: verrouDe(d) }));
+        .map((d) => ({ dossierId: d.id, projetId: d.appProperties.projetId, centre: centreDuTexte(d.appProperties.centre), titre: d.appProperties.titre ?? d.name, modifieLe: d.appProperties.modifieLe ?? null, envoyePar: d.appProperties.envoyePar ?? null, verrou: verrouDe(d) }));
     },
 
     /**
@@ -201,7 +202,7 @@ export function creerSynchro(drive, appareil) {
         if (changeAilleurs(dossier.appProperties, memoire, appareil.id)) return { changeAilleurs: true, dossierId: dossier.id };
       } else {
         // Nouveau dossier : seulement les propriétés qui ont une valeur (pas de « null » à la création).
-        const proprietes = Object.fromEntries(Object.entries({ projetId: projet.id, titre: court(titre), ...proprietesVerrou() }).filter(([, v]) => v != null));
+        const proprietes = Object.fromEntries(Object.entries({ projetId: projet.id, titre: court(titre), centre: texteDuCentre(centreDuProjet(projet)), ...proprietesVerrou() }).filter(([, v]) => v != null));
         dossier = await drive.creerDossier(court(titre), await racine(), proprietes);
       }
 
@@ -238,7 +239,9 @@ export function creerSynchro(drive, appareil) {
       const prisEntreTemps = verrouDe(await drive.decrire(dossier.id));
       if (prisEntreTemps && prisEntreTemps.appareilId !== appareil.id && verrouActif(prisEntreTemps)) return { repris: prisEntreTemps };
       const modifieLe = projet.modifieLe ?? '';
-      await drive.modifier(dossier.id, { nom: court(titre), proprietes: { titre: court(titre), modifieLe, envoyePar: appareil.id, ...proprietesVerrou() } });
+      // 0.216.0 : le centre du projet (« est,nord ») voyage avec le dossier Drive : la carte des projets place aussi les projets pas encore ouverts ici.
+      const centre = texteDuCentre(centreDuProjet(projet));
+      await drive.modifier(dossier.id, { nom: court(titre), proprietes: { titre: court(titre), modifieLe, envoyePar: appareil.id, ...(centre ? { centre } : {}), ...proprietesVerrou() } });
       return { memoire: { dossierId: dossier.id, envoyeLe: projet.modifieLe ?? null, distantVu: modifieLe, empreintes } };
     },
 

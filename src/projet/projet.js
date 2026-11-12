@@ -40,6 +40,7 @@ import { PREFIXE_PDF } from '../topo/pdf-dxf.js';
 import { calculsDUnAncienProjet } from '../volumes/calculs.js';
 import { TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
 import { retirerMetreEtRecollement } from './retrait-metre-recollement.js';
+import { centreDuProjet } from '../topo/centre-projet.js';
 
 export const FORMAT = 'topo-projet';
 // Version 2 : calculs de volume (onglets Volumes et Comparer réunis) et nature des surfaces.
@@ -234,5 +235,6 @@ export function resumerProjet(projet) {
     modifieLe: projet.modifieLe,
     nombreLeves: projet.leves.length,
     nombreSurfaces: projet.surfaces.length,
+    centre: centreDuProjet(projet), // 0.216.0 : pour la carte des projets (null si rien en Suisse)
   };
 }

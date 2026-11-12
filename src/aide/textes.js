@@ -8,7 +8,7 @@ export const TEXTES_AIDE = {
   mesureRapide:
     'Mesure rapide : touche des points sur le plan (accroche en bas, ou GNSS). 2 points : longueur, Δh, pente. 3 et plus : case « Figure fermée » (périmètre, surface) ou ligne ouverte (longueur du chemin), angles en degrés (colonne Angle, et sur le plan si la case est cochée). « Enregistrer » ou « Exporter » (PDF, DXF).',
   applications:
-    'Menu de départ : touche une tuile (ou sa sous-application en petit) pour ouvrir l\'application. Appui long = déplacer la tuile ; ★ = favori. Réglages et « Fermer l\'appli » en bas.',
+    'Menu de départ : touche une tuile (ou sa sous-application en petit) pour ouvrir l\'application. Appui long = déplacer la tuile ; ★ = favori. L\'épingle à gauche de « Changer » ouvre la carte de tous les projets (touche un projet, puis « Ouvrir »). Réglages et « Fermer l\'appli » en bas.',
   projets:
     'Projets enregistrés sur cet appareil (📱) ou sur Drive (☁). « Changer » les liste, « + Nouveau » en crée un, ⋮ renomme (projet ouvert), exporte, duplique ou supprime. Réglages de l\'appareil : tuile Réglages du menu.',
   lame:

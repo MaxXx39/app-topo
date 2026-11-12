@@ -246,7 +246,8 @@ export function creerNavigation(nav, actions) {
     if (projet) {
       fermerPage();
       const quoi = projet.dataset.projet;
-      if (quoi === 'changer') actions.changerProjet();
+      if (quoi === 'carte') actions.carteProjets?.();
+      else if (quoi === 'changer') actions.changerProjet();
       else if (quoi === 'nouveau') actions.nouveauProjet?.();
       else actions.partieProjet?.(quoi);
       return;
@@ -319,6 +320,7 @@ export function creerNavigation(nav, actions) {
             ${detail ? `<span>${echapper(detail)}</span>` : ''}
           </div>
           <div class="boutons-bandeau-projet">
+            <button type="button" class="bouton-bandeau-projet bouton-carte-projets" data-projet="carte" aria-label="Carte des projets" title="Carte des projets">${svg('<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" />')}</button>
             <button type="button" class="bouton-bandeau-projet" data-projet="changer">Changer</button>
             ${nouveau}
           </div>
