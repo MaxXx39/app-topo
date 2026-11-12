@@ -113,6 +113,7 @@ import { retirerPointDuProjet, retirerPointDesMesures, texteUsages, usagesDuPoin
 import { installerMesureDuree } from './outils/mesure-duree-ui.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur, consommerPointMoyen } from './android/pont.js';
 import { correctionsTropAnciennes } from './topo/age-corrections.js';
+import { centreDePoints, MAX_POINTS_CENTRE } from './topo/centre-points.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
@@ -654,12 +655,61 @@ const ACCROCHES_MESURE_EN_PLUS = {
 };
 const accrochesMesure = () => [
   ...MODES_ACCROCHE.map((cle) => [cle, ...ACCROCHES[cle]]),
+  ['centrepts', ...ACCROCHES.centrepts], // 0.214.0 : centre de 2 ou 3 points (la Mesure rapide est dès Intermédiaire)
   // 0.162.0 : « Perp. » (Expert) : le 2e point est le pied de la perpendiculaire menée du 1er point sur la ligne touchée.
   ...(aAcces('expert') ? [['perpendiculaire', ...ACCROCHES_MESURE_EN_PLUS.perpendiculaire]] : []),
   // 0.162.2 (demande du 08.11) : la loupe « Manuel » remplace « Libre » (point visé sans altitude).
   ['manuel', ...ACCROCHES.manuel],
   ...(recepteurDisponible() ? [['gnss', ...ACCROCHES_MESURE_EN_PLUS.gnss]] : []),
 ];
+
+// Accroche « Centre pts » (0.214.0) : points touchés (2 ou 3), pour Implanter › Point et la Mesure rapide.
+const centrePts = { points: [] };
+const centrePtsVider = () => { centrePts.points = []; };
+/** Centre en cours : { est, nord, altitude } (arrondi au mm) ou null (moins de 2 points). */
+function centrePtsCalcule() {
+  const r = centreDePoints(centrePts.points);
+  if (!r.ok) return null;
+  const mm = (v) => Math.round(v * 1000) / 1000;
+  return { est: mm(r.est), nord: mm(r.nord), altitude: r.altitude != null ? mm(r.altitude) : null };
+}
+/** Vrai si l'accroche « Centre pts » est celle de l'écran de travail (Mesure rapide ou Implanter › Point). */
+function centrePtsActif() {
+  return (mesureRapideActive() && mesureRapideEtat.accroche === 'centrepts')
+    || (ongletContexte === 'terrain' && enImplantationDePoint() && terrain.accroche === 'centrepts' && aAcces('intermediaire'));
+}
+/**
+ * Toucher un point pour le centre : un point du projet, sinon un sommet ou un point du plan DXF. Renvoie le centre { est, nord, altitude }
+ * quand on a 2 ou 3 points, 'attente' après le 1er point, ou null (refus : message donné).
+ */
+function toucherCentrePoints(position, tolerance) {
+  if (centrePts.points.length >= MAX_POINTS_CENTRE) {
+    afficherMessage(`Centre pts : ${MAX_POINTS_CENTRE} points au maximum (touche ← pour recommencer)`, 3500);
+    return null;
+  }
+  const trouve = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() })
+    ?? accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansDuProjet(), position, tolerance)));
+  if (!trouve) {
+    afficherMessage('Centre pts : aucun point ni sommet sous le doigt', 3000);
+    return null;
+  }
+  if (centrePts.points.some((q) => Math.hypot(q.est - trouve.est, q.nord - trouve.nord) < 0.0005)) {
+    afficherMessage('Centre pts : ce point est déjà pris', 3000);
+    return null;
+  }
+  centrePts.points.push({ est: trouve.est, nord: trouve.nord, altitude: trouve.altitude ?? null, nom: trouve.nom ?? '' });
+  if (centrePts.points.length < 2) {
+    afficherMessage('Centre pts : point 1 pris, touche le 2e (et un 3e pour le centre du cercle)', 3500);
+    return 'attente';
+  }
+  const resultat = centreDePoints(centrePts.points);
+  if (!resultat.ok) {
+    centrePts.points.pop();
+    afficherMessage(`Centre pts : ${resultat.raison}`, 3500);
+    return null;
+  }
+  return centrePtsCalcule();
+}
 
 /** Vrai quand la Mesure rapide est l'écran de travail (le plan lui envoie ses touchers). */
 function mesureRapideActive() {
@@ -675,7 +725,7 @@ function afficherMesureRapide() {
   if (mesureRapideEtat.accroche === 'libre') mesureRapideEtat.accroche = 'manuel';
   document.querySelector('#mesure-rapide').innerHTML = htmlMesureRapide({
     mesure, accroche: mesureRapideEtat.accroche, accroches: accrochesMesure(), pages: mesureRapideEtat.pages,
-    manuel: { candidat: Boolean(mesureRapideEtat.candidat), zoom: terrain.zoomLoupe ?? 4 }, fermee: mesureRapideEtat.fermee, afficherAngles: mesureRapideEtat.angles, accrochesOuvertes: Boolean(mesureRapideEtat.accrochesOuvertes),
+    centre: mesureRapideEtat.accroche === 'centrepts' ? { points: centrePts.points.length, pret: centrePtsCalcule() != null } : null, manuel: { candidat: Boolean(mesureRapideEtat.candidat), zoom: terrain.zoomLoupe ?? 4 }, fermee: mesureRapideEtat.fermee, afficherAngles: mesureRapideEtat.angles, accrochesOuvertes: Boolean(mesureRapideEtat.accrochesOuvertes),
   });
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
@@ -697,6 +747,11 @@ function toucherPourMesureRapide(position, tolerance) {
   const accroche = mesureRapideEtat.accroche;
   if (accroche === 'gnss') {
     afficherMessage('Accroche GNSS : touche « + Point GNSS » en bas', 3000);
+    return;
+  }
+  // 0.214.0 : centre de 2 ou 3 points ; « ✓ Ajouter le centre » l'ajoute à la mesure.
+  if (accroche === 'centrepts') {
+    if (toucherCentrePoints(position, tolerance)) afficherMesureRapide();
     return;
   }
   // « Manuel » : toucher le plan y pose la loupe ; « Ajouter ce point » l'ajoute à la mesure.
@@ -757,6 +812,7 @@ function annulerDernierPointMesure() {
 
 /** Remise à zéro de la mesure. */
 function remettreMesureAZero() {
+  centrePtsVider();
   mesureRapideEtat.points = [];
   mesureRapideEtat.fermee = true;
   mesureRapideEtat.pages = { points: 0, cotes: 0 };
@@ -1226,6 +1282,12 @@ document.querySelector('#mesure-rapide').addEventListener('click', (evenement) =
   if (action === 'basculer-accroches-mesure') {
     mesureRapideEtat.accrochesOuvertes = !mesureRapideEtat.accrochesOuvertes;
     afficherMesureRapide();
+  } else if (action === 'ajouter-centre-mesure') {
+    const centre = centrePtsCalcule();
+    if (centre) {
+      centrePtsVider();
+      ajouterPointMesure({ nom: '', ...centre });
+    }
   } else if (action === 'basculer-angles-mesure') {
     mesureRapideEtat.angles = !mesureRapideEtat.angles;
     afficherMesureRapide();
@@ -1236,6 +1298,7 @@ document.querySelector('#mesure-rapide').addEventListener('click', (evenement) =
   } else if (action === 'accroche-mesure') {
     mesureRapideEtat.accroche = bouton.dataset.valeur;
     mesureRapideEtat.candidat = null;
+    centrePtsVider();
     afficherMesureRapide();
     mettreAJourToucheVolume();
   } else if (action === 'ajouter-manuel-mesure' && mesureRapideEtat.candidat) {
@@ -1843,7 +1906,8 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         champs: [
           { cle: 'nom', titre: 'Nom du plan', valeur: lu.nom ?? fichier.name.replace(/\.dxf$/i, '') },
           { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...types.map((t) => [t.nom, t.nom])], valeur: '' },
-          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant']], valeur: 'non' },
+          // 0.214.0 : « Non (déjà calé) » : le plan est déjà en MN95, rien à recaler ni à signaler.
+          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: 'non' },
         ],
       });
       if (!choix) {
@@ -1851,9 +1915,9 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         recalculer();
         return;
       }
-      const nouveau = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, nom: choix.nom || lu.nom, type: choix.type || '' };
+      const nouveau = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, nom: choix.nom || lu.nom, type: choix.type || '', ...(choix.recaler === 'cale' ? { dejaCale: true } : {}) };
       projet.plansDxf.push(nouveau);
-      dernierPlan = { nom: nouveau.nom, avertissements };
+      dernierPlan = { nom: nouveau.nom, avertissements: choix.recaler === 'cale' ? avertissements.filter((a) => !a.includes('MN95')) : avertissements };
       afficherMessage(`Plan « ${nouveau.nom} » importé : ${lu.compte.objets} objets`, 4000);
       modifie();
       if (choix.recaler === 'oui') commencerRecalage(nouveau.id);
@@ -1898,7 +1962,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
           { cle: 'nettete', titre: 'Netteté de l\'image', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART },
           // 0.213.0 : comme pour un DXF : type du plan (liste partagée) et recalage tout de suite ou plus tard.
           { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...lireTypesDxf().map((t) => [t.nom, t.nom])], valeur: '' },
-          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant']], valeur: 'non' },
+          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: 'non' },
         ],
       });
       if (!valeurs) return;
@@ -1908,7 +1972,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       // Préfixe fixe « PDF- » (0.132.0) ; « .pdf » est enlevé (le préfixe le dit déjà).
       const base = fichier.name.replace(/\.pdf$/i, '');
       const nom = avecPrefixe(pages > 1 ? `${base} (page ${page})` : base, PREFIXE_PDF);
-      const avertissements = [`Plan PDF : il n'est pas en MN95, touche « recaler » sur le plan pour le mettre en place${enImage ? ' (accroche « Manuel » : loupe)' : ''}.`];
+      const avertissements = valeurs.recaler === 'cale' ? [] : [`Plan PDF : il n'est pas en MN95, touche « recaler » sur le plan pour le mettre en place${enImage ? ' (accroche « Manuel » : loupe)' : ''}.`];
       if (!echelle) avertissements.push('Sans échelle : le plan est à la taille de la feuille, le recalage trouvera l\'échelle.');
       let lu;
       if (enImage) {
@@ -1939,7 +2003,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         }
         if (contenu.images > 0) avertissements.push(`${contenu.images} image(s) du PDF non reprise(s) (seuls les traits et les textes sont lus).`);
       }
-      const nouveauPlan = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, type: valeurs.type || '', pdf: { page, echelle, image: enImage } };
+      const nouveauPlan = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, type: valeurs.type || '', ...(valeurs.recaler === 'cale' ? { dejaCale: true } : {}), pdf: { page, echelle, image: enImage } };
       projet.plansDxf.push(nouveauPlan);
       dernierPlan = { nom, avertissements };
       afficherMessage(`Plan PDF « ${nom} » importé${enImage ? ' en image' : ` : ${lu.compte.objets} objets`}`, 4000);
@@ -2789,6 +2853,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       },
       // 0.214.0 : grand bouton « Retour » de la fiche d'un point choisi : on peut en toucher un autre.
       changerPoint: () => {
+        centrePtsVider();
         implanter.choix = null;
         montrerImplantation();
       },
@@ -2895,7 +2960,8 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           return;
         }
         // « Manuel » (0.131.0, Intermédiaire) : loupe + main, point visé sans accroche.
-        terrain.accroche = MODES_ACCROCHE.includes(mode) || (mode === 'manuel' && aAcces('intermediaire')) ? mode : 'point';
+        centrePtsVider();
+        terrain.accroche = MODES_ACCROCHE.includes(mode) || ((mode === 'manuel' || mode === 'centrepts') && aAcces('intermediaire')) ? mode : 'point';
         retenirReglagesTerrain();
         montrerImplantation();
       },
@@ -3294,7 +3360,7 @@ function envoyerImplantationAuPlan() {
   const cibleControle = enAutocontrole() && ongletContexte === 'terrain' ? autocontrole.cible : null;
   // Dessins (Calculs › Dessin) : toujours sur le plan ; le dessin en cours avec son pilote.
   const avecPilote = piloteActif();
-  plan.palirAutour(ongletContexte === 'terrain' ? travailAGarder() : null);
+  plan.palirAutour(ongletContexte === 'terrain' && document.body.dataset.onglet === 'terrain' ? travailAGarder() : null); // 0.214.0 : jamais pâli dans l'application Plan
   // Case « Voir toute la ligne » (0.118.0) : seulement pendant le guidage d'une ligne (pas d'un talus).
   const guidageLigne = ongletContexte === 'terrain' && enImplantationDeLigne() && !enTalus() && Boolean(implanter.ligne) && !implanter.ligneAValider;
   // 0.137.0 : point ou ligne choisi mais pas encore « Implanter » : le plan reste où il est (pas de retour du suivi).
@@ -3316,11 +3382,11 @@ function envoyerImplantationAuPlan() {
         pointsControle,
         lignesAutres,
         chantiers,
-        choix: daoAppli?.actif() ? daoAppli.dernierPoint() : recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : accrocheActive && !mesure && !enLigne && !enAutocontrole() ? implanter.choix : null,
+        choix: daoAppli?.actif() ? daoAppli.dernierPoint() : recalage.planId ? (recalage.candidat ? { est: recalage.candidat.x, nord: recalage.candidat.y } : recalage.choix ? { est: recalage.choix.x, nord: recalage.choix.y } : null) : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : mesureRapideActive() && mesureRapideEtat.accroche === 'centrepts' ? centrePtsCalcule() : accrocheActive && !mesure && !enLigne && !enAutocontrole() ? implanter.choix : null,
         cible: cibleControle ?? (accrocheActive && !mesure && !enLigne && !enAutocontrole() && !ajoutLevee.actif ? implanter.cible : null),
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
-        pointsLigne: enLigne ? implanter.pointsLigne : [],
+        pointsLigne: enLigne ? implanter.pointsLigne : centrePtsActif() ? centrePts.points : [],
         mesureRapide: mesureRapideActive() ? { ...mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee }), afficherAngles: mesureRapideEtat.angles } : null,
       }
     : null);
@@ -3332,10 +3398,11 @@ function envoyerImplantationAuPlan() {
 /** Plan DXF recalé, en MN95 (fenêtre « Exporter »). */
 function exporterPlanRecale(id) {
   const choisi = projet.plansDxf.find((p) => p.id === id);
-  // Dessin DAO (0.147.0) : déjà en MN95, exporté tel quel.
-  if (!choisi?.recalage?.applique && !choisi?.dao) return;
+  if (!choisi || choisi.pdf?.image) return;
+  // 0.214.0 : tout plan importé s'exporte (avant : seulement les recalés et les dessins DAO) ; non recalé = tel qu'il a été importé.
+  const recale = Boolean(choisi.recalage?.applique || choisi.dao);
   const nom = String(choisi.nom).replace(/\.dxf$/i, '');
-  telecharger(new Blob([octetsDxf(genererDxfPlan(planRecale(choisi)))], { type: 'application/dxf' }), `${nom}_MN95.dxf`);
+  telecharger(new Blob([octetsDxf(genererDxfPlan(planRecale(choisi)))], { type: 'application/dxf' }), `${nom}${recale ? '_MN95' : ''}.dxf`);
 }
 
 /**
@@ -5234,6 +5301,13 @@ function toucherPourImplantation(position, tolerance) {
   // 0.163.0 : pendant l'implantation d'un point, toucher un autre point ne change rien : on passe par « ← ».
   if (terrain.mode === 'controler' && terrain.implantation === 'point' && implanter.cible) {
     afficherMessage('Implantation en cours : touche ← (en haut à gauche du guidage) pour changer de point', 2500);
+    return;
+  }
+  // 0.214.0 : « Centre pts » : 2 points = le milieu, 3 points = le centre du cercle ; le centre devient le point choisi (fiche + « Implanter »).
+  if (terrain.accroche === 'centrepts' && aAcces('intermediaire')) {
+    const centre = toucherCentrePoints(position, tolerance);
+    if (centre && centre !== 'attente') guiderVersChoix({ nom: '', ...centre });
+    montrerImplantation();
     return;
   }
   // « Manuel » : toucher le plan y pose la loupe (le point visé devient la cible).

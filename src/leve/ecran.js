@@ -92,6 +92,8 @@ export const ACCROCHES = {
   // 0.161.0 : la ligne, le point touché à côté (petit rond) et le point le plus proche sur la ligne (pas au milieu).
   ligne: ['Sur ligne', 'Sur une ligne du plan DXF (endroit le plus proche)', '<path d="M3 20 21 4" /><circle cx="6" cy="8" r="1.4" /><path d="M6.6 9.3 9.4 14.2" stroke-dasharray="1.6 1.6" /><circle class="repere" cx="10.2" cy="13.6" r="2.6" />'],
   croisement: ['Croisem.', 'Croisement de 2 lignes (sans altitude)', '<path d="M4 4 20 20M20 4 4 20" /><circle class="repere" cx="12" cy="12" r="3" />'],
+  // 0.214.0 (maquette 7 A) : « Centre pts » (dès Intermédiaire) : 2 points = le milieu, 3 points = le centre du cercle qui passe par les 3.
+  centrepts: ['Centre pts', 'Centre de 2 ou 3 points : milieu de 2 points, centre du cercle passant par 3 points', '<path d="M12 4 5 17h14z" stroke-dasharray="2 2.2" stroke-width="1.2" /><circle cx="12" cy="4" r="1.7" class="rond-point" /><circle cx="5" cy="17" r="1.7" class="rond-point" /><circle cx="19" cy="17" r="1.7" class="rond-point" /><path class="repere" d="M9.6 12.6h4.8M12 10.2v4.8" />'],
   centre: ['Centre', 'Centre d\'un cercle du plan DXF', '<circle cx="12" cy="12" r="9" /><circle class="repere" cx="12" cy="12" r="2.5" />'],
   // 0.131.0 : « Manuel » (Intermédiaire, implantation d'un point) : loupe + main, point visé sans accroche.
   manuel: ['Manuel', 'Manuel : loupe et main, le centre de la croix est le point visé', '<path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path class="repere" d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />'],
@@ -646,7 +648,7 @@ export function creerEcranLeve(conteneur, actions) {
     // Ligne : on peut aussi prendre une ligne entière du plan DXF.
     const enLigne = ['ligne', 'talus'].includes(donnees.controle.implantation);
     // « Manuel » (0.131.0) : implantation d'un point seulement, dès Intermédiaire.
-    const modes = enLigne ? ['trait', ...MODES_ACCROCHE] : (donnees.controle.implantation === 'point' ? [...MODES_ACCROCHE, 'manuel'] : MODES_ACCROCHE);
+    const modes = enLigne ? ['trait', ...MODES_ACCROCHE] : (donnees.controle.implantation === 'point' ? [...MODES_ACCROCHE, 'centrepts', 'manuel'] : MODES_ACCROCHE);
     const active = enLigne ? imp.accrocheLigne : imp.accroche;
     // Accroche « Point » : un point tapé (+ Point, pas pour une ligne ; 0.159.0 : Expert) ou choisi dans la liste.
     const outilsPoint = active === 'point'
@@ -674,7 +676,7 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
         ${modes.map((mode) => {
           const [mot, nom, dessin] = ACCROCHES[mode];
-          return `<button type="button" class="bouton-accroche ${mode === 'manuel' ? 'seulement-intermediaire' : ''} ${active === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${nom}" aria-label="${nom}" aria-pressed="${active === mode}">
+          return `<button type="button" class="bouton-accroche ${mode === 'manuel' || mode === 'centrepts' ? 'seulement-intermediaire' : ''} ${active === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${nom}" aria-label="${nom}" aria-pressed="${active === mode}">
             <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span class="mot-accroche">${mot}</span></button>`;
         }).join('')}
         ${outilsPoint}

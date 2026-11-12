@@ -13540,3 +13540,7 @@ body.mode-telephone .instruction-regle.proche b { font-size: 0.75rem; }
 .bouton-retour-grand { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 0 16px 0 10px; margin-bottom: 6px; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; font-size: 1rem; font-weight: 800; }
 .bouton-retour-grand svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .bouton-retour-grand:active { background: #e5eaee; }
+
+/* 0.214.0 : accroche « Centre pts » de la Mesure rapide : texte, « Ajouter le centre » et « Recommencer » sur une rangée. */
+.reglage-centre-mesure { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 4px; font-size: 0.85rem; }
+.reglage-centre-mesure .ajouter-centre-mesure { min-height: 40px; }

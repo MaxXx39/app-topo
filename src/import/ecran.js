@@ -513,7 +513,7 @@ function pageGerer(projet, vue, ouverts) {
           <div class="actions-ligne-gerer">
             <button type="button" class="bouton-secondaire" data-action="voir-plan" data-id="${plan.id}">Voir</button>
             <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="recaler-plan" data-id="${plan.id}">Recaler</button>
-            ${plan.recalage?.applique || plan.dao ? `<button type="button" class="bouton-secondaire seulement-intermediaire" data-action="exporter-plan" data-id="${plan.id}">Exporter</button>` : ''}
+            ${plan.pdf?.image ? '' : `<button type="button" class="bouton-secondaire seulement-intermediaire" data-action="exporter-plan" data-id="${plan.id}">Exporter</button>`}
             ${boutonsArchive('plan', plan.id, 'supprimer-plan')}
           </div>`,
       }));
@@ -866,6 +866,8 @@ function etatRecalage(plan) {
     return `<p class="etat-recalage recale">✓ Recalé en MN95 (${r.paires.filter((p) => p.actif !== false).length} points · rotation ${gon.toFixed(4)} gon · échelle ${ppm >= 0 ? '+' : ''}${ppm.toFixed(0)} ppm)
       <button type="button" class="bouton-lien" data-action="annuler-recalage" data-id="${plan.id}">annuler le recalage</button></p>`;
   }
+  // 0.214.0 : plan importé avec le choix « Non (déjà calé) » : rien à recaler.
+  if (plan.dejaCale) return '<p class="etat-recalage recale">✓ Déjà calé (importé tel quel)</p>';
   return plan.bornes && !estEnMn95(plan.bornes) ? '<p class="etat-recalage">Pas en MN95 : « recaler »</p>' : '';
 }
 
