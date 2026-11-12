@@ -70,7 +70,7 @@ const METRES_AUTOUR_DE_MOI = 20;
 // - Surface Import : couleurs selon l'altitude (roue, tous les modes) ;
 // - Mesures : traits et valeurs des mesures (Calculs › Mesures).
 const CALQUES_DEPART = {
-  fondSatellite: false, // 0.192.0 : fond décoché au départ (photo, ou carte nationale au-delà de 3 km), transparent à 60 % quand on le coche
+  fondSatellite: true, // 0.213.0 : fond coché au départ et à chaque ouverture de projet (photo, ou carte nationale au-delà de 2 km), transparent à 60 %
   cadastre: false,
   transparencePhoto: 60,
   carteNationale: false, // 0.199.0 : carte nationale cochée à la main : posée par-dessus la photo, décochée au départ
@@ -106,7 +106,7 @@ const CALQUES_DEPART = {
 const CALQUES_EXPERT = new Set(['controleNoms', 'controleAltitudes', 'triangles', 'couleursAltitude', 'courbes', 'remblaiDeblai', 'volumes', 'palier', 'equidistance']);
 // Équidistances proposées pour les courbes et les couleurs (m). « auto » : choisie selon la hauteur du stock.
 // Largeur visible (m) au-delà de laquelle le fond devient la carte nationale (0.192.0).
-const LARGEUR_CARTE_NATIONALE = 3000;
+const LARGEUR_CARTE_NATIONALE = 2000; // 0.213.0 : 2 km de large visible (avant 3 km)
 const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 
 /**
@@ -187,8 +187,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <div class="menu-plans-dxf menu-listes-points" hidden></div>
         <div class="menu-calques" hidden>
           <div class="ligne-menu-plan">
-            <label class="case"><input type="checkbox" data-calque="fondSatellite" /> Fond de plan (swisstopo)</label>
-            <p class="aide note-fond" data-vivant="fond-mode">Photo aérienne ; au-delà de 3 km de large : carte nationale.</p>
+            <label class="case"><input type="checkbox" data-calque="fondSatellite" ${calquesChoisis.fondSatellite ? 'checked' : ''} /> Fond de plan (swisstopo)</label>
+            <p class="aide note-fond" data-vivant="fond-mode">Photo aérienne ; au-delà de 2 km de large : carte nationale.</p>
           </div>
           <label class="reglette-transparence">Transparence <span data-vivant="transparence">60 %</span>
             <input type="range" min="0" max="100" step="5" value="60" data-calque="transparencePhoto" /></label>
@@ -997,16 +997,16 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
    * Seules les tuiles visibles à l'écran sont chargées (connexion internet nécessaire).
    */
   function dessinerFond() {
-    // 0.192.0 : au-delà de 3 km de large visible, la carte nationale (villes, noms) remplace la photo aérienne.
+    // 0.192.0 (0.213.0 : 2 km) : au-delà de 2 km de large visible, la carte nationale (villes, noms) remplace la photo aérienne.
     const largeurVisible = vue ? vue.largeur / vue.echelle : 0;
     const carteNationale = largeurVisible > LARGEUR_CARTE_NATIONALE;
     const couches = [];
     if (calques.fondSatellite) couches.push(carteNationale ? 'carte' : 'satellite');
-    // 0.199.0 : carte nationale cochée à la main : par-dessus la photo (une seule fois si la photo est déjà devenue carte au-delà de 3 km).
+    // 0.199.0 : carte nationale cochée à la main : par-dessus la photo (une seule fois si la photo est déjà devenue carte au-delà de 2 km).
     if (calques.carteNationale && !couches.includes('carte')) couches.push('carte');
     if (calques.cadastre) couches.push('cadastre');
     const noteFond = conteneur.querySelector('[data-vivant="fond-mode"]');
-    if (noteFond) noteFond.textContent = carteNationale ? 'Carte nationale (plus de 3 km de large)' : 'Photo aérienne ; au-delà de 3 km de large : carte nationale.';
+    if (noteFond) noteFond.textContent = carteNationale ? 'Carte nationale (plus de 2 km de large)' : 'Photo aérienne ; au-delà de 2 km de large : carte nationale.';
     const voulues = new Set();
 
     // Sans point, une surface importée suffit aussi à placer le fond (0.90.0).
@@ -2095,19 +2095,17 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           ${titreSectionRoue(section, titre)}${equidistance}${liste.map(section === 'cadastre' ? ligneCadastre : ligne).join('')}
         </details>`;
       }
-      // Volume (Expert) : juste après les levés ; caché au départ (tableau « Affichage »).
-      if (section === 'leve') {
-        html += `<div class="seulement-expert"><p class="titre-partie-menu">Volume</p>
-          ${caseCalque('remblaiDeblai', 'Déblai (jaune) / remblai (rouge)')}
-          ${choixListe('palier', PALIERS, 'Palier déblai / remblai', 'm')}
-          ${caseCalque('volumes', 'Étiquette du volume')}</div>`;
-      }
       return html;
     });
+    // Volume (Expert) : tout en bas du menu (0.213.0 ; avant : au milieu des natures de points) ; caché au départ (tableau « Affichage »).
+    const volume = `<div class="seulement-expert"><p class="titre-partie-menu">Volume</p>
+      ${caseCalque('remblaiDeblai', 'Déblai (jaune) / remblai (rouge)')}
+      ${choixListe('palier', PALIERS, 'Palier déblai / remblai', 'm')}
+      ${caseCalque('volumes', 'Étiquette du volume')}</div>`;
     const jourPoints = `<div class="seulement-intermediaire jour-points-menu"><p class="titre-partie-menu">Points d'un jour</p>
       <label class="case"><input type="date" data-calque="jourPoints" value="${echapper(calquesChoisis.jourPoints ?? '')}" aria-label="Montrer seulement les points pris ce jour" />
         <button type="button" class="bouton-lien bouton-lien-neutre" data-jour-effacer="oui">tout voir</button></label></div>`;
-    menuListes.innerHTML = `${parties.join('') || '<p class="menu-vide">Rien à afficher</p>'}${jourPoints}
+    menuListes.innerHTML = `${parties.join('') || '<p class="menu-vide">Rien à afficher</p>'}${jourPoints}${volume}
       <div class="ligne-outils"><button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="oui">tout</button>
         <button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="non">rien</button></div>`;
     for (const caseSection of menuListes.querySelectorAll('[data-section-toutes]')) caseSection.indeterminate = caseSection.dataset.etat === 'partiel';
@@ -2491,6 +2489,19 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   return {
     /** Loupe de l'accroche « Manuel » (0.130.0) : voir loupe.js (montrer, cacher, deplacerDe, changerZoom, placerSur). */
     loupe,
+    /** 0.213.0 : fond de plan remis comme au départ (coché, transparent à 60 %) : appelé à l'ouverture d'un autre projet. */
+    remettreFond() {
+      calquesChoisis.fondSatellite = true;
+      calquesChoisis.transparencePhoto = 60;
+      const caseFond = conteneur.querySelector('input[data-calque="fondSatellite"]');
+      if (caseFond) caseFond.checked = true;
+      const reglette = conteneur.querySelector('input[data-calque="transparencePhoto"]');
+      if (reglette) reglette.value = '60';
+      const texte = conteneur.querySelector('[data-vivant="transparence"]');
+      if (texte) texte.textContent = '60 %';
+      appliquerTransparence();
+      dessiner();
+    },
     /** Opacité de la photo aérienne du plan (0 à 1), ou null si elle n'est pas affichée (0.166.0 : PDF de la Mesure rapide). */
     opacitePhoto: () => (calques.fondSatellite ? 1 - (calquesChoisis.transparencePhoto ?? 0) / 100 : null),
     /** Affiche une nouvelle liste de points et cadre le plan dessus. */

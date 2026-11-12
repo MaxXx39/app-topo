@@ -12902,6 +12902,11 @@ body.mode-telephone .entete-pastilles .pastille-entete { min-height: 24px; }
 .etat-drive.etat-drive-envoi { background: #f59e0b; color: #1f1300; }
 .etat-drive.etat-drive-pause { background: rgba(148, 163, 184, 0.3); color: #e2e8f0; }
 .etat-drive.etat-drive-alerte { background: #dc2626; color: #ffffff; }
+/* 0.213.0 : nuage barré : rouge = hors ligne, gris = Google non connecté ; le nuage se touche (réglages Drive). */
+.etat-drive { cursor: pointer; }
+.etat-drive.etat-drive-hors-ligne { background: #dc2626; color: #ffffff; }
+.etat-drive.etat-drive-non-connecte { background: rgba(148, 163, 184, 0.3); color: #e2e8f0; }
+.etat-drive .barre-nuage { stroke-width: 2.6; }
 body.mode-telephone .etat-drive { padding: 2px 5px; min-height: 24px; }
 body.mode-telephone .etat-drive svg { width: 20px; height: 20px; }
 

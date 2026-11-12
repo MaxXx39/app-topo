@@ -1570,12 +1570,13 @@ document.querySelector('#bouton-mode').addEventListener('click', () => ouvrirFen
 // Fenêtre des réglages ouverte (pour y redessiner l'état du partage Drive), ou null.
 let fenetreReglages = null;
 /** Fenêtre des réglages ⚙ (0.156.0 : tuile « Réglages » de la page Applications, ou la pyramide du mode). */
-function ouvrirFenetreReglages() {
+function ouvrirFenetreReglages(page = null) {
   // 0.160.0 : une vraie page (plein écran) ; « ← » ramène à la page Applications.
   fenetreReglages?.fermer?.();
   navigation?.fermer();
   fenetreReglages = ouvrirReglages({
     enPage: true,
+    page,
     quandRetour: () => navigation.ouvrirPage(),
     aideActive: document.body.classList.contains('aide-active'),
     basculerAide: () => document.querySelector('#bouton-aide').click(),
@@ -1876,6 +1877,9 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
           // page), ses traits restant invisibles pour les accroches ; ou en traits comme un DXF (avant).
           ...(enImage ? [] : [{ cle: 'aspect', titre: 'Affichage', choix: [['image', 'Aspect du PDF (image + accroches)'], ['traits', 'Traits (comme un DXF)']], valeur: 'image' }]),
           { cle: 'nettete', titre: 'Netteté de l\'image', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART },
+          // 0.213.0 : comme pour un DXF : type du plan (liste partagée) et recalage tout de suite ou plus tard.
+          { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...lireTypesDxf().map((t) => [t.nom, t.nom])], valeur: '' },
+          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant']], valeur: 'non' },
         ],
       });
       if (!valeurs) return;
@@ -1916,10 +1920,12 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         }
         if (contenu.images > 0) avertissements.push(`${contenu.images} image(s) du PDF non reprise(s) (seuls les traits et les textes sont lus).`);
       }
-      projet.plansDxf.push({ id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, pdf: { page, echelle, image: enImage } });
+      const nouveauPlan = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, type: valeurs.type || '', pdf: { page, echelle, image: enImage } };
+      projet.plansDxf.push(nouveauPlan);
       dernierPlan = { nom, avertissements };
       afficherMessage(`Plan PDF « ${nom} » importé${enImage ? ' en image' : ` : ${lu.compte.objets} objets`}`, 4000);
       modifie();
+      if (valeurs.recaler === 'oui') commencerRecalage(nouveauPlan.id);
     } catch (erreur) {
       dernierPlan = { nom: fichier.name, erreur: erreur.message };
       afficherMessage(`Plan PDF non importé : ${erreur.message}`, 8000);
@@ -7887,6 +7893,20 @@ function mettreAJourEtatEntete() {
     ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path class="nuage" d="M7 18a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 9.2 4.4 4.4 0 0 1 17.5 18z" />${symbole}</svg>`
     : '';
   pastilleDrive.title = drive;
+  // 0.213.0 : nuage barré quand Drive ne peut pas travailler : rouge hors ligne (le récepteur peut recevoir, pas Drive),
+  // gris quand Google n'est pas connecté. Toucher le nuage ouvre les réglages Drive.
+  const horsLigne = typeof navigator !== 'undefined' && navigator.onLine === false;
+  const driveNonConnecte = Boolean(partage) && !partage.etat.connecte;
+  const nuageBarre = horsLigne ? 'hors-ligne' : driveNonConnecte ? 'non-connecte' : null;
+  if (nuageBarre && partage) {
+    pastilleDrive.hidden = false;
+    pastilleDrive.classList.remove('etat-drive-ok', 'etat-drive-envoi', 'etat-drive-pause', 'etat-drive-alerte', 'etat-drive-hors-ligne', 'etat-drive-non-connecte');
+    pastilleDrive.classList.add(`etat-drive-${nuageBarre}`);
+    pastilleDrive.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="nuage" d="M7 18a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 9.2 4.4 4.4 0 0 1 17.5 18z" /><path class="barre-nuage" d="M4 4L20 20" /></svg>';
+    pastilleDrive.title = horsLigne ? 'Hors ligne : Drive ne reçoit rien, les modifications restent sur la tablette (toucher : réglages Drive)' : 'Drive non connecté : toucher pour connecter Google';
+  } else {
+    pastilleDrive.classList.remove('etat-drive-hors-ligne', 'etat-drive-non-connecte');
+  }
   // La page Applications ouverte montre le projet à jour dans son encadré.
   navigation?.mettreAJour();
 
@@ -7905,6 +7925,10 @@ function mettreAJourEtatEntete() {
   pastille.title = !aAcces('expert') ? (repris ? `${repris.nom} a la main` : rendu ? 'Main rendue' : 'Tu as la main') : repris ? 'Lecture seule : toucher pour prendre la main' : rendu ? 'Main rendue : toucher pour la reprendre' : 'Tu as la main : toucher pour la rendre';
   document.body.classList.toggle('lecture-seule', Boolean(repris || rendu));
 }
+// 0.213.0 : toucher le nuage = réglages Drive (connecter Google, voir l'état). Le réseau qui part ou revient met le nuage à jour.
+document.querySelector('#etat-drive').addEventListener('click', () => ouvrirFenetreReglages('drive'));
+window.addEventListener('offline', () => mettreAJourEtatEntete());
+window.addEventListener('online', () => mettreAJourEtatEntete());
 // Main de l'en-tête (0.76.0) : rouge = prendre la main (Expert, code), grise = la reprendre,
 // verte = la rendre (le projet part sur Drive, un autre appareil peut la prendre).
 // Depuis 0.90.0, seulement en Expert : en Base et Intermédiaire on voit la main sans pouvoir la toucher.
@@ -8158,8 +8182,14 @@ surLibellesProjet((libelles) => {
 });
 
 let dernierProjetNote = null; // dernier projet noté « ouvert » dans le journal de l'appareil
+let dernierProjetFond = null; // 0.213.0 : projet pour lequel le fond de plan a été remis au départ
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
+  // 0.213.0 : à chaque ouverture d'un autre projet, le fond ortho est coché, transparent à 60 % (pas à chaque version reçue de Drive).
+  if (projet.id !== dernierProjetFond) {
+    dernierProjetFond = projet.id;
+    plan.remettreFond();
+  }
   // 0.128 : listes de points et plans / calques DXF masqués = choix de CET appareil, gardés au
   // redémarrage et jamais repris d'une autre tablette (aussi pour une version reçue de Drive).
   appliquerAffichage(projet);

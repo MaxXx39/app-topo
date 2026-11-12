@@ -4,6 +4,7 @@
 // écrites en Kotlin (android/app/src/main/java/ch/apptopo/PontAndroid.kt).
 // Dans un navigateur normal, cet objet n'existe pas et rien ne change.
 // Plus tard, c'est aussi par ici que passera la position du récepteur Emlid (Bluetooth).
+import { correctionsTropAnciennes, LIMITE_AGE_CORRECTIONS_S } from '../topo/age-corrections.js';
 
 /** Vrai si la page tourne dans l'APK Android. */
 export function estDansAppliAndroid() {
@@ -115,7 +116,13 @@ export const deconnecterRecepteur = () => window.AppliAndroid.deconnecterRecepte
  */
 export function prendrePointRecepteur() {
   try {
-    return JSON.parse(window.AppliAndroid.prendrePoint());
+    const reponse = JSON.parse(window.AppliAndroid.prendrePoint());
+    // 0.213.0 : corrections NTRIP de plus de 2 s : le point est refusé (partout : Lever, Implanter, Contrôle, Annotation…).
+    const age = reponse?.point?.ageCorrections;
+    if (reponse?.ok && correctionsTropAnciennes(age)) {
+      return { ok: false, raison: `corrections trop anciennes (${Math.round(age)} s, ${LIMITE_AGE_CORRECTIONS_S} s au plus)` };
+    }
+    return reponse;
   } catch (erreur) {
     return { ok: false, raison: `réponse illisible du récepteur (${erreur.message})` };
   }

@@ -22,6 +22,7 @@ import { htmlLame, rafraichirLame } from './lame-ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
 import { formaterNombre } from '../topo/format.js';
+import { correctionsTropAnciennes, texteAgeCorrections } from '../topo/age-corrections.js';
 import { ROLES_LEVE, debutDeNom } from '../topo/leve-direct.js';
 import { prefixeDuNom, avecPrefixe, dateDuJourCollee } from '../topo/surface.js';
 import { DIAMETRES_LISTE, GAINES_LISTE, NOMBRES_LISTE, MATERIAUX } from '../topo/chantier.js';
@@ -1691,7 +1692,9 @@ export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) 
     remplir('inclinaison', 'GNSS non connecté', '', 'attente');
     return;
   }
-  const age = etat.ageCorrections != null ? `corr. ${Math.round(etat.ageCorrections)} s` : '';
+  const age = etat.ageCorrections != null ? texteAgeCorrections(etat.ageCorrections) : '';
+  // 0.213.0 : corrections de plus de 2 s : la case RTK passe au rouge et clignote (la prise de point est bloquée, voir pont.js).
+  const correctionsPerimees = correctionsTropAnciennes(etat.ageCorrections);
   if (!etat.recu) {
     remplir('rtk', 'En attente…', '', 'attente');
     remplir('z', 'Z —', '', 'info');
@@ -1699,7 +1702,9 @@ export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) 
     const statut = { 1: 'AUTONOME', 2: 'DGPS', 4: 'FIXE', 5: 'FLOTTANT' }[etat.qualite] ?? (etat.libelleQualite ?? '?').toUpperCase();
     // Le RTK fixe était là puis il est perdu : la case clignote jusqu'à son retour (0.114.0).
     if (etat.qualite === 4) fixeDejaVu = true;
-    remplir('rtk', statut, etat.nbSatellites != null ? `${etat.nbSatellites} sat` : '', etat.qualite === 4 ? 'ok' : `pas-ok${fixeDejaVu ? ' fixe-perdu' : ''}`);
+    const satellites = etat.nbSatellites != null ? `${etat.nbSatellites} sat` : '';
+    if (correctionsPerimees) remplir('rtk', statut, [satellites, age].filter(Boolean).join(' · '), 'pas-ok fixe-perdu');
+    else remplir('rtk', statut, satellites, etat.qualite === 4 ? 'ok' : `pas-ok${fixeDejaVu ? ' fixe-perdu' : ''}`);
     // Z = altitude du bout de la canne envoyée par le GNSS (position compensée), comme partout dans l'appli.
     const z = etat.position?.altitude;
     const precision = etat.precisionH != null || etat.precisionV != null ? `H ${formaterNombre(etat.precisionH)} V ${formaterNombre(etat.precisionV)}` : '';

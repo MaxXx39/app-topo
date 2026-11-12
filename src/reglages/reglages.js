@@ -171,8 +171,10 @@ function compteListes() {
  */
 // 0.160.0 (demande du 08.11) : enPage = vraie page plein écran (entre l'en-tête et la bande du bas) au lieu
 // d'une fenêtre ; « ← » en haut la ferme et appelle quandRetour (retour à la page Applications).
-export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage, changerMode, recepteur = null, enPage = false, quandRetour = null }) {
+export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage, changerMode, recepteur = null, enPage = false, quandRetour = null, page = null }) {
   const reglages = lireReglages();
+  // 0.213.0 : page à montrer d'office (le nuage Drive de l'en-tête ouvre la page « Drive »).
+  if (page && PAGES_REGLAGES.some(([cle]) => cle === page)) pageOuverte = page;
   if (!PAGES_REGLAGES.some(([cle]) => cle === pageOuverte) || (pageOuverte === 'recepteur' && !recepteur)) pageOuverte = 'affichage';
   const fenetre = document.createElement('dialog');
   fenetre.className = `fenetre-reglages${enPage ? ' en-page' : ''}`;

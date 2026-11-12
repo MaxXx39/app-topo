@@ -3,10 +3,11 @@ import { nettoyerTypes, lireTypesDxf, couleurDuType, TYPES_DXF_DEPART } from '..
 import { nettoyerListes, fusionnerListes } from '../src/reglages/listes-partagees.js';
 
 describe('types de plans DXF (0.194.0)', () => {
-  it('liste de départ : GEOOFF, GEOPERRIN, TER, CANA, Autres, chacun sa couleur', () => {
+  it('liste de départ : GEOOFF, GEOPERRIN, TER, CANA, les types Bât (0.213.0), Autres en dernier ; couleurs en rotation', () => {
     const types = lireTypesDxf({});
     expect(types.map((t) => t.nom)).toEqual(TYPES_DXF_DEPART);
-    expect(new Set(types.map((t) => t.couleur)).size).toBe(5);
+    expect(types.map((t) => t.nom)).toEqual(['GEOOFF', 'GEOPERRIN', 'TER', 'CANA', 'Bât', 'Bât Radier', 'Bât/SS', 'Bât/Rez', 'Bât/1er', 'Bât/2eme', 'Autres']);
+    expect(new Set(types.map((t) => t.couleur)).size).toBe(8); // 8 couleurs de pastille, reprises dans l'ordre
   });
 
   it('nettoyage : virgules ou lignes, sans doublon ni vide', () => {

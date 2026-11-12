@@ -14,7 +14,7 @@ export const TEXTES_AIDE = {
   lame:
     'Guidage (Expert) : choisis la machine puis la surface à suivre. Flèches : monter ou descendre ; vert ≤ 2 cm, orange ≤ 5 cm. Réglages dans ⚙ (1 ou 2 GNSS, G / D, distances, vues).',
   partage:
-    'Projets sur Google Drive. Une seule main par projet : verte = tu enregistres, grise ou rouge = lecture seule. Prendre la main à un autre appareil : Expert et code.',
+    'Projets sur Google Drive. Une seule main par projet : verte = tu enregistres, grise ou rouge = lecture seule. Prendre la main à un autre appareil : Expert et code. Nuage en tête d\'écran : vert = à jour, rouge barré = hors ligne, gris barré = Google non connecté ; touche-le pour ouvrir les réglages Drive.',
   cartouche:
     'Écrits dans le cartouche du PDF : affaire, désignation, dessiné par et date (vide = date du jour).',
   imports:
@@ -84,5 +84,5 @@ export const TEXTES_AIDE = {
   dessin:
     'DAO (Expert) : « ✏ DAO » pose une barre sur le plan : dessiner, accrocher, calques, sélectionner (déplacer, copier, tourner…), outils topo (Δ Z, pente, projeter). Exporté en DXF.',
   plan:
-    'Pince pour zoomer, glisse pour déplacer. Fond (photo aérienne, carte nationale cochable par-dessus la photo avec sa transparence, cadastre ; au-delà de 3 km de large la photo devient la carte), DXF, Afficher, Seul, Coupe, 3D, ▲ ▼ (taille). La flèche du nord remet le nord en haut.',
+    'Pince pour zoomer, glisse pour déplacer. Fond (photo aérienne, carte nationale cochable par-dessus la photo avec sa transparence, cadastre ; au-delà de 2 km de large la photo devient la carte), DXF, Afficher, Seul, Coupe, 3D, ▲ ▼ (taille). La flèche du nord remet le nord en haut.',
 };
