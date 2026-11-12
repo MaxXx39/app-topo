@@ -5,6 +5,7 @@ import ch.apptopo.noyau.nmea.degresDepuisNmea
 import ch.apptopo.noyau.nmea.libelleQualite
 import ch.apptopo.noyau.nmea.lireEtc
 import ch.apptopo.noyau.nmea.lireGga
+import ch.apptopo.noyau.nmea.lireGsa
 import ch.apptopo.noyau.nmea.lireGst
 import ch.apptopo.noyau.nmea.lirePhraseNmea
 import ch.apptopo.noyau.nmea.sommeDeControle
@@ -88,6 +89,19 @@ class NmeaTest {
         assertNull(lireGst(lirePhraseNmea(ggaExemple)!!))
         val vide = "GNGST,071530.00,,,,,,,"
         assertNull(lireGst(lirePhraseNmea("\$$vide*${sommeDeControle(vide)}")!!)!!.horizontaleM)
+    }
+
+    @Test
+    fun `GSA donne le PDOP, le HDOP et le VDOP`() {
+        val texte = "GNGSA,A,3,04,05,09,12,24,,,,,,,,1.45,0.82,1.20,1"
+        val gsa = lireGsa(lirePhraseNmea("\$$texte*${sommeDeControle(texte)}")!!)!!
+        assertEquals(1.45, gsa.pdop!!, 1e-9)
+        assertEquals(0.82, gsa.hdop!!, 1e-9)
+        assertEquals(1.20, gsa.vdop!!, 1e-9)
+        assertNull(lireGsa(lirePhraseNmea(ggaExemple)!!))
+        // Pas de position (fix 1) : rien à lire.
+        val sansFix = "GNGSA,A,1,,,,,,,,,,,,,,,"
+        assertNull(lireGsa(lirePhraseNmea("\$$sansFix*${sommeDeControle(sansFix)}")!!))
     }
 
     @Test

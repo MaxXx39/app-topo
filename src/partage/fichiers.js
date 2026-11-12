@@ -40,8 +40,7 @@ function alleger(projet, fichiers) {
   });
   const surfaces = projet.surfaces ? { surfaces: projet.surfaces.map(sansImages) } : {};
   const mesures = projet.mesures ? { mesures: projet.mesures.map(sansImages) } : {};
-  // Photos des levés (0.77.0) : aussi pour les métrés et les levés libres.
-  const metres = projet.metres ? { metres: projet.metres.map(sansImages) } : {};
+  // Photos des levés (0.77.0) : aussi pour les levés libres.
   const autres = projet.autres ? { autres: projet.autres.map(sansImages) } : {};
   // Photos des points de contrôle (0.105.0) : chaque photo est elle-même un objet à alléger.
   const photosControle = projet.photosControle ? { photosControle: sansImages({ photos: projet.photosControle }).photos } : {};
@@ -51,7 +50,7 @@ function alleger(projet, fichiers) {
       return { ...plan, contenu: null };
     }),
   } : {};
-  return { ...surfaces, ...mesures, ...metres, ...autres, ...photosControle, ...plansDxf };
+  return { ...surfaces, ...mesures, ...autres, ...photosControle, ...plansDxf };
 }
 
 /**
@@ -68,7 +67,7 @@ export function fichiersVersProjet(fichiers) {
 
 /** Remet en place les images des photos et le contenu des plans DXF (projet ou contenu d'archive). */
 function remettre(projet, fichiers) {
-  for (const objet of [...(projet.surfaces ?? []), ...(projet.mesures ?? []), ...(projet.metres ?? []), ...(projet.autres ?? [])]) {
+  for (const objet of [...(projet.surfaces ?? []), ...(projet.mesures ?? []), ...(projet.autres ?? [])]) {
     for (const photo of objet.photos ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});
   }
   for (const photo of projet.photosControle ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});

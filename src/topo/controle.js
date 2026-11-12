@@ -152,7 +152,7 @@ export function csvControles(controles) {
  * points : [{ nom, est, nord, altitude }] ; nouvelId() : identifiant d'un nouveau point.
  * Renvoie { ajoutes: nombre, deja: [noms déjà dans la liste], sansNom: nombre }. La liste est modifiée.
  */
-export function ajouterPointsControle(liste, points, nouvelId) {
+export function ajouterPointsControle(liste, points, nouvelId, { garderDoublons = false } = {}) {
   const noms = new Set(liste.map((p) => p.nom));
   const deja = [];
   let ajoutes = 0;
@@ -163,7 +163,7 @@ export function ajouterPointsControle(liste, points, nouvelId) {
       sansNom += 1;
       continue;
     }
-    if (noms.has(nom)) {
+    if (noms.has(nom) && !garderDoublons) {
       deja.push(nom);
       continue;
     }

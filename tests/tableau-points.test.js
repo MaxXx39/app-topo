@@ -16,9 +16,7 @@ function projetExemple() {
       { id: 'h1', nom: 'LV-Chant 1', direct: true, points: [{ nom: 'P-CH-1', est: 4, nord: 5, altitude: 1, chantier: { libelle: 'CH', nature: 'EU', remarque: 'regard' }, gnss: { prisLe: '2026-11-10T10:00:00' } }] },
     ],
     surfaces: [],
-    metres: [],
     autres: [{ id: 'oa', nature: 'annotation', leveId: 'a1', photos: [{ id: 'pha', point: 'Annot-1' }] }, { id: 'oc', nature: 'chantier', leveId: 'h1', photos: [] }],
-    reseaux: [],
   };
 }
 
@@ -35,17 +33,13 @@ describe('tableau des points (0.191.0)', () => {
     p.leves.push(
       { id: 's1', nom: 'LV-Stock 1', direct: true, points: [{ nom: 'S-1', est: 1, nord: 1, altitude: 1 }] },
       { id: 't1', nom: 'LV-Terrain 1', direct: true, points: [{ nom: 'T-1', est: 1, nord: 1, altitude: 1 }] },
-      { id: 'm1', nom: 'LV-Métré 1', direct: true, points: [{ nom: 'M-1', est: 1, nord: 1, altitude: 1 }] },
-      { id: 'r1', nom: 'LV-EU 1', direct: true, points: [{ nom: 'R-1', est: 1, nord: 1, altitude: 1 }] },
       { id: 'k1', nom: 'Cadastre', cadastre: true, direct: true, points: [{ nom: 'K-1', est: 1, nord: 1, altitude: 1 }] },
     );
     p.surfaces.push({ id: 'os', nature: 'stock', leveId: 's1' }, { id: 'ot', nature: 'terrain', leveId: 't1' });
-    p.metres.push({ id: 'om', nature: 'metre', leveId: 'm1' });
-    p.reseaux.push({ id: 'or', nature: 'reseau', reseau: 'EU', leveId: 'r1' });
     const cat = (id) => categorieDeListe(p, p.leves.find((l) => l.id === id));
-    expect([cat('s1'), cat('t1'), cat('m1'), cat('r1'), cat('k1')]).toEqual(['stock', 'terrain', 'metre', 'recollement', null]);
+    expect([cat('s1'), cat('t1'), cat('k1')]).toEqual(['stock', 'terrain', null]);
     expect(listesDuTableau(p).some((l) => l.id === 'k1')).toBe(false);
-    expect(lignesDuTableau(p, { categories: new Set(['stock', 'terrain', 'metre', 'recollement']) }).map((l) => l.nom).sort()).toEqual(['M-1', 'R-1', 'S-1', 'T-1']);
+    expect(lignesDuTableau(p, { categories: new Set(['stock', 'terrain']) }).map((l) => l.nom).sort()).toEqual(['S-1', 'T-1']);
   });
 
   it('plusieurs catégories, et on peut décocher une liste', () => {

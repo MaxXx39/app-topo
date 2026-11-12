@@ -5,12 +5,12 @@
 //
 // Une archive a la forme :
 //   { id, type ('leve', 'points', 'surface', 'cadastre', 'plan', 'dessin'), nom, archiveLe (date ISO),
-//     contenu: { leves, surfaces, metres, autres, reseaux, mesures, calculs, plansDxf, dessins } }
+//     contenu: { leves, surfaces, autres, mesures, calculs, plansDxf, dessins } }
 // contenu : les morceaux du projet enlevés, rangés sous le même nom que dans le projet.
 import { nouvelIdentifiant } from '../topo/surface.js';
 
 // Parties du projet qu'une archive peut contenir (même nom que dans le projet).
-export const CLES_ARCHIVE = ['leves', 'surfaces', 'metres', 'autres', 'reseaux', 'mesures', 'calculs', 'plansDxf', 'dessins'];
+export const CLES_ARCHIVE = ['leves', 'surfaces', 'autres', 'mesures', 'calculs', 'plansDxf', 'dessins'];
 
 const NOMS_TYPES = { leve: 'Levé', points: 'Points importés', surface: 'Surface importée', cadastre: 'Cadastre', plan: 'Plan DXF', dessin: 'Dessin' };
 
@@ -51,17 +51,14 @@ export function archiver(projet, type, id) {
     const leve = (projet.leves ?? []).find((l) => l.id === id);
     if (!leve) return { erreur: 'levé introuvable' };
     nom = leve.nom;
-    // Une levée (stock, métré, levé libre, réseau) prend son propre nom, plus parlant que la liste.
-    const levees = [...(projet.surfaces ?? []), ...(projet.metres ?? []), ...(projet.autres ?? []), ...(projet.reseaux ?? [])].filter((o) => o.leveId === id);
+    // Une levée (stock, levé libre…) prend son propre nom, plus parlant que la liste.
+    const levees = [...(projet.surfaces ?? []), ...(projet.autres ?? [])].filter((o) => o.leveId === id);
     if (levees.length === 1 && levees[0].nom) nom = levees[0].nom;
     enlever(projet, contenu, 'leves', (l) => l.id === id);
     const surfaces = enlever(projet, contenu, 'surfaces', (s) => s.leveId === id);
     enleverCalculs(projet, contenu, surfaces);
-    const metres = enlever(projet, contenu, 'metres', (m) => m.leveId === id);
-    const idsMetres = new Set(metres.map((m) => m.id));
-    enlever(projet, contenu, 'mesures', (m) => m.leveId === id || idsMetres.has(m.metreId));
+    enlever(projet, contenu, 'mesures', (m) => m.leveId === id);
     enlever(projet, contenu, 'autres', (a) => a.leveId === id);
-    enlever(projet, contenu, 'reseaux', (r) => r.leveId === id);
     // Cadastre : le plan DXF des lignes part avec ses points.
     if (type === 'cadastre') enlever(projet, contenu, 'plansDxf', (p) => p.cadastre === id || (!p.cadastre && p.nom === leve.nom));
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;

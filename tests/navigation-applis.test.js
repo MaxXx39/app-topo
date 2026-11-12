@@ -1,6 +1,6 @@
 // Navigation 0.156.0 : liste des applications, application en cours, favoris de la roue (par tablette).
 import { describe, it, expect } from 'vitest';
-import { applisDisponibles, appliCourante, lireFavoris, ecrireFavoris, basculerFavori, FAVORIS_DEPART, MAX_FAVORIS, CLE_FAVORIS, lireOrdre, ecrireOrdre, ordonner, CLE_ORDRE } from '../src/navigation/applis.js';
+import { APPLIS, applisDisponibles, appliCourante, lireFavoris, ecrireFavoris, basculerFavori, FAVORIS_DEPART, MAX_FAVORIS, CLE_FAVORIS, lireOrdre, ecrireOrdre, ordonner, CLE_ORDRE } from '../src/navigation/applis.js';
 
 /** Petite mémoire qui imite localStorage. */
 function memoire(depart = {}) {
@@ -15,7 +15,7 @@ describe('applications proposées', () => {
     expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('base') }))).toEqual(['lever', 'implanter', 'controle', 'plan', 'recepteur']);
   });
   it('APK en Expert : toutes', () => {
-    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('expert') }))).toEqual(['lever', 'recollement', 'metre', 'implanter', 'mesure', 'annotation', 'controle', 'guidage', 'calculs', 'plan', 'recepteur']);
+    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('expert') }))).toEqual(['lever', 'implanter', 'mesure', 'annotation', 'controle', 'guidage', 'calculs', 'plan', 'recepteur']);
   });
   it('site : pas d\'Implanter, de Guidage ni de Récepteur ; Contrôle dès Intermédiaire', () => {
     expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('base') }))).toEqual(['lever', 'plan']);
@@ -34,11 +34,10 @@ describe('application en cours', () => {
     expect(appliCourante('mesure-rapide', 'lever')).toBe('mesure');
     expect(appliCourante('annotation', 'lever')).toBe('annotation');
   });
-  it('Lever, Recollement et Métré : trois applications sur le même écran (0.161.0)', () => {
-    expect(appliCourante('terrain', 'lever', 'leve')).toBe('lever');
-    expect(appliCourante('terrain', 'lever', 'reseau')).toBe('recollement');
-    expect(appliCourante('terrain', 'lever', 'metre')).toBe('metre');
-    expect(appliCourante('terrain', 'controler', 'metre')).toBe('implanter');
+  it('plus d\'application Recollement ni Métré (0.212.0) : le Terrain reste le Levé', () => {
+    expect(appliCourante('terrain', 'lever')).toBe('lever');
+    expect(APPLIS.map((a) => a.cle)).not.toContain('recollement');
+    expect(APPLIS.map((a) => a.cle)).not.toContain('metre');
   });
 });
 

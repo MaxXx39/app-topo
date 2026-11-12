@@ -742,6 +742,13 @@ input[type='radio'] {
   border-left: 4px solid var(--rouge);
 }
 
+/* 0.208.0 : message d'une bonne nouvelle (import de points de contrôle : tout est ajouté). */
+.message-ok {
+  padding: 0.4rem 0.6rem;
+  border-left: 4px solid #16a34a;
+  background: #dcfce7;
+}
+
 .avertissement {
   background: var(--jaune-clair);
   border-left: 4px solid var(--jaune);
@@ -1051,6 +1058,15 @@ svg.plan {
 .plan .points-legers .controle-point {
   fill: #dc2626;
   stroke: none;
+}
+
+/* 0.212.0 : marque noire au centre d'un point selon son type : levé = rond, importé = carré, dessiné = losange
+   (le contrôle a un triangle rouge ci-dessus, l'annotation n'a rien). */
+.plan .marque-centre,
+.plan .points-legers .marque-centre {
+  fill: #000000;
+  stroke: none;
+  pointer-events: none;
 }
 
 /* 0.207.0 : aperçu d'une forme dans les listes de choix (libellés, Lever, levé chantier) : même style que le plan. */
@@ -2617,18 +2633,11 @@ body.avec-recepteur .bandeaux-recepteur {
   --couleur-role: var(--succes);
 }
 
-/* Métré : aire, longueur, point compté, en cyan (la couleur des mesures). */
 .role-leve:is(.role-aire, .role-longueur, .role-compte) {
   --couleur-role: #0891b2;
 }
 
-.outils-ligne.outils-metre {
-  border-left-color: #0891b2;
-}
 
-.libelles-terrain.dans-metre .puce-libelle {
-  --couleur-libelle: #0891b2;
-}
 
 .role-leve.choisi {
   background: var(--couleur-role);
@@ -3138,9 +3147,6 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   display: none !important;
 }
 
-.bouton-nature.nature-metre {
-  --couleur-nature: #ea580c;
-}
 
 .choix-nature {
   margin: 8px 0;
@@ -3176,13 +3182,7 @@ body:is([data-onglet='surfaces'], [data-onglet='volumes'], [data-onglet='mesures
   --couleur-nature: #15803d;
 }
 
-.bouton-nature.nature-recollement {
-  --couleur-nature: #16a34a;
-}
 
-.bouton-nature.nature-reseau {
-  --couleur-nature: #db2777;
-}
 
 .bouton-nature.nature-terrassement {
   --couleur-nature: #2563eb;
@@ -4947,13 +4947,7 @@ button.bouton-import {
   --couleur-nature: #15803d;
 }
 
-.entete-levee.nature-reseau {
-  --couleur-nature: #db2777;
-}
 
-.entete-levee.nature-recollement {
-  --couleur-nature: #16a34a;
-}
 
 .entete-levee.nature-terrassement {
   --couleur-nature: #2563eb;
@@ -4963,9 +4957,6 @@ button.bouton-import {
   --couleur-nature: #7c3aed;
 }
 
-.entete-levee.nature-metre {
-  --couleur-nature: #ea580c;
-}
 
 /* « Levé libre » (contrôle, points géomètre… ; « autres » dans le code) : gris ardoise. */
 .entete-levee.nature-autres,
@@ -5146,7 +5137,6 @@ button.bouton-import {
 .pastille-liste.liste-stock { background: #b45309; }
 .pastille-liste.liste-terrain { background: #15803d; }
 .pastille-liste.liste-terrassement { background: #2563eb; }
-.pastille-liste.liste-metre { background: #ea580c; }
 .pastille-liste.liste-autres { background: #475569; }
 .pastille-liste.liste-fichier { background: var(--sombre); }
 .pastille-liste.liste-ajoutes { background: #7c3aed; }
@@ -5573,10 +5563,8 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 }
 
 .ligne-levee.nature-terrain { --couleur-nature: #15803d; }
-.ligne-levee.nature-recollement { --couleur-nature: #16a34a; }
 .ligne-levee.nature-terrassement { --couleur-nature: #2563eb; }
 .ligne-levee.nature-surface { --couleur-nature: #7c3aed; }
-.ligne-levee.nature-metre { --couleur-nature: #ea580c; }
 .ligne-levee.nature-autres { --couleur-nature: #475569; }
 
 .choisir-levee {
@@ -5655,7 +5643,6 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 .section-menu-controle { --teinte-section: var(--rouge); }
 .section-menu-surface { --teinte-section: #7c3aed; }
 .section-menu-dessin { --teinte-section: var(--ambre-fonce); }
-.section-menu-metre { --teinte-section: var(--cyan); }
 
 .pastille-liste.liste-mesures { background: #0891b2; }
 
@@ -7610,7 +7597,6 @@ body.lecture-seule .bouton-photo-levee {
 
 .plan .nature-stock { --couleur-nature: #b45309; }
 .plan .nature-terrain { --couleur-nature: #15803d; }
-.plan .nature-recollement { --couleur-nature: #16a34a; }
 .plan .nature-terrassement { --couleur-nature: #2563eb; }
 .plan .nature-surface { --couleur-nature: #7c3aed; }
 
@@ -8603,173 +8589,7 @@ body:is([data-onglet='volumes'], [data-onglet='mesures'], [data-onglet='dessin']
   stroke-width: 1;
 }
 
-/* --- Recollement de réseaux (0.101.0) : réseaux, éléments, attributs, bandeau, ouvrages --- */
-.choix-reseau .bouton-reseau span {
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.reseaux-leve,
-.elements-reseau {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  margin: 0 0 8px;
-}
-
-.puce-reseau {
-  --couleur-reseau: var(--gris);
-  min-height: 34px;
-  padding: 4px 10px;
-  border: 2px solid var(--couleur-reseau);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--couleur-reseau);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.puce-reseau.actif {
-  background: var(--couleur-reseau);
-  color: #ffffff;
-}
-
-.puce-nouveau-reseau {
-  min-width: 34px;
-  font-size: 1.1rem;
-}
-
-.reseaux-leve .bouton-crayon-libelles {
-  position: static;
-  margin-left: auto;
-  box-shadow: none;
-}
-
-.puce-element {
-  min-height: 34px;
-  padding: 4px 10px;
-  border: 1.5px solid var(--bordure);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--texte);
-  cursor: pointer;
-}
-
-.puce-element.element-ouvrage {
-  font-weight: 700;
-}
-
-.puce-element.actif {
-  border-color: var(--sombre);
-  background: var(--sombre);
-  color: #ffffff;
-}
-
-.cadre-reseau {
-  padding: 10px;
-  border: 2px solid var(--couleur-reseau);
-  border-radius: var(--rayon);
-}
-
-.cadre-reseau .conduite-en-cours {
-  --couleur-role: var(--couleur-reseau);
-}
-
-.coins-ouvrage {
-  margin: 4px 0 8px;
-  color: var(--couleur-reseau);
-}
-
-.attributs-reseau {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 6px;
-  margin: 8px 0;
-}
-
-.attribut-reseau {
-  display: grid;
-  gap: 2px;
-  font-size: 0.75rem;
-  color: var(--gris);
-}
-
-.attribut-reseau input,
-.attribut-reseau select {
-  min-height: 34px;
-  width: 100%;
-  font-size: 0.95rem;
-}
-
-.bandeau-reseau {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin: 8px 0;
-  padding: 8px 10px;
-  border-left: 4px solid var(--couleur-reseau);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--couleur-reseau) 10%, var(--surface));
-}
-
-.pente-troncon {
-  font-weight: 700;
-}
-
-.sens-ecoulement {
-  white-space: nowrap;
-}
-
-.mesures-ouvrage {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  align-items: center;
-  padding: 6px 0;
-}
-
-.mesures-ouvrage label {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.mesures-ouvrage input {
-  width: 6.5em;
-}
-
-.alerte-ouvrage {
-  color: var(--rouge);
-}
-
-.troncon-reseau {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 2px 10px;
-}
-
-/* Recollement sur le plan : conduites, flèches de pente, ouvrages. */
-.conduite-reseau {
-  stroke-width: 3;
-  stroke-linecap: round;
-}
-
-.fleche-reseau {
-  stroke: #ffffff;
-  stroke-width: 1;
-}
-
-.pente-reseau,
-.nom-ouvrage-reseau {
-  font-size: 11px;
-  font-weight: 700;
-  paint-order: stroke;
-  stroke: #ffffff;
-  stroke-width: 3px;
-}
-
+/* Ouvrage du Levé chantier sur le plan (cercle ou cadre d'une chambre) ; le Recollement a été supprimé en 0.212.0. */
 .ouvrage-reseau {
   fill: rgba(255, 255, 255, 0.85);
   stroke-width: 2.5;
@@ -12192,6 +12012,9 @@ body.mode-telephone .tuile-appli .sous-tuile button { min-height: 26px; padding:
 .bouton-pied-applis svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .bouton-pied-applis.fermer { border-color: #dc2626; background: #dc2626; color: #ffffff; }
 body.mode-telephone .bouton-pied-applis { min-height: 42px; font-size: 13px; }
+/* 0.208.0 : pied de la page Applications : « Fermer l'appli » = 1/3 de la largeur, « Réglages » = 2/3 */
+.pied-applis .bouton-pied-applis.fermer { flex: 1 1 0; }
+.pied-applis .bouton-pied-applis[data-pied="reglages"] { flex: 2 1 0; }
 
 /* Pages du projet : une seule partie de l'onglet Projet à la fois (liste des projets, Import, Exporter, Contenu). */
 .titre-partie-projet { margin: 0 0 10px; font-size: 20px; color: var(--encre); }
@@ -13079,6 +12902,11 @@ body.mode-telephone .entete-pastilles .pastille-entete { min-height: 24px; }
 .etat-drive.etat-drive-envoi { background: #f59e0b; color: #1f1300; }
 .etat-drive.etat-drive-pause { background: rgba(148, 163, 184, 0.3); color: #e2e8f0; }
 .etat-drive.etat-drive-alerte { background: #dc2626; color: #ffffff; }
+/* 0.213.0 : nuage barré : rouge = hors ligne, gris = Google non connecté ; le nuage se touche (réglages Drive). */
+.etat-drive { cursor: pointer; }
+.etat-drive.etat-drive-hors-ligne { background: #dc2626; color: #ffffff; }
+.etat-drive.etat-drive-non-connecte { background: rgba(148, 163, 184, 0.3); color: #e2e8f0; }
+.etat-drive .barre-nuage { stroke-width: 2.6; }
 body.mode-telephone .etat-drive { padding: 2px 5px; min-height: 24px; }
 body.mode-telephone .etat-drive svg { width: 20px; height: 20px; }
 
@@ -13408,7 +13236,7 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .cadre-couloir .fleche-couloir.vers-gauche .pointe { border-right: 20px solid var(--couleur-fleche); }
 .cadre-couloir .fleche-couloir.vers-droite { flex-direction: row-reverse; padding-left: 14px; }
 .cadre-couloir .fleche-couloir.vers-droite .pointe { border-left: 20px solid var(--couleur-fleche); }
-.cadre-couloir .fleche-couloir .mot-fleche { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font-size: 0.95rem; font-weight: 800; color: var(--couleur-fleche); text-shadow: 0 0 3px #fff, 0 0 3px #fff; }
+.cadre-couloir .fleche-couloir .mot-fleche { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font-size: 0.95rem; font-weight: 800; color: var(--couleur-fleche); } /* 0.208.0 : sans ombre floue */
 
 /* 0.189.3 : boutons de coupe d'Implanter › Surface avec symbole, un peu plus larges */
 .choix-coupe .puce-choix { display: inline-flex; align-items: center; gap: 6px; min-width: 150px; min-height: 48px; padding: 0 12px; }
@@ -13474,12 +13302,14 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .type-plan-dxf select { min-height: 40px; }
 
 /* 0.195.0 : tuile du menu : le haut en 3 parts, nom (avec son icône) centré sur les 2 de gauche, bouton « liste » dans la 3e */
-.tuile-appli .tete-tuile { width: 100%; display: grid; grid-template-columns: 2fr 1fr; align-items: center; gap: 4px; }
-.tuile-appli .nom-et-icone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; }
-.tuile-appli .bouton-liste-tuile { justify-self: center; width: 44px; height: 44px; border: 2px solid currentColor; border-radius: 12px; background: rgba(0, 0, 0, 0.14); color: inherit; display: grid; place-items: center; padding: 0; }
-.tuile-appli .bouton-liste-tuile svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.tuile-appli .tete-tuile { display: block; width: 100%; position: relative; min-height: 44px; }
+/* 0.208.0 : le nom est centré sur toute la tuile ; le bouton « liste » est posé à droite par-dessus (retrait à droite
+   pour que le nom ne passe pas dessous). */
+.tuile-appli .nom-et-icone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; padding: 0 46px; }
+.tuile-appli .bouton-liste-tuile { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border: 1px solid currentColor; border-radius: 10px; background: rgba(0, 0, 0, 0.14); color: inherit; display: grid; place-items: center; padding: 0; }
+.tuile-appli .bouton-liste-tuile svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .tuile-appli .coche-favori { left: 5px; right: auto; }
-body.mode-telephone .tuile-appli .bouton-liste-tuile { width: 36px; height: 36px; }
+body.mode-telephone .tuile-appli .bouton-liste-tuile { width: 34px; height: 34px; }
 
 /* 0.196.0 (maquette B du 10.11) : « Levé en cours » : un seul cadre, liseré et fond de la couleur de l'application, qui réunit
    l'appareil photo, le nom du levé et le « + », séparés par un trait de la même couleur. */
@@ -13608,3 +13438,175 @@ body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; 
   vertical-align: middle;
   margin-left: 6px;
 }
+
+/* 0.208.0 : points de contrôle dans la page Gérer : un × par point. */
+.liste-points-gerer {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.ligne-point-gerer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+/* 0.209.0 : × pour supprimer un point seul, dans la colonne du nom du tableau de points. */
+.supprimer-point-tableau {
+  margin-left: 6px;
+  padding: 0 6px;
+  color: #b91c1c;
+  font-weight: 800;
+}
+
+/* 0.210.0 : flèche + texte de l'écart sur le plan (Implanter › Ligne), collés à la ligne ; couleur de la tolérance. */
+.plan .texte-fleche-ecart {
+  font-size: 13px;
+}
+
+.plan .pointe-ecart {
+  stroke: #ffffff;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+/* 0.214.0 (maquette 6 A du 12.11) : cadre « Projet en cours » en ambre clair (le thème sombre garde le cadre foncé). */
+body:not(.theme-sombre) .cadre-projet-applis { background: #fdedc4; color: #1b2b36; }
+body:not(.theme-sombre) .cadre-projet-applis .texte-bandeau-projet,
+body:not(.theme-sombre) .cadre-projet-applis .texte-bandeau-projet b,
+body:not(.theme-sombre) .cadre-projet-applis .texte-bandeau-projet small,
+body:not(.theme-sombre) .cadre-projet-applis .texte-bandeau-projet span,
+body:not(.theme-sombre) .cadre-projet-applis .comptes-projet-applis { color: #1b2b36; }
+body:not(.theme-sombre) .cadre-projet-applis .bouton-bandeau-projet { box-shadow: 0 1px 2px rgba(27, 43, 54, 0.2); }
+
+/* 0.214.0 (maquette 3 A du 12.11) : « Contrôle à refaire » sur le tiers bas du logo du récepteur, de la même largeur, orange.
+   La barre du récepteur est dans l'en-tête ; le logo (cercle de 76 px) déborde sous l'en-tête à droite. */
+.pastille-controle { top: 58px; right: 10px; margin-top: 0; width: 76px; min-height: 26px; padding: 2px 4px; border-radius: 13px; background: #f59e0b; color: #1f1300; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; font-size: 0.62rem; font-weight: 800; }
+.pastille-controle span { display: block; }
+body.mode-telephone .pastille-controle { top: 46px; right: 6px; width: 60px; min-height: 22px; font-size: 0.55rem; }
+
+/* 0.214.0 (maquette 4 A) : petit encadré de nature à côté du nom d'une liste (Afficher, Liste de points, Gérer). */
+.etiquette-nature { display: inline-block; flex: none; margin-left: 6px; padding: 1px 5px; border-radius: 4px; background: var(--couleur-etiquette, #64748b); color: #ffffff; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.04em; line-height: 1.3; text-transform: uppercase; vertical-align: middle; }
+.puce-liste-points.choisie .etiquette-nature { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85); }
+
+/* 0.214.0 (maquette 1 B du 12.11) : Guidage : plus de colonnes de chiffres à côté de la coupe ; chaque règle porte au-dessus son
+   bandeau (▲ MONTER rouge, ● OK vert, ▼ DESCENDRE bleu, valeur orange près de la surface). La coupe gagne en largeur. */
+.corps-coupe-guidage { grid-template-columns: 78px minmax(0, 1fr) 78px; gap: 6px; }
+.vue-plan2 .corps-coupe-guidage { grid-template-columns: 68px minmax(0, 1fr) 68px; gap: 4px; }
+body.mode-telephone .corps-coupe-guidage { grid-template-columns: 62px minmax(0, 1fr) 62px; gap: 3px; }
+.corps-coupe-guidage .colonne-regle { flex-direction: column; align-items: stretch; gap: 4px; }
+.corps-coupe-guidage .colonne-regle .regle-hauteur { flex: 1; width: 28px; margin: 0 auto; }
+.instruction-regle { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 40px; padding: 3px 2px; border-radius: 8px; line-height: 1.1; text-align: center; background: #e5eaee; color: #5f6d77; font-variant-numeric: tabular-nums; }
+.instruction-regle b { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.01em; white-space: nowrap; }
+.instruction-regle small { font-size: 0.62rem; font-weight: 700; }
+.instruction-regle .nom-bout-regle { font-size: 0.55rem; font-weight: 700; opacity: 0.8; text-transform: uppercase; }
+.instruction-regle.monter { background: #dc2626; color: #ffffff; }
+.instruction-regle.descendre { background: #2563eb; color: #ffffff; }
+.instruction-regle.ok { background: #15803d; color: #ffffff; }
+.instruction-regle.proche { background: #f59e0b; color: #1f1300; }
+.instruction-regle.proche b { font-size: 0.85rem; }
+body.mode-telephone .instruction-regle b { font-size: 0.52rem; }
+body.mode-telephone .instruction-regle.proche b { font-size: 0.75rem; }
+/* Flèches d'échelle de la coupe en Guidage : 24 px (avant 40 px, trop gros). */
+.coupe-guidage .echelle-coupe button { width: 24px; height: 24px; font-size: 0.85rem; }
+.coupe-guidage .echelle-coupe span { min-width: 34px; font-size: 0.7rem; }
+
+/* 0.214.0 (maquette 2 du 12.11) : angles de la Mesure rapide sur le plan : arc discret, valeur en petit. */
+.arc-angle-mesure-rapide { fill: rgba(8, 145, 178, 0.1); stroke: #0891b2; stroke-width: 1; opacity: 0.75; pointer-events: none; }
+.angle-mesure-rapide { fill: #0e7490; font-size: 10px; font-weight: 700; paint-order: stroke; stroke: #ffffff; stroke-width: 3px; opacity: 0.85; pointer-events: none; }
+
+/* 0.214.0 (maquette 5 B du 12.11) : mesure de durée : fenêtre de choix (5 / 15 / 30 s) et décompte avec anneau. */
+.fond-mesure-duree { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgba(15, 23, 32, 0.55); }
+.fenetre-mesure-duree { width: min(92vw, 360px); display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px; border-radius: 16px; background: #ffffff; color: #1b2b36; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35); }
+.titre-mesure-duree { margin: 0; font-size: 1.1rem; font-weight: 800; }
+.aide-mesure-duree { margin: 0; font-size: 0.8rem; color: #5f6d77; text-align: center; }
+.boutons-duree { display: flex; gap: 10px; width: 100%; }
+.bouton-duree { flex: 1; min-height: 64px; border: 0; border-radius: 12px; background: #15803d; color: #ffffff; font-size: 1.4rem; font-weight: 800; }
+.decompte-mesure-duree { flex-direction: row; justify-content: space-between; }
+.anneau-mesure-duree { --avancement: 0deg; width: 76px; height: 76px; flex: none; border-radius: 50%; background: conic-gradient(#15803d var(--avancement), #d5dce1 0); display: grid; place-items: center; }
+.anneau-mesure-duree b { width: 58px; height: 58px; border-radius: 50%; background: #ffffff; display: grid; place-items: center; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+/* Rappel discret sur les boutons « Enreg. » de la bande du bas. */
+[data-nav="action"][data-cle="prendre"]::after, [data-nav="action"][data-cle="mesure-gnss"]::after { content: 'appui long = durée'; display: block; margin-top: 1px; font-size: 0.5rem; font-weight: 600; opacity: 0.8; line-height: 1; }
+
+/* 0.214.0 (demande du 12.11) : grand bouton « Retour » dans la fiche d'une ligne ou d'un point choisi (Implanter) : on le voit
+   et on le touche facilement pour choisir autre chose, sans que les accroches se superposent. */
+.bouton-retour-grand { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 0 16px 0 10px; margin-bottom: 6px; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; font-size: 1rem; font-weight: 800; }
+.bouton-retour-grand svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.bouton-retour-grand:active { background: #e5eaee; }
+
+/* 0.214.0 : accroche « Centre pts » de la Mesure rapide : texte, « Ajouter le centre » et « Recommencer » sur une rangée. */
+.reglage-centre-mesure { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 4px; font-size: 0.85rem; }
+.reglage-centre-mesure .ajouter-centre-mesure { min-height: 40px; }
+
+/* 0.216.0 : carte des projets (page plein écran) : fond swisstopo, étiquettes des projets, fiche du projet choisi. */
+.bouton-carte-projets { min-width: 44px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; }
+.bouton-carte-projets svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.carte-projets { position: fixed; inset: 0; z-index: 900; display: flex; flex-direction: column; background: #f2f4f5; color: #1b2b36; }
+.entete-carte-projets { display: flex; align-items: center; gap: 10px; padding: 8px 12px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); background: #1b2b36; color: #ffffff; }
+.entete-carte-projets h2 { flex: 1; margin: 0; font-size: 1.1rem; }
+.entete-carte-projets select { min-height: 40px; max-width: 45%; border-radius: 8px; border: 0; padding: 0 8px; }
+.entete-carte-projets .bouton-retour { background: transparent; color: #ffffff; border: 2px solid rgba(255, 255, 255, 0.5); }
+.zone-carte-projets { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; background: #dfe5e8; cursor: grab; }
+.tuiles-carte-projets, .etiquettes-carte-projets { position: absolute; inset: 0; }
+.tuile-carte-projets { position: absolute; max-width: none; user-select: none; pointer-events: none; }
+.etiquettes-carte-projets { pointer-events: none; }
+.etiquette-carte-projet { position: absolute; transform: translate(-7px, -100%); display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0; border: 0; background: transparent; pointer-events: auto; }
+.nom-carte-projet { max-width: 180px; padding: 2px 7px; border-radius: 6px; background: rgba(255, 255, 255, 0.95); color: #1b2b36; font-size: 0.78rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); }
+.repere-carte-projet { order: 2; width: 14px; height: 14px; border-radius: 50%; background: #f6ab07; border: 2px solid #1b2b36; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); }
+.etiquette-carte-projet.ouvert .repere-carte-projet { background: #15803d; }
+.etiquette-carte-projet.choisie .nom-carte-projet { background: #1b2b36; color: #ffffff; }
+.etiquette-carte-projet.choisie .repere-carte-projet { background: #dc2626; transform: scale(1.3); }
+.commandes-carte-projets { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.commandes-carte-projets button { width: 44px; height: 44px; border: 0; border-radius: 10px; background: #ffffff; color: #1b2b36; font-size: 1.4rem; font-weight: 800; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }
+.attribution-carte-projets { position: absolute; left: 6px; bottom: 4px; margin: 0; padding: 1px 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.8); font-size: 0.65rem; }
+.fiche-carte-projets { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #ffffff; border-top: 1px solid #d5dce1; }
+.fiche-carte-projets[hidden] { display: none; }
+.texte-fiche-carte { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.texte-fiche-carte strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sans-position-carte { margin: 0; padding: 4px 14px calc(6px + env(safe-area-inset-bottom, 0px)); font-size: 0.75rem; color: #5f6d77; background: #ffffff; }
+.sans-position-carte:empty { display: none; }
+
+/* 0.217.0 : ligne colorée sous le titre d'une fenêtre (import d'un plan : déjà en MN95 ou à recaler). */
+.note-fenetre { margin: 4px 0 8px; padding: 8px 10px; border-radius: 8px; font-size: 0.9em; font-weight: 600; }
+.note-fenetre.note-ok { background: #dcfce7; color: #166534; }
+.note-fenetre.note-alerte { background: #ffedd5; color: #9a3412; }
+body.theme-sombre .note-fenetre.note-ok { background: #14532d; color: #bbf7d0; }
+body.theme-sombre .note-fenetre.note-alerte { background: #7c2d12; color: #fed7aa; }
+/* 0.217.0 : « 🔒 Ouvert sur xxx » bien visible dans la liste des projets et sur la carte. */
+.verrou-drive { display: inline-block; margin-top: 2px; padding: 2px 8px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-weight: 700; }
+body.theme-sombre .verrou-drive { background: #7f1d1d; color: #fecaca; }
+
+/* 0.218.0 : contrôle d'un plan (écart en mm : vert ≤ 2, orange ≤ 15, rouge au-delà). */
+.resultat-controle-plan { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; padding: 8px 10px; border-radius: 8px; }
+.resultat-controle-plan strong { font-size: 1.3em; }
+.resultat-controle-plan.vert, .etat-controle-plan.vert { background: #dcfce7; color: #166534; }
+.resultat-controle-plan.orange, .etat-controle-plan.orange { background: #ffedd5; color: #9a3412; }
+.resultat-controle-plan.rouge, .etat-controle-plan.rouge { background: #fee2e2; color: #991b1b; }
+.etat-controle-plan { margin: 4px 0; padding: 4px 8px; border-radius: 6px; font-size: 0.9em; font-weight: 600; }
+body.theme-sombre .resultat-controle-plan.vert, body.theme-sombre .etat-controle-plan.vert { background: #14532d; color: #bbf7d0; }
+body.theme-sombre .resultat-controle-plan.orange, body.theme-sombre .etat-controle-plan.orange { background: #7c2d12; color: #fed7aa; }
+body.theme-sombre .resultat-controle-plan.rouge, body.theme-sombre .etat-controle-plan.rouge { background: #7f1d1d; color: #fecaca; }
+
+/* 0.219.0 : applications masquées (appui long sur une tuile › Masquer) et tuile prête à être déplacée. */
+.bouton-masquees { display: block; margin: 10px auto 0; padding: 8px 14px; border: 1px dashed var(--bordure, #94a3b8); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 0.9em; }
+.tuile-appli.pret-a-deplacer { outline: 3px dashed #fff; outline-offset: -6px; animation: pret-deplacer 1s ease-in-out infinite; }
+@keyframes pret-deplacer { 50% { opacity: 0.7; } }
+
+/* 0.220.0 : fiche d'un point touché sur le plan. */
+.fiche-point { border-left-color: #0ea5e9; }
+.fiche-point .entete-encadre-annotation strong { color: inherit; }
+.table-fiche-point { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table-fiche-point th { text-align: left; font-weight: 500; opacity: 0.7; padding: 2px 8px 2px 0; white-space: nowrap; }
+.table-fiche-point td { padding: 2px 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* 0.221.0 : Plan / Points / Surface : tout est caché = bouton pâli (appui long = tout montrer / tout cacher). */
+.plan-puces .puce.tout-cache { opacity: 0.5; }
+.plan-puces .puce.tout-cache svg { opacity: 0.6; }
+.plan-puces .puce[hidden] { display: none; }

@@ -4,6 +4,7 @@
 // écrites en Kotlin (android/app/src/main/java/ch/apptopo/PontAndroid.kt).
 // Dans un navigateur normal, cet objet n'existe pas et rien ne change.
 // Plus tard, c'est aussi par ici que passera la position du récepteur Emlid (Bluetooth).
+import { correctionsTropAnciennes, LIMITE_AGE_CORRECTIONS_S } from '../topo/age-corrections.js';
 
 /** Vrai si la page tourne dans l'APK Android. */
 export function estDansAppliAndroid() {
@@ -45,7 +46,7 @@ export function recepteurDisponible() {
  * EtatRecepteur.enJson côté Kotlin : { connecte, bluetooth, dernierRecepteur, recu, qualite,
  * libelleQualite, nbSatellites, hdop, ageCorrections, etatInclinaison, inclinaisonPrete,
  * inclinaison, cap (°, orientation du RX2, à confirmer), position: { est, nord, altitude } ou null,
- * precisionH, precisionV (m, message GST du RX2, ou null),
+ * precisionH, precisionV (m, message GST du RX2, ou null), pdop (message GSA, 0.220.0, ou null),
  * erreurConversion, autorise, raison }.
  */
 export function ecouterRecepteur(fonction) {
@@ -113,9 +114,51 @@ export const deconnecterRecepteur = () => window.AppliAndroid.deconnecterRecepte
  * Point à prendre maintenant (MN95 / RAN95), vérifié par l'appli Android : RTK fixe et
  * inclinaison prête. Renvoie { ok: true, point } ou { ok: false, raison }.
  */
+let pointPrepare = null; // 0.214.0 : point moyen d'une mesure de durée, remis une seule fois au prochain « prendre un point »
+
+/** Range le point moyen d'une mesure de durée : le prochain prendrePointRecepteur() le rend (une fois, 3 s au plus). */
+export function preparerPointMoyenne(point) {
+  pointPrepare = { point, jusqua: Date.now() + 3000 };
+}
+
+/** Vrai si un point moyen est prêt (le clic qui suit la mesure doit passer sans relancer une mesure). */
+export function pointMoyenPret() {
+  return Boolean(pointPrepare && Date.now() <= pointPrepare.jusqua);
+}
+
+/** Rend le point moyen préparé (une seule fois), ou null : pour les écrans qui lisent la position en direct (Mesure rapide, Annotation). */
+export function consommerPointMoyen() {
+  if (!pointMoyenPret()) return null;
+  const { point } = pointPrepare;
+  pointPrepare = null;
+  return point;
+}
+
+/** Oublie le point moyen préparé (s'il n'a pas servi). */
+export function viderPointPrepare() {
+  pointPrepare = null;
+}
+
 export function prendrePointRecepteur() {
+  if (pointMoyenPret()) {
+    const { point } = pointPrepare;
+    pointPrepare = null;
+    return { ok: true, point };
+  }
+  pointPrepare = null;
+  return lirePointRecepteur();
+}
+
+/** Une lecture du récepteur, vérifiée (RTK fixe, inclinaison prête, corrections de moins de 2 s) : { ok, point } ou { ok: false, raison }. */
+export function lirePointRecepteur() {
   try {
-    return JSON.parse(window.AppliAndroid.prendrePoint());
+    const reponse = JSON.parse(window.AppliAndroid.prendrePoint());
+    // 0.213.0 : corrections NTRIP de plus de 2 s : le point est refusé (partout : Lever, Implanter, Contrôle, Annotation…).
+    const age = reponse?.point?.ageCorrections;
+    if (reponse?.ok && correctionsTropAnciennes(age)) {
+      return { ok: false, raison: `corrections trop anciennes (${Math.round(age)} s, ${LIMITE_AGE_CORRECTIONS_S} s au plus)` };
+    }
+    return reponse;
   } catch (erreur) {
     return { ok: false, raison: `réponse illisible du récepteur (${erreur.message})` };
   }

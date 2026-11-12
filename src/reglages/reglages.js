@@ -17,7 +17,7 @@ import { echapper } from '../outils/echapper.js';
 import { anydeskDisponible, ouvrirAnydesk } from '../android/pont.js';
 import { demanderCode } from '../outils/code.js';
 import { lireListesPartagees } from './listes-partagees.js';
-import { modifierLibellesDeSorte, modifierReseaux } from '../leve/fenetre-libelles.js';
+import { modifierLibellesDeSorte } from '../leve/fenetre-libelles.js';
 import { ouvrirFenetreListes } from './fenetre-listes.js';
 import { apkPublie, estPlusRecente } from '../outils/mise-a-jour.js';
 
@@ -171,8 +171,10 @@ function compteListes() {
  */
 // 0.160.0 (demande du 08.11) : enPage = vraie page plein écran (entre l'en-tête et la bande du bas) au lieu
 // d'une fenêtre ; « ← » en haut la ferme et appelle quandRetour (retour à la page Applications).
-export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage, changerMode, recepteur = null, enPage = false, quandRetour = null }) {
+export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage, changerMode, recepteur = null, enPage = false, quandRetour = null, page = null }) {
   const reglages = lireReglages();
+  // 0.213.0 : page à montrer d'office (le nuage Drive de l'en-tête ouvre la page « Drive »).
+  if (page && PAGES_REGLAGES.some(([cle]) => cle === page)) pageOuverte = page;
   if (!PAGES_REGLAGES.some(([cle]) => cle === pageOuverte) || (pageOuverte === 'recepteur' && !recepteur)) pageOuverte = 'affichage';
   const fenetre = document.createElement('dialog');
   fenetre.className = `fenetre-reglages${enPage ? ' en-page' : ''}`;
@@ -218,12 +220,6 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
           <button type="button" class="bouton-secondaire" data-action="libelles" data-valeur="lignes">Lignes</button>
           <button type="button" class="bouton-secondaire" data-action="libelles" data-valeur="points">Points</button>
           <button type="button" class="bouton-secondaire" data-action="libelles" data-valeur="aires">Aires</button>
-        </span>
-      </div>
-      <div class="case-reglage listes-reglages seulement-expert">
-        <span><strong>Réseaux du recollement</strong><span class="aide">partagés par Drive</span></span>
-        <span class="boutons-libelles">
-          <button type="button" class="bouton-secondaire" data-action="reseaux">Réseaux</button>
         </span>
       </div>
       <div class="case-reglage listes-reglages seulement-intermediaire">
@@ -313,10 +309,6 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     }
     if (evenement.target.closest('[data-action="listes"]')) {
       modifierListes();
-      return;
-    }
-    if (evenement.target.closest('[data-action="reseaux"]')) {
-      modifierReseaux(() => changerMode?.());
       return;
     }
     const libelles = evenement.target.closest('[data-action="libelles"]');

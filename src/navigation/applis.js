@@ -19,26 +19,6 @@ export const APPLIS = [
     icone: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6" /><circle cx="12" cy="12" r="2.5" />',
   },
   {
-    // Recollement et Métré (0.161.0, demande du 08.11, Expert) : sortis de Lever, chacun son écran de levé.
-    cle: 'recollement',
-    titre: 'Recollement',
-    court: 'Recoll.', // 0.172.0 : écrit ainsi en mode téléphone
-    couleur: '#16a34a',
-    texte: '#ffffff',
-    site: true,
-    niveau: 'expert',
-    icone: '<path d="M3 8h18M3 16h18" /><circle cx="8" cy="8" r="2" /><circle cx="16" cy="16" r="2" />',
-  },
-  {
-    cle: 'metre',
-    titre: 'Métré',
-    couleur: '#ea580c',
-    texte: '#ffffff',
-    site: true,
-    niveau: 'expert',
-    icone: '<path d="M3 17 17 3l4 4L7 21z" /><path d="M7 13l2 2M10 10l2 2M13 7l2 2" /><path d="M3 21h6" />',
-  },
-  {
     cle: 'implanter',
     titre: 'Implanter',
     couleur: '#0d9488',
@@ -142,18 +122,17 @@ export function applisDisponibles({ avecRecepteur, aAcces }) {
 
 /**
  * Application en cours d'après l'onglet affiché (document.body.dataset.onglet) et le mode de Terrain
- * ('lever', 'controler' = Implanter, 'autocontrole' = Contrôle, 'lame' = Guidage) ; familleLever : 'leve' (Stock, Terrain,
- * Libre), 'reseau' (Recollement) ou 'metre' (0.161.0).
+ * ('lever', 'controler' = Implanter, 'autocontrole' = Contrôle, 'lame' = Guidage). Le Recollement et le Métré ont été
+ * supprimés en 0.212.0 ; familleLever reste pour le Levé (toujours 'leve').
  */
-export function appliCourante(onglet, modeTerrain, familleLever = 'leve') {
+export function appliCourante(onglet, modeTerrain) {
   if (onglet === 'projets') return 'projet';
   if (onglet === 'plan') return 'plan';
   if (onglet === 'mesure-rapide') return 'mesure';
   if (onglet === 'annotation') return 'annotation';
   if (['volumes', 'mesures', 'dessin', 'surfaces', 'calculs'].includes(onglet)) return 'calculs';
   if (onglet === 'terrain') {
-    const lever = { reseau: 'recollement', metre: 'metre' }[familleLever] ?? 'lever'; // 0.161.0
-    return { controler: 'implanter', autocontrole: 'controle', lame: 'guidage' }[modeTerrain] ?? lever;
+    return { controler: 'implanter', autocontrole: 'controle', lame: 'guidage' }[modeTerrain] ?? 'lever';
   }
   return 'projet';
 }
@@ -227,4 +206,38 @@ export function ordonner(applis, ordre) {
     return i < 0 ? Infinity : i;
   };
   return applis.map((a, depart) => ({ a, depart })).sort((x, y) => rang(x.a) - rang(y.a) || x.depart - y.depart).map(({ a }) => a);
+}
+
+// --- Applications masquées (0.219.0 : appui long sur une tuile › Masquer), gardées par tablette ---
+
+export const CLE_MASQUEES = 'topo-applis-masquees';
+
+/** Clés des applications masquées sur cet appareil. */
+export function lireMasquees(stockage = globalThis.localStorage) {
+  try {
+    const lu = JSON.parse(stockage?.getItem(CLE_MASQUEES) ?? 'null');
+    return Array.isArray(lu) ? lu.filter((cle) => typeof cle === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Retient les applications masquées sur cet appareil. */
+export function ecrireMasquees(liste, stockage = globalThis.localStorage) {
+  try {
+    stockage?.setItem(CLE_MASQUEES, JSON.stringify(liste));
+  } catch {
+    // Mémoire indisponible : le masquage ne sera pas retenu.
+  }
+}
+
+/** Masque (masquer = vrai) ou fait revenir une application : renvoie la nouvelle liste de clés masquées. */
+export function changerMasquee(liste, cle, masquer) {
+  const sans = liste.filter((c) => c !== cle);
+  return masquer ? [...sans, cle] : sans;
+}
+
+/** Les applications qui ne sont pas masquées (l'ordre est gardé). */
+export function sansMasquees(applis, masquees) {
+  return applis.filter((a) => !masquees.includes(a.cle));
 }

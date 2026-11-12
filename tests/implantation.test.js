@@ -154,7 +154,7 @@ describe('suivi de l\'orientation', () => {
 });
 
 describe('dessin des coupes en direct', () => {
-  it('0.190.0 : cadre fixe (hauteur = 0,8 × largeur), bout de canne au milieu, couleur de la coupe', async () => {
+  it('0.190.0 / 0.212.0 : cadre fixe (hauteur = 0,45 × largeur), bout de canne au milieu, couleur de la coupe', async () => {
     const { svgCoupeDirecte } = await import('../src/leve/coupe-directe.js');
     const lignes = [[{ distance: 0, altitude: 400 }, { distance: 4, altitude: 400.5 }]];
     const commun = { lignes, demiLongueur: 2, altitudeCanne: 400.2, classe: 'rouge', titre: 'Perpendiculaire', gauche: 'g', droite: 'd' };
@@ -162,13 +162,13 @@ describe('dessin des coupes en direct', () => {
     expect(x1).toContain('coupe-perpendiculaire');
     expect(x1).toContain('canne rouge');
     const hauteur = (svg) => Number(/viewBox="0 0 340 (\d+)"/.exec(svg)[1]);
-    // Largeur utile 286 : hauteur utile 229 (0,8 × 286) + marges 36.
-    expect(hauteur(x1)).toBe(265);
-    // Changer l'échelle des hauteurs ne change pas le cadre ; le bout de canne reste au milieu (18 + 229 / 2).
-    for (const exageration of [1, 1.5, 2, 3]) {
+    // Largeur utile 286 : hauteur utile 129 (0,45 × 286) + marges 36.
+    expect(hauteur(x1)).toBe(165);
+    // Changer l'échelle des hauteurs ne change pas le cadre ; le bout de canne reste au milieu (18 + 129 / 2).
+    for (const exageration of [0.5, 0.75, 1, 1.5, 2, 3]) {
       const svg = svgCoupeDirecte({ ...commun, exageration, sens: 'axe' });
-      expect(hauteur(svg)).toBe(265);
-      expect(svg).toContain('cy="132.5"');
+      expect(hauteur(svg)).toBe(165);
+      expect(svg).toContain('cy="82.5"');
     }
   });
 

@@ -34,8 +34,6 @@ export function nettoyerListes(listes) {
     .filter((s) => s.hote && s.utilisateur);
   // Libellés des points (0.95.0, voir leve/libelles.js) : gardés tels quels s'ils existent.
   const libelles = listes?.libelles && typeof listes.libelles === 'object' ? listes.libelles : undefined;
-  // Réseaux du recollement (0.101.0, voir leve/reseaux.js) : gardés tels quels s'ils existent.
-  const reseaux = listes?.reseaux && typeof listes.reseaux === 'object' ? listes.reseaux : undefined;
   // Bibliothèque du Levé chantier (0.175.0, voir leve/libelles-chantier.js) : gardée telle quelle si elle existe.
   const chantier = listes?.chantier && typeof listes.chantier === 'object' ? listes.chantier : undefined;
   // Types de plans DXF (0.194.0, voir topo/types-dxf.js) : liste de noms, gardée telle quelle si elle existe.
@@ -45,11 +43,11 @@ export function nettoyerListes(listes) {
   // Date de dernière modification de chaque partie (0.136.0) : sert à fusionner partie par partie.
   const dates = {};
   for (const [partie, date] of Object.entries(listes?.dates ?? {})) if (PARTIES.includes(partie) && date) dates[partie] = String(date);
-  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(reseaux ? { reseaux } : {}), ...(chantier ? { chantier } : {}), ...(typesDxf ? { typesDxf } : {}), ...(dossiers ? { dossiers } : {}), dates, modifieLe: listes?.modifieLe ?? null };
+  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(chantier ? { chantier } : {}), ...(typesDxf ? { typesDxf } : {}), ...(dossiers ? { dossiers } : {}), dates, modifieLe: listes?.modifieLe ?? null };
 }
 
 /** Les parties des listes, chacune avec sa propre date de modification (0.136.0). */
-export const PARTIES = ['adresses', 'swipos', 'libelles', 'reseaux', 'chantier', 'dossiers', 'typesDxf'];
+export const PARTIES = ['adresses', 'swipos', 'libelles', 'chantier', 'dossiers', 'typesDxf'];
 
 const existe = (listes, partie) => (Array.isArray(listes?.[partie]) ? listes[partie].length > 0 : listes?.[partie] !== undefined);
 

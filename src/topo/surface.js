@@ -26,7 +26,6 @@ import { creerLigne } from './noms.js';
 export const NATURES = [
   ['stock', 'Stock'],
   ['terrain', 'Terrain'],
-  ['recollement', 'Recollement'],
   // Anciens levés (avant 0.87.0) : « Terrassement » reste affiché tel quel, mais n'est plus proposé.
   ['terrassement', 'Terrassement'],
   // Surface faite dans Calculs › Dessin (0.77.0) : rangée comme un levé, complétée au RX2.
@@ -84,7 +83,7 @@ export function estSurfaceFichier(surface) {
 }
 
 // Préfixes des noms (0.90.0, demande du 29.10.2026) : « LV- » pour un levé (stock, terrain,
-// recollement, levé libre, métré), « Surf- » pour une surface importée ou faite dans Dessin.
+// levé libre, chantier), « Surf- » pour une surface importée ou faite dans Dessin.
 export const PREFIXE_LEVE = 'LV-';
 export const PREFIXE_SURFACE = 'Surf-';
 // Surface Swisstopo (0.109.0) : « SWISSTOP 1 », préfixe fixe comme les autres.

@@ -2,7 +2,7 @@
 // - TXT : une ligne par point « nom, Est, Nord, altitude », séparés par des tabulations, sans
 //   en-tête (se relit dans l'appli et dans Mensura) ;
 // - CSV : point-virgule (réglage suisse d'Excel), avec en-tête et toutes les infos connues du point
-//   (rôle dans le levé, date et heure, précisions, qualité RTK, satellites, HDOP, âge des
+//   (rôle dans le levé, date et heure, précisions, qualité RTK, satellites, HDOP, PDOP, âge des
 //   corrections, inclinaison) ;
 // - DXF : les points (avec altitude en Z), leurs noms et leurs altitudes (voir export/dxf.js).
 // Coordonnées MN95, m, 3 décimales.
@@ -17,7 +17,7 @@ export const FORMATS_POINTS = [
 ];
 
 // Titres des colonnes des infos complètes (CSV et PDF), dans l'ordre.
-export const TITRES_INFOS = ['Nom', 'Est (m)', 'Nord (m)', 'Altitude (m)', 'Rôle', 'Date', 'Heure', 'Précision H (m)', 'Précision V (m)', 'Qualité', 'Satellites', 'HDOP', 'Âge corrections (s)', 'Inclinaison (°)'];
+export const TITRES_INFOS = ['Nom', 'Est (m)', 'Nord (m)', 'Altitude (m)', 'Rôle', 'Date', 'Heure', 'Précision H (m)', 'Précision V (m)', 'Qualité', 'Satellites', 'HDOP', 'PDOP', 'Âge corrections (s)', 'Inclinaison (°)'];
 
 // Levé chantier (0.175.0) : colonnes en plus quand un point porte des attributs (point.chantier).
 export const TITRES_CHANTIER = ['Libellé', 'Nature', 'Forme', 'Ø (mm)', 'Ø int. (mm)', 'Altitude levée (m)', 'Fil d\'eau (m)', 'Radier (m)', 'Profondeur (m)', 'Matériau', 'Nombre', 'Remarque'];
@@ -83,6 +83,7 @@ export function infosDuPoint(p, roles = new Map()) {
     QUALITES[g.qualite] ?? (g.qualite ?? ''),
     g.nbSatellites ?? '',
     nombre(g.hdop, 1),
+    nombre(g.pdop, 1), // 0.220.0 : lu dans le message GSA du récepteur (vide si le récepteur ne l'envoie pas)
     nombre(g.ageCorrections, 1),
     nombre(g.inclinaison, 1),
   ];

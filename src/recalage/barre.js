@@ -211,6 +211,16 @@ export function etapeAxes(axes) {
   return { numero: n + 1, cote: n % 2 === 0 ? 'plan' : 'cale', rang: Math.floor(n / 2) + 1 };
 }
 
+/** Point ou ligne touché(e) pendant le calage par axes (0.223.0) : montré(e) sur le plan, puis « Valider ». */
+function candidatAxes(candidat) {
+  if (!candidat) return '';
+  const quoi = candidat.sorte === 'ligne' ? 'Ligne touchée (en orange sur le plan)' : 'Point touché (croix sur le plan)';
+  return `<div class="choix-pointage point-touche-recalage">
+    <span class="coordonnees-pointage">${quoi}</span>
+    <div class="ligne-barre-pointage"><button type="button" class="bouton" data-action="validerCandidat">Valider</button></div>
+  </div>`;
+}
+
 function htmlAxes(etat) {
   const { axes } = etat;
   const etape = etapeAxes(axes);
@@ -220,6 +230,7 @@ function htmlAxes(etat) {
     const n = axes.miseEchelle.points.length;
     return `<p class="etape-recalage etape-dxf"><span class="numero-etape">Mise à l'échelle</span>Touche le ${n === 0 ? '1er' : '2e'} point sur le plan à caler (puis tu tapes leur distance réelle)</p>
       ${accrochesDxf(etat)}
+      ${candidatAxes(axes.candidat)}
       <div class="ligne-barre-pointage"><button type="button" class="bouton-lien" data-action="annulerEchelle">annuler la mise à l'échelle</button></div>`;
   }
   const echelle = `<div class="ligne-barre-pointage">
@@ -243,7 +254,7 @@ function htmlAxes(etat) {
           <strong>Écart d'angle de la ligne 2 : ${ecart.gon.toFixed(4)} gon (${ecart.degres.toFixed(3)}°)</strong>
         </p>`;
       })();
-    return `<p class="etape-recalage etape-dxf"><span class="numero-etape">Résultat</span>Calé sur la ligne 1 ; la ligne 2 sert de contrôle. Vérifie, puis « Appliquer ».</p>
+    return `<p class="etape-recalage etape-dxf"><span class="numero-etape">Résultat</span>Le plan posé est montré en rouge transparent : vérifie qu'il est dans le bon sens (sinon « Tourner de 180° »), puis « Appliquer ». Calé sur la ligne 1 ; la ligne 2 sert de contrôle.</p>
       ${echelle}${liste}${resultat}
       <div class="ligne-barre-pointage">
         <button type="button" class="bouton-secondaire" data-action="tournerAxes">Tourner de 180°</button>
@@ -260,6 +271,7 @@ function htmlAxes(etat) {
   return `<p class="etape-recalage etape-${etape.cote === 'plan' ? 'dxf' : 'cale'}"><span class="numero-etape">Étape ${etape.numero} / 4</span>${texte}</p>
     <div class="ligne-barre-pointage">${puce('choisirFaconAxes', 'ligne', 'Toucher une ligne', axes.facon !== 'points')}${puce('choisirFaconAxes', 'points', 'Ligne entre 2 points', axes.facon === 'points')}</div>
     ${accroches}
+    ${candidatAxes(axes.candidat)}
     ${etape.numero === 1 ? echelle : ''}
     ${liste}
     <div class="ligne-barre-pointage"><button type="button" class="bouton-lien" data-action="annulerRecalage">annuler le recalage</button></div>`;

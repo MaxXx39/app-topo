@@ -7,9 +7,12 @@
 // Altitude gardée d'un point (validé le 09.11) : le fil d'eau (ou le radier) quand on le connaît ;
 // l'altitude réellement levée (dessus, tampon) est gardée à côté dans « altitudeLevee ».
 // Coordonnées MN95 Est, Nord, altitude (m) ; diamètres en mm.
-import { filDEauDepuisDessus, chambreDepuisTroisCoins } from './reseau.js';
+import { filDEauDepuisDessus, chambreDepuisTroisCoins } from './chambre.js';
 
 /** Diamètres proposés (mm) pour un tuyau, une conduite qui arrive à un ouvrage… (demande du 09.11). */
+// Matériaux proposés pour un tuyau ou une chambre (le dernier choisi est gardé d'un point à l'autre).
+export const MATERIAUX = ['PVC', 'PE', 'PP', 'Béton', 'Grès', 'Fonte', 'Acier', 'Autre'];
+
 export const DIAMETRES_LISTE = [80, 100, 125, 160, 200, 250, 315, 400, 500, 600, 800, 1000];
 /** Gaines des câbles et fourreaux : [Ø intérieur, Ø extérieur] en mm (« 80 / 92 ») ; le Ø extérieur sert au fil d'eau. À confirmer : intérieur / extérieur. */
 export const GAINES_LISTE = [[80, 92], [100, 112], [120, 132], [148, 163], [195, 214]];

@@ -24,7 +24,7 @@ export const FONDS = {
       `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/2056/${z}/${colonne}/${ligne}.jpeg`,
     attribution: '© swisstopo',
   },
-  // 0.192.0 : carte nationale en couleurs (villes, routes, noms), prise à la place de la photo quand le plan montre plus de 3 km de large.
+  // 0.192.0 : carte nationale en couleurs (villes, routes, noms), prise à la place de la photo quand le plan montre plus de 2 km de large (0.213.0 ; avant 3 km).
   carte: {
     url: (z, colonne, ligne) =>
       `https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/2056/${z}/${colonne}/${ligne}.jpeg`,

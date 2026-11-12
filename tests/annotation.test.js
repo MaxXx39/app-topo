@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ajouterAnnotation, nomProposeAnnotation, dernierAnnotation, listeAnnotationDuJour, nomListeAnnotation, precisionSuffisante, nettoyerRemarques, supprimerAnnotation, trouverAnnotation } from '../src/topo/annotation.js';
 import { prefixerNoms } from '../src/projet/projet.js';
 
-const projetVide = () => ({ leves: [], surfaces: [], autres: [], metres: [], reseaux: [] });
+const projetVide = () => ({ leves: [], surfaces: [], autres: [] });
 const jour = new Date(2026, 10, 9, 10, 0);
 
 describe('annotations', () => {

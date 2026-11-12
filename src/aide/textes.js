@@ -6,15 +6,15 @@ export const TEXTES_AIDE = {
   annotation:
     'Annotation : pose un point (Manuel = loupe sur le plan, GNSS, ou GPS tablette à 3 m ou mieux). En bas : photo (on peut dessiner dessus), ↶ efface le dernier, ID et remarque, Enreg. point. Liste « Annot-date ».',
   mesureRapide:
-    'Mesure rapide : touche des points sur le plan (accroche en bas, ou GNSS). 2 points : longueur, Δh, pente. 3 et plus : case « Figure fermée » (périmètre, surface) ou ligne ouverte (longueur du chemin). « Enregistrer » ou « Exporter » (PDF, DXF).',
+    'Mesure rapide : touche des points sur le plan (accroche en bas, ou GNSS). 2 points : longueur, Δh, pente. 3 et plus : case « Figure fermée » (périmètre, surface) ou ligne ouverte (longueur du chemin), angles en degrés (colonne Angle, et sur le plan si la case est cochée). « Enregistrer » ou « Exporter » (PDF, DXF).',
   applications:
-    'Menu de départ : touche une tuile (ou sa sous-application en petit) pour ouvrir l\'application. Appui long = déplacer la tuile ; ★ = favori. Réglages et « Fermer l\'appli » en bas.',
+    'Menu de départ : touche une tuile (ou sa sous-application en petit) pour ouvrir l\'application. Appui long = déplacer la tuile ; ★ = favori. L\'épingle à gauche de « Changer » ouvre la carte de tous les projets (touche un projet, puis « Ouvrir »). Réglages et « Fermer l\'appli » en bas.',
   projets:
     'Projets enregistrés sur cet appareil (📱) ou sur Drive (☁). « Changer » les liste, « + Nouveau » en crée un, ⋮ renomme (projet ouvert), exporte, duplique ou supprime. Réglages de l\'appareil : tuile Réglages du menu.',
   lame:
-    'Guidage (Expert) : choisis la machine puis la surface à suivre. Flèches : monter ou descendre ; vert ≤ 2 cm, orange ≤ 5 cm. Réglages dans ⚙ (1 ou 2 GNSS, G / D, distances, vues).',
+    'Guidage (Expert) : choisis la machine puis la surface à suivre. Au-dessus de chaque règle : MONTER (rouge) ou DESCENDRE (bleu) ; OK (vert) dans la tolérance ; entre les deux, seule la valeur (orange) pour que l\'affichage ne saute pas ; vert ≤ 2 cm, orange ≤ 5 cm. Réglages dans ⚙ (1 ou 2 GNSS, G / D, distances, vues).',
   partage:
-    'Projets sur Google Drive. Une seule main par projet : verte = tu enregistres, grise ou rouge = lecture seule. Prendre la main à un autre appareil : Expert et code.',
+    'Projets sur Google Drive. Une seule main par projet : verte = tu enregistres, grise ou rouge = lecture seule. Prendre la main à un autre appareil : Expert et code. Nuage en tête d\'écran : vert = à jour, rouge barré = hors ligne, gris barré = Google non connecté ; touche-le pour ouvrir les réglages Drive.',
   cartouche:
     'Écrits dans le cartouche du PDF : affaire, désignation, dessiné par et date (vide = date du jour).',
   imports:
@@ -42,7 +42,7 @@ export const TEXTES_AIDE = {
   surfaces:
     'Une surface (stock, terrain, terrassement) se crée avec les points d\'un levé (contour, lignes de rupture, points) ou s\'importe (LandXML, DXF). Touche-la sur le plan pour la choisir.',
   nature:
-    'Ce que représente le levé : Stock, Terrain, Recollement… À choisir d\'abord ; il donne le nom automatique. Modifiable plus tard (« C\'est : »).',
+    'Ce que représente le levé : Stock, Terrain, Chantier… À choisir d\'abord ; il donne le nom automatique. Modifiable plus tard (« C\'est : »).',
   contour:
     'Bord de la surface, dans l\'ordre ; le polygone se ferme tout seul. Seul l\'intérieur est gardé. Sans contour, le bord suit les points extérieurs.',
   ligne:
@@ -51,8 +51,6 @@ export const TEXTES_AIDE = {
     'Points isolés ou caractéristiques, ni sur le contour ni sur une ligne. Par défaut, tous ceux du contour sont pris ; décoche pour les choisir un par un.',
   choisirPoints:
     'Choisis les points : une série proposée, une liste tapée (« b100 à b116, b120 »), le plan (retoucher = retirer) ou la liste cochée.',
-  recollement:
-    'Un levé par réseau (EU, EC, AEP…). Choisis l\'élément (ouvrage, tuyau, vanne…) puis prends le point. Fil d\'eau = dessus − diamètre. Exports PDF, DXF, CSV, LandXML.',
   lignesLevee:
     'Contour, lignes et points isolés du levé en cours : touche un nom pour voir ses points. ✕ supprime un point ; ✂ coupe une ligne entre deux points.',
   journalNmea:
@@ -86,5 +84,5 @@ export const TEXTES_AIDE = {
   dessin:
     'DAO (Expert) : « ✏ DAO » pose une barre sur le plan : dessiner, accrocher, calques, sélectionner (déplacer, copier, tourner…), outils topo (Δ Z, pente, projeter). Exporté en DXF.',
   plan:
-    'Pince pour zoomer, glisse pour déplacer. Fond (photo aérienne, carte nationale cochable par-dessus la photo avec sa transparence, cadastre ; au-delà de 3 km de large la photo devient la carte), DXF, Afficher, Seul, Coupe, 3D, ▲ ▼ (taille). La flèche du nord remet le nord en haut.',
+    'Pince pour zoomer, glisse pour déplacer. Fond (photo aérienne, carte nationale cochable par-dessus la photo avec sa transparence, cadastre ; au-delà de 2 km de large la photo devient la carte), Plan (plans DXF, PDF et cadastre), Points, Surface (si une surface est importée), Seul, Coupe, 3D, ▲ ▼ (taille). Appui long sur Plan, Points ou Surface : tout montrer ou tout cacher (le bouton est pâli quand tout est caché). La flèche du nord remet le nord en haut.',
 };

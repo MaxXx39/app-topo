@@ -7,7 +7,7 @@ import { dateDuPoint, jourDuPoint } from '../topo/date-point.js';
 
 /**
  * Catégories : [clé, titre, couleur de la pastille]. 0.197.0 : un levé est rangé par sa nature (Libre, Stock, Terrain,
- * Terrassement, Métré, Chantier), à côté de Contrôle, Recollement, Annotation et des points Importés. Le cadastre est dans
+ * Terrassement, Chantier), à côté de Contrôle, Annotation et des points Importés (Métré et Recollement retirés en 0.212.0). Le cadastre est dans
  * « Plans ». Un bouton n'est montré que si le projet a du contenu dans cette catégorie.
  */
 export const CATEGORIES_POINTS = [
@@ -16,15 +16,13 @@ export const CATEGORIES_POINTS = [
   ['stock', 'Levé stock', '#92400e'],
   ['terrain', 'Levé terrain', '#16a34a'],
   ['terrassement', 'Levé terrassement', '#0ea5e9'],
-  ['metre', 'Levé métré', '#f97316'],
   ['chantier', 'Levé chantier', '#0f766e'],
-  ['recollement', 'Levé recollement', '#db2777'],
   ['annotation', 'Levé annotation', '#7c3aed'],
   ['import', 'Importés', '#2563eb'],
 ];
 
 /** Catégories de points qui sont des levés (tout sauf Contrôle et Importés). */
-export const CATEGORIES_LEVES = ['libre', 'stock', 'terrain', 'terrassement', 'metre', 'chantier', 'recollement', 'annotation'];
+export const CATEGORIES_LEVES = ['libre', 'stock', 'terrain', 'terrassement', 'chantier', 'annotation'];
 
 /** Colonnes : [clé, titre, valeur numérique ?]. */
 export const COLONNES_POINTS = [
@@ -64,24 +62,22 @@ export function deplacerColonne(ordre, cle, sens) {
 }
 
 /**
- * Catégorie d'une liste de points (levé du projet) : 'import', 'annotation', 'chantier', 'recollement', 'metre', 'stock',
- * 'terrain', 'terrassement' ou 'libre'. Le cadastre n'est pas dans le tableau (null : il est dans « Plans »).
+ * Catégorie d'une liste de points (levé du projet) : 'import', 'annotation', 'chantier', 'stock', 'terrain',
+ * 'terrassement' ou 'libre'. Le cadastre n'est pas dans le tableau (null : il est dans « Plans »).
  */
 export function categorieDeListe(projet, leve) {
   if (leve.cadastre) return null;
   if (!leve.direct) return 'import';
-  if ((projet.reseaux ?? []).some((r) => r.leveId === leve.id)) return 'recollement';
   const proprietaire = proprietaireDeListe(projet, leve);
   const nature = proprietaire?.nature ?? (proprietaire ? 'stock' : 'libre');
-  if (nature === 'reseau' || nature === 'recollement') return 'recollement';
-  if (['annotation', 'chantier', 'metre', 'stock', 'terrain', 'terrassement'].includes(nature)) return nature;
+  if (['annotation', 'chantier', 'stock', 'terrain', 'terrassement'].includes(nature)) return nature;
   // Surface du Dessin (rangée dans les surfaces) ou levé libre.
   return (projet.surfaces ?? []).some((o) => o.leveId === leve.id) ? 'stock' : 'libre';
 }
 
-/** Objet qui possède une liste (surface, métré, chantier, annotation, réseau) : il garde les photos. */
+/** Objet qui possède une liste (surface, chantier, annotation, levé libre) : il garde les photos. */
 function proprietaireDeListe(projet, leve) {
-  return [...(projet.surfaces ?? []), ...(projet.metres ?? []), ...(projet.autres ?? []), ...(projet.reseaux ?? [])].find((o) => o.leveId === leve.id) ?? null;
+  return [...(projet.surfaces ?? []), ...(projet.autres ?? [])].find((o) => o.leveId === leve.id) ?? null;
 }
 
 /** Listes de points du projet : [{ id, nom, categorie, nombre }] (les points de contrôle forment la liste « controle »). */

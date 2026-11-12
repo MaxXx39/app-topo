@@ -3,7 +3,8 @@
 // et modifiable (Contenu du projet › Plans DXF › « Modifier les types »).
 import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-partagees.js';
 
-export const TYPES_DXF_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER', 'CANA', 'Autres'];
+// 0.213.0 : ajout des types de bâtiment (Bât, Bât Radier, Bât/SS, Bât/Rez, Bât/1er, Bât/2eme) ; « Autres » reste en dernier.
+export const TYPES_DXF_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER', 'CANA', 'Bât', 'Bât Radier', 'Bât/SS', 'Bât/Rez', 'Bât/1er', 'Bât/2eme', 'Autres'];
 // Couleurs des pastilles, dans l'ordre de la liste (la 1re pour le 1er type, etc.).
 const COULEURS_TYPES = ['#2563eb', '#7c3aed', '#16a34a', '#ea580c', '#6b7280', '#db2777', '#0891b2', '#a16207'];
 

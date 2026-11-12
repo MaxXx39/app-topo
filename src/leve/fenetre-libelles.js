@@ -7,7 +7,6 @@ import { echapper } from '../outils/echapper.js';
 import { nettoyerAbreviation, COULEURS_LIBELLES, COULEURS_HABITUELLES, lireLibellesDetail, lireLibellesParDefaut, lireLibellesProjet, enregistrerLibelles, enregistrerLibellesProjet } from './libelles.js';
 import { aAcces } from '../reglages/reglages.js';
 import { FORMES, symboleDeForme } from '../plan/formes.js';
-import { lireReseaux, enregistrerReseaux, abreviationsReseauxDepart } from './reseaux.js';
 
 /** Nom d'une couleur de la palette (« noir »…), « habituelle » pour pas de couleur choisie. */
 function nomCouleur(couleur) {
@@ -153,25 +152,6 @@ export function modifierLibellesDeSorte(sorte, apres) {
       const sans = ([a, d, c, f]) => [a, d, c, f];
       enregistrerLibelles({ ...lireLibellesParDefaut(), [sorte]: liste.filter((l) => l[4]).map(sans) });
       enregistrerLibellesProjet({ ...lireLibellesProjet(), [sorte]: liste.filter((l) => !l[4]).map(sans) });
-      apres?.();
-    },
-  });
-}
-
-/**
- * Modifie la liste des réseaux du recollement (0.101.0) : ceux de départ gardent leur nom (couleur
- * modifiable), ceux ajoutés se modifient ; partagée par Drive. apres() est appelé une fois enregistré.
- */
-export function modifierReseaux(apres) {
-  ouvrirFenetreLibelles({
-    titre: 'Réseaux du recollement',
-    liste: lireReseaux(),
-    fixes: abreviationsReseauxDepart(),
-    avecForme: false,
-    texteAjouter: '+ Ajouter un réseau',
-    enregistrer: (liste) => {
-      // Un réseau sans couleur prend le gris (sa couleur sert au dessin du réseau).
-      enregistrerReseaux(liste.map(([a, d, c]) => [a, d, c || '#6b7280']));
       apres?.();
     },
   });

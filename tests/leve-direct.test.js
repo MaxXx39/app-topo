@@ -337,12 +337,10 @@ describe('préfixes des noms (0.90.0)', () => {
         { nom: 'Surface 1', nature: 'surface' },
         { nom: 'lv-Terre', nature: 'terrain' },
       ],
-      metres: [{ nom: 'Métré 1', nature: 'metre' }],
       autres: [{ nom: 'Levé libre 1', nature: 'autres' }],
     };
     prefixerNoms(projet);
     expect(projet.surfaces.map((s) => s.nom)).toEqual(['LV-Stock 1', 'Surf-Terrain projet', 'Surf-Surface 1', 'lv-Terre']);
-    expect(projet.metres[0].nom).toBe('LV-Métré 1');
     expect(projet.autres[0].nom).toBe('LV-Levé libre 1');
     expect(projet.leves[0].nom).toBe('LV-Stock 1');
     prefixerNoms(projet);

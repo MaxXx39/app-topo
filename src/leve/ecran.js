@@ -22,12 +22,10 @@ import { htmlLame, rafraichirLame } from './lame-ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { svgDrapeau, iconeDrapeau } from '../outils/drapeaux.js';
 import { formaterNombre } from '../topo/format.js';
+import { correctionsTropAnciennes, texteAgeCorrections } from '../topo/age-corrections.js';
 import { ROLES_LEVE, debutDeNom } from '../topo/leve-direct.js';
-import { ROLES_METRE } from '../topo/metre.js';
 import { prefixeDuNom, avecPrefixe, dateDuJourCollee } from '../topo/surface.js';
-import { ELEMENTS_RESEAU } from '../topo/reseau.js';
-import { MATERIAUX } from './reseaux.js';
-import { DIAMETRES_LISTE, GAINES_LISTE, NOMBRES_LISTE } from '../topo/chantier.js';
+import { DIAMETRES_LISTE, GAINES_LISTE, NOMBRES_LISTE, MATERIAUX } from '../topo/chantier.js';
 import { svgCoupeDirecte, controlesEchelleCoupe } from './coupe-directe.js';
 import { svgCoupeTalus } from './coupe-talus.js';
 import { svgCroquisTalus } from './croquis-talus.js';
@@ -49,9 +47,9 @@ const IMPLANTATIONS = [
   ['altitude', 'Altitude', true], // 0.106 : on tape l'altitude voulue, monter / descendre (tous les modes)
   ['talus', 'Talus', true], // tout à droite (demande du 26.10.2026)
 ];
-// Talus : Expert seulement. Base : on ne lève que des « Levé libre » (points seulement).
+// Talus : Expert seulement. Base : Lever = seulement le Levé chantier (0.214.0).
 const IMPLANTATIONS_EXPERT = ['talus'];
-const NATURES_BASE = ['autres'];
+const NATURES_BASE = ['chantier']; // 0.214.0 (demande du 12.11) : en Base, Lever = seulement le Levé chantier
 // 0.144.0 (liste du 05.11, point 5) : une seule coupe à la fois (plus de « Les 2 »).
 // 0.189.3 (maquette A du 10.11) : symbole dans chaque bouton : flèche grise = ma direction, trait = la coupe, de la couleur
 // qu'elle a sur le plan (perpendiculaire violet, dans l'axe rose).
@@ -61,20 +59,14 @@ const VUES_COUPES = [
   ['perpendiculaire', `${symboleCoupe('M5 22H35', '#7c3aed')}<span>Perpendiculaire</span>`],
   ['axe', `${symboleCoupe('M20 4V36', '#db2777')}<span>Dans l\'axe</span>`],
 ];
-// 0.190.0 : demi-longueurs (m de chaque côté) : coupes de 5, 10, 20 ou 40 m de large ; échelles de hauteur ×1 à ×3.
+// 0.190.0 : demi-longueurs (m de chaque côté) : coupes de 5, 10, 20 ou 40 m de large ; échelles de hauteur ×1 à ×3 (0.210.0 : et ×0,5, ×0,75).
 export const LONGUEURS_COUPE = [2.5, 5, 10, 20];
-export const EXAGERATIONS_COUPE = [1, 1.5, 2, 3];
-// Ce que l'on lève : une surface (même choix que « + Nouvelle surface » dans Calculs › Surfaces)
-// ou un métré (aires, longueurs, points comptés : des mesures de Calculs › Mesures / métrés).
+export const EXAGERATIONS_COUPE = [0.5, 0.75, 1, 1.5, 2, 3];
+// Ce que l'on lève : une surface (même choix que « + Nouvelle surface » dans Calculs › Surfaces).
 const NATURES_TERRAIN = [
   ['stock', 'Stock'],
   ['terrain', 'Terrain'], // terrain naturel et terrassement fusionnés (0.87.0)
   ['terrassement', 'Terrassement'], // 0.168.0 : de nouveau proposé (demande du 09.11)
-  // Recollement de réseaux (0.101.0, voir topo/reseau.js) : un levé par réseau (EU, EC…).
-  ['reseau', 'Recollement'],
-  // Ancien recollement (comme Terrain) : plus proposé, les levés déjà faits restent.
-  ['recollement', 'Recollement (ancien)'],
-  ['metre', 'Métré'],
   ['chantier', 'Levé chantier'], // 0.175.0 : éléments en cours de chantier (Intermédiaire)
   ['autres', 'Levé libre'],
   // Surface d'un dessin (Calculs › Dessin) : pas créée ici, mais on la complète au RX2.
@@ -100,6 +92,8 @@ export const ACCROCHES = {
   // 0.161.0 : la ligne, le point touché à côté (petit rond) et le point le plus proche sur la ligne (pas au milieu).
   ligne: ['Sur ligne', 'Sur une ligne du plan DXF (endroit le plus proche)', '<path d="M3 20 21 4" /><circle cx="6" cy="8" r="1.4" /><path d="M6.6 9.3 9.4 14.2" stroke-dasharray="1.6 1.6" /><circle class="repere" cx="10.2" cy="13.6" r="2.6" />'],
   croisement: ['Croisem.', 'Croisement de 2 lignes (sans altitude)', '<path d="M4 4 20 20M20 4 4 20" /><circle class="repere" cx="12" cy="12" r="3" />'],
+  // 0.214.0 (maquette 7 A) : « Centre pts » (dès Intermédiaire) : 2 points = le milieu, 3 points = le centre du cercle qui passe par les 3.
+  centrepts: ['Centre pts', 'Centre de 2 ou 3 points : milieu de 2 points, centre du cercle passant par 3 points', '<path d="M12 4 5 17h14z" stroke-dasharray="2 2.2" stroke-width="1.2" /><circle cx="12" cy="4" r="1.7" class="rond-point" /><circle cx="5" cy="17" r="1.7" class="rond-point" /><circle cx="19" cy="17" r="1.7" class="rond-point" /><path class="repere" d="M9.6 12.6h4.8M12 10.2v4.8" />'],
   centre: ['Centre', 'Centre d\'un cercle du plan DXF', '<circle cx="12" cy="12" r="9" /><circle class="repere" cx="12" cy="12" r="2.5" />'],
   // 0.131.0 : « Manuel » (Intermédiaire, implantation d'un point) : loupe + main, point visé sans accroche.
   manuel: ['Manuel', 'Manuel : loupe et main, le centre de la croix est le point visé', '<path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path class="repere" d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />'],
@@ -127,7 +121,6 @@ const ICONES = {
 // Appareil photo (photo du levé, à gauche de PRENDRE LE POINT).
 const ICONE_PHOTO = '<path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" />';
 // Lettre des noms de points d'un métré (A-ENR-1-1, L-BOR-1-1).
-const LETTRES_METRE = { aire: 'A', longueur: 'L' };
 
 /**
  * Crée l'écran dans "conteneur". Les actions sont faites par main.js via "actions" :
@@ -163,10 +156,6 @@ export function creerEcranLeve(conteneur, actions) {
   let erreurGestion = ''; // mode Contrôler : erreur de la gestion (tolérances, fichier, point tapé)
   let reglagesLameOuverts = false; // mode Lame : roue ⚙ (tolérances)
   let machineChoisie = false; // 0.153.0 : Guidage : machine choisie (sinon l'écran de choix est montré)
-  let choixReseauOuvert = false; // « Recollement » touché : on choisit le réseau (EU, EC…)
-  // Recollement : ce qui est tapé à côté du point, gardé quand l'écran se redessine (la fouille et la
-  // remarque repartent vides après chaque point ; diamètre et matériau sont gardés par main.js).
-  const saisieReseau = { diametre: null, materiau: null, profondeurFouille: '', remarque: '' };
 
   // Lignes du levé dépliées : gardées d'un dessin de l'écran à l'autre.
   conteneur.addEventListener('toggle', (evenement) => {
@@ -188,13 +177,7 @@ export function creerEcranLeve(conteneur, actions) {
     const { action } = bouton.dataset;
     if (action === 'ouvrirChoixNature' || action === 'fermerChoixNature') {
       choixNatureOuvert = action === 'ouvrirChoixNature';
-      choixReseauOuvert = action === 'ouvrirChoixNature' && bouton.dataset.valeur === 'reseau';
       dessiner();
-      return;
-    }
-    // Recollement : nouvelle conduite depuis l'ouvrage choisi dans la liste à côté.
-    if (action === 'nouvelleConduite') {
-      actions.nouvelleConduite(conteneur.querySelector('[data-champ="depart-conduite"]')?.value ?? '');
       return;
     }
     // Guidage : « Connecter le 2e GNSS » ouvre la fenêtre du récepteur (Récepteur 2 dedans).
@@ -290,14 +273,8 @@ export function creerEcranLeve(conteneur, actions) {
       return;
     }
     // Nouveau levé (0.90.0) : la fenêtre du nom s'ouvre tout de suite (sinon tous s'appellent pareil).
-    if (action === 'nouvelleSurface' && bouton.dataset.valeur === 'reseau') {
-      choixReseauOuvert = true;
-      dessiner();
-      return;
-    }
     if (action === 'nouvelleSurface') {
       choixNatureOuvert = false;
-      choixReseauOuvert = false;
       actions.nouvelleSurface(bouton.dataset.valeur);
       const levee = donnees.stock;
       if (!levee) return;
@@ -333,15 +310,12 @@ export function creerEcranLeve(conteneur, actions) {
       actions.reglerDelta(bouton.dataset.champDelta, bouton.dataset.valeur);
       return;
     }
-    if (action === 'prendre') actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '', attributsReseau());
+    if (action === 'prendre') actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '');
     else if (action === 'role') actions.choisirRole(bouton.dataset.role);
     else actions[action]?.(bouton.dataset.valeur);
   });
 
-  // Recollement : ce qui est tapé à côté du point est gardé à chaque frappe.
   conteneur.addEventListener('input', (evenement) => {
-    const champ = evenement.target.dataset?.attributReseau;
-    if (champ) saisieReseau[champ] = evenement.target.value;
     // Delta (0.139.0) : gardé à chaque frappe, sans redessiner (Enreg. Pts reste touchable tout de suite).
     const champChantier = evenement.target.dataset?.chantier;
     if (champChantier) actions.reglerChantier(champChantier, evenement.target.value, false);
@@ -356,9 +330,7 @@ export function creerEcranLeve(conteneur, actions) {
 
   conteneur.addEventListener('change', (evenement) => {
     const cible = evenement.target;
-    if (cible.dataset.attributReseau) saisieReseau[cible.dataset.attributReseau] = cible.value;
-    else if (cible.dataset.ouvrageChamp) actions.reglerOuvrage(cible.dataset.id, cible.dataset.ouvrageChamp, cible.value);
-    else if (cible.dataset.champ === 'altitude-voulue') actions.reglerAltitudeVoulue(cible.value);
+    if (cible.dataset.champ === 'altitude-voulue') actions.reglerAltitudeVoulue(cible.value);
     else if (cible.dataset.champ === 'altitude-cible') actions.reglerAltitudeCible(cible.value);
     else if (cible.dataset.champ === 'surface-controle') actions.choisirSurfaceControle(cible.value);
     else if (cible.dataset.champ === 'surface-lame') actions.choisirSurfaceLame(cible.value);
@@ -676,7 +648,7 @@ export function creerEcranLeve(conteneur, actions) {
     // Ligne : on peut aussi prendre une ligne entière du plan DXF.
     const enLigne = ['ligne', 'talus'].includes(donnees.controle.implantation);
     // « Manuel » (0.131.0) : implantation d'un point seulement, dès Intermédiaire.
-    const modes = enLigne ? ['trait', ...MODES_ACCROCHE] : (donnees.controle.implantation === 'point' ? [...MODES_ACCROCHE, 'manuel'] : MODES_ACCROCHE);
+    const modes = enLigne ? ['trait', ...MODES_ACCROCHE] : (donnees.controle.implantation === 'point' ? [...MODES_ACCROCHE, 'centrepts', 'manuel'] : MODES_ACCROCHE);
     const active = enLigne ? imp.accrocheLigne : imp.accroche;
     // Accroche « Point » : un point tapé (+ Point, pas pour une ligne ; 0.159.0 : Expert) ou choisi dans la liste.
     const outilsPoint = active === 'point'
@@ -704,7 +676,7 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
         ${modes.map((mode) => {
           const [mot, nom, dessin] = ACCROCHES[mode];
-          return `<button type="button" class="bouton-accroche ${mode === 'manuel' ? 'seulement-intermediaire' : ''} ${active === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${nom}" aria-label="${nom}" aria-pressed="${active === mode}">
+          return `<button type="button" class="bouton-accroche ${mode === 'manuel' || mode === 'centrepts' ? 'seulement-intermediaire' : ''} ${active === mode ? 'actif' : ''}" data-action="choisirAccroche" data-valeur="${mode}" title="${nom}" aria-label="${nom}" aria-pressed="${active === mode}">
             <svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span class="mot-accroche">${mot}</span></button>`;
         }).join('')}
         ${outilsPoint}
@@ -727,12 +699,12 @@ export function creerEcranLeve(conteneur, actions) {
     // 0.137.0 : ligne touchée sur le plan : fiche (nom, longueur) et « Implanter » avant le guidage.
     const fiche = imp.ligneAValider && imp.ligne
       ? `<div class="choix-implantation fiche-ligne">
+          <button type="button" class="bouton-retour-grand" data-action="changerLigne" aria-label="Retour : choisir une autre ligne"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg><span>Retour</span></button>
           <p class="coordonnees-choix"><strong>${echapper(imp.ligne.nom)}</strong> <span class="aide">· long. ${formaterNombre(imp.ligne.longueur)} m</span></p>
           <div class="ligne-outils">
             <button type="button" class="bouton bouton-implanter" data-action="implanterLigneChoisie">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></svg>Implanter</button>
             <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="decalerLigneChoisie" title="Créer une copie décalée de cette ligne">Décaler…</button>
-            <button type="button" class="bouton-lien bouton-lien-neutre" data-action="changerLigne">en toucher une autre</button>
           </div>
         </div>`
       : '';
@@ -808,7 +780,7 @@ export function creerEcranLeve(conteneur, actions) {
         <div class="bloc-lateral bloc-bouts ${g.classeBout ?? ''}">${leLong}</div>
         ${hauteur}
       </div>
-      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale), virage, { sansFleche: surLaLigne || g.classeLaterale === 'vert' })}`;
+      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale), virage, { sansFleche: surLaLigne })}`;
   }
 
   /**
@@ -819,6 +791,7 @@ export function creerEcranLeve(conteneur, actions) {
     const { implanter: imp } = donnees;
     const choix = imp.choix
       ? `<div class="choix-implantation">
+          <button type="button" class="bouton-retour-grand" data-action="changerPoint" aria-label="Retour : choisir un autre point"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg><span>Retour</span></button>
           <p class="coordonnees-choix">${imp.choix.nom ? `<strong>${echapper(imp.choix.nom)}</strong> ` : ''}<span class="coord-en">E ${formaterNombre(imp.choix.est)} · N ${formaterNombre(imp.choix.nord)}</span></p>
           <div class="champs-implantation">
             <label>Nom<input type="text" data-champ="nom-implantation" value="${echapper(imp.nomPropose)}" autocomplete="off" autocapitalize="characters" /></label>
@@ -1108,36 +1081,14 @@ export function creerEcranLeve(conteneur, actions) {
 
   /** Choix de ce que l'on va lever : une nouvelle surface de cette nature. */
   function choixNature() {
-    // 0.161.0 : Lever = Stock / Terrain / Libre ; Recollement et Métré sont des applications à part.
-    if (choixReseauOuvert || donnees.famille === 'reseau') return choixReseau();
-    const permises = donnees.famille === 'metre' ? ['metre'] : ['stock', 'terrain', 'terrassement', 'chantier', 'autres'];
+    const permises = ['stock', 'terrain', 'terrassement', 'chantier', 'autres'];
     return `<div class="choix-nature">
-      <p class="titre-choix">${donnees.famille === 'metre' ? 'Nouveau métré' : 'Que lèves-tu ?'}</p>
+      <p class="titre-choix">Que lèves-tu ?</p>
       <div class="natures-terrain">
         ${NATURES_TERRAIN.filter(([cle]) => permises.includes(cle) && (!estModeBase() || NATURES_BASE.includes(cle))).map(([cle, titre]) => `<button type="button" class="bouton-nature nature-${cle}" data-action="nouvelleSurface" data-valeur="${cle}"><span>${titre}</span>${DETAIL_NATURE[cle] ? `<small>${DETAIL_NATURE[cle]}</small>` : ''}</button>`).join('')}
       </div>
       ${donnees.stock ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerChoixNature">annuler</button>' : ''}
     </div>`;
-  }
-
-  /** Recollement : choix du réseau du nouveau levé (un levé par réseau). */
-  function choixReseau() {
-    return `<div class="choix-nature choix-reseau">
-      <p class="titre-choix">Quel réseau ?</p>
-      <div class="natures-terrain">
-        ${donnees.reseaux.map(([abreviation, description, couleur]) => `<button type="button" class="bouton-nature bouton-reseau" style="--couleur-nature: ${couleur}"
-          data-action="nouvelleSurface" data-valeur="reseau:${echapper(abreviation)}"><strong>${echapper(abreviation)}</strong> <span>${echapper(description)}</span></button>`).join('')}
-      </div>
-      <button type="button" class="bouton-lien bouton-lien-neutre" data-action="modifierReseaux">+ Ajouter ou modifier des réseaux</button>
-      ${donnees.stock ? '<button type="button" class="bouton-lien bouton-lien-neutre" data-action="fermerChoixNature">annuler</button>' : ''}
-    </div>`;
-  }
-
-  /** Recollement : ce qui est tapé à côté du point (diamètre, matériau, fouille, remarque). */
-  function attributsReseau() {
-    if (!donnees?.recollement) return {};
-    const lire = (champ) => conteneur.querySelector(`[data-attribut-reseau="${champ}"]`)?.value ?? saisieReseau[champ] ?? '';
-    return { diametre: lire('diametre'), materiau: lire('materiau'), profondeurFouille: lire('profondeurFouille'), remarque: lire('remarque') };
   }
 
   /**
@@ -1210,109 +1161,6 @@ export function creerEcranLeve(conteneur, actions) {
   }
 
   /**
-   * Recollement de réseau (0.101.0) : réseaux du projet (un clic pour changer), éléments, forme de
-   * l'ouvrage ou conduite en cours, diamètre / matériau / fouille / remarque, cadre « Point »,
-   * bandeau (dernier ouvrage, pente du dernier tronçon, fouille), puis ouvrages et conduites.
-   */
-  function priseDePointReseau() {
-    const r = donnees.recollement;
-    saisieReseau.diametre ??= r.diametre == null ? '' : String(r.diametre);
-    saisieReseau.materiau ??= r.materiau ?? '';
-    const reseaux = `<div class="reseaux-leve" role="group" aria-label="Réseaux levés">
-        ${r.levees.map((l) => `<button type="button" class="puce-reseau ${l.actif ? 'actif' : ''}" style="--couleur-reseau: ${l.couleur}" data-action="choisirStock" data-valeur="${l.id}">${echapper(l.nom)}</button>`).join('')}
-        <button type="button" class="puce-reseau puce-nouveau-reseau" data-action="ouvrirChoixNature" data-valeur="reseau" title="Nouveau réseau" aria-label="Nouveau réseau">+</button>
-        <button type="button" class="bouton-crayon-libelles seulement-intermediaire" data-action="modifierReseaux" title="Ajouter ou modifier des réseaux" aria-label="Ajouter ou modifier des réseaux">⚙</button>
-        ${bulle('recollement')}
-      </div>`;
-    const elements = `<div class="elements-reseau" role="group" aria-label="Élément levé">
-        ${ELEMENTS_RESEAU.map(([cle, titre, ouvrage]) => `<button type="button" class="puce-element ${ouvrage ? 'element-ouvrage' : ''} ${cle === r.element ? 'actif' : ''}" data-action="choisirElementReseau" data-valeur="${cle}">${titre}</button>`).join('')}
-      </div>`;
-    let enCours;
-    if (r.ouvrage) {
-      const coins = r.enCours && r.enCours.forme === 'rect' ? `<strong>Coin ${r.enCours.nbCoins + 1} / 3</strong> de ${echapper(r.enCours.nom)}` : '';
-      enCours = `<div class="ligne-choix forme-ouvrage"><span>Forme</span>
-          ${boutonsChoix('choisirFormeOuvrage', [['ronde', 'Ronde (1 point)'], ['rect', 'Carrée / rect. (3 coins)']], r.forme)}
-        </div>${coins ? `<p class="coins-ouvrage">${coins}</p>` : ''}`;
-    } else {
-      const depart = r.ouvrages.filter((o) => o.fini);
-      enCours = `<div class="element-en-cours conduite-en-cours">
-          <span class="titre-element">Conduite en cours</span>
-          <div class="corps-element">
-            <strong>${r.conduite?.numero ? `T-${echapper(r.reseau)}-${r.conduite.numero}` : 'nouvelle'}</strong><span>${r.conduite?.nbPoints ?? 0} pt(s)</span>
-          </div>
-          <div class="ligne-outils">
-            <select data-champ="depart-conduite" aria-label="Départ de la nouvelle conduite">
-              <option value="">depuis nulle part</option>
-              ${depart.map((o) => `<option value="${o.id}" ${o.id === r.dernierOuvrage?.id ? 'selected' : ''}>depuis ${echapper(o.nom)}</option>`).join('')}
-            </select>
-            <button type="button" class="bouton-secondaire" data-action="nouvelleConduite">+ Nouvelle conduite</button>
-          </div>
-        </div>`;
-    }
-    const champ = (cle, titre, attributs = '') => `<label class="attribut-reseau"><span>${titre}</span>
-        <input type="text" data-attribut-reseau="${cle}" value="${echapper(saisieReseau[cle] ?? '')}" ${attributs} /></label>`;
-    const attributs = `<div class="attributs-reseau">
-        ${champ('diametre', r.ouvrage ? 'Ø (mm)' : 'Ø ext. (mm)', 'inputmode="decimal" placeholder="—"')}
-        <label class="attribut-reseau"><span>Matériau</span><select data-attribut-reseau="materiau">
-          <option value="">—</option>
-          ${MATERIAUX.map((m) => `<option ${m === saisieReseau.materiau ? 'selected' : ''}>${m}</option>`).join('')}
-        </select></label>
-        ${r.ouvrage ? '' : champ('profondeurFouille', 'Fouille (m)', 'inputmode="decimal" placeholder="—"')}
-        ${champ('remarque', 'Remarque', 'placeholder="—"')}
-      </div>`;
-    return `
-      ${ligneSurface()}
-      ${reseaux}
-      ${elements}
-      <div class="cadre-role cadre-reseau" style="--couleur-reseau: ${r.couleur}">
-        ${enCours}
-        ${attributs}
-        ${cadrePrise()}
-      </div>
-      ${bandeauReseau()}
-      ${listeReseau()}
-      ${basDuLeve()}`;
-  }
-
-  /** Bandeau du recollement : dernier ouvrage (profondeur), pente du dernier tronçon avec le sens, fouille. */
-  function bandeauReseau() {
-    const r = donnees.recollement;
-    const morceaux = [];
-    const o = r.dernierOuvrage;
-    if (o) morceaux.push(`<span><strong>${echapper(o.nom)}</strong> prof. ${o.profondeur == null ? '—' : `${formaterNombre(o.profondeur)} m`}</span>`);
-    const t = r.dernierTroncon;
-    if (t?.pente != null) morceaux.push(`<span class="pente-troncon">${textePente(t.pente)} ${flecheSens(t.sens, t.a.nom, t.b.nom)}</span>`);
-    if (r.fouille != null) morceaux.push(`<span>fouille ${formaterNombre(r.fouille)} m</span>`);
-    return morceaux.length > 0 ? `<div class="bandeau-reseau" style="--couleur-reseau: ${r.couleur}">${morceaux.join('')}</div>` : '';
-  }
-
-  /** Ouvrages (tampon, radier et profondeur à taper) et conduites (tronçons, pente et sens). */
-  function listeReseau() {
-    const r = donnees.recollement;
-    if (r.ouvrages.length === 0 && r.conduites.length === 0) return '';
-    const ouvert = (cle) => (elementsOuverts.has(cle) ? 'open' : '');
-    const valeur = (v) => (v == null ? '' : v.toFixed(3));
-    const ouvrages = r.ouvrages.map((o) => `<details class="element-leve ouvrage-reseau" data-element="ouvrage-${o.id}" ${ouvert(`ouvrage-${o.id}`)}>
-        <summary><strong>${echapper(o.nom)}</strong><span>${o.fini ? `prof. ${o.profondeur == null ? '—' : `${formaterNombre(o.profondeur)} m`}` : `${o.nbCoins} / 3 coins`}</span></summary>
-        ${o.fini ? `<div class="mesures-ouvrage">
-          <span>Tampon <strong>${o.tampon == null ? '—' : formaterNombre(o.tampon)}</strong></span>
-          <label>Radier<input type="text" inputmode="decimal" data-ouvrage-champ="radier" data-id="${o.id}" value="${valeur(o.radier)}" placeholder="${o.radier == null && o.profondeurSaisie != null ? formaterNombre(o.tampon - o.profondeurSaisie) : '—'}" /></label>
-          <label>Profondeur<input type="text" inputmode="decimal" data-ouvrage-champ="profondeur" data-id="${o.id}" value="${valeur(o.profondeurSaisie)}" placeholder="${o.radier != null ? formaterNombre(o.profondeur) : '—'}" /></label>
-          ${o.ecartAngleDroit > 5 ? `<span class="alerte-ouvrage">angle à ${(90 + o.ecartAngleDroit).toFixed(0)}° : coins à vérifier</span>` : ''}
-        </div>` : ''}
-      </details>`).join('');
-    const conduites = r.conduites.map((c) => `<details class="element-leve conduite-reseau" data-element="conduite-${c.id}" ${ouvert(`conduite-${c.id}`)}>
-        <summary><strong>${echapper(c.nom)}</strong><span>${c.noms.length} nœud(s)</span></summary>
-        <ul>${c.troncons.map((t) => `<li class="troncon-reseau"><span>${echapper(t.de)} → ${echapper(t.a)}</span>
-          <span>${t.distance.toFixed(2)} m · ${t.pente == null ? 'pente —' : `${textePente(t.pente)} ${flecheSens(t.sens, t.de, t.a)}`}</span></li>`).join('') || '<li class="aide">un seul point</li>'}</ul>
-      </details>`).join('');
-    return `<div class="elements-leve liste-reseau">
-      ${r.ouvrages.length > 0 ? `<p class="titre-choix">Ouvrages</p>${ouvrages}` : ''}
-      ${r.conduites.length > 0 ? `<p class="titre-choix">Conduites</p>${conduites}` : ''}
-    </div>`;
-  }
-
-  /**
    * Levé en cours (0.64.0) : sa nature en petit, son nom en grand (à la couleur de la nature) avec
    * un crayon pour le renommer, puis « Changer » (reprendre un autre levé) et « + Nouveau ».
    */
@@ -1337,7 +1185,7 @@ export function creerEcranLeve(conteneur, actions) {
 
   /** Rôles proposés pour le levé en cours (dans l'ordre des boutons). */
   function rolesAffiches() {
-    return [...ROLES_LEVE, ...ROLES_METRE].filter(([cle]) => donnees.rolesPermis.includes(cle));
+    return ROLES_LEVE.filter(([cle]) => donnees.rolesPermis.includes(cle));
   }
 
   /** Place du rôle choisi dans la rangée : le cadre n'a pas de coin arrondi sous l'onglet (premier, dernier). */
@@ -1357,18 +1205,8 @@ export function creerEcranLeve(conteneur, actions) {
     </div>`;
   }
 
-  /**
-   * Ligne de rupture en cours : numéro, nombre de points, nouvelle ligne, fermer. Dans un métré :
-   * l'aire ou la longueur en cours (« A-ENR-1 · 4 pt(s) ») et « + Nouvelle ».
-   */
+  /** Ligne de rupture en cours : numéro, nombre de points, nouvelle ligne, fermer. */
   function outilsLigne() {
-    if (donnees.metre && LETTRES_METRE[donnees.role]) {
-      const e = donnees.elementMetre;
-      return `<div class="outils-ligne outils-metre">
-        <span>${echapper(debutDeNom(LETTRES_METRE[donnees.role], e.libelle))}${e.numero} · ${e.nbPoints} pt(s)</span>
-        <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${e.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle</button>
-      </div>`;
-    }
     // Contour en cours (0.78.0) : même cadre que la ligne, sans « Fermer » (un contour est toujours fermé).
     if (donnees.role === 'contour') {
       const nbPoints = donnees.elements?.contour?.noms.length ?? 0;
@@ -1402,7 +1240,7 @@ export function creerEcranLeve(conteneur, actions) {
     const sorte = sorteDuRole();
     const liste = donnees.libelles[sorte];
     const actif = { aires: donnees.libelleAire, lignes: donnees.libelleLigne, points: donnees.libellePoint }[sorte];
-    return `<div class="libelles-terrain seulement-intermediaire pour-${sorte} ${donnees.metre ? 'dans-metre' : ''}" role="group" aria-label="Ce que l'on lève">
+    return `<div class="libelles-terrain seulement-intermediaire pour-${sorte}" role="group" aria-label="Ce que l'on lève">
       <button type="button" class="puce-libelle puce-aucun ${!actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur=""><strong><i class="symbole-libelle" style="color: #000000">${symboleDeForme('')}</i>Aucun</strong><span>sans libellé</span></button>
       ${liste.map(([abreviation, signification, couleur, forme]) => `<button type="button" class="puce-libelle ${abreviation === actif ? 'actif' : ''}" data-action="choisirLibelle" data-valeur="${echapper(abreviation)}">
           <strong><i class="symbole-libelle" style="color: ${couleur || COULEURS_HABITUELLES[sorte]}">${symboleDeForme(forme)}</i>${echapper(abreviation)}</strong><span>${echapper(signification)}</span></button>`).join('')}
@@ -1480,7 +1318,6 @@ export function creerEcranLeve(conteneur, actions) {
   /** Prise de point : rôle, nom, position, bouton, annulation. */
   function priseDePoint() {
     if (!donnees.stock || choixNatureOuvert) return choixNature();
-    if (donnees.recollement) return priseDePointReseau();
     return `
       ${ligneSurface()}
       ${boutonsRoles()}
@@ -1585,17 +1422,6 @@ export function creerEcranLeve(conteneur, actions) {
      * altitude, fait: { distance, dAltitude } ou null }], nbImplantations } }.
      */
     afficher(nouvellesDonnees) {
-      if (nouvellesDonnees.recollement?.ouvrage !== donnees?.recollement?.ouvrage) {
-        // Ouvrage ↔ conduite : diamètre et matériau gardés à part (voir main.js).
-        saisieReseau.diametre = null;
-        saisieReseau.materiau = null;
-      }
-      if (nouvellesDonnees.dernierPoint !== donnees?.dernierPoint || nouvellesDonnees.stock?.id !== donnees?.stock?.id) {
-        saisieReseau.profondeurFouille = '';
-        saisieReseau.remarque = '';
-        saisieReseau.diametre = null; // repris de main.js (gardé d'un point à l'autre)
-        saisieReseau.materiau = null;
-      }
       donnees = nouvellesDonnees;
       dessiner();
     },
@@ -1608,7 +1434,7 @@ export function creerEcranLeve(conteneur, actions) {
       const bouton = conteneur.querySelector('[data-action="prendre"]');
       if (!bouton) return 'pas de levé en cours';
       if (bouton.disabled) return etat?.connecte ? etat.raison ?? 'pas prêt' : 'récepteur non connecté';
-      actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '', attributsReseau());
+      actions.prendrePoint(conteneur.querySelector('[data-champ="nom-point"]')?.value ?? '');
       return null;
     },
 
@@ -1721,18 +1547,6 @@ export function creerEcranLeve(conteneur, actions) {
  * nord. haut, droite : où est le point par rapport au récepteur (m). nord : direction du nord à
  * l'écran (°, sens des aiguilles d'une montre depuis le haut), marquée « N » sur le bord.
  */
-/** Pente d'un tronçon (%), avec son signe : « −2.00 % ». */
-function textePente(pente) {
-  return `${pente < 0 ? '−' : pente > 0 ? '+' : ''}${Math.abs(pente).toFixed(2)} %`;
-}
-
-/** Flèche du sens d'écoulement d'un tronçon de a vers b (vers le plus bas). */
-function flecheSens(sens, a, b) {
-  if (sens === 'plat') return '<span class="sens-ecoulement">⟷ plat</span>';
-  const vers = sens === 'a-b' ? b : a;
-  return `<span class="sens-ecoulement" title="L'eau coule vers ${echapper(vers)}">${sens === 'a-b' ? '⟶' : '⟵'} ${echapper(vers)}</span>`;
-}
-
 function svgCible(numero, haut, droite, couleur, nordEnHaut, nord = 0) {
   const { cercles } = CIBLES[numero - 1];
   const echelle = 100 / cercles[0]; // le grand cercle fait 100 unités de rayon
@@ -1775,6 +1589,9 @@ function iconeVirage(sens) {
   return `<svg class="icone-fleche icone-virage" viewBox="0 0 24 24" aria-hidden="true"><path d="${trait}" /></svg>`;
 }
 
+/** 0.210.0 (demande du 11.11) : la flèche du couloir garde une couleur fixe (ambre) ; la couleur de la tolérance est sur le plan. */
+const COULEUR_FLECHE_COULOIR = '#fbbf24';
+
 /** Couleur du rond de la canne dans le couloir (0.118.0) : celle de la tolérance en plan. */
 function couleurLaterale(classe) {
   return { vert: '#16a34a', orange: '#f59e0b', rouge: '#dc2626' }[classe] ?? '#9ca3af';
@@ -1797,7 +1614,8 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage 
   // Avant le début ou après la fin : la canne dépasse un peu du trait.
   const top = Math.max(haut - 6, Math.min(bas + 6, bas - part * (bas - haut)));
   const left = 50 + Math.max(-demi, Math.min(demi, (ecart / bandes[0]) * demi));
-  const texte = (r) => (r >= 1 ? `${r} m` : `${Math.round(r * 100)} cm`);
+  // 0.210.0 : jamais plus de 3 décimales (en m), en cm sous le mètre.
+  const texte = (r) => (r >= 1 ? `${Number(r.toFixed(3))} m` : `${Math.round(r * 100)} cm`);
   // 0.118.2 : seulement la graduation la plus éloignée (la bande la plus large), juste pour un
   // aperçu de l'échelle ; sa distance écrite en haut à droite (0.123 : en bas, la flèche pour se tourner).
   const r = bandes[0];
@@ -1806,9 +1624,12 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage 
   // 0.189.1 (maquette A du 10.11, tous les modes) : flèche perpendiculaire à la ligne, de la canne vers la ligne (du côté où il
   // faut aller), grosse pointe pour bien voir le sens ; l'écart écrit au-dessus. Cachée quand on est dans la tolérance.
   const versGauche = ecart > 0;
-  const largeurFleche = Math.abs(left - 50);
-  const flecheCouloir = sansFleche || largeurFleche < 0.5 ? ''
-    : `<span class="fleche-couloir ${versGauche ? 'vers-gauche' : 'vers-droite'}" style="left: ${Math.min(left, 50).toFixed(1)}%; width: ${largeurFleche.toFixed(1)}%; top: ${top.toFixed(1)}%; --couleur-fleche: ${couleur}"><b class="mot-fleche">${ecart === 0 ? '' : texte(Math.abs(ecart))}</b><i class="pointe"></i><i class="tige"></i></span>`;
+  // 0.208.0 : la flèche reste visible dans la tolérance (6 % au moins), sauf pile sur la ligne.
+  const largeurFleche = ecart === 0 ? 0 : Math.max(Math.abs(left - 50), 6);
+  const debutFleche = versGauche ? 50 : 50 - largeurFleche;
+  // Écart écrit en mètres, 3 décimales comme sur le plan (0.208.0).
+  const flecheCouloir = sansFleche || largeurFleche === 0 ? ''
+    : `<span class="fleche-couloir ${versGauche ? 'vers-gauche' : 'vers-droite'}" style="left: ${debutFleche.toFixed(1)}%; width: ${largeurFleche.toFixed(1)}%; top: ${top.toFixed(1)}%; --couleur-fleche: ${COULEUR_FLECHE_COULOIR}"><b class="mot-fleche">${ecart === 0 ? '' : `${Math.abs(ecart).toFixed(3)} m`}</b><i class="pointe"></i><i class="tige"></i></span>`;
   return `<div class="cadre-couloir" role="img" aria-label="Position de la canne le long de la ligne">
     ${reglettes}
     <span class="trait-couloir" style="top: ${haut}%; bottom: ${100 - bas}%"></span>
@@ -1874,7 +1695,9 @@ export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) 
     remplir('inclinaison', 'GNSS non connecté', '', 'attente');
     return;
   }
-  const age = etat.ageCorrections != null ? `corr. ${Math.round(etat.ageCorrections)} s` : '';
+  const age = etat.ageCorrections != null ? texteAgeCorrections(etat.ageCorrections) : '';
+  // 0.213.0 : corrections de plus de 2 s : la case RTK passe au rouge et clignote (la prise de point est bloquée, voir pont.js).
+  const correctionsPerimees = correctionsTropAnciennes(etat.ageCorrections);
   if (!etat.recu) {
     remplir('rtk', 'En attente…', '', 'attente');
     remplir('z', 'Z —', '', 'info');
@@ -1882,7 +1705,9 @@ export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) 
     const statut = { 1: 'AUTONOME', 2: 'DGPS', 4: 'FIXE', 5: 'FLOTTANT' }[etat.qualite] ?? (etat.libelleQualite ?? '?').toUpperCase();
     // Le RTK fixe était là puis il est perdu : la case clignote jusqu'à son retour (0.114.0).
     if (etat.qualite === 4) fixeDejaVu = true;
-    remplir('rtk', statut, etat.nbSatellites != null ? `${etat.nbSatellites} sat` : '', etat.qualite === 4 ? 'ok' : `pas-ok${fixeDejaVu ? ' fixe-perdu' : ''}`);
+    const satellites = etat.nbSatellites != null ? `${etat.nbSatellites} sat` : '';
+    if (correctionsPerimees) remplir('rtk', statut, [satellites, age].filter(Boolean).join(' · '), 'pas-ok fixe-perdu');
+    else remplir('rtk', statut, satellites, etat.qualite === 4 ? 'ok' : `pas-ok${fixeDejaVu ? ' fixe-perdu' : ''}`);
     // Z = altitude du bout de la canne envoyée par le GNSS (position compensée), comme partout dans l'appli.
     const z = etat.position?.altitude;
     const precision = etat.precisionH != null || etat.precisionV != null ? `H ${formaterNombre(etat.precisionH)} V ${formaterNombre(etat.precisionV)}` : '';

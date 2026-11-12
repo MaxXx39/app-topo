@@ -63,6 +63,8 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
       panneau = panneau === bouton.dataset.panneau ? null : bouton.dataset.panneau;
       // À chaque ouverture de la liste : seul le dossier du projet ouvert est déplié.
       if (panneau === 'projets' && derniers) dossiersOuverts = new Set([dossierDuProjet(lireDossiers(), derniers[0].id)]);
+      // 0.217.0 : la liste de Drive est relue à chaque ouverture (sinon « ouvert sur xxx » pouvait rester périmé sur la tablette).
+      if (panneau === 'projets') actions.rafraichirDriveEnDouce?.();
       if (derniers) dessiner(...derniers);
       conteneur.closest('.panneau')?.scrollIntoView({ block: 'start' });
       window.scrollTo(0, 0);
@@ -175,14 +177,15 @@ export function creerEcranProjet(conteneur, actions, conteneurSuite) {
  */
 export function projetsReunis(resumes, partage, tri = 'date') {
   const parId = new Map();
-  for (const r of resumes) parId.set(r.id, { id: r.id, titre: r.titre ?? r.nom, sousTitre: r.sousTitre, modifieLe: r.modifieLe, local: r, drive: null });
+  for (const r of resumes) parId.set(r.id, { id: r.id, titre: r.titre ?? r.nom, sousTitre: r.sousTitre, modifieLe: r.modifieLe, centre: r.centre ?? null, local: r, drive: null });
   if (partage?.etat.connecte) {
     for (const p of partage.etat.projetsDrive) {
       const deja = parId.get(p.projetId);
       if (deja) {
         deja.drive = p;
+        deja.centre ??= p.centre ?? null; // le centre de l'appareil d'abord, sinon celui de Drive
         if (String(p.modifieLe ?? '') > String(deja.modifieLe ?? '')) deja.modifieLe = p.modifieLe;
-      } else parId.set(p.projetId, { id: p.projetId, titre: p.titre, sousTitre: '', modifieLe: p.modifieLe ?? '', local: null, drive: p });
+      } else parId.set(p.projetId, { id: p.projetId, titre: p.titre, sousTitre: '', modifieLe: p.modifieLe ?? '', centre: p.centre ?? null, local: null, drive: p });
     }
   }
   const liste = [...parId.values()];
@@ -265,7 +268,7 @@ function ligneProjet(p, estOuvert, menu, partage) {
     p.sousTitre ? echapper(p.sousTitre) : '',
     date,
     p.local ? `${compter(p.local.nombreLeves, 'levé')} · ${compter(p.local.nombreSurfaces, 'surface')}` : '',
-    ailleurs ? `<span class="verrou-drive">ouvert sur ${echapper(verrou.nom)}</span>` : '',
+    ailleurs ? `<span class="verrou-drive">🔒 Ouvert sur ${echapper(verrou.nom)}</span>` : '',
   ].filter(Boolean).join(' · ');
   const ouvrir = estOuvert ? 'disabled' : p.local ? `data-action="ouvrir" data-id="${p.id}"` : `data-action="ouvrir-drive" data-id="${p.drive.dossierId}"`;
   return `<div class="ligne-projet ${estOuvert ? 'projet-ouvert' : ''}">

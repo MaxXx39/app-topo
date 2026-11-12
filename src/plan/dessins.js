@@ -4,6 +4,7 @@
 // Les autres dessins ont le nom de leurs sommets (« D1-1 », « PF1-1 »…), pour les implanter.
 import { estFerme, longueursCotes, pointSelonGisement } from '../topo/dessin.js';
 import { formaterNombre } from '../topo/format.js';
+import { marqueCentre } from './formes.js';
 
 /**
  * Dessine dans "groupe" (SVG). donnees : { dessins, actifId, pilote: { direction (gon) ou null,
@@ -11,7 +12,7 @@ import { formaterNombre } from '../topo/format.js';
  * élément SVG ; metresParPixel : taille d'un pixel sur le terrain (m) ; avecNoms : écrire le nom
  * des sommets (dessin.noms) des dessins qui ne sont pas en cours (calque « Noms des points »).
  */
-export function dessinerDessins(groupe, { dessins = [], actifId = null, pilote = null }, versEcran, creer, metresParPixel, avecNoms = true) {
+export function dessinerDessins(groupe, { dessins = [], actifId = null, pilote = null }, versEcran, creer, metresParPixel, avecNoms = true, rayonFormes = 6) {
   for (const dessin of dessins) {
     const actif = dessin.id === actifId;
     const ecran = dessin.sommets.map((s) => versEcran(s.est, s.nord));
@@ -26,6 +27,8 @@ export function dessinerDessins(groupe, { dessins = [], actifId = null, pilote =
       const carre = creer('rect', { x: p.x - 4, y: p.y - 4, width: 8, height: 8, class: `sommet-dessin ${actif ? 'actif' : ''}` });
       if (dessin.couleur) carre.style.stroke = dessin.couleur;
       groupe.append(carre);
+      // 0.212.0 : un point dessiné a un petit losange noir au centre.
+      groupe.append(creer('path', { d: marqueCentre('dessin', p.x, p.y, rayonFormes).chemin, class: 'marque-centre' }));
       if (!actif) {
         if (!avecNoms || !dessin.noms?.[i]) return;
         const nom = creer('text', { x: p.x + 7, y: p.y - 7, class: 'nom-sommet-dessin' });
