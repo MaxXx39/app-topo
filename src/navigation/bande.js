@@ -10,7 +10,8 @@
 // - page Applications = menu de départ ; appui long sur une tuile = la déplacer (ordre gardé par tablette).
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
-import { appliDeCle, lireFavoris, ecrireFavoris, basculerFavori, MAX_FAVORIS, lireOrdre, ecrireOrdre, ordonner } from './applis.js';
+import { appliDeCle, lireFavoris, ecrireFavoris, basculerFavori, MAX_FAVORIS, lireOrdre, ecrireOrdre, ordonner, lireMasquees, ecrireMasquees, changerMasquee, sansMasquees } from './applis.js';
+import { demanderChoix } from '../outils/choix.js';
 
 const DUREE_APPUI_LONG = 500; // ms avant que la roue des favoris s'ouvre
 const ICONE_REGLAGES = '<circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />';
@@ -55,6 +56,7 @@ export function creerNavigation(nav, actions) {
   let dernierProjet = ''; // nom du projet montré dans l'encadré de la page
   // Déplacement d'une tuile (appui long) : { tuile, minuterie, x, y, actif }.
   let deplacement = null;
+  let pretADeplacer = null; // 0.219.0 : tuile choisie par « Déplacer » du menu : le prochain appui la déplace tout de suite
 
   // --- Page « Applications » ---
   const page = document.createElement('section');
@@ -176,7 +178,49 @@ export function creerNavigation(nav, actions) {
       } catch {
         // pas grave : le doigt reste suivi par la page
       }
-    }, DUREE_APPUI_LONG);
+    }, tuile === pretADeplacer ? 0 : DUREE_APPUI_LONG);
+    if (tuile === pretADeplacer) {
+      pretADeplacer = null;
+      tuile.classList.remove('pret-a-deplacer');
+    }
+  }
+
+  /**
+   * 0.219.0 (demande du 12.11) : appui long sur une tuile, sans glisser = petit menu « Masquer / Déplacer ».
+   * (Appui long puis glisser déplace toujours la tuile, comme avant.)
+   */
+  async function menuTuile(tuile) {
+    const appli = appliDeCle(tuile.dataset.appli);
+    const choix = await demanderChoix({
+      titre: appli?.titre ?? 'Application',
+      boutons: [
+        { cle: 'masquer', texte: 'Masquer', detail: 'Elle revient avec « Applications masquées », en bas de cette page', principal: true },
+        { cle: 'deplacer', texte: 'Déplacer', detail: 'Puis appuie sur la tuile et glisse-la où tu veux' },
+        { cle: 'fermer', texte: 'Fermer' },
+      ],
+    });
+    if (choix === 'masquer') {
+      ecrireMasquees(changerMasquee(lireMasquees(), tuile.dataset.appli, true));
+      dessinerPage();
+    } else if (choix === 'deplacer') {
+      pretADeplacer = tuile;
+      tuile.classList.add('pret-a-deplacer');
+    }
+  }
+
+  /** Fenêtre « Applications masquées » : toucher une application la fait revenir. */
+  async function montrerMasquees() {
+    const masquees = lireMasquees().map((cle) => appliDeCle(cle)).filter(Boolean);
+    if (masquees.length === 0) return;
+    const choix = await demanderChoix({
+      titre: 'Applications masquées',
+      boutons: [...masquees.map((a) => ({ cle: a.cle, texte: a.titre, detail: 'Faire revenir', principal: false })), { cle: '', texte: 'Fermer' }],
+    });
+    if (!choix) return;
+    ecrireMasquees(changerMasquee(lireMasquees(), choix, false));
+    dessinerPage();
+    // On propose les autres (une par une) tant qu'il en reste.
+    if (lireMasquees().length > 0) montrerMasquees();
   }
 
   function suiteDeplacement(evenement) {
@@ -205,6 +249,8 @@ export function creerNavigation(nav, actions) {
     if (deplacement.actif) {
       deplacement.tuile.classList.remove('en-deplacement');
       page.classList.remove('deplacement');
+      // Appui long sans glisser : le menu « Masquer / Déplacer » (0.219.0).
+      if (!deplacement.fait) menuTuile(deplacement.tuile);
       ecrireOrdre([...page.querySelectorAll('.tuile-appli')].map((t) => t.dataset.appli));
       // Le toucher qui finit le déplacement n'ouvre pas l'application.
       appuiLongFait = true;
@@ -235,6 +281,10 @@ export function creerNavigation(nav, actions) {
     // 0.159.0 : Réglages et « Fermer l'appli » (pied de la page, pas des applications).
     const pied = evenement.target.closest('[data-pied]');
     if (pied) {
+      if (pied.dataset.pied === 'masquees') {
+        montrerMasquees();
+        return;
+      }
       if (pied.dataset.pied === 'reglages') {
         fermerPage();
         actions.reglages?.();
@@ -331,7 +381,7 @@ export function creerNavigation(nav, actions) {
       <div class="zone-tuiles-applis">
       <h2 class="titre-applis">Applications ${bulle('applications')}</h2>
       <div class="tuiles-applis">
-        ${ordonner(actions.applis(), lireOrdre()).map((a) => `
+        ${ordonner(sansMasquees(actions.applis(), lireMasquees()), lireOrdre()).map((a) => `
           <div class="tuile-appli ${a.cle === courante ? 'en-cours' : ''}" data-appli="${a.cle}" role="button" tabindex="0"
             style="--couleur-appli: ${a.couleur}; --texte-appli: ${a.texte}">
             <span class="tete-tuile">
@@ -350,6 +400,7 @@ export function creerNavigation(nav, actions) {
               aria-pressed="${favoris.includes(a.cle)}" aria-label="Favori de la roue">★</button>
           </div>`).join('')}
       </div>
+      ${lireMasquees().length > 0 ? `<button type="button" class="bouton-masquees" data-pied="masquees">Applications masquées (${lireMasquees().length})</button>` : ''}
       </div>
       <div class="pied-applis">
         ${actions.fermerAppli ? `<button type="button" class="bouton-pied-applis fermer" data-pied="fermer">${svg('<path d="M12 3v9" /><path d="M6.3 7.3a8 8 0 1 0 11.4 0" />')}Fermer l'appli</button>` : ''}
@@ -358,7 +409,7 @@ export function creerNavigation(nav, actions) {
   }
 
   function ouvrirRoue() {
-    const disponibles = actions.applis();
+    const disponibles = sansMasquees(actions.applis(), lireMasquees());
     const favoris = lireFavoris().map((cle) => disponibles.find((a) => a.cle === cle)).filter(Boolean);
     if (favoris.length === 0) {
       actions.message('Aucun favori : coche l\'étoile des applications dans la page Applications.');

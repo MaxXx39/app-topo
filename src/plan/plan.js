@@ -83,6 +83,7 @@ const CALQUES_DEPART = {
   nomsLeve: true, // 0.123 : noms des points levés (roue ⚙ de Levé)
   nomsImport: true, // 0.113 : noms des Points Import (flèche ▾ de la catégorie)
   altitudes: true,
+  attributs: true, // 0.219 : attributs du levé chantier (Ø, profondeur…), à part des altitudes
   contours: true,
   lignes: true,
   contourLeve: true, // 0.110 : bord pointillé + fond léger d'un levé sans contour
@@ -516,12 +517,14 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
     // Noms et altitudes : placés sans chevauchement (les étiquettes sans place sont cachées).
     // Roue de « Levé » : la case « Altitudes » montre ou cache toutes les altitudes (lignes et contours compris).
-    if (calques.noms || calques.altitudes) {
+    if (calques.noms || calques.altitudes || calques.attributs) {
       const idListe = (point) => listeDesPoints.get(point);
       const montrerNom = (point) => calques.noms && (pointsImport.has(point) ? reglageListe('nomsImport', idListe(point)) : reglageListe('nomsLeve', idListe(point)));
       const montrerAltitude = (point) => calques.altitudes && reglageListe('altitudes', idListe(point));
+      // 0.219.0 : les attributs du levé chantier ont leur propre case « Attributs » (avant : rangés avec les altitudes).
+      const montrerAttributs = (point) => calques.attributs && reglageListe('attributs', idListe(point));
       const textes = visibles.map(({ point }) =>
-        [montrerNom(point) ? point.nom : null, montrerAltitude(point) && point.altitude != null ? formaterNombre(point.altitude) : null, montrerAltitude(point) && point.chantier ? texteDuPoint(point.chantier, point.chantier) : null].filter(Boolean),
+        [montrerNom(point) ? point.nom : null, montrerAltitude(point) && point.altitude != null ? formaterNombre(point.altitude) : null, montrerAttributs(point) && point.chantier ? texteDuPoint(point.chantier, point.chantier) : null].filter(Boolean),
       );
       // 0.208.0 : les noms évitent les 📷 des photos (sinon l'icône cache le nom).
       const boitesPhotos = vue ? photos.map((photo) => {
@@ -2012,6 +2015,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     leve: [
       ['nomsLeve', 'Noms', ''],
       ['altitudes', 'Altitudes', ''],
+      ['attributs', 'Attributs', ''],
       ['contourLeve', 'Contour du levé', ''],
       ['triangles', 'Triangles', 'expert'],
       ['couleursAltitude', 'Couleurs selon l\'altitude', 'expert'],

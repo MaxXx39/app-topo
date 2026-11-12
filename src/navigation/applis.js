@@ -207,3 +207,37 @@ export function ordonner(applis, ordre) {
   };
   return applis.map((a, depart) => ({ a, depart })).sort((x, y) => rang(x.a) - rang(y.a) || x.depart - y.depart).map(({ a }) => a);
 }
+
+// --- Applications masquées (0.219.0 : appui long sur une tuile › Masquer), gardées par tablette ---
+
+export const CLE_MASQUEES = 'topo-applis-masquees';
+
+/** Clés des applications masquées sur cet appareil. */
+export function lireMasquees(stockage = globalThis.localStorage) {
+  try {
+    const lu = JSON.parse(stockage?.getItem(CLE_MASQUEES) ?? 'null');
+    return Array.isArray(lu) ? lu.filter((cle) => typeof cle === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Retient les applications masquées sur cet appareil. */
+export function ecrireMasquees(liste, stockage = globalThis.localStorage) {
+  try {
+    stockage?.setItem(CLE_MASQUEES, JSON.stringify(liste));
+  } catch {
+    // Mémoire indisponible : le masquage ne sera pas retenu.
+  }
+}
+
+/** Masque (masquer = vrai) ou fait revenir une application : renvoie la nouvelle liste de clés masquées. */
+export function changerMasquee(liste, cle, masquer) {
+  const sans = liste.filter((c) => c !== cle);
+  return masquer ? [...sans, cle] : sans;
+}
+
+/** Les applications qui ne sont pas masquées (l'ordre est gardé). */
+export function sansMasquees(applis, masquees) {
+  return applis.filter((a) => !masquees.includes(a.cle));
+}

@@ -143,6 +143,7 @@ import { fabriquerPaquet } from './export/paquet.js';
 import { creerBarreRecalage, etapeAxes } from './recalage/barre.js';
 import { creerBarreControlePlan } from './recalage/barre-controle.js';
 import { resultatControlePlan } from './topo/controle-plan.js';
+import { nomsEnDouble, sansDoublons, renommerDoublons } from './topo/doublons.js';
 import { ajouterPointAjoute, nomPointAjoute, lireNombreTape } from './topo/points-ajoutes.js';
 import { ajouterTous } from './outils/bornes.js';
 
@@ -1855,6 +1856,11 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
   importerPoints: async (fichier) => {
     try {
       const resultat = lirePoints(await fichier.text());
+      // 0.219.0 : noms répétés dans le fichier : ignorer / renommer / importer quand même.
+      const traite = await choisirTraitementDoublons([], resultat.points, fichier.name);
+      if (traite.mode === null) return;
+      resultat.points = traite.points;
+      if (traite.renommes.length > 0) resultat.avertissements = [...(resultat.avertissements ?? []), `${traite.renommes.length} nom(s) en double renommé(s) : ${traite.renommes.slice(0, 5).map((r) => `${r.avant} → ${r.apres}`).join(', ')}`];
       dernierImport = { ...resultat, nomFichier: fichier.name };
       if (resultat.points.length > 0) {
         // Simple liste de points, ou levé (0.77.0) : rangé dans Lever, à compléter dans Terrain › Lever.
@@ -4750,16 +4756,48 @@ function ajouterAuxPointsControle(points) {
 }
 
 /**
+ * Noms en double à l'import (0.219.0) : fenêtre « Ignorer / Renommer / Importer quand même » s'il y en a.
+ * Renvoie { points (à importer), mode ('ignorer', 'renommer', 'garder' ou null si on annule), renommes }.
+ */
+async function choisirTraitementDoublons(existants, points, nomFichier) {
+  const doubles = nomsEnDouble(existants, points);
+  if (doubles.length === 0) return { points, mode: 'garder', renommes: [] };
+  const liste = `${doubles.slice(0, 5).join(', ')}${doubles.length > 5 ? '…' : ''}`;
+  const choix = await demanderChoix({
+    titre: `${doubles.length} nom(s) en double dans « ${nomFichier} »`,
+    texte: `Noms : ${liste}. Les autres points sont importés dans tous les cas.`,
+    boutons: [
+      { cle: 'ignorer', texte: 'Ignorer les doublons', detail: 'Le premier point de chaque nom est gardé', principal: true },
+      { cle: 'renommer', texte: 'Renommer', detail: 'Ajoute -2, -3… au nom des doublons' },
+      { cle: 'garder', texte: 'Importer quand même', detail: 'Plusieurs points peuvent avoir le même nom' },
+      { cle: 'annuler', texte: 'Annuler l\'import' },
+    ],
+  });
+  if (!choix || choix === 'annuler') return { points, mode: null, renommes: [] };
+  if (choix === 'ignorer') return { points: sansDoublons(existants, points), mode: 'ignorer', renommes: [] };
+  if (choix === 'renommer') {
+    const { points: renommes, renommes: liste2 } = renommerDoublons(existants, points);
+    return { points: renommes, mode: 'renommer', renommes: liste2 };
+  }
+  return { points, mode: 'garder', renommes: [] };
+}
+
+/**
  * Fichier de points (CSV, TXT) ajouté aux points de contrôle (Projet › Import › « Points de contrôle »,
  * ou Terrain › Contrôle › ⚙). Renvoie { erreur } ou null.
  */
 async function importerPointsControle(fichier) {
   try {
-    const { points, erreurs } = lirePoints(await fichier.text());
+    const { points: lus, erreurs } = lirePoints(await fichier.text());
     // 0.208.0 : le reste du fichier est bien importé même si certains noms existent déjà ; le résumé le dit.
-    const { ajoutes, deja, sansNom } = ajouterPointsControle(projet.pointsControle, points, nouvelIdentifiant);
+    // 0.219.0 : noms déjà pris : on demande (ignorer / renommer / importer quand même).
+    const existants = projet.pointsControle.map((p) => p.nom);
+    const { points, mode, renommes } = await choisirTraitementDoublons(existants, lus, fichier.name);
+    if (mode === null) return { info: '', erreur: '' };
+    const { ajoutes, deja, sansNom } = ajouterPointsControle(projet.pointsControle, points, nouvelIdentifiant, { garderDoublons: mode === 'garder' });
     if (ajoutes > 0) modifie();
     const morceaux = [`${ajoutes} point(s) ajouté(s)`];
+    if (renommes.length > 0) morceaux.push(`${renommes.length} renommé(s) : ${renommes.slice(0, 5).map((r) => `${r.avant} → ${r.apres}`).join(', ')}${renommes.length > 5 ? '…' : ''}`);
     if (deja.length > 0) morceaux.push(`${deja.length} déjà dans la liste, non ajouté(s) : ${deja.slice(0, 10).join(', ')}${deja.length > 10 ? '…' : ''}`);
     if (sansNom > 0) morceaux.push(`${sansNom} sans nom, non ajouté(s)`);
     if (erreurs.length > 0) morceaux.push(`${erreurs.length} ligne(s) illisible(s) : ${erreurs.slice(0, 5).map((e) => `ligne ${e.ligne}`).join(', ')}${erreurs.length > 5 ? '…' : ''}`);

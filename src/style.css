@@ -13593,3 +13593,8 @@ body.theme-sombre .verrou-drive { background: #7f1d1d; color: #fecaca; }
 body.theme-sombre .resultat-controle-plan.vert, body.theme-sombre .etat-controle-plan.vert { background: #14532d; color: #bbf7d0; }
 body.theme-sombre .resultat-controle-plan.orange, body.theme-sombre .etat-controle-plan.orange { background: #7c2d12; color: #fed7aa; }
 body.theme-sombre .resultat-controle-plan.rouge, body.theme-sombre .etat-controle-plan.rouge { background: #7f1d1d; color: #fecaca; }
+
+/* 0.219.0 : applications masquées (appui long sur une tuile › Masquer) et tuile prête à être déplacée. */
+.bouton-masquees { display: block; margin: 10px auto 0; padding: 8px 14px; border: 1px dashed var(--bordure, #94a3b8); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 0.9em; }
+.tuile-appli.pret-a-deplacer { outline: 3px dashed #fff; outline-offset: -6px; animation: pret-deplacer 1s ease-in-out infinite; }
+@keyframes pret-deplacer { 50% { opacity: 0.7; } }
