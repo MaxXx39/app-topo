@@ -32,3 +32,12 @@ export function htmlFichePoint({ nom, liste, lignes }) {
       <table class="table-fiche-point"><tbody>${lignes.map(([titre, valeur]) => `<tr><th>${echapper(titre)}</th><td>${echapper(valeur)}</td></tr>`).join('')}</tbody></table>
     </div>`;
 }
+
+/** HTML de la petite fenêtre d'un calque touché (0.222.0). { planNom, calqueNom }. */
+export function htmlFicheCalque({ planNom, calqueNom }) {
+  return `<div class="encadre-annotation fiche-point" role="dialog" aria-label="Calque ${echapper(calqueNom)}">
+      <div class="entete-encadre-annotation"><strong>${echapper(calqueNom || 'Calque sans nom')}</strong><span>${echapper(planNom ?? '')}</span>
+        <button type="button" class="fermer-encadre-annotation" data-action="fermer-fiche" aria-label="Fermer">×</button></div>
+      <button type="button" class="bouton" data-action="masquer-calque">Masquer ce calque</button>
+    </div>`;
+}

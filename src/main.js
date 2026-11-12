@@ -125,7 +125,8 @@ import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
 import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
 import { htmlEncadreAnnotation } from './annotation/encadre.js';
-import { lignesFichePoint, htmlFichePoint } from './plan/fiche-point.js';
+import { lignesFichePoint, htmlFichePoint, htmlFicheCalque } from './plan/fiche-point.js';
+import { calqueSousLeDoigt } from './topo/calque-sous-doigt.js';
 import { ajouterAnnotation, trouverAnnotation, supprimerAnnotation, listesAnnotation, nettoyerRemarques, precisionSuffisante, estAnnotation, nomProposeAnnotation, dernierAnnotation, PRECISION_TABLETTE_DEPART } from './topo/annotation.js';
 import { applisDisponibles, appliCourante } from './navigation/applis.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
@@ -1137,6 +1138,37 @@ function montrerEncadreAnnotation(nom) {
 /** Ferme la fiche d'un point touché sur le plan (0.220.0). */
 function fermerFichePoint() {
   document.querySelector('#fiche-point-plan')?.remove();
+}
+
+/**
+ * 0.222.0 (Intermédiaire, à valider) : toucher un élément d'un plan DXF / PDF propose de masquer son calque.
+ * Renvoie vrai si un élément est trouvé (la petite fenêtre est ouverte) ; toucher ailleurs la ferme.
+ */
+function montrerFicheCalque(position, tolerance) {
+  fermerFichePoint();
+  if (!aAcces('intermediaire')) return false;
+  const trouve = calqueSousLeDoigt(plansDuProjet(), position, tolerance);
+  if (!trouve) return false;
+  const boite = document.createElement('div');
+  boite.id = 'fiche-point-plan';
+  boite.innerHTML = htmlFicheCalque(trouve);
+  const zone = document.querySelector('.panneau-plan')?.getBoundingClientRect();
+  boite.style.cssText = `position: fixed; z-index: 40; left: 8px; right: 8px; bottom: ${Math.max(8, window.innerHeight - (zone?.bottom ?? window.innerHeight) + 34)}px; display: flex; justify-content: center; pointer-events: none;`;
+  boite.addEventListener('click', (evenement) => {
+    const bouton = evenement.target.closest('[data-action]');
+    if (!bouton) return;
+    if (bouton.dataset.action === 'masquer-calque') {
+      const calque = projet.plansDxf.find((p) => p.id === trouve.planId)?.calques[trouve.calque];
+      if (calque) {
+        calque.visible = false;
+        affichageModifie();
+        afficherMessage(`Calque « ${trouve.calqueNom} » masqué (Plan › calques pour le remettre)`, 4000);
+      }
+    }
+    fermerFichePoint();
+  });
+  document.body.append(boite);
+  return true;
 }
 
 /**
@@ -7378,6 +7410,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
     return true;
   },
   quandToucherFichePoint: (point) => montrerFichePoint(point),
+  quandToucherCalque: (position, tolerance) => montrerFicheCalque(position, tolerance),
   // « Voir toute la ligne » (0.118.0) cochée ou décochée (aussi décochée par « Ma position »).
   quandVoirLigne: (coche) => {
     implanter.voirLigne = coche && Boolean(implanter.ligne);
