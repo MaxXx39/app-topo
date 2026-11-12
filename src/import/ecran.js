@@ -18,7 +18,7 @@ import { prefixeDuNom, sansPrefixe, estSurfaceFichier, origineSurface } from '..
 import { PREFIXE_PDF } from '../topo/pdf-dxf.js';
 import { htmlFormulairePoint, lireFormulairePoint, viderFormulairePoint } from '../outils/formulaire-point.js';
 import { nomPointAjoute } from '../topo/points-ajoutes.js';
-import { COULEURS_LISTES, planDuCadastre, couleurDuCadastre } from '../plan/listes-points.js';
+import { COULEURS_LISTES, planDuCadastre, couleurDuCadastre, htmlEtiquetteNature } from '../plan/listes-points.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
 import { dateHeureDuPoint, jourDuPoint, trierParDate } from '../topo/date-point.js';
@@ -441,12 +441,12 @@ function boutonsArchive(type, id, actionSuppression = null) {
 }
 
 /** Une ligne de la page « Gérer » : pastille de couleur, nom, nature, info, ⚙ qui déplie le menu de la ligne. */
-function ligneGerer({ cle, titre, nature = '', couleur = '#94a3b8', info = '', menu = '', ouverts }) {
+function ligneGerer({ cle, titre, nature = '', categorie = null, couleur = '#94a3b8', info = '', menu = '', ouverts }) {
   const ouvert = ouverts.has(cle);
   return `<div class="ligne-gerer ${ouvert ? 'ouverte' : ''}">
       <div class="entete-ligne-gerer">
         <span class="pastille-gerer" style="background: ${couleur}"></span>
-        <div class="texte-ligne-gerer"><strong>${titre}</strong>${nature ? `<span class="nature-ligne-gerer">${echapper(nature)}</span>` : ''}<span class="aide">${info}</span></div>
+        <div class="texte-ligne-gerer"><strong>${titre}</strong>${categorie ? htmlEtiquetteNature(categorie) : nature ? `<span class="nature-ligne-gerer">${echapper(nature)}</span>` : ''}<span class="aide">${info}</span></div>
         <button type="button" class="bouton-engrenage" data-action="gerer-menu" data-cle="${echapper(cle)}" aria-expanded="${ouvert}" aria-label="Actions : ${echapper(titre)}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
         </button>
@@ -468,7 +468,7 @@ function pageGerer(projet, vue, ouverts) {
     if (controle.length > 0) {
       const photosControle = (projet.photosControle ?? []).filter((photo) => controle.some((p) => p.id === photo.pointId));
       lignes.push(ligneGerer({
-        cle: 'points:controle', titre: 'Points de contrôle', nature: 'Contrôle', couleur: couleurs.get('controle'), info: `${controle.length} points`, ouverts,
+        cle: 'points:controle', titre: 'Points de contrôle', nature: 'Contrôle', categorie: 'controle', couleur: couleurs.get('controle'), info: `${controle.length} points`, ouverts,
         // 0.208.0 : un × par point (Intermédiaire, sans code) ; supprimer toute la liste (Expert).
         menu: `${photosDesPoints(photosControle)}
           <div class="liste-points-gerer seulement-intermediaire">${controle.map((p) => `<div class="ligne-point-gerer"><span>${echapper(p.nom)}</span><button type="button" class="bouton-lien" data-action="enlever-point-controle" data-id="${echapper(p.id)}" aria-label="Enlever ${echapper(p.nom)}">×</button></div>`).join('')}</div>
@@ -484,7 +484,7 @@ function pageGerer(projet, vue, ouverts) {
       const date = leve.direct && leve.importeLe ? ` · créé le ${new Date(leve.importeLe).toLocaleDateString('fr-CH')}` : '';
       const couleurListe = projet.couleursListes?.[leve.id] ?? couleurs.get(categorie);
       lignes.push(ligneGerer({
-        cle: `points:${leve.id}`, titre: echapper(leve.nom), nature: titres.get(categorie) ?? '', couleur: couleurListe, info: `${leve.points.length} points${date}`, ouverts,
+        cle: `points:${leve.id}`, titre: echapper(leve.nom), nature: titres.get(categorie) ?? '', categorie, couleur: couleurListe, info: `${leve.points.length} points${date}`, ouverts,
         menu: `${leve.dediee ? '' : `<label class="champ-gerer">Renommer <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom de la liste" /></label>`}
           <div class="champ-gerer seulement-intermediaire">Couleur ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}</div>
           ${photosDesPoints(photosDuLeve(projet, leve))}
@@ -604,7 +604,7 @@ function blocTableauPoints(projet, etat) {
   const dansLaSelection = listes.filter((l) => choisies.has(l.categorie));
   // 0.204.0 : les listes dans leur propre encadré titré (étiquettes pastel, sans pastille) ; les natures dans un autre.
   const puces = dansLaSelection.length > 0
-    ? `<div class="encadre-points encadre-listes" role="group" aria-label="Listes de points à montrer"><p class="titre-encadre-points">Listes</p><div class="puces-listes">${dansLaSelection.map((l) => `<button type="button" class="puce-liste-points ${etat.listesDecochees.has(l.id) ? '' : 'choisie'}" style="--couleur-liste: ${couleurDeListe.get(l.id)}; --couleur-categorie: ${couleurs.get(l.categorie)}" data-action="tp-liste" data-id="${echapper(l.id)}" aria-pressed="${!etat.listesDecochees.has(l.id)}">${echapper(l.nom)} <small>${l.nombre}</small></button>`).join('')}</div></div>`
+    ? `<div class="encadre-points encadre-listes" role="group" aria-label="Listes de points à montrer"><p class="titre-encadre-points">Listes</p><div class="puces-listes">${dansLaSelection.map((l) => `<button type="button" class="puce-liste-points ${etat.listesDecochees.has(l.id) ? '' : 'choisie'}" style="--couleur-liste: ${couleurDeListe.get(l.id)}; --couleur-categorie: ${couleurs.get(l.categorie)}" data-action="tp-liste" data-id="${echapper(l.id)}" aria-pressed="${!etat.listesDecochees.has(l.id)}">${echapper(l.nom)}${htmlEtiquetteNature(l.categorie)} <small>${l.nombre}</small></button>`).join('')}</div></div>`
     : '';
   const lignes = lignesTriees(projet, etat);
   const titres = new Map(CATEGORIES_POINTS.map(([cle, titre]) => [cle, titre]));

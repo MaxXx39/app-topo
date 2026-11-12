@@ -110,7 +110,9 @@ import {
 } from './topo/leve-direct.js';
 import { segmentCroise, supprimerSegment, ajouterPointExistant, horsDuContour, supprimerPointDuLevee, placeDuPoint, nomDeLigne, suitesLibres, creerLignesDepuisSuites } from './topo/lignes-levee.js';
 import { retirerPointDuProjet, retirerPointDesMesures, texteUsages, usagesDuPoint } from './topo/retirer-point.js';
-import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
+import { installerMesureDuree } from './outils/mesure-duree-ui.js';
+import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur, consommerPointMoyen } from './android/pont.js';
+import { correctionsTropAnciennes } from './topo/age-corrections.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
@@ -309,7 +311,7 @@ if (!recepteurDisponible()) document.body.classList.add('sur-site');
 let navigation = null;
 // Mesure rapide (0.158.0, dès Intermédiaire) : points choisis (jamais enregistrés tant qu'on ne touche pas
 // « Enregistrer »), accroche du toucher, page de chaque tableau.
-const mesureRapideEtat = { points: [], accroche: 'point', pages: { points: 0, cotes: 0 }, candidat: null, fermee: true };
+const mesureRapideEtat = { points: [], accroche: 'point', pages: { points: 0, cotes: 0 }, candidat: null, fermee: true, angles: true }; // angles : 0.214.0, coché au départ
 // Ajout manuel d'un point en touchant le plan (voir plus bas « Édition Lever sur le site ») ; déclaré ici car afficherOnglet le lit.
 const ajoutLevee = { actif: false, accroche: 'point', choix: null };
 // Les parties de l'onglet Calculs (ce sont aussi les noms de leurs panneaux) : Volumes, Mesures /
@@ -429,7 +431,7 @@ function sousApplis() {
 
 /** Sous-applications de Lever (0.161.0) : natures permises par le mode. */
 function sousApplisDeLever() {
-  return [['stock', 'Stock'], ['terrain', 'Terrain'], ['terrassement', 'Terrass.'], ['chantier', 'Chantier'], ['autres', 'Libre']].filter(([c]) => aAcces('intermediaire') || c === 'autres');
+  return [['stock', 'Stock'], ['terrain', 'Terrain'], ['terrassement', 'Terrass.'], ['chantier', 'Chantier'], ['autres', 'Libre']].filter(([c]) => aAcces('intermediaire') || c === 'chantier'); // 0.214.0 : en Base, seulement le Levé chantier
 }
 
 /**
@@ -673,7 +675,7 @@ function afficherMesureRapide() {
   if (mesureRapideEtat.accroche === 'libre') mesureRapideEtat.accroche = 'manuel';
   document.querySelector('#mesure-rapide').innerHTML = htmlMesureRapide({
     mesure, accroche: mesureRapideEtat.accroche, accroches: accrochesMesure(), pages: mesureRapideEtat.pages,
-    manuel: { candidat: Boolean(mesureRapideEtat.candidat), zoom: terrain.zoomLoupe ?? 4 }, fermee: mesureRapideEtat.fermee, accrochesOuvertes: Boolean(mesureRapideEtat.accrochesOuvertes),
+    manuel: { candidat: Boolean(mesureRapideEtat.candidat), zoom: terrain.zoomLoupe ?? 4 }, fermee: mesureRapideEtat.fermee, afficherAngles: mesureRapideEtat.angles, accrochesOuvertes: Boolean(mesureRapideEtat.accrochesOuvertes),
   });
   envoyerImplantationAuPlan();
   plan.rafraichirImplantation();
@@ -766,9 +768,15 @@ function agirMesureRapide(cle) {
   if (cle === 'mesure-raz') return remettreMesureAZero();
   if (cle === 'mesure-export') return exporterMesureRapide();
   if (cle !== 'mesure-gnss') return undefined;
-  const position = etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null;
-  if (!position || etatRecepteur.qualite !== 4 || !etatRecepteur.inclinaisonPrete) {
+  // 0.214.0 : point moyen d'une mesure de durée (déjà vérifié à chaque lecture), sinon la position en direct.
+  const moyen = consommerPointMoyen();
+  const position = moyen ?? (etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null);
+  if (!moyen && (!position || etatRecepteur.qualite !== 4 || !etatRecepteur.inclinaisonPrete)) {
     refuser('Point GNSS refusé : il faut le RTK fixe et l\'inclinaison prête');
+    return undefined;
+  }
+  if (!moyen && correctionsTropAnciennes(etatRecepteur.ageCorrections)) {
+    refuser(`Point GNSS refusé : corrections trop anciennes (${Math.round(etatRecepteur.ageCorrections)} s, 2 s au plus)`);
     return undefined;
   }
   ajouterPointMesure({ est: position.est, nord: position.nord, altitude: position.altitude ?? null });
@@ -938,13 +946,19 @@ function poserPositionAnnotation({ est, nord, altitude, source, precision }) {
 }
 
 function prendreGnssAnnotation() {
-  const position = etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null;
-  if (!position || etatRecepteur.qualite !== 4 || !etatRecepteur.inclinaisonPrete) {
+  // 0.214.0 : point moyen d'une mesure de durée, sinon la position en direct (corrections de 2 s au plus).
+  const moyen = consommerPointMoyen();
+  const position = moyen ?? (etatRecepteur?.connecte && etatRecepteur.recu ? etatRecepteur.position : null);
+  if (!moyen && (!position || etatRecepteur.qualite !== 4 || !etatRecepteur.inclinaisonPrete)) {
     refuser('Point GNSS refusé : il faut le RTK fixe et l\'inclinaison prête');
     return;
   }
+  if (!moyen && correctionsTropAnciennes(etatRecepteur.ageCorrections)) {
+    refuser(`Point GNSS refusé : corrections trop anciennes (${Math.round(etatRecepteur.ageCorrections)} s, 2 s au plus)`);
+    return;
+  }
   vibrer(30);
-  poserPositionAnnotation({ est: position.est, nord: position.nord, altitude: position.altitude ?? null, source: 'gnss', precision: etatRecepteur.precisionH ?? null });
+  poserPositionAnnotation({ est: position.est, nord: position.nord, altitude: position.altitude ?? null, source: 'gnss', precision: moyen?.precisionH ?? etatRecepteur.precisionH ?? null });
 }
 
 function prendreTabletteAnnotation() {
@@ -1211,6 +1225,9 @@ document.querySelector('#mesure-rapide').addEventListener('click', (evenement) =
   const action = bouton.dataset.action;
   if (action === 'basculer-accroches-mesure') {
     mesureRapideEtat.accrochesOuvertes = !mesureRapideEtat.accrochesOuvertes;
+    afficherMesureRapide();
+  } else if (action === 'basculer-angles-mesure') {
+    mesureRapideEtat.angles = !mesureRapideEtat.angles;
     afficherMesureRapide();
   } else if (action === 'basculer-ferme-mesure') {
     mesureRapideEtat.fermee = !mesureRapideEtat.fermee;
@@ -1509,14 +1526,16 @@ function afficherOnglet(demande, { partie = null } = {}) {
     }
     ongletContexte = nom;
     if (nom !== 'terrain') piloterBip(null);
-    // 0.208.0 : hors du Terrain, le plan n'est plus pâli autour du travail (il le restait en revenant dans Plan).
-    if (nom !== 'terrain') plan.palirAutour(null);
     recalculer();
   }
+  // 0.208.0 / 0.214.0 : le plan n'est pâli autour du travail que dans le Terrain ; dans l'application Plan (qui garde le
+  // contexte d'avant) et ailleurs il est normal, et il le redevient en revenant dans le Terrain.
+  plan.palirAutour(nom === 'terrain' && ongletContexte === 'terrain' ? travailAGarder() : null);
   mettreAJourToucheVolume();
   rattraperEcrans();
   // 0.126.0 : le suivi de la position revient tout seul dans Terrain ; Calculs cadre sur le volume.
-  plan.retourAutomatiqueDuSuivi(ongletContexte === 'terrain');
+  plan.retourAutomatiqueDuSuivi(ongletContexte === 'terrain' && nom !== 'plan');
+  plan.autoriserRecentrageAuto(nom !== 'plan'); // 0.214.0 : pas de recentrage automatique dans l'application Plan
   if (entreDansCalculs) cadrerSurCalculs();
   if (nom === 'mesure-rapide') afficherMesureRapide();
   if (nom === 'annotation') afficherAnnotation();
@@ -2768,6 +2787,11 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         afficherMessage(`Ligne décalée créée dans « ${resultat.levee.nom} »`, 3000);
         modifie();
       },
+      // 0.214.0 : grand bouton « Retour » de la fiche d'un point choisi : on peut en toucher un autre.
+      changerPoint: () => {
+        implanter.choix = null;
+        montrerImplantation();
+      },
       changerLigne: () => {
         implanter.ligne = null;
         implanter.ligneAValider = false;
@@ -3297,7 +3321,7 @@ function envoyerImplantationAuPlan() {
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : [],
-        mesureRapide: mesureRapideActive() ? mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee }) : null,
+        mesureRapide: mesureRapideActive() ? { ...mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee }), afficherAngles: mesureRapideEtat.angles } : null,
       }
     : null);
   gererLoupeImplantation();
@@ -8048,7 +8072,7 @@ function mettreAJourPastilleControle() {
   pastille.id = 'pastille-controle';
   pastille.type = 'button';
   pastille.className = 'pastille-controle';
-  pastille.textContent = 'Contrôle à refaire';
+  pastille.innerHTML = '<span>Contrôle</span><span>à refaire</span>'; // 0.214.0 : sur le tiers bas du logo du récepteur
   pastille.setAttribute('aria-label', 'Contrôle à refaire : ouvrir le Contrôle');
   pastille.addEventListener('click', () => {
     terrain.mode = 'autocontrole';
@@ -8059,6 +8083,13 @@ function mettreAJourPastilleControle() {
   (document.querySelector('.entete') ?? document.body).append(pastille);
 }
 setInterval(mettreAJourPastilleControle, 1000);
+
+// 0.214.0 : mesure de durée (appui long sur « Enreg. » : 5 / 15 / 30 s) ; en Contrôle, 5 s d'office.
+installerMesureDuree({
+  disponible: () => recepteurDisponible() && Boolean(etatRecepteur?.connecte),
+  dureeParDefaut: () => (enAutocontrole() && document.body.dataset.onglet === 'terrain' ? 5 : 0),
+  refuser: (texte) => refuser(texte),
+});
 
 // Rappel du contrôle aussi pendant le travail (0.90.0) : GNSS connecté, une fois la durée entre deux
 // contrôles passée depuis le dernier rappel (pas seulement à la connexion du récepteur).

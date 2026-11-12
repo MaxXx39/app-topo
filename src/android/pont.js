@@ -114,7 +114,43 @@ export const deconnecterRecepteur = () => window.AppliAndroid.deconnecterRecepte
  * Point à prendre maintenant (MN95 / RAN95), vérifié par l'appli Android : RTK fixe et
  * inclinaison prête. Renvoie { ok: true, point } ou { ok: false, raison }.
  */
+let pointPrepare = null; // 0.214.0 : point moyen d'une mesure de durée, remis une seule fois au prochain « prendre un point »
+
+/** Range le point moyen d'une mesure de durée : le prochain prendrePointRecepteur() le rend (une fois, 3 s au plus). */
+export function preparerPointMoyenne(point) {
+  pointPrepare = { point, jusqua: Date.now() + 3000 };
+}
+
+/** Vrai si un point moyen est prêt (le clic qui suit la mesure doit passer sans relancer une mesure). */
+export function pointMoyenPret() {
+  return Boolean(pointPrepare && Date.now() <= pointPrepare.jusqua);
+}
+
+/** Rend le point moyen préparé (une seule fois), ou null : pour les écrans qui lisent la position en direct (Mesure rapide, Annotation). */
+export function consommerPointMoyen() {
+  if (!pointMoyenPret()) return null;
+  const { point } = pointPrepare;
+  pointPrepare = null;
+  return point;
+}
+
+/** Oublie le point moyen préparé (s'il n'a pas servi). */
+export function viderPointPrepare() {
+  pointPrepare = null;
+}
+
 export function prendrePointRecepteur() {
+  if (pointMoyenPret()) {
+    const { point } = pointPrepare;
+    pointPrepare = null;
+    return { ok: true, point };
+  }
+  pointPrepare = null;
+  return lirePointRecepteur();
+}
+
+/** Une lecture du récepteur, vérifiée (RTK fixe, inclinaison prête, corrections de moins de 2 s) : { ok, point } ou { ok: false, raison }. */
+export function lirePointRecepteur() {
   try {
     const reponse = JSON.parse(window.AppliAndroid.prendrePoint());
     // 0.213.0 : corrections NTRIP de plus de 2 s : le point est refusé (partout : Lever, Implanter, Contrôle, Annotation…).

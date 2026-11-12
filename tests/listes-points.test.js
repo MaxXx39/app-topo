@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, LISTE_MESURES, planDuCadastre, lierCadastres, COULEUR_CADASTRE } from '../src/plan/listes-points.js';
+import { listesDePoints, htmlEtiquetteNature, pointsDesListes, montrerListe, mesuresVisibles, LISTE_MESURES, planDuCadastre, lierCadastres, COULEUR_CADASTRE } from '../src/plan/listes-points.js';
 
 const pt = (nom) => ({ nom, est: 0, nord: 0, altitude: 0 });
 
@@ -102,5 +102,21 @@ describe('Cadastre : points et lignes ensemble, une seule couleur (0.116.4)', ()
 
   it('sans plan DXF : pas de case Lignes', () => {
     expect(listesDePoints(projetCadastre(null))[0]).toMatchObject({ planId: null, couleur: COULEUR_CADASTRE });
+  });
+});
+
+describe('étiquette de nature des listes (0.214.0)', () => {
+  it('chaque liste a sa catégorie : stock, libre, importé, chantier…', () => {
+    const projet = projetEssai();
+    projet.autres.push({ id: 'ch', nom: 'LV-Chambres', nature: 'chantier', leveId: 'j', contour: [], lignesRupture: [], points: [] });
+    const categories = Object.fromEntries(listesDePoints(projet).map((l) => [l.id, l.categorie]));
+    expect(categories).toMatchObject({ s1: 'stock', o1: 'libre', f: 'import', a: 'import', ch: 'chantier' });
+    expect(categories.lx).toBeNull(); // surface importée : pas d'étiquette
+  });
+
+  it('html : texte court et couleur ; vide sans catégorie', () => {
+    expect(htmlEtiquetteNature('terrassement')).toContain('Terrass.');
+    expect(htmlEtiquetteNature('chantier')).toContain('#0f766e');
+    expect(htmlEtiquetteNature(null)).toBe('');
   });
 });

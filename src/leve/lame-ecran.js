@@ -71,7 +71,6 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
     : '<button type="button" class="bouton-secondaire" data-action="inverserLame" title="Inverser gauche et droite">⇄ Inverser G / D</button>';
   const vue = ['plan1', 'plan2', 'coupes'].includes(donnees.vue) ? donnees.vue : 'plan2';
   const coupeSeule = donnees.coupeSeule === 'long' ? 'long' : 'gd';
-  const indic = donnees.indic === 'regle' ? 'regle' : 'exterieur';
   const marges = donnees.marges ?? { gauche: 1, droite: 1, devant: 2, derriere: 2 };
   const puce = (action, cle, titre, actif) => `<button type="button" class="puce-choix ${actif ? 'actif' : ''}" data-action="${action}" data-valeur="${cle}" aria-pressed="${actif}">${titre}</button>`;
   const champMarge = (cle, titre) => `<label>${titre} <input type="text" inputmode="decimal" data-marge-lame="${cle}" value="${Number(marges[cle] ?? 0).toFixed(1)}" /> m</label>`;
@@ -80,10 +79,6 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
         <p class="titre-choix">Vue</p>
         ${VUES.map(([cle, titre]) => puce('choisirVueLame', cle, titre, vue === cle)).join('')}
         ${vue === 'plan1' ? `<span class="aide">coupe :</span>${puce('choisirCoupeLame', 'gd', 'G – D', coupeSeule === 'gd')}${puce('choisirCoupeLame', 'long', 'Arr – Av', coupeSeule === 'long')}` : ''}
-      </div>
-      <div class="reglages-outil">
-        <p class="titre-choix">Triangles et valeurs</p>
-        ${puce('choisirIndicLame', 'exterieur', 'À côté de la règle', indic !== 'regle')}${puce('choisirIndicLame', 'regle', 'Sur la règle', indic === 'regle')}
       </div>
       ${nombreGnss}
       <div class="reglages-outil">${bords}</div>
@@ -115,7 +110,7 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
       ${grosse('grader', 'Grader')}${grosse('bull', 'Bull')}${grosse('rateau', 'Râteau')}
     </div>`;
   }
-  return `<div data-machine="${machine}" class="ecran-lame ${indic === 'regle' ? 'essai-sur-regle' : 'essai-exterieur'} ${machine === 'rateau' ? '' : 'lame-un-point'}">
+  return `<div data-machine="${machine}" class="ecran-lame essai-exterieur ${machine === 'rateau' ? '' : 'lame-un-point'}">
     <div class="ligne-lame">
       ${surfaces.length > 0
         ? `<select data-champ="surface-lame" aria-label="Surface à suivre">
@@ -138,14 +133,12 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
       ${COUPES.filter(([cle]) => vue !== 'plan1' || cle === coupeSeule).map(([cle, titre]) => `<section class="bloc-coupe-guidage" data-coupe="${cle}">
         <p class="titre-coupe-guidage">${titre}</p>
         <div class="corps-coupe-guidage">
-          <div class="colonne-regle" data-vivant="lame-${cle}-regle-gauche">${htmlRegleHauteur(null)}</div>
-          <div class="indic-coupe gauche attente" data-vivant="lame-${cle}-gauche"></div>
+          <div class="colonne-regle" data-vivant="lame-${cle}-regle-gauche">${bandeauRegle(null, '')}${htmlRegleHauteur(null)}</div>
           <div class="coupe-guidage zone-coupe">
             <div data-vivant="lame-${cle}-coupe"></div>
             ${controlesEchelleCoupe('', donnees.exagerationCoupe ?? 1, 'changerLargeurCoupeLame', 'changerHauteurCoupeLame', `lame-${cle}-largeur`)}
           </div>
-          <div class="indic-coupe droite attente" data-vivant="lame-${cle}-droite"></div>
-          <div class="colonne-regle" data-vivant="lame-${cle}-regle-droite">${htmlRegleHauteur(null)}</div>
+          <div class="colonne-regle" data-vivant="lame-${cle}-regle-droite">${bandeauRegle(null, '')}${htmlRegleHauteur(null)}</div>
         </div>
         <p class="pied-coupe-guidage" data-vivant="lame-${cle}-pied"></p>
       </section>`).join('')}
@@ -187,10 +180,20 @@ function placeSilhouette(a, b, x, y) {
   return { x: (xa + xb) / 2, y: (ya + yb) / 2, angle, echelle: Math.max(0.05, largeur / 80) };
 }
 
-/** Triangle pointe en haut (monter) ou en bas (descendre), en SVG (0.152.0, à côté de la règle). */
-function triangle(ecart) {
-  const haut = ecart >= 0;
-  return `<svg class="triangle-coupe" viewBox="0 0 40 36" aria-hidden="true"><path d="${haut ? 'M20 2 38 34H2Z' : 'M20 34 38 2H2Z'}" /></svg>`;
+/**
+ * Bandeau au-dessus d'une règle (0.214.0) : « ▲ MONTER 7.0 cm » (rouge), « ▼ DESCENDRE 6.0 cm » (bleu), « ● OK » (vert) ou la
+ * valeur seule (orange). Tant que l'écart reste dans la tolérance orange, aucune direction n'est donnée : l'affichage ne saute
+ * plus entre monter et descendre près de la surface. point : { ecart (m, + = monter), classe } ou null ; nom : nom du bout (G, D…).
+ */
+export function bandeauRegle(point, nom = '') {
+  const bout = nom ? `<span class="nom-bout-regle">${nom}</span>` : '';
+  if (!point || point.ecart == null) return `<div class="instruction-regle attente">${bout}<b>—</b><small>${point ? 'hors' : ''}</small></div>`;
+  const cm = (Math.abs(point.ecart) * 100).toFixed(1);
+  if (point.classe === 'vert') return `<div class="instruction-regle ok">${bout}<b>● OK</b><small>±${cm} cm</small></div>`;
+  if (point.classe === 'orange') return `<div class="instruction-regle proche">${bout}<b>${cm}</b><small>cm</small></div>`;
+  return point.ecart > 0
+    ? `<div class="instruction-regle monter">${bout}<b>▲ MONTER</b><small>${cm} cm</small></div>`
+    : `<div class="instruction-regle descendre">${bout}<b>▼ DESCENDRE</b><small>${cm} cm</small></div>`;
 }
 
 /**
@@ -215,19 +218,12 @@ export function rafraichirLame(conteneur, vivant) {
     for (const [cote, nom] of [['gauche', milieu ? 'Milieu' : nomGauche], ['droite', nomDroite]]) {
       const point = milieu ? (cote === 'gauche' ? guidage.milieu : null) : guidage?.[cote];
       if (milieu && cote === 'droite') {
-        zone(`lame-${cle}-${cote}`).classList.add('masque');
         zone(`lame-${cle}-regle-${cote}`).classList.add('masque');
         continue;
       }
-      const element = zone(`lame-${cle}-${cote}`);
-      // 0.152.0 : triangle en haut (pointe en haut = monter), valeur en bas, nom du bout dessous.
-      element.className = `indic-coupe ${cote} ${point?.classe ? `ecart-${point.classe}` : 'attente'}`;
-      element.innerHTML = `${point?.ecart != null ? triangle(point.ecart) : '<span class="triangle-vide"></span>'}
-        <strong>${point?.ecart != null ? (Math.abs(point.ecart) * 100).toFixed(1) : '—'}</strong>
-        <span class="unite-coupe">${point?.ecart != null ? 'cm' : (point ? 'hors' : '')}</span>
-        <span class="nom-bout">${nom}</span>`;
-      // Règle de hauteur (0.107.0) : à gauche du bout gauche, à droite du bout droit.
-      zone(`lame-${cle}-regle-${cote}`).innerHTML = htmlRegleHauteur(point?.ecart ?? null, vivant.toleranceVert ?? 0.02);
+      // 0.214.0 (maquette 1 B du 12.11) : la règle de hauteur (0.107.0) porte au-dessus son instruction (MONTER, OK, DESCENDRE) ;
+      // plus de colonnes de chiffres « bord G / bord D » à côté de la coupe.
+      zone(`lame-${cle}-regle-${cote}`).innerHTML = `${bandeauRegle(point, nom)}${htmlRegleHauteur(point?.ecart ?? null, vivant.toleranceVert ?? 0.02)}`;
     }
     // Hauteur du dessin selon la vue (0.152.0) : plus haute sans plan, plus étroite à 2 coupes côte à côte.
     const cadre = zone(`lame-${cle}-coupe`);

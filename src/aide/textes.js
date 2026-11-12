@@ -6,13 +6,13 @@ export const TEXTES_AIDE = {
   annotation:
     'Annotation : pose un point (Manuel = loupe sur le plan, GNSS, ou GPS tablette à 3 m ou mieux). En bas : photo (on peut dessiner dessus), ↶ efface le dernier, ID et remarque, Enreg. point. Liste « Annot-date ».',
   mesureRapide:
-    'Mesure rapide : touche des points sur le plan (accroche en bas, ou GNSS). 2 points : longueur, Δh, pente. 3 et plus : case « Figure fermée » (périmètre, surface) ou ligne ouverte (longueur du chemin). « Enregistrer » ou « Exporter » (PDF, DXF).',
+    'Mesure rapide : touche des points sur le plan (accroche en bas, ou GNSS). 2 points : longueur, Δh, pente. 3 et plus : case « Figure fermée » (périmètre, surface) ou ligne ouverte (longueur du chemin), angles en degrés (colonne Angle, et sur le plan si la case est cochée). « Enregistrer » ou « Exporter » (PDF, DXF).',
   applications:
     'Menu de départ : touche une tuile (ou sa sous-application en petit) pour ouvrir l\'application. Appui long = déplacer la tuile ; ★ = favori. Réglages et « Fermer l\'appli » en bas.',
   projets:
     'Projets enregistrés sur cet appareil (📱) ou sur Drive (☁). « Changer » les liste, « + Nouveau » en crée un, ⋮ renomme (projet ouvert), exporte, duplique ou supprime. Réglages de l\'appareil : tuile Réglages du menu.',
   lame:
-    'Guidage (Expert) : choisis la machine puis la surface à suivre. Flèches : monter ou descendre ; vert ≤ 2 cm, orange ≤ 5 cm. Réglages dans ⚙ (1 ou 2 GNSS, G / D, distances, vues).',
+    'Guidage (Expert) : choisis la machine puis la surface à suivre. Au-dessus de chaque règle : MONTER (rouge) ou DESCENDRE (bleu) ; OK (vert) dans la tolérance ; entre les deux, seule la valeur (orange) pour que l\'affichage ne saute pas ; vert ≤ 2 cm, orange ≤ 5 cm. Réglages dans ⚙ (1 ou 2 GNSS, G / D, distances, vues).',
   partage:
     'Projets sur Google Drive. Une seule main par projet : verte = tu enregistres, grise ou rouge = lecture seule. Prendre la main à un autre appareil : Expert et code. Nuage en tête d\'écran : vert = à jour, rouge barré = hors ligne, gris barré = Google non connecté ; touche-le pour ouvrir les réglages Drive.',
   cartouche:

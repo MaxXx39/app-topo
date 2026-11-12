@@ -47,9 +47,9 @@ const IMPLANTATIONS = [
   ['altitude', 'Altitude', true], // 0.106 : on tape l'altitude voulue, monter / descendre (tous les modes)
   ['talus', 'Talus', true], // tout à droite (demande du 26.10.2026)
 ];
-// Talus : Expert seulement. Base : on ne lève que des « Levé libre » (points seulement).
+// Talus : Expert seulement. Base : Lever = seulement le Levé chantier (0.214.0).
 const IMPLANTATIONS_EXPERT = ['talus'];
-const NATURES_BASE = ['autres'];
+const NATURES_BASE = ['chantier']; // 0.214.0 (demande du 12.11) : en Base, Lever = seulement le Levé chantier
 // 0.144.0 (liste du 05.11, point 5) : une seule coupe à la fois (plus de « Les 2 »).
 // 0.189.3 (maquette A du 10.11) : symbole dans chaque bouton : flèche grise = ma direction, trait = la coupe, de la couleur
 // qu'elle a sur le plan (perpendiculaire violet, dans l'axe rose).
@@ -697,12 +697,12 @@ export function creerEcranLeve(conteneur, actions) {
     // 0.137.0 : ligne touchée sur le plan : fiche (nom, longueur) et « Implanter » avant le guidage.
     const fiche = imp.ligneAValider && imp.ligne
       ? `<div class="choix-implantation fiche-ligne">
+          <button type="button" class="bouton-retour-grand" data-action="changerLigne" aria-label="Retour : choisir une autre ligne"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg><span>Retour</span></button>
           <p class="coordonnees-choix"><strong>${echapper(imp.ligne.nom)}</strong> <span class="aide">· long. ${formaterNombre(imp.ligne.longueur)} m</span></p>
           <div class="ligne-outils">
             <button type="button" class="bouton bouton-implanter" data-action="implanterLigneChoisie">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></svg>Implanter</button>
             <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="decalerLigneChoisie" title="Créer une copie décalée de cette ligne">Décaler…</button>
-            <button type="button" class="bouton-lien bouton-lien-neutre" data-action="changerLigne">en toucher une autre</button>
           </div>
         </div>`
       : '';
@@ -789,6 +789,7 @@ export function creerEcranLeve(conteneur, actions) {
     const { implanter: imp } = donnees;
     const choix = imp.choix
       ? `<div class="choix-implantation">
+          <button type="button" class="bouton-retour-grand" data-action="changerPoint" aria-label="Retour : choisir un autre point"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg><span>Retour</span></button>
           <p class="coordonnees-choix">${imp.choix.nom ? `<strong>${echapper(imp.choix.nom)}</strong> ` : ''}<span class="coord-en">E ${formaterNombre(imp.choix.est)} · N ${formaterNombre(imp.choix.nord)}</span></p>
           <div class="champs-implantation">
             <label>Nom<input type="text" data-champ="nom-implantation" value="${echapper(imp.nomPropose)}" autocomplete="off" autocapitalize="characters" /></label>

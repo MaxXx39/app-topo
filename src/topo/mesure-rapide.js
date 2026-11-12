@@ -4,7 +4,10 @@
 // - 2 points et plus : pour chaque côté, longueur à plat (2D), longueur 3D = √(2D² + Δh²),
 //   Δh = altitude d'arrivée − altitude de départ, pente = Δh ÷ longueur 2D × 100 (%) ;
 // - 3 points et plus : la figure est fermée (le dernier point revient au premier) : périmètre 2D et 3D,
-//   surface à plat (2D, formule du lacet) et surface inclinée (3D : somme des triangles de la figure).
+//   surface à plat (2D, formule du lacet) et surface inclinée (3D : somme des triangles de la figure) ;
+// - 3 points et plus (0.214.0) : angle à chaque sommet, en degrés décimaux, à plat (2D). Ligne ouverte : angle entre les deux côtés
+//   voisins (0 à 180°), aux points du milieu seulement. Figure fermée : angle intérieur de la figure à chaque sommet (0 à 360°,
+//   plus de 180° pour un coin rentrant ; la somme fait (n − 2) × 180°).
 // Coordonnées MN95 en mètres. Sans altitude, les valeurs 3D, Δh et pente sont null (jamais inventées).
 
 /** Longueur à plat (m) entre deux points { est, nord }. */
@@ -23,6 +26,40 @@ export function valeursCote(a, b) {
   if (!aAltitude(a) || !aAltitude(b)) return { longueur2d: l2d, longueur3d: null, deltaH: null, pente: null };
   const deltaH = b.altitude - a.altitude;
   return { longueur2d: l2d, longueur3d: Math.hypot(l2d, deltaH), deltaH, pente: l2d > 0 ? (deltaH / l2d) * 100 : null };
+}
+
+/**
+ * Angles de la figure en degrés décimaux : tableau de n valeurs (null = pas d'angle à ce point). 3 points au moins, sinon tout est null.
+ * Ligne ouverte : angle géométrique au point (0 à 180°) pour les points du milieu, null aux deux bouts. Figure fermée : angle intérieur
+ * à chaque sommet. null aussi si deux points voisins sont confondus en plan.
+ */
+export function anglesDeLaFigure(points, fermee = true) {
+  const n = points.length;
+  const angles = new Array(n).fill(null);
+  if (n < 3) return angles;
+  let sens = 1; // +1 : figure dans le sens trigonométrique (Est, Nord), −1 : sens inverse
+  if (fermee) {
+    let double = 0;
+    for (let i = 0; i < n; i += 1) {
+      const a = points[i];
+      const b = points[(i + 1) % n];
+      double += a.est * b.nord - b.est * a.nord;
+    }
+    if (double < 0) sens = -1;
+  }
+  const debut = fermee ? 0 : 1;
+  const fin = fermee ? n : n - 1;
+  for (let i = debut; i < fin; i += 1) {
+    const a = points[(i + n - 1) % n];
+    const b = points[i];
+    const c = points[(i + 1) % n];
+    const [abE, abN, bcE, bcN] = [b.est - a.est, b.nord - a.nord, c.est - b.est, c.nord - b.nord];
+    if (Math.hypot(abE, abN) === 0 || Math.hypot(bcE, bcN) === 0) continue;
+    // Virage en b, de la direction a→b vers b→c (−180 à 180°, + à gauche).
+    const virage = (Math.atan2(abE * bcN - abN * bcE, abE * bcE + abN * bcN) * 180) / Math.PI;
+    angles[i] = fermee ? 180 - sens * virage : 180 - Math.abs(virage);
+  }
+  return angles;
 }
 
 /** Surface à plat (m², toujours positive) d'un polygone fermé (formule du lacet). */
@@ -122,5 +159,5 @@ export function mesureRapide(points, { fermee = true } = {}) {
       surface3d: avecAltitudes ? trianglesDuPolygone(points).reduce((total, [a, b, c]) => total + surfaceTriangle3d(points[a], points[b], points[c]), 0) : null,
     };
   }
-  return { points, cotes, longueur2d: total2d, longueur3d: total3d, ferme, ouverte };
+  return { points, cotes, longueur2d: total2d, longueur3d: total3d, ferme, ouverte, angles: anglesDeLaFigure(points, !ouverte) };
 }

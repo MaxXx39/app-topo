@@ -31,7 +31,7 @@ import { lignesDesPlans } from '../topo/drapage.js';
 import { dessinerPlansDxf as dessinerCanvasDxf, COULEURS_PLANS, surImageChargee } from './dxf-canvas.js';
 import { creerLoupe } from './loupe.js';
 import { echapper } from '../outils/echapper.js';
-import { COULEURS_LISTES, SECTIONS } from './listes-points.js';
+import { COULEURS_LISTES, SECTIONS, htmlEtiquetteNature } from './listes-points.js';
 import { jourDuPoint } from '../topo/date-point.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { couleurDuType } from '../topo/types-dxf.js';
@@ -1824,6 +1824,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // l'allume (onglet Terrain). retourSuivi = { mode, depuis: position au moment de l'arrêt } ou null.
   let retourSuivi = null;
   let retourSuiviActif = false;
+  // 0.214.0 (demande du 12.11) : dans l'application Plan, ni cap automatique ni recentrage sur la première position ;
+  // seul le bouton « Ma position » fait suivre. Les autres applications gardent le recentrage automatique.
+  let recentrageAuto = true;
   let dernierToucher = 0;
   // 0.137.0 : un point ou une ligne choisi en Implanter, pas encore validé : le suivi est arrêté et ne
   // revient pas tout seul (on voit ce qu'on a touché) ; « Implanter » le rend tout de suite.
@@ -2061,7 +2064,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const ligne = (l) => {
       const reglages = REGLAGES_LISTE[l.section] ?? [];
       const entete = `<input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} aria-label="Afficher ${echapper(l.nom)}" />
-          <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span class="nom-liste-menu">${echapper(l.nom)}</span>`;
+          <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span class="nom-liste-menu">${echapper(l.nom)}</span>${htmlEtiquetteNature(l.categorie)}`;
       if (reglages.length === 0 && !l.couleurModifiable) return `<div class="ligne-menu-plan"><label class="oeil-plan">${entete}</label></div>`;
       const cases = reglages.map(([cle, titre, n]) => `<label class="case ${n ? `seulement-${n}` : ''}"><input type="checkbox" data-reglage-liste="${cle}" data-id="${l.id}" ${reglageListe(cle, l.id) ? 'checked' : ''} /> ${titre}</label>`).join('');
       const couleur = l.couleurModifiable ? `<div class="couleur-liste-menu"><span>Couleur</span>${paletteCouleur({ couleur: l.couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${l.id}"`, nom: `Couleur de ${l.nom}` })}</div>` : '';
@@ -2528,7 +2531,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       // 0.153.0 : GPS de la tablette (sans GNSS) : aucun centrage automatique (cap auto, retour du
       // suivi, première position) ; seul « Ma position » fait suivre.
       const gpsInterne = Boolean(position?.tablette);
-      const decision = gpsInterne ? null : decisionCapAuto(capAuto, { pret: Boolean(position?.prete), suivi, occupe: Boolean(ligneVue) || suiviSuspendu });
+      const decision = gpsInterne || !recentrageAuto ? null : decisionCapAuto(capAuto, { pret: Boolean(position?.prete), suivi, occupe: Boolean(ligneVue) || suiviSuspendu });
       if (decision === 'cap') {
         changerSuivi('cap');
         if (position.azimut != null && vue) {
@@ -2552,7 +2555,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
       // Suivi : on ne recentre (et ne redessine tout) que si la position s'approche du bord.
       if (position && suivi === 'cap' && position.azimut != null && vue && Math.abs(ecartAngle(position.azimut, vue.rotation ?? 0)) > 3) tournerVers(position.azimut);
-      else if (position && (!vue || (suivi !== 'libre' && loinDuCentre()) || (premiere && points.length === 0 && !gpsInterne))) centrerSurPosition();
+      else if (position && (!vue || (suivi !== 'libre' && loinDuCentre()) || (premiere && points.length === 0 && !gpsInterne && recentrageAuto))) centrerSurPosition();
       else dessinerPosition();
     },
     /**
@@ -2662,6 +2665,10 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       }
       suiviSuspendu = false;
       dernierToucher = 0;
+    },
+    /** 0.214.0 : faux dans l'application Plan (pas de recentrage automatique), vrai ailleurs. */
+    autoriserRecentrageAuto(oui) {
+      recentrageAuto = Boolean(oui);
     },
     retourAutomatiqueDuSuivi(actif) {
       if (actif && !retourSuiviActif) dernierToucher = 0;

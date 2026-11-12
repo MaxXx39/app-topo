@@ -1,6 +1,7 @@
 // Mesure rapide (0.158.0) : longueurs 2D / 3D, Δh, pente %, périmètres, surfaces 2D / 3D.
 import { describe, it, expect } from 'vitest';
-import { mesureRapide, valeursCote, surface2d, trianglesDuPolygone } from '../src/topo/mesure-rapide.js';
+import { mesureRapide, valeursCote, surface2d, trianglesDuPolygone, anglesDeLaFigure } from '../src/topo/mesure-rapide.js';
+import { arcAngle } from '../src/plan/mesure-rapide.js';
 import { rangerMesureRapide, NOM_LEVE_MESURES_RAPIDES } from '../src/topo/mesure-rapide-levee.js';
 import { pdfMesureRapide, dxfMesureRapide, lignesResume } from '../src/export/mesure-rapide.js';
 import { creerProjet } from '../src/projet/projet.js';
@@ -122,5 +123,62 @@ describe('ligne ouverte (0.186.0)', () => {
     const projet = creerProjet('t');
     const r = rangerMesureRapide(projet, pts, new Set(), { fermee: false });
     expect(r.levee.lignesRupture[0].fermee).toBe(false);
+  });
+});
+
+describe('angles (0.214.0, degrés décimaux)', () => {
+  const p = (est, nord) => ({ est, nord });
+  const carreAntiHoraire = [p(0, 0), p(10, 0), p(10, 10), p(0, 10)];
+
+  it('moins de 3 points : pas d\'angle', () => {
+    expect(anglesDeLaFigure([p(0, 0), p(1, 1)])).toEqual([null, null]);
+    expect(mesureRapide([p(0, 0)]).angles).toEqual([null]);
+  });
+
+  it('carré fermé : 90° à chaque sommet, dans les deux sens de parcours', () => {
+    for (const points of [carreAntiHoraire, [...carreAntiHoraire].reverse()]) {
+      for (const a of anglesDeLaFigure(points, true)) expect(a).toBeCloseTo(90, 9);
+    }
+  });
+
+  it('triangle fermé : la somme vaut 180°', () => {
+    const angles = anglesDeLaFigure([p(0, 0), p(4, 0), p(0, 3)], true);
+    expect(angles.reduce((t, a) => t + a, 0)).toBeCloseTo(180, 9);
+    expect(angles[1]).toBeCloseTo(36.8699, 3);
+  });
+
+  it('figure en L : le coin rentrant fait 270° et la somme vaut (n − 2) × 180°', () => {
+    const l = [p(0, 0), p(6, 0), p(6, 2), p(2, 2), p(2, 6), p(0, 6)];
+    const angles = anglesDeLaFigure(l, true);
+    expect(angles[3]).toBeCloseTo(270, 9);
+    expect(angles.reduce((t, a) => t + a, 0)).toBeCloseTo(4 * 180, 9);
+    expect(anglesDeLaFigure([...l].reverse(), true).reduce((t, a) => t + a, 0)).toBeCloseTo(4 * 180, 9);
+  });
+
+  it('ligne ouverte : angle seulement aux points du milieu, entre 0 et 180°', () => {
+    const angles = anglesDeLaFigure([p(0, 0), p(10, 0), p(10, 10)], false);
+    expect(angles[0]).toBeNull();
+    expect(angles[2]).toBeNull();
+    expect(angles[1]).toBeCloseTo(90, 9);
+    // Tout droit : 180°.
+    expect(anglesDeLaFigure([p(0, 0), p(5, 0), p(10, 0)], false)[1]).toBeCloseTo(180, 9);
+  });
+
+  it('points confondus : pas d\'angle (jamais inventé)', () => {
+    expect(anglesDeLaFigure([p(0, 0), p(0, 0), p(5, 5)], false)[1]).toBeNull();
+  });
+
+  it('mesureRapide donne les angles selon figure fermée ou ligne ouverte', () => {
+    expect(mesureRapide(carreAntiHoraire, { fermee: true }).angles).toHaveLength(4);
+    expect(mesureRapide(carreAntiHoraire, { fermee: false }).angles[0]).toBeNull();
+  });
+
+  it('arc sur le plan : secteur et position du texte ; null si un côté est trop court', () => {
+    const arc = arcAngle({ x: 100, y: 100 }, { x: 40, y: 100 }, { x: 100, y: 160 }, 90);
+    expect(arc.chemin.startsWith('M100.0 100.0L')).toBe(true);
+    expect(arc.chemin).toContain('A20.0 20.0 0 0');
+    expect(arcAngle({ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 0, y: 50 }, 90)).toBeNull();
+    // Coin rentrant : grand arc.
+    expect(arcAngle({ x: 100, y: 100 }, { x: 40, y: 100 }, { x: 100, y: 160 }, 270).chemin).toContain('0 1 ');
   });
 });

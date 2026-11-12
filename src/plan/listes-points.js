@@ -50,6 +50,26 @@ export const SECTIONS = [
   ['annotation', 'Annotations'],
 ];
 
+// 0.214.0 (maquette 4 A du 12.11) : petit encadré de nature à côté du nom d'une liste (Afficher, Liste de points) :
+// [texte court, couleur]. Mêmes couleurs que les boutons de nature de la Liste de points.
+export const ETIQUETTES_NATURE = {
+  controle: ['Contrôle', '#b91c1c'],
+  libre: ['Libre', '#a16207'],
+  stock: ['Stock', '#92400e'],
+  terrain: ['Terrain', '#16a34a'],
+  terrassement: ['Terrass.', '#0ea5e9'],
+  chantier: ['Chantier', '#0f766e'],
+  annotation: ['Annot.', '#7c3aed'],
+  import: ['Importé', '#2563eb'],
+};
+/** Catégorie (clé de ETIQUETTES_NATURE) d'une liste d'après sa nature ; null : pas d'étiquette (cadastre, dessin, mesures…). */
+const CATEGORIE_DE_NATURE = { stock: 'stock', terrain: 'terrain', terrassement: 'terrassement', autres: 'libre', annotation: 'annotation', fichier: 'import', ajoutes: 'import', controle: 'controle' };
+/** HTML du petit encadré de nature (vide si la catégorie n'en a pas). */
+export function htmlEtiquetteNature(categorie) {
+  const e = ETIQUETTES_NATURE[categorie];
+  return e ? `<span class="etiquette-nature" style="--couleur-etiquette: ${e[1]}">${e[0]}</span>` : '';
+}
+
 const nomsDeLaSurface = (s) => [...(s.contour ?? []), ...(s.lignesRupture ?? []).flatMap((l) => l.noms), ...(s.points ?? [])];
 
 /**
@@ -64,11 +84,11 @@ export function listesDePoints(projet) {
   const listes = [];
   const SECTION_DE = { cadastre: 'cadastre', fichier: 'points', ajoutes: 'points', autres: 'leve', annotation: 'annotation', controle: 'controle', dessin: 'dessin', mesures: 'mesures', importee: 'surface' };
   const couleurs = projet.couleursListes ?? {};
-  const ajouter = (id, nom, nature, leveId, noms) => {
+  const ajouter = (id, nom, nature, leveId, noms, categorie = null) => {
     const section = SECTION_DE[nature] ?? 'leve';
     const couleur = nature === 'controle' ? COULEUR_CONTROLE : couleurs[id] ?? (leveId ? couleurs[leveId] : null) ?? null;
     // Couleur au choix : Points Import, et Surface Import (changer couleur, tableau « Affichage »).
-    listes.push({ id, nom, nature, section, leveId, noms, visible: !cachees.has(id), couleur, couleurModifiable: section === 'points' || section === 'surface' || section === 'leve' });
+    listes.push({ id, nom, nature, categorie: categorie ?? CATEGORIE_DE_NATURE[nature] ?? null, section, leveId, noms, visible: !cachees.has(id), couleur, couleurModifiable: section === 'points' || section === 'surface' || section === 'leve' });
   };
   for (const leve of projet.leves) {
     // Cadastre (0.116.4) : points et lignes rangés ensemble, une seule couleur (celle du plan DXF).
@@ -89,7 +109,7 @@ export function listesDePoints(projet) {
   }
   // Mesures faites à la main (Calculs › Mesures) : une seule case, pour leurs traits et leurs valeurs.
   if ((projet.mesures ?? []).length > 0) ajouter(LISTE_MESURES, 'Mesures', 'mesures', null, new Set());
-  for (const autres of projet.autres ?? []) ajouter(autres.id, autres.nom, autres.nature === 'annotation' ? 'annotation' : 'autres', autres.leveId, new Set(nomsDeLaSurface(autres)));
+  for (const autres of projet.autres ?? []) ajouter(autres.id, autres.nom, autres.nature === 'annotation' ? 'annotation' : 'autres', autres.leveId, new Set(nomsDeLaSurface(autres)), autres.nature === 'chantier' ? 'chantier' : null);
   // Points de contrôle : pas dans un levé, dessinés à part (triangles rouges, voir plan.js).
   if ((projet.pointsControle ?? []).length > 0) ajouter(LISTE_CONTROLE, 'Points de contrôle', 'controle', null, new Set());
   // Dessins (Calculs › Dessin) : une case par dessin (ses traits et ses sommets, en violet, voir plan/dessins.js).
