@@ -13620,3 +13620,41 @@ body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; 
   vertical-align: middle;
   margin-left: 6px;
 }
+
+/* 0.208.0 : points de contrôle dans la page Gérer : un × par point. */
+.liste-points-gerer {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.ligne-point-gerer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+/* 0.209.0 : × pour supprimer un point seul, dans la colonne du nom du tableau de points. */
+.supprimer-point-tableau {
+  margin-left: 6px;
+  padding: 0 6px;
+  color: #b91c1c;
+  font-weight: 800;
+}
+
+/* 0.210.0 : flèche + texte de l'écart sur le plan (Implanter › Ligne), collés à la ligne ; couleur de la tolérance. */
+.plan .texte-fleche-ecart {
+  font-size: 13px;
+}
+
+.plan .pointe-ecart {
+  stroke: #ffffff;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}

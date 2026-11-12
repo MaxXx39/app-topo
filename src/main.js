@@ -115,6 +115,7 @@ import {
 } from './topo/reseau.js';
 import { lireReseaux, couleurDuReseau } from './leve/reseaux.js';
 import { creerMetre, prochainNomMetre, ajouterPointMetre, nouvelElementMetre, mesureEnCours, retirerPointDesMesures, resumeMetre } from './topo/metre.js';
+import { retirerPointDuProjet, texteUsages, usagesDuPoint } from './topo/retirer-point.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur } from './android/pont.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
@@ -1747,6 +1748,16 @@ const moduleExport = creerModuleExport(document.querySelector('#exporter-projet'
   },
 });
 
+/** Retire un point de contrôle (et ses photos) après confirmation. 0.209.0 : partagé par la page Gérer et le tableau de points. */
+function retirerPointControleConfirme(id) {
+  const point = projet.pointsControle.find((p) => p.id === id);
+  if (!point || !confirm(`Enlever ${point.nom} des points de contrôle ?`)) return;
+  projet.pointsControle = projet.pointsControle.filter((p) => p.id !== id);
+  projet.photosControle = (projet.photosControle ?? []).filter((ph) => ph.pointId !== id);
+  if (autocontrole.cible?.id === id) autocontrole.cible = null;
+  modifie();
+}
+
 const ecranImport = creerEcranImport(document.querySelector('#importer'), document.querySelector('#contenu-projet'), {
   exporterListe: (type, id) => exporterListe(type, id),
   exporterPlanRecale: (id) => exporterPlanRecale(id),
@@ -2004,6 +2015,35 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     if (projet.leveActifId === id) projet.leveActifId = projet.leves[0]?.id ?? null;
     dernierPlan = null;
     modifie({ recadrer: true });
+  },
+  // 0.208.0 : retirer un point de la liste « Points de contrôle » depuis la page Gérer (Intermédiaire, sans code).
+  enleverPointControle: (id) => retirerPointControleConfirme(id),
+  // 0.209.0 : supprimer un point seul de n'importe quelle liste (tableau de points, Intermédiaire, sans code). S'il sert dans un
+  // contour, des lignes, un métré, un recollement ou des photos, la confirmation le dit et il en est retiré aussi.
+  supprimerPointListe: (listeId, nom) => {
+    if (listeId === 'controle') {
+      const point = projet.pointsControle.find((p) => p.nom === nom);
+      if (point) retirerPointControleConfirme(point.id);
+      return;
+    }
+    const leve = projet.leves.find((l) => l.id === listeId);
+    if (!leve || !leve.points.some((p) => p.nom === nom)) return;
+    const usages = texteUsages(usagesDuPoint(projet, leve, nom));
+    const suite = usages ? `\n\nIl sert dans : ${usages}. Il en sera aussi retiré.` : '';
+    if (!confirm(`Supprimer le point ${nom} de la liste « ${leve.nom} » ?${suite}`)) return;
+    retirerPointDuProjet(projet, leve, nom);
+    editeurSurfaces.charger(projet.surfaces);
+    afficherMessage(`Point ${nom} supprimé`);
+    modifie();
+  },
+  // 0.208.0 : supprimer toute la liste « Points de contrôle » (Expert). L'historique des contrôles est gardé.
+  supprimerListeControle: () => {
+    const nombre = projet.pointsControle.length;
+    if (nombre === 0 || !confirm(`Supprimer la liste « Points de contrôle » (${nombre} points) ? L'historique des contrôles est gardé.`)) return;
+    projet.pointsControle = [];
+    projet.photosControle = [];
+    autocontrole.cible = null;
+    modifie();
   },
   supprimerLeve: (id) => {
     const leve = projet.leves.find((l) => l.id === id);
@@ -3682,7 +3722,8 @@ function cotesLigne(implantationLigne) {
   if (!l || implantationLigne.message || !implanter.ligne) return null;
   const sommets = sommetsDeLaLigne();
   const trace = implanter.ligne.decalage ? ligneParallele(sommets, implanter.ligne.decalage) : sommets;
-  return { sommets: trace, abscisse: l.abscisse, longueur: l.longueur, ecart: l.ecart };
+  // 0.210.0 : fleche + classe (tolérance) pour la flèche de l'écart sur le plan ; le talus garde le texte seul.
+  return { sommets: trace, abscisse: l.abscisse, longueur: l.longueur, ecart: l.ecart, fleche: true, classe: implantationLigne.classeLaterale };
 }
 
 /**

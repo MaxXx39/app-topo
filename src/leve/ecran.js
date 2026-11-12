@@ -61,9 +61,9 @@ const VUES_COUPES = [
   ['perpendiculaire', `${symboleCoupe('M5 22H35', '#7c3aed')}<span>Perpendiculaire</span>`],
   ['axe', `${symboleCoupe('M20 4V36', '#db2777')}<span>Dans l\'axe</span>`],
 ];
-// 0.190.0 : demi-longueurs (m de chaque côté) : coupes de 5, 10, 20 ou 40 m de large ; échelles de hauteur ×1 à ×3.
+// 0.190.0 : demi-longueurs (m de chaque côté) : coupes de 5, 10, 20 ou 40 m de large ; échelles de hauteur ×1 à ×3 (0.210.0 : et ×0,5, ×0,75).
 export const LONGUEURS_COUPE = [2.5, 5, 10, 20];
-export const EXAGERATIONS_COUPE = [1, 1.5, 2, 3];
+export const EXAGERATIONS_COUPE = [0.5, 0.75, 1, 1.5, 2, 3];
 // Ce que l'on lève : une surface (même choix que « + Nouvelle surface » dans Calculs › Surfaces)
 // ou un métré (aires, longueurs, points comptés : des mesures de Calculs › Mesures / métrés).
 const NATURES_TERRAIN = [
@@ -1775,6 +1775,9 @@ function iconeVirage(sens) {
   return `<svg class="icone-fleche icone-virage" viewBox="0 0 24 24" aria-hidden="true"><path d="${trait}" /></svg>`;
 }
 
+/** 0.210.0 (demande du 11.11) : la flèche du couloir garde une couleur fixe (ambre) ; la couleur de la tolérance est sur le plan. */
+const COULEUR_FLECHE_COULOIR = '#fbbf24';
+
 /** Couleur du rond de la canne dans le couloir (0.118.0) : celle de la tolérance en plan. */
 function couleurLaterale(classe) {
   return { vert: '#16a34a', orange: '#f59e0b', rouge: '#dc2626' }[classe] ?? '#9ca3af';
@@ -1797,7 +1800,8 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage 
   // Avant le début ou après la fin : la canne dépasse un peu du trait.
   const top = Math.max(haut - 6, Math.min(bas + 6, bas - part * (bas - haut)));
   const left = 50 + Math.max(-demi, Math.min(demi, (ecart / bandes[0]) * demi));
-  const texte = (r) => (r >= 1 ? `${r} m` : `${Math.round(r * 100)} cm`);
+  // 0.210.0 : jamais plus de 3 décimales (en m), en cm sous le mètre.
+  const texte = (r) => (r >= 1 ? `${Number(r.toFixed(3))} m` : `${Math.round(r * 100)} cm`);
   // 0.118.2 : seulement la graduation la plus éloignée (la bande la plus large), juste pour un
   // aperçu de l'échelle ; sa distance écrite en haut à droite (0.123 : en bas, la flèche pour se tourner).
   const r = bandes[0];
@@ -1811,7 +1815,7 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage 
   const debutFleche = versGauche ? 50 : 50 - largeurFleche;
   // Écart écrit en mètres, 3 décimales comme sur le plan (0.208.0).
   const flecheCouloir = sansFleche || largeurFleche === 0 ? ''
-    : `<span class="fleche-couloir ${versGauche ? 'vers-gauche' : 'vers-droite'}" style="left: ${debutFleche.toFixed(1)}%; width: ${largeurFleche.toFixed(1)}%; top: ${top.toFixed(1)}%; --couleur-fleche: ${couleur}"><b class="mot-fleche">${ecart === 0 ? '' : `${Math.abs(ecart).toFixed(3)} m`}</b><i class="pointe"></i><i class="tige"></i></span>`;
+    : `<span class="fleche-couloir ${versGauche ? 'vers-gauche' : 'vers-droite'}" style="left: ${debutFleche.toFixed(1)}%; width: ${largeurFleche.toFixed(1)}%; top: ${top.toFixed(1)}%; --couleur-fleche: ${COULEUR_FLECHE_COULOIR}"><b class="mot-fleche">${ecart === 0 ? '' : `${Math.abs(ecart).toFixed(3)} m`}</b><i class="pointe"></i><i class="tige"></i></span>`;
   return `<div class="cadre-couloir" role="img" aria-label="Position de la canne le long de la ligne">
     ${reglettes}
     <span class="trait-couloir" style="top: ${haut}%; bottom: ${100 - bas}%"></span>
