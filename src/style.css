@@ -742,6 +742,13 @@ input[type='radio'] {
   border-left: 4px solid var(--rouge);
 }
 
+/* 0.208.0 : message d'une bonne nouvelle (import de points de contrôle : tout est ajouté). */
+.message-ok {
+  padding: 0.4rem 0.6rem;
+  border-left: 4px solid #16a34a;
+  background: #dcfce7;
+}
+
 .avertissement {
   background: var(--jaune-clair);
   border-left: 4px solid var(--jaune);
@@ -12192,6 +12199,9 @@ body.mode-telephone .tuile-appli .sous-tuile button { min-height: 26px; padding:
 .bouton-pied-applis svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .bouton-pied-applis.fermer { border-color: #dc2626; background: #dc2626; color: #ffffff; }
 body.mode-telephone .bouton-pied-applis { min-height: 42px; font-size: 13px; }
+/* 0.208.0 : pied de la page Applications : « Fermer l'appli » = 1/3 de la largeur, « Réglages » = 2/3 */
+.pied-applis .bouton-pied-applis.fermer { flex: 1 1 0; }
+.pied-applis .bouton-pied-applis[data-pied="reglages"] { flex: 2 1 0; }
 
 /* Pages du projet : une seule partie de l'onglet Projet à la fois (liste des projets, Import, Exporter, Contenu). */
 .titre-partie-projet { margin: 0 0 10px; font-size: 20px; color: var(--encre); }
@@ -13408,7 +13418,7 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .cadre-couloir .fleche-couloir.vers-gauche .pointe { border-right: 20px solid var(--couleur-fleche); }
 .cadre-couloir .fleche-couloir.vers-droite { flex-direction: row-reverse; padding-left: 14px; }
 .cadre-couloir .fleche-couloir.vers-droite .pointe { border-left: 20px solid var(--couleur-fleche); }
-.cadre-couloir .fleche-couloir .mot-fleche { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font-size: 0.95rem; font-weight: 800; color: var(--couleur-fleche); text-shadow: 0 0 3px #fff, 0 0 3px #fff; }
+.cadre-couloir .fleche-couloir .mot-fleche { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font-size: 0.95rem; font-weight: 800; color: var(--couleur-fleche); } /* 0.208.0 : sans ombre floue */
 
 /* 0.189.3 : boutons de coupe d'Implanter › Surface avec symbole, un peu plus larges */
 .choix-coupe .puce-choix { display: inline-flex; align-items: center; gap: 6px; min-width: 150px; min-height: 48px; padding: 0 12px; }
@@ -13474,12 +13484,14 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .type-plan-dxf select { min-height: 40px; }
 
 /* 0.195.0 : tuile du menu : le haut en 3 parts, nom (avec son icône) centré sur les 2 de gauche, bouton « liste » dans la 3e */
-.tuile-appli .tete-tuile { width: 100%; display: grid; grid-template-columns: 2fr 1fr; align-items: center; gap: 4px; }
-.tuile-appli .nom-et-icone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; }
-.tuile-appli .bouton-liste-tuile { justify-self: center; width: 44px; height: 44px; border: 2px solid currentColor; border-radius: 12px; background: rgba(0, 0, 0, 0.14); color: inherit; display: grid; place-items: center; padding: 0; }
-.tuile-appli .bouton-liste-tuile svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.tuile-appli .tete-tuile { display: block; width: 100%; position: relative; min-height: 44px; }
+/* 0.208.0 : le nom est centré sur toute la tuile ; le bouton « liste » est posé à droite par-dessus (retrait à droite
+   pour que le nom ne passe pas dessous). */
+.tuile-appli .nom-et-icone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; padding: 0 46px; }
+.tuile-appli .bouton-liste-tuile { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border: 1px solid currentColor; border-radius: 10px; background: rgba(0, 0, 0, 0.14); color: inherit; display: grid; place-items: center; padding: 0; }
+.tuile-appli .bouton-liste-tuile svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .tuile-appli .coche-favori { left: 5px; right: auto; }
-body.mode-telephone .tuile-appli .bouton-liste-tuile { width: 36px; height: 36px; }
+body.mode-telephone .tuile-appli .bouton-liste-tuile { width: 34px; height: 34px; }
 
 /* 0.196.0 (maquette B du 10.11) : « Levé en cours » : un seul cadre, liseré et fond de la couleur de l'application, qui réunit
    l'appareil photo, le nom du levé et le « + », séparés par un trait de la même couleur. */

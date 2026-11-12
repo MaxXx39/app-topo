@@ -126,9 +126,10 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
  * - quandBasculerSeul(actif) : bouton « Seul » (seulement ce sur quoi je travaille, 0.94.0)
  * Renvoie un objet avec les fonctions afficherPoints(points) et redessiner(dessin).
  */
-// Retour automatique du suivi (0.126.0) : 5 s sans toucher le plan, ou 2 m parcourus.
+// Retour automatique du suivi (0.126.0) : 5 s sans toucher le plan. 0.208.0 : on ne revient plus parce
+// qu'on a marché de 2 m (on cherche un point à pied, le plan ne doit pas repartir sous le doigt) ;
+// chaque geste sur le plan (poser, bouger, relâcher, molette) remet le délai de 5 s à zéro.
 const DELAI_RETOUR_SUIVI = 5000;
-const DISTANCE_RETOUR_SUIVI = 2;
 
 export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
   // Réglage d'une liste : son choix, sinon celui de départ (en dessous d'Expert, les réglages d'Expert gardent leur valeur de départ).
@@ -515,6 +516,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       const textes = visibles.map(({ point }) =>
         [montrerNom(point) ? point.nom : null, montrerAltitude(point) && point.altitude != null ? formaterNombre(point.altitude) : null, montrerAltitude(point) && point.chantier ? texteDuPoint(point.chantier, point.chantier) : null].filter(Boolean),
       );
+      // 0.208.0 : les noms évitent les 📷 des photos (sinon l'icône cache le nom).
+      const boitesPhotos = vue ? photos.map((photo) => {
+        const ecran = versEcran(photo.est, photo.nord, vue);
+        const { x, y } = decalagePhoto(ecran.x, ecran.y);
+        return { gauche: x - 9 * echelle, droite: x + 9 * echelle, haut: y - 8 * echelle, bas: y + 7 * echelle };
+      }) : [];
       const places = placerEtiquettes(
         visibles.map(({ x, y }, i) => ({
           x,
@@ -522,6 +529,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
           largeur: Math.max(...textes[i].map((t) => t.length)) * 6.6 * echelle,
           hauteur: textes[i].length * 13 * echelle,
         })),
+        5,
+        boitesPhotos,
       );
       places.forEach((place, i) => {
         if (!place) return;
@@ -1846,9 +1855,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function reprendreSuiviSiBesoin() {
     if (suiviSuspendu || !retourSuivi || !retourSuiviActif || suivi !== 'libre' || !position || position.tablette || pointeurs.size > 0 || ligneVue) return false;
     const attente = performance.now() - dernierToucher >= DELAI_RETOUR_SUIVI;
-    const depuis = retourSuivi.depuis;
-    const parti = depuis && Math.hypot(position.est - depuis.est, position.nord - depuis.nord) >= DISTANCE_RETOUR_SUIVI;
-    if (!attente && !parti) return false;
+    if (!attente) return false;
     const mode = retourSuivi.mode;
     retourSuivi = null;
     changerSuivi(mode);
@@ -2302,6 +2309,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   svg.addEventListener('pointermove', (evenement) => {
     if (!vue || !pointeurs.has(evenement.pointerId)) return;
+    dernierToucher = performance.now(); // 0.208.0 : bouger le doigt remet le délai de retour à zéro
     if (glisseCoupe && pointeurs.size === 1) {
       const position = positionDansPlan(evenement);
       pointeurs.set(evenement.pointerId, position);
@@ -2355,6 +2363,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
 
   svg.addEventListener('pointerup', (evenement) => {
     pointeurs.delete(evenement.pointerId);
+    dernierToucher = performance.now(); // 0.208.0 : le délai court à partir du relâchement, pas du premier contact
     if (glisseCoupe) {
       // Fin du glissement : la coupe garde sa nouvelle place (un simple toucher ne change rien).
       const fini = glisseCoupe;

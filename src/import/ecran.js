@@ -61,7 +61,9 @@ export function creerEcranImport(conteneur, contenu, actions) {
   let pointOuvert = false;
   let erreurPoint = '';
   let derniers = null;
-  let messageControle = ''; // erreur du dernier import de points de contrôle
+  // Résultat du dernier import de points de contrôle : gardé pour ce projet seulement (0.208.0 : il restait
+  // affiché dans les autres projets).
+  let messageControle = { projet: null, texte: '', alerte: false };
   // 0.186.0 : tri par date (récent d'abord ou ancien d'abord) et recherche d'un jour pour les listes de points (Intermédiaire).
   const filtreDate = { ordre: 'recent', jour: '', jourPoints: '' };
   // 0.191.0 : tableau « Points » : catégories choisies (null = départ : Levé), listes décochées, tri par colonne, jour.
@@ -259,7 +261,8 @@ export function creerEcranImport(conteneur, contenu, actions) {
       // Points de contrôle : sans code de sécurité depuis 0.90.0 (demande du 29.10.2026).
       const fichier = cible.files[0];
       cible.value = '';
-      messageControle = (await actions.importerPointsControle(fichier))?.erreur ?? '';
+      const reponse = await actions.importerPointsControle(fichier);
+      messageControle = { projet: derniers?.[0]?.id ?? null, texte: reponse?.erreur || reponse?.info || '', alerte: Boolean(reponse?.erreur) };
       if (derniers) afficher(...derniers);
     } else if (cible.dataset.champ === 'couleur-liste') actions.colorerListe(cible.dataset.id, cible.value || null);
     else if (cible.dataset.champ === 'leve-actif') actions.choisirLeve(cible.value);
@@ -371,7 +374,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
               <span><strong>Cadastre</strong><span class="aide">autour d'un point</span></span>
             </button>
           </div>
-          ${messageControle ? `<p class="erreur">${echapper(messageControle)}</p>` : ''}
+          ${messageControle.texte && messageControle.projet === projet.id ? `<p class="${messageControle.alerte ? 'erreur' : 'message-ok'}">${echapper(messageControle.texte)}</p>` : ''}
           ${pointOuvert ? `<div class="bloc-point-ajoute">
             ${htmlFormulairePoint(nomPointAjoute(projet))}
             <p class="erreur" data-vivant="erreur-point">${echapper(erreurPoint)}</p>

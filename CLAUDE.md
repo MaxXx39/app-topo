@@ -72,7 +72,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Choix pris en codant le tableau (validés le 02.11) : « Relancer NTRIP » dans tous les modes sans code ; « Enregistrer » de la fenêtre Exporter en Base (mail / « autrement » dès Intermédiaire) ; options de ligne à l'implantation et export du contrôle en Base ; code de sécurité inchangé.
 - **Code de sécurité** (`outils/code.js`, tous modes ; simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert (0.90), nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle (tolérances, points, durée), prendre la main (Drive), listes partagées. Import de points de contrôle dans Projet : **sans** code (0.90).
 
-## Fonctionnalités (état à la 0.207.1)
+## Fonctionnalités (état à la 0.208.0)
 Le détail version par version est dans l'historique git (`git log`) ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -119,6 +119,8 @@ Le détail version par version est dans l'historique git (`git log`) ; ici seule
 - Plus anciens : Guidage (Grader à 2 GNSS, râteau + journal NMEA pour le sens de la pente / de l'inclinaison), recalage par axes, talus d'une surface avec une vraie plateforme Mensura, LandXML dans Mensura (case « contour et lignes de rupture »), Plan PDF avec de vrais plans, Surface Swisstopo (CORS, GeoTIFF), cadastre Vaud, clavier réel, appui long avec gants (menu), batterie en arrière-plan, bouton « Chercher une mise à jour ».
 
 ## Décisions et points ouverts
+- **0.208.0 (12.11)** : Implanter ne revient plus au suivi après 2 m parcourus (seulement après 5 s sans geste, délai qui repart au relâchement) ; import de points de contrôle : résumé « ajoutés / déjà présents » (le message ne reste plus d'un projet à l'autre) ; plan : noms évitent les 📷 ; plan pâli remis à zéro hors Terrain ; flèche de la ligne visible en tolérance verte, écart en m à 3 décimales ; nom des tuiles centré, liseré du bouton liste plus fin ; pied des Applications 1/3 - 2/3.
+- **Demandé le 12.11 (à faire, modes validés « OK »)** : suppression de **Métré** et **Récolement** (applications, et leurs levés) ; Annotation gardée. Carte des projets (centre de la boîte, fond ortho à 2 km puis carte) ; import : doublons DXF / PDF, « déjà calé », export DXF importé ; formes : forme noire au centre par type (à préciser) ; récepteur rouge et blocage après 2 s d'âge des corrections ; PDOP (pas encore lu : phrase GSA).
 - **Abandonnés** : poignée du plan, noms sous les accroches, déblai / remblai en direct, mode des tablettes à distance, fusion des deux bandes de l'en-tête (refusée 09.11). **En attente** : métré, recollement « plus simple », double mesure de contrôle (HappySurvey), recap : nom de la tablette noté à chaque ligne du journal (à faire sur demande).
 - **À confirmer** : « 80 / 92 » du chantier (Ø ext. = 2e valeur supposé), « retour » du bandeau Lever = ↶, « harmoniser » Annotation = l'allure, nom de la liste Annotation si le nom libre change, plan d'Annotation 30–70 %, cible : cercles 20 cm = 15 / 10 / 5 (maquette validée).
 - **Pas fait** : mettre à jour nature et type du levé chantier (« plus tard », liste à donner), types DXF pour les plans PDF, points et altitudes de Surface Import par liste, date des anciens points tapés (impossible), DWG (DXF seulement), Leica iCR70 (protocole à demander à Leica).

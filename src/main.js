@@ -1522,6 +1522,8 @@ function afficherOnglet(demande, { partie = null } = {}) {
     }
     ongletContexte = nom;
     if (nom !== 'terrain') piloterBip(null);
+    // 0.208.0 : hors du Terrain, le plan n'est plus pâli autour du travail (il le restait en revenant dans Plan).
+    if (nom !== 'terrain') plan.palirAutour(null);
     recalculer();
   }
   mettreAJourToucheVolume();
@@ -4750,11 +4752,17 @@ function ajouterAuxPointsControle(points) {
 async function importerPointsControle(fichier) {
   try {
     const { points, erreurs } = lirePoints(await fichier.text());
-    const reponse = ajouterAuxPointsControle(points);
-    if (erreurs.length > 0) return { erreur: `${erreurs.length} ligne(s) illisible(s), non importée(s) : ${erreurs.slice(0, 5).map((e) => `ligne ${e.ligne}`).join(', ')}${erreurs.length > 5 ? '…' : ''}` };
-    return reponse;
+    // 0.208.0 : le reste du fichier est bien importé même si certains noms existent déjà ; le résumé le dit.
+    const { ajoutes, deja, sansNom } = ajouterPointsControle(projet.pointsControle, points, nouvelIdentifiant);
+    if (ajoutes > 0) modifie();
+    const morceaux = [`${ajoutes} point(s) ajouté(s)`];
+    if (deja.length > 0) morceaux.push(`${deja.length} déjà dans la liste, non ajouté(s) : ${deja.slice(0, 10).join(', ')}${deja.length > 10 ? '…' : ''}`);
+    if (sansNom > 0) morceaux.push(`${sansNom} sans nom, non ajouté(s)`);
+    if (erreurs.length > 0) morceaux.push(`${erreurs.length} ligne(s) illisible(s) : ${erreurs.slice(0, 5).map((e) => `ligne ${e.ligne}`).join(', ')}${erreurs.length > 5 ? '…' : ''}`);
+    const alerte = deja.length > 0 || sansNom > 0 || erreurs.length > 0;
+    return { info: morceaux.join(' ; '), erreur: alerte ? morceaux.join(' ; ') : '' };
   } catch (erreur) {
-    return { erreur: `impossible de lire « ${fichier.name} » : ${erreur.message}` };
+    return { info: '', erreur: `impossible de lire « ${fichier.name} » : ${erreur.message}` };
   }
 }
 

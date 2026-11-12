@@ -808,7 +808,7 @@ export function creerEcranLeve(conteneur, actions) {
         <div class="bloc-lateral bloc-bouts ${g.classeBout ?? ''}">${leLong}</div>
         ${hauteur}
       </div>
-      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale), virage, { sansFleche: surLaLigne || g.classeLaterale === 'vert' })}`;
+      ${htmlCouloirVertical(bandeCouloir, ecart, abscisse, longueur, couleurLaterale(g.classeLaterale), virage, { sansFleche: surLaLigne })}`;
   }
 
   /**
@@ -1806,9 +1806,12 @@ function htmlCouloirVertical(numero, ecart, abscisse, longueur, couleur, virage 
   // 0.189.1 (maquette A du 10.11, tous les modes) : flèche perpendiculaire à la ligne, de la canne vers la ligne (du côté où il
   // faut aller), grosse pointe pour bien voir le sens ; l'écart écrit au-dessus. Cachée quand on est dans la tolérance.
   const versGauche = ecart > 0;
-  const largeurFleche = Math.abs(left - 50);
-  const flecheCouloir = sansFleche || largeurFleche < 0.5 ? ''
-    : `<span class="fleche-couloir ${versGauche ? 'vers-gauche' : 'vers-droite'}" style="left: ${Math.min(left, 50).toFixed(1)}%; width: ${largeurFleche.toFixed(1)}%; top: ${top.toFixed(1)}%; --couleur-fleche: ${couleur}"><b class="mot-fleche">${ecart === 0 ? '' : texte(Math.abs(ecart))}</b><i class="pointe"></i><i class="tige"></i></span>`;
+  // 0.208.0 : la flèche reste visible dans la tolérance (6 % au moins), sauf pile sur la ligne.
+  const largeurFleche = ecart === 0 ? 0 : Math.max(Math.abs(left - 50), 6);
+  const debutFleche = versGauche ? 50 : 50 - largeurFleche;
+  // Écart écrit en mètres, 3 décimales comme sur le plan (0.208.0).
+  const flecheCouloir = sansFleche || largeurFleche === 0 ? ''
+    : `<span class="fleche-couloir ${versGauche ? 'vers-gauche' : 'vers-droite'}" style="left: ${debutFleche.toFixed(1)}%; width: ${largeurFleche.toFixed(1)}%; top: ${top.toFixed(1)}%; --couleur-fleche: ${couleur}"><b class="mot-fleche">${ecart === 0 ? '' : `${Math.abs(ecart).toFixed(3)} m`}</b><i class="pointe"></i><i class="tige"></i></span>`;
   return `<div class="cadre-couloir" role="img" aria-label="Position de la canne le long de la ligne">
     ${reglettes}
     <span class="trait-couloir" style="top: ${haut}%; bottom: ${100 - bas}%"></span>

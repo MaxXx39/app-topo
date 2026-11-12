@@ -7,9 +7,10 @@
  *   dans l'ordre de priorité (les premières sont placées en premier).
  * On essaie d'abord à droite au-dessus du point, puis à gauche, puis en dessous.
  * Si aucune place n'est libre, l'étiquette est cachée.
+ * - obstacles (facultatif) : boîtes { gauche, haut, droite, bas } à éviter (0.208.0).
  * Renvoie, pour chaque étiquette, { x, y, aGauche } (coin bas-gauche du texte) ou null si cachée.
  */
-export function placerEtiquettes(etiquettes, ecart = 5) {
+export function placerEtiquettes(etiquettes, ecart = 5, obstacles = []) {
   // 0.126.0 (vitesse) : les étiquettes déjà placées sont rangées dans une grille de cases de
   // TAILLE_CASE px : on ne compare qu'avec celles des cases touchées (avant : avec toutes).
   const grille = new Map();
@@ -27,6 +28,8 @@ export function placerEtiquettes(etiquettes, ecart = 5) {
       grille.get(cle).push(boite);
     }
   };
+  // 0.208.0 : obstacles (icônes 📷 des photos) : les étiquettes les évitent.
+  obstacles.forEach(occuper);
   return etiquettes.map(({ x, y, largeur, hauteur }) => {
     const essais = [
       { gauche: x + ecart, haut: y - ecart - hauteur, aGauche: false }, // à droite, au-dessus
