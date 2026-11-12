@@ -171,11 +171,15 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         </button>
         <button type="button" class="puce" data-action="plans-dxf" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h11l5 5v11H4z" /><path d="M15 4v5h5M8 13h8M8 17h5" /></svg>
-          DXF
+          Plan
         </button>
         <button type="button" class="puce" data-action="listes-points" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
-          Afficher
+          Points
+        </button>
+        <button type="button" class="puce" data-action="listes-surfaces" aria-expanded="false" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18 9 6l6 8 6-10v14z" /></svg>
+          Surface
         </button>
         <button type="button" class="puce puce-seul" data-action="seul-travail" aria-pressed="false" title="Seulement ce sur quoi je travaille">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></svg>
@@ -186,6 +190,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         </div>
         <div class="menu-plans-dxf" hidden></div>
         <div class="menu-plans-dxf menu-listes-points" hidden></div>
+        <div class="menu-plans-dxf menu-listes-points menu-surfaces" hidden></div>
         <div class="menu-calques" hidden>
           <div class="ligne-menu-plan">
             <label class="case"><input type="checkbox" data-calque="fondSatellite" ${calquesChoisis.fondSatellite ? 'checked' : ''} /> Fond de plan (swisstopo)</label>
@@ -224,7 +229,41 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   const boutonPlans = conteneur.querySelector('[data-action="plans-dxf"]');
   const menuPlans = conteneur.querySelector('.menu-plans-dxf:not(.menu-listes-points)');
   const boutonListes = conteneur.querySelector('[data-action="listes-points"]');
-  const menuListes = conteneur.querySelector('.menu-listes-points');
+  const menuListes = conteneur.querySelector('.menu-listes-points:not(.menu-surfaces)');
+  // 0.221.0 : « Afficher » est scindé : Plan (plans DXF, PDF, cadastre), Points (levés, import, contrôle…) et Surface (surfaces importées).
+  const boutonSurfaces = conteneur.querySelector('[data-action="listes-surfaces"]');
+  const menuSurfaces = conteneur.querySelector('.menu-surfaces');
+  const menusListes = [menuListes, menuSurfaces];
+
+  // 0.221.0 : appui long sur Plan, Points ou Surface = tout montrer (si tout est caché) ou tout cacher ; le bouton est pâli quand tout est caché.
+  const DUREE_APPUI_LONG_BOUTON = 600;
+  function installerAppuiLong(bouton, action) {
+    let minuterie = null;
+    let fait = false;
+    bouton.addEventListener('pointerdown', () => {
+      fait = false;
+      clearTimeout(minuterie);
+      minuterie = setTimeout(() => {
+        fait = true;
+        navigator.vibrate?.(40);
+        action();
+      }, DUREE_APPUI_LONG_BOUTON);
+    });
+    for (const fin of ['pointerup', 'pointerleave', 'pointercancel']) bouton.addEventListener(fin, () => clearTimeout(minuterie));
+    bouton.addEventListener('contextmenu', (evenement) => evenement.preventDefault());
+    // Le toucher qui suit un appui long ne déplie pas le menu (enregistré avant les autres « click » du bouton).
+    bouton.addEventListener('click', (evenement) => {
+      if (!fait) return;
+      fait = false;
+      evenement.stopImmediatePropagation();
+    });
+  }
+  installerAppuiLong(boutonPlans, () => {
+    const touteVisible = plansDxf.some((plan) => plan.visible !== false);
+    for (const plan of plansDxf) quandReglerPlanDxf?.(plan.id, { visible: !touteVisible });
+  });
+  installerAppuiLong(boutonListes, () => toutesLesListes(menuListes, !listesDuMenuVisibles(menuListes)));
+  installerAppuiLong(boutonSurfaces, () => toutesLesListes(menuSurfaces, !listesDuMenuVisibles(menuSurfaces)));
   const cadre = conteneur.querySelector('.plan-cadre');
   const fond = conteneur.querySelector('.plan-fond');
   const canvasDxf = conteneur.querySelector('.plan-dxf-canvas:not(.plan-points-canvas)');
@@ -1877,7 +1916,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   function marquerSuite(menu) {
     menu.classList.toggle('a-suivre', menu.scrollTop + menu.clientHeight < menu.scrollHeight - 4);
   }
-  for (const menu of [menuCalques, menuPlans, menuListes]) menu.addEventListener('scroll', () => marquerSuite(menu));
+  for (const menu of [menuCalques, menuPlans, menuListes, menuSurfaces]) menu.addEventListener('scroll', () => marquerSuite(menu));
   /** Un réglage changé (case, liste, réglette data-calque) dans Fond ou Afficher. */
   function changerCalque(champ) {
     const cle = champ.dataset.calque;
@@ -1903,12 +1942,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   // 0.106 : un menu ouvert (Fond, DXF, Afficher) = bouton surligné + plan un peu grisé, pour comprendre
   // qu'on est dans ce menu.
   function signalerMenuOuvert() {
-    const liens = [[boutonCalques, menuCalques], [boutonPlans, menuPlans], [boutonListes, menuListes]];
+    const liens = [[boutonCalques, menuCalques], [boutonPlans, menuPlans], [boutonListes, menuListes], [boutonSurfaces, menuSurfaces]];
     for (const [bouton, menu] of liens) bouton.classList.toggle('actif', !menu.hidden);
     cadre.classList.toggle('menu-plan-ouvert', liens.some(([, menu]) => !menu.hidden));
   }
   const veilleMenus = new MutationObserver(signalerMenuOuvert);
-  for (const menu of [menuCalques, menuPlans, menuListes]) veilleMenus.observe(menu, { attributes: true, attributeFilter: ['hidden'] });
+  for (const menu of [menuCalques, menuPlans, menuListes, menuSurfaces]) veilleMenus.observe(menu, { attributes: true, attributeFilter: ['hidden'] });
   menuCalques.addEventListener('change', (evenement) => {
     if (evenement.target.dataset.calque) changerCalque(evenement.target);
   });
@@ -1954,7 +1993,7 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   });
   // --- Menu des plans DXF : afficher / cacher chaque plan (œil), sa couleur ---
   // Un seul menu ouvert à la fois (Calques, Plans, Points).
-  const menus = [[boutonCalques, menuCalques], [boutonPlans, menuPlans], [boutonListes, menuListes]];
+  const menus = [[boutonCalques, menuCalques], [boutonPlans, menuPlans], [boutonListes, menuListes], [boutonSurfaces, menuSurfaces]];
   for (const [bouton, menu] of menus) {
     bouton.addEventListener('click', () => {
       for (const [autreBouton, autreMenu] of menus) {
@@ -1978,22 +2017,32 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     if (champ) champ.value = '';
     dessiner();
   });
-  menuListes.addEventListener('change', (evenement) => {
-    const planCadastre = evenement.target.dataset.lignesCadastre;
-    if (planCadastre) quandReglerPlanDxf?.(planCadastre, { visible: evenement.target.checked });
-    const id = evenement.target.dataset.liste;
-    if (id) quandMontrerListe?.(id, evenement.target.checked);
-  });
-  menuListes.addEventListener('click', (evenement) => {
-    const pastille = evenement.target.closest('[data-choix-couleur]');
-    if (pastille) {
-      pastille.closest('details')?.removeAttribute('open');
-      quandColorerListe?.(pastille.dataset.id, pastille.dataset.choixCouleur || null);
-      return;
-    }
-    const bouton = evenement.target.closest('[data-toutes]');
-    if (bouton) quandMontrerListe?.('*', bouton.dataset.toutes === 'oui');
-  });
+  /** Catégories du menu Points (toutes sauf Surface Import) ou du menu Surface (0.221.0). */
+  const sectionsDuMenu = (menu) => (menu === menuSurfaces ? ['surface'] : SECTIONS.map(([section]) => section).filter((section) => section !== 'surface'));
+  /** Vrai si au moins une liste de ce menu (Points ou Surface) est montrée. */
+  const listesDuMenuVisibles = (menu) => menu.querySelectorAll('input[data-liste]:checked').length > 0;
+  /** Tout montrer ou tout cacher dans un menu de listes (boutons « tout / rien » et appui long sur le bouton). */
+  function toutesLesListes(menu, visible) {
+    for (const section of sectionsDuMenu(menu)) quandMontrerListe?.(`section:${section}`, visible);
+  }
+  for (const menu of menusListes) {
+    menu.addEventListener('change', (evenement) => {
+      const planCadastre = evenement.target.dataset.lignesCadastre;
+      if (planCadastre) quandReglerPlanDxf?.(planCadastre, { visible: evenement.target.checked });
+      const id = evenement.target.dataset.liste;
+      if (id) quandMontrerListe?.(id, evenement.target.checked);
+    });
+    menu.addEventListener('click', (evenement) => {
+      const pastille = evenement.target.closest('[data-choix-couleur]');
+      if (pastille) {
+        pastille.closest('details')?.removeAttribute('open');
+        quandColorerListe?.(pastille.dataset.id, pastille.dataset.choixCouleur || null);
+        return;
+      }
+      const bouton = evenement.target.closest('[data-toutes]');
+      if (bouton) toutesLesListes(menu, bouton.dataset.toutes === 'oui');
+    });
+  }
 
   /**
    * Menu « Afficher » (0.94.0, tableau « Affichage ») : par catégories (voir SECTIONS de
@@ -2082,7 +2131,6 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         <span class="pastille-liste" style="background: ${l.couleur}"></span><span class="nom-cadastre">${echapper(l.nom)}</span>
         ${paletteCouleur({ couleur: l.couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${l.id}"`, nom: `Couleur de ${l.nom}` })}
         <div class="cases-cadastre">
-          ${l.planId ? `<label class="case"><input type="checkbox" data-lignes-cadastre="${l.planId}" ${l.lignesVisibles ? 'checked' : ''} /> Lignes</label>` : ''}
           <label class="case"><input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} /> Points</label>
         </div>
       </div>`;
@@ -2112,31 +2160,48 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     const jourPoints = `<div class="seulement-intermediaire jour-points-menu"><p class="titre-partie-menu">Points d'un jour</p>
       <label class="case"><input type="date" data-calque="jourPoints" value="${echapper(calquesChoisis.jourPoints ?? '')}" aria-label="Montrer seulement les points pris ce jour" />
         <button type="button" class="bouton-lien bouton-lien-neutre" data-jour-effacer="oui">tout voir</button></label></div>`;
-    menuListes.innerHTML = `${parties.join('') || '<p class="menu-vide">Rien à afficher</p>'}${jourPoints}${volume}
-      <div class="ligne-outils"><button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="oui">tout</button>
+    const toutRien = `<div class="ligne-outils"><button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="oui">tout</button>
         <button type="button" class="bouton-lien bouton-lien-neutre" data-toutes="non">rien</button></div>`;
-    for (const caseSection of menuListes.querySelectorAll('[data-section-toutes]')) caseSection.indeterminate = caseSection.dataset.etat === 'partiel';
+    // 0.221.0 : Points = toutes les catégories sauf Surface Import ; Surface = Surface Import et le bloc Volume.
+    const partiesPoints = parties.filter((_, i) => SECTIONS[i][0] !== 'surface');
+    const partiesSurface = parties.filter((_, i) => SECTIONS[i][0] === 'surface');
+    menuListes.innerHTML = `${partiesPoints.join('') || '<p class="menu-vide">Rien à afficher</p>'}${jourPoints}${toutRien}`;
+    menuSurfaces.innerHTML = `${partiesSurface.join('') || '<p class="menu-vide">Aucune surface</p>'}${volume}${toutRien}`;
+    // Le bouton Surface n'apparaît que s'il y a une surface importée.
+    const aDesSurfaces = partiesSurface.some(Boolean);
+    boutonSurfaces.hidden = !aDesSurfaces;
+    if (!aDesSurfaces) menuSurfaces.hidden = true;
+    // Un bouton dont tout est caché est pâli (appui long = tout montrer / tout cacher).
+    const toutCache = (sections) => {
+      const concernees = listes.filter((l) => sections.includes(l.section));
+      return concernees.length > 0 && concernees.every((l) => !l.visible);
+    };
+    boutonListes.classList.toggle('tout-cache', toutCache(sectionsDuMenu(menuListes)));
+    boutonSurfaces.classList.toggle('tout-cache', toutCache(['surface']));
+    for (const menu of menusListes) for (const caseSection of menu.querySelectorAll('[data-section-toutes]')) caseSection.indeterminate = caseSection.dataset.etat === 'partiel';
     montrerRoues();
   }
   // Dépliés / repliés : gardés quand le menu est refait ; un toucher dans l'en-tête (case) ne déplie pas.
-  menuListes.addEventListener('toggle', (evenement) => {
-    const d = evenement.target;
-    if (d.dataset?.sectionOuverte) (d.open ? sectionsOuvertes.add(d.dataset.sectionOuverte) : sectionsOuvertes.delete(d.dataset.sectionOuverte));
-    if (d.dataset?.listeOuverte) (d.open ? listesOuvertes.add(d.dataset.listeOuverte) : listesOuvertes.delete(d.dataset.listeOuverte));
-  }, true);
-  menuListes.addEventListener('change', (evenement) => {
-    const cible = evenement.target;
-    if (cible.dataset.calque) changerCalque(cible);
-    // Réglage d'une liste (0.192.0) : noms, altitudes, triangles… pour cette liste seulement.
-    if (cible.dataset.reglageListe) {
-      const id = cible.dataset.id;
-      reglagesListe.set(id, { ...(reglagesListe.get(id) ?? {}), [cible.dataset.reglageListe]: cible.checked });
-      // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre (comme avant) : géré seulement au niveau global.
-      dessiner();
-    }
-    // Case d'une catégorie : toutes ses listes d'un coup.
-    if (cible.dataset.sectionToutes) quandMontrerListe?.(`section:${cible.dataset.sectionToutes}`, cible.checked);
-  });
+  for (const menu of menusListes) {
+    menu.addEventListener('toggle', (evenement) => {
+      const d = evenement.target;
+      if (d.dataset?.sectionOuverte) (d.open ? sectionsOuvertes.add(d.dataset.sectionOuverte) : sectionsOuvertes.delete(d.dataset.sectionOuverte));
+      if (d.dataset?.listeOuverte) (d.open ? listesOuvertes.add(d.dataset.listeOuverte) : listesOuvertes.delete(d.dataset.listeOuverte));
+    }, true);
+    menu.addEventListener('change', (evenement) => {
+      const cible = evenement.target;
+      if (cible.dataset.calque) changerCalque(cible);
+      // Réglage d'une liste (0.192.0) : noms, altitudes, triangles… pour cette liste seulement.
+      if (cible.dataset.reglageListe) {
+        const id = cible.dataset.id;
+        reglagesListe.set(id, { ...(reglagesListe.get(id) ?? {}), [cible.dataset.reglageListe]: cible.checked });
+        // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre (comme avant) : géré seulement au niveau global.
+        dessiner();
+      }
+      // Case d'une catégorie : toutes ses listes d'un coup.
+      if (cible.dataset.sectionToutes) quandMontrerListe?.(`section:${cible.dataset.sectionToutes}`, cible.checked);
+    });
+  }
   menuPlans.addEventListener('click', (evenement) => {
     const pastille = evenement.target.closest('[data-choix-couleur]');
     if (!pastille) return;
@@ -2164,20 +2229,22 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     ajusterHauteurMenu(menuPlans);
   });
 
-  /** Plans du menu DXF : tous sauf ceux d'un cadastre (rangés dans « Afficher › Cadastre », 0.116.4). */
-  const plansDuMenu = () => plansDxf.filter((plan) => !plan.cadastre);
+  /** Plans du menu « Plan » : plans DXF, PDF et cadastre importé (0.221.0 ; ses points restent dans « Points › Cadastre »). */
+  const plansDuMenu = () => plansDxf;
 
   /** Liste des plans DXF du menu « Plans » (refaite quand les plans changent). */
   let signatureMenuPlans = null;
   function remplirMenuPlans() {
     // Plans du cadastre : rangés avec leurs points dans « Afficher › Cadastre » (0.116.4).
     const plansDxf = plansDuMenu();
+    boutonPlans.classList.toggle('tout-cache', plansDxf.length > 0 && plansDxf.every((plan) => plan.visible === false)); // 0.221.0 : tout caché = bouton pâli
     const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${plan.type || ''}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
     if (signature === signatureMenuPlans) return;
     signatureMenuPlans = signature;
     // Aucun plan : un petit cadre « Aucun DXF » (avant : un trait blanc vide).
     if (plansDxf.length === 0) {
-      menuPlans.innerHTML = '<p class="menu-vide">Aucun DXF</p>';
+      menuPlans.innerHTML = '<p class="menu-vide">Aucun plan</p>';
+      boutonPlans.classList.remove('tout-cache');
       return;
     }
     menuPlans.innerHTML = plansDxf.map((plan) => `<div class="ligne-menu-plan">
@@ -2199,6 +2266,8 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     boutonPlans.setAttribute('aria-expanded', 'false');
     menuListes.hidden = true;
     boutonListes.setAttribute('aria-expanded', 'false');
+    menuSurfaces.hidden = true;
+    boutonSurfaces.setAttribute('aria-expanded', 'false');
   });
 
   // --- Molette de la souris : zoom autour du curseur ---

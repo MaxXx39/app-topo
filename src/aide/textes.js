@@ -84,5 +84,5 @@ export const TEXTES_AIDE = {
   dessin:
     'DAO (Expert) : « ✏ DAO » pose une barre sur le plan : dessiner, accrocher, calques, sélectionner (déplacer, copier, tourner…), outils topo (Δ Z, pente, projeter). Exporté en DXF.',
   plan:
-    'Pince pour zoomer, glisse pour déplacer. Fond (photo aérienne, carte nationale cochable par-dessus la photo avec sa transparence, cadastre ; au-delà de 2 km de large la photo devient la carte), DXF, Afficher, Seul, Coupe, 3D, ▲ ▼ (taille). La flèche du nord remet le nord en haut.',
+    'Pince pour zoomer, glisse pour déplacer. Fond (photo aérienne, carte nationale cochable par-dessus la photo avec sa transparence, cadastre ; au-delà de 2 km de large la photo devient la carte), Plan (plans DXF, PDF et cadastre), Points, Surface (si une surface est importée), Seul, Coupe, 3D, ▲ ▼ (taille). Appui long sur Plan, Points ou Surface : tout montrer ou tout cacher (le bouton est pâli quand tout est caché). La flèche du nord remet le nord en haut.',
 };
