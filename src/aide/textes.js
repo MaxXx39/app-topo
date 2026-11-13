@@ -18,7 +18,7 @@ export const TEXTES_AIDE = {
   cartouche:
     'Écrits dans le cartouche du PDF : affaire, désignation, dessiné par et date (vide = date du jour).',
   imports:
-    'Points : CSV Emlid ou TXT en MN95 ; liste de points ou levé. Plans DXF / PDF vectoriels (DWG à enregistrer en DXF), puis recalage. LandXML, surfaces Swisstopo et cadastre : choisis-les ici.',
+    'Points : CSV Emlid ou TXT en MN95 ; liste de points ou levé. Plans DXF (DWG à enregistrer en DXF) ; plan PDF : tu tapes son nom puis tu choisis « Convertir en DXF » (traits, textes, calques) ou « En image » (la page telle quelle) ; puis recalage. LandXML, surfaces Swisstopo et cadastre : choisis-les ici.',
   lever:
     'Choisis le rôle (Contour, Ligne, Point) et le libellé, puis Enreg. (ou touche volume −), seulement en RTK fixe avec inclinaison prête. Son et vibration = point enregistré ; son grave = refusé. Ligne : « Continuer une ligne » (Intermédiaire) reprend une ligne déjà levée pour l\'allonger. Appui long sur Enreg. (Intermédiaire) : mesure de 5, 15 ou 30 s, avec moyenne, mini et maxi avant de valider.',
   corrections:

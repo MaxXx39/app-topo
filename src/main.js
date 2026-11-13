@@ -2103,20 +2103,23 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       afficherMessage(`Lecture du PDF (page ${page})…`, null);
       await new Promise((fin) => setTimeout(fin, 30));
       const contenu = await contenuDeLaPage(doc, page, pdfjs.OPS);
+      const nomDeBase = fichier.name.replace(/\.pdf$/i, '');
       // Vectoriel → traits ; sans traits mais avec une image (scanné) → image (choix d'office, validé le 05.11).
-      const enImage = contenu.traits.length === 0 && contenu.textes.length === 0;
-      if (enImage && contenu.images === 0) throw new Error('aucun trait ni image sur cette page');
-      afficherMessage(enImage ? 'PDF scanné : il sera posé en image' : `PDF en traits : ${contenu.traits.length} traits`, 2500);
+      const scanne = contenu.traits.length === 0 && contenu.textes.length === 0;
+      if (scanne && contenu.images === 0) throw new Error('aucun trait ni image sur cette page');
+      afficherMessage(scanne ? 'PDF scanné : il sera posé en image' : `PDF en traits : ${contenu.traits.length} traits`, 2500);
       // 0.217.0 : comme pour un DXF, la fenêtre le dit : un PDF est une page (en points), jamais en coordonnées suisses.
       const valeurs = await demanderChamps({
-        titre: `Plan PDF « ${fichier.name} »${enImage ? ' (image)' : ''}`,
+        titre: `Plan PDF « ${fichier.name} »${scanne ? ' (image)' : ''}`,
         note: { ton: 'alerte', texte: '⚠ Un PDF n\'est pas en coordonnées suisses (MN95) : le plan est à recaler.' },
         champs: [
           { cle: 'echelle', titre: 'Échelle du plan 1:', valeur: '', exemple: '500 (vide si inconnue)' },
-          // 0.145.0 (liste du 05.11, point 10, à essayer) : PDF en traits montré comme le PDF (image de la
-          // page), ses traits restant invisibles pour les accroches ; ou en traits comme un DXF (avant).
-          ...(enImage ? [] : [{ cle: 'aspect', titre: 'Affichage', choix: [['image', 'Aspect du PDF (image + accroches)'], ['traits', 'Traits (comme un DXF)']], valeur: 'image' }]),
-          { cle: 'nettete', titre: 'Netteté de l\'image', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART },
+          // 0.230.0 : le nom se demande à l'import (le préfixe « PDF- » est ajouté devant).
+          { cle: 'nom', titre: 'Nom du plan (« PDF- » est ajouté devant)', valeur: pages > 1 ? `${nomDeBase} (page ${page})` : nomDeBase },
+          // 0.230.0 (retour sur le 0.145) : au choix, convertir les traits en DXF ou importer la page en image.
+          // Un PDF scanné n'a pas de traits : il ne peut être qu'une image.
+          ...(scanne ? [] : [{ cle: 'mode', titre: 'Importer', choix: [['dxf', 'Convertir en DXF (traits, textes, calques)'], ['image', 'En image (la page telle quelle)']], valeur: 'dxf' }]),
+          { cle: 'nettete', titre: 'Netteté de l\'image (si importé en image)', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART },
           // 0.213.0 : comme pour un DXF : type du plan (liste partagée) et recalage tout de suite ou plus tard.
           { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...lireTypesDxf().map((t) => [t.nom, t.nom])], valeur: '' },
           { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: 'non' },
@@ -2126,9 +2129,10 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       const { echelle, erreur: erreurEchelle } = lireEchelle(valeurs.echelle);
       if (erreurEchelle) throw new Error(erreurEchelle);
 
-      // Préfixe fixe « PDF- » (0.132.0) ; « .pdf » est enlevé (le préfixe le dit déjà).
-      const base = fichier.name.replace(/\.pdf$/i, '');
-      const nom = avecPrefixe(pages > 1 ? `${base} (page ${page})` : base, PREFIXE_PDF);
+      // Préfixe fixe « PDF- » (0.132.0) ; le nom est celui tapé dans la fenêtre (0.230.0).
+      const enImage = scanne || valeurs.mode === 'image';
+      if (!sansPrefixe(valeurs.nom, PREFIXE_PDF).trim()) throw new Error('le nom du plan est vide');
+      const nom = avecPrefixe(valeurs.nom, PREFIXE_PDF);
       const avertissements = valeurs.recaler === 'cale' ? [] : [`Plan PDF : il n'est pas en MN95, touche « recaler » sur le plan pour le mettre en place${enImage ? ' (accroche « Manuel » : loupe)' : ''}.`];
       if (!echelle) avertissements.push('Sans échelle : le plan est à la taille de la feuille, le recalage trouvera l\'échelle.');
       let lu;
@@ -2146,18 +2150,6 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         const lecture = lirePlanDxf(dxfDuPdf(contenu, echelle), nom);
         if (lecture.erreur || !lecture.plan.bornes) throw new Error(lecture.erreur ?? 'aucun objet dessiné trouvé');
         lu = lecture.plan;
-        if (valeurs.aspect === 'image') {
-          // Image de la page posée sous les traits : son coin en bas à gauche est l'origine de la page,
-          // les traits sont rangés depuis l'origine du plan lu (décalage par la matrice de l'image).
-          const rendu = facteurDeRendu(contenu.largeur, contenu.hauteur, valeurs.nettete);
-          afficherMessage(`Image de la page (${rendu.dpi} dpi)…`, null);
-          await new Promise((fin) => setTimeout(fin, 30));
-          const image = await imageDeLaPage(doc, page, rendu.facteur);
-          const page2 = planImagePdf({ nom, largeurPt: image.largeurPt, hauteurPt: image.hauteurPt, echelle, donnees: image.donnees, pixels: image.pixels });
-          lu.contenu.image = { ...page2.contenu.image, matrice: [1, 0, 0, 1, -lu.origine.est, -lu.origine.nord] };
-          lu.traitsInvisibles = true;
-          avertissements.push('Aspect du PDF : on voit l\'image de la page ; ses traits sont invisibles mais servent aux accroches (Sommet, Milieu, Ligne…).');
-        }
         if (contenu.images > 0) avertissements.push(`${contenu.images} image(s) du PDF non reprise(s) (seuls les traits et les textes sont lus).`);
       }
       const nouveauPlan = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, type: valeurs.type || '', ...(valeurs.recaler === 'cale' ? { dejaCale: true } : {}), pdf: { page, echelle, image: enImage } };
