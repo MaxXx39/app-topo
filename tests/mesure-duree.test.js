@@ -18,6 +18,13 @@ describe('moyenne des lectures', () => {
     expect(m.mesureDuree.ecartMaxPlan).toBeCloseTo(0.01, 9);
   });
 
+  it('mini et maxi de chaque coordonnée (fenêtre de résultat)', () => {
+    const m = moyennerPoints([{ est: 100, nord: 200, altitude: 450 }, { est: 100.02, nord: 199.99, altitude: 450.04 }], 5);
+    expect(m.mesureDuree.limites.est).toEqual({ min: 100, max: 100.02 });
+    expect(m.mesureDuree.limites.nord).toEqual({ min: 199.99, max: 200 });
+    expect(m.mesureDuree.limites.altitude).toEqual({ min: 450, max: 450.04 });
+  });
+
   it('une lecture sans altitude : altitude null (jamais inventée)', () => {
     expect(moyennerPoints([{ est: 1, nord: 1, altitude: 10 }, { est: 1, nord: 1, altitude: null }], 5).altitude).toBeNull();
   });

@@ -1222,6 +1222,7 @@ export function creerEcranLeve(conteneur, actions) {
       <div class="corps-element">
         <strong>${echapper(debutDeNom('L', ligne.libelle))}${ligne.numero}</strong><span>${ligne.nbPoints} pt(s)</span>
         <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle ligne</button>
+        <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="reprendreLigne">Continuer une ligne</button>
         <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
           ${ligne.fermee ? '✓ Ligne fermée' : 'Fermer ligne'}</button>
       </div>

@@ -105,6 +105,7 @@ import {
   nouvelleLigne,
   basculerFermeture,
   ligneEnCours,
+  reprendreLigne,
   resumeStock,
   supprimerLevee,
   pointsDeLaLevee,
@@ -406,7 +407,7 @@ document.querySelector('#app').innerHTML = `
 /** Nom d'une application à l'écran (sur le site, « Lever » s'appelle « Édition Lever »). */
 const titreAppli = (appli) => {
   // Pages du projet (0.159.0) : le bouton porte le nom de la page (Projets, Import, Exporter, Contenu).
-  if (appli?.cle === 'projet') return { ouvrir: 'Projets', import: 'Import', export: 'Exporter', contenu: 'Contenu', points: 'Liste de points', plans: 'Plans', surfaces: 'Surfaces', archives: 'Archives' }[document.body.dataset.partieProjet] ?? 'Projet';
+  if (appli?.cle === 'projet') return { ouvrir: 'Projets', import: 'Importer', export: 'Exporter', contenu: 'Contenu', points: 'Liste de points', plans: 'Plans', surfaces: 'Surfaces', archives: 'Archives' }[document.body.dataset.partieProjet] ?? 'Projet';
   return !recepteurDisponible() && appli?.titreSite ? appli.titreSite : (appli?.titre ?? '');
 };
 
@@ -1530,7 +1531,7 @@ function exporterMesureRapide() {
 // Pages du projet (0.159.0, demande du 08.11) : il n'y a plus d'application « Projet » ; chaque bouton
 // de l'encadré du projet (page Applications) ouvre sa page à part : la liste des projets (« Changer »),
 // Import, Exporter ou le contenu du projet (body[data-partie-projet], le reste de l'onglet est caché).
-const TITRES_PARTIES_PROJET = { ouvrir: 'Projets', nouveau: 'Nouveau projet', import: 'Import', export: 'Exporter', contenu: 'Contenu du projet', points: 'Liste de points', plans: 'Plans', surfaces: 'Surfaces importées', archives: 'Archives' };
+const TITRES_PARTIES_PROJET = { ouvrir: 'Projets', nouveau: 'Nouveau projet', import: 'Importer', export: 'Exporter', contenu: 'Contenu du projet', points: 'Liste de points', plans: 'Plans', surfaces: 'Surfaces importées', archives: 'Archives' };
 const PAGES_CONTENU = ['points', 'plans', 'surfaces', 'archives'];
 // 0.197.0 : bouton « liste » des tuiles : les catégories de points montrées (Lever : tous les levés de terrain).
 const CATEGORIES_TUILES = {
@@ -2614,6 +2615,34 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         nouvelleLigne(stock);
         modifie();
       },
+      // 0.229.0 (Intermédiaire) : reprendre une ligne déjà levée (un autre jour…) pour la continuer.
+      reprendreLigne: async () => {
+        const stock = stockEnCours();
+        if (!stock) return;
+        const reprenables = stock.lignesRupture.map((l, i) => ({ l, i })).filter(({ l }) => l.noms.length > 0);
+        if (reprenables.length === 0) {
+          afficherMessage('Aucune ligne levée à reprendre');
+          return;
+        }
+        const choix = await demanderChoix({
+          titre: 'Continuer quelle ligne ?',
+          texte: 'Les prochains points s\'ajoutent au bout de la ligne choisie.',
+          boutons: [
+            ...reprenables.map(({ l, i }) => ({ cle: String(i), texte: nomDeLigne(l, i), detail: `${l.noms.length} pt(s) · dernier : ${l.noms.at(-1)}${l.fermee ? ' · fermée (sera rouverte)' : ''}` })),
+            { cle: 'annuler', texte: 'Annuler' },
+          ],
+        });
+        if (choix == null || choix === 'annuler') return;
+        const ligne = reprendreLigne(stock, Number(choix));
+        if (!ligne) return;
+        // Le libellé choisi doit être celui de la ligne, sinon l'appli en commencerait une autre.
+        if (stock.nature === 'chantier') terrain.chantier.libelle = ligne.libelle ?? terrain.chantier.libelle;
+        else terrain.libelleLigne = ligne.libelle ?? '';
+        leveDirect.role = 'ligne';
+        retenirReglagesTerrain();
+        modifie();
+        afficherMessage(`${nomDeLigne(ligne, Number(choix))} reprise : le prochain point s'ajoute au bout`);
+      },
       basculerFermeture: () => {
         const stock = stockEnCours();
         if (!stock) return;
@@ -2909,6 +2938,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       choisirImplantation: (quoi) => {
         const permises = aAcces('expert') ? ['point', 'ligne', 'altitude', 'talus'] : ['point', 'ligne', 'altitude'];
         terrain.implantation = permises.includes(quoi) ? quoi : 'surface';
+        if (terrain.implantation === 'surface') terrain.exagerationCoupe = 1; // 0.229.0 : la coupe de la surface repart à ×1
         retenirReglagesTerrain();
         recalculer();
       },
@@ -6842,7 +6872,7 @@ async function ajouterPointTouche(nom) {
       afficherMessage(refus.erreur, 3000);
       return;
     }
-    afficherMessage(`${nom} ajouté ${role === 'contour' ? 'au contour' : `à ${nomDeLigne(ligneEnCours(stock), stock.lignesRupture.length - 1)}`}`);
+    afficherMessage(`${nom} ajouté ${role === 'contour' ? 'au contour' : `à ${nomDeLigne(ligneEnCours(stock), stock.lignesRupture.indexOf(ligneEnCours(stock)))}`}`);
   }
   vibrer(40);
   modifie();
@@ -8535,7 +8565,7 @@ let controleAFaireDepuis = null;
 function mettreAJourPastilleControle() {
   let pastille = document.querySelector('#pastille-controle');
   const enControle = ongletContexte === 'terrain' && terrain.mode === 'autocontrole';
-  const afaire = recepteurDisponible() && Boolean(etatRecepteur?.connecte) && Boolean(projet) && !enControle
+  const afaire = recepteurDisponible() && Boolean(etatRecepteur?.connecte) && Boolean(projet) && projet.pointsControle?.length > 0 && !enControle // 0.229.0 : pas de point de contrôle = pas de pastille
     && controleNecessaire(projet.controles, new Date(), delaiControleMs(projet), nomDeLAppareil());
   if (!afaire) controleAFaireDepuis = null;
   else if (controleAFaireDepuis == null) controleAFaireDepuis = Date.now();
@@ -8563,7 +8593,7 @@ setInterval(mettreAJourPastilleControle, 1000);
 
 // 0.214.0 : mesure de durée (appui long sur « Enreg. » : 5 / 15 / 30 s) ; en Contrôle, 5 s d'office.
 installerMesureDuree({
-  disponible: () => recepteurDisponible() && Boolean(etatRecepteur?.connecte),
+  disponible: () => recepteurDisponible() && Boolean(etatRecepteur?.connecte) && aAcces('intermediaire'), // 0.229.0 : pas en Base
   dureeParDefaut: () => (enAutocontrole() && document.body.dataset.onglet === 'terrain' ? 5 : 0),
   refuser: (texte) => refuser(texte),
 });

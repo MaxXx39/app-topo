@@ -12,10 +12,10 @@ const cles = (liste) => liste.map((a) => a.cle);
 
 describe('applications proposées', () => {
   it('APK en Base : sans Calculs ni Guidage', () => {
-    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('base') }))).toEqual(['lever', 'implanter', 'controle', 'plan', 'recepteur']);
+    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('base') }))).toEqual(['lever', 'implanter', 'controle', 'plan']);
   });
   it('APK en Expert : toutes', () => {
-    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('expert') }))).toEqual(['lever', 'implanter', 'mesure', 'annotation', 'controle', 'guidage', 'calculs', 'plan', 'recepteur']);
+    expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('expert') }))).toEqual(['lever', 'implanter', 'mesure', 'annotation', 'controle', 'guidage', 'calculs', 'plan']);
   });
   it('site : pas d\'Implanter, de Guidage ni de Récepteur ; Contrôle dès Intermédiaire', () => {
     expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('base') }))).toEqual(['lever', 'plan']);
