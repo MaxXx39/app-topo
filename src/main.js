@@ -126,7 +126,7 @@ import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
 import { htmlEncadreAnnotation } from './annotation/encadre.js';
 import { lignesFichePoint, htmlFichePoint, htmlFicheCalque } from './plan/fiche-point.js';
-import { calqueSousLeDoigt } from './topo/calque-sous-doigt.js';
+import { calqueSousLeDoigt, appliquerGelIsolement, reafficherTousLesCalques } from './topo/calque-sous-doigt.js';
 import { ajouterAnnotation, trouverAnnotation, supprimerAnnotation, listesAnnotation, nettoyerRemarques, precisionSuffisante, estAnnotation, nomProposeAnnotation, dernierAnnotation, PRECISION_TABLETTE_DEPART } from './topo/annotation.js';
 import { applisDisponibles, appliCourante } from './navigation/applis.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
@@ -1133,6 +1133,70 @@ function montrerEncadreAnnotation(nom) {
     }
   });
   document.body.append(boite);
+}
+
+/**
+ * 0.225.0 (Intermédiaire) : Plan › Geler / Isoler. On touche des éléments du plan (orange ; retoucher = retirer),
+ * puis « Valider » : Geler cache leurs calques, Isoler ne garde que leurs calques. « Tout réafficher » : sans toucher.
+ */
+const selectionCalques = { mode: null, elements: [] };
+function fermerBarreSelectionCalques() {
+  document.querySelector('#barre-selection-calques')?.remove();
+  selectionCalques.mode = null;
+  selectionCalques.elements = [];
+  plan.definirSelectionCalques(false, []);
+}
+function choisirCalques(mode) {
+  fermerFichePoint();
+  fermerBarreSelectionCalques();
+  if (!aAcces('intermediaire')) return;
+  if (mode === 'reafficher') {
+    const remis = reafficherTousLesCalques(projet.plansDxf ?? []);
+    affichageModifie();
+    afficherMessage(remis > 0 ? `${remis} calque${remis > 1 ? 's' : ''} réaffiché${remis > 1 ? 's' : ''}` : 'Tous les calques sont déjà affichés', 3000);
+    return;
+  }
+  selectionCalques.mode = mode;
+  plan.definirSelectionCalques(true, []);
+  const boite = document.createElement('div');
+  boite.id = 'barre-selection-calques';
+  const zone = document.querySelector('.panneau-plan')?.getBoundingClientRect();
+  boite.style.cssText = `position: fixed; z-index: 40; left: 8px; right: 8px; bottom: ${Math.max(8, window.innerHeight - (zone?.bottom ?? window.innerHeight) + 34)}px; display: flex; justify-content: center; pointer-events: none;`;
+  boite.addEventListener('click', (evenement) => {
+    const bouton = evenement.target.closest('[data-action]');
+    if (!bouton) return;
+    if (bouton.dataset.action === 'valider-calques' && selectionCalques.elements.length > 0) {
+      const caches = appliquerGelIsolement(projet.plansDxf ?? [], selectionCalques.elements, selectionCalques.mode);
+      const texte = selectionCalques.mode === 'geler' ? 'gelé' : 'isolé';
+      fermerBarreSelectionCalques();
+      affichageModifie();
+      afficherMessage(`Calques ${texte}s (${caches} masqué${caches > 1 ? 's' : ''}) · Plan › ↺ Tout réafficher pour les remettre`, 5000);
+    } else if (bouton.dataset.action === 'annuler-calques') fermerBarreSelectionCalques();
+  });
+  document.body.append(boite);
+  majBarreSelectionCalques();
+}
+function majBarreSelectionCalques() {
+  const boite = document.querySelector('#barre-selection-calques');
+  if (!boite) return;
+  const n = selectionCalques.elements.length;
+  const noms = [...new Set(selectionCalques.elements.map((e) => e.calqueNom || 'Calque sans nom'))];
+  boite.innerHTML = `<div class="encadre-annotation fiche-point" role="dialog" aria-label="Choix des calques">
+      <div class="entete-encadre-annotation"><strong>${selectionCalques.mode === 'geler' ? '❄ Geler' : '◎ Isoler'}</strong><span>${n} élément${n > 1 ? 's' : ''}</span></div>
+      ${n > 0 ? `<div>${noms.map(echapper).join(' · ')}</div>` : '<div>Touchez un ou plusieurs éléments du plan</div>'}
+      <div class="ligne-boutons-selection"><button type="button" class="bouton" data-action="valider-calques" ${n === 0 ? 'disabled' : ''}>Valider</button>
+        <button type="button" class="bouton secondaire" data-action="annuler-calques">Annuler</button></div>
+    </div>`;
+}
+/** Un toucher du plan pendant le choix : ajoute l'élément le plus proche, ou le retire s'il est déjà choisi. */
+function toucherSelectionCalques(position, tolerance) {
+  const trouve = calqueSousLeDoigt(plansDuProjet(), position, tolerance);
+  if (!trouve) return;
+  const deja = selectionCalques.elements.findIndex((e) => e.cle === trouve.cle);
+  if (deja >= 0) selectionCalques.elements.splice(deja, 1);
+  else selectionCalques.elements.push(trouve);
+  plan.definirSelectionCalques(true, selectionCalques.elements.map((e) => e.forme));
+  majBarreSelectionCalques();
 }
 
 /** Ferme la fiche d'un point touché sur le plan (0.220.0). */
@@ -7503,6 +7567,8 @@ const plan = creerPlan(document.querySelector('#plan'), {
   },
   quandToucherFichePoint: (point) => montrerFichePoint(point),
   quandToucherCalque: (position, tolerance) => montrerFicheCalque(position, tolerance),
+  quandToucherSelectionCalques: (position, tolerance) => toucherSelectionCalques(position, tolerance),
+  quandChoisirCalques: (mode) => choisirCalques(mode),
   // « Voir toute la ligne » (0.118.0) cochée ou décochée (aussi décochée par « Ma position »).
   quandVoirLigne: (coche) => {
     implanter.voirLigne = coche && Boolean(implanter.ligne);

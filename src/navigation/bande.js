@@ -343,7 +343,7 @@ export function creerNavigation(nav, actions) {
     const courante = actions.courante();
     const comptes = actions.comptes?.() ?? '';
     const nouveau = actions.nouveauProjet
-      ? '<button type="button" class="bouton-bandeau-projet nouveau" data-projet="nouveau">+ Nouveau</button>'
+      ? `<button type="button" class="bouton-bandeau-projet bouton-logo-projet nouveau" data-projet="nouveau" aria-label="Nouveau projet" title="Nouveau projet">${svg('<path d="M12 5v14M5 12h14" />')}</button>`
       : '';
     const partie = (cle, titre, icone) => `<button type="button" class="bouton-partie-projet" data-projet="${cle}">${svg(icone)}${titre}</button>`;
     // 0.197.0 / 0.201.0 : moitié gauche = Import | Exporter côte à côte ; moitié droite = les pages du contenu deux par deux
@@ -365,13 +365,12 @@ export function creerNavigation(nav, actions) {
       <div class="cadre-projet-applis">
         <div class="bandeau-projet-applis">
           <div class="texte-bandeau-projet">
-            <small>Projet en cours</small>
             <b>${echapper(titre)}</b>
             ${detail ? `<span>${echapper(detail)}</span>` : ''}
           </div>
           <div class="boutons-bandeau-projet">
-            <button type="button" class="bouton-bandeau-projet bouton-carte-projets" data-projet="carte" aria-label="Carte des projets" title="Carte des projets">${svg('<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" />')}</button>
-            <button type="button" class="bouton-bandeau-projet" data-projet="changer">Changer</button>
+            <button type="button" class="bouton-bandeau-projet bouton-logo-projet bouton-carte-projets" data-projet="carte" aria-label="Carte des projets" title="Carte des projets">${svg('<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" />')}</button>
+            <button type="button" class="bouton-bandeau-projet bouton-texte-projet" data-projet="changer" title="Ouvrir un autre projet">Ouvrir</button>
             ${nouveau}
           </div>
         </div>
