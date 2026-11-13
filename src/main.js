@@ -8535,7 +8535,7 @@ let controleAFaireDepuis = null;
 function mettreAJourPastilleControle() {
   let pastille = document.querySelector('#pastille-controle');
   const enControle = ongletContexte === 'terrain' && terrain.mode === 'autocontrole';
-  const afaire = recepteurDisponible() && Boolean(etatRecepteur?.connecte) && Boolean(projet) && !enControle
+  const afaire = recepteurDisponible() && Boolean(etatRecepteur?.connecte) && Boolean(projet) && projet.pointsControle?.length > 0 && !enControle // 0.229.0 : pas de point de contrôle = pas de pastille
     && controleNecessaire(projet.controles, new Date(), delaiControleMs(projet), nomDeLAppareil());
   if (!afaire) controleAFaireDepuis = null;
   else if (controleAFaireDepuis == null) controleAFaireDepuis = Date.now();

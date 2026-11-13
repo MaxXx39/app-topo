@@ -320,7 +320,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
   /** 0.197.0 : page du contenu à montrer : 'points', 'plans', 'surfaces' ou 'archives'. */
   function choisirVue(quelle) {
     vue = ['points', 'plans', 'surfaces', 'archives'].includes(quelle) ? quelle : 'points';
-    gerer = false;
+    gerer = vue === 'plans' || vue === 'surfaces'; // 0.229.0 : Plans et Surfaces importées s'ouvrent directement sur « Gérer »
     if (derniers) afficher(...derniers);
   }
   return { afficher, choisirCategories, choisirVue };

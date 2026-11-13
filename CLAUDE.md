@@ -72,7 +72,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Choix pris en codant le tableau (validés le 02.11) : « Relancer NTRIP » dans tous les modes sans code ; « Enregistrer » de la fenêtre Exporter en Base (mail / « autrement » dès Intermédiaire) ; options de ligne à l'implantation et export du contrôle en Base ; code de sécurité inchangé.
 - **Code de sécurité** (`outils/code.js`, tous modes ; simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert (0.90), nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle (tolérances, points, durée), prendre la main (Drive), listes partagées. Import de points de contrôle dans Projet : **sans** code (0.90).
 
-## Fonctionnalités (état à la 0.228.0)
+## Fonctionnalités (état à la 0.229.0)
 Le détail version par version est dans l'historique git (`git log`) ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -140,6 +140,7 @@ Le détail version par version est dans l'historique git (`git log`) ; ici seule
 - **0.226** (13.11) : encadré du projet (page Applications) : 📍 carte et ＋ nouveau en **logos de 38 px** (`.bouton-logo-projet`), **« Ouvrir »** (ex-« Changer ») en texte (`.bouton-texte-projet`), « Projet en cours » retiré, le nom prend toute la place ; les boutons Import / Exporter / Liste… inchangés.
 - **0.227** (13) : encadré du projet : les 6 boutons **de même taille, en grille de 3** (`.grille-parties-projet`, `navigation/bande.js`) dans l'ordre Importer, Exporter, Liste de points, Plans, Archives, Surfaces importées (Base : 1 ligne ; Expert : 2 lignes) ; « Import » renommé **« Importer »** (bouton et titre de page).
 - **0.228** (13) : encadré du projet : **Importer et Exporter dans la 1re colonne, l'un sous l'autre** (`grid-column` / `grid-row` dans `style.css`), les 4 autres en 2 × 2 à droite (Liste de points, Plans / Archives, Surfaces importées) ; fond **sable clair** `#ede6d6` pour Importer et Exporter (plus vert ni orange).
+- **0.229** (13.11) : tuile « Récepteur » retirée du menu (doublon du bouton en haut à droite) ; cadastre autour d'un point : le clavier ne se referme plus (la barre du rayon restait cachée avec le plan : règle `:has(.barre-pointage input:focus)` dans `style.css`) ; pastille « Contrôle à refaire » seulement s'il y a des points de contrôle ; « Plans » et « Surfaces importées » s'ouvrent directement sur « Gérer ». **Pas fait / à demander** : cadastre Vaud (erreur 500 du service RDPPF, injoignable d'ici), coupes d'Implanter, reprise d'une ligne levée, fenêtre min / max / moyenne de la mesure de durée.
 - **Ouverts (non reproduits d'ici)** : dézoom en changeant d'application (OK sur ordinateur ; demander la séquence exacte sur tablette) ; accroches objet au recalage « sur site » (OK avec Chromium ; demander navigateur + plan).
 - **Abandonnés** : poignée du plan, noms sous les accroches, déblai / remblai en direct, mode des tablettes à distance, fusion des deux bandes de l'en-tête. **En attente** : double mesure de contrôle (HappySurvey), nom de la tablette à chaque ligne du journal.
 - **À confirmer** : « 80 / 92 » du chantier (Ø ext. = 2e valeur supposé), « retour » du bandeau Lever = ↶, « harmoniser » Annotation, nom de la liste Annotation si le nom libre change, plan d'Annotation 30–70 %, cercles 20 cm = 15 / 10 / 5.

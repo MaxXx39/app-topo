@@ -12636,6 +12636,11 @@ body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise
 .bouton-nature small { font-size: 0.72rem; font-weight: 600; opacity: 0.85; }
 body.clavier-ouvert { --hauteur-plan-terrain: 0px !important; --hauteur-plan-guidage: 0px !important; }
 body.clavier-ouvert .panneau-plan { display: none !important; }
+/* 0.229.0 : une barre de saisie du plan (rayon du cadastre…) dont le champ a la main reste visible : cacher le plan
+   la cachait aussi, donc le clavier se refermait aussitôt. Seule la barre reste, collée en haut. */
+body.clavier-ouvert .panneau-plan:has(.barre-pointage input:focus) { display: block !important; position: fixed; top: 0; left: 0; right: 0; height: auto !important; min-height: 0 !important; z-index: 300; background: transparent; }
+body.clavier-ouvert .panneau-plan:has(.barre-pointage input:focus) .plan-cadre > :not(.barre-pointage) { display: none !important; }
+body.clavier-ouvert .panneau-plan:has(.barre-pointage input:focus) .barre-pointage { position: static; margin: 8px; }
 
 /* 0.168.1 (choix du 09.11 : proposition C) : choix de la surface dans la bande : fond clair teinté de la couleur de
    l'application (sarcelle pour Implanter, bleu pour Guidage), bord de cette couleur, texte sombre, grosse flèche ronde. */

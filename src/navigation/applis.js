@@ -83,14 +83,6 @@ export const APPLIS = [
     site: true,
     icone: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />',
   },
-  {
-    cle: 'recepteur',
-    titre: 'Récepteur',
-    couleur: '#38bdf8',
-    texte: '#0c4a6e',
-    apk: true,
-    icone: '<path d="M8.5 3.2a5 5 0 0 1 7 0M6.6 1.3a7.8 7.8 0 0 1 10.8 0" /><ellipse cx="12" cy="9" rx="6" ry="2.6" /><path d="M6 9v1.4a6 2.6 0 0 0 12 0V9M12 13v9" />',
-  },
 ];
 
 // Le projet n'est pas une tuile (il a son bandeau en haut de la page Applications), mais c'est
