@@ -11964,7 +11964,7 @@ body.mode-telephone .entete .entete-icone-bouton.bouton-recepteur-entete { backg
 body:not([data-onglet='terrain']) .bouton-implanter-plan { display: none !important; }
 
 /* Encadré du projet : bandeau + Import / Exporter / Contenu ensemble. */
-.cadre-projet-applis { padding: 10px; border-radius: 18px; background: #1b2b36; }
+.cadre-projet-applis { padding: 10px; border-radius: 18px; border: 2px solid #eab308; background: #1b2b36; }
 .cadre-projet-applis .bandeau-projet-applis { padding: 4px 4px 10px; border-radius: 0; background: none; }
 .cadre-projet-applis .parties-projet-applis { margin-top: 0; }
 .cadre-projet-applis .bouton-partie-projet { border-color: rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.1); color: #ffffff; }
