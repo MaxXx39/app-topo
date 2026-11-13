@@ -1012,7 +1012,18 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     // perpendiculaire, couleur de la tolérance ; sur la ligne ou pour un talus : le texte posé le long de la perpendiculaire.
     if (vers) {
       const cible = ecran(vers);
-      const place = cotes.fleche && Math.abs(ecart) >= 0.0005 ? placerFlecheEcart(cible, canne) : null;
+      // 0.232.0 : canne à moins d'un pixel de la ligne (petit écart) : la flèche reste visible, posée du côté de l'écart
+      // (+ = à droite de la ligne, sens début → fin) sur la perpendiculaire du segment.
+      let repli = null;
+      const pied = pointALAbscisse(sommets, Math.max(0, Math.min(longueur, abscisse)));
+      if (pied && sommets[pied.segment + 1]) {
+        const a = ecran(sommets[pied.segment]);
+        const b = ecran(sommets[pied.segment + 1]);
+        const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const sens = ecart >= 0 ? 1 : -1;
+        repli = { x: (-(b.y - a.y) / l) * sens, y: ((b.x - a.x) / l) * sens };
+      }
+      const place = cotes.fleche && Math.abs(ecart) >= 0.0005 ? placerFlecheEcart(cible, canne, 6, repli) : null;
       if (!place) {
         texteLeLong(canne, cible, Math.abs(ecart) < 0.0005 ? 'sur la ligne' : m(ecart), 'cote-ecart');
       } else {

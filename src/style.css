@@ -10032,8 +10032,8 @@ body.mode-telephone .couloir-vertical .texte-reglette { font-size: 19px; }
 .cadre-couloir .drapeau-couloir .icone-drapeau { width: 20px; height: 24px; }
 .cadre-couloir .drapeau-couloir.fin { transform: translate(-2px, -100%); margin-top: -3px; }
 .cadre-couloir .drapeau-couloir.debut { transform: translate(-2px, 0); margin-top: 4px; }
-.cadre-couloir .moi-couloir { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 3px solid #ffffff; box-sizing: border-box; }
-@media (max-width: 520px) { .cadre-couloir .texte-reglette { font-size: 8px; } .cadre-couloir .texte-reglette.en-haut { bottom: 10px; } .cadre-couloir .drapeau-couloir .icone-drapeau { width: 15px; height: 18px; } .cadre-couloir .moi-couloir { width: 18px; height: 18px; margin: -9px 0 0 -9px; } }
+.cadre-couloir .moi-couloir { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid #ffffff; box-sizing: border-box; }
+@media (max-width: 520px) { .cadre-couloir .texte-reglette { font-size: 8px; } .cadre-couloir .texte-reglette.en-haut { bottom: 10px; } .cadre-couloir .drapeau-couloir .icone-drapeau { width: 15px; height: 18px; } .cadre-couloir .moi-couloir { width: 10px; height: 10px; margin: -5px 0 0 -5px; } }
 body.mode-telephone .cadre-couloir .texte-reglette { font-size: 8px; }
 body.mode-telephone .cadre-couloir .texte-reglette.en-haut { bottom: 10px; }
 body.mode-telephone .cadre-couloir .drapeau-couloir .icone-drapeau { width: 15px; height: 18px; }
@@ -13241,7 +13241,10 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .cadre-couloir .fleche-couloir.vers-gauche .pointe { border-right: 20px solid var(--couleur-fleche); }
 .cadre-couloir .fleche-couloir.vers-droite { flex-direction: row-reverse; padding-left: 14px; }
 .cadre-couloir .fleche-couloir.vers-droite .pointe { border-left: 20px solid var(--couleur-fleche); }
-.cadre-couloir .fleche-couloir .mot-fleche { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font-size: 0.95rem; font-weight: 800; color: var(--couleur-fleche); } /* 0.208.0 : sans ombre floue */
+.cadre-couloir .fleche-couloir .mot-fleche { position: absolute; bottom: 18px; white-space: nowrap; font-size: 0.95rem; font-weight: 800; color: var(--couleur-fleche); } /* 0.208.0 : sans ombre floue */
+/* 0.232.0 : le texte de l'écart est décalé du trait de la ligne (comme sur le plan) : il commence au bord de la flèche côté canne et s'écrit à l'opposé du trait. */
+.cadre-couloir .fleche-couloir.vers-gauche .mot-fleche { left: 6px; text-align: left; }
+.cadre-couloir .fleche-couloir.vers-droite .mot-fleche { right: 6px; text-align: right; }
 
 /* 0.189.3 : boutons de coupe d'Implanter › Surface avec symbole, un peu plus larges */
 .choix-coupe .puce-choix { display: inline-flex; align-items: center; gap: 6px; min-width: 150px; min-height: 48px; padding: 0 12px; }
