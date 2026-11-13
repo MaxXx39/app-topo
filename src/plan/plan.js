@@ -134,7 +134,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 // chaque geste sur le plan (poser, bouger, relâcher, molette) remet le délai de 5 s à zéro.
 const DELAI_RETOUR_SUIVI = 5000;
 
-export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
+export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
   // Réglage d'une liste : son choix, sinon celui de départ (en dessous d'Expert, les réglages d'Expert gardent leur valeur de départ).
   const reglageListe = (cle, id) => {
     const choix = id != null ? reglagesListe.get(id) : null;
@@ -640,8 +640,30 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     svg.append(groupe);
   }
 
+  // 0.225.0 : éléments de plan choisis pour « Geler / Isoler » : montrés en orange (formes en MN95, voir topo/calque-sous-doigt.js).
+  const selectionCalques = { actif: false, formes: [] };
+  function dessinerSelectionCalques() {
+    svg.querySelector('g.selection-calques')?.remove();
+    if (!vue || selectionCalques.formes.length === 0) return;
+    const groupe = creerElement('g', { class: 'selection-calques' });
+    for (const forme of selectionCalques.formes) {
+      if (forme.type === 'trait') {
+        const ecran = forme.pts.map((p) => versEcran(p.est, p.nord, vue));
+        groupe.append(creerElement('path', { d: tracePar(ecran, forme.ferme), class: 'trait-selection' }));
+      } else if (forme.type === 'cercle') {
+        const c = versEcran(forme.est, forme.nord, vue);
+        groupe.append(creerElement('circle', { cx: c.x, cy: c.y, r: Math.max(3, forme.r * vue.echelle), class: 'trait-selection' }));
+      } else {
+        const c = versEcran(forme.est, forme.nord, vue);
+        groupe.append(creerElement('circle', { cx: c.x, cy: c.y, r: 9, class: 'trait-selection' }));
+      }
+    }
+    svg.append(groupe);
+  }
+
   function dessinerImplantation() {
     dessinerZone();
+    dessinerSelectionCalques();
     svg.querySelector('g.implantation')?.remove();
     if (!implantation || !vue) return;
     const groupe = creerElement('g', { class: 'implantation' });
@@ -2208,6 +2230,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
     });
   }
   menuPlans.addEventListener('click', (evenement) => {
+    const gel = evenement.target.closest('[data-gel-calques]');
+    if (!gel) return;
+    menuPlans.hidden = true;
+    boutonPlans.setAttribute('aria-expanded', 'false');
+    quandChoisirCalques?.(gel.dataset.gelCalques);
+  });
+  menuPlans.addEventListener('click', (evenement) => {
     const pastille = evenement.target.closest('[data-choix-couleur]');
     if (!pastille) return;
     pastille.closest('details')?.removeAttribute('open');
@@ -2252,7 +2281,13 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
       boutonPlans.classList.remove('tout-cache');
       return;
     }
-    menuPlans.innerHTML = plansDxf.map((plan) => `<div class="ligne-menu-plan">
+    // 0.225.0 : première ligne = Geler / Isoler / Tout réafficher (Intermédiaire) ; le menu se ferme, on touche des éléments du plan, puis « Valider ».
+    const enteteCalques = `<div class="ligne-menu-plan ligne-gel-calques seulement-intermediaire">
+        <button type="button" class="bouton-gel" data-gel-calques="geler" title="Geler : cacher le calque des éléments touchés">❄ Geler</button>
+        <button type="button" class="bouton-gel" data-gel-calques="isoler" title="Isoler : ne garder que le calque des éléments touchés">◎ Isoler</button>
+        <button type="button" class="bouton-gel" data-gel-calques="reafficher" title="Tout réafficher : tous les calques de tous les plans">↺ Tout réafficher</button>
+      </div>`;
+    menuPlans.innerHTML = enteteCalques + plansDxf.map((plan) => `<div class="ligne-menu-plan">
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
           <span>${echapper(plan.nom)}</span>${plan.type ? `<span class="pastille-type-dxf" style="background: ${couleurDuType(plan.type)}">${echapper(plan.type)}</span>` : ''}</label>
         ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
@@ -2452,6 +2487,9 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
         // Tracé d'une coupe : la position touchée (celle du point levé s'il y en a un tout près).
         const point = pointLePlusProche(toucher);
         quandToucherPosition?.(point ? { est: point.est, nord: point.nord } : versTerrain(toucher.x, toucher.y, vue));
+      } else if (selectionCalques.actif) {
+        // 0.225.0 : choix des éléments à geler / isoler (main.js ajoute ou retire l'élément touché)
+        quandToucherSelectionCalques?.(versTerrain(toucher.x, toucher.y, vue), RAYON_TOUCHER / vue.echelle);
       } else if (implantation?.actif) {
         // Implantation : main.js cherche le sommet, le milieu, l'endroit de la ligne ou le centre.
         quandToucherImplantation?.(versTerrain(toucher.x, toucher.y, vue), RAYON_TOUCHER / vue.echelle);
@@ -2574,6 +2612,12 @@ export function creerPlan(conteneur, { quandToucherPoint, quandToucherStock, qua
   return {
     /** Loupe de l'accroche « Manuel » (0.130.0) : voir loupe.js (montrer, cacher, deplacerDe, changerZoom, placerSur). */
     loupe,
+    /** 0.225.0 : choix des éléments à geler / isoler : actif (les touchers vont à main.js) et formes à montrer en orange. */
+    definirSelectionCalques(actif, formes = []) {
+      selectionCalques.actif = actif;
+      selectionCalques.formes = formes;
+      dessiner();
+    },
     /** 0.213.0 : fond de plan remis comme au départ (coché, transparent à 60 %) : appelé à l'ouverture d'un autre projet. */
     remettreFond() {
       calquesChoisis.fondSatellite = true;
