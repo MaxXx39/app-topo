@@ -1,0 +1,40 @@
+# Petit programme de test Windows pour la tablette CC180 (lecture du récepteur GNSS sur un port COM).
+# Fabriqué seulement quand le dossier windows/ change (ou à la main), puis publié dans « Releases » :
+#   https://github.com/MaxXx39/app-topo/releases/download/exe-test-derniere-version/Topo-Test-Recepteur.exe
+name: Fabriquer le test Windows
+
+on:
+  push:
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fabriquer le .exe
+        run: dotnet build windows/TestRecepteur/TestRecepteur.csproj -c Release -o sortie
+
+      - name: Garder le .exe (onglet Actions)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Topo-Test-Recepteur
+          path: sortie/Topo-Test-Recepteur.exe
+
+      - name: Publier dans Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete exe-test-derniere-version --cleanup-tag --yes || true
+          gh release create exe-test-derniere-version sortie/Topo-Test-Recepteur.exe \
+            --target "${{ github.sha }}" \
+            --title "Test Windows CC180 - dernière version (n° ${{ github.run_number }}, ${{ github.ref_name }})" \
+            --notes "Petit programme de test du récepteur GNSS pour Windows (CC180)."
