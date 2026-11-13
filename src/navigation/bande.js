@@ -370,7 +370,7 @@ export function creerNavigation(nav, actions) {
           </div>
           <div class="boutons-bandeau-projet">
             <button type="button" class="bouton-bandeau-projet bouton-logo-projet bouton-carte-projets" data-projet="carte" aria-label="Carte des projets" title="Carte des projets">${svg('<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" />')}</button>
-            <button type="button" class="bouton-bandeau-projet bouton-logo-projet" data-projet="changer" aria-label="Changer de projet" title="Changer de projet">${svg('<path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4" />')}</button>
+            <button type="button" class="bouton-bandeau-projet bouton-texte-projet" data-projet="changer" title="Ouvrir un autre projet">Ouvrir</button>
             ${nouveau}
           </div>
         </div>
