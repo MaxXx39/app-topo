@@ -200,6 +200,16 @@ export function listesCadastre(projet) {
   return projet.leves.filter((l) => l.cadastre).map((l) => l.id);
 }
 
+/** 0.231.0 : identifiants des surfaces importées (section « Surface » d'Afficher), cachées au départ. */
+export function listesSurfacesImportees(projet) {
+  return (projet.surfaces ?? []).filter((s) => ['landxml', 'dxf', 'swisstopo'].includes(s.type)).map((s) => s.id);
+}
+
+/** Cache une liste (sans toucher aux autres). */
+export function cacherListe(projet, id) {
+  if (!(projet.listesCachees ?? []).includes(id)) projet.listesCachees = [...(projet.listesCachees ?? []), id];
+}
+
 /** Coche (visible) ou décoche une liste. */
 export function montrerListe(projet, id, visible) {
   const cachees = new Set(projet.listesCachees ?? []);

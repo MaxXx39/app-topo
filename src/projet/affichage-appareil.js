@@ -7,7 +7,7 @@
 // `connues` = listes qui existaient au dernier enregistrement : une liste Cadastre plus récente
 // arrive cachée (comme avant), une liste que l'utilisateur a affichée reste affichée.
 
-import { listesDePoints, listesCadastre } from '../plan/listes-points.js';
+import { listesDePoints, listesCadastre, listesSurfacesImportees } from '../plan/listes-points.js';
 
 export const CLE_AFFICHAGE = 'topo-affichage';
 const PROJETS_GARDES = 200; // au-delà, les plus anciens sont oubliés (place sur l'appareil)
@@ -62,7 +62,7 @@ export function appliquerAffichage(projet, stockage = stockageParDefaut()) {
   const garde = lireTout(stockage)[projet.id];
   const cadastres = listesCadastre(projet);
   if (!garde) {
-    projet.listesCachees = cadastres;
+    projet.listesCachees = [...cadastres, ...listesSurfacesImportees(projet)];
     for (const plan of projet.plansDxf ?? []) {
       plan.visible = true;
       for (const calque of plan.calques ?? []) calque.visible = true;
@@ -72,7 +72,7 @@ export function appliquerAffichage(projet, stockage = stockageParDefaut()) {
   const existantes = new Set(listesDePoints(projet).map((l) => l.id));
   const connues = new Set(garde.connues ?? []);
   const cachees = new Set((garde.cachees ?? []).filter((id) => existantes.has(id)));
-  for (const id of cadastres) if (!connues.has(id)) cachees.add(id);
+  for (const id of [...cadastres, ...listesSurfacesImportees(projet)]) if (!connues.has(id)) cachees.add(id); // 0.231.0 : surfaces importées cachées au départ
   projet.listesCachees = [...cachees];
   for (const plan of projet.plansDxf ?? []) {
     const retenu = garde.dxf?.[plan.id];

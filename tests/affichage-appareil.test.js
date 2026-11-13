@@ -78,4 +78,21 @@ describe('Affichage gardé par tablette (0.128)', () => {
     expect(() => appliquerAffichage(projet, t)).not.toThrow();
     expect(projet.listesCachees).toEqual(['c1']);
   });
+
+  it('0.231 : une surface importée arrive cachée ; celle que l\'utilisateur a montrée reste montrée', () => {
+    const projet = projetEssai();
+    projet.surfaces.push({ id: 's1', nom: 'Surf-A', type: 'landxml', nomFichier: 'a.xml', points: [pt('a')], faces: [] });
+    const surfaceImportee = (projet.surfaces[0]);
+    const stockage = tablette();
+    appliquerAffichage(projet, stockage);
+    const cachee = projet.listesCachees.includes('s1');
+    // Montrée à la main puis retenue par la tablette : elle reste montrée à l'ouverture suivante.
+    projet.listesCachees = projet.listesCachees.filter((id) => id !== 's1');
+    noterAffichage(projet, stockage);
+    const autre = projetEssai();
+    autre.surfaces.push(surfaceImportee);
+    appliquerAffichage(autre, stockage);
+    expect(cachee).toBe(true);
+    expect(autre.listesCachees.includes('s1')).toBe(false);
+  });
 });

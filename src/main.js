@@ -135,7 +135,7 @@ import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip 
 import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation, classeTolerance, TOLERANCES_PAR_DEFAUT } from './topo/controle.js';
 import { noterAffichage, appliquerAffichage } from './projet/affichage-appareil.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, cacherListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale, calageParAxes, echelleParDeuxPoints, recalerContenu } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
@@ -6253,6 +6253,7 @@ const surfaceSwisstopo = creerSurfaceSwisstopo({
   nomsPris: () => projet.surfaces.map((s) => s.nom),
   ajouterSurface: (surface) => {
     projet.surfaces.push(surface);
+    if (surface.type === 'swisstopo') cacherListe(projet, surface.id); // 0.231.0 : surface Swisstopo cachée au départ
     editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
     editeurSurfaces.choisir(projet.surfaces.length - 1);
     modifie({ recadrer: true });
@@ -7827,7 +7828,11 @@ async function importerSurface(fichier) {
     const surfaces = type === 'dxf' ? lu.surfaces : fusionnerSurfaces(lu.surfaces, fichier.name.replace(/\.[^.]+$/, ''));
     if (surfaces.length < lu.surfaces.length) avertissements.push(`${lu.surfaces.length} surfaces du fichier réunies en une seule`);
     // Plus de question « Stock, Terrain… ? » (0.90.0) : la nature ne servait à rien.
-    for (const surface of surfaces) projet.surfaces.push(surfaceImportee(surface, fichier.name, type));
+    for (const surface of surfaces) {
+      const importee = surfaceImportee(surface, fichier.name, type);
+      projet.surfaces.push(importee);
+      cacherListe(projet, importee.id); // 0.231.0 : surfaces cachées au départ (case dans Afficher › Surface)
+    }
     const messages = [...erreurs, ...avertissements];
     message = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} » : voir Surfaces importées, plus bas.</p>
       ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
