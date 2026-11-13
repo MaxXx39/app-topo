@@ -5031,6 +5031,18 @@ function enregistrerControle() {
  */
 let rappelEnCours = false;
 let dernierRappel = 0; // date du dernier rappel montré (ms)
+// 0.233 (13.11) : à l'ouverture d'un projet ou à la connexion du récepteur, on attend 10 s avant de proposer le contrôle
+// (le temps que le RTK se fixe) ; si entre-temps le récepteur est déconnecté ou un autre projet ouvert, rien n'est proposé.
+const ATTENTE_RAPPEL_CONTROLE_MS = 10_000;
+let minuterieRappel = null;
+function proposerControleApresDelai() {
+  clearTimeout(minuterieRappel);
+  const projetAttendu = projet;
+  minuterieRappel = setTimeout(() => {
+    minuterieRappel = null;
+    if (projet === projetAttendu && etatRecepteur?.connecte) proposerControle();
+  }, ATTENTE_RAPPEL_CONTROLE_MS);
+}
 async function proposerControle() {
   if (!ecranLeve || rappelEnCours || !controleNecessaire(projet.controles, new Date(), delaiControleMs(projet), nomDeLAppareil())) return;
   rappelEnCours = true;
@@ -7205,7 +7217,7 @@ if (recepteurDisponible()) {
     etatRecepteur = etat;
     // Mesure rapide : « + Point GNSS » de la bande suit l'état du récepteur (prêt ou non).
     if (ongletContexte === 'mesure-rapide' || ongletContexte === 'annotation') navigation?.mettreAJour();
-    if (vientDeSeConnecter) proposerControle();
+    if (vientDeSeConnecter) proposerControleApresDelai();
     mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette, terrain.hauteurCanne ?? null);
     boutonRecepteur?.mettreAJour(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
@@ -8757,7 +8769,7 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
     noterJournal({ type: 'ouverture' });
   }
   // RX2 déjà connecté : rappel du contrôle pour ce projet, s'il en faut un.
-  if (etatRecepteur?.connecte) proposerControle();
+  if (etatRecepteur?.connecte) proposerControleApresDelai();
 }
 
 /**
