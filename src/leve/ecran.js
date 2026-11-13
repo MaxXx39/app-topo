@@ -709,6 +709,9 @@ export function creerEcranLeve(conteneur, actions) {
         </div>`
       : '';
     if (fiche) return `${fiche}${lienExport()}`;
+    // 0.234.0 : ligne faite de points touchés un à un : même gros bouton « Implanter » que pour un point ou
+    // une ligne touchée (relayé en bas à droite du plan et dans la bande) ; le talus garde son bouton.
+    const pointsLigneImplantable = points.length >= 2 && donnees.controle.implantation !== 'talus';
     return `
       <div class="points-ligne">
         <p class="titre-choix">Points de la ligne</p>
@@ -716,7 +719,10 @@ export function creerEcranLeve(conteneur, actions) {
           ? '<p class="vide">Aucun point.</p>'
           : `<ol>${points.map((p, i) => `<li><strong>${role(i)}</strong> ${p.nom ? echapper(p.nom) : ''} <span class="aide"><span class="coord-en">E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)} · </span>H ${formaterNombre(p.altitude)}</span></li>`).join('')}</ol>`}
         <div class="ligne-outils">
-          <button type="button" class="bouton-secondaire" data-action="implanterPointsLigne" ${points.length < 2 ? 'disabled' : ''}>${donnees.controle.implantation === 'talus' ? 'Talus depuis cette ligne' : 'Implanter cette ligne'}</button>
+          ${pointsLigneImplantable
+    ? `<button type="button" class="bouton bouton-implanter" data-action="implanterPointsLigne">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></svg>Implanter</button>`
+    : `<button type="button" class="bouton-secondaire" data-action="implanterPointsLigne" ${points.length < 2 ? 'disabled' : ''}>${donnees.controle.implantation === 'talus' ? 'Talus depuis cette ligne' : 'Implanter cette ligne'}</button>`}
           ${points.length > 0 ? '<button type="button" class="bouton-lien" data-action="retirerDernierPointLigne">enlever le dernier</button>' : ''}
         </div>
       </div>

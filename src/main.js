@@ -492,7 +492,7 @@ function boutonDeBande(cle, titre, detail, desactive = false, court = null) {
 // Vrais boutons de l'écran relayés par la zone du milieu (clé → sélecteur).
 const RELAIS_BANDE = {
   prendre: '#leve-direct .cadre-prise .bouton-prendre',
-  implanter: '#leve-direct [data-action="implanterChoix"].bouton-implanter, #leve-direct [data-action="implanterLigneChoisie"].bouton-implanter',
+  implanter: '#leve-direct [data-action="implanterChoix"].bouton-implanter, #leve-direct [data-action="implanterLigneChoisie"].bouton-implanter, #leve-direct [data-action="implanterPointsLigne"].bouton-implanter',
   enregistrer: '#leve-direct [data-action="enregistrerImplantation"]',
   dao: '#bouton-dao',
   // 0.167.0 : Implanter › Altitude (bouton « Alti ici ») et Guidage (choix des lignes) sont dans la bande.
@@ -584,6 +584,7 @@ function contenuBande() {
   if (cle === 'implanter') {
     if (trouver('implanter')) {
       if (implanter.ligneAValider && implanter.ligne) return boutonDeBande('implanter', 'Implanter', implanter.ligne.nom);
+      if (!implanter.ligne && implanter.pointsLigne.length >= 2) return boutonDeBande('implanter', 'Implanter', `${implanter.pointsLigne.length} points`);
       const nom = document.querySelector('#leve-direct [data-champ="nom-implantation"]')?.value.trim() || implanter.choix?.nom || '';
       const altitude = document.querySelector('#leve-direct [data-champ="altitude-implantation"]')?.value.trim() ?? '';
       return boutonDeBande('implanter', 'Implanter', [nom, altitude ? `H ${altitude}` : ''].filter(Boolean).join(' · '));
