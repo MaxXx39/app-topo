@@ -13386,8 +13386,12 @@ body.theme-sombre { --bande-a: #22313c; --bande-b: #18232b; --sep-tableau: #4b5d
 .puce-liste-points small { opacity: 0.7; }
 
 /* 0.203.0 (maquette A, choisie le 10.11) : Import vert, Exporter orange ; les 4 pages du contenu dans un encadré clair, boutons blancs à icône colorée. */
-.cadre-projet-applis .grille-parties-projet .bouton-partie-projet[data-projet='import'] { background: #16a34a; border-color: #15803d; color: #ffffff; }
-.cadre-projet-applis .grille-parties-projet .bouton-partie-projet[data-projet='export'] { background: #ea580c; border-color: #c2410c; color: #ffffff; }
+/* 0.228.0 : Importer et Exporter dans la première colonne, l'un sous l'autre (Exporter seul en haut s'il n'y a pas Importer) ; fond sable clair. */
+.cadre-projet-applis .grille-parties-projet .bouton-partie-projet[data-projet='import'],
+.cadre-projet-applis .grille-parties-projet .bouton-partie-projet[data-projet='export'] { background: #ede6d6; border-color: #cbbd9c; color: #1b2b36; }
+.grille-parties-projet .bouton-partie-projet[data-projet='import'] { grid-column: 1; grid-row: 1; }
+.grille-parties-projet .bouton-partie-projet[data-projet='export'] { grid-column: 1; grid-row: 2; }
+.grille-parties-projet .bouton-partie-projet[data-projet='export']:first-child { grid-row: 1; }
 .cadre-projet-applis .grille-parties-projet { padding: 6px; gap: 6px; border-radius: 14px; background: #f1f5f9; }
 .cadre-projet-applis .grille-parties-projet .bouton-partie-projet { background: #ffffff; border: 2px solid #cbd5e1; color: #1b2b36; }
 .cadre-projet-applis .bouton-partie-projet[data-projet='points'] svg { color: #ca8a04; }
