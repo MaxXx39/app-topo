@@ -758,11 +758,15 @@ export function creerEcranLeve(conteneur, actions) {
     // Position le long : avant le début, après la fin, ou depuis le début (+ la fin en petit).
     // 0.118.1 : dans son propre bloc, coloré selon l'écart au bout le plus proche (tolérance en plan
     // du Contrôle : vert = on est sur le début ou la fin).
+    // 0.234.0 : pente du segment où se trouve la canne (%), à gauche de « fin … m » ; rien sans altitudes.
+    const penteSegment = g.ligne.pente;
+    const pente = penteSegment == null ? ''
+      : `<span class="pente-segment" title="Pente du segment en cours">${penteSegment >= 0 ? '↗ +' : '↘ −'}${Math.abs(penteSegment).toFixed(2)} %</span>`;
     let leLong;
     if (abscisse < 0) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}Avant le début</span><strong>${m(abscisse)}</strong></div>`;
     else if (abscisse > longueur) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('fin')}Après la fin</span><strong>${m(abscisse - longueur)}</strong></div>`;
     else leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}Début</span><strong>${m(abscisse)}</strong></div>
-        <div class="fin-petite">${iconeDrapeau('fin')}fin ${m(reste)}</div>`;
+        <div class="fin-petite">${pente}${iconeDrapeau('fin')}fin ${m(reste)}</div>`;
     const hauteur = g.ecartAltitude == null
       ? '<div class="bloc-hauteur sans-altitude">pas d\'altitude</div>'
       : `<div class="bloc-hauteur ${g.classeAltitude}"><span class="libelle-ecart">${iconeFleche(g.ecartAltitude >= 0 ? 'monter' : 'descendre')}${g.ecartAltitude >= 0 ? 'Monter' : 'Descendre'}</span><strong>${m(g.ecartAltitude)}</strong></div>`;

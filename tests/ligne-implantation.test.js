@@ -1,6 +1,6 @@
 // Tests de l'implantation d'une ligne : abscisse, décalage, altitude, ligne parallèle.
 import { describe, it, expect } from 'vitest';
-import { longueurPolyligne, positionSurLigne, altitudeSurLigne, guidageLigne, ligneParallele, sommetsChoisis, pointALAbscisse } from '../src/topo/ligne-implantation.js';
+import { longueurPolyligne, positionSurLigne, altitudeSurLigne, guidageLigne, penteDuSegment, ligneParallele, sommetsChoisis, pointALAbscisse } from '../src/topo/ligne-implantation.js';
 
 const p = (est, nord, altitude = null) => ({ est, nord, altitude });
 // Ligne en L : (0,0) → (10,0) → (10,10), avec des altitudes 400, 401, 403.
@@ -62,5 +62,29 @@ describe('pointALAbscisse', () => {
   it('prolonge la ligne avant le début et après la fin', () => {
     expect(pointALAbscisse(ligne, -3)).toEqual({ est: -3, nord: 0, segment: 0 });
     expect(pointALAbscisse(ligne, 22)).toEqual({ est: 10, nord: 12, segment: 1 });
+  });
+});
+
+describe('pente du segment', () => {
+  it('dénivelé ÷ longueur en plan × 100, segment par segment', () => {
+    // L : 1er segment 10 m, +1 m = +10 % ; 2e segment 10 m, +2 m = +20 %.
+    expect(penteDuSegment(0, L)).toBeCloseTo(10, 6);
+    expect(penteDuSegment(1, L)).toBeCloseTo(20, 6);
+  });
+
+  it('négative en descendant, null sans altitude ou hors de la ligne', () => {
+    expect(penteDuSegment(0, [p(0, 0, 401), p(10, 0, 400)])).toBeCloseTo(-10, 6);
+    expect(penteDuSegment(0, [p(0, 0), p(10, 0)])).toBeNull();
+    expect(penteDuSegment(5, L)).toBeNull();
+    expect(penteDuSegment(0, [p(0, 0, 400), p(0, 0, 401)])).toBeNull();
+  });
+
+  it('altitudes début / fin tapées : pente constante de toute la ligne', () => {
+    expect(penteDuSegment(1, [p(0, 0), p(10, 0), p(10, 10)], { debut: 400, fin: 401 })).toBeCloseTo(5, 6);
+  });
+
+  it('guidageLigne donne la pente du segment où est la canne', () => {
+    expect(guidageLigne(p(4, -1), L).pente).toBeCloseTo(10, 6);
+    expect(guidageLigne(p(9, 5), L).pente).toBeCloseTo(20, 6);
   });
 });

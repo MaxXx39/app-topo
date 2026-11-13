@@ -30,7 +30,7 @@ export const TEXTES_AIDE = {
   hauteurCanne:
     'Hauteur de canne : celle d\'Emlid Flow, montrée pour contrôle seulement. L\'appli ne s\'en sert pas dans ses calculs. Modifiable en Expert.',
   implanter:
-    'Touche un point, une ligne ou une surface sur le plan (accroche dans la barre), puis « Implanter » et suis la cible. ← change de point. Manuel : loupe pour viser sans accroche.',
+    'Touche un point, une ligne ou une surface sur le plan (accroche dans la barre), puis « Implanter » et suis la cible. ← change de point. Manuel : loupe pour viser sans accroche. Ligne : « ↗ +1.70 % » à gauche de « fin » = pente du segment où tu es (en %, positive en montant).',
   autocontrole:
     'Remesure un point de contrôle connu. Vert ≤ 2 cm, orange ≤ 4 cm, rouge au-delà. Un contrôle est demandé chaque jour puis toutes les 4 h. Roue ⚙ (code) : tolérances et points.',
   talus:

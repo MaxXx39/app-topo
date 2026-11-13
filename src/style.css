@@ -9895,6 +9895,8 @@ body.mode-telephone .entete-icone-bouton.bouton-reglages svg { width: 34px; heig
   opacity: 0.9;
 }
 .ligne-nette .fin-petite .icone-drapeau { width: 0.9rem; height: 1rem; }
+/* 0.234.0 : pente du segment en cours, à gauche de « fin … m » (même taille de texte). */
+.ligne-nette .fin-petite .pente-segment { margin-right: auto; font-weight: 700; white-space: nowrap; }
 .ligne-nette .bloc-hauteur { display: flex; align-items: center; justify-content: space-between; gap: 8px; white-space: nowrap; }
 .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 1.2rem; }
 .ligne-nette .bloc-hauteur .icone-fleche { width: 1.9rem; height: 1.9rem; }
