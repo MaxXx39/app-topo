@@ -406,7 +406,7 @@ document.querySelector('#app').innerHTML = `
 /** Nom d'une application à l'écran (sur le site, « Lever » s'appelle « Édition Lever »). */
 const titreAppli = (appli) => {
   // Pages du projet (0.159.0) : le bouton porte le nom de la page (Projets, Import, Exporter, Contenu).
-  if (appli?.cle === 'projet') return { ouvrir: 'Projets', import: 'Import', export: 'Exporter', contenu: 'Contenu', points: 'Liste de points', plans: 'Plans', surfaces: 'Surfaces', archives: 'Archives' }[document.body.dataset.partieProjet] ?? 'Projet';
+  if (appli?.cle === 'projet') return { ouvrir: 'Projets', import: 'Importer', export: 'Exporter', contenu: 'Contenu', points: 'Liste de points', plans: 'Plans', surfaces: 'Surfaces', archives: 'Archives' }[document.body.dataset.partieProjet] ?? 'Projet';
   return !recepteurDisponible() && appli?.titreSite ? appli.titreSite : (appli?.titre ?? '');
 };
 
@@ -1530,7 +1530,7 @@ function exporterMesureRapide() {
 // Pages du projet (0.159.0, demande du 08.11) : il n'y a plus d'application « Projet » ; chaque bouton
 // de l'encadré du projet (page Applications) ouvre sa page à part : la liste des projets (« Changer »),
 // Import, Exporter ou le contenu du projet (body[data-partie-projet], le reste de l'onglet est caché).
-const TITRES_PARTIES_PROJET = { ouvrir: 'Projets', nouveau: 'Nouveau projet', import: 'Import', export: 'Exporter', contenu: 'Contenu du projet', points: 'Liste de points', plans: 'Plans', surfaces: 'Surfaces importées', archives: 'Archives' };
+const TITRES_PARTIES_PROJET = { ouvrir: 'Projets', nouveau: 'Nouveau projet', import: 'Importer', export: 'Exporter', contenu: 'Contenu du projet', points: 'Liste de points', plans: 'Plans', surfaces: 'Surfaces importées', archives: 'Archives' };
 const PAGES_CONTENU = ['points', 'plans', 'surfaces', 'archives'];
 // 0.197.0 : bouton « liste » des tuiles : les catégories de points montrées (Lever : tous les levés de terrain).
 const CATEGORIES_TUILES = {
