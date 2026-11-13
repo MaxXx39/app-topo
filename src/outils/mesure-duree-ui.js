@@ -37,6 +37,42 @@ function choisirDuree() {
   });
 }
 
+/** Valeur en m à 3 décimales, point décimal. */
+const m3 = (v) => (v == null ? '–' : v.toFixed(3));
+
+/**
+ * Fenêtre de résultat (0.229.0) : moyenne, plus petite et plus grande lecture de E / N / H, écart (mm), précision la moins bonne.
+ * Renvoie une promesse : 'valider', 'refaire' ou null (annulé).
+ */
+function montrerResultat(point) {
+  const info = point.mesureDuree;
+  const ligne = (nom, moy, lim) => `<tr><th>${nom}</th><td>${m3(moy)}</td><td>${m3(lim?.min)}</td><td>${m3(lim?.max)}</td><td>${lim ? Math.round((lim.max - lim.min) * 1000) : '–'}</td></tr>`;
+  return new Promise((fin) => {
+    const fond = document.createElement('div');
+    fond.className = 'fond-mesure-duree';
+    fond.innerHTML = `<div class="fenetre-mesure-duree resultat-mesure-duree" role="dialog" aria-label="Résultat de la mesure">
+        <p class="titre-mesure-duree">Mesure de ${info.dureeS} s · ${info.lectures} lectures</p>
+        <table class="tableau-mesure-duree">
+          <thead><tr><th></th><th>Moyenne</th><th>Mini</th><th>Maxi</th><th>Écart (mm)</th></tr></thead>
+          <tbody>${ligne('E', point.est, info.limites.est)}${ligne('N', point.nord, info.limites.nord)}${ligne('H', point.altitude, info.limites.altitude)}</tbody>
+        </table>
+        <p class="aide-mesure-duree">Écart max au plan : ${Math.round(info.ecartMaxPlan * 1000)} mm${point.precisionH != null ? ` · Préc. H ${m3(point.precisionH)}` : ''}${point.precisionV != null ? ` · V ${m3(point.precisionV)}` : ''}</p>
+        <div class="boutons-duree">
+          <button type="button" class="bouton" data-fin="valider">Valider</button>
+          <button type="button" class="bouton-secondaire" data-fin="refaire">Refaire</button>
+        </div>
+        <button type="button" class="bouton-lien bouton-lien-neutre" data-fin="annuler">Annuler</button>
+      </div>`;
+    fond.addEventListener('click', (evenement) => {
+      const bouton = evenement.target.closest('[data-fin]');
+      if (!bouton) return;
+      fond.remove();
+      fin(bouton.dataset.fin === 'annuler' ? null : bouton.dataset.fin);
+    });
+    document.body.append(fond);
+  });
+}
+
 /** Montre le décompte pendant la mesure ; renvoie { maj(restant), fermer() }. */
 function montrerDecompte(dureeS, annuler) {
   const fond = document.createElement('div');
@@ -65,7 +101,7 @@ function montrerDecompte(dureeS, annuler) {
 export function installerMesureDuree({ disponible, dureeParDefaut = () => 0, refuser }) {
   let enCours = false;
 
-  function lancer(bouton, dureeS) {
+  function lancer(bouton, dureeS, avecResultat = false) {
     enCours = true;
     let ecran = null;
     const mesure = demarrerMesure({
@@ -81,9 +117,20 @@ export function installerMesureDuree({ disponible, dureeParDefaut = () => 0, ref
           return;
         }
         // Le bouton est touché de nouveau : l'appli prend le point moyen comme un point normal.
-        preparerPointMoyenne(resultat.point);
-        bouton.click();
-        viderPointPrepare();
+        const prendre = () => {
+          preparerPointMoyenne(resultat.point);
+          bouton.click();
+          viderPointPrepare();
+        };
+        if (!avecResultat) {
+          prendre();
+          return;
+        }
+        // 0.229.0 : appui long (dès Intermédiaire) : on montre le résultat avant de valider.
+        montrerResultat(resultat.point).then((choix) => {
+          if (choix === 'valider') prendre();
+          else if (choix === 'refaire') lancer(bouton, dureeS, true);
+        });
       },
     });
     if (enCours) ecran = montrerDecompte(dureeS, () => mesure.annuler());
@@ -103,7 +150,7 @@ export function installerMesureDuree({ disponible, dureeParDefaut = () => 0, ref
     minuterie = setTimeout(async () => {
       minuterie = null;
       const duree = await choisirDuree();
-      if (duree) lancer(bouton, duree);
+      if (duree) lancer(bouton, duree, true);
     }, DELAI_APPUI_LONG);
   }, true);
   for (const nom of ['pointerup', 'pointercancel', 'pointerleave']) document.addEventListener(nom, arreter, true);

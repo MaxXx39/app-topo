@@ -105,6 +105,7 @@ import {
   nouvelleLigne,
   basculerFermeture,
   ligneEnCours,
+  reprendreLigne,
   resumeStock,
   supprimerLevee,
   pointsDeLaLevee,
@@ -2614,6 +2615,34 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         nouvelleLigne(stock);
         modifie();
       },
+      // 0.229.0 (Intermédiaire) : reprendre une ligne déjà levée (un autre jour…) pour la continuer.
+      reprendreLigne: async () => {
+        const stock = stockEnCours();
+        if (!stock) return;
+        const reprenables = stock.lignesRupture.map((l, i) => ({ l, i })).filter(({ l }) => l.noms.length > 0);
+        if (reprenables.length === 0) {
+          afficherMessage('Aucune ligne levée à reprendre');
+          return;
+        }
+        const choix = await demanderChoix({
+          titre: 'Continuer quelle ligne ?',
+          texte: 'Les prochains points s\'ajoutent au bout de la ligne choisie.',
+          boutons: [
+            ...reprenables.map(({ l, i }) => ({ cle: String(i), texte: nomDeLigne(l, i), detail: `${l.noms.length} pt(s) · dernier : ${l.noms.at(-1)}${l.fermee ? ' · fermée (sera rouverte)' : ''}` })),
+            { cle: 'annuler', texte: 'Annuler' },
+          ],
+        });
+        if (choix == null || choix === 'annuler') return;
+        const ligne = reprendreLigne(stock, Number(choix));
+        if (!ligne) return;
+        // Le libellé choisi doit être celui de la ligne, sinon l'appli en commencerait une autre.
+        if (stock.nature === 'chantier') terrain.chantier.libelle = ligne.libelle ?? terrain.chantier.libelle;
+        else terrain.libelleLigne = ligne.libelle ?? '';
+        leveDirect.role = 'ligne';
+        retenirReglagesTerrain();
+        modifie();
+        afficherMessage(`${nomDeLigne(ligne, Number(choix))} reprise : le prochain point s'ajoute au bout`);
+      },
       basculerFermeture: () => {
         const stock = stockEnCours();
         if (!stock) return;
@@ -2909,6 +2938,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       choisirImplantation: (quoi) => {
         const permises = aAcces('expert') ? ['point', 'ligne', 'altitude', 'talus'] : ['point', 'ligne', 'altitude'];
         terrain.implantation = permises.includes(quoi) ? quoi : 'surface';
+        if (terrain.implantation === 'surface') terrain.exagerationCoupe = 1; // 0.229.0 : la coupe de la surface repart à ×1
         retenirReglagesTerrain();
         recalculer();
       },
@@ -6842,7 +6872,7 @@ async function ajouterPointTouche(nom) {
       afficherMessage(refus.erreur, 3000);
       return;
     }
-    afficherMessage(`${nom} ajouté ${role === 'contour' ? 'au contour' : `à ${nomDeLigne(ligneEnCours(stock), stock.lignesRupture.length - 1)}`}`);
+    afficherMessage(`${nom} ajouté ${role === 'contour' ? 'au contour' : `à ${nomDeLigne(ligneEnCours(stock), stock.lignesRupture.indexOf(ligneEnCours(stock)))}`}`);
   }
   vibrer(40);
   modifie();
@@ -8563,7 +8593,7 @@ setInterval(mettreAJourPastilleControle, 1000);
 
 // 0.214.0 : mesure de durée (appui long sur « Enreg. » : 5 / 15 / 30 s) ; en Contrôle, 5 s d'office.
 installerMesureDuree({
-  disponible: () => recepteurDisponible() && Boolean(etatRecepteur?.connecte),
+  disponible: () => recepteurDisponible() && Boolean(etatRecepteur?.connecte) && aAcces('intermediaire'), // 0.229.0 : pas en Base
   dureeParDefaut: () => (enAutocontrole() && document.body.dataset.onglet === 'terrain' ? 5 : 0),
   refuser: (texte) => refuser(texte),
 });

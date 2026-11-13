@@ -218,12 +218,25 @@ export function creerChantier(projet, leve) {
 /** Ligne de rupture en cours du stock (la dernière ; créée s'il n'y en a pas). */
 export function ligneEnCours(surface) {
   if (surface.lignesRupture.length === 0) surface.lignesRupture.push(creerLigne());
-  return surface.lignesRupture[surface.lignesRupture.length - 1];
+  // 0.229.0 : ligne reprise (ligneActive = son rang), sinon la dernière.
+  return surface.lignesRupture[surface.ligneActive] ?? surface.lignesRupture[surface.lignesRupture.length - 1];
+}
+
+/** 0.229.0 : reprend une ligne déjà levée (rang dans lignesRupture) : les prochains points s'y ajoutent. Rouvre la ligne si elle était fermée. */
+export function reprendreLigne(surface, rang) {
+  const ligne = surface.lignesRupture[rang];
+  if (!ligne) return null;
+  surface.ligneActive = rang === surface.lignesRupture.length - 1 ? undefined : rang;
+  ligne.fermee = false;
+  return ligne;
 }
 
 /** Commence une nouvelle ligne de rupture (sauf si la ligne en cours est encore vide). */
 export function nouvelleLigne(surface) {
-  if (ligneEnCours(surface).noms.length > 0) surface.lignesRupture.push(creerLigne());
+  if (ligneEnCours(surface).noms.length > 0) {
+    surface.lignesRupture.push(creerLigne());
+    surface.ligneActive = undefined; // la nouvelle ligne est la dernière
+  }
 }
 
 /** Ferme la ligne en cours (dernier point relié au premier) ou la rouvre. */
@@ -296,6 +309,7 @@ export function preparerLigne(projet, surface, libelle) {
   let ligne = ligneEnCours(surface);
   if (ligne.noms.length > 0 && ligne.libelle !== libelle) {
     surface.lignesRupture.push(creerLigne());
+    surface.ligneActive = undefined;
     ligne = ligneEnCours(surface);
   }
   if (ligne.libelle !== libelle || !ligne.numero) {

@@ -79,11 +79,17 @@ export async function telechargerRdppf(centre, rayon, progres = () => {}, cherch
     // Aucune variante ne marche aux 5 premiers points demandés (un point peut tomber sur une route
     // sans parcelle) : inutile de continuer.
     demandes++;
-    if (variante === null && raisons.length >= adressesGetEgrid(base, 0, 0).length) throw new Error(`service RDPPF de Vaud : ${raisons.join(' | ')}`);
-    if (variante === null && demandes >= 5) throw new Error(`service RDPPF de Vaud : ${derniere}`);
+    if (variante === null && raisons.length >= adressesGetEgrid(base, 0, 0).length) throw new Error(`service RDPPF de Vaud : ${raisons.every((r) => /erreur 5\d\d/.test(r)) ? messageService(raisons[0]) : raisons.join(' | ')}`);
+    if (variante === null && demandes >= 5) throw new Error(`service RDPPF de Vaud : ${messageService(derniere)}`);
   }
-  if (anneaux.length === 0) throw new Error(`service RDPPF de Vaud : ${derniere || 'aucune parcelle'}`);
+  if (anneaux.length === 0) throw new Error(`service RDPPF de Vaud : ${messageService(derniere)}`);
   return { points: [], lignes: anneaux };
+}
+
+function messageService(derniere) {
+  return /erreur 5\d\d/.test(derniere)
+    ? 'le service du canton de Vaud est en panne (erreur serveur 500) : réessaie plus tard. Ça ne vient pas de l\'appli.'
+    : derniere || 'aucune parcelle';
 }
 
 /** Raison donnée par le service dans une réponse d'erreur : texte de <Message>, sinon le début de la réponse. */

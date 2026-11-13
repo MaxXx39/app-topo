@@ -13636,3 +13636,10 @@ body.mode-telephone .bouton-logo-projet { min-width: 34px; width: 34px; min-heig
 body.mode-telephone .texte-bandeau-projet b { font-size: 16px; }
 .bouton-texte-projet { min-height: 38px; height: 38px; padding: 0 12px; font-size: 14px; border-radius: 10px; }
 body.mode-telephone .bouton-texte-projet { min-height: 34px; height: 34px; padding: 0 9px; font-size: 12px; }
+
+/* 0.229.0 : fenêtre de résultat de la mesure de durée (moyenne, mini, maxi, écart). */
+.resultat-mesure-duree { width: min(94vw, 420px); }
+.tableau-mesure-duree { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.tableau-mesure-duree th, .tableau-mesure-duree td { padding: 4px 6px; text-align: right; border-bottom: 1px solid #d9e0e5; }
+.tableau-mesure-duree thead th { font-size: 0.72rem; font-weight: 700; color: #5b6b76; }
+.tableau-mesure-duree tbody th { text-align: left; }

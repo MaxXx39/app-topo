@@ -8,6 +8,7 @@
 export const DUREES_MESURE = [5, 15, 30];
 
 const moyenne = (valeurs) => valeurs.reduce((t, v) => t + v, 0) / valeurs.length;
+const limites = (valeurs) => ({ min: Math.min(...valeurs), max: Math.max(...valeurs) });
 
 /**
  * Point moyen de plusieurs lectures [{ est, nord, altitude, precisionH, precisionV, … }] (au moins une). Renvoie le dernier point lu,
@@ -31,7 +32,17 @@ export function moyennerPoints(lectures, dureeS) {
     precisionH: pire('precisionH'),
     precisionV: pire('precisionV'),
     pdop: pire('pdop'), // 0.220.0 : le plus mauvais PDOP des lectures (null si le récepteur n'en donne pas)
-    mesureDuree: { dureeS, lectures: lectures.length, ecartMaxPlan: Math.max(...lectures.map((p) => Math.hypot(p.est - est, p.nord - nord))) },
+    mesureDuree: {
+      dureeS,
+      lectures: lectures.length,
+      ecartMaxPlan: Math.max(...lectures.map((p) => Math.hypot(p.est - est, p.nord - nord))),
+      // 0.229.0 : plus petite et plus grande valeur lues (m), pour la fenêtre de résultat (altitude : null si une lecture n'en a pas).
+      limites: {
+        est: limites(lectures.map((p) => p.est)),
+        nord: limites(lectures.map((p) => p.nord)),
+        altitude: avecAltitude ? limites(lectures.map((p) => p.altitude)) : null,
+      },
+    },
   };
 }
 

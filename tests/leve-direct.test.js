@@ -13,6 +13,7 @@ import {
   nouvelleLigne,
   basculerFermeture,
   ligneEnCours,
+  reprendreLigne,
   resumeStock,
   estLeveDirect,
   creerAutres,
@@ -345,5 +346,26 @@ describe('préfixes des noms (0.90.0)', () => {
     expect(projet.leves[0].nom).toBe('LV-Stock 1');
     prefixerNoms(projet);
     expect(projet.surfaces[0].nom).toBe('LV-Stock 1');
+  });
+});
+
+describe('reprendre une ligne déjà levée (0.229.0)', () => {
+  it('les points suivants vont dans la ligne reprise, sans changer les autres', () => {
+    const surface = { lignesRupture: [{ noms: ['L-HT-1-1', 'L-HT-1-2'], fermee: true, libelle: 'HT', numero: 1 }, { noms: ['L-BT-2-1'], fermee: false, libelle: 'BT', numero: 2 }] };
+    expect(ligneEnCours(surface)).toBe(surface.lignesRupture[1]);
+    const ligne = reprendreLigne(surface, 0);
+    expect(ligne).toBe(surface.lignesRupture[0]);
+    expect(ligne.fermee).toBe(false);
+    expect(ligneEnCours(surface)).toBe(surface.lignesRupture[0]);
+    // Une nouvelle ligne redevient la dernière.
+    nouvelleLigne(surface);
+    expect(surface.lignesRupture).toHaveLength(3);
+    expect(ligneEnCours(surface)).toBe(surface.lignesRupture[2]);
+  });
+
+  it('une ligne qui n\'existe pas : rien ne change', () => {
+    const surface = { lignesRupture: [{ noms: ['a'], fermee: false }] };
+    expect(reprendreLigne(surface, 5)).toBeNull();
+    expect(ligneEnCours(surface)).toBe(surface.lignesRupture[0]);
   });
 });
