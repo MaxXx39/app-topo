@@ -13649,3 +13649,12 @@ body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .cor
 body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .corps-element strong { flex: none; font-size: 1rem; }
 body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .nb-points-ligne { display: none; }
 body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .corps-element .bouton-secondaire { flex: 1 1 0; min-width: 0; padding: 3px 4px; font-size: 0.8rem; white-space: nowrap; }
+
+/* 0.233.3 (14.11) : réglettes de transparence : « Trans. », barre et % sur une seule ligne (partout) ;
+   téléphone, Implanter › Point : « + Point », « Liste » et « Proche » seulement quand l'accroche est dépliée (noms visibles). */
+.reglette-transparence { display: flex; align-items: center; gap: 8px; }
+.reglette-transparence > b { flex: none; font-weight: 600; }
+.reglette-transparence input { flex: 1 1 0; min-width: 0; width: auto; }
+.reglette-transparence > span { flex: none; min-width: 3.2em; text-align: right; }
+body.mode-telephone .barre-accroche:not(.ouverte) .bouton-outil-accroche,
+body.mode-telephone .barre-accroche:not(.ouverte) .separateur-accroche { display: none; }

@@ -195,15 +195,14 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
         <div class="menu-calques" hidden>
           <div class="ligne-menu-plan">
             <label class="case"><input type="checkbox" data-calque="fondSatellite" ${calquesChoisis.fondSatellite ? 'checked' : ''} /> Fond de plan (swisstopo)</label>
-            <p class="aide note-fond" data-vivant="fond-mode">Photo aérienne ; au-delà de 2 km de large : carte nationale.</p>
           </div>
-          <label class="reglette-transparence">Transparence <span data-vivant="transparence">60 %</span>
-            <input type="range" min="0" max="100" step="5" value="60" data-calque="transparencePhoto" /></label>
+          <label class="reglette-transparence"><b>Trans.</b>
+            <input type="range" min="0" max="100" step="5" value="60" data-calque="transparencePhoto" /><span data-vivant="transparence">60 %</span></label>
           <div class="ligne-menu-plan">
             <label class="case"><input type="checkbox" data-calque="carteNationale" /> Carte nationale (par-dessus la photo)</label>
           </div>
-          <label class="reglette-transparence">Transparence de la carte <span data-vivant="transparence-carte">60 %</span>
-            <input type="range" min="0" max="100" step="5" value="60" data-calque="transparenceCarte" /></label>
+          <label class="reglette-transparence"><b>Trans.</b>
+            <input type="range" min="0" max="100" step="5" value="60" data-calque="transparenceCarte" /><span data-vivant="transparence-carte">60 %</span></label>
           <label class="case"><input type="checkbox" data-calque="cadastre" /> Cadastre</label>
         </div>
       </div>
@@ -2302,8 +2301,8 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
           <span>${echapper(plan.nom)}</span>${plan.type ? `<span class="pastille-type-dxf" style="background: ${couleurDuType(plan.type)}">${echapper(plan.type)}</span>` : ''}</label>
         ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
-        <label class="reglette-transparence reglette-plan">Transparence <span>${plan.transparence ?? 0} %</span>
-          <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /></label>
+        <label class="reglette-transparence reglette-plan"><b>Trans.</b>
+          <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /><span>${plan.transparence ?? 0} %</span></label>
         ${(plan.calques ?? []).length > 0 ? `<button type="button" class="fleche-calques-dxf" data-deplier-plan="${plan.id}" aria-expanded="${plansDeplies.has(plan.id)}" title="Calques" aria-label="Calques de ${echapper(plan.nom)}">${plansDeplies.has(plan.id) ? '▴' : '▾'}</button>` : ''}
       </div>
       ${plansDeplies.has(plan.id) ? `<div class="calques-dxf-menu">${plan.calques.map((c, numero) => `<label class="case"><input type="checkbox" data-plan="${plan.id}" data-calque-dxf="${numero}" ${c.visible !== false ? 'checked' : ''} /> ${echapper(c.nom)}</label>`).join('')}</div>` : ''}`).join('');
