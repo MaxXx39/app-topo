@@ -1220,11 +1220,11 @@ export function creerEcranLeve(conteneur, actions) {
     return `<div class="element-en-cours role-ligne">
       <span class="titre-element">Ligne en cours</span>
       <div class="corps-element">
-        <strong>${echapper(debutDeNom('L', ligne.libelle))}${ligne.numero}</strong><span>${ligne.nbPoints} pt(s)</span>
-        <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle ligne</button>
-        <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="reprendreLigne">Continuer une ligne</button>
+        <strong>${echapper(debutDeNom('L', ligne.libelle))}${ligne.numero}</strong><span class="nb-points-ligne">${ligne.nbPoints} pt(s)</span>
+        <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}><span class="t-long">+ Nouvelle ligne</span><span class="t-court">+ Nouvelle</span></button>
+        <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="reprendreLigne"><span class="t-long">Continuer une ligne</span><span class="t-court">Continuer</span></button>
         <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
-          ${ligne.fermee ? '✓ Ligne fermée' : 'Fermer ligne'}</button>
+          ${ligne.fermee ? '<span class="t-long">✓ Ligne fermée</span><span class="t-court">✓ Fermée</span>' : '<span class="t-long">Fermer ligne</span><span class="t-court">Fermer</span>'}</button>
       </div>
       ${choixLibelle()}
     </div>`;

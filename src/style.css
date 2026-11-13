@@ -13640,3 +13640,12 @@ body.mode-telephone .bouton-texte-projet { min-height: 34px; height: 34px; paddi
 .tableau-mesure-duree th, .tableau-mesure-duree td { padding: 4px 6px; text-align: right; border-bottom: 1px solid #d9e0e5; }
 .tableau-mesure-duree thead th { font-size: 0.72rem; font-weight: 700; color: #5b6b76; }
 .tableau-mesure-duree tbody th { text-align: left; }
+
+/* 0.233.2 (14.11, téléphone) : liseré jaune du bandeau « ID point / Enreg. » réduit de 60 % (4 px → 1,6 px) ; ligne en cours :
+   nom, « + Nouvelle », « Continuer » et « Fermer » sur une seule ligne (le nombre de points est caché). */
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point { border-width: 1.6px; border-right: none; }
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::after { border-width: 1.6px; border-right: none; }
+body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .corps-element { flex-wrap: nowrap; gap: 5px; }
+body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .corps-element strong { flex: none; font-size: 1rem; }
+body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .nb-points-ligne { display: none; }
+body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .corps-element .bouton-secondaire { flex: 1 1 0; min-width: 0; padding: 3px 4px; font-size: 0.8rem; white-space: nowrap; }
