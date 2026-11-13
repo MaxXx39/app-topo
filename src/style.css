@@ -11361,14 +11361,8 @@ body.mode-telephone .ecart-coupe strong { font-size: 0.95rem; }
 }
 .vue-plan2 .indic-coupe .triangle-coupe { width: 28px; height: 24px; }
 .vue-plan2 .indic-coupe strong { font-size: 0.95rem; }
-/* Essai B : triangle et valeur à l'extérieur des règles. */
-.essai-exterieur .corps-coupe-guidage > :nth-child(1) { order: 2; }
-.essai-exterieur .corps-coupe-guidage > :nth-child(2) { order: 1; }
-.essai-exterieur .corps-coupe-guidage > :nth-child(3) { order: 3; }
-.essai-exterieur .corps-coupe-guidage > :nth-child(4) { order: 5; }
-.essai-exterieur .corps-coupe-guidage > :nth-child(5) { order: 4; }
-.essai-exterieur .corps-coupe-guidage { grid-template-columns: 48px 34px minmax(0, 1fr) 34px 48px; }
-.essai-exterieur .vue-plan2 .corps-coupe-guidage { grid-template-columns: 40px 26px minmax(0, 1fr) 26px 40px; }
+/* 0.232.0 : les anciennes règles « essai B » (ordre et 5 colonnes) sont retirées : depuis la 0.214 il n'y a plus que 3 blocs
+   (règle G | coupe | règle D) et elles envoyaient la coupe dans une case de 40 px à gauche. */
 /* Essai C : sur la règle (même case), règle plus large. */
 .essai-sur-regle .corps-coupe-guidage { grid-template-columns: 52px minmax(0, 1fr) 52px; }
 .essai-sur-regle .corps-coupe-guidage > :nth-child(1),
