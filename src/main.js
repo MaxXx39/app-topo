@@ -85,7 +85,9 @@ import { modifierLibellesDeSorte } from './leve/fenetre-libelles.js';
 import { ouvrirFenetreChantier } from './leve/fenetre-chantier.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
-import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele, ecartAuBout } from './topo/ligne-implantation.js';
+import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele, ecartAuBout, positionSurLigne } from './topo/ligne-implantation.js';
+import { tuyauxSurCoupe } from './topo/reseau.js';
+import { svgCoupeAxe } from './reseaux/coupe-svg.js';
 import { MODES_ACCROCHE, piedPerpendiculaire, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
 import {
   estLeveDirect,
@@ -211,6 +213,7 @@ const terrain = {
   vueCoupes: 'perpendiculaire',
   demiLongueur: 5,
   exagerationCoupe: 1,
+  cana: false, // 0.236.0 : réseaux dans les coupes d'Implanter › Surface (case « Cana »)
   sourceOrientation: 'rx2',
   libelleLigne: 'HT', // dernier libellé choisi pour une ligne de rupture
   libellePoint: 'TN', // et pour un point isolé (ou compté)
@@ -1441,6 +1444,7 @@ const reseaux = creerReseaux({
   altitudeDe: (id) => altitudeDeSurface(id),
   ligneSousLeDoigt: ligneDuPlanSousLeDoigt,
   pointSousLeDoigt: pointDuPlanSousLeDoigt,
+  implanter: (ligne) => implanterUnReseau(ligne),
 });
 
 document.querySelector('#mesure-rapide').addEventListener('click', (evenement) => {
@@ -2971,6 +2975,13 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         retenirReglagesTerrain();
         recalculer();
       },
+      // 0.236.0 : case « Cana » : les tuyaux et tranchées des réseaux dans les coupes d'Implanter › Surface.
+      basculerCana: () => {
+        terrain.cana = !terrain.cana;
+        retenirReglagesTerrain();
+        recalculer();
+        montrerImplantation();
+      },
       choisirImplantation: (quoi) => {
         const permises = aAcces('expert') ? ['point', 'ligne', 'altitude', 'talus'] : ['point', 'ligne', 'altitude'];
         terrain.implantation = permises.includes(quoi) ? quoi : 'surface';
@@ -3101,6 +3112,8 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       inverserLigne: () => {
         if (!implanter.ligne) return;
         implanter.ligne.inverse = !implanter.ligne.inverse;
+        // Réseau : le bord G reste le bord G (gauche / droite changent avec le sens de la ligne).
+        if (implanter.ligne.reseauId) implanter.ligne.decalage = -implanter.ligne.decalage;
         garderTalusOuvert();
         montrerImplantation();
       },
@@ -5205,8 +5218,33 @@ function calculerImplantationLigne(etat, orientation = null) {
     classeAltitude: ecartAltitude == null ? null : classeEcart(ecartAltitude),
     // 0.123 : de combien de degrés se tourner pour être dans l'axe de la ligne (+ = vers la droite) ; null sans cap.
     virage: virageVersLigne(orientation?.azimut ?? null, sommetsDeLaLigne(), g.segment),
+    // 0.236.0 : réseau implanté : profil en long, seulement à moins de 1 m de la ligne (G / D).
+    profilReseau: ligne.reseauId && Math.abs(g.ecart) < 1 ? profilEnLongDuReseau(position) : null,
     message: null,
   };
+}
+
+/** Profil en long (SVG) du réseau en cours d'implantation, avec la canne (altitude mesurée) : ±20 m autour d'elle. */
+function profilEnLongDuReseau(position) {
+  const ligne = implanter.ligne;
+  const reseau = (projet.canalisations ?? []).find((r) => r.id === ligne.reseauId);
+  if (!reseau || position.altitude == null) return null;
+  // Le terrain le long du réseau est calculé une fois (la surface ne change pas pendant l'implantation).
+  if (!ligne.terrainProfil) {
+    ligne.terrainProfil = [];
+    let cumul = 0;
+    for (let i = 0; i + 1 < reseau.sommets.length; i++) {
+      const [a, b] = [reseau.sommets[i], reseau.sommets[i + 1]];
+      if (reseau.surfaceId) for (const m of profilSurface(trianglesDeSurface(reseau.surfaceId), a, b)) ligne.terrainProfil.push(m.map((p) => ({ d: cumul + p.distance, z: p.altitude })));
+      cumul += Math.hypot(b.est - a.est, b.nord - a.nord);
+    }
+  }
+  const sur = positionSurLigne(position, reseau.sommets);
+  if (!sur) return null;
+  const d = Math.min(Math.max(sur.abscisse, 0), sur.longueur);
+  const demi = 20;
+  const fenetre = sur.longueur <= 2 * demi ? null : { d0: Math.min(Math.max(d - demi, 0), sur.longueur - 2 * demi), d1: Math.min(Math.max(d - demi, 0), sur.longueur - 2 * demi) + 2 * demi };
+  return svgCoupeAxe({ reseau, terrain: ligne.terrainProfil, position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
 }
 
 /**
@@ -7038,6 +7076,7 @@ function donneesCommunes() {
     ajoutActif: ajoutLevee.actif,
     controle: terrain,
     deltaSurface, // 0.152.0 : delta Z de la surface (Implanter › Surface)
+    nbReseaux: (projet.canalisations ?? []).length, // 0.236.0 : case « Cana » d'Implanter › Surface
     // Mode Lame : surfaces (terrassement d'abord), surface suivie, tolérances, 2e RX2 connecté ?
     lame: {
       surfaces: [...projet.surfaces].sort((a, b) => Number(['terrassement', 'surface'].includes(b.nature)) - Number(['terrassement', 'surface'].includes(a.nature))).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
@@ -7111,6 +7150,28 @@ function altitudesDesBouts() {
   return { debut: tapees.debut ?? sommets[0]?.altitude ?? null, fin: tapees.fin ?? sommets.at(-1)?.altitude ?? null };
 }
 
+/**
+ * Réseaux › Implanter (0.236.0, Expert) : on ouvre Implanter › Ligne sur la ligne du réseau (axe ou bord du fond de tranchée,
+ * à l'altitude choisie) ; la fiche et le gros bouton « Implanter » sont ceux de toute ligne.
+ */
+function implanterUnReseau({ nom, sommets, decalage, reseauId }) {
+  if (!recepteurDisponible()) {
+    afficherMessage('Implanter : seulement dans l\'appli Android, avec le GNSS', 4000);
+    return;
+  }
+  const ligne = nouvelleLigneAImplanter(nom, sommets, null);
+  ligne.decalage = decalage;
+  ligne.reseauId = reseauId;
+  implanter.ligne = ligne;
+  implanter.ligneAValider = true;
+  implanter.talusId = null;
+  implanter.pointsLigne = [];
+  terrain.implantation = 'ligne';
+  choisirModeTerrain('controler');
+  afficherOnglet('terrain');
+  montrerImplantation();
+}
+
 /** Ligne à implanter pour l'écran Terrain : nom, longueur, segments, sens, début, fin, réglages. */
 function resumeLigne() {
   const ligne = implanter.ligne;
@@ -7121,6 +7182,7 @@ function resumeLigne() {
     nbSegments: ligne.sommets.length - 1,
     segment: ligne.segment,
     inverse: ligne.inverse,
+    reseauId: ligne.reseauId ?? null,
     decalage: ligne.decalage,
     altitudes: altitudesDesBouts(),
     altitudesDuPlan: sommets.every((s) => s.altitude != null),
@@ -7206,9 +7268,16 @@ function calculerControle(etat, orientation) {
   for (const sens of ['perpendiculaire', 'axe']) {
     const { debut, fin } = extremitesCoupe(position, azimut, terrain.demiLongueur, sens);
     const base = profilSurface(triangles, debut, fin);
+    // Case « Cana » (0.236.0, Expert) : les tuyaux et tranchées des réseaux que la coupe croise.
+    const longueurCoupe = Math.hypot(fin.est - debut.est, fin.nord - debut.nord);
+    const chercheur = altitudeDeSurface(surface.id);
+    const reseauxCoupe = terrain.cana && aAcces('expert') && (projet.canalisations ?? []).length > 0
+      ? tuyauxSurCoupe(projet.canalisations, debut, fin, chercheur ? (d) => chercheur(debut.est + ((fin.est - debut.est) * d) / longueurCoupe, debut.nord + ((fin.nord - debut.nord) * d) / longueurCoupe) : null)
+      : [];
     coupes[sens] = {
       debut,
       fin,
+      reseaux: reseauxCoupe,
       lignes: decalerProfil(base, delta),
       lignesBase: delta ? base : null,
       delta,

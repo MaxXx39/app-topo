@@ -75,10 +75,11 @@ export function exagerationAuto(longueur, zmin, zmax, largeur = 720, hauteur = 3
 
 /**
  * Coupe dans l'axe d'un réseau. terrain : liste de morceaux [[{ d, z }]] (profil de la surface le long du réseau) ;
- * croisements : [{ reseau, d, fe }] ; position : { d, fe } de la canne ou null.
+ * croisements : [{ reseau, d, fe }] ; position : { d, fe } de la canne ou null (fe = altitude de la canne) ;
+ * fenetre : { d0, d1 } pour ne montrer qu'une partie du réseau (profil en long autour de la canne).
  * Renvoie { svg, exageration }.
  */
-export function svgCoupeAxe({ reseau, terrain = [], croisements = [], position = null, largeur = 720, hauteur = 300 }) {
+export function svgCoupeAxe({ reseau, terrain = [], croisements = [], position = null, fenetre = null, largeur = 720, hauteur = 300 }) {
   const L = longueurReseau(reseau);
   const t = reseau.tranchee;
   const sommetsD = [];
@@ -93,8 +94,9 @@ export function svgCoupeAxe({ reseau, terrain = [], croisements = [], position =
   ];
   const zmin = Math.min(...zs) - 0.2;
   const zmax = Math.max(...zs) + 0.2;
-  const exageration = exagerationAuto(L, zmin, zmax, largeur, hauteur);
-  const c = cadre({ x0: 0, x1: L, z0: zmin, z1: zmax, largeur, hauteur, exageration });
+  const [d0, d1] = fenetre ? [fenetre.d0, fenetre.d1] : [0, L];
+  const exageration = exagerationAuto(d1 - d0, zmin, zmax, largeur, hauteur);
+  const c = cadre({ x0: d0, x1: d1, z0: zmin, z1: zmax, largeur, hauteur, exageration });
   const P = (d, z) => `${f(c.X(d))},${f(c.Z(z))}`;
   const couleur = couleurDuType(reseau.type);
   let s = `<svg class="svg-coupe-reseau" viewBox="0 0 ${largeur} ${hauteur}" width="100%" role="img" aria-label="Coupe dans l'axe">`;

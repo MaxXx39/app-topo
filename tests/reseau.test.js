@@ -1,6 +1,6 @@
 // Tests des réseaux (canalisations) : validation, pentes, bords du fond de tranchée, coupe en travers, forme de la tranchée.
 import { describe, it, expect } from 'vitest';
-import { nouveauReseau, erreurReseau, pentesDesSegments, feALAbscisse, bordsFondTranchee, coupeEnTravers, croisementSegments, formeTranchee, longueurReseau, couleurDuType, croisementsSurAxe, HAUTEUR_SANS_SURFACE } from '../src/topo/reseau.js';
+import { nouveauReseau, erreurReseau, pentesDesSegments, feALAbscisse, bordsFondTranchee, coupeEnTravers, croisementSegments, formeTranchee, longueurReseau, couleurDuType, croisementsSurAxe, tuyauxSurCoupe, ligneAImplanterDuReseau, HAUTEUR_SANS_SURFACE } from '../src/topo/reseau.js';
 
 const s = (est, nord, fe) => ({ est, nord, fe });
 // Réseau EU vers l'est : 10 m à +10 % puis 10 m à −20 %.
@@ -134,5 +134,57 @@ describe('croisements dans l\'axe', () => {
     expect(liste[0].d).toBeCloseTo(4, 6);
     expect(liste[0].fe).toBeCloseTo(100, 6);
     expect(liste[0].reseau.nom).toBe('EC-1');
+  });
+});
+
+describe('réseaux croisés par une coupe', () => {
+  it('croisement à angle droit : position, FE, pas d\'étirement', () => {
+    const eu = EU();
+    const liste = tuyauxSurCoupe([eu], { est: 4, nord: -5 }, { est: 4, nord: 5 }, () => 102);
+    expect(liste).toHaveLength(1);
+    expect(liste[0].x).toBeCloseTo(5, 6);
+    expect(liste[0].fe).toBeCloseTo(100.4, 6);
+    expect(liste[0].etirement).toBeCloseTo(1, 6);
+    // La tranchée a sa forme (4 points) centrée sur le tuyau.
+    expect(liste[0].forme).toHaveLength(4);
+    expect(liste[0].forme[1].x).toBeCloseTo(4.6, 6);
+  });
+
+  it('croisement de biais à 30° : le tuyau paraît deux fois plus large', () => {
+    const eu = EU();
+    // Coupe qui fait 30° avec le réseau (vers l'est) : direction (cos 30°, sin 30°).
+    const c = Math.cos(Math.PI / 6);
+    const sn = Math.sin(Math.PI / 6);
+    const liste = tuyauxSurCoupe([eu], { est: 5 - 5 * c, nord: -5 * sn }, { est: 5 + 5 * c, nord: 5 * sn }, null);
+    expect(liste[0].etirement).toBeCloseTo(2, 6);
+  });
+
+  it('pas de croisement : liste vide', () => {
+    expect(tuyauxSurCoupe([EU()], { est: 4, nord: 3 }, { est: 4, nord: 9 })).toEqual([]);
+  });
+});
+
+describe('ligne à implanter d\'un réseau', () => {
+  it('l\'axe au FE par défaut, au dessus du tuyau ou au fond de la tranchée', () => {
+    const eu = EU();
+    expect(ligneAImplanterDuReseau(eu).sommets.map((x) => x.altitude)).toEqual([100, 101, 99]);
+    expect(ligneAImplanterDuReseau(eu, 'axe', 'dessus').sommets[0].altitude).toBeCloseTo(100.315, 6);
+    expect(ligneAImplanterDuReseau(eu, 'axe', 'fond').sommets[0].altitude).toBeCloseTo(99.85, 6);
+    expect(ligneAImplanterDuReseau(eu).decalage).toBe(0);
+    expect(ligneAImplanterDuReseau(eu).nom).toBe('EU-1 · axe · FE');
+  });
+
+  it('bords du fond de tranchée : décalés de ± largeur / 2 (gauche = négatif)', () => {
+    const eu = EU();
+    expect(ligneAImplanterDuReseau(eu, 'bordG', 'fond').decalage).toBeCloseTo(-0.4, 6);
+    expect(ligneAImplanterDuReseau(eu, 'bordD', 'fond').decalage).toBeCloseTo(0.4, 6);
+    expect(ligneAImplanterDuReseau(eu, 'bordD', 'fond').nom).toBe('EU-1 · bord D du fond · fond');
+  });
+
+  it('sans tranchée : pas de bords ni de fond', () => {
+    const sans = { ...EU(), tranchee: null };
+    expect(ligneAImplanterDuReseau(sans, 'bordG', 'fe')).toBeNull();
+    expect(ligneAImplanterDuReseau(sans, 'axe', 'fond')).toBeNull();
+    expect(ligneAImplanterDuReseau(sans, 'axe', 'fe')).not.toBeNull();
   });
 });

@@ -595,6 +595,7 @@ export function creerEcranLeve(conteneur, actions) {
         : '<p class="vide">Aucune surface.</p>'}
       ${ecartEtRegle()}
       <div class="ligne-choix choix-coupe seulement-intermediaire">${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}
+        ${aAcces('expert') && donnees.nbReseaux > 0 ? `<button type="button" class="puce-choix ${reglages.cana ? 'actif' : ''}" data-action="basculerCana" role="switch" aria-checked="${Boolean(reglages.cana)}" title="Montrer les tuyaux et les tranchées des réseaux dans les coupes">${reglages.cana ? '☑' : '☐'} Cana</button>` : ''}
         <button type="button" class="bouton-roue ${reglagesCoupesOuverts ? 'actif' : ''}" data-action="basculerReglagesCoupes" aria-label="Réglages des coupes" aria-expanded="${reglagesCoupesOuverts}">⚙</button></div>
       ${reglagesCoupesOuverts ? champDeltaSurface(donnees.deltaSurface) : ''}
       <div class="coupes-directes vue-${vue}">
@@ -745,6 +746,9 @@ export function creerEcranLeve(conteneur, actions) {
     if (bouton) bouton.disabled = !(etat?.connecte && etat?.autorise && donnees.implanter.ligne);
     const zone = conteneur.querySelector('[data-vivant="guidage-ligne"]');
     if (!zone) return;
+    // 0.236.0 : profil en long d'un réseau, seulement à moins de 1 m de la ligne (G / D) ; sinon la zone est vide (cachée).
+    const zoneProfil = conteneur.querySelector('[data-vivant="profil-reseau"]');
+    if (zoneProfil) zoneProfil.innerHTML = g?.profilReseau ? `<p class="titre-profil-reseau">Profil en long</p>${g.profilReseau}` : '';
     if (!g || g.message) {
       bandeCouloir = 0;
       zone.className = 'guidage-direct attente';
@@ -879,6 +883,7 @@ export function creerEcranLeve(conteneur, actions) {
       <button type="button" class="bouton bouton-prendre ${autocontrole ? '' : 'seulement-intermediaire'}" data-action="enregistrerImplantation" disabled>
         <span>${talus ? 'ENREGISTRER L\'ENTRÉE EN TERRE' : autocontrole ? 'ENREGISTRER LE CONTRÔLE' : 'ENREGISTRER L\'IMPLANTATION'}</span><span class="sous-titre-prendre">ou touche vol −</span>
       </button>
+      ${ligne && imp.ligne?.reseauId ? '<div class="profil-reseau" data-vivant="profil-reseau"></div>' : ''}
       <p class="raison-leve" data-vivant="raison" hidden></p>
     </div>`;
   }

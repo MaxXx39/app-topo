@@ -13737,3 +13737,14 @@ body.mode-telephone .barre-accroche:not(.ouverte) .separateur-accroche { display
 }
 .panneau[data-onglet='reseaux'] { border-top: 4px solid #92400e; }
 .ecran-reseaux h3 { border: 0; padding: 0; }
+
+/* 0.236.0 : réseaux dans les coupes d'Implanter › Surface (case « Cana ») et profil en long de l'implantation d'un réseau. */
+.coupe-directe .tranchee-coupe { fill: rgba(245, 158, 11, 0.25); stroke: #b45309; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.coupe-directe .tuyau-coupe { stroke-width: 1.6; }
+.coupe-directe .nom-tuyau-coupe { font: 800 8px system-ui, sans-serif; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
+.profil-reseau:empty { display: none; }
+.profil-reseau { margin-top: 8px; }
+.profil-reseau .titre-profil-reseau { font-weight: 800; font-size: 0.9rem; color: #7c3aed; margin: 0 0 4px; }
+.profil-reseau .svg-coupe-reseau { width: 100%; height: auto; }
+.ligne-cana { display: flex; align-items: center; gap: 8px; }
+.ecran-reseaux .puces-choix-reseau { display: flex; flex-wrap: wrap; gap: 8px; }

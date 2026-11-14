@@ -2,7 +2,7 @@
 // les données envoyées au plan. main.js lui donne ce dont elle a besoin (projet, surfaces, touchers…) : voir creerReseaux.
 import { htmlReseaux } from './ecran.js';
 import { svgCoupeEnTravers, svgCoupeAxe } from './coupe-svg.js';
-import { nouveauReseau, erreurReseau, coupeEnTravers, croisementsSurAxe, longueurReseau, TYPES_RESEAU } from '../topo/reseau.js';
+import { nouveauReseau, erreurReseau, coupeEnTravers, croisementsSurAxe, longueurReseau, ligneAImplanterDuReseau, TYPES_RESEAU } from '../topo/reseau.js';
 import { profilSurface } from '../topo/coupe.js';
 
 const nombreTape = (texte) => {
@@ -26,7 +26,7 @@ const brouillonVide = () => ({
  */
 export function creerReseaux(deps) {
   const { conteneur } = deps;
-  const etat = { vue: 'creer', brouillon: brouillonVide(), selectionId: null, abscisse: 0, coupe: 'perp', afficher: { tranchees: true, bords: false } };
+  const etat = { vue: 'creer', brouillon: brouillonVide(), selectionId: null, abscisse: 0, coupe: 'perp', cible: 'axe', altitude: 'fe', afficher: { tranchees: true, bords: false } };
   const liste = () => {
     const projet = deps.projet();
     projet.canalisations ??= [];
@@ -76,7 +76,7 @@ export function creerReseaux(deps) {
     const { coupeSvg, exageration } = etat.vue === 'voir' ? construireCoupe() : { coupeSvg: '', exageration: 1 };
     conteneur.innerHTML = htmlReseaux({
       vue: etat.vue, brouillon: etat.brouillon, surfaces: deps.surfaces(), reseaux: liste(), selectionId: choisi()?.id ?? null,
-      abscisse: etat.abscisse, coupe: etat.coupe, afficher: etat.afficher, coupeSvg, exageration,
+      abscisse: etat.abscisse, coupe: etat.coupe, cible: etat.cible, altitude: etat.altitude, afficher: etat.afficher, coupeSvg, exageration,
     });
     deps.majPlan();
   }
@@ -86,7 +86,7 @@ export function creerReseaux(deps) {
     const voir = etat.vue === 'voir';
     return {
       reseaux: liste(),
-      selectionId: voir ? choisi()?.id ?? null : null,
+      selectionId: etat.vue !== 'creer' ? choisi()?.id ?? null : null,
       afficher: etat.afficher,
       coupe: voir && etat.coupe === 'perp' ? construireCoupe().ligne : null,
       brouillon: etat.vue === 'creer' ? etat.brouillon.sommets : null,
@@ -180,6 +180,21 @@ export function creerReseaux(deps) {
       case 'choisir-reseau': etat.selectionId = id; etat.abscisse = longueurReseau(liste().find((r) => r.id === id)) / 2; break;
       case 'coupe-reseau': etat.coupe = valeur; break;
       case 'afficher-reseau': etat.afficher[valeur] = !etat.afficher[valeur]; break;
+      case 'cible-reseau':
+        etat.cible = valeur;
+        if (valeur !== 'axe' && etat.altitude === 'fe') etat.altitude = 'fond'; // un bord de fond de tranchée : par défaut l'altitude du fond
+        break;
+      case 'altitude-reseau': etat.altitude = valeur; break;
+      case 'implanter-reseau': {
+        const r = choisi();
+        const ligne = r ? ligneAImplanterDuReseau(r, etat.cible, etat.altitude) : null;
+        if (!ligne) {
+          deps.message('Ce choix demande une tranchée', 3500);
+          return;
+        }
+        deps.implanter({ ...ligne, reseauId: r.id });
+        return;
+      }
       case 'abscisse-reseau': etat.abscisse = Math.max(0, etat.abscisse + Number(valeur)); break;
       case 'supprimer-reseau': {
         const r = liste().find((x) => x.id === id);
@@ -216,6 +231,11 @@ export function creerReseaux(deps) {
   conteneur.addEventListener('change', (evenement) => {
     const champ = evenement.target.dataset?.champ;
     if (champ === 'surface-reseau') etat.brouillon.surfaceId = evenement.target.value;
+    else if (champ === 'reseau-implanter') {
+      etat.selectionId = evenement.target.value;
+      if (!choisi()?.tranchee) { etat.cible = 'axe'; if (etat.altitude === 'fond') etat.altitude = 'fe'; }
+      afficher();
+    }
     else if (champ === 'abscisse-reseau') afficher(); // le curseur est lâché : le texte à côté se met à jour
   });
 

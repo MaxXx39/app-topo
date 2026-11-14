@@ -1,3 +1,6 @@
+import { couleurDuType } from '../topo/reseau.js';
+import { echapper } from '../outils/echapper.js';
+
 // Dessin d'une coupe en direct (onglet Terrain, mode Implanter) : le profil de la surface sur
 // quelques mètres de part et d'autre du récepteur, et le bout de canne dessus (SVG).
 // 0.190.0 : cadre fixe, bout de canne au milieu ; échelle des hauteurs ×0,5 à ×3. 0.210.0 : cadre 25 % moins haut ; 0.212.0 : encore 25 % moins haut (hauteur = 0,45 × largeur).
@@ -37,8 +40,9 @@ export function valeursGrille(debut, fin, pas) {
  * - sens : 'perpendiculaire' ou 'axe' (couleur du dessin, la même que son trait sur le plan)
  * - titre, gauche, droite : textes (ex. « Perpendiculaire », « gauche », « droite »)
  * - grille : vrai pour la grille grise en longueur et en hauteur (Expert)
+ * - reseaux : tuyaux et tranchées croisés par la coupe (case « Cana », voir topo/reseau.js tuyauxSurCoupe) : [{ reseau, x, fe, etirement, forme }]
  */
-export function svgCoupeDirecte({ lignes, lignesBase = null, delta = 0, demiLongueur, altitudeCanne, classe, exageration = 1, sens = '', titre, gauche, droite, grille = true }) {
+export function svgCoupeDirecte({ lignes, lignesBase = null, reseaux = [], delta = 0, demiLongueur, altitudeCanne, classe, exageration = 1, sens = '', titre, gauche, droite, grille = true }) {
   // 0.190.0 (maquette B du 10.11) : cadre FIXE (hauteur = 0,45 × largeur : 2,25 m pour 5 m, 4,5 m pour 10 m…), le bout de canne
   // toujours au milieu ; seule l'échelle change (largeur 5 / 10 / 20 m…, hauteurs ×0,5, ×0,75, ×1, ×1,5, ×2, ×3).
   const longueur = 2 * demiLongueur;
@@ -90,6 +94,16 @@ export function svgCoupeDirecte({ lignes, lignesBase = null, delta = 0, demiLong
   const base = (lignesBase ?? []).map((ligne) => `<polyline points="${ligne.map((p) => `${x(p.distance).toFixed(1)},${y(p.altitude).toFixed(1)}`).join(' ')}" class="profil-base" />`).join('');
   const texteDelta = delta ? `<text x="${LARGEUR - MARGES.droite}" y="26" class="cote texte-delta-surface" text-anchor="end">Δ ${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(3)} m</text>` : '';
 
+  // Réseaux (case « Cana », 0.236.0) : la tranchée, puis le tuyau (une ellipse : plus large si la coupe le croise de biais).
+  const tuyaux = reseaux.map((t) => {
+    const couleur = couleurDuType(t.reseau.type);
+    const rayon = t.reseau.diametre / 2;
+    const forme = t.forme ? `<polygon points="${t.forme.map((p) => `${x(p.x).toFixed(1)},${y(p.z).toFixed(1)}`).join(' ')}" class="tranchee-coupe" />` : '';
+    const ellipse = `<ellipse cx="${x(t.x).toFixed(1)}" cy="${y(t.fe + rayon).toFixed(1)}" rx="${Math.max(2, rayon * t.etirement * pixelsParMetreX).toFixed(1)}" ry="${Math.max(2, rayon * pixelsParMetre).toFixed(1)}" class="tuyau-coupe" style="stroke:${couleur};fill:${couleur}44" />`;
+    const nom = `<text x="${(x(t.x) + 4).toFixed(1)}" y="${(y(t.fe + 2 * rayon) - 3).toFixed(1)}" class="nom-tuyau-coupe" style="fill:${couleur}">${echapper(t.reseau.nom)}</text>`;
+    return forme + ellipse + nom;
+  }).join('');
+
   // Le récepteur au milieu : trait vertical (sa position) et bout de canne (au bord s'il sort du dessin).
   const milieu = x(demiLongueur);
   let canne = `<line x1="${milieu}" y1="${MARGES.haut}" x2="${milieu}" y2="${yBas}" class="axe-canne" />`;
@@ -108,7 +122,7 @@ export function svgCoupeDirecte({ lignes, lignesBase = null, delta = 0, demiLong
     <text x="${milieu}" y="${hauteur - 4}" class="cote" text-anchor="middle">${demiLongueur} m | ${demiLongueur} m</text>
     ${traitsGrille}
     ${texteDelta}
-    <g clip-path="url(#${cadre})">${base}${profils}</g>
+    <g clip-path="url(#${cadre})">${base}${profils}${tuyaux}</g>
     ${canne}
   </svg>`;
 }

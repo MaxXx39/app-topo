@@ -5,7 +5,7 @@
 // les actions passent par data-action (voir main.js « Réseaux »).
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
-import { TYPES_RESEAU, couleurDuType, pentesDesSegments, longueurReseau } from '../topo/reseau.js';
+import { TYPES_RESEAU, couleurDuType, pentesDesSegments, longueurReseau, CIBLES_RESEAU, ALTITUDES_RESEAU } from '../topo/reseau.js';
 import { bulle } from '../aide/bulles.js';
 
 const nombre = (v) => (v == null ? '—' : formaterNombre(v));
@@ -72,14 +72,31 @@ function htmlVoir(e) {
       <button type="button" class="bouton-secondaire suppression-vraie" data-action="supprimer-reseau" data-id="${echapper(choisi.id)}">Supprimer ce réseau</button></div>`;
 }
 
+/** Page « Implanter » : quel réseau, quelle ligne suivre (axe ou bords du fond de tranchée) et quelle altitude viser. */
+function htmlImplanter(e) {
+  const { reseaux } = e;
+  if (reseaux.length === 0) return '<div class="cadre-reseau"><p class="invite-reseau">Aucun réseau : crée-en un dans « Créer »</p></div>';
+  const choisi = reseaux.find((r) => r.id === e.selectionId) ?? reseaux[0];
+  const avecTranchee = Boolean(choisi.tranchee);
+  const liste = reseaux.map((r) => `<option value="${echapper(r.id)}" ${r.id === choisi.id ? 'selected' : ''}>${echapper(r.nom)} · ${echapper(r.type)} · Ø${Math.round(r.diametre * 1000)}</option>`).join('');
+  const choix = (action, options, actif, permis) => `<div class="puces-choix-reseau">${options.map(([cle, titre]) => `<button type="button" class="puce-choix ${cle === actif ? 'actif' : ''}" data-action="${action}" data-valeur="${cle}" ${permis(cle) ? '' : 'disabled'} aria-pressed="${cle === actif}">${titre}</button>`).join('')}</div>`;
+  return `<div class="cadre-reseau"><h3>Réseau à implanter</h3>
+      <label class="ligne-champ-reseau">Réseau<select data-champ="reseau-implanter">${liste}</select></label>
+      <h3 style="margin-top:10px">Ligne à suivre</h3>${choix('cible-reseau', CIBLES_RESEAU, e.cible, (c) => c === 'axe' || avecTranchee)}
+      <h3 style="margin-top:10px">Altitude visée</h3>${choix('altitude-reseau', ALTITUDES_RESEAU, e.altitude, (a) => a !== 'fond' || avecTranchee)}
+      ${avecTranchee ? '' : '<p class="note-reseau">Ce réseau n\'a pas de tranchée : pas de bords ni de fond.</p>'}
+      <button type="button" class="bouton" data-action="implanter-reseau" style="margin-top:10px">Implanter</button>
+      <p class="note-reseau">Ouvre Implanter › Ligne sur ce réseau : « Monter / Descendre » suit la pente, et un profil en long apparaît à moins de 1 m de la ligne.</p></div>`;
+}
+
 /**
  * HTML de l'écran. e : { vue ('creer' ou 'voir'), brouillon, surfaces: [{ id, nom }], reseaux, selectionId, abscisse,
- * coupe ('perp' ou 'axe'), afficher: { tranchees, bords }, coupeSvg, exageration }.
+ * coupe ('perp' ou 'axe'), cible, altitude (page Implanter), afficher: { tranchees, bords }, coupeSvg, exageration }.
  */
 export function htmlReseaux(e) {
   const onglet = (cle, titre) => `<button type="button" class="${e.vue === cle ? 'actif' : ''}" data-action="vue-reseaux" data-valeur="${cle}" aria-pressed="${e.vue === cle}">${titre}</button>`;
   return `<div class="ecran-reseaux">
-    <div class="choix-segment-reseau" role="group" aria-label="Page">${onglet('creer', 'Créer')}${onglet('voir', 'Voir')}</div>
-    ${e.vue === 'creer' ? htmlCreer(e.brouillon, e.surfaces) : htmlVoir(e)}
+    <div class="choix-segment-reseau" role="group" aria-label="Page">${onglet('creer', 'Créer')}${onglet('voir', 'Voir')}${onglet('implanter', 'Implanter')}</div>
+    ${e.vue === 'creer' ? htmlCreer(e.brouillon, e.surfaces) : e.vue === 'implanter' ? htmlImplanter(e) : htmlVoir(e)}
   </div>`;
 }

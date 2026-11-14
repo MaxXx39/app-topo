@@ -191,3 +191,55 @@ export function croisementsSurAxe(reseaux, reseauId) {
   }
   return liste.sort((x, y) => x.d - y.d);
 }
+
+/**
+ * Réseaux croisés par une droite de coupe debut → fin (coupes d'Implanter › Surface, case « Cana »).
+ * Pour chacun : { reseau, x (m depuis le début de la coupe), fe, etirement (1 / sin de l'angle entre la coupe et le réseau :
+ * un tuyau coupé de biais paraît plus large), forme (tranchée [{ x, z }] ou null) }. terrainEn(x) : altitude du terrain ou null.
+ */
+export function tuyauxSurCoupe(reseaux, debut, fin, terrainEn = null) {
+  const longueur = Math.hypot(fin.est - debut.est, fin.nord - debut.nord);
+  if (longueur === 0) return [];
+  const liste = [];
+  for (const r of reseaux) {
+    for (let i = 0; i + 1 < r.sommets.length; i++) {
+      const [a, b] = [r.sommets[i], r.sommets[i + 1]];
+      const croise = croisementSegments(debut, fin, a, b);
+      if (!croise) continue;
+      const lSegment = Math.hypot(b.est - a.est, b.nord - a.nord);
+      const sinus = Math.abs((fin.est - debut.est) * (b.nord - a.nord) - (fin.nord - debut.nord) * (b.est - a.est)) / (longueur * lSegment);
+      const etirement = 1 / Math.max(sinus, 0.1);
+      const x = croise.t * longueur;
+      const fe = a.fe + (b.fe - a.fe) * croise.u;
+      const forme = r.tranchee
+        ? formeTranchee(x, fe, r.tranchee, terrainEn).map((p) => ({ x: x + (p.x - x) * etirement, z: p.z }))
+        : null;
+      liste.push({ reseau: r, x, fe, etirement, forme });
+    }
+  }
+  return liste.sort((p, q) => p.x - q.x);
+}
+
+/** Ce qu'on peut implanter sur un réseau : la ligne (axe ou bords du fond de tranchée) et l'altitude visée. */
+export const CIBLES_RESEAU = [['axe', 'Axe du tuyau'], ['bordG', 'Bord G du fond'], ['bordD', 'Bord D du fond']];
+export const ALTITUDES_RESEAU = [['fe', 'Fil d\'eau'], ['dessus', 'Dessus du tuyau'], ['fond', 'Fond de tranchée']];
+
+/**
+ * Ligne à implanter d'un réseau (même forme que celle d'Implanter › Ligne) : { nom, sommets [{ est, nord, altitude }], decalage }.
+ * cible : 'axe', 'bordG' ou 'bordD' (bords du fond de tranchée : la ligne décalée de ± largeur / 2, comme L1 / L2 du Guidage) ;
+ * altitude : 'fe' (le FE), 'dessus' (FE + diamètre) ou 'fond' (FE − hauteur de la tranchée). null si la tranchée manque pour ce choix.
+ */
+export function ligneAImplanterDuReseau(reseau, cible = 'axe', altitude = 'fe') {
+  const t = reseau.tranchee;
+  if ((cible !== 'axe' || altitude === 'fond') && !t) return null;
+  const z = { fe: (s) => s.fe, dessus: (s) => s.fe + reseau.diametre, fond: (s) => s.fe - t.hauteur }[altitude];
+  if (!z) return null;
+  const decalage = cible === 'bordG' ? -t.largeur / 2 : cible === 'bordD' ? t.largeur / 2 : 0;
+  const quoi = { axe: 'axe', bordG: 'bord G du fond', bordD: 'bord D du fond' }[cible];
+  const lib = { fe: 'FE', dessus: 'dessus', fond: 'fond' }[altitude];
+  return {
+    nom: `${reseau.nom} · ${quoi} · ${lib}`,
+    sommets: reseau.sommets.map((s) => ({ est: s.est, nord: s.nord, altitude: z(s) })),
+    decalage,
+  };
+}
