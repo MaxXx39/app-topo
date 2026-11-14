@@ -67,6 +67,16 @@ export const APPLIS = [
     icone: '<path d="M12 4v16M6 10l6-6 6 6M6 14l6 6 6-6" />',
   },
   {
+    // Réseaux (0.235.0, Expert, test) : canalisations (polyligne avec fil d'eau), coupes et tranchées.
+    cle: 'reseaux',
+    titre: 'Réseaux',
+    couleur: '#92400e',
+    texte: '#ffffff',
+    site: true,
+    niveau: 'expert',
+    icone: '<path d="M3 9h18M3 15h18" /><path d="M7 9v6M17 9v6" />',
+  },
+  {
     cle: 'calculs',
     titre: 'Calculs',
     couleur: '#db2777',
@@ -122,6 +132,7 @@ export function appliCourante(onglet, modeTerrain) {
   if (onglet === 'plan') return 'plan';
   if (onglet === 'mesure-rapide') return 'mesure';
   if (onglet === 'annotation') return 'annotation';
+  if (onglet === 'reseaux') return 'reseaux';
   if (['volumes', 'mesures', 'dessin', 'surfaces', 'calculs'].includes(onglet)) return 'calculs';
   if (onglet === 'terrain') {
     return { controler: 'implanter', autocontrole: 'controle', lame: 'guidage' }[modeTerrain] ?? 'lever';

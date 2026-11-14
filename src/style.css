@@ -13660,3 +13660,80 @@ body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .cor
 .reglette-transparence > span { flex: none; min-width: 3.2em; text-align: right; }
 body.mode-telephone .barre-accroche:not(.ouverte) .bouton-outil-accroche,
 body.mode-telephone .barre-accroche:not(.ouverte) .separateur-accroche { display: none; }
+
+/* ==========================================================================
+   0.235.0 : Réseaux (canalisations), Expert, test : plan, coupes et écran.
+   ========================================================================== */
+.reseau-plan { fill: none; stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: round; }
+.reseau-plan.choisi { stroke-width: 6; }
+.tranchee-plan { fill: rgba(245, 158, 11, 0.28); stroke: none; }
+.bord-tranchee-plan { fill: none; stroke-width: 2.5; stroke-dasharray: 7 4; }
+.nom-reseau-plan { font: 700 13px system-ui, sans-serif; paint-order: stroke; stroke: #fff; stroke-width: 3px; text-anchor: middle; }
+.sommet-reseau-plan { fill: #fff; stroke: #1b2b38; stroke-width: 2.5; }
+.fe-reseau-plan { font: 700 12px system-ui, sans-serif; fill: #92400e; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.pente-reseau-plan { font: 800 12px system-ui, sans-serif; fill: #1b2b38; paint-order: stroke; stroke: #fff; stroke-width: 3px; text-anchor: middle; }
+.coupe-reseau-plan { stroke: #7c3aed; stroke-width: 3; stroke-dasharray: 8 5; }
+.brouillon-reseau-plan { fill: none; stroke: #0d9488; stroke-width: 3; stroke-dasharray: 6 4; }
+.sommet-brouillon-plan { fill: #ccfbf1; stroke: #0d9488; stroke-width: 3; }
+.numero-brouillon-plan { font: 800 13px system-ui, sans-serif; fill: #0f766e; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+
+.ecran-reseaux { display: flex; flex-direction: column; gap: 10px; padding: 8px 12px 16px; }
+.ecran-reseaux .cadre-reseau { background: #fff; border-radius: 14px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+.ecran-reseaux h3 { margin: 0 0 8px; font-size: 0.85rem; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; }
+.ecran-reseaux .choix-segment-reseau { display: flex; gap: 4px; background: #eef1f3; border-radius: 12px; padding: 4px; }
+.ecran-reseaux .choix-segment-reseau button { flex: 1; border: 0; background: transparent; padding: 12px 6px; border-radius: 9px; font-weight: 700; font-size: 1rem; color: #475569; }
+.ecran-reseaux .choix-segment-reseau button.actif { background: #0d9488; color: #fff; }
+.ecran-reseaux .puces-types { display: flex; gap: 8px; flex-wrap: wrap; }
+.ecran-reseaux .puce-type { padding: 10px 16px; border-radius: 22px; border: 2px solid var(--couleur); background: #fff; color: var(--couleur); font-weight: 800; font-size: 1rem; }
+.ecran-reseaux .puce-type.actif { background: var(--couleur); color: #fff; }
+.ecran-reseaux .ligne-champ-reseau { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid #e2e8f0; padding: 8px 0; font-size: 1rem; }
+.ecran-reseaux .ligne-champ-reseau:last-child { border-bottom: 0; }
+.ecran-reseaux .ligne-champ-reseau input, .ecran-reseaux .ligne-champ-reseau select { min-width: 8rem; max-width: 55%; font-size: 1.1rem; font-weight: 700; text-align: right; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; }
+.ecran-reseaux .invite-reseau { background: #ccfbf1; border: 2px solid #0d9488; color: #0f766e; border-radius: 10px; padding: 10px 14px; font-weight: 700; }
+.ecran-reseaux .ok-reseau { background: #ecfdf5; border: 2px solid #16a34a; color: #166534; border-radius: 10px; padding: 10px 14px; font-weight: 700; }
+.ecran-reseaux table.points-reseau { width: 100%; border-collapse: collapse; }
+.ecran-reseaux table.points-reseau td, .ecran-reseaux table.points-reseau th { padding: 6px 4px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 0.95rem; }
+.ecran-reseaux table.points-reseau input { width: 7rem; text-align: right; font-weight: 800; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 4px 8px; }
+.ecran-reseaux .liste-reseaux .ligne-reseau { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
+.ecran-reseaux .liste-reseaux .ligne-reseau.choisi { background: #fff7e0; }
+.ecran-reseaux .liste-reseaux .ligne-reseau .nom { flex: 1; font-weight: 800; }
+.ecran-reseaux .liste-reseaux .pastille-reseau { width: 14px; height: 14px; border-radius: 50%; background: var(--couleur); flex: none; }
+.ecran-reseaux .cases-reseau { display: flex; flex-wrap: wrap; gap: 8px; }
+.ecran-reseaux .case-reseau { padding: 8px 12px; border-radius: 20px; border: 2px solid #94a3b8; background: #fff; font-weight: 700; color: #475569; }
+.ecran-reseaux .case-reseau.actif { border-color: #0d9488; background: #ccfbf1; color: #0f766e; }
+.ecran-reseaux .barre-abscisse { display: flex; align-items: center; gap: 8px; }
+.ecran-reseaux .barre-abscisse input[type="range"] { flex: 1; }
+.ecran-reseaux .barre-abscisse button { min-width: 44px; min-height: 44px; }
+.svg-coupe-reseau { background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; display: block; }
+.svg-coupe-reseau .tuyau-coupe { stroke-width: 3; }
+.svg-coupe-reseau .tranchee-coupe { fill: rgba(245, 158, 11, 0.25); stroke: #b45309; stroke-width: 2; stroke-dasharray: 7 4; }
+.svg-coupe-reseau .fond-tranchee-coupe { fill: none; stroke: #b45309; stroke-width: 2; stroke-dasharray: 7 4; }
+.svg-coupe-reseau .terrain-coupe { fill: none; stroke: #0f766e; stroke-width: 3; }
+.svg-coupe-reseau .fe-coupe { fill: #dc2626; stroke: #fff; stroke-width: 1.5; }
+.svg-coupe-reseau .texte-coupe { font: 800 13px system-ui, sans-serif; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.svg-coupe-reseau .pente-coupe { font: 800 13px system-ui, sans-serif; fill: #1b2b38; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.svg-coupe-reseau .canne-coupe { fill: #3b82f6; stroke: #fff; stroke-width: 3; }
+.ecran-reseaux .note-reseau { font-size: 0.85rem; color: #64748b; }
+/* Réseaux : le plan en haut sur tablette / téléphone (comme Annotation), l'écran dessous. */
+@media (max-width: 899px) {
+  body[data-onglet='reseaux'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * 0.4);
+  }
+  body[data-onglet='reseaux'] .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: var(--hauteur-plan-terrain);
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+  body[data-onglet='reseaux'] .mise-en-page { padding-top: var(--hauteur-plan-terrain); padding-bottom: 96px; }
+  body[data-onglet='reseaux'] .panneau[data-onglet='reseaux'] { padding-top: 4px; border-top-left-radius: 0; border-top-right-radius: 0; }
+  body[data-onglet='reseaux'] .boutons-taille-plan { display: none; }
+}
+.panneau[data-onglet='reseaux'] { border-top: 4px solid #92400e; }
+.ecran-reseaux h3 { border: 0; padding: 0; }

@@ -7,6 +7,7 @@ import { bulle } from '../aide/bulles.js';
 import { aAcces, rayonFormes, echelleTexte } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
 import { dessinerMesureRapide } from './mesure-rapide.js';
+import { dessinerReseaux } from './reseaux.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { texteDuPoint } from '../topo/chantier.js';
 // Couleur des nuages d'Annotation (vert sarcelle de l'application ; au choix dans « Afficher »).
@@ -858,6 +859,8 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     dessinerDessins(groupe, implantation, (est, nord) => versEcran(est, nord, vue), creerElement, 1 / vue.echelle, calques.noms, rayonFormes());
     // Mesure rapide (0.158.0) : points, côtés, longueurs et surface.
     dessinerMesureRapide(groupe, implantation.mesureRapide, (est, nord) => versEcran(est, nord, vue), creerElement);
+    // Réseaux (0.235.0, Expert) : canalisations, tranchées, coupe en travers.
+    dessinerReseaux(groupe, implantation.reseaux, (est, nord) => versEcran(est, nord, vue), creerElement);
     svg.append(groupe);
   }
 

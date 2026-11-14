@@ -5,6 +5,8 @@
 export const TEXTES_AIDE = {
   annotation:
     'Annotation : pose un point (Manuel = loupe sur le plan, GNSS, ou GPS tablette à 3 m ou mieux). En bas : photo (on peut dessiner dessus), ↶ efface le dernier, ID et remarque, Enreg. point. Liste « Annot-date ».',
+  reseaux:
+    'Réseaux (Expert, test) : « Créer » = touche une polyligne du DXF (son Z = fil d\'eau, le FE est le bas extérieur du tuyau) ou des points un à un avec leur FE ; type, nom, Ø ext., surface de référence, tranchée (bords droits = blindage). « Voir » : coupe perpendiculaire ou dans l\'axe, tranchées et bords G / D du fond sur le plan.',
   mesureRapide:
     'Mesure rapide : touche des points sur le plan (accroche en bas, ou GNSS). 2 points : longueur, Δh, pente. 3 et plus : case « Figure fermée » (périmètre, surface) ou ligne ouverte (longueur du chemin), angles en degrés (colonne Angle, et sur le plan si la case est cochée). « Enregistrer » ou « Exporter » (PDF, DXF).',
   applications:

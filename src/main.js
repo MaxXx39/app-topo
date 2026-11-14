@@ -124,6 +124,7 @@ import { creerNavigation } from './navigation/bande.js';
 import { mesureRapide } from './topo/mesure-rapide.js';
 import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
 import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
+import { creerReseaux } from './reseaux/reseaux.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
 import { htmlEncadreAnnotation } from './annotation/encadre.js';
 import { lignesFichePoint, htmlFichePoint, htmlFicheCalque } from './plan/fiche-point.js';
@@ -383,6 +384,9 @@ document.querySelector('#app').innerHTML = `
       </section>
       <section class="panneau" data-onglet="annotation">
         <div id="annotation"></div>
+      </section>
+      <section class="panneau" data-onglet="reseaux">
+        <div id="reseaux-ecran"></div>
       </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
       <div id="barre-mesures" class="barre-edition" hidden></div>
@@ -1403,6 +1407,42 @@ document.querySelector('#annotation').addEventListener('input', (evenement) => {
   else if (evenement.target.closest('[data-champ="remarque-annotation"]')) annotationEtat.remarque = evenement.target.value;
 });
 
+// --- Réseaux (0.235.0, Expert, test) : voir reseaux/reseaux.js ---
+/** Vrai quand l'application Réseaux est l'écran de travail (le plan lui envoie ses touchers). */
+function reseauxActif() {
+  return ongletContexte === 'reseaux' && aAcces('expert');
+}
+
+/** Polyligne du plan (DXF) sous le doigt : ses sommets { est, nord, altitude }, ou null. */
+function ligneDuPlanSousLeDoigt(position, tolerance) {
+  const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes);
+  return trouve ? trouve.sommets : null;
+}
+
+/** Point du projet, sinon sommet du plan, sous le doigt : { est, nord }, ou null. */
+function pointDuPlanSousLeDoigt(position, tolerance) {
+  const parPoint = accrocher('point', position, tolerance, { points: pointsDuProjet(), lignes: [], cercles: [] });
+  if (parPoint) return parPoint;
+  return accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansDuProjet(), position, tolerance)));
+}
+
+const reseaux = creerReseaux({
+  conteneur: document.querySelector('#reseaux-ecran'),
+  projet: () => projet,
+  modifie: () => modifie(),
+  majPlan: () => {
+    envoyerImplantationAuPlan();
+    plan.rafraichirImplantation();
+  },
+  message: (texte, duree) => afficherMessage(texte, duree),
+  vibrer: (ms) => vibrer(ms),
+  surfaces: () => projet.surfaces.filter((s) => trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
+  trianglesDe: (id) => trianglesDeSurface(id),
+  altitudeDe: (id) => altitudeDeSurface(id),
+  ligneSousLeDoigt: ligneDuPlanSousLeDoigt,
+  pointSousLeDoigt: pointDuPlanSousLeDoigt,
+});
+
 document.querySelector('#mesure-rapide').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-action]');
   if (!bouton || bouton.disabled) return;
@@ -1583,6 +1623,7 @@ function ouvrirAppli(cle, sous = null, depuisMenu = false) {
   else if (cle === 'plan') afficherOnglet('plan');
   else if (cle === 'mesure') afficherOnglet('mesure-rapide');
   else if (cle === 'annotation') afficherOnglet('annotation');
+  else if (cle === 'reseaux') afficherOnglet('reseaux');
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur', { detail: { retourMenu: depuisMenu } }));
   if (sous && cle !== 'calculs') {
     // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
@@ -1732,6 +1773,7 @@ function afficherOnglet(demande, { partie = null } = {}) {
   if (entreDansCalculs) cadrerSurCalculs();
   if (nom === 'mesure-rapide') afficherMesureRapide();
   if (nom === 'annotation') afficherAnnotation();
+  if (nom === 'reseaux') reseaux.afficher();
   navigation?.mettreAJour();
   window.scrollTo(0, 0);
   if (nom === 'projets' && !partie) navigation?.ouvrirPage();
@@ -1858,6 +1900,7 @@ function adapterAuMode() {
   }
   if (estModeBase() && estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
   else if (!aAcces('expert') && document.body.dataset.onglet === 'dessin') afficherOnglet('volumes');
+  if (!aAcces('expert') && document.body.dataset.onglet === 'reseaux') afficherOnglet('projets'); // Réseaux : Expert seulement
   if (!aAcces('expert') && terrain.implantation === 'talus') {
     terrain.implantation = 'ligne';
     retenirReglagesTerrain();
@@ -3511,9 +3554,9 @@ function gererLoupeImplantation() {
 
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
-  const accrocheActive = mesureRapideActive() || annotationActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(controlePlan.planId) || Boolean(daoAppli?.actif());
+  const accrocheActive = reseauxActif() || mesureRapideActive() || annotationActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(controlePlan.planId) || Boolean(daoAppli?.actif());
   // 0.159.0 : les applications sont indépendantes : la Mesure rapide ne montre rien d'Implanter.
-  const mesure = mesureRapideActive() || annotationActive();
+  const mesure = mesureRapideActive() || annotationActive() || reseauxActif();
   const enLigne = accrocheActive && !mesure && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
@@ -3569,6 +3612,7 @@ function envoyerImplantationAuPlan() {
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : centrePtsActif() ? centrePts.points : [],
         mesureRapide: mesureRapideActive() ? { ...mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee }), afficherAngles: mesureRapideEtat.angles } : null,
+        reseaux: reseauxActif() ? reseaux.donneesPlan() : null,
       }
     : null);
   gererLoupeImplantation();
@@ -5470,6 +5514,11 @@ function pointsDuProjet() {
  * (« Point » : les points du projet ; les autres : le plan DXF).
  */
 function toucherPourImplantation(position, tolerance) {
+  // Réseaux (0.235.0) : la polyligne ou le point touché sert à créer un réseau.
+  if (reseauxActif()) {
+    reseaux.toucher(position, tolerance);
+    return;
+  }
   // Mesure rapide (0.158.0) : le point touché (selon l'accroche) s'ajoute à la mesure.
   if (mesureRapideActive()) {
     toucherPourMesureRapide(position, tolerance);
