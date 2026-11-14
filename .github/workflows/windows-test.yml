@@ -1,12 +1,12 @@
 # Petit programme de test Windows pour la tablette CC180 (lecture du récepteur GNSS sur un port COM).
-# Fabriqué seulement quand le dossier windows/ change (ou à la main), puis publié dans « Releases » :
+# Fabriqué seulement quand le dossier windows/TestRecepteur change (ou à la main), puis publié dans « Releases » :
 #   https://github.com/MaxXx39/app-topo/releases/download/exe-test-derniere-version/Topo-Test-Recepteur.exe
 name: Fabriquer le test Windows
 
 on:
   push:
     paths:
-      - "windows/**"
+      - "windows/TestRecepteur/**"
       - ".github/workflows/windows-test.yml"
   workflow_dispatch:
 

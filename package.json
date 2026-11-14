@@ -1,13 +1,14 @@
 {
   "name": "app-topo",
   "private": true,
-  "version": "0.236.0",
+  "version": "0.237.0",
   "description": "Calcul de volumes de stocks à partir de points GNSS (PWA personnelle)",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:android": "vite build --mode android",
+    "build:windows": "vite build --mode windows",
     "preview": "vite preview",
     "test": "vitest run"
   },

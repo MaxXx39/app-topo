@@ -7,3 +7,9 @@ android/build/
 android/app/build/
 android/local.properties
 android/.kotlin/
+windows/Topo/appli/
+windows/Topo/appli.zip
+windows/Topo/version.txt
+windows/Topo/google-bureau.txt
+windows/**/bin/
+windows/**/obj/

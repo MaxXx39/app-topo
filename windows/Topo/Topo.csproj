@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Appli Windows « Topo.exe » : la même appli web que l'APK Android, dans une fenêtre Windows (WebView2).
+       .NET Framework 4.8 est déjà dans Windows 10 : rien à installer, sauf « WebView2 Runtime » (Microsoft)
+       si la tablette ne l'a pas. Une seule bibliothèque : Microsoft.Web.WebView2 (accord du 14.11).
+       Tout est rangé dans le .exe (un seul fichier à copier). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>Topo</AssemblyName>
+    <RootNamespace>Topo</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>topo.ico</ApplicationIcon>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Device" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" GeneratePathProperty="true" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Rangés dans le .exe, sous ces noms (lus par Ressources.Ouvrir). -->
+    <EmbeddedResource Include="pont-windows.js" LogicalName="pont-windows.js" />
+    <EmbeddedResource Include="..\..\android\noyau\src\main\resources\geoide\chgeo2004_lhn95.grille" LogicalName="chgeo2004_lhn95.grille" Link="chgeo2004_lhn95.grille" />
+    <!-- Fabriqués par GitHub avant la compilation (voir .github/workflows/windows.yml). -->
+    <EmbeddedResource Include="appli.zip" LogicalName="appli.zip" Condition="Exists('appli.zip')" />
+    <EmbeddedResource Include="version.txt" LogicalName="version.txt" Condition="Exists('version.txt')" />
+    <EmbeddedResource Include="google-bureau.txt" LogicalName="google-bureau.txt" Condition="Exists('google-bureau.txt')" />
+    <!-- Bibliothèque WebView2 (voir Programme.Main et Ressources.DossierDuChargeur). -->
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\lib\net462\Microsoft.Web.WebView2.Core.dll" LogicalName="Microsoft.Web.WebView2.Core.dll" Link="webview2\Microsoft.Web.WebView2.Core.dll" Condition="'$(PkgMicrosoft_Web_WebView2)' != ''" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\lib\net462\Microsoft.Web.WebView2.WinForms.dll" LogicalName="Microsoft.Web.WebView2.WinForms.dll" Link="webview2\Microsoft.Web.WebView2.WinForms.dll" Condition="'$(PkgMicrosoft_Web_WebView2)' != ''" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll" LogicalName="x64.WebView2Loader.dll" Link="webview2\x64.WebView2Loader.dll" Condition="'$(PkgMicrosoft_Web_WebView2)' != ''" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x86\native\WebView2Loader.dll" LogicalName="x86.WebView2Loader.dll" Link="webview2\x86.WebView2Loader.dll" Condition="'$(PkgMicrosoft_Web_WebView2)' != ''" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Dossier de travail de la fabrication : pas du code. -->
+    <Compile Remove="appli\**" />
+    <None Remove="appli\**" />
+  </ItemGroup>
+</Project>

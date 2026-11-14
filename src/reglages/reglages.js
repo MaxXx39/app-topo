@@ -14,12 +14,12 @@
 //   les appareils (voir listes-partagees.js) ;
 // - « Fermer l'appli » (appli Android seulement), en rouge tout en haut.
 import { echapper } from '../outils/echapper.js';
-import { anydeskDisponible, ouvrirAnydesk } from '../android/pont.js';
+import { anydeskDisponible, ouvrirAnydesk, estDansAppliWindows, installerMiseAJourWindows } from '../android/pont.js';
 import { demanderCode } from '../outils/code.js';
 import { lireListesPartagees } from './listes-partagees.js';
 import { modifierLibellesDeSorte } from '../leve/fenetre-libelles.js';
 import { ouvrirFenetreListes } from './fenetre-listes.js';
-import { apkPublie, estPlusRecente } from '../outils/mise-a-jour.js';
+import { apkPublie, exePublie, estPlusRecente } from '../outils/mise-a-jour.js';
 
 const CLE = 'topo-reglages';
 const PAR_DEFAUT = { telephone: false, mode: 'intermediaire', tailleFormes: 'normale', tailleTexte: 'normal', theme: 'normal' };
@@ -233,7 +233,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       ${recepteur ? `<div class="page-reglages" data-page="recepteur">
         <button type="button" class="bouton-secondaire bouton-large" data-action="recepteur">Récepteur GNSS, corrections, hauteur de canne…</button>
       </div>` : ''}
-      <p class="aide version-reglages">Version de l'appli : ${__VERSION_APPLI__}${recepteur ? ' (appli Android)' : ''}</p>
+      <p class="aide version-reglages">Version de l'appli : ${__VERSION_APPLI__}${recepteur ? (estDansAppliWindows() ? ' (appli Windows)' : ' (appli Android)') : ''}</p>
       ${recepteur ? `<div class="mise-a-jour-reglages">
         <button type="button" class="bouton-lien bouton-lien-neutre" data-action="chercher-mise-a-jour">Chercher une mise à jour</button>
         <span class="aide" data-zone="mise-a-jour" role="status"></span>
@@ -336,10 +336,18 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
   async function chercherMiseAJour() {
     const zone = fenetre.querySelector('[data-zone="mise-a-jour"]');
     zone.textContent = 'Recherche…';
-    const apk = await apkPublie();
+    // 0.237.0 : dans l'appli Windows, on cherche le dernier Topo.exe ; il s'installe tout seul (l'appli se relance).
+    const windows = estDansAppliWindows();
+    const apk = windows ? await exePublie() : await apkPublie();
     if (!apk) zone.textContent = 'Impossible de savoir (pas de réseau ?)';
     else if (!estPlusRecente(apk.version, __VERSION_APPLI__)) zone.textContent = `À jour (version ${__VERSION_APPLI__})`;
-    else zone.innerHTML = `Version ${apk.version} disponible : <a href="${apk.adresse}">télécharger Topo-${apk.version}.apk</a>, puis toucher « Installer »`;
+    else if (windows) {
+      zone.innerHTML = `Version ${echapper(apk.version)} disponible : <button type="button" class="bouton-secondaire" data-action="installer-windows">Installer</button>`;
+      zone.querySelector('[data-action="installer-windows"]').addEventListener('click', () => {
+        zone.textContent = 'Téléchargement… l\'appli va se relancer.';
+        installerMiseAJourWindows(apk.adresse);
+      });
+    } else zone.innerHTML = `Version ${apk.version} disponible : <a href="${apk.adresse}">télécharger Topo-${apk.version}.apk</a>, puis toucher « Installer »`;
   }
 
   /** Mode choisi : monter en Expert demande le code de sécurité (0.90.0) ; descendre, non. */

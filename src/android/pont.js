@@ -11,6 +11,17 @@ export function estDansAppliAndroid() {
   return typeof window !== 'undefined' && Boolean(window.AppliAndroid);
 }
 
+/**
+ * Vrai si la page tourne dans l'appli Windows (Topo.exe, dossier windows/Topo) : elle a le même objet
+ * window.AppliAndroid que l'APK (fabriqué par windows/Topo/pont-windows.js), donc tout le reste marche pareil.
+ */
+export function estDansAppliWindows() {
+  return estDansAppliAndroid() && window.AppliAndroid.estWindows === true;
+}
+
+/** Windows : télécharge le nouveau Topo.exe, le met à la place de celui qui tourne et relance l'appli. */
+export const installerMiseAJourWindows = (adresse) => window.AppliAndroid.installerMiseAJour(adresse);
+
 /** Octets -> texte base64 (pour passer un fichier à Kotlin, qui ne reçoit que du texte). */
 export function enBase64(octets) {
   let binaire = '';
