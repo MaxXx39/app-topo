@@ -174,7 +174,8 @@ namespace Topo
             s.IsGeneralAutofillEnabled = false;
 
             // Les fichiers de l'appli web sont servis depuis le .exe.
-            coeur.AddWebResourceRequestedFilter("https://" + ServeurAppli.HOTE + "/*", CoreWebView2WebResourceContext.All);
+            // « Toutes les sources » : aussi les fichiers demandés par un « worker » (lecture des plans PDF).
+            coeur.AddWebResourceRequestedFilter("https://" + ServeurAppli.HOTE + "/*", CoreWebView2WebResourceContext.All, CoreWebView2WebResourceRequestSourceKinds.All);
             coeur.WebResourceRequested += ServirFichier;
             coeur.WebMessageReceived += RecevoirMessage;
             coeur.NavigationStarting += (expediteur, e) =>
