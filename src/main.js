@@ -7301,12 +7301,13 @@ function calculerControle(etat, orientation) {
 
 // Boussole de la tablette (implantation : savoir où est le nord) : l'aiguille tourne au plus une
 // fois par image affichée.
-if (ecranLeve) {
+{
   let capEnAttente = null;
   ecouterBoussole((cap) => {
     if (capEnAttente === null) {
       requestAnimationFrame(() => {
-        ecranLeve.mettreAJourBoussole(capEnAttente);
+        ecranLeve?.mettreAJourBoussole(capEnAttente);
+        plan.mettreAJourBoussoleTablette(capEnAttente);
         capEnAttente = null;
       });
     }

@@ -165,6 +165,12 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       <canvas class="plan-dxf-canvas plan-points-canvas" aria-hidden="true"></canvas>
       <svg class="plan" role="img" aria-label="Plan des points"></svg>
       <div class="plan-attribution" hidden></div>
+      <div class="boussole-tablette" hidden title="Boussole de la tablette (nord magnétique, environ 3° près)" aria-label="Boussole de la tablette">
+        <svg viewBox="-30 -30 60 60" aria-hidden="true">
+          <circle r="27" class="cadran" />
+          <g class="aiguille"><path d="M0 -22 6 0H-6Z" class="nord" /><path d="M0 22 6 0H-6Z" class="sud" /><text y="-11" text-anchor="middle">N</text></g>
+        </svg>
+      </div>
       <div class="plan-calques">
         <div class="plan-puces">
         <button type="button" class="puce" data-action="calques" aria-expanded="false">
@@ -1784,6 +1790,15 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
   conteneur.querySelector('[data-action="zoom-plus"]').addEventListener('click', () => zoomerAuCentre(1.5));
   conteneur.querySelector('[data-action="zoom-moins"]').addEventListener('click', () => zoomerAuCentre(1 / 1.5));
   const boutonPosition = conteneur.querySelector('[data-action="ma-position"]');
+  // 0.238.0 : boussole de la tablette en bas à gauche du plan, seulement quand le plan ne suit pas
+  // le « cap » du GNSS (inclinaison pas prête, GPS tablette, pas de GNSS). capTablette : dernier cap (°) ou null.
+  const boussoleTablette = conteneur.querySelector('.boussole-tablette');
+  let capTablette = null;
+  function mettreAJourBoussoleTablette() {
+    const inclinaisonPrete = Boolean(position?.prete) && !position?.tablette;
+    boussoleTablette.hidden = capTablette == null || inclinaisonPrete;
+    if (capTablette != null) boussoleTablette.querySelector('.aiguille').setAttribute('transform', `rotate(${(-capTablette).toFixed(1)})`);
+  }
   const boutonNord = conteneur.querySelector('[data-action="nord-en-haut"]');
   // Dessin du bouton selon le mode : viseur (libre), viseur plein (suivi, nord en haut), flèche
   // de navigation (suivi, devant en haut).
@@ -2662,10 +2677,16 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
      * pas de flèche). Pendant le suivi (bouton « Ma position »), le plan se recentre sur elle. Le premier affichage
      * d'un levé encore vide se cadre sur elle.
      */
+    /** Nouveau cap de la boussole de la tablette (°, 0 = haut de la tablette vers le nord), ou null. */
+    mettreAJourBoussoleTablette(cap) {
+      capTablette = cap;
+      mettreAJourBoussoleTablette();
+    },
     afficherPosition(nouvellePosition) {
       const premiere = !position && nouvellePosition;
       position = nouvellePosition;
       boutonPosition.hidden = !position;
+      mettreAJourBoussoleTablette();
       // Cap automatique (0.119.0) : GNSS prêt → devant du GNSS en haut ; plus prêt → comme avant.
       // 0.153.0 : GPS de la tablette (sans GNSS) : aucun centrage automatique (cap auto, retour du
       // suivi, première position) ; seul « Ma position » fait suivre.
