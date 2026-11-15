@@ -1717,6 +1717,8 @@ document.querySelector('#leve-direct').addEventListener('input', () => navigatio
  * 'volumes', 'mesures' ; 'calculs' : la dernière partie affichée). Sur ordinateur, le plan reste
  * toujours visible à droite.
  */
+// État du contrôle d'un plan (voir plus bas « Contrôle d'un plan », 0.218.0) : déclaré ici car afficherOnglet le lit.
+const controlePlan = { planId: null, accroche: 'sommet', pointPlan: null, resultat: null, onglet: null };
 function afficherOnglet(demande, { partie = null } = {}) {
   const ongletAvant = document.body.dataset.onglet; // Annotation : on sait qu'on la quitte
   const nom = demande === 'calculs' ? partieCalculs : demande;
@@ -1727,6 +1729,8 @@ function afficherOnglet(demande, { partie = null } = {}) {
     const titre = document.querySelector('#titre-partie-projet');
     if (titre) titre.textContent = TITRES_PARTIES_PROJET[partie ?? 'contenu'];
   }
+  // 0.239.0 : la barre « Contrôler le plan » disparaît pour de bon quand on change d'écran (le plan reste « à contrôler » dans la liste des plans).
+  if (controlePlan.planId && controlePlan.onglet && nom !== controlePlan.onglet) abandonnerControlePlan();
   // Drive : on travaille sur le projet de départ (fenêtre de démarrage) : il est comparé à Drive.
   if (nom !== 'projets') partage?.choixFait();
   // Ajout manuel (0.120.0) : on le quitte en changeant de page (le plan en fait partie).
@@ -2092,7 +2096,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       }
       const avertissements = [];
       if (!estEnMn95(lu.bornes)) {
-        avertissements.push('Ce plan ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : touche « recaler » sur le plan pour le mettre en MN95.');
+        avertissements.push('Ce plan ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : à recaler depuis la page Plans.');
       }
       const ignores = Object.entries(lu.compte.ignores);
       if (ignores.length > 0) avertissements.push(`Non affiché(s) : ${ignores.map(([type, n]) => `${n} ${type}`).join(', ')} (hachures, images… : seuls les traits, textes, cercles et aplats sont lus).`);
@@ -2181,7 +2185,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       const enImage = scanne || valeurs.mode === 'image';
       if (!sansPrefixe(valeurs.nom, PREFIXE_PDF).trim()) throw new Error('le nom du plan est vide');
       const nom = avecPrefixe(valeurs.nom, PREFIXE_PDF);
-      const avertissements = valeurs.recaler === 'cale' ? [] : [`Plan PDF : il n'est pas en MN95, touche « recaler » sur le plan pour le mettre en place${enImage ? ' (accroche « Manuel » : loupe)' : ''}.`];
+      const avertissements = valeurs.recaler === 'cale' ? [] : [`Plan PDF : pas en MN95, à recaler depuis la page Plans${enImage ? ' (accroche « Manuel » : loupe)' : ''}.`];
       if (!echelle) avertissements.push('Sans échelle : le plan est à la taille de la feuille, le recalage trouvera l\'échelle.');
       let lu;
       if (enImage) {
@@ -2198,7 +2202,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         const lecture = lirePlanDxf(dxfDuPdf(contenu, echelle), nom);
         if (lecture.erreur || !lecture.plan.bornes) throw new Error(lecture.erreur ?? 'aucun objet dessiné trouvé');
         lu = lecture.plan;
-        if (contenu.images > 0) avertissements.push(`${contenu.images} image(s) du PDF non reprise(s) (seuls les traits et les textes sont lus).`);
+        if (contenu.images > 0) avertissements.push(`${contenu.images} images du PDF non reprises (seuls les traits et les textes sont lus).`);
       }
       const nouveauPlan = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, type: valeurs.type || '', ...(valeurs.recaler === 'cale' ? { dejaCale: true } : {}), pdf: { page, echelle, image: enImage } };
       projet.plansDxf.push(nouveauPlan);
@@ -4998,7 +5002,7 @@ async function importerPointsControle(fichier) {
     if (mode === null) return { info: '', erreur: '' };
     const { ajoutes, deja, sansNom } = ajouterPointsControle(projet.pointsControle, points, nouvelIdentifiant, { garderDoublons: mode === 'garder' });
     if (ajoutes > 0) modifie();
-    const morceaux = [`${ajoutes} point(s) ajouté(s)`];
+    const morceaux = [`${ajoutes} ${ajoutes > 1 ? 'points ajoutés' : 'point ajouté'}`];
     if (renommes.length > 0) morceaux.push(`${renommes.length} renommé(s) : ${renommes.slice(0, 5).map((r) => `${r.avant} → ${r.apres}`).join(', ')}${renommes.length > 5 ? '…' : ''}`);
     if (deja.length > 0) morceaux.push(`${deja.length} déjà dans la liste, non ajouté(s) : ${deja.slice(0, 10).join(', ')}${deja.length > 10 ? '…' : ''}`);
     if (sansNom > 0) morceaux.push(`${sansNom} sans nom, non ajouté(s)`);
@@ -5111,7 +5115,11 @@ async function proposerControle() {
   // Pas de point de contrôle dans le projet : un simple bandeau (0.114.0, avant une fenêtre qui
   // bloquait l'écran) ; rien n'est noté (demande du 26.10.2026).
   if (projet.pointsControle.length === 0) {
-    afficherMessage(`${texte} Aucun point de contrôle dans ce projet.`, 6000);
+    // 0.239.0 : seulement dans Lever (ou Contrôle), en haut du plan : plus sur le menu, Importer, Exporter…
+    const mode = document.body.dataset.modeTerrain;
+    if (document.body.dataset.onglet === 'terrain' && (mode === 'lever' || mode === 'autocontrole')) {
+      afficherMessage(`${texte} Aucun point de contrôle dans ce projet.`, 6000, { haut: true });
+    }
     rappelEnCours = false;
     return;
   }
@@ -6233,7 +6241,6 @@ function annulerRecalage(id) {
 // --- Contrôle d'un plan (0.218.0, demande du 12.11) : voir recalage/barre-controle.js et topo/controle-plan.js ---
 // Un plan « déjà calé » est contrôlé tout de suite après l'import, un plan recalé à la fin du recalage : on touche un point du plan,
 // puis le point connu qui lui correspond ; l'écart (mm) est gardé sur le plan (plan.controle). Sans point connu : plan « non contrôlé ».
-const controlePlan = { planId: null, accroche: 'sommet', pointPlan: null, resultat: null };
 let barreControlePlan = null;
 
 function commencerControlePlan(id) {
@@ -6287,13 +6294,23 @@ function commencerControlePlan(id) {
     },
   });
   if (estTelephone()) afficherOnglet('plan');
+  controlePlan.onglet = document.body.dataset.onglet ?? null; // écran où la barre a été ouverte (0.239.0)
   recalculer();
   requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
   montrerControlePlan();
 }
 
+/** 0.239.0 : on a changé d'écran sans valider : le contrôle est reporté (comme « plus tard »), la barre disparaît. */
+function abandonnerControlePlan() {
+  const plan1 = projet.plansDxf.find((p) => p.id === controlePlan.planId);
+  if (plan1 && !plan1.controle) plan1.controle = { saute: true, raison: 'reporté', le: new Date().toISOString() };
+  arreterControlePlan();
+  modifie();
+}
+
 function arreterControlePlan() {
   controlePlan.planId = null;
+  controlePlan.onglet = null;
   controlePlan.pointPlan = null;
   controlePlan.resultat = null;
   barreControlePlan?.enlever();
@@ -7966,7 +7983,7 @@ async function importerSurface(fichier) {
       cacherListe(projet, importee.id); // 0.231.0 : surfaces cachées au départ (case dans Afficher › Surface)
     }
     const messages = [...erreurs, ...avertissements];
-    message = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} » : voir Surfaces importées, plus bas.</p>
+    message = `<p class="resume"><strong>${surfaces.length} ${surfaces.length > 1 ? 'surfaces importées' : 'surface importée'}</strong> de « ${echapper(fichier.name)} » : voir la page « Surfaces importées ».</p>
       ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
     editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
     if (surfaces.length > 0) editeurSurfaces.choisir(projet.surfaces.length - 1);
@@ -8777,7 +8794,7 @@ setInterval(() => {
 
 /** Petit message sous l'en-tête, qui disparaît tout seul après "duree" millisecondes (null : il reste). */
 let minuterieMessage = null;
-function afficherMessage(texte, duree = 2000) {
+function afficherMessage(texte, duree = 2000, { haut = false } = {}) {
   let zone = document.querySelector('#message-flottant');
   if (!zone) {
     zone = document.createElement('div');
@@ -8789,6 +8806,7 @@ function afficherMessage(texte, duree = 2000) {
     document.body.append(zone);
   }
   zone.textContent = texte;
+  zone.classList.toggle('message-haut', haut); // 0.239.0 : en haut, sous l'en-tête (rappel de contrôle)
   zone.hidden = false;
   clearTimeout(minuterieMessage);
   if (duree !== null) minuterieMessage = setTimeout(() => (zone.hidden = true), duree);

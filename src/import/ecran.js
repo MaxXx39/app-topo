@@ -705,7 +705,7 @@ function ligneSurfaceProjet(surface) {
 
 /** Résultat d'un import de points : nombre de points, lignes illisibles, avertissements. */
 function afficherImportPoints({ nomFichier, format, points, erreurs, avertissements }) {
-  let html = `<p class="resume"><strong>${points.length} point(s) lu(s)</strong> dans « ${echapper(nomFichier)} » (format ${format}).</p>`;
+  let html = `<p class="resume"><strong>${points.length} ${points.length > 1 ? 'points lus' : 'point lu'}</strong> dans « ${echapper(nomFichier)} » (format ${format}).</p>`;
   if (erreurs.length > 0) {
     html += `<div class="erreur"><p><strong>${erreurs.length} ligne(s) illisible(s), non importée(s) :</strong></p><ul>`;
     html += erreurs.map((e) => `<li>ligne ${e.ligne} : ${echapper(e.message)}</li>`).join('');

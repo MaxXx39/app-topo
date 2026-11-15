@@ -10445,6 +10445,11 @@ button.dossier-projet-ouvert { border: none; background: none; padding: 0; font:
 body[data-onglet='terrain'][data-mode-terrain='lever'] .message-flottant {
   bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 96px);
 }
+/* 0.239.0 : message du rappel de contrôle : en haut, sous l'en-tête, loin des boutons du bas. */
+body[data-onglet] .message-flottant.message-haut {
+  top: calc(var(--hauteur-entete) + 56px);
+  bottom: auto;
+}
 /* Cibles d'au moins 44 px (doigts gantés) : liens « archiver / supprimer », ✕ des points, dossier, cloche. */
 .bouton-lien {
   display: inline-flex;

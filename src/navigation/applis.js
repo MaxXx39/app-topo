@@ -70,7 +70,7 @@ export const APPLIS = [
     // Réseaux (0.235.0, Expert, test) : canalisations (polyligne avec fil d'eau), coupes et tranchées.
     cle: 'reseaux',
     titre: 'Réseaux',
-    couleur: '#92400e',
+    couleur: '#5b7f12',
     texte: '#ffffff',
     site: true,
     niveau: 'expert',
