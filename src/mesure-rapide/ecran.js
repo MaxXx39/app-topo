@@ -10,6 +10,7 @@ import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { lignesResume } from '../export/mesure-rapide.js';
 import { bulle } from '../aide/bulles.js';
+import { ICONES_LIGNE } from '../outils/icones.js';
 
 export const LIGNES_PAR_PAGE = 6;
 
@@ -82,8 +83,8 @@ export function htmlMesureRapide({ mesure, accroche, accroches, pages, manuel = 
       ${centre ? `<div class="reglage-centre-mesure"><span>Centre pts : ${centre.points} point${centre.points > 1 ? 's' : ''} touché${centre.points > 1 ? 's' : ''} (2 : milieu, 3 : centre du cercle)</span>
           <button type="button" class="bouton ajouter-centre-mesure" data-action="ajouter-centre-mesure" ${centre.pret ? '' : 'disabled'}>✓ Ajouter le centre</button>
           <button type="button" class="bouton-lien" data-action="accroche-mesure" data-valeur="centrepts" ${centre.points > 0 ? '' : 'disabled'}>↶ Recommencer</button></div>` : ''}
-      ${n >= 3 ? `<button type="button" class="bouton-secondaire bascule-ferme-mesure" data-action="basculer-ferme-mesure" role="switch" aria-checked="${fermee}">${fermee ? '☑' : '☐'} Figure fermée (1-2-3-1)</button>
-        <button type="button" class="bouton-secondaire bascule-angles-mesure" data-action="basculer-angles-mesure" role="switch" aria-checked="${afficherAngles}">${afficherAngles ? '☑' : '☐'} Afficher les angles sur le plan</button>` : ''}
+      ${n >= 3 ? `<button type="button" class="bouton-secondaire bascule-ferme-mesure" data-action="basculer-ferme-mesure" role="switch" aria-checked="${fermee}">${fermee ? ICONES_LIGNE.caseCochee : ICONES_LIGNE.caseVide} Figure fermée (1-2-3-1)</button>
+        <button type="button" class="bouton-secondaire bascule-angles-mesure" data-action="basculer-angles-mesure" role="switch" aria-checked="${afficherAngles}">${afficherAngles ? ICONES_LIGNE.caseCochee : ICONES_LIGNE.caseVide} Afficher les angles sur le plan</button>` : ''}
       ${resume}
       ${cotes}
       ${points}

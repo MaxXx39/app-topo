@@ -104,7 +104,10 @@ describe('blocContenu', () => {
     const filtre = { ordre: 'recent', jour: '' };
     const gerer = (vue, ouverts) => blocContenu(projet, new Set(), new Set(), filtre, tableau, vue, { gerer: true, menusOuverts: new Set(ouverts) });
     const plans = gerer('plans', ['plans:p1']);
-    expect(plans).toContain('Gérer · Plans');
+    // 0.239.0 : Plans et Surfaces s'ouvrent directement sur Gérer : pas de deuxième titre ni de deuxième flèche.
+    expect(plans).toContain('page-gerer-directe');
+    expect(plans).not.toContain('Gérer · Plans');
+    expect(plans).not.toContain('data-action="gerer-fermer"');
     expect(plans).toContain('data-champ="plan-nom"');
     expect(plans).toContain('data-action="voir-plan"');
     expect(plans).toContain('data-action="recaler-plan"');

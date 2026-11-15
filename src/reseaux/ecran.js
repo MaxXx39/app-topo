@@ -7,6 +7,7 @@ import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { TYPES_RESEAU, couleurDuType, pentesDesSegments, longueurReseau, CIBLES_RESEAU, ALTITUDES_RESEAU } from '../topo/reseau.js';
 import { bulle } from '../aide/bulles.js';
+import { ICONES_LIGNE } from '../outils/icones.js';
 
 const nombre = (v) => (v == null ? '—' : formaterNombre(v));
 
@@ -37,10 +38,10 @@ function htmlCreer(b, surfaces) {
       <label class="ligne-champ-reseau">Diamètre extérieur (mm)<input type="text" inputmode="decimal" data-champ="diametre-reseau" value="${echapper(b.diametre)}" placeholder="ex. 315" /></label>
       <label class="ligne-champ-reseau">Surface de référence<select data-champ="surface-reseau"><option value="">— aucune —</option>${options}</select></label></div>
     <div class="cadre-reseau"><h3>Tranchée</h3>
-      <button type="button" class="bouton-secondaire" data-action="tranchee-reseau" role="switch" aria-checked="${t.actif}">${t.actif ? '☑' : '☐'} Avec une tranchée</button>
+      <button type="button" class="bouton-secondaire" data-action="tranchee-reseau" role="switch" aria-checked="${t.actif}">${t.actif ? ICONES_LIGNE.caseCochee : ICONES_LIGNE.caseVide} Avec une tranchée</button>
       ${t.actif ? `<label class="ligne-champ-reseau">Hauteur fond de tranchée → FE (m)<input type="text" inputmode="decimal" data-champ="hauteur-tranchee" value="${echapper(t.hauteur)}" placeholder="ex. 0.150" /></label>
         <label class="ligne-champ-reseau">Largeur au fond (m)<input type="text" inputmode="decimal" data-champ="largeur-tranchee" value="${echapper(t.largeur)}" placeholder="ex. 0.800" /></label>
-        <button type="button" class="bouton-secondaire" data-action="bords-droits-reseau" role="switch" aria-checked="${t.droit}">${t.droit ? '☑' : '☐'} Bords droits (blindage, sans talus)</button>
+        <button type="button" class="bouton-secondaire" data-action="bords-droits-reseau" role="switch" aria-checked="${t.droit}">${t.droit ? ICONES_LIGNE.caseCochee : ICONES_LIGNE.caseVide} Bords droits (blindage, sans talus)</button>
         ${t.droit ? '' : `<label class="ligne-champ-reseau">Pente du talus (H/V)<input type="text" inputmode="decimal" data-champ="talus-tranchee" value="${echapper(t.talus)}" placeholder="ex. 0.500" /></label>`}` : ''}</div>
     <div class="cadre-reseau"><button type="button" class="bouton" data-action="enregistrer-reseau">Enregistrer le réseau</button>
       <button type="button" class="bouton-secondaire" data-action="recommencer-reseau" ${b.sommets.length === 0 ? 'disabled' : ''}>Recommencer</button></div>`;
@@ -56,7 +57,7 @@ function htmlVoir(e) {
       <small>${nombre(r.sommets[0].fe)} → ${nombre(r.sommets.at(-1).fe)}</small></div>`).join('');
   const L = longueurReseau(choisi);
   const pentes = pentesDesSegments(choisi).map((p) => (p == null ? '—' : `${p >= 0 ? '+' : '−'}${Math.abs(p).toFixed(2)} %`)).join(' · ');
-  const case_ = (cle, texte, actif) => `<button type="button" class="case-reseau ${actif ? 'actif' : ''}" data-action="afficher-reseau" data-valeur="${cle}" role="switch" aria-checked="${actif}">${actif ? '☑' : '☐'} ${texte}</button>`;
+  const case_ = (cle, texte, actif) => `<button type="button" class="case-reseau ${actif ? 'actif' : ''}" data-action="afficher-reseau" data-valeur="${cle}" role="switch" aria-checked="${actif}">${actif ? ICONES_LIGNE.caseCochee : ICONES_LIGNE.caseVide} ${texte}</button>`;
   const coupe = (cle, texte) => `<button type="button" class="${e.coupe === cle ? 'actif' : ''}" data-action="coupe-reseau" data-valeur="${cle}" aria-pressed="${e.coupe === cle}">${texte}</button>`;
   return `<div class="cadre-reseau liste-reseaux"><h3>Réseaux (${reseaux.length})</h3>${liste}</div>
     <div class="cadre-reseau"><h3>${echapper(choisi.nom)} · ${echapper(choisi.type)} · Ø${Math.round(choisi.diametre * 1000)}</h3>

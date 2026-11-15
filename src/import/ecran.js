@@ -423,9 +423,15 @@ export function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordr
   };
   const [titre, corps] = pages[vue] ?? pages.points;
   // 0.205.0 : « Gérer » à droite du titre ouvre la page de toutes les lignes avec un ⚙ (renommer, couleur, exporter, archiver…).
+  // 0.239.0 : Plans et Surfaces importées s'ouvrent directement sur « Gérer » : ni deuxième flèche, ni deuxième titre, ni deuxième cadre.
+  if (gestion.gerer && (vue === 'plans' || vue === 'surfaces')) {
+    return `<div class="contenu-projet page-gerer page-gerer-directe">
+      ${pageGerer(projet, vue, gestion.menusOuverts) || '<p class="vide">Rien ici pour l\'instant.</p>'}
+    </div>`;
+  }
   if (gestion.gerer) {
     return `<div class="carte-section contenu-projet page-gerer">
-      <div class="entete-page-contenu"><button type="button" class="bouton-retour-gerer" data-action="gerer-fermer" aria-label="Retour à ${echapper(titre)}">←</button>${titreSection('leves', `Gérer · ${titre}`)}</div>
+      <div class="entete-page-contenu"><button type="button" class="bouton-retour-partie bouton-retour-gerer" data-action="gerer-fermer" aria-label="Retour à ${echapper(titre)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>${titreSection('leves', `Gérer · ${titre}`)}</div>
       ${pageGerer(projet, vue, gestion.menusOuverts) || '<p class="vide">Rien ici pour l\'instant.</p>'}
     </div>`;
   }

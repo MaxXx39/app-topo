@@ -13,6 +13,7 @@ import { formaterNombre } from '../topo/format.js';
 import { htmlRegleHauteur } from './regle-hauteur.js';
 import { silhouetteOutil } from './silhouettes.js';
 import { controlesEchelleCoupe } from './coupe-directe.js';
+import { ICONES_LIGNE } from '../outils/icones.js';
 
 /** Petit dessin de la machine (vue de derrière « gd » ou de côté « long ») pour l'écran de choix. */
 function imageMachine(machine, vue, boite) {
@@ -118,7 +119,7 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
         : '<p class="vide">Aucune surface.</p>'}
-      <button type="button" class="bouton-bip ${bip ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${bip}" title="${bip ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${bip ? 'Couper le bip' : 'Remettre le bip'}">${bip ? '🔔' : '🔕'}</button>
+      <button type="button" class="bouton-bip ${bip ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${bip}" title="${bip ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${bip ? 'Couper le bip' : 'Remettre le bip'}">${bip ? ICONES_LIGNE.cloche : ICONES_LIGNE.clocheBarree}</button>
       <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Réglages">⚙</button>
       ${bulle('lame')}
       <div class="choix-coupes-bandeau" role="group" aria-label="Coupes montrées">

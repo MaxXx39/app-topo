@@ -118,6 +118,7 @@ import { installerMesureDuree } from './outils/mesure-duree-ui.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur, consommerPointMoyen } from './android/pont.js';
 import { correctionsTropAnciennes } from './topo/age-corrections.js';
 import { centreDePoints, MAX_POINTS_CENTRE } from './topo/centre-points.js';
+import { ICONES_LIGNE } from './outils/icones.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
@@ -607,7 +608,7 @@ function contenuBande() {
       if (!champ || !ici) return '';
       return `<div class="zone-levee"><div class="levee-bande altitude-bande"><span class="titre-levee-bande">Altitude voulue</span>
         <input type="text" inputmode="decimal" class="champ-bande" data-nav-champ="altitude-voulue" value="${echapper(champ.value)}" placeholder="ex. 412.350" aria-label="Altitude voulue" /></div>
-        <button type="button" class="bouton-enreg-bande relais-altitude-ici" data-nav="action" data-cle="altitude-ici" ${ici.disabled ? 'disabled' : ''}><span>📍 Alti ici</span></button></div>`;
+        <button type="button" class="bouton-enreg-bande relais-altitude-ici" data-nav="action" data-cle="altitude-ici" ${ici.disabled ? 'disabled' : ''}><span>${ICONES_LIGNE.repere} Alti ici</span></button></div>`;
     }
     const enregistrer = trouver('enregistrer');
     if (enregistrer && terrain.implantation === 'point' && implanter.cible) {
@@ -618,7 +619,10 @@ function contenuBande() {
       return `<div class="zone-cible-bande"><div class="cible-bande"><b>${echapper(c.nom ?? '')}</b><small>${echapper(detail)}</small></div>
         ${aAcces('intermediaire') ? `<button type="button" class="bouton-enreg-bande petit relais-enregistrer" data-nav="action" data-cle="enregistrer" title="Enregistrer l'implantation" aria-label="Enregistrer l'implantation" ${enregistrer.disabled ? 'disabled' : ''}><span>Enr.</span></button>` : ''}</div>`;
     }
-    return '';
+    // 0.239.0 : Point / Ligne / Talus sans choix : même barre que Surface et Altitude (liseré, zone à droite), au lieu d'un bouton qui flotte.
+    const attente = { ligne: ['Ligne', 'touche une ligne'], talus: ['Talus', 'touche la ligne du talus'] }[terrain.implantation] ?? ['Point', 'touche un point'];
+    return `<div class="zone-levee"><div class="levee-bande surface-bande bande-attente"><span class="titre-levee-bande">${attente[0]}</span>
+      <span class="valeur-liste-bande">— ${attente[1]} —</span></div></div>`;
   }
   if (cle === 'guidage') {
     // 0.167.0 : la surface à suivre (plus « levé à suivre ») et le choix des lignes (Expert) dans la bande.
@@ -2110,7 +2114,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
           ? { ton: 'ok', texte: '✓ Coordonnées suisses (MN95) : le plan semble déjà en place.' }
           : { ton: 'alerte', texte: '⚠ Pas en coordonnées suisses (MN95) : le plan est à recaler.' },
         champs: [
-          { cle: 'nom', titre: 'Nom du plan', valeur: lu.nom ?? fichier.name.replace(/\.dxf$/i, '') },
+          { cle: 'nom', titre: 'Nom du plan', valeur: (lu.nom ?? fichier.name).replace(/\.dxf$/i, '') },
           { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...types.map((t) => [t.nom, t.nom])], valeur: '' },
           // 0.214.0 : « Non (déjà calé) » : le plan est déjà en MN95, rien à recaler ni à signaler.
           { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: dejaEnMn95 ? 'cale' : 'oui' },
@@ -2165,16 +2169,18 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         titre: `Plan PDF « ${fichier.name} »${scanne ? ' (image)' : ''}`,
         note: { ton: 'alerte', texte: '⚠ Un PDF n\'est pas en coordonnées suisses (MN95) : le plan est à recaler.' },
         champs: [
-          { cle: 'echelle', titre: 'Échelle du plan 1:', valeur: '', exemple: '500 (vide si inconnue)' },
+          // 0.239.0 : même début que pour un DXF (Nom, Type, Recalage), puis les réglages propres au PDF.
           // 0.230.0 : le nom se demande à l'import (le préfixe « PDF- » est ajouté devant).
           { cle: 'nom', titre: 'Nom du plan (« PDF- » est ajouté devant)', valeur: pages > 1 ? `${nomDeBase} (page ${page})` : nomDeBase },
-          // 0.230.0 (retour sur le 0.145) : au choix, convertir les traits en DXF ou importer la page en image.
-          // Un PDF scanné n'a pas de traits : il ne peut être qu'une image.
-          ...(scanne ? [] : [{ cle: 'mode', titre: 'Importer', choix: [['dxf', 'Convertir en DXF (traits, textes, calques)'], ['image', 'En image (la page telle quelle)']], valeur: 'dxf' }]),
-          { cle: 'nettete', titre: 'Netteté de l\'image (si importé en image)', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART },
           // 0.213.0 : comme pour un DXF : type du plan (liste partagée) et recalage tout de suite ou plus tard.
           { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...lireTypesDxf().map((t) => [t.nom, t.nom])], valeur: '' },
           { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: 'non' },
+          // 0.230.0 (retour sur le 0.145) : au choix, convertir les traits en DXF ou importer la page en image.
+          // Un PDF scanné n'a pas de traits : il ne peut être qu'une image.
+          ...(scanne ? [] : [{ cle: 'mode', titre: 'Importer', choix: [['dxf', 'Convertir en DXF (traits, textes, calques)'], ['image', 'En image (la page telle quelle)']], valeur: 'dxf' }]),
+          { cle: 'echelle', titre: 'Échelle du plan 1:', valeur: '', exemple: '500 (vide si inconnue)' },
+          // 0.239.0 : la netteté n'a de sens que pour une image : cachée quand on convertit en DXF.
+          { cle: 'nettete', titre: 'Netteté de l\'image', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART, ...(scanne ? {} : { visibleSi: { cle: 'mode', valeur: 'image' } }) },
         ],
       });
       if (!valeurs) return;

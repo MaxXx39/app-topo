@@ -5505,6 +5505,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   margin: 0 0 10px;
 }
 
+.boutons-choix button[hidden] { display: none; } /* 0.239.0 : « Aperçu » vraiment caché quand le format n'est pas PDF */
 .boutons-choix {
   display: grid;
   gap: 10px;
@@ -6989,7 +6990,7 @@ body.mode-telephone .bouton.bouton-prendre {
 
 .formats-export {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); /* 0.239.0 : 4 formats sur une ligne (avant 110 px : le PDF restait seul en dessous) */
   gap: 6px;
   margin-bottom: 12px;
 }
@@ -11789,6 +11790,8 @@ body.bande-vide .bande-appli .bouton-appli { max-width: calc(100vw - 16px); poin
 /* Les pages qui défilent gardent de la place sous leur dernier élément pour ne pas finir sous le bouton. */
 body.bande-vide .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 24px); }
 body.bande-vide .page-applis { padding-bottom: calc(var(--hauteur-bande) + 24px); }
+/* 0.239.0 : barres posées en bas du plan (recalage, contrôle du plan, accroches) : au-dessus du bouton de l'application, pas dessous. */
+body.bande-vide .barre-pointage { bottom: calc(var(--hauteur-bande) + 16px); }
 @media (min-width: 900px) {
   body.bande-vide .bande-appli { width: auto; box-shadow: none; }
   body.bande-vide .mise-en-page { padding-bottom: 16px; }
@@ -13423,7 +13426,8 @@ body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; 
 .entete-page-contenu { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .entete-page-contenu .titre-bloc { flex: 1 1 auto; min-width: 0; margin: 0; }
 .bouton-gerer { flex: none; min-height: 40px; padding: 0 16px; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; font: inherit; font-weight: 800; cursor: pointer; }
-.bouton-retour-gerer { flex: none; width: 44px; min-height: 40px; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
+/* 0.239.0 : « ← » de Gérer = même bouton que les autres pages (.bouton-retour-partie) ; page Gérer ouverte directement : sans cadre. */
+#contenu-projet > .contenu-projet.page-gerer-directe { border: 0; box-shadow: none; background: none; padding: 0; }
 .page-gerer .entete-page-contenu { justify-content: flex-start; }
 .ligne-gerer { margin: 8px 0; border: 2px solid var(--bordure, #cbd5e1); border-radius: 12px; background: var(--surface, #ffffff); }
 .ligne-gerer.ouverte { border-color: #1b2b36; }
@@ -13800,3 +13804,37 @@ body.mode-telephone .barre-accroche:not(.ouverte) .separateur-accroche { display
 body.bande-vide .boussole-tablette {
   bottom: calc(var(--hauteur-bande) + 12px);
 }
+
+/* 0.239.0 : icônes dessinées (src/outils/icones.js) à la place des émojis ; même trait fin partout. */
+.ico-ligne {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.18em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 0.239.0 : Implanter › Surface / Altitude : même encadré turquoise que Point / Ligne, la flèche descend vers la barre du bas. */
+.ecart-direct.attente.invite-choix {
+  display: flex;
+  justify-content: flex-start;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 12px;
+  background: #ccfbf1;
+  color: #134e4a;
+  font-weight: 400;
+}
+.invite-bas svg { animation-name: invite-descend; }
+@keyframes invite-descend {
+  50% { transform: translateY(4px); }
+}
+body.mode-telephone .ecart-direct.attente.invite-choix { min-height: 0; }
+/* 0.239.0 : barre d'attente d'Implanter › Point / Ligne : pas de ▾ (rien à ouvrir), texte atténué. */
+.surface-bande.bande-attente::after { content: none; }
+.bande-appli .levee-bande.surface-bande.bande-attente { padding-right: 12px; }
+.surface-bande.bande-attente .valeur-liste-bande { opacity: 0.65; }
+.fenetre-champs label[hidden] { display: none; } /* 0.239.0 : champ « visibleSi » vraiment caché */
