@@ -462,7 +462,7 @@ function sousApplisDeLever() {
  */
 function choisirNatureDeLever(sous) {
   const nature = (l) => sousAppliDeNature(l.nature);
-  const levees = [...surfacesLevees(), ...projet.autres].filter((l) => !estAnnotation(l) && nature(l) === sous);
+  const levees = [...surfacesLevees(), ...projet.autres.filter((a) => estMontre(projet, a, 'autre'))].filter((l) => !estAnnotation(l) && nature(l) === sous);
   const choisie = levees.filter((l) => l.leveId === projet.leveActifId).at(-1) ?? levees.at(-1);
   if (choisie) {
     if (choisie.id !== leveDirect.stockId) choisirLevee(choisie.id);
@@ -2501,7 +2501,8 @@ function leveEnCours() {
 /** Surfaces levées avec le récepteur (celles qu'on peut reprendre dans l'onglet Terrain). */
 function surfacesLevees() {
   const directs = new Set(projet.leves.filter(estLeveDirect).map((l) => l.id));
-  return projet.surfaces.filter((s) => directs.has(s.leveId));
+  // 0.255.1 : seulement les levés du dossier choisi.
+  return projet.surfaces.filter((s) => directs.has(s.leveId) && estMontre(projet, s, 'surface'));
 }
 
 /** Levé en cours = celui d'identifiant « id » (liste « Changer », sous-application de Lever). */
@@ -2526,7 +2527,7 @@ function reprendreLeveDirect() {
   const enCours = leveeEnCours();
   if (enCours && familleDeNature(enCours.nature) === 'leve') return;
   // Levés de l'application Lever, le plus récent d'abord choisi.
-  const levees = [...surfacesLevees(), ...projet.autres.filter((a) => !estAnnotation(a))];
+  const levees = [...surfacesLevees(), ...projet.autres.filter((a) => !estAnnotation(a) && estMontre(projet, a, 'autre'))];
   const choisie = levees.filter((s) => s.leveId === projet.leveActifId).at(-1) ?? levees.at(-1);
   leveDirect.stockId = choisie?.id ?? null;
 }
@@ -4468,7 +4469,7 @@ function ouvrirTalusSurface(valeur) {
 
 /** Sommets de tous les dessins, prêts à implanter (« PF1-1 »…, avec leur altitude). */
 function pointsDesDessins() {
-  return projet.dessins.flatMap((d) => pointsDuDessin(d, projet.dessins));
+  return projet.dessins.filter((d) => estMontre(projet, d, 'dessin')).flatMap((d) => pointsDuDessin(d, projet.dessins));
 }
 
 /** Dessins montrés sur le plan : ceux cochés dans « Afficher » (et toujours celui en cours). */
@@ -5674,7 +5675,9 @@ function ajouterPointLigne(point) {
 function pointsDuProjet() {
   const vus = new Set();
   const liste = [];
-  for (const point of [...projet.leves.flatMap((l) => l.points), ...projet.aImplanter, ...projet.pointsControle, ...pointsDesDessins()]) {
+  // 0.255.1 : les points des listes hors du dossier choisi ne sont ni montrés ni accrochables (points de contrôle et à implanter : toujours).
+  const lesPoints = projet.leves.filter((l) => estMontre(projet, l, 'leve')).flatMap((l) => l.points);
+  for (const point of [...lesPoints, ...projet.aImplanter, ...projet.pointsControle, ...pointsDesDessins()]) {
     if (vus.has(point.nom)) continue;
     vus.add(point.nom);
     liste.push(point);
@@ -7235,7 +7238,7 @@ function donneesCommunes() {
     nbReseaux: (projet.canalisations ?? []).length, // 0.236.0 : case « Cana » d'Implanter › Surface
     // Mode Lame : surfaces (terrassement d'abord), surface suivie, tolérances, 2e RX2 connecté ?
     lame: {
-      surfaces: [...projet.surfaces].sort((a, b) => Number(['terrassement', 'surface'].includes(b.nature)) - Number(['terrassement', 'surface'].includes(a.nature))).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
+      surfaces: projet.surfaces.filter((s) => s.id === terrain.lame.surfaceId || estMontre(projet, s, 'surface')).sort((a, b) => Number(['terrassement', 'surface'].includes(b.nature)) - Number(['terrassement', 'surface'].includes(a.nature))).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
       surfaceId: terrain.lame.surfaceId,
       inverse: terrain.lame.inverse,
       tolerances: terrain.lame.tolerances,

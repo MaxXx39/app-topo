@@ -187,3 +187,19 @@ describe('tableau « Liste de points » selon le dossier (0.255.0)', () => {
     definirSousDossier('');
   });
 });
+
+describe('applications : listes d\'annotation selon le dossier (0.256.0)', () => {
+  it('une liste d\'annotation rangée dans un dossier ne se voit que dans ce dossier', async () => {
+    const { definirSousDossier } = await import('../src/topo/sous-dossiers.js');
+    const { listesAnnotation } = await import('../src/topo/annotation.js');
+    const p = { ...projet(), autres: [
+      { id: 'n1', nom: 'Annot-20261116', nature: 'annotation', sousDossiers: ['TER.'] },
+      { id: 'n2', nom: 'Annot-20261117', nature: 'annotation', sousDossiers: ['CANA'] },
+    ] };
+    definirSousDossier('');
+    expect(listesAnnotation(p).map((l) => l.id).sort()).toEqual(['n1', 'n2']);
+    definirSousDossier('TER.');
+    expect(listesAnnotation(p).map((l) => l.id)).toEqual(['n1']);
+    definirSousDossier('');
+  });
+});
