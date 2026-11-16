@@ -48,9 +48,9 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       manifest: {
-        name: 'Topo - Volumes de stocks',
+        name: 'Topo',
         short_name: 'Topo',
-        description: 'Calcul de volumes de stocks à partir de points GNSS',
+        description: 'Topographie de terrain : levé, implantation, contrôle, volumes',
         lang: 'fr',
         theme_color: '#1b2b36',
         background_color: '#ffffff',

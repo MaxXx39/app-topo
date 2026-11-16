@@ -28,8 +28,17 @@ export function pdfPoints({ titre, points, roles = new Map(), cartouche = {}, ph
   let page = 0;
   const annotation = avecAnnotation(points);
   const chantier = !annotation && avecChantier(points);
-  const colonnes = annotation ? COLONNES_ANNOTATION : chantier ? COLONNES_CHANTIER : COLONNES;
-  const titres = annotation ? TITRES_ANNOTATION : chantier ? TITRES_PDF_CHANTIER : TITRES;
+  const toutesColonnes = annotation ? COLONNES_ANNOTATION : chantier ? COLONNES_CHANTIER : COLONNES;
+  const tousTitres = annotation ? TITRES_ANNOTATION : chantier ? TITRES_PDF_CHANTIER : TITRES;
+  const lignesDuTableau = points.map((p) => (annotation ? infosAnnotation(p) : chantier ? [...infosDuPoint(p, roles).slice(0, 4), ...infosChantier(p)] : [...infosDuPoint(p, roles), avecPhoto.has(p.nom) ? 'oui' : '']));
+  // 0.245.0 (audit) : les colonnes vides pour tous les points sont retirées (nom, Est, Nord et altitude restent) ; les autres s'élargissent.
+  const gardees = toutesColonnes.map((_, i) => i < 4 || lignesDuTableau.length === 0 || lignesDuTableau.some((l) => String(l[i] ?? '').trim() !== ''));
+  const largeurTotale = toutesColonnes.reduce((somme, [, largeur]) => somme + largeur, 0);
+  const largeurGardee = toutesColonnes.reduce((somme, [, largeur], i) => somme + (gardees[i] ? largeur : 0), 0);
+  const facteur = largeurTotale / largeurGardee;
+  const colonnes = toutesColonnes.filter((_, i) => gardees[i]).map(([aligne, largeur]) => [aligne, largeur * facteur]);
+  const titres = tousTitres.filter((_, i) => gardees[i]);
+  const garder = (l) => l.filter((_, i) => gardees[i]);
   const feuille = () => {
     if (page++ > 0) doc.addPage('a4', 'landscape');
     doc.setTextColor(...COULEURS.texte);
@@ -46,9 +55,9 @@ export function pdfPoints({ titre, points, roles = new Map(), cartouche = {}, ph
     return enteteTableau(doc, 24, titres, colonnes);
   };
   let y = feuille();
-  for (const p of points) {
+  for (const l of lignesDuTableau) {
     if (y > 210 - MARGE - HAUTEUR_LIGNE) y = feuille();
-    ligne(doc, y, annotation ? infosAnnotation(p) : chantier ? [...infosDuPoint(p, roles).slice(0, 4), ...infosChantier(p)] : [...infosDuPoint(p, roles), avecPhoto.has(p.nom) ? 'oui' : ''], false, colonnes);
+    ligne(doc, y, garder(l), false, colonnes);
     y += HAUTEUR_LIGNE;
   }
   if (points.length === 0) {

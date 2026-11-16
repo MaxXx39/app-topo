@@ -11,6 +11,7 @@
 // - DESSINS : dessins de Calculs › Dessin (contours et lignes en 3D, sommets) ; DESSINS_NOMS : PF1-1…
 //
 // Le DXF des mesures (onglet Calculs › Mesures, voir genererDxfMesures) est un fichier à part, sans volume.
+import { fixe3 } from '../topo/format.js';
 import { courbesDeNiveau, estMaitresse, chainerCourbes, cotesDesCourbes, texteCote } from '../topo/courbes.js';
 import { formaterNombre } from '../topo/format.js';
 import { lireLibelles, couleurDuNom, couleurDeLigne, aciDeCouleurLibelle } from '../leve/libelles.js';
@@ -259,5 +260,5 @@ export function nomDeCalque(texte) {
 
 /** Coordonnée avec 3 décimales (mm), comme dans Mensura. */
 function arrondi(valeur) {
-  return valeur.toFixed(3);
+  return fixe3(valeur);
 }

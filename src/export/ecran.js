@@ -1,5 +1,6 @@
 // Formulaire d'export : échelle, calques et cartouche du PDF (dessiné par, date ; affaire et lieu du projet),
 // boutons PDF, CSV, DXF et LandXML.
+import { nomFichierExport } from '../outils/nom-fichier.js';
 import { genererCsv } from './csv.js';
 import { genererDxf } from './dxf.js';
 import { EQUIDISTANCES_PDF } from './mise-en-page.js';
@@ -304,8 +305,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
 
   /** Nom des fichiers : volumes_<affaire>_<date>. */
   function nomDeFichier() {
-    const affaire = (obtenirDonnees().cartouche.affaire ?? '').replace(/[^\w-]+/g, '_') || 'stocks';
-    return `volumes_${affaire}_${dateDuPlan()}`;
+    return nomFichierExport(obtenirDonnees().cartouche.affaire, 'volumes', dateDuPlan());
   }
 }
 

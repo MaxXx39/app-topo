@@ -1,5 +1,6 @@
 // Export « Cadastre · Swisstopo · photo » en un clic (0.121.0) : un ZIP avec le DXF (voir pack-dxf.js)
 // et la photo aérienne swisstopo en GeoTIFF (déjà placée en MN95, voir geotiff.js ; internet nécessaire).
+import { nomFichierExport } from '../outils/nom-fichier.js';
 import { zipper } from '../recap/xlsx.js';
 import { genererDxfPaquet } from './pack-dxf.js';
 import { octetsDxf } from './dxf-recale.js';
@@ -28,6 +29,7 @@ export async function fabriquerPaquet(projet, options, { trianglesDe, pointsDe, 
   if (cadastresVoulus.length + surfacesVoulues.length === 0) return { erreur: 'Rien à exporter : coche le cadastre ou la surface Swisstopo (ou importe-les d\'abord).' };
   const fichiers = [];
   const base = nomDeFichierProjet(projet);
+  const nomPaquet = nomFichierExport(base, 'cadastre_swisstopo');
   // Surface Swisstopo : en TXT (points, au départ) ou en DXF (faces 3D, dans le même DXF que le cadastre).
   const surfaceEnDxf = options.formatSurface === 'dxf';
   // Cadastre : les lignes seulement ; les points (CAD-n) sur demande.
@@ -40,7 +42,7 @@ export async function fabriquerPaquet(projet, options, { trianglesDe, pointsDe, 
       cadastres: pourDxf,
       swisstopo: dxfSurface.map((s) => ({ triangles: trianglesDe(s) ?? [] })),
     });
-    fichiers.push([`${base}_cadastre_swisstopo.dxf`, octetsDxf(texte)]);
+    fichiers.push([`${nomPaquet}.dxf`, octetsDxf(texte)]);
   }
   if (surfacesVoulues.length > 0 && !surfaceEnDxf) {
     const points = surfacesVoulues.flatMap((s) => pointsDe(s) ?? []);
@@ -63,5 +65,5 @@ export async function fabriquerPaquet(projet, options, { trianglesDe, pointsDe, 
     }
   }
   dire('ZIP : assemblage…');
-  return { blob: new Blob([zipper(fichiers)], { type: 'application/zip' }), nom: `${base}_cadastre_swisstopo.zip` };
+  return { blob: new Blob([zipper(fichiers)], { type: 'application/zip' }), nom: `${nomPaquet}.zip` };
 }

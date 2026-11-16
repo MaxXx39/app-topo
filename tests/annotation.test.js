@@ -106,7 +106,7 @@ describe('annotations : nuage et exports', () => {
     expect(avecAnnotation([point])).toBe(true);
     const lignes = csvPoints([point]).trim().split('\r\n');
     expect(lignes[0]).toBe('Nom;Est (m);Nord (m);Altitude (m);Date;Heure;Prise;Précision (m);Remarques');
-    expect(lignes[1]).toContain('GPS tablette;2.40;fissure | à revoir');
+    expect(lignes[1]).toContain('GPS tablette;2.400;fissure | à revoir');
     expect(infosAnnotation(point)[2]).toBe('1100000.000');
   });
 

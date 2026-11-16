@@ -2,6 +2,7 @@
 // objets lus par l'appli (lignes et polylignes, arcs découpés en petits segments, cercles, textes,
 // aplats, points ; blocs éclatés), avec leurs calques et leurs couleurs. Les hachures et les
 // images, non lues à l'import, n'y sont pas (décision du 23.10.2026).
+import { fixe3 } from '../topo/format.js';
 import { couleurAci } from '../topo/dxf-plan.js';
 
 /**
@@ -12,14 +13,14 @@ export function genererDxfPlan(plan) {
   const { origine, calques = [], contenu = {} } = plan;
   const nomCalque = (c) => nomDeCalque(calques[c]?.nom ?? '0');
   const couleur = (objet) => (objet.k ? ['62', String(aciLePlusProche(objet.k))] : []);
-  const e = (x) => (origine.est + x).toFixed(3);
-  const n = (y) => (origine.nord + y).toFixed(3);
+  const e = (x) => fixe3(origine.est + x);
+  const n = (y) => fixe3(origine.nord + y);
   const entites = [];
   for (const trait of contenu.traits ?? []) {
     const en3D = Array.isArray(trait.z);
     entites.push(['0', 'POLYLINE', '8', nomCalque(trait.c), ...couleur(trait), '66', '1', '10', '0', '20', '0', '30', '0', '70', String((en3D ? 8 : 0) + (trait.f ? 1 : 0))]);
     for (let i = 0; i < trait.p.length; i += 2) {
-      entites.push(['0', 'VERTEX', '8', nomCalque(trait.c), '10', e(trait.p[i]), '20', n(trait.p[i + 1]), '30', en3D ? (trait.z[i / 2] ?? 0).toFixed(3) : '0', '70', en3D ? '32' : '0']);
+      entites.push(['0', 'VERTEX', '8', nomCalque(trait.c), '10', e(trait.p[i]), '20', n(trait.p[i + 1]), '30', en3D ? fixe3(trait.z[i / 2] ?? 0) : '0', '70', en3D ? '32' : '0']);
     }
     entites.push(['0', 'SEQEND', '8', nomCalque(trait.c)]);
   }
@@ -43,7 +44,7 @@ export function genererDxfPlan(plan) {
     ]);
   }
   for (const point of contenu.points ?? []) {
-    entites.push(['0', 'POINT', '8', nomCalque(point.c), ...couleur(point), '10', e(point.x), '20', n(point.y), '30', (point.z ?? 0).toFixed(3)]);
+    entites.push(['0', 'POINT', '8', nomCalque(point.c), ...couleur(point), '10', e(point.x), '20', n(point.y), '30', fixe3(point.z ?? 0)]);
   }
   const tableCalques = calques.map((c) => ['0', 'LAYER', '2', nomDeCalque(c.nom), '70', '0', '62', String(aciLePlusProche(c.couleur)), '6', 'CONTINUOUS']);
   const lignes = [

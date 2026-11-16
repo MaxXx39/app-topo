@@ -9,6 +9,7 @@
 // - Seules les surfaces de type TIN sont lues.
 // - Un triangle marqué i="1" est invisible (exclu de la surface) : on l'ignore.
 
+import { fixe3 } from './format.js';
 import { mini, maxi } from '../outils/bornes.js';
 
 /**
@@ -216,7 +217,7 @@ export function geometrieDeSurface(surface, points) {
 
 /** Liste de points en texte LandXML (PntList3D) : « Nord Est altitude » pour chaque point, 3 décimales. */
 function listeDePoints(points) {
-  return points.map((p) => `${p.nord.toFixed(3)} ${p.est.toFixed(3)} ${p.altitude.toFixed(3)}`).join(' ');
+  return points.map((p) => `${fixe3(p.nord)} ${fixe3(p.est)} ${fixe3(p.altitude)}`).join(' ');
 }
 
 /**
@@ -254,12 +255,12 @@ export function ecrireLandXML(surfaces, nomProjet = 'Topo') {
     const ids = new Map();
     const lignesPoints = [];
     const idDuPoint = (p) => {
-      const cle = `${p.est.toFixed(3)} ${p.nord.toFixed(3)} ${p.altitude.toFixed(3)}`;
+      const cle = `${fixe3(p.est)} ${fixe3(p.nord)} ${fixe3(p.altitude)}`;
       if (!ids.has(cle)) {
         const id = ids.size + 1;
         ids.set(cle, id);
         const attributNom = p.nom ? ` name="${encoderEntites(p.nom)}"` : '';
-        lignesPoints.push(`          <P id="${id}"${attributNom}>${p.nord.toFixed(3)} ${p.est.toFixed(3)} ${p.altitude.toFixed(3)}</P>`);
+        lignesPoints.push(`          <P id="${id}"${attributNom}>${fixe3(p.nord)} ${fixe3(p.est)} ${fixe3(p.altitude)}</P>`);
       }
       return ids.get(cle);
     };
@@ -279,7 +280,7 @@ ${faces.join('\n')}
   });
   return `<?xml version="1.0" encoding="utf-8"?>
 <LandXML xmlns="http://www.landxml.org/schema/LandXML-1.1" version="1.1" date="${date.slice(0, 10)}" time="${date.slice(11, 19)}">
-  <Application name="Topo - Volumes de stocks" />
+  <Application name="Topo" />
   <Project name="${encoderEntites(nomProjet)}" />
   <Units>
     <Metric areaUnit="squareMeter" linearUnit="meter" volumeUnit="cubicMeter" />

@@ -130,6 +130,7 @@ import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
 import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
 import { creerReseaux } from './reseaux/reseaux.js';
 import { avertissementHorsZone } from './topo/zone-ge-vd.js';
+import { nomFichierExport } from './outils/nom-fichier.js';
 import { messagePdf, messageMauvaisBouton } from './topo/messages-fichier.js';
 import { PREFIXE_IMPORT } from './topo/doublons.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
@@ -1586,7 +1587,7 @@ async function fondDuCroquisMesure(mesure, { photo, plans }) {
 function exporterMesureRapide() {
   const mesure = mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee });
   if (mesure.points.length === 0) return;
-  const base = `${nomDeFichierProjet(projet)}_mesure-rapide`.replace(/[\\/:*?"<>|]/g, '_');
+  const base = nomFichierExport(nomDeFichierProjet(projet), 'mesure-rapide');
   const avecPlans = plansDuProjet().some((p) => p.visible !== false);
   ouvrirFenetreExport({
     titre: 'Mesure rapide',
@@ -2291,7 +2292,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
   exporterListe,
   // 0.191.0 : « Exporter la sélection (CSV) » du tableau « Points » de Contenu du projet.
   exporterTableauPoints: (csv, nombre) => {
-    const base = `${nomDeFichierProjet(projet)}_points`.replace(/[\\/:*?"<>|]/g, '_');
+    const base = nomFichierExport(nomDeFichierProjet(projet), 'points');
     ouvrirFenetreExport({
       titre: `Points (${nombre})`,
       formats: [['csv', 'CSV', 'la sélection du tableau (Excel)']],
@@ -3695,7 +3696,7 @@ function exporterPlanRecale(id) {
   // 0.214.0 : tout plan importé s'exporte (avant : seulement les recalés et les dessins DAO) ; non recalé = tel qu'il a été importé.
   const recale = Boolean(choisi.recalage?.applique || choisi.dao);
   const nom = String(choisi.nom).replace(/\.dxf$/i, '');
-  telecharger(new Blob([octetsDxf(genererDxfPlan(planRecale(choisi)))], { type: 'application/dxf' }), `${nom}${recale ? '_MN95' : ''}.dxf`);
+  telecharger(new Blob([octetsDxf(genererDxfPlan(planRecale(choisi)))], { type: 'application/dxf' }), `${nomFichierExport(nomDeFichierProjet(projet), `${nom}${recale ? '_MN95' : ''}`)}.dxf`);
 }
 
 /**
@@ -3738,7 +3739,7 @@ function exporterListe(type, id) {
     photos = [...globales, ...photos];
   }
   // Nom du fichier : projet_liste, sans l'extension du fichier importé (« stock.csv » -> « stock »).
-  const base = `${nomDeFichierProjet(projet)}_${titre.replace(/\.[a-z0-9]{2,4}$/i, '')}`.replace(/[\\/:*?"<>|]/g, '_');
+  const base = nomFichierExport(nomDeFichierProjet(projet), titre.replace(/\.[a-z0-9]{2,4}$/i, ''));
   ouvrirFenetreExport({
     titre,
     formats: FORMATS_POINTS,
@@ -3774,12 +3775,12 @@ function exporterListe(type, id) {
 
 /** Implantations enregistrées (CSV). */
 function exporterImplantations() {
-  telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nomDeFichierProjet(projet)}_implantations.csv`);
+  telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nomFichierExport(nomDeFichierProjet(projet), 'implantations')}.csv`);
 }
 
 /** Contrôles et refus du projet : CSV ou PDF. */
 async function exporterControles(format) {
-  const nom = `${nomDeFichierProjet(projet)}_controles`;
+  const nom = nomFichierExport(nomDeFichierProjet(projet), 'controles');
   if (format === 'pdf') {
     const { pdfControles } = await import('./export/pdf-controles.js'); // chargé à la demande (0.126.0)
     telecharger(pdfControles(projet), `${nom}.pdf`);
