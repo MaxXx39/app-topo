@@ -82,7 +82,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.256.5)
+## Fonctionnalités (état à la 0.257.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -124,6 +124,12 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - Récepteur : Bluetooth, NTRIP (swipos), journal NMEA (Expert), 2e GNSS (Expert), GPS tablette, cap automatique, PDOP (colonne de l'export). APK : pont `window.AppliAndroid`, batterie (arrière-plan coupé après 5 min), mise à jour, « Partage écran ».
 - **Drive** : « App Topo › Configuration Projet » ; **une main par projet** (verrou 15 min) ; un appareil n'écrase jamais une version qu'il n'a pas reçue ; **listes partagées** fusionnées partie par partie (`listes-partagees.js`) ; dossiers de projets.
 - **Windows** (`Topo.exe`, jamais lancé sur un vrai Windows) : sert l'appli web à `https://topo.appli/app-topo/` (ne jamais changer l'adresse) et glisse `pont-windows.js` ; port COM, NTRIP, Drive par identifiant « bureau » (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` à créer par l'utilisateur), fichiers dans Documents › Topo › Envois, mise à jour par la release `windows-derniere-version`. Pas fait : appareil photo, touche volume −, vibreur, batterie.
+
+## 0.257.0 (retours du 16.11, à essayer sur la tablette)
+- **Arrivée dans le menu** : un projet de Drive ouvert depuis la liste ou la carte mène à la page Applications (`actionsProjet.ouvrirDrive` ; avant : on restait sur « Ouvrir projet »).
+- **Dossiers PIC / LEVE / ANNOT** ajoutés à la liste de départ (PIC = plan d'installation de chantier). Rangement automatique (`rangerNouveauxDansLeSousDossier`) : levé direct → LEVE + dossier choisi ; liste d'annotations → ANNOT seulement (à confirmer : aussi dans le dossier choisi ?). Une liste partagée déjà enregistrée sur Drive ne les reçoit pas d'office (ils apparaissent dès qu'un élément les utilise).
+- **« ＋ Autres dossiers »** en bas des menus Plan et Points du plan (si un dossier est choisi) : fenêtre qui liste ce que le dossier cache, toucher = afficher / retirer (`choisirHorsDossier`, `definirEnPlus` dans `topo/sous-dossiers.js`, en mémoire, remis à zéro au changement de dossier ou de projet). Mode : tous (non demandé : à confirmer).
+- **Ligne des dossiers** (page Applications) : elle gardait sa position à chaque redessin de la page (elle revenait au début pendant le défilement).
 
 ## 0.248.0 et 0.249.0 (lots 1 et 2 du 16.11, à essayer sur la tablette)
 - **0.248.0** : clavier `inputmode="text"` pour Delta Z ±, Δ Z surface et décalage de ligne (le clavier décimal d'Android n'a pas « - ») ; boutons + / − des coupes à 20 px (fin de `style.css`) ; Guidage : bandeau de règle = grosse flèche + valeur, cadre fixe (`cqw`, nowrap) ; Implanter › Surface sans orientation (inclinaison pas prête / pas de marche) : cadre vide + message (`.coupe-attente`), le Guidage refusait déjà ; Réseaux point par point : FE pré-rempli avec l'altitude du point ; Gérer › Plans : « DXF · type » ; plan : E / N / Z sous la souris (`.plan-coordonnees`, Z = surface d'Implanter).

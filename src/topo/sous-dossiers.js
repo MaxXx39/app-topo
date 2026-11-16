@@ -9,9 +9,13 @@
 import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-partagees.js';
 
 // Liste de départ demandée le 16.11 (GEOOFF, GEOPERRIN, TER., CANA, TS, AMEX, SITU, BAT-Rad., BAT-SS, BAT-REZ, BAT, OLD), une couleur différente chacune.
-export const SOUS_DOSSIERS_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD'];
-// 12 couleurs distinctes, dans l'ordre de la liste (les dossiers ajoutés ensuite reprennent la 1re, etc.).
-const COULEURS = ['#6b7280', '#7c3aed', '#a16207', '#1d4ed8', '#ea580c', '#84cc16', '#0ea5e9', '#db2777', '#991b1b', '#eab308', '#0f766e', '#111827'];
+// 0.257.0 : + PIC (plan d'installation de chantier), LEVE (levés directs) et ANNOT (annotations).
+export const SOUS_DOSSIERS_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC', 'LEVE', 'ANNOT'];
+/** Dossiers où vont d'office les levés directs et les annotations (en plus du dossier choisi pour les levés). */
+export const DOSSIER_LEVE = 'LEVE';
+export const DOSSIER_ANNOT = 'ANNOT';
+// 15 couleurs distinctes, dans l'ordre de la liste (les dossiers ajoutés ensuite reprennent la 1re, etc.).
+const COULEURS = ['#6b7280', '#7c3aed', '#a16207', '#1d4ed8', '#ea580c', '#84cc16', '#0ea5e9', '#db2777', '#991b1b', '#eab308', '#0f766e', '#111827', '#be185d', '#0369a1', '#65a30d'];
 
 /** Anciens types de plans (avant les dossiers) → nom du dossier de départ qui les remplace (comparaison sans tenir compte des majuscules). */
 const ANCIENS_NOMS = { ter: 'TER.', 'bât': 'BAT', 'bat': 'BAT', 'bât radier': 'BAT-Rad.', 'bât/ss': 'BAT-SS', 'bât/rez': 'BAT-REZ' };
@@ -131,6 +135,15 @@ export function basculerSousDossier(element, nom, present) {
 export const CLE_CHOIX = 'topo-sous-dossier';
 let choisi = TOUT;
 
+// Éléments montrés EN PLUS du dossier choisi (0.257.0, en mémoire : remis à zéro quand on change de dossier ou de projet).
+let enPlus = new Set();
+export function definirEnPlus(ids) {
+  enPlus = new Set(ids ?? []);
+}
+export function elementsEnPlus() {
+  return enPlus;
+}
+
 /** Sous-dossier choisi en ce moment (lu par les listes du plan et des pages). */
 export function sousDossierChoisi() {
   return choisi;
@@ -187,6 +200,8 @@ export function sousDossiersEffectifs(projet, element, genre = '') {
 
 /** L'élément est-il montré avec le sous-dossier choisi (celui de cette tablette par défaut) ? */
 export function estMontre(projet, element, genre = '', choix = choisi) {
+  // 0.257.0 : un élément ajouté « hors dossier » (Afficher › ＋ Autres dossiers) reste montré même s'il n'est pas dans le dossier choisi.
+  if (choix && (enPlus.has(element?.id) || (element?.leveId && enPlus.has(element.leveId)))) return true;
   return dansSousDossier({ sousDossiers: sousDossiersEffectifs(projet, element, genre) }, choix);
 }
 

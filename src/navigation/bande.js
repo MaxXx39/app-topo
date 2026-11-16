@@ -344,6 +344,8 @@ export function creerNavigation(nav, actions) {
 
   function dessinerPage() {
     const favoris = lireFavoris();
+    // 0.257.0 : la page est redessinée souvent ; la ligne des dossiers garde sa position (sinon elle revenait au début pendant le défilement).
+    const defilementDossiers = page.querySelector('.puces-dossiers')?.scrollLeft ?? null;
     const { titre, detail } = actions.projet();
     dernierProjet = JSON.stringify([{ titre, detail }, comptes0(), actions.sousDossiers?.() ?? null]);
     const courante = actions.courante();
@@ -422,14 +424,14 @@ export function creerNavigation(nav, actions) {
         ${actions.fermerAppli ? `<button type="button" class="bouton-pied-applis fermer" data-pied="fermer">${svg('<path d="M12 3v9" /><path d="M6.3 7.3a8 8 0 1 0 11.4 0" />')}Fermer l'appli</button>` : ''}
         <button type="button" class="bouton-pied-applis" data-pied="reglages">${svg(ICONE_REGLAGES)}Réglages</button>
       </div>`;
-    suivreLigneDossiers();
+    suivreLigneDossiers(defilementDossiers);
   }
 
   /**
    * Dossiers sur UNE seule ligne (0.253.0) : si tout ne rentre pas, la ligne défile au doigt ; un dégradé du côté où il en reste
    * (classes « reste-gauche » / « reste-droite ») et le dossier choisi est ramené dans la vue.
    */
-  function suivreLigneDossiers() {
+  function suivreLigneDossiers(defilementGarde = null) {
     const ligne = page.querySelector('.puces-dossiers');
     if (!ligne) return;
     const majBords = () => {
@@ -438,7 +440,8 @@ export function creerNavigation(nav, actions) {
     };
     ligne.addEventListener('scroll', majBords, { passive: true });
     const choisie = ligne.querySelector('.puce-dossier.actif');
-    if (choisie && ligne.scrollWidth > ligne.clientWidth) ligne.scrollLeft = Math.max(0, choisie.offsetLeft - (ligne.clientWidth - choisie.offsetWidth) / 2);
+    if (defilementGarde !== null) ligne.scrollLeft = defilementGarde;
+    else if (choisie && ligne.scrollWidth > ligne.clientWidth) ligne.scrollLeft = Math.max(0, choisie.offsetLeft - (ligne.clientWidth - choisie.offsetWidth) / 2);
     majBords();
     requestAnimationFrame(majBords); // la page peut ne pas encore avoir sa largeur finale
   }

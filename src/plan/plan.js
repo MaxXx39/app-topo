@@ -35,7 +35,7 @@ import { echapper } from '../outils/echapper.js';
 import { COULEURS_LISTES, SECTIONS, htmlEtiquetteNature } from './listes-points.js';
 import { jourDuPoint } from '../topo/date-point.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
-import { lireSousDossiers, pastilleSousDossier } from '../topo/sous-dossiers.js';
+import { lireSousDossiers, pastilleSousDossier, sousDossierChoisi } from '../topo/sous-dossiers.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
@@ -136,7 +136,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 // chaque geste sur le plan (poser, bouger, relâcher, molette) remet le délai de 5 s à zéro.
 const DELAI_RETOUR_SUIVI = 5000;
 
-export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn } = {}) {
+export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandHorsDossier, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn } = {}) {
   // Réglage d'une liste : son choix, sinon celui de départ (en dessous d'Expert, les réglages d'Expert gardent leur valeur de départ).
   const reglageListe = (cle, id) => {
     const choix = id != null ? reglagesListe.get(id) : null;
@@ -2166,11 +2166,13 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     const roue = reglages.length > 0 ? `<button type="button" class="roue-menu ${niveau}" data-roue="${section}" aria-expanded="false" title="Réglages" aria-label="Réglages ${titre}"></button>` : '';
     return `<div class="titre-partie-menu titre-avec-roue section-menu-${section}"><span>${titre}</span>${roue}</div>${reglagesSection(section)}`;
   }
+  /** 0.257.0 : sous un dossier choisi, bouton pour garder l'accès à ce que le dossier cache (vide sous « Tout »). */
+  const boutonHorsDossier = () => (sousDossierChoisi() ? '<div class="ligne-outils"><button type="button" class="bouton-lien bouton-lien-neutre" data-hors-dossier="oui">＋ Autres dossiers</button></div>' : '');
   let signatureListes = null;
   let couleursDesListes = new Map(); // id d'une liste → couleur choisie (surfaces importées)
   function remplirMenuListes(listes) {
     couleursDesListes = new Map(listes.map((l) => [l.id, l.couleur]));
-    const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}:${l.couleur}:${l.lignesVisibles}`).join('|');
+    const signature = `${sousDossierChoisi()}|${listes.map((l) => `${l.id}:${l.nom}:${l.visible}:${l.couleur}:${l.lignesVisibles}`).join('|')}`;
     if (signature === signatureListes) return;
     signatureListes = signature;
     // 0.192.0 : une ligne par liste : case, pastille de couleur, nom ; la flèche déplie ses réglages (noms, altitudes, triangles…) et sa couleur.
@@ -2225,7 +2227,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     // 0.221.0 : Points = toutes les catégories sauf Surface Import ; Surface = Surface Import et le bloc Volume.
     const partiesPoints = parties.filter((_, i) => SECTIONS[i][0] !== 'surface');
     const partiesSurface = parties.filter((_, i) => SECTIONS[i][0] === 'surface');
-    menuListes.innerHTML = `${partiesPoints.join('') || '<p class="menu-vide">Rien à afficher</p>'}${jourPoints}${toutRien}`;
+    menuListes.innerHTML = `${partiesPoints.join('') || '<p class="menu-vide">Rien à afficher</p>'}${jourPoints}${toutRien}${boutonHorsDossier()}`;
     menuSurfaces.innerHTML = `${partiesSurface.join('') || '<p class="menu-vide">Aucune surface</p>'}${volume}${toutRien}`;
     // Le bouton Surface n'apparaît que s'il y a une surface importée.
     const aDesSurfaces = partiesSurface.some(Boolean);
@@ -2260,6 +2262,15 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       }
       // Case d'une catégorie : toutes ses listes d'un coup.
       if (cible.dataset.sectionToutes) quandMontrerListe?.(`section:${cible.dataset.sectionToutes}`, cible.checked);
+    });
+  }
+  // 0.257.0 : « ＋ Autres dossiers » (menus Plan et Points).
+  for (const menu of [menuPlans, menuListes]) {
+    menu.addEventListener('click', (evenement) => {
+      if (!evenement.target.closest('[data-hors-dossier]')) return;
+      menu.hidden = true;
+      (menu === menuPlans ? boutonPlans : boutonListes).setAttribute('aria-expanded', 'false');
+      quandHorsDossier?.();
     });
   }
   menuPlans.addEventListener('click', (evenement) => {
@@ -2306,12 +2317,12 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     const plansDxf = plansDuMenu();
     const listeDossiers = lireSousDossiers();
     boutonPlans.classList.toggle('tout-cache', plansDxf.length > 0 && plansDxf.every((plan) => plan.visible === false)); // 0.221.0 : tout caché = bouton pâli
-    const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${(plan.sousDossiers ?? []).join('+')}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
+    const signature = sousDossierChoisi() + '#' + plansDxf.map((plan) => `${plan.id}:${plan.nom}:${(plan.sousDossiers ?? []).join('+')}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
     if (signature === signatureMenuPlans) return;
     signatureMenuPlans = signature;
     // Aucun plan : un petit cadre « Aucun DXF » (avant : un trait blanc vide).
     if (plansDxf.length === 0) {
-      menuPlans.innerHTML = '<p class="menu-vide">Aucun plan</p>';
+      menuPlans.innerHTML = `<p class="menu-vide">Aucun plan</p>${boutonHorsDossier()}`;
       boutonPlans.classList.remove('tout-cache');
       return;
     }
@@ -2329,7 +2340,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
           <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /><span>${plan.transparence ?? 0} %</span></label>
         ${(plan.calques ?? []).length > 0 ? `<button type="button" class="fleche-calques-dxf" data-deplier-plan="${plan.id}" aria-expanded="${plansDeplies.has(plan.id)}" title="Calques" aria-label="Calques de ${echapper(plan.nom)}">${plansDeplies.has(plan.id) ? '▴' : '▾'}</button>` : ''}
       </div>
-      ${plansDeplies.has(plan.id) ? `<div class="calques-dxf-menu">${plan.calques.map((c, numero) => `<label class="case"><input type="checkbox" data-plan="${plan.id}" data-calque-dxf="${numero}" ${c.visible !== false ? 'checked' : ''} /> ${echapper(c.nom)}</label>`).join('')}</div>` : ''}`).join('');
+      ${plansDeplies.has(plan.id) ? `<div class="calques-dxf-menu">${plan.calques.map((c, numero) => `<label class="case"><input type="checkbox" data-plan="${plan.id}" data-calque-dxf="${numero}" ${c.visible !== false ? 'checked' : ''} /> ${echapper(c.nom)}</label>`).join('')}</div>` : ''}`).join('') + boutonHorsDossier();
   }
 
   // Les menus se ferment quand on touche le plan.

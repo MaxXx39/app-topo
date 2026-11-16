@@ -29,11 +29,11 @@ const projet = () => ({
 });
 
 describe('liste des sous-dossiers', () => {
-  it('départ : les 12 dossiers demandés le 16.11, chacun avec une couleur différente', () => {
+  it('départ : les 12 dossiers du 16.11 + PIC, LEVE, ANNOT, chacun avec une couleur différente', () => {
     const liste = lireSousDossiers(null, {});
-    expect(liste.map((d) => d.nom)).toEqual(['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD']);
+    expect(liste.map((d) => d.nom)).toEqual(['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC', 'LEVE', 'ANNOT']);
     expect(liste.map((d) => d.nom)).toEqual(SOUS_DOSSIERS_DEPART);
-    expect(new Set(liste.map((d) => d.couleur)).size).toBe(12);
+    expect(new Set(liste.map((d) => d.couleur)).size).toBe(15);
   });
   it('on peut en ajouter ; la liste partagée remplace celle de départ ; un nom inconnu est gris', () => {
     const liste = lireSousDossiers(null, { sousDossiers: ['Voirie', 'Eaux'] });
@@ -201,5 +201,22 @@ describe('applications : listes d\'annotation selon le dossier (0.256.0)', () =>
     definirSousDossier('TER.');
     expect(listesAnnotation(p).map((l) => l.id)).toEqual(['n1']);
     definirSousDossier('');
+  });
+});
+
+describe('éléments montrés hors du dossier choisi (0.257.0)', () => {
+  it('un élément ajouté reste montré ; un autre dossier non ; « Tout » inchangé', async () => {
+    const { estMontre, definirEnPlus } = await import('../src/topo/sous-dossiers.js');
+    const projet = { leves: [{ id: 'l1', sousDossiers: ['CANA'] }] };
+    const plan = { id: 'p1', sousDossiers: ['CANA'] };
+    expect(estMontre(projet, plan, 'plan', 'TER.')).toBe(false);
+    definirEnPlus(['p1']);
+    expect(estMontre(projet, plan, 'plan', 'TER.')).toBe(true);
+    expect(estMontre(projet, { id: 'p2', sousDossiers: ['CANA'] }, 'plan', 'TER.')).toBe(false);
+    // une surface suit son levé ajouté
+    definirEnPlus(['l1']);
+    expect(estMontre(projet, { id: 's1', leveId: 'l1' }, 'surface', 'TER.')).toBe(true);
+    definirEnPlus([]);
+    expect(estMontre(projet, plan, 'plan', 'TER.')).toBe(false);
   });
 });

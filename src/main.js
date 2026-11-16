@@ -12,7 +12,7 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
-import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre } from './topo/sous-dossiers.js';
+import { DOSSIER_LEVE, DOSSIER_ANNOT, definirEnPlus, elementsEnPlus, lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -7727,7 +7727,12 @@ const actionsProjet = {
   nommerAppareil: (nom) => partage.nommerAppareil(nom),
   envoyerDrive: () => partage.envoyerMaintenant(),
   reprendreLaMain: () => partage.prendreLaMain(),
-  ouvrirDrive: (dossierId) => avecChargement(() => partage.ouvrirDepuisDrive(dossierId)),
+  // 0.257.0 : un projet de Drive ouvert depuis la liste / la carte mène au menu (page Applications), comme un projet de l'appareil.
+  ouvrirDrive: (dossierId) => avecChargement(async () => {
+    const avant = projet.id;
+    await partage.ouvrirDepuisDrive(dossierId);
+    if (projet.id !== avant) afficherOnglet('projets');
+  }),
   // 0.217.0 : relecture silencieuse de la liste de Drive (ouverture de la liste des projets) ; pas de message si ça échoue.
   rafraichirDriveEnDouce: () => { if (partage?.etat.connecte) partage.rafraichirListe().catch(() => {}); },
   rafraichirDrive: () => partage.rafraichirListe().catch((erreur) => afficherMessage(`Drive : ${erreur.message}`, 4000)),
@@ -7903,6 +7908,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandColorerListe: (id, couleur) => colorerListe(id, couleur),
   quandToucherPhoto: (id) => montrerPhoto(id),
   quandChangerZone: (sommets) => (cadastreAutour.actif() ? cadastreAutour.changerZone(sommets) : surfaceSwisstopo.changerZone(sommets)),
+  quandHorsDossier: () => choisirHorsDossier(),
   quandMontrerListe: (id, visible) => {
     if (typeof id === 'string' && id.startsWith('section:')) {
       // 0.192.0 : case d'une catégorie d'Afficher : toutes ses listes d'un coup.
@@ -8655,12 +8661,17 @@ let elementsConnus = null; // ids des éléments déjà là : un nouvel élémen
 /** Un élément créé alors qu'un sous-dossier est choisi y est rangé d'office (sous « Tout » : sans dossier). */
 function rangerNouveauxDansLeSousDossier() {
   const choisi = sousDossierChoisi();
-  const tous = elementsRangeables(projet).map(({ element }) => element);
-  if (elementsConnus === null) elementsConnus = new Set(tous.map((e) => e.id));
-  for (const element of tous) {
+  const tous = elementsRangeables(projet);
+  if (elementsConnus === null) elementsConnus = new Set(tous.map(({ element }) => element.id));
+  const dossierChoisi = choisi && choisi !== SANS_SOUS_DOSSIER ? [choisi] : [];
+  for (const { genre, element } of tous) {
     if (elementsConnus.has(element.id)) continue;
     elementsConnus.add(element.id);
-    if (choisi && choisi !== SANS_SOUS_DOSSIER && element.sousDossiers === undefined) element.sousDossiers = [choisi];
+    if (element.sousDossiers !== undefined) continue;
+    // 0.257.0 : un levé direct va dans LEVE (en plus du dossier choisi) ; une liste d'annotations va dans ANNOT.
+    if (genre === 'leve' && estLeveDirect(element)) element.sousDossiers = [...new Set([...dossierChoisi, DOSSIER_LEVE])];
+    else if (genre === 'autre' && estAnnotation(element)) element.sousDossiers = [DOSSIER_ANNOT];
+    else if (dossierChoisi.length > 0) element.sousDossiers = dossierChoisi;
   }
 }
 
@@ -8709,9 +8720,49 @@ function donneesSousDossiers() {
   };
 }
 
+/**
+ * « ＋ Autres dossiers » (Afficher › Plan / Points, 0.257.0) : le dossier choisi cache le reste ; ici on garde l'accès à ce qu'il cache.
+ * Toucher une ligne l'ajoute (ou le retire) ; la fenêtre revient tant qu'on ne touche pas « Fermer ».
+ */
+async function choisirHorsDossier() {
+  const noms = { plan: 'Plan', leve: 'Liste de points', autre: 'Liste', dessin: 'Dessin', surface: 'Surface' };
+  for (;;) {
+    const choix = sousDossierChoisi();
+    const enPlus = elementsEnPlus();
+    // Cadastre : suit son plan ; surfaces issues d'un levé : suivent leur levé (on propose le levé).
+    const lignes = elementsRangeables(projet).filter(({ genre, element }) => {
+      if (genre === 'reseau' || genre === 'surface' && element.leveId) return false;
+      if (genre === 'leve' && (element.cadastre || estLeveDirect(element) && element.points.length === 0)) return false;
+      return !dansSousDossier({ sousDossiers: sousDossiersEffectifs(projet, element, genre) }, choix);
+    });
+    if (lignes.length === 0) {
+      afficherMessage('Tout ce que le projet contient est déjà dans le dossier choisi', 3000);
+      return;
+    }
+    const cle = await demanderChoix({
+      titre: 'Afficher hors du dossier',
+      boutons: [
+        ...lignes.map(({ genre, element }) => ({
+          cle: element.id,
+          texte: `${enPlus.has(element.id) ? '✓ ' : ''}${element.nom ?? 'Sans nom'}`,
+          detail: `${noms[genre] ?? genre}${(element.sousDossiers ?? []).length > 0 ? ` · ${element.sousDossiers.join(', ')}` : ''} · ${enPlus.has(element.id) ? 'touche pour retirer' : 'touche pour afficher'}`,
+        })),
+        { cle: '', texte: 'Fermer' },
+      ],
+    });
+    if (!cle) return;
+    const suite = new Set(enPlus);
+    if (suite.has(cle)) suite.delete(cle);
+    else suite.add(cle);
+    definirEnPlus([...suite]);
+    recalculer();
+  }
+}
+
 /** Choisit le sous-dossier de cette tablette pour ce projet et redessine tout. */
 function choisirSousDossier(nom) {
   definirSousDossier(nom);
+  definirEnPlus([]); // les éléments montrés « hors dossier » valaient pour l'ancien dossier
   retenirChoix(projet.id, nom);
   recalculer({ recadrer: true });
   navigation?.mettreAJour?.();
@@ -9153,6 +9204,7 @@ surLibellesProjet((libelles) => {
 });
 
 let dernierProjetNote = null; // dernier projet noté « ouvert » dans le journal de l'appareil
+let dernierProjetFond0 = null; // 0.257.0 : projet dont les éléments « hors dossier » sont gardés
 let dernierProjetFond = null; // 0.213.0 : projet pour lequel le fond de plan a été remis au départ
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
@@ -9166,6 +9218,8 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   appliquerAffichage(projet);
   // 0.251.0 : sous-dossier choisi sur CETTE tablette pour ce projet (« Tout » au départ) ; les éléments déjà là ne sont jamais rangés d'office.
   definirSousDossier(lireChoix(projet));
+  if (projet.id !== dernierProjetFond0) definirEnPlus([]);
+  dernierProjetFond0 = projet.id;
   elementsConnus = new Set(elementsRangeables(projet).map(({ element }) => element.id));
   // Cadastre (0.116.4) : plan DXF relié à sa liste de points.
   lierCadastres(projet);
