@@ -13934,3 +13934,16 @@ body.theme-sombre .puce-dossier.actif { background: var(--ambre, #f6ab07); borde
 .puces-dossiers.reste-droite { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
 .puces-dossiers.reste-gauche { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
 .puces-dossiers.reste-gauche.reste-droite { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+
+/* 0.256.1 : la pastille du dossier se cache vraiment sous « Tout » (le display: inline-flex de l'en-tête passait devant l'attribut hidden). */
+.entete-pastilles .pastille-entete.pastille-dossier[hidden] { display: none; }
+
+/* 0.256.3 (demande du 16.11) : main ↔ pyramide et pyramide ↔ récepteur = le même écart que nuage ↔ main (6 px, téléphone 4 px),
+   mesuré entre les bords visibles (fond des pastilles, dessin de la pyramide, rond du récepteur). */
+.entete .entete-icone-bouton.bouton-mode { margin-left: calc(6px - 10px - 7.5px); }
+.entete:has(.bouton-recepteur-entete) { padding-right: calc(var(--largeur-recepteur) - 11.5px); }
+@media (max-width: 480px) {
+  .entete .entete-icone-bouton.bouton-mode { margin-left: calc(6px - 4px - 7.5px); }
+}
+body.mode-telephone .entete .entete-icone-bouton.bouton-mode { margin-left: calc(4px - 4px - 3px); }
+body.mode-telephone .entete:has(.bouton-recepteur-entete) { padding-right: calc(var(--largeur-recepteur) - 3px); }

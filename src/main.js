@@ -8764,12 +8764,15 @@ document.addEventListener('keydown', (evenement) => {
 function mettreAJourPastilleDossier() {
   const pastille = document.querySelector('#pastille-dossier');
   if (!pastille) return;
+  // 0.256.2 : toujours affichée quand le projet a des dossiers (ou en Expert), « Tout » compris, pour pouvoir la toucher et changer.
+  const { visible } = donneesSousDossiers();
+  pastille.hidden = !visible;
+  if (!visible) return;
   const choisi = sousDossierChoisi();
-  pastille.hidden = !choisi;
-  if (!choisi) return;
   const liste = lireSousDossiers(projet);
-  pastille.textContent = choisi === SANS_SOUS_DOSSIER ? '📁 Sans dossier' : `📁 ${choisi}`;
-  const fond = choisi === SANS_SOUS_DOSSIER ? '#6b7280' : liste.find((d) => d.nom === choisi)?.couleur ?? '#6b7280';
+  const titre = choisi === '' ? 'Tout' : choisi === SANS_SOUS_DOSSIER ? 'Sans dossier' : choisi;
+  pastille.textContent = `📁 ${titre} ▾`;
+  const fond = choisi === '' ? '#334155' : choisi === SANS_SOUS_DOSSIER ? '#6b7280' : liste.find((d) => d.nom === choisi)?.couleur ?? '#6b7280';
   pastille.style.background = fond;
   pastille.style.color = texteSur(fond);
   pastille.title = 'Dossier choisi : touche pour en changer';
