@@ -1,8 +1,8 @@
 // Bouton « Implanter » posé en bas à droite du plan (0.151.0, demande du 06.11) : quand un point ou
-// une ligne est choisi (fiche avec « Implanter », voir leve/ecran.js), le même bouton est montré sur
+// une ligne (touchée, ou faite de points touchés un à un) est choisi (fiche avec « Implanter », voir leve/ecran.js), le même bouton est montré sur
 // le plan, sous le doigt ; il touche le bouton de la fiche (qui reste caché, classe .sur-le-plan).
 
-const SELECTEUR = '[data-action="implanterChoix"].bouton-implanter, [data-action="implanterLigneChoisie"].bouton-implanter';
+const SELECTEUR = '[data-action="implanterChoix"].bouton-implanter, [data-action="implanterLigneChoisie"].bouton-implanter, [data-action="implanterPointsLigne"].bouton-implanter';
 
 /** panneau : section .panneau-plan ; ecran : conteneur de Terrain (#leve-direct). */
 export function creerBoutonImplanterPlan(panneau, ecran) {

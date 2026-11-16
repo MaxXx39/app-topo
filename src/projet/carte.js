@@ -2,6 +2,7 @@
 // (photo aérienne, puis carte nationale au-delà de 2 km de large, comme le plan). Chaque projet est une petite étiquette à son centre
 // (le centre de la boîte qui entoure son contenu, voir topo/centre-projet.js) ; on la touche pour le choisir, puis « Ouvrir ».
 // Un filtre par dossier. Les projets sans position (rien en Suisse, ou projet Drive jamais ouvert depuis la mise à jour) sont comptés à part.
+import { ICONES_LIGNE } from '../outils/icones.js';
 import { echapper } from '../outils/echapper.js';
 import { verrouActif } from '../partage/synchro.js';
 import { FONDS, niveauDeZoom, tuilesPourZone } from '../plan/fond.js';
@@ -21,7 +22,7 @@ export function ouvrirCarteProjets(projets, { ouvertId = null, appareilId = null
   fond.className = 'carte-projets';
   const liste = dossiers.liste ?? [];
   fond.innerHTML = `<div class="entete-carte-projets">
-      <button type="button" class="bouton-retour" data-action="fermer-carte" aria-label="Retour" title="Retour">
+      <button type="button" class="bouton-retour-partie" data-action="fermer-carte" aria-label="Retour" title="Retour">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
       <h2>Carte des projets</h2>
       ${liste.length > 0 ? `<select data-champ="dossier-carte" aria-label="Dossier">
@@ -108,7 +109,7 @@ export function ouvrirCarteProjets(projets, { ouvertId = null, appareilId = null
       const { x, y } = versEcran(vue, largeur, hauteur, p.centre.est, p.centre.nord);
       if (x < -150 || y < -40 || x > largeur + 150 || y > hauteur + 40) return '';
       return `<button type="button" class="etiquette-carte-projet ${p.id === choisi ? 'choisie' : ''} ${p.id === ouvertId ? 'ouvert' : ''}" data-projet="${echapper(p.id)}"
-        style="left: ${x.toFixed(1)}px; top: ${y.toFixed(1)}px"><span class="repere-carte-projet"></span><span class="nom-carte-projet">${ouvertAilleurs(p) ? '🔒 ' : ''}${echapper(p.titre)}</span></button>`;
+        style="left: ${x.toFixed(1)}px; top: ${y.toFixed(1)}px"><span class="repere-carte-projet"></span><span class="nom-carte-projet">${ouvertAilleurs(p) ? `${ICONES_LIGNE.cadenas} ` : ''}${echapper(p.titre)}</span></button>`;
     }).join('');
   }
 
@@ -120,8 +121,8 @@ export function ouvrirCarteProjets(projets, { ouvertId = null, appareilId = null
     const nomDossier = dossier === SANS_DOSSIER ? '' : (liste.find((d) => d.id === dossier)?.nom ?? '');
     const date = p.modifieLe ? new Date(p.modifieLe).toLocaleDateString('fr-CH') : '';
     fiche.innerHTML = `<div class="texte-fiche-carte"><strong>${echapper(p.titre)}</strong>
-        <span class="aide">${[nomDossier ? `📁 ${echapper(nomDossier)}` : '', date, `${p.local ? '📱' : ''}${p.drive ? '☁' : ''}`].filter(Boolean).join(' · ')}</span>
-        ${ouvertAilleurs(p) ? `<span class="verrou-drive">🔒 Ouvert sur ${echapper(ouvertAilleurs(p))}</span>` : ''}</div>
+        <span class="aide">${[nomDossier ? `${ICONES_LIGNE.dossier} ${echapper(nomDossier)}` : '', date, `${p.local ? ICONES_LIGNE.tablette : ''}${p.drive ? ICONES_LIGNE.nuage : ''}`].filter(Boolean).join(' · ')}</span>
+        ${ouvertAilleurs(p) ? `<span class="verrou-drive">${ICONES_LIGNE.cadenas} Ouvert sur ${echapper(ouvertAilleurs(p))}</span>` : ''}</div>
       <button type="button" class="bouton" data-action="ouvrir-carte" ${p.id === ouvertId ? 'disabled' : ''}>${p.id === ouvertId ? 'Projet ouvert' : 'Ouvrir'}</button>`;
   }
 

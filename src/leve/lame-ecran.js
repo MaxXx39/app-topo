@@ -13,6 +13,7 @@ import { formaterNombre } from '../topo/format.js';
 import { htmlRegleHauteur } from './regle-hauteur.js';
 import { silhouetteOutil } from './silhouettes.js';
 import { controlesEchelleCoupe } from './coupe-directe.js';
+import { ICONES_LIGNE } from '../outils/icones.js';
 
 /** Petit dessin de la machine (vue de derrière « gd » ou de côté « long ») pour l'écran de choix. */
 function imageMachine(machine, vue, boite) {
@@ -118,7 +119,7 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
             ${surfaces.map((s) => `<option value="${s.id}" ${s.id === surfaceId ? 'selected' : ''}>${echapper(s.etiquette)}</option>`).join('')}
           </select>`
         : '<p class="vide">Aucune surface.</p>'}
-      <button type="button" class="bouton-bip ${bip ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${bip}" title="${bip ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${bip ? 'Couper le bip' : 'Remettre le bip'}">${bip ? '🔔' : '🔕'}</button>
+      <button type="button" class="bouton-bip ${bip ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${bip}" title="${bip ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${bip ? 'Couper le bip' : 'Remettre le bip'}">${bip ? ICONES_LIGNE.cloche : ICONES_LIGNE.clocheBarree}</button>
       <button type="button" class="bouton-roue ${reglagesOuverts ? 'actif' : ''}" data-action="reglagesLame" aria-label="Réglages">⚙</button>
       ${bulle('lame')}
       <div class="choix-coupes-bandeau" role="group" aria-label="Coupes montrées">
@@ -144,6 +145,14 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
       </section>`).join('')}
     </div>
   </div>`;
+}
+
+/**
+ * Vue du Guidage vraiment montrée (0.240.0) : sur téléphone, une seule coupe à la fois (les boutons « G – D » et
+ * « Arr – Av » passent de l'une à l'autre), car deux coupes n'y tiennent pas ; ailleurs, la vue choisie.
+ */
+export function vueDuGuidage(vue, telephone) {
+  return telephone && vue !== 'plan1' ? 'plan1' : vue;
 }
 
 /**
@@ -181,7 +190,7 @@ function placeSilhouette(a, b, x, y) {
 }
 
 /**
- * Bandeau au-dessus d'une règle (0.214.0) : « ▲ MONTER 7.0 cm » (rouge), « ▼ DESCENDRE 6.0 cm » (bleu), « ● OK » (vert) ou la
+ * Bandeau au-dessus d'une règle (0.214.0) : « ▲ 7.0 cm » (rouge), « ▼ 6.2 cm » (bleu) : seulement la grosse flèche et la valeur (0.248.0), « ● OK » (vert) ou la
  * valeur seule (orange). Tant que l'écart reste dans la tolérance orange, aucune direction n'est donnée : l'affichage ne saute
  * plus entre monter et descendre près de la surface. point : { ecart (m, + = monter), classe } ou null ; nom : nom du bout (G, D…).
  */
@@ -192,8 +201,8 @@ export function bandeauRegle(point, nom = '') {
   if (point.classe === 'vert') return `<div class="instruction-regle ok">${bout}<b>● OK</b><small>±${cm} cm</small></div>`;
   if (point.classe === 'orange') return `<div class="instruction-regle proche">${bout}<b>${cm}</b><small>cm</small></div>`;
   return point.ecart > 0
-    ? `<div class="instruction-regle monter">${bout}<b>▲ MONTER</b><small>${cm} cm</small></div>`
-    : `<div class="instruction-regle descendre">${bout}<b>▼ DESCENDRE</b><small>${cm} cm</small></div>`;
+    ? `<div class="instruction-regle monter">${bout}<b class="fleche-regle" aria-label="Monter">▲</b><small>${cm} cm</small></div>`
+    : `<div class="instruction-regle descendre">${bout}<b class="fleche-regle" aria-label="Descendre">▼</b><small>${cm} cm</small></div>`;
 }
 
 /**

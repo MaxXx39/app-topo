@@ -164,6 +164,6 @@ export function installerMesureDuree({ disponible, dureeParDefaut = () => 0, ref
     if (!duree) return;
     evenement.stopImmediatePropagation();
     evenement.preventDefault();
-    lancer(bouton, duree);
+    lancer(bouton, duree, true); // 0.233 : en Contrôle aussi, on montre le récapitulatif de la mesure avant de valider
   }, true);
 }

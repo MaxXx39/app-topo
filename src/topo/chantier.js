@@ -28,6 +28,9 @@ export const RAYON_TAMPON_ROND = 0.3;
 export const NATURES_RESEAU_DEPART = ['EU', 'EC', 'ESP', 'Swisscom', 'Gaz', 'Elec', 'CAD', 'Éclairage', 'Autre'];
 export const NATURES_BORDURE_DEPART = ['Haute', 'Basse', 'Bordurette', 'Caniveau', 'Volige'];
 
+/** Libellé « Libre » du Levé chantier : pas de nature, pas de Ø ; seulement la remarque (et les photos de Lever). */
+export const LIBELLE_LIBRE = { abreviation: 'LIB', nom: 'Libre', court: 'Libre', forme: '', reseau: false, libre: true, ouvrage: false, modes: [], champs: ['remarque'] };
+
 /**
  * Libellés de départ. abreviation = début du nom des points (« P-CH-1 », « L-T-1-3 », sans tiret
  * dedans). ouvrage : peut être levé en 1 point (rond) ou 3 coins. modes : ce que touche le GNSS
@@ -36,6 +39,8 @@ export const NATURES_BORDURE_DEPART = ['Haute', 'Basse', 'Bordurette', 'Caniveau
  * (sinon natures de bordures).
  */
 export const LIBELLES_CHANTIER_DEPART = [
+  // 0.249.0 (demande du 16.11) : « Libre » en premier et par défaut : sans nature ni attribut, juste une remarque et des photos.
+  LIBELLE_LIBRE,
   { abreviation: 'CH', nom: 'Chambre', court: 'Chamb.', forme: 'carre', reseau: true, ouvrage: true, modes: ['tampon', 'fe'], champs: ['profondeur', 'diametre', 'remarque'] },
   { abreviation: 'GR', nom: 'Grille', court: 'Gril.', forme: 'carre-vide', reseau: true, ouvrage: true, modes: ['tampon', 'fe'], champs: ['profondeur', 'diametre', 'remarque'] },
   { abreviation: 'T', nom: 'Tuyau', court: 'Tuyau', forme: '', reseau: true, ouvrage: false, modes: ['dessus', 'fe'], champs: ['diametre', 'materiau', 'remarque'] },
@@ -76,8 +81,8 @@ export function lireAttributsChantier(libelle, saisie = {}) {
     const n = Number(texte);
     return Number.isFinite(n) ? { n } : { faux: true };
   };
-  const attributs = { libelle: libelle.abreviation, nature: saisie.nature || '' };
-  if (!attributs.nature) return { erreur: 'choisis la nature' };
+  const attributs = { libelle: libelle.abreviation, nature: libelle.libre ? '' : saisie.nature || '' };
+  if (!attributs.nature && !libelle.libre) return { erreur: 'choisis la nature' };
   const mode = libelle.modes?.length ? (libelle.modes.includes(saisie.mode) ? saisie.mode : libelle.modes[0]) : '';
   if (mode) attributs.mode = mode;
   if (libelle.ouvrage) attributs.forme = saisie.forme === 'rect' ? 'rect' : 'ronde';

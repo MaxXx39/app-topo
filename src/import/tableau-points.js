@@ -2,6 +2,7 @@
 // qu'on filtre avec des boutons de catégories (Contrôle, Levé, Import, Annotation, Chantier…) puis avec les listes de points
 // de ces catégories. Chaque ligne : nom, libellé, E, N, H, précisions, date, tablette, remarque, photo, liste.
 // Calculs seulement (rien d'écran ici) : lignes, tri, texte CSV. Aucune valeur inventée : une info inconnue reste vide.
+import { fixe3 } from '../topo/format.js';
 import { lireNomLeve } from '../topo/leve-direct.js';
 import { dateDuPoint, jourDuPoint } from '../topo/date-point.js';
 
@@ -173,7 +174,7 @@ export function csvDuTableau(lignes) {
     const t = String(v ?? '');
     return /[;"\r\n]/.test(t) ? `"${t.replaceAll('"', '""')}"` : t;
   };
-  const n = (v) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(3) : '');
+  const n = (v) => (typeof v === 'number' && Number.isFinite(v) ? fixe3(v) : '');
   const titres = [...COLONNES_POINTS.map(([, titre]) => titre), 'Catégorie'];
   const nom = (cle) => CATEGORIES_POINTS.find(([c]) => c === cle)?.[1] ?? cle;
   const corps = lignes.map((l) => [l.nom, l.libelle, n(l.est), n(l.nord), n(l.altitude), l.precision, texteDate(l.date), l.tablette, l.remarque, l.photos || '', l.liste, nom(l.categorie)]);

@@ -12,13 +12,21 @@ export function couleurFlecheEcart(classe) {
  * Où poser le bloc (pixels du plan) : cible = point de la ligne en face de la canne, canne = position du récepteur.
  * Renvoie { x, y, angle, retourne } : le point de départ du bloc (à "decalage" pixels de la ligne), l'angle (degrés, de -90 à 90, pour
  * que le texte se lise à l'endroit) et « retourne » : vrai quand la canne est du côté gauche de l'écran (on lit alors le texte
- * puis la flèche, la flèche reste contre la ligne). null si la canne est sur la ligne.
+ * puis la flèche, la flèche reste contre la ligne).
+ * 0.232.0 : « repli » = direction (x, y) de la perpendiculaire côté canne, utilisée quand la canne est à moins d'un pixel de la
+ * ligne (écart de quelques mm à petite échelle) : la flèche reste visible. Sans repli et canne sur la ligne : null.
  */
-export function placerFlecheEcart(cible, canne, decalage = 6) {
-  const dx = canne.x - cible.x;
-  const dy = canne.y - cible.y;
-  const longueur = Math.hypot(dx, dy);
-  if (longueur < 1) return null;
+export function placerFlecheEcart(cible, canne, decalage = 6, repli = null) {
+  let dx = canne.x - cible.x;
+  let dy = canne.y - cible.y;
+  let longueur = Math.hypot(dx, dy);
+  if (longueur < 1) {
+    const l = repli ? Math.hypot(repli.x, repli.y) : 0;
+    if (l === 0) return null;
+    dx = repli.x;
+    dy = repli.y;
+    longueur = l;
+  }
   const nx = dx / longueur;
   const ny = dy / longueur;
   let angle = (Math.atan2(ny, nx) * 180) / Math.PI;

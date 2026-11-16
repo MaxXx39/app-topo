@@ -7,6 +7,7 @@ import { bulle } from '../aide/bulles.js';
 import { aAcces, rayonFormes, echelleTexte } from '../reglages/reglages.js';
 import { dessinerDessins } from './dessins.js';
 import { dessinerMesureRapide } from './mesure-rapide.js';
+import { dessinerReseaux } from './reseaux.js';
 import { placerEtiquettes, pointInterieur } from './etiquettes.js';
 import { texteDuPoint } from '../topo/chantier.js';
 // Couleur des nuages d'Annotation (vert sarcelle de l'application ; au choix dans « Afficher »).
@@ -34,7 +35,7 @@ import { echapper } from '../outils/echapper.js';
 import { COULEURS_LISTES, SECTIONS, htmlEtiquetteNature } from './listes-points.js';
 import { jourDuPoint } from '../topo/date-point.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
-import { couleurDuType } from '../topo/types-dxf.js';
+import { lireSousDossiers } from '../topo/sous-dossiers.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
@@ -52,6 +53,7 @@ function cotesEnCache(triangles, equidistance) {
 import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, valeurPrincipale, couleurDeMesure } from '../mesures/valeurs.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
 import { ajouterTous } from '../outils/bornes.js';
+const SEUIL_NOMS_CACHES = 300; // 0.245.0 : au-delà de ce nombre de points visibles, noms et altitudes cachés (sauf points prioritaires)
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -134,7 +136,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 // chaque geste sur le plan (poser, bouger, relâcher, molette) remet le délai de 5 s à zéro.
 const DELAI_RETOUR_SUIVI = 5000;
 
-export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
+export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn } = {}) {
   // Réglage d'une liste : son choix, sinon celui de départ (en dessous d'Expert, les réglages d'Expert gardent leur valeur de départ).
   const reglageListe = (cle, id) => {
     const choix = id != null ? reglagesListe.get(id) : null;
@@ -164,6 +166,13 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       <canvas class="plan-dxf-canvas plan-points-canvas" aria-hidden="true"></canvas>
       <svg class="plan" role="img" aria-label="Plan des points"></svg>
       <div class="plan-attribution" hidden></div>
+      <div class="plan-coordonnees" hidden aria-live="off"></div>
+      <div class="boussole-tablette" hidden title="Boussole de la tablette (nord magnétique, environ 3° près)" aria-label="Boussole de la tablette">
+        <svg viewBox="-30 -30 60 60" aria-hidden="true">
+          <circle r="27" class="cadran" />
+          <g class="aiguille"><path d="M0 -22 6 0H-6Z" class="nord" /><path d="M0 22 6 0H-6Z" class="sud" /><text y="-11" text-anchor="middle">N</text></g>
+        </svg>
+      </div>
       <div class="plan-calques">
         <div class="plan-puces">
         <button type="button" class="puce" data-action="calques" aria-expanded="false">
@@ -195,15 +204,14 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
         <div class="menu-calques" hidden>
           <div class="ligne-menu-plan">
             <label class="case"><input type="checkbox" data-calque="fondSatellite" ${calquesChoisis.fondSatellite ? 'checked' : ''} /> Fond de plan (swisstopo)</label>
-            <p class="aide note-fond" data-vivant="fond-mode">Photo aérienne ; au-delà de 2 km de large : carte nationale.</p>
           </div>
-          <label class="reglette-transparence">Transparence <span data-vivant="transparence">60 %</span>
-            <input type="range" min="0" max="100" step="5" value="60" data-calque="transparencePhoto" /></label>
+          <label class="reglette-transparence"><b>Trans.</b>
+            <input type="range" min="0" max="100" step="5" value="60" data-calque="transparencePhoto" /><span data-vivant="transparence">60 %</span></label>
           <div class="ligne-menu-plan">
             <label class="case"><input type="checkbox" data-calque="carteNationale" /> Carte nationale (par-dessus la photo)</label>
           </div>
-          <label class="reglette-transparence">Transparence de la carte <span data-vivant="transparence-carte">60 %</span>
-            <input type="range" min="0" max="100" step="5" value="60" data-calque="transparenceCarte" /></label>
+          <label class="reglette-transparence"><b>Trans.</b>
+            <input type="range" min="0" max="100" step="5" value="60" data-calque="transparenceCarte" /><span data-vivant="transparence-carte">60 %</span></label>
           <label class="case"><input type="checkbox" data-calque="cadastre" /> Cadastre</label>
         </div>
       </div>
@@ -563,7 +571,10 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       const montrerAltitude = (point) => calques.altitudes && reglageListe('altitudes', idListe(point));
       // 0.219.0 : les attributs du levé chantier ont leur propre case « Attributs » (avant : rangés avec les altitudes).
       const montrerAttributs = (point) => calques.attributs && reglageListe('attributs', idListe(point));
-      const textes = visibles.map(({ point }) =>
+      // 0.245.0 (audit, lot 8, tous les modes) : de loin (plus de SEUIL_NOMS_CACHES points à l'écran), les noms et altitudes sont cachés,
+      // sauf ceux des points de la liste en cours ; ils reviennent en zoomant.
+      const deLoin = visibles.length > SEUIL_NOMS_CACHES;
+      const textes = visibles.map(({ point, prioritaire }) => deLoin && !prioritaire ? [] :
         [montrerNom(point) ? point.nom : null, montrerAltitude(point) && point.altitude != null ? formaterNombre(point.altitude) : null, montrerAttributs(point) && point.chantier ? texteDuPoint(point.chantier, point.chantier) : null].filter(Boolean),
       );
       // 0.208.0 : les noms évitent les 📷 des photos (sinon l'icône cache le nom).
@@ -859,6 +870,8 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     dessinerDessins(groupe, implantation, (est, nord) => versEcran(est, nord, vue), creerElement, 1 / vue.echelle, calques.noms, rayonFormes());
     // Mesure rapide (0.158.0) : points, côtés, longueurs et surface.
     dessinerMesureRapide(groupe, implantation.mesureRapide, (est, nord) => versEcran(est, nord, vue), creerElement);
+    // Réseaux (0.235.0, Expert) : canalisations, tranchées, coupe en travers.
+    dessinerReseaux(groupe, implantation.reseaux, (est, nord) => versEcran(est, nord, vue), creerElement);
     svg.append(groupe);
   }
 
@@ -1012,7 +1025,18 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     // perpendiculaire, couleur de la tolérance ; sur la ligne ou pour un talus : le texte posé le long de la perpendiculaire.
     if (vers) {
       const cible = ecran(vers);
-      const place = cotes.fleche && Math.abs(ecart) >= 0.0005 ? placerFlecheEcart(cible, canne) : null;
+      // 0.232.0 : canne à moins d'un pixel de la ligne (petit écart) : la flèche reste visible, posée du côté de l'écart
+      // (+ = à droite de la ligne, sens début → fin) sur la perpendiculaire du segment.
+      let repli = null;
+      const pied = pointALAbscisse(sommets, Math.max(0, Math.min(longueur, abscisse)));
+      if (pied && sommets[pied.segment + 1]) {
+        const a = ecran(sommets[pied.segment]);
+        const b = ecran(sommets[pied.segment + 1]);
+        const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const sens = ecart >= 0 ? 1 : -1;
+        repli = { x: (-(b.y - a.y) / l) * sens, y: ((b.x - a.x) / l) * sens };
+      }
+      const place = cotes.fleche && Math.abs(ecart) >= 0.0005 ? placerFlecheEcart(cible, canne, 6, repli) : null;
       if (!place) {
         texteLeLong(canne, cible, Math.abs(ecart) < 0.0005 ? 'sur la ligne' : m(ecart), 'cote-ecart');
       } else {
@@ -1771,6 +1795,15 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
   conteneur.querySelector('[data-action="zoom-plus"]').addEventListener('click', () => zoomerAuCentre(1.5));
   conteneur.querySelector('[data-action="zoom-moins"]').addEventListener('click', () => zoomerAuCentre(1 / 1.5));
   const boutonPosition = conteneur.querySelector('[data-action="ma-position"]');
+  // 0.238.0 : boussole de la tablette en bas à gauche du plan, seulement quand le plan ne suit pas
+  // le « cap » du GNSS (inclinaison pas prête, GPS tablette, pas de GNSS). capTablette : dernier cap (°) ou null.
+  const boussoleTablette = conteneur.querySelector('.boussole-tablette');
+  let capTablette = null;
+  function mettreAJourBoussoleTablette() {
+    const inclinaisonPrete = Boolean(position?.prete) && !position?.tablette;
+    boussoleTablette.hidden = capTablette == null || inclinaisonPrete;
+    if (capTablette != null) boussoleTablette.querySelector('.aiguille').setAttribute('transform', `rotate(${(-capTablette).toFixed(1)})`);
+  }
   const boutonNord = conteneur.querySelector('[data-action="nord-en-haut"]');
   // Dessin du bouton selon le mode : viseur (libre), viseur plein (suivi, nord en haut), flèche
   // de navigation (suivi, devant en haut).
@@ -2271,8 +2304,9 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
   function remplirMenuPlans() {
     // Plans du cadastre : rangés avec leurs points dans « Afficher › Cadastre » (0.116.4).
     const plansDxf = plansDuMenu();
+    const couleursDossiers = new Map(lireSousDossiers().map((d) => [d.nom, d.couleur]));
     boutonPlans.classList.toggle('tout-cache', plansDxf.length > 0 && plansDxf.every((plan) => plan.visible === false)); // 0.221.0 : tout caché = bouton pâli
-    const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${plan.type || ''}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
+    const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${(plan.sousDossiers ?? []).join('+')}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
     if (signature === signatureMenuPlans) return;
     signatureMenuPlans = signature;
     // Aucun plan : un petit cadre « Aucun DXF » (avant : un trait blanc vide).
@@ -2283,16 +2317,16 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     }
     // 0.225.0 : première ligne = Geler / Isoler / Tout réafficher (Intermédiaire) ; le menu se ferme, on touche des éléments du plan, puis « Valider ».
     const enteteCalques = `<div class="ligne-menu-plan ligne-gel-calques seulement-intermediaire">
-        <button type="button" class="bouton-gel" data-gel-calques="geler" title="Geler : cacher le calque des éléments touchés">❄ Geler</button>
-        <button type="button" class="bouton-gel" data-gel-calques="isoler" title="Isoler : ne garder que le calque des éléments touchés">◎ Isoler</button>
+        <button type="button" class="bouton-gel" data-gel-calques="geler" title="Geler : cacher le calque des éléments touchés">Geler</button>
+        <button type="button" class="bouton-gel" data-gel-calques="isoler" title="Isoler : ne garder que le calque des éléments touchés">Isoler</button>
         <button type="button" class="bouton-gel" data-gel-calques="reafficher" title="Tout réafficher : tous les calques de tous les plans">↺ Tout réafficher</button>
       </div>`;
     menuPlans.innerHTML = enteteCalques + plansDxf.map((plan) => `<div class="ligne-menu-plan">
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
-          <span>${echapper(plan.nom)}</span>${plan.type ? `<span class="pastille-type-dxf" style="background: ${couleurDuType(plan.type)}">${echapper(plan.type)}</span>` : ''}</label>
+          <span>${echapper(plan.nom)}</span>${(plan.sousDossiers ?? []).map((nom) => `<span class="pastille-pastel-dossier" style="background: ${couleursDossiers.get(nom) ?? '#6b7280'}">${echapper(nom)}</span>`).join('')}</label>
         ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
-        <label class="reglette-transparence reglette-plan">Transparence <span>${plan.transparence ?? 0} %</span>
-          <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /></label>
+        <label class="reglette-transparence reglette-plan"><b>Trans.</b>
+          <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /><span>${plan.transparence ?? 0} %</span></label>
         ${(plan.calques ?? []).length > 0 ? `<button type="button" class="fleche-calques-dxf" data-deplier-plan="${plan.id}" aria-expanded="${plansDeplies.has(plan.id)}" title="Calques" aria-label="Calques de ${echapper(plan.nom)}">${plansDeplies.has(plan.id) ? '▴' : '▾'}</button>` : ''}
       </div>
       ${plansDeplies.has(plan.id) ? `<div class="calques-dxf-menu">${plan.calques.map((c, numero) => `<label class="case"><input type="checkbox" data-plan="${plan.id}" data-calque-dxf="${numero}" ${c.visible !== false ? 'checked' : ''} /> ${echapper(c.nom)}</label>`).join('')}</div>` : ''}`).join('');
@@ -2401,6 +2435,18 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       });
     }
   });
+
+  // 0.248.0 (demande du 16.11) : à la souris, Est / Nord (et Z de la surface choisie) du point sous le curseur.
+  const casesCoordonnees = conteneur.querySelector('.plan-coordonnees');
+  svg.addEventListener('pointermove', (evenement) => {
+    if (evenement.pointerType !== 'mouse' || !vue || !casesCoordonnees) return;
+    const position = positionDansPlan(evenement);
+    const terrain = versTerrain(position.x, position.y, vue);
+    const z = altitudeEn ? altitudeEn(terrain.est, terrain.nord) : null;
+    casesCoordonnees.textContent = `E ${terrain.est.toFixed(3)} · N ${terrain.nord.toFixed(3)}${z != null ? ` · Z ${z.toFixed(3)}` : ''}`;
+    casesCoordonnees.hidden = false;
+  });
+  svg.addEventListener('pointerleave', () => { if (casesCoordonnees) casesCoordonnees.hidden = true; });
 
   svg.addEventListener('pointermove', (evenement) => {
     if (!vue || !pointeurs.has(evenement.pointerId)) return;
@@ -2649,10 +2695,16 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
      * pas de flèche). Pendant le suivi (bouton « Ma position »), le plan se recentre sur elle. Le premier affichage
      * d'un levé encore vide se cadre sur elle.
      */
+    /** Nouveau cap de la boussole de la tablette (°, 0 = haut de la tablette vers le nord), ou null. */
+    mettreAJourBoussoleTablette(cap) {
+      capTablette = cap;
+      mettreAJourBoussoleTablette();
+    },
     afficherPosition(nouvellePosition) {
       const premiere = !position && nouvellePosition;
       position = nouvellePosition;
       boutonPosition.hidden = !position;
+      mettreAJourBoussoleTablette();
       // Cap automatique (0.119.0) : GNSS prêt → devant du GNSS en haut ; plus prêt → comme avant.
       // 0.153.0 : GPS de la tablette (sans GNSS) : aucun centrage automatique (cap auto, retour du
       // suivi, première position) ; seul « Ma position » fait suivre.

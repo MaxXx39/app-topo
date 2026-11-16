@@ -292,6 +292,12 @@ export function creerNavigation(nav, actions) {
       else actions.fermerAppli?.();
       return;
     }
+    const puceDossier = evenement.target.closest('[data-dossier], [data-dossier-nouveau]');
+    if (puceDossier) {
+      if (puceDossier.hasAttribute('data-dossier-nouveau')) actions.nouveauSousDossier?.();
+      else actions.choisirSousDossier?.(puceDossier.dataset.dossier);
+      return;
+    }
     const projet = evenement.target.closest('[data-projet]');
     if (projet) {
       fermerPage();
@@ -339,7 +345,7 @@ export function creerNavigation(nav, actions) {
   function dessinerPage() {
     const favoris = lireFavoris();
     const { titre, detail } = actions.projet();
-    dernierProjet = JSON.stringify([{ titre, detail }, comptes0()]);
+    dernierProjet = JSON.stringify([{ titre, detail }, comptes0(), actions.sousDossiers?.() ?? null]);
     const courante = actions.courante();
     const comptes = actions.comptes?.() ?? '';
     const nouveau = actions.nouveauProjet
@@ -358,6 +364,16 @@ export function creerNavigation(nav, actions) {
       `<button type="button" class="bouton-partie-projet seulement-intermediaire" data-projet="archives">${svg('<path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4" />')}Archives</button>`,
       expert ? partie('surfaces', 'Surfaces importées', '<path d="M3 17 9 7l5 6 3-4 4 8z" /><path d="M3 17h18" />') : '',
     ].join('')}</div>`;
+    // 0.251.0 : puces des dossiers (Tout / Terrassement / Canalo…) : seuls les éléments rangés dans le dossier choisi sont montrés.
+    const dossiers = actions.sousDossiers?.();
+    const puces = dossiers?.visible
+      ? `<div class="puces-dossiers" role="group" aria-label="Dossier du projet">${bulle('dossiers')}
+          <button type="button" class="puce-dossier ${dossiers.choisi === '' ? 'actif' : ''}" data-dossier="" aria-pressed="${dossiers.choisi === ''}">Tout</button>
+          ${dossiers.liste.map((d) => `<button type="button" class="puce-dossier ${dossiers.choisi === d.nom ? 'actif' : ''}" data-dossier="${echapper(d.nom)}" style="--couleur-dossier: ${d.couleur}" aria-pressed="${dossiers.choisi === d.nom}"><i></i>${echapper(d.nom)}</button>`).join('')}
+          <button type="button" class="puce-dossier ${dossiers.choisi === '__sans' ? 'actif' : ''}" data-dossier="__sans" aria-pressed="${dossiers.choisi === '__sans'}">Sans dossier</button>
+          ${dossiers.peutCreer ? '<button type="button" class="puce-dossier nouveau-dossier" data-dossier-nouveau aria-label="Nouveau dossier" title="Nouveau dossier">＋</button>' : ''}
+        </div>`
+      : '';
     // 0.159.0 : tout ce qui touche au projet dans un seul encadré ; chaque bouton ouvre sa page.
     page.innerHTML = `
       <div class="cadre-projet-applis">
@@ -372,6 +388,7 @@ export function creerNavigation(nav, actions) {
             ${nouveau}
           </div>
         </div>
+        ${puces}
         <div class="parties-projet-applis">${parties}</div>
         ${comptes ? `<p class="comptes-projet-applis">${echapper(comptes)}</p>` : ''}
       </div>

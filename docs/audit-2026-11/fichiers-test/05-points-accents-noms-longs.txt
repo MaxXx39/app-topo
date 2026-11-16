@@ -1,0 +1,5 @@
+Écôle-Élémentaire-Ångström-Çédille-n°1	2512392.000	1145712.000	476.500
+Point avec un nom vraiment très très long pour voir si le tableau et le plan débordent 0123456789	2512394.000	1145711.000	476.500
+<b>gras</b>&<script>alert(1)</script>	2512396.000	1145710.000	476.500
+"guillemets" 'apostrophe'	2512398.000	1145709.000	476.500
+émoji-📍-point	2512400.000	1145708.000	476.500

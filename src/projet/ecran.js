@@ -6,6 +6,7 @@
 // - ensuite (voir main.js) le bloc « Imports » (fichiers de points, plans DXF) ;
 // - tout en bas, le partage par Google Drive (pas besoin de le voir tout le temps), puis la version.
 // Le cartouche du PDF (dessiné par, date) se règle au moment du PDF (voir export/cartouche.js).
+import { ICONES_LIGNE } from '../outils/icones.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
@@ -207,7 +208,7 @@ function pageProjets(projet, resumes, partage, menuOuvert, tri, ouverts) {
     ? projets.map((p) => ligneProjet(p, p.id === projet.id, menuOuvert === p.id, partage)).join('')
     : groupes.map((g) => blocDossier(g, ouverts.has(g.id), projet, menuOuvert, partage)).join('');
   return `<div class="entete-page-projets">
-    <button type="button" class="bouton-retour" data-action="panneau" data-panneau="projets" title="Retour au projet ouvert" aria-label="Retour au projet ouvert">
+    <button type="button" class="bouton-retour-partie" data-action="panneau" data-panneau="projets" title="Retour au projet ouvert" aria-label="Retour au projet ouvert">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
     <h2>Ouvrir projet</h2>
     ${partage?.etat.connecte ? '<button type="button" class="bouton-retour" data-action="rafraichirDrive" title="Actualiser la liste de Google Drive" aria-label="Actualiser">↻</button>' : ''}
@@ -251,24 +252,24 @@ function blocDossier(groupe, ouvert, projet, menuOuvert, partage) {
 /** Carte du projet ouvert (0.125.0) : son dossier ; « changer » en Expert (s'il y a des dossiers). */
 function ligneDossier(projetId) {
   const dossiers = lireDossiers();
-  if (dossiers.liste.length === 0) return '<button type="button" class="dossier-projet-ouvert seulement-expert" data-action="ranger-projet" data-id="' + echapper(projetId) + '">📁 ranger dans un dossier</button>';
+  if (dossiers.liste.length === 0) return '<button type="button" class="dossier-projet-ouvert seulement-expert" data-action="ranger-projet" data-id="' + echapper(projetId) + '">' + ICONES_LIGNE.dossier + ' ranger dans un dossier</button>';
   const id = dossierDuProjet(dossiers, projetId);
   const nom = dossiers.liste.find((d) => d.id === id)?.nom ?? 'Sans dossier';
-  return `<span class="dossier-projet-ouvert">📁 ${echapper(nom)}
+  return `<span class="dossier-projet-ouvert">${ICONES_LIGNE.dossier} ${echapper(nom)}
     <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="ranger-projet" data-id="${echapper(projetId)}">changer</button></span>`;
 }
 
 /** Une ligne : on la touche pour ouvrir le projet ; ⋮ ouvre le menu. */
 function ligneProjet(p, estOuvert, menu, partage) {
   const date = p.modifieLe ? new Date(p.modifieLe).toLocaleDateString('fr-CH') : '';
-  const ou = `${p.local ? '📱' : ''}${p.drive ? '☁' : ''}`;
+  const ou = `${p.local ? ICONES_LIGNE.tablette : ''}${p.drive ? ICONES_LIGNE.nuage : ''}`;
   const verrou = p.drive?.verrou;
   const ailleurs = verrou && verrou.appareilId !== partage?.appareil.id && verrouActif(verrou);
   const details = [
     p.sousTitre ? echapper(p.sousTitre) : '',
     date,
     p.local ? `${compter(p.local.nombreLeves, 'levé')} · ${compter(p.local.nombreSurfaces, 'surface')}` : '',
-    ailleurs ? `<span class="verrou-drive">🔒 Ouvert sur ${echapper(verrou.nom)}</span>` : '',
+    ailleurs ? `<span class="verrou-drive">${ICONES_LIGNE.cadenas} Ouvert sur ${echapper(verrou.nom)}</span>` : '',
   ].filter(Boolean).join(' · ');
   const ouvrir = estOuvert ? 'disabled' : p.local ? `data-action="ouvrir" data-id="${p.id}"` : `data-action="ouvrir-drive" data-id="${p.drive.dossierId}"`;
   return `<div class="ligne-projet ${estOuvert ? 'projet-ouvert' : ''}">
@@ -276,7 +277,7 @@ function ligneProjet(p, estOuvert, menu, partage) {
       <strong><span class="ou-projet" title="${p.local ? 'sur cet appareil' : ''}${p.local && p.drive ? ' et ' : ''}${p.drive ? 'sur Google Drive' : ''}">${ou}</span> ${echapper(p.titre)}${estOuvert ? ' <span class="etiquette-ouvert">ouvert</span>' : ''}</strong>
       <span class="aide">${details}</span>
     </button>
-    <button type="button" class="bouton-menu-projet" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
+    <button type="button" class="bouton-menu-projet seulement-expert" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
     ${menu ? `<div class="menu-projet">
       ${estOuvert ? '<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="renommerProjet">renommer</button>' : ''}
       <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="ranger-projet" data-id="${p.id}">ranger dans un dossier</button>

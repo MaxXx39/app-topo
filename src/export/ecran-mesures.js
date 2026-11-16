@@ -1,6 +1,7 @@
 // Formulaire d'export des mesures (onglet Calculs › Mesures) : à part de l'export des volumes,
 // il ne contient aucun volume. Échelle et contenu du PDF, boutons PDF, CSV et DXF.
 // Cartouche : dessiné par et date ici, affaire et lieu du projet (onglet Projet).
+import { nomFichierExport } from '../outils/nom-fichier.js';
 import { genererCsvMesures } from './csv.js';
 import { genererDxfMesures } from './dxf.js';
 import { EQUIDISTANCES_PDF } from './mise-en-page.js';
@@ -74,8 +75,7 @@ export function creerEcranExportMesures(conteneur, { obtenirGroupes, obtenirDonn
 
   /** Nom des fichiers : mesures_<affaire>_<date>. */
   function nomDeFichier() {
-    const affaire = (obtenirDonnees().cartouche.affaire ?? '').replace(/[^\w-]+/g, '_') || 'topo';
-    return `mesures_${affaire}_${dateDuPlan()}`;
+    return nomFichierExport(obtenirDonnees().cartouche.affaire, 'mesures', dateDuPlan());
   }
 
   /** Mesures à exporter, ou null (avec un message) s'il n'y en a pas. */

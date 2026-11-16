@@ -80,6 +80,8 @@ describe('cadastre RDPPF (Vaud)', () => {
     const r = await telechargerRdppf({ est: 2538020, nord: 1152020 }, 30, () => {}, chercher, 'https://x');
     expect(r.lignes).toHaveLength(1);
     expect(adresses.filter((a) => a.includes('extract'))).toHaveLength(1);
+    // 0.249.0 : le numéro de la parcelle (lu dans la réponse du service) suit son contour.
+    expect(r.parcelles).toEqual([{ numero: '440', anneau: r.lignes[0] }]);
   });
   it('message clair si le service ne répond jamais', async () => {
     const chercher = async () => ({ ok: false, status: 404, text: async () => 'Not found' });

@@ -8,6 +8,7 @@
 import { echapper } from '../outils/echapper.js';
 import { envoyerParMail, partagerFichier } from './partager.js';
 import { lireListesPartagees } from '../reglages/listes-partagees.js';
+import { ICONES_LIGNE } from '../outils/icones.js';
 
 // Adresse choisie la dernière fois (pendant que l'appli est ouverte).
 let derniereAdresse = null;
@@ -39,7 +40,7 @@ export function ouvrirFenetreExport({ titre, resume = null, formats = null, opti
     ${options.map((o) => `<label class="case option-export" data-option="${echapper(o.cle)}" ${o.formats.includes(format) ? '' : 'hidden'}><input type="checkbox" data-option-case="${echapper(o.cle)}" /> ${echapper(o.texte)}</label>`).join('')}
     <div class="boutons-choix">
       ${boutonsEnPlus.map((b, i) => `<button type="button" class="bouton-secondaire" data-cle="plus-${i}"><strong>${echapper(b.titre)}</strong><span>${echapper(b.detail ?? '')}</span></button>`).join('')}
-      <button type="button" class="bouton-secondaire bouton-apercu-pdf" data-cle="apercu" ${estPdf() ? '' : 'hidden'}><strong>👁 Aperçu</strong><span>voir le PDF avant de l'exporter</span></button>
+      <button type="button" class="bouton-secondaire bouton-apercu-pdf" data-cle="apercu" ${estPdf() ? '' : 'hidden'}><strong>${ICONES_LIGNE.oeil} Aperçu</strong><span>voir le PDF avant de l'exporter</span></button>
       <button type="button" class="bouton" data-cle="enregistrer"><strong>Enregistrer</strong><span>sur cet appareil</span></button>
       <div class="envoi-mail seulement-intermediaire">
         ${adresses.length > 0

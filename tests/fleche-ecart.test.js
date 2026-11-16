@@ -32,6 +32,14 @@ describe('flèche de l\'écart sur le plan (0.210.0)', () => {
     expect(placerFlecheEcart({ x: 10, y: 10 }, { x: 10.2, y: 10.1 })).toBeNull();
   });
 
+  it('0.232.0 : canne à moins d\'un pixel de la ligne mais avec une direction de repli : la flèche reste visible', () => {
+    const p = placerFlecheEcart({ x: 10, y: 10 }, { x: 10.2, y: 10.1 }, 6, { x: 1, y: 0 });
+    expect(p).toEqual({ x: 16, y: 10, angle: 0, retourne: false });
+    const gauche = placerFlecheEcart({ x: 10, y: 10 }, { x: 10, y: 10 }, 6, { x: -3, y: 0 });
+    expect(gauche.retourne).toBe(true);
+    expect(gauche.x).toBeCloseTo(4, 5);
+  });
+
   it('couleurs de la tolérance, neutre sinon', () => {
     expect(couleurFlecheEcart('vert')).toBe('#16a34a');
     expect(couleurFlecheEcart('orange')).toBe('#f59e0b');

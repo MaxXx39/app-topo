@@ -88,6 +88,8 @@ export function demanderTexte({ titre, valeur = '', prefixe = '' }) {
  * { texte, ton: 'ok' | 'alerte' } = une ligne colorée sous le titre (ex. « ✓ déjà en coordonnées suisses »). Renvoie { cle: texte tapé } avec OK, ou null
  * si la fenêtre est fermée (✕, touche retour, Échap) : rien n'est fait.
  */
+const attributsSi = (c) => (c.visibleSi ? `data-si-cle="${echapper(c.visibleSi.cle)}" data-si-valeur="${echapper(c.visibleSi.valeur)}"` : '');
+
 export function demanderChamps({ titre, champs, note = null }) {
   return new Promise((resoudre) => {
     const fenetre = document.createElement('dialog');
@@ -100,8 +102,8 @@ export function demanderChamps({ titre, champs, note = null }) {
       ${note ? `<p class="note-fenetre note-${note.ton === 'ok' ? 'ok' : 'alerte'}">${echapper(note.texte)}</p>` : ''}
       ${champs.map((c) => (c.choix
         // Liste à choix (0.125.0, ex. le dossier d'un nouveau projet) : choix = [[valeur, texte], ...].
-        ? `<label>${echapper(c.titre)}<select data-champ="${echapper(c.cle)}">${c.choix.map(([v, t]) => `<option value="${echapper(v)}" ${v === (c.valeur ?? '') ? 'selected' : ''}>${echapper(t)}</option>`).join('')}</select></label>`
-        : `<label>${echapper(c.titre)}<input type="text" data-champ="${echapper(c.cle)}" value="${echapper(c.valeur ?? '')}" placeholder="${echapper(c.exemple ?? '')}" /></label>`)).join('')}
+        ? `<label ${attributsSi(c)}>${echapper(c.titre)}<select data-champ="${echapper(c.cle)}">${c.choix.map(([v, t]) => `<option value="${echapper(v)}" ${v === (c.valeur ?? '') ? 'selected' : ''}>${echapper(t)}</option>`).join('')}</select></label>`
+        : `<label ${attributsSi(c)}>${echapper(c.titre)}<input type="text" data-champ="${echapper(c.cle)}" value="${echapper(c.valeur ?? '')}" placeholder="${echapper(c.exemple ?? '')}" /></label>`)).join('')}
       <div class="boutons-choix">
         <button type="button" class="bouton" data-cle="ok"><strong>OK</strong></button>
       </div>`;
@@ -114,6 +116,14 @@ export function demanderChamps({ titre, champs, note = null }) {
       const bouton = evenement.target.closest('button[data-cle]');
       if (bouton) finir(bouton.dataset.cle);
     });
+    // 0.239.0 : champ « visibleSi » : montré seulement quand un autre champ a la valeur demandée (ex. netteté de l'image).
+    const majVisibilite = () => {
+      for (const etiquette of fenetre.querySelectorAll('label[data-si-cle]')) {
+        const autre = fenetre.querySelector(`[data-champ="${etiquette.dataset.siCle}"]`);
+        etiquette.hidden = autre ? autre.value !== etiquette.dataset.siValeur : false;
+      }
+    };
+    fenetre.addEventListener('change', majVisibilite);
     fenetre.addEventListener('keydown', (evenement) => {
       if (evenement.key === 'Enter' && evenement.target.matches('input')) finir('ok');
     });
@@ -123,6 +133,7 @@ export function demanderChamps({ titre, champs, note = null }) {
     });
     fenetre.addEventListener('close', () => fenetre.remove());
     document.body.append(fenetre);
+    majVisibilite();
     fenetre.showModal();
     fenetre.querySelector('input')?.focus();
   });

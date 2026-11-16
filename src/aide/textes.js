@@ -5,6 +5,8 @@
 export const TEXTES_AIDE = {
   annotation:
     'Annotation : pose un point (Manuel = loupe sur le plan, GNSS, ou GPS tablette à 3 m ou mieux). En bas : photo (on peut dessiner dessus), ↶ efface le dernier, ID et remarque, Enreg. point. Liste « Annot-date ».',
+  reseaux:
+    'Réseaux (Expert, test) : « Créer » = touche une polyligne du DXF (son Z = fil d\'eau, le FE est le bas extérieur du tuyau) ou des points un à un avec leur FE ; type, nom, Ø ext., surface de référence, tranchée (bords droits = blindage). « Voir » : coupe perpendiculaire ou dans l\'axe, tranchées et bords G / D du fond sur le plan. « Implanter » : suit l\'axe ou un bord du fond (FE, dessus du tuyau ou fond) dans Implanter › Ligne, avec un profil en long à moins de 1 m. Implanter › Surface : case « Cana ».',
   mesureRapide:
     'Mesure rapide : touche des points sur le plan (accroche en bas, ou GNSS). 2 points : longueur, Δh, pente. 3 et plus : case « Figure fermée » (périmètre, surface) ou ligne ouverte (longueur du chemin), angles en degrés (colonne Angle, et sur le plan si la case est cochée). « Enregistrer » ou « Exporter » (PDF, DXF).',
   applications:
@@ -12,7 +14,7 @@ export const TEXTES_AIDE = {
   projets:
     'Projets enregistrés sur cet appareil (📱) ou sur Drive (☁). « Ouvrir » les liste, « ＋ » en crée un, ⋮ renomme (projet ouvert), exporte, duplique ou supprime. Réglages de l\'appareil : tuile Réglages du menu.',
   lame:
-    'Guidage (Expert) : choisis la machine puis la surface à suivre. Au-dessus de chaque règle : MONTER (rouge) ou DESCENDRE (bleu) ; OK (vert) dans la tolérance ; entre les deux, seule la valeur (orange) pour que l\'affichage ne saute pas ; vert ≤ 2 cm, orange ≤ 5 cm. Réglages dans ⚙ (1 ou 2 GNSS, G / D, distances, vues).',
+    'Guidage (Expert) : choisis la machine puis la surface à suivre. Au-dessus de chaque règle : grosse flèche ▲ (monter, rouge) ou ▼ (descendre, bleu) avec la valeur ; OK (vert) dans la tolérance ; entre les deux, seule la valeur (orange) pour que l\'affichage ne saute pas ; vert ≤ 2 cm, orange ≤ 5 cm. « 2 coupes » : l\'une sous l\'autre (téléphone : une seule coupe, G – D ou Arr – Av). Réglages dans ⚙ (1 ou 2 GNSS, G / D, distances, vues).',
   partage:
     'Projets sur Google Drive. Une seule main par projet : verte = tu enregistres, grise ou rouge = lecture seule. Prendre la main à un autre appareil : Expert et code. Nuage en tête d\'écran : vert = à jour, rouge barré = hors ligne, gris barré = Google non connecté ; touche-le pour ouvrir les réglages Drive.',
   cartouche:
@@ -30,7 +32,7 @@ export const TEXTES_AIDE = {
   hauteurCanne:
     'Hauteur de canne : celle d\'Emlid Flow, montrée pour contrôle seulement. L\'appli ne s\'en sert pas dans ses calculs. Modifiable en Expert.',
   implanter:
-    'Touche un point, une ligne ou une surface sur le plan (accroche dans la barre), puis « Implanter » et suis la cible. ← change de point. Manuel : loupe pour viser sans accroche.',
+    'Touche un point, une ligne ou une surface sur le plan (accroche dans la barre), puis « Implanter » et suis la cible. ← change de point. Manuel : loupe pour viser sans accroche. Ligne : « ↗ +1.70 % » à gauche de « fin » = pente du segment où tu es (en %, positive en montant). Ligne : à moins de 1 m de la ligne, le profil en long s\'affiche (terrain de la surface choisie, altitude et pente de la ligne, canne) ; case « Cana » (Intermédiaire) : les réseaux qui croisent la ligne.',
   autocontrole:
     'Remesure un point de contrôle connu. Vert ≤ 2 cm, orange ≤ 4 cm, rouge au-delà. Un contrôle est demandé chaque jour puis toutes les 4 h. Roue ⚙ (code) : tolérances et points.',
   talus:
@@ -55,8 +57,10 @@ export const TEXTES_AIDE = {
     'Contour, lignes et points isolés du levé en cours : touche un nom pour voir ses points. ✕ supprime un point ; ✂ coupe une ligne entre deux points.',
   journalNmea:
     'Expert. Enregistre 1 minute de ce que le GNSS envoie (NMEA) pour vérifier hauteur de canne, inclinaison ou batterie. Un résumé des messages reçus s\'affiche à la fin.',
+  dossiers:
+    'Dossiers du projet (Terrassement, Canalo, Bâtiment…) : touche un dossier dans l\'encadré du projet pour ne voir que ce qui y est rangé (plan, listes, surfaces) ; « Tout » montre tout. Le dossier choisi s\'affiche en pastille dans l\'en-tête. Expert : « ＋ » crée un dossier, la roue ⚙ d\'une ligne (Gérer) coche ses dossiers (un plan ou une liste peut être dans plusieurs), et à l\'import le champ « Dossier » est proposé. Ce que tu crées va dans le dossier choisi.',
   chantier:
-    'Levé chantier : choisis le libellé (Chambre, Tuyau…) et la nature (EU, EC…). Tuyau : lève le dessus (le Ø est obligatoire, le fil d\'eau est calculé) ou le fil d\'eau. Chambre / grille : 1 point (ronde) ou 3 coins (rectangle), Ø du tuyau qui arrive facultatif.',
+    'Levé chantier : « Libre » est proposé en premier (sans nature ni attribut : seulement une remarque et des photos). Sinon choisis le libellé (Chambre, Tuyau…) et la nature (EU, EC…). Tuyau : lève le dessus (le Ø est obligatoire, le fil d\'eau est calculé) ou le fil d\'eau. Chambre / grille : 1 point (ronde) ou 3 coins (rectangle), Ø du tuyau qui arrive facultatif.',
   trianglesEnTrop:
     'Expert. Sans contour, le levé peut créer des triangles en trop : « Supprimer au doigt », touche un triangle (retoucher = le remettre), puis « Terminer ».',
   photos:

@@ -28,7 +28,7 @@ export async function telechargerCadastre(centre, rayon, canton = 'VD', progres 
   }
   const r = rectangleAutour(centre, rayon);
   const boite = [r.estMin, r.nordMin, r.estMax, r.nordMax].map((v) => v.toFixed(3)).join(',');
-  const resultat = { points: [], lignes: [], couches, essais: [] };
+  const resultat = { points: [], lignes: [], parcelles: [], couches, essais: [] };
   for (const [sorte, nom] of [['points', couches.points], ['parcelles', couches.surfaces]]) {
     if (!nom) continue;
     progres(`Téléchargement ${sorte === 'points' ? 'des points limites' : 'des parcelles'}…`);
@@ -39,6 +39,7 @@ export async function telechargerCadastre(centre, rayon, canton = 'VD', progres 
       if (lu.points.length > 0 || lu.lignes.length > 0) {
         resultat.points.push(...lu.points);
         resultat.lignes.push(...lu.lignes);
+        resultat.parcelles.push(...(lu.parcelles ?? []));
         break;
       }
       resultat.essais.push(`${nom} ${/VERSION=([\d.]+)/.exec(adresse)[1]} : ${texte.length} car. « ${texte.replace(/\s+/g, ' ').slice(0, 160)} »`);

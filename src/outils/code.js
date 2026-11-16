@@ -16,34 +16,42 @@ export function estBonCode(texte) {
  */
 export function demanderCode(titre) {
   return new Promise((resoudre) => {
+    // 0.243.0 (audit, lot 6) : même cadre que les autres fenêtres (gros champ centré, deux gros boutons).
     const fenetre = document.createElement('dialog');
-    fenetre.className = 'fenetre-reglages fenetre-code';
+    fenetre.className = 'fenetre-choix fenetre-code';
     fenetre.innerHTML = `
-      <form method="dialog">
-        <h2>${echapper(titre)}</h2>
-        <label class="champ-code">Code de sécurité
-          <input type="password" inputmode="numeric" autocomplete="off" data-champ="code" />
-        </label>
-        <p class="erreur" data-vivant="erreur-code" hidden>Code de sécurité faux</p>
-        <div class="ligne-outils">
-          <button type="button" class="bouton-lien bouton-lien-neutre" data-action="annuler">annuler</button>
-          <button class="bouton" data-action="valider">Valider</button>
-        </div>
-      </form>`;
+      <h2>${echapper(titre)}</h2>
+      <input type="password" inputmode="numeric" autocomplete="off" class="champ-code-gros" data-champ="code" aria-label="Code de sécurité" placeholder="Code de sécurité" />
+      <p class="erreur" data-vivant="erreur-code" hidden>Code de sécurité faux</p>
+      <div class="boutons-choix">
+        <button type="button" class="bouton" data-cle="valider"><strong>Valider</strong></button>
+        <button type="button" class="bouton-secondaire" data-cle="annuler"><strong>Fermer</strong></button>
+      </div>`;
     const champ = fenetre.querySelector('[data-champ="code"]');
     const erreur = fenetre.querySelector('[data-vivant="erreur-code"]');
     let bon = false;
-    fenetre.querySelector('form').addEventListener('submit', (evenement) => {
+    const valider = () => {
       if (estBonCode(champ.value)) {
         bon = true;
-        return; // la fenêtre se ferme (method="dialog")
+        fenetre.close();
+        return;
       }
-      evenement.preventDefault();
       erreur.hidden = false;
       champ.value = '';
       champ.focus();
+    };
+    fenetre.addEventListener('click', (evenement) => {
+      const bouton = evenement.target.closest('button[data-cle]');
+      if (!bouton) return;
+      if (bouton.dataset.cle === 'valider') valider();
+      else fenetre.close();
     });
-    fenetre.querySelector('[data-action="annuler"]').addEventListener('click', () => fenetre.close());
+    champ.addEventListener('keydown', (evenement) => {
+      if (evenement.key === 'Enter') {
+        evenement.preventDefault();
+        valider();
+      }
+    });
     fenetre.addEventListener('close', () => {
       fenetre.remove();
       resoudre(bon);

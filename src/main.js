@@ -3,6 +3,7 @@
 // Tout est rangé dans le "projet" ouvert (voir projet/projet.js), enregistré automatiquement
 // sur l'appareil après chaque modification.
 import { adresseParRelais } from './import/relais.js';
+import { parcellesDesPlans } from './topo/cadastre.js';
 import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { lireLandXML, fusionnerSurfaces } from './topo/landxml.js';
@@ -11,7 +12,7 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
-import { lireTypesDxf, enregistrerTypesDxf, nettoyerTypes } from './topo/types-dxf.js';
+import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -40,6 +41,7 @@ import { creerModuleExport } from './export/module.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface, decalerProfil } from './topo/coupe.js';
+import { vueDuGuidage } from './leve/lame-ecran.js';
 import { guidageLame, TOLERANCES_LAME, pointDeProfil, bordsDeLaLame, sensCoupeLame, pointsGuidageLame, coupeEntre, coupeMilieuLame, avantDeLaLame, classeEcartLame, ecartAUneLigne } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
@@ -85,7 +87,9 @@ import { modifierLibellesDeSorte } from './leve/fenetre-libelles.js';
 import { ouvrirFenetreChantier } from './leve/fenetre-chantier.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
-import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele, ecartAuBout } from './topo/ligne-implantation.js';
+import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele, ecartAuBout, positionSurLigne, altitudeSurLigne } from './topo/ligne-implantation.js';
+import { tuyauxSurCoupe, croisementsSurAxe } from './topo/reseau.js';
+import { svgCoupeAxe } from './reseaux/coupe-svg.js';
 import { MODES_ACCROCHE, piedPerpendiculaire, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
 import {
   estLeveDirect,
@@ -116,6 +120,7 @@ import { installerMesureDuree } from './outils/mesure-duree-ui.js';
 import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecepteur, reconnecterRecepteur, deconnecterRecepteur, prendrePointRecepteur, consommerPointMoyen } from './android/pont.js';
 import { correctionsTropAnciennes } from './topo/age-corrections.js';
 import { centreDePoints, MAX_POINTS_CENTRE } from './topo/centre-points.js';
+import { ICONES_LIGNE } from './outils/icones.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
@@ -124,6 +129,11 @@ import { creerNavigation } from './navigation/bande.js';
 import { mesureRapide } from './topo/mesure-rapide.js';
 import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
 import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
+import { creerReseaux } from './reseaux/reseaux.js';
+import { avertissementHorsZone } from './topo/zone-ge-vd.js';
+import { nomFichierExport } from './outils/nom-fichier.js';
+import { messagePdf, messageMauvaisBouton } from './topo/messages-fichier.js';
+import { PREFIXE_IMPORT } from './topo/doublons.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
 import { htmlEncadreAnnotation } from './annotation/encadre.js';
 import { lignesFichePoint, htmlFichePoint, htmlFicheCalque } from './plan/fiche-point.js';
@@ -135,7 +145,7 @@ import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip 
 import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation, classeTolerance, TOLERANCES_PAR_DEFAUT } from './topo/controle.js';
 import { noterAffichage, appliquerAffichage } from './projet/affichage-appareil.js';
-import { listesDePoints, pointsDesListes, montrerListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, cacherListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale, calageParAxes, echelleParDeuxPoints, recalerContenu } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
@@ -210,6 +220,7 @@ const terrain = {
   vueCoupes: 'perpendiculaire',
   demiLongueur: 5,
   exagerationCoupe: 1,
+  cana: false, // 0.236.0 : réseaux dans les coupes d'Implanter › Surface (case « Cana »)
   sourceOrientation: 'rx2',
   libelleLigne: 'HT', // dernier libellé choisi pour une ligne de rupture
   libellePoint: 'TN', // et pour un point isolé (ou compté)
@@ -230,7 +241,7 @@ const terrain = {
   ...lireReglagesTerrain(),
 };
 // Levé chantier (0.175.0) : derniers choix (libellé, nature, mode d'altitude, forme, Ø, matériau…) gardés d'un point à l'autre.
-terrain.chantier = { libelle: 'T', nature: 'EU', mode: '', forme: 'ronde', diametre: '', gaine: '', nombre: '1', profondeur: '', materiau: 'PVC', remarque: '', ...terrain.chantier };
+terrain.chantier = { libelle: 'LIB', nature: 'EU', mode: '', forme: 'ronde', diametre: '', gaine: '', nombre: '1', profondeur: '', materiau: 'PVC', remarque: '', ...terrain.chantier };
 // Orientation (0.90.1) : toujours le cap du GNSS (la direction de marche sert en secours, sans le dire).
 terrain.sourceOrientation = 'rx2';
 // Site sans récepteur : seulement le mode Lever (et Contrôle en consultation).
@@ -374,7 +385,7 @@ document.querySelector('#app').innerHTML = `
       </section>
       <section class="panneau" data-onglet="dessin">
         <h2>Dessin ${bulle('dessin')}</h2>
-        <button type="button" class="bouton seulement-expert bouton-dao" id="bouton-dao">✏ DAO : dessiner sur le plan</button>
+        <button type="button" class="bouton seulement-expert bouton-dao" id="bouton-dao">DAO : dessiner sur le plan</button>
         <div id="dessins"></div>
         <div id="talus-surfaces" class="carte-section"></div>
       </section>
@@ -383,6 +394,9 @@ document.querySelector('#app').innerHTML = `
       </section>
       <section class="panneau" data-onglet="annotation">
         <div id="annotation"></div>
+      </section>
+      <section class="panneau" data-onglet="reseaux">
+        <div id="reseaux-ecran"></div>
       </section>
       <div id="barre-surfaces" class="barre-edition" hidden></div>
       <div id="barre-mesures" class="barre-edition" hidden></div>
@@ -485,16 +499,19 @@ function choisirSousAppli(cle) {
 function boutonDeBande(cle, titre, detail, desactive = false, court = null) {
   // 0.172.0 : `court` = texte du mode téléphone (voir .t-long / .t-court).
   const texte = court ? `<span class="t-long">${echapper(titre)}</span><span class="t-court">${echapper(court)}</span>` : echapper(titre);
-  return `<button type="button" class="bouton-enreg-bande relais-${cle}" data-nav="action" data-cle="${cle}" ${desactive ? 'disabled' : ''}>
+  // 0.241.0 (audit, lot 4) : grisé mais touchable (aria-disabled) : un toucher dit pourquoi (voir raisonBoutonGrise).
+  return `<button type="button" class="bouton-enreg-bande relais-${cle}" data-nav="action" data-cle="${cle}" ${desactive ? 'aria-disabled="true"' : ''}>
     <span>${texte}</span>${detail ? `<small>${echapper(detail)}</small>` : ''}</button>`;
 }
 
 // Vrais boutons de l'écran relayés par la zone du milieu (clé → sélecteur).
 const RELAIS_BANDE = {
   prendre: '#leve-direct .cadre-prise .bouton-prendre',
-  implanter: '#leve-direct [data-action="implanterChoix"].bouton-implanter, #leve-direct [data-action="implanterLigneChoisie"].bouton-implanter',
+  implanter: '#leve-direct [data-action="implanterChoix"].bouton-implanter, #leve-direct [data-action="implanterLigneChoisie"].bouton-implanter, #leve-direct [data-action="implanterPointsLigne"].bouton-implanter',
   enregistrer: '#leve-direct [data-action="enregistrerImplantation"]',
   dao: '#bouton-dao',
+  // 0.242.0 : Réseaux › Créer : « Enregistrer le réseau » est dans la bande du bas.
+  'enregistrer-reseau': '#reseaux-ecran [data-action="enregistrer-reseau"]',
   // 0.167.0 : Implanter › Altitude (bouton « Alti ici ») et Guidage (choix des lignes) sont dans la bande.
   'altitude-ici': '#leve-direct [data-action="prendreAltitudeIci"]',
   // 0.171.0 (maquette B) : L1 (bord G) et L2 (bord D) du Guidage : touchent les cases de l'écran (qui restent visibles).
@@ -584,6 +601,7 @@ function contenuBande() {
   if (cle === 'implanter') {
     if (trouver('implanter')) {
       if (implanter.ligneAValider && implanter.ligne) return boutonDeBande('implanter', 'Implanter', implanter.ligne.nom);
+      if (!implanter.ligne && implanter.pointsLigne.length >= 2) return boutonDeBande('implanter', 'Implanter', `${implanter.pointsLigne.length} points`);
       const nom = document.querySelector('#leve-direct [data-champ="nom-implantation"]')?.value.trim() || implanter.choix?.nom || '';
       const altitude = document.querySelector('#leve-direct [data-champ="altitude-implantation"]')?.value.trim() ?? '';
       return boutonDeBande('implanter', 'Implanter', [nom, altitude ? `H ${altitude}` : ''].filter(Boolean).join(' · '));
@@ -599,7 +617,7 @@ function contenuBande() {
       if (!champ || !ici) return '';
       return `<div class="zone-levee"><div class="levee-bande altitude-bande"><span class="titre-levee-bande">Altitude voulue</span>
         <input type="text" inputmode="decimal" class="champ-bande" data-nav-champ="altitude-voulue" value="${echapper(champ.value)}" placeholder="ex. 412.350" aria-label="Altitude voulue" /></div>
-        <button type="button" class="bouton-enreg-bande relais-altitude-ici" data-nav="action" data-cle="altitude-ici" ${ici.disabled ? 'disabled' : ''}><span>📍 Alti ici</span></button></div>`;
+        <button type="button" class="bouton-enreg-bande relais-altitude-ici" data-nav="action" data-cle="altitude-ici" ${ici.disabled ? 'disabled' : ''}><span>${ICONES_LIGNE.repere} Alti ici</span></button></div>`;
     }
     const enregistrer = trouver('enregistrer');
     if (enregistrer && terrain.implantation === 'point' && implanter.cible) {
@@ -608,9 +626,19 @@ function contenuBande() {
       const c = implanter.cible;
       const detail = `E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}${c.altitude != null ? ` · Z ${formaterNombre(c.altitude)}` : ''}`;
       return `<div class="zone-cible-bande"><div class="cible-bande"><b>${echapper(c.nom ?? '')}</b><small>${echapper(detail)}</small></div>
-        ${aAcces('intermediaire') ? `<button type="button" class="bouton-enreg-bande petit relais-enregistrer" data-nav="action" data-cle="enregistrer" title="Enregistrer l'implantation" aria-label="Enregistrer l'implantation" ${enregistrer.disabled ? 'disabled' : ''}><span>Enr.</span></button>` : ''}</div>`;
+        ${aAcces('intermediaire') ? `<button type="button" class="bouton-enreg-bande petit relais-enregistrer" data-nav="action" data-cle="enregistrer" title="Enregistrer l'implantation" aria-label="Enregistrer l'implantation" ${enregistrer.disabled ? 'aria-disabled="true"' : ''}><span>Enreg.</span></button>` : ''}</div>`;
     }
-    return '';
+    // 0.242.0 (audit, lot 3) : Ligne / Talus en guidage : la bande dit ce qu'on guide et porte « Enreg. » (comme pour un point).
+    if (enregistrer && ['ligne', 'talus'].includes(terrain.implantation) && implanter.ligne && !implanter.ligneAValider) {
+      const l = implanter.ligne;
+      const titre = terrain.implantation === 'talus' ? 'Talus' : 'Ligne';
+      return `<div class="zone-cible-bande"><div class="cible-bande"><b>${echapper(l.nom ?? titre)}</b><small>${titre} en guidage</small></div>
+        ${aAcces('intermediaire') ? `<button type="button" class="bouton-enreg-bande petit relais-enregistrer" data-nav="action" data-cle="enregistrer" title="Enregistrer" aria-label="Enregistrer" ${enregistrer.disabled ? 'aria-disabled="true"' : ''}><span>Enreg.</span></button>` : ''}</div>`;
+    }
+    // 0.239.0 : Point / Ligne / Talus sans choix : même barre que Surface et Altitude (liseré, zone à droite), au lieu d'un bouton qui flotte.
+    const attente = { ligne: ['Ligne', 'touche une ligne'], talus: ['Talus', 'touche la ligne du talus'] }[terrain.implantation] ?? ['Point', 'touche un point'];
+    return `<div class="zone-levee"><div class="levee-bande surface-bande bande-attente"><span class="titre-levee-bande">${attente[0]}</span>
+      <span class="valeur-liste-bande">— ${attente[1]} —</span></div></div>`;
   }
   if (cle === 'guidage') {
     // 0.167.0 : la surface à suivre (plus « levé à suivre ») et le choix des lignes (Expert) dans la bande.
@@ -633,6 +661,7 @@ function contenuBande() {
   if (cle === 'calculs' && document.body.dataset.onglet === 'dessin' && aAcces('expert')) {
     return boutonDeBande('dao', daoAppli?.actif() ? 'Quitter la DAO' : 'DAO', 'dessiner sur le plan');
   }
+  if (cle === 'reseaux') return trouver('enregistrer-reseau') ? boutonDeBande('enregistrer-reseau', 'Enregistrer le réseau', '', false, 'Enreg.') : '';
   if (cle === 'mesure') return mesureRapideBande();
   if (cle === 'annotation') return annotationBande();
   return '';
@@ -648,7 +677,23 @@ function agirDepuisBande(cle) {
     agirAnnotation(cle);
     return;
   }
-  document.querySelector(RELAIS_BANDE[cle])?.click();
+  const vrai = document.querySelector(RELAIS_BANDE[cle]);
+  if (vrai?.disabled && ['prendre', 'implanter', 'enregistrer'].includes(cle)) {
+    afficherMessage(raisonBoutonGrise(cle), 4000);
+    return;
+  }
+  vrai?.click();
+}
+
+/** 0.241.0 : pourquoi « Enreg. » / « Implanter » / « Enr. » est grisé (dit au toucher). */
+function raisonBoutonGrise(cle) {
+  const e = etatRecepteur;
+  if (!e?.connecte) return 'Enregistrement impossible : récepteur non connecté.';
+  if (!e.recu) return 'Enregistrement impossible : en attente de la position du récepteur.';
+  if (e.raison) return `Enregistrement impossible : ${e.raison}`;
+  if (!e.autorise) return 'Enregistrement impossible : il faut le RTK fixe et l\'inclinaison prête.';
+  if (cle === 'prendre') return 'Enregistrement impossible : aucun levé en cours.';
+  return 'Enregistrement impossible : choisis d\'abord un point ou une ligne à implanter.';
 }
 
 // --- Mesure rapide (0.158.0, dès Intermédiaire, demande du 08.11, formules validées) ---
@@ -968,6 +1013,8 @@ function afficherAnnotation() {
       photos: (l.photos ?? []).filter((ph) => ph.point === p.nom).length, premiere: p.annotation?.remarques?.[0] ?? '',
     }));
   const dernier = dernierAnnotation(projet);
+  // 0.242.0 (audit, lot 3) : fiche ouverte = le bandeau « nom / remarque / Enreg. point » se cache (il couvrait les boutons de la fiche).
+  document.body.classList.toggle('fiche-annotation-ouverte', Boolean(annotationEtat.fiche));
   document.querySelector('#annotation').innerHTML = `${htmlAnnotation({
     mode: annotationEtat.mode, fiche: annotationEtat.fiche, photos: photosDeLaFicheAnnotation(),
     manuel: { zoom: terrain.zoomLoupe ?? 4 },
@@ -1183,7 +1230,7 @@ function majBarreSelectionCalques() {
   const n = selectionCalques.elements.length;
   const noms = [...new Set(selectionCalques.elements.map((e) => e.calqueNom || 'Calque sans nom'))];
   boite.innerHTML = `<div class="encadre-annotation fiche-point" role="dialog" aria-label="Choix des calques">
-      <div class="entete-encadre-annotation"><strong>${selectionCalques.mode === 'geler' ? '❄ Geler' : '◎ Isoler'}</strong><span>${n} élément${n > 1 ? 's' : ''}</span></div>
+      <div class="entete-encadre-annotation"><strong>${selectionCalques.mode === 'geler' ? 'Geler' : 'Isoler'}</strong><span>${n} élément${n > 1 ? 's' : ''}</span></div>
       ${n > 0 ? `<div>${noms.map(echapper).join(' · ')}</div>` : '<div>Touchez un ou plusieurs éléments du plan</div>'}
       <div class="ligne-boutons-selection"><button type="button" class="bouton" data-action="valider-calques" ${n === 0 ? 'disabled' : ''}>Valider</button>
         <button type="button" class="bouton secondaire" data-action="annuler-calques">Annuler</button></div>
@@ -1246,11 +1293,25 @@ function montrerFichePoint(point) {
   const liste = projet.leves.find((l) => l.points.some((p) => p.nom === point.nom && p.est === point.est && p.nord === point.nord));
   const boite = document.createElement('div');
   boite.id = 'fiche-point-plan';
-  boite.innerHTML = htmlFichePoint({ nom: point.nom, liste: liste?.nom ?? '', lignes: lignesFichePoint(point) });
+  // 0.249.0 (Expert, demande du 16.11) : un point devient point de contrôle (copie : le point reste dans sa liste) depuis sa fiche, et l'inverse.
+  const dejaControle = projet.pointsControle.find((p) => p.nom === point.nom && p.est === point.est && p.nord === point.nord);
+  const controle = aAcces('expert') && !point.annotation ? (dejaControle ? 'retirer' : liste || point.nom ? 'ajouter' : null) : null;
+  boite.innerHTML = htmlFichePoint({ nom: point.nom, liste: liste?.nom ?? '', lignes: lignesFichePoint(point), controle });
   const zone = document.querySelector('.panneau-plan')?.getBoundingClientRect();
   boite.style.cssText = `position: fixed; z-index: 40; left: 8px; right: 8px; bottom: ${Math.max(8, window.innerHeight - (zone?.bottom ?? window.innerHeight) + 34)}px; display: flex; justify-content: center; pointer-events: none;`;
   boite.addEventListener('click', (evenement) => {
     if (evenement.target.closest('[data-action="fermer-fiche"]')) fermerFichePoint();
+    const bouton = evenement.target.closest('[data-action="controle-fiche"]');
+    if (bouton) {
+      if (refuserEnLectureSeule()) return;
+      if (bouton.dataset.valeur === 'retirer') {
+        if (dejaControle) retirerPointControleConfirme(dejaControle.id);
+      } else {
+        const refus = ajouterAuxPointsControle([{ nom: point.nom, est: point.est, nord: point.nord, altitude: point.altitude ?? null }]);
+        if (refus) afficherMessage(refus.erreur, 4000);
+      }
+      fermerFichePoint();
+    }
   });
   document.body.append(boite);
   return true;
@@ -1402,6 +1463,44 @@ document.querySelector('#annotation').addEventListener('input', (evenement) => {
   else if (evenement.target.closest('[data-champ="remarque-annotation"]')) annotationEtat.remarque = evenement.target.value;
 });
 
+// --- Réseaux (0.235.0, Expert, test) : voir reseaux/reseaux.js ---
+/** Vrai quand l'application Réseaux est l'écran de travail (le plan lui envoie ses touchers). */
+function reseauxActif() {
+  return ongletContexte === 'reseaux' && aAcces('expert');
+}
+
+/** Polyligne du plan (DXF) sous le doigt : ses sommets { est, nord, altitude }, ou null. */
+function ligneDuPlanSousLeDoigt(position, tolerance) {
+  const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes);
+  return trouve ? trouve.sommets : null;
+}
+
+/** Point du projet, sinon sommet du plan, sous le doigt : { est, nord }, ou null. */
+function pointDuPlanSousLeDoigt(position, tolerance) {
+  const parPoint = accrocher('point', position, tolerance, { points: pointsDuProjet(), lignes: [], cercles: [] });
+  if (parPoint) return parPoint;
+  return accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansDuProjet(), position, tolerance)));
+}
+
+const reseaux = creerReseaux({
+  conteneur: document.querySelector('#reseaux-ecran'),
+  projet: () => projet,
+  modifie: () => modifie(),
+  majPlan: () => {
+    envoyerImplantationAuPlan();
+    plan.rafraichirImplantation();
+  },
+  message: (texte, duree) => afficherMessage(texte, duree),
+  vibrer: (ms) => vibrer(ms),
+  surfaces: () => projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
+  trianglesDe: (id) => trianglesDeSurface(id),
+  altitudeDe: (id) => altitudeDeSurface(id),
+  ligneSousLeDoigt: ligneDuPlanSousLeDoigt,
+  pointSousLeDoigt: pointDuPlanSousLeDoigt,
+  implanter: (ligne) => implanterUnReseau(ligne),
+  apresAffichage: () => navigation?.mettreAJour(),
+});
+
 document.querySelector('#mesure-rapide').addEventListener('click', (evenement) => {
   const bouton = evenement.target.closest('button[data-action]');
   if (!bouton || bouton.disabled) return;
@@ -1503,7 +1602,7 @@ async function fondDuCroquisMesure(mesure, { photo, plans }) {
 function exporterMesureRapide() {
   const mesure = mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee });
   if (mesure.points.length === 0) return;
-  const base = `${nomDeFichierProjet(projet)}_mesure-rapide`.replace(/[\\/:*?"<>|]/g, '_');
+  const base = nomFichierExport(nomDeFichierProjet(projet), 'mesure-rapide');
   const avecPlans = plansDuProjet().some((p) => p.visible !== false);
   ouvrirFenetreExport({
     titre: 'Mesure rapide',
@@ -1582,6 +1681,7 @@ function ouvrirAppli(cle, sous = null, depuisMenu = false) {
   else if (cle === 'plan') afficherOnglet('plan');
   else if (cle === 'mesure') afficherOnglet('mesure-rapide');
   else if (cle === 'annotation') afficherOnglet('annotation');
+  else if (cle === 'reseaux') afficherOnglet('reseaux');
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur', { detail: { retourMenu: depuisMenu } }));
   if (sous && cle !== 'calculs') {
     // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
@@ -1636,6 +1736,15 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
     detail: document.querySelector('#etat')?.textContent ?? '',
   }),
   partieProjet: ouvrirPartieProjet,
+  // 0.251.0 : puces « Tout / Terrassement / Canalo… » de l'encadré du projet.
+  sousDossiers: () => donneesSousDossiers(),
+  choisirSousDossier: (nom) => choisirSousDossier(nom),
+  nouveauSousDossier: async () => {
+    const nom = nettoyerSousDossiers((await demanderTexte({ titre: 'Nom du nouveau dossier', valeur: '' })) ?? '')[0];
+    if (!nom) return;
+    enregistrerSousDossiers([...lireSousDossiers(projet).map((d) => d.nom), nom]);
+    choisirSousDossier(nom);
+  },
   sousApplisDe,
   reglages: () => ouvrirFenetreReglages(),
   // 0.216.0 : carte de tous les projets (bouton à gauche de « Changer »).
@@ -1671,6 +1780,8 @@ document.querySelector('#leve-direct').addEventListener('input', () => navigatio
  * 'volumes', 'mesures' ; 'calculs' : la dernière partie affichée). Sur ordinateur, le plan reste
  * toujours visible à droite.
  */
+// État du contrôle d'un plan (voir plus bas « Contrôle d'un plan », 0.218.0) : déclaré ici car afficherOnglet le lit.
+const controlePlan = { planId: null, accroche: 'sommet', pointPlan: null, resultat: null, onglet: null };
 function afficherOnglet(demande, { partie = null } = {}) {
   const ongletAvant = document.body.dataset.onglet; // Annotation : on sait qu'on la quitte
   const nom = demande === 'calculs' ? partieCalculs : demande;
@@ -1681,6 +1792,8 @@ function afficherOnglet(demande, { partie = null } = {}) {
     const titre = document.querySelector('#titre-partie-projet');
     if (titre) titre.textContent = TITRES_PARTIES_PROJET[partie ?? 'contenu'];
   }
+  // 0.239.0 : la barre « Contrôler le plan » disparaît pour de bon quand on change d'écran (le plan reste « à contrôler » dans la liste des plans).
+  if (controlePlan.planId && controlePlan.onglet && nom !== controlePlan.onglet) abandonnerControlePlan();
   // Drive : on travaille sur le projet de départ (fenêtre de démarrage) : il est comparé à Drive.
   if (nom !== 'projets') partage?.choixFait();
   // Ajout manuel (0.120.0) : on le quitte en changeant de page (le plan en fait partie).
@@ -1731,6 +1844,7 @@ function afficherOnglet(demande, { partie = null } = {}) {
   if (entreDansCalculs) cadrerSurCalculs();
   if (nom === 'mesure-rapide') afficherMesureRapide();
   if (nom === 'annotation') afficherAnnotation();
+  if (nom === 'reseaux') reseaux.afficher();
   navigation?.mettreAJour();
   window.scrollTo(0, 0);
   if (nom === 'projets' && !partie) navigation?.ouvrirPage();
@@ -1857,6 +1971,7 @@ function adapterAuMode() {
   }
   if (estModeBase() && estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
   else if (!aAcces('expert') && document.body.dataset.onglet === 'dessin') afficherOnglet('volumes');
+  if (!aAcces('expert') && document.body.dataset.onglet === 'reseaux') afficherOnglet('projets'); // Réseaux : Expert seulement
   if (!aAcces('expert') && terrain.implantation === 'talus') {
     terrain.implantation = 'ligne';
     retenirReglagesTerrain();
@@ -1978,12 +2093,20 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
   importerPointsControle: (fichier) => importerPointsControle(fichier),
   importerPoints: async (fichier) => {
     try {
-      const resultat = lirePoints(await fichier.text());
+      const texteFichier = await fichier.text();
+      // 0.244.0 : un plan, un PDF ou un LandXML donné comme liste de points : on dit où l'importer.
+      const mauvais = messageMauvaisBouton(fichier.name, texteFichier.slice(0, 200));
+      if (mauvais) throw new Error(mauvais);
+      const resultat = lirePoints(texteFichier);
       // 0.219.0 : noms répétés dans le fichier : ignorer / renommer / importer quand même.
-      const traite = await choisirTraitementDoublons([], resultat.points, fichier.name);
+      // 0.244.0 (audit) : on compare aussi aux noms déjà dans le projet (autres listes).
+      const traite = await choisirTraitementDoublons([...nomsDuProjet(projet)], resultat.points, fichier.name);
       if (traite.mode === null) return;
       resultat.points = traite.points;
       if (traite.renommes.length > 0) resultat.avertissements = [...(resultat.avertissements ?? []), `${traite.renommes.length} nom(s) en double renommé(s) : ${traite.renommes.slice(0, 5).map((r) => `${r.avant} → ${r.apres}`).join(', ')}`];
+      // 0.244.0 (Expert) : avertir (sans refuser) des points hors de la zone Genève–Vaud (fichier pas en MN95 ?).
+      const horsZone = avertissementHorsZone(resultat.points);
+      if (horsZone) resultat.avertissements = [...(resultat.avertissements ?? []), horsZone];
       dernierImport = { ...resultat, nomFichier: fichier.name };
       if (resultat.points.length > 0) {
         // Simple liste de points, ou levé (0.77.0) : rangé dans Lever, à compléter dans Terrain › Lever.
@@ -1992,7 +2115,8 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
           texte: 'C\'est quoi ?',
           boutons: [['liste', 'Liste de points'], ...NATURES_IMPORT].map(([cle, titre], i) => ({ cle, texte: titre, detail: i === 0 ? '' : 'levé', principal: i === 0 })),
         });
-        const leve = ajouterLeve(projet, fichier.name, resultat.points);
+        // 0.244.0 : liste de points importée = préfixe fixe « Imp- », sans l'extension du fichier.
+        const leve = ajouterLeve(projet, choix === 'liste' ? `${PREFIXE_IMPORT}${fichier.name.replace(/\.[^./\\]+$/, '')}` : fichier.name, resultat.points);
         if (choix !== 'liste') {
           const surface = leveDepuisFichier(projet, leve, choix);
           projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
@@ -2013,22 +2137,32 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
   },
   renommerLeve: (id, nom) => {
     const leve = projet.leves.find((l) => l.id === id);
-    if (leve && nom) leve.nom = nom;
+    // 0.244.0 : le préfixe « Imp- » des listes importées reste fixe.
+    if (leve && nom) leve.nom = leve.nom.startsWith(PREFIXE_IMPORT) && !nom.startsWith(PREFIXE_IMPORT) ? `${PREFIXE_IMPORT}${nom}` : nom;
     modifie();
   },
-  // 0.194.0 (Expert) : modifier la liste des types de plans DXF (partagée par Drive).
-  modifierTypesDxf: async () => {
-    const actuels = lireTypesDxf().map((t) => t.nom).join(', ');
-    const texte = await demanderTexte({ titre: 'Types de plans DXF (séparés par des virgules)', valeur: actuels });
+  // 0.251.0 (Expert) : modifier la liste des sous-dossiers (partagée par Drive) ; remplace les « types » de plans.
+  modifierSousDossiers: async () => {
+    const actuels = lireSousDossiers().map((t) => t.nom).join(', ');
+    const texte = await demanderTexte({ titre: 'Dossiers du projet (séparés par des virgules)', valeur: actuels });
     if (texte == null) return;
-    const noms = nettoyerTypes(texte);
+    const noms = nettoyerSousDossiers(texte);
     if (noms.length === 0) {
-      afficherMessage('Il faut au moins un type', 4000);
+      afficherMessage('Il faut au moins un dossier', 4000);
       return;
     }
-    enregistrerTypesDxf(noms);
-    afficherMessage('Types enregistrés (partagés par Drive)', 3000);
+    enregistrerSousDossiers(noms);
+    afficherMessage('Dossiers enregistrés (partagés par Drive)', 3000);
     recalculer();
+  },
+  // Coche / décoche un dossier sur un élément (liste de points, surface, plan, dessin, réseau) : Expert.
+  basculerSousDossier: (genre, id, nom, present) => {
+    if (refuserEnLectureSeule()) return;
+    const element = elementDeGenre(genre, id);
+    if (!element) return;
+    element.sousDossiers = basculerSousDossier(element, nom, present);
+    // Une liste (levé) range aussi ses surfaces : elles suivent le levé (voir dossiersEffectifs).
+    modifie();
   },
   importerPlanDxf: async (fichier) => {
     afficherMessage(`Lecture du plan « ${fichier.name} »…`, null);
@@ -2044,12 +2178,11 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       }
       const avertissements = [];
       if (!estEnMn95(lu.bornes)) {
-        avertissements.push('Ce plan ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : touche « recaler » sur le plan pour le mettre en MN95.');
+        avertissements.push('Ce plan ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : à recaler depuis la page Plans.');
       }
       const ignores = Object.entries(lu.compte.ignores);
       if (ignores.length > 0) avertissements.push(`Non affiché(s) : ${ignores.map(([type, n]) => `${n} ${type}`).join(', ')} (hachures, images… : seuls les traits, textes, cercles et aplats sont lus).`);
       // 0.194.0 (Expert) : nom, type (GEOOFF, TER, CANA…) et recalage au choix, avant de ranger le plan.
-      const types = lireTypesDxf();
       // 0.217.0 : la fenêtre dit si le plan est déjà en coordonnées suisses (MN95) ou non, et propose le recalage qui va avec.
       const dejaEnMn95 = estEnMn95(lu.bornes);
       const choix = await demanderChamps({
@@ -2058,8 +2191,8 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
           ? { ton: 'ok', texte: '✓ Coordonnées suisses (MN95) : le plan semble déjà en place.' }
           : { ton: 'alerte', texte: '⚠ Pas en coordonnées suisses (MN95) : le plan est à recaler.' },
         champs: [
-          { cle: 'nom', titre: 'Nom du plan', valeur: lu.nom ?? fichier.name.replace(/\.dxf$/i, '') },
-          { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...types.map((t) => [t.nom, t.nom])], valeur: '' },
+          { cle: 'nom', titre: 'Nom du plan', valeur: (lu.nom ?? fichier.name).replace(/\.dxf$/i, '') },
+          champSousDossier(),
           // 0.214.0 : « Non (déjà calé) » : le plan est déjà en MN95, rien à recaler ni à signaler.
           { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: dejaEnMn95 ? 'cale' : 'oui' },
         ],
@@ -2069,7 +2202,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         recalculer();
         return;
       }
-      const nouveau = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, nom: choix.nom || lu.nom, type: choix.type || '', ...(choix.recaler === 'cale' ? { dejaCale: true } : {}) };
+      const nouveau = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, nom: choix.nom || lu.nom, sousDossiers: await sousDossiersChoisis(choix.sousDossier), ...(choix.recaler === 'cale' ? { dejaCale: true } : {}) };
       projet.plansDxf.push(nouveau);
       dernierPlan = { nom: nouveau.nom, avertissements: choix.recaler === 'cale' ? avertissements.filter((a) => !a.includes('MN95')) : avertissements };
       afficherMessage(`Plan « ${nouveau.nom} » importé : ${lu.compte.objets} objets`, 4000);
@@ -2113,16 +2246,18 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         titre: `Plan PDF « ${fichier.name} »${scanne ? ' (image)' : ''}`,
         note: { ton: 'alerte', texte: '⚠ Un PDF n\'est pas en coordonnées suisses (MN95) : le plan est à recaler.' },
         champs: [
-          { cle: 'echelle', titre: 'Échelle du plan 1:', valeur: '', exemple: '500 (vide si inconnue)' },
+          // 0.239.0 : même début que pour un DXF (Nom, Type, Recalage), puis les réglages propres au PDF.
           // 0.230.0 : le nom se demande à l'import (le préfixe « PDF- » est ajouté devant).
           { cle: 'nom', titre: 'Nom du plan (« PDF- » est ajouté devant)', valeur: pages > 1 ? `${nomDeBase} (page ${page})` : nomDeBase },
+          // 0.213.0 : comme pour un DXF : type du plan (liste partagée) et recalage tout de suite ou plus tard.
+          champSousDossier(),
+          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: 'non' },
           // 0.230.0 (retour sur le 0.145) : au choix, convertir les traits en DXF ou importer la page en image.
           // Un PDF scanné n'a pas de traits : il ne peut être qu'une image.
           ...(scanne ? [] : [{ cle: 'mode', titre: 'Importer', choix: [['dxf', 'Convertir en DXF (traits, textes, calques)'], ['image', 'En image (la page telle quelle)']], valeur: 'dxf' }]),
-          { cle: 'nettete', titre: 'Netteté de l\'image (si importé en image)', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART },
-          // 0.213.0 : comme pour un DXF : type du plan (liste partagée) et recalage tout de suite ou plus tard.
-          { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...lireTypesDxf().map((t) => [t.nom, t.nom])], valeur: '' },
-          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: 'non' },
+          { cle: 'echelle', titre: 'Échelle du plan 1:', valeur: '', exemple: '500 (vide si inconnue)' },
+          // 0.239.0 : la netteté n'a de sens que pour une image : cachée quand on convertit en DXF.
+          { cle: 'nettete', titre: 'Netteté de l\'image', choix: NETTETES.map(([cle, titre, dpi]) => [cle, `${titre} (${dpi} dpi)`]), valeur: NETTETE_DEPART, ...(scanne ? {} : { visibleSi: { cle: 'mode', valeur: 'image' } }) },
         ],
       });
       if (!valeurs) return;
@@ -2133,7 +2268,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       const enImage = scanne || valeurs.mode === 'image';
       if (!sansPrefixe(valeurs.nom, PREFIXE_PDF).trim()) throw new Error('le nom du plan est vide');
       const nom = avecPrefixe(valeurs.nom, PREFIXE_PDF);
-      const avertissements = valeurs.recaler === 'cale' ? [] : [`Plan PDF : il n'est pas en MN95, touche « recaler » sur le plan pour le mettre en place${enImage ? ' (accroche « Manuel » : loupe)' : ''}.`];
+      const avertissements = valeurs.recaler === 'cale' ? [] : [`Plan PDF : pas en MN95, à recaler depuis la page Plans${enImage ? ' (accroche « Manuel » : loupe)' : ''}.`];
       if (!echelle) avertissements.push('Sans échelle : le plan est à la taille de la feuille, le recalage trouvera l\'échelle.');
       let lu;
       if (enImage) {
@@ -2150,9 +2285,9 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         const lecture = lirePlanDxf(dxfDuPdf(contenu, echelle), nom);
         if (lecture.erreur || !lecture.plan.bornes) throw new Error(lecture.erreur ?? 'aucun objet dessiné trouvé');
         lu = lecture.plan;
-        if (contenu.images > 0) avertissements.push(`${contenu.images} image(s) du PDF non reprise(s) (seuls les traits et les textes sont lus).`);
+        if (contenu.images > 0) avertissements.push(`${contenu.images} images du PDF non reprises (seuls les traits et les textes sont lus).`);
       }
-      const nouveauPlan = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, type: valeurs.type || '', ...(valeurs.recaler === 'cale' ? { dejaCale: true } : {}), pdf: { page, echelle, image: enImage } };
+      const nouveauPlan = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, sousDossiers: await sousDossiersChoisis(valeurs.sousDossier), ...(valeurs.recaler === 'cale' ? { dejaCale: true } : {}), pdf: { page, echelle, image: enImage } };
       projet.plansDxf.push(nouveauPlan);
       dernierPlan = { nom, avertissements };
       afficherMessage(`Plan PDF « ${nom} » importé${enImage ? ' en image' : ` : ${lu.compte.objets} objets`}`, 4000);
@@ -2160,8 +2295,9 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       if (valeurs.recaler === 'oui') commencerRecalage(nouveauPlan.id);
       else if (valeurs.recaler === 'cale') commencerControlePlan(nouveauPlan.id);
     } catch (erreur) {
-      dernierPlan = { nom: fichier.name, erreur: erreur.message };
-      afficherMessage(`Plan PDF non importé : ${erreur.message}`, 8000);
+      const message = messagePdf(erreur);
+      dernierPlan = { nom: fichier.name, erreur: message };
+      afficherMessage(`Plan PDF non importé : ${message}`, 8000);
       recalculer();
     } finally {
       doc?.loadingTask?.destroy();
@@ -2188,7 +2324,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
   exporterListe,
   // 0.191.0 : « Exporter la sélection (CSV) » du tableau « Points » de Contenu du projet.
   exporterTableauPoints: (csv, nombre) => {
-    const base = `${nomDeFichierProjet(projet)}_points`.replace(/[\\/:*?"<>|]/g, '_');
+    const base = nomFichierExport(nomDeFichierProjet(projet), 'points');
     ouvrirFenetreExport({
       titre: `Points (${nombre})`,
       formats: [['csv', 'CSV', 'la sélection du tableau (Excel)']],
@@ -2780,7 +2916,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           terrain.chantier.profondeur = '';
           const libelle = libelleChantier(valeur);
           const natures = lireNaturesChantier()[libelle.reseau ? 'reseau' : 'bordure'];
-          if (!natures.includes(terrain.chantier.nature)) terrain.chantier.nature = natures[0];
+          if (!libelle.libre && !natures.includes(terrain.chantier.nature)) terrain.chantier.nature = natures[0];
         }
         retenirReglagesTerrain();
         if (redessiner) recalculer();
@@ -2927,6 +3063,13 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         retenirReglagesTerrain();
         recalculer();
       },
+      // 0.236.0 : case « Cana » : les tuyaux et tranchées des réseaux dans les coupes d'Implanter › Surface.
+      basculerCana: () => {
+        terrain.cana = !terrain.cana;
+        retenirReglagesTerrain();
+        recalculer();
+        montrerImplantation();
+      },
       choisirImplantation: (quoi) => {
         const permises = aAcces('expert') ? ['point', 'ligne', 'altitude', 'talus'] : ['point', 'ligne', 'altitude'];
         terrain.implantation = permises.includes(quoi) ? quoi : 'surface';
@@ -3057,6 +3200,8 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
       inverserLigne: () => {
         if (!implanter.ligne) return;
         implanter.ligne.inverse = !implanter.ligne.inverse;
+        // Réseau : le bord G reste le bord G (gauche / droite changent avec le sens de la ligne).
+        if (implanter.ligne.reseauId) implanter.ligne.decalage = -implanter.ligne.decalage;
         garderTalusOuvert();
         montrerImplantation();
       },
@@ -3510,9 +3655,9 @@ function gererLoupeImplantation() {
 
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
-  const accrocheActive = mesureRapideActive() || annotationActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(controlePlan.planId) || Boolean(daoAppli?.actif());
+  const accrocheActive = reseauxActif() || mesureRapideActive() || annotationActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(controlePlan.planId) || Boolean(daoAppli?.actif());
   // 0.159.0 : les applications sont indépendantes : la Mesure rapide ne montre rien d'Implanter.
-  const mesure = mesureRapideActive() || annotationActive();
+  const mesure = mesureRapideActive() || annotationActive() || reseauxActif();
   const enLigne = accrocheActive && !mesure && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
   const sommets = enLigne && implanter.ligne ? sommetsDeLaLigne() : null;
   // Lignes des levés « Autres » cochés dans le menu « Points » (ce ne sont pas des surfaces).
@@ -3568,6 +3713,7 @@ function envoyerImplantationAuPlan() {
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
         pointsLigne: enLigne ? implanter.pointsLigne : centrePtsActif() ? centrePts.points : [],
         mesureRapide: mesureRapideActive() ? { ...mesureRapide(mesureRapideEtat.points, { fermee: mesureRapideEtat.fermee }), afficherAngles: mesureRapideEtat.angles } : null,
+        reseaux: reseauxActif() ? reseaux.donneesPlan() : null,
       }
     : null);
   gererLoupeImplantation();
@@ -3582,7 +3728,7 @@ function exporterPlanRecale(id) {
   // 0.214.0 : tout plan importé s'exporte (avant : seulement les recalés et les dessins DAO) ; non recalé = tel qu'il a été importé.
   const recale = Boolean(choisi.recalage?.applique || choisi.dao);
   const nom = String(choisi.nom).replace(/\.dxf$/i, '');
-  telecharger(new Blob([octetsDxf(genererDxfPlan(planRecale(choisi)))], { type: 'application/dxf' }), `${nom}${recale ? '_MN95' : ''}.dxf`);
+  telecharger(new Blob([octetsDxf(genererDxfPlan(planRecale(choisi)))], { type: 'application/dxf' }), `${nomFichierExport(nomDeFichierProjet(projet), `${nom}${recale ? '_MN95' : ''}`)}.dxf`);
 }
 
 /**
@@ -3625,7 +3771,7 @@ function exporterListe(type, id) {
     photos = [...globales, ...photos];
   }
   // Nom du fichier : projet_liste, sans l'extension du fichier importé (« stock.csv » -> « stock »).
-  const base = `${nomDeFichierProjet(projet)}_${titre.replace(/\.[a-z0-9]{2,4}$/i, '')}`.replace(/[\\/:*?"<>|]/g, '_');
+  const base = nomFichierExport(nomDeFichierProjet(projet), titre.replace(/\.[a-z0-9]{2,4}$/i, ''));
   ouvrirFenetreExport({
     titre,
     formats: FORMATS_POINTS,
@@ -3661,12 +3807,12 @@ function exporterListe(type, id) {
 
 /** Implantations enregistrées (CSV). */
 function exporterImplantations() {
-  telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nomDeFichierProjet(projet)}_implantations.csv`);
+  telecharger(new Blob(['\ufeff' + csvImplantations(projet.implantations)], { type: 'text/csv;charset=utf-8' }), `${nomFichierExport(nomDeFichierProjet(projet), 'implantations')}.csv`);
 }
 
 /** Contrôles et refus du projet : CSV ou PDF. */
 async function exporterControles(format) {
-  const nom = `${nomDeFichierProjet(projet)}_controles`;
+  const nom = nomFichierExport(nomDeFichierProjet(projet), 'controles');
   if (format === 'pdf') {
     const { pdfControles } = await import('./export/pdf-controles.js'); // chargé à la demande (0.126.0)
     telecharger(pdfControles(projet), `${nom}.pdf`);
@@ -3695,7 +3841,7 @@ function colorerListe(id, couleur) {
  * le cadre mesuré pour un ouvrage à 3 coins. [{ id, est, nord, rayon, couleur } ou { id, coins, couleur }].
  */
 function formesDuChantier() {
-  const cachees = new Set(projet.listesCachees ?? []);
+  const cachees = idsMasques();
   const libelles = lireLibellesChantier();
   const couleurs = lireNaturesChantier().couleurs;
   const formes = [];
@@ -3715,7 +3861,7 @@ function formesDuChantier() {
 
 /** Lignes des levés « Autres » visibles : [{ sommets: [{ est, nord }], fermee }]. */
 function lignesDesAutres() {
-  const cachees = new Set(projet.listesCachees ?? []);
+  const cachees = idsMasques();
   const lignes = [];
   for (const autres of projet.autres) {
     if (cachees.has(autres.id)) continue;
@@ -4145,7 +4291,7 @@ function toucherCoteTalus(position, tolerance) {
 
 /** Talus des surfaces montrées, pour le plan (barbules et pente). */
 function tranchesDesTalusSurfaces() {
-  const cachees = new Set(projet.listesCachees ?? []);
+  const cachees = idsMasques();
   return projet.surfaces
     .filter((s) => s.type === 'talus' && (!cachees.has(s.id) || s.id === talusSurface.actifId))
     .flatMap((s) => {
@@ -4202,8 +4348,8 @@ function donneesTalusSurfaces() {
     };
   });
   return {
-    sources: projet.surfaces.filter((s) => estSurfaceFichier(s) && s.type !== 'talus').map((s) => ({ id: s.id, nom: s.nom })),
-    terrains: projet.surfaces.filter((s) => trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
+    sources: projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && estSurfaceFichier(s) && s.type !== 'talus').map((s) => ({ id: s.id, nom: s.nom })),
+    terrains: projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
     talus,
   };
 }
@@ -4327,7 +4473,7 @@ function pointsDesDessins() {
 
 /** Dessins montrés sur le plan : ceux cochés dans « Afficher » (et toujours celui en cours). */
 function dessinsVisibles() {
-  const cachees = new Set(projet.listesCachees ?? []);
+  const cachees = idsMasques();
   return projet.dessins.filter((d) => !cachees.has(d.id) || (piloteActif() && d.id === pilote.dessinId));
 }
 
@@ -4349,7 +4495,7 @@ function donneesDessin() {
         empecheSurface: estFerme(d) ? (surfaceDuDessin(d, projet.dessins).erreur ?? null) : null,
         // Talus jusqu'au terrain (0.108.0) : réglages et terrains possibles (levés et surfaces avec triangles).
         talus: d.talus ?? null,
-        terrains: ferme ? projet.surfaces.filter((s) => !s.dessinId && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })) : [],
+        terrains: ferme ? projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && !s.dessinId && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })) : [],
       };
     }),
     pentesTalus: PENTES_TALUS,
@@ -4908,7 +5054,7 @@ async function choisirTraitementDoublons(existants, points, nomFichier) {
   if (doubles.length === 0) return { points, mode: 'garder', renommes: [] };
   const liste = `${doubles.slice(0, 5).join(', ')}${doubles.length > 5 ? '…' : ''}`;
   const choix = await demanderChoix({
-    titre: `${doubles.length} nom(s) en double dans « ${nomFichier} »`,
+    titre: `${doubles.length} nom(s) en double (dans « ${nomFichier} » ou déjà dans le projet)`,
     texte: `Noms : ${liste}. Les autres points sont importés dans tous les cas.`,
     boutons: [
       { cle: 'ignorer', texte: 'Ignorer les doublons', detail: 'Le premier point de chaque nom est gardé', principal: true },
@@ -4940,7 +5086,7 @@ async function importerPointsControle(fichier) {
     if (mode === null) return { info: '', erreur: '' };
     const { ajoutes, deja, sansNom } = ajouterPointsControle(projet.pointsControle, points, nouvelIdentifiant, { garderDoublons: mode === 'garder' });
     if (ajoutes > 0) modifie();
-    const morceaux = [`${ajoutes} point(s) ajouté(s)`];
+    const morceaux = [`${ajoutes} ${ajoutes > 1 ? 'points ajoutés' : 'point ajouté'}`];
     if (renommes.length > 0) morceaux.push(`${renommes.length} renommé(s) : ${renommes.slice(0, 5).map((r) => `${r.avant} → ${r.apres}`).join(', ')}${renommes.length > 5 ? '…' : ''}`);
     if (deja.length > 0) morceaux.push(`${deja.length} déjà dans la liste, non ajouté(s) : ${deja.slice(0, 10).join(', ')}${deja.length > 10 ? '…' : ''}`);
     if (sansNom > 0) morceaux.push(`${sansNom} sans nom, non ajouté(s)`);
@@ -5020,7 +5166,7 @@ function enregistrerControle() {
   if (resultat.global === 'orange') {
     demanderChoix({ titre: '⚠ Contrôle à la limite', texte: `${detail}. Écart entre les deux tolérances : avertissement.`, boutons: [{ cle: 'ok', texte: 'OK', principal: true }] });
   } else if (resultat.global === 'rouge') {
-    demanderChoix({ titre: '⛔ Hors tolérance', texte: `${detail}. Contacte le géomètre.`, boutons: [{ cle: 'ok', texte: 'OK', principal: true }] });
+    demanderChoix({ titre: 'Hors tolérance', texte: `${detail}. Contacte le géomètre.`, boutons: [{ cle: 'ok', texte: 'OK', principal: true }] });
   }
 }
 
@@ -5031,6 +5177,18 @@ function enregistrerControle() {
  */
 let rappelEnCours = false;
 let dernierRappel = 0; // date du dernier rappel montré (ms)
+// 0.233 (13.11) : à l'ouverture d'un projet ou à la connexion du récepteur, on attend 10 s avant de proposer le contrôle
+// (le temps que le RTK se fixe) ; si entre-temps le récepteur est déconnecté ou un autre projet ouvert, rien n'est proposé.
+const ATTENTE_RAPPEL_CONTROLE_MS = 10_000;
+let minuterieRappel = null;
+function proposerControleApresDelai() {
+  clearTimeout(minuterieRappel);
+  const projetAttendu = projet;
+  minuterieRappel = setTimeout(() => {
+    minuterieRappel = null;
+    if (projet === projetAttendu && etatRecepteur?.connecte) proposerControle();
+  }, ATTENTE_RAPPEL_CONTROLE_MS);
+}
 async function proposerControle() {
   if (!ecranLeve || rappelEnCours || !controleNecessaire(projet.controles, new Date(), delaiControleMs(projet), nomDeLAppareil())) return;
   rappelEnCours = true;
@@ -5041,7 +5199,11 @@ async function proposerControle() {
   // Pas de point de contrôle dans le projet : un simple bandeau (0.114.0, avant une fenêtre qui
   // bloquait l'écran) ; rien n'est noté (demande du 26.10.2026).
   if (projet.pointsControle.length === 0) {
-    afficherMessage(`${texte} Aucun point de contrôle dans ce projet.`, 6000);
+    // 0.239.0 : seulement dans Lever (ou Contrôle), en haut du plan : plus sur le menu, Importer, Exporter…
+    const mode = document.body.dataset.modeTerrain;
+    if (document.body.dataset.onglet === 'terrain' && (mode === 'lever' || mode === 'autocontrole')) {
+      afficherMessage(`${texte} Aucun point de contrôle dans ce projet.`, 6000);
+    }
     rappelEnCours = false;
     return;
   }
@@ -5148,8 +5310,76 @@ function calculerImplantationLigne(etat, orientation = null) {
     classeAltitude: ecartAltitude == null ? null : classeEcart(ecartAltitude),
     // 0.123 : de combien de degrés se tourner pour être dans l'axe de la ligne (+ = vers la droite) ; null sans cap.
     virage: virageVersLigne(orientation?.azimut ?? null, sommetsDeLaLigne(), g.segment),
+    // 0.236.0 : réseau implanté : profil en long, seulement à moins de 1 m de la ligne (G / D).
+    // 0.249.0 : toute ligne (pas seulement un réseau) : profil en long à moins de 1 m, avec la case « Cana » pour les réseaux qui la croisent.
+    profilReseau: Math.abs(g.ecart) < 1 ? (ligne.reseauId ? profilEnLongDuReseau(position) : profilEnLongDeLaLigne(position)) : null,
     message: null,
   };
+}
+
+/**
+ * Profil en long (SVG) d'une ligne à implanter (0.249.0, demande du 16.11) : le terrain de la surface choisie, la ligne (son altitude
+ * le long d'elle, sa pente) et la canne, ±20 m autour d'elle. Case « Cana » : les réseaux qui croisent la ligne en plus.
+ * null sans altitudes sur la ligne (ni tapées au début et à la fin, ni dans le plan 3D) ou sans altitude de la canne.
+ */
+function profilEnLongDeLaLigne(position) {
+  const ligne = implanter.ligne;
+  const sommets = sommetsDeLaLigne();
+  if (!ligne || sommets.length < 2 || position.altitude == null) return null;
+  const altitudes = altitudesDesBouts();
+  const avecZ = [];
+  let cumul = 0;
+  for (let i = 0; i < sommets.length; i++) {
+    if (i > 0) cumul += Math.hypot(sommets[i].est - sommets[i - 1].est, sommets[i].nord - sommets[i - 1].nord);
+    const fe = altitudeSurLigne(cumul, sommets, altitudes);
+    if (fe == null) return null;
+    avecZ.push({ est: sommets[i].est, nord: sommets[i].nord, fe });
+  }
+  const pseudo = { id: '__ligne', type: '', nom: ligne.nom, diametre: 0.03, sommets: avecZ, tranchee: null };
+  // Terrain le long de la ligne : recalculé seulement si la surface ou la ligne changent.
+  const cle = `${terrain.surfaceId ?? ''}|${ligne.decalage ?? 0}|${ligne.inverse ? 1 : 0}|${avecZ.length}|${avecZ[0].est}`;
+  if (ligne.terrainProfilCle !== cle) {
+    ligne.terrainProfilCle = cle;
+    ligne.terrainProfil = [];
+    const triangles = terrain.surfaceId ? trianglesDeSurface(terrain.surfaceId) : [];
+    let cumulTerrain = 0;
+    for (let i = 0; i + 1 < avecZ.length; i++) {
+      const [a, b] = [avecZ[i], avecZ[i + 1]];
+      if (triangles.length > 0) for (const m of profilSurface(triangles, a, b)) ligne.terrainProfil.push(m.map((p) => ({ d: cumulTerrain + p.distance, z: p.altitude })));
+      cumulTerrain += Math.hypot(b.est - a.est, b.nord - a.nord);
+    }
+  }
+  const sur = positionSurLigne(position, avecZ);
+  if (!sur) return null;
+  const d = Math.min(Math.max(sur.abscisse, 0), sur.longueur);
+  const demi = 20;
+  const d0 = Math.min(Math.max(d - demi, 0), Math.max(sur.longueur - 2 * demi, 0));
+  const fenetre = sur.longueur <= 2 * demi ? null : { d0, d1: d0 + 2 * demi };
+  const croisements = terrain.cana && aAcces('intermediaire') ? croisementsSurAxe([...(projet.canalisations ?? []), pseudo], '__ligne') : [];
+  return svgCoupeAxe({ reseau: pseudo, terrain: ligne.terrainProfil, croisements, position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
+}
+
+/** Profil en long (SVG) du réseau en cours d'implantation, avec la canne (altitude mesurée) : ±20 m autour d'elle. */
+function profilEnLongDuReseau(position) {
+  const ligne = implanter.ligne;
+  const reseau = (projet.canalisations ?? []).find((r) => r.id === ligne.reseauId);
+  if (!reseau || position.altitude == null) return null;
+  // Le terrain le long du réseau est calculé une fois (la surface ne change pas pendant l'implantation).
+  if (!ligne.terrainProfil) {
+    ligne.terrainProfil = [];
+    let cumul = 0;
+    for (let i = 0; i + 1 < reseau.sommets.length; i++) {
+      const [a, b] = [reseau.sommets[i], reseau.sommets[i + 1]];
+      if (reseau.surfaceId) for (const m of profilSurface(trianglesDeSurface(reseau.surfaceId), a, b)) ligne.terrainProfil.push(m.map((p) => ({ d: cumul + p.distance, z: p.altitude })));
+      cumul += Math.hypot(b.est - a.est, b.nord - a.nord);
+    }
+  }
+  const sur = positionSurLigne(position, reseau.sommets);
+  if (!sur) return null;
+  const d = Math.min(Math.max(sur.abscisse, 0), sur.longueur);
+  const demi = 20;
+  const fenetre = sur.longueur <= 2 * demi ? null : { d0: Math.min(Math.max(d - demi, 0), sur.longueur - 2 * demi), d1: Math.min(Math.max(d - demi, 0), sur.longueur - 2 * demi) + 2 * demi };
+  return svgCoupeAxe({ reseau, terrain: ligne.terrainProfil, position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
 }
 
 /**
@@ -5457,6 +5687,11 @@ function pointsDuProjet() {
  * (« Point » : les points du projet ; les autres : le plan DXF).
  */
 function toucherPourImplantation(position, tolerance) {
+  // Réseaux (0.235.0) : la polyligne ou le point touché sert à créer un réseau.
+  if (reseauxActif()) {
+    reseaux.toucher(position, tolerance);
+    return;
+  }
   // Mesure rapide (0.158.0) : le point touché (selon l'accroche) s'ajoute à la mesure.
   if (mesureRapideActive()) {
     toucherPourMesureRapide(position, tolerance);
@@ -5576,7 +5811,11 @@ let barreRecalage = null;
 
 /** Plans DXF du projet tels qu'on les utilise : recalés (sauf celui qu'on est en train de recaler). */
 function plansDuProjet() {
-  return (projet.plansDxf ?? []).map((p) => (p.id === recalage.planId ? p : planRecale(p)));
+  // 0.251.0 : seuls les plans du dossier choisi (le plan du cadastre suit sa liste de points) ; le plan en recalage reste toujours là.
+  const cadastres = new Map((projet.leves ?? []).filter((l) => l.cadastre).map((l) => [planDuCadastre(projet, l)?.id, l]));
+  return (projet.plansDxf ?? [])
+    .filter((p) => p.id === recalage.planId || (cadastres.has(p.id) ? estMontre(projet, cadastres.get(p.id), 'leve') : estMontre(projet, p, 'plan')))
+    .map((p) => (p.id === recalage.planId ? p : planRecale(p)));
 }
 
 function commencerRecalage(id) {
@@ -6133,7 +6372,6 @@ function annulerRecalage(id) {
 // --- Contrôle d'un plan (0.218.0, demande du 12.11) : voir recalage/barre-controle.js et topo/controle-plan.js ---
 // Un plan « déjà calé » est contrôlé tout de suite après l'import, un plan recalé à la fin du recalage : on touche un point du plan,
 // puis le point connu qui lui correspond ; l'écart (mm) est gardé sur le plan (plan.controle). Sans point connu : plan « non contrôlé ».
-const controlePlan = { planId: null, accroche: 'sommet', pointPlan: null, resultat: null };
 let barreControlePlan = null;
 
 function commencerControlePlan(id) {
@@ -6187,13 +6425,23 @@ function commencerControlePlan(id) {
     },
   });
   if (estTelephone()) afficherOnglet('plan');
+  controlePlan.onglet = document.body.dataset.onglet ?? null; // écran où la barre a été ouverte (0.239.0)
   recalculer();
   requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
   montrerControlePlan();
 }
 
+/** 0.239.0 : on a changé d'écran sans valider : le contrôle est reporté (comme « plus tard »), la barre disparaît. */
+function abandonnerControlePlan() {
+  const plan1 = projet.plansDxf.find((p) => p.id === controlePlan.planId);
+  if (plan1 && !plan1.controle) plan1.controle = { saute: true, raison: 'reporté', le: new Date().toISOString() };
+  arreterControlePlan();
+  modifie();
+}
+
 function arreterControlePlan() {
   controlePlan.planId = null;
+  controlePlan.onglet = null;
   controlePlan.pointPlan = null;
   controlePlan.resultat = null;
   barreControlePlan?.enlever();
@@ -6253,6 +6501,7 @@ const surfaceSwisstopo = creerSurfaceSwisstopo({
   nomsPris: () => projet.surfaces.map((s) => s.nom),
   ajouterSurface: (surface) => {
     projet.surfaces.push(surface);
+    if (surface.type === 'swisstopo') cacherListe(projet, surface.id); // 0.231.0 : surface Swisstopo cachée au départ
     editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
     editeurSurfaces.choisir(projet.surfaces.length - 1);
     modifie({ recadrer: true });
@@ -6702,7 +6951,14 @@ function rangerPointPris(resultat) {
     delete photo.attentePoint;
   }
   noterJournal({ type: 'point', controleRecent: controleRecentIci() });
-  afficherMessage(`Point ${resultat.point.nom} pris${enAttente.length > 0 ? ` · ${enAttente.length} photo(s) rattachée(s)` : ''}`);
+  // 0.241.0 : confirmation en haut, en vert, avec la précision du point et le nombre de satellites (si connus).
+  const g = resultat.point.gnss;
+  const details = [];
+  if (g?.precisionH != null) details.push(`H ${Number(g.precisionH).toFixed(3)} m`);
+  if (g?.precisionV != null) details.push(`V ${Number(g.precisionV).toFixed(3)} m`);
+  if (g?.nbSatellites != null) details.push(`${g.nbSatellites} sat.`);
+  if (enAttente.length > 0) details.push(`${enAttente.length} photo(s) rattachée(s)`);
+  afficherMessage(`Point ${resultat.point.nom} pris${details.length > 0 ? ` · ${details.join(' · ')}` : ''}`, 2500, { ok: true });
   modifie();
 }
 
@@ -6739,7 +6995,7 @@ function montrerPhoto(id) {
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-photo';
   fenetre.innerHTML = `<form method="dialog">
-      <h2>📷 ${echapper(photo.point ?? 'Photo du levé')}</h2>
+      <h2>${ICONES_LIGNE.photo} ${echapper(photo.point ?? 'Photo du levé')}</h2>
       <img src="${photo.image}" alt="${echapper(photo.legende || photo.point || 'photo')}" />
       ${photo.legende ? `<p>${echapper(photo.legende)}</p>` : ''}
       <div class="ligne-outils"><button class="bouton">Fermer</button><button type="button" class="bouton-secondaire seulement-intermediaire" data-cle="dessiner">✎ Dessiner</button>${deControle ? '<button type="button" class="bouton-lien" data-cle="supprimer">supprimer la photo</button>' : ''}</div>
@@ -6885,8 +7141,9 @@ function donneesChantier(stock) {
   const libelles = lireLibellesChantier();
   const libelle = libelleChantier(terrain.chantier.libelle, libelles);
   const toutesNatures = lireNaturesChantier();
-  const natures = toutesNatures[libelle.reseau ? 'reseau' : 'bordure'];
-  const nature = natures.includes(terrain.chantier.nature) ? terrain.chantier.nature : natures[0];
+  // « Libre » : pas de nature (liste vide, nature vide).
+  const natures = libelle.libre ? [] : toutesNatures[libelle.reseau ? 'reseau' : 'bordure'];
+  const nature = libelle.libre ? '' : natures.includes(terrain.chantier.nature) ? terrain.chantier.nature : natures[0];
   const mode = libelle.modes.includes(terrain.chantier.mode) ? terrain.chantier.mode : libelle.modes[0] ?? '';
   const cadre = (stock.cadres ?? []).find((c) => c.noms.length < 3 && c.libelle === libelle.abreviation);
   const dernier = (stock.cadres ?? []).filter((c) => c.noms.length === 3).at(-1);
@@ -6975,6 +7232,7 @@ function donneesCommunes() {
     ajoutActif: ajoutLevee.actif,
     controle: terrain,
     deltaSurface, // 0.152.0 : delta Z de la surface (Implanter › Surface)
+    nbReseaux: (projet.canalisations ?? []).length, // 0.236.0 : case « Cana » d'Implanter › Surface
     // Mode Lame : surfaces (terrassement d'abord), surface suivie, tolérances, 2e RX2 connecté ?
     lame: {
       surfaces: [...projet.surfaces].sort((a, b) => Number(['terrassement', 'surface'].includes(b.nature)) - Number(['terrassement', 'surface'].includes(a.nature))).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
@@ -6985,7 +7243,7 @@ function donneesCommunes() {
       recepteur2: Boolean(etatRecepteur2?.connecte),
       recepteursBull: terrain.lame.recepteursBull,
       unGnss: outilAUnGnss(),
-      vue: terrain.lame.vue,
+      vue: vueDuGuidage(terrain.lame.vue, document.body.classList.contains('mode-telephone')), // 0.240.0 : téléphone = une coupe à la fois
       indic: terrain.lame.indic === 'regle' ? 'regle' : 'exterieur',
       lignes: lignesGuidage.liste.map((l) => ({ nom: `L${l.place + 1}`, slot: l.place, bout: l.bout })),
       choixLignes: lignesGuidage.choix,
@@ -6998,7 +7256,7 @@ function donneesCommunes() {
     },
     autocontrole: donneesAutocontrole(),
     // Seulement les levés et surfaces qui ont des triangles (0.90.1 : pas les levés vides), plus la surface choisie.
-    surfaces: projet.surfaces.filter((s) => s.id === terrain.surfaceId || trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
+    surfaces: projet.surfaces.filter((s) => s.id === terrain.surfaceId || (estMontre(projet, s, 'surface') && trianglesDeSurface(s.id).length > 0)).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
     implanter: {
       accroche: terrain.accroche,
       zoomLoupe: terrain.zoomLoupe ?? 4,
@@ -7048,6 +7306,28 @@ function altitudesDesBouts() {
   return { debut: tapees.debut ?? sommets[0]?.altitude ?? null, fin: tapees.fin ?? sommets.at(-1)?.altitude ?? null };
 }
 
+/**
+ * Réseaux › Implanter (0.236.0, Expert) : on ouvre Implanter › Ligne sur la ligne du réseau (axe ou bord du fond de tranchée,
+ * à l'altitude choisie) ; la fiche et le gros bouton « Implanter » sont ceux de toute ligne.
+ */
+function implanterUnReseau({ nom, sommets, decalage, reseauId }) {
+  if (!recepteurDisponible()) {
+    afficherMessage('Implanter : seulement dans l\'appli Android, avec le GNSS', 4000);
+    return;
+  }
+  const ligne = nouvelleLigneAImplanter(nom, sommets, null);
+  ligne.decalage = decalage;
+  ligne.reseauId = reseauId;
+  implanter.ligne = ligne;
+  implanter.ligneAValider = true;
+  implanter.talusId = null;
+  implanter.pointsLigne = [];
+  terrain.implantation = 'ligne';
+  choisirModeTerrain('controler');
+  afficherOnglet('terrain');
+  montrerImplantation();
+}
+
 /** Ligne à implanter pour l'écran Terrain : nom, longueur, segments, sens, début, fin, réglages. */
 function resumeLigne() {
   const ligne = implanter.ligne;
@@ -7058,6 +7338,7 @@ function resumeLigne() {
     nbSegments: ligne.sommets.length - 1,
     segment: ligne.segment,
     inverse: ligne.inverse,
+    reseauId: ligne.reseauId ?? null,
     decalage: ligne.decalage,
     altitudes: altitudesDesBouts(),
     altitudesDuPlan: sommets.every((s) => s.altitude != null),
@@ -7070,7 +7351,7 @@ function resumeLigne() {
  * Réglages d'un plan DXF (liste des plans, ou menu « Plans » du plan) : visible (œil), couleur
  * (null = celles du DXF) et nom court (« Bordures »).
  */
-function reglerPlanDxf(id, { visible, couleur, nom, transparence, type }) {
+function reglerPlanDxf(id, { visible, couleur, nom, transparence }) {
   const choisi = projet.plansDxf.find((p) => p.id === id);
   if (!choisi) return;
   if (visible !== undefined) choisi.visible = visible;
@@ -7079,8 +7360,7 @@ function reglerPlanDxf(id, { visible, couleur, nom, transparence, type }) {
   if (nom !== undefined && sansPrefixe(nom, choisi.pdf ? PREFIXE_PDF : '').trim()) choisi.nom = choisi.pdf ? avecPrefixe(nom, PREFIXE_PDF) : nom.trim();
   if (transparence !== undefined) choisi.transparence = Math.min(100, Math.max(0, Math.round(transparence)));
   // Seulement montrer / cacher : réglage de la tablette (0.128.1), permis aussi en lecture seule.
-  if (type !== undefined) choisi.type = String(type);
-  if (couleur === undefined && nom === undefined && transparence === undefined && type === undefined) affichageModifie();
+  if (couleur === undefined && nom === undefined && transparence === undefined) affichageModifie();
   else modifie();
 }
 
@@ -7143,9 +7423,16 @@ function calculerControle(etat, orientation) {
   for (const sens of ['perpendiculaire', 'axe']) {
     const { debut, fin } = extremitesCoupe(position, azimut, terrain.demiLongueur, sens);
     const base = profilSurface(triangles, debut, fin);
+    // Case « Cana » (0.236.0, Expert) : les tuyaux et tranchées des réseaux que la coupe croise.
+    const longueurCoupe = Math.hypot(fin.est - debut.est, fin.nord - debut.nord);
+    const chercheur = altitudeDeSurface(surface.id);
+    const reseauxCoupe = terrain.cana && aAcces('expert') && (projet.canalisations ?? []).length > 0
+      ? tuyauxSurCoupe(projet.canalisations, debut, fin, chercheur ? (d) => chercheur(debut.est + ((fin.est - debut.est) * d) / longueurCoupe, debut.nord + ((fin.nord - debut.nord) * d) / longueurCoupe) : null)
+      : [];
     coupes[sens] = {
       debut,
       fin,
+      reseaux: reseauxCoupe,
       lignes: decalerProfil(base, delta),
       lignesBase: delta ? base : null,
       delta,
@@ -7153,9 +7440,11 @@ function calculerControle(etat, orientation) {
       altitudeCanne: fiable ? position.altitude : null,
     };
   }
+  // 0.248.0 (demande du 16.11) : sans orientation (inclinaison pas prête, ou pas encore de direction de marche), on ne sait pas
+  // dans quel sens est la coupe : pas de coupe (cadre vide + message), au lieu d'une coupe nord-sud / est-ouest trompeuse.
   if (orientation.azimut == null) {
-    Object.assign(coupes.perpendiculaire, { titre: 'Ouest-est (orientation inconnue)', gauche: '← ouest', droite: 'est →' });
-    Object.assign(coupes.axe, { titre: 'Sud-nord (orientation inconnue)', gauche: '← sud', droite: 'nord →' });
+    const messageCoupes = suiviOrientation.source === 'marche' ? 'avance pour donner la direction' : 'inclinaison en attente';
+    return { ecart, classe: ecart == null ? null : classeEcart(ecart), altitudeSurface, altitudeCanne: position.altitude, message, coupes: null, messageCoupes };
   }
   return {
     ecart,
@@ -7169,12 +7458,13 @@ function calculerControle(etat, orientation) {
 
 // Boussole de la tablette (implantation : savoir où est le nord) : l'aiguille tourne au plus une
 // fois par image affichée.
-if (ecranLeve) {
+{
   let capEnAttente = null;
   ecouterBoussole((cap) => {
     if (capEnAttente === null) {
       requestAnimationFrame(() => {
-        ecranLeve.mettreAJourBoussole(capEnAttente);
+        ecranLeve?.mettreAJourBoussole(capEnAttente);
+        plan.mettreAJourBoussoleTablette(capEnAttente);
         capEnAttente = null;
       });
     }
@@ -7204,7 +7494,7 @@ if (recepteurDisponible()) {
     etatRecepteur = etat;
     // Mesure rapide : « + Point GNSS » de la bande suit l'état du récepteur (prêt ou non).
     if (ongletContexte === 'mesure-rapide' || ongletContexte === 'annotation') navigation?.mettreAJour();
-    if (vientDeSeConnecter) proposerControle();
+    if (vientDeSeConnecter) proposerControleApresDelai();
     mettreAJourBandeaux(etat, etat.connecte ? null : positionTablette, terrain.hauteurCanne ?? null);
     boutonRecepteur?.mettreAJour(etat);
     const orientation = suiviOrientation.ajouter(etat, performance.now());
@@ -7562,6 +7852,12 @@ document.addEventListener('visibilitychange', () => {
 // DAO (0.147.0, Expert) : voir dao/dao.js ; créée après le plan (plus bas).
 let daoAppli = null;
 const plan = creerPlan(document.querySelector('#plan'), {
+  // Z sous la souris : altitude de la surface choisie dans Implanter (rien si pas de surface ou hors surface).
+  altitudeEn: (est, nord) => {
+    const chercheur = altitudeDeSurface(terrain.surfaceId);
+    const z = chercheur ? chercheur(est, nord) : null;
+    return typeof z === 'number' && Number.isFinite(z) ? z : null;
+  },
   quandToucherPosition: toucherPourCoupe,
   peutDeplacerCoupe: () => !refuserEnLectureSeule(),
   quandDeplacerCoupe: (id, bout, position) => {
@@ -7648,7 +7944,7 @@ daoAppli = creerDao({
   demanderTexte,
   demanderChamps,
   confirmer: (texte) => confirm(texte),
-  surfaces: () => projet.surfaces.filter((x) => trianglesDeSurface(x.id).length > 0).map((x) => [x.id, x.nom]),
+  surfaces: () => projet.surfaces.filter((x) => estMontre(projet, x, 'surface') && trianglesDeSurface(x.id).length > 0).map((x) => [x.id, x.nom]),
   altitudeSur: (id) => {
     const triangles = trianglesDeSurface(id);
     return triangles.length > 0 ? chercheurAltitude(triangles) : null;
@@ -7827,9 +8123,13 @@ async function importerSurface(fichier) {
     const surfaces = type === 'dxf' ? lu.surfaces : fusionnerSurfaces(lu.surfaces, fichier.name.replace(/\.[^.]+$/, ''));
     if (surfaces.length < lu.surfaces.length) avertissements.push(`${lu.surfaces.length} surfaces du fichier réunies en une seule`);
     // Plus de question « Stock, Terrain… ? » (0.90.0) : la nature ne servait à rien.
-    for (const surface of surfaces) projet.surfaces.push(surfaceImportee(surface, fichier.name, type));
+    for (const surface of surfaces) {
+      const importee = surfaceImportee(surface, fichier.name, type);
+      projet.surfaces.push(importee);
+      cacherListe(projet, importee.id); // 0.231.0 : surfaces cachées au départ (case dans Afficher › Surface)
+    }
     const messages = [...erreurs, ...avertissements];
-    message = `<p class="resume"><strong>${surfaces.length} surface(s)</strong> importée(s) de « ${echapper(fichier.name)} » : voir Surfaces importées, plus bas.</p>
+    message = `<p class="resume"><strong>${surfaces.length} ${surfaces.length > 1 ? 'surfaces importées' : 'surface importée'}</strong> de « ${echapper(fichier.name)} » : voir la page « Surfaces importées ».</p>
       ${messages.length > 0 ? `<div class="avertissement"><ul>${messages.map((m) => `<li>${echapper(m)}</li>`).join('')}</ul></div>` : ''}`;
     editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
     if (surfaces.length > 0) editeurSurfaces.choisir(projet.surfaces.length - 1);
@@ -7965,7 +8265,7 @@ const ecranMesures = creerEcranMesures(document.querySelector('#mesures'), docum
 
 // Export des mesures : à part de celui des volumes (aucun volume dedans).
 /** Vrai si cette liste (surface, métré, dessin, levé…) est cochée dans « Afficher ». */
-const estAffichee = (id) => !(projet.listesCachees ?? []).includes(id);
+const estAffichee = (id) => !idsMasques().has(id);
 
 /** Calculs de volume du projet dont le résultat est connu : [{ calcul, resultat }]. */
 function calculsReussis() {
@@ -8041,6 +8341,8 @@ creerEcranExport(moduleExport.zone('plan'), {
       },
       points: leves.flatMap((l) => l.points),
       fichierPoints: leves.map((l) => l.nom).join(', '),
+      // Numéros de parcelles du cadastre importé (calque CADASTRE_PARCELLES visible) : DXF (calque PARCELLES) et PDF.
+      parcelles: parcellesDesPlans(projet.plansDxf ?? []),
       // Dessins (Calculs › Dessin) cochés : DXF (calque DESSINS) et PDF.
       dessins: projet.dessins
         .filter((d) => selection.has(d.id) && d.sommets.length > 0)
@@ -8149,7 +8451,7 @@ function recalculer({ recadrer = false } = {}) {
   plan.afficherListeDesPoints(listeDesPoints(projet, listes));
   plan.afficherPointsImport(pointsDesImports(projet, listes));
   // Points des surfaces importées (visibles dans « Afficher ») : cases Points / Altitudes de Surface Import (0.122.0).
-  plan.afficherPointsSurfaces(projet.surfaces.filter((s) => estSurfaceFichier(s) && !(projet.listesCachees ?? []).includes(s.id)).flatMap((s) => s.points ?? []));
+  plan.afficherPointsSurfaces(projet.surfaces.filter((s) => estSurfaceFichier(s) && !idsMasques().has(s.id)).flatMap((s) => s.points ?? []));
   plan.afficherPhotos(photosDuPlan(listes));
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
@@ -8159,7 +8461,7 @@ function recalculer({ recadrer = false } = {}) {
   // Calculs › Mesures : hors modification, les points des listes cochées (comme ailleurs) ; pendant la
   // modification d'une mesure, ceux de son levé (ce sont eux qu'on touche pour les ajouter).
   const enModification = (ongletContexte === 'mesures' && ecranMesures.enModification()) || editeurSurfaces.enModification();
-  const cacheesParListe = new Set(listes.filter((l) => !l.visible).map((l) => l.id));
+  const cacheesParListe = new Set([...listes.filter((l) => !l.visible).map((l) => l.id), ...idsHorsSousDossier(projet)]);
   const visibles = new Set(editeurSurfaces.enModification() ? surfacesAffichees() : projet.surfaces.filter((s) => !cacheesParListe.has(s.id)));
   // Une surface importée montre ses propres points ; sinon, ceux du levé ou des listes cochées.
   let pointsDuPlan;
@@ -8333,12 +8635,82 @@ function modifie(options) {
   synchroniserSurfacesDessins();
   synchroniserTalusSurfaces();
   prefixerNoms(projet);
+  rangerNouveauxDansLeSousDossier();
   // Une surface supprimée : ses calculs de volume disparaissent avec elle.
   projet.calculs = nettoyerCalculs(projet.calculs, projet.surfaces);
   recalculer(options);
   historique.memoriser(modifications, projet);
   mettreAJourAnnuler();
   enregistrerBientot();
+}
+
+
+// --- Sous-dossiers (0.251.0, voir topo/sous-dossiers.js) ---
+let elementsConnus = null; // ids des éléments déjà là : un nouvel élément est rangé dans le sous-dossier choisi
+
+/** Un élément créé alors qu'un sous-dossier est choisi y est rangé d'office (sous « Tout » : sans dossier). */
+function rangerNouveauxDansLeSousDossier() {
+  const choisi = sousDossierChoisi();
+  const tous = elementsRangeables(projet).map(({ element }) => element);
+  if (elementsConnus === null) elementsConnus = new Set(tous.map((e) => e.id));
+  for (const element of tous) {
+    if (elementsConnus.has(element.id)) continue;
+    elementsConnus.add(element.id);
+    if (choisi && choisi !== SANS_SOUS_DOSSIER && element.sousDossiers === undefined) element.sousDossiers = [choisi];
+  }
+}
+
+/** Élément du projet de ce genre et de cet identifiant ('leve', 'surface', 'autre', 'plan', 'dessin', 'reseau'). */
+function elementDeGenre(genre, id) {
+  return elementsRangeables(projet).find((x) => x.genre === genre && x.element.id === id)?.element ?? null;
+}
+
+/** Champ « Dossier » des fenêtres d'import : le sous-dossier choisi est proposé d'office. */
+function champSousDossier() {
+  const choisi = sousDossierChoisi();
+  return {
+    cle: 'sousDossier',
+    titre: 'Dossier',
+    choix: [['', 'Sans dossier'], ...lireSousDossiers(projet).map((d) => [d.nom, d.nom]), ['__nouveau', '＋ Créer un dossier…']],
+    valeur: choisi && choisi !== SANS_SOUS_DOSSIER ? choisi : '',
+  };
+}
+
+/** Dossiers de l'élément importé d'après ce que l'utilisateur a choisi (« ＋ Créer un dossier… » demande le nom et l'ajoute à la liste). */
+async function sousDossiersChoisis(valeur) {
+  if (valeur === '__nouveau') {
+    const texte = await demanderTexte({ titre: 'Nom du nouveau dossier', valeur: '' });
+    const nom = nettoyerSousDossiers(texte ?? '')[0];
+    if (!nom) return [];
+    enregistrerSousDossiers([...lireSousDossiers(projet).map((d) => d.nom), nom]);
+    return [nom];
+  }
+  return valeur ? [valeur] : [];
+}
+
+/** Identifiants masqués sur le plan : listes décochées + éléments hors du sous-dossier choisi. */
+function idsMasques() {
+  return new Set([...(projet.listesCachees ?? []), ...idsHorsSousDossier(projet)]);
+}
+
+/** Sous-dossiers pour l'encadré du projet (page Applications) : ce que la tablette peut choisir. */
+function donneesSousDossiers() {
+  const liste = lireSousDossiers(projet);
+  const nb = new Map(liste.map((d) => [d.nom, elementsRangeables(projet).filter(({ element }) => (element.sousDossiers ?? []).includes(d.nom)).length]));
+  return {
+    choisi: sousDossierChoisi(),
+    liste: liste.map((d) => ({ ...d, nombre: nb.get(d.nom) })),
+    visible: aAcces('expert') || sousDossiersUtilises(projet).size > 0,
+    peutCreer: aAcces('expert'),
+  };
+}
+
+/** Choisit le sous-dossier de cette tablette pour ce projet et redessine tout. */
+function choisirSousDossier(nom) {
+  definirSousDossier(nom);
+  retenirChoix(projet.id, nom);
+  recalculer({ recadrer: true });
+  navigation?.mettreAJour?.();
 }
 
 function enregistrerBientot() {
@@ -8384,10 +8756,24 @@ document.addEventListener('keydown', (evenement) => {
   evenement.preventDefault();
 });
 
+/** Pastille du sous-dossier choisi, dans l'en-tête (0.251.0) : cachée sous « Tout » ; la toucher ouvre la page Applications pour en changer. */
+function mettreAJourPastilleDossier() {
+  const pastille = document.querySelector('#pastille-dossier');
+  if (!pastille) return;
+  const choisi = sousDossierChoisi();
+  pastille.hidden = !choisi;
+  if (!choisi) return;
+  const liste = lireSousDossiers(projet);
+  pastille.textContent = choisi === SANS_SOUS_DOSSIER ? '📁 Sans dossier' : `📁 ${choisi}`;
+  pastille.style.background = choisi === SANS_SOUS_DOSSIER ? '#6b7280' : liste.find((d) => d.nom === choisi)?.couleur ?? '#6b7280';
+  pastille.title = 'Dossier choisi : touche pour en changer';
+}
+
 /** Ligne sous le titre du projet (en-tête) : sous-titre et l'état de Drive si connecté. */
 function mettreAJourEtatEntete() {
   // Titre : affaire - lieu (ou le nom, sinon « Projet sans nom 2 »…).
   document.querySelector('#titre-projet').textContent = titreProjet(projet);
+  mettreAJourPastilleDossier();
 
   const drive = partage?.etat.connecte
     ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive', rendu: 'Drive : main rendue' }[partage.etat.etat] ?? 'Drive : en attente'
@@ -8440,8 +8826,8 @@ function mettreAJourEtatEntete() {
   pastille.hidden = !partage?.etat.connecte;
   // Main rendue (bouton, ou 5 minutes sans rien faire) : « 🔒 Lecture seule · main rendue » en gris ; toucher = la reprendre.
   const rendu = partage?.etat.connecte && partage.etat.rendu?.projetId === projet.id;
-  if (repris) pastille.textContent = `🔒 ${repris.nom} a la main`;
-  else if (rendu) pastille.textContent = '🔒 Lecture seule · main rendue';
+  if (repris) pastille.innerHTML = `${ICONES_LIGNE.cadenas} ${echapper(repris.nom)} a la main`;
+  else if (rendu) pastille.innerHTML = `${ICONES_LIGNE.cadenas} Lecture seule · main rendue`;
   else pastille.innerHTML = `<svg class="main-verrou" viewBox="0 0 24 24" aria-hidden="true">${ICONE_MAIN}</svg>`;
   pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : rendu ? 'pastille-grise' : 'pastille-verte'}`;
   pastille.classList.toggle('pastille-inactive', !aAcces('expert'));
@@ -8455,6 +8841,7 @@ window.addEventListener('online', () => mettreAJourEtatEntete());
 // Main de l'en-tête (0.76.0) : rouge = prendre la main (Expert, code), grise = la reprendre,
 // verte = la rendre (le projet part sur Drive, un autre appareil peut la prendre).
 // Depuis 0.90.0, seulement en Expert : en Base et Intermédiaire on voit la main sans pouvoir la toucher.
+document.querySelector('#pastille-dossier')?.addEventListener('click', () => navigation?.ouvrirPage?.());
 document.querySelector('#pastille-verrou').addEventListener('click', async () => {
   if (!aAcces('expert')) return;
   if (partage?.etat.repris?.projetId === projet.id) partage.prendreLaMain();
@@ -8638,9 +9025,9 @@ setInterval(() => {
   });
 }, 30_000);
 
-/** Petit message sous l'en-tête, qui disparaît tout seul après "duree" millisecondes (null : il reste). */
+/** Petit message sous l'en-tête (0.241.0 : toujours en haut), qui disparaît tout seul après "duree" millisecondes (null : il reste). */
 let minuterieMessage = null;
-function afficherMessage(texte, duree = 2000) {
+function afficherMessage(texte, duree = 2000, { ok = false } = {}) {
   let zone = document.querySelector('#message-flottant');
   if (!zone) {
     zone = document.createElement('div');
@@ -8652,6 +9039,9 @@ function afficherMessage(texte, duree = 2000) {
     document.body.append(zone);
   }
   zone.textContent = texte;
+  // 0.241.0 : toujours en haut, sous l'en-tête ; il laisse passer le toucher sauf s'il reste affiché (durée null).
+  zone.classList.toggle('message-fermable', duree === null);
+  zone.classList.toggle('message-ok', ok);
   zone.hidden = false;
   clearTimeout(minuterieMessage);
   if (duree !== null) minuterieMessage = setTimeout(() => (zone.hidden = true), duree);
@@ -8723,6 +9113,9 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   // 0.128 : listes de points et plans / calques DXF masqués = choix de CET appareil, gardés au
   // redémarrage et jamais repris d'une autre tablette (aussi pour une version reçue de Drive).
   appliquerAffichage(projet);
+  // 0.251.0 : sous-dossier choisi sur CETTE tablette pour ce projet (« Tout » au départ) ; les éléments déjà là ne sont jamais rangés d'office.
+  definirSousDossier(lireChoix(projet));
+  elementsConnus = new Set(elementsRangeables(projet).map(({ element }) => element.id));
   // Cadastre (0.116.4) : plan DXF relié à sa liste de points.
   lierCadastres(projet);
   // Anciens projets : un libellé absent de la liste mais utilisé par des points est recréé, pour ce projet seulement (0.105.5).
@@ -8752,7 +9145,7 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
     noterJournal({ type: 'ouverture' });
   }
   // RX2 déjà connecté : rappel du contrôle pour ce projet, s'il en faut un.
-  if (etatRecepteur?.connecte) proposerControle();
+  if (etatRecepteur?.connecte) proposerControleApresDelai();
 }
 
 /**

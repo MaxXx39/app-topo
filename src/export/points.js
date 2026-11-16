@@ -46,14 +46,18 @@ export function infosAnnotation(p) {
   return [
     p.nom, formaterNombre(p.est), formaterNombre(p.nord), p.altitude == null ? '' : formaterNombre(p.altitude),
     le ? le.toLocaleDateString('fr-CH') : '', le ? le.toLocaleTimeString('fr-CH') : '',
-    PRISES[a.source] ?? '', nombre(a.precision, 2), (a.remarques ?? []).join(' | '),
+    PRISES[a.source] ?? '', nombre(a.precision), (a.remarques ?? []).join(' | '),
   ];
 }
 
 // Qualité de la position (message GGA du récepteur) : 4 = RTK fixe, 5 = RTK flottant…
 const QUALITES = { 1: 'autonome', 2: 'DGPS', 4: 'RTK fixe', 5: 'RTK flottant' };
 
-const nombre = (valeur, decimales = 3) => (typeof valeur === 'number' && Number.isFinite(valeur) ? valeur.toFixed(decimales) : '');
+const nombre = (valeur, decimales = 3) => {
+  if (typeof valeur !== 'number' || !Number.isFinite(valeur)) return '';
+  const texte = valeur.toFixed(decimales);
+  return /^-0\.0+$/.test(texte) ? texte.slice(1) : texte; // jamais « -0.000 »
+};
 
 /** Texte TXT : « nom<tab>Est<tab>Nord<tab>altitude » (altitude vide si inconnue). */
 export function txtPoints(points) {

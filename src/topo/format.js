@@ -8,5 +8,11 @@
 export function formaterNombre(valeur) {
   // Valeur inconnue (altitude d'un point ajouté sans altitude…) : un tiret.
   if (typeof valeur !== 'number' || !Number.isFinite(valeur)) return '—';
-  return valeur.toFixed(3);
+  return fixe3(valeur);
+}
+
+/** Nombre à 3 décimales, sans jamais « -0.000 » (une valeur toute proche de zéro s'écrit 0.000). */
+export function fixe3(valeur) {
+  const texte = valeur.toFixed(3);
+  return texte === '-0.000' ? '0.000' : texte;
 }

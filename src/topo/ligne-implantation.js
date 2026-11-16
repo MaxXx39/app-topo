@@ -81,6 +81,27 @@ export function altitudeSurLigne(abscisse, sommets, altitudesTapees = {}) {
 }
 
 /**
+ * Pente d'un segment de la ligne (%), positive en montant dans le sens de la ligne : dénivelé ÷ longueur
+ * en plan × 100 (même définition que Mesure rapide). "segment" = numéro du segment (0 = le premier).
+ * Comme pour altitudeSurLigne : si les altitudes du début et de la fin sont tapées, la pente est celle
+ * de toute la ligne (constante) ; sinon ce sont les altitudes des sommets. null si une altitude manque
+ * ou si le segment n'a pas de longueur.
+ */
+export function penteDuSegment(segment, sommets, altitudesTapees = {}) {
+  const a = sommets[segment];
+  const b = sommets[segment + 1];
+  if (!a || !b) return null;
+  const { debut, fin } = altitudesTapees;
+  if (debut != null && fin != null) {
+    const longueur = longueurPolyligne(sommets);
+    return longueur > 0 ? ((fin - debut) / longueur) * 100 : null;
+  }
+  if (a.altitude == null || b.altitude == null) return null;
+  const longueur = Math.hypot(b.est - a.est, b.nord - a.nord);
+  return longueur > 0 ? ((b.altitude - a.altitude) / longueur) * 100 : null;
+}
+
+/**
  * Guidage vers la ligne (ou sa parallèle à "decalageVoulu" m, + à droite) :
  * { abscisse, longueur, reste (jusqu'à la fin, m), decalage (de la canne par rapport à la ligne),
  *   ecart (décalage − décalage voulu : > 0 la canne est trop à droite, il faut aller à gauche),
@@ -97,6 +118,8 @@ export function guidageLigne(position, sommets, { decalageVoulu = 0, altitudes =
     decalage: sur.decalage,
     ecart: sur.decalage - decalageVoulu,
     segment: sur.segment,
+    // Pente du segment où se trouve la canne (%), null sans altitudes.
+    pente: penteDuSegment(sur.segment, sommets, altitudes),
     cible: {
       est: sur.projete.est + sur.droite.est * decalageVoulu,
       nord: sur.projete.nord + sur.droite.nord * decalageVoulu,

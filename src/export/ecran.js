@@ -1,5 +1,6 @@
 // Formulaire d'export : échelle, calques et cartouche du PDF (dessiné par, date ; affaire et lieu du projet),
 // boutons PDF, CSV, DXF et LandXML.
+import { nomFichierExport } from '../outils/nom-fichier.js';
 import { genererCsv } from './csv.js';
 import { genererDxf } from './dxf.js';
 import { EQUIDISTANCES_PDF } from './mise-en-page.js';
@@ -110,6 +111,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
   conteneur.addEventListener('change', () => {
     retenirReglages(conteneur, format);
     resumer();
+    expliquerCsv();
   });
   // Ce qui est exporté : seulement ce qui est coché dans « Quoi exporter ? ».
   const obtenirDonnees = () => donneesChoisies(choix.selection());
@@ -128,7 +130,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
       message.textContent = 'CSV téléchargé.';
     },
     dxf: () => {
-      const { points, dessinSurfaces, dessins } = obtenirDonnees();
+      const { points, dessinSurfaces, dessins, parcelles = [] } = obtenirDonnees();
       const { stocks, resultats, surfaces } = dessinSurfaces;
       const triangles = resultats.flatMap((r) => r.trianglesDessus ?? []);
       const plage = triangles.length > 0 ? plageAltitudes(triangles) : null;
@@ -139,6 +141,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
         surfaces,
         equidistance: plage ? equidistanceAuto(plage.min, plage.max) : null,
         dessins,
+        parcelles,
       });
       // Photo aérienne (0.98.0) : son GeoTIFF est fabriqué quand la fenêtre du DXF se ferme.
       const avecPhoto = champ('geotiff').checked;
@@ -164,7 +167,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
       message.textContent = `LandXML téléchargé (${liste.length} surface(s)).`;
     },
     pdf: async () => {
-      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos, coupes, dessins, levesSeuls = [] } = obtenirDonnees();
+      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos, coupes, dessins, levesSeuls = [], parcelles = [] } = obtenirDonnees();
       // Sans volume, le PDF montre quand même les points, levés et dessins cochés (levé seul).
       if (!verifier(volumes, points.length > 0 || dessins.length > 0 || levesSeuls.length > 0)) return;
       message.textContent = 'Préparation du PDF…';
@@ -192,6 +195,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
           photos,
           coupes,
           dessins,
+          parcelles,
           levesSeuls,
           calques,
           cartouche: {
@@ -228,11 +232,24 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     else if (format === 'landxml') texte = champ('landxml-contour').checked ? 'avec contour et lignes de rupture' : 'triangles seulement';
     zone.textContent = texte;
   }
+  /**
+   * 0.241.0 (audit, lot 4) : le CSV du plan est le tableau des volumes. Sans volume calculé, le bouton est grisé
+   * et une phrase dit pourquoi et où trouver l'export des points (avant : « Rien de coché » après le toucher).
+   */
+  function expliquerCsv() {
+    const bouton = conteneur.querySelector('[data-action="exporter"]');
+    const sansVolume = format === 'csv' && !obtenirDonnees().volumes.some(({ resultat }) => resultat && !resultat.erreurs);
+    bouton.disabled = sansVolume;
+    if (sansVolume) message.textContent = 'Le CSV du plan est le tableau des volumes : aucun volume calculé ici. Pour les points, utilise « Exporter › Points ».';
+    else if (format === 'csv' && message.textContent.startsWith('Le CSV du plan')) message.textContent = '';
+  }
   function montrerFormat() {
     resumer();
     for (const puce of conteneur.querySelectorAll('[data-format]')) puce.classList.toggle('actif', puce.dataset.format === format);
     for (const bloc of conteneur.querySelectorAll('[data-pour]')) bloc.hidden = !bloc.dataset.pour.split(' ').includes(format);
     conteneur.querySelector('[data-action="exporter"]').textContent = `Exporter en ${FORMATS.find(([cle]) => cle === format)[1]}`;
+    if (format !== 'csv') conteneur.querySelector('[data-action="exporter"]').disabled = false;
+    expliquerCsv();
   }
   conteneur.addEventListener('click', (evenement) => {
     const puce = evenement.target.closest('button[data-format]');
@@ -290,8 +307,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
 
   /** Nom des fichiers : volumes_<affaire>_<date>. */
   function nomDeFichier() {
-    const affaire = (obtenirDonnees().cartouche.affaire ?? '').replace(/[^\w-]+/g, '_') || 'stocks';
-    return `volumes_${affaire}_${dateDuPlan()}`;
+    return nomFichierExport(obtenirDonnees().cartouche.affaire, 'volumes', dateDuPlan());
   }
 }
 

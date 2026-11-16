@@ -39,7 +39,7 @@ export function creerModuleExport(conteneur, actions) {
       <p class="titre-choix titre-etape">Quoi ?</p>
       <div class="tuiles-export" role="group" aria-label="Quoi exporter">
         ${SORTES.filter(([cle]) => PRINCIPALES[cle]).map(([cle, titre, niveau]) => `<button type="button" class="tuile-export ${niveau ? `seulement-${niveau}` : ''}" data-sorte="${cle}"><strong>${cle === 'listes' ? 'Points' : cle === 'plan' ? 'Plan' : titre}</strong><small>${PRINCIPALES[cle]}</small></button>`).join('')}
-        <button type="button" class="tuile-export" data-action="autres" aria-expanded="false"><strong>Autres ▾</strong><small>mesures, réseaux…</small></button>
+        <button type="button" class="tuile-export seulement-expert" data-action="autres" aria-expanded="false"><strong>Autres ▾</strong><small>mesures, réseaux…</small></button>
       </div>
       <div class="choix-sorte-export autres-export" role="group" aria-label="Autres exports" hidden>
         ${SORTES.filter(([cle]) => !PRINCIPALES[cle]).map(([cle, titre, niveau]) => `<button type="button" class="puce-choix ${niveau ? `seulement-${niveau}` : ''}" data-sorte="${cle}">${titre}</button>`).join('')}

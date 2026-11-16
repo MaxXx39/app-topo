@@ -4,7 +4,7 @@
 // contient ; avec GEOMETRY=true, son contour. Le cercle est couvert par une grille de points ;
 // un point déjà dans une parcelle trouvée n'est pas redemandé. Essayé à l'aveugle : les
 // variantes d'adresse (EN = version 2, XY = version 1) sont essayées dans l'ordre.
-import { grilleDuCercle, pasDeGrille, dansAnneau, contoursDeReponse, egridsDuTexte, contourDuExtrait } from '../topo/cadastre.js';
+import { grilleDuCercle, pasDeGrille, dansAnneau, contoursDeReponse, egridsDuTexte, contourDuExtrait, numeroDeParcelle } from '../topo/cadastre.js';
 
 export const ADRESSE_RDPPF_VD = 'https://www.rdppf.vd.ch/ws/RdppfSVC.svc';
 const POINTS_MAX = 150; // demandes au plus pour un cercle
@@ -26,6 +26,7 @@ export function adressesGetEgrid(base, est, nord) {
 export async function telechargerRdppf(centre, rayon, progres = () => {}, chercher = (...args) => fetch(...args), base = ADRESSE_RDPPF_VD) {
   const grille = grilleDuCercle(centre, rayon, pasDeGrille(rayon)).slice(0, POINTS_MAX);
   const anneaux = [];
+  const parcelles = []; // 0.249.0 : [{ numero, anneau }] (numéro lu dans la réponse du service, jamais inventé)
   const vus = new Set();
   let variante = null; // numéro de la variante d'adresse qui marche
   let derniere = '';
@@ -60,19 +61,29 @@ export async function telechargerRdppf(centre, rayon, progres = () => {}, cherch
       }
       variante = i;
       // 0.112.8 : Vaud répond sans contour (essai du 03.11) : on demande l'extrait de chaque parcelle.
+      const numeros = new Map(); // anneau → numéro de la parcelle
       if (contours.length === 0) {
         for (const egrid of egrids) {
           if (egridsFaits.has(egrid)) continue;
           egridsFaits.add(egrid);
           progres(`Cadastre Vaud (RDPPF) : contour de la parcelle ${egrid}…`);
-          contours.push(...(await contourParExtrait(chercher, base, egrid)));
+          const { anneaux: lus, numero } = await contourParExtrait(chercher, base, egrid);
+          contours.push(...lus);
+          // Le numéro vient de l'extrait ; à défaut, de la réponse GetEGRID quand elle ne parle que d'une parcelle.
+          const retenu = numero || (egrids.length === 1 ? numeroDeParcelle(texte) : '');
+          if (retenu && lus[0]) numeros.set(lus[0], retenu);
         }
+      } else if (contours.length === 1 && egrids.length <= 1) {
+        // Une seule parcelle dans la réponse : son numéro est celui de la réponse.
+        const numero = numeroDeParcelle(texte);
+        if (numero) numeros.set(contours[0], numero);
       }
       for (const anneau of contours) {
         const cle = anneau.slice(0, 3).map((p) => p.map((v) => v.toFixed(2)).join(',')).join(';') + anneau.length;
         if (vus.has(cle)) continue;
         vus.add(cle);
         anneaux.push(anneau);
+        if (numeros.get(anneau)) parcelles.push({ numero: numeros.get(anneau), anneau });
       }
       break;
     }
@@ -83,7 +94,7 @@ export async function telechargerRdppf(centre, rayon, progres = () => {}, cherch
     if (variante === null && demandes >= 5) throw new Error(`service RDPPF de Vaud : ${messageService(derniere)}`);
   }
   if (anneaux.length === 0) throw new Error(`service RDPPF de Vaud : ${messageService(derniere)}`);
-  return { points: [], lignes: anneaux };
+  return { points: [], lignes: anneaux, parcelles };
 }
 
 function messageService(derniere) {
@@ -112,6 +123,14 @@ export function adressesExtrait(base, egrid) {
 
 let varianteExtrait = null; // variante d'adresse de l'extrait qui a marché (gardée pour la suite)
 
+/** Numéro du bien-fonds dans un extrait RDPPF (XML ou JSON) : cherché dans la partie « RealEstate » seulement (l'extrait contient d'autres numéros). */
+function numeroDuBienFonds(texte) {
+  const xml = /<(?:\w+:)?RealEstate\b[\s\S]*?<\/(?:\w+:)?RealEstate>/.exec(texte)?.[0];
+  if (xml) return numeroDeParcelle(xml);
+  const json = /"RealEstate"\s*:\s*\{[\s\S]{0,600}/i.exec(texte)?.[0];
+  return json ? numeroDeParcelle(json) : '';
+}
+
 /** Contour d'une parcelle par son extrait RDPPF ; erreur claire (raisons du service) sinon. */
 async function contourParExtrait(chercher, base, egrid) {
   const adresses = adressesExtrait(base, egrid);
@@ -133,7 +152,7 @@ async function contourParExtrait(chercher, base, egrid) {
     const anneaux = contourDuExtrait(texte);
     if (anneaux.length > 0) {
       varianteExtrait = i;
-      return anneaux;
+      return { anneaux, numero: numeroDuBienFonds(texte) };
     }
     raisons.push(`extrait sans contour « ${texte.replace(/\s+/g, ' ').slice(0, 150)} » (${adresses[i].replace(base, '')})`);
   }

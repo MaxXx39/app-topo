@@ -129,8 +129,10 @@ describe('forme du libellé, couleur de la nature', () => {
     expect(couleurDeNature('Inconnue')).toBe('#6b7280');
   });
   it('chaque libellé de départ a une forme et un nom court', () => {
-    expect(DEPART.map((l) => l.court)).toEqual(['Chamb.', 'Gril.', 'Tuyau', 'Cap de v.', 'Born.', 'Cabl.', 'Four.', 'Bord.']);
-    expect(new Set(DEPART.map((l) => l.forme)).size).toBe(DEPART.length);
+    // « Libre » (0.249.0) est en premier ; les autres ont chacun leur forme.
+    expect(DEPART.map((l) => l.court)).toEqual(['Libre', 'Chamb.', 'Gril.', 'Tuyau', 'Cap de v.', 'Born.', 'Cabl.', 'Four.', 'Bord.']);
+    const sansLibre = DEPART.filter((l) => !l.libre);
+    expect(new Set(sansLibre.map((l) => l.forme)).size).toBe(sansLibre.length);
   });
 });
 
@@ -153,5 +155,17 @@ describe('gaines, nombre et listes de diamètres', () => {
     const r = lireAttributsChantier(cb, { nature: 'Swisscom', gaine: '120/132', nombre: 2 });
     expect(texteDuPoint(r.attributs, {})).toBe('Ø132 ×2');
     expect(lireAttributsChantier(cb, { nature: 'Swisscom' }).attributs.diametre).toBeUndefined();
+  });
+});
+
+describe('libellé « Libre » (0.249.0)', () => {
+  it('est le premier libellé de départ, sans nature ni attribut sauf la remarque', async () => {
+    const { LIBELLES_CHANTIER_DEPART, lireAttributsChantier } = await import('../src/topo/chantier.js');
+    const libre = LIBELLES_CHANTIER_DEPART[0];
+    expect(libre.libre).toBe(true);
+    expect(libre.champs).toEqual(['remarque']);
+    const r = lireAttributsChantier(libre, { nature: 'EU', diametre: '200', remarque: ' regard à vérifier ' });
+    expect(r.erreur).toBeUndefined();
+    expect(r.attributs).toEqual({ libelle: 'LIB', nature: '', remarque: 'regard à vérifier' });
   });
 });

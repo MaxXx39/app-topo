@@ -4,6 +4,7 @@
 // - couleur selon deux limites par tolérance : vert jusqu'à la 1re, orange jusqu'à la 2e, rouge au-delà ;
 // - rappel : un contrôle réussi (vert ou orange) est demandé chaque jour, puis toutes les 4 heures
 //   (durée réglable par projet depuis 0.90.0, en Expert : 2 h pour un chantier sensible…).
+import { fixe3 } from './format.js';
 
 // Tolérances par défaut (m), choisies par l'utilisateur le 26.10.2026 : plan et hauteur 2 cm / 4 cm.
 export const TOLERANCES_PAR_DEFAUT = { plan: { vert: 0.02, orange: 0.04 }, hauteur: { vert: 0.02, orange: 0.04 } };
@@ -124,7 +125,7 @@ export function dateHeure(iso) {
  * refus a seulement sa date, son appareil et « Refus ».
  */
 export function csvControles(controles) {
-  const n = (valeur) => (valeur == null ? '' : valeur.toFixed(3));
+  const n = (valeur) => (valeur == null ? '' : fixe3(valeur));
   const texte = (valeur) => {
     const t = String(valeur ?? '');
     return /[;"\r\n]/.test(t) ? `"${t.replaceAll('"', '""')}"` : t;

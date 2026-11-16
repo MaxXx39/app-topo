@@ -38,6 +38,7 @@ import { symboleDeForme } from '../plan/formes.js';
 import { COULEURS_HABITUELLES } from './libelles.js';
 import { htmlRegleHauteur } from './regle-hauteur.js';
 import { ouvrirFenetrePointTape, ouvrirListePoints } from './fenetres-points.js';
+import { ICONES_LIGNE } from '../outils/icones.js';
 
 // Mode Contrôler : ce qu'on implante (point, ligne, talus, surface), vue des coupes, longueurs.
 const IMPLANTATIONS = [
@@ -523,8 +524,11 @@ export function creerEcranLeve(conteneur, actions) {
     const c = direct?.controle;
     if (zone) {
       if (!c || c.ecart == null) {
-        zone.className = 'ecart-direct attente';
-        zone.innerHTML = `<span class="message-ecart">${echapper(c?.message ?? (donnees.controle.implantation === 'altitude' ? 'Tape l\'altitude voulue' : 'Choisis une surface'))}</span>`;
+        // 0.239.0 : même encadré turquoise que « Touche un point / une ligne sur le plan », mais la flèche descend vers la
+        // liste / le champ de la barre du bas (la surface se choisit dans une liste, l'altitude se tape : pas sur le plan).
+        const texte = c?.message ?? (donnees.controle.implantation === 'altitude' ? 'Tape l\'altitude voulue' : 'Choisis une surface');
+        zone.className = 'ecart-direct attente invite-choix invite-courte invite-bas';
+        zone.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6" /></svg><strong class="message-ecart">${echapper(texte === 'Choisis une surface' ? 'Choisis une surface dans la liste' : texte)}</strong>`;
       } else {
         const monter = c.ecart >= 0;
         zone.className = `ecart-direct ${c.classe}`;
@@ -541,7 +545,7 @@ export function creerEcranLeve(conteneur, actions) {
       const coupe = c?.coupes?.[sens];
       cadre.innerHTML = coupe
         ? svgCoupeDirecte({ ...TITRES_COUPES[sens], ...coupe, classe: c.classe, sens, exageration: donnees.controle.exagerationCoupe, grille: aAcces('expert') })
-        : `<p class="aide">${TITRES_COUPES[sens].titre} : ${c?.messageCoupes ?? 'en attente de la position'}</p>`;
+        : `<div class="coupe-attente"><span>${TITRES_COUPES[sens].titre} : ${echapper(c?.messageCoupes ?? 'en attente de la position')}</span></div>`;
     }
   }
 
@@ -581,7 +585,7 @@ export function creerEcranLeve(conteneur, actions) {
       return `${choixImplantation}
         <div class="ligne-altitude-voulue">
           <label class="champ-altitude-voulue">Altitude voulue<input type="text" inputmode="decimal" data-champ="altitude-voulue" value="${reglages.altitudeVoulue != null ? Number(reglages.altitudeVoulue).toFixed(3) : ''}" placeholder="ex. 412.350" /></label>
-          <button type="button" class="bouton-secondaire bouton-altitude-ici" data-action="prendreAltitudeIci">📍 Altitude ici</button>
+          <button type="button" class="bouton-secondaire bouton-altitude-ici" data-action="prendreAltitudeIci">${ICONES_LIGNE.repere} Altitude ici</button>
         </div>
         ${ecartEtRegle()}`;
     }
@@ -595,6 +599,7 @@ export function creerEcranLeve(conteneur, actions) {
         : '<p class="vide">Aucune surface.</p>'}
       ${ecartEtRegle()}
       <div class="ligne-choix choix-coupe seulement-intermediaire">${boutonsChoix('choisirVueCoupes', VUES_COUPES, vue)}
+        ${aAcces('expert') && donnees.nbReseaux > 0 ? `<button type="button" class="puce-choix ${reglages.cana ? 'actif' : ''}" data-action="basculerCana" role="switch" aria-checked="${Boolean(reglages.cana)}" title="Montrer les tuyaux et les tranchées des réseaux dans les coupes">${reglages.cana ? '☑' : '☐'} Cana</button>` : ''}
         <button type="button" class="bouton-roue ${reglagesCoupesOuverts ? 'actif' : ''}" data-action="basculerReglagesCoupes" aria-label="Réglages des coupes" aria-expanded="${reglagesCoupesOuverts}">⚙</button></div>
       ${reglagesCoupesOuverts ? champDeltaSurface(donnees.deltaSurface) : ''}
       <div class="coupes-directes vue-${vue}">
@@ -609,7 +614,7 @@ export function creerEcranLeve(conteneur, actions) {
   /** Delta Z de la surface (0.152.0, dès Intermédiaire) : champ (m, + = plus haut) et bouton « 0 ». */
   function champDeltaSurface(delta) {
     return `<div class="ligne-choix seulement-intermediaire ligne-delta-surface">
-        <label>Δ Z surface <input type="text" inputmode="decimal" data-champ="delta-surface" value="${delta ? Number(delta).toFixed(3) : ''}" placeholder="0.000" /> m</label>
+        <label>Δ Z surface <input type="text" inputmode="text" data-champ="delta-surface" value="${delta ? Number(delta).toFixed(3) : ''}" placeholder="0.000" /> m</label>
         <button type="button" class="bouton-secondaire" data-action="deltaSurfaceZero" ${delta ? '' : 'disabled'}>0</button>
         <span class="aide">+ plus haut</span>
       </div>`;
@@ -627,7 +632,7 @@ export function creerEcranLeve(conteneur, actions) {
   /** Bouton 🔔 / 🔕 : bip-bip de hauteur marche / arrêt (retenu sur cet appareil). */
   function boutonBip() {
     const actif = donnees.controle.bip !== false;
-    return `<button type="button" class="bouton-bip ${actif ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${actif}" title="${actif ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${actif ? 'Couper le bip' : 'Remettre le bip'}">${actif ? '🔔' : '🔕'}</button>`;
+    return `<button type="button" class="bouton-bip ${actif ? '' : 'coupe'}" data-action="basculerBip" aria-pressed="${actif}" title="${actif ? 'Couper le bip' : 'Remettre le bip'}" aria-label="${actif ? 'Couper le bip' : 'Remettre le bip'}">${actif ? ICONES_LIGNE.cloche : ICONES_LIGNE.clocheBarree}</button>`;
   }
 
   /** Bandeau sarcelle : ce qu'il faut faire maintenant (flèche vers le plan) ; 0.152.0 : une seule ligne courte. */
@@ -653,9 +658,9 @@ export function creerEcranLeve(conteneur, actions) {
     // Accroche « Point » : un point tapé (+ Point, pas pour une ligne ; 0.159.0 : Expert) ou choisi dans la liste.
     const outilsPoint = active === 'point'
       ? `<span class="separateur-accroche"></span>
-        ${enLigne ? '' : '<button type="button" class="bouton-outil-accroche seulement-expert" data-action="ouvrirFormulairePoint" title="Taper un point (Est, Nord, H)">+ Point</button>'}
+        ${enLigne ? '' : `<button type="button" class="bouton-outil-accroche seulement-expert" data-action="ouvrirFormulairePoint" title="Taper un point (Est, Nord, H)">+ Point</button>`}
         <button type="button" class="bouton-outil-accroche" data-action="ouvrirListePoints" title="Choisir un point dans la liste du projet">Liste</button>
-        ${enLigne ? '' : '<button type="button" class="bouton-outil-accroche seulement-expert" data-action="basculerPlusProche" title="Le plus proche : implanter le point du plan le plus proche, la cible suit quand tu te déplaces">⌖ Proche</button>'}`
+        ${enLigne ? '' : `<button type="button" class="bouton-outil-accroche seulement-expert" data-action="basculerPlusProche" title="Le plus proche : implanter le point du plan le plus proche, la cible suit quand tu te déplaces">${ICONES_LIGNE.viseur} Proche</button>`}`
       : '';
     // « Manuel » (0.151.0) : flèches (1 pixel de la loupe) et zoom ×2 / ×4 / ×8, comme au recalage.
     const outilsManuel = active === 'manuel' && !enLigne
@@ -709,6 +714,9 @@ export function creerEcranLeve(conteneur, actions) {
         </div>`
       : '';
     if (fiche) return `${fiche}${lienExport()}`;
+    // 0.234.0 : ligne faite de points touchés un à un : même gros bouton « Implanter » que pour un point ou
+    // une ligne touchée (relayé en bas à droite du plan et dans la bande) ; le talus garde son bouton.
+    const pointsLigneImplantable = points.length >= 2 && donnees.controle.implantation !== 'talus';
     return `
       <div class="points-ligne">
         <p class="titre-choix">Points de la ligne</p>
@@ -716,7 +724,10 @@ export function creerEcranLeve(conteneur, actions) {
           ? '<p class="vide">Aucun point.</p>'
           : `<ol>${points.map((p, i) => `<li><strong>${role(i)}</strong> ${p.nom ? echapper(p.nom) : ''} <span class="aide"><span class="coord-en">E ${formaterNombre(p.est)} · N ${formaterNombre(p.nord)} · </span>H ${formaterNombre(p.altitude)}</span></li>`).join('')}</ol>`}
         <div class="ligne-outils">
-          <button type="button" class="bouton-secondaire" data-action="implanterPointsLigne" ${points.length < 2 ? 'disabled' : ''}>${donnees.controle.implantation === 'talus' ? 'Talus depuis cette ligne' : 'Implanter cette ligne'}</button>
+          ${pointsLigneImplantable
+    ? `<button type="button" class="bouton bouton-implanter" data-action="implanterPointsLigne">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M1 12h4M19 12h4" /></svg>Implanter</button>`
+    : `<button type="button" class="bouton-secondaire" data-action="implanterPointsLigne" ${points.length < 2 ? 'disabled' : ''}>${donnees.controle.implantation === 'talus' ? 'Talus depuis cette ligne' : 'Implanter cette ligne'}</button>`}
           ${points.length > 0 ? '<button type="button" class="bouton-lien" data-action="retirerDernierPointLigne">enlever le dernier</button>' : ''}
         </div>
       </div>
@@ -739,6 +750,9 @@ export function creerEcranLeve(conteneur, actions) {
     if (bouton) bouton.disabled = !(etat?.connecte && etat?.autorise && donnees.implanter.ligne);
     const zone = conteneur.querySelector('[data-vivant="guidage-ligne"]');
     if (!zone) return;
+    // 0.236.0 : profil en long d'un réseau, seulement à moins de 1 m de la ligne (G / D) ; sinon la zone est vide (cachée).
+    const zoneProfil = conteneur.querySelector('[data-vivant="profil-reseau"]');
+    if (zoneProfil) zoneProfil.innerHTML = g?.profilReseau ? `<p class="titre-profil-reseau">Profil en long</p>${g.profilReseau}` : '';
     if (!g || g.message) {
       bandeCouloir = 0;
       zone.className = 'guidage-direct attente';
@@ -758,11 +772,15 @@ export function creerEcranLeve(conteneur, actions) {
     // Position le long : avant le début, après la fin, ou depuis le début (+ la fin en petit).
     // 0.118.1 : dans son propre bloc, coloré selon l'écart au bout le plus proche (tolérance en plan
     // du Contrôle : vert = on est sur le début ou la fin).
+    // 0.234.0 : pente du segment où se trouve la canne (%), à gauche de « fin … m » ; rien sans altitudes.
+    const penteSegment = g.ligne.pente;
+    const pente = penteSegment == null ? ''
+      : `<span class="pente-segment" title="Pente du segment en cours">${penteSegment >= 0 ? '↗ +' : '↘ −'}${Math.abs(penteSegment).toFixed(2)} %</span>`;
     let leLong;
     if (abscisse < 0) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}Avant le début</span><strong>${m(abscisse)}</strong></div>`;
     else if (abscisse > longueur) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('fin')}Après la fin</span><strong>${m(abscisse - longueur)}</strong></div>`;
     else leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}Début</span><strong>${m(abscisse)}</strong></div>
-        <div class="fin-petite">${iconeDrapeau('fin')}fin ${m(reste)}</div>`;
+        <div class="fin-petite">${pente}${iconeDrapeau('fin')}fin ${m(reste)}</div>`;
     const hauteur = g.ecartAltitude == null
       ? '<div class="bloc-hauteur sans-altitude">pas d\'altitude</div>'
       : `<div class="bloc-hauteur ${g.classeAltitude}"><span class="libelle-ecart">${iconeFleche(g.ecartAltitude >= 0 ? 'monter' : 'descendre')}${g.ecartAltitude >= 0 ? 'Monter' : 'Descendre'}</span><strong>${m(g.ecartAltitude)}</strong></div>`;
@@ -805,13 +823,17 @@ export function creerEcranLeve(conteneur, actions) {
           </div>
         </div>`
       : '';
+    // 0.245.0 (audit, lot 8, Intermédiaire) : la liste montre ce qui est déjà implanté : coche verte et écart (orange au-delà de 2 cm,
+    // rouge au-delà de 4 cm, tolérances du Contrôle), et le titre compte les points faits.
+    const nbFaits = imp.aImplanter.filter((p) => p.fait).length;
+    const classeEcart = (distance) => (distance <= 0.02 ? 'ecart-vert' : distance <= 0.04 ? 'ecart-orange' : 'ecart-rouge');
     const liste = imp.aImplanter.length > 0
-      ? `<div class="liste-a-implanter seulement-expert">
-          <p class="titre-choix">À implanter</p>
-          ${imp.aImplanter.map((p) => `<div class="ligne-a-implanter ${imp.cible?.id === p.id ? 'actif' : ''}">
+      ? `<div class="liste-a-implanter seulement-intermediaire">
+          <p class="titre-choix">À implanter · ${nbFaits} / ${imp.aImplanter.length} fait(s)</p>
+          ${imp.aImplanter.map((p) => `<div class="ligne-a-implanter ${imp.cible?.id === p.id ? 'actif' : ''} ${p.fait ? 'implante' : ''}">
               <button type="button" class="bouton-lien bouton-lien-neutre" data-action="implanterPoint" data-valeur="${p.id}"><strong>${echapper(p.nom)}</strong></button>
-              <span class="aide">${p.fait ? `✓ ${formaterNombre(p.fait.distance)} m${p.fait.dAltitude != null ? ` · dH ${formaterNombre(p.fait.dAltitude)}` : ''}` : (p.altitude != null ? `H ${formaterNombre(p.altitude)}` : '')}</span>
-              <button type="button" class="bouton-lien" data-action="supprimerPointAImplanter" data-valeur="${p.id}" aria-label="Supprimer ${echapper(p.nom)}">×</button>
+              <span class="aide ${p.fait ? classeEcart(p.fait.distance) : ''}">${p.fait ? `<b class="coche-implante">✓</b> ${formaterNombre(p.fait.distance)} m${p.fait.dAltitude != null ? ` · dH ${formaterNombre(p.fait.dAltitude)}` : ''}` : (p.altitude != null ? `H ${formaterNombre(p.altitude)}` : '')}</span>
+              <button type="button" class="bouton-lien seulement-expert" data-action="supprimerPointAImplanter" data-valeur="${p.id}" aria-label="Supprimer ${echapper(p.nom)}">×</button>
             </div>`).join('')}
         </div>`
       : '';
@@ -858,7 +880,7 @@ export function creerEcranLeve(conteneur, actions) {
         ${!ligne && !autocontrole && imp.precedent && !imp.plusProche ? `<button type="button" class="bouton-suivant" data-action="implanterPrecedent" title="Implanter le point précédent : ${echapper(imp.precedent)}" aria-label="Point précédent : ${echapper(imp.precedent)}">◀ ${echapper(imp.precedent)}</button>` : ''}
         <p class="titre-vue-guidage">${titre}</p>
         ${ligne ? '<button type="button" class="bouton-retour" data-action="inverserLigne" title="Inverser le sens" aria-label="Inverser le sens">⇄</button>' : ''}
-        ${!ligne && !autocontrole ? `<button type="button" class="bouton-suivant bouton-plus-proche seulement-expert ${imp.plusProche ? 'actif' : ''}" data-action="basculerPlusProche" aria-pressed="${imp.plusProche}" title="Le plus proche : la cible suit le point du plan le plus proche">⌖ Proche</button>` : ''}
+        ${!ligne && !autocontrole ? `<button type="button" class="bouton-suivant bouton-plus-proche seulement-expert ${imp.plusProche ? 'actif' : ''}" data-action="basculerPlusProche" aria-pressed="${imp.plusProche}" title="Le plus proche : la cible suit le point du plan le plus proche">${ICONES_LIGNE.viseur} Proche</button>` : ''}
         ${!ligne && !autocontrole && imp.suivant && !imp.plusProche ? `<button type="button" class="bouton-suivant" data-action="implanterSuivant" title="Implanter le point suivant : ${echapper(imp.suivant)}" aria-label="Point suivant : ${echapper(imp.suivant)}">${echapper(imp.suivant)} ▶</button>` : ''}
         <button type="button" class="bouton-retour ${ouverts ? 'actif' : ''}" data-action="basculerReglagesGuidage" title="Réglages de l'implantation" aria-label="Réglages de l'implantation" aria-expanded="${ouverts}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>
@@ -869,6 +891,7 @@ export function creerEcranLeve(conteneur, actions) {
       <button type="button" class="bouton bouton-prendre ${autocontrole ? '' : 'seulement-intermediaire'}" data-action="enregistrerImplantation" disabled>
         <span>${talus ? 'ENREGISTRER L\'ENTRÉE EN TERRE' : autocontrole ? 'ENREGISTRER LE CONTRÔLE' : 'ENREGISTRER L\'IMPLANTATION'}</span><span class="sous-titre-prendre">ou touche vol −</span>
       </button>
+      ${ligne && imp.ligne && !talus ? `${!imp.ligne.reseauId && aAcces('intermediaire') && donnees.nbReseaux > 0 ? `<div class="ligne-choix"><button type="button" class="puce-choix ${donnees.controle.cana ? 'actif' : ''}" data-action="basculerCana" role="switch" aria-checked="${Boolean(donnees.controle.cana)}" title="Montrer les réseaux qui croisent la ligne dans le profil en long">${donnees.controle.cana ? '☑' : '☐'} Cana</button></div>` : ''}<div class="profil-reseau" data-vivant="profil-reseau"></div>` : ''}
       <p class="raison-leve" data-vivant="raison" hidden></p>
     </div>`;
   }
@@ -983,7 +1006,7 @@ export function creerEcranLeve(conteneur, actions) {
     return `<div class="reglages-guidage">
       <div class="ligne-choix"><span>Guidage</span>${boutonsChoix('choisirGuidage', GUIDAGES, reglages.guidage)}</div>
       ${ligne ? altitudesDesBouts() : ''}
-      ${ligne ? `<label class="champ-decalage">Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
+      ${ligne ? `<label class="champ-decalage">Décalage parallèle (m)<input type="text" inputmode="text" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
       <p class="aide" data-vivant="orientation"></p>
     </div>`;
   }
@@ -1109,7 +1132,7 @@ export function creerEcranLeve(conteneur, actions) {
           <label class="champ-delta">dist.<input type="text" inputmode="decimal" data-delta="distance" value="${echapper(d.distance)}" placeholder="0.000" autocomplete="off" /></label>
         </div>
         <div class="rang-delta rang-z">
-          <label class="champ-delta">Z ±<input type="text" inputmode="decimal" data-delta="z" value="${echapper(d.z)}" placeholder="0.000" autocomplete="off" /></label>
+          <label class="champ-delta">Z ±<input type="text" inputmode="text" data-delta="z" value="${echapper(d.z)}" placeholder="0.000" autocomplete="off" /></label>
         </div>
         <button type="button" class="bouton-fermer-delta" data-action="reglerDelta" data-champ-delta="effacer" title="Fermer le delta (remis à zéro)" aria-label="Fermer le delta (remis à zéro)">×</button>
       </div>`;
@@ -1220,11 +1243,11 @@ export function creerEcranLeve(conteneur, actions) {
     return `<div class="element-en-cours role-ligne">
       <span class="titre-element">Ligne en cours</span>
       <div class="corps-element">
-        <strong>${echapper(debutDeNom('L', ligne.libelle))}${ligne.numero}</strong><span>${ligne.nbPoints} pt(s)</span>
-        <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}>+ Nouvelle ligne</button>
-        <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="reprendreLigne">Continuer une ligne</button>
+        <strong>${echapper(debutDeNom('L', ligne.libelle))}${ligne.numero}</strong><span class="nb-points-ligne">${ligne.nbPoints} pt(s)</span>
+        <button type="button" class="bouton-secondaire" data-action="nouvelleLigne" ${ligne.nbPoints === 0 ? 'disabled' : ''}><span class="t-long">+ Nouvelle ligne</span><span class="t-court">+ Nouvelle</span></button>
+        <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="reprendreLigne"><span class="t-long">Continuer une ligne</span><span class="t-court">Continuer</span></button>
         <button type="button" class="bouton-secondaire ${ligne.fermee ? 'actif' : ''}" data-action="basculerFermeture" aria-pressed="${ligne.fermee}" ${ligne.nbPoints < 3 ? 'disabled' : ''}>
-          ${ligne.fermee ? '✓ Ligne fermée' : 'Fermer ligne'}</button>
+          ${ligne.fermee ? '<span class="t-long">✓ Ligne fermée</span><span class="t-court">✓ Fermée</span>' : '<span class="t-long">Fermer ligne</span><span class="t-court">Fermer</span>'}</button>
       </div>
       ${choixLibelle()}
     </div>`;
@@ -1287,7 +1310,7 @@ export function creerEcranLeve(conteneur, actions) {
     if (c.diametre && !DIAMETRES_LISTE.includes(Number(c.diametre))) diametres.push([c.diametre, c.diametre]);
     return `<div class="chantier-leve" role="group" aria-label="Ce que l'on lève sur le chantier">
       ${rangee('libelles', c.libelles.map((lib) => `<button type="button" class="chip-chantier ${lib.abreviation === l.abreviation ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="libelle" data-valeur="${echapper(lib.abreviation)}" title="${echapper(lib.nom)}"><i class="symbole-libelle" style="color: ${couleurNature}">${symboleDeForme(lib.forme)}</i>${echapper(lib.court || lib.nom)}</button>`).join('') + '<button type="button" class="bouton-crayon-libelles seulement-expert" data-action="modifierChantier" title="Modifier la bibliothèque du chantier" aria-label="Modifier la bibliothèque du chantier">⚙</button>', 'Plus de libellés')}
-      ${rangee('natures', c.natures.map((n) => `<button type="button" class="nat-chantier ${n === c.nature ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="nature" data-valeur="${echapper(n)}"><i style="background: ${c.couleursNatures[n] ?? '#6b7280'}"></i>${echapper(n)}</button>`).join(''), 'Plus de natures')}
+      ${c.natures.length > 0 ? rangee('natures', c.natures.map((n) => `<button type="button" class="nat-chantier ${n === c.nature ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="nature" data-valeur="${echapper(n)}"><i style="background: ${c.couleursNatures[n] ?? '#6b7280'}"></i>${echapper(n)}</button>`).join(''), 'Plus de natures') : ''}
       ${reglages ? `<div class="reglages-chantier">${reglages}${bulle('chantier')}</div>` : ''}
       <div class="attributs-chantier">
         ${l.champs.includes('diametre') ? liste('diametre', l.ouvrage ? 'Ø tuyau' : 'Ø', diametres, c.diametre, `d ${diametreRequis && diametreVide ? 'manque' : ''}`, true) : ''}
@@ -1352,7 +1375,7 @@ export function creerEcranLeve(conteneur, actions) {
           <p class="titre-choix">Photos (${photos.length}) ${bulle('photos')}</p>
           <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
               <img src="${photo.miniature}" alt="${echapper(photo.legende || donnees.stock.nom)}" />
-              <span class="point-photo">📷 ${photo.point ? echapper(photo.point) : photo.attentePoint ? 'prochain point' : 'tout le levé'}</span>
+              <span class="point-photo">${ICONES_LIGNE.photo} ${photo.point ? echapper(photo.point) : photo.attentePoint ? 'prochain point' : 'tout le levé'}</span>
               <input type="text" data-champ="legende-photo-levee" data-id="${photo.id}" value="${echapper(photo.legende ?? '')}" placeholder="Légende" aria-label="Légende de la photo" />
               <button type="button" class="bouton-lien" data-action="supprimerPhotoLevee" data-valeur="${photo.id}">supprimer</button>
             </figure>`).join('')}</div>

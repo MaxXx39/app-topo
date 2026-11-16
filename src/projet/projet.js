@@ -32,12 +32,14 @@
 //              hauteur: { mode ('fixe', 'sommets'), altitude, pente: { pourcent, cote, depuis } ou null } }],
 //                                   // Calculs › Dessin (voir topo/dessin.js)
 //   archives: [{ id, type, nom, archiveLe, contenu }],  // éléments archivés (voir projet/archives.js)
+//   canalisations: [{ id, type, nom, diametre (m, ext.), sommets: [{ est, nord, fe }], tranchee, surfaceId, source }],  // réseaux (voir topo/reseau.js)
 // }
 // Une surface créée à partir de points appartient à un levé : ses noms de points renvoient
 // aux points de ce levé. De même pour une mesure.
 import { nouvelIdentifiant, estImportee, avecPrefixe, prefixeDuNom } from '../topo/surface.js';
 import { PREFIXE_PDF } from '../topo/pdf-dxf.js';
 import { calculsDUnAncienProjet } from '../volumes/calculs.js';
+import { typesVersSousDossiers } from '../topo/sous-dossiers.js';
 import { TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
 import { retirerMetreEtRecollement } from './retrait-metre-recollement.js';
 import { centreDuProjet } from '../topo/centre-projet.js';
@@ -77,6 +79,7 @@ export function creerProjet(nom = '') {
     controles: [],
     dessins: [],
     couleursListes: {},
+    canalisations: [],              // réseaux (0.235.0, application Réseaux) : voir topo/reseau.js
   };
 }
 
@@ -183,6 +186,9 @@ export function completerProjet(projet) {
   complet.controles ??= [];
   complet.dessins ??= [];
   complet.couleursListes ??= {}; // couleur choisie par liste de points (id → « #2563eb »)
+  // 0.251.0 : le « type » d'un plan DXF devient un sous-dossier du même nom.
+  typesVersSousDossiers(complet);
+  complet.canalisations ??= []; // réseaux (0.235.0) ; « reseaux » = ancien Recollement, retiré
   // Surfaces importées : plus de nature depuis 0.90.0 (celle des anciennes est retirée).
   complet.surfaces = (complet.surfaces ?? []).map((surface) => {
     if (!estImportee(surface)) return { nature: 'stock', ...surface };

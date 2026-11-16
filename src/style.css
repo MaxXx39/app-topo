@@ -4159,29 +4159,18 @@ svg.plan,
   background: rgba(27, 43, 54, 0.45);
 }
 
-/* Fenêtre « Code de sécurité » (réglages protégés : nom de l'appareil, NTRIP). */
-.fenetre-code {
-  width: min(86vw, 320px);
-}
-
-.champ-code {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-weight: 700;
-}
-
-.champ-code input {
-  min-height: 44px;
+/* Fenêtre « Code de sécurité » (0.243.0 : même cadre que les autres fenêtres, `fenetre-choix`). */
+.fenetre-choix .champ-code-gros {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 52px;
+  margin: 8px 0;
   font-size: 1.4rem;
   letter-spacing: 0.3em;
   text-align: center;
+  border-radius: 12px;
 }
-
-.fenetre-code .ligne-outils {
-  justify-content: flex-end;
-  margin-top: 12px;
-}
+.fenetre-code .erreur { margin: 0 0 8px; text-align: center; }
 
 /* Mode de l'appli (réglages ⚙) : Base, Intermédiaire ou Expert, trois gros boutons avec les barres. */
 .choix-mode-appli {
@@ -5505,6 +5494,7 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   margin: 0 0 10px;
 }
 
+.boutons-choix button[hidden] { display: none; } /* 0.239.0 : « Aperçu » vraiment caché quand le format n'est pas PDF */
 .boutons-choix {
   display: grid;
   gap: 10px;
@@ -6989,7 +6979,7 @@ body.mode-telephone .bouton.bouton-prendre {
 
 .formats-export {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); /* 0.239.0 : 4 formats sur une ligne (avant 110 px : le PDF restait seul en dessous) */
   gap: 6px;
   margin-bottom: 12px;
 }
@@ -9093,26 +9083,7 @@ body.mode-telephone .levee-en-cours .boutons-levee .bouton-secondaire {
   border-left-color: var(--bordeaux);
 }
 
-/* --- Affichage « Plein soleil » : fort contraste, textes plus gras --- */
-body.theme-soleil {
-  --fond: #ffffff;
-  --gris: #2b3640;
-  --bordure: #7d8a94;
-  --texte: #000000;
-  --encre: #000000;
-  font-weight: 500;
-}
-body.theme-soleil :is(strong, b, h2, h3, button, label, summary) {
-  font-weight: 700;
-}
-body.theme-soleil .onglets button,
-body.theme-soleil .plan-boutons button,
-body.theme-soleil .plan-calques button {
-  border-width: 2px;
-}
-body.theme-soleil svg.plan text {
-  font-weight: 700;
-}
+/* 0.243.0 : le thème « Plein soleil » est supprimé (audit, 16.11). */
 
 /* --- Affichage « Sombre » : pour le soir ou les tunnels --- */
 body.theme-sombre {
@@ -9262,11 +9233,6 @@ body.theme-sombre .puce {
   background: rgba(24, 35, 43, 0.95);
   color: var(--texte);
 }
-body.theme-soleil .plan-cadre { background: #ffffff; }
-body.theme-soleil svg.plan text { fill: #000000; }
-body.theme-soleil svg.plan text.nom-controle { fill: #b91c1c; }
-body.theme-soleil .puce,
-body.theme-soleil .plan-boutons button { border: 2px solid #000000; color: #000000; }
 
 /* --- Lever (0.114.0, 0.115.1) : barre fixe en bas de l'écran, au-dessus de la barre du bas, toujours au
    même endroit : appareil photo à gauche, nom du prochain point (modifiable), puis « Enreg. Pts ». --- */
@@ -9895,6 +9861,8 @@ body.mode-telephone .entete-icone-bouton.bouton-reglages svg { width: 34px; heig
   opacity: 0.9;
 }
 .ligne-nette .fin-petite .icone-drapeau { width: 0.9rem; height: 1rem; }
+/* 0.234.0 : pente du segment en cours, à gauche de « fin … m » (même taille de texte). */
+.ligne-nette .fin-petite .pente-segment { margin-right: auto; font-weight: 700; white-space: nowrap; }
 .ligne-nette .bloc-hauteur { display: flex; align-items: center; justify-content: space-between; gap: 8px; white-space: nowrap; }
 .ligne-nette .bloc-hauteur .libelle-ecart { font-size: 1.2rem; }
 .ligne-nette .bloc-hauteur .icone-fleche { width: 1.9rem; height: 1.9rem; }
@@ -10032,8 +10000,8 @@ body.mode-telephone .couloir-vertical .texte-reglette { font-size: 19px; }
 .cadre-couloir .drapeau-couloir .icone-drapeau { width: 20px; height: 24px; }
 .cadre-couloir .drapeau-couloir.fin { transform: translate(-2px, -100%); margin-top: -3px; }
 .cadre-couloir .drapeau-couloir.debut { transform: translate(-2px, 0); margin-top: 4px; }
-.cadre-couloir .moi-couloir { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 3px solid #ffffff; box-sizing: border-box; }
-@media (max-width: 520px) { .cadre-couloir .texte-reglette { font-size: 8px; } .cadre-couloir .texte-reglette.en-haut { bottom: 10px; } .cadre-couloir .drapeau-couloir .icone-drapeau { width: 15px; height: 18px; } .cadre-couloir .moi-couloir { width: 18px; height: 18px; margin: -9px 0 0 -9px; } }
+.cadre-couloir .moi-couloir { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid #ffffff; box-sizing: border-box; }
+@media (max-width: 520px) { .cadre-couloir .texte-reglette { font-size: 8px; } .cadre-couloir .texte-reglette.en-haut { bottom: 10px; } .cadre-couloir .drapeau-couloir .icone-drapeau { width: 15px; height: 18px; } .cadre-couloir .moi-couloir { width: 10px; height: 10px; margin: -5px 0 0 -5px; } }
 body.mode-telephone .cadre-couloir .texte-reglette { font-size: 8px; }
 body.mode-telephone .cadre-couloir .texte-reglette.en-haut { bottom: 10px; }
 body.mode-telephone .cadre-couloir .drapeau-couloir .icone-drapeau { width: 15px; height: 18px; }
@@ -10433,16 +10401,14 @@ button.dossier-projet-ouvert { border: none; background: none; padding: 0; font:
 /* --- 0.126.0 (retour d'essai sur tablette lente, 05.11) --- */
 /* Points sur canvas (beaucoup de points) : déjà pâlis un par un, le canvas ne l'est pas en plus. */
 .plan-cadre.plan-palir .plan-points-canvas { opacity: 1; }
-/* Messages : en bas, au-dessus de la barre du bas (et de la bande « Enreg. Pts » dans Lever), fermés d'un toucher. */
-.message-flottant {
-  top: auto;
-  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 12px);
-  pointer-events: auto;
-  cursor: pointer;
-}
-body[data-onglet='terrain'][data-mode-terrain='lever'] .message-flottant {
-  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 96px);
-}
+/* 0.241.0 (audit, lot 4) : tous les messages sont en haut, sous l'en-tête, et laissent passer le toucher
+   (avant : en bas, ils couvraient « Enreg. » ou « Réglages » pendant 2 à 5 s). Un message qui reste (durée null)
+   se ferme d'un toucher. */
+.message-flottant { top: calc(var(--hauteur-entete) + 56px); bottom: auto; pointer-events: none; }
+.message-flottant.message-fermable { pointer-events: auto; cursor: pointer; }
+body[data-onglet] .message-flottant.message-haut { top: calc(var(--hauteur-entete) + 56px); bottom: auto; }
+/* Confirmation d'un point pris : en vert. */
+.message-flottant.message-ok { background: #15803d; }
 /* Cibles d'au moins 44 px (doigts gantés) : liens « archiver / supprimer », ✕ des points, dossier, cloche. */
 .bouton-lien {
   display: inline-flex;
@@ -11361,14 +11327,8 @@ body.mode-telephone .ecart-coupe strong { font-size: 0.95rem; }
 }
 .vue-plan2 .indic-coupe .triangle-coupe { width: 28px; height: 24px; }
 .vue-plan2 .indic-coupe strong { font-size: 0.95rem; }
-/* Essai B : triangle et valeur à l'extérieur des règles. */
-.essai-exterieur .corps-coupe-guidage > :nth-child(1) { order: 2; }
-.essai-exterieur .corps-coupe-guidage > :nth-child(2) { order: 1; }
-.essai-exterieur .corps-coupe-guidage > :nth-child(3) { order: 3; }
-.essai-exterieur .corps-coupe-guidage > :nth-child(4) { order: 5; }
-.essai-exterieur .corps-coupe-guidage > :nth-child(5) { order: 4; }
-.essai-exterieur .corps-coupe-guidage { grid-template-columns: 48px 34px minmax(0, 1fr) 34px 48px; }
-.essai-exterieur .vue-plan2 .corps-coupe-guidage { grid-template-columns: 40px 26px minmax(0, 1fr) 26px 40px; }
+/* 0.232.0 : les anciennes règles « essai B » (ordre et 5 colonnes) sont retirées : depuis la 0.214 il n'y a plus que 3 blocs
+   (règle G | coupe | règle D) et elles envoyaient la coupe dans une case de 40 px à gauche. */
 /* Essai C : sur la règle (même case), règle plus large. */
 .essai-sur-regle .corps-coupe-guidage { grid-template-columns: 52px minmax(0, 1fr) 52px; }
 .essai-sur-regle .corps-coupe-guidage > :nth-child(1),
@@ -11788,6 +11748,8 @@ body.bande-vide .bande-appli .bouton-appli { max-width: calc(100vw - 16px); poin
 /* Les pages qui défilent gardent de la place sous leur dernier élément pour ne pas finir sous le bouton. */
 body.bande-vide .mise-en-page { padding-bottom: calc(var(--hauteur-bande) + 24px); }
 body.bande-vide .page-applis { padding-bottom: calc(var(--hauteur-bande) + 24px); }
+/* 0.239.0 : barres posées en bas du plan (recalage, contrôle du plan, accroches) : au-dessus du bouton de l'application, pas dessous. */
+body.bande-vide .barre-pointage { bottom: calc(var(--hauteur-bande) + 16px); }
 @media (min-width: 900px) {
   body.bande-vide .bande-appli { width: auto; box-shadow: none; }
   body.bande-vide .mise-en-page { padding-bottom: 16px; }
@@ -11808,7 +11770,7 @@ body.bande-vide .page-applis { padding-bottom: calc(var(--hauteur-bande) + 24px)
   font-weight: 900;
 }
 .bande-appli .bouton-enreg-bande small { font-size: 14px; font-weight: 700; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bande-appli .bouton-enreg-bande:disabled { background: #fde7b0; color: rgba(27, 43, 54, 0.55); }
+.bande-appli .bouton-enreg-bande:is(:disabled, [aria-disabled='true']) { background: #fde7b0; color: rgba(27, 43, 54, 0.55); }
 .zone-info-appli:has(.bouton-enreg-bande) { background: none; }
 body.mode-telephone .bande-appli .bouton-enreg-bande { font-size: 17px; gap: 6px; }
 body.mode-telephone .bande-appli .bouton-enreg-bande small { font-size: 11px; }
@@ -11876,7 +11838,7 @@ body[data-relais='dao'] #bouton-dao { display: none; }
 body[data-mode-terrain='autocontrole'] .bande-appli .bouton-enreg-bande.relais-enregistrer { background: var(--bordeaux); }
 .bande-appli .bouton-enreg-bande.relais-dao { background: #db2777; color: #ffffff; }
 .bande-appli .bouton-enreg-bande.relais-mesure-gnss { background: #7c3aed; color: #ffffff; }
-.bande-appli .bouton-enreg-bande:is(.relais-implanter, .relais-enregistrer, .relais-dao, .relais-mesure-gnss):disabled { background: #475569; color: rgba(255, 255, 255, 0.6); }
+.bande-appli .bouton-enreg-bande:is(.relais-implanter, .relais-enregistrer, .relais-dao, .relais-mesure-gnss):is(:disabled, [aria-disabled='true']) { background: #475569; color: rgba(255, 255, 255, 0.6); }
 .bande-appli .bouton-enreg-bande:is(.relais-implanter, .relais-enregistrer, .relais-dao, .relais-mesure-gnss) small { color: inherit; }
 .bande-appli .bouton-enreg-bande.relais-enregistrer span { font-size: 18px; }
 body.mode-telephone .bande-appli .bouton-enreg-bande.relais-enregistrer span { font-size: 14px; }
@@ -11970,7 +11932,7 @@ body.mode-telephone .entete .entete-icone-bouton.bouton-recepteur-entete { backg
 body:not([data-onglet='terrain']) .bouton-implanter-plan { display: none !important; }
 
 /* Encadré du projet : bandeau + Import / Exporter / Contenu ensemble. */
-.cadre-projet-applis { padding: 10px; border-radius: 18px; background: #1b2b36; }
+.cadre-projet-applis { padding: 10px; border-radius: 18px; border: 2px solid #eab308; background: #1b2b36; }
 .cadre-projet-applis .bandeau-projet-applis { padding: 4px 4px 10px; border-radius: 0; background: none; }
 .cadre-projet-applis .parties-projet-applis { margin-top: 0; }
 .cadre-projet-applis .bouton-partie-projet { border-color: rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.1); color: #ffffff; }
@@ -12304,11 +12266,11 @@ body[data-onglet='terrain'] .mise-en-page, body[data-onglet='volumes'] .mise-en-
 
 /* 0.165.0 (essai demandé le 09.11) : légère transparence sous les boutons zoom / position du plan
    (on voit le plan à travers) ; Plein soleil garde des boutons pleins pour le contraste. */
-body:not(.theme-soleil) .plan-boutons {
+body .plan-boutons {
   background: color-mix(in srgb, var(--surface) 72%, transparent);
   backdrop-filter: blur(2px);
 }
-body:not(.theme-soleil) .plan-boutons button:not(.actif) {
+body .plan-boutons button:not(.actif) {
   background: transparent;
 }
 
@@ -12470,8 +12432,9 @@ body.mode-telephone.bande-action:not(.mode-base)[data-onglet='terrain'][data-mod
 body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta {
   position: fixed;
   z-index: 20;
-  left: calc(var(--gauche-bandeau-point) + 6px);
-  bottom: calc(var(--bas-bandeau-point) + var(--hauteur-bandeau-point) + 2px);
+  /* 0.242.0 (audit, lot 3) : E / N à droite, sur la même ligne que le résumé (à gauche), au-dessus du bandeau. */
+  right: calc(var(--gauche-bandeau-point) + 6px);
+  bottom: calc(var(--bas-bandeau-point) + var(--hauteur-bandeau-point) + 14px);
   margin: 0;
   padding: 0 8px;
   border-radius: 8px;
@@ -13040,15 +13003,11 @@ body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever
 .fenetre-reglages .page-reglages > .case-reglage,
 .fenetre-reglages .page-reglages > .bouton-large,
 .fenetre-reglages .page-reglages .partage-reglages .carte-section {
-  background: var(--surface); border: 1.5px solid var(--bordure); border-left: 6px solid var(--ambre); border-radius: 12px;
+  background: var(--surface); border: 1.5px solid var(--bordure); border-radius: 12px;
   padding: 10px 12px; margin: 0; box-shadow: var(--ombre); box-sizing: border-box;
 }
-.fenetre-reglages .page-reglages > .choix-mode-appli { border-left-color: var(--sombre); }
-.fenetre-reglages .page-reglages > .ligne-telephone-ecran { border-left-color: #0891b2; }
-.fenetre-reglages .page-reglages > .choix-taille { border-left-color: #7c3aed; }
-.fenetre-reglages .page-reglages > .case-reglage { border-left-color: var(--succes); }
+/* 0.243.0 (audit) : plus de liseré de couleur à gauche : chaque réglage garde son rectangle blanc au bord fin gris. */
 .fenetre-reglages .page-reglages .partage-reglages { display: flex; flex-direction: column; gap: 10px; }
-.fenetre-reglages .page-reglages .partage-reglages .carte-section { border-left-color: #0ea5e9; }
 .fenetre-reglages .page-reglages > .choix-taille .titre-taille { display: block; margin-bottom: 6px; font-weight: 800; }
 
 /* ===== 0.175.10 (demande du 09.11) ===== */
@@ -13241,7 +13200,10 @@ body[data-onglet='annotation'] .mise-en-page { padding-bottom: calc(var(--hauteu
 .cadre-couloir .fleche-couloir.vers-gauche .pointe { border-right: 20px solid var(--couleur-fleche); }
 .cadre-couloir .fleche-couloir.vers-droite { flex-direction: row-reverse; padding-left: 14px; }
 .cadre-couloir .fleche-couloir.vers-droite .pointe { border-left: 20px solid var(--couleur-fleche); }
-.cadre-couloir .fleche-couloir .mot-fleche { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font-size: 0.95rem; font-weight: 800; color: var(--couleur-fleche); } /* 0.208.0 : sans ombre floue */
+.cadre-couloir .fleche-couloir .mot-fleche { position: absolute; bottom: 18px; white-space: nowrap; font-size: 0.95rem; font-weight: 800; color: var(--couleur-fleche); } /* 0.208.0 : sans ombre floue */
+/* 0.232.0 : le texte de l'écart est décalé du trait de la ligne (comme sur le plan) : il commence au bord de la flèche côté canne et s'écrit à l'opposé du trait. */
+.cadre-couloir .fleche-couloir.vers-gauche .mot-fleche { left: 6px; text-align: left; }
+.cadre-couloir .fleche-couloir.vers-droite .mot-fleche { right: 6px; text-align: right; }
 
 /* 0.189.3 : boutons de coupe d'Implanter › Surface avec symbole, un peu plus larges */
 .choix-coupe .puce-choix { display: inline-flex; align-items: center; gap: 6px; min-width: 150px; min-height: 48px; padding: 0 12px; }
@@ -13419,7 +13381,8 @@ body.mode-telephone .cadre-projet-applis .grille-parties-projet { padding: 4px; 
 .entete-page-contenu { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .entete-page-contenu .titre-bloc { flex: 1 1 auto; min-width: 0; margin: 0; }
 .bouton-gerer { flex: none; min-height: 40px; padding: 0 16px; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; font: inherit; font-weight: 800; cursor: pointer; }
-.bouton-retour-gerer { flex: none; width: 44px; min-height: 40px; border: 2px solid #1b2b36; border-radius: 12px; background: #ffffff; color: #1b2b36; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
+/* 0.239.0 : « ← » de Gérer = même bouton que les autres pages (.bouton-retour-partie) ; page Gérer ouverte directement : sans cadre. */
+#contenu-projet > .contenu-projet.page-gerer-directe { border: 0; box-shadow: none; background: none; padding: 0; }
 .page-gerer .entete-page-contenu { justify-content: flex-start; }
 .ligne-gerer { margin: 8px 0; border: 2px solid var(--bordure, #cbd5e1); border-radius: 12px; background: var(--surface, #ffffff); }
 .ligne-gerer.ouverte { border-color: #1b2b36; }
@@ -13558,6 +13521,7 @@ body.mode-telephone .instruction-regle.proche b { font-size: 0.75rem; }
 .entete-carte-projets h2 { flex: 1; margin: 0; font-size: 1.1rem; }
 .entete-carte-projets select { min-height: 40px; max-width: 45%; border-radius: 8px; border: 0; padding: 0 8px; }
 .entete-carte-projets .bouton-retour { background: transparent; color: #ffffff; border: 2px solid rgba(255, 255, 255, 0.5); }
+.entete-carte-projets .bouton-retour-partie { background: transparent; color: #ffffff; border: 2px solid rgba(255, 255, 255, 0.5); }
 .zone-carte-projets { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; background: #dfe5e8; cursor: grab; }
 .tuiles-carte-projets, .etiquettes-carte-projets { position: absolute; inset: 0; }
 .tuile-carte-projets { position: absolute; max-width: none; user-select: none; pointer-events: none; }
@@ -13643,3 +13607,313 @@ body.mode-telephone .bouton-texte-projet { min-height: 34px; height: 34px; paddi
 .tableau-mesure-duree th, .tableau-mesure-duree td { padding: 4px 6px; text-align: right; border-bottom: 1px solid #d9e0e5; }
 .tableau-mesure-duree thead th { font-size: 0.72rem; font-weight: 700; color: #5b6b76; }
 .tableau-mesure-duree tbody th { text-align: left; }
+
+/* 0.233.2 (14.11, téléphone) : liseré jaune du bandeau « ID point / Enreg. » réduit de 60 % (4 px → 1,6 px) ; ligne en cours :
+   nom, « + Nouvelle », « Continuer » et « Fermer » sur une seule ligne (le nombre de points est caché). */
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise .ligne-id-prendre .champ-id-point { border-width: 1.6px; border-right: none; }
+body.mode-telephone.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .cadre-prise > [data-action="annulerDernierPoint"]::after { border-width: 1.6px; border-right: none; }
+body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .corps-element { flex-wrap: nowrap; gap: 5px; }
+body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .corps-element strong { flex: none; font-size: 1rem; }
+body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .nb-points-ligne { display: none; }
+body.mode-telephone[data-mode-terrain='lever'] .element-en-cours.role-ligne .corps-element .bouton-secondaire { flex: 1 1 0; min-width: 0; padding: 3px 4px; font-size: 0.8rem; white-space: nowrap; }
+
+/* 0.233.3 (14.11) : réglettes de transparence : « Trans. », barre et % sur une seule ligne (partout) ;
+   téléphone, Implanter › Point : « + Point », « Liste » et « Proche » seulement quand l'accroche est dépliée (noms visibles). */
+.reglette-transparence { display: flex; align-items: center; gap: 8px; }
+.reglette-transparence > b { flex: none; font-weight: 600; }
+.reglette-transparence input { flex: 1 1 0; min-width: 0; width: auto; }
+.reglette-transparence > span { flex: none; min-width: 3.2em; text-align: right; }
+body.mode-telephone .barre-accroche:not(.ouverte) .bouton-outil-accroche,
+body.mode-telephone .barre-accroche:not(.ouverte) .separateur-accroche { display: none; }
+
+/* ==========================================================================
+   0.235.0 : Réseaux (canalisations), Expert, test : plan, coupes et écran.
+   ========================================================================== */
+.reseau-plan { fill: none; stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: round; }
+.reseau-plan.choisi { stroke-width: 6; }
+.tranchee-plan { fill: rgba(245, 158, 11, 0.28); stroke: none; }
+.bord-tranchee-plan { fill: none; stroke-width: 2.5; stroke-dasharray: 7 4; }
+.nom-reseau-plan { font: 700 13px system-ui, sans-serif; paint-order: stroke; stroke: #fff; stroke-width: 3px; text-anchor: middle; }
+.sommet-reseau-plan { fill: #fff; stroke: #1b2b38; stroke-width: 2.5; }
+.fe-reseau-plan { font: 700 12px system-ui, sans-serif; fill: #92400e; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.pente-reseau-plan { font: 800 12px system-ui, sans-serif; fill: #1b2b38; paint-order: stroke; stroke: #fff; stroke-width: 3px; text-anchor: middle; }
+.coupe-reseau-plan { stroke: #7c3aed; stroke-width: 3; stroke-dasharray: 8 5; }
+.brouillon-reseau-plan { fill: none; stroke: #0d9488; stroke-width: 3; stroke-dasharray: 6 4; }
+.sommet-brouillon-plan { fill: #ccfbf1; stroke: #0d9488; stroke-width: 3; }
+.numero-brouillon-plan { font: 800 13px system-ui, sans-serif; fill: #0f766e; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+
+.ecran-reseaux { display: flex; flex-direction: column; gap: 10px; padding: 8px 12px 16px; }
+.ecran-reseaux .cadre-reseau { background: #fff; border-radius: 14px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+.ecran-reseaux h3 { margin: 0 0 8px; font-size: 0.85rem; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; }
+.ecran-reseaux .choix-segment-reseau { display: flex; gap: 4px; background: #eef1f3; border-radius: 12px; padding: 4px; }
+.ecran-reseaux .choix-segment-reseau button { flex: 1; border: 0; background: transparent; padding: 12px 6px; border-radius: 9px; font-weight: 700; font-size: 1rem; color: #475569; }
+.ecran-reseaux .choix-segment-reseau button.actif { background: #0d9488; color: #fff; }
+.ecran-reseaux .puces-types { display: flex; gap: 8px; flex-wrap: wrap; }
+.ecran-reseaux .puce-type { padding: 10px 16px; border-radius: 22px; border: 2px solid var(--couleur); background: #fff; color: var(--couleur); font-weight: 800; font-size: 1rem; }
+.ecran-reseaux .puce-type.actif { background: var(--couleur); color: #fff; }
+.ecran-reseaux .ligne-champ-reseau { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid #e2e8f0; padding: 8px 0; font-size: 1rem; }
+.ecran-reseaux .ligne-champ-reseau:last-child { border-bottom: 0; }
+.ecran-reseaux .ligne-champ-reseau input, .ecran-reseaux .ligne-champ-reseau select { min-width: 8rem; max-width: 55%; font-size: 1.1rem; font-weight: 700; text-align: right; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; }
+.ecran-reseaux .invite-reseau { background: #ccfbf1; border: 2px solid #0d9488; color: #0f766e; border-radius: 10px; padding: 10px 14px; font-weight: 700; }
+.ecran-reseaux .ok-reseau { background: #ecfdf5; border: 2px solid #16a34a; color: #166534; border-radius: 10px; padding: 10px 14px; font-weight: 700; }
+.ecran-reseaux table.points-reseau { width: 100%; border-collapse: collapse; }
+.ecran-reseaux table.points-reseau td, .ecran-reseaux table.points-reseau th { padding: 6px 4px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 0.95rem; }
+.ecran-reseaux table.points-reseau input { width: 7rem; text-align: right; font-weight: 800; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 4px 8px; }
+.ecran-reseaux .liste-reseaux .ligne-reseau { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
+.ecran-reseaux .liste-reseaux .ligne-reseau.choisi { background: #fff7e0; }
+.ecran-reseaux .liste-reseaux .ligne-reseau .nom { flex: 1; font-weight: 800; }
+.ecran-reseaux .liste-reseaux .pastille-reseau { width: 14px; height: 14px; border-radius: 50%; background: var(--couleur); flex: none; }
+.ecran-reseaux .cases-reseau { display: flex; flex-wrap: wrap; gap: 8px; }
+.ecran-reseaux .case-reseau { padding: 8px 12px; border-radius: 20px; border: 2px solid #94a3b8; background: #fff; font-weight: 700; color: #475569; }
+.ecran-reseaux .case-reseau.actif { border-color: #0d9488; background: #ccfbf1; color: #0f766e; }
+.ecran-reseaux .barre-abscisse { display: flex; align-items: center; gap: 8px; }
+.ecran-reseaux .barre-abscisse input[type="range"] { flex: 1; }
+.ecran-reseaux .barre-abscisse button { min-width: 44px; min-height: 44px; }
+.svg-coupe-reseau { background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; display: block; }
+.svg-coupe-reseau .tuyau-coupe { stroke-width: 3; }
+.svg-coupe-reseau .tranchee-coupe { fill: rgba(245, 158, 11, 0.25); stroke: #b45309; stroke-width: 2; stroke-dasharray: 7 4; }
+.svg-coupe-reseau .fond-tranchee-coupe { fill: none; stroke: #b45309; stroke-width: 2; stroke-dasharray: 7 4; }
+.svg-coupe-reseau .terrain-coupe { fill: none; stroke: #0f766e; stroke-width: 3; }
+.svg-coupe-reseau .fe-coupe { fill: #dc2626; stroke: #fff; stroke-width: 1.5; }
+.svg-coupe-reseau .texte-coupe { font: 800 13px system-ui, sans-serif; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.svg-coupe-reseau .pente-coupe { font: 800 13px system-ui, sans-serif; fill: #1b2b38; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.svg-coupe-reseau .canne-coupe { fill: #3b82f6; stroke: #fff; stroke-width: 3; }
+.ecran-reseaux .note-reseau { font-size: 0.85rem; color: #64748b; }
+/* Réseaux : le plan en haut sur tablette / téléphone (comme Annotation), l'écran dessous. */
+@media (max-width: 899px) {
+  body[data-onglet='reseaux'] {
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * 0.4);
+  }
+  body[data-onglet='reseaux'] .panneau-plan {
+    display: block;
+    position: fixed;
+    top: var(--hauteur-entete);
+    left: 0;
+    right: 0;
+    height: var(--hauteur-plan-terrain);
+    z-index: 10;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 2px 10px rgba(16, 24, 20, 0.2);
+  }
+  body[data-onglet='reseaux'] .mise-en-page { padding-top: var(--hauteur-plan-terrain); padding-bottom: 96px; }
+  body[data-onglet='reseaux'] .panneau[data-onglet='reseaux'] { padding-top: 4px; border-top-left-radius: 0; border-top-right-radius: 0; }
+  body[data-onglet='reseaux'] .boutons-taille-plan { display: none; }
+}
+.panneau[data-onglet='reseaux'] { border-top: 4px solid #92400e; }
+.ecran-reseaux h3 { border: 0; padding: 0; }
+
+/* 0.236.0 : réseaux dans les coupes d'Implanter › Surface (case « Cana ») et profil en long de l'implantation d'un réseau. */
+.coupe-directe .tranchee-coupe { fill: rgba(245, 158, 11, 0.25); stroke: #b45309; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.coupe-directe .tuyau-coupe { stroke-width: 1.6; }
+.coupe-directe .nom-tuyau-coupe { font: 800 8px system-ui, sans-serif; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
+.profil-reseau:empty { display: none; }
+.profil-reseau { margin-top: 8px; }
+.profil-reseau .titre-profil-reseau { font-weight: 800; font-size: 0.9rem; color: #7c3aed; margin: 0 0 4px; }
+.profil-reseau .svg-coupe-reseau { width: 100%; height: auto; }
+.ligne-cana { display: flex; align-items: center; gap: 8px; }
+.ecran-reseaux .puces-choix-reseau { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* 0.238.0 : boussole de la tablette, en bas à gauche du plan (au-dessus de la barre d'échelle). */
+.boussole-tablette {
+  position: absolute;
+  left: 8px;
+  bottom: 44px;
+  z-index: 2;
+  padding: 2px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.88);
+  pointer-events: none;
+}
+
+.boussole-tablette[hidden] {
+  display: none;
+}
+
+.boussole-tablette svg {
+  display: block;
+  width: 40px;
+  height: 40px;
+}
+
+.boussole-tablette .cadran {
+  fill: #ffffff;
+  stroke: var(--sombre);
+  stroke-width: 2;
+}
+
+.boussole-tablette .nord {
+  fill: var(--rouge);
+}
+
+.boussole-tablette .sud {
+  fill: #9ca3af;
+}
+
+.boussole-tablette text {
+  font-size: 8.4px;
+  font-weight: 800;
+  fill: #ffffff;
+}
+
+/* Bande vide (seul le bouton de l'application en bas à gauche) : le plan passe dessous, la boussole se place au-dessus du bouton. */
+body.bande-vide .boussole-tablette {
+  bottom: calc(var(--hauteur-bande) + 12px);
+}
+
+/* 0.239.0 : icônes dessinées (src/outils/icones.js) à la place des émojis ; même trait fin partout. */
+.ico-ligne {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.18em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 0.239.0 : Implanter › Surface / Altitude : même encadré turquoise que Point / Ligne, la flèche descend vers la barre du bas. */
+.ecart-direct.attente.invite-choix {
+  display: flex;
+  justify-content: flex-start;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 12px;
+  background: #ccfbf1;
+  color: #134e4a;
+  font-weight: 400;
+}
+.invite-bas svg { animation-name: invite-descend; }
+@keyframes invite-descend {
+  50% { transform: translateY(4px); }
+}
+body.mode-telephone .ecart-direct.attente.invite-choix { min-height: 0; }
+/* 0.239.0 : barre d'attente d'Implanter › Point / Ligne : pas de ▾ (rien à ouvrir), texte atténué. */
+.surface-bande.bande-attente::after { content: none; }
+.bande-appli .levee-bande.surface-bande.bande-attente { padding-right: 12px; }
+.surface-bande.bande-attente .valeur-liste-bande { opacity: 0.65; }
+.fenetre-champs label[hidden] { display: none; } /* 0.239.0 : champ « visibleSi » vraiment caché */
+
+/* 0.240.0 (audit de novembre, lot 2) : Guidage lisible depuis le siège de la machine, tablette en portrait.
+   Les deux coupes sont l'une sous l'autre sur toute la largeur (avant : côte à côte, 130 px chacune), la consigne
+   (MONTER / DESCENDRE + valeur) est écrite en grand, les boutons d'échelle font 44 px. Téléphone : une coupe à la fois
+   (voir vueDuGuidage), le bouton « 2 coupes » n'y est plus proposé. Le paysage (Windows) n'est pas touché ici. */
+@media (orientation: portrait) {
+  .coupes-guidage.vue-plan2 { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .corps-coupe-guidage, .vue-plan2 .corps-coupe-guidage { grid-template-columns: 124px minmax(0, 1fr) 124px; gap: 8px; }
+  .vue-plan2 .corps-coupe-guidage .regle-hauteur, .corps-coupe-guidage .colonne-regle .regle-hauteur { width: 44px; min-height: 150px; }
+  .instruction-regle { min-height: 72px; padding: 6px 4px; border-radius: 12px; }
+  .instruction-regle .nom-bout-regle { font-size: 0.8rem; }
+  .instruction-regle b { font-size: 1.05rem; }
+  .instruction-regle small { font-size: 1rem; }
+  .instruction-regle.monter small, .instruction-regle.descendre small { font-size: 1.9rem; font-weight: 800; line-height: 1.05; }
+  .instruction-regle.ok b, .instruction-regle.proche b { font-size: 1.9rem; line-height: 1.05; }
+  .bloc-coupe-guidage .titre-coupe-guidage { font-size: 0.95rem; }
+  .pied-coupe-guidage { font-size: 0.95rem; }
+  .coupe-guidage .echelle-coupe button { width: 44px; height: 44px; font-size: 1.2rem; }
+  .coupe-guidage .echelle-coupe span { min-width: 44px; font-size: 0.95rem; }
+  .coupe-guidage .echelle-coupe.largeur-coupe { top: 0; right: auto; left: 50%; transform: translateX(-50%); }
+  .coupe-guidage .echelle-coupe.hauteur-coupe { right: 0; }
+  .coupe-guidage.zone-coupe { min-height: 216px; }
+  body.mode-telephone .corps-coupe-guidage { grid-template-columns: 92px minmax(0, 1fr) 92px; gap: 6px; }
+  body.mode-telephone .instruction-regle b { font-size: 0.85rem; }
+  body.mode-telephone .instruction-regle.monter small, body.mode-telephone .instruction-regle.descendre small,
+  body.mode-telephone .instruction-regle.ok b, body.mode-telephone .instruction-regle.proche b { font-size: 1.45rem; }
+  body.mode-telephone .corps-coupe-guidage .colonne-regle .regle-hauteur { width: 36px; min-height: 120px; }
+  body.mode-telephone .coupe-guidage.zone-coupe { min-height: 180px; }
+}
+/* Téléphone : les réglages d'échelle passent sous la coupe (ils la recouvraient), en deux petites rangées. */
+@media (orientation: portrait) {
+  body.mode-telephone .coupe-guidage.zone-coupe { flex-direction: column; justify-content: flex-start; gap: 6px; }
+  body.mode-telephone .coupe-guidage.zone-coupe > div:first-child { width: 100%; }
+  body.mode-telephone .coupe-guidage .echelle-coupe.largeur-coupe,
+  body.mode-telephone .coupe-guidage .echelle-coupe.hauteur-coupe { position: static; transform: none; flex-direction: row; }
+  body.mode-telephone .coupe-guidage .echelle-coupe button { width: 38px; height: 38px; }
+  body.mode-telephone .coupe-guidage .echelle-coupe span { min-width: 34px; font-size: 0.8rem; }
+}
+body.mode-telephone .ecran-lame .choix-coupes-bandeau [data-valeur='deux'] { display: none; }
+
+/* 0.242.0 : Annotation, fiche ouverte : le bandeau du bas se cache. */
+body.fiche-annotation-ouverte .bandeau-annotation { display: none; }
+body[data-relais='enregistrer-reseau'] #reseaux-ecran [data-action='enregistrer-reseau'] { display: none; }
+.bande-appli .bouton-enreg-bande.relais-enregistrer-reseau { background: #5b7f12; color: #ffffff; }
+
+/* 0.243.0 (audit) : thème sombre avec le fond photo (coché au départ) : le liseré des noms était blanc sur texte clair, donc illisible. */
+body.theme-sombre .avec-photo .plan .noms text { stroke: rgba(14, 22, 28, 0.92); fill: #f1f5f8; }
+body.theme-sombre .avec-photo .plan .noms text.altitude { fill: #c3ced6; }
+
+/* 0.243.0 : pages du projet sans titre en double. */
+.entete-gerer-seul { justify-content: flex-end; margin-bottom: 8px; }
+
+/* 0.245.0 (audit, lot 8) : liste « À implanter » : coche verte et écart des points déjà implantés. */
+.ligne-a-implanter .coche-implante { color: #15803d; font-weight: 900; }
+.ligne-a-implanter .aide.ecart-orange { color: #c2410c; font-weight: 700; }
+.ligne-a-implanter .aide.ecart-rouge { color: #b91c1c; font-weight: 700; }
+.ligne-a-implanter .aide.ecart-orange .coche-implante, .ligne-a-implanter .aide.ecart-rouge .coche-implante { color: inherit; }
+.ligne-a-implanter.implante strong { color: var(--gris); }
+
+/* 0.247.0 (audit, lot 6 : maquette « Importer, des tuiles pleines ») : bords pleins (le pointillé évoquait une zone vide), icône dans une pastille,
+   3 tuiles par rangée (2 sur téléphone) ; « Points de contrôle » garde le rouge sur son icône seulement. */
+.boutons-imports { grid-template-columns: repeat(3, 1fr); }
+body.mode-telephone .boutons-imports { grid-template-columns: repeat(2, 1fr); }
+.bouton-import {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 92px;
+  padding: 10px 6px;
+  border: 1.5px solid var(--bordure);
+  background: var(--surface);
+  text-align: center;
+}
+.bouton-import > span { align-items: center; text-align: center; }
+.bouton-import svg {
+  box-sizing: content-box;
+  width: 22px;
+  height: 22px;
+  padding: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sombre) 10%, var(--surface));
+}
+.bouton-import.import-controle { border-color: var(--bordure); color: var(--texte); }
+.bouton-import.import-controle svg { stroke: #dc2626; background: #fee2e2; }
+body.mode-telephone .bouton-import { min-height: 84px; padding: 8px 4px; }
+body.mode-telephone .bouton-import svg { width: 20px; height: 20px; padding: 7px; }
+
+/* 0.248.0 : boutons + / − de largeur et d'échelle de coupe réduits de moitié, sur toutes les coupes
+   (demande du 16.11). Placé en dernier pour passer devant les règles par écran (Guidage, téléphone). */
+.echelle-coupe button,
+.coupe-guidage .echelle-coupe button,
+body.mode-telephone .coupe-guidage .echelle-coupe button { width: 20px; height: 20px; font-size: 0.85rem; line-height: 1; padding: 0; }
+.echelle-coupe span,
+.coupe-guidage .echelle-coupe span,
+body.mode-telephone .coupe-guidage .echelle-coupe span { min-width: 24px; font-size: 0.65rem; }
+.echelle-coupe { gap: 1px; padding: 1px; }
+
+/* 0.248.0 : bandeau de règle du Guidage à cadre FIXE : seulement la flèche (grosse) et la valeur, jamais sur 2 lignes,
+   pour que l'échelle des deux coupes reste la même (un « 170 cm » trop large agrandissait la case). */
+.instruction-regle { container-type: inline-size; overflow: hidden; height: 72px; min-height: 72px; box-sizing: border-box; }
+.instruction-regle .fleche-regle { font-size: min(2.6rem, 40cqw); line-height: 1; }
+.instruction-regle small { white-space: nowrap; }
+.instruction-regle.monter small, .instruction-regle.descendre small { font-size: min(1.6rem, 17cqw); line-height: 1.05; }
+.instruction-regle.ok b, .instruction-regle.proche b { font-size: min(1.9rem, 20cqw); white-space: nowrap; }
+body.mode-telephone .instruction-regle { height: 64px; min-height: 64px; }
+
+/* 0.248.0 : coupe sans orientation = cadre vide de la même taille que la coupe (340 × 165) avec un message. */
+.coupe-attente { display: flex; align-items: center; justify-content: center; aspect-ratio: 340 / 165; width: 100%; box-sizing: border-box; border: 1px dashed var(--bordure, #9aa7b0); border-radius: 8px; text-align: center; padding: 8px; font-weight: 700; opacity: 0.75; }
+
+/* 0.248.0 : Est / Nord / Z sous la souris, en bas à gauche du plan (ordinateur seulement). */
+.plan-coordonnees { position: absolute; left: 6px; bottom: 6px; z-index: 5; padding: 2px 8px; border-radius: 6px; background: rgba(15, 23, 42, 0.78); color: #fff; font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; pointer-events: none; }
+
+/* 0.251.0 : dossiers du projet : puces dans l'encadré du projet (Applications) et pastille dans l'en-tête. */
+.puces-dossiers { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px 10px; }
+.puce-dossier { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border: 1px solid #475569; border-radius: 999px; background: transparent; color: #e2e8f0; font: inherit; font-weight: 700; font-size: 0.9rem; }
+.puce-dossier i { width: 10px; height: 10px; border-radius: 50%; background: var(--couleur-dossier, #6b7280); }
+.puce-dossier.actif { background: #eab308; border-color: #eab308; color: #1f1300; }
+.pastille-entete.pastille-dossier { color: #fff; }
+.pastille-pastel-dossier { display: inline-block; padding: 0 8px; border-radius: 999px; color: #fff; font-size: 0.72rem; font-weight: 800; margin-left: 4px; }
+.rangement-dossiers { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rangement-dossiers .puce-dossier { color: inherit; border-color: var(--bord, #cbd5e1); min-height: 32px; font-size: 0.82rem; }
+.rangement-dossiers .puce-dossier.actif { color: #fff; background: var(--couleur-dossier, #475569); border-color: var(--couleur-dossier, #475569); }
+.rangement-dossiers .puce-dossier.actif i { background: #fff; }

@@ -15,11 +15,14 @@ export default defineConfig(({ mode }) => ({
   // (dans l'APK : https://appassets.androidplatform.net/app-topo/, servie par l'appli elle-même)
   base: '/app-topo/',
   define: { __VERSION_APPLI__: JSON.stringify(version) },
-  build: mode === 'android' ? { outDir: 'android/app/src/main/assets/app-topo', emptyOutDir: true } : {},
+  // « npm run build:windows » (mode windows, 0.237.0) : même appli, rangée dans Topo.exe (windows/Topo/appli,
+  // servie à l'adresse https://topo.appli/app-topo/ par l'appli Windows), sans la partie PWA non plus.
+  build: mode === 'android' ? { outDir: 'android/app/src/main/assets/app-topo', emptyOutDir: true }
+    : mode === 'windows' ? { outDir: 'windows/Topo/appli', emptyOutDir: true } : {},
   plugins: [
     // Rend l'application installable sur téléphone et ordinateur (PWA),
     // et utilisable sans connexion une fois installée.
-    mode !== 'android' && VitePWA({
+    mode !== 'android' && mode !== 'windows' && VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icone.svg', 'apple-touch-icon.png'],
       workbox: {
@@ -45,9 +48,9 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       manifest: {
-        name: 'Topo - Volumes de stocks',
+        name: 'Topo',
         short_name: 'Topo',
-        description: 'Calcul de volumes de stocks à partir de points GNSS',
+        description: 'Topographie de terrain : levé, implantation, contrôle, volumes',
         lang: 'fr',
         theme_color: '#1b2b36',
         background_color: '#ffffff',

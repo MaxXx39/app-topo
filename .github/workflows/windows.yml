@@ -1,0 +1,89 @@
+# Fabrication de l'appli Windows « Topo.exe » (la même appli web que l'APK, dans une fenêtre Windows).
+# - Lancée À LA MAIN (onglet Actions › « Fabriquer l'appli Windows » › Run workflow), ou quand le code
+#   Windows (dossier windows/Topo) change. Les autres envois ne fabriquent que l'APK Android :
+#   Windows ne suit que sur demande (décision du 14.11).
+# - Le résultat est publié dans « Releases », sous « Windows - dernière version » :
+#   https://github.com/MaxXx39/app-topo/releases/download/windows-derniere-version/Topo.exe
+# - Google Drive : les secrets GOOGLE_BUREAU_ID et GOOGLE_BUREAU_SECRET du dépôt (identifiant « Application de
+#   bureau » du projet Google Cloud) sont rangés dans le .exe. Sans eux, le .exe marche, sans Drive.
+name: Fabriquer l'appli Windows
+
+on:
+  push:
+    paths:
+      - "windows/Topo/**"
+      - "windows/Topo.Tests/**"
+      - ".github/workflows/windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Appli web pour Windows
+        run: |
+          npm ci
+          npm run build:windows
+
+      - name: Ranger l'appli web, la version et l'identifiant Google pour le .exe
+        shell: pwsh
+        env:
+          GOOGLE_BUREAU_ID: ${{ secrets.GOOGLE_BUREAU_ID }}
+          GOOGLE_BUREAU_SECRET: ${{ secrets.GOOGLE_BUREAU_SECRET }}
+        run: |
+          Compress-Archive -Path windows/Topo/appli/* -DestinationPath windows/Topo/appli.zip -Force
+          $version = node -p "require('./package.json').version"
+          Set-Content -Path windows/Topo/version.txt -Value $version -NoNewline -Encoding utf8
+          if ($env:GOOGLE_BUREAU_ID -and $env:GOOGLE_BUREAU_SECRET) {
+            Set-Content -Path windows/Topo/google-bureau.txt -Value "$($env:GOOGLE_BUREAU_ID)`n$($env:GOOGLE_BUREAU_SECRET)" -NoNewline -Encoding utf8
+            Write-Host "Identifiant Google « bureau » : présent (Drive actif)."
+          } else {
+            Write-Host "::warning::Secrets GOOGLE_BUREAU_ID / GOOGLE_BUREAU_SECRET absents : ce Topo.exe n'aura pas Google Drive."
+          }
+
+      - name: Tests des calculs (MN95, NMEA, NTRIP…)
+        shell: pwsh
+        run: |
+          dotnet build windows/Topo.Tests/Topo.Tests.csproj -c Release -o sortie-tests
+          ./sortie-tests/Topo.Tests.exe android/noyau/src/main/resources/geoide/chgeo2004_lhn95.grille
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Fabriquer Topo.exe
+        shell: pwsh
+        run: |
+          dotnet build windows/Topo/Topo.csproj -c Release -o sortie
+          $taille = (Get-Item sortie/Topo.exe).Length
+          Write-Host "Topo.exe : $taille octets"
+          # Le .exe doit contenir l'appli web et WebView2 (plusieurs Mo) : plus petit, il manque quelque chose.
+          if ($taille -lt 3000000) { Write-Host "::error::Topo.exe trop petit : l'appli web ou WebView2 n'est pas dedans."; exit 1 }
+
+      - name: Garder Topo.exe (onglet Actions)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Topo-windows
+          path: sortie/Topo.exe
+
+      - name: Publier « Windows - dernière version » (Releases)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release delete windows-derniere-version --cleanup-tag --yes || true
+          # Même fichier en double : Topo.exe (lien fixe) et Topo-<version>.exe (la version se lit dans le nom).
+          cp sortie/Topo.exe Topo.exe
+          cp sortie/Topo.exe "Topo-${VERSION}.exe"
+          gh release create windows-derniere-version Topo.exe "Topo-${VERSION}.exe" \
+            --target "${{ github.sha }}" \
+            --title "Windows - dernière version (${VERSION}, n° ${{ github.run_number }}, ${{ github.ref_name }})" \
+            --notes "Appli Topo pour Windows 10 / 11, version ${VERSION} (${{ github.run_number }}). Sur la tablette : téléchargez Topo.exe, rangez-le sur le Bureau ou dans Documents, puis ouvrez-le. La première fois, Windows peut demander d'installer « WebView2 Runtime » (Microsoft)."

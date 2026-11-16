@@ -7,13 +7,15 @@
 //   point tapé ;
 // - la liste cochée est affichée sur le plan ; ses points se voient sous elle.
 // Le levé avec le récepteur se fait dans l'onglet Terrain (src/leve/ecran.js).
+import { ICONES_LIGNE } from '../outils/icones.js';
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { COULEURS_PLANS } from '../plan/dxf-canvas.js';
 import { estEnMn95 } from '../topo/dxf-plan.js';
-import { resumeControlePlan } from '../topo/controle-plan.js';
+import { PREFIXE_IMPORT } from '../topo/doublons.js';
+import { resumeControlePlan, texteEcartMm } from '../topo/controle-plan.js';
 import { rotationLisible } from '../topo/recalage.js';
 import { prefixeDuNom, sansPrefixe, estSurfaceFichier, origineSurface } from '../topo/surface.js';
 import { PREFIXE_PDF } from '../topo/pdf-dxf.js';
@@ -24,7 +26,7 @@ import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
 import { dateHeureDuPoint, jourDuPoint, trierParDate } from '../topo/date-point.js';
 import { nomDuType, resumeArchive } from '../projet/archives.js';
-import { lireTypesDxf, couleurDuType } from '../topo/types-dxf.js';
+import { lireSousDossiers, estMontre, sousDossiersEffectifs } from '../topo/sous-dossiers.js';
 import { CATEGORIES_POINTS, CATEGORIES_LEVES, COLONNES_POINTS, categorieDeListe, ordreColonnes, deplacerColonne, listesDuTableau, lignesDuTableau, trierLignes, texteDate, csvDuTableau } from './tableau-points.js';
 
 /**
@@ -106,8 +108,13 @@ export function creerEcranImport(conteneur, contenu, actions) {
     const bouton = evenement.target.closest('button[data-action]');
     if (!bouton) return;
     const { action, id } = bouton.dataset;
-    if (action === 'modifier-types-dxf') {
-      actions.modifierTypesDxf();
+    if (action === 'modifier-sous-dossiers') {
+      actions.modifierSousDossiers();
+      return;
+    }
+    if (action === 'dossier-bascule') {
+      const { genre, nom, present } = bouton.dataset;
+      actions.basculerSousDossier(genre, id, nom, present !== 'oui');
       return;
     }
     if (action === 'tp-categorie') {
@@ -295,8 +302,6 @@ export function creerEcranImport(conteneur, contenu, actions) {
       actions.reglerPlanDxf(cible.dataset.id, { visible: cible.checked });
     } else if (cible.dataset.champ === 'plan-couleur') {
       actions.reglerPlanDxf(cible.dataset.id, { couleur: cible.value || null });
-    } else if (cible.dataset.champ === 'plan-type') {
-      actions.reglerPlanDxf(cible.dataset.id, { type: cible.value });
     } else if (cible.dataset.champ === 'plan-nom') {
       actions.reglerPlanDxf(cible.dataset.id, { nom: cible.value });
     } else if (cible.dataset.champ === 'calque-dxf') {
@@ -423,14 +428,21 @@ export function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordr
   };
   const [titre, corps] = pages[vue] ?? pages.points;
   // 0.205.0 : « Gérer » à droite du titre ouvre la page de toutes les lignes avec un ⚙ (renommer, couleur, exporter, archiver…).
-  if (gestion.gerer) {
-    return `<div class="carte-section contenu-projet page-gerer">
-      <div class="entete-page-contenu"><button type="button" class="bouton-retour-gerer" data-action="gerer-fermer" aria-label="Retour à ${echapper(titre)}">←</button>${titreSection('leves', `Gérer · ${titre}`)}</div>
+  // 0.239.0 : Plans et Surfaces importées s'ouvrent directement sur « Gérer » : ni deuxième flèche, ni deuxième titre, ni deuxième cadre.
+  if (gestion.gerer && (vue === 'plans' || vue === 'surfaces')) {
+    return `<div class="contenu-projet page-gerer page-gerer-directe">
       ${pageGerer(projet, vue, gestion.menusOuverts) || '<p class="vide">Rien ici pour l\'instant.</p>'}
     </div>`;
   }
-  return `<div class="carte-section contenu-projet">
-      <div class="entete-page-contenu">${titreSection('leves', titre, bulle('leves'))}<button type="button" class="bouton-gerer" data-action="gerer-ouvrir">Gérer</button></div>
+  if (gestion.gerer) {
+    return `<div class="carte-section contenu-projet page-gerer">
+      <div class="entete-page-contenu"><button type="button" class="bouton-retour-partie bouton-retour-gerer" data-action="gerer-fermer" aria-label="Retour à ${echapper(titre)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>${titreSection('leves', `Gérer · ${titre}`)}</div>
+      ${pageGerer(projet, vue, gestion.menusOuverts) || '<p class="vide">Rien ici pour l\'instant.</p>'}
+    </div>`;
+  }
+  // 0.243.0 (audit, lot 6) : un seul cadre, un seul titre (celui de la page) : « Gérer » seul à droite, le tableau tout de suite.
+  return `<div class="contenu-projet page-gerer-directe page-liste-seule">
+      <div class="entete-page-contenu entete-gerer-seul"><button type="button" class="bouton-gerer" data-action="gerer-ouvrir" aria-label="Gérer : ${echapper(titre)}">Gérer</button></div>
       ${corps() || '<p class="vide">Rien ici pour l\'instant.</p>'}
     </div>`;
 }
@@ -443,17 +455,24 @@ function boutonsArchive(type, id, actionSuppression = null) {
 }
 
 /** Une ligne de la page « Gérer » : pastille de couleur, nom, nature, info, ⚙ qui déplie le menu de la ligne. */
-function ligneGerer({ cle, titre, nature = '', categorie = null, couleur = '#94a3b8', info = '', menu = '', ouverts }) {
+function ligneGerer({ cle, titre, nature = '', categorie = null, couleur = '#94a3b8', info = '', menu = '', ouverts, videEnBase = false, projet = null, genre = '', element = null }) {
   const ouvert = ouverts.has(cle);
+  // 0.251.0 : dossiers de la ligne : pastilles (tous les modes) et, dans le menu ⚙, cases pour la ranger (Expert).
+  const dossiers = projet && element ? sousDossiersEffectifs(projet, element, genre) : [];
+  const liste = projet && element ? lireSousDossiers(projet) : [];
+  const pastilles = dossiers.map((nom) => `<span class="pastille-pastel-dossier" style="background: ${liste.find((d) => d.nom === nom)?.couleur ?? '#6b7280'}">${echapper(nom)}</span>`).join('');
+  const rangement = projet && element
+    ? `<div class="champ-gerer seulement-expert">Dossiers <span class="rangement-dossiers">${liste.map((d) => `<button type="button" class="puce-dossier ${dossiers.includes(d.nom) ? 'actif' : ''}" style="--couleur-dossier: ${d.couleur}" data-action="dossier-bascule" data-genre="${genre}" data-id="${echapper(element.id)}" data-nom="${echapper(d.nom)}" data-present="${dossiers.includes(d.nom) ? 'oui' : 'non'}" aria-pressed="${dossiers.includes(d.nom)}"><i></i>${echapper(d.nom)}</button>`).join('')}</span></div>`
+    : '';
   return `<div class="ligne-gerer ${ouvert ? 'ouverte' : ''}">
       <div class="entete-ligne-gerer">
         <span class="pastille-gerer" style="background: ${couleur}"></span>
-        <div class="texte-ligne-gerer"><strong>${titre}</strong>${categorie ? htmlEtiquetteNature(categorie) : nature ? `<span class="nature-ligne-gerer">${echapper(nature)}</span>` : ''}<span class="aide">${info}</span></div>
-        <button type="button" class="bouton-engrenage" data-action="gerer-menu" data-cle="${echapper(cle)}" aria-expanded="${ouvert}" aria-label="Actions : ${echapper(titre)}">
+        <div class="texte-ligne-gerer"><strong>${titre}</strong>${categorie ? htmlEtiquetteNature(categorie) : nature ? `<span class="nature-ligne-gerer">${echapper(nature)}</span>` : ''}<span class="aide">${info}</span>${pastilles}</div>
+        <button type="button" class="bouton-engrenage ${videEnBase ? 'seulement-intermediaire' : ''}" data-action="gerer-menu" data-cle="${echapper(cle)}" aria-expanded="${ouvert}" aria-label="Actions : ${echapper(titre)}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
         </button>
       </div>
-      ${ouvert ? `<div class="menu-ligne-gerer">${menu}</div>` : ''}
+      ${ouvert ? `<div class="menu-ligne-gerer">${menu}${rangement}</div>` : ''}
     </div>`;
 }
 
@@ -470,7 +489,7 @@ function pageGerer(projet, vue, ouverts) {
     if (controle.length > 0) {
       const photosControle = (projet.photosControle ?? []).filter((photo) => controle.some((p) => p.id === photo.pointId));
       lignes.push(ligneGerer({
-        cle: 'points:controle', titre: 'Points de contrôle', nature: 'Contrôle', categorie: 'controle', couleur: couleurs.get('controle'), info: `${controle.length} points`, ouverts,
+        cle: 'points:controle', titre: 'Points de contrôle', nature: 'Contrôle', categorie: 'controle', couleur: couleurs.get('controle'), info: `${controle.length} points`, ouverts, videEnBase: photosControle.length === 0,
         // 0.208.0 : un × par point (Intermédiaire, sans code) ; supprimer toute la liste (Expert).
         menu: `${photosDesPoints(photosControle)}
           <div class="liste-points-gerer seulement-intermediaire">${controle.map((p) => `<div class="ligne-point-gerer"><span>${echapper(p.nom)}</span><button type="button" class="bouton-lien" data-action="enlever-point-controle" data-id="${echapper(p.id)}" aria-label="Enlever ${echapper(p.nom)}">×</button></div>`).join('')}</div>
@@ -482,12 +501,13 @@ function pageGerer(projet, vue, ouverts) {
     }
     for (const leve of projet.leves ?? []) {
       const categorie = categorieDeListe(projet, leve);
-      if (!categorie) continue;
+      if (!categorie || !estMontre(projet, leve, 'leve')) continue;
       const date = leve.direct && leve.importeLe ? ` · créé le ${new Date(leve.importeLe).toLocaleDateString('fr-CH')}` : '';
       const couleurListe = projet.couleursListes?.[leve.id] ?? couleurs.get(categorie);
       lignes.push(ligneGerer({
-        cle: `points:${leve.id}`, titre: echapper(leve.nom), nature: titres.get(categorie) ?? '', categorie, couleur: couleurListe, info: `${leve.points.length} points${date}`, ouverts,
-        menu: `${leve.dediee ? '' : `<label class="champ-gerer">Renommer <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom de la liste" /></label>`}
+        projet, genre: 'leve', element: leve,
+        cle: `points:${leve.id}`, titre: echapper(leve.nom), nature: titres.get(categorie) ?? '', categorie, couleur: couleurListe, info: `${leve.points.length} points${date}`, ouverts, videEnBase: Boolean(leve.dediee) && photosDuLeve(projet, leve).length === 0,
+        menu: `${leve.dediee ? '' : leve.nom.startsWith(PREFIXE_IMPORT) ? `<label class="champ-gerer">Renommer <span class="champ-prefixe"><span class="prefixe-nom">${echapper(PREFIXE_IMPORT)}</span><input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(sansPrefixe(leve.nom, PREFIXE_IMPORT))}" aria-label="Nom de la liste (après ${echapper(PREFIXE_IMPORT)})" /></span></label>` : `<label class="champ-gerer">Renommer <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom de la liste" /></label>`}
           <div class="champ-gerer seulement-intermediaire">Couleur ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}</div>
           ${photosDesPoints(photosDuLeve(projet, leve))}
           <div class="actions-ligne-gerer">
@@ -497,21 +517,19 @@ function pageGerer(projet, vue, ouverts) {
       }));
     }
   } else if (vue === 'plans') {
-    const types = lireTypesDxf();
     const cadastres = (projet.leves ?? []).filter((l) => l.cadastre);
     const plansCadastre = new Set(cadastres.map((l) => planDuCadastre(projet, l)?.id).filter(Boolean));
-    if (aDesPlansModifiables(projet, plansCadastre)) {
-      lignes.push('<div class="ligne-outils seulement-expert"><button type="button" class="bouton-lien bouton-lien-neutre" data-action="modifier-types-dxf">Modifier les types</button></div>');
-    }
-    for (const plan of (projet.plansDxf ?? []).filter((p) => !plansCadastre.has(p.id))) {
+    lignes.push('<div class="ligne-outils seulement-expert"><button type="button" class="bouton-lien bouton-lien-neutre" data-action="modifier-sous-dossiers">Modifier les dossiers</button></div>');
+    for (const plan of (projet.plansDxf ?? []).filter((p) => !plansCadastre.has(p.id) && estMontre(projet, p, 'plan'))) {
       const nom = plan.pdf
         ? `<div class="champ-prefixe"><span class="prefixe-nom">${echapper(PREFIXE_PDF)}</span><input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(sansPrefixe(plan.nom, PREFIXE_PDF))}" aria-label="Nom du plan (après ${echapper(PREFIXE_PDF)})" /></div>`
         : `<input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />`;
       lignes.push(ligneGerer({
-        cle: `plans:${plan.id}`, titre: echapper(plan.nom), nature: plan.pdf ? 'PDF' : 'DXF', couleur: plan.couleur ?? '#64748b', info: `${plan.compte?.objets ?? 0} objets`, ouverts,
+        projet, genre: 'plan', element: plan,
+        cle: `plans:${plan.id}`, titre: echapper(plan.nom), nature: plan.pdf ? 'PDF' : 'DXF', couleur: plan.couleur ?? '#64748b', info: [`${plan.compte?.objets ?? 0} objets`, resumeEtatPlan(plan)].filter(Boolean).join(' · '), ouverts,
         menu: `<label class="champ-gerer">Renommer ${nom}</label>
+          ${etatRecalage(plan)}${etatControle(plan)}
           <div class="champ-gerer">Couleur ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: 'Couleur du plan' })}</div>
-          ${typeDuPlan(plan, types)}
           <div class="actions-ligne-gerer">
             <button type="button" class="bouton-secondaire" data-action="voir-plan" data-id="${plan.id}">Voir</button>
             <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="recaler-plan" data-id="${plan.id}">Recaler</button>
@@ -520,9 +538,10 @@ function pageGerer(projet, vue, ouverts) {
           </div>`,
       }));
     }
-    for (const leve of cadastres) {
+    for (const leve of cadastres.filter((l) => estMontre(projet, l, 'leve'))) {
       const planDxf = planDuCadastre(projet, leve);
       lignes.push(ligneGerer({
+        projet, genre: 'leve', element: leve,
         cle: `plans:${leve.id}`, titre: echapper(leve.nom), nature: 'Cadastre', couleur: couleurDuCadastre(planDxf) ?? '#7c3aed', info: `${leve.points.length} points`, ouverts,
         menu: `<div class="champ-gerer">Couleur ${paletteCouleur({ couleur: couleurDuCadastre(planDxf), options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${leve.id}"`, nom: 'Couleur du cadastre' })}</div>
           <div class="actions-ligne-gerer">
@@ -531,9 +550,10 @@ function pageGerer(projet, vue, ouverts) {
           </div>`,
       }));
     }
-    for (const dessin of (projet.dessins ?? []).filter((d) => d.sommets.length > 0)) {
+    for (const dessin of (projet.dessins ?? []).filter((d) => d.sommets.length > 0 && estMontre(projet, d, 'dessin'))) {
       lignes.push(ligneGerer({
-        cle: `plans:${dessin.id}`, titre: echapper(dessin.nom), nature: 'Dessin', couleur: '#7c3aed', info: `${pointsDuDessin(dessin, projet.dessins).length} points`, ouverts,
+        projet, genre: 'dessin', element: dessin,
+        cle: `plans:${dessin.id}`, titre: echapper(dessin.nom), nature: 'Dessin', couleur: '#7c3aed', info: `${pointsDuDessin(dessin, projet.dessins).length} points`, ouverts, videEnBase: true,
         menu: `<div class="actions-ligne-gerer seulement-intermediaire">
             <button type="button" class="bouton-secondaire" data-action="exporter-liste" data-type="dessin" data-id="${dessin.id}">Exporter</button>
             ${boutonsArchive('dessin', dessin.id)}
@@ -541,8 +561,9 @@ function pageGerer(projet, vue, ouverts) {
       }));
     }
   } else if (vue === 'surfaces') {
-    for (const surface of projet.surfaces.filter((x) => estSurfaceFichier(x))) {
+    for (const surface of projet.surfaces.filter((x) => estSurfaceFichier(x) && estMontre(projet, x, 'surface'))) {
       lignes.push(ligneGerer({
+        projet, genre: 'surface', element: surface,
         cle: `surfaces:${surface.id}`, titre: echapper(surface.nom), nature: origineSurface(surface) ?? '', couleur: '#7c3aed',
         info: `${[surface.nomFichier].filter(Boolean).map(echapper).join('')} · ${surface.faces?.length ?? 0} triangles`, ouverts,
         menu: `<label class="champ-gerer">Renommer <span class="champ-prefixe"><span class="prefixe-nom">${echapper(prefixeDuNom(surface))}</span><input type="text" class="nom-leve" data-champ="nom-surface-projet" data-id="${surface.id}" value="${echapper(sansPrefixe(surface.nom, prefixeDuNom(surface)))}" aria-label="Nom de la surface (après ${echapper(prefixeDuNom(surface))})" /></span></label>
@@ -633,7 +654,7 @@ function blocTableauPoints(projet, etat) {
     date: `<td>${echapper(texteDate(l.date))}</td>`,
     tablette: `<td>${echapper(l.tablette)}</td>`,
     remarque: `<td>${echapper(l.remarque)}</td>`,
-    photos: `<td>${l.photoId ? `<button type="button" class="bouton-lien" data-action="voir-photo" data-id="${l.photoId}" aria-label="Voir la photo de ${echapper(l.nom)}">📷 ${l.photos}</button>` : ''}</td>`,
+    photos: `<td>${l.photoId ? `<button type="button" class="bouton-lien" data-action="voir-photo" data-id="${l.photoId}" aria-label="Voir la photo de ${echapper(l.nom)}">${ICONES_LIGNE.photo} ${l.photos}</button>` : ''}</td>`,
     liste: `<td>${echapper(l.liste)}</td>`,
   });
   const corps = lignes.slice(0, LIGNES_MAX_TABLEAU).map((l) => { const c = cellules(l); return `<tr>${ordre.map((cle) => c[cle]).join('')}</tr>`; }).join('');
@@ -687,7 +708,7 @@ function photosDesPoints(photos) {
       <summary>Photos (${photos.length})</summary>
       <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
           <button type="button" class="miniature-photo" data-action="voir-photo" data-id="${photo.id}" aria-label="Voir la photo de ${echapper(photo.point ?? 'tout le levé')}"><img src="${photo.miniature}" alt="${echapper(photo.legende || photo.point || 'Photo du levé')}" /></button>
-          <span class="point-photo">📷 ${echapper(photo.point ?? 'tout le levé')}</span>
+          <span class="point-photo">${ICONES_LIGNE.photo} ${echapper(photo.point ?? 'tout le levé')}</span>
           ${photo.legende ? `<span class="aide">${echapper(photo.legende)}</span>` : ''}
         </figure>`).join('')}</div>
     </details>`;
@@ -705,7 +726,7 @@ function ligneSurfaceProjet(surface) {
 
 /** Résultat d'un import de points : nombre de points, lignes illisibles, avertissements. */
 function afficherImportPoints({ nomFichier, format, points, erreurs, avertissements }) {
-  let html = `<p class="resume"><strong>${points.length} point(s) lu(s)</strong> dans « ${echapper(nomFichier)} » (format ${format}).</p>`;
+  let html = `<p class="resume"><strong>${points.length} ${points.length > 1 ? 'points lus' : 'point lu'}</strong> dans « ${echapper(nomFichier)} » (format ${format}).</p>`;
   if (erreurs.length > 0) {
     html += `<div class="erreur"><p><strong>${erreurs.length} ligne(s) illisible(s), non importée(s) :</strong></p><ul>`;
     html += erreurs.map((e) => `<li>ligne ${e.ligne} : ${echapper(e.message)}</li>`).join('');
@@ -792,20 +813,11 @@ function listesDessins(projet) {
     .join('');
 }
 
-/** Type d'un plan DXF (0.194.0) : petite pastille avec son nom ; en Expert, une liste pour le changer. */
-function typeDuPlan(plan, types) {
-  const pastille = plan.type ? `<span class="pastille-type-dxf" style="background: ${couleurDuType(plan.type, types)}">${echapper(plan.type)}</span>` : '';
-  const options = [['', '— aucun —'], ...types.map((t) => [t.nom, t.nom])];
-  if (plan.type && !types.some((t) => t.nom === plan.type)) options.push([plan.type, plan.type]);
-  const liste = `<label class="type-plan-dxf seulement-expert">Type <select data-champ="plan-type" data-id="${plan.id}">${options.map(([v, t]) => `<option value="${echapper(v)}" ${v === (plan.type ?? '') ? 'selected' : ''}>${echapper(t)}</option>`).join('')}</select></label>`;
-  return `<div class="ligne-type-dxf">${pastille}${liste}</div>`;
-}
-
 /** Plans DXF du projet : nom, nombre d'objets, voir / supprimer, et la liste des calques à cocher. */
 function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
-  const plans = (projet.plansDxf ?? []).filter((p) => !caches.has(p.id));
+  const plans = (projet.plansDxf ?? []).filter((p) => !caches.has(p.id) && estMontre(projet, p, 'plan'));
   if (plans.length === 0) return '';
-  const types = lireTypesDxf();
+  const dossiersListe = lireSousDossiers(projet);
   return `<div class="liste-plans-dxf">${plans
     .map((plan) => {
       const prefixe = prefixeCommun(plan.calques.map((c) => c.nom));
@@ -816,7 +828,7 @@ function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
           <strong class="nom-plan-dxf">${echapper(plan.nom)}</strong>
           <span class="pastille-gerer" style="background: ${plan.couleur ?? '#64748b'}" title="Couleur du plan"></span>
         </div>
-        ${plan.type ? `<div class="ligne-type-dxf"><span class="pastille-type-dxf" style="background: ${couleurDuType(plan.type, types)}">${echapper(plan.type)}</span></div>` : ''}
+        ${(plan.sousDossiers ?? []).length > 0 ? `<div class="ligne-type-dxf">${plan.sousDossiers.map((nom) => `<span class="pastille-pastel-dossier" style="background: ${dossiersListe.find((d) => d.nom === nom)?.couleur ?? '#6b7280'}">${echapper(nom)}</span>`).join('')}</div>` : ''}
         <div class="ligne-outils">
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${plan.id}">voir</button>
@@ -867,7 +879,7 @@ function etatRecalage(plan) {
     const { gon } = rotationLisible(r.parametres.rotation);
     const ppm = (r.parametres.echelle - 1) * 1e6;
     return `<p class="etat-recalage recale">✓ Recalé en MN95 (${r.paires.filter((p) => p.actif !== false).length} points · rotation ${gon.toFixed(4)} gon · échelle ${ppm >= 0 ? '+' : ''}${ppm.toFixed(0)} ppm)
-      <button type="button" class="bouton-lien" data-action="annuler-recalage" data-id="${plan.id}">annuler le recalage</button></p>`;
+      <button type="button" class="bouton-lien seulement-intermediaire" data-action="annuler-recalage" data-id="${plan.id}">annuler le recalage</button></p>`;
   }
   // 0.214.0 : plan importé avec le choix « Non (déjà calé) » : rien à recaler.
   if (plan.dejaCale) return '<p class="etat-recalage recale">✓ Déjà calé (importé tel quel)</p>';
@@ -882,7 +894,17 @@ function etatControle(plan) {
   const texte = c ? resumeControlePlan(c) : 'Non contrôlé';
   const classe = !c || c.saute ? 'orange' : c.couleur;
   return `<p class="etat-controle-plan ${classe}">${c && !c.saute ? '✓' : '⚠'} ${echapper(texte)}
-    <button type="button" class="bouton-lien" data-action="controler-plan" data-id="${plan.id}">${c && !c.saute ? 'recontrôler' : 'contrôler'}</button></p>`;
+    <button type="button" class="bouton-lien seulement-intermediaire" data-action="controler-plan" data-id="${plan.id}">${c && !c.saute ? 'recontrôler' : 'contrôler'}</button></p>`;
+}
+
+/** 0.241.0 : état d'un plan en quelques mots pour sa ligne de « Gérer » (visible dès Base) : « à recaler », « recalé · contrôlé 3 mm »… */
+function resumeEtatPlan(plan) {
+  const enPlace = plan.recalage?.applique || plan.dejaCale || (plan.bornes && estEnMn95(plan.bornes));
+  if (!enPlace) return plan.bornes ? 'à recaler' : '';
+  const base = plan.recalage?.applique ? 'recalé' : plan.dejaCale ? 'déjà calé' : 'en MN95';
+  const c = plan.controle;
+  if (c && !c.saute) return `${base} · contrôlé (${texteEcartMm(c.distanceMm)})`;
+  return `${base} · non contrôlé`;
 }
 
 /**

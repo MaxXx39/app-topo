@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide GitHub et Google - Topo</title>
+<style>
+:root{color-scheme:light dark;--fond:#fff;--encre:#1f2937;--bord:#d1d5db;--code:#f3f4f6;--lien:#0369a1}
+@media (prefers-color-scheme:dark){:root{--fond:#111827;--encre:#e5e7eb;--bord:#374151;--code:#1f2937;--lien:#7dd3fc}}
+body{margin:0;background:var(--fond);color:var(--encre);font:16px/1.55 system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:2rem;border-bottom:1px solid var(--bord);padding-bottom:4px}h3{font-size:1.05rem;margin-top:1.4rem}
+code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:.9em;word-break:break-word}
+blockquote{margin:12px 0;padding:8px 12px;border-left:4px solid #eab308;background:var(--code)}
+.tab{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{border:1px solid var(--bord);padding:6px 8px;text-align:left;vertical-align:top}
+ul.coches{list-style:none;padding-left:4px}a{color:var(--lien)}
+</style></head><body><main>
+<h1>Guide : GitHub et Google pour l'appli Topo</h1>
+<p>Écrit le 16.11.2026 (version 0.249.0), pour toi, géomètre, sans connaissance en développement.</p>
+<p>Ce guide dit <strong>ce qui est branché aujourd'hui</strong>, <strong>comment le paramétrer</strong>, et <strong>comment déménager le dépôt GitHub vers un compte pro</strong> sans casser l'appli.</p>
+<blockquote>Les noms de menus de GitHub et de Google changent de temps en temps : si un bouton n'est pas exactement là où c'est écrit, cherche son nom dans la page. Les adresses écrites dans le code, elles, sont vérifiées.</blockquote>
+<h2>1. Les trois services, en deux phrases chacun</h2>
+<ul>
+<li><strong>GitHub</strong> : garde le code de l'appli (le « dépôt » <code>MaxXx39/app-topo</code>), met le site en ligne (GitHub Pages), et fabrique tout seul l'APK Android et le <code>Topo.exe</code> Windows (GitHub Actions) qu'il range dans « Releases ».</li>
+<li><strong>Google Cloud</strong> : donne à l'appli le droit de parler à ton Google Drive (partage de projets). Il ne garde aucune donnée : il fournit seulement un « identifiant d'application » (client OAuth).</li>
+<li><strong>Cloudflare</strong> (petit relais du cadastre Vaud) : il passe les demandes du site internet vers le service de Vaud. Il est indépendant de GitHub et de Google ; tu n'as rien à y changer en déménageant.</li>
+</ul>
+<h2>2. Où l'adresse GitHub est écrite dans l'appli</h2>
+<p>Si le dépôt change de compte, ces endroits doivent suivre (voir la partie 5) :</p>
+<div class="tab"><table><thead><tr><th>Où</th><th>Quoi</th><th>Pourquoi</th></tr></thead><tbody>
+<tr><td><code>src/outils/mise-a-jour.js</code></td><td>4 adresses <code>github.com/MaxXx39/app-topo/...</code> (APK, EXE, et leurs « releases »)</td><td>« Chercher une mise à jour » dans Réglages</td></tr>
+<tr><td><code>windows/Topo/MiseAJour.cs</code></td><td><code>DEBUT_AUTORISE</code></td><td>l'appli Windows n'accepte de télécharger que depuis cette adresse (sécurité)</td></tr>
+<tr><td><code>windows/Topo.Tests/Tests.cs</code></td><td>2 adresses d'essai</td><td>tests de ce qui précède</td></tr>
+<tr><td><code>src/partage/connexion.js</code></td><td>commentaire sur l'origine Google</td><td>seulement un rappel</td></tr>
+<tr><td><code>vite.config.js</code></td><td><code>base: '/app-topo/'</code></td><td><strong>le nom du dépôt</strong> doit rester <code>app-topo</code>, sinon changer cette ligne</td></tr>
+<tr><td><code>.github/workflows/*.yml</code></td><td>adresses dans les commentaires</td><td>seulement un rappel</td></tr>
+<tr><td><code>public/confidentialite.html</code></td><td>page de confidentialité demandée par Google</td><td>son adresse est donnée dans Google Cloud</td></tr>
+</tbody></table></div>
+<p>L'adresse <code>https://topo.appli/app-topo/</code> de l'appli Windows est <strong>fictive et interne</strong> : ne la change jamais.</p>
+<h2>3. Paramétrer GitHub (état actuel)</h2>
+<ol>
+<li><strong>Le dépôt</strong> : <code>MaxXx39/app-topo</code>. La branche <code>main</code> = ce qui est publié. La branche de travail (<code>claude/…</code>) = ce qui est en cours d'essai.</li>
+<li><strong>GitHub Pages</strong> (le site web) : dépôt › <em>Settings</em> › <em>Pages</em> › <em>Source</em> = <strong>GitHub Actions</strong>. Le site est alors à <code>https://maxxx39.github.io/app-topo/</code>. Il est reconstruit à chaque fusion dans <code>main</code> (fichier <code>.github/workflows/publier.yml</code>).</li>
+<li><strong>Droits des Actions</strong> : les fichiers de fabrication demandent déjà eux-mêmes le droit d'écrire dans « Releases ». Si une fabrication échoue avec une erreur de droits (surtout sur un compte d'organisation), vérifier dépôt › <em>Settings</em> › <em>Actions</em> › <em>General</em> › <em>Workflow permissions</em> = <strong>Read and write permissions</strong>.</li>
+<li><strong>Secrets</strong> (dépôt › <em>Settings</em> › <em>Secrets and variables</em> › <em>Actions</em>) : seulement pour l'appli Windows, deux secrets que <strong>toi seul</strong> crées : <code>GOOGLE_BUREAU_ID</code> et <code>GOOGLE_BUREAU_SECRET</code> (voir la partie 4, client « Bureau »). Sans eux, <code>Topo.exe</code> se fabrique quand même, mais sans la connexion à Drive.</li>
+<li><strong>Releases</strong> : créées automatiquement. <code>apk-derniere-version</code> (fichier <code>Topo.apk</code>, lien fixe), <code>windows-derniere-version</code> (fichier <code>Topo.exe</code>), <code>exe-test-derniere-version</code> (petit programme d'essai du récepteur).</li>
+<li><strong>Clé de signature de l'APK</strong> : le fichier <code>android/app/cle-signature.jks</code> est dans le dépôt. <strong>Ne le perds jamais et ne le change pas</strong> : Android refuse de mettre à jour une appli signée avec une autre clé (il faudrait la désinstaller, donc perdre les projets de la tablette).</li>
+</ol>
+<h2>4. Paramétrer Google (état actuel)</h2>
+<p>Tout se fait sur <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">https://console.cloud.google.com/</a>, avec le compte Google de l'appli, dans le projet <strong>« Topo Perrin »</strong>.</p>
+<ol>
+<li><strong>API activée</strong> : <em>APIs et services</em> › <em>Bibliothèque</em> › « Google Drive API » doit être <strong>activée</strong>.</li>
+<li><strong>Écran de consentement OAuth</strong> (<em>Google Auth Platform</em> ou <em>APIs et services</em> › <em>Écran de consentement</em>) :</li>
+</ol>
+<ul>
+<li>type d'utilisateurs : <em>Externe</em> ;</li>
+<li>champ d'accès demandé : un seul, <code>.../auth/drive.file</code> (seulement les fichiers créés par l'appli) ;</li>
+<li>lien de la politique de confidentialité : <code>https://maxxx39.github.io/app-topo/confidentialite.html</code> ;</li>
+<li><strong>« Publier l'application »</strong> : tant qu'elle est en mode <em>Test</em>, Google oblige à se reconnecter environ tous les 7 jours. Publier supprime cette contrainte (à ma connaissance, <code>drive.file</code> n'impose pas de vérification lourde par Google : à confirmer dans la console).</li>
+</ul>
+<ol>
+<li><strong>Identifiants</strong> (<em>Identifiants</em> › <em>Créer des identifiants</em> › <em>ID client OAuth</em>), trois clients :</li>
+</ol>
+<ul>
+<li><strong>Application Web</strong> (le site et la PWA) : <em>Origines JavaScript autorisées</em> = <code>https://maxxx39.github.io</code> (sans <code>/app-topo</code>). Son identifiant est écrit dans <code>src/partage/connexion.js</code> (<code>ID_CLIENT_WEB</code>) ; ce n'est <strong>pas un secret</strong>.</li>
+<li><strong>Android</strong> (l'APK) : nom du package de l'appli + <strong>empreinte SHA-1</strong> de <code>cle-signature.jks</code> (la même pour toujours, puisque la clé ne change pas).</li>
+<li><strong>Application de bureau</strong> (Windows) : donne l'ID et le secret à mettre dans les deux secrets GitHub <code>GOOGLE_BUREAU_ID</code> et <code>GOOGLE_BUREAU_SECRET</code> (partie 3, point 4). <strong>Ne les écris jamais dans le chat ni dans le code.</strong></li>
+</ul>
+<h2>5. Déménager le dépôt vers un autre compte GitHub (pro)</h2>
+<h3>Avant de commencer (5 minutes, indispensable)</h3>
+<ul>
+<li><strong>Sauvegarde</strong> : dans l'appli, exporte tes projets importants en « Fichier projet (.topo.json) » ou assure-toi qu'ils sont sur Drive.</li>
+<li><strong>Ce qui est lié à l'adresse du site</strong> : la PWA (le site installé comme une appli) garde ses projets <em>dans le navigateur, par adresse</em>. Si l'adresse passe de <code>maxxx39.github.io</code> à <code>nouveau-compte.github.io</code>, <strong>les projets de la PWA ne suivent pas</strong> : il faut les exporter (ou les avoir sur Drive) et les rouvrir sur la nouvelle adresse. <strong>L'APK Android et <code>Topo.exe</code> ne sont pas touchés</strong> (leur adresse interne ne change pas).</li>
+</ul>
+<h3>Étape 1 : déplacer le dépôt</h3>
+<p>Deux façons. <strong>La première est recommandée.</strong></p>
+<ul>
+<li><strong>A. Transférer le dépôt</strong> (garde l'historique, les releases et met des redirections automatiques) : ancien compte › dépôt › <em>Settings</em> › tout en bas <em>Danger Zone</em> › <em>Transfer ownership</em>, puis nom du nouveau compte ou de l'organisation. Le nouveau compte doit accepter.</li>
+<li><strong>B. Copier le dépôt</strong> (l'ancien reste en place) : sur le nouveau compte, créer un dépôt vide <code>app-topo</code>, puis depuis un terminal : <code>git clone --mirror https://github.com/MaxXx39/app-topo.git</code>, entrer dans le dossier, <code>git push --mirror https://github.com/NOUVEAU/app-topo.git</code>. Les « Releases » ne sont <strong>pas</strong> copiées : elles se recréent à la première fabrication.</li>
+</ul>
+<p>Garde <strong>le même nom de dépôt : <code>app-topo</code></strong>. Sinon il faut aussi changer <code>base</code> dans <code>vite.config.js</code>.</p>
+<h3>Étape 2 : réparamétrer le nouveau dépôt (partie 3)</h3>
+<p>Pages › Source <em>GitHub Actions</em> ; droits des Actions si besoin ; recréer les deux secrets Windows. Puis lancer à la main (onglet <em>Actions</em>) « Publier sur GitHub Pages » et « Fabriquer l'APK » pour vérifier que tout est vert.</p>
+<h3>Étape 3 : changer les adresses dans le code</h3>
+<p>Dans les fichiers du tableau de la partie 2, remplacer <code>MaxXx39</code> par le nouveau compte, et <code>maxxx39.github.io</code> par <code>nouveau-compte.github.io</code>. <strong>Demande-le-moi</strong> : je le fais en une version, avec les tests, et je te dis quoi essayer.</p>
+<h3>Étape 4 : mettre Google Cloud à jour</h3>
+<ul>
+<li>Client <strong>Web</strong> : ajouter l'origine <code>https://nouveau-compte.github.io</code> (on peut garder l'ancienne quelques semaines).</li>
+<li>Écran de consentement : changer le lien de la politique de confidentialité.</li>
+<li>Les clients <strong>Android</strong> et <strong>Bureau</strong> ne changent pas (même clé, mêmes secrets à recréer dans GitHub).</li>
+<li>Si tu changes aussi de <strong>compte Google</strong> (un compte pro) : il faut recréer un projet Google Cloud avec les trois clients ci-dessus, puis me donner le nouvel ID client Web et, pour le bureau, recréer les deux secrets GitHub. Les fichiers déjà sur l'ancien Drive ne suivent pas tout seuls : ouvre le dossier « App Topo » de l'ancien compte et partage-le avec le nouveau, ou ré-exporte les projets.</li>
+</ul>
+<h3>Étape 5 : les appareils déjà installés</h3>
+<ul>
+<li><strong>APK</strong> : « Chercher une mise à jour » interroge l'ancienne adresse GitHub. Avec le <em>transfer</em> (A), GitHub redirige : ça marche encore. Avec la copie (B), installe la première APK du nouveau dépôt <strong>à la main</strong> une fois (même clé de signature = les projets restent).</li>
+<li><strong>Windows</strong> : pareil (<code>Topo.exe</code> d'abord récupéré à la main une fois).</li>
+<li><strong>PWA</strong> : réinstaller à la nouvelle adresse (voir « Avant de commencer »).</li>
+</ul>
+<h3>Liste de contrôle finale</h3>
+<ul class="coches">
+<li>☐ le site s'ouvre à la nouvelle adresse ;</li>
+<li>☐ l'onglet <em>Actions</em> est vert (tests, site, APK) ;</li>
+<li>☐ <code>Topo.apk</code> se télécharge depuis les nouvelles <em>Releases</em> ;</li>
+<li>☐ Réglages › Drive : connexion possible depuis le site, l'APK et Windows ;</li>
+<li>☐ « Chercher une mise à jour » trouve la bonne version ;</li>
+<li>☐ un projet exporté s'ouvre dans la nouvelle PWA.</li>
+</ul>
+<h2>6. Ce que je ne peux pas faire à ta place</h2>
+<p>Je n'ai pas accès à tes comptes GitHub ni Google : je ne peux ni les créer, ni cliquer dans leurs réglages, ni voir leurs secrets. Je peux préparer les modifications du code, vérifier les listes ci-dessus et te dire quoi cliquer. Ne me donne jamais un mot de passe ni un jeton dans le chat.</p>
+</main></body></html>
