@@ -352,11 +352,32 @@ namespace Topo
                     case "ouvrirAnydesk": OuvrirAnydesk(); break;
                     case "lireAdresse": LireAdresse(Nombre(args, 0), Texte(args, 1)); break;
                     case "installerMiseAJour": InstallerMiseAJour(Texte(args, 0)); break;
+                    case "montrerClavier": Clavier(true); break;
+                    case "cacherClavier": Clavier(false); break;
                 }
             }
             catch (Exception erreur)
             {
                 Message("Erreur : " + erreur.Message);
+            }
+        }
+
+        bool erreurClavierDite;
+
+        // Clavier tactile (0.256.4) : sorti quand un champ de texte est touché du doigt, rangé quand plus aucun champ n'a la main.
+        // Si Windows refuse, on le dit une seule fois (jamais d'échec silencieux, mais pas un message à chaque toucher).
+        void Clavier(bool montrer)
+        {
+            try
+            {
+                if (montrer) ClavierTactile.Montrer();
+                else ClavierTactile.Cacher();
+            }
+            catch (Exception erreur)
+            {
+                if (erreurClavierDite) return;
+                erreurClavierDite = true;
+                Message("Clavier tactile : " + erreur.Message);
             }
         }
 

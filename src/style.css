@@ -3,6 +3,7 @@
    Couleurs et tailles réunies ici en "variables" pour les changer facilement.
    ========================================================================== */
 :root {
+  --largeur-panneau: 440px; /* panneau de gauche en largeur (≥ 900 px) ; 0.256.4 : plus large dès 1200 px, voir fin du fichier */
   /* Couleurs de Perrin Groupe : bleu nuit et jaune ambre */
   --sombre: #1b2b36;
   --encre: #1b2b36; /* texte foncé sur fond clair (devient clair en affichage Sombre, 0.114.0) */
@@ -513,7 +514,7 @@ body.aide-active .rond-aide {
 @media (min-width: 900px) {
   .mise-en-page {
     display: grid;
-    grid-template-columns: 440px 1fr;
+    grid-template-columns: var(--largeur-panneau) 1fr;
     gap: 16px;
     padding: 16px;
     padding-top: calc(16px + 56px);
@@ -542,7 +543,7 @@ body.aide-active .rond-aide {
     bottom: auto;
     left: 16px;
     right: auto;
-    width: 440px;
+    width: var(--largeur-panneau);
     height: 48px;
     padding: 4px;
     border: none;
@@ -930,7 +931,7 @@ th:not(:first-child) {
   .barre-edition {
     left: 16px;
     right: auto;
-    width: 440px;
+    width: var(--largeur-panneau);
     bottom: 16px;
   }
 }
@@ -11549,7 +11550,7 @@ body.clavier-ouvert .bande-appli:not(:focus-within) { display: none; }
     bottom: auto;
     left: 16px;
     right: auto;
-    width: 440px;
+    width: var(--largeur-panneau);
     height: 48px;
     padding: 4px;
     border-top: none;
@@ -11581,7 +11582,7 @@ body:not(.aide-active) #leve-direct .choix-implantation-type { display: none; }
 }
 .page-applis[hidden] { display: none; }
 @media (min-width: 900px) {
-  .page-applis { left: 16px; right: auto; width: 440px; bottom: 16px; margin-top: 68px; border-radius: var(--rayon); box-shadow: var(--ombre); }
+  .page-applis { left: 16px; right: auto; width: var(--largeur-panneau); bottom: 16px; margin-top: 68px; border-radius: var(--rayon); box-shadow: var(--ombre); }
 }
 .bandeau-projet-applis {
   display: flex;
@@ -12023,7 +12024,7 @@ dialog.fenetre-reglages.en-page .titre-reglages { display: flex; align-items: ce
 }
 .retour-reglages svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 @media (min-width: 900px) {
-  dialog.fenetre-reglages.en-page[open] { left: 16px; right: auto; width: 440px; bottom: 16px; margin-top: 68px; border-radius: var(--rayon); box-shadow: var(--ombre); }
+  dialog.fenetre-reglages.en-page[open] { left: 16px; right: auto; width: var(--largeur-panneau); bottom: 16px; margin-top: 68px; border-radius: var(--rayon); box-shadow: var(--ombre); }
 }
 
 /* ==========================================================================
@@ -13947,3 +13948,9 @@ body.theme-sombre .puce-dossier.actif { background: var(--ambre, #f6ab07); borde
 }
 body.mode-telephone .entete .entete-icone-bouton.bouton-mode { margin-left: calc(4px - 4px - 3px); }
 body.mode-telephone .entete:has(.bouton-recepteur-entete) { padding-right: calc(var(--largeur-recepteur) - 3px); }
+
+/* 0.256.4 (audit Windows, demande du 16.11) : en paysage large (tablette Windows 1280 × 800, ordinateur), le panneau de gauche
+   prend 40 % de l'écran (440 à 560 px) : la consigne d'implantation (« Descendre 0.373 m ») n'est plus coupée. */
+@media (min-width: 1200px) {
+  :root { --largeur-panneau: clamp(440px, 40vw, 560px); }
+}
