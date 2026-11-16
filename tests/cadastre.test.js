@@ -109,3 +109,52 @@ describe('cadastre', () => {
     expect(listesDePoints(projet).find((l) => l.id === 'c').section).toBe('cadastre');
   });
 });
+
+describe('numéros de parcelles (0.249.0)', () => {
+  const GML_PARCELLE = `<wfs:FeatureCollection xmlns:gml="http://www.opengis.net/gml"><gml:featureMember><ms:Liegenschaft><ms:Nummer>1234</ms:Nummer><ms:geom><gml:Polygon><gml:outerBoundaryIs><gml:LinearRing><gml:coordinates>2538000,1152000 2538010,1152000 2538010,1152010 2538000,1152010 2538000,1152000</gml:coordinates></gml:LinearRing></gml:outerBoundaryIs></gml:Polygon></ms:geom></ms:Liegenschaft></gml:featureMember>
+    <gml:featureMember><ms:Liegenschaft><ms:geom><gml:Polygon><gml:outerBoundaryIs><gml:LinearRing><gml:coordinates>2538020,1152000 2538030,1152000 2538030,1152010 2538020,1152000</gml:coordinates></gml:LinearRing></gml:outerBoundaryIs></gml:Polygon></ms:geom></ms:Liegenschaft></gml:featureMember></wfs:FeatureCollection>`;
+
+  it('lit le numéro d\'une parcelle d\'un WFS ; sans numéro, la parcelle n\'a pas d\'étiquette (rien d\'inventé)', async () => {
+    const { parcellesDuGml, numeroDeParcelle } = await import('../src/topo/cadastre.js');
+    const parcelles = parcellesDuGml(GML_PARCELLE);
+    expect(parcelles).toHaveLength(1);
+    expect(parcelles[0].numero).toBe('1234');
+    expect(parcelles[0].anneau).toHaveLength(5);
+    expect(lireGml(GML_PARCELLE).parcelles).toHaveLength(1);
+    expect(lireGml(GML_PARCELLE).lignes).toHaveLength(2); // les limites restent lues comme avant
+    expect(numeroDeParcelle('{"GetEGRIDResponse":[{"egrid":"CH123456789012","number":"12A"}]}')).toBe('12A');
+    expect(numeroDeParcelle('<data:Number>345</data:Number>')).toBe('345');
+    expect(numeroDeParcelle('<a>rien</a>')).toBe('');
+  });
+
+  it('étiquette : centre de la parcelle, ou dans la parcelle si elle est en U', async () => {
+    const { pointDEtiquette, dansAnneau } = await import('../src/topo/cadastre.js');
+    expect(pointDEtiquette([[0, 0], [10, 0], [10, 10], [0, 10]])).toEqual([5, 5]);
+    const u = [[0, 0], [30, 0], [30, 30], [20, 30], [20, 10], [10, 10], [10, 30], [0, 30]];
+    expect(dansAnneau(pointDEtiquette(u), u)).toBe(true);
+  });
+
+  it('DXF : les numéros sont sur un calque à part, relus avec leur position, et retrouvés pour les exports', async () => {
+    const { parcellesDesPlans } = await import('../src/topo/cadastre.js');
+    const anneau = [[2538000, 1152000], [2538010, 1152000], [2538010, 1152010], [2538000, 1152010]];
+    const { plan } = lirePlanDxf(dxfDuCadastre([anneau], [{ numero: '1234', anneau }]), 'Cadastre 1');
+    expect(plan.calques.map((c) => c.nom)).toContain('CADASTRE_PARCELLES');
+    const texte = plan.contenu.textes[0];
+    expect(texte.t).toBe('1234');
+    const liste = parcellesDesPlans([{ ...plan, visible: true }]);
+    expect(liste).toEqual([{ numero: '1234', est: 2538005, nord: 1152005 }]);
+    // calque caché : pas exporté
+    const cache = { ...plan, calques: plan.calques.map((c) => (c.nom === 'CADASTRE_PARCELLES' ? { ...c, visible: false } : c)) };
+    expect(parcellesDesPlans([cache])).toEqual([]);
+  });
+});
+
+describe('export des numéros de parcelles (0.249.0)', () => {
+  it('DXF du plan : calque PARCELLES à part', async () => {
+    const { genererDxf } = await import('../src/export/dxf.js');
+    const texte = genererDxf({ points: [], parcelles: [{ numero: '1234', est: 2538005, nord: 1152005 }] });
+    expect(texte).toContain('PARCELLES');
+    expect(texte).toContain('1234');
+    expect(genererDxf({ points: [] })).not.toContain('PARCELLES');
+  });
+});

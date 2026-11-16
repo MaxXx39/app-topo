@@ -104,7 +104,7 @@ export const COULEURS = {
  * { document, echelle, format, messageFond } : document jsPDF, échelle utilisée, format de la
  * première feuille ('a4' ou 'a3'), et un message (fond non mis, plan coupé...) ou null.
  */
-export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, papier = 'auto', orientation = 'paysage', calques = {}, comparaisons = [], photos = [], coupes = [], dessins = [], levesSeuls = [] }) {
+export async function creerPdf({ stocks, resultats, points, cartouche, echelleImposee = null, papier = 'auto', orientation = 'paysage', calques = {}, comparaisons = [], photos = [], coupes = [], dessins = [], levesSeuls = [], parcelles = [] }) {
   const choix = { ...CALQUES_PDF, ...calques };
   // Remblai / déblai et couleurs selon l'altitude ne se lisent pas l'un sur l'autre.
   if (choix.ecarts) choix.couleurs = false;
@@ -148,7 +148,7 @@ export async function creerPdf({ stocks, resultats, points, cartouche, echelleIm
     const contenu = contenuDuPlan(calcules, points, coupes, dessins, levesSeuls);
     nouvelleFeuille(formatDuPlan(contenu.zone), orientation);
     dessinerCadres(doc);
-    const plan = await dessinerPlan(doc, calcules, contenu, echelleImposee, choix, coupes, dessins, levesSeuls);
+    const plan = await dessinerPlan(doc, calcules, contenu, echelleImposee, choix, coupes, dessins, levesSeuls, parcelles);
     const yLibre = dessinerColonne(doc, calcules, { ...cartouche, echelle: plan.echelle }, { choix, relief: plan.relief, ecarts: plan.legendeEcarts, comparaisons });
     placerPhotos(yLibre);
     echelle = plan.echelle;
@@ -424,7 +424,7 @@ async function dessinerPageComparaison(doc, { nom, description, resultat }, cart
  * Renvoie { echelle, messageFond, relief, legendeEcarts } (relief : plage d'altitudes et
  * équidistance ; legendeEcarts : paliers remblai / déblai ; pour les légendes).
  */
-async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, echelleImposee, choix, coupes = [], dessins = [], levesSeuls = []) {
+async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, echelleImposee, choix, coupes = [], dessins = [], levesSeuls = [], parcelles = []) {
   if (!zone) return { echelle: echelleImposee ?? 500, messageFond: null, relief: null, legendeEcarts: null };
   const projection = preparerProjection(zone, echelleImposee);
   const { echelle, versPapier } = projection;
@@ -504,6 +504,7 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
   for (const { stock } of calcules) polyligne(stock.contour ?? [], true);
 
   dessinerDessinsPdf(doc, dessins, versPapier, choix);
+  dessinerParcellesPdf(doc, parcelles, versPapier, zone);
   dessinerPointsPdf(doc, pointsMontres, versPapier, echelle, choix);
 
   // Nom et volume de chaque stock, dans une étiquette blanche
@@ -531,6 +532,21 @@ async function dessinerPlan(doc, calcules, { parNom, pointsMontres, zone }, eche
   dessinerTraitsCoupes(doc, coupes, versPapier);
   terminerCadrePlan(doc, echelle, sources);
   return { echelle, messageFond, relief, legendeEcarts };
+}
+
+/** Numéros de parcelles du cadastre (0.249.0) : texte magenta en italique, centré, seulement ceux qui sont dans la zone du plan. */
+function dessinerParcellesPdf(doc, parcelles, versPapier, zone) {
+  if (!parcelles?.length) return;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7);
+  doc.setTextColor(192, 38, 211);
+  for (const p of parcelles) {
+    if (zone && (p.est < zone.estMin || p.est > zone.estMax || p.nord < zone.nordMin || p.nord > zone.nordMax)) continue;
+    const { x, y } = versPapier(p);
+    doc.text(String(p.numero), x, y, { align: 'center' });
+  }
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...COULEURS.texte);
 }
 
 /** Dessins (Calculs › Dessin) : traits violets, sommets en petits carrés et leur nom (calque « noms »). */

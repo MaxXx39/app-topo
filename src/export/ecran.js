@@ -130,7 +130,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
       message.textContent = 'CSV téléchargé.';
     },
     dxf: () => {
-      const { points, dessinSurfaces, dessins } = obtenirDonnees();
+      const { points, dessinSurfaces, dessins, parcelles = [] } = obtenirDonnees();
       const { stocks, resultats, surfaces } = dessinSurfaces;
       const triangles = resultats.flatMap((r) => r.trianglesDessus ?? []);
       const plage = triangles.length > 0 ? plageAltitudes(triangles) : null;
@@ -141,6 +141,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
         surfaces,
         equidistance: plage ? equidistanceAuto(plage.min, plage.max) : null,
         dessins,
+        parcelles,
       });
       // Photo aérienne (0.98.0) : son GeoTIFF est fabriqué quand la fenêtre du DXF se ferme.
       const avecPhoto = champ('geotiff').checked;
@@ -166,7 +167,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
       message.textContent = `LandXML téléchargé (${liste.length} surface(s)).`;
     },
     pdf: async () => {
-      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos, coupes, dessins, levesSeuls = [] } = obtenirDonnees();
+      const { stocks, resultats, points, fichierPoints, comparaisons, volumes, photos, coupes, dessins, levesSeuls = [], parcelles = [] } = obtenirDonnees();
       // Sans volume, le PDF montre quand même les points, levés et dessins cochés (levé seul).
       if (!verifier(volumes, points.length > 0 || dessins.length > 0 || levesSeuls.length > 0)) return;
       message.textContent = 'Préparation du PDF…';
@@ -194,6 +195,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
           photos,
           coupes,
           dessins,
+          parcelles,
           levesSeuls,
           calques,
           cartouche: {

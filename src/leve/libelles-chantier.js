@@ -2,7 +2,7 @@
 // (EU, EC… / Haute, Basse…), à part des libellés des autres levés, modifiables en Expert et partagées
 // par Drive (listes partagées, partie « chantier » = { libelles, natures: { reseau, bordure } }).
 // Sans rien de partagé : les listes de départ (topo/chantier.js).
-import { LIBELLES_CHANTIER_DEPART, NATURES_RESEAU_DEPART, NATURES_BORDURE_DEPART, couleurDeNature } from '../topo/chantier.js';
+import { LIBELLES_CHANTIER_DEPART, LIBELLE_LIBRE, NATURES_RESEAU_DEPART, NATURES_BORDURE_DEPART, couleurDeNature } from '../topo/chantier.js';
 import { FORMES } from '../plan/formes.js';
 import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-partagees.js';
 
@@ -20,7 +20,8 @@ export function nettoyerLibelle(l) {
     court: String(l?.court ?? '').trim() || nom,
     // Forme du point sur le plan (celle du libellé) ; les anciennes valeurs « rond » deviennent le rond plein.
     forme: FORMES.some(([cle]) => cle === l?.forme) ? l.forme : '',
-    reseau: l?.reseau !== false,
+    reseau: l?.reseau !== false && !l?.libre,
+    ...(l?.libre ? { libre: true } : {}),
     ouvrage: Boolean(l?.ouvrage),
     modes: (l?.modes ?? []).filter((m) => modesPermis.includes(m)),
     champs: (l?.champs ?? []).filter((c) => champsPermis.includes(c)),
@@ -31,7 +32,10 @@ export function nettoyerLibelle(l) {
 export function lireLibellesChantier() {
   const partage = lireListesPartagees().chantier?.libelles;
   const propres = Array.isArray(partage) ? partage.map(nettoyerLibelle).filter(Boolean) : [];
-  return structuredClone(propres.length > 0 ? propres : LIBELLES_CHANTIER_DEPART);
+  const liste = structuredClone(propres.length > 0 ? propres : LIBELLES_CHANTIER_DEPART);
+  // « Libre » toujours là et en premier, même dans une ancienne liste partagée (0.249.0).
+  if (!liste.some((l) => l.libre)) liste.unshift(structuredClone(LIBELLE_LIBRE));
+  return liste;
 }
 
 /** Natures du Levé chantier : { reseau: [...], bordure: [...], couleurs: { nature: '#rrggbb' } }. */

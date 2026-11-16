@@ -109,10 +109,11 @@ export function creerCadastreAutour(outils) {
         throw new Error(exemple ? `rien dans ce cercle : ${recus}, par ex. E ${exemple[0].toFixed(3)} N ${exemple[1].toFixed(3)} (point touché E ${centre.est.toFixed(3)} N ${centre.nord.toFixed(3)})` : `aucun point limite dans ce cercle (${recus})`);
       }
       const nom = nomDeLaListe(outils.nomsPris());
-      const { plan: planDxf } = dedans.lignes.length > 0 ? lirePlanDxf(dxfDuCadastre(dedans.lignes), nom) : {};
+      const { plan: planDxf } = dedans.lignes.length > 0 ? lirePlanDxf(dxfDuCadastre(dedans.lignes, dedans.parcelles ?? []), nom) : {};
       arreter();
       outils.ajouterCadastre({ nom, points, planDxf: planDxf ?? null });
-      outils.afficherMessage(`${nom} : ${points.length} point(s) limite(s), ${dedans.lignes.length} ligne(s)`, 6000);
+      const nbNumeros = (dedans.parcelles ?? []).length;
+      outils.afficherMessage(`${nom} : ${points.length} point(s) limite(s), ${dedans.lignes.length} ligne(s)${nbNumeros > 0 ? `, ${nbNumeros} numéro(s) de parcelle` : ' (aucun numéro de parcelle reçu du service)'}`, 6000);
     } catch (erreur) {
       occupe = false;
       if (actif) dessinerBarre();

@@ -8,6 +8,8 @@ export const RAYON_MAX = 500; // m
 export const RAYON_DEPART = 50; // m
 export const PREFIXE_POINT = 'CAD-';
 export const NOM_CALQUE = 'CADASTRE';
+/** Calque des numéros de parcelles (0.249.0) : à part des limites, pour les montrer / cacher / exporter séparément. */
+export const NOM_CALQUE_PARCELLES = 'CADASTRE_PARCELLES';
 
 /** Rectangle MN95 autour du centre { est, nord } : { estMin, nordMin, estMax, nordMax }. */
 export function rectangleAutour(centre, rayon) {
@@ -80,7 +82,64 @@ export function lireGml(texte) {
       lignes.push(paires);
     }
   }
-  return { points, lignes };
+  return { points, lignes, parcelles: parcellesDuGml(texte) };
+}
+
+/**
+ * Numéro d'une parcelle (« 1234 », « 12A ») dans un morceau de texte (réponse WFS d'un objet, extrait ou réponse GetEGRID,
+ * XML ou JSON) : propriété Nummer / Numero / Number / no_parcelle… Chaîne vide si rien n'est trouvé (rien d'inventé).
+ */
+export function numeroDeParcelle(texte) {
+  const noms = '(?:Nummer|Numero|Numéro|Number|no_parcelle|numero_parcelle|NO_PARCELLE)';
+  const xml = new RegExp(`<(?:\\w+:)?${noms}\\b[^>]*>\\s*([^<\\s][^<]{0,19}?)\\s*</(?:\\w+:)?${noms}>`, 'i').exec(texte);
+  if (xml) return xml[1].trim();
+  const json = new RegExp(`"${noms}"\\s*:\\s*"?([^",}\\s][^",}]{0,19})"?`, 'i').exec(texte);
+  return json ? json[1].trim() : '';
+}
+
+/** Parcelles d'un GML : un objet (featureMember / member) avec un numéro et un contour → [{ numero, anneau }]. */
+export function parcellesDuGml(texte) {
+  const objets = texte.matchAll(/<((?:\w+:)?(?:featureMember|member))\b[\s\S]*?<\/\1>/g);
+  const parcelles = [];
+  for (const [objet] of objets) {
+    const numero = numeroDeParcelle(objet);
+    if (!numero) continue;
+    const anneau = /<(?:\w+:)?LinearRing\b[\s\S]*?<\/(?:\w+:)?LinearRing>/.exec(objet)?.[0];
+    const paires = anneau ? pairesDuMorceau(anneau) : [];
+    if (paires.length >= 3) parcelles.push({ numero, anneau: paires });
+  }
+  return parcelles;
+}
+
+/**
+ * Où écrire le numéro d'une parcelle : le centre du contour s'il est dedans, sinon le milieu de la corde horizontale
+ * la plus longue passant par la hauteur du centre (parcelle en L ou en U). Renvoie [est, nord].
+ */
+export function pointDEtiquette(anneau) {
+  let aire = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < anneau.length; i++) {
+    const [x1, y1] = anneau[i];
+    const [x2, y2] = anneau[(i + 1) % anneau.length];
+    const croix = x1 * y2 - x2 * y1;
+    aire += croix;
+    cx += (x1 + x2) * croix;
+    cy += (y1 + y2) * croix;
+  }
+  if (Math.abs(aire) < 1e-9) return anneau[0];
+  const centre = [cx / (3 * aire), cy / (3 * aire)];
+  if (dansAnneau(centre, anneau)) return centre;
+  const xs = [];
+  for (let i = 0; i < anneau.length; i++) {
+    const [x1, y1] = anneau[i];
+    const [x2, y2] = anneau[(i + 1) % anneau.length];
+    if ((y1 > centre[1]) !== (y2 > centre[1])) xs.push(x1 + ((centre[1] - y1) * (x2 - x1)) / (y2 - y1));
+  }
+  xs.sort((a, b) => a - b);
+  let meilleur = null;
+  for (let i = 0; i + 1 < xs.length; i += 2) if (!meilleur || xs[i + 1] - xs[i] > meilleur[1] - meilleur[0]) meilleur = [xs[i], xs[i + 1]];
+  return meilleur ? [(meilleur[0] + meilleur[1]) / 2, centre[1]] : anneau[0];
 }
 
 /** Distance à plat (m) entre deux paires [est, nord]. */
@@ -95,7 +154,11 @@ function distance(a, b) {
 export function garderDansLeCercle(donnees, centre, rayon) {
   const c = [centre.est, centre.nord];
   const dedans = (p) => distance(p, c) <= rayon;
-  return { points: donnees.points.filter(dedans), lignes: donnees.lignes.filter((ligne) => ligne.some(dedans)) };
+  return {
+    points: donnees.points.filter(dedans),
+    lignes: donnees.lignes.filter((ligne) => ligne.some(dedans)),
+    parcelles: (donnees.parcelles ?? []).filter((p) => p.anneau.some(dedans)),
+  };
 }
 
 const mm = (v) => Math.round(v * 1000) / 1000;
@@ -123,15 +186,38 @@ export function pointsDuCadastre(donnees) {
  * Texte d'un DXF (ASCII) avec les lignes du cadastre, calque « CADASTRE » : lu ensuite par
  * lirePlanDxf comme n'importe quel plan DXF (accroche Sommet, Milieu, Sur ligne comprise).
  */
-export function dxfDuCadastre(lignes) {
+export function dxfDuCadastre(lignes, parcelles = []) {
   const sortie = ['0', 'SECTION', '2', 'ENTITIES'];
   for (const ligne of lignes) {
     sortie.push('0', 'POLYLINE', '8', NOM_CALQUE, '66', '1', '70', '0');
     for (const [est, nord] of ligne) sortie.push('0', 'VERTEX', '8', NOM_CALQUE, '10', String(mm(est)), '20', String(mm(nord)), '30', '0');
     sortie.push('0', 'SEQEND', '8', NOM_CALQUE);
   }
+  // Numéros de parcelles (0.249.0) : un texte magenta (couleur 6) centré dans la parcelle, sur un calque à part.
+  for (const { numero, anneau } of parcelles) {
+    const [est, nord] = pointDEtiquette(anneau);
+    sortie.push('0', 'TEXT', '8', NOM_CALQUE_PARCELLES, '62', '6', '10', String(mm(est)), '20', String(mm(nord)), '30', '0', '40', '2.5', '1', String(numero), '72', '1', '73', '2', '11', String(mm(est)), '21', String(mm(nord)), '31', '0');
+  }
   sortie.push('0', 'ENDSEC', '0', 'EOF');
   return sortie.join('\n');
+}
+
+/**
+ * Numéros de parcelles des plans DXF du projet (calque CADASTRE_PARCELLES, 0.249.0), pour les exports PDF / DXF du plan :
+ * [{ numero, est, nord }] en MN95. Un plan caché ou un calque caché (« Afficher ») n'est pas exporté.
+ */
+export function parcellesDesPlans(plans = []) {
+  const liste = [];
+  for (const plan of plans) {
+    if (!plan?.contenu || plan.visible === false || !plan.origine) continue;
+    plan.calques.forEach((calque, c) => {
+      if (calque.nom !== NOM_CALQUE_PARCELLES || calque.visible === false) return;
+      for (const t of plan.contenu.textes ?? []) {
+        if (t.c === c && t.t) liste.push({ numero: t.t, est: plan.origine.est + t.x, nord: plan.origine.nord + t.y });
+      }
+    });
+  }
+  return liste;
 }
 
 /** Nom de la liste de points : « Cadastre 1 », ou le numéro libre suivant. */

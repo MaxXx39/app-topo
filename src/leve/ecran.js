@@ -891,7 +891,7 @@ export function creerEcranLeve(conteneur, actions) {
       <button type="button" class="bouton bouton-prendre ${autocontrole ? '' : 'seulement-intermediaire'}" data-action="enregistrerImplantation" disabled>
         <span>${talus ? 'ENREGISTRER L\'ENTRÉE EN TERRE' : autocontrole ? 'ENREGISTRER LE CONTRÔLE' : 'ENREGISTRER L\'IMPLANTATION'}</span><span class="sous-titre-prendre">ou touche vol −</span>
       </button>
-      ${ligne && imp.ligne?.reseauId ? '<div class="profil-reseau" data-vivant="profil-reseau"></div>' : ''}
+      ${ligne && imp.ligne && !talus ? `${!imp.ligne.reseauId && aAcces('intermediaire') && donnees.nbReseaux > 0 ? `<div class="ligne-choix"><button type="button" class="puce-choix ${donnees.controle.cana ? 'actif' : ''}" data-action="basculerCana" role="switch" aria-checked="${Boolean(donnees.controle.cana)}" title="Montrer les réseaux qui croisent la ligne dans le profil en long">${donnees.controle.cana ? '☑' : '☐'} Cana</button></div>` : ''}<div class="profil-reseau" data-vivant="profil-reseau"></div>` : ''}
       <p class="raison-leve" data-vivant="raison" hidden></p>
     </div>`;
   }
@@ -1310,7 +1310,7 @@ export function creerEcranLeve(conteneur, actions) {
     if (c.diametre && !DIAMETRES_LISTE.includes(Number(c.diametre))) diametres.push([c.diametre, c.diametre]);
     return `<div class="chantier-leve" role="group" aria-label="Ce que l'on lève sur le chantier">
       ${rangee('libelles', c.libelles.map((lib) => `<button type="button" class="chip-chantier ${lib.abreviation === l.abreviation ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="libelle" data-valeur="${echapper(lib.abreviation)}" title="${echapper(lib.nom)}"><i class="symbole-libelle" style="color: ${couleurNature}">${symboleDeForme(lib.forme)}</i>${echapper(lib.court || lib.nom)}</button>`).join('') + '<button type="button" class="bouton-crayon-libelles seulement-expert" data-action="modifierChantier" title="Modifier la bibliothèque du chantier" aria-label="Modifier la bibliothèque du chantier">⚙</button>', 'Plus de libellés')}
-      ${rangee('natures', c.natures.map((n) => `<button type="button" class="nat-chantier ${n === c.nature ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="nature" data-valeur="${echapper(n)}"><i style="background: ${c.couleursNatures[n] ?? '#6b7280'}"></i>${echapper(n)}</button>`).join(''), 'Plus de natures')}
+      ${c.natures.length > 0 ? rangee('natures', c.natures.map((n) => `<button type="button" class="nat-chantier ${n === c.nature ? 'actif' : ''}" data-action="reglerChantier" data-champ-chantier="nature" data-valeur="${echapper(n)}"><i style="background: ${c.couleursNatures[n] ?? '#6b7280'}"></i>${echapper(n)}</button>`).join(''), 'Plus de natures') : ''}
       ${reglages ? `<div class="reglages-chantier">${reglages}${bulle('chantier')}</div>` : ''}
       <div class="attributs-chantier">
         ${l.champs.includes('diametre') ? liste('diametre', l.ouvrage ? 'Ø tuyau' : 'Ø', diametres, c.diametre, `d ${diametreRequis && diametreVide ? 'manque' : ''}`, true) : ''}

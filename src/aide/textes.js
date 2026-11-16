@@ -32,7 +32,7 @@ export const TEXTES_AIDE = {
   hauteurCanne:
     'Hauteur de canne : celle d\'Emlid Flow, montrée pour contrôle seulement. L\'appli ne s\'en sert pas dans ses calculs. Modifiable en Expert.',
   implanter:
-    'Touche un point, une ligne ou une surface sur le plan (accroche dans la barre), puis « Implanter » et suis la cible. ← change de point. Manuel : loupe pour viser sans accroche. Ligne : « ↗ +1.70 % » à gauche de « fin » = pente du segment où tu es (en %, positive en montant).',
+    'Touche un point, une ligne ou une surface sur le plan (accroche dans la barre), puis « Implanter » et suis la cible. ← change de point. Manuel : loupe pour viser sans accroche. Ligne : « ↗ +1.70 % » à gauche de « fin » = pente du segment où tu es (en %, positive en montant). Ligne : à moins de 1 m de la ligne, le profil en long s\'affiche (terrain de la surface choisie, altitude et pente de la ligne, canne) ; case « Cana » (Intermédiaire) : les réseaux qui croisent la ligne.',
   autocontrole:
     'Remesure un point de contrôle connu. Vert ≤ 2 cm, orange ≤ 4 cm, rouge au-delà. Un contrôle est demandé chaque jour puis toutes les 4 h. Roue ⚙ (code) : tolérances et points.',
   talus:
@@ -58,7 +58,7 @@ export const TEXTES_AIDE = {
   journalNmea:
     'Expert. Enregistre 1 minute de ce que le GNSS envoie (NMEA) pour vérifier hauteur de canne, inclinaison ou batterie. Un résumé des messages reçus s\'affiche à la fin.',
   chantier:
-    'Levé chantier : choisis le libellé (Chambre, Tuyau…) et la nature (EU, EC…). Tuyau : lève le dessus (le Ø est obligatoire, le fil d\'eau est calculé) ou le fil d\'eau. Chambre / grille : 1 point (ronde) ou 3 coins (rectangle), Ø du tuyau qui arrive facultatif.',
+    'Levé chantier : « Libre » est proposé en premier (sans nature ni attribut : seulement une remarque et des photos). Sinon choisis le libellé (Chambre, Tuyau…) et la nature (EU, EC…). Tuyau : lève le dessus (le Ø est obligatoire, le fil d\'eau est calculé) ou le fil d\'eau. Chambre / grille : 1 point (ronde) ou 3 coins (rectangle), Ø du tuyau qui arrive facultatif.',
   trianglesEnTrop:
     'Expert. Sans contour, le levé peut créer des triangles en trop : « Supprimer au doigt », touche un triangle (retoucher = le remettre), puis « Terminer ».',
   photos:

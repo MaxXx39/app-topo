@@ -3,6 +3,7 @@
 // Tout est rangé dans le "projet" ouvert (voir projet/projet.js), enregistré automatiquement
 // sur l'appareil après chaque modification.
 import { adresseParRelais } from './import/relais.js';
+import { parcellesDesPlans } from './topo/cadastre.js';
 import './style.css';
 import { lirePoints } from './topo/import-points.js';
 import { lireLandXML, fusionnerSurfaces } from './topo/landxml.js';
@@ -86,8 +87,8 @@ import { modifierLibellesDeSorte } from './leve/fenetre-libelles.js';
 import { ouvrirFenetreChantier } from './leve/fenetre-chantier.js';
 import { altitudeSurSurface, ecartSurface, classeEcart, extremitesCoupe, chercheurAltitude, directionDeMarche, pointLePlusProche } from './topo/implantation.js';
 import { guidageTalus, zoneTalus, sourceAltitudeLigne, talusComplet, textePente } from './topo/talus.js';
-import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele, ecartAuBout, positionSurLigne } from './topo/ligne-implantation.js';
-import { tuyauxSurCoupe } from './topo/reseau.js';
+import { guidageLigne, sommetsChoisis, longueurPolyligne, ligneParallele, ecartAuBout, positionSurLigne, altitudeSurLigne } from './topo/ligne-implantation.js';
+import { tuyauxSurCoupe, croisementsSurAxe } from './topo/reseau.js';
 import { svgCoupeAxe } from './reseaux/coupe-svg.js';
 import { MODES_ACCROCHE, piedPerpendiculaire, accrocher, accrocherTrait, sourcesDesPlans, guidage, ecartsImplantation, classeDistance, nomPointAImplanter, csvImplantations } from './topo/accroche.js';
 import {
@@ -240,7 +241,7 @@ const terrain = {
   ...lireReglagesTerrain(),
 };
 // Levé chantier (0.175.0) : derniers choix (libellé, nature, mode d'altitude, forme, Ø, matériau…) gardés d'un point à l'autre.
-terrain.chantier = { libelle: 'T', nature: 'EU', mode: '', forme: 'ronde', diametre: '', gaine: '', nombre: '1', profondeur: '', materiau: 'PVC', remarque: '', ...terrain.chantier };
+terrain.chantier = { libelle: 'LIB', nature: 'EU', mode: '', forme: 'ronde', diametre: '', gaine: '', nombre: '1', profondeur: '', materiau: 'PVC', remarque: '', ...terrain.chantier };
 // Orientation (0.90.1) : toujours le cap du GNSS (la direction de marche sert en secours, sans le dire).
 terrain.sourceOrientation = 'rx2';
 // Site sans récepteur : seulement le mode Lever (et Contrôle en consultation).
@@ -1292,11 +1293,25 @@ function montrerFichePoint(point) {
   const liste = projet.leves.find((l) => l.points.some((p) => p.nom === point.nom && p.est === point.est && p.nord === point.nord));
   const boite = document.createElement('div');
   boite.id = 'fiche-point-plan';
-  boite.innerHTML = htmlFichePoint({ nom: point.nom, liste: liste?.nom ?? '', lignes: lignesFichePoint(point) });
+  // 0.249.0 (Expert, demande du 16.11) : un point devient point de contrôle (copie : le point reste dans sa liste) depuis sa fiche, et l'inverse.
+  const dejaControle = projet.pointsControle.find((p) => p.nom === point.nom && p.est === point.est && p.nord === point.nord);
+  const controle = aAcces('expert') && !point.annotation ? (dejaControle ? 'retirer' : liste || point.nom ? 'ajouter' : null) : null;
+  boite.innerHTML = htmlFichePoint({ nom: point.nom, liste: liste?.nom ?? '', lignes: lignesFichePoint(point), controle });
   const zone = document.querySelector('.panneau-plan')?.getBoundingClientRect();
   boite.style.cssText = `position: fixed; z-index: 40; left: 8px; right: 8px; bottom: ${Math.max(8, window.innerHeight - (zone?.bottom ?? window.innerHeight) + 34)}px; display: flex; justify-content: center; pointer-events: none;`;
   boite.addEventListener('click', (evenement) => {
     if (evenement.target.closest('[data-action="fermer-fiche"]')) fermerFichePoint();
+    const bouton = evenement.target.closest('[data-action="controle-fiche"]');
+    if (bouton) {
+      if (refuserEnLectureSeule()) return;
+      if (bouton.dataset.valeur === 'retirer') {
+        if (dejaControle) retirerPointControleConfirme(dejaControle.id);
+      } else {
+        const refus = ajouterAuxPointsControle([{ nom: point.nom, est: point.est, nord: point.nord, altitude: point.altitude ?? null }]);
+        if (refus) afficherMessage(refus.erreur, 4000);
+      }
+      fermerFichePoint();
+    }
   });
   document.body.append(boite);
   return true;
@@ -2884,7 +2899,7 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
           terrain.chantier.profondeur = '';
           const libelle = libelleChantier(valeur);
           const natures = lireNaturesChantier()[libelle.reseau ? 'reseau' : 'bordure'];
-          if (!natures.includes(terrain.chantier.nature)) terrain.chantier.nature = natures[0];
+          if (!libelle.libre && !natures.includes(terrain.chantier.nature)) terrain.chantier.nature = natures[0];
         }
         retenirReglagesTerrain();
         if (redessiner) recalculer();
@@ -5279,9 +5294,52 @@ function calculerImplantationLigne(etat, orientation = null) {
     // 0.123 : de combien de degrés se tourner pour être dans l'axe de la ligne (+ = vers la droite) ; null sans cap.
     virage: virageVersLigne(orientation?.azimut ?? null, sommetsDeLaLigne(), g.segment),
     // 0.236.0 : réseau implanté : profil en long, seulement à moins de 1 m de la ligne (G / D).
-    profilReseau: ligne.reseauId && Math.abs(g.ecart) < 1 ? profilEnLongDuReseau(position) : null,
+    // 0.249.0 : toute ligne (pas seulement un réseau) : profil en long à moins de 1 m, avec la case « Cana » pour les réseaux qui la croisent.
+    profilReseau: Math.abs(g.ecart) < 1 ? (ligne.reseauId ? profilEnLongDuReseau(position) : profilEnLongDeLaLigne(position)) : null,
     message: null,
   };
+}
+
+/**
+ * Profil en long (SVG) d'une ligne à implanter (0.249.0, demande du 16.11) : le terrain de la surface choisie, la ligne (son altitude
+ * le long d'elle, sa pente) et la canne, ±20 m autour d'elle. Case « Cana » : les réseaux qui croisent la ligne en plus.
+ * null sans altitudes sur la ligne (ni tapées au début et à la fin, ni dans le plan 3D) ou sans altitude de la canne.
+ */
+function profilEnLongDeLaLigne(position) {
+  const ligne = implanter.ligne;
+  const sommets = sommetsDeLaLigne();
+  if (!ligne || sommets.length < 2 || position.altitude == null) return null;
+  const altitudes = altitudesDesBouts();
+  const avecZ = [];
+  let cumul = 0;
+  for (let i = 0; i < sommets.length; i++) {
+    if (i > 0) cumul += Math.hypot(sommets[i].est - sommets[i - 1].est, sommets[i].nord - sommets[i - 1].nord);
+    const fe = altitudeSurLigne(cumul, sommets, altitudes);
+    if (fe == null) return null;
+    avecZ.push({ est: sommets[i].est, nord: sommets[i].nord, fe });
+  }
+  const pseudo = { id: '__ligne', type: '', nom: ligne.nom, diametre: 0.03, sommets: avecZ, tranchee: null };
+  // Terrain le long de la ligne : recalculé seulement si la surface ou la ligne changent.
+  const cle = `${terrain.surfaceId ?? ''}|${ligne.decalage ?? 0}|${ligne.inverse ? 1 : 0}|${avecZ.length}|${avecZ[0].est}`;
+  if (ligne.terrainProfilCle !== cle) {
+    ligne.terrainProfilCle = cle;
+    ligne.terrainProfil = [];
+    const triangles = terrain.surfaceId ? trianglesDeSurface(terrain.surfaceId) : [];
+    let cumulTerrain = 0;
+    for (let i = 0; i + 1 < avecZ.length; i++) {
+      const [a, b] = [avecZ[i], avecZ[i + 1]];
+      if (triangles.length > 0) for (const m of profilSurface(triangles, a, b)) ligne.terrainProfil.push(m.map((p) => ({ d: cumulTerrain + p.distance, z: p.altitude })));
+      cumulTerrain += Math.hypot(b.est - a.est, b.nord - a.nord);
+    }
+  }
+  const sur = positionSurLigne(position, avecZ);
+  if (!sur) return null;
+  const d = Math.min(Math.max(sur.abscisse, 0), sur.longueur);
+  const demi = 20;
+  const d0 = Math.min(Math.max(d - demi, 0), Math.max(sur.longueur - 2 * demi, 0));
+  const fenetre = sur.longueur <= 2 * demi ? null : { d0, d1: d0 + 2 * demi };
+  const croisements = terrain.cana && aAcces('intermediaire') ? croisementsSurAxe([...(projet.canalisations ?? []), pseudo], '__ligne') : [];
+  return svgCoupeAxe({ reseau: pseudo, terrain: ligne.terrainProfil, croisements, position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
 }
 
 /** Profil en long (SVG) du réseau en cours d'implantation, avec la canne (altitude mesurée) : ±20 m autour d'elle. */
@@ -7062,8 +7120,9 @@ function donneesChantier(stock) {
   const libelles = lireLibellesChantier();
   const libelle = libelleChantier(terrain.chantier.libelle, libelles);
   const toutesNatures = lireNaturesChantier();
-  const natures = toutesNatures[libelle.reseau ? 'reseau' : 'bordure'];
-  const nature = natures.includes(terrain.chantier.nature) ? terrain.chantier.nature : natures[0];
+  // « Libre » : pas de nature (liste vide, nature vide).
+  const natures = libelle.libre ? [] : toutesNatures[libelle.reseau ? 'reseau' : 'bordure'];
+  const nature = libelle.libre ? '' : natures.includes(terrain.chantier.nature) ? terrain.chantier.nature : natures[0];
   const mode = libelle.modes.includes(terrain.chantier.mode) ? terrain.chantier.mode : libelle.modes[0] ?? '';
   const cadre = (stock.cadres ?? []).find((c) => c.noms.length < 3 && c.libelle === libelle.abreviation);
   const dernier = (stock.cadres ?? []).filter((c) => c.noms.length === 3).at(-1);
@@ -8262,6 +8321,8 @@ creerEcranExport(moduleExport.zone('plan'), {
       },
       points: leves.flatMap((l) => l.points),
       fichierPoints: leves.map((l) => l.nom).join(', '),
+      // Numéros de parcelles du cadastre importé (calque CADASTRE_PARCELLES visible) : DXF (calque PARCELLES) et PDF.
+      parcelles: parcellesDesPlans(projet.plansDxf ?? []),
       // Dessins (Calculs › Dessin) cochés : DXF (calque DESSINS) et PDF.
       dessins: projet.dessins
         .filter((d) => selection.has(d.id) && d.sommets.length > 0)

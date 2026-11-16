@@ -24,12 +24,13 @@ export function lignesFichePoint(point) {
   return lignes;
 }
 
-/** HTML de la fiche. { nom, liste (nom de la liste du point, facultatif), lignes }. */
-export function htmlFichePoint({ nom, liste, lignes }) {
+/** HTML de la fiche. { nom, liste (nom de la liste du point, facultatif), lignes, controle (facultatif : 'ajouter' ou 'retirer', bouton Expert) }. */
+export function htmlFichePoint({ nom, liste, lignes, controle = null }) {
   return `<div class="encadre-annotation fiche-point" role="dialog" aria-label="Point ${echapper(nom)}">
       <div class="entete-encadre-annotation"><strong>${echapper(nom)}</strong><span>${echapper(liste ?? '')}</span>
         <button type="button" class="fermer-encadre-annotation" data-action="fermer-fiche" aria-label="Fermer">×</button></div>
       <table class="table-fiche-point"><tbody>${lignes.map(([titre, valeur]) => `<tr><th>${echapper(titre)}</th><td>${echapper(valeur)}</td></tr>`).join('')}</tbody></table>
+      ${controle ? `<button type="button" class="bouton seulement-expert" data-action="controle-fiche" data-valeur="${controle}">${controle === 'ajouter' ? 'Ajouter aux points de contrôle' : 'Retirer des points de contrôle'}</button>` : ''}
     </div>`;
 }
 

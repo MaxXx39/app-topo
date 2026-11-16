@@ -33,8 +33,9 @@ const COULEURS = { POINTS: 7, NOMS: 8, ALTITUDES: 5, CONTOURS: 1, LIGNES_RUPTURE
  *   CHANT_<libellé>_<nature> par libellé et nature (lignes 3D, cadres), et CHANT_…_TXT pour le texte « Ø300 · FE 432.150 » à côté des points
  * - dessins : [{ ferme, lignes (vrai : relier les sommets), points: [{ nom, est, nord, altitude }] }]
  *   (Calculs › Dessin ; altitude inconnue écrite à 0)
+ * - parcelles : [{ numero, est, nord }] numéros du cadastre importé (0.249.0), calque PARCELLES (magenta), à part du reste
  */
-export function genererDxf({ points, stocks = [], resultats = [], surfaces = [], equidistance = null, dessins = [], chantier = null }) {
+export function genererDxf({ points, stocks = [], resultats = [], surfaces = [], equidistance = null, dessins = [], chantier = null, parcelles = [] }) {
   const entites = [];
   const calques = new Map(Object.entries(COULEURS).filter(([nom]) => !nom.startsWith('COURBES') || equidistance));
   const parNom = new Map(points.map((p) => [p.nom, p]));
@@ -95,6 +96,11 @@ export function genererDxf({ points, stocks = [], resultats = [], surfaces = [],
       entites.push(['0', 'POINT', '8', 'DESSINS', ...xyz(p, 0)]);
       entites.push(['0', 'TEXT', '8', 'DESSINS_NOMS', ...xyz({ ...p, est: p.est + 0.2, nord: p.nord + 0.2 }, 0), '40', '0.3', '1', p.nom]);
     }
+  }
+
+  if (parcelles.length > 0) {
+    calques.set('PARCELLES', 6);
+    for (const p of parcelles) entites.push(texteCentre({ est: p.est, nord: p.nord, altitude: 0 }, 2.5, 0, texteAscii(String(p.numero)), 'PARCELLES'));
   }
 
   return ecrireDxf(calques, entites);
