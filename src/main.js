@@ -505,6 +505,8 @@ const RELAIS_BANDE = {
   implanter: '#leve-direct [data-action="implanterChoix"].bouton-implanter, #leve-direct [data-action="implanterLigneChoisie"].bouton-implanter, #leve-direct [data-action="implanterPointsLigne"].bouton-implanter',
   enregistrer: '#leve-direct [data-action="enregistrerImplantation"]',
   dao: '#bouton-dao',
+  // 0.242.0 : Réseaux › Créer : « Enregistrer le réseau » est dans la bande du bas.
+  'enregistrer-reseau': '#reseaux-ecran [data-action="enregistrer-reseau"]',
   // 0.167.0 : Implanter › Altitude (bouton « Alti ici ») et Guidage (choix des lignes) sont dans la bande.
   'altitude-ici': '#leve-direct [data-action="prendreAltitudeIci"]',
   // 0.171.0 (maquette B) : L1 (bord G) et L2 (bord D) du Guidage : touchent les cases de l'écran (qui restent visibles).
@@ -619,7 +621,14 @@ function contenuBande() {
       const c = implanter.cible;
       const detail = `E ${formaterNombre(c.est)} · N ${formaterNombre(c.nord)}${c.altitude != null ? ` · Z ${formaterNombre(c.altitude)}` : ''}`;
       return `<div class="zone-cible-bande"><div class="cible-bande"><b>${echapper(c.nom ?? '')}</b><small>${echapper(detail)}</small></div>
-        ${aAcces('intermediaire') ? `<button type="button" class="bouton-enreg-bande petit relais-enregistrer" data-nav="action" data-cle="enregistrer" title="Enregistrer l'implantation" aria-label="Enregistrer l'implantation" ${enregistrer.disabled ? 'disabled' : ''}><span>Enr.</span></button>` : ''}</div>`;
+        ${aAcces('intermediaire') ? `<button type="button" class="bouton-enreg-bande petit relais-enregistrer" data-nav="action" data-cle="enregistrer" title="Enregistrer l'implantation" aria-label="Enregistrer l'implantation" ${enregistrer.disabled ? 'aria-disabled="true"' : ''}><span>Enreg.</span></button>` : ''}</div>`;
+    }
+    // 0.242.0 (audit, lot 3) : Ligne / Talus en guidage : la bande dit ce qu'on guide et porte « Enreg. » (comme pour un point).
+    if (enregistrer && ['ligne', 'talus'].includes(terrain.implantation) && implanter.ligne && !implanter.ligneAValider) {
+      const l = implanter.ligne;
+      const titre = terrain.implantation === 'talus' ? 'Talus' : 'Ligne';
+      return `<div class="zone-cible-bande"><div class="cible-bande"><b>${echapper(l.nom ?? titre)}</b><small>${titre} en guidage</small></div>
+        ${aAcces('intermediaire') ? `<button type="button" class="bouton-enreg-bande petit relais-enregistrer" data-nav="action" data-cle="enregistrer" title="Enregistrer" aria-label="Enregistrer" ${enregistrer.disabled ? 'aria-disabled="true"' : ''}><span>Enreg.</span></button>` : ''}</div>`;
     }
     // 0.239.0 : Point / Ligne / Talus sans choix : même barre que Surface et Altitude (liseré, zone à droite), au lieu d'un bouton qui flotte.
     const attente = { ligne: ['Ligne', 'touche une ligne'], talus: ['Talus', 'touche la ligne du talus'] }[terrain.implantation] ?? ['Point', 'touche un point'];
@@ -647,6 +656,7 @@ function contenuBande() {
   if (cle === 'calculs' && document.body.dataset.onglet === 'dessin' && aAcces('expert')) {
     return boutonDeBande('dao', daoAppli?.actif() ? 'Quitter la DAO' : 'DAO', 'dessiner sur le plan');
   }
+  if (cle === 'reseaux') return trouver('enregistrer-reseau') ? boutonDeBande('enregistrer-reseau', 'Enregistrer le réseau', '', false, 'Enreg.') : '';
   if (cle === 'mesure') return mesureRapideBande();
   if (cle === 'annotation') return annotationBande();
   return '';
@@ -998,6 +1008,8 @@ function afficherAnnotation() {
       photos: (l.photos ?? []).filter((ph) => ph.point === p.nom).length, premiere: p.annotation?.remarques?.[0] ?? '',
     }));
   const dernier = dernierAnnotation(projet);
+  // 0.242.0 (audit, lot 3) : fiche ouverte = le bandeau « nom / remarque / Enreg. point » se cache (il couvrait les boutons de la fiche).
+  document.body.classList.toggle('fiche-annotation-ouverte', Boolean(annotationEtat.fiche));
   document.querySelector('#annotation').innerHTML = `${htmlAnnotation({
     mode: annotationEtat.mode, fiche: annotationEtat.fiche, photos: photosDeLaFicheAnnotation(),
     manuel: { zoom: terrain.zoomLoupe ?? 4 },
@@ -1467,6 +1479,7 @@ const reseaux = creerReseaux({
   ligneSousLeDoigt: ligneDuPlanSousLeDoigt,
   pointSousLeDoigt: pointDuPlanSousLeDoigt,
   implanter: (ligne) => implanterUnReseau(ligne),
+  apresAffichage: () => navigation?.mettreAJour(),
 });
 
 document.querySelector('#mesure-rapide').addEventListener('click', (evenement) => {

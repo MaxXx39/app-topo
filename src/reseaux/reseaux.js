@@ -79,6 +79,7 @@ export function creerReseaux(deps) {
       abscisse: etat.abscisse, coupe: etat.coupe, cible: etat.cible, altitude: etat.altitude, afficher: etat.afficher, coupeSvg, exageration,
     });
     deps.majPlan();
+    deps.apresAffichage?.(); // 0.242.0 : la bande du bas (« Enregistrer le réseau ») suit la page
   }
 
   /** Ce que le plan dessine : voir plan/reseaux.js. */

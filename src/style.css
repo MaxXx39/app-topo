@@ -12467,8 +12467,9 @@ body.mode-telephone.bande-action:not(.mode-base)[data-onglet='terrain'][data-mod
 body.bande-action[data-onglet='terrain'][data-mode-terrain='lever'] .ligne-position-delta {
   position: fixed;
   z-index: 20;
-  left: calc(var(--gauche-bandeau-point) + 6px);
-  bottom: calc(var(--bas-bandeau-point) + var(--hauteur-bandeau-point) + 2px);
+  /* 0.242.0 (audit, lot 3) : E / N à droite, sur la même ligne que le résumé (à gauche), au-dessus du bandeau. */
+  right: calc(var(--gauche-bandeau-point) + 6px);
+  bottom: calc(var(--bas-bandeau-point) + var(--hauteur-bandeau-point) + 14px);
   margin: 0;
   padding: 0 8px;
   border-radius: 8px;
@@ -13870,3 +13871,8 @@ body.mode-telephone .ecart-direct.attente.invite-choix { min-height: 0; }
   body.mode-telephone .coupe-guidage .echelle-coupe span { min-width: 34px; font-size: 0.8rem; }
 }
 body.mode-telephone .ecran-lame .choix-coupes-bandeau [data-valeur='deux'] { display: none; }
+
+/* 0.242.0 : Annotation, fiche ouverte : le bandeau du bas se cache. */
+body.fiche-annotation-ouverte .bandeau-annotation { display: none; }
+body[data-relais='enregistrer-reseau'] #reseaux-ecran [data-action='enregistrer-reseau'] { display: none; }
+.bande-appli .bouton-enreg-bande.relais-enregistrer-reseau { background: #5b7f12; color: #ffffff; }
