@@ -13906,14 +13906,23 @@ body.mode-telephone .instruction-regle { height: 64px; min-height: 64px; }
 /* 0.248.0 : Est / Nord / Z sous la souris, en bas à gauche du plan (ordinateur seulement). */
 .plan-coordonnees { position: absolute; left: 6px; bottom: 6px; z-index: 5; padding: 2px 8px; border-radius: 6px; background: rgba(15, 23, 42, 0.78); color: #fff; font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; pointer-events: none; }
 
-/* 0.251.0 : dossiers du projet : puces dans l'encadré du projet (Applications) et pastille dans l'en-tête. */
-.puces-dossiers { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px 10px; }
-.puce-dossier { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border: 1px solid #475569; border-radius: 999px; background: transparent; color: #e2e8f0; font: inherit; font-weight: 700; font-size: 0.9rem; }
-.puce-dossier i { width: 10px; height: 10px; border-radius: 50%; background: var(--couleur-dossier, #6b7280); }
-.puce-dossier.actif { background: #eab308; border-color: #eab308; color: #1f1300; }
-.pastille-entete.pastille-dossier { color: #fff; }
-.pastille-pastel-dossier { display: inline-block; padding: 0 8px; border-radius: 999px; color: #fff; font-size: 0.72rem; font-weight: 800; margin-left: 4px; }
-.rangement-dossiers { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.rangement-dossiers .puce-dossier { color: inherit; border-color: var(--bord, #cbd5e1); min-height: 32px; font-size: 0.82rem; }
-.rangement-dossiers .puce-dossier.actif { color: #fff; background: var(--couleur-dossier, #475569); border-color: var(--couleur-dossier, #475569); }
-.rangement-dossiers .puce-dossier.actif i { background: #fff; }
+/* 0.252.0 : dossiers du projet, lisibles dans les deux thèmes (texte foncé sur fond clair, choisi selon la couleur du dossier pour les pastilles). */
+.entete-icone-bouton.bouton-aide { display: none !important; } /* l'aide ne se règle plus que dans Réglages */
+.puces-dossiers { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 2px 12px; }
+.puce-dossier { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 6px 14px; border: 2px solid var(--bordure, #cbd5e1); border-radius: 999px; background: var(--surface, #fff); color: var(--encre, #1b2b36); font: inherit; font-weight: 800; font-size: 1rem; }
+.puce-dossier i { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.35); }
+.puce-dossier.actif { background: var(--sombre, #1b2b36); border-color: var(--sombre, #1b2b36); color: #ffffff; }
+body.theme-sombre .puce-dossier.actif { background: var(--ambre, #f6ab07); border-color: var(--ambre, #f6ab07); color: #1b2b36; }
+.pastille-entete.pastille-dossier { font-size: 0.95rem; padding: 5px 14px; max-width: 55vw; border: 2px solid rgba(255, 255, 255, 0.85); }
+.pastille-pastel-dossier { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 800; margin: 2px 4px 2px 0; }
+#menu-dossiers { position: fixed; right: 8px; z-index: 60; min-width: 220px; max-width: calc(100vw - 16px); padding: 6px; border-radius: 14px; background: var(--surface, #fff); color: var(--encre, #1b2b36); border: 2px solid var(--bordure, #cbd5e1); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+.ligne-menu-dossiers { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 8px 12px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-weight: 700; font-size: 1.05rem; text-align: left; }
+.ligne-menu-dossiers i { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.35); }
+.ligne-menu-dossiers span { flex: 1; }
+.ligne-menu-dossiers.actif { background: var(--ambre-clair, #fdedc4); color: #1b2b36; }
+.menu-dossiers { flex-wrap: wrap; }
+.liste-deroulante-dossiers { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; min-width: 220px; padding: 6px 12px; border: 2px solid var(--bordure, #cbd5e1); border-radius: 10px; background: var(--surface, #fff); color: var(--encre, #1b2b36); font: inherit; font-weight: 700; }
+.cases-dossiers { flex-basis: 100%; display: grid; gap: 2px; margin-top: 6px; padding: 6px; border: 2px solid var(--bordure, #cbd5e1); border-radius: 10px; background: var(--surface, #fff); }
+.case-dossier { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 4px 8px; color: var(--encre, #1b2b36); font-weight: 700; font-size: 1rem; }
+.case-dossier input { width: 24px; height: 24px; flex: none; }
+.case-dossier i { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.35); }

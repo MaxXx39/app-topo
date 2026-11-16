@@ -38,6 +38,24 @@ export function lireSousDossiers(projet = null, listes = lireListesPartagees()) 
   return noms.map((nom, i) => ({ nom, couleur: COULEURS[i % COULEURS.length] }));
 }
 
+/** Couleur de texte lisible (noir ou blanc) sur un fond « #rrggbb » : luminance relative, seuil à 0,45 (0.252.0 : texte blanc illisible sur les fonds clairs). */
+export function texteSur(fond) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(fond ?? ''));
+  if (!m) return '#ffffff';
+  const [r, g, b] = [1, 2, 3].map((i) => {
+    const c = parseInt(m[i], 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? '#111827' : '#ffffff';
+}
+
+/** Pastille HTML d'un sous-dossier (couleur de fond du dossier, texte noir ou blanc selon le fond). */
+export function pastilleSousDossier(nom, liste) {
+  const fond = liste.find((d) => d.nom === nom)?.couleur ?? '#6b7280';
+  const echappe = String(nom).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return `<span class="pastille-pastel-dossier" style="background: ${fond}; color: ${texteSur(fond)}">${echappe}</span>`;
+}
+
 /** Couleur de la pastille d'un sous-dossier (gris s'il n'est plus dans la liste). */
 export function couleurDuSousDossier(nom, liste) {
   return liste.find((d) => d.nom === nom)?.couleur ?? '#6b7280';

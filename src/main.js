@@ -12,7 +12,7 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
-import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre } from './topo/sous-dossiers.js';
+import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -8765,8 +8765,49 @@ function mettreAJourPastilleDossier() {
   if (!choisi) return;
   const liste = lireSousDossiers(projet);
   pastille.textContent = choisi === SANS_SOUS_DOSSIER ? '📁 Sans dossier' : `📁 ${choisi}`;
-  pastille.style.background = choisi === SANS_SOUS_DOSSIER ? '#6b7280' : liste.find((d) => d.nom === choisi)?.couleur ?? '#6b7280';
+  const fond = choisi === SANS_SOUS_DOSSIER ? '#6b7280' : liste.find((d) => d.nom === choisi)?.couleur ?? '#6b7280';
+  pastille.style.background = fond;
+  pastille.style.color = texteSur(fond);
   pastille.title = 'Dossier choisi : touche pour en changer';
+}
+
+/** Menu sous la pastille de l'en-tête (0.252.0) : choisir un autre dossier sans passer par la page Applications. */
+function ouvrirMenuDossiers() {
+  const existant = document.querySelector('#menu-dossiers');
+  if (existant) {
+    existant.remove();
+    return;
+  }
+  const { choisi, liste } = donneesSousDossiers();
+  const remplis = liste.filter((d) => d.nombre > 0 || d.nom === choisi);
+  const ligne = (valeur, titre, couleur = null) => `<button type="button" class="ligne-menu-dossiers ${valeur === choisi ? 'actif' : ''}" data-dossier-choix="${valeur.replace(/"/g, '&quot;')}">${couleur ? `<i style="background: ${couleur}"></i>` : ''}<span>${titre}</span>${valeur === choisi ? '<b>✓</b>' : ''}</button>`;
+  const echappe = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const menu = document.createElement('div');
+  menu.id = 'menu-dossiers';
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML = [ligne('', 'Tout'), ...remplis.map((d) => ligne(d.nom, echappe(d.nom), d.couleur)), ligne(SANS_SOUS_DOSSIER, 'Sans dossier')].join('');
+  const entete = document.querySelector('.entete')?.getBoundingClientRect();
+  menu.style.top = `${Math.round(entete?.bottom ?? 56) + 4}px`;
+  document.body.append(menu);
+  const fermer = () => {
+    menu.remove();
+    document.removeEventListener('pointerdown', dehors, true);
+    document.removeEventListener('keydown', touche, true);
+  };
+  const dehors = (evenement) => {
+    if (!menu.contains(evenement.target) && !evenement.target.closest('#pastille-dossier')) fermer();
+  };
+  const touche = (evenement) => {
+    if (evenement.key === 'Escape') fermer();
+  };
+  menu.addEventListener('click', (evenement) => {
+    const bouton = evenement.target.closest('[data-dossier-choix]');
+    if (!bouton) return;
+    choisirSousDossier(bouton.dataset.dossierChoix);
+    fermer();
+  });
+  document.addEventListener('pointerdown', dehors, true);
+  document.addEventListener('keydown', touche, true);
 }
 
 /** Ligne sous le titre du projet (en-tête) : sous-titre et l'état de Drive si connecté. */
@@ -8841,7 +8882,10 @@ window.addEventListener('online', () => mettreAJourEtatEntete());
 // Main de l'en-tête (0.76.0) : rouge = prendre la main (Expert, code), grise = la reprendre,
 // verte = la rendre (le projet part sur Drive, un autre appareil peut la prendre).
 // Depuis 0.90.0, seulement en Expert : en Base et Intermédiaire on voit la main sans pouvoir la toucher.
-document.querySelector('#pastille-dossier')?.addEventListener('click', () => navigation?.ouvrirPage?.());
+document.querySelector('#pastille-dossier')?.addEventListener('click', (evenement) => {
+  evenement.stopPropagation();
+  ouvrirMenuDossiers();
+});
 document.querySelector('#pastille-verrou').addEventListener('click', async () => {
   if (!aAcces('expert')) return;
   if (partage?.etat.repris?.projetId === projet.id) partage.prendreLaMain();

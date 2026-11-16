@@ -35,7 +35,7 @@ import { echapper } from '../outils/echapper.js';
 import { COULEURS_LISTES, SECTIONS, htmlEtiquetteNature } from './listes-points.js';
 import { jourDuPoint } from '../topo/date-point.js';
 import { choixCouleur as paletteCouleur } from '../outils/palette.js';
-import { lireSousDossiers } from '../topo/sous-dossiers.js';
+import { lireSousDossiers, pastilleSousDossier } from '../topo/sous-dossiers.js';
 import { FONDS, niveauDeZoom, tuilesPourZone, garderLesTraits } from './fond.js';
 import { couleurAltitude } from './couleurs.js';
 import { zonesRemblaiDeblai, PALIERS, enRgb } from './ecarts.js';
@@ -2304,7 +2304,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
   function remplirMenuPlans() {
     // Plans du cadastre : rangés avec leurs points dans « Afficher › Cadastre » (0.116.4).
     const plansDxf = plansDuMenu();
-    const couleursDossiers = new Map(lireSousDossiers().map((d) => [d.nom, d.couleur]));
+    const listeDossiers = lireSousDossiers();
     boutonPlans.classList.toggle('tout-cache', plansDxf.length > 0 && plansDxf.every((plan) => plan.visible === false)); // 0.221.0 : tout caché = bouton pâli
     const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${(plan.sousDossiers ?? []).join('+')}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
     if (signature === signatureMenuPlans) return;
@@ -2323,7 +2323,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       </div>`;
     menuPlans.innerHTML = enteteCalques + plansDxf.map((plan) => `<div class="ligne-menu-plan">
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
-          <span>${echapper(plan.nom)}</span>${(plan.sousDossiers ?? []).map((nom) => `<span class="pastille-pastel-dossier" style="background: ${couleursDossiers.get(nom) ?? '#6b7280'}">${echapper(nom)}</span>`).join('')}</label>
+          <span>${echapper(plan.nom)}</span>${(plan.sousDossiers ?? []).map((nom) => pastilleSousDossier(nom, listeDossiers)).join('')}</label>
         ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
         <label class="reglette-transparence reglette-plan"><b>Trans.</b>
           <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /><span>${plan.transparence ?? 0} %</span></label>

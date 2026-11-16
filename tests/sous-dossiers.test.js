@@ -132,3 +132,17 @@ describe('choix de la tablette', () => {
     expect(lireChoix(p, m)).toBe('');
   });
 });
+
+describe('lisibilité des pastilles (0.252.0)', () => {
+  it('texte foncé sur un fond clair, blanc sur un fond foncé', async () => {
+    const { texteSur, pastilleSousDossier } = await import('../src/topo/sous-dossiers.js');
+    expect(texteSur('#eab308')).toBe('#111827'); // jaune
+    expect(texteSur('#fdedc4')).toBe('#111827');
+    expect(texteSur('#2563eb')).toBe('#ffffff'); // bleu
+    expect(texteSur('#7c3aed')).toBe('#ffffff');
+    expect(texteSur('n\'importe quoi')).toBe('#ffffff');
+    const html = pastilleSousDossier('Voirie <b>', [{ nom: 'Voirie <b>', couleur: '#eab308' }]);
+    expect(html).toContain('color: #111827');
+    expect(html).toContain('Voirie &lt;b&gt;');
+  });
+});
