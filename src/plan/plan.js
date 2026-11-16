@@ -53,6 +53,7 @@ function cotesEnCache(triangles, equidistance) {
 import { lignesEtiquette, texteMorceau, placeEtiquetteMesure, valeurPrincipale, couleurDeMesure } from '../mesures/valeurs.js';
 import { nomsDeLaMesure } from '../topo/mesure.js';
 import { ajouterTous } from '../outils/bornes.js';
+const SEUIL_NOMS_CACHES = 300; // 0.245.0 : au-delà de ce nombre de points visibles, noms et altitudes cachés (sauf points prioritaires)
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -569,7 +570,10 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       const montrerAltitude = (point) => calques.altitudes && reglageListe('altitudes', idListe(point));
       // 0.219.0 : les attributs du levé chantier ont leur propre case « Attributs » (avant : rangés avec les altitudes).
       const montrerAttributs = (point) => calques.attributs && reglageListe('attributs', idListe(point));
-      const textes = visibles.map(({ point }) =>
+      // 0.245.0 (audit, lot 8, tous les modes) : de loin (plus de SEUIL_NOMS_CACHES points à l'écran), les noms et altitudes sont cachés,
+      // sauf ceux des points de la liste en cours ; ils reviennent en zoomant.
+      const deLoin = visibles.length > SEUIL_NOMS_CACHES;
+      const textes = visibles.map(({ point, prioritaire }) => deLoin && !prioritaire ? [] :
         [montrerNom(point) ? point.nom : null, montrerAltitude(point) && point.altitude != null ? formaterNombre(point.altitude) : null, montrerAttributs(point) && point.chantier ? texteDuPoint(point.chantier, point.chantier) : null].filter(Boolean),
       );
       // 0.208.0 : les noms évitent les 📷 des photos (sinon l'icône cache le nom).

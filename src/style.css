@@ -13844,3 +13844,10 @@ body.theme-sombre .avec-photo .plan .noms text.altitude { fill: #c3ced6; }
 
 /* 0.243.0 : pages du projet sans titre en double. */
 .entete-gerer-seul { justify-content: flex-end; margin-bottom: 8px; }
+
+/* 0.245.0 (audit, lot 8) : liste « À implanter » : coche verte et écart des points déjà implantés. */
+.ligne-a-implanter .coche-implante { color: #15803d; font-weight: 900; }
+.ligne-a-implanter .aide.ecart-orange { color: #c2410c; font-weight: 700; }
+.ligne-a-implanter .aide.ecart-rouge { color: #b91c1c; font-weight: 700; }
+.ligne-a-implanter .aide.ecart-orange .coche-implante, .ligne-a-implanter .aide.ecart-rouge .coche-implante { color: inherit; }
+.ligne-a-implanter.implante strong { color: var(--gris); }

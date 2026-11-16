@@ -823,13 +823,17 @@ export function creerEcranLeve(conteneur, actions) {
           </div>
         </div>`
       : '';
+    // 0.245.0 (audit, lot 8, Intermédiaire) : la liste montre ce qui est déjà implanté : coche verte et écart (orange au-delà de 2 cm,
+    // rouge au-delà de 4 cm, tolérances du Contrôle), et le titre compte les points faits.
+    const nbFaits = imp.aImplanter.filter((p) => p.fait).length;
+    const classeEcart = (distance) => (distance <= 0.02 ? 'ecart-vert' : distance <= 0.04 ? 'ecart-orange' : 'ecart-rouge');
     const liste = imp.aImplanter.length > 0
-      ? `<div class="liste-a-implanter seulement-expert">
-          <p class="titre-choix">À implanter</p>
-          ${imp.aImplanter.map((p) => `<div class="ligne-a-implanter ${imp.cible?.id === p.id ? 'actif' : ''}">
+      ? `<div class="liste-a-implanter seulement-intermediaire">
+          <p class="titre-choix">À implanter · ${nbFaits} / ${imp.aImplanter.length} fait(s)</p>
+          ${imp.aImplanter.map((p) => `<div class="ligne-a-implanter ${imp.cible?.id === p.id ? 'actif' : ''} ${p.fait ? 'implante' : ''}">
               <button type="button" class="bouton-lien bouton-lien-neutre" data-action="implanterPoint" data-valeur="${p.id}"><strong>${echapper(p.nom)}</strong></button>
-              <span class="aide">${p.fait ? `✓ ${formaterNombre(p.fait.distance)} m${p.fait.dAltitude != null ? ` · dH ${formaterNombre(p.fait.dAltitude)}` : ''}` : (p.altitude != null ? `H ${formaterNombre(p.altitude)}` : '')}</span>
-              <button type="button" class="bouton-lien" data-action="supprimerPointAImplanter" data-valeur="${p.id}" aria-label="Supprimer ${echapper(p.nom)}">×</button>
+              <span class="aide ${p.fait ? classeEcart(p.fait.distance) : ''}">${p.fait ? `<b class="coche-implante">✓</b> ${formaterNombre(p.fait.distance)} m${p.fait.dAltitude != null ? ` · dH ${formaterNombre(p.fait.dAltitude)}` : ''}` : (p.altitude != null ? `H ${formaterNombre(p.altitude)}` : '')}</span>
+              <button type="button" class="bouton-lien seulement-expert" data-action="supprimerPointAImplanter" data-valeur="${p.id}" aria-label="Supprimer ${echapper(p.nom)}">×</button>
             </div>`).join('')}
         </div>`
       : '';
