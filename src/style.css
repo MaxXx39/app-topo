@@ -13926,3 +13926,11 @@ body.theme-sombre .puce-dossier.actif { background: var(--ambre, #f6ab07); borde
 .case-dossier { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 4px 8px; color: var(--encre, #1b2b36); font-weight: 700; font-size: 1rem; }
 .case-dossier input { width: 24px; height: 24px; flex: none; }
 .case-dossier i { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.35); }
+
+/* 0.253.0 : tous les dossiers sur UNE ligne ; trop nombreux : la ligne défile au doigt, avec un dégradé du côté où il en reste. */
+.puces-dossiers { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; gap: 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+.puces-dossiers::-webkit-scrollbar { display: none; }
+.puces-dossiers .puce-dossier { flex: none; white-space: nowrap; min-height: 40px; padding: 4px 11px; font-size: 0.95rem; gap: 6px; }
+.puces-dossiers.reste-droite { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+.puces-dossiers.reste-gauche { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
+.puces-dossiers.reste-gauche.reste-droite { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
