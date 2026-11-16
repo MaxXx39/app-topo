@@ -12,7 +12,7 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
-import { DOSSIER_LEVE, DOSSIER_ANNOT, lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre } from './topo/sous-dossiers.js';
+import { DOSSIER_LEVE, DOSSIER_ANNOT, lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -1010,7 +1010,7 @@ function afficherAnnotation() {
   const liste = listesAnnotation(projet).flatMap((l) => (projet.leves.find((v) => v.id === l.leveId)?.points ?? []).map((p) => ({ l, p })))
     .sort((a, b) => sens * String(a.p.annotation?.le ?? '').localeCompare(String(b.p.annotation?.le ?? ''))).map(({ l, p }) => ({
       nom: p.nom, source: p.annotation?.source, remarques: p.annotation?.remarques?.length ?? 0, date: dateHeure(p.annotation?.le),
-      photos: (l.photos ?? []).filter((ph) => ph.point === p.nom).length, premiere: p.annotation?.remarques?.[0] ?? '',
+      photos: (l.photos ?? []).filter((ph) => ph.point === p.nom).length, premiere: p.annotation?.remarques?.[0] ?? '', dossiers: sousDossiersEffectifs(projet, l, 'autre').join(', '),
     }));
   const dernier = dernierAnnotation(projet);
   // 0.242.0 (audit, lot 3) : fiche ouverte = le bandeau « nom / remarque / Enreg. point » se cache (il couvrait les boutons de la fiche).
@@ -1963,6 +1963,7 @@ function ouvrirFenetreReglages(page = null) {
  * avant Expert). Rien n'est supprimé : en repassant dans un mode plus complet, tout est là.
  */
 function adapterAuMode() {
+  definirFiltreApplications(estModeBase()); // 0.259.0 : filtre par dossier dans les applications : Base seulement
   // Guidage de lame : mode Expert seulement.
   if (terrain.mode === 'lame' && !lameActive()) {
     terrain.mode = 'lever';
@@ -2013,7 +2014,7 @@ function etiquetteSurface(surface) {
   if (estImportee(surface)) precisions.push(origineSurface(surface));
   const texte = precisions.length > 0 ? `${surface.nom} (${precisions.join(', ')})` : surface.nom;
   const leve = projet.leves.find((l) => l.id === surface.leveId);
-  return projet.leves.length > 1 && leve ? `${texte} · ${leve.nom}` : texte;
+  return `${projet.leves.length > 1 && leve ? `${texte} · ${leve.nom}` : texte}${suffixeDossiers(projet, surface, 'surface')}`;
 }
 
 /**
@@ -8730,8 +8731,8 @@ function appliquerDossierALAffichage() {
     if (genre === 'reseau') continue;
     if (genre === 'plan') {
       // Le plan du cadastre suit sa liste de points.
-      element.visible = cadastres.has(element.id) ? estMontre(projet, cadastres.get(element.id), 'leve') : estMontre(projet, element, 'plan');
-    } else if (estMontre(projet, element, genre)) cachees.delete(element.id);
+      element.visible = cadastres.has(element.id) ? estDansSousDossier(projet, cadastres.get(element.id), 'leve') : estDansSousDossier(projet, element, 'plan');
+    } else if (estDansSousDossier(projet, element, genre)) cachees.delete(element.id);
     else cachees.add(element.id);
   }
   projet.listesCachees = [...cachees];

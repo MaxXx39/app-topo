@@ -189,8 +189,27 @@ export function sousDossiersEffectifs(projet, element, genre = '') {
   return element?.sousDossiers ?? [];
 }
 
+// Filtre des applications : actif en Base seulement (réglé par main.js selon le mode).
+let filtreApplications = true;
+export function definirFiltreApplications(actif) {
+  filtreApplications = Boolean(actif);
+}
+
+/** Texte « · TER., CANA » à ajouter au nom d'un élément dans une liste d'application (vide s'il n'est dans aucun dossier). */
+export function suffixeDossiers(projet, element, genre = '') {
+  const noms = sousDossiersEffectifs(projet, element, genre);
+  return noms.length > 0 ? ` · ${noms.join(', ')}` : '';
+}
+
 /** L'élément est-il montré avec le sous-dossier choisi (celui de cette tablette par défaut) ? */
 export function estMontre(projet, element, genre = '', choix = choisi) {
+  // 0.259.0 : dans les applications, seul le mode Base est filtré par le dossier ; Intermédiaire et Expert listent tout (avec la pastille du dossier).
+  if (!filtreApplications) return true;
+  return estDansSousDossier(projet, element, genre, choix);
+}
+
+/** Vrai si l'élément est rangé dans le dossier `choix` (Tout : oui), quel que soit le mode : sert à cocher / décocher l'affichage. */
+export function estDansSousDossier(projet, element, genre = '', choix = choisi) {
   return dansSousDossier({ sousDossiers: sousDossiersEffectifs(projet, element, genre) }, choix);
 }
 

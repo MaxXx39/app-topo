@@ -200,3 +200,16 @@ describe('applications : listes d\'annotation selon le dossier (0.256.0)', () =>
     definirSousDossier('');
   });
 });
+
+describe('applications : filtre par dossier selon le mode (0.259.0)', () => {
+  it('Base filtre ; Intermédiaire / Expert listent tout, mais estDansSousDossier reste exact', async () => {
+    const { estMontre, estDansSousDossier, definirFiltreApplications } = await import('../src/topo/sous-dossiers.js');
+    const el = { id: 'x', sousDossiers: ['CANA'] };
+    definirFiltreApplications(true);
+    expect(estMontre({}, el, 'plan', 'TER.')).toBe(false);
+    definirFiltreApplications(false);
+    expect(estMontre({}, el, 'plan', 'TER.')).toBe(true);
+    expect(estDansSousDossier({}, el, 'plan', 'TER.')).toBe(false);
+    definirFiltreApplications(true);
+  });
+});
