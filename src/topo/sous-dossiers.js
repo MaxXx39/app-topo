@@ -135,15 +135,6 @@ export function basculerSousDossier(element, nom, present) {
 export const CLE_CHOIX = 'topo-sous-dossier';
 let choisi = TOUT;
 
-// Éléments montrés EN PLUS du dossier choisi (0.257.0, en mémoire : remis à zéro quand on change de dossier ou de projet).
-let enPlus = new Set();
-export function definirEnPlus(ids) {
-  enPlus = new Set(ids ?? []);
-}
-export function elementsEnPlus() {
-  return enPlus;
-}
-
 /** Sous-dossier choisi en ce moment (lu par les listes du plan et des pages). */
 export function sousDossierChoisi() {
   return choisi;
@@ -200,8 +191,6 @@ export function sousDossiersEffectifs(projet, element, genre = '') {
 
 /** L'élément est-il montré avec le sous-dossier choisi (celui de cette tablette par défaut) ? */
 export function estMontre(projet, element, genre = '', choix = choisi) {
-  // 0.257.0 : un élément ajouté « hors dossier » (Afficher › ＋ Autres dossiers) reste montré même s'il n'est pas dans le dossier choisi.
-  if (choix && (enPlus.has(element?.id) || (element?.leveId && enPlus.has(element.leveId)))) return true;
   return dansSousDossier({ sousDossiers: sousDossiersEffectifs(projet, element, genre) }, choix);
 }
 

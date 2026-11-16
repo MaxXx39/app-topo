@@ -105,8 +105,8 @@ describe('ce que montre un dossier', () => {
   });
 });
 
-describe('listes du plan (Afficher) selon le dossier choisi', () => {
-  it('sous « Tout », toutes les listes ; dans un dossier, seulement les siennes', async () => {
+describe('listes du plan (Afficher) avec un dossier choisi (0.258.0)', () => {
+  it('toutes les listes restent listées, avec leurs dossiers (le dossier ne fait que cocher)', async () => {
     const { definirSousDossier } = await import('../src/topo/sous-dossiers.js');
     const p = projet();
     definirSousDossier('');
@@ -114,9 +114,8 @@ describe('listes du plan (Afficher) selon le dossier choisi', () => {
     expect(toutes).toContain('l2');
     expect(toutes).toContain('s1');
     definirSousDossier('Canalo');
-    expect(listesDePoints(p).map((l) => l.id)).toEqual(['l2']);
-    definirSousDossier('Terrassement');
-    expect(listesDePoints(p).map((l) => l.id).sort()).toEqual(['l1', 'l2', 's1']);
+    expect(listesDePoints(p).map((l) => l.id)).toContain('l1');
+    expect(listesDePoints(p).find((l) => l.id === 'l2').sousDossiers).toContain('Canalo');
     definirSousDossier('');
   });
 });
@@ -166,7 +165,7 @@ describe('points de contrôle (0.254.0)', () => {
 });
 
 describe('tableau « Liste de points » selon le dossier (0.255.0)', () => {
-  it('ne montre que les listes du dossier choisi ; les points de contrôle restent', async () => {
+  it('0.258.0 : le dossier ne filtre plus le tableau (les pastilles disent où est chaque liste)', async () => {
     const { definirSousDossier } = await import('../src/topo/sous-dossiers.js');
     const { listesDuTableau, lignesDuTableau, CATEGORIES_POINTS } = await import('../src/import/tableau-points.js');
     const p = projet();
@@ -180,10 +179,8 @@ describe('tableau « Liste de points » selon le dossier (0.255.0)', () => {
     definirSousDossier('');
     expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'a', 'b', 'c']);
     definirSousDossier('Canalo');
-    expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'a']);
-    expect(lignesDuTableau(p, { categories }).map((l) => l.nom)).toEqual(['PC1', 'R1']);
-    definirSousDossier(SANS_SOUS_DOSSIER);
-    expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'c']);
+    expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'a', 'b', 'c']);
+    expect(lignesDuTableau(p, { categories }).map((l) => l.nom)).toEqual(['PC1', 'R1', 'B1', 'L1']);
     definirSousDossier('');
   });
 });
@@ -201,22 +198,5 @@ describe('applications : listes d\'annotation selon le dossier (0.256.0)', () =>
     definirSousDossier('TER.');
     expect(listesAnnotation(p).map((l) => l.id)).toEqual(['n1']);
     definirSousDossier('');
-  });
-});
-
-describe('éléments montrés hors du dossier choisi (0.257.0)', () => {
-  it('un élément ajouté reste montré ; un autre dossier non ; « Tout » inchangé', async () => {
-    const { estMontre, definirEnPlus } = await import('../src/topo/sous-dossiers.js');
-    const projet = { leves: [{ id: 'l1', sousDossiers: ['CANA'] }] };
-    const plan = { id: 'p1', sousDossiers: ['CANA'] };
-    expect(estMontre(projet, plan, 'plan', 'TER.')).toBe(false);
-    definirEnPlus(['p1']);
-    expect(estMontre(projet, plan, 'plan', 'TER.')).toBe(true);
-    expect(estMontre(projet, { id: 'p2', sousDossiers: ['CANA'] }, 'plan', 'TER.')).toBe(false);
-    // une surface suit son levé ajouté
-    definirEnPlus(['l1']);
-    expect(estMontre(projet, { id: 's1', leveId: 'l1' }, 'surface', 'TER.')).toBe(true);
-    definirEnPlus([]);
-    expect(estMontre(projet, plan, 'plan', 'TER.')).toBe(false);
   });
 });

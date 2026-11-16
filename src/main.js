@@ -12,7 +12,7 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
-import { DOSSIER_LEVE, DOSSIER_ANNOT, definirEnPlus, elementsEnPlus, lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, sousDossiersEffectifs } from './topo/sous-dossiers.js';
+import { DOSSIER_LEVE, DOSSIER_ANNOT, lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -5814,10 +5814,8 @@ let barreRecalage = null;
 
 /** Plans DXF du projet tels qu'on les utilise : recalés (sauf celui qu'on est en train de recaler). */
 function plansDuProjet() {
-  // 0.251.0 : seuls les plans du dossier choisi (le plan du cadastre suit sa liste de points) ; le plan en recalage reste toujours là.
-  const cadastres = new Map((projet.leves ?? []).filter((l) => l.cadastre).map((l) => [planDuCadastre(projet, l)?.id, l]));
+  // 0.258.0 : tous les plans sont listés ; le dossier choisi ne fait que cocher / décocher (voir appliquerDossierALAffichage).
   return (projet.plansDxf ?? [])
-    .filter((p) => p.id === recalage.planId || (cadastres.has(p.id) ? estMontre(projet, cadastres.get(p.id), 'leve') : estMontre(projet, p, 'plan')))
     .map((p) => (p.id === recalage.planId ? p : planRecale(p)));
 }
 
@@ -7908,7 +7906,6 @@ const plan = creerPlan(document.querySelector('#plan'), {
   quandColorerListe: (id, couleur) => colorerListe(id, couleur),
   quandToucherPhoto: (id) => montrerPhoto(id),
   quandChangerZone: (sommets) => (cadastreAutour.actif() ? cadastreAutour.changerZone(sommets) : surfaceSwisstopo.changerZone(sommets)),
-  quandHorsDossier: () => choisirHorsDossier(),
   quandMontrerListe: (id, visible) => {
     if (typeof id === 'string' && id.startsWith('section:')) {
       // 0.192.0 : case d'une catégorie d'Afficher : toutes ses listes d'un coup.
@@ -8286,8 +8283,7 @@ function calculsReussis() {
 creerEcranExport(moduleExport.zone('plan'), {
   // « Quoi exporter ? » : volumes, surfaces (par nature), dessins, listes de points ; cochés comme « Afficher ».
   obtenirGroupes: () => {
-    // 0.255.0 : « Quoi exporter ? » ne propose que ce qui est dans le dossier choisi.
-    const surfacesDe = (natures) => projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && (estImportee(s) ? natures.includes('importee') : natures.includes(s.nature ?? 'stock'))).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
+    const surfacesDe = (natures) => projet.surfaces.filter((s) => (estImportee(s) ? natures.includes('importee') : natures.includes(s.nature ?? 'stock'))).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
     return [
       { titre: 'Volumes', elements: projet.calculs.map((c) => ({ id: c.id, nom: nomDuCalcul(c, projet.surfaces), defaut: estAffichee(c.surface1Id) })) },
       { titre: 'Stocks', elements: surfacesDe(['stock']) },
@@ -8295,10 +8291,10 @@ creerEcranExport(moduleExport.zone('plan'), {
       { titre: 'Terrassement', elements: surfacesDe(['terrassement']) },
       { titre: 'Surfaces (dessins)', elements: surfacesDe(['surface']) },
       { titre: 'Surfaces importées', elements: surfacesDe(['importee']) },
-      { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0 && estMontre(projet, d, 'dessin')).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
+      { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
       {
         titre: 'Listes de points',
-        elements: projet.leves.filter((l) => estMontre(projet, l, 'leve')).map((l) => ({
+        elements: projet.leves.map((l) => ({
           id: l.id,
           nom: l.nom,
           // Levé du récepteur : coché si c'est le levé affiché ; fichier importé : comme « Afficher ».
@@ -8703,9 +8699,9 @@ async function sousDossiersChoisis(valeur) {
   return valeur ? [valeur] : [];
 }
 
-/** Identifiants masqués sur le plan : listes décochées + éléments hors du sous-dossier choisi. */
+/** Identifiants masqués sur le plan : les listes décochées (le dossier choisi les a décochées, voir appliquerDossierALAffichage). */
 function idsMasques() {
-  return new Set([...(projet.listesCachees ?? []), ...idsHorsSousDossier(projet)]);
+  return new Set(projet.listesCachees ?? []);
 }
 
 /** Sous-dossiers pour l'encadré du projet (page Applications) : ce que la tablette peut choisir. */
@@ -8721,50 +8717,33 @@ function donneesSousDossiers() {
 }
 
 /**
- * « ＋ Autres dossiers » (Afficher › Plan / Points, 0.257.0) : le dossier choisi cache le reste ; ici on garde l'accès à ce qu'il cache.
- * Toucher une ligne l'ajoute (ou le retire) ; la fenêtre revient tant qu'on ne touche pas « Fermer ».
+ * 0.258.0 (demande du 16.11) : choisir un dossier COCHE ce qui y est rangé et DÉCOCHE le reste (listes de points, surfaces, dessins, plans) ;
+ * tout reste listé dans « Afficher » et on peut cocher à la main un élément d'un autre dossier. « Tout » ne change aucune case.
+ * Les cases sont celles de la tablette (listesCachees, plan.visible : gardées par affichage-appareil.js).
  */
-async function choisirHorsDossier() {
-  const noms = { plan: 'Plan', leve: 'Liste de points', autre: 'Liste', dessin: 'Dessin', surface: 'Surface' };
-  for (;;) {
-    const choix = sousDossierChoisi();
-    const enPlus = elementsEnPlus();
-    // Cadastre : suit son plan ; surfaces issues d'un levé : suivent leur levé (on propose le levé).
-    const lignes = elementsRangeables(projet).filter(({ genre, element }) => {
-      if (genre === 'reseau' || genre === 'surface' && element.leveId) return false;
-      if (genre === 'leve' && (element.cadastre || estLeveDirect(element) && element.points.length === 0)) return false;
-      return !dansSousDossier({ sousDossiers: sousDossiersEffectifs(projet, element, genre) }, choix);
-    });
-    if (lignes.length === 0) {
-      afficherMessage('Tout ce que le projet contient est déjà dans le dossier choisi', 3000);
-      return;
-    }
-    const cle = await demanderChoix({
-      titre: 'Afficher hors du dossier',
-      boutons: [
-        ...lignes.map(({ genre, element }) => ({
-          cle: element.id,
-          texte: `${enPlus.has(element.id) ? '✓ ' : ''}${element.nom ?? 'Sans nom'}`,
-          detail: `${noms[genre] ?? genre}${(element.sousDossiers ?? []).length > 0 ? ` · ${element.sousDossiers.join(', ')}` : ''} · ${enPlus.has(element.id) ? 'touche pour retirer' : 'touche pour afficher'}`,
-        })),
-        { cle: '', texte: 'Fermer' },
-      ],
-    });
-    if (!cle) return;
-    const suite = new Set(enPlus);
-    if (suite.has(cle)) suite.delete(cle);
-    else suite.add(cle);
-    definirEnPlus([...suite]);
-    recalculer();
+function appliquerDossierALAffichage() {
+  const choix = sousDossierChoisi();
+  if (!choix) return;
+  const cachees = new Set(projet.listesCachees ?? []);
+  const cadastres = new Map((projet.leves ?? []).filter((l) => l.cadastre).map((l) => [planDuCadastre(projet, l)?.id, l]));
+  for (const { genre, element } of elementsRangeables(projet)) {
+    if (genre === 'reseau') continue;
+    if (genre === 'plan') {
+      // Le plan du cadastre suit sa liste de points.
+      element.visible = cadastres.has(element.id) ? estMontre(projet, cadastres.get(element.id), 'leve') : estMontre(projet, element, 'plan');
+    } else if (estMontre(projet, element, genre)) cachees.delete(element.id);
+    else cachees.add(element.id);
   }
+  projet.listesCachees = [...cachees];
 }
 
 /** Choisit le sous-dossier de cette tablette pour ce projet et redessine tout. */
 function choisirSousDossier(nom) {
   definirSousDossier(nom);
-  definirEnPlus([]); // les éléments montrés « hors dossier » valaient pour l'ancien dossier
+  appliquerDossierALAffichage();
   retenirChoix(projet.id, nom);
   recalculer({ recadrer: true });
+  enregistrerBientot(); // les cases cochées par le dossier sont retenues par la tablette
   navigation?.mettreAJour?.();
 }
 
@@ -9204,7 +9183,6 @@ surLibellesProjet((libelles) => {
 });
 
 let dernierProjetNote = null; // dernier projet noté « ouvert » dans le journal de l'appareil
-let dernierProjetFond0 = null; // 0.257.0 : projet dont les éléments « hors dossier » sont gardés
 let dernierProjetFond = null; // 0.213.0 : projet pour lequel le fond de plan a été remis au départ
 async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   projet = nouveau;
@@ -9218,8 +9196,6 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   appliquerAffichage(projet);
   // 0.251.0 : sous-dossier choisi sur CETTE tablette pour ce projet (« Tout » au départ) ; les éléments déjà là ne sont jamais rangés d'office.
   definirSousDossier(lireChoix(projet));
-  if (projet.id !== dernierProjetFond0) definirEnPlus([]);
-  dernierProjetFond0 = projet.id;
   elementsConnus = new Set(elementsRangeables(projet).map(({ element }) => element.id));
   // Cadastre (0.116.4) : plan DXF relié à sa liste de points.
   lierCadastres(projet);
