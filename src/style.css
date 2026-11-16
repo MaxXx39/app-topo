@@ -13954,3 +13954,35 @@ body.mode-telephone .entete:has(.bouton-recepteur-entete) { padding-right: calc(
 @media (min-width: 1200px) {
   :root { --largeur-panneau: clamp(440px, 40vw, 560px); }
 }
+
+/* 0.256.5 (demande du 16.11) : sur grand écran aussi (tablette Windows en paysage, ordinateur), la bande des applications est EN BAS,
+   sur toute la largeur, comme sur Android (avant : en haut à gauche, à la place des anciens onglets). */
+@media (min-width: 900px) {
+  .bande-appli {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: calc(var(--hauteur-bande) + env(safe-area-inset-bottom));
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+    border-top: 4px solid var(--couleur-appli, #1b2b36);
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .mise-en-page,
+  body.bande-vide .mise-en-page {
+    padding-top: 16px;
+    padding-bottom: 16px;
+    height: calc(100vh - var(--hauteur-entete) - var(--hauteur-bande) - env(safe-area-inset-bottom));
+  }
+  .page-applis { margin-top: 16px; bottom: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 16px); }
+  body.bande-vide .page-applis { padding-bottom: 24px; }
+  dialog.fenetre-reglages.en-page[open] { margin-top: 16px; bottom: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 16px); }
+  body.bande-vide dialog.fenetre-reglages.en-page[open] { padding-bottom: 14px; }
+  .barre-edition { bottom: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 16px); }
+  .message-flottant, body[data-onglet] .message-flottant.message-haut { top: calc(var(--hauteur-entete) + 12px); }
+  /* Page Applications ouverte : la bande est cachée (comme sur Android), sa place revient au panneau et au plan. */
+  body.page-applis-ouverte .mise-en-page { height: calc(100vh - var(--hauteur-entete)); }
+  body.page-applis-ouverte .page-applis { bottom: 16px; }
+}
