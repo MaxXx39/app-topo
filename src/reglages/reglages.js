@@ -229,6 +229,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       </div>
       <div class="page-reglages" data-page="drive">
         <div class="partage-reglages" data-zone="partage">${partage ? '' : '<p class="aide">Google Drive n\'est pas disponible ici.</p>'}</div>
+        <p class="seulement-expert"><a class="bouton-lien bouton-lien-neutre" href="guide-github-google.html" target="_blank" rel="noopener">Guide : GitHub et Google (changer de compte)</a></p>
       </div>
       ${recepteur ? `<div class="page-reglages" data-page="recepteur">
         <button type="button" class="bouton-secondaire bouton-large" data-action="recepteur">Récepteur GNSS, corrections, hauteur de canne…</button>

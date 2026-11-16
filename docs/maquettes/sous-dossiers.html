@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquettes - Sous-dossiers de projet</title>
+<style>
+  :root { color-scheme: light dark; --fond:#f3f4f6; --carte:#fff; --encre:#1f2937; --doux:#6b7280; --bord:#d1d5db; --or:#eab308; --ok:#15803d; --acc:#0369a1; --puce:#e5e7eb; --tel:#111827; }
+  @media (prefers-color-scheme: dark) { :root { --fond:#0b1220; --carte:#162032; --encre:#e5e7eb; --doux:#9ca3af; --bord:#334155; --puce:#243247; --acc:#7dd3fc; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--fond); color:var(--encre); font:16px/1.5 system-ui, sans-serif; }
+  main { max-width: 1100px; margin:0 auto; padding: 16px; }
+  h1 { font-size:1.5rem; margin:.2rem 0 .4rem; } h2 { font-size:1.2rem; margin:2rem 0 .3rem; border-bottom:1px solid var(--bord); padding-bottom:4px; }
+  p.intro, p.note { color:var(--doux); margin:.2rem 0 .8rem; }
+  .regles { background:var(--carte); border:1px solid var(--bord); border-left:4px solid var(--or); border-radius:8px; padding:10px 14px; }
+  .regles li { margin:3px 0; }
+  .paire { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:16px; margin-top:10px; }
+  figure { margin:0; }
+  figcaption { font-weight:700; margin:0 0 6px; } figcaption small { font-weight:400; color:var(--doux); display:block; }
+  /* Écran de tablette en portrait (réduit) */
+  .ecran { background:var(--tel); border-radius:18px; padding:8px; }
+  .interieur { background:var(--carte); border-radius:12px; padding:10px; min-height:300px; font-size:.85rem; }
+  .projet { background:var(--or); color:#1f1300; border-radius:12px; padding:8px 10px; }
+  .projet strong { font-size:1rem; }
+  .ligne { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:6px; }
+  .puce { background:var(--puce); color:var(--encre); border-radius:999px; padding:5px 11px; font-weight:600; border:0; }
+  .puce.on { background:#1f2937; color:#fff; } @media (prefers-color-scheme: dark) { .puce.on { background:#f3f4f6; color:#111827; } }
+  .puce.sur-or { background:rgba(255,255,255,.55); } .puce.sur-or.on { background:#1f1300; color:#fff; }
+  .liste { margin-top:10px; display:grid; gap:6px; }
+  .rang { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--fond); border-radius:8px; padding:7px 9px; }
+  .rang.grise { opacity:.35; }
+  .badge { font-size:.72rem; background:var(--puce); border-radius:6px; padding:1px 7px; color:var(--doux); }
+  .badge.t { background:#fde68a; color:#78350f; } .badge.c { background:#bbf7d0; color:#14532d; } .badge.b { background:#bfdbfe; color:#1e3a8a; }
+  .bouton { background:var(--acc); color:#fff; border:0; border-radius:8px; padding:7px 12px; font-weight:700; } @media (prefers-color-scheme: dark) { .bouton { color:#0b1220; } }
+  .champ { display:flex; justify-content:space-between; gap:8px; align-items:center; border:1px solid var(--bord); border-radius:8px; padding:7px 9px; margin-top:6px; background:var(--carte); }
+  .fenetre { border:2px solid var(--bord); border-radius:12px; padding:10px; background:var(--carte); box-shadow:0 4px 14px rgba(0,0,0,.25); }
+  .menu { border:1px solid var(--bord); border-radius:8px; margin-top:4px; background:var(--carte); overflow:hidden; }
+  .menu div { padding:7px 10px; border-bottom:1px solid var(--bord); } .menu div:last-child { border:0; } .menu .on { background:var(--puce); font-weight:700; }
+  .barre { background:#1f2937; color:#fff; border-radius:10px; padding:8px 10px; margin-top:10px; display:flex; justify-content:space-between; align-items:center; }
+  .case { display:inline-block; width:16px; height:16px; border:2px solid var(--doux); border-radius:4px; vertical-align:middle; margin-right:6px; } .case.on { background:var(--acc); border-color:var(--acc); }
+  .reco { background:#dcfce7; color:#14532d; border-radius:6px; padding:1px 8px; font-size:.75rem; font-weight:700; }
+  .q { background:var(--carte); border:1px solid var(--bord); border-radius:8px; padding:10px 14px; }
+  .q li { margin:4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sous-dossiers de projet : maquettes</h1>
+  <p class="intro">Idée : dans un projet, des dossiers (Terrassement, Canalo, Bâtiment…). Le menu du projet permet de choisir <b>Tout</b> ou un dossier ; dans les applications, on ne voit alors que ce que l'Expert y a rangé. Format : tablette en portrait. <b>Rien n'est codé</b> : choisis ta variante pour chaque écran, puis on code.</p>
+
+  <div class="regles">
+    <b>Règles proposées (à valider)</b>
+    <ul>
+      <li>Un élément (levé, liste de points, plan DXF / PDF, surface importée, réseau, dessin) est dans <b>un seul dossier</b> ou dans <b>« Sans dossier »</b>.</li>
+      <li><b>Tout</b> montre tout, comme aujourd'hui. Les projets existants restent identiques (aucun dossier au départ).</li>
+      <li>Voir / choisir un dossier : <b>tous les modes</b>. Créer, ranger, déplacer : <b>Expert</b>.</li>
+      <li>Ce qui est créé (levé, import) va dans le <b>dossier choisi à ce moment-là</b> ; sous « Tout », il reste « Sans dossier ».</li>
+      <li>Le dossier choisi est un réglage de <b>chaque tablette</b> (comme « Afficher »). Le rangement, lui, est dans le projet (partagé par Drive).</li>
+    </ul>
+  </div>
+
+  <!-- ÉCRAN 1 -->
+  <h2>Écran 1 : choisir le dossier dans le menu du projet</h2>
+  <p class="note">Page Applications, encadré or du projet. Les listes en dessous (Liste de points, Plans, Surfaces…) et les applications ne montrent que le dossier choisi.</p>
+  <div class="paire">
+    <figure>
+      <figcaption>Variante A : puces sous le nom <span class="reco">proposée</span><small>Un toucher, tout est visible d'un coup. Limite : 5 à 6 dossiers avant de défiler.</small></figcaption>
+      <div class="ecran"><div class="interieur">
+        <div class="projet"><strong>Affaire 10 203</strong> <span style="float:right">📍 Ouvrir ＋</span>
+          <div class="ligne">
+            <button class="puce sur-or on">Tout</button><button class="puce sur-or">Terrassement</button><button class="puce sur-or">Canalo</button><button class="puce sur-or">Bâtiment</button><button class="puce sur-or">Sans dossier</button>
+          </div>
+        </div>
+        <div class="liste">
+          <div class="rang"><span>LV-20260520 Stock 1</span><span class="badge t">Terrassement</span></div>
+          <div class="rang"><span>Plan DXF – Réseaux EU</span><span class="badge c">Canalo</span></div>
+          <div class="rang"><span>Surf-Plateforme villa</span><span class="badge b">Bâtiment</span></div>
+          <div class="rang"><span>Imp-Points de calage</span><span class="badge">Sans dossier</span></div>
+        </div>
+        <p class="note" style="margin-top:10px">Choix « Canalo » :</p>
+        <div class="projet" style="margin-top:0"><strong>Affaire 10 203</strong> · <b>Canalo</b>
+          <div class="ligne"><button class="puce sur-or">Tout</button><button class="puce sur-or">Terrassement</button><button class="puce sur-or on">Canalo</button><button class="puce sur-or">Bâtiment</button></div></div>
+        <div class="liste">
+          <div class="rang grise"><span>LV-20260520 Stock 1</span></div>
+          <div class="rang"><span>Plan DXF – Réseaux EU</span><span class="badge c">Canalo</span></div>
+          <div class="rang grise"><span>Surf-Plateforme villa</span></div>
+        </div>
+      </div></div>
+    </figure>
+    <figure>
+      <figcaption>Variante B : liste déroulante<small>Prend moins de place, convient à beaucoup de dossiers. Un toucher de plus pour changer.</small></figcaption>
+      <div class="ecran"><div class="interieur">
+        <div class="projet"><strong>Affaire 10 203</strong> <span style="float:right">📍 Ouvrir ＋</span>
+          <div class="champ" style="color:var(--encre)"><span>📁 Dossier : <b>Canalo</b></span><span>▾</span></div>
+        </div>
+        <div class="menu">
+          <div>Tout</div><div>Terrassement</div><div class="on">Canalo ✓</div><div>Bâtiment</div><div>Sans dossier</div><div style="color:var(--acc)">＋ Nouveau dossier… <span class="badge">Expert</span></div>
+        </div>
+        <div class="liste">
+          <div class="rang"><span>Plan DXF – Réseaux EU</span><span class="badge c">Canalo</span></div>
+        </div>
+      </div></div>
+    </figure>
+  </div>
+
+  <!-- ÉCRAN 2 -->
+  <h2>Écran 2 : ranger à l'import</h2>
+  <p class="note">Les imports (points, plans DXF / PDF, surfaces) proposent le dossier, avec création si besoin. Expert seulement (l'import est déjà Expert).</p>
+  <div class="paire">
+    <figure>
+      <figcaption>Variante A : champ « Ranger dans » dans la fenêtre d'import <span class="reco">proposée</span><small>Le dossier actif est présélectionné : on ne change rien dans le cas courant.</small></figcaption>
+      <div class="ecran"><div class="interieur"><div class="fenetre">
+        <b>Plan « Ter_100G_MGO.dxf »</b>
+        <div class="champ"><span>Nom du plan</span><span>Ter_100G_MGO</span></div>
+        <div class="champ"><span>Type</span><span>TER ▾</span></div>
+        <div class="champ"><span>📁 Ranger dans</span><span><b>Terrassement</b> ▾</span></div>
+        <div class="menu"><div>Sans dossier</div><div class="on">Terrassement ✓</div><div>Canalo</div><div>Bâtiment</div><div style="color:var(--acc)">＋ Créer un dossier…</div></div>
+        <div class="ligne" style="justify-content:flex-end"><button class="bouton">OK</button></div>
+      </div></div></div>
+    </figure>
+    <figure>
+      <figcaption>Variante B : on importe d'abord, on range après<small>Message en haut : « Plan ajouté. Ranger dans un dossier ? ». Plus rapide à l'import, mais un geste de plus pour ranger.</small></figcaption>
+      <div class="ecran"><div class="interieur">
+        <div class="fenetre" style="border-color:var(--ok)">✓ Plan « Ter_100G_MGO » ajouté<div class="ligne">
+          <button class="puce">Terrassement</button><button class="puce">Canalo</button><button class="puce">Bâtiment</button><button class="puce">＋ Nouveau</button><button class="puce">Plus tard</button></div></div>
+        <div class="liste"><div class="rang"><span>Ter_100G_MGO</span><span class="badge">Sans dossier</span></div></div>
+      </div></div>
+    </figure>
+  </div>
+
+  <!-- ÉCRAN 3 -->
+  <h2>Écran 3 : déplacer / ranger des levés et listes existants</h2>
+  <p class="note">Page « Gérer » du projet (Liste de points, Plans, Surfaces importées…). Expert seulement.</p>
+  <div class="paire">
+    <figure>
+      <figcaption>Variante A : le ⚙ de chaque ligne<small>Cohérent avec « Gérer » d'aujourd'hui. Un élément à la fois.</small></figcaption>
+      <div class="ecran"><div class="interieur">
+        <div class="rang"><span><b>LV-20260520 Stock 1</b> <span class="badge">Sans dossier</span></span><span>⚙</span></div>
+        <div class="fenetre" style="margin-top:6px">
+          <div class="champ" style="margin-top:0"><span>Renommer</span><span>20260520 Stock 1</span></div>
+          <div class="champ"><span>📁 Dossier</span><span>Sans dossier ▾</span></div>
+          <div class="menu"><div>Sans dossier ✓</div><div>Terrassement</div><div>Canalo</div><div>Bâtiment</div><div style="color:var(--acc)">＋ Nouveau dossier…</div></div>
+        </div>
+        <div class="rang" style="margin-top:6px"><span>Plan DXF – Réseaux EU <span class="badge c">Canalo</span></span><span>⚙</span></div>
+      </div></div>
+    </figure>
+    <figure>
+      <figcaption>Variante B : mode « Ranger » avec cases à cocher <span class="reco">proposée</span><small>Plusieurs éléments d'un coup (utile pour un gros projet existant à trier). Un seul bouton « Déplacer vers… ».</small></figcaption>
+      <div class="ecran"><div class="interieur">
+        <div class="ligne" style="margin:0 0 6px"><button class="puce on">Ranger</button><button class="puce">Gérer</button></div>
+        <div class="liste" style="margin-top:0">
+          <div class="rang"><span><span class="case on"></span>LV-20260520 Stock 1</span><span class="badge">Sans dossier</span></div>
+          <div class="rang"><span><span class="case on"></span>LV-20260520 Stock 2</span><span class="badge">Sans dossier</span></div>
+          <div class="rang"><span><span class="case"></span>Plan DXF – Réseaux EU</span><span class="badge c">Canalo</span></div>
+          <div class="rang"><span><span class="case on"></span>Surf-Plateforme villa</span><span class="badge">Sans dossier</span></div>
+        </div>
+        <div class="barre"><span>3 sélectionnés</span><button class="bouton">Déplacer vers… ▾</button></div>
+        <div class="menu" style="margin-left:40%"><div>Terrassement</div><div>Canalo</div><div>Bâtiment</div><div>Sans dossier</div><div style="color:var(--acc)">＋ Nouveau dossier…</div></div>
+      </div></div>
+    </figure>
+  </div>
+
+  <h2>Questions pour toi</h2>
+  <div class="q">
+    <ol>
+      <li><b>Écran 1</b> : A (puces) ou B (liste) ? Combien de dossiers penses-tu avoir au maximum par projet ?</li>
+      <li><b>Écran 2</b> : A (choix dans la fenêtre d'import) ou B (on range après) ?</li>
+      <li><b>Écran 3</b> : A (un par un), B (plusieurs d'un coup), ou les deux ?</li>
+      <li>Un élément dans <b>un seul</b> dossier suffit-il ? (Un plan utile à Canalo <i>et</i> à Terrassement devrait alors rester « Sans dossier » ou être importé deux fois.)</li>
+      <li>Les <b>applications</b> (Lever, Implanter, Contrôle…) doivent-elles aussi respecter le dossier choisi, ou seulement les listes et le plan ?</li>
+      <li>Noms des dossiers : libres (tu les crées) ou une liste de départ Terrassement / Canalo / Bâtiment ?</li>
+    </ol>
+  </div>
+</main>
+</body>
+</html>
