@@ -13521,6 +13521,7 @@ body.mode-telephone .instruction-regle.proche b { font-size: 0.75rem; }
 .entete-carte-projets h2 { flex: 1; margin: 0; font-size: 1.1rem; }
 .entete-carte-projets select { min-height: 40px; max-width: 45%; border-radius: 8px; border: 0; padding: 0 8px; }
 .entete-carte-projets .bouton-retour { background: transparent; color: #ffffff; border: 2px solid rgba(255, 255, 255, 0.5); }
+.entete-carte-projets .bouton-retour-partie { background: transparent; color: #ffffff; border: 2px solid rgba(255, 255, 255, 0.5); }
 .zone-carte-projets { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; background: #dfe5e8; cursor: grab; }
 .tuiles-carte-projets, .etiquettes-carte-projets { position: absolute; inset: 0; }
 .tuile-carte-projets { position: absolute; max-width: none; user-select: none; pointer-events: none; }
@@ -13851,3 +13852,31 @@ body.theme-sombre .avec-photo .plan .noms text.altitude { fill: #c3ced6; }
 .ligne-a-implanter .aide.ecart-rouge { color: #b91c1c; font-weight: 700; }
 .ligne-a-implanter .aide.ecart-orange .coche-implante, .ligne-a-implanter .aide.ecart-rouge .coche-implante { color: inherit; }
 .ligne-a-implanter.implante strong { color: var(--gris); }
+
+/* 0.247.0 (audit, lot 6 : maquette « Importer, des tuiles pleines ») : bords pleins (le pointillé évoquait une zone vide), icône dans une pastille,
+   3 tuiles par rangée (2 sur téléphone) ; « Points de contrôle » garde le rouge sur son icône seulement. */
+.boutons-imports { grid-template-columns: repeat(3, 1fr); }
+body.mode-telephone .boutons-imports { grid-template-columns: repeat(2, 1fr); }
+.bouton-import {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 92px;
+  padding: 10px 6px;
+  border: 1.5px solid var(--bordure);
+  background: var(--surface);
+  text-align: center;
+}
+.bouton-import > span { align-items: center; text-align: center; }
+.bouton-import svg {
+  box-sizing: content-box;
+  width: 22px;
+  height: 22px;
+  padding: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sombre) 10%, var(--surface));
+}
+.bouton-import.import-controle { border-color: var(--bordure); color: var(--texte); }
+.bouton-import.import-controle svg { stroke: #dc2626; background: #fee2e2; }
+body.mode-telephone .bouton-import { min-height: 84px; padding: 8px 4px; }
+body.mode-telephone .bouton-import svg { width: 20px; height: 20px; padding: 7px; }

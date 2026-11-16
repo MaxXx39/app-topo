@@ -2315,8 +2315,8 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     }
     // 0.225.0 : première ligne = Geler / Isoler / Tout réafficher (Intermédiaire) ; le menu se ferme, on touche des éléments du plan, puis « Valider ».
     const enteteCalques = `<div class="ligne-menu-plan ligne-gel-calques seulement-intermediaire">
-        <button type="button" class="bouton-gel" data-gel-calques="geler" title="Geler : cacher le calque des éléments touchés">❄ Geler</button>
-        <button type="button" class="bouton-gel" data-gel-calques="isoler" title="Isoler : ne garder que le calque des éléments touchés">◎ Isoler</button>
+        <button type="button" class="bouton-gel" data-gel-calques="geler" title="Geler : cacher le calque des éléments touchés">Geler</button>
+        <button type="button" class="bouton-gel" data-gel-calques="isoler" title="Isoler : ne garder que le calque des éléments touchés">Isoler</button>
         <button type="button" class="bouton-gel" data-gel-calques="reafficher" title="Tout réafficher : tous les calques de tous les plans">↺ Tout réafficher</button>
       </div>`;
     menuPlans.innerHTML = enteteCalques + plansDxf.map((plan) => `<div class="ligne-menu-plan">

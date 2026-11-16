@@ -7,6 +7,7 @@
 //   point tapé ;
 // - la liste cochée est affichée sur le plan ; ses points se voient sous elle.
 // Le levé avec le récepteur se fait dans l'onglet Terrain (src/leve/ecran.js).
+import { ICONES_LIGNE } from '../outils/icones.js';
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
 import { bulle } from '../aide/bulles.js';
@@ -642,7 +643,7 @@ function blocTableauPoints(projet, etat) {
     date: `<td>${echapper(texteDate(l.date))}</td>`,
     tablette: `<td>${echapper(l.tablette)}</td>`,
     remarque: `<td>${echapper(l.remarque)}</td>`,
-    photos: `<td>${l.photoId ? `<button type="button" class="bouton-lien" data-action="voir-photo" data-id="${l.photoId}" aria-label="Voir la photo de ${echapper(l.nom)}">📷 ${l.photos}</button>` : ''}</td>`,
+    photos: `<td>${l.photoId ? `<button type="button" class="bouton-lien" data-action="voir-photo" data-id="${l.photoId}" aria-label="Voir la photo de ${echapper(l.nom)}">${ICONES_LIGNE.photo} ${l.photos}</button>` : ''}</td>`,
     liste: `<td>${echapper(l.liste)}</td>`,
   });
   const corps = lignes.slice(0, LIGNES_MAX_TABLEAU).map((l) => { const c = cellules(l); return `<tr>${ordre.map((cle) => c[cle]).join('')}</tr>`; }).join('');
@@ -696,7 +697,7 @@ function photosDesPoints(photos) {
       <summary>Photos (${photos.length})</summary>
       <div class="liste-photos">${photos.map((photo) => `<figure class="photo">
           <button type="button" class="miniature-photo" data-action="voir-photo" data-id="${photo.id}" aria-label="Voir la photo de ${echapper(photo.point ?? 'tout le levé')}"><img src="${photo.miniature}" alt="${echapper(photo.legende || photo.point || 'Photo du levé')}" /></button>
-          <span class="point-photo">📷 ${echapper(photo.point ?? 'tout le levé')}</span>
+          <span class="point-photo">${ICONES_LIGNE.photo} ${echapper(photo.point ?? 'tout le levé')}</span>
           ${photo.legende ? `<span class="aide">${echapper(photo.legende)}</span>` : ''}
         </figure>`).join('')}</div>
     </details>`;

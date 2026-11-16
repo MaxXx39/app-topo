@@ -384,7 +384,7 @@ document.querySelector('#app').innerHTML = `
       </section>
       <section class="panneau" data-onglet="dessin">
         <h2>Dessin ${bulle('dessin')}</h2>
-        <button type="button" class="bouton seulement-expert bouton-dao" id="bouton-dao">✏ DAO : dessiner sur le plan</button>
+        <button type="button" class="bouton seulement-expert bouton-dao" id="bouton-dao">DAO : dessiner sur le plan</button>
         <div id="dessins"></div>
         <div id="talus-surfaces" class="carte-section"></div>
       </section>
@@ -1229,7 +1229,7 @@ function majBarreSelectionCalques() {
   const n = selectionCalques.elements.length;
   const noms = [...new Set(selectionCalques.elements.map((e) => e.calqueNom || 'Calque sans nom'))];
   boite.innerHTML = `<div class="encadre-annotation fiche-point" role="dialog" aria-label="Choix des calques">
-      <div class="entete-encadre-annotation"><strong>${selectionCalques.mode === 'geler' ? '❄ Geler' : '◎ Isoler'}</strong><span>${n} élément${n > 1 ? 's' : ''}</span></div>
+      <div class="entete-encadre-annotation"><strong>${selectionCalques.mode === 'geler' ? 'Geler' : 'Isoler'}</strong><span>${n} élément${n > 1 ? 's' : ''}</span></div>
       ${n > 0 ? `<div>${noms.map(echapper).join(' · ')}</div>` : '<div>Touchez un ou plusieurs éléments du plan</div>'}
       <div class="ligne-boutons-selection"><button type="button" class="bouton" data-action="valider-calques" ${n === 0 ? 'disabled' : ''}>Valider</button>
         <button type="button" class="bouton secondaire" data-action="annuler-calques">Annuler</button></div>
@@ -5134,7 +5134,7 @@ function enregistrerControle() {
   if (resultat.global === 'orange') {
     demanderChoix({ titre: '⚠ Contrôle à la limite', texte: `${detail}. Écart entre les deux tolérances : avertissement.`, boutons: [{ cle: 'ok', texte: 'OK', principal: true }] });
   } else if (resultat.global === 'rouge') {
-    demanderChoix({ titre: '⛔ Hors tolérance', texte: `${detail}. Contacte le géomètre.`, boutons: [{ cle: 'ok', texte: 'OK', principal: true }] });
+    demanderChoix({ titre: 'Hors tolérance', texte: `${detail}. Contacte le géomètre.`, boutons: [{ cle: 'ok', texte: 'OK', principal: true }] });
   }
 }
 
@@ -6916,7 +6916,7 @@ function montrerPhoto(id) {
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-photo';
   fenetre.innerHTML = `<form method="dialog">
-      <h2>📷 ${echapper(photo.point ?? 'Photo du levé')}</h2>
+      <h2>${ICONES_LIGNE.photo} ${echapper(photo.point ?? 'Photo du levé')}</h2>
       <img src="${photo.image}" alt="${echapper(photo.legende || photo.point || 'photo')}" />
       ${photo.legende ? `<p>${echapper(photo.legende)}</p>` : ''}
       <div class="ligne-outils"><button class="bouton">Fermer</button><button type="button" class="bouton-secondaire seulement-intermediaire" data-cle="dessiner">✎ Dessiner</button>${deControle ? '<button type="button" class="bouton-lien" data-cle="supprimer">supprimer la photo</button>' : ''}</div>
@@ -8653,8 +8653,8 @@ function mettreAJourEtatEntete() {
   pastille.hidden = !partage?.etat.connecte;
   // Main rendue (bouton, ou 5 minutes sans rien faire) : « 🔒 Lecture seule · main rendue » en gris ; toucher = la reprendre.
   const rendu = partage?.etat.connecte && partage.etat.rendu?.projetId === projet.id;
-  if (repris) pastille.textContent = `🔒 ${repris.nom} a la main`;
-  else if (rendu) pastille.textContent = '🔒 Lecture seule · main rendue';
+  if (repris) pastille.innerHTML = `${ICONES_LIGNE.cadenas} ${echapper(repris.nom)} a la main`;
+  else if (rendu) pastille.innerHTML = `${ICONES_LIGNE.cadenas} Lecture seule · main rendue`;
   else pastille.innerHTML = `<svg class="main-verrou" viewBox="0 0 24 24" aria-hidden="true">${ICONE_MAIN}</svg>`;
   pastille.className = `pastille-entete ${repris ? 'pastille-rouge' : rendu ? 'pastille-grise' : 'pastille-verte'}`;
   pastille.classList.toggle('pastille-inactive', !aAcces('expert'));
