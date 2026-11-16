@@ -136,7 +136,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 // chaque geste sur le plan (poser, bouger, relâcher, molette) remet le délai de 5 s à zéro.
 const DELAI_RETOUR_SUIVI = 5000;
 
-export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe } = {}) {
+export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn } = {}) {
   // Réglage d'une liste : son choix, sinon celui de départ (en dessous d'Expert, les réglages d'Expert gardent leur valeur de départ).
   const reglageListe = (cle, id) => {
     const choix = id != null ? reglagesListe.get(id) : null;
@@ -166,6 +166,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       <canvas class="plan-dxf-canvas plan-points-canvas" aria-hidden="true"></canvas>
       <svg class="plan" role="img" aria-label="Plan des points"></svg>
       <div class="plan-attribution" hidden></div>
+      <div class="plan-coordonnees" hidden aria-live="off"></div>
       <div class="boussole-tablette" hidden title="Boussole de la tablette (nord magnétique, environ 3° près)" aria-label="Boussole de la tablette">
         <svg viewBox="-30 -30 60 60" aria-hidden="true">
           <circle r="27" class="cadran" />
@@ -2433,6 +2434,18 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       });
     }
   });
+
+  // 0.248.0 (demande du 16.11) : à la souris, Est / Nord (et Z de la surface choisie) du point sous le curseur.
+  const casesCoordonnees = conteneur.querySelector('.plan-coordonnees');
+  svg.addEventListener('pointermove', (evenement) => {
+    if (evenement.pointerType !== 'mouse' || !vue || !casesCoordonnees) return;
+    const position = positionDansPlan(evenement);
+    const terrain = versTerrain(position.x, position.y, vue);
+    const z = altitudeEn ? altitudeEn(terrain.est, terrain.nord) : null;
+    casesCoordonnees.textContent = `E ${terrain.est.toFixed(3)} · N ${terrain.nord.toFixed(3)}${z != null ? ` · Z ${z.toFixed(3)}` : ''}`;
+    casesCoordonnees.hidden = false;
+  });
+  svg.addEventListener('pointerleave', () => { if (casesCoordonnees) casesCoordonnees.hidden = true; });
 
   svg.addEventListener('pointermove', (evenement) => {
     if (!vue || !pointeurs.has(evenement.pointerId)) return;

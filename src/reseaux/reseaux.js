@@ -122,8 +122,10 @@ export function creerReseaux(deps) {
         deps.message('Même point que le précédent : pas ajouté', 2500);
         return;
       }
-      b.sommets.push({ est: mm(point.est), nord: mm(point.nord), fe: '' });
-      b.message = '';
+      // 0.248.0 : le FE est pré-rempli avec l'altitude du point s'il en a une (0 = pas d'altitude).
+      const aAltitude = typeof point.altitude === 'number' && Number.isFinite(point.altitude) && Math.abs(point.altitude) > 1e-9;
+      b.sommets.push({ est: mm(point.est), nord: mm(point.nord), fe: aAltitude ? mm(point.altitude).toFixed(3) : '' });
+      b.message = aAltitude ? '✓ FE pré-rempli avec l\'altitude du point (modifiable)' : '';
     }
     afficher();
   }

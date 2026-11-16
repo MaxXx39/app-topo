@@ -545,7 +545,7 @@ export function creerEcranLeve(conteneur, actions) {
       const coupe = c?.coupes?.[sens];
       cadre.innerHTML = coupe
         ? svgCoupeDirecte({ ...TITRES_COUPES[sens], ...coupe, classe: c.classe, sens, exageration: donnees.controle.exagerationCoupe, grille: aAcces('expert') })
-        : `<p class="aide">${TITRES_COUPES[sens].titre} : ${c?.messageCoupes ?? 'en attente de la position'}</p>`;
+        : `<div class="coupe-attente"><span>${TITRES_COUPES[sens].titre} : ${echapper(c?.messageCoupes ?? 'en attente de la position')}</span></div>`;
     }
   }
 
@@ -614,7 +614,7 @@ export function creerEcranLeve(conteneur, actions) {
   /** Delta Z de la surface (0.152.0, dès Intermédiaire) : champ (m, + = plus haut) et bouton « 0 ». */
   function champDeltaSurface(delta) {
     return `<div class="ligne-choix seulement-intermediaire ligne-delta-surface">
-        <label>Δ Z surface <input type="text" inputmode="decimal" data-champ="delta-surface" value="${delta ? Number(delta).toFixed(3) : ''}" placeholder="0.000" /> m</label>
+        <label>Δ Z surface <input type="text" inputmode="text" data-champ="delta-surface" value="${delta ? Number(delta).toFixed(3) : ''}" placeholder="0.000" /> m</label>
         <button type="button" class="bouton-secondaire" data-action="deltaSurfaceZero" ${delta ? '' : 'disabled'}>0</button>
         <span class="aide">+ plus haut</span>
       </div>`;
@@ -1006,7 +1006,7 @@ export function creerEcranLeve(conteneur, actions) {
     return `<div class="reglages-guidage">
       <div class="ligne-choix"><span>Guidage</span>${boutonsChoix('choisirGuidage', GUIDAGES, reglages.guidage)}</div>
       ${ligne ? altitudesDesBouts() : ''}
-      ${ligne ? `<label class="champ-decalage">Décalage parallèle (m)<input type="text" inputmode="decimal" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
+      ${ligne ? `<label class="champ-decalage">Décalage parallèle (m)<input type="text" inputmode="text" data-reglage-ligne="decalage" value="${l.decalage ? l.decalage.toFixed(3) : ''}" placeholder="+ à droite, − à gauche" /></label>` : ''}
       <p class="aide" data-vivant="orientation"></p>
     </div>`;
   }
@@ -1132,7 +1132,7 @@ export function creerEcranLeve(conteneur, actions) {
           <label class="champ-delta">dist.<input type="text" inputmode="decimal" data-delta="distance" value="${echapper(d.distance)}" placeholder="0.000" autocomplete="off" /></label>
         </div>
         <div class="rang-delta rang-z">
-          <label class="champ-delta">Z ±<input type="text" inputmode="decimal" data-delta="z" value="${echapper(d.z)}" placeholder="0.000" autocomplete="off" /></label>
+          <label class="champ-delta">Z ±<input type="text" inputmode="text" data-delta="z" value="${echapper(d.z)}" placeholder="0.000" autocomplete="off" /></label>
         </div>
         <button type="button" class="bouton-fermer-delta" data-action="reglerDelta" data-champ-delta="effacer" title="Fermer le delta (remis à zéro)" aria-label="Fermer le delta (remis à zéro)">×</button>
       </div>`;

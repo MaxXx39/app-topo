@@ -517,7 +517,7 @@ function pageGerer(projet, vue, ouverts) {
         ? `<div class="champ-prefixe"><span class="prefixe-nom">${echapper(PREFIXE_PDF)}</span><input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(sansPrefixe(plan.nom, PREFIXE_PDF))}" aria-label="Nom du plan (après ${echapper(PREFIXE_PDF)})" /></div>`
         : `<input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />`;
       lignes.push(ligneGerer({
-        cle: `plans:${plan.id}`, titre: echapper(plan.nom), nature: plan.pdf ? 'PDF' : 'DXF', couleur: plan.couleur ?? '#64748b', info: [`${plan.compte?.objets ?? 0} objets`, resumeEtatPlan(plan)].filter(Boolean).join(' · '), ouverts,
+        cle: `plans:${plan.id}`, titre: echapper(plan.nom), nature: [plan.pdf ? 'PDF' : 'DXF', plan.type].filter(Boolean).join(' · '), couleur: plan.couleur ?? '#64748b', info: [`${plan.compte?.objets ?? 0} objets`, resumeEtatPlan(plan)].filter(Boolean).join(' · '), ouverts,
         menu: `<label class="champ-gerer">Renommer ${nom}</label>
           ${etatRecalage(plan)}${etatControle(plan)}
           <div class="champ-gerer">Couleur ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: 'Couleur du plan' })}</div>

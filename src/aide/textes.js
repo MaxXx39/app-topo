@@ -14,7 +14,7 @@ export const TEXTES_AIDE = {
   projets:
     'Projets enregistrés sur cet appareil (📱) ou sur Drive (☁). « Ouvrir » les liste, « ＋ » en crée un, ⋮ renomme (projet ouvert), exporte, duplique ou supprime. Réglages de l\'appareil : tuile Réglages du menu.',
   lame:
-    'Guidage (Expert) : choisis la machine puis la surface à suivre. Au-dessus de chaque règle : MONTER (rouge) ou DESCENDRE (bleu) ; OK (vert) dans la tolérance ; entre les deux, seule la valeur (orange) pour que l\'affichage ne saute pas ; vert ≤ 2 cm, orange ≤ 5 cm. « 2 coupes » : l\'une sous l\'autre (téléphone : une seule coupe, G – D ou Arr – Av). Réglages dans ⚙ (1 ou 2 GNSS, G / D, distances, vues).',
+    'Guidage (Expert) : choisis la machine puis la surface à suivre. Au-dessus de chaque règle : grosse flèche ▲ (monter, rouge) ou ▼ (descendre, bleu) avec la valeur ; OK (vert) dans la tolérance ; entre les deux, seule la valeur (orange) pour que l\'affichage ne saute pas ; vert ≤ 2 cm, orange ≤ 5 cm. « 2 coupes » : l\'une sous l\'autre (téléphone : une seule coupe, G – D ou Arr – Av). Réglages dans ⚙ (1 ou 2 GNSS, G / D, distances, vues).',
   partage:
     'Projets sur Google Drive. Une seule main par projet : verte = tu enregistres, grise ou rouge = lecture seule. Prendre la main à un autre appareil : Expert et code. Nuage en tête d\'écran : vert = à jour, rouge barré = hors ligne, gris barré = Google non connecté ; touche-le pour ouvrir les réglages Drive.',
   cartouche:

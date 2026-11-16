@@ -7361,9 +7361,11 @@ function calculerControle(etat, orientation) {
       altitudeCanne: fiable ? position.altitude : null,
     };
   }
+  // 0.248.0 (demande du 16.11) : sans orientation (inclinaison pas prête, ou pas encore de direction de marche), on ne sait pas
+  // dans quel sens est la coupe : pas de coupe (cadre vide + message), au lieu d'une coupe nord-sud / est-ouest trompeuse.
   if (orientation.azimut == null) {
-    Object.assign(coupes.perpendiculaire, { titre: 'Ouest-est (orientation inconnue)', gauche: '← ouest', droite: 'est →' });
-    Object.assign(coupes.axe, { titre: 'Sud-nord (orientation inconnue)', gauche: '← sud', droite: 'nord →' });
+    const messageCoupes = suiviOrientation.source === 'marche' ? 'avance pour donner la direction' : 'inclinaison en attente';
+    return { ecart, classe: ecart == null ? null : classeEcart(ecart), altitudeSurface, altitudeCanne: position.altitude, message, coupes: null, messageCoupes };
   }
   return {
     ecart,
@@ -7771,6 +7773,12 @@ document.addEventListener('visibilitychange', () => {
 // DAO (0.147.0, Expert) : voir dao/dao.js ; créée après le plan (plus bas).
 let daoAppli = null;
 const plan = creerPlan(document.querySelector('#plan'), {
+  // Z sous la souris : altitude de la surface choisie dans Implanter (rien si pas de surface ou hors surface).
+  altitudeEn: (est, nord) => {
+    const chercheur = altitudeDeSurface(terrain.surfaceId);
+    const z = chercheur ? chercheur(est, nord) : null;
+    return typeof z === 'number' && Number.isFinite(z) ? z : null;
+  },
   quandToucherPosition: toucherPourCoupe,
   peutDeplacerCoupe: () => !refuserEnLectureSeule(),
   quandDeplacerCoupe: (id, bout, position) => {

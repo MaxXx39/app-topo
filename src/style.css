@@ -13880,3 +13880,28 @@ body.mode-telephone .boutons-imports { grid-template-columns: repeat(2, 1fr); }
 .bouton-import.import-controle svg { stroke: #dc2626; background: #fee2e2; }
 body.mode-telephone .bouton-import { min-height: 84px; padding: 8px 4px; }
 body.mode-telephone .bouton-import svg { width: 20px; height: 20px; padding: 7px; }
+
+/* 0.248.0 : boutons + / − de largeur et d'échelle de coupe réduits de moitié, sur toutes les coupes
+   (demande du 16.11). Placé en dernier pour passer devant les règles par écran (Guidage, téléphone). */
+.echelle-coupe button,
+.coupe-guidage .echelle-coupe button,
+body.mode-telephone .coupe-guidage .echelle-coupe button { width: 20px; height: 20px; font-size: 0.85rem; line-height: 1; padding: 0; }
+.echelle-coupe span,
+.coupe-guidage .echelle-coupe span,
+body.mode-telephone .coupe-guidage .echelle-coupe span { min-width: 24px; font-size: 0.65rem; }
+.echelle-coupe { gap: 1px; padding: 1px; }
+
+/* 0.248.0 : bandeau de règle du Guidage à cadre FIXE : seulement la flèche (grosse) et la valeur, jamais sur 2 lignes,
+   pour que l'échelle des deux coupes reste la même (un « 170 cm » trop large agrandissait la case). */
+.instruction-regle { container-type: inline-size; overflow: hidden; height: 72px; min-height: 72px; box-sizing: border-box; }
+.instruction-regle .fleche-regle { font-size: min(2.6rem, 40cqw); line-height: 1; }
+.instruction-regle small { white-space: nowrap; }
+.instruction-regle.monter small, .instruction-regle.descendre small { font-size: min(1.6rem, 17cqw); line-height: 1.05; }
+.instruction-regle.ok b, .instruction-regle.proche b { font-size: min(1.9rem, 20cqw); white-space: nowrap; }
+body.mode-telephone .instruction-regle { height: 64px; min-height: 64px; }
+
+/* 0.248.0 : coupe sans orientation = cadre vide de la même taille que la coupe (340 × 165) avec un message. */
+.coupe-attente { display: flex; align-items: center; justify-content: center; aspect-ratio: 340 / 165; width: 100%; box-sizing: border-box; border: 1px dashed var(--bordure, #9aa7b0); border-radius: 8px; text-align: center; padding: 8px; font-weight: 700; opacity: 0.75; }
+
+/* 0.248.0 : Est / Nord / Z sous la souris, en bas à gauche du plan (ordinateur seulement). */
+.plan-coordonnees { position: absolute; left: 6px; bottom: 6px; z-index: 5; padding: 2px 8px; border-radius: 6px; background: rgba(15, 23, 42, 0.78); color: #fff; font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; pointer-events: none; }

@@ -190,7 +190,7 @@ function placeSilhouette(a, b, x, y) {
 }
 
 /**
- * Bandeau au-dessus d'une règle (0.214.0) : « ▲ MONTER 7.0 cm » (rouge), « ▼ DESCENDRE 6.0 cm » (bleu), « ● OK » (vert) ou la
+ * Bandeau au-dessus d'une règle (0.214.0) : « ▲ 7.0 cm » (rouge), « ▼ 6.2 cm » (bleu) : seulement la grosse flèche et la valeur (0.248.0), « ● OK » (vert) ou la
  * valeur seule (orange). Tant que l'écart reste dans la tolérance orange, aucune direction n'est donnée : l'affichage ne saute
  * plus entre monter et descendre près de la surface. point : { ecart (m, + = monter), classe } ou null ; nom : nom du bout (G, D…).
  */
@@ -201,8 +201,8 @@ export function bandeauRegle(point, nom = '') {
   if (point.classe === 'vert') return `<div class="instruction-regle ok">${bout}<b>● OK</b><small>±${cm} cm</small></div>`;
   if (point.classe === 'orange') return `<div class="instruction-regle proche">${bout}<b>${cm}</b><small>cm</small></div>`;
   return point.ecart > 0
-    ? `<div class="instruction-regle monter">${bout}<b>▲ MONTER</b><small>${cm} cm</small></div>`
-    : `<div class="instruction-regle descendre">${bout}<b>▼ DESCENDRE</b><small>${cm} cm</small></div>`;
+    ? `<div class="instruction-regle monter">${bout}<b class="fleche-regle" aria-label="Monter">▲</b><small>${cm} cm</small></div>`
+    : `<div class="instruction-regle descendre">${bout}<b class="fleche-regle" aria-label="Descendre">▼</b><small>${cm} cm</small></div>`;
 }
 
 /**
