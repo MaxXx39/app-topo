@@ -129,6 +129,9 @@ import { mesureRapide } from './topo/mesure-rapide.js';
 import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
 import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
 import { creerReseaux } from './reseaux/reseaux.js';
+import { avertissementHorsZone } from './topo/zone-ge-vd.js';
+import { messagePdf, messageMauvaisBouton } from './topo/messages-fichier.js';
+import { PREFIXE_IMPORT } from './topo/doublons.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
 import { htmlEncadreAnnotation } from './annotation/encadre.js';
 import { lignesFichePoint, htmlFichePoint, htmlFicheCalque } from './plan/fiche-point.js';
@@ -2065,12 +2068,20 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
   importerPointsControle: (fichier) => importerPointsControle(fichier),
   importerPoints: async (fichier) => {
     try {
-      const resultat = lirePoints(await fichier.text());
+      const texteFichier = await fichier.text();
+      // 0.244.0 : un plan, un PDF ou un LandXML donné comme liste de points : on dit où l'importer.
+      const mauvais = messageMauvaisBouton(fichier.name, texteFichier.slice(0, 200));
+      if (mauvais) throw new Error(mauvais);
+      const resultat = lirePoints(texteFichier);
       // 0.219.0 : noms répétés dans le fichier : ignorer / renommer / importer quand même.
-      const traite = await choisirTraitementDoublons([], resultat.points, fichier.name);
+      // 0.244.0 (audit) : on compare aussi aux noms déjà dans le projet (autres listes).
+      const traite = await choisirTraitementDoublons([...nomsDuProjet(projet)], resultat.points, fichier.name);
       if (traite.mode === null) return;
       resultat.points = traite.points;
       if (traite.renommes.length > 0) resultat.avertissements = [...(resultat.avertissements ?? []), `${traite.renommes.length} nom(s) en double renommé(s) : ${traite.renommes.slice(0, 5).map((r) => `${r.avant} → ${r.apres}`).join(', ')}`];
+      // 0.244.0 (Expert) : avertir (sans refuser) des points hors de la zone Genève–Vaud (fichier pas en MN95 ?).
+      const horsZone = avertissementHorsZone(resultat.points);
+      if (horsZone) resultat.avertissements = [...(resultat.avertissements ?? []), horsZone];
       dernierImport = { ...resultat, nomFichier: fichier.name };
       if (resultat.points.length > 0) {
         // Simple liste de points, ou levé (0.77.0) : rangé dans Lever, à compléter dans Terrain › Lever.
@@ -2079,7 +2090,8 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
           texte: 'C\'est quoi ?',
           boutons: [['liste', 'Liste de points'], ...NATURES_IMPORT].map(([cle, titre], i) => ({ cle, texte: titre, detail: i === 0 ? '' : 'levé', principal: i === 0 })),
         });
-        const leve = ajouterLeve(projet, fichier.name, resultat.points);
+        // 0.244.0 : liste de points importée = préfixe fixe « Imp- », sans l'extension du fichier.
+        const leve = ajouterLeve(projet, choix === 'liste' ? `${PREFIXE_IMPORT}${fichier.name.replace(/\.[^./\\]+$/, '')}` : fichier.name, resultat.points);
         if (choix !== 'liste') {
           const surface = leveDepuisFichier(projet, leve, choix);
           projet.calculs = calculsAutomatiques(projet.calculs, projet.surfaces, surface);
@@ -2100,7 +2112,8 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
   },
   renommerLeve: (id, nom) => {
     const leve = projet.leves.find((l) => l.id === id);
-    if (leve && nom) leve.nom = nom;
+    // 0.244.0 : le préfixe « Imp- » des listes importées reste fixe.
+    if (leve && nom) leve.nom = leve.nom.startsWith(PREFIXE_IMPORT) && !nom.startsWith(PREFIXE_IMPORT) ? `${PREFIXE_IMPORT}${nom}` : nom;
     modifie();
   },
   // 0.194.0 (Expert) : modifier la liste des types de plans DXF (partagée par Drive).
@@ -2249,8 +2262,9 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       if (valeurs.recaler === 'oui') commencerRecalage(nouveauPlan.id);
       else if (valeurs.recaler === 'cale') commencerControlePlan(nouveauPlan.id);
     } catch (erreur) {
-      dernierPlan = { nom: fichier.name, erreur: erreur.message };
-      afficherMessage(`Plan PDF non importé : ${erreur.message}`, 8000);
+      const message = messagePdf(erreur);
+      dernierPlan = { nom: fichier.name, erreur: message };
+      afficherMessage(`Plan PDF non importé : ${message}`, 8000);
       recalculer();
     } finally {
       doc?.loadingTask?.destroy();
@@ -5007,7 +5021,7 @@ async function choisirTraitementDoublons(existants, points, nomFichier) {
   if (doubles.length === 0) return { points, mode: 'garder', renommes: [] };
   const liste = `${doubles.slice(0, 5).join(', ')}${doubles.length > 5 ? '…' : ''}`;
   const choix = await demanderChoix({
-    titre: `${doubles.length} nom(s) en double dans « ${nomFichier} »`,
+    titre: `${doubles.length} nom(s) en double (dans « ${nomFichier} » ou déjà dans le projet)`,
     texte: `Noms : ${liste}. Les autres points sont importés dans tous les cas.`,
     boutons: [
       { cle: 'ignorer', texte: 'Ignorer les doublons', detail: 'Le premier point de chaque nom est gardé', principal: true },

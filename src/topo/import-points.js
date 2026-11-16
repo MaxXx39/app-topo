@@ -25,6 +25,10 @@ export function lirePoints(texte) {
   }
 
   resultat.avertissements = chercherNomsEnDouble(resultat.points);
+  const sans = resultat.points.filter((p) => p.sansAltitude);
+  if (sans.length > 0) {
+    resultat.avertissements.push(`${sans.length} point(s) sans altitude : 0.000 mis (${sans.slice(0, 5).map((p) => p.nom).join(', ')}${sans.length > 5 ? '…' : ''})`);
+  }
   return resultat;
 }
 
@@ -178,7 +182,9 @@ function creerPoint(texteNom, texteEst, texteNord, texteAltitude, ligne) {
 
   const est = lireNombre(texteEst);
   const nord = lireNombre(texteNord);
-  const altitude = lireNombre(texteAltitude);
+  // 0.244.0 (audit, décision du 16.11) : un point sans altitude est accepté avec 0.000 (signalé par lirePoints).
+  const sansAltitude = (texteAltitude ?? '').trim() === '';
+  const altitude = sansAltitude ? 0 : lireNombre(texteAltitude);
   const illisibles = [];
   if (est === null) illisibles.push('Est');
   if (nord === null) illisibles.push('Nord');
@@ -187,7 +193,7 @@ function creerPoint(texteNom, texteEst, texteNord, texteAltitude, ligne) {
     return { erreur: `point « ${nom} » : ${illisibles.join(', ')} illisible(s)` };
   }
 
-  return { nom, est, nord, altitude, ligne };
+  return sansAltitude ? { nom, est, nord, altitude, ligne, sansAltitude: true } : { nom, est, nord, altitude, ligne };
 }
 
 /**

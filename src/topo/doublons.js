@@ -1,6 +1,9 @@
 // Noms de points en double à l'import (0.219.0, demande du 12.11) : on repère les doublons, puis on choisit de les ignorer,
 // de les renommer (« nom-2 », « nom-3 »…) ou de les importer quand même. Un nom est comparé sans espaces autour ; un nom vide n'est pas un doublon.
 
+/** Préfixe fixe des listes de points importées (0.244.0). */
+export const PREFIXE_IMPORT = 'Imp-';
+
 const nomDe = (p) => String(p?.nom ?? '').trim();
 
 /** Noms déjà pris (liste de noms existants) ou répétés dans les points eux-mêmes, sans répétition dans le résultat. */

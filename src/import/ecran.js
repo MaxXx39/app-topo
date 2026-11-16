@@ -13,6 +13,7 @@ import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { COULEURS_PLANS } from '../plan/dxf-canvas.js';
 import { estEnMn95 } from '../topo/dxf-plan.js';
+import { PREFIXE_IMPORT } from '../topo/doublons.js';
 import { resumeControlePlan, texteEcartMm } from '../topo/controle-plan.js';
 import { rotationLisible } from '../topo/recalage.js';
 import { prefixeDuNom, sansPrefixe, estSurfaceFichier, origineSurface } from '../topo/surface.js';
@@ -494,7 +495,7 @@ function pageGerer(projet, vue, ouverts) {
       const couleurListe = projet.couleursListes?.[leve.id] ?? couleurs.get(categorie);
       lignes.push(ligneGerer({
         cle: `points:${leve.id}`, titre: echapper(leve.nom), nature: titres.get(categorie) ?? '', categorie, couleur: couleurListe, info: `${leve.points.length} points${date}`, ouverts, videEnBase: Boolean(leve.dediee) && photosDuLeve(projet, leve).length === 0,
-        menu: `${leve.dediee ? '' : `<label class="champ-gerer">Renommer <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom de la liste" /></label>`}
+        menu: `${leve.dediee ? '' : leve.nom.startsWith(PREFIXE_IMPORT) ? `<label class="champ-gerer">Renommer <span class="champ-prefixe"><span class="prefixe-nom">${echapper(PREFIXE_IMPORT)}</span><input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(sansPrefixe(leve.nom, PREFIXE_IMPORT))}" aria-label="Nom de la liste (après ${echapper(PREFIXE_IMPORT)})" /></span></label>` : `<label class="champ-gerer">Renommer <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom de la liste" /></label>`}
           <div class="champ-gerer seulement-intermediaire">Couleur ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}</div>
           ${photosDesPoints(photosDuLeve(projet, leve))}
           <div class="actions-ligne-gerer">
