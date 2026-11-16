@@ -148,6 +148,14 @@ export function htmlLame(donnees, { reglagesOuverts = false, bip = true, choixMa
 }
 
 /**
+ * Vue du Guidage vraiment montrée (0.240.0) : sur téléphone, une seule coupe à la fois (les boutons « G – D » et
+ * « Arr – Av » passent de l'une à l'autre), car deux coupes n'y tiennent pas ; ailleurs, la vue choisie.
+ */
+export function vueDuGuidage(vue, telephone) {
+  return telephone && vue !== 'plan1' ? 'plan1' : vue;
+}
+
+/**
  * Lignes suivies (0.154.0, Expert ; 0.171.0, maquette B du 09.11) : une seule rangée de deux cases, L1 (bord G) et
  * L2 (bord D). Toucher une case = choisir (ou changer) sa ligne sur le plan ; × l'enlève. L'écart en plan est rempli
  * en direct. Les mêmes cases sont aussi dans la bande du bas (L1 / L2), qui touchent ces boutons.

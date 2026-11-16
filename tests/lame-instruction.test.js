@@ -1,6 +1,6 @@
 // 0.214.0 : bandeau au-dessus de la règle du Guidage : MONTER / DESCENDRE seulement hors de la tolérance orange.
 import { describe, expect, it } from 'vitest';
-import { bandeauRegle } from '../src/leve/lame-ecran.js';
+import { bandeauRegle, vueDuGuidage } from '../src/leve/lame-ecran.js';
 
 describe('bandeau de la règle du Guidage', () => {
   it('rouge : monter, avec la valeur en cm', () => {
@@ -30,5 +30,16 @@ describe('bandeau de la règle du Guidage', () => {
     expect(bandeauRegle({ ecart: 0.01, classe: 'vert' }, 'G')).toContain('OK');
     expect(bandeauRegle(null, 'G')).toContain('attente');
     expect(bandeauRegle({ ecart: null }, 'G')).toContain('hors');
+  });
+});
+
+describe('vue du Guidage selon l\'appareil (0.240.0)', () => {
+  it('téléphone : toujours une seule coupe', () => {
+    expect(vueDuGuidage('plan2', true)).toBe('plan1');
+    expect(vueDuGuidage('coupes', true)).toBe('plan1');
+  });
+  it('tablette : la vue choisie est gardée', () => {
+    expect(vueDuGuidage('plan2', false)).toBe('plan2');
+    expect(vueDuGuidage('plan1', false)).toBe('plan1');
   });
 });

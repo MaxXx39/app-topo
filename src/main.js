@@ -40,6 +40,7 @@ import { creerModuleExport } from './export/module.js';
 import { calculerMesure } from './topo/mesure.js';
 import { NOM_TYPE } from './mesures/valeurs.js';
 import { profilSurface, decalerProfil } from './topo/coupe.js';
+import { vueDuGuidage } from './leve/lame-ecran.js';
 import { guidageLame, TOLERANCES_LAME, pointDeProfil, bordsDeLaLame, sensCoupeLame, pointsGuidageLame, coupeEntre, coupeMilieuLame, avantDeLaLame, classeEcartLame, ecartAUneLigne } from './topo/lame.js';
 import { echapper } from './outils/echapper.js';
 import {
@@ -7110,7 +7111,7 @@ function donneesCommunes() {
       recepteur2: Boolean(etatRecepteur2?.connecte),
       recepteursBull: terrain.lame.recepteursBull,
       unGnss: outilAUnGnss(),
-      vue: terrain.lame.vue,
+      vue: vueDuGuidage(terrain.lame.vue, document.body.classList.contains('mode-telephone')), // 0.240.0 : téléphone = une coupe à la fois
       indic: terrain.lame.indic === 'regle' ? 'regle' : 'exterieur',
       lignes: lignesGuidage.liste.map((l) => ({ nom: `L${l.place + 1}`, slot: l.place, bout: l.bout })),
       choixLignes: lignesGuidage.choix,

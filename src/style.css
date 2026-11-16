@@ -13838,3 +13838,42 @@ body.mode-telephone .ecart-direct.attente.invite-choix { min-height: 0; }
 .bande-appli .levee-bande.surface-bande.bande-attente { padding-right: 12px; }
 .surface-bande.bande-attente .valeur-liste-bande { opacity: 0.65; }
 .fenetre-champs label[hidden] { display: none; } /* 0.239.0 : champ « visibleSi » vraiment caché */
+
+/* 0.240.0 (audit de novembre, lot 2) : Guidage lisible depuis le siège de la machine, tablette en portrait.
+   Les deux coupes sont l'une sous l'autre sur toute la largeur (avant : côte à côte, 130 px chacune), la consigne
+   (MONTER / DESCENDRE + valeur) est écrite en grand, les boutons d'échelle font 44 px. Téléphone : une coupe à la fois
+   (voir vueDuGuidage), le bouton « 2 coupes » n'y est plus proposé. Le paysage (Windows) n'est pas touché ici. */
+@media (orientation: portrait) {
+  .coupes-guidage.vue-plan2 { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .corps-coupe-guidage, .vue-plan2 .corps-coupe-guidage { grid-template-columns: 124px minmax(0, 1fr) 124px; gap: 8px; }
+  .vue-plan2 .corps-coupe-guidage .regle-hauteur, .corps-coupe-guidage .colonne-regle .regle-hauteur { width: 44px; min-height: 150px; }
+  .instruction-regle { min-height: 72px; padding: 6px 4px; border-radius: 12px; }
+  .instruction-regle .nom-bout-regle { font-size: 0.8rem; }
+  .instruction-regle b { font-size: 1.05rem; }
+  .instruction-regle small { font-size: 1rem; }
+  .instruction-regle.monter small, .instruction-regle.descendre small { font-size: 1.9rem; font-weight: 800; line-height: 1.05; }
+  .instruction-regle.ok b, .instruction-regle.proche b { font-size: 1.9rem; line-height: 1.05; }
+  .bloc-coupe-guidage .titre-coupe-guidage { font-size: 0.95rem; }
+  .pied-coupe-guidage { font-size: 0.95rem; }
+  .coupe-guidage .echelle-coupe button { width: 44px; height: 44px; font-size: 1.2rem; }
+  .coupe-guidage .echelle-coupe span { min-width: 44px; font-size: 0.95rem; }
+  .coupe-guidage .echelle-coupe.largeur-coupe { top: 0; right: auto; left: 50%; transform: translateX(-50%); }
+  .coupe-guidage .echelle-coupe.hauteur-coupe { right: 0; }
+  .coupe-guidage.zone-coupe { min-height: 216px; }
+  body.mode-telephone .corps-coupe-guidage { grid-template-columns: 92px minmax(0, 1fr) 92px; gap: 6px; }
+  body.mode-telephone .instruction-regle b { font-size: 0.85rem; }
+  body.mode-telephone .instruction-regle.monter small, body.mode-telephone .instruction-regle.descendre small,
+  body.mode-telephone .instruction-regle.ok b, body.mode-telephone .instruction-regle.proche b { font-size: 1.45rem; }
+  body.mode-telephone .corps-coupe-guidage .colonne-regle .regle-hauteur { width: 36px; min-height: 120px; }
+  body.mode-telephone .coupe-guidage.zone-coupe { min-height: 180px; }
+}
+/* Téléphone : les réglages d'échelle passent sous la coupe (ils la recouvraient), en deux petites rangées. */
+@media (orientation: portrait) {
+  body.mode-telephone .coupe-guidage.zone-coupe { flex-direction: column; justify-content: flex-start; gap: 6px; }
+  body.mode-telephone .coupe-guidage.zone-coupe > div:first-child { width: 100%; }
+  body.mode-telephone .coupe-guidage .echelle-coupe.largeur-coupe,
+  body.mode-telephone .coupe-guidage .echelle-coupe.hauteur-coupe { position: static; transform: none; flex-direction: row; }
+  body.mode-telephone .coupe-guidage .echelle-coupe button { width: 38px; height: 38px; }
+  body.mode-telephone .coupe-guidage .echelle-coupe span { min-width: 34px; font-size: 0.8rem; }
+}
+body.mode-telephone .ecran-lame .choix-coupes-bandeau [data-valeur='deux'] { display: none; }
