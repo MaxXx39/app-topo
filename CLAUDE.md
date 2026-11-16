@@ -51,7 +51,7 @@ docs/                tableau des modes (xlsx) ; audit-2026-11/ (présentation de
 - Publier site + APK (seulement sur demande) : PR vers `main`, attendre « construire » et « apk » au vert, fusionner, puis `git fetch origin main && git merge --ff-only origin/main`. Jamais de rebase ni de force-push. Si « apk » échoue avec « a release with the same tag name already exists » : relancer le job une fois.
 - **Windows** : `…/releases/download/windows-derniere-version/Topo.exe` (aussi `Topo-<version>.exe`) ; fabriqué **à la main** (Actions › « Fabriquer l'appli Windows ») ou quand `windows/Topo/**` change ; jamais par un envoi ordinaire.
 - APK : `…/releases/download/apk-derniere-version/Topo.apk` (lien fixe, + `Topo-<version>.apk`).
-- **Publié** : tout jusqu'à la 0.224.0 (PR 92, 12.11). **Non publié** : 0.225 → 0.247 (branche de travail).
+- **Publié** : tout jusqu'à la 0.224.0 (PR 92, 12.11). **Non publié** : 0.225 → 0.249 (branche de travail).
 
 ## Conventions de code
 - **Découpage de `main.js`** : petit à petit, au fil des demandes (jamais en gros) ; même comportement, avec tests et essai Playwright.
@@ -82,7 +82,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.247.0)
+## Fonctionnalités (état à la 0.249.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -124,6 +124,11 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - Récepteur : Bluetooth, NTRIP (swipos), journal NMEA (Expert), 2e GNSS (Expert), GPS tablette, cap automatique, PDOP (colonne de l'export). APK : pont `window.AppliAndroid`, batterie (arrière-plan coupé après 5 min), mise à jour, « Partage écran ».
 - **Drive** : « App Topo › Configuration Projet » ; **une main par projet** (verrou 15 min) ; un appareil n'écrase jamais une version qu'il n'a pas reçue ; **listes partagées** fusionnées partie par partie (`listes-partagees.js`) ; dossiers de projets.
 - **Windows** (`Topo.exe`, jamais lancé sur un vrai Windows) : sert l'appli web à `https://topo.appli/app-topo/` (ne jamais changer l'adresse) et glisse `pont-windows.js` ; port COM, NTRIP, Drive par identifiant « bureau » (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` à créer par l'utilisateur), fichiers dans Documents › Topo › Envois, mise à jour par la release `windows-derniere-version`. Pas fait : appareil photo, touche volume −, vibreur, batterie.
+
+## 0.248.0 et 0.249.0 (lots 1 et 2 du 16.11, à essayer sur la tablette)
+- **0.248.0** : clavier `inputmode="text"` pour Delta Z ±, Δ Z surface et décalage de ligne (le clavier décimal d'Android n'a pas « - ») ; boutons + / − des coupes à 20 px (fin de `style.css`) ; Guidage : bandeau de règle = grosse flèche + valeur, cadre fixe (`cqw`, nowrap) ; Implanter › Surface sans orientation (inclinaison pas prête / pas de marche) : cadre vide + message (`.coupe-attente`), le Guidage refusait déjà ; Réseaux point par point : FE pré-rempli avec l'altitude du point ; Gérer › Plans : « DXF · type » ; plan : E / N / Z sous la souris (`.plan-coordonnees`, Z = surface d'Implanter).
+- **0.249.0** : **Levé chantier « Libre »** (`LIBELLE_LIBRE`, Base) premier libellé et par défaut, sans nature ni attribut (remarque + photos), ajouté même à une ancienne liste partagée. **Implanter › Ligne** : profil en long à < 1 m pour toute ligne (`profilEnLongDeLaLigne` : terrain de la surface d'Implanter, altitude / pente de la ligne 3D ou tapée, canne) + case Cana (Intermédiaire, réseaux qui croisent). **Fiche du point** : « Ajouter aux points de contrôle » (copie) / « Retirer » (Expert). **DXF 3D** : le Z d'une polyligne est déjà gardé et implantable (test `dxf-polyligne-3d`). **Parcelles** : numéros lus dans la réponse du service (WFS Genève via geodienste.ch : propriété Nummer ; Vaud RDPPF : `number` / extrait RealEstate) → calque DXF `CADASTRE_PARCELLES` magenta du plan cadastre (`topo/cadastre.js`) ; exports : DXF du plan = calque `PARCELLES`, PDF = numéros magenta italique. **Essayé à l'aveugle (pas de réseau ici) : vérifier avec les vrais services, surtout Genève** ; sans numéro reçu, rien n'est écrit.
+- **Prévu (lot 3)** : maquettes HTML des sous-dossiers de projet (menu projet Tout / Terrassement / Canalo / Bâtiment, rangement à l'import, déplacer un levé) ; guide GitHub / Google (`docs/` + page dans l'appli, avec passage à un autre compte GitHub).
 
 ## À essayer sur la tablette (rien de ceci n'a été vu avec le vrai matériel)
 - **0.208 → 0.224 (publiées)** : carte des projets, contrôle des plans, recalage par axes, Plan / Points / Surface, mesure de durée, angles, Centre pts, règle du Guidage, NTRIP > 2 s, nuage Drive, **PDOP (l'APK lit-il des GSA ?)**, carte nationale au zoom.
