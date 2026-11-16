@@ -13934,3 +13934,6 @@ body.theme-sombre .puce-dossier.actif { background: var(--ambre, #f6ab07); borde
 .puces-dossiers.reste-droite { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
 .puces-dossiers.reste-gauche { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
 .puces-dossiers.reste-gauche.reste-droite { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+
+/* 0.256.1 : la pastille du dossier se cache vraiment sous « Tout » (le display: inline-flex de l'en-tête passait devant l'attribut hidden). */
+.entete-pastilles .pastille-entete.pastille-dossier[hidden] { display: none; }
