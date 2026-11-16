@@ -40,14 +40,16 @@ export function nettoyerListes(listes) {
   const typesDxf = Array.isArray(listes?.typesDxf) ? listes.typesDxf.map((t) => String(t)).filter(Boolean) : undefined;
   // Dossiers de projets (0.125.0, voir projet/dossiers.js) : gardés tels quels s'ils existent.
   const dossiers = listes?.dossiers && typeof listes.dossiers === 'object' ? listes.dossiers : undefined;
+  // Sous-dossiers de projet (0.251.0, voir topo/sous-dossiers.js) : liste de noms, gardée telle quelle si elle existe.
+  const sousDossiers = Array.isArray(listes?.sousDossiers) ? listes.sousDossiers.map((t) => String(t)).filter(Boolean) : undefined;
   // Date de dernière modification de chaque partie (0.136.0) : sert à fusionner partie par partie.
   const dates = {};
   for (const [partie, date] of Object.entries(listes?.dates ?? {})) if (PARTIES.includes(partie) && date) dates[partie] = String(date);
-  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(chantier ? { chantier } : {}), ...(typesDxf ? { typesDxf } : {}), ...(dossiers ? { dossiers } : {}), dates, modifieLe: listes?.modifieLe ?? null };
+  return { adresses, swipos, ...(libelles ? { libelles } : {}), ...(chantier ? { chantier } : {}), ...(typesDxf ? { typesDxf } : {}), ...(dossiers ? { dossiers } : {}), ...(sousDossiers ? { sousDossiers } : {}), dates, modifieLe: listes?.modifieLe ?? null };
 }
 
 /** Les parties des listes, chacune avec sa propre date de modification (0.136.0). */
-export const PARTIES = ['adresses', 'swipos', 'libelles', 'chantier', 'dossiers', 'typesDxf'];
+export const PARTIES = ['adresses', 'swipos', 'libelles', 'chantier', 'dossiers', 'typesDxf', 'sousDossiers'];
 
 const existe = (listes, partie) => (Array.isArray(listes?.[partie]) ? listes[partie].length > 0 : listes?.[partie] !== undefined);
 

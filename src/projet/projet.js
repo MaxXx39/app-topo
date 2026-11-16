@@ -39,6 +39,7 @@
 import { nouvelIdentifiant, estImportee, avecPrefixe, prefixeDuNom } from '../topo/surface.js';
 import { PREFIXE_PDF } from '../topo/pdf-dxf.js';
 import { calculsDUnAncienProjet } from '../volumes/calculs.js';
+import { typesVersSousDossiers } from '../topo/sous-dossiers.js';
 import { TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
 import { retirerMetreEtRecollement } from './retrait-metre-recollement.js';
 import { centreDuProjet } from '../topo/centre-projet.js';
@@ -185,6 +186,8 @@ export function completerProjet(projet) {
   complet.controles ??= [];
   complet.dessins ??= [];
   complet.couleursListes ??= {}; // couleur choisie par liste de points (id → « #2563eb »)
+  // 0.251.0 : le « type » d'un plan DXF devient un sous-dossier du même nom.
+  typesVersSousDossiers(complet);
   complet.canalisations ??= []; // réseaux (0.235.0) ; « reseaux » = ancien Recollement, retiré
   // Surfaces importées : plus de nature depuis 0.90.0 (celle des anciennes est retirée).
   complet.surfaces = (complet.surfaces ?? []).map((surface) => {

@@ -13905,3 +13905,15 @@ body.mode-telephone .instruction-regle { height: 64px; min-height: 64px; }
 
 /* 0.248.0 : Est / Nord / Z sous la souris, en bas à gauche du plan (ordinateur seulement). */
 .plan-coordonnees { position: absolute; left: 6px; bottom: 6px; z-index: 5; padding: 2px 8px; border-radius: 6px; background: rgba(15, 23, 42, 0.78); color: #fff; font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; pointer-events: none; }
+
+/* 0.251.0 : dossiers du projet : puces dans l'encadré du projet (Applications) et pastille dans l'en-tête. */
+.puces-dossiers { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px 10px; }
+.puce-dossier { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border: 1px solid #475569; border-radius: 999px; background: transparent; color: #e2e8f0; font: inherit; font-weight: 700; font-size: 0.9rem; }
+.puce-dossier i { width: 10px; height: 10px; border-radius: 50%; background: var(--couleur-dossier, #6b7280); }
+.puce-dossier.actif { background: #eab308; border-color: #eab308; color: #1f1300; }
+.pastille-entete.pastille-dossier { color: #fff; }
+.pastille-pastel-dossier { display: inline-block; padding: 0 8px; border-radius: 999px; color: #fff; font-size: 0.72rem; font-weight: 800; margin-left: 4px; }
+.rangement-dossiers { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rangement-dossiers .puce-dossier { color: inherit; border-color: var(--bord, #cbd5e1); min-height: 32px; font-size: 0.82rem; }
+.rangement-dossiers .puce-dossier.actif { color: #fff; background: var(--couleur-dossier, #475569); border-color: var(--couleur-dossier, #475569); }
+.rangement-dossiers .puce-dossier.actif i { background: #fff; }

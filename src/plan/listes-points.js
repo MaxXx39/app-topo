@@ -16,6 +16,7 @@
 // Les listes décochées sont rangées dans le projet (projet.listesCachees : leurs identifiants).
 import { estImportee } from '../topo/surface.js';
 import { estLeveDirect } from '../topo/leve-direct.js';
+import { estMontre } from '../topo/sous-dossiers.js';
 
 // Identifiant de la case « Mesures » (mesures faites à la main).
 export const LISTE_MESURES = 'mesures-calculs';
@@ -84,13 +85,18 @@ export function listesDePoints(projet) {
   const listes = [];
   const SECTION_DE = { cadastre: 'cadastre', fichier: 'points', ajoutes: 'points', autres: 'leve', annotation: 'annotation', controle: 'controle', dessin: 'dessin', mesures: 'mesures', importee: 'surface' };
   const couleurs = projet.couleursListes ?? {};
+  // 0.251.0 : seuls les éléments du sous-dossier choisi sur cette tablette sont listés (« Tout » : tous).
+  let masque = false;
   const ajouter = (id, nom, nature, leveId, noms, categorie = null) => {
+    if (masque) return;
     const section = SECTION_DE[nature] ?? 'leve';
     const couleur = nature === 'controle' ? COULEUR_CONTROLE : couleurs[id] ?? (leveId ? couleurs[leveId] : null) ?? null;
     // Couleur au choix : Points Import, et Surface Import (changer couleur, tableau « Affichage »).
     listes.push({ id, nom, nature, categorie: categorie ?? CATEGORIE_DE_NATURE[nature] ?? null, section, leveId, noms, visible: !cachees.has(id), couleur, couleurModifiable: section === 'points' || section === 'surface' || section === 'leve' });
   };
   for (const leve of projet.leves) {
+    masque = !estMontre(projet, leve, 'leve');
+    if (masque && leve.cadastre) continue;
     // Cadastre (0.116.4) : points et lignes rangés ensemble, une seule couleur (celle du plan DXF).
     if (leve.cadastre) {
       const planDxf = planDuCadastre(projet, leve);
@@ -100,6 +106,7 @@ export function listesDePoints(projet) {
     else if (!estLeveDirect(leve)) ajouter(leve.id, leve.nom, 'fichier', leve.id, null);
   }
   for (const s of projet.surfaces) {
+    masque = !estMontre(projet, s, 'surface');
     // Surface LandXML / DXF : pas de points d'un levé, seulement la surface.
     if (estImportee(s)) {
       ajouter(s.id, s.nom, 'importee', null, new Set());
@@ -107,13 +114,21 @@ export function listesDePoints(projet) {
     }
     ajouter(s.id, s.nom, s.nature ?? 'stock', s.leveId, s.tousLesPoints ? null : new Set(nomsDeLaSurface(s)));
   }
+  masque = false;
   // Mesures faites à la main (Calculs › Mesures) : une seule case, pour leurs traits et leurs valeurs.
   if ((projet.mesures ?? []).length > 0) ajouter(LISTE_MESURES, 'Mesures', 'mesures', null, new Set());
-  for (const autres of projet.autres ?? []) ajouter(autres.id, autres.nom, autres.nature === 'annotation' ? 'annotation' : 'autres', autres.leveId, new Set(nomsDeLaSurface(autres)), autres.nature === 'chantier' ? 'chantier' : null);
+  for (const autres of projet.autres ?? []) {
+    masque = !estMontre(projet, autres, 'autre');
+    ajouter(autres.id, autres.nom, autres.nature === 'annotation' ? 'annotation' : 'autres', autres.leveId, new Set(nomsDeLaSurface(autres)), autres.nature === 'chantier' ? 'chantier' : null);
+  }
+  masque = false;
   // Points de contrôle : pas dans un levé, dessinés à part (triangles rouges, voir plan.js).
   if ((projet.pointsControle ?? []).length > 0) ajouter(LISTE_CONTROLE, 'Points de contrôle', 'controle', null, new Set());
   // Dessins (Calculs › Dessin) : une case par dessin (ses traits et ses sommets, en violet, voir plan/dessins.js).
-  for (const dessin of projet.dessins ?? []) ajouter(dessin.id, dessin.nom, 'dessin', null, new Set());
+  for (const dessin of projet.dessins ?? []) {
+    masque = !estMontre(projet, dessin, 'dessin');
+    ajouter(dessin.id, dessin.nom, 'dessin', null, new Set());
+  }
   const ordre = SECTIONS.map(([cle]) => cle);
   return listes.sort((a, b) => ordre.indexOf(a.section) - ordre.indexOf(b.section));
 }

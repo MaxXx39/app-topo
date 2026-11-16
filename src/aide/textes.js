@@ -57,6 +57,8 @@ export const TEXTES_AIDE = {
     'Contour, lignes et points isolés du levé en cours : touche un nom pour voir ses points. ✕ supprime un point ; ✂ coupe une ligne entre deux points.',
   journalNmea:
     'Expert. Enregistre 1 minute de ce que le GNSS envoie (NMEA) pour vérifier hauteur de canne, inclinaison ou batterie. Un résumé des messages reçus s\'affiche à la fin.',
+  dossiers:
+    'Dossiers du projet (Terrassement, Canalo, Bâtiment…) : touche un dossier dans l\'encadré du projet pour ne voir que ce qui y est rangé (plan, listes, surfaces) ; « Tout » montre tout. Le dossier choisi s\'affiche en pastille dans l\'en-tête. Expert : « ＋ » crée un dossier, la roue ⚙ d\'une ligne (Gérer) coche ses dossiers (un plan ou une liste peut être dans plusieurs), et à l\'import le champ « Dossier » est proposé. Ce que tu crées va dans le dossier choisi.',
   chantier:
     'Levé chantier : « Libre » est proposé en premier (sans nature ni attribut : seulement une remarque et des photos). Sinon choisis le libellé (Chambre, Tuyau…) et la nature (EU, EC…). Tuyau : lève le dessus (le Ø est obligatoire, le fil d\'eau est calculé) ou le fil d\'eau. Chambre / grille : 1 point (ronde) ou 3 coins (rectangle), Ø du tuyau qui arrive facultatif.',
   trianglesEnTrop:

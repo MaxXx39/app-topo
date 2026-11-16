@@ -12,7 +12,7 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
-import { lireTypesDxf, enregistrerTypesDxf, nettoyerTypes } from './topo/types-dxf.js';
+import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -1492,7 +1492,7 @@ const reseaux = creerReseaux({
   },
   message: (texte, duree) => afficherMessage(texte, duree),
   vibrer: (ms) => vibrer(ms),
-  surfaces: () => projet.surfaces.filter((s) => trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
+  surfaces: () => projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
   trianglesDe: (id) => trianglesDeSurface(id),
   altitudeDe: (id) => altitudeDeSurface(id),
   ligneSousLeDoigt: ligneDuPlanSousLeDoigt,
@@ -1736,6 +1736,15 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
     detail: document.querySelector('#etat')?.textContent ?? '',
   }),
   partieProjet: ouvrirPartieProjet,
+  // 0.251.0 : puces « Tout / Terrassement / Canalo… » de l'encadré du projet.
+  sousDossiers: () => donneesSousDossiers(),
+  choisirSousDossier: (nom) => choisirSousDossier(nom),
+  nouveauSousDossier: async () => {
+    const nom = nettoyerSousDossiers((await demanderTexte({ titre: 'Nom du nouveau dossier', valeur: '' })) ?? '')[0];
+    if (!nom) return;
+    enregistrerSousDossiers([...lireSousDossiers(projet).map((d) => d.nom), nom]);
+    choisirSousDossier(nom);
+  },
   sousApplisDe,
   reglages: () => ouvrirFenetreReglages(),
   // 0.216.0 : carte de tous les projets (bouton à gauche de « Changer »).
@@ -2132,19 +2141,28 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     if (leve && nom) leve.nom = leve.nom.startsWith(PREFIXE_IMPORT) && !nom.startsWith(PREFIXE_IMPORT) ? `${PREFIXE_IMPORT}${nom}` : nom;
     modifie();
   },
-  // 0.194.0 (Expert) : modifier la liste des types de plans DXF (partagée par Drive).
-  modifierTypesDxf: async () => {
-    const actuels = lireTypesDxf().map((t) => t.nom).join(', ');
-    const texte = await demanderTexte({ titre: 'Types de plans DXF (séparés par des virgules)', valeur: actuels });
+  // 0.251.0 (Expert) : modifier la liste des sous-dossiers (partagée par Drive) ; remplace les « types » de plans.
+  modifierSousDossiers: async () => {
+    const actuels = lireSousDossiers().map((t) => t.nom).join(', ');
+    const texte = await demanderTexte({ titre: 'Dossiers du projet (séparés par des virgules)', valeur: actuels });
     if (texte == null) return;
-    const noms = nettoyerTypes(texte);
+    const noms = nettoyerSousDossiers(texte);
     if (noms.length === 0) {
-      afficherMessage('Il faut au moins un type', 4000);
+      afficherMessage('Il faut au moins un dossier', 4000);
       return;
     }
-    enregistrerTypesDxf(noms);
-    afficherMessage('Types enregistrés (partagés par Drive)', 3000);
+    enregistrerSousDossiers(noms);
+    afficherMessage('Dossiers enregistrés (partagés par Drive)', 3000);
     recalculer();
+  },
+  // Coche / décoche un dossier sur un élément (liste de points, surface, plan, dessin, réseau) : Expert.
+  basculerSousDossier: (genre, id, nom, present) => {
+    if (refuserEnLectureSeule()) return;
+    const element = elementDeGenre(genre, id);
+    if (!element) return;
+    element.sousDossiers = basculerSousDossier(element, nom, present);
+    // Une liste (levé) range aussi ses surfaces : elles suivent le levé (voir dossiersEffectifs).
+    modifie();
   },
   importerPlanDxf: async (fichier) => {
     afficherMessage(`Lecture du plan « ${fichier.name} »…`, null);
@@ -2165,7 +2183,6 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       const ignores = Object.entries(lu.compte.ignores);
       if (ignores.length > 0) avertissements.push(`Non affiché(s) : ${ignores.map(([type, n]) => `${n} ${type}`).join(', ')} (hachures, images… : seuls les traits, textes, cercles et aplats sont lus).`);
       // 0.194.0 (Expert) : nom, type (GEOOFF, TER, CANA…) et recalage au choix, avant de ranger le plan.
-      const types = lireTypesDxf();
       // 0.217.0 : la fenêtre dit si le plan est déjà en coordonnées suisses (MN95) ou non, et propose le recalage qui va avec.
       const dejaEnMn95 = estEnMn95(lu.bornes);
       const choix = await demanderChamps({
@@ -2175,7 +2192,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
           : { ton: 'alerte', texte: '⚠ Pas en coordonnées suisses (MN95) : le plan est à recaler.' },
         champs: [
           { cle: 'nom', titre: 'Nom du plan', valeur: (lu.nom ?? fichier.name).replace(/\.dxf$/i, '') },
-          { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...types.map((t) => [t.nom, t.nom])], valeur: '' },
+          champSousDossier(),
           // 0.214.0 : « Non (déjà calé) » : le plan est déjà en MN95, rien à recaler ni à signaler.
           { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: dejaEnMn95 ? 'cale' : 'oui' },
         ],
@@ -2185,7 +2202,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         recalculer();
         return;
       }
-      const nouveau = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, nom: choix.nom || lu.nom, type: choix.type || '', ...(choix.recaler === 'cale' ? { dejaCale: true } : {}) };
+      const nouveau = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, nom: choix.nom || lu.nom, sousDossiers: await sousDossiersChoisis(choix.sousDossier), ...(choix.recaler === 'cale' ? { dejaCale: true } : {}) };
       projet.plansDxf.push(nouveau);
       dernierPlan = { nom: nouveau.nom, avertissements: choix.recaler === 'cale' ? avertissements.filter((a) => !a.includes('MN95')) : avertissements };
       afficherMessage(`Plan « ${nouveau.nom} » importé : ${lu.compte.objets} objets`, 4000);
@@ -2233,7 +2250,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
           // 0.230.0 : le nom se demande à l'import (le préfixe « PDF- » est ajouté devant).
           { cle: 'nom', titre: 'Nom du plan (« PDF- » est ajouté devant)', valeur: pages > 1 ? `${nomDeBase} (page ${page})` : nomDeBase },
           // 0.213.0 : comme pour un DXF : type du plan (liste partagée) et recalage tout de suite ou plus tard.
-          { cle: 'type', titre: 'Type', choix: [['', '— aucun —'], ...lireTypesDxf().map((t) => [t.nom, t.nom])], valeur: '' },
+          champSousDossier(),
           { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: 'non' },
           // 0.230.0 (retour sur le 0.145) : au choix, convertir les traits en DXF ou importer la page en image.
           // Un PDF scanné n'a pas de traits : il ne peut être qu'une image.
@@ -2270,7 +2287,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         lu = lecture.plan;
         if (contenu.images > 0) avertissements.push(`${contenu.images} images du PDF non reprises (seuls les traits et les textes sont lus).`);
       }
-      const nouveauPlan = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, type: valeurs.type || '', ...(valeurs.recaler === 'cale' ? { dejaCale: true } : {}), pdf: { page, echelle, image: enImage } };
+      const nouveauPlan = { id: nouvelIdentifiant(), importeLe: new Date().toISOString(), ...lu, sousDossiers: await sousDossiersChoisis(valeurs.sousDossier), ...(valeurs.recaler === 'cale' ? { dejaCale: true } : {}), pdf: { page, echelle, image: enImage } };
       projet.plansDxf.push(nouveauPlan);
       dernierPlan = { nom, avertissements };
       afficherMessage(`Plan PDF « ${nom} » importé${enImage ? ' en image' : ` : ${lu.compte.objets} objets`}`, 4000);
@@ -3824,7 +3841,7 @@ function colorerListe(id, couleur) {
  * le cadre mesuré pour un ouvrage à 3 coins. [{ id, est, nord, rayon, couleur } ou { id, coins, couleur }].
  */
 function formesDuChantier() {
-  const cachees = new Set(projet.listesCachees ?? []);
+  const cachees = idsMasques();
   const libelles = lireLibellesChantier();
   const couleurs = lireNaturesChantier().couleurs;
   const formes = [];
@@ -3844,7 +3861,7 @@ function formesDuChantier() {
 
 /** Lignes des levés « Autres » visibles : [{ sommets: [{ est, nord }], fermee }]. */
 function lignesDesAutres() {
-  const cachees = new Set(projet.listesCachees ?? []);
+  const cachees = idsMasques();
   const lignes = [];
   for (const autres of projet.autres) {
     if (cachees.has(autres.id)) continue;
@@ -4274,7 +4291,7 @@ function toucherCoteTalus(position, tolerance) {
 
 /** Talus des surfaces montrées, pour le plan (barbules et pente). */
 function tranchesDesTalusSurfaces() {
-  const cachees = new Set(projet.listesCachees ?? []);
+  const cachees = idsMasques();
   return projet.surfaces
     .filter((s) => s.type === 'talus' && (!cachees.has(s.id) || s.id === talusSurface.actifId))
     .flatMap((s) => {
@@ -4331,8 +4348,8 @@ function donneesTalusSurfaces() {
     };
   });
   return {
-    sources: projet.surfaces.filter((s) => estSurfaceFichier(s) && s.type !== 'talus').map((s) => ({ id: s.id, nom: s.nom })),
-    terrains: projet.surfaces.filter((s) => trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
+    sources: projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && estSurfaceFichier(s) && s.type !== 'talus').map((s) => ({ id: s.id, nom: s.nom })),
+    terrains: projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
     talus,
   };
 }
@@ -4456,7 +4473,7 @@ function pointsDesDessins() {
 
 /** Dessins montrés sur le plan : ceux cochés dans « Afficher » (et toujours celui en cours). */
 function dessinsVisibles() {
-  const cachees = new Set(projet.listesCachees ?? []);
+  const cachees = idsMasques();
   return projet.dessins.filter((d) => !cachees.has(d.id) || (piloteActif() && d.id === pilote.dessinId));
 }
 
@@ -4478,7 +4495,7 @@ function donneesDessin() {
         empecheSurface: estFerme(d) ? (surfaceDuDessin(d, projet.dessins).erreur ?? null) : null,
         // Talus jusqu'au terrain (0.108.0) : réglages et terrains possibles (levés et surfaces avec triangles).
         talus: d.talus ?? null,
-        terrains: ferme ? projet.surfaces.filter((s) => !s.dessinId && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })) : [],
+        terrains: ferme ? projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && !s.dessinId && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })) : [],
       };
     }),
     pentesTalus: PENTES_TALUS,
@@ -5794,7 +5811,11 @@ let barreRecalage = null;
 
 /** Plans DXF du projet tels qu'on les utilise : recalés (sauf celui qu'on est en train de recaler). */
 function plansDuProjet() {
-  return (projet.plansDxf ?? []).map((p) => (p.id === recalage.planId ? p : planRecale(p)));
+  // 0.251.0 : seuls les plans du dossier choisi (le plan du cadastre suit sa liste de points) ; le plan en recalage reste toujours là.
+  const cadastres = new Map((projet.leves ?? []).filter((l) => l.cadastre).map((l) => [planDuCadastre(projet, l)?.id, l]));
+  return (projet.plansDxf ?? [])
+    .filter((p) => p.id === recalage.planId || (cadastres.has(p.id) ? estMontre(projet, cadastres.get(p.id), 'leve') : estMontre(projet, p, 'plan')))
+    .map((p) => (p.id === recalage.planId ? p : planRecale(p)));
 }
 
 function commencerRecalage(id) {
@@ -7235,7 +7256,7 @@ function donneesCommunes() {
     },
     autocontrole: donneesAutocontrole(),
     // Seulement les levés et surfaces qui ont des triangles (0.90.1 : pas les levés vides), plus la surface choisie.
-    surfaces: projet.surfaces.filter((s) => s.id === terrain.surfaceId || trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
+    surfaces: projet.surfaces.filter((s) => s.id === terrain.surfaceId || (estMontre(projet, s, 'surface') && trianglesDeSurface(s.id).length > 0)).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
     implanter: {
       accroche: terrain.accroche,
       zoomLoupe: terrain.zoomLoupe ?? 4,
@@ -7330,7 +7351,7 @@ function resumeLigne() {
  * Réglages d'un plan DXF (liste des plans, ou menu « Plans » du plan) : visible (œil), couleur
  * (null = celles du DXF) et nom court (« Bordures »).
  */
-function reglerPlanDxf(id, { visible, couleur, nom, transparence, type }) {
+function reglerPlanDxf(id, { visible, couleur, nom, transparence }) {
   const choisi = projet.plansDxf.find((p) => p.id === id);
   if (!choisi) return;
   if (visible !== undefined) choisi.visible = visible;
@@ -7339,8 +7360,7 @@ function reglerPlanDxf(id, { visible, couleur, nom, transparence, type }) {
   if (nom !== undefined && sansPrefixe(nom, choisi.pdf ? PREFIXE_PDF : '').trim()) choisi.nom = choisi.pdf ? avecPrefixe(nom, PREFIXE_PDF) : nom.trim();
   if (transparence !== undefined) choisi.transparence = Math.min(100, Math.max(0, Math.round(transparence)));
   // Seulement montrer / cacher : réglage de la tablette (0.128.1), permis aussi en lecture seule.
-  if (type !== undefined) choisi.type = String(type);
-  if (couleur === undefined && nom === undefined && transparence === undefined && type === undefined) affichageModifie();
+  if (couleur === undefined && nom === undefined && transparence === undefined) affichageModifie();
   else modifie();
 }
 
@@ -7924,7 +7944,7 @@ daoAppli = creerDao({
   demanderTexte,
   demanderChamps,
   confirmer: (texte) => confirm(texte),
-  surfaces: () => projet.surfaces.filter((x) => trianglesDeSurface(x.id).length > 0).map((x) => [x.id, x.nom]),
+  surfaces: () => projet.surfaces.filter((x) => estMontre(projet, x, 'surface') && trianglesDeSurface(x.id).length > 0).map((x) => [x.id, x.nom]),
   altitudeSur: (id) => {
     const triangles = trianglesDeSurface(id);
     return triangles.length > 0 ? chercheurAltitude(triangles) : null;
@@ -8245,7 +8265,7 @@ const ecranMesures = creerEcranMesures(document.querySelector('#mesures'), docum
 
 // Export des mesures : à part de celui des volumes (aucun volume dedans).
 /** Vrai si cette liste (surface, métré, dessin, levé…) est cochée dans « Afficher ». */
-const estAffichee = (id) => !(projet.listesCachees ?? []).includes(id);
+const estAffichee = (id) => !idsMasques().has(id);
 
 /** Calculs de volume du projet dont le résultat est connu : [{ calcul, resultat }]. */
 function calculsReussis() {
@@ -8431,7 +8451,7 @@ function recalculer({ recadrer = false } = {}) {
   plan.afficherListeDesPoints(listeDesPoints(projet, listes));
   plan.afficherPointsImport(pointsDesImports(projet, listes));
   // Points des surfaces importées (visibles dans « Afficher ») : cases Points / Altitudes de Surface Import (0.122.0).
-  plan.afficherPointsSurfaces(projet.surfaces.filter((s) => estSurfaceFichier(s) && !(projet.listesCachees ?? []).includes(s.id)).flatMap((s) => s.points ?? []));
+  plan.afficherPointsSurfaces(projet.surfaces.filter((s) => estSurfaceFichier(s) && !idsMasques().has(s.id)).flatMap((s) => s.points ?? []));
   plan.afficherPhotos(photosDuPlan(listes));
   const active = editeurSurfaces.objetActif();
   const calculActif = active ? surfacesCalculees.get(active.id) : null;
@@ -8441,7 +8461,7 @@ function recalculer({ recadrer = false } = {}) {
   // Calculs › Mesures : hors modification, les points des listes cochées (comme ailleurs) ; pendant la
   // modification d'une mesure, ceux de son levé (ce sont eux qu'on touche pour les ajouter).
   const enModification = (ongletContexte === 'mesures' && ecranMesures.enModification()) || editeurSurfaces.enModification();
-  const cacheesParListe = new Set(listes.filter((l) => !l.visible).map((l) => l.id));
+  const cacheesParListe = new Set([...listes.filter((l) => !l.visible).map((l) => l.id), ...idsHorsSousDossier(projet)]);
   const visibles = new Set(editeurSurfaces.enModification() ? surfacesAffichees() : projet.surfaces.filter((s) => !cacheesParListe.has(s.id)));
   // Une surface importée montre ses propres points ; sinon, ceux du levé ou des listes cochées.
   let pointsDuPlan;
@@ -8615,12 +8635,82 @@ function modifie(options) {
   synchroniserSurfacesDessins();
   synchroniserTalusSurfaces();
   prefixerNoms(projet);
+  rangerNouveauxDansLeSousDossier();
   // Une surface supprimée : ses calculs de volume disparaissent avec elle.
   projet.calculs = nettoyerCalculs(projet.calculs, projet.surfaces);
   recalculer(options);
   historique.memoriser(modifications, projet);
   mettreAJourAnnuler();
   enregistrerBientot();
+}
+
+
+// --- Sous-dossiers (0.251.0, voir topo/sous-dossiers.js) ---
+let elementsConnus = null; // ids des éléments déjà là : un nouvel élément est rangé dans le sous-dossier choisi
+
+/** Un élément créé alors qu'un sous-dossier est choisi y est rangé d'office (sous « Tout » : sans dossier). */
+function rangerNouveauxDansLeSousDossier() {
+  const choisi = sousDossierChoisi();
+  const tous = elementsRangeables(projet).map(({ element }) => element);
+  if (elementsConnus === null) elementsConnus = new Set(tous.map((e) => e.id));
+  for (const element of tous) {
+    if (elementsConnus.has(element.id)) continue;
+    elementsConnus.add(element.id);
+    if (choisi && choisi !== SANS_SOUS_DOSSIER && element.sousDossiers === undefined) element.sousDossiers = [choisi];
+  }
+}
+
+/** Élément du projet de ce genre et de cet identifiant ('leve', 'surface', 'autre', 'plan', 'dessin', 'reseau'). */
+function elementDeGenre(genre, id) {
+  return elementsRangeables(projet).find((x) => x.genre === genre && x.element.id === id)?.element ?? null;
+}
+
+/** Champ « Dossier » des fenêtres d'import : le sous-dossier choisi est proposé d'office. */
+function champSousDossier() {
+  const choisi = sousDossierChoisi();
+  return {
+    cle: 'sousDossier',
+    titre: 'Dossier',
+    choix: [['', 'Sans dossier'], ...lireSousDossiers(projet).map((d) => [d.nom, d.nom]), ['__nouveau', '＋ Créer un dossier…']],
+    valeur: choisi && choisi !== SANS_SOUS_DOSSIER ? choisi : '',
+  };
+}
+
+/** Dossiers de l'élément importé d'après ce que l'utilisateur a choisi (« ＋ Créer un dossier… » demande le nom et l'ajoute à la liste). */
+async function sousDossiersChoisis(valeur) {
+  if (valeur === '__nouveau') {
+    const texte = await demanderTexte({ titre: 'Nom du nouveau dossier', valeur: '' });
+    const nom = nettoyerSousDossiers(texte ?? '')[0];
+    if (!nom) return [];
+    enregistrerSousDossiers([...lireSousDossiers(projet).map((d) => d.nom), nom]);
+    return [nom];
+  }
+  return valeur ? [valeur] : [];
+}
+
+/** Identifiants masqués sur le plan : listes décochées + éléments hors du sous-dossier choisi. */
+function idsMasques() {
+  return new Set([...(projet.listesCachees ?? []), ...idsHorsSousDossier(projet)]);
+}
+
+/** Sous-dossiers pour l'encadré du projet (page Applications) : ce que la tablette peut choisir. */
+function donneesSousDossiers() {
+  const liste = lireSousDossiers(projet);
+  const nb = new Map(liste.map((d) => [d.nom, elementsRangeables(projet).filter(({ element }) => (element.sousDossiers ?? []).includes(d.nom)).length]));
+  return {
+    choisi: sousDossierChoisi(),
+    liste: liste.map((d) => ({ ...d, nombre: nb.get(d.nom) })),
+    visible: aAcces('expert') || sousDossiersUtilises(projet).size > 0,
+    peutCreer: aAcces('expert'),
+  };
+}
+
+/** Choisit le sous-dossier de cette tablette pour ce projet et redessine tout. */
+function choisirSousDossier(nom) {
+  definirSousDossier(nom);
+  retenirChoix(projet.id, nom);
+  recalculer({ recadrer: true });
+  navigation?.mettreAJour?.();
 }
 
 function enregistrerBientot() {
@@ -8666,10 +8756,24 @@ document.addEventListener('keydown', (evenement) => {
   evenement.preventDefault();
 });
 
+/** Pastille du sous-dossier choisi, dans l'en-tête (0.251.0) : cachée sous « Tout » ; la toucher ouvre la page Applications pour en changer. */
+function mettreAJourPastilleDossier() {
+  const pastille = document.querySelector('#pastille-dossier');
+  if (!pastille) return;
+  const choisi = sousDossierChoisi();
+  pastille.hidden = !choisi;
+  if (!choisi) return;
+  const liste = lireSousDossiers(projet);
+  pastille.textContent = choisi === SANS_SOUS_DOSSIER ? '📁 Sans dossier' : `📁 ${choisi}`;
+  pastille.style.background = choisi === SANS_SOUS_DOSSIER ? '#6b7280' : liste.find((d) => d.nom === choisi)?.couleur ?? '#6b7280';
+  pastille.title = 'Dossier choisi : touche pour en changer';
+}
+
 /** Ligne sous le titre du projet (en-tête) : sous-titre et l'état de Drive si connecté. */
 function mettreAJourEtatEntete() {
   // Titre : affaire - lieu (ou le nom, sinon « Projet sans nom 2 »…).
   document.querySelector('#titre-projet').textContent = titreProjet(projet);
+  mettreAJourPastilleDossier();
 
   const drive = partage?.etat.connecte
     ? { 'a-jour': 'Drive ✓', envoi: 'Drive …', repris: 'Drive', rendu: 'Drive : main rendue' }[partage.etat.etat] ?? 'Drive : en attente'
@@ -8737,6 +8841,7 @@ window.addEventListener('online', () => mettreAJourEtatEntete());
 // Main de l'en-tête (0.76.0) : rouge = prendre la main (Expert, code), grise = la reprendre,
 // verte = la rendre (le projet part sur Drive, un autre appareil peut la prendre).
 // Depuis 0.90.0, seulement en Expert : en Base et Intermédiaire on voit la main sans pouvoir la toucher.
+document.querySelector('#pastille-dossier')?.addEventListener('click', () => navigation?.ouvrirPage?.());
 document.querySelector('#pastille-verrou').addEventListener('click', async () => {
   if (!aAcces('expert')) return;
   if (partage?.etat.repris?.projetId === projet.id) partage.prendreLaMain();
@@ -9008,6 +9113,9 @@ async function ouvrir(nouveau, { changerOnglet = true } = {}) {
   // 0.128 : listes de points et plans / calques DXF masqués = choix de CET appareil, gardés au
   // redémarrage et jamais repris d'une autre tablette (aussi pour une version reçue de Drive).
   appliquerAffichage(projet);
+  // 0.251.0 : sous-dossier choisi sur CETTE tablette pour ce projet (« Tout » au départ) ; les éléments déjà là ne sont jamais rangés d'office.
+  definirSousDossier(lireChoix(projet));
+  elementsConnus = new Set(elementsRangeables(projet).map(({ element }) => element.id));
   // Cadastre (0.116.4) : plan DXF relié à sa liste de points.
   lierCadastres(projet);
   // Anciens projets : un libellé absent de la liste mais utilisé par des points est recréé, pour ce projet seulement (0.105.5).
