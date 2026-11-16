@@ -435,8 +435,9 @@ export function blocContenu(projet, calquesOuverts, fermees, filtreDate = { ordr
       ${pageGerer(projet, vue, gestion.menusOuverts) || '<p class="vide">Rien ici pour l\'instant.</p>'}
     </div>`;
   }
-  return `<div class="carte-section contenu-projet">
-      <div class="entete-page-contenu">${titreSection('leves', titre, bulle('leves'))}<button type="button" class="bouton-gerer" data-action="gerer-ouvrir">Gérer</button></div>
+  // 0.243.0 (audit, lot 6) : un seul cadre, un seul titre (celui de la page) : « Gérer » seul à droite, le tableau tout de suite.
+  return `<div class="contenu-projet page-gerer-directe page-liste-seule">
+      <div class="entete-page-contenu entete-gerer-seul"><button type="button" class="bouton-gerer" data-action="gerer-ouvrir" aria-label="Gérer : ${echapper(titre)}">Gérer</button></div>
       ${corps() || '<p class="vide">Rien ici pour l\'instant.</p>'}
     </div>`;
 }

@@ -4159,29 +4159,18 @@ svg.plan,
   background: rgba(27, 43, 54, 0.45);
 }
 
-/* Fenêtre « Code de sécurité » (réglages protégés : nom de l'appareil, NTRIP). */
-.fenetre-code {
-  width: min(86vw, 320px);
-}
-
-.champ-code {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-weight: 700;
-}
-
-.champ-code input {
-  min-height: 44px;
+/* Fenêtre « Code de sécurité » (0.243.0 : même cadre que les autres fenêtres, `fenetre-choix`). */
+.fenetre-choix .champ-code-gros {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 52px;
+  margin: 8px 0;
   font-size: 1.4rem;
   letter-spacing: 0.3em;
   text-align: center;
+  border-radius: 12px;
 }
-
-.fenetre-code .ligne-outils {
-  justify-content: flex-end;
-  margin-top: 12px;
-}
+.fenetre-code .erreur { margin: 0 0 8px; text-align: center; }
 
 /* Mode de l'appli (réglages ⚙) : Base, Intermédiaire ou Expert, trois gros boutons avec les barres. */
 .choix-mode-appli {
@@ -9094,26 +9083,7 @@ body.mode-telephone .levee-en-cours .boutons-levee .bouton-secondaire {
   border-left-color: var(--bordeaux);
 }
 
-/* --- Affichage « Plein soleil » : fort contraste, textes plus gras --- */
-body.theme-soleil {
-  --fond: #ffffff;
-  --gris: #2b3640;
-  --bordure: #7d8a94;
-  --texte: #000000;
-  --encre: #000000;
-  font-weight: 500;
-}
-body.theme-soleil :is(strong, b, h2, h3, button, label, summary) {
-  font-weight: 700;
-}
-body.theme-soleil .onglets button,
-body.theme-soleil .plan-boutons button,
-body.theme-soleil .plan-calques button {
-  border-width: 2px;
-}
-body.theme-soleil svg.plan text {
-  font-weight: 700;
-}
+/* 0.243.0 : le thème « Plein soleil » est supprimé (audit, 16.11). */
 
 /* --- Affichage « Sombre » : pour le soir ou les tunnels --- */
 body.theme-sombre {
@@ -9263,11 +9233,6 @@ body.theme-sombre .puce {
   background: rgba(24, 35, 43, 0.95);
   color: var(--texte);
 }
-body.theme-soleil .plan-cadre { background: #ffffff; }
-body.theme-soleil svg.plan text { fill: #000000; }
-body.theme-soleil svg.plan text.nom-controle { fill: #b91c1c; }
-body.theme-soleil .puce,
-body.theme-soleil .plan-boutons button { border: 2px solid #000000; color: #000000; }
 
 /* --- Lever (0.114.0, 0.115.1) : barre fixe en bas de l'écran, au-dessus de la barre du bas, toujours au
    même endroit : appareil photo à gauche, nom du prochain point (modifiable), puis « Enreg. Pts ». --- */
@@ -12301,11 +12266,11 @@ body[data-onglet='terrain'] .mise-en-page, body[data-onglet='volumes'] .mise-en-
 
 /* 0.165.0 (essai demandé le 09.11) : légère transparence sous les boutons zoom / position du plan
    (on voit le plan à travers) ; Plein soleil garde des boutons pleins pour le contraste. */
-body:not(.theme-soleil) .plan-boutons {
+body .plan-boutons {
   background: color-mix(in srgb, var(--surface) 72%, transparent);
   backdrop-filter: blur(2px);
 }
-body:not(.theme-soleil) .plan-boutons button:not(.actif) {
+body .plan-boutons button:not(.actif) {
   background: transparent;
 }
 
@@ -13038,15 +13003,11 @@ body.clavier-ouvert.bande-action[data-onglet='terrain'][data-mode-terrain='lever
 .fenetre-reglages .page-reglages > .case-reglage,
 .fenetre-reglages .page-reglages > .bouton-large,
 .fenetre-reglages .page-reglages .partage-reglages .carte-section {
-  background: var(--surface); border: 1.5px solid var(--bordure); border-left: 6px solid var(--ambre); border-radius: 12px;
+  background: var(--surface); border: 1.5px solid var(--bordure); border-radius: 12px;
   padding: 10px 12px; margin: 0; box-shadow: var(--ombre); box-sizing: border-box;
 }
-.fenetre-reglages .page-reglages > .choix-mode-appli { border-left-color: var(--sombre); }
-.fenetre-reglages .page-reglages > .ligne-telephone-ecran { border-left-color: #0891b2; }
-.fenetre-reglages .page-reglages > .choix-taille { border-left-color: #7c3aed; }
-.fenetre-reglages .page-reglages > .case-reglage { border-left-color: var(--succes); }
+/* 0.243.0 (audit) : plus de liseré de couleur à gauche : chaque réglage garde son rectangle blanc au bord fin gris. */
 .fenetre-reglages .page-reglages .partage-reglages { display: flex; flex-direction: column; gap: 10px; }
-.fenetre-reglages .page-reglages .partage-reglages .carte-section { border-left-color: #0ea5e9; }
 .fenetre-reglages .page-reglages > .choix-taille .titre-taille { display: block; margin-bottom: 6px; font-weight: 800; }
 
 /* ===== 0.175.10 (demande du 09.11) ===== */
@@ -13876,3 +13837,10 @@ body.mode-telephone .ecran-lame .choix-coupes-bandeau [data-valeur='deux'] { dis
 body.fiche-annotation-ouverte .bandeau-annotation { display: none; }
 body[data-relais='enregistrer-reseau'] #reseaux-ecran [data-action='enregistrer-reseau'] { display: none; }
 .bande-appli .bouton-enreg-bande.relais-enregistrer-reseau { background: #5b7f12; color: #ffffff; }
+
+/* 0.243.0 (audit) : thème sombre avec le fond photo (coché au départ) : le liseré des noms était blanc sur texte clair, donc illisible. */
+body.theme-sombre .avec-photo .plan .noms text { stroke: rgba(14, 22, 28, 0.92); fill: #f1f5f8; }
+body.theme-sombre .avec-photo .plan .noms text.altitude { fill: #c3ced6; }
+
+/* 0.243.0 : pages du projet sans titre en double. */
+.entete-gerer-seul { justify-content: flex-end; margin-bottom: 8px; }

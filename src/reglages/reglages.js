@@ -23,9 +23,8 @@ import { apkPublie, exePublie, estPlusRecente } from '../outils/mise-a-jour.js';
 
 const CLE = 'topo-reglages';
 const PAR_DEFAUT = { telephone: false, mode: 'intermediaire', tailleFormes: 'normale', tailleTexte: 'normal', theme: 'normal' };
-// Affichage de l'appareil (0.114.0, tous les modes) : [clé, titre]. « Plein soleil » = fort contraste,
-// textes plus gras ; « Sombre » = fond foncé pour le soir ou les tunnels (classes theme-… sur la page).
-export const THEMES = [['normal', 'Normal'], ['soleil', 'Plein soleil'], ['sombre', 'Sombre']];
+// Affichage de l'appareil (0.114.0, tous les modes) : [clé, titre]. « Sombre » = fond foncé pour le soir ou les tunnels (classes theme-… sur la page).
+export const THEMES = [['normal', 'Normal'], ['sombre', 'Sombre']];
 // Tailles à choisir sur le plan (0.104.0, propres à chaque appareil, tous les modes) : [clé, titre, facteur].
 // Formes des points : « Normales » = 70 % de (3,5 px + 20 %), soit 2,94 px (0.105.3 : −30 %). Texte (noms et
 // altitudes des points) : « Normal » = 60 % de la taille d'origine (0.105.3 : −20 % de plus).
@@ -48,6 +47,7 @@ export function lireReglages() {
   try {
     const reglages = { ...PAR_DEFAUT, ...JSON.parse(localStorage.getItem(CLE) ?? '{}') };
     reglages.mode = modeValide(reglages.mode);
+    if (!THEMES.some(([cle]) => cle === reglages.theme)) reglages.theme = 'normal'; // 0.243.0 : « Plein soleil » supprimé
     return reglages;
   } catch {
     return { ...PAR_DEFAUT };
