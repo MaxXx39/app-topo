@@ -12,7 +12,7 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
-import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre } from './topo/sous-dossiers.js';
+import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -462,7 +462,7 @@ function sousApplisDeLever() {
  */
 function choisirNatureDeLever(sous) {
   const nature = (l) => sousAppliDeNature(l.nature);
-  const levees = [...surfacesLevees(), ...projet.autres].filter((l) => !estAnnotation(l) && nature(l) === sous);
+  const levees = [...surfacesLevees(), ...projet.autres.filter((a) => estMontre(projet, a, 'autre'))].filter((l) => !estAnnotation(l) && nature(l) === sous);
   const choisie = levees.filter((l) => l.leveId === projet.leveActifId).at(-1) ?? levees.at(-1);
   if (choisie) {
     if (choisie.id !== leveDirect.stockId) choisirLevee(choisie.id);
@@ -2501,7 +2501,8 @@ function leveEnCours() {
 /** Surfaces levées avec le récepteur (celles qu'on peut reprendre dans l'onglet Terrain). */
 function surfacesLevees() {
   const directs = new Set(projet.leves.filter(estLeveDirect).map((l) => l.id));
-  return projet.surfaces.filter((s) => directs.has(s.leveId));
+  // 0.255.1 : seulement les levés du dossier choisi.
+  return projet.surfaces.filter((s) => directs.has(s.leveId) && estMontre(projet, s, 'surface'));
 }
 
 /** Levé en cours = celui d'identifiant « id » (liste « Changer », sous-application de Lever). */
@@ -2526,7 +2527,7 @@ function reprendreLeveDirect() {
   const enCours = leveeEnCours();
   if (enCours && familleDeNature(enCours.nature) === 'leve') return;
   // Levés de l'application Lever, le plus récent d'abord choisi.
-  const levees = [...surfacesLevees(), ...projet.autres.filter((a) => !estAnnotation(a))];
+  const levees = [...surfacesLevees(), ...projet.autres.filter((a) => !estAnnotation(a) && estMontre(projet, a, 'autre'))];
   const choisie = levees.filter((s) => s.leveId === projet.leveActifId).at(-1) ?? levees.at(-1);
   leveDirect.stockId = choisie?.id ?? null;
 }
@@ -4468,7 +4469,7 @@ function ouvrirTalusSurface(valeur) {
 
 /** Sommets de tous les dessins, prêts à implanter (« PF1-1 »…, avec leur altitude). */
 function pointsDesDessins() {
-  return projet.dessins.flatMap((d) => pointsDuDessin(d, projet.dessins));
+  return projet.dessins.filter((d) => estMontre(projet, d, 'dessin')).flatMap((d) => pointsDuDessin(d, projet.dessins));
 }
 
 /** Dessins montrés sur le plan : ceux cochés dans « Afficher » (et toujours celui en cours). */
@@ -5674,7 +5675,9 @@ function ajouterPointLigne(point) {
 function pointsDuProjet() {
   const vus = new Set();
   const liste = [];
-  for (const point of [...projet.leves.flatMap((l) => l.points), ...projet.aImplanter, ...projet.pointsControle, ...pointsDesDessins()]) {
+  // 0.255.1 : les points des listes hors du dossier choisi ne sont ni montrés ni accrochables (points de contrôle et à implanter : toujours).
+  const lesPoints = projet.leves.filter((l) => estMontre(projet, l, 'leve')).flatMap((l) => l.points);
+  for (const point of [...lesPoints, ...projet.aImplanter, ...projet.pointsControle, ...pointsDesDessins()]) {
     if (vus.has(point.nom)) continue;
     vus.add(point.nom);
     liste.push(point);
@@ -7235,7 +7238,7 @@ function donneesCommunes() {
     nbReseaux: (projet.canalisations ?? []).length, // 0.236.0 : case « Cana » d'Implanter › Surface
     // Mode Lame : surfaces (terrassement d'abord), surface suivie, tolérances, 2e RX2 connecté ?
     lame: {
-      surfaces: [...projet.surfaces].sort((a, b) => Number(['terrassement', 'surface'].includes(b.nature)) - Number(['terrassement', 'surface'].includes(a.nature))).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
+      surfaces: projet.surfaces.filter((s) => s.id === terrain.lame.surfaceId || estMontre(projet, s, 'surface')).sort((a, b) => Number(['terrassement', 'surface'].includes(b.nature)) - Number(['terrassement', 'surface'].includes(a.nature))).map((s) => ({ id: s.id, etiquette: etiquetteSurface(s) })),
       surfaceId: terrain.lame.surfaceId,
       inverse: terrain.lame.inverse,
       tolerances: terrain.lame.tolerances,
@@ -8277,7 +8280,8 @@ function calculsReussis() {
 creerEcranExport(moduleExport.zone('plan'), {
   // « Quoi exporter ? » : volumes, surfaces (par nature), dessins, listes de points ; cochés comme « Afficher ».
   obtenirGroupes: () => {
-    const surfacesDe = (natures) => projet.surfaces.filter((s) => (estImportee(s) ? natures.includes('importee') : natures.includes(s.nature ?? 'stock'))).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
+    // 0.255.0 : « Quoi exporter ? » ne propose que ce qui est dans le dossier choisi.
+    const surfacesDe = (natures) => projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && (estImportee(s) ? natures.includes('importee') : natures.includes(s.nature ?? 'stock'))).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
     return [
       { titre: 'Volumes', elements: projet.calculs.map((c) => ({ id: c.id, nom: nomDuCalcul(c, projet.surfaces), defaut: estAffichee(c.surface1Id) })) },
       { titre: 'Stocks', elements: surfacesDe(['stock']) },
@@ -8285,10 +8289,10 @@ creerEcranExport(moduleExport.zone('plan'), {
       { titre: 'Terrassement', elements: surfacesDe(['terrassement']) },
       { titre: 'Surfaces (dessins)', elements: surfacesDe(['surface']) },
       { titre: 'Surfaces importées', elements: surfacesDe(['importee']) },
-      { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
+      { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0 && estMontre(projet, d, 'dessin')).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
       {
         titre: 'Listes de points',
-        elements: projet.leves.map((l) => ({
+        elements: projet.leves.filter((l) => estMontre(projet, l, 'leve')).map((l) => ({
           id: l.id,
           nom: l.nom,
           // Levé du récepteur : coché si c'est le levé affiché ; fichier importé : comme « Afficher ».
@@ -8765,8 +8769,49 @@ function mettreAJourPastilleDossier() {
   if (!choisi) return;
   const liste = lireSousDossiers(projet);
   pastille.textContent = choisi === SANS_SOUS_DOSSIER ? '📁 Sans dossier' : `📁 ${choisi}`;
-  pastille.style.background = choisi === SANS_SOUS_DOSSIER ? '#6b7280' : liste.find((d) => d.nom === choisi)?.couleur ?? '#6b7280';
+  const fond = choisi === SANS_SOUS_DOSSIER ? '#6b7280' : liste.find((d) => d.nom === choisi)?.couleur ?? '#6b7280';
+  pastille.style.background = fond;
+  pastille.style.color = texteSur(fond);
   pastille.title = 'Dossier choisi : touche pour en changer';
+}
+
+/** Menu sous la pastille de l'en-tête (0.252.0) : choisir un autre dossier sans passer par la page Applications. */
+function ouvrirMenuDossiers() {
+  const existant = document.querySelector('#menu-dossiers');
+  if (existant) {
+    existant.remove();
+    return;
+  }
+  const { choisi, liste } = donneesSousDossiers();
+  const remplis = liste.filter((d) => d.nombre > 0 || d.nom === choisi);
+  const ligne = (valeur, titre, couleur = null) => `<button type="button" class="ligne-menu-dossiers ${valeur === choisi ? 'actif' : ''}" data-dossier-choix="${valeur.replace(/"/g, '&quot;')}">${couleur ? `<i style="background: ${couleur}"></i>` : ''}<span>${titre}</span>${valeur === choisi ? '<b>✓</b>' : ''}</button>`;
+  const echappe = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const menu = document.createElement('div');
+  menu.id = 'menu-dossiers';
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML = [ligne('', 'Tout'), ...remplis.map((d) => ligne(d.nom, echappe(d.nom), d.couleur)), ligne(SANS_SOUS_DOSSIER, 'Sans dossier')].join('');
+  const entete = document.querySelector('.entete')?.getBoundingClientRect();
+  menu.style.top = `${Math.round(entete?.bottom ?? 56) + 4}px`;
+  document.body.append(menu);
+  const fermer = () => {
+    menu.remove();
+    document.removeEventListener('pointerdown', dehors, true);
+    document.removeEventListener('keydown', touche, true);
+  };
+  const dehors = (evenement) => {
+    if (!menu.contains(evenement.target) && !evenement.target.closest('#pastille-dossier')) fermer();
+  };
+  const touche = (evenement) => {
+    if (evenement.key === 'Escape') fermer();
+  };
+  menu.addEventListener('click', (evenement) => {
+    const bouton = evenement.target.closest('[data-dossier-choix]');
+    if (!bouton) return;
+    choisirSousDossier(bouton.dataset.dossierChoix);
+    fermer();
+  });
+  document.addEventListener('pointerdown', dehors, true);
+  document.addEventListener('keydown', touche, true);
 }
 
 /** Ligne sous le titre du projet (en-tête) : sous-titre et l'état de Drive si connecté. */
@@ -8841,7 +8886,10 @@ window.addEventListener('online', () => mettreAJourEtatEntete());
 // Main de l'en-tête (0.76.0) : rouge = prendre la main (Expert, code), grise = la reprendre,
 // verte = la rendre (le projet part sur Drive, un autre appareil peut la prendre).
 // Depuis 0.90.0, seulement en Expert : en Base et Intermédiaire on voit la main sans pouvoir la toucher.
-document.querySelector('#pastille-dossier')?.addEventListener('click', () => navigation?.ouvrirPage?.());
+document.querySelector('#pastille-dossier')?.addEventListener('click', (evenement) => {
+  evenement.stopPropagation();
+  ouvrirMenuDossiers();
+});
 document.querySelector('#pastille-verrou').addEventListener('click', async () => {
   if (!aAcces('expert')) return;
   if (partage?.etat.repris?.projetId === projet.id) partage.prendreLaMain();

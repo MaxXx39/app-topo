@@ -26,7 +26,7 @@ import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
 import { dateHeureDuPoint, jourDuPoint, trierParDate } from '../topo/date-point.js';
 import { nomDuType, resumeArchive } from '../projet/archives.js';
-import { lireSousDossiers, estMontre, sousDossiersEffectifs } from '../topo/sous-dossiers.js';
+import { lireSousDossiers, estMontre, sousDossiersEffectifs, pastilleSousDossier } from '../topo/sous-dossiers.js';
 import { CATEGORIES_POINTS, CATEGORIES_LEVES, COLONNES_POINTS, categorieDeListe, ordreColonnes, deplacerColonne, listesDuTableau, lignesDuTableau, trierLignes, texteDate, csvDuTableau } from './tableau-points.js';
 
 /**
@@ -110,11 +110,6 @@ export function creerEcranImport(conteneur, contenu, actions) {
     const { action, id } = bouton.dataset;
     if (action === 'modifier-sous-dossiers') {
       actions.modifierSousDossiers();
-      return;
-    }
-    if (action === 'dossier-bascule') {
-      const { genre, nom, present } = bouton.dataset;
-      actions.basculerSousDossier(genre, id, nom, present !== 'oui');
       return;
     }
     if (action === 'tp-categorie') {
@@ -298,6 +293,8 @@ export function creerEcranImport(conteneur, contenu, actions) {
       await actions.importerPlanPdf(fichier);
     } else if (cible.dataset.champ === 'cadastre-points') {
       actions.montrerPointsCadastre(cible.dataset.id, cible.checked);
+    } else if (cible.dataset.champ === 'dossier-case') {
+      actions.basculerSousDossier(cible.dataset.genre, cible.dataset.id, cible.dataset.nom, cible.checked);
     } else if (cible.dataset.champ === 'plan-visible') {
       actions.reglerPlanDxf(cible.dataset.id, { visible: cible.checked });
     } else if (cible.dataset.champ === 'plan-couleur') {
@@ -460,9 +457,17 @@ function ligneGerer({ cle, titre, nature = '', categorie = null, couleur = '#94a
   // 0.251.0 : dossiers de la ligne : pastilles (tous les modes) et, dans le menu ⚙, cases pour la ranger (Expert).
   const dossiers = projet && element ? sousDossiersEffectifs(projet, element, genre) : [];
   const liste = projet && element ? lireSousDossiers(projet) : [];
-  const pastilles = dossiers.map((nom) => `<span class="pastille-pastel-dossier" style="background: ${liste.find((d) => d.nom === nom)?.couleur ?? '#6b7280'}">${echapper(nom)}</span>`).join('');
+  const pastilles = dossiers.map((nom) => pastilleSousDossier(nom, liste)).join('');
+  // 0.252.0 : liste déroulante (bouton « Dossiers : Canalo, Terrassement ▾ ») avec une case à cocher par dossier ; reste ouverte tant qu'on coche.
+  const cleListe = `dos:${cle}`;
+  const listeOuverte = ouverts.has(cleListe);
+  const resume = dossiers.length > 0 ? dossiers.join(', ') : 'Aucun';
   const rangement = projet && element
-    ? `<div class="champ-gerer seulement-expert">Dossiers <span class="rangement-dossiers">${liste.map((d) => `<button type="button" class="puce-dossier ${dossiers.includes(d.nom) ? 'actif' : ''}" style="--couleur-dossier: ${d.couleur}" data-action="dossier-bascule" data-genre="${genre}" data-id="${echapper(element.id)}" data-nom="${echapper(d.nom)}" data-present="${dossiers.includes(d.nom) ? 'oui' : 'non'}" aria-pressed="${dossiers.includes(d.nom)}"><i></i>${echapper(d.nom)}</button>`).join('')}</span></div>`
+    ? `<div class="champ-gerer seulement-expert menu-dossiers">
+        <span>Dossiers</span>
+        <button type="button" class="liste-deroulante-dossiers" data-action="gerer-menu" data-cle="${echapper(cleListe)}" aria-expanded="${listeOuverte}"><span>${echapper(resume)}</span><b aria-hidden="true">${listeOuverte ? '▴' : '▾'}</b></button>
+        ${listeOuverte ? `<div class="cases-dossiers">${liste.map((d) => `<label class="case-dossier"><input type="checkbox" data-champ="dossier-case" data-genre="${genre}" data-id="${echapper(element.id)}" data-nom="${echapper(d.nom)}" ${dossiers.includes(d.nom) ? 'checked' : ''} /><i style="background: ${d.couleur}"></i><span>${echapper(d.nom)}</span></label>`).join('')}</div>` : ''}
+      </div>`
     : '';
   return `<div class="ligne-gerer ${ouvert ? 'ouverte' : ''}">
       <div class="entete-ligne-gerer">
@@ -828,7 +833,7 @@ function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
           <strong class="nom-plan-dxf">${echapper(plan.nom)}</strong>
           <span class="pastille-gerer" style="background: ${plan.couleur ?? '#64748b'}" title="Couleur du plan"></span>
         </div>
-        ${(plan.sousDossiers ?? []).length > 0 ? `<div class="ligne-type-dxf">${plan.sousDossiers.map((nom) => `<span class="pastille-pastel-dossier" style="background: ${dossiersListe.find((d) => d.nom === nom)?.couleur ?? '#6b7280'}">${echapper(nom)}</span>`).join('')}</div>` : ''}
+        ${(plan.sousDossiers ?? []).length > 0 ? `<div class="ligne-type-dxf">${plan.sousDossiers.map((nom) => pastilleSousDossier(nom, dossiersListe)).join('')}</div>` : ''}
         <div class="ligne-outils">
           <span class="aide">${plan.compte?.objets ?? 0} objets · ${visibles} / ${plan.calques.length} calques affichés</span>
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="voir-plan" data-id="${plan.id}">voir</button>

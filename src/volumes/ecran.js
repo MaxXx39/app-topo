@@ -18,6 +18,8 @@ import { nouveauVolume, choisirSorte, nomAutomatique, nomDuCalcul, grouperParNat
  * - allerLever() : ouvre Terrain › Lever (bouton « Aller dans Lever » d'un volume sans contour)
  * Renvoie { afficher() }.
  */
+import { estMontre } from '../topo/sous-dossiers.js';
+
 export function creerEcranVolumes(conteneur, options) {
   const { obtenirProjet, obtenirResultat, etiquette, obtenirMontre, montrer, quandChange } = options;
   let nouveauId = null; // volume qui vient d'être ajouté : on le fait défiler jusqu'à l'écran
@@ -79,7 +81,8 @@ export function creerEcranVolumes(conteneur, options) {
         conteneur.innerHTML = '<p class="vide">Aucun levé.</p>';
         return;
       }
-      const lignes = projet.calculs.map((calcul) => ({ calcul, resultat: obtenirResultat(calcul), nom: nomDuCalcul(calcul, projet.surfaces) }));
+      // 0.255.1 : seulement les volumes dont la surface est dans le dossier choisi.
+      const lignes = projet.calculs.filter((c) => estMontre(projet, projet.surfaces.find((s) => s.id === c.surface1Id) ?? {}, 'surface')).map((calcul) => ({ calcul, resultat: obtenirResultat(calcul), nom: nomDuCalcul(calcul, projet.surfaces) }));
       conteneur.innerHTML = `
         <div class="ligne-outils">
           <button type="button" class="bouton" data-action="ajouter-volume">+ Ajouter un volume</button>

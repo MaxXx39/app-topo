@@ -8,8 +8,14 @@
 //   créer, ranger, déplacer : Expert.
 import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-partagees.js';
 
-export const SOUS_DOSSIERS_DEPART = ['Terrassement', 'Canalo', 'Bâtiment'];
-const COULEURS = ['#ea580c', '#16a34a', '#2563eb', '#7c3aed', '#db2777', '#0891b2', '#a16207', '#6b7280'];
+// Liste de départ demandée le 16.11 (GEOOFF, GEOPERRIN, TER., CANA, TS, AMEX, SITU, BAT-Rad., BAT-SS, BAT-REZ, BAT, OLD), une couleur différente chacune.
+export const SOUS_DOSSIERS_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD'];
+// 12 couleurs distinctes, dans l'ordre de la liste (les dossiers ajoutés ensuite reprennent la 1re, etc.).
+const COULEURS = ['#6b7280', '#7c3aed', '#a16207', '#1d4ed8', '#ea580c', '#84cc16', '#0ea5e9', '#db2777', '#991b1b', '#eab308', '#0f766e', '#111827'];
+
+/** Anciens types de plans (avant les dossiers) → nom du dossier de départ qui les remplace (comparaison sans tenir compte des majuscules). */
+const ANCIENS_NOMS = { ter: 'TER.', 'bât': 'BAT', 'bat': 'BAT', 'bât radier': 'BAT-Rad.', 'bât/ss': 'BAT-SS', 'bât/rez': 'BAT-REZ' };
+const nomActuel = (nom) => ANCIENS_NOMS[String(nom).trim().toLowerCase()] ?? nom;
 
 /** Valeur du choix « Tout » (rien n'est filtré) et du choix « Sans dossier ». */
 export const TOUT = '';
@@ -36,6 +42,24 @@ export function lireSousDossiers(projet = null, listes = lireListesPartagees()) 
   const noms = propres.length > 0 ? propres : [...SOUS_DOSSIERS_DEPART];
   for (const nom of sousDossiersUtilises(projet)) if (!noms.some((n) => n.toLowerCase() === nom.toLowerCase())) noms.push(nom);
   return noms.map((nom, i) => ({ nom, couleur: COULEURS[i % COULEURS.length] }));
+}
+
+/** Couleur de texte lisible (noir ou blanc) sur un fond « #rrggbb » : luminance relative, seuil à 0,45 (0.252.0 : texte blanc illisible sur les fonds clairs). */
+export function texteSur(fond) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(fond ?? ''));
+  if (!m) return '#ffffff';
+  const [r, g, b] = [1, 2, 3].map((i) => {
+    const c = parseInt(m[i], 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? '#111827' : '#ffffff';
+}
+
+/** Pastille HTML d'un sous-dossier (couleur de fond du dossier, texte noir ou blanc selon le fond). */
+export function pastilleSousDossier(nom, liste) {
+  const fond = liste.find((d) => d.nom === nom)?.couleur ?? '#6b7280';
+  const echappe = String(nom).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return `<span class="pastille-pastel-dossier" style="background: ${fond}; color: ${texteSur(fond)}">${echappe}</span>`;
 }
 
 /** Couleur de la pastille d'un sous-dossier (gris s'il n'est plus dans la liste). */
@@ -69,12 +93,21 @@ export function typesVersSousDossiers(projet) {
   let nb = 0;
   for (const plan of projet?.plansDxf ?? []) {
     if (!('type' in plan)) continue;
-    const nom = nettoyerSousDossiers([plan.type])[0];
+    const nom = nettoyerSousDossiers([nomActuel(plan.type)])[0];
     if (nom) {
       plan.sousDossiers = [...new Set([...(plan.sousDossiers ?? []), nom])];
       nb += 1;
     }
     delete plan.type;
+  }
+  // Plans déjà migrés par la 0.251 : « TER » devient « TER. » (liste de départ), etc.
+  for (const plan of projet?.plansDxf ?? []) {
+    if (!Array.isArray(plan.sousDossiers)) continue;
+    const renommes = [...new Set(plan.sousDossiers.map(nomActuel))];
+    if (renommes.join('|') !== plan.sousDossiers.join('|')) {
+      plan.sousDossiers = renommes;
+      nb += 1;
+    }
   }
   return nb;
 }

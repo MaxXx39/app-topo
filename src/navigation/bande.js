@@ -366,11 +366,13 @@ export function creerNavigation(nav, actions) {
     ].join('')}</div>`;
     // 0.251.0 : puces des dossiers (Tout / Terrassement / Canalo…) : seuls les éléments rangés dans le dossier choisi sont montrés.
     const dossiers = actions.sousDossiers?.();
+    // Dossiers vides cachés (sauf celui qui est choisi) ; « Tout » et « Sans dossier » n'ont de sens que s'il y a des dossiers remplis.
+    const remplis = (dossiers?.liste ?? []).filter((d) => d.nombre > 0 || d.nom === dossiers.choisi);
     const puces = dossiers?.visible
-      ? `<div class="puces-dossiers" role="group" aria-label="Dossier du projet">${bulle('dossiers')}
-          <button type="button" class="puce-dossier ${dossiers.choisi === '' ? 'actif' : ''}" data-dossier="" aria-pressed="${dossiers.choisi === ''}">Tout</button>
-          ${dossiers.liste.map((d) => `<button type="button" class="puce-dossier ${dossiers.choisi === d.nom ? 'actif' : ''}" data-dossier="${echapper(d.nom)}" style="--couleur-dossier: ${d.couleur}" aria-pressed="${dossiers.choisi === d.nom}"><i></i>${echapper(d.nom)}</button>`).join('')}
-          <button type="button" class="puce-dossier ${dossiers.choisi === '__sans' ? 'actif' : ''}" data-dossier="__sans" aria-pressed="${dossiers.choisi === '__sans'}">Sans dossier</button>
+      ? `<div class="puces-dossiers" role="group" aria-label="Dossier du projet">
+          ${remplis.length > 0 ? `<button type="button" class="puce-dossier ${dossiers.choisi === '' ? 'actif' : ''}" data-dossier="" aria-pressed="${dossiers.choisi === ''}">Tout</button>` : ''}
+          ${remplis.map((d) => `<button type="button" class="puce-dossier ${dossiers.choisi === d.nom ? 'actif' : ''}" data-dossier="${echapper(d.nom)}" aria-pressed="${dossiers.choisi === d.nom}"><i style="background: ${d.couleur}"></i>${echapper(d.nom)}</button>`).join('')}
+          ${remplis.length > 0 ? `<button type="button" class="puce-dossier ${dossiers.choisi === '__sans' ? 'actif' : ''}" data-dossier="__sans" aria-pressed="${dossiers.choisi === '__sans'}">Sans dossier</button>` : ''}
           ${dossiers.peutCreer ? '<button type="button" class="puce-dossier nouveau-dossier" data-dossier-nouveau aria-label="Nouveau dossier" title="Nouveau dossier">＋</button>' : ''}
         </div>`
       : '';
@@ -420,6 +422,25 @@ export function creerNavigation(nav, actions) {
         ${actions.fermerAppli ? `<button type="button" class="bouton-pied-applis fermer" data-pied="fermer">${svg('<path d="M12 3v9" /><path d="M6.3 7.3a8 8 0 1 0 11.4 0" />')}Fermer l'appli</button>` : ''}
         <button type="button" class="bouton-pied-applis" data-pied="reglages">${svg(ICONE_REGLAGES)}Réglages</button>
       </div>`;
+    suivreLigneDossiers();
+  }
+
+  /**
+   * Dossiers sur UNE seule ligne (0.253.0) : si tout ne rentre pas, la ligne défile au doigt ; un dégradé du côté où il en reste
+   * (classes « reste-gauche » / « reste-droite ») et le dossier choisi est ramené dans la vue.
+   */
+  function suivreLigneDossiers() {
+    const ligne = page.querySelector('.puces-dossiers');
+    if (!ligne) return;
+    const majBords = () => {
+      ligne.classList.toggle('reste-gauche', ligne.scrollLeft > 2);
+      ligne.classList.toggle('reste-droite', ligne.scrollLeft + ligne.clientWidth < ligne.scrollWidth - 2);
+    };
+    ligne.addEventListener('scroll', majBords, { passive: true });
+    const choisie = ligne.querySelector('.puce-dossier.actif');
+    if (choisie && ligne.scrollWidth > ligne.clientWidth) ligne.scrollLeft = Math.max(0, choisie.offsetLeft - (ligne.clientWidth - choisie.offsetWidth) / 2);
+    majBords();
+    requestAnimationFrame(majBords); // la page peut ne pas encore avoir sa largeur finale
   }
 
   function ouvrirRoue() {

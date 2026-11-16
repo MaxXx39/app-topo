@@ -6,6 +6,7 @@
 // le (date ISO), remarques: [texte] } } ; ses photos sont dans la liste (photo.point = son nom).
 import { creerListeDeLevee, nommerListeDeLevee } from './leve-direct.js';
 import { nouvelIdentifiant, dateDuJourCollee, PREFIXE_ANNOTATION_LISTE } from './surface.js';
+import { estMontre } from './sous-dossiers.js';
 
 export const PREFIXE_ANNOTATION = PREFIXE_ANNOTATION_LISTE;
 // Précision minimale du GPS de la tablette pour enregistrer un point (m) : 3 m au départ, réglable.
@@ -21,7 +22,8 @@ export function nomListeAnnotation(maintenant = new Date()) {
 
 /** Listes d'annotations du projet (de la plus récente à la plus ancienne). */
 export function listesAnnotation(projet) {
-  return (projet.autres ?? []).filter(estAnnotation).reverse();
+  // 0.255.1 : seulement les listes d'annotation du dossier choisi.
+  return (projet.autres ?? []).filter((l) => estAnnotation(l) && estMontre(projet, l, 'autre')).reverse();
 }
 
 /** Liste du jour (créée si elle manque) : celle qui porte le nom « Anot-AAAAMMJJ ». */
