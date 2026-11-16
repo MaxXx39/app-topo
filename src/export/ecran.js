@@ -110,6 +110,7 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
   conteneur.addEventListener('change', () => {
     retenirReglages(conteneur, format);
     resumer();
+    expliquerCsv();
   });
   // Ce qui est exporté : seulement ce qui est coché dans « Quoi exporter ? ».
   const obtenirDonnees = () => donneesChoisies(choix.selection());
@@ -228,11 +229,24 @@ export function creerEcranExport(conteneur, { obtenirGroupes, obtenirDonnees: do
     else if (format === 'landxml') texte = champ('landxml-contour').checked ? 'avec contour et lignes de rupture' : 'triangles seulement';
     zone.textContent = texte;
   }
+  /**
+   * 0.241.0 (audit, lot 4) : le CSV du plan est le tableau des volumes. Sans volume calculé, le bouton est grisé
+   * et une phrase dit pourquoi et où trouver l'export des points (avant : « Rien de coché » après le toucher).
+   */
+  function expliquerCsv() {
+    const bouton = conteneur.querySelector('[data-action="exporter"]');
+    const sansVolume = format === 'csv' && !obtenirDonnees().volumes.some(({ resultat }) => resultat && !resultat.erreurs);
+    bouton.disabled = sansVolume;
+    if (sansVolume) message.textContent = 'Le CSV du plan est le tableau des volumes : aucun volume calculé ici. Pour les points, utilise « Exporter › Points ».';
+    else if (format === 'csv' && message.textContent.startsWith('Le CSV du plan')) message.textContent = '';
+  }
   function montrerFormat() {
     resumer();
     for (const puce of conteneur.querySelectorAll('[data-format]')) puce.classList.toggle('actif', puce.dataset.format === format);
     for (const bloc of conteneur.querySelectorAll('[data-pour]')) bloc.hidden = !bloc.dataset.pour.split(' ').includes(format);
     conteneur.querySelector('[data-action="exporter"]').textContent = `Exporter en ${FORMATS.find(([cle]) => cle === format)[1]}`;
+    if (format !== 'csv') conteneur.querySelector('[data-action="exporter"]').disabled = false;
+    expliquerCsv();
   }
   conteneur.addEventListener('click', (evenement) => {
     const puce = evenement.target.closest('button[data-format]');

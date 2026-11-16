@@ -276,7 +276,7 @@ function ligneProjet(p, estOuvert, menu, partage) {
       <strong><span class="ou-projet" title="${p.local ? 'sur cet appareil' : ''}${p.local && p.drive ? ' et ' : ''}${p.drive ? 'sur Google Drive' : ''}">${ou}</span> ${echapper(p.titre)}${estOuvert ? ' <span class="etiquette-ouvert">ouvert</span>' : ''}</strong>
       <span class="aide">${details}</span>
     </button>
-    <button type="button" class="bouton-menu-projet" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
+    <button type="button" class="bouton-menu-projet seulement-expert" data-action="menu-projet" data-id="${p.id}" aria-expanded="${menu}" aria-label="Plus d'actions">⋮</button>
     ${menu ? `<div class="menu-projet">
       ${estOuvert ? '<button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="renommerProjet">renommer</button>' : ''}
       <button type="button" class="bouton-lien bouton-lien-neutre seulement-expert" data-action="ranger-projet" data-id="${p.id}">ranger dans un dossier</button>

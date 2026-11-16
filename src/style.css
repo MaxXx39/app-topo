@@ -10436,21 +10436,14 @@ button.dossier-projet-ouvert { border: none; background: none; padding: 0; font:
 /* --- 0.126.0 (retour d'essai sur tablette lente, 05.11) --- */
 /* Points sur canvas (beaucoup de points) : déjà pâlis un par un, le canvas ne l'est pas en plus. */
 .plan-cadre.plan-palir .plan-points-canvas { opacity: 1; }
-/* Messages : en bas, au-dessus de la barre du bas (et de la bande « Enreg. Pts » dans Lever), fermés d'un toucher. */
-.message-flottant {
-  top: auto;
-  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 12px);
-  pointer-events: auto;
-  cursor: pointer;
-}
-body[data-onglet='terrain'][data-mode-terrain='lever'] .message-flottant {
-  bottom: calc(var(--hauteur-onglets) + env(safe-area-inset-bottom) + 96px);
-}
-/* 0.239.0 : message du rappel de contrôle : en haut, sous l'en-tête, loin des boutons du bas. */
-body[data-onglet] .message-flottant.message-haut {
-  top: calc(var(--hauteur-entete) + 56px);
-  bottom: auto;
-}
+/* 0.241.0 (audit, lot 4) : tous les messages sont en haut, sous l'en-tête, et laissent passer le toucher
+   (avant : en bas, ils couvraient « Enreg. » ou « Réglages » pendant 2 à 5 s). Un message qui reste (durée null)
+   se ferme d'un toucher. */
+.message-flottant { top: calc(var(--hauteur-entete) + 56px); bottom: auto; pointer-events: none; }
+.message-flottant.message-fermable { pointer-events: auto; cursor: pointer; }
+body[data-onglet] .message-flottant.message-haut { top: calc(var(--hauteur-entete) + 56px); bottom: auto; }
+/* Confirmation d'un point pris : en vert. */
+.message-flottant.message-ok { background: #15803d; }
 /* Cibles d'au moins 44 px (doigts gantés) : liens « archiver / supprimer », ✕ des points, dossier, cloche. */
 .bouton-lien {
   display: inline-flex;
@@ -11812,7 +11805,7 @@ body.bande-vide .barre-pointage { bottom: calc(var(--hauteur-bande) + 16px); }
   font-weight: 900;
 }
 .bande-appli .bouton-enreg-bande small { font-size: 14px; font-weight: 700; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bande-appli .bouton-enreg-bande:disabled { background: #fde7b0; color: rgba(27, 43, 54, 0.55); }
+.bande-appli .bouton-enreg-bande:is(:disabled, [aria-disabled='true']) { background: #fde7b0; color: rgba(27, 43, 54, 0.55); }
 .zone-info-appli:has(.bouton-enreg-bande) { background: none; }
 body.mode-telephone .bande-appli .bouton-enreg-bande { font-size: 17px; gap: 6px; }
 body.mode-telephone .bande-appli .bouton-enreg-bande small { font-size: 11px; }
@@ -11880,7 +11873,7 @@ body[data-relais='dao'] #bouton-dao { display: none; }
 body[data-mode-terrain='autocontrole'] .bande-appli .bouton-enreg-bande.relais-enregistrer { background: var(--bordeaux); }
 .bande-appli .bouton-enreg-bande.relais-dao { background: #db2777; color: #ffffff; }
 .bande-appli .bouton-enreg-bande.relais-mesure-gnss { background: #7c3aed; color: #ffffff; }
-.bande-appli .bouton-enreg-bande:is(.relais-implanter, .relais-enregistrer, .relais-dao, .relais-mesure-gnss):disabled { background: #475569; color: rgba(255, 255, 255, 0.6); }
+.bande-appli .bouton-enreg-bande:is(.relais-implanter, .relais-enregistrer, .relais-dao, .relais-mesure-gnss):is(:disabled, [aria-disabled='true']) { background: #475569; color: rgba(255, 255, 255, 0.6); }
 .bande-appli .bouton-enreg-bande:is(.relais-implanter, .relais-enregistrer, .relais-dao, .relais-mesure-gnss) small { color: inherit; }
 .bande-appli .bouton-enreg-bande.relais-enregistrer span { font-size: 18px; }
 body.mode-telephone .bande-appli .bouton-enreg-bande.relais-enregistrer span { font-size: 14px; }

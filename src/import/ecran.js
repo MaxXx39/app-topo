@@ -13,7 +13,7 @@ import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
 import { COULEURS_PLANS } from '../plan/dxf-canvas.js';
 import { estEnMn95 } from '../topo/dxf-plan.js';
-import { resumeControlePlan } from '../topo/controle-plan.js';
+import { resumeControlePlan, texteEcartMm } from '../topo/controle-plan.js';
 import { rotationLisible } from '../topo/recalage.js';
 import { prefixeDuNom, sansPrefixe, estSurfaceFichier, origineSurface } from '../topo/surface.js';
 import { PREFIXE_PDF } from '../topo/pdf-dxf.js';
@@ -449,13 +449,13 @@ function boutonsArchive(type, id, actionSuppression = null) {
 }
 
 /** Une ligne de la page « Gérer » : pastille de couleur, nom, nature, info, ⚙ qui déplie le menu de la ligne. */
-function ligneGerer({ cle, titre, nature = '', categorie = null, couleur = '#94a3b8', info = '', menu = '', ouverts }) {
+function ligneGerer({ cle, titre, nature = '', categorie = null, couleur = '#94a3b8', info = '', menu = '', ouverts, videEnBase = false }) {
   const ouvert = ouverts.has(cle);
   return `<div class="ligne-gerer ${ouvert ? 'ouverte' : ''}">
       <div class="entete-ligne-gerer">
         <span class="pastille-gerer" style="background: ${couleur}"></span>
         <div class="texte-ligne-gerer"><strong>${titre}</strong>${categorie ? htmlEtiquetteNature(categorie) : nature ? `<span class="nature-ligne-gerer">${echapper(nature)}</span>` : ''}<span class="aide">${info}</span></div>
-        <button type="button" class="bouton-engrenage" data-action="gerer-menu" data-cle="${echapper(cle)}" aria-expanded="${ouvert}" aria-label="Actions : ${echapper(titre)}">
+        <button type="button" class="bouton-engrenage ${videEnBase ? 'seulement-intermediaire' : ''}" data-action="gerer-menu" data-cle="${echapper(cle)}" aria-expanded="${ouvert}" aria-label="Actions : ${echapper(titre)}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
         </button>
       </div>
@@ -476,7 +476,7 @@ function pageGerer(projet, vue, ouverts) {
     if (controle.length > 0) {
       const photosControle = (projet.photosControle ?? []).filter((photo) => controle.some((p) => p.id === photo.pointId));
       lignes.push(ligneGerer({
-        cle: 'points:controle', titre: 'Points de contrôle', nature: 'Contrôle', categorie: 'controle', couleur: couleurs.get('controle'), info: `${controle.length} points`, ouverts,
+        cle: 'points:controle', titre: 'Points de contrôle', nature: 'Contrôle', categorie: 'controle', couleur: couleurs.get('controle'), info: `${controle.length} points`, ouverts, videEnBase: photosControle.length === 0,
         // 0.208.0 : un × par point (Intermédiaire, sans code) ; supprimer toute la liste (Expert).
         menu: `${photosDesPoints(photosControle)}
           <div class="liste-points-gerer seulement-intermediaire">${controle.map((p) => `<div class="ligne-point-gerer"><span>${echapper(p.nom)}</span><button type="button" class="bouton-lien" data-action="enlever-point-controle" data-id="${echapper(p.id)}" aria-label="Enlever ${echapper(p.nom)}">×</button></div>`).join('')}</div>
@@ -492,7 +492,7 @@ function pageGerer(projet, vue, ouverts) {
       const date = leve.direct && leve.importeLe ? ` · créé le ${new Date(leve.importeLe).toLocaleDateString('fr-CH')}` : '';
       const couleurListe = projet.couleursListes?.[leve.id] ?? couleurs.get(categorie);
       lignes.push(ligneGerer({
-        cle: `points:${leve.id}`, titre: echapper(leve.nom), nature: titres.get(categorie) ?? '', categorie, couleur: couleurListe, info: `${leve.points.length} points${date}`, ouverts,
+        cle: `points:${leve.id}`, titre: echapper(leve.nom), nature: titres.get(categorie) ?? '', categorie, couleur: couleurListe, info: `${leve.points.length} points${date}`, ouverts, videEnBase: Boolean(leve.dediee) && photosDuLeve(projet, leve).length === 0,
         menu: `${leve.dediee ? '' : `<label class="champ-gerer">Renommer <input type="text" class="nom-leve" data-champ="nom-leve" data-id="${leve.id}" value="${echapper(leve.nom)}" aria-label="Nom de la liste" /></label>`}
           <div class="champ-gerer seulement-intermediaire">Couleur ${choixCouleur(leve.id, projet.couleursListes?.[leve.id])}</div>
           ${photosDesPoints(photosDuLeve(projet, leve))}
@@ -514,8 +514,9 @@ function pageGerer(projet, vue, ouverts) {
         ? `<div class="champ-prefixe"><span class="prefixe-nom">${echapper(PREFIXE_PDF)}</span><input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(sansPrefixe(plan.nom, PREFIXE_PDF))}" aria-label="Nom du plan (après ${echapper(PREFIXE_PDF)})" /></div>`
         : `<input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />`;
       lignes.push(ligneGerer({
-        cle: `plans:${plan.id}`, titre: echapper(plan.nom), nature: plan.pdf ? 'PDF' : 'DXF', couleur: plan.couleur ?? '#64748b', info: `${plan.compte?.objets ?? 0} objets`, ouverts,
+        cle: `plans:${plan.id}`, titre: echapper(plan.nom), nature: plan.pdf ? 'PDF' : 'DXF', couleur: plan.couleur ?? '#64748b', info: [`${plan.compte?.objets ?? 0} objets`, resumeEtatPlan(plan)].filter(Boolean).join(' · '), ouverts,
         menu: `<label class="champ-gerer">Renommer ${nom}</label>
+          ${etatRecalage(plan)}${etatControle(plan)}
           <div class="champ-gerer">Couleur ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: 'Couleur du plan' })}</div>
           ${typeDuPlan(plan, types)}
           <div class="actions-ligne-gerer">
@@ -539,7 +540,7 @@ function pageGerer(projet, vue, ouverts) {
     }
     for (const dessin of (projet.dessins ?? []).filter((d) => d.sommets.length > 0)) {
       lignes.push(ligneGerer({
-        cle: `plans:${dessin.id}`, titre: echapper(dessin.nom), nature: 'Dessin', couleur: '#7c3aed', info: `${pointsDuDessin(dessin, projet.dessins).length} points`, ouverts,
+        cle: `plans:${dessin.id}`, titre: echapper(dessin.nom), nature: 'Dessin', couleur: '#7c3aed', info: `${pointsDuDessin(dessin, projet.dessins).length} points`, ouverts, videEnBase: true,
         menu: `<div class="actions-ligne-gerer seulement-intermediaire">
             <button type="button" class="bouton-secondaire" data-action="exporter-liste" data-type="dessin" data-id="${dessin.id}">Exporter</button>
             ${boutonsArchive('dessin', dessin.id)}
@@ -873,7 +874,7 @@ function etatRecalage(plan) {
     const { gon } = rotationLisible(r.parametres.rotation);
     const ppm = (r.parametres.echelle - 1) * 1e6;
     return `<p class="etat-recalage recale">✓ Recalé en MN95 (${r.paires.filter((p) => p.actif !== false).length} points · rotation ${gon.toFixed(4)} gon · échelle ${ppm >= 0 ? '+' : ''}${ppm.toFixed(0)} ppm)
-      <button type="button" class="bouton-lien" data-action="annuler-recalage" data-id="${plan.id}">annuler le recalage</button></p>`;
+      <button type="button" class="bouton-lien seulement-intermediaire" data-action="annuler-recalage" data-id="${plan.id}">annuler le recalage</button></p>`;
   }
   // 0.214.0 : plan importé avec le choix « Non (déjà calé) » : rien à recaler.
   if (plan.dejaCale) return '<p class="etat-recalage recale">✓ Déjà calé (importé tel quel)</p>';
@@ -888,7 +889,17 @@ function etatControle(plan) {
   const texte = c ? resumeControlePlan(c) : 'Non contrôlé';
   const classe = !c || c.saute ? 'orange' : c.couleur;
   return `<p class="etat-controle-plan ${classe}">${c && !c.saute ? '✓' : '⚠'} ${echapper(texte)}
-    <button type="button" class="bouton-lien" data-action="controler-plan" data-id="${plan.id}">${c && !c.saute ? 'recontrôler' : 'contrôler'}</button></p>`;
+    <button type="button" class="bouton-lien seulement-intermediaire" data-action="controler-plan" data-id="${plan.id}">${c && !c.saute ? 'recontrôler' : 'contrôler'}</button></p>`;
+}
+
+/** 0.241.0 : état d'un plan en quelques mots pour sa ligne de « Gérer » (visible dès Base) : « à recaler », « recalé · contrôlé 3 mm »… */
+function resumeEtatPlan(plan) {
+  const enPlace = plan.recalage?.applique || plan.dejaCale || (plan.bornes && estEnMn95(plan.bornes));
+  if (!enPlace) return plan.bornes ? 'à recaler' : '';
+  const base = plan.recalage?.applique ? 'recalé' : plan.dejaCale ? 'déjà calé' : 'en MN95';
+  const c = plan.controle;
+  if (c && !c.saute) return `${base} · contrôlé (${texteEcartMm(c.distanceMm)})`;
+  return `${base} · non contrôlé`;
 }
 
 /**

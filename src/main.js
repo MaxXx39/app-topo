@@ -494,7 +494,8 @@ function choisirSousAppli(cle) {
 function boutonDeBande(cle, titre, detail, desactive = false, court = null) {
   // 0.172.0 : `court` = texte du mode téléphone (voir .t-long / .t-court).
   const texte = court ? `<span class="t-long">${echapper(titre)}</span><span class="t-court">${echapper(court)}</span>` : echapper(titre);
-  return `<button type="button" class="bouton-enreg-bande relais-${cle}" data-nav="action" data-cle="${cle}" ${desactive ? 'disabled' : ''}>
+  // 0.241.0 (audit, lot 4) : grisé mais touchable (aria-disabled) : un toucher dit pourquoi (voir raisonBoutonGrise).
+  return `<button type="button" class="bouton-enreg-bande relais-${cle}" data-nav="action" data-cle="${cle}" ${desactive ? 'aria-disabled="true"' : ''}>
     <span>${texte}</span>${detail ? `<small>${echapper(detail)}</small>` : ''}</button>`;
 }
 
@@ -661,7 +662,23 @@ function agirDepuisBande(cle) {
     agirAnnotation(cle);
     return;
   }
-  document.querySelector(RELAIS_BANDE[cle])?.click();
+  const vrai = document.querySelector(RELAIS_BANDE[cle]);
+  if (vrai?.disabled && ['prendre', 'implanter', 'enregistrer'].includes(cle)) {
+    afficherMessage(raisonBoutonGrise(cle), 4000);
+    return;
+  }
+  vrai?.click();
+}
+
+/** 0.241.0 : pourquoi « Enreg. » / « Implanter » / « Enr. » est grisé (dit au toucher). */
+function raisonBoutonGrise(cle) {
+  const e = etatRecepteur;
+  if (!e?.connecte) return 'Enregistrement impossible : récepteur non connecté.';
+  if (!e.recu) return 'Enregistrement impossible : en attente de la position du récepteur.';
+  if (e.raison) return `Enregistrement impossible : ${e.raison}`;
+  if (!e.autorise) return 'Enregistrement impossible : il faut le RTK fixe et l\'inclinaison prête.';
+  if (cle === 'prendre') return 'Enregistrement impossible : aucun levé en cours.';
+  return 'Enregistrement impossible : choisis d\'abord un point ou une ligne à implanter.';
 }
 
 // --- Mesure rapide (0.158.0, dès Intermédiaire, demande du 08.11, formules validées) ---
@@ -5125,7 +5142,7 @@ async function proposerControle() {
     // 0.239.0 : seulement dans Lever (ou Contrôle), en haut du plan : plus sur le menu, Importer, Exporter…
     const mode = document.body.dataset.modeTerrain;
     if (document.body.dataset.onglet === 'terrain' && (mode === 'lever' || mode === 'autocontrole')) {
-      afficherMessage(`${texte} Aucun point de contrôle dans ce projet.`, 6000, { haut: true });
+      afficherMessage(`${texte} Aucun point de contrôle dans ce projet.`, 6000);
     }
     rappelEnCours = false;
     return;
@@ -6827,7 +6844,14 @@ function rangerPointPris(resultat) {
     delete photo.attentePoint;
   }
   noterJournal({ type: 'point', controleRecent: controleRecentIci() });
-  afficherMessage(`Point ${resultat.point.nom} pris${enAttente.length > 0 ? ` · ${enAttente.length} photo(s) rattachée(s)` : ''}`);
+  // 0.241.0 : confirmation en haut, en vert, avec la précision du point et le nombre de satellites (si connus).
+  const g = resultat.point.gnss;
+  const details = [];
+  if (g?.precisionH != null) details.push(`H ${Number(g.precisionH).toFixed(3)} m`);
+  if (g?.precisionV != null) details.push(`V ${Number(g.precisionV).toFixed(3)} m`);
+  if (g?.nbSatellites != null) details.push(`${g.nbSatellites} sat.`);
+  if (enAttente.length > 0) details.push(`${enAttente.length} photo(s) rattachée(s)`);
+  afficherMessage(`Point ${resultat.point.nom} pris${details.length > 0 ? ` · ${details.join(' · ')}` : ''}`, 2500, { ok: true });
   modifie();
 }
 
@@ -8799,9 +8823,9 @@ setInterval(() => {
   });
 }, 30_000);
 
-/** Petit message sous l'en-tête, qui disparaît tout seul après "duree" millisecondes (null : il reste). */
+/** Petit message sous l'en-tête (0.241.0 : toujours en haut), qui disparaît tout seul après "duree" millisecondes (null : il reste). */
 let minuterieMessage = null;
-function afficherMessage(texte, duree = 2000, { haut = false } = {}) {
+function afficherMessage(texte, duree = 2000, { ok = false } = {}) {
   let zone = document.querySelector('#message-flottant');
   if (!zone) {
     zone = document.createElement('div');
@@ -8813,7 +8837,9 @@ function afficherMessage(texte, duree = 2000, { haut = false } = {}) {
     document.body.append(zone);
   }
   zone.textContent = texte;
-  zone.classList.toggle('message-haut', haut); // 0.239.0 : en haut, sous l'en-tête (rappel de contrôle)
+  // 0.241.0 : toujours en haut, sous l'en-tête ; il laisse passer le toucher sauf s'il reste affiché (durée null).
+  zone.classList.toggle('message-fermable', duree === null);
+  zone.classList.toggle('message-ok', ok);
   zone.hidden = false;
   clearTimeout(minuterieMessage);
   if (duree !== null) minuterieMessage = setTimeout(() => (zone.hidden = true), duree);
