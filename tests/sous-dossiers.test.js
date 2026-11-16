@@ -29,10 +29,11 @@ const projet = () => ({
 });
 
 describe('liste des sous-dossiers', () => {
-  it('départ : Terrassement, Canalo, Bâtiment, chacun avec sa couleur', () => {
+  it('départ : les 12 dossiers demandés le 16.11, chacun avec une couleur différente', () => {
     const liste = lireSousDossiers(null, {});
+    expect(liste.map((d) => d.nom)).toEqual(['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD']);
     expect(liste.map((d) => d.nom)).toEqual(SOUS_DOSSIERS_DEPART);
-    expect(new Set(liste.map((d) => d.couleur)).size).toBe(3);
+    expect(new Set(liste.map((d) => d.couleur)).size).toBe(12);
   });
   it('on peut en ajouter ; la liste partagée remplace celle de départ ; un nom inconnu est gris', () => {
     const liste = lireSousDossiers(null, { sousDossiers: ['Voirie', 'Eaux'] });
@@ -60,11 +61,14 @@ describe('anciens types de plans', () => {
   it('le type devient un sous-dossier du même nom et disparaît', () => {
     const p = { plansDxf: [{ id: 'a', type: 'TER' }, { id: 'b', type: '' }, { id: 'c', sousDossiers: ['Canalo'], type: 'CANA' }, { id: 'd' }] };
     expect(typesVersSousDossiers(p)).toBe(2);
-    expect(p.plansDxf[0]).toEqual({ id: 'a', sousDossiers: ['TER'] });
+    expect(p.plansDxf[0]).toEqual({ id: 'a', sousDossiers: ['TER.'] }); // l'ancien « TER » devient « TER. »
     expect(p.plansDxf[1]).toEqual({ id: 'b' });
     expect(p.plansDxf[2].sousDossiers).toEqual(['Canalo', 'CANA']);
     expect('type' in p.plansDxf[3]).toBe(false);
     expect(typesVersSousDossiers(p)).toBe(0); // rien de plus la 2e fois
+    const dejaMigre = { plansDxf: [{ id: 'z', sousDossiers: ['TER', 'Bât Radier', 'Canalo'] }] };
+    expect(typesVersSousDossiers(dejaMigre)).toBe(1);
+    expect(dejaMigre.plansDxf[0].sousDossiers).toEqual(['TER.', 'BAT-Rad.', 'Canalo']);
   });
 });
 
@@ -122,8 +126,8 @@ describe('choix de la tablette', () => {
     const m = magasin();
     const p = projet();
     expect(lireChoix(p, m)).toBe('');
-    retenirChoix('p1', 'Canalo', m);
-    expect(lireChoix(p, m)).toBe('Canalo');
+    retenirChoix('p1', 'CANA', m);
+    expect(lireChoix(p, m)).toBe('CANA');
     retenirChoix('p1', 'Disparu', m);
     expect(lireChoix(p, m)).toBe('');
     retenirChoix('p1', SANS_SOUS_DOSSIER, m);
@@ -144,5 +148,19 @@ describe('lisibilité des pastilles (0.252.0)', () => {
     const html = pastilleSousDossier('Voirie <b>', [{ nom: 'Voirie <b>', couleur: '#eab308' }]);
     expect(html).toContain('color: #111827');
     expect(html).toContain('Voirie &lt;b&gt;');
+  });
+});
+
+describe('points de contrôle (0.254.0)', () => {
+  it('sont dans tous les dossiers : le filtre ne les cache jamais', async () => {
+    const { definirSousDossier } = await import('../src/topo/sous-dossiers.js');
+    const { LISTE_CONTROLE } = await import('../src/plan/listes-points.js');
+    const p = { ...projet(), pointsControle: [{ id: 'c1', nom: 'PC1', est: 2538000, nord: 1152000, altitude: null }] };
+    for (const choix of ['', 'Canalo', 'Terrassement', SANS_SOUS_DOSSIER]) {
+      definirSousDossier(choix);
+      expect(listesDePoints(p).map((l) => l.id)).toContain(LISTE_CONTROLE);
+      expect(idsHorsSousDossier(p, choix).has(LISTE_CONTROLE)).toBe(false);
+    }
+    definirSousDossier('');
   });
 });
