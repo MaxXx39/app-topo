@@ -164,3 +164,26 @@ describe('points de contrôle (0.254.0)', () => {
     definirSousDossier('');
   });
 });
+
+describe('tableau « Liste de points » selon le dossier (0.255.0)', () => {
+  it('ne montre que les listes du dossier choisi ; les points de contrôle restent', async () => {
+    const { definirSousDossier } = await import('../src/topo/sous-dossiers.js');
+    const { listesDuTableau, lignesDuTableau, CATEGORIES_POINTS } = await import('../src/import/tableau-points.js');
+    const p = projet();
+    p.pointsControle = [{ id: 'c1', nom: 'PC1', est: 1, nord: 2, altitude: null }];
+    p.leves = [
+      { id: 'a', nom: 'Imp-Regards', points: [{ nom: 'R1', est: 1, nord: 1, altitude: 1 }], sousDossiers: ['Canalo'] },
+      { id: 'b', nom: 'Imp-Bordures', points: [{ nom: 'B1', est: 2, nord: 2, altitude: 2 }], sousDossiers: ['Terrassement'] },
+      { id: 'c', nom: 'Imp-Libre', points: [{ nom: 'L1', est: 3, nord: 3, altitude: 3 }] },
+    ];
+    const categories = new Set(CATEGORIES_POINTS.map(([cle]) => cle));
+    definirSousDossier('');
+    expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'a', 'b', 'c']);
+    definirSousDossier('Canalo');
+    expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'a']);
+    expect(lignesDuTableau(p, { categories }).map((l) => l.nom)).toEqual(['PC1', 'R1']);
+    definirSousDossier(SANS_SOUS_DOSSIER);
+    expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'c']);
+    definirSousDossier('');
+  });
+});

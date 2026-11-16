@@ -8277,7 +8277,8 @@ function calculsReussis() {
 creerEcranExport(moduleExport.zone('plan'), {
   // « Quoi exporter ? » : volumes, surfaces (par nature), dessins, listes de points ; cochés comme « Afficher ».
   obtenirGroupes: () => {
-    const surfacesDe = (natures) => projet.surfaces.filter((s) => (estImportee(s) ? natures.includes('importee') : natures.includes(s.nature ?? 'stock'))).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
+    // 0.255.0 : « Quoi exporter ? » ne propose que ce qui est dans le dossier choisi.
+    const surfacesDe = (natures) => projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && (estImportee(s) ? natures.includes('importee') : natures.includes(s.nature ?? 'stock'))).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
     return [
       { titre: 'Volumes', elements: projet.calculs.map((c) => ({ id: c.id, nom: nomDuCalcul(c, projet.surfaces), defaut: estAffichee(c.surface1Id) })) },
       { titre: 'Stocks', elements: surfacesDe(['stock']) },
@@ -8285,10 +8286,10 @@ creerEcranExport(moduleExport.zone('plan'), {
       { titre: 'Terrassement', elements: surfacesDe(['terrassement']) },
       { titre: 'Surfaces (dessins)', elements: surfacesDe(['surface']) },
       { titre: 'Surfaces importées', elements: surfacesDe(['importee']) },
-      { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
+      { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0 && estMontre(projet, d, 'dessin')).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
       {
         titre: 'Listes de points',
-        elements: projet.leves.map((l) => ({
+        elements: projet.leves.filter((l) => estMontre(projet, l, 'leve')).map((l) => ({
           id: l.id,
           nom: l.nom,
           // Levé du récepteur : coché si c'est le levé affiché ; fichier importé : comme « Afficher ».
