@@ -320,6 +320,8 @@ export function creerNavigation(nav, actions) {
   function ouvrirPage() {
     actions.avantPage?.();
     pageOuverte = true;
+    const zone = page.querySelector('.zone-tuiles-applis');
+    if (zone) zone.scrollTop = 0; // une page qu'on ouvre commence en haut
     dessinerPage();
     placerSousEntete(page);
     page.hidden = false;
@@ -341,13 +343,19 @@ export function creerNavigation(nav, actions) {
   }
 
   const comptes0 = () => actions.comptes?.() ?? '';
+  // Ce qui, dans l'encadré du projet, peut changer : la page n'est redessinée que si cela change.
+  // 0.270.1 : avant, la comparaison de mettreAJour ne prenait pas la même chose (toujours « changé ») :
+  // la page était redessinée à chaque mise à jour de Lever (5 fois par seconde avec le récepteur) et remontait en haut.
+  const signaturePage = () => JSON.stringify([actions.projet(), comptes0(), actions.sousDossiers?.() ?? null]);
 
   function dessinerPage() {
     const favoris = lireFavoris();
     // 0.257.0 : la page est redessinée souvent ; la ligne des dossiers garde sa position (sinon elle revenait au début pendant le défilement).
     const defilementDossiers = page.querySelector('.puces-dossiers')?.scrollLeft ?? null;
+    // 0.270.1 : la liste des tuiles garde aussi sa position quand la page est redessinée.
+    const defilementTuiles = page.querySelector('.zone-tuiles-applis')?.scrollTop ?? null;
     const { titre, detail } = actions.projet();
-    dernierProjet = JSON.stringify([{ titre, detail }, comptes0(), actions.sousDossiers?.() ?? null]);
+    dernierProjet = signaturePage();
     const courante = actions.courante();
     const comptes = actions.comptes?.() ?? '';
     const nouveau = actions.nouveauProjet
@@ -424,6 +432,8 @@ export function creerNavigation(nav, actions) {
         <button type="button" class="bouton-pied-applis" data-pied="reglages">${svg(ICONE_REGLAGES)}Réglages</button>
       </div>`;
     suivreLigneDossiers(defilementDossiers);
+    const zoneTuiles = page.querySelector('.zone-tuiles-applis');
+    if (zoneTuiles && defilementTuiles != null) zoneTuiles.scrollTop = defilementTuiles;
   }
 
   /**
@@ -479,8 +489,7 @@ export function creerNavigation(nav, actions) {
   function mettreAJour() {
     // Page ouverte avant que le projet soit chargé (démarrage) : son encadré suit le nom du projet.
     if (pageOuverte && !deplacement) {
-      const projet = JSON.stringify([actions.projet(), actions.comptes?.() ?? '']);
-      if (projet !== dernierProjet) dessinerPage();
+      if (signaturePage() !== dernierProjet) dessinerPage();
     }
     const courante = pageOuverte ? null : actions.courante();
     const appli = courante ? appliDeCle(courante) : null;
