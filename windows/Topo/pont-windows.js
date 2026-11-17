@@ -14,6 +14,8 @@
     pointRecuLe: 0,
     reglages: { 1: depart.reglages1 || '{}', 2: depart.reglages2 || '{}' },
     journal: '',
+    // 0.266.0 : boutons + / − de la tablette (codes appris, apprentissage en cours, erreur), voir BoutonsTablette.cs.
+    boutons: depart.boutons ? JSON.stringify(depart.boutons) : '{}',
   };
 
   function envoyer(fonction) {
@@ -51,6 +53,10 @@
       if (window.recevoirPositionTablette) window.recevoirPositionTablette(tablette);
     },
     reglages: function (numero, texteJson) { copie.reglages[numero] = texteJson; },
+    boutons: function (etat) {
+      copie.boutons = JSON.stringify(etat);
+      if (window.recevoirBoutonsTablette) window.recevoirBoutonsTablette(etat);
+    },
   };
 
   // Clavier tactile (0.256.4) : Windows ne le sort pas toujours tout seul dans une fenêtre d'appli. Un champ de texte touché
@@ -128,5 +134,8 @@
     lireAdresse: function (numero, adresse) { envoyer('lireAdresse', numero, adresse); },
     // Propre à Windows : télécharge le nouveau Topo.exe, le met à la place de celui-ci et relance l'appli.
     installerMiseAJour: function (adresse) { envoyer('installerMiseAJour', adresse); },
+    // Propre à Windows (0.266.0) : boutons + / − de la tablette → changer de programme. quoi : 'plus', 'moins', 'oublier', 'annuler'.
+    apprendreBouton: function (quoi) { envoyer('apprendreBouton', quoi); },
+    lireBoutonsTablette: function () { return copie.boutons; },
   };
 })();

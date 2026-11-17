@@ -91,7 +91,7 @@ export function svgCoupeAxe({ reseau, terrain = [], croisements = [], ifc = [], 
   let cumul = 0;
   reseau.sommets.forEach((s, i) => {
     if (i > 0) cumul += Math.hypot(s.est - reseau.sommets[i - 1].est, s.nord - reseau.sommets[i - 1].nord);
-    sommetsD.push({ d: cumul, fe: s.fe });
+    sommetsD.push({ d: cumul, fe: s.fe, interpole: Boolean(s.interpole) });
   });
   const zs = [
     ...sommetsD.flatMap((s) => [s.fe, s.fe + reseau.diametre, ...(t ? [s.fe - t.hauteur] : []), ...(t && terrain.length === 0 ? [s.fe + HAUTEUR_SANS_SURFACE] : [])]),
@@ -130,7 +130,10 @@ export function svgCoupeAxe({ reseau, terrain = [], croisements = [], ifc = [], 
   sommetsD.forEach((p, i) => {
     s += `<circle class="fe-coupe" cx="${f(c.X(p.d))}" cy="${f(c.Z(p.fe))}" r="4" />`;
     const bord = i === sommetsD.length - 1 ? -1 : 1;
-    s += `<text class="texte-coupe" x="${f(c.X(p.d) + 5 * bord)}" y="${f(c.Z(p.fe) + 16)}" text-anchor="${bord < 0 ? 'end' : 'start'}" style="fill:${couleur}">${nombre3(p.fe)}</text>`;
+    // 0.266.0 : FE interpolé (pas tapé) : gris italique, « interpolé ».
+    s += p.interpole
+      ? `<text class="texte-coupe fe-interpole-coupe" x="${f(c.X(p.d) + 5 * bord)}" y="${f(c.Z(p.fe) + 16)}" text-anchor="${bord < 0 ? 'end' : 'start'}">${nombre3(p.fe)} interpolé</text>`
+      : `<text class="texte-coupe" x="${f(c.X(p.d) + 5 * bord)}" y="${f(c.Z(p.fe) + 16)}" text-anchor="${bord < 0 ? 'end' : 'start'}" style="fill:${couleur}">${nombre3(p.fe)}</text>`;
   });
   // Pente de chaque segment, au milieu.
   pentesDesSegments(reseau).forEach((pente, i) => {

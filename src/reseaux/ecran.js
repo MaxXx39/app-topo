@@ -5,7 +5,8 @@
 // les actions passent par data-action (voir main.js « Réseaux »).
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
-import { TYPES_RESEAU, couleurDuType, pentesDesSegments, longueurReseau, CIBLES_RESEAU, ALTITUDES_RESEAU } from '../topo/reseau.js';
+import { TYPES_RESEAU, couleurDuType, pentesDesSegments, longueurReseau, CIBLES_RESEAU, ALTITUDES_RESEAU, fesInterpoles } from '../topo/reseau.js';
+import { ACCROCHES } from '../leve/ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { ICONES_LIGNE } from '../outils/icones.js';
 
@@ -15,20 +16,57 @@ function puces(types, actif) {
   return `<div class="puces-types" role="group" aria-label="Type de réseau">${types.map((t) => `<button type="button" class="puce-type ${t.cle === actif ? 'actif' : ''}" style="--couleur:${t.couleur}" data-action="type-reseau" data-valeur="${echapper(t.cle)}" aria-pressed="${t.cle === actif}">${echapper(t.cle)}</button>`).join('')}</div>`;
 }
 
+// Accroches du mode « Point par point » (0.266.0, comme Implanter).
+const ACCROCHES_RESEAU = ['point', 'sommet', 'milieu', 'ligne', 'croisement', 'centre'];
+
+/** Lecture d'un nombre tapé (virgule acceptée), ou null. */
+const nombreTape = (texte) => {
+  const t = String(texte ?? '').trim().replace(',', '.');
+  return t === '' || !Number.isFinite(Number(t)) ? null : Number(t);
+};
+
+/**
+ * Tableau des points d'un tracé avec leur FE (0.266.0) : un FE vide entre deux FE tapés montre le FE interpolé en gris
+ * italique (texte d'exemple du champ) avec « interpolé » à côté. troncon : n° du tronçon (mode « Par calque »), ou null.
+ */
+function tableauPoints(sommets, troncon = null) {
+  const calcules = fesInterpoles(sommets.map((s) => ({ est: s.est, nord: s.nord, fe: nombreTape(s.fe) })));
+  const attributTroncon = troncon == null ? '' : ` data-troncon="${troncon}"`;
+  const lignes = sommets.map((s, i) => {
+    const c = calcules[i];
+    return `<tr><td>${i + 1}</td><td>${nombre(s.est)} · ${nombre(s.nord)}</td>
+      <td class="cellule-fe"><input type="text" inputmode="decimal" data-champ="fe-point-reseau" data-index="${i}"${attributTroncon} value="${echapper(s.fe)}" placeholder="${c.interpole ? c.fe.toFixed(3) : 'FE'}" class="${c.interpole ? 'fe-interpole' : ''}" aria-label="Fil d'eau du point ${i + 1}" />
+        <small class="note-interpole" ${c.interpole ? '' : 'hidden'}>interpolé</small></td></tr>`;
+  }).join('');
+  return `<table class="points-reseau"><thead><tr><th>#</th><th>Est · Nord</th><th>FE</th></tr></thead><tbody>${lignes}</tbody></table>`;
+}
+
+/** Barre d'accroches du mode « Point par point » (mêmes dessins que dans Implanter). */
+function barreAccroches(active) {
+  return `<div class="accroches accroches-reseau" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">${ACCROCHES_RESEAU.map((mode) => {
+    const [mot, nom, dessin] = ACCROCHES[mode];
+    return `<button type="button" class="bouton-accroche ${active === mode ? 'actif' : ''}" data-action="accroche-reseau" data-valeur="${mode}" title="${nom}" aria-label="${nom}" aria-pressed="${active === mode}"><svg viewBox="0 0 24 24" aria-hidden="true">${dessin}</svg><span class="mot-accroche">${mot}</span></button>`;
+  }).join('')}</div>`;
+}
+
 function htmlCreer(b, surfaces) {
+  const mode = (cle, titre) => `<button type="button" data-action="mode-reseau" data-valeur="${cle}" class="${b.mode === cle ? 'actif' : ''}" aria-pressed="${b.mode === cle}">${titre}</button>`;
   const selection = `<div class="choix-segment-reseau" role="group" aria-label="Façon de choisir le tracé">
-      <button type="button" data-action="mode-reseau" data-valeur="dxf" class="${b.mode === 'dxf' ? 'actif' : ''}" aria-pressed="${b.mode === 'dxf'}">Clic sur le DXF</button>
-      <button type="button" data-action="mode-reseau" data-valeur="points" class="${b.mode === 'points' ? 'actif' : ''}" aria-pressed="${b.mode === 'points'}">Point par point</button></div>`;
-  const invite = b.sommets.length === 0
-    ? `<p class="invite-reseau">${b.mode === 'dxf' ? 'Touche une polyligne sur le plan' : 'Touche le premier point sur le plan'}</p>`
+      ${mode('dxf', 'Clic sur le DXF')}${mode('points', 'Point par point')}${mode('calque', 'Par calque')}</div>
+      ${b.mode === 'points' ? barreAccroches(b.accroche) : ''}`;
+  const vide = b.mode === 'calque' ? b.troncons.length === 0 : b.sommets.length === 0;
+  const invites = { dxf: 'Touche une polyligne sur le plan', points: 'Touche le premier point sur le plan', calque: 'Touche une ligne du calque sur le plan' };
+  const invite = vide
+    ? `<p class="invite-reseau">${invites[b.mode] ?? invites.dxf}</p>`
     : b.message ? `<p class="ok-reseau">${echapper(b.message)}</p>` : '';
-  const lignes = b.sommets.map((s, i) => `<tr><td>${i + 1}</td><td>${nombre(s.est)} · ${nombre(s.nord)}</td>
-      <td><input type="text" inputmode="decimal" data-champ="fe-point-reseau" data-index="${i}" value="${echapper(s.fe)}" placeholder="FE" aria-label="Fil d'eau du point ${i + 1}" /></td></tr>`).join('');
-  const points = b.sommets.length > 0
-    ? `<div class="cadre-reseau"><h3>Points du tracé (fil d'eau en m)</h3>
-        <table class="points-reseau"><thead><tr><th>#</th><th>Est · Nord</th><th>FE</th></tr></thead><tbody>${lignes}</tbody></table>
-        <p class="note-reseau">${b.mode === 'points' ? 'Touche un autre point du plan pour continuer. ' : ''}<button type="button" class="bouton-lien" data-action="enlever-point-reseau" ${b.mode === 'points' ? '' : 'hidden'}>enlever le dernier</button></p></div>`
-    : '';
+  let points = '';
+  if (b.mode === 'calque' && b.troncons.length > 0) {
+    points = b.troncons.map((t, k) => `<div class="cadre-reseau"><h3>Tronçon ${k + 1}${b.troncons.length > 1 ? ` / ${b.troncons.length}` : ''} (fil d'eau en m)</h3>${tableauPoints(t.sommets, k)}</div>`).join('');
+  } else if (b.sommets.length > 0) {
+    points = `<div class="cadre-reseau"><h3>Points du tracé (fil d'eau en m)</h3>
+        ${tableauPoints(b.sommets)}
+        <p class="note-reseau">${b.mode === 'points' ? 'Touche un autre point du plan pour continuer. ' : ''}<button type="button" class="bouton-lien" data-action="enlever-point-reseau" ${b.mode === 'points' ? '' : 'hidden'}>enlever le dernier</button></p></div>`;
+  }
   const t = b.tranchee;
   const options = surfaces.map((s) => `<option value="${echapper(s.id)}" ${b.surfaceId === s.id ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('');
   return `<div class="cadre-reseau"><h3>Tracé ${bulle('reseaux')}</h3>${selection}${invite}</div>
@@ -44,7 +82,7 @@ function htmlCreer(b, surfaces) {
         <button type="button" class="bouton-secondaire" data-action="bords-droits-reseau" role="switch" aria-checked="${t.droit}">${t.droit ? ICONES_LIGNE.caseCochee : ICONES_LIGNE.caseVide} Bords droits (blindage, sans talus)</button>
         ${t.droit ? '' : `<label class="ligne-champ-reseau">Pente du talus (H/V)<input type="text" inputmode="decimal" data-champ="talus-tranchee" value="${echapper(t.talus)}" placeholder="ex. 0.500" /></label>`}` : ''}</div>
     <div class="cadre-reseau"><button type="button" class="bouton" data-action="enregistrer-reseau">Enregistrer le réseau</button>
-      <button type="button" class="bouton-secondaire" data-action="recommencer-reseau" ${b.sommets.length === 0 ? 'disabled' : ''}>Recommencer</button></div>`;
+      <button type="button" class="bouton-secondaire" data-action="recommencer-reseau" ${vide ? 'disabled' : ''}>Recommencer</button></div>`;
 }
 
 function htmlVoir(e) {

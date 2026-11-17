@@ -140,7 +140,7 @@ import { PREFIXE_IMPORT } from './topo/doublons.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
 import { htmlEncadreAnnotation } from './annotation/encadre.js';
 import { lignesFichePoint, htmlFichePoint } from './plan/fiche-point.js';
-import { calqueSousLeDoigt, appliquerGelIsolement, reafficherTousLesCalques } from './topo/calque-sous-doigt.js';
+import { calqueSousLeDoigt, appliquerGelIsolement, reafficherTousLesCalques, lignesDuCalque } from './topo/calque-sous-doigt.js';
 import { ajouterAnnotation, trouverAnnotation, supprimerAnnotation, listesAnnotation, nettoyerRemarques, precisionSuffisante, estAnnotation, nomProposeAnnotation, dernierAnnotation, PRECISION_TABLETTE_DEPART } from './topo/annotation.js';
 import { applisDisponibles, appliCourante } from './navigation/applis.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
@@ -148,7 +148,7 @@ import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip 
 import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation, classeTolerance, TOLERANCES_PAR_DEFAUT } from './topo/controle.js';
 import { noterAffichage, appliquerAffichage } from './projet/affichage-appareil.js';
-import { listesDePoints, pointsDesListes, montrerListe, cacherListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, cacherListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, listesCadastre, listesSurfacesImportees, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale, calageParAxes, echelleParDeuxPoints, recalerContenu } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderCases, demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
@@ -1472,6 +1472,17 @@ const reseaux = creerReseaux({
   ifcLeLong: (sommets) => objetsIfcLeLong(projet.plansDxf, sommets),
   ligneSousLeDoigt: ligneDuPlanSousLeDoigt,
   pointSousLeDoigt: pointDuPlanSousLeDoigt,
+  // 0.266.0 : barre d'accroches du mode « Point par point » et mode « Par calque » (toutes les lignes du calque touché).
+  accrocherSous: (mode, position, tolerance) => {
+    const sources = mode === 'point' ? { points: pointsDuProjet(), lignes: [], cercles: [] } : sourcesDesPlans(plansAccrochables(), position, tolerance);
+    return accrocher(mode, position, tolerance, avecToutesLesLignes(mode, sources));
+  },
+  lignesDuCalqueSous: (position, tolerance) => {
+    const plans = plansAccrochables();
+    const trouve = calqueSousLeDoigt(plans, position, tolerance);
+    if (!trouve) return null;
+    return { calque: trouve.calqueNom, lignes: lignesDuCalque(plans.find((p) => p.id === trouve.planId), trouve.calque) };
+  },
   implanter: (ligne) => implanterUnReseau(ligne),
   apresAffichage: () => navigation?.mettreAJour(),
 });
@@ -8861,21 +8872,17 @@ function donneesSousDossiers() {
 
 /**
  * 0.258.0 (demande du 16.11) : choisir un dossier COCHE ce qui y est rangé et DÉCOCHE le reste (listes de points, surfaces, dessins, plans) ;
- * tout reste listé dans « Afficher » et on peut cocher à la main un élément d'un autre dossier. « Tout » recoche tout (0.265.0).
+ * tout reste listé dans « Afficher » et on peut cocher à la main un élément d'un autre dossier. « Tout » remet l'affichage de départ (sans cadastre ni surfaces importées, 0.266.0).
  * Les cases sont celles de la tablette (listesCachees, plan.visible : gardées par affichage-appareil.js).
  */
 function appliquerDossierALAffichage() {
   const choix = sousDossierChoisi();
   const cachees = new Set(projet.listesCachees ?? []);
-  // « Tout » (0.265.0, demande du 17.11) : tout est recoché (plans, listes, surfaces, dessins) ; avant, rien ne changeait et on
-  // restait avec les seules cases du dernier dossier choisi.
+  // « Tout » (0.265.0 / 0.266.0, demandes du 17.11) : l'affichage de départ revient (comme un projet ouvert pour la première fois
+  // sur la tablette, voir projet/affichage-appareil.js) : tout est coché SAUF les points du cadastre et les surfaces importées.
   if (!choix) {
-    for (const { genre, element } of elementsRangeables(projet)) {
-      if (genre === 'reseau') continue;
-      if (genre === 'plan') element.visible = true;
-      else cachees.delete(element.id);
-    }
-    projet.listesCachees = [...cachees];
+    projet.listesCachees = [...listesCadastre(projet), ...listesSurfacesImportees(projet)];
+    for (const plan of projet.plansDxf ?? []) plan.visible = true;
     return;
   }
   const cadastres = new Map((projet.leves ?? []).filter((l) => l.cadastre).map((l) => [planDuCadastre(projet, l)?.id, l]));

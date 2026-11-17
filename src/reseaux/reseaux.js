@@ -2,7 +2,7 @@
 // les données envoyées au plan. main.js lui donne ce dont elle a besoin (projet, surfaces, touchers…) : voir creerReseaux.
 import { htmlReseaux } from './ecran.js';
 import { svgCoupeEnTravers, svgCoupeAxe } from './coupe-svg.js';
-import { nouveauReseau, erreurReseau, coupeEnTravers, croisementsSurAxe, longueurReseau, ligneAImplanterDuReseau, TYPES_RESEAU } from '../topo/reseau.js';
+import { nouveauReseau, erreurReseau, coupeEnTravers, croisementsSurAxe, longueurReseau, ligneAImplanterDuReseau, TYPES_RESEAU, fesInterpoles, lireNomCalque, tronconsDeLignes } from '../topo/reseau.js';
 import { profilSurface } from '../topo/coupe.js';
 
 const nombreTape = (texte) => {
@@ -12,8 +12,11 @@ const nombreTape = (texte) => {
   return Number.isFinite(n) ? n : null;
 };
 const mm = (v) => Math.round(v * 1000) / 1000;
+// « Par calque » : au-delà, le calque touché n'est pas un calque de tuyaux (0.266.0).
+const TRONCONS_MAX = 50;
+// 0.266.0 : accroche du mode « Point par point » (Sommet au départ) ; troncons : mode « Par calque » ([{ sommets }], un réseau chacun).
 const brouillonVide = () => ({
-  mode: 'dxf', type: TYPES_RESEAU[1].cle, nom: '', diametre: '', sommets: [], surfaceId: '', message: '',
+  mode: 'dxf', type: TYPES_RESEAU[1].cle, nom: '', diametre: '', sommets: [], troncons: [], calque: '', accroche: 'sommet', surfaceId: '', message: '',
   tranchee: { actif: false, hauteur: '', largeur: '', talus: '', droit: false },
 });
 
@@ -22,6 +25,8 @@ const brouillonVide = () => ({
  *   conteneur (élément), projet() → le projet, modifie(), majPlan() (redessine le plan), message(texte, ms), vibrer(),
  *   surfaces() → [{ id, nom }] (avec triangles), trianglesDe(id), altitudeDe(id) → (est, nord) → z ou null,
  *   ligneSousLeDoigt(position, tolerance) → [{ est, nord, altitude }] ou null, pointSousLeDoigt(position, tolerance) → { est, nord } ou null,
+ *   accrocherSous(accroche, position, tolerance) → { est, nord, altitude } ou null (0.266.0, barre d'accroches),
+ *   lignesDuCalqueSous(position, tolerance) → { calque (nom), lignes: [[{ est, nord, altitude }]] } ou null (0.266.0, « Par calque »),
  *   ifcSurCoupe(debut, fin), ifcLeLong(sommets) → objets des maquettes IFC coupés (0.262.0, facultatifs),
  * }
  */
@@ -91,7 +96,7 @@ export function creerReseaux(deps) {
       selectionId: etat.vue !== 'creer' ? choisi()?.id ?? null : null,
       afficher: etat.afficher,
       coupe: voir && etat.coupe === 'perp' ? construireCoupe().ligne : null,
-      brouillon: etat.vue === 'creer' ? etat.brouillon.sommets : null,
+      brouillon: etat.vue === 'creer' ? (etat.brouillon.mode === 'calque' ? etat.brouillon.troncons.flatMap((t) => t.sommets) : etat.brouillon.sommets) : null,
     };
   }
 
@@ -112,10 +117,35 @@ export function creerReseaux(deps) {
         ? `✓ Polyligne : ${sommets.length} sommets, fil d'eau = Z de la polyligne`
         : `La polyligne n'a pas toutes ses altitudes (Z à 0) : tape le fil d'eau des ${nbManque} point${nbManque > 1 ? 's' : ''} vides`;
       if (nbManque > 0) deps.vibrer(60);
+    } else if (b.mode === 'calque') {
+      // 0.266.0 : toutes les lignes du calque touché ; un réseau par tronçon ; diamètre et type lus dans le nom du calque ;
+      // FE = Z du DXF 3D (sinon à taper, interpolé entre deux FE).
+      const trouve = deps.lignesDuCalqueSous?.(position, tolerance);
+      if (!trouve || trouve.lignes.length === 0) {
+        deps.message('Aucune ligne sous le doigt', 3000);
+        return;
+      }
+      const troncons = tronconsDeLignes(trouve.lignes);
+      // Calque de dessin (hachures, détails…) touché par erreur : des milliers de morceaux, pas des réseaux.
+      if (troncons.length > TRONCONS_MAX) {
+        deps.message(`Calque « ${trouve.calque} » : ${troncons.length} tronçons, trop pour des réseaux (${TRONCONS_MAX} au plus) : touche une ligne du calque des tuyaux`, 6000);
+        return;
+      }
+      b.calque = trouve.calque;
+      b.troncons = troncons.map((points) => ({
+        sommets: points.map((q) => ({ est: mm(q.est), nord: mm(q.nord), fe: q.altitude == null ? '' : mm(q.altitude).toFixed(3) })),
+      }));
+      const lu = lireNomCalque(trouve.calque);
+      if (lu.diametre != null) b.diametre = String(lu.diametre);
+      if (lu.type) b.type = lu.type;
+      if (!b.nom.trim()) b.nom = [lu.type ?? 'R', lu.diametre].filter((x) => x != null).join('-');
+      const sansZ = b.troncons.reduce((n, t) => n + t.sommets.filter((q) => q.fe === '').length, 0);
+      b.message = `✓ Calque « ${trouve.calque} » : ${b.troncons.length} tronçon${b.troncons.length > 1 ? 's' : ''}${lu.diametre != null ? `, Ø ${lu.diametre}` : ''}${lu.type ? `, ${lu.type}` : ''}${sansZ > 0 ? ` — ${sansZ} point${sansZ > 1 ? 's' : ''} sans Z : FE à taper (interpolé entre deux FE)` : ', FE = Z du DXF'}`;
     } else {
-      const point = deps.pointSousLeDoigt(position, tolerance);
+      // 0.266.0 : barre d'accroches (Point, Sommet, Milieu, Sur ligne, Croisement, Centre) comme dans Implanter.
+      const point = deps.accrocherSous ? deps.accrocherSous(b.accroche, position, tolerance) : deps.pointSousLeDoigt(position, tolerance);
       if (!point) {
-        deps.message('Aucun point sous le doigt', 3000);
+        deps.message('Rien à accrocher sous le doigt', 3000);
         return;
       }
       const dernier = b.sommets.at(-1);
@@ -131,14 +161,21 @@ export function creerReseaux(deps) {
     afficher();
   }
 
-  function lireBrouillon() {
+  /** Sommets avec leur FE : tapé, sinon interpolé entre deux FE (0.266.0, marqué « interpole »). */
+  function sommetsAvecFe(sommets) {
+    const tapes = sommets.map((s) => ({ est: s.est, nord: s.nord, fe: nombreTape(s.fe) }));
+    const calcules = fesInterpoles(tapes);
+    return tapes.map((s, k) => (calcules[k].interpole ? { ...s, fe: calcules[k].fe, interpole: true } : s));
+  }
+
+  function lireBrouillon(sommets = etat.brouillon.sommets, nom = etat.brouillon.nom.trim()) {
     const b = etat.brouillon;
     const t = b.tranchee;
     return nouveauReseau({
       type: b.type,
-      nom: b.nom.trim(),
+      nom,
       diametre: nombreTape(b.diametre) == null ? null : nombreTape(b.diametre) / 1000,
-      sommets: b.sommets.map((s) => ({ est: s.est, nord: s.nord, fe: nombreTape(s.fe) })),
+      sommets: sommetsAvecFe(sommets),
       tranchee: t.actif ? { hauteur: nombreTape(t.hauteur), largeur: nombreTape(t.largeur), talus: t.droit ? 0 : nombreTape(t.talus) } : null,
       surfaceId: b.surfaceId || null,
       source: b.mode,
@@ -146,23 +183,34 @@ export function creerReseaux(deps) {
   }
 
   function enregistrer() {
-    const reseau = lireBrouillon();
-    const erreur = erreurReseau(reseau);
-    if (erreur) {
-      alert(`Réseau non enregistré : ${erreur}`);
+    const b = etat.brouillon;
+    // « Par calque » (0.266.0) : un réseau par tronçon, nommés « nom-1 », « nom-2 »… s'il y en a plusieurs.
+    const listes = b.mode === 'calque' ? b.troncons.map((t) => t.sommets) : [b.sommets];
+    if (listes.length === 0) {
+      alert('Réseau non enregistré : touche d\'abord une ligne du calque.');
       return;
     }
-    if (liste().some((r) => r.nom === reseau.nom)) {
-      alert(`Réseau non enregistré : le nom « ${reseau.nom} » existe déjà.`);
-      return;
+    const base = b.nom.trim();
+    const reseaux = listes.map((sommets, k) => lireBrouillon(sommets, listes.length > 1 ? `${base}-${k + 1}` : base));
+    for (const [k, reseau] of reseaux.entries()) {
+      const erreur = erreurReseau(reseau);
+      if (erreur) {
+        alert(`Réseau non enregistré${listes.length > 1 ? ` (tronçon ${k + 1})` : ''} : ${erreur}`);
+        return;
+      }
+      if (liste().some((r) => r.nom === reseau.nom)) {
+        alert(`Réseau non enregistré : le nom « ${reseau.nom} » existe déjà.`);
+        return;
+      }
     }
-    liste().push(reseau);
+    liste().push(...reseaux);
+    const reseau = reseaux[0];
     etat.selectionId = reseau.id;
     etat.abscisse = longueurReseau(reseau) / 2;
     etat.brouillon = { ...brouillonVide(), type: etat.brouillon.type, mode: etat.brouillon.mode };
     etat.vue = 'voir';
     deps.modifie();
-    deps.message(`Réseau « ${reseau.nom} » enregistré`, 2500);
+    deps.message(reseaux.length > 1 ? `${reseaux.length} réseaux enregistrés (${reseaux[0].nom} … ${reseaux.at(-1).nom})` : `Réseau « ${reseau.nom} » enregistré`, 2500);
     afficher();
   }
 
@@ -174,12 +222,13 @@ export function creerReseaux(deps) {
     const b = etat.brouillon;
     switch (action) {
       case 'vue-reseaux': etat.vue = valeur; break;
-      case 'mode-reseau': b.mode = valeur; b.sommets = []; b.message = ''; break;
+      case 'mode-reseau': b.mode = valeur; b.sommets = []; b.troncons = []; b.message = ''; break;
+      case 'accroche-reseau': b.accroche = valeur; break;
       case 'type-reseau': b.type = valeur; break;
       case 'tranchee-reseau': b.tranchee.actif = !b.tranchee.actif; break;
       case 'bords-droits-reseau': b.tranchee.droit = !b.tranchee.droit; break;
       case 'enlever-point-reseau': b.sommets.pop(); break;
-      case 'recommencer-reseau': b.sommets = []; b.message = ''; break;
+      case 'recommencer-reseau': b.sommets = []; b.troncons = []; b.message = ''; break;
       case 'enregistrer-reseau': enregistrer(); return;
       case 'choisir-reseau': etat.selectionId = id; etat.abscisse = longueurReseau(liste().find((r) => r.id === id)) / 2; break;
       case 'coupe-reseau': etat.coupe = valeur; break;
@@ -213,6 +262,23 @@ export function creerReseaux(deps) {
     afficher();
   });
 
+  /**
+   * FE interpolés mis à jour sur place pendant la frappe (0.266.0) : sans redessiner l'écran (le clavier reste ouvert).
+   * Le FE interpolé est écrit en gris italique dans le champ vide (texte d'exemple) avec « interpolé » à côté.
+   */
+  function majInterpoles(sommets, troncon) {
+    const calcules = fesInterpoles(sommets.map((s) => ({ est: s.est, nord: s.nord, fe: nombreTape(s.fe) })));
+    const filtre = troncon != null ? `[data-troncon="${troncon}"]` : ':not([data-troncon])';
+    for (const champ of conteneur.querySelectorAll(`[data-champ="fe-point-reseau"]${filtre}`)) {
+      const c = calcules[Number(champ.dataset.index)];
+      const interpole = Boolean(c?.interpole);
+      champ.placeholder = interpole ? c.fe.toFixed(3) : 'FE';
+      champ.classList.toggle('fe-interpole', interpole);
+      const note = champ.parentElement.querySelector('.note-interpole');
+      if (note) note.hidden = !interpole;
+    }
+  }
+
   // Champs : on retient ce qui est tapé sans redessiner (le clavier reste ouvert).
   conteneur.addEventListener('input', (evenement) => {
     const champ = evenement.target.dataset?.champ;
@@ -223,7 +289,12 @@ export function creerReseaux(deps) {
     else if (champ === 'hauteur-tranchee') b.tranchee.hauteur = v;
     else if (champ === 'largeur-tranchee') b.tranchee.largeur = v;
     else if (champ === 'talus-tranchee') b.tranchee.talus = v;
-    else if (champ === 'fe-point-reseau') b.sommets[Number(evenement.target.dataset.index)].fe = v;
+    else if (champ === 'fe-point-reseau') {
+      const t = evenement.target.dataset.troncon;
+      const sommets = t != null ? b.troncons[Number(t)].sommets : b.sommets;
+      sommets[Number(evenement.target.dataset.index)].fe = v;
+      majInterpoles(sommets, t);
+    }
     else if (champ === 'abscisse-reseau') {
       etat.abscisse = Number(v);
       const { coupeSvg } = construireCoupe();

@@ -243,3 +243,78 @@ export function ligneAImplanterDuReseau(reseau, cible = 'axe', altitude = 'fe') 
     decalage,
   };
 }
+
+/**
+ * Fils d'eau interpolés (0.266.0, demande du 17.11) : un point sans FE, entre deux points qui en ont un, reçoit le FE
+ * interpolé selon la longueur le long du tracé (en plan : entre deux FE la pente est constante, la longueur le long
+ * du tuyau donne donc la même proportion). Avant le premier FE ou après le dernier : rien (à taper).
+ * - sommets : [{ est, nord, fe }] (fe : nombre, ou null / vide)
+ * Renvoie un tableau de la même longueur : { fe (m, au mm, ou null), interpole (vrai si calculé) }.
+ */
+export function fesInterpoles(sommets) {
+  const fe = sommets.map((s) => (nombreOk(s.fe) ? s.fe : null));
+  const cumul = [0];
+  for (let k = 1; k < sommets.length; k++) cumul.push(cumul[k - 1] + Math.hypot(sommets[k].est - sommets[k - 1].est, sommets[k].nord - sommets[k - 1].nord));
+  return fe.map((valeur, k) => {
+    if (valeur != null) return { fe: valeur, interpole: false };
+    let a = k - 1;
+    while (a >= 0 && fe[a] == null) a--;
+    let b = k + 1;
+    while (b < fe.length && fe[b] == null) b++;
+    if (a < 0 || b >= fe.length || cumul[b] === cumul[a]) return { fe: null, interpole: false };
+    const r = (cumul[k] - cumul[a]) / (cumul[b] - cumul[a]);
+    return { fe: Math.round((fe[a] + r * (fe[b] - fe[a])) * 1000) / 1000, interpole: true };
+  });
+}
+
+/**
+ * Diamètre et type lus dans le nom d'un calque DXF (0.266.0) : le nom peut être écrit n'importe comment
+ * (« perrin-ec-200 » = EC, 200 mm ; « Aaa-800 » = 800 mm, type inconnu ; « C-EC_PVC_200 »).
+ * Diamètre = premier nombre de 2 à 4 chiffres (mm) ; type = EC, EU, AEP, Gaz ou Drainage écrit comme un mot
+ * (sans tenir compte des majuscules, aussi collé au nombre : « EC200 »).
+ * Renvoie { diametre (mm, ou null), type (clé de TYPES_RESEAU, ou null) }.
+ */
+export function lireNomCalque(nom) {
+  const texte = String(nom ?? '');
+  const morceaux = texte.split(/[^A-Za-z0-9]+/).filter(Boolean);
+  let diametre = null;
+  let type = null;
+  for (const morceau of morceaux) {
+    const colle = morceau.match(/^([A-Za-z]+)(\d{2,4})$/); // « EC200 »
+    const mot = colle ? colle[1] : morceau;
+    const chiffres = colle ? colle[2] : /^\d{2,4}$/.test(morceau) ? morceau : null;
+    if (diametre == null && chiffres) diametre = Number(chiffres);
+    if (type == null) type = TYPES_RESEAU.find((t) => t.cle.toLowerCase() === mot.toLowerCase())?.cle ?? null;
+  }
+  return { diametre, type };
+}
+
+/**
+ * Lignes d'un calque mises en tronçons (0.266.0, « Par calque ») : les lignes qui se touchent bout à bout (à 1 cm près)
+ * sont mises ensemble, dans le bon sens ; un embranchement (3 lignes au même bout) arrête le tronçon.
+ * - lignes : [[{ est, nord, altitude }]] ; renvoie [[{ est, nord, altitude }]] (un tableau de points par tronçon).
+ */
+export function tronconsDeLignes(lignes, tolerance = 0.01) {
+  const restantes = lignes.filter((l) => l.length >= 2).map((l) => [...l]);
+  const proche = (p, q) => Math.hypot(p.est - q.est, p.nord - q.nord) <= tolerance;
+  // Nombre de bouts de lignes à cet endroit (pour voir les embranchements).
+  const bouts = (p) => lignes.reduce((n, l) => n + (l.length >= 2 && proche(l[0], p) ? 1 : 0) + (l.length >= 2 && proche(l.at(-1), p) ? 1 : 0), 0);
+  const troncons = [];
+  while (restantes.length > 0) {
+    let troncon = restantes.shift();
+    for (let sens = 0; sens < 2; sens++) {
+      for (;;) {
+        const bout = troncon.at(-1);
+        if (bouts(bout) !== 2) break; // bout libre ou embranchement
+        const k = restantes.findIndex((l) => proche(l[0], bout) || proche(l.at(-1), bout));
+        if (k < 0) break;
+        const suite = restantes.splice(k, 1)[0];
+        const dansLeSens = proche(suite[0], bout) ? suite : [...suite].reverse();
+        troncon = [...troncon, ...dansLeSens.slice(1)];
+      }
+      troncon = troncon.reverse(); // puis on prolonge par l'autre bout
+    }
+    troncons.push(troncon);
+  }
+  return troncons;
+}
