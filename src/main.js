@@ -124,7 +124,9 @@ import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecept
 import { correctionsTropAnciennes } from './topo/age-corrections.js';
 import { centreDePoints, MAX_POINTS_CENTRE } from './topo/centre-points.js';
 import { ICONES_LIGNE } from './outils/icones.js';
-import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
+import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette, estDansAppliWindows } from './android/pont.js';
+// 0.267.0 : appli Windows (Topo.exe) : marque sur la page pour sa mise en page (panneau de gauche à 50 %, voir fin de style.css).
+if (estDansAppliWindows()) document.body.classList.add('appli-windows');
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
@@ -140,7 +142,7 @@ import { PREFIXE_IMPORT } from './topo/doublons.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
 import { htmlEncadreAnnotation } from './annotation/encadre.js';
 import { lignesFichePoint, htmlFichePoint } from './plan/fiche-point.js';
-import { calqueSousLeDoigt, appliquerGelIsolement, reafficherTousLesCalques } from './topo/calque-sous-doigt.js';
+import { calqueSousLeDoigt, appliquerGelIsolement, reafficherTousLesCalques, lignesDuCalque } from './topo/calque-sous-doigt.js';
 import { ajouterAnnotation, trouverAnnotation, supprimerAnnotation, listesAnnotation, nettoyerRemarques, precisionSuffisante, estAnnotation, nomProposeAnnotation, dernierAnnotation, PRECISION_TABLETTE_DEPART } from './topo/annotation.js';
 import { applisDisponibles, appliCourante } from './navigation/applis.js';
 import { aAcces, appliquerReglages, estModeBase, lameActive, ouvrirReglages } from './reglages/reglages.js';
@@ -148,7 +150,7 @@ import { sonValidation, sonRefus, sonPerteFix, sonRetourFix, vibrer, piloterBip 
 import { rythmeBip } from './topo/bip.js';
 import { ecartsControle, resultatControle, estControleReussi, controleNecessaire, lireTolerances, csvControles, ajouterPointsControle, delaiControleMs, lireDelaiControle, couleurImplantation, classeTolerance, TOLERANCES_PAR_DEFAUT } from './topo/controle.js';
 import { noterAffichage, appliquerAffichage } from './projet/affichage-appareil.js';
-import { listesDePoints, pointsDesListes, montrerListe, cacherListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
+import { listesDePoints, pointsDesListes, montrerListe, cacherListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, listesCadastre, listesSurfacesImportees, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale, calageParAxes, echelleParDeuxPoints, recalerContenu } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
 import { demanderCases, demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
@@ -1472,6 +1474,17 @@ const reseaux = creerReseaux({
   ifcLeLong: (sommets) => objetsIfcLeLong(projet.plansDxf, sommets),
   ligneSousLeDoigt: ligneDuPlanSousLeDoigt,
   pointSousLeDoigt: pointDuPlanSousLeDoigt,
+  // 0.266.0 : barre d'accroches du mode « Point par point » et mode « Par calque » (toutes les lignes du calque touché).
+  accrocherSous: (mode, position, tolerance) => {
+    const sources = mode === 'point' ? { points: pointsDuProjet(), lignes: [], cercles: [] } : sourcesDesPlans(plansAccrochables(), position, tolerance);
+    return accrocher(mode, position, tolerance, avecToutesLesLignes(mode, sources));
+  },
+  lignesDuCalqueSous: (position, tolerance) => {
+    const plans = plansAccrochables();
+    const trouve = calqueSousLeDoigt(plans, position, tolerance);
+    if (!trouve) return null;
+    return { calque: trouve.calqueNom, lignes: lignesDuCalque(plans.find((p) => p.id === trouve.planId), trouve.calque) };
+  },
   implanter: (ligne) => implanterUnReseau(ligne),
   apresAffichage: () => navigation?.mettreAJour(),
 });
@@ -8861,13 +8874,19 @@ function donneesSousDossiers() {
 
 /**
  * 0.258.0 (demande du 16.11) : choisir un dossier COCHE ce qui y est rangé et DÉCOCHE le reste (listes de points, surfaces, dessins, plans) ;
- * tout reste listé dans « Afficher » et on peut cocher à la main un élément d'un autre dossier. « Tout » ne change aucune case.
+ * tout reste listé dans « Afficher » et on peut cocher à la main un élément d'un autre dossier. « Tout » remet l'affichage de départ (sans cadastre ni surfaces importées, 0.266.0).
  * Les cases sont celles de la tablette (listesCachees, plan.visible : gardées par affichage-appareil.js).
  */
 function appliquerDossierALAffichage() {
   const choix = sousDossierChoisi();
-  if (!choix) return;
   const cachees = new Set(projet.listesCachees ?? []);
+  // « Tout » (0.265.0 / 0.266.0, demandes du 17.11) : l'affichage de départ revient (comme un projet ouvert pour la première fois
+  // sur la tablette, voir projet/affichage-appareil.js) : tout est coché SAUF les points du cadastre et les surfaces importées.
+  if (!choix) {
+    projet.listesCachees = [...listesCadastre(projet), ...listesSurfacesImportees(projet)];
+    for (const plan of projet.plansDxf ?? []) plan.visible = true;
+    return;
+  }
   const cadastres = new Map((projet.leves ?? []).filter((l) => l.cadastre).map((l) => [planDuCadastre(projet, l)?.id, l]));
   for (const { genre, element } of elementsRangeables(projet)) {
     if (genre === 'reseau') continue;

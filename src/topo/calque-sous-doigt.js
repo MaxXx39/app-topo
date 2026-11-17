@@ -90,3 +90,23 @@ export function reafficherTousLesCalques(plansDuProjet) {
   }
   return remis;
 }
+
+/**
+ * Toutes les lignes d'un calque d'un plan (0.266.0, Réseaux « Par calque ») : [[{ est, nord, altitude }]] en MN95 (m).
+ * altitude = Z du DXF 3D, ou null s'il n'y en a pas (Z à 0 = pas d'altitude). Une ligne fermée revient à son début.
+ */
+export function lignesDuCalque(plan, numeroCalque) {
+  const lignes = [];
+  if (!plan?.contenu || !plan.origine) return lignes;
+  for (const trait of plan.contenu.traits ?? []) {
+    if (trait.c !== numeroCalque || trait.p.length < 4) continue;
+    const points = [];
+    for (let i = 0; i + 1 < trait.p.length; i += 2) {
+      const z = trait.z?.[i / 2];
+      points.push({ est: plan.origine.est + trait.p[i], nord: plan.origine.nord + trait.p[i + 1], altitude: typeof z === 'number' && Math.abs(z) > 1e-9 ? z : null });
+    }
+    if (trait.f) points.push({ ...points[0] });
+    lignes.push(points);
+  }
+  return lignes;
+}

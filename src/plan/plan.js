@@ -2040,8 +2040,14 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     const elements = dessin.stocks
       .map((stock, index) => ({ nom: stock.nom, triangles: estVisible(stock) ? dessin.resultats[index]?.trianglesDessus ?? [] : [] }))
       .filter((e) => e.triangles.length > 0);
-    // 0.143.0 : lignes des plans DXF montrés, posées sur la surface dans la 3D.
-    ouvrirVue3d(elements, 'Vue 3D', { lignesDxf: lignesDesPlans(plansDxf.filter((plan) => !plan.cadastre || plan.visible !== false)) });
+    // 0.143.0 : lignes des plans DXF montrés, posées sur la surface dans la 3D (pas la coupe d'une maquette IFC).
+    // 0.264.0 : maquettes IFC montrées (à leur place, calques décochés cachés) ; « Couper » à l'altitude de la coupe en plan.
+    const ifc = plansDxf.filter((plan) => plan.ifc && plan.visible !== false && plan.contenu?.maquette);
+    ouvrirVue3d(elements, 'Vue 3D', {
+      lignesDxf: lignesDesPlans(plansDxf.filter((plan) => !plan.ifc && (!plan.cadastre || plan.visible !== false))),
+      maquettes: ifc.map((plan) => ({ nom: plan.nom, maquette: plan.contenu.maquette, cachees: new Set((plan.calques ?? []).filter((c) => c.visible === false).map((c) => c.nom)) })),
+      altitudeCoupe: ifc.find((plan) => plan.altitudeCoupe != null)?.altitudeCoupe ?? null,
+    });
   });
   // « Seul » : seulement ce sur quoi je travaille (main.js choisit quoi garder).
   const boutonSeul = conteneur.querySelector('[data-action="seul-travail"]');

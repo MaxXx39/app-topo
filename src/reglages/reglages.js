@@ -14,7 +14,7 @@
 //   les appareils (voir listes-partagees.js) ;
 // - « Fermer l'appli » (appli Android seulement), en rouge tout en haut.
 import { echapper } from '../outils/echapper.js';
-import { anydeskDisponible, ouvrirAnydesk, estDansAppliWindows, installerMiseAJourWindows } from '../android/pont.js';
+import { anydeskDisponible, ouvrirAnydesk, estDansAppliWindows, installerMiseAJourWindows, boutonsTabletteDisponibles, apprendreBoutonTablette, etatBoutonsTablette, ecouterBoutonsTablette } from '../android/pont.js';
 import { demanderCode } from '../outils/code.js';
 import { lireListesPartagees } from './listes-partagees.js';
 import { modifierLibellesDeSorte } from '../leve/fenetre-libelles.js';
@@ -234,6 +234,14 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       ${recepteur ? `<div class="page-reglages" data-page="recepteur">
         <button type="button" class="bouton-secondaire bouton-large" data-action="recepteur">Récepteur GNSS, corrections, hauteur de canne…</button>
       </div>` : ''}
+      ${boutonsTabletteDisponibles() ? `<div class="case-reglage listes-reglages seulement-expert boutons-tablette-reglages">
+        <span><strong>Boutons + / − de la tablette</strong><span class="aide" data-zone="boutons-tablette"></span></span>
+        <span class="boutons-libelles">
+          <button type="button" class="bouton-secondaire" data-action="apprendre-bouton" data-valeur="plus">Apprendre +</button>
+          <button type="button" class="bouton-secondaire" data-action="apprendre-bouton" data-valeur="moins">Apprendre −</button>
+          <button type="button" class="bouton-lien bouton-lien-neutre" data-action="apprendre-bouton" data-valeur="oublier">oublier</button>
+        </span>
+      </div>` : ''}
       <p class="aide version-reglages">Version de l'appli : ${__VERSION_APPLI__}${recepteur ? (estDansAppliWindows() ? ' (appli Windows)' : ' (appli Android)') : ''}</p>
       ${recepteur ? `<div class="mise-a-jour-reglages">
         <button type="button" class="bouton-lien bouton-lien-neutre" data-action="chercher-mise-a-jour">Chercher une mise à jour</button>
@@ -287,6 +295,19 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     const titre = fenetre.querySelector('[data-titre-page]');
     if (titre) titre.textContent = PAGES_REGLAGES.find(([c]) => c === cle)?.[1] ?? '';
   }
+  /** Boutons + / − de la tablette Windows (0.266.0) : ce qui est appris, ou « appuie sur le bouton… ». */
+  function montrerBoutonsTablette(etat = etatBoutonsTablette()) {
+    const zone = fenetre.querySelector('[data-zone="boutons-tablette"]');
+    if (!zone) return;
+    if (etat.erreur) zone.textContent = `⚠ ${etat.erreur}`;
+    else if (etat.apprend) zone.textContent = `Appuie maintenant sur le bouton ${etat.apprend === 'plus' ? '+' : '−'} de la tablette…`;
+    else if (etat.plus || etat.moins) zone.textContent = `+ ${etat.plus ? `appris (code ${etat.plus})` : 'pas appris'} · − ${etat.moins ? `appris (code ${etat.moins})` : 'pas appris'} : changer de programme`;
+    else zone.textContent = 'pas encore appris (luminosité normale)';
+  }
+  if (boutonsTabletteDisponibles()) {
+    montrerBoutonsTablette();
+    ecouterBoutonsTablette((etat) => montrerBoutonsTablette(etat));
+  }
   fenetre.addEventListener('click', (evenement) => {
     const onglet = evenement.target.closest('[data-page-reglages]');
     if (onglet) {
@@ -310,6 +331,13 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     }
     if (evenement.target.closest('[data-action="listes"]')) {
       modifierListes();
+      return;
+    }
+    // 0.266.0 (appli Windows) : apprendre les boutons + / − de la tablette (le prochain bouton appuyé est retenu).
+    const apprendre = evenement.target.closest('[data-action="apprendre-bouton"]');
+    if (apprendre) {
+      apprendreBoutonTablette(apprendre.dataset.valeur);
+      montrerBoutonsTablette({ ...etatBoutonsTablette(), apprend: ['plus', 'moins'].includes(apprendre.dataset.valeur) ? apprendre.dataset.valeur : '' });
       return;
     }
     const libelles = evenement.target.closest('[data-action="libelles"]');

@@ -13683,7 +13683,8 @@ body.mode-telephone .barre-accroche:not(.ouverte) .separateur-accroche { display
 /* Réseaux : le plan en haut sur tablette / téléphone (comme Annotation), l'écran dessous. */
 @media (max-width: 899px) {
   body[data-onglet='reseaux'] {
-    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * 0.4);
+    /* 0.266.0 : hauteur du plan réglable avec les flèches ▲ / ▼ (même réglage que Lever et Annotation). */
+    --hauteur-plan-terrain: calc((100svh - var(--hauteur-entete) - var(--hauteur-onglets)) * max(var(--part-plan-terrain, 0.4), var(--part-plan-min, 0.3)));
   }
   body[data-onglet='reseaux'] .panneau-plan {
     display: block;
@@ -13699,7 +13700,7 @@ body.mode-telephone .barre-accroche:not(.ouverte) .separateur-accroche { display
   }
   body[data-onglet='reseaux'] .mise-en-page { padding-top: var(--hauteur-plan-terrain); padding-bottom: 96px; }
   body[data-onglet='reseaux'] .panneau[data-onglet='reseaux'] { padding-top: 4px; border-top-left-radius: 0; border-top-right-radius: 0; }
-  body[data-onglet='reseaux'] .boutons-taille-plan { display: none; }
+  body[data-onglet='reseaux'] .boutons-taille-plan { position: absolute; bottom: 0; left: 50%; z-index: 3; display: flex; gap: 2px; transform: translateX(-50%); }
 }
 .panneau[data-onglet='reseaux'] { border-top: 4px solid #92400e; }
 .ecran-reseaux h3 { border: 0; padding: 0; }
@@ -14017,3 +14018,22 @@ body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; mi
 .choix-face-ifc { display: grid; gap: 4px; margin: 4px 0; }
 .choix-face-ifc .objet-ifc { font-size: 0.85rem; color: var(--texte-doux, #475569); overflow-wrap: anywhere; }
 .puces-face-ifc { display: flex; gap: 6px; flex-wrap: wrap; }
+/* 0.266.0 : Réseaux : barre d'accroches (Point par point) et FE interpolé (gris italique + « interpolé »). */
+.accroches-reseau { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.points-reseau .cellule-fe { white-space: nowrap; }
+.points-reseau input.fe-interpole::placeholder { font-style: italic; color: #64748b; opacity: 1; }
+.points-reseau .note-interpole { margin-left: 4px; font-style: italic; color: #64748b; font-size: 0.75rem; }
+.svg-coupe-reseau .fe-interpole-coupe { font-style: italic; fill: #64748b; }
+/* 0.267.0 : Réseaux : colonne Pente % avec « = » (même pente qu'avant) ; diamètre tapé ou choisi dans la liste. */
+.points-reseau .coord-reseau { font-size: 0.8rem; line-height: 1.2; }
+.points-reseau .cellule-pente { white-space: nowrap; }
+.points-reseau input[data-champ="pente-point-reseau"] { width: 4.5em; }
+.points-reseau input[data-champ="fe-point-reseau"] { width: 6.5em; }
+.points-reseau .bouton-meme-pente { margin-left: 4px; min-width: 32px; min-height: 32px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--fond-carte, #fff); font-weight: 800; }
+.champ-diametre-reseau { display: inline-flex; gap: 6px; align-items: center; }
+.champ-diametre-reseau select { min-height: 36px; }
+/* 0.267.0 (demande du 17.11, photo de la tablette Windows CC180 en paysage) : dans l'appli Windows, le panneau de gauche prend
+   la MOITIÉ de l'écran (le plan un peu moins) ; Topo.exe agrandit aussi toute l'appli de 15 % (Fenetre.cs, FACTEUR_AGRANDI). */
+@media (min-width: 900px) {
+  body.appli-windows { --largeur-panneau: 50vw; }
+}

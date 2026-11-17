@@ -148,4 +148,16 @@ describe('clavier tactile de l\'appli Windows (0.256.4)', () => {
     vi.advanceTimersByTime(200);
     expect(messages).toEqual(['montrerClavier']);
   });
+
+  it('boutons + / − de la tablette (0.266.0) : apprendre, état de départ et état envoyé par Windows', () => {
+    const { page, messages } = lancer({ boutons: { plus: 0, moins: 0, apprend: '', erreur: '' } });
+    expect(JSON.parse(page.AppliAndroid.lireBoutonsTablette())).toEqual({ plus: 0, moins: 0, apprend: '', erreur: '' });
+    page.AppliAndroid.apprendreBouton('plus');
+    expect(messages.at(-1)).toEqual({ fonction: 'apprendreBouton', args: ['plus'] });
+    const recus = [];
+    page.recevoirBoutonsTablette = (etat) => recus.push(etat);
+    page.__topoWindows.boutons({ plus: 175, moins: 0, apprend: '', erreur: '' });
+    expect(recus).toEqual([{ plus: 175, moins: 0, apprend: '', erreur: '' }]);
+    expect(JSON.parse(page.AppliAndroid.lireBoutonsTablette()).plus).toBe(175);
+  });
 });

@@ -521,3 +521,54 @@ export function recalerMaquette(maquette, transformer) {
   });
   return { ...maquette, origine: nouvelle, objets };
 }
+
+/** Couleur d'un calque IFC en [R, V, B] (0 à 255), pour la vue 3D. */
+export function rvbCalqueIfc(nom) {
+  const hex = couleurCalqueIfc(nom).replace('#', '');
+  return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+}
+
+/**
+ * Triangle (3 points { est, nord, altitude }) gardé sous l'altitude "haut" (m) : la partie au-dessus
+ * est coupée. Renvoie 0, 1 ou 2 triangles (le morceau gardé peut être un quadrilatère).
+ */
+export function trianglesSous(triangle, haut) {
+  const dessous = triangle.filter((p) => p.altitude <= haut).length;
+  if (dessous === 3) return [triangle];
+  if (dessous === 0) return [];
+  // Polygone gardé : on parcourt les côtés, on garde les sommets dessous et les points de coupe.
+  const garde = [];
+  for (let k = 0; k < 3; k++) {
+    const p = triangle[k];
+    const q = triangle[(k + 1) % 3];
+    if (p.altitude <= haut) garde.push(p);
+    if ((p.altitude <= haut) !== (q.altitude <= haut)) {
+      const r = (haut - p.altitude) / (q.altitude - p.altitude);
+      garde.push({ est: p.est + r * (q.est - p.est), nord: p.nord + r * (q.nord - p.nord), altitude: haut });
+    }
+  }
+  return garde.length === 3 ? [garde] : [[garde[0], garde[1], garde[2]], [garde[0], garde[2], garde[3]]];
+}
+
+/**
+ * Triangles de la maquette pour la vue 3D (0.264.0) : [{ t: [p, q, r] ({ est, nord, altitude }, m), couleur: [R, V, B] }].
+ * - cachees : noms des calques décochés (pas montrés) ;
+ * - haut : altitude au-dessus de laquelle tout est coupé (case « Couper à la coupe IFC »), ou null.
+ */
+export function trianglesMaquette(maquette, { cachees = new Set(), haut = null } = {}) {
+  const sortie = [];
+  if (!maquette) return sortie;
+  for (const objet of maquette.objets ?? []) {
+    const type = maquette.types?.[objet.t] ?? 'Autres';
+    if (cachees.has(type)) continue;
+    if (haut != null && boiteObjet(objet, maquette.origine).altMin > haut) continue;
+    const couleur = rvbCalqueIfc(type);
+    const s = sommetsEnMetres(objet, maquette.origine);
+    const point = (k) => ({ est: s[3 * k], nord: s[3 * k + 1], altitude: s[3 * k + 2] });
+    for (let k = 0; k + 2 < objet.i.length; k += 3) {
+      const t = [point(objet.i[k]), point(objet.i[k + 1]), point(objet.i[k + 2])];
+      for (const morceau of haut == null ? [t] : trianglesSous(t, haut)) sortie.push({ t: morceau, couleur });
+    }
+  }
+  return sortie;
+}

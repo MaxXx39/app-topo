@@ -9,6 +9,7 @@ import { echapper } from '../outils/echapper.js';
 import { mini, maxi } from '../outils/bornes.js';
 import { draperLignes } from '../topo/drapage.js';
 import { chercheurAltitude } from '../topo/implantation.js';
+import { trianglesMaquette } from '../topo/ifc.js';
 
 /** Centre (m) et taille (plus grand côté en plan, m) des triangles. */
 export function cadreScene(triangles) {
@@ -96,33 +97,121 @@ export function directionNord(vue) {
 }
 
 /**
- * Dessine les triangles sur le canvas (contexte 2D), du plus loin au plus près.
- * options (0.126.0) : couleurs ('altitude' ou 'element' : triangles [{ t, element }]), transparent.
+ * Prépare les triangles pour des dessins rapides (0.265.0 : la 3D avec une maquette IFC ramait) : coordonnées à plat,
+ * couleur de chaque triangle déjà éclairée (texte « rgb(…) »), et numéros des triangles du plus grand au plus petit (pour
+ * l'aperçu pendant un geste). À refaire seulement si les triangles, l'exagération ou les couleurs changent.
+ * options : couleurs ('altitude' ou 'element'), elementDe(n), couleurDe(n) (couleur propre, ex. maquette IFC), exageration.
  */
-export function dessinerScene(contexte, triangles, vue, plage, { couleurs = 'altitude', transparent = false, elementDe = null } = {}) {
+export function preparerScene(triangles, plage, { couleurs = 'altitude', elementDe = null, couleurDe = null, exageration = 1 } = {}) {
+  const n = triangles.length;
+  const xyz = new Float64Array(9 * n);
+  const teintes = new Array(n);
+  const aires = new Float64Array(n);
+  for (let k = 0; k < n; k++) {
+    const t = triangles[k];
+    for (let j = 0; j < 3; j++) {
+      xyz[9 * k + 3 * j] = t[j].est;
+      xyz[9 * k + 3 * j + 1] = t[j].nord;
+      xyz[9 * k + 3 * j + 2] = t[j].altitude ?? 0;
+    }
+    const milieu = ((t[0].altitude ?? 0) + (t[1].altitude ?? 0) + (t[2].altitude ?? 0)) / 3;
+    const lumiere = eclairage(t, exageration);
+    const propre = couleurDe?.(k);
+    const base = propre ?? (couleurs === 'element' && elementDe ? COULEURS_ELEMENTS[elementDe(k) % COULEURS_ELEMENTS.length] : couleurRVB(milieu, plage));
+    teintes[k] = `rgb(${Math.round(base[0] * lumiere)}, ${Math.round(base[1] * lumiere)}, ${Math.round(base[2] * lumiere)})`;
+    // Aire en 3D (m²) : pour garder les plus grands triangles dans l'aperçu.
+    const ux = t[1].est - t[0].est; const uy = t[1].nord - t[0].nord; const uz = (t[1].altitude ?? 0) - (t[0].altitude ?? 0);
+    const vx = t[2].est - t[0].est; const vy = t[2].nord - t[0].nord; const vz = (t[2].altitude ?? 0) - (t[0].altitude ?? 0);
+    aires[k] = Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
+  }
+  const parTaille = Uint32Array.from({ length: n }, (_, k) => k).sort((a, b) => aires[b] - aires[a]);
+  return { n, xyz, teintes, parTaille };
+}
+
+// Nombre de « tiroirs » du tri par profondeur (tri en un passage : assez fin pour l'œil).
+const TIROIRS = 4096;
+
+/**
+ * Dessine une scène préparée (voir preparerScene), du plus loin au plus près (« algorithme du peintre »).
+ * - apercu : vrai pendant un geste : seulement les "max" plus grands triangles, sans lisere (beaucoup plus rapide) ;
+ * - transparent : triangles à moitié transparents.
+ * Les triangles de moins d'un quart de pixel ne sont pas dessinés (invisibles).
+ */
+export function dessinerScene(contexte, scene, vue, { transparent = false, apercu = false, max = 6000 } = {}) {
   contexte.globalAlpha = 1;
   contexte.fillStyle = '#e5ecf2';
   contexte.fillRect(0, 0, vue.largeur, vue.hauteur);
-  const projetes = triangles.map((t, n) => {
-    const sommets = t.map((p) => projeter(p, vue));
-    return { t, n, sommets, profondeur: (sommets[0].profondeur + sommets[1].profondeur + sommets[2].profondeur) / 3 };
-  });
-  projetes.sort((a, b) => b.profondeur - a.profondeur);
+  const total = apercu ? Math.min(scene.n, max) : scene.n;
+  if (total === 0) return;
+  const a = (vue.azimut * Math.PI) / 180;
+  const i = (vue.inclinaison * Math.PI) / 180;
+  const [ca, sa, ci, si] = [Math.cos(a), Math.sin(a), Math.cos(i), Math.sin(i)];
+  const { est: e0, nord: n0, altitude: z0 } = vue.centre;
+  const ex = vue.exageration;
+  const demiL = vue.largeur / 2;
+  const demiH = vue.hauteur / 2;
+  const ech = vue.echelle;
+  const ecran = new Float32Array(6 * total);
+  const profondeurs = new Float32Array(total);
+  const numeros = new Uint32Array(total);
+  let garde = 0;
+  let pMin = Infinity;
+  let pMax = -Infinity;
+  const xyz = scene.xyz;
+  for (let r = 0; r < total; r++) {
+    const k = apercu ? scene.parTaille[r] : r;
+    let p = 0;
+    for (let j = 0; j < 3; j++) {
+      const o = 9 * k + 3 * j;
+      const dx = xyz[o] - e0;
+      const dy = xyz[o + 1] - n0;
+      const dz = (xyz[o + 2] - z0) * ex;
+      const x = dx * ca - dy * sa;
+      const y = dx * sa + dy * ca;
+      ecran[6 * garde + 2 * j] = demiL + x * ech;
+      ecran[6 * garde + 2 * j + 1] = demiH - (y * si + dz * ci) * ech;
+      p += y * ci - dz * si;
+    }
+    const b = 6 * garde;
+    const aire = Math.abs((ecran[b + 2] - ecran[b]) * (ecran[b + 5] - ecran[b + 1]) - (ecran[b + 4] - ecran[b]) * (ecran[b + 3] - ecran[b + 1]));
+    if (aire < 0.5) continue; // moins d'un quart de pixel : invisible
+    profondeurs[garde] = p;
+    numeros[garde] = k;
+    if (p < pMin) pMin = p;
+    if (p > pMax) pMax = p;
+    garde++;
+  }
+  // Tri par profondeur en un passage (tiroirs), du plus loin au plus près.
+  const comptes = new Uint32Array(TIROIRS + 1);
+  const pas = pMax > pMin ? (TIROIRS - 1) / (pMax - pMin) : 0;
+  const tiroir = new Uint16Array(garde);
+  for (let r = 0; r < garde; r++) {
+    tiroir[r] = TIROIRS - 1 - Math.floor((profondeurs[r] - pMin) * pas);
+    comptes[tiroir[r] + 1]++;
+  }
+  for (let t = 1; t <= TIROIRS; t++) comptes[t] += comptes[t - 1];
+  const ordre = new Uint32Array(garde);
+  for (let r = 0; r < garde; r++) ordre[comptes[tiroir[r]]++] = r;
   contexte.globalAlpha = transparent ? 0.55 : 1;
-  for (const { t, n, sommets } of projetes) {
-    const milieu = ((t[0].altitude ?? 0) + (t[1].altitude ?? 0) + (t[2].altitude ?? 0)) / 3;
-    const lumiere = eclairage(t, vue.exageration);
-    const base = couleurs === 'element' && elementDe ? COULEURS_ELEMENTS[elementDe(n) % COULEURS_ELEMENTS.length] : couleurRVB(milieu, plage);
-    const [r, g, b] = base.map((c) => Math.round(c * lumiere));
-    contexte.fillStyle = `rgb(${r}, ${g}, ${b})`;
-    contexte.strokeStyle = contexte.fillStyle;
+  contexte.lineWidth = 1;
+  const lisere = !transparent && !apercu;
+  let teinte = '';
+  for (let q = 0; q < garde; q++) {
+    const r = ordre[q];
+    const b = 6 * r;
+    const couleur = scene.teintes[numeros[r]];
+    if (couleur !== teinte) {
+      teinte = couleur;
+      contexte.fillStyle = couleur;
+      if (lisere) contexte.strokeStyle = couleur;
+    }
     contexte.beginPath();
-    contexte.moveTo(sommets[0].x, sommets[0].y);
-    contexte.lineTo(sommets[1].x, sommets[1].y);
-    contexte.lineTo(sommets[2].x, sommets[2].y);
+    contexte.moveTo(ecran[b], ecran[b + 1]);
+    contexte.lineTo(ecran[b + 2], ecran[b + 3]);
+    contexte.lineTo(ecran[b + 4], ecran[b + 5]);
     contexte.closePath();
     contexte.fill();
-    if (!transparent) contexte.stroke();
+    if (lisere) contexte.stroke(); // cache les fines lignes claires entre triangles voisins
   }
   contexte.globalAlpha = 1;
 }
@@ -201,8 +290,18 @@ function dessinerReperes(contexte, vue, ratio) {
  * si les éléments sont loin les uns des autres), les couleurs (altitude ou par élément), la
  * transparence, le zoom (+ / −, doigts, molette) et « Vue de départ ».
  */
-export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf = [] } = {}) {
-  const elements = Array.isArray(elementsOuTriangles[0]) ? [{ nom: titre, triangles: elementsOuTriangles }] : elementsOuTriangles.filter((e) => e.triangles.length > 0);
+export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf = [], maquettes = [], altitudeCoupe = null } = {}) {
+  const surfaces = Array.isArray(elementsOuTriangles[0]) ? [{ nom: titre, triangles: elementsOuTriangles }] : elementsOuTriangles.filter((e) => e.triangles.length > 0);
+  // Maquettes IFC (0.264.0, Intermédiaire) : un élément par maquette, chaque triangle à la couleur de son type ; « Couper » enlève
+  // tout ce qui est au-dessus de l'altitude de la coupe IFC (choisie dans Plan). maquettes : [{ nom, maquette, cachees (calques décochés) }].
+  let couper = false;
+  const elementsIfc = () => maquettes.map((m) => {
+    const morceaux = trianglesMaquette(m.maquette, { cachees: m.cachees, haut: couper ? altitudeCoupe : null });
+    return { nom: `IFC « ${m.nom} »`, ifc: true, triangles: morceaux.map((x) => x.t), couleurs: morceaux.map((x) => x.couleur) };
+  }).filter((e) => e.triangles.length > 0 || couper);
+  let elements = [...surfaces, ...elementsIfc()];
+  // Hauteurs à l'échelle (×1) quand il y a une maquette IFC (sinon le bâtiment est étiré) ; ×2 pour un terrain seul.
+  const exagerationDepart = maquettes.length > 0 ? 1 : 2;
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-3d';
   const options = elements.length > 1
@@ -214,8 +313,8 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
   fenetre.innerHTML = `
     <div class="entete-3d">
       ${options}
-      <label>Hauteurs ×<span data-vivant="exageration">2</span>
-        <input type="range" min="1" max="5" step="0.5" value="2" data-champ="exageration" /></label>
+      <label>Hauteurs ×<span data-vivant="exageration">${exagerationDepart}</span>
+        <input type="range" min="1" max="5" step="0.5" value="${exagerationDepart}" data-champ="exageration" /></label>
       <button type="button" class="bouton" data-action="fermer">Fermer</button>
     </div>
     <div class="outils-3d">
@@ -225,13 +324,14 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
       </div>
       <label class="case"><input type="checkbox" data-champ="transparent" /> Transparent</label>
       ${lignesDxf.length > 0 ? '<label class="case"><input type="checkbox" data-champ="lignes-dxf" checked /> Lignes DXF</label>' : ''}
+      ${maquettes.length > 0 && altitudeCoupe != null ? `<label class="case"><input type="checkbox" data-champ="couper-ifc" /> Couper l'IFC à ${altitudeCoupe.toFixed(2)}</label>` : ''}
       <span class="zoom-3d">
         <button type="button" class="bouton-secondaire" data-action="zoom-moins" aria-label="Dézoomer">−</button>
         <button type="button" class="bouton-secondaire" data-action="zoom-plus" aria-label="Zoomer">+</button>
         <button type="button" class="bouton-secondaire" data-action="depart" title="Vue de départ">⟲ Départ</button>
       </span>
     </div>
-    ${elements.length === 0 ? '<p class="vide">Aucun levé ni surface avec des triangles sur le plan.</p>' : '<canvas class="toile-3d"></canvas>'}`;
+    ${elements.length === 0 ? '<p class="vide">Aucun levé, surface ni maquette IFC avec des triangles sur le plan.</p>' : '<canvas class="toile-3d"></canvas>'}`;
   document.body.append(fenetre);
   fenetre.addEventListener('close', () => fenetre.remove());
   fenetre.querySelector('[data-action="fermer"]').addEventListener('click', () => fenetre.close());
@@ -245,11 +345,16 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
   if (selecteur) selecteur.value = String(choix);
   let triangles = [];
   let elementDe = () => 0;
+  let couleurDe = () => null;
+  let scene = null; // triangles préparés (preparerScene), refaits si les triangles, l'exagération ou les couleurs changent
+  let enGeste = false;
+  let imagePrevue = false;
+  let minuterieComplete = null;
   let cadre = null;
   let plage = null;
   let drapees = [];
   let voirLignes = true;
-  const vue = { azimut: 0, inclinaison: 35, exageration: 2, centre: null, echelle: 1, largeur: 0, hauteur: 0 };
+  const vue = { azimut: 0, inclinaison: 35, exageration: exagerationDepart, centre: null, echelle: 1, largeur: 0, hauteur: 0 };
   const reglages = { couleurs: 'altitude', transparent: false };
   let zoom = 1;
   const choisir = () => {
@@ -262,11 +367,17 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
       n += e.triangles.length;
     }
     elementDe = (rang) => debuts.find((d) => rang < d.fin)?.i ?? 0;
-    cadre = cadreScene(triangles);
-    plage = plageAltitudes(triangles);
+    // Couleur propre de chaque triangle (maquette IFC), null pour une surface (couleur d'altitude ou par élément).
+    const couleursTri = montres.flatMap(({ e }) => e.couleurs ?? e.triangles.map(() => null));
+    couleurDe = (rang) => couleursTri[rang];
+    const terrain = montres.filter(({ e }) => !e.ifc).flatMap(({ e }) => e.triangles);
+    cadre = cadreScene(triangles.length > 0 ? triangles : terrain);
+    // Couleurs d'altitude et lignes DXF : seulement sur les surfaces (pas sur le bâtiment).
+    plage = plageAltitudes(terrain.length > 0 ? terrain : triangles);
     vue.centre = cadre.centre;
     // 0.143.0 : lignes des plans DXF montrés, posées sur les triangles choisis.
-    drapees = lignesDxf.length > 0 && triangles.length > 0 ? draperLignes(lignesDxf, chercheurAltitude(triangles), { pas: Math.max(0.5, cadre.taille / 400) }) : [];
+    drapees = lignesDxf.length > 0 && terrain.length > 0 ? draperLignes(lignesDxf, chercheurAltitude(terrain), { pas: Math.max(0.5, cadre.taille / 400) }) : [];
+    scene = null; // à préparer au prochain dessin
   };
   const depart = () => {
     vue.azimut = 0;
@@ -274,18 +385,48 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
     zoom = 1;
   };
   choisir();
-  const dessiner = () => {
+  const preparer = () => {
+    scene = preparerScene(triangles, plage, { couleurs: reglages.couleurs, elementDe, couleurDe, exageration: vue.exageration });
+  };
+  // Dessin d'une image. 0.265.0 : pendant un geste (doigt posé), un aperçu (les plus grands triangles) ; le dessin complet
+  // vient 150 ms après le dernier mouvement. Le canvas ne change de taille que si la fenêtre a changé.
+  const dessinerMaintenant = () => {
+    imagePrevue = false;
     const rectangle = toile.getBoundingClientRect();
     const ratio = window.devicePixelRatio || 1;
-    toile.width = Math.round(rectangle.width * ratio);
-    toile.height = Math.round(rectangle.height * ratio);
+    const largeur = Math.round(rectangle.width * ratio);
+    const hauteur = Math.round(rectangle.height * ratio);
+    if (toile.width !== largeur || toile.height !== hauteur) {
+      toile.width = largeur;
+      toile.height = hauteur;
+    }
     vue.largeur = toile.width;
     vue.hauteur = toile.height;
     vue.echelle = (0.75 * Math.min(vue.largeur, vue.hauteur) / cadre.taille) * zoom;
+    if (!scene) preparer();
     const contexte = toile.getContext('2d');
-    dessinerScene(contexte, triangles, vue, plage, { ...reglages, elementDe });
+    dessinerScene(contexte, scene, vue, { transparent: reglages.transparent, apercu: enGeste });
     if (voirLignes) dessinerLignes3d(contexte, drapees, vue, ratio);
     dessinerReperes(contexte, vue, ratio);
+  };
+  // Un seul dessin par image affichée, même si le doigt envoie plusieurs mouvements entre deux images.
+  const dessiner = () => {
+    if (!imagePrevue) {
+      imagePrevue = true;
+      requestAnimationFrame(dessinerMaintenant);
+    }
+  };
+  // Pendant un geste : aperçu tout de suite ; dessin complet quand le doigt est levé (molette : 150 ms après le dernier cran).
+  const dessinerEnGeste = () => {
+    enGeste = true;
+    dessiner();
+    clearTimeout(minuterieComplete);
+    if (doigts.size === 0) minuterieComplete = setTimeout(finirGeste, 150);
+  };
+  const finirGeste = () => {
+    if (!enGeste) return;
+    enGeste = false;
+    dessiner();
   };
   selecteur?.addEventListener('change', () => {
     choix = selecteur.value === 'tout' ? 'tout' : Number(selecteur.value);
@@ -297,6 +438,7 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
     const couleurs = evenement.target.closest('[data-couleurs]')?.dataset.couleurs;
     if (couleurs) {
       reglages.couleurs = couleurs;
+      scene = null;
       for (const b of fenetre.querySelectorAll('[data-couleurs]')) b.classList.toggle('actif', b.dataset.couleurs === couleurs);
     }
     const action = evenement.target.closest('[data-action]')?.dataset.action;
@@ -309,6 +451,17 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
     voirLignes = evenement.target.checked;
     dessiner();
   });
+  // Couper l'IFC (0.264.0) : on refait les triangles des maquettes, sans changer la vue (ni le centre, ni le zoom).
+  fenetre.querySelector('[data-champ="couper-ifc"]')?.addEventListener('change', (evenement) => {
+    couper = evenement.target.checked;
+    elements = [...surfaces, ...elementsIfc()];
+    const centre = vue.centre;
+    const taille = cadre?.taille;
+    choisir();
+    vue.centre = centre;
+    if (taille) cadre.taille = taille;
+    dessiner();
+  });
   fenetre.querySelector('[data-champ="transparent"]').addEventListener('change', (evenement) => {
     reglages.transparent = evenement.target.checked;
     dessiner();
@@ -316,6 +469,7 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
   fenetre.querySelector('[data-champ="exageration"]').addEventListener('input', (evenement) => {
     vue.exageration = Number(evenement.target.value);
     fenetre.querySelector('[data-vivant="exageration"]').textContent = String(vue.exageration);
+    scene = null; // l'éclairage dépend de l'exagération
     dessiner();
   });
   // Un doigt : tourner (gauche / droite) et incliner (haut / bas) ; deux doigts : zoomer.
@@ -339,15 +493,18 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
       vue.inclinaison = Math.min(90, Math.max(5, vue.inclinaison + (evenement.clientY - avant.y) * 0.3));
       doigts.set(evenement.pointerId, { x: evenement.clientX, y: evenement.clientY });
     }
-    dessiner();
+    dessinerEnGeste();
   });
-  const lever = (evenement) => doigts.delete(evenement.pointerId);
+  const lever = (evenement) => {
+    doigts.delete(evenement.pointerId);
+    if (doigts.size === 0) finirGeste();
+  };
   toile.addEventListener('pointerup', lever);
   toile.addEventListener('pointercancel', lever);
   toile.addEventListener('wheel', (evenement) => {
     evenement.preventDefault();
     zoom = Math.min(20, Math.max(0.2, zoom * (evenement.deltaY < 0 ? 1.15 : 1 / 1.15)));
-    dessiner();
+    dessinerEnGeste();
   }, { passive: false });
   requestAnimationFrame(dessiner);
 }

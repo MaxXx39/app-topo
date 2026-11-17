@@ -254,3 +254,25 @@ export function anydeskDisponible() {
 
 /** Ouvre AnyDesk ; s'il n'est pas installé, Android propose de l'installer. */
 export const ouvrirAnydesk = () => window.AppliAndroid.ouvrirAnydesk();
+
+// --- Boutons + / − de la tablette Windows (0.266.0) : changer de programme (Alt+Tab), voir windows/Topo/BoutonsTablette.cs ---
+
+/** Vrai si l'appli Windows sait écouter les boutons de la tablette. */
+export const boutonsTabletteDisponibles = () => estDansAppliWindows() && typeof window.AppliAndroid.apprendreBouton === 'function';
+
+/** 'plus' ou 'moins' : le prochain bouton appuyé est retenu ; 'oublier' : plus aucun ; 'annuler' : arrête d'apprendre. */
+export const apprendreBoutonTablette = (quoi) => window.AppliAndroid.apprendreBouton(quoi);
+
+/** État des boutons : { plus (code ou 0), moins, apprend ('plus' / 'moins' / ''), erreur }. */
+export function etatBoutonsTablette() {
+  try {
+    return JSON.parse(window.AppliAndroid.lireBoutonsTablette() || '{}');
+  } catch {
+    return {};
+  }
+}
+
+/** Appelle "fonction(etat)" à chaque changement (bouton appris, erreur). */
+export function ecouterBoutonsTablette(fonction) {
+  window.recevoirBoutonsTablette = fonction;
+}
