@@ -138,3 +138,37 @@ export function demanderChamps({ titre, champs, note = null }) {
     fenetre.querySelector('input')?.focus();
   });
 }
+
+/**
+ * Petite fenêtre de cases à cocher puis « OK » (0.260.0 : choisir les dossiers d'une liste). options : [{ cle, texte, coche }].
+ * Renvoie la liste des clés cochées avec OK, ou null si la fenêtre est fermée (rien n'est changé).
+ */
+export function demanderCases({ titre, options }) {
+  return new Promise((resoudre) => {
+    const fenetre = document.createElement('dialog');
+    fenetre.className = 'fenetre-choix fenetre-champs';
+    fenetre.innerHTML = `
+      <div class="entete-fenetre-champs">
+        <h2>${echapper(titre)}</h2>
+        <button type="button" class="bouton-retour" data-cle="fermer" title="Fermer" aria-label="Fermer">✕</button>
+      </div>
+      <div class="cases-fenetre">${options.map((o, i) => `<label class="case"><input type="checkbox" data-i="${i}" ${o.coche ? 'checked' : ''} /> ${echapper(o.texte)}</label>`).join('')}</div>
+      <div class="boutons-choix"><button type="button" class="bouton" data-cle="ok"><strong>OK</strong></button></div>`;
+    const finir = (cle) => {
+      const cochees = [...fenetre.querySelectorAll('input[data-i]:checked')].map((c) => options[Number(c.dataset.i)].cle);
+      fenetre.close();
+      resoudre(cle === 'ok' ? cochees : null);
+    };
+    fenetre.addEventListener('click', (evenement) => {
+      const bouton = evenement.target.closest('button[data-cle]');
+      if (bouton) finir(bouton.dataset.cle);
+    });
+    fenetre.addEventListener('cancel', (evenement) => {
+      evenement.preventDefault();
+      finir('fermer');
+    });
+    fenetre.addEventListener('close', () => fenetre.remove());
+    document.body.append(fenetre);
+    fenetre.showModal();
+  });
+}

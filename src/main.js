@@ -12,7 +12,7 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
-import { DOSSIER_LEVE, DOSSIER_ANNOT, lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
+import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -136,7 +136,7 @@ import { messagePdf, messageMauvaisBouton } from './topo/messages-fichier.js';
 import { PREFIXE_IMPORT } from './topo/doublons.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
 import { htmlEncadreAnnotation } from './annotation/encadre.js';
-import { lignesFichePoint, htmlFichePoint, htmlFicheCalque } from './plan/fiche-point.js';
+import { lignesFichePoint, htmlFichePoint } from './plan/fiche-point.js';
 import { calqueSousLeDoigt, appliquerGelIsolement, reafficherTousLesCalques } from './topo/calque-sous-doigt.js';
 import { ajouterAnnotation, trouverAnnotation, supprimerAnnotation, listesAnnotation, nettoyerRemarques, precisionSuffisante, estAnnotation, nomProposeAnnotation, dernierAnnotation, PRECISION_TABLETTE_DEPART } from './topo/annotation.js';
 import { applisDisponibles, appliCourante } from './navigation/applis.js';
@@ -148,7 +148,7 @@ import { noterAffichage, appliquerAffichage } from './projet/affichage-appareil.
 import { listesDePoints, pointsDesListes, montrerListe, cacherListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale, calageParAxes, echelleParDeuxPoints, recalerContenu } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
-import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
+import { demanderCases, demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
 import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { dessinerPlansDxf } from './plan/dxf-canvas.js';
@@ -1250,37 +1250,6 @@ function toucherSelectionCalques(position, tolerance) {
 /** Ferme la fiche d'un point touché sur le plan (0.220.0). */
 function fermerFichePoint() {
   document.querySelector('#fiche-point-plan')?.remove();
-}
-
-/**
- * 0.222.0 (Intermédiaire, à valider) : toucher un élément d'un plan DXF / PDF propose de masquer son calque.
- * Renvoie vrai si un élément est trouvé (la petite fenêtre est ouverte) ; toucher ailleurs la ferme.
- */
-function montrerFicheCalque(position, tolerance) {
-  fermerFichePoint();
-  if (!aAcces('intermediaire')) return false;
-  const trouve = calqueSousLeDoigt(plansDuProjet(), position, tolerance);
-  if (!trouve) return false;
-  const boite = document.createElement('div');
-  boite.id = 'fiche-point-plan';
-  boite.innerHTML = htmlFicheCalque(trouve);
-  const zone = document.querySelector('.panneau-plan')?.getBoundingClientRect();
-  boite.style.cssText = `position: fixed; z-index: 40; left: 8px; right: 8px; bottom: ${Math.max(8, window.innerHeight - (zone?.bottom ?? window.innerHeight) + 34)}px; display: flex; justify-content: center; pointer-events: none;`;
-  boite.addEventListener('click', (evenement) => {
-    const bouton = evenement.target.closest('[data-action]');
-    if (!bouton) return;
-    if (bouton.dataset.action === 'masquer-calque') {
-      const calque = projet.plansDxf.find((p) => p.id === trouve.planId)?.calques[trouve.calque];
-      if (calque) {
-        calque.visible = false;
-        affichageModifie();
-        afficherMessage(`Calque « ${trouve.calqueNom} » masqué (Plan › calques pour le remettre)`, 4000);
-      }
-    }
-    fermerFichePoint();
-  });
-  document.body.append(boite);
-  return true;
 }
 
 /**
@@ -7891,9 +7860,9 @@ const plan = creerPlan(document.querySelector('#plan'), {
     return true;
   },
   quandToucherFichePoint: (point) => montrerFichePoint(point),
-  quandToucherCalque: (position, tolerance) => montrerFicheCalque(position, tolerance),
   quandToucherSelectionCalques: (position, tolerance) => toucherSelectionCalques(position, tolerance),
   quandChoisirCalques: (mode) => choisirCalques(mode),
+  quandChoisirDossiers: (id) => choisirDossiersDeLElement(id),
   // « Voir toute la ligne » (0.118.0) cochée ou décochée (aussi décochée par « Ma position »).
   quandVoirLigne: (coche) => {
     implanter.voirLigne = coche && Boolean(implanter.ligne);
@@ -8665,10 +8634,9 @@ function rangerNouveauxDansLeSousDossier() {
     if (elementsConnus.has(element.id)) continue;
     elementsConnus.add(element.id);
     if (element.sousDossiers !== undefined) continue;
-    // 0.257.0 : un levé direct va dans LEVE (en plus du dossier choisi) ; une liste d'annotations va dans ANNOT.
-    if (genre === 'leve' && estLeveDirect(element)) element.sousDossiers = [...new Set([...dossierChoisi, DOSSIER_LEVE])];
-    else if (genre === 'autre' && estAnnotation(element)) element.sousDossiers = [DOSSIER_ANNOT];
-    else if (dossierChoisi.length > 0) element.sousDossiers = dossierChoisi;
+    // 0.260.0 : les levés (toutes listes de points) et les annotations n'ont pas de dossier de base ; le reste prend le dossier choisi.
+    if (genre === 'leve' || ((genre === 'autre' || genre === 'surface') && (estAnnotation(element) || element.leveId))) continue;
+    if (dossierChoisi.length > 0) element.sousDossiers = dossierChoisi;
   }
 }
 
@@ -8736,6 +8704,26 @@ function appliquerDossierALAffichage() {
     else cachees.add(element.id);
   }
   projet.listesCachees = [...cachees];
+}
+
+/**
+ * Pastille de dossier (ou « + dossier ») touchée dans Afficher (Plan / Points / Surface) : petite fenêtre de cases pour changer les dossiers
+ * de la liste, du plan ou de la surface (Intermédiaire et Expert, 0.260.0). Une surface d'un levé suit son levé.
+ */
+async function choisirDossiersDeLElement(id) {
+  if (!aAcces('intermediaire') || refuserEnLectureSeule()) return;
+  const trouve = elementsRangeables(projet).find((x) => x.element.id === id);
+  if (!trouve) return;
+  const leve = trouve.element.leveId ? projet.leves.find((l) => l.id === trouve.element.leveId) : null;
+  const cible = leve && Array.isArray(leve.sousDossiers) ? leve : trouve.element;
+  const actuels = new Set(sousDossiersEffectifs(projet, trouve.element, trouve.genre));
+  const cochees = await demanderCases({
+    titre: `Dossiers de « ${cible.nom ?? 'cet élément'} »`,
+    options: lireSousDossiers(projet).map((d) => ({ cle: d.nom, texte: d.nom, coche: actuels.has(d.nom) })),
+  });
+  if (!cochees) return;
+  cible.sousDossiers = cochees;
+  modifie();
 }
 
 /** Choisit le sous-dossier de cette tablette pour ce projet et redessine tout. */

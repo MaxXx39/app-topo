@@ -29,11 +29,11 @@ const projet = () => ({
 });
 
 describe('liste des sous-dossiers', () => {
-  it('départ : les 12 dossiers du 16.11 + PIC, LEVE, ANNOT, chacun avec une couleur différente', () => {
+  it('départ : les 12 dossiers du 16.11 + PIC, chacun avec une couleur différente', () => {
     const liste = lireSousDossiers(null, {});
-    expect(liste.map((d) => d.nom)).toEqual(['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC', 'LEVE', 'ANNOT']);
+    expect(liste.map((d) => d.nom)).toEqual(['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC']);
     expect(liste.map((d) => d.nom)).toEqual(SOUS_DOSSIERS_DEPART);
-    expect(new Set(liste.map((d) => d.couleur)).size).toBe(15);
+    expect(new Set(liste.map((d) => d.couleur)).size).toBe(13);
   });
   it('on peut en ajouter ; la liste partagée remplace celle de départ ; un nom inconnu est gris', () => {
     const liste = lireSousDossiers(null, { sousDossiers: ['Voirie', 'Eaux'] });
@@ -100,7 +100,7 @@ describe('ce que montre un dossier', () => {
     const p = projet();
     expect(idsHorsSousDossier(p, '').size).toBe(0);
     const caches = idsHorsSousDossier(p, 'Canalo');
-    expect([...caches].sort()).toEqual(['l1', 'l3', 's1', 'd2'].sort());
+    expect([...caches].sort()).toEqual(['l1', 's1', 'd2'].sort());
     expect(elementsRangeables(p)).toHaveLength(6);
   });
 });
@@ -211,5 +211,17 @@ describe('applications : filtre par dossier selon le mode (0.259.0)', () => {
     expect(estMontre({}, el, 'plan', 'TER.')).toBe(true);
     expect(estDansSousDossier({}, el, 'plan', 'TER.')).toBe(false);
     definirFiltreApplications(true);
+  });
+});
+
+describe('levés sans dossier (0.260.0)', () => {
+  it('un levé ou une annotation sans dossier reste montré dans un dossier choisi (Base) ; une surface suit son levé', async () => {
+    const { estMontre, definirFiltreApplications } = await import('../src/topo/sous-dossiers.js');
+    definirFiltreApplications(true);
+    const projet = { leves: [{ id: 'l1' }] };
+    expect(estMontre(projet, { id: 'l1' }, 'leve', 'TER.')).toBe(true);
+    expect(estMontre(projet, { id: 'a1', nature: 'annotation' }, 'autre', 'TER.')).toBe(true);
+    expect(estMontre(projet, { id: 's1', leveId: 'l1' }, 'surface', 'TER.')).toBe(false);
+    expect(estMontre(projet, { id: 'p1', sousDossiers: ['CANA'] }, 'plan', 'TER.')).toBe(false);
   });
 });

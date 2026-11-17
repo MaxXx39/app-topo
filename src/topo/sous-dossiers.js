@@ -9,11 +9,8 @@
 import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-partagees.js';
 
 // Liste de départ demandée le 16.11 (GEOOFF, GEOPERRIN, TER., CANA, TS, AMEX, SITU, BAT-Rad., BAT-SS, BAT-REZ, BAT, OLD), une couleur différente chacune.
-// 0.257.0 : + PIC (plan d'installation de chantier), LEVE (levés directs) et ANNOT (annotations).
-export const SOUS_DOSSIERS_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC', 'LEVE', 'ANNOT'];
-/** Dossiers où vont d'office les levés directs et les annotations (en plus du dossier choisi pour les levés). */
-export const DOSSIER_LEVE = 'LEVE';
-export const DOSSIER_ANNOT = 'ANNOT';
+// 0.257.0 : + PIC (plan d'installation de chantier). Les levés et les annotations n'ont PAS de dossier de base (0.260.0) : ils restent dans leurs catégories.
+export const SOUS_DOSSIERS_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC'];
 // 15 couleurs distinctes, dans l'ordre de la liste (les dossiers ajoutés ensuite reprennent la 1re, etc.).
 const COULEURS = ['#6b7280', '#7c3aed', '#a16207', '#1d4ed8', '#ea580c', '#84cc16', '#0ea5e9', '#db2777', '#991b1b', '#eab308', '#0f766e', '#111827', '#be185d', '#0369a1', '#65a30d'];
 
@@ -205,6 +202,8 @@ export function suffixeDossiers(projet, element, genre = '') {
 export function estMontre(projet, element, genre = '', choix = choisi) {
   // 0.259.0 : dans les applications, seul le mode Base est filtré par le dossier ; Intermédiaire et Expert listent tout (avec la pastille du dossier).
   if (!filtreApplications) return true;
+  // 0.260.0 : un levé ou une liste d'annotations sans dossier reste montré (ils n'ont pas de dossier de base).
+  if (choix && (genre === 'leve' || genre === 'autre') && sousDossiersEffectifs(projet, element, genre).length === 0) return true;
   return estDansSousDossier(projet, element, genre, choix);
 }
 

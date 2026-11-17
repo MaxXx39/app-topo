@@ -136,7 +136,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 // chaque geste sur le plan (poser, bouger, relâcher, molette) remet le délai de 5 s à zéro.
 const DELAI_RETOUR_SUIVI = 5000;
 
-export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn } = {}) {
+export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandChoisirDossiers, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn } = {}) {
   // Réglage d'une liste : son choix, sinon celui de départ (en dessous d'Expert, les réglages d'Expert gardent leur valeur de départ).
   const reglageListe = (cle, id) => {
     const choix = id != null ? reglagesListe.get(id) : null;
@@ -2166,6 +2166,13 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     const roue = reglages.length > 0 ? `<button type="button" class="roue-menu ${niveau}" data-roue="${section}" aria-expanded="false" title="Réglages" aria-label="Réglages ${titre}"></button>` : '';
     return `<div class="titre-partie-menu titre-avec-roue section-menu-${section}"><span>${titre}</span>${roue}</div>${reglagesSection(section)}`;
   }
+  /** 0.260.0 : pastilles des dossiers d'une liste ; les toucher (Intermédiaire / Expert) ouvre la fenêtre de cases ; sans dossier : petit bouton « + dossier ». */
+  const htmlDossiersCliquables = (id, noms = []) => {
+    const liste = lireSousDossiers();
+    return noms.length > 0
+      ? `<span class="dossiers-cliquables" data-dossiers-de="${id}">${noms.map((nom) => pastilleSousDossier(nom, liste)).join('')}</span>`
+      : `<span class="dossiers-cliquables ajout-dossier seulement-intermediaire" data-dossiers-de="${id}">+ dossier</span>`;
+  };
   let signatureListes = null;
   let couleursDesListes = new Map(); // id d'une liste → couleur choisie (surfaces importées)
   function remplirMenuListes(listes) {
@@ -2177,7 +2184,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     const ligne = (l) => {
       const reglages = REGLAGES_LISTE[l.section] ?? [];
       const entete = `<input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} aria-label="Afficher ${echapper(l.nom)}" />
-          <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span class="nom-liste-menu">${echapper(l.nom)}</span>${htmlEtiquetteNature(l.categorie)}${(l.sousDossiers ?? []).map((nom) => pastilleSousDossier(nom, lireSousDossiers())).join('')}`;
+          <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span class="nom-liste-menu">${echapper(l.nom)}</span>${htmlEtiquetteNature(l.categorie)}${htmlDossiersCliquables(l.id, l.sousDossiers)}`;
       if (reglages.length === 0 && !l.couleurModifiable) return `<div class="ligne-menu-plan"><label class="oeil-plan">${entete}</label></div>`;
       const cases = reglages.map(([cle, titre, n]) => `<label class="case ${n ? `seulement-${n}` : ''}"><input type="checkbox" data-reglage-liste="${cle}" data-id="${l.id}" ${reglageListe(cle, l.id) ? 'checked' : ''} /> ${titre}</label>`).join('');
       const couleur = l.couleurModifiable ? `<div class="couleur-liste-menu"><span>Couleur</span>${paletteCouleur({ couleur: l.couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${l.id}"`, nom: `Couleur de ${l.nom}` })}</div>` : '';
@@ -2262,6 +2269,15 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       if (cible.dataset.sectionToutes) quandMontrerListe?.(`section:${cible.dataset.sectionToutes}`, cible.checked);
     });
   }
+  // Pastille de dossier touchée (dans une case à cocher : on évite de la cocher / décocher).
+  for (const menu of [menuPlans, menuListes, menuSurfaces]) {
+    menu.addEventListener('click', (evenement) => {
+      const cible = evenement.target.closest('[data-dossiers-de]');
+      if (!cible || !quandChoisirDossiers) return;
+      evenement.preventDefault();
+      quandChoisirDossiers(cible.dataset.dossiersDe);
+    });
+  }
   menuPlans.addEventListener('click', (evenement) => {
     const gel = evenement.target.closest('[data-gel-calques]');
     if (!gel) return;
@@ -2304,7 +2320,6 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
   function remplirMenuPlans() {
     // Plans du cadastre : rangés avec leurs points dans « Afficher › Cadastre » (0.116.4).
     const plansDxf = plansDuMenu();
-    const listeDossiers = lireSousDossiers();
     boutonPlans.classList.toggle('tout-cache', plansDxf.length > 0 && plansDxf.every((plan) => plan.visible === false)); // 0.221.0 : tout caché = bouton pâli
     const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${(plan.sousDossiers ?? []).join('+')}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
     if (signature === signatureMenuPlans) return;
@@ -2323,7 +2338,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       </div>`;
     menuPlans.innerHTML = enteteCalques + plansDxf.map((plan) => `<div class="ligne-menu-plan">
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
-          <span>${echapper(plan.nom)}</span>${(plan.sousDossiers ?? []).map((nom) => pastilleSousDossier(nom, listeDossiers)).join('')}</label>
+          <span>${echapper(plan.nom)}</span>${htmlDossiersCliquables(plan.id, plan.sousDossiers)}</label>
         ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
         <label class="reglette-transparence reglette-plan"><b>Trans.</b>
           <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /><span>${plan.transparence ?? 0} %</span></label>

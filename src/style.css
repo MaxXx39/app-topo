@@ -13986,3 +13986,19 @@ body.mode-telephone .entete:has(.bouton-recepteur-entete) { padding-right: calc(
   body.page-applis-ouverte .mise-en-page { height: calc(100vh - var(--hauteur-entete)); }
   body.page-applis-ouverte .page-applis { bottom: 16px; }
 }
+
+/* 0.260.0 (demandes du 17.11) : dossiers un tout petit peu moins hauts (liste du plan, en-tête, page Applications) ; pastilles touchables ; « Ouvrir projet » en ambre clair, un peu plus grand. */
+.dossiers-cliquables { display: inline-flex; flex-wrap: wrap; align-items: center; cursor: pointer; }
+.dossiers-cliquables .pastille-pastel-dossier { padding: 1px 9px; margin: 1px 3px 1px 0; font-size: 0.8rem; }
+.dossiers-cliquables.ajout-dossier { padding: 1px 9px; margin: 1px 3px 1px 0; border: 1px dashed currentColor; border-radius: 999px; font-size: 0.8rem; font-weight: 700; opacity: 0.75; }
+.cases-fenetre { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; padding: 4px 2px 10px; }
+.cases-fenetre .case { min-height: 40px; font-size: 1.05rem; }
+.pastille-entete.pastille-dossier { padding: 3px 12px; }
+.puce-dossier { min-height: 38px; }
+.puces-dossiers .puce-dossier { min-height: 34px; padding: 3px 10px; }
+.puces-dossiers { padding: 2px 2px 8px; }
+.cadre-projet-applis { padding: 8px; }
+.cadre-projet-applis .bandeau-projet-applis { padding: 2px 4px 6px; }
+.bouton-projet.gestion-projets { background: #fdedc4; color: var(--encre); border: 2px solid var(--ambre); }
+.actions-projets .bouton-projet.gestion-projets { min-height: 48px; font-size: 1rem; font-weight: 800; }
+body.theme-sombre .bouton-projet.gestion-projets { background: #fdedc4; color: #1b2b36; }
