@@ -1185,7 +1185,7 @@ export function creerEcranLeve(conteneur, actions) {
             <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>
             <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
           </label>
-          <button type="button" class="bouton bouton-prendre" data-action="prendre" title="Enregistrer le point (ou touche volume −)" disabled>
+          <button type="button" class="bouton bouton-prendre" data-action="prendre" title="Enregistrer le point" disabled>
             <span>Enreg. (Vol. −)</span>
           </button>
         </div>

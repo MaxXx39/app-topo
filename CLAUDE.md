@@ -51,7 +51,7 @@ docs/                tableau des modes (xlsx) ; audit-2026-11/ (présentation de
 - Publier site + APK (seulement sur demande) : PR vers `main`, attendre « construire » et « apk » au vert, fusionner, puis `git fetch origin main && git merge --ff-only origin/main`. Jamais de rebase ni de force-push. Si « apk » échoue avec « a release with the same tag name already exists » : relancer le job une fois.
 - **Windows** : `…/releases/download/windows-derniere-version/Topo.exe` (aussi `Topo-<version>.exe`) ; fabriqué **à la main** (Actions › « Fabriquer l'appli Windows ») ou quand `windows/Topo/**` change ; jamais par un envoi ordinaire.
 - APK : `…/releases/download/apk-derniere-version/Topo.apk` (lien fixe, + `Topo-<version>.apk`).
-- **Publié** : tout jusqu'à la 0.263.0 (PR 99, 17.11 : site, APK et Topo.exe fabriqué depuis `main`). **Non publié** : 0.264.0 → 0.267.0. **Attention** : `windows.yml` se lance à CHAQUE envoi qui touche `windows/Topo/**`, même sur la branche de travail, et publie alors Topo.exe : l'arrêter (Actions › annuler) si l'utilisateur n'a pas demandé Windows (fait pour 0.266.0 et 0.267.0).
+- **Publié** : tout jusqu'à la 0.263.0 (PR 99, 17.11 : site, APK et Topo.exe fabriqué depuis `main`). **Non publié** : 0.264.0 → 0.268.0. **Attention** : `windows.yml` se lance à CHAQUE envoi qui touche `windows/Topo/**`, même sur la branche de travail, et publie alors Topo.exe : l'arrêter (Actions › annuler) si l'utilisateur n'a pas demandé Windows (fait pour 0.266.0 et 0.267.0).
 
 ## Conventions de code
 - **Découpage de `main.js`** : petit à petit, au fil des demandes (jamais en gros) ; même comportement, avec tests et essai Playwright.
@@ -82,7 +82,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.267.0)
+## Fonctionnalités (état à la 0.268.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -124,6 +124,13 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - Récepteur : Bluetooth, NTRIP (swipos), journal NMEA (Expert), 2e GNSS (Expert), GPS tablette, cap automatique, PDOP (colonne de l'export). APK : pont `window.AppliAndroid`, batterie (arrière-plan coupé après 5 min), mise à jour, « Partage écran ».
 - **Drive** : « App Topo › Configuration Projet » ; **une main par projet** (verrou 15 min) ; un appareil n'écrase jamais une version qu'il n'a pas reçue ; **listes partagées** fusionnées partie par partie (`listes-partagees.js`) ; dossiers de projets.
 - **Windows** (`Topo.exe`, jamais lancé sur un vrai Windows) : sert l'appli web à `https://topo.appli/app-topo/` (ne jamais changer l'adresse) et glisse `pont-windows.js` ; port COM, NTRIP, Drive par identifiant « bureau » (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` à créer par l'utilisateur), fichiers dans Documents › Topo › Envois, mise à jour par la release `windows-derniere-version`. Pas fait : appareil photo, touche volume −, vibreur, batterie.
+
+## 0.268.0 — petits retours du 17.11 (à essayer sur la tablette)
+- **Changer de dossier ne bouge plus le plan** (`choisirSousDossier` : `recalculer({ recadrer: false })`) : seulement l'affichage change.
+- **3D** : l'IFC est tout **gris** (`GRIS_IFC`, vue3d.js) ; **deux doigts = zoomer ET déplacer** (`vue.decalX / decalY`, remis à 0 par « Départ »).
+- **Implanter › Surface** : coupe perpendiculaire, axe, Cana et ⚙ sur **une seule ligne**, boutons de 38 px, icônes 26 px (fin de `style.css`).
+- **Windows** : plus de mention « touche volume − » dans le bouton Enreg. ni dans l'aide (Android seulement) ; **Implanter › Point** : cible à droite à la place de la grande carte, mini-plan en encart en haut à droite (`body.appli-windows`, essayé en simulation 1280 × 800, sans vrai point).
+- **Pas fait** (à décider) : Annotation › extrait de plan (Intermédiaire, décidé), appareil photo sous Windows, scroll bloqué sous Windows, bande grise en bas sur tablette (besoin de la séquence exacte), lecture de Leica iCON, WhatsApp (gadget, non).
 
 ## 0.267.0 — Réseaux : pente, nom proposé, liste des diamètres ; Windows à 50 / 50 (demandes du 17.11)
 - **Pente tapée** (colonne « Pente % », dès le 2e point) : FE OU pente pour chaque point (taper l'un vide l'autre) ; **−2 % = le FE descend du point d'avant vers ce point, sens du tracé ; pente = Δh / longueur en plan** (décidé) : FE = FE d'avant + pente / 100 × longueur (`fesDuTrace` : tapé > pente > interpolé). Bouton **« = »** (dès le 3e point) : même pente que le segment d'avant (tapée ou calculée). FE calculé par pente : gris italique + « pente » ; pente calculée : gris italique dans le champ. Clavier `inputmode="text"` pour le signe −.

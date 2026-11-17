@@ -14037,3 +14037,42 @@ body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; mi
 @media (min-width: 900px) {
   body.appli-windows { --largeur-panneau: 50vw; }
 }
+
+/* 0.268.0 (demande du 17.11) : Implanter › Surface : coupe perpendiculaire, axe, Cana et ⚙ sur UNE ligne, bandeau plus bas (plus de place pour la coupe). */
+.choix-coupe { flex-wrap: nowrap; gap: 4px; margin-block: 2px; }
+.choix-coupe .puce-choix { flex: 1 1 0; min-width: 0; min-height: 38px; padding: 0 6px; gap: 4px; font-size: 13px; white-space: nowrap; }
+.choix-coupe .symbole-coupe { width: 26px; height: 26px; }
+.choix-coupe .bouton-roue { flex: none; min-width: 38px; min-height: 38px; margin-left: 0; }
+
+/* 0.268.0 (demande du 17.11) : Implanter › Point sous Windows (paysage) : textes à gauche, CIBLE à droite à la place de la grande carte,
+   avec le mini-plan « Plan » en encart en haut à droite de la cible, comme sur la tablette. */
+@media (min-width: 900px) {
+  body.appli-windows.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .cible-haut {
+    position: fixed;
+    top: calc(var(--hauteur-entete) + 72px);
+    left: calc(var(--largeur-panneau) + 32px);
+    right: 16px;
+    bottom: calc(var(--hauteur-bande, 0px) + 16px);
+    z-index: 12;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--rayon);
+    background: #ffffff;
+    box-shadow: var(--ombre);
+  }
+  body.appli-windows.vue-implantation .vue-guidage .cible-haut .cible-implantation { width: auto; height: 100%; max-width: 100%; max-height: none; }
+  body.appli-windows.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .panneau-plan {
+    position: fixed;
+    top: calc(var(--hauteur-entete) + 72px + 8px);
+    left: auto;
+    right: 24px;
+    width: min(32vw, 340px);
+    height: 240px;
+    z-index: 13;
+    border: 3px solid #0d9488;
+    border-radius: 12px;
+    opacity: 0.9;
+  }
+  body.appli-windows.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .panneau-plan :is(.plan-calques, .plan-boutons, .boutons-taille-plan, .case-voir-ligne, .plan-attribution) { display: none; }
+}

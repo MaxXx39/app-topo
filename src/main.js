@@ -8924,7 +8924,7 @@ function choisirSousDossier(nom) {
   definirSousDossier(nom);
   appliquerDossierALAffichage();
   retenirChoix(projet.id, nom);
-  recalculer({ recadrer: true });
+  recalculer({ recadrer: false }); // 0.268.0 : changer de dossier ne bouge ni la position ni le zoom du plan
   enregistrerBientot(); // les cases cochées par le dossier sont retenues par la tablette
   navigation?.mettreAJour?.();
 }
