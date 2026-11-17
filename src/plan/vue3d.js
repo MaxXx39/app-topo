@@ -9,6 +9,7 @@ import { echapper } from '../outils/echapper.js';
 import { mini, maxi } from '../outils/bornes.js';
 import { draperLignes } from '../topo/drapage.js';
 import { chercheurAltitude } from '../topo/implantation.js';
+import { trianglesMaquette } from '../topo/ifc.js';
 
 /** Centre (m) et taille (plus grand côté en plan, m) des triangles. */
 export function cadreScene(triangles) {
@@ -99,7 +100,7 @@ export function directionNord(vue) {
  * Dessine les triangles sur le canvas (contexte 2D), du plus loin au plus près.
  * options (0.126.0) : couleurs ('altitude' ou 'element' : triangles [{ t, element }]), transparent.
  */
-export function dessinerScene(contexte, triangles, vue, plage, { couleurs = 'altitude', transparent = false, elementDe = null } = {}) {
+export function dessinerScene(contexte, triangles, vue, plage, { couleurs = 'altitude', transparent = false, elementDe = null, couleurDe = null } = {}) {
   contexte.globalAlpha = 1;
   contexte.fillStyle = '#e5ecf2';
   contexte.fillRect(0, 0, vue.largeur, vue.hauteur);
@@ -112,7 +113,9 @@ export function dessinerScene(contexte, triangles, vue, plage, { couleurs = 'alt
   for (const { t, n, sommets } of projetes) {
     const milieu = ((t[0].altitude ?? 0) + (t[1].altitude ?? 0) + (t[2].altitude ?? 0)) / 3;
     const lumiere = eclairage(t, vue.exageration);
-    const base = couleurs === 'element' && elementDe ? COULEURS_ELEMENTS[elementDe(n) % COULEURS_ELEMENTS.length] : couleurRVB(milieu, plage);
+    // Maquette IFC (0.264.0) : toujours la couleur de son type (couleurDe), quel que soit le choix des couleurs.
+    const propre = couleurDe?.(n);
+    const base = propre ?? (couleurs === 'element' && elementDe ? COULEURS_ELEMENTS[elementDe(n) % COULEURS_ELEMENTS.length] : couleurRVB(milieu, plage));
     const [r, g, b] = base.map((c) => Math.round(c * lumiere));
     contexte.fillStyle = `rgb(${r}, ${g}, ${b})`;
     contexte.strokeStyle = contexte.fillStyle;
@@ -201,8 +204,18 @@ function dessinerReperes(contexte, vue, ratio) {
  * si les éléments sont loin les uns des autres), les couleurs (altitude ou par élément), la
  * transparence, le zoom (+ / −, doigts, molette) et « Vue de départ ».
  */
-export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf = [] } = {}) {
-  const elements = Array.isArray(elementsOuTriangles[0]) ? [{ nom: titre, triangles: elementsOuTriangles }] : elementsOuTriangles.filter((e) => e.triangles.length > 0);
+export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf = [], maquettes = [], altitudeCoupe = null } = {}) {
+  const surfaces = Array.isArray(elementsOuTriangles[0]) ? [{ nom: titre, triangles: elementsOuTriangles }] : elementsOuTriangles.filter((e) => e.triangles.length > 0);
+  // Maquettes IFC (0.264.0, Intermédiaire) : un élément par maquette, chaque triangle à la couleur de son type ; « Couper » enlève
+  // tout ce qui est au-dessus de l'altitude de la coupe IFC (choisie dans Plan). maquettes : [{ nom, maquette, cachees (calques décochés) }].
+  let couper = false;
+  const elementsIfc = () => maquettes.map((m) => {
+    const morceaux = trianglesMaquette(m.maquette, { cachees: m.cachees, haut: couper ? altitudeCoupe : null });
+    return { nom: `IFC « ${m.nom} »`, ifc: true, triangles: morceaux.map((x) => x.t), couleurs: morceaux.map((x) => x.couleur) };
+  }).filter((e) => e.triangles.length > 0 || couper);
+  let elements = [...surfaces, ...elementsIfc()];
+  // Hauteurs à l'échelle (×1) quand il y a une maquette IFC (sinon le bâtiment est étiré) ; ×2 pour un terrain seul.
+  const exagerationDepart = maquettes.length > 0 ? 1 : 2;
   const fenetre = document.createElement('dialog');
   fenetre.className = 'fenetre-3d';
   const options = elements.length > 1
@@ -214,8 +227,8 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
   fenetre.innerHTML = `
     <div class="entete-3d">
       ${options}
-      <label>Hauteurs ×<span data-vivant="exageration">2</span>
-        <input type="range" min="1" max="5" step="0.5" value="2" data-champ="exageration" /></label>
+      <label>Hauteurs ×<span data-vivant="exageration">${exagerationDepart}</span>
+        <input type="range" min="1" max="5" step="0.5" value="${exagerationDepart}" data-champ="exageration" /></label>
       <button type="button" class="bouton" data-action="fermer">Fermer</button>
     </div>
     <div class="outils-3d">
@@ -225,13 +238,14 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
       </div>
       <label class="case"><input type="checkbox" data-champ="transparent" /> Transparent</label>
       ${lignesDxf.length > 0 ? '<label class="case"><input type="checkbox" data-champ="lignes-dxf" checked /> Lignes DXF</label>' : ''}
+      ${maquettes.length > 0 && altitudeCoupe != null ? `<label class="case"><input type="checkbox" data-champ="couper-ifc" /> Couper l'IFC à ${altitudeCoupe.toFixed(2)}</label>` : ''}
       <span class="zoom-3d">
         <button type="button" class="bouton-secondaire" data-action="zoom-moins" aria-label="Dézoomer">−</button>
         <button type="button" class="bouton-secondaire" data-action="zoom-plus" aria-label="Zoomer">+</button>
         <button type="button" class="bouton-secondaire" data-action="depart" title="Vue de départ">⟲ Départ</button>
       </span>
     </div>
-    ${elements.length === 0 ? '<p class="vide">Aucun levé ni surface avec des triangles sur le plan.</p>' : '<canvas class="toile-3d"></canvas>'}`;
+    ${elements.length === 0 ? '<p class="vide">Aucun levé, surface ni maquette IFC avec des triangles sur le plan.</p>' : '<canvas class="toile-3d"></canvas>'}`;
   document.body.append(fenetre);
   fenetre.addEventListener('close', () => fenetre.remove());
   fenetre.querySelector('[data-action="fermer"]').addEventListener('click', () => fenetre.close());
@@ -245,11 +259,12 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
   if (selecteur) selecteur.value = String(choix);
   let triangles = [];
   let elementDe = () => 0;
+  let couleurDe = () => null;
   let cadre = null;
   let plage = null;
   let drapees = [];
   let voirLignes = true;
-  const vue = { azimut: 0, inclinaison: 35, exageration: 2, centre: null, echelle: 1, largeur: 0, hauteur: 0 };
+  const vue = { azimut: 0, inclinaison: 35, exageration: exagerationDepart, centre: null, echelle: 1, largeur: 0, hauteur: 0 };
   const reglages = { couleurs: 'altitude', transparent: false };
   let zoom = 1;
   const choisir = () => {
@@ -262,11 +277,16 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
       n += e.triangles.length;
     }
     elementDe = (rang) => debuts.find((d) => rang < d.fin)?.i ?? 0;
-    cadre = cadreScene(triangles);
-    plage = plageAltitudes(triangles);
+    // Couleur propre de chaque triangle (maquette IFC), null pour une surface (couleur d'altitude ou par élément).
+    const couleursTri = montres.flatMap(({ e }) => e.couleurs ?? e.triangles.map(() => null));
+    couleurDe = (rang) => couleursTri[rang];
+    const terrain = montres.filter(({ e }) => !e.ifc).flatMap(({ e }) => e.triangles);
+    cadre = cadreScene(triangles.length > 0 ? triangles : terrain);
+    // Couleurs d'altitude et lignes DXF : seulement sur les surfaces (pas sur le bâtiment).
+    plage = plageAltitudes(terrain.length > 0 ? terrain : triangles);
     vue.centre = cadre.centre;
     // 0.143.0 : lignes des plans DXF montrés, posées sur les triangles choisis.
-    drapees = lignesDxf.length > 0 && triangles.length > 0 ? draperLignes(lignesDxf, chercheurAltitude(triangles), { pas: Math.max(0.5, cadre.taille / 400) }) : [];
+    drapees = lignesDxf.length > 0 && terrain.length > 0 ? draperLignes(lignesDxf, chercheurAltitude(terrain), { pas: Math.max(0.5, cadre.taille / 400) }) : [];
   };
   const depart = () => {
     vue.azimut = 0;
@@ -283,7 +303,7 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
     vue.hauteur = toile.height;
     vue.echelle = (0.75 * Math.min(vue.largeur, vue.hauteur) / cadre.taille) * zoom;
     const contexte = toile.getContext('2d');
-    dessinerScene(contexte, triangles, vue, plage, { ...reglages, elementDe });
+    dessinerScene(contexte, triangles, vue, plage, { ...reglages, elementDe, couleurDe });
     if (voirLignes) dessinerLignes3d(contexte, drapees, vue, ratio);
     dessinerReperes(contexte, vue, ratio);
   };
@@ -307,6 +327,17 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
   });
   fenetre.querySelector('[data-champ="lignes-dxf"]')?.addEventListener('change', (evenement) => {
     voirLignes = evenement.target.checked;
+    dessiner();
+  });
+  // Couper l'IFC (0.264.0) : on refait les triangles des maquettes, sans changer la vue (ni le centre, ni le zoom).
+  fenetre.querySelector('[data-champ="couper-ifc"]')?.addEventListener('change', (evenement) => {
+    couper = evenement.target.checked;
+    elements = [...surfaces, ...elementsIfc()];
+    const centre = vue.centre;
+    const taille = cadre?.taille;
+    choisir();
+    vue.centre = centre;
+    if (taille) cadre.taille = taille;
     dessiner();
   });
   fenetre.querySelector('[data-champ="transparent"]').addEventListener('change', (evenement) => {

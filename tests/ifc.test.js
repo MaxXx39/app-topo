@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as W from 'web-ifc';
 import {
   rangerMaquette, coupeHorizontale, coupeVerticale, coupeVerticaleLeLong, couperPolygoneEnX, couperLigneEnX,
-  altitudeDeCoupe, calqueDuTypeIfc, bornesMaquette, altitudesObjetEn, recalerMaquette,
+  altitudeDeCoupe, calqueDuTypeIfc, bornesMaquette, altitudesObjetEn, recalerMaquette, trianglesSous, trianglesMaquette,
 } from '../src/topo/ifc.js';
 import { lireIfcAvecApi, texteIfc } from '../src/import/ifc.js';
 
@@ -207,5 +207,29 @@ describe('lecture d\'un IFC avec web-ifc', () => {
     const c = coupeHorizontale(maquette, 421.5);
     expect(c.traits).toHaveLength(1);
     expect(c.traits[0].f).toBe(true);
+  });
+});
+
+describe('maquette dans la vue 3D (0.264.0)', () => {
+  it('coupe un triangle sous une altitude : 0, 1 ou 2 triangles', () => {
+    const p = (est, nord, altitude) => ({ est, nord, altitude });
+    const t = [p(0, 0, 0), p(1, 0, 0), p(0, 0, 2)];
+    expect(trianglesSous(t, 3)).toEqual([t]);
+    expect(trianglesSous(t, -1)).toEqual([]);
+    const garde = trianglesSous(t, 1); // 2 sommets dessous : un quadrilatère = 2 triangles
+    expect(garde).toHaveLength(2);
+    expect(Math.max(...garde.flat().map((q) => q.altitude))).toBe(1);
+    expect(trianglesSous([p(0, 0, 0), p(1, 0, 2), p(0, 1, 2)], 1)).toHaveLength(1);
+  });
+
+  it('triangles de la maquette : couleur du type, calques cachés, coupe au-dessus', () => {
+    const m = rangerMaquette([boite(E, N, 420, E + 10, N + 0.3, 423), boite(E, N, 423, E + 10, N + 5, 423.25, 'IfcSlab')]);
+    const tout = trianglesMaquette(m);
+    expect(tout).toHaveLength(24);
+    expect(tout[0].couleur).toEqual([220, 38, 38]); // murs rouges (#dc2626)
+    expect(trianglesMaquette(m, { cachees: new Set(['Dalles']) })).toHaveLength(12);
+    const coupe = trianglesMaquette(m, { haut: 421 });
+    expect(Math.max(...coupe.flatMap((x) => x.t.map((q) => q.altitude)))).toBeCloseTo(421, 6);
+    expect(coupe.every((x) => x.couleur[0] === 220)).toBe(true); // la dalle (au-dessus) a disparu
   });
 });
