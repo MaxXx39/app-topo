@@ -82,7 +82,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.260.0)
+## Fonctionnalités (état à la 0.261.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -131,11 +131,16 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **0.258.0 (correction du 16.11) : le dossier choisi COCHE / DÉCOCHE, il ne filtre plus l'affichage.** Choisir un dossier (`appliquerDossierALAffichage` dans `main.js`) coche ce qui y est rangé et décoche le reste (`projet.listesCachees`, `plan.visible`, retenus par la tablette) ; « Tout » ne change aucune case. **Tout reste listé** dans Afficher (Plan / Points / Surface, avec pastilles de dossier), dans les pages Liste de points / Plans / Surfaces importées et dans Exporter › Quoi exporter ? ; on peut cocher à la main un élément d'un autre dossier. **Applications** (Lever, Annotation, Implanter, Guidage, Calculs, accroches ; `estMontre`) : **Base = filtrées par le dossier choisi ; Intermédiaire et Expert = tout est listé avec le nom du dossier à côté** (0.259.0, `definirFiltreApplications` réglé dans `adapterAuMode`, `suffixeDossiers` : étiquette des surfaces, liste d'Annotation ; pas encore sur les autres listes d'applications, ex. lignes de volumes). Le bouton « ＋ Autres dossiers » de la 0.257.0 est supprimé. À confirmer : les pastilles de dossier dans le tableau Liste de points.
 - **Ligne des dossiers** (page Applications) : elle gardait sa position à chaque redessin de la page (elle revenait au début pendant le défilement).
 
+## 0.261.0 (demandes du 17.11, 2e lot)
+- **« Sans dossier » supprimé** des puces et du menu de l'en-tête (ce qui n'a pas de dossier se retrouve sous « Tout ») ; un ancien choix « Sans dossier » revient à « Tout ». **Nouveau dossier « Autre »** (`DOSSIER_AUTRE`), toujours le dernier de la liste (même avec une liste partagée Drive).
+- **« Ouvrir projet » de la page Projets : remis comme avant** (le changement de couleur de la 0.260.0 est annulé). C'est le bouton « Ouvrir » de l'**encadré du projet** (page Applications) qui change : même hauteur que ＋ et l'épingle, plus large, blanc à contour bleu nuit épais.
+- **Barre du récepteur** : case rouge « Hors ligne » (`body.drive-hors-ligne`, `data-bandeau="cloud"` dans `leve/ecran.js`) quand le nuage de l'en-tête est rouge barré (pas d'internet). Nuage gris barré = Google non connecté : pas de case. Le nuage rouge avec « ! » (erreur de Drive) n'a pas de case.
+
 ## 0.260.0 (demandes du 17.11, à essayer sur la tablette)
 - **Plus de dossiers LEVE ni ANNOT** : les levés (toutes les listes de points) et les listes d'Annotation n'ont **aucun dossier de base** (même si un dossier est choisi) ; on peut leur en donner un. Dans les applications en Base, un levé ou une annotation sans dossier reste montré quand un dossier est choisi. Décocher / cocher dans Afficher suit toujours le dossier (un levé sans dossier est décoché quand on choisit TER.).
 - **Pastille de dossier touchable** dans Afficher (Plan / Points / Surface) : Intermédiaire et Expert ouvrent une fenêtre de cases (`demanderCases`, `choisirDossiersDeLElement`) ; une liste sans dossier montre « + dossier » ; en Base, pastilles seulement. Une surface d'un levé suit son levé.
 - **Toucher un élément du plan ne propose plus « masquer le calque »** (`montrerFicheCalque` supprimé) : seulement Plan › Geler / Isoler.
-- **Hauteurs réduites** un peu : pastilles de la liste du plan, pastille 📁 de l'en-tête, puces et encadré de la page Applications (fin de `style.css`). **« Ouvrir projet »** : ambre clair (`#fdedc4`), 48 px. Le bouton « Ouvrir » de l'encadré de la page Applications n'a pas changé.
+- **Hauteurs réduites** un peu : pastilles de la liste du plan, pastille 📁 de l'en-tête, puces et encadré de la page Applications (fin de `style.css`). (« Ouvrir projet » : voir 0.261.0.)
 
 ## 0.248.0 et 0.249.0 (lots 1 et 2 du 16.11, à essayer sur la tablette)
 - **0.248.0** : clavier `inputmode="text"` pour Delta Z ±, Δ Z surface et décalage de ligne (le clavier décimal d'Android n'a pas « - ») ; boutons + / − des coupes à 20 px (fin de `style.css`) ; Guidage : bandeau de règle = grosse flèche + valeur, cadre fixe (`cqw`, nowrap) ; Implanter › Surface sans orientation (inclinaison pas prête / pas de marche) : cadre vide + message (`.coupe-attente`), le Guidage refusait déjà ; Réseaux point par point : FE pré-rempli avec l'altitude du point ; Gérer › Plans : « DXF · type » ; plan : E / N / Z sous la souris (`.plan-coordonnees`, Z = surface d'Implanter).

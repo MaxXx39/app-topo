@@ -13987,7 +13987,7 @@ body.mode-telephone .entete:has(.bouton-recepteur-entete) { padding-right: calc(
   body.page-applis-ouverte .page-applis { bottom: 16px; }
 }
 
-/* 0.260.0 (demandes du 17.11) : dossiers un tout petit peu moins hauts (liste du plan, en-tête, page Applications) ; pastilles touchables ; « Ouvrir projet » en ambre clair, un peu plus grand. */
+/* 0.260.0 (demandes du 17.11) : dossiers un tout petit peu moins hauts (liste du plan, en-tête, page Applications) ; pastilles touchables ; bouton « Ouvrir » de l'encadré du projet plus visible ; bandeau « Hors ligne » dans la barre du récepteur. */
 .dossiers-cliquables { display: inline-flex; flex-wrap: wrap; align-items: center; cursor: pointer; }
 .dossiers-cliquables .pastille-pastel-dossier { padding: 1px 9px; margin: 1px 3px 1px 0; font-size: 0.8rem; }
 .dossiers-cliquables.ajout-dossier { padding: 1px 9px; margin: 1px 3px 1px 0; border: 1px dashed currentColor; border-radius: 999px; font-size: 0.8rem; font-weight: 700; opacity: 0.75; }
@@ -13999,6 +13999,12 @@ body.mode-telephone .entete:has(.bouton-recepteur-entete) { padding-right: calc(
 .puces-dossiers { padding: 2px 2px 8px; }
 .cadre-projet-applis { padding: 8px; }
 .cadre-projet-applis .bandeau-projet-applis { padding: 2px 4px 6px; }
-.bouton-projet.gestion-projets { background: #fdedc4; color: var(--encre); border: 2px solid var(--ambre); }
-.actions-projets .bouton-projet.gestion-projets { min-height: 48px; font-size: 1rem; font-weight: 800; }
-body.theme-sombre .bouton-projet.gestion-projets { background: #fdedc4; color: #1b2b36; }
+
+/* 0.261.0 : bouton « Ouvrir » de l'encadré du projet : même hauteur que ＋ et l'épingle, un peu plus large, blanc à contour bleu nuit épais. */
+.cadre-projet-applis .bouton-texte-projet { padding: 0 16px; background: #ffffff; color: #1b2b36; border: 3px solid #1b2b36; font-weight: 800; font-size: 15px; box-shadow: none; }
+body.mode-telephone .cadre-projet-applis .bouton-texte-projet { padding: 0 11px; font-size: 13px; }
+/* 0.261.0 : « Hors ligne » (nuage rouge barré) : case rouge dans la barre du récepteur, sans déborder sur le plan. */
+.bandeaux-recepteur .case-recepteur.cloud-hors-ligne { display: none; }
+body.drive-hors-ligne .bandeaux-recepteur .case-recepteur.cloud-hors-ligne { display: flex; flex-grow: 0.7; background: #dc2626; color: #ffffff; }
+body.drive-hors-ligne .bandeaux-recepteur .case-recepteur.cloud-hors-ligne b { font-size: 14px; white-space: nowrap; }
+body.mode-telephone.drive-hors-ligne .bandeaux-recepteur .case-recepteur.cloud-hors-ligne b { font-size: 11.5px; white-space: normal; }

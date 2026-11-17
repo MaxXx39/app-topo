@@ -10,7 +10,9 @@ import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-p
 
 // Liste de départ demandée le 16.11 (GEOOFF, GEOPERRIN, TER., CANA, TS, AMEX, SITU, BAT-Rad., BAT-SS, BAT-REZ, BAT, OLD), une couleur différente chacune.
 // 0.257.0 : + PIC (plan d'installation de chantier). Les levés et les annotations n'ont PAS de dossier de base (0.260.0) : ils restent dans leurs catégories.
-export const SOUS_DOSSIERS_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC'];
+export const SOUS_DOSSIERS_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC', 'Autre'];
+/** Dossier « Autre » (0.261.0) : toujours le dernier de la liste (remplace la puce « Sans dossier »). */
+export const DOSSIER_AUTRE = 'Autre';
 // 15 couleurs distinctes, dans l'ordre de la liste (les dossiers ajoutés ensuite reprennent la 1re, etc.).
 const COULEURS = ['#6b7280', '#7c3aed', '#a16207', '#1d4ed8', '#ea580c', '#84cc16', '#0ea5e9', '#db2777', '#991b1b', '#eab308', '#0f766e', '#111827', '#be185d', '#0369a1', '#65a30d'];
 
@@ -42,6 +44,9 @@ export function lireSousDossiers(projet = null, listes = lireListesPartagees()) 
   const propres = nettoyerSousDossiers(listes?.sousDossiers ?? []);
   const noms = propres.length > 0 ? propres : [...SOUS_DOSSIERS_DEPART];
   for (const nom of sousDossiersUtilises(projet)) if (!noms.some((n) => n.toLowerCase() === nom.toLowerCase())) noms.push(nom);
+  // « Autre » toujours en bas de la liste.
+  const sansAutre = noms.filter((n) => n.toLowerCase() !== DOSSIER_AUTRE.toLowerCase());
+  noms.splice(0, noms.length, ...sansAutre, DOSSIER_AUTRE);
   return noms.map((nom, i) => ({ nom, couleur: COULEURS[i % COULEURS.length] }));
 }
 
@@ -167,7 +172,7 @@ export function retenirChoix(idProjet, nom, magasin = stockage()) {
 export function lireChoix(projet, magasin = stockage()) {
   try {
     const nom = JSON.parse(magasin?.getItem(CLE_CHOIX) ?? '{}')[projet?.id] ?? TOUT;
-    if (nom === SANS_SOUS_DOSSIER) return nom;
+    if (nom === SANS_SOUS_DOSSIER) return TOUT; // 0.261.0 : la puce « Sans dossier » n'existe plus
     return nom && lireSousDossiers(projet).some((d) => d.nom === nom) ? nom : TOUT;
   } catch {
     return TOUT;

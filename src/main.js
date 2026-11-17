@@ -8811,7 +8811,7 @@ function ouvrirMenuDossiers() {
   const menu = document.createElement('div');
   menu.id = 'menu-dossiers';
   menu.setAttribute('role', 'menu');
-  menu.innerHTML = [ligne('', 'Tout'), ...remplis.map((d) => ligne(d.nom, echappe(d.nom), d.couleur)), ligne(SANS_SOUS_DOSSIER, 'Sans dossier')].join('');
+  menu.innerHTML = [ligne('', 'Tout'), ...remplis.map((d) => ligne(d.nom, echappe(d.nom), d.couleur))].join('');
   const entete = document.querySelector('.entete')?.getBoundingClientRect();
   menu.style.top = `${Math.round(entete?.bottom ?? 56) + 4}px`;
   document.body.append(menu);
@@ -8874,6 +8874,7 @@ function mettreAJourEtatEntete() {
   const horsLigne = typeof navigator !== 'undefined' && navigator.onLine === false;
   const driveNonConnecte = Boolean(partage) && !partage.etat.connecte;
   const nuageBarre = horsLigne ? 'hors-ligne' : driveNonConnecte ? 'non-connecte' : null;
+  document.body.classList.toggle('drive-hors-ligne', Boolean(horsLigne && partage)); // 0.261.0 : case rouge « Hors ligne » dans la barre du récepteur
   if (nuageBarre && partage) {
     pastilleDrive.hidden = false;
     pastilleDrive.classList.remove('etat-drive-ok', 'etat-drive-envoi', 'etat-drive-pause', 'etat-drive-alerte', 'etat-drive-hors-ligne', 'etat-drive-non-connecte');

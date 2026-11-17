@@ -368,13 +368,12 @@ export function creerNavigation(nav, actions) {
     ].join('')}</div>`;
     // 0.251.0 : puces des dossiers (Tout / Terrassement / Canalo…) : seuls les éléments rangés dans le dossier choisi sont montrés.
     const dossiers = actions.sousDossiers?.();
-    // Dossiers vides cachés (sauf celui qui est choisi) ; « Tout » et « Sans dossier » n'ont de sens que s'il y a des dossiers remplis.
+    // Dossiers vides cachés (sauf celui qui est choisi) ; « Tout » n'a de sens que s'il y a des dossiers remplis.
     const remplis = (dossiers?.liste ?? []).filter((d) => d.nombre > 0 || d.nom === dossiers.choisi);
     const puces = dossiers?.visible
       ? `<div class="puces-dossiers" role="group" aria-label="Dossier du projet">
           ${remplis.length > 0 ? `<button type="button" class="puce-dossier ${dossiers.choisi === '' ? 'actif' : ''}" data-dossier="" aria-pressed="${dossiers.choisi === ''}">Tout</button>` : ''}
           ${remplis.map((d) => `<button type="button" class="puce-dossier ${dossiers.choisi === d.nom ? 'actif' : ''}" data-dossier="${echapper(d.nom)}" aria-pressed="${dossiers.choisi === d.nom}"><i style="background: ${d.couleur}"></i>${echapper(d.nom)}</button>`).join('')}
-          ${remplis.length > 0 ? `<button type="button" class="puce-dossier ${dossiers.choisi === '__sans' ? 'actif' : ''}" data-dossier="__sans" aria-pressed="${dossiers.choisi === '__sans'}">Sans dossier</button>` : ''}
           ${dossiers.peutCreer ? '<button type="button" class="puce-dossier nouveau-dossier" data-dossier-nouveau aria-label="Nouveau dossier" title="Nouveau dossier">＋</button>' : ''}
         </div>`
       : '';

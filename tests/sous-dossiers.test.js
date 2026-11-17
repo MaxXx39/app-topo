@@ -29,16 +29,16 @@ const projet = () => ({
 });
 
 describe('liste des sous-dossiers', () => {
-  it('départ : les 12 dossiers du 16.11 + PIC, chacun avec une couleur différente', () => {
+  it('départ : les 12 dossiers du 16.11 + PIC + Autre (en bas), chacun avec une couleur différente', () => {
     const liste = lireSousDossiers(null, {});
-    expect(liste.map((d) => d.nom)).toEqual(['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC']);
+    expect(liste.map((d) => d.nom)).toEqual(['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC', 'Autre']);
     expect(liste.map((d) => d.nom)).toEqual(SOUS_DOSSIERS_DEPART);
-    expect(new Set(liste.map((d) => d.couleur)).size).toBe(13);
+    expect(new Set(liste.map((d) => d.couleur)).size).toBe(14);
   });
   it('on peut en ajouter ; la liste partagée remplace celle de départ ; un nom inconnu est gris', () => {
     const liste = lireSousDossiers(null, { sousDossiers: ['Voirie', 'Eaux'] });
-    expect(liste.map((d) => d.nom)).toEqual(['Voirie', 'Eaux']);
-    expect(couleurDuSousDossier('Autre', liste)).toBe('#6b7280');
+    expect(liste.map((d) => d.nom)).toEqual(['Voirie', 'Eaux', 'Autre']); // « Autre » toujours en bas
+    expect(couleurDuSousDossier('Inconnu', liste)).toBe('#6b7280');
   });
   it('un dossier déjà utilisé par un élément du projet est toujours proposé', () => {
     const p = projet();
@@ -130,7 +130,7 @@ describe('choix de la tablette', () => {
     retenirChoix('p1', 'Disparu', m);
     expect(lireChoix(p, m)).toBe('');
     retenirChoix('p1', SANS_SOUS_DOSSIER, m);
-    expect(lireChoix(p, m)).toBe(SANS_SOUS_DOSSIER);
+    expect(lireChoix(p, m)).toBe(''); // 0.261.0 : « Sans dossier » n'existe plus
     retenirChoix('p1', '', m);
     expect(lireChoix(p, m)).toBe('');
   });
