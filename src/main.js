@@ -135,6 +135,8 @@ import { mesureRapide } from './topo/mesure-rapide.js';
 import { rangerMesureRapide } from './topo/mesure-rapide-levee.js';
 import { htmlMesureRapide, nombreDePages } from './mesure-rapide/ecran.js';
 import { creerReseaux } from './reseaux/reseaux.js';
+import { creerAppliLaser } from './laser/appli.js';
+import { rangerPointLaser, csvTestLaser } from './topo/laser-levee.js';
 import { avertissementHorsZone } from './topo/zone-ge-vd.js';
 import { nomFichierExport } from './outils/nom-fichier.js';
 import { messagePdf, messageMauvaisBouton } from './topo/messages-fichier.js';
@@ -396,6 +398,9 @@ document.querySelector('#app').innerHTML = `
       </section>
       <section class="panneau" data-onglet="mesure-rapide">
         <div id="mesure-rapide"></div>
+      </section>
+      <section class="panneau" data-onglet="test-laser">
+        <div id="test-laser"></div>
       </section>
       <section class="panneau" data-onglet="annotation">
         <div id="annotation"></div>
@@ -1456,6 +1461,29 @@ function pointDuPlanSousLeDoigt(position, tolerance) {
   return accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansAccrochables(), position, tolerance)));
 }
 
+// Test laser (0.269.0, Expert) : écran dans laser/appli.js ; ici seulement l'enregistrement et l'export.
+const appliLaser = creerAppliLaser({
+  conteneur: document.querySelector('#test-laser'),
+  lireEtat: () => etatRecepteur,
+  message: (texte, duree, options) => afficherMessage(texte, duree, options),
+  enregistrerPoint: (point) => {
+    if (refuserEnLectureSeule()) return null;
+    const resultat = rangerPointLaser(projet, point, nomsDuProjet(projet));
+    if (resultat.erreur) {
+      alert(`Point non enregistré : ${resultat.erreur}.`);
+      return null;
+    }
+    afficherMessage(`Point ${resultat.point.nom} enregistré dans « ${resultat.levee.nom} »`, 4000, { ok: true });
+    modifie();
+    return resultat.point.nom;
+  },
+  exporterCsv: (lignes) => {
+    if (lignes.length === 0) return;
+    const nom = `${nomFichierExport(nomDeFichierProjet(projet), 'test-laser')}.csv`;
+    enregistrerFichier(new Blob([csvTestLaser(lignes)], { type: 'text/csv' }), nom);
+  },
+});
+
 const reseaux = creerReseaux({
   conteneur: document.querySelector('#reseaux-ecran'),
   projet: () => projet,
@@ -1670,6 +1698,7 @@ function ouvrirAppli(cle, sous = null, depuisMenu = false) {
   else if (cle === 'mesure') afficherOnglet('mesure-rapide');
   else if (cle === 'annotation') afficherOnglet('annotation');
   else if (cle === 'reseaux') afficherOnglet('reseaux');
+  else if (cle === 'laser') afficherOnglet('test-laser');
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur', { detail: { retourMenu: depuisMenu } }));
   if (sous && cle !== 'calculs') {
     // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
@@ -1834,6 +1863,8 @@ function afficherOnglet(demande, { partie = null } = {}) {
   if (nom === 'mesure-rapide') afficherMesureRapide();
   if (nom === 'annotation') afficherAnnotation();
   if (nom === 'reseaux') reseaux.afficher();
+  if (nom === 'test-laser') appliLaser.afficher();
+  else if (ongletAvant === 'test-laser') appliLaser.arreter();
   navigation?.mettreAJour();
   window.scrollTo(0, 0);
   if (nom === 'projets' && !partie) navigation?.ouvrirPage();
@@ -1961,7 +1992,7 @@ function adapterAuMode() {
   }
   if (estModeBase() && estPartieCalculs(document.body.dataset.onglet)) afficherOnglet('projets');
   else if (!aAcces('expert') && document.body.dataset.onglet === 'dessin') afficherOnglet('volumes');
-  if (!aAcces('expert') && document.body.dataset.onglet === 'reseaux') afficherOnglet('projets'); // Réseaux : Expert seulement
+  if (!aAcces('expert') && ['reseaux', 'test-laser'].includes(document.body.dataset.onglet)) afficherOnglet('projets'); // Réseaux, Test laser : Expert seulement
   if (!aAcces('expert') && terrain.implantation === 'talus') {
     terrain.implantation = 'ligne';
     retenirReglagesTerrain();
