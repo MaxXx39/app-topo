@@ -2,7 +2,8 @@
 // les données envoyées au plan. main.js lui donne ce dont elle a besoin (projet, surfaces, touchers…) : voir creerReseaux.
 import { htmlReseaux } from './ecran.js';
 import { svgCoupeEnTravers, svgCoupeAxe } from './coupe-svg.js';
-import { nouveauReseau, erreurReseau, coupeEnTravers, croisementsSurAxe, longueurReseau, ligneAImplanterDuReseau, TYPES_RESEAU, fesInterpoles, lireNomCalque, tronconsDeLignes } from '../topo/reseau.js';
+import { nouveauReseau, erreurReseau, coupeEnTravers, croisementsSurAxe, longueurReseau, ligneAImplanterDuReseau, TYPES_RESEAU, fesDuTrace, nomProposeReseau, lireNomCalque, tronconsDeLignes } from '../topo/reseau.js';
+import { tableauPoints } from './ecran.js';
 import { profilSurface } from '../topo/coupe.js';
 
 const nombreTape = (texte) => {
@@ -16,7 +17,8 @@ const mm = (v) => Math.round(v * 1000) / 1000;
 const TRONCONS_MAX = 50;
 // 0.266.0 : accroche du mode « Point par point » (Sommet au départ) ; troncons : mode « Par calque » ([{ sommets }], un réseau chacun).
 const brouillonVide = () => ({
-  mode: 'dxf', type: TYPES_RESEAU[1].cle, nom: '', diametre: '', sommets: [], troncons: [], calque: '', accroche: 'sommet', surfaceId: '', message: '',
+  // nomTouche (0.267.0) : le nom a été tapé (sinon il suit le type : EU-1, EU-2…).
+  mode: 'dxf', type: TYPES_RESEAU[1].cle, nom: '', nomTouche: false, diametre: '', sommets: [], troncons: [], calque: '', accroche: 'sommet', surfaceId: '', message: '',
   tranchee: { actif: false, hauteur: '', largeur: '', talus: '', droit: false },
 });
 
@@ -79,6 +81,7 @@ export function creerReseaux(deps) {
 
   /** Redessine l'écran et le plan. */
   function afficher() {
+    proposerNom();
     const { coupeSvg, exageration } = etat.vue === 'voir' ? construireCoupe() : { coupeSvg: '', exageration: 1 };
     conteneur.innerHTML = htmlReseaux({
       vue: etat.vue, brouillon: etat.brouillon, surfaces: deps.surfaces(), reseaux: liste(), selectionId: choisi()?.id ?? null,
@@ -111,7 +114,7 @@ export function creerReseaux(deps) {
         return;
       }
       const manque = (s) => s.altitude == null || Math.abs(s.altitude) < 1e-9;
-      b.sommets = sommets.map((s) => ({ est: mm(s.est), nord: mm(s.nord), fe: manque(s) ? '' : mm(s.altitude).toFixed(3) }));
+      b.sommets = sommets.map((s) => ({ est: mm(s.est), nord: mm(s.nord), fe: manque(s) ? '' : mm(s.altitude).toFixed(3), pente: '' }));
       const nbManque = sommets.filter(manque).length;
       b.message = nbManque === 0
         ? `✓ Polyligne : ${sommets.length} sommets, fil d'eau = Z de la polyligne`
@@ -133,12 +136,11 @@ export function creerReseaux(deps) {
       }
       b.calque = trouve.calque;
       b.troncons = troncons.map((points) => ({
-        sommets: points.map((q) => ({ est: mm(q.est), nord: mm(q.nord), fe: q.altitude == null ? '' : mm(q.altitude).toFixed(3) })),
+        sommets: points.map((q) => ({ est: mm(q.est), nord: mm(q.nord), fe: q.altitude == null ? '' : mm(q.altitude).toFixed(3), pente: '' })),
       }));
       const lu = lireNomCalque(trouve.calque);
       if (lu.diametre != null) b.diametre = String(lu.diametre);
       if (lu.type) b.type = lu.type;
-      if (!b.nom.trim()) b.nom = [lu.type ?? 'R', lu.diametre].filter((x) => x != null).join('-');
       const sansZ = b.troncons.reduce((n, t) => n + t.sommets.filter((q) => q.fe === '').length, 0);
       b.message = `✓ Calque « ${trouve.calque} » : ${b.troncons.length} tronçon${b.troncons.length > 1 ? 's' : ''}${lu.diametre != null ? `, Ø ${lu.diametre}` : ''}${lu.type ? `, ${lu.type}` : ''}${sansZ > 0 ? ` — ${sansZ} point${sansZ > 1 ? 's' : ''} sans Z : FE à taper (interpolé entre deux FE)` : ', FE = Z du DXF'}`;
     } else {
@@ -155,17 +157,22 @@ export function creerReseaux(deps) {
       }
       // 0.248.0 : le FE est pré-rempli avec l'altitude du point s'il en a une (0 = pas d'altitude).
       const aAltitude = typeof point.altitude === 'number' && Number.isFinite(point.altitude) && Math.abs(point.altitude) > 1e-9;
-      b.sommets.push({ est: mm(point.est), nord: mm(point.nord), fe: aAltitude ? mm(point.altitude).toFixed(3) : '' });
+      b.sommets.push({ est: mm(point.est), nord: mm(point.nord), fe: aAltitude ? mm(point.altitude).toFixed(3) : '', pente: '' });
       b.message = aAltitude ? '✓ FE pré-rempli avec l\'altitude du point (modifiable)' : '';
     }
     afficher();
   }
 
-  /** Sommets avec leur FE : tapé, sinon interpolé entre deux FE (0.266.0, marqué « interpole »). */
+  /** Sommets avec leur FE : tapé, calculé par la pente tapée (0.267.0), sinon interpolé entre deux FE (0.266.0, marqué « interpole »). */
   function sommetsAvecFe(sommets) {
-    const tapes = sommets.map((s) => ({ est: s.est, nord: s.nord, fe: nombreTape(s.fe) }));
-    const calcules = fesInterpoles(tapes);
-    return tapes.map((s, k) => (calcules[k].interpole ? { ...s, fe: calcules[k].fe, interpole: true } : s));
+    const calcules = fesDuTrace(sommets.map((s) => ({ est: s.est, nord: s.nord, fe: nombreTape(s.fe), pente: nombreTape(s.pente) })));
+    return sommets.map((s, k) => ({ est: s.est, nord: s.nord, fe: calcules[k].fe, ...(calcules[k].source === 'interpole' ? { interpole: true } : {}) }));
+  }
+
+  /** Nom proposé (0.267.0) tant que le nom n'a pas été tapé : « type-n », premier numéro libre. */
+  function proposerNom() {
+    const b = etat.brouillon;
+    if (!b.nomTouche) b.nom = nomProposeReseau(b.type, liste().map((r) => r.nom));
   }
 
   function lireBrouillon(sommets = etat.brouillon.sommets, nom = etat.brouillon.nom.trim()) {
@@ -191,7 +198,10 @@ export function creerReseaux(deps) {
       return;
     }
     const base = b.nom.trim();
-    const reseaux = listes.map((sommets, k) => lireBrouillon(sommets, listes.length > 1 ? `${base}-${k + 1}` : base));
+    // Plusieurs tronçons : nom tapé → « nom-1 », « nom-2 »… ; nom proposé → numéros libres à la suite (EU-3, EU-4…).
+    const nomsPris = liste().map((r) => r.nom);
+    const nomDe = (k) => (listes.length === 1 ? base : b.nomTouche ? `${base}-${k + 1}` : nomProposeReseau(b.type, nomsPris, k));
+    const reseaux = listes.map((sommets, k) => lireBrouillon(sommets, nomDe(k)));
     for (const [k, reseau] of reseaux.entries()) {
       const erreur = erreurReseau(reseau);
       if (erreur) {
@@ -224,6 +234,21 @@ export function creerReseaux(deps) {
       case 'vue-reseaux': etat.vue = valeur; break;
       case 'mode-reseau': b.mode = valeur; b.sommets = []; b.troncons = []; b.message = ''; break;
       case 'accroche-reseau': b.accroche = valeur; break;
+      case 'meme-pente': {
+        // 0.267.0 : la même pente que le segment d'avant (tapée ou calculée).
+        const t = bouton.dataset.troncon;
+        const sommets = t != null ? b.troncons[Number(t)].sommets : b.sommets;
+        const k = Number(bouton.dataset.index);
+        const calcules = fesDuTrace(sommets.map((q) => ({ est: q.est, nord: q.nord, fe: nombreTape(q.fe), pente: nombreTape(q.pente) })));
+        const avant = calcules[k - 1]?.pente;
+        if (avant == null) {
+          deps.message('Pas de pente connue sur le segment d\'avant', 2500);
+          return;
+        }
+        sommets[k].pente = String(avant);
+        sommets[k].fe = '';
+        break;
+      }
       case 'type-reseau': b.type = valeur; break;
       case 'tranchee-reseau': b.tranchee.actif = !b.tranchee.actif; break;
       case 'bords-droits-reseau': b.tranchee.droit = !b.tranchee.droit; break;
@@ -267,15 +292,21 @@ export function creerReseaux(deps) {
    * Le FE interpolé est écrit en gris italique dans le champ vide (texte d'exemple) avec « interpolé » à côté.
    */
   function majInterpoles(sommets, troncon) {
-    const calcules = fesInterpoles(sommets.map((s) => ({ est: s.est, nord: s.nord, fe: nombreTape(s.fe) })));
+    // Les textes d'exemple (FE et pentes calculés) du tableau refait, recopiés dans les champs en place (le champ tapé garde la main).
+    const modele = document.createElement('div');
+    modele.innerHTML = tableauPoints(sommets, troncon);
     const filtre = troncon != null ? `[data-troncon="${troncon}"]` : ':not([data-troncon])';
-    for (const champ of conteneur.querySelectorAll(`[data-champ="fe-point-reseau"]${filtre}`)) {
-      const c = calcules[Number(champ.dataset.index)];
-      const interpole = Boolean(c?.interpole);
-      champ.placeholder = interpole ? c.fe.toFixed(3) : 'FE';
-      champ.classList.toggle('fe-interpole', interpole);
+    for (const champ of conteneur.querySelectorAll(`:is([data-champ="fe-point-reseau"], [data-champ="pente-point-reseau"])${filtre}`)) {
+      const neuf = modele.querySelector(`[data-champ="${champ.dataset.champ}"][data-index="${champ.dataset.index}"]`);
+      if (!neuf) continue;
+      champ.placeholder = neuf.placeholder;
+      champ.className = neuf.className;
       const note = champ.parentElement.querySelector('.note-interpole');
-      if (note) note.hidden = !interpole;
+      const noteNeuve = neuf.parentElement.querySelector('.note-interpole');
+      if (note && noteNeuve) {
+        note.hidden = noteNeuve.hidden;
+        note.textContent = noteNeuve.textContent;
+      }
     }
   }
 
@@ -284,15 +315,25 @@ export function creerReseaux(deps) {
     const champ = evenement.target.dataset?.champ;
     const b = etat.brouillon;
     const v = evenement.target.value;
-    if (champ === 'nom-reseau') b.nom = v;
-    else if (champ === 'diametre-reseau') b.diametre = v;
+    if (champ === 'nom-reseau') {
+      b.nom = v;
+      b.nomTouche = v.trim() !== ''; // effacé : le nom proposé revient au prochain affichage
+    } else if (champ === 'diametre-reseau') b.diametre = v;
     else if (champ === 'hauteur-tranchee') b.tranchee.hauteur = v;
     else if (champ === 'largeur-tranchee') b.tranchee.largeur = v;
     else if (champ === 'talus-tranchee') b.tranchee.talus = v;
-    else if (champ === 'fe-point-reseau') {
+    else if (champ === 'fe-point-reseau' || champ === 'pente-point-reseau') {
+      // 0.267.0 : FE OU pente pour un point : taper l'un vide l'autre.
       const t = evenement.target.dataset.troncon;
+      const k = Number(evenement.target.dataset.index);
       const sommets = t != null ? b.troncons[Number(t)].sommets : b.sommets;
-      sommets[Number(evenement.target.dataset.index)].fe = v;
+      const autre = champ === 'fe-point-reseau' ? 'pente' : 'fe';
+      sommets[k][champ === 'fe-point-reseau' ? 'fe' : 'pente'] = v;
+      if (v.trim() !== '') {
+        sommets[k][autre] = '';
+        const champAutre = evenement.target.closest('tr')?.querySelector(`[data-champ="${autre === 'pente' ? 'pente' : 'fe'}-point-reseau"]`);
+        if (champAutre) champAutre.value = '';
+      }
       majInterpoles(sommets, t);
     }
     else if (champ === 'abscisse-reseau') {
@@ -306,6 +347,11 @@ export function creerReseaux(deps) {
   conteneur.addEventListener('change', (evenement) => {
     const champ = evenement.target.dataset?.champ;
     if (champ === 'surface-reseau') etat.brouillon.surfaceId = evenement.target.value;
+    else if (champ === 'diametre-liste-reseau' && evenement.target.value) {
+      // 0.267.0 : diamètre choisi dans la liste (celle du Levé chantier) ; on peut toujours le taper.
+      etat.brouillon.diametre = evenement.target.value;
+      afficher();
+    }
     else if (champ === 'reseau-implanter') {
       etat.selectionId = evenement.target.value;
       if (!choisi()?.tranchee) { etat.cible = 'axe'; if (etat.altitude === 'fond') etat.altitude = 'fe'; }

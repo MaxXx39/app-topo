@@ -318,3 +318,59 @@ export function tronconsDeLignes(lignes, tolerance = 0.01) {
   }
   return troncons;
 }
+
+/**
+ * Fils d'eau de tout le tracé (0.267.0) : tapés, calculés par une pente tapée, ou interpolés.
+ * - sommets : [{ est, nord, fe, pente }] (nombres, ou null) ; pente en % du point d'avant vers ce point, dans le sens du
+ *   tracé (−2 = descend), rapportée à la longueur en plan (décidé le 17.11) : FE = FE d'avant + pente / 100 × longueur.
+ * Un FE tapé passe avant une pente tapée. Les points restés sans FE entre deux FE connus sont interpolés (fesInterpoles).
+ * Renvoie [{ fe (m, au mm, ou null), source: 'tape' | 'pente' | 'interpole' | null, pente (% du segment qui arrive, ou null) }].
+ */
+export function fesDuTrace(sommets) {
+  const n = sommets.length;
+  const fe = new Array(n).fill(null);
+  const source = new Array(n).fill(null);
+  const longueur = (k) => Math.hypot(sommets[k].est - sommets[k - 1].est, sommets[k].nord - sommets[k - 1].nord);
+  const parPentes = () => {
+    for (let k = 0; k < n; k++) {
+      if (fe[k] != null) continue;
+      if (nombreOk(sommets[k].fe)) {
+        fe[k] = sommets[k].fe;
+        source[k] = 'tape';
+      } else if (k > 0 && nombreOk(sommets[k].pente) && fe[k - 1] != null) {
+        fe[k] = Math.round((fe[k - 1] + (sommets[k].pente / 100) * longueur(k)) * 1000) / 1000;
+        source[k] = 'pente';
+      }
+    }
+  };
+  parPentes();
+  // Interpolation entre FE connus, puis les pentes qui suivent un point interpolé.
+  const interpoles = fesInterpoles(sommets.map((s, k) => ({ est: s.est, nord: s.nord, fe: fe[k] })));
+  interpoles.forEach((r, k) => {
+    if (r.interpole) {
+      fe[k] = r.fe;
+      source[k] = 'interpole';
+    }
+  });
+  parPentes();
+  return fe.map((valeur, k) => {
+    const l = k > 0 ? longueur(k) : 0;
+    const pente = k > 0 && valeur != null && fe[k - 1] != null && l > 0 ? Math.round(((valeur - fe[k - 1]) / l) * 100 * 1000) / 1000 : null;
+    return { fe: valeur, source: source[k], pente };
+  });
+}
+
+/** Nom proposé pour un nouveau réseau (0.267.0) : « type-n », le premier numéro libre parmi les noms pris (EU-1, EU-2…). */
+export function nomProposeReseau(type, nomsPris, deja = 0) {
+  const pris = new Set(nomsPris);
+  let n = 1;
+  let restants = deja;
+  for (;;) {
+    const nom = `${type}-${n}`;
+    if (!pris.has(nom)) {
+      if (restants === 0) return nom;
+      restants--;
+    }
+    n++;
+  }
+}

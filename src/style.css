@@ -14024,3 +14024,16 @@ body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; mi
 .points-reseau input.fe-interpole::placeholder { font-style: italic; color: #64748b; opacity: 1; }
 .points-reseau .note-interpole { margin-left: 4px; font-style: italic; color: #64748b; font-size: 0.75rem; }
 .svg-coupe-reseau .fe-interpole-coupe { font-style: italic; fill: #64748b; }
+/* 0.267.0 : Réseaux : colonne Pente % avec « = » (même pente qu'avant) ; diamètre tapé ou choisi dans la liste. */
+.points-reseau .coord-reseau { font-size: 0.8rem; line-height: 1.2; }
+.points-reseau .cellule-pente { white-space: nowrap; }
+.points-reseau input[data-champ="pente-point-reseau"] { width: 4.5em; }
+.points-reseau input[data-champ="fe-point-reseau"] { width: 6.5em; }
+.points-reseau .bouton-meme-pente { margin-left: 4px; min-width: 32px; min-height: 32px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--fond-carte, #fff); font-weight: 800; }
+.champ-diametre-reseau { display: inline-flex; gap: 6px; align-items: center; }
+.champ-diametre-reseau select { min-height: 36px; }
+/* 0.267.0 (demande du 17.11, photo de la tablette Windows CC180 en paysage) : dans l'appli Windows, le panneau de gauche prend
+   la MOITIÉ de l'écran (le plan un peu moins) ; Topo.exe agrandit aussi toute l'appli de 15 % (Fenetre.cs, FACTEUR_AGRANDI). */
+@media (min-width: 900px) {
+  body.appli-windows { --largeur-panneau: 50vw; }
+}

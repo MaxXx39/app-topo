@@ -25,6 +25,8 @@ namespace Topo
         // Largeur « de référence » de l'écran, en points de l'appli web : le zoom est réglé pour que le grand côté
         // de l'écran en fasse autant, quelle que soit la tablette (comme la tablette Android : 1280 × 800).
         const double GRAND_COTE_REFERENCE = 1280.0;
+        // 0.267.0 (demande du 17.11 : textes trop petits sur la CC180) : toute l'appli 15 % plus grande que l'échelle de référence.
+        const double FACTEUR_AGRANDI = 1.15;
 
         readonly string dossierDonnees;
         readonly Reglages reglages;
@@ -266,7 +268,7 @@ namespace Topo
             {
                 double echelleWindows = EchelleWindows();
                 double grandCote = Math.Max(vue.ClientSize.Width, vue.ClientSize.Height);
-                zoom = grandCote / (echelleWindows * GRAND_COTE_REFERENCE);
+                zoom = grandCote / (echelleWindows * GRAND_COTE_REFERENCE) * FACTEUR_AGRANDI;
                 zoom = Math.Max(0.5, Math.Min(2.0, zoom));
             }
             try { if (Math.Abs(vue.ZoomFactor - zoom) > 0.005) vue.ZoomFactor = zoom; }

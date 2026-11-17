@@ -5,7 +5,8 @@
 // les actions passent par data-action (voir main.js « Réseaux »).
 import { echapper } from '../outils/echapper.js';
 import { formaterNombre } from '../topo/format.js';
-import { TYPES_RESEAU, couleurDuType, pentesDesSegments, longueurReseau, CIBLES_RESEAU, ALTITUDES_RESEAU, fesInterpoles } from '../topo/reseau.js';
+import { TYPES_RESEAU, couleurDuType, pentesDesSegments, longueurReseau, CIBLES_RESEAU, ALTITUDES_RESEAU, fesDuTrace } from '../topo/reseau.js';
+import { DIAMETRES_LISTE } from '../topo/chantier.js';
 import { ACCROCHES } from '../leve/ecran.js';
 import { bulle } from '../aide/bulles.js';
 import { ICONES_LIGNE } from '../outils/icones.js';
@@ -26,19 +27,25 @@ const nombreTape = (texte) => {
 };
 
 /**
- * Tableau des points d'un tracé avec leur FE (0.266.0) : un FE vide entre deux FE tapés montre le FE interpolé en gris
- * italique (texte d'exemple du champ) avec « interpolé » à côté. troncon : n° du tronçon (mode « Par calque »), ou null.
+ * Tableau des points d'un tracé avec leur FE (0.266.0) et leur pente (0.267.0) : pour chaque point (sauf le 1er), on tape
+ * soit le FE, soit la pente en % depuis le point d'avant (−2 = descend dans le sens du tracé) ; « = » reprend la pente du
+ * segment d'avant. Un FE calculé (par la pente, ou interpolé entre deux FE) est écrit en gris italique dans le champ vide
+ * (texte d'exemple) avec « pente » ou « interpolé » à côté ; la pente calculée aussi. troncon : n° du tronçon (« Par calque »).
  */
-function tableauPoints(sommets, troncon = null) {
-  const calcules = fesInterpoles(sommets.map((s) => ({ est: s.est, nord: s.nord, fe: nombreTape(s.fe) })));
+export function tableauPoints(sommets, troncon = null) {
+  const calcules = fesDuTrace(sommets.map((s) => ({ est: s.est, nord: s.nord, fe: nombreTape(s.fe), pente: nombreTape(s.pente) })));
   const attributTroncon = troncon == null ? '' : ` data-troncon="${troncon}"`;
   const lignes = sommets.map((s, i) => {
     const c = calcules[i];
-    return `<tr><td>${i + 1}</td><td>${nombre(s.est)} · ${nombre(s.nord)}</td>
-      <td class="cellule-fe"><input type="text" inputmode="decimal" data-champ="fe-point-reseau" data-index="${i}"${attributTroncon} value="${echapper(s.fe)}" placeholder="${c.interpole ? c.fe.toFixed(3) : 'FE'}" class="${c.interpole ? 'fe-interpole' : ''}" aria-label="Fil d'eau du point ${i + 1}" />
-        <small class="note-interpole" ${c.interpole ? '' : 'hidden'}>interpolé</small></td></tr>`;
+    const calcule = c.source === 'pente' || c.source === 'interpole';
+    const note = c.source === 'pente' ? 'pente' : 'interpolé';
+    const penteCalculee = c.pente != null && nombreTape(s.pente) == null;
+    const pente = i === 0 ? '<td></td>' : `<td class="cellule-pente"><input type="text" inputmode="text" data-champ="pente-point-reseau" data-index="${i}"${attributTroncon} value="${echapper(s.pente ?? '')}" placeholder="${penteCalculee ? c.pente.toFixed(2) : '%'}" class="${penteCalculee ? 'fe-interpole' : ''}" aria-label="Pente vers le point ${i + 1} (%)" />${i >= 2 ? `<button type="button" class="bouton-meme-pente" data-action="meme-pente" data-index="${i}"${attributTroncon} title="Même pente que le segment d'avant" aria-label="Même pente que le segment d'avant">=</button>` : ''}</td>`;
+    return `<tr><td>${i + 1}</td><td class="coord-reseau">${nombre(s.est)}<br />${nombre(s.nord)}</td>
+      <td class="cellule-fe"><input type="text" inputmode="decimal" data-champ="fe-point-reseau" data-index="${i}"${attributTroncon} value="${echapper(s.fe)}" placeholder="${calcule ? c.fe.toFixed(3) : 'FE'}" class="${calcule ? 'fe-interpole' : ''}" aria-label="Fil d'eau du point ${i + 1}" />
+        <small class="note-interpole" ${calcule ? '' : 'hidden'}>${note}</small></td>${pente}</tr>`;
   }).join('');
-  return `<table class="points-reseau"><thead><tr><th>#</th><th>Est · Nord</th><th>FE</th></tr></thead><tbody>${lignes}</tbody></table>`;
+  return `<table class="points-reseau"><thead><tr><th>#</th><th>Est · Nord</th><th>FE</th><th>Pente %</th></tr></thead><tbody>${lignes}</tbody></table>`;
 }
 
 /** Barre d'accroches du mode « Point par point » (mêmes dessins que dans Implanter). */
@@ -73,7 +80,8 @@ function htmlCreer(b, surfaces) {
     ${points}
     <div class="cadre-reseau"><h3>Réseau</h3>${puces(TYPES_RESEAU, b.type)}
       <label class="ligne-champ-reseau">Nom<input type="text" data-champ="nom-reseau" value="${echapper(b.nom)}" placeholder="ex. EU-1" autocomplete="off" /></label>
-      <label class="ligne-champ-reseau">Diamètre extérieur (mm)<input type="text" inputmode="decimal" data-champ="diametre-reseau" value="${echapper(b.diametre)}" placeholder="ex. 315" /></label>
+      <label class="ligne-champ-reseau">Diamètre extérieur (mm)<span class="champ-diametre-reseau"><input type="text" inputmode="decimal" data-champ="diametre-reseau" value="${echapper(b.diametre)}" placeholder="ex. 315" />
+        <select data-champ="diametre-liste-reseau" aria-label="Choisir le diamètre dans la liste"><option value="">liste</option>${DIAMETRES_LISTE.map((d) => `<option value="${d}" ${String(d) === String(b.diametre).trim() ? 'selected' : ''}>${d}</option>`).join('')}</select></span></label>
       <label class="ligne-champ-reseau">Surface de référence<select data-champ="surface-reseau"><option value="">— aucune —</option>${options}</select></label></div>
     <div class="cadre-reseau"><h3>Tranchée</h3>
       <button type="button" class="bouton-secondaire" data-action="tranchee-reseau" role="switch" aria-checked="${t.actif}">${t.actif ? ICONES_LIGNE.caseCochee : ICONES_LIGNE.caseVide} Avec une tranchée</button>

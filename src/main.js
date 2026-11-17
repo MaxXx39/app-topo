@@ -124,7 +124,9 @@ import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecept
 import { correctionsTropAnciennes } from './topo/age-corrections.js';
 import { centreDePoints, MAX_POINTS_CENTRE } from './topo/centre-points.js';
 import { ICONES_LIGNE } from './outils/icones.js';
-import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette } from './android/pont.js';
+import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette, estDansAppliWindows } from './android/pont.js';
+// 0.267.0 : appli Windows (Topo.exe) : marque sur la page pour sa mise en page (panneau de gauche à 50 %, voir fin de style.css).
+if (estDansAppliWindows()) document.body.classList.add('appli-windows');
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';

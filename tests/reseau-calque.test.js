@@ -71,3 +71,38 @@ describe('FE interpolé dans la coupe dans l\'axe', () => {
     expect(svg).toContain('419.900 interpolé');
   });
 });
+
+import { fesDuTrace, nomProposeReseau } from '../src/topo/reseau.js';
+describe('FE par pente tapée (0.267.0)', () => {
+  it('FE du point = FE d\'avant + pente × longueur en plan ; −2 % descend dans le sens du tracé', () => {
+    const s = [
+      { est: 0, nord: 0, fe: 420, pente: null },
+      { est: 30, nord: 40, fe: null, pente: -2 }, // 50 m à −2 % → 419.000
+      { est: 30, nord: 60, fe: null, pente: -2 }, // 20 m → 418.600
+    ];
+    const r = fesDuTrace(s);
+    expect(r.map((x) => x.fe)).toEqual([420, 419, 418.6]);
+    expect(r.map((x) => x.source)).toEqual(['tape', 'pente', 'pente']);
+    expect(r[1].pente).toBe(-2);
+  });
+  it('un FE tapé passe avant la pente ; pente et interpolation ensemble', () => {
+    const s = [
+      { est: 0, nord: 0, fe: 420, pente: null },
+      { est: 10, nord: 0, fe: 421, pente: -2 },
+      { est: 20, nord: 0, fe: null, pente: null }, // interpolé entre 421 et 420.5
+      { est: 30, nord: 0, fe: 420.5, pente: null },
+      { est: 40, nord: 0, fe: null, pente: 1 }, // 420.6
+    ];
+    const r = fesDuTrace(s);
+    expect(r.map((x) => x.fe)).toEqual([420, 421, 420.75, 420.5, 420.6]);
+    expect(r.map((x) => x.source)).toEqual(['tape', 'tape', 'interpole', 'tape', 'pente']);
+  });
+});
+
+describe('nom proposé d\'un réseau', () => {
+  it('premier numéro libre du type', () => {
+    expect(nomProposeReseau('EU', [])).toBe('EU-1');
+    expect(nomProposeReseau('EU', ['EU-1', 'EU-2', 'EC-1'])).toBe('EU-3');
+    expect(nomProposeReseau('EC', ['EC-1', 'EC-3'], 1)).toBe('EC-4'); // le 2e libre après EC-2
+  });
+});
