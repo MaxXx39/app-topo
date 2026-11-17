@@ -51,7 +51,7 @@ docs/                tableau des modes (xlsx) ; audit-2026-11/ (présentation de
 - Publier site + APK (seulement sur demande) : PR vers `main`, attendre « construire » et « apk » au vert, fusionner, puis `git fetch origin main && git merge --ff-only origin/main`. Jamais de rebase ni de force-push. Si « apk » échoue avec « a release with the same tag name already exists » : relancer le job une fois.
 - **Windows** : `…/releases/download/windows-derniere-version/Topo.exe` (aussi `Topo-<version>.exe`) ; fabriqué **à la main** (Actions › « Fabriquer l'appli Windows ») ou quand `windows/Topo/**` change ; jamais par un envoi ordinaire.
 - APK : `…/releases/download/apk-derniere-version/Topo.apk` (lien fixe, + `Topo-<version>.apk`).
-- **Publié** : tout jusqu'à la 0.263.0 (PR 99, 17.11 : site, APK et Topo.exe fabriqué depuis `main`). **Non publié** : 0.264.0 → 0.269.0. **Attention** : `windows.yml` se lance à CHAQUE envoi qui touche `windows/Topo/**`, même sur la branche de travail, et publie alors Topo.exe : l'arrêter (Actions › annuler) si l'utilisateur n'a pas demandé Windows (fait pour 0.266.0 et 0.267.0).
+- **Publié** : tout jusqu'à la 0.263.0 (PR 99, 17.11 : site, APK et Topo.exe fabriqué depuis `main`). **Non publié (site)** : 0.264.0 → 0.270.0. **Attention : `apk.yml` refait et publie `Topo.apk` à CHAQUE envoi, même sur la branche de travail** (vu le 17.11 : l'APK 0.269.0 était publiée sans PR) : l'APK suit donc toujours la branche. Topo.exe 0.269.0 fabriqué à la main le 17.11 (demande), puis 0.270.0 (pont-windows.js touché). **Attention** : `windows.yml` se lance à CHAQUE envoi qui touche `windows/Topo/**`, même sur la branche de travail, et publie alors Topo.exe : l'arrêter (Actions › annuler) si l'utilisateur n'a pas demandé Windows (fait pour 0.266.0 et 0.267.0).
 
 ## Conventions de code
 - **Découpage de `main.js`** : petit à petit, au fil des demandes (jamais en gros) ; même comportement, avec tests et essai Playwright.
@@ -82,7 +82,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.269.0)
+## Fonctionnalités (état à la 0.270.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -124,6 +124,11 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - Récepteur : Bluetooth, NTRIP (swipos), journal NMEA (Expert), 2e GNSS (Expert), GPS tablette, cap automatique, PDOP (colonne de l'export). APK : pont `window.AppliAndroid`, batterie (arrière-plan coupé après 5 min), mise à jour, « Partage écran ».
 - **Drive** : « App Topo › Configuration Projet » ; **une main par projet** (verrou 15 min) ; un appareil n'écrase jamais une version qu'il n'a pas reçue ; **listes partagées** fusionnées partie par partie (`listes-partagees.js`) ; dossiers de projets.
 - **Windows** (`Topo.exe`, jamais lancé sur un vrai Windows) : sert l'appli web à `https://topo.appli/app-topo/` (ne jamais changer l'adresse) et glisse `pont-windows.js` ; port COM, NTRIP, Drive par identifiant « bureau » (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` à créer par l'utilisateur), fichiers dans Documents › Topo › Envois, mise à jour par la release `windows-derniere-version`. Pas fait : appareil photo, touche volume −, vibreur, batterie.
+
+## 0.270.0 — laser D510 en Bluetooth basse consommation (BLE) dans l'APK (demande du 17.11, jamais essayé avec le vrai laser)
+- **Protocole** repris de la page Web Bluetooth de l'utilisateur (qui marche dans son Chrome) : service `3ab10100-f831-4395-b29d-570977d5bf94`, distance `…10101` (float 4 octets petit-boutiste, m, notification), inclinaison `…10103` (même format, **radians supposé**, réglage Montage › Radians / Degrés + valeur brute affichée), commande `…10109` (« g » = mesurer). La WebView de l'APK n'a pas Web Bluetooth : tout est en Kotlin (`android/…/LaserBle.kt`, sans bibliothèque ; recherche 6 s, noms DISTO / Leica, notifications allumées une par une). Permission `BLUETOOTH_SCAN` (neverForLocation) ; Android < 12 : localisation.
+- **Pont** : `choisirLaser`, `deconnecterLaser`, `mesurerLaser`, `etatLaser` ; vers la page `window.recevoirEtatLaser`, `window.recevoirMesureLaser({ quoi, valeur, heure })` (`pont.js` : `laserDisponible`, `ecouterLaser`). Windows : fonctions vides (« pas encore »).
+- **Écran** : barre « Laser : connecté · Mesurer · Déconnecter » ; une mesure remplit Distance + Angle de la partie ouverte (angle gardé s'il arrive à moins de 2 s de la distance, sinon 0) ; Essai B : station marquée « laser ici » (1re sans distance, ou choisie). **À vérifier** : unité et signe de l'angle, que le D510 envoie l'angle avec chaque mesure, la distance brute (pas « Smart Horizontal »).
 
 ## 0.269.0 — application « Test laser » (demande du 17.11, Expert, APK, rien essayé sur le terrain)
 - **But** : lever un point inaccessible avec le RX2 + un **Leica D510 fixé sur la canne** (distance et angle vertical **tapés à la main** ; Bluetooth BLE du D510 : plus tard, l'APK ne sait que le Bluetooth « port série »). Tuile à part « Test laser » (`cle: 'laser'`, onglet `test-laser`, rouge `#b91c1c`), plan en haut comme Réseaux.

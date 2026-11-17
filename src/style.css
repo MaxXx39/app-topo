@@ -14122,3 +14122,7 @@ body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; mi
   body[data-onglet='test-laser'] .boutons-taille-plan { position: absolute; bottom: 0; left: 50%; z-index: 3; display: flex; gap: 2px; transform: translateX(-50%); }
 }
 .panneau[data-onglet='test-laser'] { border-top: 4px solid #b91c1c; }
+.barre-laser { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; border-radius: 8px; background: var(--fond-doux, #f1f5f9); }
+.barre-laser > span { flex: 1 1 auto; }
+.barre-laser.laser-connecte { background: #dcfce7; color: #14532d; }
+.station-cible-laser { outline: 2px solid #b91c1c; outline-offset: 2px; border-radius: 6px; }

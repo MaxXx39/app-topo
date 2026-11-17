@@ -11,6 +11,8 @@ export const TEXTES_AIDE = {
     'Essai B : vise le même point depuis 2 stations ; chaque distance donne un cercle autour de la station, le point est à leur croisement (2 solutions : à gauche ou à droite en allant de la station 1 vers la 2 ; le cap, s\'il est lu, propose le côté). Angle d\'intersection idéal vers 90° (moins de 30° : peu sûr). L\'écart d\'altitude entre les 2 stations contrôle les angles du laser.',
   laserVerite:
     'Contrôle : si le point visé est accessible, pose la canne dessus et prends-le au GNSS : l\'appli affiche l\'écart avec le point calculé au laser (vert ≤ 3 cm).',
+  laserBluetooth:
+    'Laser en Bluetooth (APK) : « Connecter le laser » cherche le D510 (allumé, Bluetooth actif, Chrome fermé). Chaque mesure remplit Distance et Angle de la partie ouverte (Essai B : la station marquée « laser ici »). Vérifie l\'angle avec l\'écran du D510 : s\'il est faux, change Radians / Degrés ici.',
   laserMontage:
     'Montage (gardé sur cette tablette) : hauteur = de la pointe de la canne à l\'arrière du laser (d\'où le D510 mesure), le long de la canne ; décalages en regardant la cible (+ = à droite, + = vers la cible). Correction du cap : donnée par l\'essai A. « Corriger la canne penchée » : la hauteur suit la canne d\'après l\'inclinaison du RX2.',
   annotation:

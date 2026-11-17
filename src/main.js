@@ -128,6 +128,7 @@ import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, a
 // 0.267.0 : appli Windows (Topo.exe) : marque sur la page pour sa mise en page (panneau de gauche à 50 %, voir fin de style.css).
 if (estDansAppliWindows()) document.body.classList.add('appli-windows');
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
+import { laserDisponible, choisirLaser, deconnecterLaser, mesurerLaser, ecouterLaser } from './android/pont.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { creerNavigation } from './navigation/bande.js';
@@ -1477,12 +1478,16 @@ const appliLaser = creerAppliLaser({
     modifie();
     return resultat.point.nom;
   },
+  laser: { disponible: laserDisponible, choisir: choisirLaser, deconnecter: deconnecterLaser, mesurer: mesurerLaser },
   exporterCsv: (lignes) => {
     if (lignes.length === 0) return;
     const nom = `${nomFichierExport(nomDeFichierProjet(projet), 'test-laser')}.csv`;
     enregistrerFichier(new Blob([csvTestLaser(lignes)], { type: 'text/csv' }), nom);
   },
 });
+
+// Laser en Bluetooth (0.270.0) : l'APK envoie son état et ses mesures à l'écran Test laser.
+if (laserDisponible()) ecouterLaser((e) => appliLaser.recevoirEtatLaser(e), (m) => appliLaser.recevoirMesure(m));
 
 const reseaux = creerReseaux({
   conteneur: document.querySelector('#reseaux-ecran'),

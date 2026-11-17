@@ -19,7 +19,16 @@ export const CLE_MONTAGE_LASER = 'topo-laser';
 export const DUREE_LECTURE_MS = 5000;
 const PAS_LECTURE_MS = 200;
 const LECTURES_MINI = 10;
-const MONTAGE_DEPART = { hauteur: 0, droite: 0, avant: 0, correctionCap: 0, corrigerInclinaison: true };
+// uniteAngle : unité de l'inclinaison envoyée par le D510 en Bluetooth ('rad' au départ, à vérifier avec son écran).
+const MONTAGE_DEPART = { hauteur: 0, droite: 0, avant: 0, correctionCap: 0, corrigerInclinaison: true, uniteAngle: 'rad' };
+// Distance et inclinaison du laser arrivent l'une après l'autre : elles vont ensemble si moins de 2 s les séparent.
+export const ECART_MESURE_LASER_MS = 2000;
+
+/** Inclinaison reçue du laser (valeur brute) en degrés, selon l'unité réglée ('rad' ou 'deg'). */
+export function angleLaserEnDegres(valeur, unite = 'rad') {
+  if (!Number.isFinite(valeur)) return null;
+  return unite === 'deg' ? valeur : (valeur * 180) / Math.PI;
+}
 
 /** Réglages du montage gardés sur la tablette (tout à 0 tant que le montage n'est pas fait). */
 export function lireMontage(stockage = globalThis.localStorage) {
@@ -87,7 +96,7 @@ const cm = (v) => (Number.isFinite(v) ? `${(v * 100).toFixed(1)} cm` : '—');
  * Crée l'application. dependances : { conteneur, lireEtat () → état du récepteur, message (texte, durée, options),
  * enregistrerPoint (point) → nom ou null, exporterCsv (lignes), estExpert () }.
  */
-export function creerAppliLaser({ conteneur, lireEtat, message, enregistrerPoint, exporterCsv }) {
+export function creerAppliLaser({ conteneur, lireEtat, message, enregistrerPoint, exporterCsv, laser = null }) {
   const etat = {
     partie: 'cap',
     montage: lireMontage(),
@@ -96,6 +105,9 @@ export function creerAppliLaser({ conteneur, lireEtat, message, enregistrerPoint
     essaiA: { cible: null, distance: '', serie: [] },
     essaiB: { mesures: [null, null], distances: ['', ''], angles: ['', ''], cote: null, verite: null },
     seance: [], // lignes du CSV
+    // Laser en Bluetooth : état reçu de l'APK, dernière mesure (pour assembler distance et angle), station visée (essai B).
+    laser: { etat: 'deconnecte', nom: null, peutMesurer: false, distance: null, tDistance: 0, brut: null, tBrut: 0 },
+    cibleB: null,
   };
 
   const montageCalcul = () => ({ hauteur: etat.montage.hauteur, droite: etat.montage.droite, avant: etat.montage.avant });
@@ -278,7 +290,9 @@ export function creerAppliLaser({ conteneur, lireEtat, message, enregistrerPoint
   function htmlEssaiB() {
     const b = etat.essaiB;
     const r = resultatsB();
-    const stations = [0, 1].map((i) => `<div class="station-laser"><p class="laser-etape"><strong>Station ${i + 1}</strong></p>
+    const avecLaser = etat.laser.etat === 'connecte';
+    const stations = [0, 1].map((i) => `<div class="station-laser ${avecLaser && cibleB() === i ? 'station-cible-laser' : ''}"><p class="laser-etape"><strong>Station ${i + 1}</strong>
+      ${avecLaser ? `<button type="button" class="puce-choix ${cibleB() === i ? 'actif' : ''}" data-action="laser-cible" data-valeur="${i}">${cibleB() === i ? '◀ laser ici' : 'laser ici'}</button>` : ''}</p>
       ${htmlLecture(`station-b${i}`, b.mesures[i] ? `Relire station ${i + 1} (5 s)` : `Lire station ${i + 1} (5 s)`)}
       ${htmlStation(b.mesures[i])}
       <div class="champs-laser">${champ('b-distance', b.distances[i], 'Distance', 'm', i)}${champ('b-angle', b.angles[i], 'Angle', '°', i)}</div></div>`).join('');
@@ -314,6 +328,23 @@ export function creerAppliLaser({ conteneur, lireEtat, message, enregistrerPoint
       </div></div></div>`;
   }
 
+  /** Station de l'essai B qui reçoit la mesure du laser : choisie, sinon la 1re sans distance. */
+  const cibleB = () => etat.cibleB ?? (lireNombre(etat.essaiB.distances[0]) == null ? 0 : 1);
+
+  function htmlLaser() {
+    if (!laser?.disponible()) return '';
+    const l = etat.laser;
+    const textes = { deconnecte: 'non connecté', recherche: 'recherche…', connexion: 'connexion…', connecte: `connecté${l.nom ? ` (${echapper(l.nom)})` : ''}` };
+    const connecte = l.etat === 'connecte';
+    return `<div class="barre-laser ${connecte ? 'laser-connecte' : ''}">
+      <span>Laser : <strong>${textes[l.etat] ?? echapper(l.etat)}</strong></span>
+      ${connecte
+        ? `${l.peutMesurer ? '<button type="button" class="bouton" data-action="laser-mesurer">Mesurer</button>' : ''}
+           <button type="button" class="bouton-secondaire" data-action="laser-deconnecter">Déconnecter</button>`
+        : `<button type="button" class="bouton-secondaire" data-action="laser-connecter" ${l.etat === 'deconnecte' ? '' : 'disabled'}>Connecter le laser</button>`}
+    </div>`;
+  }
+
   function htmlMontage() {
     const m = etat.montage;
     return `<div class="partie-laser">
@@ -325,6 +356,9 @@ export function creerAppliLaser({ conteneur, lireEtat, message, enregistrerPoint
         ${champ('m-correction', String(m.correctionCap), 'Correction du cap', '°')}
       </div>
       <button type="button" class="bouton-secondaire" data-action="laser-incl" role="switch" aria-checked="${m.corrigerInclinaison}">${m.corrigerInclinaison ? '✓' : '○'} Corriger la canne penchée</button>
+      ${laser?.disponible() ? `<p class="laser-etape">Angle reçu du laser en Bluetooth ${bulle('laserBluetooth')}</p>
+      <div class="choix-cote-laser">${[['rad', 'Radians'], ['deg', 'Degrés']].map(([c, t]) => `<button type="button" class="puce-choix ${m.uniteAngle === c ? 'actif' : ''}" data-action="laser-unite" data-valeur="${c}">${t}</button>`).join('')}</div>
+      <p class="laser-info">Dernière valeur reçue : ${etat.laser.brut != null ? `${etat.laser.brut.toFixed(5)} → ${deg(angleLaserEnDegres(etat.laser.brut, m.uniteAngle), 2)}` : '—'}</p>` : ''}
     </div>`;
   }
 
@@ -344,6 +378,7 @@ export function creerAppliLaser({ conteneur, lireEtat, message, enregistrerPoint
     conteneur.innerHTML = `<div class="ecran-laser">
       <div class="titre-laser"><h2>Test laser ${bulle('testLaser')}</h2>
         <button type="button" class="bouton-secondaire" data-action="laser-csv" ${etat.seance.length ? '' : 'disabled'}>CSV (${etat.seance.length})</button></div>
+      ${htmlLaser()}
       <div class="onglets-laser" role="tablist">${parties.map(([c, t]) => `<button type="button" role="tab" class="puce-choix ${etat.partie === c ? 'actif' : ''}" data-action="laser-partie" data-valeur="${c}" aria-selected="${etat.partie === c}">${t}</button>`).join('')}</div>
       ${htmlPartie()}
     </div>`;
@@ -460,6 +495,18 @@ export function creerAppliLaser({ conteneur, lireEtat, message, enregistrerPoint
       ecrireMontage(etat.montage);
       afficher();
     } else if (action === 'laser-csv') exporterCsv(etat.seance);
+    else if (action === 'laser-connecter') laser?.choisir();
+    else if (action === 'laser-deconnecter') laser?.deconnecter();
+    else if (action === 'laser-mesurer') {
+      if (!laser?.mesurer()) message('Le laser n\'a pas pris la commande : appuie sur son bouton DIST.', 4000);
+    } else if (action === 'laser-cible') {
+      etat.cibleB = Number(bouton.dataset.valeur);
+      afficher();
+    } else if (action === 'laser-unite') {
+      etat.montage.uniteAngle = bouton.dataset.valeur;
+      ecrireMontage(etat.montage);
+      afficher();
+    }
   });
 
   // Saisie : la valeur est gardée à chaque touche ; seul le résultat est refait (le champ garde la main).
@@ -486,9 +533,73 @@ export function creerAppliLaser({ conteneur, lireEtat, message, enregistrerPoint
     majCalcul();
   });
 
+  // --- Laser en Bluetooth ---
+
+  /** Écrit une valeur du laser dans le champ de la partie ouverte (sans retaper l'écran). */
+  function remplir(quoi, valeur, indiceB = cibleB()) {
+    const texte = quoi === 'distance' ? valeur.toFixed(3) : valeur.toFixed(2);
+    let cle = null;
+    let indice = '';
+    if (etat.partie === 'cap') {
+      cle = quoi === 'distance' ? 'cap-distance' : 'cap-angle';
+      etat.cap[quoi === 'distance' ? 'distance' : 'angle'] = texte;
+    } else if (etat.partie === 'a' && quoi === 'distance') {
+      cle = 'a-distance';
+      etat.essaiA.distance = texte;
+    } else if (etat.partie === 'b') {
+      const i = indiceB;
+      indice = String(i);
+      cle = quoi === 'distance' ? 'b-distance' : 'b-angle';
+      etat.essaiB[quoi === 'distance' ? 'distances' : 'angles'][i] = texte;
+    }
+    if (!cle) return false;
+    const champ = conteneur.querySelector(`[data-champ="${cle}"]${indice !== '' ? `[data-indice="${indice}"]` : ''}`);
+    if (champ) champ.value = texte;
+    return true;
+  }
+
+  /** Mesure reçue du laser : la distance, puis l'angle s'il arrive à moins de 2 s (ou juste avant). */
+  function recevoirMesure({ quoi, valeur, heure } = {}) {
+    if (!Number.isFinite(valeur)) return;
+    const t = Number.isFinite(heure) ? heure : Date.now();
+    const l = etat.laser;
+    if (quoi === 'distance') {
+      if (!(valeur > 0)) return;
+      l.distance = valeur;
+      l.tDistance = t;
+      l.indiceB = cibleB(); // la distance et son angle vont à la même station
+      if (!remplir('distance', valeur, l.indiceB)) {
+        message(`Laser : ${valeur.toFixed(3)} m (ouvre Cap, Essai A ou Essai B pour l'utiliser)`, 3000);
+        return;
+      }
+      const angleProche = l.brut != null && Math.abs(t - l.tBrut) <= ECART_MESURE_LASER_MS;
+      if (angleProche) remplir('angle', angleLaserEnDegres(l.brut, etat.montage.uniteAngle), l.indiceB);
+      else if (etat.partie !== 'a') remplir('angle', 0, l.indiceB);
+      message(`Laser : ${valeur.toFixed(3)} m${angleProche ? ` · ${angleLaserEnDegres(l.brut, etat.montage.uniteAngle).toFixed(2)}°` : ''}`, 2500, { ok: true });
+    } else if (quoi === 'inclinaison') {
+      l.brut = valeur;
+      l.tBrut = t;
+      if (Math.abs(t - l.tDistance) <= ECART_MESURE_LASER_MS && l.distance != null) remplir('angle', angleLaserEnDegres(valeur, etat.montage.uniteAngle), l.indiceB);
+      if (etat.partie === 'montage') afficher();
+    }
+    // Essai B : l'écran est refait pour montrer quelle station recevra la prochaine mesure.
+    if (etat.partie === 'b') afficher();
+    else if (etat.partie !== 'montage') majCalcul();
+  }
+
+  function recevoirEtatLaser(e = {}) {
+    const avant = etat.laser.etat;
+    Object.assign(etat.laser, { etat: e.etat ?? 'deconnecte', nom: e.nom ?? null, peutMesurer: Boolean(e.peutMesurer) });
+    if (e.message) message(e.message, 5000);
+    if (avant !== etat.laser.etat && e.etat === 'connecte') message(`Laser connecté${e.nom ? ` : ${e.nom}` : ''}`, 3000, { ok: true });
+    afficher();
+  }
+
   return {
     afficher,
     arreter,
+    recevoirMesure,
+    recevoirEtatLaser,
     /** Pour les essais : état interne (lecture seule). */
     etat: () => etat,
   };

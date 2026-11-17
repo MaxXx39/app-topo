@@ -60,6 +60,9 @@ class EcranPrincipal : Activity() {
     // Vrai quand la touche « volume − » prend le point (onglet Terrain, mode Lever : voir la page).
     @Volatile private var toucheVolumePourPoint = false
 
+    // Laser Leica DISTO en Bluetooth basse consommation (Test laser, 0.270.0).
+    val laser by lazy { LaserBle(this) { script -> runOnUiThread { if (pageChargee) page.evaluateJavascript(script, null) } } }
+
     // Action à refaire quand l'utilisateur aura accepté la permission Bluetooth.
     private var apresPermission: (() -> Unit)? = null
 
@@ -173,6 +176,7 @@ class EcranPrincipal : Activity() {
         recepteur2.corrections.arreter()
         recepteur.bluetooth.deconnecter()
         recepteur2.bluetooth.deconnecter()
+        laser.deconnecter(dire = false)
         page.destroy()
         super.onDestroy()
     }
@@ -455,6 +459,62 @@ class EcranPrincipal : Activity() {
     fun deconnecterRecepteur() {
         recepteur.bluetooth.deconnecter()
         recepteur.oublier("non connecté")
+    }
+
+    // --- Laser Leica DISTO (BLE, Test laser) ---
+
+    /**
+     * Permissions pour chercher un appareil BLE : « Appareils à proximité » (Android 12 et plus),
+     * sinon la localisation (exigée par Android pour une recherche BLE). Manquantes : demandées, puis [ensuite].
+     */
+    private fun permissionsLaser(ensuite: () -> Unit): Boolean {
+        val voulues = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            listOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        val manquantes = voulues.filterNot { aLaPermission(it) }
+        if (manquantes.isEmpty()) return true
+        apresPermission = ensuite
+        requestPermissions(manquantes.toTypedArray(), CODE_PERMISSIONS)
+        return false
+    }
+
+    /** Cherche les lasers DISTO allumés (6 s), puis montre la liste ; le choisi est connecté. */
+    fun choisirLaser() {
+        if (!permissionsLaser { choisirLaser() }) return
+        val adaptateur = getSystemService(BluetoothManager::class.java)?.adapter
+        if (adaptateur == null || !adaptateur.isEnabled) {
+            message("Activez le Bluetooth de la tablette.")
+            return
+        }
+        val scanner = adaptateur.bluetoothLeScanner
+        if (scanner == null) {
+            message("Recherche Bluetooth impossible sur cette tablette.")
+            return
+        }
+        message("Recherche du laser (6 s)… Allume le D510 et son Bluetooth.")
+        laser.chercher(scanner) { appareils ->
+            if (appareils.isEmpty()) {
+                AlertDialog.Builder(this)
+                    .setTitle("Aucun laser trouvé")
+                    .setMessage("Allume le D510, active son Bluetooth (symbole Bluetooth à l'écran), puis réessaie. Ferme d'abord Chrome ou toute appli encore connectée au laser.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return@chercher
+            }
+            @SuppressLint("MissingPermission")
+            val noms = appareils.map { "${it.name ?: "(sans nom)"}\n${it.address}" }.toTypedArray()
+            AlertDialog.Builder(this)
+                .setTitle("Choisir le laser")
+                .setItems(noms) { _, numero -> laser.connecter(appareils[numero]) }
+                .setNegativeButton("Annuler", null)
+                .show()
+        }
+    }
+
+    fun deconnecterLaser() {
+        laser.deconnecter()
     }
 
     /** Essai à 2 récepteurs : choisit le 2e RX2 dans les appareils appairés et s'y connecte. */

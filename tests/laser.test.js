@@ -172,3 +172,13 @@ describe('lectures de 5 s', () => {
     proche(ecartAngle(az, 0), -Math.atan2(0.1, 20) * 180 / Math.PI, 1e-3);
   });
 });
+
+import { angleLaserEnDegres } from '../src/laser/appli.js';
+
+describe('angle reçu du laser', () => {
+  it('radians ou degrés', () => {
+    proche(angleLaserEnDegres(Math.PI / 6, 'rad'), 30);
+    expect(angleLaserEnDegres(12.5, 'deg')).toBe(12.5);
+    expect(angleLaserEnDegres(null)).toBeNull();
+  });
+});
