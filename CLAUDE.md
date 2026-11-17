@@ -209,7 +209,8 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 
 ## Reste à faire
 - **Windows** (audit) : connexion Drive qui échoue (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` ?). Panneau de gauche et clavier tactile : faits en 0.256.4, à essayer sur la tablette.
-- Pas fait : nature et type du levé chantier modifiables après coup, types DXF pour les PDF, points et altitudes de Surface Import par liste, DWG (refusé pour l'instant le 17.11), Leica iCR70, Métré (en dernier), Réglages › Récepteur (fenêtre au lieu d'une page), « 0 surface » LandXML (message existant gardé).
+- **DWG → DXF (idée du 17.11, rien fait)** : plutôt que lire le DWG dans l'appli, l'utilisateur envoie ses DWG dans la conversation et Claude les convertit ici avec LibreDWG (`dwg2dxf`, outil seulement, pas dans l'appli : la GPL ne gêne pas), contrôle le résultat (objets, calques, MN95) et rend le DXF. Pas encore essayé : attendre un vrai DWG. Au bureau : ODA File Converter (gratuit) ou « Enregistrer sous DXF ».
+- Pas fait : nature et type du levé chantier modifiables après coup, types DXF pour les PDF, points et altitudes de Surface Import par liste, DWG dans l'appli (refusé pour l'instant le 17.11, voir conversion ci-dessus), Leica iCR70, Métré (en dernier), Réglages › Récepteur (fenêtre au lieu d'une page), « 0 surface » LandXML (message existant gardé).
 - Ouverts (non reproduits d'ici) : dézoom en changeant d'application (demander la séquence exacte sur tablette) ; accroches objet au recalage « sur site » (demander navigateur + plan).
 - **IFC** : fait en 0.262.0 / 0.263.0 (voir plus haut) ; suite possible (3D : faite en 0.264.0) : export DXF de la coupe, filtre par étage / attributs, implanter une ligne d'IFC.
 - Google Cloud : page `public/confidentialite.html` ; reste à l'utilisateur : « Publier l'application » (sinon réautorisation ~7 jours).
