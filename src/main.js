@@ -8874,7 +8874,14 @@ function mettreAJourEtatEntete() {
   const horsLigne = typeof navigator !== 'undefined' && navigator.onLine === false;
   const driveNonConnecte = Boolean(partage) && !partage.etat.connecte;
   const nuageBarre = horsLigne ? 'hors-ligne' : driveNonConnecte ? 'non-connecte' : null;
-  document.body.classList.toggle('drive-hors-ligne', Boolean(horsLigne && partage)); // 0.261.0 : case rouge « Hors ligne » dans la barre du récepteur
+  document.body.classList.toggle('drive-hors-ligne', Boolean(horsLigne && partage)); // 0.261.1 : pastille rouge « Hors ligne » en haut du logo du récepteur
+  if (!document.querySelector('#pastille-hors-ligne')) {
+    const hl = document.createElement('div');
+    hl.id = 'pastille-hors-ligne';
+    hl.className = 'pastille-hors-ligne';
+    hl.textContent = 'Hors ligne';
+    (document.querySelector('.entete') ?? document.body).append(hl);
+  }
   if (nuageBarre && partage) {
     pastilleDrive.hidden = false;
     pastilleDrive.classList.remove('etat-drive-ok', 'etat-drive-envoi', 'etat-drive-pause', 'etat-drive-alerte', 'etat-drive-hors-ligne', 'etat-drive-non-connecte');

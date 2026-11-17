@@ -14003,8 +14003,7 @@ body.mode-telephone .entete:has(.bouton-recepteur-entete) { padding-right: calc(
 /* 0.261.0 : bouton « Ouvrir » de l'encadré du projet : même hauteur que ＋ et l'épingle, un peu plus large, blanc à contour bleu nuit épais. */
 .cadre-projet-applis .bouton-texte-projet { padding: 0 16px; background: #ffffff; color: #1b2b36; border: 3px solid #1b2b36; font-weight: 800; font-size: 15px; box-shadow: none; }
 body.mode-telephone .cadre-projet-applis .bouton-texte-projet { padding: 0 11px; font-size: 13px; }
-/* 0.261.0 : « Hors ligne » (nuage rouge barré) : case rouge dans la barre du récepteur, sans déborder sur le plan. */
-.bandeaux-recepteur .case-recepteur.cloud-hors-ligne { display: none; }
-body.drive-hors-ligne .bandeaux-recepteur .case-recepteur.cloud-hors-ligne { display: flex; flex-grow: 0.7; background: #dc2626; color: #ffffff; }
-body.drive-hors-ligne .bandeaux-recepteur .case-recepteur.cloud-hors-ligne b { font-size: 14px; white-space: nowrap; }
-body.mode-telephone.drive-hors-ligne .bandeaux-recepteur .case-recepteur.cloud-hors-ligne b { font-size: 11.5px; white-space: normal; }
+/* 0.261.1 : « Hors ligne » (nuage rouge barré) : pastille rouge sur le tiers HAUT du logo du récepteur (la pastille « Contrôle à refaire » est sur le tiers bas). */
+.pastille-hors-ligne { display: none; position: absolute; top: 6px; right: 10px; z-index: 30; width: 76px; min-height: 24px; padding: 2px 4px; border-radius: 13px; background: #dc2626; color: #ffffff; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; line-height: 1.05; pointer-events: none; }
+body.drive-hors-ligne.avec-recepteur .pastille-hors-ligne { display: flex; }
+body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; min-height: 20px; font-size: 0.58rem; }

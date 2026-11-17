@@ -1688,7 +1688,7 @@ export function mettreAJourBandeaux(etat, tablette = null, hauteurCanne = null) 
     bandeaux.title = 'Récepteur : toucher pour connecter ou régler';
     // 0.138.0 (liste du 05.11, point 7) : 4 cases, chacune avec l'important en gros et le détail en petit dessous :
     // état RTK (satellites), Z du bout de la canne (précision H / V), hauteur de canne, inclinaison (angle, âge des corrections).
-    bandeaux.innerHTML = ['rtk', 'z', 'canne', 'inclinaison'].map((cle) => `<div class="case-recepteur" data-bandeau="${cle}"><b></b><small></small></div>`).join('') + '<div class="case-recepteur cloud-hors-ligne" data-bandeau="cloud"><b>Hors ligne</b></div>';
+    bandeaux.innerHTML = ['rtk', 'z', 'canne', 'inclinaison'].map((cle) => `<div class="case-recepteur" data-bandeau="${cle}"><b></b><small></small></div>`).join('');
     bandeaux.addEventListener('click', () => document.dispatchEvent(new CustomEvent('ouvrir-recepteur')));
     document.querySelector('.entete').append(bandeaux);
   }
