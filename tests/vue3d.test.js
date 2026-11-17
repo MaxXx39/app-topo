@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cadreScene, projeter, eclairage } from '../src/plan/vue3d.js';
+import { cadreScene, projeter, eclairage, preparerScene, dessinerScene } from '../src/plan/vue3d.js';
 
 const p = (est, nord, altitude) => ({ est, nord, altitude });
 
@@ -54,5 +54,32 @@ describe('vue 3D : choix, échelle et nord (0.126.0)', () => {
     const tourne = directionNord({ azimut: 90, inclinaison: 35 });
     expect(Math.abs(tourne.x)).toBeCloseTo(1);
     expect(tourne.y).toBeCloseTo(0);
+  });
+});
+
+describe('dessin rapide de la 3D (0.265.0)', () => {
+  const p = (est, nord, altitude) => ({ est, nord, altitude });
+  const grand = [p(0, 0, 0), p(10, 0, 0), p(0, 10, 0)];
+  const petit = [p(0, 0, 1), p(1, 0, 1), p(0, 1, 1)];
+  const minuscule = [p(5, 5, 2), p(5.001, 5, 2), p(5, 5.001, 2)];
+  // Faux contexte de canvas : compte les triangles remplis.
+  const faux = () => ({ remplis: 0, fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, fill() { this.remplis++; }, stroke() {} });
+  const vue = { azimut: 0, inclinaison: 90, exageration: 1, centre: { est: 0, nord: 0, altitude: 0 }, echelle: 20, largeur: 400, hauteur: 400 };
+
+  it('prépare couleurs (couleur propre d\'une maquette IFC) et ordre du plus grand au plus petit', () => {
+    const scene = preparerScene([petit, grand], { min: 0, max: 1 }, { couleurDe: (k) => (k === 1 ? [220, 38, 38] : null) });
+    expect(scene.n).toBe(2);
+    expect(Array.from(scene.parTaille)).toEqual([1, 0]);
+    expect(scene.teintes[1]).toMatch(/^rgb\(/);
+  });
+
+  it('dessine tout, sauf les triangles invisibles ; l\'aperçu ne garde que les plus grands', () => {
+    const scene = preparerScene([petit, grand, minuscule], { min: 0, max: 2 });
+    const complet = faux();
+    dessinerScene(complet, scene, vue);
+    expect(complet.remplis).toBe(2); // le minuscule (moins d'un quart de pixel) n'est pas dessiné
+    const apercu = faux();
+    dessinerScene(apercu, scene, vue, { apercu: true, max: 1 });
+    expect(apercu.remplis).toBe(1);
   });
 });

@@ -8861,13 +8861,23 @@ function donneesSousDossiers() {
 
 /**
  * 0.258.0 (demande du 16.11) : choisir un dossier COCHE ce qui y est rangé et DÉCOCHE le reste (listes de points, surfaces, dessins, plans) ;
- * tout reste listé dans « Afficher » et on peut cocher à la main un élément d'un autre dossier. « Tout » ne change aucune case.
+ * tout reste listé dans « Afficher » et on peut cocher à la main un élément d'un autre dossier. « Tout » recoche tout (0.265.0).
  * Les cases sont celles de la tablette (listesCachees, plan.visible : gardées par affichage-appareil.js).
  */
 function appliquerDossierALAffichage() {
   const choix = sousDossierChoisi();
-  if (!choix) return;
   const cachees = new Set(projet.listesCachees ?? []);
+  // « Tout » (0.265.0, demande du 17.11) : tout est recoché (plans, listes, surfaces, dessins) ; avant, rien ne changeait et on
+  // restait avec les seules cases du dernier dossier choisi.
+  if (!choix) {
+    for (const { genre, element } of elementsRangeables(projet)) {
+      if (genre === 'reseau') continue;
+      if (genre === 'plan') element.visible = true;
+      else cachees.delete(element.id);
+    }
+    projet.listesCachees = [...cachees];
+    return;
+  }
   const cadastres = new Map((projet.leves ?? []).filter((l) => l.cadastre).map((l) => [planDuCadastre(projet, l)?.id, l]));
   for (const { genre, element } of elementsRangeables(projet)) {
     if (genre === 'reseau') continue;
