@@ -4,6 +4,7 @@
 // le début du réseau. Les altitudes sont des z.
 import { couleurDuType, formeTranchee, pentesDesSegments, longueurReseau, HAUTEUR_SANS_SURFACE } from '../topo/reseau.js';
 import { echapper } from '../outils/echapper.js';
+import { svgObjetsIfc } from '../plan/coupe-ifc.js';
 
 const f = (v) => v.toFixed(1);
 const nombre3 = (v) => v.toFixed(3);
@@ -24,10 +25,11 @@ function cadre({ x0, x1, z0, z1, largeur, hauteur, marge = 12, exageration = 1 }
 
 /**
  * Coupe en travers. coupe : résultat de coupeEnTravers ; terrain : [{ x, z }] (profil de la surface le long de la coupe,
- * peut être vide) ; terrainEn(x) : altitude du terrain ou null ; options : { largeur, hauteur }.
+ * peut être vide) ; terrainEn(x) : altitude du terrain ou null ; ifc : objets des maquettes IFC coupés (0.262.0, points
+ * { x, z }) ; options : { largeur, hauteur }.
  * Renvoie le SVG (texte).
  */
-export function svgCoupeEnTravers({ coupe, terrain = [], terrainEn = null, largeur = 720, hauteur = 320 }) {
+export function svgCoupeEnTravers({ coupe, terrain = [], terrainEn = null, ifc = [], largeur = 720, hauteur = 320 }) {
   if (!coupe) return '';
   const largeurCoupe = 2 * coupe.demiLargeur;
   const formes = coupe.tuyaux.filter((t) => t.reseau.tranchee).map((t) => ({ t, forme: formeTranchee(t.x, t.fe, t.reseau.tranchee, terrainEn) }));
@@ -44,6 +46,8 @@ export function svgCoupeEnTravers({ coupe, terrain = [], terrainEn = null, large
   const c = cadre({ x0, x1, z0, z1, largeur, hauteur });
   const pts = (liste) => liste.map((p) => `${f(c.X(p.x))},${f(c.Z(p.z))}`).join(' ');
   let s = `<svg class="svg-coupe-reseau" viewBox="0 0 ${largeur} ${hauteur}" width="100%" role="img" aria-label="Coupe en travers">`;
+  // Maquettes IFC (0.262.0) : sous tout le reste (le cadre est fait pour les tuyaux : ce qui dépasse est coupé).
+  s += svgObjetsIfc(ifc, c.X, c.Z);
   // Tranchées d'abord (sous les tuyaux).
   for (const { t, forme } of formes) {
     s += `<polygon class="tranchee-coupe" points="${pts(forme)}" data-reseau="${echapper(t.reseau.id)}" />`;
@@ -75,11 +79,12 @@ export function exagerationAuto(longueur, zmin, zmax, largeur = 720, hauteur = 3
 
 /**
  * Coupe dans l'axe d'un réseau. terrain : liste de morceaux [[{ d, z }]] (profil de la surface le long du réseau) ;
+ * ifc : objets des maquettes IFC coupés le long du réseau (0.262.0, points { x = distance, z }) ;
  * croisements : [{ reseau, d, fe }] ; position : { d, fe } de la canne ou null (fe = altitude de la canne) ;
  * fenetre : { d0, d1 } pour ne montrer qu'une partie du réseau (profil en long autour de la canne).
  * Renvoie { svg, exageration }.
  */
-export function svgCoupeAxe({ reseau, terrain = [], croisements = [], position = null, fenetre = null, largeur = 720, hauteur = 300 }) {
+export function svgCoupeAxe({ reseau, terrain = [], croisements = [], ifc = [], position = null, fenetre = null, largeur = 720, hauteur = 300 }) {
   const L = longueurReseau(reseau);
   const t = reseau.tranchee;
   const sommetsD = [];
@@ -100,6 +105,8 @@ export function svgCoupeAxe({ reseau, terrain = [], croisements = [], position =
   const P = (d, z) => `${f(c.X(d))},${f(c.Z(z))}`;
   const couleur = couleurDuType(reseau.type);
   let s = `<svg class="svg-coupe-reseau" viewBox="0 0 ${largeur} ${hauteur}" width="100%" role="img" aria-label="Coupe dans l'axe">`;
+  // Maquettes IFC (0.262.0, x = distance le long de la ligne) : sous tout le reste.
+  s += svgObjetsIfc(ifc, c.X, c.Z);
   // Tranchée : entre le fond et le terrain (ou FE + 1,5 m sans surface).
   if (t) {
     const haut = terrain.length > 0 ? terrain.flat() : sommetsD.map((p) => ({ d: p.d, z: p.fe + HAUTEUR_SANS_SURFACE }));

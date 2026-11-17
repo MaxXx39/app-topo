@@ -32,7 +32,8 @@ export default defineConfig(({ mode }) => ({
         // téléchargée à l'installation ; elle l'est à la première photo HEIC, puis gardée sur
         // l'appareil (runtimeCaching ci-dessous) pour marcher ensuite sans connexion.
         // 0.129.0 : même chose pour la lecture des plans PDF (pdf.js, environ 1,8 Mo).
-        globIgnores: ['**/heic-to-*.js', '**/pdf.min-*.js', '**/pdf.worker.min-*'],
+        // 0.262.0 : même chose pour la lecture des maquettes IFC (web-ifc, environ 3,5 Mo + 1,6 Mo).
+        globIgnores: ['**/heic-to-*.js', '**/pdf.min-*.js', '**/pdf.worker.min-*', '**/web-ifc-api-*.js'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
@@ -44,6 +45,11 @@ export default defineConfig(({ mode }) => ({
             urlPattern: /\/assets\/pdf\.(min|worker\.min)-[^/]+\.m?js$/,
             handler: 'CacheFirst',
             options: { cacheName: 'lecture-pdf', expiration: { maxEntries: 6 } },
+          },
+          {
+            urlPattern: /\/assets\/web-ifc(-api)?-[^/]+\.(js|wasm)$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'lecture-ifc', expiration: { maxEntries: 4 } },
           },
         ],
       },

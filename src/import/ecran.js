@@ -33,7 +33,7 @@ import { CATEGORIES_POINTS, CATEGORIES_LEVES, COLONNES_POINTS, categorieDeListe,
  * Crée le panneau « Import » dans "conteneur" et « Contenu du projet » dans "contenu". Les actions sont faites par main.js via "actions" :
  * archiver(type, id), restaurerArchive(id), supprimerArchive(id) (archives, 0.119.0, voir projet/archives.js),
  * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id),
- * importerPlanDxf(fichier), importerPlanPdf(fichier), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
+ * importerPlanDxf(fichier), importerPlanPdf(fichier), importerIfc(fichier) (0.262.0), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
  * recalerPlanDxf(id), controlerPlanDxf(id) (0.218.0), exporterPlanRecale(id), annulerRecalagePlan(id),
  * montrerCalqueDxf(id, n° du calque, visible),
  * montrerTousCalquesDxf(id, visible), ajouterPointTape({ nom, est, nord, altitude }) (renvoie
@@ -291,6 +291,10 @@ export function creerEcranImport(conteneur, contenu, actions) {
       const fichier = cible.files[0];
       cible.value = '';
       await actions.importerPlanPdf(fichier);
+    } else if (cible.dataset.champ === 'fichier-ifc' && cible.files[0]) {
+      const fichier = cible.files[0];
+      cible.value = '';
+      await actions.importerIfc(fichier);
     } else if (cible.dataset.champ === 'cadastre-points') {
       actions.montrerPointsCadastre(cible.dataset.id, cible.checked);
     } else if (cible.dataset.champ === 'dossier-case') {
@@ -359,6 +363,11 @@ export function creerEcranImport(conteneur, contenu, actions) {
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v15H6z" /><path d="M14 2v6h6" /><path d="M9 17l3-5 3 3" /></svg>
               <span><strong>Plan PDF</strong><span class="aide">PDF en traits</span></span>
               <input type="file" data-champ="fichier-plan-pdf" accept=".pdf,application/pdf" hidden />
+            </label>
+            <label class="bouton-import">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7z" /><path d="M3 7l9 5 9-5M12 12v10" /></svg>
+              <span><strong>Maquette IFC</strong><span class="aide">bâtiment en 3D</span></span>
+              <input type="file" data-champ="fichier-ifc" accept=".ifc" hidden />
             </label>
             <label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17 9 7l5 6 3-4 4 8z" /><path d="M3 17h18" /></svg>
@@ -531,14 +540,14 @@ function pageGerer(projet, vue, ouverts) {
         : `<input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />`;
       lignes.push(ligneGerer({
         projet, genre: 'plan', element: plan,
-        cle: `plans:${plan.id}`, titre: echapper(plan.nom), nature: plan.pdf ? 'PDF' : 'DXF', couleur: plan.couleur ?? '#64748b', info: [`${plan.compte?.objets ?? 0} objets`, resumeEtatPlan(plan)].filter(Boolean).join(' · '), ouverts,
+        cle: `plans:${plan.id}`, titre: echapper(plan.nom), nature: plan.ifc ? 'IFC' : plan.pdf ? 'PDF' : 'DXF', couleur: plan.couleur ?? '#64748b', info: [`${plan.compte?.objets ?? 0} objets`, resumeEtatPlan(plan)].filter(Boolean).join(' · '), ouverts,
         menu: `<label class="champ-gerer">Renommer ${nom}</label>
           ${etatRecalage(plan)}${etatControle(plan)}
           <div class="champ-gerer">Couleur ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: 'Couleur du plan' })}</div>
           <div class="actions-ligne-gerer">
             <button type="button" class="bouton-secondaire" data-action="voir-plan" data-id="${plan.id}">Voir</button>
-            <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="recaler-plan" data-id="${plan.id}">Recaler</button>
-            ${plan.pdf?.image ? '' : `<button type="button" class="bouton-secondaire seulement-intermediaire" data-action="exporter-plan" data-id="${plan.id}">Exporter</button>`}
+            ${plan.ifc ? '' : `<button type="button" class="bouton-secondaire seulement-intermediaire" data-action="recaler-plan" data-id="${plan.id}">Recaler</button>`}
+            ${plan.pdf?.image || plan.ifc ? '' : `<button type="button" class="bouton-secondaire seulement-intermediaire" data-action="exporter-plan" data-id="${plan.id}">Exporter</button>`}
             ${boutonsArchive('plan', plan.id, 'supprimer-plan')}
           </div>`,
       }));

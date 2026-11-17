@@ -14007,3 +14007,9 @@ body.mode-telephone .cadre-projet-applis .bouton-texte-projet { padding: 0 11px;
 .pastille-hors-ligne { display: none; position: absolute; top: 6px; right: 10px; z-index: 30; width: 76px; min-height: 24px; padding: 2px 4px; border-radius: 13px; background: #dc2626; color: #ffffff; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; line-height: 1.05; pointer-events: none; }
 body.drive-hors-ligne.avec-recepteur .pastille-hors-ligne { display: flex; }
 body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; min-height: 20px; font-size: 0.58rem; }
+/* 0.262.0 : ligne « Coupe IFC » du menu Plan (altitude de la coupe des maquettes IFC). */
+.ligne-coupe-ifc { flex-wrap: wrap; }
+.ligne-coupe-ifc select { flex: 1 1 140px; min-height: 36px; font-size: 0.9rem; }
+.ligne-coupe-ifc .champ-coupe-ifc { width: 7em; min-height: 36px; font-size: 0.9rem; }
+/* 0.262.0 : objets des maquettes IFC dans les coupes (contour à la couleur du type, rempli clair). */
+.ifc-coupe { fill: none; stroke-width: 1.2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }

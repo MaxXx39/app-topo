@@ -12,6 +12,8 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
+import { bornesMaquette, couleurCalqueIfc } from './topo/ifc.js';
+import { estPlanIfc, lireChoixCoupeIfc, enregistrerChoixCoupeIfc, niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, arrondiRecepteur, objetsIfcSurCoupe, objetsIfcLeLong, signatureIfc } from './plan/coupe-ifc.js';
 import { nuageDriveRouge } from './topo/etat-drive.js';
 import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
@@ -1465,6 +1467,9 @@ const reseaux = creerReseaux({
   surfaces: () => projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
   trianglesDe: (id) => trianglesDeSurface(id),
   altitudeDe: (id) => altitudeDeSurface(id),
+  // 0.262.0 : maquettes IFC affichées, coupées en travers ou le long du réseau.
+  ifcSurCoupe: (debut, fin) => objetsIfcSurCoupe(projet.plansDxf, debut, fin),
+  ifcLeLong: (sommets) => objetsIfcLeLong(projet.plansDxf, sommets),
   ligneSousLeDoigt: ligneDuPlanSousLeDoigt,
   pointSousLeDoigt: pointDuPlanSousLeDoigt,
   implanter: (ligne) => implanterUnReseau(ligne),
@@ -1668,7 +1673,8 @@ function comptesDuProjet() {
   const surfaces = projet.surfaces.filter((s) => estSurfaceFichier(s)).length;
   return [
     projet.leves.length > 0 ? pluriel(projet.leves.length, 'levé') : '',
-    (projet.plansDxf ?? []).length > 0 ? `${projet.plansDxf.length} DXF` : '',
+    (projet.plansDxf ?? []).some((p) => !estPlanIfc(p)) ? `${projet.plansDxf.filter((p) => !estPlanIfc(p)).length} DXF` : '',
+    (projet.plansDxf ?? []).some(estPlanIfc) ? `${projet.plansDxf.filter(estPlanIfc).length} IFC` : '',
     surfaces > 0 ? pluriel(surfaces, 'surface') : '',
   ].filter(Boolean).join(' · ');
 }
@@ -2272,6 +2278,61 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       recalculer();
     } finally {
       doc?.loadingTask?.destroy();
+    }
+  },
+  // 0.262.0 (Expert) : maquette IFC (bâtiment, structure) : vue en plan coupée à une altitude et sur les coupes.
+  importerIfc: async (fichier) => {
+    try {
+      afficherMessage(`Lecture de l'IFC « ${fichier.name} »… (quelques secondes)`, null);
+      await new Promise((fin) => setTimeout(fin, 30));
+      const { lireIfc } = await import('./import/ifc.js');
+      const octets = new Uint8Array(await fichier.arrayBuffer());
+      // Un IFC commence toujours par « ISO-10303-21 » (format STEP) : sinon, le dire tout de suite.
+      if (!new TextDecoder().decode(octets.subarray(0, 64)).includes('ISO-10303-21')) throw new Error('ce n\'est pas un fichier IFC (texte « ISO-10303-21 » absent au début)');
+      const { maquette, compte, schema } = await lireIfc(octets);
+      const bornes = bornesMaquette(maquette);
+      if (!bornes) throw new Error('aucun objet en 3D trouvé dans ce fichier');
+      afficherMessage(`IFC lu : ${compte.objets} objets`, 1500);
+      const avertissements = [];
+      const enMn95 = estEnMn95(bornes);
+      if (!enMn95) avertissements.push('Cette maquette ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : son calage n\'est pas encore possible dans l\'appli.');
+      if (compte.ignores > 0) avertissements.push(`${compte.ignores} objet(s) sans forme lisible, pas repris.`);
+      if (maquette.niveaux.length === 0) avertissements.push('Pas de niveau (étage) dans le fichier : coupe à une altitude tapée ou à celle du récepteur.');
+      const choix = await demanderChamps({
+        titre: `Maquette IFC « ${fichier.name} »`,
+        note: enMn95
+          ? { ton: 'ok', texte: `✓ Coordonnées suisses (MN95) : la maquette semble en place. ${compte.objets} objets, ${maquette.niveaux.length} niveaux.` }
+          : { ton: 'alerte', texte: '⚠ Pas en coordonnées suisses (MN95) : la maquette ne sera pas à sa place.' },
+        champs: [
+          { cle: 'nom', titre: 'Nom de la maquette', valeur: fichier.name.replace(/\.ifc$/i, '') },
+          champSousDossier(),
+        ],
+      });
+      if (!choix) {
+        afficherMessage('Maquette IFC non importée');
+        return;
+      }
+      const nouveau = {
+        id: nouvelIdentifiant(),
+        importeLe: new Date().toISOString(),
+        nom: choix.nom || fichier.name.replace(/\.ifc$/i, ''),
+        origine: maquette.origine,
+        bornes,
+        calques: maquette.types.map((nom) => ({ nom, couleur: couleurCalqueIfc(nom), visible: true })),
+        contenu: { maquette },
+        compte: { objets: compte.objets, ignores: {} },
+        ifc: { niveaux: maquette.niveaux, schema, triangles: compte.triangles },
+        dejaCale: enMn95,
+        sousDossiers: await sousDossiersChoisis(choix.sousDossier),
+      };
+      projet.plansDxf.push(nouveau);
+      dernierPlan = { nom: nouveau.nom, avertissements };
+      afficherMessage(`Maquette IFC « ${nouveau.nom} » importée : ${compte.objets} objets`, 4000, { ok: true });
+      modifie();
+    } catch (erreur) {
+      dernierPlan = { nom: fichier.name, erreur: erreur.message };
+      afficherMessage(`Maquette IFC non importée : ${erreur.message}`, 8000);
+      recalculer();
     }
   },
   voirPlanDxf: (id) => {
@@ -4902,7 +4963,7 @@ function guidageDesPoints(points, triangles, coins, sensLame = null) {
   // 0.190.0 : les boutons − / + de la coupe multiplient les marges (la coupe est plus ou moins large autour de l'outil).
   const facteurMarges = terrain.lame.zoomMarges ?? 1;
   const marges = Object.fromEntries(Object.entries(terrain.lame.marges).map(([cle, valeur]) => [cle, Math.max(valeur, 0.5) * facteurMarges]));
-  const coupe = coupeDecalee(coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]), delta);
+  const coupe = avecIfc(coupeDecalee(coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]), delta));
   let long;
   let coupeLong;
   if (sensLame) {
@@ -4913,12 +4974,12 @@ function guidageDesPoints(points, triangles, coins, sensLame = null) {
     const ecart = surfaceMilieu == null ? null : surfaceMilieu - milieu.altitude;
     long = { milieu: { ecart, classe: classeEcartLame(ecart, tolerances) } };
     const brute = coupeEntre(triangles, arriere, avant, 0);
-    coupeLong = brute ? coupeDecalee({ ...brute, centre: { distance: marges.derriere, altitude: milieu.altitude } }, delta) : null;
+    coupeLong = brute ? avecIfc(coupeDecalee({ ...brute, centre: { distance: marges.derriere, altitude: milieu.altitude } }, delta)) : null;
   } else {
     // Râteau : Arr – Av comme G – D, l'arrière à gauche ; le « dévers » est la pente vers l'avant.
     const calcul = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface, tolerances });
     long = calcul.erreur ? null : calcul;
-    coupeLong = calcul.erreur ? null : coupeDecalee(coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]), delta);
+    coupeLong = calcul.erreur ? null : avecIfc(coupeDecalee(coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]), delta));
   }
   // Lignes suivies (0.154.0) : écart en plan du bout choisi à la ligne, sur l'axe G – D, et place du
   // croisement sur la coupe G – D (distance depuis le début de la coupe).
@@ -4948,6 +5009,12 @@ function guidageDesPoints(points, triangles, coins, sensLame = null) {
 }
 
 /** Coupe du Guidage avec la surface décalée de "delta" (m) ; la surface de base gardée à part. */
+/** Coupe du Guidage avec les maquettes IFC affichées qu'elle traverse (0.262.0) : coupe.ifc. */
+function avecIfc(coupe) {
+  if (!coupe?.debut || !(projet.plansDxf ?? []).some(estPlanIfc)) return coupe;
+  return { ...coupe, ifc: objetsIfcSurCoupe(projet.plansDxf, coupe.debut, coupe.fin) };
+}
+
 function coupeDecalee(coupe, delta) {
   if (!coupe || !delta) return coupe;
   return { ...coupe, morceauxBase: coupe.morceaux, morceaux: decalerProfil(coupe.morceaux, delta), delta };
@@ -5328,7 +5395,20 @@ function profilEnLongDeLaLigne(position) {
   const d0 = Math.min(Math.max(d - demi, 0), Math.max(sur.longueur - 2 * demi, 0));
   const fenetre = sur.longueur <= 2 * demi ? null : { d0, d1: d0 + 2 * demi };
   const croisements = terrain.cana && aAcces('intermediaire') ? croisementsSurAxe([...(projet.canalisations ?? []), pseudo], '__ligne') : [];
-  return svgCoupeAxe({ reseau: pseudo, terrain: ligne.terrainProfil, croisements, position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
+  return svgCoupeAxe({ reseau: pseudo, terrain: ligne.terrainProfil, croisements, ifc: ifcLeLongDeLaLigne(ligne, avecZ), position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
+}
+
+/**
+ * Maquettes IFC coupées le long de la ligne implantée (0.262.0), gardées sur la ligne et refaites seulement si la ligne ou ce qui est
+ * affiché des maquettes change (le profil en long se redessine 5 fois par seconde).
+ */
+function ifcLeLongDeLaLigne(ligne, sommets) {
+  const cle = `${signatureIfc(projet.plansDxf)}|${sommets.map((p) => `${p.est},${p.nord}`).join(';')}`;
+  if (ligne.ifcProfilCle !== cle) {
+    ligne.ifcProfilCle = cle;
+    ligne.ifcProfil = objetsIfcLeLong(projet.plansDxf, sommets);
+  }
+  return ligne.ifcProfil;
 }
 
 /** Profil en long (SVG) du réseau en cours d'implantation, avec la canne (altitude mesurée) : ±20 m autour d'elle. */
@@ -5351,7 +5431,7 @@ function profilEnLongDuReseau(position) {
   const d = Math.min(Math.max(sur.abscisse, 0), sur.longueur);
   const demi = 20;
   const fenetre = sur.longueur <= 2 * demi ? null : { d0: Math.min(Math.max(d - demi, 0), sur.longueur - 2 * demi), d1: Math.min(Math.max(d - demi, 0), sur.longueur - 2 * demi) + 2 * demi };
-  return svgCoupeAxe({ reseau, terrain: ligne.terrainProfil, position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
+  return svgCoupeAxe({ reseau, terrain: ligne.terrainProfil, ifc: ifcLeLongDeLaLigne(ligne, reseau.sommets), position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
 }
 
 /**
@@ -5786,8 +5866,22 @@ let barreRecalage = null;
 /** Plans DXF du projet tels qu'on les utilise : recalés (sauf celui qu'on est en train de recaler). */
 function plansDuProjet() {
   // 0.258.0 : tous les plans sont listés ; le dossier choisi ne fait que cocher / décocher (voir appliquerDossierALAffichage).
+  // 0.262.0 : une maquette IFC devient le plan coupé à l'altitude choisie par la tablette.
+  const altitudeIfc = (projet.plansDxf ?? []).some(estPlanIfc) ? altitudeIfcDeLaTablette().altitude : null;
   return (projet.plansDxf ?? [])
-    .map((p) => (p.id === recalage.planId ? p : planRecale(p)));
+    .map((p) => (estPlanIfc(p) ? planIfcCoupe(p, altitudeIfc) : p.id === recalage.planId ? p : planRecale(p)));
+}
+
+/** Altitude de la coupe en plan des maquettes IFC sur cette tablette : { altitude (m ou null), texte }. */
+function altitudeIfcDeLaTablette() {
+  const canne = etatRecepteur?.connecte && etatRecepteur?.recu ? arrondiRecepteur(etatRecepteur.position?.altitude) : null;
+  return altitudeCoupeIfc((projet.plansDxf ?? []).filter(estPlanIfc), lireChoixCoupeIfc(projet.id), canne);
+}
+
+/** Choix de l'altitude de coupe IFC (onglet Plan) : retenu par la tablette, puis plan redessiné. */
+function choisirCoupeIfc(choix) {
+  enregistrerChoixCoupeIfc(projet.id, choix);
+  recalculer();
 }
 
 function commencerRecalage(id) {
@@ -6271,6 +6365,27 @@ function apercuRecalageAxes() {
   const { a, b, tEst, tNord, rotation } = r;
   const recale = Object.assign(Object.create(choisi), recalerContenu(choisi, { a, b, tEst, tNord, echelle, rotation }));
   return Object.assign(Object.create(recale), { id: `${choisi.id}-apercu`, visible: true, couleur: '#e11d48', transparence: 25 });
+}
+
+/**
+ * Plans à dessiner sur le plan : rien avec le bouton « Seul » (Implanter : l'élément choisi seulement ;
+ * Lever, 0.105.4 : le levé en cours seulement), sinon plansAffiches().
+ */
+function plansPourLePlan() {
+  const seulEnLever = seulTravail && ongletContexte === 'terrain' && Boolean(ecranLeve) && terrain.mode === 'lever';
+  return elementSeul() || seulEnLever ? [] : plansAffiches();
+}
+
+// 0.262.0 : altitude de la dernière coupe IFC « au récepteur » (pour ne recouper que si elle change).
+let derniereCoupeIfcRecepteur;
+
+/** Coupe IFC qui suit le récepteur : le plan est recoupé quand l'altitude du bout de canne change (au cm). */
+function suivreCoupeIfcAuRecepteur() {
+  if (lireChoixCoupeIfc(projet.id)?.sorte !== 'recepteur' || !(projet.plansDxf ?? []).some(estPlanIfc)) return;
+  const altitude = altitudeIfcDeLaTablette().altitude;
+  if (altitude === derniereCoupeIfcRecepteur) return;
+  derniereCoupeIfcRecepteur = altitude;
+  plan.afficherPlansDxf(plansPourLePlan());
 }
 
 /** Plans montrés sur le plan : ceux du projet, et l'aperçu du calage par axes s'il y en a un. */
@@ -7405,6 +7520,7 @@ function calculerControle(etat, orientation) {
       debut,
       fin,
       reseaux: reseauxCoupe,
+      ifc: objetsIfcSurCoupe(projet.plansDxf, debut, fin), // 0.262.0 : maquettes IFC affichées
       lignes: decalerProfil(base, delta),
       lignesBase: delta ? base : null,
       delta,
@@ -7498,6 +7614,7 @@ if (recepteurDisponible()) {
     const delta = deltaEnMetres();
     const decale = position && ongletContexte === 'terrain' && terrain.mode === 'lever' && deltaActif(delta) ? pointAvecDelta(position, delta, orientation.azimut) : null;
     const tablette = !etat.connecte && positionTablette ? { est: positionTablette.est, nord: positionTablette.nord, prete: false, tablette: true, precision: positionTablette.precision, azimut: null } : null;
+    suivreCoupeIfcAuRecepteur();
     plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotes, delta: decale } : tablette);
   });
   // GPS de la tablette : gardé ici, montré avec l'état suivant du RX2 (5 fois par seconde).
@@ -7871,6 +7988,9 @@ const plan = creerPlan(document.querySelector('#plan'), {
     if (!coche) plan.rafraichirImplantation();
   },
   quandReglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
+  // 0.262.0 : coupe en plan des maquettes IFC (choix de la tablette).
+  lireCoupeIfc: () => ({ niveaux: niveauxDesIfc((projet.plansDxf ?? []).filter(estPlanIfc)), choix: lireChoixCoupeIfc(projet.id), altitude: altitudeIfcDeLaTablette().altitude }),
+  quandChoisirCoupeIfc: (choix) => choisirCoupeIfc(choix),
   // Menu « Points » : cocher / décocher une liste de points ('*' : toutes). Pas une modification
   // du travail (rien à annuler) : on redessine et on enregistre.
   // Couleur d'une liste (menu « Afficher » ; aussi dans Projet › Listes de points).
@@ -8460,7 +8580,7 @@ function recalculer({ recadrer = false } = {}) {
   }
   // Bouton « Seul » dans Lever (0.105.4) : tout est caché (plans DXF, autres levés, imports, mesures, coupes) sauf le fond et le levé en cours.
   const seulEnLever = seulTravail && ongletContexte === 'terrain' && Boolean(ecranLeve) && terrain.mode === 'lever';
-  plan.afficherPlansDxf(seul || seulEnLever ? [] : plansAffiches());
+  plan.afficherPlansDxf(plansPourLePlan());
   // Ce qui est coché (calques, « Afficher ») vaut dans tous les onglets.
   const dessinDuPlan = {
     ...editeurSurfaces.obtenirDessin(),

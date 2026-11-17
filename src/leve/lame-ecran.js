@@ -7,6 +7,7 @@
 //   droite ; dessous le dévers et les bords de la surface ;
 // - coupe Arr – Av (au milieu de l'outil, perpendiculaire) : pareil, l'arrière à gauche, l'avant à droite.
 // Les nombres changent 5 fois par seconde sans redessiner l'écran (rafraichirLame).
+import { svgObjetsIfc } from '../plan/coupe-ifc.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { formaterNombre } from '../topo/format.js';
@@ -294,7 +295,8 @@ export function svgCoupeGuidage(coupe, guidage, noms, hauteur = 140, lignes = []
   const trace = (m) => `M${m.map((p) => `${x(p.distance).toFixed(1)} ${y(p.altitude).toFixed(1)}`).join('L')}`;
   // Delta Z (0.152.0) : surface de base en gris pointillé, surface décalée en brun.
   const base = (morceauxBase ?? []).map((m) => `<path class="profil-base" d="${trace(m)}" />`).join('');
-  const surface = base + morceaux.map((m) => `<path class="surface-coupe-lame" d="${trace(m)}" />`).join('');
+  // Maquettes IFC (0.262.0) : dessinées sous la surface.
+  const surface = svgObjetsIfc(coupe.ifc, x, y) + base + morceaux.map((m) => `<path class="surface-coupe-lame" d="${trace(m)}" />`).join('');
   const texteDelta = delta ? `<text x="4" y="11" class="note-coupe-lame texte-delta-surface">Δ ${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(3)} m</text>` : '';
   // Pente du projet au milieu de chaque tronçon assez long à l'écran, sous la ligne.
   const altitudeA = (d) => {

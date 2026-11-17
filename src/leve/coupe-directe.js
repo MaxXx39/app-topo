@@ -1,5 +1,6 @@
 import { couleurDuType } from '../topo/reseau.js';
 import { echapper } from '../outils/echapper.js';
+import { svgObjetsIfc } from '../plan/coupe-ifc.js';
 
 // Dessin d'une coupe en direct (onglet Terrain, mode Implanter) : le profil de la surface sur
 // quelques mètres de part et d'autre du récepteur, et le bout de canne dessus (SVG).
@@ -41,8 +42,9 @@ export function valeursGrille(debut, fin, pas) {
  * - titre, gauche, droite : textes (ex. « Perpendiculaire », « gauche », « droite »)
  * - grille : vrai pour la grille grise en longueur et en hauteur (Expert)
  * - reseaux : tuyaux et tranchées croisés par la coupe (case « Cana », voir topo/reseau.js tuyauxSurCoupe) : [{ reseau, x, fe, etirement, forme }]
+ * - ifc : objets des maquettes IFC coupés (0.262.0, voir topo/ifc.js coupeVerticale) : [{ couleur, points: [{ x, z }], ferme }]
  */
-export function svgCoupeDirecte({ lignes, lignesBase = null, reseaux = [], delta = 0, demiLongueur, altitudeCanne, classe, exageration = 1, sens = '', titre, gauche, droite, grille = true }) {
+export function svgCoupeDirecte({ lignes, lignesBase = null, reseaux = [], ifc = [], delta = 0, demiLongueur, altitudeCanne, classe, exageration = 1, sens = '', titre, gauche, droite, grille = true }) {
   // 0.190.0 (maquette B du 10.11) : cadre FIXE (hauteur = 0,45 × largeur : 2,25 m pour 5 m, 4,5 m pour 10 m…), le bout de canne
   // toujours au milieu ; seule l'échelle change (largeur 5 / 10 / 20 m…, hauteurs ×0,5, ×0,75, ×1, ×1,5, ×2, ×3).
   const longueur = 2 * demiLongueur;
@@ -51,6 +53,8 @@ export function svgCoupeDirecte({ lignes, lignesBase = null, reseaux = [], delta
   const pixelsParMetreX = largeurUtile / longueur;
   const pixelsParMetre = pixelsParMetreX * (Number(exageration) > 0 ? Number(exageration) : 1);
   const altitudes = [...lignes.flat().map((p) => p.altitude), ...(lignesBase ?? []).flat().map((p) => p.altitude), ...(altitudeCanne != null ? [altitudeCanne] : [])];
+  // Sans surface ni canne : le dessin se centre sur la maquette IFC.
+  if (altitudes.length === 0) for (const objet of ifc) for (const p of objet.points) altitudes.push(p.z);
   const bas0 = altitudes.length > 0 ? Math.min(...altitudes) : 0;
   const haut0 = altitudes.length > 0 ? Math.max(...altitudes) : 1;
   const hauteur = hauteurUtile + MARGES.haut + MARGES.bas;
@@ -58,7 +62,7 @@ export function svgCoupeDirecte({ lignes, lignesBase = null, reseaux = [], delta
   const entete = `<text x="${MARGES.gauche}" y="12" class="titre-coupe">${titre}</text>
     <text x="${MARGES.gauche}" y="${hauteur - 4}" class="cote">${gauche}</text>
     <text x="${LARGEUR - MARGES.droite}" y="${hauteur - 4}" class="cote" text-anchor="end">${droite}</text>`;
-  if (lignes.length === 0) {
+  if (lignes.length === 0 && ifc.length === 0) {
     return `<svg viewBox="0 0 ${LARGEUR} ${hauteur}" class="${classes}">${entete}
       <text x="${LARGEUR / 2}" y="${hauteur / 2}" text-anchor="middle" class="vide-coupe">Pas de surface ici</text></svg>`;
   }
@@ -104,6 +108,9 @@ export function svgCoupeDirecte({ lignes, lignesBase = null, reseaux = [], delta
     return forme + ellipse + nom;
   }).join('');
 
+  // Maquettes IFC (0.262.0) : contour de chaque objet coupé, rempli clair, à la couleur de son type.
+  const objetsIfc = svgObjetsIfc(ifc, x, y);
+
   // Le récepteur au milieu : trait vertical (sa position) et bout de canne (au bord s'il sort du dessin).
   const milieu = x(demiLongueur);
   let canne = `<line x1="${milieu}" y1="${MARGES.haut}" x2="${milieu}" y2="${yBas}" class="axe-canne" />`;
@@ -122,7 +129,7 @@ export function svgCoupeDirecte({ lignes, lignesBase = null, reseaux = [], delta
     <text x="${milieu}" y="${hauteur - 4}" class="cote" text-anchor="middle">${demiLongueur} m | ${demiLongueur} m</text>
     ${traitsGrille}
     ${texteDelta}
-    <g clip-path="url(#${cadre})">${base}${profils}${tuyaux}</g>
+    <g clip-path="url(#${cadre})">${objetsIfc}${base}${profils}${tuyaux}</g>
     ${canne}
   </svg>`;
 }

@@ -13,7 +13,7 @@
 
 ## Stack
 - JavaScript vanilla (modules ES), **Vite 8**, **vite-plugin-pwa**, **Vitest 5** ; plan en SVG (fond DXF en canvas).
-- Bibliothèques : `delaunator` + `@kninnug/constrainautor` (triangulation), `jspdf` (PDF), `heic-to` (photos HEIC), `pdfjs-dist` 6.4.299 (plans PDF, version legacy, accord du 05.11).
+- Bibliothèques : `delaunator` + `@kninnug/constrainautor` (triangulation), `jspdf` (PDF), `heic-to` (photos HEIC), `pdfjs-dist` 6.4.299 (plans PDF, version legacy, accord du 05.11), `web-ifc` 0.0.78 (maquettes IFC, accord du 17.11 ; ~5 Mo chargés seulement au 1er import IFC, gardés hors ligne : cache `lecture-ifc`).
 - APK Android : Kotlin sans bibliothèque (sauf `play-services-auth`), WebView ; la même appli web sert l'APK.
 - Appli Windows : C# .NET Framework 4.8, WinForms, une seule bibliothèque `Microsoft.Web.WebView2` 1.0.2903.40 (accord du 14.11) ; la même appli web sert le `.exe`.
 - Hébergement : GitHub Pages (`publier.yml`) ; APK par `apk.yml` (release `apk-derniere-version`). Partage de projets : Google Drive (`drive.file`).
@@ -23,8 +23,8 @@
 src/main.js          point d'entrée, état, liaison des écrans (gros fichier : chercher avec grep)
 src/topo/            calculs de topo (volume, coupe, mesure, implantation, talus, accroche, recalage, contrôle,
                      dessin, lame, levé direct, DXF, PDF, noms de fichiers, zone Genève–Vaud…)
-src/import/          lecture CSV Emlid, TXT, LandXML, DXF, PDF ; écran de l'onglet Projet (ecran.js, tableau-points.js)
-src/plan/            plan SVG/canvas (vue, fonds swisstopo, DXF, listes de points, dessins, loupe « Manuel »)
+src/import/          lecture CSV Emlid, TXT, LandXML, DXF, PDF, IFC (ifc.js, web-ifc) ; écran de l'onglet Projet (ecran.js, tableau-points.js)
+src/plan/            plan SVG/canvas (vue, fonds swisstopo, DXF, listes de points, dessins, loupe « Manuel », coupe-ifc.js)
 src/surfaces/ volumes/ mesures/ coupes/ photos/ dessin/ dao/   Calculs
 src/leve/            Terrain (lever, implanter, contrôle, guidage/lame, récepteur, croquis, fenêtres)
 src/annotation/ mesure-rapide/ reseaux/   applications Annotation, Mesure rapide, Réseaux
@@ -51,7 +51,7 @@ docs/                tableau des modes (xlsx) ; audit-2026-11/ (présentation de
 - Publier site + APK (seulement sur demande) : PR vers `main`, attendre « construire » et « apk » au vert, fusionner, puis `git fetch origin main && git merge --ff-only origin/main`. Jamais de rebase ni de force-push. Si « apk » échoue avec « a release with the same tag name already exists » : relancer le job une fois.
 - **Windows** : `…/releases/download/windows-derniere-version/Topo.exe` (aussi `Topo-<version>.exe`) ; fabriqué **à la main** (Actions › « Fabriquer l'appli Windows ») ou quand `windows/Topo/**` change ; jamais par un envoi ordinaire.
 - APK : `…/releases/download/apk-derniere-version/Topo.apk` (lien fixe, + `Topo-<version>.apk`).
-- **Publié** : tout jusqu'à la 0.256.3 (PR 98, 16.11). **Non publié** : 0.256.4 → 0.256.5 (Topo.exe fabriqué depuis la branche de travail le 16.11).
+- **Publié** : tout jusqu'à la 0.256.3 (PR 98, 16.11). **Non publié** : 0.256.4 → 0.262.0 (Topo.exe fabriqué depuis la branche de travail le 16.11, à la 0.256.5).
 
 ## Conventions de code
 - **Découpage de `main.js`** : petit à petit, au fil des demandes (jamais en gros) ; même comportement, avec tests et essai Playwright.
@@ -63,7 +63,7 @@ docs/                tableau des modes (xlsx) ; audit-2026-11/ (présentation de
 - Noms de points jamais interprétés. Noms levés : contour `C-Stock-n-m`, ligne `L-lib-n-m`, point `P-lib-n`, aire `A-lib-n-m` ; sommets de dessin `D1-1`.
 - Dans l'appli on écrit **GNSS**, jamais « RX2 » (sauf l'ancien nom de liste « Levé RX2 date »).
 - Données sur l'appareil (IndexedDB) ; seule exception : Drive. Mot de passe NTRIP jamais dans le projet (sauf liste partagée swipos sur Drive, acceptée).
-- Réglages de l'appareil (hors projet) : `topo-affichage`, `topo-sous-dossier`, `topo-colonnes-points`, `topo-export-plan`, `topo-reglages` (téléphone, mode, `tailleFormes`, `tailleTexte` : 4 tailles ; `theme` : `normal` / `sombre`), `topo-terrain`, `topo-plan-terrain-part`, `topo-plan-guidage-part`, `topo-favoris-applis`, `topo-ordre-applis`, `topo-applis-masquees`.
+- Réglages de l'appareil (hors projet) : `topo-affichage`, `topo-sous-dossier`, `topo-colonnes-points`, `topo-export-plan`, `topo-reglages` (téléphone, mode, `tailleFormes`, `tailleTexte` : 4 tailles ; `theme` : `normal` / `sombre`), `topo-terrain`, `topo-plan-terrain-part`, `topo-plan-guidage-part`, `topo-favoris-applis`, `topo-ordre-applis`, `topo-applis-masquees`, `topo-coupe-ifc` (altitude de coupe des IFC, par projet).
 - Fichiers exportés : un seul modèle **`affaire_contenu_date`** (`outils/nom-fichier.js`).
 - Icônes dessinées (`outils/icones.js`, `ICONES_LIGNE`, `.ico-ligne`) à la place des émojis ; signes de texte ✓ ⚠ ✎ ✕ ⚙ ★ gardés.
 - Pas de bouton « Annuler » visible : ne pas promettre d'annulation (Mesure rapide : « ↶ Retirer »).
@@ -78,11 +78,11 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Code (`reglages/reglages.js`) : `modeAppli()`, `aAcces('intermediaire' | 'expert')`, `estModeBase()`, `lameActive()` (= Expert) ; HTML : classes `.seulement-intermediaire` / `.seulement-expert` ; calques du plan : propriété `niveau`. **Nouvelle fonction : demander le mode, puis poser la classe ou `aAcces`.**
 - **Base** : ouvrir un projet, carte des projets, Drive, **Lever = seulement le Levé chantier**, implanter point / ligne / surface (sans « Enregistrer l'implantation », coupes dans l'axe), Contrôle, récepteur, GPS tablette, plan (fonds, plans DXF, « Afficher »), liste de points, plans (état visible), archives (sans supprimer), export du contrôle, « Enregistrer » de la fenêtre Exporter.
 - **Intermédiaire** en plus : créer un projet, toutes les natures de levé (Stock, Terrain, Terrassement, Libre), lignes / contours, libellés, Annotation, Mesure rapide, Delta, mesure de durée, accroches Manuel et Centre pts, « Enregistrer l'implantation », liste « À implanter » (coches), Calculs (volumes), exports PDF / DXF / mail, couleurs et exports de listes, supprimer un point (×), archiver, contrôler / recaler un plan, masquer / geler / isoler des calques, listes partagées, réglage swipos.
-- **Expert** en plus : bloc Importer (points, plans DXF / PDF, surfaces, Swisstopo, cadastre, avertissements d'import), exporter / dupliquer / supprimer un projet, Surface Projet, export CSV / LandXML, « Quoi exporter ? », prendre la main, talus, créer des « À implanter », coupes, Dessin / DAO, **Guidage** et 2e GNSS, **Réseaux**, réglages NTRIP, journal NMEA, supprimer un levé, calque Triangles, recalage par axes, vraie suppression (archives).
+- **Expert** en plus : bloc Importer (points, plans DXF / PDF, maquette IFC (0.262.0 ; voir la coupe IFC : tous les modes), surfaces, Swisstopo, cadastre, avertissements d'import), exporter / dupliquer / supprimer un projet, Surface Projet, export CSV / LandXML, « Quoi exporter ? », prendre la main, talus, créer des « À implanter », coupes, Dessin / DAO, **Guidage** et 2e GNSS, **Réseaux**, réglages NTRIP, journal NMEA, supprimer un levé, calque Triangles, recalage par axes, vraie suppression (archives).
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.261.2)
+## Fonctionnalités (état à la 0.262.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -124,6 +124,13 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - Récepteur : Bluetooth, NTRIP (swipos), journal NMEA (Expert), 2e GNSS (Expert), GPS tablette, cap automatique, PDOP (colonne de l'export). APK : pont `window.AppliAndroid`, batterie (arrière-plan coupé après 5 min), mise à jour, « Partage écran ».
 - **Drive** : « App Topo › Configuration Projet » ; **une main par projet** (verrou 15 min) ; un appareil n'écrase jamais une version qu'il n'a pas reçue ; **listes partagées** fusionnées partie par partie (`listes-partagees.js`) ; dossiers de projets.
 - **Windows** (`Topo.exe`, jamais lancé sur un vrai Windows) : sert l'appli web à `https://topo.appli/app-topo/` (ne jamais changer l'adresse) et glisse `pont-windows.js` ; port COM, NTRIP, Drive par identifiant « bureau » (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` à créer par l'utilisateur), fichiers dans Documents › Topo › Envois, mise à jour par la release `windows-derniere-version`. Pas fait : appareil photo, touche volume −, vibreur, batterie.
+
+## 0.262.0 — Maquette IFC (demande du 17.11, à essayer sur la tablette)
+- **Import** (Expert, tuile « Maquette IFC » du bloc Importer) : lu par `web-ifc` (`import/ifc.js`, ouvertures déjà découpées) ; doit être **en MN95** (coordonnées partagées Revit / IfcMapConversion lues dans le fichier, aucune conversion ; sinon avertissement). Fichier d'essai du 17.11 : STEP Gland « Apec » (Revit, IFC4, cm), 529 objets, niveaux S1 417.32 / N0 420.50 / N1 424.52 / N2 430.70 / N3 434.45 (**altitudes à confirmer par l'utilisateur**).
+- **Rangement** : un plan de `projet.plansDxf` avec `ifc: { niveaux, schema, triangles }`, `dejaCale`, calques = types (Murs, Dalles, Poteaux, Poutres, Fondations, Escaliers, Portes et fenêtres, Autres : `TYPES_IFC`) ; la maquette (`contenu.maquette` : sommets au mm, triangles) part sur Drive dans `plan-<id>.json.gz` (1,2 Mo de JSON pour l'essai). Pas de Recaler ni d'Exporter pour un IFC (pas encore).
+- **Voir (tous les modes)** : en plan, **coupe horizontale** (`topo/ifc.js` `coupeHorizontale` : contour fermé + aplat clair par objet, points alignés retirés pour l'accroche Sommet) à l'altitude choisie dans **Plan › Coupe IFC** (`plan/coupe-ifc.js`, choix de la tablette `topo-coupe-ifc`, rien n'est écrit dans le projet) : **niveau + 1.00 m** (décidé), altitude tapée, ou **bout de canne pile** (arrondi au cm, recoupe à chaque cm, `suivreCoupeIfcAuRecepteur`). Sans choix : premier niveau.
+- **Coupes** (`coupeVerticale`, `objetsIfcSurCoupe`, `svgObjetsIfc`) : Implanter › Surface (perpendiculaire / axe, maquette dessinée même sans surface sous la coupe), Implanter › Ligne (profil en long, gardé en mémoire), Réseaux (en travers et dans l'axe), Guidage (G–D et Arr–Av). Seulement les maquettes et calques affichés. Calculs › Coupes : pas fait (non demandé).
+- **Pas encore** : implanter sur l'IFC (prochaine étape), calage d'un IFC pas en MN95 (réutiliser le recalage par paires, accroches = coins de la coupe), vue 3D, export DXF de la coupe, filtre par étage, attributs (nom de l'objet gardé : `objet.n`). Essayé : Playwright (import, plan, choix du niveau, coupe dans l'axe d'Implanter › Surface) ; Réseaux et Guidage : tests seulement.
 
 ## 0.257.0 (retours du 16.11, à essayer sur la tablette)
 - **Arrivée dans le menu** : un projet de Drive ouvert depuis la liste ou la carte mène à la page Applications (`actionsProjet.ouvrirDrive` ; avant : on restait sur « Ouvrir projet »).
@@ -176,7 +183,7 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Windows** (audit) : connexion Drive qui échoue (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` ?). Panneau de gauche et clavier tactile : faits en 0.256.4, à essayer sur la tablette.
 - Pas fait : nature et type du levé chantier modifiables après coup, types DXF pour les PDF, points et altitudes de Surface Import par liste, DWG, Leica iCR70, Métré (en dernier), Réglages › Récepteur (fenêtre au lieu d'une page), « 0 surface » LandXML (message existant gardé).
 - Ouverts (non reproduits d'ici) : dézoom en changeant d'application (demander la séquence exacte sur tablette) ; accroches objet au recalage « sur site » (demander navigateur + plan).
-- **Idée pour plus tard (16.11, rien décidé, rien codé) : importer un IFC** et le voir en plan, en 3D et en coupes. Faisable avec la bibliothèque `web-ifc` (WASM, ~1-2 Mo, **accord à demander avant de l'ajouter**) qui donne des triangles. 3D : affichage comme les surfaces (vérifier d'abord comment la 3D actuelle est faite). Coupes : couper les triangles par le plan vertical. Plan : emprise au sol ou coupe horizontale à une altitude (à choisir avec l'utilisateur). **Point délicat : la position** (IFC4 `IfcMapConversion` = géoréférencé, sinon coordonnées locales : calage par paires de points comme un plan DXF, ou décalage + rotation ; ne rien deviner). Questions à poser avant : types d'IFC (bâtiment / réseaux / génie civil), géoréférencés MN95 ?, voir seulement ou implanter aussi, mode (Expert probable), un IFC d'exemple. Plan conseillé : lecture + plan + 3D calés à la main, puis coupes, puis filtre par type / étage et attributs.
+- **IFC** : fait en 0.262.0 (voir plus haut) ; suite : implanter, calage d'un IFC non MN95, 3D, filtre par étage / attributs.
 - Google Cloud : page `public/confidentialite.html` ; reste à l'utilisateur : « Publier l'application » (sinon réautorisation ~7 jours).
 
 ## Historique (très résumé)
