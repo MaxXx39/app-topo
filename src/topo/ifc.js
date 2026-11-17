@@ -409,3 +409,115 @@ export function rangerMaquette(objets, niveaux = []) {
   }
   return { origine, niveaux: [...niveaux].sort((a, b) => a.altitude - b.altitude), types, objets: rangees };
 }
+
+/** Distance (m) d'un point (x, y) au segment a–b (points [x, y]) en plan. */
+function distanceAuSegment(x, y, ax, ay, bx, by) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2));
+  return Math.hypot(x - (ax + t * dx), y - (ay + t * dy));
+}
+
+/**
+ * Objet de la maquette touché sur la coupe en plan, et altitudes de son dessus et de son dessous pile
+ * à cet endroit (0.263.0, implanter un coin d'IFC : « Dessus / Dessous » dans la fiche du point).
+ * - est, nord : point accroché (m) ; altitudeCoupe : altitude de la coupe en plan (m), ou null ;
+ * - tolerance : distance au contour coupé pour dire « c'est cet objet » (m, 2 cm).
+ * Dessus / dessous = la plus haute / la plus basse des faces non verticales de l'objet au-dessus du
+ * point (une face qui passe à moins de "tolerance" compte : un coin est sur le bord des faces).
+ * Renvoie { nom, type, dessus, dessous } (m) ou null si aucun objet coupé ne passe là.
+ */
+export function altitudesObjetEn(maquette, est, nord, altitudeCoupe, tolerance = 0.02) {
+  if (!maquette) return null;
+  const { origine } = maquette;
+  const h = altitudeCoupe == null ? null : altitudeCoupe + DECALAGE;
+  let meilleur = null;
+  for (const objet of maquette.objets ?? []) {
+    const b = boiteObjet(objet, origine);
+    if (est < b.estMin - tolerance || est > b.estMax + tolerance || nord < b.nordMin - tolerance || nord > b.nordMax + tolerance) continue;
+    if (h != null && (b.altMin > h || b.altMax < h)) continue;
+    const s = sommetsEnMetres(objet, origine);
+    let distance = 0;
+    if (h != null) {
+      // Distance du point au contour de l'objet coupé à l'altitude de la coupe.
+      distance = Infinity;
+      const contours = couperMaillage(objet.i, (k) => s[3 * k + 2] - h, (a, c, r) => [s[3 * a] + r * (s[3 * c] - s[3 * a]), s[3 * a + 1] + r * (s[3 * c + 1] - s[3 * a + 1])]);
+      for (const { points, ferme } of contours) {
+        for (let k = 0; k + 1 < points.length + (ferme ? 1 : 0); k++) {
+          const p = points[k];
+          const q = points[(k + 1) % points.length];
+          distance = Math.min(distance, distanceAuSegment(est, nord, p[0], p[1], q[0], q[1]));
+        }
+      }
+      if (distance > tolerance) continue;
+    }
+    if (meilleur && meilleur.distance <= distance) continue;
+    const altitudes = altitudesDesFacesEn(objet, s, est, nord, tolerance);
+    if (altitudes.length === 0) continue;
+    meilleur = { distance, nom: objet.n ?? '', type: maquette.types?.[objet.t] ?? 'Autres', dessus: Math.max(...altitudes), dessous: Math.min(...altitudes) };
+  }
+  if (!meilleur) return null;
+  const mm = (v) => Math.round(v * 1000) / 1000;
+  return { nom: meilleur.nom, type: meilleur.type, dessus: mm(meilleur.dessus), dessous: mm(meilleur.dessous) };
+}
+
+/** Altitudes (m) des faces non verticales de l'objet au point (est, nord), à "tolerance" près en plan. */
+function altitudesDesFacesEn(objet, s, est, nord, tolerance) {
+  const altitudes = [];
+  for (let k = 0; k + 2 < objet.i.length; k += 3) {
+    const [a, b, c] = [objet.i[k], objet.i[k + 1], objet.i[k + 2]];
+    const [ax, ay, az] = [s[3 * a], s[3 * a + 1], s[3 * a + 2]];
+    const [bx, by, bz] = [s[3 * b], s[3 * b + 1], s[3 * b + 2]];
+    const [cx, cy, cz] = [s[3 * c], s[3 * c + 1], s[3 * c + 2]];
+    const det = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay); // 2 × aire en plan (signée)
+    if (Math.abs(det) < 1e-8) continue; // face verticale : pas d'altitude « au-dessus » du point
+    // Coordonnées barycentriques du point dans le triangle (en plan).
+    const u = ((bx - est) * (cy - nord) - (cx - est) * (by - nord)) / det;
+    const v = ((cx - est) * (ay - nord) - (ax - est) * (cy - nord)) / det;
+    const w = 1 - u - v;
+    const dedans = u >= 0 && v >= 0 && w >= 0;
+    if (!dedans && Math.min(distanceAuSegment(est, nord, ax, ay, bx, by), distanceAuSegment(est, nord, bx, by, cx, cy), distanceAuSegment(est, nord, cx, cy, ax, ay)) > tolerance) continue;
+    altitudes.push(u * az + v * bz + w * cz); // plan de la face, prolongé de quelques mm au bord
+  }
+  return altitudes;
+}
+
+/**
+ * Maquette recalée (0.263.0, IFC pas en MN95, recalage par paires de points comme un plan DXF) : chaque
+ * sommet passe par "transformer(est, nord)" → { est, nord } (m, MN95) ; les altitudes ne changent pas.
+ * Les objets et les niveaux sont les mêmes ; l'origine est recalculée (coin sud-ouest au mètre).
+ */
+export function recalerMaquette(maquette, transformer) {
+  const { origine } = maquette;
+  const absolus = maquette.objets.map((objet) => {
+    const p = new Float64Array(objet.v.length);
+    for (let k = 0; k < objet.v.length; k += 3) {
+      const { est, nord } = transformer(origine.est + objet.v[k] / 1000, origine.nord + objet.v[k + 1] / 1000);
+      p[k] = est;
+      p[k + 1] = nord;
+      p[k + 2] = objet.v[k + 2];
+    }
+    return p;
+  });
+  let estMin = Infinity;
+  let nordMin = Infinity;
+  for (const p of absolus) {
+    for (let k = 0; k < p.length; k += 3) {
+      if (p[k] < estMin) estMin = p[k];
+      if (p[k + 1] < nordMin) nordMin = p[k + 1];
+    }
+  }
+  const nouvelle = Number.isFinite(estMin) ? { est: Math.floor(estMin), nord: Math.floor(nordMin) } : { est: 0, nord: 0 };
+  const objets = maquette.objets.map((objet, n) => {
+    const p = absolus[n];
+    const v = new Array(p.length);
+    for (let k = 0; k < p.length; k += 3) {
+      v[k] = Math.round((p[k] - nouvelle.est) * 1000);
+      v[k + 1] = Math.round((p[k + 1] - nouvelle.nord) * 1000);
+      v[k + 2] = p[k + 2];
+    }
+    return { ...objet, v };
+  });
+  return { ...maquette, origine: nouvelle, objets };
+}

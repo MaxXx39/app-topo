@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { rangerMaquette } from '../src/topo/ifc.js';
 import {
-  niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, objetsIfcSurCoupe, signatureIfc, svgObjetsIfc, arrondiRecepteur,
+  niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, objetsIfcSurCoupe, signatureIfc, svgObjetsIfc, arrondiRecepteur, objetIfcEn,
 } from '../src/plan/coupe-ifc.js';
 import { svgCoupeDirecte } from '../src/leve/coupe-directe.js';
 import { svgCoupeAxe, svgCoupeEnTravers } from '../src/reseaux/coupe-svg.js';
@@ -79,5 +79,19 @@ describe('coupe en plan des maquettes IFC (choix de la tablette)', () => {
     // Guidage : coupe G – D.
     const coupe = { longueur: 4, morceaux: [[{ distance: 0, altitude: 420 }, { distance: 4, altitude: 420 }]], troncons: [], ruptures: [], a: { distance: 1, altitude: 420 }, b: { distance: 3, altitude: 420 }, ifc: objets };
     expect(svgCoupeGuidage(coupe, { gauche: { classe: 'vert' }, droite: { classe: 'vert' } }, ['G', 'D'])).toContain('ifc-coupe');
+  });
+
+  it('maquette recalée : la coupe en plan, les coupes et le coin touché sont à la nouvelle place', () => {
+    const plan = planIfc();
+    // Recalage : simple déplacement de 100 m vers l'est (a = 1, b = 0).
+    plan.recalage = { applique: true, parametres: { a: 1, b: 0, tEst: 100, tNord: 0, echelle: 1, rotation: 0 }, paires: [] };
+    const coupe = planIfcCoupe(plan, 421.5);
+    expect(coupe.origine.est).toBe(E + 100);
+    expect(coupe.recalage).toBeNull(); // déjà en place : rien à recaler en plus
+    expect(planIfcCoupe(plan, 421.5, null).origine.est).toBe(E); // pendant son recalage : telle que lue
+    expect(objetsIfcSurCoupe([plan], { est: E + 105, nord: N - 2 }, { est: E + 105, nord: N + 2 })).toHaveLength(1);
+    expect(objetsIfcSurCoupe([plan], { est: E + 5, nord: N - 2 }, { est: E + 5, nord: N + 2 })).toHaveLength(0);
+    expect(objetIfcEn([plan], E + 100, N, 421.5)).toMatchObject({ plan: 'p1', type: 'Murs', dessus: 423.5, dessous: 420.5 });
+    expect(objetIfcEn([plan], E, N, 421.5)).toBeNull();
   });
 });

@@ -2358,7 +2358,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
         <button type="button" class="bouton-gel" data-gel-calques="isoler" title="Isoler : ne garder que le calque des éléments touchés">Isoler</button>
         <button type="button" class="bouton-gel" data-gel-calques="reafficher" title="Tout réafficher : tous les calques de tous les plans">↺ Tout réafficher</button>
       </div>`;
-    menuPlans.innerHTML = enteteCalques + (coupeIfc ? htmlCoupeIfc(coupeIfc) : '') + plansDxf.map((plan) => `<div class="ligne-menu-plan">
+    menuPlans.innerHTML = enteteCalques + plansDxf.map((plan) => `<div class="ligne-menu-plan">
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
           <span>${echapper(plan.nom)}</span>${htmlDossiersCliquables(plan.id, plan.sousDossiers)}</label>
         ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
@@ -2366,12 +2366,13 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
           <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /><span>${plan.transparence ?? 0} %</span></label>
         ${(plan.calques ?? []).length > 0 ? `<button type="button" class="fleche-calques-dxf" data-deplier-plan="${plan.id}" aria-expanded="${plansDeplies.has(plan.id)}" title="Calques" aria-label="Calques de ${echapper(plan.nom)}">${plansDeplies.has(plan.id) ? '▴' : '▾'}</button>` : ''}
       </div>
-      ${plansDeplies.has(plan.id) ? `<div class="calques-dxf-menu">${plan.calques.map((c, numero) => `<label class="case"><input type="checkbox" data-plan="${plan.id}" data-calque-dxf="${numero}" ${c.visible !== false ? 'checked' : ''} /> ${echapper(c.nom)}</label>`).join('')}</div>` : ''}`).join('');
+      ${plansDeplies.has(plan.id) ? `<div class="calques-dxf-menu">${plan.ifc && coupeIfc ? htmlCoupeIfc(coupeIfc) : ''}${plan.calques.map((c, numero) => `<label class="case"><input type="checkbox" data-plan="${plan.id}" data-calque-dxf="${numero}" ${c.visible !== false ? 'checked' : ''} /> ${echapper(c.nom)}</label>`).join('')}</div>` : ''}`).join('');
   }
 
   /**
    * Ligne « Coupe IFC » du menu Plan (0.262.0) : niveaux du fichier (coupe à +1.00 m), altitude tapée,
    * ou bout de canne du récepteur. coupe : { niveaux, choix, altitude } (voir main.js, lireCoupeIfc).
+   * 0.263.0 (demande du 17.11) : dans le dépliage de chaque IFC (flèche ▾), plus en haut du menu ; la même hauteur pour tous les IFC.
    */
   function htmlCoupeIfc({ niveaux = [], choix = null, altitude = null }) {
     const sorte = choix?.sorte ?? 'niveau';

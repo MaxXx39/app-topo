@@ -163,3 +163,27 @@ describe('hachures (HATCH, 0.107.3)', () => {
     expect(plan.contenu.traits.filter((t) => t.f)).toHaveLength(3);
   });
 });
+
+describe('attributs des blocs (0.263.0)', () => {
+  it('écrit les attributs visibles d\'un bloc inséré, pas les invisibles ni les modèles (ATTDEF)', () => {
+    const fichier = dxf(
+      ...section('BLOCKS',
+        [0, 'BLOCK'], [8, '0'], [2, 'REGARD'], [10, 0], [20, 0],
+        [0, 'CIRCLE'], [8, '0'], [10, 0], [20, 0], [40, 0.5],
+        [0, 'ATTDEF'], [8, '0'], [10, 0.6], [20, 0], [40, 0.2], [1, ''], [2, 'NUM'], [3, 'Numéro ?'], [70, 0],
+        [0, 'ENDBLK']),
+      ...section('ENTITIES',
+        [0, 'INSERT'], [8, 'Canalo'], [66, 1], [2, 'REGARD'], [10, E + 30], [20, N + 30],
+        [0, 'ATTRIB'], [8, 'Canalo'], [10, E + 30.6], [20, N + 30], [40, 0.2], [1, 'R12'], [2, 'NUM'], [70, 0],
+        [0, 'ATTRIB'], [8, 'Canalo'], [10, E + 30.6], [20, N + 29.7], [40, 0.2], [1, 'secret'], [2, 'CODE'], [70, 1],
+        [0, 'SEQEND'], [8, 'Canalo']),
+      [0, 'EOF'],
+    );
+    const { plan } = lirePlanDxf(fichier, 'regard.dxf');
+    expect(plan.contenu.textes.map((t) => t.t)).toEqual(['R12']);
+    const t = plan.contenu.textes[0];
+    expect(plan.origine.est + t.x).toBeCloseTo(E + 30.6, 3);
+    expect(plan.origine.nord + t.y).toBeCloseTo(N + 30, 3);
+    expect(plan.contenu.cercles).toHaveLength(1);
+  });
+});

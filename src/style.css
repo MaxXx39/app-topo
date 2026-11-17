@@ -14013,3 +14013,7 @@ body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; mi
 .ligne-coupe-ifc .champ-coupe-ifc { width: 7em; min-height: 36px; font-size: 0.9rem; }
 /* 0.262.0 : objets des maquettes IFC dans les coupes (contour à la couleur du type, rempli clair). */
 .ifc-coupe { fill: none; stroke-width: 1.2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+/* 0.263.0 : fiche d'un coin d'IFC (Implanter › Point) : objet touché et Dessus / Dessous. */
+.choix-face-ifc { display: grid; gap: 4px; margin: 4px 0; }
+.choix-face-ifc .objet-ifc { font-size: 0.85rem; color: var(--texte-doux, #475569); overflow-wrap: anywhere; }
+.puces-face-ifc { display: flex; gap: 6px; flex-wrap: wrap; }

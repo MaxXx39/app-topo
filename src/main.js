@@ -13,7 +13,7 @@ import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { bornesMaquette, couleurCalqueIfc } from './topo/ifc.js';
-import { estPlanIfc, lireChoixCoupeIfc, enregistrerChoixCoupeIfc, niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, arrondiRecepteur, objetsIfcSurCoupe, objetsIfcLeLong, signatureIfc } from './plan/coupe-ifc.js';
+import { estPlanIfc, lireChoixCoupeIfc, enregistrerChoixCoupeIfc, niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, arrondiRecepteur, objetsIfcSurCoupe, objetsIfcLeLong, signatureIfc, objetIfcEn } from './plan/coupe-ifc.js';
 import { nuageDriveRouge } from './topo/etat-drive.js';
 import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
@@ -743,7 +743,7 @@ function toucherCentrePoints(position, tolerance) {
     return null;
   }
   const trouve = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() })
-    ?? accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansDuProjet(), position, tolerance)));
+    ?? accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansAccrochables(), position, tolerance)));
   if (!trouve) {
     afficherMessage('Centre pts : aucun point ni sommet sous le doigt', 3000);
     return null;
@@ -820,7 +820,7 @@ function toucherPourMesureRapide(position, tolerance) {
       afficherMessage('Perpendiculaire : pose d\'abord un premier point (autre accroche)', 3500);
       return;
     }
-    const pied = piedPerpendiculaire(dernier, position, tolerance, avecToutesLesLignes('croisement', sourcesDesPlans(plansDuProjet(), position, tolerance)).lignes);
+    const pied = piedPerpendiculaire(dernier, position, tolerance, avecToutesLesLignes('croisement', sourcesDesPlans(plansAccrochables(), position, tolerance)).lignes);
     if (!pied) {
       afficherMessage('Aucune ligne sous le doigt', 3000);
       return;
@@ -828,7 +828,7 @@ function toucherPourMesureRapide(position, tolerance) {
     ajouterPointMesure({ nom: '', est: pied.est, nord: pied.nord, altitude: pied.altitude });
     return;
   }
-  const sources = accroche === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansDuProjet(), position, tolerance);
+  const sources = accroche === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansAccrochables(), position, tolerance);
   const trouve = accrocher(accroche, position, tolerance, avecToutesLesLignes(accroche, sources));
   if (!trouve) {
     const quoi = { point: 'Aucun point du projet', sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[accroche];
@@ -1443,7 +1443,7 @@ function reseauxActif() {
 
 /** Polyligne du plan (DXF) sous le doigt : ses sommets { est, nord, altitude }, ou null. */
 function ligneDuPlanSousLeDoigt(position, tolerance) {
-  const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes);
+  const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansAccrochables(), position, tolerance).lignes);
   return trouve ? trouve.sommets : null;
 }
 
@@ -1451,7 +1451,7 @@ function ligneDuPlanSousLeDoigt(position, tolerance) {
 function pointDuPlanSousLeDoigt(position, tolerance) {
   const parPoint = accrocher('point', position, tolerance, { points: pointsDuProjet(), lignes: [], cercles: [] });
   if (parPoint) return parPoint;
-  return accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansDuProjet(), position, tolerance)));
+  return accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansAccrochables(), position, tolerance)));
 }
 
 const reseaux = creerReseaux({
@@ -2295,17 +2295,19 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       afficherMessage(`IFC lu : ${compte.objets} objets`, 1500);
       const avertissements = [];
       const enMn95 = estEnMn95(bornes);
-      if (!enMn95) avertissements.push('Cette maquette ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : son calage n\'est pas encore possible dans l\'appli.');
+      if (!enMn95) avertissements.push('Cette maquette ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : à recaler depuis la page Plans (accroche sur les coins de la coupe en plan).');
       if (compte.ignores > 0) avertissements.push(`${compte.ignores} objet(s) sans forme lisible, pas repris.`);
       if (maquette.niveaux.length === 0) avertissements.push('Pas de niveau (étage) dans le fichier : coupe à une altitude tapée ou à celle du récepteur.');
       const choix = await demanderChamps({
         titre: `Maquette IFC « ${fichier.name} »`,
         note: enMn95
           ? { ton: 'ok', texte: `✓ Coordonnées suisses (MN95) : la maquette semble en place. ${compte.objets} objets, ${maquette.niveaux.length} niveaux.` }
-          : { ton: 'alerte', texte: '⚠ Pas en coordonnées suisses (MN95) : la maquette ne sera pas à sa place.' },
+          : { ton: 'alerte', texte: '⚠ Pas en coordonnées suisses (MN95) : la maquette est à recaler.' },
         champs: [
           { cle: 'nom', titre: 'Nom de la maquette', valeur: fichier.name.replace(/\.ifc$/i, '') },
           champSousDossier(),
+          // 0.263.0 : comme pour un plan DXF (accroche sur les coins de la coupe en plan).
+          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: enMn95 ? 'cale' : 'oui' },
         ],
       });
       if (!choix) {
@@ -2322,13 +2324,14 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
         contenu: { maquette },
         compte: { objets: compte.objets, ignores: {} },
         ifc: { niveaux: maquette.niveaux, schema, triangles: compte.triangles },
-        dejaCale: enMn95,
+        ...(choix.recaler === 'cale' ? { dejaCale: true } : {}),
         sousDossiers: await sousDossiersChoisis(choix.sousDossier),
       };
       projet.plansDxf.push(nouveau);
       dernierPlan = { nom: nouveau.nom, avertissements };
       afficherMessage(`Maquette IFC « ${nouveau.nom} » importée : ${compte.objets} objets`, 4000, { ok: true });
       modifie();
+      if (choix.recaler === 'oui') commencerRecalage(nouveau.id);
     } catch (erreur) {
       dernierPlan = { nom: fichier.name, erreur: erreur.message };
       afficherMessage(`Maquette IFC non importée : ${erreur.message}`, 8000);
@@ -2339,7 +2342,7 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     const choisi = projet.plansDxf.find((p) => p.id === id);
     if (!choisi) return;
     if (estTelephone()) afficherOnglet('plan');
-    requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+    requestAnimationFrame(() => plan.cadrerSurPlans([planUtilise(choisi)]));
   },
   supprimerPlanDxf: (id) => {
     const choisi = projet.plansDxf.find((p) => p.id === id);
@@ -3349,6 +3352,13 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         implanter.choix = null;
         montrerImplantation();
       },
+      // 0.263.0 : coin d'IFC : altitude du dessus ou du dessous de l'objet touché.
+      choisirFaceIfc: (face) => {
+        const ifc = implanter.choix?.ifc;
+        if (!ifc || !['dessus', 'dessous'].includes(face)) return;
+        implanter.choix = { ...implanter.choix, altitude: ifc[face], ifc: { ...ifc, face } };
+        montrerImplantation();
+      },
       implanterChoix: ({ nom, altitude }) => {
         const lue = lireAltitude(altitude);
         if (!implanter.choix || lue === undefined) return;
@@ -4106,7 +4116,7 @@ function toucherPourDessin(position, tolerance) {
   if (accroche === 'point') sources = { lignes: [], cercles: [], points: pointsDuProjet() };
   else {
     // Plan DXF, et les côtés des autres dessins (le dessin en cours aussi, pour s'accrocher à ses sommets).
-    const dxf = sourcesDesPlans(plansDuProjet(), position, tolerance);
+    const dxf = sourcesDesPlans(plansAccrochables(), position, tolerance);
     const lignesDessins = projet.dessins.filter((d) => d.type !== 'points' && d.sommets.length >= 2).map((d) => ({ points: d.sommets, ferme: estFerme(d) && d.sommets.length >= 3 }));
     sources = { ...dxf, lignes: [...dxf.lignes, ...lignesDessins] };
   }
@@ -4808,7 +4818,7 @@ function choixLignesGuidageActif() {
 
 /** Toucher du plan pendant le choix des lignes du Guidage : la ligne touchée est ajoutée (2 au plus). */
 function toucherPourLigneGuidage(position, tolerance) {
-  const lignes = avecToutesLesLignes('croisement', sourcesDesPlans(plansDuProjet(), position, tolerance)).lignes;
+  const lignes = avecToutesLesLignes('croisement', sourcesDesPlans(plansAccrochables(), position, tolerance)).lignes;
   const trouve = accrocherTrait(position, tolerance, lignes);
   if (!trouve) {
     afficherMessage('Aucune ligne sous le doigt (plan DXF, levé, dessin)', 3000);
@@ -5684,7 +5694,7 @@ function toucherPourLigne(position, tolerance) {
       montrerImplantation();
       return;
     }
-    const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes);
+    const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansAccrochables(), position, tolerance).lignes);
     if (!trouve) {
       afficherMessage('Aucune ligne (DXF, levé) ni côté de dessin sous le doigt', 3000);
       return;
@@ -5698,7 +5708,7 @@ function toucherPourLigne(position, tolerance) {
   } else {
     const sources = terrain.accrocheLigne === 'point'
       ? { lignes: [], cercles: [], points: pointsDuProjet() }
-      : sourcesDesPlans(plansDuProjet(), position, tolerance);
+      : sourcesDesPlans(plansAccrochables(), position, tolerance);
     const trouve = accrocher(terrain.accrocheLigne, position, tolerance, avecToutesLesLignes(terrain.accrocheLigne, sources));
     if (!trouve) {
       afficherMessage('Rien sous le doigt', 3000);
@@ -5822,7 +5832,7 @@ function toucherPourImplantation(position, tolerance) {
   }
   const sources = terrain.accroche === 'point'
     ? { lignes: [], cercles: [], points: pointsDuProjet() }
-    : sourcesDesPlans(plansDuProjet(), position, tolerance);
+    : sourcesDesPlans(plansAccrochables(), position, tolerance);
   const trouve = accrocher(terrain.accroche, position, tolerance, avecToutesLesLignes(terrain.accroche, sources));
   if (!trouve) {
     const quoi = { point: 'aucun point du projet', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', croisement: 'aucun croisement de lignes', centre: 'aucun cercle' }[terrain.accroche];
@@ -5830,7 +5840,15 @@ function toucherPourImplantation(position, tolerance) {
     return;
   }
   const mm = (valeur) => Math.round(valeur * 1000) / 1000;
-  guiderVersChoix({ ...trouve, est: mm(trouve.est), nord: mm(trouve.nord), altitude: trouve.altitude != null ? mm(trouve.altitude) : null });
+  // 0.263.0 : coin d'une maquette IFC : altitude = dessus de l'objet touché (Dessus / Dessous dans la fiche).
+  const ifc = terrain.accroche === 'point' ? null : objetIfcDuPoint(trouve, terrain.accroche, position, tolerance);
+  guiderVersChoix({
+    ...trouve,
+    est: mm(trouve.est),
+    nord: mm(trouve.nord),
+    altitude: ifc ? ifc.dessus : trouve.altitude != null ? mm(trouve.altitude) : null,
+    ...(ifc ? { ifc: { ...ifc, face: 'dessus' } } : {}),
+  });
   montrerImplantation();
 }
 
@@ -5869,7 +5887,41 @@ function plansDuProjet() {
   // 0.262.0 : une maquette IFC devient le plan coupé à l'altitude choisie par la tablette.
   const altitudeIfc = (projet.plansDxf ?? []).some(estPlanIfc) ? altitudeIfcDeLaTablette().altitude : null;
   return (projet.plansDxf ?? [])
-    .map((p) => (estPlanIfc(p) ? planIfcCoupe(p, altitudeIfc) : p.id === recalage.planId ? p : planRecale(p)));
+    .map((p) => (estPlanIfc(p) ? planIfcCoupe(p, altitudeIfc, p.id === recalage.planId ? null : undefined) : p.id === recalage.planId ? p : planRecale(p)));
+}
+
+/**
+ * Plans où l'on peut accrocher (accroches Sommet, Milieu, Sur ligne…) : les coins d'une maquette IFC seulement dès
+ * Intermédiaire (0.263.0 : implanter sur l'IFC = Intermédiaire, décidé le 17.11).
+ */
+function plansAccrochables() {
+  return plansDuProjet().filter((p) => !estPlanIfc(p) || aAcces('intermediaire'));
+}
+
+/**
+ * Point accroché sur la coupe en plan d'une maquette IFC (0.263.0) : l'objet touché et les altitudes de son dessus et de
+ * son dessous à cet endroit ({ plan, nom, type, dessus, dessous }), ou null si le point ne vient pas d'une maquette IFC
+ * (même accroche refaite sur les seules maquettes : même point au mm près).
+ */
+function objetIfcDuPoint(trouve, accroche, position, tolerance) {
+  const ifc = plansAccrochables().filter(estPlanIfc);
+  if (ifc.length === 0) return null;
+  const surIfc = accrocher(accroche, position, tolerance, avecToutesLesLignes(accroche, sourcesDesPlans(ifc, position, tolerance)));
+  if (!surIfc || Math.hypot(surIfc.est - trouve.est, surIfc.nord - trouve.nord) > 0.001) return null;
+  return objetIfcEn(projet.plansDxf, trouve.est, trouve.nord, altitudeIfcDeLaTablette().altitude);
+}
+
+/**
+ * Plan tel qu'on l'utilise (dessin, accroches, cadrage) : pour une maquette IFC (0.263.0), sa coupe en plan à sa place
+ * (recalée) ; sinon le plan recalé.
+ */
+function planUtilise(plan) {
+  return estPlanIfc(plan) ? planIfcCoupe(plan, altitudeIfcDeLaTablette().altitude) : planRecale(plan);
+}
+
+/** Plan tel qu'il a été lu (pendant son recalage) : pour une maquette IFC, sa coupe en plan sans recalage. */
+function planTelQueLu(plan) {
+  return estPlanIfc(plan) ? planIfcCoupe(plan, altitudeIfcDeLaTablette().altitude, null) : plan;
 }
 
 /** Altitude de la coupe en plan des maquettes IFC sur cette tablette : { altitude (m ou null), texte }. */
@@ -6131,7 +6183,7 @@ function toucherPourRecalage(position, tolerance) {
       plan.loupe.placerSur(position.est, position.nord);
       return;
     }
-    const trouve = accrocher(recalage.accroche, position, tolerance, sourcesDesPlans([choisi], position, tolerance));
+    const trouve = accrocher(recalage.accroche, position, tolerance, sourcesDesPlans([planTelQueLu(choisi)], position, tolerance));
     if (!trouve) {
       afficherMessage('Rien à accrocher sous le doigt sur le DXF à recaler', 3000);
       return;
@@ -6225,7 +6277,7 @@ function appliquerRecalage() {
   arreterRecalage();
   modifie();
   afficherMessage(`Plan « ${choisi.nom} » recalé`, 3000);
-  requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+  requestAnimationFrame(() => plan.cadrerSurPlans([planUtilise(choisi)]));
   commencerControlePlan(choisi.id); // 0.218.0 : le contrôle suit le recalage
 }
 
@@ -6246,7 +6298,7 @@ function toucherPourAxes(choisi, position, tolerance) {
     const mode = surLePlan ? recalage.accroche : recalage.accrocheCale;
     if (mode === 'point') return accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() });
     if (mode === 'manuel') return { est: position.est, nord: position.nord };
-    const sources = surLePlan ? sourcesDesPlans([choisi], position, tolerance) : avecToutesLesLignes('croisement', sourcesDesPlans(autres(), position, tolerance));
+    const sources = surLePlan ? sourcesDesPlans([planTelQueLu(choisi)], position, tolerance) : avecToutesLesLignes('croisement', sourcesDesPlans(autres(), position, tolerance));
     return accrocher(mode, position, tolerance, sources);
   };
   // 0.223.0 : ce qui est touché (point de l'échelle, point ou ligne) est montré sur le plan avant d'être validé (croix ou ligne
@@ -6363,7 +6415,8 @@ function apercuRecalageAxes() {
   const r = calageParAxes(lignesPlan, lignesCalees, { echelle, tourne });
   if (r.erreur) return null;
   const { a, b, tEst, tNord, rotation } = r;
-  const recale = Object.assign(Object.create(choisi), recalerContenu(choisi, { a, b, tEst, tNord, echelle, rotation }));
+  const lu = planTelQueLu(choisi); // maquette IFC : sa coupe en plan (0.263.0)
+  const recale = Object.assign(Object.create(lu), recalerContenu(lu, { a, b, tEst, tNord, echelle, rotation }));
   return Object.assign(Object.create(recale), { id: `${choisi.id}-apercu`, visible: true, couleur: '#e11d48', transparence: 25 });
 }
 
@@ -6435,7 +6488,7 @@ function appliquerCalageAxes() {
   arreterRecalage();
   modifie();
   afficherMessage(`Plan « ${choisi.nom} » calé par axes`, 3000);
-  requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+  requestAnimationFrame(() => plan.cadrerSurPlans([planUtilise(choisi)]));
   commencerControlePlan(choisi.id);
 }
 
@@ -6514,7 +6567,7 @@ function commencerControlePlan(id) {
   if (estTelephone()) afficherOnglet('plan');
   controlePlan.onglet = document.body.dataset.onglet ?? null; // écran où la barre a été ouverte (0.239.0)
   recalculer();
-  requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+  requestAnimationFrame(() => plan.cadrerSurPlans([planUtilise(choisi)]));
   montrerControlePlan();
 }
 
@@ -6549,7 +6602,7 @@ function toucherPourControlePlan(position, tolerance) {
   const choisi = projet.plansDxf.find((p) => p.id === controlePlan.planId);
   if (!choisi || controlePlan.resultat) return;
   if (!controlePlan.pointPlan) {
-    const trouve = accrocher(controlePlan.accroche, position, tolerance, sourcesDesPlans([planRecale(choisi)], position, tolerance));
+    const trouve = accrocher(controlePlan.accroche, position, tolerance, sourcesDesPlans([planUtilise(choisi)], position, tolerance));
     if (!trouve) {
       afficherMessage('Rien à accrocher sous le doigt sur ce plan', 3000);
       return;
@@ -6696,7 +6749,7 @@ function dessinerBarrePointage() {
 
 /** Toucher du plan pendant le pointage : le point accroché est montré (croix), à valider. */
 function toucherPourPointage(position, tolerance) {
-  const trouve = accrocher(pointage.accroche, position, tolerance, avecToutesLesLignes(pointage.accroche, sourcesDesPlans(plansDuProjet(), position, tolerance)));
+  const trouve = accrocher(pointage.accroche, position, tolerance, avecToutesLesLignes(pointage.accroche, sourcesDesPlans(plansAccrochables(), position, tolerance)));
   if (!trouve) {
     const quoi = { sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[pointage.accroche];
     afficherMessage(`${quoi} sous le doigt`, 3000);
@@ -6820,7 +6873,7 @@ function dessinerBarreAjout() {
 function toucherPourAjout(position, tolerance) {
   const sources = ajoutLevee.accroche === 'point'
     ? { lignes: [], cercles: [], points: pointsDuProjet() }
-    : sourcesDesPlans(plansDuProjet(), position, tolerance);
+    : sourcesDesPlans(plansAccrochables(), position, tolerance);
   const trouve = accrocher(ajoutLevee.accroche, position, tolerance, avecToutesLesLignes(ajoutLevee.accroche, sources));
   if (!trouve) {
     const quoi = { point: 'Aucun point du projet', sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[ajoutLevee.accroche];
@@ -8035,7 +8088,7 @@ daoAppli = creerDao({
   projet: () => projet,
   nouvelId: () => nouvelIdentifiant(),
   accrocher: (mode, position, tolerance) => {
-    const sources = mode === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansDuProjet(), position, tolerance);
+    const sources = mode === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansAccrochables(), position, tolerance);
     return accrocher(mode, position, tolerance, avecToutesLesLignes(mode, sources));
   },
   demanderTexte,
@@ -8046,7 +8099,7 @@ daoAppli = creerDao({
     const triangles = trianglesDeSurface(id);
     return triangles.length > 0 ? chercheurAltitude(triangles) : null;
   },
-  traitSous: (position, tolerance) => accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes)?.sommets ?? null,
+  traitSous: (position, tolerance) => accrocherTrait(position, tolerance, sourcesDesPlans(plansAccrochables(), position, tolerance).lignes)?.sommets ?? null,
   message: (texte, duree) => afficherMessage(texte, duree),
   redessiner: () => recalculer(),
   enregistrer: () => modifie(),

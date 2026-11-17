@@ -546,7 +546,7 @@ function pageGerer(projet, vue, ouverts) {
           <div class="champ-gerer">Couleur ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: 'Couleur du plan' })}</div>
           <div class="actions-ligne-gerer">
             <button type="button" class="bouton-secondaire" data-action="voir-plan" data-id="${plan.id}">Voir</button>
-            ${plan.ifc ? '' : `<button type="button" class="bouton-secondaire seulement-intermediaire" data-action="recaler-plan" data-id="${plan.id}">Recaler</button>`}
+            <button type="button" class="bouton-secondaire ${plan.ifc ? 'seulement-expert' : 'seulement-intermediaire'}" data-action="recaler-plan" data-id="${plan.id}">Recaler</button>
             ${plan.pdf?.image || plan.ifc ? '' : `<button type="button" class="bouton-secondaire seulement-intermediaire" data-action="exporter-plan" data-id="${plan.id}">Exporter</button>`}
             ${boutonsArchive('plan', plan.id, 'supprimer-plan')}
           </div>`,

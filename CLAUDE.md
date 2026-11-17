@@ -51,7 +51,7 @@ docs/                tableau des modes (xlsx) ; audit-2026-11/ (présentation de
 - Publier site + APK (seulement sur demande) : PR vers `main`, attendre « construire » et « apk » au vert, fusionner, puis `git fetch origin main && git merge --ff-only origin/main`. Jamais de rebase ni de force-push. Si « apk » échoue avec « a release with the same tag name already exists » : relancer le job une fois.
 - **Windows** : `…/releases/download/windows-derniere-version/Topo.exe` (aussi `Topo-<version>.exe`) ; fabriqué **à la main** (Actions › « Fabriquer l'appli Windows ») ou quand `windows/Topo/**` change ; jamais par un envoi ordinaire.
 - APK : `…/releases/download/apk-derniere-version/Topo.apk` (lien fixe, + `Topo-<version>.apk`).
-- **Publié** : tout jusqu'à la 0.256.3 (PR 98, 16.11). **Non publié** : 0.256.4 → 0.262.0 (Topo.exe fabriqué depuis la branche de travail le 16.11, à la 0.256.5).
+- **Publié** : tout jusqu'à la 0.256.3 (PR 98, 16.11). **Non publié** : 0.256.4 → 0.263.0 (Topo.exe fabriqué depuis la branche de travail le 16.11, à la 0.256.5).
 
 ## Conventions de code
 - **Découpage de `main.js`** : petit à petit, au fil des demandes (jamais en gros) ; même comportement, avec tests et essai Playwright.
@@ -82,7 +82,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.262.0)
+## Fonctionnalités (état à la 0.263.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -125,12 +125,19 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Drive** : « App Topo › Configuration Projet » ; **une main par projet** (verrou 15 min) ; un appareil n'écrase jamais une version qu'il n'a pas reçue ; **listes partagées** fusionnées partie par partie (`listes-partagees.js`) ; dossiers de projets.
 - **Windows** (`Topo.exe`, jamais lancé sur un vrai Windows) : sert l'appli web à `https://topo.appli/app-topo/` (ne jamais changer l'adresse) et glisse `pont-windows.js` ; port COM, NTRIP, Drive par identifiant « bureau » (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` à créer par l'utilisateur), fichiers dans Documents › Topo › Envois, mise à jour par la release `windows-derniere-version`. Pas fait : appareil photo, touche volume −, vibreur, batterie.
 
+## 0.263.0 — IFC : implanter, recaler ; attributs des blocs DXF (demandes du 17.11, à essayer sur la tablette)
+- **Coupe IFC** : la ligne est dans le **dépliage (flèche ▾) de chaque IFC** du menu Plan (plus en haut du menu) ; **la même hauteur pour tous les IFC** (décidé).
+- **Implanter un coin d'IFC** (**Intermédiaire** ; en Base les IFC ne sont pas accrochables : `plansAccrochables()`) : accroches habituelles (Sommet, Milieu…) sur la coupe en plan ; si le point vient d'un IFC (`objetIfcDuPoint`), la fiche montre l'objet et **Dessus / Dessous** (`altitudesObjetEn` : faces non verticales de l'objet touché pile à cet endroit, à 2 cm près ; Dessus au départ) → altitude du point.
+- **Recaler un IFC** (**Expert** : bouton Recaler de Gérer, ou « Recaler maintenant » à l'import si pas en MN95) : même barre que pour un DXF, accroche sur la coupe en plan telle que lue (`planTelQueLu`) ; la **maquette** est recalée (`recalerMaquette`, `maquetteEnPlace`, en mémoire) pour le plan, les coupes et les coins. `planRecale` ne touche pas un IFC ; `planUtilise` = coupe à sa place.
+- **Blocs DXF** : toujours explosés (point d'insertion pas accrochable, décidé) ; **attributs visibles (ATTRIB) écrits sur le plan** comme des textes (invisibles et ATTDEF non). **DWG : pas maintenant** (LibreDWG web = GPL-3.0, ~9 Mo, version 0.9 : décidé le 17.11).
+- Essayé (Playwright) : dépliage, coin de mur N0 → Dessus 424.322 / Dessous 420.483, accroche d'un coin dans la barre de recalage. Recalage complet (Valider / Appliquer) : tests seulement.
+
 ## 0.262.0 — Maquette IFC (demande du 17.11, à essayer sur la tablette)
 - **Import** (Expert, tuile « Maquette IFC » du bloc Importer) : lu par `web-ifc` (`import/ifc.js`, ouvertures déjà découpées) ; doit être **en MN95** (coordonnées partagées Revit / IfcMapConversion lues dans le fichier, aucune conversion ; sinon avertissement). Fichier d'essai du 17.11 : STEP Gland « Apec » (Revit, IFC4, cm), 529 objets, niveaux S1 417.32 / N0 420.50 / N1 424.52 / N2 430.70 / N3 434.45 (**altitudes à confirmer par l'utilisateur**).
-- **Rangement** : un plan de `projet.plansDxf` avec `ifc: { niveaux, schema, triangles }`, `dejaCale`, calques = types (Murs, Dalles, Poteaux, Poutres, Fondations, Escaliers, Portes et fenêtres, Autres : `TYPES_IFC`) ; la maquette (`contenu.maquette` : sommets au mm, triangles) part sur Drive dans `plan-<id>.json.gz` (1,2 Mo de JSON pour l'essai). Pas de Recaler ni d'Exporter pour un IFC (pas encore).
-- **Voir (tous les modes)** : en plan, **coupe horizontale** (`topo/ifc.js` `coupeHorizontale` : contour fermé + aplat clair par objet, points alignés retirés pour l'accroche Sommet) à l'altitude choisie dans **Plan › Coupe IFC** (`plan/coupe-ifc.js`, choix de la tablette `topo-coupe-ifc`, rien n'est écrit dans le projet) : **niveau + 1.00 m** (décidé), altitude tapée, ou **bout de canne pile** (arrondi au cm, recoupe à chaque cm, `suivreCoupeIfcAuRecepteur`). Sans choix : premier niveau.
+- **Rangement** : un plan de `projet.plansDxf` avec `ifc: { niveaux, schema, triangles }`, `dejaCale`, calques = types (Murs, Dalles, Poteaux, Poutres, Fondations, Escaliers, Portes et fenêtres, Autres : `TYPES_IFC`) ; la maquette (`contenu.maquette` : sommets au mm, triangles) part sur Drive dans `plan-<id>.json.gz` (1,2 Mo de JSON pour l'essai). Pas d'Exporter pour un IFC (pas encore) ; Recaler : 0.263.0.
+- **Voir (tous les modes)** : en plan, **coupe horizontale** (`topo/ifc.js` `coupeHorizontale` : contour fermé + aplat clair par objet, points alignés retirés pour l'accroche Sommet) à l'altitude choisie dans **Plan › Coupe IFC** (0.263.0 : dans le dépliage de l'IFC) (`plan/coupe-ifc.js`, choix de la tablette `topo-coupe-ifc`, rien n'est écrit dans le projet) : **niveau + 1.00 m** (décidé), altitude tapée, ou **bout de canne pile** (arrondi au cm, recoupe à chaque cm, `suivreCoupeIfcAuRecepteur`). Sans choix : premier niveau.
 - **Coupes** (`coupeVerticale`, `objetsIfcSurCoupe`, `svgObjetsIfc`) : Implanter › Surface (perpendiculaire / axe, maquette dessinée même sans surface sous la coupe), Implanter › Ligne (profil en long, gardé en mémoire), Réseaux (en travers et dans l'axe), Guidage (G–D et Arr–Av). Seulement les maquettes et calques affichés. Calculs › Coupes : pas fait (non demandé).
-- **Pas encore** : implanter sur l'IFC (prochaine étape), calage d'un IFC pas en MN95 (réutiliser le recalage par paires, accroches = coins de la coupe), vue 3D, export DXF de la coupe, filtre par étage, attributs (nom de l'objet gardé : `objet.n`). Essayé : Playwright (import, plan, choix du niveau, coupe dans l'axe d'Implanter › Surface) ; Réseaux et Guidage : tests seulement.
+- **Pas encore** (implanter et recaler : faits en 0.263.0) : vue 3D, export DXF de la coupe, filtre par étage, attributs (nom de l'objet gardé : `objet.n`). Essayé : Playwright (import, plan, choix du niveau, coupe dans l'axe d'Implanter › Surface) ; Réseaux et Guidage : tests seulement.
 
 ## 0.257.0 (retours du 16.11, à essayer sur la tablette)
 - **Arrivée dans le menu** : un projet de Drive ouvert depuis la liste ou la carte mène à la page Applications (`actionsProjet.ouvrirDrive` ; avant : on restait sur « Ouvrir projet »).
@@ -181,9 +188,9 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 
 ## Reste à faire
 - **Windows** (audit) : connexion Drive qui échoue (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` ?). Panneau de gauche et clavier tactile : faits en 0.256.4, à essayer sur la tablette.
-- Pas fait : nature et type du levé chantier modifiables après coup, types DXF pour les PDF, points et altitudes de Surface Import par liste, DWG, Leica iCR70, Métré (en dernier), Réglages › Récepteur (fenêtre au lieu d'une page), « 0 surface » LandXML (message existant gardé).
+- Pas fait : nature et type du levé chantier modifiables après coup, types DXF pour les PDF, points et altitudes de Surface Import par liste, DWG (refusé pour l'instant le 17.11), Leica iCR70, Métré (en dernier), Réglages › Récepteur (fenêtre au lieu d'une page), « 0 surface » LandXML (message existant gardé).
 - Ouverts (non reproduits d'ici) : dézoom en changeant d'application (demander la séquence exacte sur tablette) ; accroches objet au recalage « sur site » (demander navigateur + plan).
-- **IFC** : fait en 0.262.0 (voir plus haut) ; suite : implanter, calage d'un IFC non MN95, 3D, filtre par étage / attributs.
+- **IFC** : fait en 0.262.0 / 0.263.0 (voir plus haut) ; suite possible : 3D, export DXF de la coupe, filtre par étage / attributs, implanter une ligne d'IFC.
 - Google Cloud : page `public/confidentialite.html` ; reste à l'utilisateur : « Publier l'application » (sinon réautorisation ~7 jours).
 
 ## Historique (très résumé)

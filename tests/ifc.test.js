@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as W from 'web-ifc';
 import {
   rangerMaquette, coupeHorizontale, coupeVerticale, coupeVerticaleLeLong, couperPolygoneEnX, couperLigneEnX,
-  altitudeDeCoupe, calqueDuTypeIfc, bornesMaquette,
+  altitudeDeCoupe, calqueDuTypeIfc, bornesMaquette, altitudesObjetEn, recalerMaquette,
 } from '../src/topo/ifc.js';
 import { lireIfcAvecApi, texteIfc } from '../src/import/ifc.js';
 
@@ -155,6 +155,40 @@ DATA;
 ENDSEC;
 END-ISO-10303-21;
 `;
+
+describe('coin d\'IFC à implanter et recalage (0.263.0)', () => {
+  it('dessus et dessous de l\'objet touché sur la coupe, pile à cet endroit', () => {
+    // Mur 420.00 → 423.00 et dalle posée dessus 423.00 → 423.25 (plus large).
+    const m = rangerMaquette([boite(E, N, 420, E + 10, N + 0.3, 423), boite(E - 1, N - 1, 423, E + 11, N + 5, 423.25, 'IfcSlab')]);
+    // Coin du mur, touché sur la coupe à 421.00 : c'est le mur (la dalle n'est pas coupée à cette altitude).
+    expect(altitudesObjetEn(m, E, N, 421)).toEqual({ nom: 'boîte', type: 'Murs', dessus: 423, dessous: 420 });
+    // Au milieu du mur (sur son bord) aussi.
+    expect(altitudesObjetEn(m, E + 5, N + 0.3, 421)).toMatchObject({ dessus: 423, dessous: 420 });
+    // Coupe à 423.10 : seule la dalle est coupée ; son coin.
+    expect(altitudesObjetEn(m, E - 1, N - 1, 423.1)).toMatchObject({ type: 'Dalles', dessus: 423.25, dessous: 423 });
+    // Loin de tout contour coupé (plus de 2 cm) : rien.
+    expect(altitudesObjetEn(m, E + 5, N + 0.15, 421)).toBeNull();
+    expect(altitudesObjetEn(m, E + 20, N, 421)).toBeNull();
+  });
+
+  it('dessus d\'une dalle en pente : altitude pile au coin touché', () => {
+    // Dalle dont le dessus monte de 1 % vers l'est : triangles faits à la main.
+    const z = (e) => 421 + 0.01 * (e - E);
+    const sommets = [E, N, 420.8, E + 10, N, 420.8, E + 10, N + 4, 420.8, E, N + 4, 420.8, E, N, z(E), E + 10, N, z(E + 10), E + 10, N + 4, z(E + 10), E, N + 4, z(E)];
+    const faces = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]];
+    const m = rangerMaquette([{ type: 'IfcSlab', nom: 'Dalle', sommets, triangles: faces.flatMap(([a, b, c, d]) => [a, b, c, a, c, d]) }]);
+    expect(altitudesObjetEn(m, E + 10, N, 420.9)).toMatchObject({ dessus: 421.1, dessous: 420.8 });
+  });
+
+  it('maquette recalée : sommets déplacés en plan, altitudes et objets gardés', () => {
+    const m = rangerMaquette([boite(0, 0, 400, 10, 0.3, 403)]);
+    const r = recalerMaquette(m, (est, nord) => ({ est: est + 2500000, nord: nord + 1100000 }));
+    expect(bornesMaquette(r)).toEqual({ estMin: 2500000, nordMin: 1100000, estMax: 2500010, nordMax: 1100000.3 });
+    expect(r.objets).toHaveLength(1);
+    expect(coupeHorizontale(r, 401).traits).toHaveLength(1);
+    expect(m.origine).toEqual({ est: 0, nord: 0 }); // la maquette lue ne bouge pas
+  });
+});
 
 describe('lecture d\'un IFC avec web-ifc', () => {
   it('lit le mur en MN95, en mètres, et l\'étage', async () => {

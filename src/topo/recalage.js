@@ -177,6 +177,8 @@ const recales = new WeakMap();
  * (nom, calques, couleur, visible) sur le plan d'origine.
  */
 export function planRecale(plan) {
+  // Maquette IFC (0.263.0) : son recalage se fait sur la maquette elle-même (voir plan/coupe-ifc.js).
+  if (plan.ifc) return plan;
   const parametres = plan.recalage?.applique ? plan.recalage.parametres : null;
   if (!parametres) return plan;
   const cle = JSON.stringify(parametres);

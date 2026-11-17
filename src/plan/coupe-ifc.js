@@ -4,7 +4,8 @@
 // Le plan IFC rangé dans le projet garde seulement la maquette (contenu.maquette) ; le plan coupé est
 // un plan « dérivé » (il lit nom, calques, visible… sur le plan du projet) dont le contenu est la coupe.
 // Changer d'altitude ne modifie donc pas le projet (rien n'est renvoyé sur Drive).
-import { altitudeDeCoupe, coupeHorizontale, coupeVerticale, coupeVerticaleLeLong } from '../topo/ifc.js';
+import { altitudeDeCoupe, coupeHorizontale, coupeVerticale, coupeVerticaleLeLong, recalerMaquette, bornesMaquette, altitudesObjetEn } from '../topo/ifc.js';
+import { appliquerHelmert } from '../topo/recalage.js';
 
 const CLE = 'topo-coupe-ifc';
 
@@ -51,25 +52,51 @@ export function altitudeCoupeIfc(plans, choix, altitudeCanne) {
   return altitudeDeCoupe({ niveaux: niveau ? [niveau] : niveaux, objets: [] }, niveau ? { sorte: 'niveau', niveau: niveau.nom } : choix, altitudeCanne);
 }
 
-// Plans coupés déjà calculés : plan du projet → { altitude, plan }.
+/** Paramètres du recalage appliqué à une maquette IFC (0.263.0), ou null. */
+export const parametresDuPlan = (plan) => (plan?.recalage?.applique ? plan.recalage.parametres : null);
+
+// Maquettes recalées déjà calculées : maquette lue → { cle (paramètres), maquette }.
+const recalees = new WeakMap();
+
+/**
+ * Maquette à sa place : recalée avec "parametres" (Helmert, voir topo/recalage.js) s'il y en a, sinon telle
+ * que lue. Gardée en mémoire tant que le recalage ne change pas.
+ */
+export function maquetteEnPlace(maquette, parametres) {
+  if (!maquette || !parametres) return maquette;
+  const cle = JSON.stringify(parametres);
+  const enCache = recalees.get(maquette);
+  if (enCache?.cle === cle) return enCache.maquette;
+  const recalee = recalerMaquette(maquette, (est, nord) => appliquerHelmert(parametres, est, nord));
+  recalees.set(maquette, { cle, maquette: recalee });
+  return recalee;
+}
+
+// Plans coupés déjà calculés : plan du projet → { altitude, maquette, plan }.
 const coupes = new WeakMap();
 const VIDE = { traits: [], pleins: [], cercles: [], textes: [], points: [] };
 
 /**
  * Plan coupé à l'altitude donnée (m), à dessiner et à utiliser pour les accroches. Recalculé
- * seulement si l'altitude change. Sans altitude (récepteur sans position) : plan vide.
+ * seulement si l'altitude ou le recalage changent. Sans altitude (récepteur sans position) : plan vide.
+ * parametres : recalage à appliquer (par défaut celui du plan ; null = la maquette telle que lue, pendant
+ * son recalage). Le plan coupé n'a pas de recalage à refaire (« recalage » à null) : il est déjà en place.
  */
-export function planIfcCoupe(plan, altitude) {
+export function planIfcCoupe(plan, altitude, parametres = parametresDuPlan(plan)) {
   if (!plan.contenu?.maquette) return plan;
+  const maquette = maquetteEnPlace(plan.contenu.maquette, parametres);
   const enCache = coupes.get(plan);
-  if (enCache && enCache.altitude === altitude && enCache.maquette === plan.contenu.maquette) return enCache.plan;
-  const contenu = altitude == null ? VIDE : coupeHorizontale(plan.contenu.maquette, altitude);
+  if (enCache && enCache.altitude === altitude && enCache.maquette === maquette) return enCache.plan;
+  const contenu = altitude == null ? VIDE : coupeHorizontale(maquette, altitude);
   const coupe = Object.assign(Object.create(plan), {
-    contenu: { ...contenu, maquette: plan.contenu.maquette },
-    revision: `ifc${altitude}`,
+    contenu: { ...contenu, maquette },
+    origine: maquette.origine,
+    bornes: bornesMaquette(maquette) ?? plan.bornes,
+    recalage: null,
+    revision: `ifc${altitude}|${parametres ? JSON.stringify(parametres) : ''}`,
     altitudeCoupe: altitude,
   });
-  coupes.set(plan, { altitude, maquette: plan.contenu.maquette, plan: coupe });
+  coupes.set(plan, { altitude, maquette, plan: coupe });
   return coupe;
 }
 
@@ -82,7 +109,7 @@ export function arrondiRecepteur(altitude) {
 function maquettesAffichees(plans) {
   return (plans ?? [])
     .filter((plan) => estPlanIfc(plan) && plan.visible !== false && plan.contenu?.maquette)
-    .map((plan) => ({ maquette: plan.contenu.maquette, cache: new Set((plan.calques ?? []).filter((c) => c.visible === false).map((c) => c.nom)) }));
+    .map((plan) => ({ maquette: maquetteEnPlace(plan.contenu.maquette, parametresDuPlan(plan)), cache: new Set((plan.calques ?? []).filter((c) => c.visible === false).map((c) => c.nom)) }));
 }
 
 /**
@@ -115,4 +142,16 @@ export function svgObjetsIfc(objets, versX, versZ) {
       ? `<polygon points="${points}" class="ifc-coupe" style="stroke:${o.couleur};fill:${o.couleur}33" />`
       : `<polyline points="${points}" class="ifc-coupe" style="stroke:${o.couleur}" />`;
   }).join('');
+}
+
+/**
+ * Objet IFC touché au point (est, nord) sur la coupe en plan (0.263.0) : { plan (id), nom, type, dessus, dessous }
+ * ou null. Cherché dans les maquettes affichées (à leur place), à l'altitude de la coupe.
+ */
+export function objetIfcEn(plans, est, nord, altitudeCoupe) {
+  for (const plan of (plans ?? []).filter((p) => estPlanIfc(p) && p.visible !== false && p.contenu?.maquette)) {
+    const trouve = altitudesObjetEn(maquetteEnPlace(plan.contenu.maquette, parametresDuPlan(plan)), est, nord, altitudeCoupe);
+    if (trouve && (plan.calques ?? []).find((c) => c.nom === trouve.type)?.visible !== false) return { plan: plan.id, ...trouve };
+  }
+  return null;
 }
