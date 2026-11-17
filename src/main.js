@@ -12,6 +12,7 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
+import { nuageDriveRouge } from './topo/etat-drive.js';
 import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
@@ -8874,7 +8875,7 @@ function mettreAJourEtatEntete() {
   const horsLigne = typeof navigator !== 'undefined' && navigator.onLine === false;
   const driveNonConnecte = Boolean(partage) && !partage.etat.connecte;
   const nuageBarre = horsLigne ? 'hors-ligne' : driveNonConnecte ? 'non-connecte' : null;
-  document.body.classList.toggle('drive-hors-ligne', Boolean(horsLigne && partage)); // 0.261.1 : pastille rouge « Hors ligne » en haut du logo du récepteur
+  document.body.classList.toggle('drive-hors-ligne', Boolean(partage) && nuageDriveRouge({ horsLigne, connecte: partage.etat.connecte, etat: partage.etat.etat })); // 0.261.1 : pastille rouge « Hors ligne » en haut du logo du récepteur
   if (!document.querySelector('#pastille-hors-ligne')) {
     const hl = document.createElement('div');
     hl.id = 'pastille-hors-ligne';
