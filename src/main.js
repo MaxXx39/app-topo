@@ -12,7 +12,10 @@ import { creerCadastreAutour } from './import/zone-cadastre.js';
 import { lectureAndroidDisponible, lireParAndroid } from './android/pont.js';
 import { lireDXF } from './topo/dxf-lecture.js';
 import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
-import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre } from './topo/sous-dossiers.js';
+import { bornesMaquette, couleurCalqueIfc } from './topo/ifc.js';
+import { estPlanIfc, lireChoixCoupeIfc, enregistrerChoixCoupeIfc, niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, arrondiRecepteur, objetsIfcSurCoupe, objetsIfcLeLong, signatureIfc, objetIfcEn } from './plan/coupe-ifc.js';
+import { nuageDriveRouge } from './topo/etat-drive.js';
+import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -136,7 +139,7 @@ import { messagePdf, messageMauvaisBouton } from './topo/messages-fichier.js';
 import { PREFIXE_IMPORT } from './topo/doublons.js';
 import { htmlAnnotation, htmlBandeauAnnotation, dateHeure } from './annotation/ecran.js';
 import { htmlEncadreAnnotation } from './annotation/encadre.js';
-import { lignesFichePoint, htmlFichePoint, htmlFicheCalque } from './plan/fiche-point.js';
+import { lignesFichePoint, htmlFichePoint } from './plan/fiche-point.js';
 import { calqueSousLeDoigt, appliquerGelIsolement, reafficherTousLesCalques } from './topo/calque-sous-doigt.js';
 import { ajouterAnnotation, trouverAnnotation, supprimerAnnotation, listesAnnotation, nettoyerRemarques, precisionSuffisante, estAnnotation, nomProposeAnnotation, dernierAnnotation, PRECISION_TABLETTE_DEPART } from './topo/annotation.js';
 import { applisDisponibles, appliCourante } from './navigation/applis.js';
@@ -148,7 +151,7 @@ import { noterAffichage, appliquerAffichage } from './projet/affichage-appareil.
 import { listesDePoints, pointsDesListes, montrerListe, cacherListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale, calageParAxes, echelleParDeuxPoints, recalerContenu } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
-import { demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
+import { demanderCases, demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
 import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { dessinerPlansDxf } from './plan/dxf-canvas.js';
@@ -740,7 +743,7 @@ function toucherCentrePoints(position, tolerance) {
     return null;
   }
   const trouve = accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() })
-    ?? accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansDuProjet(), position, tolerance)));
+    ?? accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansAccrochables(), position, tolerance)));
   if (!trouve) {
     afficherMessage('Centre pts : aucun point ni sommet sous le doigt', 3000);
     return null;
@@ -817,7 +820,7 @@ function toucherPourMesureRapide(position, tolerance) {
       afficherMessage('Perpendiculaire : pose d\'abord un premier point (autre accroche)', 3500);
       return;
     }
-    const pied = piedPerpendiculaire(dernier, position, tolerance, avecToutesLesLignes('croisement', sourcesDesPlans(plansDuProjet(), position, tolerance)).lignes);
+    const pied = piedPerpendiculaire(dernier, position, tolerance, avecToutesLesLignes('croisement', sourcesDesPlans(plansAccrochables(), position, tolerance)).lignes);
     if (!pied) {
       afficherMessage('Aucune ligne sous le doigt', 3000);
       return;
@@ -825,7 +828,7 @@ function toucherPourMesureRapide(position, tolerance) {
     ajouterPointMesure({ nom: '', est: pied.est, nord: pied.nord, altitude: pied.altitude });
     return;
   }
-  const sources = accroche === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansDuProjet(), position, tolerance);
+  const sources = accroche === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansAccrochables(), position, tolerance);
   const trouve = accrocher(accroche, position, tolerance, avecToutesLesLignes(accroche, sources));
   if (!trouve) {
     const quoi = { point: 'Aucun point du projet', sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[accroche];
@@ -1010,7 +1013,7 @@ function afficherAnnotation() {
   const liste = listesAnnotation(projet).flatMap((l) => (projet.leves.find((v) => v.id === l.leveId)?.points ?? []).map((p) => ({ l, p })))
     .sort((a, b) => sens * String(a.p.annotation?.le ?? '').localeCompare(String(b.p.annotation?.le ?? ''))).map(({ l, p }) => ({
       nom: p.nom, source: p.annotation?.source, remarques: p.annotation?.remarques?.length ?? 0, date: dateHeure(p.annotation?.le),
-      photos: (l.photos ?? []).filter((ph) => ph.point === p.nom).length, premiere: p.annotation?.remarques?.[0] ?? '',
+      photos: (l.photos ?? []).filter((ph) => ph.point === p.nom).length, premiere: p.annotation?.remarques?.[0] ?? '', dossiers: sousDossiersEffectifs(projet, l, 'autre').join(', '),
     }));
   const dernier = dernierAnnotation(projet);
   // 0.242.0 (audit, lot 3) : fiche ouverte = le bandeau « nom / remarque / Enreg. point » se cache (il couvrait les boutons de la fiche).
@@ -1253,37 +1256,6 @@ function fermerFichePoint() {
 }
 
 /**
- * 0.222.0 (Intermédiaire, à valider) : toucher un élément d'un plan DXF / PDF propose de masquer son calque.
- * Renvoie vrai si un élément est trouvé (la petite fenêtre est ouverte) ; toucher ailleurs la ferme.
- */
-function montrerFicheCalque(position, tolerance) {
-  fermerFichePoint();
-  if (!aAcces('intermediaire')) return false;
-  const trouve = calqueSousLeDoigt(plansDuProjet(), position, tolerance);
-  if (!trouve) return false;
-  const boite = document.createElement('div');
-  boite.id = 'fiche-point-plan';
-  boite.innerHTML = htmlFicheCalque(trouve);
-  const zone = document.querySelector('.panneau-plan')?.getBoundingClientRect();
-  boite.style.cssText = `position: fixed; z-index: 40; left: 8px; right: 8px; bottom: ${Math.max(8, window.innerHeight - (zone?.bottom ?? window.innerHeight) + 34)}px; display: flex; justify-content: center; pointer-events: none;`;
-  boite.addEventListener('click', (evenement) => {
-    const bouton = evenement.target.closest('[data-action]');
-    if (!bouton) return;
-    if (bouton.dataset.action === 'masquer-calque') {
-      const calque = projet.plansDxf.find((p) => p.id === trouve.planId)?.calques[trouve.calque];
-      if (calque) {
-        calque.visible = false;
-        affichageModifie();
-        afficherMessage(`Calque « ${trouve.calqueNom} » masqué (Plan › calques pour le remettre)`, 4000);
-      }
-    }
-    fermerFichePoint();
-  });
-  document.body.append(boite);
-  return true;
-}
-
-/**
  * 0.220.0 : toucher un point sur le plan (sans autre geste en cours) ouvre sa fiche (coordonnées, date, précisions, PDOP…) ;
  * toucher le plan ailleurs la ferme. Renvoie vrai si la fiche est ouverte.
  */
@@ -1471,7 +1443,7 @@ function reseauxActif() {
 
 /** Polyligne du plan (DXF) sous le doigt : ses sommets { est, nord, altitude }, ou null. */
 function ligneDuPlanSousLeDoigt(position, tolerance) {
-  const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes);
+  const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansAccrochables(), position, tolerance).lignes);
   return trouve ? trouve.sommets : null;
 }
 
@@ -1479,7 +1451,7 @@ function ligneDuPlanSousLeDoigt(position, tolerance) {
 function pointDuPlanSousLeDoigt(position, tolerance) {
   const parPoint = accrocher('point', position, tolerance, { points: pointsDuProjet(), lignes: [], cercles: [] });
   if (parPoint) return parPoint;
-  return accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansDuProjet(), position, tolerance)));
+  return accrocher('sommet', position, tolerance, avecToutesLesLignes('sommet', sourcesDesPlans(plansAccrochables(), position, tolerance)));
 }
 
 const reseaux = creerReseaux({
@@ -1495,6 +1467,9 @@ const reseaux = creerReseaux({
   surfaces: () => projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
   trianglesDe: (id) => trianglesDeSurface(id),
   altitudeDe: (id) => altitudeDeSurface(id),
+  // 0.262.0 : maquettes IFC affichées, coupées en travers ou le long du réseau.
+  ifcSurCoupe: (debut, fin) => objetsIfcSurCoupe(projet.plansDxf, debut, fin),
+  ifcLeLong: (sommets) => objetsIfcLeLong(projet.plansDxf, sommets),
   ligneSousLeDoigt: ligneDuPlanSousLeDoigt,
   pointSousLeDoigt: pointDuPlanSousLeDoigt,
   implanter: (ligne) => implanterUnReseau(ligne),
@@ -1698,7 +1673,8 @@ function comptesDuProjet() {
   const surfaces = projet.surfaces.filter((s) => estSurfaceFichier(s)).length;
   return [
     projet.leves.length > 0 ? pluriel(projet.leves.length, 'levé') : '',
-    (projet.plansDxf ?? []).length > 0 ? `${projet.plansDxf.length} DXF` : '',
+    (projet.plansDxf ?? []).some((p) => !estPlanIfc(p)) ? `${projet.plansDxf.filter((p) => !estPlanIfc(p)).length} DXF` : '',
+    (projet.plansDxf ?? []).some(estPlanIfc) ? `${projet.plansDxf.filter(estPlanIfc).length} IFC` : '',
     surfaces > 0 ? pluriel(surfaces, 'surface') : '',
   ].filter(Boolean).join(' · ');
 }
@@ -1963,6 +1939,7 @@ function ouvrirFenetreReglages(page = null) {
  * avant Expert). Rien n'est supprimé : en repassant dans un mode plus complet, tout est là.
  */
 function adapterAuMode() {
+  definirFiltreApplications(estModeBase()); // 0.259.0 : filtre par dossier dans les applications : Base seulement
   // Guidage de lame : mode Expert seulement.
   if (terrain.mode === 'lame' && !lameActive()) {
     terrain.mode = 'lever';
@@ -2013,7 +1990,7 @@ function etiquetteSurface(surface) {
   if (estImportee(surface)) precisions.push(origineSurface(surface));
   const texte = precisions.length > 0 ? `${surface.nom} (${precisions.join(', ')})` : surface.nom;
   const leve = projet.leves.find((l) => l.id === surface.leveId);
-  return projet.leves.length > 1 && leve ? `${texte} · ${leve.nom}` : texte;
+  return `${projet.leves.length > 1 && leve ? `${texte} · ${leve.nom}` : texte}${suffixeDossiers(projet, surface, 'surface')}`;
 }
 
 /**
@@ -2303,11 +2280,69 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
       doc?.loadingTask?.destroy();
     }
   },
+  // 0.262.0 (Expert) : maquette IFC (bâtiment, structure) : vue en plan coupée à une altitude et sur les coupes.
+  importerIfc: async (fichier) => {
+    try {
+      afficherMessage(`Lecture de l'IFC « ${fichier.name} »… (quelques secondes)`, null);
+      await new Promise((fin) => setTimeout(fin, 30));
+      const { lireIfc } = await import('./import/ifc.js');
+      const octets = new Uint8Array(await fichier.arrayBuffer());
+      // Un IFC commence toujours par « ISO-10303-21 » (format STEP) : sinon, le dire tout de suite.
+      if (!new TextDecoder().decode(octets.subarray(0, 64)).includes('ISO-10303-21')) throw new Error('ce n\'est pas un fichier IFC (texte « ISO-10303-21 » absent au début)');
+      const { maquette, compte, schema } = await lireIfc(octets);
+      const bornes = bornesMaquette(maquette);
+      if (!bornes) throw new Error('aucun objet en 3D trouvé dans ce fichier');
+      afficherMessage(`IFC lu : ${compte.objets} objets`, 1500);
+      const avertissements = [];
+      const enMn95 = estEnMn95(bornes);
+      if (!enMn95) avertissements.push('Cette maquette ne semble pas être en MN95 (Est 2 480 000 à 2 840 000, Nord 1 070 000 à 1 300 000) : à recaler depuis la page Plans (accroche sur les coins de la coupe en plan).');
+      if (compte.ignores > 0) avertissements.push(`${compte.ignores} objet(s) sans forme lisible, pas repris.`);
+      if (maquette.niveaux.length === 0) avertissements.push('Pas de niveau (étage) dans le fichier : coupe à une altitude tapée ou à celle du récepteur.');
+      const choix = await demanderChamps({
+        titre: `Maquette IFC « ${fichier.name} »`,
+        note: enMn95
+          ? { ton: 'ok', texte: `✓ Coordonnées suisses (MN95) : la maquette semble en place. ${compte.objets} objets, ${maquette.niveaux.length} niveaux.` }
+          : { ton: 'alerte', texte: '⚠ Pas en coordonnées suisses (MN95) : la maquette est à recaler.' },
+        champs: [
+          { cle: 'nom', titre: 'Nom de la maquette', valeur: fichier.name.replace(/\.ifc$/i, '') },
+          champSousDossier(),
+          // 0.263.0 : comme pour un plan DXF (accroche sur les coins de la coupe en plan).
+          { cle: 'recaler', titre: 'Recalage', choix: [['non', 'Plus tard'], ['oui', 'Recaler maintenant'], ['cale', 'Non (déjà calé)']], valeur: enMn95 ? 'cale' : 'oui' },
+        ],
+      });
+      if (!choix) {
+        afficherMessage('Maquette IFC non importée');
+        return;
+      }
+      const nouveau = {
+        id: nouvelIdentifiant(),
+        importeLe: new Date().toISOString(),
+        nom: choix.nom || fichier.name.replace(/\.ifc$/i, ''),
+        origine: maquette.origine,
+        bornes,
+        calques: maquette.types.map((nom) => ({ nom, couleur: couleurCalqueIfc(nom), visible: true })),
+        contenu: { maquette },
+        compte: { objets: compte.objets, ignores: {} },
+        ifc: { niveaux: maquette.niveaux, schema, triangles: compte.triangles },
+        ...(choix.recaler === 'cale' ? { dejaCale: true } : {}),
+        sousDossiers: await sousDossiersChoisis(choix.sousDossier),
+      };
+      projet.plansDxf.push(nouveau);
+      dernierPlan = { nom: nouveau.nom, avertissements };
+      afficherMessage(`Maquette IFC « ${nouveau.nom} » importée : ${compte.objets} objets`, 4000, { ok: true });
+      modifie();
+      if (choix.recaler === 'oui') commencerRecalage(nouveau.id);
+    } catch (erreur) {
+      dernierPlan = { nom: fichier.name, erreur: erreur.message };
+      afficherMessage(`Maquette IFC non importée : ${erreur.message}`, 8000);
+      recalculer();
+    }
+  },
   voirPlanDxf: (id) => {
     const choisi = projet.plansDxf.find((p) => p.id === id);
     if (!choisi) return;
     if (estTelephone()) afficherOnglet('plan');
-    requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+    requestAnimationFrame(() => plan.cadrerSurPlans([planUtilise(choisi)]));
   },
   supprimerPlanDxf: (id) => {
     const choisi = projet.plansDxf.find((p) => p.id === id);
@@ -3317,6 +3352,13 @@ const ecranLeve = creerEcranLeve(document.querySelector('#leve-direct'), {
         implanter.choix = null;
         montrerImplantation();
       },
+      // 0.263.0 : coin d'IFC : altitude du dessus ou du dessous de l'objet touché.
+      choisirFaceIfc: (face) => {
+        const ifc = implanter.choix?.ifc;
+        if (!ifc || !['dessus', 'dessous'].includes(face)) return;
+        implanter.choix = { ...implanter.choix, altitude: ifc[face], ifc: { ...ifc, face } };
+        montrerImplantation();
+      },
       implanterChoix: ({ nom, altitude }) => {
         const lue = lireAltitude(altitude);
         if (!implanter.choix || lue === undefined) return;
@@ -4074,7 +4116,7 @@ function toucherPourDessin(position, tolerance) {
   if (accroche === 'point') sources = { lignes: [], cercles: [], points: pointsDuProjet() };
   else {
     // Plan DXF, et les côtés des autres dessins (le dessin en cours aussi, pour s'accrocher à ses sommets).
-    const dxf = sourcesDesPlans(plansDuProjet(), position, tolerance);
+    const dxf = sourcesDesPlans(plansAccrochables(), position, tolerance);
     const lignesDessins = projet.dessins.filter((d) => d.type !== 'points' && d.sommets.length >= 2).map((d) => ({ points: d.sommets, ferme: estFerme(d) && d.sommets.length >= 3 }));
     sources = { ...dxf, lignes: [...dxf.lignes, ...lignesDessins] };
   }
@@ -4776,7 +4818,7 @@ function choixLignesGuidageActif() {
 
 /** Toucher du plan pendant le choix des lignes du Guidage : la ligne touchée est ajoutée (2 au plus). */
 function toucherPourLigneGuidage(position, tolerance) {
-  const lignes = avecToutesLesLignes('croisement', sourcesDesPlans(plansDuProjet(), position, tolerance)).lignes;
+  const lignes = avecToutesLesLignes('croisement', sourcesDesPlans(plansAccrochables(), position, tolerance)).lignes;
   const trouve = accrocherTrait(position, tolerance, lignes);
   if (!trouve) {
     afficherMessage('Aucune ligne sous le doigt (plan DXF, levé, dessin)', 3000);
@@ -4931,7 +4973,7 @@ function guidageDesPoints(points, triangles, coins, sensLame = null) {
   // 0.190.0 : les boutons − / + de la coupe multiplient les marges (la coupe est plus ou moins large autour de l'outil).
   const facteurMarges = terrain.lame.zoomMarges ?? 1;
   const marges = Object.fromEntries(Object.entries(terrain.lame.marges).map(([cle, valeur]) => [cle, Math.max(valeur, 0.5) * facteurMarges]));
-  const coupe = coupeDecalee(coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]), delta);
+  const coupe = avecIfc(coupeDecalee(coupeEntre(triangles, points.gauche, points.droite, [marges.gauche, marges.droite]), delta));
   let long;
   let coupeLong;
   if (sensLame) {
@@ -4942,12 +4984,12 @@ function guidageDesPoints(points, triangles, coins, sensLame = null) {
     const ecart = surfaceMilieu == null ? null : surfaceMilieu - milieu.altitude;
     long = { milieu: { ecart, classe: classeEcartLame(ecart, tolerances) } };
     const brute = coupeEntre(triangles, arriere, avant, 0);
-    coupeLong = brute ? coupeDecalee({ ...brute, centre: { distance: marges.derriere, altitude: milieu.altitude } }, delta) : null;
+    coupeLong = brute ? avecIfc(coupeDecalee({ ...brute, centre: { distance: marges.derriere, altitude: milieu.altitude } }, delta)) : null;
   } else {
     // Râteau : Arr – Av comme G – D, l'arrière à gauche ; le « dévers » est la pente vers l'avant.
     const calcul = guidageLame({ gauche: points.arriere, droite: points.avant, altitudeSurface, tolerances });
     long = calcul.erreur ? null : calcul;
-    coupeLong = calcul.erreur ? null : coupeDecalee(coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]), delta);
+    coupeLong = calcul.erreur ? null : avecIfc(coupeDecalee(coupeEntre(triangles, points.arriere, points.avant, [marges.derriere, marges.devant]), delta));
   }
   // Lignes suivies (0.154.0) : écart en plan du bout choisi à la ligne, sur l'axe G – D, et place du
   // croisement sur la coupe G – D (distance depuis le début de la coupe).
@@ -4977,6 +5019,12 @@ function guidageDesPoints(points, triangles, coins, sensLame = null) {
 }
 
 /** Coupe du Guidage avec la surface décalée de "delta" (m) ; la surface de base gardée à part. */
+/** Coupe du Guidage avec les maquettes IFC affichées qu'elle traverse (0.262.0) : coupe.ifc. */
+function avecIfc(coupe) {
+  if (!coupe?.debut || !(projet.plansDxf ?? []).some(estPlanIfc)) return coupe;
+  return { ...coupe, ifc: objetsIfcSurCoupe(projet.plansDxf, coupe.debut, coupe.fin) };
+}
+
 function coupeDecalee(coupe, delta) {
   if (!coupe || !delta) return coupe;
   return { ...coupe, morceauxBase: coupe.morceaux, morceaux: decalerProfil(coupe.morceaux, delta), delta };
@@ -5357,7 +5405,20 @@ function profilEnLongDeLaLigne(position) {
   const d0 = Math.min(Math.max(d - demi, 0), Math.max(sur.longueur - 2 * demi, 0));
   const fenetre = sur.longueur <= 2 * demi ? null : { d0, d1: d0 + 2 * demi };
   const croisements = terrain.cana && aAcces('intermediaire') ? croisementsSurAxe([...(projet.canalisations ?? []), pseudo], '__ligne') : [];
-  return svgCoupeAxe({ reseau: pseudo, terrain: ligne.terrainProfil, croisements, position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
+  return svgCoupeAxe({ reseau: pseudo, terrain: ligne.terrainProfil, croisements, ifc: ifcLeLongDeLaLigne(ligne, avecZ), position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
+}
+
+/**
+ * Maquettes IFC coupées le long de la ligne implantée (0.262.0), gardées sur la ligne et refaites seulement si la ligne ou ce qui est
+ * affiché des maquettes change (le profil en long se redessine 5 fois par seconde).
+ */
+function ifcLeLongDeLaLigne(ligne, sommets) {
+  const cle = `${signatureIfc(projet.plansDxf)}|${sommets.map((p) => `${p.est},${p.nord}`).join(';')}`;
+  if (ligne.ifcProfilCle !== cle) {
+    ligne.ifcProfilCle = cle;
+    ligne.ifcProfil = objetsIfcLeLong(projet.plansDxf, sommets);
+  }
+  return ligne.ifcProfil;
 }
 
 /** Profil en long (SVG) du réseau en cours d'implantation, avec la canne (altitude mesurée) : ±20 m autour d'elle. */
@@ -5380,7 +5441,7 @@ function profilEnLongDuReseau(position) {
   const d = Math.min(Math.max(sur.abscisse, 0), sur.longueur);
   const demi = 20;
   const fenetre = sur.longueur <= 2 * demi ? null : { d0: Math.min(Math.max(d - demi, 0), sur.longueur - 2 * demi), d1: Math.min(Math.max(d - demi, 0), sur.longueur - 2 * demi) + 2 * demi };
-  return svgCoupeAxe({ reseau, terrain: ligne.terrainProfil, position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
+  return svgCoupeAxe({ reseau, terrain: ligne.terrainProfil, ifc: ifcLeLongDeLaLigne(ligne, reseau.sommets), position: { d, fe: position.altitude }, fenetre, hauteur: 170 }).svg;
 }
 
 /**
@@ -5633,7 +5694,7 @@ function toucherPourLigne(position, tolerance) {
       montrerImplantation();
       return;
     }
-    const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes);
+    const trouve = accrocherTrait(position, tolerance, sourcesDesPlans(plansAccrochables(), position, tolerance).lignes);
     if (!trouve) {
       afficherMessage('Aucune ligne (DXF, levé) ni côté de dessin sous le doigt', 3000);
       return;
@@ -5647,7 +5708,7 @@ function toucherPourLigne(position, tolerance) {
   } else {
     const sources = terrain.accrocheLigne === 'point'
       ? { lignes: [], cercles: [], points: pointsDuProjet() }
-      : sourcesDesPlans(plansDuProjet(), position, tolerance);
+      : sourcesDesPlans(plansAccrochables(), position, tolerance);
     const trouve = accrocher(terrain.accrocheLigne, position, tolerance, avecToutesLesLignes(terrain.accrocheLigne, sources));
     if (!trouve) {
       afficherMessage('Rien sous le doigt', 3000);
@@ -5771,7 +5832,7 @@ function toucherPourImplantation(position, tolerance) {
   }
   const sources = terrain.accroche === 'point'
     ? { lignes: [], cercles: [], points: pointsDuProjet() }
-    : sourcesDesPlans(plansDuProjet(), position, tolerance);
+    : sourcesDesPlans(plansAccrochables(), position, tolerance);
   const trouve = accrocher(terrain.accroche, position, tolerance, avecToutesLesLignes(terrain.accroche, sources));
   if (!trouve) {
     const quoi = { point: 'aucun point du projet', sommet: 'aucun sommet', milieu: 'aucune ligne', ligne: 'aucune ligne', croisement: 'aucun croisement de lignes', centre: 'aucun cercle' }[terrain.accroche];
@@ -5779,7 +5840,15 @@ function toucherPourImplantation(position, tolerance) {
     return;
   }
   const mm = (valeur) => Math.round(valeur * 1000) / 1000;
-  guiderVersChoix({ ...trouve, est: mm(trouve.est), nord: mm(trouve.nord), altitude: trouve.altitude != null ? mm(trouve.altitude) : null });
+  // 0.263.0 : coin d'une maquette IFC : altitude = dessus de l'objet touché (Dessus / Dessous dans la fiche).
+  const ifc = terrain.accroche === 'point' ? null : objetIfcDuPoint(trouve, terrain.accroche, position, tolerance);
+  guiderVersChoix({
+    ...trouve,
+    est: mm(trouve.est),
+    nord: mm(trouve.nord),
+    altitude: ifc ? ifc.dessus : trouve.altitude != null ? mm(trouve.altitude) : null,
+    ...(ifc ? { ifc: { ...ifc, face: 'dessus' } } : {}),
+  });
   montrerImplantation();
 }
 
@@ -5814,11 +5883,57 @@ let barreRecalage = null;
 
 /** Plans DXF du projet tels qu'on les utilise : recalés (sauf celui qu'on est en train de recaler). */
 function plansDuProjet() {
-  // 0.251.0 : seuls les plans du dossier choisi (le plan du cadastre suit sa liste de points) ; le plan en recalage reste toujours là.
-  const cadastres = new Map((projet.leves ?? []).filter((l) => l.cadastre).map((l) => [planDuCadastre(projet, l)?.id, l]));
+  // 0.258.0 : tous les plans sont listés ; le dossier choisi ne fait que cocher / décocher (voir appliquerDossierALAffichage).
+  // 0.262.0 : une maquette IFC devient le plan coupé à l'altitude choisie par la tablette.
+  const altitudeIfc = (projet.plansDxf ?? []).some(estPlanIfc) ? altitudeIfcDeLaTablette().altitude : null;
   return (projet.plansDxf ?? [])
-    .filter((p) => p.id === recalage.planId || (cadastres.has(p.id) ? estMontre(projet, cadastres.get(p.id), 'leve') : estMontre(projet, p, 'plan')))
-    .map((p) => (p.id === recalage.planId ? p : planRecale(p)));
+    .map((p) => (estPlanIfc(p) ? planIfcCoupe(p, altitudeIfc, p.id === recalage.planId ? null : undefined) : p.id === recalage.planId ? p : planRecale(p)));
+}
+
+/**
+ * Plans où l'on peut accrocher (accroches Sommet, Milieu, Sur ligne…) : les coins d'une maquette IFC seulement dès
+ * Intermédiaire (0.263.0 : implanter sur l'IFC = Intermédiaire, décidé le 17.11).
+ */
+function plansAccrochables() {
+  return plansDuProjet().filter((p) => !estPlanIfc(p) || aAcces('intermediaire'));
+}
+
+/**
+ * Point accroché sur la coupe en plan d'une maquette IFC (0.263.0) : l'objet touché et les altitudes de son dessus et de
+ * son dessous à cet endroit ({ plan, nom, type, dessus, dessous }), ou null si le point ne vient pas d'une maquette IFC
+ * (même accroche refaite sur les seules maquettes : même point au mm près).
+ */
+function objetIfcDuPoint(trouve, accroche, position, tolerance) {
+  const ifc = plansAccrochables().filter(estPlanIfc);
+  if (ifc.length === 0) return null;
+  const surIfc = accrocher(accroche, position, tolerance, avecToutesLesLignes(accroche, sourcesDesPlans(ifc, position, tolerance)));
+  if (!surIfc || Math.hypot(surIfc.est - trouve.est, surIfc.nord - trouve.nord) > 0.001) return null;
+  return objetIfcEn(projet.plansDxf, trouve.est, trouve.nord, altitudeIfcDeLaTablette().altitude);
+}
+
+/**
+ * Plan tel qu'on l'utilise (dessin, accroches, cadrage) : pour une maquette IFC (0.263.0), sa coupe en plan à sa place
+ * (recalée) ; sinon le plan recalé.
+ */
+function planUtilise(plan) {
+  return estPlanIfc(plan) ? planIfcCoupe(plan, altitudeIfcDeLaTablette().altitude) : planRecale(plan);
+}
+
+/** Plan tel qu'il a été lu (pendant son recalage) : pour une maquette IFC, sa coupe en plan sans recalage. */
+function planTelQueLu(plan) {
+  return estPlanIfc(plan) ? planIfcCoupe(plan, altitudeIfcDeLaTablette().altitude, null) : plan;
+}
+
+/** Altitude de la coupe en plan des maquettes IFC sur cette tablette : { altitude (m ou null), texte }. */
+function altitudeIfcDeLaTablette() {
+  const canne = etatRecepteur?.connecte && etatRecepteur?.recu ? arrondiRecepteur(etatRecepteur.position?.altitude) : null;
+  return altitudeCoupeIfc((projet.plansDxf ?? []).filter(estPlanIfc), lireChoixCoupeIfc(projet.id), canne);
+}
+
+/** Choix de l'altitude de coupe IFC (onglet Plan) : retenu par la tablette, puis plan redessiné. */
+function choisirCoupeIfc(choix) {
+  enregistrerChoixCoupeIfc(projet.id, choix);
+  recalculer();
 }
 
 function commencerRecalage(id) {
@@ -6068,7 +6183,7 @@ function toucherPourRecalage(position, tolerance) {
       plan.loupe.placerSur(position.est, position.nord);
       return;
     }
-    const trouve = accrocher(recalage.accroche, position, tolerance, sourcesDesPlans([choisi], position, tolerance));
+    const trouve = accrocher(recalage.accroche, position, tolerance, sourcesDesPlans([planTelQueLu(choisi)], position, tolerance));
     if (!trouve) {
       afficherMessage('Rien à accrocher sous le doigt sur le DXF à recaler', 3000);
       return;
@@ -6162,7 +6277,7 @@ function appliquerRecalage() {
   arreterRecalage();
   modifie();
   afficherMessage(`Plan « ${choisi.nom} » recalé`, 3000);
-  requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+  requestAnimationFrame(() => plan.cadrerSurPlans([planUtilise(choisi)]));
   commencerControlePlan(choisi.id); // 0.218.0 : le contrôle suit le recalage
 }
 
@@ -6183,7 +6298,7 @@ function toucherPourAxes(choisi, position, tolerance) {
     const mode = surLePlan ? recalage.accroche : recalage.accrocheCale;
     if (mode === 'point') return accrocher('point', position, tolerance, { lignes: [], cercles: [], points: pointsDuProjet() });
     if (mode === 'manuel') return { est: position.est, nord: position.nord };
-    const sources = surLePlan ? sourcesDesPlans([choisi], position, tolerance) : avecToutesLesLignes('croisement', sourcesDesPlans(autres(), position, tolerance));
+    const sources = surLePlan ? sourcesDesPlans([planTelQueLu(choisi)], position, tolerance) : avecToutesLesLignes('croisement', sourcesDesPlans(autres(), position, tolerance));
     return accrocher(mode, position, tolerance, sources);
   };
   // 0.223.0 : ce qui est touché (point de l'échelle, point ou ligne) est montré sur le plan avant d'être validé (croix ou ligne
@@ -6300,8 +6415,30 @@ function apercuRecalageAxes() {
   const r = calageParAxes(lignesPlan, lignesCalees, { echelle, tourne });
   if (r.erreur) return null;
   const { a, b, tEst, tNord, rotation } = r;
-  const recale = Object.assign(Object.create(choisi), recalerContenu(choisi, { a, b, tEst, tNord, echelle, rotation }));
+  const lu = planTelQueLu(choisi); // maquette IFC : sa coupe en plan (0.263.0)
+  const recale = Object.assign(Object.create(lu), recalerContenu(lu, { a, b, tEst, tNord, echelle, rotation }));
   return Object.assign(Object.create(recale), { id: `${choisi.id}-apercu`, visible: true, couleur: '#e11d48', transparence: 25 });
+}
+
+/**
+ * Plans à dessiner sur le plan : rien avec le bouton « Seul » (Implanter : l'élément choisi seulement ;
+ * Lever, 0.105.4 : le levé en cours seulement), sinon plansAffiches().
+ */
+function plansPourLePlan() {
+  const seulEnLever = seulTravail && ongletContexte === 'terrain' && Boolean(ecranLeve) && terrain.mode === 'lever';
+  return elementSeul() || seulEnLever ? [] : plansAffiches();
+}
+
+// 0.262.0 : altitude de la dernière coupe IFC « au récepteur » (pour ne recouper que si elle change).
+let derniereCoupeIfcRecepteur;
+
+/** Coupe IFC qui suit le récepteur : le plan est recoupé quand l'altitude du bout de canne change (au cm). */
+function suivreCoupeIfcAuRecepteur() {
+  if (lireChoixCoupeIfc(projet.id)?.sorte !== 'recepteur' || !(projet.plansDxf ?? []).some(estPlanIfc)) return;
+  const altitude = altitudeIfcDeLaTablette().altitude;
+  if (altitude === derniereCoupeIfcRecepteur) return;
+  derniereCoupeIfcRecepteur = altitude;
+  plan.afficherPlansDxf(plansPourLePlan());
 }
 
 /** Plans montrés sur le plan : ceux du projet, et l'aperçu du calage par axes s'il y en a un. */
@@ -6351,7 +6488,7 @@ function appliquerCalageAxes() {
   arreterRecalage();
   modifie();
   afficherMessage(`Plan « ${choisi.nom} » calé par axes`, 3000);
-  requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+  requestAnimationFrame(() => plan.cadrerSurPlans([planUtilise(choisi)]));
   commencerControlePlan(choisi.id);
 }
 
@@ -6430,7 +6567,7 @@ function commencerControlePlan(id) {
   if (estTelephone()) afficherOnglet('plan');
   controlePlan.onglet = document.body.dataset.onglet ?? null; // écran où la barre a été ouverte (0.239.0)
   recalculer();
-  requestAnimationFrame(() => plan.cadrerSurPlans([planRecale(choisi)]));
+  requestAnimationFrame(() => plan.cadrerSurPlans([planUtilise(choisi)]));
   montrerControlePlan();
 }
 
@@ -6465,7 +6602,7 @@ function toucherPourControlePlan(position, tolerance) {
   const choisi = projet.plansDxf.find((p) => p.id === controlePlan.planId);
   if (!choisi || controlePlan.resultat) return;
   if (!controlePlan.pointPlan) {
-    const trouve = accrocher(controlePlan.accroche, position, tolerance, sourcesDesPlans([planRecale(choisi)], position, tolerance));
+    const trouve = accrocher(controlePlan.accroche, position, tolerance, sourcesDesPlans([planUtilise(choisi)], position, tolerance));
     if (!trouve) {
       afficherMessage('Rien à accrocher sous le doigt sur ce plan', 3000);
       return;
@@ -6612,7 +6749,7 @@ function dessinerBarrePointage() {
 
 /** Toucher du plan pendant le pointage : le point accroché est montré (croix), à valider. */
 function toucherPourPointage(position, tolerance) {
-  const trouve = accrocher(pointage.accroche, position, tolerance, avecToutesLesLignes(pointage.accroche, sourcesDesPlans(plansDuProjet(), position, tolerance)));
+  const trouve = accrocher(pointage.accroche, position, tolerance, avecToutesLesLignes(pointage.accroche, sourcesDesPlans(plansAccrochables(), position, tolerance)));
   if (!trouve) {
     const quoi = { sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[pointage.accroche];
     afficherMessage(`${quoi} sous le doigt`, 3000);
@@ -6736,7 +6873,7 @@ function dessinerBarreAjout() {
 function toucherPourAjout(position, tolerance) {
   const sources = ajoutLevee.accroche === 'point'
     ? { lignes: [], cercles: [], points: pointsDuProjet() }
-    : sourcesDesPlans(plansDuProjet(), position, tolerance);
+    : sourcesDesPlans(plansAccrochables(), position, tolerance);
   const trouve = accrocher(ajoutLevee.accroche, position, tolerance, avecToutesLesLignes(ajoutLevee.accroche, sources));
   if (!trouve) {
     const quoi = { point: 'Aucun point du projet', sommet: 'Aucun sommet', milieu: 'Aucune ligne', ligne: 'Aucune ligne', croisement: 'Aucun croisement de lignes', centre: 'Aucun cercle' }[ajoutLevee.accroche];
@@ -7436,6 +7573,7 @@ function calculerControle(etat, orientation) {
       debut,
       fin,
       reseaux: reseauxCoupe,
+      ifc: objetsIfcSurCoupe(projet.plansDxf, debut, fin), // 0.262.0 : maquettes IFC affichées
       lignes: decalerProfil(base, delta),
       lignesBase: delta ? base : null,
       delta,
@@ -7529,6 +7667,7 @@ if (recepteurDisponible()) {
     const delta = deltaEnMetres();
     const decale = position && ongletContexte === 'terrain' && terrain.mode === 'lever' && deltaActif(delta) ? pointAvecDelta(position, delta, orientation.azimut) : null;
     const tablette = !etat.connecte && positionTablette ? { est: positionTablette.est, nord: positionTablette.nord, prete: false, tablette: true, precision: positionTablette.precision, azimut: null } : null;
+    suivreCoupeIfcAuRecepteur();
     plan.afficherPosition(position ? { est: position.est, nord: position.nord, prete: Boolean(etat.inclinaisonPrete), azimut: orientation.azimut, coupes: traits, vers, cotesLigne: cotes, delta: decale } : tablette);
   });
   // GPS de la tablette : gardé ici, montré avec l'état suivant du RX2 (5 fois par seconde).
@@ -7727,7 +7866,12 @@ const actionsProjet = {
   nommerAppareil: (nom) => partage.nommerAppareil(nom),
   envoyerDrive: () => partage.envoyerMaintenant(),
   reprendreLaMain: () => partage.prendreLaMain(),
-  ouvrirDrive: (dossierId) => avecChargement(() => partage.ouvrirDepuisDrive(dossierId)),
+  // 0.257.0 : un projet de Drive ouvert depuis la liste / la carte mène au menu (page Applications), comme un projet de l'appareil.
+  ouvrirDrive: (dossierId) => avecChargement(async () => {
+    const avant = projet.id;
+    await partage.ouvrirDepuisDrive(dossierId);
+    if (projet.id !== avant) afficherOnglet('projets');
+  }),
   // 0.217.0 : relecture silencieuse de la liste de Drive (ouverture de la liste des projets) ; pas de message si ça échoue.
   rafraichirDriveEnDouce: () => { if (partage?.etat.connecte) partage.rafraichirListe().catch(() => {}); },
   rafraichirDrive: () => partage.rafraichirListe().catch((erreur) => afficherMessage(`Drive : ${erreur.message}`, 4000)),
@@ -7887,9 +8031,9 @@ const plan = creerPlan(document.querySelector('#plan'), {
     return true;
   },
   quandToucherFichePoint: (point) => montrerFichePoint(point),
-  quandToucherCalque: (position, tolerance) => montrerFicheCalque(position, tolerance),
   quandToucherSelectionCalques: (position, tolerance) => toucherSelectionCalques(position, tolerance),
   quandChoisirCalques: (mode) => choisirCalques(mode),
+  quandChoisirDossiers: (id) => choisirDossiersDeLElement(id),
   // « Voir toute la ligne » (0.118.0) cochée ou décochée (aussi décochée par « Ma position »).
   quandVoirLigne: (coche) => {
     implanter.voirLigne = coche && Boolean(implanter.ligne);
@@ -7897,6 +8041,9 @@ const plan = creerPlan(document.querySelector('#plan'), {
     if (!coche) plan.rafraichirImplantation();
   },
   quandReglerPlanDxf: (id, changements) => reglerPlanDxf(id, changements),
+  // 0.262.0 : coupe en plan des maquettes IFC (choix de la tablette).
+  lireCoupeIfc: () => ({ niveaux: niveauxDesIfc((projet.plansDxf ?? []).filter(estPlanIfc)), choix: lireChoixCoupeIfc(projet.id), altitude: altitudeIfcDeLaTablette().altitude }),
+  quandChoisirCoupeIfc: (choix) => choisirCoupeIfc(choix),
   // Menu « Points » : cocher / décocher une liste de points ('*' : toutes). Pas une modification
   // du travail (rien à annuler) : on redessine et on enregistre.
   // Couleur d'une liste (menu « Afficher » ; aussi dans Projet › Listes de points).
@@ -7941,7 +8088,7 @@ daoAppli = creerDao({
   projet: () => projet,
   nouvelId: () => nouvelIdentifiant(),
   accrocher: (mode, position, tolerance) => {
-    const sources = mode === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansDuProjet(), position, tolerance);
+    const sources = mode === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansAccrochables(), position, tolerance);
     return accrocher(mode, position, tolerance, avecToutesLesLignes(mode, sources));
   },
   demanderTexte,
@@ -7952,7 +8099,7 @@ daoAppli = creerDao({
     const triangles = trianglesDeSurface(id);
     return triangles.length > 0 ? chercheurAltitude(triangles) : null;
   },
-  traitSous: (position, tolerance) => accrocherTrait(position, tolerance, sourcesDesPlans(plansDuProjet(), position, tolerance).lignes)?.sommets ?? null,
+  traitSous: (position, tolerance) => accrocherTrait(position, tolerance, sourcesDesPlans(plansAccrochables(), position, tolerance).lignes)?.sommets ?? null,
   message: (texte, duree) => afficherMessage(texte, duree),
   redessiner: () => recalculer(),
   enregistrer: () => modifie(),
@@ -8280,8 +8427,7 @@ function calculsReussis() {
 creerEcranExport(moduleExport.zone('plan'), {
   // « Quoi exporter ? » : volumes, surfaces (par nature), dessins, listes de points ; cochés comme « Afficher ».
   obtenirGroupes: () => {
-    // 0.255.0 : « Quoi exporter ? » ne propose que ce qui est dans le dossier choisi.
-    const surfacesDe = (natures) => projet.surfaces.filter((s) => estMontre(projet, s, 'surface') && (estImportee(s) ? natures.includes('importee') : natures.includes(s.nature ?? 'stock'))).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
+    const surfacesDe = (natures) => projet.surfaces.filter((s) => (estImportee(s) ? natures.includes('importee') : natures.includes(s.nature ?? 'stock'))).map((s) => ({ id: s.id, nom: etiquetteSurface(s), defaut: estAffichee(s.id) }));
     return [
       { titre: 'Volumes', elements: projet.calculs.map((c) => ({ id: c.id, nom: nomDuCalcul(c, projet.surfaces), defaut: estAffichee(c.surface1Id) })) },
       { titre: 'Stocks', elements: surfacesDe(['stock']) },
@@ -8289,10 +8435,10 @@ creerEcranExport(moduleExport.zone('plan'), {
       { titre: 'Terrassement', elements: surfacesDe(['terrassement']) },
       { titre: 'Surfaces (dessins)', elements: surfacesDe(['surface']) },
       { titre: 'Surfaces importées', elements: surfacesDe(['importee']) },
-      { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0 && estMontre(projet, d, 'dessin')).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
+      { titre: 'Dessins', elements: projet.dessins.filter((d) => d.sommets.length > 0).map((d) => ({ id: d.id, nom: d.nom, defaut: estAffichee(d.id) })) },
       {
         titre: 'Listes de points',
-        elements: projet.leves.filter((l) => estMontre(projet, l, 'leve')).map((l) => ({
+        elements: projet.leves.map((l) => ({
           id: l.id,
           nom: l.nom,
           // Levé du récepteur : coché si c'est le levé affiché ; fichier importé : comme « Afficher ».
@@ -8487,7 +8633,7 @@ function recalculer({ recadrer = false } = {}) {
   }
   // Bouton « Seul » dans Lever (0.105.4) : tout est caché (plans DXF, autres levés, imports, mesures, coupes) sauf le fond et le levé en cours.
   const seulEnLever = seulTravail && ongletContexte === 'terrain' && Boolean(ecranLeve) && terrain.mode === 'lever';
-  plan.afficherPlansDxf(seul || seulEnLever ? [] : plansAffiches());
+  plan.afficherPlansDxf(plansPourLePlan());
   // Ce qui est coché (calques, « Afficher ») vaut dans tous les onglets.
   const dessinDuPlan = {
     ...editeurSurfaces.obtenirDessin(),
@@ -8655,12 +8801,16 @@ let elementsConnus = null; // ids des éléments déjà là : un nouvel élémen
 /** Un élément créé alors qu'un sous-dossier est choisi y est rangé d'office (sous « Tout » : sans dossier). */
 function rangerNouveauxDansLeSousDossier() {
   const choisi = sousDossierChoisi();
-  const tous = elementsRangeables(projet).map(({ element }) => element);
-  if (elementsConnus === null) elementsConnus = new Set(tous.map((e) => e.id));
-  for (const element of tous) {
+  const tous = elementsRangeables(projet);
+  if (elementsConnus === null) elementsConnus = new Set(tous.map(({ element }) => element.id));
+  const dossierChoisi = choisi && choisi !== SANS_SOUS_DOSSIER ? [choisi] : [];
+  for (const { genre, element } of tous) {
     if (elementsConnus.has(element.id)) continue;
     elementsConnus.add(element.id);
-    if (choisi && choisi !== SANS_SOUS_DOSSIER && element.sousDossiers === undefined) element.sousDossiers = [choisi];
+    if (element.sousDossiers !== undefined) continue;
+    // 0.260.0 : les levés (toutes listes de points) et les annotations n'ont pas de dossier de base ; le reste prend le dossier choisi.
+    if (genre === 'leve' || ((genre === 'autre' || genre === 'surface') && (estAnnotation(element) || element.leveId))) continue;
+    if (dossierChoisi.length > 0) element.sousDossiers = dossierChoisi;
   }
 }
 
@@ -8692,9 +8842,9 @@ async function sousDossiersChoisis(valeur) {
   return valeur ? [valeur] : [];
 }
 
-/** Identifiants masqués sur le plan : listes décochées + éléments hors du sous-dossier choisi. */
+/** Identifiants masqués sur le plan : les listes décochées (le dossier choisi les a décochées, voir appliquerDossierALAffichage). */
 function idsMasques() {
-  return new Set([...(projet.listesCachees ?? []), ...idsHorsSousDossier(projet)]);
+  return new Set(projet.listesCachees ?? []);
 }
 
 /** Sous-dossiers pour l'encadré du projet (page Applications) : ce que la tablette peut choisir. */
@@ -8709,11 +8859,54 @@ function donneesSousDossiers() {
   };
 }
 
+/**
+ * 0.258.0 (demande du 16.11) : choisir un dossier COCHE ce qui y est rangé et DÉCOCHE le reste (listes de points, surfaces, dessins, plans) ;
+ * tout reste listé dans « Afficher » et on peut cocher à la main un élément d'un autre dossier. « Tout » ne change aucune case.
+ * Les cases sont celles de la tablette (listesCachees, plan.visible : gardées par affichage-appareil.js).
+ */
+function appliquerDossierALAffichage() {
+  const choix = sousDossierChoisi();
+  if (!choix) return;
+  const cachees = new Set(projet.listesCachees ?? []);
+  const cadastres = new Map((projet.leves ?? []).filter((l) => l.cadastre).map((l) => [planDuCadastre(projet, l)?.id, l]));
+  for (const { genre, element } of elementsRangeables(projet)) {
+    if (genre === 'reseau') continue;
+    if (genre === 'plan') {
+      // Le plan du cadastre suit sa liste de points.
+      element.visible = cadastres.has(element.id) ? estDansSousDossier(projet, cadastres.get(element.id), 'leve') : estDansSousDossier(projet, element, 'plan');
+    } else if (estDansSousDossier(projet, element, genre)) cachees.delete(element.id);
+    else cachees.add(element.id);
+  }
+  projet.listesCachees = [...cachees];
+}
+
+/**
+ * Pastille de dossier (ou « + dossier ») touchée dans Afficher (Plan / Points / Surface) : petite fenêtre de cases pour changer les dossiers
+ * de la liste, du plan ou de la surface (Intermédiaire et Expert, 0.260.0). Une surface d'un levé suit son levé.
+ */
+async function choisirDossiersDeLElement(id) {
+  if (!aAcces('intermediaire') || refuserEnLectureSeule()) return;
+  const trouve = elementsRangeables(projet).find((x) => x.element.id === id);
+  if (!trouve) return;
+  const leve = trouve.element.leveId ? projet.leves.find((l) => l.id === trouve.element.leveId) : null;
+  const cible = leve && Array.isArray(leve.sousDossiers) ? leve : trouve.element;
+  const actuels = new Set(sousDossiersEffectifs(projet, trouve.element, trouve.genre));
+  const cochees = await demanderCases({
+    titre: `Dossiers de « ${cible.nom ?? 'cet élément'} »`,
+    options: lireSousDossiers(projet).map((d) => ({ cle: d.nom, texte: d.nom, coche: actuels.has(d.nom) })),
+  });
+  if (!cochees) return;
+  cible.sousDossiers = cochees;
+  modifie();
+}
+
 /** Choisit le sous-dossier de cette tablette pour ce projet et redessine tout. */
 function choisirSousDossier(nom) {
   definirSousDossier(nom);
+  appliquerDossierALAffichage();
   retenirChoix(projet.id, nom);
   recalculer({ recadrer: true });
+  enregistrerBientot(); // les cases cochées par le dossier sont retenues par la tablette
   navigation?.mettreAJour?.();
 }
 
@@ -8792,7 +8985,7 @@ function ouvrirMenuDossiers() {
   const menu = document.createElement('div');
   menu.id = 'menu-dossiers';
   menu.setAttribute('role', 'menu');
-  menu.innerHTML = [ligne('', 'Tout'), ...remplis.map((d) => ligne(d.nom, echappe(d.nom), d.couleur)), ligne(SANS_SOUS_DOSSIER, 'Sans dossier')].join('');
+  menu.innerHTML = [ligne('', 'Tout'), ...remplis.map((d) => ligne(d.nom, echappe(d.nom), d.couleur))].join('');
   const entete = document.querySelector('.entete')?.getBoundingClientRect();
   menu.style.top = `${Math.round(entete?.bottom ?? 56) + 4}px`;
   document.body.append(menu);
@@ -8855,6 +9048,14 @@ function mettreAJourEtatEntete() {
   const horsLigne = typeof navigator !== 'undefined' && navigator.onLine === false;
   const driveNonConnecte = Boolean(partage) && !partage.etat.connecte;
   const nuageBarre = horsLigne ? 'hors-ligne' : driveNonConnecte ? 'non-connecte' : null;
+  document.body.classList.toggle('drive-hors-ligne', Boolean(partage) && nuageDriveRouge({ horsLigne, connecte: partage.etat.connecte, etat: partage.etat.etat })); // 0.261.1 : pastille rouge « Hors ligne » en haut du logo du récepteur
+  if (!document.querySelector('#pastille-hors-ligne')) {
+    const hl = document.createElement('div');
+    hl.id = 'pastille-hors-ligne';
+    hl.className = 'pastille-hors-ligne';
+    hl.textContent = 'Hors ligne';
+    (document.querySelector('.entete') ?? document.body).append(hl);
+  }
   if (nuageBarre && partage) {
     pastilleDrive.hidden = false;
     pastilleDrive.classList.remove('etat-drive-ok', 'etat-drive-envoi', 'etat-drive-pause', 'etat-drive-alerte', 'etat-drive-hors-ligne', 'etat-drive-non-connecte');

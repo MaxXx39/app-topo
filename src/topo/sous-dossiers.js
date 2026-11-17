@@ -9,9 +9,12 @@
 import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-partagees.js';
 
 // Liste de départ demandée le 16.11 (GEOOFF, GEOPERRIN, TER., CANA, TS, AMEX, SITU, BAT-Rad., BAT-SS, BAT-REZ, BAT, OLD), une couleur différente chacune.
-export const SOUS_DOSSIERS_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD'];
-// 12 couleurs distinctes, dans l'ordre de la liste (les dossiers ajoutés ensuite reprennent la 1re, etc.).
-const COULEURS = ['#6b7280', '#7c3aed', '#a16207', '#1d4ed8', '#ea580c', '#84cc16', '#0ea5e9', '#db2777', '#991b1b', '#eab308', '#0f766e', '#111827'];
+// 0.257.0 : + PIC (plan d'installation de chantier). Les levés et les annotations n'ont PAS de dossier de base (0.260.0) : ils restent dans leurs catégories.
+export const SOUS_DOSSIERS_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC', 'Autre'];
+/** Dossier « Autre » (0.261.0) : toujours le dernier de la liste (remplace la puce « Sans dossier »). */
+export const DOSSIER_AUTRE = 'Autre';
+// 15 couleurs distinctes, dans l'ordre de la liste (les dossiers ajoutés ensuite reprennent la 1re, etc.).
+const COULEURS = ['#6b7280', '#7c3aed', '#a16207', '#1d4ed8', '#ea580c', '#84cc16', '#0ea5e9', '#db2777', '#991b1b', '#eab308', '#0f766e', '#111827', '#be185d', '#0369a1', '#65a30d'];
 
 /** Anciens types de plans (avant les dossiers) → nom du dossier de départ qui les remplace (comparaison sans tenir compte des majuscules). */
 const ANCIENS_NOMS = { ter: 'TER.', 'bât': 'BAT', 'bat': 'BAT', 'bât radier': 'BAT-Rad.', 'bât/ss': 'BAT-SS', 'bât/rez': 'BAT-REZ' };
@@ -41,6 +44,9 @@ export function lireSousDossiers(projet = null, listes = lireListesPartagees()) 
   const propres = nettoyerSousDossiers(listes?.sousDossiers ?? []);
   const noms = propres.length > 0 ? propres : [...SOUS_DOSSIERS_DEPART];
   for (const nom of sousDossiersUtilises(projet)) if (!noms.some((n) => n.toLowerCase() === nom.toLowerCase())) noms.push(nom);
+  // « Autre » toujours en bas de la liste.
+  const sansAutre = noms.filter((n) => n.toLowerCase() !== DOSSIER_AUTRE.toLowerCase());
+  noms.splice(0, noms.length, ...sansAutre, DOSSIER_AUTRE);
   return noms.map((nom, i) => ({ nom, couleur: COULEURS[i % COULEURS.length] }));
 }
 
@@ -166,7 +172,7 @@ export function retenirChoix(idProjet, nom, magasin = stockage()) {
 export function lireChoix(projet, magasin = stockage()) {
   try {
     const nom = JSON.parse(magasin?.getItem(CLE_CHOIX) ?? '{}')[projet?.id] ?? TOUT;
-    if (nom === SANS_SOUS_DOSSIER) return nom;
+    if (nom === SANS_SOUS_DOSSIER) return TOUT; // 0.261.0 : la puce « Sans dossier » n'existe plus
     return nom && lireSousDossiers(projet).some((d) => d.nom === nom) ? nom : TOUT;
   } catch {
     return TOUT;
@@ -185,8 +191,29 @@ export function sousDossiersEffectifs(projet, element, genre = '') {
   return element?.sousDossiers ?? [];
 }
 
+// Filtre des applications : actif en Base seulement (réglé par main.js selon le mode).
+let filtreApplications = true;
+export function definirFiltreApplications(actif) {
+  filtreApplications = Boolean(actif);
+}
+
+/** Texte « · TER., CANA » à ajouter au nom d'un élément dans une liste d'application (vide s'il n'est dans aucun dossier). */
+export function suffixeDossiers(projet, element, genre = '') {
+  const noms = sousDossiersEffectifs(projet, element, genre);
+  return noms.length > 0 ? ` · ${noms.join(', ')}` : '';
+}
+
 /** L'élément est-il montré avec le sous-dossier choisi (celui de cette tablette par défaut) ? */
 export function estMontre(projet, element, genre = '', choix = choisi) {
+  // 0.259.0 : dans les applications, seul le mode Base est filtré par le dossier ; Intermédiaire et Expert listent tout (avec la pastille du dossier).
+  if (!filtreApplications) return true;
+  // 0.260.0 : un levé ou une liste d'annotations sans dossier reste montré (ils n'ont pas de dossier de base).
+  if (choix && (genre === 'leve' || genre === 'autre') && sousDossiersEffectifs(projet, element, genre).length === 0) return true;
+  return estDansSousDossier(projet, element, genre, choix);
+}
+
+/** Vrai si l'élément est rangé dans le dossier `choix` (Tout : oui), quel que soit le mode : sert à cocher / décocher l'affichage. */
+export function estDansSousDossier(projet, element, genre = '', choix = choisi) {
   return dansSousDossier({ sousDossiers: sousDossiersEffectifs(projet, element, genre) }, choix);
 }
 

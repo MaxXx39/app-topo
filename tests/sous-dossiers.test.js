@@ -29,16 +29,16 @@ const projet = () => ({
 });
 
 describe('liste des sous-dossiers', () => {
-  it('départ : les 12 dossiers demandés le 16.11, chacun avec une couleur différente', () => {
+  it('départ : les 12 dossiers du 16.11 + PIC + Autre (en bas), chacun avec une couleur différente', () => {
     const liste = lireSousDossiers(null, {});
-    expect(liste.map((d) => d.nom)).toEqual(['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD']);
+    expect(liste.map((d) => d.nom)).toEqual(['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC', 'Autre']);
     expect(liste.map((d) => d.nom)).toEqual(SOUS_DOSSIERS_DEPART);
-    expect(new Set(liste.map((d) => d.couleur)).size).toBe(12);
+    expect(new Set(liste.map((d) => d.couleur)).size).toBe(14);
   });
   it('on peut en ajouter ; la liste partagée remplace celle de départ ; un nom inconnu est gris', () => {
     const liste = lireSousDossiers(null, { sousDossiers: ['Voirie', 'Eaux'] });
-    expect(liste.map((d) => d.nom)).toEqual(['Voirie', 'Eaux']);
-    expect(couleurDuSousDossier('Autre', liste)).toBe('#6b7280');
+    expect(liste.map((d) => d.nom)).toEqual(['Voirie', 'Eaux', 'Autre']); // « Autre » toujours en bas
+    expect(couleurDuSousDossier('Inconnu', liste)).toBe('#6b7280');
   });
   it('un dossier déjà utilisé par un élément du projet est toujours proposé', () => {
     const p = projet();
@@ -100,13 +100,13 @@ describe('ce que montre un dossier', () => {
     const p = projet();
     expect(idsHorsSousDossier(p, '').size).toBe(0);
     const caches = idsHorsSousDossier(p, 'Canalo');
-    expect([...caches].sort()).toEqual(['l1', 'l3', 's1', 'd2'].sort());
+    expect([...caches].sort()).toEqual(['l1', 's1', 'd2'].sort());
     expect(elementsRangeables(p)).toHaveLength(6);
   });
 });
 
-describe('listes du plan (Afficher) selon le dossier choisi', () => {
-  it('sous « Tout », toutes les listes ; dans un dossier, seulement les siennes', async () => {
+describe('listes du plan (Afficher) avec un dossier choisi (0.258.0)', () => {
+  it('toutes les listes restent listées, avec leurs dossiers (le dossier ne fait que cocher)', async () => {
     const { definirSousDossier } = await import('../src/topo/sous-dossiers.js');
     const p = projet();
     definirSousDossier('');
@@ -114,9 +114,8 @@ describe('listes du plan (Afficher) selon le dossier choisi', () => {
     expect(toutes).toContain('l2');
     expect(toutes).toContain('s1');
     definirSousDossier('Canalo');
-    expect(listesDePoints(p).map((l) => l.id)).toEqual(['l2']);
-    definirSousDossier('Terrassement');
-    expect(listesDePoints(p).map((l) => l.id).sort()).toEqual(['l1', 'l2', 's1']);
+    expect(listesDePoints(p).map((l) => l.id)).toContain('l1');
+    expect(listesDePoints(p).find((l) => l.id === 'l2').sousDossiers).toContain('Canalo');
     definirSousDossier('');
   });
 });
@@ -131,7 +130,7 @@ describe('choix de la tablette', () => {
     retenirChoix('p1', 'Disparu', m);
     expect(lireChoix(p, m)).toBe('');
     retenirChoix('p1', SANS_SOUS_DOSSIER, m);
-    expect(lireChoix(p, m)).toBe(SANS_SOUS_DOSSIER);
+    expect(lireChoix(p, m)).toBe(''); // 0.261.0 : « Sans dossier » n'existe plus
     retenirChoix('p1', '', m);
     expect(lireChoix(p, m)).toBe('');
   });
@@ -166,7 +165,7 @@ describe('points de contrôle (0.254.0)', () => {
 });
 
 describe('tableau « Liste de points » selon le dossier (0.255.0)', () => {
-  it('ne montre que les listes du dossier choisi ; les points de contrôle restent', async () => {
+  it('0.258.0 : le dossier ne filtre plus le tableau (les pastilles disent où est chaque liste)', async () => {
     const { definirSousDossier } = await import('../src/topo/sous-dossiers.js');
     const { listesDuTableau, lignesDuTableau, CATEGORIES_POINTS } = await import('../src/import/tableau-points.js');
     const p = projet();
@@ -180,10 +179,8 @@ describe('tableau « Liste de points » selon le dossier (0.255.0)', () => {
     definirSousDossier('');
     expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'a', 'b', 'c']);
     definirSousDossier('Canalo');
-    expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'a']);
-    expect(lignesDuTableau(p, { categories }).map((l) => l.nom)).toEqual(['PC1', 'R1']);
-    definirSousDossier(SANS_SOUS_DOSSIER);
-    expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'c']);
+    expect(listesDuTableau(p).map((l) => l.id)).toEqual(['controle', 'a', 'b', 'c']);
+    expect(lignesDuTableau(p, { categories }).map((l) => l.nom)).toEqual(['PC1', 'R1', 'B1', 'L1']);
     definirSousDossier('');
   });
 });
@@ -201,5 +198,30 @@ describe('applications : listes d\'annotation selon le dossier (0.256.0)', () =>
     definirSousDossier('TER.');
     expect(listesAnnotation(p).map((l) => l.id)).toEqual(['n1']);
     definirSousDossier('');
+  });
+});
+
+describe('applications : filtre par dossier selon le mode (0.259.0)', () => {
+  it('Base filtre ; Intermédiaire / Expert listent tout, mais estDansSousDossier reste exact', async () => {
+    const { estMontre, estDansSousDossier, definirFiltreApplications } = await import('../src/topo/sous-dossiers.js');
+    const el = { id: 'x', sousDossiers: ['CANA'] };
+    definirFiltreApplications(true);
+    expect(estMontre({}, el, 'plan', 'TER.')).toBe(false);
+    definirFiltreApplications(false);
+    expect(estMontre({}, el, 'plan', 'TER.')).toBe(true);
+    expect(estDansSousDossier({}, el, 'plan', 'TER.')).toBe(false);
+    definirFiltreApplications(true);
+  });
+});
+
+describe('levés sans dossier (0.260.0)', () => {
+  it('un levé ou une annotation sans dossier reste montré dans un dossier choisi (Base) ; une surface suit son levé', async () => {
+    const { estMontre, definirFiltreApplications } = await import('../src/topo/sous-dossiers.js');
+    definirFiltreApplications(true);
+    const projet = { leves: [{ id: 'l1' }] };
+    expect(estMontre(projet, { id: 'l1' }, 'leve', 'TER.')).toBe(true);
+    expect(estMontre(projet, { id: 'a1', nature: 'annotation' }, 'autre', 'TER.')).toBe(true);
+    expect(estMontre(projet, { id: 's1', leveId: 'l1' }, 'surface', 'TER.')).toBe(false);
+    expect(estMontre(projet, { id: 'p1', sousDossiers: ['CANA'] }, 'plan', 'TER.')).toBe(false);
   });
 });

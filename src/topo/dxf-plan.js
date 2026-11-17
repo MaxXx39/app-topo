@@ -613,7 +613,9 @@ function creerLecteur(calquesLus) {
         break;
       }
       case 'TEXT':
+      case 'ATTRIB': // 0.263.0 (demande du 17.11) : attributs des blocs (numéro, cote d'un regard…) écrits comme des textes
       case 'MTEXT': {
+        if (entite.type === 'ATTRIB' && (nombre(entite, 70) & 1)) break; // attribut invisible : pas écrit
         const brutTexte = entite.type === 'MTEXT'
           ? entite.paires.filter((p) => p.code === 3 || p.code === 1).map((p) => p.valeur).join('')
           : valeur(entite, 1, '');
@@ -624,9 +626,9 @@ function creerLecteur(calquesLus) {
         let x = nombre(entite, 10);
         let y = nombre(entite, 20);
         let angle = nombre(entite, 50);
-        if (entite.type === 'TEXT') {
+        if (entite.type !== 'MTEXT') {
           ah = Math.min(nombre(entite, 72), 2);
-          av = nombre(entite, 73);
+          av = nombre(entite, entite.type === 'ATTRIB' ? 74 : 73); // ATTRIB : alignement vertical en code 74
           if (ah !== 0 || av !== 0) {
             x = nombre(entite, 11, x);
             y = nombre(entite, 21, y);
@@ -660,7 +662,6 @@ function creerLecteur(calquesLus) {
         for (const contenu of bloc.entites) ajouter(contenu, blocs, total, profondeur + 1, nomCalque, k);
         break;
       }
-      case 'ATTRIB':
       case 'ATTDEF':
       case 'VIEWPORT':
       case 'SEQEND':

@@ -26,14 +26,14 @@ import { choixCouleur as paletteCouleur } from '../outils/palette.js';
 import { pointsDuDessin } from '../topo/dessin.js';
 import { dateHeureDuPoint, jourDuPoint, trierParDate } from '../topo/date-point.js';
 import { nomDuType, resumeArchive } from '../projet/archives.js';
-import { lireSousDossiers, estMontre, sousDossiersEffectifs, pastilleSousDossier } from '../topo/sous-dossiers.js';
+import { lireSousDossiers, sousDossiersEffectifs, pastilleSousDossier } from '../topo/sous-dossiers.js';
 import { CATEGORIES_POINTS, CATEGORIES_LEVES, COLONNES_POINTS, categorieDeListe, ordreColonnes, deplacerColonne, listesDuTableau, lignesDuTableau, trierLignes, texteDate, csvDuTableau } from './tableau-points.js';
 
 /**
  * Crée le panneau « Import » dans "conteneur" et « Contenu du projet » dans "contenu". Les actions sont faites par main.js via "actions" :
  * archiver(type, id), restaurerArchive(id), supprimerArchive(id) (archives, 0.119.0, voir projet/archives.js),
  * importerPoints(fichier), choisirLeve(id), renommerLeve(id, nom), supprimerLeve(id),
- * importerPlanDxf(fichier), importerPlanPdf(fichier), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
+ * importerPlanDxf(fichier), importerPlanPdf(fichier), importerIfc(fichier) (0.262.0), voirPlanDxf(id), supprimerPlanDxf(id), reglerPlanDxf(id, { visible, couleur, nom }),
  * recalerPlanDxf(id), controlerPlanDxf(id) (0.218.0), exporterPlanRecale(id), annulerRecalagePlan(id),
  * montrerCalqueDxf(id, n° du calque, visible),
  * montrerTousCalquesDxf(id, visible), ajouterPointTape({ nom, est, nord, altitude }) (renvoie
@@ -291,6 +291,10 @@ export function creerEcranImport(conteneur, contenu, actions) {
       const fichier = cible.files[0];
       cible.value = '';
       await actions.importerPlanPdf(fichier);
+    } else if (cible.dataset.champ === 'fichier-ifc' && cible.files[0]) {
+      const fichier = cible.files[0];
+      cible.value = '';
+      await actions.importerIfc(fichier);
     } else if (cible.dataset.champ === 'cadastre-points') {
       actions.montrerPointsCadastre(cible.dataset.id, cible.checked);
     } else if (cible.dataset.champ === 'dossier-case') {
@@ -359,6 +363,11 @@ export function creerEcranImport(conteneur, contenu, actions) {
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v15H6z" /><path d="M14 2v6h6" /><path d="M9 17l3-5 3 3" /></svg>
               <span><strong>Plan PDF</strong><span class="aide">PDF en traits</span></span>
               <input type="file" data-champ="fichier-plan-pdf" accept=".pdf,application/pdf" hidden />
+            </label>
+            <label class="bouton-import">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7z" /><path d="M3 7l9 5 9-5M12 12v10" /></svg>
+              <span><strong>Maquette IFC</strong><span class="aide">bâtiment en 3D</span></span>
+              <input type="file" data-champ="fichier-ifc" accept=".ifc" hidden />
             </label>
             <label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17 9 7l5 6 3-4 4 8z" /><path d="M3 17h18" /></svg>
@@ -506,7 +515,7 @@ function pageGerer(projet, vue, ouverts) {
     }
     for (const leve of projet.leves ?? []) {
       const categorie = categorieDeListe(projet, leve);
-      if (!categorie || !estMontre(projet, leve, 'leve')) continue;
+      if (!categorie) continue;
       const date = leve.direct && leve.importeLe ? ` · créé le ${new Date(leve.importeLe).toLocaleDateString('fr-CH')}` : '';
       const couleurListe = projet.couleursListes?.[leve.id] ?? couleurs.get(categorie);
       lignes.push(ligneGerer({
@@ -525,25 +534,25 @@ function pageGerer(projet, vue, ouverts) {
     const cadastres = (projet.leves ?? []).filter((l) => l.cadastre);
     const plansCadastre = new Set(cadastres.map((l) => planDuCadastre(projet, l)?.id).filter(Boolean));
     lignes.push('<div class="ligne-outils seulement-expert"><button type="button" class="bouton-lien bouton-lien-neutre" data-action="modifier-sous-dossiers">Modifier les dossiers</button></div>');
-    for (const plan of (projet.plansDxf ?? []).filter((p) => !plansCadastre.has(p.id) && estMontre(projet, p, 'plan'))) {
+    for (const plan of (projet.plansDxf ?? []).filter((p) => !plansCadastre.has(p.id))) {
       const nom = plan.pdf
         ? `<div class="champ-prefixe"><span class="prefixe-nom">${echapper(PREFIXE_PDF)}</span><input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(sansPrefixe(plan.nom, PREFIXE_PDF))}" aria-label="Nom du plan (après ${echapper(PREFIXE_PDF)})" /></div>`
         : `<input type="text" class="nom-plan-dxf" data-champ="plan-nom" data-id="${plan.id}" value="${echapper(plan.nom)}" aria-label="Nom du plan" />`;
       lignes.push(ligneGerer({
         projet, genre: 'plan', element: plan,
-        cle: `plans:${plan.id}`, titre: echapper(plan.nom), nature: plan.pdf ? 'PDF' : 'DXF', couleur: plan.couleur ?? '#64748b', info: [`${plan.compte?.objets ?? 0} objets`, resumeEtatPlan(plan)].filter(Boolean).join(' · '), ouverts,
+        cle: `plans:${plan.id}`, titre: echapper(plan.nom), nature: plan.ifc ? 'IFC' : plan.pdf ? 'PDF' : 'DXF', couleur: plan.couleur ?? '#64748b', info: [`${plan.compte?.objets ?? 0} objets`, resumeEtatPlan(plan)].filter(Boolean).join(' · '), ouverts,
         menu: `<label class="champ-gerer">Renommer ${nom}</label>
           ${etatRecalage(plan)}${etatControle(plan)}
           <div class="champ-gerer">Couleur ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: 'Couleur du plan' })}</div>
           <div class="actions-ligne-gerer">
             <button type="button" class="bouton-secondaire" data-action="voir-plan" data-id="${plan.id}">Voir</button>
-            <button type="button" class="bouton-secondaire seulement-intermediaire" data-action="recaler-plan" data-id="${plan.id}">Recaler</button>
-            ${plan.pdf?.image ? '' : `<button type="button" class="bouton-secondaire seulement-intermediaire" data-action="exporter-plan" data-id="${plan.id}">Exporter</button>`}
+            <button type="button" class="bouton-secondaire ${plan.ifc ? 'seulement-expert' : 'seulement-intermediaire'}" data-action="recaler-plan" data-id="${plan.id}">Recaler</button>
+            ${plan.pdf?.image || plan.ifc ? '' : `<button type="button" class="bouton-secondaire seulement-intermediaire" data-action="exporter-plan" data-id="${plan.id}">Exporter</button>`}
             ${boutonsArchive('plan', plan.id, 'supprimer-plan')}
           </div>`,
       }));
     }
-    for (const leve of cadastres.filter((l) => estMontre(projet, l, 'leve'))) {
+    for (const leve of cadastres) {
       const planDxf = planDuCadastre(projet, leve);
       lignes.push(ligneGerer({
         projet, genre: 'leve', element: leve,
@@ -555,7 +564,7 @@ function pageGerer(projet, vue, ouverts) {
           </div>`,
       }));
     }
-    for (const dessin of (projet.dessins ?? []).filter((d) => d.sommets.length > 0 && estMontre(projet, d, 'dessin'))) {
+    for (const dessin of (projet.dessins ?? []).filter((d) => d.sommets.length > 0)) {
       lignes.push(ligneGerer({
         projet, genre: 'dessin', element: dessin,
         cle: `plans:${dessin.id}`, titre: echapper(dessin.nom), nature: 'Dessin', couleur: '#7c3aed', info: `${pointsDuDessin(dessin, projet.dessins).length} points`, ouverts, videEnBase: true,
@@ -566,7 +575,7 @@ function pageGerer(projet, vue, ouverts) {
       }));
     }
   } else if (vue === 'surfaces') {
-    for (const surface of projet.surfaces.filter((x) => estSurfaceFichier(x) && estMontre(projet, x, 'surface'))) {
+    for (const surface of projet.surfaces.filter((x) => estSurfaceFichier(x))) {
       lignes.push(ligneGerer({
         projet, genre: 'surface', element: surface,
         cle: `surfaces:${surface.id}`, titre: echapper(surface.nom), nature: origineSurface(surface) ?? '', couleur: '#7c3aed',
@@ -820,7 +829,7 @@ function listesDessins(projet) {
 
 /** Plans DXF du projet : nom, nombre d'objets, voir / supprimer, et la liste des calques à cocher. */
 function listePlansDxf(projet, calquesOuverts, caches = new Set()) {
-  const plans = (projet.plansDxf ?? []).filter((p) => !caches.has(p.id) && estMontre(projet, p, 'plan'));
+  const plans = (projet.plansDxf ?? []).filter((p) => !caches.has(p.id));
   if (plans.length === 0) return '';
   const dossiersListe = lireSousDossiers(projet);
   return `<div class="liste-plans-dxf">${plans

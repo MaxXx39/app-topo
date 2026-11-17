@@ -22,6 +22,7 @@ const brouillonVide = () => ({
  *   conteneur (élément), projet() → le projet, modifie(), majPlan() (redessine le plan), message(texte, ms), vibrer(),
  *   surfaces() → [{ id, nom }] (avec triangles), trianglesDe(id), altitudeDe(id) → (est, nord) → z ou null,
  *   ligneSousLeDoigt(position, tolerance) → [{ est, nord, altitude }] ou null, pointSousLeDoigt(position, tolerance) → { est, nord } ou null,
+ *   ifcSurCoupe(debut, fin), ifcLeLong(sommets) → objets des maquettes IFC coupés (0.262.0, facultatifs),
  * }
  */
 export function creerReseaux(deps) {
@@ -54,7 +55,7 @@ export function creerReseaux(deps) {
         if (r.surfaceId) for (const m of profilSurface(deps.trianglesDe(r.surfaceId), a, b)) morceaux.push(m.map((p) => ({ d: cumul + p.distance, z: p.altitude })));
         cumul += Math.hypot(b.est - a.est, b.nord - a.nord);
       }
-      const { svg, exageration } = svgCoupeAxe({ reseau: r, terrain: morceaux, croisements: croisementsSurAxe(liste(), r.id) });
+      const { svg, exageration } = svgCoupeAxe({ reseau: r, terrain: morceaux, croisements: croisementsSurAxe(liste(), r.id), ifc: deps.ifcLeLong?.(r.sommets) ?? [] });
       return { coupeSvg: svg, exageration, ligne: null };
     }
     const abscisse = Math.min(Math.max(etat.abscisse, 0), L);
@@ -65,7 +66,7 @@ export function creerReseaux(deps) {
       return deps.altitudeDe(r.surfaceId)?.(coupe.debut.est + (coupe.fin.est - coupe.debut.est) * t, coupe.debut.nord + (coupe.fin.nord - coupe.debut.nord) * t) ?? null;
     }) : null;
     return {
-      coupeSvg: svgCoupeEnTravers({ coupe, terrain: profilTerrain(r.surfaceId, coupe.debut, coupe.fin), terrainEn }),
+      coupeSvg: svgCoupeEnTravers({ coupe, terrain: profilTerrain(r.surfaceId, coupe.debut, coupe.fin), terrainEn, ifc: deps.ifcSurCoupe?.(coupe.debut, coupe.fin) ?? [] }),
       exageration: 1,
       ligne: { debut: coupe.debut, fin: coupe.fin },
     };

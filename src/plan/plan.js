@@ -136,7 +136,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 // chaque geste sur le plan (poser, bouger, relâcher, molette) remet le délai de 5 s à zéro.
 const DELAI_RETOUR_SUIVI = 5000;
 
-export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn } = {}) {
+export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandChoisirDossiers, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn, lireCoupeIfc, quandChoisirCoupeIfc } = {}) {
   // Réglage d'une liste : son choix, sinon celui de départ (en dessous d'Expert, les réglages d'Expert gardent leur valeur de départ).
   const reglageListe = (cle, id) => {
     const choix = id != null ? reglagesListe.get(id) : null;
@@ -2166,18 +2166,25 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     const roue = reglages.length > 0 ? `<button type="button" class="roue-menu ${niveau}" data-roue="${section}" aria-expanded="false" title="Réglages" aria-label="Réglages ${titre}"></button>` : '';
     return `<div class="titre-partie-menu titre-avec-roue section-menu-${section}"><span>${titre}</span>${roue}</div>${reglagesSection(section)}`;
   }
+  /** 0.260.0 : pastilles des dossiers d'une liste ; les toucher (Intermédiaire / Expert) ouvre la fenêtre de cases ; sans dossier : petit bouton « + dossier ». */
+  const htmlDossiersCliquables = (id, noms = []) => {
+    const liste = lireSousDossiers();
+    return noms.length > 0
+      ? `<span class="dossiers-cliquables" data-dossiers-de="${id}">${noms.map((nom) => pastilleSousDossier(nom, liste)).join('')}</span>`
+      : `<span class="dossiers-cliquables ajout-dossier seulement-intermediaire" data-dossiers-de="${id}">+ dossier</span>`;
+  };
   let signatureListes = null;
   let couleursDesListes = new Map(); // id d'une liste → couleur choisie (surfaces importées)
   function remplirMenuListes(listes) {
     couleursDesListes = new Map(listes.map((l) => [l.id, l.couleur]));
-    const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}:${l.couleur}:${l.lignesVisibles}`).join('|');
+    const signature = listes.map((l) => `${l.id}:${l.nom}:${l.visible}:${l.couleur}:${l.lignesVisibles}:${(l.sousDossiers ?? []).join('+')}`).join('|');
     if (signature === signatureListes) return;
     signatureListes = signature;
     // 0.192.0 : une ligne par liste : case, pastille de couleur, nom ; la flèche déplie ses réglages (noms, altitudes, triangles…) et sa couleur.
     const ligne = (l) => {
       const reglages = REGLAGES_LISTE[l.section] ?? [];
       const entete = `<input type="checkbox" data-liste="${l.id}" ${l.visible ? 'checked' : ''} aria-label="Afficher ${echapper(l.nom)}" />
-          <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span class="nom-liste-menu">${echapper(l.nom)}</span>${htmlEtiquetteNature(l.categorie)}`;
+          <span class="pastille-liste liste-${l.nature}" ${l.couleur ? `style="background: ${l.couleur}"` : ''}></span><span class="nom-liste-menu">${echapper(l.nom)}</span>${htmlEtiquetteNature(l.categorie)}${htmlDossiersCliquables(l.id, l.sousDossiers)}`;
       if (reglages.length === 0 && !l.couleurModifiable) return `<div class="ligne-menu-plan"><label class="oeil-plan">${entete}</label></div>`;
       const cases = reglages.map(([cle, titre, n]) => `<label class="case ${n ? `seulement-${n}` : ''}"><input type="checkbox" data-reglage-liste="${cle}" data-id="${l.id}" ${reglageListe(cle, l.id) ? 'checked' : ''} /> ${titre}</label>`).join('');
       const couleur = l.couleurModifiable ? `<div class="couleur-liste-menu"><span>Couleur</span>${paletteCouleur({ couleur: l.couleur, options: COULEURS_LISTES, attributs: `data-champ-couleur="couleur-liste" data-id="${l.id}"`, nom: `Couleur de ${l.nom}` })}</div>` : '';
@@ -2262,6 +2269,15 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       if (cible.dataset.sectionToutes) quandMontrerListe?.(`section:${cible.dataset.sectionToutes}`, cible.checked);
     });
   }
+  // Pastille de dossier touchée (dans une case à cocher : on évite de la cocher / décocher).
+  for (const menu of [menuPlans, menuListes, menuSurfaces]) {
+    menu.addEventListener('click', (evenement) => {
+      const cible = evenement.target.closest('[data-dossiers-de]');
+      if (!cible || !quandChoisirDossiers) return;
+      evenement.preventDefault();
+      quandChoisirDossiers(cible.dataset.dossiersDe);
+    });
+  }
   menuPlans.addEventListener('click', (evenement) => {
     const gel = evenement.target.closest('[data-gel-calques]');
     if (!gel) return;
@@ -2282,6 +2298,26 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
     if (champ.dataset.reglage === 'visible') quandReglerPlanDxf?.(id, { visible: champ.checked });
     else if (champ.dataset.reglage === 'transparence') quandReglerPlanDxf?.(id, { transparence: Number(champ.value) });
     else if (champ.dataset.calqueDxf !== undefined) quandMontrerCalqueDxf?.(id, Number(champ.dataset.calqueDxf), champ.checked);
+  });
+  // 0.262.0 : altitude de la coupe en plan des maquettes IFC (niveau + 1.00 m, altitude tapée, bout de canne).
+  menuPlans.addEventListener('change', (evenement) => {
+    const champ = evenement.target.closest('[data-coupe-ifc]');
+    if (!champ) return;
+    const actuel = lireCoupeIfc?.() ?? {};
+    let choix;
+    if (champ.dataset.coupeIfc === 'altitude') {
+      const altitude = Number(String(champ.value).replace(',', '.'));
+      if (!Number.isFinite(altitude) || champ.value.trim() === '') return;
+      choix = { sorte: 'altitude', altitude };
+    } else if (champ.value === 'recepteur') choix = { sorte: 'recepteur' };
+    else if (champ.value === 'altitude') choix = { sorte: 'altitude', altitude: Math.round((actuel.altitude ?? 0) * 100) / 100 };
+    else {
+      const niveau = (actuel.niveaux ?? [])[Number(champ.value.replace('niveau-', ''))];
+      if (!niveau) return;
+      choix = { sorte: 'niveau', niveau: niveau.nom, altitude: niveau.altitude };
+    }
+    signatureMenuPlans = null;
+    quandChoisirCoupeIfc?.(choix);
   });
   // Flèche d'un plan : ses calques, à cocher un par un (0.94.0).
   const plansDeplies = new Set();
@@ -2304,14 +2340,15 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
   function remplirMenuPlans() {
     // Plans du cadastre : rangés avec leurs points dans « Afficher › Cadastre » (0.116.4).
     const plansDxf = plansDuMenu();
-    const listeDossiers = lireSousDossiers();
     boutonPlans.classList.toggle('tout-cache', plansDxf.length > 0 && plansDxf.every((plan) => plan.visible === false)); // 0.221.0 : tout caché = bouton pâli
     const signature = plansDxf.map((plan) => `${plan.id}:${plan.nom}:${(plan.sousDossiers ?? []).join('+')}:${plan.visible !== false}:${plan.couleur || ''}:${plan.transparence ?? 0}:${(plan.calques ?? []).map((c) => (c.visible ? 1 : 0)).join('')}`).join('|');
-    if (signature === signatureMenuPlans) return;
-    signatureMenuPlans = signature;
+    const coupeIfc = plansDxf.some((plan) => plan.ifc) ? lireCoupeIfc?.() : null;
+    const signatureComplete = `${signature}#${JSON.stringify(coupeIfc?.choix ?? null)}`;
+    if (signatureComplete === signatureMenuPlans) return;
+    signatureMenuPlans = signatureComplete;
     // Aucun plan : un petit cadre « Aucun DXF » (avant : un trait blanc vide).
     if (plansDxf.length === 0) {
-      menuPlans.innerHTML = '<p class="menu-vide">Aucun plan</p>';
+      menuPlans.innerHTML = `<p class="menu-vide">Aucun plan</p>`;
       boutonPlans.classList.remove('tout-cache');
       return;
     }
@@ -2323,13 +2360,34 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       </div>`;
     menuPlans.innerHTML = enteteCalques + plansDxf.map((plan) => `<div class="ligne-menu-plan">
         <label class="oeil-plan" title="Afficher / cacher"><input type="checkbox" data-plan="${plan.id}" data-reglage="visible" ${plan.visible !== false ? 'checked' : ''} />
-          <span>${echapper(plan.nom)}</span>${(plan.sousDossiers ?? []).map((nom) => pastilleSousDossier(nom, listeDossiers)).join('')}</label>
+          <span>${echapper(plan.nom)}</span>${htmlDossiersCliquables(plan.id, plan.sousDossiers)}</label>
         ${paletteCouleur({ couleur: plan.couleur, options: COULEURS_PLANS, attributs: `data-champ-couleur="plan-couleur" data-id="${plan.id}"`, nom: `Couleur de ${plan.nom}` })}
         <label class="reglette-transparence reglette-plan"><b>Trans.</b>
           <input type="range" min="0" max="100" step="5" value="${plan.transparence ?? 0}" data-plan="${plan.id}" data-reglage="transparence" /><span>${plan.transparence ?? 0} %</span></label>
         ${(plan.calques ?? []).length > 0 ? `<button type="button" class="fleche-calques-dxf" data-deplier-plan="${plan.id}" aria-expanded="${plansDeplies.has(plan.id)}" title="Calques" aria-label="Calques de ${echapper(plan.nom)}">${plansDeplies.has(plan.id) ? '▴' : '▾'}</button>` : ''}
       </div>
-      ${plansDeplies.has(plan.id) ? `<div class="calques-dxf-menu">${plan.calques.map((c, numero) => `<label class="case"><input type="checkbox" data-plan="${plan.id}" data-calque-dxf="${numero}" ${c.visible !== false ? 'checked' : ''} /> ${echapper(c.nom)}</label>`).join('')}</div>` : ''}`).join('');
+      ${plansDeplies.has(plan.id) ? `<div class="calques-dxf-menu">${plan.ifc && coupeIfc ? htmlCoupeIfc(coupeIfc) : ''}${plan.calques.map((c, numero) => `<label class="case"><input type="checkbox" data-plan="${plan.id}" data-calque-dxf="${numero}" ${c.visible !== false ? 'checked' : ''} /> ${echapper(c.nom)}</label>`).join('')}</div>` : ''}`).join('');
+  }
+
+  /**
+   * Ligne « Coupe IFC » du menu Plan (0.262.0) : niveaux du fichier (coupe à +1.00 m), altitude tapée,
+   * ou bout de canne du récepteur. coupe : { niveaux, choix, altitude } (voir main.js, lireCoupeIfc).
+   * 0.263.0 (demande du 17.11) : dans le dépliage de chaque IFC (flèche ▾), plus en haut du menu ; la même hauteur pour tous les IFC.
+   */
+  function htmlCoupeIfc({ niveaux = [], choix = null, altitude = null }) {
+    const sorte = choix?.sorte ?? 'niveau';
+    let choisi = choix?.sorte === 'niveau' ? niveaux.findIndex((n) => n.nom === choix.niveau && (choix.altitude == null || n.altitude === choix.altitude)) : -1;
+    if (sorte === 'niveau' && choisi < 0) choisi = 0;
+    const options = [
+      ...niveaux.map((n, k) => `<option value="niveau-${k}" ${sorte === 'niveau' && k === choisi ? 'selected' : ''}>${echapper(n.nom)} (${n.altitude.toFixed(2)}) + 1 m</option>`),
+      `<option value="altitude" ${sorte === 'altitude' ? 'selected' : ''}>Altitude…</option>`,
+      `<option value="recepteur" ${sorte === 'recepteur' ? 'selected' : ''}>Récepteur (bout de canne)</option>`,
+    ];
+    const champ = sorte === 'altitude'
+      ? `<input type="text" inputmode="decimal" class="champ-coupe-ifc" data-coupe-ifc="altitude" value="${Number.isFinite(choix?.altitude) ? choix.altitude.toFixed(2) : altitude != null ? altitude.toFixed(2) : ''}" aria-label="Altitude de la coupe (m)" />`
+      : '';
+    return `<div class="ligne-menu-plan ligne-coupe-ifc"><b>Coupe IFC</b>
+        <select data-coupe-ifc="sorte" aria-label="Altitude de la coupe des maquettes IFC">${options.join('')}</select>${champ}</div>`;
   }
 
   // Les menus se ferment quand on touche le plan.

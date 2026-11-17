@@ -53,6 +53,36 @@
     reglages: function (numero, texteJson) { copie.reglages[numero] = texteJson; },
   };
 
+  // Clavier tactile (0.256.4) : Windows ne le sort pas toujours tout seul dans une fenêtre d'appli. Un champ de texte touché
+  // du DOIGT ou du stylet (pas à la souris : un vrai clavier est là) demande le clavier ; quand plus aucun champ n'a la main,
+  // on le range. Voir ClavierTactile.cs.
+  var doc = window.document;
+  var dernierPointeur = 'mouse';
+  var SANS_CLAVIER = { checkbox: 1, radio: 1, button: 1, submit: 1, reset: 1, range: 1, file: 1, color: 1, image: 1, hidden: 1 };
+  function estChampTexte(el) {
+    if (!el || el.disabled || el.readOnly) return false;
+    if (el.tagName === 'TEXTAREA' || el.isContentEditable) return true;
+    return el.tagName === 'INPUT' && !SANS_CLAVIER[(el.type || 'text').toLowerCase()];
+  }
+  var clavierDemande = false;
+  if (doc && doc.addEventListener) {
+    doc.addEventListener('pointerdown', function (e) { dernierPointeur = e.pointerType || 'mouse'; }, true);
+    doc.addEventListener('focusin', function (e) {
+      if (!estChampTexte(e.target) || dernierPointeur === 'mouse') return;
+      clavierDemande = true;
+      envoyer('montrerClavier');
+    }, true);
+    doc.addEventListener('focusout', function () {
+      if (!clavierDemande) return;
+      // On attend un instant : le doigt passe peut-être d'un champ à l'autre (le clavier reste alors sorti).
+      setTimeout(function () {
+        if (estChampTexte(doc.activeElement)) return;
+        clavierDemande = false;
+        envoyer('cacherClavier');
+      }, 150);
+    }, true);
+  }
+
   window.AppliAndroid = {
     // Vrai seulement ici : permet à l'appli web d'adapter les rares choses propres à Windows (mise à jour).
     estWindows: true,

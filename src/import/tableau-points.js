@@ -5,7 +5,6 @@
 import { fixe3 } from '../topo/format.js';
 import { lireNomLeve } from '../topo/leve-direct.js';
 import { dateDuPoint, jourDuPoint } from '../topo/date-point.js';
-import { estMontre } from '../topo/sous-dossiers.js';
 
 /**
  * Catégories : [clé, titre, couleur de la pastille]. 0.197.0 : un levé est rangé par sa nature (Libre, Stock, Terrain,
@@ -88,8 +87,7 @@ export function listesDuTableau(projet) {
   if ((projet.pointsControle ?? []).length > 0) listes.push({ id: 'controle', nom: 'Points de contrôle', categorie: 'controle', nombre: projet.pointsControle.length });
   for (const leve of projet.leves ?? []) {
     const categorie = categorieDeListe(projet, leve);
-    // 0.255.0 : seules les listes du dossier choisi sur cette tablette (les points de contrôle sont dans tous les dossiers).
-    if (categorie && leve.points.length > 0 && estMontre(projet, leve, 'leve')) listes.push({ id: leve.id, nom: leve.nom, categorie, nombre: leve.points.length });
+    if (categorie && leve.points.length > 0) listes.push({ id: leve.id, nom: leve.nom, categorie, nombre: leve.points.length });
   }
   return listes;
 }
@@ -140,7 +138,7 @@ export function lignesDuTableau(projet, { categories, listesDecochees = new Set(
   }
   for (const leve of projet.leves ?? []) {
     const categorie = categorieDeListe(projet, leve);
-    if (!categorie || !aGarder(leve.id, categorie) || !estMontre(projet, leve, 'leve')) continue;
+    if (!categorie || !aGarder(leve.id, categorie)) continue;
     const photos = proprietaireDeListe(projet, leve)?.photos ?? [];
     for (const p of leve.points) lignes.push(ligneDuPoint(p, categorie, leve, photos));
   }

@@ -46,7 +46,8 @@ function alleger(projet, fichiers) {
   const photosControle = projet.photosControle ? { photosControle: sansImages({ photos: projet.photosControle }).photos } : {};
   const plansDxf = projet.plansDxf ? {
     plansDxf: projet.plansDxf.map((plan) => {
-      fichiers.set(`${prefixePlan}${plan.id}${FIN}`, plan.contenu);
+      // Maquette IFC (0.262.0) : seulement la maquette (la coupe en plan se refait sur chaque tablette).
+      fichiers.set(`${prefixePlan}${plan.id}${FIN}`, plan.ifc && plan.contenu ? { maquette: plan.contenu.maquette } : plan.contenu);
       return { ...plan, contenu: null };
     }),
   } : {};

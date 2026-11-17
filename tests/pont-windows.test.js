@@ -100,3 +100,52 @@ describe('pont de l\'appli Windows', () => {
     expect(page.AppliAndroid.lireJournalNmea()).toBe('$GNGGA,1\r\n$GNETC,2\r\n');
   });
 });
+
+describe('clavier tactile de l\'appli Windows (0.256.4)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  /** Fausse page avec un document qui retient ses écouteurs. */
+  function lancerAvecDocument() {
+    const messages = [];
+    const ecouteurs = {};
+    const doc = { activeElement: null, addEventListener: (type, f) => { ecouteurs[type] = f; } };
+    const page = { chrome: { webview: { postMessage: (m) => messages.push(m.fonction) } }, document: doc };
+    page.top = page;
+    new Function('window', source.replace('/*DEPART*/ {}', '{}'))(page);
+    return { doc, ecouteurs, messages };
+  }
+  const champ = { tagName: 'INPUT', type: 'text' };
+  const caseACocher = { tagName: 'INPUT', type: 'checkbox' };
+
+  it('champ touché au doigt : clavier demandé ; quitté : rangé', () => {
+    const { doc, ecouteurs, messages } = lancerAvecDocument();
+    ecouteurs.pointerdown({ pointerType: 'touch' });
+    doc.activeElement = champ;
+    ecouteurs.focusin({ target: champ });
+    expect(messages).toEqual(['montrerClavier']);
+    doc.activeElement = caseACocher;
+    ecouteurs.focusout({});
+    vi.advanceTimersByTime(200);
+    expect(messages).toEqual(['montrerClavier', 'cacherClavier']);
+  });
+
+  it('à la souris : rien (un vrai clavier est là) ; case à cocher : rien', () => {
+    const { ecouteurs, messages } = lancerAvecDocument();
+    ecouteurs.pointerdown({ pointerType: 'mouse' });
+    ecouteurs.focusin({ target: champ });
+    ecouteurs.pointerdown({ pointerType: 'touch' });
+    ecouteurs.focusin({ target: caseACocher });
+    expect(messages).toEqual([]);
+  });
+
+  it('d\'un champ à l\'autre : le clavier reste sorti', () => {
+    const { doc, ecouteurs, messages } = lancerAvecDocument();
+    ecouteurs.pointerdown({ pointerType: 'pen' });
+    ecouteurs.focusin({ target: champ });
+    ecouteurs.focusout({});
+    doc.activeElement = { tagName: 'TEXTAREA' };
+    vi.advanceTimersByTime(200);
+    expect(messages).toEqual(['montrerClavier']);
+  });
+});

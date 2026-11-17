@@ -97,7 +97,7 @@ export function htmlBandeauAnnotation({ nom, remarque, photos, position, dernier
  */
 export function htmlAnnotation({ mode, fiche, photos = [], manuel, tablette, liste, reglages = false, tri = 'recent' }) {
   const lignes = liste.map((a) => `<button type="button" class="ligne-annotation ${fiche?.nom === a.nom ? 'actif' : ''}" data-action="ouvrir-annotation" data-nom="${echapper(a.nom)}">
-      <strong>${echapper(a.nom)}</strong><span>${echapper(a.premiere || '—')}</span><small>${echapper(a.date)} · ${a.remarques} rem. · ${a.photos} photo(s) · ${echapper(SOURCES[a.source] ?? '')}</small></button>`).join('');
+      <strong>${echapper(a.nom)}</strong><span>${echapper(a.premiere || '—')}</span><small>${echapper(a.date)} · ${a.remarques} rem. · ${a.photos} photo(s) · ${echapper(SOURCES[a.source] ?? '')}${a.dossiers ? ` · ${echapper(a.dossiers)}` : ''}</small></button>`).join('');
   const invite = mode === 'loupe'
     ? 'Touche le plan, place la croix, puis lève le doigt'
     : 'Choisis Manuel, GNSS ou GPS tablette en bas';

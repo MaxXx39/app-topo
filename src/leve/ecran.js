@@ -802,6 +802,16 @@ export function creerEcranLeve(conteneur, actions) {
   }
 
   /**
+   * Coin d'une maquette IFC (0.263.0, Intermédiaire) : l'objet touché et le choix de l'altitude, dessus ou dessous
+   * de l'objet à cet endroit (Dessus au départ). ifc : { nom, type, dessus, dessous, face }.
+   */
+  function htmlFaceIfc(ifc) {
+    const bouton = (face, titre) => `<button type="button" class="puce-choix ${ifc.face === face ? 'actif' : ''}" data-action="choisirFaceIfc" data-valeur="${face}">${titre} ${formaterNombre(ifc[face])}</button>`;
+    return `<div class="choix-face-ifc"><span class="objet-ifc">IFC · ${echapper(ifc.type)}${ifc.nom ? ` · ${echapper(ifc.nom)}` : ''}</span>
+      <div class="puces-face-ifc">${bouton('dessus', 'Dessus')}${bouton('dessous', 'Dessous')}</div></div>`;
+  }
+
+  /**
    * Implantation d'un point, avant le guidage : point choisi (implanter ou garder dans la liste
    * « À implanter »), liste « À implanter », export. Le guidage est dans vueImplantation.
    */
@@ -811,6 +821,7 @@ export function creerEcranLeve(conteneur, actions) {
       ? `<div class="choix-implantation">
           <button type="button" class="bouton-retour-grand" data-action="changerPoint" aria-label="Retour : choisir un autre point"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg><span>Retour</span></button>
           <p class="coordonnees-choix">${imp.choix.nom ? `<strong>${echapper(imp.choix.nom)}</strong> ` : ''}<span class="coord-en">E ${formaterNombre(imp.choix.est)} · N ${formaterNombre(imp.choix.nord)}</span></p>
+          ${imp.choix.ifc ? htmlFaceIfc(imp.choix.ifc) : ''}
           <div class="champs-implantation">
             <label>Nom<input type="text" data-champ="nom-implantation" value="${echapper(imp.nomPropose)}" autocomplete="off" autocapitalize="characters" /></label>
             <label>Altitude<input type="text" inputmode="decimal" data-champ="altitude-implantation" value="${imp.choix.altitude != null ? imp.choix.altitude.toFixed(3) : ''}" placeholder="facultative" /></label>

@@ -3,6 +3,7 @@
    Couleurs et tailles réunies ici en "variables" pour les changer facilement.
    ========================================================================== */
 :root {
+  --largeur-panneau: 440px; /* panneau de gauche en largeur (≥ 900 px) ; 0.256.4 : plus large dès 1200 px, voir fin du fichier */
   /* Couleurs de Perrin Groupe : bleu nuit et jaune ambre */
   --sombre: #1b2b36;
   --encre: #1b2b36; /* texte foncé sur fond clair (devient clair en affichage Sombre, 0.114.0) */
@@ -513,7 +514,7 @@ body.aide-active .rond-aide {
 @media (min-width: 900px) {
   .mise-en-page {
     display: grid;
-    grid-template-columns: 440px 1fr;
+    grid-template-columns: var(--largeur-panneau) 1fr;
     gap: 16px;
     padding: 16px;
     padding-top: calc(16px + 56px);
@@ -542,7 +543,7 @@ body.aide-active .rond-aide {
     bottom: auto;
     left: 16px;
     right: auto;
-    width: 440px;
+    width: var(--largeur-panneau);
     height: 48px;
     padding: 4px;
     border: none;
@@ -930,7 +931,7 @@ th:not(:first-child) {
   .barre-edition {
     left: 16px;
     right: auto;
-    width: 440px;
+    width: var(--largeur-panneau);
     bottom: 16px;
   }
 }
@@ -11549,7 +11550,7 @@ body.clavier-ouvert .bande-appli:not(:focus-within) { display: none; }
     bottom: auto;
     left: 16px;
     right: auto;
-    width: 440px;
+    width: var(--largeur-panneau);
     height: 48px;
     padding: 4px;
     border-top: none;
@@ -11581,7 +11582,7 @@ body:not(.aide-active) #leve-direct .choix-implantation-type { display: none; }
 }
 .page-applis[hidden] { display: none; }
 @media (min-width: 900px) {
-  .page-applis { left: 16px; right: auto; width: 440px; bottom: 16px; margin-top: 68px; border-radius: var(--rayon); box-shadow: var(--ombre); }
+  .page-applis { left: 16px; right: auto; width: var(--largeur-panneau); bottom: 16px; margin-top: 68px; border-radius: var(--rayon); box-shadow: var(--ombre); }
 }
 .bandeau-projet-applis {
   display: flex;
@@ -12023,7 +12024,7 @@ dialog.fenetre-reglages.en-page .titre-reglages { display: flex; align-items: ce
 }
 .retour-reglages svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 @media (min-width: 900px) {
-  dialog.fenetre-reglages.en-page[open] { left: 16px; right: auto; width: 440px; bottom: 16px; margin-top: 68px; border-radius: var(--rayon); box-shadow: var(--ombre); }
+  dialog.fenetre-reglages.en-page[open] { left: 16px; right: auto; width: var(--largeur-panneau); bottom: 16px; margin-top: 68px; border-radius: var(--rayon); box-shadow: var(--ombre); }
 }
 
 /* ==========================================================================
@@ -13947,3 +13948,72 @@ body.theme-sombre .puce-dossier.actif { background: var(--ambre, #f6ab07); borde
 }
 body.mode-telephone .entete .entete-icone-bouton.bouton-mode { margin-left: calc(4px - 4px - 3px); }
 body.mode-telephone .entete:has(.bouton-recepteur-entete) { padding-right: calc(var(--largeur-recepteur) - 3px); }
+
+/* 0.256.4 (audit Windows, demande du 16.11) : en paysage large (tablette Windows 1280 × 800, ordinateur), le panneau de gauche
+   prend 40 % de l'écran (440 à 560 px) : la consigne d'implantation (« Descendre 0.373 m ») n'est plus coupée. */
+@media (min-width: 1200px) {
+  :root { --largeur-panneau: clamp(440px, 40vw, 560px); }
+}
+
+/* 0.256.5 (demande du 16.11) : sur grand écran aussi (tablette Windows en paysage, ordinateur), la bande des applications est EN BAS,
+   sur toute la largeur, comme sur Android (avant : en haut à gauche, à la place des anciens onglets). */
+@media (min-width: 900px) {
+  .bande-appli {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: calc(var(--hauteur-bande) + env(safe-area-inset-bottom));
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+    border-top: 4px solid var(--couleur-appli, #1b2b36);
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .mise-en-page,
+  body.bande-vide .mise-en-page {
+    padding-top: 16px;
+    padding-bottom: 16px;
+    height: calc(100vh - var(--hauteur-entete) - var(--hauteur-bande) - env(safe-area-inset-bottom));
+  }
+  .page-applis { margin-top: 16px; bottom: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 16px); }
+  body.bande-vide .page-applis { padding-bottom: 24px; }
+  dialog.fenetre-reglages.en-page[open] { margin-top: 16px; bottom: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 16px); }
+  body.bande-vide dialog.fenetre-reglages.en-page[open] { padding-bottom: 14px; }
+  .barre-edition { bottom: calc(var(--hauteur-bande) + env(safe-area-inset-bottom) + 16px); }
+  .message-flottant, body[data-onglet] .message-flottant.message-haut { top: calc(var(--hauteur-entete) + 12px); }
+  /* Page Applications ouverte : la bande est cachée (comme sur Android), sa place revient au panneau et au plan. */
+  body.page-applis-ouverte .mise-en-page { height: calc(100vh - var(--hauteur-entete)); }
+  body.page-applis-ouverte .page-applis { bottom: 16px; }
+}
+
+/* 0.260.0 (demandes du 17.11) : dossiers un tout petit peu moins hauts (liste du plan, en-tête, page Applications) ; pastilles touchables ; bouton « Ouvrir » de l'encadré du projet plus visible ; bandeau « Hors ligne » dans la barre du récepteur. */
+.dossiers-cliquables { display: inline-flex; flex-wrap: wrap; align-items: center; cursor: pointer; }
+.dossiers-cliquables .pastille-pastel-dossier { padding: 1px 9px; margin: 1px 3px 1px 0; font-size: 0.8rem; }
+.dossiers-cliquables.ajout-dossier { padding: 1px 9px; margin: 1px 3px 1px 0; border: 1px dashed currentColor; border-radius: 999px; font-size: 0.8rem; font-weight: 700; opacity: 0.75; }
+.cases-fenetre { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; padding: 4px 2px 10px; }
+.cases-fenetre .case { min-height: 40px; font-size: 1.05rem; }
+.pastille-entete.pastille-dossier { padding: 3px 12px; }
+.puce-dossier { min-height: 38px; }
+.puces-dossiers .puce-dossier { min-height: 34px; padding: 3px 10px; }
+.puces-dossiers { padding: 2px 2px 8px; }
+.cadre-projet-applis { padding: 8px; }
+.cadre-projet-applis .bandeau-projet-applis { padding: 2px 4px 6px; }
+
+/* 0.261.0 : bouton « Ouvrir » de l'encadré du projet : même hauteur que ＋ et l'épingle, un peu plus large, blanc à contour bleu nuit épais. */
+.cadre-projet-applis .bouton-texte-projet { padding: 0 16px; background: #ffffff; color: #1b2b36; border: 3px solid #1b2b36; font-weight: 800; font-size: 15px; box-shadow: none; }
+body.mode-telephone .cadre-projet-applis .bouton-texte-projet { padding: 0 11px; font-size: 13px; }
+/* 0.261.1 : « Hors ligne » (nuage rouge barré) : pastille rouge sur le tiers HAUT du logo du récepteur (la pastille « Contrôle à refaire » est sur le tiers bas). */
+.pastille-hors-ligne { display: none; position: absolute; top: 6px; right: 10px; z-index: 30; width: 76px; min-height: 24px; padding: 2px 4px; border-radius: 13px; background: #dc2626; color: #ffffff; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; line-height: 1.05; pointer-events: none; }
+body.drive-hors-ligne.avec-recepteur .pastille-hors-ligne { display: flex; }
+body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; min-height: 20px; font-size: 0.58rem; }
+/* 0.262.0 : ligne « Coupe IFC » du menu Plan (altitude de la coupe des maquettes IFC). */
+.ligne-coupe-ifc { flex-wrap: wrap; }
+.ligne-coupe-ifc select { flex: 1 1 140px; min-height: 36px; font-size: 0.9rem; }
+.ligne-coupe-ifc .champ-coupe-ifc { width: 7em; min-height: 36px; font-size: 0.9rem; }
+/* 0.262.0 : objets des maquettes IFC dans les coupes (contour à la couleur du type, rempli clair). */
+.ifc-coupe { fill: none; stroke-width: 1.2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+/* 0.263.0 : fiche d'un coin d'IFC (Implanter › Point) : objet touché et Dessus / Dessous. */
+.choix-face-ifc { display: grid; gap: 4px; margin: 4px 0; }
+.choix-face-ifc .objet-ifc { font-size: 0.85rem; color: var(--texte-doux, #475569); overflow-wrap: anywhere; }
+.puces-face-ifc { display: flex; gap: 6px; flex-wrap: wrap; }

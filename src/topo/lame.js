@@ -234,6 +234,8 @@ export function coupeEntre(triangles, a, b, marges = 1) {
     ruptures,
     a: { distance: avant, altitude: a.altitude },
     b: { distance: avant + largeur, altitude: b.altitude },
+    debut, // 0.262.0 : bouts de la coupe en plan (MN95), pour y couper les maquettes IFC
+    fin,
   };
 }
 
