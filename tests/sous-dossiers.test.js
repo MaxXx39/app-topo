@@ -31,9 +31,9 @@ const projet = () => ({
 describe('liste des sous-dossiers', () => {
   it('départ : les 12 dossiers du 16.11 + PIC + Autre (en bas), chacun avec une couleur différente', () => {
     const liste = lireSousDossiers(null, {});
-    expect(liste.map((d) => d.nom)).toEqual(['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC', 'Autre']);
+    expect(liste.map((d) => d.nom)).toEqual(['TER.', 'CANA', 'TS', 'AMEX', 'BAT', 'SITU', 'PIC', 'PERRIN1', 'PERRIN2', 'GEOOFF', 'GEOPERRIN', 'OLD', 'Autre']);
     expect(liste.map((d) => d.nom)).toEqual(SOUS_DOSSIERS_DEPART);
-    expect(new Set(liste.map((d) => d.couleur)).size).toBe(14);
+    expect(new Set(liste.map((d) => d.couleur)).size).toBe(13);
   });
   it('on peut en ajouter ; la liste partagée remplace celle de départ ; un nom inconnu est gris', () => {
     const liste = lireSousDossiers(null, { sousDossiers: ['Voirie', 'Eaux'] });
