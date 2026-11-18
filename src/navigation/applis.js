@@ -77,6 +77,17 @@ export const APPLIS = [
     icone: '<path d="M3 9h18M3 15h18" /><path d="M7 9v6M17 9v6" />',
   },
   {
+    // Test laser (0.269.0, Expert, essai) : GNSS + laser D510 sur la canne, point visé par le cap ou par 2 stations.
+    cle: 'laser',
+    titre: 'Test laser',
+    court: 'Laser',
+    couleur: '#b91c1c',
+    texte: '#ffffff',
+    apk: true,
+    niveau: 'expert',
+    icone: '<path d="M4 20V8" /><circle cx="4" cy="6" r="2" /><path d="M7 9l13-4" stroke-dasharray="2 2" /><circle cx="20" cy="5" r="1.5" />',
+  },
+  {
     cle: 'calculs',
     titre: 'Calculs',
     couleur: '#db2777',
@@ -133,6 +144,7 @@ export function appliCourante(onglet, modeTerrain) {
   if (onglet === 'mesure-rapide') return 'mesure';
   if (onglet === 'annotation') return 'annotation';
   if (onglet === 'reseaux') return 'reseaux';
+  if (onglet === 'test-laser') return 'laser';
   if (['volumes', 'mesures', 'dessin', 'surfaces', 'calculs'].includes(onglet)) return 'calculs';
   if (onglet === 'terrain') {
     return { controler: 'implanter', autocontrole: 'controle', lame: 'guidage' }[modeTerrain] ?? 'lever';

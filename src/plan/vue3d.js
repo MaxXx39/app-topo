@@ -38,7 +38,7 @@ export function projeter(p, vue) {
   // Inclinaison : le fond monte à l'écran, le haut aussi.
   const ecranY = y * Math.sin(i) + dz * Math.cos(i);
   const profondeur = y * Math.cos(i) - dz * Math.sin(i);
-  return { x: vue.largeur / 2 + x * vue.echelle, y: vue.hauteur / 2 - ecranY * vue.echelle, profondeur };
+  return { x: vue.largeur / 2 + (vue.decalX ?? 0) + x * vue.echelle, y: vue.hauteur / 2 + (vue.decalY ?? 0) - ecranY * vue.echelle, profondeur };
 }
 
 /**
@@ -148,8 +148,8 @@ export function dessinerScene(contexte, scene, vue, { transparent = false, aperc
   const [ca, sa, ci, si] = [Math.cos(a), Math.sin(a), Math.cos(i), Math.sin(i)];
   const { est: e0, nord: n0, altitude: z0 } = vue.centre;
   const ex = vue.exageration;
-  const demiL = vue.largeur / 2;
-  const demiH = vue.hauteur / 2;
+  const demiL = vue.largeur / 2 + (vue.decalX ?? 0); // 0.268.0 : déplacement à deux doigts
+  const demiH = vue.hauteur / 2 + (vue.decalY ?? 0);
   const ech = vue.echelle;
   const ecran = new Float32Array(6 * total);
   const profondeurs = new Float32Array(total);
@@ -290,6 +290,8 @@ function dessinerReperes(contexte, vue, ratio) {
  * si les éléments sont loin les uns des autres), les couleurs (altitude ou par élément), la
  * transparence, le zoom (+ / −, doigts, molette) et « Vue de départ ».
  */
+const GRIS_IFC = [150, 156, 164];
+
 export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf = [], maquettes = [], altitudeCoupe = null } = {}) {
   const surfaces = Array.isArray(elementsOuTriangles[0]) ? [{ nom: titre, triangles: elementsOuTriangles }] : elementsOuTriangles.filter((e) => e.triangles.length > 0);
   // Maquettes IFC (0.264.0, Intermédiaire) : un élément par maquette, chaque triangle à la couleur de son type ; « Couper » enlève
@@ -297,7 +299,8 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
   let couper = false;
   const elementsIfc = () => maquettes.map((m) => {
     const morceaux = trianglesMaquette(m.maquette, { cachees: m.cachees, haut: couper ? altitudeCoupe : null });
-    return { nom: `IFC « ${m.nom} »`, ifc: true, triangles: morceaux.map((x) => x.t), couleurs: morceaux.map((x) => x.couleur) };
+    // 0.268.0 (demande du 17.11) : l'IFC est tout gris (l'éclairage garde le relief) ; les couleurs par type restent sur le plan.
+    return { nom: `IFC « ${m.nom} »`, ifc: true, triangles: morceaux.map((x) => x.t), couleurs: morceaux.map(() => GRIS_IFC) };
   }).filter((e) => e.triangles.length > 0 || couper);
   let elements = [...surfaces, ...elementsIfc()];
   // Hauteurs à l'échelle (×1) quand il y a une maquette IFC (sinon le bâtiment est étiré) ; ×2 pour un terrain seul.
@@ -382,6 +385,8 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
   const depart = () => {
     vue.azimut = 0;
     vue.inclinaison = 35;
+    vue.decalX = 0;
+    vue.decalY = 0;
     zoom = 1;
   };
   choisir();
@@ -488,6 +493,10 @@ export function ouvrirVue3d(elementsOuTriangles, titre = 'Vue 3D', { lignesDxf =
       const [c, d] = [...doigts.values()];
       const ecartApres = Math.hypot(c.x - d.x, c.y - d.y);
       if (ecartAvant > 0) zoom = Math.min(20, Math.max(0.2, zoom * (ecartApres / ecartAvant)));
+      // Déplacer : le milieu des deux doigts entraîne la vue (en pixels du canvas).
+      const ratioEcran = toile.width / Math.max(1, toile.getBoundingClientRect().width);
+      vue.decalX = (vue.decalX ?? 0) + (((c.x + d.x) - (a.x + b.x)) / 2) * ratioEcran;
+      vue.decalY = (vue.decalY ?? 0) + (((c.y + d.y) - (a.y + b.y)) / 2) * ratioEcran;
     } else {
       vue.azimut = (vue.azimut + (evenement.clientX - avant.x) * 0.5) % 360;
       vue.inclinaison = Math.min(90, Math.max(5, vue.inclinaison + (evenement.clientY - avant.y) * 0.3));

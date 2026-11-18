@@ -3,6 +3,18 @@
 
 // 0.163.0 : chaque bulle tient en 4 lignes au plus (demande du 09.11).
 export const TEXTES_AIDE = {
+  testLaser:
+    'Test laser (Expert, essai) : GNSS sur la canne + laser D510 fixé dessus ; distance et angle du laser tapés à la main (angle + = vers le haut). Chaque lecture du récepteur = moyenne de 5 s, en FIXE avec l\'inclinaison prête. « Cap » : point visé avec le cap du RX2 ; « Essai A » : le cap est-il juste ? ; « Essai B » : même point depuis 2 stations, sans cap ; « Montage » : réglages du laser. Enreg. = point TL-n dans « LV-Test laser » ; CSV = toute la séance. Formules à valider sur le terrain.',
+  laserEssaiA:
+    'Essai A : prends B au GNSS (une canne posée), puis en A (20 m au moins) vise B avec le laser et lis station et cap : l\'appli compare le cap lu à l\'azimut GNSS A → B. Refais-le à plusieurs endroits et dans plusieurs directions ; avec 3 stations ou plus, l\'écart moyen peut servir de correction du cap (il comprend le Nord du RX2 et la position du laser sur la canne). L\'écart-type dit si le cap est fiable (0,17° ≈ 3 cm à 10 m).',
+  laserEssaiB:
+    'Essai B : vise le même point depuis 2 stations ; chaque distance donne un cercle autour de la station, le point est à leur croisement (2 solutions : à gauche ou à droite en allant de la station 1 vers la 2 ; le cap, s\'il est lu, propose le côté). Angle d\'intersection idéal vers 90° (moins de 30° : peu sûr). L\'écart d\'altitude entre les 2 stations contrôle les angles du laser.',
+  laserVerite:
+    'Contrôle : si le point visé est accessible, pose la canne dessus et prends-le au GNSS : l\'appli affiche l\'écart avec le point calculé au laser (vert ≤ 3 cm).',
+  laserBluetooth:
+    'Laser en Bluetooth (APK) : « Connecter le laser » cherche le D510 (allumé, Bluetooth actif, Chrome fermé). Chaque mesure remplit Distance et Angle de la partie ouverte (Essai B : la station marquée « laser ici »). Vérifie l\'angle avec l\'écran du D510 : s\'il est faux, change Radians / Degrés ici.',
+  laserMontage:
+    'Montage (gardé sur cette tablette) : hauteur = de la pointe de la canne à l\'arrière du laser (d\'où le D510 mesure), le long de la canne ; décalages en regardant la cible (+ = à droite, + = vers la cible). Correction du cap : donnée par l\'essai A. « Corriger la canne penchée » : la hauteur suit la canne d\'après l\'inclinaison du RX2.',
   annotation:
     'Annotation : pose un point (Manuel = loupe sur le plan, GNSS, ou GPS tablette à 3 m ou mieux). En bas : photo (on peut dessiner dessus), ↶ efface le dernier, ID et remarque, Enreg. point. Liste « Annot-date ».',
   reseaux:
@@ -22,7 +34,7 @@ export const TEXTES_AIDE = {
   imports:
     'Points : CSV Emlid ou TXT en MN95 ; liste de points ou levé. Plans DXF (DWG à enregistrer en DXF) ; plan PDF : tu tapes son nom puis tu choisis « Convertir en DXF » (traits, textes, calques) ou « En image » (la page telle quelle) ; puis recalage. LandXML, surfaces Swisstopo et cadastre : choisis-les ici. Maquette IFC (bâtiment, structure) : elle doit être en MN95 (coordonnées partagées) ; on la voit en plan coupée à une altitude (Plan › Coupe IFC) et dans les coupes d\'Implanter, de Réseaux et du Guidage. Pas en MN95 : « Recalage › Recaler maintenant » (Expert), en accrochant les coins de la coupe en plan. Blocs des DXF : leurs attributs visibles (numéro, cote…) sont écrits sur le plan.',
   lever:
-    'Choisis le rôle (Contour, Ligne, Point) et le libellé, puis Enreg. (ou touche volume −), seulement en RTK fixe avec inclinaison prête. Son et vibration = point enregistré ; son grave = refusé. Ligne : « Continuer une ligne » (Intermédiaire) reprend une ligne déjà levée pour l\'allonger. Appui long sur Enreg. (Intermédiaire) : mesure de 5, 15 ou 30 s, avec moyenne, mini et maxi avant de valider.',
+    'Choisis le rôle (Contour, Ligne, Point) et le libellé, puis Enreg. (ou touche volume −, sur Android seulement), seulement en RTK fixe avec inclinaison prête. Son et vibration = point enregistré ; son grave = refusé. Ligne : « Continuer une ligne » (Intermédiaire) reprend une ligne déjà levée pour l\'allonger. Appui long sur Enreg. (Intermédiaire) : mesure de 5, 15 ou 30 s, avec moyenne, mini et maxi avant de valider.',
   corrections:
     'Corrections RTK : par Emlid Flow, ou par l\'appli (NTRIP : roue ⚙ de la barre du récepteur, code de sécurité). Ferme Emlid Flow avant. Le mot de passe reste sur la tablette.',
   talusSurface:

@@ -677,6 +677,13 @@ export function creerEcranLeve(conteneur, actions) {
           </div>
         </div>`
       : '';
+    // « Manuel » : plus de barre d'accroches, une flèche retour ramène au choix des accroches (demande du 17.11).
+    if (active === 'manuel' && !enLigne) {
+      return `<div class="barre-accroche barre-accroche-manuel">
+        <button type="button" class="bouton-retour-grand" data-action="choisirAccroche" data-valeur="point" aria-label="Retour : choisir une accroche"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg><span>Accroches</span></button>
+        ${outilsManuel}
+      </div>`;
+    }
     return `<div class="barre-accroche ${enLigne ? 'accroches-ligne' : ''} ${accrochesOuvertes() ? 'ouverte' : ''}">
       <div class="accroches" role="group" aria-label="Accroche : ce que l'on prend en touchant le plan">
         ${modes.map((mode) => {
@@ -1178,7 +1185,7 @@ export function creerEcranLeve(conteneur, actions) {
             <svg viewBox="0 0 24 24" aria-hidden="true">${ICONE_PHOTO}</svg>
             <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
           </label>
-          <button type="button" class="bouton bouton-prendre" data-action="prendre" title="Enregistrer le point (ou touche volume −)" disabled>
+          <button type="button" class="bouton bouton-prendre" data-action="prendre" title="Enregistrer le point" disabled>
             <span>Enreg. (Vol. −)</span>
           </button>
         </div>

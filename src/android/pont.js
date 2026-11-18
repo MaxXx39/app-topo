@@ -66,6 +66,27 @@ export function ecouterRecepteur(fonction) {
 
 export const choisirRecepteur = () => window.AppliAndroid.choisirRecepteur();
 
+// --- Laser Leica DISTO en Bluetooth basse consommation (Test laser, 0.270.0) ---
+
+/** Vrai si l'APK sait se connecter au laser (APK 0.270.0 et plus). */
+export function laserDisponible() {
+  return estDansAppliAndroid() && !window.AppliAndroid.estWindows && typeof window.AppliAndroid.choisirLaser === 'function';
+}
+
+export const choisirLaser = () => window.AppliAndroid.choisirLaser();
+export const deconnecterLaser = () => window.AppliAndroid.deconnecterLaser();
+/** Déclenche une mesure depuis la tablette : vrai si la commande est partie. */
+export const mesurerLaser = () => Boolean(window.AppliAndroid.mesurerLaser?.());
+
+/**
+ * surEtat({ etat: 'deconnecte' | 'recherche' | 'connexion' | 'connecte', nom, peutMesurer, message }) ;
+ * surMesure({ quoi: 'distance' (m) | 'inclinaison' (valeur brute), valeur, heure }).
+ */
+export function ecouterLaser(surEtat, surMesure) {
+  window.recevoirEtatLaser = surEtat;
+  window.recevoirMesureLaser = surMesure;
+}
+
 // --- Essai à 2 récepteurs (demande du 26.10.2026, mode Expert) : un 2e RX2, même état que le 1er ---
 
 /** Journal NMEA (0.82.0) : vrai si l'APK sait enregistrer tout ce que le RX2 envoie. */

@@ -78,6 +78,28 @@ class PontAndroid(private val ecran: EcranPrincipal) {
         ecran.runOnUiThread { ecran.deconnecterRecepteur() }
     }
 
+    // --- Laser Leica DISTO (BLE, Test laser, 0.270.0) ---
+
+    /** Cherche les lasers DISTO, montre la liste et se connecte à celui choisi. */
+    @JavascriptInterface
+    fun choisirLaser() {
+        ecran.runOnUiThread { ecran.choisirLaser() }
+    }
+
+    /** Coupe la connexion au laser. */
+    @JavascriptInterface
+    fun deconnecterLaser() {
+        ecran.runOnUiThread { ecran.deconnecterLaser() }
+    }
+
+    /** Déclenche une mesure depuis la tablette (si le laser le permet) : vrai si la commande est partie. */
+    @JavascriptInterface
+    fun mesurerLaser(): Boolean = ecran.laser.mesurer()
+
+    /** État du laser : deconnecte, recherche, connexion, connecte. */
+    @JavascriptInterface
+    fun etatLaser(): String = ecran.laser.etat
+
     /** Journal NMEA (0.82.0) : enregistre tout ce que le RX2 envoie pendant "secondes" (5 à 300). */
     @JavascriptInterface
     fun demarrerJournalNmea(secondes: Int) {

@@ -106,6 +106,12 @@
     choisirRecepteur2: function () { envoyer('choisirRecepteur2'); },
     deconnecterRecepteur2: function () { envoyer('deconnecterRecepteur2'); },
 
+    // --- Laser Leica DISTO en Bluetooth (Test laser) : pas encore sous Windows (APK seulement) ---
+    choisirLaser: function () { alert('Laser en Bluetooth : pas encore dans l\'appli Windows (tablette Android seulement).'); },
+    deconnecterLaser: function () {},
+    mesurerLaser: function () { return false; },
+    etatLaser: function () { return 'deconnecte'; },
+
     // Point à prendre maintenant : la copie a moins d'une seconde, sinon on refuse (jamais de point périmé).
     prendrePoint: function () {
       if (copie.point && Date.now() - copie.pointRecuLe <= 1000) return copie.point;

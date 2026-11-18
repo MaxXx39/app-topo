@@ -8,9 +8,9 @@
 //   créer, ranger, déplacer : Expert.
 import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-partagees.js';
 
-// Liste de départ demandée le 16.11 (GEOOFF, GEOPERRIN, TER., CANA, TS, AMEX, SITU, BAT-Rad., BAT-SS, BAT-REZ, BAT, OLD), une couleur différente chacune.
+// Liste de départ réorganisée le 17.11 (TER., CANA, TS, AMEX, BAT, SITU, PIC, PERRIN1, PERRIN2, GEOOFF, GEOPERRIN, OLD, Autre), une couleur différente chacune.
 // 0.257.0 : + PIC (plan d'installation de chantier). Les levés et les annotations n'ont PAS de dossier de base (0.260.0) : ils restent dans leurs catégories.
-export const SOUS_DOSSIERS_DEPART = ['GEOOFF', 'GEOPERRIN', 'TER.', 'CANA', 'TS', 'AMEX', 'SITU', 'BAT-Rad.', 'BAT-SS', 'BAT-REZ', 'BAT', 'OLD', 'PIC', 'Autre'];
+export const SOUS_DOSSIERS_DEPART = ['TER.', 'CANA', 'TS', 'AMEX', 'BAT', 'SITU', 'PIC', 'PERRIN1', 'PERRIN2', 'GEOOFF', 'GEOPERRIN', 'OLD', 'Autre'];
 /** Dossier « Autre » (0.261.0) : toujours le dernier de la liste (remplace la puce « Sans dossier »). */
 export const DOSSIER_AUTRE = 'Autre';
 // 15 couleurs distinctes, dans l'ordre de la liste (les dossiers ajoutés ensuite reprennent la 1re, etc.).

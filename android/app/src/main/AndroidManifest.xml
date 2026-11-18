@@ -10,7 +10,11 @@
     <!-- Bluetooth : Android 12 et plus récent (« Appareils à proximité ») -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- Laser Leica DISTO en Bluetooth basse consommation (Test laser) : recherche des appareils, sans localisation -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
     <!-- GPS de la tablette : se localiser sur le plan quand aucun RX2 n'est connecté -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
