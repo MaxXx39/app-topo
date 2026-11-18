@@ -82,7 +82,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.270.1)
+## Fonctionnalités (état à la 0.271.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -124,6 +124,10 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - Récepteur : Bluetooth, NTRIP (swipos), journal NMEA (Expert), 2e GNSS (Expert), GPS tablette, cap automatique, PDOP (colonne de l'export). APK : pont `window.AppliAndroid`, batterie (arrière-plan coupé après 5 min), mise à jour, « Partage écran ».
 - **Drive** : « App Topo › Configuration Projet » ; **une main par projet** (verrou 15 min) ; un appareil n'écrase jamais une version qu'il n'a pas reçue ; **listes partagées** fusionnées partie par partie (`listes-partagees.js`) ; dossiers de projets.
 - **Windows** (`Topo.exe`, jamais lancé sur un vrai Windows) : sert l'appli web à `https://topo.appli/app-topo/` (ne jamais changer l'adresse) et glisse `pont-windows.js` ; port COM, NTRIP, Drive par identifiant « bureau » (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` à créer par l'utilisateur), fichiers dans Documents › Topo › Envois, mise à jour par la release `windows-derniere-version`. Pas fait : appareil photo, touche volume −, vibreur, batterie.
+
+## 0.271.0 — couleurs des sous-dossiers (choix de l'utilisateur, 18.11)
+- Couleurs des 13 dossiers de départ, dans l'ordre de `SOUS_DOSSIERS_DEPART` : TER. `#a0480d`, CANA `#5347f5`, TS `#eb9c2d`, AMEX `#03ab24`, BAT `#ff5900`, SITU `#84cc16`, PIC `#0ea5e9`, PERRIN1 `#ffcf24`, PERRIN2 `#fee567`, GEOOFF `#ec3636`, GEOPERRIN `#0a008f`, OLD `#dedede`, Autre `#666666`. Liste `COULEURS` de `src/topo/sous-dossiers.js` (15 couleurs ; les 2 dernières restent celles d'avant).
+- PERRIN1 et PERRIN2 (jaunes proches) et TS / BAT (oranges proches) : à surveiller sur la tablette.
 
 ## 0.270.1 — page Applications qui remontait toute seule (retour du 17.11, Android : Lever → menu → impossible de descendre)
 - Cause : `mettreAJour` de `navigation/bande.js` comparait le projet avec une signature différente de celle de `dessinerPage` (toujours « changé ») : chaque mise à jour de Lever (MutationObserver sur `#leve-direct`, 5 fois par seconde avec le récepteur) redessinait la page et remettait `.zone-tuiles-applis` en haut. Corrigé (`signaturePage`, position de défilement gardée ; ouverture de la page = en haut). Reproduit puis vérifié en Playwright ; **à confirmer sur la tablette**.
