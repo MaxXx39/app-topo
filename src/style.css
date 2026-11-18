@@ -14126,3 +14126,8 @@ body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; mi
 .barre-laser > span { flex: 1 1 auto; }
 .barre-laser.laser-connecte { background: #dcfce7; color: #14532d; }
 .station-cible-laser { outline: 2px solid #b91c1c; outline-offset: 2px; border-radius: 6px; }
+
+/* 0.272.0 : case « Messages RTCM entiers (Stonex) » des réglages NTRIP (APK seulement : cachée sous Windows). */
+.ligne-case { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 0.95rem; }
+.ligne-case input { width: 22px; height: 22px; flex: none; }
+body.appli-windows .ligne-case { display: none; }

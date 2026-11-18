@@ -37,6 +37,8 @@ export const TEXTES_AIDE = {
     'Choisis le rôle (Contour, Ligne, Point) et le libellé, puis Enreg. (ou touche volume −, sur Android seulement), seulement en RTK fixe avec inclinaison prête. Son et vibration = point enregistré ; son grave = refusé. Ligne : « Continuer une ligne » (Intermédiaire) reprend une ligne déjà levée pour l\'allonger. Appui long sur Enreg. (Intermédiaire) : mesure de 5, 15 ou 30 s, avec moyenne, mini et maxi avant de valider.',
   corrections:
     'Corrections RTK : par Emlid Flow, ou par l\'appli (NTRIP : roue ⚙ de la barre du récepteur, code de sécurité). Ferme Emlid Flow avant. Le mot de passe reste sur la tablette.',
+  messagesEntiers:
+    'Essai pour les récepteurs Stonex S800 / S900 : les corrections sont envoyées au récepteur message par message, jamais coupées en deux. Laisse décoché avec un Emlid. Fonctionne avec des corrections RTCM 3 (swipos).',
   talusSurface:
     'Talus d\'une surface (Expert) : « + Talus », touche les côtés sur le plan, règle pente H/V, sens et fin (terrain, longueur, altitude), « Appliquer ». À implanter dans Implanter › Talus.',
   talusDessin:
