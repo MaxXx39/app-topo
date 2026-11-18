@@ -1,7 +1,7 @@
 # Fabrication de l'appli Windows « Topo.exe » (la même appli web que l'APK, dans une fenêtre Windows).
-# - Lancée À LA MAIN (onglet Actions › « Fabriquer l'appli Windows » › Run workflow), ou quand le code
-#   Windows (dossier windows/Topo) change. Les autres envois ne fabriquent que l'APK Android :
-#   Windows ne suit que sur demande (décision du 14.11).
+# - Lancée À CHAQUE NOUVELLE VERSION (package.json change : décision du 18.11, Android et Windows gardent
+#   le même numéro), quand le code Windows (dossier windows/Topo) change, ou à la main (onglet Actions ›
+#   « Fabriquer l'appli Windows » › Run workflow).
 # - Le résultat est publié dans « Releases », sous « Windows - dernière version » :
 #   https://github.com/MaxXx39/app-topo/releases/download/windows-derniere-version/Topo.exe
 # - Google Drive : les secrets GOOGLE_BUREAU_ID et GOOGLE_BUREAU_SECRET du dépôt (identifiant « Application de
@@ -11,6 +11,7 @@ name: Fabriquer l'appli Windows
 on:
   push:
     paths:
+      - "package.json"
       - "windows/Topo/**"
       - "windows/Topo.Tests/**"
       - ".github/workflows/windows.yml"

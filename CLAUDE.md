@@ -7,7 +7,7 @@
 - Nouvelle fonctionnalité : **toujours demander** dans quel mode la mettre (**Base**, **Intermédiaire** ou **Expert**) avant de la coder.
 - Tout se fait dans le cloud ; l'utilisateur n'utilise que navigateur / tablette.
 - **Tablettes Android toujours en portrait** (décidé le 13.11) : tester et dessiner en portrait (tablette 8" simulée à 800 × 1280 ; téléphone < 500 px). Paysage non prioritaire.
-- **Windows (14.11)** : on garde APK Android **et** `Topo.exe`. Toute modification se fait et s'essaie **d'abord pour l'APK** ; on ne fabrique / publie pour Windows **que sur demande**. La tablette Windows (CC180) est **en paysage** (1280 × 800 simulé).
+- **Windows (14.11)** : on garde APK Android **et** `Topo.exe`. Toute modification se fait et s'essaie **d'abord pour l'APK**. **18.11 : Android et Windows gardent le même numéro de version** : `windows.yml` refait Topo.exe tout seul à chaque changement de `package.json` (donc à chaque nouvelle version). La tablette Windows (CC180) est **en paysage** (1280 × 800 simulé).
 - **Git** : commit en français après chaque fonctionnalité qui marche. Ne jamais demander mot de passe ni jeton dans le chat. Aucun identifiant de modèle dans commits / PR.
 - Avant d'ajouter une bibliothèque : dire ce qu'elle fait, pourquoi, demander l'accord.
 
@@ -49,9 +49,9 @@ docs/                tableau des modes (xlsx) ; audit-2026-11/ (présentation de
 ## Livraison et publication
 - À chaque livraison : version augmentée dans `package.json` (ligne 4) **et** `package-lock.json` (lignes 3 et 9), CLAUDE.md et bulles d'aide à jour, `npm test` et `npm run build` sans erreur, essai Playwright, commit puis envoi sur la branche de travail (`claude/exciting-mayer-eu1y9s`).
 - Publier site + APK (seulement sur demande) : PR vers `main`, attendre « construire » et « apk » au vert, fusionner, puis `git fetch origin main && git merge --ff-only origin/main`. Jamais de rebase ni de force-push. Si « apk » échoue avec « a release with the same tag name already exists » : relancer le job une fois.
-- **Windows** : `…/releases/download/windows-derniere-version/Topo.exe` (aussi `Topo-<version>.exe`) ; fabriqué **à la main** (Actions › « Fabriquer l'appli Windows ») ou quand `windows/Topo/**` change ; jamais par un envoi ordinaire.
+- **Windows** : `…/releases/download/windows-derniere-version/Topo.exe` (aussi `Topo-<version>.exe`) ; fabriqué à chaque envoi qui change `package.json` (nouvelle version, décision du 18.11) ou `windows/Topo/**`, ou à la main (Actions › « Fabriquer l'appli Windows ») ; un envoi sans changement de version (ex. CLAUDE.md seul) ne le refait pas. Après chaque livraison : vérifier que « apk » ET « Fabriquer l'appli Windows » sont au vert, au même numéro.
 - APK : `…/releases/download/apk-derniere-version/Topo.apk` (lien fixe, + `Topo-<version>.apk`).
-- **Publié** : tout jusqu'à la 0.263.0 (PR 99, 17.11 : site, APK et Topo.exe fabriqué depuis `main`). **Non publié (site)** : 0.264.0 → 0.270.1. **Attention : `apk.yml` refait et publie `Topo.apk` à CHAQUE envoi, même sur la branche de travail** (vu le 17.11 : l'APK 0.269.0 était publiée sans PR) : l'APK suit donc toujours la branche. Topo.exe 0.269.0 fabriqué à la main le 17.11 (demande), puis 0.270.0 (pont-windows.js touché), puis 0.270.1 à la main le 18.11 (demande : correction du défilement). **Attention** : `windows.yml` se lance à CHAQUE envoi qui touche `windows/Topo/**`, même sur la branche de travail, et publie alors Topo.exe : l'arrêter (Actions › annuler) si l'utilisateur n'a pas demandé Windows (fait pour 0.266.0 et 0.267.0).
+- **Publié** : tout jusqu'à la 0.263.0 (PR 99, 17.11 : site, APK et Topo.exe fabriqué depuis `main`). **Non publié (site)** : 0.264.0 → 0.270.1. **Attention : `apk.yml` refait et publie `Topo.apk` à CHAQUE envoi, même sur la branche de travail** (vu le 17.11 : l'APK 0.269.0 était publiée sans PR) : l'APK suit donc toujours la branche. Topo.exe 0.269.0 fabriqué à la main le 17.11 (demande), puis 0.270.0 (pont-windows.js touché), puis 0.270.1 à la main le 18.11 (demande : correction du défilement). Depuis le 18.11, Topo.exe suit chaque version (ne plus annuler `windows.yml`).
 
 ## Conventions de code
 - **Découpage de `main.js`** : petit à petit, au fil des demandes (jamais en gros) ; même comportement, avec tests et essai Playwright.
@@ -230,7 +230,7 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - Plus anciens : Guidage (Grader à 2 GNSS, râteau), talus d'une surface avec une vraie plateforme Mensura, LandXML dans Mensura, Plan PDF réels, Surface Swisstopo (CORS, GeoTIFF), cadastre Vaud (source à remplacer si « service en panne » dure), clavier réel, appui long avec gants, batterie en arrière-plan.
 
 ## Décisions de l'utilisateur à ne pas remettre en cause
-- Tablettes Android en portrait ; Windows en paysage, sur demande seulement ; APK d'abord.
+- Tablettes Android en portrait ; Windows en paysage ; APK d'abord ; **même numéro de version pour l'APK et Topo.exe** (18.11).
 - FE (fil d'eau) = bas **extérieur** du tuyau ; tolérances Contrôle 2 cm / 4 cm ; contrôle d'un plan 2 / 15 mm ; palier orange d'Implanter › Ligne 2 / 5 cm ; « 5 s = 6 lectures » voulu.
 - Lever en Base = Chantier seulement ; tablette neuve toujours lancée par un Expert ; mesure de durée dès Intermédiaire.
 - Audit du 15–16.11 (`docs/audit-2026-11/presentation.html`) : **lot 1 (boutons à 44 px partout) refusé** ; lots 2 à 9 faits (0.240 → 0.247) ; tuile Lever gardée en texte blanc ; retour ambre de Réglages et d'Implanter gardé ; thème « Plein soleil » supprimé.
