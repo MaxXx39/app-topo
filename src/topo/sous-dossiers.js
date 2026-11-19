@@ -13,8 +13,8 @@ import { lireListesPartagees, ecrireListesPartagees } from '../reglages/listes-p
 export const SOUS_DOSSIERS_DEPART = ['TER.', 'CANA', 'TS', 'AMEX', 'BAT', 'SITU', 'PIC', 'PERRIN1', 'PERRIN2', 'GEOOFF', 'GEOPERRIN', 'OLD', 'Autre'];
 /** Dossier « Autre » (0.261.0) : toujours le dernier de la liste (remplace la puce « Sans dossier »). */
 export const DOSSIER_AUTRE = 'Autre';
-// 15 couleurs distinctes, dans l'ordre de la liste (les dossiers ajoutés ensuite reprennent la 1re, etc.).
-const COULEURS = ['#6b7280', '#7c3aed', '#a16207', '#1d4ed8', '#ea580c', '#84cc16', '#0ea5e9', '#db2777', '#991b1b', '#eab308', '#0f766e', '#111827', '#be185d', '#0369a1', '#65a30d'];
+// 15 couleurs distinctes (0.271.0 : choix de l'utilisateur pour les 13 premiers), dans l'ordre de la liste (les dossiers ajoutés ensuite reprennent la 1re, etc.).
+const COULEURS = ['#a0480d', '#5347f5', '#eb9c2d', '#03ab24', '#ff5900', '#84cc16', '#0ea5e9', '#ffcf24', '#fee567', '#ec3636', '#0a008f', '#dedede', '#666666', '#0369a1', '#65a30d'];
 
 /** Anciens types de plans (avant les dossiers) → nom du dossier de départ qui les remplace (comparaison sans tenir compte des majuscules). */
 const ANCIENS_NOMS = { ter: 'TER.', 'bât': 'BAT', 'bat': 'BAT', 'bât radier': 'BAT-Rad.', 'bât/ss': 'BAT-SS', 'bât/rez': 'BAT-REZ' };
@@ -43,7 +43,8 @@ export function nettoyerSousDossiers(texteOuListe) {
 export function lireSousDossiers(projet = null, listes = lireListesPartagees()) {
   const propres = nettoyerSousDossiers(listes?.sousDossiers ?? []);
   const noms = propres.length > 0 ? propres : [...SOUS_DOSSIERS_DEPART];
-  for (const nom of sousDossiersUtilises(projet)) if (!noms.some((n) => n.toLowerCase() === nom.toLowerCase())) noms.push(nom);
+  // 0.272.1 : dossiers créés dans CE projet (jamais envoyés aux autres projets) ; puis ceux déjà utilisés par des éléments.
+  for (const nom of [...nettoyerSousDossiers(projet?.sousDossiersPropres ?? []), ...sousDossiersUtilises(projet)]) if (!noms.some((n) => n.toLowerCase() === nom.toLowerCase())) noms.push(nom);
   // « Autre » toujours en bas de la liste.
   const sansAutre = noms.filter((n) => n.toLowerCase() !== DOSSIER_AUTRE.toLowerCase());
   noms.splice(0, noms.length, ...sansAutre, DOSSIER_AUTRE);
@@ -71,6 +72,16 @@ export function pastilleSousDossier(nom, liste) {
 /** Couleur de la pastille d'un sous-dossier (gris s'il n'est plus dans la liste). */
 export function couleurDuSousDossier(nom, liste) {
   return liste.find((d) => d.nom === nom)?.couleur ?? '#6b7280';
+}
+
+/** Ajoute un dossier réservé à CE projet (rien n'est écrit dans les listes partagées). Renvoie le nom retenu ou ''. */
+export function ajouterSousDossierProjet(projet, nom) {
+  const propre = nettoyerSousDossiers([nom])[0];
+  if (!propre || !projet) return '';
+  const existant = lireSousDossiers(projet).find((d) => d.nom.toLowerCase() === propre.toLowerCase());
+  if (existant) return existant.nom;
+  projet.sousDossiersPropres = [...nettoyerSousDossiers(projet.sousDossiersPropres ?? []), propre];
+  return propre;
 }
 
 /** Enregistre la liste des sous-dossiers dans les listes partagées (envoyée sur Drive à tous les appareils). */

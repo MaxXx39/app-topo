@@ -18,6 +18,8 @@ data class ReglagesNtrip(
     val pointDeMontage: String,
     val utilisateur: String,
     val motDePasse: String,
+    /** Essai 0.272.0 (Stonex S800 / S900) : n'envoyer au récepteur que des messages RTCM entiers, un par un. Faux = comme avant (Emlid). */
+    val messagesEntiers: Boolean = false,
 ) {
     /** Ce qui manque pour se connecter (texte à afficher), ou null si tout est rempli. */
     fun manque(): String? = when {
