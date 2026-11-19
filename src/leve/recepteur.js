@@ -73,6 +73,11 @@ export function creerBoutonRecepteur(nav, actions) {
       const numero = evenement.target.closest('[data-numero]')?.dataset.numero ?? '1';
       if (champ && champ !== 'motDePasse') saisie[numero][champ] = evenement.target.value;
     });
+    fenetre.addEventListener('change', (evenement) => {
+      if (evenement.target.dataset.correctionCase !== 'messagesEntiers') return;
+      const numero = evenement.target.closest('[data-numero]')?.dataset.numero ?? '1';
+      saisie[numero].messagesEntiers = evenement.target.checked;
+    });
     // Réglage swipos choisi dans la liste partagée : il remplit les cases (puis « Démarrer »).
     fenetre.addEventListener('change', (evenement) => {
       const champ = evenement.target.dataset.champ;
@@ -87,7 +92,7 @@ export function creerBoutonRecepteur(nav, actions) {
       if (!choisi) return;
       // Choix direct (0.84.0, sans code) : la connexion démarre tout de suite avec ce réglage.
       if (champ === 'swipos-direct') {
-        const reglagesChoisis = { hote: choisi.hote, port: choisi.port, pointDeMontage: choisi.pointDeMontage, utilisateur: choisi.utilisateur, motDePasse: choisi.motDePasse };
+        const reglagesChoisis = { hote: choisi.hote, port: choisi.port, pointDeMontage: choisi.pointDeMontage, utilisateur: choisi.utilisateur, motDePasse: choisi.motDePasse, messagesEntiers: Boolean((numero === '2' ? actions.lireReglagesCorrections2 : actions.lireReglagesCorrections)?.()?.messagesEntiers) };
         if (numero === '2') actions.demarrerCorrections2(reglagesChoisis);
         else actions.demarrerCorrections(reglagesChoisis);
         setTimeout(dessiner, 300);
@@ -141,6 +146,7 @@ export function creerBoutonRecepteur(nav, actions) {
         pointDeMontage: lire('pointDeMontage'),
         utilisateur: lire('utilisateur'),
         motDePasse: bloc.querySelector('[data-correction="motDePasse"]')?.value ?? '',
+        messagesEntiers: Boolean(bloc.querySelector('[data-correction-case="messagesEntiers"]')?.checked),
       };
       if (numero === '2') actions.demarrerCorrections2(reglages);
       else actions.demarrerCorrections(reglages);
@@ -178,7 +184,7 @@ export function creerBoutonRecepteur(nav, actions) {
     const lire = numero === 2 ? actions.lireReglagesCorrections2 : actions.lireReglagesCorrections;
     const reglages = lire?.();
     if (!reglages?.hote) return;
-    const relance = { hote: reglages.hote, port: reglages.port, pointDeMontage: reglages.pointDeMontage, utilisateur: reglages.utilisateur, motDePasse: '' };
+    const relance = { hote: reglages.hote, port: reglages.port, pointDeMontage: reglages.pointDeMontage, utilisateur: reglages.utilisateur, motDePasse: '', messagesEntiers: Boolean(reglages.messagesEntiers) };
     if (numero === 2) actions.demarrerCorrections2(relance);
     else actions.demarrerCorrections(relance);
     setTimeout(dessiner, 300);
@@ -265,6 +271,7 @@ export function creerBoutonRecepteur(nav, actions) {
         <label>Identifiant<input type="text" data-correction="utilisateur" value="${valeur('utilisateur')}" autocapitalize="off" spellcheck="false" autocomplete="off" /></label>
         <label>Mot de passe<input type="password" data-correction="motDePasse" value="${echapper(motDePasseChoisi[numero])}" placeholder="${reglages.motDePasseEnregistre ? 'enregistré' : ''}" autocomplete="off" /></label>
       </div>
+      <label class="ligne-case"><input type="checkbox" data-correction-case="messagesEntiers" ${(saisie[numero].messagesEntiers ?? reglages.messagesEntiers) ? 'checked' : ''} /> Messages RTCM entiers (Stonex) ${bulle('messagesEntiers')}</label>
       <div class="ligne-outils">
         <button type="button" class="bouton-secondaire" data-action="demarrerCorrections">${reglages.actives ? 'Redémarrer' : 'Démarrer'}</button>
         ${reglages.actives ? '<button type="button" class="bouton-lien" data-action="arreterCorrections">arrêter (retour à Emlid Flow)</button>' : ''}

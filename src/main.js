@@ -15,7 +15,7 @@ import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { bornesMaquette, couleurCalqueIfc } from './topo/ifc.js';
 import { estPlanIfc, lireChoixCoupeIfc, enregistrerChoixCoupeIfc, niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, arrondiRecepteur, objetsIfcSurCoupe, objetsIfcLeLong, signatureIfc, objetIfcEn } from './plan/coupe-ifc.js';
 import { nuageDriveRouge } from './topo/etat-drive.js';
-import { lireSousDossiers, enregistrerSousDossiers, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
+import { lireSousDossiers, enregistrerSousDossiers, ajouterSousDossierProjet, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -1763,9 +1763,9 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
   sousDossiers: () => donneesSousDossiers(),
   choisirSousDossier: (nom) => choisirSousDossier(nom),
   nouveauSousDossier: async () => {
-    const nom = nettoyerSousDossiers((await demanderTexte({ titre: 'Nom du nouveau dossier', valeur: '' })) ?? '')[0];
+    const nom = ajouterSousDossierProjet(projet, (await demanderTexte({ titre: 'Nom du nouveau dossier (réservé à ce projet)', valeur: '' })) ?? '');
     if (!nom) return;
-    enregistrerSousDossiers([...lireSousDossiers(projet).map((d) => d.nom), nom]);
+    modifie();
     choisirSousDossier(nom);
   },
   sousApplisDe,
@@ -8048,6 +8048,7 @@ document.addEventListener('visibilitychange', () => {
 // DAO (0.147.0, Expert) : voir dao/dao.js ; créée après le plan (plus bas).
 let daoAppli = null;
 const plan = creerPlan(document.querySelector('#plan'), {
+  dossiersDuProjet: () => lireSousDossiers(projet),
   // Z sous la souris : altitude de la surface choisie dans Implanter (rien si pas de surface ou hors surface).
   altitudeEn: (est, nord) => {
     const chercheur = altitudeDeSurface(terrain.surfaceId);
@@ -8882,10 +8883,9 @@ function champSousDossier() {
 /** Dossiers de l'élément importé d'après ce que l'utilisateur a choisi (« ＋ Créer un dossier… » demande le nom et l'ajoute à la liste). */
 async function sousDossiersChoisis(valeur) {
   if (valeur === '__nouveau') {
-    const texte = await demanderTexte({ titre: 'Nom du nouveau dossier', valeur: '' });
-    const nom = nettoyerSousDossiers(texte ?? '')[0];
+    const nom = ajouterSousDossierProjet(projet, (await demanderTexte({ titre: 'Nom du nouveau dossier (réservé à ce projet)', valeur: '' })) ?? '');
     if (!nom) return [];
-    enregistrerSousDossiers([...lireSousDossiers(projet).map((d) => d.nom), nom]);
+    modifie();
     return [nom];
   }
   return valeur ? [valeur] : [];

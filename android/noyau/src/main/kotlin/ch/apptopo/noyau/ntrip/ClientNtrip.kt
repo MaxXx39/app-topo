@@ -105,6 +105,7 @@ class ClientNtrip(
                     }
                     is ReponseNtrip.Acceptee -> {
                         val remonteur = if (reponse.decoupe) Remonteur() else null
+                        val decoupeur = if (reglages.messagesEntiers) DecoupeurRtcm() else null // seulement si demandé : sinon rien ne change
                         changer(EtatNtrip("connexion", "connecté, en attente des corrections…", octets, heureDerniere))
                         var prochaineGga = 0L
                         val tampon = ByteArray(4096)
@@ -125,7 +126,8 @@ class ClientNtrip(
                             if (lus < 0) throw IOException("connexion fermée par le serveur")
                             val utiles = remonteur?.ajouter(tampon, lus) ?: tampon.copyOf(lus)
                             if (utiles.isEmpty()) continue
-                            surCorrections(utiles)
+                            if (decoupeur == null) surCorrections(utiles)
+                            else for (message in decoupeur.ajouter(utiles)) surCorrections(message) // un message entier par envoi
                             octets += utiles.size
                             heureDerniere = horloge()
                             if (etat.etat != "recoit") changer(EtatNtrip("recoit", "corrections reçues", octets, heureDerniere))

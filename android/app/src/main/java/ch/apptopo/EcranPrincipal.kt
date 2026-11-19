@@ -573,6 +573,7 @@ class EcranPrincipal : Activity() {
             pointDeMontage = p.getString("pointDeMontage", "") ?: "",
             utilisateur = p.getString("utilisateur", "") ?: "",
             motDePasse = p.getString("motDePasse", "") ?: "",
+            messagesEntiers = p.getBoolean("messagesEntiers", false),
         )
     }
 
@@ -588,6 +589,7 @@ class EcranPrincipal : Activity() {
             .put("pointDeMontage", r?.pointDeMontage ?: POINT_DE_MONTAGE_PROPOSE)
             .put("utilisateur", r?.utilisateur ?: "")
             .put("motDePasseEnregistre", !r?.motDePasse.isNullOrEmpty())
+            .put("messagesEntiers", r?.messagesEntiers ?: false)
             .put("actives", preferencesCorrections(numero).getBoolean(CLE_CORRECTIONS_ACTIVES, false))
             .toString()
     }
@@ -610,6 +612,8 @@ class EcranPrincipal : Activity() {
             pointDeMontage = lu.optString("pointDeMontage").trim(),
             utilisateur = lu.optString("utilisateur").trim(),
             motDePasse = lu.optString("motDePasse").ifEmpty { ancien?.motDePasse ?: "" },
+            // Absent (relance, choix swipos direct) : on garde le réglage enregistré.
+            messagesEntiers = lu.optBoolean("messagesEntiers", ancien?.messagesEntiers ?: false),
         )
         preferencesCorrections(numero).edit()
             .putString("hote", reglages.hote)
@@ -617,6 +621,7 @@ class EcranPrincipal : Activity() {
             .putString("pointDeMontage", reglages.pointDeMontage)
             .putString("utilisateur", reglages.utilisateur)
             .putString("motDePasse", reglages.motDePasse)
+            .putBoolean("messagesEntiers", reglages.messagesEntiers)
             .putBoolean(CLE_CORRECTIONS_ACTIVES, true)
             .apply()
         recepteurNumero(numero).corrections.demarrer(reglages)

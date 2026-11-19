@@ -136,7 +136,7 @@ const EQUIDISTANCES = ['auto', '0.1', '0.2', '0.25', '0.5', '1'];
 // chaque geste sur le plan (poser, bouger, relâcher, molette) remet le délai de 5 s à zéro.
 const DELAI_RETOUR_SUIVI = 5000;
 
-export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandChoisirDossiers, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn, lireCoupeIfc, quandChoisirCoupeIfc } = {}) {
+export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisirCalques, quandToucherPoint,quandToucherStock, quandToucherTriangle, quandToucherPosition, quandToucherMesure, quandToucherImplantation, quandToucherAnnotation, quandToucherFichePoint, quandToucherCalque, quandReglerPlanDxf, quandMontrerListe, quandChoisirDossiers, quandColorerListe, quandMontrerCalqueDxf, quandBasculerSeul, quandToucherPhoto, quandChangerZone, quandVoirLigne, quandCreerCoupe, quandDeplacerCoupe, peutDeplacerCoupe, altitudeEn, lireCoupeIfc, quandChoisirCoupeIfc, dossiersDuProjet } = {}) {
   // Réglage d'une liste : son choix, sinon celui de départ (en dessous d'Expert, les réglages d'Expert gardent leur valeur de départ).
   const reglageListe = (cle, id) => {
     const choix = id != null ? reglagesListe.get(id) : null;
@@ -2174,7 +2174,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
   }
   /** 0.260.0 : pastilles des dossiers d'une liste ; les toucher (Intermédiaire / Expert) ouvre la fenêtre de cases ; sans dossier : petit bouton « + dossier ». */
   const htmlDossiersCliquables = (id, noms = []) => {
-    const liste = lireSousDossiers();
+    const liste = dossiersDuProjet ? dossiersDuProjet() : lireSousDossiers();
     return noms.length > 0
       ? `<span class="dossiers-cliquables" data-dossiers-de="${id}">${noms.map((nom) => pastilleSousDossier(nom, liste)).join('')}</span>`
       : `<span class="dossiers-cliquables ajout-dossier seulement-intermediaire" data-dossiers-de="${id}">+ dossier</span>`;

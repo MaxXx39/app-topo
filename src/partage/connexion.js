@@ -25,10 +25,17 @@ export function connexionPossible() {
  * Crée la connexion. Renvoie { obtenirJeton(renouveler) } : promesse d'un jeton d'accès à Drive
  * (gardé tant qu'il est valable, environ 1 heure), ou une erreur lisible.
  */
-export function creerConnexion() {
+export function creerConnexion({ memoire = memoireNavigateur() } = {}) {
   let jeton = null;
   let finValidite = 0;
   let enCours = null;
+
+  // Navigateur seulement : le jeton encore valable est retrouvé après un rechargement de la page,
+  // pour ne pas rouvrir la fenêtre Google à chaque ouverture (Chrome la bloque sans toucher).
+  if (!estDansAppliAndroid()) {
+    const garde = lireJetonGarde(memoire);
+    if (garde) ({ jeton, finValidite } = garde);
+  }
 
   async function obtenirJeton(renouveler = false) {
     if (!renouveler && jeton && Date.now() < finValidite) return jeton;
@@ -37,6 +44,7 @@ export function creerConnexion() {
         jeton = nouveau;
         // Jeton Google : valable 1 heure ; on le renouvelle un peu avant.
         finValidite = Date.now() + 50 * 60 * 1000;
+        if (!estDansAppliAndroid()) garderJeton(memoire, jeton, finValidite);
         return jeton;
       })
       .finally(() => {
@@ -45,7 +53,52 @@ export function creerConnexion() {
     return enCours;
   }
 
-  return { obtenirJeton, oublier: () => (jeton = null) };
+  return {
+    obtenirJeton,
+    oublier: () => {
+      jeton = null;
+      finValidite = 0;
+      effacerJetonGarde(memoire);
+    },
+  };
+}
+
+const CLE_JETON = 'topo-jeton-drive';
+
+/** Mémoire de l'appareil (localStorage) ; null si elle n'est pas disponible. */
+function memoireNavigateur() {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Jeton gardé s'il est encore valable (sinon null). Jamais d'erreur. */
+export function lireJetonGarde(memoire, maintenant = Date.now()) {
+  try {
+    const garde = JSON.parse(memoire?.getItem(CLE_JETON) ?? 'null');
+    if (garde?.jeton && garde.finValidite > maintenant) return garde;
+  } catch {
+    // mémoire illisible : on redemandera un jeton
+  }
+  return null;
+}
+
+function garderJeton(memoire, jeton, finValidite) {
+  try {
+    memoire?.setItem(CLE_JETON, JSON.stringify({ jeton, finValidite }));
+  } catch {
+    // mémoire pleine ou bloquée : le jeton reste seulement en mémoire de la page
+  }
+}
+
+function effacerJetonGarde(memoire) {
+  try {
+    memoire?.removeItem(CLE_JETON);
+  } catch {
+    // rien à faire
+  }
 }
 
 // Réponse d'Android attendue 2 minutes au plus (choix du compte compris) : sans réponse, la
