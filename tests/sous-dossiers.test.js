@@ -225,3 +225,16 @@ describe('levés sans dossier (0.260.0)', () => {
     expect(estMontre(projet, { id: 'p1', sousDossiers: ['CANA'] }, 'plan', 'TER.')).toBe(false);
   });
 });
+
+describe('dossier réservé au projet (0.272.1)', () => {
+  it("un dossier créé dans un projet n'entre pas dans les listes partagées ni dans un autre projet", async () => {
+    const { ajouterSousDossierProjet, lireSousDossiers } = await import('../src/topo/sous-dossiers.js');
+    const a = { plansDxf: [], leves: [] };
+    const b = { plansDxf: [], leves: [] };
+    expect(ajouterSousDossierProjet(a, 'Cana Sous Sol')).toBe('Cana Sous Sol');
+    expect(lireSousDossiers(a, {}).map((d) => d.nom)).toContain('Cana Sous Sol');
+    expect(lireSousDossiers(b, {}).map((d) => d.nom)).not.toContain('Cana Sous Sol');
+    expect(ajouterSousDossierProjet(a, 'cana sous sol')).toBe('Cana Sous Sol');
+    expect(a.sousDossiersPropres).toEqual(['Cana Sous Sol']);
+  });
+});

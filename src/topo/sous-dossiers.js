@@ -43,7 +43,8 @@ export function nettoyerSousDossiers(texteOuListe) {
 export function lireSousDossiers(projet = null, listes = lireListesPartagees()) {
   const propres = nettoyerSousDossiers(listes?.sousDossiers ?? []);
   const noms = propres.length > 0 ? propres : [...SOUS_DOSSIERS_DEPART];
-  for (const nom of sousDossiersUtilises(projet)) if (!noms.some((n) => n.toLowerCase() === nom.toLowerCase())) noms.push(nom);
+  // 0.272.1 : dossiers créés dans CE projet (jamais envoyés aux autres projets) ; puis ceux déjà utilisés par des éléments.
+  for (const nom of [...nettoyerSousDossiers(projet?.sousDossiersPropres ?? []), ...sousDossiersUtilises(projet)]) if (!noms.some((n) => n.toLowerCase() === nom.toLowerCase())) noms.push(nom);
   // « Autre » toujours en bas de la liste.
   const sansAutre = noms.filter((n) => n.toLowerCase() !== DOSSIER_AUTRE.toLowerCase());
   noms.splice(0, noms.length, ...sansAutre, DOSSIER_AUTRE);
@@ -71,6 +72,16 @@ export function pastilleSousDossier(nom, liste) {
 /** Couleur de la pastille d'un sous-dossier (gris s'il n'est plus dans la liste). */
 export function couleurDuSousDossier(nom, liste) {
   return liste.find((d) => d.nom === nom)?.couleur ?? '#6b7280';
+}
+
+/** Ajoute un dossier réservé à CE projet (rien n'est écrit dans les listes partagées). Renvoie le nom retenu ou ''. */
+export function ajouterSousDossierProjet(projet, nom) {
+  const propre = nettoyerSousDossiers([nom])[0];
+  if (!propre || !projet) return '';
+  const existant = lireSousDossiers(projet).find((d) => d.nom.toLowerCase() === propre.toLowerCase());
+  if (existant) return existant.nom;
+  projet.sousDossiersPropres = [...nettoyerSousDossiers(projet.sousDossiersPropres ?? []), propre];
+  return propre;
 }
 
 /** Enregistre la liste des sous-dossiers dans les listes partagées (envoyée sur Drive à tous les appareils). */

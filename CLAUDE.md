@@ -125,6 +125,9 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Drive** : « App Topo › Configuration Projet » ; **une main par projet** (verrou 15 min) ; un appareil n'écrase jamais une version qu'il n'a pas reçue ; **listes partagées** fusionnées partie par partie (`listes-partagees.js`) ; dossiers de projets.
 - **Windows** (`Topo.exe`, jamais lancé sur un vrai Windows) : sert l'appli web à `https://topo.appli/app-topo/` (ne jamais changer l'adresse) et glisse `pont-windows.js` ; port COM, NTRIP, Drive par identifiant « bureau » (secrets `GOOGLE_BUREAU_ID` / `GOOGLE_BUREAU_SECRET` à créer par l'utilisateur), fichiers dans Documents › Topo › Envois, mise à jour par la release `windows-derniere-version`. Pas fait : appareil photo, touche volume −, vibreur, batterie.
 
+## 0.272.1 — dossiers créés dans un projet = réservés à ce projet (demande du 19.11)
+- « ＋ Créer un dossier » (page Applications et imports) range le nom dans `projet.sousDossiersPropres` (`ajouterSousDossierProjet`), plus dans les listes partagées Drive : les autres projets ne le voient pas. La liste de départ et « Dossiers du projet » (partagée, Expert) ne changent pas.
+
 ## 0.272.0 — « Messages RTCM entiers » pour Stonex S800 / S900 (essai du 18.11, APK seulement, rien essayé sur le terrain)
 - **Problème** (journaux NMEA du S800 et du S900, 18.11) : avec Topo en Bluetooth, le Stonex reste AUTONOME alors que SurvCE (même récepteur, même point de montage `MSM_GISGEO_LV95LHN95`) donne FIXE. Le journal contient des lignes `@GNSS,<octets illisibles>,ERROR,1*xx` : le Stonex parle un langage de commandes texte (`@GNSS,GET/SET,…*xx`, **somme de contrôle non retrouvée**) et lit des morceaux du flux RTCM comme des commandes ; « LEICA GR50 » (station de référence swipos, message RTCM 1033) y apparaît en clair.
 - **Hypothèse à vérifier** : Topo envoie le flux NTRIP en morceaux de taille quelconque (messages coupés en deux) ; SurvCE enverrait des messages entiers.
