@@ -15,7 +15,7 @@ import { texteDuDxf, lirePlanDxf, estEnMn95 } from './topo/dxf-plan.js';
 import { bornesMaquette, couleurCalqueIfc } from './topo/ifc.js';
 import { estPlanIfc, lireChoixCoupeIfc, enregistrerChoixCoupeIfc, niveauxDesIfc, altitudeCoupeIfc, planIfcCoupe, arrondiRecepteur, objetsIfcSurCoupe, objetsIfcLeLong, signatureIfc, objetIfcEn } from './plan/coupe-ifc.js';
 import { nuageDriveRouge } from './topo/etat-drive.js';
-import { lireSousDossiers, enregistrerSousDossiers, ajouterSousDossierProjet, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
+import { lireSousDossiers, enregistrerSousDossiers, ajouterSousDossierProjet, changerCouleurSousDossierProjet, retirerSousDossierProjet, estDossierDuProjet, COULEURS_CHOIX, nettoyerSousDossiers, sousDossiersUtilises, typesVersSousDossiers, basculerSousDossier, sousDossierChoisi, definirSousDossier, texteSur, retenirChoix, lireChoix, dansSousDossier, SANS_SOUS_DOSSIER, elementsRangeables, idsHorsSousDossier, estMontre, estDansSousDossier, definirFiltreApplications, suffixeDossiers, sousDossiersEffectifs } from './topo/sous-dossiers.js';
 import { dxfDuPdf, lireEchelle, PREFIXE_PDF } from './topo/pdf-dxf.js';
 import { chargerPdfjs, ouvrirPdf, contenuDeLaPage, imageDeLaPage } from './import/pdf.js';
 import { NETTETES, NETTETE_DEPART, facteurDeRendu, planImagePdf } from './topo/pdf-image.js';
@@ -156,7 +156,7 @@ import { noterAffichage, appliquerAffichage } from './projet/affichage-appareil.
 import { listesDePoints, pointsDesListes, montrerListe, cacherListe, mesuresVisibles, couleursDesPoints, listeDesPoints, pointsDesImports, planDuCadastre, lierCadastres, listesCadastre, listesSurfacesImportees, COULEUR_CADASTRE, LISTE_CONTROLE, LISTE_MESURES } from './plan/listes-points.js';
 import { calculerHelmert, planRecale, calageParAxes, echelleParDeuxPoints, recalerContenu } from './topo/recalage.js';
 import { nomSuivant, nomPrecedent } from './topo/noms.js';
-import { demanderCases, demanderChamps, demanderChoix, demanderTexte } from './outils/choix.js';
+import { demanderCases, demanderChamps, demanderChoix, demanderTexte, demanderDossier } from './outils/choix.js';
 import { demanderCode } from './outils/code.js';
 import { genererDxfPlan, octetsDxf } from './export/dxf-recale.js';
 import { dessinerPlansDxf } from './plan/dxf-canvas.js';
@@ -1763,11 +1763,12 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
   sousDossiers: () => donneesSousDossiers(),
   choisirSousDossier: (nom) => choisirSousDossier(nom),
   nouveauSousDossier: async () => {
-    const nom = ajouterSousDossierProjet(projet, (await demanderTexte({ titre: 'Nom du nouveau dossier (réservé à ce projet)', valeur: '' })) ?? '');
+    const nom = await creerDossierDuProjet();
     if (!nom) return;
-    modifie();
     choisirSousDossier(nom);
   },
+  // 0.272.3 : appui long sur la puce d'un dossier réservé au projet (Expert) : changer sa couleur ou le supprimer.
+  modifierSousDossier: (nom) => modifierDossierDuProjet(nom),
   sousApplisDe,
   reglages: () => ouvrirFenetreReglages(),
   // 0.216.0 : carte de tous les projets (bouton à gauche de « Changer »).
@@ -8883,12 +8884,42 @@ function champSousDossier() {
 /** Dossiers de l'élément importé d'après ce que l'utilisateur a choisi (« ＋ Créer un dossier… » demande le nom et l'ajoute à la liste). */
 async function sousDossiersChoisis(valeur) {
   if (valeur === '__nouveau') {
-    const nom = ajouterSousDossierProjet(projet, (await demanderTexte({ titre: 'Nom du nouveau dossier (réservé à ce projet)', valeur: '' })) ?? '');
-    if (!nom) return [];
-    modifie();
-    return [nom];
+    const nom = await creerDossierDuProjet();
+    return nom ? [nom] : [];
   }
   return valeur ? [valeur] : [];
+}
+
+/** Fenêtre « nouveau dossier réservé à ce projet » : nom + couleur à toucher. Renvoie le nom retenu ou ''. */
+async function creerDossierDuProjet() {
+  const reponse = await demanderDossier({ titre: 'Nouveau dossier (réservé à ce projet)', nom: '', couleurs: COULEURS_CHOIX });
+  if (!reponse?.nom) return '';
+  const nom = ajouterSousDossierProjet(projet, reponse.nom, reponse.couleur);
+  if (nom) modifie();
+  return nom;
+}
+
+/** Fenêtre d'un dossier réservé au projet : changer la couleur, ou le supprimer (les éléments rangés restent, sans ce dossier). */
+async function modifierDossierDuProjet(nom) {
+  if (!aAcces('expert') || !estDossierDuProjet(projet, nom)) return;
+  const actuel = lireSousDossiers(projet).find((d) => d.nom === nom);
+  const reponse = await demanderDossier({ titre: `Dossier « ${nom} »`, couleur: actuel?.couleur, couleurs: COULEURS_CHOIX, suppression: true });
+  if (!reponse) return;
+  if (reponse.supprimer) {
+    const nb = elementsRangeables(projet).filter(({ element }) => (element.sousDossiers ?? []).includes(nom)).length;
+    const choix = await demanderChoix({
+      titre: `Supprimer le dossier « ${nom} » ?`,
+      texte: nb > 0 ? `${nb} élément${nb > 1 ? 's' : ''} rangé${nb > 1 ? 's' : ''} dedans ${nb > 1 ? 'restent' : 'reste'} dans le projet, sans ce dossier.` : 'Il est vide.',
+      boutons: [{ cle: 'oui', texte: 'Supprimer', principal: true }, { cle: 'non', texte: 'Garder' }],
+    });
+    if (choix !== 'oui') return;
+    retirerSousDossierProjet(projet, nom);
+    if (sousDossierChoisi() === nom) choisirSousDossier('');
+    modifie();
+    afficherMessage(`Dossier « ${nom} » supprimé`, 3000, { ok: true });
+    return;
+  }
+  if (changerCouleurSousDossierProjet(projet, nom, reponse.couleur)) modifie();
 }
 
 /** Identifiants masqués sur le plan : les listes décochées (le dossier choisi les a décochées, voir appliquerDossierALAffichage). */
@@ -8902,7 +8933,7 @@ function donneesSousDossiers() {
   const nb = new Map(liste.map((d) => [d.nom, elementsRangeables(projet).filter(({ element }) => (element.sousDossiers ?? []).includes(d.nom)).length]));
   return {
     choisi: sousDossierChoisi(),
-    liste: liste.map((d) => ({ ...d, nombre: nb.get(d.nom) })),
+    liste: liste.map((d) => ({ ...d, nombre: nb.get(d.nom), propre: aAcces('expert') && estDossierDuProjet(projet, d.nom) })),
     visible: aAcces('expert') || sousDossiersUtilises(projet).size > 0,
     peutCreer: aAcces('expert'),
   };

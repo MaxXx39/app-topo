@@ -48,7 +48,17 @@ export function lireSousDossiers(projet = null, listes = lireListesPartagees()) 
   // « Autre » toujours en bas de la liste.
   const sansAutre = noms.filter((n) => n.toLowerCase() !== DOSSIER_AUTRE.toLowerCase());
   noms.splice(0, noms.length, ...sansAutre, DOSSIER_AUTRE);
-  return noms.map((nom, i) => ({ nom, couleur: COULEURS[i % COULEURS.length] }));
+  // 0.272.3 : couleur choisie pour un dossier réservé à ce projet (projet.couleursDossiers), sinon celle de la palette.
+  const choisies = projet?.couleursDossiers ?? {};
+  return noms.map((nom, i) => ({ nom, couleur: choisies[nom] ?? COULEURS[i % COULEURS.length] }));
+}
+
+/** Couleurs proposées pour un dossier réservé au projet (les 13 de départ + 2 de rechange). */
+export const COULEURS_CHOIX = COULEURS;
+
+/** Vrai si le dossier a été créé dans CE projet (donc modifiable et supprimable). */
+export function estDossierDuProjet(projet, nom) {
+  return nettoyerSousDossiers(projet?.sousDossiersPropres ?? []).some((n) => n.toLowerCase() === String(nom).toLowerCase());
 }
 
 /** Couleur de texte lisible (noir ou blanc) sur un fond « #rrggbb » : luminance relative, seuil à 0,45 (0.252.0 : texte blanc illisible sur les fonds clairs). */
@@ -75,13 +85,41 @@ export function couleurDuSousDossier(nom, liste) {
 }
 
 /** Ajoute un dossier réservé à CE projet (rien n'est écrit dans les listes partagées). Renvoie le nom retenu ou ''. */
-export function ajouterSousDossierProjet(projet, nom) {
+export function ajouterSousDossierProjet(projet, nom, couleur = '') {
   const propre = nettoyerSousDossiers([nom])[0];
   if (!propre || !projet) return '';
   const existant = lireSousDossiers(projet).find((d) => d.nom.toLowerCase() === propre.toLowerCase());
   if (existant) return existant.nom;
   projet.sousDossiersPropres = [...nettoyerSousDossiers(projet.sousDossiersPropres ?? []), propre];
+  if (couleur) changerCouleurSousDossierProjet(projet, propre, couleur);
   return propre;
+}
+
+/** Change la couleur d'un dossier réservé au projet (« #rrggbb »). Renvoie vrai si c'est fait. */
+export function changerCouleurSousDossierProjet(projet, nom, couleur) {
+  if (!projet || !estDossierDuProjet(projet, nom) || !/^#[0-9a-f]{6}$/i.test(String(couleur))) return false;
+  projet.couleursDossiers = { ...(projet.couleursDossiers ?? {}), [nom]: couleur };
+  return true;
+}
+
+/**
+ * Supprime un dossier réservé au projet : il est retiré de la liste et de tous les éléments qui y étaient rangés
+ * (ils restent dans le projet, ils perdent seulement ce dossier). Renvoie le nombre d'éléments qui le perdent, ou -1 si ce n'est pas un dossier du projet.
+ */
+export function retirerSousDossierProjet(projet, nom) {
+  if (!projet || !estDossierDuProjet(projet, nom)) return -1;
+  const meme = (n) => String(n).toLowerCase() === String(nom).toLowerCase();
+  projet.sousDossiersPropres = nettoyerSousDossiers(projet.sousDossiersPropres ?? []).filter((n) => !meme(n));
+  if (projet.couleursDossiers) delete projet.couleursDossiers[Object.keys(projet.couleursDossiers).find(meme) ?? ''];
+  let touches = 0;
+  for (const { element } of elementsRangeables(projet)) {
+    const avant = element.sousDossiers ?? [];
+    if (!avant.some(meme)) continue;
+    element.sousDossiers = avant.filter((n) => !meme(n));
+    if (element.sousDossiers.length === 0) delete element.sousDossiers;
+    touches++;
+  }
+  return touches;
 }
 
 /** Enregistre la liste des sous-dossiers dans les listes partagées (envoyée sur Drive à tous les appareils). */

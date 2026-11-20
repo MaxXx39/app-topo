@@ -98,6 +98,19 @@ export function creerNavigation(nav, actions) {
   }
   page.addEventListener('click', quandClicPage);
   page.addEventListener('pointerdown', debutDeplacement);
+  // 0.272.3 : appui long sur la puce d'un dossier réservé au projet : couleur / suppression.
+  let minuterieDossier = null;
+  page.addEventListener('pointerdown', (evenement) => {
+    const puce = evenement.target.closest('[data-propre]');
+    if (!puce) return;
+    clearTimeout(minuterieDossier);
+    minuterieDossier = setTimeout(() => {
+      appuiLongFait = true;
+      setTimeout(() => { appuiLongFait = false; }, 400);
+      actions.modifierSousDossier?.(puce.dataset.dossier);
+    }, 600);
+  });
+  for (const fin of ['pointerup', 'pointercancel', 'pointermove']) page.addEventListener(fin, () => clearTimeout(minuterieDossier));
   page.addEventListener('pointermove', suiteDeplacement);
   for (const fin of ['pointerup', 'pointercancel']) page.addEventListener(fin, finDeplacement);
   // Pendant un déplacement, le doigt ne fait pas défiler la page.
@@ -381,7 +394,7 @@ export function creerNavigation(nav, actions) {
     const puces = dossiers?.visible
       ? `<div class="puces-dossiers" role="group" aria-label="Dossier du projet">
           ${remplis.length > 0 ? `<button type="button" class="puce-dossier ${dossiers.choisi === '' ? 'actif' : ''}" data-dossier="" aria-pressed="${dossiers.choisi === ''}">Tout</button>` : ''}
-          ${remplis.map((d) => `<button type="button" class="puce-dossier ${dossiers.choisi === d.nom ? 'actif' : ''}" data-dossier="${echapper(d.nom)}" aria-pressed="${dossiers.choisi === d.nom}"><i style="background: ${d.couleur}"></i>${echapper(d.nom)}</button>`).join('')}
+          ${remplis.map((d) => `<button type="button" class="puce-dossier ${dossiers.choisi === d.nom ? 'actif' : ''}" data-dossier="${echapper(d.nom)}"${d.propre ? ' data-propre' : ''} aria-pressed="${dossiers.choisi === d.nom}"><i style="background: ${d.couleur}"></i>${echapper(d.nom)}</button>`).join('')}
           ${dossiers.peutCreer ? '<button type="button" class="puce-dossier nouveau-dossier" data-dossier-nouveau aria-label="Nouveau dossier" title="Nouveau dossier">＋</button>' : ''}
         </div>`
       : '';
