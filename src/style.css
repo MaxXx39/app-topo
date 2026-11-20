@@ -14239,3 +14239,10 @@ body.appli-windows .ligne-case { display: none; }
     z-index: 12;
   }
 }
+
+/* 0.273.0 (demande du 20.11) : plus de raccourcis (Stock, Terrain, Point…) dans les tuiles de la page Applications, sauf le bouton
+   « liste de points » : tuiles beaucoup plus basses, sur tous les supports (Android, site, Windows). */
+.tuile-appli, body.mode-telephone .tuile-appli { min-height: 0; padding: 6px 8px 8px; gap: 2px; justify-content: center; }
+.tuile-appli .tete-tuile { min-height: 44px; display: flex; align-items: center; }
+.tuile-appli .nom-et-icone { width: 100%; }
+body.mode-telephone .tuile-appli .tete-tuile { min-height: 38px; }

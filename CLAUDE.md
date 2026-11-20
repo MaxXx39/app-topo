@@ -131,6 +131,7 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Bouton ⇄** (Windows, Implanter › Point ; `.bouton-inverser-cible`, `body.cible-inversee`) : inverse la cible et le plan ; inversé, la cible entre dans la petite boîte bas gauche (220 px) et le plan prend la grande place. Remplace « toucher l'encart ». Essayé en Playwright.
 - **Photo** : `outils/camera-windows.js` (branché dans `main.js` sous Windows) : un bouton photo ouvre une **fenêtre avec la caméra** (`getUserMedia`, WebView2 demande l'autorisation la 1re fois) ; « Prendre la photo » donne un JPEG au champ comme l'appareil photo d'Android. Si la caméra manque : message + « Choisir un fichier ». Test `camera-windows.test.js` ; essayé en Playwright avec une fausse caméra, **jamais sur la CC180**.
 - **« Vol − » retiré sous Windows** (bouton Enreg. du Lever, de la bande, de Mesure rapide, gros bouton d'Implanter).
+- **Tuiles de la page Applications, tous supports (demande du 20.11)** : **plus de raccourcis** (Stock, Terrain, Point… ; `sous-tuile` retiré de `bande.js`), seulement le bouton « liste de points » ; tuiles beaucoup plus basses (fin de `style.css`). Les petits textes (« Aucun contrôle », comptes) restent.
 - **Page Applications sous Windows** : cadre du projet, boutons du projet (icône à côté du texte), puces de dossiers, tuiles et pied plus bas : **2 lignes d'applications visibles** (1113 × 696 simulé).
 
 ## 0.272.3 — dossier réservé au projet : couleur au choix et suppression (demande du 20.11, **Expert**, à essayer sur la tablette)

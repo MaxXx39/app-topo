@@ -32,7 +32,7 @@ const svg = (trace) => `<svg viewBox="0 0 24 24" aria-hidden="true">${trace}</sv
  * - changerProjet(), nouveauProjet() (ou null si le mode ne le permet pas) ;
  * - comptes() : ligne en petit sous Import / Exporter / Contenu (ex. « 3 levés · 2 DXF ») ; detailTuile(cle) :
  *   ligne en petit sous le nom d'une tuile (ex. date du dernier contrôle) ;
- * - sousApplisDe(cle) : [[cle, titre]] écrites en petit sur la tuile (toucher = ouvrir dessus) ;
+ * - sousApplisDe(cle) : plus affichées sur les tuiles depuis la 0.273.0 (la fonction reste fournie par main.js, sans effet) ;
  * - reglages(), fermerAppli (ou null : pas de bouton) : pied de la page Applications ; avantPage() : juste
  *   avant d'ouvrir la page (fermer la page des réglages) ;
  * - partieProjet('import' | 'export' | 'points' | 'plans' | 'surfaces' | 'archives') : page Projet ouverte sur cette partie ; importPermis() ;
@@ -429,10 +429,6 @@ export function creerNavigation(nav, actions) {
             ${(() => {
               const detail = actions.detailTuile?.(a.cle) ?? '';
               return detail ? `<small class="detail-tuile">${echapper(detail)}</small>` : '';
-            })()}
-            ${(() => {
-              const sous = actions.sousApplisDe?.(a.cle) ?? [];
-              return sous.length > 0 ? `<span class="sous-tuile">${sous.map(([c, t]) => `<button type="button" data-sous="${c}">${echapper(t)}</button>`).join('')}</span>` : '';
             })()}
             <button type="button" class="coche-favori ${favoris.includes(a.cle) ? 'coche' : ''}" data-favori="${a.cle}"
               aria-pressed="${favoris.includes(a.cle)}" aria-label="Favori de la roue">★</button>
