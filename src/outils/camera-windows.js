@@ -29,6 +29,7 @@ export async function ouvrirCamera(champ) {
       <p class="erreur-camera" hidden></p>
       <div class="boutons-camera">
         <button type="button" class="bouton" data-camera="prendre" disabled>Prendre la photo</button>
+        <button type="button" class="bouton" data-camera="changer" hidden>Changer de caméra</button>
         <button type="button" class="bouton" data-camera="fichier" hidden>Choisir un fichier</button>
         <button type="button" class="bouton" data-camera="fermer">Fermer</button>
       </div>
@@ -70,17 +71,55 @@ export async function ouvrirCamera(champ) {
       fermer();
     }, 'image/jpeg', 0.9);
   });
-  try {
-    flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-    if (!fond.isConnected) { flux.getTracks().forEach((t) => t.stop()); return; }
+  const changer = fond.querySelector('[data-camera="changer"]');
+  let cameras = []; // caméras de la tablette (avant, arrière…)
+  let numero = 0;
+
+  /** Démarre la caméra demandée (identifiant) ou, sans identifiant, celle de l'arrière si Windows sait la choisir. */
+  async function demarrer(id) {
+    flux?.getTracks().forEach((t) => t.stop());
+    const video_ = id ? { deviceId: { exact: id } } : { facingMode: { ideal: 'environment' } };
+    flux = await navigator.mediaDevices.getUserMedia({ video: video_, audio: false });
+    if (!fond.isConnected) { flux.getTracks().forEach((t) => t.stop()); return false; }
     video.srcObject = flux;
     await video.play().catch(() => {});
     prendre.disabled = false;
+    return true;
+  }
+
+  try {
+    // Caméra gardée au dernier usage, sinon l'arrière si elle se reconnaît.
+    let id = null;
+    try { id = localStorage.getItem('topo-camera') || null; } catch { /* pas de stockage : tant pis */ }
+    try { if (!(await demarrer(id))) return; } catch { if (!(await demarrer(null))) return; }
+    // Les noms des caméras ne sont connus qu'après l'autorisation.
+    cameras = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+    const actuelle = flux.getVideoTracks()[0]?.getSettings?.().deviceId;
+    numero = Math.max(0, cameras.findIndex((c) => c.deviceId === actuelle));
+    if (!id) {
+      const arriere = cameras.findIndex((c) => /back|rear|environment|arri[eè]re|world/i.test(c.label));
+      if (arriere >= 0 && arriere !== numero) {
+        numero = arriere;
+        await demarrer(cameras[numero].deviceId);
+      }
+    }
+    changer.hidden = cameras.length < 2;
   } catch (e) {
     erreur.textContent = `Pas d'accès à la caméra (${e?.message || e?.name || 'refusée ou absente'}). Autorise la caméra pour Topo dans Windows (Paramètres › Confidentialité › Caméra), ou choisis un fichier.`;
     erreur.hidden = false;
     fichier.hidden = false;
   }
+  changer.addEventListener('click', async () => {
+    if (cameras.length < 2) return;
+    numero = (numero + 1) % cameras.length;
+    try {
+      await demarrer(cameras[numero].deviceId);
+      try { localStorage.setItem('topo-camera', cameras[numero].deviceId); } catch { /* sans stockage : pas gardé */ }
+    } catch (e) {
+      erreur.textContent = `Cette caméra ne démarre pas (${e?.message || e?.name}).`;
+      erreur.hidden = false;
+    }
+  });
 }
 
 /** Branche tout : à appeler une fois, seulement sous Windows. */
