@@ -14131,3 +14131,8 @@ body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; mi
 .ligne-case { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 0.95rem; }
 .ligne-case input { width: 22px; height: 22px; flex: none; }
 body.appli-windows .ligne-case { display: none; }
+
+/* 0.272.3 : palette de couleurs d'un dossier réservé au projet. */
+.palette-dossier { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.palette-dossier .pastille-couleur { width: 40px; height: 40px; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.25); padding: 0; cursor: pointer; }
+.palette-dossier .pastille-couleur.actif { outline: 3px solid #0f2a43; outline-offset: 2px; }

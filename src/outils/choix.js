@@ -172,3 +172,59 @@ export function demanderCases({ titre, options }) {
     fenetre.showModal();
   });
 }
+
+/**
+ * Fenêtre « dossier réservé au projet » (0.272.3) : nom (si `nom` est donné, même vide), palette de couleurs à toucher,
+ * et « Supprimer ce dossier » si `suppression` est vrai. couleurs : liste de « #rrggbb ».
+ * Renvoie { nom, couleur } avec OK, { supprimer: true } avec Supprimer, ou null si annulé.
+ */
+export function demanderDossier({ titre, nom = null, couleur, couleurs, suppression = false }) {
+  return new Promise((resoudre) => {
+    let choisie = couleur ?? couleurs[0];
+    const fenetre = document.createElement('dialog');
+    fenetre.className = 'fenetre-choix';
+    fenetre.innerHTML = `
+      <h2>${echapper(titre)}</h2>
+      ${nom === null ? '' : `<div class="champ-prefixe"><input type="text" data-champ="texte" value="${echapper(nom)}" aria-label="Nom du dossier" /></div>`}
+      <div class="palette-dossier" role="radiogroup" aria-label="Couleur du dossier">
+        ${couleurs.map((c) => `<button type="button" class="pastille-couleur ${c === choisie ? 'actif' : ''}" data-couleur="${echapper(c)}" role="radio" aria-checked="${c === choisie}" aria-label="Couleur ${echapper(c)}" style="background: ${echapper(c)}"></button>`).join('')}
+      </div>
+      <div class="boutons-choix">
+        <button type="button" class="bouton" data-cle="ok"><strong>OK</strong></button>
+        ${suppression ? '<button type="button" class="bouton-secondaire" data-cle="supprimer"><strong>Supprimer ce dossier</strong></button>' : ''}
+        <button type="button" class="bouton-secondaire" data-cle="annuler"><strong>Annuler</strong></button>
+      </div>`;
+    const champ = fenetre.querySelector('input');
+    const finir = (cle) => {
+      const texte = champ ? champ.value.trim() : '';
+      fenetre.close();
+      if (cle === 'supprimer') return resoudre({ supprimer: true });
+      if (cle !== 'ok') return resoudre(null);
+      return resoudre({ nom: texte, couleur: choisie });
+    };
+    fenetre.addEventListener('click', (evenement) => {
+      const pastille = evenement.target.closest('[data-couleur]');
+      if (pastille) {
+        choisie = pastille.dataset.couleur;
+        for (const p of fenetre.querySelectorAll('[data-couleur]')) {
+          p.classList.toggle('actif', p === pastille);
+          p.setAttribute('aria-checked', String(p === pastille));
+        }
+        return;
+      }
+      const bouton = evenement.target.closest('button[data-cle]');
+      if (bouton) finir(bouton.dataset.cle);
+    });
+    champ?.addEventListener('keydown', (evenement) => {
+      if (evenement.key === 'Enter') finir('ok');
+    });
+    fenetre.addEventListener('cancel', (evenement) => {
+      evenement.preventDefault();
+      finir('annuler');
+    });
+    fenetre.addEventListener('close', () => fenetre.remove());
+    document.body.append(fenetre);
+    fenetre.showModal();
+    champ?.select();
+  });
+}
