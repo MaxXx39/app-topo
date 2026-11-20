@@ -124,9 +124,27 @@ import { regleToucheVolume, recepteurDisponible, ecouterRecepteur, choisirRecept
 import { correctionsTropAnciennes } from './topo/age-corrections.js';
 import { centreDePoints, MAX_POINTS_CENTRE } from './topo/centre-points.js';
 import { ICONES_LIGNE } from './outils/icones.js';
+import { brancherCameraWindows } from './outils/camera-windows.js';
 import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette, estDansAppliWindows } from './android/pont.js';
 // 0.267.0 : appli Windows (Topo.exe) : marque sur la page pour sa mise en page (panneau de gauche à 50 %, voir fin de style.css).
-if (estDansAppliWindows()) document.body.classList.add('appli-windows');
+if (estDansAppliWindows()) {
+  document.body.classList.add('appli-windows');
+  // 0.273.0 : bouton ⇄ d'Implanter › Point : inverse la cible (grande) et le plan (petit), voir « cible-inversee » dans style.css.
+  const boutonInverser = document.createElement('button');
+  boutonInverser.type = 'button';
+  boutonInverser.className = 'bouton-inverser-cible';
+  boutonInverser.textContent = '⇄';
+  boutonInverser.title = 'Inverser la cible et le plan';
+  boutonInverser.setAttribute('aria-label', 'Inverser la cible et le plan');
+  boutonInverser.addEventListener('click', () => {
+    document.body.classList.toggle('cible-inversee');
+    // le plan change de taille : on le recadre sur le point
+    window.dispatchEvent(new Event('resize'));
+    document.dispatchEvent(new CustomEvent('cible-en-haut'));
+  });
+  document.body.appendChild(boutonInverser);
+  brancherCameraWindows(); // 0.273.0 : le bouton photo ouvre la caméra (pas l'explorateur de fichiers)
+}
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { laserDisponible, choisirLaser, deconnecterLaser, mesurerLaser, ecouterLaser } from './android/pont.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
@@ -606,7 +624,7 @@ function contenuBande() {
         </div>`
       : '';
     const prendre = trouver('prendre');
-    const enreg = prendre ? boutonDeBande('prendre', 'Enreg. (Vol. −)', document.querySelector('#leve-direct .cadre-prise [data-champ="nom-point"]')?.value ?? '', prendre.disabled, 'Enreg.') : '';
+    const enreg = prendre ? boutonDeBande('prendre', estDansAppliWindows() ? 'Enreg.' : 'Enreg. (Vol. −)', document.querySelector('#leve-direct .cadre-prise [data-champ="nom-point"]')?.value ?? '', prendre.disabled, 'Enreg.') : '';
     return bloc || enreg ? `<div class="zone-levee">${bloc}${enreg}</div>` : '';
   }
   if (cle === 'implanter') {
@@ -863,7 +881,7 @@ function mesureRapideBande() {
     ${bouton('mesure-annuler', 'annuler', '↶ Annuler', dernier ? (dernier.nom || `point ${n}`) : '', n === 0)}
     ${bouton('mesure-raz', 'raz', 'RAZ', '', n === 0)}
     ${bouton('mesure-export', 'export', 'Export', '', n === 0)}
-    ${gnss ? bouton('mesure-gnss', 'relais-mesure-gnss', 'Enreg. (Vol −)', pret ? '' : 'RTK fixe + incl.', !pret, 'Enreg.') : ''}
+    ${gnss ? bouton('mesure-gnss', 'relais-mesure-gnss', (estDansAppliWindows() ? 'Enreg.' : 'Enreg. (Vol −)'), pret ? '' : 'RTK fixe + incl.', !pret, 'Enreg.') : ''}
   </div>`;
 }
 
@@ -4049,7 +4067,8 @@ document.querySelector('.panneau-plan [data-action="delta-plan"]')?.addEventList
 });
 // 0.151.0 : encart du plan déplaçable, + / −, toucher = plan en grand (voir plan/encart.js).
 creerEncartPlan(document.querySelector('.panneau-plan'), {
-  quandToucher: () => ecranLeve.planEnGrand(true),
+  // Windows (paysage) : la cible a sa place à droite, l'encart ne la remplace pas (0.273.0).
+  quandToucher: () => { if (!estDansAppliWindows()) ecranLeve.planEnGrand(true); },
   quandCible: () => ecranLeve.planEnGrand(false),
   zoomer: (facteur) => document.querySelector(`#plan [data-action="${facteur > 1 ? 'zoom-plus' : 'zoom-moins'}"]`)?.click(),
 });

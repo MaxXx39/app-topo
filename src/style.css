@@ -14047,7 +14047,7 @@ body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; mi
 /* 0.268.0 (demande du 17.11) : Implanter › Point sous Windows (paysage) : textes à gauche, CIBLE à droite à la place de la grande carte,
    avec le mini-plan « Plan » en encart en haut à droite de la cible, comme sur la tablette. */
 @media (min-width: 900px) {
-  body.appli-windows.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .cible-haut {
+  body.appli-windows.mode-leve.vue-implantation.cible-en-haut:not(.cible-inversee)[data-onglet='terrain'] .cible-haut {
     position: fixed;
     top: calc(var(--hauteur-entete) + 72px);
     left: calc(var(--largeur-panneau) + 32px);
@@ -14061,20 +14061,23 @@ body.mode-telephone .pastille-hors-ligne { top: 4px; right: 6px; width: 60px; mi
     background: #ffffff;
     box-shadow: var(--ombre);
   }
+  body.appli-windows.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .cible-haut[hidden] { display: none; }
   body.appli-windows.vue-implantation .vue-guidage .cible-haut .cible-implantation { width: auto; height: 100%; max-width: 100%; max-height: none; }
-  body.appli-windows.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .panneau-plan {
+  body.appli-windows.mode-leve.vue-implantation.cible-en-haut:not(.cible-inversee)[data-onglet='terrain'] .panneau-plan {
     position: fixed;
-    top: calc(var(--hauteur-entete) + 72px + 8px);
-    left: auto;
-    right: 24px;
-    width: min(32vw, 340px);
-    height: 240px;
+    top: auto;
+    left: 16px;
+    right: auto;
+    bottom: calc(var(--hauteur-bande, 0px) + 16px);
+    width: calc(var(--largeur-panneau) - 32px);
+    max-width: 420px;
+    height: 220px;
     z-index: 13;
     border: 3px solid #0d9488;
     border-radius: 12px;
     opacity: 0.9;
   }
-  body.appli-windows.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .panneau-plan :is(.plan-calques, .plan-boutons, .boutons-taille-plan, .case-voir-ligne, .plan-attribution) { display: none; }
+  body.appli-windows.mode-leve.vue-implantation.cible-en-haut:not(.cible-inversee)[data-onglet='terrain'] .panneau-plan :is(.plan-calques, .plan-boutons, .boutons-taille-plan, .case-voir-ligne, .plan-attribution) { display: none; }
 }
 
 /* Test laser (0.269.0, Expert) */
@@ -14136,3 +14139,110 @@ body.appli-windows .ligne-case { display: none; }
 .palette-dossier { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
 .palette-dossier .pastille-couleur { width: 40px; height: 40px; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.25); padding: 0; cursor: pointer; }
 .palette-dossier .pastille-couleur.actif { outline: 3px solid #0f2a43; outline-offset: 2px; }
+
+/* 0.273.0 (demande du 20.11, Windows en paysage) : page Applications plus compacte pour voir au moins 2 lignes d'applications :
+   cadre du projet moins haut, 6 boutons du projet plus bas (icône à côté du texte), bandeau des dossiers plus bas,
+   tuiles et pied plus bas. */
+@media (min-width: 900px) {
+  body.appli-windows .page-applis { padding-top: 0; }
+  body.appli-windows .cadre-projet-applis { padding: 4px 8px 6px; margin-top: 0; }
+  body.appli-windows .cadre-projet-applis .bandeau-projet-applis { padding: 0 4px 4px; gap: 4px; }
+  body.appli-windows .cadre-projet-applis .bouton-bandeau-projet { min-height: 34px; height: 34px; }
+  body.appli-windows .cadre-projet-applis .grille-parties-projet { padding: 4px; gap: 4px; }
+  body.appli-windows .grille-parties-projet .bouton-partie-projet { height: 40px; flex-direction: row; gap: 6px; font-size: 12.5px; padding: 2px 6px; }
+  body.appli-windows .grille-parties-projet .bouton-partie-projet svg { width: 20px; height: 20px; flex: none; }
+  body.appli-windows .puces-dossiers { padding: 0 2px 4px; }
+  body.appli-windows .puces-dossiers .puce-dossier { min-height: 26px; padding: 1px 9px; font-size: 0.85rem; }
+  body.appli-windows .zone-tuiles-applis .titre-applis { margin: 4px 0 2px; }
+  body.appli-windows .tuile-appli { min-height: 0; padding: 6px 8px 8px; gap: 2px; }
+  body.appli-windows .tuile-appli .tete-tuile { min-height: 36px; }
+  body.appli-windows .tuile-appli .nom-et-icone { gap: 0; }
+  body.appli-windows .tuile-appli .nom-et-icone > svg, body.appli-windows .tuile-appli > svg { width: 20px; height: 20px; }
+  body.appli-windows .tuile-appli .bouton-liste-tuile { width: 34px; height: 34px; }
+  body.appli-windows .tuile-appli .sous-tuile button { min-height: 20px; font-size: 10.5px; padding: 0 5px; }
+  body.appli-windows .pied-applis { padding: 4px 8px; }
+  body.appli-windows .bouton-pied-applis { min-height: 40px; height: 40px; }
+}
+
+/* 0.273.0 (demande du 20.11) : Implanter › Surface / Altitude sous Windows en paysage : la règle de hauteur est fixée contre le bord
+   droit du panneau, sur toute la hauteur disponible (comme sur la tablette en portrait) ; le texte et les coupes lui laissent la place. */
+@media (min-width: 900px) {
+  body.appli-windows.regle-sous-plan[data-onglet='terrain'] .ecart-et-regle .colonne-regle {
+    position: fixed;
+    top: calc(var(--hauteur-entete) + 16px);
+    bottom: calc(var(--hauteur-bande, 0px) + 16px);
+    left: calc(var(--largeur-panneau) - 54px);
+    right: auto;
+    width: 44px;
+    z-index: 9;
+  }
+  body.appli-windows.regle-sous-plan[data-onglet='terrain'] .ecart-et-regle .regle-hauteur { border-radius: 8px; }
+  body.appli-windows.regle-sous-plan[data-onglet='terrain'] .panneau[data-onglet='terrain'] { padding-right: 62px; }
+}
+
+/* 0.273.0 : fenêtre de la caméra (Windows). */
+.fenetre-camera { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; background: rgba(0, 0, 0, 0.7); }
+.boite-camera { display: flex; flex-direction: column; gap: 10px; width: min(92vw, 720px); max-height: 94vh; padding: 12px; border-radius: 14px; background: var(--surface, #fff); color: var(--texte, #0f172a); }
+.boite-camera .video-camera { width: 100%; max-height: 68vh; background: #000; border-radius: 8px; object-fit: contain; }
+.boite-camera .erreur-camera { margin: 0; color: #b91c1c; font-weight: 600; }
+.boite-camera .boutons-camera { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.boite-camera .boutons-camera .bouton { min-height: 48px; }
+
+/* 0.273.0 (demande du 20.11) : Implanter › Point sous Windows : bouton ⇄ qui inverse la cible et le plan.
+   Inversé : le PLAN prend la grande place à droite, la CIBLE entre dans la petite boîte en bas à gauche. */
+.bouton-inverser-cible { display: none; }
+@media (min-width: 900px) {
+  body.appli-windows.mode-leve.vue-implantation.cible-en-haut[data-onglet='terrain'] .bouton-inverser-cible {
+    position: fixed;
+    display: grid;
+    place-items: center;
+    left: calc(min(var(--largeur-panneau) - 32px, 420px) + 16px - 48px);
+    bottom: calc(var(--hauteur-bande, 0px) + 16px + 220px + 6px);
+    width: 48px;
+    height: 44px;
+    z-index: 30;
+    border: 2px solid #0d9488;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #0d9488;
+    font-size: 1.4rem;
+    font-weight: 800;
+    padding: 0;
+  }
+  body.appli-windows.mode-leve.vue-implantation.cible-en-haut.cible-inversee[data-onglet='terrain'] .cible-haut {
+    position: fixed;
+    top: auto;
+    left: 16px;
+    right: auto;
+    bottom: calc(var(--hauteur-bande, 0px) + 16px);
+    width: calc(var(--largeur-panneau) - 32px);
+    max-width: 420px;
+    height: 220px;
+    z-index: 13;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 3px solid #0d9488;
+    border-radius: 12px;
+    background: #ffffff;
+  }
+  body.appli-windows.vue-implantation.cible-inversee .vue-guidage .cible-haut .cible-implantation { width: auto; height: 100%; max-width: 100%; max-height: 100%; }
+  body.appli-windows.mode-leve.vue-implantation.cible-en-haut.cible-inversee[data-onglet='terrain'] .panneau-plan {
+    position: fixed;
+    top: calc(var(--hauteur-entete) + 72px);
+    left: calc(var(--largeur-panneau) + 32px);
+    right: 16px;
+    bottom: calc(var(--hauteur-bande, 0px) + 16px);
+    width: auto;
+    height: auto;
+    z-index: 12;
+  }
+}
+
+/* 0.273.0 (demande du 20.11) : plus de raccourcis (Stock, Terrain, Point…) dans les tuiles de la page Applications, sauf le bouton
+   « liste de points » : tuiles beaucoup plus basses, sur tous les supports (Android, site, Windows). */
+.tuile-appli, body.mode-telephone .tuile-appli { min-height: 0; padding: 6px 8px 8px; gap: 2px; justify-content: center; }
+.tuile-appli .tete-tuile { min-height: 44px; display: flex; align-items: center; }
+.tuile-appli .nom-et-icone { width: 100%; }
+body.mode-telephone .tuile-appli .tete-tuile { min-height: 38px; }

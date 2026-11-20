@@ -11,6 +11,7 @@
 //
 // L'état du récepteur arrive 5 fois par seconde (mettreAJourRecepteur) : on ne change alors que
 // quelques textes et l'état du bouton, sans redessiner l'écran (le doigt peut être dessus).
+import { estDansAppliWindows } from '../android/pont.js';
 import { echapper } from '../outils/echapper.js';
 import { aAcces, estModeBase } from '../reglages/reglages.js';
 import { demanderCode } from '../outils/code.js';
@@ -907,7 +908,7 @@ export function creerEcranLeve(conteneur, actions) {
       ${talus ? detailLigne() : ligne ? choixLigneNette() : detailPoint()}
       ${guidage}
       <button type="button" class="bouton bouton-prendre ${autocontrole ? '' : 'seulement-intermediaire'}" data-action="enregistrerImplantation" disabled>
-        <span>${talus ? 'ENREGISTRER L\'ENTRÉE EN TERRE' : autocontrole ? 'ENREGISTRER LE CONTRÔLE' : 'ENREGISTRER L\'IMPLANTATION'}</span><span class="sous-titre-prendre">ou touche vol −</span>
+        <span>${talus ? 'ENREGISTRER L\'ENTRÉE EN TERRE' : autocontrole ? 'ENREGISTRER LE CONTRÔLE' : 'ENREGISTRER L\'IMPLANTATION'}</span>${estDansAppliWindows() ? '' : '<span class="sous-titre-prendre">ou touche vol −</span>'}
       </button>
       ${ligne && imp.ligne && !talus ? `${!imp.ligne.reseauId && aAcces('intermediaire') && donnees.nbReseaux > 0 ? `<div class="ligne-choix"><button type="button" class="puce-choix ${donnees.controle.cana ? 'actif' : ''}" data-action="basculerCana" role="switch" aria-checked="${Boolean(donnees.controle.cana)}" title="Montrer les réseaux qui croisent la ligne dans le profil en long">${donnees.controle.cana ? '☑' : '☐'} Cana</button></div>` : ''}<div class="profil-reseau" data-vivant="profil-reseau"></div>` : ''}
       <p class="raison-leve" data-vivant="raison" hidden></p>
@@ -1186,7 +1187,7 @@ export function creerEcranLeve(conteneur, actions) {
             <input type="file" data-champ="photo-levee" accept="image/*" capture="environment" hidden />
           </label>
           <button type="button" class="bouton bouton-prendre" data-action="prendre" title="Enregistrer le point" disabled>
-            <span>Enreg. (Vol. −)</span>
+            <span>${estDansAppliWindows() ? 'Enreg.' : 'Enreg. (Vol. −)'}</span>
           </button>
         </div>
         <div class="ligne-position-delta">
