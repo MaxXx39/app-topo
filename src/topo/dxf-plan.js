@@ -50,8 +50,11 @@ export function estEnMn95(bornes) {
  * xrefs (0.280.0, calage de plans) : Map(nom du fichier en minuscules, sans dossier ni extension → texte DXF) ; un xref
  * VIDE du plan (bloc « référence externe ») est rempli avec ce fichier, ses calques nommés « xref|calque » comme dans
  * AutoCAD. plan.compte.xrefs = [{ nom, chemin, etat ('present' | 'lu' | 'introuvable'), objets }].
+ * annotations (0.281.0, calage de plans seulement) : cotations (DIMENSION, dessinées par leur bloc) et lignes de repère
+ * (LEADER) sont lues, marquées s = 'DIMENSION' / 'LEADER' pour que le nettoyage puisse les retirer. Ailleurs dans
+ * Topo, elles restent ignorées comme avant.
  */
-export function lirePlanDxf(texte, nom = 'plan.dxf', { xrefs = new Map() } = {}) {
+export function lirePlanDxf(texte, nom = 'plan.dxf', { xrefs = new Map(), annotations = false } = {}) {
   if (texte.startsWith('AutoCAD Binary DXF')) return { erreur: 'DXF binaire : enregistre le fichier en DXF « texte » (ASCII)' };
   const paires = lirePaires(texte);
   if (paires.length === 0) return { erreur: 'fichier vide ou illisible' };
@@ -61,7 +64,7 @@ export function lirePlanDxf(texte, nom = 'plan.dxf', { xrefs = new Map() } = {})
   const calquesLus = lireCalques(sections.TABLES ?? []);
   const blocs = lireBlocs(sections.BLOCKS ?? []);
   const infosXrefs = remplirXrefs(blocs, calquesLus, xrefs);
-  const lecteur = creerLecteur(calquesLus);
+  const lecteur = creerLecteur(calquesLus, { annotations });
   for (const entite of decouperEntites(sections.ENTITIES)) lecteur.ajouter(entite, blocs, identite(), 0);
   const plan = lecteur.terminer(nom);
   if (infosXrefs.length) plan.compte.xrefs = infosXrefs;
@@ -489,7 +492,8 @@ export function texteSansMiseEnForme(texte) {
 }
 
 /** Crée le lecteur qui accumule les objets du plan (coordonnées absolues). */
-function creerLecteur(calquesLus) {
+function creerLecteur(calquesLus, { annotations = false } = {}) {
+  let sourceCourante = null; // 'DIMENSION' pendant la lecture du bloc d'une cotation (0.281.0)
   const calques = []; // [{ nom, couleur, visible }]
   const indexCalque = new Map();
   const brut = { traits: [], pleins: [], cercles: [], textes: [], points: [] };
@@ -529,7 +533,7 @@ function creerLecteur(calquesLus) {
   function trait(c, k, points, ferme, z = null, s = null) {
     if (points.length < 2) return;
     for (const [x, y] of points) etendre(x, y);
-    brut.traits.push({ c, k, points, f: ferme, z, s });
+    brut.traits.push({ c, k, points, f: ferme, z, s: s ?? sourceCourante });
   }
 
   /**
@@ -639,7 +643,7 @@ function creerLecteur(calquesLus) {
         // Les sommets 3 et 4 sont dans l'ordre « en Z » : on remet le contour dans l'ordre.
         const sommets = [0, 1, 3, 2].map((i) => point(nombre(entite, 10 + i), nombre(entite, 20 + i)));
         for (const [x, y] of sommets) etendre(x, y);
-        brut.pleins.push({ c, k, points: sommets, s: 'SOLID' });
+        brut.pleins.push({ c, k, points: sommets, s: sourceCourante ?? 'SOLID' });
         break;
       }
       case 'HATCH': {
@@ -652,10 +656,11 @@ function creerLecteur(calquesLus) {
           break;
         }
         for (const contour of contours) trait(c, k, contour, true, null, 'HATCH');
-        brut.pleins.push({ c, k, points: contours.flat(), h: contours.map((contour) => contour.length) });
+        brut.pleins.push({ c, k, points: contours.flat(), h: contours.map((contour) => contour.length), ...(sourceCourante ? { s: sourceCourante } : {}) });
         break;
       }
       case 'POINT': {
+        if (sourceCourante === 'DIMENSION') break; // points de définition d'une cote : invisibles
         const [x, y] = point(nombre(entite, 10), nombre(entite, 20));
         etendre(x, y);
         brut.points.push({ c, k, x, y, z: nombre(entite, 30) });
@@ -691,7 +696,7 @@ function creerLecteur(calquesLus) {
         }
         const [xp, yp] = point(x, y);
         etendre(xp, yp);
-        brut.textes.push({ c, k, x: xp, y: yp, h: nombre(entite, 40, 1) * echelle, a: angle + angleDe(t), t: lu, ah, av, ...(entite.type === 'ATTRIB' ? { s: 'ATTRIB' } : {}) });
+        brut.textes.push({ c, k, x: xp, y: yp, h: nombre(entite, 40, 1) * echelle, a: angle + angleDe(t), t: lu, ah, av, ...(sourceCourante ? { s: sourceCourante } : entite.type === 'ATTRIB' ? { s: 'ATTRIB' } : {}) });
         break;
       }
       case 'INSERT': {
@@ -709,6 +714,31 @@ function creerLecteur(calquesLus) {
         local.f = nombre(entite, 20) - by;
         const total = composer(t, local);
         for (const contenu of bloc.entites) ajouter(contenu, bloc.blocs ?? blocs, total, profondeur + 1, nomCalque, k, bloc.prefixe ?? prefixe);
+        break;
+      }
+      case 'DIMENSION': {
+        // Cotation (0.281.0, calage seulement) : AutoCAD range son dessin (traits, flèches, texte) dans un bloc
+        // anonyme « *D… » déjà à sa place.
+        const bloc = annotations ? blocs.get(valeur(entite, 2, '')) : null;
+        if (!bloc || profondeur >= PROFONDEUR_BLOCS) {
+          ignores.DIMENSION = (ignores.DIMENSION ?? 0) + 1;
+          break;
+        }
+        const avant = sourceCourante;
+        sourceCourante = 'DIMENSION';
+        for (const contenu of bloc.entites) ajouter(contenu, blocs, t, profondeur + 1, nomCalque, k, prefixe);
+        sourceCourante = avant;
+        break;
+      }
+      case 'LEADER': {
+        // Ligne de repère (0.281.0, calage seulement) : ses sommets en codes 10 / 20.
+        if (!annotations) {
+          ignores.LEADER = (ignores.LEADER ?? 0) + 1;
+          break;
+        }
+        const xs = nombres(entite, 10);
+        const ys = nombres(entite, 20);
+        trait(c, k, xs.map((x, i) => point(x, ys[i] ?? 0)), false, null, 'LEADER');
         break;
       }
       case 'ATTDEF':

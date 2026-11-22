@@ -269,3 +269,37 @@ export function versHelmert(s) {
   const [a, b] = partieA(s);
   return { a, b, tEst: s.tx, tNord: s.ty, echelle: s.echelle, rotation: Math.atan2(b, a) };
 }
+
+const MESSAGES_AUTO = {
+  forte: 'Calage automatique trouvé, confiance FORTE. Regardez la superposition et cliquez un point de vérification pour en être sûr.',
+  moyenne: 'Calage automatique trouvé, confiance MOYENNE : cliquez un ou deux points de vérification avant de continuer.',
+  faible: 'Calage automatique INCERTAIN : probablement faux. Calez à la main (points ou axes).',
+};
+
+/**
+ * Résultat d'un calage automatique (0.281.0, topo/calage-auto.js), présenté comme celui de caler() : les éléments
+ * (ici seulement des vérifications) sont évalués avec la similitude trouvée. auto : retour de calerAutomatiquement
+ * (+ sources). Même verdict que caler() quand il y a des vérifications ; sinon « sans-verification ».
+ */
+export function resultatAutomatique(auto, elements = []) {
+  const similitude = { ...auto.similitude };
+  // Tous les éléments sont évalués (mêmes rangs que la liste) ; seules les vérifications font le verdict.
+  const evalues = elements.map((e) => ({ ...e, role: e.role ?? 'calage', ...ecartElement(e, similitude) }));
+  const ecarts = evalues.filter((e) => e.role === 'verification').map((e) => e.ecartM);
+  const titre = `Calage automatique (confiance ${auto.niveau}). `;
+  let verdict = 'sans-verification';
+  let message = MESSAGES_AUTO[auto.niveau] ?? MESSAGES_AUTO.faible;
+  if (ecarts.length) {
+    const pire = Math.max(...ecarts);
+    verdict = verdictEcart(pire);
+    message = titre + {
+      juste: `Vérification : le point tombe à ${mm(pire)} de sa place. Le calage est juste.`,
+      'a-revoir': `Vérification : le point tombe à ${mm(pire)} de sa place. À revoir (clic imprécis ?).`,
+      faux: `Vérification : le point tombe à ${pire < 1 ? mm(pire) : `${pire.toFixed(2)} m`} de sa place. Le calage automatique est FAUX : calez à la main.`,
+    }[verdict];
+  }
+  return {
+    similitude, echelleBrute: auto.echelleBrute ?? similitude.echelle, echelleArrondie: Boolean(auto.echelleArrondie),
+    elements: evalues, verdict, message, methode: 'automatique', confiance: auto.niveau, auto,
+  };
+}

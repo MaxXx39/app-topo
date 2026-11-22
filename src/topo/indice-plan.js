@@ -36,7 +36,8 @@ function sommetsGardes(plan, { ecartes = [], zone = null } = {}) {
   };
   const sommets = [];
   for (const t of plan.contenu?.traits ?? []) {
-    if (ecarte.has(plan.calques[t.c]?.nom)) continue;
+    // Cotations, repères et contours de hachures : pas des repères sûrs d'un indice à l'autre.
+    if (ecarte.has(plan.calques[t.c]?.nom) || t.s === 'DIMENSION' || t.s === 'LEADER' || t.s === 'HATCH') continue;
     for (let i = 0; i < t.p.length; i += 2) {
       const x = e0 + t.p[i];
       const y = n0 + t.p[i + 1];

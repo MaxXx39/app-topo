@@ -36,7 +36,7 @@ export function etiquettes(elements) {
  * (référence, éléments cliqués, résultat) pour la revoir ou la rejouer.
  * lu : plan lu (déjà nettoyé, voir topo/nettoyage-plan.js) ; nettoyage : sa recette ; resultat : retour de caler() ; reference : plan de référence ; elements : éléments cliqués.
  */
-export function planCale({ lu, nom, fichier, resultat, reference, elements, id, le, nettoyage = null, indice = 'A', reperes = [], calquesVus = [], historique = [], mode = 'a-la-main', part = null }) {
+export function planCale({ lu, nom, fichier, resultat, reference, elements, id, le, nettoyage = null, indice = 'A', reperes = [], calquesVus = [], historique = [], mode = 'a-la-main', part = null, changements = null }) {
   const parametres = versHelmert(resultat.similitude);
   return {
     ...lu,
@@ -64,7 +64,10 @@ export function planCale({ lu, nom, fichier, resultat, reference, elements, id, 
       indice,
       reperes,
       calquesVus,
-      indices: [...historique, { indice, le, fichier, mode, ...(part !== null ? { part } : {}) }],
+      indices: [...historique, { indice, le, fichier, mode, ...(part !== null ? { part } : {}), ...(changements ? { changements } : {}) }],
+      // Calage automatique (0.281.0) : méthode et confiance (pour le rejouer sur un nouvel indice).
+      methode: resultat.methode,
+      ...(resultat.auto ? { auto: { niveau: resultat.auto.niveau, votes: resultat.auto.votes, dominance: resultat.auto.dominance, points: resultat.auto.points, ecartMoyenM: resultat.auto.ecartMoyenM, sources: resultat.auto.sources ?? [] } } : {}),
     },
   };
 }
