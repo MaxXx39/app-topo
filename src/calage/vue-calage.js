@@ -62,6 +62,22 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
       ctx.strokeStyle = m.couleur;
       ctx.fillStyle = m.couleur;
       ctx.setLineDash(m.attente ? [4, 3] : []);
+      if (m.type === 'zone') {
+        // Zone à garder (nettoyage) : polygone, fermé une fois fini, en pointillé pendant le dessin.
+        const pts = [];
+        for (let i = 0; i + 1 < m.xy.length; i += 2) pts.push(versEcran(m.xy[i], m.xy[i + 1], vue));
+        ctx.beginPath();
+        pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+        if (!m.attente) ctx.closePath();
+        ctx.stroke();
+        if (!m.attente) {
+          ctx.globalAlpha = 0.06;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        for (const q of pts) ctx.fillRect(q.x - 3, q.y - 3, 6, 6);
+        continue;
+      }
       if (m.type === 'axe') {
         const a = versEcran(m.xy[0], m.xy[1], vue);
         const b = versEcran(m.xy[2], m.xy[3], vue);

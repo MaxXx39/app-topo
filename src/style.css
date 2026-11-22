@@ -14521,3 +14521,33 @@ dialog.page-calage[open] {
 .resultat-calage dt { color: var(--gris); }
 .resultat-calage dd { margin: 0; }
 .verdict-calage { display: flex; gap: 8px; align-items: flex-start; }
+
+/* 0.279.0 : Calage de plans › Nettoyer : colonne des réglages à gauche, plan calé à droite (maquette du 22.11). */
+.nettoyer-calage { flex: 1 1 auto; min-height: 0; display: grid; gap: 10px; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); }
+.colonne-nettoyer { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 2px; }
+.colonne-nettoyer .carte-calage { padding: 8px 12px; gap: 6px; }
+.ligne-titre { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.lien-calage { border: none; background: none; padding: 0; color: #2563eb; font: inherit; font-size: 0.88rem; cursor: pointer; text-decoration: underline; align-self: flex-start; }
+.lien-calage:disabled { color: var(--gris); text-decoration: none; cursor: default; opacity: 0.6; }
+.filtre-calques { padding: 6px 9px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); font: inherit; }
+.bouton.petit, .bouton-secondaire.petit { padding: 5px 9px; font-size: 0.85rem; }
+.barre-calage { flex-wrap: wrap; align-items: center; }
+.liste-calques { max-height: 38vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--bordure); border-radius: 8px; padding: 4px; }
+.calque-calage { display: grid; grid-template-columns: 20px 26px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 6px; cursor: pointer; font-size: 0.88rem; }
+.calque-calage:hover { background: color-mix(in srgb, #2563eb 6%, var(--surface)); }
+.calque-calage.choisi { outline: 2px solid #2563eb; background: color-mix(in srgb, #2563eb 10%, var(--surface)); }
+.calque-calage.ecarte .nom-calque { text-decoration: line-through; color: var(--gris); }
+.nom-calque { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge-calque { font-size: 0.72rem; padding: 0 5px; border-radius: 6px; background: var(--jaune-clair); color: var(--encre); }
+.couleur-calque { width: 24px; height: 18px; padding: 0; border: 1px solid var(--bordure); border-radius: 4px; background: none; cursor: pointer; }
+.types-calage { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 0.9rem; }
+.choix-hachures { display: flex; border: 1px solid var(--bordure); border-radius: 8px; overflow: hidden; }
+.choix-hachures button { flex: 1; padding: 6px 4px; border: none; border-right: 1px solid var(--bordure); background: var(--surface); color: var(--encre); font: inherit; font-size: 0.85rem; cursor: pointer; }
+.choix-hachures button:last-child { border-right: none; }
+.choix-hachures button.actif { background: #2563eb; color: #ffffff; font-weight: 700; }
+.vue-nettoyer { min-height: 300px; }
+.zoom-calage { display: flex; gap: 4px; }
+.zoom-calage button { width: 28px; height: 24px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); cursor: pointer; }
+.pied-vue { padding: 5px 10px; border-top: 1px solid var(--bordure); font-size: 0.85rem; color: var(--gris); }
+.pied-vue strong { color: var(--encre); }
+@media (max-width: 860px) { .nettoyer-calage { grid-template-columns: minmax(0, 1fr); } }

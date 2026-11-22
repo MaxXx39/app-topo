@@ -34,9 +34,9 @@ export function etiquettes(elements) {
  * Plan calé, prêt à ranger dans projet.plansDxf : le plan reçu TEL QUEL (lu par lirePlanDxf) + un recalage appliqué
  * (comme un plan recalé : affichage, accroches, implantation, export DXF, Drive) + la recette du calage
  * (référence, éléments cliqués, résultat) pour la revoir ou la rejouer.
- * lu : plan lu ; resultat : retour de caler() ; reference : plan de référence ; elements : éléments cliqués.
+ * lu : plan lu (déjà nettoyé, voir topo/nettoyage-plan.js) ; nettoyage : sa recette ; resultat : retour de caler() ; reference : plan de référence ; elements : éléments cliqués.
  */
-export function planCale({ lu, nom, fichier, resultat, reference, elements, id, le }) {
+export function planCale({ lu, nom, fichier, resultat, reference, elements, id, le, nettoyage = null }) {
   const parametres = versHelmert(resultat.similitude);
   return {
     ...lu,
@@ -57,6 +57,8 @@ export function planCale({ lu, nom, fichier, resultat, reference, elements, id, 
       verdict: resultat.verdict,
       ecartVerificationM: Math.max(0, ...resultat.elements.filter((e) => e.role === 'verification').map((e) => e.ecartM)),
       message: resultat.message,
+      // Recette du nettoyage (calques écartés, couleurs, types, hachures, zone en coordonnées du plan reçu, préfixe).
+      ...(nettoyage ? { nettoyage: JSON.parse(JSON.stringify(nettoyage)) } : {}),
     },
   };
 }

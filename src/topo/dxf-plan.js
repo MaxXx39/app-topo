@@ -479,10 +479,12 @@ function creerLecteur(calquesLus) {
     return couleurAci(Math.abs(aci));
   }
 
-  function trait(c, k, points, ferme, z = null) {
+  // s (0.279.0) : type d'origine de l'objet quand le nettoyage du calage de plans peut le retirer à part
+  // ('SPLINE', 'HATCH' = contour d'une hachure, 'SOLID', 'ATTRIB') ; absent pour le reste.
+  function trait(c, k, points, ferme, z = null, s = null) {
     if (points.length < 2) return;
     for (const [x, y] of points) etendre(x, y);
-    brut.traits.push({ c, k, points, f: ferme, z });
+    brut.traits.push({ c, k, points, f: ferme, z, s });
   }
 
   /**
@@ -582,7 +584,7 @@ function creerLecteur(calquesLus) {
         const controle = nombres(entite, 10).map((x, i) => [x, nombres(entite, 20)[i]]);
         const ajustement = nombres(entite, 11).map((x, i) => [x, nombres(entite, 21)[i]]);
         const points = controle.length >= 2 ? pointsSpline(nombre(entite, 71, 3), controle, nombres(entite, 40)) : ajustement;
-        trait(c, k, points.map(([x, y]) => point(x, y)), (nombre(entite, 70) & 1) === 1);
+        trait(c, k, points.map(([x, y]) => point(x, y)), (nombre(entite, 70) & 1) === 1, null, 'SPLINE');
         break;
       }
       case 'SOLID':
@@ -590,7 +592,7 @@ function creerLecteur(calquesLus) {
         // Les sommets 3 et 4 sont dans l'ordre « en Z » : on remet le contour dans l'ordre.
         const sommets = [0, 1, 3, 2].map((i) => point(nombre(entite, 10 + i), nombre(entite, 20 + i)));
         for (const [x, y] of sommets) etendre(x, y);
-        brut.pleins.push({ c, k, points: sommets });
+        brut.pleins.push({ c, k, points: sommets, s: 'SOLID' });
         break;
       }
       case 'HATCH': {
@@ -602,7 +604,7 @@ function creerLecteur(calquesLus) {
           ignores.HATCH = (ignores.HATCH ?? 0) + 1;
           break;
         }
-        for (const contour of contours) trait(c, k, contour, true);
+        for (const contour of contours) trait(c, k, contour, true, null, 'HATCH');
         brut.pleins.push({ c, k, points: contours.flat(), h: contours.map((contour) => contour.length) });
         break;
       }
@@ -642,7 +644,7 @@ function creerLecteur(calquesLus) {
         }
         const [xp, yp] = point(x, y);
         etendre(xp, yp);
-        brut.textes.push({ c, k, x: xp, y: yp, h: nombre(entite, 40, 1) * echelle, a: angle + angleDe(t), t: lu, ah, av });
+        brut.textes.push({ c, k, x: xp, y: yp, h: nombre(entite, 40, 1) * echelle, a: angle + angleDe(t), t: lu, ah, av, ...(entite.type === 'ATTRIB' ? { s: 'ATTRIB' } : {}) });
         break;
       }
       case 'INSERT': {
@@ -679,8 +681,8 @@ function creerLecteur(calquesLus) {
     const mm = (v) => Math.round(v * 1000) / 1000;
     const local = ([x, y]) => [mm(x - origine.est), mm(y - origine.nord)];
     const contenu = {
-      traits: brut.traits.map(({ c, k, points, f, z }) => ({ c, k, p: points.flatMap(local), f, ...(z ? { z: z.map(mm) } : {}) })),
-      pleins: brut.pleins.map(({ c, k, points, h }) => ({ c, k, p: points.flatMap(local), ...(h ? { h } : {}) })),
+      traits: brut.traits.map(({ c, k, points, f, z, s }) => ({ c, k, p: points.flatMap(local), f, ...(z ? { z: z.map(mm) } : {}), ...(s ? { s } : {}) })),
+      pleins: brut.pleins.map(({ c, k, points, h, s }) => ({ c, k, p: points.flatMap(local), ...(h ? { h } : {}), ...(s ? { s } : {}) })),
       cercles: brut.cercles.map(({ c, k, x, y, r }) => ({ c, k, x: mm(x - origine.est), y: mm(y - origine.nord), r: mm(r) })),
       textes: brut.textes.map((texte) => ({ ...texte, x: mm(texte.x - origine.est), y: mm(texte.y - origine.nord), h: mm(texte.h), a: Math.round(texte.a * 100) / 100 })),
       points: brut.points.map(({ c, k, x, y, z }) => ({ c, k, x: mm(x - origine.est), y: mm(y - origine.nord), z: mm(z) })),
