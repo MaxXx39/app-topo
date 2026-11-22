@@ -29,6 +29,24 @@ describe('pont de l\'appli Windows', () => {
     expect(page.AppliAndroid.estWindows).toBe(true);
   });
 
+  it('Topo Bureau (0.277.0) : fichiers, Drive et mise à jour, mais ni récepteur ni boutons de tablette', () => {
+    const { page, messages } = lancer({ bureau: true, version: '0.277.0' });
+    const a = page.AppliAndroid;
+    expect(a.estBureau).toBe(true);
+    expect(a.estWindows).toBe(false); // la mise en page « tablette Windows » ne s'applique pas
+    for (const nom of ['enregistrerFichier', 'partagerFichier', 'demanderJetonDrive', 'installerMiseAJour', 'fermerAppli', 'lireAdresse']) expect(typeof a[nom], nom).toBe('function');
+    for (const nom of ['prendrePoint', 'choisirRecepteur', 'lireReglagesCorrections', 'demarrerJournalNmea', 'apprendreBouton', 'choisirLaser']) expect(a[nom], nom).toBeUndefined();
+    expect(a.modeleAppareil()).toBe('PC Windows');
+    a.demanderJetonDrive(true);
+    expect(messages.at(-1)).toEqual({ fonction: 'demanderJetonDrive', args: [true] });
+  });
+
+  it('Topo Tablette : pas « bureau »', () => {
+    const { page } = lancer();
+    expect(page.AppliAndroid.estBureau).toBe(false);
+    expect(page.AppliAndroid.modeleAppareil()).toBe('Tablette Windows');
+  });
+
   it('ne fait rien hors de l\'appli Windows, ni si le pont existe déjà', () => {
     const page = {};
     page.top = page;

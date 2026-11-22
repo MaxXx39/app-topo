@@ -145,6 +145,14 @@ static class Tests
         Verifier(MiseAJour.AdresseAutorisee("https://github.com/MaxXx39/app-topo/releases/download/windows-derniere-version/Topo-0.237.0.exe"), "mise à jour : adresse GitHub acceptée");
         Verifier(!MiseAJour.AdresseAutorisee("https://exemple.com/Topo.exe") && !MiseAJour.AdresseAutorisee("http://github.com/MaxXx39/app-topo/releases/download/x/Topo.exe"), "mise à jour : autres adresses refusées");
 
+        Console.WriteLine("Plans DWG (ODA File Converter)");
+        string dxfXref = "0\nSECTION\n2\nBLOCKS\n0\nBLOCK\n2\nArchi\n70\n4\n1\nC:\\Projets\\Archi\\Murs.dwg\n0\nENDBLK\n0\nBLOCK\n2\nPorte\n70\n0\n0\nENDBLK\n0\nENDSEC\n0\nEOF\n";
+        var xrefs = ConversionDwg.XrefsDuDxf(dxfXref);
+        Verifier(xrefs.Count == 1 && xrefs[0] == "C:\\Projets\\Archi\\Murs.dwg", "xref lu dans le DXF (bloc ordinaire ignoré)");
+        Verifier(ConversionDwg.NomDuFichier("..\\Archi\\Murs.dwg") == "Murs.dwg", "nom du fichier d'un xref");
+        Verifier(ConversionDwg.Arguments("a", "b") == "\"a\" \"b\" \"ACAD2018\" \"DXF\" \"0\" \"1\" \"*.DWG\"", "arguments d'ODA");
+        Verifier(ConversionDwg.TrouverOda(null, new[] { System.IO.Path.GetTempPath() + "pas-de-dossier-oda" }) == null, "ODA absent : null");
+
         Console.WriteLine(echecs == 0 ? "\nTous les tests passent." : "\n" + echecs + " test(s) en échec.");
         return echecs == 0 ? 0 : 1;
     }

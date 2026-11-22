@@ -70,6 +70,7 @@ import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/jo
 import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { lireNomsMateriel } from './materiel/noms-tablette.js';
 import { ouvrirMateriel as ouvrirPageMateriel } from './materiel/appli.js';
+import { ouvrirCalage as ouvrirPageCalage } from './calage/appli.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE, EXAGERATIONS_COUPE, ACCROCHES } from './leve/ecran.js';
 import { creerEncartPlan } from './plan/encart.js';
@@ -127,7 +128,7 @@ import { correctionsTropAnciennes } from './topo/age-corrections.js';
 import { centreDePoints, MAX_POINTS_CENTRE } from './topo/centre-points.js';
 import { ICONES_LIGNE } from './outils/icones.js';
 import { brancherCameraWindows } from './outils/camera-windows.js';
-import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette, estDansAppliWindows } from './android/pont.js';
+import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette, estDansAppliWindows, estDansAppliBureau } from './android/pont.js';
 // 0.267.0 : appli Windows (Topo.exe) : marque sur la page pour sa mise en page (panneau de gauche à 50 %, voir fin de style.css).
 if (estDansAppliWindows()) {
   document.body.classList.add('appli-windows');
@@ -1725,6 +1726,7 @@ function ouvrirAppli(cle, sous = null, depuisMenu = false) {
   else if (cle === 'reseaux') afficherOnglet('reseaux');
   else if (cle === 'laser') afficherOnglet('test-laser');
   else if (cle === 'materiel') ouvrirMateriel();
+  else if (cle === 'calage') ouvrirCalage();
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur', { detail: { retourMenu: depuisMenu } }));
   if (sous && cle !== 'calculs') {
     // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
@@ -1766,7 +1768,7 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
     ecranImport.choisirCategories(categories);
     ouvrirPartieProjet('points');
   },
-  applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces, dansAppli: estDansAppliAndroid() })
+  applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces, dansAppli: estDansAppliAndroid() && !estDansAppliBureau() })
     // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile.
     .filter((a) => a.cle !== 'plan' || !window.matchMedia('(min-width: 900px)').matches),
   courante: () => appliCourante(document.body.dataset.onglet, terrain.mode),
@@ -1974,6 +1976,39 @@ function ouvrirMateriel() {
   }).catch((erreur) => afficherMessage(`Matériel : ${erreur.message}`, 8000));
 }
 
+/**
+ * Calage de plans (0.278.0, Expert, site et Topo Bureau) : page plein écran à part (calage/appli.js). Le plan calé
+ * est rangé dans le projet comme un plan importé (dossier choisi, Drive) ; « ← » ramène à la page Applications.
+ */
+function ouvrirCalage() {
+  fenetreReglages?.fermer?.();
+  navigation?.fermer();
+  ouvrirPageCalage({
+    projet,
+    // remplace (0.280.0, nouvel indice) : id du plan calé qu'il remplace (même id, même dossier, couleur et affichage).
+    ajouterPlan: (plan, { remplace = null } = {}) => {
+      if (lectureSeule()) {
+        refuserEnLectureSeule();
+        return null;
+      }
+      const ancien = remplace ? projet.plansDxf.find((p) => p.id === remplace) : null;
+      if (ancien) {
+        const { id, sousDossiers, couleur, transparence, visible } = ancien;
+        const range = { ...plan, id, sousDossiers, ...(couleur !== undefined ? { couleur } : {}), ...(transparence !== undefined ? { transparence } : {}), ...(visible !== undefined ? { visible } : {}) };
+        projet.plansDxf[projet.plansDxf.indexOf(ancien)] = range;
+        modifie();
+        return range;
+      }
+      const range = { ...plan, id: nouvelIdentifiant() };
+      projet.plansDxf.push(range);
+      modifie();
+      return range;
+    },
+    quandRetour: () => navigation.ouvrirPage(),
+    message: (texte, duree, options) => afficherMessage(texte, duree, options),
+  });
+}
+
 let fenetreReglages = null;
 /** Fenêtre des réglages ⚙ (0.156.0 : tuile « Réglages » de la page Applications, ou la pyramide du mode). */
 function ouvrirFenetreReglages(page = null) {
@@ -1988,7 +2023,7 @@ function ouvrirFenetreReglages(page = null) {
     basculerAide: () => document.querySelector('#bouton-aide').click(),
     fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? fermerAppli : null,
     // Partie « Récepteur » des réglages (appli Android) : ouvre la fenêtre du récepteur.
-    recepteur: estDansAppliAndroid() ? () => document.dispatchEvent(new CustomEvent('ouvrir-recepteur')) : null,
+    recepteur: recepteurDisponible() ? () => document.dispatchEvent(new CustomEvent('ouvrir-recepteur')) : null, // 0.277.0 : pas dans Topo Bureau
     changerMode: () => {
       adapterAuMode();
       recalculer();
@@ -9398,7 +9433,8 @@ for (const evenement of ['pointerdown', 'keydown', 'wheel']) {
   }, { passive: true, capture: true });
 }
 setInterval(() => {
-  if (estDansAppliAndroid() || !partage?.etat.connecte) return;
+  // Tablettes (APK, Topo Tablette) : la main est gardée ; site et Topo Bureau (0.277.0) : rendue après 5 minutes sans activité.
+  if ((estDansAppliAndroid() && !estDansAppliBureau()) || !partage?.etat.connecte) return;
   if (Date.now() - derniereActivite < INACTIVITE) return;
   if (partage.etat.rendu?.projetId === projet.id || partage.etat.repris?.projetId === projet.id) return;
   partage.rendreLaMain('rendue après 5 minutes sans activité').then(() => {

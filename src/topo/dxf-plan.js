@@ -45,8 +45,13 @@ export function estEnMn95(bornes) {
   return Boolean(bornes) && bornes.estMin >= 2480000 && bornes.estMax <= 2840000 && bornes.nordMin >= 1070000 && bornes.nordMax <= 1300000;
 }
 
-/** Lit un plan DXF. Renvoie { plan } ou { erreur } (message compréhensible). */
-export function lirePlanDxf(texte, nom = 'plan.dxf') {
+/**
+ * Lit un plan DXF. Renvoie { plan } ou { erreur } (message compréhensible).
+ * xrefs (0.280.0, calage de plans) : Map(nom du fichier en minuscules, sans dossier ni extension → texte DXF) ; un xref
+ * VIDE du plan (bloc « référence externe ») est rempli avec ce fichier, ses calques nommés « xref|calque » comme dans
+ * AutoCAD. plan.compte.xrefs = [{ nom, chemin, etat ('present' | 'lu' | 'introuvable'), objets }].
+ */
+export function lirePlanDxf(texte, nom = 'plan.dxf', { xrefs = new Map() } = {}) {
   if (texte.startsWith('AutoCAD Binary DXF')) return { erreur: 'DXF binaire : enregistre le fichier en DXF « texte » (ASCII)' };
   const paires = lirePaires(texte);
   if (paires.length === 0) return { erreur: 'fichier vide ou illisible' };
@@ -55,9 +60,47 @@ export function lirePlanDxf(texte, nom = 'plan.dxf') {
 
   const calquesLus = lireCalques(sections.TABLES ?? []);
   const blocs = lireBlocs(sections.BLOCKS ?? []);
+  const infosXrefs = remplirXrefs(blocs, calquesLus, xrefs);
   const lecteur = creerLecteur(calquesLus);
   for (const entite of decouperEntites(sections.ENTITIES)) lecteur.ajouter(entite, blocs, identite(), 0);
-  return { plan: lecteur.terminer(nom) };
+  const plan = lecteur.terminer(nom);
+  if (infosXrefs.length) plan.compte.xrefs = infosXrefs;
+  return { plan };
+}
+
+/** Nom d'un fichier sans dossier (chemins Windows ou non) ni extension, en minuscules : « ..\\Archi\\Murs.dwg » → « murs ». */
+export function nomXref(chemin) {
+  return String(chemin ?? '').split(/[\\/]/).pop().replace(/\.[^.]*$/, '').trim().toLowerCase();
+}
+
+/**
+ * Xrefs du plan : un bloc « référence externe » (drapeau 4) vide est rempli avec le fichier fourni (entités, blocs et
+ * calques de ce fichier ; calques préfixés « nom du xref| »). Renvoie la liste des xrefs et leur état.
+ */
+function remplirXrefs(blocs, calquesLus, xrefs) {
+  const infos = [];
+  for (const [nomBloc, bloc] of blocs) {
+    if (!bloc.xref) continue;
+    const info = { nom: nomBloc, chemin: bloc.xref, etat: 'present', objets: bloc.entites.length };
+    if (bloc.entites.length === 0) {
+      const texte = xrefs.get(nomXref(bloc.xref)) ?? xrefs.get(nomBloc.toLowerCase());
+      if (texte === undefined) info.etat = 'introuvable';
+      else {
+        const sections = lireSections(lirePaires(texte));
+        const prefixe = `${nomBloc}|`;
+        for (const [nomCalque, calque] of lireCalques(sections.TABLES ?? [])) {
+          if (nomCalque !== '0') calquesLus.set(prefixe + nomCalque, calque);
+        }
+        bloc.entites = decouperEntites(sections.ENTITIES ?? []);
+        bloc.blocs = lireBlocs(sections.BLOCKS ?? []); // blocs propres au fichier du xref
+        bloc.prefixe = prefixe;
+        info.etat = 'lu';
+        info.objets = bloc.entites.length;
+      }
+    }
+    infos.push(info);
+  }
+  return infos;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -159,6 +202,8 @@ function lireBlocs(paires) {
   for (const entite of decouperEntites(paires)) {
     if (entite.type === 'BLOCK') {
       bloc = { base: { x: nombre(entite, 10), y: nombre(entite, 20) }, entites: [] };
+      // Référence externe (xref, drapeau 4 du code 70) : chemin du fichier en code 1 (0.280.0).
+      if (nombre(entite, 70) & 4) bloc.xref = valeur(entite, 1, '') || valeur(entite, 2, '');
       blocs.set(valeur(entite, 2, ''), bloc);
     } else if (entite.type === 'ENDBLK') {
       bloc = null;
@@ -479,18 +524,22 @@ function creerLecteur(calquesLus) {
     return couleurAci(Math.abs(aci));
   }
 
-  function trait(c, k, points, ferme, z = null) {
+  // s (0.279.0) : type d'origine de l'objet quand le nettoyage du calage de plans peut le retirer à part
+  // ('SPLINE', 'HATCH' = contour d'une hachure, 'SOLID', 'ATTRIB') ; absent pour le reste.
+  function trait(c, k, points, ferme, z = null, s = null) {
     if (points.length < 2) return;
     for (const [x, y] of points) etendre(x, y);
-    brut.traits.push({ c, k, points, f: ferme, z });
+    brut.traits.push({ c, k, points, f: ferme, z, s });
   }
 
   /**
    * Ajoute une entité (et, pour un bloc, son contenu) avec la transformation "t" (blocs insérés).
    * "calqueBloc", "couleurBloc" : calque et couleur de l'insertion, pour les entités du bloc sur le calque 0.
    */
-  function ajouter(entite, blocs, t, profondeur, calqueBloc = null, couleurBloc = null) {
+  // prefixe (0.280.0) : « xref| » devant les calques des objets lus dans le fichier d'un xref (sauf le calque 0).
+  function ajouter(entite, blocs, t, profondeur, calqueBloc = null, couleurBloc = null, prefixe = '') {
     let nomCalque = valeur(entite, 8, '0');
+    if (prefixe && nomCalque !== '0') nomCalque = prefixe + nomCalque;
     if (calqueBloc && nomCalque === '0') nomCalque = calqueBloc;
     const c = numeroCalque(nomCalque);
     const k = couleurPropre(entite, couleurBloc);
@@ -582,7 +631,7 @@ function creerLecteur(calquesLus) {
         const controle = nombres(entite, 10).map((x, i) => [x, nombres(entite, 20)[i]]);
         const ajustement = nombres(entite, 11).map((x, i) => [x, nombres(entite, 21)[i]]);
         const points = controle.length >= 2 ? pointsSpline(nombre(entite, 71, 3), controle, nombres(entite, 40)) : ajustement;
-        trait(c, k, points.map(([x, y]) => point(x, y)), (nombre(entite, 70) & 1) === 1);
+        trait(c, k, points.map(([x, y]) => point(x, y)), (nombre(entite, 70) & 1) === 1, null, 'SPLINE');
         break;
       }
       case 'SOLID':
@@ -590,7 +639,7 @@ function creerLecteur(calquesLus) {
         // Les sommets 3 et 4 sont dans l'ordre « en Z » : on remet le contour dans l'ordre.
         const sommets = [0, 1, 3, 2].map((i) => point(nombre(entite, 10 + i), nombre(entite, 20 + i)));
         for (const [x, y] of sommets) etendre(x, y);
-        brut.pleins.push({ c, k, points: sommets });
+        brut.pleins.push({ c, k, points: sommets, s: 'SOLID' });
         break;
       }
       case 'HATCH': {
@@ -602,7 +651,7 @@ function creerLecteur(calquesLus) {
           ignores.HATCH = (ignores.HATCH ?? 0) + 1;
           break;
         }
-        for (const contour of contours) trait(c, k, contour, true);
+        for (const contour of contours) trait(c, k, contour, true, null, 'HATCH');
         brut.pleins.push({ c, k, points: contours.flat(), h: contours.map((contour) => contour.length) });
         break;
       }
@@ -642,7 +691,7 @@ function creerLecteur(calquesLus) {
         }
         const [xp, yp] = point(x, y);
         etendre(xp, yp);
-        brut.textes.push({ c, k, x: xp, y: yp, h: nombre(entite, 40, 1) * echelle, a: angle + angleDe(t), t: lu, ah, av });
+        brut.textes.push({ c, k, x: xp, y: yp, h: nombre(entite, 40, 1) * echelle, a: angle + angleDe(t), t: lu, ah, av, ...(entite.type === 'ATTRIB' ? { s: 'ATTRIB' } : {}) });
         break;
       }
       case 'INSERT': {
@@ -659,7 +708,7 @@ function creerLecteur(calquesLus) {
         local.e = nombre(entite, 10) - bx;
         local.f = nombre(entite, 20) - by;
         const total = composer(t, local);
-        for (const contenu of bloc.entites) ajouter(contenu, blocs, total, profondeur + 1, nomCalque, k);
+        for (const contenu of bloc.entites) ajouter(contenu, bloc.blocs ?? blocs, total, profondeur + 1, nomCalque, k, bloc.prefixe ?? prefixe);
         break;
       }
       case 'ATTDEF':
@@ -679,8 +728,8 @@ function creerLecteur(calquesLus) {
     const mm = (v) => Math.round(v * 1000) / 1000;
     const local = ([x, y]) => [mm(x - origine.est), mm(y - origine.nord)];
     const contenu = {
-      traits: brut.traits.map(({ c, k, points, f, z }) => ({ c, k, p: points.flatMap(local), f, ...(z ? { z: z.map(mm) } : {}) })),
-      pleins: brut.pleins.map(({ c, k, points, h }) => ({ c, k, p: points.flatMap(local), ...(h ? { h } : {}) })),
+      traits: brut.traits.map(({ c, k, points, f, z, s }) => ({ c, k, p: points.flatMap(local), f, ...(z ? { z: z.map(mm) } : {}), ...(s ? { s } : {}) })),
+      pleins: brut.pleins.map(({ c, k, points, h, s }) => ({ c, k, p: points.flatMap(local), ...(h ? { h } : {}), ...(s ? { s } : {}) })),
       cercles: brut.cercles.map(({ c, k, x, y, r }) => ({ c, k, x: mm(x - origine.est), y: mm(y - origine.nord), r: mm(r) })),
       textes: brut.textes.map((texte) => ({ ...texte, x: mm(texte.x - origine.est), y: mm(texte.y - origine.nord), h: mm(texte.h), a: Math.round(texte.a * 100) / 100 })),
       points: brut.points.map(({ c, k, x, y, z }) => ({ c, k, x: mm(x - origine.est), y: mm(y - origine.nord), z: mm(z) })),

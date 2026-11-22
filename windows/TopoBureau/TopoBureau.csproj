@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Appli Windows « Topo Bureau » (TopoBureau.exe, 0.277.0, décision du 22.11) : la même chose que le site PC, mais
+       installée sur l'ordinateur du bureau, avec plus tard des fonctions avancées (DWG par ODA File Converter…).
+       Même code que Topo Tablette (fichiers de windows/Topo), avec la constante BUREAU (voir Edition.cs) :
+       pas de récepteur ni de boutons de tablette, fenêtre normale, zoom 100 %, ses propres données (AppData\Local\TopoBureau).
+       Une seule bibliothèque : Microsoft.Web.WebView2 (accord du 14.11). Tout est rangé dans le .exe. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>TopoBureau</AssemblyName>
+    <RootNamespace>Topo</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <DefineConstants>$(DefineConstants);BUREAU</DefineConstants>
+    <ApplicationManifest>..\Topo\app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\Topo\topo.ico</ApplicationIcon>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Le code de Topo Tablette (sans ses dossiers de fabrication). -->
+    <Compile Include="..\Topo\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Device" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" GeneratePathProperty="true" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Mêmes fichiers rangés dans le .exe que Topo Tablette (fabriqués par GitHub dans windows/Topo, voir windows.yml). -->
+    <EmbeddedResource Include="..\Topo\pont-windows.js" LogicalName="pont-windows.js" />
+    <EmbeddedResource Include="..\..\android\noyau\src\main\resources\geoide\chgeo2004_lhn95.grille" LogicalName="chgeo2004_lhn95.grille" Link="chgeo2004_lhn95.grille" />
+    <EmbeddedResource Include="..\Topo\appli.zip" LogicalName="appli.zip" Condition="Exists('..\Topo\appli.zip')" />
+    <EmbeddedResource Include="..\Topo\version.txt" LogicalName="version.txt" Condition="Exists('..\Topo\version.txt')" />
+    <EmbeddedResource Include="..\Topo\google-bureau.txt" LogicalName="google-bureau.txt" Condition="Exists('..\Topo\google-bureau.txt')" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\lib\net462\Microsoft.Web.WebView2.Core.dll" LogicalName="Microsoft.Web.WebView2.Core.dll" Link="webview2\Microsoft.Web.WebView2.Core.dll" Condition="'$(PkgMicrosoft_Web_WebView2)' != ''" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\lib\net462\Microsoft.Web.WebView2.WinForms.dll" LogicalName="Microsoft.Web.WebView2.WinForms.dll" Link="webview2\Microsoft.Web.WebView2.WinForms.dll" Condition="'$(PkgMicrosoft_Web_WebView2)' != ''" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll" LogicalName="x64.WebView2Loader.dll" Link="webview2\x64.WebView2Loader.dll" Condition="'$(PkgMicrosoft_Web_WebView2)' != ''" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x86\native\WebView2Loader.dll" LogicalName="x86.WebView2Loader.dll" Link="webview2\x86.WebView2Loader.dll" Condition="'$(PkgMicrosoft_Web_WebView2)' != ''" />
+  </ItemGroup>
+</Project>

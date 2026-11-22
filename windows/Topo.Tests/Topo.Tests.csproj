@@ -20,8 +20,10 @@
     <Compile Include="..\Topo\EtatRecepteur.cs" />
     <Compile Include="..\Topo\RecepteurSerie.cs" />
     <Compile Include="..\Topo\Reglages.cs" />
+    <Compile Include="..\Topo\Edition.cs" />
     <Compile Include="..\Topo\Drive.cs" />
     <Compile Include="..\Topo\ServeurAppli.cs" />
     <Compile Include="..\Topo\MiseAJour.cs" />
+    <Compile Include="..\Topo\ConversionDwg.cs" />
   </ItemGroup>
 </Project>

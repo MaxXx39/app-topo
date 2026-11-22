@@ -14,13 +14,13 @@
 //   les appareils (voir listes-partagees.js) ;
 // - « Fermer l'appli » (appli Android seulement), en rouge tout en haut.
 import { echapper } from '../outils/echapper.js';
-import { anydeskDisponible, ouvrirAnydesk, estDansAppliWindows, installerMiseAJourWindows, boutonsTabletteDisponibles, apprendreBoutonTablette, etatBoutonsTablette, ecouterBoutonsTablette } from '../android/pont.js';
+import { anydeskDisponible, ouvrirAnydesk, estDansAppliWindows, estDansAppliBureau, installerMiseAJourWindows, boutonsTabletteDisponibles, apprendreBoutonTablette, etatBoutonsTablette, ecouterBoutonsTablette } from '../android/pont.js';
 import { demanderCode } from '../outils/code.js';
 import { CHOIX_AUTRE } from '../materiel/noms-tablette.js';
 import { lireListesPartagees } from './listes-partagees.js';
 import { modifierLibellesDeSorte } from '../leve/fenetre-libelles.js';
 import { ouvrirFenetreListes } from './fenetre-listes.js';
-import { apkPublie, exePublie, estPlusRecente } from '../outils/mise-a-jour.js';
+import { apkPublie, exePublie, exeBureauPublie, estPlusRecente } from '../outils/mise-a-jour.js';
 
 const CLE = 'topo-reglages';
 const PAR_DEFAUT = { telephone: false, mode: 'intermediaire', tailleFormes: 'normale', tailleTexte: 'normal', theme: 'normal' };
@@ -243,8 +243,8 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
           <button type="button" class="bouton-lien bouton-lien-neutre" data-action="apprendre-bouton" data-valeur="oublier">oublier</button>
         </span>
       </div>` : ''}
-      <p class="aide version-reglages">Version de l'appli : ${__VERSION_APPLI__}${recepteur ? (estDansAppliWindows() ? ' (appli Windows)' : ' (appli Android)') : ''}</p>
-      ${recepteur ? `<div class="mise-a-jour-reglages">
+      <p class="aide version-reglages">Version de l'appli : ${__VERSION_APPLI__}${estDansAppliBureau() ? ' (Topo Bureau)' : recepteur ? (estDansAppliWindows() ? ' (Topo Tablette)' : ' (appli Android)') : ''}</p>
+      ${recepteur || estDansAppliBureau() ? `<div class="mise-a-jour-reglages">
         <button type="button" class="bouton-lien bouton-lien-neutre" data-action="chercher-mise-a-jour">Chercher une mise à jour</button>
         <span class="aide" data-zone="mise-a-jour" role="status"></span>
       </div>` : ''}
@@ -395,8 +395,10 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     const zone = fenetre.querySelector('[data-zone="mise-a-jour"]');
     zone.textContent = 'Recherche…';
     // 0.237.0 : dans l'appli Windows, on cherche le dernier Topo.exe ; il s'installe tout seul (l'appli se relance).
-    const windows = estDansAppliWindows();
-    const apk = windows ? await exePublie() : await apkPublie();
+    // 0.277.0 : Topo Tablette (windows-derniere-version) ou Topo Bureau (bureau-derniere-version) : même installation.
+    const bureau = estDansAppliBureau();
+    const windows = estDansAppliWindows() || bureau;
+    const apk = bureau ? await exeBureauPublie() : windows ? await exePublie() : await apkPublie();
     if (!apk) zone.textContent = 'Impossible de savoir (pas de réseau ?)';
     else if (!estPlusRecente(apk.version, __VERSION_APPLI__)) zone.textContent = `À jour (version ${__VERSION_APPLI__})`;
     else if (windows) {

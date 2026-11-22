@@ -1,4 +1,4 @@
-// Pont entre l'appli web et l'appli Windows (Topo.exe, dossier windows/Topo).
+// Pont entre l'appli web et les appli Windows (Topo Tablette et Topo Bureau, dossiers windows/Topo et windows/TopoBureau).
 // Ce script est glissé dans la page par la fenêtre Windows AVANT le reste de l'appli. Il fabrique l'objet
 // window.AppliAndroid avec les MÊMES fonctions que l'APK Android (voir src/android/pont.js et PontAndroid.kt) :
 // l'appli web marche donc pareil sur les deux, sans rien savoir de Windows.
@@ -89,9 +89,12 @@
     }, true);
   }
 
-  window.AppliAndroid = {
-    // Vrai seulement ici : permet à l'appli web d'adapter les rares choses propres à Windows (mise à jour).
-    estWindows: true,
+  // Commun à Topo Tablette et Topo Bureau.
+  var appli = {
+    // Vrai seulement dans Topo Tablette : permet à l'appli web d'adapter les rares choses propres à la tablette Windows.
+    estWindows: !depart.bureau,
+    // 0.277.0 : vrai dans Topo Bureau (PC) : pas de récepteur, l'appli web se comporte comme le site PC (src/android/pont.js).
+    estBureau: Boolean(depart.bureau),
     versionWindows: depart.version || '',
 
     // --- Fichiers ---
@@ -99,49 +102,63 @@
     partagerFichier: function (nom, type, contenuBase64) { envoyer('partagerFichier', nom, type, contenuBase64, ''); },
     partagerFichierMail: function (nom, type, contenuBase64, adresse) { envoyer('partagerFichier', nom, type, contenuBase64, adresse || ''); },
 
-    // --- Récepteur ---
-    choisirRecepteur: function () { envoyer('choisirRecepteur'); },
-    reconnecterRecepteur: function () { envoyer('reconnecterRecepteur'); },
-    deconnecterRecepteur: function () { envoyer('deconnecterRecepteur'); },
-    choisirRecepteur2: function () { envoyer('choisirRecepteur2'); },
-    deconnecterRecepteur2: function () { envoyer('deconnecterRecepteur2'); },
-
-    // --- Laser Leica DISTO en Bluetooth (Test laser) : pas encore sous Windows (APK seulement) ---
-    choisirLaser: function () { alert('Laser en Bluetooth : pas encore dans l\'appli Windows (tablette Android seulement).'); },
-    deconnecterLaser: function () {},
-    mesurerLaser: function () { return false; },
-    etatLaser: function () { return 'deconnecte'; },
-
-    // Point à prendre maintenant : la copie a moins d'une seconde, sinon on refuse (jamais de point périmé).
-    prendrePoint: function () {
-      if (copie.point && Date.now() - copie.pointRecuLe <= 1000) return copie.point;
-      return JSON.stringify({ ok: false, raison: 'Pas de position récente du récepteur' });
-    },
-
-    demarrerJournalNmea: function (secondes) { copie.journal = ''; envoyer('demarrerJournalNmea', secondes); },
-    lireJournalNmea: function () { return copie.journal; },
-
-    // --- Corrections RTK par internet ---
-    lireReglagesCorrections: function () { return copie.reglages[1]; },
-    demarrerCorrections: function (texteJson) { demarrerCorrections(1, texteJson); },
-    arreterCorrections: function () { retoucherReglages(1, { actives: false }); envoyer('arreterCorrections'); },
-    lireReglagesCorrections2: function () { return copie.reglages[2]; },
-    demarrerCorrections2: function (texteJson) { demarrerCorrections(2, texteJson); },
-    arreterCorrections2: function () { retoucherReglages(2, { actives: false }); envoyer('arreterCorrections2'); },
-    choisirModeCorrections2: function (mode) { envoyer('choisirModeCorrections2', mode); },
-
     // --- Divers ---
     demanderJetonDrive: function (renouveler) { envoyer('demanderJetonDrive', Boolean(renouveler)); },
     fermerAppli: function () { envoyer('fermerAppli'); },
-    modeleAppareil: function () { return depart.modele || 'Tablette Windows'; },
-    activerToucheVolume: function () { /* pas de touche « volume » sous Windows */ },
+    modeleAppareil: function () { return depart.modele || (depart.bureau ? 'PC Windows' : 'Tablette Windows'); },
     vibrer: function () { /* pas de vibreur sous Windows */ },
     ouvrirAnydesk: function () { envoyer('ouvrirAnydesk'); },
     lireAdresse: function (numero, adresse) { envoyer('lireAdresse', numero, adresse); },
-    // Propre à Windows : télécharge le nouveau Topo.exe, le met à la place de celui-ci et relance l'appli.
+    // Propre à Windows : télécharge le nouveau .exe, le met à la place de celui-ci et relance l'appli.
     installerMiseAJour: function (adresse) { envoyer('installerMiseAJour', adresse); },
-    // Propre à Windows (0.266.0) : boutons + / − de la tablette → changer de programme. quoi : 'plus', 'moins', 'oublier', 'annuler'.
-    apprendreBouton: function (quoi) { envoyer('apprendreBouton', quoi); },
-    lireBoutonsTablette: function () { return copie.boutons; },
   };
+
+  // Seulement Topo Bureau (0.280.0, calage de plans) : plan DWG (et ses xrefs) choisi dans une fenêtre Windows,
+  // converti en DXF par ODA File Converter ; réponse par window.recevoirConversionDwg(numero, { fichiers | erreur }).
+  if (depart.bureau) appli.choisirDwg = function (numero) { envoyer('choisirDwg', numero); };
+
+  // Seulement Topo Tablette : récepteur GNSS, corrections NTRIP, journal NMEA, laser, boutons + / −.
+  // (Topo Bureau ne les a pas : l'appli web voit alors « pas de récepteur », comme sur le site.)
+  if (!depart.bureau) {
+    var tablette = {
+      // --- Récepteur ---
+      choisirRecepteur: function () { envoyer('choisirRecepteur'); },
+      reconnecterRecepteur: function () { envoyer('reconnecterRecepteur'); },
+      deconnecterRecepteur: function () { envoyer('deconnecterRecepteur'); },
+      choisirRecepteur2: function () { envoyer('choisirRecepteur2'); },
+      deconnecterRecepteur2: function () { envoyer('deconnecterRecepteur2'); },
+
+      // --- Laser Leica DISTO en Bluetooth (Test laser) : pas encore sous Windows (APK seulement) ---
+      choisirLaser: function () { alert('Laser en Bluetooth : pas encore dans l\'appli Windows (tablette Android seulement).'); },
+      deconnecterLaser: function () {},
+      mesurerLaser: function () { return false; },
+      etatLaser: function () { return 'deconnecte'; },
+
+      // Point à prendre maintenant : la copie a moins d'une seconde, sinon on refuse (jamais de point périmé).
+      prendrePoint: function () {
+        if (copie.point && Date.now() - copie.pointRecuLe <= 1000) return copie.point;
+        return JSON.stringify({ ok: false, raison: 'Pas de position récente du récepteur' });
+      },
+
+      demarrerJournalNmea: function (secondes) { copie.journal = ''; envoyer('demarrerJournalNmea', secondes); },
+      lireJournalNmea: function () { return copie.journal; },
+
+      // --- Corrections RTK par internet ---
+      lireReglagesCorrections: function () { return copie.reglages[1]; },
+      demarrerCorrections: function (texteJson) { demarrerCorrections(1, texteJson); },
+      arreterCorrections: function () { retoucherReglages(1, { actives: false }); envoyer('arreterCorrections'); },
+      lireReglagesCorrections2: function () { return copie.reglages[2]; },
+      demarrerCorrections2: function (texteJson) { demarrerCorrections(2, texteJson); },
+      arreterCorrections2: function () { retoucherReglages(2, { actives: false }); envoyer('arreterCorrections2'); },
+      choisirModeCorrections2: function (mode) { envoyer('choisirModeCorrections2', mode); },
+
+      activerToucheVolume: function () { /* pas de touche « volume » sous Windows */ },
+      // Propre à Windows (0.266.0) : boutons + / − de la tablette → changer de programme. quoi : 'plus', 'moins', 'oublier', 'annuler'.
+      apprendreBouton: function (quoi) { envoyer('apprendreBouton', quoi); },
+      lireBoutonsTablette: function () { return copie.boutons; },
+    };
+    Object.keys(tablette).forEach(function (cle) { appli[cle] = tablette[cle]; });
+  }
+
+  window.AppliAndroid = appli;
 })();

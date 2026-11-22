@@ -10,7 +10,7 @@ using System.Windows.Forms;
 
 namespace Topo
 {
-    // Point d'entrée de l'appli Windows « Topo.exe ».
+    // Point d'entrée des appli Windows « Topo Tablette » et « Topo Bureau » (même code, voir Edition.cs).
     // Tout est rangé DANS ce seul fichier .exe (appli web, géoïde, bibliothèque WebView2) : rien à installer à côté,
     // et une mise à jour = remplacer un fichier.
     static class Programme
@@ -35,11 +35,11 @@ namespace Topo
 
             // Une seule fenêtre Topo à la fois (deux fenêtres se disputeraient le récepteur et les projets).
             bool premiere;
-            using (var verrou = new Mutex(true, "Topo-appli-windows", out premiere))
+            using (var verrou = new Mutex(true, Edition.Verrou, out premiere))
             {
                 if (!premiere)
                 {
-                    MessageBox.Show("Topo est déjà ouvert.", "Topo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(Edition.Nom + " est déjà ouvert.", Edition.Nom, MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
                 // Connexions https modernes (Google, GitHub).
@@ -67,8 +67,8 @@ namespace Topo
             string texte = erreur == null ? "erreur inconnue" : erreur.ToString();
             try { File.AppendAllText(Path.Combine(Reglages.DossierDonnees(), "erreurs.txt"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\r\n" + texte + "\r\n\r\n", Encoding.UTF8); }
             catch (Exception) { /* disque plein : le message suffit */ }
-            MessageBox.Show("Erreur imprévue dans Topo :\r\n" + (erreur == null ? texte : erreur.Message) +
-                "\r\n\r\n(Détail noté dans le fichier erreurs.txt du dossier Topo.)", "Topo", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show("Erreur imprévue dans " + Edition.Nom + " :\r\n" + (erreur == null ? texte : erreur.Message) +
+                "\r\n\r\n(Détail noté dans le fichier erreurs.txt du dossier " + Edition.DossierDonnees + ".)", Edition.Nom, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

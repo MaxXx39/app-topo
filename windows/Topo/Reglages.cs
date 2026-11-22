@@ -28,7 +28,7 @@ namespace Topo
         // Dossier des données de l'appli sur cette tablette (créé au besoin).
         public static string DossierDonnees()
         {
-            string dossier = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Topo");
+            string dossier = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Edition.DossierDonnees);
             Directory.CreateDirectory(dossier);
             return dossier;
         }

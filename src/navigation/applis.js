@@ -7,7 +7,7 @@
 // Une application : cle, titre, couleur (fond du bouton), texte (couleur du texte sur ce fond),
 // icone (tracé SVG 24 × 24), niveau ('intermediaire' / 'expert' : mode minimum), apk (vrai : seulement
 // dans l'appli Android, avec un récepteur), site (vrai : aussi sur le site), titreSite (nom sur le site),
-// siteSeulement (vrai : jamais dans l'APK ni dans Topo.exe, 0.274.0).
+// siteSeulement (vrai : jamais dans l'APK ni dans Topo Tablette, 0.274.0 ; oui sur le site et dans Topo Bureau, 0.277.0).
 // 0.159.0 : Réglages n'est plus une application (bouton à part en bas de la page Applications).
 export const APPLIS = [
   {
@@ -98,6 +98,18 @@ export const APPLIS = [
     siteSeulement: true,
     niveau: 'expert',
     icone: '<rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18" />',
+  },
+  {
+    // Calage de plans (0.278.0, Expert, site et Topo Bureau) : caler un plan reçu sur un plan MN95 du projet.
+    cle: 'calage',
+    titre: 'Calage de plans',
+    court: 'Calage',
+    couleur: '#1e40af',
+    texte: '#ffffff',
+    site: true,
+    siteSeulement: true,
+    niveau: 'expert',
+    icone: '<rect x="3" y="3" width="10" height="10" /><path d="M11 21l10-4-4-10" /><path d="M13 13l4 4" stroke-dasharray="2 2" />',
   },
   {
     cle: 'calculs',

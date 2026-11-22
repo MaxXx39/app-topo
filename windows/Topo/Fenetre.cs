@@ -56,14 +56,15 @@ namespace Topo
             boutons = new BoutonsTablette(reglages, action => { try { if (!IsDisposed && IsHandleCreated) BeginInvoke(action); } catch (Exception) { /* fenêtre fermée */ } });
             boutons.QuandChange = json => Executer("window.__topoWindows&&window.__topoWindows.boutons&&window.__topoWindows.boutons(" + json + ")");
 
-            Text = "Topo " + Version();
+            Text = Edition.Nom + " " + Version();
             Icon = Ressources.Icone();
             BackColor = Color.FromArgb(0x1b, 0x2b, 0x36);
             MinimumSize = new Size(480, 360);
             // Plein écran (sans barre de titre ni barre des tâches), comme sur la tablette Android : tout l'écran
             // est pour l'appli. On la ferme par « Fermer l'appli » du menu. Touche F11 (clavier) : fenêtre normale.
             KeyPreview = true;
-            pleinEcran = reglages.Texte("plein_ecran", "oui") != "non";
+            // Topo Bureau (PC) : fenêtre normale au départ ; Topo Tablette : plein écran.
+            pleinEcran = reglages.Texte("plein_ecran", Edition.Bureau ? "non" : "oui") != "non";
             AppliquerPleinEcran();
 
             vue.Dock = DockStyle.Fill;
@@ -154,16 +155,16 @@ namespace Topo
             catch (WebView2RuntimeNotFoundException)
             {
                 DialogResult choix = MessageBox.Show(this,
-                    "Il manque « Microsoft Edge WebView2 Runtime » sur cette tablette (le moteur qui affiche l'appli).\r\n\r\n" +
-                    "Touchez OK pour ouvrir la page de téléchargement de Microsoft, installez-le, puis relancez Topo.",
-                    "Topo", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+                    "Il manque « Microsoft Edge WebView2 Runtime » sur cet appareil (le moteur qui affiche l'appli).\r\n\r\n" +
+                    "Touchez OK pour ouvrir la page de téléchargement de Microsoft, installez-le, puis relancez " + Edition.Nom + ".",
+                    Edition.Nom, MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
                 if (choix == DialogResult.OK) OuvrirDehors("https://go.microsoft.com/fwlink/p/?LinkId=2124703");
                 Close();
                 return;
             }
             catch (Exception erreur)
             {
-                MessageBox.Show(this, "Topo ne peut pas démarrer :\r\n" + erreur.Message, "Topo", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(this, Edition.Nom + " ne peut pas démarrer :\r\n" + erreur.Message, Edition.Nom, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 Close();
                 return;
             }
@@ -217,6 +218,8 @@ namespace Topo
             await coeur.AddScriptToExecuteOnDocumentCreatedAsync(ScriptDuPont());
             coeur.Navigate(ServeurAppli.ADRESSE_ACCUEIL);
 
+            // Topo Bureau : pas de récepteur, de corrections, de position Windows ni de boutons de tablette.
+            if (Edition.Bureau) return;
             // Essai à 2 récepteurs : le 2e reçoit une copie des corrections du 1er, ou a sa propre connexion.
             AppliquerModeCorrections2();
             // Corrections par internet laissées en marche la dernière fois : on les reprend.
@@ -239,6 +242,7 @@ namespace Topo
                 { "modele", ModeleAppareil() },
                 { "version", Version() },
                 { "boutons", boutons.EnJson() },
+                { "bureau", Edition.Bureau }, // pont-windows.js : Topo Bureau = sans récepteur, l'appli web se comporte comme le site PC
             };
             return (Ressources.Texte("pont-windows.js") ?? "").Replace("/*DEPART*/ {}", Json.Ecrire(depart));
         }
@@ -246,7 +250,9 @@ namespace Topo
         void ServirFichier(object expediteur, CoreWebView2WebResourceRequestedEventArgs e)
         {
             string type;
-            byte[] contenu = serveur.Contenu(e.Request.Uri, out type);
+            byte[] contenu = ContenuConverti(e.Request.Uri);
+            if (contenu != null) type = "application/dxf";
+            else contenu = serveur.Contenu(e.Request.Uri, out type);
             if (contenu == null)
             {
                 e.Response = environnement.CreateWebResourceResponse(new MemoryStream(new byte[0]), 404, "Not Found", "Content-Type: text/plain");
@@ -264,6 +270,7 @@ namespace Topo
             double zoom;
             int force = reglages.Entier("zoom_ecran", 0);
             if (force >= 30 && force <= 300) zoom = force / 100.0;
+            else if (Edition.Bureau) zoom = 1.0; // PC : comme le site dans un navigateur (Windows gère déjà l'échelle de l'écran)
             else
             {
                 double echelleWindows = EchelleWindows();
@@ -359,6 +366,7 @@ namespace Topo
                     case "fermerAppli": Close(); break;
                     case "ouvrirAnydesk": OuvrirAnydesk(); break;
                     case "lireAdresse": LireAdresse(Nombre(args, 0), Texte(args, 1)); break;
+                    case "choisirDwg": ChoisirDwg(Nombre(args, 0)); break;
                     case "installerMiseAJour": InstallerMiseAJour(Texte(args, 0)); break;
                     case "montrerClavier": Clavier(true); break;
                     case "cacherClavier": Clavier(false); break;
@@ -577,7 +585,7 @@ namespace Topo
             if (contenu == null) { Message("Envoi impossible : fichier mal transmis."); return; }
             try
             {
-                string dossier = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Topo", "Envois");
+                string dossier = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), Edition.DossierEnvois, "Envois");
                 Directory.CreateDirectory(dossier);
                 string chemin = Path.Combine(dossier, NomPropre(nom));
                 File.WriteAllBytes(chemin, contenu);
@@ -617,6 +625,77 @@ namespace Topo
 
         // Cadastre : lit une adresse internet pour la page, sans la protection « CORS » du navigateur.
         // Seulement en https et vers les services du cadastre.
+        // =====================================================================
+        // Plans DWG (0.280.0, Topo Bureau, calage de plans) : conversion par ODA File Converter, voir ConversionDwg.cs
+        // =====================================================================
+
+        const string DOSSIER_CONVERSIONS = "__conversion/";
+        // Dernière conversion : nom du DXF -> octets, servis à la page à https://topo.appli/app-topo/__conversion/<n°>/<nom>.
+        readonly Dictionary<string, byte[]> conversions = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+
+        byte[] ContenuConverti(string adresse)
+        {
+            string chemin = ServeurAppli.CheminDuFichier(adresse);
+            if (chemin == null || !chemin.StartsWith(DOSSIER_CONVERSIONS, StringComparison.Ordinal)) return null;
+            byte[] octets;
+            lock (conversions) return conversions.TryGetValue(chemin.Substring(DOSSIER_CONVERSIONS.Length), out octets) ? octets : null;
+        }
+
+        void ChoisirDwg(int numero)
+        {
+            string[] choisis;
+            using (var fenetre = new OpenFileDialog())
+            {
+                fenetre.Title = "Plan DWG ou DXF (et ses xrefs : Ctrl + clic)";
+                fenetre.Filter = "Plans DWG / DXF|*.dwg;*.dxf|Tous les fichiers|*.*";
+                fenetre.Multiselect = true;
+                string dernier = reglages.Texte("dossier_plans");
+                if (!string.IsNullOrEmpty(dernier) && Directory.Exists(dernier)) fenetre.InitialDirectory = dernier;
+                if (fenetre.ShowDialog(this) != DialogResult.OK)
+                {
+                    Executer("window.recevoirConversionDwg && window.recevoirConversionDwg(" + numero + ",{\"fichiers\":[]})");
+                    return;
+                }
+                choisis = fenetre.FileNames;
+                reglages.Ecrire("dossier_plans", Path.GetDirectoryName(choisis[0]));
+            }
+            Message("Conversion du plan en DXF…");
+            string oda = ConversionDwg.TrouverOda(reglages.Texte("oda_chemin"), new[] {
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            });
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                var reponse = new Dictionary<string, object>();
+                try
+                {
+                    ConversionDwg.Resultat resultat = ConversionDwg.Convertir(choisis, oda);
+                    var fichiers = new List<object>();
+                    lock (conversions)
+                    {
+                        conversions.Clear();
+                        foreach (var f in resultat.Fichiers)
+                        {
+                            string cle = numero + "/" + f.Key;
+                            conversions[cle] = f.Value;
+                            fichiers.Add(new Dictionary<string, object> {
+                                { "nom", f.Key },
+                                { "adresse", ServeurAppli.ADRESSE_ACCUEIL + DOSSIER_CONVERSIONS + numero + "/" + Uri.EscapeDataString(f.Key) },
+                                { "xrefTrouve", resultat.XrefsTrouves.Exists(x => string.Equals(Path.GetFileNameWithoutExtension(x), Path.GetFileNameWithoutExtension(f.Key), StringComparison.OrdinalIgnoreCase)) },
+                            });
+                        }
+                    }
+                    reponse["fichiers"] = fichiers;
+                }
+                catch (Exception erreur)
+                {
+                    reponse.Clear();
+                    reponse["erreur"] = erreur.Message;
+                }
+                Executer("window.recevoirConversionDwg && window.recevoirConversionDwg(" + numero + "," + Json.Ecrire(reponse) + ")");
+            });
+        }
+
         void LireAdresse(int numero, string adresse)
         {
             ThreadPool.QueueUserWorkItem(delegate

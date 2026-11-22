@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { versionDuTitre, estPlusRecente, versionPubliee, apkPublie, exePublie } from '../src/outils/mise-a-jour.js';
+import { versionDuTitre, estPlusRecente, versionPubliee, apkPublie, exePublie, exeBureauPublie } from '../src/outils/mise-a-jour.js';
 
 describe('mise à jour de l\'APK', () => {
   it('lit la version dans le titre de la release', () => {
@@ -29,15 +29,27 @@ describe('mise à jour de l\'APK', () => {
     expect((await apkPublie(sans)).adresse).toMatch(/Topo\.apk$/);
   });
 
-  it('appli Windows : lit la release « windows-derniere-version » et donne le Topo-<version>.exe', async () => {
+  it('Topo Tablette : lit la release « windows-derniere-version » et donne le TopoTablette-<version>.exe', async () => {
     const adresses = [];
     const avec = async (adresse) => {
       adresses.push(adresse);
-      return { ok: true, json: async () => ({ name: 'Windows - dernière version (0.237.0, n° 3, main)', assets: [{ name: 'Topo.exe', browser_download_url: 'https://x/Topo.exe' }, { name: 'Topo-0.237.0.exe', browser_download_url: 'https://x/Topo-0.237.0.exe' }] }) };
+      return { ok: true, json: async () => ({ name: 'Windows - dernière version (0.277.0, n° 3, main)', assets: [{ name: 'Topo.exe', browser_download_url: 'https://x/Topo.exe' }, { name: 'Topo-0.277.0.exe', browser_download_url: 'https://x/Topo-0.277.0.exe' }, { name: 'TopoTablette-0.277.0.exe', browser_download_url: 'https://x/TopoTablette-0.277.0.exe' }] }) };
     };
-    expect(await exePublie(avec)).toEqual({ version: '0.237.0', adresse: 'https://x/Topo-0.237.0.exe' });
+    expect(await exePublie(avec)).toEqual({ version: '0.277.0', adresse: 'https://x/TopoTablette-0.277.0.exe' });
     expect(adresses[0]).toMatch(/windows-derniere-version$/);
-    const sans = async () => ({ ok: true, json: async () => ({ name: 'Windows (0.237.0, n° 3, main)', assets: [] }) });
-    expect((await exePublie(sans)).adresse).toMatch(/windows-derniere-version\/Topo\.exe$/);
+    const sans = async () => ({ ok: true, json: async () => ({ name: 'Windows (0.277.0, n° 3, main)', assets: [] }) });
+    expect((await exePublie(sans)).adresse).toMatch(/windows-derniere-version\/TopoTablette\.exe$/);
+  });
+
+  it('Topo Bureau (0.277.0) : release « bureau-derniere-version », TopoBureau-<version>.exe', async () => {
+    const adresses = [];
+    const avec = async (adresse) => {
+      adresses.push(adresse);
+      return { ok: true, json: async () => ({ name: 'Topo Bureau - dernière version (0.277.0, n° 4, main)', assets: [{ name: 'TopoBureau-0.277.0.exe', browser_download_url: 'https://x/TopoBureau-0.277.0.exe' }] }) };
+    };
+    expect(await exeBureauPublie(avec)).toEqual({ version: '0.277.0', adresse: 'https://x/TopoBureau-0.277.0.exe' });
+    expect(adresses[0]).toMatch(/bureau-derniere-version$/);
+    const sans = async () => ({ ok: true, json: async () => ({ name: 'Topo Bureau (0.277.0)', assets: [] }) });
+    expect((await exeBureauPublie(sans)).adresse).toMatch(/bureau-derniere-version\/TopoBureau\.exe$/);
   });
 });
