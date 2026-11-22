@@ -12,6 +12,9 @@ import {
 } from './planning.js';
 import { pdfDuMois } from './pdf-mois.js';
 import { excelDuMois } from './excel-mois.js';
+import {
+  comparer, resultatDuJour, ecartsAVerifier, texteEcart, propositionsDePrerempli, appliquerPropositions, STATUTS_COMPARAISON,
+} from './comparaison.js';
 
 const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 const TAILLE_PILE = 30; // niveaux d'annulation (Ctrl+Z), gardés tant que la page est ouverte
@@ -19,11 +22,14 @@ const DEPLACEMENT_MINI = 4; // px : en dessous, c'est un toucher (ouvrir la barr
 
 /**
  * Crée l'écran. obtenirParc() : le parc en cours ; changer(action) : applique et enregistre (voir appli.js) ;
- * message(texte, durée, options) ; enregistrer(blob, nom) : fichier exporté (PDF, Excel) ; redessiner().
+ * message(texte, durée, options) ; enregistrer(blob, nom) : fichier exporté (PDF, Excel) ; redessiner() ;
+ * chargerJournaux() : journaux des tablettes (recap, Drive + ce PC) pour « Réel » et « Comparer » (voir comparaison.js).
  */
-export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer, redessiner }) {
+export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer, redessiner, chargerJournaux = null }) {
   const jour = aujourdhui();
   const etat = { annee: Number(jour.slice(0, 4)), mois: Number(jour.slice(5, 7)), vue: 'mois', inactifs: false, reperer: '' };
+  // Affichage du mois (0.276.0) : 'prevu' (le planning), 'reel' (ce que les journaux ont vu), 'comp' (les deux, avec les écarts).
+  const recap = { affichage: 'prevu', journaux: null, chargement: false, erreur: '' };
   const pile = []; // copies des affectations avant chaque changement du planning
   let geste = null; // glisser en cours
 
@@ -252,6 +258,58 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
     return undefined;
   }
 
+  /** Lit les journaux des tablettes (« Réel », « Comparer ») ; une erreur est écrite sous la barre, jamais en silence. */
+  async function chargerRecap() {
+    if (!chargerJournaux) return;
+    recap.chargement = true;
+    recap.erreur = '';
+    redessiner();
+    try {
+      recap.journaux = await chargerJournaux();
+    } catch (erreur) {
+      recap.erreur = erreur.message;
+    }
+    recap.chargement = false;
+    redessiner();
+  }
+
+  /** Comparaison d'après le parc d'aujourd'hui (refaite à chaque dessin : un préremplissage la met à jour). */
+  const comparaisonCourante = () => (recap.journaux ? comparer(obtenirParc(), recap.journaux, jour) : null);
+
+  async function preremplir() {
+    const comparaison = comparaisonCourante();
+    if (!comparaison) return message('Les journaux ne sont pas chargés.', 4000);
+    const { propositions, sansChantier } = propositionsDePrerempli(obtenirParc(), comparaison);
+    if (!propositions.length) {
+      return message(sansChantier ? `Rien à préremplir : ${sansChantier} jour(s) vus dans des projets sans chantier dans le parc (onglet Chantiers › « Depuis les projets »).` : 'Rien à préremplir : aucun jour vu sans planning.', 6000);
+    }
+    const parc = obtenirParc();
+    const liste = propositions.slice(0, 10).map((p) => `${parc.articles.find((a) => a.id === p.articleId)?.numero ?? '?'} → ${nomDuChantier(parc.chantiers.find((c) => c.id === p.chantierId))} (${dateSuisse(p.debut).slice(0, 5)}${p.fin === p.debut ? '' : ` → ${dateSuisse(p.fin).slice(0, 5)}`})`).join(' · ');
+    const reponse = await demanderChoix({
+      titre: `Ajouter ${propositions.length} affectation(s) au planning ?`,
+      texte: `${liste}${propositions.length > 10 ? ' …' : ''}${sansChantier ? ` · ${sansChantier} jour(s) ignorés (projet sans chantier)` : ''}`,
+      boutons: [{ cle: 'oui', texte: 'Ajouter', principal: true }, { cle: 'non', texte: 'Annuler' }],
+    });
+    if (reponse !== 'oui') return undefined;
+    const { ok, resultat } = await modifier((p) => appliquerPropositions(p, propositions));
+    if (ok) message(`${resultat.posees} affectation(s) ajoutée(s) (${resultat.jours} jour(s)) : à relire dans « Prévu »`, 7000, { ok: true });
+    redessiner();
+    return undefined;
+  }
+
+  /** Détail d'un jour (toucher une case en « Réel » ou « Comparer »). */
+  function detailDuJour(articleId, iso) {
+    const parc = obtenirParc();
+    const r = resultatDuJour(comparaisonCourante(), articleId, iso);
+    if (!r) return;
+    const numero = parc.articles.find((a) => a.id === articleId)?.numero ?? '?';
+    const prevu = r.prevu ? nomDuChantier(parc.chantiers.find((c) => c.id === r.prevu.chantierId)) : 'rien';
+    const vu = r.vus.length
+      ? r.vus.map((v) => `${v.chantierId ? nomDuChantier(parc.chantiers.find((c) => c.id === v.chantierId)) : v.projet || 'projet sans nom'} (${[v.appareil, v.utilisateur].filter(Boolean).join(', ')}${v.points ? `, ${v.points} point(s)` : ''}${v.implantations ? `, ${v.implantations} implantation(s)` : ''})`).join(' + ')
+      : 'rien';
+    message(`${numero} · ${dateSuisse(iso)} : prévu ${prevu} · vu ${vu} · ${STATUTS_COMPARAISON[r.statut]}`, 9000);
+  }
+
   /** Actions des boutons (data-action) ; renvoie vrai si l'action est celle du planning. */
   function agir(action, bouton) {
     const actions = {
@@ -261,13 +319,17 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
       'vue-mois': () => { etat.vue = 'mois'; },
       'vue-annee': () => { etat.vue = 'annee'; },
       'ouvrir-mois': () => Object.assign(etat, { vue: 'mois', mois: Number(bouton.dataset.mois) }),
+      'affichage-prevu': () => { recap.affichage = 'prevu'; },
+      'affichage-reel': () => { recap.affichage = 'reel'; },
+      'affichage-comp': () => { recap.affichage = 'comp'; },
     };
     if (actions[action]) {
       actions[action]();
-      redessiner();
+      if (action.startsWith('affichage-') && recap.affichage !== 'prevu' && !recap.journaux && !recap.chargement) chargerRecap();
+      else redessiner();
       return true;
     }
-    const lentes = { annuler, saisir, prolonger, 'exporter-pdf': () => exporter('pdf'), 'exporter-excel': () => exporter('xlsx'), 'ouvrir-affectation': () => ouvrirAffectation(bouton.dataset.id) };
+    const lentes = { annuler, saisir, prolonger, preremplir, 'actualiser-recap': chargerRecap, 'exporter-pdf': () => exporter('pdf'), 'exporter-excel': () => exporter('xlsx'), 'ouvrir-affectation': () => ouvrirAffectation(bouton.dataset.id) };
     if (!lentes[action]) return false;
     Promise.resolve(lentes[action]()).catch((erreur) => message(`Erreur : ${erreur.message}`, 8000));
     return true;
@@ -293,7 +355,11 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
         </span>
         <input type="search" data-planning="reperer" value="${echapper(etat.reperer)}" placeholder="Repérer (chantier, article…)" aria-label="Repérer un chantier ou un article" />
         <label class="case-materiel"><input type="checkbox" data-planning="inactifs" ${etat.inactifs ? 'checked' : ''} /> Inactifs</label>
-        ${etat.vue === 'mois' ? `
+        ${etat.vue === 'mois' && chargerJournaux ? `<span class="choix-vue" role="group" aria-label="Affichage du mois">
+          ${[['prevu', 'Prévu'], ['reel', 'Réel'], ['comp', 'Comparer']].map(([c, t]) => `<button type="button" class="${recap.affichage === c ? 'actif' : ''}" data-action="affichage-${c}" aria-pressed="${recap.affichage === c}">${t}</button>`).join('')}
+        </span>` : ''}
+        ${etat.vue === 'mois' && recap.affichage !== 'prevu' ? `<button type="button" class="bouton-secondaire" data-action="actualiser-recap" ${recap.chargement ? 'aria-disabled="true"' : ''}>${recap.chargement ? 'Lecture…' : '⟳ Relire le recap'}</button>` : ''}
+        ${etat.vue === 'mois' && recap.affichage === 'prevu' ? `
         <button type="button" class="bouton-secondaire" data-action="annuler" ${pile.length ? '' : 'aria-disabled="true"'} title="Ctrl+Z">↶ Annuler${pile.length ? ` (${pile.length})` : ''}</button>
         <button type="button" class="bouton-secondaire" data-action="prolonger">↦ Prolonger ${MOIS[moisPrecedent.mois - 1]}</button>
         <button type="button" class="bouton-secondaire" data-action="saisir">＋ Saisie</button>
@@ -302,14 +368,38 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
       </div>
       ${!parc.articles.length ? '<p class="aide">Ajoutez d\'abord des articles (onglet Parc) et des chantiers.</p>' : ''}
       <div class="cadre-planning">${etat.vue === 'annee' ? htmlAnnee() : htmlMois()}</div>
+      ${etat.vue === 'mois' && recap.affichage !== 'prevu' ? htmlRecap() : ''}
       <div class="bulle-planning" data-zone="bulle" hidden></div>`;
+  }
+
+  /** Sous la grille en « Réel » / « Comparer » : légende, avertissements, liste « À vérifier » et « Préremplir ». */
+  function htmlRecap() {
+    if (recap.chargement) return '<p class="aide">Lecture des journaux des tablettes…</p>';
+    if (recap.erreur) return `<p class="erreur">Journaux illisibles : ${echapper(recap.erreur)}</p>`;
+    const comparaison = comparaisonCourante();
+    if (!comparaison) return '<p class="aide">Journaux pas encore lus.</p>';
+    const parc = obtenirParc();
+    const ecarts = ecartsAVerifier(comparaison);
+    const court = (iso) => dateSuisse(iso).slice(0, 5);
+    const legende = [['ok', 'vu comme prévu'], ['ecart', 'vu sur un autre chantier'], ['sans', 'vu, rien de prévu'], ['absent', 'prévu, pas vu (jours ouvrés passés)']];
+    return `
+      <div class="legende-recap">${legende.map(([c, t]) => `<span><i class="vu vu-${c}"></i>${t}</span>`).join('')}</div>
+      ${!comparaison.premierJour ? '<p class="aide">Aucun jour du recap n\'est relié à un article du parc : choisir l\'article de chaque tablette dans Réglages › Drive, puis travailler dans un projet dont le nom commence par le n° du chantier.</p>' : `<p class="aide">Recap lu depuis le ${dateSuisse(comparaison.premierJour)}.</p>`}
+      ${comparaison.sansArticle.length ? `<p class="aide">Pas d'article du parc (donc pas comparées) : ${echapper(comparaison.sansArticle.join(', '))}.</p>` : ''}
+      <div class="carte"><h2>À vérifier <span class="pastille ${ecarts.length ? 'p-ecart' : 'p-ok'}">${ecarts.length}</span></h2>
+        ${ecarts.length ? `<ul class="liste">${ecarts.map((e) => `<li><span class="vu vu-${e.statut}"></span> ${echapper(texteEcart(parc, e, court))}</li>`).join('')}</ul>` : '<p class="vide">Tout est conforme au planning.</p>'}
+        <div class="barre-materiel"><button type="button" class="bouton" data-action="preremplir">Préremplir les jours vus sans planning</button></div>
+      </div>`;
   }
 
   /** Vrai si le texte « Repérer » se trouve dans ce qui est donné. */
   const repere = (...textes) => !etat.reperer.trim() || etat.reperer.toLowerCase().split(/\s+/).filter(Boolean).every((m) => textes.join(' ').toLowerCase().includes(m));
 
   function htmlMois() {
-    const d = donneesDuMois(obtenirParc(), etat.annee, etat.mois, { inactifs: etat.inactifs, avecVeille: true });
+    const parc = obtenirParc();
+    const d = donneesDuMois(parc, etat.annee, etat.mois, { inactifs: etat.inactifs, avecVeille: true });
+    const comparaison = recap.affichage === 'prevu' ? null : comparaisonCourante();
+    const reel = recap.affichage === 'reel';
     const colonne = (j) => j + 2; // colonne 1 = article ; la veille (j = 0) = colonne 2
     const classesJour = (x) => `jour-pl${x.semaine >= 5 ? ' we' : ''}${x.iso === jour ? ' auj' : ''}${x.j === 0 ? ' veille' : ''}${x.semaine === 0 && x.j > 1 ? ' lundi' : ''}`;
     const entete = `<div class="ligne-pl entete-pl"><div class="nom-pl">Article</div>${d.jours.map((x) => `<div class="${classesJour(x)}" style="grid-column:${colonne(x.j)}"><b>${x.j === 0 ? Number(x.iso.slice(8)) : x.j}</b>${JOURS_COURTS[x.semaine]}</div>`).join('')}</div>`;
@@ -319,8 +409,14 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
         const pale = etat.reperer.trim() && !repere(article.numero, article.designation) && !barres.some((b) => repere(b.principal, b.responsable));
         return `<div class="ligne-pl${pale ? ' pale' : ''}${article.statut !== 'actif' ? ' inactif' : ''}" data-article="${echapper(article.id)}">
           <div class="nom-pl"><span class="pastille-article" style="background:${article.couleur};color:${texteSurCouleur(article.couleur)}">${echapper(article.numero)}</span><span class="designation-pl">${echapper(article.designation)}</span></div>
-          ${d.jours.map((x) => `<div class="${classesJour(x)}" data-j="${x.j}" style="grid-column:${colonne(x.j)}"></div>`).join('')}
-          ${barres.map((b) => `<div class="barre-pl${b.avant ? ' avant' : ''}${b.apres ? ' apres' : ''}${etat.reperer.trim() && !repere(b.principal, b.responsable, article.numero) ? ' pale' : ''}" data-af="${echapper(b.af.id)}"
+          ${d.jours.map((x) => {
+            const r = comparaison ? resultatDuJour(comparaison, article.id, x.iso) : null;
+            if (!r) return `<div class="${classesJour(x)}" data-j="${x.j}" style="grid-column:${colonne(x.j)}"></div>`;
+            const chantierVu = r.vus.map((v) => parc.chantiers.find((c) => c.id === v.chantierId)).find(Boolean);
+            const fond = reel && r.vus.length ? `background:${article.couleur};color:${texteSurCouleur(article.couleur)}` : '';
+            return `<div class="${classesJour(x)} avec-vu" data-j="${x.j}" data-vu="${r.statut}" style="grid-column:${colonne(x.j)};${fond}">${reel && r.vus.length ? `<span class="chiffres-vu">${echapper(chantierVu ? chantierVu.cle.slice(-3) : '?')}</span>` : ''}${reel ? '' : `<i class="vu vu-${r.statut}"></i>`}</div>`;
+          }).join('')}
+          ${reel ? '' : barres.map((b) => `<div class="barre-pl${b.avant ? ' avant' : ''}${b.apres ? ' apres' : ''}${etat.reperer.trim() && !repere(b.principal, b.responsable, article.numero) ? ' pale' : ''}" data-af="${echapper(b.af.id)}"
               style="grid-column:${colonne(b.j1)} / ${colonne(b.j2) + 1};background:${article.couleur};color:${texteSurCouleur(article.couleur)}"
               title="${echapper(`${b.principal}${b.responsable ? ` – ${b.responsable}` : ''} · du ${dateSuisse(b.af.debut)} au ${dateSuisse(b.af.fin)}${b.af.remarque ? ` · ${b.af.remarque}` : ''}`)}">
               <span class="poignee-pl g" data-bord="g"></span>
@@ -328,7 +424,7 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
               <span class="poignee-pl d" data-bord="d"></span></div>`).join('')}
         </div>`;
       }).join('')}`).join('');
-    return `<div class="grille-planning" style="--jours:${d.jours.length}">${entete}${lignes || '<p class="vide">Aucun article à montrer.</p>'}</div>`;
+    return `<div class="grille-planning${comparaison ? ' lecture' : ''}${recap.affichage === 'comp' ? ' comparer' : ''}" style="--jours:${d.jours.length}">${entete}${lignes || '<p class="vide">Aucun article à montrer.</p>'}</div>`;
   }
 
   function htmlAnnee() {
@@ -412,6 +508,7 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
     page.addEventListener('pointerdown', (evenement) => {
       const ligne = evenement.target.closest('.grille-planning .ligne-pl[data-article]');
       if (!ligne || evenement.button > 0) return;
+      if (recap.affichage !== 'prevu') return; // « Réel » et « Comparer » : lecture seule (toucher une case = détail)
       const barre = evenement.target.closest('.barre-pl');
       const parc = obtenirParc();
       const j = jourSous(ligne, evenement.clientX);
@@ -456,6 +553,15 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
     };
     page.addEventListener('pointerup', (evenement) => { finir(evenement).catch((erreur) => message(`Erreur : ${erreur.message}`, 8000)); });
     page.addEventListener('pointercancel', (evenement) => { finir(evenement, true); });
+    // Toucher une case en « Réel » / « Comparer » : ce que le recap a vu ce jour-là.
+    page.addEventListener('click', (evenement) => {
+      if (recap.affichage === 'prevu') return;
+      const cellule = evenement.target.closest('.jour-pl[data-vu]');
+      const ligne = cellule?.closest('.ligne-pl[data-article]');
+      if (!ligne) return;
+      const iso = isoDe(Number(cellule.dataset.j));
+      detailDuJour(ligne.dataset.article, iso);
+    });
     page.addEventListener('input', (evenement) => {
       if (evenement.target.dataset.planning !== 'reperer') return;
       etat.reperer = evenement.target.value;

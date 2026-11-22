@@ -675,6 +675,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       ecrire: (parc) => avecDrive((s) => s.ecrireMateriel(parc)),
       ecrireFichier: (id, nom, blob) => avecDrive((s) => s.ecrireFichierMateriel(id, nom, blob)),
       lireFichier: (id) => avecDrive((s) => s.lireFichierMateriel(id)),
+      journaux: () => avecDrive((s) => s.lireJournaux()), // recap : journaux de toutes les tablettes (Planning › Réel / Comparer)
       supprimerFichier: (id) => avecDrive((s) => s.supprimerFichierMateriel(id)),
       retenirNoms: (parc) => retenirNomsMateriel(nomsPourTablettes(parc), parc.modifieLe),
     },

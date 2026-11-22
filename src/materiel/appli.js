@@ -22,6 +22,9 @@ import { creerEcranPlanning } from './ecran-planning.js';
 import { affectationDuJour, historiqueArticle, nomDuChantier, responsableDe, nombreDeJours, aujourdhui, finsProches } from './planning.js';
 import { creerSauvegarde, lireSauvegarde, nomSauvegarde } from './sauvegarde.js';
 import { creerXlsx } from '../recap/xlsx.js';
+import { reunirJournaux } from './comparaison.js';
+import { lireJournal } from '../recap/journal.js';
+import { appareil as appareilDuJournal } from '../partage/memoire.js';
 
 const PAGES = [['planning', 'Planning'], ['parc', 'Parc'], ['chantiers', 'Chantiers'], ['categories', 'Catégories'], ['sauvegarde', 'Sauvegarde']];
 const TAILLE_MAX_FICHIER = 5 * 1024 * 1024; // limite d'un envoi sur Drive
@@ -229,7 +232,20 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
     }
   }
 
-  const planning = creerEcranPlanning({ obtenirParc: () => parc, changer, message, enregistrer: enregistrerFichier, redessiner: () => dessiner() });
+  const planning = creerEcranPlanning({
+    obtenirParc: () => parc,
+    changer,
+    message,
+    enregistrer: enregistrerFichier,
+    redessiner: () => dessiner(),
+    // Recap des tablettes : journaux de Drive (toutes les tablettes) + celui de ce PC (plus récent que sa copie sur Drive).
+    chargerJournaux: async () => {
+      let drive = [];
+      if (materiel?.connecte()) drive = await materiel.journaux();
+      else message('Drive non connecté : seulement le journal de ce PC.', 5000);
+      return reunirJournaux(drive, lireJournal(appareilDuJournal()));
+    },
+  });
   planning.installer(page);
 
   // --- Dessin ---

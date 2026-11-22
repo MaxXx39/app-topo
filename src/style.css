@@ -14425,3 +14425,20 @@ dialog.page-materiel[open] {
 .bloc-sauvegarde { display: flex; flex-direction: column; gap: 8px; max-width: 900px; }
 .bloc-sauvegarde h4 { margin: 0; }
 .historique-fiche li { flex-wrap: wrap; }
+
+/* 0.276.0 : Matériel › Planning › Réel / Comparer (ronds de couleur du recap). */
+.vu { display: inline-block; width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--surface); flex: 0 0 auto; }
+.vu-ok { background: #1f9d55; }
+.vu-ecart { background: #c62828; }
+.vu-sans { background: #2563eb; }
+.vu-absent { background: #d97706; }
+.jour-pl.avec-vu { position: relative; align-items: center; justify-content: center; cursor: pointer; }
+.jour-pl.avec-vu .vu { position: relative; z-index: 2; pointer-events: none; }
+.grille-planning.lecture .jour-pl { cursor: default; }
+.grille-planning.lecture .jour-pl.avec-vu { cursor: pointer; }
+.grille-planning.lecture .barre-pl { pointer-events: none; cursor: default; }
+.grille-planning.comparer .barre-pl { opacity: 0.45; }
+.chiffres-vu { font-size: 0.68rem; font-weight: 700; }
+.legende-recap { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--gris); font-size: 0.85rem; }
+.legende-recap span { display: inline-flex; gap: 6px; align-items: center; }
+.liste .vu { vertical-align: middle; }
