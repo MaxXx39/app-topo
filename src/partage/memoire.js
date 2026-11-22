@@ -42,6 +42,14 @@ export function nommerUtilisateur(nom) {
   ecrire(CLE_APPAREIL, { ...appareil(), utilisateur: String(nom).trim().slice(0, 40) });
 }
 
+/**
+ * Article du parc (n° interne, ex. « 953 ») avec lequel travaille cette tablette (0.274.0) : la tablette
+ * et sa canne GNSS portent le même n°. Noté au journal du recap ; '' = pas choisi.
+ */
+export function choisirArticle(numero) {
+  ecrire(CLE_APPAREIL, { ...appareil(), article: String(numero ?? '').trim().slice(0, 100) });
+}
+
 export const etaitConnecte = () => lire(CLE_CONNECTE, false) === true;
 export const retenirConnexion = (connecte) => ecrire(CLE_CONNECTE, Boolean(connecte));
 

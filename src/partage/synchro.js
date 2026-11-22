@@ -27,6 +27,7 @@ export const NOM_PROJETS = 'Configuration Projet';
 // Recap (0.119.0) : journaux des appareils et fichier Excel de la semaine.
 export const NOM_RECAP = 'Recap';
 export const NOM_FICHIER_RECAP = 'Recap App Topo.xlsx';
+export const NOM_MATERIEL = 'Matériel';
 const TYPE_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 // Signe de vie de l'appareil qui a le projet (ms), et durée après laquelle son verrou expire.
 export const SIGNE_DE_VIE = 5 * 60 * 1000;
@@ -131,7 +132,71 @@ export function creerSynchro(drive, appareil) {
     return recapId;
   }
 
+  // Matériel (0.274.0) : dossier « App Topo › Matériel » (créé au premier besoin) : le parc dans
+  // « materiel.json.gz », chaque photo ou document dans son propre fichier (propriété fichier = id).
+  let materielId = null;
+  async function dossierMateriel() {
+    if (materielId) return materielId;
+    await racine();
+    const trouves = await drive.lister(`'${appTopoId}' in parents and mimeType = '${TYPE_DOSSIER}' and appProperties has { key='topo' and value='materiel' }`);
+    materielId = trouves[0]?.id ?? (await drive.creerDossier(NOM_MATERIEL, appTopoId, { topo: 'materiel' })).id;
+    return materielId;
+  }
+  async function fichierParc() {
+    const dossier = await dossierMateriel();
+    return (await drive.lister(`'${dossier}' in parents and appProperties has { key='topo' and value='materiel-parc' }`))[0] ?? null;
+  }
+  async function fichierJoint(id) {
+    const dossier = await dossierMateriel();
+    return (await drive.lister(`'${dossier}' in parents and appProperties has { key='fichier' and value='${id}' }`))[0] ?? null;
+  }
+
   return {
+    /** Matériel : { parc, modifieLe } lu sur Drive, ou null s'il n'y est pas encore. */
+    async lireMateriel() {
+      const fichier = await fichierParc();
+      if (!fichier) return null;
+      return { parc: await decomprimer(await drive.lire(fichier.id)), modifieLe: fichier.appProperties?.modifieLe ?? null };
+    },
+
+    /** Date (modifieLe) du parc sur Drive, sans le télécharger ; null s'il n'y est pas. */
+    async dateMateriel() {
+      return (await fichierParc())?.appProperties?.modifieLe ?? null;
+    },
+
+    /** Écrit le parc sur Drive (fichier créé au premier envoi). */
+    async ecrireMateriel(parc) {
+      const fichier = await fichierParc();
+      const blob = new Blob([await comprimer(parc)], { type: 'application/gzip' });
+      const proprietes = { topo: 'materiel-parc', modifieLe: parc.modifieLe ?? '', envoyePar: appareil.id };
+      if (fichier) {
+        await drive.ecrireContenu(fichier.id, blob);
+        await drive.modifier(fichier.id, { proprietes });
+      } else {
+        const cree = await drive.creerFichier('materiel.json.gz', await dossierMateriel(), blob);
+        await drive.modifier(cree.id, { proprietes });
+      }
+    },
+
+    /** Matériel : envoie une photo ou un document (Blob) ; rien si déjà sur Drive (un fichier joint ne change jamais). */
+    async ecrireFichierMateriel(id, nom, blob) {
+      if (await fichierJoint(id)) return;
+      const cree = await drive.creerFichier(nom, await dossierMateriel(), blob);
+      await drive.modifier(cree.id, { proprietes: { topo: 'materiel-fichier', fichier: id } });
+    },
+
+    /** Matériel : photo ou document (Blob), ou null s'il n'est pas sur Drive. */
+    async lireFichierMateriel(id) {
+      const fichier = await fichierJoint(id);
+      return fichier ? drive.lire(fichier.id) : null;
+    },
+
+    /** Matériel : met une photo ou un document à la corbeille de Drive. */
+    async supprimerFichierMateriel(id) {
+      const fichier = await fichierJoint(id);
+      if (fichier) await drive.supprimer(fichier.id);
+    },
+
     /**
      * Recap (0.119.0) : écrit le journal de cet appareil (voir recap/journal.js) dans « App Topo ›
      * Recap » (un fichier par appareil, créé au premier envoi).

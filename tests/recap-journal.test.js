@@ -14,6 +14,15 @@ describe('journal de l\'appareil', () => {
     expect(j.jours[0]).toMatchObject({ jour: '2026-11-03', ouvertures: 1, points: 1, implantations: 1, sansControle: { points: 0, implantations: 0, depuis: null } });
   });
 
+  it('note l\'article du parc (0.274.0) : une ligne par article', () => {
+    const j = journalVide({ id: 'a1', nom: 'Tablette 1', article: '953' });
+    noter(j, projet, { type: 'point', controleRecent: true }, new Date(2026, 10, 3, 8, 0));
+    j.article = '954';
+    noter(j, projet, { type: 'point', controleRecent: true }, new Date(2026, 10, 3, 9, 0));
+    expect(j.jours.map((l) => [l.article, l.points])).toEqual([['953', 1], ['954', 1]]);
+    expect(journalVide().article).toBe('');
+  });
+
   it('note le travail fait sans contrôle, avec l\'heure du premier', () => {
     const j = journalVide();
     const premier = new Date(2026, 10, 3, 8, 0);

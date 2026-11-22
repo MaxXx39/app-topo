@@ -7,6 +7,7 @@
 // - tout en bas, le partage par Google Drive (pas besoin de le voir tout le temps), puis la version.
 // Le cartouche du PDF (dessiné par, date) se règle au moment du PDF (voir export/cartouche.js).
 import { ICONES_LIGNE } from '../outils/icones.js';
+import { valeurDansListe, CHOIX_AUTRE } from '../materiel/noms-tablette.js';
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { titreSection } from '../outils/section.js';
@@ -311,7 +312,7 @@ const ETATS_PARTAGE = {
  * vrai), avec un avertissement (le changer une fois réglé déconnecte de Drive) ; tant qu'il n'est
  * pas donné, la case est ouverte.
  */
-export function blocPartage({ etat, appareil }, { modifierNom = false, modifierUtilisateur = false } = {}) {
+export function blocPartage({ etat, appareil, noms = { articles: [], responsables: [] } }, { modifierNom = false, modifierUtilisateur = false, modifierArticle = false, autre = {} } = {}) {
   const [texte, classe] = ETATS_PARTAGE[etat.etat] ?? ['?', ''];
   const heure = etat.etat === 'a-jour' && etat.derniereSynchro ? ` · ${etat.derniereSynchro.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}` : '';
   const reprise = etat.etat === 'repris' && etat.repris
@@ -327,8 +328,15 @@ export function blocPartage({ etat, appareil }, { modifierNom = false, modifierU
       : `<p class="nom-appareil-fixe"><span>Cet appareil</span><strong>${echapper(appareil.nom)}</strong>
           <button type="button" class="bouton-crayon-libelles" data-action="modifierNomAppareil" title="Modifier le nom de l'appareil" aria-label="Modifier le nom de l'appareil">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button></p>`}
+    ${appareil.nom ? (modifierArticle
+      ? champListe({ quoi: 'article', titre: 'Article du parc', valeur: appareil.article, autre: autre.article, exemple: 'ex. 953',
+        options: (noms.articles ?? []).map((a) => [a.numero, `${[a.numero, a.designation].filter(Boolean).join(' · ')}${a.categorie ? ` (${a.categorie})` : ''}`]) })
+      : `<p class="nom-appareil-fixe"><span>Article du parc ${bulle('articleTablette')}</span><strong>${echapper(texteArticle(appareil.article, noms))}</strong>
+          <button type="button" class="bouton-crayon-libelles" data-action="modifierArticle" title="Changer l'article de la tablette" aria-label="Changer l'article de la tablette">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button></p>`) : ''}
     ${appareil.nom ? (modifierUtilisateur
-      ? `<label class="nom-appareil">Utilisateur <input type="text" data-champ="utilisateur" value="${echapper(appareil.utilisateur ?? '')}" placeholder="ex. Dupont" /></label>`
+      ? champListe({ quoi: 'utilisateur', titre: 'Utilisateur', valeur: appareil.utilisateur, autre: autre.utilisateur, exemple: 'ex. Dupont',
+        options: (noms.responsables ?? []).map((r) => [r, r]) })
       : `<p class="nom-appareil-fixe"><span>Utilisateur</span><strong>${echapper(appareil.utilisateur || '—')}</strong>
           <button type="button" class="bouton-crayon-libelles" data-action="modifierUtilisateur" title="Changer l'utilisateur de la tablette" aria-label="Changer l'utilisateur de la tablette">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m14 6 4 4" /></svg></button></p>`) : ''}
@@ -345,6 +353,32 @@ export function blocPartage({ etat, appareil }, { modifierNom = false, modifierU
     ${etat.message && !['a-jour', 'deconnecte'].includes(etat.etat) ? `<p class="${etat.etat === 'erreur' ? 'erreur' : 'aide'}">${echapper(etat.message)}</p>` : ''}
     ${reprise}
   </section>`;
+}
+
+/** « 953 · Canne RX2 » (article du parc de la tablette, d'après la liste du parc) ; « — » si pas choisi. */
+export function texteArticle(numero, noms) {
+  const n = String(numero ?? '').trim();
+  if (!n) return '—';
+  const article = (noms?.articles ?? []).find((a) => a.numero.toLowerCase() === n.toLowerCase());
+  return article?.designation ? `${n} · ${article.designation}` : n;
+}
+
+/**
+ * Liste déroulante de Réglages › Drive (0.274.0, article ou utilisateur de la tablette) : options
+ * [valeur, texte] du parc, puis « Autre… » qui ouvre un champ pour taper un nom ponctuel (choisi
+ * d'office si la valeur actuelle n'est pas dans la liste, ou s'il n'y a pas de liste).
+ */
+export function champListe({ quoi, titre, valeur, options, autre = false, exemple = '' }) {
+  const { valeur: v, dansListe } = valeurDansListe(valeur, options.map(([o]) => o));
+  const tape = autre || !dansListe || options.length === 0;
+  const choisie = options.find(([o]) => o.toLowerCase() === v.toLowerCase())?.[0] ?? '';
+  return `<label class="nom-appareil">${echapper(titre)}
+      <select data-champ="${quoi}">
+        <option value="" ${!tape && !v ? 'selected' : ''}>— aucun —</option>
+        ${options.map(([o, texte]) => `<option value="${echapper(o)}" ${!tape && o === choisie ? 'selected' : ''}>${echapper(texte)}</option>`).join('')}
+        <option value="${CHOIX_AUTRE}" ${tape ? 'selected' : ''}>Autre…</option>
+      </select></label>
+    ${tape ? `<label class="nom-appareil">${echapper(titre)} (autre) <input type="text" data-champ="${quoi}-autre" value="${echapper(v)}" placeholder="${echapper(exemple)}" /></label>` : ''}`;
 }
 
 // Mots féminins (« aucune surface ») ; les autres sont masculins (« aucun levé »).

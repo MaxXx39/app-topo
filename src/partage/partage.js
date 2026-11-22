@@ -19,11 +19,13 @@
 import { creerDrive } from './drive.js';
 import { creerSynchro, choisirVersion, verrouActif, SIGNE_DE_VIE } from './synchro.js';
 import { creerConnexion, connexionPossible } from './connexion.js';
-import { appareil, nommerAppareil, nommerUtilisateur, etaitConnecte, retenirConnexion, memoireProjet, retenirProjet } from './memoire.js';
+import { appareil, nommerAppareil, nommerUtilisateur, choisirArticle, etaitConnecte, retenirConnexion, memoireProjet, retenirProjet } from './memoire.js';
 import { estDansAppliAndroid } from '../android/pont.js';
 import { lireJournal, jourLocal } from '../recap/journal.js';
 import { ongletsDuRecap } from '../recap/recap.js';
 import { creerXlsx } from '../recap/xlsx.js';
+import { nomsPourTablettes, normaliserParc } from '../materiel/donnees.js';
+import { lireNomsMateriel, retenirNomsMateriel } from '../materiel/noms-tablette.js';
 import { lireListesPartagees, ecrireListesPartagees, surChangementListes, fusionnerListes } from '../reglages/listes-partagees.js';
 
 const DELAI_ENVOI = 30_000; // après une modification (ms)
@@ -132,10 +134,34 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
   // Recap (0.119.0) : journal de cet appareil envoyé toutes les 30 min au plus, recap Excel refait
   // une fois par jour (le premier appareil connecté du jour s'en charge).
   setInterval(() => mettreAJourRecap(), LISTES);
+  // Matériel (0.274.0) : listes des articles et responsables du parc, relues à la connexion et toutes les 10 minutes.
+  setInterval(() => rafraichirNomsMateriel(), LISTES);
   surChangementListes((listes, { depuisDrive }) => {
     // Une modification ici est fusionnée avec Drive (partie par partie) avant l'envoi, jamais écrasée.
     if (!depuisDrive && etat.connecte && synchro) synchroniserListes().catch((erreur) => signalerListes(erreur));
   });
+
+  /**
+   * Matériel (0.274.0) : relit sur Drive les articles et responsables du parc (pour les listes
+   * déroulantes de Réglages › Drive) quand le parc a changé. Sans réseau : on garde les listes d'avant.
+   */
+  /** Lance une action Drive du matériel, ou une erreur claire si Drive n'est pas connecté. */
+  function avecDrive(action) {
+    if (!etat.connecte || !synchro) return Promise.reject(new Error('Google Drive n\'est pas connecté (Réglages › Drive)'));
+    return action(synchro);
+  }
+
+  async function rafraichirNomsMateriel() {
+    if (!etat.connecte || !synchro) return;
+    try {
+      const date = await synchro.dateMateriel();
+      if (!date || date === lireNomsMateriel().modifieLe) return;
+      const lu = await synchro.lireMateriel();
+      if (lu) retenirNomsMateriel(nomsPourTablettes(normaliserParc(lu.parc)), lu.modifieLe);
+    } catch {
+      // Pas de réseau : les listes d'avant restent (on peut aussi taper un nom).
+    }
+  }
 
   /** Échec de la synchro des listes partagées : jamais silencieux (message en bas de l'écran). */
   function signalerListes(erreur) {
@@ -342,6 +368,7 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       changer('a-jour');
       synchroniserListes().catch((erreur) => signalerListes(erreur));
       mettreAJourRecap();
+      rafraichirNomsMateriel();
       // Choix du projet pas encore fait (fenêtre de démarrage) : rien n'est comparé ni pris pour l'instant.
       if (!choixEnAttente) await apresOuverture();
     } catch (erreur) {
@@ -630,8 +657,27 @@ export function creerPartage({ obtenirProjet, titreDe, lireLocal, ouvrirProjet, 
       nommerUtilisateur(nom);
       quandChange();
     },
+    choisirArticle(numero) {
+      choisirArticle(numero);
+      quandChange();
+    },
     appareil,
     mettreAJourRecap,
+
+    /**
+     * Matériel (0.274.0) : accès au parc sur Drive (voir synchro.js). Chaque fonction lance une
+     * erreur claire si Drive n'est pas connecté.
+     */
+    materiel: {
+      connecte: () => Boolean(etat.connecte && synchro),
+      lire: () => avecDrive((s) => s.lireMateriel()),
+      date: () => avecDrive((s) => s.dateMateriel()),
+      ecrire: (parc) => avecDrive((s) => s.ecrireMateriel(parc)),
+      ecrireFichier: (id, nom, blob) => avecDrive((s) => s.ecrireFichierMateriel(id, nom, blob)),
+      lireFichier: (id) => avecDrive((s) => s.lireFichierMateriel(id)),
+      supprimerFichier: (id) => avecDrive((s) => s.supprimerFichierMateriel(id)),
+      retenirNoms: (parc) => retenirNomsMateriel(nomsPourTablettes(parc), parc.modifieLe),
+    },
 
     /** Au démarrage de l'appli : se reconnecte si on l'était (dans l'APK, sans rien demander). */
     demarrer({ choixEnAttente: attente = false } = {}) {

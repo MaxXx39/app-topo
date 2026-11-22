@@ -68,6 +68,8 @@ import * as historique from './projet/historique.js';
 import { archiver, restaurer, supprimerArchive } from './projet/archives.js';
 import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/journal.js';
 import { appareil as appareilDuJournal } from './partage/memoire.js';
+import { lireNomsMateriel } from './materiel/noms-tablette.js';
+import { ouvrirMateriel as ouvrirPageMateriel } from './materiel/appli.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE, EXAGERATIONS_COUPE, ACCROCHES } from './leve/ecran.js';
 import { creerEncartPlan } from './plan/encart.js';
@@ -1722,6 +1724,7 @@ function ouvrirAppli(cle, sous = null, depuisMenu = false) {
   else if (cle === 'annotation') afficherOnglet('annotation');
   else if (cle === 'reseaux') afficherOnglet('reseaux');
   else if (cle === 'laser') afficherOnglet('test-laser');
+  else if (cle === 'materiel') ouvrirMateriel();
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur', { detail: { retourMenu: depuisMenu } }));
   if (sous && cle !== 'calculs') {
     // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
@@ -1763,7 +1766,7 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
     ecranImport.choisirCategories(categories);
     ouvrirPartieProjet('points');
   },
-  applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces })
+  applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces, dansAppli: estDansAppliAndroid() })
     // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile.
     .filter((a) => a.cle !== 'plan' || !window.matchMedia('(min-width: 900px)').matches),
   courante: () => appliCourante(document.body.dataset.onglet, terrain.mode),
@@ -1952,6 +1955,25 @@ function ouvrirCarteDesProjets() {
   }
 }
 
+/**
+ * Matériel (0.274.0, Expert, site seulement) : page plein écran à part (materiel/appli.js) ; « ← » ramène à la
+ * page Applications. Les projets connus (appareil et Drive) servent à relier chantiers et projets.
+ */
+function ouvrirMateriel() {
+  fenetreReglages?.fermer?.();
+  navigation?.fermer();
+  ouvrirPageMateriel({
+    materiel: partage?.materiel ?? null,
+    nomsProjets: async () => [...new Set([
+      ...(await stockage.listerProjets()).map(titreProjet),
+      ...(partage?.etat.projetsDrive ?? []).map((p) => p.titre).filter(Boolean),
+    ])],
+    quandRetour: () => navigation.ouvrirPage(),
+    message: (texte, duree, options) => afficherMessage(texte, duree, options),
+    enregistrer: enregistrerFichier,
+  }).catch((erreur) => afficherMessage(`Matériel : ${erreur.message}`, 8000));
+}
+
 let fenetreReglages = null;
 /** Fenêtre des réglages ⚙ (0.156.0 : tuile « Réglages » de la page Applications, ou la pyramide du mode). */
 function ouvrirFenetreReglages(page = null) {
@@ -1974,7 +1996,7 @@ function ouvrirFenetreReglages(page = null) {
     // Partage par Google Drive (dans les réglages depuis la version 0.54.0).
     partage: partage
       ? {
-          html: (options) => blocPartage({ etat: partage.etat, appareil: partage.appareil() }, options),
+          html: (options) => blocPartage({ etat: partage.etat, appareil: partage.appareil(), noms: lireNomsMateriel() }, options),
           actions: {
             connecterDrive: () => partage.connecter(),
             deconnecterDrive: () => partage.deconnecter(),
@@ -1994,6 +2016,10 @@ function ouvrirFenetreReglages(page = null) {
             },
             nommerUtilisateur: (nom) => {
               partage.nommerUtilisateur(nom);
+              fenetreReglages?.rafraichir();
+            },
+            choisirArticle: (numero) => {
+              partage.choisirArticle(numero);
               fenetreReglages?.rafraichir();
             },
           },

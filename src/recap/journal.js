@@ -3,8 +3,8 @@
 // « topo-journal ») et envoyé sur Drive (« App Topo › Recap ») avec la synchronisation.
 //
 // Forme :
-// { appareilId, appareil (nom), modifieLe,
-//   jours: [{ jour ('2026-11-03'), projetId, projet (nom), ouvertures, debut, fin (dates ISO),
+// { appareilId, appareil (nom), utilisateur, article (n° du parc, 0.274.0), modifieLe,
+//   jours: [{ jour ('2026-11-03'), projetId, projet (nom), appareil, utilisateur, article, ouvertures, debut, fin (dates ISO),
 //             points, implantations, controles, sansControle: { points, implantations, depuis } }],
 //   controles: [{ id, le, projetId, projet, type ('mesure' ou 'refus'), point, ecarts, remarque }] }
 // sansControle : travail (points levés, implantations) fait par cet appareil alors qu'il n'avait
@@ -23,7 +23,7 @@ export function jourLocal(date) {
 
 /** Journal vide pour cet appareil. */
 export function journalVide(appareil = { id: '', nom: '' }) {
-  return { appareilId: appareil.id, appareil: appareil.nom, utilisateur: appareil.utilisateur ?? '', modifieLe: null, jours: [], controles: [] };
+  return { appareilId: appareil.id, appareil: appareil.nom, utilisateur: appareil.utilisateur ?? '', article: appareil.article ?? '', modifieLe: null, jours: [], controles: [] };
 }
 
 /**
@@ -46,10 +46,13 @@ function ligneDuJour(journal, projet, maintenant) {
   const jour = jourLocal(maintenant);
   // 0.162.0 : le nom de la tablette et l'utilisateur du moment sont notés dans chaque ligne (changer
   // d'utilisateur ne change pas ce qui a déjà été noté) ; une ligne par jour, projet et utilisateur.
+  // 0.274.0 : l'article du parc (n° de la tablette et de sa canne, Réglages › Drive) aussi : il dira au
+  // planning du matériel quel appareil était sur quel chantier ce jour-là.
   const utilisateur = journal.utilisateur ?? '';
-  let ligne = journal.jours.find((j) => j.jour === jour && j.projetId === projet.id && (j.utilisateur ?? '') === utilisateur && (j.appareil ?? journal.appareil) === journal.appareil);
+  const article = journal.article ?? '';
+  let ligne = journal.jours.find((j) => j.jour === jour && j.projetId === projet.id && (j.utilisateur ?? '') === utilisateur && (j.appareil ?? journal.appareil) === journal.appareil && (j.article ?? '') === article);
   if (!ligne) {
-    ligne = { jour, projetId: projet.id, projet: projet.nom, appareil: journal.appareil, utilisateur, ouvertures: 0, debut: maintenant.toISOString(), fin: maintenant.toISOString(), points: 0, implantations: 0, controles: 0, sansControle: { points: 0, implantations: 0, depuis: null } };
+    ligne = { jour, projetId: projet.id, projet: projet.nom, appareil: journal.appareil, utilisateur, article, ouvertures: 0, debut: maintenant.toISOString(), fin: maintenant.toISOString(), points: 0, implantations: 0, controles: 0, sansControle: { points: 0, implantations: 0, depuis: null } };
     journal.jours.push(ligne);
   }
   ligne.projet = projet.nom || ligne.projet;
@@ -83,6 +86,7 @@ export function noter(journal, projet, evenement, maintenant = new Date()) {
       id: c.id,
       appareil: journal.appareil,
       utilisateur: journal.utilisateur ?? '',
+      article: journal.article ?? '',
       le: c.le ?? maintenant.toISOString(),
       projetId: projet.id,
       projet: projet.nom,
@@ -110,7 +114,7 @@ function oublierAnciens(journal, maintenant) {
 export function lireJournal(appareil) {
   try {
     const lu = JSON.parse(localStorage.getItem(CLE) ?? 'null');
-    if (lu && Array.isArray(lu.jours) && Array.isArray(lu.controles)) return { ...lu, appareilId: appareil.id, appareil: appareil.nom, utilisateur: appareil.utilisateur ?? '' };
+    if (lu && Array.isArray(lu.jours) && Array.isArray(lu.controles)) return { ...lu, appareilId: appareil.id, appareil: appareil.nom, utilisateur: appareil.utilisateur ?? '', article: appareil.article ?? '' };
   } catch {
     // illisible : on repart d'un journal vide
   }

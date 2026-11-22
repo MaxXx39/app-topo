@@ -16,6 +16,7 @@
 import { echapper } from '../outils/echapper.js';
 import { anydeskDisponible, ouvrirAnydesk, estDansAppliWindows, installerMiseAJourWindows, boutonsTabletteDisponibles, apprendreBoutonTablette, etatBoutonsTablette, ecouterBoutonsTablette } from '../android/pont.js';
 import { demanderCode } from '../outils/code.js';
+import { CHOIX_AUTRE } from '../materiel/noms-tablette.js';
 import { lireListesPartagees } from './listes-partagees.js';
 import { modifierLibellesDeSorte } from '../leve/fenetre-libelles.js';
 import { ouvrirFenetreListes } from './fenetre-listes.js';
@@ -253,6 +254,9 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     </form>`;
   const zonePartage = fenetre.querySelector('[data-zone="partage"]');
   let modifierUtilisateur = false; // crayon de l'utilisateur de la tablette (0.162.0)
+  let modifierArticle = false; // crayon de l'article du parc de cette tablette (0.274.0)
+  const autre = { article: false, utilisateur: false }; // « Autre… » choisi dans la liste : on tape le nom
+  const optionsPartage = () => ({ modifierNom, modifierUtilisateur, modifierArticle, autre });
   let modifierNom = false; // crayon touché : le nom de l'appareil devient modifiable
   let deverrouille = false; // bon code tapé (voir outils/code.js) : vaut jusqu'à la fermeture de la fenêtre
   // On ne redessine pas pendant qu'on tape le nom de l'appareil (le curseur serait perdu). Un lien
@@ -260,7 +264,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
   const rafraichir = () => {
     const enSaisie = zonePartage.contains(document.activeElement) && document.activeElement.matches('input');
     if (!partage || !fenetre.open || enSaisie) return;
-    zonePartage.innerHTML = partage.html({ modifierNom, modifierUtilisateur });
+    zonePartage.innerHTML = partage.html(optionsPartage());
   };
   fenetre.addEventListener('change', (evenement) => {
     const champ = evenement.target.dataset.reglage;
@@ -276,9 +280,33 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
       for (const puce of fenetre.querySelectorAll(`[data-reglage="${champ}"]`)) puce.closest('.puce-mode').classList.toggle('actif', puce.checked);
       changerMode?.(); // le plan est redessiné avec les nouvelles tailles
     } else if (champ === 'aide') basculerAide();
-    else if (evenement.target.dataset.champ === 'utilisateur') {
-      modifierUtilisateur = false;
-      partage?.actions.nommerUtilisateur(evenement.target.value.trim());
+    else if (['utilisateur', 'article'].includes(evenement.target.dataset.champ)) {
+      // 0.274.0 : liste déroulante (articles / responsables du parc) ; « Autre… » ouvre un champ pour taper un nom ponctuel.
+      const quoi = evenement.target.dataset.champ;
+      if (evenement.target.value === CHOIX_AUTRE) {
+        autre[quoi] = true;
+        zonePartage.innerHTML = partage.html(optionsPartage());
+        zonePartage.querySelector(`[data-champ="${quoi}-autre"]`)?.focus();
+        return;
+      }
+      autre[quoi] = false;
+      if (quoi === 'utilisateur') {
+        modifierUtilisateur = false;
+        partage?.actions.nommerUtilisateur(evenement.target.value.trim());
+      } else {
+        modifierArticle = false;
+        partage?.actions.choisirArticle(evenement.target.value.trim());
+      }
+    } else if (['utilisateur-autre', 'article-autre'].includes(evenement.target.dataset.champ)) {
+      const quoi = evenement.target.dataset.champ.replace('-autre', '');
+      autre[quoi] = false;
+      if (quoi === 'utilisateur') {
+        modifierUtilisateur = false;
+        partage?.actions.nommerUtilisateur(evenement.target.value.trim());
+      } else {
+        modifierArticle = false;
+        partage?.actions.choisirArticle(evenement.target.value.trim());
+      }
     } else if (evenement.target.dataset.champ === 'nom-appareil') {
       modifierNom = false;
       partage?.actions.nommerAppareil(evenement.target.value.trim());
@@ -356,6 +384,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     const bouton = evenement.target.closest('[data-zone="partage"] button[data-action]');
     if (bouton?.dataset.action === 'modifierNomAppareil') modifierNomProtege();
     if (bouton?.dataset.action === 'modifierUtilisateur') modifierUtilisateurProtege();
+    if (bouton?.dataset.action === 'modifierArticle') modifierArticleProtege();
     else if (bouton) partage?.actions[bouton.dataset.action]?.();
   });
   /**
@@ -418,8 +447,17 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     if (!deverrouille && !(await demanderCode('Changer l\'utilisateur de la tablette'))) return;
     deverrouille = true;
     modifierUtilisateur = true;
-    zonePartage.innerHTML = partage.html({ modifierNom, modifierUtilisateur });
+    zonePartage.innerHTML = partage.html(optionsPartage());
     zonePartage.querySelector('[data-champ="utilisateur"]')?.focus();
+  }
+
+  /** Crayon de l'article du parc de cette tablette (0.274.0) : protégé par le code, comme le nom de l'appareil. */
+  async function modifierArticleProtege() {
+    if (!deverrouille && !(await demanderCode('Changer l\'article de la tablette'))) return;
+    deverrouille = true;
+    modifierArticle = true;
+    zonePartage.innerHTML = partage.html(optionsPartage());
+    zonePartage.querySelector('[data-champ="article"]')?.focus();
   }
 
   /** Crayon du nom de l'appareil : protégé par le code (demandé une fois par ouverture de la fenêtre). */
@@ -427,7 +465,7 @@ export function ouvrirReglages({ aideActive, basculerAide, fermerAppli, partage,
     if (!deverrouille && !(await demanderCode('Modifier le nom de l\'appareil'))) return;
     deverrouille = true;
     modifierNom = true;
-    zonePartage.innerHTML = partage.html({ modifierNom, modifierUtilisateur });
+    zonePartage.innerHTML = partage.html(optionsPartage());
     zonePartage.querySelector('[data-champ="nom-appareil"]')?.focus();
   }
   // « Entrée » dans un champ (utilisateur, nom de l'appareil…) valide le champ sans fermer la page (0.165.0).
