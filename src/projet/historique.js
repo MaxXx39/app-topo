@@ -14,7 +14,7 @@ const LIMITE = 50;
 
 /** Crée un historique vide. */
 export function creerHistorique(limite = LIMITE) {
-  return { passe: [], futur: [], actuel: null, limite, photos: new Map(), plans: new Map() };
+  return { passe: [], futur: [], actuel: null, limite, photos: new Map(), plans: new Map(), pdfs: new Map() };
 }
 
 /**
@@ -48,7 +48,17 @@ function alleger(historique, projet) {
       return { ...plan, contenu: null };
     }),
   } : {};
-  return { ...avecPhotos, ...photosControle, ...plansDxf };
+  // PDF des comparaisons (0.282.0) : gardés une seule fois, comme le contenu des plans.
+  const comparaisons = projet.comparaisons ? {
+    comparaisons: projet.comparaisons.map((c) => ({
+      ...c,
+      fichiers: (c.fichiers ?? []).map((f) => {
+        if (f.donnees) historique.pdfs.set(f.id, f.donnees);
+        return { ...f, donnees: null };
+      }),
+    })),
+  } : {};
+  return { ...avecPhotos, ...photosControle, ...plansDxf, ...comparaisons };
 }
 
 /** Relit une étape de l'historique et remet les images des photos. */
@@ -66,6 +76,7 @@ function remettre(historique, projet) {
   }
   for (const photo of projet.photosControle ?? []) Object.assign(photo, historique.photos.get(photo.id));
   for (const plan of projet.plansDxf ?? []) plan.contenu = historique.plans.get(plan.id) ?? null;
+  for (const c of projet.comparaisons ?? []) for (const f of c.fichiers ?? []) f.donnees = historique.pdfs.get(f.id) ?? null;
 }
 
 /** Repart de zéro avec ce projet (à l'ouverture d'un projet). */
@@ -74,6 +85,7 @@ export function reinitialiser(historique, projet) {
   historique.futur = [];
   historique.photos.clear();
   historique.plans.clear();
+  historique.pdfs?.clear();
   historique.actuel = instantane(historique, projet);
 }
 

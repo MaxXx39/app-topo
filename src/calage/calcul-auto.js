@@ -2,8 +2,8 @@
 // Sans « Worker » (vieux navigateur, essais), le calcul se fait ici, après avoir laissé l'écran se dessiner.
 import { calerAutomatiquement } from '../topo/calage-auto.js';
 
-/** Promesse du résultat de calerAutomatiquement(segsSource, segsCible) (null = rien trouvé). */
-export function calculerAuto(segsSource, segsCible) {
+/** Promesse du résultat de calerAutomatiquement(segsSource, segsCible, options) (null = rien trouvé). */
+export function calculerAuto(segsSource, segsCible, options = {}) {
   return new Promise((tenir, rater) => {
     let travail = null;
     try {
@@ -14,7 +14,7 @@ export function calculerAuto(segsSource, segsCible) {
     if (!travail) {
       setTimeout(() => {
         try {
-          tenir(calerAutomatiquement(segsSource, segsCible));
+          tenir(calerAutomatiquement(segsSource, segsCible, options));
         } catch (erreur) {
           rater(erreur);
         }
@@ -30,6 +30,6 @@ export function calculerAuto(segsSource, segsCible) {
       travail.terminate();
       rater(new Error(ev.message || 'calcul en arrière-plan impossible'));
     });
-    travail.postMessage({ segsSource, segsCible });
+    travail.postMessage({ segsSource, segsCible, options });
   });
 }
