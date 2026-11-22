@@ -127,7 +127,7 @@ import { correctionsTropAnciennes } from './topo/age-corrections.js';
 import { centreDePoints, MAX_POINTS_CENTRE } from './topo/centre-points.js';
 import { ICONES_LIGNE } from './outils/icones.js';
 import { brancherCameraWindows } from './outils/camera-windows.js';
-import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette, estDansAppliWindows } from './android/pont.js';
+import { correctionsDisponibles, lireReglagesCorrections, demarrerCorrections, arreterCorrections, estDansAppliAndroid, ecouterPositionTablette, estDansAppliWindows, estDansAppliBureau } from './android/pont.js';
 // 0.267.0 : appli Windows (Topo.exe) : marque sur la page pour sa mise en page (panneau de gauche à 50 %, voir fin de style.css).
 if (estDansAppliWindows()) {
   document.body.classList.add('appli-windows');
@@ -1766,7 +1766,7 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
     ecranImport.choisirCategories(categories);
     ouvrirPartieProjet('points');
   },
-  applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces, dansAppli: estDansAppliAndroid() })
+  applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces, dansAppli: estDansAppliAndroid() && !estDansAppliBureau() })
     // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile.
     .filter((a) => a.cle !== 'plan' || !window.matchMedia('(min-width: 900px)').matches),
   courante: () => appliCourante(document.body.dataset.onglet, terrain.mode),
@@ -1988,7 +1988,7 @@ function ouvrirFenetreReglages(page = null) {
     basculerAide: () => document.querySelector('#bouton-aide').click(),
     fermerAppli: estDansAppliAndroid() && typeof window.AppliAndroid.fermerAppli === 'function' ? fermerAppli : null,
     // Partie « Récepteur » des réglages (appli Android) : ouvre la fenêtre du récepteur.
-    recepteur: estDansAppliAndroid() ? () => document.dispatchEvent(new CustomEvent('ouvrir-recepteur')) : null,
+    recepteur: recepteurDisponible() ? () => document.dispatchEvent(new CustomEvent('ouvrir-recepteur')) : null, // 0.277.0 : pas dans Topo Bureau
     changerMode: () => {
       adapterAuMode();
       recalculer();
@@ -9398,7 +9398,8 @@ for (const evenement of ['pointerdown', 'keydown', 'wheel']) {
   }, { passive: true, capture: true });
 }
 setInterval(() => {
-  if (estDansAppliAndroid() || !partage?.etat.connecte) return;
+  // Tablettes (APK, Topo Tablette) : la main est gardée ; site et Topo Bureau (0.277.0) : rendue après 5 minutes sans activité.
+  if ((estDansAppliAndroid() && !estDansAppliBureau()) || !partage?.etat.connecte) return;
   if (Date.now() - derniereActivite < INACTIVITE) return;
   if (partage.etat.rendu?.projetId === projet.id || partage.etat.repris?.projetId === projet.id) return;
   partage.rendreLaMain('rendue après 5 minutes sans activité').then(() => {

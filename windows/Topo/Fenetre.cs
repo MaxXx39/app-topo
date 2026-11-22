@@ -56,14 +56,15 @@ namespace Topo
             boutons = new BoutonsTablette(reglages, action => { try { if (!IsDisposed && IsHandleCreated) BeginInvoke(action); } catch (Exception) { /* fenêtre fermée */ } });
             boutons.QuandChange = json => Executer("window.__topoWindows&&window.__topoWindows.boutons&&window.__topoWindows.boutons(" + json + ")");
 
-            Text = "Topo " + Version();
+            Text = Edition.Nom + " " + Version();
             Icon = Ressources.Icone();
             BackColor = Color.FromArgb(0x1b, 0x2b, 0x36);
             MinimumSize = new Size(480, 360);
             // Plein écran (sans barre de titre ni barre des tâches), comme sur la tablette Android : tout l'écran
             // est pour l'appli. On la ferme par « Fermer l'appli » du menu. Touche F11 (clavier) : fenêtre normale.
             KeyPreview = true;
-            pleinEcran = reglages.Texte("plein_ecran", "oui") != "non";
+            // Topo Bureau (PC) : fenêtre normale au départ ; Topo Tablette : plein écran.
+            pleinEcran = reglages.Texte("plein_ecran", Edition.Bureau ? "non" : "oui") != "non";
             AppliquerPleinEcran();
 
             vue.Dock = DockStyle.Fill;
@@ -154,16 +155,16 @@ namespace Topo
             catch (WebView2RuntimeNotFoundException)
             {
                 DialogResult choix = MessageBox.Show(this,
-                    "Il manque « Microsoft Edge WebView2 Runtime » sur cette tablette (le moteur qui affiche l'appli).\r\n\r\n" +
-                    "Touchez OK pour ouvrir la page de téléchargement de Microsoft, installez-le, puis relancez Topo.",
-                    "Topo", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+                    "Il manque « Microsoft Edge WebView2 Runtime » sur cet appareil (le moteur qui affiche l'appli).\r\n\r\n" +
+                    "Touchez OK pour ouvrir la page de téléchargement de Microsoft, installez-le, puis relancez " + Edition.Nom + ".",
+                    Edition.Nom, MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
                 if (choix == DialogResult.OK) OuvrirDehors("https://go.microsoft.com/fwlink/p/?LinkId=2124703");
                 Close();
                 return;
             }
             catch (Exception erreur)
             {
-                MessageBox.Show(this, "Topo ne peut pas démarrer :\r\n" + erreur.Message, "Topo", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(this, Edition.Nom + " ne peut pas démarrer :\r\n" + erreur.Message, Edition.Nom, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 Close();
                 return;
             }
@@ -217,6 +218,8 @@ namespace Topo
             await coeur.AddScriptToExecuteOnDocumentCreatedAsync(ScriptDuPont());
             coeur.Navigate(ServeurAppli.ADRESSE_ACCUEIL);
 
+            // Topo Bureau : pas de récepteur, de corrections, de position Windows ni de boutons de tablette.
+            if (Edition.Bureau) return;
             // Essai à 2 récepteurs : le 2e reçoit une copie des corrections du 1er, ou a sa propre connexion.
             AppliquerModeCorrections2();
             // Corrections par internet laissées en marche la dernière fois : on les reprend.
@@ -239,6 +242,7 @@ namespace Topo
                 { "modele", ModeleAppareil() },
                 { "version", Version() },
                 { "boutons", boutons.EnJson() },
+                { "bureau", Edition.Bureau }, // pont-windows.js : Topo Bureau = sans récepteur, l'appli web se comporte comme le site PC
             };
             return (Ressources.Texte("pont-windows.js") ?? "").Replace("/*DEPART*/ {}", Json.Ecrire(depart));
         }
@@ -264,6 +268,7 @@ namespace Topo
             double zoom;
             int force = reglages.Entier("zoom_ecran", 0);
             if (force >= 30 && force <= 300) zoom = force / 100.0;
+            else if (Edition.Bureau) zoom = 1.0; // PC : comme le site dans un navigateur (Windows gère déjà l'échelle de l'écran)
             else
             {
                 double echelleWindows = EchelleWindows();
@@ -577,7 +582,7 @@ namespace Topo
             if (contenu == null) { Message("Envoi impossible : fichier mal transmis."); return; }
             try
             {
-                string dossier = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Topo", "Envois");
+                string dossier = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), Edition.DossierEnvois, "Envois");
                 Directory.CreateDirectory(dossier);
                 string chemin = Path.Combine(dossier, NomPropre(nom));
                 File.WriteAllBytes(chemin, contenu);

@@ -1,9 +1,13 @@
-# Fabrication de l'appli Windows « Topo.exe » (la même appli web que l'APK, dans une fenêtre Windows).
+# Fabrication des appli Windows (la même appli web que l'APK, dans une fenêtre Windows) — 0.277.0 :
+# - « Topo Tablette » (TopoTablette.exe, l'ancien Topo.exe) pour la tablette terrain ;
+# - « Topo Bureau » (TopoBureau.exe) pour le PC du bureau : le même code (windows/Topo) avec la constante BUREAU.
 # - Lancée À CHAQUE NOUVELLE VERSION (package.json change : décision du 18.11, Android et Windows gardent
 #   le même numéro), quand le code Windows (dossier windows/Topo) change, ou à la main (onglet Actions ›
 #   « Fabriquer l'appli Windows » › Run workflow).
 # - Le résultat est publié dans « Releases », sous « Windows - dernière version » :
-#   https://github.com/MaxXx39/app-topo/releases/download/windows-derniere-version/Topo.exe
+#   https://github.com/MaxXx39/app-topo/releases/download/windows-derniere-version/TopoTablette.exe
+#   (Topo.exe y reste aussi : les tablettes qui ont l'ancienne appli cherchent ce nom pour se mettre à jour)
+#   https://github.com/MaxXx39/app-topo/releases/download/bureau-derniere-version/TopoBureau.exe
 # - Google Drive : les secrets GOOGLE_BUREAU_ID et GOOGLE_BUREAU_SECRET du dépôt (identifiant « Application de
 #   bureau » du projet Google Cloud) sont rangés dans le .exe. Sans eux, le .exe marche, sans Drive.
 name: Fabriquer l'appli Windows
@@ -13,6 +17,7 @@ on:
     paths:
       - "package.json"
       - "windows/Topo/**"
+      - "windows/TopoBureau/**"
       - "windows/Topo.Tests/**"
       - ".github/workflows/windows.yml"
   workflow_dispatch:
@@ -59,32 +64,47 @@ jobs:
           ./sortie-tests/Topo.Tests.exe android/noyau/src/main/resources/geoide/chgeo2004_lhn95.grille
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: Fabriquer Topo.exe
+      - name: Fabriquer TopoTablette.exe et TopoBureau.exe
         shell: pwsh
         run: |
           dotnet build windows/Topo/Topo.csproj -c Release -o sortie
-          $taille = (Get-Item sortie/Topo.exe).Length
-          Write-Host "Topo.exe : $taille octets"
-          # Le .exe doit contenir l'appli web et WebView2 (plusieurs Mo) : plus petit, il manque quelque chose.
-          if ($taille -lt 3000000) { Write-Host "::error::Topo.exe trop petit : l'appli web ou WebView2 n'est pas dedans."; exit 1 }
+          dotnet build windows/TopoBureau/TopoBureau.csproj -c Release -o sortie-bureau
+          foreach ($exe in @('sortie/TopoTablette.exe', 'sortie-bureau/TopoBureau.exe')) {
+            $taille = (Get-Item $exe).Length
+            Write-Host "$exe : $taille octets"
+            # Le .exe doit contenir l'appli web et WebView2 (plusieurs Mo) : plus petit, il manque quelque chose.
+            if ($taille -lt 3000000) { Write-Host "::error::$exe trop petit : l'appli web ou WebView2 n'est pas dedans."; exit 1 }
+          }
 
-      - name: Garder Topo.exe (onglet Actions)
+      - name: Garder les .exe (onglet Actions)
         uses: actions/upload-artifact@v4
         with:
           name: Topo-windows
-          path: sortie/Topo.exe
+          path: |
+            sortie/TopoTablette.exe
+            sortie-bureau/TopoBureau.exe
 
-      - name: Publier « Windows - dernière version » (Releases)
+      - name: Publier « Windows - dernière version » (Topo Tablette) et « Topo Bureau - dernière version » (Releases)
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           gh release delete windows-derniere-version --cleanup-tag --yes || true
-          # Même fichier en double : Topo.exe (lien fixe) et Topo-<version>.exe (la version se lit dans le nom).
-          cp sortie/Topo.exe Topo.exe
-          cp sortie/Topo.exe "Topo-${VERSION}.exe"
-          gh release create windows-derniere-version Topo.exe "Topo-${VERSION}.exe" \
+          # Même fichier plusieurs fois : TopoTablette.exe (lien fixe), TopoTablette-<version>.exe (la version se lit dans
+          # le nom), et Topo.exe / Topo-<version>.exe pour les tablettes qui ont encore l'ancienne appli « Topo ».
+          cp sortie/TopoTablette.exe TopoTablette.exe
+          cp sortie/TopoTablette.exe "TopoTablette-${VERSION}.exe"
+          cp sortie/TopoTablette.exe Topo.exe
+          cp sortie/TopoTablette.exe "Topo-${VERSION}.exe"
+          gh release delete bureau-derniere-version --cleanup-tag --yes || true
+          cp sortie-bureau/TopoBureau.exe TopoBureau.exe
+          cp sortie-bureau/TopoBureau.exe "TopoBureau-${VERSION}.exe"
+          gh release create bureau-derniere-version TopoBureau.exe "TopoBureau-${VERSION}.exe" \
+            --target "${{ github.sha }}" \
+            --title "Topo Bureau - dernière version (${VERSION}, n° ${{ github.run_number }}, ${{ github.ref_name }})" \
+            --notes "Topo Bureau pour le PC (Windows 10 / 11), version ${VERSION} (${{ github.run_number }}) : la même chose que le site, installée sur l'ordinateur. Téléchargez TopoBureau.exe, rangez-le dans Documents (ou sur le Bureau), puis ouvrez-le. La première fois, Windows peut demander d'installer « WebView2 Runtime » (Microsoft)."
+          gh release create windows-derniere-version TopoTablette.exe "TopoTablette-${VERSION}.exe" Topo.exe "Topo-${VERSION}.exe" \
             --target "${{ github.sha }}" \
             --title "Windows - dernière version (${VERSION}, n° ${{ github.run_number }}, ${{ github.ref_name }})" \
-            --notes "Appli Topo pour Windows 10 / 11, version ${VERSION} (${{ github.run_number }}). Sur la tablette : téléchargez Topo.exe, rangez-le sur le Bureau ou dans Documents, puis ouvrez-le. La première fois, Windows peut demander d'installer « WebView2 Runtime » (Microsoft)."
+            --notes "Topo Tablette pour la tablette Windows 10 / 11, version ${VERSION} (${{ github.run_number }}). Sur la tablette : téléchargez TopoTablette.exe (Topo.exe = le même fichier, pour les anciennes installations), rangez-le sur le Bureau ou dans Documents, puis ouvrez-le. La première fois, Windows peut demander d'installer « WebView2 Runtime » (Microsoft)."

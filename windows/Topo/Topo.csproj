@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Appli Windows « Topo.exe » : la même appli web que l'APK Android, dans une fenêtre Windows (WebView2).
+  <!-- Appli Windows « Topo Tablette » (TopoTablette.exe, l'ancien Topo.exe, 0.277.0) : la même appli web que l'APK Android,
+       dans une fenêtre Windows (WebView2). Le même code fabrique aussi « Topo Bureau » (windows/TopoBureau, voir Edition.cs).
        .NET Framework 4.8 est déjà dans Windows 10 : rien à installer, sauf « WebView2 Runtime » (Microsoft)
        si la tablette ne l'a pas. Une seule bibliothèque : Microsoft.Web.WebView2 (accord du 14.11).
        Tout est rangé dans le .exe (un seul fichier à copier). -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
-    <AssemblyName>Topo</AssemblyName>
+    <AssemblyName>TopoTablette</AssemblyName>
     <RootNamespace>Topo</RootNamespace>
     <LangVersion>7.3</LangVersion>
     <PlatformTarget>AnyCPU</PlatformTarget>

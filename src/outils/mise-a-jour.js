@@ -6,9 +6,14 @@
 
 export const ADRESSE_APK = 'https://github.com/MaxXx39/app-topo/releases/download/apk-derniere-version/Topo.apk';
 const ADRESSE_RELEASE = 'https://api.github.com/repos/MaxXx39/app-topo/releases/tags/apk-derniere-version';
-// Appli Windows (0.237.0) : même principe, release « windows-derniere-version », fichiers Topo.exe et Topo-<version>.exe.
-export const ADRESSE_EXE = 'https://github.com/MaxXx39/app-topo/releases/download/windows-derniere-version/Topo.exe';
+// Appli Windows « Topo Tablette » (0.237.0 ; renommée en 0.277.0) : même principe, release « windows-derniere-version »,
+// fichiers TopoTablette.exe et TopoTablette-<version>.exe (Topo.exe / Topo-<version>.exe y restent aussi, pour les
+// tablettes qui ont encore l'ancienne appli : elles cherchent ces noms-là pour se mettre à jour).
+export const ADRESSE_EXE = 'https://github.com/MaxXx39/app-topo/releases/download/windows-derniere-version/TopoTablette.exe';
 const ADRESSE_RELEASE_WINDOWS = 'https://api.github.com/repos/MaxXx39/app-topo/releases/tags/windows-derniere-version';
+// Appli Windows « Topo Bureau » (0.277.0, PC du bureau) : release « bureau-derniere-version », TopoBureau(-<version>).exe.
+export const ADRESSE_EXE_BUREAU = 'https://github.com/MaxXx39/app-topo/releases/download/bureau-derniere-version/TopoBureau.exe';
+const ADRESSE_RELEASE_BUREAU = 'https://api.github.com/repos/MaxXx39/app-topo/releases/tags/bureau-derniere-version';
 
 /** Numéro de version « 0.119.0 » trouvé dans le titre de la release, ou null. */
 export function versionDuTitre(titre) {
@@ -40,15 +45,20 @@ export async function versionPubliee(lire = fetch) {
  * (« Topo-0.174.1.apk », demande du 09.11), sinon le lien fixe « Topo.apk ».
  */
 export async function apkPublie(lire = fetch) {
-  return programmePublie(lire, ADRESSE_RELEASE, 'apk', ADRESSE_APK);
+  return programmePublie(lire, ADRESSE_RELEASE, 'Topo', 'apk', ADRESSE_APK);
 }
 
-/** Dernier Topo.exe publié pour Windows : { version, adresse } ou null (« Topo-0.237.0.exe », sinon le lien fixe « Topo.exe »). */
+/** Dernier Topo Tablette publié : { version, adresse } ou null (« TopoTablette-0.277.0.exe », sinon le lien fixe « TopoTablette.exe »). */
 export async function exePublie(lire = fetch) {
-  return programmePublie(lire, ADRESSE_RELEASE_WINDOWS, 'exe', ADRESSE_EXE);
+  return programmePublie(lire, ADRESSE_RELEASE_WINDOWS, 'TopoTablette', 'exe', ADRESSE_EXE);
 }
 
-async function programmePublie(lire, adresseRelease, extension, adresseFixe) {
+/** Dernier Topo Bureau publié : { version, adresse } ou null (« TopoBureau-0.277.0.exe », sinon le lien fixe « TopoBureau.exe »). */
+export async function exeBureauPublie(lire = fetch) {
+  return programmePublie(lire, ADRESSE_RELEASE_BUREAU, 'TopoBureau', 'exe', ADRESSE_EXE_BUREAU);
+}
+
+async function programmePublie(lire, adresseRelease, prefixe, extension, adresseFixe) {
   try {
     const controle = new AbortController();
     const minuterie = setTimeout(() => controle.abort(), 15000);
@@ -58,7 +68,7 @@ async function programmePublie(lire, adresseRelease, extension, adresseFixe) {
     const release = await reponse.json();
     const version = versionDuTitre(release?.name);
     if (!version) return null;
-    const nom = `Topo-${version}.${extension}`;
+    const nom = `${prefixe}-${version}.${extension}`;
     const fichier = (release?.assets ?? []).find((a) => a?.name === nom);
     return { version, adresse: fichier?.browser_download_url ?? adresseFixe };
   } catch {

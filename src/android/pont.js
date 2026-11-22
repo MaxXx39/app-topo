@@ -19,6 +19,15 @@ export function estDansAppliWindows() {
   return estDansAppliAndroid() && window.AppliAndroid.estWindows === true;
 }
 
+/**
+ * Vrai si la page tourne dans Topo Bureau (0.277.0, windows/TopoBureau : le PC du bureau). Il a aussi window.AppliAndroid
+ * (fichiers, Drive, mise à jour) mais ni récepteur ni boutons de tablette : l'appli s'y comporte comme le site PC
+ * (applications « site seulement » comme Matériel, main Drive rendue après 5 minutes sans activité…).
+ */
+export function estDansAppliBureau() {
+  return estDansAppliAndroid() && window.AppliAndroid.estBureau === true;
+}
+
 /** Windows : télécharge le nouveau Topo.exe, le met à la place de celui qui tourne et relance l'appli. */
 export const installerMiseAJourWindows = (adresse) => window.AppliAndroid.installerMiseAJour(adresse);
 
