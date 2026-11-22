@@ -4,7 +4,7 @@
 // glisser une barre = la déplacer ; toucher une barre = la modifier. Règles : planning.js.
 import { echapper } from '../outils/echapper.js';
 import { demanderChoix, demanderChamps, demanderCases } from '../outils/choix.js';
-import { texteSurCouleur, dateSuisse, chantiersTries, ajouterChantier, normaliserNumeroChantier, articlesTries } from './donnees.js';
+import { texteSurCouleur, dateSuisse, chantiersTries, ajouterChantier, modifierChantier, normaliserNumeroChantier, articlesTries } from './donnees.js';
 import {
   MOIS, JOURS_COURTS, donneesDuMois, ajouterJours, nombreDeJours, aujourdhui, moisVoisin, bornesDuMois, joursDuMois,
   isoDuJour, poserAffectation, lireAffectation, chevauchements, supprimerAffectation, rendreAuDepot, couperAffectation,
@@ -168,6 +168,7 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
         { cle: 'modifier', texte: 'Modifier', detail: 'dates, chantier, responsable, remarque', principal: true },
         { cle: 'rendre', texte: 'Rendre au dépôt', detail: 'choisir le dernier jour sur le chantier' },
         { cle: 'changer', texte: 'Changer de chantier à partir du…' },
+        { cle: 'chantier', texte: 'Modifier le chantier…', detail: 'n°, nom, responsable, facturable, archivé : pour toutes ses barres' },
         { cle: 'couper', texte: 'Couper en deux' },
         { cle: 'supprimer', texte: 'Supprimer', classe: 'bouton-danger' },
         { cle: 'fermer', texte: 'Fermer' },
@@ -203,6 +204,24 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
     } else if (action === 'couper') {
       const champs = await demanderChamps({ titre: 'Couper en deux', champs: [{ cle: 'jour', titre: 'La 2e partie commence le', valeur: dateSuisse(demain(jour)), exemple: 'JJ.MM.AAAA' }] });
       if (champs) await modifier((p) => couperAffectation(p, af.id, champs.jour));
+    } else if (action === 'chantier') {
+      // 0.276.2 : fiche du chantier de cette barre (même contrôles que l'onglet Chantiers : n° unique, nom obligatoire).
+      const c = chantier;
+      const champs = await demanderChamps({
+        titre: `Chantier ${nomDuChantier(c)}`,
+        champs: [
+          { cle: 'numero', titre: 'N° de chantier', valeur: c.numero, exemple: 'ex. 10 203' },
+          { cle: 'nom', titre: 'Nom', valeur: c.nom },
+          { cle: 'responsable', titre: 'Responsable', valeur: c.responsable },
+          { cle: 'facturable', titre: 'Facturable', valeur: c.facturable ? 'oui' : 'non', choix: [['oui', 'Oui'], ['non', 'Non']] },
+          { cle: 'archive', titre: 'Archivé (caché des listes de choix)', valeur: c.archive ? 'oui' : 'non', choix: [['non', 'Non'], ['oui', 'Oui']] },
+          { cle: 'notes', titre: 'Notes', valeur: c.notes },
+        ],
+      });
+      if (champs) {
+        const { ok } = await changer((p) => modifierChantier(p, c.id, { ...champs, facturable: champs.facturable === 'oui', archive: champs.archive === 'oui' }));
+        if (ok) message('Chantier enregistré (toutes ses barres sont à jour)', 3000, { ok: true });
+      }
     } else if (action === 'supprimer') {
       await modifier((p) => supprimerAffectation(p, af.id));
     }
