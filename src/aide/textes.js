@@ -3,6 +3,10 @@
 
 // 0.163.0 : chaque bulle tient en 4 lignes au plus (demande du 09.11).
 export const TEXTES_AIDE = {
+  materiel:
+    'Matériel (Expert, sur le site) : le parc de l\'entreprise, le même pour tous les projets. « Planning » : glisser sur des jours vides = affecter un article à un chantier ; tirer un bord = allonger ; glisser une barre = la déplacer ; toucher une barre = modifier, rendre au dépôt, changer de chantier, couper. Chevauchement : couper ou remplacer. « Réel » et « Comparer » : ce que le recap des tablettes a vu (une tablette = un article, réglé dans Réglages › Drive ; le projet doit commencer par le n° du chantier) : rond vert = comme prévu, rouge = autre chantier, bleu = rien de prévu, orange = prévu mais pas vu ; « Préremplir » ajoute les jours vus sans planning (rien n\'est corrigé tout seul). ↶ Annuler (Ctrl+Z), « Prolonger » le mois d\'avant, PDF et Excel du mois pour la compta (AAAA_MM). « Parc », « Chantiers » (un projet dont le nom commence par le n° du chantier lui est relié), « Sauvegarde » (.zip complet). Copié sur Drive (App Topo › Matériel).',
+  articleTablette:
+    'Article du parc : la tablette et sa canne GNSS portent le même n° (liste lue sur Drive, App Topo › Matériel). « Autre… » = taper un n° qui n\'est pas dans la liste. Noté au journal du recap : le planning du matériel saura quel appareil était sur quel chantier.',
   testLaser:
     'Test laser (Expert, essai) : GNSS sur la canne + laser D510 fixé dessus ; distance et angle du laser tapés à la main (angle + = vers le haut). Chaque lecture du récepteur = moyenne de 5 s, en FIXE avec l\'inclinaison prête. « Cap » : point visé avec le cap du RX2 ; « Essai A » : le cap est-il juste ? ; « Essai B » : même point depuis 2 stations, sans cap ; « Montage » : réglages du laser. Enreg. = point TL-n dans « LV-Test laser » ; CSV = toute la séance. Formules à valider sur le terrain.',
   laserEssaiA:

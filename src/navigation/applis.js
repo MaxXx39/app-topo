@@ -6,7 +6,8 @@
 
 // Une application : cle, titre, couleur (fond du bouton), texte (couleur du texte sur ce fond),
 // icone (tracé SVG 24 × 24), niveau ('intermediaire' / 'expert' : mode minimum), apk (vrai : seulement
-// dans l'appli Android, avec un récepteur), site (vrai : aussi sur le site), titreSite (nom sur le site).
+// dans l'appli Android, avec un récepteur), site (vrai : aussi sur le site), titreSite (nom sur le site),
+// siteSeulement (vrai : jamais dans l'APK ni dans Topo.exe, 0.274.0).
 // 0.159.0 : Réglages n'est plus une application (bouton à part en bas de la page Applications).
 export const APPLIS = [
   {
@@ -88,6 +89,17 @@ export const APPLIS = [
     icone: '<path d="M4 20V8" /><circle cx="4" cy="6" r="2" /><path d="M7 9l13-4" stroke-dasharray="2 2" /><circle cx="20" cy="5" r="1.5" />',
   },
   {
+    // Matériel (0.274.0, Expert, site seulement) : parc de l'entreprise, chantiers, planning (page à part, sans plan).
+    cle: 'materiel',
+    titre: 'Matériel',
+    couleur: '#0f766e',
+    texte: '#ffffff',
+    site: true,
+    siteSeulement: true,
+    niveau: 'expert',
+    icone: '<rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18" />',
+  },
+  {
     cle: 'calculs',
     titre: 'Calculs',
     couleur: '#db2777',
@@ -125,8 +137,9 @@ export function appliDeCle(cle) {
  * Applications proposées : dans l'appli Android (avecRecepteur) toutes celles permises par le mode ;
  * sur le site, seulement celles marquées « site ». aAcces('intermediaire' | 'expert') dit si le mode le permet.
  */
-export function applisDisponibles({ avecRecepteur, aAcces }) {
+export function applisDisponibles({ avecRecepteur, aAcces, dansAppli = avecRecepteur }) {
   return APPLIS.filter((a) => {
+    if (a.siteSeulement && dansAppli) return false;
     if (avecRecepteur ? false : !a.site) return false;
     const niveau = avecRecepteur ? a.niveau : (a.niveauSite ?? a.niveau);
     return !niveau || aAcces(niveau);
