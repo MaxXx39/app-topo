@@ -70,6 +70,7 @@ import { lireJournal, ecrireJournal, noter, aUnControleRecent } from './recap/jo
 import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { lireNomsMateriel } from './materiel/noms-tablette.js';
 import { ouvrirMateriel as ouvrirPageMateriel } from './materiel/appli.js';
+import { ouvrirCalage as ouvrirPageCalage } from './calage/appli.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE, EXAGERATIONS_COUPE, ACCROCHES } from './leve/ecran.js';
 import { creerEncartPlan } from './plan/encart.js';
@@ -1725,6 +1726,7 @@ function ouvrirAppli(cle, sous = null, depuisMenu = false) {
   else if (cle === 'reseaux') afficherOnglet('reseaux');
   else if (cle === 'laser') afficherOnglet('test-laser');
   else if (cle === 'materiel') ouvrirMateriel();
+  else if (cle === 'calage') ouvrirCalage();
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur', { detail: { retourMenu: depuisMenu } }));
   if (sous && cle !== 'calculs') {
     // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
@@ -1972,6 +1974,30 @@ function ouvrirMateriel() {
     message: (texte, duree, options) => afficherMessage(texte, duree, options),
     enregistrer: enregistrerFichier,
   }).catch((erreur) => afficherMessage(`Matériel : ${erreur.message}`, 8000));
+}
+
+/**
+ * Calage de plans (0.278.0, Expert, site et Topo Bureau) : page plein écran à part (calage/appli.js). Le plan calé
+ * est rangé dans le projet comme un plan importé (dossier choisi, Drive) ; « ← » ramène à la page Applications.
+ */
+function ouvrirCalage() {
+  fenetreReglages?.fermer?.();
+  navigation?.fermer();
+  ouvrirPageCalage({
+    projet,
+    ajouterPlan: (plan) => {
+      if (lectureSeule()) {
+        refuserEnLectureSeule();
+        return null;
+      }
+      const range = { ...plan, id: nouvelIdentifiant() };
+      projet.plansDxf.push(range);
+      modifie();
+      return range;
+    },
+    quandRetour: () => navigation.ouvrirPage(),
+    message: (texte, duree, options) => afficherMessage(texte, duree, options),
+  });
 }
 
 let fenetreReglages = null;

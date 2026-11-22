@@ -260,3 +260,12 @@ export function caler(elements, { arrondirEchelle = true } = {}) {
     methode: calage.some((e) => e.type === 'axe') ? 'axes et points' : 'points',
   };
 }
+
+/**
+ * Paramètres de recalage de Topo ({ a, b, tEst, tNord, echelle, rotation (radians) }, voir topo/recalage.js,
+ * appliquerHelmert) depuis une similitude : le plan calé s'affiche, s'accroche et s'exporte comme un plan recalé.
+ */
+export function versHelmert(s) {
+  const [a, b] = partieA(s);
+  return { a, b, tEst: s.tx, tNord: s.ty, echelle: s.echelle, rotation: Math.atan2(b, a) };
+}

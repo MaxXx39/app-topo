@@ -100,6 +100,18 @@ export const APPLIS = [
     icone: '<rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18" />',
   },
   {
+    // Calage de plans (0.278.0, Expert, site et Topo Bureau) : caler un plan reçu sur un plan MN95 du projet.
+    cle: 'calage',
+    titre: 'Calage de plans',
+    court: 'Calage',
+    couleur: '#1e40af',
+    texte: '#ffffff',
+    site: true,
+    siteSeulement: true,
+    niveau: 'expert',
+    icone: '<rect x="3" y="3" width="10" height="10" /><path d="M11 21l10-4-4-10" /><path d="M13 13l4 4" stroke-dasharray="2 2" />',
+  },
+  {
     cle: 'calculs',
     titre: 'Calculs',
     couleur: '#db2777',

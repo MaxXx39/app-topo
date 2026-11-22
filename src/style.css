@@ -14443,3 +14443,81 @@ dialog.page-materiel[open] {
 .legende-recap { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--gris); font-size: 0.85rem; }
 .legende-recap span { display: inline-flex; gap: 6px; align-items: center; }
 .liste .vu { vertical-align: middle; }
+
+/* ==========================================================================
+   0.278.0 : application Calage de plans (Expert, site PC et Topo Bureau) : page plein écran, outils en haut
+   (comme AutoCAD / Mensura), deux vues de même taille, éléments et résultat en bas (maquette validée le 22.11).
+   ========================================================================== */
+dialog.page-calage[open] {
+  position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column;
+  width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: none;
+  background: var(--fond); color: var(--encre);
+}
+.entete-calage { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 16px; background: var(--sombre); color: #ffffff; border-bottom: 4px solid #1e40af; }
+.entete-calage h2 { margin: 0; font-size: 1.05rem; letter-spacing: 0.04em; text-transform: uppercase; color: #ffffff; }
+.etapes-calage { display: flex; gap: 4px; flex-wrap: wrap; }
+.etapes-calage button { padding: 7px 14px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 8px; background: transparent; color: #ffffff; font: inherit; cursor: pointer; }
+.etapes-calage button.actif { background: #ffffff; color: var(--sombre); font-weight: 700; }
+.etapes-calage button:disabled { opacity: 0.4; cursor: default; }
+.contenu-calage { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 12px; }
+.contenu-calage.en-calage { overflow: hidden; padding-bottom: 10px; gap: 8px; }
+.carte-calage { padding: 12px 14px; background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.carte-calage h3 { margin: 0; font-size: 0.95rem; }
+.carte-calage select, .champ-calage input { padding: 8px 10px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); font: inherit; max-width: 480px; }
+.champ-calage { display: flex; flex-direction: column; gap: 4px; }
+.champ-calage > span, .aide-calage { font-size: 0.85rem; color: var(--gris); }
+.bouton-fichier { align-self: flex-start; cursor: pointer; }
+.note-calage { margin: 0; padding: 6px 10px; border-radius: 8px; }
+.note-calage.ok { background: color-mix(in srgb, #16a34a 12%, var(--surface)); }
+.note-calage.alerte { background: var(--jaune-clair); }
+.resume-plan-recu { margin: 0; }
+.pied-calage { display: flex; justify-content: space-between; gap: 10px; }
+.pied-calage .bouton[aria-disabled='true'] { opacity: 0.5; }
+.barre-calage { display: flex; gap: 8px; }
+.cadre-tableau-calage { overflow-x: auto; background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon); }
+.tableau-calage { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.tableau-calage th, .tableau-calage td { padding: 6px 10px; border-bottom: 1px solid var(--bordure); text-align: left; }
+.chiffre { font-variant-numeric: tabular-nums; }
+.pastille-calage { display: inline-block; padding: 1px 9px; border-radius: 10px; font-size: 0.85rem; font-weight: 700; color: #ffffff; }
+.p-juste { background: #16a34a; }
+.p-revoir { background: #ea580c; }
+.p-faux { background: #dc2626; }
+.p-sans { background: #6b7280; }
+/* Ruban d'outils */
+.ruban-calage { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; background: var(--surface); border: 1px solid var(--bordure); border-radius: 12px; }
+.groupe-ruban { display: flex; flex-direction: column; gap: 3px; padding: 2px 8px; border-right: 1px solid var(--bordure); }
+.groupe-ruban:last-child { border-right: 0; }
+.titre-groupe { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gris); }
+.boutons-groupe { display: flex; gap: 3px; }
+.outil-ruban { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 44px; height: 46px; padding: 2px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--encre); cursor: pointer; font-size: 1rem; line-height: 1; }
+.outil-ruban span { font-size: 0.68rem; }
+.outil-ruban:hover:not(:disabled) { border-color: var(--bordure); }
+.outil-ruban.actif { background: color-mix(in srgb, #2563eb 14%, var(--surface)); border-color: #2563eb; color: #2563eb; font-weight: 700; }
+.outil-ruban:disabled { opacity: 0.35; cursor: default; }
+.rond-role { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+.consigne-calage { margin: 0; font-weight: 600; }
+/* Vues : même taille côte à côte, ou une seule en grand */
+.vues-calage { flex: 1 1 auto; min-height: 220px; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.vue-calage { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--bordure); border-radius: var(--rayon); overflow: hidden; background: var(--surface); }
+.vue-calage[data-cote='cale'] { display: none; }
+.vues-calage[data-mode='plan'], .vues-calage[data-mode='ref'], .vues-calage[data-mode='cale'] { grid-template-columns: minmax(0, 1fr); }
+.vues-calage[data-mode='plan'] .vue-calage:not([data-cote='plan']),
+.vues-calage[data-mode='ref'] .vue-calage:not([data-cote='ref']),
+.vues-calage[data-mode='cale'] .vue-calage:not([data-cote='cale']) { display: none; }
+.vues-calage[data-mode='cale'] .vue-calage[data-cote='cale'] { display: flex; }
+.tete-vue { display: flex; justify-content: space-between; gap: 8px; padding: 5px 10px; border-bottom: 1px solid var(--bordure); font-size: 0.88rem; }
+.toile-calage { position: relative; flex: 1 1 auto; min-height: 0; background: #ffffff; cursor: crosshair; touch-action: none; }
+.toile-calage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bas-calage { display: grid; gap: 10px; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); max-height: 30vh; overflow-y: auto; flex: 0 0 auto; }
+.bas-calage .carte-calage { padding: 8px 12px; gap: 6px; }
+@media (max-width: 860px) { .bas-calage { grid-template-columns: minmax(0, 1fr); } .vues-calage { grid-template-columns: minmax(0, 1fr); } }
+.elements-calage { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.elements-calage li { flex: 0 1 auto; display: flex; align-items: center; gap: 8px; padding: 3px 6px 3px 8px; border: 1px solid var(--bordure); border-radius: 8px; white-space: nowrap; font-size: 0.9rem; }
+.elements-calage li.aide-calage { white-space: normal; }
+.elements-calage li .chiffre { margin-left: auto; font-weight: 700; }
+.etiquette-calage { padding: 1px 7px; border-radius: 6px; color: #ffffff; font-weight: 700; font-size: 0.85rem; }
+.suppr-calage { border: none; background: none; color: var(--gris); cursor: pointer; font-size: 1rem; }
+.resultat-calage dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; }
+.resultat-calage dt { color: var(--gris); }
+.resultat-calage dd { margin: 0; }
+.verdict-calage { display: flex; gap: 8px; align-items: flex-start; }
