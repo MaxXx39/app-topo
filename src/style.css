@@ -14558,3 +14558,10 @@ dialog.page-calage[open] {
 .champs-calage { display: flex; flex-wrap: wrap; gap: 10px; }
 .champ-calage.court input { width: 90px; }
 .badge-calque.nouveau { background: #dbeafe; color: #1e3a8a; }
+
+/* 0.281.0 : Calage de plans : calage automatique, indice recalé (orange), « Ce qui a changé ». */
+.note-calage.orange { background: color-mix(in srgb, #ea580c 14%, var(--surface)); border: 1px solid #ea580c; }
+.tete-vue .bouton-secondaire.petit { margin-left: auto; margin-right: 8px; }
+.tete-vue .bouton-secondaire.actif { background: #2563eb; color: #ffffff; border-color: #2563eb; }
+.pied-calage .bouton-secondaire + .bouton { margin-left: 8px; }
+.pied-calage > :last-child { margin-left: auto; }

@@ -1,8 +1,8 @@
 // Nettoyage d'un plan calé (0.279.0, calage de plans, décisions du 22.11) : garder seulement ce qui sert sur le
 // chantier, avant de ranger le plan dans le projet.
 //  - calques écartés (les calques gelés / éteints du fichier sont écartés d'office, voir recetteDeDepart) ;
-//  - types d'objets à retirer : attributs, textes, splines, surfaces pleines ; hachures : garder, contour seulement,
-//    supprimer (les cotations, lignes de repère et multilignes ne sont jamais lues par Topo) ;
+//  - types d'objets à retirer : cotations, lignes de repère (lues seulement pour le calage, 0.281.0), attributs, textes,
+//    splines, surfaces pleines ; hachures : garder, contour seulement, supprimer (multilignes jamais lues) ;
 //  - zone à garder (polygone) : les traits sont COUPÉS au bord ; textes, cercles, points, hachures et surfaces
 //    pleines qui touchent la zone sont gardés ENTIERS ;
 //  - couleur d'un calque (tous ses objets la prennent) ; préfixe ajouté au nom des calques.
@@ -10,6 +10,8 @@
 // coordonnées absolues du plan reçu (avant calage), [[x, y], …].
 
 export const TYPES_RETIRABLES = [
+  ['cotations', 'Cotations'],
+  ['reperes', 'Lignes de repère'],
   ['attributs', 'Attributs'],
   ['textes', 'Textes'],
   ['splines', 'Splines'],
@@ -25,7 +27,8 @@ export function recetteDeDepart(plan, prefixe = '') {
   return {
     ecartes: plan.calques.filter((c) => c.visible === false).map((c) => c.nom),
     couleurs: {},
-    types: { attributs: false, textes: false, splines: false, pleins: false },
+    // Cochés au départ comme sur la maquette validée le 22.11 : cotations, lignes de repère, attributs.
+    types: { cotations: true, reperes: true, attributs: true, textes: false, splines: false, pleins: false },
     hachures: 'contour',
     zone: null,
     prefixe,
@@ -149,6 +152,7 @@ export function nettoyerPlan(plan, recette) {
   const sortie = { traits: [], pleins: [], cercles: [], textes: [], points: [] };
   for (const t of traits) {
     if (!garde(t)) continue;
+    if ((t.s === 'DIMENSION' && types.cotations) || (t.s === 'LEADER' && types.reperes)) continue;
     if (t.s === 'SPLINE' && types.splines) continue;
     if (t.s === 'HATCH' && hachures === 'supprimer') continue;
     if (t.s === 'SOLID' && types.pleins) continue;
@@ -175,6 +179,7 @@ export function nettoyerPlan(plan, recette) {
   }
   for (const p of pleins) {
     if (!garde(p)) continue;
+    if (p.s === 'DIMENSION' && types.cotations) continue;
     if (p.h && hachures !== 'garder') continue;
     if (!p.h && types.pleins) continue;
     if (zone && !toucheZone(enPoints(p.p), zone, true)) continue;
@@ -182,7 +187,7 @@ export function nettoyerPlan(plan, recette) {
   }
   for (const c of cercles) if (garde(c) && (!zone || cercleToucheZone(c.x, c.y, c.r, zone))) sortie.cercles.push(c);
   for (const t of textes) {
-    if (!garde(t) || types.textes || (t.s === 'ATTRIB' && types.attributs)) continue;
+    if (!garde(t) || types.textes || (t.s === 'ATTRIB' && types.attributs) || (t.s === 'DIMENSION' && types.cotations)) continue;
     if (zone && !pointDansPolygone(t.x, t.y, zone)) continue;
     sortie.textes.push(t);
   }
