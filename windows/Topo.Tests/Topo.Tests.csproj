@@ -24,5 +24,6 @@
     <Compile Include="..\Topo\Drive.cs" />
     <Compile Include="..\Topo\ServeurAppli.cs" />
     <Compile Include="..\Topo\MiseAJour.cs" />
+    <Compile Include="..\Topo\ConversionDwg.cs" />
   </ItemGroup>
 </Project>

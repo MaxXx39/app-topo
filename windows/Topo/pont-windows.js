@@ -113,6 +113,10 @@
     installerMiseAJour: function (adresse) { envoyer('installerMiseAJour', adresse); },
   };
 
+  // Seulement Topo Bureau (0.280.0, calage de plans) : plan DWG (et ses xrefs) choisi dans une fenêtre Windows,
+  // converti en DXF par ODA File Converter ; réponse par window.recevoirConversionDwg(numero, { fichiers | erreur }).
+  if (depart.bureau) appli.choisirDwg = function (numero) { envoyer('choisirDwg', numero); };
+
   // Seulement Topo Tablette : récepteur GNSS, corrections NTRIP, journal NMEA, laser, boutons + / −.
   // (Topo Bureau ne les a pas : l'appli web voit alors « pas de récepteur », comme sur le site.)
   if (!depart.bureau) {

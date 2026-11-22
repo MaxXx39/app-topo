@@ -14551,3 +14551,10 @@ dialog.page-calage[open] {
 .pied-vue { padding: 5px 10px; border-top: 1px solid var(--bordure); font-size: 0.85rem; color: var(--gris); }
 .pied-vue strong { color: var(--encre); }
 @media (max-width: 860px) { .nettoyer-calage { grid-template-columns: minmax(0, 1fr); } }
+
+/* 0.280.0 : Calage de plans : xrefs, champ Indice, nouveaux calques d'un nouvel indice. */
+.xrefs-calage { margin: 0; padding-left: 18px; font-size: 0.9rem; }
+.xrefs-calage li.alerte { color: var(--rouge); font-weight: 600; }
+.champs-calage { display: flex; flex-wrap: wrap; gap: 10px; }
+.champ-calage.court input { width: 90px; }
+.badge-calque.nouveau { background: #dbeafe; color: #1e3a8a; }

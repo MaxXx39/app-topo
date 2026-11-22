@@ -1985,10 +1985,19 @@ function ouvrirCalage() {
   navigation?.fermer();
   ouvrirPageCalage({
     projet,
-    ajouterPlan: (plan) => {
+    // remplace (0.280.0, nouvel indice) : id du plan calé qu'il remplace (même id, même dossier, couleur et affichage).
+    ajouterPlan: (plan, { remplace = null } = {}) => {
       if (lectureSeule()) {
         refuserEnLectureSeule();
         return null;
+      }
+      const ancien = remplace ? projet.plansDxf.find((p) => p.id === remplace) : null;
+      if (ancien) {
+        const { id, sousDossiers, couleur, transparence, visible } = ancien;
+        const range = { ...plan, id, sousDossiers, ...(couleur !== undefined ? { couleur } : {}), ...(transparence !== undefined ? { transparence } : {}), ...(visible !== undefined ? { visible } : {}) };
+        projet.plansDxf[projet.plansDxf.indexOf(ancien)] = range;
+        modifie();
+        return range;
       }
       const range = { ...plan, id: nouvelIdentifiant() };
       projet.plansDxf.push(range);

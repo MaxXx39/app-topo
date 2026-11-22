@@ -36,7 +36,7 @@ export function etiquettes(elements) {
  * (référence, éléments cliqués, résultat) pour la revoir ou la rejouer.
  * lu : plan lu (déjà nettoyé, voir topo/nettoyage-plan.js) ; nettoyage : sa recette ; resultat : retour de caler() ; reference : plan de référence ; elements : éléments cliqués.
  */
-export function planCale({ lu, nom, fichier, resultat, reference, elements, id, le, nettoyage = null }) {
+export function planCale({ lu, nom, fichier, resultat, reference, elements, id, le, nettoyage = null, indice = 'A', reperes = [], calquesVus = [], historique = [], mode = 'a-la-main', part = null }) {
   const parametres = versHelmert(resultat.similitude);
   return {
     ...lu,
@@ -59,6 +59,12 @@ export function planCale({ lu, nom, fichier, resultat, reference, elements, id, 
       message: resultat.message,
       // Recette du nettoyage (calques écartés, couleurs, types, hachures, zone en coordonnées du plan reçu, préfixe).
       ...(nettoyage ? { nettoyage: JSON.parse(JSON.stringify(nettoyage)) } : {}),
+      // Nouvel indice (0.280.0) : indice de ce plan, repères pour contrôler le suivant (coordonnées du plan reçu),
+      // calques du fichier reçu (les nouveaux seront signalés), et la suite des indices calés.
+      indice,
+      reperes,
+      calquesVus,
+      indices: [...historique, { indice, le, fichier, mode, ...(part !== null ? { part } : {}) }],
     },
   };
 }

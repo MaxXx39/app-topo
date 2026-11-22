@@ -306,3 +306,48 @@ export function etatBoutonsTablette() {
 export function ecouterBoutonsTablette(fonction) {
   window.recevoirBoutonsTablette = fonction;
 }
+
+// --- Topo Bureau : plans DWG par ODA File Converter (0.280.0, calage de plans) ---
+
+/** Vrai dans Topo Bureau quand le programme sait convertir des DWG (ODA File Converter, installé sur le PC). */
+export function peutConvertirDwg() {
+  return estDansAppliBureau() && typeof window.AppliAndroid.choisirDwg === 'function';
+}
+
+let numeroDwg = 0;
+const conversionsEnCours = new Map();
+
+/**
+ * Topo Bureau : ouvre la fenêtre Windows « Plan DWG / DXF et ses xrefs », convertit les DWG en DXF par ODA File
+ * Converter (les xrefs trouvés à côté du plan sont convertis aussi) et renvoie [{ nom, octets (Uint8Array, DXF) }].
+ * [] si l'utilisateur ferme la fenêtre ; erreur compréhensible sinon (ODA introuvable, conversion ratée…).
+ */
+export function choisirDwgBureau() {
+  if (!window.recevoirConversionDwg) {
+    window.recevoirConversionDwg = (numero, reponse) => {
+      const demande = conversionsEnCours.get(numero);
+      if (!demande) return;
+      conversionsEnCours.delete(numero);
+      demande(reponse);
+    };
+  }
+  return new Promise((tenir, rater) => {
+    const numero = ++numeroDwg;
+    conversionsEnCours.set(numero, async (reponse) => {
+      try {
+        if (reponse?.erreur) throw new Error(reponse.erreur);
+        // Les DXF convertis sont servis par le programme à une adresse à part (pas de gros texte dans un message).
+        const fichiers = [];
+        for (const f of reponse?.fichiers ?? []) {
+          const recu = await fetch(f.adresse);
+          if (!recu.ok) throw new Error(`fichier converti illisible : ${f.nom}`);
+          fichiers.push({ nom: f.nom, octets: new Uint8Array(await recu.arrayBuffer()), xrefTrouve: Boolean(f.xrefTrouve) });
+        }
+        tenir(fichiers);
+      } catch (erreur) {
+        rater(erreur);
+      }
+    });
+    window.AppliAndroid.choisirDwg(numero);
+  });
+}

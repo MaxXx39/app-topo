@@ -250,7 +250,9 @@ namespace Topo
         void ServirFichier(object expediteur, CoreWebView2WebResourceRequestedEventArgs e)
         {
             string type;
-            byte[] contenu = serveur.Contenu(e.Request.Uri, out type);
+            byte[] contenu = ContenuConverti(e.Request.Uri);
+            if (contenu != null) type = "application/dxf";
+            else contenu = serveur.Contenu(e.Request.Uri, out type);
             if (contenu == null)
             {
                 e.Response = environnement.CreateWebResourceResponse(new MemoryStream(new byte[0]), 404, "Not Found", "Content-Type: text/plain");
@@ -364,6 +366,7 @@ namespace Topo
                     case "fermerAppli": Close(); break;
                     case "ouvrirAnydesk": OuvrirAnydesk(); break;
                     case "lireAdresse": LireAdresse(Nombre(args, 0), Texte(args, 1)); break;
+                    case "choisirDwg": ChoisirDwg(Nombre(args, 0)); break;
                     case "installerMiseAJour": InstallerMiseAJour(Texte(args, 0)); break;
                     case "montrerClavier": Clavier(true); break;
                     case "cacherClavier": Clavier(false); break;
@@ -622,6 +625,77 @@ namespace Topo
 
         // Cadastre : lit une adresse internet pour la page, sans la protection « CORS » du navigateur.
         // Seulement en https et vers les services du cadastre.
+        // =====================================================================
+        // Plans DWG (0.280.0, Topo Bureau, calage de plans) : conversion par ODA File Converter, voir ConversionDwg.cs
+        // =====================================================================
+
+        const string DOSSIER_CONVERSIONS = "__conversion/";
+        // Dernière conversion : nom du DXF -> octets, servis à la page à https://topo.appli/app-topo/__conversion/<n°>/<nom>.
+        readonly Dictionary<string, byte[]> conversions = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+
+        byte[] ContenuConverti(string adresse)
+        {
+            string chemin = ServeurAppli.CheminDuFichier(adresse);
+            if (chemin == null || !chemin.StartsWith(DOSSIER_CONVERSIONS, StringComparison.Ordinal)) return null;
+            byte[] octets;
+            lock (conversions) return conversions.TryGetValue(chemin.Substring(DOSSIER_CONVERSIONS.Length), out octets) ? octets : null;
+        }
+
+        void ChoisirDwg(int numero)
+        {
+            string[] choisis;
+            using (var fenetre = new OpenFileDialog())
+            {
+                fenetre.Title = "Plan DWG ou DXF (et ses xrefs : Ctrl + clic)";
+                fenetre.Filter = "Plans DWG / DXF|*.dwg;*.dxf|Tous les fichiers|*.*";
+                fenetre.Multiselect = true;
+                string dernier = reglages.Texte("dossier_plans");
+                if (!string.IsNullOrEmpty(dernier) && Directory.Exists(dernier)) fenetre.InitialDirectory = dernier;
+                if (fenetre.ShowDialog(this) != DialogResult.OK)
+                {
+                    Executer("window.recevoirConversionDwg && window.recevoirConversionDwg(" + numero + ",{\"fichiers\":[]})");
+                    return;
+                }
+                choisis = fenetre.FileNames;
+                reglages.Ecrire("dossier_plans", Path.GetDirectoryName(choisis[0]));
+            }
+            Message("Conversion du plan en DXF…");
+            string oda = ConversionDwg.TrouverOda(reglages.Texte("oda_chemin"), new[] {
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            });
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                var reponse = new Dictionary<string, object>();
+                try
+                {
+                    ConversionDwg.Resultat resultat = ConversionDwg.Convertir(choisis, oda);
+                    var fichiers = new List<object>();
+                    lock (conversions)
+                    {
+                        conversions.Clear();
+                        foreach (var f in resultat.Fichiers)
+                        {
+                            string cle = numero + "/" + f.Key;
+                            conversions[cle] = f.Value;
+                            fichiers.Add(new Dictionary<string, object> {
+                                { "nom", f.Key },
+                                { "adresse", ServeurAppli.ADRESSE_ACCUEIL + DOSSIER_CONVERSIONS + numero + "/" + Uri.EscapeDataString(f.Key) },
+                                { "xrefTrouve", resultat.XrefsTrouves.Exists(x => string.Equals(Path.GetFileNameWithoutExtension(x), Path.GetFileNameWithoutExtension(f.Key), StringComparison.OrdinalIgnoreCase)) },
+                            });
+                        }
+                    }
+                    reponse["fichiers"] = fichiers;
+                }
+                catch (Exception erreur)
+                {
+                    reponse.Clear();
+                    reponse["erreur"] = erreur.Message;
+                }
+                Executer("window.recevoirConversionDwg && window.recevoirConversionDwg(" + numero + "," + Json.Ecrire(reponse) + ")");
+            });
+        }
+
         void LireAdresse(int numero, string adresse)
         {
             ThreadPool.QueueUserWorkItem(delegate
