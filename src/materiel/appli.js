@@ -19,7 +19,7 @@ import {
   listerFichiersLocaux, lireEtatDrive, ecrireEtatDrive, choixSynchro, enregistrerCopieAvantRestauration,
 } from './stockage.js';
 import { creerEcranPlanning } from './ecran-planning.js';
-import { affectationDuJour, historiqueArticle, nomDuChantier, responsableDe, nombreDeJours, aujourdhui, finsProches } from './planning.js';
+import { affectationDuJour, historiqueArticle, nomDuChantier, responsableDe, nombreDeJours, aujourdhui, finsProches, chantiersAArchiver, archiverChantiers, dernierJourDuChantier } from './planning.js';
 import { creerSauvegarde, lireSauvegarde, nomSauvegarde } from './sauvegarde.js';
 import { creerXlsx } from '../recap/xlsx.js';
 import { reunirJournaux } from './comparaison.js';
@@ -69,6 +69,7 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
   let partie = 'planning';
   let fiche = null; // { id (null = nouvel article), brouillon (champs proposés), mdpVisible }
   let chantierEdite = null; // id du chantier dans le formulaire, 'nouveau', ou null
+  let montrerArchives = false; // liste des chantiers : les archivés sont cachés tant qu'on ne les demande pas
   const filtre = { texte: '', categorieId: '', statut: '' };
   const tri = { colonne: null, sens: 1 };
   let projets = [];
@@ -463,10 +464,14 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
     const v = c ?? { numero: '', nom: '', responsable: '', facturable: true, archive: false, notes: '' };
     const sansChantier = projetsSansChantier(parc, projets);
     const projetDe = (ch) => projets.find((nom) => ch.cle && cleNumeroDuProjet(nom) === ch.cle);
+    const nbArchives = parc.chantiers.filter((x) => x.archive).length;
+    const montres = chantiersTries(parc).filter((ch) => montrerArchives || !ch.archive);
     return `
       <div class="barre-materiel">
         <button type="button" class="bouton" data-action="nouveau-chantier">＋ Chantier</button>
         <button type="button" class="bouton-secondaire" data-action="depuis-projets" ${sansChantier.length ? '' : 'aria-disabled="true"'}>＋ Depuis les projets (${sansChantier.length})</button>
+        <button type="button" class="bouton-secondaire" data-action="archiver-anciens">Archiver les anciens…</button>
+        <button type="button" class="bouton-secondaire ${montrerArchives ? 'actif' : ''}" data-action="basculer-archives" aria-pressed="${montrerArchives}">${montrerArchives ? 'Cacher' : 'Voir'} les archivés (${nbArchives})</button>
       </div>
       ${chantierEdite ? `<form class="fiche-materiel fiche-chantier" data-zone="chantier" autocomplete="off">
         <fieldset><legend>${c ? `Chantier ${echapper(c.numero || c.nom)}` : 'Nouveau chantier'}</legend>
@@ -484,12 +489,41 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
           ${c ? '<button type="button" class="bouton-secondaire bouton-danger" data-action="supprimer-chantier">Supprimer</button>' : ''}
         </div>
       </form>` : ''}
-      ${parc.chantiers.length ? `<div class="cadre-tableau-materiel"><table class="tableau-materiel">
-        <thead><tr><th>N°</th><th>Nom</th><th>Responsable</th><th>Facturable</th><th>Projet de Topo</th></tr></thead>
-        <tbody>${chantiersTries(parc).map((ch) => `<tr data-chantier="${echapper(ch.id)}" class="${ch.archive ? 'ligne-archivee' : ''}">
+      ${montres.length ? `<div class="cadre-tableau-materiel"><table class="tableau-materiel">
+        <thead><tr><th>N°</th><th>Nom</th><th>Responsable</th><th>Facturable</th><th>Dernier jour</th><th>Projet de Topo</th><th><span class="sr">Archiver</span></th></tr></thead>
+        <tbody>${montres.map((ch) => `<tr data-chantier="${echapper(ch.id)}" class="${ch.archive ? 'ligne-archivee' : ''}">
           <td>${echapper(ch.numero)}</td><td>${echapper(ch.nom)}${ch.archive ? ' <span class="aide">(archivé)</span>' : ''}</td><td>${echapper(ch.responsable)}</td>
-          <td>${ch.facturable ? '✓' : '—'}</td><td>${projetDe(ch) ? `✓ ${echapper(projetDe(ch))}` : '<span class="aide">—</span>'}</td></tr>`).join('')}</tbody></table></div>`
-        : '<p class="vide">Aucun chantier pour l\'instant.</p>'}`;
+          <td>${ch.facturable ? '✓' : '—'}</td><td>${echapper(dateSuisse(dernierJourDuChantier(parc, ch.id)) || '—')}</td><td>${projetDe(ch) ? `✓ ${echapper(projetDe(ch))}` : '<span class="aide">—</span>'}</td>
+          <td><button type="button" class="bouton-lien" data-action="archiver-chantier" data-id="${echapper(ch.id)}">${ch.archive ? 'désarchiver' : 'archiver'}</button></td></tr>`).join('')}</tbody></table></div>`
+        : `<p class="vide">${parc.chantiers.length ? 'Tous les chantiers sont archivés : « Voir les archivés » pour les retrouver.' : 'Aucun chantier pour l\'instant.'}</p>`}`;
+  }
+
+  /** « Archiver les anciens… » : choisir depuis combien de mois un chantier est fini (3, 6 ou 12), avec le nombre concerné. */
+  async function archiverLesAnciens() {
+    const jour = aujourdhui();
+    const choix = [3, 6, 12].map((mois) => [mois, chantiersAArchiver(parc, jour, mois)]);
+    if (choix.every(([, liste]) => liste.length === 0)) {
+      message('Aucun chantier fini depuis plus de 3 mois (ou déjà archivé).', 5000);
+      return;
+    }
+    const reponse = await demanderChoix({
+      titre: 'Archiver les chantiers finis depuis…',
+      texte: 'Ils restent dans le planning, les exports et l\'historique ; ils disparaissent seulement de cette liste et des choix de chantier. « Voir les archivés » les ramène.',
+      boutons: [
+        ...choix.map(([mois, liste]) => ({ cle: String(mois), texte: `Plus de ${mois} mois`, detail: liste.length ? `${liste.length} chantier(s)` : 'aucun', principal: mois === 6 })),
+        { cle: 'non', texte: 'Annuler' },
+      ],
+    });
+    const mois = Number(reponse);
+    if (!mois) return;
+    const liste = choix.find(([m]) => m === mois)[1];
+    if (!liste.length) {
+      message(`Aucun chantier fini depuis plus de ${mois} mois.`, 4000);
+      return;
+    }
+    const { ok, resultat } = await changer((p) => archiverChantiers(p, liste.map((c) => c.id)));
+    if (ok) message(`${resultat} chantier(s) archivé(s) : « Voir les archivés » les ramène`, 6000, { ok: true });
+    dessiner();
   }
 
   /** Crée un chantier pour chaque projet choisi qui n'en a pas (n° = début du nom du projet). */
@@ -745,6 +779,17 @@ export async function ouvrirMateriel({ materiel = null, nomsProjets = async () =
       return dessiner();
     }
     if (action === 'depuis-projets') return chantiersDepuisProjets();
+    if (action === 'basculer-archives') {
+      montrerArchives = !montrerArchives;
+      return dessiner();
+    }
+    if (action === 'archiver-chantier') {
+      const c = parc.chantiers.find((x) => x.id === id);
+      await changer((p) => archiverChantiers(p, [id], !c.archive));
+      message(c.archive ? `Chantier ${c.numero || c.nom} archivé : retrouvable avec « Voir les archivés »` : `Chantier ${c.numero || c.nom} remis dans la liste`, 4000, { ok: true });
+      return dessiner();
+    }
+    if (action === 'archiver-anciens') return archiverLesAnciens();
     // Catégories
     if (action === 'nouvelle-categorie' || action === 'renommer-categorie') {
       const ancienne = parc.categories.find((c) => c.id === id);

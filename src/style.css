@@ -14407,7 +14407,7 @@ dialog.page-materiel[open] {
 .barre-pl.apres { border-right-style: dashed; border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .barre-pl .texte-pl { flex: 1; min-width: 0; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; pointer-events: none; }
 .barre-pl .texte-pl i { opacity: 0.75; font-size: 0.72rem; }
-.poignee-pl { flex: 0 0 8px; align-self: stretch; cursor: ew-resize; }
+.poignee-pl { flex: 0 0 10px; align-self: stretch; cursor: ew-resize; }
 .poignee-pl:hover { background: rgba(0, 0, 0, 0.18); }
 .apercu-pl { background: color-mix(in srgb, #0f766e 30%, transparent); border: 2px dashed #0f766e; pointer-events: none; }
 .bulle-planning { position: fixed; z-index: 50; padding: 4px 8px; border-radius: 6px; background: var(--sombre); color: #ffffff; font-size: 0.8rem; pointer-events: none; white-space: nowrap; }
@@ -14425,6 +14425,7 @@ dialog.page-materiel[open] {
 .bloc-sauvegarde { display: flex; flex-direction: column; gap: 8px; max-width: 900px; }
 .bloc-sauvegarde h4 { margin: 0; }
 .historique-fiche li { flex-wrap: wrap; }
+.barre-materiel .bouton-secondaire.actif { background: var(--sombre); color: #ffffff; border-color: var(--sombre); }
 
 /* 0.276.0 : Matériel › Planning › Réel / Comparer (ronds de couleur du recap). */
 .vu { display: inline-block; width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--surface); flex: 0 0 auto; }

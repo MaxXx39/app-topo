@@ -150,7 +150,8 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
     });
   }
 
-  const choixChantiers = () => chantiersTries(obtenirParc()).filter((c) => !c.archive).map((c) => [c.id, nomDuChantier(c)]);
+  // Chantiers à proposer (les archivés n'y sont pas) ; « inclure » = celui de l'affectation qu'on modifie, même archivé.
+  const choixChantiers = (inclure = null) => chantiersTries(obtenirParc()).filter((c) => !c.archive || c.id === inclure).map((c) => [c.id, nomDuChantier(c)]);
 
   // --- Fenêtre d'une affectation (toucher une barre) ---
 
@@ -179,7 +180,7 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
         champs: [
           { cle: 'debut', titre: 'Du', valeur: dateSuisse(af.debut), exemple: 'JJ.MM.AAAA' },
           { cle: 'fin', titre: 'Au', valeur: dateSuisse(af.fin), exemple: 'JJ.MM.AAAA' },
-          { cle: 'chantierId', titre: 'Chantier', valeur: af.chantierId, choix: choixChantiers() },
+          { cle: 'chantierId', titre: 'Chantier', valeur: af.chantierId, choix: choixChantiers(af.chantierId) },
           { cle: 'responsable', titre: 'Responsable (vide = celui du chantier)', valeur: af.responsable, exemple: chantier?.responsable ?? '' },
           { cle: 'remarque', titre: 'Remarque', valeur: af.remarque },
         ],
@@ -455,12 +456,15 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
   // --- Gestes sur la grille (souris, doigt, stylet) ---
 
   /** Jour (j) sous le pointeur dans une ligne, borné à la veille et au dernier jour du mois. */
-  function jourSous(ligne, x) {
+  function jourSous(ligne, x, libre = false) {
     const cases = ligne.querySelectorAll('.jour-pl');
     const premiere = cases[0].getBoundingClientRect();
     const largeur = premiere.width;
     const n = cases.length - 1;
-    return Math.max(0, Math.min(n, Math.floor((x - premiere.left) / largeur)));
+    const brut = Math.floor((x - premiere.left) / largeur);
+    // libre : en tirant le bord d'une barre, on peut dépasser la grille (au-delà du dernier jour du mois, ou avant
+    // la veille) pour allonger sur le mois voisin ; la bulle montre alors la vraie date.
+    return libre ? brut : Math.max(0, Math.min(n, brut));
   }
 
   function montrerBulle(page, x, y, texte) {
@@ -483,11 +487,14 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
     }
     const delta = g.j - g.j0;
     if (g.sorte === 'deplacer') return { debut: ajouterJours(g.af.debut, delta), fin: ajouterJours(g.af.fin, delta) };
+    // Une barre qui commence avant (ou finit après) le mois montré : son vrai début (ou sa vraie fin) est hors
+    // de la grille. On n'y touche pas tant qu'on ne tire pas ce bord vers l'intérieur de la grille (0.276.1 :
+    // avant, le simple toucher de ce bord écrasait la date par celle du bord du mois).
     if (g.bord === 'g') {
-      const debut = ajouterJours(g.af.debut < isoDe(0) ? isoDe(g.j0) : g.af.debut, delta);
+      const debut = g.af.debut < isoDe(0) ? (g.j > g.j0 ? isoDe(g.j) : g.af.debut) : ajouterJours(g.af.debut, delta);
       return { debut: debut > g.af.fin ? g.af.fin : debut, fin: g.af.fin };
     }
-    const fin = ajouterJours(g.af.fin > isoDe(joursDuMois(etat.annee, etat.mois)) ? isoDe(g.j0) : g.af.fin, delta);
+    const fin = g.af.fin > isoDe(joursDuMois(etat.annee, etat.mois)) ? (g.j < g.j0 ? isoDe(g.j) : g.af.fin) : ajouterJours(g.af.fin, delta);
     return { debut: g.af.debut, fin: fin < g.af.debut ? g.af.debut : fin };
   }
 
@@ -531,7 +538,7 @@ export function creerEcranPlanning({ obtenirParc, changer, message, enregistrer,
       if (!geste) return;
       if (!geste.bouge && Math.hypot(evenement.clientX - geste.x0, evenement.clientY - geste.y0) < DEPLACEMENT_MINI) return;
       geste.bouge = true;
-      geste.j = jourSous(geste.ligne, evenement.clientX);
+      geste.j = jourSous(geste.ligne, evenement.clientX, geste.sorte === 'etirer');
       const { debut, fin } = apercu(geste);
       montrerBulle(page, evenement.clientX, evenement.clientY, texteDates(debut, fin));
     });

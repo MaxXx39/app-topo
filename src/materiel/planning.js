@@ -251,6 +251,48 @@ export function remettreAffectations(parc, copie) {
   parc.affectations = copie.map((af) => ({ ...af }));
 }
 
+// --- Archivage des chantiers anciens (0.276.1) ---
+
+/** Jour ISO reculé de n mois (le 31 mars − 1 mois = le 28 février). */
+export function reculerDeMois(iso, n) {
+  const [annee, mois, jour] = iso.split('-').map(Number);
+  const cible = new Date(Date.UTC(annee, mois - 1 - n, 1));
+  const a = cible.getUTCFullYear();
+  const m = cible.getUTCMonth() + 1;
+  return isoDuJour(a, m, Math.min(jour, joursDuMois(a, m)));
+}
+
+/** Dernier jour d'un chantier (fin de sa dernière affectation), ou null s'il n'en a pas. */
+export function dernierJourDuChantier(parc, chantierId) {
+  return parc.affectations.filter((af) => af.chantierId === chantierId).reduce((m, af) => (m === null || af.fin > m ? af.fin : m), null);
+}
+
+/**
+ * Chantiers à proposer à l'archivage : pas encore archivés, au moins une affectation, et plus aucune depuis
+ * plus de « mois » mois (leur dernier jour est avant le même jour d'il y a « mois » mois). Un chantier sans
+ * aucune affectation n'est jamais proposé (il vient peut-être d'être créé).
+ */
+export function chantiersAArchiver(parc, jour, mois) {
+  const limite = reculerDeMois(jour, mois);
+  return parc.chantiers.filter((c) => {
+    if (c.archive) return false;
+    const dernier = dernierJourDuChantier(parc, c.id);
+    return dernier !== null && dernier < limite;
+  });
+}
+
+/** Archive (ou désarchive) des chantiers : ils restent dans le planning et l'historique, mais plus dans les listes de choix. */
+export function archiverChantiers(parc, ids, archive = true) {
+  let n = 0;
+  for (const c of parc.chantiers) {
+    if (ids.includes(c.id) && c.archive !== archive) {
+      c.archive = archive;
+      n += 1;
+    }
+  }
+  return n;
+}
+
 // --- Données d'un mois (écran, PDF, Excel) ---
 
 /**
