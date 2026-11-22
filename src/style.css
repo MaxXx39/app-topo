@@ -14565,3 +14565,65 @@ dialog.page-calage[open] {
 .tete-vue .bouton-secondaire.actif { background: #2563eb; color: #ffffff; border-color: #2563eb; }
 .pied-calage .bouton-secondaire + .bouton { margin-left: 8px; }
 .pied-calage > :last-child { margin-left: auto; }
+
+/* ==========================================================================
+   0.282.0 : application Comparer des PDF (Expert, site PC et Topo Bureau) : même allure que Calage de plans,
+   liseré cyan foncé, plan au centre, modifications à droite (maquette validée le 22.11).
+   ========================================================================== */
+dialog.page-comparateur[open] {
+  position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column;
+  width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: none;
+  background: var(--fond); color: var(--encre);
+}
+.entete-comparateur { border-bottom-color: #0e7490; }
+.occupe-comparateur { margin-left: auto; padding: 4px 10px; border-radius: 999px; background: #0e7490; color: #ffffff; font-size: 0.85rem; }
+.page-comparateur .outil-ruban.actif { background: color-mix(in srgb, #0e7490 14%, var(--surface)); border-color: #0e7490; color: #0e7490; }
+.page-comparateur .choix-hachures button.actif { background: #0e7490; }
+.choix-planche { max-width: 220px; padding: 4px 6px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); }
+.case-ruban, .reglage-ruban { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.7rem; color: var(--gris); padding: 0 4px; }
+.reglage-ruban input { width: 90px; }
+.case-ruban { flex-direction: row; gap: 4px; }
+.travail-comparateur { flex: 1 1 auto; min-height: 0; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) 330px; }
+@media (max-width: 900px) { .travail-comparateur { grid-template-columns: minmax(0, 1fr); } }
+.vue-comparateur { min-height: 320px; }
+.toile-comparateur { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #ffffff; cursor: grab; touch-action: none; }
+.toile-comparateur:active { cursor: grabbing; }
+.toile-comparateur[data-outil]:not([data-outil='']) { cursor: crosshair; }
+.toile-comparateur[data-outil='main'] { cursor: move; }
+.toile-comparateur canvas { position: absolute; top: 0; left: 0; }
+.toile-comparateur .fond-comparateur.deuxieme { left: calc(50% + 2px); }
+.toile-comparateur .dessus-comparateur { pointer-events: none; }
+.poignee-rideau { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: #0e7490; cursor: ew-resize; z-index: 2; }
+.poignee-rideau span { position: absolute; top: 50%; left: -14px; width: 30px; height: 30px; border-radius: 50%; background: #0e7490; color: #ffffff; display: grid; place-items: center; transform: translateY(-50%); }
+.legende-comparateur { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.8rem; color: var(--gris); }
+.legende-comparateur span { display: inline-flex; align-items: center; gap: 5px; }
+.legende-comparateur i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.panneau-comparateur { min-height: 0; overflow-y: auto; }
+.onglets-panneau { display: flex; gap: 4px; }
+.onglets-panneau button { flex: 1; padding: 6px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); cursor: pointer; }
+.onglets-panneau button.actif { background: #0e7490; color: #ffffff; border-color: #0e7490; font-weight: 700; }
+.filtres-modifs button { font-size: 0.8rem; }
+.liste-modifs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.liste-modifs .modif { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 8px; align-items: start; padding: 7px; border: 1px solid var(--bordure); border-radius: 10px; background: var(--surface); cursor: pointer; }
+.liste-modifs .modif.choisie { outline: 2px solid #0e7490; }
+.liste-modifs .num { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #d97706; color: #ffffff; font-weight: 800; font-size: 0.78rem; }
+.liste-modifs .num.annot { background: #7c3aed; }
+.liste-modifs .etat-validee .num { background: #15803d; }
+.liste-modifs .etat-ignoree { opacity: 0.6; }
+.liste-modifs .etat-ignoree .num { background: #94a3b8; }
+.liste-modifs .quoi { font-weight: 700; font-size: 0.86rem; }
+.liste-modifs .detail { font-size: 0.78rem; color: var(--gris); }
+.avant-apres { font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; }
+.avant-apres del { color: #dc2626; }
+.avant-apres ins { color: #2563eb; text-decoration: none; font-weight: 700; }
+.actions-modif { display: flex; flex-direction: column; gap: 4px; }
+.actions-modif button { border: 1px solid var(--bordure); background: var(--surface); color: var(--encre); border-radius: 6px; padding: 2px 7px; cursor: pointer; font-size: 0.78rem; }
+.liste-comparaisons { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.indice-a, .indice-b { display: inline-block; padding: 0 6px; border-radius: 5px; color: #ffffff; font-weight: 700; font-size: 0.78rem; }
+.indice-a { background: #dc2626; }
+.indice-b { background: #2563eb; }
+.choix-ab { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+.cote-a { border-color: #dc2626; }
+.cote-b { border-color: #2563eb; }
+.rapport-comparateur { max-width: 640px; }
+.rapport-comparateur label { display: flex; gap: 6px; align-items: center; }

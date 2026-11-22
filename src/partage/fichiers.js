@@ -2,13 +2,15 @@
 // plusieurs fichiers pour ne renvoyer que ce qui a changé :
 // - projet.json.gz : le projet sans les images des photos ni le contenu des plans DXF (léger) ;
 // - plan-<id>.json.gz : le contenu d'un plan DXF (lourd, ne change presque jamais) ;
-// - photo-<id>.json.gz : l'image et la miniature d'une photo.
+// - photo-<id>.json.gz : l'image et la miniature d'une photo ;
+// - pdf-<id>.json.gz : un fichier PDF d'une comparaison (0.282.0, « Comparer des PDF »).
 // Chaque fichier est comprimé (gzip, fait par le navigateur lui-même) : un plan DXF devient
 // plusieurs fois plus petit, ce qui accélère l'envoi sur le réseau du chantier.
 
 export const FICHIER_PROJET = 'projet.json.gz';
 const prefixePlan = 'plan-';
 const prefixePhoto = 'photo-';
+const prefixePdf = 'pdf-';
 const FIN = '.json.gz';
 
 /**
@@ -51,7 +53,17 @@ function alleger(projet, fichiers) {
       return { ...plan, contenu: null };
     }),
   } : {};
-  return { ...surfaces, ...mesures, ...autres, ...photosControle, ...plansDxf };
+  // Comparaisons de PDF (0.282.0) : chaque PDF (base64) part dans son propre fichier.
+  const comparaisons = projet.comparaisons ? {
+    comparaisons: projet.comparaisons.map((c) => ({
+      ...c,
+      fichiers: (c.fichiers ?? []).map((f) => {
+        if (f.donnees) fichiers.set(`${prefixePdf}${f.id}${FIN}`, { donnees: f.donnees });
+        return { ...f, donnees: null };
+      }),
+    })),
+  } : {};
+  return { ...surfaces, ...mesures, ...autres, ...photosControle, ...plansDxf, ...comparaisons };
 }
 
 /**
@@ -73,6 +85,7 @@ function remettre(projet, fichiers) {
   }
   for (const photo of projet.photosControle ?? []) Object.assign(photo, fichiers.get(`${prefixePhoto}${photo.id}${FIN}`) ?? {});
   for (const plan of projet.plansDxf ?? []) plan.contenu = fichiers.get(`${prefixePlan}${plan.id}${FIN}`) ?? null;
+  for (const c of projet.comparaisons ?? []) for (const f of c.fichiers ?? []) f.donnees = fichiers.get(`${prefixePdf}${f.id}${FIN}`)?.donnees ?? null;
 }
 
 /** Comprime un objet en JSON gzip : renvoie un Blob. */
@@ -114,6 +127,7 @@ export async function decomprimer(donnees) {
 export function sansContenu(nom, contenu) {
   if (nom === FICHIER_PROJET) return false;
   if (contenu == null) return true;
+  if (nom.startsWith(prefixePdf)) return !contenu.donnees;
   return nom.startsWith(prefixePhoto) && !contenu.image && !contenu.miniature;
 }
 

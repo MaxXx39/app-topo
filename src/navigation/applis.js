@@ -112,6 +112,18 @@ export const APPLIS = [
     icone: '<rect x="3" y="3" width="10" height="10" /><path d="M11 21l10-4-4-10" /><path d="M13 13l4 4" stroke-dasharray="2 2" />',
   },
   {
+    // Comparer des PDF (0.282.0, Expert, site et Topo Bureau) : deux indices d'un plan PDF, modifications, rapport.
+    cle: 'comparer',
+    titre: 'Comparer des PDF',
+    court: 'Comparer',
+    couleur: '#0e7490',
+    texte: '#ffffff',
+    site: true,
+    siteSeulement: true,
+    niveau: 'expert',
+    icone: '<rect x="3" y="4" width="11" height="15" rx="1" /><rect x="10" y="6" width="11" height="15" rx="1" /><path d="M13 11h5M13 15h3" />',
+  },
+  {
     cle: 'calculs',
     titre: 'Calculs',
     couleur: '#db2777',

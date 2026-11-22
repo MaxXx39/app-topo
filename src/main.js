@@ -71,6 +71,7 @@ import { appareil as appareilDuJournal } from './partage/memoire.js';
 import { lireNomsMateriel } from './materiel/noms-tablette.js';
 import { ouvrirMateriel as ouvrirPageMateriel } from './materiel/appli.js';
 import { ouvrirCalage as ouvrirPageCalage } from './calage/appli.js';
+import { ouvrirComparateur as ouvrirPageComparateur } from './comparateur/appli.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE, EXAGERATIONS_COUPE, ACCROCHES } from './leve/ecran.js';
 import { creerEncartPlan } from './plan/encart.js';
@@ -1727,6 +1728,7 @@ function ouvrirAppli(cle, sous = null, depuisMenu = false) {
   else if (cle === 'laser') afficherOnglet('test-laser');
   else if (cle === 'materiel') ouvrirMateriel();
   else if (cle === 'calage') ouvrirCalage();
+  else if (cle === 'comparer') ouvrirComparateur();
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur', { detail: { retourMenu: depuisMenu } }));
   if (sous && cle !== 'calculs') {
     // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
@@ -2004,6 +2006,23 @@ function ouvrirCalage() {
       modifie();
       return range;
     },
+    quandRetour: () => navigation.ouvrirPage(),
+    message: (texte, duree, options) => afficherMessage(texte, duree, options),
+  });
+}
+
+/**
+ * Comparer des PDF (0.282.0, Expert, site et Topo Bureau) : page plein écran à part (comparateur/appli.js) ; les
+ * comparaisons sont rangées dans le projet (projet.comparaisons, PDF dans pdf-<id>.json.gz sur Drive).
+ */
+function ouvrirComparateur() {
+  fenetreReglages?.fermer?.();
+  navigation?.fermer();
+  ouvrirPageComparateur({
+    projet,
+    modifie: () => modifie(),
+    qui: () => appareilDuJournal().utilisateur || appareilDuJournal().nom || '',
+    enregistrer: enregistrerFichier,
     quandRetour: () => navigation.ouvrirPage(),
     message: (texte, duree, options) => afficherMessage(texte, duree, options),
   });

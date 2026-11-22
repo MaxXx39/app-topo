@@ -22,7 +22,7 @@ describe('applications proposées', () => {
     expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('intermediaire') }))).toEqual(['lever', 'mesure', 'annotation', 'controle', 'calculs', 'plan']);
   });
   it('Matériel (0.274.0) : site en Expert seulement, jamais dans l\'APK ni dans Topo.exe', () => {
-    expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('expert') }))).toEqual(['lever', 'mesure', 'annotation', 'controle', 'reseaux', 'materiel', 'calage', 'calculs', 'plan']);
+    expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('expert') }))).toEqual(['lever', 'mesure', 'annotation', 'controle', 'reseaux', 'materiel', 'calage', 'comparer', 'calculs', 'plan']);
     expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('expert'), dansAppli: true }))).not.toContain('materiel');
   });
   it('Calage de plans (0.278.0) : site et Topo Bureau en Expert, jamais dans l\'APK ni Topo Tablette', () => {
