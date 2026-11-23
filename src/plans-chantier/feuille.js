@@ -8,7 +8,7 @@ import { dessinerObjet, dessinerLigne, dessinerPrimitives, symboleDeLObjet } fro
 import { dessinerFondSwisstopo, attendreTuiles } from './tuiles.js';
 import { metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
 import {
-  miseEnPageFeuille, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
+  miseEnPageFeuille, cadreSituation, etendueDuCadre, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
   reglagesFeuille, FORMATS_FEUILLE,
 } from '../topo/feuille-chantier.js';
 import { boiteSymbole, primitivesEtage } from '../topo/symboles.js';
@@ -133,6 +133,7 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
   ctx.lineWidth = Math.max(1, 0.5 * s);
   ctx.strokeRect(mm(c.x), mm(c.y), mm(c.l), mm(c.h));
   if (prep.r.nord) dessinerNord(ctx, mise.nord, s);
+  if (prep.r.situation.actif) dessinerSituation(ctx, d, prep, s, quandTuile, texte);
   if (prep.r.barre) {
     const b = barreDeLaFeuille(plan.echelle ?? 200, mise.barre.max);
     const x = mise.barre.x;
@@ -188,6 +189,43 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
   for (const t of textesCartouche(K, mise.k, prep.champs)) texte(t.texte, t.x, t.y, t.taille, { gras: t.gras, couleur: t.couleur });
   ctx.restore();
   return prep;
+}
+
+/** Vue de situation : carte nationale autour du plan, rectangle rouge = zone du plan, nord, échelle. */
+function dessinerSituation(ctx, d, prep, s, quandTuile, texte) {
+  const { mise, vue, r } = prep;
+  const sit = r.situation;
+  const B = cadreSituation(mise, sit);
+  const mm = (v) => v * s;
+  const centre = [vue.estCentre, vue.nordCentre];
+  const vueS = { echelle: (s * 1000) / sit.echelle, estCentre: centre[0], nordCentre: centre[1], largeur: B.l * s, hauteur: B.h * s, rotation: 0 };
+  prep.vueSituation = vueS;
+  ctx.save();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(mm(B.x), mm(B.y), mm(B.l), mm(B.h));
+  ctx.beginPath();
+  ctx.rect(mm(B.x), mm(B.y), mm(B.l), mm(B.h));
+  ctx.clip();
+  ctx.translate(mm(B.x), mm(B.y));
+  dessinerFondSwisstopo(ctx, vueS, { carte: true }, 1, quandTuile);
+  const e = etendueDuCadre(d.pc, mise.cadre, centre);
+  const a = versEcran(e.estMin, e.nordMax, vueS);
+  const b = versEcran(e.estMax, e.nordMin, vueS);
+  ctx.fillStyle = 'rgba(220,38,38,0.15)';
+  ctx.strokeStyle = '#dc2626';
+  ctx.lineWidth = Math.max(1, 0.5 * s);
+  const [rx, ry, rl, rh] = [a.x, a.y, Math.max(b.x - a.x, 1.5 * s), Math.max(b.y - a.y, 1.5 * s)];
+  ctx.fillRect(rx, ry, rl, rh);
+  ctx.strokeRect(rx, ry, rl, rh);
+  ctx.restore();
+  ctx.strokeStyle = '#1b2b36';
+  ctx.lineWidth = Math.max(1, 0.5 * s);
+  ctx.strokeRect(mm(B.x), mm(B.y), mm(B.l), mm(B.h));
+  // Titre et nord, sur une bande blanche en bas du cadre.
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillRect(mm(B.x), mm(B.y + B.h - 6 * mise.k), mm(B.l), mm(6 * mise.k));
+  texte(`Situation 1:${sit.echelle}`, B.x + 2 * mise.k, B.y + B.h - 3 * mise.k, 6 * mise.k, { gras: true });
+  dessinerNord(ctx, { x: B.x + B.l - 5 * mise.k, y: B.y + 6 * mise.k, t: 6 * mise.k }, s);
 }
 
 /** Cadre blanc à liseré (légende, cartouche). */
@@ -323,6 +361,12 @@ export async function creerPdfChantier(donnees, avancement = () => {}) {
       const att = await attendreTuiles(prep.vue, donnees.plan.fond, 1);
       if (att?.manquantes) remarques.push('fond swisstopo incomplet (pas de connexion ?)');
     }
+    if (prep.r.situation.actif) {
+      const sit = prep.r.situation;
+      const vS = { echelle: (s * 1000) / sit.echelle, estCentre: prep.vue.estCentre, nordCentre: prep.vue.nordCentre, largeur: cadreSituation(prep.mise, sit).l * s, hauteur: cadreSituation(prep.mise, sit).h * s, rotation: 0 };
+      const att = await attendreTuiles(vS, { carte: true }, 1);
+      if (att?.manquantes) remarques.push('carte de situation incomplète (pas de connexion ?)');
+    }
     const { page } = prep.mise;
     const toile = document.createElement('canvas');
     toile.width = Math.round(page.largeur * s);
@@ -338,8 +382,10 @@ export async function creerPdfChantier(donnees, avancement = () => {}) {
     } catch {
       // Une tuile du fond refuse d'être lue (CORS) : la page est refaite sans le fond swisstopo.
       remarques.push('fond swisstopo refusé par le navigateur : page faite sans lui');
-      const sans = { ...donnees, plan: { ...donnees.plan, fond: { ...donnees.plan.fond, ortho: false, cadastre: false } } };
-      dessinerPage(ctx, sans, prep, s, { avecTextes: false, logo });
+      const sans = { ...donnees, plan: { ...donnees.plan, fond: { ...donnees.plan.fond, ortho: false, cadastre: false, carte: false } } };
+      const prepSans = { ...prep, r: { ...prep.r, situation: { ...prep.r.situation, actif: false } } };
+      const sans2 = { ...sans, plan: { ...sans.plan, fond: { ...sans.plan.fond, carte: false } } };
+      dessinerPage(ctx, sans2, prepSans, s, { avecTextes: false, logo });
       image = toile.toDataURL('image/jpeg', 0.9);
     }
     doc.addImage(image, 'JPEG', 0, 0, page.largeur, page.hauteur, undefined, 'FAST');

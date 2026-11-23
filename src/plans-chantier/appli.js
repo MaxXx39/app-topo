@@ -24,7 +24,7 @@ import { chargerBibliothequeBase, entreesBibliotheque, filtrerEntrees, CATEGORIE
 import { dessinerVignette, symboleDeLObjet } from './dessin.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
-import { reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille } from '../topo/feuille-chantier.js';
+import { reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
 import { nomFichierExport } from '../outils/nom-fichier.js';
@@ -287,6 +287,7 @@ export function ouvrirPlansChantier({
         ${groupe('Accroche', ACCROCHES.map(([c, t]) => `<button type="button" class="outil-ruban petit" data-accroche="${c}"><span>${t}</span></button>`).join(''))}
         ${groupe('Fond', `<button type="button" class="outil-ruban" data-action="fond-plans">${ico('<path d="M3 6L9 4L15 6L21 4V18L15 20L9 18L3 20Z"/><path d="M9 4V18M15 6V20"/>')}<span>Plans…</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-points"><span>Points levés</span></button>
+          <button type="button" class="outil-ruban petit" data-action="fond-carte"><span>Carte</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-ortho"><span>Photo</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-cadastre"><span>Cadastre</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-surfaces"><span>Surfaces</span></button>`)}
@@ -775,6 +776,7 @@ export function ouvrirPlansChantier({
       ${r.pages === 'phases' ? `<p class="aide-calage">Phases montrées sur toutes les pages :</p>
         ${p.phases.map((ph) => `<label class="case-chantier"><input type="checkbox" data-phase-commune="${ph.id}" ${ph.commune ? 'checked' : ''}> ${echapper(ph.nom)}</label>`).join('')}` : ''}
       <h3>Fond</h3>
+      <label class="case-chantier"><input type="checkbox" data-fond="carte" ${p.fond.carte ? 'checked' : ''}> Carte nationale swisstopo</label>
       <label class="case-chantier"><input type="checkbox" data-fond="ortho" ${p.fond.ortho ? 'checked' : ''}> Photo aérienne swisstopo</label>
       ${p.fond.ortho ? `<label class="champ-calage"><span>Photo pâlie : <b data-valeur-de="paleur">${p.fond.paleur ?? PALEUR_ORTHO} %</b></span><input type="range" min="0" max="90" step="5" value="${p.fond.paleur ?? PALEUR_ORTHO}" data-feuille-curseur="paleur"></label>` : ''}
       <label class="case-chantier"><input type="checkbox" data-fond="cadastre" ${p.fond.cadastre ? 'checked' : ''}> Cadastre</label>
@@ -790,6 +792,10 @@ export function ouvrirPlansChantier({
       <label class="case-chantier"><input type="checkbox" data-feuille-case="legende" ${r.legende ? 'checked' : ''}> Légende automatique</label>
       <label class="case-chantier"><input type="checkbox" data-feuille-case="nord" ${r.nord ? 'checked' : ''}> Nord</label>
       <label class="case-chantier"><input type="checkbox" data-feuille-case="barre" ${r.barre ? 'checked' : ''}> Barre d'échelle</label>
+      <label class="case-chantier"><input type="checkbox" data-situation="actif" ${r.situation.actif ? 'checked' : ''}> Vue de situation (carte nationale)</label>
+      ${r.situation.actif ? `<label class="champ-calage"><span>Coin</span><select data-situation="coin">${options(COINS_SITUATION, r.situation.coin)}</select></label>
+      <label class="champ-calage"><span>Échelle de la situation 1 :</span><input type="number" min="500" max="100000" step="500" value="${r.situation.echelle}" data-situation="echelle"></label>
+      <label class="champ-calage"><span>Taille (mm, A3)</span><input type="number" min="30" max="120" step="5" value="${r.situation.taille}" data-situation="taille"></label>` : ''}
       <h3>Enregistrer</h3>
       <div class="actions-chantier"><button type="button" class="bouton" data-action="feuille-pdf">PDF</button><button type="button" class="bouton-secondaire" data-action="feuille-dxf">DXF</button></div>
       <p class="aide-calage">Nom : <span class="chiffre">${echapper(nomPdf)}</span></p>`;
@@ -892,6 +898,15 @@ export function ouvrirPlansChantier({
       etat.reglageEnCours = false;
       return;
     }
+    if (c.dataset.situation) {
+      if (!avantChangement()) return majPanneauFeuille();
+      const v = c.type === 'checkbox' ? c.checked : c.type === 'number' ? nombreDe(c) : c.value;
+      if (v === null) return majPanneauFeuille();
+      p.feuille = { ...(p.feuille ?? {}), situation: { ...reglagesFeuille(p).situation, [c.dataset.situation]: v } };
+      enregistrer();
+      majFeuille();
+      return majPanneauFeuille();
+    }
     const cle = c.dataset.feuille ?? c.dataset.feuilleCase ?? c.dataset.fond ?? c.dataset.phaseCommune;
     if (!cle) return;
     if (cle === 'logo' && c.value === 'image') return choisirLogo(p);
@@ -921,6 +936,7 @@ export function ouvrirPlansChantier({
     page.querySelectorAll('[data-outil]').forEach((b) => b.classList.toggle('actif', b.dataset.outil === etat.outil));
     page.querySelectorAll('[data-accroche]').forEach((b) => b.classList.toggle('actif', etat.accroches.has(b.dataset.accroche)));
     page.querySelector('[data-action="fond-points"]')?.classList.toggle('actif', plan()?.fond?.points !== false);
+    page.querySelector('[data-action="fond-carte"]')?.classList.toggle('actif', Boolean(plan()?.fond?.carte));
     page.querySelector('[data-action="fond-ortho"]')?.classList.toggle('actif', Boolean(plan()?.fond?.ortho));
     page.querySelector('[data-action="fond-cadastre"]')?.classList.toggle('actif', Boolean(plan()?.fond?.cadastre));
     page.querySelector('[data-action="fond-surfaces"]')?.classList.toggle('actif', plan()?.fond?.surfaces !== false);
@@ -1292,9 +1308,9 @@ export function ouvrirPlansChantier({
       enregistrer();
       return majTout();
     }
-    if (['fond-ortho', 'fond-cadastre', 'fond-surfaces'].includes(b.dataset.action)) {
+    if (['fond-carte', 'fond-ortho', 'fond-cadastre', 'fond-surfaces'].includes(b.dataset.action)) {
       if (!avantChangement()) return;
-      const cle = { 'fond-ortho': 'ortho', 'fond-cadastre': 'cadastre', 'fond-surfaces': 'surfaces' }[b.dataset.action];
+      const cle = { 'fond-carte': 'carte', 'fond-ortho': 'ortho', 'fond-cadastre': 'cadastre', 'fond-surfaces': 'surfaces' }[b.dataset.action];
       p.fond[cle] = cle === 'surfaces' ? p.fond.surfaces === false : !p.fond[cle];
       if (cle === 'surfaces' && !surfaces().length && p.fond.surfaces) message('Le projet n\'a aucune surface (ou elles sont cachées par le dossier choisi).', 4000);
       enregistrer();

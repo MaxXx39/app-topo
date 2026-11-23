@@ -13,8 +13,35 @@ export function reglagesFeuille(plan) {
   return {
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
+    situation: situationDe(f.situation), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
   };
+}
+
+export const COINS_SITUATION = [['hd', 'Haut droite'], ['hg', 'Haut gauche'], ['bg', 'Bas gauche'], ['bd', 'Bas droite']];
+/** Vue de situation (0.293.0) : petit cadre carte nationale dans un coin, zone du plan en rouge. */
+export const situationDe = (s = {}) => ({ actif: Boolean(s.actif), coin: s.coin ?? 'hd', echelle: s.echelle ?? 5000, taille: s.taille ?? 60 });
+
+/**
+ * Cadre (mm) de la vue de situation dans un coin du cadre du plan ; taille = côté en mm sur une feuille A3 (suit k).
+ * Au-dessus du cartouche et de la légende, il vaut mieux choisir un coin du haut.
+ */
+export function cadreSituation(mise, situation) {
+  const t = situation.taille * mise.k;
+  const m = 3 * mise.k;
+  const c = mise.cadre;
+  const x = situation.coin.endsWith('g') ? c.x + m + (situation.coin === 'hg' ? 26 * mise.k : 0) : c.x + c.l - t - m;
+  const y = situation.coin.startsWith('h') ? c.y + m : c.y + c.h - t - m - (situation.coin === 'bg' ? 12 * mise.k : 0);
+  return { x, y, l: t, h: t };
+}
+
+/**
+ * Rectangle (m, en MN95) montré en rouge dans la vue de situation = ce que voit le cadre du plan.
+ */
+export function etendueDuCadre(plan, cadre, centre) {
+  const echelle = plan.echelle ?? ECHELLE_PAPIER;
+  const l = (cadre.l * echelle) / 1000;
+  const h = (cadre.h * echelle) / 1000;
+  return { estMin: centre[0] - l / 2, estMax: centre[0] + l / 2, nordMin: centre[1] - h / 2, nordMax: centre[1] + h / 2 };
 }
 
 /**
