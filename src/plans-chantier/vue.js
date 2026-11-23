@@ -1,11 +1,14 @@
-// Plans de chantier (0.286.0) : la vue du plan (2 canvas). Dessous : les plans DXF / PDF / IFC du projet (comme le
+// Plans de chantier (0.288.0) : la vue du plan (2 canvas). Dessous : les plans DXF / PDF / IFC du projet (comme le
 // plan principal, dessinerPlansDxf) et les points levés. Dessus : les objets du plan de chantier (zones, lignes,
 // pistes, flèches, textes), l'objet choisi, le dessin en cours et l'accroche.
 // Molette = zoom autour de la souris ; glisser dans le vide = déplacer ; deux doigts = zoomer ;
 // glisser l'objet choisi = le déplacer (si glisserObjet le permet).
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
-import { objetsVisibles, couleurObjet, styleLigne, pointeDeFleche, bornesObjets, positionsLeLong, morceauxAvecTrous, LARGEUR_FLECHE, POINTE_FLECHE } from '../topo/plan-chantier.js';
+import {
+  objetsVisibles, couleurObjet, styleLigne, pointeDeFleche, bornesObjets, positionsLeLong, morceauxAvecTrous, metresParMm,
+  epaisseurLigneMm, contourZoneMm, opaciteZone, dimensionsFleche, centreZone, texteSurface, pointsDe,
+} from '../topo/plan-chantier.js';
 
 const SEUIL_GLISSER_PX = 5;
 const FACTEUR_MOLETTE = 1.2;
@@ -115,21 +118,47 @@ export function creerVueChantier(conteneur, options) {
     if (ferme) ctx.closePath();
   }
 
+  /** Pixels à l'écran pour 1 mm de papier (échelle du plan × zoom) : épaisseurs et motifs suivent le PDF à l'échelle choisie. */
+  const pxParMm = (pc) => vue.echelle * metresParMm(pc);
+
+  /** Plaque blanche arrondie avec un texte centré en (x, y) (texte de plan, surface d'une zone). */
+  function plaque(ctx, texte, x, y, h, poids = 600) {
+    ctx.font = `${poids} ${h}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const w = ctx.measureText(texte).width + h * 0.7;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeStyle = 'rgba(43,52,64,0.45)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x - w / 2, y - h * 0.68, w, h * 1.36, h * 0.35);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#1b2b36';
+    ctx.fillText(texte, x, y + h * 0.04);
+    return { w, h: h * 1.36 };
+  }
+
   function dessinerObjet(ctx, pc, o) {
     const couleur = couleurObjet(pc, o);
     const e = vue.echelle;
+    const mm = pxParMm(pc);
     ctx.setLineDash([]);
     if (o.type === 'zone') {
       chemin(ctx, o.points, true);
-      ctx.globalAlpha = 0.2;
+      ctx.globalAlpha = opaciteZone(o);
       ctx.fillStyle = couleur;
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.strokeStyle = couleur;
-      ctx.lineWidth = o.categorie === 'emprise' ? 3.5 : 2;
+      ctx.lineWidth = Math.max(0.8, contourZoneMm(o) * mm);
       ctx.stroke();
+      if (o.afficherSurface) {
+        const c = ecran(centreZone(o.points));
+        plaque(ctx, texteSurface(o.points), c.x, c.y, Math.min(22, Math.max(10, 3 * mm)));
+      }
     } else if (o.type === 'ligne') {
-      dessinerLigne(ctx, o.points.map((p) => { const q = ecran(p); return [q.x, q.y]; }), styleLigne(o.style), couleur, e);
+      dessinerLigne(ctx, o.points.map((p) => { const q = ecran(p); return [q.x, q.y]; }), styleLigne(o.style), couleur, mm, o);
     } else if (o.type === 'piste') {
       chemin(ctx, o.points, false);
       ctx.strokeStyle = couleur;
@@ -148,14 +177,14 @@ export function creerVueChantier(conteneur, options) {
     } else if (o.type === 'fleche') {
       const pts = o.points;
       if (pts.length < 2) return;
-      // Largeur du corps et longueur de la pointe en m (réglables) ; au moins 3 px / 10 px pour rester visibles.
-      const largeur = Math.max(3 / e, o.largeur ?? LARGEUR_FLECHE);
-      const pointe = Math.max(10 / e, o.pointe ?? POINTE_FLECHE);
-      const tete = pointeDeFleche(pts[pts.length - 2], pts[pts.length - 1], pointe, Math.max(largeur * 2, 1.6, 8 / e));
+      // Largeur du corps (m) et pointe à l'échelle réglée ; au moins 1,5 px / 9 px pour rester visibles.
+      const dim = dimensionsFleche(o);
+      const pointe = Math.max(9 / e, dim.longueurPointe);
+      const tete = pointeDeFleche(pts[pts.length - 2], pts[pts.length - 1], pointe, Math.max(dim.largeurPointe, 7 / e));
       const base = [(tete[1][0] + tete[2][0]) / 2, (tete[1][1] + tete[2][1]) / 2];
       chemin(ctx, [...pts.slice(0, -1), base], false);
       ctx.strokeStyle = couleur;
-      ctx.lineWidth = largeur * e;
+      ctx.lineWidth = Math.max(1.5, dim.largeur * e);
       ctx.lineCap = 'butt';
       ctx.stroke();
       ctx.lineCap = 'round';
@@ -165,30 +194,55 @@ export function creerVueChantier(conteneur, options) {
     } else if (o.type === 'texte') {
       const q = ecran(o.point);
       const h = Math.max(9, (o.taille ?? 1) * e);
-      ctx.font = `600 ${h}px system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const w = ctx.measureText(o.texte).width + h * 0.7;
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.strokeStyle = 'rgba(43,52,64,0.45)';
-      ctx.lineWidth = 1;
-      const r = h * 0.35;
-      ctx.beginPath();
-      ctx.roundRect(q.x - w / 2, q.y - h * 0.68, w, h * 1.36, r);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = '#1b2b36';
-      ctx.fillText(o.texte, q.x, q.y + h * 0.04);
+      const { w, h: hauteur } = plaque(ctx, o.texte, q.x, q.y, h);
+      if (o.repere) dessinerRepere(ctx, o, q, w, hauteur, couleur);
     }
   }
 
-  /** Ligne à l'écran (points en px) avec son style : tirets, et motif répété (la ligne s'interrompt autour). */
-  function dessinerLigne(ctx, pts, style, couleur, echelle) {
+  /** Ligne de repère d'un texte : du bord de la plaque au point visé, avec une flèche ou un point au bout. */
+  function dessinerRepere(ctx, o, q, w, h, couleur) {
+    const t = ecran(o.repere);
+    const dx = t.x - q.x;
+    const dy = t.y - q.y;
+    const k = Math.min((w / 2) / (Math.abs(dx) || 1e-9), (h / 2) / (Math.abs(dy) || 1e-9));
+    if (k >= 1) return; // le point visé est sous la plaque
+    const dep = { x: q.x + dx * k, y: q.y + dy * k };
+    ctx.strokeStyle = '#1b2b36';
+    ctx.fillStyle = '#1b2b36';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(dep.x, dep.y);
+    ctx.lineTo(t.x, t.y);
+    ctx.stroke();
+    const bout = o.repereBout ?? 'fleche';
+    if (bout === 'point') {
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    } else if (bout === 'fleche') {
+      const a = Math.atan2(t.y - dep.y, t.x - dep.x);
+      ctx.beginPath();
+      ctx.moveTo(t.x, t.y);
+      ctx.lineTo(t.x - 10 * Math.cos(a - 0.35), t.y - 10 * Math.sin(a - 0.35));
+      ctx.lineTo(t.x - 10 * Math.cos(a + 0.35), t.y - 10 * Math.sin(a + 0.35));
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  /**
+   * Ligne à l'écran (points en px) avec son style : tirets, épaisseur et motif en mm de papier (× l'échelle du motif de la
+   * ligne) ; la ligne s'interrompt autour de chaque motif. pxMm = pixels pour 1 mm de papier.
+   */
+  function dessinerLigne(ctx, pts, style, couleur, pxMm, o = {}) {
     const m = style.motif;
+    const ech = o.echelleMotif ?? 1;
+    const epaisseur = Math.max(0.8, (o.epaisseurMm ?? style.epaisseurMm) * pxMm);
     const trace = (morceaux) => {
       ctx.strokeStyle = couleur;
-      ctx.lineWidth = style.epaisseur;
-      ctx.setLineDash(style.tirets.map((t) => Math.max(2, t * echelle)));
+      ctx.lineWidth = epaisseur;
+      ctx.setLineDash(style.tirets.map((t) => Math.max(1.5, t * pxMm)));
       for (const mo of morceaux) {
         ctx.beginPath();
         mo.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
@@ -197,32 +251,35 @@ export function creerVueChantier(conteneur, options) {
       ctx.setLineDash([]);
     };
     if (!m) return trace([pts]);
+    const taille = Math.max(6, m.tailleMm * pxMm * ech); // hauteur du motif (px)
     if (m.type === 'poteau') {
-      // Poteaux tous les pasM m (au moins 14 px entre deux), petit rectangle en travers de la ligne.
+      // Poteaux tous les pasMm de papier : petit rectangle en travers de la ligne.
       trace([pts]);
-      const pas = Math.max(m.pasM * echelle, 14);
+      const pas = Math.max(m.pasMm * pxMm * ech, taille * 1.6);
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = couleur;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = Math.max(1, epaisseur * 0.8);
       for (const q of positionsLeLong(pts, pas, 0)) {
         ctx.save();
         ctx.translate(q.x, q.y);
         ctx.rotate(q.angle);
-        ctx.fillRect(-2.5, -5, 5, 10);
-        ctx.strokeRect(-2.5, -5, 5, 10);
+        ctx.fillRect(-taille * 0.2, -taille / 2, taille * 0.4, taille);
+        ctx.strokeRect(-taille * 0.2, -taille / 2, taille * 0.4, taille);
         ctx.restore();
       }
       return;
     }
-    ctx.font = '600 12px system-ui, sans-serif';
-    const largeurMotif = m.type === 'texte' ? ctx.measureText(m.texte).width + (m.eclair ? 12 : 0) : m.type === 'double' ? 26 : 12;
-    const reperes = positionsLeLong(pts, m.pasPx);
-    trace(morceauxAvecTrous(pts, reperes.map((r) => r.s), largeurMotif / 2 + 6));
+    ctx.font = `600 ${taille}px system-ui, sans-serif`;
+    const larg = m.type === 'texte' ? ctx.measureText(m.texte).width + (m.eclair ? taille : 0) : m.type === 'double' ? taille * 2 : taille;
+    const pas = Math.max(m.pasMm * pxMm * ech, larg + taille * 1.5);
+    const reperes = positionsLeLong(pts, pas);
+    trace(morceauxAvecTrous(pts, reperes.map((r) => r.s), larg / 2 + taille * 0.5));
     ctx.fillStyle = couleur;
     ctx.strokeStyle = couleur;
-    ctx.lineWidth = 1.8;
+    ctx.lineWidth = Math.max(1.2, epaisseur * 0.9);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    const inverse = o.sens === 'inverse';
     for (const r of reperes) {
       ctx.save();
       ctx.translate(r.x, r.y);
@@ -231,30 +288,33 @@ export function creerVueChantier(conteneur, options) {
       ctx.rotate(m.type === 'texte' ? a : r.angle);
       if (m.type === 'texte') {
         if (m.eclair) {
-          const x0 = -largeurMotif / 2;
+          const u = taille / 12; // l'éclair tient dans un carré de 12 u
+          const x0 = -larg / 2;
           ctx.beginPath();
-          ctx.moveTo(x0 + 6, -6);
-          ctx.lineTo(x0 + 1.5, 1);
-          ctx.lineTo(x0 + 5, 1);
-          ctx.lineTo(x0 + 3, 7);
-          ctx.lineTo(x0 + 9, -1);
-          ctx.lineTo(x0 + 5.5, -1);
+          ctx.moveTo(x0 + 6 * u, -6 * u);
+          ctx.lineTo(x0 + 1.5 * u, 1 * u);
+          ctx.lineTo(x0 + 5 * u, 1 * u);
+          ctx.lineTo(x0 + 3 * u, 7 * u);
+          ctx.lineTo(x0 + 9 * u, -1 * u);
+          ctx.lineTo(x0 + 5.5 * u, -1 * u);
           ctx.closePath();
           ctx.fill();
-          ctx.fillText(m.texte, 6, 0.5);
-        } else ctx.fillText(m.texte, 0, 0.5);
+          ctx.fillText(m.texte, taille * 0.5, taille * 0.04);
+        } else ctx.fillText(m.texte, 0, taille * 0.04);
       } else {
+        // Chevron : « > » dans le sens de la ligne (retournable) ; flèche double « < > » : un dans chaque sens.
+        const demi = taille / 2;
         const chevron = (dx, sens) => {
           ctx.beginPath();
-          ctx.moveTo(dx - 3 * sens, -4.5);
-          ctx.lineTo(dx + 3 * sens, 0);
-          ctx.lineTo(dx - 3 * sens, 4.5);
+          ctx.moveTo(dx - demi * 0.55 * sens, -demi);
+          ctx.lineTo(dx + demi * 0.55 * sens, 0);
+          ctx.lineTo(dx - demi * 0.55 * sens, demi);
           ctx.stroke();
         };
-        if (m.type === 'chevron') chevron(0, 1);
+        if (m.type === 'chevron') chevron(0, inverse ? -1 : 1);
         else {
-          chevron(-6, -1);
-          chevron(6, 1);
+          chevron(-demi * 0.7, -1);
+          chevron(demi * 0.7, 1);
         }
       }
       ctx.restore();
@@ -265,7 +325,7 @@ export function creerVueChantier(conteneur, options) {
     ctx.strokeStyle = ORANGE;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([5, 4]);
-    const pts = o.type === 'texte' ? [o.point] : o.points;
+    const pts = pointsDe(o);
     if (o.type !== 'texte') {
       chemin(ctx, pts, o.type === 'zone');
       ctx.stroke();
@@ -281,6 +341,24 @@ export function creerVueChantier(conteneur, options) {
 
   function dessinerSaisie(ctx, pc) {
     const s = saisie();
+    if (s?.source) {
+      // Décalage : la ligne de départ (orange épais) et l'aperçu de la copie décalée.
+      chemin(ctx, s.source, false);
+      ctx.strokeStyle = ORANGE;
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (s.apercu?.length > 1) {
+        chemin(ctx, s.apercu, false);
+        ctx.strokeStyle = pc ? couleurObjet(pc, { type: 'ligne', style: s.style, phase: pc.phaseActive }) : ORANGE;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      return;
+    }
     if (!s || !s.points.length) return;
     const pts = curseur ? [...s.points, curseur] : s.points;
     const couleur = pc ? couleurObjet(pc, { type: s.outil, categorie: s.categorie, style: s.style, phase: pc.phaseActive }) : ORANGE;

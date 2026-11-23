@@ -5,11 +5,14 @@
 // Un plan de chantier : { id, nom, genre, creeLe, modifieLe, phases [{ id, nom, couleur, visible }], phaseActive,
 //   couleurs ('objets' | 'phases'), objets [...], fond { plans: [id…] cachés, points: bool } }.
 // Un objet : { id, type, phase, ... } :
-//   zone   : { points, categorie }                 (polygone fermé, aire en m²)
-//   ligne  : { points, style }                     (clôture, barrière…)
+//   zone   : { points, categorie, opacite (0–100, fond), contourMm, afficherSurface }
+//   ligne  : { points, style, epaisseurMm, echelleMotif, sens ('inverse' = chevrons retournés), couleur }
 //   piste  : { points, largeur }                   (largeur en m)
-//   fleche : { points }                            (sens de circulation, la pointe au dernier point)
-//   texte  : { point, texte, taille }              (taille = hauteur des lettres en m)
+//   fleche : { points, largeur (m, 0,2), echelle (pointe, ×1) }  (sens de circulation, la pointe au dernier point)
+//   texte  : { point, texte, taille, repere [e, n], repereBout ('fleche' | 'point' | 'aucun') }
+//             (taille = hauteur des lettres en m ; repere = point visé par la ligne de repère, facultatif)
+// Unités du dessin (0.288.0) : épaisseurs de trait, taille et espacement des motifs en **mm sur le papier** ; sur le
+// terrain, 1 mm de papier = « échelle du plan » / 1000 m (plan.echelle, 200 au départ : 1 mm = 0,2 m).
 
 export const GENRES = [
   ['installation', 'Plan d\'installation de chantier'],
@@ -26,33 +29,40 @@ export const CATEGORIES_ZONE = [
   { cle: 'parking', nom: 'Parking', couleur: '#64748b' },
 ];
 
-// tirets : longueurs en m (trait, vide), [] = trait plein ; epaisseur en px à l'écran.
-// motif (0.287.0, d'après les lignes de l'utilisateur) : dessiné le long de la ligne, qui s'interrompt autour.
-//   poteau : petit rectangle tous les pasM mètres (vrais poteaux de clôture) ; chevron « > », double « < > »,
-//   texte (« EAU »…, eclair = petit éclair devant) : tous les pasPx pixels à l'écran (comme un type de ligne de DAO).
+// Styles de ligne (0.288.0, dimensions en mm sur le papier) :
+//   tirets : [trait, vide] en mm, [] = trait plein ; epaisseurMm : épaisseur du trait ;
+//   motif (d'après les lignes de l'utilisateur) : dessiné le long de la ligne, qui s'interrompt autour, tous les pasMm :
+//   poteau (rectangle en travers, clôture), chevron « > » (flèche simple, retournable), double « < > » (flèche double),
+//   texte (« EAU »…, eclair = petit éclair devant) ; tailleMm = hauteur du motif ou des lettres.
 export const STYLES_LIGNE = [
-  { cle: 'cloture', nom: 'Clôture de chantier', couleur: '#f59e0b', tirets: [], epaisseur: 2, motif: { type: 'poteau', pasM: 3.5 } },
-  { cle: 'barriere', nom: 'Barrière (chevrons)', couleur: '#facc15', tirets: [], epaisseur: 3, motif: { type: 'chevron', pasPx: 110 } },
-  { cle: 'limite', nom: 'Limite (< >)', couleur: '#a21caf', tirets: [], epaisseur: 3, motif: { type: 'double', pasPx: 130 } },
-  { cle: 'elec', nom: 'Électricité', couleur: '#ef4444', tirets: [], epaisseur: 1.5, motif: { type: 'texte', texte: 'ELEC', eclair: true, pasPx: 170 } },
-  { cle: 'eau', nom: 'Eau', couleur: '#38b2c4', tirets: [], epaisseur: 2.5, motif: { type: 'texte', texte: 'EAU', pasPx: 170 } },
-  { cle: 'gaz', nom: 'Gaz', couleur: '#eab308', tirets: [], epaisseur: 2.5, motif: { type: 'texte', texte: 'GAZ', pasPx: 170 } },
-  { cle: 'eu', nom: 'Eaux usées (EU)', couleur: '#8a9a3b', tirets: [], epaisseur: 2.5, motif: { type: 'texte', texte: 'EU', pasPx: 170 } },
-  { cle: 'ec', nom: 'Eaux claires (EC)', couleur: '#1d4ed8', tirets: [], epaisseur: 2.5, motif: { type: 'texte', texte: 'EC', pasPx: 170 } },
-  { cle: 'swisscom', nom: 'Swisscom', couleur: '#22c55e', tirets: [], epaisseur: 2.5, motif: { type: 'texte', texte: 'SWISSCOM', pasPx: 190 } },
-  { cle: 'palplanches', nom: 'Palplanches', couleur: '#475569', tirets: [], epaisseur: 4 },
-  { cle: 'conduite', nom: 'Conduite provisoire', couleur: '#2563eb', tirets: [1.5, 0.5], epaisseur: 2 },
-  { cle: 'signalisation', nom: 'Signalisation', couleur: '#f97316', tirets: [0.3, 0.3], epaisseur: 3 },
-  { cle: 'libre', nom: 'Ligne', couleur: '#1b2b36', tirets: [], epaisseur: 2 },
+  { cle: 'cloture', nom: 'Clôture de chantier', couleur: '#f59e0b', tirets: [], epaisseurMm: 0.35, motif: { type: 'poteau', pasMm: 14, tailleMm: 2.6 } },
+  { cle: 'flecheSimple', nom: 'Flèche simple  >', couleur: '#eab308', tirets: [], epaisseurMm: 0.5, motif: { type: 'chevron', pasMm: 22, tailleMm: 2.6 } },
+  { cle: 'flecheDouble', nom: 'Flèche double  < >', couleur: '#a21caf', tirets: [], epaisseurMm: 0.5, motif: { type: 'double', pasMm: 26, tailleMm: 2.6 } },
+  { cle: 'elec', nom: 'Électricité', couleur: '#ef4444', tirets: [], epaisseurMm: 0.25, motif: { type: 'texte', texte: 'ELEC', eclair: true, pasMm: 34, tailleMm: 2.6 } },
+  { cle: 'eau', nom: 'Eau', couleur: '#38b2c4', tirets: [], epaisseurMm: 0.5, motif: { type: 'texte', texte: 'EAU', pasMm: 34, tailleMm: 2.6 } },
+  { cle: 'gaz', nom: 'Gaz', couleur: '#eab308', tirets: [], epaisseurMm: 0.5, motif: { type: 'texte', texte: 'GAZ', pasMm: 34, tailleMm: 2.6 } },
+  { cle: 'eu', nom: 'Eaux usées (EU)', couleur: '#8a9a3b', tirets: [], epaisseurMm: 0.5, motif: { type: 'texte', texte: 'EU', pasMm: 34, tailleMm: 2.6 } },
+  { cle: 'ec', nom: 'Eaux claires (EC)', couleur: '#1d4ed8', tirets: [], epaisseurMm: 0.5, motif: { type: 'texte', texte: 'EC', pasMm: 34, tailleMm: 2.6 } },
+  { cle: 'swisscom', nom: 'Swisscom', couleur: '#22c55e', tirets: [], epaisseurMm: 0.5, motif: { type: 'texte', texte: 'SWISSCOM', pasMm: 40, tailleMm: 2.6 } },
+  { cle: 'palplanches', nom: 'Palplanches', couleur: '#475569', tirets: [], epaisseurMm: 0.9 },
+  { cle: 'conduite', nom: 'Conduite provisoire', couleur: '#2563eb', tirets: [7, 2.5], epaisseurMm: 0.4 },
+  { cle: 'signalisation', nom: 'Signalisation', couleur: '#f97316', tirets: [1.5, 1.5], epaisseurMm: 0.6 },
+  { cle: 'libre', nom: 'Ligne', couleur: '#1b2b36', tirets: [], epaisseurMm: 0.35 },
 ];
-// Anciens genres de ligne (0.286.0) : « Câble électrique » devient « Électricité ».
-const ALIAS_STYLES = { cable: 'elec' };
+// Anciens genres de ligne : « Câble électrique » (0.286.0) = Électricité ; « Barrière (chevrons) » et « Limite » (0.287.0)
+// = flèche simple et flèche double (0.288.0).
+const ALIAS_STYLES = { cable: 'elec', barriere: 'flecheSimple', limite: 'flecheDouble' };
+
+export const ECHELLE_PAPIER = 200; // échelle du plan au départ (1:200)
+export const OPACITE_ZONE = 20; // % du fond d'une zone, au départ
+export const CONTOUR_ZONE_MM = 0.35; // épaisseur du contour d'une zone, au départ (l'emprise : × 2)
 
 export const COULEURS_PHASES = ['#e0702c', '#2f9e6b', '#2563eb', '#9333ea', '#db2777', '#0e7490', '#a16207', '#475569'];
 export const COULEUR_PISTE = '#7c858e';
 export const COULEUR_FLECHE = '#19a7cc';
-export const LARGEUR_FLECHE = 0.9; // m, largeur du corps d'une flèche
-export const POINTE_FLECHE = 2.5; // m, longueur de la pointe (sa largeur = 2 × la largeur du corps, au moins 1,6 m)
+export const LARGEUR_FLECHE = 0.2; // m, largeur du corps d'une flèche (0.288.0 : 0,2 au lieu de 0,9)
+export const POINTE_LONGUEUR = 1.2; // m, longueur de la pointe à l'échelle ×1
+export const POINTE_LARGEUR = 0.9; // m, largeur de la pointe à l'échelle ×1
 
 export const categorieZone = (cle) => CATEGORIES_ZONE.find((c) => c.cle === cle) ?? CATEGORIES_ZONE[0];
 export const styleLigne = (cle) => STYLES_LIGNE.find((s) => s.cle === (ALIAS_STYLES[cle] ?? cle)) ?? STYLES_LIGNE[STYLES_LIGNE.length - 1];
@@ -69,7 +79,7 @@ export function nouveauPlanChantier(nom, genre = 'installation', maintenant = ne
   const phase = { id: nouvelId('ph'), nom: 'Phase 1', couleur: COULEURS_PHASES[0], visible: true };
   return {
     id: nouvelId('pc'), nom: nom || 'Plan de chantier', genre, creeLe: maintenant, modifieLe: maintenant,
-    phases: [phase], phaseActive: phase.id, couleurs: 'objets', objets: [], fond: { plansCaches: [], points: true },
+    phases: [phase], phaseActive: phase.id, couleurs: 'objets', objets: [], fond: { plansCaches: [], points: true }, echelle: ECHELLE_PAPIER,
   };
 }
 
@@ -171,8 +181,8 @@ export function dansPolygone(p, points) {
   return dedans;
 }
 
-/** Points d'un objet (le point d'un texte compris). */
-export const pointsDe = (o) => (o.type === 'texte' ? [o.point] : o.points ?? []);
+/** Points d'un objet (le point d'un texte et son point de repère compris). */
+export const pointsDe = (o) => (o.type === 'texte' ? [o.point, ...(o.repere ? [o.repere] : [])] : o.points ?? []);
 
 /**
  * Objet sous le point p (m), à tolerance m près : le plus haut dessiné (le dernier) d'abord. Une zone est touchée
@@ -189,7 +199,7 @@ export function objetSousLePoint(objets, p, tolerance) {
     }
     const pts = o.points ?? [];
     const ferme = o.type === 'zone';
-    const marge = o.type === 'piste' ? (o.largeur ?? 4) / 2 + tolerance : o.type === 'fleche' ? (o.largeur ?? LARGEUR_FLECHE) / 2 + tolerance : tolerance;
+    const marge = o.type === 'piste' ? (o.largeur ?? 4) / 2 + tolerance : o.type === 'fleche' ? Math.max(o.largeur ?? LARGEUR_FLECHE, 0.4) / 2 + tolerance : tolerance;
     const n = ferme ? pts.length : pts.length - 1;
     for (let i = 0; i < n; i++) if (distanceAuSegment(p, pts[i], pts[(i + 1) % pts.length]) <= marge) return o;
     if (ferme && pts.length >= 3 && dansPolygone(p, pts)) return o;
@@ -199,7 +209,7 @@ export function objetSousLePoint(objets, p, tolerance) {
 
 /** Déplace un objet de (dEst, dNord) m (sans le copier). */
 export function deplacerObjet(o, dEst, dNord) {
-  if (o.type === 'texte') o.point = [o.point[0] + dEst, o.point[1] + dNord];
+  if (o.type === 'texte') o.point = [o.point[0] + dEst, o.point[1] + dNord]; // le point de repère reste en place
   else o.points = o.points.map(([e, n]) => [e + dEst, n + dNord]);
   return o;
 }
@@ -250,7 +260,7 @@ export function resumeObjet(o) {
   if (o.type === 'zone') return `Zone · ${categorieZone(o.categorie).nom} · ${n(aire(o.points))} m²`;
   if (o.type === 'ligne') return `${styleLigne(o.style).nom} · ${n(longueur(o.points))} m`;
   if (o.type === 'piste') return `Piste · ${n(o.largeur ?? 4)} m de large · ${n(longueur(o.points))} m`;
-  if (o.type === 'fleche') return `Flèche · ${n(o.largeur ?? LARGEUR_FLECHE)} m de large · ${n(longueur(o.points))} m`;
+  if (o.type === 'fleche') return `Flèche · ${n(longueur(o.points))} m`;
   if (o.type === 'texte') return `Texte « ${o.texte} »`;
   return o.type;
 }
@@ -331,6 +341,136 @@ export function morceauxAvecTrous(points, abscisses, demi) {
   }
   finir();
   return morceaux;
+}
+
+// ------------------------------------------------------------------ Unités du papier, flèche, surface, décalage
+
+/** Mètres sur le terrain pour 1 mm de papier (échelle du plan : 200 → 0,2). */
+export const metresParMm = (plan) => (plan?.echelle ?? ECHELLE_PAPIER) / 1000;
+
+/** Épaisseur d'une ligne (mm de papier) : la sienne, sinon celle de son genre. */
+export const epaisseurLigneMm = (o) => o.epaisseurMm ?? styleLigne(o.style).epaisseurMm;
+
+/** Épaisseur du contour d'une zone (mm de papier). */
+export const contourZoneMm = (o) => o.contourMm ?? (o.categorie === 'emprise' ? CONTOUR_ZONE_MM * 2 : CONTOUR_ZONE_MM);
+
+/** Opacité du fond d'une zone, de 0 à 1. */
+export const opaciteZone = (o) => Math.min(100, Math.max(0, o.opacite ?? OPACITE_ZONE)) / 100;
+
+/**
+ * Dimensions d'une flèche (m) : largeur du corps, échelle de la pointe, longueur et largeur de la pointe (au moins deux
+ * fois la largeur du corps). Une flèche d'avant 0.288.0 (« pointe » en m) garde à peu près sa pointe.
+ */
+export function dimensionsFleche(o) {
+  const largeur = o.largeur ?? LARGEUR_FLECHE;
+  const echelle = o.echelle ?? (o.pointe ? o.pointe / POINTE_LONGUEUR : 1);
+  return { largeur, echelle, longueurPointe: POINTE_LONGUEUR * echelle, largeurPointe: Math.max(POINTE_LARGEUR * echelle, largeur * 2) };
+}
+
+/** Centre d'une zone (centre de gravité du polygone ; milieu des bornes si la zone est plate). */
+export function centreZone(points) {
+  let a2 = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < points.length; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
+    const c = x1 * y2 - x2 * y1;
+    a2 += c;
+    cx += (x1 + x2) * c;
+    cy += (y1 + y2) * c;
+  }
+  if (Math.abs(a2) < 1e-9) {
+    const xs = points.map((p) => p[0]);
+    const ys = points.map((p) => p[1]);
+    return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+  }
+  return [cx / (3 * a2), cy / (3 * a2)];
+}
+
+/** Texte de la surface d'une zone : « 312 m² » (arrondi au m², milliers séparés). */
+export function texteSurface(points) {
+  return `${Math.round(aire(points)).toLocaleString('fr-CH').replace(/\u202f|\u00a0/g, "'")} m²`;
+}
+
+/**
+ * Côté d'une polyligne où se trouve le point p : +1 = à gauche en suivant la ligne dans son sens, −1 = à droite
+ * (d'après le segment le plus proche).
+ */
+export function coteDuPoint(points, p) {
+  let meilleur = null;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const d = distanceAuSegment(p, points[i], points[i + 1]);
+    if (!meilleur || d < meilleur.d) meilleur = { d, i };
+  }
+  if (!meilleur) return 1;
+  const [ax, ay] = points[meilleur.i];
+  const [bx, by] = points[meilleur.i + 1];
+  return (bx - ax) * (p[1] - ay) - (by - ay) * (p[0] - ax) >= 0 ? 1 : -1;
+}
+
+/**
+ * Polyligne décalée de d mètres (d > 0 = à gauche en suivant la ligne, d < 0 = à droite), coins prolongés jusqu'à
+ * leur croisement (coin trop pointu : coupé). Si le dernier point = le premier (contour fermé), le décalage reste fermé.
+ */
+export function decalerPolyligne(points, d) {
+  const copie = points.map((p) => [p[0], p[1]]);
+  if (copie.length < 2 || !d) return copie;
+  const segs = [];
+  for (let i = 0; i + 1 < copie.length; i++) {
+    const [x1, y1] = copie[i];
+    const [x2, y2] = copie[i + 1];
+    const l = Math.hypot(x2 - x1, y2 - y1);
+    if (l < 1e-9) continue;
+    const ux = (x2 - x1) / l;
+    const uy = (y2 - y1) / l;
+    segs.push({ a: [x1, y1], b: [x2, y2], ux, uy, nx: -uy * d, ny: ux * d });
+  }
+  if (!segs.length) return copie;
+  // Coin entre deux segments consécutifs : croisement des deux droites décalées (ou 2 points si le coin est trop pointu).
+  const coin = (s, t) => {
+    const px = s.b[0] + s.nx;
+    const py = s.b[1] + s.ny;
+    const qx = t.a[0] + t.nx;
+    const qy = t.a[1] + t.ny;
+    const croix = s.ux * t.uy - s.uy * t.ux;
+    if (Math.abs(croix) < 1e-9) return [[px, py]];
+    const k = ((qx - px) * t.uy - (qy - py) * t.ux) / croix;
+    const x = px + s.ux * k;
+    const y = py + s.uy * k;
+    return Math.hypot(x - s.b[0], y - s.b[1]) > 4 * Math.abs(d) ? [[px, py], [qx, qy]] : [[x, y]];
+  };
+  const ferme = segs.length >= 3 && Math.hypot(copie[0][0] - copie[copie.length - 1][0], copie[0][1] - copie[copie.length - 1][1]) < 1e-9;
+  const res = [];
+  if (ferme) {
+    const jonction = coin(segs[segs.length - 1], segs[0]);
+    res.push(...jonction);
+    for (let i = 0; i + 1 < segs.length; i++) res.push(...coin(segs[i], segs[i + 1]));
+    res.push(...jonction);
+    return res;
+  }
+  res.push([segs[0].a[0] + segs[0].nx, segs[0].a[1] + segs[0].ny]);
+  for (let i = 0; i + 1 < segs.length; i++) res.push(...coin(segs[i], segs[i + 1]));
+  const dern = segs[segs.length - 1];
+  res.push([dern.b[0] + dern.nx, dern.b[1] + dern.ny]);
+  return res;
+}
+
+/**
+ * Ligne la plus proche du point p (à tolerance m près) parmi des lignes au format de l'accroche
+ * ({ points: [{ est, nord }], ferme }) : ses points [e, n] (refermés si la ligne est fermée), ou null.
+ */
+export function ligneLaPlusProche(lignes, p, tolerance) {
+  let meilleur = null;
+  for (const l of lignes) {
+    const pts = l.points.map((q) => [q.est, q.nord]);
+    const n = l.ferme ? pts.length : pts.length - 1;
+    for (let i = 0; i < n; i++) {
+      const d = distanceAuSegment(p, pts[i], pts[(i + 1) % pts.length]);
+      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, pts: l.ferme ? [...pts, pts[0]] : pts };
+    }
+  }
+  return meilleur?.pts ?? null;
 }
 
 /** Copie profonde du plan (pour « Annuler »). */
