@@ -731,3 +731,13 @@ describe('calques d\'un plan affiché (0.296.0)', () => {
     expect(plansAvecCalques([plan], fond)[0]).toBe(copie); // même objet tant que les réglages sont les mêmes
   });
 });
+
+describe('plans par phase (0.296.1)', () => {
+  it('la page d\'une phase utilise les plans de cette phase', async () => {
+    const { preparerPage } = await import('../src/plans-chantier/feuille.js');
+    const plan = nouveauPlanChantier('t', 'pic');
+    const donnees = { plan, plans: [{ id: 'a' }, { id: 'b' }], plansPar: (ph) => (ph === 'p2' ? [{ id: 'b' }] : [{ id: 'a' }, { id: 'b' }]), bib: BIB, projet: {}, points: [], surfaces: [] };
+    expect(preparerPage(donnees, { phase: 'p2', phases: ['p2'], titre: 'Phase 2' }, 3).plans.map((x) => x.id)).toEqual(['b']);
+    expect(preparerPage(donnees, { titre: '', phases: [plan.phases[0].id] }, 3).plans).toHaveLength(2);
+  });
+});

@@ -91,7 +91,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.296.0)
+## Fonctionnalités (état à la 0.296.1)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -137,6 +137,9 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 ## Plans de chantier : état (23.11)
 - **Étapes 1 à 4 faites** (0.286.0 → 0.289.0, Expert, site PC + Topo Bureau). **Petits restes** : tableau des modes (`docs/modes-base-intermediaire-expert.xlsx`) pas mis à jour (Plans de chantier, Calage, Comparer) ; jamais essayé sur Topo Bureau ni avec swisstopo (bloqué ici) ; la maquette est faite pour 1366 × 768 (portrait tablette non prévu).
 - **À valider avec l'utilisateur** : « une page par phase » = la phase seule + les phases cochées « sur toutes les pages » (choix fait sans lui) ; poses de l'escalier (lecture du bloc « Base vie Etage » : palier le long du petit côté, volée de 3 m le long du grand ; « petit côté » = échange des axes) ; matériaux d'après les couleurs (table `MATERIAUX` de `topo/symboles.js`) ; phares / feux placés par fractions de la boîte (camions : devant = y mini ; chargeuse : devant = x maxi).
+
+## 0.296.1 — Plans de chantier : plans différents par phase (demande du 23.11)
+- Bouton « Plans… » : on choisit d'abord **« Toutes les phases »** (choix général) **ou une phase** (choix propre), puis les plans du projet montrés dessous ; `plan.fond.plansParPhase[idPhase] = [ids]` (sinon `plansCaches` général) ; « Tout remettre au choix général ». Changer de phase active **change les plans affichés** ; la feuille « une page par phase » utilise les plans de la phase de la page (`donnees.plansPar`, `prep.plans`). Les réglages de calques (`fond.calques`) restent communs à toutes les phases.
 
 ## 0.296.0 — Plans de chantier : réglages de l'outil dans le bandeau, calques des plans affichés (demandes du 23.11)
 - **Les réglages de l'outil actif sont dans le bandeau du haut** (« Outil : Zone / Ligne… » : genre en liste déroulante, épaisseur, transparence, texte…), plus dans la colonne de droite (qui garde le plan, les phases, la liste des éléments).

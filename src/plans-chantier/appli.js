@@ -109,12 +109,16 @@ export function ouvrirPlansChantier({
   });
 
   const plan = () => liste().find((x) => x.id === etat.planId) ?? null;
-  const plansMontres = () => {
-    const caches = new Set(plan()?.fond?.plansCaches ?? []);
+  // 0.296.1 : plans montrés dessous PAR PHASE (plan.fond.plansParPhase[idPhase] = ids), sinon le choix général (plansCaches)
+  const plansMontres = (idPhase = plan()?.phaseActive) => {
+    const fond = plan()?.fond;
+    const propres = fond?.plansParPhase?.[idPhase];
+    if (propres) return plans().filter((p) => propres.includes(p.id));
+    const caches = new Set(fond?.plansCaches ?? []);
     return plans().filter((p) => !caches.has(p.id));
   };
   // 0.296.0 : réglages de calques (masqués, couleurs) propres à ce plan de chantier
-  const plansFond = () => plansAvecCalques(plansMontres(), plan()?.fond);
+  const plansFond = (idPhase) => plansAvecCalques(plansMontres(idPhase), plan()?.fond);
 
   let fermee = false;
   function fermer() {
@@ -739,7 +743,7 @@ export function ouvrirPlansChantier({
 
   /** Données communes à l'aperçu et au PDF. */
   const donneesFeuille = () => ({
-    plan: plan(), plans: plansFond(), points: plan()?.fond?.points === false ? [] : points(), surfaces: plan()?.fond?.surfaces === false ? [] : surfaces(),
+    plan: plan(), plans: plansFond(), plansPar: (idPhase) => plansFond(idPhase), points: plan()?.fond?.points === false ? [] : points(), surfaces: plan()?.fond?.surfaces === false ? [] : surfaces(),
     bib: bib(), projet: leProjet(), auteur: auteur(), centre: centreDeDepart(plan(), plansFond()),
   });
 
@@ -1519,10 +1523,36 @@ export function ouvrirPlansChantier({
     if (b.dataset.action === 'fond-plans') {
       const tous = plans();
       if (!tous.length) return message('Le projet n\'a aucun plan (DXF, PDF, IFC) à mettre dessous.', 4000);
+      // 0.296.1 : choix général ou propre à une phase (« changer de plan par phase »)
+      let phase = null;
+      if (p.phases.length > 1) {
+        const rep = await demanderChoix({
+          titre: 'Plans montrés dessous : pour quelle phase ?',
+          boutons: [
+            { cle: '__toutes', texte: 'Toutes les phases', detail: 'choix général (phases sans choix propre)', principal: true },
+            ...p.phases.map((ph) => ({ cle: ph.id, texte: ph.nom, detail: p.fond.plansParPhase?.[ph.id] ? 'choix propre à cette phase' : 'suit le choix général' })),
+            ...(p.fond.plansParPhase && Object.keys(p.fond.plansParPhase).length ? [{ cle: '__reinit', texte: 'Tout remettre au choix général', detail: 'efface les choix par phase' }] : []),
+          ],
+        });
+        if (!rep) return;
+        if (rep === '__reinit') {
+          if (!avantChangement()) return;
+          delete p.fond.plansParPhase;
+          enregistrer();
+          return majTout();
+        }
+        phase = rep === '__toutes' ? null : rep;
+      }
       const caches = new Set(p.fond.plansCaches ?? []);
-      const coches = await demanderCases({ titre: 'Plans du projet montrés dessous', options: tous.map((x) => ({ cle: x.id, texte: x.nom ?? x.id, coche: !caches.has(x.id) })) });
+      const actuels = phase ? new Set(plansMontres(phase).map((x) => x.id)) : null;
+      const nomPhase = p.phases.find((x) => x.id === phase)?.nom;
+      const coches = await demanderCases({ titre: phase ? `Plans montrés dessous en « ${nomPhase} »` : 'Plans du projet montrés dessous', options: tous.map((x) => ({ cle: x.id, texte: x.nom ?? x.id, coche: phase ? actuels.has(x.id) : !caches.has(x.id) })) });
       if (!coches || !avantChangement()) return;
-      p.fond.plansCaches = tous.map((x) => x.id).filter((id) => !coches.includes(id));
+      if (phase) {
+        p.fond.plansParPhase = { ...(p.fond.plansParPhase ?? {}), [phase]: coches };
+      } else {
+        p.fond.plansCaches = tous.map((x) => x.id).filter((id) => !coches.includes(id));
+      }
       enregistrer();
       return majTout();
     }
@@ -1543,7 +1573,7 @@ export function ouvrirPlansChantier({
       if (etat.choisi && !objetsVisibles(p).some((o) => o.id === etat.choisi)) etat.choisi = null; // l'élément choisi n'est plus montré dans cette phase
       enregistrer();
       majTout();
-      return vue?.redessinerDessus(); // 0.294.1 : l'affichage suit la gestion des phases dès qu'on change de phase
+      return vue?.redessiner(); // 0.294.1 : l'affichage suit la gestion des phases dès qu'on change de phase
     }
     if (b.dataset.phaseRenommer) {
       const ph = p.phases.find((x) => x.id === b.dataset.phaseRenommer);

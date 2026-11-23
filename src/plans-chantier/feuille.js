@@ -58,7 +58,9 @@ export function preparerPage(donnees, page, pxParMm) {
     indice: r.indice,
     auteur: r.auteur || donnees.auteur || '',
   };
-  return { r, objets, legende, mise, vue, champs, textes: [] };
+  // 0.296.1 : plans montrés dessous = ceux de la phase de la page (page par phase), sinon le choix général
+  const plansPage = page.phase && donnees.plansPar ? donnees.plansPar(page.phase) : donnees.plans;
+  return { r, objets, legende, mise, vue, champs, textes: [], plans: plansPage };
 }
 
 /**
@@ -92,9 +94,10 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
   ctx.clip();
   ctx.translate(mm(c.x), mm(c.y));
   dessinerFondSwisstopo(ctx, vue, plan.fond, 1, quandTuile);
-  if (donnees.plans.length) {
+  const plansPage = prep.plans ?? donnees.plans;
+  if (plansPage.length) {
     const toile = document.createElement('canvas');
-    dessinerPlansDxf(toile, donnees.plans, vue, 1);
+    dessinerPlansDxf(toile, plansPage, vue, 1);
     ctx.drawImage(toile, 0, 0);
     toile.width = 0;
   }
