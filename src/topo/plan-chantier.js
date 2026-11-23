@@ -145,8 +145,12 @@ export function retirerObjet(plan, id) {
 /** Objets dont la phase est visible. */
 export function objetsVisibles(plan) {
   const visibles = new Set(plan.phases.filter((p) => p.visible !== false).map((p) => p.id));
-  return plan.objets.filter((o) => visibles.has(o.phase));
+  const construction = plan.construction?.visible !== false; // 0.293.0 : lignes de construction, hors phases
+  return plan.objets.filter((o) => (o.type === 'construction' ? construction : visibles.has(o.phase)));
 }
+
+/** Objets qui s'impriment (PDF, DXF, légende) : tout sauf les lignes de construction (0.293.0). */
+export const objetsImprimables = (objets) => objets.filter((o) => o.type !== 'construction');
 
 /**
  * Couleur d'un objet : celle de sa phase (plan.couleurs = 'phases'), sinon celle choisie pour lui (objet.couleur), sinon
@@ -160,6 +164,7 @@ export function couleurObjet(plan, objet) {
   if (objet.type === 'piste') return COULEUR_PISTE;
   if (objet.type === 'fleche') return COULEUR_FLECHE;
   if (estPose(objet)) return '#64748b';
+  if (objet.type === 'construction') return '#06b6d4';
   return '#1b2b36';
 }
 
@@ -220,6 +225,11 @@ export const estPose = (o) => o.type === 'symbole' || o.type === 'grue';
 export function objetSousLePoint(objets, p, tolerance, surSymbole = null) {
   for (let k = objets.length - 1; k >= 0; k--) {
     const o = objets[k];
+    if (o.type === 'construction') {
+      const [a, b] = segmentConstruction(o);
+      if (distanceAuSegment(p, a, b) <= tolerance) return o;
+      continue;
+    }
     if (estPose(o)) {
       // Symbole posé (0.289.0) : dans sa boîte tournée (surSymbole, qui connaît la bibliothèque), sinon près de son centre.
       if (surSymbole ? surSymbole(o, p, tolerance) : Math.hypot(p[0] - o.point[0], p[1] - o.point[1]) <= tolerance + 1) return o;
@@ -285,7 +295,50 @@ export function pointeDeFleche(a, b, longueurPointe = 2, largeurPointe = 1.6) {
 export function lignesPourAccroche(objets) {
   return objets
     .filter((o) => o.type !== 'texte' && (o.points?.length ?? 0) >= 2)
-    .map((o) => ({ points: o.points.map(([est, nord]) => ({ est, nord, altitude: null })), ferme: o.type === 'zone' }));
+    .map((o) => ({ points: (o.type === 'construction' ? segmentConstruction(o) : o.points).map(([est, nord]) => ({ est, nord, altitude: null })), ferme: o.type === 'zone' }));
+}
+
+/**
+ * Segment d'une ligne de construction (0.293.0) : ses 2 points ; une droite infinie est prolongée de 5 000 m de chaque côté
+ * (assez pour l'accroche et le toucher sur tout un chantier). Renvoie [[e, n], [e, n]].
+ */
+export function segmentConstruction(o, prolongement = 5000) {
+  const [a, b] = o.points;
+  if (!o.infinie) return [a, b];
+  const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  const [ux, uy] = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+  return [[a[0] - ux * prolongement, a[1] - uy * prolongement], [b[0] + ux * prolongement, b[1] + uy * prolongement]];
+}
+
+/**
+ * Segment le plus proche du point p (à tolerance m près) parmi des lignes au format de l'accroche ; renvoie [[e, n], [e, n]]
+ * ou null (pour une parallèle en ligne de construction : on décale ce segment-là, pas toute la polyligne).
+ */
+export function segmentLePlusProche(lignes, p, tolerance) {
+  let meilleur = null;
+  for (const l of lignes) {
+    const pts = l.points.map((q) => [q.est, q.nord]);
+    const n = l.ferme ? pts.length : pts.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      const d = distanceAuSegment(p, a, b);
+      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, seg: [a, b] };
+    }
+  }
+  return meilleur?.seg ?? null;
+}
+
+/** Point à la distance l (m) de p dans la direction angle (degrés, sens inverse des aiguilles depuis l'Est). */
+export function pointALaDistance(p, l, angle) {
+  const a = (angle * Math.PI) / 180;
+  return [Math.round((p[0] + l * Math.cos(a)) * 1e6) / 1e6, Math.round((p[1] + l * Math.sin(a)) * 1e6) / 1e6];
+}
+
+/** Angle (degrés, sens inverse des aiguilles depuis l'Est) de p vers q, ou null s'ils sont confondus. */
+export function angleVers(p, q) {
+  if (Math.hypot(q[0] - p[0], q[1] - p[1]) < 1e-9) return null;
+  return (Math.atan2(q[1] - p[1], q[0] - p[0]) * 180) / Math.PI;
 }
 
 /** Résumé d'un objet pour la liste et le panneau : « Zone · Stockage · 312.5 m² ». */
@@ -296,6 +349,7 @@ export function resumeObjet(o) {
   if (o.type === 'piste') return `Piste · ${n(o.largeur ?? 4)} m de large · ${n(longueur(o.points))} m`;
   if (o.type === 'fleche') return `Flèche · ${n(longueur(o.points))} m`;
   if (o.type === 'texte') return `Texte « ${o.texte} »`;
+  if (o.type === 'construction') return o.infinie ? 'Construction · droite' : `Construction · segment ${n(longueur(o.points))} m`;
   if (o.type === 'grue') return `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'} · flèche ${o.fleche ?? 40} m${o.chassis && o.chassis !== 'aucun' ? ` · châssis ${o.chassis}` : ''}`;
   if (o.type === 'symbole') return o.etage ? 'Base-vie à étage' : String(o.cle ?? '').replace(/^[a-z]+:/, '');
   return o.type;

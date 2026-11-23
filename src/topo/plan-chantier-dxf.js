@@ -113,7 +113,7 @@ export function nomDeBloc(texteNom, suffixe = '') {
 export function dxfPlanChantier(plan, bib, objets = null) {
   const texteM = texteSymbolesM(plan);
   const visibles = new Set(plan.phases.filter((p) => p.visible !== false).map((p) => p.id));
-  const liste = objets ?? plan.objets.filter((o) => visibles.has(o.phase));
+  const liste = (objets ?? plan.objets.filter((o) => visibles.has(o.phase))).filter((o) => o.type !== 'construction'); // construction : jamais exportée
   const nomPhase = (id) => plan.phases.find((p) => p.id === id)?.nom ?? 'PHASE';
   const calques = new Map(); // nom → ACI
   const calque = (o, genre, aci) => {

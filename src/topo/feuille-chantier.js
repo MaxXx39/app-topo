@@ -51,7 +51,7 @@ export function pagesDeLaFeuille(plan, pages = reglagesFeuille(plan).pages) {
 /** Objets d'une page (phases de la page). */
 export function objetsDeLaPage(plan, page) {
   const ids = new Set(page.phases);
-  return plan.objets.filter((o) => ids.has(o.phase));
+  return plan.objets.filter((o) => o.type !== 'construction' && ids.has(o.phase)); // construction : jamais imprimée
 }
 
 /**
@@ -86,7 +86,7 @@ export function vueDuCadre(plan, cadre, pxParMm, centre) {
 
 /** Centre de départ de la feuille : milieu des éléments du plan (ou des plans du projet, ou null). */
 export function centreDeDepart(plan, plans = []) {
-  const b = bornesObjets(objetsVisibles(plan));
+  const b = bornesObjets(objetsVisibles(plan).filter((o) => o.type !== 'construction'));
   if (b) return [(b.estMin + b.estMax) / 2, (b.nordMin + b.nordMax) / 2];
   const p = plans.find((x) => x.bornes);
   return p ? [(p.bornes.estMin + p.bornes.estMax) / 2, (p.bornes.nordMin + p.bornes.nordMax) / 2] : null;

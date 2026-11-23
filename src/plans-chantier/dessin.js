@@ -132,6 +132,34 @@ export function dessinerObjet(d, o) {
     }
   } else if (o.type === 'ligne') {
     dessinerLigne(ctx, o.points.map((p) => { const q = ecran(p); return [q.x, q.y]; }), styleLigne(o.style), couleur, mm, o, e);
+  } else if (o.type === 'construction') {
+    // Ligne de construction (0.293.0, jamais imprimée) : trait cyan en tirets, droite infinie prolongée hors de l'écran.
+    const a = ecran(o.points[0]);
+    const b = ecran(o.points[1]);
+    let [x1, y1, x2, y2] = [a.x, a.y, b.x, b.y];
+    if (o.infinie) {
+      const l = Math.hypot(x2 - x1, y2 - y1) || 1;
+      const [ux, uy] = [(x2 - x1) / l, (y2 - y1) / l];
+      const L = (vue.largeur + vue.hauteur) * 3;
+      [x1, y1, x2, y2] = [x1 - ux * L, y1 - uy * L, x2 + ux * L, y2 + uy * L];
+    }
+    ctx.strokeStyle = couleur;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([9, 5]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = couleur;
+    for (const q of [a, b]) {
+      ctx.beginPath();
+      ctx.moveTo(q.x - 4, q.y);
+      ctx.lineTo(q.x + 4, q.y);
+      ctx.moveTo(q.x, q.y - 4);
+      ctx.lineTo(q.x, q.y + 4);
+      ctx.stroke();
+    }
   } else if (o.type === 'piste') {
     chemin(d, o.points, false);
     ctx.strokeStyle = couleur;
