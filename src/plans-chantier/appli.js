@@ -12,6 +12,7 @@ import { accrocher, sourcesDesPlans } from '../topo/accroche.js';
 import {
   GENRES, CATEGORIES_ZONE, STYLES_LIGNE, nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet, retirerObjet,
   objetsVisibles, objetSousLePoint, deplacerObjet, lignesPourAccroche, resumeObjet, copiePlan, aire, longueur,
+  sommetSousLePoint, couleurObjet, LARGEUR_FLECHE, POINTE_FLECHE,
 } from '../topo/plan-chantier.js';
 import { creerVueChantier } from './vue.js';
 
@@ -50,6 +51,7 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
   const etat = {
     ecran: 'liste', planId: null, outil: 'choisir', saisie: null, choisi: null, accroches: new Set(['point', 'sommet']),
     categorie: 'installation', style: 'cloture', largeur: 4, tailleTexte: 1.2, curseur: null,
+    largeurFleche: LARGEUR_FLECHE, pointeFleche: POINTE_FLECHE, glisse: null, // glisse : { type: 'sommet', i } ou { type: 'objet' }
   };
   let vue = null;
   let pileAnnuler = [];
@@ -60,12 +62,18 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
     return plans().filter((p) => !caches.has(p.id));
   };
 
+  let fermee = false;
   function fermer() {
+    fermee = true;
     vue?.detruire();
     page.close();
     page.remove();
     quandRetour?.();
   }
+  // Le navigateur peut fermer la page à un 2e Échap malgré tout (Chrome) : on la rouvre, seul « ← » la ferme.
+  page.addEventListener('close', () => {
+    if (!fermee && page.isConnected) page.showModal();
+  });
 
   /** Avant chaque changement : refusé en lecture seule, sinon on garde l'état d'avant (↶ Annuler). */
   function avantChangement() {
@@ -95,8 +103,7 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
     majTout();
   }
 
-  page.addEventListener('cancel', (ev) => {
-    ev.preventDefault();
+  function echap() {
     if (etat.saisie) {
       etat.saisie = null;
       majTout();
@@ -107,9 +114,22 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
       etat.outil = 'choisir';
       majTout();
     }
+  }
+  page.addEventListener('cancel', (ev) => {
+    ev.preventDefault();
+    echap();
   });
   page.addEventListener('keydown', (ev) => {
     if ((ev.ctrlKey || ev.metaKey) && ['z', 'y'].includes(ev.key.toLowerCase())) ev.stopPropagation();
+    // Échap (0.287.0) : arrête le dessin ou le choix, mais ne ramène jamais au menu de l'appli.
+    if (ev.key === 'Escape') {
+      ev.stopPropagation();
+      if (!ev.target.matches('input, select, textarea')) {
+        ev.preventDefault();
+        echap();
+      }
+      return;
+    }
     if (etat.ecran !== 'dessin') return;
     const dansChamp = ev.target.matches('input, select, textarea');
     if (ev.key === 'Enter' && !dansChamp && etat.saisie) {
@@ -232,14 +252,26 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
         majEtat();
       },
       glisserObjet: {
+        // 0.287.0 : sur une poignée (sommet) de l'élément choisi = déplacer ce sommet (avec l'accroche) ; ailleurs sur
+        // l'élément = le déplacer en entier.
         debut: (p, tol) => {
           if (etat.outil !== 'choisir' || !etat.choisi) return false;
-          const sous = objetSousLePoint(objetsVisibles(plan()), p, tol);
-          if (sous?.id !== etat.choisi) return false;
-          return avantChangement();
+          const o = plan().objets.find((x) => x.id === etat.choisi);
+          if (!o) return false;
+          const i = o.type === 'texte' ? -1 : sommetSousLePoint(o, p, tol);
+          if (i < 0 && objetSousLePoint(objetsVisibles(plan()), p, tol)?.id !== etat.choisi) return false;
+          if (!avantChangement()) return false;
+          etat.glisse = i >= 0 ? { type: 'sommet', i } : { type: 'objet' };
+          return true;
         },
-        deplacer: (de, dn) => deplacerObjet(plan().objets.find((o) => o.id === etat.choisi), de, dn),
+        deplacer: (de, dn, point) => {
+          const o = plan().objets.find((x) => x.id === etat.choisi);
+          if (!o) return;
+          if (etat.glisse?.type === 'sommet') o.points[etat.glisse.i] = point;
+          else deplacerObjet(o, de, dn);
+        },
         fin: () => {
+          etat.glisse = null;
           enregistrer();
           majPanneau();
         },
@@ -250,14 +282,16 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
 
   /** Accroche pendant un dessin : points levés, puis sommets / milieux / bords des plans et de ce qui est dessiné. */
   function accrochage(position, tolerance) {
-    if (etat.outil === 'choisir') return null;
+    if (etat.outil === 'choisir' && etat.glisse?.type !== 'sommet') return null;
     const a = etat.accroches;
     if (a.has('point')) {
       const t = accrocher('point', position, tolerance, { points: plan()?.fond?.points === false ? [] : points() });
       if (t) return t;
     }
     const sources = sourcesDesPlans(plansFond(), position, tolerance);
-    sources.lignes = [...sources.lignes, ...lignesPourAccroche(plan().objets)];
+    // Pendant qu'on glisse un sommet, l'élément lui-même n'est pas une accroche (il bouge).
+    const autres = etat.glisse ? plan().objets.filter((o) => o.id !== etat.choisi) : plan().objets;
+    sources.lignes = [...sources.lignes, ...lignesPourAccroche(autres)];
     for (const mode of ['sommet', 'milieu', 'ligne']) {
       if (!a.has(mode)) continue;
       const t = accrocher(mode, position, tolerance, sources);
@@ -277,6 +311,7 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
       if (!texte || !avantChangement()) return;
       const o = ajouterObjet(plan(), { type: 'texte', point: p, texte, taille: etat.tailleTexte });
       etat.choisi = o.id;
+      etat.outil = 'choisir';
       enregistrer();
       majTout();
       return;
@@ -302,10 +337,11 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
       return;
     }
     if (!avantChangement()) return;
-    const props = { zone: { categorie: s.categorie }, ligne: { style: s.style }, piste: { largeur: s.largeur }, fleche: {} }[s.outil];
+    const props = { zone: { categorie: s.categorie }, ligne: { style: s.style }, piste: { largeur: s.largeur }, fleche: { largeur: etat.largeurFleche, pointe: etat.pointeFleche } }[s.outil];
     const o = ajouterObjet(plan(), { type: s.outil, points: s.points, ...props });
     etat.saisie = null;
     etat.choisi = o.id;
+    etat.outil = 'choisir'; // 0.287.0 : l'élément dessiné est choisi (poignées, réglages à droite)
     vue?.oublierCurseur();
     enregistrer();
     majTout();
@@ -342,7 +378,7 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
     const s = etat.saisie;
     const n = s?.points.length ?? 0;
     const textes = {
-      choisir: etat.choisi ? 'Glisser l\'élément choisi pour le déplacer ; Suppr = l\'effacer ; Échap = ne plus le choisir.' : 'Cliquez un élément pour le choisir. Molette = zoom, glisser dans le vide = déplacer le plan.',
+      choisir: etat.choisi ? 'Glisser une poignée (carré) = déplacer ce sommet ; glisser l\'élément = le déplacer ; Suppr = l\'effacer ; Échap = ne plus le choisir.' : 'Cliquez un élément pour le choisir (ou dans la liste à droite). Molette = zoom, glisser dans le vide = déplacer le plan.',
       zone: n >= 3 ? 'Cliquez le sommet suivant ; cliquez le 1er sommet (ou Entrée, double-clic) pour fermer la zone.' : 'Cliquez les sommets de la zone.',
       ligne: n >= 2 ? 'Point suivant ; Entrée ou double-clic = finir.' : 'Cliquez le départ de la ligne.',
       piste: n >= 2 ? 'Point suivant de l\'axe ; Entrée ou double-clic = finir.' : 'Cliquez le départ de l\'axe de la piste.',
@@ -378,6 +414,8 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
       ligne: `<label class="champ-calage"><span>Genre de ligne</span><select data-reglage="style">${options(STYLES_LIGNE, etat.style)}</select></label>`,
       piste: `<label class="champ-calage"><span>Largeur de la piste (m)</span><input type="number" min="1" max="30" step="0.5" value="${etat.largeur}" data-reglage="largeur"></label>`,
       texte: `<label class="champ-calage"><span>Hauteur des lettres (m)</span><input type="number" min="0.2" max="10" step="0.1" value="${etat.tailleTexte}" data-reglage="tailleTexte"></label>`,
+      fleche: `<label class="champ-calage"><span>Largeur de la flèche (m)</span><input type="number" min="0.1" max="10" step="0.1" value="${etat.largeurFleche}" data-reglage="largeurFleche"></label>
+        <label class="champ-calage"><span>Longueur de la pointe (m)</span><input type="number" min="0.3" max="20" step="0.1" value="${etat.pointeFleche}" data-reglage="pointeFleche"></label>`,
     }[etat.outil] ?? '';
     let choisi = '';
     if (o) {
@@ -388,9 +426,12 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
         piste: `<label class="champ-calage"><span>Largeur (m)</span><input type="number" min="1" max="30" step="0.5" value="${o.largeur ?? 4}" data-prop="largeur"></label>`,
         texte: `<label class="champ-calage"><span>Texte</span><input type="text" value="${echapper(o.texte)}" data-prop="texte" maxlength="80"></label>
           <label class="champ-calage"><span>Hauteur des lettres (m)</span><input type="number" min="0.2" max="10" step="0.1" value="${o.taille ?? 1}" data-prop="taille"></label>`,
-        fleche: '',
+        fleche: `<label class="champ-calage"><span>Largeur (m)</span><input type="number" min="0.1" max="10" step="0.1" value="${o.largeur ?? LARGEUR_FLECHE}" data-prop="largeur"></label>
+          <label class="champ-calage"><span>Longueur de la pointe (m)</span><input type="number" min="0.3" max="20" step="0.1" value="${o.pointe ?? POINTE_FLECHE}" data-prop="pointe"></label>`,
       }[o.type];
       choisi = `<h3>Élément choisi</h3><p class="resume-chantier">${echapper(resumeObjet(o))}</p>${propre}
+        ${p.couleurs === 'phases' ? '<p class="aide-calage">Couleurs « une par phase » : la couleur vient de la phase.</p>' : `<div class="couleur-element"><label class="champ-calage"><span>Couleur</span><input type="color" value="${couleurObjet({ ...p, couleurs: 'objets' }, o)}" data-prop="couleur"></label>
+          ${o.couleur ? '<button type="button" class="lien-calage" data-action="couleur-origine">Couleur d\'origine</button>' : ''}</div>`}
         <label class="champ-calage"><span>Phase</span><select data-prop="phase">${phaseChoix}</select></label>
         <button type="button" class="bouton-secondaire" data-action="effacer">Effacer cet élément</button>`;
     }
@@ -408,7 +449,9 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
         <option value="phases" ${p.couleurs === 'phases' ? 'selected' : ''}>Une couleur par phase</option></select></label>
       ${reglages ? `<h3>Outil</h3>${reglages}` : ''}
       ${choisi}
-      <p class="aide-calage">${p.objets.length} élément${p.objets.length > 1 ? 's' : ''} dans ce plan.</p>`;
+      <h3>Éléments (${p.objets.length})</h3>
+      <ul class="elements-chantier">${[...p.objets].reverse().map((x) => `<li><button type="button" data-choisir="${x.id}" class="${x.id === etat.choisi ? 'actif' : ''}">
+        <i style="background:${couleurObjet(p, x)}"></i>${echapper(resumeObjet(x))}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul>`;
     page.querySelector('.ruban-chantier [data-action="effacer"]')?.toggleAttribute('disabled', !etat.choisi);
   }
 
@@ -460,6 +503,19 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
       return majOutils();
     }
     if (b.dataset.zoom) return b.dataset.zoom === 'tout' ? vue?.cadrer() : vue?.zoom(Number(b.dataset.zoom));
+    if (b.dataset.choisir) {
+      etat.outil = 'choisir';
+      etat.saisie = null;
+      etat.choisi = b.dataset.choisir;
+      return majTout();
+    }
+    if (b.dataset.action === 'couleur-origine') {
+      const o = p.objets.find((x) => x.id === etat.choisi);
+      if (!o || !avantChangement()) return;
+      delete o.couleur;
+      enregistrer();
+      return majTout();
+    }
     if (b.dataset.action === 'effacer') return supprimerChoisi();
     if (b.dataset.action === 'annuler') return annuler();
     if (b.dataset.action === 'fond-points') {

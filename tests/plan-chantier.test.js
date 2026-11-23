@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet, retirerObjet, objetsVisibles, couleurObjet, aire, longueur,
   distanceAuSegment, dansPolygone, objetSousLePoint, deplacerObjet, bornesObjets, pointeDeFleche, lignesPourAccroche,
-  resumeObjet, copiePlan, categorieZone, styleLigne,
+  resumeObjet, copiePlan, categorieZone, styleLigne, sommetSousLePoint, positionsLeLong, morceauxAvecTrous,
 } from '../src/topo/plan-chantier.js';
 import { completerProjet } from '../src/projet/projet.js';
 
@@ -142,5 +142,40 @@ describe('projet : plans de chantier et comparaisons gardés à l\'ouverture', (
     const complet = completerProjet({ nom: 'x', surfaces: [], comparaisons: [{ id: 'v1', nom: 'avant/après', avant: 'surface:a', apres: 'surface:b' }] });
     expect(complet.comparaisons).toBeUndefined();
     expect(complet.calculs.map((k) => k.id)).toContain('v1');
+  });
+});
+
+describe('plan de chantier 0.287.0 : couleurs, poignées, lignes à motifs, flèches', () => {
+  it('couleur choisie pour un élément, sauf en « une couleur par phase »', () => {
+    const p = nouveauPlanChantier('P');
+    const z = ajouterObjet(p, { type: 'zone', points: carre, categorie: 'stockage', couleur: '#123456' });
+    expect(couleurObjet(p, z)).toBe('#123456');
+    p.couleurs = 'phases';
+    expect(couleurObjet(p, z)).toBe(p.phases[0].couleur);
+  });
+  it('ancien genre « câble » = électricité', () => {
+    expect(styleLigne('cable').cle).toBe('elec');
+    expect(styleLigne('elec').motif.eclair).toBe(true);
+  });
+  it('sommet sous le point (poignée) : le plus proche à la tolérance, sinon -1', () => {
+    const o = { type: 'zone', points: carre };
+    expect(sommetSousLePoint(o, [E + 10.1, N + 0.1], 0.5)).toBe(1);
+    expect(sommetSousLePoint(o, [E + 5, N + 5], 0.5)).toBe(-1);
+  });
+  it('repères réguliers le long d\'une ligne, même en tournant', () => {
+    const r = positionsLeLong([[0, 0], [10, 0], [10, 10]], 4);
+    expect(r.map((q) => [q.x, q.y])).toEqual([[2, 0], [6, 0], [10, 0], [10, 4], [10, 8]]);
+    expect(r[3].angle).toBeCloseTo(Math.PI / 2, 6);
+    expect(positionsLeLong([[0, 0], [1, 0]], 0)).toEqual([]);
+  });
+  it('morceaux de ligne sans les trous des motifs', () => {
+    expect(morceauxAvecTrous([[0, 0], [10, 0], [10, 10]], [4, 12], 1)).toEqual([[[0, 0], [3, 0]], [[5, 0], [10, 0], [10, 1]], [[10, 3], [10, 10]]]);
+    expect(morceauxAvecTrous([[0, 0], [10, 0]], [], 1)).toEqual([[[0, 0], [10, 0]]]);
+  });
+  it('flèche : touchée à sa demi-largeur, résumé avec la largeur', () => {
+    const f = { type: 'fleche', points: [[E, N], [E + 20, N]], largeur: 2 };
+    expect(objetSousLePoint([f], [E + 10, N + 1.1], 0.2)).toBe(f);
+    expect(objetSousLePoint([f], [E + 10, N + 1.5], 0.2)).toBeNull();
+    expect(resumeObjet(f)).toBe('Flèche · 2.0 m de large · 20.0 m');
   });
 });

@@ -5,7 +5,7 @@
 // glisser l'objet choisi = le déplacer (si glisserObjet le permet).
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
-import { objetsVisibles, couleurObjet, styleLigne, pointeDeFleche, bornesObjets } from '../topo/plan-chantier.js';
+import { objetsVisibles, couleurObjet, styleLigne, pointeDeFleche, bornesObjets, positionsLeLong, morceauxAvecTrous, LARGEUR_FLECHE, POINTE_FLECHE } from '../topo/plan-chantier.js';
 
 const SEUIL_GLISSER_PX = 5;
 const FACTEUR_MOLETTE = 1.2;
@@ -18,7 +18,7 @@ const ORANGE = '#ea580c';
  *  saisie() : { outil, points: [[e, n]…] } pendant un dessin, ou null ;
  *  accrocher(position, toleranceM) : point accroché { est, nord } ou null ;
  *  clic(point [e, n], toleranceM, ev) ; double(point) ; bouge(point) (barre d'état) ;
- *  glisserObjet : { debut(point, tol) → true s'il prend le geste, deplacer(dEst, dNord), fin() }.
+ *  glisserObjet : { debut(point, tol) → true s'il prend le geste, deplacer(dEst, dNord, point accroché), fin() }.
  * Renvoie { redessiner(), redessinerDessus(), cadrer(), zoom(f), vue(), detruire() }.
  */
 export function creerVueChantier(conteneur, options) {
@@ -129,22 +129,7 @@ export function creerVueChantier(conteneur, options) {
       ctx.lineWidth = o.categorie === 'emprise' ? 3.5 : 2;
       ctx.stroke();
     } else if (o.type === 'ligne') {
-      const s = styleLigne(o.style);
-      chemin(ctx, o.points, false);
-      ctx.strokeStyle = couleur;
-      ctx.lineWidth = s.epaisseur;
-      ctx.setLineDash(s.tirets.map((t) => Math.max(2, t * e)));
-      ctx.stroke();
-      ctx.setLineDash([]);
-      if (s.ronds) {
-        ctx.fillStyle = couleur;
-        for (const p of o.points) {
-          const q = ecran(p);
-          ctx.beginPath();
-          ctx.arc(q.x, q.y, s.epaisseur + 0.5, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-      }
+      dessinerLigne(ctx, o.points.map((p) => { const q = ecran(p); return [q.x, q.y]; }), styleLigne(o.style), couleur, e);
     } else if (o.type === 'piste') {
       chemin(ctx, o.points, false);
       ctx.strokeStyle = couleur;
@@ -163,12 +148,14 @@ export function creerVueChantier(conteneur, options) {
     } else if (o.type === 'fleche') {
       const pts = o.points;
       if (pts.length < 2) return;
-      const l = Math.max(1.2, 9 / e); // pointe d'au moins 9 px
-      const tete = pointeDeFleche(pts[pts.length - 2], pts[pts.length - 1], Math.max(2, l * 2), Math.max(1.6, l * 1.6));
+      // Largeur du corps et longueur de la pointe en m (réglables) ; au moins 3 px / 10 px pour rester visibles.
+      const largeur = Math.max(3 / e, o.largeur ?? LARGEUR_FLECHE);
+      const pointe = Math.max(10 / e, o.pointe ?? POINTE_FLECHE);
+      const tete = pointeDeFleche(pts[pts.length - 2], pts[pts.length - 1], pointe, Math.max(largeur * 2, 1.6, 8 / e));
       const base = [(tete[1][0] + tete[2][0]) / 2, (tete[1][1] + tete[2][1]) / 2];
       chemin(ctx, [...pts.slice(0, -1), base], false);
       ctx.strokeStyle = couleur;
-      ctx.lineWidth = Math.max(3, 0.9 * e);
+      ctx.lineWidth = largeur * e;
       ctx.lineCap = 'butt';
       ctx.stroke();
       ctx.lineCap = 'round';
@@ -192,6 +179,85 @@ export function creerVueChantier(conteneur, options) {
       ctx.stroke();
       ctx.fillStyle = '#1b2b36';
       ctx.fillText(o.texte, q.x, q.y + h * 0.04);
+    }
+  }
+
+  /** Ligne à l'écran (points en px) avec son style : tirets, et motif répété (la ligne s'interrompt autour). */
+  function dessinerLigne(ctx, pts, style, couleur, echelle) {
+    const m = style.motif;
+    const trace = (morceaux) => {
+      ctx.strokeStyle = couleur;
+      ctx.lineWidth = style.epaisseur;
+      ctx.setLineDash(style.tirets.map((t) => Math.max(2, t * echelle)));
+      for (const mo of morceaux) {
+        ctx.beginPath();
+        mo.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    };
+    if (!m) return trace([pts]);
+    if (m.type === 'poteau') {
+      // Poteaux tous les pasM m (au moins 14 px entre deux), petit rectangle en travers de la ligne.
+      trace([pts]);
+      const pas = Math.max(m.pasM * echelle, 14);
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = couleur;
+      ctx.lineWidth = 1.5;
+      for (const q of positionsLeLong(pts, pas, 0)) {
+        ctx.save();
+        ctx.translate(q.x, q.y);
+        ctx.rotate(q.angle);
+        ctx.fillRect(-2.5, -5, 5, 10);
+        ctx.strokeRect(-2.5, -5, 5, 10);
+        ctx.restore();
+      }
+      return;
+    }
+    ctx.font = '600 12px system-ui, sans-serif';
+    const largeurMotif = m.type === 'texte' ? ctx.measureText(m.texte).width + (m.eclair ? 12 : 0) : m.type === 'double' ? 26 : 12;
+    const reperes = positionsLeLong(pts, m.pasPx);
+    trace(morceauxAvecTrous(pts, reperes.map((r) => r.s), largeurMotif / 2 + 6));
+    ctx.fillStyle = couleur;
+    ctx.strokeStyle = couleur;
+    ctx.lineWidth = 1.8;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const r of reperes) {
+      ctx.save();
+      ctx.translate(r.x, r.y);
+      // Texte lisible : jamais à l'envers.
+      const a = r.angle > Math.PI / 2 || r.angle < -Math.PI / 2 ? r.angle + Math.PI : r.angle;
+      ctx.rotate(m.type === 'texte' ? a : r.angle);
+      if (m.type === 'texte') {
+        if (m.eclair) {
+          const x0 = -largeurMotif / 2;
+          ctx.beginPath();
+          ctx.moveTo(x0 + 6, -6);
+          ctx.lineTo(x0 + 1.5, 1);
+          ctx.lineTo(x0 + 5, 1);
+          ctx.lineTo(x0 + 3, 7);
+          ctx.lineTo(x0 + 9, -1);
+          ctx.lineTo(x0 + 5.5, -1);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillText(m.texte, 6, 0.5);
+        } else ctx.fillText(m.texte, 0, 0.5);
+      } else {
+        const chevron = (dx, sens) => {
+          ctx.beginPath();
+          ctx.moveTo(dx - 3 * sens, -4.5);
+          ctx.lineTo(dx + 3 * sens, 0);
+          ctx.lineTo(dx - 3 * sens, 4.5);
+          ctx.stroke();
+        };
+        if (m.type === 'chevron') chevron(0, 1);
+        else {
+          chevron(-6, -1);
+          chevron(6, 1);
+        }
+      }
+      ctx.restore();
     }
   }
 
@@ -298,7 +364,7 @@ export function creerVueChantier(conteneur, options) {
       if (!geste.glisse) return;
       if (geste.objet) {
         const t = versTerrain(p.x, p.y, vue);
-        glisserObjet.deplacer(t.est - geste.dernier[0], t.nord - geste.dernier[1]);
+        glisserObjet.deplacer(t.est - geste.dernier[0], t.nord - geste.dernier[1], pointSous(p.x, p.y));
         geste.dernier = [t.est, t.nord];
         redessinerDessus();
       } else if (geste.x !== undefined) {
