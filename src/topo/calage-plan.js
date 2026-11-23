@@ -303,3 +303,39 @@ export function resultatAutomatique(auto, elements = []) {
     elements: evalues, verdict, message, methode: 'automatique', confiance: auto.niveau, auto,
   };
 }
+
+/**
+ * Droite ajustée sur des points levés (un axe dont on a levé des points : bornes sur l'axe, axe implanté) : moindres
+ * carrés orthogonaux (la droite qui passe au mieux par tous les points). points : [[E, N], …], au moins 2 distincts.
+ * Renvoie { segment: [E1, N1, E2, N2] (du premier au dernier point projetés sur la droite), ecartMaxM, ecartMoyenM }
+ * (écart = distance d'un point à la droite). Lance ErreurCalage s'il n'y a pas 2 points distincts.
+ */
+export function droiteParPoints(points) {
+  if (points.length < 2) throw new ErreurCalage('Il faut au moins 2 points levés sur l\'axe.');
+  const n = points.length;
+  const mx = points.reduce((s, p) => s + p[0], 0) / n;
+  const my = points.reduce((s, p) => s + p[1], 0) / n;
+  let sxx = 0;
+  let sxy = 0;
+  let syy = 0;
+  for (const [x, y] of points) {
+    sxx += (x - mx) ** 2;
+    sxy += (x - mx) * (y - my);
+    syy += (y - my) ** 2;
+  }
+  if (sxx + syy < 1e-12) throw new ErreurCalage('Les points de l\'axe sont confondus : choisissez des points éloignés.');
+  // Direction principale du nuage de points.
+  const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+  const abscisse = (p) => (p[0] - mx) * ux + (p[1] - my) * uy;
+  const ecarts = points.map((p) => Math.abs(-(p[0] - mx) * uy + (p[1] - my) * ux));
+  const ts = points.map(abscisse);
+  const t1 = Math.min(...ts);
+  const t2 = Math.max(...ts);
+  return {
+    segment: [mx + t1 * ux, my + t1 * uy, mx + t2 * ux, my + t2 * uy],
+    ecartMaxM: Math.max(...ecarts),
+    ecartMoyenM: ecarts.reduce((s, e) => s + e, 0) / n,
+  };
+}

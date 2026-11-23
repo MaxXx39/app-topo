@@ -14627,3 +14627,15 @@ dialog.page-comparateur[open] {
 .cote-b { border-color: #2563eb; }
 .rapport-comparateur { max-width: 640px; }
 .rapport-comparateur label { display: flex; gap: 6px; align-items: center; }
+
+/* 0.283.0 : Calage de plans : nettoyage par sélection (rose), info-bulle du calque, écran de chargement, indices gardés. */
+.infobulle-calage { position: absolute; z-index: 3; max-width: 260px; padding: 3px 8px; border-radius: 6px; background: rgba(15, 23, 42, 0.92); color: #ffffff; font-size: 0.8rem; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.calque-calage.choisi { outline: 2px solid #e11d48; background: color-mix(in srgb, #e11d48 14%, var(--surface)); font-weight: 700; }
+.chargement-calage { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(15, 23, 42, 0.72); color: #ffffff; text-align: center; padding: 20px; }
+.chargement-calage p { margin: 0; max-width: 420px; font-weight: 600; }
+.rond-chargement { width: 54px; height: 54px; border: 6px solid rgba(255, 255, 255, 0.3); border-top-color: #ffffff; border-radius: 50%; animation: tour-chargement 0.9s linear infinite; }
+@keyframes tour-chargement { to { transform: rotate(360deg); } }
+.ligne-indice td { background: color-mix(in srgb, #2563eb 5%, var(--surface)); padding-left: 22px; }
+.actions-ligne-calage { display: flex; flex-wrap: wrap; gap: 4px; }
+.groupe-ruban select { padding: 6px 8px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); font: inherit; max-width: 220px; }
+.outil-ruban[aria-pressed='true'] { background: color-mix(in srgb, #2563eb 14%, var(--surface)); border-color: #2563eb; color: #2563eb; }
