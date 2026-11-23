@@ -11,6 +11,9 @@
 //   fleche : { points, largeur (m, 0,2), echelle (pointe, ×1) }  (sens de circulation, la pointe au dernier point)
 //   texte  : { point, texte, taille, repere [e, n], repereBout ('fleche' | 'point' | 'aucun') }
 //             (taille = hauteur des lettres en m ; repere = point visé par la ligne de repère, facultatif)
+//   symbole : { point (centre), rotation (°, sens trigonométrique), cle (symbole de la bibliothèque, topo/symboles.js),
+//             etage { pose 0–7, textes ['1er', 'Rez'] } (base-vie à étage) }                         (0.289.0)
+//   grue   : { point (la tour), rotation, modele ('tour' | 'auto'), fleche (m), chassis ('4.50'… | 'aucun'), rayon (bool) }
 // Unités du dessin (0.288.0) : épaisseurs de trait, taille et espacement des motifs en **mm sur le papier** ; sur le
 // terrain, 1 mm de papier = « échelle du plan » / 1000 m (plan.echelle, 200 au départ : 1 mm = 0,2 m).
 
@@ -79,7 +82,7 @@ export function nouveauPlanChantier(nom, genre = 'installation', maintenant = ne
   const phase = { id: nouvelId('ph'), nom: 'Phase 1', couleur: COULEURS_PHASES[0], visible: true };
   return {
     id: nouvelId('pc'), nom: nom || 'Plan de chantier', genre, creeLe: maintenant, modifieLe: maintenant,
-    phases: [phase], phaseActive: phase.id, couleurs: 'objets', objets: [], fond: { plansCaches: [], points: true }, echelle: ECHELLE_PAPIER,
+    phases: [phase], phaseActive: phase.id, couleurs: 'objets', objets: [], fond: { plansCaches: [], points: true, ortho: true }, echelle: ECHELLE_PAPIER, // 0.289.0 : photo pâlie au départ
   };
 }
 
@@ -133,6 +136,7 @@ export function couleurObjet(plan, objet) {
   if (objet.type === 'ligne') return styleLigne(objet.style).couleur;
   if (objet.type === 'piste') return COULEUR_PISTE;
   if (objet.type === 'fleche') return COULEUR_FLECHE;
+  if (estPose(objet)) return '#64748b';
   return '#1b2b36';
 }
 
@@ -182,15 +186,22 @@ export function dansPolygone(p, points) {
 }
 
 /** Points d'un objet (le point d'un texte et son point de repère compris). */
-export const pointsDe = (o) => (o.type === 'texte' ? [o.point, ...(o.repere ? [o.repere] : [])] : o.points ?? []);
+export const pointsDe = (o) => (o.type === 'texte' ? [o.point, ...(o.repere ? [o.repere] : [])] : estPose(o) ? [o.point] : o.points ?? []);
+/** Élément posé d'un point (symbole, grue : 0.289.0). */
+export const estPose = (o) => o.type === 'symbole' || o.type === 'grue';
 
 /**
  * Objet sous le point p (m), à tolerance m près : le plus haut dessiné (le dernier) d'abord. Une zone est touchée
  * dedans ou sur son bord ; une piste à sa demi-largeur ; un texte dans le rectangle de ses lettres (environ).
  */
-export function objetSousLePoint(objets, p, tolerance) {
+export function objetSousLePoint(objets, p, tolerance, surSymbole = null) {
   for (let k = objets.length - 1; k >= 0; k--) {
     const o = objets[k];
+    if (estPose(o)) {
+      // Symbole posé (0.289.0) : dans sa boîte tournée (surSymbole, qui connaît la bibliothèque), sinon près de son centre.
+      if (surSymbole ? surSymbole(o, p, tolerance) : Math.hypot(p[0] - o.point[0], p[1] - o.point[1]) <= tolerance + 1) return o;
+      continue;
+    }
     if (o.type === 'texte') {
       const h = o.taille ?? 1;
       const l = Math.max(1, String(o.texte).length) * h * 0.6;
@@ -209,7 +220,7 @@ export function objetSousLePoint(objets, p, tolerance) {
 
 /** Déplace un objet de (dEst, dNord) m (sans le copier). */
 export function deplacerObjet(o, dEst, dNord) {
-  if (o.type === 'texte') o.point = [o.point[0] + dEst, o.point[1] + dNord]; // le point de repère reste en place
+  if (o.type === 'texte' || estPose(o)) o.point = [o.point[0] + dEst, o.point[1] + dNord]; // le point de repère reste en place
   else o.points = o.points.map(([e, n]) => [e + dEst, n + dNord]);
   return o;
 }
@@ -262,6 +273,8 @@ export function resumeObjet(o) {
   if (o.type === 'piste') return `Piste · ${n(o.largeur ?? 4)} m de large · ${n(longueur(o.points))} m`;
   if (o.type === 'fleche') return `Flèche · ${n(longueur(o.points))} m`;
   if (o.type === 'texte') return `Texte « ${o.texte} »`;
+  if (o.type === 'grue') return `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'} · flèche ${o.fleche ?? 40} m${o.chassis && o.chassis !== 'aucun' ? ` · châssis ${o.chassis}` : ''}`;
+  if (o.type === 'symbole') return o.etage ? 'Base-vie à étage' : String(o.cle ?? '').replace(/^[a-z]+:/, '');
   return o.type;
 }
 
@@ -475,3 +488,23 @@ export function ligneLaPlusProche(lignes, p, tolerance) {
 
 /** Copie profonde du plan (pour « Annuler »). */
 export const copiePlan = (plan) => JSON.parse(JSON.stringify(plan));
+
+/**
+ * Bords d'une surface triangulée (0.289.0, fond du plan de chantier) : les côtés qui n'appartiennent qu'à un triangle.
+ * triangles : [[a, b, c]] avec a = { est, nord } ; renvoie [[[e, n], [e, n]]…] (segments).
+ */
+export function bordsDesTriangles(triangles) {
+  const cle = (p) => `${Math.round(p.est * 1000)},${Math.round(p.nord * 1000)}`;
+  const vus = new Map();
+  for (const t of triangles) {
+    for (let i = 0; i < 3; i++) {
+      const a = t[i];
+      const b = t[(i + 1) % 3];
+      const k = [cle(a), cle(b)].sort().join('|');
+      const deja = vus.get(k);
+      if (deja) deja.n += 1;
+      else vus.set(k, { n: 1, seg: [[a.est, a.nord], [b.est, b.nord]] });
+    }
+  }
+  return [...vus.values()].filter((x) => x.n === 1).map((x) => x.seg);
+}

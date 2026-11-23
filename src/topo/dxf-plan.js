@@ -110,7 +110,7 @@ function remplirXrefs(blocs, calquesLus, xrefs) {
 // Découpage du fichier
 
 /** Paires { code (nombre), valeur (texte) }. */
-function lirePaires(texte) {
+export function lirePaires(texte) {
   const lignes = texte.split(/\r?\n/);
   const paires = [];
   for (let i = 0; i + 1 < lignes.length; i += 2) {
@@ -122,7 +122,7 @@ function lirePaires(texte) {
 }
 
 /** Paires de chaque section, par nom (HEADER, TABLES, BLOCKS, ENTITIES…). */
-function lireSections(paires) {
+export function lireSections(paires) {
   const sections = {};
   let nom = null;
   let debut = 0;
@@ -140,7 +140,7 @@ function lireSections(paires) {
 }
 
 /** Entités d'une liste de paires : { type, paires } (paires dans l'ordre, sans le code 0). */
-function decouperEntites(paires) {
+export function decouperEntites(paires) {
   const entites = [];
   let courante = null;
   for (const paire of paires) {
@@ -183,7 +183,7 @@ function nombres(entite, code) {
 }
 
 /** Calques de la table LAYER : Map(nom -> { couleur, visible }). */
-function lireCalques(paires) {
+export function lireCalques(paires) {
   const calques = new Map();
   for (const entite of decouperEntites(paires)) {
     if (entite.type !== 'LAYER') continue;
@@ -199,7 +199,7 @@ function lireCalques(paires) {
 }
 
 /** Blocs : Map(nom -> { base: { x, y }, entites }). */
-function lireBlocs(paires) {
+export function lireBlocs(paires) {
   const blocs = new Map();
   let bloc = null;
   for (const entite of decouperEntites(paires)) {
@@ -467,7 +467,7 @@ function hsvVersHex(teinte, saturation, valeurMax) {
 }
 
 /** Couleur « vraie » (code 420, rouge × 65536 + vert × 256 + bleu). */
-function couleurVraie(rvb) {
+export function couleurVraie(rvb) {
   return `#${(rvb & 0xffffff).toString(16).padStart(6, '0')}`;
 }
 

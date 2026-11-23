@@ -81,6 +81,7 @@ export function creerProjet(nom = '') {
     couleursListes: {},
     canalisations: [],              // réseaux (0.235.0, application Réseaux) : voir topo/reseau.js
     plansChantier: [],              // plans de chantier (0.286.0) : voir topo/plan-chantier.js
+    symboles: [],                   // symboles importés d'un DXF de blocs (0.289.0, plans de chantier) : voir topo/symboles.js
   };
 }
 
@@ -203,6 +204,7 @@ export function completerProjet(projet) {
   // = les comparaisons de PDF, à garder ; 0.286.0 : elles étaient effacées à chaque ouverture du projet).
   if (!Array.isArray(projet.calculs)) delete complet.comparaisons;
   complet.plansChantier ??= []; // plans de chantier (0.286.0)
+  complet.symboles ??= []; // symboles importés (0.289.0)
   for (const surface of complet.surfaces) delete surface.volume;
   prefixerNoms(complet);
   return complet;
