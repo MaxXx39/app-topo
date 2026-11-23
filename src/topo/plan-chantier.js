@@ -38,7 +38,8 @@ export const CATEGORIES_ZONE = [
 //   poteau (rectangle en travers, clôture), chevron « > » (flèche simple, retournable), double « < > » (flèche double),
 //   texte (« EAU »…, eclair = petit éclair devant) ; tailleMm = hauteur du motif ou des lettres.
 export const STYLES_LIGNE = [
-  { cle: 'cloture', nom: 'Clôture de chantier', couleur: '#f08c00', tirets: [], epaisseurMm: 0.35, motif: { type: 'poteau', pasMm: 14, tailleMm: 2.6 } },
+  // 0.293.0 : clôture dans le style du portail (grillage orange à croisillons, poteaux sombres tous les 3,5 m).
+  { cle: 'cloture', nom: 'Clôture de chantier', couleur: '#f2a20c', tirets: [], epaisseurMm: 0.3, motif: { type: 'cloture', largeurM: 0.14, elementM: 3.5 } },
   { cle: 'flecheSimple', nom: 'Flèche simple  >', couleur: '#eab308', tirets: [], epaisseurMm: 0.5, motif: { type: 'chevron', pasMm: 22, tailleMm: 2.6 } },
   { cle: 'flecheDouble', nom: 'Flèche double  < >', couleur: '#a21caf', tirets: [], epaisseurMm: 0.5, motif: { type: 'double', pasMm: 26, tailleMm: 2.6 } },
   { cle: 'elec', nom: 'Électricité', couleur: '#ef4444', tirets: [], epaisseurMm: 0.25, motif: { type: 'texte', texte: 'ELEC', eclair: true, pasMm: 34, tailleMm: 2.6 } },

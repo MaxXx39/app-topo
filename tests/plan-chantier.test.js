@@ -220,7 +220,7 @@ describe('plan de chantier 0.288.0 : décalage, flèche, surface, unités du pap
   it('unités du papier : 1 mm = échelle / 1000 m, épaisseurs et opacité par défaut ou choisies', () => {
     expect(metresParMm({})).toBe(0.2);
     expect(metresParMm({ echelle: 500 })).toBe(0.5);
-    expect(epaisseurLigneMm({ style: 'cloture' })).toBe(0.35);
+    expect(epaisseurLigneMm({ style: 'cloture' })).toBe(0.3);
     expect(epaisseurLigneMm({ style: 'cloture', epaisseurMm: 0.7 })).toBe(0.7);
     expect(contourZoneMm({ categorie: 'emprise' })).toBe(0.7);
     expect(contourZoneMm({ categorie: 'stockage', contourMm: 1 })).toBe(1);

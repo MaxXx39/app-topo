@@ -651,3 +651,16 @@ describe('tourelles orientables (0.293.0)', () => {
     }
   });
 });
+
+describe('abaque de grue (0.293.0)', () => {
+  it('lit « portée : charge » et dessine un cercle par portée', async () => {
+    const { lireAbaque, grueDeLObjet } = await import('../src/topo/grue-mobile.js');
+    expect(lireAbaque('20:5.2, 25:3.8, 30:2.9')).toEqual([{ r: 20, t: 5.2 }, { r: 25, t: 3.8 }, { r: 30, t: 2.9 }]);
+    expect(lireAbaque('12, 18')).toEqual([{ r: 12, t: null }, { r: 18, t: null }]);
+    expect(lireAbaque('abc, 0, -5')).toEqual([]);
+    const g = grueDeLObjet(BIB, { type: 'grue', modele: 'tour', fleche: 40, abaqueTexte: '15:6, 30:3' });
+    const cercles = g.rayon.filter((p) => p.g === 'c').map((p) => p.r);
+    expect(cercles).toEqual([40, 15, 30]);
+    expect(g.rayon.some((p) => p.g === 't' && p.t === '15 m · 6 t')).toBe(true);
+  });
+});

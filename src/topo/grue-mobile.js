@@ -41,12 +41,41 @@ export function grueMobile(o) {
   return memoire.get(cle);
 }
 
+/**
+ * Abaque tapé « 20:5.2, 25:3.8, 30:2.9 » (portée en m : charge en t) → [{ r, t }] triés par portée. Les entrées
+ * illisibles sont ignorées ; la charge peut manquer (« 20, 25 » = seulement les cercles).
+ */
+export function lireAbaque(texte) {
+  const nombre = (v) => (v === undefined || v.trim() === '' ? NaN : Number(v.replace(',', '.')));
+  const res = [];
+  for (const x of String(texte ?? '').split(/[;\n]+|,(?=\s*\d+(?:[.,]\d+)?\s*[:=])|,\s+(?=\d)/)) {
+    const [r, t] = x.trim().split(/\s*[:=]\s*/);
+    const portee = nombre(r ?? '');
+    if (Number.isFinite(portee) && portee > 0) res.push({ r: portee, t: Number.isFinite(nombre(t ?? '')) ? nombre(t) : null });
+  }
+  return res.sort((a, b) => a.r - b.r);
+}
+
+/** Rayon d'action d'une grue à partir de son abaque : cercle principal (flèche) + un cercle par portée, avec « 24 m · 3.2 t ». */
+function rayonAbaque(g, abaque) {
+  const res = [{ g: 'c', k: '#334155', x: 0, y: 0, r: g.fleche, mat: 'trait' }];
+  const texte = (r, t) => (t === null || t === undefined ? `${r} m` : `${r} m · ${t} t`);
+  for (const { r, t } of abaque) {
+    if (Math.abs(r - g.fleche) < 0.05) continue;
+    res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r, mat: 'trait' }, { g: 't', k: '#92400e', x: r, y: -1.2, h: 0.9, a: 90, t: texte(r, t), ah: 1, av: 2 });
+  }
+  res.push({ g: 't', k: '#92400e', x: g.fleche, y: -1.2, h: 0.9, a: 90, t: texte(g.fleche, abaque.find((e) => Math.abs(e.r - g.fleche) < 0.05)?.t), ah: 1, av: 2 });
+  return res;
+}
+
 /** Symbole d'une grue (tour, automontante ou mobile) : l'orientation de la flèche des grues à tour est indépendante du châssis. */
 export function grueDeLObjet(bib, o) {
   if (o.modele === 'mobile') return grueMobile(o);
-  const g = grueLibre(bib, o.modele ?? 'tour', o.fleche ?? 40);
+  let g = grueLibre(bib, o.modele ?? 'tour', o.fleche ?? 40);
+  const abaque = g ? lireAbaque(o.abaqueTexte) : [];
+  if (g && abaque.length) g = { ...g, rayon: rayonAbaque(g, abaque) }; // abaque tapé : remplace les cercles tous les 5 m
   if (!g || !Number(o.rotationFleche)) return g;
-  const cle = `${g.modele}|${g.fleche}|${o.rotationFleche}`;
+  const cle = `${g.modele}|${g.fleche}|${o.rotationFleche}|${o.abaqueTexte ?? ''}`;
   if (!memoire.has(cle)) {
     if (memoire.size > 60) memoire.clear();
     const primitives = tournerPrims(g.primitives, o.rotationFleche);
