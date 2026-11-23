@@ -91,7 +91,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.296.1)
+## Fonctionnalités (état à la 0.296.2)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -137,6 +137,13 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 ## Plans de chantier : état (23.11)
 - **Étapes 1 à 4 faites** (0.286.0 → 0.289.0, Expert, site PC + Topo Bureau). **Petits restes** : tableau des modes (`docs/modes-base-intermediaire-expert.xlsx`) pas mis à jour (Plans de chantier, Calage, Comparer) ; jamais essayé sur Topo Bureau ni avec swisstopo (bloqué ici) ; la maquette est faite pour 1366 × 768 (portrait tablette non prévu).
 - **À valider avec l'utilisateur** : « une page par phase » = la phase seule + les phases cochées « sur toutes les pages » (choix fait sans lui) ; poses de l'escalier (lecture du bloc « Base vie Etage » : palier le long du petit côté, volée de 3 m le long du grand ; « petit côté » = échange des axes) ; matériaux d'après les couleurs (table `MATERIAUX` de `topo/symboles.js`) ; phares / feux placés par fractions de la boîte (camions : devant = y mini ; chargeuse : devant = x maxi).
+
+## 0.296.2 — Plans de chantier : retours du 23.11 (6e lot)
+- **Phases : par défaut seule la phase en cours est montrée** (ni les phases d'avant, ni celles d'après ; `regleDeVue` : autres phases = caché ; sans règle `objetsVus` montre la phase en cours + celles cochées « sur toutes les pages ») ; les cases « Montrer » du panneau ne servent plus qu'à la feuille « toutes les phases sur une page » ; pour voir une autre phase, la gestion des phases.
+- **Genre d'une ligne / zone** (élément choisi et outil) : liste déroulante **avec l'aperçu** (trait ou zone) comme l'ancienne légende, ouverte en position fixe sous le bouton (le bandeau garde sa hauteur).
+- **Tas de stock** : les anneaux sont des voiles clairs transparents (le matériau et sa texture restent visibles), **plus de contours d'anneaux** (« courbes de niveau ») : seules les hachures de talus restent.
+- **Ortho** : « Repère = ligne » montre en surbrillance le **segment** qui sera pris ; l'angle repris est celui de la ligne (0 à 180°, tel quel) ; bouton **« N S E O »** = repère à 0°.
+- **Cotes des cercles de grue** : « 20m / 30m / 40m » (le code effaçait les zéros de 20, 30, 40 → « 2m »).
 
 ## 0.296.1 — Plans de chantier : plans différents par phase (demande du 23.11)
 - Bouton « Plans… » : on choisit d'abord **« Toutes les phases »** (choix général) **ou une phase** (choix propre), puis les plans du projet montrés dessous ; `plan.fond.plansParPhase[idPhase] = [ids]` (sinon `plansCaches` général) ; « Tout remettre au choix général ». Changer de phase active **change les plans affichés** ; la feuille « une page par phase » utilise les plans de la phase de la page (`donnees.plansPar`, `prep.plans`). Les réglages de calques (`fond.calques`) restent communs à toutes les phases.

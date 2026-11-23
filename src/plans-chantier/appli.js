@@ -19,7 +19,7 @@ import {
   decalerPolyligne, ligneLaPlusProche,
 } from '../topo/plan-chantier.js';
 import { creerVueChantier } from './vue.js';
-import { listeGenres } from './apercu.js';
+import { listeGenres, apercuZone, apercuLigne } from './apercu.js';
 import { chargerBibliothequeBase, entreesBibliotheque, filtrerEntrees, CATEGORIES_SYMBOLES, symbolesDuDxf, ajouterSymbolesProjet } from './bibliotheque.js';
 import { dessinerVignette, symboleDeLObjet } from './dessin.js';
 import { geometrieCotation, lignesDuTexte, CATEGORIES_ZONE, STYLES_LIGNE } from '../topo/plan-chantier.js';
@@ -44,10 +44,14 @@ const OUTILS = [
   ['cotation', '<path d="M4 18H20M4 14V21M20 14V21"/><path d="M4 18L7 16V20ZM20 18L17 16V20Z"/>', 'Cotation'],
   ['construction', '<path d="M3 20L21 4" stroke-dasharray="3 2.5"/><path d="M12 8V16M8 12H16"/>', 'Construction'],
 ];
-/** Genre de l'élément choisi : liste déroulante (le bandeau du haut garde la même hauteur). */
-const selectGenres = (type, valeur) => `<label class="champ-calage"><span>Genre</span><select data-genre-liste="${type}">${(type === 'zone' ? CATEGORIES_ZONE : STYLES_LIGNE).map((g) => `<option value="${g.cle}" ${g.cle === valeur ? 'selected' : ''}>${echapper(g.nom)}</option>`).join('')}</select></label>`;
-/** Genre de l'outil actif : liste déroulante dans le bandeau du haut. */
-const selectGenresOutil = (type, valeur) => `<label class="champ-calage"><span>Genre</span><select data-genre-outil="${type}">${(type === 'zone' ? CATEGORIES_ZONE : STYLES_LIGNE).map((g) => `<option value="${g.cle}" ${g.cle === valeur ? 'selected' : ''}>${echapper(g.nom)}</option>`).join('')}</select></label>`;
+/** Genre de l'élément choisi ou de l'outil : liste déroulante AVEC l'aperçu du trait / de la zone (le bandeau garde sa hauteur). */
+const genreDeroulant = (type, valeur, cible) => {
+  const genres = type === 'zone' ? CATEGORIES_ZONE : STYLES_LIGNE;
+  const g = genres.find((x) => x.cle === valeur) ?? genres[0];
+  return `<details class="genre-deroulant"><summary>${type === 'zone' ? apercuZone(g.cle) : apercuLigne(g)}<span>${echapper(g.nom)}</span></summary>${listeGenres(type, g.cle, cible, echapper)}</details>`;
+};
+const selectGenres = (type, valeur) => genreDeroulant(type, valeur, 'objet');
+const selectGenresOutil = (type, valeur) => genreDeroulant(type, valeur, 'outil');
 const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 const TRAITS_CONSTRUCTION = [['tirets', 'Tirets'], ['continu', 'Continu'], ['points', 'Pointillé'], ['mixte', 'Tirets-points']];
 const ACCROCHES = [['point', 'Point'], ['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['perpendiculaire', 'Perpendiculaire']];
@@ -184,6 +188,15 @@ export function ouvrirPlansChantier({
     ev.preventDefault();
     echap();
   });
+  // Liste des genres (0.296.2) : ouverte sous son bouton, en position fixe (le bandeau a un défilement qui la couperait).
+  page.addEventListener('toggle', (ev) => {
+    const d = ev.target;
+    if (!d.matches?.('details.genre-deroulant') || !d.open) return;
+    const liste = d.querySelector('.liste-genres');
+    const r = d.querySelector('summary').getBoundingClientRect();
+    Object.assign(liste.style, { position: 'fixed', left: `${r.left}px`, top: `${r.bottom + 2}px`, width: `${Math.max(r.width, 320)}px`, maxHeight: `${Math.max(160, window.innerHeight - r.bottom - 16)}px` });
+  }, true);
+
   page.addEventListener('keydown', (ev) => {
     if ((ev.ctrlKey || ev.metaKey) && ['z', 'y'].includes(ev.key.toLowerCase())) ev.stopPropagation();
     // Échap (0.287.0) : arrête le dessin ou le choix, mais ne ramène jamais au menu de l'appli.
@@ -316,6 +329,7 @@ export function ouvrirPlansChantier({
           <button type="button" class="outil-ruban petit" data-action="fond-surfaces"><span>Surfaces</span></button>`)}
         ${groupe('Ortho', `<button type="button" class="outil-ruban petit" data-action="ortho" title="Ortho (F8) : le dessin est aimanté aux directions N / S / E / O, ou à celles du repère"><span>Ortho</span></button>
           <label class="champ-bandeau" title="Angle du repère en degrés (0 = Est / Nord) : le dessin s'aimante à ce repère et à ses perpendiculaires"><span>Repère °</span><input type="number" step="0.1" value="${etat.orthoAngle}" data-reglage="orthoAngle" style="width:64px"></label>
+ <button type="button" class="outil-ruban petit" data-action="ortho-zero" title="Repère à 0° : directions Nord / Sud / Est / Ouest"><span>N S E O</span></button>
           <button type="button" class="outil-ruban petit" data-action="ortho-repere" title="Prendre l'angle d'une ligne du plan ou du dessin comme repère"><span>Repère = ligne</span></button>`)}
         ${groupe('Construction', `<button type="button" class="outil-ruban petit" data-action="construction-visible" title="Montrer ou cacher les lignes de construction (jamais imprimées)"><span>Afficher</span></button>`)}
         ${groupe('Zoom', '<button type="button" class="outil-ruban" data-zoom="1.5">＋</button><button type="button" class="outil-ruban" data-zoom="0.667">−</button><button type="button" class="outil-ruban" data-zoom="tout">⤢<span>Tout</span></button>')}
@@ -420,6 +434,13 @@ export function ouvrirPlansChantier({
 
   /** Dessin en cours pour la vue ; pendant un décalage, avec l'aperçu de la copie du côté où est la souris. */
   function saisieVue() {
+    if (etat.orthoRepere && etat.curseur) {
+      // 0.296.2 : on voit la ligne qui sera prise comme repère de l'Ortho (surbrillance orange)
+      const tol = 10 / (vue?.vue?.().echelle ?? 1);
+      const lignes = lignesRepere(etat.curseur, tol);
+      const source = segmentLePlusProche(lignes, etat.curseur, tol * 1.5); // le segment visé, pas toute la polyligne
+      if (source) return { outil: 'ortho-repere', points: [], source, style: 'libre' };
+    }
     const s = etat.saisie;
     if (!s?.source || !etat.curseur) return s;
     return { ...s, apercu: decalerPolyligne(s.source, coteDuPoint(s.source, etat.curseur) * etat.distanceDecalage) };
@@ -550,15 +571,21 @@ export function ouvrirPlansChantier({
     majTout();
   }
 
+  /** Lignes que l'on peut prendre comme repère de l'Ortho : plan DXF dessous, éléments dessinés, contours des symboles. */
+  function lignesRepere(p, tolerance) {
+    return [...lignesPourAccroche(objetsVisibles(plan())), ...lignesSymboles(plan().objets), ...sourcesDesPlans(plansFond(), { est: p[0], nord: p[1] }, tolerance).lignes];
+  }
+
   async function toucher(p, tolerance) {
     if (etat.orthoRepere) {
       etat.orthoRepere = false;
-      const lignes = [...lignesPourAccroche(objetsVisibles(plan())), ...lignesSymboles(plan().objets), ...sourcesDesPlans(plansFond(), { est: p[0], nord: p[1] }, tolerance).lignes];
-      const a = angleDeLaLigne(lignes, p, tolerance * 1.5, 0);
-      if (a === null) return message('Aucune ligne ici : l\'angle de repère n\'a pas changé.', 3000);
-      etat.orthoAngle = Math.round(((a % 90) + 90) % 90 * 100) / 100;
+      const seg = segmentLePlusProche(lignesRepere(p, tolerance), p, tolerance * 1.5);
+      if (!seg) return message('Aucune ligne ici : l\'angle de repère n\'a pas changé.', 3000);
+      // L'angle de la ligne cliquée, tel quel (0 à 180°, sens trigonométrique depuis l'Est) ; 0 = N / S / E / O.
+      const angle = ((angleVers(seg[0], seg[1]) % 180) + 180) % 180;
+      etat.orthoAngle = Math.round(angle * 100) / 100;
       etat.ortho = true;
-      message(`Repère de l'Ortho : ${etat.orthoAngle}°`, 3000);
+      message(`Repère de l'Ortho : ${etat.orthoAngle}° (angle de la ligne cliquée)`, 3500);
       return majTout();
     }
     if (etat.attenteRepere) {
@@ -1504,6 +1531,13 @@ export function ouvrirPlansChantier({
       etat.ortho = !etat.ortho;
       majOutils();
       return majConsigne();
+    }
+    if (b.dataset.action === 'ortho-zero') {
+      etat.orthoAngle = 0;
+      majOutils();
+      const champ = page.querySelector('[data-reglage="orthoAngle"]');
+      if (champ) champ.value = 0;
+      return message('Ortho : repère à 0° (Nord / Sud / Est / Ouest).', 2500);
     }
     if (b.dataset.action === 'ortho-repere') {
       etat.orthoRepere = true;

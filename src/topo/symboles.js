@@ -230,7 +230,7 @@ export const CHASSIS_MIN = 2; // m
 export const CHASSIS_MAX = 12; // m
 const DEBUT_FLECHE = 2; // m : au-delà de x = 2 m (la tour et la contre-flèche restent telles quelles), la flèche s'allonge
 const arrondi3 = (v) => Math.round(v * 1000) / 1000;
-const texteM = (v) => `${String(Math.round(v * 100) / 100).replace(/\.?0+$/, '')}m`;
+const texteM = (v) => `${Math.round(v * 100) / 100}m`; // 0.296.2 : « 20m » (l'ancien code effaçait les zéros de 20, 30, 40 → « 2m »)
 
 /** Côté du châssis (m) lu dans « 4.50 », « 4.5 » ou un nombre ; null pour « aucun ». */
 export function coteChassis(chassis) {

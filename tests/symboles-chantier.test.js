@@ -580,11 +580,12 @@ describe('gestion des phases (0.293.0)', () => {
     return { m, plan, p1, p2, p3, a: mk(p1), b: mk(p2), c: mk(p3) };
   };
 
-  it('sans règle : l\'affichage de départ (cases visibles des phases)', async () => {
-    const { m, plan, p2, a, b, c } = await planPhases();
-    plan.phases.find((p) => p.id === p2).visible = false;
-    expect(m.objetsVus(plan, plan.phases[0].id).map((o) => o.id)).toEqual([a.id, c.id]);
-    void b;
+  it('sans règle : seule la phase en cours est montrée (et celles « sur toutes les pages »)', async () => {
+    const { m, plan, p1, p2, p3, a, b, c } = await planPhases();
+    expect(m.objetsVus(plan, p1).map((o) => o.id)).toEqual([a.id]);
+    expect(m.objetsVus(plan, p2).map((o) => o.id)).toEqual([b.id]);
+    plan.phases.find((p) => p.id === p3).commune = true;
+    expect(m.objetsVus(plan, p2).map((o) => o.id)).toEqual([b.id, c.id]);
   });
 
   it('matrice : phase 1 ne voit pas 2 et 3 mais 4 ; phase 2 voit 1 estompée et 3', async () => {
@@ -593,6 +594,7 @@ describe('gestion des phases (0.293.0)', () => {
     m.reglerVue(plan, p1, p3, { mode: 'cache' });
     expect(m.objetsVus(plan, p1).map((o) => o.id)).toEqual([a.id]);
     m.reglerVue(plan, p2, p1, { mode: 'estompe', opacite: 0.4 });
+    m.reglerVue(plan, p2, p3, { mode: 'normal' });
     const vus = m.objetsVus(plan, p2);
     expect(vus.map((o) => o.id)).toEqual([a.id, b.id, c.id]);
     expect(vus[0].rendu).toEqual({ mode: 'estompe', opacite: 0.4, couleur: plan.phases[0].couleur }); // couleur de la phase de l'élément
@@ -603,7 +605,7 @@ describe('gestion des phases (0.293.0)', () => {
     const { m, plan, p1, p2, p3, a } = await planPhases();
     a.fin = p2;
     m.reglerVue(plan, p3, p1, { mode: 'normal', fini: 'assombri' });
-    expect(m.objetsVus(plan, p2).some((o) => o.id === a.id)).toBe(true); // pas de règle pour p2 : départ
+    expect(m.objetsVus(plan, p2).some((o) => o.id === a.id)).toBe(false); // pas de règle pour p2 : départ = la phase en cours seule
     expect(m.objetsVus(plan, p3).find((o) => o.id === a.id).rendu.mode).toBe('assombri'); // fini en phase 3
     m.reglerVue(plan, p3, p1, { genresCaches: ['zone'] });
     expect(m.objetsVus(plan, p3).some((o) => o.id === a.id)).toBe(false);
@@ -618,7 +620,7 @@ describe('gestion des phases (0.293.0)', () => {
     expect(m.datesDePhase({ debut: '2027-03-01', fin: '2027-04-30' })).toBe('01.03.2027 – 30.04.2027');
     m.reglerVue(plan, p2, p1, { mode: 'cache' });
     const ids = objetsDeLaPage(plan, { phase: p2, phases: [p2] }).map((o) => o.id);
-    expect(ids).toEqual([b.id, c.id]); // la phase 1 est cachée, la 3 reste visible
+    expect(ids).toEqual([b.id]); // par défaut seule la phase en cours (2) est montrée
     void a;
   });
 });
@@ -739,5 +741,15 @@ describe('plans par phase (0.296.1)', () => {
     const donnees = { plan, plans: [{ id: 'a' }, { id: 'b' }], plansPar: (ph) => (ph === 'p2' ? [{ id: 'b' }] : [{ id: 'a' }, { id: 'b' }]), bib: BIB, projet: {}, points: [], surfaces: [] };
     expect(preparerPage(donnees, { phase: 'p2', phases: ['p2'], titre: 'Phase 2' }, 3).plans.map((x) => x.id)).toEqual(['b']);
     expect(preparerPage(donnees, { titre: '', phases: [plan.phases[0].id] }, 3).plans).toHaveLength(2);
+  });
+});
+
+describe('retours du 23.11 (5e lot)', () => {
+  it('cotes des cercles de grue : 20m, 30m, 40m (pas 2m, 3m, 4m)', async () => {
+    const { grueLibre } = await import('../src/topo/symboles.js');
+    const g = grueLibre(BIB, 'tour', 50);
+    const textes = g.rayon.filter((p) => p.g === 't').map((p) => p.t);
+    expect(textes).toEqual(expect.arrayContaining(['20m', '25m', '30m', '35m', '40m', '45m', '50m']));
+    expect(grueLibre(BIB, 'tour', 42.5).rayon.some((p) => p.t === '42.5m')).toBe(true);
   });
 });

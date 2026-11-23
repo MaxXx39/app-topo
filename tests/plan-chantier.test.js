@@ -43,9 +43,14 @@ describe('plan de chantier : modèle', () => {
     const a = ajouterObjet(p, { type: 'zone', points: carre });
     const ph2 = ajouterPhase(p);
     ajouterObjet(p, { type: 'fleche', points: [[E, N], [E + 5, N]] });
+    p.phaseActive = p.phases[0].id;
+    expect(objetsVisibles(p).map((o) => o.id)).toEqual([a.id]); // 0.296.2 : seule la phase en cours (la 1) est montrée
+    p.phaseActive = ph2.id;
+    expect(objetsVisibles(p)).toHaveLength(1);
+    ph2.commune = true; // « sur toutes les pages » : montrée aussi depuis la phase 1
+    p.phaseActive = p.phases[0].id;
     expect(objetsVisibles(p)).toHaveLength(2);
-    ph2.visible = false;
-    expect(objetsVisibles(p).map((o) => o.id)).toEqual([a.id]);
+    ph2.commune = false;
     expect(retirerObjet(p, a.id)).toBe(true);
     expect(retirerObjet(p, a.id)).toBe(false);
   });

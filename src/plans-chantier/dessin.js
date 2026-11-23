@@ -96,15 +96,12 @@ function dessinerTas(d, o, couleur) {
   ctx.save();
   chemin(d, o.points, true);
   ctx.clip();
+  // 0.296.2 : chaque anneau est un voile clair transparent (la texture et la couleur du matériau restent visibles) et
+  // il n'y a plus de contours d'anneaux (les « courbes de niveau » sont supprimées) : seules les hachures de talus restent.
   anneaux.forEach((a, i) => {
     chemin(d, a, true);
-    ctx.fillStyle = nuance(couleur, 0.08 + 0.34 * ((i + 1) / anneaux.length));
-    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = `rgba(255,255,255,${(0.03 + 0.1 * ((i + 1) / anneaux.length)).toFixed(3)})`;
     ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = nuance(couleur, -0.25);
-    ctx.lineWidth = 0.6;
-    ctx.stroke();
   });
   // Éclairage : voile clair en haut à gauche, sombre en bas à droite.
   const xs = o.points.map((p) => ecran(p).x);
