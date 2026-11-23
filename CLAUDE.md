@@ -91,7 +91,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.293.0)
+## Fonctionnalités (état à la 0.294.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -137,6 +137,8 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 ## Plans de chantier : état (23.11)
 - **Étapes 1 à 4 faites** (0.286.0 → 0.289.0, Expert, site PC + Topo Bureau). **Petits restes** : tableau des modes (`docs/modes-base-intermediaire-expert.xlsx`) pas mis à jour (Plans de chantier, Calage, Comparer) ; jamais essayé sur Topo Bureau ni avec swisstopo (bloqué ici) ; la maquette est faite pour 1366 × 768 (portrait tablette non prévu).
 - **À valider avec l'utilisateur** : « une page par phase » = la phase seule + les phases cochées « sur toutes les pages » (choix fait sans lui) ; poses de l'escalier (lecture du bloc « Base vie Etage » : palier le long du petit côté, volée de 3 m le long du grand ; « petit côté » = échange des axes) ; matériaux d'après les couleurs (table `MATERIAUX` de `topo/symboles.js`) ; phares / feux placés par fractions de la boîte (camions : devant = y mini ; chargeuse : devant = x maxi).
+
+## 0.294.0 — voir la section 0.293.0 ci-dessous : texte de zone, tout l'élément dans le bandeau, clôture style portail, abaque de grue (retours du 23.11, publiés avec la 0.294.0)
 
 ## 0.293.0 — Plans de chantier : lignes de construction, bandeau de l'élément, retouches (retours du 23.11, 2e lot ; **partiel**)
 - **Lignes de construction** (`type: 'construction'`, outil « Construction » : droite infinie, segment ou point + angle / longueur tapés) : cyan en tirets, **jamais imprimées ni exportées en PDF / DXF**, affichage activable par « Afficher » du ruban ; accroches **Perpendiculaire** et **Croisement** ; **longueur tapée** pendant le dessin (touche chiffre, Entrée) ; Décaler « en ligne de construction ». Angle tapé = degrés depuis l'Est, sens trigonométrique (**à valider**).
