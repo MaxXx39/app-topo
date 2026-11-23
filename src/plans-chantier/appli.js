@@ -1194,7 +1194,8 @@ export function ouvrirPlansChantier({
         ${cote ? `<label class="champ-calage"><span>Côté du châssis (m)</span><input type="number" min="${CHASSIS_MIN}" max="${CHASSIS_MAX}" step="0.05" value="${cote.toFixed(2)}" data-prop="chassis" list="chassis-grue"></label>
         <datalist id="chassis-grue">${chassis.map((c) => `<option value="${c}"></option>`).join('')}</datalist>` : ''}
         ${champNombre('Orientation de la flèche (indépendante du châssis)', 'prop', 'rotationFleche', o.rotationFleche ?? 0, -360, 360, 1, '°')}
-        ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}`;
+        ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}
+        <label class="champ-calage"><span>Abaque (portée : charge) — vide = cercles tous les 5 m dès 20 m</span><input type="text" maxlength="200" value="${echapper(o.abaqueTexte ?? '')}" placeholder="20:5.2, 25:3.8, 30:2.9" data-prop="abaqueTexte"></label>`;
     }
     if (o.etage) {
       const textes = o.etage.textes ?? ['1er', 'Rez'];
@@ -1663,6 +1664,7 @@ export function ouvrirPlansChantier({
       o[cle] = valeur;
       if (cle === 'fin' && !valeur) delete o.fin;
       if (cle === 'etiquette' && !valeur) delete o.etiquette;
+      if (cle === 'abaqueTexte' && !valeur) delete o.abaqueTexte;
       if (cle === 'materiau' && !valeur) delete o.materiau;
       if (cle === 'tonnes') o.tonnes = Number(valeur);
       if (cle === 'chassis') o.chassis = Number(valeur).toFixed(2); // côté libre (m), gardé en texte comme « 4.50 »
