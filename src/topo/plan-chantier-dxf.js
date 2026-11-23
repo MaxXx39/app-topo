@@ -7,6 +7,7 @@
 import {
   styleLigne, categorieZone, couleurObjet, dimensionsFleche, pointeDeFleche, centreZone, texteSurface, positionsLeLong,
   metresParMm, estPose, texteSymbolesM,
+  geometrieCotation,
 } from './plan-chantier.js';
 import { couleurAci } from './dxf-plan.js';
 import { grueDeLObjet, symboleDeLObjetPose } from './grue-mobile.js';
@@ -154,6 +155,20 @@ export function dxfPlanChantier(plan, bib, objets = null) {
       const base = [(tete[1][0] + tete[2][0]) / 2, (tete[1][1] + tete[2][1]) / 2];
       entites.push(...polyligne([...o.points.slice(0, -1), base], c, { largeur: dim.largeur }));
       entites.push(...solide([...tete[0], ...tete[1], ...tete[2]], c, null));
+    } else if (o.type === 'cotation') {
+      const g = geometrieCotation(o);
+      if (!g) continue;
+      const c = calque(o, 'COTATIONS', aci);
+      for (const [a, b] of g.lignes) entites.push(...polyligne([a, b], c));
+      if (g.arc) entites.push(...polyligne(g.arc, c));
+      const L = 2.6 * mParMm;
+      for (const f of g.fleches) {
+        const n = [-f.dir[1], f.dir[0]];
+        const b1 = [f.p[0] + f.dir[0] * L + n[0] * L * 0.22, f.p[1] + f.dir[1] * L + n[1] * L * 0.22];
+        const b2 = [f.p[0] + f.dir[0] * L - n[0] * L * 0.22, f.p[1] + f.dir[1] * L - n[1] * L * 0.22];
+        entites.push(...solide([...f.p, ...b1, ...b2], c, null));
+      }
+      entites.push(...texte(g.texte.p[0], g.texte.p[1], texteM, g.texte.angle, g.texte.t, c));
     } else if (o.type === 'texte') {
       const c = calque(o, 'TEXTES', 7);
       entites.push(...texte(o.point[0], o.point[1], o.taille ?? 1, 0, o.texte, c));

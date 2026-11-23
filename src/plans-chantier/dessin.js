@@ -7,7 +7,7 @@
 import { versEcran } from '../plan/vue.js';
 import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
-  dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
+  geometrieCotation, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
 } from '../topo/plan-chantier.js';
 import { grueDeLObjet, symboleDeLObjetPose } from '../topo/grue-mobile.js';
 import { nuance, primitivesEtage, chassisLibre, boiteSymbole, echelleDeLObjet } from '../topo/symboles.js';
@@ -192,6 +192,41 @@ export function dessinerObjet(d, o) {
     chemin(d, tete, true);
     ctx.fillStyle = couleur;
     ctx.fill();
+  } else if (o.type === 'cotation') {
+    const g = geometrieCotation(o);
+    if (!g) return;
+    ctx.strokeStyle = couleur;
+    ctx.fillStyle = couleur;
+    ctx.lineWidth = Math.max(0.8, 0.25 * mm);
+    ctx.beginPath();
+    for (const [a, b] of g.lignes) {
+      const A = ecran(a);
+      const B = ecran(b);
+      ctx.moveTo(A.x, A.y);
+      ctx.lineTo(B.x, B.y);
+    }
+    if (g.arc) g.arc.forEach((pt, i) => { const q = ecran(pt); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
+    ctx.stroke();
+    // Flèches aux deux bouts de la ligne de cote (3 mm sur le papier).
+    const L = Math.max(5, 2.6 * mm);
+    for (const f of g.fleches) {
+      const q = ecran(f.p);
+      const a = Math.atan2(-f.dir[1], f.dir[0]);
+      ctx.beginPath();
+      ctx.moveTo(q.x, q.y);
+      ctx.lineTo(q.x + L * Math.cos(a - 0.22), q.y + L * Math.sin(a - 0.22));
+      ctx.lineTo(q.x + L * Math.cos(a + 0.22), q.y + L * Math.sin(a + 0.22));
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Valeur sur une plaque blanche, de la même taille que le texte des symboles, le long de la ligne de cote.
+    const t = ecran(g.texte.p);
+    const h = Math.max(9, (pc ? texteSymbolesM(pc) : 1) * e);
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    ctx.rotate((-g.texte.angle * Math.PI) / 180);
+    plaque(ctx, g.texte.t, 0, 0, h);
+    ctx.restore();
   } else if (o.type === 'texte') {
     const q = ecran(o.point);
     const h = Math.max(9, (o.taille ?? 1) * e);

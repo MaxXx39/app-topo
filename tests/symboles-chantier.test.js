@@ -529,3 +529,42 @@ describe('blocs dynamiques (0.293.0)', () => {
     expect(tailles.size).toBe(1);
   });
 });
+
+describe('cotations et ligne de repère (0.293.0)', () => {
+  it('cotation de longueur : valeur, traits de rappel, côté de la ligne de cote', async () => {
+    const { geometrieCotation } = await import('../src/topo/plan-chantier.js');
+    const g = geometrieCotation({ type: 'cotation', genre: 'longueur', points: [[0, 0], [10, 0]], decalage: 2 });
+    expect(g.valeur).toBeCloseTo(10, 6);
+    expect(g.texte.t).toBe('10.00 m');
+    expect(g.lignes).toHaveLength(3);
+    expect(g.lignes[2][0]).toEqual([0, 2]); // ligne de cote à 2 m à gauche de A → B
+    expect(g.texte.angle).toBe(0);
+    // texte jamais à l'envers
+    expect(geometrieCotation({ genre: 'longueur', points: [[10, 0], [0, 0]], decalage: 1 }).texte.angle).toBe(0);
+  });
+
+  it('cotation d\'angle : 90° entre Est et Nord, arc entre les côtés', async () => {
+    const { geometrieCotation } = await import('../src/topo/plan-chantier.js');
+    const g = geometrieCotation({ genre: 'angle', points: [[0, 0], [5, 0], [0, 5]] });
+    expect(g.valeur).toBeCloseTo(90, 6);
+    expect(g.texte.t).toBe('90.00°');
+    expect(g.arc.length).toBeGreaterThan(8);
+    expect(geometrieCotation({ genre: 'angle', points: [[0, 0], [5, 0], [5, 5]] }).valeur).toBeCloseTo(45, 6);
+  });
+
+  it('la cotation se choisit, est dans le DXF et dans le résumé', () => {
+    const plan = nouveauPlanChantier('t', 'pic');
+    const o = ajouterObjet(plan, { type: 'cotation', genre: 'longueur', points: [[0, 0], [10, 0]], decalage: 2 });
+    expect(objetSousLePoint(plan.objets, [5, 2], 0.3)?.id).toBe(o.id);
+    expect(resumeObjet(o)).toContain('10.00 m');
+    expect(dxfPlanChantier(plan, BIB)).toContain('COTATIONS');
+  });
+
+  it('la ligne de repère d\'un texte se touche sur toute sa longueur', () => {
+    const plan = nouveauPlanChantier('t', 'pic');
+    const t = ajouterObjet(plan, { type: 'texte', point: [0, 0], texte: 'Grue', taille: 1, repere: [20, 0] });
+    expect(objetSousLePoint(plan.objets, [10, 0.4], 0.3)?.id).toBe(t.id);
+    expect(objetSousLePoint(plan.objets, [20.5, 0.5], 0.3)?.id).toBe(t.id);
+    expect(objetSousLePoint(plan.objets, [10, 3], 0.3)).toBeNull();
+  });
+});

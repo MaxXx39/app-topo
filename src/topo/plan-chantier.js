@@ -168,6 +168,7 @@ export function couleurObjet(plan, objet) {
   if (objet.type === 'fleche') return COULEUR_FLECHE;
   if (estPose(objet)) return '#64748b';
   if (objet.type === 'construction') return '#06b6d4';
+  if (objet.type === 'cotation') return '#be123c';
   return '#1b2b36';
 }
 
@@ -242,6 +243,13 @@ export function objetSousLePoint(objets, p, tolerance, surSymbole = null) {
       const h = o.taille ?? 1;
       const l = Math.max(1, String(o.texte).length) * h * 0.6;
       if (Math.abs(p[0] - o.point[0]) <= l / 2 + tolerance && Math.abs(p[1] - o.point[1]) <= h / 2 + tolerance) return o;
+      // 0.293.0 : la ligne de repère se touche facilement (zone élargie le long du trait et autour du point visé).
+      if (o.repere && (distanceAuSegment(p, o.point, o.repere) <= tolerance * 2 || Math.hypot(p[0] - o.repere[0], p[1] - o.repere[1]) <= tolerance * 2.5)) return o;
+      continue;
+    }
+    if (o.type === 'cotation') {
+      const g = geometrieCotation(o);
+      if (g && (g.lignes.some(([a, b]) => distanceAuSegment(p, a, b) <= tolerance * 1.5) || g.arc?.some((q, i) => i && distanceAuSegment(p, g.arc[i - 1], q) <= tolerance * 1.5) || Math.hypot(p[0] - g.texte.p[0], p[1] - g.texte.p[1]) <= tolerance * 3)) return o;
       continue;
     }
     const pts = o.points ?? [];
@@ -352,6 +360,7 @@ export function resumeObjet(o) {
   if (o.type === 'piste') return `Piste · ${n(o.largeur ?? 4)} m de large · ${n(longueur(o.points))} m`;
   if (o.type === 'fleche') return `Flèche · ${n(longueur(o.points))} m`;
   if (o.type === 'texte') return `Texte « ${o.texte} »`;
+  if (o.type === 'cotation') { const g = geometrieCotation(o); return g ? `Cotation ${o.genre === 'angle' ? 'd\'angle' : 'de longueur'} · ${g.texte.t}` : 'Cotation'; }
   if (o.type === 'construction') return o.infinie ? 'Construction · droite' : `Construction · segment ${n(longueur(o.points))} m`;
   if (o.type === 'grue' && o.modele === 'mobile') return `Grue mobile ${o.tonnes ?? 100} t · flèche ${o.fleche ?? 25} m`;
   if (o.type === 'grue') return `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'} · flèche ${o.fleche ?? 40} m${o.chassis && o.chassis !== 'aucun' ? ` · châssis ${o.chassis}` : ''}`;
@@ -669,4 +678,65 @@ export function anneauxDuTas(points, hauteur = TAS_HAUTEUR, talus = TAS_TALUS, n
     aireAvant = a;
   }
   return { anneaux, largeur, sens };
+}
+
+// ------------------------------------------------------------------ Cotations (0.293.0)
+
+const dirDe = (a, b) => {
+  const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+};
+
+/** Angle (degrés, sens trigonométrique, 0 = Est) d'un vecteur. */
+const angleDe = (a, b) => (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+
+/**
+ * Géométrie d'une cotation, en m (E, N) :
+ *  - longueur { points [A, B], decalage (m, + à gauche de A → B) } : traits de rappel, ligne de cote avec flèches, valeur ;
+ *  - angle { points [sommet, P1, P2], rayon (m, facultatif) } : arc entre les deux côtés, valeur en degrés.
+ * Renvoie { lignes [[a, b]…], fleches [{ p, dir }], arc ([[e, n]…] ou null), texte { p, angle (°, lisible), t } , valeur }.
+ */
+export function geometrieCotation(o) {
+  const pts = o.points ?? [];
+  if (o.genre === 'angle') {
+    const [S, A, B] = pts;
+    if (!S || !A || !B) return null;
+    const a1 = angleDe(S, A);
+    const a2 = angleDe(S, B);
+    let d = ((a2 - a1 + 540) % 360) - 180; // écart signé entre les côtés, de −180 à 180
+    const valeur = Math.abs(d);
+    const r = o.rayon ?? Math.max(0.3, 0.55 * Math.min(Math.hypot(A[0] - S[0], A[1] - S[1]), Math.hypot(B[0] - S[0], B[1] - S[1])));
+    const arc = [];
+    const n = Math.max(6, Math.ceil(valeur / 5));
+    for (let i = 0; i <= n; i++) {
+      const a = ((a1 + (d * i) / n) * Math.PI) / 180;
+      arc.push([S[0] + r * Math.cos(a), S[1] + r * Math.sin(a)]);
+    }
+    const am = ((a1 + d / 2) * Math.PI) / 180;
+    const rt = r * 1.0;
+    return {
+      lignes: [[S, [S[0] + (A[0] - S[0]) * 1, S[1] + (A[1] - S[1]) * 1]], [S, B]], fleches: [], arc,
+      texte: { p: [S[0] + rt * Math.cos(am), S[1] + rt * Math.sin(am)], angle: 0, t: `${Math.abs(valeur).toFixed(2)}°` }, valeur,
+    };
+  }
+  const [A, B] = pts;
+  if (!A || !B) return null;
+  const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+  if (L < 1e-6) return null;
+  const u = dirDe(A, B);
+  const nv = [-u[1], u[0]];
+  const dec = o.decalage ?? 1;
+  const s = dec < 0 ? -1 : 1;
+  const A2 = [A[0] + nv[0] * dec, A[1] + nv[1] * dec];
+  const B2 = [B[0] + nv[0] * dec, B[1] + nv[1] * dec];
+  const ext = 0.25 * s; // les traits de rappel dépassent un peu la ligne de cote
+  const rappel = (P, P2) => [P, [P2[0] + nv[0] * ext, P2[1] + nv[1] * ext]];
+  let ang = angleDe(A, B);
+  if (ang > 90 || ang <= -90) ang += 180; // texte jamais à l'envers
+  ang = ((ang + 180) % 360) - 180;
+  return {
+    lignes: [rappel(A, A2), rappel(B, B2), [A2, B2]],
+    fleches: [{ p: A2, dir: u }, { p: B2, dir: [-u[0], -u[1]] }], arc: null,
+    texte: { p: [(A2[0] + B2[0]) / 2, (A2[1] + B2[1]) / 2], angle: ang, t: `${L.toFixed(2)} m` }, valeur: L,
+  };
 }
