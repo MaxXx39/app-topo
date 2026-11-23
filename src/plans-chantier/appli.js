@@ -313,7 +313,16 @@ export function ouvrirPlansChantier({
   function htmlDessin() {
     // 0.297.1 : le ruban tient sur UNE ligne : icônes seules (le nom est dans l'infobulle), plus de titres de groupes.
     const groupe = (titre, html) => `<div class="groupe-ruban" role="group" aria-label="${titre}">${html}</div>`;
-    const bt = (attrs, icone, titre, classe = '') => `<button type="button" class="outil-ruban ${classe}" ${attrs} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${titre}</span></button>`;
+    // Mots courts sous les icônes (le nom complet est dans l'infobulle) : un juste milieu entre icônes seules et textes longs.
+    const COURTS = {
+      'Sélectionner': 'Choisir', 'Effacer': 'Effacer', 'Annuler (Ctrl+Z)': 'Annuler', 'Zone': 'Zone', 'Ligne': 'Ligne', 'Flèche': 'Flèche', 'Texte': 'Texte',
+      'Décaler': 'Décaler', 'Cotation': 'Cote', 'Construction': 'Constr.', 'Bibliothèque de symboles': 'Symboles',
+      'Accroche : point levé': 'Point', 'Accroche : sommet': 'Sommet', 'Accroche : milieu': 'Milieu', 'Accroche : sur la ligne': 'Ligne', 'Accroche : croisement': 'Croisem.', 'Accroche : perpendiculaire': 'Perpend.',
+      'Plans du projet dessous (par phase)': 'Plans', 'Calques des plans affichés (masquer, couleur)': 'Calques', 'Points levés': 'Points', 'Fond : carte nationale': 'Carte', 'Fond : photo aérienne': 'Photo', 'Fond : cadastre': 'Cadastre', 'Fond : surfaces du projet': 'Surfaces',
+      'Repère à 0° : Nord / Sud / Est / Ouest': 'N S E O', 'Montrer / cacher les lignes de construction (jamais imprimées)': 'Constr.', 'Zoom avant': '+', 'Zoom arrière': '−', 'Tout voir': 'Tout',
+    };
+    const court = (titre) => COURTS[titre] ?? (titre.startsWith('Ortho') ? 'Ortho' : titre.startsWith('Repère de l') ? 'Repère' : titre);
+    const bt = (attrs, icone, titre, classe = '') => `<button type="button" class="outil-ruban ${classe}" ${attrs} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${court(titre)}</span></button>`;
     const outil = (cle, icone, texte) => bt(`data-outil="${cle}"`, icone, texte);
     const ICONES_ACCROCHE = {
       point: '<rect x="5" y="5" width="14" height="14" rx="1"/><circle cx="12" cy="12" r="2.2"/>',

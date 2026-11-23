@@ -14801,14 +14801,13 @@ dialog.page-chantier[open] {
 .page-chantier .genre-deroulant .liste-genres { z-index: 40; background: #fff; border: 1px solid #94a3b8; border-radius: 8px; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25); overflow: auto; }
 .page-chantier .ruban-element .propre-element .genre-deroulant .liste-genres { max-height: none; width: auto; }
 
-/* 0.297.1 : ruban des Plans de chantier sur UNE ligne, icônes seules */
+/* 0.297.1 : ruban des Plans de chantier sur UNE ligne : icône + mot court (le nom complet est dans l'infobulle) */
 .page-chantier .ruban-une-ligne { display: flex; flex-wrap: nowrap; align-items: center; gap: 0; overflow-x: auto; padding: 3px 6px; }
-.page-chantier .ruban-une-ligne .groupe-ruban { flex-direction: row; align-items: center; gap: 1px; padding: 0 5px; flex-shrink: 0; }
+.page-chantier .ruban-une-ligne .groupe-ruban { flex-direction: row; align-items: center; gap: 0; padding: 0 3px; flex-shrink: 0; }
 .page-chantier .ruban-une-ligne .titre-groupe { display: none; }
-.page-chantier .ruban-une-ligne .outil-ruban { min-width: 34px; width: 34px; height: 34px; padding: 2px; }
-.page-chantier .ruban-une-ligne .outil-ruban span { display: none; }
+.page-chantier .ruban-une-ligne .outil-ruban { position: relative; min-width: 0; width: auto; height: 46px; padding: 2px 4px; gap: 1px; }
+.page-chantier .ruban-une-ligne .outil-ruban span { display: block; font-size: 0.6rem; line-height: 1.05; white-space: nowrap; }
 .page-chantier .ruban-une-ligne .outil-ruban svg { width: 20px; height: 20px; }
-.page-chantier .ruban-une-ligne .champ-ortho { width: 54px; height: 28px; padding: 2px 4px; font-size: 12px; }
-.page-chantier .ruban-une-ligne .outil-ruban { position: relative; }
-.page-chantier .ruban-une-ligne [data-action="ortho"].actif::after { content: '✓'; position: absolute; right: 0; top: -2px; font-size: 11px; font-weight: 900; color: #b45309; }
-.page-chantier .ruban-element .propre-element { height: 104px; }
+.page-chantier .ruban-une-ligne .champ-ortho { width: 46px; height: 26px; padding: 2px 3px; font-size: 12px; }
+.page-chantier .ruban-une-ligne [data-action="ortho"].actif::after { content: '✓'; position: absolute; right: 1px; top: -1px; font-size: 11px; font-weight: 900; color: #b45309; }
+.page-chantier .ruban-element .propre-element { height: 118px; align-content: flex-start; }
