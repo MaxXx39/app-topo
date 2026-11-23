@@ -127,8 +127,8 @@ function benneAvecIcone(benne, nom, icone, texteBenne) {
   const prims = benne.primitives.filter((p) => p.g !== 't');
   const b = benne.boite;
   const cy = (b[1] + b[3]) / 2;
-  const ajouts = [...icone(0, cy + 0.45, 1.15)];
-  if (texteBenne) ajouts.push({ g: 't', k: '#1e293b', x: 0, y: cy - 1.15, h: 0.35, a: 90, t: texteBenne, ah: 1, av: 2 });
+  const ajouts = [...icone(0, cy + 0.7, 1.75)];
+  if (texteBenne) ajouts.push({ g: 't', k: '#1e293b', x: 0, y: cy - 1.45, h: 0.35, a: 90, t: texteBenne, ah: 1, av: 2 });
   return { ...benne, cle: `base:${nom}`, nom, primitives: [...prims, ...ajouts], dessine: true };
 }
 
@@ -191,13 +191,15 @@ export function retoucherBibliotheque(symboles) {
     if (s.nom === 'Tri lattes + travaux' && par('Panneau Travaux')) t = { ...versSymbole('Tri lattes + travaux', 'Sécurité', trilattesTravaux(par('Panneau Travaux'))), cle: s.cle };
     if (s.nom === 'Benne Decantation') t = { ...versSymbole('Benne Decantation', 'Base-vie', divers.benneDecantation()), cle: s.cle };
     if (s.nom === '2.50interdictiondeparquer') t = { ...t, nom: 'Interdiction de parquer' };
+    // 0.293.0 : pelle à tourelle orientable : les 47 premières primitives = chenilles, le reste tourne autour du centre des chenilles.
+    if (s.nom === 'Pelle Chenille 20T') t = { ...t, pivote: { depuis: 47, centre: [0, 1.961] } };
     if (RETIRES.includes(s.nom)) t = { ...t, cache: true };
     return t;
   });
   if (par('manuscop base') && par('Maniscop tourelle')) res.push(manuscop(par('manuscop base'), par('Maniscop tourelle')));
   const benne = par('Benne à déchets');
   if (benne) {
-    res.push(benneAvecIcone(benne, 'Benne recyclage', (x, y) => divers.logoRecyclage(x, y, 1.45), null));
+    res.push(benneAvecIcone(benne, 'Benne recyclage', (x, y) => divers.logoRecyclage(x, y, 1.35), null));
     res.push(benneAvecIcone(benne, 'Benne de tri – bois', divers.iconeBois, 'BOIS'));
     res.push(benneAvecIcone(benne, 'Benne de tri – métal', divers.iconeMetal, 'MÉTAL'));
     res.push(benneAvecIcone(benne, 'Benne de tri – inertes', divers.iconeInertes, 'INERTES'));

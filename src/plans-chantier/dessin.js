@@ -9,7 +9,7 @@ import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
   dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
 } from '../topo/plan-chantier.js';
-import { grueDeLObjet } from '../topo/grue-mobile.js';
+import { grueDeLObjet, symboleDeLObjetPose } from '../topo/grue-mobile.js';
 import { nuance, primitivesEtage, chassisLibre, boiteSymbole, echelleDeLObjet } from '../topo/symboles.js';
 
 const ecranDe = (d) => ([e, n]) => versEcran(e, n, d.vue);
@@ -646,7 +646,7 @@ export function dessinerSymbolePose(d, o) {
     ctx.restore();
     return;
   }
-  const s = bib.find((x) => x.cle === o.cle);
+  const s = symboleDeLObjetPose(bib, o);
   if (o.etage) {
     const et = primitivesEtage(bib, o.etage.pose ?? 0);
     if (!et) return manquant(d, o, q);
@@ -708,7 +708,7 @@ function manquant(d, o, q) {
 /** Symbole de la bibliothèque qui donne la boîte d'un objet posé (la grue : sa flèche ; à étage : le conteneur). */
 export function symboleDeLObjet(bib, o) {
   if (o.type === 'grue') return grueDeLObjet(bib, o);
-  return bib.find((x) => x.cle === o.cle) ?? null;
+  return symboleDeLObjetPose(bib, o);
 }
 
 /** Vignette d'un symbole dans un petit canvas (bibliothèque) : cadré, sans rotation. */

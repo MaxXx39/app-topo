@@ -61,22 +61,44 @@ const goutte = (y, r, k) => {
   const pts = [[0, y + r * 1.15], ...Array.from({ length: 21 }, (_, i) => { const a = (-30 + (i * 240) / 20) * Math.PI / 180 - Math.PI / 2 + Math.PI; return [r * 0.72 * Math.sin(a + Math.PI) * -1, y - r * 0.2 + r * 0.72 * Math.cos(a + Math.PI) * -1]; })];
   return plein(k, 'peinture', pts);
 };
+/** Taille commune des pictos des camions (0.293.0) : pastille de 2,3 m de diamètre, presque la largeur de la caisse. */
+const K_PICTO = 1.85;
+/** Agrandit un picto dessiné autour de (0, y) : tout est multiplié par K_PICTO autour de ce centre. */
+function grandPicto(prims, y) {
+  const f = (v, i) => (i % 2 ? y + (v - y) * K_PICTO : v * K_PICTO);
+  return prims.map((p) => {
+    if (p.g === 'l') return { ...p, p: p.p.map(f) };
+    if (p.g === 'h') {
+      const pp = p.p.map((c) => c.map(f));
+      const xs = pp.flatMap((c) => c.filter((_, i) => i % 2 === 0));
+      const ys = pp.flatMap((c) => c.filter((_, i) => i % 2));
+      return { ...p, p: pp, ...(p.b ? { b: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] } : {}) };
+    }
+    if (p.g === 'c') return { ...p, x: p.x * K_PICTO, y: y + (p.y - y) * K_PICTO, r: p.r * K_PICTO };
+    return p;
+  });
+}
 /** Picto citerne : goutte d'eau bleue. */
-const pictoCiterne = (y) => [...pastille(y, 0.62), goutte(y, 0.5, '#1d6fd1')];
+const pictoCiterne0 = (y) => [...pastille(y, 0.62), goutte(y, 0.5, '#1d6fd1')];
 /** Picto carburant : pompe à essence (pistolet) rouge sur la pastille. */
-const pictoCarburant = (y) => [...pastille(y, 0.62),
+const pictoCarburant0 = (y) => [...pastille(y, 0.62),
   plein('#d63a3a', 'peinture', rectArrondi(-0.26, y - 0.34, 0.08, y + 0.34, 0.04)), plein('#f8fafc', 'blanc', rectArrondi(-0.18, y + 0.1, 0.0, y + 0.26, 0.02)),
   trait([[0.08, y + 0.2], [0.26, y + 0.2], [0.26, y - 0.1]], false, '#d63a3a'), plein('#334155', 'metal', rectArrondi(0.2, y - 0.2, 0.32, y - 0.08, 0.02)),
   plein('#d63a3a', 'peinture', rectArrondi(-0.34, y - 0.42, 0.16, y - 0.34))];
 /** Picto balayeuse : balai (manche + brosse). */
-const pictoBalai = (y) => [...pastille(y, 0.62),
+const pictoBalai0 = (y) => [...pastille(y, 0.62),
   plein('#8a6a4b', 'gravats', epais([[0.3, y + 0.42], [-0.05, y - 0.05]], 0.07)),
   plein('#c98a2b', 'peinture', [[-0.34, y - 0.02], [0.2, y - 0.02], [0.28, y - 0.42], [-0.42, y - 0.42]]),
   ...[-0.28, -0.14, 0, 0.14].map((x) => trait([[x, y - 0.06], [x - 0.05, y - 0.4]], false, '#7a521a'))];
 /** Picto bitume : flamme noire sur la pastille (bitume chaud) avec 2 traits de route. */
-const pictoBitume = (y) => [...pastille(y, 0.62),
+const pictoBitume0 = (y) => [...pastille(y, 0.62),
   plein('#f08c00', 'peinture', [[0, y + 0.45], [0.22, y + 0.12], [0.3, y - 0.18], [0.12, y - 0.38], [-0.12, y - 0.38], [-0.3, y - 0.18], [-0.2, y + 0.05], [-0.08, y + 0.15]]),
   plein('#3a3f45', 'caoutchouc', [[0, y + 0.1], [0.12, y - 0.12], [0.06, y - 0.3], [-0.06, y - 0.3], [-0.12, y - 0.12]])];
+
+const pictoCiterne = (y) => grandPicto(pictoCiterne0(y), y);
+const pictoCarburant = (y) => grandPicto(pictoCarburant0(y), y);
+const pictoBalai = (y) => grandPicto(pictoBalai0(y), y);
+const pictoBitume = (y) => grandPicto(pictoBitume0(y), y);
 
 export const camionCiterne = () => [...camion({ L: 9, corps: (b) => citerne(b, '#c3c8cd') }), ...pictoCiterne(1.1)];
 
@@ -127,7 +149,7 @@ export function camionBalai() {
 /** Tracteur agricole (rouge) et sa benne basculante (verte), d'après l'image de l'utilisateur : devant en bas. */
 export function tracteurBenne() {
   const res = [];
-  const ROUGE = '#c93a3a';
+  const BLEU_T = '#2a5db0';
   const VERT = '#2f9e55';
   const wb = 1.15; // demi-largeur de la benne
   // --- Benne : roues, garde-boue, timon en V, caisse ondulée, rebord, vérin, hayon.
@@ -148,13 +170,13 @@ export function tracteurBenne() {
   res.push(...pneuCrante(-1.4, -3.05, -0.85, -1.45, { pas: 0.2, chevron: true }), ...pneuCrante(0.85, -3.05, 1.4, -1.45, { pas: 0.2, chevron: true }));
   res.push(...pneuCrante(-1.1, -5.2, -0.74, -4.15, { pas: 0.17 }), ...pneuCrante(0.74, -5.2, 1.1, -4.15, { pas: 0.17 }));
   res.push(trait([[-0.85, -4.65], [-0.5, -4.65]], false, '#4b5563'), trait([[0.5, -4.65], [0.85, -4.65]], false, '#4b5563'));
-  res.push(...piece('#a82f2f', 'peinture', rectArrondi(-1.45, -2.95, -0.8, -1.5, 0.2)), ...piece('#a82f2f', 'peinture', rectArrondi(0.8, -2.95, 1.45, -1.5, 0.2)));
-  res.push(...piece(ROUGE, 'peinture', rectArrondi(-0.55, -5.55, 0.55, -3.05, 0.28)));
-  for (let y = -4.75; y < -3.3; y += 0.17) res.push(trait([[-0.3, y], [0.3, y]], false, '#8f2a2a'));
+  res.push(...piece('#1e4580', 'peinture', rectArrondi(-1.45, -2.95, -0.8, -1.5, 0.2)), ...piece('#1e4580', 'peinture', rectArrondi(0.8, -2.95, 1.45, -1.5, 0.2)));
+  res.push(...piece(BLEU_T, 'peinture', rectArrondi(-0.55, -5.55, 0.55, -3.05, 0.28)));
+  for (let y = -4.75; y < -3.3; y += 0.17) res.push(trait([[-0.3, y], [0.3, y]], false, '#1b3f78'));
   res.push(...piece('#2b2f33', 'caoutchouc', rectArrondi(-0.36, -5.5, 0.36, -5.36, 0.05)));
   res.push(...piece('#f8fafc', 'blanc', rectArrondi(-0.62, -5.0, -0.5, -4.6, 0.04)), ...piece('#f8fafc', 'blanc', rectArrondi(0.5, -5.0, 0.62, -4.6, 0.04)));
   res.push(...piece(GRIS, 'metal', cercle(0.32, -3.7, 0.06, 10)));
-  res.push(...piece(ROUGE, 'peinture', rectArrondi(-0.82, -3.12, 0.82, -1.4, 0.16)));
+  res.push(...piece(BLEU_T, 'peinture', rectArrondi(-0.82, -3.12, 0.82, -1.4, 0.16)));
   res.push(...piece(VITRE, 'vitre', rectArrondi(-0.74, -3.06, 0.74, -2.78, 0.1)), ...piece(VITRE, 'vitre', rectArrondi(-0.74, -1.72, 0.74, -1.46, 0.1)));
   res.push(...piece(VITRE, 'vitre', rectArrondi(-0.8, -2.8, -0.68, -1.75, 0.04)), ...piece(VITRE, 'vitre', rectArrondi(0.68, -2.8, 0.8, -1.75, 0.04)));
   res.push(...piece(CLAIR, 'metal', rectArrondi(-0.66, -2.76, 0.66, -1.76, 0.1)));

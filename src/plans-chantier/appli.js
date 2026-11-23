@@ -1169,7 +1169,8 @@ export function ouvrirPlansChantier({
         <label class="champ-calage"><span>Texte de l'étage</span><input type="text" maxlength="30" value="${echapper(textes[0])}" data-etage-texte="0"></label>
         <label class="champ-calage"><span>Texte du rez</span><input type="text" maxlength="30" value="${echapper(textes[1])}" data-etage-texte="1"></label>`;
     }
-    return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${rotation}${orienter}`;
+    const tourelle = sy?.pivote ? champNombre('Rotation de la tourelle (par rapport aux chenilles)', 'prop', 'tourelle', o.tourelle ?? 0, -360, 360, 1, '°') : '';
+    return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${tourelle}${rotation}${orienter}`;
   }
 
   /** Vignette d'une pose de la base-vie à étage. */

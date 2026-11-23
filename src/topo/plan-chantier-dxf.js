@@ -9,7 +9,7 @@ import {
   metresParMm, estPose, texteSymbolesM,
 } from './plan-chantier.js';
 import { couleurAci } from './dxf-plan.js';
-import { grueDeLObjet } from './grue-mobile.js';
+import { grueDeLObjet, symboleDeLObjetPose } from './grue-mobile.js';
 import { chassisLibre, primitivesEtage, echelleDeLObjet } from './symboles.js';
 import { nomDeCalque, texteAscii } from '../export/dxf.js';
 
@@ -203,8 +203,9 @@ function blocDuPoseBrut(o, bib) {
     const et = primitivesEtage(bib, o.etage.pose ?? 0);
     return et ? { base: `BASE_VIE_ETAGE_P${(o.etage.pose ?? 0) + 1}`, nom: nomDeBloc(`BASE_VIE_ETAGE_P${(o.etage.pose ?? 0) + 1}`), primitives: [...et.dessous, ...et.rez, ...et.etage] } : null;
   }
-  const s = bib.find((x) => x.cle === o.cle);
-  return s ? { base: s.nom, nom: nomDeBloc(s.nom), primitives: s.primitives } : null;
+  const s = symboleDeLObjetPose(bib, o);
+  const t = s?.pivote && Number(o.tourelle) ? `_T${Math.round(o.tourelle)}` : '';
+  return s ? { base: s.nom + t, nom: nomDeBloc(s.nom + t), primitives: s.primitives } : null;
 }
 
 function ecrire(calques, blocs, entites) {

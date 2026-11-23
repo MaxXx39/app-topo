@@ -5,6 +5,7 @@ import { AUTOGRUES, porteurGrueMobile, tourelleGrueMobile, pivotGrueMobile } fro
 import { tournerPrims, deplacer } from './symboles-outils.js';
 import { versSymbole } from './symboles-retouches.js';
 import { grueLibre } from './symboles.js';
+import { bornesPrimitives } from './blocs-dxf.js';
 
 const memoire = new Map();
 export const TONNES_MOBILES = AUTOGRUES.map((a) => a.t);
@@ -55,6 +56,27 @@ export function grueDeLObjet(bib, o) {
       xMin = Math.min(xMin, b[0]); yMin = Math.min(yMin, b[1]); xMax = Math.max(xMax, b[2]); yMax = Math.max(yMax, b[3]);
     }
     memoire.set(cle, { ...g, primitives, boite: Number.isFinite(xMin) ? [xMin, yMin, xMax, yMax] : g.boite });
+  }
+  return memoire.get(cle);
+}
+
+/**
+ * Symbole d'un objet posé : celui de la bibliothèque ; si ce symbole a une tourelle (`pivote` : les `depuis` premières
+ * primitives sont le châssis, le reste tourne autour de `centre`), la tourelle est tournée de `o.tourelle` degrés.
+ */
+export function symboleDeLObjetPose(bib, o) {
+  const s = bib.find((x) => x.cle === o.cle) ?? null;
+  const a = Number(o.tourelle) || 0;
+  if (!s?.pivote || !a) return s;
+  const cle = `p|${s.cle}|${a}`;
+  if (!memoire.has(cle)) {
+    if (memoire.size > 60) memoire.clear();
+    const [cx, cy] = s.pivote.centre;
+    const fixe = s.primitives.slice(0, s.pivote.depuis);
+    const tour = deplacerPrims(tournerPrims(deplacerPrims(s.primitives.slice(s.pivote.depuis), -cx, -cy), a), cx, cy);
+    const primitives = [...fixe, ...tour];
+    const b = bornesPrimitives(primitives);
+    memoire.set(cle, { ...s, primitives, boite: b ? [b.xMin, b.yMin, b.xMax, b.yMax] : s.boite });
   }
   return memoire.get(cle);
 }
