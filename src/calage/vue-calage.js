@@ -13,17 +13,21 @@ const FACTEUR_MOLETTE = 1.2;
  *  plans() : plans à dessiner (format de lirePlanDxf, déjà recalés si besoin) ;
  *  marques() : [{ type: 'point' | 'axe', xy: [x, y] ou [x1, y1, x2, y2], texte, couleur, attente }] ;
  *  survol(position { est, nord }, toleranceM) : accroche { est, nord } ou { segment: [x1, y1, x2, y2] }, ou null ;
+ *  infobulle(position, toleranceM) : texte montré près de la souris (nom du calque…), ou null (0.283.0) ;
  *  clic(position, toleranceM) : appelé au clic (sans glisser) ;
  *  cadrage() : plans montrés en entier par « Tout » (par défaut : plans()).
  * Renvoie { redessiner(), cadrer(), zoom(facteur), detruire() }.
  */
-export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = () => [], survol = () => null, clic = () => {} }) {
+export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = () => [], survol = () => null, infobulle = null, clic = () => {} }) {
   conteneur.classList.add('vue-calage-plan');
   const fond = document.createElement('canvas');
   const dessus = document.createElement('canvas');
   fond.className = 'fond-calage';
   dessus.className = 'dessus-calage';
-  conteneur.append(fond, dessus);
+  const bulle = document.createElement('div');
+  bulle.className = 'infobulle-calage';
+  bulle.hidden = true;
+  conteneur.append(fond, dessus, bulle);
   let vue = null;
   let accroche = null;
   let image = 0;
@@ -146,8 +150,16 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
     const { x, y } = position(ev);
     image = requestAnimationFrame(() => {
       if (!vue) return;
-      accroche = survol(versTerrain(x, y, vue), tolerance());
+      const terrain = versTerrain(x, y, vue);
+      accroche = survol(terrain, tolerance());
       dessinerDessus();
+      const texte = infobulle ? infobulle(terrain, tolerance()) : null;
+      bulle.hidden = !texte;
+      if (texte) {
+        bulle.textContent = texte;
+        bulle.style.left = `${Math.min(x + 14, Math.max(0, conteneur.clientWidth - 200))}px`;
+        bulle.style.top = `${y + 16}px`;
+      }
     });
   }
 
@@ -182,6 +194,7 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
     } else if (pts.length === 1 && geste) {
       const p = pts[0];
       if (!geste.glisse && Math.hypot(p.x - geste.x, p.y - geste.y) > SEUIL_GLISSER_PX) geste.glisse = true;
+      if (geste.glisse) bulle.hidden = true;
       if (geste.glisse && geste.x !== undefined) {
         vue = deplacer(geste.vue, p.x - geste.x, p.y - geste.y);
         redessiner();
@@ -210,6 +223,7 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
   conteneur.addEventListener('pointerleave', () => {
     if (pointeurs.size) return;
     accroche = null;
+    bulle.hidden = true;
     if (vue) dessinerDessus();
   });
 

@@ -1988,10 +1988,33 @@ function ouvrirCalage() {
   ouvrirPageCalage({
     projet,
     // remplace (0.280.0, nouvel indice) : id du plan calé qu'il remplace (même id, même dossier, couleur et affichage).
-    ajouterPlan: (plan, { remplace = null } = {}) => {
+    // modifier(faire) (0.283.0) : change le projet (afficher un indice, …) sauf en lecture seule.
+    modifier: (faire) => {
+      if (lectureSeule()) {
+        refuserEnLectureSeule();
+        return false;
+      }
+      faire();
+      modifie();
+      return true;
+    },
+    // conserve (0.283.0, nouvel indice) : id de l'indice d'avant, GARDÉ dans le projet (caché, marqué archive) ; le
+    // nouveau prend son dossier, sa couleur et son affichage. remplace : mise à jour sur place (vérification après coup).
+    ajouterPlan: (plan, { remplace = null, conserve = null } = {}) => {
       if (lectureSeule()) {
         refuserEnLectureSeule();
         return null;
+      }
+      const precedent = conserve ? projet.plansDxf.find((p) => p.id === conserve) : null;
+      if (precedent) {
+        const { sousDossiers, couleur, transparence, visible } = precedent;
+        const groupe = precedent.calage?.groupe ?? precedent.id;
+        precedent.calage = { ...precedent.calage, groupe, archive: true };
+        precedent.visible = false;
+        const range = { ...plan, id: nouvelIdentifiant(), sousDossiers, ...(couleur !== undefined ? { couleur } : {}), ...(transparence !== undefined ? { transparence } : {}), ...(visible !== undefined ? { visible } : {}), calage: { ...plan.calage, groupe } };
+        projet.plansDxf.push(range);
+        modifie();
+        return range;
       }
       const ancien = remplace ? projet.plansDxf.find((p) => p.id === remplace) : null;
       if (ancien) {
@@ -2006,6 +2029,9 @@ function ouvrirCalage() {
       modifie();
       return range;
     },
+    // Dossiers du projet proposés à la création d'un plan (TER., CANA…) et dossier choisi en ce moment.
+    dossiers: () => lireSousDossiers(projet).map((d) => d.nom),
+    dossierDepart: () => { const c = sousDossierChoisi(); return c && c !== SANS_SOUS_DOSSIER ? c : ''; },
     quandRetour: () => navigation.ouvrirPage(),
     message: (texte, duree, options) => afficherMessage(texte, duree, options),
   });

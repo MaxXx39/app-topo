@@ -913,6 +913,8 @@ function etatControle(plan) {
 
 /** 0.241.0 : état d'un plan en quelques mots pour sa ligne de « Gérer » (visible dès Base) : « à recaler », « recalé · contrôlé 3 mm »… */
 function resumeEtatPlan(plan) {
+  // 0.283.0 : plan calé par « Calage de plans » : son indice (les anciens indices restent dans le projet, cachés).
+  if (plan.calage?.indice) return `indice ${plan.calage.indice}${plan.calage.archive ? ' (ancien)' : ''} · calé${plan.calage.verdict === 'juste' ? ' · vérifié ✓' : plan.calage.verdict === 'sans-verification' ? ' · non vérifié' : ''}`;
   const enPlace = plan.recalage?.applique || plan.dejaCale || (plan.bornes && estEnMn95(plan.bornes));
   if (!enPlace) return plan.bornes ? 'à recaler' : '';
   const base = plan.recalage?.applique ? 'recalé' : plan.dejaCale ? 'déjà calé' : 'en MN95';
