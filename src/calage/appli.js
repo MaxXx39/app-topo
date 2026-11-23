@@ -18,6 +18,7 @@ import { accrocher, accrocherTrait, sourcesDesPlans } from '../topo/accroche.js'
 import { caler, droiteParPoints, ErreurCalage, appliquerSimilitude, inverserSimilitude, versHelmert, resultatAutomatique, SEUIL_JUSTE_M, SEUIL_A_REVOIR_M } from '../topo/calage-plan.js';
 import { segmentsDuPlan } from '../topo/calage-auto.js';
 import { differencesPlans, sousPlan } from '../topo/differences-plan.js';
+import { archiver, restaurer } from '../projet/archives.js';
 import { calculerAuto } from './calcul-auto.js';
 import { recetteDeDepart, nettoyerPlan, compterParCalque, calqueSousLePoint, TYPES_RETIRABLES, CHOIX_HACHURES } from '../topo/nettoyage-plan.js';
 import { plansDeReference, plansCales, indicesDuGroupe, etiquettes, planCale, planReference, planDesPoints, planEnMn95, REF_POINTS } from './plans.js';
@@ -44,7 +45,7 @@ const enCouleur = (plan, couleur) => Object.assign(Object.create(plan), { couleu
  * Ouvre la page. projet : projet ouvert (projet.plansDxf) ; ajouterPlan(plan) : range le plan calé dans le projet
  * (identifiant, dossier, enregistrement, Drive) et renvoie le plan rangé ; quandRetour() ; message().
  */
-export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier = () => false, dossiers = () => [], dossierDepart = () => '', quandRetour = null, message = () => {} }) {
+export function ouvrirCalage({ projet, simple = false, points = () => [], ajouterPlan, modifier = () => false, dossiers = () => [], dossierDepart = () => '', quandRetour = null, message = () => {} }) {
   const page = document.createElement('dialog');
   page.className = 'page-calage';
   document.body.append(page);
@@ -76,6 +77,10 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
     if (memoPoints.n !== liste.length) memoPoints = { n: liste.length, plan: planDesPoints(liste) };
     return memoPoints.plan;
   };
+  // Indices d'un plan calé : le dernier est dans le projet, les anciens sont dans les Archives (0.284.1).
+  const tousPlans = () => [...projet.plansDxf, ...(projet.archives ?? []).flatMap((a) => a.contenu?.plansDxf ?? [])];
+  const planParId = (id) => tousPlans().find((p) => p.id === id) ?? null;
+  const archiveDu = (id) => (projet.archives ?? []).find((a) => a.contenu?.plansDxf?.some((p) => p.id === id)) ?? null;
   const referencePoints = () => etat.referenceId === REF_POINTS;
   const reference = () => (referencePoints() ? (points().length ? planPoints() : null) : projet.plansDxf.find((p) => p.id === etat.referenceId) ?? null);
   const referenceAffichee = () => (reference() ? planRecale(reference()) : null);
@@ -110,7 +115,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
   function dessiner() {
     vues.forEach((v) => v.detruire());
     vues = [];
-    const etapes = [['plan', '1 Le plan'], ['caler', '2 Caler'], ['nettoyer', '3 Nettoyer'], ['fin', '4 Terminé']];
+    const etapes = simple ? [['plan', '1 Le plan'], ['caler', '2 Caler'], ['fin', '3 Terminé']] : [['plan', '1 Le plan'], ['caler', '2 Caler'], ['nettoyer', '3 Nettoyer'], ['fin', '4 Terminé']];
     page.innerHTML = `
       <header class="entete-calage">
         <button type="button" class="retour-reglages" data-action="retour" aria-label="Retour aux applications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
@@ -138,19 +143,22 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
 
   function htmlListe() {
     const cales = plansCales(projet.plansDxf);
-    const ligneIndice = (p, courant) => {
+    const ligneIndice = (p) => {
       const c = p.calage;
       const ch = c.indices?.at(-1)?.changements;
+      const archive = archiveDu(p.id);
       return `<tr class="ligne-indice">
         <td colspan="2"><span class="aide-calage">Indice <strong>${echapper(c.indice ?? '?')}</strong> · ${echapper(c.fichier ?? '')} · ${dateCourte(c.le)}${ch ? ` · +${ch.ajoutes} / −${ch.supprimes}` : ''}</span></td>
-        <td colspan="6">${courant && p.visible !== false ? '<span class="pastille-calage p-juste">Affiché dans le projet</span>' : `<button type="button" class="bouton-secondaire petit" data-afficher-indice="${echapper(p.id)}">Afficher cet indice</button>`}
+        <td colspan="6">${archive ? '<span class="pastille-calage p-sans">Archivé</span> <button type="button" class="bouton-secondaire petit" data-afficher-indice="' + echapper(p.id) + '">Afficher cet indice</button>'
+    : p.visible === false ? `<span class="aide-calage">Dans le projet (caché)</span> <button type="button" class="bouton-secondaire petit" data-afficher-indice="${echapper(p.id)}">Afficher</button>`
+      : '<span class="pastille-calage p-juste">Affiché dans le projet</span>'}
           <button type="button" class="bouton-secondaire petit" data-comparer-avec="${echapper(p.id)}">Comparer…</button></td>
       </tr>`;
     };
     const lignes = cales.map((p) => {
       const c = p.calage;
       const [texte, classe] = VERDICTS[c.verdict] ?? ['?', 'p-sans'];
-      const indices = indicesDuGroupe(projet.plansDxf, p);
+      const indices = indicesDuGroupe(tousPlans(), p);
       return `<tr>
         <td><strong>${echapper(p.nom)}</strong><br><span class="aide-calage">${echapper(c.fichier ?? '')}</span></td>
         <td>${echapper(c.referenceNom ?? '')}</td>
@@ -159,9 +167,9 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
         <td><span class="pastille-calage ${classe}">${texte}</span> ${c.verdict === 'sans-verification' ? '' : `<span class="chiffre">${mm(c.ecartVerificationM)}</span>`}${c.verifieLe ? `<br><span class="aide-calage">vérifié le ${dateCourte(c.verifieLe)}</span>` : ''}</td>
         <td><strong>${echapper(c.indice ?? '')}</strong>${indices.length > 1 ? ` <span class="aide-calage">(${indices.length} indices)</span>` : ''}${c.indices?.at(-1)?.changements ? ` <span class="aide-calage" title="Objets ajoutés / supprimés depuis l'indice d'avant">+${c.indices.at(-1).changements.ajoutes} / −${c.indices.at(-1).changements.supprimes}</span>` : ''}${c.methode === 'automatique' ? ' <span class="aide-calage">· auto</span>' : ''}</td>
         <td>${dateCourte(c.le)}</td>
-        <td class="actions-ligne-calage"><button type="button" class="bouton-secondaire petit" data-indice-de="${echapper(p.id)}">Nouvel indice…</button>
+        <td class="actions-ligne-calage">${simple ? '' : `<button type="button" class="bouton-secondaire petit" data-indice-de="${echapper(p.id)}">Nouvel indice…</button>`}
           <button type="button" class="bouton-secondaire petit" data-verifier="${echapper(p.id)}">Vérifier</button></td>
-      </tr>${indices.length > 1 ? indices.map((q) => ligneIndice(q, q.id === p.id)).join('') : ''}`;
+      </tr>${indices.length > 1 && !simple ? indices.map((q) => ligneIndice(q)).join('') : ''}`;
     }).join('');
     return `
       <div class="barre-calage"><button type="button" class="bouton" data-action="nouveau">＋ Caler un nouveau plan</button></div>
@@ -186,6 +194,9 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
         ${geles ? `<p class="aide-calage">${geles} calque(s) gelé(s) ou éteint(s) : écartés d'office au nettoyage.</p>` : ''}
         ${estEnMn95(b) && !ni ? '<p class="note-calage ok">✓ Ce plan semble déjà en MN95 : le caler n\'est peut-être pas utile.</p>' : ''}`;
     }
+    // Tablette (0.285.0) : le plan reçu est un plan DXF déjà dans le projet, ou un fichier DXF choisi sur la tablette.
+    const plansRecus = simple ? projet.plansDxf.filter((p) => !p.ifc && !p.calage && p.contenu && (p.contenu.traits?.length || p.contenu.cercles?.length || p.contenu.points?.length)) : [];
+    const choixProjet = simple && plansRecus.length ? `<label class="champ-calage"><span>Un plan DXF du projet</span><select data-champ="plan-projet"><option value="">— choisir —</option>${plansRecus.map((p) => `<option value="${echapper(p.id)}" ${p.nom === etat.fichier ? 'selected' : ''}>${echapper(p.nom)}</option>`).join('')}</select></label><span class="aide-calage">ou un fichier DXF de la tablette :</span>` : '';
     const choix = peutConvertirDwg()
       ? '<button type="button" class="bouton-secondaire bouton-fichier" data-action="choisir-dwg">Choisir le plan DWG / DXF (et ses xrefs)…</button>'
       : '<label class="bouton-secondaire bouton-fichier">Choisir le DXF (et ses xrefs)…<input type="file" accept=".dxf" multiple data-action="fichier" hidden></label>';
@@ -200,6 +211,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
         <p class="aide-calage">Indice actuel : ${echapper(ni.ancien.calage.indice ?? '?')} · ${echapper(ni.ancien.calage.fichier ?? '')} · calé le ${dateCourte(ni.ancien.calage.le)}</p></section>` : ''}
       <section class="carte-calage">
         <h3>Plan reçu</h3>
+        ${choixProjet}
         ${choix}
         ${etat.lecture ? `<p class="aide-calage">${echapper(etat.lecture)}</p>` : ''}
         ${resume}
@@ -210,15 +222,16 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
           ${ni ? '' : `<label class="champ-calage"><span>Dossier du projet</span><select data-champ="dossier"><option value="">Sans dossier</option>${dossiers().map((d) => `<option value="${echapper(d)}" ${d === etat.dossier ? 'selected' : ''}>${echapper(d)}</option>`).join('')}</select></label>`}
         </div>` : ''}
       </section>
-      ${ni ? '' : `<section class="carte-calage">
-        <h3>Référence MN95 (un plan du projet)</h3>
-        ${refs.length || points().length ? `<select data-champ="reference"><option value="">— choisir —</option>${points().length ? `<option value="${REF_POINTS}" ${REF_POINTS === etat.referenceId ? 'selected' : ''}>Points du projet (${points().length} points : levés, à implanter, contrôle)</option>` : ''}${refs.map((p) => `<option value="${echapper(p.id)}" ${p.id === etat.referenceId ? 'selected' : ''}>${echapper(p.nom)}${planEnMn95(p) ? '' : ' (local)'}</option>`).join('')}</select>`
+      ${ni || simple ? '' : `<section class="carte-calage">
+        <h3>Référence : un plan du projet (MN95 ou local) ou des points du projet</h3>
+        ${true ? `<select data-champ="reference"><option value="">— choisir —</option><option value="${REF_POINTS}" ${REF_POINTS === etat.referenceId ? 'selected' : ''} ${points().length ? '' : 'disabled'}>Points du projet (${points().length ? `${points().length} points : levés, à implanter, contrôle` : 'aucun point dans le projet'})</option>${refs.map((p) => `<option value="${echapper(p.id)}" ${p.id === etat.referenceId ? 'selected' : ''}>${echapper(p.nom)}${planEnMn95(p) ? '' : ' (local)'}</option>`).join('')}</select>`
           : '<p class="note-calage alerte">⚠ Aucun plan ni point dans ce projet : ajoutez une référence ci-dessous ou levez des points.</p>'}
         ${referencePoints() ? '<p class="aide-calage">Caler sur des points du projet : cliquez un point du plan reçu puis le point levé ; pour un axe, cliquez l\'axe du plan reçu puis 2 points levés ou plus sur cet axe, et « Terminer l\'axe ».</p>' : ''}
         ${peutConvertirDwg()
     ? '<button type="button" class="bouton-secondaire bouton-fichier" data-action="choisir-dwg-ref">＋ Ajouter une référence (DWG / DXF)…</button>'
     : '<label class="bouton-secondaire bouton-fichier">＋ Ajouter une référence (DXF)…<input type="file" accept=".dxf" multiple data-action="fichier-ref" hidden></label>'}
       </section>`}
+      ${simple ? `<section class="carte-calage"><h3>Caler sur les points du projet (levés, à implanter, contrôle)</h3><p class="aide-calage">${points().length} point(s) dans le projet.${points().length < 2 ? ' ⚠ Il en faut au moins 2 : levez d\'abord des points sur place.' : ''}</p></section>` : ''}
       <div class="pied-calage"><button type="button" class="bouton-secondaire" data-aller="liste">← Plans calés</button>${ni ? piedIndice : `<button type="button" class="bouton" data-aller="caler" ${accessible('caler') ? '' : 'aria-disabled="true"'}>Caler →</button>`}</div>`;
   }
 
@@ -232,7 +245,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
         ${groupe('Accroche', ACCROCHES.map(([v, i, t]) => outil('accroche', v, i, t)).join(''))}
         ${groupe('Affichage', AFFICHAGES.map(([v, i, t]) => outil('affichage', v, i, t)).join(''))}
         ${groupe('Zoom', '<button type="button" class="outil-ruban" data-zoom="1.5">＋</button><button type="button" class="outil-ruban" data-zoom="0.667">−</button><button type="button" class="outil-ruban" data-zoom="tout">⤢<span>Tout</span></button>')}
-        ${groupe('Automatique', '<button type="button" class="outil-ruban" data-action="caler-auto">⚡<span>Caler auto</span></button>')}
+        ${simple ? '' : groupe('Automatique', '<button type="button" class="outil-ruban" data-action="caler-auto">⚡<span>Caler auto</span></button>')}
         ${groupe('Modifier', `${referencePoints() ? '<button type="button" class="outil-ruban" data-action="finir-axe" data-zone="finir-axe">✓<span>Terminer l\'axe</span></button>' : ''}<button type="button" class="outil-ruban" data-action="retirer-dernier">↶<span>Retirer le dernier</span></button><button type="button" class="outil-ruban" data-action="tout-effacer">✕<span>Tout effacer</span></button>`)}
       </div>
       <p class="consigne-calage" data-zone="consigne"></p>
@@ -247,7 +260,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
       </div>
       <div class="pied-calage">${etat.verif
     ? '<button type="button" class="bouton-secondaire" data-aller="liste">← Plans calés</button><button type="button" class="bouton" data-action="enregistrer-verif">Enregistrer la vérification</button>'
-    : '<button type="button" class="bouton-secondaire" data-aller="plan">← Le plan</button><button type="button" class="bouton" data-action="vers-nettoyer">Nettoyer →</button>'}</div>`;
+    : `<button type="button" class="bouton-secondaire" data-aller="plan">← Le plan</button><button type="button" class="bouton" data-action="vers-nettoyer">${simple ? 'Enregistrer le plan calé' : 'Nettoyer →'}</button>`}</div>`;
   }
 
   function htmlFin() {
@@ -267,7 +280,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
   function htmlNettoyer() {
     const ignores = Object.entries(etat.lu.compte.ignores ?? {});
     const ni = etat.nouvelIndice;
-    const groupe = ni ? indicesDuGroupe(projet.plansDxf, ni.ancien) : [];
+    const groupe = ni ? indicesDuGroupe(tousPlans(), ni.ancien) : [];
     const groupeRuban = (titre, boutons, attributs = '') => `<div class="groupe-ruban" ${attributs}><span class="titre-groupe">${titre}</span><div class="boutons-groupe">${boutons}</div></div>`;
     const bouton = (action, icone, texte, extra = '') => `<button type="button" class="outil-ruban" data-action="${action}" ${extra}>${icone}<span>${texte}</span></button>`;
     return `
@@ -339,8 +352,8 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
     if (c.avantId === c.apresId) return null;
     const cle = `${c.avantId}|${c.apresId}`;
     if (compare.cle !== cle) {
-      const avant = planRecale(projet.plansDxf.find((p) => p.id === c.avantId));
-      const apres = planRecale(projet.plansDxf.find((p) => p.id === c.apresId));
+      const avant = planRecale(planParId(c.avantId));
+      const apres = planRecale(planParId(c.apresId));
       const d = differencesPlans(avant, apres);
       compare = { cle, d, plans: [sousPlan(apres, d.inchanges, '#9ca3af'), sousPlan(avant, d.supprimes, '#dc2626'), sousPlan(apres, d.ajoutes, '#16a34a')] };
     }
@@ -349,7 +362,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
 
   function monterComparer() {
     const c = etat.comparaison;
-    const plan = () => planRecale(projet.plansDxf.find((p) => p.id === c.apresId));
+    const plan = () => planRecale(planParId(c.apresId));
     vues = [creerVueCalage(page.querySelector('[data-toile="comparer"]'), {
       plans: () => [...(etat.refVisible && reference() ? [refGrise()] : []), ...(calculComparaison()?.plans ?? [plan()])],
       cadrage: () => [plan()],
@@ -419,7 +432,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
   function changementsDepuisAncien() {
     const n = planNettoye();
     if (!etat.nouvelIndice || !n.cale) return null;
-    const base = projet.plansDxf.find((p) => p.id === etat.baseId) ?? etat.nouvelIndice.ancien;
+    const base = planParId(etat.baseId) ?? etat.nouvelIndice.ancien;
     const cle = `${n.cle}|${base.id}`;
     if (changements.cle !== cle) {
       const ancien = planRecale(base);
@@ -579,6 +592,13 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
         boutons: [{ cle: 'non', texte: 'Revenir au calage', principal: true }, { cle: 'oui', texte: 'Continuer quand même' }],
       });
       if (choix !== 'oui') return;
+    }
+    if (simple) {
+      // Sur place : on garde tout le plan tel quel (pas de nettoyage), et on l'enregistre tout de suite.
+      etat.recette = { ecartes: [], couleurs: {}, types: { cotations: false, reperes: false, attributs: false, textes: false, splines: false, pleins: false }, hachures: 'garder', zone: null, prefixe: '' };
+      etat.avant = [];
+      enregistrer();
+      return;
     }
     if (!etat.recette) {
       etat.recette = recetteDeLAncien();
@@ -807,7 +827,8 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
         </dl>
         <div class="verdict-calage"><span class="pastille-calage ${classe}">${texte}</span><span>${echapper(r.message)}</span></div>`;
     }
-    page.querySelector('[data-action="caler-auto"]').disabled = etat.calculAuto;
+    const bAuto = page.querySelector('[data-action="caler-auto"]');
+    if (bAuto) bAuto.disabled = etat.calculAuto;
     const bouton = page.querySelector('[data-action="vers-nettoyer"]');
     bouton?.setAttribute('aria-disabled', String(!r || r.verdict === 'faux'));
     vues.forEach((v) => v.redessiner());
@@ -1104,11 +1125,38 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
     dessiner();
   }
 
+  /**
+   * Afficher un ancien indice : il sort des Archives et prend la place de l'indice affiché (dossier, couleur, affichage),
+   * qui part à son tour dans les Archives. Un indice du projet seulement caché est simplement montré.
+   */
+  function afficherIndice(id) {
+    const choisi = planParId(id);
+    if (!choisi) return false;
+    const archive = archiveDu(id);
+    return modifier(() => {
+      if (!archive) {
+        indicesDuGroupe(projet.plansDxf, choisi).forEach((q) => { q.visible = q.id === choisi.id; });
+        return;
+      }
+      const groupe = choisi.calage.groupe ?? choisi.id;
+      const actuel = projet.plansDxf.find((p) => p.calage && (p.calage.groupe ?? p.id) === groupe);
+      restaurer(projet, archive.id);
+      const remis = projet.plansDxf.find((p) => p.id === id);
+      if (actuel) {
+        const { sousDossiers, couleur, transparence } = actuel;
+        Object.assign(remis, { sousDossiers, visible: true, ...(couleur !== undefined ? { couleur } : {}), ...(transparence !== undefined ? { transparence } : {}) });
+        const { archive: rangee } = archiver(projet, 'plan', actuel.id);
+        if (rangee) rangee.nom = `${actuel.nom} (indice ${actuel.calage.indice ?? '?'})`;
+      } else remis.visible = true;
+      delete remis.calage.archive;
+    });
+  }
+
   /** Comparer deux indices d'un plan calé (au choix dans les deux listes). */
   function comparer(planId) {
-    const plan = projet.plansDxf.find((p) => p.id === planId);
+    const plan = planParId(planId);
     if (!plan?.calage) return;
-    const plans = indicesDuGroupe(projet.plansDxf, plan);
+    const plans = indicesDuGroupe(tousPlans(), plan);
     if (plans.length < 2) {
       message('Il n\'y a qu\'un seul indice : rien à comparer.', 3500);
       return;
@@ -1125,6 +1173,12 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
 
   function nouveau() {
     remettreAZero();
+    if (simple) {
+      etat.referenceId = REF_POINTS;
+      etape = 'plan';
+      dessiner();
+      return;
+    }
     if (!plansDeReference(projet.plansDxf).some((p) => p.id === etat.referenceId)) etat.referenceId = plansDeReference(projet.plansDxf)[0]?.id ?? '';
     etape = 'plan';
     dessiner();
@@ -1149,8 +1203,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
     else if (cible.dataset.verifier) verifier(cible.dataset.verifier);
     else if (cible.dataset.comparerAvec) comparer(cible.dataset.comparerAvec);
     else if (cible.dataset.afficherIndice) {
-      const choisi = projet.plansDxf.find((p) => p.id === cible.dataset.afficherIndice);
-      if (choisi && modifier(() => { indicesDuGroupe(projet.plansDxf, choisi).forEach((q) => { q.visible = q.id === choisi.id; }); })) dessiner();
+      if (afficherIndice(cible.dataset.afficherIndice)) dessiner();
     } else if (action === 'enregistrer-verif') enregistrerVerification();
     else if (action === 'enregistrer-reference') enregistrerReference();
     else if (action === 'annuler-reference') {
@@ -1279,6 +1332,12 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
       Promise.all([...t.files].map(async (f) => ({ nom: f.name, octets: new Uint8Array(await f.arrayBuffer()) }))).then(lireFichiers);
     } else if (t.dataset.action === 'fichier-ref' && t.files?.length) {
       Promise.all([...t.files].map(async (f) => ({ nom: f.name, octets: new Uint8Array(await f.arrayBuffer()) }))).then((f) => lireFichiers(f, { reference: true }));
+    } else if (t.dataset.champ === 'plan-projet') {
+      const choisi = projet.plansDxf.find((p) => p.id === t.value);
+      if (!choisi) return;
+      Object.assign(etat, { lu: { ...choisi, visible: true, recalage: undefined, couleur: undefined, transparence: 0 }, fichier: choisi.nom, nom: `${choisi.nom} (calé)`, lecture: '', elements: [], enCours: null, resultat: null, erreur: '', recette: null, avant: [], selection: [] });
+      etat.referenceId = REF_POINTS;
+      dessiner();
     } else if (t.dataset.champ === 'indice') etat.indice = t.value;
     else if (t.dataset.champ === 'dossier') etat.dossier = t.value;
     else if (t.dataset.champ === 'base') {

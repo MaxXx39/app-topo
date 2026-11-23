@@ -35,7 +35,9 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
   let geste = null; // { x, y, vue, glisse, distance (2 doigts) }
 
   const taille = () => ({ largeur: conteneur.clientWidth || 300, hauteur: conteneur.clientHeight || 200 });
-  const tolerance = () => (vue ? 10 / vue.echelle : 1); // 10 px
+  // 10 px à la souris, 18 px au doigt (0.285.0 : calage sur place sur tablette)
+  const px = () => (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 18 : 10);
+  const tolerance = () => (vue ? px() / vue.echelle : 1);
 
   function cadrer() {
     const { largeur, hauteur } = taille();
