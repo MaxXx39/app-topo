@@ -27,22 +27,35 @@ export const CATEGORIES_ZONE = [
 ];
 
 // tirets : longueurs en m (trait, vide), [] = trait plein ; epaisseur en px à l'écran.
+// motif (0.287.0, d'après les lignes de l'utilisateur) : dessiné le long de la ligne, qui s'interrompt autour.
+//   poteau : petit rectangle tous les pasM mètres (vrais poteaux de clôture) ; chevron « > », double « < > »,
+//   texte (« EAU »…, eclair = petit éclair devant) : tous les pasPx pixels à l'écran (comme un type de ligne de DAO).
 export const STYLES_LIGNE = [
-  { cle: 'cloture', nom: 'Clôture', couleur: '#c0392b', tirets: [0.9, 0.35], epaisseur: 2.5, ronds: true },
-  { cle: 'barriere', nom: 'Barrière', couleur: '#ea580c', tirets: [0.5, 0.5], epaisseur: 3 },
+  { cle: 'cloture', nom: 'Clôture de chantier', couleur: '#f59e0b', tirets: [], epaisseur: 2, motif: { type: 'poteau', pasM: 3.5 } },
+  { cle: 'barriere', nom: 'Barrière (chevrons)', couleur: '#facc15', tirets: [], epaisseur: 3, motif: { type: 'chevron', pasPx: 110 } },
+  { cle: 'limite', nom: 'Limite (< >)', couleur: '#a21caf', tirets: [], epaisseur: 3, motif: { type: 'double', pasPx: 130 } },
+  { cle: 'elec', nom: 'Électricité', couleur: '#ef4444', tirets: [], epaisseur: 1.5, motif: { type: 'texte', texte: 'ELEC', eclair: true, pasPx: 170 } },
+  { cle: 'eau', nom: 'Eau', couleur: '#38b2c4', tirets: [], epaisseur: 2.5, motif: { type: 'texte', texte: 'EAU', pasPx: 170 } },
+  { cle: 'gaz', nom: 'Gaz', couleur: '#eab308', tirets: [], epaisseur: 2.5, motif: { type: 'texte', texte: 'GAZ', pasPx: 170 } },
+  { cle: 'eu', nom: 'Eaux usées (EU)', couleur: '#8a9a3b', tirets: [], epaisseur: 2.5, motif: { type: 'texte', texte: 'EU', pasPx: 170 } },
+  { cle: 'ec', nom: 'Eaux claires (EC)', couleur: '#1d4ed8', tirets: [], epaisseur: 2.5, motif: { type: 'texte', texte: 'EC', pasPx: 170 } },
+  { cle: 'swisscom', nom: 'Swisscom', couleur: '#22c55e', tirets: [], epaisseur: 2.5, motif: { type: 'texte', texte: 'SWISSCOM', pasPx: 190 } },
   { cle: 'palplanches', nom: 'Palplanches', couleur: '#475569', tirets: [], epaisseur: 4 },
   { cle: 'conduite', nom: 'Conduite provisoire', couleur: '#2563eb', tirets: [1.5, 0.5], epaisseur: 2 },
-  { cle: 'cable', nom: 'Câble électrique', couleur: '#a16207', tirets: [1, 0.3, 0.2, 0.3], epaisseur: 2 },
-  { cle: 'signalisation', nom: 'Signalisation', couleur: '#f59e0b', tirets: [0.3, 0.3], epaisseur: 3 },
+  { cle: 'signalisation', nom: 'Signalisation', couleur: '#f97316', tirets: [0.3, 0.3], epaisseur: 3 },
   { cle: 'libre', nom: 'Ligne', couleur: '#1b2b36', tirets: [], epaisseur: 2 },
 ];
+// Anciens genres de ligne (0.286.0) : « Câble électrique » devient « Électricité ».
+const ALIAS_STYLES = { cable: 'elec' };
 
 export const COULEURS_PHASES = ['#e0702c', '#2f9e6b', '#2563eb', '#9333ea', '#db2777', '#0e7490', '#a16207', '#475569'];
 export const COULEUR_PISTE = '#7c858e';
 export const COULEUR_FLECHE = '#19a7cc';
+export const LARGEUR_FLECHE = 0.9; // m, largeur du corps d'une flèche
+export const POINTE_FLECHE = 2.5; // m, longueur de la pointe (sa largeur = 2 × la largeur du corps, au moins 1,6 m)
 
 export const categorieZone = (cle) => CATEGORIES_ZONE.find((c) => c.cle === cle) ?? CATEGORIES_ZONE[0];
-export const styleLigne = (cle) => STYLES_LIGNE.find((s) => s.cle === cle) ?? STYLES_LIGNE[STYLES_LIGNE.length - 1];
+export const styleLigne = (cle) => STYLES_LIGNE.find((s) => s.cle === (ALIAS_STYLES[cle] ?? cle)) ?? STYLES_LIGNE[STYLES_LIGNE.length - 1];
 
 let compteur = 0;
 /** Identifiant court et unique (ex. « pc-lx3k9a-1 »). */
@@ -99,9 +112,13 @@ export function objetsVisibles(plan) {
   return plan.objets.filter((o) => visibles.has(o.phase));
 }
 
-/** Couleur d'un objet : celle de sa phase (plan.couleurs = 'phases') ou celle de sa catégorie / son style. */
+/**
+ * Couleur d'un objet : celle de sa phase (plan.couleurs = 'phases'), sinon celle choisie pour lui (objet.couleur), sinon
+ * celle de sa catégorie / son style.
+ */
 export function couleurObjet(plan, objet) {
   if (plan.couleurs === 'phases') return plan.phases.find((p) => p.id === objet.phase)?.couleur ?? '#1b2b36';
+  if (objet.couleur) return objet.couleur; // couleur choisie pour cet élément (0.287.0)
   if (objet.type === 'zone') return categorieZone(objet.categorie).couleur;
   if (objet.type === 'ligne') return styleLigne(objet.style).couleur;
   if (objet.type === 'piste') return COULEUR_PISTE;
@@ -172,7 +189,7 @@ export function objetSousLePoint(objets, p, tolerance) {
     }
     const pts = o.points ?? [];
     const ferme = o.type === 'zone';
-    const marge = o.type === 'piste' ? (o.largeur ?? 4) / 2 + tolerance : tolerance;
+    const marge = o.type === 'piste' ? (o.largeur ?? 4) / 2 + tolerance : o.type === 'fleche' ? (o.largeur ?? LARGEUR_FLECHE) / 2 + tolerance : tolerance;
     const n = ferme ? pts.length : pts.length - 1;
     for (let i = 0; i < n; i++) if (distanceAuSegment(p, pts[i], pts[(i + 1) % pts.length]) <= marge) return o;
     if (ferme && pts.length >= 3 && dansPolygone(p, pts)) return o;
@@ -233,9 +250,87 @@ export function resumeObjet(o) {
   if (o.type === 'zone') return `Zone · ${categorieZone(o.categorie).nom} · ${n(aire(o.points))} m²`;
   if (o.type === 'ligne') return `${styleLigne(o.style).nom} · ${n(longueur(o.points))} m`;
   if (o.type === 'piste') return `Piste · ${n(o.largeur ?? 4)} m de large · ${n(longueur(o.points))} m`;
-  if (o.type === 'fleche') return `Flèche · ${n(longueur(o.points))} m`;
+  if (o.type === 'fleche') return `Flèche · ${n(o.largeur ?? LARGEUR_FLECHE)} m de large · ${n(longueur(o.points))} m`;
   if (o.type === 'texte') return `Texte « ${o.texte} »`;
   return o.type;
+}
+
+/** Sommet d'un objet sous le point p (à tolerance m près) : son rang, ou -1 (pour le glisser par sa poignée). */
+export function sommetSousLePoint(o, p, tolerance) {
+  const pts = pointsDe(o);
+  let meilleur = -1;
+  let dMin = tolerance;
+  pts.forEach((q, i) => {
+    const d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+    if (d <= dMin) {
+      dMin = d;
+      meilleur = i;
+    }
+  });
+  return meilleur;
+}
+
+/**
+ * Positions régulières le long d'une polyligne (points [x, y], toutes unités) : un repère tous les « pas », le premier à
+ * « debut » du départ. Renvoie [{ x, y, angle (radians, sens du segment), s (abscisse le long de la ligne) }].
+ */
+export function positionsLeLong(points, pas, debut = pas / 2) {
+  const res = [];
+  if (!(pas > 0) || points.length < 2) return res;
+  let cumul = 0;
+  let prochain = debut;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[i + 1];
+    const l = Math.hypot(x2 - x1, y2 - y1);
+    while (l > 0 && prochain <= cumul + l) {
+      const t = (prochain - cumul) / l;
+      res.push({ x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1), angle: Math.atan2(y2 - y1, x2 - x1), s: prochain });
+      prochain += pas;
+      if (res.length > 5000) return res;
+    }
+    cumul += l;
+  }
+  return res;
+}
+
+/**
+ * Morceaux d'une polyligne sans les trous autour de certaines abscisses (pour y écrire un motif) : demi = demi-largeur
+ * de chaque trou (même unité). Renvoie une liste de polylignes [[x, y]…].
+ */
+export function morceauxAvecTrous(points, abscisses, demi) {
+  const trous = abscisses.map((s) => [s - demi, s + demi]);
+  const dedans = (s) => trous.some(([a, b]) => s > a && s < b);
+  const morceaux = [];
+  let courant = [];
+  let cumul = 0;
+  const finir = () => {
+    if (courant.length >= 2) morceaux.push(courant);
+    courant = [];
+  };
+  for (let i = 0; i + 1 < points.length; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[i + 1];
+    const l = Math.hypot(x2 - x1, y2 - y1);
+    if (!l) continue;
+    // Coupures du segment : ses bouts et les bords des trous qui tombent dedans.
+    const coupes = [0, l, ...trous.flat().map((s) => s - cumul).filter((d) => d > 0 && d < l)].sort((a, b) => a - b);
+    for (let k = 0; k + 1 < coupes.length; k++) {
+      const d0 = coupes[k];
+      const d1 = coupes[k + 1];
+      if (d1 - d0 < 1e-9) continue;
+      const point = (d) => [x1 + ((x2 - x1) * d) / l, y1 + ((y2 - y1) * d) / l];
+      if (dedans(cumul + (d0 + d1) / 2)) {
+        finir();
+        continue;
+      }
+      if (!courant.length) courant.push(point(d0));
+      courant.push(point(d1));
+    }
+    cumul += l;
+  }
+  finir();
+  return morceaux;
 }
 
 /** Copie profonde du plan (pour « Annuler »). */

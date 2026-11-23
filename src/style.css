@@ -14676,3 +14676,11 @@ dialog.page-chantier[open] {
 .phases-chantier li.active .nom-phase { font-weight: 700; }
 .resume-chantier { margin: 0; font-weight: 600; }
 .actions-chantier { display: flex; gap: 6px; flex-wrap: wrap; }
+/* 0.287.0 : liste des éléments, couleur d'un élément */
+.elements-chantier { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; }
+.elements-chantier button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid transparent; border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 0.85rem; text-align: left; cursor: pointer; }
+.elements-chantier button:hover { border-color: var(--bordure); }
+.elements-chantier button.actif { border-color: #b45309; background: color-mix(in srgb, #b45309 10%, var(--surface)); font-weight: 600; }
+.elements-chantier i { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.couleur-element { display: flex; align-items: flex-end; gap: 10px; }
+.couleur-element input[type='color'] { width: 48px; height: 32px; padding: 0; border: 1px solid var(--bordure); border-radius: 6px; background: none; }
