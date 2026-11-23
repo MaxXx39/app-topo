@@ -7,7 +7,7 @@ import { transformerPrimitives, CATEGORIES_SYMBOLES } from './symboles.js';
 import { symbolesDessines, portail, portailCoulissant, trilattes } from './symboles-dessines.js';
 import {
   camionCiterne, camionCarburant, camionBitume, camionBalai, tracteurBenne, niveleuse, camionGrue, AUTOGRUES, pompeABeton,
-  nacelle, elevateurCiseaux, compresseur, betonniere,
+  nacelle, elevateurCiseaux, compresseur, betonniere, compacteurTandem, compacteurMixte, compacteurPneus,
 } from './symboles-vehicules.js';
 import * as divers from './symboles-divers.js';
 import { rectArrondi, cercle, ellipse, epais, plein, piece, trait, tourner, deplacer, miroir } from './symboles-outils.js';
@@ -157,16 +157,10 @@ const boiteLigne = (p) => {
   return b ? [b.xMin, b.yMin, b.xMax, b.yMax] : null;
 };
 
-/** Tri lattes + travaux : les 3 lattes et le panneau « Travaux » 2 fois plus grand, sans la lampe, posé en haut. */
+/** Tri lattes + travaux : les 3 lattes et le panneau « Travaux » 1,8 fois plus grand, lampe (gyrophare) gardée, posé en haut. */
 function trilattesTravaux(panneau) {
   const k = 1.8;
-  const ymin = panneau.boite[1];
-  // La lampe orange (en bas à gauche du panneau : boîte entièrement à gauche de −0,2 m et sous −0,2 m) est retirée.
-  const sansLampe = panneau.primitives.filter((p) => {
-    const b = p.b ?? (p.g === 'l' ? boiteLigne(p) : null);
-    return !(b && b[2] < -0.2 && b[3] < -0.2);
-  });
-  const grand = transformerPrimitives(sansLampe, (x, y) => [r3(x * k), r3(y * k + 0.55 - ymin * 0)]);
+  const grand = transformerPrimitives(panneau.primitives, (x, y) => [r3(x * k), r3(y * k + 0.55)]);
   return [...trilattes(), ...grand];
 }
 
@@ -195,6 +189,9 @@ export function retoucherBibliotheque(symboles) {
     if (s.nom === 'Portail') t = { ...versSymbole('Portail', 'Sécurité', portail(5)), cle: s.cle };
     if (s.nom === 'Tri Lattes') t = { ...versSymbole('Tri Lattes', 'Sécurité', trilattes()), cle: s.cle };
     if (s.nom === 'Tri lattes + travaux' && par('Panneau Travaux')) t = { ...versSymbole('Tri lattes + travaux', 'Sécurité', trilattesTravaux(par('Panneau Travaux'))), cle: s.cle };
+    if (s.nom === 'Compact Tandem') t = { ...versSymbole('Compact Tandem', 'Engins', compacteurTandem()), cle: s.cle };
+    if (s.nom === 'Compact Mixte') t = { ...versSymbole('Compact Mixte', 'Engins', compacteurMixte()), cle: s.cle };
+    if (s.nom === 'Compact pneu') t = { ...versSymbole('Compact pneu', 'Engins', compacteurPneus()), cle: s.cle };
     if (s.nom === 'Benne Decantation') t = { ...versSymbole('Benne Decantation', 'Base-vie', divers.benneDecantation()), cle: s.cle };
     if (s.nom === '2.50interdictiondeparquer') t = { ...t, nom: 'Interdiction de parquer' };
     if (RETIRES.includes(s.nom)) t = { ...t, cache: true };
@@ -232,7 +229,7 @@ export function retoucherBibliotheque(symboles) {
     // Base-vie
     ['Abri à vélos', 'Base-vie', divers.abriVelos()], ['Place de parking réservée', 'Base-vie', divers.parkingReserve()],
     // Stockage
-    ['Stock de banches de coffrage', 'Stockage', divers.stockBanches()], ['Palette de tuyaux PVC', 'Stockage', divers.paletteTuyaux()],
+    ['Banche avec lest', 'Stockage', divers.stockBanches()], ['Palette de tuyaux PVC', 'Stockage', divers.paletteTuyaux()],
     ['Stock d\'armatures', 'Stockage', divers.stockArmatures()], ['Treillis soudés', 'Stockage', divers.stockTreillis()],
     ['Regards préfabriqués', 'Stockage', divers.stockRegards()], ['Big-bags', 'Stockage', divers.stockBigBags()],
     ['Sacs sur palette', 'Stockage', divers.sacsPalette()], ['Palette de parpaings', 'Stockage', divers.paletteParpaings()],

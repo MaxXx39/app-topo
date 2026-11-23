@@ -152,10 +152,33 @@ const SIGNAUX = [
   ['Signal Priorité au trafic en sens inverse – flèche noire à droite', () => rondInterdiction(() => [{ ...fleche(0.34, 0.07, 0, NOIR, 0.12, 0.05), mat: 'trait' }, { ...fleche(0.54, 0.09, 180, ROUGE, -0.12, -0.02), mat: 'peinture' }])],
   ['Signal Priorité sur le trafic en sens inverse – flèche blanche à gauche', () => [...piece('#8a9198', 'metal', rectArrondi(-0.03, -0.95, 0.03, -0.42)), ...piece(BLEU, 'peinture', rectArrondi(-0.42, -0.42, 0.42, 0.42, 0.04)), fleche(0.56, 0.1, 0, '#f8fafc', -0.12, 0.0), { ...fleche(0.34, 0.07, 180, ROUGE, 0.12, 0.05), mat: 'peinture' }]],
   ['Signal Priorité sur le trafic en sens inverse – flèche blanche à droite', () => [...piece('#8a9198', 'metal', rectArrondi(-0.03, -0.95, 0.03, -0.42)), ...piece(BLEU, 'peinture', rectArrondi(-0.42, -0.42, 0.42, 0.42, 0.04)), fleche(0.56, 0.1, 0, '#f8fafc', 0.12, 0.0), { ...fleche(0.34, 0.07, 180, ROUGE, -0.12, 0.05), mat: 'peinture' }]],
+  // Panneaux de déviation (orange, flèche noire) : à gauche, à droite, tout droit (0.293.0).
+  ['Panneau Déviation – à gauche', () => deviation(90)],
+  ['Panneau Déviation – à droite', () => deviation(-90)],
+  ['Panneau Déviation – tout droit', () => deviation(0)],
+  ['Barrière suisse 2 lattes rouge et blanc', () => barriere2Lattes()],
   // Balise de guidage : bandes rouges et blanches en biais, dans les 2 sens.
   ['Balise de guidage – bandes montant vers la droite', () => balise(1)],
   ['Balise de guidage – bandes montant vers la gauche', () => balise(-1)],
 ];
+
+/** Panneau de déviation suisse : plaque orange 1,2 × 0,8 m, grande flèche noire (angle : 0 = tout droit, 90 = à gauche). */
+function deviation(angle) {
+  return [...piece('#8a9198', 'metal', rectArrondi(-0.03, -0.95, 0.03, -0.4)),
+    ...piece('#f08c00', 'peinture', rectArrondi(-0.6, -0.4, 0.6, 0.4, 0.05), NOIR),
+    { ...fleche(0.62, 0.14, angle, NOIR), mat: 'trait' }];
+}
+
+/** Barrière suisse à 2 lattes rouges et blanches (vue de face, 2,0 m) sur deux pieds. */
+function barriere2Lattes() {
+  const res = [...piece('#8a9198', 'metal', rectArrondi(-0.95, -0.35, -0.85, 0.35)), ...piece('#8a9198', 'metal', rectArrondi(0.85, -0.35, 0.95, 0.35))];
+  for (const y of [-0.15, 0.15]) {
+    res.push(plein('#f8fafc', 'blanc', rectArrondi(-1.0, y - 0.07, 1.0, y + 0.07)));
+    for (let k = 0; k < 8; k++) if (k % 2 === 0) res.push(plein('#d63a3a', 'peinture', rectArrondi(-1.0 + k * 0.25, y - 0.07, -1.0 + (k + 1) * 0.25, y + 0.07)));
+    res.push(trait(rectArrondi(-1.0, y - 0.07, 1.0, y + 0.07), true));
+  }
+  return res;
+}
 
 /** Feu de chantier (vu de face) : boîtier noir à 3 feux sur un pied, batterie au sol. */
 function feuChantier() {

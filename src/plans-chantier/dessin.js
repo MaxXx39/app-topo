@@ -386,6 +386,72 @@ function dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM, o) {
     ctx.strokeStyle = couleur;
     ctx.lineWidth = Math.max(0.6, epaisseur * 0.5);
     ctx.stroke();
+  } else if (m.type === 'lattes') {
+    // 2 lattes rouges et blanches côte à côte (bandes de 0,5 m en alternance), sur des pieds.
+    const dec = w * 0.27;
+    const lat = (d, sens) => {
+      const dp = pts.map((q, i) => {
+        const r = pts[Math.min(i + 1, pts.length - 1)];
+        const t = pts[Math.max(i - 1, 0)];
+        const a = Math.atan2(r[1] - t[1], r[0] - t[0]);
+        return [q[0] - Math.sin(a) * d * sens, q[1] + Math.cos(a) * d * sens];
+      });
+      ctx.beginPath();
+      dp.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.lineCap = 'butt';
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = w * 0.4;
+      ctx.setLineDash([]);
+      ctx.stroke();
+      ctx.strokeStyle = '#d63a3a';
+      const pas = Math.max(3, 0.5 * pxM * ech);
+      ctx.setLineDash([pas, pas]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      ctx.lineCap = 'round';
+    };
+    for (const r of reperes) {
+      const [nx, ny] = [-Math.sin(r.angle), Math.cos(r.angle)];
+      ctx.beginPath();
+      ctx.moveTo(r.x - nx * w * 0.55, r.y - ny * w * 0.55);
+      ctx.lineTo(r.x + nx * w * 0.55, r.y + ny * w * 0.55);
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = Math.max(1.2, w * 0.12);
+      ctx.stroke();
+    }
+    lat(dec, 1);
+    lat(dec, -1);
+  } else if (m.type === 'pieton') {
+    // Cheminement piéton : bande verte claire, bords pleins, petites flèches dans le sens du tracé.
+    tube(w, 'rgba(34,197,94,0.28)');
+    for (const sens of [1, -1]) {
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => {
+        const r = pts[Math.min(i + 1, pts.length - 1)];
+        const t = pts[Math.max(i - 1, 0)];
+        const an = Math.atan2(r[1] - t[1], r[0] - t[0]);
+        const q = [x - Math.sin(an) * (w / 2) * sens, y + Math.cos(an) * (w / 2) * sens];
+        if (i) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]);
+      });
+      ctx.strokeStyle = couleur;
+      ctx.lineWidth = Math.max(1, epaisseur);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    for (const r of reperes) {
+      const [ux, uy] = [Math.cos(r.angle), Math.sin(r.angle)];
+      const [nx, ny] = [-uy, ux];
+      const h = Math.min(w * 0.3, 8);
+      ctx.moveTo(r.x - ux * h - nx * h, r.y - uy * h - ny * h);
+      ctx.lineTo(r.x + ux * h, r.y + uy * h);
+      ctx.lineTo(r.x - ux * h + nx * h, r.y - uy * h + ny * h);
+    }
+    ctx.strokeStyle = couleur;
+    ctx.lineWidth = Math.max(1.2, epaisseur * 1.2);
+    ctx.stroke();
   } else if (m.type === 'heras') {
     // Treillis : trait double fin ; pieds en béton perpendiculaires à chaque joint de panneau ; croisillon par panneau.
     tube(Math.max(2, w * 0.1), '#94a3b8');

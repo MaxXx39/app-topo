@@ -124,7 +124,7 @@ export function benneDecantation() {
   // Pompe, tuyaux et regards.
   res.push(...piece('#f08c00', 'peinture', rectArrondi(-0.45, xs[2] + 0.55, 0.45, xs[2] + 1.0, 0.06)), trait([[0, xs[2] + 0.55], [0, xs[2] + 0.1]], false, NOIR), trait([[0.45, xs[2] + 0.8], [0.95, xs[2] + 0.8], [0.95, L / 2 - 0.3]], false, NOIR));
   res.push(...piece('#aeb4ba', 'metal', cercle(-0.7, xs[0] + 0.3, 0.12, 12)), ...piece('#aeb4ba', 'metal', cercle(-0.7, xs[2] + 0.3, 0.12, 12)));
-  res.push(texte('Décantation', 0.35, (xs[0] + xs[1]) / 2, 0.42, { a: 90 }), texte('pH', 0.35, (xs[1] + xs[2]) / 2 - 0.35, 0.42, { a: 90 }), texte('Eau claire', 0.35, (xs[2] + xs[3]) / 2, 0.42, { a: 90 }));
+  res.push(texte('Décantation', 0.35, (xs[0] + xs[3]) / 2, 0.42, { a: 90 })); // un seul texte (retour du 23.11)
   return res;
 }
 
@@ -276,32 +276,47 @@ export function abriVelos() {
   return res;
 }
 
-/** Place de parking réservée : marquage blanc sur fond bleu-gris, panneau « P » bleu. */
+/** Place de parking réservée : une seule place, fond transparent, contour et lettre P bleus (retour du 23.11). */
 export function parkingReserve() {
   const res = [];
-  res.push(motif('#8aa4c8', rectArrondi(-1.3, -2.6, 1.3, 2.6, 0.04)));
-  res.push(plein('#ffffff', 'blanc', rectArrondi(-1.3, -2.6, 1.3, 2.6, 0.04), rectArrondi(-1.2, -2.5, 1.2, 2.5, 0.03)));
-  res.push(...piece('#1f5fae', 'peinture', rectArrondi(-0.55, 0.3, 0.55, 1.4, 0.1)));
-  // Lettre P blanche : fût et panse (anneau en demi-cercle).
+  const BLEU = '#1f5fae';
+  res.push(plein(BLEU, 'peinture', rectArrondi(-1.3, -2.6, 1.3, 2.6, 0.04), rectArrondi(-1.2, -2.5, 1.2, 2.5, 0.03)));
+  // Lettre P bleue : fût et panse (anneau en demi-cercle).
   const panse = [[-0.06, 1.2], [0.04, 1.2], ...arc(0.04, 0.95, 0.25, 90, -90, 10), [0.04, 0.7], [-0.06, 0.7]];
   const trou = [[-0.06, 1.08], [0.04, 1.08], ...arc(0.04, 0.95, 0.13, 90, -90, 8), [0.04, 0.82], [-0.06, 0.82]];
-  res.push(plein('#ffffff', 'blanc', [[-0.2, 0.5], [-0.06, 0.5], [-0.06, 1.2], [-0.2, 1.2]]), plein('#ffffff', 'blanc', panse, trou));
-  res.push(texte('Réservé', 0, -1.2, 0.45, { a: 90 }));
+  res.push(plein(BLEU, 'peinture', [[-0.3, 0.4], [-0.06, 0.4], [-0.06, 1.3], [-0.3, 1.3]]), plein(BLEU, 'peinture', panse, trou));
   return res;
 }
 
 // ------------------------------------------------------------------ Stockage
 
-/** Banches de coffrage stockées à plat : 4 banches empilées sur palette, coffrant orange à nervures et trous de tirant. */
+/**
+ * Banche de coffrage avec lest, vue de dessus (0.293.0, d'après la photo de l'utilisateur) : le coffrant orange (devant,
+ * y mini), la passerelle de travail grillagée avec garde-corps derrière, 2 étais obliques en acier jusqu'au sol et 2 blocs
+ * de lest en béton posés sur les pieds des étais.
+ */
 export function stockBanches() {
   const res = [];
-  res.push(...piece('#a9744a', 'gravats', rectArrondi(-1.75, -1.05, 1.75, 1.05, 0.03)));
-  for (let i = 0; i < 3; i++) res.push(...piece('#7b8794', 'metal', rectArrondi(-1.7 + i * 0.03, -1.0 + i * 0.03, 1.7 - i * 0.03, 1.0 - i * 0.03, 0.03)));
-  res.push(...piece('#5f666d', 'metal', rectArrondi(-1.65, -0.95, 1.65, 0.95, 0.04)));
-  res.push(...piece('#e0a23c', 'peinture', rectArrondi(-1.53, -0.83, 1.53, 0.83, 0.03), '#a76e12'));
-  for (let x = -1.0; x < 1.4; x += 0.5) res.push(trait([[x, -0.8], [x, 0.8]], false, '#a76e12'));
-  for (let x = -1.25; x < 1.4; x += 0.5) for (const y of [-0.55, 0, 0.55]) res.push(plein('#6b4a1a', 'caoutchouc', cercle(x, y, 0.035, 8)));
-  res.push(trait([[-1.53, 0.45], [1.53, 0.45]], false, '#a76e12'), trait([[-1.53, -0.45], [1.53, -0.45]], false, '#a76e12'));
+  const L = 3.0;
+  // Lest : 2 blocs de béton au pied des étais.
+  for (const x of [-1.0, 1.0]) {
+    res.push(...piece('#a8adb2', 'beton', rectArrondi(x - 0.35, 1.05, x + 0.35, 1.7, 0.03), '#6b7280'), trait([[x - 0.35, 1.375], [x + 0.35, 1.375]], false, '#7b848d'));
+    res.push(...piece('#d63a3a', 'peinture', rectArrondi(x - 0.05, 1.3, x + 0.05, 1.45, 0.02)));
+  }
+  // Étais : de la passerelle (y = 0.5) au pied lesté (y = 1.4), avec le vérin au milieu.
+  for (const x of [-1.0, 1.0]) {
+    res.push(...piece('#5f666d', 'metal', epais([[x, 0.45], [x, 1.2]], 0.08)), ...piece('#e0a23c', 'peinture', epais([[x, 0.75], [x, 1.0]], 0.12)));
+    res.push(...piece(METAL, 'metal', cercle(x, 0.45, 0.07, 10)));
+  }
+  // Passerelle : plancher grillagé et garde-corps (lisses sur 3 côtés).
+  res.push(...piece('#c9ced3', 'metal', rectArrondi(-L / 2, 0.12, L / 2, 0.95, 0.02), '#5f666d'));
+  for (let x = -L / 2 + 0.1; x < L / 2; x += 0.1) res.push(trait([[x, 0.15], [x, 0.92]], false, '#9aa3ab'));
+  res.push(trait([[-L / 2 + 0.03, 0.15], [-L / 2 + 0.03, 0.92], [L / 2 - 0.03, 0.92], [L / 2 - 0.03, 0.15]], false, '#d63a3a'));
+  for (const x of [-L / 2 + 0.03, 0, L / 2 - 0.03]) res.push(plein('#d63a3a', 'peinture', rectArrondi(x - 0.04, 0.89, x + 0.04, 0.97, 0.01)));
+  // Coffrant orange à nervures (devant) et poutres verticales.
+  res.push(...piece('#e0a23c', 'peinture', rectArrondi(-L / 2, -0.12, L / 2, 0.12, 0.02), '#a76e12'));
+  for (let x = -L / 2 + 0.25; x < L / 2; x += 0.5) res.push(trait([[x, -0.1], [x, 0.1]], false, '#a76e12'));
+  res.push(...piece('#5f666d', 'metal', rectArrondi(-L / 2 - 0.04, -0.14, -L / 2 + 0.04, 0.14)), ...piece('#5f666d', 'metal', rectArrondi(L / 2 - 0.04, -0.14, L / 2 + 0.04, 0.14)));
   return res;
 }
 

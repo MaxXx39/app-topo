@@ -38,7 +38,7 @@ export const CATEGORIES_ZONE = [
 //   poteau (rectangle en travers, clôture), chevron « > » (flèche simple, retournable), double « < > » (flèche double),
 //   texte (« EAU »…, eclair = petit éclair devant) ; tailleMm = hauteur du motif ou des lettres.
 export const STYLES_LIGNE = [
-  { cle: 'cloture', nom: 'Clôture de chantier', couleur: '#f59e0b', tirets: [], epaisseurMm: 0.35, motif: { type: 'poteau', pasMm: 14, tailleMm: 2.6 } },
+  { cle: 'cloture', nom: 'Clôture de chantier', couleur: '#f08c00', tirets: [], epaisseurMm: 0.35, motif: { type: 'poteau', pasMm: 14, tailleMm: 2.6 } },
   { cle: 'flecheSimple', nom: 'Flèche simple  >', couleur: '#eab308', tirets: [], epaisseurMm: 0.5, motif: { type: 'chevron', pasMm: 22, tailleMm: 2.6 } },
   { cle: 'flecheDouble', nom: 'Flèche double  < >', couleur: '#a21caf', tirets: [], epaisseurMm: 0.5, motif: { type: 'double', pasMm: 26, tailleMm: 2.6 } },
   { cle: 'elec', nom: 'Électricité', couleur: '#ef4444', tirets: [], epaisseurMm: 0.25, motif: { type: 'texte', texte: 'ELEC', eclair: true, pasMm: 34, tailleMm: 2.6 } },
@@ -55,6 +55,9 @@ export const STYLES_LIGNE = [
   { cle: 'echafaudage', nom: 'Échafaudage', couleur: '#64748b', tirets: [], epaisseurMm: 0.3, motif: { type: 'echafaudage', largeurM: 0.9, elementM: 2.5 } },
   { cle: 'filet', nom: 'Filet de protection', couleur: '#2f9e55', tirets: [], epaisseurMm: 0.3, motif: { type: 'filet', largeurM: 0.35, elementM: 0.5 } },
   { cle: 'heras', nom: 'Barrière Heras', couleur: '#475569', tirets: [], epaisseurMm: 0.3, motif: { type: 'heras', largeurM: 0.8, elementM: 3.5 } },
+  // 0.293.0 : barrière suisse à 2 lattes rouges et blanches, cheminement piéton (bande verte avec flèches).
+  { cle: 'lattes', nom: 'Barrière 2 lattes rouge et blanc', couleur: '#d63a3a', tirets: [], epaisseurMm: 0.3, motif: { type: 'lattes', largeurM: 0.35, elementM: 0.5 } },
+  { cle: 'pieton', nom: 'Cheminement piéton', couleur: '#16a34a', tirets: [], epaisseurMm: 0.3, motif: { type: 'pieton', largeurM: 1.2, elementM: 2.5 } },
   { cle: 'libre', nom: 'Ligne', couleur: '#1b2b36', tirets: [], epaisseurMm: 0.35 },
 ];
 // Anciens genres de ligne : « Câble électrique » (0.286.0) = Électricité ; « Barrière (chevrons) » et « Limite » (0.287.0)

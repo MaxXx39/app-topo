@@ -51,7 +51,34 @@ function citerne(b, couleur, { bandes = METAL, trous = 3 } = {}) {
   return res;
 }
 
-export const camionCiterne = () => [...camion({ L: 9, corps: (b) => citerne(b, '#c3c8cd') }), texte('CITERNE', 0, 1.1, 0.42, { a: 90 })];
+
+// ------------------------------------------------------------------ Pictos des camions (0.293.0 : un logo plutôt qu'un mot)
+
+/** Pastille ronde blanche (rayon r) au centre (0, y) : fond des pictos. */
+const pastille = (y, r) => [...piece('#f8fafc', 'blanc', cercle(0, y, r, 28), '#334155')];
+/** Goutte (eau, carburant) : pointe en haut, couleur k, taille r. */
+const goutte = (y, r, k) => {
+  const pts = [[0, y + r * 1.15], ...Array.from({ length: 21 }, (_, i) => { const a = (-30 + (i * 240) / 20) * Math.PI / 180 - Math.PI / 2 + Math.PI; return [r * 0.72 * Math.sin(a + Math.PI) * -1, y - r * 0.2 + r * 0.72 * Math.cos(a + Math.PI) * -1]; })];
+  return plein(k, 'peinture', pts);
+};
+/** Picto citerne : goutte d'eau bleue. */
+const pictoCiterne = (y) => [...pastille(y, 0.62), goutte(y, 0.5, '#1d6fd1')];
+/** Picto carburant : pompe à essence (pistolet) rouge sur la pastille. */
+const pictoCarburant = (y) => [...pastille(y, 0.62),
+  plein('#d63a3a', 'peinture', rectArrondi(-0.26, y - 0.34, 0.08, y + 0.34, 0.04)), plein('#f8fafc', 'blanc', rectArrondi(-0.18, y + 0.1, 0.0, y + 0.26, 0.02)),
+  trait([[0.08, y + 0.2], [0.26, y + 0.2], [0.26, y - 0.1]], false, '#d63a3a'), plein('#334155', 'metal', rectArrondi(0.2, y - 0.2, 0.32, y - 0.08, 0.02)),
+  plein('#d63a3a', 'peinture', rectArrondi(-0.34, y - 0.42, 0.16, y - 0.34))];
+/** Picto balayeuse : balai (manche + brosse). */
+const pictoBalai = (y) => [...pastille(y, 0.62),
+  plein('#8a6a4b', 'gravats', epais([[0.3, y + 0.42], [-0.05, y - 0.05]], 0.07)),
+  plein('#c98a2b', 'peinture', [[-0.34, y - 0.02], [0.2, y - 0.02], [0.28, y - 0.42], [-0.42, y - 0.42]]),
+  ...[-0.28, -0.14, 0, 0.14].map((x) => trait([[x, y - 0.06], [x - 0.05, y - 0.4]], false, '#7a521a'))];
+/** Picto bitume : flamme noire sur la pastille (bitume chaud) avec 2 traits de route. */
+const pictoBitume = (y) => [...pastille(y, 0.62),
+  plein('#f08c00', 'peinture', [[0, y + 0.45], [0.22, y + 0.12], [0.3, y - 0.18], [0.12, y - 0.38], [-0.12, y - 0.38], [-0.3, y - 0.18], [-0.2, y + 0.05], [-0.08, y + 0.15]]),
+  plein('#3a3f45', 'caoutchouc', [[0, y + 0.1], [0.12, y - 0.12], [0.06, y - 0.3], [-0.06, y - 0.3], [-0.12, y - 0.12]])];
+
+export const camionCiterne = () => [...camion({ L: 9, corps: (b) => citerne(b, '#c3c8cd') }), ...pictoCiterne(1.1)];
 
 /** Camion carburant aux couleurs Perrin : cabine jaune, citerne orange comme la caisse des camions benne. */
 export function camionCarburant() {
@@ -61,7 +88,7 @@ export function camionCarburant() {
     plein('#334155', 'peinture', rectArrondi(b.x1 - 0.14, b.y0 + 0.4, b.x1 - 0.02, b.y1 - 0.4)),
     ...piece('#f8fafc', 'blanc', rectArrondi(-0.22, b.y1 - 0.06, 0.22, b.y1 + 0.1)),
   ];
-  return [...camion({ L: 9, corps, couleurCabine: PERRIN_JAUNE }), texte('CARBURANT', 0, 1.1, 0.4, { a: 90 })];
+  return [...camion({ L: 9, corps, couleurCabine: PERRIN_JAUNE }), ...pictoCarburant(1.1)];
 }
 
 export function camionBitume() {
@@ -70,7 +97,7 @@ export function camionBitume() {
     ...piece(METAL, 'metal', rectArrondi(-1.7, b.y1 + 0.05, 1.7, b.y1 + 0.22, 0.04)),
     ...Array.from({ length: 12 }, (_, i) => plein('#2b2f33', 'caoutchouc', cercle(-1.55 + (3.1 * i) / 11, b.y1 + 0.135, 0.045, 8))),
   ];
-  return [...camion({ L: 9, corps, couleurCabine: PERRIN_ORANGE }), texte('BITUME', 0, 0.9, 0.42, { a: 90 })];
+  return [...camion({ L: 9, corps, couleurCabine: PERRIN_ORANGE }), ...pictoBitume(0.9)];
 }
 
 export function camionBalai() {
@@ -91,7 +118,42 @@ export function camionBalai() {
     }
     return [...res, ...piece(GRIS, 'metal', cercle(x, y, 0.12, 12))];
   };
-  return [...camion({ L, W, essieux: [1.8], corps, couleurCabine: BLANC }), ...brosse(-1.05), ...brosse(1.05), texte('BALAYEUSE', 0, 1.3, 0.34, { a: 90 })];
+  return [...camion({ L, W, essieux: [1.8], corps, couleurCabine: BLANC }), ...brosse(-1.05), ...brosse(1.05), ...pictoBalai(1.3)];
+}
+
+
+// ------------------------------------------------------------------ Compacteurs (0.293.0 : 3 types bien différents)
+
+/** Bille (rouleau) de compacteur : rectangle gris à reflets, rayures en travers, bords sombres. */
+const bille = (x0, y0, x1, y1) => [
+  ...piece('#aab2ba', 'metal', rectArrondi(x0, y0, x1, y1, 0.06), '#4b5563'),
+  ...[0.25, 0.5, 0.75].map((f) => trait([[x0 + 0.04, y0 + (y1 - y0) * f], [x1 - 0.04, y0 + (y1 - y0) * f]], false, '#7b848d')),
+];
+/** Corps de compacteur : capot jaune, cabine / poste de conduite sombre avec arceau, gyrophare orange. */
+const corpsCompacteur = (x0, y0, x1, y1, ycab) => [
+  ...piece(PERRIN_JAUNE, 'peinture', rectArrondi(x0, y0, x1, y1, 0.12)),
+  ...piece('#d9a90f', 'peinture', rectArrondi(x0 + 0.1, y0 + 0.1, x1 - 0.1, ycab - 0.1, 0.06)),
+  ...piece('#3a3f45', 'metal', rectArrondi(x0 + 0.12, ycab, x1 - 0.12, y1 - 0.12, 0.06)),
+  ...piece('#9cc9e6', 'vitre', rectArrondi(x0 + 0.2, ycab + 0.1, x1 - 0.2, y1 - 0.2, 0.04)),
+  ...piece('#f08c00', 'phare', cercle(0, ycab + 0.05, 0.07, 10)),
+];
+
+/** Compacteur tandem : 2 billes lisses de même largeur (avant et arrière), corps étroit entre elles. */
+export function compacteurTandem() {
+  return [...bille(-0.7, -2.0, 0.7, -0.95), ...bille(-0.7, 0.95, 0.7, 2.0), ...corpsCompacteur(-0.55, -1.0, 0.55, 1.0, -0.1)];
+}
+/** Compacteur mixte : 1 bille à l'avant, 4 pneus à l'arrière (2 de chaque côté). */
+export function compacteurMixte() {
+  const res = [...bille(-0.65, -2.0, 0.65, -0.95)];
+  for (const y of [0.9, 1.5]) res.push(...pneu(-0.95, y - 0.28, -0.45, y + 0.28), ...pneu(0.45, y - 0.28, 0.95, y + 0.28));
+  return [...res, ...corpsCompacteur(-0.55, -1.0, 0.55, 1.8, 0.2)];
+}
+/** Compacteur à pneus : 4 pneus devant, 5 derrière, décalés pour couvrir toute la largeur, lestage en caisse. */
+export function compacteurPneus() {
+  const res = [];
+  for (const x of [-0.95, -0.32, 0.32, 0.95]) res.push(...pneu(x - 0.28, -1.65, x + 0.28, -1.05));
+  for (const x of [-1.27, -0.63, 0, 0.63, 1.27]) res.push(...pneu(x - 0.28, 1.05, x + 0.28, 1.65));
+  return [...res, ...corpsCompacteur(-0.8, -1.2, 0.8, 1.2, 0.0), ...piece('#8a9198', 'metal', rectArrondi(-0.6, -1.1, 0.6, -0.4, 0.05), '#4b5563')];
 }
 
 // ------------------------------------------------------------------ Tracteur + benne

@@ -120,7 +120,7 @@ describe('modernisation', () => {
 
 describe('bibliothèque livrée (Base_2023.dxf)', () => {
   it('59 symboles proposés, grues et châssis réglables', () => {
-    expect(BIB.filter((s) => !s.cache)).toHaveLength(120); // 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
+    expect(BIB.filter((s) => !s.cache)).toHaveLength(124); // 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
     expect(flechesDisponibles(BIB, 'tour')).toEqual([25, 30, 35, 40, 45, 50, 55, 60, 65, 70]);
     expect(flechesDisponibles(BIB, 'auto')).toEqual([20, 25, 30, 35, 40, 45, 50]);
     expect(chassisDisponibles(BIB)).toEqual(['3.80', '4.20', '4.50', '4.60', '6']);
@@ -460,7 +460,7 @@ describe('0.292.0 : texte unique, échelle d\'un bloc, tas de stock, nouvelles l
       ['Nacelle articulée (repliée)', 'Engins'], ['Élévateur à ciseaux', 'Engins'], ['Compresseur', 'Engins'], ['Bétonnière', 'Engins'],
       ['Centrale à béton mobile', 'Installations'], ['Silo à ciment', 'Installations'], ['Poste de lavage des roues', 'Installations'], ['Mât d\'éclairage', 'Installations'],
       ['Extincteur', 'Sécurité'], ['Abri à vélos', 'Base-vie'], ['Douches', 'Base-vie'], ['Benne Decantation', 'Base-vie'],
-      ['Stock de banches de coffrage', 'Stockage'], ['Palette de tuyaux PVC', 'Stockage'], ['Plaques de roulage', 'Stockage'], ['Regards préfabriqués', 'Stockage'],
+      ['Banche avec lest', 'Stockage'], ['Palette de tuyaux PVC', 'Stockage'], ['Plaques de roulage', 'Stockage'], ['Regards préfabriqués', 'Stockage'],
     ];
     for (const [n, c] of attendus) expect(nom(n)?.categorie, n).toBe(c);
     for (const t of [40, 100, 200, 350]) for (const e of ['plié', 'déplié']) expect(nom(`Camion grue ${t} t (${e})`)?.categorie).toBe('Grues');
