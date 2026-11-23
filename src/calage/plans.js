@@ -31,7 +31,7 @@ export function planDesPoints(points) {
   const bornes = vide ? null : { estMin: Math.min(...est), nordMin: Math.min(...nord), estMax: Math.max(...est), nordMax: Math.max(...nord) };
   const origine = vide ? { est: 0, nord: 0 } : { est: Math.floor(bornes.estMin), nord: Math.floor(bornes.nordMin) };
   const etendue = vide ? 1 : Math.max(bornes.estMax - bornes.estMin, bornes.nordMax - bornes.nordMin, 1);
-  const rayon = Math.max(0.05, etendue / 250);
+  const rayon = Math.max(0.05, etendue / 90); // assez gros pour être touché au doigt
   const mm = (v) => Math.round(v * 1000) / 1000;
   const x = (p) => mm(p.est - origine.est);
   const y = (p) => mm(p.nord - origine.nord);
