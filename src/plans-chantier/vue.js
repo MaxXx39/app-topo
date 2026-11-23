@@ -6,7 +6,7 @@
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
 import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles } from '../topo/plan-chantier.js';
-import { dessinerObjet, symboleDeLObjet } from './dessin.js';
+import { dessinerObjet, dessinerObjets, symboleDeLObjet } from './dessin.js';
 import { coinsSymbole, poigneeRotation } from '../topo/symboles.js';
 import { dessinerFondSwisstopo } from './tuiles.js';
 
@@ -139,7 +139,7 @@ export function creerVueChantier(conteneur, options) {
     if (pc) {
       const visibles = objetsVisibles(pc);
       const d = contexteDessin(ctx, pc);
-      for (const o of visibles) dessinerObjet(d, o);
+      dessinerObjets(d, visibles);
       const sel = visibles.find((o) => o.id === choisi()); // phase cachée : plus de cadre de choix
       if (sel) dessinerChoix(ctx, sel);
       // Symbole à poser (0.289.0) : aperçu transparent sous la souris.

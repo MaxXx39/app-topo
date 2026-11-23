@@ -120,7 +120,7 @@ describe('modernisation', () => {
 
 describe('bibliothèque livrée (Base_2023.dxf)', () => {
   it('59 symboles proposés, grues et châssis réglables', () => {
-    expect(BIB.filter((s) => !s.cache)).toHaveLength(116); // 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
+    expect(BIB.filter((s) => !s.cache)).toHaveLength(113); // 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
     expect(flechesDisponibles(BIB, 'tour')).toEqual([25, 30, 35, 40, 45, 50, 55, 60, 65, 70]);
     expect(flechesDisponibles(BIB, 'auto')).toEqual([20, 25, 30, 35, 40, 45, 50]);
     expect(chassisDisponibles(BIB)).toEqual(['3.80', '4.20', '4.50', '4.60', '6']);
@@ -566,5 +566,74 @@ describe('cotations et ligne de repère (0.293.0)', () => {
     expect(objetSousLePoint(plan.objets, [10, 0.4], 0.3)?.id).toBe(t.id);
     expect(objetSousLePoint(plan.objets, [20.5, 0.5], 0.3)?.id).toBe(t.id);
     expect(objetSousLePoint(plan.objets, [10, 3], 0.3)).toBeNull();
+  });
+});
+
+describe('gestion des phases (0.293.0)', () => {
+  const planPhases = async () => {
+    const m = await import('../src/topo/plan-chantier.js');
+    const plan = m.nouveauPlanChantier('t', 'pic');
+    m.ajouterPhase(plan, 'Phase 2');
+    m.ajouterPhase(plan, 'Phase 3');
+    const [p1, p2, p3] = plan.phases.map((p) => p.id);
+    const mk = (phase, extra = {}) => m.ajouterObjet(plan, { type: 'zone', categorie: 'installation', points: [[0, 0], [5, 0], [5, 5]], phase, ...extra });
+    return { m, plan, p1, p2, p3, a: mk(p1), b: mk(p2), c: mk(p3) };
+  };
+
+  it('sans règle : l\'affichage de départ (cases visibles des phases)', async () => {
+    const { m, plan, p2, a, b, c } = await planPhases();
+    plan.phases.find((p) => p.id === p2).visible = false;
+    expect(m.objetsVus(plan, plan.phases[0].id).map((o) => o.id)).toEqual([a.id, c.id]);
+    void b;
+  });
+
+  it('matrice : phase 1 ne voit pas 2 et 3 mais 4 ; phase 2 voit 1 estompée et 3', async () => {
+    const { m, plan, p1, p2, p3, a, b, c } = await planPhases();
+    m.reglerVue(plan, p1, p2, { mode: 'cache' });
+    m.reglerVue(plan, p1, p3, { mode: 'cache' });
+    expect(m.objetsVus(plan, p1).map((o) => o.id)).toEqual([a.id]);
+    m.reglerVue(plan, p2, p1, { mode: 'estompe', opacite: 0.4 });
+    const vus = m.objetsVus(plan, p2);
+    expect(vus.map((o) => o.id)).toEqual([a.id, b.id, c.id]);
+    expect(vus[0].rendu).toEqual({ mode: 'estompe', opacite: 0.4, couleur: '#64748b' });
+    expect(vus[1].rendu).toBeUndefined();
+  });
+
+  it('éléments dont la fin est passée, genres et éléments cachés, couleur unique', async () => {
+    const { m, plan, p1, p2, p3, a } = await planPhases();
+    a.fin = p2;
+    m.reglerVue(plan, p3, p1, { mode: 'normal', fini: 'assombri' });
+    expect(m.objetsVus(plan, p2).some((o) => o.id === a.id)).toBe(true); // pas de règle pour p2 : départ
+    expect(m.objetsVus(plan, p3).find((o) => o.id === a.id).rendu.mode).toBe('assombri'); // fini en phase 3
+    m.reglerVue(plan, p3, p1, { genresCaches: ['zone'] });
+    expect(m.objetsVus(plan, p3).some((o) => o.id === a.id)).toBe(false);
+    m.reglerVue(plan, p3, p1, { genresCaches: [], mode: 'couleur', fini: 'couleur', couleur: '#0000ff' });
+    expect(m.couleurObjet(plan, m.objetsVus(plan, p3).find((o) => o.id === a.id))).toBe('#0000ff');
+    m.reinitialiserVues(plan, p3);
+    expect(plan.vues[p3]).toBeUndefined();
+  });
+
+  it('dates de phase dans le cartouche et page par phase selon la matrice', async () => {
+    const { m, plan, p1, p2, a, b, c } = await planPhases();
+    expect(m.datesDePhase({ debut: '2027-03-01', fin: '2027-04-30' })).toBe('01.03.2027 – 30.04.2027');
+    m.reglerVue(plan, p2, p1, { mode: 'cache' });
+    const ids = objetsDeLaPage(plan, { phase: p2, phases: [p2] }).map((o) => o.id);
+    expect(ids).toEqual([b.id, c.id]); // la phase 1 est cachée, la 3 reste visible
+    void a;
+  });
+});
+
+describe('panneau de déviation (0.293.0)', () => {
+  it('texte et sens modifiables ; la largeur suit le texte ; texte brut gardé dans le DXF', async () => {
+    const { panneauDeviation } = await import('../src/topo/panneau-deviation.js');
+    const court = panneauDeviation({ texte: 'Aigle', sens: 'droite' });
+    const long = panneauDeviation({ texte: 'Saint-Maurice', sens: 'gauche' });
+    expect(long.largeur).toBeGreaterThan(court.largeur);
+    expect(court.primitives.some((p) => p.g === 't' && p.brut && p.t === 'Aigle')).toBe(true);
+    expect(panneauDeviation({ texte: 'Aigle', sens: 'tout' }).largeur).not.toBe(court.largeur);
+    const o = { type: 'symbole', cle: 'dyn:deviation', texte: 'Aigle', sens: 'droite', point: [0, 0], rotation: 0 };
+    expect(resumeObjet(o)).toContain('Aigle');
+    const bloc = blocDuPose(o, BIB, 0.6);
+    expect(bloc.primitives.find((p) => p.g === 't').h).toBeLessThan(0.6); // pas remplacé par la taille des symboles
   });
 });

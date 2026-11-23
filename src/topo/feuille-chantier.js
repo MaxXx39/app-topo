@@ -3,7 +3,7 @@
 // légende automatique (genres et symboles utilisés), nord, barre d'échelle ; une page par phase ou toutes sur une page.
 // Unités : mm de papier (origine en haut à gauche de la feuille, y vers le bas).
 import { tailleFeuille, barreEchellePapier } from '../export/echelle.js';
-import { categorieZone, styleLigne, objetsVisibles, bornesObjets, ECHELLE_PAPIER, estPose, materiauTas } from './plan-chantier.js';
+import { categorieZone, styleLigne, objetsVisibles, objetsVus, bornesObjets, ECHELLE_PAPIER, estPose, materiauTas } from './plan-chantier.js';
 
 export const FORMATS_FEUILLE = [['a4', 'A4'], ['a3', 'A3'], ['a1', 'A1']];
 
@@ -77,6 +77,8 @@ export function pagesDeLaFeuille(plan, pages = reglagesFeuille(plan).pages) {
 
 /** Objets d'une page (phases de la page). */
 export function objetsDeLaPage(plan, page) {
+  // Gestion des phases : une page par phase avec des règles = « on voit quoi » dans cette phase.
+  if (page.phase && plan.vues?.[page.phase]) return objetsVus(plan, page.phase).filter((o) => o.type !== 'construction');
   const ids = new Set(page.phases);
   return plan.objets.filter((o) => o.type !== 'construction' && ids.has(o.phase)); // construction : jamais imprimée
 }

@@ -145,11 +145,74 @@ export function retirerObjet(plan, id) {
   return plan.objets.length < avant;
 }
 
-/** Objets dont la phase est visible. */
+/**
+ * Gestion des phases (0.293.0) : « on voit quoi, quand ». plan.vues[phaseEnCours][phaseVue] = règle d'affichage des
+ * éléments de phaseVue quand on est dans phaseEnCours :
+ *   { mode, opacite (0–1), couleur, fini (mode des éléments dont la fin est passée), genresCaches [types], elementsCaches [ids] }.
+ * Un élément peut avoir une phase de fin (o.fin) : « en place » de sa phase jusqu'à cette phase, « fini » après.
+ * Sans règle pour la phase en cours, on garde l'ancien affichage (cases « visible » des phases).
+ */
+export const MODES_VUE = [['cache', 'Caché'], ['normal', 'Normal'], ['estompe', 'Estompé'], ['assombri', 'Assombri / grisé'], ['couleur', 'Couleur unique']];
+export const OPACITE_VUE = 0.35;
+export const COULEUR_VUE = '#64748b';
+
+/** Règle d'affichage des éléments de `vue` quand on est dans `courante` (règle enregistrée, sinon celle de départ). */
+export function regleDeVue(plan, courante, vue) {
+  const r = plan.vues?.[courante]?.[vue];
+  if (r) return r;
+  if (vue === courante) return { mode: 'normal' };
+  return { mode: plan.phases.find((p) => p.id === vue)?.visible === false ? 'cache' : 'normal' };
+}
+
+/** Phase après laquelle l'élément est « fini » : rang de la phase de fin, ou null. */
+const rangDe = (plan, id) => plan.phases.findIndex((p) => p.id === id);
+
+/**
+ * Objets à montrer dans la phase `courante` (la phase active à l'écran, celle de la page sur la feuille). Un élément
+ * estompé, assombri ou en couleur unique est rendu comme une copie avec `rendu: { mode, opacite, couleur }` (même id).
+ */
+export function objetsVus(plan, courante = plan.phaseActive) {
+  const construction = plan.construction?.visible !== false; // lignes de construction, hors phases
+  const reglee = Boolean(plan.vues?.[courante]);
+  const rc = rangDe(plan, courante);
+  return plan.objets.flatMap((o) => {
+    if (o.type === 'construction') return construction ? [o] : [];
+    if (!reglee) return plan.phases.find((p) => p.id === o.phase)?.visible !== false ? [o] : [];
+    const r = regleDeVue(plan, courante, o.phase);
+    if (r.genresCaches?.includes(o.type) || r.elementsCaches?.includes(o.id)) return [];
+    let mode = r.mode;
+    if (o.fin && rc > rangDe(plan, o.fin)) mode = r.fini ?? 'cache';
+    if (mode === 'cache') return [];
+    if (mode === 'normal') return [o];
+    return [{ ...o, rendu: { mode, opacite: r.opacite ?? OPACITE_VUE, couleur: r.couleur ?? COULEUR_VUE } }];
+  });
+}
+
+/** Objets dont la phase est visible (dans la phase active). */
 export function objetsVisibles(plan) {
-  const visibles = new Set(plan.phases.filter((p) => p.visible !== false).map((p) => p.id));
-  const construction = plan.construction?.visible !== false; // 0.293.0 : lignes de construction, hors phases
-  return plan.objets.filter((o) => (o.type === 'construction' ? construction : visibles.has(o.phase)));
+  return objetsVus(plan, plan.phaseActive);
+}
+
+/** Modifie une règle de vue (crée la ligne de la phase en cours au besoin, avec les règles de départ de toutes les phases). */
+export function reglerVue(plan, courante, vue, champs) {
+  plan.vues ??= {};
+  if (!plan.vues[courante]) {
+    plan.vues[courante] = {};
+    for (const p of plan.phases) plan.vues[courante][p.id] = { ...regleDeVue(plan, courante, p.id) };
+  }
+  plan.vues[courante][vue] = { ...(plan.vues[courante][vue] ?? { mode: 'normal' }), ...champs };
+  return plan.vues[courante][vue];
+}
+
+/** Remet la ligne d'une phase en cours à l'affichage de départ (cases « visible » des phases). */
+export function reinitialiserVues(plan, courante) {
+  if (plan.vues) delete plan.vues[courante];
+}
+
+/** Dates d'une phase pour le cartouche : « 01.03.2027 – 30.04.2027 » (ou une seule, ou vide). */
+export function datesDePhase(phase) {
+  const f = (d) => (d ? d.split('-').reverse().join('.') : '');
+  return [f(phase?.debut), f(phase?.fin)].filter(Boolean).join(' – ');
 }
 
 /** Objets qui s'impriment (PDF, DXF, légende) : tout sauf les lignes de construction (0.293.0). */
@@ -160,6 +223,7 @@ export const objetsImprimables = (objets) => objets.filter((o) => o.type !== 'co
  * celle de sa catégorie / son style.
  */
 export function couleurObjet(plan, objet) {
+  if (objet.rendu?.mode === 'couleur') return objet.rendu.couleur; // gestion des phases : couleur unique
   if (plan.couleurs === 'phases') return plan.phases.find((p) => p.id === objet.phase)?.couleur ?? '#1b2b36';
   if (objet.couleur) return objet.couleur; // couleur choisie pour cet élément (0.287.0)
   if (objet.type === 'zone') return materiauTas(objet.materiau)?.couleur ?? categorieZone(objet.categorie).couleur;
@@ -364,6 +428,7 @@ export function resumeObjet(o) {
   if (o.type === 'construction') return o.infinie ? 'Construction · droite' : `Construction · segment ${n(longueur(o.points))} m`;
   if (o.type === 'grue' && o.modele === 'mobile') return `Grue mobile ${o.tonnes ?? 100} t · flèche ${o.fleche ?? 25} m`;
   if (o.type === 'grue') return `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'} · flèche ${o.fleche ?? 40} m${o.chassis && o.chassis !== 'aucun' ? ` · châssis ${o.chassis}` : ''}`;
+  if (o.type === 'symbole' && o.cle === 'dyn:deviation') return `Panneau de déviation « ${o.texte ?? ''} »`;
   if (o.type === 'symbole') return o.etage ? 'Base-vie à étage' : String(o.cle ?? '').replace(/^[a-z]+:/, '');
   return o.type;
 }

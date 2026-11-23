@@ -102,6 +102,41 @@ function dessinerTas(d, o, couleur) {
 }
 
 /** Dessine un élément du plan de chantier. */
+/**
+ * Dessine des objets dans l'ordre. Ceux qui ont un rendu de phase (estompé, assombri, couleur unique : `o.rendu`) sont
+ * dessinés d'abord, par groupes de même rendu, sur une toile à part posée ensuite avec la transparence ou le gris voulu :
+ * l'effet vaut pour tout le groupe (pas de double teinte aux croisements).
+ */
+export function dessinerObjets(d, objets) {
+  const groupes = new Map();
+  const normaux = [];
+  for (const o of objets) {
+    if (!o.rendu) normaux.push(o);
+    else {
+      const cle = `${o.rendu.mode}|${o.rendu.opacite}|${o.rendu.couleur}`;
+      if (!groupes.has(cle)) groupes.set(cle, []);
+      groupes.get(cle).push(o);
+    }
+  }
+  for (const liste of groupes.values()) {
+    const { mode, opacite } = liste[0].rendu;
+    const toile = document.createElement('canvas');
+    toile.width = d.ctx.canvas.width;
+    toile.height = d.ctx.canvas.height;
+    const tctx = toile.getContext('2d');
+    tctx.setTransform(d.ctx.getTransform());
+    for (const o of liste) dessinerObjet({ ...d, ctx: tctx }, o);
+    d.ctx.save();
+    d.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    d.ctx.globalAlpha = mode === 'estompe' ? opacite : mode === 'assombri' ? 0.8 : 1;
+    if (mode === 'assombri') d.ctx.filter = 'grayscale(1) brightness(0.7)';
+    d.ctx.drawImage(toile, 0, 0);
+    d.ctx.restore();
+    toile.width = 0;
+  }
+  for (const o of normaux) dessinerObjet(d, o);
+}
+
 export function dessinerObjet(d, o) {
   const { ctx, vue, pc } = d;
   const couleur = couleurObjet(pc, o);
@@ -597,7 +632,8 @@ export function dessinerPrimitives(ctx, prims, e, mm, options = {}) {
       ctx.stroke();
     } else if (p.g === 't') {
       // 0.292.0 : tous les textes ont la même taille (options.texteU, en unités du symbole) et une plaque blanche.
-      texteDansSymbole(ctx, options.texteU ? { ...p, h: options.texteU } : p, e, options.angle ?? 0);
+      if (p.brut) texteBrut(ctx, p, e, options.angle ?? 0);
+      else texteDansSymbole(ctx, options.texteU ? { ...p, h: options.texteU } : p, e, options.angle ?? 0);
     }
   }
 }
@@ -605,6 +641,24 @@ export function dessinerPrimitives(ctx, prims, e, mm, options = {}) {
 /**
  * Texte d'un symbole (repère du symbole, y vers le haut) : jamais à l'envers (angleSymbole = rotation du symbole posé, °).
  */
+/** Texte d'un panneau (0.293.0) : noir, gras, taille propre, sans plaque ; jamais à l'envers. */
+function texteBrut(ctx, p, e, angleSymbole) {
+  if (p.h * e < 3) return;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  let a = p.a ?? 0;
+  const total = (((a + angleSymbole) % 360) + 360) % 360;
+  if (total > 90 && total < 270) a += 180;
+  ctx.rotate((a * Math.PI) / 180);
+  ctx.scale(1 / e, -1 / e);
+  ctx.font = `700 ${(p.h * e).toFixed(2)}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = p.k;
+  ctx.fillText(p.t, 0, 0);
+  ctx.restore();
+}
+
 function texteDansSymbole(ctx, p, e, angleSymbole) {
   if (p.h * e < 3) return; // trop petit pour être lu
   ctx.save();
@@ -667,7 +721,7 @@ export function dessinerSymbolePose(d, o) {
     ctx.rotate((-(rot - (vue.rotation ?? 0)) * Math.PI) / 180);
     ctx.scale(e, -e);
   };
-  const unique = d.pc?.couleurs === 'phases' ? d.pc.phases.find((p) => p.id === o.phase)?.couleur : null;
+  const unique = o.rendu?.mode === 'couleur' ? o.rendu.couleur : d.pc?.couleurs === 'phases' ? d.pc.phases.find((p) => p.id === o.phase)?.couleur : null;
   // 0.292.0 : texte de la même taille partout (mm sur le papier × échelle du plan), indépendante de l'échelle du bloc.
   const opts = { angle: rot, couleurUnique: unique ?? undefined, texteU: d.pc ? texteSymbolesM(d.pc) / k : undefined };
   if (o.type === 'grue') {
@@ -723,7 +777,7 @@ function dessinerRayon(ctx, g, e, mm, rot, texteU) {
       ctx.lineWidth = principal ? lw * 1.4 : lw;
       ctx.stroke();
       ctx.setLineDash([]);
-    } else if (p.g === 't') texteDansSymbole(ctx, { ...p, k: '#92400e', ...(texteU ? { h: texteU } : {}) }, e, rot);
+    } else if (p.g === 't') { if (p.brut) texteBrut(ctx, p, e, rot); else texteDansSymbole(ctx, { ...p, k: '#92400e', ...(texteU ? { h: texteU } : {}) }, e, rot); }
   }
 }
 

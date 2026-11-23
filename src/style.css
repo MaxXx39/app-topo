@@ -14744,3 +14744,21 @@ dialog.page-chantier[open] {
 .page-chantier .ruban-element .groupe-ordre { display: inline-flex; gap: 2px; }
 .page-chantier .ruban-element .bouton-secondaire.petit { padding: 3px 8px; min-height: 0; }
 .page-chantier .ruban-element button.actif { background: #b45309; color: #fff; }
+
+/* 0.293.0 : gestion des phases (Plans de chantier) */
+.fenetre-phases { width: min(920px, 96vw); max-height: 92vh; }
+.fenetre-phases .corps-phases { overflow: auto; max-height: 68vh; padding: 4px 2px; }
+.fenetre-phases table { border-collapse: collapse; }
+.fenetre-phases th, .fenetre-phases td { padding: 3px 4px; font-size: 13px; text-align: center; }
+.fenetre-phases th.en-cours { text-align: left; white-space: nowrap; }
+.fenetre-phases .pastille-phase { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+.fenetre-phases .case-vue { min-width: 78px; padding: 6px 8px; border: 1px solid #94a3b8; border-radius: 8px; background: #fff; font: inherit; font-size: 12px; cursor: pointer; }
+.fenetre-phases .case-vue.soi { border: 0; color: #64748b; font-style: italic; cursor: default; }
+.fenetre-phases .case-vue.mode-cache { background: #f1f5f9; color: #94a3b8; }
+.fenetre-phases .case-vue.mode-normal { background: #dcfce7; }
+.fenetre-phases .case-vue.mode-estompe { background: #fef9c3; }
+.fenetre-phases .case-vue.mode-assombri { background: #cbd5e1; }
+.fenetre-phases .case-vue.mode-couleur { background: #dbeafe; }
+.fenetre-phases .case-vue.choisie { outline: 3px solid #b45309; }
+.fenetre-phases .editeur-vue { margin-top: 10px; padding: 8px 10px; border: 2px solid #b45309; border-radius: 10px; background: #fff7ed; }
+.fenetre-phases .editeur-vue h3 { margin: 0 0 6px; font-size: 14px; }

@@ -4,9 +4,9 @@
 // posée en entier et les textes de la légende et du cartouche sont écrits en vrai texte (nets à l'impression).
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { versEcran } from '../plan/vue.js';
-import { dessinerObjet, dessinerLigne, dessinerPrimitives, symboleDeLObjet } from './dessin.js';
+import { dessinerObjets, dessinerLigne, dessinerPrimitives, symboleDeLObjet } from './dessin.js';
 import { dessinerFondSwisstopo, attendreTuiles } from './tuiles.js';
-import { metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
+import { datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
 import {
   miseEnPageFeuille, cadreSituation, etendueDuCadre, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
   reglagesFeuille, FORMATS_FEUILLE,
@@ -51,7 +51,7 @@ export function preparerPage(donnees, page, pxParMm) {
     affaire: donnees.projet?.cartouche?.affaire || donnees.projet?.nom || '',
     projet: donnees.projet?.cartouche?.designation ?? '',
     titre: r.titre || plan.nom,
-    phase: page.titre ? `Phase : ${page.titre}` : '',
+    phase: page.titre ? `Phase : ${page.titre}${datesDePhase(plan.phases.find((p) => p.id === page.phase)) ? ` (${datesDePhase(plan.phases.find((p) => p.id === page.phase))})` : ''}` : '',
     echelle: plan.echelle ?? 200,
     format: `${format} ${r.orientation}`,
     date: r.date || new Date().toLocaleDateString('fr-CH'),
@@ -125,7 +125,7 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
     }
   }
   const d = { ctx, vue, pc: plan, bib, mm: s };
-  for (const o of prep.objets) dessinerObjet(d, o);
+  dessinerObjets(d, prep.objets);
   ctx.restore();
 
   // --- Cadre, nord, barre d'échelle.
