@@ -595,7 +595,7 @@ describe('gestion des phases (0.293.0)', () => {
     m.reglerVue(plan, p2, p1, { mode: 'estompe', opacite: 0.4 });
     const vus = m.objetsVus(plan, p2);
     expect(vus.map((o) => o.id)).toEqual([a.id, b.id, c.id]);
-    expect(vus[0].rendu).toEqual({ mode: 'estompe', opacite: 0.4, couleur: '#64748b' });
+    expect(vus[0].rendu).toEqual({ mode: 'estompe', opacite: 0.4, couleur: plan.phases[0].couleur }); // couleur de la phase de l'élément
     expect(vus[1].rendu).toBeUndefined();
   });
 
@@ -662,5 +662,35 @@ describe('abaque de grue (0.293.0)', () => {
     const cercles = g.rayon.filter((p) => p.g === 'c').map((p) => p.r);
     expect(cercles).toEqual([40, 15, 30]);
     expect(g.rayon.some((p) => p.g === 't' && p.t === '15 m · 6 t')).toBe(true);
+  });
+});
+
+describe('planning des phases, ortho et retours du 3e lot (0.294.1)', () => {
+  it('Gantt : barres d\'après les dates, fin = début de la suivante, phases sans dates', async () => {
+    const { ganttPhases } = await import('../src/topo/plan-chantier.js');
+    expect(ganttPhases([{ id: 'a', nom: 'A', couleur: '#f00' }])).toBeNull();
+    const g = ganttPhases([
+      { id: 'a', nom: 'Terrassement', couleur: '#f00', debut: '2027-03-01', fin: '2027-03-31' },
+      { id: 'b', nom: 'Gros œuvre', couleur: '#0f0', debut: '2027-04-01' },
+      { id: 'c', nom: 'Sans', couleur: '#00f' },
+    ]);
+    expect(g.lignes).toHaveLength(2);
+    expect(g.lignes[0].x0).toBe(0);
+    expect(g.lignes[1].x0).toBeGreaterThan(g.lignes[0].x1 - 0.05);
+    expect(g.lignes[1].x1).toBeCloseTo(1, 6);
+    expect(g.sansDates).toEqual(['Sans']);
+  });
+
+  it('feuille : le planning a sa place à gauche du cartouche', () => {
+    const m = miseEnPageFeuille('a3', 'paysage', 0);
+    expect(m.planning.x).toBeGreaterThan(m.barre.x);
+    expect(m.planning.x + m.planning.l).toBeLessThan(m.cartouche.x);
+    expect(reglagesFeuille({ feuille: { planning: true } }).planning).toBe(true);
+  });
+
+  it('le texte et sa ligne de repère prennent la couleur choisie (DXF)', () => {
+    const plan = nouveauPlanChantier('t', 'pic');
+    ajouterObjet(plan, { type: 'texte', point: [0, 0], texte: 'Grue', couleur: '#ff0000' });
+    expect(dxfPlanChantier(plan, BIB)).toContain('TEXTES');
   });
 });

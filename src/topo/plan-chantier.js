@@ -185,7 +185,7 @@ export function objetsVus(plan, courante = plan.phaseActive) {
     if (o.fin && rc > rangDe(plan, o.fin)) mode = r.fini ?? 'cache';
     if (mode === 'cache') return [];
     if (mode === 'normal') return [o];
-    return [{ ...o, rendu: { mode, opacite: r.opacite ?? OPACITE_VUE, couleur: r.couleur ?? COULEUR_VUE } }];
+    return [{ ...o, rendu: { mode, opacite: r.opacite ?? OPACITE_VUE, couleur: r.couleur ?? plan.phases.find((p) => p.id === o.phase)?.couleur ?? COULEUR_VUE } }]; // couleur unique de départ = celle de la phase
   });
 }
 
@@ -804,5 +804,39 @@ export function geometrieCotation(o) {
     lignes: [rappel(A, A2), rappel(B, B2), [A2, B2]],
     fleches: [{ p: A2, dir: u }, { p: B2, dir: [-u[0], -u[1]] }], arc: null,
     texte: { p: [(A2[0] + B2[0]) / 2, (A2[1] + B2[1]) / 2], angle: ang, t: `${L.toFixed(2)} m` }, valeur: L,
+  };
+}
+
+// ------------------------------------------------------------------ Planning des phases (0.294.1)
+
+/**
+ * Diagramme de Gantt des phases d'après leurs dates (phase.debut / phase.fin, « AAAA-MM-JJ »). Une phase sans date de fin
+ * dure jusqu'au début de la suivante (ou 30 jours) ; sans date de début elle est « sans dates ».
+ * Renvoie { debut, fin (ms), jours, lignes [{ id, nom, couleur, x0, x1 (0–1 de la largeur), debut, fin }], sansDates [noms] }
+ * ou null s'il n'y a aucune date.
+ */
+export function ganttPhases(phases) {
+  const jour = 86400000;
+  const t = (d) => (d ? Date.parse(`${d}T00:00:00Z`) : NaN);
+  const avecDebut = phases.filter((p) => Number.isFinite(t(p.debut)));
+  if (!avecDebut.length) return null;
+  const brutes = phases.map((p, i) => {
+    const d = t(p.debut);
+    if (!Number.isFinite(d)) return null;
+    let f = t(p.fin);
+    if (!Number.isFinite(f)) {
+      const suivante = phases.slice(i + 1).map((q) => t(q.debut)).find((x) => Number.isFinite(x) && x > d);
+      f = suivante ?? d + 30 * jour;
+    }
+    return { p, d, f: Math.max(f, d + jour) };
+  });
+  const valides = brutes.filter(Boolean);
+  const debut = Math.min(...valides.map((x) => x.d));
+  const fin = Math.max(...valides.map((x) => x.f));
+  const etendue = fin - debut || jour;
+  return {
+    debut, fin, jours: Math.round(etendue / jour),
+    lignes: valides.map(({ p, d, f }) => ({ id: p.id, nom: p.nom, couleur: p.couleur, x0: (d - debut) / etendue, x1: (f - debut) / etendue, debut: p.debut, fin: p.fin ?? new Date(f).toISOString().slice(0, 10) })),
+    sansDates: phases.filter((p) => !Number.isFinite(t(p.debut))).map((p) => p.nom),
   };
 }

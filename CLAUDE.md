@@ -91,7 +91,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.294.0)
+## Fonctionnalités (état à la 0.295.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -137,6 +137,17 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 ## Plans de chantier : état (23.11)
 - **Étapes 1 à 4 faites** (0.286.0 → 0.289.0, Expert, site PC + Topo Bureau). **Petits restes** : tableau des modes (`docs/modes-base-intermediaire-expert.xlsx`) pas mis à jour (Plans de chantier, Calage, Comparer) ; jamais essayé sur Topo Bureau ni avec swisstopo (bloqué ici) ; la maquette est faite pour 1366 × 768 (portrait tablette non prévu).
 - **À valider avec l'utilisateur** : « une page par phase » = la phase seule + les phases cochées « sur toutes les pages » (choix fait sans lui) ; poses de l'escalier (lecture du bloc « Base vie Etage » : palier le long du petit côté, volée de 3 m le long du grand ; « petit côté » = échange des axes) ; matériaux d'après les couleurs (table `MATERIAUX` de `topo/symboles.js`) ; phares / feux placés par fractions de la boîte (camions : devant = y mini ; chargeuse : devant = x maxi).
+
+## 0.295.0 — Plans de chantier : retours du 23.11 (3e lot ; réponses : construction = trait au choix + segment par défaut, planning = Gantt, plusieurs phases = début → fin)
+- **Mode Ortho** (ruban « Ortho », F8, `etat.ortho`, `pointOrtho`) : pendant un dessin, le point suivant est aimanté aux directions N / S / E / O ou à celles d'un **repère** (champ « Repère ° », ou « Repère = ligne » : l'angle d'une ligne cliquée ; perpendiculaires comprises) ; les accroches d'objet restent prioritaires.
+- **Cotes des cercles de grue** écrites **par-dessus** la grue (elles étaient cachées dessous : « 2 » au lieu de « 20 »), décalées sous la flèche (y = −2,4 m).
+- **Lignes de construction** : **segment par défaut** ; trait au choix (tirets, continu, pointillé, tirets-points : `o.trait`) ; case « Droite infinie » dans le bandeau.
+- **Clôture** : plots en béton en travers à chaque poteau (comme Heras). **Compacteurs** : les 2 bandes jaunes deux fois moins larges (`reduireBandesJaunes`). **Cheminement piéton** : **pictogramme de piéton** tous les 2,5 m (plus de flèche) et **largeur de la bande réglable par élément** (`o.largeurM`, remplace l'épaisseur pour toutes les lignes en bande, DXF compris).
+- **Textures de stock** (`plans-chantier/textures.js`) : une par matériau (terre, remblai, sable, gravier, grave, béton concassé, enrobé, blocs), dessinée sur la couleur du stock.
+- **Base-vie à étage** : le pictogramme de niveau reste lisible quand le bloc est retourné. **Texte sur un bloc** (`o.etiquette`, champ « Texte sur le bloc », ex. « Bureaux » sur un conteneur, aussi dans le DXF).
+- **Couleur d'un texte** : change vraiment la couleur du texte et de sa ligne de repère. **Phases** : couleur unique de départ = **couleur de la phase** ; **changer de phase active redessine** le plan selon la gestion des phases (le choix n'était pas appliqué) ; libellé « Éléments terminés (leur Fin est avant cette phase : démontés) ».
+- **Planning des phases** (`ganttPhases`, fenêtre Gestion des phases) : diagramme de Gantt d'après les dates des phases (fin absente = début de la suivante ou 30 jours) ; case « Mettre ce planning sur la feuille » (`plan.feuille.planning`, à gauche du cartouche).
+- Pas fait : repère de l'Ortho par clic de deux points, texture à l'échelle du plan (elle reste en pixels), pictogramme piéton sur la feuille PDF vérifié seulement à l'écran.
 
 ## 0.294.0 — voir la section 0.293.0 ci-dessous : texte de zone, tout l'élément dans le bandeau, clôture style portail, abaque de grue (retours du 23.11, publiés avec la 0.294.0)
 

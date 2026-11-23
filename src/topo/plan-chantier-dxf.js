@@ -139,7 +139,7 @@ export function dxfPlanChantier(plan, bib, objets = null) {
     } else if (o.type === 'ligne') {
       const st = styleLigne(o.style);
       const c = calque(o, st.nom.replace(/\s+[<>].*$/, ''), aci);
-      entites.push(...polyligne(o.points, c, st.motif?.largeurM ? { largeur: st.motif.largeurM * (o.echelleMotif ?? 1) } : {}));
+      entites.push(...polyligne(o.points, c, st.motif?.largeurM ? { largeur: (o.largeurM ?? st.motif.largeurM) * (o.echelleMotif ?? 1) } : {}));
       if (st.motif?.type === 'texte') {
         for (const r of positionsLeLong(o.points, st.motif.pasMm * mParMm * (o.echelleMotif ?? 1))) {
           const a = (r.angle * 180) / Math.PI;
@@ -171,7 +171,7 @@ export function dxfPlanChantier(plan, bib, objets = null) {
       }
       entites.push(...texte(g.texte.p[0], g.texte.p[1], texteM, g.texte.angle, g.texte.t, c));
     } else if (o.type === 'texte') {
-      const c = calque(o, 'TEXTES', 7);
+      const c = calque(o, 'TEXTES', o.couleur ? aci : 7);
       entites.push(...texte(o.point[0], o.point[1], o.taille ?? 1, 0, o.texte, c));
       if (o.repere) entites.push('0', 'LINE', '8', c, '10', f3(o.point[0]), '20', f3(o.point[1]), '30', '0', '11', f3(o.repere[0]), '21', f3(o.repere[1]), '31', '0');
     } else if (estPose(o)) {
@@ -181,6 +181,7 @@ export function dxfPlanChantier(plan, bib, objets = null) {
       if (!blocs.has(pose.nom)) blocs.set(pose.nom, entitesPrimitives(pose.primitives));
       const c = calque(o, o.type === 'grue' ? 'GRUES' : 'SYMBOLES', 7);
       entites.push('0', 'INSERT', '8', c, '2', pose.nom, '10', f3(o.point[0]), '20', f3(o.point[1]), '30', '0', ...(k !== 1 ? ['41', f3(k), '42', f3(k), '43', f3(k)] : []), '50', (o.rotation ?? 0).toFixed(2));
+      if (o.etiquette) entites.push(...texte(o.point[0], o.point[1], texteM, o.rotation ?? 0, o.etiquette, c));
       if (o.type === 'grue' && o.rayon !== false) {
         const r = nomDeCalque('PC_GRUES_RAYON');
         calques.set(r, 30);

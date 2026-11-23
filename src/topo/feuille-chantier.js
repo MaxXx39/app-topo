@@ -13,7 +13,7 @@ export function reglagesFeuille(plan) {
   return {
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    situation: situationDe(f.situation), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
+    situation: situationDe(f.situation), planning: Boolean(f.planning), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
   };
 }
 
@@ -63,7 +63,10 @@ export function miseEnPageFeuille(format = 'a3', orientation = 'paysage', lignes
   const legende = { x: cartouche.x, y: cartouche.y - hl, l: lc, h: hl, ligne, colonnes };
   const nord = { x: cadre.x + 11 * k, y: cadre.y + 17 * k, t: 12 * k };
   const barre = { x: cadre.x + 6 * k, y: cadre.y + cadre.h - 8 * k, max: Math.min(70 * k, cadre.l * 0.25) };
-  return { page, k, cadre, cartouche, legende, nord, barre };
+  // Planning des phases (0.294.1) : à gauche du cartouche, après la barre d'échelle.
+  const px = cadre.x + 6 * k + barre.max + 8 * k;
+  const planning = { x: px, y: cartouche.y, l: Math.max(0, cartouche.x - px - 4 * k), h: cartouche.h };
+  return { page, k, cadre, cartouche, legende, nord, barre, planning };
 }
 
 /** Pages à faire : une par phase (avec les phases « sur toutes les pages »), ou une seule (phases visibles). */

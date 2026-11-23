@@ -50,7 +50,7 @@ export function apercuLigne(style, couleur = style.couleur) {
     }
   } else if (m?.type === 'pieton') {
     marques += `<rect x="2" y="${y - 5}" width="${L - 4}" height="10" fill="#22c55e" fill-opacity="0.28" stroke="${couleur}" stroke-width="1"/>`;
-    for (let x = 18; x < L - 8; x += 26) marques += `<polyline points="${x - 3},${y - 4} ${x + 3},${y} ${x - 3},${y + 4}" fill="none" stroke="${couleur}" stroke-width="1.6"/>`;
+    for (let x = 20; x < L - 8; x += 30) marques += `<g stroke="${couleur}" stroke-width="1.1" fill="${couleur}" stroke-linecap="round"><circle cx="${x}" cy="${y - 3.2}" r="1.3"/><path d="M${x} ${y - 1.8}V${y + 0.8}M${x} ${y - 1.2}L${x + 2} ${y + 0.4}M${x} ${y - 1.2}L${x - 1.8} ${y + 0.4}M${x} ${y + 0.8}L${x + 2} ${y + 3.6}M${x} ${y + 0.8}L${x - 1.6} ${y + 3.6}" fill="none"/></g>`;
   } else if (m?.type === 'heras') {
     for (let x = 10; x < L; x += 36) marques += `<line x1="${x}" y1="${y - 5}" x2="${x}" y2="${y + 5}" stroke="#334155" stroke-width="2.4"/><circle cx="${x}" cy="${y}" r="1.8" fill="#cbd5e1"/>`;
   } else if (m?.type === 'texte') {

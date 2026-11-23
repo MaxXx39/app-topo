@@ -6,7 +6,7 @@ import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { versEcran } from '../plan/vue.js';
 import { dessinerObjets, dessinerLigne, dessinerPrimitives, symboleDeLObjet } from './dessin.js';
 import { dessinerFondSwisstopo, attendreTuiles } from './tuiles.js';
-import { datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
+import { ganttPhases, datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
 import {
   miseEnPageFeuille, cadreSituation, etendueDuCadre, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
   reglagesFeuille, FORMATS_FEUILLE,
@@ -150,6 +150,27 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
     ctx.strokeRect(mm(x), mm(y), mm(b.mm), mm(h));
     texte('0', x, y - 2.2 * mise.k, 6 * mise.k, { align: 'center' });
     texte(`${b.metres} m`, x + b.mm, y - 2.2 * mise.k, 6 * mise.k, { align: 'center' });
+  }
+
+  // --- Planning des phases (diagramme de Gantt) à gauche du cartouche.
+  if (prep.r.planning && mise.planning.l > 40 * mise.k) {
+    const g = ganttPhases(plan.phases);
+    if (g) {
+      const B = mise.planning;
+      boite(ctx, B, s);
+      texte('Planning', B.x + 3 * mise.k, B.y + 4.5 * mise.k, 7 * mise.k, { gras: true });
+      const n = g.lignes.length;
+      const ligne = Math.min(6 * mise.k, (B.h - 9 * mise.k) / n);
+      const xm = B.x + 28 * mise.k;
+      const lg = B.l - 32 * mise.k;
+      g.lignes.forEach((l, i) => {
+        const y = B.y + 8 * mise.k + i * ligne;
+        texte(l.nom, B.x + 3 * mise.k, y + ligne / 2, Math.min(6 * mise.k, ligne * 2.2), {});
+        ctx.fillStyle = l.couleur;
+        ctx.fillRect(mm(xm + l.x0 * lg), mm(y + ligne * 0.18), mm(Math.max(1, (l.x1 - l.x0) * lg)), mm(ligne * 0.64));
+      });
+      texte(`${datesDePhase({ debut: g.lignes[0].debut })} → ${new Date(g.fin).toLocaleDateString('fr-CH')}`, B.x + B.l - 3 * mise.k, B.y + 4.5 * mise.k, 5.5 * mise.k, { align: 'right' });
+    }
   }
 
   // --- Légende.

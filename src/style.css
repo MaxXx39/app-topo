@@ -14768,3 +14768,9 @@ dialog.page-chantier[open] {
 .page-chantier .ruban-element .propre-element .champ-calage { display: flex; flex-direction: column; gap: 2px; width: auto; min-width: 120px; margin: 0; font-size: 12px; }
 .page-chantier .ruban-element .propre-element .case-chantier { margin: 0; }
 .page-chantier .ruban-element .propre-element .aide-calage { margin: 0; }
+
+/* 0.294.1 : groupe Ortho du ruban */
+.page-chantier .groupe-ruban .champ-bandeau { display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 11px; color: #475569; }
+.page-chantier .groupe-ruban .champ-bandeau input { width: 58px; padding: 2px 4px; }
+.page-chantier .ruban-element .propre-element { max-height: 22vh; }
+.page-chantier .ruban-element .propre-element .liste-genres { max-height: 104px; overflow: auto; width: 340px; flex-shrink: 0; }

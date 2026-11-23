@@ -2,7 +2,7 @@
 // phase Y » ; chaque case dit comment montrer les éléments de Y quand on est dans X (caché, normal, estompé, assombri,
 // couleur unique), avec un réglage pour les éléments dont la fin est passée, par genre et par élément. Dates de phase.
 import { echapper } from '../outils/echapper.js';
-import { MODES_VUE, OPACITE_VUE, COULEUR_VUE, regleDeVue, reglerVue, reinitialiserVues, resumeObjet } from '../topo/plan-chantier.js';
+import { MODES_VUE, OPACITE_VUE, COULEUR_VUE, regleDeVue, reglerVue, reinitialiserVues, resumeObjet, ganttPhases } from '../topo/plan-chantier.js';
 
 const GENRES = [['zone', 'Zones'], ['ligne', 'Lignes et clôtures'], ['piste', 'Pistes'], ['fleche', 'Flèches'], ['texte', 'Textes'], ['symbole', 'Symboles'], ['grue', 'Grues'], ['cotation', 'Cotations']];
 const COURT = { cache: '—', normal: 'Normal', estompe: 'Estompé', assombri: 'Grisé', couleur: 'Couleur' };
@@ -37,10 +37,28 @@ export function ouvrirGestionPhases(acces) {
         <p class="aide-calage">Chaque ligne : « quand on est dans cette phase… » ; chaque colonne : « … on voit les éléments de cette phase comme ça ». Touchez une case pour la régler. ✎ = genres ou éléments cachés ; ↪ = éléments terminés visibles.</p>
         <div class="tableau-phases"><table>${ligneEntete}${lignes}</table></div>
         ${sel ? editeur(p) : '<p class="aide-calage">Aucune case choisie.</p>'}
+        <h3>Planning des phases</h3>
+        ${planning(p)}
         <h3>Dates des phases</h3>
         <table class="dates-phases"><tr><th>Phase</th><th>Début</th><th>Fin</th></tr>${dates}</table>
       </div>
       <div class="boutons-choix"><button type="button" class="bouton" data-cle="fermer"><strong>Fermer</strong></button></div>`;
+  }
+
+  /** Diagramme de Gantt (SVG) : une barre par phase, d'après ses dates. */
+  function planning(p) {
+    const g = ganttPhases(p.phases);
+    if (!g) return '<p class="aide-calage">Saisissez les dates de début (et de fin) des phases pour voir le planning.</p>';
+    const L = 560;
+    const H = 22;
+    const marge = 110;
+    const fmt = (iso) => iso.split('-').reverse().join('.');
+    const barres = g.lignes.map((l, i) => `<text x="0" y="${i * H + 15}" font-size="11" fill="currentColor">${echapper(l.nom)}</text>
+      <rect x="${marge + l.x0 * L}" y="${i * H + 3}" width="${Math.max(3, (l.x1 - l.x0) * L)}" height="${H - 7}" rx="4" fill="${l.couleur}"/>
+      <text x="${marge + l.x1 * L + 4}" y="${i * H + 15}" font-size="10" fill="currentColor">${fmt(l.debut)} → ${fmt(l.fin)}</text>`).join('');
+    return `<svg viewBox="0 0 ${marge + L + 130} ${g.lignes.length * H + 4}" width="100%" role="img" aria-label="Planning des phases">${barres}</svg>
+      ${g.sansDates.length ? `<p class="aide-calage">Sans dates : ${g.sansDates.map(echapper).join(', ')}</p>` : ''}
+      <label class="case"><input type="checkbox" data-planning-feuille ${p.feuille?.planning ? 'checked' : ''}> Mettre ce planning sur la feuille (à côté du cartouche)</label>`;
   }
 
   function editeur(p) {
@@ -53,8 +71,8 @@ export function ouvrirGestionPhases(acces) {
       <h3>Dans « ${echapper(c.nom)} », on voit « ${echapper(v.nom)} »</h3>
       <label class="champ-calage"><span>Rendu</span><select data-champ="mode">${optionsMode(r.mode)}</select></label>
       ${r.mode === 'estompe' ? `<label class="champ-calage"><span>Opacité : <b>${Math.round((r.opacite ?? OPACITE_VUE) * 100)} %</b></span><input type="range" min="5" max="90" step="5" value="${Math.round((r.opacite ?? OPACITE_VUE) * 100)}" data-champ="opacite"></label>` : ''}
-      ${r.mode === 'couleur' ? `<label class="champ-calage"><span>Couleur unique</span><input type="color" value="${r.couleur ?? COULEUR_VUE}" data-champ="couleur"></label>` : ''}
-      <label class="champ-calage"><span>Éléments dont la fin est passée</span><select data-champ="fini">${optionsMode(r.fini ?? 'cache')}</select></label>
+      ${r.mode === 'couleur' ? `<label class="champ-calage"><span>Couleur unique</span><input type="color" value="${r.couleur ?? v.couleur ?? COULEUR_VUE}" data-champ="couleur"></label>` : ''}
+      <label class="champ-calage"><span>Éléments terminés (leur « Fin » est avant cette phase : démontés)</span><select data-champ="fini">${optionsMode(r.fini ?? 'cache')}</select></label>
       ${genresPresents.length ? `<p class="aide-calage">Genres montrés :</p>${genresPresents.map(([g, t]) => `<label class="case"><input type="checkbox" data-genre="${g}" ${r.genresCaches?.includes(g) ? '' : 'checked'}> ${t}</label>`).join('')}` : ''}
       ${elements.length ? `<details><summary>Éléments précis (${elements.length})</summary>${elements.map((o) => `<label class="case"><input type="checkbox" data-element="${o.id}" ${r.elementsCaches?.includes(o.id) ? '' : 'checked'}> ${echapper(resumeObjet(o))}</label>`).join('')}</details>` : '<p class="aide-calage">Cette phase n\'a pas d\'élément.</p>'}
     </div>`;
@@ -91,6 +109,14 @@ export function ouvrirGestionPhases(acces) {
       const ph = acces.plan().phases.find((x) => x.id === c.dataset.id);
       if (c.value) ph[c.dataset.date] = c.value;
       else delete ph[c.dataset.date];
+      acces.enregistrer();
+      acces.redessiner();
+      return dessiner();
+    }
+    if (c.dataset.planningFeuille !== undefined) {
+      if (!acces.avantChangement()) return;
+      const pl = acces.plan();
+      pl.feuille = { ...(pl.feuille ?? {}), planning: c.checked };
       acces.enregistrer();
       acces.redessiner();
       return;
