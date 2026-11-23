@@ -14784,3 +14784,12 @@ dialog.page-chantier[open] {
 .page-chantier .ruban-element .styles-lignes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; max-width: 260px; }
 .page-chantier .ruban-element .style-ligne button { padding: 0 6px; min-height: 22px; border: 1px solid #94a3b8; border-radius: 5px; background: #fff; cursor: pointer; }
 .page-chantier .ruban-element .style-ligne button.actif { background: #b45309; color: #fff; }
+
+/* 0.296.0 : calques des plans affichés (Plans de chantier) */
+.fenetre-calques { width: min(560px, 96vw); max-height: 90vh; }
+.fenetre-calques .corps-calques { overflow: auto; max-height: 62vh; }
+.fenetre-calques .barre-calques { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.fenetre-calques .barre-calques input[type="search"] { flex: 1; min-width: 140px; }
+.fenetre-calques .liste-calques { list-style: none; margin: 0; padding: 0; }
+.fenetre-calques .liste-calques li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 4px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+.fenetre-calques .liste-calques input[type="color"] { width: 34px; height: 24px; padding: 0; }

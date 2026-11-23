@@ -25,6 +25,7 @@ import { dessinerVignette, symboleDeLObjet } from './dessin.js';
 import { geometrieCotation, lignesDuTexte, CATEGORIES_ZONE, STYLES_LIGNE } from '../topo/plan-chantier.js';
 import { SENS_DEVIATION, CLE_DEVIATION } from '../topo/panneau-deviation.js';
 import { ouvrirGestionPhases } from './gestion-phases.js';
+import { ouvrirGestionCalques, plansAvecCalques } from './gestion-calques.js';
 import { autogrueDe, TONNES_MOBILES, FLECHE_MOBILE_MIN } from '../topo/grue-mobile.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
@@ -45,6 +46,8 @@ const OUTILS = [
 ];
 /** Genre de l'élément choisi : liste déroulante (le bandeau du haut garde la même hauteur). */
 const selectGenres = (type, valeur) => `<label class="champ-calage"><span>Genre</span><select data-genre-liste="${type}">${(type === 'zone' ? CATEGORIES_ZONE : STYLES_LIGNE).map((g) => `<option value="${g.cle}" ${g.cle === valeur ? 'selected' : ''}>${echapper(g.nom)}</option>`).join('')}</select></label>`;
+/** Genre de l'outil actif : liste déroulante dans le bandeau du haut. */
+const selectGenresOutil = (type, valeur) => `<label class="champ-calage"><span>Genre</span><select data-genre-outil="${type}">${(type === 'zone' ? CATEGORIES_ZONE : STYLES_LIGNE).map((g) => `<option value="${g.cle}" ${g.cle === valeur ? 'selected' : ''}>${echapper(g.nom)}</option>`).join('')}</select></label>`;
 const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 const TRAITS_CONSTRUCTION = [['tirets', 'Tirets'], ['continu', 'Continu'], ['points', 'Pointillé'], ['mixte', 'Tirets-points']];
 const ACCROCHES = [['point', 'Point'], ['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['perpendiculaire', 'Perpendiculaire']];
@@ -106,10 +109,12 @@ export function ouvrirPlansChantier({
   });
 
   const plan = () => liste().find((x) => x.id === etat.planId) ?? null;
-  const plansFond = () => {
+  const plansMontres = () => {
     const caches = new Set(plan()?.fond?.plansCaches ?? []);
     return plans().filter((p) => !caches.has(p.id));
   };
+  // 0.296.0 : réglages de calques (masqués, couleurs) propres à ce plan de chantier
+  const plansFond = () => plansAvecCalques(plansMontres(), plan()?.fond);
 
   let fermee = false;
   function fermer() {
@@ -299,6 +304,7 @@ export function ouvrirPlansChantier({
         ${groupe('Symboles', `<button type="button" class="outil-ruban" data-action="biblio" aria-pressed="${etat.biblio.ouvert}">${ico('<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>')}<span>Bibliothèque</span></button>`)}
         ${groupe('Accroche', ACCROCHES.map(([c, t]) => `<button type="button" class="outil-ruban petit" data-accroche="${c}"><span>${t}</span></button>`).join(''))}
         ${groupe('Fond', `<button type="button" class="outil-ruban" data-action="fond-plans">${ico('<path d="M3 6L9 4L15 6L21 4V18L15 20L9 18L3 20Z"/><path d="M9 4V18M15 6V20"/>')}<span>Plans…</span></button>
+          <button type="button" class="outil-ruban petit" data-action="fond-calques" title="Masquer des calques d'un plan affiché dessous, changer leur couleur"><span>Calques…</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-points"><span>Points levés</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-carte"><span>Carte</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-ortho"><span>Photo</span></button>
@@ -1076,11 +1082,11 @@ export function ouvrirPlansChantier({
     const mmLigne = (cle) => (etat.epaisseurMm ?? styleLigne(cle).epaisseurMm);
     // Réglages de l'outil : donnés aux éléments dessinés ensuite.
     const reglages = {
-      zone: `${listeGenres('zone', etat.categorie, 'outil', echapper)}
+      zone: `${selectGenresOutil('zone', etat.categorie)}
         ${champCurseur('Transparence du fond (opacité)', 'reglage', 'opacite', etat.opacite)}
         ${champNombre('Épaisseur du contour', 'reglage', 'contourMm', etat.contourMm ?? (etat.categorie === 'emprise' ? 0.7 : 0.35), 0.05, 5, 0.05, 'mm')}
         ${champCase('Afficher la surface (m²)', 'reglage-case', 'afficherSurface', etat.afficherSurface)}`,
-      ligne: `${listeGenres('ligne', etat.style, 'outil', echapper)}
+      ligne: `${selectGenresOutil('ligne', etat.style)}
         ${champNombre('Épaisseur', 'reglage', 'epaisseurMm', mmLigne(etat.style), 0.05, 5, 0.05, 'mm')}
         ${champNombre('Échelle du motif', 'reglage', 'echelleMotif', etat.echelleMotif, 0.3, 5, 0.1, '×')}`,
       piste: champNombre('Largeur de la piste', 'reglage', 'largeur', etat.largeur, 1, 30, 0.5, 'm'),
@@ -1099,7 +1105,7 @@ export function ouvrirPlansChantier({
       cotation: `<label class="champ-calage"><span>Genre de cotation</span><select data-reglage="cotationGenre"><option value="longueur" ${etat.cotationGenre !== 'angle' ? 'selected' : ''}>Longueur alignée</option><option value="angle" ${etat.cotationGenre === 'angle' ? 'selected' : ''}>Angle</option></select></label>`,
       decaler: `${champNombre('Distance du décalage', 'reglage', 'distanceDecalage', etat.distanceDecalage, 0.01, 100, 0.05, 'm')}
         ${champCase('En ligne de construction (parallèle)', 'reglage-case', 'decalerConstruction', etat.decalerConstruction)}
-        <p class="aide-calage">Genre de la ligne créée :</p>${listeGenres('ligne', etat.style, 'outil', echapper)}`,
+        ${selectGenresOutil('ligne', etat.style)}`,
     }[etat.outil] ?? '';
     let choisi = '';
     let propreHtml = '';
@@ -1154,26 +1160,27 @@ export function ouvrirPlansChantier({
       <label class="champ-calage"><span>Couleurs</span><select data-champ="couleurs">
         <option value="objets" ${p.couleurs !== 'phases' ? 'selected' : ''}>Celles des objets</option>
         <option value="phases" ${p.couleurs === 'phases' ? 'selected' : ''}>Une couleur par phase</option></select></label>
-      ${reglages ? `<h3>Outil</h3>${reglages}` : ''}
       ${choisi}
       <h3>Éléments (${p.objets.length})</h3>
       <ul class="elements-chantier">${[...p.objets].reverse().map((x) => `<li><button type="button" data-choisir="${x.id}" class="${x.id === etat.choisi ? 'actif' : ''}">
         <i style="background:${couleurObjet(p, x)}"></i>${echapper(resumeObjet(x))}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul>`;
     page.querySelector('.ruban-chantier [data-action="effacer"]')?.toggleAttribute('disabled', !etat.choisi);
     zone.querySelectorAll('canvas[data-vignette-pose]').forEach((c) => dessinerPose(c, Number(c.dataset.vignettePose)));
-    majBandeau(o, p, propreHtml);
+    majBandeau(o, p, propreHtml, reglages);
   }
 
   /**
    * Bandeau de l'élément choisi (0.293.0, au-dessus du plan) : ce qu'on règle le plus souvent, sans défiler dans le panneau de
    * droite : rotation, échelle, orientation, phase, couleur, ordre de dessin, décaler, effacer.
    */
-  function majBandeau(o, p, propre = '') {
+  function majBandeau(o, p, propre = '', reglagesOutil = '') {
     const zone = page.querySelector('[data-zone="bandeau-element"]');
     if (!zone) return;
-    zone.hidden = !o;
+    zone.hidden = !o && !(reglagesOutil && etat.outil !== 'choisir');
     if (!o) {
-      zone.innerHTML = '';
+      // 0.296.0 : les réglages de l'outil actif sont dans le bandeau du haut (plus dans la colonne de droite)
+      const nom = [...OUTILS, ...[['symbole', '', 'Symbole']]].find(([c]) => c === etat.outil)?.[2] ?? 'Outil';
+      zone.innerHTML = zone.hidden ? '' : `<span class="puce-element">Outil : ${echapper(nom)}</span><div class="propre-element">${reglagesOutil}</div>`;
       return;
     }
     const k = echelleDeLObjet(o);
@@ -1519,6 +1526,9 @@ export function ouvrirPlansChantier({
       enregistrer();
       return majTout();
     }
+    if (b.dataset.action === 'fond-calques') {
+      return ouvrirGestionCalques({ plans: plansMontres, plan, avantChangement, enregistrer, redessiner: () => { majTout(); vue?.redessiner(); } });
+    }
     if (b.dataset.action === 'gestion-phases') {
       return ouvrirGestionPhases({ plan, avantChangement, enregistrer, redessiner: () => { majTout(); vue?.redessinerDessus(); } });
     }
@@ -1607,6 +1617,16 @@ export function ouvrirPlansChantier({
       if (etat.reglageEnCours) enregistrer();
       etat.reglageEnCours = false;
       return;
+    }
+    if (c.dataset.genreOutil) {
+      if (c.dataset.genreOutil === 'zone') etat.categorie = c.value;
+      else {
+        etat.style = c.value;
+        etat.epaisseurMm = null;
+        if (etat.saisie?.source) etat.saisie.style = c.value;
+      }
+      if (etat.saisie && !etat.saisie.source) Object.assign(etat.saisie, { categorie: etat.categorie, style: etat.style });
+      return majTout();
     }
     if (c.dataset.genreListe) {
       const o = p.objets.find((x) => x.id === etat.choisi);

@@ -717,3 +717,17 @@ describe('retours du 23.11 (4e lot)', () => {
     expect(resumeObjet(t)).toContain('Haut…');
   });
 });
+
+describe('calques d\'un plan affiché (0.296.0)', () => {
+  it('masquer et colorer des calques sans toucher au plan du projet', async () => {
+    const { plansAvecCalques } = await import('../src/plans-chantier/gestion-calques.js');
+    const plan = { id: 'p1', nom: 'Plan', calques: [{ nom: 'MUR', couleur: '#111111', visible: true }, { nom: 'COTES', couleur: '#222222', visible: true }] };
+    expect(plansAvecCalques([plan], {})[0]).toBe(plan);
+    const fond = { calques: { p1: { 1: { visible: false }, 0: { couleur: '#ff0000' } } } };
+    const [copie] = plansAvecCalques([plan], fond);
+    expect(copie.calques[1].visible).toBe(false);
+    expect(copie.calques[0].couleur).toBe('#ff0000');
+    expect(plan.calques[1].visible).toBe(true); // le plan du projet n'a pas bougé
+    expect(plansAvecCalques([plan], fond)[0]).toBe(copie); // même objet tant que les réglages sont les mêmes
+  });
+});

@@ -91,7 +91,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.295.1)
+## Fonctionnalités (état à la 0.296.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -137,6 +137,10 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 ## Plans de chantier : état (23.11)
 - **Étapes 1 à 4 faites** (0.286.0 → 0.289.0, Expert, site PC + Topo Bureau). **Petits restes** : tableau des modes (`docs/modes-base-intermediaire-expert.xlsx`) pas mis à jour (Plans de chantier, Calage, Comparer) ; jamais essayé sur Topo Bureau ni avec swisstopo (bloqué ici) ; la maquette est faite pour 1366 × 768 (portrait tablette non prévu).
 - **À valider avec l'utilisateur** : « une page par phase » = la phase seule + les phases cochées « sur toutes les pages » (choix fait sans lui) ; poses de l'escalier (lecture du bloc « Base vie Etage » : palier le long du petit côté, volée de 3 m le long du grand ; « petit côté » = échange des axes) ; matériaux d'après les couleurs (table `MATERIAUX` de `topo/symboles.js`) ; phares / feux placés par fractions de la boîte (camions : devant = y mini ; chargeuse : devant = x maxi).
+
+## 0.296.0 — Plans de chantier : réglages de l'outil dans le bandeau, calques des plans affichés (demandes du 23.11)
+- **Les réglages de l'outil actif sont dans le bandeau du haut** (« Outil : Zone / Ligne… » : genre en liste déroulante, épaisseur, transparence, texte…), plus dans la colonne de droite (qui garde le plan, les phases, la liste des éléments).
+- **Calques d'un plan affiché dessous** (bouton « Calques… » du ruban Fond, `gestion-calques.js`, `plansAvecCalques`) : masquer / montrer chaque calque, changer sa couleur, filtrer, Tout montrer / Tout cacher, couleurs d'origine ; réglé **pour ce plan de chantier seulement** (`plan.fond.calques[idPlan][n° du calque] = { visible, couleur }`, le plan du projet ne change pas) ; vaut à l'écran, sur la feuille, pour l'accroche. **Essayé seulement sans plan DXF réel** (fenêtre vide) : test par calcul.
 
 ## 0.295.1 — Plans de chantier : retours du 23.11 (4e lot)
 - **Bandeau de hauteur constante** : le genre d'une zone ou d'une ligne se change par une **liste déroulante** (`selectGenres`, plus la longue liste) ; la partie « propre » du bandeau a une hauteur fixe (84 px, défilement si besoin). **Outil Piste retiré** du ruban (les pistes déjà dessinées restent).
