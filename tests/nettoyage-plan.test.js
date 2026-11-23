@@ -52,7 +52,7 @@ describe('nettoyage', () => {
     expect(compterParCalque(plan)).toEqual([8, 2, 1]);
   });
   it('sans zone : calques écartés, hachure en contour seulement, types', () => {
-    const r = { ...recetteDeDepart(plan, 'P - '), types: { attributs: true, textes: false, splines: true, pleins: true } };
+    const r = { ...recetteDeDepart(plan, 'P - '), hachures: 'contour', types: { attributs: true, textes: false, splines: true, pleins: true } };
     const n = nettoyerPlan(plan, r);
     expect(n.calques.map((c) => c.nom)).toEqual(['P - MURS', 'P - COTES']);
     expect(n.contenu.traits).toHaveLength(3); // spline et calque gelé retirés, contour de hachure gardé

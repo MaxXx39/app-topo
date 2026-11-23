@@ -20,8 +20,7 @@ export const TYPES_RETIRABLES = [
 export const CHOIX_HACHURES = [['garder', 'Garder'], ['contour', 'Contour seulement'], ['supprimer', 'Supprimer']];
 
 /**
- * Recette de départ : calques gelés / éteints écartés, rien d'autre retiré, hachures en contour seulement
- * (comme l'appli d'origine). prefixe : texte ajouté devant le nom de chaque calque.
+ * Recette de départ : calques gelés / éteints écartés, rien d'autre retiré, hachures gardées (0.284.1, demande du 23.11). prefixe : texte ajouté devant le nom de chaque calque.
  */
 export function recetteDeDepart(plan, prefixe = '') {
   return {
@@ -29,7 +28,7 @@ export function recetteDeDepart(plan, prefixe = '') {
     couleurs: {},
     // Cochés au départ comme sur la maquette validée le 22.11 : cotations, lignes de repère, attributs.
     types: { cotations: true, reperes: true, attributs: true, textes: false, splines: false, pleins: false },
-    hachures: 'contour',
+    hachures: 'garder',
     zone: null,
     prefixe,
   };

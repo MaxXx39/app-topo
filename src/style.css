@@ -14639,3 +14639,6 @@ dialog.page-comparateur[open] {
 .actions-ligne-calage { display: flex; flex-wrap: wrap; gap: 4px; }
 .groupe-ruban select { padding: 6px 8px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); font: inherit; max-width: 220px; }
 .outil-ruban[aria-pressed='true'] { background: color-mix(in srgb, #2563eb 14%, var(--surface)); border-color: #2563eb; color: #2563eb; }
+
+/* 0.284.1 : la vue de Comparer prend toute la hauteur de la page. */
+.contenu-calage > .vue-nettoyer { flex: 1 1 auto; min-height: 0; }

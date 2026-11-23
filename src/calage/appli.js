@@ -18,6 +18,7 @@ import { accrocher, accrocherTrait, sourcesDesPlans } from '../topo/accroche.js'
 import { caler, droiteParPoints, ErreurCalage, appliquerSimilitude, inverserSimilitude, versHelmert, resultatAutomatique, SEUIL_JUSTE_M, SEUIL_A_REVOIR_M } from '../topo/calage-plan.js';
 import { segmentsDuPlan } from '../topo/calage-auto.js';
 import { differencesPlans, sousPlan } from '../topo/differences-plan.js';
+import { archiver, restaurer } from '../projet/archives.js';
 import { calculerAuto } from './calcul-auto.js';
 import { recetteDeDepart, nettoyerPlan, compterParCalque, calqueSousLePoint, TYPES_RETIRABLES, CHOIX_HACHURES } from '../topo/nettoyage-plan.js';
 import { plansDeReference, plansCales, indicesDuGroupe, etiquettes, planCale, planReference, planDesPoints, planEnMn95, REF_POINTS } from './plans.js';
@@ -76,6 +77,10 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
     if (memoPoints.n !== liste.length) memoPoints = { n: liste.length, plan: planDesPoints(liste) };
     return memoPoints.plan;
   };
+  // Indices d'un plan calé : le dernier est dans le projet, les anciens sont dans les Archives (0.284.1).
+  const tousPlans = () => [...projet.plansDxf, ...(projet.archives ?? []).flatMap((a) => a.contenu?.plansDxf ?? [])];
+  const planParId = (id) => tousPlans().find((p) => p.id === id) ?? null;
+  const archiveDu = (id) => (projet.archives ?? []).find((a) => a.contenu?.plansDxf?.some((p) => p.id === id)) ?? null;
   const referencePoints = () => etat.referenceId === REF_POINTS;
   const reference = () => (referencePoints() ? (points().length ? planPoints() : null) : projet.plansDxf.find((p) => p.id === etat.referenceId) ?? null);
   const referenceAffichee = () => (reference() ? planRecale(reference()) : null);
@@ -138,19 +143,22 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
 
   function htmlListe() {
     const cales = plansCales(projet.plansDxf);
-    const ligneIndice = (p, courant) => {
+    const ligneIndice = (p) => {
       const c = p.calage;
       const ch = c.indices?.at(-1)?.changements;
+      const archive = archiveDu(p.id);
       return `<tr class="ligne-indice">
         <td colspan="2"><span class="aide-calage">Indice <strong>${echapper(c.indice ?? '?')}</strong> · ${echapper(c.fichier ?? '')} · ${dateCourte(c.le)}${ch ? ` · +${ch.ajoutes} / −${ch.supprimes}` : ''}</span></td>
-        <td colspan="6">${courant && p.visible !== false ? '<span class="pastille-calage p-juste">Affiché dans le projet</span>' : `<button type="button" class="bouton-secondaire petit" data-afficher-indice="${echapper(p.id)}">Afficher cet indice</button>`}
+        <td colspan="6">${archive ? '<span class="pastille-calage p-sans">Archivé</span> <button type="button" class="bouton-secondaire petit" data-afficher-indice="' + echapper(p.id) + '">Afficher cet indice</button>'
+    : p.visible === false ? `<span class="aide-calage">Dans le projet (caché)</span> <button type="button" class="bouton-secondaire petit" data-afficher-indice="${echapper(p.id)}">Afficher</button>`
+      : '<span class="pastille-calage p-juste">Affiché dans le projet</span>'}
           <button type="button" class="bouton-secondaire petit" data-comparer-avec="${echapper(p.id)}">Comparer…</button></td>
       </tr>`;
     };
     const lignes = cales.map((p) => {
       const c = p.calage;
       const [texte, classe] = VERDICTS[c.verdict] ?? ['?', 'p-sans'];
-      const indices = indicesDuGroupe(projet.plansDxf, p);
+      const indices = indicesDuGroupe(tousPlans(), p);
       return `<tr>
         <td><strong>${echapper(p.nom)}</strong><br><span class="aide-calage">${echapper(c.fichier ?? '')}</span></td>
         <td>${echapper(c.referenceNom ?? '')}</td>
@@ -161,7 +169,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
         <td>${dateCourte(c.le)}</td>
         <td class="actions-ligne-calage"><button type="button" class="bouton-secondaire petit" data-indice-de="${echapper(p.id)}">Nouvel indice…</button>
           <button type="button" class="bouton-secondaire petit" data-verifier="${echapper(p.id)}">Vérifier</button></td>
-      </tr>${indices.length > 1 ? indices.map((q) => ligneIndice(q, q.id === p.id)).join('') : ''}`;
+      </tr>${indices.length > 1 ? indices.map((q) => ligneIndice(q)).join('') : ''}`;
     }).join('');
     return `
       <div class="barre-calage"><button type="button" class="bouton" data-action="nouveau">＋ Caler un nouveau plan</button></div>
@@ -211,8 +219,8 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
         </div>` : ''}
       </section>
       ${ni ? '' : `<section class="carte-calage">
-        <h3>Référence MN95 (un plan du projet)</h3>
-        ${refs.length || points().length ? `<select data-champ="reference"><option value="">— choisir —</option>${points().length ? `<option value="${REF_POINTS}" ${REF_POINTS === etat.referenceId ? 'selected' : ''}>Points du projet (${points().length} points : levés, à implanter, contrôle)</option>` : ''}${refs.map((p) => `<option value="${echapper(p.id)}" ${p.id === etat.referenceId ? 'selected' : ''}>${echapper(p.nom)}${planEnMn95(p) ? '' : ' (local)'}</option>`).join('')}</select>`
+        <h3>Référence : un plan du projet (MN95 ou local) ou des points du projet</h3>
+        ${true ? `<select data-champ="reference"><option value="">— choisir —</option><option value="${REF_POINTS}" ${REF_POINTS === etat.referenceId ? 'selected' : ''} ${points().length ? '' : 'disabled'}>Points du projet (${points().length ? `${points().length} points : levés, à implanter, contrôle` : 'aucun point dans le projet'})</option>${refs.map((p) => `<option value="${echapper(p.id)}" ${p.id === etat.referenceId ? 'selected' : ''}>${echapper(p.nom)}${planEnMn95(p) ? '' : ' (local)'}</option>`).join('')}</select>`
           : '<p class="note-calage alerte">⚠ Aucun plan ni point dans ce projet : ajoutez une référence ci-dessous ou levez des points.</p>'}
         ${referencePoints() ? '<p class="aide-calage">Caler sur des points du projet : cliquez un point du plan reçu puis le point levé ; pour un axe, cliquez l\'axe du plan reçu puis 2 points levés ou plus sur cet axe, et « Terminer l\'axe ».</p>' : ''}
         ${peutConvertirDwg()
@@ -267,7 +275,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
   function htmlNettoyer() {
     const ignores = Object.entries(etat.lu.compte.ignores ?? {});
     const ni = etat.nouvelIndice;
-    const groupe = ni ? indicesDuGroupe(projet.plansDxf, ni.ancien) : [];
+    const groupe = ni ? indicesDuGroupe(tousPlans(), ni.ancien) : [];
     const groupeRuban = (titre, boutons, attributs = '') => `<div class="groupe-ruban" ${attributs}><span class="titre-groupe">${titre}</span><div class="boutons-groupe">${boutons}</div></div>`;
     const bouton = (action, icone, texte, extra = '') => `<button type="button" class="outil-ruban" data-action="${action}" ${extra}>${icone}<span>${texte}</span></button>`;
     return `
@@ -339,8 +347,8 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
     if (c.avantId === c.apresId) return null;
     const cle = `${c.avantId}|${c.apresId}`;
     if (compare.cle !== cle) {
-      const avant = planRecale(projet.plansDxf.find((p) => p.id === c.avantId));
-      const apres = planRecale(projet.plansDxf.find((p) => p.id === c.apresId));
+      const avant = planRecale(planParId(c.avantId));
+      const apres = planRecale(planParId(c.apresId));
       const d = differencesPlans(avant, apres);
       compare = { cle, d, plans: [sousPlan(apres, d.inchanges, '#9ca3af'), sousPlan(avant, d.supprimes, '#dc2626'), sousPlan(apres, d.ajoutes, '#16a34a')] };
     }
@@ -349,7 +357,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
 
   function monterComparer() {
     const c = etat.comparaison;
-    const plan = () => planRecale(projet.plansDxf.find((p) => p.id === c.apresId));
+    const plan = () => planRecale(planParId(c.apresId));
     vues = [creerVueCalage(page.querySelector('[data-toile="comparer"]'), {
       plans: () => [...(etat.refVisible && reference() ? [refGrise()] : []), ...(calculComparaison()?.plans ?? [plan()])],
       cadrage: () => [plan()],
@@ -419,7 +427,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
   function changementsDepuisAncien() {
     const n = planNettoye();
     if (!etat.nouvelIndice || !n.cale) return null;
-    const base = projet.plansDxf.find((p) => p.id === etat.baseId) ?? etat.nouvelIndice.ancien;
+    const base = planParId(etat.baseId) ?? etat.nouvelIndice.ancien;
     const cle = `${n.cle}|${base.id}`;
     if (changements.cle !== cle) {
       const ancien = planRecale(base);
@@ -1104,11 +1112,38 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
     dessiner();
   }
 
+  /**
+   * Afficher un ancien indice : il sort des Archives et prend la place de l'indice affiché (dossier, couleur, affichage),
+   * qui part à son tour dans les Archives. Un indice du projet seulement caché est simplement montré.
+   */
+  function afficherIndice(id) {
+    const choisi = planParId(id);
+    if (!choisi) return false;
+    const archive = archiveDu(id);
+    return modifier(() => {
+      if (!archive) {
+        indicesDuGroupe(projet.plansDxf, choisi).forEach((q) => { q.visible = q.id === choisi.id; });
+        return;
+      }
+      const groupe = choisi.calage.groupe ?? choisi.id;
+      const actuel = projet.plansDxf.find((p) => p.calage && (p.calage.groupe ?? p.id) === groupe);
+      restaurer(projet, archive.id);
+      const remis = projet.plansDxf.find((p) => p.id === id);
+      if (actuel) {
+        const { sousDossiers, couleur, transparence } = actuel;
+        Object.assign(remis, { sousDossiers, visible: true, ...(couleur !== undefined ? { couleur } : {}), ...(transparence !== undefined ? { transparence } : {}) });
+        const { archive: rangee } = archiver(projet, 'plan', actuel.id);
+        if (rangee) rangee.nom = `${actuel.nom} (indice ${actuel.calage.indice ?? '?'})`;
+      } else remis.visible = true;
+      delete remis.calage.archive;
+    });
+  }
+
   /** Comparer deux indices d'un plan calé (au choix dans les deux listes). */
   function comparer(planId) {
-    const plan = projet.plansDxf.find((p) => p.id === planId);
+    const plan = planParId(planId);
     if (!plan?.calage) return;
-    const plans = indicesDuGroupe(projet.plansDxf, plan);
+    const plans = indicesDuGroupe(tousPlans(), plan);
     if (plans.length < 2) {
       message('Il n\'y a qu\'un seul indice : rien à comparer.', 3500);
       return;
@@ -1149,8 +1184,7 @@ export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier 
     else if (cible.dataset.verifier) verifier(cible.dataset.verifier);
     else if (cible.dataset.comparerAvec) comparer(cible.dataset.comparerAvec);
     else if (cible.dataset.afficherIndice) {
-      const choisi = projet.plansDxf.find((p) => p.id === cible.dataset.afficherIndice);
-      if (choisi && modifier(() => { indicesDuGroupe(projet.plansDxf, choisi).forEach((q) => { q.visible = q.id === choisi.id; }); })) dessiner();
+      if (afficherIndice(cible.dataset.afficherIndice)) dessiner();
     } else if (action === 'enregistrer-verif') enregistrerVerification();
     else if (action === 'enregistrer-reference') enregistrerReference();
     else if (action === 'annuler-reference') {

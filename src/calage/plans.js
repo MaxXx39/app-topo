@@ -55,7 +55,15 @@ export function planDesPoints(points) {
 
 /** Plans du projet calés par cette application (ils ont leur « recette »), du plus récent au plus ancien. */
 export function plansCales(plansDxf = []) {
-  return plansDxf.filter((p) => p.calage && !p.calage.archive).sort((a, b) => String(b.calage.le).localeCompare(String(a.calage.le)));
+  const tries = plansDxf.filter((p) => p.calage && !p.calage.archive).sort((a, b) => String(b.calage.le).localeCompare(String(a.calage.le)));
+  // Un seul plan par lignée d'indices : le plus récent (un ancien indice restauré des Archives ne double pas la ligne).
+  const vus = new Set();
+  return tries.filter((p) => {
+    const groupe = p.calage.groupe ?? p.id;
+    if (vus.has(groupe)) return false;
+    vus.add(groupe);
+    return true;
+  });
 }
 
 /**

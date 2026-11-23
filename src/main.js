@@ -2009,10 +2009,12 @@ function ouvrirCalage() {
       if (precedent) {
         const { sousDossiers, couleur, transparence, visible } = precedent;
         const groupe = precedent.calage?.groupe ?? precedent.id;
-        precedent.calage = { ...precedent.calage, groupe, archive: true };
-        precedent.visible = false;
+        precedent.calage = { ...precedent.calage, groupe };
         const range = { ...plan, id: nouvelIdentifiant(), sousDossiers, ...(couleur !== undefined ? { couleur } : {}), ...(transparence !== undefined ? { transparence } : {}), ...(visible !== undefined ? { visible } : {}), calage: { ...plan.calage, groupe } };
         projet.plansDxf.push(range);
+        // L'indice d'avant va dans les Archives (restaurable, « Afficher cet indice » dans Calage de plans).
+        const { archive } = archiver(projet, 'plan', precedent.id);
+        if (archive) archive.nom = `${precedent.nom} (indice ${precedent.calage.indice ?? '?'})`;
         modifie();
         return range;
       }
