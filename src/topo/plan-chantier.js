@@ -508,3 +508,45 @@ export function bordsDesTriangles(triangles) {
   }
   return [...vus.values()].filter((x) => x.n === 1).map((x) => x.seg);
 }
+
+/**
+ * Ordre de dessin (0.290.0) : le dernier élément de plan.objets est dessiné au-dessus. quoi : 'devant' (tout au-dessus),
+ * 'arriere' (tout en dessous), 'monter' / 'descendre' (d'un cran, seulement parmi les éléments de la même phase visibles
+ * ou non, l'ordre suit la liste). Renvoie vrai si l'ordre a changé.
+ */
+export function changerOrdre(plan, id, quoi) {
+  const i = plan.objets.findIndex((o) => o.id === id);
+  if (i < 0) return false;
+  const n = plan.objets.length;
+  const j = { devant: n - 1, arriere: 0, monter: Math.min(n - 1, i + 1), descendre: Math.max(0, i - 1) }[quoi] ?? i;
+  if (j === i) return false;
+  const [o] = plan.objets.splice(i, 1);
+  plan.objets.splice(j, 0, o);
+  return true;
+}
+
+/**
+ * Direction de la ligne la plus proche du point p (à tolerance m près), pour aligner un symbole (0.290.0) : angle du
+ * segment le plus proche en degrés (sens trigonométrique, 0 = vers l'Est), ramené au plus près de « actuel » (le symbole
+ * ne se retourne pas : on prend le segment ou son sens inverse). lignes : format de l'accroche ({ points: [{ est, nord }],
+ * ferme }). Renvoie null si aucune ligne n'est assez près.
+ */
+export function angleDeLaLigne(lignes, p, tolerance, actuel = 0) {
+  let meilleur = null;
+  for (const l of lignes) {
+    const pts = l.points;
+    const n = l.ferme ? pts.length : pts.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      if (Math.hypot(b.est - a.est, b.nord - a.nord) < 1e-9) continue;
+      const d = distanceAuSegment(p, [a.est, a.nord], [b.est, b.nord]);
+      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, angle: (Math.atan2(b.nord - a.nord, b.est - a.est) * 180) / Math.PI };
+    }
+  }
+  if (!meilleur) return null;
+  // Le sens le plus proche de la rotation actuelle (écart ramené à −180…180°).
+  const ecart = (x) => ((((x - actuel) % 360) + 540) % 360) - 180;
+  const angle = Math.abs(ecart(meilleur.angle)) <= 90 ? meilleur.angle : meilleur.angle + 180;
+  return Math.round(((angle % 360) + 360) % 360 * 100) / 100;
+}

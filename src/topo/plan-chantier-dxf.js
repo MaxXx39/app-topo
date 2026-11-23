@@ -9,7 +9,7 @@ import {
   metresParMm, estPose,
 } from './plan-chantier.js';
 import { couleurAci } from './dxf-plan.js';
-import { symboleGrue, symboleChassis, primitivesEtage } from './symboles.js';
+import { grueLibre, chassisLibre, primitivesEtage } from './symboles.js';
 import { nomDeCalque, texteAscii } from '../export/dxf.js';
 
 const f3 = (v) => (Math.abs(v) < 0.0005 ? '0.000' : v.toFixed(3));
@@ -179,10 +179,10 @@ export function dxfPlanChantier(plan, bib, objets = null) {
 /** Bloc d'un élément posé : { nom, primitives, fleche } (grue = châssis + grue ; à étage = escalier + 2 conteneurs). */
 export function blocDuPose(o, bib) {
   if (o.type === 'grue') {
-    const g = symboleGrue(bib, o.modele ?? 'tour', o.fleche ?? 40);
+    const g = grueLibre(bib, o.modele ?? 'tour', o.fleche ?? 40);
     if (!g) return null;
-    const ch = symboleChassis(bib, o.chassis);
-    return { nom: nomDeBloc(`GRUE_${o.modele === 'auto' ? 'AUTO' : 'TOUR'}_${g.fleche}M${ch ? `_${ch.chassis}` : ''}`), primitives: [...(ch?.primitives ?? []), ...g.primitives], fleche: g.fleche };
+    const ch = chassisLibre(bib, o.chassis);
+    return { nom: nomDeBloc(`GRUE_${o.modele === 'auto' ? 'AUTO' : 'TOUR'}_${g.fleche}M${ch ? `_${ch.cote.toFixed(2)}` : ''}`), primitives: [...(ch?.primitives ?? []), ...g.primitives], fleche: g.fleche };
   }
   if (o.etage) {
     const et = primitivesEtage(bib, o.etage.pose ?? 0);

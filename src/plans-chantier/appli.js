@@ -22,8 +22,8 @@ import { creerVueChantier } from './vue.js';
 import { listeGenres } from './apercu.js';
 import { chargerBibliothequeBase, entreesBibliotheque, filtrerEntrees, CATEGORIES_SYMBOLES, symbolesDuDxf, ajouterSymbolesProjet } from './bibliotheque.js';
 import { dessinerVignette, symboleDeLObjet } from './dessin.js';
-import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR } from '../topo/symboles.js';
-import { estPose } from '../topo/plan-chantier.js';
+import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX } from '../topo/symboles.js';
+import { estPose, changerOrdre, angleDeLaLigne } from '../topo/plan-chantier.js';
 import { reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
@@ -79,6 +79,7 @@ export function ouvrirPlansChantier({
     // 0.289.0 : symboles
     pose: null, // élément à poser (outil « symbole ») : { type: 'symbole', cle… } ou { type: 'grue', … }
     rotationPose: 0, biblio: { ouvert: false, categorie: '', recherche: '' }, fondEtat: null,
+    orienter: null, // 0.290.0 : { id, mode: 'point' | 'ligne' } : le prochain clic oriente le symbole choisi
   };
   let vue = null;
   let pileAnnuler = [];
@@ -143,7 +144,10 @@ export function ouvrirPlansChantier({
   }
 
   function echap() {
-    if (etat.attenteRepere) {
+    if (etat.orienter) {
+      etat.orienter = null;
+      majTout();
+    } else if (etat.attenteRepere) {
       etat.attenteRepere = null;
       majTout();
     } else if (etat.saisie) {
@@ -313,7 +317,7 @@ export function ouvrirPlansChantier({
         // 0.287.0 : sur une poignée (sommet) de l'élément choisi = déplacer ce sommet (avec l'accroche) ; ailleurs sur
         // l'élément = le déplacer en entier.
         debut: (p, tol) => {
-          if (etat.outil !== 'choisir' || !etat.choisi) return false;
+          if (etat.outil !== 'choisir' || !etat.choisi || etat.orienter) return false;
           const o = plan().objets.find((x) => x.id === etat.choisi);
           if (!o) return false;
           if (estPose(o)) {
@@ -389,7 +393,8 @@ export function ouvrirPlansChantier({
 
   /** Accroche pendant un dessin : points levés, puis sommets / milieux / bords des plans et de ce qui est dessiné. */
   function accrochage(position, tolerance) {
-    if (etat.outil === 'choisir' && etat.glisse?.type !== 'sommet' && !(etat.glisse?.type === 'objet' && etat.glisse.decal)) return null;
+    if (etat.orienter?.mode === 'ligne') return null; // on touche la ligne elle-même
+    if (etat.outil === 'choisir' && !etat.orienter && etat.glisse?.type !== 'sommet' && !(etat.glisse?.type === 'objet' && etat.glisse.decal)) return null;
     if (etat.outil === 'decaler') return null; // on touche la ligne elle-même, puis le côté : pas d'accroche
     const a = etat.accroches;
     if (a.has('point')) {
@@ -406,6 +411,31 @@ export function ouvrirPlansChantier({
       if (t) return t;
     }
     return null;
+  }
+
+  /** Orienter le symbole choisi (0.290.0) : vers le point cliqué (accroché), ou parallèle à la ligne cliquée. */
+  function toucherOrientation(p, tolerance) {
+    const { id, mode } = etat.orienter;
+    const o = plan().objets.find((x) => x.id === id);
+    if (!o) {
+      etat.orienter = null;
+      return majTout();
+    }
+    let rotation;
+    if (mode === 'point') {
+      if (Math.hypot(p[0] - o.point[0], p[1] - o.point[1]) < 0.01) return message('Cliquez un point plus loin que le centre du symbole.', 3000);
+      rotation = rotationVers(o, p);
+    } else {
+      const autres = plan().objets.filter((x) => x.id !== id);
+      const lignes = [...lignesPourAccroche(objetsVisibles({ ...plan(), objets: autres })), ...lignesSymboles(autres), ...sourcesDesPlans(plansFond(), { est: p[0], nord: p[1] }, tolerance).lignes];
+      rotation = angleDeLaLigne(lignes, p, tolerance * 1.5, o.rotation ?? 0);
+      if (rotation === null) return message('Aucune ligne ici : cliquez une ligne du plan ou un élément dessiné.', 3000);
+    }
+    if (!avantChangement()) return;
+    o.rotation = rotation;
+    etat.orienter = null;
+    enregistrer();
+    majTout();
   }
 
   /** Décalage : 1er clic = la ligne à décaler (dessin ou plan DXF), 2e clic = le côté de la copie. */
@@ -457,9 +487,11 @@ export function ouvrirPlansChantier({
       }
       return majTout();
     }
+    if (etat.orienter) return toucherOrientation(p, tolerance);
     if (etat.outil === 'decaler') return toucherDecalage(p, tolerance);
     if (etat.outil === 'choisir') {
       etat.choisi = objetSous(p, tolerance)?.id ?? null;
+      etat.orienter = null;
       majTout();
       return;
     }
@@ -824,6 +856,10 @@ export function ouvrirPlansChantier({
       decaler: etat.saisie?.source ? `Cliquez du côté où mettre la copie, à ${etat.distanceDecalage} m.` : 'Cliquez la ligne à décaler (une ligne du plan DXF ou un élément dessiné).',
     };
     const zone = page.querySelector('[data-zone="consigne"]');
+    if (zone && etat.orienter) {
+      zone.textContent = etat.orienter.mode === 'point' ? 'Cliquez le point vers lequel tourner le symbole (accroches actives). (Échap = abandonner)' : 'Cliquez la ligne sur laquelle aligner le symbole (plan DXF ou élément dessiné). (Échap = abandonner)';
+      return;
+    }
     if (zone) zone.textContent = etat.attenteRepere ? `${textes.texte} (Échap = sans repère)` : `${textes[etat.outil]}${etat.outil !== 'choisir' ? ' (Échap = arrêter)' : ''}`;
   }
 
@@ -904,6 +940,12 @@ export function ouvrirPlansChantier({
         ${estPose(o) ? '' : p.couleurs === 'phases' ? '<p class="aide-calage">Couleurs « une par phase » : la couleur vient de la phase.</p>' : `<div class="couleur-element"><label class="champ-calage"><span>Couleur</span><input type="color" value="${couleurObjet({ ...p, couleurs: 'objets' }, o)}" data-prop="couleur"></label>
           ${o.couleur ? '<button type="button" class="lien-calage" data-action="couleur-origine">Couleur d\'origine</button>' : ''}</div>`}
         <label class="champ-calage"><span>Phase</span><select data-prop="phase">${phaseChoix}</select></label>
+        <p class="aide-calage">Ordre de dessin :</p>
+        <div class="actions-chantier ordre-chantier">
+          <button type="button" class="bouton-secondaire" data-ordre="devant" title="Tout au-dessus">Premier plan</button>
+          <button type="button" class="bouton-secondaire" data-ordre="monter" title="Un cran au-dessus">▲</button>
+          <button type="button" class="bouton-secondaire" data-ordre="descendre" title="Un cran en dessous">▼</button>
+          <button type="button" class="bouton-secondaire" data-ordre="arriere" title="Tout en dessous">Arrière-plan</button></div>
         <div class="actions-chantier">${decaler}<button type="button" class="bouton-secondaire" data-action="effacer">Effacer cet élément</button></div>`;
     }
     zone.innerHTML = `
@@ -943,26 +985,33 @@ export function ouvrirPlansChantier({
     const rotation = `<div class="ligne-rotation">${champNombre('Rotation', 'prop', 'rotation', o.rotation ?? 0, -360, 360, 1, '°')}
       <button type="button" class="bouton-secondaire" data-tourner="90" title="Tourner de 90° à gauche">⟲ 90°</button>
       <button type="button" class="bouton-secondaire" data-tourner="-90" title="Tourner de 90° à droite">⟳ 90°</button></div>`;
+    const orienter = `<div class="actions-chantier">
+      <button type="button" class="bouton-secondaire ${etat.orienter?.mode === 'point' ? 'actif' : ''}" data-orienter="point" title="Cliquer ensuite le point visé (accroches)">Orienter vers un point</button>
+      <button type="button" class="bouton-secondaire ${etat.orienter?.mode === 'ligne' ? 'actif' : ''}" data-orienter="ligne" title="Cliquer ensuite une ligne (plan DXF ou dessin)">Aligner sur une ligne</button></div>`;
     if (o.type === 'grue') {
+      // 0.290.0 : longueur de flèche et côté du châssis tapés librement (les longueurs du DXF sont proposées).
       const fleches = flechesDisponibles(bib(), o.modele ?? 'tour');
       const chassis = chassisDisponibles(bib());
-      return `${rotation}
+      const cote = coteChassis(o.chassis);
+      return `${rotation}${orienter}
         <label class="champ-calage"><span>Modèle</span><select data-prop="modele">
           <option value="tour" ${o.modele !== 'auto' ? 'selected' : ''}>Grue à tour</option><option value="auto" ${o.modele === 'auto' ? 'selected' : ''}>Grue automontante</option></select></label>
-        <label class="champ-calage"><span>Longueur de la flèche</span><select data-prop="fleche">${fleches.map((f) => `<option value="${f}" ${f === sy?.fleche ? 'selected' : ''}>${f} m</option>`).join('')}</select></label>
-        <label class="champ-calage"><span>Châssis</span><select data-prop="chassis"><option value="aucun" ${!o.chassis || o.chassis === 'aucun' ? 'selected' : ''}>Sans châssis</option>
-          ${chassis.map((c) => `<option value="${c}" ${o.chassis === c ? 'selected' : ''}>${c} × ${c} m</option>`).join('')}</select></label>
+        <label class="champ-calage"><span>Longueur de la flèche (m)</span><input type="number" min="${FLECHE_MIN}" max="${FLECHE_MAX}" step="0.5" value="${sy?.fleche ?? o.fleche ?? 40}" data-prop="fleche" list="fleches-grue"></label>
+        <datalist id="fleches-grue">${fleches.map((f) => `<option value="${f}"></option>`).join('')}</datalist>
+        ${champCase('Châssis (coté sur le plan)', 'prop-case', 'chassisOui', Boolean(cote))}
+        ${cote ? `<label class="champ-calage"><span>Côté du châssis (m)</span><input type="number" min="${CHASSIS_MIN}" max="${CHASSIS_MAX}" step="0.05" value="${cote.toFixed(2)}" data-prop="chassis" list="chassis-grue"></label>
+        <datalist id="chassis-grue">${chassis.map((c) => `<option value="${c}"></option>`).join('')}</datalist>` : ''}
         ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}`;
     }
     if (o.etage) {
       const textes = o.etage.textes ?? ['1er', 'Rez'];
-      return `${dims}${rotation}
+      return `${dims}${rotation}${orienter}
         <p class="aide-calage">Pose de l'escalier (4 coins × 2 sens de montée) :</p>
         <div class="poses-etage">${POSES_ETAGE.map((t, i) => `<button type="button" data-pose-etage="${i}" class="${(o.etage.pose ?? 0) === i ? 'actif' : ''}" title="${echapper(t)}"><canvas data-vignette-pose="${i}"></canvas></button>`).join('')}</div>
         <label class="champ-calage"><span>Texte de l'étage</span><input type="text" maxlength="30" value="${echapper(textes[0])}" data-etage-texte="0"></label>
         <label class="champ-calage"><span>Texte du rez</span><input type="text" maxlength="30" value="${echapper(textes[1])}" data-etage-texte="1"></label>`;
     }
-    return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${rotation}`;
+    return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${rotation}${orienter}`;
   }
 
   /** Vignette d'une pose de la base-vie à étage. */
@@ -1081,6 +1130,19 @@ export function ouvrirPlansChantier({
       etat.saisie = null;
       etat.choisi = null;
       majBiblio();
+      return majTout();
+    }
+    if (b.dataset.ordre) {
+      if (!etat.choisi || !avantChangement()) return;
+      if (!changerOrdre(p, etat.choisi, b.dataset.ordre)) {
+        pileAnnuler.pop();
+        return message(b.dataset.ordre === 'devant' || b.dataset.ordre === 'monter' ? 'Cet élément est déjà tout au-dessus.' : 'Cet élément est déjà tout en dessous.', 2500);
+      }
+      enregistrer();
+      return majTout();
+    }
+    if (b.dataset.orienter) {
+      etat.orienter = etat.orienter?.mode === b.dataset.orienter ? null : { id: etat.choisi, mode: b.dataset.orienter };
       return majTout();
     }
     if (b.dataset.tourner || b.dataset.poseEtage !== undefined) {
@@ -1308,6 +1370,14 @@ export function ouvrirPlansChantier({
       const o = p.objets.find((x) => x.id === etat.choisi);
       if (!o) return;
       const cle = c.dataset.propCase;
+      if (cle === 'chassisOui') {
+        if (!avantChangement()) return;
+        o.chassis = c.checked ? (coteChassis(o.chassisAvant) ?? 4.5).toFixed(2) : 'aucun';
+        if (!c.checked) o.chassisAvant = coteChassis(o.chassis) ?? o.chassisAvant;
+        enregistrer();
+        majPanneau();
+        return vue?.redessinerDessus();
+      }
       if (cle === 'rayon') {
         if (!avantChangement()) return;
         o.rayon = c.checked; // rayon d'action d'une grue : affiché ou caché
@@ -1347,12 +1417,7 @@ export function ouvrirPlansChantier({
       }
       if (!avantChangement()) return;
       o[cle] = valeur;
-      if (cle === 'fleche') o.fleche = Number(valeur);
-      if (cle === 'modele') {
-        // Autre modèle de grue : la flèche disponible la plus proche.
-        const fl = flechesDisponibles(bib(), valeur);
-        if (fl.length) o.fleche = fl.reduce((m, f) => (Math.abs(f - (o.fleche ?? 40)) < Math.abs(m - (o.fleche ?? 40)) ? f : m));
-      }
+      if (cle === 'chassis') o.chassis = Number(valeur).toFixed(2); // côté libre (m), gardé en texte comme « 4.50 »
       enregistrer();
       majPanneau();
       vue?.redessinerDessus();

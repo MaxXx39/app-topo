@@ -9,7 +9,7 @@ import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
   dimensionsFleche, centreZone, texteSurface,
 } from '../topo/plan-chantier.js';
-import { nuance, primitivesEtage, symboleGrue, symboleChassis, boiteSymbole } from '../topo/symboles.js';
+import { nuance, primitivesEtage, grueLibre, chassisLibre, boiteSymbole } from '../topo/symboles.js';
 
 const ecranDe = (d) => ([e, n]) => versEcran(e, n, d.vue);
 
@@ -371,10 +371,10 @@ export function dessinerSymbolePose(d, o) {
   const unique = d.pc?.couleurs === 'phases' ? d.pc.phases.find((p) => p.id === o.phase)?.couleur : null;
   const opts = { angle: rot, couleurUnique: unique ?? undefined };
   if (o.type === 'grue') {
-    const g = symboleGrue(bib, o.modele ?? 'tour', o.fleche ?? 40);
+    const g = grueLibre(bib, o.modele ?? 'tour', o.fleche ?? 40);
     if (!g) return manquant(d, o, q);
     debut();
-    const ch = symboleChassis(bib, o.chassis);
+    const ch = chassisLibre(bib, o.chassis); // 0.290.0 : côté libre, coté
     if (ch) dessinerPrimitives(ctx, ch.primitives, e, d.mm, opts);
     if (o.rayon !== false && g.rayon?.length) dessinerRayon(ctx, g, e, d.mm, rot);
     dessinerPrimitives(ctx, g.primitives, e, d.mm, { ...opts, ombreForte: true });
@@ -442,7 +442,7 @@ function manquant(d, o, q) {
 
 /** Symbole de la bibliothèque qui donne la boîte d'un objet posé (la grue : sa flèche ; à étage : le conteneur). */
 export function symboleDeLObjet(bib, o) {
-  if (o.type === 'grue') return symboleGrue(bib, o.modele ?? 'tour', o.fleche ?? 40);
+  if (o.type === 'grue') return grueLibre(bib, o.modele ?? 'tour', o.fleche ?? 40);
   return bib.find((x) => x.cle === o.cle) ?? null;
 }
 

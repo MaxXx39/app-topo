@@ -6,9 +6,11 @@ import {
   bibliothequeDepuisBlocs, materiau, adoucir, nuance, categorieDuBloc, separerRayon, transformeEscalier, primitivesEtage,
   symboleGrue, flechesDisponibles, chassisDisponibles, symboleChassis, surLeSymbole, rotationVers, versTerrainSymbole,
   versSymbole, poigneeRotation, coinsSymbole, equipementsVehicule, CLE_CONTENEUR, ARDOISE, BLANC_BLOC,
+  grueLibre, chassisLibre, coteChassis,
 } from '../src/topo/symboles.js';
 import {
   nouveauPlanChantier, ajouterObjet, objetSousLePoint, deplacerObjet, resumeObjet, bordsDesTriangles, ajouterPhase, estPose,
+  changerOrdre, angleDeLaLigne,
 } from '../src/topo/plan-chantier.js';
 import {
   miseEnPageFeuille, pagesDeLaFeuille, elementsLegende, textesCartouche, vueDuCadre, reglagesFeuille, centreDeDepart, objetsDeLaPage,
@@ -306,5 +308,51 @@ describe('export DXF', () => {
     expect(relu.contenu.textes.map((t) => t.t)).toEqual(expect.arrayContaining(['ELEC', '1er', 'Rez', '300 m2']));
     expect(relu.contenu.cercles.some((c) => Math.abs(c.r - 40) < 0.01)).toBe(true);
     expect(blocDuPose({ type: 'symbole', cle: 'inconnu' }, BIB)).toBeNull();
+  });
+});
+
+describe('0.290.0 : grue et châssis à longueur libre, ordre de dessin, orientation', () => {
+  it('flèche tapée : la flèche s\'allonge, la tour et la contre-flèche restent, rayon à la longueur tapée', () => {
+    const base = symboleGrue(BIB, 'tour', 40);
+    const g = grueLibre(BIB, 'tour', 42.5);
+    expect(g.fleche).toBe(42.5);
+    expect(g.boite[2]).toBeCloseTo(2 + (base.boite[2] - 2) * (40.5 / 38), 2);
+    expect(g.boite[0]).toBeCloseTo(base.boite[0], 6); // contre-flèche inchangée
+    expect(g.rayon.find((p) => p.g === 'c' && p.r === 42.5)).toBeTruthy();
+    expect(g.rayon.filter((p) => p.g === 'c').map((p) => p.r)).toEqual([42.5, 20, 25, 30, 35, 40]);
+    expect(g.primitives.some((p) => p.g === 't' && p.t.includes('42.5m'))).toBe(true);
+    expect(grueLibre(BIB, 'tour', 500).fleche).toBe(90); // borné
+    expect(grueLibre(BIB, 'tour', 40).primitives).toBe(base.primitives); // longueur du DXF : bloc tel quel
+  });
+  it('châssis : côté libre, mis à l\'échelle et coté', () => {
+    expect(coteChassis('4.50')).toBe(4.5);
+    expect(coteChassis('aucun')).toBeNull();
+    expect(coteChassis('5,2')).toBe(5.2);
+    const c = chassisLibre(BIB, '5.20');
+    expect(c.cote).toBe(5.2);
+    const textes = c.primitives.filter((p) => p.g === 't').map((p) => p.t);
+    expect(textes).toEqual(['5.20 m', '5.20 m']);
+    const b = bornesPrimitives(c.primitives.filter((p) => p.mat !== 'trait' || p.k !== '#0f172a'));
+    expect(b.xMax - b.xMin).toBeGreaterThan(5.2); // pieds compris
+    expect(chassisLibre(BIB, 'aucun')).toBeNull();
+  });
+  it('ordre de dessin : premier plan, arrière-plan, d\'un cran', () => {
+    const plan = nouveauPlanChantier('PIC');
+    const [a, b, c] = ['a', 'b', 'c'].map((t) => ajouterObjet(plan, { type: 'texte', point: [0, 0], texte: t }));
+    expect(changerOrdre(plan, a.id, 'devant')).toBe(true);
+    expect(plan.objets.map((o) => o.texte)).toEqual(['b', 'c', 'a']);
+    expect(changerOrdre(plan, a.id, 'devant')).toBe(false);
+    changerOrdre(plan, a.id, 'descendre');
+    expect(plan.objets.map((o) => o.texte)).toEqual(['b', 'a', 'c']);
+    changerOrdre(plan, c.id, 'arriere');
+    expect(plan.objets.map((o) => o.texte)).toEqual(['c', 'b', 'a']);
+    expect(changerOrdre(plan, 'x', 'devant')).toBe(false);
+    expect(b).toBeTruthy();
+  });
+  it('aligner sur une ligne : angle du segment le plus proche, sans se retourner', () => {
+    const lignes = [{ points: [{ est: 0, nord: 0 }, { est: 10, nord: 10 }], ferme: false }];
+    expect(angleDeLaLigne(lignes, [5, 5.2], 1, 0)).toBe(45);
+    expect(angleDeLaLigne(lignes, [5, 5.2], 1, 200)).toBe(225); // le sens le plus proche de la rotation actuelle
+    expect(angleDeLaLigne(lignes, [50, 0], 1, 0)).toBeNull();
   });
 });
