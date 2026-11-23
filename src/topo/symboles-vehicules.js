@@ -286,6 +286,49 @@ export function camionGrue({ L, essieux, appuis, fleche }, deploye) {
   return res;
 }
 
+// ------------------------------------------------------------------ Grue mobile dynamique (0.293.0)
+
+/** Porteur de la grue mobile (devant en bas) : essieux, châssis, cabine, appuis sortis ou non. Centré sur le milieu du camion. */
+export function porteurGrueMobile({ L, essieux, appuis }, stabilisateurs) {
+  const W = 2.55;
+  const y0 = -L / 2;
+  const res = [];
+  const posEssieux = [y0 + 1.2, y0 + 2.7];
+  for (let i = 0; i < essieux - 2; i++) posEssieux.push(y0 + L - 1.3 - (essieux - 3 - i) * 1.5);
+  for (const y of posEssieux) res.push(...pneu(-W / 2 - 0.1, y - 0.55, -W / 2 + 0.42, y + 0.55), ...pneu(W / 2 - 0.42, y - 0.55, W / 2 + 0.1, y + 0.55));
+  res.push(...piece(GRIS, 'metal', rectArrondi(-W / 2 + 0.15, y0 + 2.0, W / 2 - 0.15, y0 + L - 0.1, 0.06)));
+  res.push(...appui(y0 + 3.5, appuis / 2, stabilisateurs, W / 2), ...appui(y0 + L - 1.0, appuis / 2, stabilisateurs, W / 2));
+  res.push(...piece(BLANC, 'peinture', rectArrondi(-W / 2, y0, W / 2, y0 + 2.2, 0.35)), ...piece(VITRE, 'vitre', rectArrondi(-W / 2 + 0.18, y0 + 0.2, W / 2 - 0.18, y0 + 0.75, 0.15)));
+  res.push(...piece(BLANC, 'peinture', rectArrondi(-W / 2 + 0.15, y0 + 0.8, W / 2 - 0.15, y0 + 2.1, 0.2)));
+  return res;
+}
+
+/** Hauteur (m, depuis le milieu du camion) du pivot de la tourelle. */
+export const pivotGrueMobile = ({ L }) => -L / 2 + L * 0.6;
+
+/** Tourelle + flèche déployée vers +y, pivot en (0, 0) : cabine du grutier à gauche, contrepoids, flèche télescopique, crochet. */
+export function tourelleGrueMobile(fleche) {
+  const res = [];
+  res.push(...piece(CLAIR, 'metal', cercle(0, 0, 1.35, 32)));
+  res.push(...piece('#3a3f45', 'metal', rectArrondi(-1.25, 1.05, 1.25, 2.0, 0.1)));
+  res.push(...piece(PERRIN_JAUNE, 'peinture', rectArrondi(-1.3, -1.25, 1.3, 1.15, 0.2)));
+  res.push(...piece('#d9a90f', 'peinture', rectArrondi(-1.18, -0.2, 1.18, 1.02, 0.1)));
+  res.push(...piece(PERRIN_JAUNE, 'peinture', rectArrondi(-1.35, -1.3, -0.35, -0.2, 0.12)), ...piece(VITRE, 'vitre', rectArrondi(-1.28, -1.22, -0.43, -0.62, 0.08)));
+  const long = Math.max(4, fleche) * 0.88;
+  const parts = [[1.15, 0.32], [0.95, 0.27], [0.76, 0.23], [0.58, 0.18]];
+  let y = 0;
+  parts.forEach(([w, f], i) => {
+    const l = long * f;
+    res.push(...piece(PERRIN_JAUNE, 'peinture', rectArrondi(-w / 2, y, w / 2, y + l + 0.3, 0.07)), trait([[0, y + 0.15], [0, y + l + 0.15]], false, '#b37a0a'));
+    void i;
+    y += l;
+  });
+  res.push(...piece(METAL, 'metal', cercle(0, y + 0.2, 0.42, 16)), ...piece('#2b2f33', 'caoutchouc', cercle(0, y + 0.2, 0.18, 10)));
+  res.push(trait([[0, y + 0.2], [0, y + 1.1]], false, NOIR), ...piece('#2b2f33', 'caoutchouc', rectArrondi(-0.25, y + 1.1, 0.25, y + 1.6, 0.05)));
+  res.push(...piece(METAL, 'metal', cercle(0, 0, 0.32, 14)));
+  return res;
+}
+
 // ------------------------------------------------------------------ Pompe à béton
 
 /**

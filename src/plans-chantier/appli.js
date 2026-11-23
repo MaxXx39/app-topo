@@ -22,6 +22,7 @@ import { creerVueChantier } from './vue.js';
 import { listeGenres } from './apercu.js';
 import { chargerBibliothequeBase, entreesBibliotheque, filtrerEntrees, CATEGORIES_SYMBOLES, symbolesDuDxf, ajouterSymbolesProjet } from './bibliotheque.js';
 import { dessinerVignette, symboleDeLObjet } from './dessin.js';
+import { autogrueDe, TONNES_MOBILES, FLECHE_MOBILE_MIN } from '../topo/grue-mobile.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
 import { reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
@@ -1122,7 +1123,7 @@ export function ouvrirPlansChantier({
 
   /** Nom de ce qui va être posé (panneau de l'outil). */
   function nomDeLaPose(pose) {
-    if (pose.type === 'grue') return pose.modele === 'auto' ? 'Grue automontante' : 'Grue à tour';
+    if (pose.type === 'grue') return pose.modele === 'auto' ? 'Grue automontante' : pose.modele === 'mobile' ? 'Grue mobile' : 'Grue à tour';
     if (pose.etage) return 'Base-vie à étage';
     return bib().find((x) => x.cle === pose.cle)?.nom ?? pose.cle;
   }
@@ -1136,6 +1137,14 @@ export function ouvrirPlansChantier({
       ${k !== 1 ? '<button type="button" class="bouton-secondaire" data-echelle-reelle title="Revenir à la taille réelle">Taille réelle</button>' : ''}</div>`;
     const rotation = ''; // 0.293.0 : rotation, échelle et orientation sont dans le bandeau du haut
     const orienter = '';
+    if (o.type === 'grue' && o.modele === 'mobile') {
+      // 0.293.0 : grue mobile dynamique (porteur = rotation de l'objet, tourelle et flèche indépendantes).
+      const a = autogrueDe(o.tonnes ?? 100);
+      return `<label class="champ-calage"><span>Taille de la grue</span><select data-prop="tonnes">${TONNES_MOBILES.map((t) => `<option value="${t}" ${t === a.t ? 'selected' : ''}>${t} t</option>`).join('')}</select></label>
+        ${champNombre('Rotation de la tourelle (par rapport au porteur)', 'prop', 'tourelle', o.tourelle ?? 0, -360, 360, 1, '°')}
+        ${champNombre('Longueur de la flèche', 'prop', 'fleche', sy?.fleche ?? o.fleche ?? 20, FLECHE_MOBILE_MIN, a.fleche, 0.5, 'm')}
+        ${champCase('Stabilisateurs sortis', 'prop-case', 'stabilisateurs', o.stabilisateurs !== false)}`;
+    }
     if (o.type === 'grue') {
       // 0.290.0 : longueur de flèche et côté du châssis tapés librement (les longueurs du DXF sont proposées).
       const fleches = flechesDisponibles(bib(), o.modele ?? 'tour');
@@ -1149,6 +1158,7 @@ export function ouvrirPlansChantier({
         ${champCase('Châssis (coté sur le plan)', 'prop-case', 'chassisOui', Boolean(cote))}
         ${cote ? `<label class="champ-calage"><span>Côté du châssis (m)</span><input type="number" min="${CHASSIS_MIN}" max="${CHASSIS_MAX}" step="0.05" value="${cote.toFixed(2)}" data-prop="chassis" list="chassis-grue"></label>
         <datalist id="chassis-grue">${chassis.map((c) => `<option value="${c}"></option>`).join('')}</datalist>` : ''}
+        ${champNombre('Orientation de la flèche (indépendante du châssis)', 'prop', 'rotationFleche', o.rotationFleche ?? 0, -360, 360, 1, '°')}
         ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}`;
     }
     if (o.etage) {
@@ -1563,6 +1573,12 @@ export function ouvrirPlansChantier({
         majPanneau();
         return vue?.redessinerDessus();
       }
+      if (cle === 'stabilisateurs') {
+        if (!avantChangement()) return;
+        o.stabilisateurs = c.checked;
+        enregistrer();
+        return vue?.redessinerDessus();
+      }
       if (cle === 'rayon') {
         if (!avantChangement()) return;
         o.rayon = c.checked; // rayon d'action d'une grue : affiché ou caché
@@ -1603,6 +1619,7 @@ export function ouvrirPlansChantier({
       if (!avantChangement()) return;
       o[cle] = valeur;
       if (cle === 'materiau' && !valeur) delete o.materiau;
+      if (cle === 'tonnes') o.tonnes = Number(valeur);
       if (cle === 'chassis') o.chassis = Number(valeur).toFixed(2); // côté libre (m), gardé en texte comme « 4.50 »
       enregistrer();
       majPanneau();

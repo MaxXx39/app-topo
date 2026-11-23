@@ -9,7 +9,8 @@ import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
   dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
 } from '../topo/plan-chantier.js';
-import { nuance, primitivesEtage, grueLibre, chassisLibre, boiteSymbole, echelleDeLObjet } from '../topo/symboles.js';
+import { grueDeLObjet } from '../topo/grue-mobile.js';
+import { nuance, primitivesEtage, chassisLibre, boiteSymbole, echelleDeLObjet } from '../topo/symboles.js';
 
 const ecranDe = (d) => ([e, n]) => versEcran(e, n, d.vue);
 
@@ -635,7 +636,7 @@ export function dessinerSymbolePose(d, o) {
   // 0.292.0 : texte de la même taille partout (mm sur le papier × échelle du plan), indépendante de l'échelle du bloc.
   const opts = { angle: rot, couleurUnique: unique ?? undefined, texteU: d.pc ? texteSymbolesM(d.pc) / k : undefined };
   if (o.type === 'grue') {
-    const g = grueLibre(bib, o.modele ?? 'tour', o.fleche ?? 40);
+    const g = grueDeLObjet(bib, o);
     if (!g) return manquant(d, o, q);
     debut();
     const ch = chassisLibre(bib, o.chassis); // 0.290.0 : côté libre, coté
@@ -706,7 +707,7 @@ function manquant(d, o, q) {
 
 /** Symbole de la bibliothèque qui donne la boîte d'un objet posé (la grue : sa flèche ; à étage : le conteneur). */
 export function symboleDeLObjet(bib, o) {
-  if (o.type === 'grue') return grueLibre(bib, o.modele ?? 'tour', o.fleche ?? 40);
+  if (o.type === 'grue') return grueDeLObjet(bib, o);
   return bib.find((x) => x.cle === o.cle) ?? null;
 }
 

@@ -237,8 +237,9 @@ export function retoucherBibliotheque(symboles) {
   for (const [nom, categorie, prims, centre] of nouveaux) res.push(versSymbole(nom, categorie, prims, { centre: centre !== false }));
   // Camions grues : 4 tailles, repliés et dépliés (le point de base reste le centre du camion).
   for (const a of AUTOGRUES) {
-    res.push(versSymbole(`Camion grue ${a.t} t (plié)`, 'Grues', camionGrue(a, false), { centre: false }));
-    res.push(versSymbole(`Camion grue ${a.t} t (déplié)`, 'Grues', camionGrue(a, true), { centre: false }));
+    // 0.293.0 : remplacés par la grue mobile dynamique (topo/grue-mobile.js) ; gardés cachés pour les plans déjà dessinés.
+    res.push({ ...versSymbole(`Camion grue ${a.t} t (plié)`, 'Grues', camionGrue(a, false), { centre: false }), cache: true });
+    res.push({ ...versSymbole(`Camion grue ${a.t} t (déplié)`, 'Grues', camionGrue(a, true), { centre: false }), cache: true });
   }
   for (const d of symbolesDessines()) res.push(versSymbole(d.nom, d.categorie, d.primitives));
   return res;

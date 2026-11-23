@@ -9,7 +9,8 @@ import {
   metresParMm, estPose, texteSymbolesM,
 } from './plan-chantier.js';
 import { couleurAci } from './dxf-plan.js';
-import { grueLibre, chassisLibre, primitivesEtage, echelleDeLObjet } from './symboles.js';
+import { grueDeLObjet } from './grue-mobile.js';
+import { chassisLibre, primitivesEtage, echelleDeLObjet } from './symboles.js';
 import { nomDeCalque, texteAscii } from '../export/dxf.js';
 
 const f3 = (v) => (Math.abs(v) < 0.0005 ? '0.000' : v.toFixed(3));
@@ -191,10 +192,11 @@ export function blocDuPose(o, bib, texteU = null) {
 
 function blocDuPoseBrut(o, bib) {
   if (o.type === 'grue') {
-    const g = grueLibre(bib, o.modele ?? 'tour', o.fleche ?? 40);
+    const g = grueDeLObjet(bib, o);
     if (!g) return null;
     const ch = chassisLibre(bib, o.chassis);
-    const base = `GRUE_${o.modele === 'auto' ? 'AUTO' : 'TOUR'}_${g.fleche}M${ch ? `_${ch.cote.toFixed(2)}` : ''}`;
+    const orient = o.modele === 'mobile' ? `_${g.tonnes}T_T${Math.round(Number(o.tourelle) || 0)}${o.stabilisateurs === false ? '_SANS' : ''}` : Number(o.rotationFleche) ? `_R${Math.round(o.rotationFleche)}` : '';
+    const base = `GRUE_${o.modele === 'auto' ? 'AUTO' : o.modele === 'mobile' ? 'MOBILE' : 'TOUR'}_${g.fleche}M${ch ? `_${ch.cote.toFixed(2)}` : ''}${orient}`;
     return { base, nom: nomDeBloc(base), primitives: [...(ch?.primitives ?? []), ...g.primitives], fleche: g.fleche };
   }
   if (o.etage) {

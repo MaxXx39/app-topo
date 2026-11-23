@@ -120,7 +120,7 @@ describe('modernisation', () => {
 
 describe('bibliothèque livrée (Base_2023.dxf)', () => {
   it('59 symboles proposés, grues et châssis réglables', () => {
-    expect(BIB.filter((s) => !s.cache)).toHaveLength(124); // 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
+    expect(BIB.filter((s) => !s.cache)).toHaveLength(116); // 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
     expect(flechesDisponibles(BIB, 'tour')).toEqual([25, 30, 35, 40, 45, 50, 55, 60, 65, 70]);
     expect(flechesDisponibles(BIB, 'auto')).toEqual([20, 25, 30, 35, 40, 45, 50]);
     expect(chassisDisponibles(BIB)).toEqual(['3.80', '4.20', '4.50', '4.60', '6']);
@@ -483,5 +483,49 @@ describe('0.292.0 : texte unique, échelle d\'un bloc, tas de stock, nouvelles l
     const { plan: relu } = lirePlanDxf(texte, 'x.dxf');
     expect(relu.calques.map((c) => c.nom)).toEqual(expect.arrayContaining(['PC_PHASE_1_GLISSIERE_BETON_GBA_']));
     expect(blocDuPose({ type: 'symbole', cle: 'base:Base Vie Bureau' }, BIB, 0.6).nom).toMatch(/_T60$/);
+  });
+});
+
+describe('blocs dynamiques (0.293.0)', () => {
+  it('grue mobile : la tourelle tourne, les stabilisateurs et la taille changent la boîte', async () => {
+    const { grueMobile, grueDeLObjet } = await import('../src/topo/grue-mobile.js');
+    const a = grueMobile({ tonnes: 100, fleche: 25, tourelle: 0 });
+    const b = grueMobile({ tonnes: 100, fleche: 25, tourelle: 90 });
+    expect(a.modele).toBe('mobile');
+    expect(b.boite).not.toEqual(a.boite); // flèche vers l'avant ou sur le côté
+    expect(Math.abs(b.boite[2] - b.boite[0])).toBeGreaterThan(Math.abs(a.boite[2] - a.boite[0]));
+    expect(grueMobile({ tonnes: 100, fleche: 25, tourelle: 0, stabilisateurs: false }).boite).not.toEqual(a.boite);
+    expect(grueMobile({ tonnes: 350, fleche: 25, tourelle: 0 }).boite[3] - a.boite[1]).toBeGreaterThan(0);
+    expect(grueMobile({ tonnes: 100, fleche: 25, tourelle: 0 })).toBe(a); // gardée en mémoire
+    expect(grueDeLObjet(BIB, { type: 'grue', modele: 'mobile', tonnes: 40, fleche: 12 }).tonnes).toBe(40);
+  });
+
+  it('grue à tour : la flèche s\'oriente sans bouger le châssis', async () => {
+    const { grueDeLObjet } = await import('../src/topo/grue-mobile.js');
+    const base = grueDeLObjet(BIB, { type: 'grue', modele: 'tour', fleche: 40 });
+    const tournee = grueDeLObjet(BIB, { type: 'grue', modele: 'tour', fleche: 40, rotationFleche: 90 });
+    expect(tournee.primitives.length).toBe(base.primitives.length);
+    expect(tournee.boite).not.toEqual(base.boite);
+  });
+
+  it('DXF : le nom du bloc d\'une grue mobile rappelle sa taille et sa tourelle', () => {
+    const o = { type: 'grue', modele: 'mobile', tonnes: 200, fleche: 30, tourelle: 45, point: [0, 0], rotation: 0 };
+    expect(blocDuPose(o, BIB, 0.3).nom).toMatch(/GRUE_MOBILE_.*200T/);
+  });
+
+  it('tous les textes des symboles sortent à la même hauteur (texteU)', async () => {
+    const { dessinerPrimitives } = await import('../src/plans-chantier/dessin.js');
+    const tailles = new Set();
+    const ctx = new Proxy({}, {
+      get: (c, k) => (k === 'fillText' ? () => { tailles.add(String(c.font).match(/([\d.]+)px/)?.[1]); } : k === 'measureText' ? () => ({ width: 10 }) : /^create/.test(String(k)) ? () => ({ addColorStop() {} }) : k in c ? c[k] : () => {}),
+      set: (c, k, v) => { c[k] = v; return true; },
+    });
+    let n = 0;
+    for (const s of BIB.filter((x) => !x.cache && x.primitives.some((p) => p.g === 't'))) {
+      dessinerPrimitives(ctx, s.primitives, 20, 1, { texteU: 0.6 });
+      n++;
+    }
+    expect(n).toBeGreaterThan(10);
+    expect(tailles.size).toBe(1);
   });
 });
