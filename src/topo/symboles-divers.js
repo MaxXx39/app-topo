@@ -292,7 +292,7 @@ export function parkingReserve() {
 
 /**
  * Banche de coffrage avec lest, vue de dessus (0.293.0, d'après la photo de l'utilisateur) : le coffrant orange (devant,
- * y mini), la passerelle de travail grillagée avec garde-corps derrière, 2 étais obliques en acier jusqu'au sol et 2 blocs
+ * y mini), 2 étais obliques en acier jusqu'au sol et 2 blocs
  * de lest en béton posés sur les pieds des étais.
  */
 export function stockBanches() {
@@ -305,14 +305,9 @@ export function stockBanches() {
   }
   // Étais : de la passerelle (y = 0.5) au pied lesté (y = 1.4), avec le vérin au milieu.
   for (const x of [-1.0, 1.0]) {
-    res.push(...piece('#5f666d', 'metal', epais([[x, 0.45], [x, 1.2]], 0.08)), ...piece('#e0a23c', 'peinture', epais([[x, 0.75], [x, 1.0]], 0.12)));
-    res.push(...piece(METAL, 'metal', cercle(x, 0.45, 0.07, 10)));
+    res.push(...piece('#5f666d', 'metal', epais([[x, 0.1], [x, 1.2]], 0.08)), ...piece('#e0a23c', 'peinture', epais([[x, 0.6], [x, 0.9]], 0.12)));
+    res.push(...piece(METAL, 'metal', cercle(x, 0.1, 0.07, 10)));
   }
-  // Passerelle : plancher grillagé et garde-corps (lisses sur 3 côtés).
-  res.push(...piece('#c9ced3', 'metal', rectArrondi(-L / 2, 0.12, L / 2, 0.95, 0.02), '#5f666d'));
-  for (let x = -L / 2 + 0.1; x < L / 2; x += 0.1) res.push(trait([[x, 0.15], [x, 0.92]], false, '#9aa3ab'));
-  res.push(trait([[-L / 2 + 0.03, 0.15], [-L / 2 + 0.03, 0.92], [L / 2 - 0.03, 0.92], [L / 2 - 0.03, 0.15]], false, '#d63a3a'));
-  for (const x of [-L / 2 + 0.03, 0, L / 2 - 0.03]) res.push(plein('#d63a3a', 'peinture', rectArrondi(x - 0.04, 0.89, x + 0.04, 0.97, 0.01)));
   // Coffrant orange à nervures (devant) et poutres verticales.
   res.push(...piece('#e0a23c', 'peinture', rectArrondi(-L / 2, -0.12, L / 2, 0.12, 0.02), '#a76e12'));
   for (let x = -L / 2 + 0.25; x < L / 2; x += 0.5) res.push(trait([[x, -0.1], [x, 0.1]], false, '#a76e12'));

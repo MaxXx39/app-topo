@@ -122,40 +122,6 @@ export function camionBalai() {
 }
 
 
-// ------------------------------------------------------------------ Compacteurs (0.293.0 : 3 types bien différents)
-
-/** Bille (rouleau) de compacteur : rectangle gris à reflets, rayures en travers, bords sombres. */
-const bille = (x0, y0, x1, y1) => [
-  ...piece('#aab2ba', 'metal', rectArrondi(x0, y0, x1, y1, 0.06), '#4b5563'),
-  ...[0.25, 0.5, 0.75].map((f) => trait([[x0 + 0.04, y0 + (y1 - y0) * f], [x1 - 0.04, y0 + (y1 - y0) * f]], false, '#7b848d')),
-];
-/** Corps de compacteur : capot jaune, cabine / poste de conduite sombre avec arceau, gyrophare orange. */
-const corpsCompacteur = (x0, y0, x1, y1, ycab) => [
-  ...piece(PERRIN_JAUNE, 'peinture', rectArrondi(x0, y0, x1, y1, 0.12)),
-  ...piece('#d9a90f', 'peinture', rectArrondi(x0 + 0.1, y0 + 0.1, x1 - 0.1, ycab - 0.1, 0.06)),
-  ...piece('#3a3f45', 'metal', rectArrondi(x0 + 0.12, ycab, x1 - 0.12, y1 - 0.12, 0.06)),
-  ...piece('#9cc9e6', 'vitre', rectArrondi(x0 + 0.2, ycab + 0.1, x1 - 0.2, y1 - 0.2, 0.04)),
-  ...piece('#f08c00', 'phare', cercle(0, ycab + 0.05, 0.07, 10)),
-];
-
-/** Compacteur tandem : 2 billes lisses de même largeur (avant et arrière), corps étroit entre elles. */
-export function compacteurTandem() {
-  return [...bille(-0.7, -2.0, 0.7, -0.95), ...bille(-0.7, 0.95, 0.7, 2.0), ...corpsCompacteur(-0.55, -1.0, 0.55, 1.0, -0.1)];
-}
-/** Compacteur mixte : 1 bille à l'avant, 4 pneus à l'arrière (2 de chaque côté). */
-export function compacteurMixte() {
-  const res = [...bille(-0.65, -2.0, 0.65, -0.95)];
-  for (const y of [0.9, 1.5]) res.push(...pneu(-0.95, y - 0.28, -0.45, y + 0.28), ...pneu(0.45, y - 0.28, 0.95, y + 0.28));
-  return [...res, ...corpsCompacteur(-0.55, -1.0, 0.55, 1.8, 0.2)];
-}
-/** Compacteur à pneus : 4 pneus devant, 5 derrière, décalés pour couvrir toute la largeur, lestage en caisse. */
-export function compacteurPneus() {
-  const res = [];
-  for (const x of [-0.95, -0.32, 0.32, 0.95]) res.push(...pneu(x - 0.28, -1.65, x + 0.28, -1.05));
-  for (const x of [-1.27, -0.63, 0, 0.63, 1.27]) res.push(...pneu(x - 0.28, 1.05, x + 0.28, 1.65));
-  return [...res, ...corpsCompacteur(-0.8, -1.2, 0.8, 1.2, 0.0), ...piece('#8a9198', 'metal', rectArrondi(-0.6, -1.1, 0.6, -0.4, 0.05), '#4b5563')];
-}
-
 // ------------------------------------------------------------------ Tracteur + benne
 
 /** Tracteur agricole (rouge) et sa benne basculante (verte), d'après l'image de l'utilisateur : devant en bas. */

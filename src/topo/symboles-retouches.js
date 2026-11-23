@@ -7,7 +7,7 @@ import { transformerPrimitives, CATEGORIES_SYMBOLES } from './symboles.js';
 import { symbolesDessines, portail, portailCoulissant, trilattes } from './symboles-dessines.js';
 import {
   camionCiterne, camionCarburant, camionBitume, camionBalai, tracteurBenne, niveleuse, camionGrue, AUTOGRUES, pompeABeton,
-  nacelle, elevateurCiseaux, compresseur, betonniere, compacteurTandem, compacteurMixte, compacteurPneus,
+  nacelle, elevateurCiseaux, compresseur, betonniere,
 } from './symboles-vehicules.js';
 import * as divers from './symboles-divers.js';
 import { rectArrondi, cercle, ellipse, epais, plein, piece, trait, tourner, deplacer, miroir } from './symboles-outils.js';
@@ -189,9 +189,6 @@ export function retoucherBibliotheque(symboles) {
     if (s.nom === 'Portail') t = { ...versSymbole('Portail', 'Sécurité', portail(5)), cle: s.cle };
     if (s.nom === 'Tri Lattes') t = { ...versSymbole('Tri Lattes', 'Sécurité', trilattes()), cle: s.cle };
     if (s.nom === 'Tri lattes + travaux' && par('Panneau Travaux')) t = { ...versSymbole('Tri lattes + travaux', 'Sécurité', trilattesTravaux(par('Panneau Travaux'))), cle: s.cle };
-    if (s.nom === 'Compact Tandem') t = { ...versSymbole('Compact Tandem', 'Engins', compacteurTandem()), cle: s.cle };
-    if (s.nom === 'Compact Mixte') t = { ...versSymbole('Compact Mixte', 'Engins', compacteurMixte()), cle: s.cle };
-    if (s.nom === 'Compact pneu') t = { ...versSymbole('Compact pneu', 'Engins', compacteurPneus()), cle: s.cle };
     if (s.nom === 'Benne Decantation') t = { ...versSymbole('Benne Decantation', 'Base-vie', divers.benneDecantation()), cle: s.cle };
     if (s.nom === '2.50interdictiondeparquer') t = { ...t, nom: 'Interdiction de parquer' };
     if (RETIRES.includes(s.nom)) t = { ...t, cache: true };
