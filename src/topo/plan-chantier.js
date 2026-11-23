@@ -434,6 +434,7 @@ export function resumeObjet(o) {
   if (o.type === 'construction') return o.infinie ? 'Construction · droite' : `Construction · segment ${n(longueur(o.points))} m`;
   if (o.type === 'grue' && o.modele === 'mobile') return `Grue mobile ${o.tonnes ?? 100} t · flèche ${o.fleche ?? 25} m`;
   if (o.type === 'grue') return `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'} · flèche ${o.fleche ?? 40} m${o.chassis && o.chassis !== 'aucun' ? ` · châssis ${o.chassis}` : ''}`;
+  if (o.type === 'symbole' && o.cle === 'dyn:parking') return `Parking réservé · ${o.nombre ?? 1} place${(o.nombre ?? 1) > 1 ? 's' : ''}`;
   if (o.type === 'symbole' && o.cle === 'dyn:deviation') return `Panneau de déviation « ${o.texte ?? ''} »`;
   if (o.type === 'symbole') return o.etage ? 'Base-vie à étage' : String(o.cle ?? '').replace(/^[a-z]+:/, '');
   return o.type;

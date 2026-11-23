@@ -91,7 +91,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.296.2)
+## Fonctionnalités (état à la 0.297.0)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -137,6 +137,12 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 ## Plans de chantier : état (23.11)
 - **Étapes 1 à 4 faites** (0.286.0 → 0.289.0, Expert, site PC + Topo Bureau). **Petits restes** : tableau des modes (`docs/modes-base-intermediaire-expert.xlsx`) pas mis à jour (Plans de chantier, Calage, Comparer) ; jamais essayé sur Topo Bureau ni avec swisstopo (bloqué ici) ; la maquette est faite pour 1366 × 768 (portrait tablette non prévu).
 - **À valider avec l'utilisateur** : « une page par phase » = la phase seule + les phases cochées « sur toutes les pages » (choix fait sans lui) ; poses de l'escalier (lecture du bloc « Base vie Etage » : palier le long du petit côté, volée de 3 m le long du grand ; « petit côté » = échange des axes) ; matériaux d'après les couleurs (table `MATERIAUX` de `topo/symboles.js`) ; phares / feux placés par fractions de la boîte (camions : devant = y mini ; chargeuse : devant = x maxi).
+
+## 0.297.0 — Plans de chantier : retours du 23.11 (7e lot)
+- **Parking réservé dynamique** (`topo/parking-dynamique.js`, `cle: 'dyn:parking'`, `o.nombre` 1–30 places côte à côte, `o.couleur` : cadre et grand P de la même couleur, fond transparent) ; l'ancien symbole fixe est gardé caché pour les anciens plans.
+- **Format A2** ajouté (A4 / A3 / A2 / A1, PDF 160 dpi). **Cartouche** : l'**indice est sous le numéro et le nom du plan**.
+- **Barbules de talus** dans le bon sens : une **ligne de crête** en haut du talus (à la largeur du talus du pied) et des barbules qui en partent **vers le pied**.
+- **Supprimer un point** d'une ligne, flèche ou zone choisie : **Maj (ou Ctrl) + clic** ou **double-clic** sur le carré du sommet (au moins 2 points, 3 pour une zone).
 
 ## 0.296.2 — Plans de chantier : retours du 23.11 (6e lot)
 - **Phases : par défaut seule la phase en cours est montrée** (ni les phases d'avant, ni celles d'après ; `regleDeVue` : autres phases = caché ; sans règle `objetsVus` montre la phase en cours + celles cochées « sur toutes les pages ») ; les cases « Montrer » du panneau ne servent plus qu'à la feuille « toutes les phases sur une page » ; pour voir une autre phase, la gestion des phases.

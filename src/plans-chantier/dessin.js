@@ -114,13 +114,15 @@ function dessinerTas(d, o, couleur) {
   ctx.fillStyle = g;
   ctx.fill();
   ctx.restore();
-  // Hachures de talus le long du pied, tous les 1,2 m (au moins 6 px).
+  // Hachures de talus (0.297.0) : une ligne en HAUT du talus (crête, à `largeur` du pied) et des barbules qui en partent
+  // vers le BAS du talus (le pied), une longue, une courte.
   ctx.strokeStyle = nuance(couleur, -0.45);
   ctx.lineWidth = 0.7;
   ctx.beginPath();
   const pas = Math.max(1.2, 6 / vue.echelle);
   let k = 0;
   const pts = o.points;
+  const crete = [];
   for (let i = 0; i < pts.length; i++) {
     const [x1, y1] = pts[i];
     const [x2, y2] = pts[(i + 1) % pts.length];
@@ -128,10 +130,17 @@ function dessinerTas(d, o, couleur) {
     if (l < 1e-6) continue;
     const [ux, uy] = [(x2 - x1) / l, (y2 - y1) / l];
     const [nx, ny] = [-uy * sens, ux * sens]; // vers l'intérieur
+    const haut = (s, d) => [x1 + ux * s + nx * d, y1 + uy * s + ny * d];
+    // Ligne de crête : parallèle au bord, à `largeur` vers l'intérieur.
+    const c1 = ecran(haut(0, largeur));
+    const c2 = ecran(haut(l, largeur));
+    ctx.moveTo(c1.x, c1.y);
+    ctx.lineTo(c2.x, c2.y);
+    crete.push(c1);
     for (let s = pas / 2; s < l; s += pas) {
       const long = (k++ % 2 === 0 ? 0.55 : 0.3) * largeur;
-      const a = ecran([x1 + ux * s, y1 + uy * s]);
-      const b = ecran([x1 + ux * s + nx * long, y1 + uy * s + ny * long]);
+      const a = ecran(haut(s, largeur)); // part de la crête
+      const b = ecran(haut(s, largeur - long)); // descend vers le pied
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
     }

@@ -13,7 +13,7 @@ import {
   changerOrdre, angleDeLaLigne, texteSymbolesM, anneauxDuTas, aireSignee, materiauTas, MATERIAUX_TAS, couleurObjet, styleLigne,
 } from '../src/topo/plan-chantier.js';
 import {
-  miseEnPageFeuille, pagesDeLaFeuille, elementsLegende, textesCartouche, vueDuCadre, reglagesFeuille, centreDeDepart, objetsDeLaPage,
+  miseEnPageFeuille, FORMATS_FEUILLE, pagesDeLaFeuille, elementsLegende, textesCartouche, vueDuCadre, reglagesFeuille, centreDeDepart, objetsDeLaPage,
 } from '../src/topo/feuille-chantier.js';
 import { dxfPlanChantier, trianguler, aciProche, blocDuPose } from '../src/topo/plan-chantier-dxf.js';
 import { lirePlanDxf } from '../src/topo/dxf-plan.js';
@@ -120,7 +120,7 @@ describe('modernisation', () => {
 
 describe('bibliothèque livrée (Base_2023.dxf)', () => {
   it('59 symboles proposés, grues et châssis réglables', () => {
-    expect(BIB.filter((s) => !s.cache)).toHaveLength(113); // 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
+    expect(BIB.filter((s) => !s.cache)).toHaveLength(112); // 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
     expect(flechesDisponibles(BIB, 'tour')).toEqual([25, 30, 35, 40, 45, 50, 55, 60, 65, 70]);
     expect(flechesDisponibles(BIB, 'auto')).toEqual([20, 25, 30, 35, 40, 45, 50]);
     expect(chassisDisponibles(BIB)).toEqual(['3.80', '4.20', '4.50', '4.60', '6']);
@@ -264,7 +264,7 @@ describe('feuille', () => {
   it('cartouche : textes dans la partie droite ; vue du cadre à l\'échelle', () => {
     const k = { x: 200, y: 250, l: 135, h: 36 };
     const t = textesCartouche(k, 1, { affaire: '10 203', projet: 'Gland', titre: 'PIC', phase: '', echelle: 200, format: 'A3 paysage', date: '23.11.2026', indice: 'B', auteur: '' });
-    expect(t.map((x) => x.texte)).toEqual(['10 203', 'Gland', 'PIC', 'Échelle 1:200', 'Format A3 paysage', 'Date 23.11.2026', 'Indice B']);
+    expect(t.map((x) => x.texte)).toEqual(['10 203', 'Gland', 'PIC', 'Indice B', 'Échelle 1:200', 'Format A3 paysage', 'Date 23.11.2026']); // l'indice sous le nom du plan
     expect(Math.min(...t.map((x) => x.x))).toBeGreaterThan(k.x + k.l * 0.4);
     const v = vueDuCadre({ echelle: 200 }, { l: 400, h: 277 }, 2, [2500000, 1118000]);
     expect(v.echelle).toBe(10); // 2 px / mm × 1000 / 200
@@ -751,5 +751,23 @@ describe('retours du 23.11 (5e lot)', () => {
     const textes = g.rayon.filter((p) => p.g === 't').map((p) => p.t);
     expect(textes).toEqual(expect.arrayContaining(['20m', '25m', '30m', '35m', '40m', '45m', '50m']));
     expect(grueLibre(BIB, 'tour', 42.5).rayon.some((p) => p.t === '42.5m')).toBe(true);
+  });
+});
+
+describe('retours du 23.11 (7e lot)', () => {
+  it('parking : nombre de places et couleur', async () => {
+    const { parkingDynamique } = await import('../src/topo/parking-dynamique.js');
+    const un = parkingDynamique({ nombre: 1 });
+    const quatre = parkingDynamique({ nombre: 4, couleur: '#dc2626' });
+    expect(quatre.largeur).toBeCloseTo(un.largeur * 4, 1);
+    expect(quatre.primitives.every((p) => p.k === '#dc2626' || !p.k || p.g === 'h')).toBe(true);
+    expect(JSON.stringify(quatre.primitives)).toContain('#dc2626');
+    expect(parkingDynamique({ nombre: 99 }).largeur).toBeCloseTo(un.largeur * 30, 1); // au plus 30 places
+  });
+
+  it('A2 proposé comme format de feuille', () => {
+    expect(FORMATS_FEUILLE.map(([c]) => c)).toContain('a2');
+    const m = miseEnPageFeuille('a2', 'paysage', 0);
+    expect(m.page.largeur).toBe(594);
   });
 });

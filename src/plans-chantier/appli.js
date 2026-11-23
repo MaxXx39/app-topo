@@ -24,6 +24,7 @@ import { chargerBibliothequeBase, entreesBibliotheque, filtrerEntrees, CATEGORIE
 import { dessinerVignette, symboleDeLObjet } from './dessin.js';
 import { geometrieCotation, lignesDuTexte, CATEGORIES_ZONE, STYLES_LIGNE } from '../topo/plan-chantier.js';
 import { SENS_DEVIATION, CLE_DEVIATION } from '../topo/panneau-deviation.js';
+import { CLE_PARKING } from '../topo/parking-dynamique.js';
 import { ouvrirGestionPhases } from './gestion-phases.js';
 import { ouvrirGestionCalques, plansAvecCalques } from './gestion-calques.js';
 import { autogrueDe, TONNES_MOBILES, FLECHE_MOBILE_MIN } from '../topo/grue-mobile.js';
@@ -366,7 +367,8 @@ export function ouvrirPlansChantier({
       },
       accrocher: accrochage,
       clic: toucher,
-      double: () => {
+      double: (p) => {
+        if (etat.outil === 'choisir' && etat.choisi && p && supprimerSommet(p, 10 / (vue?.vue?.().echelle ?? 1))) return; // double-clic sur un carré = supprimer ce point
         if (etat.saisie?.outil === 'decaler') return;
         if (etat.saisie && etat.saisie.outil !== 'zone') finirSaisie();
         else if (etat.saisie?.outil === 'zone' && etat.saisie.points.length >= 3) finirSaisie();
@@ -576,7 +578,27 @@ export function ouvrirPlansChantier({
     return [...lignesPourAccroche(objetsVisibles(plan())), ...lignesSymboles(plan().objets), ...sourcesDesPlans(plansFond(), { est: p[0], nord: p[1] }, tolerance).lignes];
   }
 
-  async function toucher(p, tolerance) {
+  /** Supprime le sommet touché de la ligne, piste, flèche ou zone choisie (au moins 2 points, 3 pour une zone). */
+  function supprimerSommet(p, tolerance) {
+    const o = plan().objets.find((x) => x.id === etat.choisi);
+    if (!o || !Array.isArray(o.points) || o.type === 'construction' || o.type === 'cotation') return false;
+    const i = sommetSousLePoint(o, p, tolerance * 1.5);
+    if (i < 0) return false;
+    const min = o.type === 'zone' ? 3 : 2;
+    if (o.points.length <= min) {
+      message(o.type === 'zone' ? 'Une zone garde au moins 3 points.' : 'Il faut garder au moins 2 points.', 3000);
+      return true;
+    }
+    if (!avantChangement()) return true;
+    o.points.splice(i, 1);
+    enregistrer();
+    majTout();
+    vue?.redessinerDessus();
+    return true;
+  }
+
+  async function toucher(p, tolerance, ev) {
+    if (etat.outil === 'choisir' && etat.choisi && (ev?.shiftKey || ev?.ctrlKey) && supprimerSommet(p, tolerance)) return; // Maj / Ctrl + clic sur un carré = supprimer ce point
     if (etat.orthoRepere) {
       etat.orthoRepere = false;
       const seg = segmentLePlusProche(lignesRepere(p, tolerance), p, tolerance * 1.5);
@@ -1053,7 +1075,7 @@ export function ouvrirPlansChantier({
     const s = etat.saisie;
     const n = s?.points.length ?? 0;
     const textes = {
-      choisir: etat.choisi ? (estPose(plan().objets.find((x) => x.id === etat.choisi) ?? {}) ? 'Glisser le symbole = le déplacer (le point saisi s\'accroche) ; poignée ronde = le tourner ; Suppr = l\'effacer ; Échap = ne plus le choisir.' : 'Glisser une poignée (carré) = déplacer ce sommet ; glisser l\'élément = le déplacer ; Suppr = l\'effacer ; Échap = ne plus le choisir.') : 'Cliquez un élément pour le choisir (ou dans la liste à droite). Molette = zoom, glisser dans le vide = déplacer le plan.',
+      choisir: etat.choisi ? (estPose(plan().objets.find((x) => x.id === etat.choisi) ?? {}) ? 'Glisser le symbole = le déplacer (le point saisi s\'accroche) ; poignée ronde = le tourner ; Suppr = l\'effacer ; Échap = ne plus le choisir.' : 'Glisser une poignée (carré) = déplacer ce sommet ; Maj + clic ou double-clic sur un carré = supprimer ce point ; glisser l\'élément = le déplacer ; Suppr = l\'effacer ; Échap = ne plus le choisir.') : 'Cliquez un élément pour le choisir (ou dans la liste à droite). Molette = zoom, glisser dans le vide = déplacer le plan.',
       symbole: etat.pose ? 'Cliquez où poser le symbole (son centre). La rotation de pose se règle à droite.' : 'Choisissez un symbole dans la bibliothèque (à gauche).',
       zone: n >= 3 ? 'Cliquez le sommet suivant ; cliquez le 1er sommet (ou Entrée, double-clic) pour fermer la zone.' : 'Cliquez les sommets de la zone.',
       ligne: n >= 2 ? 'Point suivant ; Entrée ou double-clic = finir.' : 'Cliquez le départ de la ligne.',
@@ -1284,6 +1306,10 @@ export function ouvrirPlansChantier({
         <div class="poses-etage">${POSES_ETAGE.map((t, i) => `<button type="button" data-pose-etage="${i}" class="${(o.etage.pose ?? 0) === i ? 'actif' : ''}" title="${echapper(t)}"><canvas data-vignette-pose="${i}"></canvas></button>`).join('')}</div>
         <label class="champ-calage"><span>Texte de l'étage</span><input type="text" maxlength="30" value="${echapper(textes[0])}" data-etage-texte="0"></label>
         <label class="champ-calage"><span>Texte du rez</span><input type="text" maxlength="30" value="${echapper(textes[1])}" data-etage-texte="1"></label>`;
+    }
+    if (o.cle === CLE_PARKING) {
+      return `${champNombre('Nombre de places côte à côte', 'prop', 'nombre', o.nombre ?? 1, 1, 30, 1, '')}
+        <label class="champ-calage"><span>Couleur</span><input type="color" value="${o.couleur ?? '#1f5fae'}" data-prop="couleur"></label>`;
     }
     if (o.cle === CLE_DEVIATION) {
       return `<label class="champ-calage"><span>Texte du panneau</span><input type="text" maxlength="30" value="${echapper(o.texte ?? 'Lugano')}" data-prop="texte"></label>
