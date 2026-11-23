@@ -119,7 +119,9 @@ function tournerCommeModele(s, modele) {
 /** Réunit la base et la tourelle du manuscop (télescopique rotatif) : les deux blocs tournent autour du même point de base. */
 function manuscop(base, tourelle) {
   const brut = (s) => deplacerPrimitives(s.primitives, -s.decalage[0], -s.decalage[1]).map((p) => (p.b ? { ...p, b: [p.b[0] - s.decalage[0], p.b[1] - s.decalage[1], p.b[2] - s.decalage[0], p.b[3] - s.decalage[1]].map(r3) } : p));
-  return { ...versSymbole('Manuscop (télescopique rotatif)', 'Engins', [...brut(base), ...brut(tourelle)]), dessine: false };
+  const sym = versSymbole('Manuscop (télescopique rotatif)', 'Engins', [...brut(base), ...brut(tourelle)]);
+  // 0.293.0 : tourelle orientable : les primitives de la base (châssis) restent, la tourelle tourne autour du centre du châssis.
+  return { ...sym, dessine: false, pivote: { depuis: base.primitives.length, centre: [sym.decalage[0], sym.decalage[1]] } };
 }
 
 /** Benne jaune du DXF (« Benne à déchets », la même pour le recyclage et le tri) sans son texte, avec une icône par-dessus. */

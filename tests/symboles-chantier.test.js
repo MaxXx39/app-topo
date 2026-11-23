@@ -637,3 +637,17 @@ describe('panneau de déviation (0.293.0)', () => {
     expect(bloc.primitives.find((p) => p.g === 't').h).toBeLessThan(0.6); // pas remplacé par la taille des symboles
   });
 });
+
+describe('tourelles orientables (0.293.0)', () => {
+  it('pelle 20 t et télescopique rotatif : la tourelle tourne, le châssis reste', async () => {
+    const { symboleDeLObjetPose } = await import('../src/topo/grue-mobile.js');
+    for (const nom of ['Pelle Chenille 20T', 'Manuscop (télescopique rotatif)']) {
+      const s = BIB.find((x) => x.nom === nom);
+      expect(s.pivote).toBeTruthy();
+      const t = symboleDeLObjetPose(BIB, { cle: s.cle, tourelle: 90 });
+      expect(t.primitives).toHaveLength(s.primitives.length);
+      expect(t.primitives.slice(0, s.pivote.depuis)).toEqual(s.primitives.slice(0, s.pivote.depuis));
+      expect(t.boite).not.toEqual(s.boite);
+    }
+  });
+});

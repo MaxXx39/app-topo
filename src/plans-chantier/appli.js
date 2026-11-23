@@ -1206,7 +1206,7 @@ export function ouvrirPlansChantier({
       return `<label class="champ-calage"><span>Texte du panneau</span><input type="text" maxlength="30" value="${echapper(o.texte ?? 'Lugano')}" data-prop="texte"></label>
         <label class="champ-calage"><span>Sens</span><select data-prop="sens">${SENS_DEVIATION.map(([v, t]) => `<option value="${v}" ${(o.sens ?? 'droite') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
     }
-    const tourelle = sy?.pivote ? champNombre('Rotation de la tourelle (par rapport aux chenilles)', 'prop', 'tourelle', o.tourelle ?? 0, -360, 360, 1, '°') : '';
+    const tourelle = sy?.pivote ? champNombre('Rotation de la tourelle (par rapport au châssis)', 'prop', 'tourelle', o.tourelle ?? 0, -360, 360, 1, '°') : '';
     return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${tourelle}${rotation}${orienter}`;
   }
 
