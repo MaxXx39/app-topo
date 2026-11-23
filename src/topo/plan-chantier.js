@@ -13,7 +13,7 @@
 //             (taille = hauteur des lettres en m ; repere = point visé par la ligne de repère, facultatif)
 //   symbole : { point (centre), rotation (°, sens trigonométrique), cle (symbole de la bibliothèque, topo/symboles.js),
 //             etage { pose 0–7, textes ['1er', 'Rez'] } (base-vie à étage) }                         (0.289.0)
-//   grue   : { point (la tour), rotation, modele ('tour' | 'auto'), fleche (m), chassis ('4.50'… | 'aucun'), rayon (bool) }
+//   grue   : { point (la tour), rotation, modele ('tour' | 'auto' | 'mobile'), rotationFleche (°, tour / auto), tonnes + tourelle (°) + stabilisateurs (mobile), fleche (m), chassis ('4.50'… | 'aucun'), rayon (bool) }
 // Unités du dessin (0.288.0) : épaisseurs de trait, taille et espacement des motifs en **mm sur le papier** ; sur le
 // terrain, 1 mm de papier = « échelle du plan » / 1000 m (plan.echelle, 200 au départ : 1 mm = 0,2 m).
 
@@ -38,7 +38,7 @@ export const CATEGORIES_ZONE = [
 //   poteau (rectangle en travers, clôture), chevron « > » (flèche simple, retournable), double « < > » (flèche double),
 //   texte (« EAU »…, eclair = petit éclair devant) ; tailleMm = hauteur du motif ou des lettres.
 export const STYLES_LIGNE = [
-  { cle: 'cloture', nom: 'Clôture de chantier', couleur: '#f59e0b', tirets: [], epaisseurMm: 0.35, motif: { type: 'poteau', pasMm: 14, tailleMm: 2.6 } },
+  { cle: 'cloture', nom: 'Clôture de chantier', couleur: '#f08c00', tirets: [], epaisseurMm: 0.35, motif: { type: 'poteau', pasMm: 14, tailleMm: 2.6 } },
   { cle: 'flecheSimple', nom: 'Flèche simple  >', couleur: '#eab308', tirets: [], epaisseurMm: 0.5, motif: { type: 'chevron', pasMm: 22, tailleMm: 2.6 } },
   { cle: 'flecheDouble', nom: 'Flèche double  < >', couleur: '#a21caf', tirets: [], epaisseurMm: 0.5, motif: { type: 'double', pasMm: 26, tailleMm: 2.6 } },
   { cle: 'elec', nom: 'Électricité', couleur: '#ef4444', tirets: [], epaisseurMm: 0.25, motif: { type: 'texte', texte: 'ELEC', eclair: true, pasMm: 34, tailleMm: 2.6 } },
@@ -50,6 +50,14 @@ export const STYLES_LIGNE = [
   { cle: 'palplanches', nom: 'Palplanches', couleur: '#475569', tirets: [], epaisseurMm: 0.9 },
   { cle: 'conduite', nom: 'Conduite provisoire', couleur: '#2563eb', tirets: [7, 2.5], epaisseurMm: 0.4 },
   { cle: 'signalisation', nom: 'Signalisation', couleur: '#f97316', tirets: [1.5, 1.5], epaisseurMm: 0.6 },
+  // 0.292.0 : lignes « en bande » (largeur réelle en m, qui suit l'échelle du plan) et barrière Heras.
+  { cle: 'gba', nom: 'Glissière béton (GBA)', couleur: '#9aa3ab', tirets: [], epaisseurMm: 0.3, motif: { type: 'gba', largeurM: 0.6, elementM: 4 } },
+  { cle: 'echafaudage', nom: 'Échafaudage', couleur: '#64748b', tirets: [], epaisseurMm: 0.3, motif: { type: 'echafaudage', largeurM: 0.9, elementM: 2.5 } },
+  { cle: 'filet', nom: 'Filet de protection', couleur: '#2f9e55', tirets: [], epaisseurMm: 0.3, motif: { type: 'filet', largeurM: 0.35, elementM: 0.5 } },
+  { cle: 'heras', nom: 'Barrière Heras', couleur: '#475569', tirets: [], epaisseurMm: 0.3, motif: { type: 'heras', largeurM: 0.8, elementM: 3.5 } },
+  // 0.293.0 : barrière suisse à 2 lattes rouges et blanches, cheminement piéton (bande verte avec flèches).
+  { cle: 'lattes', nom: 'Barrière 2 lattes rouge et blanc', couleur: '#d63a3a', tirets: [], epaisseurMm: 0.3, motif: { type: 'lattes', largeurM: 0.35, elementM: 0.5 } },
+  { cle: 'pieton', nom: 'Cheminement piéton', couleur: '#16a34a', tirets: [], epaisseurMm: 0.3, motif: { type: 'pieton', largeurM: 1.2, elementM: 2.5 } },
   { cle: 'libre', nom: 'Ligne', couleur: '#1b2b36', tirets: [], epaisseurMm: 0.35 },
 ];
 // Anciens genres de ligne : « Câble électrique » (0.286.0) = Électricité ; « Barrière (chevrons) » et « Limite » (0.287.0)
@@ -66,6 +74,24 @@ export const COULEUR_FLECHE = '#19a7cc';
 export const LARGEUR_FLECHE = 0.2; // m, largeur du corps d'une flèche (0.288.0 : 0,2 au lieu de 0,9)
 export const POINTE_LONGUEUR = 1.2; // m, longueur de la pointe à l'échelle ×1
 export const POINTE_LARGEUR = 0.9; // m, largeur de la pointe à l'échelle ×1
+
+// 0.292.0 : taille du texte des symboles (mm sur le papier, la même pour tous les blocs) et matériaux des tas de stock.
+export const TAILLE_TEXTE_MM = 3;
+/** Hauteur (m sur le terrain) du texte des symboles : tailleTexteMm × échelle / 1000. */
+export const texteSymbolesM = (plan) => Math.min(12, Math.max(0.5, plan?.tailleTexteMm ?? TAILLE_TEXTE_MM)) * ((plan?.echelle ?? ECHELLE_PAPIER) / 1000);
+export const MATERIAUX_TAS = [
+  { cle: 'terre', nom: 'Terre végétale', couleur: '#6b4a2f' },
+  { cle: 'remblai', nom: 'Remblai / tout-venant', couleur: '#8a6d4b' },
+  { cle: 'sable', nom: 'Sable', couleur: '#d4b878' },
+  { cle: 'gravier', nom: 'Gravier', couleur: '#a8a29a' },
+  { cle: 'grave', nom: 'Grave 0/45', couleur: '#8c8c86' },
+  { cle: 'concasse', nom: 'Béton concassé', couleur: '#9ca3a8' },
+  { cle: 'enrobe', nom: 'Enrobé / fraisât', couleur: '#454b50' },
+  { cle: 'blocs', nom: 'Blocs', couleur: '#78716c' },
+];
+export const materiauTas = (cle) => MATERIAUX_TAS.find((m) => m.cle === cle) ?? null;
+export const TAS_HAUTEUR = 3; // m, au départ
+export const TAS_TALUS = 1.5; // m horizontaux pour 1 m de hauteur, au départ (à valider)
 
 export const categorieZone = (cle) => CATEGORIES_ZONE.find((c) => c.cle === cle) ?? CATEGORIES_ZONE[0];
 export const styleLigne = (cle) => STYLES_LIGNE.find((s) => s.cle === (ALIAS_STYLES[cle] ?? cle)) ?? STYLES_LIGNE[STYLES_LIGNE.length - 1];
@@ -119,24 +145,94 @@ export function retirerObjet(plan, id) {
   return plan.objets.length < avant;
 }
 
-/** Objets dont la phase est visible. */
-export function objetsVisibles(plan) {
-  const visibles = new Set(plan.phases.filter((p) => p.visible !== false).map((p) => p.id));
-  return plan.objets.filter((o) => visibles.has(o.phase));
+/**
+ * Gestion des phases (0.293.0) : « on voit quoi, quand ». plan.vues[phaseEnCours][phaseVue] = règle d'affichage des
+ * éléments de phaseVue quand on est dans phaseEnCours :
+ *   { mode, opacite (0–1), couleur, fini (mode des éléments dont la fin est passée), genresCaches [types], elementsCaches [ids] }.
+ * Un élément peut avoir une phase de fin (o.fin) : « en place » de sa phase jusqu'à cette phase, « fini » après.
+ * Sans règle pour la phase en cours, on garde l'ancien affichage (cases « visible » des phases).
+ */
+export const MODES_VUE = [['cache', 'Caché'], ['normal', 'Normal'], ['estompe', 'Estompé'], ['assombri', 'Assombri / grisé'], ['couleur', 'Couleur unique']];
+export const OPACITE_VUE = 0.35;
+export const COULEUR_VUE = '#64748b';
+
+/** Règle d'affichage des éléments de `vue` quand on est dans `courante` (règle enregistrée, sinon celle de départ). */
+export function regleDeVue(plan, courante, vue) {
+  const r = plan.vues?.[courante]?.[vue];
+  if (r) return r;
+  if (vue === courante) return { mode: 'normal' };
+  return { mode: plan.phases.find((p) => p.id === vue)?.visible === false ? 'cache' : 'normal' };
 }
+
+/** Phase après laquelle l'élément est « fini » : rang de la phase de fin, ou null. */
+const rangDe = (plan, id) => plan.phases.findIndex((p) => p.id === id);
+
+/**
+ * Objets à montrer dans la phase `courante` (la phase active à l'écran, celle de la page sur la feuille). Un élément
+ * estompé, assombri ou en couleur unique est rendu comme une copie avec `rendu: { mode, opacite, couleur }` (même id).
+ */
+export function objetsVus(plan, courante = plan.phaseActive) {
+  const construction = plan.construction?.visible !== false; // lignes de construction, hors phases
+  const reglee = Boolean(plan.vues?.[courante]);
+  const rc = rangDe(plan, courante);
+  return plan.objets.flatMap((o) => {
+    if (o.type === 'construction') return construction ? [o] : [];
+    if (!reglee) return plan.phases.find((p) => p.id === o.phase)?.visible !== false ? [o] : [];
+    const r = regleDeVue(plan, courante, o.phase);
+    if (r.genresCaches?.includes(o.type) || r.elementsCaches?.includes(o.id)) return [];
+    let mode = r.mode;
+    if (o.fin && rc > rangDe(plan, o.fin)) mode = r.fini ?? 'cache';
+    if (mode === 'cache') return [];
+    if (mode === 'normal') return [o];
+    return [{ ...o, rendu: { mode, opacite: r.opacite ?? OPACITE_VUE, couleur: r.couleur ?? COULEUR_VUE } }];
+  });
+}
+
+/** Objets dont la phase est visible (dans la phase active). */
+export function objetsVisibles(plan) {
+  return objetsVus(plan, plan.phaseActive);
+}
+
+/** Modifie une règle de vue (crée la ligne de la phase en cours au besoin, avec les règles de départ de toutes les phases). */
+export function reglerVue(plan, courante, vue, champs) {
+  plan.vues ??= {};
+  if (!plan.vues[courante]) {
+    plan.vues[courante] = {};
+    for (const p of plan.phases) plan.vues[courante][p.id] = { ...regleDeVue(plan, courante, p.id) };
+  }
+  plan.vues[courante][vue] = { ...(plan.vues[courante][vue] ?? { mode: 'normal' }), ...champs };
+  return plan.vues[courante][vue];
+}
+
+/** Remet la ligne d'une phase en cours à l'affichage de départ (cases « visible » des phases). */
+export function reinitialiserVues(plan, courante) {
+  if (plan.vues) delete plan.vues[courante];
+}
+
+/** Dates d'une phase pour le cartouche : « 01.03.2027 – 30.04.2027 » (ou une seule, ou vide). */
+export function datesDePhase(phase) {
+  const f = (d) => (d ? d.split('-').reverse().join('.') : '');
+  return [f(phase?.debut), f(phase?.fin)].filter(Boolean).join(' – ');
+}
+
+/** Objets qui s'impriment (PDF, DXF, légende) : tout sauf les lignes de construction (0.293.0). */
+export const objetsImprimables = (objets) => objets.filter((o) => o.type !== 'construction');
 
 /**
  * Couleur d'un objet : celle de sa phase (plan.couleurs = 'phases'), sinon celle choisie pour lui (objet.couleur), sinon
  * celle de sa catégorie / son style.
  */
 export function couleurObjet(plan, objet) {
+  if (objet.rendu?.mode === 'couleur') return objet.rendu.couleur; // gestion des phases : couleur unique
   if (plan.couleurs === 'phases') return plan.phases.find((p) => p.id === objet.phase)?.couleur ?? '#1b2b36';
   if (objet.couleur) return objet.couleur; // couleur choisie pour cet élément (0.287.0)
-  if (objet.type === 'zone') return categorieZone(objet.categorie).couleur;
+  if (objet.type === 'zone') return materiauTas(objet.materiau)?.couleur ?? categorieZone(objet.categorie).couleur;
   if (objet.type === 'ligne') return styleLigne(objet.style).couleur;
   if (objet.type === 'piste') return COULEUR_PISTE;
   if (objet.type === 'fleche') return COULEUR_FLECHE;
   if (estPose(objet)) return '#64748b';
+  if (objet.type === 'construction') return '#06b6d4';
+  if (objet.type === 'cotation') return '#be123c';
   return '#1b2b36';
 }
 
@@ -197,6 +293,11 @@ export const estPose = (o) => o.type === 'symbole' || o.type === 'grue';
 export function objetSousLePoint(objets, p, tolerance, surSymbole = null) {
   for (let k = objets.length - 1; k >= 0; k--) {
     const o = objets[k];
+    if (o.type === 'construction') {
+      const [a, b] = segmentConstruction(o);
+      if (distanceAuSegment(p, a, b) <= tolerance) return o;
+      continue;
+    }
     if (estPose(o)) {
       // Symbole posé (0.289.0) : dans sa boîte tournée (surSymbole, qui connaît la bibliothèque), sinon près de son centre.
       if (surSymbole ? surSymbole(o, p, tolerance) : Math.hypot(p[0] - o.point[0], p[1] - o.point[1]) <= tolerance + 1) return o;
@@ -206,6 +307,13 @@ export function objetSousLePoint(objets, p, tolerance, surSymbole = null) {
       const h = o.taille ?? 1;
       const l = Math.max(1, String(o.texte).length) * h * 0.6;
       if (Math.abs(p[0] - o.point[0]) <= l / 2 + tolerance && Math.abs(p[1] - o.point[1]) <= h / 2 + tolerance) return o;
+      // 0.293.0 : la ligne de repère se touche facilement (zone élargie le long du trait et autour du point visé).
+      if (o.repere && (distanceAuSegment(p, o.point, o.repere) <= tolerance * 2 || Math.hypot(p[0] - o.repere[0], p[1] - o.repere[1]) <= tolerance * 2.5)) return o;
+      continue;
+    }
+    if (o.type === 'cotation') {
+      const g = geometrieCotation(o);
+      if (g && (g.lignes.some(([a, b]) => distanceAuSegment(p, a, b) <= tolerance * 1.5) || g.arc?.some((q, i) => i && distanceAuSegment(p, g.arc[i - 1], q) <= tolerance * 1.5) || Math.hypot(p[0] - g.texte.p[0], p[1] - g.texte.p[1]) <= tolerance * 3)) return o;
       continue;
     }
     const pts = o.points ?? [];
@@ -262,7 +370,50 @@ export function pointeDeFleche(a, b, longueurPointe = 2, largeurPointe = 1.6) {
 export function lignesPourAccroche(objets) {
   return objets
     .filter((o) => o.type !== 'texte' && (o.points?.length ?? 0) >= 2)
-    .map((o) => ({ points: o.points.map(([est, nord]) => ({ est, nord, altitude: null })), ferme: o.type === 'zone' }));
+    .map((o) => ({ points: (o.type === 'construction' ? segmentConstruction(o) : o.points).map(([est, nord]) => ({ est, nord, altitude: null })), ferme: o.type === 'zone' }));
+}
+
+/**
+ * Segment d'une ligne de construction (0.293.0) : ses 2 points ; une droite infinie est prolongée de 5 000 m de chaque côté
+ * (assez pour l'accroche et le toucher sur tout un chantier). Renvoie [[e, n], [e, n]].
+ */
+export function segmentConstruction(o, prolongement = 5000) {
+  const [a, b] = o.points;
+  if (!o.infinie) return [a, b];
+  const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  const [ux, uy] = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+  return [[a[0] - ux * prolongement, a[1] - uy * prolongement], [b[0] + ux * prolongement, b[1] + uy * prolongement]];
+}
+
+/**
+ * Segment le plus proche du point p (à tolerance m près) parmi des lignes au format de l'accroche ; renvoie [[e, n], [e, n]]
+ * ou null (pour une parallèle en ligne de construction : on décale ce segment-là, pas toute la polyligne).
+ */
+export function segmentLePlusProche(lignes, p, tolerance) {
+  let meilleur = null;
+  for (const l of lignes) {
+    const pts = l.points.map((q) => [q.est, q.nord]);
+    const n = l.ferme ? pts.length : pts.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      const d = distanceAuSegment(p, a, b);
+      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, seg: [a, b] };
+    }
+  }
+  return meilleur?.seg ?? null;
+}
+
+/** Point à la distance l (m) de p dans la direction angle (degrés, sens inverse des aiguilles depuis l'Est). */
+export function pointALaDistance(p, l, angle) {
+  const a = (angle * Math.PI) / 180;
+  return [Math.round((p[0] + l * Math.cos(a)) * 1e6) / 1e6, Math.round((p[1] + l * Math.sin(a)) * 1e6) / 1e6];
+}
+
+/** Angle (degrés, sens inverse des aiguilles depuis l'Est) de p vers q, ou null s'ils sont confondus. */
+export function angleVers(p, q) {
+  if (Math.hypot(q[0] - p[0], q[1] - p[1]) < 1e-9) return null;
+  return (Math.atan2(q[1] - p[1], q[0] - p[0]) * 180) / Math.PI;
 }
 
 /** Résumé d'un objet pour la liste et le panneau : « Zone · Stockage · 312.5 m² ». */
@@ -273,7 +424,11 @@ export function resumeObjet(o) {
   if (o.type === 'piste') return `Piste · ${n(o.largeur ?? 4)} m de large · ${n(longueur(o.points))} m`;
   if (o.type === 'fleche') return `Flèche · ${n(longueur(o.points))} m`;
   if (o.type === 'texte') return `Texte « ${o.texte} »`;
+  if (o.type === 'cotation') { const g = geometrieCotation(o); return g ? `Cotation ${o.genre === 'angle' ? 'd\'angle' : 'de longueur'} · ${g.texte.t}` : 'Cotation'; }
+  if (o.type === 'construction') return o.infinie ? 'Construction · droite' : `Construction · segment ${n(longueur(o.points))} m`;
+  if (o.type === 'grue' && o.modele === 'mobile') return `Grue mobile ${o.tonnes ?? 100} t · flèche ${o.fleche ?? 25} m`;
   if (o.type === 'grue') return `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'} · flèche ${o.fleche ?? 40} m${o.chassis && o.chassis !== 'aucun' ? ` · châssis ${o.chassis}` : ''}`;
+  if (o.type === 'symbole' && o.cle === 'dyn:deviation') return `Panneau de déviation « ${o.texte ?? ''} »`;
   if (o.type === 'symbole') return o.etage ? 'Base-vie à étage' : String(o.cle ?? '').replace(/^[a-z]+:/, '');
   return o.type;
 }
@@ -507,4 +662,146 @@ export function bordsDesTriangles(triangles) {
     }
   }
   return [...vus.values()].filter((x) => x.n === 1).map((x) => x.seg);
+}
+
+/**
+ * Ordre de dessin (0.290.0) : le dernier élément de plan.objets est dessiné au-dessus. quoi : 'devant' (tout au-dessus),
+ * 'arriere' (tout en dessous), 'monter' / 'descendre' (d'un cran, seulement parmi les éléments de la même phase visibles
+ * ou non, l'ordre suit la liste). Renvoie vrai si l'ordre a changé.
+ */
+export function changerOrdre(plan, id, quoi) {
+  const i = plan.objets.findIndex((o) => o.id === id);
+  if (i < 0) return false;
+  const n = plan.objets.length;
+  const j = { devant: n - 1, arriere: 0, monter: Math.min(n - 1, i + 1), descendre: Math.max(0, i - 1) }[quoi] ?? i;
+  if (j === i) return false;
+  const [o] = plan.objets.splice(i, 1);
+  plan.objets.splice(j, 0, o);
+  return true;
+}
+
+/**
+ * Direction de la ligne la plus proche du point p (à tolerance m près), pour aligner un symbole (0.290.0) : angle du
+ * segment le plus proche en degrés (sens trigonométrique, 0 = vers l'Est), ramené au plus près de « actuel » (le symbole
+ * ne se retourne pas : on prend le segment ou son sens inverse). lignes : format de l'accroche ({ points: [{ est, nord }],
+ * ferme }). Renvoie null si aucune ligne n'est assez près.
+ */
+export function angleDeLaLigne(lignes, p, tolerance, actuel = 0) {
+  let meilleur = null;
+  for (const l of lignes) {
+    const pts = l.points;
+    const n = l.ferme ? pts.length : pts.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      if (Math.hypot(b.est - a.est, b.nord - a.nord) < 1e-9) continue;
+      const d = distanceAuSegment(p, [a.est, a.nord], [b.est, b.nord]);
+      if (d <= tolerance && (!meilleur || d < meilleur.d)) meilleur = { d, angle: (Math.atan2(b.nord - a.nord, b.est - a.est) * 180) / Math.PI };
+    }
+  }
+  if (!meilleur) return null;
+  // Le sens le plus proche de la rotation actuelle (écart ramené à −180…180°).
+  const ecart = (x) => ((((x - actuel) % 360) + 540) % 360) - 180;
+  const angle = Math.abs(ecart(meilleur.angle)) <= 90 ? meilleur.angle : meilleur.angle + 180;
+  return Math.round(((angle % 360) + 360) % 360 * 100) / 100;
+}
+
+
+// ------------------------------------------------------------------ Tas de stock (0.292.0)
+
+/** Aire signée d'un contour (> 0 = sens trigonométrique en Est / Nord). */
+export function aireSignee(points) {
+  let a = 0;
+  for (let i = 0; i < points.length; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
+    a += x1 * y2 - x2 * y1;
+  }
+  return a / 2;
+}
+
+/**
+ * Anneaux d'un tas de stock : le contour décalé vers l'intérieur de largeur × i / n (i = 1…n), largeur = hauteur × talus,
+ * limitée à 45 % de la plus petite dimension de la zone. Renvoie { anneaux [contours fermés], largeur (m), sens (+1 / −1) }.
+ * Un anneau qui se retourne (zone trop étroite) arrête la liste.
+ */
+export function anneauxDuTas(points, hauteur = TAS_HAUTEUR, talus = TAS_TALUS, n = 6) {
+  const ferme = [...points, points[0]];
+  const sens = aireSignee(points) >= 0 ? 1 : -1; // intérieur = à gauche pour un contour trigonométrique
+  const xs = points.map((p) => p[0]);
+  const ys = points.map((p) => p[1]);
+  const petit = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const largeur = Math.max(0.1, Math.min(hauteur * talus, petit * 0.45));
+  const anneaux = [];
+  let aireAvant = Math.abs(aireSignee(points));
+  for (let i = 1; i <= n; i++) {
+    const r = decalerPolyligne(ferme, sens * ((largeur * i) / n));
+    if (r.length < 4) break;
+    const a = Math.abs(aireSignee(r.slice(0, -1)));
+    if (a >= aireAvant * 0.999 || aireSignee(r.slice(0, -1)) * sens < 0) break;
+    anneaux.push(r.slice(0, -1));
+    aireAvant = a;
+  }
+  return { anneaux, largeur, sens };
+}
+
+// ------------------------------------------------------------------ Cotations (0.293.0)
+
+const dirDe = (a, b) => {
+  const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+};
+
+/** Angle (degrés, sens trigonométrique, 0 = Est) d'un vecteur. */
+const angleDe = (a, b) => (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+
+/**
+ * Géométrie d'une cotation, en m (E, N) :
+ *  - longueur { points [A, B], decalage (m, + à gauche de A → B) } : traits de rappel, ligne de cote avec flèches, valeur ;
+ *  - angle { points [sommet, P1, P2], rayon (m, facultatif) } : arc entre les deux côtés, valeur en degrés.
+ * Renvoie { lignes [[a, b]…], fleches [{ p, dir }], arc ([[e, n]…] ou null), texte { p, angle (°, lisible), t } , valeur }.
+ */
+export function geometrieCotation(o) {
+  const pts = o.points ?? [];
+  if (o.genre === 'angle') {
+    const [S, A, B] = pts;
+    if (!S || !A || !B) return null;
+    const a1 = angleDe(S, A);
+    const a2 = angleDe(S, B);
+    let d = ((a2 - a1 + 540) % 360) - 180; // écart signé entre les côtés, de −180 à 180
+    const valeur = Math.abs(d);
+    const r = o.rayon ?? Math.max(0.3, 0.55 * Math.min(Math.hypot(A[0] - S[0], A[1] - S[1]), Math.hypot(B[0] - S[0], B[1] - S[1])));
+    const arc = [];
+    const n = Math.max(6, Math.ceil(valeur / 5));
+    for (let i = 0; i <= n; i++) {
+      const a = ((a1 + (d * i) / n) * Math.PI) / 180;
+      arc.push([S[0] + r * Math.cos(a), S[1] + r * Math.sin(a)]);
+    }
+    const am = ((a1 + d / 2) * Math.PI) / 180;
+    const rt = r * 1.0;
+    return {
+      lignes: [[S, [S[0] + (A[0] - S[0]) * 1, S[1] + (A[1] - S[1]) * 1]], [S, B]], fleches: [], arc,
+      texte: { p: [S[0] + rt * Math.cos(am), S[1] + rt * Math.sin(am)], angle: 0, t: `${Math.abs(valeur).toFixed(2)}°` }, valeur,
+    };
+  }
+  const [A, B] = pts;
+  if (!A || !B) return null;
+  const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+  if (L < 1e-6) return null;
+  const u = dirDe(A, B);
+  const nv = [-u[1], u[0]];
+  const dec = o.decalage ?? 1;
+  const s = dec < 0 ? -1 : 1;
+  const A2 = [A[0] + nv[0] * dec, A[1] + nv[1] * dec];
+  const B2 = [B[0] + nv[0] * dec, B[1] + nv[1] * dec];
+  const ext = 0.25 * s; // les traits de rappel dépassent un peu la ligne de cote
+  const rappel = (P, P2) => [P, [P2[0] + nv[0] * ext, P2[1] + nv[1] * ext]];
+  let ang = angleDe(A, B);
+  if (ang > 90 || ang <= -90) ang += 180; // texte jamais à l'envers
+  ang = ((ang + 180) % 360) - 180;
+  return {
+    lignes: [rappel(A, A2), rappel(B, B2), [A2, B2]],
+    fleches: [{ p: A2, dir: u }, { p: B2, dir: [-u[0], -u[1]] }], arc: null,
+    texte: { p: [(A2[0] + B2[0]) / 2, (A2[1] + B2[1]) / 2], angle: ang, t: `${L.toFixed(2)} m` }, valeur: L,
+  };
 }

@@ -7,9 +7,10 @@
 import { versEcran } from '../plan/vue.js';
 import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
-  dimensionsFleche, centreZone, texteSurface,
+  geometrieCotation, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
 } from '../topo/plan-chantier.js';
-import { nuance, primitivesEtage, symboleGrue, symboleChassis, boiteSymbole } from '../topo/symboles.js';
+import { grueDeLObjet, symboleDeLObjetPose } from '../topo/grue-mobile.js';
+import { nuance, primitivesEtage, chassisLibre, boiteSymbole, echelleDeLObjet } from '../topo/symboles.js';
 
 const ecranDe = (d) => ([e, n]) => versEcran(e, n, d.vue);
 
@@ -42,7 +43,100 @@ export function plaque(ctx, texte, x, y, h, poids = 600) {
   return { w, h: h * 1.36 };
 }
 
+/**
+ * Tas de stock (0.292.0) : le contour décalé vers l'intérieur de largeur = hauteur × talus (6 anneaux, de plus en plus
+ * clairs vers le sommet), un éclairage du nord-ouest (clair en haut à gauche, sombre en bas à droite) et des hachures de
+ * talus (traits du pied vers le sommet, un long, un court).
+ */
+function dessinerTas(d, o, couleur) {
+  const { ctx, vue } = d;
+  const { anneaux, largeur, sens } = anneauxDuTas(o.points, o.tasH, o.tasTalus ?? TAS_TALUS);
+  const ecran = ecranDe(d);
+  ctx.save();
+  chemin(d, o.points, true);
+  ctx.clip();
+  anneaux.forEach((a, i) => {
+    chemin(d, a, true);
+    ctx.fillStyle = nuance(couleur, 0.08 + 0.34 * ((i + 1) / anneaux.length));
+    ctx.globalAlpha = 0.95;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = nuance(couleur, -0.25);
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+  });
+  // Éclairage : voile clair en haut à gauche, sombre en bas à droite.
+  const xs = o.points.map((p) => ecran(p).x);
+  const ys = o.points.map((p) => ecran(p).y);
+  const g = ctx.createLinearGradient(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
+  g.addColorStop(0, 'rgba(255,255,255,0.28)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0)');
+  g.addColorStop(1, 'rgba(15,23,42,0.34)');
+  chemin(d, o.points, true);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.restore();
+  // Hachures de talus le long du pied, tous les 1,2 m (au moins 6 px).
+  ctx.strokeStyle = nuance(couleur, -0.45);
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  const pas = Math.max(1.2, 6 / vue.echelle);
+  let k = 0;
+  const pts = o.points;
+  for (let i = 0; i < pts.length; i++) {
+    const [x1, y1] = pts[i];
+    const [x2, y2] = pts[(i + 1) % pts.length];
+    const l = Math.hypot(x2 - x1, y2 - y1);
+    if (l < 1e-6) continue;
+    const [ux, uy] = [(x2 - x1) / l, (y2 - y1) / l];
+    const [nx, ny] = [-uy * sens, ux * sens]; // vers l'intérieur
+    for (let s = pas / 2; s < l; s += pas) {
+      const long = (k++ % 2 === 0 ? 0.55 : 0.3) * largeur;
+      const a = ecran([x1 + ux * s, y1 + uy * s]);
+      const b = ecran([x1 + ux * s + nx * long, y1 + uy * s + ny * long]);
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+    }
+  }
+  ctx.stroke();
+}
+
 /** Dessine un élément du plan de chantier. */
+/**
+ * Dessine des objets dans l'ordre. Ceux qui ont un rendu de phase (estompé, assombri, couleur unique : `o.rendu`) sont
+ * dessinés d'abord, par groupes de même rendu, sur une toile à part posée ensuite avec la transparence ou le gris voulu :
+ * l'effet vaut pour tout le groupe (pas de double teinte aux croisements).
+ */
+export function dessinerObjets(d, objets) {
+  const groupes = new Map();
+  const normaux = [];
+  for (const o of objets) {
+    if (!o.rendu) normaux.push(o);
+    else {
+      const cle = `${o.rendu.mode}|${o.rendu.opacite}|${o.rendu.couleur}`;
+      if (!groupes.has(cle)) groupes.set(cle, []);
+      groupes.get(cle).push(o);
+    }
+  }
+  for (const liste of groupes.values()) {
+    const { mode, opacite } = liste[0].rendu;
+    const toile = document.createElement('canvas');
+    toile.width = d.ctx.canvas.width;
+    toile.height = d.ctx.canvas.height;
+    const tctx = toile.getContext('2d');
+    tctx.setTransform(d.ctx.getTransform());
+    for (const o of liste) dessinerObjet({ ...d, ctx: tctx }, o);
+    d.ctx.save();
+    d.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    d.ctx.globalAlpha = mode === 'estompe' ? opacite : mode === 'assombri' ? 0.8 : 1;
+    if (mode === 'assombri') d.ctx.filter = 'grayscale(1) brightness(0.7)';
+    d.ctx.drawImage(toile, 0, 0);
+    d.ctx.restore();
+    toile.width = 0;
+  }
+  for (const o of normaux) dessinerObjet(d, o);
+}
+
 export function dessinerObjet(d, o) {
   const { ctx, vue, pc } = d;
   const couleur = couleurObjet(pc, o);
@@ -55,19 +149,53 @@ export function dessinerObjet(d, o) {
   if (o.type === 'symbole' || o.type === 'grue') return dessinerSymbolePose(d, o);
   if (o.type === 'zone') {
     chemin(d, o.points, true);
-    ctx.globalAlpha = opaciteZone(o);
+    ctx.globalAlpha = o.tasH > 0 ? Math.max(0.7, opaciteZone(o)) : opaciteZone(o);
     ctx.fillStyle = couleur;
     ctx.fill();
     ctx.globalAlpha = 1;
+    if (o.tasH > 0) dessinerTas(d, o, couleur);
     ctx.strokeStyle = couleur;
     ctx.lineWidth = Math.max(0.8, contourZoneMm(o) * mm);
+    chemin(d, o.points, true);
     ctx.stroke();
-    if (o.afficherSurface) {
+    // Étiquette au centre : surface et / ou hauteur du tas.
+    const parties = [];
+    if (o.afficherSurface) parties.push(texteSurface(o.points));
+    if (o.tasH > 0 && o.afficherHauteur) parties.push(`H ${Number(o.tasH).toFixed(1)} m`);
+    if (parties.length) {
       const c = ecran(centreZone(o.points));
-      plaque(ctx, texteSurface(o.points), c.x, c.y, Math.min(22, Math.max(10, 3 * mm)));
+      plaque(ctx, parties.join(' · '), c.x, c.y, Math.min(22, Math.max(10, 3 * mm)));
     }
   } else if (o.type === 'ligne') {
-    dessinerLigne(ctx, o.points.map((p) => { const q = ecran(p); return [q.x, q.y]; }), styleLigne(o.style), couleur, mm, o);
+    dessinerLigne(ctx, o.points.map((p) => { const q = ecran(p); return [q.x, q.y]; }), styleLigne(o.style), couleur, mm, o, e);
+  } else if (o.type === 'construction') {
+    // Ligne de construction (0.293.0, jamais imprimée) : trait cyan en tirets, droite infinie prolongée hors de l'écran.
+    const a = ecran(o.points[0]);
+    const b = ecran(o.points[1]);
+    let [x1, y1, x2, y2] = [a.x, a.y, b.x, b.y];
+    if (o.infinie) {
+      const l = Math.hypot(x2 - x1, y2 - y1) || 1;
+      const [ux, uy] = [(x2 - x1) / l, (y2 - y1) / l];
+      const L = (vue.largeur + vue.hauteur) * 3;
+      [x1, y1, x2, y2] = [x1 - ux * L, y1 - uy * L, x2 + ux * L, y2 + uy * L];
+    }
+    ctx.strokeStyle = couleur;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([9, 5]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = couleur;
+    for (const q of [a, b]) {
+      ctx.beginPath();
+      ctx.moveTo(q.x - 4, q.y);
+      ctx.lineTo(q.x + 4, q.y);
+      ctx.moveTo(q.x, q.y - 4);
+      ctx.lineTo(q.x, q.y + 4);
+      ctx.stroke();
+    }
   } else if (o.type === 'piste') {
     chemin(d, o.points, false);
     ctx.strokeStyle = couleur;
@@ -99,6 +227,41 @@ export function dessinerObjet(d, o) {
     chemin(d, tete, true);
     ctx.fillStyle = couleur;
     ctx.fill();
+  } else if (o.type === 'cotation') {
+    const g = geometrieCotation(o);
+    if (!g) return;
+    ctx.strokeStyle = couleur;
+    ctx.fillStyle = couleur;
+    ctx.lineWidth = Math.max(0.8, 0.25 * mm);
+    ctx.beginPath();
+    for (const [a, b] of g.lignes) {
+      const A = ecran(a);
+      const B = ecran(b);
+      ctx.moveTo(A.x, A.y);
+      ctx.lineTo(B.x, B.y);
+    }
+    if (g.arc) g.arc.forEach((pt, i) => { const q = ecran(pt); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
+    ctx.stroke();
+    // Flèches aux deux bouts de la ligne de cote (3 mm sur le papier).
+    const L = Math.max(5, 2.6 * mm);
+    for (const f of g.fleches) {
+      const q = ecran(f.p);
+      const a = Math.atan2(-f.dir[1], f.dir[0]);
+      ctx.beginPath();
+      ctx.moveTo(q.x, q.y);
+      ctx.lineTo(q.x + L * Math.cos(a - 0.22), q.y + L * Math.sin(a - 0.22));
+      ctx.lineTo(q.x + L * Math.cos(a + 0.22), q.y + L * Math.sin(a + 0.22));
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Valeur sur une plaque blanche, de la même taille que le texte des symboles, le long de la ligne de cote.
+    const t = ecran(g.texte.p);
+    const h = Math.max(9, (pc ? texteSymbolesM(pc) : 1) * e);
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    ctx.rotate((-g.texte.angle * Math.PI) / 180);
+    plaque(ctx, g.texte.t, 0, 0, h);
+    ctx.restore();
   } else if (o.type === 'texte') {
     const q = ecran(o.point);
     const h = Math.max(9, (o.taille ?? 1) * e);
@@ -144,10 +307,11 @@ function dessinerRepere(d, o, q, w, h) {
  * Ligne à l'écran (points en px) avec son style : tirets, épaisseur et motif en mm de papier (× l'échelle du motif de la
  * ligne) ; la ligne s'interrompt autour de chaque motif. pxMm = pixels pour 1 mm de papier.
  */
-export function dessinerLigne(ctx, pts, style, couleur, pxMm, o = {}) {
+export function dessinerLigne(ctx, pts, style, couleur, pxMm, o = {}, pxM = null) {
   const m = style.motif;
   const ech = o.echelleMotif ?? 1;
   const epaisseur = Math.max(0.8, (o.epaisseurMm ?? style.epaisseurMm) * pxMm);
+  if (m?.largeurM) return dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM ?? pxMm * 5, o);
   const trace = (morceaux) => {
     ctx.strokeStyle = couleur;
     ctx.lineWidth = epaisseur;
@@ -225,6 +389,159 @@ export function dessinerLigne(ctx, pts, style, couleur, pxMm, o = {}) {
     }
     ctx.restore();
   }
+}
+
+/**
+ * Lignes « en bande » (0.292.0) : largeur réelle en m (largeurM × échelle du motif), qui suit l'échelle du plan :
+ * glissière béton GBA (éléments de 4 m), échafaudage (travées de 2,5 m avec croisillons), filet de protection (bande
+ * hachurée), barrière Heras (panneaux de 3,5 m sur pieds). pxM = pixels pour 1 m sur le terrain.
+ */
+function dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM, o) {
+  const w = Math.max(3, m.largeurM * pxM * ech);
+  const tube = (largeur, style) => {
+    ctx.beginPath();
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.strokeStyle = style;
+    ctx.lineWidth = largeur;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.lineCap = 'round';
+  };
+  const reperes = positionsLeLong(pts, Math.max(4, m.elementM * pxM * ech), 0);
+  const trans = (r, demi, k = 1) => {
+    const [nx, ny] = [-Math.sin(r.angle), Math.cos(r.angle)];
+    ctx.moveTo(r.x - nx * demi * k, r.y - ny * demi * k);
+    ctx.lineTo(r.x + nx * demi * k, r.y + ny * demi * k);
+  };
+  ctx.setLineDash([]);
+  if (m.type === 'gba') {
+    tube(w + 1.6, '#334155');
+    tube(w, '#c4cad0');
+    tube(Math.max(1, w * 0.3), '#9aa3ab');
+    ctx.beginPath();
+    for (const r of reperes) trans(r, w / 2);
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = Math.max(0.8, w * 0.07);
+    ctx.stroke();
+  } else if (m.type === 'echafaudage') {
+    tube(w + 1.6, '#475569');
+    tube(w, 'rgba(226,232,240,0.85)');
+    ctx.beginPath();
+    for (let i = 0; i < reperes.length; i++) {
+      const r = reperes[i];
+      trans(r, w / 2);
+      const s = reperes[i + 1];
+      if (s) {
+        const [n1x, n1y] = [-Math.sin(r.angle), Math.cos(r.angle)];
+        const [n2x, n2y] = [-Math.sin(s.angle), Math.cos(s.angle)];
+        ctx.moveTo(r.x + (n1x * w) / 2, r.y + (n1y * w) / 2);
+        ctx.lineTo(s.x - (n2x * w) / 2, s.y - (n2y * w) / 2);
+        ctx.moveTo(r.x - (n1x * w) / 2, r.y - (n1y * w) / 2);
+        ctx.lineTo(s.x + (n2x * w) / 2, s.y + (n2y * w) / 2);
+      }
+    }
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = Math.max(0.7, w * 0.06);
+    ctx.stroke();
+  } else if (m.type === 'filet') {
+    tube(w, 'rgba(47,158,85,0.28)');
+    tube(Math.max(1, epaisseur), couleur);
+    ctx.beginPath();
+    for (const r of positionsLeLong(pts, Math.max(3, 0.4 * pxM * ech), 0)) {
+      const [nx, ny] = [-Math.sin(r.angle), Math.cos(r.angle)];
+      const [ux, uy] = [Math.cos(r.angle), Math.sin(r.angle)];
+      ctx.moveTo(r.x - nx * (w / 2) - ux * (w / 4), r.y - ny * (w / 2) - uy * (w / 4));
+      ctx.lineTo(r.x + nx * (w / 2) + ux * (w / 4), r.y + ny * (w / 2) + uy * (w / 4));
+    }
+    ctx.strokeStyle = couleur;
+    ctx.lineWidth = Math.max(0.6, epaisseur * 0.5);
+    ctx.stroke();
+  } else if (m.type === 'lattes') {
+    // 2 lattes rouges et blanches côte à côte (bandes de 0,5 m en alternance), sur des pieds.
+    const dec = w * 0.27;
+    const lat = (d, sens) => {
+      const dp = pts.map((q, i) => {
+        const r = pts[Math.min(i + 1, pts.length - 1)];
+        const t = pts[Math.max(i - 1, 0)];
+        const a = Math.atan2(r[1] - t[1], r[0] - t[0]);
+        return [q[0] - Math.sin(a) * d * sens, q[1] + Math.cos(a) * d * sens];
+      });
+      ctx.beginPath();
+      dp.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.lineCap = 'butt';
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = w * 0.4;
+      ctx.setLineDash([]);
+      ctx.stroke();
+      ctx.strokeStyle = '#d63a3a';
+      const pas = Math.max(3, 0.5 * pxM * ech);
+      ctx.setLineDash([pas, pas]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      ctx.lineCap = 'round';
+    };
+    for (const r of reperes) {
+      const [nx, ny] = [-Math.sin(r.angle), Math.cos(r.angle)];
+      ctx.beginPath();
+      ctx.moveTo(r.x - nx * w * 0.55, r.y - ny * w * 0.55);
+      ctx.lineTo(r.x + nx * w * 0.55, r.y + ny * w * 0.55);
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = Math.max(1.2, w * 0.12);
+      ctx.stroke();
+    }
+    lat(dec, 1);
+    lat(dec, -1);
+  } else if (m.type === 'pieton') {
+    // Cheminement piéton : bande verte claire, bords pleins, petites flèches dans le sens du tracé.
+    tube(w, 'rgba(34,197,94,0.28)');
+    for (const sens of [1, -1]) {
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => {
+        const r = pts[Math.min(i + 1, pts.length - 1)];
+        const t = pts[Math.max(i - 1, 0)];
+        const an = Math.atan2(r[1] - t[1], r[0] - t[0]);
+        const q = [x - Math.sin(an) * (w / 2) * sens, y + Math.cos(an) * (w / 2) * sens];
+        if (i) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]);
+      });
+      ctx.strokeStyle = couleur;
+      ctx.lineWidth = Math.max(1, epaisseur);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    for (const r of reperes) {
+      const [ux, uy] = [Math.cos(r.angle), Math.sin(r.angle)];
+      const [nx, ny] = [-uy, ux];
+      const h = Math.min(w * 0.3, 8);
+      ctx.moveTo(r.x - ux * h - nx * h, r.y - uy * h - ny * h);
+      ctx.lineTo(r.x + ux * h, r.y + uy * h);
+      ctx.lineTo(r.x - ux * h + nx * h, r.y - uy * h + ny * h);
+    }
+    ctx.strokeStyle = couleur;
+    ctx.lineWidth = Math.max(1.2, epaisseur * 1.2);
+    ctx.stroke();
+  } else if (m.type === 'heras') {
+    // Treillis : trait double fin ; pieds en béton perpendiculaires à chaque joint de panneau ; croisillon par panneau.
+    tube(Math.max(2, w * 0.1), '#94a3b8');
+    tube(Math.max(1, epaisseur), couleur);
+    for (const r of reperes) {
+      const [nx, ny] = [-Math.sin(r.angle), Math.cos(r.angle)];
+      ctx.beginPath();
+      ctx.moveTo(r.x - nx * (w / 2), r.y - ny * (w / 2));
+      ctx.lineTo(r.x + nx * (w / 2), r.y + ny * (w / 2));
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = Math.max(1.4, w * 0.16);
+      ctx.stroke();
+      ctx.fillStyle = '#cbd5e1';
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, Math.max(1.5, w * 0.1), 0, 2 * Math.PI);
+      ctx.fill();
+    }
+  }
+  void o;
 }
 
 // ------------------------------------------------------------------ Symboles
@@ -314,7 +631,9 @@ export function dessinerPrimitives(ctx, prims, e, mm, options = {}) {
       ctx.lineWidth = trait;
       ctx.stroke();
     } else if (p.g === 't') {
-      texteDansSymbole(ctx, p, e, options.angle ?? 0);
+      // 0.292.0 : tous les textes ont la même taille (options.texteU, en unités du symbole) et une plaque blanche.
+      if (p.brut) texteBrut(ctx, p, e, options.angle ?? 0);
+      else texteDansSymbole(ctx, options.texteU ? { ...p, h: options.texteU } : p, e, options.angle ?? 0);
     }
   }
 }
@@ -322,6 +641,24 @@ export function dessinerPrimitives(ctx, prims, e, mm, options = {}) {
 /**
  * Texte d'un symbole (repère du symbole, y vers le haut) : jamais à l'envers (angleSymbole = rotation du symbole posé, °).
  */
+/** Texte d'un panneau (0.293.0) : noir, gras, taille propre, sans plaque ; jamais à l'envers. */
+function texteBrut(ctx, p, e, angleSymbole) {
+  if (p.h * e < 3) return;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  let a = p.a ?? 0;
+  const total = (((a + angleSymbole) % 360) + 360) % 360;
+  if (total > 90 && total < 270) a += 180;
+  ctx.rotate((a * Math.PI) / 180);
+  ctx.scale(1 / e, -1 / e);
+  ctx.font = `700 ${(p.h * e).toFixed(2)}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = p.k;
+  ctx.fillText(p.t, 0, 0);
+  ctx.restore();
+}
+
 function texteDansSymbole(ctx, p, e, angleSymbole) {
   if (p.h * e < 3) return; // trop petit pour être lu
   ctx.save();
@@ -336,6 +673,21 @@ function texteDansSymbole(ctx, p, e, angleSymbole) {
   const retourne = a !== (p.a ?? 0);
   ctx.textAlign = retourne ? 'center' : ['left', 'center', 'right'][p.ah ?? 0];
   ctx.textBaseline = ['alphabetic', 'bottom', 'middle', 'top'][p.av ?? 0];
+  {
+    // 0.292.0 : tout texte de symbole est sur une plaque blanche arrondie, légèrement transparente.
+    const h = p.h * e;
+    const w = ctx.measureText(p.t).width;
+    const x0 = { left: 0, center: -w / 2, right: -w }[ctx.textAlign];
+    const y0 = { alphabetic: -0.78 * h, bottom: -h, middle: -h / 2, top: 0 }[ctx.textBaseline];
+    const m = h * 0.28;
+    ctx.beginPath();
+    ctx.roundRect(x0 - m, y0 - m * 0.7, w + 2 * m, h + m * 1.4, h * 0.35);
+    ctx.fillStyle = 'rgba(255,255,255,0.84)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(43,52,64,0.45)';
+    ctx.lineWidth = Math.max(0.6, h * 0.06);
+    ctx.stroke();
+  }
   ctx.fillStyle = p.k;
   ctx.fillText(p.t, 0, 0);
   ctx.restore();
@@ -359,7 +711,8 @@ function pictoNiveau(ctx, x, y, t, etage) {
 /** Dessine un symbole (ou une grue) posé sur le plan. */
 export function dessinerSymbolePose(d, o) {
   const { ctx, vue, bib } = d;
-  const e = vue.echelle;
+  const k = echelleDeLObjet(o); // 0.292.0 : échelle d'un bloc (×1 = taille réelle)
+  const e = vue.echelle * k; // pixels par unité du symbole
   const q = versEcran(o.point[0], o.point[1], vue);
   const rot = o.rotation ?? 0;
   const debut = () => {
@@ -368,20 +721,21 @@ export function dessinerSymbolePose(d, o) {
     ctx.rotate((-(rot - (vue.rotation ?? 0)) * Math.PI) / 180);
     ctx.scale(e, -e);
   };
-  const unique = d.pc?.couleurs === 'phases' ? d.pc.phases.find((p) => p.id === o.phase)?.couleur : null;
-  const opts = { angle: rot, couleurUnique: unique ?? undefined };
+  const unique = o.rendu?.mode === 'couleur' ? o.rendu.couleur : d.pc?.couleurs === 'phases' ? d.pc.phases.find((p) => p.id === o.phase)?.couleur : null;
+  // 0.292.0 : texte de la même taille partout (mm sur le papier × échelle du plan), indépendante de l'échelle du bloc.
+  const opts = { angle: rot, couleurUnique: unique ?? undefined, texteU: d.pc ? texteSymbolesM(d.pc) / k : undefined };
   if (o.type === 'grue') {
-    const g = symboleGrue(bib, o.modele ?? 'tour', o.fleche ?? 40);
+    const g = grueDeLObjet(bib, o);
     if (!g) return manquant(d, o, q);
     debut();
-    const ch = symboleChassis(bib, o.chassis);
+    const ch = chassisLibre(bib, o.chassis); // 0.290.0 : côté libre, coté
     if (ch) dessinerPrimitives(ctx, ch.primitives, e, d.mm, opts);
-    if (o.rayon !== false && g.rayon?.length) dessinerRayon(ctx, g, e, d.mm, rot);
+    if (o.rayon !== false && g.rayon?.length) dessinerRayon(ctx, g, e, d.mm, rot, opts.texteU);
     dessinerPrimitives(ctx, g.primitives, e, d.mm, { ...opts, ombreForte: true });
     ctx.restore();
     return;
   }
-  const s = bib.find((x) => x.cle === o.cle);
+  const s = symboleDeLObjetPose(bib, o);
   if (o.etage) {
     const et = primitivesEtage(bib, o.etage.pose ?? 0);
     if (!et) return manquant(d, o, q);
@@ -395,7 +749,7 @@ export function dessinerSymbolePose(d, o) {
     textes.forEach((texte, i) => {
       const y = (i ? -0.55 : 0.55) + 0.12;
       pictoNiveau(ctx, -1.0 - t * 0.3, y, t, i === 0);
-      texteDansSymbole(ctx, { x: -0.55, y, h: t, a: 0, t: texte, ah: 0, av: 2, k: '#0f172a' }, e, rot);
+      texteDansSymbole(ctx, { x: -0.55, y, h: opts.texteU ?? t, a: 0, t: texte, ah: 0, av: 2, k: '#0f172a' }, e, rot);
     });
     ctx.restore();
     return;
@@ -407,7 +761,7 @@ export function dessinerSymbolePose(d, o) {
 }
 
 /** Rayon d'action d'une grue : cercles de sa bibliothèque, en tirets ambre, et un voile très léger. */
-function dessinerRayon(ctx, g, e, mm, rot) {
+function dessinerRayon(ctx, g, e, mm, rot, texteU) {
   const lw = Math.max(0.8, 0.25 * mm) / e;
   for (const p of g.rayon) {
     if (p.g === 'c') {
@@ -423,7 +777,7 @@ function dessinerRayon(ctx, g, e, mm, rot) {
       ctx.lineWidth = principal ? lw * 1.4 : lw;
       ctx.stroke();
       ctx.setLineDash([]);
-    } else if (p.g === 't') texteDansSymbole(ctx, { ...p, k: '#92400e' }, e, rot);
+    } else if (p.g === 't') { if (p.brut) texteBrut(ctx, p, e, rot); else texteDansSymbole(ctx, { ...p, k: '#92400e', ...(texteU ? { h: texteU } : {}) }, e, rot); }
   }
 }
 
@@ -442,8 +796,8 @@ function manquant(d, o, q) {
 
 /** Symbole de la bibliothèque qui donne la boîte d'un objet posé (la grue : sa flèche ; à étage : le conteneur). */
 export function symboleDeLObjet(bib, o) {
-  if (o.type === 'grue') return symboleGrue(bib, o.modele ?? 'tour', o.fleche ?? 40);
-  return bib.find((x) => x.cle === o.cle) ?? null;
+  if (o.type === 'grue') return grueDeLObjet(bib, o);
+  return symboleDeLObjetPose(bib, o);
 }
 
 /** Vignette d'un symbole dans un petit canvas (bibliothèque) : cadré, sans rotation. */

@@ -5,6 +5,7 @@ import { versTerrain } from '../plan/vue.js';
 
 const cache = new Map(); // adresse → { image (img ou canvas), etat : 'charge' | 'ok' | 'erreur' }
 const MAX_TUILES = 250;
+const ZOOM_MAX_CARTE = 26;
 export const PALEUR_ORTHO = 45; // % de blanc posé sur la photo au départ (« orthophoto pâlie »)
 
 /** Zone du terrain vue (m) d'une vue sans rotation. */
@@ -51,14 +52,15 @@ function tuile(adresse, traitsSeulement, quandPrete) {
  */
 export function dessinerFondSwisstopo(ctx, vue, fond, densite = 1, quandPrete = null) {
   const res = { tuiles: 0, manquantes: 0, enCours: 0 };
-  const couches = [fond?.ortho ? 'satellite' : null, fond?.cadastre ? 'cadastre' : null].filter(Boolean);
+  const couches = [fond?.carte ? 'carte' : null, fond?.ortho ? 'satellite' : null, fond?.cadastre ? 'cadastre' : null].filter(Boolean);
   if (!couches.length) return res;
-  const z = niveauDeZoom(1 / vue.echelle, densite);
   const zone = zoneDe(vue);
-  const liste = tuilesPourZone(zone, z);
-  if (liste.length > MAX_TUILES) return res;
   for (const nom of couches) {
     const source = FONDS[nom];
+    // La carte nationale n'existe pas en dessous de 0,5 m / pixel (niveau 26).
+    const z = Math.min(niveauDeZoom(1 / vue.echelle, densite), nom === 'carte' ? ZOOM_MAX_CARTE : 99);
+    const liste = tuilesPourZone(zone, z);
+    if (liste.length > MAX_TUILES) continue;
     for (const t of liste) {
       const adresse = source.url(t.z, t.colonne, t.ligne);
       const lu = tuile(adresse, source.traitsSeulement, quandPrete);

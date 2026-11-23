@@ -6,7 +6,7 @@
 // [x, y, x, y…] ; voir blocs-dxf.js pour leur forme.
 import { bornesPrimitives, deplacerPrimitives } from './blocs-dxf.js';
 
-export const CATEGORIES_SYMBOLES = ['Base-vie', 'Engins', 'Grues', 'Véhicules', 'Sécurité'];
+export const CATEGORIES_SYMBOLES = ['Base-vie', 'Installations', 'Stockage', 'Engins', 'Grues', 'Véhicules', 'Sécurité', 'Signalisation']; // Signalisation : 0.291.0 ; Installations, Stockage : 0.292.0
 
 // Matériaux d'après la couleur d'origine (décidé le 23.11) et leur couleur modernisée.
 const MATERIAUX = {
@@ -222,6 +222,100 @@ export function symboleGrue(bibliotheque, modele, fleche) {
 /** Symbole du châssis choisi (ou null pour « sans châssis »). */
 export const symboleChassis = (bibliotheque, chassis) => (chassis && chassis !== 'aucun' ? bibliotheque.find((s) => s.chassis === chassis) ?? null : null);
 
+// ------------------------------------------------------------------ Grue à longueur libre (0.290.0, demande du 23.11)
+
+export const FLECHE_MIN = 10; // m
+export const FLECHE_MAX = 90; // m
+export const CHASSIS_MIN = 2; // m
+export const CHASSIS_MAX = 12; // m
+const DEBUT_FLECHE = 2; // m : au-delà de x = 2 m (la tour et la contre-flèche restent telles quelles), la flèche s'allonge
+const arrondi3 = (v) => Math.round(v * 1000) / 1000;
+const texteM = (v) => `${String(Math.round(v * 100) / 100).replace(/\.?0+$/, '')}m`;
+
+/** Côté du châssis (m) lu dans « 4.50 », « 4.5 » ou un nombre ; null pour « aucun ». */
+export function coteChassis(chassis) {
+  if (chassis == null || chassis === 'aucun' || chassis === '') return null;
+  const v = Number(String(chassis).replace(',', '.'));
+  return Number.isFinite(v) && v > 0 ? Math.min(CHASSIS_MAX, Math.max(CHASSIS_MIN, v)) : null;
+}
+
+/**
+ * Grue pour une flèche de longueur libre (m) : le bloc le plus proche, flèche allongée ou raccourcie au-delà de la tour
+ * (x > 2 m, la tour et la contre-flèche ne bougent pas) ; rayon d'action refait : cercle principal à la longueur de la
+ * flèche, cercles gris tous les 5 m dès 20 m, avec leurs cotes. Renvoie { primitives, rayon, fleche, boite } ou null.
+ */
+const memoire = new Map(); // calculs gardés (dessin à chaque image) : clé → résultat
+function garder(cle, calcul) {
+  if (!memoire.has(cle)) {
+    if (memoire.size > 200) memoire.clear();
+    memoire.set(cle, calcul());
+  }
+  return memoire.get(cle);
+}
+
+export function grueLibre(bibliotheque, modele, fleche) {
+  const base = symboleGrue(bibliotheque, modele, fleche);
+  if (!base) return null;
+  const L = Math.min(FLECHE_MAX, Math.max(FLECHE_MIN, Number(fleche) || base.fleche));
+  return garder(`g|${base.cle}|${L}`, () => calculerGrue(base, L, modele));
+}
+
+function calculerGrue(base, L, modele) {
+  const k = L / base.fleche;
+  const f = (x, y) => [arrondi3(x > DEBUT_FLECHE ? DEBUT_FLECHE + (x - DEBUT_FLECHE) * ((L - DEBUT_FLECHE) / (base.fleche - DEBUT_FLECHE)) : x), y];
+  const primitives = Math.abs(k - 1) < 1e-9 ? base.primitives : transformerPrimitives(base.primitives, f).map((p) => (p.g === 't' ? { ...p, t: p.t.replace(/\d+(\.\d+)?\s*m\b/i, texteM(L)) } : p));
+  const rayon = [{ g: 'c', k: ARDOISE, x: 0, y: 0, r: L }, { g: 't', k: '#92400e', x: L, y: -1.2, h: 0.9, a: 90, t: texteM(L), ah: 1, av: 2 }];
+  for (let r = 20; r < L - 2; r += 5) {
+    rayon.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r }, { g: 't', k: '#92400e', x: r, y: -1.2, h: 0.9, a: 90, t: texteM(r), ah: 1, av: 2 });
+  }
+  const b = bornesPrimitives(primitives);
+  return { primitives, rayon, fleche: L, boite: b ? [b.xMin, b.yMin, b.xMax, b.yMax] : base.boite, modele, nom: base.nom };
+}
+
+/**
+ * Châssis d'un côté libre (m) : le châssis de la bibliothèque le plus proche, mis à l'échelle (nominal : le nombre de son
+ * nom, « Chassis Grue 4.50 » = 4,50 m), avec sa cote (côté écrit sous le châssis et à gauche, traits de cote).
+ * Renvoie { primitives, cote } ou null (sans châssis).
+ */
+export function chassisLibre(bibliotheque, chassis) {
+  const c = coteChassis(chassis);
+  if (!c) return null;
+  const liste = bibliotheque.filter((s) => s.chassis && Number.isFinite(Number(s.chassis.replace(/\(\d+\)$/, ''))));
+  if (!liste.length) return null;
+  const nominal = (s) => Number(s.chassis.replace(/\(\d+\)$/, ''));
+  const base = liste.reduce((m, s) => (Math.abs(nominal(s) - c) < Math.abs(nominal(m) - c) ? s : m));
+  return garder(`c|${base.cle}|${c}`, () => calculerChassis(base, c, c / nominal(base)));
+}
+
+function calculerChassis(base, c, k) {
+  const prims = Math.abs(k - 1) < 1e-9 ? base.primitives : transformerPrimitives(base.primitives, (x, y) => [arrondi3(x * k), arrondi3(y * k)]);
+  return { primitives: [...prims, ...coteDuChassis(c, bornesPrimitives(prims))], cote: c };
+}
+
+/** Cote d'un châssis carré de côté c (m) : traits de cote sous le châssis et à sa gauche, avec « 4.50 m » écrit. */
+export function coteDuChassis(c, b) {
+  const h = Math.max(0.3, c * 0.08); // hauteur du texte (m)
+  const d = Math.max(0.6, c * 0.15); // écart entre le châssis et la ligne de cote
+  const y = (b?.yMin ?? -c / 2) - d;
+  const x = (b?.xMin ?? -c / 2) - d;
+  const t = c / 2;
+  const tic = h * 0.5;
+  const k = '#0f172a';
+  const texte = `${c.toFixed(2)} m`;
+  return [
+    { g: 'l', k, p: [-t, y, t, y], f: false, mat: 'trait' },
+    { g: 'l', k, p: [-t - tic, y - tic, -t + tic, y + tic], f: false, mat: 'trait' },
+    { g: 'l', k, p: [t - tic, y - tic, t + tic, y + tic], f: false, mat: 'trait' },
+    { g: 'l', k, p: [-t, y + tic * 2, -t, y - tic], f: false, mat: 'trait' },
+    { g: 'l', k, p: [t, y + tic * 2, t, y - tic], f: false, mat: 'trait' },
+    { g: 't', k, x: 0, y: y - h * 0.9, h, a: 0, t: texte, ah: 1, av: 2 },
+    { g: 'l', k, p: [x, -t, x, t], f: false, mat: 'trait' },
+    { g: 'l', k, p: [x - tic, -t - tic, x + tic, -t + tic], f: false, mat: 'trait' },
+    { g: 'l', k, p: [x - tic, t - tic, x + tic, t + tic], f: false, mat: 'trait' },
+    { g: 't', k, x: x - h * 0.9, y: 0, h, a: 90, t: texte, ah: 1, av: 2 },
+  ];
+}
+
 // ------------------------------------------------------------------ Base-vie à étage
 
 // Conteneur de la base-vie (bloc « Base Vie Contenair », 6,04 × 2,47 m) et escalier « Base vie Etage » (palier + volée
@@ -296,10 +390,14 @@ export function primitivesEtage(bibliotheque, pose = 0) {
 
 // ------------------------------------------------------------------ Pose
 
-/** Rotation (degrés, sens trigonométrique) et point [e, n] → transformation du repère du symbole au terrain. */
+/** Échelle d'un symbole posé (0.292.0, ×1 = taille réelle) ; une grue se règle par sa flèche, pas par l'échelle. */
+export const echelleDeLObjet = (objet) => (objet.type === 'grue' ? 1 : Math.min(10, Math.max(0.1, Number(objet.echelle) || 1)));
+
+/** Rotation (degrés, sens trigonométrique), échelle et point [e, n] → transformation du repère du symbole au terrain. */
 export function versTerrainSymbole(objet) {
   const a = ((objet.rotation ?? 0) * Math.PI) / 180;
-  const [c, s] = [Math.cos(a), Math.sin(a)];
+  const k = echelleDeLObjet(objet);
+  const [c, s] = [Math.cos(a) * k, Math.sin(a) * k];
   const [e, n] = objet.point;
   return (x, y) => [e + c * x - s * y, n + s * x + c * y];
 }
@@ -307,9 +405,10 @@ export function versTerrainSymbole(objet) {
 /** Repère du terrain → repère du symbole (inverse de versTerrainSymbole). */
 export function versSymbole(objet, [e, n]) {
   const a = ((objet.rotation ?? 0) * Math.PI) / 180;
+  const k = echelleDeLObjet(objet);
   const [c, s] = [Math.cos(a), Math.sin(a)];
   const [dx, dy] = [e - objet.point[0], n - objet.point[1]];
-  return [c * dx + s * dy, -s * dx + c * dy];
+  return [(c * dx + s * dy) / k, (-s * dx + c * dy) / k];
 }
 
 /** Boîte [xMin, yMin, xMax, yMax] (m) d'un symbole dans son repère (centrée sur 0, 0 sauf les grues). */

@@ -30,6 +30,25 @@ export function apercuLigne(style, couleur = style.couleur) {
       marques += `${trou(x, 22)}<polyline points="${x - 1},${y - 5} ${x - 6},${y} ${x - 1},${y + 5}" fill="none" stroke="${couleur}" stroke-width="1.8"/>`
         + `<polyline points="${x + 1},${y - 5} ${x + 6},${y} ${x + 1},${y + 5}" fill="none" stroke="${couleur}" stroke-width="1.8"/>`;
     }
+  } else if (m?.type === 'gba') {
+    marques += `<rect x="2" y="${y - 4.5}" width="${L - 4}" height="9" rx="2" fill="#c4cad0" stroke="#334155" stroke-width="1"/>`;
+    for (let x = 32; x < L - 2; x += 30) marques += `<line x1="${x}" y1="${y - 4.5}" x2="${x}" y2="${y + 4.5}" stroke="#475569" stroke-width="1"/>`;
+  } else if (m?.type === 'echafaudage') {
+    marques += `<rect x="2" y="${y - 5}" width="${L - 4}" height="10" fill="#e2e8f0" stroke="#475569" stroke-width="1"/>`;
+    for (let x = 2; x < L - 2; x += 20) marques += `<line x1="${x}" y1="${y - 5}" x2="${x}" y2="${y + 5}" stroke="#64748b"/><line x1="${x}" y1="${y - 5}" x2="${Math.min(L - 2, x + 20)}" y2="${y + 5}" stroke="#64748b"/><line x1="${x}" y1="${y + 5}" x2="${Math.min(L - 2, x + 20)}" y2="${y - 5}" stroke="#64748b"/>`;
+  } else if (m?.type === 'filet') {
+    marques += `<rect x="2" y="${y - 4}" width="${L - 4}" height="8" fill="${couleur}" fill-opacity="0.25"/>`;
+    for (let x = 4; x < L - 4; x += 6) marques += `<line x1="${x}" y1="${y - 4}" x2="${x + 3}" y2="${y + 4}" stroke="${couleur}" stroke-width="1"/>`;
+  } else if (m?.type === 'lattes') {
+    for (const dy of [-2.6, 2.6]) {
+      marques += `<rect x="2" y="${y + dy - 2}" width="${L - 4}" height="4" fill="#f8fafc" stroke="#334155" stroke-width="0.6"/>`;
+      for (let x = 2; x < L - 6; x += 12) marques += `<rect x="${x}" y="${y + dy - 2}" width="6" height="4" fill="#d63a3a"/>`;
+    }
+  } else if (m?.type === 'pieton') {
+    marques += `<rect x="2" y="${y - 5}" width="${L - 4}" height="10" fill="#22c55e" fill-opacity="0.28" stroke="${couleur}" stroke-width="1"/>`;
+    for (let x = 18; x < L - 8; x += 26) marques += `<polyline points="${x - 3},${y - 4} ${x + 3},${y} ${x - 3},${y + 4}" fill="none" stroke="${couleur}" stroke-width="1.6"/>`;
+  } else if (m?.type === 'heras') {
+    for (let x = 10; x < L; x += 36) marques += `<line x1="${x}" y1="${y - 5}" x2="${x}" y2="${y + 5}" stroke="#334155" stroke-width="2.4"/><circle cx="${x}" cy="${y}" r="1.8" fill="#cbd5e1"/>`;
   } else if (m?.type === 'texte') {
     const w = m.texte.length * 6 + (m.eclair ? 10 : 0) + 6;
     const xs = w > 50 ? [60] : [32, 90];

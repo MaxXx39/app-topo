@@ -6,10 +6,12 @@
 // pose, ses deux textes (« 1er », « Rez ») écrits à part (modifiables).
 import {
   styleLigne, categorieZone, couleurObjet, dimensionsFleche, pointeDeFleche, centreZone, texteSurface, positionsLeLong,
-  metresParMm, estPose,
+  metresParMm, estPose, texteSymbolesM,
+  geometrieCotation,
 } from './plan-chantier.js';
 import { couleurAci } from './dxf-plan.js';
-import { symboleGrue, symboleChassis, primitivesEtage } from './symboles.js';
+import { grueDeLObjet, symboleDeLObjetPose } from './grue-mobile.js';
+import { chassisLibre, primitivesEtage, echelleDeLObjet } from './symboles.js';
 import { nomDeCalque, texteAscii } from '../export/dxf.js';
 
 const f3 = (v) => (Math.abs(v) < 0.0005 ? '0.000' : v.toFixed(3));
@@ -101,15 +103,19 @@ function paires(plat) {
 }
 
 /** Nom de bloc accepté par AutoCAD (majuscules sans accent, 31 caractères au plus). */
-export const nomDeBloc = (texteNom) => nomDeCalque(`PC_${texteNom}`);
+export function nomDeBloc(texteNom, suffixe = '') {
+  const base = nomDeCalque(`PC_${texteNom}`);
+  return suffixe ? `${base.slice(0, 31 - suffixe.length)}${suffixe}` : base;
+}
 
 /**
  * Texte du fichier DXF d'un plan de chantier. objets : ceux à écrire (par défaut : les phases visibles) ; bib :
  * bibliothèque des symboles. Renvoie le texte (CRLF).
  */
 export function dxfPlanChantier(plan, bib, objets = null) {
+  const texteM = texteSymbolesM(plan);
   const visibles = new Set(plan.phases.filter((p) => p.visible !== false).map((p) => p.id));
-  const liste = objets ?? plan.objets.filter((o) => visibles.has(o.phase));
+  const liste = (objets ?? plan.objets.filter((o) => visibles.has(o.phase))).filter((o) => o.type !== 'construction'); // construction : jamais exportée
   const nomPhase = (id) => plan.phases.find((p) => p.id === id)?.nom ?? 'PHASE';
   const calques = new Map(); // nom → ACI
   const calque = (o, genre, aci) => {
@@ -132,7 +138,7 @@ export function dxfPlanChantier(plan, bib, objets = null) {
     } else if (o.type === 'ligne') {
       const st = styleLigne(o.style);
       const c = calque(o, st.nom.replace(/\s+[<>].*$/, ''), aci);
-      entites.push(...polyligne(o.points, c, {}));
+      entites.push(...polyligne(o.points, c, st.motif?.largeurM ? { largeur: st.motif.largeurM * (o.echelleMotif ?? 1) } : {}));
       if (st.motif?.type === 'texte') {
         for (const r of positionsLeLong(o.points, st.motif.pasMm * mParMm * (o.echelleMotif ?? 1))) {
           const a = (r.angle * 180) / Math.PI;
@@ -149,16 +155,31 @@ export function dxfPlanChantier(plan, bib, objets = null) {
       const base = [(tete[1][0] + tete[2][0]) / 2, (tete[1][1] + tete[2][1]) / 2];
       entites.push(...polyligne([...o.points.slice(0, -1), base], c, { largeur: dim.largeur }));
       entites.push(...solide([...tete[0], ...tete[1], ...tete[2]], c, null));
+    } else if (o.type === 'cotation') {
+      const g = geometrieCotation(o);
+      if (!g) continue;
+      const c = calque(o, 'COTATIONS', aci);
+      for (const [a, b] of g.lignes) entites.push(...polyligne([a, b], c));
+      if (g.arc) entites.push(...polyligne(g.arc, c));
+      const L = 2.6 * mParMm;
+      for (const f of g.fleches) {
+        const n = [-f.dir[1], f.dir[0]];
+        const b1 = [f.p[0] + f.dir[0] * L + n[0] * L * 0.22, f.p[1] + f.dir[1] * L + n[1] * L * 0.22];
+        const b2 = [f.p[0] + f.dir[0] * L - n[0] * L * 0.22, f.p[1] + f.dir[1] * L - n[1] * L * 0.22];
+        entites.push(...solide([...f.p, ...b1, ...b2], c, null));
+      }
+      entites.push(...texte(g.texte.p[0], g.texte.p[1], texteM, g.texte.angle, g.texte.t, c));
     } else if (o.type === 'texte') {
       const c = calque(o, 'TEXTES', 7);
       entites.push(...texte(o.point[0], o.point[1], o.taille ?? 1, 0, o.texte, c));
       if (o.repere) entites.push('0', 'LINE', '8', c, '10', f3(o.point[0]), '20', f3(o.point[1]), '30', '0', '11', f3(o.repere[0]), '21', f3(o.repere[1]), '31', '0');
     } else if (estPose(o)) {
-      const pose = blocDuPose(o, bib);
+      const k = echelleDeLObjet(o);
+      const pose = blocDuPose(o, bib, texteM / k);
       if (!pose) continue;
       if (!blocs.has(pose.nom)) blocs.set(pose.nom, entitesPrimitives(pose.primitives));
       const c = calque(o, o.type === 'grue' ? 'GRUES' : 'SYMBOLES', 7);
-      entites.push('0', 'INSERT', '8', c, '2', pose.nom, '10', f3(o.point[0]), '20', f3(o.point[1]), '30', '0', '50', (o.rotation ?? 0).toFixed(2));
+      entites.push('0', 'INSERT', '8', c, '2', pose.nom, '10', f3(o.point[0]), '20', f3(o.point[1]), '30', '0', ...(k !== 1 ? ['41', f3(k), '42', f3(k), '43', f3(k)] : []), '50', (o.rotation ?? 0).toFixed(2));
       if (o.type === 'grue' && o.rayon !== false) {
         const r = nomDeCalque('PC_GRUES_RAYON');
         calques.set(r, 30);
@@ -177,19 +198,29 @@ export function dxfPlanChantier(plan, bib, objets = null) {
 }
 
 /** Bloc d'un élément posé : { nom, primitives, fleche } (grue = châssis + grue ; à étage = escalier + 2 conteneurs). */
-export function blocDuPose(o, bib) {
+export function blocDuPose(o, bib, texteU = null) {
+  const pose = blocDuPoseBrut(o, bib);
+  if (!pose || !texteU || !pose.primitives.some((p) => p.g === 't' && !p.brut)) return pose;
+  // Texte de la même taille partout (0.292.0) : sa hauteur est écrite dans le bloc ; le nom du bloc la rappelle.
+  return { ...pose, nom: nomDeBloc(pose.base ?? pose.nom, `_T${Math.round(texteU * 100)}`), primitives: pose.primitives.map((p) => (p.g === 't' && !p.brut ? { ...p, h: texteU } : p)) };
+}
+
+function blocDuPoseBrut(o, bib) {
   if (o.type === 'grue') {
-    const g = symboleGrue(bib, o.modele ?? 'tour', o.fleche ?? 40);
+    const g = grueDeLObjet(bib, o);
     if (!g) return null;
-    const ch = symboleChassis(bib, o.chassis);
-    return { nom: nomDeBloc(`GRUE_${o.modele === 'auto' ? 'AUTO' : 'TOUR'}_${g.fleche}M${ch ? `_${ch.chassis}` : ''}`), primitives: [...(ch?.primitives ?? []), ...g.primitives], fleche: g.fleche };
+    const ch = chassisLibre(bib, o.chassis);
+    const orient = o.modele === 'mobile' ? `_${g.tonnes}T_T${Math.round(Number(o.tourelle) || 0)}${o.stabilisateurs === false ? '_SANS' : ''}` : Number(o.rotationFleche) ? `_R${Math.round(o.rotationFleche)}` : '';
+    const base = `GRUE_${o.modele === 'auto' ? 'AUTO' : o.modele === 'mobile' ? 'MOBILE' : 'TOUR'}_${g.fleche}M${ch ? `_${ch.cote.toFixed(2)}` : ''}${orient}`;
+    return { base, nom: nomDeBloc(base), primitives: [...(ch?.primitives ?? []), ...g.primitives], fleche: g.fleche };
   }
   if (o.etage) {
     const et = primitivesEtage(bib, o.etage.pose ?? 0);
-    return et ? { nom: nomDeBloc(`BASE_VIE_ETAGE_P${(o.etage.pose ?? 0) + 1}`), primitives: [...et.dessous, ...et.rez, ...et.etage] } : null;
+    return et ? { base: `BASE_VIE_ETAGE_P${(o.etage.pose ?? 0) + 1}`, nom: nomDeBloc(`BASE_VIE_ETAGE_P${(o.etage.pose ?? 0) + 1}`), primitives: [...et.dessous, ...et.rez, ...et.etage] } : null;
   }
-  const s = bib.find((x) => x.cle === o.cle);
-  return s ? { nom: nomDeBloc(s.nom), primitives: s.primitives } : null;
+  const s = symboleDeLObjetPose(bib, o);
+  const t = s?.pivote && Number(o.tourelle) ? `_T${Math.round(o.tourelle)}` : '';
+  return s ? { base: s.nom + t, nom: nomDeBloc(s.nom + t), primitives: s.primitives } : null;
 }
 
 function ecrire(calques, blocs, entites) {

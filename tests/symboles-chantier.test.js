@@ -6,9 +6,11 @@ import {
   bibliothequeDepuisBlocs, materiau, adoucir, nuance, categorieDuBloc, separerRayon, transformeEscalier, primitivesEtage,
   symboleGrue, flechesDisponibles, chassisDisponibles, symboleChassis, surLeSymbole, rotationVers, versTerrainSymbole,
   versSymbole, poigneeRotation, coinsSymbole, equipementsVehicule, CLE_CONTENEUR, ARDOISE, BLANC_BLOC,
+  grueLibre, chassisLibre, coteChassis, echelleDeLObjet,
 } from '../src/topo/symboles.js';
 import {
   nouveauPlanChantier, ajouterObjet, objetSousLePoint, deplacerObjet, resumeObjet, bordsDesTriangles, ajouterPhase, estPose,
+  changerOrdre, angleDeLaLigne, texteSymbolesM, anneauxDuTas, aireSignee, materiauTas, MATERIAUX_TAS, couleurObjet, styleLigne,
 } from '../src/topo/plan-chantier.js';
 import {
   miseEnPageFeuille, pagesDeLaFeuille, elementsLegende, textesCartouche, vueDuCadre, reglagesFeuille, centreDeDepart, objetsDeLaPage,
@@ -118,7 +120,7 @@ describe('modernisation', () => {
 
 describe('bibliothèque livrée (Base_2023.dxf)', () => {
   it('59 symboles proposés, grues et châssis réglables', () => {
-    expect(BIB.filter((s) => !s.cache)).toHaveLength(59);
+    expect(BIB.filter((s) => !s.cache)).toHaveLength(113); // 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
     expect(flechesDisponibles(BIB, 'tour')).toEqual([25, 30, 35, 40, 45, 50, 55, 60, 65, 70]);
     expect(flechesDisponibles(BIB, 'auto')).toEqual([20, 25, 30, 35, 40, 45, 50]);
     expect(chassisDisponibles(BIB)).toEqual(['3.80', '4.20', '4.50', '4.60', '6']);
@@ -139,7 +141,7 @@ describe('bibliothèque livrée (Base_2023.dxf)', () => {
   });
   it('entrées du panneau : grues, base-vie à étage, recherche sans accents', () => {
     const e = entreesBibliotheque(BIB);
-    expect(e.map((x) => x.cle)).toEqual(expect.arrayContaining(['grue:tour', 'grue:auto', 'etage', 'base:WC']));
+    expect(e.map((x) => x.cle)).toEqual(expect.arrayContaining(['grue:tour', 'grue:auto', 'etage', 'base:WC homme / femme']));
     expect(e.some((x) => x.cle.startsWith('base:Grue '))).toBe(false);
     expect(filtrerEntrees(e, '', 'cone').map((x) => x.nom)).toEqual(['Cône']);
     expect(filtrerEntrees(e, 'Véhicules').every((x) => x.categorie === 'Véhicules')).toBe(true);
@@ -306,5 +308,346 @@ describe('export DXF', () => {
     expect(relu.contenu.textes.map((t) => t.t)).toEqual(expect.arrayContaining(['ELEC', '1er', 'Rez', '300 m2']));
     expect(relu.contenu.cercles.some((c) => Math.abs(c.r - 40) < 0.01)).toBe(true);
     expect(blocDuPose({ type: 'symbole', cle: 'inconnu' }, BIB)).toBeNull();
+  });
+});
+
+describe('0.290.0 : grue et châssis à longueur libre, ordre de dessin, orientation', () => {
+  it('flèche tapée : la flèche s\'allonge, la tour et la contre-flèche restent, rayon à la longueur tapée', () => {
+    const base = symboleGrue(BIB, 'tour', 40);
+    const g = grueLibre(BIB, 'tour', 42.5);
+    expect(g.fleche).toBe(42.5);
+    expect(g.boite[2]).toBeCloseTo(2 + (base.boite[2] - 2) * (40.5 / 38), 2);
+    expect(g.boite[0]).toBeCloseTo(base.boite[0], 6); // contre-flèche inchangée
+    expect(g.rayon.find((p) => p.g === 'c' && p.r === 42.5)).toBeTruthy();
+    expect(g.rayon.filter((p) => p.g === 'c').map((p) => p.r)).toEqual([42.5, 20, 25, 30, 35, 40]);
+    expect(g.primitives.some((p) => p.g === 't' && p.t.includes('42.5m'))).toBe(true);
+    expect(grueLibre(BIB, 'tour', 500).fleche).toBe(90); // borné
+    expect(grueLibre(BIB, 'tour', 40).primitives).toBe(base.primitives); // longueur du DXF : bloc tel quel
+  });
+  it('châssis : côté libre, mis à l\'échelle et coté', () => {
+    expect(coteChassis('4.50')).toBe(4.5);
+    expect(coteChassis('aucun')).toBeNull();
+    expect(coteChassis('5,2')).toBe(5.2);
+    const c = chassisLibre(BIB, '5.20');
+    expect(c.cote).toBe(5.2);
+    const textes = c.primitives.filter((p) => p.g === 't').map((p) => p.t);
+    expect(textes).toEqual(['5.20 m', '5.20 m']);
+    const b = bornesPrimitives(c.primitives.filter((p) => p.mat !== 'trait' || p.k !== '#0f172a'));
+    expect(b.xMax - b.xMin).toBeGreaterThan(5.2); // pieds compris
+    expect(chassisLibre(BIB, 'aucun')).toBeNull();
+  });
+  it('ordre de dessin : premier plan, arrière-plan, d\'un cran', () => {
+    const plan = nouveauPlanChantier('PIC');
+    const [a, b, c] = ['a', 'b', 'c'].map((t) => ajouterObjet(plan, { type: 'texte', point: [0, 0], texte: t }));
+    expect(changerOrdre(plan, a.id, 'devant')).toBe(true);
+    expect(plan.objets.map((o) => o.texte)).toEqual(['b', 'c', 'a']);
+    expect(changerOrdre(plan, a.id, 'devant')).toBe(false);
+    changerOrdre(plan, a.id, 'descendre');
+    expect(plan.objets.map((o) => o.texte)).toEqual(['b', 'a', 'c']);
+    changerOrdre(plan, c.id, 'arriere');
+    expect(plan.objets.map((o) => o.texte)).toEqual(['c', 'b', 'a']);
+    expect(changerOrdre(plan, 'x', 'devant')).toBe(false);
+    expect(b).toBeTruthy();
+  });
+  it('aligner sur une ligne : angle du segment le plus proche, sans se retourner', () => {
+    const lignes = [{ points: [{ est: 0, nord: 0 }, { est: 10, nord: 10 }], ferme: false }];
+    expect(angleDeLaLigne(lignes, [5, 5.2], 1, 0)).toBe(45);
+    expect(angleDeLaLigne(lignes, [5, 5.2], 1, 200)).toBe(225); // le sens le plus proche de la rotation actuelle
+    expect(angleDeLaLigne(lignes, [50, 0], 1, 0)).toBeNull();
+  });
+});
+
+describe('0.291.0 : retouches de la bibliothèque (retours du 23.11) et symboles dessinés', () => {
+  const nom = (n) => BIB.find((x) => x.nom === n);
+  it('retirés : passerelle, radier, parties de la pelle, table du finisseur, parties du manuscop', () => {
+    for (const n of ['Base Vie Etage passerelle', 'radier', 'Pelle Chenille Chassis', 'Pelle Chenille base', 'Finisseur Table', 'manuscop base', 'Maniscop tourelle']) expect(nom(n).cache).toBe(true);
+    expect(nom('Manuscop (télescopique rotatif)').cache).toBeUndefined();
+  });
+  it('WC seul retiré (il reste « WC homme / femme »)', () => {
+    expect(nom('WC').cache).toBe(true);
+    expect(nom('WC homme / femme').cache).toBeUndefined();
+  });
+  it('éclair jaune, gravats dans le dumper plein, voitures dans le même sens', () => {
+    expect(nom('Elec').primitives.some((p) => p.k === '#facc15')).toBe(true);
+    expect(nom('Dumper plein').primitives.filter((p) => p.mat === 'gravats').length).toBeGreaterThan(10);
+    expect(nom('Voiture Grise').largeur).toBeCloseTo(nom('Voiture Blanche').largeur, 2);
+    expect(nom('Voiture Grise').hauteur).toBeGreaterThan(4);
+  });
+  it('symboles dessinés présents, centrés, dans leur catégorie', () => {
+    for (const [n, c] of [['Tracteur + benne', 'Véhicules'], ['Camion citerne', 'Véhicules'], ['Camion carburant', 'Véhicules'], ['Camion balai', 'Véhicules'],
+      ['Camion bitume', 'Véhicules'], ['Niveleuse', 'Engins'], ['WC homme / femme', 'Base-vie'], ['Benne recyclage', 'Base-vie'],
+      ['Panneau Chantier interdit au public', 'Sécurité'], ['Casque obligatoire', 'Sécurité'], ['Chaussures de sécurité obligatoires', 'Sécurité'],
+      ['Feu de chantier', 'Signalisation'], ['Signal Vitesse maximale 30', 'Signalisation'], ['Balise de guidage – bandes montant vers la droite', 'Signalisation']]) {
+      const x = nom(n);
+      expect(x?.categorie, n).toBe(c);
+      expect((x.boite[0] + x.boite[2]) / 2).toBeCloseTo(0, 2);
+    }
+    expect(nom('Portail').largeur).toBeGreaterThan(5); // 2 vantaux de 2,5 m + poteaux
+    expect(nom('Tri Lattes').hauteur).toBeCloseTo(3.05, 1);
+  });
+  it('grue automontante posée avec son châssis de 4,20 m', () => {
+    expect(entreesBibliotheque(BIB).find((x) => x.cle === 'grue:auto').pose.chassis).toBe('4.20');
+  });
+});
+
+describe('0.292.0 : texte unique, échelle d\'un bloc, tas de stock, nouvelles lignes, nouveaux symboles', () => {
+  const nom = (n) => BIB.find((x) => x.nom === n);
+  it('taille du texte des symboles : mm sur le papier × échelle du plan', () => {
+    expect(texteSymbolesM({ echelle: 200 })).toBeCloseTo(0.6, 9); // 3 mm au départ
+    expect(texteSymbolesM({ echelle: 500, tailleTexteMm: 2 })).toBeCloseTo(1.0, 9);
+    expect(texteSymbolesM({ echelle: 200, tailleTexteMm: 99 })).toBeCloseTo(2.4, 9); // borné à 12 mm
+  });
+  it('échelle d\'un bloc : la boîte, le toucher et la poignée suivent ; la grue n\'a pas d\'échelle', () => {
+    const s = { boite: [-3, -1, 3, 1] };
+    const o = { type: 'symbole', point: [100, 200], rotation: 0, echelle: 2 };
+    expect(echelleDeLObjet(o)).toBe(2);
+    expect(echelleDeLObjet({ type: 'grue', echelle: 3 })).toBe(1);
+    expect(echelleDeLObjet({ type: 'symbole', echelle: 0 })).toBe(1);
+    expect(coinsSymbole(o, s)[1]).toEqual([106, 198]);
+    expect(surLeSymbole(o, s, [105, 201.5])).toBe(true);
+    expect(surLeSymbole({ ...o, echelle: 1 }, s, [105, 201.5])).toBe(false);
+    expect(versSymbole(o, [106, 202])).toEqual([3, 1]);
+  });
+  it('tas de stock : anneaux vers l\'intérieur, sens du contour sans importance, limités par la taille de la zone', () => {
+    const carre = [[0, 0], [20, 0], [20, 20], [0, 20]];
+    const t = anneauxDuTas(carre, 3, 1.5);
+    expect(t.largeur).toBeCloseTo(4.5, 9);
+    expect(t.anneaux).toHaveLength(6);
+    expect(aireSignee(carre)).toBe(400);
+    const xs = t.anneaux.at(-1).map((p) => p[0]);
+    expect(Math.min(...xs)).toBeCloseTo(4.5, 6);
+    expect(Math.max(...xs)).toBeCloseTo(15.5, 6);
+    const horaire = [...carre].reverse();
+    expect(anneauxDuTas(horaire, 3, 1.5).sens).toBe(-1);
+    expect(Math.min(...anneauxDuTas(horaire, 3, 1.5).anneaux.at(-1).map((p) => p[0]))).toBeCloseTo(4.5, 6);
+    expect(anneauxDuTas([[0, 0], [4, 0], [4, 4], [0, 4]], 10, 3).largeur).toBeCloseTo(1.8, 9); // 45 % de 4 m
+  });
+  it('matériaux de tas : couleur du matériau, nom dans la légende', () => {
+    const plan = nouveauPlanChantier('PIC');
+    const z = ajouterObjet(plan, { type: 'zone', points: [[0, 0], [10, 0], [10, 5]], categorie: 'stockage', materiau: 'sable', tasH: 3 });
+    expect(couleurObjet(plan, z)).toBe(materiauTas('sable').couleur);
+    expect(elementsLegende([z]).map((x) => x.nom)).toEqual(['Stock : Sable']);
+    expect(MATERIAUX_TAS.map((m) => m.cle)).toContain('gravier');
+  });
+  it('nouvelles lignes en bande : GBA, échafaudage, filet, Heras', () => {
+    for (const c of ['gba', 'echafaudage', 'filet', 'heras']) expect(styleLigne(c).motif.largeurM).toBeGreaterThan(0);
+    expect(styleLigne('gba').nom).toBe('Glissière béton (GBA)');
+  });
+  it('anciens symboles retouchés : benne recyclage jaune avec logo vert, bennes de tri, dumper vide de la couleur des côtés', () => {
+    const r = nom('Benne recyclage');
+    expect(r.primitives.some((p) => p.g === 't')).toBe(false);
+    expect(r.primitives.filter((p) => p.k === '#1f9d55').length).toBeGreaterThanOrEqual(6);
+    expect(r.largeur).toBeCloseTo(nom('Benne à déchets').largeur, 2);
+    for (const n of ['bois', 'métal', 'inertes', 'plâtre']) expect(nom(`Benne de tri – ${n}`).primitives.some((p) => p.g === 't')).toBe(true);
+    const vide = nom('Dumper Vide').primitives[5];
+    expect(vide.k).toBe(nom('Dumper Vide').primitives[1].k);
+    expect(nom('Camion Benne Plein').primitives.filter((p) => p.mat === 'gravats').length).toBeGreaterThan(10);
+    expect(nom('Interdiction de parquer').cle).toBe('base:2.50interdictiondeparquer');
+  });
+  it('portail refait, 2 balises, 4 signaux de circulation alternée, trilattes + panneau 2 fois plus grand', () => {
+    expect(nom('Portail').largeur).toBeGreaterThan(5);
+    expect(nom('Portail').primitives.some((p) => p.m)).toBe(true); // zone balayée à l\'ouverture
+    expect(nom('Portail coulissant').largeur).toBeGreaterThan(8);
+    const g = nom('Balise de guidage – bandes montant vers la gauche');
+    const d = nom('Balise de guidage – bandes montant vers la droite');
+    expect(g.largeur).toBe(d.largeur);
+    expect(BIB.filter((x) => x.nom.startsWith('Signal Priorité')).map((x) => x.nom)).toHaveLength(4);
+    expect(nom('Tri lattes + travaux').largeur).toBeGreaterThan(1.5); // panneau de 0,9 m × 1,8
+  });
+  it('nouveaux symboles : véhicules, camions grues (4 tailles, pliés / dépliés), installations, stockage', () => {
+    const attendus = [
+      ['Camion pompe à béton (plié)', 'Véhicules'], ['Camion pompe à béton (déplié)', 'Véhicules'], ['Camion toupie (goulotte dépliée)', 'Véhicules'],
+      ['Nacelle articulée (repliée)', 'Engins'], ['Élévateur à ciseaux', 'Engins'], ['Compresseur', 'Engins'], ['Bétonnière', 'Engins'],
+      ['Centrale à béton mobile', 'Installations'], ['Silo à ciment', 'Installations'], ['Poste de lavage des roues', 'Installations'], ['Mât d\'éclairage', 'Installations'],
+      ['Extincteur', 'Sécurité'], ['Abri à vélos', 'Base-vie'], ['Douches', 'Base-vie'], ['Benne Decantation', 'Base-vie'],
+      ['Banche avec lest', 'Stockage'], ['Palette de tuyaux PVC', 'Stockage'], ['Plaques de roulage', 'Stockage'], ['Regards préfabriqués', 'Stockage'],
+    ];
+    for (const [n, c] of attendus) expect(nom(n)?.categorie, n).toBe(c);
+    for (const t of [40, 100, 200, 350]) for (const e of ['plié', 'déplié']) expect(nom(`Camion grue ${t} t (${e})`)?.categorie).toBe('Grues');
+    // Le camion reste au point de base : la flèche déployée ne le décale pas.
+    const plie = nom('Camion grue 100 t (plié)');
+    const deplie = nom('Camion grue 100 t (déplié)');
+    expect(plie.boite[1]).toBeCloseTo(-6.6, 1);
+    expect(deplie.boite[3]).toBeGreaterThan(35);
+    expect(deplie.largeur).toBeGreaterThan(8); // appuis sortis
+    expect(nom('Camion carburant').primitives.some((p) => p.k === '#f5c518')).toBe(true); // cabine aux couleurs Perrin
+  });
+  it('dxf : échelle du bloc (codes 41 / 42 / 43), texte de la même taille dans les blocs, lignes en bande épaisses', () => {
+    const plan = nouveauPlanChantier('PIC');
+    ajouterObjet(plan, { type: 'symbole', point: [2500000, 1118000], cle: 'base:Base Vie Bureau', echelle: 0.5 });
+    ajouterObjet(plan, { type: 'ligne', style: 'gba', points: [[2500000, 1118000], [2500020, 1118000]] });
+    const texte = dxfPlanChantier(plan, BIB);
+    expect(texte).toMatch(/\r\n41\r\n0\.500\r\n42\r\n0\.500\r\n43\r\n0\.500\r\n/);
+    expect(texte).toContain('_T120'); // 0,6 m / 0,5 = 1,2 m dans le bloc
+    expect(texte).toMatch(/\r\n40\r\n0\.600\r\n41\r\n0\.600\r\n/); // largeur de la polyligne GBA
+    const { plan: relu } = lirePlanDxf(texte, 'x.dxf');
+    expect(relu.calques.map((c) => c.nom)).toEqual(expect.arrayContaining(['PC_PHASE_1_GLISSIERE_BETON_GBA_']));
+    expect(blocDuPose({ type: 'symbole', cle: 'base:Base Vie Bureau' }, BIB, 0.6).nom).toMatch(/_T60$/);
+  });
+});
+
+describe('blocs dynamiques (0.293.0)', () => {
+  it('grue mobile : la tourelle tourne, les stabilisateurs et la taille changent la boîte', async () => {
+    const { grueMobile, grueDeLObjet } = await import('../src/topo/grue-mobile.js');
+    const a = grueMobile({ tonnes: 100, fleche: 25, tourelle: 0 });
+    const b = grueMobile({ tonnes: 100, fleche: 25, tourelle: 90 });
+    expect(a.modele).toBe('mobile');
+    expect(b.boite).not.toEqual(a.boite); // flèche vers l'avant ou sur le côté
+    expect(Math.abs(b.boite[2] - b.boite[0])).toBeGreaterThan(Math.abs(a.boite[2] - a.boite[0]));
+    expect(grueMobile({ tonnes: 100, fleche: 25, tourelle: 0, stabilisateurs: false }).boite).not.toEqual(a.boite);
+    expect(grueMobile({ tonnes: 350, fleche: 25, tourelle: 0 }).boite[3] - a.boite[1]).toBeGreaterThan(0);
+    expect(grueMobile({ tonnes: 100, fleche: 25, tourelle: 0 })).toBe(a); // gardée en mémoire
+    expect(grueDeLObjet(BIB, { type: 'grue', modele: 'mobile', tonnes: 40, fleche: 12 }).tonnes).toBe(40);
+  });
+
+  it('grue à tour : la flèche s\'oriente sans bouger le châssis', async () => {
+    const { grueDeLObjet } = await import('../src/topo/grue-mobile.js');
+    const base = grueDeLObjet(BIB, { type: 'grue', modele: 'tour', fleche: 40 });
+    const tournee = grueDeLObjet(BIB, { type: 'grue', modele: 'tour', fleche: 40, rotationFleche: 90 });
+    expect(tournee.primitives.length).toBe(base.primitives.length);
+    expect(tournee.boite).not.toEqual(base.boite);
+  });
+
+  it('DXF : le nom du bloc d\'une grue mobile rappelle sa taille et sa tourelle', () => {
+    const o = { type: 'grue', modele: 'mobile', tonnes: 200, fleche: 30, tourelle: 45, point: [0, 0], rotation: 0 };
+    expect(blocDuPose(o, BIB, 0.3).nom).toMatch(/GRUE_MOBILE_.*200T/);
+  });
+
+  it('tous les textes des symboles sortent à la même hauteur (texteU)', async () => {
+    const { dessinerPrimitives } = await import('../src/plans-chantier/dessin.js');
+    const tailles = new Set();
+    const ctx = new Proxy({}, {
+      get: (c, k) => (k === 'fillText' ? () => { tailles.add(String(c.font).match(/([\d.]+)px/)?.[1]); } : k === 'measureText' ? () => ({ width: 10 }) : /^create/.test(String(k)) ? () => ({ addColorStop() {} }) : k in c ? c[k] : () => {}),
+      set: (c, k, v) => { c[k] = v; return true; },
+    });
+    let n = 0;
+    for (const s of BIB.filter((x) => !x.cache && x.primitives.some((p) => p.g === 't'))) {
+      dessinerPrimitives(ctx, s.primitives, 20, 1, { texteU: 0.6 });
+      n++;
+    }
+    expect(n).toBeGreaterThan(10);
+    expect(tailles.size).toBe(1);
+  });
+});
+
+describe('cotations et ligne de repère (0.293.0)', () => {
+  it('cotation de longueur : valeur, traits de rappel, côté de la ligne de cote', async () => {
+    const { geometrieCotation } = await import('../src/topo/plan-chantier.js');
+    const g = geometrieCotation({ type: 'cotation', genre: 'longueur', points: [[0, 0], [10, 0]], decalage: 2 });
+    expect(g.valeur).toBeCloseTo(10, 6);
+    expect(g.texte.t).toBe('10.00 m');
+    expect(g.lignes).toHaveLength(3);
+    expect(g.lignes[2][0]).toEqual([0, 2]); // ligne de cote à 2 m à gauche de A → B
+    expect(g.texte.angle).toBe(0);
+    // texte jamais à l'envers
+    expect(geometrieCotation({ genre: 'longueur', points: [[10, 0], [0, 0]], decalage: 1 }).texte.angle).toBe(0);
+  });
+
+  it('cotation d\'angle : 90° entre Est et Nord, arc entre les côtés', async () => {
+    const { geometrieCotation } = await import('../src/topo/plan-chantier.js');
+    const g = geometrieCotation({ genre: 'angle', points: [[0, 0], [5, 0], [0, 5]] });
+    expect(g.valeur).toBeCloseTo(90, 6);
+    expect(g.texte.t).toBe('90.00°');
+    expect(g.arc.length).toBeGreaterThan(8);
+    expect(geometrieCotation({ genre: 'angle', points: [[0, 0], [5, 0], [5, 5]] }).valeur).toBeCloseTo(45, 6);
+  });
+
+  it('la cotation se choisit, est dans le DXF et dans le résumé', () => {
+    const plan = nouveauPlanChantier('t', 'pic');
+    const o = ajouterObjet(plan, { type: 'cotation', genre: 'longueur', points: [[0, 0], [10, 0]], decalage: 2 });
+    expect(objetSousLePoint(plan.objets, [5, 2], 0.3)?.id).toBe(o.id);
+    expect(resumeObjet(o)).toContain('10.00 m');
+    expect(dxfPlanChantier(plan, BIB)).toContain('COTATIONS');
+  });
+
+  it('la ligne de repère d\'un texte se touche sur toute sa longueur', () => {
+    const plan = nouveauPlanChantier('t', 'pic');
+    const t = ajouterObjet(plan, { type: 'texte', point: [0, 0], texte: 'Grue', taille: 1, repere: [20, 0] });
+    expect(objetSousLePoint(plan.objets, [10, 0.4], 0.3)?.id).toBe(t.id);
+    expect(objetSousLePoint(plan.objets, [20.5, 0.5], 0.3)?.id).toBe(t.id);
+    expect(objetSousLePoint(plan.objets, [10, 3], 0.3)).toBeNull();
+  });
+});
+
+describe('gestion des phases (0.293.0)', () => {
+  const planPhases = async () => {
+    const m = await import('../src/topo/plan-chantier.js');
+    const plan = m.nouveauPlanChantier('t', 'pic');
+    m.ajouterPhase(plan, 'Phase 2');
+    m.ajouterPhase(plan, 'Phase 3');
+    const [p1, p2, p3] = plan.phases.map((p) => p.id);
+    const mk = (phase, extra = {}) => m.ajouterObjet(plan, { type: 'zone', categorie: 'installation', points: [[0, 0], [5, 0], [5, 5]], phase, ...extra });
+    return { m, plan, p1, p2, p3, a: mk(p1), b: mk(p2), c: mk(p3) };
+  };
+
+  it('sans règle : l\'affichage de départ (cases visibles des phases)', async () => {
+    const { m, plan, p2, a, b, c } = await planPhases();
+    plan.phases.find((p) => p.id === p2).visible = false;
+    expect(m.objetsVus(plan, plan.phases[0].id).map((o) => o.id)).toEqual([a.id, c.id]);
+    void b;
+  });
+
+  it('matrice : phase 1 ne voit pas 2 et 3 mais 4 ; phase 2 voit 1 estompée et 3', async () => {
+    const { m, plan, p1, p2, p3, a, b, c } = await planPhases();
+    m.reglerVue(plan, p1, p2, { mode: 'cache' });
+    m.reglerVue(plan, p1, p3, { mode: 'cache' });
+    expect(m.objetsVus(plan, p1).map((o) => o.id)).toEqual([a.id]);
+    m.reglerVue(plan, p2, p1, { mode: 'estompe', opacite: 0.4 });
+    const vus = m.objetsVus(plan, p2);
+    expect(vus.map((o) => o.id)).toEqual([a.id, b.id, c.id]);
+    expect(vus[0].rendu).toEqual({ mode: 'estompe', opacite: 0.4, couleur: '#64748b' });
+    expect(vus[1].rendu).toBeUndefined();
+  });
+
+  it('éléments dont la fin est passée, genres et éléments cachés, couleur unique', async () => {
+    const { m, plan, p1, p2, p3, a } = await planPhases();
+    a.fin = p2;
+    m.reglerVue(plan, p3, p1, { mode: 'normal', fini: 'assombri' });
+    expect(m.objetsVus(plan, p2).some((o) => o.id === a.id)).toBe(true); // pas de règle pour p2 : départ
+    expect(m.objetsVus(plan, p3).find((o) => o.id === a.id).rendu.mode).toBe('assombri'); // fini en phase 3
+    m.reglerVue(plan, p3, p1, { genresCaches: ['zone'] });
+    expect(m.objetsVus(plan, p3).some((o) => o.id === a.id)).toBe(false);
+    m.reglerVue(plan, p3, p1, { genresCaches: [], mode: 'couleur', fini: 'couleur', couleur: '#0000ff' });
+    expect(m.couleurObjet(plan, m.objetsVus(plan, p3).find((o) => o.id === a.id))).toBe('#0000ff');
+    m.reinitialiserVues(plan, p3);
+    expect(plan.vues[p3]).toBeUndefined();
+  });
+
+  it('dates de phase dans le cartouche et page par phase selon la matrice', async () => {
+    const { m, plan, p1, p2, a, b, c } = await planPhases();
+    expect(m.datesDePhase({ debut: '2027-03-01', fin: '2027-04-30' })).toBe('01.03.2027 – 30.04.2027');
+    m.reglerVue(plan, p2, p1, { mode: 'cache' });
+    const ids = objetsDeLaPage(plan, { phase: p2, phases: [p2] }).map((o) => o.id);
+    expect(ids).toEqual([b.id, c.id]); // la phase 1 est cachée, la 3 reste visible
+    void a;
+  });
+});
+
+describe('panneau de déviation (0.293.0)', () => {
+  it('texte et sens modifiables ; la largeur suit le texte ; texte brut gardé dans le DXF', async () => {
+    const { panneauDeviation } = await import('../src/topo/panneau-deviation.js');
+    const court = panneauDeviation({ texte: 'Aigle', sens: 'droite' });
+    const long = panneauDeviation({ texte: 'Saint-Maurice', sens: 'gauche' });
+    expect(long.largeur).toBeGreaterThan(court.largeur);
+    expect(court.primitives.some((p) => p.g === 't' && p.brut && p.t === 'Aigle')).toBe(true);
+    expect(panneauDeviation({ texte: 'Aigle', sens: 'tout' }).largeur).not.toBe(court.largeur);
+    const o = { type: 'symbole', cle: 'dyn:deviation', texte: 'Aigle', sens: 'droite', point: [0, 0], rotation: 0 };
+    expect(resumeObjet(o)).toContain('Aigle');
+    const bloc = blocDuPose(o, BIB, 0.6);
+    expect(bloc.primitives.find((p) => p.g === 't').h).toBeLessThan(0.6); // pas remplacé par la taille des symboles
+  });
+});
+
+describe('tourelles orientables (0.293.0)', () => {
+  it('pelle 20 t et télescopique rotatif : la tourelle tourne, le châssis reste', async () => {
+    const { symboleDeLObjetPose } = await import('../src/topo/grue-mobile.js');
+    for (const nom of ['Pelle Chenille 20T', 'Manuscop (télescopique rotatif)']) {
+      const s = BIB.find((x) => x.nom === nom);
+      expect(s.pivote).toBeTruthy();
+      const t = symboleDeLObjetPose(BIB, { cle: s.cle, tourelle: 90 });
+      expect(t.primitives).toHaveLength(s.primitives.length);
+      expect(t.primitives.slice(0, s.pivote.depuis)).toEqual(s.primitives.slice(0, s.pivote.depuis));
+      expect(t.boite).not.toEqual(s.boite);
+    }
   });
 });

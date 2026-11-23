@@ -3,6 +3,8 @@
 // s'y ajoutent les symboles importés d'un DXF de blocs dans le projet (projet.symboles, partagés par Drive).
 import { lireBlocsDxf } from '../topo/blocs-dxf.js';
 import { bibliothequeDepuisBlocs, CATEGORIES_SYMBOLES, CLE_CONTENEUR, CLE_ESCALIER } from '../topo/symboles.js';
+import { grueMobile } from '../topo/grue-mobile.js';
+import { panneauDeviation, CLE_DEVIATION } from '../topo/panneau-deviation.js';
 import { texteDuDxf } from '../topo/dxf-plan.js';
 
 let promesse = null;
@@ -23,10 +25,14 @@ export function entreesBibliotheque(bib) {
     const s = bib.filter((x) => x.modele === modele).sort((a, b) => a.fleche - b.fleche);
     if (!s.length) return;
     const milieu = s[Math.floor(s.length / 2)];
-    res.push({ cle: `grue:${modele}`, nom, categorie: 'Grues', largeur: null, hauteur: null, detail: `flèche ${s[0].fleche}–${s[s.length - 1].fleche} m`, pose: { type: 'grue', modele, fleche: milieu.fleche, chassis: modele === 'auto' ? 'aucun' : '4.50', rayon: true }, symbole: milieu });
+    res.push({ cle: `grue:${modele}`, nom, categorie: 'Grues', largeur: null, hauteur: null, detail: `flèche ${s[0].fleche}–${s[s.length - 1].fleche} m`, pose: { type: 'grue', modele, fleche: milieu.fleche, chassis: modele === 'auto' ? '4.20' : '4.50', rayon: true }, symbole: milieu });
   };
   grue('tour', 'Grue à tour');
   grue('auto', 'Grue automontante');
+  // 0.293.0 : grue mobile dynamique (4 tailles au choix dans le panneau, tourelle et flèche réglables).
+  res.push({ cle: 'grue:mobile', nom: 'Grue mobile (camion grue)', categorie: 'Grues', largeur: null, hauteur: null, detail: '40 / 100 / 200 / 350 t, tourelle et flèche réglables', pose: { type: 'grue', modele: 'mobile', tonnes: 100, fleche: 25, tourelle: 0, stabilisateurs: true, rayon: false }, symbole: grueMobile({ tonnes: 100, fleche: 25, tourelle: 0 }) });
+  // 0.293.0 : panneau de déviation suisse, texte et sens au choix (dans le panneau de droite une fois posé).
+  res.push({ cle: CLE_DEVIATION, nom: 'Panneau de déviation (texte, sens)', categorie: 'Signalisation', largeur: null, hauteur: null, detail: 'texte modifiable, flèche à gauche / droite / tout droit', pose: { type: 'symbole', cle: CLE_DEVIATION, texte: 'Lugano', sens: 'droite' }, symbole: panneauDeviation({ texte: 'Lugano', sens: 'droite' }) });
   const conteneur = bib.find((x) => x.cle === CLE_CONTENEUR);
   if (conteneur && bib.some((x) => x.cle === CLE_ESCALIER)) {
     res.push({ cle: 'etage', nom: 'Base-vie à étage', categorie: 'Base-vie', largeur: conteneur.largeur, hauteur: conteneur.hauteur, detail: '8 poses de l\'escalier', pose: { type: 'symbole', cle: CLE_CONTENEUR, etage: { pose: 0, textes: ['1er', 'Rez'] } }, symbole: { ...conteneur, etageDemo: true } });

@@ -3,7 +3,7 @@
 // légende automatique (genres et symboles utilisés), nord, barre d'échelle ; une page par phase ou toutes sur une page.
 // Unités : mm de papier (origine en haut à gauche de la feuille, y vers le bas).
 import { tailleFeuille, barreEchellePapier } from '../export/echelle.js';
-import { categorieZone, styleLigne, objetsVisibles, bornesObjets, ECHELLE_PAPIER, estPose } from './plan-chantier.js';
+import { categorieZone, styleLigne, objetsVisibles, objetsVus, bornesObjets, ECHELLE_PAPIER, estPose, materiauTas } from './plan-chantier.js';
 
 export const FORMATS_FEUILLE = [['a4', 'A4'], ['a3', 'A3'], ['a1', 'A1']];
 
@@ -13,8 +13,35 @@ export function reglagesFeuille(plan) {
   return {
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
+    situation: situationDe(f.situation), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
   };
+}
+
+export const COINS_SITUATION = [['hd', 'Haut droite'], ['hg', 'Haut gauche'], ['bg', 'Bas gauche'], ['bd', 'Bas droite']];
+/** Vue de situation (0.293.0) : petit cadre carte nationale dans un coin, zone du plan en rouge. */
+export const situationDe = (s = {}) => ({ actif: Boolean(s.actif), coin: s.coin ?? 'hd', echelle: s.echelle ?? 5000, taille: s.taille ?? 60 });
+
+/**
+ * Cadre (mm) de la vue de situation dans un coin du cadre du plan ; taille = côté en mm sur une feuille A3 (suit k).
+ * Au-dessus du cartouche et de la légende, il vaut mieux choisir un coin du haut.
+ */
+export function cadreSituation(mise, situation) {
+  const t = situation.taille * mise.k;
+  const m = 3 * mise.k;
+  const c = mise.cadre;
+  const x = situation.coin.endsWith('g') ? c.x + m + (situation.coin === 'hg' ? 26 * mise.k : 0) : c.x + c.l - t - m;
+  const y = situation.coin.startsWith('h') ? c.y + m : c.y + c.h - t - m - (situation.coin === 'bg' ? 12 * mise.k : 0);
+  return { x, y, l: t, h: t };
+}
+
+/**
+ * Rectangle (m, en MN95) montré en rouge dans la vue de situation = ce que voit le cadre du plan.
+ */
+export function etendueDuCadre(plan, cadre, centre) {
+  const echelle = plan.echelle ?? ECHELLE_PAPIER;
+  const l = (cadre.l * echelle) / 1000;
+  const h = (cadre.h * echelle) / 1000;
+  return { estMin: centre[0] - l / 2, estMax: centre[0] + l / 2, nordMin: centre[1] - h / 2, nordMax: centre[1] + h / 2 };
 }
 
 /**
@@ -50,8 +77,10 @@ export function pagesDeLaFeuille(plan, pages = reglagesFeuille(plan).pages) {
 
 /** Objets d'une page (phases de la page). */
 export function objetsDeLaPage(plan, page) {
+  // Gestion des phases : une page par phase avec des règles = « on voit quoi » dans cette phase.
+  if (page.phase && plan.vues?.[page.phase]) return objetsVus(plan, page.phase).filter((o) => o.type !== 'construction');
   const ids = new Set(page.phases);
-  return plan.objets.filter((o) => ids.has(o.phase));
+  return plan.objets.filter((o) => o.type !== 'construction' && ids.has(o.phase)); // construction : jamais imprimée
 }
 
 /**
@@ -65,11 +94,11 @@ export function elementsLegende(objets, nomSymbole = (c) => String(c).replace(/^
     if (!vus.has(cle)) vus.set(cle, { cle, nom, type, exemple, rang });
   };
   for (const o of objets) {
-    if (o.type === 'zone') ajouter(`zone:${o.categorie}:${o.couleur ?? ''}`, categorieZone(o.categorie).nom, 'zone', o, 0);
+    if (o.type === 'zone') ajouter(`zone:${o.categorie}:${o.materiau ?? ''}:${o.couleur ?? ''}`, o.materiau ? `Stock : ${materiauTas(o.materiau)?.nom ?? o.materiau}` : categorieZone(o.categorie).nom, 'zone', o, 0);
     else if (o.type === 'ligne') ajouter(`ligne:${styleLigne(o.style).cle}:${o.couleur ?? ''}`, styleLigne(o.style).nom.replace(/\s+[<>].*$/, ''), 'ligne', o, 1);
     else if (o.type === 'piste') ajouter('piste', 'Piste de chantier', 'piste', o, 2);
     else if (o.type === 'fleche') ajouter(`fleche:${o.couleur ?? ''}`, 'Sens de circulation', 'fleche', o, 2);
-    else if (o.type === 'grue') ajouter(`grue:${o.modele}:${o.fleche}`, `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'}, flèche ${o.fleche} m`, 'grue', o, 3);
+    else if (o.type === 'grue') ajouter(`grue:${o.modele}:${o.modele === 'mobile' ? o.tonnes : o.fleche}`, o.modele === 'mobile' ? `Grue mobile ${o.tonnes ?? 100} t` : `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'}, flèche ${o.fleche} m`, 'grue', o, 3);
     else if (o.type === 'symbole') ajouter(o.etage ? 'etage' : `symbole:${o.cle}`, o.etage ? 'Base-vie à étage' : nomSymbole(o.cle), 'symbole', o, 3);
   }
   return [...vus.values()].sort((a, b) => a.rang - b.rang);
@@ -86,7 +115,7 @@ export function vueDuCadre(plan, cadre, pxParMm, centre) {
 
 /** Centre de départ de la feuille : milieu des éléments du plan (ou des plans du projet, ou null). */
 export function centreDeDepart(plan, plans = []) {
-  const b = bornesObjets(objetsVisibles(plan));
+  const b = bornesObjets(objetsVisibles(plan).filter((o) => o.type !== 'construction'));
   if (b) return [(b.estMin + b.estMax) / 2, (b.nordMin + b.nordMax) / 2];
   const p = plans.find((x) => x.bornes);
   return p ? [(p.bornes.estMin + p.bornes.estMax) / 2, (p.bornes.nordMin + p.bornes.nordMax) / 2] : null;
