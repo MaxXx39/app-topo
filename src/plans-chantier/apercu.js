@@ -39,6 +39,10 @@ export function apercuLigne(style, couleur = style.couleur) {
   } else if (m?.type === 'filet') {
     marques += `<rect x="2" y="${y - 4}" width="${L - 4}" height="8" fill="${couleur}" fill-opacity="0.25"/>`;
     for (let x = 4; x < L - 4; x += 6) marques += `<line x1="${x}" y1="${y - 4}" x2="${x + 3}" y2="${y + 4}" stroke="${couleur}" stroke-width="1"/>`;
+  } else if (m?.type === 'cloture') {
+    marques += `<rect x="2" y="${y - 3}" width="${L - 4}" height="6" fill="#f2a20c" stroke="#7a4b00" stroke-width="0.8"/>`;
+    for (let x = 6; x < L - 4; x += 8) marques += `<line x1="${x}" y1="${y - 3}" x2="${x + 8}" y2="${y + 3}" stroke="#7a4b00" stroke-width="0.6"/><line x1="${x}" y1="${y + 3}" x2="${x + 8}" y2="${y - 3}" stroke="#7a4b00" stroke-width="0.6"/>`;
+    for (const x of [8, 58, 108]) marques += `<rect x="${x - 2.5}" y="${y - 5}" width="5" height="10" fill="#3a3f45"/>`;
   } else if (m?.type === 'lattes') {
     for (const dy of [-2.6, 2.6]) {
       marques += `<rect x="2" y="${y + dy - 2}" width="${L - 4}" height="4" fill="#f8fafc" stroke="#334155" stroke-width="0.6"/>`;

@@ -160,6 +160,7 @@ export function dessinerObjet(d, o) {
     ctx.stroke();
     // Étiquette au centre : surface et / ou hauteur du tas.
     const parties = [];
+    if (o.etiquette) parties.push(o.etiquette); // 0.293.0 : texte libre de la zone ou du tas
     if (o.afficherSurface) parties.push(texteSurface(o.points));
     if (o.tasH > 0 && o.afficherHauteur) parties.push(`H ${Number(o.tasH).toFixed(1)} m`);
     if (parties.length) {
@@ -457,6 +458,37 @@ function dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM, o) {
     ctx.strokeStyle = couleur;
     ctx.lineWidth = Math.max(0.6, epaisseur * 0.5);
     ctx.stroke();
+  } else if (m.type === 'cloture') {
+    // Clôture « comme le portail » : bande orange à croisillons (tous les 0,5 m), poteaux sombres tous les 3,5 m.
+    tube(w + 1.4, '#7a4b00');
+    tube(w, '#f2a20c');
+    ctx.beginPath();
+    for (const r of positionsLeLong(pts, Math.max(3, 0.5 * pxM * ech), 0)) {
+      const [ux, uy] = [Math.cos(r.angle), Math.sin(r.angle)];
+      const [nx, ny] = [-uy, ux];
+      const h = w * 0.42;
+      const l = Math.max(1.5, 0.25 * pxM * ech);
+      ctx.moveTo(r.x - ux * l - nx * h, r.y - uy * l - ny * h);
+      ctx.lineTo(r.x + ux * l + nx * h, r.y + uy * l + ny * h);
+      ctx.moveTo(r.x - ux * l + nx * h, r.y - uy * l + ny * h);
+      ctx.lineTo(r.x + ux * l - nx * h, r.y + uy * l - ny * h);
+    }
+    ctx.strokeStyle = '#7a4b00';
+    ctx.lineWidth = Math.max(0.5, w * 0.12);
+    ctx.stroke();
+    for (const r of reperes) {
+      const t = Math.max(3.5, 0.3 * pxM * ech);
+      ctx.save();
+      ctx.translate(r.x, r.y);
+      ctx.rotate(r.angle);
+      ctx.fillStyle = '#3a3f45';
+      ctx.fillRect(-t / 2, -t / 2, t, t);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(0.8, t * 0.18), 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.restore();
+    }
   } else if (m.type === 'lattes') {
     // 2 lattes rouges et blanches côte à côte (bandes de 0,5 m en alternance), sur des pieds.
     const dec = w * 0.27;

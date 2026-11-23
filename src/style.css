@@ -14762,3 +14762,9 @@ dialog.page-chantier[open] {
 .fenetre-phases .case-vue.choisie { outline: 3px solid #b45309; }
 .fenetre-phases .editeur-vue { margin-top: 10px; padding: 8px 10px; border: 2px solid #b45309; border-radius: 10px; background: #fff7ed; }
 .fenetre-phases .editeur-vue h3 { margin: 0 0 6px; font-size: 14px; }
+
+/* 0.293.0 : tout ce qui concerne l'élément choisi est dans le bandeau du haut */
+.page-chantier .ruban-element .propre-element { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 14px; max-height: 30vh; overflow: auto; padding-top: 4px; border-top: 1px solid #fed7aa; }
+.page-chantier .ruban-element .propre-element .champ-calage { display: flex; flex-direction: column; gap: 2px; width: auto; min-width: 120px; margin: 0; font-size: 12px; }
+.page-chantier .ruban-element .propre-element .case-chantier { margin: 0; }
+.page-chantier .ruban-element .propre-element .aide-calage { margin: 0; }

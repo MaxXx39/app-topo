@@ -131,9 +131,10 @@ export function dxfPlanChantier(plan, bib, objets = null) {
     if (o.type === 'zone') {
       const c = calque(o, `ZONE_${categorieZone(o.categorie).nom}`, aci);
       entites.push(...polyligne(o.points, c, { ferme: true }));
-      if (o.afficherSurface) {
+      const etiq = [o.etiquette, o.afficherSurface ? texteSurface(o.points) : null].filter(Boolean).join(' · ');
+      if (etiq) {
         const [x, y] = centreZone(o.points);
-        entites.push(...texte(x, y, 3 * mParMm, 0, texteSurface(o.points), c));
+        entites.push(...texte(x, y, 3 * mParMm, 0, etiq, c));
       }
     } else if (o.type === 'ligne') {
       const st = styleLigne(o.style);

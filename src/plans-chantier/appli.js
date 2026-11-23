@@ -1064,9 +1064,11 @@ export function ouvrirPlansChantier({
         <p class="aide-calage">Genre de la ligne créée :</p>${listeGenres('ligne', etat.style, 'outil', echapper)}`,
     }[etat.outil] ?? '';
     let choisi = '';
+    let propreHtml = '';
     if (o) {
       const propre = {
         zone: `${listeGenres('zone', o.categorie, 'objet', echapper)}
+          <label class="champ-calage"><span>Texte de la zone (au centre)</span><input type="text" maxlength="60" value="${echapper(o.etiquette ?? '')}" placeholder="ex. Stock de sable" data-prop="etiquette"></label>
           ${champCurseur('Transparence du fond (opacité)', 'prop', 'opacite', o.opacite ?? OPACITE_ZONE)}
           ${champNombre('Épaisseur du contour', 'prop', 'contourMm', contourZoneMm(o), 0.05, 5, 0.05, 'mm')}
           ${champCase('Afficher la surface (m²)', 'prop-case', 'afficherSurface', o.afficherSurface)}
@@ -1093,8 +1095,7 @@ export function ouvrirPlansChantier({
         symbole: panneauSymbole(o),
         grue: panneauSymbole(o),
       }[o.type];
-      choisi = `<h3>Élément choisi</h3><p class="resume-chantier">${echapper(resumeObjet(o))}</p>${propre ?? ''}
-        <p class="aide-calage">Rotation, échelle, couleur, phase, ordre de dessin : dans le bandeau au-dessus du plan.</p>`;
+      propreHtml = propre ?? ''; // 0.293.0 : tout ce qui concerne l'élément choisi est dans le bandeau du haut
     }
     zone.innerHTML = `
       <h3>Plan</h3>
@@ -1119,14 +1120,14 @@ export function ouvrirPlansChantier({
         <i style="background:${couleurObjet(p, x)}"></i>${echapper(resumeObjet(x))}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul>`;
     page.querySelector('.ruban-chantier [data-action="effacer"]')?.toggleAttribute('disabled', !etat.choisi);
     zone.querySelectorAll('canvas[data-vignette-pose]').forEach((c) => dessinerPose(c, Number(c.dataset.vignettePose)));
-    majBandeau(o, p);
+    majBandeau(o, p, propreHtml);
   }
 
   /**
    * Bandeau de l'élément choisi (0.293.0, au-dessus du plan) : ce qu'on règle le plus souvent, sans défiler dans le panneau de
    * droite : rotation, échelle, orientation, phase, couleur, ordre de dessin, décaler, effacer.
    */
-  function majBandeau(o, p) {
+  function majBandeau(o, p, propre = '') {
     const zone = page.querySelector('[data-zone="bandeau-element"]');
     if (!zone) return;
     zone.hidden = !o;
@@ -1151,7 +1152,8 @@ export function ouvrirPlansChantier({
     zone.innerHTML = `<span class="puce-element">${echapper(resumeObjet(o))}</span>
       ${poseHtml}${phases}${couleur}
       <span class="groupe-ordre" role="group" aria-label="Ordre de dessin">${bouton('data-ordre="devant"', '⤒', 'Premier plan')}${bouton('data-ordre="monter"', '▲', 'Un cran au-dessus')}${bouton('data-ordre="descendre"', '▼', 'Un cran en dessous')}${bouton('data-ordre="arriere"', '⤓', 'Arrière-plan')}</span>
-      ${decaler}${bouton('data-action="effacer"', '✕ Effacer', 'Effacer cet élément')}`;
+      ${decaler}${bouton('data-action="effacer"', '✕ Effacer', 'Effacer cet élément')}
+      ${propre ? `<div class="propre-element">${propre}</div>` : ''}`;
   }
 
   /** Nom de ce qui va être posé (panneau de l'outil). */
@@ -1660,6 +1662,7 @@ export function ouvrirPlansChantier({
       if (!avantChangement()) return;
       o[cle] = valeur;
       if (cle === 'fin' && !valeur) delete o.fin;
+      if (cle === 'etiquette' && !valeur) delete o.etiquette;
       if (cle === 'materiau' && !valeur) delete o.materiau;
       if (cle === 'tonnes') o.tonnes = Number(valeur);
       if (cle === 'chassis') o.chassis = Number(valeur).toFixed(2); // côté libre (m), gardé en texte comme « 4.50 »
