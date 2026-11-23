@@ -80,6 +80,7 @@ export function creerProjet(nom = '') {
     dessins: [],
     couleursListes: {},
     canalisations: [],              // réseaux (0.235.0, application Réseaux) : voir topo/reseau.js
+    plansChantier: [],              // plans de chantier (0.286.0) : voir topo/plan-chantier.js
   };
 }
 
@@ -198,8 +199,10 @@ export function completerProjet(projet) {
   if (!Array.isArray(projet.calculs)) complet.calculs = calculsDUnAncienProjet(complet.surfaces, projet.comparaisons);
   // Calculs d'avant le choix de la base « depuis une altitude » : base sur la ligne du contour.
   complet.calculs = complet.calculs.map((calcul) => ({ base: 'contour', altitude: null, ...calcul }));
-  // Anciens champs, remplacés par les calculs.
-  delete complet.comparaisons;
+  // Anciens champs, remplacés par les calculs (projet de la version 1 seulement : depuis la 0.282.0, « comparaisons »
+  // = les comparaisons de PDF, à garder ; 0.286.0 : elles étaient effacées à chaque ouverture du projet).
+  if (!Array.isArray(projet.calculs)) delete complet.comparaisons;
+  complet.plansChantier ??= []; // plans de chantier (0.286.0)
   for (const surface of complet.surfaces) delete surface.volume;
   prefixerNoms(complet);
   return complet;

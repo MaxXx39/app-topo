@@ -124,6 +124,18 @@ export const APPLIS = [
     icone: '<rect x="3" y="4" width="11" height="15" rx="1" /><rect x="10" y="6" width="11" height="15" rx="1" /><path d="M13 11h5M13 15h3" />',
   },
   {
+    // Plans de chantier (0.286.0, Expert, site et Topo Bureau) : installation de chantier, phasage, circulation.
+    cle: 'plans-chantier',
+    titre: 'Plans de chantier',
+    court: 'Chantier',
+    couleur: '#b45309',
+    texte: '#ffffff',
+    site: true,
+    siteSeulement: true,
+    niveau: 'expert',
+    icone: '<path d="M3 20h18M5 20V9l7-5 7 5v11" /><path d="M9 20v-6h6v6" />',
+  },
+  {
     cle: 'calculs',
     titre: 'Calculs',
     couleur: '#db2777',

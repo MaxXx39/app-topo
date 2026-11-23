@@ -72,6 +72,7 @@ import { lireNomsMateriel } from './materiel/noms-tablette.js';
 import { ouvrirMateriel as ouvrirPageMateriel } from './materiel/appli.js';
 import { ouvrirCalage as ouvrirPageCalage } from './calage/appli.js';
 import { ouvrirComparateur as ouvrirPageComparateur } from './comparateur/appli.js';
+import { ouvrirPlansChantier as ouvrirPagePlansChantier } from './plans-chantier/appli.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE, EXAGERATIONS_COUPE, ACCROCHES } from './leve/ecran.js';
 import { creerEncartPlan } from './plan/encart.js';
@@ -1729,6 +1730,7 @@ function ouvrirAppli(cle, sous = null, depuisMenu = false) {
   else if (cle === 'materiel') ouvrirMateriel();
   else if (cle === 'calage') ouvrirCalage();
   else if (cle === 'comparer') ouvrirComparateur();
+  else if (cle === 'plans-chantier') ouvrirPlansChantier();
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur', { detail: { retourMenu: depuisMenu } }));
   if (sous && cle !== 'calculs') {
     // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
@@ -2063,6 +2065,24 @@ function ouvrirComparateur() {
     modifie: () => modifie(),
     qui: () => appareilDuJournal().utilisateur || appareilDuJournal().nom || '',
     enregistrer: enregistrerFichier,
+    quandRetour: () => navigation.ouvrirPage(),
+    message: (texte, duree, options) => afficherMessage(texte, duree, options),
+  });
+}
+
+/**
+ * Plans de chantier (0.286.0, Expert, site et Topo Bureau) : page plein écran à part (plans-chantier/appli.js) ;
+ * installation de chantier, phasage, circulation dessinés sur les plans du projet, rangés dans projet.plansChantier.
+ */
+function ouvrirPlansChantier() {
+  fenetreReglages?.fermer?.();
+  navigation?.fermer();
+  ouvrirPagePlansChantier({
+    projet: () => projet, // relu à chaque fois : Drive ou l'Annuler général peuvent remplacer le projet
+    modifie: () => modifie(),
+    plans: () => plansDuProjet(),
+    points: () => pointsDuProjet(),
+    lectureSeule: () => lectureSeule(),
     quandRetour: () => navigation.ouvrirPage(),
     message: (texte, duree, options) => afficherMessage(texte, duree, options),
   });
