@@ -21,10 +21,11 @@ const lu = {
 const mn95 = { id: 'r', nom: 'Référence', origine: { est: 2510000, nord: 1141000 }, bornes: { estMin: 2510000, nordMin: 1141000, estMax: 2510300, nordMax: 1141800 }, calques: [], contenu: { traits: [{ c: 0, p: [0, 0, 1, 1] }] } };
 
 describe('plans de référence', () => {
-  it('seulement les plans en MN95, sans IFC ni plan vide', () => {
+  it('plans en MN95 ou locaux (0.284.0), sans IFC ni plan vide', () => {
     const local = { ...lu, id: 'l' };
     const ifc = { ...mn95, id: 'i', ifc: {} };
-    expect(plansDeReference([local, mn95, ifc]).map((p) => p.id)).toEqual(['r']);
+    const vide = { ...mn95, id: 'v', contenu: { traits: [] } };
+    expect(plansDeReference([local, mn95, ifc, vide]).map((p) => p.id)).toEqual(['l', 'r']);
   });
 });
 
