@@ -91,7 +91,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.297.0)
+## Fonctionnalités (état à la 0.297.1)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -137,6 +137,10 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 ## Plans de chantier : état (23.11)
 - **Étapes 1 à 4 faites** (0.286.0 → 0.289.0, Expert, site PC + Topo Bureau). **Petits restes** : tableau des modes (`docs/modes-base-intermediaire-expert.xlsx`) pas mis à jour (Plans de chantier, Calage, Comparer) ; jamais essayé sur Topo Bureau ni avec swisstopo (bloqué ici) ; la maquette est faite pour 1366 × 768 (portrait tablette non prévu).
 - **À valider avec l'utilisateur** : « une page par phase » = la phase seule + les phases cochées « sur toutes les pages » (choix fait sans lui) ; poses de l'escalier (lecture du bloc « Base vie Etage » : palier le long du petit côté, volée de 3 m le long du grand ; « petit côté » = échange des axes) ; matériaux d'après les couleurs (table `MATERIAUX` de `topo/symboles.js`) ; phares / feux placés par fractions de la boîte (camions : devant = y mini ; chargeuse : devant = x maxi).
+
+## 0.297.1 — Plans de chantier : ruban sur une ligne, talus sans croisement (retours du 23.11)
+- **Le ruban d'outils tient sur UNE ligne** (42 px au lieu de 2 lignes) : **icônes seules** avec le nom dans l'infobulle (`title` / `aria-label`), plus de titres de groupes ; icônes dessinées pour les accroches (point, sommet, milieu, sur ligne, croisement, perpendiculaire), les fonds (plans, calques, points levés, carte, photo, cadastre, surfaces), l'Ortho (bouton avec ✓ quand il est actif, angle du repère, N S E O, repère = ligne), la construction (œil) et le zoom.
+- **Talus** : la ligne de crête est le dernier anneau décalé (coins propres) et les barbules n'approchent pas des coins : plus de croisements. **Un seul réglage de hauteur de tas** : le champ « Talus » n'est plus proposé (fixe : 1,5 m horizontal pour 1 m de hauteur).
 
 ## 0.297.0 — Plans de chantier : retours du 23.11 (7e lot)
 - **Parking réservé dynamique** (`topo/parking-dynamique.js`, `cle: 'dyn:parking'`, `o.nombre` 1–30 places côte à côte, `o.couleur` : cadre et grand P de la même couleur, fond transparent) ; l'ancien symbole fixe est gardé caché pour les anciens plans.

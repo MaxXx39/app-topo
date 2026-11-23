@@ -114,36 +114,35 @@ function dessinerTas(d, o, couleur) {
   ctx.fillStyle = g;
   ctx.fill();
   ctx.restore();
-  // Hachures de talus (0.297.0) : une ligne en HAUT du talus (crête, à `largeur` du pied) et des barbules qui en partent
-  // vers le BAS du talus (le pied), une longue, une courte.
+  // Hachures de talus (0.297.1) : la ligne de crête est le dernier anneau (contour décalé avec ses coins droits, donc sans
+  // croisement) ; les barbules partent de la crête vers le pied, une longue, une courte, sans s'approcher des coins.
   ctx.strokeStyle = nuance(couleur, -0.45);
   ctx.lineWidth = 0.7;
   ctx.beginPath();
-  const pas = Math.max(1.2, 6 / vue.echelle);
-  let k = 0;
-  const pts = o.points;
-  const crete = [];
-  for (let i = 0; i < pts.length; i++) {
-    const [x1, y1] = pts[i];
-    const [x2, y2] = pts[(i + 1) % pts.length];
-    const l = Math.hypot(x2 - x1, y2 - y1);
-    if (l < 1e-6) continue;
-    const [ux, uy] = [(x2 - x1) / l, (y2 - y1) / l];
-    const [nx, ny] = [-uy * sens, ux * sens]; // vers l'intérieur
-    const haut = (s, d) => [x1 + ux * s + nx * d, y1 + uy * s + ny * d];
-    // Ligne de crête : parallèle au bord, à `largeur` vers l'intérieur.
-    const c1 = ecran(haut(0, largeur));
-    const c2 = ecran(haut(l, largeur));
-    ctx.moveTo(c1.x, c1.y);
-    ctx.lineTo(c2.x, c2.y);
-    crete.push(c1);
-    for (let s = pas / 2; s < l; s += pas) {
-      const long = (k++ % 2 === 0 ? 0.55 : 0.3) * largeur;
-      const a = ecran(haut(s, largeur)); // part de la crête
-      const b = ecran(haut(s, largeur - long)); // descend vers le pied
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-    }
+  const crete = anneaux.at(-1);
+  if (crete?.length >= 3) {
+    const pas = Math.max(1.2, 6 / vue.echelle);
+    let k = 0;
+    crete.forEach(([x1, y1], i) => {
+      const [x2, y2] = crete[(i + 1) % crete.length];
+      const c1 = ecran([x1, y1]);
+      const c2 = ecran([x2, y2]);
+      if (i === 0) ctx.moveTo(c1.x, c1.y);
+      ctx.lineTo(c2.x, c2.y);
+      const l = Math.hypot(x2 - x1, y2 - y1);
+      if (l < 1e-6) return;
+      const [ux, uy] = [(x2 - x1) / l, (y2 - y1) / l];
+      const [nx, ny] = [-uy * sens, ux * sens]; // vers l'intérieur : les barbules vont à l'opposé
+      const marge = 0.6 * largeur;
+      for (let t = marge; t < l - marge; t += pas) {
+        const long = (k++ % 2 === 0 ? 0.55 : 0.3) * largeur;
+        const a = ecran([x1 + ux * t, y1 + uy * t]);
+        const b = ecran([x1 + ux * t - nx * long, y1 + uy * t - ny * long]);
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      }
+      ctx.moveTo(c2.x, c2.y);
+    });
   }
   ctx.stroke();
 }

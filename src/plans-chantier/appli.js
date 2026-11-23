@@ -311,29 +311,40 @@ export function ouvrirPlansChantier({
   // ---------------------------------------------------------------- Dessiner
 
   function htmlDessin() {
-    const groupe = (titre, html) => `<div class="groupe-ruban"><span class="titre-groupe">${titre}</span><div class="boutons-groupe">${html}</div></div>`;
-    const outil = (cle, icone, texte) => `<button type="button" class="outil-ruban" data-outil="${cle}">${ico(icone)}<span>${texte}</span></button>`;
+    // 0.297.1 : le ruban tient sur UNE ligne : icônes seules (le nom est dans l'infobulle), plus de titres de groupes.
+    const groupe = (titre, html) => `<div class="groupe-ruban" role="group" aria-label="${titre}">${html}</div>`;
+    const bt = (attrs, icone, titre, classe = '') => `<button type="button" class="outil-ruban ${classe}" ${attrs} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${titre}</span></button>`;
+    const outil = (cle, icone, texte) => bt(`data-outil="${cle}"`, icone, texte);
+    const ICONES_ACCROCHE = {
+      point: '<rect x="5" y="5" width="14" height="14" rx="1"/><circle cx="12" cy="12" r="2.2"/>',
+      sommet: '<rect x="6" y="6" width="12" height="12"/>',
+      milieu: '<path d="M12 5L19 18H5Z"/>',
+      ligne: '<path d="M4 19L20 5"/><circle cx="12" cy="12" r="2.4"/>',
+      croisement: '<path d="M5 5L19 19M19 5L5 19"/><rect x="8.5" y="8.5" width="7" height="7"/>',
+      perpendiculaire: '<path d="M5 19H19M12 19V6"/><path d="M12 15H16V19"/>',
+    };
+    const TITRES_ACCROCHE = { point: 'Accroche : point levé', sommet: 'Accroche : sommet', milieu: 'Accroche : milieu', ligne: 'Accroche : sur la ligne', croisement: 'Accroche : croisement', perpendiculaire: 'Accroche : perpendiculaire' };
     return `
-      <div class="ruban-calage ruban-chantier" role="toolbar" aria-label="Outils de dessin">
+      <div class="ruban-calage ruban-chantier ruban-une-ligne" role="toolbar" aria-label="Outils de dessin">
         ${groupe('Sélection', `${outil('choisir', ICONE_CHOISIR, 'Sélectionner')}
-          <button type="button" class="outil-ruban" data-action="effacer">${ico('<path d="M5 5L19 19M19 5L5 19"/>')}<span>Effacer</span></button>
-          <button type="button" class="outil-ruban" data-action="annuler">${ico('<path d="M9 14L4 9L9 4"/><path d="M4 9H14A6 6 0 0 1 14 21H11"/>')}<span>Annuler</span></button>`)}
+          ${bt('data-action="effacer"', '<path d="M5 5L19 19M19 5L5 19"/>', 'Effacer')}
+          ${bt('data-action="annuler"', '<path d="M9 14L4 9L9 4"/><path d="M4 9H14A6 6 0 0 1 14 21H11"/>', 'Annuler (Ctrl+Z)')}`)}
         ${groupe('Dessin', OUTILS.map(([c, i, t]) => outil(c, i, t)).join(''))}
-        ${groupe('Symboles', `<button type="button" class="outil-ruban" data-action="biblio" aria-pressed="${etat.biblio.ouvert}">${ico('<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>')}<span>Bibliothèque</span></button>`)}
-        ${groupe('Accroche', ACCROCHES.map(([c, t]) => `<button type="button" class="outil-ruban petit" data-accroche="${c}"><span>${t}</span></button>`).join(''))}
-        ${groupe('Fond', `<button type="button" class="outil-ruban" data-action="fond-plans">${ico('<path d="M3 6L9 4L15 6L21 4V18L15 20L9 18L3 20Z"/><path d="M9 4V18M15 6V20"/>')}<span>Plans…</span></button>
-          <button type="button" class="outil-ruban petit" data-action="fond-calques" title="Masquer des calques d'un plan affiché dessous, changer leur couleur"><span>Calques…</span></button>
-          <button type="button" class="outil-ruban petit" data-action="fond-points"><span>Points levés</span></button>
-          <button type="button" class="outil-ruban petit" data-action="fond-carte"><span>Carte</span></button>
-          <button type="button" class="outil-ruban petit" data-action="fond-ortho"><span>Photo</span></button>
-          <button type="button" class="outil-ruban petit" data-action="fond-cadastre"><span>Cadastre</span></button>
-          <button type="button" class="outil-ruban petit" data-action="fond-surfaces"><span>Surfaces</span></button>`)}
-        ${groupe('Ortho', `<button type="button" class="outil-ruban petit" data-action="ortho" title="Ortho (F8) : le dessin est aimanté aux directions N / S / E / O, ou à celles du repère"><span>Ortho</span></button>
-          <label class="champ-bandeau" title="Angle du repère en degrés (0 = Est / Nord) : le dessin s'aimante à ce repère et à ses perpendiculaires"><span>Repère °</span><input type="number" step="0.1" value="${etat.orthoAngle}" data-reglage="orthoAngle" style="width:64px"></label>
- <button type="button" class="outil-ruban petit" data-action="ortho-zero" title="Repère à 0° : directions Nord / Sud / Est / Ouest"><span>N S E O</span></button>
-          <button type="button" class="outil-ruban petit" data-action="ortho-repere" title="Prendre l'angle d'une ligne du plan ou du dessin comme repère"><span>Repère = ligne</span></button>`)}
-        ${groupe('Construction', `<button type="button" class="outil-ruban petit" data-action="construction-visible" title="Montrer ou cacher les lignes de construction (jamais imprimées)"><span>Afficher</span></button>`)}
-        ${groupe('Zoom', '<button type="button" class="outil-ruban" data-zoom="1.5">＋</button><button type="button" class="outil-ruban" data-zoom="0.667">−</button><button type="button" class="outil-ruban" data-zoom="tout">⤢<span>Tout</span></button>')}
+        ${groupe('Symboles', bt(`data-action="biblio" aria-pressed="${etat.biblio.ouvert}"`, '<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>', 'Bibliothèque de symboles'))}
+        ${groupe('Accroche', ACCROCHES.map(([c]) => bt(`data-accroche="${c}"`, ICONES_ACCROCHE[c], TITRES_ACCROCHE[c])).join(''))}
+        ${groupe('Fond', `${bt('data-action="fond-plans"', '<path d="M3 6L9 4L15 6L21 4V18L15 20L9 18L3 20Z"/><path d="M9 4V18M15 6V20"/>', 'Plans du projet dessous (par phase)')}
+          ${bt('data-action="fond-calques"', '<path d="M12 4L21 9L12 14L3 9Z"/><path d="M3 13L12 18L21 13"/>', 'Calques des plans affichés (masquer, couleur)')}
+          ${bt('data-action="fond-points"', '<circle cx="7" cy="8" r="1.7"/><circle cx="16" cy="7" r="1.7"/><circle cx="11" cy="16" r="1.7"/><circle cx="19" cy="15" r="1.7"/>', 'Points levés')}
+          ${bt('data-action="fond-carte"', '<circle cx="12" cy="12" r="8"/><path d="M15.5 8.5L13.2 13.2L8.5 15.5L10.8 10.8Z"/>', 'Fond : carte nationale')}
+          ${bt('data-action="fond-ortho"', '<rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="12" cy="13" r="3.2"/><path d="M8 7L9.5 5H14.5L16 7"/>', 'Fond : photo aérienne')}
+          ${bt('data-action="fond-cadastre"', '<path d="M4 4H20V20H4Z"/><path d="M4 12H20M12 4V20"/>', 'Fond : cadastre')}
+          ${bt('data-action="fond-surfaces"', '<path d="M3 18L9 8L14 13L21 5"/><path d="M3 18H21"/>', 'Fond : surfaces du projet')}`)}
+        ${groupe('Ortho', `${bt('data-action="ortho"', '<path d="M5 5V19H19"/><path d="M5 14H10V19"/>', 'Ortho (F8) : le dessin est aimanté aux directions N / S / E / O ou à celles du repère')}
+          <input type="number" step="0.1" value="${etat.orthoAngle}" data-reglage="orthoAngle" class="champ-ortho" title="Angle du repère de l'Ortho en degrés (0 = Nord / Sud / Est / Ouest)" aria-label="Angle du repère de l'Ortho">
+          ${bt('data-action="ortho-zero"', '<path d="M12 3V21M3 12H21"/><path d="M12 3L9.5 7H14.5Z"/>', 'Repère à 0° : Nord / Sud / Est / Ouest')}
+          ${bt('data-action="ortho-repere"', '<path d="M3 17L21 7"/><path d="M14 12V20L16.4 17.6L19 20.6"/>', 'Repère de l\'Ortho = l\'angle d\'une ligne cliquée')}`)}
+        ${groupe('Construction', bt('data-action="construction-visible"', '<path d="M2 12S6 5 12 5S22 12 22 12S18 19 12 19S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', 'Montrer / cacher les lignes de construction (jamais imprimées)'))}
+        ${groupe('Zoom', `${bt('data-zoom="1.5"', '<path d="M12 5V19M5 12H19"/>', 'Zoom avant')}${bt('data-zoom="0.667"', '<path d="M5 12H19"/>', 'Zoom arrière')}${bt('data-zoom="tout"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Tout voir')}`)}
       </div>
       <div class="ruban-element" data-zone="bandeau-element" hidden></div>
       <p class="consigne-calage" data-zone="consigne"></p>
@@ -1173,9 +1184,8 @@ export function ouvrirPlansChantier({
           ${champCase('Afficher la surface (m²)', 'prop-case', 'afficherSurface', o.afficherSurface)}
           <label class="champ-calage"><span>Matériau du stock</span><select data-prop="materiau"><option value="">— (couleur du genre)</option>
             ${MATERIAUX_TAS.map((m) => `<option value="${m.cle}" ${o.materiau === m.cle ? 'selected' : ''}>${m.nom}</option>`).join('')}</select></label>
-          ${champCase('Effet de tas (hauteur, talus)', 'prop-case', 'tasOui', o.tasH > 0)}
+          ${champCase('Effet de tas', 'prop-case', 'tasOui', o.tasH > 0)}
           ${o.tasH > 0 ? `${champNombre('Hauteur du tas', 'prop', 'tasH', o.tasH, 0.2, 30, 0.1, 'm')}
-            ${champNombre('Talus (m horizontaux pour 1 m de hauteur)', 'prop', 'tasTalus', o.tasTalus ?? TAS_TALUS, 0.3, 5, 0.1, '')}
             ${champCase('Écrire la hauteur', 'prop-case', 'afficherHauteur', o.afficherHauteur)}` : ''}`,
         ligne: `${selectGenres('ligne', styleLigne(o.style).cle)}
           ${styleLigne(o.style).motif?.largeurM ? champNombre('Largeur de la bande', 'prop', 'largeurM', o.largeurM ?? styleLigne(o.style).motif.largeurM, 0.1, 20, 0.1, 'm') : champNombre('Épaisseur', 'prop', 'epaisseurMm', epaisseurLigneMm(o), 0.05, 5, 0.05, 'mm')}
