@@ -14684,3 +14684,14 @@ dialog.page-chantier[open] {
 .elements-chantier i { width: 12px; height: 12px; border-radius: 3px; flex: none; }
 .couleur-element { display: flex; align-items: flex-end; gap: 10px; }
 .couleur-element input[type='color'] { width: 48px; height: 32px; padding: 0; border: 1px solid var(--bordure); border-radius: 6px; background: none; }
+
+/* 0.288.0 : légende des genres (aperçu du trait / de la zone devant chaque nom), cases et boutons du panneau */
+.liste-genres { display: flex; flex-direction: column; gap: 2px; max-height: 240px; overflow-y: auto; border: 1px solid var(--bordure); border-radius: 8px; padding: 3px; background: var(--surface); }
+.liste-genres button { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border: 1px solid transparent; border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 0.85rem; text-align: left; cursor: pointer; }
+.liste-genres button:hover { border-color: var(--bordure); }
+.liste-genres button.actif { border-color: #b45309; background: color-mix(in srgb, #b45309 10%, var(--surface)); font-weight: 600; }
+.liste-genres .apercu-genre { flex: none; }
+.liste-genres button > span { flex: 1; min-width: 0; }
+.case-chantier { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.actions-chantier { display: flex; flex-wrap: wrap; gap: 6px; }
+.champ-calage input[type='range'] { width: 100%; accent-color: #b45309; }

@@ -1,4 +1,4 @@
-// Application « Plans de chantier » (0.286.0, Expert, site PC et Topo Bureau ; maquette validée le 23.11) :
+// Application « Plans de chantier » (0.288.0, Expert, site PC et Topo Bureau ; maquette validée le 23.11) :
 // dessiner un plan d'installation de chantier, de phasage ou de circulation sur les plans du projet (MN95).
 // Page plein écran à part (comme Calage de plans) : « Plans » (liste du projet) · « Dessiner » (bandeau d'outils en
 // haut comme AutoCAD, plan au centre, phases et élément choisi à droite).
@@ -10,11 +10,13 @@ import { bulle } from '../aide/bulles.js';
 import { demanderChoix, demanderTexte, demanderCases } from '../outils/choix.js';
 import { accrocher, sourcesDesPlans } from '../topo/accroche.js';
 import {
-  GENRES, CATEGORIES_ZONE, STYLES_LIGNE, nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet, retirerObjet,
-  objetsVisibles, objetSousLePoint, deplacerObjet, lignesPourAccroche, resumeObjet, copiePlan, aire, longueur,
-  sommetSousLePoint, couleurObjet, LARGEUR_FLECHE, POINTE_FLECHE,
+  GENRES, nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet, retirerObjet, objetsVisibles, objetSousLePoint,
+  deplacerObjet, lignesPourAccroche, resumeObjet, copiePlan, aire, longueur, sommetSousLePoint, couleurObjet, styleLigne,
+  LARGEUR_FLECHE, OPACITE_ZONE, ECHELLE_PAPIER, epaisseurLigneMm, contourZoneMm, dimensionsFleche, coteDuPoint,
+  decalerPolyligne, ligneLaPlusProche,
 } from '../topo/plan-chantier.js';
 import { creerVueChantier } from './vue.js';
+import { listeGenres } from './apercu.js';
 
 const OUTILS = [
   ['zone', '<path d="M4 8L12 4L20 9L17 19H6Z"/>', 'Zone'],
@@ -22,7 +24,9 @@ const OUTILS = [
   ['piste', '<path d="M3 15L12 9L21 15M3 20L12 14L21 20"/>', 'Piste'],
   ['fleche', '<path d="M3 14H15V9L21 15L15 21V16H3Z"/>', 'Flèche'],
   ['texte', '<path d="M5 6H19M12 6V20M9 20H15"/>', 'Texte'],
+  ['decaler', '<path d="M3 16L10 6L21 13"/><path d="M3 21L11 10L21 18" opacity=".55"/>', 'Décaler'],
 ];
+const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 const ACCROCHES = [['point', 'Point'], ['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne']];
 const ICONE_CHOISIR = '<path d="M6 3L18 13L12 14L15 21L12.5 22L9.5 15L6 19Z"/>';
 const MAX_ANNULER = 50;
@@ -51,7 +55,12 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
   const etat = {
     ecran: 'liste', planId: null, outil: 'choisir', saisie: null, choisi: null, accroches: new Set(['point', 'sommet']),
     categorie: 'installation', style: 'cloture', largeur: 4, tailleTexte: 1.2, curseur: null,
-    largeurFleche: LARGEUR_FLECHE, pointeFleche: POINTE_FLECHE, glisse: null, // glisse : { type: 'sommet', i } ou { type: 'objet' }
+    // Réglages de l'outil (valeurs données aux éléments dessinés ensuite) : null = celle du genre.
+    opacite: OPACITE_ZONE, contourMm: null, afficherSurface: false, epaisseurMm: null, echelleMotif: 1,
+    largeurFleche: LARGEUR_FLECHE, echelleFleche: 1, texteRepere: false, repereBout: 'fleche', distanceDecalage: 0.5,
+    attenteRepere: null, // id du texte qui attend le point visé par sa ligne de repère
+    reglageEnCours: false, // un curseur (transparence…) est en train d'être glissé
+    glisse: null, // glisse : { type: 'sommet', i } ou { type: 'objet' }
   };
   let vue = null;
   let pileAnnuler = [];
@@ -104,7 +113,10 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
   }
 
   function echap() {
-    if (etat.saisie) {
+    if (etat.attenteRepere) {
+      etat.attenteRepere = null;
+      majTout();
+    } else if (etat.saisie) {
       etat.saisie = null;
       majTout();
     } else if (etat.choisi) {
@@ -240,10 +252,11 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
       points: () => (plan()?.fond?.points === false ? [] : points()),
       planChantier: plan,
       choisi: () => etat.choisi,
-      saisie: () => etat.saisie,
+      saisie: saisieVue,
       accrocher: accrochage,
       clic: toucher,
       double: () => {
+        if (etat.saisie?.outil === 'decaler') return;
         if (etat.saisie && etat.saisie.outil !== 'zone') finirSaisie();
         else if (etat.saisie?.outil === 'zone' && etat.saisie.points.length >= 3) finirSaisie();
       },
@@ -258,7 +271,8 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
           if (etat.outil !== 'choisir' || !etat.choisi) return false;
           const o = plan().objets.find((x) => x.id === etat.choisi);
           if (!o) return false;
-          const i = o.type === 'texte' ? -1 : sommetSousLePoint(o, p, tol);
+          let i = sommetSousLePoint(o, p, tol);
+          if (o.type === 'texte' && i === 0) i = -1; // le texte se déplace en entier ; seule la poignée du repère est un sommet
           if (i < 0 && objetSousLePoint(objetsVisibles(plan()), p, tol)?.id !== etat.choisi) return false;
           if (!avantChangement()) return false;
           etat.glisse = i >= 0 ? { type: 'sommet', i } : { type: 'objet' };
@@ -267,8 +281,10 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
         deplacer: (de, dn, point) => {
           const o = plan().objets.find((x) => x.id === etat.choisi);
           if (!o) return;
-          if (etat.glisse?.type === 'sommet') o.points[etat.glisse.i] = point;
-          else deplacerObjet(o, de, dn);
+          if (etat.glisse?.type === 'sommet') {
+            if (o.type === 'texte') o.repere = point;
+            else o.points[etat.glisse.i] = point;
+          } else deplacerObjet(o, de, dn);
         },
         fin: () => {
           etat.glisse = null;
@@ -280,9 +296,17 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
     majTout();
   }
 
+  /** Dessin en cours pour la vue ; pendant un décalage, avec l'aperçu de la copie du côté où est la souris. */
+  function saisieVue() {
+    const s = etat.saisie;
+    if (!s?.source || !etat.curseur) return s;
+    return { ...s, apercu: decalerPolyligne(s.source, coteDuPoint(s.source, etat.curseur) * etat.distanceDecalage) };
+  }
+
   /** Accroche pendant un dessin : points levés, puis sommets / milieux / bords des plans et de ce qui est dessiné. */
   function accrochage(position, tolerance) {
     if (etat.outil === 'choisir' && etat.glisse?.type !== 'sommet') return null;
+    if (etat.outil === 'decaler') return null; // on touche la ligne elle-même, puis le côté : pas d'accroche
     const a = etat.accroches;
     if (a.has('point')) {
       const t = accrocher('point', position, tolerance, { points: plan()?.fond?.points === false ? [] : points() });
@@ -300,7 +324,56 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
     return null;
   }
 
+  /** Décalage : 1er clic = la ligne à décaler (dessin ou plan DXF), 2e clic = le côté de la copie. */
+  function toucherDecalage(p, tolerance) {
+    const s = etat.saisie;
+    if (!s?.source) {
+      const lignes = [...lignesPourAccroche(objetsVisibles(plan()).filter((o) => o.type !== 'texte')), ...sourcesDesPlans(plansFond(), { est: p[0], nord: p[1] }, tolerance).lignes];
+      const source = ligneLaPlusProche(lignes, p, tolerance * 1.5);
+      if (!source) return message('Aucune ligne ici : touchez une ligne du plan ou un élément dessiné.', 3000);
+      etat.saisie = { outil: 'decaler', source, style: etat.style, points: [] };
+      majConsigne();
+      return vue?.redessinerDessus();
+    }
+    creerDecalage(s.source, coteDuPoint(s.source, p) * etat.distanceDecalage, s.style);
+  }
+
+  /** Crée la ligne décalée de distance m (+ à gauche, − à droite en suivant la ligne de départ). */
+  function creerDecalage(source, distance, style) {
+    if (!avantChangement()) return;
+    const o = ajouterObjet(plan(), compact({ type: 'ligne', points: decalerPolyligne(source, distance), style, epaisseurMm: etat.epaisseurMm ?? undefined, echelleMotif: etat.echelleMotif !== 1 ? etat.echelleMotif : undefined }));
+    etat.saisie = null;
+    etat.choisi = o.id;
+    etat.outil = 'choisir';
+    vue?.oublierCurseur();
+    enregistrer();
+    majTout();
+  }
+
+  /** « Décaler… » depuis l'élément choisi : la ligne de départ est déjà connue, on touche seulement le côté. */
+  function decalerChoisi() {
+    const o = plan().objets.find((x) => x.id === etat.choisi);
+    if (!o || o.type === 'texte') return;
+    const source = o.type === 'zone' ? [...o.points, o.points[0]] : o.points;
+    etat.outil = 'decaler';
+    etat.style = o.type === 'ligne' ? styleLigne(o.style).cle : etat.style;
+    etat.saisie = { outil: 'decaler', source, style: etat.style, points: [] };
+    etat.choisi = null;
+    majTout();
+  }
+
   async function toucher(p, tolerance) {
+    if (etat.attenteRepere) {
+      const o = plan().objets.find((x) => x.id === etat.attenteRepere);
+      etat.attenteRepere = null;
+      if (o && avantChangement()) {
+        o.repere = p;
+        o.repereBout = etat.repereBout;
+        enregistrer();
+      }
+      return majTout();
+    }
+    if (etat.outil === 'decaler') return toucherDecalage(p, tolerance);
     if (etat.outil === 'choisir') {
       etat.choisi = objetSousLePoint(objetsVisibles(plan()), p, tolerance)?.id ?? null;
       majTout();
@@ -312,6 +385,7 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
       const o = ajouterObjet(plan(), { type: 'texte', point: p, texte, taille: etat.tailleTexte });
       etat.choisi = o.id;
       etat.outil = 'choisir';
+      if (etat.texteRepere) etat.attenteRepere = o.id; // le prochain clic donne le point visé
       enregistrer();
       majTout();
       return;
@@ -330,14 +404,19 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
 
   function finirSaisie() {
     const s = etat.saisie;
-    if (!s) return;
+    if (!s || s.outil === 'decaler') return;
     const min = s.outil === 'zone' ? 3 : 2;
     if (s.points.length < min) {
       message(s.outil === 'zone' ? 'Une zone a au moins 3 sommets.' : 'Il faut au moins 2 points.', 3000);
       return;
     }
     if (!avantChangement()) return;
-    const props = { zone: { categorie: s.categorie }, ligne: { style: s.style }, piste: { largeur: s.largeur }, fleche: { largeur: etat.largeurFleche, pointe: etat.pointeFleche } }[s.outil];
+    const props = {
+      zone: compact({ categorie: s.categorie, opacite: etat.opacite, contourMm: etat.contourMm ?? undefined, afficherSurface: etat.afficherSurface || undefined }),
+      ligne: compact({ style: s.style, epaisseurMm: etat.epaisseurMm ?? undefined, echelleMotif: etat.echelleMotif !== 1 ? etat.echelleMotif : undefined }),
+      piste: { largeur: s.largeur },
+      fleche: compact({ largeur: etat.largeurFleche, echelle: etat.echelleFleche !== 1 ? etat.echelleFleche : undefined }),
+    }[s.outil];
     const o = ajouterObjet(plan(), { type: s.outil, points: s.points, ...props });
     etat.saisie = null;
     etat.choisi = o.id;
@@ -383,10 +462,11 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
       ligne: n >= 2 ? 'Point suivant ; Entrée ou double-clic = finir.' : 'Cliquez le départ de la ligne.',
       piste: n >= 2 ? 'Point suivant de l\'axe ; Entrée ou double-clic = finir.' : 'Cliquez le départ de l\'axe de la piste.',
       fleche: n >= 2 ? 'Point suivant ; Entrée ou double-clic = finir (la pointe est au dernier point).' : 'Cliquez le départ de la flèche, puis les points jusqu\'à la pointe.',
-      texte: 'Cliquez où écrire le texte.',
+      texte: etat.attenteRepere ? 'Cliquez le point visé par la ligne de repère.' : `Cliquez où écrire le texte${etat.texteRepere ? ' (puis le point visé par la ligne de repère)' : ''}.`,
+      decaler: etat.saisie?.source ? `Cliquez du côté où mettre la copie, à ${etat.distanceDecalage} m.` : 'Cliquez la ligne à décaler (une ligne du plan DXF ou un élément dessiné).',
     };
     const zone = page.querySelector('[data-zone="consigne"]');
-    if (zone) zone.textContent = `${textes[etat.outil]}${etat.outil !== 'choisir' ? ' (Échap = arrêter)' : ''}`;
+    if (zone) zone.textContent = etat.attenteRepere ? `${textes.texte} (Échap = sans repère)` : `${textes[etat.outil]}${etat.outil !== 'choisir' ? ' (Échap = arrêter)' : ''}`;
   }
 
   function majEtat() {
@@ -403,39 +483,70 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
     zone.innerHTML = c ? `<span class="chiffre">E ${c[0].toFixed(2)}</span><span class="chiffre">N ${c[1].toFixed(2)}</span>${mesure ? `<span>${mesure}</span>` : ''}` : '';
   }
 
+  /** Champ nombre : data-reglage (outil) ou data-prop (élément choisi). */
+  const champNombre = (titre, attr, cle, valeur, min, max, pas, unite = '') =>
+    `<label class="champ-calage"><span>${titre}${unite ? ` (${unite})` : ''}</span><input type="number" min="${min}" max="${max}" step="${pas}" value="${valeur}" data-${attr}="${cle}"></label>`;
+  const champCase = (titre, attr, cle, coche) => `<label class="case-chantier"><input type="checkbox" data-${attr}="${cle}" ${coche ? 'checked' : ''}> ${titre}</label>`;
+  const champCurseur = (titre, attr, cle, valeur) =>
+    `<label class="champ-calage"><span>${titre} : <b data-valeur-de="${cle}">${Math.round(valeur)} %</b></span><input type="range" min="0" max="100" step="5" value="${valeur}" data-${attr}="${cle}"></label>`;
+
   function majPanneau() {
     const zone = page.querySelector('[data-zone="panneau"]');
     if (!zone) return;
     const p = plan();
     const o = p.objets.find((x) => x.id === etat.choisi);
-    const options = (liste, valeur) => liste.map((x) => `<option value="${x.cle}" ${x.cle === valeur ? 'selected' : ''}>${echapper(x.nom)}</option>`).join('');
+    const mmLigne = (cle) => (etat.epaisseurMm ?? styleLigne(cle).epaisseurMm);
+    // Réglages de l'outil : donnés aux éléments dessinés ensuite.
     const reglages = {
-      zone: `<label class="champ-calage"><span>Genre de zone</span><select data-reglage="categorie">${options(CATEGORIES_ZONE, etat.categorie)}</select></label>`,
-      ligne: `<label class="champ-calage"><span>Genre de ligne</span><select data-reglage="style">${options(STYLES_LIGNE, etat.style)}</select></label>`,
-      piste: `<label class="champ-calage"><span>Largeur de la piste (m)</span><input type="number" min="1" max="30" step="0.5" value="${etat.largeur}" data-reglage="largeur"></label>`,
-      texte: `<label class="champ-calage"><span>Hauteur des lettres (m)</span><input type="number" min="0.2" max="10" step="0.1" value="${etat.tailleTexte}" data-reglage="tailleTexte"></label>`,
-      fleche: `<label class="champ-calage"><span>Largeur de la flèche (m)</span><input type="number" min="0.1" max="10" step="0.1" value="${etat.largeurFleche}" data-reglage="largeurFleche"></label>
-        <label class="champ-calage"><span>Longueur de la pointe (m)</span><input type="number" min="0.3" max="20" step="0.1" value="${etat.pointeFleche}" data-reglage="pointeFleche"></label>`,
+      zone: `${listeGenres('zone', etat.categorie, 'outil', echapper)}
+        ${champCurseur('Transparence du fond (opacité)', 'reglage', 'opacite', etat.opacite)}
+        ${champNombre('Épaisseur du contour', 'reglage', 'contourMm', etat.contourMm ?? (etat.categorie === 'emprise' ? 0.7 : 0.35), 0.05, 5, 0.05, 'mm')}
+        ${champCase('Afficher la surface (m²)', 'reglage-case', 'afficherSurface', etat.afficherSurface)}`,
+      ligne: `${listeGenres('ligne', etat.style, 'outil', echapper)}
+        ${champNombre('Épaisseur', 'reglage', 'epaisseurMm', mmLigne(etat.style), 0.05, 5, 0.05, 'mm')}
+        ${champNombre('Échelle du motif', 'reglage', 'echelleMotif', etat.echelleMotif, 0.3, 5, 0.1, '×')}`,
+      piste: champNombre('Largeur de la piste', 'reglage', 'largeur', etat.largeur, 1, 30, 0.5, 'm'),
+      fleche: `${champNombre('Largeur de la ligne', 'reglage', 'largeurFleche', etat.largeurFleche, 0.05, 5, 0.05, 'm')}
+        ${champNombre('Échelle de la pointe', 'reglage', 'echelleFleche', etat.echelleFleche, 0.3, 10, 0.1, '×')}`,
+      texte: `${champNombre('Hauteur des lettres', 'reglage', 'tailleTexte', etat.tailleTexte, 0.2, 10, 0.1, 'm')}
+        ${champCase('Avec ligne de repère', 'reglage-case', 'texteRepere', etat.texteRepere)}
+        <label class="champ-calage"><span>Bout du repère</span><select data-reglage="repereBout">
+          ${[['fleche', 'Flèche'], ['point', 'Point'], ['aucun', 'Rien']].map(([v, t]) => `<option value="${v}" ${etat.repereBout === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`,
+      decaler: `${champNombre('Distance du décalage', 'reglage', 'distanceDecalage', etat.distanceDecalage, 0.01, 100, 0.05, 'm')}
+        <p class="aide-calage">Genre de la ligne créée :</p>${listeGenres('ligne', etat.style, 'outil', echapper)}`,
     }[etat.outil] ?? '';
     let choisi = '';
     if (o) {
       const phaseChoix = p.phases.map((ph) => `<option value="${ph.id}" ${ph.id === o.phase ? 'selected' : ''}>${echapper(ph.nom)}</option>`).join('');
       const propre = {
-        zone: `<label class="champ-calage"><span>Genre de zone</span><select data-prop="categorie">${options(CATEGORIES_ZONE, o.categorie)}</select></label>`,
-        ligne: `<label class="champ-calage"><span>Genre de ligne</span><select data-prop="style">${options(STYLES_LIGNE, o.style)}</select></label>`,
-        piste: `<label class="champ-calage"><span>Largeur (m)</span><input type="number" min="1" max="30" step="0.5" value="${o.largeur ?? 4}" data-prop="largeur"></label>`,
+        zone: `${listeGenres('zone', o.categorie, 'objet', echapper)}
+          ${champCurseur('Transparence du fond (opacité)', 'prop', 'opacite', o.opacite ?? OPACITE_ZONE)}
+          ${champNombre('Épaisseur du contour', 'prop', 'contourMm', contourZoneMm(o), 0.05, 5, 0.05, 'mm')}
+          ${champCase('Afficher la surface (m²)', 'prop-case', 'afficherSurface', o.afficherSurface)}`,
+        ligne: `${listeGenres('ligne', styleLigne(o.style).cle, 'objet', echapper)}
+          ${champNombre('Épaisseur', 'prop', 'epaisseurMm', epaisseurLigneMm(o), 0.05, 5, 0.05, 'mm')}
+          ${champNombre('Échelle du motif', 'prop', 'echelleMotif', o.echelleMotif ?? 1, 0.3, 5, 0.1, '×')}
+          ${styleLigne(o.style).motif?.type === 'chevron' ? '<button type="button" class="bouton-secondaire" data-action="inverser-sens">⇄ Inverser le sens de la flèche</button>' : ''}`,
+        piste: champNombre('Largeur', 'prop', 'largeur', o.largeur ?? 4, 1, 30, 0.5, 'm'),
         texte: `<label class="champ-calage"><span>Texte</span><input type="text" value="${echapper(o.texte)}" data-prop="texte" maxlength="80"></label>
-          <label class="champ-calage"><span>Hauteur des lettres (m)</span><input type="number" min="0.2" max="10" step="0.1" value="${o.taille ?? 1}" data-prop="taille"></label>`,
-        fleche: `<label class="champ-calage"><span>Largeur (m)</span><input type="number" min="0.1" max="10" step="0.1" value="${o.largeur ?? LARGEUR_FLECHE}" data-prop="largeur"></label>
-          <label class="champ-calage"><span>Longueur de la pointe (m)</span><input type="number" min="0.3" max="20" step="0.1" value="${o.pointe ?? POINTE_FLECHE}" data-prop="pointe"></label>`,
+          ${champNombre('Hauteur des lettres', 'prop', 'taille', o.taille ?? 1, 0.2, 10, 0.1, 'm')}
+          ${champCase('Ligne de repère', 'prop-case', 'repere', Boolean(o.repere) || etat.attenteRepere === o.id)}
+          ${o.repere ? `<label class="champ-calage"><span>Bout du repère</span><select data-prop="repereBout">
+            ${[['fleche', 'Flèche'], ['point', 'Point'], ['aucun', 'Rien']].map(([v, t]) => `<option value="${v}" ${(o.repereBout ?? 'fleche') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
+          ${etat.attenteRepere === o.id ? '<p class="aide-calage">Cliquez le point visé sur le plan (Échap = sans repère).</p>' : ''}`,
+        fleche: `${champNombre('Largeur de la ligne', 'prop', 'largeur', dimensionsFleche(o).largeur, 0.05, 5, 0.05, 'm')}
+          ${champNombre('Échelle de la pointe', 'prop', 'echelle', Math.round(dimensionsFleche(o).echelle * 100) / 100, 0.3, 10, 0.1, '×')}`,
       }[o.type];
+      const decaler = o.type !== 'texte' ? '<button type="button" class="bouton-secondaire" data-action="decaler-choisi">⇉ Décaler…</button>' : '';
       choisi = `<h3>Élément choisi</h3><p class="resume-chantier">${echapper(resumeObjet(o))}</p>${propre}
         ${p.couleurs === 'phases' ? '<p class="aide-calage">Couleurs « une par phase » : la couleur vient de la phase.</p>' : `<div class="couleur-element"><label class="champ-calage"><span>Couleur</span><input type="color" value="${couleurObjet({ ...p, couleurs: 'objets' }, o)}" data-prop="couleur"></label>
           ${o.couleur ? '<button type="button" class="lien-calage" data-action="couleur-origine">Couleur d\'origine</button>' : ''}</div>`}
         <label class="champ-calage"><span>Phase</span><select data-prop="phase">${phaseChoix}</select></label>
-        <button type="button" class="bouton-secondaire" data-action="effacer">Effacer cet élément</button>`;
+        <div class="actions-chantier">${decaler}<button type="button" class="bouton-secondaire" data-action="effacer">Effacer cet élément</button></div>`;
     }
     zone.innerHTML = `
+      <h3>Plan</h3>
+      <label class="champ-calage"><span>Échelle d'impression 1 :</span><input type="number" min="1" max="10000" step="50" value="${p.echelle ?? ECHELLE_PAPIER}" data-champ="echelle"></label>
       <h3>Phases</h3>
       <ul class="phases-chantier">${p.phases.map((ph) => `<li class="${ph.id === p.phaseActive ? 'active' : ''}">
         <input type="checkbox" data-phase-visible="${ph.id}" ${ph.visible !== false ? 'checked' : ''} aria-label="Montrer ${echapper(ph.nom)}">
@@ -493,6 +604,7 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
     if (b.dataset.outil) {
       etat.outil = b.dataset.outil;
       etat.saisie = null;
+      etat.attenteRepere = null;
       if (etat.outil !== 'choisir') etat.choisi = null;
       return majTout();
     }
@@ -516,6 +628,37 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
       enregistrer();
       return majTout();
     }
+    if (b.dataset.genre) {
+      const { genre, cible, valeur } = b.dataset;
+      if (cible === 'outil') {
+        if (genre === 'zone') etat.categorie = valeur;
+        else {
+          etat.style = valeur;
+          etat.epaisseurMm = null; // l'épaisseur redevient celle du genre
+          if (etat.saisie?.source) etat.saisie.style = valeur;
+        }
+        if (etat.saisie && !etat.saisie.source) Object.assign(etat.saisie, { categorie: etat.categorie, style: etat.style });
+        return majTout();
+      }
+      const o = p.objets.find((x) => x.id === etat.choisi);
+      if (!o || !avantChangement()) return;
+      if (genre === 'zone') o.categorie = valeur;
+      else {
+        o.style = valeur;
+        delete o.epaisseurMm; // épaisseur du nouveau genre
+      }
+      enregistrer();
+      return majTout();
+    }
+    if (b.dataset.action === 'inverser-sens') {
+      const o = p.objets.find((x) => x.id === etat.choisi);
+      if (!o || !avantChangement()) return;
+      if (o.sens === 'inverse') delete o.sens;
+      else o.sens = 'inverse';
+      enregistrer();
+      return majTout();
+    }
+    if (b.dataset.action === 'decaler-choisi') return decalerChoisi();
     if (b.dataset.action === 'effacer') return supprimerChoisi();
     if (b.dataset.action === 'annuler') return annuler();
     if (b.dataset.action === 'fond-points') {
@@ -565,15 +708,66 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
     }
   });
 
+  /** Valeur d'un champ nombre, bornée par son min / max (virgule acceptée) ; null si illisible. */
+  const nombreDe = (c) => {
+    const v = Number(String(c.value).replace(',', '.'));
+    if (!Number.isFinite(v) || String(c.value).trim() === '') return null;
+    return Math.min(c.max !== '' ? Number(c.max) : Infinity, Math.max(c.min !== '' ? Number(c.min) : -Infinity, v));
+  };
+
+  // Curseur de transparence : l'aperçu suit le doigt ; un seul « Annuler » pour tout le glissement.
+  page.addEventListener('input', (ev) => {
+    const c = ev.target;
+    const p = plan();
+    if (!p || c.type !== 'range') return;
+    const valeur = Number(c.value);
+    const etiquette = page.querySelector(`[data-valeur-de="${c.dataset.reglage ?? c.dataset.prop}"]`);
+    if (etiquette) etiquette.textContent = `${Math.round(valeur)} %`;
+    if (c.dataset.reglage) {
+      etat[c.dataset.reglage] = valeur;
+      return;
+    }
+    const o = p.objets.find((x) => x.id === etat.choisi);
+    if (!o) return;
+    if (!etat.reglageEnCours) {
+      if (!avantChangement()) return;
+      etat.reglageEnCours = true;
+    }
+    o[c.dataset.prop] = valeur;
+    vue?.redessinerDessus();
+  });
+
   page.addEventListener('change', (ev) => {
     const c = ev.target;
     const p = plan();
     if (!p) return;
+    if (c.type === 'range') {
+      if (etat.reglageEnCours) enregistrer();
+      etat.reglageEnCours = false;
+      return;
+    }
     if (c.dataset.reglage) {
-      etat[c.dataset.reglage] = c.type === 'number' ? Math.max(Number(c.min) || 0.1, Number(c.value) || Number(c.min) || 1) : c.value;
-      if (etat.saisie) Object.assign(etat.saisie, { categorie: etat.categorie, style: etat.style, largeur: etat.largeur });
+      const cle = c.dataset.reglage;
+      if (c.type === 'number') {
+        const v = nombreDe(c);
+        if (v === null) return majPanneau();
+        etat[cle] = v;
+      } else etat[cle] = c.value;
+      if (etat.saisie && !etat.saisie.source) Object.assign(etat.saisie, { categorie: etat.categorie, style: etat.style, largeur: etat.largeur });
+      majConsigne();
       vue?.redessinerDessus();
       return;
+    }
+    if (c.dataset.reglageCase) {
+      etat[c.dataset.reglageCase] = c.checked;
+      return majConsigne();
+    }
+    if (c.dataset.champ === 'echelle') {
+      const v = nombreDe(c);
+      if (v === null || !avantChangement()) return majPanneau();
+      p.echelle = v;
+      enregistrer();
+      return vue?.redessinerDessus();
     }
     if (c.dataset.phaseVisible) {
       if (!avantChangement()) return;
@@ -593,12 +787,43 @@ export function ouvrirPlansChantier({ projet: projetDonne, modifie, plans = () =
       enregistrer();
       return vue?.redessinerDessus();
     }
+    if (c.dataset.propCase) {
+      const o = p.objets.find((x) => x.id === etat.choisi);
+      if (!o) return;
+      const cle = c.dataset.propCase;
+      if (cle === 'repere') {
+        if (c.checked) {
+          etat.attenteRepere = o.id; // le prochain clic sur le plan donne le point visé
+          etat.repereBout = o.repereBout ?? etat.repereBout;
+        } else {
+          etat.attenteRepere = null;
+          if (o.repere && avantChangement()) {
+            delete o.repere;
+            delete o.repereBout;
+            enregistrer();
+          }
+        }
+        return majTout();
+      }
+      if (!avantChangement()) return;
+      if (c.checked) o[cle] = true;
+      else delete o[cle];
+      enregistrer();
+      majPanneau();
+      return vue?.redessinerDessus();
+    }
     if (c.dataset.prop) {
       const o = p.objets.find((x) => x.id === etat.choisi);
-      if (!o || !avantChangement()) return;
+      if (!o) return;
       const cle = c.dataset.prop;
       if (cle === 'texte' && !c.value.trim()) return majPanneau();
-      o[cle] = c.type === 'number' ? Math.max(Number(c.min) || 0.1, Number(c.value) || 1) : c.value.trim();
+      let valeur = c.value.trim();
+      if (c.type === 'number') {
+        valeur = nombreDe(c);
+        if (valeur === null) return majPanneau();
+      }
+      if (!avantChangement()) return;
+      o[cle] = valeur;
       enregistrer();
       majPanneau();
       vue?.redessinerDessus();

@@ -3,6 +3,8 @@ import {
   nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet, retirerObjet, objetsVisibles, couleurObjet, aire, longueur,
   distanceAuSegment, dansPolygone, objetSousLePoint, deplacerObjet, bornesObjets, pointeDeFleche, lignesPourAccroche,
   resumeObjet, copiePlan, categorieZone, styleLigne, sommetSousLePoint, positionsLeLong, morceauxAvecTrous,
+  decalerPolyligne, coteDuPoint, ligneLaPlusProche, centreZone, texteSurface, dimensionsFleche, metresParMm, epaisseurLigneMm,
+  contourZoneMm, opaciteZone, pointsDe, LARGEUR_FLECHE,
 } from '../src/topo/plan-chantier.js';
 import { completerProjet } from '../src/projet/projet.js';
 
@@ -176,6 +178,71 @@ describe('plan de chantier 0.287.0 : couleurs, poignées, lignes à motifs, flè
     const f = { type: 'fleche', points: [[E, N], [E + 20, N]], largeur: 2 };
     expect(objetSousLePoint([f], [E + 10, N + 1.1], 0.2)).toBe(f);
     expect(objetSousLePoint([f], [E + 10, N + 1.5], 0.2)).toBeNull();
-    expect(resumeObjet(f)).toBe('Flèche · 2.0 m de large · 20.0 m');
+    expect(resumeObjet(f)).toBe('Flèche · 20.0 m');
+  });
+});
+
+describe('plan de chantier 0.288.0 : décalage, flèche, surface, unités du papier', () => {
+  it('décalage d\'une ligne : à gauche (+) ou à droite (−) en suivant son sens', () => {
+    expect(decalerPolyligne([[0, 0], [10, 0]], 2)).toEqual([[0, 2], [10, 2]]);
+    expect(decalerPolyligne([[0, 0], [10, 0]], -0.5)).toEqual([[0, -0.5], [10, -0.5]]);
+    expect(decalerPolyligne([[0, 0], [10, 0], [10, 10]], 1)).toEqual([[0, 1], [9, 1], [9, 10]]); // le coin se croise
+  });
+  it('décalage d\'un contour fermé : reste fermé, dedans ou dehors', () => {
+    const anneau = [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]; // sens inverse des aiguilles : la gauche est dedans
+    expect(decalerPolyligne(anneau, 1)).toEqual([[1, 1], [9, 1], [9, 9], [1, 9], [1, 1]]);
+    expect(decalerPolyligne(anneau, -1)).toEqual([[-1, -1], [11, -1], [11, 11], [-1, 11], [-1, -1]]);
+  });
+  it('côté du clic par rapport à la ligne', () => {
+    expect(coteDuPoint([[0, 0], [10, 0]], [5, 3])).toBe(1);
+    expect(coteDuPoint([[0, 0], [10, 0]], [5, -3])).toBe(-1);
+    expect(coteDuPoint([[10, 0], [0, 0]], [5, 3])).toBe(-1); // ligne dessinée dans l'autre sens
+  });
+  it('ligne la plus proche (traits du plan DXF ou éléments dessinés), refermée si elle est fermée', () => {
+    const l = (pts, ferme = false) => ({ points: pts.map(([est, nord]) => ({ est, nord })), ferme });
+    const lignes = [l([[0, 0], [10, 0]]), l([[0, 5], [10, 5], [10, 8], [0, 8]], true)];
+    expect(ligneLaPlusProche(lignes, [5, 0.2], 0.5)).toEqual([[0, 0], [10, 0]]);
+    expect(ligneLaPlusProche(lignes, [5, 8.1], 0.5)).toHaveLength(5);
+    expect(ligneLaPlusProche(lignes, [5, 3], 0.5)).toBeNull();
+  });
+  it('flèche : largeur 0,2 m au départ, échelle de la pointe, anciennes flèches gardées', () => {
+    expect(dimensionsFleche({})).toEqual({ largeur: 0.2, echelle: 1, longueurPointe: 1.2, largeurPointe: 0.9 });
+    const d = dimensionsFleche({ echelle: 2 });
+    expect(d.longueurPointe).toBeCloseTo(2.4, 6);
+    expect(d.largeurPointe).toBeCloseTo(1.8, 6);
+    expect(dimensionsFleche({ largeur: 0.9, pointe: 2.5 }).longueurPointe).toBeCloseTo(2.5, 6);
+    expect(LARGEUR_FLECHE).toBe(0.2);
+  });
+  it('surface d\'une zone : centre et texte en m²', () => {
+    expect(centreZone([[0, 0], [10, 0], [10, 4], [0, 4]])).toEqual([5, 2]);
+    expect(texteSurface([[0, 0], [10, 0], [10, 31.25], [0, 31.25]])).toBe('313 m²');
+  });
+  it('unités du papier : 1 mm = échelle / 1000 m, épaisseurs et opacité par défaut ou choisies', () => {
+    expect(metresParMm({})).toBe(0.2);
+    expect(metresParMm({ echelle: 500 })).toBe(0.5);
+    expect(epaisseurLigneMm({ style: 'cloture' })).toBe(0.35);
+    expect(epaisseurLigneMm({ style: 'cloture', epaisseurMm: 0.7 })).toBe(0.7);
+    expect(contourZoneMm({ categorie: 'emprise' })).toBe(0.7);
+    expect(contourZoneMm({ categorie: 'stockage', contourMm: 1 })).toBe(1);
+    expect(opaciteZone({})).toBe(0.2);
+    expect(opaciteZone({ opacite: 60 })).toBe(0.6);
+    expect(opaciteZone({ opacite: 150 })).toBe(1);
+  });
+  it('flèche simple et double, anciens genres « barrière » et « limite » conservés', () => {
+    expect(styleLigne('flecheSimple').motif.type).toBe('chevron');
+    expect(styleLigne('flecheDouble').motif.type).toBe('double');
+    expect(styleLigne('barriere').cle).toBe('flecheSimple');
+    expect(styleLigne('limite').cle).toBe('flecheDouble');
+  });
+  it('texte avec ligne de repère : le point visé fait partie de ses points, il reste en place si le texte bouge', () => {
+    const t = { type: 'texte', point: [E, N], texte: 'Base', repere: [E + 5, N + 5] };
+    expect(pointsDe(t)).toEqual([[E, N], [E + 5, N + 5]]);
+    deplacerObjet(t, 2, 0);
+    expect(t.point).toEqual([E + 2, N]);
+    expect(t.repere).toEqual([E + 5, N + 5]);
+    expect(bornesObjets([t]).estMax).toBe(E + 5);
+  });
+  it('nouveau plan : échelle 1:200', () => {
+    expect(nouveauPlanChantier('P').echelle).toBe(200);
   });
 });
