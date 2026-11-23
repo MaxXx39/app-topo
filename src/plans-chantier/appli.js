@@ -22,8 +22,8 @@ import { creerVueChantier } from './vue.js';
 import { listeGenres } from './apercu.js';
 import { chargerBibliothequeBase, entreesBibliotheque, filtrerEntrees, CATEGORIES_SYMBOLES, symbolesDuDxf, ajouterSymbolesProjet } from './bibliotheque.js';
 import { dessinerVignette, symboleDeLObjet } from './dessin.js';
-import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX } from '../topo/symboles.js';
-import { estPose, changerOrdre, angleDeLaLigne } from '../topo/plan-chantier.js';
+import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
+import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM } from '../topo/plan-chantier.js';
 import { reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
@@ -918,7 +918,13 @@ export function ouvrirPlansChantier({
         zone: `${listeGenres('zone', o.categorie, 'objet', echapper)}
           ${champCurseur('Transparence du fond (opacité)', 'prop', 'opacite', o.opacite ?? OPACITE_ZONE)}
           ${champNombre('Épaisseur du contour', 'prop', 'contourMm', contourZoneMm(o), 0.05, 5, 0.05, 'mm')}
-          ${champCase('Afficher la surface (m²)', 'prop-case', 'afficherSurface', o.afficherSurface)}`,
+          ${champCase('Afficher la surface (m²)', 'prop-case', 'afficherSurface', o.afficherSurface)}
+          <label class="champ-calage"><span>Matériau du stock</span><select data-prop="materiau"><option value="">— (couleur du genre)</option>
+            ${MATERIAUX_TAS.map((m) => `<option value="${m.cle}" ${o.materiau === m.cle ? 'selected' : ''}>${m.nom}</option>`).join('')}</select></label>
+          ${champCase('Effet de tas (hauteur, talus)', 'prop-case', 'tasOui', o.tasH > 0)}
+          ${o.tasH > 0 ? `${champNombre('Hauteur du tas', 'prop', 'tasH', o.tasH, 0.2, 30, 0.1, 'm')}
+            ${champNombre('Talus (m horizontaux pour 1 m de hauteur)', 'prop', 'tasTalus', o.tasTalus ?? TAS_TALUS, 0.3, 5, 0.1, '')}
+            ${champCase('Écrire la hauteur', 'prop-case', 'afficherHauteur', o.afficherHauteur)}` : ''}`,
         ligne: `${listeGenres('ligne', styleLigne(o.style).cle, 'objet', echapper)}
           ${champNombre('Épaisseur', 'prop', 'epaisseurMm', epaisseurLigneMm(o), 0.05, 5, 0.05, 'mm')}
           ${champNombre('Échelle du motif', 'prop', 'echelleMotif', o.echelleMotif ?? 1, 0.3, 5, 0.1, '×')}
@@ -951,6 +957,7 @@ export function ouvrirPlansChantier({
     zone.innerHTML = `
       <h3>Plan</h3>
       <label class="champ-calage"><span>Échelle d'impression 1 :</span><input type="number" min="1" max="10000" step="50" value="${p.echelle ?? ECHELLE_PAPIER}" data-champ="echelle"></label>
+      <label class="champ-calage"><span>Texte des symboles (mm sur le papier)</span><input type="number" min="0.5" max="12" step="0.5" value="${p.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm"></label>
       <h3>Phases</h3>
       <ul class="phases-chantier">${p.phases.map((ph) => `<li class="${ph.id === p.phaseActive ? 'active' : ''}">
         <input type="checkbox" data-phase-visible="${ph.id}" ${ph.visible !== false ? 'checked' : ''} aria-label="Montrer ${echapper(ph.nom)}">
@@ -981,10 +988,13 @@ export function ouvrirPlansChantier({
   /** Réglages d'un symbole posé : rotation ; grue : modèle, flèche, châssis, rayon ; base-vie à étage : pose, textes. */
   function panneauSymbole(o) {
     const sy = symboleDeLObjet(bib(), o);
-    const dims = sy && o.type !== 'grue' ? `<p class="aide-calage">${n1(sy.largeur)} × ${n1(sy.hauteur)} m (échelle réelle)</p>` : '';
+    const k = echelleDeLObjet(o);
+    const dims = sy && o.type !== 'grue' ? `<p class="aide-calage">${n1(sy.largeur * k)} × ${n1(sy.hauteur * k)} m${k === 1 ? ' (échelle réelle)' : ` (échelle ×${k})`}</p>` : '';
+    const echelle = o.type === 'grue' ? '' : `<div class="ligne-rotation">${champNombre('Échelle du bloc', 'prop', 'echelle', k, 0.1, 10, 0.05, '×')}
+      ${k !== 1 ? '<button type="button" class="bouton-secondaire" data-echelle-reelle title="Revenir à la taille réelle">Taille réelle</button>' : ''}</div>`;
     const rotation = `<div class="ligne-rotation">${champNombre('Rotation', 'prop', 'rotation', o.rotation ?? 0, -360, 360, 1, '°')}
       <button type="button" class="bouton-secondaire" data-tourner="90" title="Tourner de 90° à gauche">⟲ 90°</button>
-      <button type="button" class="bouton-secondaire" data-tourner="-90" title="Tourner de 90° à droite">⟳ 90°</button></div>`;
+      <button type="button" class="bouton-secondaire" data-tourner="-90" title="Tourner de 90° à droite">⟳ 90°</button></div>${echelle}`;
     const orienter = `<div class="actions-chantier">
       <button type="button" class="bouton-secondaire ${etat.orienter?.mode === 'point' ? 'actif' : ''}" data-orienter="point" title="Cliquer ensuite le point visé (accroches)">Orienter vers un point</button>
       <button type="button" class="bouton-secondaire ${etat.orienter?.mode === 'ligne' ? 'actif' : ''}" data-orienter="ligne" title="Cliquer ensuite une ligne (plan DXF ou dessin)">Aligner sur une ligne</button></div>`;
@@ -1143,6 +1153,13 @@ export function ouvrirPlansChantier({
     }
     if (b.dataset.orienter) {
       etat.orienter = etat.orienter?.mode === b.dataset.orienter ? null : { id: etat.choisi, mode: b.dataset.orienter };
+      return majTout();
+    }
+    if (b.dataset.echelleReelle !== undefined) {
+      const o = p.objets.find((x) => x.id === etat.choisi);
+      if (!o || !avantChangement()) return;
+      delete o.echelle;
+      enregistrer();
       return majTout();
     }
     if (b.dataset.tourner || b.dataset.poseEtage !== undefined) {
@@ -1348,6 +1365,13 @@ export function ouvrirPlansChantier({
       enregistrer();
       return vue?.redessinerDessus();
     }
+    if (c.dataset.champ === 'tailleTexteMm') {
+      const v = nombreDe(c);
+      if (v === null || !avantChangement()) return majPanneau();
+      p.tailleTexteMm = v;
+      enregistrer();
+      return vue?.redessinerDessus();
+    }
     if (c.dataset.phaseVisible) {
       if (!avantChangement()) return;
       p.phases.find((x) => x.id === c.dataset.phaseVisible).visible = c.checked;
@@ -1370,6 +1394,21 @@ export function ouvrirPlansChantier({
       const o = p.objets.find((x) => x.id === etat.choisi);
       if (!o) return;
       const cle = c.dataset.propCase;
+      if (cle === 'tasOui') {
+        if (!avantChangement()) return;
+        if (c.checked) {
+          o.tasH = o.tasH > 0 ? o.tasH : TAS_HAUTEUR;
+          o.tasTalus ??= TAS_TALUS;
+          o.afficherHauteur = true;
+        } else {
+          delete o.tasH;
+          delete o.tasTalus;
+          delete o.afficherHauteur;
+        }
+        enregistrer();
+        majPanneau();
+        return vue?.redessinerDessus();
+      }
       if (cle === 'chassisOui') {
         if (!avantChangement()) return;
         o.chassis = c.checked ? (coteChassis(o.chassisAvant) ?? 4.5).toFixed(2) : 'aucun';
@@ -1417,6 +1456,7 @@ export function ouvrirPlansChantier({
       }
       if (!avantChangement()) return;
       o[cle] = valeur;
+      if (cle === 'materiau' && !valeur) delete o.materiau;
       if (cle === 'chassis') o.chassis = Number(valeur).toFixed(2); // côté libre (m), gardé en texte comme « 4.50 »
       enregistrer();
       majPanneau();

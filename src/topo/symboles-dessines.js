@@ -6,180 +6,11 @@
 import { ARDOISE, BLANC_BLOC, equipementsVehicule } from './symboles.js';
 import { bornesPrimitives } from './blocs-dxf.js';
 
-const r3 = (v) => Math.round(v * 1000) / 1000;
-const plat = (pts) => pts.flatMap(([x, y]) => [r3(x), r3(y)]);
-
-// ------------------------------------------------------------------ Petites formes (listes de points [x, y])
-
-/** Rectangle [x0, y0] – [x1, y1], coins arrondis de rayon r (m). */
-export function rectArrondi(x0, y0, x1, y1, r = 0, n = 4) {
-  if (r <= 0) return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
-  const pts = [];
-  const coin = (cx, cy, a0) => {
-    for (let i = 0; i <= n; i++) {
-      const a = a0 + (Math.PI / 2) * (i / n);
-      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
-    }
-  };
-  coin(x1 - r, y0 + r, -Math.PI / 2);
-  coin(x1 - r, y1 - r, 0);
-  coin(x0 + r, y1 - r, Math.PI / 2);
-  coin(x0 + r, y0 + r, Math.PI);
-  return pts;
-}
-/** Cercle (polygone de n côtés). */
-export const cercle = (cx, cy, r, n = 28) => Array.from({ length: n }, (_, i) => [cx + r * Math.cos((2 * Math.PI * i) / n), cy + r * Math.sin((2 * Math.PI * i) / n)]);
-/** Triangle équilatéral pointe en haut, centré en (cx, cy), de côté c. */
-const triangle = (cx, cy, c) => {
-  const h = (c * Math.sqrt(3)) / 2;
-  return [[cx - c / 2, cy - h / 3], [cx + c / 2, cy - h / 3], [cx, cy + (2 * h) / 3]];
-};
-/** Points tournés de a degrés autour de (cx, cy). */
-const tourner = (pts, a, cx = 0, cy = 0) => {
-  const [c, s] = [Math.cos((a * Math.PI) / 180), Math.sin((a * Math.PI) / 180)];
-  return pts.map(([x, y]) => [cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c]);
-};
-
-// ------------------------------------------------------------------ Primitives
-
-const boite = (contours) => {
-  const b = bornesPrimitives([{ g: 'h', p: contours }]);
-  return [b.xMin, b.yMin, b.xMax, b.yMax].map(r3);
-};
-/** Remplissage d'un ou plusieurs contours (le 2e et les suivants = trous), matériau mat. */
-const plein = (k, mat, ...contours) => {
-  const p = contours.map(plat);
-  return { g: 'h', k, mat, p, b: boite(p), m: false };
-};
-const trait = (pts, ferme = false, k = ARDOISE) => ({ g: 'l', k, p: plat(pts), f: ferme, mat: 'trait' });
-/** Pièce : remplissage + contour fin. */
-const piece = (k, mat, pts, kTrait = ARDOISE) => [plein(k, mat, pts), trait(pts, true, kTrait)];
-const texte = (t, x, y, h, { k = '#1e293b', a = 0, pl = false } = {}) => ({ g: 't', k, x: r3(x), y: r3(y), h, a, t, ah: 1, av: 2, ...(pl ? { pl: true } : {}) });
-const pneu = (x0, y0, x1, y1) => piece('#2b2f33', 'caoutchouc', rectArrondi(x0, y0, x1, y1, Math.min(x1 - x0, y1 - y0) * 0.25));
-
-// ------------------------------------------------------------------ Camions
-
-/**
- * Camion (devant en bas) : cabine, roues, corps (fonction qui reçoit la boîte du plateau) ; phares, feux et rétroviseurs
- * comme les camions du DXF. L : longueur (m), W : largeur (m), couleurCabine, essieux : positions y des essieux arrière.
- */
-function camion({ L = 9, W = 2.5, couleurCabine = '#eef1f4', essieux = [1.6, 2.9], corps }) {
-  const y0 = -L / 2;
-  const yc = y0 + 1.9; // fin de la cabine
-  const prims = [];
-  // Roues (sous la carrosserie, dépassent un peu).
-  for (const y of [y0 + 1.0, ...essieux]) {
-    prims.push(...pneu(-W / 2 - 0.06, y - 0.5, -W / 2 + 0.35, y + 0.5), ...pneu(W / 2 - 0.35, y - 0.5, W / 2 + 0.06, y + 0.5));
-  }
-  prims.push(...piece('#5f666d', 'metal', rectArrondi(-W / 2 + 0.15, yc - 0.1, W / 2 - 0.15, L / 2 - 0.1, 0.05))); // châssis
-  prims.push(...corps({ x0: -W / 2 + 0.05, y0: yc + 0.15, x1: W / 2 - 0.05, y1: L / 2 }));
-  // Cabine : carrosserie, pare-brise, toit.
-  prims.push(...piece(couleurCabine, 'peinture', rectArrondi(-W / 2, y0, W / 2, yc, 0.35)));
-  prims.push(...piece('#9cc9e6', 'vitre', rectArrondi(-W / 2 + 0.18, y0 + 0.2, W / 2 - 0.18, y0 + 0.75, 0.15)));
-  prims.push(...piece(couleurCabine, 'peinture', rectArrondi(-W / 2 + 0.15, y0 + 0.8, W / 2 - 0.15, yc - 0.1, 0.2)));
-  return [...prims, ...equipementsVehicule('Camion', { xMin: -W / 2, yMin: y0, xMax: W / 2, yMax: L / 2 })];
-}
-
-/** Citerne (cylindre vu de dessus) avec ses cerclages et ses trous d'homme. */
-function citerne(b, couleur, { bandes = '#8a9198', trous = 3 } = {}) {
-  const res = [...piece(couleur, 'metal', rectArrondi(b.x0, b.y0, b.x1, b.y1, (b.x1 - b.x0) * 0.42, 6))];
-  const n = Math.max(2, Math.round((b.y1 - b.y0) / 1.3));
-  for (let i = 1; i < n; i++) {
-    const y = b.y0 + ((b.y1 - b.y0) * i) / n;
-    res.push(trait([[b.x0 + 0.05, y], [b.x1 - 0.05, y]], false, bandes));
-  }
-  for (let i = 0; i < trous; i++) {
-    const y = b.y0 + ((b.y1 - b.y0) * (i + 0.5)) / trous;
-    res.push(...piece('#aeb4ba', 'metal', cercle(0, y, 0.28, 18)), trait(cercle(0, y, 0.16, 14), true));
-  }
-  res.push(trait([[0, b.y0 + 0.3], [0, b.y1 - 0.3]], false, '#5f666d')); // passerelle
-  return res;
-}
-
-function camionCiterne() {
-  return [...camion({ L: 9, corps: (b) => citerne(b, '#c3c8cd') }), texte('CITERNE', 0, 1.1, 0.42, { a: 90, pl: true })];
-}
-
-function camionCarburant() {
-  const corps = (b) => [
-    ...citerne(b, '#eef1f4', { bandes: '#aeb4ba' }),
-    plein('#d63a3a', 'peinture', rectArrondi(b.x0 + 0.02, b.y0 + 0.4, b.x0 + 0.16, b.y1 - 0.4)),
-    plein('#d63a3a', 'peinture', rectArrondi(b.x1 - 0.16, b.y0 + 0.4, b.x1 - 0.02, b.y1 - 0.4)),
-    // Plaque orange de matières dangereuses à l'arrière.
-    ...piece('#f08c00', 'peinture', rectArrondi(-0.2, b.y1 - 0.02, 0.2, b.y1 + 0.12)),
-  ];
-  return [...camion({ L: 9, corps }), ...piece('#f08c00', 'peinture', rectArrondi(-0.2, -4.62, 0.2, -4.5)), texte('CARBURANT', 0, 1.1, 0.4, { a: 90, pl: true })];
-}
-
-function camionBitume() {
-  const corps = (b) => [
-    ...citerne(b, '#3a3f45', { bandes: '#5f666d', trous: 2 }),
-    // Rampe d'épandage à l'arrière, plus large que le camion, avec ses buses.
-    ...piece('#8a9198', 'metal', rectArrondi(-1.7, b.y1 + 0.05, 1.7, b.y1 + 0.22, 0.04)),
-    ...Array.from({ length: 12 }, (_, i) => plein('#2b2f33', 'caoutchouc', cercle(-1.55 + (3.1 * i) / 11, b.y1 + 0.135, 0.045, 8))),
-  ];
-  return [...camion({ L: 9, corps, couleurCabine: '#f2a20c' }), texte('BITUME', 0, 0.9, 0.42, { a: 90, pl: true, k: '#1e293b' })];
-}
-
-function camionBalai() {
-  const L = 6.2;
-  const W = 2.2;
-  const corps = (b) => [
-    ...piece('#f08c00', 'peinture', rectArrondi(b.x0, b.y0, b.x1, b.y1, 0.25)),
-    plein('#f8fafc', 'blanc', rectArrondi(b.x0 + 0.1, b.y0 + 0.9, b.x1 - 0.1, b.y0 + 1.15)),
-    plein('#f8fafc', 'blanc', rectArrondi(b.x0 + 0.1, b.y1 - 1.0, b.x1 - 0.1, b.y1 - 0.75)),
-    ...piece('#5f666d', 'metal', rectArrondi(-0.6, b.y0 + 0.2, 0.6, b.y0 + 0.6, 0.1)), // bouche d'aspiration
-  ];
-  const brosse = (x) => {
-    const y = -L / 2 + 0.25;
-    const res = [...piece('#8a6a4b', 'gravats', cercle(x, y, 0.5, 24))];
-    for (let i = 0; i < 12; i++) {
-      const a = (2 * Math.PI * i) / 12;
-      res.push(trait([[x + 0.12 * Math.cos(a), y + 0.12 * Math.sin(a)], [x + 0.48 * Math.cos(a), y + 0.48 * Math.sin(a)]], false, '#5c4630'));
-    }
-    return [...res, ...piece('#5f666d', 'metal', cercle(x, y, 0.12, 12))];
-  };
-  return [...camion({ L, W, essieux: [1.8], corps, couleurCabine: '#f8fafc' }), ...brosse(-1.05), ...brosse(1.05), texte('BALAYEUSE', 0, 1.3, 0.34, { a: 90, pl: true })];
-}
-
-/** Tracteur agricole et sa benne (d'après l'image de l'utilisateur : benne verte en haut, tracteur rouge en bas). */
-function tracteurBenne() {
-  const res = [];
-  // Benne : caisse verte, rebord, 2 essieux.
-  for (const y of [2.6, 3.7]) res.push(...pneu(-1.38, y - 0.42, -1.12, y + 0.42), ...pneu(1.12, y - 0.42, 1.38, y + 0.42));
-  res.push(...piece('#2f9e55', 'peinture', rectArrondi(-1.2, 0.6, 1.2, 5.6, 0.06)));
-  res.push(trait(rectArrondi(-1.08, 0.72, 1.08, 5.48, 0.04), true, '#e8f5e9'));
-  // Timon en V.
-  res.push(trait([[-0.75, 0.6], [0, -0.9], [0.75, 0.6]], false), trait([[0, -0.9], [0, -1.45]], false));
-  res.push(...piece('#8a9198', 'metal', cercle(0, -1.45, 0.08, 10)));
-  // Tracteur : grandes roues arrière, petites roues avant, capot, cabine.
-  res.push(...pneu(-1.25, -2.85, -0.75, -1.65), ...pneu(0.75, -2.85, 1.25, -1.65));
-  res.push(...pneu(-1.05, -5.35, -0.65, -4.65), ...pneu(0.65, -5.35, 1.05, -4.65));
-  res.push(...piece('#d63a3a', 'peinture', rectArrondi(-0.75, -3.1, 0.75, -1.45, 0.15)));
-  res.push(...piece('#2b2f33', 'caoutchouc', rectArrondi(-0.55, -3.05, 0.55, -1.75, 0.1))); // toit de la cabine
-  res.push(...piece('#9cc9e6', 'vitre', rectArrondi(-0.5, -3.05, 0.5, -2.75, 0.08)));
-  res.push(...piece('#d63a3a', 'peinture', rectArrondi(-0.42, -5.55, 0.42, -3.05, 0.3))); // capot
-  res.push(trait([[-0.18, -5.3], [-0.18, -3.4]], false, '#a12a2a'), trait([[0.18, -5.3], [0.18, -3.4]], false, '#a12a2a'));
-  res.push(...equipementsVehicule('Camion', { xMin: -0.6, yMin: -5.6, xMax: 0.6, yMax: -5.0 }).filter((p) => p.mat === 'phare'));
-  return res;
-}
-
-/** Niveleuse (devant en bas) : roues avant, long châssis, lame en biais, cabine, moteur, roues arrière en tandem. */
-function niveleuse() {
-  const jaune = '#f2a20c';
-  const res = [];
-  for (const y of [1.6, 3.0]) res.push(...pneu(-1.3, y - 0.55, -0.85, y + 0.55), ...pneu(0.85, y - 0.55, 1.3, y + 0.55));
-  res.push(...pneu(-1.2, -4.6, -0.8, -3.6), ...pneu(0.8, -4.6, 1.2, -3.6));
-  res.push(...piece(jaune, 'peinture', rectArrondi(-0.95, -4.3, 0.95, -3.95, 0.08))); // essieu avant
-  res.push(...piece(jaune, 'peinture', rectArrondi(-0.28, -4.4, 0.28, 0.9, 0.12))); // col de cygne
-  res.push(...piece('#5f666d', 'metal', cercle(0, -1.2, 0.85, 28), cercle(0, -1.2, 0.6, 24)));
-  res.push(...piece('#8a9198', 'metal', tourner(rectArrondi(-1.9, -1.32, 1.9, -1.08, 0.04), 18, 0, -1.2))); // lame
-  res.push(...piece(jaune, 'peinture', rectArrondi(-1.0, 0.7, 1.0, 2.3, 0.25))); // cabine
-  res.push(...piece('#9cc9e6', 'vitre', rectArrondi(-0.82, 0.85, 0.82, 1.35, 0.12)));
-  res.push(...piece(jaune, 'peinture', rectArrondi(-1.0, 2.3, 1.0, 4.5, 0.2))); // moteur
-  for (let i = 0; i < 5; i++) res.push(trait([[-0.7, 3.0 + i * 0.25], [0.7, 3.0 + i * 0.25]], false, '#b37a0a'));
-  return res;
-}
+import {
+  r3, plat, rectArrondi, cercle, triangle, tourner, boite, plein, motif, trait, piece, texte, epais, NOIR as NOIR_OUTILS,
+} from './symboles-outils.js';
+void r3; void plat; void boite; void NOIR_OUTILS; void tourner;
+export { rectArrondi, cercle };
 
 // ------------------------------------------------------------------ Base-vie
 
@@ -203,31 +34,6 @@ function wcHommeFemme() {
     ...homme(-0.28, -0.08, 0.62, '#1e293b'),
     ...femme(0.28, -0.08, 0.62, '#b4234f'),
     texte('WC', 0, 0.44, 0.2, { pl: true }),
-  ];
-}
-
-/** Logo du recyclage : 3 flèches qui tournent autour d'un triangle, centré en (x, y), taille t. */
-function logoRecyclage(x, y, t, k = '#f8fafc') {
-  const res = [];
-  for (let i = 0; i < 3; i++) {
-    const a = 90 + i * 120;
-    // Une branche : bande le long d'un côté du triangle, terminée par une pointe.
-    const corps = [[-0.42, -0.06], [0.18, -0.06], [0.18, 0.06], [-0.42, 0.06]].map(([u, v]) => [u * t, v * t]);
-    const pointe = [[0.16, -0.16], [0.42, 0], [0.16, 0.16]].map(([u, v]) => [u * t, v * t]);
-    const place = (pts) => tourner(pts.map(([u, v]) => [u, v - 0.3 * t]), a + 90).map(([u, v]) => [x + u, y + v]);
-    res.push(plein(k, 'blanc', place(corps)), plein(k, 'blanc', place(pointe)));
-  }
-  return res;
-}
-
-function benneRecyclage() {
-  return [
-    ...piece('#2f9e55', 'peinture', [[-1.0, -2.0], [1.0, -2.0], [1.0, 2.0], [-1.0, 2.0]]),
-    plein('#258a49', 'peinture', [[-0.85, -1.85], [0.85, -1.85], [0.85, 1.85], [-0.85, 1.85]]),
-    trait([[-1.0, -2.0], [-0.85, -1.85]], false), trait([[1.0, -2.0], [0.85, -1.85]], false),
-    trait([[1.0, 2.0], [0.85, 1.85]], false), trait([[-1.0, 2.0], [-0.85, 1.85]], false),
-    ...logoRecyclage(0, 0.35, 1.25),
-    texte('RECYCLAGE', 0, -1.2, 0.26, { pl: true }),
   ];
 }
 
@@ -261,7 +67,7 @@ const chaussure = (x, y, r) => {
 
 function panneauInterditPublic() {
   const res = [...piece('#f8fafc', 'blanc', rectArrondi(-0.55, -0.75, 0.55, 0.75, 0.04)), ...piece(ROUGE, 'peinture', rectArrondi(-0.55, 0.38, 0.55, 0.75, 0.04))];
-  res.push(texte('CHANTIER', 0, 0.62, 0.15, { k: '#ffffff' }), texte('INTERDIT AU PUBLIC', 0, 0.46, 0.085, { k: '#ffffff' }));
+  res.push(...mot('CHANTIER', 0, 0.58, 0.13, '#ffffff'), ...mot('INTERDIT AU PUBLIC', 0, 0.44, 0.06, '#ffffff'));
   // Interdiction aux piétons : rond rouge barré sur un piéton.
   res.push(plein(ROUGE, 'peinture', cercle(0, 0.05, 0.26, 32), cercle(0, 0.05, 0.21, 32)));
   res.push(...homme(0, 0.03, 0.34, NOIR));
@@ -287,6 +93,43 @@ const fleche = (l, e, a, k, dx = 0, dy = 0) => {
 };
 const voiture = (x, k) => [plein(k, 'peinture', rectArrondi(x - 0.09, -0.15, x + 0.09, 0.15, 0.04)), plein('#f8fafc', 'blanc', rectArrondi(x - 0.06, 0.04, x + 0.06, 0.1, 0.01))];
 
+/** Balise de guidage (0,5 × 1,2 m) : fond blanc, 7 bandes rouges en biais ; sens = +1 (montent vers la droite) ou −1. */
+function balise(sens) {
+  const res = [...piece('#f8fafc', 'blanc', rectArrondi(-0.25, -0.6, 0.25, 0.6))];
+  for (let i = -3; i <= 3; i++) {
+    const c = i * 0.3;
+    const bande = [[-0.25, c - 0.1], [-0.25, c + 0.06], [0.25, c + 0.3], [0.25, c + 0.14]].map(([x, y]) => [x * sens, Math.max(-0.6, Math.min(0.6, y))]);
+    res.push(plein(ROUGE, 'peinture', bande));
+  }
+  res.push(trait(rectArrondi(-0.25, -0.6, 0.25, 0.6), true));
+  return res;
+}
+
+/** Chiffre « 0 », « 3 » ou « 5 » dessiné en traits épais (pour les panneaux : pas de texte sur plaque), centré, hauteur h. */
+function chiffre(c, cx, cy, h, k) {
+  const w = h * 0.52;
+  const e = h * 0.17;
+  const P = (pts) => pts.map(([x, y]) => [cx + x * w, cy + y * h]);
+  if (c === '0') {
+    const ext = rectArrondi(cx - w / 2 - e / 2, cy - h / 2, cx + w / 2 + e / 2, cy + h / 2, e * 1.1);
+    const inte = rectArrondi(cx - w / 2 + e / 2, cy - h / 2 + e, cx + w / 2 - e / 2, cy + h / 2 - e, e * 0.4);
+    return [plein(k, 'trait', ext, inte)];
+  }
+  const lignes = {
+    3: [[[-0.5, 0.5], [0.5, 0.5], [0.5, 0], [-0.1, 0]], [[0.5, 0], [0.5, -0.5], [-0.5, -0.5]]],
+    5: [[[0.5, 0.5], [-0.5, 0.5], [-0.5, 0.02], [0.5, 0.02], [0.5, -0.5], [-0.5, -0.5]]],
+  }[c] ?? [];
+  return lignes.map((l) => plein(k, 'trait', epais(P(l), e)));
+}
+/** Nombre de 1 à 3 chiffres parmi 0, 3 et 5 (vitesses 30 et 50). */
+const nombre = (txt, cx, cy, h, k) => [...txt].flatMap((c, i, a) => chiffre(c, cx + (i - (a.length - 1) / 2) * h * 0.78, cy, h, k));
+/** Petit mot en lettres capitales (rectangles) : seulement pour les panneaux, qui n'ont pas de plaque ; ici trait épais simplifié. */
+function mot(t, x, y, h, k) {
+  // Bande de la largeur du mot (le texte exact est écrit par le plan sur plaque : ici seulement un repère graphique).
+  const l = Math.min(1.0, [...t].length * h * 0.55);
+  return [plein(k, 'blanc', rectArrondi(x - l / 2, y - h * 0.32, x + l / 2, y + h * 0.32, h * 0.1))];
+}
+
 const SIGNAUX = [
   ['Signal Chaussée rétrécie', () => triangleDanger(() => [
     plein(NOIR, 'trait', [[-0.17, -0.16], [-0.12, -0.16], [-0.06, 0.02], [-0.06, 0.18], [-0.1, 0.18], [-0.1, 0.03]]),
@@ -296,21 +139,22 @@ const SIGNAUX = [
     plein(NOIR, 'trait', rectArrondi(-0.08, -0.17, 0.08, 0.2, 0.03)),
     plein('#e03131', 'phare', cercle(0, 0.11, 0.045, 14)), plein('#f59f00', 'phare', cercle(0, 0.01, 0.045, 14)), plein('#2f9e44', 'phare', cercle(0, -0.09, 0.045, 14)),
   ])],
-  ['Signal Vitesse maximale 30', () => rondInterdiction(() => [texte('30', 0, 0, 0.36, { k: NOIR })])],
-  ['Signal Vitesse maximale 50', () => rondInterdiction(() => [texte('50', 0, 0, 0.36, { k: NOIR })])],
+  ['Signal Vitesse maximale 30', () => rondInterdiction(() => nombre('30', 0, 0, 0.36, NOIR))],
+  ['Signal Vitesse maximale 50', () => rondInterdiction(() => nombre('50', 0, 0, 0.36, NOIR))],
   ['Signal Interdiction de dépasser', () => rondInterdiction(() => [...voiture(-0.12, ROUGE), ...voiture(0.12, NOIR)])],
   ['Signal Circulation interdite', () => rondInterdiction(() => [])],
   ['Signal Accès interdit', () => [...piece('#8a9198', 'metal', rectArrondi(-0.03, -0.95, 0.03, -0.45)), ...piece(ROUGE, 'peinture', cercle(0, 0, 0.45, 36)), plein('#f8fafc', 'blanc', rectArrondi(-0.3, -0.07, 0.3, 0.07))]],
   ['Signal Obstacle à contourner par la droite', () => [...piece('#8a9198', 'metal', rectArrondi(-0.03, -0.95, 0.03, -0.45)), ...piece(BLEU, 'peinture', cercle(0, 0, 0.45, 36)), fleche(0.55, 0.12, -135, '#f8fafc')]],
   ['Signal Obstacle à contourner par la gauche', () => [...piece('#8a9198', 'metal', rectArrondi(-0.03, -0.95, 0.03, -0.45)), ...piece(BLEU, 'peinture', cercle(0, 0, 0.45, 36)), fleche(0.55, 0.12, 135, '#f8fafc')]],
-  ['Signal Priorité au trafic en sens inverse', () => rondInterdiction(() => [{ ...fleche(0.46, 0.08, 0, NOIR, -0.1), mat: 'trait' }, { ...fleche(0.46, 0.08, 180, ROUGE, 0.1), mat: 'peinture' }])],
-  ['Signal Priorité sur le trafic en sens inverse', () => [...piece('#8a9198', 'metal', rectArrondi(-0.03, -0.95, 0.03, -0.42)), ...piece(BLEU, 'peinture', rectArrondi(-0.42, -0.42, 0.42, 0.42, 0.04)), fleche(0.5, 0.09, 0, '#f8fafc', -0.11), { ...fleche(0.5, 0.09, 180, ROUGE, 0.11), mat: 'peinture' }]],
-  ['Balise de guidage', () => {
-    const res = [...piece('#f8fafc', 'blanc', rectArrondi(-0.25, -0.6, 0.25, 0.6))];
-    for (let i = -3; i <= 3; i++) res.push(plein(ROUGE, 'peinture', [[-0.25, i * 0.3 - 0.06], [-0.25, i * 0.3 + 0.1], [0.25, i * 0.3 + 0.34], [0.25, i * 0.3 + 0.18]].filter(Boolean).map(([x, y]) => [x, Math.max(-0.6, Math.min(0.6, y))])));
-    res.push(trait(rectArrondi(-0.25, -0.6, 0.25, 0.6), true));
-    return res;
-  }],
+  // Circulation alternée : rond rouge (le trafic en sens inverse est prioritaire : sa grande flèche rouge descend) et carré
+  // bleu (nous sommes prioritaires : notre grande flèche blanche monte), dans les 2 sens (flèche de notre côté à gauche / à droite).
+  ['Signal Priorité au trafic en sens inverse – flèche noire à gauche', () => rondInterdiction(() => [{ ...fleche(0.34, 0.07, 0, NOIR, -0.12, 0.05), mat: 'trait' }, { ...fleche(0.54, 0.09, 180, ROUGE, 0.12, -0.02), mat: 'peinture' }])],
+  ['Signal Priorité au trafic en sens inverse – flèche noire à droite', () => rondInterdiction(() => [{ ...fleche(0.34, 0.07, 0, NOIR, 0.12, 0.05), mat: 'trait' }, { ...fleche(0.54, 0.09, 180, ROUGE, -0.12, -0.02), mat: 'peinture' }])],
+  ['Signal Priorité sur le trafic en sens inverse – flèche blanche à gauche', () => [...piece('#8a9198', 'metal', rectArrondi(-0.03, -0.95, 0.03, -0.42)), ...piece(BLEU, 'peinture', rectArrondi(-0.42, -0.42, 0.42, 0.42, 0.04)), fleche(0.56, 0.1, 0, '#f8fafc', -0.12, 0.0), { ...fleche(0.34, 0.07, 180, ROUGE, 0.12, 0.05), mat: 'peinture' }]],
+  ['Signal Priorité sur le trafic en sens inverse – flèche blanche à droite', () => [...piece('#8a9198', 'metal', rectArrondi(-0.03, -0.95, 0.03, -0.42)), ...piece(BLEU, 'peinture', rectArrondi(-0.42, -0.42, 0.42, 0.42, 0.04)), fleche(0.56, 0.1, 0, '#f8fafc', 0.12, 0.0), { ...fleche(0.34, 0.07, 180, ROUGE, -0.12, 0.05), mat: 'peinture' }]],
+  // Balise de guidage : bandes rouges et blanches en biais, dans les 2 sens.
+  ['Balise de guidage – bandes montant vers la droite', () => balise(1)],
+  ['Balise de guidage – bandes montant vers la gauche', () => balise(-1)],
 ];
 
 /** Feu de chantier (vu de face) : boîtier noir à 3 feux sur un pied, batterie au sol. */
@@ -328,21 +172,76 @@ const signalObligation = (picto) => [...piece('#8a9198', 'metal', rectArrondi(-0
 
 // ------------------------------------------------------------------ Portail et trilattes (remplacent ceux du DXF)
 
-/** Portail de chantier à 2 vantaux (5 m) : poteaux, vantaux grillagés, sens d'ouverture. */
+/** Traits en tirets le long d'une polyligne (longueur du trait l, vide v, en m). */
+function tirets(pts, l = 0.25, v = 0.2, k = '#475569') {
+  const res = [];
+  let cumul = 0;
+  let trace = true;
+  let restant = l;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    let [x, y] = pts[i];
+    const [x2, y2] = pts[i + 1];
+    let d = Math.hypot(x2 - x, y2 - y);
+    const [ux, uy] = [(x2 - x) / (d || 1), (y2 - y) / (d || 1)];
+    while (d > 1e-9) {
+      const pas = Math.min(restant, d);
+      if (trace) res.push(trait([[x, y], [x + ux * pas, y + uy * pas]], false, k));
+      x += ux * pas;
+      y += uy * pas;
+      d -= pas;
+      restant -= pas;
+      cumul += pas;
+      if (restant < 1e-9) {
+        trace = !trace;
+        restant = trace ? l : v;
+      }
+    }
+  }
+  void cumul;
+  return res;
+}
+
+/** Vantail de portail grillagé : cadre orange, maillage en croix tous les 0,5 m (longueur l le long de x, de x0 à x0 + l). */
+function vantail(x0, l, y = 0) {
+  const res = [...piece('#f2a20c', 'peinture', rectArrondi(x0, y - 0.07, x0 + l, y + 0.07, 0.02))];
+  for (let x = x0 + 0.25; x < x0 + l - 0.1; x += 0.5) res.push(trait([[x - 0.25, y - 0.05], [x + 0.25, y + 0.05]], false, '#7a4b00'), trait([[x - 0.25, y + 0.05], [x + 0.25, y - 0.05]], false, '#7a4b00'));
+  return res;
+}
+
+/**
+ * Portail de chantier à 2 vantaux (5 m) : poteaux, vantaux fermés (orange grillagé), zone balayée à l'ouverture (secteur
+ * jaune clair, 90° vers l'intérieur) avec les vantaux ouverts en tirets. Centré sur l'ouverture, intérieur du chantier en haut.
+ */
 export function portail(largeur = 5) {
   const d = largeur / 2;
+  const R = d - 0.2;
   const res = [];
   for (const s of [-1, 1]) {
-    const arc = Array.from({ length: 13 }, (_, i) => {
-      const a = (Math.PI / 2) * (i / 12);
-      return [s * (d - (d - 0.12) * Math.cos(a)), (d - 0.12) * Math.sin(a)];
-    });
-    res.push(trait(arc, false, '#db7e20'));
-    res.push(...piece('#aeb4ba', 'metal', rectArrondi(s > 0 ? 0.04 : -d + 0.12, -0.06, s > 0 ? d - 0.12 : -0.04, 0.06)));
-    for (let x = 0.3; x < d - 0.2; x += 0.3) res.push(trait([[s * x, -0.05], [s * x, 0.05]], false, '#5f666d'));
-    res.push(...piece('#3a3f45', 'metal', rectArrondi(s * d - 0.12, -0.12, s * d + 0.12, 0.12)));
+    const secteur = [[s * d, 0], ...Array.from({ length: 13 }, (_, i) => {
+      const a = ((s < 0 ? 0 : 180) + (s < 0 ? 90 : -90) * (i / 12)) * (Math.PI / 180);
+      return [s * d + R * Math.cos(a), R * Math.sin(a)];
+    })];
+    res.push(motif('#fde68a', secteur));
+    res.push(...tirets(secteur.slice(1), 0.22, 0.16, '#a16207'));
+    res.push(...tirets([[s * d, 0.12], [s * d, R]], 0.25, 0.18, '#a16207'));
+    res.push(...vantail(s < 0 ? -d + 0.1 : d - 0.1 - R, R));
+    res.push(...piece('#3a3f45', 'metal', rectArrondi(s * d - 0.15, -0.15, s * d + 0.15, 0.15, 0.02)), plein('#cbd5e1', 'metal', cercle(s * d, 0, 0.05, 8)));
   }
-  res.push(texte('Portail', 0, -0.4, 0.3, { pl: true }));
+  res.push(trait([[-d - 0.8, -0.05], [-d - 0.15, -0.05]], false, '#475569'), trait([[d + 0.15, -0.05], [d + 0.8, -0.05]], false, '#475569'));
+  return res;
+}
+
+/** Portail coulissant (4 m) : vantail fermé dans l'ouverture, sa position ouverte en tirets derrière la clôture, flèche. */
+export function portailCoulissant(largeur = 4) {
+  const d = largeur / 2;
+  const res = [];
+  res.push(motif('#fde68a', rectArrondi(d, 0.12, d + largeur, 0.5, 0.02)));
+  res.push(...tirets(rectArrondi(d, 0.12, d + largeur, 0.5, 0.02).concat([[d, 0.12]]), 0.22, 0.16, '#a16207'));
+  res.push(...vantail(-d, largeur));
+  res.push(plein('#a16207', 'peinture', [[d + 0.3, 0.31], [d + 1.2, 0.31], [d + 1.2, 0.4], [d + 1.8, 0.28], [d + 1.2, 0.16], [d + 1.2, 0.25], [d + 0.3, 0.25]]));
+  for (const x of [-d - 0.1, d + 0.1]) res.push(...piece('#3a3f45', 'metal', rectArrondi(x - 0.15, -0.15, x + 0.15, 0.15, 0.02)));
+  res.push(trait([[-d - 0.9, -0.05], [-d - 0.25, -0.05]], false, '#475569'), trait([[d + 0.25, -0.05], [d + largeur + 0.9, -0.05]], false, '#475569'));
+  res.push(trait([[-d, 0.3], [d + largeur, 0.3]], false, '#94a3b8'));
   return res;
 }
 
@@ -367,14 +266,7 @@ export function trilattes() {
 /** Symboles dessinés : [{ nom, categorie, primitives }] (centrés et mis au format de la bibliothèque par symboles-retouches.js). */
 export function symbolesDessines() {
   return [
-    { nom: 'Tracteur + benne', categorie: 'Véhicules', primitives: tracteurBenne() },
-    { nom: 'Camion citerne', categorie: 'Véhicules', primitives: camionCiterne() },
-    { nom: 'Camion carburant', categorie: 'Véhicules', primitives: camionCarburant() },
-    { nom: 'Camion balai', categorie: 'Véhicules', primitives: camionBalai() },
-    { nom: 'Camion bitume', categorie: 'Véhicules', primitives: camionBitume() },
-    { nom: 'Niveleuse', categorie: 'Engins', primitives: niveleuse() },
     { nom: 'WC homme / femme', categorie: 'Base-vie', primitives: wcHommeFemme() },
-    { nom: 'Benne recyclage', categorie: 'Base-vie', primitives: benneRecyclage() },
     { nom: 'Panneau Chantier interdit au public', categorie: 'Sécurité', primitives: panneauInterditPublic() },
     { nom: 'Casque obligatoire', categorie: 'Sécurité', primitives: signalObligation(casque) },
     { nom: 'Chaussures de sécurité obligatoires', categorie: 'Sécurité', primitives: signalObligation(chaussure) },

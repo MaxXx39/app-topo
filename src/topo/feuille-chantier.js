@@ -3,7 +3,7 @@
 // légende automatique (genres et symboles utilisés), nord, barre d'échelle ; une page par phase ou toutes sur une page.
 // Unités : mm de papier (origine en haut à gauche de la feuille, y vers le bas).
 import { tailleFeuille, barreEchellePapier } from '../export/echelle.js';
-import { categorieZone, styleLigne, objetsVisibles, bornesObjets, ECHELLE_PAPIER, estPose } from './plan-chantier.js';
+import { categorieZone, styleLigne, objetsVisibles, bornesObjets, ECHELLE_PAPIER, estPose, materiauTas } from './plan-chantier.js';
 
 export const FORMATS_FEUILLE = [['a4', 'A4'], ['a3', 'A3'], ['a1', 'A1']];
 
@@ -65,7 +65,7 @@ export function elementsLegende(objets, nomSymbole = (c) => String(c).replace(/^
     if (!vus.has(cle)) vus.set(cle, { cle, nom, type, exemple, rang });
   };
   for (const o of objets) {
-    if (o.type === 'zone') ajouter(`zone:${o.categorie}:${o.couleur ?? ''}`, categorieZone(o.categorie).nom, 'zone', o, 0);
+    if (o.type === 'zone') ajouter(`zone:${o.categorie}:${o.materiau ?? ''}:${o.couleur ?? ''}`, o.materiau ? `Stock : ${materiauTas(o.materiau)?.nom ?? o.materiau}` : categorieZone(o.categorie).nom, 'zone', o, 0);
     else if (o.type === 'ligne') ajouter(`ligne:${styleLigne(o.style).cle}:${o.couleur ?? ''}`, styleLigne(o.style).nom.replace(/\s+[<>].*$/, ''), 'ligne', o, 1);
     else if (o.type === 'piste') ajouter('piste', 'Piste de chantier', 'piste', o, 2);
     else if (o.type === 'fleche') ajouter(`fleche:${o.couleur ?? ''}`, 'Sens de circulation', 'fleche', o, 2);

@@ -6,7 +6,7 @@
 // [x, y, x, y…] ; voir blocs-dxf.js pour leur forme.
 import { bornesPrimitives, deplacerPrimitives } from './blocs-dxf.js';
 
-export const CATEGORIES_SYMBOLES = ['Base-vie', 'Engins', 'Grues', 'Véhicules', 'Sécurité', 'Signalisation']; // Signalisation : 0.291.0
+export const CATEGORIES_SYMBOLES = ['Base-vie', 'Installations', 'Stockage', 'Engins', 'Grues', 'Véhicules', 'Sécurité', 'Signalisation']; // Signalisation : 0.291.0 ; Installations, Stockage : 0.292.0
 
 // Matériaux d'après la couleur d'origine (décidé le 23.11) et leur couleur modernisée.
 const MATERIAUX = {
@@ -390,10 +390,14 @@ export function primitivesEtage(bibliotheque, pose = 0) {
 
 // ------------------------------------------------------------------ Pose
 
-/** Rotation (degrés, sens trigonométrique) et point [e, n] → transformation du repère du symbole au terrain. */
+/** Échelle d'un symbole posé (0.292.0, ×1 = taille réelle) ; une grue se règle par sa flèche, pas par l'échelle. */
+export const echelleDeLObjet = (objet) => (objet.type === 'grue' ? 1 : Math.min(10, Math.max(0.1, Number(objet.echelle) || 1)));
+
+/** Rotation (degrés, sens trigonométrique), échelle et point [e, n] → transformation du repère du symbole au terrain. */
 export function versTerrainSymbole(objet) {
   const a = ((objet.rotation ?? 0) * Math.PI) / 180;
-  const [c, s] = [Math.cos(a), Math.sin(a)];
+  const k = echelleDeLObjet(objet);
+  const [c, s] = [Math.cos(a) * k, Math.sin(a) * k];
   const [e, n] = objet.point;
   return (x, y) => [e + c * x - s * y, n + s * x + c * y];
 }
@@ -401,9 +405,10 @@ export function versTerrainSymbole(objet) {
 /** Repère du terrain → repère du symbole (inverse de versTerrainSymbole). */
 export function versSymbole(objet, [e, n]) {
   const a = ((objet.rotation ?? 0) * Math.PI) / 180;
+  const k = echelleDeLObjet(objet);
   const [c, s] = [Math.cos(a), Math.sin(a)];
   const [dx, dy] = [e - objet.point[0], n - objet.point[1]];
-  return [c * dx + s * dy, -s * dx + c * dy];
+  return [(c * dx + s * dy) / k, (-s * dx + c * dy) / k];
 }
 
 /** Boîte [xMin, yMin, xMax, yMax] (m) d'un symbole dans son repère (centrée sur 0, 0 sauf les grues). */

@@ -6,11 +6,11 @@ import {
   bibliothequeDepuisBlocs, materiau, adoucir, nuance, categorieDuBloc, separerRayon, transformeEscalier, primitivesEtage,
   symboleGrue, flechesDisponibles, chassisDisponibles, symboleChassis, surLeSymbole, rotationVers, versTerrainSymbole,
   versSymbole, poigneeRotation, coinsSymbole, equipementsVehicule, CLE_CONTENEUR, ARDOISE, BLANC_BLOC,
-  grueLibre, chassisLibre, coteChassis,
+  grueLibre, chassisLibre, coteChassis, echelleDeLObjet,
 } from '../src/topo/symboles.js';
 import {
   nouveauPlanChantier, ajouterObjet, objetSousLePoint, deplacerObjet, resumeObjet, bordsDesTriangles, ajouterPhase, estPose,
-  changerOrdre, angleDeLaLigne,
+  changerOrdre, angleDeLaLigne, texteSymbolesM, anneauxDuTas, aireSignee, materiauTas, MATERIAUX_TAS, couleurObjet, styleLigne,
 } from '../src/topo/plan-chantier.js';
 import {
   miseEnPageFeuille, pagesDeLaFeuille, elementsLegende, textesCartouche, vueDuCadre, reglagesFeuille, centreDeDepart, objetsDeLaPage,
@@ -120,7 +120,7 @@ describe('modernisation', () => {
 
 describe('bibliothèque livrée (Base_2023.dxf)', () => {
   it('59 symboles proposés, grues et châssis réglables', () => {
-    expect(BIB.filter((s) => !s.cache)).toHaveLength(77); // 0.291.0 : 59 du DXF − 7 retirés + manuscop réuni + 24 dessinés
+    expect(BIB.filter((s) => !s.cache)).toHaveLength(120); // 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
     expect(flechesDisponibles(BIB, 'tour')).toEqual([25, 30, 35, 40, 45, 50, 55, 60, 65, 70]);
     expect(flechesDisponibles(BIB, 'auto')).toEqual([20, 25, 30, 35, 40, 45, 50]);
     expect(chassisDisponibles(BIB)).toEqual(['3.80', '4.20', '4.50', '4.60', '6']);
@@ -141,7 +141,7 @@ describe('bibliothèque livrée (Base_2023.dxf)', () => {
   });
   it('entrées du panneau : grues, base-vie à étage, recherche sans accents', () => {
     const e = entreesBibliotheque(BIB);
-    expect(e.map((x) => x.cle)).toEqual(expect.arrayContaining(['grue:tour', 'grue:auto', 'etage', 'base:WC']));
+    expect(e.map((x) => x.cle)).toEqual(expect.arrayContaining(['grue:tour', 'grue:auto', 'etage', 'base:WC homme / femme']));
     expect(e.some((x) => x.cle.startsWith('base:Grue '))).toBe(false);
     expect(filtrerEntrees(e, '', 'cone').map((x) => x.nom)).toEqual(['Cône']);
     expect(filtrerEntrees(e, 'Véhicules').every((x) => x.categorie === 'Véhicules')).toBe(true);
@@ -363,9 +363,9 @@ describe('0.291.0 : retouches de la bibliothèque (retours du 23.11) et symboles
     for (const n of ['Base Vie Etage passerelle', 'radier', 'Pelle Chenille Chassis', 'Pelle Chenille base', 'Finisseur Table', 'manuscop base', 'Maniscop tourelle']) expect(nom(n).cache).toBe(true);
     expect(nom('Manuscop (télescopique rotatif)').cache).toBeUndefined();
   });
-  it('textes sur plaque blanche pour les conteneurs, bennes et WC', () => {
-    for (const n of ['Base Vie Bureau', 'Benne à déchets', 'WC', 'Base Vie Vestiaire']) expect(nom(n).primitives.filter((p) => p.g === 't').every((p) => p.pl)).toBe(true);
-    expect(nom('Poubelle').primitives.some((p) => p.pl)).toBe(false);
+  it('WC seul retiré (il reste « WC homme / femme »)', () => {
+    expect(nom('WC').cache).toBe(true);
+    expect(nom('WC homme / femme').cache).toBeUndefined();
   });
   it('éclair jaune, gravats dans le dumper plein, voitures dans le même sens', () => {
     expect(nom('Elec').primitives.some((p) => p.k === '#facc15')).toBe(true);
@@ -377,7 +377,7 @@ describe('0.291.0 : retouches de la bibliothèque (retours du 23.11) et symboles
     for (const [n, c] of [['Tracteur + benne', 'Véhicules'], ['Camion citerne', 'Véhicules'], ['Camion carburant', 'Véhicules'], ['Camion balai', 'Véhicules'],
       ['Camion bitume', 'Véhicules'], ['Niveleuse', 'Engins'], ['WC homme / femme', 'Base-vie'], ['Benne recyclage', 'Base-vie'],
       ['Panneau Chantier interdit au public', 'Sécurité'], ['Casque obligatoire', 'Sécurité'], ['Chaussures de sécurité obligatoires', 'Sécurité'],
-      ['Feu de chantier', 'Signalisation'], ['Signal Vitesse maximale 30', 'Signalisation'], ['Balise de guidage', 'Signalisation']]) {
+      ['Feu de chantier', 'Signalisation'], ['Signal Vitesse maximale 30', 'Signalisation'], ['Balise de guidage – bandes montant vers la droite', 'Signalisation']]) {
       const x = nom(n);
       expect(x?.categorie, n).toBe(c);
       expect((x.boite[0] + x.boite[2]) / 2).toBeCloseTo(0, 2);
@@ -387,5 +387,101 @@ describe('0.291.0 : retouches de la bibliothèque (retours du 23.11) et symboles
   });
   it('grue automontante posée avec son châssis de 4,20 m', () => {
     expect(entreesBibliotheque(BIB).find((x) => x.cle === 'grue:auto').pose.chassis).toBe('4.20');
+  });
+});
+
+describe('0.292.0 : texte unique, échelle d\'un bloc, tas de stock, nouvelles lignes, nouveaux symboles', () => {
+  const nom = (n) => BIB.find((x) => x.nom === n);
+  it('taille du texte des symboles : mm sur le papier × échelle du plan', () => {
+    expect(texteSymbolesM({ echelle: 200 })).toBeCloseTo(0.6, 9); // 3 mm au départ
+    expect(texteSymbolesM({ echelle: 500, tailleTexteMm: 2 })).toBeCloseTo(1.0, 9);
+    expect(texteSymbolesM({ echelle: 200, tailleTexteMm: 99 })).toBeCloseTo(2.4, 9); // borné à 12 mm
+  });
+  it('échelle d\'un bloc : la boîte, le toucher et la poignée suivent ; la grue n\'a pas d\'échelle', () => {
+    const s = { boite: [-3, -1, 3, 1] };
+    const o = { type: 'symbole', point: [100, 200], rotation: 0, echelle: 2 };
+    expect(echelleDeLObjet(o)).toBe(2);
+    expect(echelleDeLObjet({ type: 'grue', echelle: 3 })).toBe(1);
+    expect(echelleDeLObjet({ type: 'symbole', echelle: 0 })).toBe(1);
+    expect(coinsSymbole(o, s)[1]).toEqual([106, 198]);
+    expect(surLeSymbole(o, s, [105, 201.5])).toBe(true);
+    expect(surLeSymbole({ ...o, echelle: 1 }, s, [105, 201.5])).toBe(false);
+    expect(versSymbole(o, [106, 202])).toEqual([3, 1]);
+  });
+  it('tas de stock : anneaux vers l\'intérieur, sens du contour sans importance, limités par la taille de la zone', () => {
+    const carre = [[0, 0], [20, 0], [20, 20], [0, 20]];
+    const t = anneauxDuTas(carre, 3, 1.5);
+    expect(t.largeur).toBeCloseTo(4.5, 9);
+    expect(t.anneaux).toHaveLength(6);
+    expect(aireSignee(carre)).toBe(400);
+    const xs = t.anneaux.at(-1).map((p) => p[0]);
+    expect(Math.min(...xs)).toBeCloseTo(4.5, 6);
+    expect(Math.max(...xs)).toBeCloseTo(15.5, 6);
+    const horaire = [...carre].reverse();
+    expect(anneauxDuTas(horaire, 3, 1.5).sens).toBe(-1);
+    expect(Math.min(...anneauxDuTas(horaire, 3, 1.5).anneaux.at(-1).map((p) => p[0]))).toBeCloseTo(4.5, 6);
+    expect(anneauxDuTas([[0, 0], [4, 0], [4, 4], [0, 4]], 10, 3).largeur).toBeCloseTo(1.8, 9); // 45 % de 4 m
+  });
+  it('matériaux de tas : couleur du matériau, nom dans la légende', () => {
+    const plan = nouveauPlanChantier('PIC');
+    const z = ajouterObjet(plan, { type: 'zone', points: [[0, 0], [10, 0], [10, 5]], categorie: 'stockage', materiau: 'sable', tasH: 3 });
+    expect(couleurObjet(plan, z)).toBe(materiauTas('sable').couleur);
+    expect(elementsLegende([z]).map((x) => x.nom)).toEqual(['Stock : Sable']);
+    expect(MATERIAUX_TAS.map((m) => m.cle)).toContain('gravier');
+  });
+  it('nouvelles lignes en bande : GBA, échafaudage, filet, Heras', () => {
+    for (const c of ['gba', 'echafaudage', 'filet', 'heras']) expect(styleLigne(c).motif.largeurM).toBeGreaterThan(0);
+    expect(styleLigne('gba').nom).toBe('Glissière béton (GBA)');
+  });
+  it('anciens symboles retouchés : benne recyclage jaune avec logo vert, bennes de tri, dumper vide de la couleur des côtés', () => {
+    const r = nom('Benne recyclage');
+    expect(r.primitives.some((p) => p.g === 't')).toBe(false);
+    expect(r.primitives.filter((p) => p.k === '#1f9d55').length).toBeGreaterThanOrEqual(6);
+    expect(r.largeur).toBeCloseTo(nom('Benne à déchets').largeur, 2);
+    for (const n of ['bois', 'métal', 'inertes', 'plâtre']) expect(nom(`Benne de tri – ${n}`).primitives.some((p) => p.g === 't')).toBe(true);
+    const vide = nom('Dumper Vide').primitives[5];
+    expect(vide.k).toBe(nom('Dumper Vide').primitives[1].k);
+    expect(nom('Camion Benne Plein').primitives.filter((p) => p.mat === 'gravats').length).toBeGreaterThan(10);
+    expect(nom('Interdiction de parquer').cle).toBe('base:2.50interdictiondeparquer');
+  });
+  it('portail refait, 2 balises, 4 signaux de circulation alternée, trilattes + panneau 2 fois plus grand', () => {
+    expect(nom('Portail').largeur).toBeGreaterThan(5);
+    expect(nom('Portail').primitives.some((p) => p.m)).toBe(true); // zone balayée à l\'ouverture
+    expect(nom('Portail coulissant').largeur).toBeGreaterThan(8);
+    const g = nom('Balise de guidage – bandes montant vers la gauche');
+    const d = nom('Balise de guidage – bandes montant vers la droite');
+    expect(g.largeur).toBe(d.largeur);
+    expect(BIB.filter((x) => x.nom.startsWith('Signal Priorité')).map((x) => x.nom)).toHaveLength(4);
+    expect(nom('Tri lattes + travaux').largeur).toBeGreaterThan(1.5); // panneau de 0,9 m × 1,8
+  });
+  it('nouveaux symboles : véhicules, camions grues (4 tailles, pliés / dépliés), installations, stockage', () => {
+    const attendus = [
+      ['Camion pompe à béton (plié)', 'Véhicules'], ['Camion pompe à béton (déplié)', 'Véhicules'], ['Camion toupie (goulotte dépliée)', 'Véhicules'],
+      ['Nacelle articulée (repliée)', 'Engins'], ['Élévateur à ciseaux', 'Engins'], ['Compresseur', 'Engins'], ['Bétonnière', 'Engins'],
+      ['Centrale à béton mobile', 'Installations'], ['Silo à ciment', 'Installations'], ['Poste de lavage des roues', 'Installations'], ['Mât d\'éclairage', 'Installations'],
+      ['Extincteur', 'Sécurité'], ['Abri à vélos', 'Base-vie'], ['Douches', 'Base-vie'], ['Benne Decantation', 'Base-vie'],
+      ['Stock de banches de coffrage', 'Stockage'], ['Palette de tuyaux PVC', 'Stockage'], ['Plaques de roulage', 'Stockage'], ['Regards préfabriqués', 'Stockage'],
+    ];
+    for (const [n, c] of attendus) expect(nom(n)?.categorie, n).toBe(c);
+    for (const t of [40, 100, 200, 350]) for (const e of ['plié', 'déplié']) expect(nom(`Camion grue ${t} t (${e})`)?.categorie).toBe('Grues');
+    // Le camion reste au point de base : la flèche déployée ne le décale pas.
+    const plie = nom('Camion grue 100 t (plié)');
+    const deplie = nom('Camion grue 100 t (déplié)');
+    expect(plie.boite[1]).toBeCloseTo(-6.6, 1);
+    expect(deplie.boite[3]).toBeGreaterThan(35);
+    expect(deplie.largeur).toBeGreaterThan(8); // appuis sortis
+    expect(nom('Camion carburant').primitives.some((p) => p.k === '#f5c518')).toBe(true); // cabine aux couleurs Perrin
+  });
+  it('dxf : échelle du bloc (codes 41 / 42 / 43), texte de la même taille dans les blocs, lignes en bande épaisses', () => {
+    const plan = nouveauPlanChantier('PIC');
+    ajouterObjet(plan, { type: 'symbole', point: [2500000, 1118000], cle: 'base:Base Vie Bureau', echelle: 0.5 });
+    ajouterObjet(plan, { type: 'ligne', style: 'gba', points: [[2500000, 1118000], [2500020, 1118000]] });
+    const texte = dxfPlanChantier(plan, BIB);
+    expect(texte).toMatch(/\r\n41\r\n0\.500\r\n42\r\n0\.500\r\n43\r\n0\.500\r\n/);
+    expect(texte).toContain('_T120'); // 0,6 m / 0,5 = 1,2 m dans le bloc
+    expect(texte).toMatch(/\r\n40\r\n0\.600\r\n41\r\n0\.600\r\n/); // largeur de la polyligne GBA
+    const { plan: relu } = lirePlanDxf(texte, 'x.dxf');
+    expect(relu.calques.map((c) => c.nom)).toEqual(expect.arrayContaining(['PC_PHASE_1_GLISSIERE_BETON_GBA_']));
+    expect(blocDuPose({ type: 'symbole', cle: 'base:Base Vie Bureau' }, BIB, 0.6).nom).toMatch(/_T60$/);
   });
 });

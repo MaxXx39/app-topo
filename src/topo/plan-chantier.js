@@ -50,6 +50,11 @@ export const STYLES_LIGNE = [
   { cle: 'palplanches', nom: 'Palplanches', couleur: '#475569', tirets: [], epaisseurMm: 0.9 },
   { cle: 'conduite', nom: 'Conduite provisoire', couleur: '#2563eb', tirets: [7, 2.5], epaisseurMm: 0.4 },
   { cle: 'signalisation', nom: 'Signalisation', couleur: '#f97316', tirets: [1.5, 1.5], epaisseurMm: 0.6 },
+  // 0.292.0 : lignes « en bande » (largeur réelle en m, qui suit l'échelle du plan) et barrière Heras.
+  { cle: 'gba', nom: 'Glissière béton (GBA)', couleur: '#9aa3ab', tirets: [], epaisseurMm: 0.3, motif: { type: 'gba', largeurM: 0.6, elementM: 4 } },
+  { cle: 'echafaudage', nom: 'Échafaudage', couleur: '#64748b', tirets: [], epaisseurMm: 0.3, motif: { type: 'echafaudage', largeurM: 0.9, elementM: 2.5 } },
+  { cle: 'filet', nom: 'Filet de protection', couleur: '#2f9e55', tirets: [], epaisseurMm: 0.3, motif: { type: 'filet', largeurM: 0.35, elementM: 0.5 } },
+  { cle: 'heras', nom: 'Barrière Heras', couleur: '#475569', tirets: [], epaisseurMm: 0.3, motif: { type: 'heras', largeurM: 0.8, elementM: 3.5 } },
   { cle: 'libre', nom: 'Ligne', couleur: '#1b2b36', tirets: [], epaisseurMm: 0.35 },
 ];
 // Anciens genres de ligne : « Câble électrique » (0.286.0) = Électricité ; « Barrière (chevrons) » et « Limite » (0.287.0)
@@ -66,6 +71,24 @@ export const COULEUR_FLECHE = '#19a7cc';
 export const LARGEUR_FLECHE = 0.2; // m, largeur du corps d'une flèche (0.288.0 : 0,2 au lieu de 0,9)
 export const POINTE_LONGUEUR = 1.2; // m, longueur de la pointe à l'échelle ×1
 export const POINTE_LARGEUR = 0.9; // m, largeur de la pointe à l'échelle ×1
+
+// 0.292.0 : taille du texte des symboles (mm sur le papier, la même pour tous les blocs) et matériaux des tas de stock.
+export const TAILLE_TEXTE_MM = 3;
+/** Hauteur (m sur le terrain) du texte des symboles : tailleTexteMm × échelle / 1000. */
+export const texteSymbolesM = (plan) => Math.min(12, Math.max(0.5, plan?.tailleTexteMm ?? TAILLE_TEXTE_MM)) * ((plan?.echelle ?? ECHELLE_PAPIER) / 1000);
+export const MATERIAUX_TAS = [
+  { cle: 'terre', nom: 'Terre végétale', couleur: '#6b4a2f' },
+  { cle: 'remblai', nom: 'Remblai / tout-venant', couleur: '#8a6d4b' },
+  { cle: 'sable', nom: 'Sable', couleur: '#d4b878' },
+  { cle: 'gravier', nom: 'Gravier', couleur: '#a8a29a' },
+  { cle: 'grave', nom: 'Grave 0/45', couleur: '#8c8c86' },
+  { cle: 'concasse', nom: 'Béton concassé', couleur: '#9ca3a8' },
+  { cle: 'enrobe', nom: 'Enrobé / fraisât', couleur: '#454b50' },
+  { cle: 'blocs', nom: 'Blocs', couleur: '#78716c' },
+];
+export const materiauTas = (cle) => MATERIAUX_TAS.find((m) => m.cle === cle) ?? null;
+export const TAS_HAUTEUR = 3; // m, au départ
+export const TAS_TALUS = 1.5; // m horizontaux pour 1 m de hauteur, au départ (à valider)
 
 export const categorieZone = (cle) => CATEGORIES_ZONE.find((c) => c.cle === cle) ?? CATEGORIES_ZONE[0];
 export const styleLigne = (cle) => STYLES_LIGNE.find((s) => s.cle === (ALIAS_STYLES[cle] ?? cle)) ?? STYLES_LIGNE[STYLES_LIGNE.length - 1];
@@ -132,7 +155,7 @@ export function objetsVisibles(plan) {
 export function couleurObjet(plan, objet) {
   if (plan.couleurs === 'phases') return plan.phases.find((p) => p.id === objet.phase)?.couleur ?? '#1b2b36';
   if (objet.couleur) return objet.couleur; // couleur choisie pour cet élément (0.287.0)
-  if (objet.type === 'zone') return categorieZone(objet.categorie).couleur;
+  if (objet.type === 'zone') return materiauTas(objet.materiau)?.couleur ?? categorieZone(objet.categorie).couleur;
   if (objet.type === 'ligne') return styleLigne(objet.style).couleur;
   if (objet.type === 'piste') return COULEUR_PISTE;
   if (objet.type === 'fleche') return COULEUR_FLECHE;
@@ -549,4 +572,43 @@ export function angleDeLaLigne(lignes, p, tolerance, actuel = 0) {
   const ecart = (x) => ((((x - actuel) % 360) + 540) % 360) - 180;
   const angle = Math.abs(ecart(meilleur.angle)) <= 90 ? meilleur.angle : meilleur.angle + 180;
   return Math.round(((angle % 360) + 360) % 360 * 100) / 100;
+}
+
+
+// ------------------------------------------------------------------ Tas de stock (0.292.0)
+
+/** Aire signée d'un contour (> 0 = sens trigonométrique en Est / Nord). */
+export function aireSignee(points) {
+  let a = 0;
+  for (let i = 0; i < points.length; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
+    a += x1 * y2 - x2 * y1;
+  }
+  return a / 2;
+}
+
+/**
+ * Anneaux d'un tas de stock : le contour décalé vers l'intérieur de largeur × i / n (i = 1…n), largeur = hauteur × talus,
+ * limitée à 45 % de la plus petite dimension de la zone. Renvoie { anneaux [contours fermés], largeur (m), sens (+1 / −1) }.
+ * Un anneau qui se retourne (zone trop étroite) arrête la liste.
+ */
+export function anneauxDuTas(points, hauteur = TAS_HAUTEUR, talus = TAS_TALUS, n = 6) {
+  const ferme = [...points, points[0]];
+  const sens = aireSignee(points) >= 0 ? 1 : -1; // intérieur = à gauche pour un contour trigonométrique
+  const xs = points.map((p) => p[0]);
+  const ys = points.map((p) => p[1]);
+  const petit = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const largeur = Math.max(0.1, Math.min(hauteur * talus, petit * 0.45));
+  const anneaux = [];
+  let aireAvant = Math.abs(aireSignee(points));
+  for (let i = 1; i <= n; i++) {
+    const r = decalerPolyligne(ferme, sens * ((largeur * i) / n));
+    if (r.length < 4) break;
+    const a = Math.abs(aireSignee(r.slice(0, -1)));
+    if (a >= aireAvant * 0.999 || aireSignee(r.slice(0, -1)) * sens < 0) break;
+    anneaux.push(r.slice(0, -1));
+    aireAvant = a;
+  }
+  return { anneaux, largeur, sens };
 }
