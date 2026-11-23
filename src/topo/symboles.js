@@ -264,9 +264,9 @@ function calculerGrue(base, L, modele) {
   const k = L / base.fleche;
   const f = (x, y) => [arrondi3(x > DEBUT_FLECHE ? DEBUT_FLECHE + (x - DEBUT_FLECHE) * ((L - DEBUT_FLECHE) / (base.fleche - DEBUT_FLECHE)) : x), y];
   const primitives = Math.abs(k - 1) < 1e-9 ? base.primitives : transformerPrimitives(base.primitives, f).map((p) => (p.g === 't' ? { ...p, t: p.t.replace(/\d+(\.\d+)?\s*m\b/i, texteM(L)) } : p));
-  const rayon = [{ g: 'c', k: ARDOISE, x: 0, y: 0, r: L }, { g: 't', k: '#92400e', x: L, y: -1.2, h: 0.9, a: 90, t: texteM(L), ah: 1, av: 2 }];
+  const rayon = [{ g: 'c', k: ARDOISE, x: 0, y: 0, r: L }, { g: 't', k: '#92400e', x: L, y: -2.4, h: 0.9, a: 90, t: texteM(L), ah: 1, av: 2 }];
   for (let r = 20; r < L - 2; r += 5) {
-    rayon.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r }, { g: 't', k: '#92400e', x: r, y: -1.2, h: 0.9, a: 90, t: texteM(r), ah: 1, av: 2 });
+    rayon.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r }, { g: 't', k: '#92400e', x: r, y: -2.4, h: 0.9, a: 90, t: texteM(r), ah: 1, av: 2 });
   }
   const b = bornesPrimitives(primitives);
   return { primitives, rayon, fleche: L, boite: b ? [b.xMin, b.yMin, b.xMax, b.yMax] : base.boite, modele, nom: base.nom };

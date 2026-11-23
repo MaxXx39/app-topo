@@ -7,8 +7,9 @@
 import { versEcran } from '../plan/vue.js';
 import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
-  geometrieCotation, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
+  geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
 } from '../topo/plan-chantier.js';
+import { textureMateriau } from './textures.js';
 import { grueDeLObjet, symboleDeLObjetPose } from '../topo/grue-mobile.js';
 import { nuance, primitivesEtage, chassisLibre, boiteSymbole, echelleDeLObjet } from '../topo/symboles.js';
 
@@ -25,8 +26,48 @@ function chemin(d, pts, ferme) {
   if (ferme) d.ctx.closePath();
 }
 
+/**
+ * Plaque à plusieurs lignes (0.295.1) : styles[i] = { g (gras), s (souligné) } pour la ligne i. Renvoie { w, h } (px).
+ */
+export function plaqueMulti(ctx, lignes, x, y, h, couleurTexte, styles = []) {
+  const interligne = h * 1.25;
+  const police = (i) => `${styles[i]?.g ? 800 : 500} ${h}px system-ui, sans-serif`;
+  let largeur = 0;
+  lignes.forEach((l, i) => {
+    ctx.font = police(i);
+    largeur = Math.max(largeur, ctx.measureText(l).width);
+  });
+  const w = largeur + h * 0.7;
+  const H = lignes.length * interligne + h * 0.4;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.strokeStyle = 'rgba(43,52,64,0.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, y - H / 2, w, H, h * 0.35);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = couleurTexte;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  lignes.forEach((l, i) => {
+    const yy = y - H / 2 + h * 0.2 + interligne * (i + 0.5);
+    ctx.font = police(i);
+    ctx.fillText(l, x, yy);
+    if (styles[i]?.s) {
+      const lw = ctx.measureText(l).width;
+      ctx.strokeStyle = couleurTexte;
+      ctx.lineWidth = Math.max(1, h * 0.07);
+      ctx.beginPath();
+      ctx.moveTo(x - lw / 2, yy + h * 0.48);
+      ctx.lineTo(x + lw / 2, yy + h * 0.48);
+      ctx.stroke();
+    }
+  });
+  return { w, h: H };
+}
+
 /** Plaque blanche arrondie avec un texte centré en (x, y) (texte de plan, surface d'une zone). */
-export function plaque(ctx, texte, x, y, h, poids = 600) {
+export function plaque(ctx, texte, x, y, h, poids = 600, couleurTexte = '#1b2b36') {
   ctx.font = `${poids} ${h}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -38,7 +79,7 @@ export function plaque(ctx, texte, x, y, h, poids = 600) {
   ctx.roundRect(x - w / 2, y - h * 0.68, w, h * 1.36, h * 0.35);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = '#1b2b36';
+  ctx.fillStyle = couleurTexte;
   ctx.fillText(texte, x, y + h * 0.04);
   return { w, h: h * 1.36 };
 }
@@ -153,6 +194,17 @@ export function dessinerObjet(d, o) {
     ctx.fillStyle = couleur;
     ctx.fill();
     ctx.globalAlpha = 1;
+    // 0.294.1 : texture du matériau (grains, cailloux, blocs…) par-dessus la couleur du stock
+    const motif = o.materiau ? textureMateriau(ctx, o.materiau) : null;
+    if (motif) {
+      ctx.save();
+      chemin(d, o.points, true);
+      ctx.clip();
+      ctx.fillStyle = motif;
+      ctx.globalAlpha = 0.9;
+      ctx.fillRect(0, 0, vue.largeur, vue.hauteur);
+      ctx.restore();
+    }
     if (o.tasH > 0) dessinerTas(d, o, couleur);
     ctx.strokeStyle = couleur;
     ctx.lineWidth = Math.max(0.8, contourZoneMm(o) * mm);
@@ -182,7 +234,7 @@ export function dessinerObjet(d, o) {
     }
     ctx.strokeStyle = couleur;
     ctx.lineWidth = 1;
-    ctx.setLineDash([9, 5]);
+    ctx.setLineDash({ continu: [], points: [1.5, 5], mixte: [14, 4, 2, 4] }[o.trait] ?? [9, 5]);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
@@ -266,7 +318,8 @@ export function dessinerObjet(d, o) {
   } else if (o.type === 'texte') {
     const q = ecran(o.point);
     const h = Math.max(9, (o.taille ?? 1) * e);
-    const { w, h: hauteur } = plaque(ctx, o.texte, q.x, q.y, h);
+    const lignesTxt = lignesDuTexte(o.texte);
+    const { w, h: hauteur } = (lignesTxt.length > 1 || o.styles?.some((x) => x?.g || x?.s)) ? plaqueMulti(ctx, lignesTxt, q.x, q.y, h, couleur, o.styles ?? []) : plaque(ctx, o.texte, q.x, q.y, h, 600, couleur);
     if (o.repere) dessinerRepere(d, o, q, w, hauteur);
   }
 }
@@ -274,14 +327,15 @@ export function dessinerObjet(d, o) {
 /** Ligne de repère d'un texte : du bord de la plaque au point visé, avec une flèche ou un point au bout. */
 function dessinerRepere(d, o, q, w, h) {
   const { ctx } = d;
+  const couleur = couleurObjet(d.pc ?? { couleurs: 'objets', phases: [] }, o);
   const t = ecranDe(d)(o.repere);
   const dx = t.x - q.x;
   const dy = t.y - q.y;
   const k = Math.min((w / 2) / (Math.abs(dx) || 1e-9), (h / 2) / (Math.abs(dy) || 1e-9));
   if (k >= 1) return; // le point visé est sous la plaque
   const dep = { x: q.x + dx * k, y: q.y + dy * k };
-  ctx.strokeStyle = '#1b2b36';
-  ctx.fillStyle = '#1b2b36';
+  ctx.strokeStyle = couleur;
+  ctx.fillStyle = couleur;
   ctx.lineWidth = 1.2;
   ctx.setLineDash([]);
   ctx.beginPath();
@@ -398,7 +452,7 @@ export function dessinerLigne(ctx, pts, style, couleur, pxMm, o = {}, pxM = null
  * hachurée), barrière Heras (panneaux de 3,5 m sur pieds). pxM = pixels pour 1 m sur le terrain.
  */
 function dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM, o) {
-  const w = Math.max(3, m.largeurM * pxM * ech);
+  const w = Math.max(3, (o?.largeurM ?? m.largeurM) * pxM * ech); // 0.294.1 : largeur réglable par élément
   const tube = (largeur, style) => {
     ctx.beginPath();
     pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
@@ -476,6 +530,22 @@ function dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM, o) {
     ctx.strokeStyle = '#7a4b00';
     ctx.lineWidth = Math.max(0.5, w * 0.12);
     ctx.stroke();
+    // Plots en béton de chaque panneau, en travers de la clôture (comme la barrière Heras).
+    for (const r of reperes) {
+      const lg = Math.max(7, 0.9 * pxM * ech);
+      const ep = Math.max(2.5, 0.22 * pxM * ech);
+      ctx.save();
+      ctx.translate(r.x, r.y);
+      ctx.rotate(r.angle);
+      ctx.fillStyle = '#c3c9cf';
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = Math.max(0.6, ep * 0.12);
+      ctx.beginPath();
+      ctx.roundRect(-ep / 2, -lg / 2, ep, lg, ep * 0.25);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
     for (const r of reperes) {
       const t = Math.max(3.5, 0.3 * pxM * ech);
       ctx.save();
@@ -543,18 +613,34 @@ function dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM, o) {
       ctx.lineWidth = Math.max(1, epaisseur);
       ctx.stroke();
     }
-    ctx.beginPath();
+    // Un piéton qui marche (pictogramme, vu de côté) tous les 2,5 m, tourné dans le sens du tracé.
     for (const r of reperes) {
-      const [ux, uy] = [Math.cos(r.angle), Math.sin(r.angle)];
-      const [nx, ny] = [-uy, ux];
-      const h = Math.min(w * 0.3, 8);
-      ctx.moveTo(r.x - ux * h - nx * h, r.y - uy * h - ny * h);
-      ctx.lineTo(r.x + ux * h, r.y + uy * h);
-      ctx.lineTo(r.x - ux * h + nx * h, r.y - uy * h + ny * h);
+      const h = Math.max(5, w * 0.62);
+      ctx.save();
+      ctx.translate(r.x, r.y);
+      ctx.rotate(r.angle);
+      ctx.strokeStyle = couleur;
+      ctx.fillStyle = couleur;
+      ctx.lineCap = 'round';
+      ctx.lineWidth = Math.max(1, h * 0.12);
+      // repère : x = sens de marche, y vers le côté ; la tête est à gauche du sens de marche (y négatif à l'écran)
+      ctx.beginPath();
+      ctx.arc(0, -h * 0.42, h * 0.11, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0, -h * 0.28);
+      ctx.lineTo(0, h * 0.05); // tronc
+      ctx.moveTo(0, -h * 0.22);
+      ctx.lineTo(h * 0.2, -h * 0.02); // bras avant
+      ctx.moveTo(0, -h * 0.22);
+      ctx.lineTo(-h * 0.18, -h * 0.02); // bras arrière
+      ctx.moveTo(0, h * 0.05);
+      ctx.lineTo(h * 0.2, h * 0.4); // jambe avant
+      ctx.moveTo(0, h * 0.05);
+      ctx.lineTo(-h * 0.17, h * 0.4); // jambe arrière
+      ctx.stroke();
+      ctx.restore();
     }
-    ctx.strokeStyle = couleur;
-    ctx.lineWidth = Math.max(1.2, epaisseur * 1.2);
-    ctx.stroke();
   } else if (m.type === 'heras') {
     // Treillis : trait double fin ; pieds en béton perpendiculaires à chaque joint de panneau ; croisillon par panneau.
     tube(Math.max(2, w * 0.1), '#94a3b8');
@@ -762,8 +848,10 @@ export function dessinerSymbolePose(d, o) {
     debut();
     const ch = chassisLibre(bib, o.chassis); // 0.290.0 : côté libre, coté
     if (ch) dessinerPrimitives(ctx, ch.primitives, e, d.mm, opts);
-    if (o.rayon !== false && g.rayon?.length) dessinerRayon(ctx, g, e, d.mm, rot, opts.texteU);
+    if (o.rayon !== false && g.rayon?.length) dessinerRayon(ctx, g, e, d.mm, rot, opts.texteU, 'cercles');
     dessinerPrimitives(ctx, g.primitives, e, d.mm, { ...opts, ombreForte: true });
+    // 0.294.1 : les cotes des cercles sont écrites PAR-DESSUS la grue (elles étaient cachées dessous)
+    if (o.rayon !== false && g.rayon?.length) dessinerRayon(ctx, g, e, d.mm, rot, opts.texteU, 'textes');
     ctx.restore();
     return;
   }
@@ -780,7 +868,8 @@ export function dessinerSymbolePose(d, o) {
     const t = 0.55;
     textes.forEach((texte, i) => {
       const y = (i ? -0.55 : 0.55) + 0.12;
-      pictoNiveau(ctx, -1.0 - t * 0.3, y, t, i === 0);
+      const tot = (((rot % 360) + 360) % 360);
+      pictoNiveau(ctx, -1.0 - t * 0.3, y, t, (tot > 90 && tot < 270) ? i !== 0 : i === 0); // le pictogramme reste lisible quand le bloc est retourné
       texteDansSymbole(ctx, { x: -0.55, y, h: opts.texteU ?? t, a: 0, t: texte, ah: 0, av: 2, k: '#0f172a' }, e, rot);
     });
     ctx.restore();
@@ -789,13 +878,16 @@ export function dessinerSymbolePose(d, o) {
   if (!s) return manquant(d, o, q);
   debut();
   dessinerPrimitives(ctx, s.primitives, e, d.mm, opts);
+  // 0.294.1 : texte libre au centre d'un bloc (ex. « Bureaux » sur un conteneur), même taille que les autres textes de symboles
+  if (o.etiquette) texteDansSymbole(ctx, { x: 0, y: 0, h: opts.texteU ?? 0.5, a: 0, t: o.etiquette, ah: 1, av: 2, k: '#0f172a' }, e, rot);
   ctx.restore();
 }
 
 /** Rayon d'action d'une grue : cercles de sa bibliothèque, en tirets ambre, et un voile très léger. */
-function dessinerRayon(ctx, g, e, mm, rot, texteU) {
+function dessinerRayon(ctx, g, e, mm, rot, texteU, partie = 'tout') {
   const lw = Math.max(0.8, 0.25 * mm) / e;
   for (const p of g.rayon) {
+    if ((p.g === 't') !== (partie === 'textes') && partie !== 'tout') continue;
     if (p.g === 'c') {
       const principal = Math.abs(p.r - g.fleche) < 0.5;
       ctx.beginPath();

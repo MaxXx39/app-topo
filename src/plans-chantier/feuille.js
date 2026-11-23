@@ -6,9 +6,9 @@ import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { versEcran } from '../plan/vue.js';
 import { dessinerObjets, dessinerLigne, dessinerPrimitives, symboleDeLObjet } from './dessin.js';
 import { dessinerFondSwisstopo, attendreTuiles } from './tuiles.js';
-import { datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
+import { ganttPhases, datesDePhase, metresParMm, styleLigne, couleurObjet, opaciteZone, bordsDesTriangles, contourZoneMm } from '../topo/plan-chantier.js';
 import {
-  miseEnPageFeuille, cadreSituation, etendueDuCadre, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
+  miseEnPageFeuille, cadreSituation, etendueDuCadre, echelleDeSituation, pagesDeLaFeuille, objetsDeLaPage, elementsLegende, vueDuCadre, barreDeLaFeuille, textesCartouche,
   reglagesFeuille, FORMATS_FEUILLE,
 } from '../topo/feuille-chantier.js';
 import { boiteSymbole, primitivesEtage } from '../topo/symboles.js';
@@ -58,7 +58,9 @@ export function preparerPage(donnees, page, pxParMm) {
     indice: r.indice,
     auteur: r.auteur || donnees.auteur || '',
   };
-  return { r, objets, legende, mise, vue, champs, textes: [] };
+  // 0.296.1 : plans montrés dessous = ceux de la phase de la page (page par phase), sinon le choix général
+  const plansPage = page.phase && donnees.plansPar ? donnees.plansPar(page.phase) : donnees.plans;
+  return { r, objets, legende, mise, vue, champs, textes: [], plans: plansPage };
 }
 
 /**
@@ -92,9 +94,10 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
   ctx.clip();
   ctx.translate(mm(c.x), mm(c.y));
   dessinerFondSwisstopo(ctx, vue, plan.fond, 1, quandTuile);
-  if (donnees.plans.length) {
+  const plansPage = prep.plans ?? donnees.plans;
+  if (plansPage.length) {
     const toile = document.createElement('canvas');
-    dessinerPlansDxf(toile, donnees.plans, vue, 1);
+    dessinerPlansDxf(toile, plansPage, vue, 1);
     ctx.drawImage(toile, 0, 0);
     toile.width = 0;
   }
@@ -152,6 +155,27 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
     texte(`${b.metres} m`, x + b.mm, y - 2.2 * mise.k, 6 * mise.k, { align: 'center' });
   }
 
+  // --- Planning des phases (diagramme de Gantt) à gauche du cartouche.
+  if (prep.r.planning && mise.planning.l > 40 * mise.k) {
+    const g = ganttPhases(plan.phases);
+    if (g) {
+      const B = mise.planning;
+      boite(ctx, B, s);
+      texte('Planning', B.x + 3 * mise.k, B.y + 4.5 * mise.k, 7 * mise.k, { gras: true });
+      const n = g.lignes.length;
+      const ligne = Math.min(6 * mise.k, (B.h - 9 * mise.k) / n);
+      const xm = B.x + 28 * mise.k;
+      const lg = B.l - 32 * mise.k;
+      g.lignes.forEach((l, i) => {
+        const y = B.y + 8 * mise.k + i * ligne;
+        texte(l.nom, B.x + 3 * mise.k, y + ligne / 2, Math.min(6 * mise.k, ligne * 2.2), {});
+        ctx.fillStyle = l.couleur;
+        ctx.fillRect(mm(xm + l.x0 * lg), mm(y + ligne * 0.18), mm(Math.max(1, (l.x1 - l.x0) * lg)), mm(ligne * 0.64));
+      });
+      texte(`${datesDePhase({ debut: g.lignes[0].debut })} → ${new Date(g.fin).toLocaleDateString('fr-CH')}`, B.x + B.l - 3 * mise.k, B.y + 4.5 * mise.k, 5.5 * mise.k, { align: 'right' });
+    }
+  }
+
   // --- Légende.
   if (legende.length) {
     const L = mise.legende;
@@ -198,7 +222,8 @@ function dessinerSituation(ctx, d, prep, s, quandTuile, texte) {
   const B = cadreSituation(mise, sit);
   const mm = (v) => v * s;
   const centre = [vue.estCentre, vue.nordCentre];
-  const vueS = { echelle: (s * 1000) / sit.echelle, estCentre: centre[0], nordCentre: centre[1], largeur: B.l * s, hauteur: B.h * s, rotation: 0 };
+  const echSit = echelleDeSituation(plan, mise, sit);
+  const vueS = { echelle: (s * 1000) / echSit, estCentre: centre[0], nordCentre: centre[1], largeur: B.l * s, hauteur: B.h * s, rotation: 0 };
   prep.vueSituation = vueS;
   ctx.save();
   ctx.fillStyle = '#ffffff';
@@ -214,7 +239,10 @@ function dessinerSituation(ctx, d, prep, s, quandTuile, texte) {
   ctx.fillStyle = 'rgba(220,38,38,0.15)';
   ctx.strokeStyle = '#dc2626';
   ctx.lineWidth = Math.max(1, 0.5 * s);
-  const [rx, ry, rl, rh] = [a.x, a.y, Math.max(b.x - a.x, 1.5 * s), Math.max(b.y - a.y, 1.5 * s)];
+  // Rectangle rouge : jamais plus petit que 5 mm sur le papier (0.295.1), centré sur la zone du plan.
+  const mini = 5 * mise.k * s;
+  const [rl, rh] = [Math.max(b.x - a.x, mini), Math.max(b.y - a.y, mini)];
+  const [rx, ry] = [(a.x + b.x) / 2 - rl / 2, (a.y + b.y) / 2 - rh / 2];
   ctx.fillRect(rx, ry, rl, rh);
   ctx.strokeRect(rx, ry, rl, rh);
   ctx.restore();
@@ -224,7 +252,7 @@ function dessinerSituation(ctx, d, prep, s, quandTuile, texte) {
   // Titre et nord, sur une bande blanche en bas du cadre.
   ctx.fillStyle = 'rgba(255,255,255,0.9)';
   ctx.fillRect(mm(B.x), mm(B.y + B.h - 6 * mise.k), mm(B.l), mm(6 * mise.k));
-  texte(`Situation 1:${sit.echelle}`, B.x + 2 * mise.k, B.y + B.h - 3 * mise.k, 6 * mise.k, { gras: true });
+  texte(`Situation 1:${echSit}`, B.x + 2 * mise.k, B.y + B.h - 3 * mise.k, 6 * mise.k, { gras: true });
   dessinerNord(ctx, { x: B.x + B.l - 5 * mise.k, y: B.y + 6 * mise.k, t: 6 * mise.k }, s);
 }
 
@@ -363,7 +391,7 @@ export async function creerPdfChantier(donnees, avancement = () => {}) {
     }
     if (prep.r.situation.actif) {
       const sit = prep.r.situation;
-      const vS = { echelle: (s * 1000) / sit.echelle, estCentre: prep.vue.estCentre, nordCentre: prep.vue.nordCentre, largeur: cadreSituation(prep.mise, sit).l * s, hauteur: cadreSituation(prep.mise, sit).h * s, rotation: 0 };
+      const vS = { echelle: (s * 1000) / echelleDeSituation(donnees.plan, prep.mise, sit), estCentre: prep.vue.estCentre, nordCentre: prep.vue.nordCentre, largeur: cadreSituation(prep.mise, sit).l * s, hauteur: cadreSituation(prep.mise, sit).h * s, rotation: 0 };
       const att = await attendreTuiles(vS, { carte: true }, 1);
       if (att?.manquantes) remarques.push('carte de situation incomplète (pas de connexion ?)');
     }

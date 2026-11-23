@@ -62,9 +62,9 @@ function rayonAbaque(g, abaque) {
   const texte = (r, t) => (t === null || t === undefined ? `${r} m` : `${r} m · ${t} t`);
   for (const { r, t } of abaque) {
     if (Math.abs(r - g.fleche) < 0.05) continue;
-    res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r, mat: 'trait' }, { g: 't', k: '#92400e', x: r, y: -1.2, h: 0.9, a: 90, t: texte(r, t), ah: 1, av: 2 });
+    res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r, mat: 'trait' }, { g: 't', k: '#92400e', x: r, y: -2.4, h: 0.9, a: 90, t: texte(r, t), ah: 1, av: 2 });
   }
-  res.push({ g: 't', k: '#92400e', x: g.fleche, y: -1.2, h: 0.9, a: 90, t: texte(g.fleche, abaque.find((e) => Math.abs(e.r - g.fleche) < 0.05)?.t), ah: 1, av: 2 });
+  res.push({ g: 't', k: '#92400e', x: g.fleche, y: -2.4, h: 0.9, a: 90, t: texte(g.fleche, abaque.find((e) => Math.abs(e.r - g.fleche) < 0.05)?.t), ah: 1, av: 2 });
   return res;
 }
 

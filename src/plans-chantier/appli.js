@@ -22,9 +22,10 @@ import { creerVueChantier } from './vue.js';
 import { listeGenres } from './apercu.js';
 import { chargerBibliothequeBase, entreesBibliotheque, filtrerEntrees, CATEGORIES_SYMBOLES, symbolesDuDxf, ajouterSymbolesProjet } from './bibliotheque.js';
 import { dessinerVignette, symboleDeLObjet } from './dessin.js';
-import { geometrieCotation } from '../topo/plan-chantier.js';
+import { geometrieCotation, lignesDuTexte, CATEGORIES_ZONE, STYLES_LIGNE } from '../topo/plan-chantier.js';
 import { SENS_DEVIATION, CLE_DEVIATION } from '../topo/panneau-deviation.js';
 import { ouvrirGestionPhases } from './gestion-phases.js';
+import { ouvrirGestionCalques, plansAvecCalques } from './gestion-calques.js';
 import { autogrueDe, TONNES_MOBILES, FLECHE_MOBILE_MIN } from '../topo/grue-mobile.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
@@ -37,14 +38,18 @@ import { PALEUR_ORTHO } from './tuiles.js';
 const OUTILS = [
   ['zone', '<path d="M4 8L12 4L20 9L17 19H6Z"/>', 'Zone'],
   ['ligne', '<path d="M3 18L9 8L15 14L21 5"/>', 'Ligne'],
-  ['piste', '<path d="M3 15L12 9L21 15M3 20L12 14L21 20"/>', 'Piste'],
   ['fleche', '<path d="M3 14H15V9L21 15L15 21V16H3Z"/>', 'Flèche'],
   ['texte', '<path d="M5 6H19M12 6V20M9 20H15"/>', 'Texte'],
   ['decaler', '<path d="M3 16L10 6L21 13"/><path d="M3 21L11 10L21 18" opacity=".55"/>', 'Décaler'],
   ['cotation', '<path d="M4 18H20M4 14V21M20 14V21"/><path d="M4 18L7 16V20ZM20 18L17 16V20Z"/>', 'Cotation'],
   ['construction', '<path d="M3 20L21 4" stroke-dasharray="3 2.5"/><path d="M12 8V16M8 12H16"/>', 'Construction'],
 ];
+/** Genre de l'élément choisi : liste déroulante (le bandeau du haut garde la même hauteur). */
+const selectGenres = (type, valeur) => `<label class="champ-calage"><span>Genre</span><select data-genre-liste="${type}">${(type === 'zone' ? CATEGORIES_ZONE : STYLES_LIGNE).map((g) => `<option value="${g.cle}" ${g.cle === valeur ? 'selected' : ''}>${echapper(g.nom)}</option>`).join('')}</select></label>`;
+/** Genre de l'outil actif : liste déroulante dans le bandeau du haut. */
+const selectGenresOutil = (type, valeur) => `<label class="champ-calage"><span>Genre</span><select data-genre-outil="${type}">${(type === 'zone' ? CATEGORIES_ZONE : STYLES_LIGNE).map((g) => `<option value="${g.cle}" ${g.cle === valeur ? 'selected' : ''}>${echapper(g.nom)}</option>`).join('')}</select></label>`;
 const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
+const TRAITS_CONSTRUCTION = [['tirets', 'Tirets'], ['continu', 'Continu'], ['points', 'Pointillé'], ['mixte', 'Tirets-points']];
 const ACCROCHES = [['point', 'Point'], ['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['perpendiculaire', 'Perpendiculaire']];
 const ICONE_CHOISIR = '<path d="M6 3L18 13L12 14L15 21L12.5 22L9.5 15L6 19Z"/>';
 const MAX_ANNULER = 50;
@@ -78,7 +83,7 @@ export function ouvrirPlansChantier({
     categorie: 'installation', style: 'cloture', largeur: 4, tailleTexte: 1.2, curseur: null,
     // Réglages de l'outil (valeurs données aux éléments dessinés ensuite) : null = celle du genre.
     opacite: OPACITE_ZONE, contourMm: null, afficherSurface: false, epaisseurMm: null, echelleMotif: 1,
-    largeurFleche: LARGEUR_FLECHE, echelleFleche: 1, texteRepere: false, repereBout: 'fleche', distanceDecalage: 0.5, cotationGenre: 'longueur',
+    largeurFleche: LARGEUR_FLECHE, echelleFleche: 1, texteRepere: false, repereBout: 'fleche', distanceDecalage: 0.5, cotationGenre: 'longueur', ortho: false, orthoAngle: 0, orthoRepere: false,
     attenteRepere: null, // id du texte qui attend le point visé par sa ligne de repère
     reglageEnCours: false, // un curseur (transparence…) est en train d'être glissé
     glisse: null, // glisse : { type: 'sommet', i } ou { type: 'objet' } ou { type: 'rotation' }
@@ -86,7 +91,7 @@ export function ouvrirPlansChantier({
     pose: null, // élément à poser (outil « symbole ») : { type: 'symbole', cle… } ou { type: 'grue', … }
     rotationPose: 0, biblio: { ouvert: false, categorie: '', recherche: '' }, fondEtat: null,
     orienter: null, // 0.290.0 : { id, mode: 'point' | 'ligne' } : le prochain clic oriente le symbole choisi
-    constructionMode: 'droite', // 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
+    constructionMode: 'segment', constructionTrait: 'tirets', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
     decalerConstruction: false, // Décaler : créer une ligne de construction (parallèle) au lieu d'une ligne
   };
   let vue = null;
@@ -104,10 +109,16 @@ export function ouvrirPlansChantier({
   });
 
   const plan = () => liste().find((x) => x.id === etat.planId) ?? null;
-  const plansFond = () => {
-    const caches = new Set(plan()?.fond?.plansCaches ?? []);
+  // 0.296.1 : plans montrés dessous PAR PHASE (plan.fond.plansParPhase[idPhase] = ids), sinon le choix général (plansCaches)
+  const plansMontres = (idPhase = plan()?.phaseActive) => {
+    const fond = plan()?.fond;
+    const propres = fond?.plansParPhase?.[idPhase];
+    if (propres) return plans().filter((p) => propres.includes(p.id));
+    const caches = new Set(fond?.plansCaches ?? []);
     return plans().filter((p) => !caches.has(p.id));
   };
+  // 0.296.0 : réglages de calques (masqués, couleurs) propres à ce plan de chantier
+  const plansFond = (idPhase) => plansAvecCalques(plansMontres(idPhase), plan()?.fond);
 
   let fermee = false;
   function fermer() {
@@ -185,6 +196,12 @@ export function ouvrirPlansChantier({
       return;
     }
     if (etat.ecran !== 'dessin') return;
+    if (ev.key === 'F8') {
+      ev.preventDefault();
+      etat.ortho = !etat.ortho;
+      majOutils();
+      return majConsigne();
+    }
     const dansChamp = ev.target.matches('input, select, textarea');
     if (ev.key === 'Enter' && ev.target.matches('[data-saisie]')) {
       ev.preventDefault();
@@ -291,11 +308,15 @@ export function ouvrirPlansChantier({
         ${groupe('Symboles', `<button type="button" class="outil-ruban" data-action="biblio" aria-pressed="${etat.biblio.ouvert}">${ico('<rect x="3" y="7" width="12" height="9" rx="1"/><path d="M15 10H19L21 13V16H15"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>')}<span>Bibliothèque</span></button>`)}
         ${groupe('Accroche', ACCROCHES.map(([c, t]) => `<button type="button" class="outil-ruban petit" data-accroche="${c}"><span>${t}</span></button>`).join(''))}
         ${groupe('Fond', `<button type="button" class="outil-ruban" data-action="fond-plans">${ico('<path d="M3 6L9 4L15 6L21 4V18L15 20L9 18L3 20Z"/><path d="M9 4V18M15 6V20"/>')}<span>Plans…</span></button>
+          <button type="button" class="outil-ruban petit" data-action="fond-calques" title="Masquer des calques d'un plan affiché dessous, changer leur couleur"><span>Calques…</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-points"><span>Points levés</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-carte"><span>Carte</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-ortho"><span>Photo</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-cadastre"><span>Cadastre</span></button>
           <button type="button" class="outil-ruban petit" data-action="fond-surfaces"><span>Surfaces</span></button>`)}
+        ${groupe('Ortho', `<button type="button" class="outil-ruban petit" data-action="ortho" title="Ortho (F8) : le dessin est aimanté aux directions N / S / E / O, ou à celles du repère"><span>Ortho</span></button>
+          <label class="champ-bandeau" title="Angle du repère en degrés (0 = Est / Nord) : le dessin s'aimante à ce repère et à ses perpendiculaires"><span>Repère °</span><input type="number" step="0.1" value="${etat.orthoAngle}" data-reglage="orthoAngle" style="width:64px"></label>
+          <button type="button" class="outil-ruban petit" data-action="ortho-repere" title="Prendre l'angle d'une ligne du plan ou du dessin comme repère"><span>Repère = ligne</span></button>`)}
         ${groupe('Construction', `<button type="button" class="outil-ruban petit" data-action="construction-visible" title="Montrer ou cacher les lignes de construction (jamais imprimées)"><span>Afficher</span></button>`)}
         ${groupe('Zoom', '<button type="button" class="outil-ruban" data-zoom="1.5">＋</button><button type="button" class="outil-ruban" data-zoom="0.667">−</button><button type="button" class="outil-ruban" data-zoom="tout">⤢<span>Tout</span></button>')}
       </div>
@@ -445,7 +466,21 @@ export function ouvrirPlansChantier({
       const t = accrocher(mode, position, tolerance, sources);
       if (t) return t;
     }
-    return null;
+    return pointOrtho(position);
+  }
+
+  /** Ortho (0.294.1) : pendant un dessin, le point suivant est aimanté à la direction du repère (ou à ses perpendiculaires). */
+  function pointOrtho(position) {
+    const dernier = etat.saisie?.points?.at(-1);
+    if (!etat.ortho || !dernier || etat.saisie.outil === 'decaler') return null;
+    const [x, y] = [position.est - dernier[0], position.nord - dernier[1]];
+    const L = Math.hypot(x, y);
+    if (L < 1e-6) return null;
+    const base = ((etat.orthoAngle || 0) * Math.PI) / 180;
+    const a = Math.atan2(y, x) - base;
+    const k = Math.round(a / (Math.PI / 2)) * (Math.PI / 2) + base;
+    const d = L * Math.cos(Math.atan2(y, x) - k); // longueur projetée sur la direction choisie
+    return { est: dernier[0] + d * Math.cos(k), nord: dernier[1] + d * Math.sin(k), altitude: null, mode: 'ortho' };
   }
 
   /** Orienter le symbole choisi (0.290.0) : vers le point cliqué (accroché), ou parallèle à la ligne cliquée. */
@@ -516,6 +551,16 @@ export function ouvrirPlansChantier({
   }
 
   async function toucher(p, tolerance) {
+    if (etat.orthoRepere) {
+      etat.orthoRepere = false;
+      const lignes = [...lignesPourAccroche(objetsVisibles(plan())), ...lignesSymboles(plan().objets), ...sourcesDesPlans(plansFond(), { est: p[0], nord: p[1] }, tolerance).lignes];
+      const a = angleDeLaLigne(lignes, p, tolerance * 1.5, 0);
+      if (a === null) return message('Aucune ligne ici : l\'angle de repère n\'a pas changé.', 3000);
+      etat.orthoAngle = Math.round(((a % 90) + 90) % 90 * 100) / 100;
+      etat.ortho = true;
+      message(`Repère de l'Ortho : ${etat.orthoAngle}°`, 3000);
+      return majTout();
+    }
     if (etat.attenteRepere) {
       const o = plan().objets.find((x) => x.id === etat.attenteRepere);
       etat.attenteRepere = null;
@@ -576,7 +621,7 @@ export function ouvrirPlansChantier({
     if (!avantChangement()) return;
     let champs;
     if (etat.cotationGenre === 'angle') {
-      champs = { type: 'cotation', genre: 'angle', points: pts.slice(0, 3) };
+      champs = { type: 'cotation', genre: 'angle', ordre: 'p1-s-p3', points: pts.slice(0, 3) }; // sommet = point 2
     } else {
       const [A, B, C] = pts;
       const L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
@@ -625,7 +670,7 @@ export function ouvrirPlansChantier({
     }
     if (!avantChangement()) return;
     if (plan().construction?.visible === false) plan().construction = { ...(plan().construction ?? {}), visible: true }; // on la voit en la créant
-    const o = ajouterObjet(plan(), { type: 'construction', points: pts, infinie });
+    const o = ajouterObjet(plan(), { type: 'construction', points: pts, infinie, ...(etat.constructionTrait !== 'tirets' ? { trait: etat.constructionTrait } : {}) });
     etat.saisie = null;
     etat.choisi = o.id;
     etat.outil = 'choisir';
@@ -698,7 +743,7 @@ export function ouvrirPlansChantier({
 
   /** Données communes à l'aperçu et au PDF. */
   const donneesFeuille = () => ({
-    plan: plan(), plans: plansFond(), points: plan()?.fond?.points === false ? [] : points(), surfaces: plan()?.fond?.surfaces === false ? [] : surfaces(),
+    plan: plan(), plans: plansFond(), plansPar: (idPhase) => plansFond(idPhase), points: plan()?.fond?.points === false ? [] : points(), surfaces: plan()?.fond?.surfaces === false ? [] : surfaces(),
     bib: bib(), projet: leProjet(), auteur: auteur(), centre: centreDeDepart(plan(), plansFond()),
   });
 
@@ -821,7 +866,8 @@ export function ouvrirPlansChantier({
       <label class="case-chantier"><input type="checkbox" data-feuille-case="barre" ${r.barre ? 'checked' : ''}> Barre d'échelle</label>
       <label class="case-chantier"><input type="checkbox" data-situation="actif" ${r.situation.actif ? 'checked' : ''}> Vue de situation (carte nationale)</label>
       ${r.situation.actif ? `<label class="champ-calage"><span>Coin</span><select data-situation="coin">${options(COINS_SITUATION, r.situation.coin)}</select></label>
-      <label class="champ-calage"><span>Échelle de la situation 1 :</span><input type="number" min="500" max="100000" step="500" value="${r.situation.echelle}" data-situation="echelle"></label>
+      <label class="case-chantier"><input type="checkbox" data-situation="auto" ${r.situation.auto ? 'checked' : ''}> Échelle automatique (la zone du plan reste bien visible)</label>
+      ${r.situation.auto ? '' : `<label class="champ-calage"><span>Échelle de la situation 1 :</span><input type="number" min="500" max="100000" step="500" value="${r.situation.echelle}" data-situation="echelle"></label>`}
       <label class="champ-calage"><span>Taille (mm, A3)</span><input type="number" min="30" max="120" step="5" value="${r.situation.taille}" data-situation="taille"></label>` : ''}
       <h3>Enregistrer</h3>
       <div class="actions-chantier"><button type="button" class="bouton" data-action="feuille-pdf">PDF</button><button type="button" class="bouton-secondaire" data-action="feuille-dxf">DXF</button></div>
@@ -967,6 +1013,7 @@ export function ouvrirPlansChantier({
     page.querySelector('[data-action="fond-ortho"]')?.classList.toggle('actif', Boolean(plan()?.fond?.ortho));
     page.querySelector('[data-action="fond-cadastre"]')?.classList.toggle('actif', Boolean(plan()?.fond?.cadastre));
     page.querySelector('[data-action="fond-surfaces"]')?.classList.toggle('actif', plan()?.fond?.surfaces !== false);
+    page.querySelector('[data-action="ortho"]')?.classList.toggle('actif', etat.ortho);
     page.querySelector('[data-action="construction-visible"]')?.classList.toggle('actif', plan()?.construction?.visible !== false);
     page.querySelector('[data-action="biblio"]')?.setAttribute('aria-pressed', String(etat.biblio.ouvert));
     page.querySelector('[data-action="effacer"]')?.toggleAttribute('disabled', !etat.choisi);
@@ -988,7 +1035,7 @@ export function ouvrirPlansChantier({
       texte: etat.attenteRepere ? 'Cliquez le point visé par la ligne de repère.' : `Cliquez où écrire le texte${etat.texteRepere ? ' (puis le point visé par la ligne de repère)' : ''}.`,
       decaler: etat.saisie?.source ? `Cliquez du côté où mettre la copie, à ${etat.distanceDecalage} m.` : (etat.decalerConstruction ? 'Cliquez le segment dont on veut une parallèle en ligne de construction (plan DXF, dessin ou autre construction).' : 'Cliquez la ligne à décaler (une ligne du plan DXF ou un élément dessiné).'),
       cotation: etat.cotationGenre === 'angle'
-        ? (n === 0 ? 'Cliquez le sommet de l\'angle.' : n === 1 ? 'Cliquez un point du 1er côté.' : 'Cliquez un point du 2e côté : l\'angle est coté.')
+        ? (n === 0 ? 'Cliquez le point 1 (sur le 1er côté).' : n === 1 ? 'Cliquez le point 2 : c\'est le sommet de l\'angle.' : 'Cliquez le point 3 (sur le 2e côté) : l\'angle 2 est coté.')
         : (n === 0 ? 'Cliquez le 1er point à coter (accroches actives).' : n === 1 ? 'Cliquez le 2e point.' : 'Cliquez où placer la ligne de cote (de quel côté et à quelle distance).'),
       construction: etat.constructionMode === 'angle'
         ? (n ? 'Tapez l\'angle de la droite puis Entrée (ou cliquez un 2e point).' : 'Cliquez un point de la droite, puis tapez son angle.')
@@ -1039,11 +1086,11 @@ export function ouvrirPlansChantier({
     const mmLigne = (cle) => (etat.epaisseurMm ?? styleLigne(cle).epaisseurMm);
     // Réglages de l'outil : donnés aux éléments dessinés ensuite.
     const reglages = {
-      zone: `${listeGenres('zone', etat.categorie, 'outil', echapper)}
+      zone: `${selectGenresOutil('zone', etat.categorie)}
         ${champCurseur('Transparence du fond (opacité)', 'reglage', 'opacite', etat.opacite)}
         ${champNombre('Épaisseur du contour', 'reglage', 'contourMm', etat.contourMm ?? (etat.categorie === 'emprise' ? 0.7 : 0.35), 0.05, 5, 0.05, 'mm')}
         ${champCase('Afficher la surface (m²)', 'reglage-case', 'afficherSurface', etat.afficherSurface)}`,
-      ligne: `${listeGenres('ligne', etat.style, 'outil', echapper)}
+      ligne: `${selectGenresOutil('ligne', etat.style)}
         ${champNombre('Épaisseur', 'reglage', 'epaisseurMm', mmLigne(etat.style), 0.05, 5, 0.05, 'mm')}
         ${champNombre('Échelle du motif', 'reglage', 'echelleMotif', etat.echelleMotif, 0.3, 5, 0.1, '×')}`,
       piste: champNombre('Largeur de la piste', 'reglage', 'largeur', etat.largeur, 1, 30, 0.5, 'm'),
@@ -1055,19 +1102,22 @@ export function ouvrirPlansChantier({
           ${[['fleche', 'Flèche'], ['point', 'Point'], ['aucun', 'Rien']].map(([v, t]) => `<option value="${v}" ${etat.repereBout === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`,
       symbole: etat.pose ? `<p class="resume-chantier">${echapper(nomDeLaPose(etat.pose))}</p>
         ${champNombre('Rotation de pose', 'reglage', 'rotationPose', etat.rotationPose, -360, 360, 5, '°')}` : '<p class="aide-calage">Choisissez un symbole dans la bibliothèque.</p>',
-      construction: `<label class="champ-calage"><span>Type</span><select data-reglage="constructionMode">
+      construction: `<label class="champ-calage"><span>Trait</span><select data-reglage="constructionTrait">${TRAITS_CONSTRUCTION.map(([v, t]) => `<option value="${v}" ${etat.constructionTrait === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        <label class="champ-calage"><span>Type</span><select data-reglage="constructionMode">
           ${[['droite', 'Droite (2 points)'], ['angle', 'Droite par un point et un angle'], ['segment', 'Segment (2 points ou longueur tapée)']].map(([v, t]) => `<option value="${v}" ${etat.constructionMode === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         <p class="aide-calage">Cyan en tirets, jamais imprimées ni exportées ; elles servent d'accroche (Sur ligne, Croisement, Perpendiculaire) et pour aligner. « Décaler » avec la case « En ligne de construction » donne une parallèle.</p>`,
       cotation: `<label class="champ-calage"><span>Genre de cotation</span><select data-reglage="cotationGenre"><option value="longueur" ${etat.cotationGenre !== 'angle' ? 'selected' : ''}>Longueur alignée</option><option value="angle" ${etat.cotationGenre === 'angle' ? 'selected' : ''}>Angle</option></select></label>`,
       decaler: `${champNombre('Distance du décalage', 'reglage', 'distanceDecalage', etat.distanceDecalage, 0.01, 100, 0.05, 'm')}
         ${champCase('En ligne de construction (parallèle)', 'reglage-case', 'decalerConstruction', etat.decalerConstruction)}
-        <p class="aide-calage">Genre de la ligne créée :</p>${listeGenres('ligne', etat.style, 'outil', echapper)}`,
+        ${selectGenresOutil('ligne', etat.style)}`,
     }[etat.outil] ?? '';
     let choisi = '';
     let propreHtml = '';
     if (o) {
       const propre = {
-        zone: `${listeGenres('zone', o.categorie, 'objet', echapper)}
+        construction: `<label class="champ-calage"><span>Trait</span><select data-prop="trait">${TRAITS_CONSTRUCTION.map(([v, t]) => `<option value="${v}" ${(o.trait ?? 'tirets') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+          ${champCase('Droite infinie', 'prop-case', 'infinie', Boolean(o.infinie))}`,
+        zone: `${selectGenres('zone', o.categorie)}
           <label class="champ-calage"><span>Texte de la zone (au centre)</span><input type="text" maxlength="60" value="${echapper(o.etiquette ?? '')}" placeholder="ex. Stock de sable" data-prop="etiquette"></label>
           ${champCurseur('Transparence du fond (opacité)', 'prop', 'opacite', o.opacite ?? OPACITE_ZONE)}
           ${champNombre('Épaisseur du contour', 'prop', 'contourMm', contourZoneMm(o), 0.05, 5, 0.05, 'mm')}
@@ -1078,13 +1128,14 @@ export function ouvrirPlansChantier({
           ${o.tasH > 0 ? `${champNombre('Hauteur du tas', 'prop', 'tasH', o.tasH, 0.2, 30, 0.1, 'm')}
             ${champNombre('Talus (m horizontaux pour 1 m de hauteur)', 'prop', 'tasTalus', o.tasTalus ?? TAS_TALUS, 0.3, 5, 0.1, '')}
             ${champCase('Écrire la hauteur', 'prop-case', 'afficherHauteur', o.afficherHauteur)}` : ''}`,
-        ligne: `${listeGenres('ligne', styleLigne(o.style).cle, 'objet', echapper)}
-          ${champNombre('Épaisseur', 'prop', 'epaisseurMm', epaisseurLigneMm(o), 0.05, 5, 0.05, 'mm')}
+        ligne: `${selectGenres('ligne', styleLigne(o.style).cle)}
+          ${styleLigne(o.style).motif?.largeurM ? champNombre('Largeur de la bande', 'prop', 'largeurM', o.largeurM ?? styleLigne(o.style).motif.largeurM, 0.1, 20, 0.1, 'm') : champNombre('Épaisseur', 'prop', 'epaisseurMm', epaisseurLigneMm(o), 0.05, 5, 0.05, 'mm')}
           ${champNombre('Échelle du motif', 'prop', 'echelleMotif', o.echelleMotif ?? 1, 0.3, 5, 0.1, '×')}
           ${styleLigne(o.style).motif?.type === 'chevron' ? '<button type="button" class="bouton-secondaire" data-action="inverser-sens">⇄ Inverser le sens de la flèche</button>' : ''}`,
         piste: champNombre('Largeur', 'prop', 'largeur', o.largeur ?? 4, 1, 30, 0.5, 'm'),
-        cotation: o.genre === 'angle' ? champNombre('Rayon de l\'arc', 'prop', 'rayon', o.rayon ?? Math.round((geometrieCotation(o)?.arc?.[0] ? Math.hypot(geometrieCotation(o).arc[0][0] - o.points[0][0], geometrieCotation(o).arc[0][1] - o.points[0][1]) : 1) * 100) / 100, 0.1, 500, 0.1, 'm') : champNombre('Distance de la ligne de cote (+ gauche, − droite)', 'prop', 'decalage', o.decalage ?? 1, -500, 500, 0.1, 'm'),
-        texte: `<label class="champ-calage"><span>Texte</span><input type="text" value="${echapper(o.texte)}" data-prop="texte" maxlength="80"></label>
+        cotation: o.genre === 'angle' ? champNombre('Rayon de l\'arc', 'prop', 'rayon', o.rayon ?? Math.round((geometrieCotation(o)?.arc?.[0] ? Math.hypot(geometrieCotation(o).arc[0][0] - geometrieCotation(o).sommet[0], geometrieCotation(o).arc[0][1] - geometrieCotation(o).sommet[1]) : 1) * 100) / 100, 0.1, 500, 0.1, 'm') : champNombre('Distance de la ligne de cote (+ gauche, − droite)', 'prop', 'decalage', o.decalage ?? 1, -500, 500, 0.1, 'm'),
+        texte: `<label class="champ-calage"><span>Texte (Entrée = nouvelle ligne)</span><textarea data-prop="texte" maxlength="400" rows="2">${echapper(o.texte)}</textarea></label>
+          <div class="styles-lignes"><span>Style des lignes :</span>${lignesDuTexte(o.texte).map((l, i) => `<span class="style-ligne">${i + 1} <button type="button" data-style-ligne="${i}" data-s="g" class="${o.styles?.[i]?.g ? 'actif' : ''}" title="Gras" style="font-weight:800">G</button><button type="button" data-style-ligne="${i}" data-s="s" class="${o.styles?.[i]?.s ? 'actif' : ''}" title="Souligné" style="text-decoration:underline">S</button></span>`).join('')}</div>
           ${champNombre('Hauteur des lettres', 'prop', 'taille', o.taille ?? 1, 0.2, 10, 0.1, 'm')}
           ${champCase('Ligne de repère', 'prop-case', 'repere', Boolean(o.repere) || etat.attenteRepere === o.id)}
           ${o.repere ? `<label class="champ-calage"><span>Bout du repère</span><select data-prop="repereBout">
@@ -1113,26 +1164,27 @@ export function ouvrirPlansChantier({
       <label class="champ-calage"><span>Couleurs</span><select data-champ="couleurs">
         <option value="objets" ${p.couleurs !== 'phases' ? 'selected' : ''}>Celles des objets</option>
         <option value="phases" ${p.couleurs === 'phases' ? 'selected' : ''}>Une couleur par phase</option></select></label>
-      ${reglages ? `<h3>Outil</h3>${reglages}` : ''}
       ${choisi}
       <h3>Éléments (${p.objets.length})</h3>
       <ul class="elements-chantier">${[...p.objets].reverse().map((x) => `<li><button type="button" data-choisir="${x.id}" class="${x.id === etat.choisi ? 'actif' : ''}">
         <i style="background:${couleurObjet(p, x)}"></i>${echapper(resumeObjet(x))}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul>`;
     page.querySelector('.ruban-chantier [data-action="effacer"]')?.toggleAttribute('disabled', !etat.choisi);
     zone.querySelectorAll('canvas[data-vignette-pose]').forEach((c) => dessinerPose(c, Number(c.dataset.vignettePose)));
-    majBandeau(o, p, propreHtml);
+    majBandeau(o, p, propreHtml, reglages);
   }
 
   /**
    * Bandeau de l'élément choisi (0.293.0, au-dessus du plan) : ce qu'on règle le plus souvent, sans défiler dans le panneau de
    * droite : rotation, échelle, orientation, phase, couleur, ordre de dessin, décaler, effacer.
    */
-  function majBandeau(o, p, propre = '') {
+  function majBandeau(o, p, propre = '', reglagesOutil = '') {
     const zone = page.querySelector('[data-zone="bandeau-element"]');
     if (!zone) return;
-    zone.hidden = !o;
+    zone.hidden = !o && !(reglagesOutil && etat.outil !== 'choisir');
     if (!o) {
-      zone.innerHTML = '';
+      // 0.296.0 : les réglages de l'outil actif sont dans le bandeau du haut (plus dans la colonne de droite)
+      const nom = [...OUTILS, ...[['symbole', '', 'Symbole']]].find(([c]) => c === etat.outil)?.[2] ?? 'Outil';
+      zone.innerHTML = zone.hidden ? '' : `<span class="puce-element">Outil : ${echapper(nom)}</span><div class="propre-element">${reglagesOutil}</div>`;
       return;
     }
     const k = echelleDeLObjet(o);
@@ -1154,6 +1206,7 @@ export function ouvrirPlansChantier({
       <span class="groupe-ordre" role="group" aria-label="Ordre de dessin">${bouton('data-ordre="devant"', '⤒', 'Premier plan')}${bouton('data-ordre="monter"', '▲', 'Un cran au-dessus')}${bouton('data-ordre="descendre"', '▼', 'Un cran en dessous')}${bouton('data-ordre="arriere"', '⤓', 'Arrière-plan')}</span>
       ${decaler}${bouton('data-action="effacer"', '✕ Effacer', 'Effacer cet élément')}
       ${propre ? `<div class="propre-element">${propre}</div>` : ''}`;
+    zone.querySelectorAll('canvas[data-vignette-pose]').forEach((c) => dessinerPose(c, Number(c.dataset.vignettePose))); // vignettes des 8 poses de l'escalier
   }
 
   /** Nom de ce qui va être posé (panneau de l'outil). */
@@ -1210,7 +1263,8 @@ export function ouvrirPlansChantier({
         <label class="champ-calage"><span>Sens</span><select data-prop="sens">${SENS_DEVIATION.map(([v, t]) => `<option value="${v}" ${(o.sens ?? 'droite') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
     }
     const tourelle = sy?.pivote ? champNombre('Rotation de la tourelle (par rapport au châssis)', 'prop', 'tourelle', o.tourelle ?? 0, -360, 360, 1, '°') : '';
-    return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${tourelle}${rotation}${orienter}`;
+    const etiq = `<label class="champ-calage"><span>Texte sur le bloc</span><input type="text" maxlength="40" value="${echapper(o.etiquette ?? '')}" placeholder="ex. Bureaux" data-prop="etiquette"></label>`;
+    return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${tourelle}${etiq}${rotation}${orienter}`;
   }
 
   /** Vignette d'une pose de la base-vie à étage. */
@@ -1435,6 +1489,27 @@ export function ouvrirPlansChantier({
       enregistrer();
       return majTout();
     }
+    if (b.dataset.styleLigne !== undefined) {
+      const o = p.objets.find((x) => x.id === etat.choisi);
+      if (!o || !avantChangement()) return;
+      const i = Number(b.dataset.styleLigne);
+      const styles = [...(o.styles ?? [])];
+      styles[i] = { ...(styles[i] ?? {}), [b.dataset.s]: !styles[i]?.[b.dataset.s] };
+      o.styles = styles;
+      enregistrer();
+      majTout();
+      return vue?.redessinerDessus();
+    }
+    if (b.dataset.action === 'ortho') {
+      etat.ortho = !etat.ortho;
+      majOutils();
+      return majConsigne();
+    }
+    if (b.dataset.action === 'ortho-repere') {
+      etat.orthoRepere = true;
+      message('Cliquez une ligne du plan ou du dessin : son angle devient le repère de l\'Ortho.', 4000);
+      return;
+    }
     if (b.dataset.action === 'saisie-ok') return placerParSaisie();
     if (b.dataset.action === 'decaler-choisi') return decalerChoisi();
     if (b.dataset.action === 'effacer') return supprimerChoisi();
@@ -1448,12 +1523,41 @@ export function ouvrirPlansChantier({
     if (b.dataset.action === 'fond-plans') {
       const tous = plans();
       if (!tous.length) return message('Le projet n\'a aucun plan (DXF, PDF, IFC) à mettre dessous.', 4000);
+      // 0.296.1 : choix général ou propre à une phase (« changer de plan par phase »)
+      let phase = null;
+      if (p.phases.length > 1) {
+        const rep = await demanderChoix({
+          titre: 'Plans montrés dessous : pour quelle phase ?',
+          boutons: [
+            { cle: '__toutes', texte: 'Toutes les phases', detail: 'choix général (phases sans choix propre)', principal: true },
+            ...p.phases.map((ph) => ({ cle: ph.id, texte: ph.nom, detail: p.fond.plansParPhase?.[ph.id] ? 'choix propre à cette phase' : 'suit le choix général' })),
+            ...(p.fond.plansParPhase && Object.keys(p.fond.plansParPhase).length ? [{ cle: '__reinit', texte: 'Tout remettre au choix général', detail: 'efface les choix par phase' }] : []),
+          ],
+        });
+        if (!rep) return;
+        if (rep === '__reinit') {
+          if (!avantChangement()) return;
+          delete p.fond.plansParPhase;
+          enregistrer();
+          return majTout();
+        }
+        phase = rep === '__toutes' ? null : rep;
+      }
       const caches = new Set(p.fond.plansCaches ?? []);
-      const coches = await demanderCases({ titre: 'Plans du projet montrés dessous', options: tous.map((x) => ({ cle: x.id, texte: x.nom ?? x.id, coche: !caches.has(x.id) })) });
+      const actuels = phase ? new Set(plansMontres(phase).map((x) => x.id)) : null;
+      const nomPhase = p.phases.find((x) => x.id === phase)?.nom;
+      const coches = await demanderCases({ titre: phase ? `Plans montrés dessous en « ${nomPhase} »` : 'Plans du projet montrés dessous', options: tous.map((x) => ({ cle: x.id, texte: x.nom ?? x.id, coche: phase ? actuels.has(x.id) : !caches.has(x.id) })) });
       if (!coches || !avantChangement()) return;
-      p.fond.plansCaches = tous.map((x) => x.id).filter((id) => !coches.includes(id));
+      if (phase) {
+        p.fond.plansParPhase = { ...(p.fond.plansParPhase ?? {}), [phase]: coches };
+      } else {
+        p.fond.plansCaches = tous.map((x) => x.id).filter((id) => !coches.includes(id));
+      }
       enregistrer();
       return majTout();
+    }
+    if (b.dataset.action === 'fond-calques') {
+      return ouvrirGestionCalques({ plans: plansMontres, plan, avantChangement, enregistrer, redessiner: () => { majTout(); vue?.redessiner(); } });
     }
     if (b.dataset.action === 'gestion-phases') {
       return ouvrirGestionPhases({ plan, avantChangement, enregistrer, redessiner: () => { majTout(); vue?.redessinerDessus(); } });
@@ -1466,8 +1570,10 @@ export function ouvrirPlansChantier({
     }
     if (b.dataset.phaseActive) {
       p.phaseActive = b.dataset.phaseActive;
+      if (etat.choisi && !objetsVisibles(p).some((o) => o.id === etat.choisi)) etat.choisi = null; // l'élément choisi n'est plus montré dans cette phase
       enregistrer();
-      return majPanneau();
+      majTout();
+      return vue?.redessiner(); // 0.294.1 : l'affichage suit la gestion des phases dès qu'on change de phase
     }
     if (b.dataset.phaseRenommer) {
       const ph = p.phases.find((x) => x.id === b.dataset.phaseRenommer);
@@ -1541,6 +1647,27 @@ export function ouvrirPlansChantier({
       if (etat.reglageEnCours) enregistrer();
       etat.reglageEnCours = false;
       return;
+    }
+    if (c.dataset.genreOutil) {
+      if (c.dataset.genreOutil === 'zone') etat.categorie = c.value;
+      else {
+        etat.style = c.value;
+        etat.epaisseurMm = null;
+        if (etat.saisie?.source) etat.saisie.style = c.value;
+      }
+      if (etat.saisie && !etat.saisie.source) Object.assign(etat.saisie, { categorie: etat.categorie, style: etat.style });
+      return majTout();
+    }
+    if (c.dataset.genreListe) {
+      const o = p.objets.find((x) => x.id === etat.choisi);
+      if (!o || !avantChangement()) return;
+      if (c.dataset.genreListe === 'zone') o.categorie = c.value;
+      else {
+        o.style = c.value;
+        delete o.epaisseurMm;
+      }
+      enregistrer();
+      return majTout();
     }
     if (c.dataset.reglage) {
       const cle = c.dataset.reglage;

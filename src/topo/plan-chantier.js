@@ -185,7 +185,7 @@ export function objetsVus(plan, courante = plan.phaseActive) {
     if (o.fin && rc > rangDe(plan, o.fin)) mode = r.fini ?? 'cache';
     if (mode === 'cache') return [];
     if (mode === 'normal') return [o];
-    return [{ ...o, rendu: { mode, opacite: r.opacite ?? OPACITE_VUE, couleur: r.couleur ?? COULEUR_VUE } }];
+    return [{ ...o, rendu: { mode, opacite: r.opacite ?? OPACITE_VUE, couleur: r.couleur ?? plan.phases.find((p) => p.id === o.phase)?.couleur ?? COULEUR_VUE } }]; // couleur unique de départ = celle de la phase
   });
 }
 
@@ -215,6 +215,9 @@ export function datesDePhase(phase) {
   const f = (d) => (d ? d.split('-').reverse().join('.') : '');
   return [f(phase?.debut), f(phase?.fin)].filter(Boolean).join(' – ');
 }
+
+/** Lignes d'un texte de plan (retours à la ligne), au moins une. */
+export const lignesDuTexte = (t) => String(t ?? '').split(/\r?\n/);
 
 /** Objets qui s'impriment (PDF, DXF, légende) : tout sauf les lignes de construction (0.293.0). */
 export const objetsImprimables = (objets) => objets.filter((o) => o.type !== 'construction');
@@ -306,8 +309,10 @@ export function objetSousLePoint(objets, p, tolerance, surSymbole = null) {
     }
     if (o.type === 'texte') {
       const h = o.taille ?? 1;
-      const l = Math.max(1, String(o.texte).length) * h * 0.6;
-      if (Math.abs(p[0] - o.point[0]) <= l / 2 + tolerance && Math.abs(p[1] - o.point[1]) <= h / 2 + tolerance) return o;
+      const lignes = lignesDuTexte(o.texte);
+      const l = Math.max(1, ...lignes.map((x) => x.length)) * h * 0.6;
+      const H = lignes.length * h * 1.25;
+      if (Math.abs(p[0] - o.point[0]) <= l / 2 + tolerance && Math.abs(p[1] - o.point[1]) <= H / 2 + tolerance) return o;
       // 0.293.0 : la ligne de repère se touche facilement (zone élargie le long du trait et autour du point visé).
       if (o.repere && (distanceAuSegment(p, o.point, o.repere) <= tolerance * 2 || Math.hypot(p[0] - o.repere[0], p[1] - o.repere[1]) <= tolerance * 2.5)) return o;
       continue;
@@ -424,7 +429,7 @@ export function resumeObjet(o) {
   if (o.type === 'ligne') return `${styleLigne(o.style).nom} · ${n(longueur(o.points))} m`;
   if (o.type === 'piste') return `Piste · ${n(o.largeur ?? 4)} m de large · ${n(longueur(o.points))} m`;
   if (o.type === 'fleche') return `Flèche · ${n(longueur(o.points))} m`;
-  if (o.type === 'texte') return `Texte « ${o.texte} »`;
+  if (o.type === 'texte') return `Texte « ${String(o.texte).split(/\r?\n/)[0]}${/\n/.test(o.texte) ? '…' : ''} »`;
   if (o.type === 'cotation') { const g = geometrieCotation(o); return g ? `Cotation ${o.genre === 'angle' ? 'd\'angle' : 'de longueur'} · ${g.texte.t}` : 'Cotation'; }
   if (o.type === 'construction') return o.infinie ? 'Construction · droite' : `Construction · segment ${n(longueur(o.points))} m`;
   if (o.type === 'grue' && o.modele === 'mobile') return `Grue mobile ${o.tonnes ?? 100} t · flèche ${o.fleche ?? 25} m`;
@@ -765,7 +770,8 @@ const angleDe = (a, b) => (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI
 export function geometrieCotation(o) {
   const pts = o.points ?? [];
   if (o.genre === 'angle') {
-    const [S, A, B] = pts;
+    // 0.295.1 : angle coté entre les points 1, 2, 3 (le sommet est le point 2) ; les anciens (sommet en premier) gardent leur ordre
+    const [S, A, B] = o.ordre === 'p1-s-p3' ? [pts[1], pts[0], pts[2]] : pts;
     if (!S || !A || !B) return null;
     const a1 = angleDe(S, A);
     const a2 = angleDe(S, B);
@@ -781,7 +787,7 @@ export function geometrieCotation(o) {
     const am = ((a1 + d / 2) * Math.PI) / 180;
     const rt = r * 1.0;
     return {
-      lignes: [[S, [S[0] + (A[0] - S[0]) * 1, S[1] + (A[1] - S[1]) * 1]], [S, B]], fleches: [], arc,
+      sommet: S, lignes: [[S, [S[0] + (A[0] - S[0]) * 1, S[1] + (A[1] - S[1]) * 1]], [S, B]], fleches: [], arc,
       texte: { p: [S[0] + rt * Math.cos(am), S[1] + rt * Math.sin(am)], angle: 0, t: `${Math.abs(valeur).toFixed(2)}°` }, valeur,
     };
   }
@@ -804,5 +810,39 @@ export function geometrieCotation(o) {
     lignes: [rappel(A, A2), rappel(B, B2), [A2, B2]],
     fleches: [{ p: A2, dir: u }, { p: B2, dir: [-u[0], -u[1]] }], arc: null,
     texte: { p: [(A2[0] + B2[0]) / 2, (A2[1] + B2[1]) / 2], angle: ang, t: `${L.toFixed(2)} m` }, valeur: L,
+  };
+}
+
+// ------------------------------------------------------------------ Planning des phases (0.294.1)
+
+/**
+ * Diagramme de Gantt des phases d'après leurs dates (phase.debut / phase.fin, « AAAA-MM-JJ »). Une phase sans date de fin
+ * dure jusqu'au début de la suivante (ou 30 jours) ; sans date de début elle est « sans dates ».
+ * Renvoie { debut, fin (ms), jours, lignes [{ id, nom, couleur, x0, x1 (0–1 de la largeur), debut, fin }], sansDates [noms] }
+ * ou null s'il n'y a aucune date.
+ */
+export function ganttPhases(phases) {
+  const jour = 86400000;
+  const t = (d) => (d ? Date.parse(`${d}T00:00:00Z`) : NaN);
+  const avecDebut = phases.filter((p) => Number.isFinite(t(p.debut)));
+  if (!avecDebut.length) return null;
+  const brutes = phases.map((p, i) => {
+    const d = t(p.debut);
+    if (!Number.isFinite(d)) return null;
+    let f = t(p.fin);
+    if (!Number.isFinite(f)) {
+      const suivante = phases.slice(i + 1).map((q) => t(q.debut)).find((x) => Number.isFinite(x) && x > d);
+      f = suivante ?? d + 30 * jour;
+    }
+    return { p, d, f: Math.max(f, d + jour) };
+  });
+  const valides = brutes.filter(Boolean);
+  const debut = Math.min(...valides.map((x) => x.d));
+  const fin = Math.max(...valides.map((x) => x.f));
+  const etendue = fin - debut || jour;
+  return {
+    debut, fin, jours: Math.round(etendue / jour),
+    lignes: valides.map(({ p, d, f }) => ({ id: p.id, nom: p.nom, couleur: p.couleur, x0: (d - debut) / etendue, x1: (f - debut) / etendue, debut: p.debut, fin: p.fin ?? new Date(f).toISOString().slice(0, 10) })),
+    sansDates: phases.filter((p) => !Number.isFinite(t(p.debut))).map((p) => p.nom),
   };
 }

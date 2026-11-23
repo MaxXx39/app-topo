@@ -124,6 +124,26 @@ function manuscop(base, tourelle) {
   return { ...sym, dessine: false, pivote: { depuis: base.primitives.length, centre: [sym.decalage[0], sym.decalage[1]] } };
 }
 
+
+/** Réduit de moitié l'épaisseur des bandes jaunes (y de 1,5 à 2,1 m, de chaque côté) en gardant leur bord extérieur. */
+function reduireBandesJaunes(prims, k = 0.5) {
+  const dedans = (ys) => ys.every((y) => y >= 1.49 && y <= 2.11) || ys.every((y) => y <= -1.49 && y >= -2.11);
+  const f = (flat) => flat.map((v, i) => {
+    if (i % 2 === 0) return v;
+    const sens = v >= 0 ? 1 : -1;
+    const ext = sens * 2.101;
+    return r3(ext + (v - ext) * k);
+  });
+  return prims.map((p) => {
+    if (p.g === 'h' && p.k === '#f2a20c' && p.b && dedans([p.b[1], p.b[3]]) && p.b[3] - p.b[1] > 0.3) {
+      const pp = p.p.map(f);
+      return { ...p, p: pp, b: [p.b[0], Math.min(...pp.flatMap((c) => c.filter((_, i) => i % 2))), p.b[2], Math.max(...pp.flatMap((c) => c.filter((_, i) => i % 2)))].map(r3) };
+    }
+    if (p.g === 'l' && dedans(p.p.filter((_, i) => i % 2))) return { ...p, p: f(p.p) };
+    return p;
+  });
+}
+
 /** Benne jaune du DXF (« Benne à déchets », la même pour le recyclage et le tri) sans son texte, avec une icône par-dessus. */
 function benneAvecIcone(benne, nom, icone, texteBenne) {
   const prims = benne.primitives.filter((p) => p.g !== 't');
@@ -195,6 +215,8 @@ export function retoucherBibliotheque(symboles) {
     if (s.nom === '2.50interdictiondeparquer') t = { ...t, nom: 'Interdiction de parquer' };
     // 0.293.0 : pelle à tourelle orientable : les 47 premières primitives = chenilles, le reste tourne autour du centre des chenilles.
     if (s.nom === 'Pelle Chenille 20T') t = { ...t, pivote: { depuis: 47, centre: [0, 1.961] } };
+    // 0.294.1 : compacteurs : les 2 bandes jaunes des extrémités sont deux fois moins larges (plus de gris et de noir visibles).
+    if (['Compact Tandem', 'Compact Mixte', 'Compact pneu'].includes(s.nom)) t = { ...t, primitives: reduireBandesJaunes(t.primitives) };
     if (RETIRES.includes(s.nom)) t = { ...t, cache: true };
     return t;
   });

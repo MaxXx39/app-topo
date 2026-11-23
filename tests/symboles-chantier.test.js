@@ -595,7 +595,7 @@ describe('gestion des phases (0.293.0)', () => {
     m.reglerVue(plan, p2, p1, { mode: 'estompe', opacite: 0.4 });
     const vus = m.objetsVus(plan, p2);
     expect(vus.map((o) => o.id)).toEqual([a.id, b.id, c.id]);
-    expect(vus[0].rendu).toEqual({ mode: 'estompe', opacite: 0.4, couleur: '#64748b' });
+    expect(vus[0].rendu).toEqual({ mode: 'estompe', opacite: 0.4, couleur: plan.phases[0].couleur }); // couleur de la phase de l'élément
     expect(vus[1].rendu).toBeUndefined();
   });
 
@@ -662,5 +662,82 @@ describe('abaque de grue (0.293.0)', () => {
     const cercles = g.rayon.filter((p) => p.g === 'c').map((p) => p.r);
     expect(cercles).toEqual([40, 15, 30]);
     expect(g.rayon.some((p) => p.g === 't' && p.t === '15 m · 6 t')).toBe(true);
+  });
+});
+
+describe('planning des phases, ortho et retours du 3e lot (0.294.1)', () => {
+  it('Gantt : barres d\'après les dates, fin = début de la suivante, phases sans dates', async () => {
+    const { ganttPhases } = await import('../src/topo/plan-chantier.js');
+    expect(ganttPhases([{ id: 'a', nom: 'A', couleur: '#f00' }])).toBeNull();
+    const g = ganttPhases([
+      { id: 'a', nom: 'Terrassement', couleur: '#f00', debut: '2027-03-01', fin: '2027-03-31' },
+      { id: 'b', nom: 'Gros œuvre', couleur: '#0f0', debut: '2027-04-01' },
+      { id: 'c', nom: 'Sans', couleur: '#00f' },
+    ]);
+    expect(g.lignes).toHaveLength(2);
+    expect(g.lignes[0].x0).toBe(0);
+    expect(g.lignes[1].x0).toBeGreaterThan(g.lignes[0].x1 - 0.05);
+    expect(g.lignes[1].x1).toBeCloseTo(1, 6);
+    expect(g.sansDates).toEqual(['Sans']);
+  });
+
+  it('feuille : le planning a sa place à gauche du cartouche', () => {
+    const m = miseEnPageFeuille('a3', 'paysage', 0);
+    expect(m.planning.x).toBeGreaterThan(m.barre.x);
+    expect(m.planning.x + m.planning.l).toBeLessThan(m.cartouche.x);
+    expect(reglagesFeuille({ feuille: { planning: true } }).planning).toBe(true);
+  });
+
+  it('le texte et sa ligne de repère prennent la couleur choisie (DXF)', () => {
+    const plan = nouveauPlanChantier('t', 'pic');
+    ajouterObjet(plan, { type: 'texte', point: [0, 0], texte: 'Grue', couleur: '#ff0000' });
+    expect(dxfPlanChantier(plan, BIB)).toContain('TEXTES');
+  });
+});
+
+describe('retours du 23.11 (4e lot)', () => {
+  it('angle coté entre les points 1, 2, 3 : le sommet est le point 2', async () => {
+    const { geometrieCotation } = await import('../src/topo/plan-chantier.js');
+    const g = geometrieCotation({ genre: 'angle', ordre: 'p1-s-p3', points: [[5, 0], [0, 0], [0, 5]] });
+    expect(g.valeur).toBeCloseTo(90, 6);
+    expect(g.sommet).toEqual([0, 0]);
+    // sans l'ordre (anciennes cotations) : le sommet reste le 1er point
+    expect(geometrieCotation({ genre: 'angle', points: [[0, 0], [5, 0], [0, 5]] }).sommet).toEqual([0, 0]);
+  });
+
+  it('texte sur plusieurs lignes : toucher et DXF ligne par ligne', async () => {
+    const m = await import('../src/topo/plan-chantier.js');
+    expect(m.lignesDuTexte('a\nb\r\nc')).toEqual(['a', 'b', 'c']);
+    const plan = nouveauPlanChantier('t', 'pic');
+    const t = ajouterObjet(plan, { type: 'texte', point: [0, 0], texte: 'Haut\nBas', taille: 1, styles: [{ g: true }, { s: true }] });
+    expect(objetSousLePoint(plan.objets, [0, 1], 0.2)?.id).toBe(t.id); // 2 lignes : plus haut qu'une
+    const dxf = dxfPlanChantier(plan, BIB);
+    expect(dxf).toContain('Haut');
+    expect(dxf).toContain('Bas');
+    expect(resumeObjet(t)).toContain('Haut…');
+  });
+});
+
+describe('calques d\'un plan affiché (0.296.0)', () => {
+  it('masquer et colorer des calques sans toucher au plan du projet', async () => {
+    const { plansAvecCalques } = await import('../src/plans-chantier/gestion-calques.js');
+    const plan = { id: 'p1', nom: 'Plan', calques: [{ nom: 'MUR', couleur: '#111111', visible: true }, { nom: 'COTES', couleur: '#222222', visible: true }] };
+    expect(plansAvecCalques([plan], {})[0]).toBe(plan);
+    const fond = { calques: { p1: { 1: { visible: false }, 0: { couleur: '#ff0000' } } } };
+    const [copie] = plansAvecCalques([plan], fond);
+    expect(copie.calques[1].visible).toBe(false);
+    expect(copie.calques[0].couleur).toBe('#ff0000');
+    expect(plan.calques[1].visible).toBe(true); // le plan du projet n'a pas bougé
+    expect(plansAvecCalques([plan], fond)[0]).toBe(copie); // même objet tant que les réglages sont les mêmes
+  });
+});
+
+describe('plans par phase (0.296.1)', () => {
+  it('la page d\'une phase utilise les plans de cette phase', async () => {
+    const { preparerPage } = await import('../src/plans-chantier/feuille.js');
+    const plan = nouveauPlanChantier('t', 'pic');
+    const donnees = { plan, plans: [{ id: 'a' }, { id: 'b' }], plansPar: (ph) => (ph === 'p2' ? [{ id: 'b' }] : [{ id: 'a' }, { id: 'b' }]), bib: BIB, projet: {}, points: [], surfaces: [] };
+    expect(preparerPage(donnees, { phase: 'p2', phases: ['p2'], titre: 'Phase 2' }, 3).plans.map((x) => x.id)).toEqual(['b']);
+    expect(preparerPage(donnees, { titre: '', phases: [plan.phases[0].id] }, 3).plans).toHaveLength(2);
   });
 });
