@@ -14695,3 +14695,35 @@ dialog.page-chantier[open] {
 .case-chantier { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
 .actions-chantier { display: flex; flex-wrap: wrap; gap: 6px; }
 .champ-calage input[type='range'] { width: 100%; accent-color: #b45309; }
+
+/* 0.289.0 : Plans de chantier, bibliothèque des symboles (panneau de gauche), réglages d'un symbole, onglet Feuille. */
+.travail-chantier.avec-biblio { grid-template-columns: 250px minmax(0, 1fr) 300px; }
+@media (max-width: 1100px) { .travail-chantier.avec-biblio { grid-template-columns: 210px minmax(0, 1fr) 260px; } }
+.biblio-chantier { overflow: hidden; }
+.biblio-chantier[hidden] { display: none; }
+.biblio-chantier input[type='search'] { padding: 6px 8px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); font: inherit; }
+.biblio-chantier h3 { margin: 4px 0 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gris); }
+.categories-biblio { display: flex; flex-wrap: wrap; gap: 4px; }
+.categories-biblio button { padding: 3px 8px; border: 1px solid var(--bordure); border-radius: 999px; background: var(--surface); color: inherit; font: inherit; font-size: 0.78rem; cursor: pointer; }
+.categories-biblio button.actif { border-color: #b45309; background: #b45309; color: #ffffff; }
+.liste-biblio { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; align-content: start; }
+.entree-biblio { display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px; border: 1px solid var(--bordure); border-radius: 8px; background: #ffffff; color: #1b2b36; font: inherit; text-align: left; cursor: pointer; }
+.entree-biblio:hover { border-color: #b45309; }
+.entree-biblio.actif { border-color: #b45309; box-shadow: 0 0 0 2px color-mix(in srgb, #b45309 35%, transparent); }
+.entree-biblio canvas { width: 100%; height: 62px; }
+.entree-biblio .nom { font-size: 0.75rem; font-weight: 600; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entree-biblio .dims { font-size: 0.7rem; color: #64748b; }
+.ligne-rotation { display: flex; align-items: flex-end; gap: 6px; flex-wrap: wrap; }
+.ligne-rotation .champ-calage { flex: 1 1 90px; }
+.poses-etage { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.poses-etage button { padding: 2px; border: 1px solid var(--bordure); border-radius: 6px; background: #ffffff; cursor: pointer; }
+.poses-etage button.actif { border-color: #b45309; box-shadow: 0 0 0 2px color-mix(in srgb, #b45309 35%, transparent); }
+.poses-etage canvas { width: 100%; height: 44px; display: block; }
+.vue-feuille { min-height: 320px; }
+.toile-feuille { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #94a3b8; }
+.toile-feuille canvas { box-shadow: 0 4px 18px rgba(15, 23, 42, 0.35); cursor: grab; touch-action: none; background: #ffffff; }
+.toile-feuille canvas:active { cursor: grabbing; }
+/* 0.289.0 : ruban des plans de chantier sur une seule ligne en 1366 px (outils un peu plus serrés). */
+.page-chantier .ruban-chantier { gap: 2px; }
+.page-chantier .ruban-chantier .groupe-ruban { padding: 2px 5px; }
+.page-chantier .ruban-chantier .outil-ruban { padding: 2px 5px; min-width: 40px; }

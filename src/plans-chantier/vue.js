@@ -5,10 +5,10 @@
 // glisser l'objet choisi = le déplacer (si glisserObjet le permet).
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
-import {
-  objetsVisibles, couleurObjet, styleLigne, pointeDeFleche, bornesObjets, positionsLeLong, morceauxAvecTrous, metresParMm,
-  epaisseurLigneMm, contourZoneMm, opaciteZone, dimensionsFleche, centreZone, texteSurface, pointsDe,
-} from '../topo/plan-chantier.js';
+import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles } from '../topo/plan-chantier.js';
+import { dessinerObjet, symboleDeLObjet } from './dessin.js';
+import { coinsSymbole, poigneeRotation } from '../topo/symboles.js';
+import { dessinerFondSwisstopo } from './tuiles.js';
 
 const SEUIL_GLISSER_PX = 5;
 const FACTEUR_MOLETTE = 1.2;
@@ -25,11 +25,16 @@ const ORANGE = '#ea580c';
  * Renvoie { redessiner(), redessinerDessus(), cadrer(), zoom(f), vue(), detruire() }.
  */
 export function creerVueChantier(conteneur, options) {
-  const { plans, points, planChantier, choisi, saisie, accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null } = options;
+  const {
+    plans, points, planChantier, choisi, saisie, accrocher = () => null, clic = () => {}, double = () => {}, bouge = () => {}, glisserObjet = null,
+    bibliotheque = () => [], surfaces = () => [], apercu = () => null, etatFond = () => {},
+  } = options;
   conteneur.classList.add('toile-chantier');
+  const photo = document.createElement('canvas'); // 0.289.0 : fond swisstopo (photo pâlie, cadastre)
   const fond = document.createElement('canvas');
   const dessus = document.createElement('canvas');
-  conteneur.append(fond, dessus);
+  conteneur.append(photo, fond, dessus);
+  const bordsCache = new Map(); // id de surface → bords (calculés une fois)
   let vue = null;
   let curseur = null; // dernier point sous la souris (accroché si possible) [e, n]
   let accroche = null;
@@ -63,8 +68,10 @@ export function creerVueChantier(conteneur, options) {
     if (!vue) return;
     const { largeur, hauteur } = taille();
     vue = { ...vue, largeur, hauteur };
-    dessinerPlansDxf(fond, plans(), vue, densite());
     const pc = planChantier();
+    dessinerPhoto(pc);
+    dessinerPlansDxf(fond, plans(), vue, densite());
+    if (pc?.fond?.surfaces !== false) dessinerSurfaces();
     if (pc?.fond?.points !== false) {
       const ctx = fond.getContext('2d');
       ctx.setTransform(densite(), 0, 0, densite(), 0, 0);
@@ -81,6 +88,43 @@ export function creerVueChantier(conteneur, options) {
     redessinerDessus();
   }
 
+  let imagePhoto = 0;
+  /** Fond swisstopo (0.289.0) : redessiné quand une tuile arrive. */
+  function dessinerPhoto(pc) {
+    const d = densite();
+    photo.width = Math.round(vue.largeur * d);
+    photo.height = Math.round(vue.hauteur * d);
+    const ctx = photo.getContext('2d');
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    const r = dessinerFondSwisstopo(ctx, vue, pc?.fond, d, () => {
+      cancelAnimationFrame(imagePhoto);
+      imagePhoto = requestAnimationFrame(() => vue && dessinerPhoto(planChantier()));
+    });
+    etatFond(r);
+  }
+
+  /** Surfaces du projet en fond : leurs bords, en gris fin. */
+  function dessinerSurfaces() {
+    const ctx = fond.getContext('2d');
+    ctx.setTransform(densite(), 0, 0, densite(), 0, 0);
+    ctx.strokeStyle = 'rgba(71,85,105,0.7)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    for (const s of surfaces()) {
+      const cle = `${s.id}:${s.triangles.length}`;
+      if (!bordsCache.has(cle)) bordsCache.set(cle, bordsDesTriangles(s.triangles));
+      ctx.beginPath();
+      for (const [a, b] of bordsCache.get(cle)) {
+        const p = ecran(a);
+        const q = ecran(b);
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(q.x, q.y);
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
   function redessinerDessus() {
     if (!vue) return;
     const d = densite();
@@ -94,9 +138,17 @@ export function creerVueChantier(conteneur, options) {
     const pc = planChantier();
     if (pc) {
       const visibles = objetsVisibles(pc);
-      for (const o of visibles) dessinerObjet(ctx, pc, o);
+      const d = contexteDessin(ctx, pc);
+      for (const o of visibles) dessinerObjet(d, o);
       const sel = visibles.find((o) => o.id === choisi()); // phase cachée : plus de cadre de choix
       if (sel) dessinerChoix(ctx, sel);
+      // Symbole à poser (0.289.0) : aperçu transparent sous la souris.
+      const fantome = curseur ? apercu() : null;
+      if (fantome) {
+        ctx.globalAlpha = 0.6;
+        dessinerObjet(d, { ...fantome, point: curseur, phase: pc.phaseActive });
+        ctx.globalAlpha = 1;
+      }
     }
     dessinerSaisie(ctx, pc);
     if (accroche) {
@@ -120,211 +172,35 @@ export function creerVueChantier(conteneur, options) {
 
   /** Pixels à l'écran pour 1 mm de papier (échelle du plan × zoom) : épaisseurs et motifs suivent le PDF à l'échelle choisie. */
   const pxParMm = (pc) => vue.echelle * metresParMm(pc);
-
-  /** Plaque blanche arrondie avec un texte centré en (x, y) (texte de plan, surface d'une zone). */
-  function plaque(ctx, texte, x, y, h, poids = 600) {
-    ctx.font = `${poids} ${h}px system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const w = ctx.measureText(texte).width + h * 0.7;
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.strokeStyle = 'rgba(43,52,64,0.45)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(x - w / 2, y - h * 0.68, w, h * 1.36, h * 0.35);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#1b2b36';
-    ctx.fillText(texte, x, y + h * 0.04);
-    return { w, h: h * 1.36 };
-  }
-
-  function dessinerObjet(ctx, pc, o) {
-    const couleur = couleurObjet(pc, o);
-    const e = vue.echelle;
-    const mm = pxParMm(pc);
-    ctx.setLineDash([]);
-    if (o.type === 'zone') {
-      chemin(ctx, o.points, true);
-      ctx.globalAlpha = opaciteZone(o);
-      ctx.fillStyle = couleur;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = couleur;
-      ctx.lineWidth = Math.max(0.8, contourZoneMm(o) * mm);
-      ctx.stroke();
-      if (o.afficherSurface) {
-        const c = ecran(centreZone(o.points));
-        plaque(ctx, texteSurface(o.points), c.x, c.y, Math.min(22, Math.max(10, 3 * mm)));
-      }
-    } else if (o.type === 'ligne') {
-      dessinerLigne(ctx, o.points.map((p) => { const q = ecran(p); return [q.x, q.y]; }), styleLigne(o.style), couleur, mm, o);
-    } else if (o.type === 'piste') {
-      chemin(ctx, o.points, false);
-      ctx.strokeStyle = couleur;
-      ctx.globalAlpha = 0.45;
-      ctx.lineWidth = Math.max(3, (o.largeur ?? 4) * e);
-      ctx.lineCap = 'butt';
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.lineCap = 'round';
-      chemin(ctx, o.points, false);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([Math.max(3, 1.5 * e), Math.max(3, 1.5 * e)]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    } else if (o.type === 'fleche') {
-      const pts = o.points;
-      if (pts.length < 2) return;
-      // Largeur du corps (m) et pointe à l'échelle réglée ; au moins 1,5 px / 9 px pour rester visibles.
-      const dim = dimensionsFleche(o);
-      const pointe = Math.max(9 / e, dim.longueurPointe);
-      const tete = pointeDeFleche(pts[pts.length - 2], pts[pts.length - 1], pointe, Math.max(dim.largeurPointe, 7 / e));
-      const base = [(tete[1][0] + tete[2][0]) / 2, (tete[1][1] + tete[2][1]) / 2];
-      chemin(ctx, [...pts.slice(0, -1), base], false);
-      ctx.strokeStyle = couleur;
-      ctx.lineWidth = Math.max(1.5, dim.largeur * e);
-      ctx.lineCap = 'butt';
-      ctx.stroke();
-      ctx.lineCap = 'round';
-      chemin(ctx, tete, true);
-      ctx.fillStyle = couleur;
-      ctx.fill();
-    } else if (o.type === 'texte') {
-      const q = ecran(o.point);
-      const h = Math.max(9, (o.taille ?? 1) * e);
-      const { w, h: hauteur } = plaque(ctx, o.texte, q.x, q.y, h);
-      if (o.repere) dessinerRepere(ctx, o, q, w, hauteur, couleur);
-    }
-  }
-
-  /** Ligne de repère d'un texte : du bord de la plaque au point visé, avec une flèche ou un point au bout. */
-  function dessinerRepere(ctx, o, q, w, h, couleur) {
-    const t = ecran(o.repere);
-    const dx = t.x - q.x;
-    const dy = t.y - q.y;
-    const k = Math.min((w / 2) / (Math.abs(dx) || 1e-9), (h / 2) / (Math.abs(dy) || 1e-9));
-    if (k >= 1) return; // le point visé est sous la plaque
-    const dep = { x: q.x + dx * k, y: q.y + dy * k };
-    ctx.strokeStyle = '#1b2b36';
-    ctx.fillStyle = '#1b2b36';
-    ctx.lineWidth = 1.2;
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.moveTo(dep.x, dep.y);
-    ctx.lineTo(t.x, t.y);
-    ctx.stroke();
-    const bout = o.repereBout ?? 'fleche';
-    if (bout === 'point') {
-      ctx.beginPath();
-      ctx.arc(t.x, t.y, 3, 0, 2 * Math.PI);
-      ctx.fill();
-    } else if (bout === 'fleche') {
-      const a = Math.atan2(t.y - dep.y, t.x - dep.x);
-      ctx.beginPath();
-      ctx.moveTo(t.x, t.y);
-      ctx.lineTo(t.x - 10 * Math.cos(a - 0.35), t.y - 10 * Math.sin(a - 0.35));
-      ctx.lineTo(t.x - 10 * Math.cos(a + 0.35), t.y - 10 * Math.sin(a + 0.35));
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-
-  /**
-   * Ligne à l'écran (points en px) avec son style : tirets, épaisseur et motif en mm de papier (× l'échelle du motif de la
-   * ligne) ; la ligne s'interrompt autour de chaque motif. pxMm = pixels pour 1 mm de papier.
-   */
-  function dessinerLigne(ctx, pts, style, couleur, pxMm, o = {}) {
-    const m = style.motif;
-    const ech = o.echelleMotif ?? 1;
-    const epaisseur = Math.max(0.8, (o.epaisseurMm ?? style.epaisseurMm) * pxMm);
-    const trace = (morceaux) => {
-      ctx.strokeStyle = couleur;
-      ctx.lineWidth = epaisseur;
-      ctx.setLineDash(style.tirets.map((t) => Math.max(1.5, t * pxMm)));
-      for (const mo of morceaux) {
-        ctx.beginPath();
-        mo.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
-    };
-    if (!m) return trace([pts]);
-    const taille = Math.max(6, m.tailleMm * pxMm * ech); // hauteur du motif (px)
-    if (m.type === 'poteau') {
-      // Poteaux tous les pasMm de papier : petit rectangle en travers de la ligne.
-      trace([pts]);
-      const pas = Math.max(m.pasMm * pxMm * ech, taille * 1.6);
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = couleur;
-      ctx.lineWidth = Math.max(1, epaisseur * 0.8);
-      for (const q of positionsLeLong(pts, pas, 0)) {
-        ctx.save();
-        ctx.translate(q.x, q.y);
-        ctx.rotate(q.angle);
-        ctx.fillRect(-taille * 0.2, -taille / 2, taille * 0.4, taille);
-        ctx.strokeRect(-taille * 0.2, -taille / 2, taille * 0.4, taille);
-        ctx.restore();
-      }
-      return;
-    }
-    ctx.font = `600 ${taille}px system-ui, sans-serif`;
-    const larg = m.type === 'texte' ? ctx.measureText(m.texte).width + (m.eclair ? taille : 0) : m.type === 'double' ? taille * 2 : taille;
-    const pas = Math.max(m.pasMm * pxMm * ech, larg + taille * 1.5);
-    const reperes = positionsLeLong(pts, pas);
-    trace(morceauxAvecTrous(pts, reperes.map((r) => r.s), larg / 2 + taille * 0.5));
-    ctx.fillStyle = couleur;
-    ctx.strokeStyle = couleur;
-    ctx.lineWidth = Math.max(1.2, epaisseur * 0.9);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const inverse = o.sens === 'inverse';
-    for (const r of reperes) {
-      ctx.save();
-      ctx.translate(r.x, r.y);
-      // Texte lisible : jamais à l'envers.
-      const a = r.angle > Math.PI / 2 || r.angle < -Math.PI / 2 ? r.angle + Math.PI : r.angle;
-      ctx.rotate(m.type === 'texte' ? a : r.angle);
-      if (m.type === 'texte') {
-        if (m.eclair) {
-          const u = taille / 12; // l'éclair tient dans un carré de 12 u
-          const x0 = -larg / 2;
-          ctx.beginPath();
-          ctx.moveTo(x0 + 6 * u, -6 * u);
-          ctx.lineTo(x0 + 1.5 * u, 1 * u);
-          ctx.lineTo(x0 + 5 * u, 1 * u);
-          ctx.lineTo(x0 + 3 * u, 7 * u);
-          ctx.lineTo(x0 + 9 * u, -1 * u);
-          ctx.lineTo(x0 + 5.5 * u, -1 * u);
-          ctx.closePath();
-          ctx.fill();
-          ctx.fillText(m.texte, taille * 0.5, taille * 0.04);
-        } else ctx.fillText(m.texte, 0, taille * 0.04);
-      } else {
-        // Chevron : « > » dans le sens de la ligne (retournable) ; flèche double « < > » : un dans chaque sens.
-        const demi = taille / 2;
-        const chevron = (dx, sens) => {
-          ctx.beginPath();
-          ctx.moveTo(dx - demi * 0.55 * sens, -demi);
-          ctx.lineTo(dx + demi * 0.55 * sens, 0);
-          ctx.lineTo(dx - demi * 0.55 * sens, demi);
-          ctx.stroke();
-        };
-        if (m.type === 'chevron') chevron(0, inverse ? -1 : 1);
-        else {
-          chevron(-demi * 0.7, -1);
-          chevron(demi * 0.7, 1);
-        }
-      }
-      ctx.restore();
-    }
-  }
+  const contexteDessin = (ctx, pc) => ({ ctx, vue, pc, bib: bibliotheque(), mm: pxParMm(pc) });
 
   function dessinerChoix(ctx, o) {
     ctx.strokeStyle = ORANGE;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([5, 4]);
+    if (estPose(o)) {
+      // Symbole : sa boîte tournée, son centre, et la poignée ronde de rotation.
+      const s = symboleDeLObjet(bibliotheque(), o);
+      if (s) {
+        chemin(ctx, coinsSymbole(o, s), true);
+        ctx.stroke();
+        const c = ecran(o.point);
+        const r = ecran(poigneeRotation(o, s));
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y);
+        ctx.lineTo(r.x, r.y);
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, 6, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillRect(c.x - 4, c.y - 4, 8, 8);
+        ctx.strokeRect(c.x - 4, c.y - 4, 8, 8);
+      }
+      return;
+    }
     const pts = pointsDe(o);
     if (o.type !== 'texte') {
       chemin(ctx, pts, o.type === 'zone');

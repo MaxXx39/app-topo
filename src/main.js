@@ -2082,6 +2082,10 @@ function ouvrirPlansChantier() {
     modifie: () => modifie(),
     plans: () => plansDuProjet(),
     points: () => pointsDuProjet(),
+    // 0.289.0 : surfaces du projet en fond (bords des triangles), enregistrer le PDF / DXF, auteur du cartouche.
+    surfaces: () => projet.surfaces.filter((s) => estMontre(projet, s, 'surface')).map((s) => ({ id: s.id, nom: s.nom, triangles: trianglesDeSurface(s.id) })).filter((s) => s.triangles.length > 0),
+    enregistrer: enregistrerFichier,
+    auteur: () => appareilDuJournal().utilisateur || appareilDuJournal().nom || '',
     lectureSeule: () => lectureSeule(),
     quandRetour: () => navigation.ouvrirPage(),
     message: (texte, duree, options) => afficherMessage(texte, duree, options),
