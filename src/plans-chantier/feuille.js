@@ -15,7 +15,7 @@ import { boiteSymbole, primitivesEtage } from '../topo/symboles.js';
 import { texteWinAnsi } from '../topo/comparaison-pdf.js';
 import logoPerrin from '../assets/logo-perrin.jpg?inline';
 
-const DPI_PDF = { a4: 220, a3: 200, a1: 130 };
+const DPI_PDF = { a4: 220, a3: 200, a2: 160, a1: 130 };
 
 /** Image d'un logo (adresse ou data:…), chargée une fois. */
 const images = new Map();

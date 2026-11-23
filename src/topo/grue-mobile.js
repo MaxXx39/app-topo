@@ -7,6 +7,7 @@ import { versSymbole } from './symboles-retouches.js';
 import { grueLibre } from './symboles.js';
 import { bornesPrimitives } from './blocs-dxf.js';
 import { panneauDeviation, CLE_DEVIATION } from './panneau-deviation.js';
+import { parkingDynamique, CLE_PARKING } from './parking-dynamique.js';
 
 const memoire = new Map();
 export const TONNES_MOBILES = AUTOGRUES.map((a) => a.t);
@@ -96,6 +97,7 @@ export function grueDeLObjet(bib, o) {
  */
 export function symboleDeLObjetPose(bib, o) {
   if (o.cle === CLE_DEVIATION) return panneauDeviation(o);
+  if (o.cle === CLE_PARKING) return parkingDynamique(o);
   const s = bib.find((x) => x.cle === o.cle) ?? null;
   const a = Number(o.tourelle) || 0;
   if (!s?.pivote || !a) return s;

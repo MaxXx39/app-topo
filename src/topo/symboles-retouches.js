@@ -260,7 +260,10 @@ export function retoucherBibliotheque(symboles) {
     // Portail coulissant
     ['Portail coulissant', 'Sécurité', portailCoulissant(4)],
   ];
-  for (const [nom, categorie, prims, centre] of nouveaux) res.push(versSymbole(nom, categorie, prims, { centre: centre !== false }));
+  for (const [nom, categorie, prims, centre] of nouveaux) {
+    const sym = versSymbole(nom, categorie, prims, { centre: centre !== false });
+    res.push(nom === 'Place de parking réservée' ? { ...sym, cache: true } : sym); // 0.297.0 : remplacée par le parking dynamique (gardée pour les anciens plans)
+  }
   // Camions grues : 4 tailles, repliés et dépliés (le point de base reste le centre du camion).
   for (const a of AUTOGRUES) {
     // 0.293.0 : remplacés par la grue mobile dynamique (topo/grue-mobile.js) ; gardés cachés pour les plans déjà dessinés.

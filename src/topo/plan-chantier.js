@@ -151,7 +151,7 @@ export function retirerObjet(plan, id) {
  * éléments de phaseVue quand on est dans phaseEnCours :
  *   { mode, opacite (0–1), couleur, fini (mode des éléments dont la fin est passée), genresCaches [types], elementsCaches [ids] }.
  * Un élément peut avoir une phase de fin (o.fin) : « en place » de sa phase jusqu'à cette phase, « fini » après.
- * Sans règle pour la phase en cours, on garde l'ancien affichage (cases « visible » des phases).
+ * Sans règle pour la phase en cours : seule cette phase est montrée (0.296.2), avec les phases cochées « sur toutes les pages ».
  */
 export const MODES_VUE = [['cache', 'Caché'], ['normal', 'Normal'], ['estompe', 'Estompé'], ['assombri', 'Assombri / grisé'], ['couleur', 'Couleur unique']];
 export const OPACITE_VUE = 0.35;
@@ -161,8 +161,8 @@ export const COULEUR_VUE = '#64748b';
 export function regleDeVue(plan, courante, vue) {
   const r = plan.vues?.[courante]?.[vue];
   if (r) return r;
-  if (vue === courante) return { mode: 'normal' };
-  return { mode: plan.phases.find((p) => p.id === vue)?.visible === false ? 'cache' : 'normal' };
+  // 0.296.2 : par défaut, seule la phase en cours est montrée (ni les phases d'avant, ni celles d'après)
+  return { mode: vue === courante ? 'normal' : 'cache' };
 }
 
 /** Phase après laquelle l'élément est « fini » : rang de la phase de fin, ou null. */
@@ -178,7 +178,7 @@ export function objetsVus(plan, courante = plan.phaseActive) {
   const rc = rangDe(plan, courante);
   return plan.objets.flatMap((o) => {
     if (o.type === 'construction') return construction ? [o] : [];
-    if (!reglee) return plan.phases.find((p) => p.id === o.phase)?.visible !== false ? [o] : [];
+    if (!reglee) return o.phase === courante || plan.phases.find((p) => p.id === o.phase)?.commune ? [o] : []; // départ : la phase en cours (et celles « sur toutes les pages »)
     const r = regleDeVue(plan, courante, o.phase);
     if (r.genresCaches?.includes(o.type) || r.elementsCaches?.includes(o.id)) return [];
     let mode = r.mode;
@@ -434,6 +434,7 @@ export function resumeObjet(o) {
   if (o.type === 'construction') return o.infinie ? 'Construction · droite' : `Construction · segment ${n(longueur(o.points))} m`;
   if (o.type === 'grue' && o.modele === 'mobile') return `Grue mobile ${o.tonnes ?? 100} t · flèche ${o.fleche ?? 25} m`;
   if (o.type === 'grue') return `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'} · flèche ${o.fleche ?? 40} m${o.chassis && o.chassis !== 'aucun' ? ` · châssis ${o.chassis}` : ''}`;
+  if (o.type === 'symbole' && o.cle === 'dyn:parking') return `Parking réservé · ${o.nombre ?? 1} place${(o.nombre ?? 1) > 1 ? 's' : ''}`;
   if (o.type === 'symbole' && o.cle === 'dyn:deviation') return `Panneau de déviation « ${o.texte ?? ''} »`;
   if (o.type === 'symbole') return o.etage ? 'Base-vie à étage' : String(o.cle ?? '').replace(/^[a-z]+:/, '');
   return o.type;

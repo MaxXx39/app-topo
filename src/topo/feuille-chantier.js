@@ -5,7 +5,7 @@
 import { tailleFeuille, barreEchellePapier } from '../export/echelle.js';
 import { categorieZone, styleLigne, objetsVisibles, objetsVus, bornesObjets, ECHELLE_PAPIER, estPose, materiauTas } from './plan-chantier.js';
 
-export const FORMATS_FEUILLE = [['a4', 'A4'], ['a3', 'A3'], ['a1', 'A1']];
+export const FORMATS_FEUILLE = [['a4', 'A4'], ['a3', 'A3'], ['a2', 'A2'], ['a1', 'A1']];
 
 /** Réglages de la feuille d'un plan, complétés par ceux de départ. */
 export function reglagesFeuille(plan) {
@@ -149,15 +149,15 @@ export function textesCartouche(cartouche, k, champs) {
   const t = (texte, x, yy, taille, gras = false, couleur = '#1b2b36') => ({ texte: String(texte ?? ''), x, y: yy, taille: taille * k, gras, couleur });
   const xm = x0 + (cartouche.x + cartouche.l - x0) / 2;
   return [
-    t(champs.affaire, x0, y(0.17), 8, true),
-    t(champs.projet, x0, y(0.3), 6.5),
-    t(champs.titre, x0, y(0.47), 9.5, true),
-    t(champs.phase, x0, y(0.6), 7, false, '#b45309'),
-    t(`Échelle 1:${champs.echelle}`, x0, y(0.76), 6.5),
-    t(`Format ${champs.format}`, xm, y(0.76), 6.5),
-    t(`Date ${champs.date}`, x0, y(0.9), 6.5),
-    t(`Indice ${champs.indice}`, xm, y(0.9), 6.5, true),
-    ...(champs.auteur ? [t(`Dessiné par ${champs.auteur}`, xm, y(0.6), 6.5)] : []),
+    t(champs.affaire, x0, y(0.15), 8, true),
+    t(champs.projet, x0, y(0.27), 6.5),
+    t(champs.titre, x0, y(0.41), 9.5, true),
+    t(`Indice ${champs.indice}`, x0, y(0.54), 8, true), // 0.297.0 : l'indice sous le numéro et le nom du plan
+    t(champs.phase, x0, y(0.67), 7, false, '#b45309'),
+    t(`Échelle 1:${champs.echelle}`, x0, y(0.81), 6.5),
+    t(`Format ${champs.format}`, xm, y(0.81), 6.5),
+    t(`Date ${champs.date}`, x0, y(0.93), 6.5),
+    ...(champs.auteur ? [t(`Dessiné par ${champs.auteur}`, xm, y(0.93), 6.5)] : []),
   ].filter((x) => x.texte.trim() && !/ $/.test(x.texte));
 }
 
