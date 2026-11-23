@@ -165,23 +165,31 @@ export function tracteurBenne() {
   for (let x = -wb + 0.36; x < wb - 0.2; x += 0.3) res.push(trait([[x, 1.1], [x, 5.8]], false, '#1d6b3a'));
   res.push(...piece(METAL, 'metal', rectArrondi(-0.1, 1.05, 0.1, 1.9, 0.04)));
   res.push(trait([[-wb + 0.12, 5.62], [wb - 0.12, 5.62]], false, '#e8f5e9'), ...piece(METAL, 'metal', cercle(-wb + 0.12, 5.88, 0.07, 8)), ...piece(METAL, 'metal', cercle(wb - 0.12, 5.88, 0.07, 8)));
-  // --- Tracteur : attelage, grandes roues arrière à crampons, garde-boue, petites roues avant, capot, cabine.
+  // --- Tracteur (vu de dessus, d'après l'image de l'utilisateur du 23.11 : tracteur bleu moderne) : relevage et attelage,
+  // grandes roues arrière à crampons sous des garde-boue, petites roues avant, long capot à calandre, grande cabine vitrée.
+  const FONCE = '#1e4580';
   res.push(...piece(GRIS, 'metal', rectArrondi(-0.28, -1.5, 0.28, -0.85, 0.05)), ...piece(METAL, 'metal', cercle(0, -0.95, 0.08, 10)));
-  res.push(...pneuCrante(-1.4, -3.05, -0.85, -1.45, { pas: 0.2, chevron: true }), ...pneuCrante(0.85, -3.05, 1.4, -1.45, { pas: 0.2, chevron: true }));
-  res.push(...pneuCrante(-1.1, -5.2, -0.74, -4.15, { pas: 0.17 }), ...pneuCrante(0.74, -5.2, 1.1, -4.15, { pas: 0.17 }));
-  res.push(trait([[-0.85, -4.65], [-0.5, -4.65]], false, '#4b5563'), trait([[0.5, -4.65], [0.85, -4.65]], false, '#4b5563'));
-  res.push(...piece('#1e4580', 'peinture', rectArrondi(-1.45, -2.95, -0.8, -1.5, 0.2)), ...piece('#1e4580', 'peinture', rectArrondi(0.8, -2.95, 1.45, -1.5, 0.2)));
-  res.push(...piece(BLEU_T, 'peinture', rectArrondi(-0.55, -5.55, 0.55, -3.05, 0.28)));
-  for (let y = -4.75; y < -3.3; y += 0.17) res.push(trait([[-0.3, y], [0.3, y]], false, '#1b3f78'));
-  res.push(...piece('#2b2f33', 'caoutchouc', rectArrondi(-0.36, -5.5, 0.36, -5.36, 0.05)));
-  res.push(...piece('#f8fafc', 'blanc', rectArrondi(-0.62, -5.0, -0.5, -4.6, 0.04)), ...piece('#f8fafc', 'blanc', rectArrondi(0.5, -5.0, 0.62, -4.6, 0.04)));
-  res.push(...piece(GRIS, 'metal', cercle(0.32, -3.7, 0.06, 10)));
-  res.push(...piece(BLEU_T, 'peinture', rectArrondi(-0.82, -3.12, 0.82, -1.4, 0.16)));
-  res.push(...piece(VITRE, 'vitre', rectArrondi(-0.74, -3.06, 0.74, -2.78, 0.1)), ...piece(VITRE, 'vitre', rectArrondi(-0.74, -1.72, 0.74, -1.46, 0.1)));
-  res.push(...piece(VITRE, 'vitre', rectArrondi(-0.8, -2.8, -0.68, -1.75, 0.04)), ...piece(VITRE, 'vitre', rectArrondi(0.68, -2.8, 0.8, -1.75, 0.04)));
-  res.push(...piece(CLAIR, 'metal', rectArrondi(-0.66, -2.76, 0.66, -1.76, 0.1)));
-  res.push(...piece(METAL, 'metal', rectArrondi(-0.25, -2.45, 0.25, -2.05, 0.08)));
-  res.push(trait([[-0.82, -2.85], [-1.02, -2.9]], false, NOIR), trait([[0.82, -2.85], [1.02, -2.9]], false, NOIR));
+  res.push(trait([[-0.5, -1.75], [-0.16, -1.15]], false, '#4b5563'), trait([[0.5, -1.75], [0.16, -1.15]], false, '#4b5563'));
+  // Roues arrière : grandes (2,1 m), crampons en chevrons ; roues avant : petites (1,0 m).
+  res.push(...pneuCrante(-1.62, -3.4, -1.0, -1.25, { pas: 0.2, chevron: true }), ...pneuCrante(1.0, -3.4, 1.62, -1.25, { pas: 0.2, chevron: true }));
+  res.push(...pneuCrante(-1.3, -5.0, -0.92, -3.95, { pas: 0.17, chevron: true }), ...pneuCrante(0.92, -5.0, 1.3, -3.95, { pas: 0.17, chevron: true }));
+  res.push(trait([[-0.92, -4.45], [-0.5, -4.45]], false, '#4b5563'), trait([[0.5, -4.45], [0.92, -4.45]], false, '#4b5563'));
+  // Garde-boue arrière : un liseré bleu foncé le long du bord extérieur des roues.
+  res.push(...piece(FONCE, 'peinture', rectArrondi(-1.66, -3.3, -1.58, -1.35, 0.03)), ...piece(FONCE, 'peinture', rectArrondi(1.58, -3.3, 1.66, -1.35, 0.03)));
+  // Capot : calandre sombre avec 2 phares, marquage et nervure centrale.
+  res.push(...piece(BLEU_T, 'peinture', rectArrondi(-0.52, -5.7, 0.52, -3.2, 0.3)));
+  res.push(...piece('#2b2f33', 'caoutchouc', rectArrondi(-0.4, -5.68, 0.4, -5.38, 0.1)));
+  for (let x = -0.3; x <= 0.31; x += 0.12) res.push(trait([[x, -5.64], [x, -5.42]], false, '#6b7280'));
+  res.push(...piece('#fff4c2', 'phare', rectArrondi(-0.5, -5.64, -0.34, -5.5, 0.04)), ...piece('#fff4c2', 'phare', rectArrondi(0.34, -5.64, 0.5, -5.5, 0.04)));
+  res.push(trait([[0, -5.3], [0, -3.3]], false, '#1b3f78'), trait([[-0.28, -5.2], [-0.28, -3.4]], false, '#1b3f78'), trait([[0.28, -5.2], [0.28, -3.4]], false, '#1b3f78'));
+  res.push(...piece(METAL, 'metal', cercle(0.3, -3.65, 0.07, 10)));
+  // Cabine : grande verrière (toit vitré clair et montants), larges rétroviseurs.
+  res.push(...piece(BLEU_T, 'peinture', rectArrondi(-0.95, -3.3, 0.95, -1.3, 0.2)));
+  res.push(...piece(VITRE, 'vitre', rectArrondi(-0.86, -3.22, 0.86, -1.4, 0.14)));
+  res.push(...piece(CLAIR, 'metal', rectArrondi(-0.7, -3.0, 0.7, -1.65, 0.1)), ...piece(METAL, 'metal', rectArrondi(-0.3, -2.55, 0.3, -2.1, 0.08)));
+  res.push(trait([[-0.86, -2.3], [-0.7, -2.3]], false, '#1b3f78'), trait([[0.7, -2.3], [0.86, -2.3]], false, '#1b3f78'));
+  res.push(trait([[-0.95, -3.0], [-1.18, -3.1]], false, NOIR), trait([[0.95, -3.0], [1.18, -3.1]], false, NOIR));
+  res.push(...piece('#2b2f33', 'caoutchouc', rectArrondi(-1.28, -3.18, -1.1, -2.9, 0.04)), ...piece('#2b2f33', 'caoutchouc', rectArrondi(1.1, -3.18, 1.28, -2.9, 0.04)));
   return res;
 }
 
