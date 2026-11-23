@@ -23,7 +23,7 @@ export function entreesBibliotheque(bib) {
     const s = bib.filter((x) => x.modele === modele).sort((a, b) => a.fleche - b.fleche);
     if (!s.length) return;
     const milieu = s[Math.floor(s.length / 2)];
-    res.push({ cle: `grue:${modele}`, nom, categorie: 'Grues', largeur: null, hauteur: null, detail: `flèche ${s[0].fleche}–${s[s.length - 1].fleche} m`, pose: { type: 'grue', modele, fleche: milieu.fleche, chassis: modele === 'auto' ? 'aucun' : '4.50', rayon: true }, symbole: milieu });
+    res.push({ cle: `grue:${modele}`, nom, categorie: 'Grues', largeur: null, hauteur: null, detail: `flèche ${s[0].fleche}–${s[s.length - 1].fleche} m`, pose: { type: 'grue', modele, fleche: milieu.fleche, chassis: modele === 'auto' ? '4.20' : '4.50', rayon: true }, symbole: milieu });
   };
   grue('tour', 'Grue à tour');
   grue('auto', 'Grue automontante');

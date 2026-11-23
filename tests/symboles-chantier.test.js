@@ -120,7 +120,7 @@ describe('modernisation', () => {
 
 describe('bibliothèque livrée (Base_2023.dxf)', () => {
   it('59 symboles proposés, grues et châssis réglables', () => {
-    expect(BIB.filter((s) => !s.cache)).toHaveLength(59);
+    expect(BIB.filter((s) => !s.cache)).toHaveLength(77); // 0.291.0 : 59 du DXF − 7 retirés + manuscop réuni + 24 dessinés
     expect(flechesDisponibles(BIB, 'tour')).toEqual([25, 30, 35, 40, 45, 50, 55, 60, 65, 70]);
     expect(flechesDisponibles(BIB, 'auto')).toEqual([20, 25, 30, 35, 40, 45, 50]);
     expect(chassisDisponibles(BIB)).toEqual(['3.80', '4.20', '4.50', '4.60', '6']);
@@ -354,5 +354,38 @@ describe('0.290.0 : grue et châssis à longueur libre, ordre de dessin, orienta
     expect(angleDeLaLigne(lignes, [5, 5.2], 1, 0)).toBe(45);
     expect(angleDeLaLigne(lignes, [5, 5.2], 1, 200)).toBe(225); // le sens le plus proche de la rotation actuelle
     expect(angleDeLaLigne(lignes, [50, 0], 1, 0)).toBeNull();
+  });
+});
+
+describe('0.291.0 : retouches de la bibliothèque (retours du 23.11) et symboles dessinés', () => {
+  const nom = (n) => BIB.find((x) => x.nom === n);
+  it('retirés : passerelle, radier, parties de la pelle, table du finisseur, parties du manuscop', () => {
+    for (const n of ['Base Vie Etage passerelle', 'radier', 'Pelle Chenille Chassis', 'Pelle Chenille base', 'Finisseur Table', 'manuscop base', 'Maniscop tourelle']) expect(nom(n).cache).toBe(true);
+    expect(nom('Manuscop (télescopique rotatif)').cache).toBeUndefined();
+  });
+  it('textes sur plaque blanche pour les conteneurs, bennes et WC', () => {
+    for (const n of ['Base Vie Bureau', 'Benne à déchets', 'WC', 'Base Vie Vestiaire']) expect(nom(n).primitives.filter((p) => p.g === 't').every((p) => p.pl)).toBe(true);
+    expect(nom('Poubelle').primitives.some((p) => p.pl)).toBe(false);
+  });
+  it('éclair jaune, gravats dans le dumper plein, voitures dans le même sens', () => {
+    expect(nom('Elec').primitives.some((p) => p.k === '#facc15')).toBe(true);
+    expect(nom('Dumper plein').primitives.filter((p) => p.mat === 'gravats').length).toBeGreaterThan(10);
+    expect(nom('Voiture Grise').largeur).toBeCloseTo(nom('Voiture Blanche').largeur, 2);
+    expect(nom('Voiture Grise').hauteur).toBeGreaterThan(4);
+  });
+  it('symboles dessinés présents, centrés, dans leur catégorie', () => {
+    for (const [n, c] of [['Tracteur + benne', 'Véhicules'], ['Camion citerne', 'Véhicules'], ['Camion carburant', 'Véhicules'], ['Camion balai', 'Véhicules'],
+      ['Camion bitume', 'Véhicules'], ['Niveleuse', 'Engins'], ['WC homme / femme', 'Base-vie'], ['Benne recyclage', 'Base-vie'],
+      ['Panneau Chantier interdit au public', 'Sécurité'], ['Casque obligatoire', 'Sécurité'], ['Chaussures de sécurité obligatoires', 'Sécurité'],
+      ['Feu de chantier', 'Signalisation'], ['Signal Vitesse maximale 30', 'Signalisation'], ['Balise de guidage', 'Signalisation']]) {
+      const x = nom(n);
+      expect(x?.categorie, n).toBe(c);
+      expect((x.boite[0] + x.boite[2]) / 2).toBeCloseTo(0, 2);
+    }
+    expect(nom('Portail').largeur).toBeGreaterThan(5); // 2 vantaux de 2,5 m + poteaux
+    expect(nom('Tri Lattes').hauteur).toBeCloseTo(3.05, 1);
+  });
+  it('grue automontante posée avec son châssis de 4,20 m', () => {
+    expect(entreesBibliotheque(BIB).find((x) => x.cle === 'grue:auto').pose.chassis).toBe('4.20');
   });
 });

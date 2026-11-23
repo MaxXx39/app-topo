@@ -6,7 +6,7 @@
 // [x, y, x, y…] ; voir blocs-dxf.js pour leur forme.
 import { bornesPrimitives, deplacerPrimitives } from './blocs-dxf.js';
 
-export const CATEGORIES_SYMBOLES = ['Base-vie', 'Engins', 'Grues', 'Véhicules', 'Sécurité'];
+export const CATEGORIES_SYMBOLES = ['Base-vie', 'Engins', 'Grues', 'Véhicules', 'Sécurité', 'Signalisation']; // Signalisation : 0.291.0
 
 // Matériaux d'après la couleur d'origine (décidé le 23.11) et leur couleur modernisée.
 const MATERIAUX = {

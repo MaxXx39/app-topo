@@ -5,6 +5,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { lireBlocsDxf } from '../src/topo/blocs-dxf.js';
 import { bibliothequeDepuisBlocs } from '../src/topo/symboles.js';
+import { retoucherBibliotheque } from '../src/topo/symboles-retouches.js';
 import { texteDuDxf } from '../src/topo/dxf-plan.js';
 
 const chemin = process.argv[2];
@@ -17,6 +18,7 @@ if (erreur) {
   console.error(erreur);
   process.exit(1);
 }
-const symboles = bibliothequeDepuisBlocs(blocs, 'base:');
+// 0.291.0 : retouches validées avec l'utilisateur (plaques, retraits, éclairs, gravats…) + symboles dessinés dans Topo.
+const symboles = retoucherBibliotheque(bibliothequeDepuisBlocs(blocs, 'base:'));
 writeFileSync(new URL('../src/plans-chantier/symboles-base.json', import.meta.url), JSON.stringify({ source: 'Base_2023.dxf', symboles }));
 console.log(`${symboles.length} symboles (${symboles.filter((s) => !s.cache).length} proposés) écrits.`);

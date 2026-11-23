@@ -336,6 +336,21 @@ function texteDansSymbole(ctx, p, e, angleSymbole) {
   const retourne = a !== (p.a ?? 0);
   ctx.textAlign = retourne ? 'center' : ['left', 'center', 'right'][p.ah ?? 0];
   ctx.textBaseline = ['alphabetic', 'bottom', 'middle', 'top'][p.av ?? 0];
+  if (p.pl) {
+    // 0.291.0 : texte sur une plaque blanche arrondie (lisible sur le conteneur, la benne…).
+    const h = p.h * e;
+    const w = ctx.measureText(p.t).width;
+    const x0 = { left: 0, center: -w / 2, right: -w }[ctx.textAlign];
+    const y0 = { alphabetic: -0.78 * h, bottom: -h, middle: -h / 2, top: 0 }[ctx.textBaseline];
+    const m = h * 0.28;
+    ctx.beginPath();
+    ctx.roundRect(x0 - m, y0 - m * 0.7, w + 2 * m, h + m * 1.4, h * 0.35);
+    ctx.fillStyle = 'rgba(255,255,255,0.93)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(43,52,64,0.5)';
+    ctx.lineWidth = Math.max(0.6, h * 0.06);
+    ctx.stroke();
+  }
   ctx.fillStyle = p.k;
   ctx.fillText(p.t, 0, 0);
   ctx.restore();
@@ -395,7 +410,7 @@ export function dessinerSymbolePose(d, o) {
     textes.forEach((texte, i) => {
       const y = (i ? -0.55 : 0.55) + 0.12;
       pictoNiveau(ctx, -1.0 - t * 0.3, y, t, i === 0);
-      texteDansSymbole(ctx, { x: -0.55, y, h: t, a: 0, t: texte, ah: 0, av: 2, k: '#0f172a' }, e, rot);
+      texteDansSymbole(ctx, { x: -0.55, y, h: t, a: 0, t: texte, ah: 0, av: 2, k: '#0f172a', pl: true }, e, rot);
     });
     ctx.restore();
     return;
