@@ -2029,6 +2029,16 @@ function ouvrirCalage() {
       modifie();
       return range;
     },
+    // Points du projet qui peuvent servir de référence (0.284.0) : levés (bornes, axes implantés relevés), à implanter, contrôle.
+    points: () => {
+      const vus = new Set();
+      return [...projet.leves.flatMap((l) => l.points), ...projet.aImplanter, ...projet.pointsControle].filter((p) => {
+        const cle = `${p.nom}|${p.est}|${p.nord}`;
+        if (vus.has(cle)) return false;
+        vus.add(cle);
+        return Number.isFinite(p.est) && Number.isFinite(p.nord);
+      });
+    },
     // Dossiers du projet proposés à la création d'un plan (TER., CANA…) et dossier choisi en ce moment.
     dossiers: () => lireSousDossiers(projet).map((d) => d.nom),
     dossierDepart: () => { const c = sousDossierChoisi(); return c && c !== SANS_SOUS_DOSSIER ? c : ''; },

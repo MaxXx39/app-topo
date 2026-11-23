@@ -15,12 +15,12 @@ import { indiceSuivant, reperesDuPlan, controlerIndice, partRetrouvee, TOLERANCE
 import { lirePlanDxf, texteDuDxf, estEnMn95, nomXref } from '../topo/dxf-plan.js';
 import { planRecale } from '../topo/recalage.js';
 import { accrocher, accrocherTrait, sourcesDesPlans } from '../topo/accroche.js';
-import { caler, ErreurCalage, appliquerSimilitude, inverserSimilitude, versHelmert, resultatAutomatique, SEUIL_JUSTE_M, SEUIL_A_REVOIR_M } from '../topo/calage-plan.js';
+import { caler, droiteParPoints, ErreurCalage, appliquerSimilitude, inverserSimilitude, versHelmert, resultatAutomatique, SEUIL_JUSTE_M, SEUIL_A_REVOIR_M } from '../topo/calage-plan.js';
 import { segmentsDuPlan } from '../topo/calage-auto.js';
 import { differencesPlans, sousPlan } from '../topo/differences-plan.js';
 import { calculerAuto } from './calcul-auto.js';
 import { recetteDeDepart, nettoyerPlan, compterParCalque, calqueSousLePoint, TYPES_RETIRABLES, CHOIX_HACHURES } from '../topo/nettoyage-plan.js';
-import { plansDeReference, plansCales, indicesDuGroupe, etiquettes, planCale, planReference } from './plans.js';
+import { plansDeReference, plansCales, indicesDuGroupe, etiquettes, planCale, planReference, planDesPoints, planEnMn95, REF_POINTS } from './plans.js';
 import { creerVueCalage } from './vue-calage.js';
 
 const COULEUR_CALAGE = '#2563eb';
@@ -44,7 +44,7 @@ const enCouleur = (plan, couleur) => Object.assign(Object.create(plan), { couleu
  * Ouvre la page. projet : projet ouvert (projet.plansDxf) ; ajouterPlan(plan) : range le plan calé dans le projet
  * (identifiant, dossier, enregistrement, Drive) et renvoie le plan rangé ; quandRetour() ; message().
  */
-export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, dossiers = () => [], dossierDepart = () => '', quandRetour = null, message = () => {} }) {
+export function ouvrirCalage({ projet, points = () => [], ajouterPlan, modifier = () => false, dossiers = () => [], dossierDepart = () => '', quandRetour = null, message = () => {} }) {
   const page = document.createElement('dialog');
   page.className = 'page-calage';
   document.body.append(page);
@@ -69,7 +69,15 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
   let vues = [];
   let reserve = null; // état gardé pendant l'ajout d'une référence
 
-  const reference = () => projet.plansDxf.find((p) => p.id === etat.referenceId) ?? null;
+  // Référence : un plan du projet (en MN95 ou local), ou « Points du projet » (levés, à implanter, contrôle ; 0.284.0).
+  let memoPoints = { n: -1, plan: null };
+  const planPoints = () => {
+    const liste = points();
+    if (memoPoints.n !== liste.length) memoPoints = { n: liste.length, plan: planDesPoints(liste) };
+    return memoPoints.plan;
+  };
+  const referencePoints = () => etat.referenceId === REF_POINTS;
+  const reference = () => (referencePoints() ? (points().length ? planPoints() : null) : projet.plansDxf.find((p) => p.id === etat.referenceId) ?? null);
   const referenceAffichee = () => (reference() ? planRecale(reference()) : null);
   let grise = { source: null, plan: null };
   const refGrise = () => {
@@ -204,8 +212,9 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
       </section>
       ${ni ? '' : `<section class="carte-calage">
         <h3>Référence MN95 (un plan du projet)</h3>
-        ${refs.length ? `<select data-champ="reference"><option value="">— choisir —</option>${refs.map((p) => `<option value="${echapper(p.id)}" ${p.id === etat.referenceId ? 'selected' : ''}>${echapper(p.nom)}</option>`).join('')}</select>`
-          : '<p class="note-calage alerte">⚠ Aucun plan en MN95 dans ce projet : ajoutez la référence ci-dessous.</p>'}
+        ${refs.length || points().length ? `<select data-champ="reference"><option value="">— choisir —</option>${points().length ? `<option value="${REF_POINTS}" ${REF_POINTS === etat.referenceId ? 'selected' : ''}>Points du projet (${points().length} points : levés, à implanter, contrôle)</option>` : ''}${refs.map((p) => `<option value="${echapper(p.id)}" ${p.id === etat.referenceId ? 'selected' : ''}>${echapper(p.nom)}${planEnMn95(p) ? '' : ' (local)'}</option>`).join('')}</select>`
+          : '<p class="note-calage alerte">⚠ Aucun plan ni point dans ce projet : ajoutez une référence ci-dessous ou levez des points.</p>'}
+        ${referencePoints() ? '<p class="aide-calage">Caler sur des points du projet : cliquez un point du plan reçu puis le point levé ; pour un axe, cliquez l\'axe du plan reçu puis 2 points levés ou plus sur cet axe, et « Terminer l\'axe ».</p>' : ''}
         ${peutConvertirDwg()
     ? '<button type="button" class="bouton-secondaire bouton-fichier" data-action="choisir-dwg-ref">＋ Ajouter une référence (DWG / DXF)…</button>'
     : '<label class="bouton-secondaire bouton-fichier">＋ Ajouter une référence (DXF)…<input type="file" accept=".dxf" multiple data-action="fichier-ref" hidden></label>'}
@@ -224,12 +233,12 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
         ${groupe('Affichage', AFFICHAGES.map(([v, i, t]) => outil('affichage', v, i, t)).join(''))}
         ${groupe('Zoom', '<button type="button" class="outil-ruban" data-zoom="1.5">＋</button><button type="button" class="outil-ruban" data-zoom="0.667">−</button><button type="button" class="outil-ruban" data-zoom="tout">⤢<span>Tout</span></button>')}
         ${groupe('Automatique', '<button type="button" class="outil-ruban" data-action="caler-auto">⚡<span>Caler auto</span></button>')}
-        ${groupe('Modifier', '<button type="button" class="outil-ruban" data-action="retirer-dernier">↶<span>Retirer le dernier</span></button><button type="button" class="outil-ruban" data-action="tout-effacer">✕<span>Tout effacer</span></button>')}
+        ${groupe('Modifier', `${referencePoints() ? '<button type="button" class="outil-ruban" data-action="finir-axe" data-zone="finir-axe">✓<span>Terminer l\'axe</span></button>' : ''}<button type="button" class="outil-ruban" data-action="retirer-dernier">↶<span>Retirer le dernier</span></button><button type="button" class="outil-ruban" data-action="tout-effacer">✕<span>Tout effacer</span></button>`)}
       </div>
       <p class="consigne-calage" data-zone="consigne"></p>
       <div class="vues-calage" data-mode="${etat.affichage}">
         <div class="vue-calage" data-cote="plan"><div class="tete-vue"><strong>Plan reçu${etat.nouvelIndice ? ' (nouvel indice)' : ''} · ${echapper(etat.fichier)}</strong><span class="aide-calage">clic 1</span></div><div class="toile-calage" data-toile="plan"></div></div>
-        <div class="vue-calage" data-cote="ref"><div class="tete-vue"><strong>Référence MN95 (base) · ${echapper(reference()?.nom ?? '')}</strong><span class="aide-calage">clic 2</span></div><div class="toile-calage" data-toile="ref"></div></div>
+        <div class="vue-calage" data-cote="ref"><div class="tete-vue"><strong>Référence (base) · ${echapper(reference()?.nom ?? '')}</strong><span class="aide-calage">clic 2</span></div><div class="toile-calage" data-toile="ref"></div></div>
         <div class="vue-calage" data-cote="cale"><div class="tete-vue"><strong>Plan calé sur la référence</strong><span class="aide-calage">bleu = plan calé · gris = référence</span></div><div class="toile-calage" data-toile="cale"></div></div>
       </div>
       <div class="bas-calage">
@@ -607,6 +616,7 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
       const texte = etiquettes([...etat.elements, etat.enCours]).at(-1);
       if (cote === 'plan') marques.push({ type: etat.enCours.type, xy: etat.enCours.plan, texte, couleur, attente: true });
       // Calage déjà connu : où l'élément devrait tomber sur la référence (aide au clic).
+      if (cote === 'ref') for (const [e, n] of etat.enCours.refPoints ?? []) marques.push({ type: 'point', xy: [e, n], texte: texte, couleur, attente: true });
       if (cote === 'ref' && etat.resultat) {
         const s = etat.resultat.similitude;
         const pl = etat.enCours.plan;
@@ -618,8 +628,10 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
   }
 
   /** Accroche sous la souris dans un plan : { est, nord } (point) ou { segment } (axe), ou null. */
-  function accrocheDans(plans, position, tolerance) {
+  function accrocheDans(plans, position, tolerance, cote = 'plan') {
     const sources = sourcesDesPlans(plans, position, tolerance);
+    // Référence « Points du projet » : on accroche seulement les points levés (aussi pour un axe : voir clicRef).
+    if (cote === 'ref' && referencePoints()) return accrocher('sommet', position, tolerance, sources);
     if (etat.type === 'axe') {
       const t = accrocherTrait(position, tolerance, sources.lignes);
       if (!t) return null;
@@ -648,7 +660,22 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
       message('Cliquez d\'abord l\'élément sur le plan reçu.', 2500);
       return;
     }
-    const a = accrocheDans([referenceAffichee()], position, tolerance);
+    const a = accrocheDans([referenceAffichee()], position, tolerance, 'ref');
+    if (referencePoints() && etat.enCours.type === 'axe') {
+      // Axe du plan reçu + points levés sur cet axe : on en cumule 2 ou plus, puis « Terminer l'axe » (droite ajustée).
+      if (!a) {
+        message('Pas de point levé ici : cliquez un point levé sur l\'axe.', 2500);
+        return;
+      }
+      const vus = etat.enCours.refPoints ?? [];
+      if (vus.some(([e, n]) => Math.hypot(e - a.est, n - a.nord) < 1e-6)) {
+        message('Ce point est déjà pris : cliquez un autre point levé sur l\'axe.', 2500);
+        return;
+      }
+      etat.enCours.refPoints = [...vus, [a.est, a.nord]];
+      majCaler();
+      return;
+    }
     if (!a) {
       message(etat.enCours.type === 'axe' ? 'Pas de trait ici : cliquez sur la même ligne.' : `Rien à accrocher ici (${ACCROCHES.find(([v]) => v === etat.accroche)[2]}).`, 2500);
       return;
@@ -658,6 +685,28 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
     etat.enCours = null;
     recalculer();
     if (etat.affichage === 'ref') changerAffichage('plan');
+    majCaler();
+  }
+
+  /** Axe + points levés : la droite ajustée sur les points devient la ligne de la référence. */
+  function finirAxe() {
+    const e = etat.enCours;
+    if (!e?.refPoints || e.refPoints.length < 2) {
+      message('Cliquez au moins 2 points levés sur l\'axe, puis « Terminer l\'axe ».', 3500);
+      return;
+    }
+    let droite;
+    try {
+      droite = droiteParPoints(e.refPoints);
+    } catch (erreur) {
+      message(erreur.message, 4000);
+      return;
+    }
+    etat.elements.push({ type: 'axe', role: e.role, plan: e.plan, ref: droite.segment, pointsAxe: e.refPoints.length, ecartAxeM: droite.ecartMaxM });
+    etat.enCours = null;
+    recalculer();
+    if (etat.affichage === 'ref') changerAffichage('plan');
+    message(`Axe : droite ajustée sur ${e.refPoints.length} points (écart des points à la droite : ${mm(droite.ecartMaxM)} au plus).${droite.ecartMaxM > 0.02 ? ' ⚠ Les points ne sont pas bien alignés.' : ''}`, 5000, { ok: droite.ecartMaxM <= 0.02 });
     majCaler();
   }
 
@@ -689,7 +738,7 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
       creerVueCalage(toile('ref'), {
         plans: () => [referenceAffichee()],
         marques: () => marquesDe('ref'),
-        survol: (p, t) => (etat.enCours ? accrocheDans([referenceAffichee()], p, t) : null),
+        survol: (p, t) => (etat.enCours ? accrocheDans([referenceAffichee()], p, t, 'ref') : null),
         clic: clicRef,
       }),
       creerVueCalage(toile('cale'), {
@@ -706,7 +755,6 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
   /** Vérifier = cliquer le même point sur le plan reçu puis sur la référence : il faut les deux vues séparées. */
   function passerEnVerification() {
     etat.role = 'verification';
-    etat.type = 'point';
     changerAffichage('deux');
     majCaler();
     message('Vérification : cliquez un point sur le plan reçu (à gauche), puis le même point sur la référence (à droite).', 5000);
@@ -725,7 +773,10 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
     page.querySelectorAll('[data-outil="accroche"]').forEach((b) => { b.disabled = etat.type === 'axe'; });
     const noms = etiquettes(etat.elements);
     const prochain = etiquettes([...etat.elements, { type: etat.type, role: etat.role }]).at(-1);
-    page.querySelector('[data-zone="consigne"]').textContent = etat.calculAuto ? 'Calage automatique en cours (quelques secondes)…' : etat.enCours
+    const bAxe = page.querySelector('[data-zone="finir-axe"]');
+    if (bAxe) bAxe.disabled = !(etat.enCours?.type === 'axe' && (etat.enCours.refPoints?.length ?? 0) >= 2);
+    page.querySelector('[data-zone="consigne"]').textContent = etat.calculAuto ? 'Calage automatique en cours (quelques secondes)…' : etat.enCours?.type === 'axe' && referencePoints()
+      ? `${etiquettes([...etat.elements, etat.enCours]).at(-1)} : cliquez 2 points levés ou plus SUR l'axe (à droite)${etat.enCours.refPoints?.length ? ` : ${etat.enCours.refPoints.length} pris` : ''}, puis « Terminer l'axe ».` : etat.enCours
       ? `${etiquettes([...etat.elements, etat.enCours]).at(-1)} : cliquez le même ${etat.enCours.type === 'axe' ? 'trait' : 'point'} sur la RÉFÉRENCE (à droite)${etat.resultat ? ' (marque « ? » = où il devrait être)' : ''}.`
       : `${prochain} : cliquez ${etat.type === 'axe' ? 'un trait (axe)' : 'un point'} sur le PLAN REÇU (à gauche), puis le même sur la référence (à droite).`;
     const compte = (f) => etat.elements.filter(f).length;
@@ -787,7 +838,7 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
       const { plan, erreur } = lirePlanDxf(texteDuDxf(principal.octets), principal.nom, { xrefs, annotations: true });
       if (erreur || !plan.bornes) throw new Error(erreur ?? 'aucun objet dessiné trouvé');
       if (pourReference) {
-        if (!estEnMn95(plan.bornes)) throw new Error('ce plan n\'est pas en MN95 (coordonnées hors de la zone Genève–Vaud) : il ne peut pas servir de référence');
+        // Référence locale acceptée (travail local) : le plan calé sera dans le même repère.
         entrerReference(plan, principal.nom);
         etat.occupe = '';
         dessiner();
@@ -843,7 +894,7 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
       message('Donnez un nom à la référence.', 3000);
       return;
     }
-    const plan = planReference({ lu: propre, nom, fichier: etat.fichier, le: new Date().toISOString(), nettoyage: etat.recette });
+    const plan = planReference({ lu: propre, nom, fichier: etat.fichier, le: new Date().toISOString(), nettoyage: etat.recette, local: !estEnMn95(propre.bornes) });
     if (dossiers().length) plan.sousDossiers = dossierDepart() ? [dossierDepart()] : [];
     const range = ajouterPlan(plan);
     if (!range) return;
@@ -1038,7 +1089,7 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
       ...plan,
       calage: {
         ...plan.calage,
-        elements: etat.elements.map(({ type, role, plan: pl, ref }) => ({ type, role, plan: [...pl], ref: [...ref] })),
+        elements: etat.elements.map(({ type, role, plan: pl, ref, pointsAxe, ecartAxeM }) => ({ type, role, plan: [...pl], ref: [...ref], ...(pointsAxe ? { pointsAxe, ecartAxeM } : {}) })),
         verdict: r.verdict,
         ecartVerificationM: Math.max(0, ...r.elements.filter((e) => e.role === 'verification').map((e) => e.ecartM)),
         message: r.message,
@@ -1093,6 +1144,7 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
     else if (action === 'vers-nettoyer') allerNettoyer();
     else if (action === 'choisir-dwg') choisirDwg();
     else if (action === 'choisir-dwg-ref') choisirDwg({ reference: true });
+    else if (action === 'finir-axe') finirAxe();
     else if (cible.dataset.indiceDe) commencerIndice(cible.dataset.indiceDe);
     else if (cible.dataset.verifier) verifier(cible.dataset.verifier);
     else if (cible.dataset.comparerAvec) comparer(cible.dataset.comparerAvec);
@@ -1206,7 +1258,8 @@ export function ouvrirCalage({ projet, ajouterPlan, modifier = () => false, doss
       recalculer();
       majCaler();
     } else if (action === 'retirer-dernier') {
-      if (etat.enCours) etat.enCours = null;
+      if (etat.enCours?.refPoints?.length) etat.enCours.refPoints.pop();
+      else if (etat.enCours) etat.enCours = null;
       else if (etat.elements.length) etat.elements.pop();
       else etat.auto = null;
       recalculer();

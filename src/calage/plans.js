@@ -9,7 +9,48 @@ import { versHelmert } from '../topo/calage-plan.js';
  * PDF scannés) qui sont en MN95 une fois recalés (plan importé déjà calé, recalé, ou calé ici).
  */
 export function plansDeReference(plansDxf = []) {
-  return plansDxf.filter((p) => !p.ifc && !p.calage?.archive && p.contenu && (p.contenu.traits?.length || p.contenu.cercles?.length || p.contenu.points?.length) && estEnMn95(planRecale(p).bornes));
+  // 0.284.0 : la référence peut être locale (pas en MN95) : le plan calé sera dans le même repère.
+  return plansDxf.filter((p) => !p.ifc && !p.calage?.archive && p.contenu && (p.contenu.traits?.length || p.contenu.cercles?.length || p.contenu.points?.length));
+}
+
+/** Vrai si le plan (une fois recalé) est en MN95 ; sinon c'est un plan local. */
+export const planEnMn95 = (plan) => Boolean(plan.bornes) && estEnMn95(planRecale(plan).bornes);
+
+/** Identifiant de la « référence » faite des points du projet (levés, à implanter, contrôle). */
+export const REF_POINTS = '__points';
+
+/**
+ * Plan « Points du projet » pour servir de référence (0.284.0) : un plan au format de lirePlanDxf (même dessin, mêmes
+ * accroches) fait des points levés : un point accrochable + un rond + son nom. points : [{ nom, est, nord }].
+ */
+export function planDesPoints(points) {
+  const valides = points.filter((p) => Number.isFinite(p.est) && Number.isFinite(p.nord));
+  const est = valides.map((p) => p.est);
+  const nord = valides.map((p) => p.nord);
+  const vide = valides.length === 0;
+  const bornes = vide ? null : { estMin: Math.min(...est), nordMin: Math.min(...nord), estMax: Math.max(...est), nordMax: Math.max(...nord) };
+  const origine = vide ? { est: 0, nord: 0 } : { est: Math.floor(bornes.estMin), nord: Math.floor(bornes.nordMin) };
+  const etendue = vide ? 1 : Math.max(bornes.estMax - bornes.estMin, bornes.nordMax - bornes.nordMin, 1);
+  const rayon = Math.max(0.05, etendue / 250);
+  const mm = (v) => Math.round(v * 1000) / 1000;
+  const x = (p) => mm(p.est - origine.est);
+  const y = (p) => mm(p.nord - origine.nord);
+  const contenu = {
+    traits: [],
+    pleins: [],
+    cercles: valides.map((p) => ({ c: 0, k: null, x: x(p), y: y(p), r: mm(rayon) })),
+    textes: valides.map((p) => ({ c: 0, k: null, x: mm(x(p) + rayon * 1.5), y: mm(y(p) + rayon * 1.5), h: mm(rayon * 2.5), a: 0, t: String(p.nom ?? ''), ah: 0, av: 0 })),
+    points: valides.map((p) => ({ c: 0, k: null, x: x(p), y: y(p), z: p.altitude ?? 0 })),
+  };
+  return {
+    id: REF_POINTS,
+    nom: 'Points du projet',
+    origine,
+    bornes,
+    calques: [{ nom: 'Points', couleur: '#0f172a', visible: true }],
+    contenu,
+    compte: { objets: valides.length * 3, ignores: {} },
+  };
 }
 
 /** Plans du projet calés par cette application (ils ont leur « recette »), du plus récent au plus ancien. */
@@ -60,7 +101,7 @@ export function planCale({ lu, nom, fichier, resultat, reference, elements, id, 
       fichier,
       referenceId: reference.id,
       referenceNom: reference.nom,
-      elements: elements.map(({ type, role, plan, ref }) => ({ type, role, plan: [...plan], ref: [...ref] })),
+      elements: elements.map(({ type, role, plan, ref, pointsAxe, ecartAxeM }) => ({ type, role, plan: [...plan], ref: [...ref], ...(pointsAxe ? { pointsAxe, ecartAxeM } : {}) })),
       similitude: { ...resultat.similitude },
       echelleBrute: resultat.echelleBrute,
       echelleArrondie: resultat.echelleArrondie,
@@ -87,6 +128,7 @@ export function planCale({ lu, nom, fichier, resultat, reference, elements, id, 
  * Plan de référence ajouté depuis le module de calage (0.283.0) : un plan DXF / DWG déjà en MN95, nettoyé, rangé comme
  * un plan importé « déjà calé » (sans calage : il sert de référence, il n'est pas dans la liste des plans calés).
  */
-export function planReference({ lu, nom, fichier, le, nettoyage = null }) {
-  return { ...lu, nom: nom || lu.nom, importeLe: le, dejaCale: true, reference: { fichier, le, ...(nettoyage ? { nettoyage: JSON.parse(JSON.stringify(nettoyage)) } : {}) } };
+export function planReference({ lu, nom, fichier, le, nettoyage = null, local = false }) {
+  // Référence locale (pas en MN95) : pas « déjà calé », elle reste à recaler si on veut un jour la passer en MN95.
+  return { ...lu, nom: nom || lu.nom, importeLe: le, ...(local ? { local: true } : { dejaCale: true }), reference: { fichier, le, ...(nettoyage ? { nettoyage: JSON.parse(JSON.stringify(nettoyage)) } : {}) } };
 }
