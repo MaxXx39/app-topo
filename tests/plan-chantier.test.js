@@ -1,0 +1,146 @@
+import { describe, it, expect } from 'vitest';
+import {
+  nouveauPlanChantier, ajouterPhase, retirerPhase, ajouterObjet, retirerObjet, objetsVisibles, couleurObjet, aire, longueur,
+  distanceAuSegment, dansPolygone, objetSousLePoint, deplacerObjet, bornesObjets, pointeDeFleche, lignesPourAccroche,
+  resumeObjet, copiePlan, categorieZone, styleLigne,
+} from '../src/topo/plan-chantier.js';
+import { completerProjet } from '../src/projet/projet.js';
+
+const E = 2500000;
+const N = 1118000;
+const carre = [[E, N], [E + 10, N], [E + 10, N + 10], [E, N + 10]];
+
+describe('plan de chantier : modèle', () => {
+  it('nouveau plan : une phase active, aucun objet', () => {
+    const p = nouveauPlanChantier('PIC-01', 'installation', '2026-11-23T08:00:00.000Z');
+    expect(p.nom).toBe('PIC-01');
+    expect(p.genre).toBe('installation');
+    expect(p.phases).toHaveLength(1);
+    expect(p.phaseActive).toBe(p.phases[0].id);
+    expect(p.objets).toEqual([]);
+    expect(p.creeLe).toBe('2026-11-23T08:00:00.000Z');
+  });
+
+  it('phases : ajouter (devient active, couleur suivante), retirer avec ses objets, jamais la dernière', () => {
+    const p = nouveauPlanChantier('P');
+    const ph1 = p.phaseActive;
+    const ph2 = ajouterPhase(p);
+    expect(p.phaseActive).toBe(ph2.id);
+    expect(ph2.nom).toBe('Phase 2');
+    expect(ph2.couleur).not.toBe(p.phases[0].couleur);
+    ajouterObjet(p, { type: 'zone', points: carre, categorie: 'stockage' });
+    expect(p.objets[0].phase).toBe(ph2.id);
+    expect(retirerPhase(p, ph2.id)).toBe(true);
+    expect(p.objets).toHaveLength(0);
+    expect(p.phaseActive).toBe(ph1);
+    expect(retirerPhase(p, ph1)).toBe(false);
+  });
+
+  it('objets visibles : ceux des phases cochées seulement', () => {
+    const p = nouveauPlanChantier('P');
+    const a = ajouterObjet(p, { type: 'zone', points: carre });
+    const ph2 = ajouterPhase(p);
+    ajouterObjet(p, { type: 'fleche', points: [[E, N], [E + 5, N]] });
+    expect(objetsVisibles(p)).toHaveLength(2);
+    ph2.visible = false;
+    expect(objetsVisibles(p).map((o) => o.id)).toEqual([a.id]);
+    expect(retirerObjet(p, a.id)).toBe(true);
+    expect(retirerObjet(p, a.id)).toBe(false);
+  });
+
+  it('couleur : celle de la catégorie / du style, ou celle de la phase', () => {
+    const p = nouveauPlanChantier('P');
+    const z = ajouterObjet(p, { type: 'zone', points: carre, categorie: 'stockage' });
+    const l = ajouterObjet(p, { type: 'ligne', points: carre, style: 'cloture' });
+    expect(couleurObjet(p, z)).toBe(categorieZone('stockage').couleur);
+    expect(couleurObjet(p, l)).toBe(styleLigne('cloture').couleur);
+    p.couleurs = 'phases';
+    expect(couleurObjet(p, z)).toBe(p.phases[0].couleur);
+    expect(categorieZone('inconnue').cle).toBe('installation');
+    expect(styleLigne('inconnu').cle).toBe('libre');
+  });
+});
+
+describe('plan de chantier : géométrie', () => {
+  it('aire et longueur', () => {
+    expect(aire(carre)).toBeCloseTo(100, 6);
+    expect(aire([...carre].reverse())).toBeCloseTo(100, 6);
+    expect(longueur(carre)).toBeCloseTo(30, 6);
+    expect(longueur(carre, true)).toBeCloseTo(40, 6);
+  });
+
+  it('distance à un segment, point dans un polygone', () => {
+    expect(distanceAuSegment([E + 5, N + 3], [E, N], [E + 10, N])).toBeCloseTo(3, 6);
+    expect(distanceAuSegment([E - 4, N + 3], [E, N], [E + 10, N])).toBeCloseTo(5, 6);
+    expect(dansPolygone([E + 5, N + 5], carre)).toBe(true);
+    expect(dansPolygone([E + 15, N + 5], carre)).toBe(false);
+  });
+
+  it('objet sous le point : zone (dedans), piste (demi-largeur), texte, le dernier dessiné d\'abord', () => {
+    const p = nouveauPlanChantier('P');
+    const z = ajouterObjet(p, { type: 'zone', points: carre });
+    const piste = ajouterObjet(p, { type: 'piste', points: [[E - 20, N + 30], [E + 20, N + 30]], largeur: 6 });
+    const t = ajouterObjet(p, { type: 'texte', point: [E + 5, N + 5], texte: 'Base', taille: 1 });
+    expect(objetSousLePoint(p.objets, [E + 5, N + 5], 0.2).id).toBe(t.id);
+    expect(objetSousLePoint(p.objets, [E + 2, N + 8], 0.2).id).toBe(z.id);
+    expect(objetSousLePoint(p.objets, [E, N + 32.5], 0.2).id).toBe(piste.id);
+    expect(objetSousLePoint(p.objets, [E, N + 34], 0.2)).toBeNull();
+  });
+
+  it('déplacer et bornes', () => {
+    const o = deplacerObjet({ type: 'zone', points: carre.map((q) => [...q]) }, 2, -1);
+    expect(o.points[0]).toEqual([E + 2, N - 1]);
+    const t = deplacerObjet({ type: 'texte', point: [E, N] }, 1, 1);
+    expect(t.point).toEqual([E + 1, N + 1]);
+    expect(bornesObjets([o, t])).toEqual({ estMin: E + 1, estMax: E + 12, nordMin: N - 1, nordMax: N + 9 });
+    expect(bornesObjets([])).toBeNull();
+  });
+
+  it('pointe de flèche : sur le dernier point, de la bonne taille', () => {
+    const [pointe, g, d] = pointeDeFleche([E, N], [E + 10, N], 2, 1.6);
+    expect(pointe).toEqual([E + 10, N]);
+    expect(g[0]).toBeCloseTo(E + 8, 6);
+    expect(g[1]).toBeCloseTo(N + 0.8, 6);
+    expect(d[1]).toBeCloseTo(N - 0.8, 6);
+  });
+
+  it('lignes pour l\'accroche : sans les textes, zones fermées', () => {
+    const lignes = lignesPourAccroche([
+      { type: 'zone', points: carre }, { type: 'texte', point: [E, N], texte: 'x' }, { type: 'ligne', points: [[E, N], [E + 1, N]] },
+    ]);
+    expect(lignes).toHaveLength(2);
+    expect(lignes[0].ferme).toBe(true);
+    expect(lignes[0].points[0]).toEqual({ est: E, nord: N, altitude: null });
+  });
+
+  it('résumé lisible', () => {
+    expect(resumeObjet({ type: 'zone', points: carre, categorie: 'stockage' })).toBe('Zone · Stockage · 100.0 m²');
+    expect(resumeObjet({ type: 'piste', points: [[E, N], [E + 25, N]], largeur: 4 })).toBe('Piste · 4.0 m de large · 25.0 m');
+    expect(resumeObjet({ type: 'texte', texte: 'Base-vie' })).toBe('Texte « Base-vie »');
+  });
+
+  it('copie indépendante (Annuler)', () => {
+    const p = nouveauPlanChantier('P');
+    ajouterObjet(p, { type: 'zone', points: carre });
+    const c = copiePlan(p);
+    c.objets[0].points[0][0] = 0;
+    expect(p.objets[0].points[0][0]).toBe(E);
+  });
+});
+
+describe('projet : plans de chantier et comparaisons gardés à l\'ouverture', () => {
+  it('plansChantier ajouté s\'il manque, gardé s\'il existe', () => {
+    expect(completerProjet({ nom: 'x', calculs: [] }).plansChantier).toEqual([]);
+    const p = nouveauPlanChantier('PIC');
+    expect(completerProjet({ nom: 'x', calculs: [], plansChantier: [p] }).plansChantier[0].nom).toBe('PIC');
+  });
+  it('comparaisons de PDF (0.282.0) : plus effacées en rouvrant le projet', () => {
+    const c = { id: 'c1', nom: 'Coffrage', fichiers: [], planches: [] };
+    expect(completerProjet({ nom: 'x', calculs: [], comparaisons: [c] }).comparaisons).toEqual([c]);
+  });
+  it('projet de la version 1 : ses anciennes comparaisons de volumes deviennent des calculs', () => {
+    const complet = completerProjet({ nom: 'x', surfaces: [], comparaisons: [{ id: 'v1', nom: 'avant/après', avant: 'surface:a', apres: 'surface:b' }] });
+    expect(complet.comparaisons).toBeUndefined();
+    expect(complet.calculs.map((k) => k.id)).toContain('v1');
+  });
+});
