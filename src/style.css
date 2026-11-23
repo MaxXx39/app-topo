@@ -14774,3 +14774,13 @@ dialog.page-chantier[open] {
 .page-chantier .groupe-ruban .champ-bandeau input { width: 58px; padding: 2px 4px; }
 .page-chantier .ruban-element .propre-element { max-height: 22vh; }
 .page-chantier .ruban-element .propre-element .liste-genres { max-height: 104px; overflow: auto; width: 340px; flex-shrink: 0; }
+
+/* 0.295.1 : bandeau de hauteur constante ; vignettes des poses de l'escalier lisibles */
+.page-chantier .ruban-element .propre-element { height: 84px; max-height: none; overflow: auto; }
+.page-chantier .ruban-element .poses-etage { width: 380px; flex-shrink: 0; }
+.page-chantier .ruban-element .poses-etage button, .page-chantier .ruban-element .poses-etage button.actif { background: #fff; color: inherit; }
+.page-chantier .ruban-element .poses-etage canvas { height: 34px; }
+.page-chantier .ruban-element .propre-element textarea { min-width: 260px; height: 56px; font: inherit; }
+.page-chantier .ruban-element .styles-lignes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; max-width: 260px; }
+.page-chantier .ruban-element .style-ligne button { padding: 0 6px; min-height: 22px; border: 1px solid #94a3b8; border-radius: 5px; background: #fff; cursor: pointer; }
+.page-chantier .ruban-element .style-ligne button.actif { background: #b45309; color: #fff; }

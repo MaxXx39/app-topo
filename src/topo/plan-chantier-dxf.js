@@ -7,7 +7,7 @@
 import {
   styleLigne, categorieZone, couleurObjet, dimensionsFleche, pointeDeFleche, centreZone, texteSurface, positionsLeLong,
   metresParMm, estPose, texteSymbolesM,
-  geometrieCotation,
+  geometrieCotation, lignesDuTexte,
 } from './plan-chantier.js';
 import { couleurAci } from './dxf-plan.js';
 import { grueDeLObjet, symboleDeLObjetPose } from './grue-mobile.js';
@@ -172,7 +172,7 @@ export function dxfPlanChantier(plan, bib, objets = null) {
       entites.push(...texte(g.texte.p[0], g.texte.p[1], texteM, g.texte.angle, g.texte.t, c));
     } else if (o.type === 'texte') {
       const c = calque(o, 'TEXTES', o.couleur ? aci : 7);
-      entites.push(...texte(o.point[0], o.point[1], o.taille ?? 1, 0, o.texte, c));
+      lignesDuTexte(o.texte).forEach((l, i, a) => entites.push(...texte(o.point[0], o.point[1] - (i - (a.length - 1) / 2) * (o.taille ?? 1) * 1.25, o.taille ?? 1, 0, l, c)));
       if (o.repere) entites.push('0', 'LINE', '8', c, '10', f3(o.point[0]), '20', f3(o.point[1]), '30', '0', '11', f3(o.repere[0]), '21', f3(o.repere[1]), '31', '0');
     } else if (estPose(o)) {
       const k = echelleDeLObjet(o);

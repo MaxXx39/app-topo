@@ -694,3 +694,26 @@ describe('planning des phases, ortho et retours du 3e lot (0.294.1)', () => {
     expect(dxfPlanChantier(plan, BIB)).toContain('TEXTES');
   });
 });
+
+describe('retours du 23.11 (4e lot)', () => {
+  it('angle coté entre les points 1, 2, 3 : le sommet est le point 2', async () => {
+    const { geometrieCotation } = await import('../src/topo/plan-chantier.js');
+    const g = geometrieCotation({ genre: 'angle', ordre: 'p1-s-p3', points: [[5, 0], [0, 0], [0, 5]] });
+    expect(g.valeur).toBeCloseTo(90, 6);
+    expect(g.sommet).toEqual([0, 0]);
+    // sans l'ordre (anciennes cotations) : le sommet reste le 1er point
+    expect(geometrieCotation({ genre: 'angle', points: [[0, 0], [5, 0], [0, 5]] }).sommet).toEqual([0, 0]);
+  });
+
+  it('texte sur plusieurs lignes : toucher et DXF ligne par ligne', async () => {
+    const m = await import('../src/topo/plan-chantier.js');
+    expect(m.lignesDuTexte('a\nb\r\nc')).toEqual(['a', 'b', 'c']);
+    const plan = nouveauPlanChantier('t', 'pic');
+    const t = ajouterObjet(plan, { type: 'texte', point: [0, 0], texte: 'Haut\nBas', taille: 1, styles: [{ g: true }, { s: true }] });
+    expect(objetSousLePoint(plan.objets, [0, 1], 0.2)?.id).toBe(t.id); // 2 lignes : plus haut qu'une
+    const dxf = dxfPlanChantier(plan, BIB);
+    expect(dxf).toContain('Haut');
+    expect(dxf).toContain('Bas');
+    expect(resumeObjet(t)).toContain('Haut…');
+  });
+});

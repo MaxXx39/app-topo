@@ -19,7 +19,18 @@ export function reglagesFeuille(plan) {
 
 export const COINS_SITUATION = [['hd', 'Haut droite'], ['hg', 'Haut gauche'], ['bg', 'Bas gauche'], ['bd', 'Bas droite']];
 /** Vue de situation (0.293.0) : petit cadre carte nationale dans un coin, zone du plan en rouge. */
-export const situationDe = (s = {}) => ({ actif: Boolean(s.actif), coin: s.coin ?? 'hd', echelle: s.echelle ?? 5000, taille: s.taille ?? 60 });
+export const situationDe = (s = {}) => ({ actif: Boolean(s.actif), coin: s.coin ?? 'hd', echelle: s.echelle ?? 5000, taille: s.taille ?? 60, auto: Boolean(s.auto) });
+
+/**
+ * Échelle de la carte de situation : celle tapée, ou en automatique (0.295.1) celle qui donne à la zone du plan (rectangle
+ * rouge) environ un tiers du côté du cadre, quel que soit le zoom du plan.
+ */
+export function echelleDeSituation(plan, mise, sit) {
+  if (!sit.auto) return sit.echelle;
+  const largeurM = (mise.cadre.l * (plan.echelle ?? ECHELLE_PAPIER)) / 1000;
+  const B = cadreSituation(mise, sit);
+  return Math.max(200, Math.round((largeurM * 1000) / (0.33 * B.l) / 100) * 100);
+}
 
 /**
  * Cadre (mm) de la vue de situation dans un coin du cadre du plan ; taille = côté en mm sur une feuille A3 (suit k).

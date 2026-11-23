@@ -91,7 +91,7 @@ Levé du 20/05/2026 (affaire 10 203), tolérance **0,5 %** : Stock 1 = 1636.197 
 - Mode des nouveautés décidé le 16.11 : liste d'implantation avec coches = Intermédiaire ; noms cachés de loin = tous ; « Contrôler » un plan = Intermédiaire (état visible dès Base) ; avertissements d'import = Expert.
 - **Code de sécurité** (`outils/code.js`, simple barrière, ne jamais l'écrire dans les bulles) : passer en Expert, nom de l'appareil, réglages NTRIP, roue ⚙ de Contrôle, prendre la main, listes partagées. Import de points de contrôle : sans code. « Relancer NTRIP » : sans code.
 
-## Fonctionnalités (état à la 0.295.0)
+## Fonctionnalités (état à la 0.295.1)
 Le détail version par version est dans `git log` ; ici seulement ce qui est en vigueur. Les noms entre `…` sont des repères pour `grep`.
 
 ### Navigation et en-tête
@@ -137,6 +137,13 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 ## Plans de chantier : état (23.11)
 - **Étapes 1 à 4 faites** (0.286.0 → 0.289.0, Expert, site PC + Topo Bureau). **Petits restes** : tableau des modes (`docs/modes-base-intermediaire-expert.xlsx`) pas mis à jour (Plans de chantier, Calage, Comparer) ; jamais essayé sur Topo Bureau ni avec swisstopo (bloqué ici) ; la maquette est faite pour 1366 × 768 (portrait tablette non prévu).
 - **À valider avec l'utilisateur** : « une page par phase » = la phase seule + les phases cochées « sur toutes les pages » (choix fait sans lui) ; poses de l'escalier (lecture du bloc « Base vie Etage » : palier le long du petit côté, volée de 3 m le long du grand ; « petit côté » = échange des axes) ; matériaux d'après les couleurs (table `MATERIAUX` de `topo/symboles.js`) ; phares / feux placés par fractions de la boîte (camions : devant = y mini ; chargeuse : devant = x maxi).
+
+## 0.295.1 — Plans de chantier : retours du 23.11 (4e lot)
+- **Bandeau de hauteur constante** : le genre d'une zone ou d'une ligne se change par une **liste déroulante** (`selectGenres`, plus la longue liste) ; la partie « propre » du bandeau a une hauteur fixe (84 px, défilement si besoin). **Outil Piste retiré** du ruban (les pistes déjà dessinées restent).
+- **Texte sur plusieurs lignes** (zone de saisie, Entrée = nouvelle ligne) avec **gras et souligné par ligne** (`o.styles[i] = { g, s }`, `plaqueMulti`, `lignesDuTexte`) ; DXF : une ligne de texte par ligne.
+- **Cotation d'angle entre les points 1, 2, 3 : le sommet est le point 2** (`ordre: 'p1-s-p3'` ; les anciennes cotations gardent leur ordre).
+- **Base-vie à étage** : les 8 poses ont leurs vignettes dans le bandeau (elles n'étaient dessinées que dans le panneau de droite).
+- **Vue de situation** : rectangle rouge jamais plus petit que 5 mm sur le papier et centré ; case **« Échelle automatique »** (`situation.auto`, `echelleDeSituation` : la zone du plan fait environ un tiers du cadre, quel que soit le zoom du plan).
 
 ## 0.295.0 — Plans de chantier : retours du 23.11 (3e lot ; réponses : construction = trait au choix + segment par défaut, planning = Gantt, plusieurs phases = début → fin)
 - **Mode Ortho** (ruban « Ortho », F8, `etat.ortho`, `pointOrtho`) : pendant un dessin, le point suivant est aimanté aux directions N / S / E / O ou à celles d'un **repère** (champ « Repère ° », ou « Repère = ligne » : l'angle d'une ligne cliquée ; perpendiculaires comprises) ; les accroches d'objet restent prioritaires.

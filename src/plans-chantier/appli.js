@@ -22,7 +22,7 @@ import { creerVueChantier } from './vue.js';
 import { listeGenres } from './apercu.js';
 import { chargerBibliothequeBase, entreesBibliotheque, filtrerEntrees, CATEGORIES_SYMBOLES, symbolesDuDxf, ajouterSymbolesProjet } from './bibliotheque.js';
 import { dessinerVignette, symboleDeLObjet } from './dessin.js';
-import { geometrieCotation } from '../topo/plan-chantier.js';
+import { geometrieCotation, lignesDuTexte, CATEGORIES_ZONE, STYLES_LIGNE } from '../topo/plan-chantier.js';
 import { SENS_DEVIATION, CLE_DEVIATION } from '../topo/panneau-deviation.js';
 import { ouvrirGestionPhases } from './gestion-phases.js';
 import { autogrueDe, TONNES_MOBILES, FLECHE_MOBILE_MIN } from '../topo/grue-mobile.js';
@@ -37,13 +37,14 @@ import { PALEUR_ORTHO } from './tuiles.js';
 const OUTILS = [
   ['zone', '<path d="M4 8L12 4L20 9L17 19H6Z"/>', 'Zone'],
   ['ligne', '<path d="M3 18L9 8L15 14L21 5"/>', 'Ligne'],
-  ['piste', '<path d="M3 15L12 9L21 15M3 20L12 14L21 20"/>', 'Piste'],
   ['fleche', '<path d="M3 14H15V9L21 15L15 21V16H3Z"/>', 'Flèche'],
   ['texte', '<path d="M5 6H19M12 6V20M9 20H15"/>', 'Texte'],
   ['decaler', '<path d="M3 16L10 6L21 13"/><path d="M3 21L11 10L21 18" opacity=".55"/>', 'Décaler'],
   ['cotation', '<path d="M4 18H20M4 14V21M20 14V21"/><path d="M4 18L7 16V20ZM20 18L17 16V20Z"/>', 'Cotation'],
   ['construction', '<path d="M3 20L21 4" stroke-dasharray="3 2.5"/><path d="M12 8V16M8 12H16"/>', 'Construction'],
 ];
+/** Genre de l'élément choisi : liste déroulante (le bandeau du haut garde la même hauteur). */
+const selectGenres = (type, valeur) => `<label class="champ-calage"><span>Genre</span><select data-genre-liste="${type}">${(type === 'zone' ? CATEGORIES_ZONE : STYLES_LIGNE).map((g) => `<option value="${g.cle}" ${g.cle === valeur ? 'selected' : ''}>${echapper(g.nom)}</option>`).join('')}</select></label>`;
 const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 const TRAITS_CONSTRUCTION = [['tirets', 'Tirets'], ['continu', 'Continu'], ['points', 'Pointillé'], ['mixte', 'Tirets-points']];
 const ACCROCHES = [['point', 'Point'], ['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['perpendiculaire', 'Perpendiculaire']];
@@ -610,7 +611,7 @@ export function ouvrirPlansChantier({
     if (!avantChangement()) return;
     let champs;
     if (etat.cotationGenre === 'angle') {
-      champs = { type: 'cotation', genre: 'angle', points: pts.slice(0, 3) };
+      champs = { type: 'cotation', genre: 'angle', ordre: 'p1-s-p3', points: pts.slice(0, 3) }; // sommet = point 2
     } else {
       const [A, B, C] = pts;
       const L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
@@ -855,7 +856,8 @@ export function ouvrirPlansChantier({
       <label class="case-chantier"><input type="checkbox" data-feuille-case="barre" ${r.barre ? 'checked' : ''}> Barre d'échelle</label>
       <label class="case-chantier"><input type="checkbox" data-situation="actif" ${r.situation.actif ? 'checked' : ''}> Vue de situation (carte nationale)</label>
       ${r.situation.actif ? `<label class="champ-calage"><span>Coin</span><select data-situation="coin">${options(COINS_SITUATION, r.situation.coin)}</select></label>
-      <label class="champ-calage"><span>Échelle de la situation 1 :</span><input type="number" min="500" max="100000" step="500" value="${r.situation.echelle}" data-situation="echelle"></label>
+      <label class="case-chantier"><input type="checkbox" data-situation="auto" ${r.situation.auto ? 'checked' : ''}> Échelle automatique (la zone du plan reste bien visible)</label>
+      ${r.situation.auto ? '' : `<label class="champ-calage"><span>Échelle de la situation 1 :</span><input type="number" min="500" max="100000" step="500" value="${r.situation.echelle}" data-situation="echelle"></label>`}
       <label class="champ-calage"><span>Taille (mm, A3)</span><input type="number" min="30" max="120" step="5" value="${r.situation.taille}" data-situation="taille"></label>` : ''}
       <h3>Enregistrer</h3>
       <div class="actions-chantier"><button type="button" class="bouton" data-action="feuille-pdf">PDF</button><button type="button" class="bouton-secondaire" data-action="feuille-dxf">DXF</button></div>
@@ -1023,7 +1025,7 @@ export function ouvrirPlansChantier({
       texte: etat.attenteRepere ? 'Cliquez le point visé par la ligne de repère.' : `Cliquez où écrire le texte${etat.texteRepere ? ' (puis le point visé par la ligne de repère)' : ''}.`,
       decaler: etat.saisie?.source ? `Cliquez du côté où mettre la copie, à ${etat.distanceDecalage} m.` : (etat.decalerConstruction ? 'Cliquez le segment dont on veut une parallèle en ligne de construction (plan DXF, dessin ou autre construction).' : 'Cliquez la ligne à décaler (une ligne du plan DXF ou un élément dessiné).'),
       cotation: etat.cotationGenre === 'angle'
-        ? (n === 0 ? 'Cliquez le sommet de l\'angle.' : n === 1 ? 'Cliquez un point du 1er côté.' : 'Cliquez un point du 2e côté : l\'angle est coté.')
+        ? (n === 0 ? 'Cliquez le point 1 (sur le 1er côté).' : n === 1 ? 'Cliquez le point 2 : c\'est le sommet de l\'angle.' : 'Cliquez le point 3 (sur le 2e côté) : l\'angle 2 est coté.')
         : (n === 0 ? 'Cliquez le 1er point à coter (accroches actives).' : n === 1 ? 'Cliquez le 2e point.' : 'Cliquez où placer la ligne de cote (de quel côté et à quelle distance).'),
       construction: etat.constructionMode === 'angle'
         ? (n ? 'Tapez l\'angle de la droite puis Entrée (ou cliquez un 2e point).' : 'Cliquez un point de la droite, puis tapez son angle.')
@@ -1105,7 +1107,7 @@ export function ouvrirPlansChantier({
       const propre = {
         construction: `<label class="champ-calage"><span>Trait</span><select data-prop="trait">${TRAITS_CONSTRUCTION.map(([v, t]) => `<option value="${v}" ${(o.trait ?? 'tirets') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
           ${champCase('Droite infinie', 'prop-case', 'infinie', Boolean(o.infinie))}`,
-        zone: `${listeGenres('zone', o.categorie, 'objet', echapper)}
+        zone: `${selectGenres('zone', o.categorie)}
           <label class="champ-calage"><span>Texte de la zone (au centre)</span><input type="text" maxlength="60" value="${echapper(o.etiquette ?? '')}" placeholder="ex. Stock de sable" data-prop="etiquette"></label>
           ${champCurseur('Transparence du fond (opacité)', 'prop', 'opacite', o.opacite ?? OPACITE_ZONE)}
           ${champNombre('Épaisseur du contour', 'prop', 'contourMm', contourZoneMm(o), 0.05, 5, 0.05, 'mm')}
@@ -1116,13 +1118,14 @@ export function ouvrirPlansChantier({
           ${o.tasH > 0 ? `${champNombre('Hauteur du tas', 'prop', 'tasH', o.tasH, 0.2, 30, 0.1, 'm')}
             ${champNombre('Talus (m horizontaux pour 1 m de hauteur)', 'prop', 'tasTalus', o.tasTalus ?? TAS_TALUS, 0.3, 5, 0.1, '')}
             ${champCase('Écrire la hauteur', 'prop-case', 'afficherHauteur', o.afficherHauteur)}` : ''}`,
-        ligne: `${listeGenres('ligne', styleLigne(o.style).cle, 'objet', echapper)}
+        ligne: `${selectGenres('ligne', styleLigne(o.style).cle)}
           ${styleLigne(o.style).motif?.largeurM ? champNombre('Largeur de la bande', 'prop', 'largeurM', o.largeurM ?? styleLigne(o.style).motif.largeurM, 0.1, 20, 0.1, 'm') : champNombre('Épaisseur', 'prop', 'epaisseurMm', epaisseurLigneMm(o), 0.05, 5, 0.05, 'mm')}
           ${champNombre('Échelle du motif', 'prop', 'echelleMotif', o.echelleMotif ?? 1, 0.3, 5, 0.1, '×')}
           ${styleLigne(o.style).motif?.type === 'chevron' ? '<button type="button" class="bouton-secondaire" data-action="inverser-sens">⇄ Inverser le sens de la flèche</button>' : ''}`,
         piste: champNombre('Largeur', 'prop', 'largeur', o.largeur ?? 4, 1, 30, 0.5, 'm'),
-        cotation: o.genre === 'angle' ? champNombre('Rayon de l\'arc', 'prop', 'rayon', o.rayon ?? Math.round((geometrieCotation(o)?.arc?.[0] ? Math.hypot(geometrieCotation(o).arc[0][0] - o.points[0][0], geometrieCotation(o).arc[0][1] - o.points[0][1]) : 1) * 100) / 100, 0.1, 500, 0.1, 'm') : champNombre('Distance de la ligne de cote (+ gauche, − droite)', 'prop', 'decalage', o.decalage ?? 1, -500, 500, 0.1, 'm'),
-        texte: `<label class="champ-calage"><span>Texte</span><input type="text" value="${echapper(o.texte)}" data-prop="texte" maxlength="80"></label>
+        cotation: o.genre === 'angle' ? champNombre('Rayon de l\'arc', 'prop', 'rayon', o.rayon ?? Math.round((geometrieCotation(o)?.arc?.[0] ? Math.hypot(geometrieCotation(o).arc[0][0] - geometrieCotation(o).sommet[0], geometrieCotation(o).arc[0][1] - geometrieCotation(o).sommet[1]) : 1) * 100) / 100, 0.1, 500, 0.1, 'm') : champNombre('Distance de la ligne de cote (+ gauche, − droite)', 'prop', 'decalage', o.decalage ?? 1, -500, 500, 0.1, 'm'),
+        texte: `<label class="champ-calage"><span>Texte (Entrée = nouvelle ligne)</span><textarea data-prop="texte" maxlength="400" rows="2">${echapper(o.texte)}</textarea></label>
+          <div class="styles-lignes"><span>Style des lignes :</span>${lignesDuTexte(o.texte).map((l, i) => `<span class="style-ligne">${i + 1} <button type="button" data-style-ligne="${i}" data-s="g" class="${o.styles?.[i]?.g ? 'actif' : ''}" title="Gras" style="font-weight:800">G</button><button type="button" data-style-ligne="${i}" data-s="s" class="${o.styles?.[i]?.s ? 'actif' : ''}" title="Souligné" style="text-decoration:underline">S</button></span>`).join('')}</div>
           ${champNombre('Hauteur des lettres', 'prop', 'taille', o.taille ?? 1, 0.2, 10, 0.1, 'm')}
           ${champCase('Ligne de repère', 'prop-case', 'repere', Boolean(o.repere) || etat.attenteRepere === o.id)}
           ${o.repere ? `<label class="champ-calage"><span>Bout du repère</span><select data-prop="repereBout">
@@ -1192,6 +1195,7 @@ export function ouvrirPlansChantier({
       <span class="groupe-ordre" role="group" aria-label="Ordre de dessin">${bouton('data-ordre="devant"', '⤒', 'Premier plan')}${bouton('data-ordre="monter"', '▲', 'Un cran au-dessus')}${bouton('data-ordre="descendre"', '▼', 'Un cran en dessous')}${bouton('data-ordre="arriere"', '⤓', 'Arrière-plan')}</span>
       ${decaler}${bouton('data-action="effacer"', '✕ Effacer', 'Effacer cet élément')}
       ${propre ? `<div class="propre-element">${propre}</div>` : ''}`;
+    zone.querySelectorAll('canvas[data-vignette-pose]').forEach((c) => dessinerPose(c, Number(c.dataset.vignettePose))); // vignettes des 8 poses de l'escalier
   }
 
   /** Nom de ce qui va être posé (panneau de l'outil). */
@@ -1474,6 +1478,17 @@ export function ouvrirPlansChantier({
       enregistrer();
       return majTout();
     }
+    if (b.dataset.styleLigne !== undefined) {
+      const o = p.objets.find((x) => x.id === etat.choisi);
+      if (!o || !avantChangement()) return;
+      const i = Number(b.dataset.styleLigne);
+      const styles = [...(o.styles ?? [])];
+      styles[i] = { ...(styles[i] ?? {}), [b.dataset.s]: !styles[i]?.[b.dataset.s] };
+      o.styles = styles;
+      enregistrer();
+      majTout();
+      return vue?.redessinerDessus();
+    }
     if (b.dataset.action === 'ortho') {
       etat.ortho = !etat.ortho;
       majOutils();
@@ -1592,6 +1607,17 @@ export function ouvrirPlansChantier({
       if (etat.reglageEnCours) enregistrer();
       etat.reglageEnCours = false;
       return;
+    }
+    if (c.dataset.genreListe) {
+      const o = p.objets.find((x) => x.id === etat.choisi);
+      if (!o || !avantChangement()) return;
+      if (c.dataset.genreListe === 'zone') o.categorie = c.value;
+      else {
+        o.style = c.value;
+        delete o.epaisseurMm;
+      }
+      enregistrer();
+      return majTout();
     }
     if (c.dataset.reglage) {
       const cle = c.dataset.reglage;

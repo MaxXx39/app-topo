@@ -7,7 +7,7 @@
 import { versEcran } from '../plan/vue.js';
 import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
-  geometrieCotation, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
+  geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
 } from '../topo/plan-chantier.js';
 import { textureMateriau } from './textures.js';
 import { grueDeLObjet, symboleDeLObjetPose } from '../topo/grue-mobile.js';
@@ -24,6 +24,46 @@ function chemin(d, pts, ferme) {
     else d.ctx.moveTo(q.x, q.y);
   });
   if (ferme) d.ctx.closePath();
+}
+
+/**
+ * Plaque à plusieurs lignes (0.295.1) : styles[i] = { g (gras), s (souligné) } pour la ligne i. Renvoie { w, h } (px).
+ */
+export function plaqueMulti(ctx, lignes, x, y, h, couleurTexte, styles = []) {
+  const interligne = h * 1.25;
+  const police = (i) => `${styles[i]?.g ? 800 : 500} ${h}px system-ui, sans-serif`;
+  let largeur = 0;
+  lignes.forEach((l, i) => {
+    ctx.font = police(i);
+    largeur = Math.max(largeur, ctx.measureText(l).width);
+  });
+  const w = largeur + h * 0.7;
+  const H = lignes.length * interligne + h * 0.4;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.strokeStyle = 'rgba(43,52,64,0.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, y - H / 2, w, H, h * 0.35);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = couleurTexte;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  lignes.forEach((l, i) => {
+    const yy = y - H / 2 + h * 0.2 + interligne * (i + 0.5);
+    ctx.font = police(i);
+    ctx.fillText(l, x, yy);
+    if (styles[i]?.s) {
+      const lw = ctx.measureText(l).width;
+      ctx.strokeStyle = couleurTexte;
+      ctx.lineWidth = Math.max(1, h * 0.07);
+      ctx.beginPath();
+      ctx.moveTo(x - lw / 2, yy + h * 0.48);
+      ctx.lineTo(x + lw / 2, yy + h * 0.48);
+      ctx.stroke();
+    }
+  });
+  return { w, h: H };
 }
 
 /** Plaque blanche arrondie avec un texte centré en (x, y) (texte de plan, surface d'une zone). */
@@ -278,7 +318,8 @@ export function dessinerObjet(d, o) {
   } else if (o.type === 'texte') {
     const q = ecran(o.point);
     const h = Math.max(9, (o.taille ?? 1) * e);
-    const { w, h: hauteur } = plaque(ctx, o.texte, q.x, q.y, h, 600, couleur);
+    const lignesTxt = lignesDuTexte(o.texte);
+    const { w, h: hauteur } = (lignesTxt.length > 1 || o.styles?.some((x) => x?.g || x?.s)) ? plaqueMulti(ctx, lignesTxt, q.x, q.y, h, couleur, o.styles ?? []) : plaque(ctx, o.texte, q.x, q.y, h, 600, couleur);
     if (o.repere) dessinerRepere(d, o, q, w, hauteur);
   }
 }
