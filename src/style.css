@@ -14822,3 +14822,67 @@ dialog.page-chantier[open] {
 /* 0.299.0 : Plans de chantier, couleur des hachures d'une zone (carré de couleur + ↺). */
 .ligne-couleur-hachure { display: flex; align-items: center; gap: 6px; }
 .page-chantier .ligne-couleur-hachure input[type='color'] { width: 40px; min-width: 40px; height: 28px; padding: 0; border: 1px solid var(--bordure); border-radius: 6px; background: none; }
+
+/* ==========================================================================
+   0.300.0 : application Plateformes (Expert, site PC et Topo Bureau) : même allure que Plans de chantier, liseré violet.
+   ========================================================================== */
+dialog.page-plateformes[open] {
+  position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column;
+  width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: none;
+  background: var(--fond); color: var(--encre);
+}
+.entete-plateformes { border-bottom-color: #6d28d9; }
+.puce-plateformes { background: #6d28d9; }
+.page-plateformes .outil-ruban svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.page-plateformes .outil-ruban.actif { background: color-mix(in srgb, #6d28d9 14%, var(--surface)); border-color: #6d28d9; color: #6d28d9; }
+.page-plateformes .ruban-plateformes { align-items: center; gap: 2px; }
+.page-plateformes .ruban-plateformes .groupe-ruban { padding: 2px 5px; }
+.page-plateformes .ruban-plateformes .outil-ruban { padding: 2px 5px; min-width: 42px; height: 42px; }
+.champ-alt-suivante { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--gris); padding: 0 6px; }
+.champ-alt-suivante input { width: 84px; padding: 4px 6px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); font: inherit; text-align: right; }
+.bandeau-plateforme { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 5px 10px; background: #f5f3ff; border-bottom: 2px solid #6d28d9; border-radius: 8px 8px 0 0; font-size: 0.85rem; }
+body.theme-sombre .bandeau-plateforme { background: #241b3a; }
+.bandeau-plateforme label { display: flex; align-items: center; gap: 4px; }
+.bandeau-plateforme input[type='text'] { width: 140px; padding: 3px 6px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); font: inherit; }
+.bandeau-plateforme input[type='color'] { width: 34px; height: 26px; padding: 0; border: 1px solid var(--bordure); border-radius: 6px; }
+.bandeau-plateforme .alerte, .panneau-plateformes .alerte { color: var(--rouge); }
+.travail-plateformes { flex: 1 1 auto; min-height: 0; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) 300px; }
+@media (max-width: 900px) { .travail-plateformes { grid-template-columns: minmax(0, 1fr); } }
+.gauche-plateformes { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
+.vue-plateformes { flex: 1 1 60%; min-height: 260px; }
+.toile-plateformes { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #ffffff; cursor: crosshair; touch-action: none; }
+.toile-plateformes canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tableau-plateforme { flex: 0 1 40%; min-height: 150px; overflow: hidden; }
+.cadre-tableau-plateforme { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.table-plateforme { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+.table-plateforme th, .table-plateforme td { padding: 2px 6px; border-bottom: 1px solid var(--bordure); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.table-plateforme th:first-child, .table-plateforme td:first-child { text-align: left; }
+.table-plateforme th { position: sticky; top: 0; background: var(--surface); color: var(--gris); font-weight: 600; font-size: 0.75rem; z-index: 1; }
+.table-plateforme .groupe-cote { text-align: center; color: #92400e; border-bottom: 1px solid #92400e; }
+.table-plateforme .centre { text-align: center; }
+.table-plateforme .sep { border-left: 1px solid var(--bordure); }
+.table-plateforme input[type='text'] { width: 84px; padding: 2px 5px; border: 1px solid var(--bordure); border-radius: 5px; background: var(--surface); color: var(--encre); font: inherit; text-align: right; }
+.table-plateforme input.hv, .panneau-plateformes input.hv { width: 56px; }
+.table-plateforme input.calc { font-style: italic; color: var(--gris); }
+.table-plateforme tr.ligne-point td:first-child { font-weight: 700; }
+.table-plateforme tr.ligne-cote td { background: color-mix(in srgb, #92400e 5%, var(--surface)); font-size: 0.8rem; }
+.table-plateforme tr.ligne-cote td:first-child { padding-left: 20px; color: var(--gris); }
+.table-plateforme tr.interieur td { color: var(--gris); }
+.table-plateforme tr.choisi td { background: color-mix(in srgb, #6d28d9 14%, var(--surface)); }
+.bouton-lien { border: none; background: none; cursor: pointer; color: var(--gris); font-size: 1rem; padding: 0 2px; }
+.bouton-lien.detache { color: var(--rouge); }
+.panneau-plateformes { overflow-y: auto; }
+.panneau-plateformes h3 { margin: 4px 0 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gris); }
+.panneau-plateformes select, .panneau-plateformes input[type='text'] { padding: 4px 6px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); font: inherit; }
+.liste-plateformes { display: flex; flex-direction: column; gap: 2px; }
+.liste-plateformes button { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid transparent; border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 0.88rem; text-align: left; cursor: pointer; }
+.liste-plateformes button.actif { border-color: #6d28d9; background: color-mix(in srgb, #6d28d9 10%, var(--surface)); font-weight: 600; }
+.liste-plateformes i { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.liste-plateformes small { margin-left: auto; color: var(--gris); }
+.grille-berme { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; font-size: 0.85rem; }
+.resume-volume { margin: 0; }
+.resume-volume .deblai { color: #b45309; font-weight: 700; }
+.resume-volume .remblai { color: #15803d; font-weight: 700; }
+.ligne-dz { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.contenu-plateformes { padding-bottom: 10px; }
+.toile-plateformes:focus { outline: none; }

@@ -42,6 +42,7 @@ import { calculsDUnAncienProjet } from '../volumes/calculs.js';
 import { typesVersSousDossiers } from '../topo/sous-dossiers.js';
 import { TOLERANCES_PAR_DEFAUT } from '../topo/controle.js';
 import { retirerMetreEtRecollement } from './retrait-metre-recollement.js';
+import { retirerDessins } from './retrait-dessins.js';
 import { centreDuProjet } from '../topo/centre-projet.js';
 
 export const FORMAT = 'topo-projet';
@@ -78,6 +79,8 @@ export function creerProjet(nom = '') {
     tolerancesControle: structuredClone(TOLERANCES_PAR_DEFAUT),
     controles: [],
     dessins: [],
+    plateformes: [],                // Plateformes (0.300.0, voir topo/plateforme.js)
+    constructionsPlateformes: [],   // lignes de construction 2D des Plateformes [[e1, n1, e2, n2]]
     couleursListes: {},
     canalisations: [],              // réseaux (0.235.0, application Réseaux) : voir topo/reseau.js
     plansChantier: [],              // plans de chantier (0.286.0) : voir topo/plan-chantier.js
@@ -187,6 +190,10 @@ export function completerProjet(projet) {
   complet.tolerancesControle ??= structuredClone(TOLERANCES_PAR_DEFAUT);
   complet.controles ??= [];
   complet.dessins ??= [];
+  // 0.300.0 : Calculs › Dessin supprimé (remplacé par Plateformes) : les dessins et leurs surfaces sont retirés.
+  retirerDessins(complet);
+  complet.plateformes ??= []; // Plateformes (0.300.0, topo/plateforme.js)
+  complet.constructionsPlateformes ??= [];
   complet.couleursListes ??= {}; // couleur choisie par liste de points (id → « #2563eb »)
   // 0.251.0 : le « type » d'un plan DXF devient un sous-dossier du même nom.
   typesVersSousDossiers(complet);

@@ -73,6 +73,7 @@ import { ouvrirMateriel as ouvrirPageMateriel } from './materiel/appli.js';
 import { ouvrirCalage as ouvrirPageCalage } from './calage/appli.js';
 import { ouvrirComparateur as ouvrirPageComparateur } from './comparateur/appli.js';
 import { ouvrirPlansChantier as ouvrirPagePlansChantier } from './plans-chantier/appli.js';
+import { ouvrirPlateformes as ouvrirPagePlateformes } from './plateformes/appli.js';
 import { bulle, installerAide } from './aide/bulles.js';
 import { creerEcranLeve, mettreAJourBandeaux, LONGUEURS_COUPE, EXAGERATIONS_COUPE, ACCROCHES } from './leve/ecran.js';
 import { creerEncartPlan } from './plan/encart.js';
@@ -369,7 +370,7 @@ const ajoutLevee = { actif: false, accroche: 'point', choix: null };
 // Terrain › Lever ; son panneau reste caché (l'éditeur garde le levé affiché et les triangles en trop).
 const PARTIES_CALCULS = [
   ['volumes', 'Volumes'],
-  ['dessin', 'Dessin'],
+  ['dessin', 'DAO'], // 0.300.0 : la liste « Dessin » est supprimée (Plateformes) ; restent la DAO et les talus de surface
 ];
 const boutonPartie = ([cle, titre]) => `<button type="button" data-partie="${cle}">${titre}</button>`;
 const estPartieCalculs = (nom) => PARTIES_CALCULS.some(([cle]) => cle === nom);
@@ -415,9 +416,9 @@ document.querySelector('#app').innerHTML = `
         <div id="mesures"></div>
       </section>
       <section class="panneau" data-onglet="dessin">
-        <h2>Dessin ${bulle('dessin')}</h2>
+        <h2>DAO ${bulle('dessin')}</h2>
         <button type="button" class="bouton seulement-expert bouton-dao" id="bouton-dao">DAO : dessiner sur le plan</button>
-        <div id="dessins"></div>
+        <div id="dessins" hidden></div><!-- 0.300.0 : Dessin supprimé (remplacé par Plateformes), gardé caché -->
         <div id="talus-surfaces" class="carte-section"></div>
       </section>
       <section class="panneau" data-onglet="mesure-rapide">
@@ -1731,6 +1732,7 @@ function ouvrirAppli(cle, sous = null, depuisMenu = false) {
   else if (cle === 'calage') ouvrirCalage();
   else if (cle === 'comparer') ouvrirComparateur();
   else if (cle === 'plans-chantier') ouvrirPlansChantier();
+  else if (cle === 'plateformes') ouvrirPlateformes();
   else if (cle === 'recepteur') document.dispatchEvent(new CustomEvent('ouvrir-recepteur', { detail: { retourMenu: depuisMenu } }));
   if (sous && cle !== 'calculs') {
     // L'écran vient d'être dessiné : on touche sa sous-application (au besoin à l'image suivante).
@@ -2087,12 +2089,34 @@ function ouvrirPlansChantier() {
       ...projet.leves.filter((l) => estMontre(projet, l, 'leve')).map((l) => ({ id: l.id, nom: l.nom, points: l.points })),
       { id: '__implanter', nom: 'À implanter', points: projet.aImplanter },
       { id: '__controle', nom: 'Points de contrôle', points: projet.pointsControle },
-      { id: '__dessins', nom: 'Sommets des dessins', points: pointsDesDessins() },
     ].filter((l) => l.points?.length),
     // 0.289.0 : surfaces du projet en fond (bords des triangles), enregistrer le PDF / DXF, auteur du cartouche.
     surfaces: () => projet.surfaces.filter((s) => estMontre(projet, s, 'surface')).map((s) => ({ id: s.id, nom: s.nom, triangles: trianglesDeSurface(s.id) })).filter((s) => s.triangles.length > 0),
     enregistrer: enregistrerFichier,
     auteur: () => appareilDuJournal().utilisateur || appareilDuJournal().nom || '',
+    lectureSeule: () => lectureSeule(),
+    quandRetour: () => navigation.ouvrirPage(),
+    message: (texte, duree, options) => afficherMessage(texte, duree, options),
+  });
+}
+
+/**
+ * Plateformes (0.300.0, Expert, site et Topo Bureau) : page plein écran à part (plateformes/appli.js) ; les plateformes
+ * sont rangées dans projet.plateformes et deviennent des surfaces du projet (type 'plateforme', mises à jour par la page).
+ */
+function ouvrirPlateformes() {
+  fenetreReglages?.fermer?.();
+  navigation?.fermer();
+  ouvrirPagePlateformes({
+    projet: () => projet,
+    modifie: () => {
+      modifie();
+      editeurSurfaces.charger(projet.surfaces, { garderPosition: true });
+    },
+    plans: () => plansDuProjet(),
+    points: () => pointsDuProjet(),
+    surfaces: () => projet.surfaces.filter((s) => s.type !== 'plateforme' && trianglesDeSurface(s.id).length > 0).map((s) => ({ id: s.id, nom: s.nom })),
+    trianglesDeSurface: (id) => trianglesDeSurface(id),
     lectureSeule: () => lectureSeule(),
     quandRetour: () => navigation.ouvrirPage(),
     message: (texte, duree, options) => afficherMessage(texte, duree, options),

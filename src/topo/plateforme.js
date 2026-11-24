@@ -1,0 +1,495 @@
+// Plateformes (0.300.0, Expert, décisions du 24.11, maquette validée) : surfaces 3D dessinées dans Topo, avec talus.
+// Ici les calculs, sans écran (page : src/plateformes/appli.js).
+//
+// projet.plateformes = [{ id, nom, lettre ('A', 'B'…), couleur, creeLe,
+//   sommets: [{ nom ('A-1'), est, nord, alt (m ou null), calc (vrai = altitude calculée : interpolée ou par une pente),
+//              lien { id (plateforme), nom (son sommet) } (angle partagé avec une autre plateforme), detache (vrai =
+//              même position que l'angle lié mais altitude propre : une marche) }],
+//   interieurs: [{ nom, est, nord, alt, calc }] (points intérieurs isolés),
+//   ruptures: [[nomA, nomB]] (lignes de rupture, entre deux points EXISTANTS de la plateforme),
+//   talus: { [nom du sommet de départ du côté]: { on, deb: 'H:V', rem: 'H:V' } } (talus du côté vers le sommet suivant),
+//   terrainId (surface de référence du talus), berme: { on, hauteur (m), largeur (m), deb, rem } }]
+// projet.constructionsPlateformes = [[e1, n1, e2, n2]] : lignes de construction 2D (accroche seulement).
+//
+// Conventions (décidées par l'utilisateur) :
+//  - pente d'un côté en % = (altitude du sommet suivant − altitude du sommet) / longueur en plan × 100, dans l'ordre du
+//    contour : −2 % = descend du 1er point vers le suivant ;
+//  - talus en H:V (« 3:2 » = 3 m en plan pour 2 m de haut), un pour le déblai et un pour le remblai : le côté prend l'un
+//    ou l'autre selon que la plateforme est au-dessous ou au-dessus de la surface de référence ;
+//  - berme plate : talus ① (pente du côté) jusqu'à « hauteur » sous / sur le bord, berme de « largeur », puis talus ③.
+// Coordonnées MN95 (m).
+
+export const TALUS_DEFAUT = { on: true, deb: '3:2', rem: '2:1' };
+export const BERME_DEFAUT = { on: false, hauteur: 3, largeur: 2, deb: '3:2', rem: '2:1' };
+export const COULEURS_PLATEFORMES = ['#6d28d9', '#0e7490', '#b45309', '#15803d', '#be123c', '#1d4ed8', '#a16207', '#475569'];
+
+/** Lettre suivante libre : A, B… Z, AA, AB… */
+export function lettreSuivante(plateformes) {
+  const prises = new Set(plateformes.map((p) => p.lettre));
+  for (let i = 0; i < 702; i += 1) {
+    const l = i < 26 ? String.fromCharCode(65 + i) : String.fromCharCode(64 + Math.floor(i / 26)) + String.fromCharCode(65 + (i % 26));
+    if (!prises.has(l)) return l;
+  }
+  return `P${plateformes.length + 1}`;
+}
+
+/** Nom libre suivant d'un point de la plateforme : « A-1 », « A-2 »… (numéros pris par ses sommets et points intérieurs). */
+export function prochainNom(pf) {
+  let max = 0;
+  for (const s of [...pf.sommets, ...pf.interieurs]) {
+    const m = String(s.nom).match(new RegExp(`^${pf.lettre}-(\\d+)$`));
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return `${pf.lettre}-${max + 1}`;
+}
+
+/** Nouvelle plateforme (sans sommet). */
+export function nouvellePlateforme(plateformes, id, maintenant = new Date().toISOString()) {
+  const lettre = lettreSuivante(plateformes);
+  return {
+    id, nom: `Plateforme ${lettre}`, lettre, couleur: COULEURS_PLATEFORMES[plateformes.length % COULEURS_PLATEFORMES.length], creeLe: maintenant,
+    sommets: [], interieurs: [], ruptures: [], talus: {}, terrainId: null, berme: { ...BERME_DEFAUT },
+  };
+}
+
+/** « 3:2 » → { horizontal: 3, vertical: 2 } (aussi « 3/2 », « 1.5 » = 1.5:1), ou null. */
+export function lireHV(texte) {
+  const t = String(texte ?? '').replace(',', '.').trim();
+  const m = t.match(/^(\d+(?:\.\d+)?)\s*[:/]\s*(\d+(?:\.\d+)?)$/);
+  if (m) return Number(m[1]) > 0 && Number(m[2]) > 0 ? { horizontal: Number(m[1]), vertical: Number(m[2]) } : null;
+  const v = Number(t);
+  return v > 0 ? { horizontal: v, vertical: 1 } : null;
+}
+
+const parId = (plateformes, id) => plateformes.find((p) => p.id === id) ?? null;
+
+/** Sommet source d'un sommet lié (en suivant les liens, 5 au plus), ou le sommet lui-même. */
+function sommetSource(plateformes, s, profondeur = 0) {
+  if (!s.lien || profondeur > 5) return s;
+  const q = parId(plateformes, s.lien.id)?.sommets.find((x) => x.nom === s.lien.nom);
+  return q ? sommetSource(plateformes, q, profondeur + 1) : s;
+}
+
+/**
+ * Sommets d'une plateforme avec la position (et l'altitude, sauf détaché) des angles liés :
+ * [{ nom, est, nord, alt, calc, lie, detache }].
+ */
+export function sommetsResolus(pf, plateformes) {
+  return pf.sommets.map((s) => {
+    const src = sommetSource(plateformes, s);
+    const lie = src !== s;
+    return { nom: s.nom, est: src.est, nord: src.nord, alt: lie && !s.detache ? src.alt : s.alt, calc: lie && !s.detache ? src.calc : s.calc, lie, detache: Boolean(s.detache) };
+  });
+}
+
+/** Plateformes accrochées à celle-ci (par des angles liés, dans les deux sens, de proche en proche), elle comprise. */
+export function plateformesAccrochees(plateformes, id) {
+  const voisins = new Map(plateformes.map((p) => [p.id, new Set()]));
+  for (const p of plateformes) {
+    for (const s of p.sommets) {
+      if (s.lien && voisins.has(s.lien.id)) {
+        voisins.get(p.id).add(s.lien.id);
+        voisins.get(s.lien.id).add(p.id);
+      }
+    }
+  }
+  const vus = new Set([id]);
+  const pile = [id];
+  while (pile.length) for (const v of voisins.get(pile.pop()) ?? []) if (!vus.has(v)) vus.add(v), pile.push(v);
+  return vus;
+}
+
+/**
+ * Change l'altitude d'un point (sommet ou point intérieur) de la plateforme. Un angle lié non détaché change l'angle
+ * source (donc toutes les plateformes qui le partagent). calc : vrai pour une altitude calculée.
+ */
+export function changerAltitude(plateformes, pf, nom, alt, calc = false) {
+  const valeur = alt == null || !Number.isFinite(alt) ? null : Math.round(alt * 1000) / 1000;
+  const s = pf.sommets.find((x) => x.nom === nom) ?? pf.interieurs.find((x) => x.nom === nom);
+  if (!s) return;
+  const cible = s.lien && !s.detache ? sommetSource(plateformes, s) : s;
+  cible.alt = valeur;
+  cible.calc = valeur == null ? false : Boolean(calc);
+}
+
+/** Longueur en plan (m). */
+const longueurPlan = (a, b) => Math.hypot(b.est - a.est, b.nord - a.nord);
+
+/** Pente (%) du côté i (du sommet i au suivant), ou null si une altitude manque. */
+export function penteCote(sommets, i) {
+  const a = sommets[i];
+  const b = sommets[(i + 1) % sommets.length];
+  const l = longueurPlan(a, b);
+  if (a.alt == null || b.alt == null || l < 1e-9) return null;
+  return ((b.alt - a.alt) / l) * 100;
+}
+
+/** Altitude du sommet suivant pour une pente (%) tapée sur le côté i : alt(i) + pente / 100 × longueur, ou null. */
+export function altitudeParPente(sommets, i, pente) {
+  const a = sommets[i];
+  const b = sommets[(i + 1) % sommets.length];
+  if (a.alt == null || !Number.isFinite(pente)) return null;
+  return a.alt + (pente / 100) * longueurPlan(a, b);
+}
+
+/**
+ * Altitudes interpolées des sommets sans altitude, le long du contour, selon la longueur entre les deux sommets connus
+ * (non calculés) qui les entourent. Renvoie [{ nom, alt }] (seulement ceux qu'on peut remplir).
+ */
+export function interpolerContour(sommets) {
+  const n = sommets.length;
+  const connu = (i) => sommets[i].alt != null && !sommets[i].calc;
+  if (sommets.filter((s, i) => connu(i)).length < 1) return [];
+  const res = [];
+  for (let i = 0; i < n; i += 1) {
+    if (connu(i)) continue;
+    // Avant : on recule jusqu'à un sommet connu ; après : on avance.
+    let a = i;
+    let da = 0;
+    for (let k = 0; k < n; k += 1) {
+      const p = (a - 1 + n) % n;
+      da += longueurPlan(sommets[p], sommets[a]);
+      a = p;
+      if (connu(a)) break;
+    }
+    let b = i;
+    let db = 0;
+    for (let k = 0; k < n; k += 1) {
+      const q = (b + 1) % n;
+      db += longueurPlan(sommets[b], sommets[q]);
+      b = q;
+      if (connu(b)) break;
+    }
+    if (!connu(a) || !connu(b)) continue;
+    const t = da + db > 1e-9 ? da / (da + db) : 0.5;
+    res.push({ nom: sommets[i].nom, alt: sommets[a].alt + (sommets[b].alt - sommets[a].alt) * t });
+  }
+  return res;
+}
+
+/** Identité d'un sommet (pour reconnaître un côté partagé) : « id de la plateforme source | nom ». */
+function identite(plateformes, pf, s) {
+  if (!s.lien) return `${pf.id}|${s.nom}`;
+  const src = sommetSource(plateformes, s);
+  const proprio = plateformes.find((p) => p.sommets.includes(src));
+  return `${proprio?.id ?? s.lien.id}|${src.nom}`;
+}
+
+/** Vrai si le côté i de la plateforme est aussi un côté d'une autre plateforme (accrochée) : pas de talus. */
+export function cotePartage(plateformes, pf, i) {
+  const n = pf.sommets.length;
+  const a = identite(plateformes, pf, pf.sommets[i]);
+  const b = identite(plateformes, pf, pf.sommets[(i + 1) % n]);
+  return plateformes.some((q) => q !== pf && q.sommets.some((s, k) => {
+    const x = identite(plateformes, q, s);
+    const y = identite(plateformes, q, q.sommets[(k + 1) % q.sommets.length]);
+    return (x === a && y === b) || (x === b && y === a);
+  }));
+}
+
+/**
+ * Ajoute un point au milieu du côté i de la plateforme (petit « + ») : altitude = moyenne des deux voisins (calculée).
+ * Si le côté est partagé, l'autre plateforme reçoit le même point (lié). Renvoie le nom du point.
+ */
+export function ajouterPointMilieu(plateformes, pf, i) {
+  const res = sommetsResolus(pf, plateformes);
+  const n = res.length;
+  const a = res[i];
+  const b = res[(i + 1) % n];
+  const nom = prochainNom(pf);
+  const ida = identite(plateformes, pf, pf.sommets[i]);
+  const idb = identite(plateformes, pf, pf.sommets[(i + 1) % n]);
+  const alt = a.alt != null && b.alt != null ? (a.alt + b.alt) / 2 : null;
+  const m = (v) => Math.round(v * 1000) / 1000;
+  pf.sommets.splice(i + 1, 0, { nom, est: m((a.est + b.est) / 2), nord: m((a.nord + b.nord) / 2), alt: alt == null ? null : m(alt), calc: alt != null });
+  pf.talus[nom] = { ...(pf.talus[pf.sommets[i].nom] ?? TALUS_DEFAUT) };
+  for (const q of plateformes) {
+    if (q === pf) continue;
+    const k = q.sommets.findIndex((s, j) => {
+      const x = identite(plateformes, q, s);
+      const y = identite(plateformes, q, q.sommets[(j + 1) % q.sommets.length]);
+      return (x === ida && y === idb) || (x === idb && y === ida);
+    });
+    if (k < 0) continue;
+    q.sommets.splice(k + 1, 0, { nom, est: pf.sommets[i + 1].est, nord: pf.sommets[i + 1].nord, alt: null, calc: false, lien: { id: pf.id, nom } });
+    q.talus[nom] = { ...(q.talus[q.sommets[k].nom] ?? TALUS_DEFAUT) };
+  }
+  return nom;
+}
+
+/** Δ Z : ajoute dz à toutes les altitudes de la plateforme (et des plateformes accrochées si « avecAccrochees »). */
+export function appliquerDeltaZ(plateformes, id, dz, avecAccrochees = false) {
+  const ids = avecAccrochees ? plateformesAccrochees(plateformes, id) : new Set([id]);
+  const faits = new Set();
+  for (const pf of plateformes) {
+    if (!ids.has(pf.id)) continue;
+    for (const s of [...pf.sommets, ...pf.interieurs]) {
+      // Un angle lié non détaché bouge avec sa source (une seule fois, même partagé par plusieurs plateformes).
+      const cible = s.lien && !s.detache ? sommetSource(plateformes, s) : s;
+      if (faits.has(cible) || cible.alt == null) continue;
+      faits.add(cible);
+      cible.alt = Math.round((cible.alt + dz) * 1000) / 1000;
+    }
+  }
+}
+
+// --- Triangles de la plateforme ---
+
+/** Vrai si (x, y) est dans le polygone [{ est, nord }] (pair-impair). */
+function dedans(x, y, poly) {
+  let r = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+    const a = poly[i];
+    const b = poly[j];
+    if ((a.nord > y) !== (b.nord > y) && x < ((b.est - a.est) * (y - a.nord)) / (b.nord - a.nord) + a.est) r = !r;
+  }
+  return r;
+}
+
+/**
+ * Triangles de la plateforme (contour + points intérieurs + lignes de rupture imposées). « trianguler » =
+ * trianglerAvecContraintes (topo/volume.js, passé pour garder ce fichier sans dépendance lourde).
+ * Renvoie { triangles: [[p, q, r]] (points { nom, est, nord, altitude }) } ou { erreur }.
+ */
+export function trianglesPlateforme(pf, plateformes, trianguler) {
+  const sommets = sommetsResolus(pf, plateformes);
+  if (sommets.length < 3) return { erreur: 'il faut au moins 3 angles' };
+  const tous = [...sommets, ...pf.interieurs];
+  const manque = tous.filter((p) => p.alt == null).map((p) => p.nom);
+  if (manque.length) return { erreur: `altitude manquante : ${manque.slice(0, 6).join(', ')}${manque.length > 6 ? '…' : ''}` };
+  const parNom = new Map(tous.map((p) => [p.nom, { nom: p.nom, est: p.est, nord: p.nord, altitude: p.alt }]));
+  const noms = [...parNom.keys()];
+  const segments = [];
+  for (let i = 0; i < sommets.length; i += 1) segments.push([sommets[i].nom, sommets[(i + 1) % sommets.length].nom]);
+  for (const [a, b] of pf.ruptures) if (parNom.has(a) && parNom.has(b)) segments.push([a, b]);
+  const r = trianguler(noms, segments, parNom);
+  if (r.erreurs) return { erreur: r.erreurs[0] };
+  const triangles = r.triangles.filter((t) => dedans((t[0].est + t[1].est + t[2].est) / 3, (t[0].nord + t[1].nord + t[2].nord) / 3, sommets));
+  return { triangles };
+}
+
+// --- Talus (avec berme) ---
+
+/**
+ * Altitude du talus à d m du bord (profil) : nature 'remblai' (descend) ou 'deblai' (monte) ; p1 = talus ① { horizontal,
+ * vertical }, berme = { hauteur, largeur, p3 } ou null. Renvoie { z, partie (1, 'berme', 3) }.
+ */
+export function profilTalus(zBord, d, nature, p1, berme = null) {
+  const sens = nature === 'remblai' ? -1 : 1;
+  const r1 = p1.vertical / p1.horizontal;
+  if (!berme) return { z: zBord + sens * d * r1, partie: 1 };
+  const d1 = berme.hauteur / r1;
+  if (d <= d1) return { z: zBord + sens * d * r1, partie: 1 };
+  if (d <= d1 + berme.largeur) return { z: zBord + sens * berme.hauteur, partie: 'berme' };
+  const r3 = berme.p3.vertical / berme.p3.horizontal;
+  return { z: zBord + sens * (berme.hauteur + (d - d1 - berme.largeur) * r3), partie: 3 };
+}
+
+/** Première distance (m) où le profil rencontre le terrain en partant de p dans la direction u (longueur 1), ou null. */
+function entreeProfil(p, u, zBord, nature, p1, berme, altitudeTerrain, distanceMax) {
+  const ecart = (d) => {
+    const t = altitudeTerrain(p.est + u.est * d, p.nord + u.nord * d);
+    return t == null ? null : profilTalus(zBord, d, nature, p1, berme).z - t;
+  };
+  const PAS = 0.25;
+  let avant = ecart(0);
+  let dAvant = 0;
+  if (avant === 0) return 0;
+  for (let d = PAS; d <= distanceMax + 1e-9; d += PAS) {
+    const v = ecart(d);
+    if (v == null) {
+      avant = null;
+      continue;
+    }
+    if (avant != null && Math.sign(v) !== Math.sign(avant)) {
+      let [a, b, va] = [dAvant, d, avant];
+      while (b - a > 0.0005) {
+        const m = (a + b) / 2;
+        const vm = ecart(m);
+        if (vm == null) break;
+        if (Math.sign(vm) === Math.sign(va)) [a, va] = [m, vm];
+        else b = m;
+      }
+      return (a + b) / 2;
+    }
+    avant = v;
+    dAvant = d;
+  }
+  return null;
+}
+
+/**
+ * Talus d'une plateforme jusqu'à la surface de référence, côté par côté.
+ * - sommets : sommetsResolus (altitudes connues) ;
+ * - reglageCote(i) → { pentes: { deblai, remblai } ({ horizontal, vertical }) } ou null (pas de talus sur ce côté) ;
+ * - berme : { hauteur, largeur, p3: { deblai, remblai } } ou null ;
+ * - altitudeTerrain(est, nord) → m ou null.
+ * Renvoie { colonnes: [{ points: [{ est, nord, altitude }…] (du bord à l'entrée en terre, avec les 2 bords de la berme
+ *   s'il y en a), nature, chaine (n° de suite continue), sommet (n° de l'angle ou null) }], erreurs: [texte] }.
+ */
+export function talusPlateforme(sommets, reglageCote, berme, altitudeTerrain, { pas = 1, distanceMax = 200 } = {}) {
+  const n = sommets.length;
+  const erreurs = [];
+  const colonnes = [];
+  if (n < 3 || sommets.some((s) => s.alt == null)) return { colonnes, erreurs: ['altitudes de la plateforme incomplètes'] };
+  let aire = 0;
+  for (let i = 0; i < n; i += 1) aire += sommets[i].est * sommets[(i + 1) % n].nord - sommets[(i + 1) % n].est * sommets[i].nord;
+  const signe = aire >= 0 ? 1 : -1;
+  const normale = (a, b) => {
+    const l = longueurPlan(a, b) || 1;
+    return { est: ((b.nord - a.nord) / l) * signe, nord: (-(b.est - a.est) / l) * signe };
+  };
+  const normales = sommets.map((a, i) => normale(a, sommets[(i + 1) % n]));
+  const reglages = sommets.map((_, i) => reglageCote(i));
+  let chaine = 0;
+
+  const colonne = (p, zBord, dir, pentes, sommet) => {
+    const t = altitudeTerrain(p.est, p.nord);
+    if (t == null) {
+      erreurs.push(`surface de référence absente sous E ${p.est.toFixed(1)} N ${p.nord.toFixed(1)}`);
+      return null;
+    }
+    const nature = zBord - t >= 0 ? 'remblai' : 'deblai';
+    const p1 = pentes[nature];
+    const b = berme ? { hauteur: berme.hauteur, largeur: berme.largeur, p3: berme.p3[nature] } : null;
+    const lu = Math.hypot(dir.est, dir.nord) || 1;
+    const u = { est: dir.est / lu, nord: dir.nord / lu };
+    // Le long d'une arête (angle), la distance en plan est plus longue : on garde le profil vu sur la normale.
+    const facteur = lu;
+    const terrainLe = (e, nn) => altitudeTerrain(e, nn);
+    const dPlan = Math.abs(zBord - t) < 1e-6 ? 0 : entreeProfil(p, u, zBord, nature, { horizontal: p1.horizontal * facteur, vertical: p1.vertical }, b ? { ...b, largeur: b.largeur * facteur, p3: { horizontal: b.p3.horizontal * facteur, vertical: b.p3.vertical } } : null, terrainLe, distanceMax * facteur);
+    if (dPlan == null) {
+      erreurs.push(`pas d'entrée en terre à moins de ${distanceMax} m (E ${p.est.toFixed(1)} N ${p.nord.toFixed(1)})`);
+      return null;
+    }
+    const pts = [{ est: p.est, nord: p.nord, altitude: zBord }];
+    if (b) {
+      const r1 = p1.vertical / (p1.horizontal * facteur);
+      const d1 = b.hauteur / r1;
+      const sens = nature === 'remblai' ? -1 : 1;
+      if (dPlan > d1 + 1e-6) {
+        pts.push({ est: p.est + u.est * d1, nord: p.nord + u.nord * d1, altitude: zBord + sens * b.hauteur });
+        const d2 = Math.min(dPlan, d1 + b.largeur * facteur);
+        if (d2 > d1 + 1e-6) pts.push({ est: p.est + u.est * d2, nord: p.nord + u.nord * d2, altitude: zBord + sens * b.hauteur });
+      }
+    }
+    if (dPlan > 1e-6) {
+      const fin = profilTalus(zBord, dPlan, nature, { horizontal: p1.horizontal * facteur, vertical: p1.vertical }, b ? { ...b, largeur: b.largeur * facteur, p3: { horizontal: b.p3.horizontal * facteur, vertical: b.p3.vertical } } : null);
+      const dernier = pts.at(-1);
+      if (Math.hypot(dernier.est - (p.est + u.est * dPlan), dernier.nord - (p.nord + u.nord * dPlan)) > 1e-6) pts.push({ est: p.est + u.est * dPlan, nord: p.nord + u.nord * dPlan, altitude: fin.z });
+    }
+    return { points: pts, nature, sommet };
+  };
+
+  for (let k = 0; k < n; k += 1) {
+    const a = sommets[k];
+    const b = sommets[(k + 1) % n];
+    const avant = reglages[(k + n - 1) % n];
+    const ici = reglages[k];
+    // Angle k : colonne sur l'arête (bissectrice) si les deux côtés ont un talus ; sur la normale du côté qui en a un sinon.
+    // (Angle 0 sans talus après lui : sa colonne est ajoutée à la fin, avec le dernier côté.)
+    if ((avant || ici) && !(k === 0 && avant && !ici)) {
+      let dir;
+      if (avant && ici) {
+        const n1 = normales[(k + n - 1) % n];
+        const n2 = normales[k];
+        const produit = 1 + n1.est * n2.est + n1.nord * n2.nord;
+        dir = produit > 1e-6 ? { est: (n1.est + n2.est) / produit, nord: (n1.nord + n2.nord) / produit } : n2;
+      } else dir = ici ? normales[k] : normales[(k + n - 1) % n];
+      if (!avant) chaine += 1;
+      const c = colonne(a, a.alt, dir, (ici ?? avant).pentes, k);
+      if (c) colonnes.push({ ...c, chaine });
+    }
+    if (!ici) continue;
+    const l = longueurPlan(a, b);
+    const nombre = Math.max(1, Math.ceil(l / pas));
+    for (let j = 1; j < nombre; j += 1) {
+      const t = j / nombre;
+      const p = { est: a.est + (b.est - a.est) * t, nord: a.nord + (b.nord - a.nord) * t };
+      const c = colonne(p, a.alt + (b.alt - a.alt) * t, normales[k], ici.pentes, null);
+      if (c) colonnes.push({ ...c, chaine });
+    }
+    // Dernier côté avec talus, mais pas le suivant : la colonne de l'angle d'arrivée ferme la suite.
+    if (!reglages[(k + 1) % n] && k + 1 === n) {
+      const c = colonne(b, b.alt, normales[k], ici.pentes, (k + 1) % n);
+      if (c) colonnes.push({ ...c, chaine });
+    }
+  }
+  // Tour complet : une seule suite, fermée. Sinon, si le dernier côté et le premier ont un talus, la dernière suite
+  // continue la première : on la remet devant.
+  const ferme = reglages.every(Boolean);
+  if (!ferme && reglages[n - 1] && reglages[0] && colonnes.length) {
+    const derniere = colonnes.at(-1).chaine;
+    const premiere = colonnes[0].chaine;
+    if (derniere !== premiere) {
+      const fin = colonnes.filter((c) => c.chaine === derniere).map((c) => ({ ...c, chaine: premiere }));
+      const reste = colonnes.filter((c) => c.chaine !== derniere);
+      colonnes.length = 0;
+      colonnes.push(...fin, ...reste);
+    }
+  }
+  return { colonnes, erreurs: [...new Set(erreurs)].slice(0, 5), ferme };
+}
+
+/** Triangles du talus (bandes entre colonnes voisines de la même suite ; tour fermé si « ferme »). */
+export function trianglesTalus({ colonnes, ferme }) {
+  const tri = [];
+  const relier = (c1, c2) => {
+    const a = c1.points;
+    const b = c2.points;
+    if (a.length === b.length) {
+      for (let i = 0; i + 1 < a.length; i += 1) {
+        tri.push([a[i], b[i], b[i + 1]]);
+        tri.push([a[i], b[i + 1], a[i + 1]]);
+      }
+    } else {
+      // Une seule a une berme (le talus la quitte entre deux colonnes) : éventail simple.
+      const [court, long, inverse] = a.length < b.length ? [a, b, false] : [b, a, true];
+      for (let i = 0; i + 1 < long.length; i += 1) {
+        const j = Math.min(court.length - 1, Math.round((i / (long.length - 1)) * (court.length - 1)));
+        const t = [court[j], long[i], long[i + 1]];
+        tri.push(inverse ? [t[0], t[2], t[1]] : t);
+      }
+      for (let j = 0; j + 1 < court.length; j += 1) tri.push(inverse ? [court[j], long.at(-1), court[j + 1]] : [court[j], court[j + 1], long.at(-1)]);
+    }
+  };
+  for (let i = 0; i + 1 < colonnes.length; i += 1) if (colonnes[i].chaine === colonnes[i + 1].chaine) relier(colonnes[i], colonnes[i + 1]);
+  if (ferme && colonnes.length > 2) relier(colonnes.at(-1), colonnes[0]);
+  // Triangles plats (deux points au même endroit) retirés.
+  return tri.filter(([p, q, r]) => Math.abs((q.est - p.est) * (r.nord - p.nord) - (q.nord - p.nord) * (r.est - p.est)) > 1e-8);
+}
+
+/** Réglage du talus du côté i pour talusPlateforme (null si pas de talus : côté partagé, case décochée, pente illisible). */
+export function reglageDuCote(plateformes, pf, i) {
+  if (cotePartage(plateformes, pf, i)) return null;
+  const t = pf.talus[pf.sommets[i].nom] ?? TALUS_DEFAUT;
+  if (!t.on) return null;
+  const deblai = lireHV(t.deb);
+  const remblai = lireHV(t.rem);
+  return deblai && remblai ? { pentes: { deblai, remblai } } : null;
+}
+
+/** Berme de la plateforme pour talusPlateforme, ou null. */
+export function bermeDe(pf) {
+  const b = pf.berme;
+  if (!b?.on || !(b.hauteur > 0) || !(b.largeur >= 0)) return null;
+  const deblai = lireHV(b.deb);
+  const remblai = lireHV(b.rem);
+  return deblai && remblai ? { hauteur: b.hauteur, largeur: b.largeur, p3: { deblai, remblai } } : null;
+}
+
+/** Points et faces (indices) d'une surface en triangles : { points: [{ nom, est, nord, altitude }], faces }. */
+export function pointsEtFaces(triangles, prefixe) {
+  const index = new Map();
+  const points = [];
+  const cle = (p) => `${p.est.toFixed(4)} ${p.nord.toFixed(4)} ${p.altitude.toFixed(4)}`;
+  const faces = triangles.map((t) => t.map((p) => {
+    const k = cle(p);
+    if (!index.has(k)) {
+      index.set(k, points.length);
+      points.push({ nom: p.nom ?? `${prefixe}T${points.length + 1}`, est: Math.round(p.est * 1000) / 1000, nord: Math.round(p.nord * 1000) / 1000, altitude: Math.round(p.altitude * 1000) / 1000 });
+    }
+    return index.get(k);
+  }));
+  return { points, faces };
+}
