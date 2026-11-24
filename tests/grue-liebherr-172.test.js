@@ -200,8 +200,13 @@ describe('dessin à l\'échelle', () => {
   });
   it('cercles : principal à la portée du crochet, cercles du tableau avec leur charge', () => {
     const s = grueFiche({ fleche: 50, cercles: 'principaux' });
-    expect(s.rayon.filter((p) => p.g === 'c').map((p) => p.r)).toEqual([50, 30, 40]);
+    expect(s.rayon.filter((p) => p.g === 'c').map((p) => p.r)).toEqual([50, 20, 30, 40]);
     expect(s.rayon.find((p) => p.g === 't' && p.t.startsWith('40 m')).t).toBe('40 m · 3.99 t');
+    // Condecta : portées non rondes dans la fiche, mais un cercle tous les 10 m avec la charge de la portée suivante
+    const co = grueFiche({ modeleGrue: C.id, fleche: 45, tour: 'euro4513', hauteur: 24 });
+    expect(co.rayon.filter((p) => p.g === 'c').map((p) => p.r)).toEqual([45, 20, 30, 40]);
+    expect(co.rayon.find((p) => p.g === 't' && p.t.startsWith('20 m')).t).toBe('20 m · 3.20 t'); // portée suivante : 20,72 m
+    expect(co.rayon.find((p) => p.g === 't' && p.t.startsWith('30 m')).t).toBe('30 m · 2.00 t'); // portée suivante : 30,68 m
     expect(grueFiche({ fleche: 50, cercles: 'aucun' }).rayon.filter((p) => p.g === 'c')).toHaveLength(1);
     expect(grueFiche({ fleche: 50, cercles: 'tous' }).rayon.filter((p) => p.g === 'c').length).toBeGreaterThan(8);
   });

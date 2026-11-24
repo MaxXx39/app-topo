@@ -315,9 +315,13 @@ function cerclesDeCharge(g) {
   const rMax = tab[tab.length - 1][0];
   const res = [{ g: 'c', k: '#334155', x: 0, y: 0, r: rMax, mat: 'trait' }];
   const texteCercle = (rr, t) => ({ g: 't', k: g.couleurTexte, perso: true, x: rr, y: -2.4, h: 0.9, a: 90, t: `${rr} m · ${fixe2(t)} t`, ah: 1, av: 2 });
-  if (cercles !== 'aucun') {
-    const choisis = tab.filter(([rr]) => rr < rMax && rr >= 20 && (cercles === 'tous' || Math.abs(rr / 10 - Math.round(rr / 10)) < 1e-9));
-    for (const [rr, t] of choisis) res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' }, texteCercle(rr, t));
+  if (cercles === 'tous') {
+    // tous les cercles du tableau de la fiche (portée : charge)
+    for (const [rr, t] of tab.filter(([rr]) => rr < rMax && rr >= 20)) res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' }, texteCercle(rr, t));
+  } else if (cercles === 'principaux') {
+    // 0.314.0 : un cercle tous les 10 m (20, 30, 40…) avec la charge à cette portée (portée suivante du tableau, côté prudent) :
+    // marche pour toutes les fiches, même si leurs portées ne sont pas rondes (Condecta : 21,87 m, 30,68 m…).
+    for (let rr = 20; rr < rMax - 1; rr += 10) res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' }, texteCercle(rr, chargeAuRayon(f, rr, mode).t));
   }
   res.push(texteCercle(rMax, tab[tab.length - 1][1]));
   return res;
