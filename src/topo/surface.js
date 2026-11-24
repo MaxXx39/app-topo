@@ -71,7 +71,7 @@ export function creerSurface(nom, leveId, nature = 'stock') {
 
 /** Vrai si la surface a été importée d'un fichier (LandXML, DXF) et non créée à partir de points. */
 export function estImportee(surface) {
-  return surface.type === 'landxml' || surface.type === 'dxf' || surface.type === 'dessin' || surface.type === 'swisstopo' || surface.type === 'talus';
+  return surface.type === 'landxml' || surface.type === 'dxf' || surface.type === 'dessin' || surface.type === 'swisstopo' || surface.type === 'talus' || surface.type === 'plateforme'; // 0.300.0 : plateforme (Plateformes)
 }
 
 /**

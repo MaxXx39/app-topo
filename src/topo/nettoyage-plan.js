@@ -30,6 +30,7 @@ export function recetteDeDepart(plan, prefixe = '') {
     types: { cotations: true, reperes: true, attributs: true, textes: false, splines: false, pleins: false },
     hachures: 'garder',
     zone: null,
+    enleves: [],
     prefixe,
   };
 }
@@ -140,7 +141,9 @@ const enPoints = (p) => {
  */
 export function nettoyerPlan(plan, recette) {
   const ecartes = new Set(recette.ecartes);
-  const garde = (o) => !ecartes.has(plan.calques[o.c]?.nom);
+  // 0.298.0 : objets enlevés à la main (clés, voir cleObjet).
+  const enleves = new Set(recette.enleves ?? []);
+  const garde = (o, genre) => !ecartes.has(plan.calques[o.c]?.nom) && (enleves.size === 0 || !enleves.has(cleObjet(plan, genre, o)));
   const { traits = [], pleins = [], cercles = [], textes = [], points = [] } = plan.contenu ?? {};
   const { types, hachures } = recette;
   const o0 = plan.origine;
@@ -150,7 +153,7 @@ export function nettoyerPlan(plan, recette) {
 
   const sortie = { traits: [], pleins: [], cercles: [], textes: [], points: [] };
   for (const t of traits) {
-    if (!garde(t)) continue;
+    if (!garde(t, 'traits')) continue;
     if ((t.s === 'DIMENSION' && types.cotations) || (t.s === 'LEADER' && types.reperes)) continue;
     if (t.s === 'SPLINE' && types.splines) continue;
     if (t.s === 'HATCH' && hachures === 'supprimer') continue;
@@ -177,23 +180,27 @@ export function nettoyerPlan(plan, recette) {
     for (const morceau of morceaux) sortie.traits.push({ ...reste, p: morceau.flatMap(([x, y]) => [mm(x), mm(y)]), f: false });
   }
   for (const p of pleins) {
-    if (!garde(p)) continue;
+    if (!garde(p, 'pleins')) continue;
     if (p.s === 'DIMENSION' && types.cotations) continue;
     if (p.h && hachures !== 'garder') continue;
     if (!p.h && types.pleins) continue;
     if (zone && !toucheZone(enPoints(p.p), zone, true)) continue;
     sortie.pleins.push(p);
   }
-  for (const c of cercles) if (garde(c) && (!zone || cercleToucheZone(c.x, c.y, c.r, zone))) sortie.cercles.push(c);
+  for (const c of cercles) if (garde(c, 'cercles') && (!zone || cercleToucheZone(c.x, c.y, c.r, zone))) sortie.cercles.push(c);
   for (const t of textes) {
-    if (!garde(t) || types.textes || (t.s === 'ATTRIB' && types.attributs) || (t.s === 'DIMENSION' && types.cotations)) continue;
+    if (!garde(t, 'textes') || types.textes || (t.s === 'ATTRIB' && types.attributs) || (t.s === 'DIMENSION' && types.cotations)) continue;
     if (zone && !pointDansPolygone(t.x, t.y, zone)) continue;
     sortie.textes.push(t);
   }
-  for (const p of points) if (garde(p) && (!zone || pointDansPolygone(p.x, p.y, zone))) sortie.points.push(p);
+  for (const p of points) if (garde(p, 'points') && (!zone || pointDansPolygone(p.x, p.y, zone))) sortie.points.push(p);
 
   // Calques : seulement ceux qui ont encore un objet ; préfixe, couleur choisie (les objets la prennent tous).
   const utilises = new Set([...sortie.traits, ...sortie.pleins, ...sortie.cercles, ...sortie.textes, ...sortie.points].map((o) => o.c));
+  // 0.298.0 : plan en image (PDF scanné) : l'image reste, avec son calque, sauf si ce calque est écarté.
+  const indexImage = plan.contenu?.image ? Math.max(0, plan.calques.findIndex((c) => c.nom === 'PDF_IMAGE')) : -1;
+  const image = indexImage >= 0 && !ecartes.has(plan.calques[indexImage]?.nom) ? plan.contenu.image : null;
+  if (image) utilises.add(indexImage);
   const nouvelIndex = new Map();
   const calques = [];
   plan.calques.forEach((c, i) => {
@@ -206,7 +213,8 @@ export function nettoyerPlan(plan, recette) {
     return { ...o, c: nouvelIndex.get(o.c), ...(recolore ? { k: null } : {}) };
   };
   const contenu = Object.fromEntries(Object.entries(sortie).map(([cle, liste]) => [cle, liste.map(renumeroter)]));
-  const objets = Object.values(contenu).reduce((n, l) => n + l.length, 0);
+  const objets = Object.values(contenu).reduce((n, l) => n + l.length, 0) + (image ? 1 : 0);
+  if (image) contenu.image = image;
   return { ...plan, calques, contenu, bornes: bornesDuContenu(contenu, o0) ?? plan.bornes, compte: { ...plan.compte, objets } };
 }
 
@@ -260,4 +268,170 @@ export function calqueSousLePoint(plan, x, y, tolerance) {
   for (const c of cercles) essayer(Math.abs(Math.hypot(c.x - px, c.y - py) - c.r), c.c);
   for (const o of [...textes, ...points]) essayer(Math.hypot(o.x - px, o.y - py), o.c);
   return meilleur.c;
+}
+
+// --- Objets enlevés à la main (0.298.0, demande du 24.11) ---
+// On peut enlever un objet seul (clic) ou plusieurs (rectangle), sans écarter tout son calque ; la recette garde la liste
+// « enleves » (clés des objets) et on peut les restaurer un par un ou tous.
+// Clé d'un objet = son genre, son calque et sa géométrie en coordonnées absolues du plan reçu (au mm) : elle ne dépend pas
+// de l'ordre des objets dans le fichier, donc un nouvel indice où l'objet n'a pas bougé le retrouve (et l'enlève encore).
+
+export const GENRES_OBJETS = ['traits', 'pleins', 'cercles', 'textes', 'points'];
+const NOM_GENRE = { traits: 'Trait', pleins: 'Surface', cercles: 'Cercle', textes: 'Texte', points: 'Point' };
+
+/** Petit résumé (empreinte FNV-1a 32 bits) d'un texte, en base 36 : une clé courte. */
+function empreinte(texte) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < texte.length; i += 1) {
+    h ^= texte.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/** Clé d'un objet (genre : 'traits', 'pleins', 'cercles', 'textes' ou 'points') du plan. */
+export function cleObjet(plan, genre, o) {
+  const { est, nord } = plan.origine ?? { est: 0, nord: 0 };
+  const r = (v) => Math.round(v * 1000);
+  const calque = plan.calques[o.c]?.nom ?? '';
+  let geo;
+  if (genre === 'traits' || genre === 'pleins') {
+    const p = [];
+    for (let i = 0; i < o.p.length; i += 2) p.push(r(o.p[i] + est), r(o.p[i + 1] + nord));
+    geo = `${p.join(',')}|${o.f ? 1 : 0}|${o.s ?? ''}|${o.h ? 1 : 0}`;
+  } else if (genre === 'cercles') geo = `${r(o.x + est)},${r(o.y + nord)},${r(o.r)}`;
+  else if (genre === 'textes') geo = `${r(o.x + est)},${r(o.y + nord)}|${o.t ?? ''}`;
+  else geo = `${r(o.x + est)},${r(o.y + nord)}`;
+  return `${genre[0]}${empreinte(`${calque}|${geo}`)}`;
+}
+
+/** Libellé d'un objet pour la liste « Enlevés à la main » : { cle, texte }. */
+export function libelleObjet(plan, genre, o) {
+  const calque = plan.calques[o.c]?.nom ?? '?';
+  const extrait = genre === 'textes' && o.t ? ` « ${String(o.t).slice(0, 24)} »` : '';
+  return { cle: cleObjet(plan, genre, o), texte: `${NOM_GENRE[genre]}${extrait} · ${calque}` };
+}
+
+/** Distance du point (px, py) à une suite de points plats [x0, y0, x1, y1…] (fermée si « ferme »). */
+function distanceAuxSegments(p, ferme, px, py) {
+  let d = Infinity;
+  const n = p.length;
+  if (n === 2) return Math.hypot(p[0] - px, p[1] - py);
+  for (let i = 0; i + 3 < n + (ferme ? 2 : 0); i += 2) {
+    const ax = p[i];
+    const ay = p[i + 1];
+    const bx = p[(i + 2) % n];
+    const by = p[(i + 3) % n];
+    const l2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+    const u = Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / l2));
+    d = Math.min(d, Math.hypot(ax + u * (bx - ax) - px, ay + u * (by - ay) - py));
+  }
+  return d;
+}
+
+/**
+ * Objet le plus proche du point (x, y) absolus du plan, à moins de « tolerance » (unités du plan) :
+ * { genre, index, cle } ou null. « exclus » : Set de clés à ne pas proposer. Une surface pleine est trouvée aussi
+ * en touchant dedans.
+ */
+export function objetSousLePoint(plan, x, y, tolerance, exclus = new Set()) {
+  const px = x - plan.origine.est;
+  const py = y - plan.origine.nord;
+  const c = plan.contenu ?? {};
+  let meilleur = null;
+  const essayer = (d, genre, index) => {
+    if (d > tolerance || (meilleur && d >= meilleur.d)) return;
+    const cle = cleObjet(plan, genre, c[genre][index]);
+    if (!exclus.has(cle)) meilleur = { d, genre, index, cle };
+  };
+  (c.traits ?? []).forEach((t, i) => essayer(distanceAuxSegments(t.p, t.f, px, py), 'traits', i));
+  (c.cercles ?? []).forEach((o, i) => essayer(Math.abs(Math.hypot(o.x - px, o.y - py) - o.r), 'cercles', i));
+  (c.textes ?? []).forEach((o, i) => essayer(Math.hypot(o.x - px, o.y - py), 'textes', i));
+  (c.points ?? []).forEach((o, i) => essayer(Math.hypot(o.x - px, o.y - py), 'points', i));
+  (c.pleins ?? []).forEach((o, i) => {
+    const pts = enPoints(o.p);
+    // Dedans : un peu moins prioritaire qu'un trait tout proche (distance = moitié de la tolérance).
+    essayer(pointDansPolygone(px, py, pts) ? tolerance / 2 : distanceAuxSegments(o.p, true, px, py), 'pleins', i);
+  });
+  return meilleur && { genre: meilleur.genre, index: meilleur.index, cle: meilleur.cle };
+}
+
+/**
+ * Clés des objets pris par une zone (polygone [[x, y], …] en coordonnées absolues du plan reçu) :
+ * mode 'dedans' = entièrement dedans (rectangle tiré de gauche à droite, comme AutoCAD) ;
+ * mode 'touche' = qui touchent la zone (tiré de droite à gauche). « exclus » : clés déjà enlevées.
+ */
+export function objetsDansZone(plan, zoneAbsolue, mode = 'dedans', exclus = new Set()) {
+  const o0 = plan.origine;
+  const poly = zoneAbsolue.map(([x, y]) => [x - o0.est, y - o0.nord]);
+  const c = plan.contenu ?? {};
+  const cles = [];
+  const prendre = (genre, o, pris) => {
+    if (!pris) return;
+    const cle = cleObjet(plan, genre, o);
+    if (!exclus.has(cle)) cles.push(cle);
+  };
+  const dedansTous = (pts) => pts.every(([x, y]) => pointDansPolygone(x, y, poly));
+  for (const genre of ['traits', 'pleins']) {
+    for (const o of c[genre] ?? []) {
+      const pts = enPoints(o.p);
+      const ferme = genre === 'pleins' || o.f;
+      prendre(genre, o, mode === 'dedans' ? dedansTous(pts) : toucheZone(pts, poly, ferme && pts.length > 2));
+    }
+  }
+  for (const o of c.cercles ?? []) {
+    const boite = [[o.x - o.r, o.y - o.r], [o.x + o.r, o.y - o.r], [o.x + o.r, o.y + o.r], [o.x - o.r, o.y + o.r]];
+    prendre('cercles', o, mode === 'dedans' ? dedansTous(boite) : cercleToucheZone(o.x, o.y, o.r, poly));
+  }
+  for (const genre of ['textes', 'points']) for (const o of c[genre] ?? []) prendre(genre, o, pointDansPolygone(o.x, o.y, poly));
+  return cles;
+}
+
+/** Libellés des objets enlevés à la main, dans l'ordre de la liste « enleves » (ceux introuvables dans ce plan sont omis). */
+export function objetsEnleves(plan, enleves = []) {
+  if (!enleves.length) return [];
+  const voulu = new Set(enleves);
+  const trouves = new Map();
+  for (const genre of GENRES_OBJETS) {
+    for (const o of plan.contenu?.[genre] ?? []) {
+      const l = libelleObjet(plan, genre, o);
+      if (voulu.has(l.cle) && !trouves.has(l.cle)) trouves.set(l.cle, l);
+    }
+  }
+  return enleves.filter((cle) => trouves.has(cle)).map((cle) => trouves.get(cle));
+}
+
+/**
+ * Plan reçu réduit aux objets montrés par la recette (calques gardés, types gardés, dans la zone, pas enlevés à la main),
+ * SANS les couper ni les renommer : mêmes objets, mêmes clés (cleObjet). Sert à choisir un objet à enlever à la main.
+ */
+export function planVisible(plan, recette) {
+  const ecartes = new Set(recette.ecartes);
+  const enleves = new Set(recette.enleves ?? []);
+  const { types, hachures } = recette;
+  const o0 = plan.origine;
+  const zone = recette.zone?.length >= 3 ? recette.zone.map(([x, y]) => [x - o0.est, y - o0.nord]) : null;
+  const c = plan.contenu ?? {};
+  const base = (o, genre) => !ecartes.has(plan.calques[o.c]?.nom) && !(enleves.size && enleves.has(cleObjet(plan, genre, o)));
+  const contenu = {
+    traits: (c.traits ?? []).filter((t) => base(t, 'traits')
+      && !((t.s === 'DIMENSION' && types.cotations) || (t.s === 'LEADER' && types.reperes) || (t.s === 'SPLINE' && types.splines)
+        || (t.s === 'HATCH' && hachures === 'supprimer') || (t.s === 'SOLID' && types.pleins))
+      && (!zone || toucheZone(enPoints(t.p), zone, t.f && t.p.length > 4))),
+    pleins: (c.pleins ?? []).filter((p) => base(p, 'pleins') && !(p.s === 'DIMENSION' && types.cotations) && !(p.h && hachures !== 'garder') && !(!p.h && types.pleins)
+      && (!zone || toucheZone(enPoints(p.p), zone, true))),
+    cercles: (c.cercles ?? []).filter((o) => base(o, 'cercles') && (!zone || cercleToucheZone(o.x, o.y, o.r, zone))),
+    textes: (c.textes ?? []).filter((t) => base(t, 'textes') && !types.textes && !(t.s === 'ATTRIB' && types.attributs) && !(t.s === 'DIMENSION' && types.cotations)
+      && (!zone || pointDansPolygone(t.x, t.y, zone))),
+    points: (c.points ?? []).filter((p) => base(p, 'points') && (!zone || pointDansPolygone(p.x, p.y, zone))),
+  };
+  return { ...plan, contenu };
+}
+
+/** Plan réduit aux objets enlevés à la main (pour les montrer en rouge et pouvoir les restaurer d'un clic). */
+export function planDesEnleves(plan, enleves = []) {
+  const voulu = new Set(enleves);
+  const c = plan.contenu ?? {};
+  const contenu = Object.fromEntries(GENRES_OBJETS.map((g) => [g, (c[g] ?? []).filter((o) => voulu.has(cleObjet(plan, g, o)))]));
+  return { ...plan, contenu };
 }

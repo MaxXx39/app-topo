@@ -374,7 +374,7 @@ export function creerEditeurSurfaces(conteneur, barre, options) {
   /** Cartes d'une surface : contour, lignes de rupture, points, triangles supprimés, état. */
   function contenuSurface(surface) {
     if (estImportee(surface)) {
-      const source = surface.type === 'dessin' ? `Dessin : ${echapper(surface.nomFichier)} (mise à jour avec le dessin)` : `Importée : ${echapper(surface.nomFichier)} (${origineSurface(surface)})`;
+      const source = surface.type === 'plateforme' ? `Plateforme : ${echapper(surface.nomFichier)} (mise à jour avec la plateforme, application Plateformes)` : surface.type === 'dessin' ? `Dessin : ${echapper(surface.nomFichier)} (mise à jour avec le dessin)` : `Importée : ${echapper(surface.nomFichier)} (${origineSurface(surface)})`;
       return `<p class="aide">${source}</p>${decrire?.(surface) ?? ''}${cartePhotos(surface)}`;
     }
     const problemes = verifierSurface(surface, pointsDe(surface).map((p) => p.nom));

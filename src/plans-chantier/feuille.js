@@ -119,12 +119,28 @@ export function dessinerPage(ctx, donnees, prep, pxParMm, { avecTextes = true, l
   }
   if (plan.fond?.points !== false) {
     ctx.fillStyle = '#475569';
+    const noms = [];
     for (const p of donnees.points) {
       const q = versEcran(p.est, p.nord, vue);
       if (q.x < -5 || q.y < -5 || q.x > vue.largeur + 5 || q.y > vue.hauteur + 5) continue;
       ctx.beginPath();
       ctx.arc(q.x, q.y, Math.max(1.5, 0.5 * s), 0, 2 * Math.PI);
       ctx.fill();
+      if (plan.fond.nomsPoints && p.nom) noms.push([q, p.nom]);
+    }
+    // 0.299.0 : noms des points, 1,8 mm sur le papier
+    if (noms.length) {
+      ctx.save();
+      ctx.font = `${Math.max(6, 1.8 * s)}px Helvetica, Arial, sans-serif`;
+      ctx.textBaseline = 'bottom';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = Math.max(1.5, 0.5 * s);
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      for (const [q, nom] of noms) {
+        ctx.strokeText(String(nom), q.x + 0.8 * s, q.y - 0.4 * s);
+        ctx.fillText(String(nom), q.x + 0.8 * s, q.y - 0.4 * s);
+      }
+      ctx.restore();
     }
   }
   const d = { ctx, vue, pc: plan, bib, mm: s };

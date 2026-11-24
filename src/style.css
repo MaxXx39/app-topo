@@ -14811,3 +14811,123 @@ dialog.page-chantier[open] {
 .page-chantier .ruban-une-ligne .champ-ortho { width: 46px; height: 26px; padding: 2px 3px; font-size: 12px; }
 .page-chantier .ruban-une-ligne [data-action="ortho"].actif::after { content: '✓'; position: absolute; right: 1px; top: -1px; font-size: 11px; font-weight: 900; color: #b45309; }
 .page-chantier .ruban-element .propre-element { height: 118px; align-content: flex-start; }
+
+/* 0.298.0 : Calage de plans, objets enlevés à la main (liste avec ↺ pour restaurer). */
+.liste-enleves { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow-y: auto; font-size: 0.82rem; }
+.liste-enleves li { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 6px; }
+.liste-enleves li:hover { background: color-mix(in srgb, #dc2626 8%, var(--surface)); }
+.liste-enleves li > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liste-enleves .bouton-secondaire.petit { padding: 1px 8px; min-height: 0; }
+
+/* 0.299.0 : Plans de chantier, couleur des hachures d'une zone (carré de couleur + ↺). */
+.ligne-couleur-hachure { display: flex; align-items: center; gap: 6px; }
+.page-chantier .ligne-couleur-hachure input[type='color'] { width: 40px; min-width: 40px; height: 28px; padding: 0; border: 1px solid var(--bordure); border-radius: 6px; background: none; }
+
+/* ==========================================================================
+   0.300.0 : application Plateformes (Expert, site PC et Topo Bureau) : même allure que Plans de chantier, liseré violet.
+   ========================================================================== */
+dialog.page-plateformes[open] {
+  position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column;
+  width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: none;
+  background: var(--fond); color: var(--encre);
+}
+.entete-plateformes { border-bottom-color: #6d28d9; }
+.puce-plateformes { background: #6d28d9; }
+.page-plateformes .outil-ruban svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.page-plateformes .outil-ruban.actif { background: color-mix(in srgb, #6d28d9 14%, var(--surface)); border-color: #6d28d9; color: #6d28d9; }
+.page-plateformes .ruban-plateformes { align-items: center; gap: 2px; }
+.page-plateformes .ruban-plateformes .groupe-ruban { padding: 2px 5px; }
+.page-plateformes .ruban-plateformes .outil-ruban { padding: 2px 5px; min-width: 42px; height: 42px; }
+.champ-alt-suivante { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--gris); padding: 0 6px; }
+.champ-alt-suivante input { width: 84px; padding: 4px 6px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); font: inherit; text-align: right; }
+.bandeau-plateforme { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 5px 10px; background: #f5f3ff; border-bottom: 2px solid #6d28d9; border-radius: 8px 8px 0 0; font-size: 0.85rem; }
+body.theme-sombre .bandeau-plateforme { background: #241b3a; }
+.bandeau-plateforme label { display: flex; align-items: center; gap: 4px; }
+.bandeau-plateforme input[type='text'] { width: 140px; padding: 3px 6px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); font: inherit; }
+.bandeau-plateforme input[type='color'] { width: 34px; height: 26px; padding: 0; border: 1px solid var(--bordure); border-radius: 6px; }
+.bandeau-plateforme .alerte, .panneau-plateformes .alerte { color: var(--rouge); }
+.travail-plateformes { flex: 1 1 auto; min-height: 0; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) 300px; }
+@media (max-width: 900px) { .travail-plateformes { grid-template-columns: minmax(0, 1fr); } }
+.gauche-plateformes { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
+.vue-plateformes { flex: 1 1 60%; min-height: 260px; }
+.toile-plateformes { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #ffffff; cursor: crosshair; touch-action: none; }
+.toile-plateformes canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tableau-plateforme { flex: 0 1 40%; min-height: 150px; overflow: hidden; }
+.cadre-tableau-plateforme { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.table-plateforme { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+.table-plateforme th, .table-plateforme td { padding: 2px 6px; border-bottom: 1px solid var(--bordure); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.table-plateforme th:first-child, .table-plateforme td:first-child { text-align: left; }
+.table-plateforme th { position: sticky; top: 0; background: var(--surface); color: var(--gris); font-weight: 600; font-size: 0.75rem; z-index: 1; }
+.table-plateforme .groupe-cote { text-align: center; color: #92400e; border-bottom: 1px solid #92400e; }
+.table-plateforme .centre { text-align: center; }
+.table-plateforme .sep { border-left: 1px solid var(--bordure); }
+.table-plateforme input[type='text'] { width: 84px; padding: 2px 5px; border: 1px solid var(--bordure); border-radius: 5px; background: var(--surface); color: var(--encre); font: inherit; text-align: right; }
+.table-plateforme input.hv, .panneau-plateformes input.hv { width: 56px; }
+.table-plateforme input.calc { font-style: italic; color: var(--gris); }
+.table-plateforme tr.ligne-point td:first-child { font-weight: 700; }
+.table-plateforme tr.ligne-cote td { background: color-mix(in srgb, #92400e 5%, var(--surface)); font-size: 0.8rem; }
+.table-plateforme tr.ligne-cote td:first-child { padding-left: 20px; color: var(--gris); }
+.table-plateforme tr.interieur td { color: var(--gris); }
+.table-plateforme tr.choisi td { background: color-mix(in srgb, #6d28d9 14%, var(--surface)); }
+.bouton-lien { border: none; background: none; cursor: pointer; color: var(--gris); font-size: 1rem; padding: 0 2px; }
+.bouton-lien.detache { color: var(--rouge); }
+.panneau-plateformes { overflow-y: auto; }
+.panneau-plateformes h3 { margin: 4px 0 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gris); }
+.panneau-plateformes select, .panneau-plateformes input[type='text'] { padding: 4px 6px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); font: inherit; }
+.liste-plateformes { display: flex; flex-direction: column; gap: 2px; }
+.liste-plateformes button { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid transparent; border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 0.88rem; text-align: left; cursor: pointer; }
+.liste-plateformes button.actif { border-color: #6d28d9; background: color-mix(in srgb, #6d28d9 10%, var(--surface)); font-weight: 600; }
+.liste-plateformes i { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.liste-plateformes small { margin-left: auto; color: var(--gris); }
+.grille-berme { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; font-size: 0.85rem; }
+.resume-volume { margin: 0; }
+.resume-volume .deblai { color: #b45309; font-weight: 700; }
+.resume-volume .remblai { color: #15803d; font-weight: 700; }
+.ligne-dz { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.contenu-plateformes { padding-bottom: 10px; }
+.toile-plateformes:focus { outline: none; }
+
+/* 0.302.0 : Plateformes : onglets Tableau / Coupe 1 / Coupe 2, coupe, étapes, berme d'un côté. */
+.onglets-plateforme { display: flex; gap: 2px; border-bottom: 1px solid var(--bordure); }
+.onglets-plateforme button { padding: 5px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0; background: none; color: var(--gris); font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.onglets-plateforme button.actif { background: var(--surface); border-color: var(--bordure); color: #6d28d9; margin-bottom: -1px; }
+.partie-coupe { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.tete-coupe { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 0.85rem; }
+.tete-coupe .boutons-coupe { margin-left: auto; display: flex; gap: 6px; }
+.svg-coupe { width: 100%; height: auto; display: block; background: #ffffff; border: 1px solid var(--bordure); border-radius: 8px; }
+.svg-coupe .grille-coupe { stroke: #eef1f3; }
+.svg-coupe .axe-coupe { font-size: 10px; fill: #5f6d77; }
+.svg-coupe .nom-coupe { font-size: 10px; fill: #1b2b36; font-weight: 700; }
+.svg-coupe .terrain-coupe { fill: none; stroke: #7c5a3a; stroke-width: 1.6; }
+.svg-coupe .etape-coupe { fill: none; stroke: #6d28d9; stroke-width: 2.8; }
+.svg-coupe .dessous-coupe { fill: none; stroke: #6d28d9; stroke-width: 1.6; stroke-dasharray: 6 4; }
+.svg-coupe .autre-coupe { fill: none; stroke: #6d28d9; stroke-width: 1; opacity: 0.35; }
+.svg-coupe .deblai-coupe { fill: #c2410c; fill-opacity: 0.32; stroke: none; }
+.svg-coupe .remblai-coupe { fill: #15803d; fill-opacity: 0.32; stroke: none; }
+.choix-etape { display: flex; gap: 4px; }
+.choix-etape button { padding: 3px 10px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.choix-etape button.actif { background: #6d28d9; border-color: #6d28d9; color: #ffffff; }
+.chaine-etapes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.etape-pf { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; padding: 5px 6px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; }
+.etape-pf:hover { border-color: var(--bordure); }
+.etape-pf.choisie { border-color: #6d28d9; background: color-mix(in srgb, #6d28d9 10%, var(--surface)); }
+.rond-etape { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #ffffff; font-size: 0.75rem; font-weight: 700; }
+.titre-etape { font-weight: 700; font-size: 0.88rem; }
+.puce-type { font-size: 0.68rem; padding: 0 6px; border: 1px solid var(--bordure); border-radius: 999px; color: var(--gris); font-weight: 600; }
+.vols-etape { display: flex; gap: 10px; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.vols-etape .deblai, .totaux-etapes .deblai { color: #c2410c; font-weight: 700; }
+.vols-etape .remblai, .totaux-etapes .remblai { color: #15803d; font-weight: 700; }
+.totaux-etapes { display: grid; grid-template-columns: 1fr auto auto; gap: 3px 10px; font-size: 0.82rem; font-variant-numeric: tabular-nums; border-top: 2px solid var(--encre); padding-top: 5px; }
+.bouton-berme { border: none; background: none; color: var(--gris); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 4px; border-radius: 4px; }
+.bouton-berme.propre { color: #92400e; box-shadow: inset 0 -2px 0 #92400e; }
+.table-plateforme tr.ligne-berme td { background: color-mix(in srgb, #92400e 8%, var(--surface)); }
+.berme-cote { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 0.8rem; padding: 2px 0 2px 20px; }
+.berme-cote label { display: flex; align-items: center; gap: 4px; }
+.berme-cote select { font: inherit; font-size: 0.8rem; padding: 1px 4px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); }
+
+/* 0.303.0 : Plateformes : ouvrages (murs, radiers, dalles). */
+.liste-ouvrages { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; }
+.ouvrage-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 3px 4px; border: 1px solid var(--bordure); border-radius: 6px; }
+.ouvrage-ligne label { display: flex; align-items: center; gap: 3px; }
+.panneau-plateformes input.hv-large { width: 78px; }
+.svg-coupe .ouvrage-coupe { fill: #475569; fill-opacity: 0.55; stroke: #334155; stroke-width: 1; }

@@ -22,7 +22,7 @@ describe('applications proposées', () => {
     expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('intermediaire') }))).toEqual(['lever', 'mesure', 'annotation', 'controle', 'calculs', 'plan']);
   });
   it('Matériel (0.274.0) : site en Expert seulement, jamais dans l\'APK ni dans Topo.exe', () => {
-    expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('expert') }))).toEqual(['lever', 'mesure', 'annotation', 'controle', 'reseaux', 'materiel', 'calage', 'comparer', 'plans-chantier', 'calculs', 'plan']);
+    expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('expert') }))).toEqual(['lever', 'mesure', 'annotation', 'controle', 'reseaux', 'materiel', 'calage', 'comparer', 'plans-chantier', 'plateformes', 'calculs', 'plan']);
     expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('expert'), dansAppli: true }))).not.toContain('materiel');
   });
   it('Calage de plans : Expert seulement ; site, Topo Bureau, APK et Topo Tablette (0.285.0 : version simple sur place)', () => {
@@ -30,6 +30,11 @@ describe('applications proposées', () => {
     expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('intermediaire') }))).not.toContain('calage');
     expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('expert') }))).toContain('calage');
     expect(cles(applisDisponibles({ avecRecepteur: true, aAcces: mode('expert') }))).toContain('calage');
+  });
+  it('Plateformes (0.300.0) : site et Topo Bureau en Expert, jamais dans l\'APK ni Topo Tablette', () => {
+    expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('intermediaire') }))).not.toContain('plateformes');
+    expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('expert') }))).toContain('plateformes');
+    expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('expert'), dansAppli: true }))).not.toContain('plateformes');
   });
   it('Plans de chantier (0.286.0) : site et Topo Bureau en Expert, jamais dans l\'APK ni Topo Tablette', () => {
     expect(cles(applisDisponibles({ avecRecepteur: false, aAcces: mode('intermediaire') }))).not.toContain('plans-chantier');

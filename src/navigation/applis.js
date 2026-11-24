@@ -136,6 +136,19 @@ export const APPLIS = [
     icone: '<path d="M3 20h18M5 20V9l7-5 7 5v11" /><path d="M9 20v-6h6v6" />',
   },
   {
+    // 0.300.0 (décisions du 24.11) : surfaces 3D dessinées (altitudes, pentes, ruptures, talus avec berme, volumes) ;
+    // remplace Calculs › Dessin.
+    cle: 'plateformes',
+    titre: 'Plateformes',
+    court: 'Plateformes',
+    couleur: '#6d28d9',
+    texte: '#ffffff',
+    site: true,
+    siteSeulement: true,
+    niveau: 'expert',
+    icone: '<path d="M3 16l5-9 13 2-3 9z" /><path d="M3 16l3 4h12l3-4" />',
+  },
+  {
     cle: 'calculs',
     titre: 'Calculs',
     couleur: '#db2777',
