@@ -153,6 +153,7 @@ if (estDansAppliWindows()) {
 import { sortesDePhrases, lignesBatterie } from './topo/nmea-sortes.js';
 import { laserDisponible, choisirLaser, deconnecterLaser, mesurerLaser, ecouterLaser } from './android/pont.js';
 import { journalNmeaDisponible, demarrerJournalNmea, lireJournalNmea } from './android/pont.js';
+import { peutConvertirDwg } from './android/pont.js';
 import { recepteur2Disponible, ecouterRecepteur2, choisirRecepteur2, deconnecterRecepteur2, choisirModeCorrections2, lireReglagesCorrections2, demarrerCorrections2, arreterCorrections2 } from './android/pont.js';
 import { creerNavigation } from './navigation/bande.js';
 import { mesureRapide } from './topo/mesure-rapide.js';
@@ -1977,11 +1978,15 @@ function ouvrirMateriel() {
  * Calage de plans (0.278.0, Expert, site et Topo Bureau) : page plein écran à part (calage/appli.js). Le plan calé
  * est rangé dans le projet comme un plan importé (dossier choisi, Drive) ; « ← » ramène à la page Applications.
  */
-function ouvrirCalage() {
+function ouvrirCalage({ depart = null } = {}) {
   fenetreReglages?.fermer?.();
   navigation?.fermer();
   ouvrirPageCalage({
     projet,
+    // 0.309.0 : « deja-cale » = ouverte par Importer › Plan DXF (plan déjà en MN95, sans référence).
+    depart,
+    // Contrôle avec les points levés (0.218.0, barre sur le plan) d'un plan de la liste des plans calés.
+    controlerPlan: (id) => commencerControlePlan(id),
     // remplace (0.280.0, nouvel indice) : id du plan calé qu'il remplace (même id, même dossier, couleur et affichage).
     // Tablettes Android (0.285.0) : version simple sur place (points du projet, sans nettoyage ni indices).
     // 0.308.0 : Topo Tablette (Windows) a la version complète, comme le site et Topo Bureau (DWG par ODA s'il est installé).
@@ -2376,6 +2381,11 @@ const ecranImport = creerEcranImport(document.querySelector('#importer'), docume
     // Une liste (levé) range aussi ses surfaces : elles suivent le levé (voir dossiersEffectifs).
     modifie();
   },
+  // 0.309.0 (demande du 24.11) : la tuile « Plan DXF » ouvre l'import d'un plan déjà calé du Calage de plans
+  // (DXF / DWG par ODA, nettoyage, indices, contrôles) ; les tablettes Android gardent l'import simple ci-dessous.
+  importPlanCaleDisponible: () => !(estDansAppliAndroid() && !estDansAppliBureau() && !estDansAppliWindows()),
+  dwgDisponible: () => peutConvertirDwg(),
+  importerPlanCale: () => ouvrirCalage({ depart: 'deja-cale' }),
   importerPlanDxf: async (fichier) => {
     afficherMessage(`Lecture du plan « ${fichier.name} »…`, null);
     // On laisse le message s'afficher avant la lecture (quelques secondes pour un gros plan).

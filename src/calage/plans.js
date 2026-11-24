@@ -107,8 +107,9 @@ export function planCale({ lu, nom, fichier, resultat, reference, elements, id, 
     calage: {
       le,
       fichier,
-      referenceId: reference.id,
-      referenceNom: reference.nom,
+      // 0.309.0 : plan importé « déjà calé » (sans référence) : referenceId null, méthode 'deja-cale'.
+      referenceId: reference?.id ?? null,
+      referenceNom: reference?.nom ?? '',
       elements: elements.map(({ type, role, plan, ref, pointsAxe, ecartAxeM }) => ({ type, role, plan: [...plan], ref: [...ref], ...(pointsAxe ? { pointsAxe, ecartAxeM } : {}) })),
       similitude: { ...resultat.similitude },
       echelleBrute: resultat.echelleBrute,
@@ -139,4 +140,33 @@ export function planCale({ lu, nom, fichier, resultat, reference, elements, id, 
 export function planReference({ lu, nom, fichier, le, nettoyage = null, local = false }) {
   // Référence locale (pas en MN95) : pas « déjà calé », elle reste à recaler si on veut un jour la passer en MN95.
   return { ...lu, nom: nom || lu.nom, importeLe: le, ...(local ? { local: true } : { dejaCale: true }), reference: { fichier, le, ...(nettoyage ? { nettoyage: JSON.parse(JSON.stringify(nettoyage)) } : {}) } };
+}
+
+/**
+ * Plan importé « déjà calé » (0.309.0, demande du 24.11) : un DXF / DWG que l'utilisateur sait en MN95, importé sans
+ * référence ni calage (similitude identité), nettoyé comme un plan calé, puis contrôlable après coup (Vérifier contre un
+ * autre plan du projet, ou Contrôler avec les points levés). Résultat au format de caler().
+ */
+export function resultatDejaCale() {
+  return {
+    similitude: { echelle: 1, rotationDeg: 0, tx: 0, ty: 0 },
+    echelleBrute: 1,
+    echelleArrondie: 1,
+    elements: [],
+    verdict: 'sans-verification',
+    message: 'Importé déjà calé (MN95) : pas de calage. À contrôler : « Vérifier » (un autre plan) ou « Contrôler » (points levés).',
+    methode: 'deja-cale',
+  };
+}
+
+/** Vrai si ce plan calé a été importé « déjà calé » (sans référence). */
+export const estDejaCale = (plan) => plan?.calage?.methode === 'deja-cale';
+
+/**
+ * Plans qui peuvent servir à VÉRIFIER un plan déjà calé : les références du projet, sauf les indices du même plan.
+ * plansDxf : projet.plansDxf ; plan : le plan à vérifier.
+ */
+export function referencesPourVerifier(plansDxf, plan) {
+  const groupe = plan.calage?.groupe ?? plan.id;
+  return plansDeReference(plansDxf).filter((p) => p.id !== plan.id && (p.calage?.groupe ?? p.id) !== groupe);
 }

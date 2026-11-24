@@ -21,7 +21,8 @@ import { differencesPlans, sousPlan } from '../topo/differences-plan.js';
 import { archiver, restaurer } from '../projet/archives.js';
 import { calculerAuto } from './calcul-auto.js';
 import { recetteDeDepart, nettoyerPlan, compterParCalque, calqueSousLePoint, TYPES_RETIRABLES, CHOIX_HACHURES, planVisible, planDesEnleves, objetSousLePoint, objetsDansZone, objetsEnleves, libelleObjet, exploserTextes } from '../topo/nettoyage-plan.js';
-import { plansDeReference, plansCales, indicesDuGroupe, etiquettes, planCale, planReference, planDesPoints, planEnMn95, REF_POINTS } from './plans.js';
+import { plansDeReference, plansCales, indicesDuGroupe, etiquettes, planCale, planReference, planDesPoints, planEnMn95, REF_POINTS, resultatDejaCale, estDejaCale, referencesPourVerifier } from './plans.js';
+import { resumeControlePlan } from '../topo/controle-plan.js';
 import { creerVueCalage } from './vue-calage.js';
 import { lirePdfPourCalage, estPdf } from './pdf-calage.js';
 
@@ -47,7 +48,7 @@ const enCouleur = (plan, couleur) => Object.assign(Object.create(plan), { couleu
  * Ouvre la page. projet : projet ouvert (projet.plansDxf) ; ajouterPlan(plan) : range le plan calé dans le projet
  * (identifiant, dossier, enregistrement, Drive) et renvoie le plan rangé ; quandRetour() ; message().
  */
-export function ouvrirCalage({ projet, simple = false, points = () => [], ajouterPlan, modifier = () => false, dossiers = () => [], dossierDepart = () => '', quandRetour = null, message = () => {} }) {
+export function ouvrirCalage({ projet, simple = false, depart = null, controlerPlan = null, points = () => [], ajouterPlan, modifier = () => false, dossiers = () => [], dossierDepart = () => '', quandRetour = null, message = () => {} }) {
   const page = document.createElement('dialog');
   page.className = 'page-calage';
   document.body.append(page);
@@ -72,6 +73,8 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     enleverMain: false, voirEnleves: false,
     // 0.298.0 : plan reçu lu dans un PDF { page, mode ('traits' | 'image'), avertissements }, ou null.
     lecturePdf: null,
+    // 0.309.0 : plan importé « déjà calé » (MN95, sans référence ni calage) : 1 Le plan → 2 Nettoyer → 3 Terminé.
+    dejaCale: false,
   };
   let vues = [];
   let reserve = null; // état gardé pendant l'ajout d'une référence
@@ -102,15 +105,15 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
       lu: null, fichier: '', nom: '', lecture: '', indice: 'A', nouvelIndice: null, elements: [], enCours: null, resultat: null,
       erreur: '', enregistre: null, recette: null, avant: [], dessinZone: null, selection: [], type: 'point', role: 'calage',
       auto: null, calculAuto: false, voirChangements: false, occupe: '', verif: null, modeReference: false, comparaison: null, baseId: '', refVisible: false,
-      enleverMain: false, voirEnleves: false, lecturePdf: null,
+      enleverMain: false, voirEnleves: false, lecturePdf: null, dejaCale: false,
     });
   }
 
-  function fermer() {
+  function fermer({ sansRetour = false } = {}) {
     vues.forEach((v) => v.detruire());
     page.close();
     page.remove();
-    quandRetour?.();
+    if (!sansRetour) quandRetour?.();
   }
   page.addEventListener('cancel', (ev) => {
     ev.preventDefault();
@@ -122,7 +125,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
   function dessiner() {
     vues.forEach((v) => v.detruire());
     vues = [];
-    const etapes = simple ? [['plan', '1 Le plan'], ['caler', '2 Caler'], ['fin', '3 Terminé']] : [['plan', '1 Le plan'], ['caler', '2 Caler'], ['nettoyer', '3 Nettoyer'], ['fin', '4 Terminé']];
+    const etapes = etat.dejaCale ? [['plan', '1 Le plan'], ['nettoyer', '2 Nettoyer'], ['fin', '3 Terminé']] : simple ? [['plan', '1 Le plan'], ['caler', '2 Caler'], ['fin', '3 Terminé']] : [['plan', '1 Le plan'], ['caler', '2 Caler'], ['nettoyer', '3 Nettoyer'], ['fin', '4 Terminé']];
     page.innerHTML = `
       <header class="entete-calage">
         <button type="button" class="retour-reglages" data-action="retour" aria-label="Retour aux applications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg></button>
@@ -144,6 +147,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     if (etat.verif) return cle === 'caler';
     if (cle === 'plan') return etat.enregistre === null;
     if (cle === 'caler') return Boolean(etat.lu && reference()) && etat.enregistre === null;
+    if (cle === 'nettoyer' && etat.dejaCale) return Boolean(etat.lu) && etat.enregistre === null;
     if (cle === 'nettoyer') return Boolean(etat.resultat && etat.resultat.verdict !== 'faux') && etat.enregistre === null;
     return etat.enregistre !== null;
   }
@@ -168,20 +172,20 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
       const indices = indicesDuGroupe(tousPlans(), p);
       return `<tr>
         <td><strong>${echapper(p.nom)}</strong><br><span class="aide-calage">${echapper(c.fichier ?? '')}</span></td>
-        <td>${echapper(c.referenceNom ?? '')}</td>
+        <td>${estDejaCale(p) ? `<span class="aide-calage">déjà calé (sans référence)</span>${c.verifieAvec ? `<br><span class="aide-calage">vérifié sur ${echapper(c.verifieAvec)}</span>` : ''}` : echapper(c.referenceNom ?? '')}</td>
         <td class="chiffre">${c.similitude.echelle.toPrecision(6).replace(/\.?0+$/, '')}</td>
         <td class="chiffre">${nombre(c.similitude.rotationDeg, 4)}°</td>
-        <td><span class="pastille-calage ${classe}">${texte}</span> ${c.verdict === 'sans-verification' ? '' : `<span class="chiffre">${mm(c.ecartVerificationM)}</span>`}${c.verifieLe ? `<br><span class="aide-calage">vérifié le ${dateCourte(c.verifieLe)}</span>` : ''}</td>
+        <td><span class="pastille-calage ${classe}">${texte}</span> ${c.verdict === 'sans-verification' ? '' : `<span class="chiffre">${mm(c.ecartVerificationM)}</span>`}${c.verifieLe ? `<br><span class="aide-calage">vérifié le ${dateCourte(c.verifieLe)}</span>` : ''}${p.controle ? `<br><span class="aide-calage">Points : ${echapper(resumeControlePlan(p.controle))}</span>` : ''}</td>
         <td><strong>${echapper(c.indice ?? '')}</strong>${indices.length > 1 ? ` <span class="aide-calage">(${indices.length} indices)</span>` : ''}${c.indices?.at(-1)?.changements ? ` <span class="aide-calage" title="Objets ajoutés / supprimés depuis l'indice d'avant">+${c.indices.at(-1).changements.ajoutes} / −${c.indices.at(-1).changements.supprimes}</span>` : ''}${c.methode === 'automatique' ? ' <span class="aide-calage">· auto</span>' : ''}</td>
         <td>${dateCourte(c.le)}</td>
         <td class="actions-ligne-calage">${simple ? '' : `<button type="button" class="bouton-secondaire petit" data-indice-de="${echapper(p.id)}">Nouvel indice…</button>`}
-          <button type="button" class="bouton-secondaire petit" data-verifier="${echapper(p.id)}">Vérifier</button></td>
+          <button type="button" class="bouton-secondaire petit" data-verifier="${echapper(p.id)}" title="Contre un autre plan du projet">Vérifier</button>${controlerPlan ? `<button type="button" class="bouton-secondaire petit" data-controler="${echapper(p.id)}" title="Un point du plan contre un point levé (vert ≤ 2 mm, orange ≤ 15 mm)">Contrôler (points)</button>` : ''}</td>
       </tr>${indices.length > 1 && !simple ? indices.map((q) => ligneIndice(q)).join('') : ''}`;
     }).join('');
     return `
-      <div class="barre-calage"><button type="button" class="bouton" data-action="nouveau">＋ Caler un nouveau plan</button></div>
+      <div class="barre-calage"><button type="button" class="bouton" data-action="nouveau">＋ Caler un nouveau plan</button>${simple ? '' : '<button type="button" class="bouton-secondaire" data-action="deja-cale">＋ Importer un plan déjà calé (DXF / DWG)</button>'}</div>
       ${cales.length ? `<div class="cadre-tableau-calage"><table class="tableau-calage">
-        <thead><tr><th>Plan calé</th><th>Référence</th><th>Échelle</th><th>Rotation</th><th>Vérification</th><th>Indice</th><th>Calé le</th><th></th></tr></thead>
+        <thead><tr><th>Plan</th><th>Référence</th><th>Échelle</th><th>Rotation</th><th>Vérification</th><th>Indice</th><th>Calé le</th><th></th></tr></thead>
         <tbody>${lignes}</tbody></table></div>` : '<p class="vide">Aucun plan calé dans ce projet.</p>'}`;
   }
 
@@ -200,7 +204,9 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
         ${xrefs.some((x) => x.etat === 'introuvable') ? '<p class="note-calage alerte">⚠ Un xref manque : rechoisissez le plan avec ses xrefs (Ctrl + clic), sinon son contenu ne sera pas sur le plan calé.</p>' : ''}
         ${geles ? `<p class="aide-calage">${geles} calque(s) gelé(s) ou éteint(s) : écartés d'office au nettoyage.</p>` : ''}
         ${etat.lecturePdf ? `<p class="aide-calage">PDF, page ${etat.lecturePdf.page}, lu ${etat.lecturePdf.mode === 'traits' ? 'en traits' : 'en image'} (taille de la feuille : le calage trouve l'échelle).</p>${etat.lecturePdf.avertissements.map((a) => `<p class="aide-calage">⚠ ${echapper(a)}</p>`).join('')}` : ''}
-        ${estEnMn95(b) && !ni ? '<p class="note-calage ok">✓ Ce plan semble déjà en MN95 : le caler n\'est peut-être pas utile.</p>' : ''}`;
+        ${etat.dejaCale ? (estEnMn95(b) ? '<p class="note-calage ok">✓ En MN95 : importé tel quel, sans calage.</p>'
+    : '<p class="note-calage alerte">⚠ Ce plan n\'est PAS en MN95 (coordonnées locales ou autres unités) : il faut le caler sur une référence. <button type="button" class="bouton-secondaire petit" data-action="vers-calage">Le caler sur une référence →</button></p>')
+    : estEnMn95(b) && !ni ? '<p class="note-calage ok">✓ Ce plan semble déjà en MN95 : le caler n\'est peut-être pas utile. <button type="button" class="bouton-secondaire petit" data-action="passer-deja-cale">L\'importer déjà calé →</button></p>' : ''}`;
     }
     // Tablette (0.285.0) : le plan reçu est un plan DXF déjà dans le projet, ou un fichier DXF choisi sur la tablette.
     const plansRecus = simple ? projet.plansDxf.filter((p) => !p.ifc && !p.calage && p.contenu && (p.contenu.traits?.length || p.contenu.cercles?.length || p.contenu.points?.length)) : [];
@@ -209,14 +215,17 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     const boutonPdf = '<label class="bouton-secondaire bouton-fichier">Choisir un PDF…<input type="file" accept=".pdf,application/pdf" data-action="fichier" hidden></label>';
     const choix = `<div class="barre-calage">${peutConvertirDwg()
       ? '<button type="button" class="bouton-secondaire bouton-fichier" data-action="choisir-dwg">Choisir le plan DWG / DXF (et ses xrefs)…</button>'
-      : '<label class="bouton-secondaire bouton-fichier">Choisir le DXF (et ses xrefs)…<input type="file" accept=".dxf" multiple data-action="fichier" hidden></label>'}${boutonPdf}</div>`;
+      : '<label class="bouton-secondaire bouton-fichier">Choisir le DXF (et ses xrefs)…<input type="file" accept=".dxf" multiple data-action="fichier" hidden></label>'}${etat.dejaCale ? '' : boutonPdf}</div>`;
     const controle = ni?.controle;
     let piedIndice = '';
     if (ni && lu && controle?.enCours) piedIndice = '<button type="button" class="bouton" aria-disabled="true" disabled>Contrôle en cours…</button>';
     else if (ni && lu && controle?.memeOrigine) piedIndice = '<button type="button" class="bouton" data-action="rejouer">Rejouer la recette →</button>';
     else if (ni && lu && controle?.recale) piedIndice = '<button type="button" class="bouton-secondaire" data-action="caler-a-la-main">Caler à la main</button><button type="button" class="bouton" data-action="rejouer-recale">Rejouer avec ce recalage →</button>';
     else if (ni && lu) piedIndice = '<button type="button" class="bouton" data-action="caler-a-la-main">Caler à la main →</button>';
+    // Plan déjà calé : pas de calage, on passe au nettoyage (recette de l'indice d'avant reprise pour un nouvel indice).
+    if (etat.dejaCale && lu) piedIndice = `<button type="button" class="bouton" data-action="nettoyer-deja-cale">${ni && controle?.memeOrigine ? 'Rejouer la recette →' : ni ? 'Continuer quand même (déjà calé) →' : 'Nettoyer →'}</button>`;
     return `
+      ${etat.dejaCale && !ni ? '<section class="carte-calage"><h3>Importer un plan déjà calé (MN95)</h3><p class="aide-calage">Sans référence ni calage : le plan est lu, nettoyé, puis rangé dans le projet. À contrôler ensuite : « Vérifier » (un autre plan) ou « Contrôler (points) ».</p></section>' : ''}
       ${ni ? `<section class="carte-calage"><h3>Nouvel indice de « ${echapper(ni.ancien.nom)} »</h3>
         <p class="aide-calage">Indice actuel : ${echapper(ni.ancien.calage.indice ?? '?')} · ${echapper(ni.ancien.calage.fichier ?? '')} · calé le ${dateCourte(ni.ancien.calage.le)}</p></section>` : ''}
       <section class="carte-calage">
@@ -227,12 +236,12 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
         ${resume}
         ${controle ? `<p class="note-calage ${controle.memeOrigine ? 'ok' : controle.recale ? 'orange' : 'alerte'}">${controle.memeOrigine ? '✓' : '⚠'} ${echapper(controle.message)}</p>` : ''}
         ${lu ? `<div class="champs-calage">
-          ${ni ? '' : `<label class="champ-calage"><span>Nom du plan calé <small class="aide-calage">(→ ${echapper(nomPlanCale(typeDuFichier(etat.fichier), etat.nom || 'nom', etat.indice))})</small></span><span class="champ-prefixe"><span class="prefixe-nom">${typeDuFichier(etat.fichier)}-</span><input type="text" data-champ="nom" value="${echapper(baseDuNomCale(etat.nom))}"></span></label>`}
+          ${ni ? '' : `<label class="champ-calage"><span>Nom du plan${etat.dejaCale ? '' : ' calé'} <small class="aide-calage">(→ ${echapper(nomPlanCale(typeDuFichier(etat.fichier), etat.nom || 'nom', etat.indice))})</small></span><span class="champ-prefixe"><span class="prefixe-nom">${typeDuFichier(etat.fichier)}-</span><input type="text" data-champ="nom" value="${echapper(baseDuNomCale(etat.nom))}"></span></label>`}
           <label class="champ-calage court"><span>Indice</span><input type="text" data-champ="indice" value="${echapper(etat.indice)}" maxlength="8"></label>
           ${ni ? '' : `<label class="champ-calage"><span>Dossier du projet</span><select data-champ="dossier"><option value="">Sans dossier</option>${dossiers().map((d) => `<option value="${echapper(d)}" ${d === etat.dossier ? 'selected' : ''}>${echapper(d)}</option>`).join('')}</select></label>`}
         </div>` : ''}
       </section>
-      ${ni || simple ? '' : `<section class="carte-calage">
+      ${ni || simple || etat.dejaCale ? '' : `<section class="carte-calage">
         <h3>Référence : un plan du projet (MN95 ou local) ou des points du projet</h3>
         ${true ? `<select data-champ="reference"><option value="">— choisir —</option><option value="${REF_POINTS}" ${REF_POINTS === etat.referenceId ? 'selected' : ''} ${points().length ? '' : 'disabled'}>Points du projet (${points().length ? `${points().length} points : levés, à implanter, contrôle` : 'aucun point dans le projet'})</option>${refs.map((p) => `<option value="${echapper(p.id)}" ${p.id === etat.referenceId ? 'selected' : ''}>${echapper(p.nom)}${planEnMn95(p) ? '' : ' (local)'}</option>`).join('')}</select>`
           : '<p class="note-calage alerte">⚠ Aucun plan ni point dans ce projet : ajoutez une référence ci-dessous ou levez des points.</p>'}
@@ -242,7 +251,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     : '<label class="bouton-secondaire bouton-fichier">＋ Ajouter une référence (DXF)…<input type="file" accept=".dxf" multiple data-action="fichier-ref" hidden></label>'}
       </section>`}
       ${simple ? `<section class="carte-calage"><h3>Caler sur les points du projet (levés, à implanter, contrôle)</h3><p class="aide-calage">${points().length} point(s) dans le projet.${points().length < 2 ? ' ⚠ Il en faut au moins 2 : levez d\'abord des points sur place.' : ''}</p></section>` : ''}
-      <div class="pied-calage"><button type="button" class="bouton-secondaire" data-aller="liste">← Plans calés</button>${ni ? piedIndice : `<button type="button" class="bouton" data-aller="caler" ${accessible('caler') ? '' : 'aria-disabled="true"'}>Caler →</button>`}</div>`;
+      <div class="pied-calage"><button type="button" class="bouton-secondaire" data-aller="liste">← Plans calés</button>${ni || etat.dejaCale ? piedIndice : `<button type="button" class="bouton" data-aller="caler" ${accessible('caler') ? '' : 'aria-disabled="true"'}>Caler →</button>`}</div>`;
   }
 
   function htmlCaler() {
@@ -278,11 +287,12 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     const c = p.calage;
     return `
       <section class="carte-calage">
-        <h3>✓ Plan « ${echapper(p.nom)} » (indice ${echapper(c.indice ?? '')}) calé et rangé dans le projet</h3>
-        <p>Échelle ${c.similitude.echelle.toPrecision(6).replace(/\.?0+$/, '')} · rotation ${nombre(c.similitude.rotationDeg, 4)}° · ${echapper(c.message)}</p>
+        <h3>✓ Plan « ${echapper(p.nom)} » (indice ${echapper(c.indice ?? '')}) ${estDejaCale(p) ? 'importé (déjà calé)' : 'calé'} et rangé dans le projet</h3>
+        ${estDejaCale(p) ? `<p>${echapper(c.message)}</p>
+        <div class="barre-calage"><button type="button" class="bouton-secondaire" data-verifier="${echapper(p.id)}">Vérifier (un autre plan)</button>${controlerPlan ? `<button type="button" class="bouton-secondaire" data-controler="${echapper(p.id)}">Contrôler (points levés)</button>` : ''}</div>` : `<p>Échelle ${c.similitude.echelle.toPrecision(6).replace(/\.?0+$/, '')} · rotation ${nombre(c.similitude.rotationDeg, 4)}° · ${echapper(c.message)}</p>`}
         <p class="aide-calage">Il est dans la page Plans du projet : l'afficher, y accrocher, implanter, l'exporter en DXF (Exporter › Plan), comme les autres plans. Copié sur Drive avec le projet.</p>
       </section>
-      <div class="pied-calage"><button type="button" class="bouton-secondaire" data-aller="liste">Plans calés</button><button type="button" class="bouton" data-action="nouveau">＋ Caler un autre plan</button></div>`;
+      <div class="pied-calage"><button type="button" class="bouton-secondaire" data-aller="liste">Plans calés</button>${estDejaCale(p) ? '<button type="button" class="bouton" data-action="deja-cale">＋ Importer un autre plan déjà calé</button>' : '<button type="button" class="bouton" data-action="nouveau">＋ Caler un autre plan</button>'}</div>`;
   }
 
   // --- Écran Nettoyer (0.279.0, maquette validée le 22.11) ---
@@ -298,7 +308,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
         ${groupeRuban('Calques choisis', `${bouton('ecarter-selection', '✕', 'Écarter la sélection', 'data-zone="bouton-ecarter"')}${bouton('vider-selection', '◌', 'Tout désélectionner')}${bouton('annuler-nettoyage', '↶', 'Annuler')}`)}
         ${groupeRuban('Zone à garder', '', 'data-zone="boutons-zone"')}
         ${groupeRuban('À la main', `${bouton('enlever-main', '✂', 'Enlever des objets', 'data-zone="bouton-enlever"')}${bouton('voir-enleves', '◍', 'Voir les enlevés', 'data-zone="bouton-voir-enleves"')}${bouton('restaurer-tout', '↺', 'Tout restaurer', 'data-zone="bouton-restaurer"')}`)}
-        ${groupeRuban('Affichage', `${etat.modeReference ? '' : bouton('voir-reference', '▥', 'Référence', `data-zone="bouton-reference" aria-pressed="${etat.refVisible}"`)}${ni ? bouton('voir-changements', '±', 'Ce qui a changé') : ''}`)}
+        ${groupeRuban('Affichage', `${etat.modeReference || etat.dejaCale ? '' : bouton('voir-reference', '▥', 'Référence', `data-zone="bouton-reference" aria-pressed="${etat.refVisible}"`)}${ni ? bouton('voir-changements', '±', 'Ce qui a changé') : ''}`)}
         ${ni && groupe.length > 1 ? groupeRuban('Comparer avec', `<select class="choix-base" data-champ="base" aria-label="Indice de comparaison">${groupe.map((q) => `<option value="${echapper(q.id)}" ${q.id === (etat.baseId || ni.ancien.id) ? 'selected' : ''}>Indice ${echapper(q.calage.indice ?? '?')}</option>`).join('')}</select>`) : ''}
         ${groupeRuban('Zoom', '<button type="button" class="outil-ruban" data-zoom="1.5">＋</button><button type="button" class="outil-ruban" data-zoom="0.667">−</button><button type="button" class="outil-ruban" data-zoom="tout">⤢<span>Tout</span></button>')}
       </div>
@@ -335,7 +345,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
           </section>
         </div>
         <div class="vue-calage vue-nettoyer">
-          <div class="tete-vue"><strong>${etat.modeReference ? 'Plan de référence' : 'Plan calé nettoyé'}</strong><span class="aide-calage">${etat.modeReference ? '' : 'survolez un objet : le nom de son calque s\'affiche'}</span></div>
+          <div class="tete-vue"><strong>${etat.modeReference ? 'Plan de référence' : etat.dejaCale ? 'Plan nettoyé (MN95)' : 'Plan calé nettoyé'}</strong><span class="aide-calage">${etat.modeReference ? '' : 'survolez un objet : le nom de son calque s\'affiche'}</span></div>
           <div class="toile-calage" data-toile="nettoyer"></div>
           <div class="pied-vue" data-zone="compteur"></div>
         </div>
@@ -688,7 +698,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
       message('Calage automatique incertain : cliquez un point de vérification, ou calez à la main.', 5000);
       return;
     }
-    if (r.verdict !== 'juste') {
+    if (r.verdict !== 'juste' && r.methode !== 'deja-cale') {
       const choix = await demanderChoix({
         titre: r.verdict === 'a-revoir' ? 'Vérification à revoir (2 à 4 mm)' : 'Pas de vérification',
         texte: r.message,
@@ -999,7 +1009,13 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
       else {
         const c = etat.nouvelIndice.ancien.calage;
         etat.nouvelIndice.controle = controlerIndice(c.reperes ?? [], plan, c.similitude.echelle);
-        if (!etat.nouvelIndice.controle.memeOrigine) {
+        if (etat.dejaCale && !etat.nouvelIndice.controle.memeOrigine) {
+          // Plan déjà calé : pas de référence pour le recaler ; s'il est bien en MN95, on continue sans calage.
+          const ctl = etat.nouvelIndice.controle;
+          ctl.message = ctl.message.replace(/ ?(Le plan a bougé : )?calez[^.]*\./, '') + (estEnMn95(plan.bornes)
+            ? ' Il est en MN95 : si vous êtes sûr de lui, continuez (déjà calé) ; sinon calez-le sur une référence.'
+            : ' Il n\'est pas en MN95 : calez-le sur une référence.');
+        } else if (!etat.nouvelIndice.controle.memeOrigine) {
           etat.nouvelIndice.controle.enCours = true;
           essayerRecalage(plan); // en arrière-plan ; l'écran se redessine à la fin
         }
@@ -1184,7 +1200,8 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     etat.nom = baseDuNomCale(ancien.nom);
     etat.baseId = ancien.id;
     etat.indice = indiceSuivant(ancien.calage.indice);
-    if (!reference()) {
+    etat.dejaCale = estDejaCale(ancien);
+    if (!etat.dejaCale && !reference()) {
       message(`La référence « ${ancien.calage.referenceNom} » n'est plus dans le projet : nouvel indice impossible.`, 6000);
       remettreAZero();
       return;
@@ -1220,7 +1237,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
       le: new Date().toISOString(), nettoyage: etat.recette, indice: etat.indice.trim() || 'A',
       reperes: reperesDuPlan(etat.lu, etat.recette), calquesVus: etat.lu.calques.map((c) => c.nom),
       historique: ni?.ancien.calage.indices ?? [],
-      mode: ni?.mode ?? 'a-la-main',
+      mode: ni?.mode ?? (etat.dejaCale ? 'deja-cale' : 'a-la-main'),
       part: ni?.controle ? Math.round(ni.controle.part * 1000) / 1000 : null,
       // « +21 / −6 » est toujours par rapport à l'indice d'avant (même si la comparaison affichée était avec un autre).
       changements: ni && planNettoye().cale ? (({ ajoutes, supprimes }) => ({ ajoutes, supprimes }))(differencesPlans(planRecale(ni.ancien), planNettoye().cale).compte) : null,
@@ -1231,18 +1248,35 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     const range = ajouterPlan(plan, ni ? { conserve: ni.planId } : {});
     if (!range) return;
     etat.enregistre = range;
-    message(`Plan « ${etat.enregistre.nom} » calé et rangé dans le projet`, 4000, { ok: true });
+    message(`Plan « ${etat.enregistre.nom} » ${etat.dejaCale ? 'importé (déjà calé)' : 'calé'} et rangé dans le projet`, 4000, { ok: true });
     etape = 'fin';
     dessiner();
   }
 
   /** Vérification après coup : le plan enregistré est rouvert sur sa référence, en rôle Vérification. */
-  function verifier(planId) {
+  async function verifier(planId) {
     const plan = projet.plansDxf.find((p) => p.id === planId);
     const c = plan?.calage;
     if (!c) return;
+    // Plan déjà calé (0.309.0) : pas de référence à lui ; on choisit le plan (ou les points) qui sert à le vérifier.
+    let refVerif = c.referenceId;
+    if (estDejaCale(plan)) {
+      const refs = referencesPourVerifier(projet.plansDxf, plan);
+      if (!refs.length && !points().length) {
+        message('Aucun autre plan ni point dans le projet pour le vérifier : importez un plan de référence, ou « Contrôler (points) » après un levé.', 7000);
+        return;
+      }
+      refVerif = await demanderChoix({
+        titre: `Vérifier « ${plan.nom} » sur :`,
+        texte: 'Cliquez ensuite le même point sur ce plan (à gauche) et sur celui-ci (à droite).',
+        boutons: [...refs.map((q, i) => ({ cle: q.id, texte: q.nom, detail: planEnMn95(q) ? '' : 'local', principal: i === 0 })),
+          ...(points().length ? [{ cle: REF_POINTS, texte: 'Points du projet', detail: `${points().length} points : levés, à implanter, contrôle` }] : [])],
+      });
+      if (!refVerif) return;
+    }
     remettreAZero();
-    etat.referenceId = c.referenceId;
+    etat.dejaCale = false;
+    etat.referenceId = refVerif;
     if (!reference()) {
       message(`La référence « ${c.referenceNom} » n'est plus dans le projet : vérification impossible.`, 6000);
       return;
@@ -1274,6 +1308,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
         ecartVerificationM: Math.max(0, ...r.elements.filter((e) => e.role === 'verification').map((e) => e.ecartM)),
         message: r.message,
         verifieLe: new Date().toISOString(),
+        ...(estDejaCale(plan) ? { verifieAvec: reference()?.nom ?? '' } : {}),
       },
     };
     const range = ajouterPlan(maj, { remplace: plan.id });
@@ -1330,6 +1365,40 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     dessiner();
   }
 
+  /** 0.309.0 : importer un plan DXF / DWG déjà en MN95 (sans référence ni calage), le nettoyer, le ranger. */
+  function commencerDejaCale() {
+    remettreAZero();
+    etat.dejaCale = true;
+    etape = 'plan';
+    dessiner();
+  }
+
+  /** Plan déjà calé lu : nettoyage (recette de l'indice d'avant pour un nouvel indice), sans calage. */
+  async function nettoyerDejaCale() {
+    if (!etat.lu) return;
+    if (!estEnMn95(etat.lu.bornes)) {
+      const choix = await demanderChoix({
+        titre: 'Ce plan n\'est pas en MN95',
+        texte: 'Ses coordonnées ne tombent pas en Suisse (MN95). Importé tel quel, il ne sera pas à sa place sur le plan.',
+        boutons: [{ cle: 'caler', texte: 'Le caler sur une référence', principal: true }, { cle: 'oui', texte: 'L\'importer quand même' }],
+      });
+      if (choix === 'caler' && !etat.nouvelIndice) {
+        etat.dejaCale = false;
+        etat.referenceId = plansDeReference(projet.plansDxf)[0]?.id ?? '';
+        dessiner();
+        return;
+      }
+      if (choix !== 'oui') return;
+    }
+    etat.resultat = resultatDejaCale();
+    if (etat.nouvelIndice) {
+      etat.nouvelIndice.mode = etat.nouvelIndice.controle?.memeOrigine ? 'meme-origine' : 'deja-cale';
+      etat.nouvelIndice.rejoue = true;
+    }
+    etat.recette = null;
+    allerNettoyer();
+  }
+
   function nouveau() {
     remettreAZero();
     if (simple) {
@@ -1360,6 +1429,25 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     else if (action === 'finir-axe') finirAxe();
     else if (cible.dataset.indiceDe) commencerIndice(cible.dataset.indiceDe);
     else if (cible.dataset.verifier) verifier(cible.dataset.verifier);
+    else if (cible.dataset.controler) {
+      // Contrôle avec les points levés (0.309.0) : celui de la page Plans (barre sur le plan de l'appli).
+      const id = cible.dataset.controler;
+      fermer({ sansRetour: true });
+      controlerPlan?.(id);
+    } else if (action === 'deja-cale') commencerDejaCale();
+    else if (action === 'passer-deja-cale') {
+      etat.dejaCale = true;
+      etat.referenceId = '';
+      dessiner();
+    } else if (action === 'vers-calage') {
+      etat.dejaCale = false;
+      if (!plansDeReference(projet.plansDxf).some((p) => p.id === etat.referenceId)) etat.referenceId = plansDeReference(projet.plansDxf)[0]?.id ?? '';
+      if (etat.nouvelIndice) {
+        message('Nouvel indice d\'un plan déjà calé : calez plutôt un nouveau plan (« ＋ Caler un nouveau plan »).', 6000);
+        return;
+      }
+      dessiner();
+    } else if (action === 'nettoyer-deja-cale') nettoyerDejaCale();
     else if (cible.dataset.comparerAvec) comparer(cible.dataset.comparerAvec);
     else if (cible.dataset.afficherIndice) {
       if (afficherIndice(cible.dataset.afficherIndice)) dessiner();
@@ -1449,7 +1537,8 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
       // Retour à la liste après un enregistrement : on repart de zéro (pas deux fois le même plan).
       if (aller === 'liste' && (etat.enregistre || etat.verif || etat.comparaison)) remettreAZero();
       if (aller === 'nettoyer') {
-        allerNettoyer();
+        if (etat.dejaCale && !etat.resultat) nettoyerDejaCale();
+        else allerNettoyer();
         return;
       }
       if (aller !== 'liste' && !accessible(aller)) {
@@ -1573,6 +1662,8 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     }
   });
 
-  dessiner();
+  // 0.309.0 : ouverte par Importer › Plan DXF : directement l'import d'un plan déjà calé.
+  if (depart === 'deja-cale' && !simple) commencerDejaCale();
+  else dessiner();
   return { fermer };
 }

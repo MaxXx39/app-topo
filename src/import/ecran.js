@@ -244,6 +244,7 @@ export function creerEcranImport(conteneur, contenu, actions) {
     else if (action === 'recaler-plan') actions.recalerPlanDxf(id);
     else if (action === 'annuler-recalage') actions.annulerRecalagePlan(id);
     else if (action === 'controler-plan') actions.controlerPlanDxf(id);
+    else if (action === 'importer-plan-cale') actions.importerPlanCale(); // 0.309.0 : écran du Calage de plans
     else if (action === 'tous-calques') actions.montrerTousCalquesDxf(id, bouton.dataset.visible === 'oui');
   });
 
@@ -354,11 +355,14 @@ export function creerEcranImport(conteneur, contenu, actions) {
               <span><strong>Points de contrôle</strong><span class="aide">CSV, TXT</span></span>
               <input type="file" data-champ="fichier-controle" accept=".csv,.txt,.pts,.xyz,.dat,.asc,text/csv,text/plain" hidden />
             </label>
-            <label class="bouton-import">
+            ${actions.importPlanCaleDisponible?.() ? `<button type="button" class="bouton-import" data-action="importer-plan-cale">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21 21 3M3 9l6-6M15 21l6-6M3 15h6v6" /></svg>
+              <span><strong>${actions.dwgDisponible?.() ? 'Plan DXF / DWG' : 'Plan DXF'}</strong><span class="aide">déjà calé, nettoyage</span></span>
+            </button>` : `<label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21 21 3M3 9l6-6M15 21l6-6M3 15h6v6" /></svg>
               <span><strong>Plan DXF</strong><span class="aide">fond de plan</span></span>
               <input type="file" data-champ="fichier-plan" accept=".dxf,application/dxf" hidden />
-            </label>
+            </label>`}
             <label class="bouton-import">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v15H6z" /><path d="M14 2v6h6" /><path d="M9 17l3-5 3 3" /></svg>
               <span><strong>Plan PDF</strong><span class="aide">PDF en traits</span></span>
