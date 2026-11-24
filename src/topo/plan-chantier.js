@@ -5,7 +5,7 @@
 // Un plan de chantier : { id, nom, genre, creeLe, modifieLe, phases [{ id, nom, couleur, visible }], phaseActive,
 //   couleurs ('objets' | 'phases'), objets [...], fond { plans: [id…] cachés, points: bool } }.
 // Un objet : { id, type, phase, ... } :
-//   zone   : { points, categorie, opacite (0–100, fond), contourMm, afficherSurface }
+//   zone   : { points, categorie, opacite (0–100, fond), contourMm, afficherSurface, traitContour, hachure { motif, angle, pasMm, couleur } }
 //   ligne  : { points, style, epaisseurMm, echelleMotif, sens ('inverse' = chevrons retournés), couleur }
 //   piste  : { points, largeur }                   (largeur en m)
 //   fleche : { points, largeur (m, 0,2), echelle (pointe, ×1) }  (sens de circulation, la pointe au dernier point)
@@ -30,6 +30,9 @@ export const CATEGORIES_ZONE = [
   { cle: 'emprise', nom: 'Emprise du chantier', couleur: '#1d4ed8' },
   { cle: 'interdite', nom: 'Zone interdite', couleur: '#dc2626' },
   { cle: 'parking', nom: 'Parking', couleur: '#64748b' },
+  // 0.299.0 (demande du 24.11) : deux genres de plus, simples noms de zone (couleurs proposées, à confirmer).
+  { cle: 'phase', nom: 'Phase', couleur: '#475569' },
+  { cle: 'autre', nom: 'Autre', couleur: '#a855f7' },
 ];
 
 // Styles de ligne (0.288.0, dimensions en mm sur le papier) :
@@ -846,4 +849,159 @@ export function ganttPhases(phases) {
     lignes: valides.map(({ p, d, f }) => ({ id: p.id, nom: p.nom, couleur: p.couleur, x0: (d - debut) / etendue, x1: (f - debut) / etendue, debut: p.debut, fin: p.fin ?? new Date(f).toISOString().slice(0, 10) })),
     sansDates: phases.filter((p) => !Number.isFinite(t(p.debut))).map((p) => p.nom),
   };
+}
+
+// --- Zones : type de trait du contour et hachures (0.299.0, demande du 24.11) ---
+
+/** Types de trait du contour d'une zone : [clé, nom, tirets en mm de papier ([] = continu)]. */
+export const TRAITS_CONTOUR = [
+  ['continu', 'Continu', []],
+  ['tirets', 'Tirets', [4, 2]],
+  ['points', 'Pointillé', [0.2, 1.4]],
+  ['mixte', 'Tirets-points', [5, 1.5, 0.4, 1.5]],
+];
+/** Tirets (mm de papier) du contour d'une zone ; [] = continu. */
+export const tiretsContour = (o) => (TRAITS_CONTOUR.find(([c]) => c === o?.traitContour) ?? TRAITS_CONTOUR[0])[2];
+
+/** Motifs de hachure : [clé, nom]. « aucune » = remplissage seul. */
+export const MOTIFS_HACHURE = [
+  ['aucune', 'Aucune'],
+  ['lignes', 'Lignes'],
+  ['quadrillage', 'Quadrillage'],
+  ['tirets', 'Tirets'],
+  ['points', 'Points'],
+  ['briques', 'Briques'],
+];
+export const HACHURE_ANGLE = 45; // degrés depuis l'Est, sens trigonométrique, au départ
+export const HACHURE_PAS_MM = 3; // espacement en mm de papier, au départ
+const HACHURE_MAX = 20000; // segments ou points au plus (un pas trop fin est élargi)
+
+/** Morceaux de la droite horizontale y (repère local) qui sont dans le polygone [[x, y]…] (règle pair-impair). */
+function morceauxSurLigne(poly, y) {
+  const xs = [];
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+    const [xi, yi] = poly[i];
+    const [xj, yj] = poly[j];
+    if ((yi > y) !== (yj > y)) xs.push(xi + ((y - yi) * (xj - xi)) / (yj - yi));
+  }
+  xs.sort((a, b) => a - b);
+  const res = [];
+  for (let k = 0; k + 1 < xs.length; k += 2) if (xs[k + 1] - xs[k] > 1e-9) res.push([xs[k], xs[k + 1]]);
+  return res;
+}
+
+/**
+ * Hachure d'une zone (polygone [[est, nord]…]) : { segments: [[x1, y1, x2, y2]…], points: [[x, y]…] } en MN95.
+ * motif : 'lignes', 'quadrillage', 'tirets', 'points', 'briques' ; angle en degrés (depuis l'Est, sens trigonométrique) ;
+ * pas = espacement en m. La grille est calée sur l'origine MN95 (deux zones voisines ont des hachures qui se suivent).
+ */
+export function hachureZone(points, { motif = 'lignes', angle = HACHURE_ANGLE, pas = 1 } = {}) {
+  const vide = { segments: [], points: [] };
+  if (!points || points.length < 3 || !(pas > 0) || motif === 'aucune') return vide;
+  const xs = points.map((p) => p[0]);
+  const ys = points.map((p) => p[1]);
+  const aire = Math.abs(aireSigneeZone(points));
+  // Trop de traits (pas minuscule pour la zone) : on élargit le pas.
+  let p = pas;
+  const nombre = () => (motif === 'points' ? aire / (p * p) : (Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) / p) * (motif === 'quadrillage' ? 2 : motif === 'briques' || motif === 'tirets' ? 4 : 1));
+  while (nombre() > HACHURE_MAX) p *= 1.5;
+  const segments = [];
+  const pts = [];
+  // Une direction : on tourne la zone de −angle (les hachures deviennent horizontales), on coupe, on retourne.
+  const direction = (deg, genre) => {
+    const a = (deg * Math.PI) / 180;
+    const [c, sn] = [Math.cos(a), Math.sin(a)];
+    const versLocal = ([x, y]) => [x * c + y * sn, -x * sn + y * c];
+    const versMn95 = (u, v) => [u * c - v * sn, u * sn + v * c];
+    const poly = points.map(versLocal);
+    const vmin = Math.min(...poly.map((q) => q[1]));
+    const vmax = Math.max(...poly.map((q) => q[1]));
+    for (let k = Math.ceil(vmin / p); k * p <= vmax; k += 1) {
+      const v = k * p;
+      for (const [u1, u2] of morceauxSurLigne(poly, v)) {
+        if (genre === 'points') {
+          for (let m = Math.ceil(u1 / p); m * p <= u2; m += 1) pts.push(versMn95(m * p, v));
+        } else if (genre === 'tirets') {
+          // Tirets de 0,6 pas, vides de 0,4 pas, décalés d'une ligne à l'autre.
+          const decale = (k % 2) * 0.5 * p;
+          for (let m = Math.floor((u1 - decale) / p); m * p + decale < u2; m += 1) {
+            const d1 = Math.max(u1, m * p + decale);
+            const d2 = Math.min(u2, m * p + decale + 0.6 * p);
+            if (d2 - d1 > 1e-9) segments.push([...versMn95(d1, v), ...versMn95(d2, v)]);
+          }
+        } else segments.push([...versMn95(u1, v), ...versMn95(u2, v)]);
+      }
+      // Briques : joints verticaux entre cette ligne et la suivante, tous les 2 pas, décalés d'un pas une rangée sur deux.
+      if (genre === 'briques') {
+        const v2 = v + p;
+        const decale = (((k % 2) + 2) % 2) * p;
+        for (const [u1, u2] of morceauxSurLigne(poly, v + p / 2)) {
+          for (let m = Math.ceil((u1 - decale) / (2 * p)); m * 2 * p + decale <= u2; m += 1) {
+            const u = m * 2 * p + decale;
+            // Joint gardé là où il est dans la zone (coupé à ses bords hauts et bas).
+            const haut = morceauxSurLigne(poly.map(([x, y]) => [y, x]), u).find(([a, b]) => a <= v + p / 2 && v + p / 2 <= b);
+            if (!haut) continue;
+            const w1 = Math.max(v, haut[0]);
+            const w2 = Math.min(v2, haut[1]);
+            if (w2 - w1 > 1e-9) segments.push([...versMn95(u, w1), ...versMn95(u, w2)]);
+          }
+        }
+      }
+    }
+  };
+  if (motif === 'points') direction(angle, 'points');
+  else if (motif === 'tirets') direction(angle, 'tirets');
+  else if (motif === 'briques') direction(angle, 'briques');
+  else {
+    direction(angle, 'lignes');
+    if (motif === 'quadrillage') direction(angle + 90, 'lignes');
+  }
+  return { segments, points: pts };
+}
+
+/** Aire signée d'un polygone [[x, y]…] (m², positive dans le sens trigonométrique). */
+function aireSigneeZone(points) {
+  let a = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
+    a += x1 * y2 - x2 * y1;
+  }
+  return a / 2;
+}
+
+/** Réglages de hachure d'une zone en m : { motif, angle, pas } (pas = pasMm × échelle / 1000), ou null sans hachure. */
+export function hachureDeLaZone(plan, o) {
+  const h = o?.hachure;
+  if (!h || !h.motif || h.motif === 'aucune') return null;
+  return { motif: h.motif, angle: Number.isFinite(h.angle) ? h.angle : HACHURE_ANGLE, pas: (h.pasMm > 0 ? h.pasMm : HACHURE_PAS_MM) * metresParMm(plan) };
+}
+
+// --- Ajouter un point au milieu d'un côté (0.299.0) ---
+
+/**
+ * Côtés d'un objet (ligne, zone, flèche, piste) où l'on peut ajouter un point : [{ index (le point est inséré après
+ * celui-ci), milieu [e, n] }]. Une zone a aussi le côté qui ferme (dernier → premier).
+ */
+export function milieuxDesCotes(o) {
+  if (!['ligne', 'zone', 'fleche', 'piste'].includes(o?.type) || !o.points || o.points.length < 2) return [];
+  const n = o.points.length;
+  const res = [];
+  const cotes = o.type === 'zone' && n >= 3 ? n : n - 1;
+  for (let i = 0; i < cotes; i += 1) {
+    const a = o.points[i];
+    const b = o.points[(i + 1) % n];
+    res.push({ index: i, milieu: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] });
+  }
+  return res;
+}
+
+/** Copie des points avec un point ajouté au milieu du côté « index » (entre le point index et le suivant). */
+export function ajouterPointAuMilieu(points, index, ferme = false) {
+  const n = points.length;
+  if (index < 0 || index >= (ferme ? n : n - 1)) return points.slice();
+  const a = points[index];
+  const b = points[(index + 1) % n];
+  const m = [Math.round(((a[0] + b[0]) / 2) * 1000) / 1000, Math.round(((a[1] + b[1]) / 2) * 1000) / 1000];
+  return [...points.slice(0, index + 1), m, ...points.slice(index + 1)];
 }

@@ -2082,6 +2082,13 @@ function ouvrirPlansChantier() {
     modifie: () => modifie(),
     plans: () => plansDuProjet(),
     points: () => pointsDuProjet(),
+    // 0.299.0 : points par liste (choisir les listes montrées, noms des points)
+    listesPoints: () => [
+      ...projet.leves.filter((l) => estMontre(projet, l, 'leve')).map((l) => ({ id: l.id, nom: l.nom, points: l.points })),
+      { id: '__implanter', nom: 'À implanter', points: projet.aImplanter },
+      { id: '__controle', nom: 'Points de contrôle', points: projet.pointsControle },
+      { id: '__dessins', nom: 'Sommets des dessins', points: pointsDesDessins() },
+    ].filter((l) => l.points?.length),
     // 0.289.0 : surfaces du projet en fond (bords des triangles), enregistrer le PDF / DXF, auteur du cartouche.
     surfaces: () => projet.surfaces.filter((s) => estMontre(projet, s, 'surface')).map((s) => ({ id: s.id, nom: s.nom, triangles: trianglesDeSurface(s.id) })).filter((s) => s.triangles.length > 0),
     enregistrer: enregistrerFichier,

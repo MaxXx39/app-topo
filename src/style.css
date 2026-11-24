@@ -14818,3 +14818,7 @@ dialog.page-chantier[open] {
 .liste-enleves li:hover { background: color-mix(in srgb, #dc2626 8%, var(--surface)); }
 .liste-enleves li > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .liste-enleves .bouton-secondaire.petit { padding: 1px 8px; min-height: 0; }
+
+/* 0.299.0 : Plans de chantier, couleur des hachures d'une zone (carré de couleur + ↺). */
+.ligne-couleur-hachure { display: flex; align-items: center; gap: 6px; }
+.page-chantier .ligne-couleur-hachure input[type='color'] { width: 40px; min-width: 40px; height: 28px; padding: 0; border: 1px solid var(--bordure); border-radius: 6px; background: none; }

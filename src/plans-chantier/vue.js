@@ -5,7 +5,7 @@
 // glisser l'objet choisi = le déplacer (si glisserObjet le permet).
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
-import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles } from '../topo/plan-chantier.js';
+import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles, milieuxDesCotes } from '../topo/plan-chantier.js';
 import { dessinerObjet, dessinerObjets, symboleDeLObjet } from './dessin.js';
 import { coinsSymbole, poigneeRotation } from '../topo/symboles.js';
 import { dessinerFondSwisstopo } from './tuiles.js';
@@ -76,6 +76,7 @@ export function creerVueChantier(conteneur, options) {
       const ctx = fond.getContext('2d');
       ctx.setTransform(densite(), 0, 0, densite(), 0, 0);
       ctx.fillStyle = '#475569';
+      const noms = [];
       for (const p of points()) {
         if (!Number.isFinite(p.est)) continue;
         const q = versEcran(p.est, p.nord, vue);
@@ -83,6 +84,19 @@ export function creerVueChantier(conteneur, options) {
         ctx.beginPath();
         ctx.arc(q.x, q.y, 2.2, 0, 2 * Math.PI);
         ctx.fill();
+        if (pc?.fond?.nomsPoints && p.nom) noms.push([q, p.nom]);
+      }
+      // 0.299.0 : noms des points (au plus 1500 à l'écran, sinon illisible : zoomer)
+      if (noms.length && noms.length <= 1500) {
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.textBaseline = 'bottom';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineJoin = 'round';
+        for (const [q, nom] of noms) {
+          ctx.strokeText(String(nom), q.x + 4, q.y - 2);
+          ctx.fillText(String(nom), q.x + 4, q.y - 2);
+        }
       }
     }
     redessinerDessus();
@@ -212,6 +226,20 @@ export function creerVueChantier(conteneur, options) {
       const q = ecran(p);
       ctx.fillRect(q.x - 4, q.y - 4, 8, 8);
       ctx.strokeRect(q.x - 4, q.y - 4, 8, 8);
+    }
+    // 0.299.0 : petit « + » au milieu de chaque côté (ligne, zone, flèche, piste) : clic ou glisser = ajouter un point.
+    for (const { milieu } of milieuxDesCotes(o)) {
+      const q = ecran(milieu);
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, 5, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(q.x - 2.8, q.y);
+      ctx.lineTo(q.x + 2.8, q.y);
+      ctx.moveTo(q.x, q.y - 2.8);
+      ctx.lineTo(q.x, q.y + 2.8);
+      ctx.stroke();
     }
   }
 

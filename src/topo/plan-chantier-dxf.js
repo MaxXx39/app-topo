@@ -7,7 +7,7 @@
 import {
   styleLigne, categorieZone, couleurObjet, dimensionsFleche, pointeDeFleche, centreZone, texteSurface, positionsLeLong,
   metresParMm, estPose, texteSymbolesM,
-  geometrieCotation, lignesDuTexte,
+  geometrieCotation, lignesDuTexte, hachureZone, hachureDeLaZone,
 } from './plan-chantier.js';
 import { couleurAci } from './dxf-plan.js';
 import { grueDeLObjet, symboleDeLObjetPose } from './grue-mobile.js';
@@ -131,6 +131,14 @@ export function dxfPlanChantier(plan, bib, objets = null) {
     if (o.type === 'zone') {
       const c = calque(o, `ZONE_${categorieZone(o.categorie).nom}`, aci);
       entites.push(...polyligne(o.points, c, { ferme: true }));
+      // 0.299.0 : hachures = traits (LINE) et petits cercles (points) sur un calque « …_HACHURES ».
+      const reglage = hachureDeLaZone(plan, o);
+      if (reglage) {
+        const h = hachureZone(o.points, reglage);
+        const ch = calque(o, `ZONE_${categorieZone(o.categorie).nom}_HACHURES`, o.hachure.couleur ? aciProche(o.hachure.couleur) : aci);
+        for (const [x1, y1, x2, y2] of h.segments) entites.push('0', 'LINE', '8', ch, '10', f3(x1), '20', f3(y1), '30', '0', '11', f3(x2), '21', f3(y2), '31', '0');
+        for (const [x, y] of h.points) entites.push('0', 'CIRCLE', '8', ch, '10', f3(x), '20', f3(y), '30', '0', '40', f3(0.25 * mParMm));
+      }
       const etiq = [o.etiquette, o.afficherSurface ? texteSurface(o.points) : null].filter(Boolean).join(' · ');
       if (etiq) {
         const [x, y] = centreZone(o.points);

@@ -8,12 +8,59 @@ import { versEcran } from '../plan/vue.js';
 import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
   geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
+  hachureZone, hachureDeLaZone, tiretsContour,
 } from '../topo/plan-chantier.js';
 import { textureMateriau } from './textures.js';
 import { grueDeLObjet, symboleDeLObjetPose } from '../topo/grue-mobile.js';
 import { nuance, primitivesEtage, chassisLibre, boiteSymbole, echelleDeLObjet } from '../topo/symboles.js';
 
 const ecranDe = (d) => ([e, n]) => versEcran(e, n, d.vue);
+
+// 0.299.0 : hachures des zones, gardées tant que la zone et ses réglages ne changent pas (le plan se redessine souvent).
+const memoHachures = new WeakMap();
+function hachuresMemo(pc, o) {
+  const r = hachureDeLaZone(pc, o);
+  if (!r) return null;
+  const cle = JSON.stringify([o.points, r]);
+  const m = memoHachures.get(o);
+  if (m?.cle === cle) return m.h;
+  const h = hachureZone(o.points, r);
+  memoHachures.set(o, { cle, h });
+  return h;
+}
+
+/** Dessine les hachures d'une zone (traits ou points), de la couleur choisie (sinon celle de la zone). */
+function dessinerHachures(d, o, couleur) {
+  const h = hachuresMemo(d.pc, o);
+  if (!h) return;
+  const { ctx } = d;
+  const ecran = ecranDe(d);
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = o.hachure.couleur || couleur;
+  ctx.fillStyle = o.hachure.couleur || couleur;
+  ctx.lineWidth = Math.max(0.6, 0.18 * d.mm);
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  for (const [x1, y1, x2, y2] of h.segments) {
+    const a = ecran([x1, y1]);
+    const b = ecran([x2, y2]);
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+  }
+  ctx.stroke();
+  if (h.points.length) {
+    const r = Math.max(0.8, 0.25 * d.mm);
+    ctx.beginPath();
+    for (const p of h.points) {
+      const q = ecran(p);
+      ctx.moveTo(q.x + r, q.y);
+      ctx.arc(q.x, q.y, r, 0, 2 * Math.PI);
+    }
+    ctx.fill();
+  }
+  ctx.restore();
+}
 
 function chemin(d, pts, ferme) {
   const ecran = ecranDe(d);
@@ -211,10 +258,18 @@ export function dessinerObjet(d, o) {
       ctx.restore();
     }
     if (o.tasH > 0) dessinerTas(d, o, couleur);
+    dessinerHachures(d, o, couleur); // 0.299.0 : hachures en plus du remplissage
     ctx.strokeStyle = couleur;
     ctx.lineWidth = Math.max(0.8, contourZoneMm(o) * mm);
+    // 0.299.0 : type de trait du contour (tirets en mm de papier)
+    const tirets = tiretsContour(o);
+    if (tirets.length) {
+      ctx.setLineDash(tirets.map((t) => Math.max(1, t * mm)));
+      if (o.traitContour === 'points') ctx.lineCap = 'round';
+    }
     chemin(d, o.points, true);
     ctx.stroke();
+    ctx.setLineDash([]);
     // Étiquette au centre : surface et / ou hauteur du tas.
     const parties = [];
     if (o.etiquette) parties.push(o.etiquette); // 0.293.0 : texte libre de la zone ou du tas
