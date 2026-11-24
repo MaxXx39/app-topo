@@ -4,6 +4,7 @@
 // une flèche qui n'est pas dans l'axe de la coupe apparaît raccourcie (× cos de l'angle).
 // Tout en m. Résultat : { longueur, zMin, zMax, batiments, grues, niveaux }.
 import { reglagesGrue, niveauxGrue, boutDeFleche, porteeMax, chargeAuRayon } from './grue-fiche.js';
+import { profilSurface } from './coupe.js';
 import { modeleDe } from './grue-modele.js';
 
 const RAD = Math.PI / 180;
@@ -44,10 +45,20 @@ export function traverseePolygone(a, b, pts) {
   return res;
 }
 
-/** Lignes proposées pour la coupe : l'axe de chaque grue d'après fiche, puis chaque ligne de construction (segment). */
+/**
+ * Lignes proposées pour la coupe : les lignes de coupe tracées (lignes de construction marquées `coupe`), l'axe de chaque
+ * grue d'après fiche, puis les autres lignes de construction (segments).
+ */
 export function lignesDeCoupe(plan) {
   const res = [];
   let n = 0;
+  let nc = 0;
+  for (const o of plan?.objets ?? []) {
+    if (o.type === 'construction' && o.coupe && o.points?.length >= 2) {
+      nc += 1;
+      res.push({ id: `constr:${o.id}`, nom: `Coupe ${nc} (tracée)`, a: o.points[0], b: o.points[o.points.length - 1], tracee: true });
+    }
+  }
   for (const o of plan?.objets ?? []) {
     if (o.type === 'grue' && o.modele === 'fiche') {
       const g = reglagesGrue(o);
@@ -59,7 +70,7 @@ export function lignesDeCoupe(plan) {
     }
   }
   for (const o of plan?.objets ?? []) {
-    if (o.type === 'construction' && o.points?.length >= 2) {
+    if (o.type === 'construction' && !o.coupe && o.points?.length >= 2) {
       n += 1;
       res.push({ id: `constr:${o.id}`, nom: `Ligne de construction ${n}`, a: o.points[0], b: o.points[o.points.length - 1] });
     }
@@ -108,9 +119,10 @@ export function formesGrue(o, a, u) {
 }
 
 /**
- * Coupe d'un plan le long de la ligne { a, b } : grues d'après fiche (projetées) et zones avec Z bas et Z haut (bâtiments).
+ * Coupe d'un plan le long de la ligne { a, b } : grues d'après fiche (projetées), zones « Bâtiment » avec Z bas et Z haut, et
+ * profil des surfaces du projet (terrains, plateformes) : surfaces = [{ id, nom, type, triangles }].
  */
-export function coupeChantier(plan, ligne) {
+export function coupeChantier(plan, ligne, surfaces = []) {
   const { a, b } = ligne;
   const longueur = Math.hypot(b[0] - a[0], b[1] - a[1]);
   const u = longueur > 0 ? [(b[0] - a[0]) / longueur, (b[1] - a[1]) / longueur] : [1, 0];
@@ -118,7 +130,7 @@ export function coupeChantier(plan, ligne) {
   const grues = [];
   const zs = [];
   for (const o of plan?.objets ?? []) {
-    if (o.type === 'zone' && Number.isFinite(Number(o.zBas)) && Number.isFinite(Number(o.zHaut)) && o.zBas !== '' && o.zHaut !== '' && o.points?.length >= 3) {
+    if (o.type === 'zone' && o.categorie === 'batiment' && Number.isFinite(Number(o.zBas)) && Number.isFinite(Number(o.zHaut)) && o.zBas !== '' && o.zHaut !== '' && o.points?.length >= 3) {
       for (const [s0, s1] of traverseePolygone(a, b, o.points)) {
         batiments.push({ id: o.id, s0, s1, zBas: Number(o.zBas), zHaut: Number(o.zHaut), nom: o.etiquette || 'Bâtiment' });
         zs.push(Number(o.zBas), Number(o.zHaut));
@@ -130,6 +142,13 @@ export function coupeChantier(plan, ligne) {
       if (o.massifs) zs.push(gr.niveaux.pied - (Number(o.massifH) > 0 ? Number(o.massifH) : 1));
     }
   }
-  return { longueur, batiments, grues, zMin: zs.length ? Math.min(...zs) : 0, zMax: zs.length ? Math.max(...zs) : 10 };
+  const profils = [];
+  for (const s of surfaces) {
+    const lignes = profilSurface(s.triangles, { est: a[0], nord: a[1] }, { est: b[0], nord: b[1] }).map((l) => l.map((p) => [Math.round(p.distance * 1000) / 1000, Math.round(p.altitude * 1000) / 1000]));
+    if (!lignes.length) continue;
+    profils.push({ id: s.id, nom: s.nom, type: s.type === 'plateforme' ? 'plateforme' : 'terrain', lignes });
+    for (const l of lignes) for (const p of l) zs.push(p[1]);
+  }
+  return { longueur, batiments, grues, surfaces: profils, zMin: zs.length ? Math.min(...zs) : 0, zMax: zs.length ? Math.max(...zs) : 10 };
 }
 

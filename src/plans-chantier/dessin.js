@@ -292,15 +292,22 @@ export function dessinerObjet(d, o) {
       const L = (vue.largeur + vue.hauteur) * 3;
       [x1, y1, x2, y2] = [x1 - ux * L, y1 - uy * L, x2 + ux * L, y2 + uy * L];
     }
-    ctx.strokeStyle = couleur;
-    ctx.lineWidth = 1;
-    ctx.setLineDash({ continu: [], points: [1.5, 5], mixte: [14, 4, 2, 4] }[o.trait] ?? [9, 5]);
+    ctx.strokeStyle = o.coupe ? '#dc2626' : couleur; // 0.312.0 : ligne de coupe (vue de côté) en rouge, trait-point, avec A et B
+    ctx.lineWidth = o.coupe ? 2 : 1;
+    ctx.setLineDash(o.coupe ? [14, 4, 2, 4] : ({ continu: [], points: [1.5, 5], mixte: [14, 4, 2, 4] }[o.trait] ?? [9, 5]));
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = couleur;
+    ctx.fillStyle = o.coupe ? '#dc2626' : couleur;
+    if (o.coupe) {
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('A', a.x - 11, a.y - 8);
+      ctx.fillText('B', b.x + 11, b.y - 8);
+      ctx.textAlign = 'start';
+    }
     for (const q of [a, b]) {
       ctx.beginPath();
       ctx.moveTo(q.x - 4, q.y);

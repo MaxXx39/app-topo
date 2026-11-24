@@ -15,9 +15,10 @@ export function svgCoupe(coupe, largeur = 700, hauteur = 240) {
   const mb = 22;
   let sMin = 0;
   let sMax = coupe.longueur;
+  for (const sf of coupe.surfaces ?? []) for (const l of sf.lignes) for (const p of l) { sMin = Math.min(sMin, p[0]); sMax = Math.max(sMax, p[0]); }
   for (const g of coupe.grues) {
     for (const f of g.formes) {
-      for (const p of f.pts ?? [[f.s, f.z]]) {
+      for (const p of f.pts ?? (f.ancre === 'end' ? [[f.s - 16, f.z], [f.s, f.z]] : [[f.s, f.z]])) {
         sMin = Math.min(sMin, p[0]);
         sMax = Math.max(sMax, p[0]);
       }
@@ -52,8 +53,16 @@ export function svgCoupe(coupe, largeur = 700, hauteur = 240) {
     }
     corps.push(`<line x1="${ml}" x2="${largeur - mr}" y1="${Y(g.niveaux.pied).toFixed(1)}" y2="${Y(g.niveaux.pied).toFixed(1)}" stroke="#92400e" stroke-dasharray="5 4" stroke-width="1"/>`);
   }
-  const vide = !coupe.grues.length && !coupe.batiments.length ? `<text x="${largeur / 2}" y="${hauteur / 2}" text-anchor="middle" class="t">Rien à voir sur cette ligne (grue d'après fiche, ou zone avec Z bas et Z haut)</text>` : '';
-  return `<svg viewBox="0 0 ${largeur} ${hauteur}" width="${largeur}" height="${hauteur}" role="img" aria-label="Vue de côté">
+  // Surfaces du projet (terrains en vert, plateformes en brun), par-dessus les bâtiments
+  for (const sf of coupe.surfaces ?? []) {
+    const k = sf.type === 'plateforme' ? '#b45309' : '#15803d';
+    for (const l of sf.lignes) corps.push(`<path d="${chemin(l)}" fill="none" stroke="${k}" stroke-width="2" stroke-linejoin="round"/>`);
+    const fin = sf.lignes[sf.lignes.length - 1];
+    const dernier = fin[fin.length - 1];
+    corps.push(`<text x="${(X(dernier[0]) - 4).toFixed(1)}" y="${(Y(dernier[1]) - 5).toFixed(1)}" text-anchor="end" class="t" style="fill:${k}">${echapper(sf.nom)}</text>`);
+  }
+  const vide = !coupe.grues.length && !coupe.batiments.length && !(coupe.surfaces ?? []).length ? `<text x="${largeur / 2}" y="${hauteur / 2}" text-anchor="middle" class="t">Rien à voir sur cette ligne (grue d'après fiche, zone Bâtiment avec Z bas et Z haut, surface du projet)</text>` : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largeur} ${hauteur}" width="${largeur}" height="${hauteur}" role="img" aria-label="Vue de côté">
     <style>.z{font:10px sans-serif;fill:#64748b}.t{font:11px sans-serif;fill:#1e293b}.tc{font:11px sans-serif;fill:#7c2d12}</style>
     ${reperes.join('')}
     <line x1="${ml}" x2="${ml}" y1="${mt}" y2="${hauteur - mb}" stroke="#94a3b8"/>

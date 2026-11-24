@@ -34,6 +34,8 @@ export const CATEGORIES_ZONE = [
   // 0.299.0 (demande du 24.11) : deux genres de plus, simples noms de zone (couleurs proposées, à confirmer).
   { cle: 'phase', nom: 'Phase', couleur: '#475569' },
   { cle: 'autre', nom: 'Autre', couleur: '#a855f7' },
+  // 0.312.0 (demande du 24.11) : la zone « Bâtiment » a un Z bas et un Z haut, visibles sur la vue de côté (couleur proposée, à confirmer).
+  { cle: 'batiment', nom: 'Bâtiment', couleur: '#78716c' },
 ];
 
 // Styles de ligne (0.288.0, dimensions en mm sur le papier) :
