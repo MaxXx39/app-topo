@@ -381,3 +381,19 @@ describe('retirer un point', () => {
     expect(pf.ruptures).toEqual([]);
   });
 });
+
+import { bandeRemblai, coteOuvrageProche, contreUnOuvrage as contre } from '../src/topo/plateforme.js';
+describe('remblai contre un ouvrage (0.307.0)', () => {
+  it('mur ouvert, bâtiment à gauche : la bande part à droite, et son côté sur la face n\'a pas de talus', () => {
+    const mur = { type: 'mur', points: [[0, 0], [10, 0]], epaisseur: 0.3, cote: 'gauche' };
+    const b = bandeRemblai(mur, 4);
+    expect(b).toEqual([[0, 0], [10, 0], [10, -4], [0, -4]]);
+    expect(contre({ est: 0, nord: 0 }, { est: 10, nord: 0 }, [mur])).toBe(true);
+  });
+  it('bâtiment fermé : le côté touché, vers l\'extérieur', () => {
+    const bat = { type: 'mur', ferme: true, points: [[0, 0], [10, 0], [10, 8], [0, 8]], epaisseur: 0.3 };
+    const i = coteOuvrageProche(bat, { est: 10.5, nord: 4 });
+    expect(i).toBe(1);
+    expect(bandeRemblai(bat, 3, i)).toEqual([[10, 0], [10, 8], [13, 8], [13, 0]]);
+  });
+});

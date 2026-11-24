@@ -778,3 +778,43 @@ export function traverseesOuvrage(o, a, b) {
   }
   return res;
 }
+
+/**
+ * 0.307.0 (demande du 24.11 : « remblayer du bon côté ») : bande de remblai contre la face extérieure d'un ouvrage, de
+ * « largeur » m, du côté OPPOSÉ au bâtiment. Mur ouvert : le long de toute la face ; contour fermé (mur fermé, radier,
+ * dalle) : le long du côté « segment » (n° du côté). Renvoie le contour [[e, n]…] (la face d'abord), ou [] si impossible.
+ */
+export function bandeRemblai(o, largeur, segment = 0) {
+  const pts = o.points ?? [];
+  const L = Math.abs(Number(largeur) || 0);
+  if (pts.length < 2 || !(L > 0)) return [];
+  const ferme = o.type !== 'mur' || (o.ferme && pts.length >= 3);
+  let face = pts;
+  let d;
+  if (ferme) {
+    // Intérieur à gauche pour un contour trigonométrique : dehors = à droite (décalage négatif).
+    d = aireXY(pts) > 0 ? -L : L;
+    const i = Math.max(0, Math.min(pts.length - 1, segment));
+    face = [pts[i], pts[(i + 1) % pts.length]];
+  } else {
+    d = (o.cote ?? 'gauche') === 'gauche' ? -L : L;
+  }
+  const r3 = (v) => Math.round(v * 1000) / 1000;
+  return [...face, ...decaler(face, d, false).reverse()].map(([e, n]) => [r3(e), r3(n)]);
+}
+
+/** Côté d'un ouvrage le plus proche d'un point { est, nord } : n° du segment (contour fermé : le dernier ferme). */
+export function coteOuvrageProche(o, p) {
+  const pts = o.points ?? [];
+  const ferme = o.type !== 'mur' || (o.ferme && pts.length >= 3);
+  let meilleur = { i: 0, d: Infinity };
+  for (let i = 0; i < (ferme ? pts.length : pts.length - 1); i += 1) {
+    const [a, b] = [pts[i], pts[(i + 1) % pts.length]];
+    const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+    const l2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((p.est - a[0]) * dx + (p.nord - a[1]) * dy) / l2));
+    const d = Math.hypot(p.est - (a[0] + t * dx), p.nord - (a[1] + t * dy));
+    if (d < meilleur.d) meilleur = { i, d };
+  }
+  return meilleur.i;
+}
