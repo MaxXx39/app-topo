@@ -205,16 +205,31 @@ describe('dessin à l\'échelle', () => {
     expect(grueFiche({ fleche: 50, cercles: 'aucun' }).rayon.filter((p) => p.g === 'c')).toHaveLength(1);
     expect(grueFiche({ fleche: 50, cercles: 'tous' }).rayon.filter((p) => p.g === 'c').length).toBeGreaterThan(8);
   });
-  it('pied toujours coté ; massifs sous les appuis avec leur taille', () => {
+  it('pied toujours coté ; 4 massifs carrés (2 m au départ) sous les appuis, cotés', () => {
     const s = grueFiche({ fleche: 40, tour: 'hc175-uc460m' });
     expect(s.primitives.some((p) => p.g === 't' && p.t === '4.60 m')).toBe(true);
-    const m = grueFiche({ fleche: 40, tour: 'hc175-uc460m', massifs: true, massifL: 2, massifB: 3 });
-    expect(m.primitives.some((p) => p.g === 't' && p.t === 'Massif 2.00 × 3.00 m')).toBe(true);
+    expect(s.primitives.filter((p) => p.g === 'h' && p.k === '#b9bfc6')).toHaveLength(0); // pas de massif sans la case
+    const m = grueFiche({ fleche: 40, tour: 'hc175-uc460m', massifs: true });
     const gris = m.primitives.filter((p) => p.g === 'h' && p.k === '#b9bfc6');
     expect(gris).toHaveLength(4);
-    expect(gris[0].b[2] - gris[0].b[0]).toBeCloseTo(2, 3);
-    expect(gris[0].b[3] - gris[0].b[1]).toBeCloseTo(3, 3);
-    expect(grueFiche({ fleche: 40, tour: 'hc175-far', massifs: true }).primitives.filter((p) => p.g === 'h' && p.k === '#b9bfc6')).toHaveLength(1); // ancrage fixe : un seul massif
+    for (const g of gris) {
+      expect(g.b[2] - g.b[0]).toBeCloseTo(2, 3);
+      expect(g.b[3] - g.b[1]).toBeCloseTo(2, 3);
+    }
+    // centrés sur les 4 coins du carré d'appui de 4,60 m
+    expect(gris.map((g) => [(g.b[0] + g.b[2]) / 2, (g.b[1] + g.b[3]) / 2].map((v) => Math.round(v * 100) / 100)).sort()).toEqual([[-2.3, -2.3], [-2.3, 2.3], [2.3, -2.3], [2.3, 2.3]]);
+    expect(m.primitives.filter((p) => p.g === 't' && p.t === '2.00 m')).toHaveLength(2); // cote au-dessus et à droite
+    const g3 = grueFiche({ fleche: 40, tour: 'hc175-uc460m', massifs: true, massifL: 3 });
+    expect(g3.primitives.some((p) => p.g === 't' && p.t === '3.00 m')).toBe(true);
+    expect(g3.primitives.filter((p) => p.g === 'h' && p.k === '#b9bfc6')[0].b[2] - g3.primitives.filter((p) => p.g === 'h' && p.k === '#b9bfc6')[0].b[0]).toBeCloseTo(3, 3);
+  });
+  it('les massifs suivent l\'orientation du pied (pas de la flèche) ; ancrage fixe : 4 massifs aux coins du mât', () => {
+    const fa = grueFiche({ fleche: 40, tour: 'hc175-far', massifs: true });
+    expect(fa.primitives.filter((p) => p.g === 'h' && p.k === '#b9bfc6')).toHaveLength(4);
+    const a = grueFiche({ fleche: 40, tour: 'hc175-uc460m', massifs: true });
+    const b = grueFiche({ fleche: 40, tour: 'hc175-uc460m', massifs: true, rotationFleche: 90 });
+    const pos = (x) => x.primitives.filter((p) => p.g === 'h' && p.k === '#b9bfc6').map((g) => g.b.join());
+    expect(pos(b)).toEqual(pos(a));
   });
   it('branchée aux plans de chantier et au DXF', () => {
     const o = { id: 'g1', type: 'grue', modele: 'fiche', modeleGrue: L.id, point: [2500000, 1120000], rotation: 30, fleche: 45, tour: 'hc175-uc460m', hauteur: 27.3, rayon: true, phase: 'p1' };

@@ -77,7 +77,8 @@ export function reglagesGrue(o = {}) {
     zPied: Number.isFinite(Number(o.zPied)) && o.zPied !== '' && o.zPied != null ? Number(o.zPied) : 0,
     afficherCharge: o.afficherCharge !== false, afficherHsc: o.afficherHsc !== false,
     couleurTexte: /^#[0-9a-f]{6}$/i.test(o.couleurTexte ?? '') ? o.couleurTexte : COULEUR_TEXTE,
-    massifs: Boolean(o.massifs), massifL: nombreOu(o.massifL, 1.5), massifB: nombreOu(o.massifB, 1.5), massifH: nombreOu(o.massifH, 1),
+    // 0.313.0 : 4 massifs carrés (côté massifL, 2 m au départ) sous le pied, dans l'orientation du pied ; massifH : seulement pour la vue de côté
+    massifs: Boolean(o.massifs), massifL: nombreOu(o.massifL, 2), massifB: nombreOu(o.massifL, 2), massifH: nombreOu(o.massifH, 1),
   };
 }
 
@@ -153,7 +154,7 @@ export function ficheGrue(o) {
   l.push({ titre: 'Flèche', valeur: `${fixe1(f.nom)} m (portée maximale ${fixe1(f.rMax ?? rMax)} m)`, detail: f.sections ? `éléments ${f.sections.map((i) => CERCLES[i - 1]).join(' ')}${pf ? `, ${Math.round(pf)} kg` : ''}` : null });
   if (cp) l.push({ titre: 'Contrepoids', valeur: `${fixe2(cp.t)} t`, detail: cp.texte });
   const pied = tour.pied.type === 'FA' ? 'ancrage fixe' : tour.pied.type === 'UC' ? `châssis roulant ${fixe2(tour.pied.c)} m` : tour.pied.type === 'CB' ? `croix de fondation ${fixe2(tour.pied.c)} m` : `stabilisateurs ${fixe2(tour.pied.c)} × ${fixe2(tour.pied.c)} m`;
-  l.push({ titre: 'Pied', valeur: pied, detail: `mât ${fixe2(tour.mat)} m de large${g.massifs ? ` · massifs ${fixe2(g.massifL)} × ${fixe2(g.massifB)} × ${fixe2(g.massifH)} m` : ''}` });
+  l.push({ titre: 'Pied', valeur: pied, detail: `mât ${fixe2(tour.mat)} m de large${g.massifs ? ` · 4 massifs ${fixe2(g.massifL)} × ${fixe2(g.massifL)} m` : ''}` });
   for (const [titre, valeur] of modele.infos ?? []) l.push({ titre, valeur });
   const estimes = (modele.estimes ?? []).map((k) => NOMS_ESTIMES[k] ?? k);
   if (estimes.length) pas.push(`Dimensions estimées (pas dans la fiche) : ${estimes.join(', ')}. À corriger dans « Modèles de grues… ».`);
@@ -189,11 +190,11 @@ function pointeFleche(x0, x1, w) {
   return [...piece(JAUNE, 'peinture', pts), ...piece(METAL_FONCE, 'metal', cercle(x1 - 0.2, 0, 0.17, 14))];
 }
 
-/** Positions des appuis du pied (là où se posent les massifs). */
+/** Positions des 4 appuis du pied (là où se posent les massifs) : coins du carré d'appui, ou coins du mât pour un ancrage fixe. */
 export function appuisDuPied(tour) {
   const { type, c } = tour.pied;
-  if (type === 'FA') return [[0, 0]];
-  return [[c / 2, c / 2], [c / 2, -c / 2], [-c / 2, c / 2], [-c / 2, -c / 2]];
+  const d = type === 'FA' ? tour.mat / 2 : c / 2;
+  return [[d, d], [d, -d], [-d, d], [-d, -d]];
 }
 
 /** Massifs sous les appuis (rectangles L × B centrés sur chaque appui) + leur étiquette. */
@@ -203,6 +204,23 @@ function massifs(g) {
     res.push(...piece(BETON, 'peinture', rectArrondi(x - g.massifL / 2, y - g.massifB / 2, x + g.massifL / 2, y + g.massifB / 2, 0.03, 1), '#6b7280'));
   }
   return res;
+}
+
+/** Cote d'un massif carré de côté c centré en [x, y] : une cote au-dessus et une à droite (« 2.00 m »). */
+function coteDuMassif([x, y], c) {
+  const k = '#0f172a';
+  const h = Math.max(0.3, c * 0.18);
+  const tic = h * 0.5;
+  const yc = y + c / 2 + 0.5;
+  const xc = x + c / 2 + 0.5;
+  const t = `${c.toFixed(2)} m`;
+  const l = (p) => ({ g: 'l', k, p, f: false, mat: 'trait' });
+  return [
+    l([x - c / 2, yc, x + c / 2, yc]), l([x - c / 2, yc - tic, x - c / 2, yc + tic]), l([x + c / 2, yc - tic, x + c / 2, yc + tic]),
+    { g: 't', k, x, y: yc + h, h, a: 0, t, ah: 1, av: 2 },
+    l([xc, y - c / 2, xc, y + c / 2]), l([xc - tic, y - c / 2, xc + tic, y - c / 2]), l([xc - tic, y + c / 2, xc + tic, y + c / 2]),
+    { g: 't', k, x: xc + h, y, h, a: 90, t, ah: 1, av: 2 },
+  ];
 }
 
 /** Pied de la tour (vue de dessus) : ancrage fixe, croix, châssis roulant ou stabilisateurs (carré d'appui c, bras en diagonale). */
@@ -318,7 +336,7 @@ export function grueFiche(o = {}) {
     // Pied toujours coté (côté du carré d'appui) ; massifs : leur taille écrite
     const bornes = bornesPrimitives([...dessous, ...base]);
     const cote = g.tour.pied.type === 'FA' ? [] : coteDuChassis(g.tour.pied.c, bornes);
-    if (g.massifs) cote.push(texte(`Massif ${fixe2(g.massifL)} × ${fixe2(g.massifB)} m`, (g.tour.pied.c ?? 0) / 2 + g.massifL / 2 + 1.8, -(g.tour.pied.c ?? 0) / 2, 0.5, { k: '#0f172a' }));
+    if (g.massifs) cote.push(...coteDuMassif(appuisDuPied(g.tour)[0], g.massifL));
     const bas = [...dessous, ...base, ...mat(g.tour.mat), ...cote];
     let haut = partieHaute(g);
     if (g.afficherHsc) haut.push(texte(`HSC ${fixe1(g.hauteur.h)} m`, -Math.max(g.modele.dim.arriereTotal * 0.6, 3), (g.tour.pied.c ?? g.tour.mat) / 2 + 1.2, 0.8, { k: '#1e293b' }));

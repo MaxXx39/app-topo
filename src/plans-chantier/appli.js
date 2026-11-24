@@ -1539,7 +1539,7 @@ export function ouvrirPlansChantier({
         <label class="champ-calage"><span>Couleur des textes</span><input type="color" value="${g.couleurTexte}" data-prop="couleurTexte"></label>
         ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}
         ${champCase('Massifs sous le pied', 'prop-case', 'massifs', g.massifs)}
-        ${g.massifs ? `${champNombre('Massif L', 'prop', 'massifL', g.massifL, 0.1, 30, 0.1, 'm')}${champNombre('Massif B', 'prop', 'massifB', g.massifB, 0.1, 30, 0.1, 'm')}${champNombre('Massif H', 'prop', 'massifH', g.massifH, 0.1, 10, 0.1, 'm')}` : ''}`;
+        ${g.massifs ? champNombre('Côté du massif', 'prop', 'massifL', g.massifL, 0.1, 30, 0.1, 'm') : ''}`;
     }
     if (o.type === 'grue' && o.modele === 'mobile') {
       // 0.293.0 : grue mobile dynamique (porteur = rotation de l'objet, tourelle et flèche indépendantes).
