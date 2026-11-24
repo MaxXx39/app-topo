@@ -388,8 +388,16 @@ export function creerVueChantier(conteneur, options) {
   // Vue lisible depuis l'élément (essais automatiques : cliquer à un endroit précis du terrain).
   conteneur.vueChantier = () => vue;
 
+  // 0.304.0 : quand un bandeau apparaît au-dessus (le haut du plan descend, le bas ne bouge pas), le dessin reste
+  // à sa place à l'écran : on décale la vue de la moitié de la différence de hauteur.
+  let cadreAvant = null;
   const observateur = new ResizeObserver(() => {
     if (!conteneur.clientWidth) return;
+    const r = conteneur.getBoundingClientRect();
+    if (vue && cadreAvant && Math.abs(r.bottom - cadreAvant.bottom) < 1 && Math.abs(r.width - cadreAvant.width) < 1 && Math.abs(r.top - cadreAvant.top) >= 1) {
+      vue = deplacer(vue, 0, (conteneur.clientHeight - cadreAvant.hauteur) / 2);
+    }
+    cadreAvant = { top: r.top, bottom: r.bottom, width: r.width, hauteur: conteneur.clientHeight };
     if (!vue) cadrer();
     else redessiner();
   });

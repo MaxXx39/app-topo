@@ -15,7 +15,7 @@ import { nouvelIdentifiant, avecPrefixe, PREFIXE_SURFACE } from '../topo/surface
 import {
   nouvellePlateforme, prochainNom, sommetsResolus, changerAltitude, penteCote, altitudeParPente, interpolerContour,
   ajouterPointMilieu, appliquerDeltaZ, cotePartage, trianglesPlateforme, talusPlateforme, trianglesTalus, reglageDuCote,
-  bermeDe, pointsEtFaces, TALUS_DEFAUT, BERME_DEFAUT, lireHV,
+  pointsEtFaces, TALUS_DEFAUT, lireHV, retirerPoint,
   unitesPlateformes, ordreDesEtapes, profilLeLong, volumeTerrainAFin, COULEURS_PLATEFORMES,
   altitudesAuto, empriseOuvrage, hautOuvrage, contreUnOuvrage, traverseesOuvrage,
 } from '../topo/plateforme.js';
@@ -65,12 +65,11 @@ export function ouvrirPlateformes({
     saisie: null, // dessin en cours : { points: [{ est, nord, alt, lien }] } (plateforme) ou { debut } (rupture, construction)
     accroches: new Set(['point', 'sommet']),
     voir: { noms: true, alt: true, pentes: true, tri: true, talus: true },
-    altSuivante: '', // altitude donnée au prochain point cliqué (vide = celle de l'accroche, sinon aucune)
     selPoint: null, selCote: null, // point / côté surlignés dans le tableau
     curseur: null,
     // 0.302.0 : étape choisie (id d'une plateforme seule ou d'un groupe), « l'étape seule » sur le plan, onglet du bas
-    // ('tableau', 'c1', 'c2'), côté dont la berme est ouverte dans le tableau.
-    etape: null, etapeSeule: true, onglet: 'tableau', bermeCote: null,
+    // ('tableau', 'c1', 'c2').
+    etape: null, etapeSeule: true, onglet: 'tableau',
   };
   let pile = [];
   let vue = null;
@@ -151,7 +150,9 @@ export function ouvrirPlateformes({
         if (altRef) {
           // 0.303.0 : contre la face extérieure d'un mur / radier / dalle, pas de talus.
           const n = res.sommets.length;
-          res.talus = talusPlateforme(res.sommets, (i) => (contreUnOuvrage(res.sommets[i], res.sommets[(i + 1) % n], ouvrages()) ? null : reglageDuCote(tous, pf, i)), bermeDe(pf), altRef, { pas: 1 });
+          // 0.304.0 : berme retirée pour l'instant (décision de l'utilisateur) : aucune, même si un ancien réglage existe.
+          const sansBerme = (x) => (x ? { pentes: x.pentes, berme: null } : null);
+          res.talus = talusPlateforme(res.sommets, (i) => (contreUnOuvrage(res.sommets[i], res.sommets[(i + 1) % n], ouvrages()) ? null : sansBerme(reglageDuCote(tous, pf, i))), null, altRef, { pas: 1 });
           res.erreursTalus = res.talus.erreurs;
           res.trianglesTalus = trianglesTalus(res.talus);
         }
@@ -293,14 +294,28 @@ export function ouvrirPlateformes({
     page.remove();
     quandRetour?.();
   }
+  // 0.304.0 : Échap ne ferme jamais la page (seul « ← » la ferme) : il annule l'action en cours (voir echap()).
   page.addEventListener('cancel', (ev) => {
     ev.preventDefault();
+    echap();
+  });
+  /** Échap : bulle ouverte, dessin en cours, outil, point choisi, l'un après l'autre. */
+  function echap() {
+    if (bulleOuverte) return fermerBulle(false);
     if (etat.saisie) {
       etat.saisie = null;
       return majTout();
     }
-    fermer();
-  });
+    if (etat.outil !== 'choisir') {
+      etat.outil = 'choisir';
+      return majTout();
+    }
+    if (etat.selPoint || etat.selCote != null) {
+      etat.selPoint = null;
+      etat.selCote = null;
+      return majTout();
+    }
+  }
 
   // --- Page ---
 
@@ -331,7 +346,6 @@ export function ouvrirPlateformes({
           <div class="groupe-ruban"><div class="boutons-groupe">${ACCROCHES.map(([c, i, t, aide]) => `<button type="button" class="outil-ruban" data-accroche="${c}" title="Accroche : ${t}${aide ? ` (${aide})` : ''}">${ico(i)}<span>${t}</span></button>`).join('')}</div></div>
           <div class="groupe-ruban"><div class="boutons-groupe">${VOIR.map(([c, i, t]) => `<button type="button" class="outil-ruban" data-voir="${c}" title="Montrer / cacher : ${t}">${ico(i)}<span>${t}</span></button>`).join('')}
             <button type="button" class="outil-ruban" data-action="tout-voir" title="Tout voir">${ico('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>')}<span>Tout</span></button></div></div>
-          <label class="champ-alt-suivante" title="Altitude donnée au prochain point cliqué (vide : altitude du point accroché s'il en a une)">Alt. du clic <input type="text" inputmode="text" data-champ="altSuivante" value="${echapper(etat.altSuivante)}" placeholder="m"></label>
         </div>
         <div class="bandeau-plateforme" data-zone="bandeau"></div>
         <p class="consigne-calage" data-zone="consigne"></p>
@@ -340,7 +354,7 @@ export function ouvrirPlateformes({
             <div class="vue-calage vue-plateformes"><div class="toile-plateformes" data-toile></div><div class="pied-vue etat-chantier" data-zone="etat"></div></div>
             <section class="carte-calage tableau-plateforme">
               <div class="onglets-plateforme" role="tablist"><button type="button" data-onglet="tableau" role="tab"><span data-zone="titre-tableau">Tableau</span></button><button type="button" data-onglet="c1" role="tab">Coupe 1</button><button type="button" data-onglet="c2" role="tab">Coupe 2</button></div>
-              <div data-zone="partie-tableau"><div class="cadre-tableau-plateforme" data-zone="tableau"></div>
+              <div data-zone="partie-tableau" class="partie-tableau"><div class="cadre-tableau-plateforme" data-zone="tableau"></div>
               <div class="barre-calage"><button type="button" class="bouton-secondaire petit" data-action="interpoler">Interpoler les vides</button><button type="button" class="bouton-secondaire petit" data-action="effacer-calculees">Effacer les calculées</button></div></div>
               <div data-zone="partie-coupe" class="partie-coupe" hidden></div></section>
           </div>
@@ -370,10 +384,10 @@ export function ouvrirPlateformes({
     const c = page.querySelector('[data-zone="consigne"]');
     const s = etat.saisie;
     c.textContent = {
-      choisir: choisie() ? 'Glisser un carré = déplacer l\'angle ; « + » au milieu d\'un côté = ajouter un point ; flèche de pente = taper la pente ; toucher un angle = son altitude.' : 'Choisissez une plateforme (clic dedans) ou dessinez-en une (outil « Plateforme »).',
-      plateforme: s?.points?.length ? `${s.points.length} angle(s) : cliquez le suivant ; cliquez le 1er angle (ou Entrée) pour finir ; Échap abandonne.` : 'Cliquez les angles de la plateforme (accroche sur un angle d\'une autre plateforme = angle partagé). « Alt. du clic » donne l\'altitude.',
+      choisir: choisie() ? 'Glisser un carré = déplacer l\'angle ; « + » au milieu d\'un côté = ajouter un point ; toucher un angle ou une pente = la changer (✕ = retirer le point).' : 'Choisissez une plateforme (clic dedans) ou dessinez-en une (outil « Plateforme »).',
+      plateforme: s?.points?.length ? `${s.points.length} angle(s) : cliquez le suivant (altitude dans la bulle) ; 1er angle, double-clic ou Entrée pour finir ; Échap abandonne.` : 'Cliquez les angles de la plateforme : l\'altitude se tape dans la bulle (accroche sur un angle d\'une autre plateforme = angle partagé).',
       rupture: s?.debut ? `Ligne de rupture depuis ${s.debut} : cliquez le 2e point.` : 'Ligne de rupture : cliquez un point existant de la plateforme choisie, puis un autre.',
-      interieur: 'Cliquez dans la plateforme choisie : point intérieur (altitude : « Alt. du clic », sinon celle de la surface).',
+      interieur: 'Cliquez dans la plateforme choisie : point intérieur (altitude dans la bulle ; vide = celle de la surface).',
       construction: s?.debut ? 'Cliquez le 2e point de la ligne de construction.' : 'Ligne de construction : 2 clics (elle sert seulement à l\'accroche).',
       surprof: s?.points?.length ? `${s.points.length} point(s) du contour (dans la plateforme parente) ; 1er point ou Entrée pour finir.` : 'Sur-profondeur / sur-hauteur : cliquez son contour DANS la plateforme choisie (sa parente).',
       ouvrage: s?.points?.length ? `${s.points.length} point(s) ; Entrée = mur ouvert ; 1er point = contour fermé (bâtiment, radier, dalle).` : 'Ouvrage : cliquez la FACE EXTÉRIEURE du mur (ou le contour du radier / de la dalle), accroches sur les plans DXF.',
@@ -419,7 +433,8 @@ export function ouvrirPlateformes({
         <td>${echapper(p.nom)}</td>
         <td><input type="text" inputmode="text" class="${p.calc || pf.auto?.mode ? 'calc' : ''}" value="${f3(pf.auto?.mode ? resultats().get(pf.id)?.altitudesAuto?.get(p.nom) : p.alt)}" data-alt="${echapper(p.nom)}" ${pf.auto?.mode ? 'readonly title="Altitude calculée (voir « Altitudes » à droite)"' : ''} aria-label="Altitude ${echapper(p.nom)}"></td>
         <td class="centre">${src.lien ? `<button type="button" class="bouton-lien ${src.detache ? 'detache' : ''}" data-lien="${i}" title="${src.detache ? 'Détaché : altitude propre (marche). Toucher = relier' : 'Lié : même altitude que l\'autre plateforme. Toucher = détacher'}">${src.detache ? '✂' : '🔗'}</button>` : partage ? '<span title="Angle partagé par une plateforme accrochée">🔗</span>' : ''}</td>
-        <td class="sep" colspan="5"></td></tr>`);
+        <td class="sep" colspan="4"></td>
+        <td class="centre">${pf.sommets.length > 3 ? `<button type="button" class="bouton-lien" data-retirer-point="${echapper(p.nom)}" title="Retirer l'angle ${echapper(p.nom)}">✕</button>` : ''}</td></tr>`);
       const j = (i + 1) % s.length;
       if (s.length < 2 || (s.length === 2 && i === 1)) return;
       const pente = penteCote(s, i);
@@ -432,29 +447,16 @@ export function ouvrirPlateformes({
     : `<td class="centre"><input type="checkbox" data-talus-on="${echapper(src.nom)}" ${t.on ? 'checked' : ''} aria-label="Talus de ${echapper(p.nom)} à ${echapper(s[j].nom)}"></td>
         <td><input type="text" class="hv" value="${echapper(t.deb)}" data-talus-deb="${echapper(src.nom)}" ${t.on ? '' : 'disabled'} aria-label="Talus en déblai (H:V)"></td>
         <td><input type="text" class="hv" value="${echapper(t.rem)}" data-talus-rem="${echapper(src.nom)}" ${t.on ? '' : 'disabled'} aria-label="Talus en remblai (H:V)"></td>`}
-        <td class="centre">${coteP ? '' : `<button type="button" class="bouton-berme ${t.berme ? 'propre' : ''}" data-berme-cote="${i}" title="Berme de ce côté${t.berme ? (t.berme.mode === 'aucune' ? ' : aucune' : ' : propre') : ' : comme la plateforme'}" aria-label="Berme du côté ${echapper(p.nom)}">⋯</button>`}</td></tr>`);
-      // 0.302.0 : berme de ce côté (discrète : ouverte par « ⋯ »)
-      if (etat.bermeCote === i && !coteP) {
-        const bc = t.berme ?? null;
-        const mode = bc?.mode ?? 'comme';
-        const v = { ...BERME_DEFAUT, ...(pf.berme ?? {}), ...(bc ?? {}) };
-        lignes.push(`<tr class="ligne-berme"><td colspan="8"><div class="berme-cote">
-          <label>Berme de ce côté <select data-berme-cote-mode="${echapper(src.nom)}"><option value="comme" ${mode === 'comme' ? 'selected' : ''}>comme la plateforme</option><option value="aucune" ${mode === 'aucune' ? 'selected' : ''}>aucune</option><option value="propre" ${mode === 'propre' ? 'selected' : ''}>propre à ce côté</option></select></label>
-          ${mode === 'propre' ? `<label>① hauteur <input type="text" class="hv" data-berme-cote-champ="hauteur" data-cote-nom="${echapper(src.nom)}" value="${f2(v.hauteur)}"> m</label>
-          <label>② largeur <input type="text" class="hv" data-berme-cote-champ="largeur" data-cote-nom="${echapper(src.nom)}" value="${f2(v.largeur)}"> m</label>
-          <label>③ D <input type="text" class="hv" data-berme-cote-champ="deb" data-cote-nom="${echapper(src.nom)}" value="${echapper(v.deb)}"></label>
-          <label>R <input type="text" class="hv" data-berme-cote-champ="rem" data-cote-nom="${echapper(src.nom)}" value="${echapper(v.rem)}"></label>` : ''}
-        </div></td></tr>`);
-      }
+        <td></td></tr>`);
     });
     for (const p of pf.interieurs) {
       lignes.push(`<tr class="ligne-point interieur ${etat.selPoint === p.nom ? 'choisi' : ''}"><td>${echapper(p.nom)} <small>intérieur</small></td>
         <td><input type="text" inputmode="text" class="${p.calc ? 'calc' : ''}" value="${f3(p.alt)}" data-alt="${echapper(p.nom)}" aria-label="Altitude ${echapper(p.nom)}"></td>
-        <td class="centre"><button type="button" class="bouton-lien" data-retirer-interieur="${echapper(p.nom)}" title="Retirer ce point intérieur">✕</button></td><td class="sep" colspan="5"></td></tr>`);
+        <td></td><td class="sep" colspan="4"></td><td class="centre"><button type="button" class="bouton-lien" data-retirer-point="${echapper(p.nom)}" title="Retirer ce point intérieur">✕</button></td></tr>`);
     }
     z.innerHTML = `<table class="table-plateforme"><thead>
-      <tr><th colspan="3">Point (1 point)</th><th colspan="5" class="groupe-cote sep">Côté (entre 2 points)</th></tr>
-      <tr><th>Point / côté</th><th>Altitude</th><th class="centre">Lien</th><th class="sep">Pente %</th><th class="centre">Talus</th><th>Déblai H:V</th><th>Remblai H:V</th><th class="centre" title="Berme de ce côté">Berme</th></tr>
+      <tr><th colspan="3">Point (1 point)</th><th colspan="4" class="groupe-cote sep">Côté (entre 2 points)</th><th></th></tr>
+      <tr><th>Point / côté</th><th>Altitude</th><th class="centre">Lien</th><th class="sep">Pente %</th><th class="centre">Talus</th><th>Déblai H:V</th><th>Remblai H:V</th><th class="centre" title="Retirer le point">✕</th></tr>
       </thead><tbody>${lignes.join('') || '<tr><td colspan="8" class="aide-calage">Aucun point.</td></tr>'}</tbody></table>`;
   }
 
@@ -476,7 +478,6 @@ export function ouvrirPlateformes({
     const pf = choisie();
     const u = uniteDe(pf);
     const r = pf ? resultats().get(pf.id) : null;
-    const b = { ...BERME_DEFAUT, ...(pf?.berme ?? {}) };
     const e = etapesCalculees();
     const tot = totauxEtapes();
     const etapeChoisie = etat.etape ?? u?.id ?? null;
@@ -506,12 +507,6 @@ export function ouvrirPlateformes({
       ${pf.auto?.mode === 'surface' ? `<label class="champ-calage"><span>Surface</span><select data-auto="surfaceId"><option value="">— choisir —</option>${surfaces().map((x) => `<option value="${echapper(x.id)}" ${x.id === pf.auto.surfaceId ? 'selected' : ''}>${echapper(x.nom)}</option>`).join('')}</select></label>` : ''}
       <h3>Talus de ${echapper(u.nom)}</h3>
       <label class="champ-calage"><span>Posée sur (surface de référence)</span><select data-unite-ref="${echapper(u.id)}">${optionsReference(u.id, u.source.terrainId ?? null)}</select></label>
-      <label class="case-chantier"><input type="checkbox" data-berme="on" ${b.on ? 'checked' : ''}> Berme (plate) de ${echapper(pf.nom)}</label>
-      ${b.on ? `<div class="grille-berme">
-        <span>① Hauteur plateforme → berme</span><span><input type="text" class="hv" data-berme="hauteur" value="${f2(b.hauteur)}"> m</span>
-        <span>② Largeur de la berme</span><span><input type="text" class="hv" data-berme="largeur" value="${f2(b.largeur)}"> m</span>
-        <span>③ Talus après la berme</span><span>D <input type="text" class="hv" data-berme="deb" value="${echapper(b.deb)}"> R <input type="text" class="hv" data-berme="rem" value="${echapper(b.rem)}"></span>
-      </div><p class="aide-calage">① = pentes du tableau ; « ⋯ » d'un côté = sa berme à part.</p>` : ''}
       ${r?.erreursTalus?.length ? `<p class="note-calage alerte">⚠ ${r.erreursTalus.map(echapper).join('<br>')}</p>` : ''}
       <h3>Volumes de l'étape (avec talus)</h3>
       ${r?.volume ? `<p class="resume-volume"><span class="chiffre deblai">Déblai ${r.volume.deblai.toFixed(1)} m³</span> · <span class="chiffre remblai">Remblai ${r.volume.remblai.toFixed(1)} m³</span><br><span class="aide-calage">Emprise ${r.volume.surface.toFixed(1)} m²${r.volume.horsTerrain > 0.01 ? ` · ⚠ ${r.volume.horsTerrain.toFixed(1)} m² hors de la surface de référence` : ''}</span></p>`
@@ -641,8 +636,16 @@ export function ouvrirPlateformes({
     toile.append(fond, dessus);
     vue = null;
     observateur?.disconnect();
+    // 0.304.0 : quand un bandeau apparaît au-dessus (le haut du plan descend, le bas ne bouge pas), le dessin reste
+    // à sa place à l'écran : on décale la vue de la moitié de la différence de hauteur.
+    let cadreAvant = null;
     observateur = new ResizeObserver(() => {
       if (!toile.clientWidth) return;
+      const r = toile.getBoundingClientRect();
+      if (vue && cadreAvant && Math.abs(r.bottom - cadreAvant.bottom) < 1 && Math.abs(r.width - cadreAvant.width) < 1 && Math.abs(r.top - cadreAvant.top) >= 1) {
+        vue = deplacer(vue, 0, (toile.clientHeight - cadreAvant.hauteur) / 2);
+      }
+      cadreAvant = { top: r.top, bottom: r.bottom, width: r.width, hauteur: toile.clientHeight };
       if (!vue) cadrer();
       else redessiner();
     });
@@ -658,8 +661,9 @@ export function ouvrirPlateformes({
     toile.addEventListener('pointermove', pointerMove);
     toile.addEventListener('pointerup', pointerUp);
     toile.addEventListener('pointercancel', pointerUp);
+    // Double-clic = finir (le 2e clic, au même endroit, a déjà fini : voir clic()).
     toile.addEventListener('dblclick', () => {
-      if (['plateforme', 'surprof', 'ouvrage'].includes(etat.outil)) finirPlateforme();
+      if (['plateforme', 'surprof', 'ouvrage'].includes(etat.outil) && etat.saisie?.points?.length) finirPlateforme();
     });
     toile.vuePlateformes = () => vue;
     toile.tabIndex = 0; // le plan prend le clavier quand on le touche (Entrée, Échap, Ctrl+Z)
@@ -759,7 +763,7 @@ export function ouvrirPlateformes({
     }
     if (etat.voir.talus) for (const pf of liste()) {
       alphaBase = alphaDe(pf);
-      dessinerTalus(ctx, r.get(pf.id));
+      dessinerTalus(ctx, r.get(pf.id), pf);
     }
     for (const pf of liste()) {
       alphaBase = alphaDe(pf);
@@ -839,54 +843,73 @@ export function ouvrirPlateformes({
     ctx.fillText(t, x, y);
   }
 
-  function dessinerTalus(ctx, res) {
+  /**
+   * Talus (0.304.0) : barbules de topo (une longue, une courte) qui partent de la CRÊTE (le haut du talus : le bord de
+   * la plateforme en remblai, l'entrée en terre en déblai) vers le pied, espacées de ~9 px à l'écran ; pied en tirets ;
+   * pente H:V écrite en petit au milieu du talus de chaque côté.
+   */
+  function dessinerTalus(ctx, res, pf) {
     ctx.globalAlpha = alphaBase;
     if (!res?.talus) return;
     const cols = res.talus.colonnes;
-    // Barbules (une sur deux plus courte) du bord à l'entrée en terre, et pied du talus en tirets.
+    const ESPACE = 9;
+    let base = null;
+    let alterne = 0;
     cols.forEach((c, i) => {
-      const couleur = c.nature === 'deblai' ? '#b45309' : '#15803d';
-      ctx.strokeStyle = couleur;
-      ctx.lineWidth = 1;
-      const a = ecran(c.points[0]);
-      const b = ecran(c.points.at(-1));
-      const k = c.sommet != null ? 1 : i % 2 ? 0.5 : 1;
+      const haut = c.nature === 'remblai' ? c.points[0] : c.points.at(-1);
+      const bas = c.nature === 'remblai' ? c.points.at(-1) : c.points[0];
+      const a = ecran(haut);
+      const b = ecran(bas);
+      const coin = c.sommet != null;
+      const suite = i > 0 && cols[i - 1].chaine === c.chaine;
+      if (!coin && suite && base && Math.hypot(a.x - base.x, a.y - base.y) < ESPACE) return;
+      base = a;
+      alterne = coin ? 0 : alterne + 1;
+      const k = coin || alterne % 2 === 0 ? 1 : 0.5;
+      ctx.strokeStyle = c.nature === 'deblai' ? '#b45309' : '#15803d';
+      ctx.lineWidth = coin ? 1.2 : 1;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k);
       ctx.stroke();
     });
-    const suite = (indice, couleur, tirets, epaisseur) => {
-      ctx.strokeStyle = couleur;
-      ctx.setLineDash(tirets);
-      ctx.lineWidth = epaisseur;
-      ctx.beginPath();
-      let avant = null;
-      for (const c of cols) {
-        const p = indice === -1 ? c.points.at(-1) : c.points.length === 4 ? c.points[indice] : null;
-        if (!p) {
-          avant = null;
-          continue;
-        }
-        const q = ecran(p);
-        if (avant && avant.chaine === c.chaine) ctx.lineTo(q.x, q.y);
-        else ctx.moveTo(q.x, q.y);
-        avant = c;
+    // Pied du talus (entrée en terre) en tirets, suite par suite.
+    ctx.strokeStyle = '#475569';
+    ctx.setLineDash([4, 3]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    let avant = null;
+    for (const c of cols) {
+      const q = ecran(c.points.at(-1));
+      if (avant && avant.chaine === c.chaine) ctx.lineTo(q.x, q.y);
+      else ctx.moveTo(q.x, q.y);
+      avant = c;
+    }
+    if (res.talus.ferme && cols.length > 2 && avant) {
+      const q = ecran(cols[0].points.at(-1));
+      ctx.lineTo(q.x, q.y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Pente de chaque côté (H:V du déblai ou du remblai, selon ce que prend le milieu du côté).
+    if (pf && etat.voir.pentes) {
+      const parCote = new Map();
+      for (const c of cols) if (c.sommet == null && c.cote != null) (parCote.get(c.cote) ?? parCote.set(c.cote, []).get(c.cote)).push(c);
+      ctx.textAlign = 'center';
+      for (const [k, liste] of parCote) {
+        // Au tiers du côté (le milieu a déjà le « + » et la flèche de pente) ; talus étroit à l'écran : juste dehors.
+        const c = liste[Math.floor(liste.length / 3)];
+        const a = ecran(c.points[0]);
+        const b = ecran(c.points.at(-1));
+        const l = Math.hypot(b.x - a.x, b.y - a.y);
+        if (l < 2) continue;
+        const t = pf.talus[pf.sommets[k]?.nom] ?? TALUS_DEFAUT;
+        const hv = c.nature === 'deblai' ? t.deb : t.rem;
+        const [x, y] = l >= 26 ? [(a.x + b.x) / 2, (a.y + b.y) / 2] : [b.x + ((b.x - a.x) / l) * 9, b.y + ((b.y - a.y) / l) * 9];
+        texte(ctx, String(hv), x, y + 3, c.nature === 'deblai' ? '#92400e' : '#166534', 9);
       }
-      if (res.talus.ferme && cols.length > 2) {
-        const p = indice === -1 ? cols[0].points.at(-1) : cols[0].points.length === 4 ? cols[0].points[indice] : null;
-        if (p && avant) {
-          const q = ecran(p);
-          ctx.lineTo(q.x, q.y);
-        }
-      }
-      ctx.stroke();
-      ctx.setLineDash([]);
-    };
-    suite(-1, '#475569', [4, 3], 1);
-    // Berme : ses deux bords en brun épais pâle
-    suite(1, 'rgba(146,64,14,0.45)', [], 3);
-    suite(2, 'rgba(146,64,14,0.45)', [], 3);
+      ctx.textAlign = 'start';
+    }
     ctx.globalAlpha = 1;
   }
 
@@ -1004,8 +1027,8 @@ export function ouvrirPlateformes({
     s.forEach((p, i) => {
       const q = pts[i];
       carre(ctx, q, etat.selPoint === p.nom && estChoisie ? COULEUR_APPLI : '#ffffff', '#1b2b36');
-      etiquette(ctx, p, q, estChoisie);
-      if (p.detache && estChoisie) texte(ctx, 'détaché', q.x + 8, q.y + 16, '#dc2626', 10);
+      etiquette(ctx, p, q);
+      if (p.detache && estChoisie) texte(ctx, 'détaché', q.x + 8, q.y + 12, '#dc2626', 10);
     });
     for (const p of pf.interieurs) {
       const q = ecran(p);
@@ -1016,22 +1039,18 @@ export function ouvrirPlateformes({
       ctx.arc(q.x, q.y, 5.5, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
-      etiquette(ctx, p, q, estChoisie);
+      etiquette(ctx, p, q);
     }
     ctx.globalAlpha = 1;
   }
 
-  function etiquette(ctx, p, q, estChoisie) {
+  /** Nom du point et son altitude l'un sur l'autre (0.304.0), en haut à droite du point. */
+  function etiquette(ctx, p, q) {
     if (!etat.voir.noms && !etat.voir.alt) return;
-    let x = q.x + 8;
-    const y = q.y - 8;
-    if (etat.voir.noms) {
-      texte(ctx, `${p.nom} `, x, y, '#1b2b36', 11, true);
-      ctx.font = '700 11px system-ui, sans-serif';
-      x += ctx.measureText(`${p.nom} `).width;
-    }
-    if (etat.voir.alt) texte(ctx, p.alt == null ? '—' : f3(p.alt), x, y, p.calc ? '#5f6d77' : '#1b2b36', 11, false, Boolean(p.calc));
-    if (!estChoisie) return;
+    const x = q.x + 8;
+    const deux = etat.voir.noms && etat.voir.alt;
+    if (etat.voir.noms) texte(ctx, p.nom, x, deux ? q.y - 18 : q.y - 7, '#1b2b36', 11, true);
+    if (etat.voir.alt) texte(ctx, p.alt == null ? '—' : f3(p.alt), x, q.y - 6, p.calc ? '#5f6d77' : '#1b2b36', 11, false, Boolean(p.calc));
   }
 
   // --- Accroche ---
@@ -1100,7 +1119,8 @@ export function ouvrirPlateformes({
 
   function pointerDown(ev) {
     if (!vue) return;
-    // Toucher le plan quitte le champ en cours (sinon Entrée / Ctrl+Z restent dans le champ).
+    // Toucher le plan valide la bulle ouverte et quitte le champ en cours (sinon Entrée / Ctrl+Z restent dans le champ).
+    if (bulleOuverte && !ev.target.closest?.('.bulle-plateforme')) fermerBulle(true);
     toile.focus({ preventScroll: true });
     toile.setPointerCapture(ev.pointerId);
     pointeurs.set(ev.pointerId, position(ev));
@@ -1209,8 +1229,20 @@ export function ouvrirPlateformes({
         message(`Point ${nom} ajouté au milieu du côté (altitude interpolée) : glissez son carré pour le placer.`, 3000);
         return enregistrer();
       }
-      if (cible?.type === 'pente') return viser(`[data-pente="${cible.i}"]`, () => { etat.selCote = cible.i; etat.selPoint = null; });
-      if (cible?.type === 'sommet' || cible?.type === 'interieur') return viser(`[data-alt="${CSS.escape(cible.nom)}"]`, () => { etat.selPoint = cible.nom; etat.selCote = null; });
+      // 0.304.0 : toucher une pente ou un point = sa bulle (taper la valeur sur le plan, ✕ = retirer le point).
+      if (cible?.type === 'pente') {
+        etat.selCote = cible.i;
+        etat.selPoint = null;
+        majTout();
+        return bulleDePente(cible.i);
+      }
+      if (cible?.type === 'sommet' || cible?.type === 'interieur') {
+        etat.selPoint = cible.nom;
+        etat.selCote = null;
+        majTout();
+        surligner(`[data-alt="${CSS.escape(cible.nom)}"]`);
+        return bulleDePoint(cible.nom);
+      }
       // Clic dans une plateforme = la choisir.
       const dedans = liste().filter((q) => {
         const s = sommetsResolus(q, liste());
@@ -1242,17 +1274,37 @@ export function ouvrirPlateformes({
       etat.outil = 'choisir';
       return enregistrer();
     }
-    const altTapee = nombre(etat.altSuivante);
     if (['plateforme', 'surprof', 'ouvrage'].includes(etat.outil)) {
       if (etat.outil === 'surprof' && !etat.saisie && !choisie()) return message('Choisissez d\'abord la plateforme parente (outil « Choisir »), puis dessinez la sur-profondeur dedans.', 4000);
       const s = etat.saisie ?? (etat.saisie = { points: [], parentId: etat.outil === 'surprof' ? choisie()?.id : null });
       const premier = s.points[0];
-      if (premier && s.points.length >= 3 && Math.hypot(ecran(premier).x - ecran(a).x, ecran(premier).y - ecran(a).y) <= pxTol()) {
+      const dernier = s.points.at(-1);
+      const pres = (p) => Math.hypot(ecran(p).x - ecran(a).x, ecran(p).y - ecran(a).y) <= pxTol();
+      if (premier && s.points.length >= 3 && pres(premier)) {
         s.ferme = true;
         return finirPlateforme();
       }
-      s.points.push({ est: a.est, nord: a.nord, alt: altTapee ?? a.altitude ?? null, lien: a.lien ?? null });
-      return majTout();
+      // 0.304.0 : un 2e clic au même endroit (double-clic) finit, sans créer un 2e point au même endroit.
+      if (dernier && pres(dernier)) {
+        if (s.points.length >= (etat.outil === 'ouvrage' ? 2 : 3)) return finirPlateforme();
+        return;
+      }
+      // Altitude : celle du point accroché, sinon celle du point d'avant ; changée dans la bulle (plateforme seulement).
+      const point = { est: a.est, nord: a.nord, alt: a.altitude ?? dernier?.alt ?? null, lien: a.lien ?? null };
+      s.points.push(point);
+      majTout();
+      if (etat.outil === 'plateforme' && !(a.lien && a.altitude != null)) {
+        ouvrirBulle({
+          x: ecran(point).x, y: ecran(point).y, titre: `Angle ${s.points.length} : altitude (m)`, valeur: f3(point.alt),
+          valider: (texte) => {
+            const v = texte.trim() === '' ? null : nombre(texte);
+            if (v === null && texte.trim() !== '') return message('Altitude illisible (exemple : 412.350).', 3000);
+            point.alt = v;
+            majTout();
+          },
+        });
+      }
+      return;
     }
     if (etat.outil === 'construction') {
       if (!etat.saisie?.debut) {
@@ -1284,8 +1336,8 @@ export function ouvrirPlateformes({
       const s = sommetsResolus(pf, liste());
       if (s.length < 3 || !dansPolygone(a, s)) return message('Le point intérieur doit être dans la plateforme choisie.', 3000);
       if (!avantChangement()) return;
-      // Altitude : tapée, sinon celle de l'accroche, sinon celle de la surface actuelle (calculée).
-      let alt = altTapee ?? a.altitude ?? null;
+      // Altitude : celle de l'accroche, sinon celle de la surface actuelle (calculée) ; puis la bulle pour la taper.
+      let alt = a.altitude ?? null;
       let calc = false;
       if (alt == null) {
         const tri = resultats().get(pf.id)?.triangles ?? [];
@@ -1295,7 +1347,8 @@ export function ouvrirPlateformes({
       const nom = prochainNom(pf);
       pf.interieurs.push({ nom, est: Math.round(a.est * 1000) / 1000, nord: Math.round(a.nord * 1000) / 1000, alt: alt == null ? null : Math.round(alt * 1000) / 1000, calc });
       etat.selPoint = nom;
-      return enregistrer();
+      enregistrer();
+      return bulleDePoint(nom);
     }
   }
 
@@ -1406,15 +1459,135 @@ export function ouvrirPlateformes({
     enregistrer();
   }
 
-  /** Met le curseur dans un champ du tableau (après avoir surligné sa ligne). */
-  function viser(selecteur, avant) {
-    avant?.();
-    majTout();
+  /** Fait défiler le tableau jusqu'à la ligne d'un champ (sans y mettre le curseur : la bulle le prend). */
+  function surligner(selecteur) {
     const e = page.querySelector(`[data-zone="tableau"] ${selecteur}`);
-    if (!e) return;
-    e.closest('tr')?.scrollIntoView({ block: 'nearest' });
-    e.focus({ preventScroll: true });
-    e.select?.();
+    const cadre = page.querySelector('[data-zone="tableau"]');
+    const tr = e?.closest('tr');
+    if (!tr || !cadre) return;
+    const h = cadre.querySelector('thead')?.offsetHeight ?? 0;
+    if (tr.offsetTop - h < cadre.scrollTop || tr.offsetTop + tr.offsetHeight > cadre.scrollTop + cadre.clientHeight) cadre.scrollTop = Math.max(0, tr.offsetTop - h - 4);
+  }
+
+  // --- Bulles (0.304.0) : taper une altitude ou une pente sur le plan, à côté du point ---
+
+  let bulleOuverte = null; // { el, valider, input }
+  /** Ouvre une bulle sur le plan en (x, y) (px de la toile) : titre, valeur, valider(texte) ; supprimer() facultatif. */
+  function ouvrirBulle({ x, y, titre, valeur = '', valider, supprimer = null }) {
+    fermerBulle(false);
+    const el = document.createElement('div');
+    el.className = 'bulle-plateforme';
+    el.innerHTML = `<label>${echapper(titre)}<input type="text" inputmode="text" value="${echapper(valeur)}"></label>
+      <button type="button" class="bouton-principal petit" data-bulle="ok" title="Valider (Entrée)">✓</button>
+      ${supprimer ? '<button type="button" class="bouton-secondaire petit" data-bulle="retirer" title="Retirer ce point (Suppr)">✕</button>' : ''}`;
+    toile.append(el);
+    const { largeur, hauteur } = taille();
+    const l = el.offsetWidth || 220;
+    const h = el.offsetHeight || 40;
+    el.style.left = `${Math.max(4, Math.min(largeur - l - 4, x + 12))}px`;
+    el.style.top = `${Math.max(4, Math.min(hauteur - h - 4, y - h - 12))}px`;
+    const input = el.querySelector('input');
+    bulleOuverte = { el, valider, input };
+    el.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+    el.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-bulle]');
+      if (!b) return;
+      if (b.dataset.bulle === 'ok') fermerBulle(true);
+      else {
+        fermerBulle(false);
+        supprimer();
+      }
+    });
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        ev.stopPropagation();
+        fermerBulle(true);
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault();
+        ev.stopPropagation();
+        fermerBulle(false);
+      }
+    });
+    input.focus({ preventScroll: true });
+    input.select();
+  }
+  /** Ferme la bulle ; avec « valider », la valeur tapée est prise. */
+  function fermerBulle(valider) {
+    const b = bulleOuverte;
+    if (!b) return;
+    bulleOuverte = null;
+    const texte = b.input.value;
+    b.el.remove();
+    toile?.focus({ preventScroll: true });
+    if (valider) b.valider(texte);
+  }
+
+  /** Bulle de l'altitude d'un point (angle ou intérieur) de la plateforme choisie, avec ✕ pour le retirer. */
+  function bulleDePoint(nom) {
+    const pf = choisie();
+    if (!pf) return;
+    const p = sommetsResolus(pf, liste()).find((x) => x.nom === nom) ?? pf.interieurs.find((x) => x.nom === nom);
+    if (!p) return;
+    const q = ecran(p);
+    const auto = Boolean(pf.auto?.mode) && pf.sommets.some((x) => x.nom === nom);
+    ouvrirBulle({
+      x: q.x, y: q.y, titre: `${nom} : altitude (m)${auto ? ' (calculée)' : ''}`, valeur: f3(auto ? resultats().get(pf.id)?.altitudesAuto?.get(nom) : p.alt),
+      valider: (texte) => {
+        if (auto) return message('Altitudes calculées : voir « Les altitudes viennent » à droite.', 3000);
+        const v = texte.trim() === '' ? null : nombre(texte);
+        if (v === null && texte.trim() !== '') return message('Altitude illisible (exemple : 412.350).', 3000);
+        if ((v ?? null) === (p.alt ?? null)) return;
+        if (!avantChangement()) return;
+        changerAltitude(liste(), pf, nom, v, false);
+        enregistrer();
+      },
+      supprimer: () => retirer(nom),
+    });
+  }
+
+  /** Bulle de la pente (%) du côté i : l'altitude du point suivant est recalculée. */
+  function bulleDePente(i) {
+    const pf = choisie();
+    const s = sommetsResolus(pf, liste());
+    const z = zonesToucher.find((x) => x.type === 'pente' && x.i === i);
+    if (!pf || !z) return;
+    ouvrirBulle({
+      x: z.x, y: z.y, titre: `Pente ${s[i].nom} → ${s[(i + 1) % s.length].nom} (%)`, valeur: f2(penteCote(s, i)),
+      valider: (texte) => appliquerPente(pf, i, texte),
+    });
+  }
+
+  /** Pente tapée (tableau ou bulle) : altitude du sommet suivant = altitude + pente × longueur. */
+  function appliquerPente(pf, i, texte) {
+    const v = nombre(String(texte).replace('%', ''));
+    const s = sommetsResolus(pf, liste());
+    const z = altitudeParPente(s, i, v);
+    if (z == null) {
+      majTableau();
+      return message(s[i]?.alt == null ? `Il faut d'abord l'altitude de ${s[i]?.nom}.` : 'Pente illisible (exemple : -2).', 3000);
+    }
+    if (!avantChangement()) return;
+    const suivant = s[(i + 1) % s.length].nom;
+    changerAltitude(liste(), pf, suivant, z, true);
+    message(`Altitude de ${suivant} calculée par la pente (${v} %).`, 2500);
+    return enregistrer();
+  }
+
+  /** Retire un point de la plateforme choisie (angle : 3 au moins ; ↶ le remet). */
+  function retirer(nom) {
+    const pf = choisie();
+    if (!pf) return;
+    if (pf.sommets.some((x) => x.nom === nom) && pf.sommets.length <= 3) return message('Une plateforme garde au moins 3 angles.', 3000);
+    if (!avantChangement()) return;
+    const err = retirerPoint(liste(), pf, nom);
+    if (err) {
+      pile.pop();
+      return message(err, 3000);
+    }
+    if (etat.selPoint === nom) etat.selPoint = null;
+    message(`Point ${nom} retiré (↶ Annuler le remet).`, 2500);
+    enregistrer();
   }
 
   function majEtat() {
@@ -1472,11 +1645,6 @@ export function ouvrirPlateformes({
       else o.cote = o.cote === 'droite' ? 'gauche' : 'droite';
       return enregistrer();
     }
-    if (b.dataset.bermeCote !== undefined) {
-      const i = Number(b.dataset.bermeCote);
-      etat.bermeCote = etat.bermeCote === i ? null : i;
-      return majTableau();
-    }
     if (b.dataset.action === 'retour') return fermer();
     if (b.dataset.outil) {
       etat.outil = b.dataset.outil;
@@ -1525,12 +1693,7 @@ export function ouvrirPlateformes({
       pf.ruptures.pop();
       return enregistrer();
     }
-    if (b.dataset.retirerInterieur) {
-      if (!avantChangement()) return;
-      pf.interieurs = pf.interieurs.filter((p) => p.nom !== b.dataset.retirerInterieur);
-      pf.ruptures = pf.ruptures.filter(([x, y]) => x !== b.dataset.retirerInterieur && y !== b.dataset.retirerInterieur);
-      return enregistrer();
-    }
+    if (b.dataset.retirerPoint) return retirer(b.dataset.retirerPoint);
     if (b.dataset.lien !== undefined) {
       const s = pf.sommets[Number(b.dataset.lien)];
       if (!s?.lien || !avantChangement()) return;
@@ -1577,10 +1740,6 @@ export function ouvrirPlateformes({
   async function changement(c) {
     if (!c.isConnected && !c.dataset) return;
     const pf = choisie();
-    if (c.dataset.champ === 'altSuivante') {
-      etat.altSuivante = c.value;
-      return;
-    }
     if (!pf) return;
     if (c.dataset.alt !== undefined && pf.auto?.mode) return majTableau();
     if (c.dataset.alt !== undefined) {
@@ -1590,21 +1749,7 @@ export function ouvrirPlateformes({
       changerAltitude(liste(), pf, c.dataset.alt, v, false);
       return enregistrer();
     }
-    if (c.dataset.pente !== undefined) {
-      const i = Number(c.dataset.pente);
-      const v = nombre(c.value.replace('%', ''));
-      const s = sommetsResolus(pf, liste());
-      const z = altitudeParPente(s, i, v);
-      if (z == null) {
-        majTableau();
-        return message(s[i]?.alt == null ? `Il faut d'abord l'altitude de ${s[i]?.nom}.` : 'Pente illisible (exemple : -2).', 3000);
-      }
-      if (!avantChangement()) return;
-      const suivant = s[(i + 1) % s.length].nom;
-      changerAltitude(liste(), pf, suivant, z, true);
-      message(`Altitude de ${suivant} calculée par la pente (${v} %).`, 2500);
-      return enregistrer();
-    }
+    if (c.dataset.pente !== undefined) return appliquerPente(pf, Number(c.dataset.pente), c.value);
     if (c.dataset.talusOn || c.dataset.talusDeb || c.dataset.talusRem) {
       const nom = c.dataset.talusOn ?? c.dataset.talusDeb ?? c.dataset.talusRem;
       if ((c.dataset.talusDeb || c.dataset.talusRem) && !lireHV(c.value)) {
@@ -1642,7 +1787,7 @@ export function ouvrirPlateformes({
       o[c.dataset.champOuvrage] = v;
       return enregistrer();
     }
-    // 0.302.0 : sur quoi l'étape est posée ; groupe ; berme d'un côté
+    // 0.302.0 : sur quoi l'étape est posée ; groupe
     if (c.dataset.uniteRef) {
       if (!avantChangement()) return;
       const u = uniteDe(pf);
@@ -1669,34 +1814,6 @@ export function ouvrirPlateformes({
       g.nom = c.value.trim();
       return enregistrer();
     }
-    if (c.dataset.bermeCoteMode) {
-      if (!avantChangement()) return;
-      const t = { ...TALUS_DEFAUT, ...(pf.talus[c.dataset.bermeCoteMode] ?? {}) };
-      if (c.value === 'comme') delete t.berme;
-      else if (c.value === 'aucune') t.berme = { mode: 'aucune' };
-      else t.berme = { ...BERME_DEFAUT, ...(pf.berme ?? {}), mode: 'propre' };
-      delete t.berme?.on;
-      pf.talus[c.dataset.bermeCoteMode] = t;
-      return enregistrer();
-    }
-    if (c.dataset.bermeCoteChamp) {
-      const nom = c.dataset.coteNom;
-      const cle = c.dataset.bermeCoteChamp;
-      const t = { ...TALUS_DEFAUT, ...(pf.talus[nom] ?? {}) };
-      if (t.berme?.mode !== 'propre') return;
-      let v;
-      if (cle === 'deb' || cle === 'rem') {
-        if (!lireHV(c.value)) return message('Pente illisible : écrivez H:V, par exemple 3:2.', 3500);
-        v = c.value.trim();
-      } else {
-        v = nombre(c.value);
-        if (v === null || v < 0) return message('Nombre illisible.', 2500);
-      }
-      if (!avantChangement()) return;
-      t.berme = { ...t.berme, [cle]: v };
-      pf.talus[nom] = t;
-      return enregistrer();
-    }
     if (c.dataset.pf) {
       if (!avantChangement()) return;
       const cle = c.dataset.pf;
@@ -1706,22 +1823,6 @@ export function ouvrirPlateformes({
         pf.nom = nom;
       } else if (cle === 'couleur') pf.couleur = c.value;
       else if (cle === 'terrainId') pf.terrainId = c.value || null;
-      return enregistrer();
-    }
-    if (c.dataset.berme) {
-      const cle = c.dataset.berme;
-      const b = { ...BERME_DEFAUT, ...(pf.berme ?? {}) };
-      if (cle === 'on') b.on = c.checked;
-      else if (cle === 'deb' || cle === 'rem') {
-        if (!lireHV(c.value)) return message('Pente illisible : écrivez H:V, par exemple 3:2.', 3500);
-        b[cle] = c.value.trim();
-      } else {
-        const v = nombre(c.value);
-        if (v === null || v < 0) return message('Nombre illisible.', 2500);
-        b[cle] = v;
-      }
-      if (!avantChangement()) return;
-      pf.berme = b;
       return enregistrer();
     }
   }
@@ -1736,11 +1837,14 @@ export function ouvrirPlateformes({
       ev.preventDefault();
       return finirPlateforme();
     }
-    if (ev.key === 'Escape' && etat.saisie) {
+    if (ev.key === 'Escape') {
       ev.preventDefault();
       ev.stopPropagation();
-      etat.saisie = null;
-      majTout();
+      echap();
+    }
+    if ((ev.key === 'Delete' || ev.key === 'Backspace') && !dansChamp && etat.selPoint && etat.outil === 'choisir') {
+      ev.preventDefault();
+      retirer(etat.selPoint);
     }
   });
 

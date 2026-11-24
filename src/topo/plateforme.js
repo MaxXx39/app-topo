@@ -218,6 +218,36 @@ export function ajouterPointMilieu(plateformes, pf, i) {
   return nom;
 }
 
+/**
+ * 0.304.0 : retire un point de la plateforme (angle ou point intérieur). Un angle garde au moins 3 angles ; les deux côtés
+ * qui l'entouraient deviennent un seul (réglage de talus du côté d'avant) ; ses lignes de rupture partent. Un angle d'une
+ * autre plateforme lié à lui devient un angle propre (même position, même altitude). Renvoie un texte d'erreur ou null.
+ */
+export function retirerPoint(plateformes, pf, nom) {
+  const k = pf.interieurs.findIndex((p) => p.nom === nom);
+  if (k >= 0) {
+    pf.interieurs.splice(k, 1);
+  } else {
+    const i = pf.sommets.findIndex((s) => s.nom === nom);
+    if (i < 0) return 'point introuvable';
+    if (pf.sommets.length <= 3) return 'une plateforme garde au moins 3 angles';
+    const res = sommetsResolus(pf, plateformes)[i];
+    for (const q of plateformes) {
+      if (q === pf) continue;
+      for (const s of q.sommets) {
+        if (s.lien?.id !== pf.id || s.lien.nom !== nom) continue;
+        Object.assign(s, { est: res.est, nord: res.nord, alt: s.detache ? s.alt : res.alt, calc: s.detache ? s.calc : res.calc });
+        delete s.lien;
+        delete s.detache;
+      }
+    }
+    pf.sommets.splice(i, 1);
+    delete pf.talus[nom];
+  }
+  pf.ruptures = pf.ruptures.filter(([a, b]) => a !== nom && b !== nom);
+  return null;
+}
+
 /** Δ Z : ajoute dz à toutes les altitudes de la plateforme (et des plateformes accrochées si « avecAccrochees »). */
 export function appliquerDeltaZ(plateformes, id, dz, avecAccrochees = false) {
   const ids = avecAccrochees ? plateformesAccrochees(plateformes, id) : new Set([id]);
@@ -345,7 +375,9 @@ export function talusPlateforme(sommets, reglageCote, berme, altitudeTerrain, { 
   const reglages = sommets.map((_, i) => reglageCote(i));
   let chaine = 0;
 
-  const colonne = (p, zBord, dir, reglage, sommet) => {
+  // dir : direction du talus en plan (sa longueur allonge l'horizontale : arête d'un angle), ou fonction de la nature
+  // (0.304.0 : angle entre deux côtés de pentes différentes).
+  const colonne = (p, zBord, dirOuFonction, reglage, sommet, cote) => {
     const pentes = reglage.pentes;
     // 0.302.0 : berme propre au côté (reglage.berme, null = aucune), sinon celle de la plateforme.
     const bermeIci = reglage.berme !== undefined ? reglage.berme : berme;
@@ -356,6 +388,7 @@ export function talusPlateforme(sommets, reglageCote, berme, altitudeTerrain, { 
     }
     const nature = zBord - t >= 0 ? 'remblai' : 'deblai';
     const p1 = pentes[nature];
+    const dir = typeof dirOuFonction === 'function' ? dirOuFonction(nature) : dirOuFonction;
     const b = bermeIci ? { hauteur: bermeIci.hauteur, largeur: bermeIci.largeur, p3: bermeIci.p3[nature] } : null;
     const lu = Math.hypot(dir.est, dir.nord) || 1;
     const u = { est: dir.est / lu, nord: dir.nord / lu };
@@ -383,8 +416,9 @@ export function talusPlateforme(sommets, reglageCote, berme, altitudeTerrain, { 
       const dernier = pts.at(-1);
       if (Math.hypot(dernier.est - (p.est + u.est * dPlan), dernier.nord - (p.nord + u.nord * dPlan)) > 1e-6) pts.push({ est: p.est + u.est * dPlan, nord: p.nord + u.nord * dPlan, altitude: fin.z });
     }
-    return { points: pts, nature, sommet };
+    return { points: pts, nature, sommet, cote };
   };
+  const ratio = (r, nature) => r.pentes[nature].vertical / r.pentes[nature].horizontal;
 
   for (let k = 0; k < n; k += 1) {
     const a = sommets[k];
@@ -396,13 +430,22 @@ export function talusPlateforme(sommets, reglageCote, berme, altitudeTerrain, { 
     if ((avant || ici) && !(k === 0 && avant && !ici)) {
       let dir;
       if (avant && ici) {
+        // Arête de l'angle = croisement des deux plans de talus : en plan, le point p où les deux talus ont descendu
+        // (ou monté) de 1 m : n1·p = 1 / r1 et n2·p = 1 / r2 (r = V / H de chaque côté). Mêmes pentes : la bissectrice.
         const n1 = normales[(k + n - 1) % n];
         const n2 = normales[k];
-        const produit = 1 + n1.est * n2.est + n1.nord * n2.nord;
-        dir = produit > 1e-6 ? { est: (n1.est + n2.est) / produit, nord: (n1.nord + n2.nord) / produit } : n2;
+        dir = (nature) => {
+          const r1 = ratio(avant, nature);
+          const r2 = ratio(ici, nature);
+          const det = n1.est * n2.nord - n1.nord * n2.est;
+          if (Math.abs(det) < 1e-6 || 1 + n1.est * n2.est + n1.nord * n2.nord < 1e-6) return n2;
+          const p = { est: (n2.nord / r1 - n1.nord / r2) / det, nord: (n1.est / r2 - n2.est / r1) / det };
+          // Longueur = allongement de l'horizontale de « ici » le long de l'arête.
+          return { est: p.est * r2, nord: p.nord * r2 };
+        };
       } else dir = ici ? normales[k] : normales[(k + n - 1) % n];
       if (!avant) chaine += 1;
-      const c = colonne(a, a.alt, dir, ici ?? avant, k);
+      const c = colonne(a, a.alt, dir, ici ?? avant, k, ici ? k : (k + n - 1) % n);
       if (c) colonnes.push({ ...c, chaine });
     }
     if (!ici) continue;
@@ -411,12 +454,12 @@ export function talusPlateforme(sommets, reglageCote, berme, altitudeTerrain, { 
     for (let j = 1; j < nombre; j += 1) {
       const t = j / nombre;
       const p = { est: a.est + (b.est - a.est) * t, nord: a.nord + (b.nord - a.nord) * t };
-      const c = colonne(p, a.alt + (b.alt - a.alt) * t, normales[k], ici, null);
+      const c = colonne(p, a.alt + (b.alt - a.alt) * t, normales[k], ici, null, k);
       if (c) colonnes.push({ ...c, chaine });
     }
     // Dernier côté avec talus, mais pas le suivant : la colonne de l'angle d'arrivée ferme la suite.
     if (!reglages[(k + 1) % n] && k + 1 === n) {
-      const c = colonne(b, b.alt, normales[k], ici, (k + 1) % n);
+      const c = colonne(b, b.alt, normales[k], ici, (k + 1) % n, k);
       if (c) colonnes.push({ ...c, chaine });
     }
   }
