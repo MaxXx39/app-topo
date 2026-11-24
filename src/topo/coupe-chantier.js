@@ -101,28 +101,20 @@ export function formesGrue(o, a, u) {
   const arr = D.contreFlecheArriere;
   const [j1, j2] = largeurMin(X(D.flecheDebut), X(bout));
   if (M.type === 'automontante') {
-    // 0.315.2 (d'après la photo d'une Liebherr 25 L envoyée le 24.11) : mât plein et fin (jaune en bas, gris en haut), châssis noir
-    // sur stabilisateurs avec lest gris, béquille en diagonale, tête de mât penchée vers l'arrière, haubans, flèche grise puis
-    // jaune plus fine ; pas de contre-flèche. Dimensions estimées : à valider.
+    // 0.315.4 (d'après les images de Liebherr automontantes du 24.11) : mât en treillis jaune, châssis noir
+    // sur stabilisateurs avec lest en plaques empilées, tête de mât penchée vers l'arrière, haubans, flèche jaune
+    // plus fine après le tiers ; pas de contre-flèche. Dimensions estimées : à valider.
     const cw = c * proj;
     const H = nv.flecheHaut - nv.pied;
     const bas = nv.pied + 0.7;
-    const milieuMat = nv.pied + H * 0.4;
     formes.push(rect(s0 - cw / 2, s0 + cw / 2, nv.pied + 0.25, bas, 'chassisauto'));
     for (const cote of [-1, 1]) formes.push(rect(s0 + cote * cw / 2 - 0.25, s0 + cote * cw / 2 + 0.25, nv.pied, nv.pied + 0.25, 'pied'));
-    formes.push(rect(X(-2.5), X(-1.0), bas, bas + 2.3, 'lest'));
-    // mât télescopique : 3 tronçons emboîtés (de plus en plus fins), un collier à chaque jonction
-    const l1 = tour.mat * 0.5;
-    const l2 = tour.mat * 0.42;
-    const l3 = tour.mat * 0.35;
-    const z2 = nv.pied + H * 0.72;
-    formes.push(rect(s0 - l1, s0 + l1, bas, milieuMat, 'matbas'));
-    formes.push(rect(s0 - l2, s0 + l2, milieuMat, z2, 'mathaut'));
-    formes.push(rect(s0 - l3, s0 + l3, z2, nv.flecheHaut, 'mathaut'));
-    for (const [z, l] of [[milieuMat, l1], [z2, l2]]) formes.push(rect(s0 - l - 0.08, s0 + l + 0.08, z - 0.12, z + 0.12, 'collier'));
-    formes.push({ type: 'ligne', genre: 'bequille', pts: [ptCoupe(X(-1.0), bas + 0.3), ptCoupe(s0 - l1, milieuMat)] });
+    // lest : plaques empilées à côté du pied du mât (d'après la fiche d'une Liebherr automontante)
+    for (let k = 0; k < 6; k++) formes.push(rect(X(-2.2), X(-0.9), bas + k * 0.4, bas + k * 0.4 + 0.34, 'lest'));
+    // mât en treillis jaune, de largeur constante
+    formes.push(rect(s0 - tour.mat / 2, s0 + tour.mat / 2, bas, nv.flecheHaut, 'mat'));
     const pointe = [X(-1.1), nv.haut];
-    formes.push({ type: 'poly', genre: 'tete', pts: [ptCoupe(s0 - l3, nv.flecheHaut), ptCoupe(s0 + l3, nv.flecheHaut), ptCoupe(...pointe)] });
+    formes.push({ type: 'poly', genre: 'tete', pts: [ptCoupe(s0 - tour.mat / 2, nv.flecheHaut), ptCoupe(s0 + tour.mat / 2, nv.flecheHaut), ptCoupe(...pointe)] });
     const coupeG = D.flecheDebut + (bout - D.flecheDebut) * 0.35; // partie intérieure grise, puis partie extérieure jaune plus fine
     const [g1, g2] = largeurMin(X(D.flecheDebut), X(coupeG));
     const [o1, o2] = largeurMin(X(coupeG), X(bout));

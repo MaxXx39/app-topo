@@ -6,7 +6,7 @@ const COULEURS = {
   mat: ['#f7dc94', '#7a5b12'], fleche: ['#f7dc94', '#7a5b12'], contre: ['#f7dc94', '#7a5b12'], pied: ['#8d96a0', '#4b535b'],
   massif: ['url(#hach-beton)', '#6b7280'], crochet: ['#1b1f24', '#1b1f24'], contrepoids: ['#9aa2ab', '#4b535b'],
   plateforme: ['#7b838c', '#4b535b'], chassisauto: ['#2b2f33', '#111827'], lest: ['#c9ced3', '#6b7280'], matbas: ['#f2b61f', '#7a5b12'],
-  mathaut: ['#a3a9af', '#4b535b'], collier: ['#4b535b', '#374151'], tete: ['#a3a9af', '#4b535b'], flecheg: ['#d3d8dd', '#6b7280'], cabine: ['#e8f1f4', '#4b535b'], chariot: ['#3a3f45', '#1b1f24'],
+  mathaut: ['#a3a9af', '#4b535b'], collier: ['#4b535b', '#374151'], tete: ['#f2b61f', '#7a5b12'], flecheg: ['#f7dc94', '#7a5b12'], cabine: ['#e8f1f4', '#4b535b'], chariot: ['#3a3f45', '#1b1f24'],
 };
 const TREILLIS = new Set(['mat', 'fleche', 'contre', 'flecheg']);
 
