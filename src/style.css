@@ -14811,3 +14811,10 @@ dialog.page-chantier[open] {
 .page-chantier .ruban-une-ligne .champ-ortho { width: 46px; height: 26px; padding: 2px 3px; font-size: 12px; }
 .page-chantier .ruban-une-ligne [data-action="ortho"].actif::after { content: '✓'; position: absolute; right: 1px; top: -1px; font-size: 11px; font-weight: 900; color: #b45309; }
 .page-chantier .ruban-element .propre-element { height: 118px; align-content: flex-start; }
+
+/* 0.298.0 : Calage de plans, objets enlevés à la main (liste avec ↺ pour restaurer). */
+.liste-enleves { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow-y: auto; font-size: 0.82rem; }
+.liste-enleves li { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 6px; }
+.liste-enleves li:hover { background: color-mix(in srgb, #dc2626 8%, var(--surface)); }
+.liste-enleves li > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liste-enleves .bouton-secondaire.petit { padding: 1px 8px; min-height: 0; }

@@ -15,10 +15,12 @@ const FACTEUR_MOLETTE = 1.2;
  *  survol(position { est, nord }, toleranceM) : accroche { est, nord } ou { segment: [x1, y1, x2, y2] }, ou null ;
  *  infobulle(position, toleranceM) : texte montré près de la souris (nom du calque…), ou null (0.283.0) ;
  *  clic(position, toleranceM) : appelé au clic (sans glisser) ;
- *  cadrage() : plans montrés en entier par « Tout » (par défaut : plans()).
+ *  cadrage() : plans montrés en entier par « Tout » (par défaut : plans()) ;
+ *  rectangle (0.298.0) : { actif() : vrai si glisser trace un rectangle au lieu de déplacer le plan,
+ *    fin(a, b, mode) : a, b = coins { est, nord }, mode 'dedans' (tiré de gauche à droite) ou 'touche' (de droite à gauche) }.
  * Renvoie { redessiner(), cadrer(), zoom(facteur), detruire() }.
  */
-export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = () => [], survol = () => null, infobulle = null, clic = () => {} }) {
+export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = () => [], survol = () => null, infobulle = null, clic = () => {}, rectangle = null }) {
   conteneur.classList.add('vue-calage-plan');
   const fond = document.createElement('canvas');
   const dessus = document.createElement('canvas');
@@ -32,7 +34,8 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
   let accroche = null;
   let image = 0;
   const pointeurs = new Map();
-  let geste = null; // { x, y, vue, glisse, distance (2 doigts) }
+  let geste = null; // { x, y, vue, glisse, distance (2 doigts), rect (rectangle de sélection) }
+  let rectEcran = null; // { x0, y0, x1, y1 } pendant le tracé d'un rectangle
 
   const taille = () => ({ largeur: conteneur.clientWidth || 300, hauteur: conteneur.clientHeight || 200 });
   // 10 px à la souris, 18 px au doigt (0.285.0 : calage sur place sur tablette)
@@ -111,6 +114,18 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
       }
     }
     ctx.setLineDash([]);
+    // Rectangle de sélection (comme AutoCAD) : bleu plein de gauche à droite (entièrement dedans), vert en tirets de droite à gauche (qui touche).
+    if (rectEcran) {
+      const { x0, y0, x1, y1 } = rectEcran;
+      const dedans = x1 >= x0;
+      ctx.strokeStyle = dedans ? '#2563eb' : '#16a34a';
+      ctx.fillStyle = dedans ? 'rgba(37, 99, 235, 0.08)' : 'rgba(22, 163, 74, 0.08)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash(dedans ? [] : [6, 4]);
+      ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+      ctx.strokeRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+      ctx.setLineDash([]);
+    }
     // Accroche au survol : carré orange (point) ou trait orange (axe).
     if (accroche) {
       ctx.strokeStyle = '#ea580c';
@@ -178,7 +193,7 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
     conteneur.setPointerCapture(ev.pointerId);
     pointeurs.set(ev.pointerId, position(ev));
     const pts = [...pointeurs.values()];
-    if (pts.length === 1) geste = { ...pts[0], vue, glisse: false };
+    if (pts.length === 1) geste = { ...pts[0], vue, glisse: false, rect: Boolean(rectangle?.actif()) };
     else if (pts.length === 2) geste = { vue, glisse: true, distance: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y), milieu: { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } };
   });
   conteneur.addEventListener('pointermove', (ev) => {
@@ -197,7 +212,10 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
       const p = pts[0];
       if (!geste.glisse && Math.hypot(p.x - geste.x, p.y - geste.y) > SEUIL_GLISSER_PX) geste.glisse = true;
       if (geste.glisse) bulle.hidden = true;
-      if (geste.glisse && geste.x !== undefined) {
+      if (geste.glisse && geste.rect) {
+        rectEcran = { x0: geste.x, y0: geste.y, x1: p.x, y1: p.y };
+        dessinerDessus();
+      } else if (geste.glisse && geste.x !== undefined) {
         vue = deplacer(geste.vue, p.x - geste.x, p.y - geste.y);
         redessiner();
       } else if (ev.pointerType !== 'mouse') chercherAccroche(ev);
@@ -212,11 +230,18 @@ export function creerVueCalage(conteneur, { plans, cadrage = plans, marques = ()
         const terrain = versTerrain(p.x, p.y, vue);
         accroche = survol(terrain, tolerance());
         clic(terrain, tolerance());
+      } else if (geste?.rect && rectEcran && ev.type === 'pointerup') {
+        const r = rectEcran;
+        rectEcran = null;
+        dessinerDessus();
+        rectangle.fin(versTerrain(r.x0, r.y0, vue), versTerrain(r.x1, r.y1, vue), r.x1 >= r.x0 ? 'dedans' : 'touche');
       }
+      rectEcran = null;
       geste = null;
     } else {
       // Il reste un doigt : il reprend le déplacement depuis là.
       const reste = [...pointeurs.values()][0];
+      rectEcran = null;
       geste = { ...reste, vue, glisse: true };
     }
   };
