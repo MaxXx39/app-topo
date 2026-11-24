@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Audit concurrence – Calage et Plans de chantier</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  :root { --bleu:#1e3a8a; --or:#eab308; --gris:#64748b; --clair:#f1f5f9; --vert:#15803d; --orange:#c2410c; --rouge:#b91c1c; }
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 10.2pt; line-height: 1.45; color:#0f172a; margin:0; background:#fff; }
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+  h1 { font-size: 24pt; color: var(--bleu); margin: 0 0 4mm; }
+  h2 { font-size: 15pt; color: var(--bleu); border-bottom: 2px solid var(--or); padding-bottom: 1.5mm; margin: 0 0 4mm; }
+  h3 { font-size: 11.5pt; color: var(--bleu); margin: 5mm 0 1.5mm; }
+  p { margin: 0 0 2.5mm; }
+  ul { margin: 0 0 3mm; padding-left: 5mm; }
+  li { margin-bottom: 1.2mm; }
+  .sous { color: var(--gris); font-size: 11pt; margin-bottom: 8mm; }
+  .encadre { background: var(--clair); border-left: 4px solid var(--or); padding: 3mm 4mm; margin: 3mm 0 4mm; }
+  .encadre.bleu { border-left-color: var(--bleu); }
+  table { width: 100%; border-collapse: collapse; font-size: 8.8pt; margin: 2mm 0 4mm; }
+  th, td { border: 1px solid #cbd5e1; padding: 1.6mm 2mm; vertical-align: top; text-align: left; }
+  th { background: var(--bleu); color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .oui { color: var(--vert); font-weight: 700; }
+  .non { color: var(--rouge); font-weight: 700; }
+  .part { color: var(--orange); font-weight: 700; }
+  .c { text-align: center; }
+  .petit { font-size: 8.5pt; color: var(--gris); }
+  .tag { display:inline-block; padding: 0 2mm; border-radius: 2mm; font-size: 8pt; font-weight: 700; color:#fff; }
+  .t-p { background: var(--vert); } .t-m { background: var(--orange); } .t-g { background: var(--rouge); }
+  .deux { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .carte { border: 1px solid #cbd5e1; border-radius: 2mm; padding: 3mm; break-inside: avoid; }
+  .carte h3 { margin-top: 0; }
+  .sources li { font-size: 8.4pt; word-break: break-all; }
+  .pied { margin-top: 10mm; font-size: 8.5pt; color: var(--gris); }
+</style>
+</head>
+<body>
+
+<!-- 1 -->
+<section class="page">
+  <h1>Audit de la concurrence</h1>
+  <div class="sous">Calage de plans · Plans de chantier · (et Comparer des PDF)<br>Application Topo, version 0.309.0 — 24 novembre 2026</div>
+
+  <h2>Résumé en une page</h2>
+  <div class="encadre bleu">
+    <b>En une phrase :</b> personne ne fait les deux choses de Topo <i>dans le même outil, pensé pour un géomètre suisse et utilisable sur la tablette du chantier</i>. Les concurrents sont soit des gros logiciels de DAO (AutoCAD / Civil 3D, Mensura, Trimble Business Center), soit des plateformes de gestion de chantier (Procore, Bluebeam, SYNCHRO) chères et pensées pour les grandes entreprises.
+  </div>
+
+  <h3>Calage de plans</h3>
+  <ul>
+    <li>Les concurrents savent tous <b>déplacer / tourner / mettre à l'échelle</b> un plan sur des points (AutoCAD Map « Rubber Sheet », Mensura « calage rapide de 2 plans », TBC, QGIS Helmert).</li>
+    <li>Ce que Topo fait <b>et qu'on ne retrouve pas clairement ailleurs</b> : verdict chiffré vert / orange / rouge (2 / 4 mm), <b>recette rejouée sur le nouvel indice</b>, contrôle « même origine », « Ce qui a changé » entre indices, calage automatique par vote + ICP (ajustement itératif des points les plus proches).</li>
+    <li>Point faible de Topo : DWG seulement par ODA dans les applis Windows ; pas de déformation non uniforme (« rubber sheet ») pour les vieux plans scannés.</li>
+  </ul>
+
+  <h3>Plans de chantier</h3>
+  <ul>
+    <li>Marché coupé en deux : <b>outils de dessin / BIM</b> (Revit, PCMO, Méthode+ module PIC) et <b>plateformes logistiques</b> (Bluebeam, SYNCHRO 4D dès ~5 000 USD, PLOT).</li>
+    <li>Topo a déjà : phases avec règles d'affichage, grues à flèche réglable, ~150 symboles modernisés, feuille PDF avec cartouche / légende / situation, DXF par blocs, fond swisstopo. C'est <b>au niveau</b> des outils de dessin, avec un vrai avantage : <b>le plan de chantier est dans le même projet que le levé</b>.</li>
+    <li>Ce qui manque surtout : <b>partage en lecture</b> (lien / tablette du conducteur de travaux), <b>vérifications automatiques</b> (grue qui survole la limite de parcelle, zones qui se chevauchent), lien avec le planning.</li>
+  </ul>
+
+  <h3>Les 5 pistes à plus fort intérêt (détail page 10)</h3>
+  <ol>
+    <li>Rapport de calage PDF « une page » à joindre au plan livré (preuve de qualité).</li>
+    <li>Plan de chantier visible <b>en lecture seule sur la tablette</b> (Terrain) : implanter un conteneur, une clôture.</li>
+    <li>Contrôles automatiques du PIC (survol de la grue, distances aux limites).</li>
+    <li>Calage multi-plans : caler un dossier entier d'indices d'un coup.</li>
+    <li>Déformation « rubber sheet » pour plans anciens / scannés (Expert).</li>
+  </ol>
+</section>
+
+<!-- 2 -->
+<section class="page">
+  <h2>Méthode et limites</h2>
+  <h3>Comment l'audit a été fait</h3>
+  <ul>
+    <li>Recherches web le 24.11.2026 sur la documentation officielle des éditeurs (Autodesk, Trimble, Bentley, Bluebeam, Procore, QGIS, Sogelink / Mensura) et sur des ressources de formation (éduscol, FFB).</li>
+    <li>Comparaison avec ce que Topo fait réellement aujourd'hui (fichier CLAUDE.md, état à la 0.309.0).</li>
+    <li>Aucune donnée de vos chantiers ou de vos projets n'a été envoyée dans les recherches.</li>
+  </ul>
+
+  <h3>Ce qu'il faut savoir avant de lire</h3>
+  <div class="encadre">
+    <ul>
+      <li><b>Aucun logiciel n'a été essayé</b> : tout vient des pages des éditeurs et de forums. Une fonction « non trouvée » peut exister quand même.</li>
+      <li><b>Prix</b> : un seul prix public trouvé (SYNCHRO 4D, « à partir de 4 980 USD »). Les autres : « non publié » / sur devis.</li>
+      <li><b>Leica Infinity</b> : seule une page de 2016 a été trouvée (outil « Shift Rotate Scale », import IFC). À vérifier.</li>
+      <li><b>Mensura</b> : la doc trouvée (formations Sogelink) parle de « calage rapide de 2 plans DWG » sans dire la méthode de calcul ni le contrôle.</li>
+      <li>Les outils suisses de PIC (bureaux d'ingénieurs, entreprises) : rien de spécifique trouvé ; souvent fait dans AutoCAD avec une bibliothèque maison — <b>comme vous avec <code>Base_2023.dxf</code></b>.</li>
+    </ul>
+  </div>
+
+  <h3>Vocabulaire</h3>
+  <ul>
+    <li><b>Calage / géoréférencement</b> : placer un plan dans les vraies coordonnées (MN95).</li>
+    <li><b>Similitude (Helmert)</b> : déplacement + rotation + une seule échelle ; le plan n'est pas déformé.</li>
+    <li><b>Rubber sheet (« feuille de caoutchouc »)</b> : déformation non uniforme ; chaque point de calage tombe pile, le reste est étiré entre eux.</li>
+    <li><b>PIC</b> : plan d'installation de chantier (base-vie, grues, accès, stocks, clôtures).</li>
+    <li><b>4D</b> : maquette 3D + planning (on voit le chantier jour par jour).</li>
+    <li><b>Overlay</b> : superposition de deux indices d'un plan en deux couleurs.</li>
+  </ul>
+</section>
+
+<!-- 3 -->
+<section class="page">
+  <h2>Calage de plans : panorama</h2>
+
+  <div class="deux">
+    <div class="carte">
+      <h3>AutoCAD Map 3D / Civil 3D (Autodesk)</h3>
+      <p><b>Fait bien :</b> on affecte un système de coordonnées au dessin (GEOCSASSIGN / MAPCSASSIGN) ; <b>Rubber Sheet (ADERSHEET)</b> aligne deux jeux de données sur des points de base / de référence, avec déformation non uniforme. Raster Design : rubber sheet d'image, au moins 3 paires de points.</p>
+      <p><b>Limites :</b> outil généraliste, plusieurs produits ; pas de verdict de qualité ni de recette rejouable ; les objets Civil 3D ne se transforment pas directement (à extraire puis recréer).</p>
+      <p class="petit">Public : bureaux d'ingénieurs. Prix : abonnement, non relevé.</p>
+    </div>
+    <div class="carte">
+      <h3>Mensura (Sogelink)</h3>
+      <p><b>Fait bien :</b> import DWG / DXF, choix des calques par module, <b>« calage rapide de 2 plans DWG dans le même système »</b>, gestion des systèmes de coordonnées ; très présent chez les géomètres et en VRD (voirie et réseaux divers).</p>
+      <p><b>Limites :</b> rien trouvé sur le contrôle de l'écart, les indices successifs ni le calage automatique. Logiciel PC, pas tablette.</p>
+      <p class="petit">C'est la cible de vos exports DXF.</p>
+    </div>
+    <div class="carte">
+      <h3>Trimble Business Center (TBC) / Trimble Access</h3>
+      <p><b>Fait bien :</b> géoréférencer une image par 2 pixels ou plus ; dans Access (terrain) « Georeference map » = translation + rotation + échelle sur des points levés.</p>
+      <p><b>Limites :</b> DWG avec fausses coordonnées : les forums conseillent de tourner à la main (90° ± convergence) puis de vérifier sur fond de carte → <b>manque d'outil guidé</b>.</p>
+    </div>
+    <div class="carte">
+      <h3>QGIS (gratuit)</h3>
+      <p><b>Fait bien :</b> Georeferencer avec Helmert (≥ 2 points), polynômes, « Thin Plate Spline » pour cartes déformées ; export des vecteurs transformés.</p>
+      <p><b>Limites :</b> pensé pour les images ; DXF peu adapté ; pas de notion d'indice de plan ; interface de SIG, pas de chantier.</p>
+    </div>
+  </div>
+
+  <h3>Ce que ça veut dire pour Topo</h3>
+  <ul>
+    <li>Le <b>calcul</b> (similitude) est banal : tout le monde l'a. La valeur de Topo est <b>autour</b> du calcul : verdict, vérification séparée, recette, indices, nettoyage, comparaison.</li>
+    <li>Trimble Access montre que le calage <b>sur le terrain, sur des points levés</b> est attendu : Topo le fait déjà (version tablette, « Points du projet »).</li>
+    <li>Les vieux plans déformés sont traités ailleurs par « rubber sheet » / « thin plate spline » : Topo n'a que la similitude (c'est plus sûr, mais ça ne couvre pas tout).</li>
+  </ul>
+</section>
+
+<!-- 4 -->
+<section class="page">
+  <h2>Calage de plans : tableau comparatif</h2>
+  <table>
+    <tr><th>Fonction</th><th class="c">Topo 0.309</th><th class="c">AutoCAD Map / Civil 3D</th><th class="c">Mensura</th><th class="c">TBC / Access</th><th class="c">QGIS</th></tr>
+    <tr><td>Import DXF</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c part">partiel</td></tr>
+    <tr><td>Import DWG</td><td class="c part">Windows + ODA</td><td class="c oui">natif</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c part">partiel</td></tr>
+    <tr><td>PDF (traits ou image)</td><td class="c oui">oui</td><td class="c part">import PDF</td><td class="c">non trouvé</td><td class="c part">image</td><td class="c part">image</td></tr>
+    <tr><td>Xrefs</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c">non trouvé</td><td class="c">non trouvé</td><td class="c non">non</td></tr>
+    <tr><td>Calage 2 points + similitude</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c oui">oui</td></tr>
+    <tr><td>Calage sur un axe</td><td class="c oui">oui</td><td class="c">non trouvé</td><td class="c">non trouvé</td><td class="c">non trouvé</td><td class="c non">non</td></tr>
+    <tr><td>Déformation non uniforme</td><td class="c non">non</td><td class="c oui">Rubber Sheet</td><td class="c">non trouvé</td><td class="c">non trouvé</td><td class="c oui">TPS</td></tr>
+    <tr><td>Points de vérification séparés + verdict</td><td class="c oui">2 / 4 mm</td><td class="c part">résidus</td><td class="c">non trouvé</td><td class="c part">résidus</td><td class="c part">résidus</td></tr>
+    <tr><td>Calage automatique</td><td class="c oui">vote + ICP</td><td class="c">non trouvé</td><td class="c">non trouvé</td><td class="c">non trouvé</td><td class="c non">non</td></tr>
+    <tr><td>Nettoyage (calques, zone, types)</td><td class="c oui">oui</td><td class="c oui">outils DAO</td><td class="c oui">calques</td><td class="c part">calques</td><td class="c part">filtre</td></tr>
+    <tr><td>Recette rejouée sur nouvel indice</td><td class="c oui">oui</td><td class="c">non trouvé</td><td class="c">non trouvé</td><td class="c">non trouvé</td><td class="c non">non</td></tr>
+    <tr><td>« Ce qui a changé » entre indices</td><td class="c oui">oui</td><td class="c part">DWG Compare</td><td class="c">non trouvé</td><td class="c">non trouvé</td><td class="c non">non</td></tr>
+    <tr><td>Calage sur le terrain (tablette)</td><td class="c oui">APK / Windows</td><td class="c non">non</td><td class="c non">non</td><td class="c oui">Access</td><td class="c non">non</td></tr>
+    <tr><td>Contrôle par points levés</td><td class="c oui">2 / 15 mm</td><td class="c">non trouvé</td><td class="c">non trouvé</td><td class="c part">implicite</td><td class="c non">non</td></tr>
+    <tr><td>Rapport de calage imprimable</td><td class="c non">non</td><td class="c part">tableau résidus</td><td class="c">non trouvé</td><td class="c oui">rapports TBC</td><td class="c part">rapport PDF</td></tr>
+  </table>
+  <p class="petit">« non trouvé » = pas vu dans la documentation consultée, pas forcément absent. AutoCAD « DWG Compare » : connu de la DAO, non vérifié dans cette recherche.</p>
+
+  <div class="encadre">
+    <b>Lecture :</b> Topo est en avance sur le <b>suivi des indices</b> et le <b>contrôle</b>, en retard sur <b>le DWG partout</b>, <b>la déformation</b> et <b>le rapport imprimable</b> (QGIS et TBC sortent un rapport des résidus, Topo garde tout dans le projet mais ne l'imprime pas).
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="page">
+  <h2>Calage de plans : pistes « mieux ou autrement »</h2>
+  <table>
+    <tr><th style="width:28%">Idée</th><th>Pourquoi (intérêt pour un géomètre)</th><th style="width:11%">Effort</th><th style="width:26%">Question à vous poser</th></tr>
+    <tr><td><b>Rapport de calage PDF</b> (1 page : plan reçu, référence, paramètres, tableau des points avec écarts, verdict, indice, date, qui)</td><td>Preuve à joindre au plan livré ou à classer dans l'affaire ; ce que TBC et QGIS font.</td><td><span class="tag t-p">petit</span></td><td>Logo Perrin comme les plans de chantier ? Mode Expert ?</td></tr>
+    <tr><td><b>Calage d'un dossier entier</b> (plusieurs DXF d'un même architecte d'un coup, calage auto contre le 1er calé)</td><td>Un lot d'indices arrive souvent ensemble ; aujourd'hui un par un.</td><td><span class="tag t-m">moyen</span></td><td>Accepter d'office les « confiance forte », ou tout faire valider ?</td></tr>
+    <tr><td><b>Déformation « rubber sheet »</b> (Expert, option à part, jamais par défaut)</td><td>Vieux plans cadastraux ou scannés qui ne tiennent pas en similitude.</td><td><span class="tag t-m">moyen</span></td><td><b>Formule à valider avec vous</b> (triangles ou spline) ; quelle tolérance pour l'accepter ?</td></tr>
+    <tr><td><b>Lecture DWG dans le site PC</b> (sans ODA)</td><td>Les plans arrivent en DWG ; ODA n'existe que sous Windows.</td><td><span class="tag t-g">grand</span></td><td>Déjà refusé (licence GPL, taille). À revoir dans 6 mois ?</td></tr>
+    <tr><td><b>Calage par deux axes</b> (croisement de 2 axes implantés = 1 point + direction)</td><td>Sur un chantier, on a souvent les axes de la construction, pas des points.</td><td><span class="tag t-p">petit</span></td><td>Utile chez vous ?</td></tr>
+    <tr><td><b>Alerte « plan qui a bougé »</b> sur la tablette (repères contrôlés au point levé suivant)</td><td>Un indice décalé détecté sur le terrain avant d'implanter faux.</td><td><span class="tag t-m">moyen</span></td><td>Quel seuil (2 cm ? 5 cm ?)</td></tr>
+    <tr><td><b>Export DXF « prêt Mensura »</b> (nom de calques, couleurs, unités, contrôle de relecture)</td><td>Mensura est l'outil d'arrivée ; éviter les surprises à l'ouverture.</td><td><span class="tag t-p">petit</span></td><td>Avez-vous un DXF Mensura d'exemple ?</td></tr>
+  </table>
+
+  <h3>Ce qu'il ne faut pas faire (à mon avis)</h3>
+  <ul>
+    <li>Refaire une DAO complète (AutoCAD / Mensura le font) : garder Topo sur <b>« caler, contrôler, suivre les indices, implanter »</b>.</li>
+    <li>Rendre la déformation automatique : elle cache les erreurs ; la similitude doit rester la règle.</li>
+  </ul>
+</section>
+
+<!-- 6 -->
+<section class="page">
+  <h2>Plans de chantier : panorama</h2>
+
+  <div class="deux">
+    <div class="carte">
+      <h3>Revit / BIM (Autodesk)</h3>
+      <p><b>Fait bien :</b> PIC en 3D à partir d'une bibliothèque d'objets BIM ; vues de phasage (gabarit « Plan – Phasage », filtres de phases). Très utilisé en formation (éduscol).</p>
+      <p><b>Limites :</b> lourd, il faut la maquette ; peu adapté à un plan rapide de géomètre.</p>
+    </div>
+    <div class="carte">
+      <h3>Méthode+ (module PIC) / PCMO</h3>
+      <p><b>Fait bien :</b> équipements posés « sous forme de pictogrammes, en quelques clics » ; formation d'une journée annoncée (FFB). PCMO : bibliothèques 2D / 3D enrichissables.</p>
+      <p><b>Limites :</b> marché français ; prix non publié ; pas trouvé de lien avec un levé ou un fond cadastral suisse.</p>
+    </div>
+    <div class="carte">
+      <h3>Bluebeam (Revu)</h3>
+      <p><b>Fait bien :</b> annoter et partager des plans de logistique sur PDF ; très répandu chez les entreprises ; collaboration.</p>
+      <p><b>Limites :</b> annotation sur PDF, pas de vraies coordonnées ; pas de grue réglable.</p>
+    </div>
+    <div class="carte">
+      <h3>Bentley SYNCHRO 4D</h3>
+      <p><b>Fait bien :</b> engins et trajets liés aux tâches du planning, détection de conflits avant travaux, zones de travail ; « à partir de 4 980 USD ».</p>
+      <p><b>Limites :</b> grands projets, maquette 3D nécessaire, cher.</p>
+    </div>
+    <div class="carte">
+      <h3>Plateformes « logistique » (PLOT, Procore…)</h3>
+      <p><b>Fait bien :</b> livraisons, réservations de zones, plan partagé avec toute l'équipe.</p>
+      <p><b>Limites :</b> orientées gestion, dessin simple ; anglo-saxon.</p>
+    </div>
+    <div class="carte">
+      <h3>AutoCAD + bibliothèque maison</h3>
+      <p><b>Fait bien :</b> la pratique réelle en Suisse (comme votre <code>Base_2023.dxf</code>) ; liberté totale.</p>
+      <p><b>Limites :</b> pas de phases propres, pas de grue paramétrée, mise en page à la main.</p>
+    </div>
+  </div>
+
+  <div class="encadre bleu" style="margin-top:5mm">
+    <b>Position de Topo :</b> entre les deux familles. Plus simple et plus « géomètre » que Revit / SYNCHRO, plus juste (MN95, fond swisstopo, levés) que Bluebeam, plus structuré (phases, grues, légende auto) qu'AutoCAD + bibliothèque. <b>Le gros atout unique : le PIC vit dans le même projet que le levé, les plans calés et l'implantation.</b>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="page">
+  <h2>Plans de chantier : tableau comparatif</h2>
+  <table>
+    <tr><th>Fonction</th><th class="c">Topo 0.309</th><th class="c">Revit</th><th class="c">Méthode+ / PCMO</th><th class="c">Bluebeam</th><th class="c">SYNCHRO 4D</th><th class="c">AutoCAD + biblio</th></tr>
+    <tr><td>Vraies coordonnées (MN95)</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c">non trouvé</td><td class="c non">non</td><td class="c oui">oui</td><td class="c oui">oui</td></tr>
+    <tr><td>Fond orthophoto / cadastre suisse</td><td class="c oui">swisstopo</td><td class="c part">import</td><td class="c">non trouvé</td><td class="c part">PDF</td><td class="c part">import</td><td class="c part">import</td></tr>
+    <tr><td>Bibliothèque de symboles</td><td class="c oui">~150</td><td class="c oui">familles BIM</td><td class="c oui">pictos</td><td class="c part">tampons</td><td class="c oui">3D</td><td class="c oui">maison</td></tr>
+    <tr><td>Grue paramétrée (flèche, rayon)</td><td class="c oui">oui + abaque</td><td class="c part">familles</td><td class="c">non trouvé</td><td class="c non">non</td><td class="c oui">engins</td><td class="c part">blocs dyn.</td></tr>
+    <tr><td>Phases</td><td class="c oui">règles par phase</td><td class="c oui">filtres</td><td class="c">non trouvé</td><td class="c part">calques</td><td class="c oui">planning</td><td class="c part">calques</td></tr>
+    <tr><td>Planning (Gantt)</td><td class="c part">simple</td><td class="c non">non</td><td class="c">non trouvé</td><td class="c non">non</td><td class="c oui">complet</td><td class="c non">non</td></tr>
+    <tr><td>Détection de conflits</td><td class="c non">non</td><td class="c part">collisions</td><td class="c">non trouvé</td><td class="c non">non</td><td class="c oui">oui</td><td class="c non">non</td></tr>
+    <tr><td>Feuille PDF (cartouche, légende auto, nord, échelle, situation)</td><td class="c oui">oui</td><td class="c oui">feuilles</td><td class="c oui">oui</td><td class="c part">manuel</td><td class="c part">vues</td><td class="c part">manuel</td></tr>
+    <tr><td>Export DXF</td><td class="c oui">blocs</td><td class="c oui">oui</td><td class="c">non trouvé</td><td class="c non">non</td><td class="c part">oui</td><td class="c oui">natif</td></tr>
+    <tr><td>3D</td><td class="c non">non</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c non">non</td><td class="c oui">oui</td><td class="c part">oui</td></tr>
+    <tr><td>Partage / lecture par l'équipe</td><td class="c part">Drive (projet)</td><td class="c part">ACC</td><td class="c">non trouvé</td><td class="c oui">Studio</td><td class="c oui">cloud</td><td class="c non">fichier</td></tr>
+    <tr><td>Sur tablette de chantier</td><td class="c non">PC seulement</td><td class="c non">non</td><td class="c non">non</td><td class="c oui">iPad</td><td class="c part">viewer</td><td class="c non">non</td></tr>
+    <tr><td>Lien avec levé / implantation</td><td class="c oui">même projet</td><td class="c non">non</td><td class="c non">non</td><td class="c non">non</td><td class="c non">non</td><td class="c non">non</td></tr>
+  </table>
+  <div class="encadre">
+    <b>Lecture :</b> Topo est complet sur le <b>dessin 2D et la mise en page</b>. Les écarts : <b>tablette</b>, <b>partage en lecture</b>, <b>contrôles automatiques</b> et <b>3D</b> (la 3D est moins utile pour un PIC de géomètre).
+  </div>
+</section>
+
+<!-- 8 -->
+<section class="page">
+  <h2>Plans de chantier : pistes « mieux ou autrement »</h2>
+  <table>
+    <tr><th style="width:28%">Idée</th><th>Pourquoi</th><th style="width:11%">Effort</th><th style="width:26%">Question à vous poser</th></tr>
+    <tr><td><b>Plan de chantier en lecture sur la tablette</b> (calque dans Terrain, implanter un conteneur, un coin de clôture, la grue)</td><td>Le lien levé ↔ PIC est votre avantage unique : il faut qu'il serve sur le terrain.</td><td><span class="tag t-m">moyen</span></td><td>Quel mode (Intermédiaire ?) ; APK + Topo Tablette ?</td></tr>
+    <tr><td><b>Contrôles automatiques</b> : grue qui survole hors parcelle / une route / une autre grue, conteneur sur une conduite, distances mini</td><td>Ce que vendent SYNCHRO et les plateformes ; utile devant l'autorité.</td><td><span class="tag t-m">moyen</span></td><td>Quelles règles ? <b>Aucune norme à deviner</b> : vous les donnez.</td></tr>
+    <tr><td><b>Lien de partage en lecture</b> (PDF + vue web pour le conducteur de travaux / le maître d'ouvrage)</td><td>Bluebeam / Procore misent tout là-dessus.</td><td><span class="tag t-m">moyen</span></td><td>Drive en lecture seule suffit-il ?</td></tr>
+    <tr><td><b>Modèles de PIC</b> (base-vie type, clôture + portail + WC + bennes à poser d'un bloc)</td><td>Gagner du temps à chaque chantier ; comme les « pictos en quelques clics » de Méthode+.</td><td><span class="tag t-p">petit</span></td><td>Avez-vous 2–3 installations « types » ?</td></tr>
+    <tr><td><b>Quantités automatiques</b> (m de clôture, nb de plots, surfaces de zones, nb de conteneurs) en tableau / Excel</td><td>Sert au devis d'installation et à la commande de matériel.</td><td><span class="tag t-p">petit</span></td><td>Lien avec l'appli Matériel ?</td></tr>
+    <tr><td><b>Giration simple</b> d'un camion à l'entrée du chantier</td><td>Question fréquente de l'autorité ; décision du 23.11 : pas de giration.</td><td><span class="tag t-g">grand</span></td><td>Toujours non ?</td></tr>
+    <tr><td><b>Planning relié</b> (date d'une phase → éléments présents)</td><td>Pas besoin d'un SYNCHRO ; le Gantt existe déjà.</td><td><span class="tag t-p">petit</span></td><td>Utile ou gadget ?</td></tr>
+  </table>
+  <h3>Ce qu'il ne faut pas faire (à mon avis)</h3>
+  <ul>
+    <li>La 3D complète du chantier : beaucoup de travail, peu de gain pour un géomètre.</li>
+    <li>Une gestion des livraisons façon plateforme : autre métier.</li>
+  </ul>
+</section>
+
+<!-- 9 -->
+<section class="page">
+  <h2>En bonus : Comparer des PDF</h2>
+  <p>Liée aux deux sujets (indices de plans), la comparaison est l'endroit où la concurrence est la plus forte.</p>
+  <table>
+    <tr><th>Fonction</th><th class="c">Topo 0.309</th><th class="c">Bluebeam Revu</th><th class="c">Procore Drawings</th></tr>
+    <tr><td>Superposition 2 couleurs</td><td class="c oui">oui</td><td class="c oui">Overlay Pages</td><td class="c oui">Overlay</td></tr>
+    <tr><td>Détection automatique des zones changées</td><td class="c oui">oui + liste</td><td class="c oui">Compare / Smart Overlay (Max, préversion)</td><td class="c part">PDF de comparaison</td></tr>
+    <tr><td>Recalage auto de B</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c part">mêmes tailles</td></tr>
+    <tr><td>Textes « avant → après »</td><td class="c oui">oui</td><td class="c">non trouvé</td><td class="c">non trouvé</td></tr>
+    <tr><td>Suivi à traiter / validé / ignoré, qui a validé</td><td class="c oui">oui</td><td class="c part">annotations</td><td class="c part">tâches</td></tr>
+    <tr><td>Dossiers entiers appariés par cartouche</td><td class="c oui">oui</td><td class="c oui">par discipline / feuille (Max)</td><td class="c oui">par jeu de plans</td></tr>
+    <tr><td>Rapport PDF</td><td class="c oui">oui</td><td class="c oui">oui</td><td class="c oui">par e-mail</td></tr>
+  </table>
+  <div class="encadre">
+    <b>Lecture :</b> sur le papier, Topo est <b>au niveau</b>. Procore note un piège que vous risquez aussi : <b>des feuilles de tailles différentes font tout sortir en « modifié »</b>. À tester sur de vrais plans d'architecte avant d'aller plus loin.
+  </div>
+  <h3>Pistes</h3>
+  <ul>
+    <li>Relier Comparer des PDF et Calage : une modification validée dans le PDF → zone à recontrôler dans le plan calé.</li>
+    <li>Prévenir quand les tailles de feuille diffèrent (avant de lancer la détection).</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section class="page">
+  <h2>Priorités proposées et questions</h2>
+  <table>
+    <tr><th>#</th><th>Piste</th><th>Module</th><th>Effort</th><th>Pourquoi d'abord</th></tr>
+    <tr><td>1</td><td>Rapport de calage PDF</td><td>Calage</td><td><span class="tag t-p">petit</span></td><td>Preuve de qualité, rapide.</td></tr>
+    <tr><td>2</td><td>PIC visible et implantable sur la tablette</td><td>Plans de chantier</td><td><span class="tag t-m">moyen</span></td><td>Exploite l'avantage unique (même projet).</td></tr>
+    <tr><td>3</td><td>Contrôles automatiques du PIC (règles données par vous)</td><td>Plans de chantier</td><td><span class="tag t-m">moyen</span></td><td>Ce que la concurrence chère fait.</td></tr>
+    <tr><td>4</td><td>Calage d'un dossier d'indices d'un coup</td><td>Calage</td><td><span class="tag t-m">moyen</span></td><td>Réutilise le calage auto existant.</td></tr>
+    <tr><td>5</td><td>Quantités + modèles de PIC</td><td>Plans de chantier</td><td><span class="tag t-p">petit</span></td><td>Gain de temps direct.</td></tr>
+    <tr><td>6</td><td>Rubber sheet (Expert)</td><td>Calage</td><td><span class="tag t-m">moyen</span></td><td>Seulement si vous avez des vieux plans à caler.</td></tr>
+  </table>
+
+  <h3>Questions à trancher avec vous</h3>
+  <ol>
+    <li>Le rapport de calage : quel contenu exact, et pour qui (classement interne, client, autorité) ?</li>
+    <li>Le PIC sur la tablette : quel mode (Base / Intermédiaire / Expert) et sur quelles façons d'utiliser Topo ?</li>
+    <li>Contrôles du PIC : quelles règles et quelles distances ? (je ne les invente pas)</li>
+    <li>Rubber sheet : en avez-vous vraiment besoin ? Si oui, méthode et tolérance à valider ensemble.</li>
+    <li>Faut-il essayer 1 ou 2 concurrents pour de vrai (Mensura, Bluebeam en version d'essai) pour compléter ce tableau ?</li>
+  </ol>
+  <p class="pied">Rien n'a été codé pour cet audit. Les « non trouvé » et le prix de SYNCHRO viennent des pages consultées le 24.11.2026.</p>
+</section>
+
+<!-- 11 -->
+<section class="page">
+  <h2>Sources (consultées le 24.11.2026)</h2>
+  <ul class="sources">
+    <li>Autodesk – Civil 3D, assigner un système de coordonnées : https://help.autodesk.com/cloudhelp/2026/ENU/Civil3D-UserGuide/files/GUID-75B8A4F1-CB5E-4D11-9504-4F16690A5825.htm</li>
+    <li>Autodesk – Transformer un dessin (Map 3D / Civil 3D) : https://autodesk.com/support/technical/article/An-existing-drawing-with-a-defined-coordinate-system-needs-to-be-converted-into-another-coodinate-system</li>
+    <li>Autodesk – Objets Civil 3D et reprojection : https://autodesk.com/support/technical/article/Civil-3D-Objects-do-not-come-across-after-re-projecting-a-coordinate-system-in-Civil-3D</li>
+    <li>Autodesk – ADERSHEET (Rubber Sheet) : https://help.autodesk.com/cloudhelp/2019/ENU/MAP3D-Use/files/GUID-A793316E-6677-4634-8903-E14BA92EC27B.htm</li>
+    <li>Autodesk blog – Transform et Rubber Sheet : https://www.autodesk.com/blogs/autocad/part-three-map-3d-toolset-for-regular-autocad-objects-transform-rubber-sheet/</li>
+    <li>Autodesk – Raster Design, rubbersheet d'image : https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-RasterDesign/files/GUID-2A84445E-5A05-42DE-A719-7F17B3686564.htm</li>
+    <li>Sogelink – Mensura, formation DAO : https://www.sogelink.com/app/uploads/2022/09/01_DAO01_Dessiner-mesurer-modifier-et-imprimer-vos-plans-1.pdf</li>
+    <li>Sogelink – Mensura BTP, initiation VRD : https://www.sogelink.com/wp-content/uploads/2026/06/Mensura-Btp-02-Initiation-Vrd-3J.pdf</li>
+    <li>Éduscol – TD DAO Mensura : https://sti.eduscol.education.fr/sites/eduscol.education.fr.sti/files/ressources/pedagogiques/7316/7316-dao-mensura-td02-romagne.pdf</li>
+    <li>Trimble Access – Georeference map : https://help.fieldsystems.trimble.com/trimble-access/latest/en/cogo-georeference-map.htm</li>
+    <li>Trimble TBC – Georeference an Image : https://help.fieldsystems.trimble.com/tbc/8289.htm</li>
+    <li>Trimble Community – DWG à fausses coordonnées : https://community.trimble.com/question/problem-importing-cad-file-results-in-false-ne-coords-making-file-unusable</li>
+    <li>Leica – Infinity (2016) : https://leica-geosystems.com/blog-content/2016/the-glue-of-leica-geosystems-updates-to-leica-infinity</li>
+    <li>QGIS – Georeferencer : https://docs.qgis.org/3.44/en/docs/user_manual/managing_data_source/georeferencer.html</li>
+    <li>Bentley – SYNCHRO : https://www.bentley.com/software/synchro/ ; fiche : https://www.bentley.com/pds-synchro-4d-product-ltr-en ; ebook : https://www.bentley.com/wp-content/uploads/synchro_4d-pre-construction-ebook.pdf</li>
+    <li>Bluebeam – Logistique de chantier : https://blog.bluebeam.com/site-logistics-technology/</li>
+    <li>Bluebeam – Smart Overlay : https://support.bluebeam.com/revu/how-to/use-smart-overlay.html</li>
+    <li>Procore – Compare drawing revisions : https://support.procore.com/products/online/user-guide/project-level/drawings/tutorials/compare-drawing-revisions</li>
+    <li>Procore – Échecs de comparaison : https://support.procore.com/faq/why-are-my-drawing-comparisons-failing</li>
+    <li>PLOT – Logistics : https://getplot.com/tools/logistics</li>
+    <li>FFB – Installation de chantier en 3D (Méthode+) : https://www.ffbatiment.fr/gestion-entreprise/organiser-mon-chantier/logistique-transport/dossier-bam/realiser-l-installation-de-chantier-en-3d-grace-au-bim</li>
+    <li>Éduscol – PIC avec PCMO : https://sti.eduscol.education.fr/print/9732 ; PIC avec Revit : https://sti.eduscol.education.fr/print/9733</li>
+    <li>Éduscol – Phasage Revit : https://sti.eduscol.education.fr/sites/eduscol.education.fr.sti/files/ressources/techniques/7805/7805-leg-manuel-dutilisateur-revit-chapitre-2-phasages-v12015.docx</li>
+  </ul>
+</section>
+
+</body>
+</html>
