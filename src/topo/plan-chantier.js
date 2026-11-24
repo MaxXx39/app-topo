@@ -1046,6 +1046,50 @@ export function arcSurCote(points, index, m, ferme = false, n = 16) {
   return [...points.slice(0, index + 1), ...milieu, ...points.slice(index + 1)];
 }
 
+// --- Arcs modifiables (0.315.0, demande du 24.11 : un arc ne doit pas devenir « juste des segments ») ---
+// Un arc reste une suite de points (tous les calculs, le DXF et le PDF la lisent comme avant) mais l'objet se souvient des
+// arcs : o.arcs = [{ i (point de départ), n (points ajoutés), m (point de passage) }] et o.arcsLen (nombre de points quand
+// c'est vrai). Si le nombre de points change autrement (point ajouté ou retiré), les arcs sont oubliés : il reste des segments.
+
+/** Arcs encore valables d'un élément. */
+export function arcsDe(o) {
+  return Array.isArray(o?.arcs) && o.arcsLen === o.points?.length ? o.arcs : [];
+}
+
+/** Le côté « index » devient un arc passant par m (depuis les points et arcs de départ) : { points, arcs, arcsLen }. */
+export function courberCote(base, baseArcs, index, m, ferme = false) {
+  const points = arcSurCote(base, index, m, ferme);
+  const ajoutes = points.length - base.length;
+  if (ajoutes <= 0) return { points, arcs: baseArcs, arcsLen: base.length };
+  const arcs = [...baseArcs.map((a) => (a.i > index ? { ...a, i: a.i + ajoutes } : a)), { i: index, n: ajoutes, m: [m[0], m[1]] }];
+  return { points, arcs, arcsLen: points.length };
+}
+
+/** Poignées rondes des arcs (milieu de chaque arc) : [{ numero, point }]. */
+export function poigneesArcs(o) {
+  return arcsDe(o).map((a, numero) => ({ numero, point: o.points[a.i + 1 + Math.floor(a.n / 2)] })).filter((x) => x.point);
+}
+
+/** Indices des points intérieurs aux arcs (pas de carré à glisser dessus). */
+export function pointsDansArcs(o) {
+  const res = new Set();
+  for (const a of arcsDe(o)) for (let k = 1; k <= a.n; k++) res.add(a.i + k);
+  return res;
+}
+
+/** Courbe de nouveau l'arc « numero » pour qu'il passe par m (mêmes bouts, même nombre de points). */
+export function recourber(o, numero, m) {
+  const a = arcsDe(o)[numero];
+  if (!a) return o;
+  const debut = o.points[a.i];
+  const fin = o.points[(a.i + a.n + 1) % o.points.length];
+  const nouveau = arcSurCote([debut, fin], 0, m, false);
+  if (nouveau.length !== a.n + 2) return o; // m aligné avec les bouts : l'arc reste comme il est
+  o.points = [...o.points.slice(0, a.i + 1), ...nouveau.slice(1, -1), ...o.points.slice(a.i + 1 + a.n)];
+  o.arcs = o.arcs.map((x, k) => (k === numero ? { ...x, m: [m[0], m[1]] } : x));
+  return o;
+}
+
 // --- Formes : rectangle et rond (0.301.0, demande du 24.11) ---
 // Ce sont des zones (contour, épaisseur, remplissage, hachures comme toute zone). Le rond garde son centre et son rayon
 // (o.cercle = { centre: [e, n], rayon }) ; ses points (polygone de 72 côtés) servent au dessin, à la surface, aux

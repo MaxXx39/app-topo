@@ -1,7 +1,7 @@
 // Mesure de durée, côté écran (0.214.0, maquette 5 B du 12.11) : un appui long sur un bouton « Enreg. » ouvre le choix 5 / 15 / 30 s ;
 // pendant la mesure, un anneau fait le décompte (« Annuler » arrête tout). En Contrôle, la mesure dure 5 s d'office.
 // À la fin, le point moyen est rangé (pont.js) puis le bouton est touché de nouveau : l'appli le prend comme un point normal.
-import { demarrerMesure, DUREES_MESURE } from '../topo/mesure-duree.js';
+import { demarrerMesure, DUREES_MESURE, lectureDeMesure } from '../topo/mesure-duree.js';
 import { lirePointRecepteur, preparerPointMoyenne, pointMoyenPret, viderPointPrepare } from '../android/pont.js';
 
 // Boutons qui prennent un point : ceux de l'écran (Lever, Implanter, Contrôle) et ceux de la bande du bas (+ Mesure rapide, Annotation).
@@ -37,6 +37,10 @@ function choisirDuree() {
   });
 }
 
+/** Petit niveau à bulle dessiné, bulle bien centrée (avertissement « inclinaison perdue, canne bullée »). */
+const ICONE_BULLE = '<svg class="icone-bulle" viewBox="0 0 48 20" width="40" height="17" aria-hidden="true"><rect x="1.5" y="3" width="45" height="14" rx="7" fill="#fef3c7" stroke="#92400e" stroke-width="1.6"/><line x1="19" y1="3" x2="19" y2="17" stroke="#92400e" stroke-width="1.2"/><line x1="29" y1="3" x2="29" y2="17" stroke="#92400e" stroke-width="1.2"/><circle cx="24" cy="10" r="4.2" fill="#84cc16" stroke="#3f6212" stroke-width="1.2"/></svg>';
+const TEXTE_BULLE = 'Inclinaison perdue : la canne était bullée au départ (moins de 1°), la mesure continue.';
+
 /** Valeur en m à 3 décimales, point décimal. */
 const m3 = (v) => (v == null ? '–' : v.toFixed(3));
 
@@ -44,8 +48,9 @@ const m3 = (v) => (v == null ? '–' : v.toFixed(3));
  * Fenêtre de résultat (0.229.0) : moyenne, plus petite et plus grande lecture de E / N / H, écart (mm), précision la moins bonne.
  * Renvoie une promesse : 'valider', 'refaire' ou null (annulé).
  */
-function montrerResultat(point) {
+function montrerResultat(point, perdues = 0, avertir = false) {
   const info = point.mesureDuree;
+  const bulle = perdues > 0 && avertir ? `<p class="avertissement-bulle">${ICONE_BULLE}<span>${TEXTE_BULLE} (${perdues} lecture${perdues > 1 ? 's' : ''} sur ${info.lectures})</span></p>` : '';
   const ligne = (nom, moy, lim) => `<tr><th>${nom}</th><td>${m3(moy)}</td><td>${m3(lim?.min)}</td><td>${m3(lim?.max)}</td><td>${lim ? Math.round((lim.max - lim.min) * 1000) : '–'}</td></tr>`;
   return new Promise((fin) => {
     const fond = document.createElement('div');
@@ -56,6 +61,7 @@ function montrerResultat(point) {
           <thead><tr><th></th><th>Moyenne</th><th>Mini</th><th>Maxi</th><th>Écart (mm)</th></tr></thead>
           <tbody>${ligne('E', point.est, info.limites.est)}${ligne('N', point.nord, info.limites.nord)}${ligne('H', point.altitude, info.limites.altitude)}</tbody>
         </table>
+        ${bulle}
         <p class="aide-mesure-duree">Écart max au plan : ${Math.round(info.ecartMaxPlan * 1000)} mm${point.precisionH != null ? ` · Préc. H ${m3(point.precisionH)}` : ''}${point.precisionV != null ? ` · V ${m3(point.precisionV)}` : ''}</p>
         <div class="boutons-duree">
           <button type="button" class="bouton" data-fin="valider">Valider</button>
@@ -79,13 +85,14 @@ function montrerDecompte(dureeS, annuler) {
   fond.className = 'fond-mesure-duree';
   fond.innerHTML = `<div class="fenetre-mesure-duree decompte-mesure-duree" role="status">
       <div class="anneau-mesure-duree"><b data-vivant="restant">${dureeS}</b></div>
-      <div><p class="titre-mesure-duree">Mesure de ${dureeS} s</p><p class="aide-mesure-duree">Ne bouge pas la canne.</p></div>
+      <div><p class="titre-mesure-duree">Mesure de ${dureeS} s</p><p class="aide-mesure-duree">Ne bouge pas la canne.</p><p class="avertissement-bulle" data-vivant="bulle" hidden>${ICONE_BULLE}<span>${TEXTE_BULLE}</span></p></div>
       <button type="button" class="bouton-secondaire" data-action="annuler-mesure-duree">Annuler</button>
     </div>`;
   fond.querySelector('[data-action="annuler-mesure-duree"]').addEventListener('click', annuler);
   document.body.append(fond);
   const anneau = fond.querySelector('.anneau-mesure-duree');
   return {
+    avertirBulle: () => { fond.querySelector('[data-vivant="bulle"]').hidden = false; },
     maj(restant) {
       fond.querySelector('[data-vivant="restant"]').textContent = String(restant);
       anneau.style.setProperty('--avancement', `${Math.round(((dureeS - restant) / dureeS) * 360)}deg`);
@@ -98,16 +105,18 @@ function montrerDecompte(dureeS, annuler) {
  * Branche la mesure de durée. options : { disponible() (vrai dans l'APK avec un récepteur), dureeParDefaut(bouton) (secondes ; 0 = mesure normale),
  * refuser(texte) (message de refus, comme un point refusé) }.
  */
-export function installerMesureDuree({ disponible, dureeParDefaut = () => 0, refuser }) {
+export function installerMesureDuree({ disponible, dureeParDefaut = () => 0, refuser, lectureSecours = null, avertir = () => false }) {
   let enCours = false;
 
   function lancer(bouton, dureeS, avecResultat = false) {
     enCours = true;
     let ecran = null;
+    // 0.315.0 : départ canne bullée (< 1°) : si l'inclinaison se perd ensuite, la mesure continue (avertissement en Expert)
+    const suivi = { lectures: 0, perdues: 0, bulle: false };
     const mesure = demarrerMesure({
       dureeS,
-      prendre: lirePointRecepteur,
-      quandTic: (restant) => ecran?.maj(restant),
+      prendre: () => lectureDeMesure({ lire: lirePointRecepteur, secours: lectureSecours, etat: suivi }),
+      quandTic: (restant) => { ecran?.maj(restant); if (suivi.perdues > 0 && avertir()) ecran?.avertirBulle(); },
       quandFin: (resultat) => {
         ecran?.fermer();
         enCours = false;
@@ -127,7 +136,7 @@ export function installerMesureDuree({ disponible, dureeParDefaut = () => 0, ref
           return;
         }
         // 0.229.0 : appui long (dès Intermédiaire) : on montre le résultat avant de valider.
-        montrerResultat(resultat.point).then((choix) => {
+        montrerResultat(resultat.point, suivi.perdues, avertir()).then((choix) => {
           if (choix === 'valider') prendre();
           else if (choix === 'refaire') lancer(bouton, dureeS, true);
         });

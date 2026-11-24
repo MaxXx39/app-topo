@@ -3,7 +3,7 @@
 // par la ligne. Projection : chaque point est ramené sur la ligne (distance s depuis le début A), les hauteurs sont vraies ;
 // une flèche qui n'est pas dans l'axe de la coupe apparaît raccourcie (× cos de l'angle).
 // Tout en m. Résultat : { longueur, zMin, zMax, batiments, grues, niveaux }.
-import { reglagesGrue, niveauxGrue, boutDeFleche, porteeMax, chargeAuRayon } from './grue-fiche.js';
+import { reglagesGrue, niveauxGrue, boutDeFleche, porteeMax } from './grue-fiche.js';
 import { profilSurface } from './coupe.js';
 import { modeleDe } from './grue-modele.js';
 
@@ -112,9 +112,12 @@ export function formesGrue(o, a, u) {
   const sc = X(r);
   formes.push({ type: 'ligne', genre: 'cable', pts: [ptCoupe(sc, nv.flecheBas), ptCoupe(sc, nv.crochet + 0.8)] });
   formes.push(rect(sc - 0.35, sc + 0.35, nv.crochet, nv.crochet + 0.8, 'crochet'));
-  const ch = chargeAuRayon(f, r, g.mode);
-  formes.push({ type: 'texte', genre: 'charge', s: sc, z: nv.crochet - 0.9, t: `${fixe1(ch.rayon)} m · ${ch.t.toFixed(2)} t` });
-  formes.push({ type: 'texte', genre: 'hsc', ancre: 'end', s: s0 - tour.mat / 2 - 0.6, z: nv.pied + 1.2, t: `HSC ${fixe1(h.h)} m · Z pied ${nv.pied.toFixed(2)}` });
+  // 0.315.0 : étiquettes avec flèche (placées sans chevauchement par le dessin) : flèche + HSC, cote de la HSC, Z du châssis, Z haut
+  const sMat = s0 - tour.mat / 2 - 1.2;
+  formes.push({ type: 'cote', genre: 'hsc', pts: [ptCoupe(sMat, nv.pied), ptCoupe(sMat, nv.crochet)], t: `HSC ${fixe1(h.h)} m · Z ${nv.crochet.toFixed(2)}` });
+  formes.push({ type: 'etiquette', genre: 'fleche', s: (j1 + j2) / 2, z: nv.flecheHaut, t: `Flèche ${fixe1(f.nom)} m · HSC ${fixe1(h.h)} m`, pref: 'haut' });
+  formes.push({ type: 'etiquette', genre: 'chassis', s: s0 + (tour.pied.type === 'FA' ? tour.mat : c * proj) / 2, z: nv.pied, t: `Z châssis ${nv.pied.toFixed(2)}`, pref: 'droite-bas' });
+  formes.push({ type: 'etiquette', genre: 'haut', s: s0, z: nv.haut, t: `Z haut de la grue ${nv.haut.toFixed(2)}`, pref: 'haut' });
   return { formes, niveaux: nv, s0, nom: `${M.nom}` };
 }
 

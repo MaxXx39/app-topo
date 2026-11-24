@@ -15024,3 +15024,11 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .page-chantier .ruban-une-ligne .outil-ruban { padding: 2px 3px; }
 .fenetre-modeles-grues .boutons-choix { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
 .fenetre-modeles-grues .boutons-choix button { width: auto; min-height: 0; padding: 8px 18px; }
+
+/* 0.315.0 : réglages d'une grue d'après fiche rangés par thème */
+.groupe-grue { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 8px; padding: 3px 6px; border: 1px solid var(--bordure, #cbd5e1); border-radius: 6px; margin: 0 4px 4px 0; }
+.groupe-grue > b { flex: 0 0 100%; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
+
+/* 0.315.0 : avertissement « inclinaison perdue, canne bullée » (Expert) pendant / après une mesure de durée */
+.avertissement-bulle { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; padding: 4px 8px; border-radius: 6px; background: #fffbeb; border: 1px solid #f59e0b; color: #92400e; font-size: 12px; }
+.avertissement-bulle[hidden] { display: none; }

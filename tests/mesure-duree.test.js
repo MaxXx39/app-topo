@@ -1,6 +1,6 @@
 // 0.214.0 : mesure de 5, 15 ou 30 secondes : moyenne des lectures, refus complet si une lecture est refusée.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { demarrerMesure, moyennerPoints, DUREES_MESURE } from '../src/topo/mesure-duree.js';
+import { demarrerMesure, moyennerPoints, DUREES_MESURE, lectureDeMesure } from '../src/topo/mesure-duree.js';
 
 describe('moyenne des lectures', () => {
   it('moyenne en Est, Nord et altitude ; plus mauvaise précision ; écart maximal', () => {
@@ -72,5 +72,38 @@ describe('mesure dans le temps', () => {
     mesure.annuler();
     vi.advanceTimersByTime(40000);
     expect(fin).toEqual({ ok: false, annule: true });
+  });
+});
+
+describe('mesure de durée : canne bullée au départ (0.315.0)', () => {
+  const ok = (incl) => ({ ok: true, point: { est: 1, nord: 2, altitude: 3, inclinaison: incl } });
+  const secours = () => ({ ok: true, point: { est: 1, nord: 2, altitude: 3, inclinaison: null } });
+  const perdu = () => ({ ok: false, raison: 'inclinaison pas prête' });
+  it('départ à 0,6° puis inclinaison perdue : on continue avec la lecture de secours', () => {
+    const etat = { lectures: 0, perdues: 0, bulle: false };
+    const reponses = [ok(0.6), perdu(), perdu()];
+    const lire = () => reponses.shift();
+    expect(lectureDeMesure({ lire, secours, etat }).ok).toBe(true);
+    expect(lectureDeMesure({ lire, secours, etat }).ok).toBe(true);
+    expect(lectureDeMesure({ lire, secours, etat }).ok).toBe(true);
+    expect(etat.perdues).toBe(2);
+  });
+  it('départ à 2° : une lecture refusée arrête la mesure comme avant', () => {
+    const etat = { lectures: 0, perdues: 0, bulle: false };
+    const reponses = [ok(2), perdu()];
+    const lire = () => reponses.shift();
+    lectureDeMesure({ lire, secours, etat });
+    expect(lectureDeMesure({ lire, secours, etat }).ok).toBe(false);
+  });
+  it('secours refusé (RTK perdu) : la mesure est refusée même canne bullée', () => {
+    const etat = { lectures: 0, perdues: 0, bulle: false };
+    const reponses = [ok(0.2), perdu()];
+    const r = lectureDeMesure({ lire: () => reponses.shift(), secours: () => ({ ok: false, raison: 'RTK fixe perdu' }), etat });
+    expect(r.ok).toBe(true);
+    expect(lectureDeMesure({ lire: () => perdu(), secours: () => ({ ok: false, raison: 'RTK fixe perdu' }), etat }).ok).toBe(false);
+  });
+  it('un départ refusé reste refusé', () => {
+    const etat = { lectures: 0, perdues: 0, bulle: false };
+    expect(lectureDeMesure({ lire: perdu, secours, etat }).ok).toBe(false);
   });
 });

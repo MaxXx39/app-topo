@@ -9473,6 +9473,14 @@ installerMesureDuree({
   disponible: () => recepteurDisponible() && Boolean(etatRecepteur?.connecte) && aAcces('intermediaire'), // 0.229.0 : pas en Base
   dureeParDefaut: () => (enAutocontrole() && document.body.dataset.onglet === 'terrain' ? 5 : 0),
   refuser: (texte) => refuser(texte),
+  // 0.315.0 : inclinaison perdue en cours de mesure (canne bullée au départ) : lecture d'après l'état du récepteur (RTK fixe, corrections récentes)
+  lectureSecours: () => {
+    const e = etatRecepteur;
+    if (!e?.connecte || !e.recu || !e.position || e.qualite !== 4) return { ok: false, raison: 'RTK fixe perdu' };
+    if (correctionsTropAnciennes(e.ageCorrections)) return { ok: false, raison: 'corrections trop anciennes' };
+    return { ok: true, point: { ...e.position, qualite: e.qualite, nbSatellites: e.nbSatellites ?? null, hdop: e.hdop ?? null, ageCorrections: e.ageCorrections ?? null, inclinaison: e.inclinaison ?? null, precisionH: e.precisionH ?? null, precisionV: e.precisionV ?? null, pdop: e.pdop ?? null } };
+  },
+  avertir: () => aAcces('expert'),
 });
 
 // Rappel du contrôle aussi pendant le travail (0.90.0) : GNSS connecté, une fois la durée entre deux

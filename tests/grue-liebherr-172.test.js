@@ -208,7 +208,7 @@ describe('dessin à l\'échelle', () => {
     expect(co.rayon.find((p) => p.g === 't' && p.t.startsWith('20 m')).t).toBe('20 m · 3.20 t'); // portée suivante : 20,72 m
     expect(co.rayon.find((p) => p.g === 't' && p.t.startsWith('30 m')).t).toBe('30 m · 2.00 t'); // portée suivante : 30,68 m
     expect(grueFiche({ fleche: 50, cercles: 'aucun' }).rayon.filter((p) => p.g === 'c')).toHaveLength(1);
-    expect(grueFiche({ fleche: 50, cercles: 'tous' }).rayon.filter((p) => p.g === 'c').length).toBeGreaterThan(8);
+    expect(grueFiche({ fleche: 50, cercles: 'tous' }).rayon.filter((p) => p.g === 'c').length).toBeGreaterThan(4);
   });
   it('pied toujours coté ; 4 massifs carrés (2 m au départ) sous les appuis, cotés', () => {
     const s = grueFiche({ fleche: 40, tour: 'hc175-uc460m' });
@@ -275,5 +275,37 @@ describe('modèles de l\'utilisateur et éditeur', () => {
     expect(chargeAuRayon(m.fleches[0], 15).t).toBe(2);
     definirModelesPerso([]);
     expect(modeleDe(m.id).id).toBe(L.id); // modèle supprimé : retour au modèle livré
+  });
+});
+
+describe('textes de la grue (0.315.0)', () => {
+  // Cadre approximatif d'un texte (largeur ≈ 0,55 × hauteur par lettre ; tourné de 90° = échangé)
+  const cadreTexte = (p) => {
+    const w = p.t.length * p.h * 0.55;
+    const [lx, ly] = (p.a ?? 0) % 180 === 90 ? [p.h, w] : [w, p.h];
+    return [p.x - lx / 2, p.y - ly / 2, p.x + lx / 2, p.y + ly / 2];
+  };
+  const croise = (a, b) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
+  for (const [nom, o] of [
+    ['Liebherr 62,5 m', { fleche: 62.5, tour: '21hc290-uc800', hauteur: 54.1, rayonCrochet: 46.5, cercles: 'tous' }],
+    ['Liebherr 40 m', { fleche: 40, cercles: 'principaux' }],
+    ['Condecta 45 m tous', { modeleGrue: 'condecta-euro-4513', fleche: 45, tour: 'euro4513', hauteur: 24, cercles: 'tous' }],
+  ]) {
+    it(`aucun texte ne chevauche un autre : ${nom}`, () => {
+      const s = grueFiche(o);
+      const textes = [...s.primitives, ...s.rayon].filter((p) => p.g === 't' && p.t);
+      for (let i = 0; i < textes.length; i++) for (let j = i + 1; j < textes.length; j++) {
+        expect(croise(cadreTexte(textes[i]), cadreTexte(textes[j])), `${textes[i].t} / ${textes[j].t}`).toBe(false);
+      }
+    });
+  }
+  it('au plus un cercle tous les 5 m', () => {
+    const s = grueFiche({ modeleGrue: 'condecta-euro-4513', fleche: 45, tour: 'euro4513', cercles: 'tous' });
+    const rs = s.rayon.filter((p) => p.g === 'c').map((p) => p.r).sort((a, b) => a - b);
+    for (let i = 1; i < rs.length; i++) expect(rs[i] - rs[i - 1]).toBeGreaterThanOrEqual(5 - 1e-9);
+  });
+  it('étiquette flèche + HSC dans le même texte', () => {
+    const s = grueFiche({ fleche: 40 });
+    expect(s.primitives.some((p) => p.g === 't' && /^Flèche 40\.0 m · HSC /.test(p.t))).toBe(true);
   });
 });

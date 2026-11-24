@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   rectangleTroisPoints, pointsDuRond, changerRayon, poigneesDe, pointDeBase, deplacerObjet, milieuxDesCotes,
-  sommetSousLePoint, nouveauPlanChantier, ajouterObjet,
+  sommetSousLePoint, nouveauPlanChantier, ajouterObjet, courberCote, arcsDe, poigneesArcs, recourber,
 } from '../src/topo/plan-chantier.js';
 import { dxfPlanChantier } from '../src/topo/plan-chantier-dxf.js';
 
@@ -76,5 +76,33 @@ describe('arc sur un côté', () => {
     const z = arcSurCote([[0, 0], [10, 0], [10, 10]], 2, [3, 7], true, 4);
     expect(z).toHaveLength(6);
     expect(z.slice(0, 3)).toEqual([[0, 0], [10, 0], [10, 10]]);
+  });
+});
+
+describe('arcs modifiables (0.315.0)', () => {
+  const carre = () => ({ type: 'zone', points: [[0, 0], [10, 0], [10, 10], [0, 10]] });
+  it('un arc garde son souvenir et se courbe de nouveau sans couper en segments à part', () => {
+    const o = carre();
+    const r = courberCote(o.points, [], 0, [5, -3], true);
+    Object.assign(o, { points: r.points, arcs: r.arcs, arcsLen: r.arcsLen });
+    expect(o.points).toHaveLength(4 + 15);
+    expect(arcsDe(o)).toHaveLength(1);
+    expect(poigneesArcs(o)).toHaveLength(1);
+    expect(poigneesArcs(o)[0].point[1]).toBeCloseTo(-3, 1); // le milieu de l'arc passe par le point tiré
+    recourber(o, 0, [5, -6]);
+    expect(o.points).toHaveLength(19);
+    expect(poigneesArcs(o)[0].point[1]).toBeCloseTo(-6, 1);
+    expect(o.points[0]).toEqual([0, 0]);
+    expect(o.points[16]).toEqual([10, 0]);
+  });
+  it('un deuxième arc décale le premier ; un point ajouté ailleurs fait oublier les arcs', () => {
+    const o = carre();
+    let r = courberCote(o.points, [], 2, [5, 13], true);
+    Object.assign(o, r);
+    r = courberCote(o.points, arcsDe(o), 0, [5, -3], true);
+    Object.assign(o, { points: r.points, arcs: r.arcs, arcsLen: r.arcsLen });
+    expect(arcsDe(o).map((a) => a.i).sort((a, b) => a - b)).toEqual([0, 17]);
+    o.points = [...o.points, [0, 5]];
+    expect(arcsDe(o)).toHaveLength(0);
   });
 });
