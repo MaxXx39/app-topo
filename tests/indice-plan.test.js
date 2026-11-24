@@ -41,3 +41,40 @@ describe('contrôle d\'un nouvel indice', () => {
     expect(r.part).toBe(0);
   });
 });
+
+// 0.307.0 : nom d'un plan calé (type fixe devant, indice derrière) ; textes multi-lignes explosés.
+import { nomPlanCale, baseDuNomCale, typeDuFichier } from '../src/topo/indice-plan.js';
+import { exploserTextes } from '../src/topo/nettoyage-plan.js';
+
+describe('nom du plan calé', () => {
+  it('DXF- / PDF- devant, _ind- derrière, sans doublon', () => {
+    expect(nomPlanCale('DXF', 'Villa Dupont', 'B')).toBe('DXF-Villa Dupont_ind-B');
+    expect(nomPlanCale('PDF', 'PDF-Façade_ind-A', 'C')).toBe('PDF-Façade_ind-C');
+    expect(baseDuNomCale('DWG_plan_A_ind-2')).toBe('plan_A');
+    expect(typeDuFichier('plan.dwg')).toBe('DXF');
+    expect(typeDuFichier('plan.PDF')).toBe('PDF');
+  });
+});
+
+describe('exploser les textes multi-lignes', () => {
+  it('une ligne = un texte, interligne 5/3 de la hauteur, attache en haut', () => {
+    const plan = { contenu: { textes: [{ c: 0, x: 0, y: 0, h: 0.3, a: 0, t: 'A B C', lignes: ['A', 'B', 'C'], ah: 0, av: 3 }, { c: 0, x: 5, y: 5, h: 1, a: 0, t: 'seul' }] } };
+    const e = exploserTextes(plan);
+    expect(e.contenu.textes.map((t) => t.t)).toEqual(['A', 'B', 'C', 'seul']);
+    expect(e.contenu.textes[1].y).toBeCloseTo(-0.5, 6);
+    expect(e.contenu.textes[2].y).toBeCloseTo(-1, 6);
+    expect(e.contenu.textes[0].lignes).toBeUndefined();
+    expect(exploserTextes(plan)).toBe(e); // même plan = même résultat
+  });
+});
+
+import { lirePlanDxf } from '../src/topo/dxf-plan.js';
+describe('MTEXT de plusieurs lignes', () => {
+  it('les lignes sont gardées à part', () => {
+    const dxf = ['0', 'SECTION', '2', 'ENTITIES', '0', 'MTEXT', '8', 'TXT', '10', '2500000', '20', '1117000', '40', '0.5', '71', '1', '1', '{\\fArial;Mur BA}\\Pép. 25 cm', '0', 'ENDSEC', '0', 'EOF'].join('\n');
+    const { plan: p } = lirePlanDxf(dxf, 'essai');
+    const t = p.contenu.textes[0];
+    expect(t.lignes).toEqual(['Mur BA', 'ép. 25 cm']);
+    expect(t.t).toBe('Mur BA ép. 25 cm');
+  });
+});

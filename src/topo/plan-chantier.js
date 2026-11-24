@@ -1008,6 +1008,40 @@ export function ajouterPointAuMilieu(points, index, ferme = false) {
   return [...points.slice(0, index + 1), m, ...points.slice(index + 1)];
 }
 
+/**
+ * 0.307.0 (demande du 24.11 : appui long sur le « + » d'un côté) : le côté « index » devient un arc de cercle qui passe
+ * par ses deux bouts et par le point m (la souris) ; l'arc est remplacé par `n` petits segments (suite de points, comme
+ * un arc exporté en polyligne). Points alignés : le côté reste droit. Renvoie une copie des points.
+ */
+export function arcSurCote(points, index, m, ferme = false, n = 16) {
+  const nb = points.length;
+  if (index < 0 || index >= (ferme ? nb : nb - 1)) return points.slice();
+  const a = points[index];
+  const b = points[(index + 1) % nb];
+  const r3 = (v) => Math.round(v * 1000) / 1000;
+  // Centre du cercle par a, m, b.
+  const d = 2 * (a[0] * (m[1] - b[1]) + m[0] * (b[1] - a[1]) + b[0] * (a[1] - m[1]));
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (Math.abs(d) < 1e-9 * Math.max(1, L * L)) return points.slice();
+  const c2 = (p) => p[0] * p[0] + p[1] * p[1];
+  const cx = (c2(a) * (m[1] - b[1]) + c2(m) * (b[1] - a[1]) + c2(b) * (a[1] - m[1])) / d;
+  const cy = (c2(a) * (b[0] - m[0]) + c2(m) * (a[0] - b[0]) + c2(b) * (m[0] - a[0])) / d;
+  const r = Math.hypot(a[0] - cx, a[1] - cy);
+  const ang = (p) => Math.atan2(p[1] - cy, p[0] - cx);
+  const deuxPi = 2 * Math.PI;
+  const norme = (x) => ((x % deuxPi) + deuxPi) % deuxPi;
+  const a0 = ang(a);
+  // Sens : celui qui passe par m.
+  let balayage = norme(ang(b) - a0);
+  if (norme(ang(m) - a0) > balayage) balayage -= deuxPi;
+  const milieu = [];
+  for (let k = 1; k < n; k++) {
+    const t = a0 + (balayage * k) / n;
+    milieu.push([r3(cx + r * Math.cos(t)), r3(cy + r * Math.sin(t))]);
+  }
+  return [...points.slice(0, index + 1), ...milieu, ...points.slice(index + 1)];
+}
+
 // --- Formes : rectangle et rond (0.301.0, demande du 24.11) ---
 // Ce sont des zones (contour, épaisseur, remplissage, hachures comme toute zone). Le rond garde son centre et son rayon
 // (o.cercle = { centre: [e, n], rayon }) ; ses points (polygone de 72 côtés) servent au dessin, à la surface, aux

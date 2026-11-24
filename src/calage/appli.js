@@ -11,7 +11,7 @@ import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
 import { demanderChoix } from '../outils/choix.js';
 import { peutConvertirDwg, choisirDwgBureau } from '../android/pont.js';
-import { indiceSuivant, reperesDuPlan, controlerIndice, partRetrouvee, TOLERANCE_REPERE_M, PART_MEME_ORIGINE } from '../topo/indice-plan.js';
+import { indiceSuivant, reperesDuPlan, controlerIndice, partRetrouvee, TOLERANCE_REPERE_M, PART_MEME_ORIGINE, nomPlanCale, baseDuNomCale, typeDuFichier } from '../topo/indice-plan.js';
 import { lirePlanDxf, texteDuDxf, estEnMn95, nomXref } from '../topo/dxf-plan.js';
 import { planRecale } from '../topo/recalage.js';
 import { accrocher, accrocherTrait, sourcesDesPlans } from '../topo/accroche.js';
@@ -20,7 +20,7 @@ import { segmentsDuPlan } from '../topo/calage-auto.js';
 import { differencesPlans, sousPlan } from '../topo/differences-plan.js';
 import { archiver, restaurer } from '../projet/archives.js';
 import { calculerAuto } from './calcul-auto.js';
-import { recetteDeDepart, nettoyerPlan, compterParCalque, calqueSousLePoint, TYPES_RETIRABLES, CHOIX_HACHURES, planVisible, planDesEnleves, objetSousLePoint, objetsDansZone, objetsEnleves, libelleObjet } from '../topo/nettoyage-plan.js';
+import { recetteDeDepart, nettoyerPlan, compterParCalque, calqueSousLePoint, TYPES_RETIRABLES, CHOIX_HACHURES, planVisible, planDesEnleves, objetSousLePoint, objetsDansZone, objetsEnleves, libelleObjet, exploserTextes } from '../topo/nettoyage-plan.js';
 import { plansDeReference, plansCales, indicesDuGroupe, etiquettes, planCale, planReference, planDesPoints, planEnMn95, REF_POINTS } from './plans.js';
 import { creerVueCalage } from './vue-calage.js';
 import { lirePdfPourCalage, estPdf } from './pdf-calage.js';
@@ -227,7 +227,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
         ${resume}
         ${controle ? `<p class="note-calage ${controle.memeOrigine ? 'ok' : controle.recale ? 'orange' : 'alerte'}">${controle.memeOrigine ? '✓' : '⚠'} ${echapper(controle.message)}</p>` : ''}
         ${lu ? `<div class="champs-calage">
-          ${ni ? '' : `<label class="champ-calage"><span>Nom du plan calé</span><input type="text" data-champ="nom" value="${echapper(etat.nom)}"></label>`}
+          ${ni ? '' : `<label class="champ-calage"><span>Nom du plan calé <small class="aide-calage">(→ ${echapper(nomPlanCale(typeDuFichier(etat.fichier), etat.nom || 'nom', etat.indice))})</small></span><span class="champ-prefixe"><span class="prefixe-nom">${typeDuFichier(etat.fichier)}-</span><input type="text" data-champ="nom" value="${echapper(baseDuNomCale(etat.nom))}"></span></label>`}
           <label class="champ-calage court"><span>Indice</span><input type="text" data-champ="indice" value="${echapper(etat.indice)}" maxlength="8"></label>
           ${ni ? '' : `<label class="champ-calage"><span>Dossier du projet</span><select data-champ="dossier"><option value="">Sans dossier</option>${dossiers().map((d) => `<option value="${echapper(d)}" ${d === etat.dossier ? 'selected' : ''}>${echapper(d)}</option>`).join('')}</select></label>`}
         </div>` : ''}
@@ -323,6 +323,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
           <section class="carte-calage">
             <h3>Types d'objets à supprimer</h3>
             <div class="types-calage">${TYPES_RETIRABLES.map(([cle, titre]) => `<label><input type="checkbox" data-type="${cle}" ${etat.recette.types[cle] ? 'checked' : ''}> ${titre}</label>`).join('')}</div>
+            ${(etat.lu?.contenu?.textes ?? []).some((x) => x.lignes?.length > 1) ? `<label class="case-calage"><input type="checkbox" data-exploser-textes ${etat.recette.exploserTextes ? 'checked' : ''}> Exploser les textes multi-lignes (${etat.lu.contenu.textes.filter((x) => x.lignes?.length > 1).length}) : une ligne = un texte</label>` : ''}
             ${ignores.length ? `<p class="aide-calage">Jamais lus par Topo : ${ignores.map(([t, n]) => `${n} ${echapper(t)}`).join(', ')}</p>` : ''}
           </section>
           <section class="carte-calage">
@@ -447,7 +448,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     const liste = etat.recette.enleves ?? [];
     if (!liste.length) return null;
     const cle = JSON.stringify([liste, etat.resultat.similitude]);
-    if (rouges.cle !== cle) rouges = { cle, plan: enCouleur(enMn95(planDesEnleves(etat.lu, liste)), COULEUR_ENLEVE) };
+    if (rouges.cle !== cle) rouges = { cle, plan: enCouleur(enMn95(planDesEnleves(luExplose(), liste)), COULEUR_ENLEVE) };
     return rouges.plan;
   }
 
@@ -554,7 +555,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     const xy = versPlanRecu([position.est, position.nord]);
     // 0.298.0 : objets enlevés montrés en rouge : un clic dessus le restaure ; mode « Enlever » : un clic enlève l'objet.
     if (!etat.dessinZone && etat.voirEnleves && etat.recette.enleves?.length) {
-      const rouge = objetSousLePoint(planDesEnleves(etat.lu, etat.recette.enleves), xy[0], xy[1], toleranceM / etat.resultat.similitude.echelle);
+      const rouge = objetSousLePoint(planDesEnleves(luExplose(), etat.recette.enleves), xy[0], xy[1], toleranceM / etat.resultat.similitude.echelle);
       if (rouge) {
         restaurerObjets([rouge.cle]);
         return;
@@ -569,8 +570,12 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
       const premier = etat.dessinZone[0];
       const tolPlan = toleranceM / etat.resultat.similitude.echelle;
       // Clic sur le premier sommet : la zone est fermée.
+      const dernier = etat.dessinZone.at(-1);
       if (etat.dessinZone.length >= 3 && Math.hypot(xy[0] - premier[0], xy[1] - premier[1]) <= tolPlan) finirZone();
-      else {
+      // 0.307.0 : double-clic (2e clic au même endroit que le dernier sommet) = fermer la zone, sans sommet en double.
+      else if (dernier && Math.hypot(xy[0] - dernier[0], xy[1] - dernier[1]) <= tolPlan) {
+        if (etat.dessinZone.length >= 3) finirZone();
+      } else {
         etat.dessinZone.push(xy);
         majNettoyer();
       }
@@ -630,7 +635,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
         <span class="aide-calage chiffre">${comptes[i]}</span>
       </div>`).join('') || '<p class="aide-calage">Aucun calque.</p>';
     // 0.298.0 : objets enlevés à la main (liste, restaurer un par un ou tous)
-    const enleves = objetsEnleves(etat.lu, r.enleves ?? []);
+    const enleves = objetsEnleves(luExplose(), r.enleves ?? []);
     page.querySelector('[data-zone="titre-enleves"]').textContent = `Enlevés à la main (${enleves.length})`;
     page.querySelector('[data-zone="enleves"]').innerHTML = enleves.length
       ? `${enleves.slice(-200).reverse().map((o) => `<li><span>${echapper(o.texte)}</span><button type="button" class="bouton-secondaire petit" data-restaurer="${echapper(o.cle)}" title="Remettre cet objet" aria-label="Restaurer ${echapper(o.texte)}">↺</button></li>`).join('')}${enleves.length > 200 ? `<li class="aide-calage">… et ${enleves.length - 200} plus anciens</li>` : ''}`
@@ -662,7 +667,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
       : etat.selection.length ? `${etat.selection.length} calque(s) en rose : cliquez-en d'autres, ou « Écarter la sélection » pour les enlever du plan.`
         : 'Cliquez un calque sur le plan ou dans la liste : il passe en rose. Choisissez-en plusieurs, puis « Écarter la sélection ».';
     page.querySelector('[data-zone="compteur"]').innerHTML = etat.dessinZone
-      ? 'Cliquez les sommets de la zone ; cliquez le premier sommet (ou « Fermer la zone ») pour finir.'
+      ? 'Cliquez les sommets de la zone ; double-clic, clic sur le premier sommet ou « Fermer la zone » pour finir.'
       : ch ? `<span style="color:#16a34a;font-weight:700">+${ch.d.compte.ajoutes} ajoutés</span> · <span style="color:#dc2626;font-weight:700">−${ch.d.compte.supprimes} supprimés</span> · ${ch.d.compte.inchanges} inchangés (gris)${ch.d.parCalque.length ? ` · surtout : ${ch.d.parCalque.slice(0, 4).map((c) => `${echapper(c.nom)} (+${c.ajoutes} / −${c.supprimes})`).join(', ')}` : ''}`
       : `<strong class="chiffre">${plan.compte.objets}</strong> objets gardés sur <span class="chiffre">${etat.lu.compte.objets}</span> · Suppr = écarter la sélection`;
     vues.forEach((v) => v.redessiner());
@@ -703,8 +708,9 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
       etat.avant = [];
     }
     if (!etat.recette) {
-      const base = etat.fichier.replace(/\.[^.]+$/, '');
-      etat.recette = recetteDeDepart(etat.lu, `${/\.dwg$/i.test(etat.fichier) ? 'DWG' : estPdf(etat.fichier) ? 'PDF' : 'DXF'}_${base} - `);
+      // 0.307.0 : préfixe des calques = nom du plan (sans l'indice : les calques gardent leur nom d'un indice à l'autre).
+      const base = baseDuNomCale(etat.nom) || etat.fichier.replace(/\.[^.]+$/, '');
+      etat.recette = recetteDeDepart(etat.lu, `${nomPlanCale(typeDuFichier(etat.fichier), base, '')} - `);
       etat.avant = [];
     }
     etat.recette.enleves ??= [];
@@ -1054,6 +1060,9 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     etape = 'plan';
   }
 
+  /** Plan reçu, textes multi-lignes explosés si la recette le demande (0.307.0). */
+  const luExplose = () => (etat.recette?.exploserTextes ? exploserTextes(etat.lu) : etat.lu);
+
   function enregistrerReference() {
     const { plan: propre } = planNettoye();
     if (!propre.compte.objets) {
@@ -1172,7 +1181,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     remettreAZero();
     etat.nouvelIndice = { planId, ancien, controle: null };
     etat.referenceId = ancien.calage.referenceId;
-    etat.nom = ancien.nom;
+    etat.nom = baseDuNomCale(ancien.nom);
     etat.baseId = ancien.id;
     etat.indice = indiceSuivant(ancien.calage.indice);
     if (!reference()) {
@@ -1207,7 +1216,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
     }
     const ni = etat.nouvelIndice;
     const plan = planCale({
-      lu: propre, nom: etat.nom.trim(), fichier: etat.fichier, resultat: etat.resultat, reference: reference(), elements: etat.elements,
+      lu: propre, nom: nomPlanCale(typeDuFichier(etat.fichier), baseDuNomCale(etat.nom) || etat.fichier.replace(/\.[^.]+$/, ''), etat.indice.trim() || 'A'), fichier: etat.fichier, resultat: etat.resultat, reference: reference(), elements: etat.elements,
       le: new Date().toISOString(), nettoyage: etat.recette, indice: etat.indice.trim() || 'A',
       reperes: reperesDuPlan(etat.lu, etat.recette), calquesVus: etat.lu.calques.map((c) => c.nom),
       historique: ni?.ancien.calage.indices ?? [],
@@ -1521,6 +1530,7 @@ export function ouvrirCalage({ projet, simple = false, points = () => [], ajoute
       const nom = etat.lu.calques[Number(t.dataset.couleur)].nom;
       changerRecette((r) => { r.couleurs[nom] = t.value; });
     } else if (t.dataset.type) changerRecette((r) => { r.types[t.dataset.type] = t.checked; });
+    else if (t.dataset.exploserTextes !== undefined) changerRecette((r) => { r.exploserTextes = t.checked; });
     else if (t.dataset.champ === 'prefixe') changerRecette((r) => { r.prefixe = t.value; });
   });
   page.addEventListener('input', (ev) => {

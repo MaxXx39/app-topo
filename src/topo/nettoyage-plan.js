@@ -35,6 +35,43 @@ export function recetteDeDepart(plan, prefixe = '') {
   };
 }
 
+/** Interligne d'un MTEXT (AutoCAD : 5 / 3 de la hauteur du texte). */
+export const INTERLIGNE = 5 / 3;
+const memoireExplose = new WeakMap();
+
+/**
+ * 0.307.0 : « Exploser les textes » : un texte de plusieurs lignes (MTEXT, `lignes`) devient une ligne de texte par ligne,
+ * chacune à sa place (interligne 5/3 de la hauteur, dans le sens du texte), même calque, même alignement. Les autres
+ * objets ne changent pas. Même plan en entrée = même résultat (les clés des objets enlevés à la main restent valables).
+ */
+export function exploserTextes(plan) {
+  if (memoireExplose.has(plan)) return memoireExplose.get(plan);
+  const textes = plan.contenu?.textes ?? [];
+  if (!textes.some((t) => t.lignes?.length > 1)) return plan;
+  const mm = (v) => Math.round(v * 1000) / 1000;
+  const sortie = [];
+  for (const t of textes) {
+    if (!(t.lignes?.length > 1)) {
+      sortie.push(t);
+      continue;
+    }
+    const n = t.lignes.length;
+    const pas = t.h * INTERLIGNE;
+    // Décalage de la 1re ligne par rapport au point d'attache : haut (av 3) = 0, milieu = moitié du bloc, bas = tout le bloc.
+    const debut = t.av === 2 ? ((n - 1) * pas) / 2 : t.av === 1 || t.av === 0 ? (n - 1) * pas : 0;
+    const a = (t.a * Math.PI) / 180;
+    const [bx, by] = [Math.sin(a), -Math.cos(a)]; // vers le bas du texte
+    const { lignes, ...reste } = t;
+    lignes.forEach((ligne, i) => {
+      const d = i * pas - debut;
+      sortie.push({ ...reste, t: ligne, x: mm(t.x + bx * d), y: mm(t.y + by * d) });
+    });
+  }
+  const res = { ...plan, contenu: { ...plan.contenu, textes: sortie } };
+  memoireExplose.set(plan, res);
+  return res;
+}
+
 /** Nombre d'objets de chaque calque (index du calque → nombre). */
 export function compterParCalque(plan) {
   const compte = new Array(plan.calques.length).fill(0);
@@ -139,7 +176,8 @@ const enPoints = (p) => {
  * Plan nettoyé selon la recette : { ...plan, calques, contenu, compte } (rangé comme lirePlanDxf). Les calques
  * écartés ou sans objet gardé disparaissent ; les autres prennent le préfixe et leur couleur choisie.
  */
-export function nettoyerPlan(plan, recette) {
+export function nettoyerPlan(planRecu, recette) {
+  const plan = recette.exploserTextes ? exploserTextes(planRecu) : planRecu;
   const ecartes = new Set(recette.ecartes);
   // 0.298.0 : objets enlevés à la main (clés, voir cleObjet).
   const enleves = new Set(recette.enleves ?? []);
@@ -405,7 +443,8 @@ export function objetsEnleves(plan, enleves = []) {
  * Plan reçu réduit aux objets montrés par la recette (calques gardés, types gardés, dans la zone, pas enlevés à la main),
  * SANS les couper ni les renommer : mêmes objets, mêmes clés (cleObjet). Sert à choisir un objet à enlever à la main.
  */
-export function planVisible(plan, recette) {
+export function planVisible(planRecu, recette) {
+  const plan = recette.exploserTextes ? exploserTextes(planRecu) : planRecu;
   const ecartes = new Set(recette.ecartes);
   const enleves = new Set(recette.enleves ?? []);
   const { types, hachures } = recette;

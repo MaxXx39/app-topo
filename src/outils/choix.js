@@ -88,7 +88,7 @@ export function demanderTexte({ titre, valeur = '', prefixe = '' }) {
  * { texte, ton: 'ok' | 'alerte' } = une ligne colorée sous le titre (ex. « ✓ déjà en coordonnées suisses »). Renvoie { cle: texte tapé } avec OK, ou null
  * si la fenêtre est fermée (✕, touche retour, Échap) : rien n'est fait.
  */
-const attributsSi = (c) => (c.visibleSi ? `data-si-cle="${echapper(c.visibleSi.cle)}" data-si-valeur="${echapper(c.visibleSi.valeur)}"` : '');
+const attributsSi = (c) => (c.visibleSi ? `data-si-cle="${echapper(c.visibleSi.cle)}" data-si-valeur="${echapper([].concat(c.visibleSi.valeur).join('|'))}"` : ''); // plusieurs valeurs : « a|b »
 
 export function demanderChamps({ titre, champs, note = null }) {
   return new Promise((resoudre) => {
@@ -120,7 +120,7 @@ export function demanderChamps({ titre, champs, note = null }) {
     const majVisibilite = () => {
       for (const etiquette of fenetre.querySelectorAll('label[data-si-cle]')) {
         const autre = fenetre.querySelector(`[data-champ="${etiquette.dataset.siCle}"]`);
-        etiquette.hidden = autre ? autre.value !== etiquette.dataset.siValeur : false;
+        etiquette.hidden = autre ? !etiquette.dataset.siValeur.split('|').includes(autre.value) : false;
       }
     };
     fenetre.addEventListener('change', majVisibilite);

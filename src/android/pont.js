@@ -311,7 +311,8 @@ export function ecouterBoutonsTablette(fonction) {
 
 /** Vrai dans Topo Bureau quand le programme sait convertir des DWG (ODA File Converter, installé sur le PC). */
 export function peutConvertirDwg() {
-  return estDansAppliBureau() && typeof window.AppliAndroid.choisirDwg === 'function';
+  // 0.308.0 : Topo Bureau et Topo Tablette (calage complet sur la tablette Windows).
+  return (estDansAppliBureau() || estDansAppliWindows()) && typeof window.AppliAndroid.choisirDwg === 'function';
 }
 
 let numeroDwg = 0;

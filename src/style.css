@@ -14971,3 +14971,21 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .page-chantier .ruban-element { height: 112px; box-sizing: border-box; overflow-y: auto; align-content: flex-start; }
 .page-chantier .ruban-element > .aide-calage { margin: 0; align-self: center; }
 .page-chantier .ruban-element { flex-shrink: 0; }
+/* 0.307.0 : le ruban d'outils ne se fait plus écraser par le bandeau (vu dans Topo Bureau, 24.11). */
+.page-chantier .ruban-une-ligne, .page-chantier .consigne-calage { flex-shrink: 0; }
+.page-chantier .ruban-une-ligne { min-height: 54px; }
+.liste-biblio .titre-type-biblio { grid-column: 1 / -1; margin: 6px 0 0; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: #92400e; border-bottom: 1px solid #fed7aa; }
+
+/* 0.307.0 : Plateformes : onglet Coupe caché pour de bon (son display:flex passait devant hidden), bulle à 2 champs,
+   tableau redimensionnable à la main (poignée entre le plan et le tableau). */
+.partie-coupe[hidden] { display: none; }
+.bulle-plateforme { flex-wrap: wrap; max-width: 330px; }
+.bulle-plateforme .champ-pente-bulle { width: 64px; }
+.poignee-tableau-pf { flex: none; height: 10px; margin: -6px 0; cursor: row-resize; touch-action: none; display: flex; align-items: center; justify-content: center; z-index: 2; }
+.poignee-tableau-pf::before { content: ''; width: 46px; height: 4px; border-radius: 2px; background: var(--bordure); }
+.poignee-tableau-pf:hover::before { background: #6d28d9; }
+.gauche-plateformes > .tableau-plateforme.taille-main { flex: 0 0 var(--hauteur-tableau-pf); }
+.page-plateformes .ruban-plateformes { flex-wrap: nowrap; overflow-x: auto; }
+.page-plateformes .ruban-plateformes .groupe-ruban { padding: 2px 2px; flex-shrink: 0; }
+.page-plateformes .ruban-plateformes .outil-ruban { min-width: 36px; padding: 2px 3px; }
+.page-plateformes .ruban-plateformes .outil-ruban span { font-size: 0.6rem; }
