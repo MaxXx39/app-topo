@@ -62,3 +62,12 @@ describe('grue mobile repliée', () => {
     expect(rep.boite[3] - rep.boite[1]).toBeLessThan(15);
   });
 });
+
+describe('finisseur Super 800 (0.306.0)', () => {
+  it('cotes de la fiche : 4,88 m de long, trémie ouverte 3,09 m ; le 1900 garde sa clé', () => {
+    const s = parNom('Finisseur Super 800');
+    expect(s.hauteur).toBeCloseTo(4.88, 2);
+    expect(s.largeur).toBeCloseTo(3.09, 2);
+    expect(bib.find((x) => x.cle === 'base:Finisseur').nom).toBe('Finisseur Super 1900');
+  });
+});

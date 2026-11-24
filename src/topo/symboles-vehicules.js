@@ -481,3 +481,54 @@ export function betonniere() {
   return res;
 }
 void ellipse; void pointe;
+
+// ------------------------------------------------------------------ Finisseur Vögele Super 800 (0.306.0)
+
+/**
+ * Finisseur Super 800 vu de dessus, trémie devant EN HAUT comme le finisseur (Super 1900) du DXF. Cotes de la fiche
+ * technique envoyée par l'utilisateur le 24.11 : longueur 4,88 m (trémie 1,80 m, châssis jusqu'à 3,465 m, table
+ * jusqu'à 4,395 m, plateforme et garde-corps jusqu'au bout), trémie ouverte 3,09 m, chenilles de 0,18 m à 1,14 m hors
+ * tout, 1,50 m au sol. Corps de 1,27 m et table de 2,30 m lus sur la vue de face (à valider). Poste de conduite à
+ * l'arrière (siège, pupitre, volant), sans toit.
+ */
+export function finisseur800() {
+  const H = 2.44; // demi-longueur : devant y = +2,44, arrière y = −2,44
+  const yTremie = H - 1.8;
+  const yChassis = H - 3.465;
+  const yTable = H - 4.395;
+  const res = [];
+  // Chenilles (sous la trémie et le corps) : 1,94 m de long, 1,50 m au sol.
+  for (const s of [-1, 1]) {
+    const x0 = s > 0 ? 0.39 : -0.57;
+    res.push(...piece('#2b2f33', 'caoutchouc', rectArrondi(x0, H - 2.87, x0 + 0.18, H - 0.93, 0.09)));
+    for (let y = H - 2.8; y < H - 1.0; y += 0.16) res.push(trait([[x0 + 0.02, y], [x0 + 0.16, y]], false, '#5f666d'));
+  }
+  // Trémie : fond au milieu, deux ailes ouvertes (3,09 m), rouleaux de poussée devant.
+  res.push(...piece('#8a9198', 'metal', rectArrondi(-0.57, yTremie, 0.57, H - 0.06, 0.04)));
+  for (const s of [-1, 1]) {
+    const aile = [[s * 0.57, yTremie + 0.05], [s * 1.545, yTremie + 0.14], [s * 1.545, H - 0.08], [s * 0.57, H - 0.02]].map(([x, y]) => [x, y]);
+    res.push(...piece(PERRIN_ORANGE, 'peinture', aile));
+    res.push(trait([[s * 1.06, yTremie + 0.1], [s * 1.06, H - 0.05]], false, '#b37a0a'));
+    res.push(...piece(NOIR, 'caoutchouc', rectArrondi(s * 0.2 - 0.14, H - 0.08, s * 0.2 + 0.14, H + 0.0, 0.03)));
+  }
+  res.push(...piece('#5f666d', 'metal', rectArrondi(-0.5, yTremie + 0.2, 0.5, H - 0.25, 0.03)));
+  res.push(trait([[-0.5, yTremie + 0.7], [0.5, yTremie + 0.7]], false, '#43474c'), trait([[-0.5, yTremie + 1.2], [0.5, yTremie + 1.2]], false, '#43474c'));
+  // Table (de 3,465 à 4,395 m depuis l'avant), 2,30 m, flasques aux bouts.
+  res.push(...piece('#aeb4ba', 'metal', rectArrondi(-1.15, yTable, 1.15, yChassis, 0.03)));
+  for (const s of [-1, 1]) res.push(...piece('#5f666d', 'metal', rectArrondi(s * 1.15 - 0.06, yTable - 0.05, s * 1.15 + 0.06, yChassis + 0.05, 0.02)));
+  res.push(trait([[-1.1, (yTable + yChassis) / 2], [1.1, (yTable + yChassis) / 2]], false, '#7b8794'));
+  // Corps (moteur) : capot orange avec grilles, échappement.
+  res.push(...piece(PERRIN_ORANGE, 'peinture', rectArrondi(-0.635, yChassis + 0.05, 0.635, yTremie + 0.08, 0.12)));
+  res.push(...piece('#d98f0a', 'peinture', rectArrondi(-0.5, yChassis + 0.25, 0.5, yTremie - 0.15, 0.08)));
+  for (let k = 0; k < 3; k++) res.push(...piece('#3a3f45', 'metal', rectArrondi(-0.32 + k * 0.24, yTremie - 0.75, -0.18 + k * 0.24, yTremie - 0.3, 0.03)));
+  res.push(...piece('#3a3f45', 'metal', cercle(0.42, yTremie - 0.25, 0.07, 12)));
+  // Poste de conduite (arrière, sans toit) : plancher, pupitre et volant, siège, garde-corps.
+  res.push(...piece('#c9d1d9', 'metal', rectArrondi(-0.75, -H + 0.04, 0.75, yChassis - 0.12, 0.05)));
+  res.push(...piece('#3a3f45', 'metal', rectArrondi(-0.42, yChassis - 0.42, 0.42, yChassis - 0.18, 0.04)));
+  res.push(...piece('#1f2937', 'caoutchouc', cercle(0, yChassis - 0.3, 0.16, 16)), trait([[-0.12, yChassis - 0.3], [0.12, yChassis - 0.3]], false, '#94a3b8'));
+  res.push(...piece('#2b2f33', 'caoutchouc', rectArrondi(-0.26, -H + 0.55, 0.26, -H + 0.98, 0.1)));
+  res.push(...piece('#2b2f33', 'caoutchouc', rectArrondi(-0.26, -H + 0.42, 0.26, -H + 0.56, 0.05)));
+  res.push(...piece('#43474c', 'metal', [[-0.75, -H], [0.75, -H], [0.75, -H + 0.05], [-0.75, -H + 0.05]]));
+  for (const s of [-1, 1]) res.push(...piece('#43474c', 'metal', [[s * 0.75 - 0.025, -H], [s * 0.75 + 0.025, -H], [s * 0.75 + 0.025, yChassis - 0.15], [s * 0.75 - 0.025, yChassis - 0.15]]));
+  return res;
+}

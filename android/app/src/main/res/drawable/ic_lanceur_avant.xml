@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Logo de l'appli topo (public/icone.svg) : tas ambre sur fond bleu nuit. -->
+<!-- Logo de l'APK (0.306.0, famille A choisie le 24.11) : tas ambre sur fond bleu nuit + pastille verte « tablette
+     debout ». Même dessin que public/icone.svg (site : pastille bleue « globe »), réduit pour la zone sûre des icônes
+     adaptatives. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -7,22 +9,14 @@
     android:viewportHeight="512">
     <group
         android:pivotX="256"
-        android:pivotY="280"
-        android:scaleX="0.85"
-        android:scaleY="0.85">
-        <path
-            android:fillColor="#F6AB07"
-            android:pathData="M96,364 L200,200 L252,252 L312,156 L416,364 Z" />
-        <path
-            android:pathData="M200,200 L252,252 L312,156"
-            android:strokeAlpha="0.35"
-            android:strokeColor="#1B2B36"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round"
-            android:strokeWidth="14" />
-        <path
-            android:fillAlpha="0.55"
-            android:fillColor="#F6AB07"
-            android:pathData="M105,384 L407,384 A9,9 0,0 1,407 402 L105,402 A9,9 0,0 1,105 384 Z" />
+        android:pivotY="256"
+        android:scaleX="0.62"
+        android:scaleY="0.62">
+        <path android:fillColor="#F6AB07" android:pathData="M104.8,319.7 L190.1,185.2 L232.7,227.9 L281.9,149.1 L367.2,319.7 Z" />
+        <path android:pathData="M190.1,185.2 L232.7,227.9 L281.9,149.1" android:strokeAlpha="0.35" android:strokeColor="#1B2B36" android:strokeLineCap="round" android:strokeLineJoin="round" android:strokeWidth="11.5" />
+        <path android:fillAlpha="0.55" android:fillColor="#F6AB07" android:pathData="M112.2,336.1 L359.8,336.1 A7.4,7.4 0,0 1 359.8,350.9 L112.2,350.9 A7.4,7.4 0,0 1 112.2,336.1 Z" />
+        <path android:fillColor="#16A34A" android:strokeColor="#1B2B36" android:strokeWidth="14" android:pathData="M262.0,340.0 A78.0,78.0 0,1 0 418.0,340.0 A78.0,78.0 0,1 0 262.0,340.0 Z" />
+        <path android:strokeColor="#FFFFFF" android:strokeWidth="9.9" android:pathData="M325.7,300.4 L354.3,300.4 A7.7,7.7 0,0 1 362.0,308.1 L362.0,371.9 A7.7,7.7 0,0 1 354.3,379.6 L325.7,379.6 A7.7,7.7 0,0 1 318.0,371.9 L318.0,308.1 A7.7,7.7 0,0 1 325.7,300.4 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M335.6,366.4 A4.4,4.4 0,1 0 344.4,366.4 A4.4,4.4 0,1 0 335.6,366.4 Z" />
     </group>
 </vector>

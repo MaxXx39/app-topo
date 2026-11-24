@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" fill="#1b2b36"/>
-  <path d="M96 364 L200 200 L252 252 L312 156 L416 364 Z" fill="#f6ab07"/>
-  <path d="M200 200 L252 252 L312 156" fill="none" stroke="#1b2b36" stroke-width="14" stroke-linejoin="round" stroke-linecap="round" opacity="0.35"/>
-  <rect x="96" y="384" width="320" height="18" rx="9" fill="#f6ab07" opacity="0.55"/>
+  <g transform="translate(236 250) scale(0.82) translate(-256 -279)"><path d="M96 364 L200 200 L252 252 L312 156 L416 364 Z" fill="#f6ab07"/><path d="M200 200 L252 252 L312 156" fill="none" stroke="#1b2b36" stroke-width="14" stroke-linejoin="round" stroke-linecap="round" opacity="0.35"/><rect x="96" y="384" width="320" height="18" rx="9" fill="#f6ab07" opacity="0.55"/></g>
+  <circle cx="340" cy="340" r="78" fill="#2563eb" stroke="#1b2b36" stroke-width="14"/>
+  <g transform="translate(285 285) scale(1.1)"><circle cx="50" cy="50" r="34" fill="none" stroke="#fff" stroke-width="8"/><ellipse cx="50" cy="50" rx="14" ry="34" fill="none" stroke="#fff" stroke-width="6"/><path d="M17 50h66M24 32h52M24 68h52" stroke="#fff" stroke-width="5"/></g>
 </svg>

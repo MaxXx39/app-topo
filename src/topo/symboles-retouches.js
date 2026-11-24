@@ -6,7 +6,7 @@ import { bornesPrimitives, deplacerPrimitives } from './blocs-dxf.js';
 import { transformerPrimitives, CATEGORIES_SYMBOLES } from './symboles.js';
 import { symbolesDessines, portail, portailCoulissant, trilattes } from './symboles-dessines.js';
 import {
-  camionCiterne, camionCarburant, camionBitume, camionBalai, tracteurBenne, niveleuse, camionGrue, AUTOGRUES, pompeABeton,
+  camionCiterne, camionCarburant, camionBitume, camionBalai, tracteurBenne, niveleuse, camionGrue, AUTOGRUES, pompeABeton, finisseur800,
   nacelle, elevateurCiseaux, compresseur, betonniere,
 } from './symboles-vehicules.js';
 import * as divers from './symboles-divers.js';
@@ -219,6 +219,7 @@ export function retoucherBibliotheque(symboles) {
     if (s.nom === 'Tri lattes + travaux' && par('Panneau Travaux')) t = { ...versSymbole('Tri lattes + travaux', 'Sécurité', trilattesTravaux(par('Panneau Travaux'))), cle: s.cle };
     if (s.nom === 'Benne Decantation') t = { ...versSymbole('Benne Decantation', 'Base-vie', divers.benneDecantation()), cle: s.cle };
     if (s.nom === '2.50interdictiondeparquer') t = { ...t, nom: 'Interdiction de parquer' };
+    if (s.nom === 'Finisseur') t = { ...t, nom: 'Finisseur Super 1900' }; // 0.306.0 : à côté du Super 800 (la clé reste base:Finisseur)
     // 0.293.0 : pelle à tourelle orientable : les 47 premières primitives = chenilles, le reste tourne autour du centre des chenilles.
     if (s.nom === 'Pelle Chenille 20T') t = { ...t, pivote: { depuis: 47, centre: [0, 1.961] } };
     // 0.305.0 : pelle à pneus (36 premières primitives = roues, lame, appuis, châssis) et pelle 5 t (tourelle = godet,
@@ -252,7 +253,7 @@ export function retoucherBibliotheque(symboles) {
     ['Camion balai', 'Véhicules', camionBalai()], ['Camion bitume', 'Véhicules', camionBitume()],
     ['Camion pompe à béton (plié)', 'Véhicules', pompeABeton(false), false], ['Camion pompe à béton (déplié)', 'Véhicules', pompeABeton(true), false],
     // Engins
-    ['Niveleuse', 'Engins', niveleuse()], ['Nacelle articulée (repliée)', 'Engins', nacelle(false)], ['Nacelle articulée (déployée)', 'Engins', nacelle(true), false],
+    ['Finisseur Super 800', 'Engins', finisseur800()], ['Niveleuse', 'Engins', niveleuse()], ['Nacelle articulée (repliée)', 'Engins', nacelle(false)], ['Nacelle articulée (déployée)', 'Engins', nacelle(true), false],
     ['Élévateur à ciseaux', 'Engins', elevateurCiseaux()], ['Compresseur', 'Engins', compresseur()], ['Bétonnière', 'Engins', betonniere()],
     // Installations
     ['Centrale à béton mobile', 'Installations', divers.centraleBeton()], ['Silo à ciment', 'Installations', divers.siloCiment()],
