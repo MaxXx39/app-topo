@@ -6,7 +6,7 @@ const COULEURS = {
   mat: ['#f7dc94', '#7a5b12'], fleche: ['#f7dc94', '#7a5b12'], contre: ['#f7dc94', '#7a5b12'], pied: ['#8d96a0', '#4b535b'],
   massif: ['url(#hach-beton)', '#6b7280'], crochet: ['#1b1f24', '#1b1f24'], contrepoids: ['#9aa2ab', '#4b535b'],
   plateforme: ['#7b838c', '#4b535b'], chassisauto: ['#2b2f33', '#111827'], lest: ['#c9ced3', '#6b7280'], matbas: ['#f2b61f', '#7a5b12'],
-  mathaut: ['#a3a9af', '#4b535b'], tete: ['#a3a9af', '#4b535b'], flecheg: ['#d3d8dd', '#6b7280'], cabine: ['#e8f1f4', '#4b535b'], chariot: ['#3a3f45', '#1b1f24'],
+  mathaut: ['#a3a9af', '#4b535b'], collier: ['#4b535b', '#374151'], tete: ['#a3a9af', '#4b535b'], flecheg: ['#d3d8dd', '#6b7280'], cabine: ['#e8f1f4', '#4b535b'], chariot: ['#3a3f45', '#1b1f24'],
 };
 const TREILLIS = new Set(['mat', 'fleche', 'contre', 'flecheg']);
 
@@ -63,6 +63,12 @@ export function svgCoupe(coupe, largeur = 700, hauteur = 240) {
       } else if (f.type === 'poly') {
         const [fill, stroke] = COULEURS[f.genre] ?? ['#f7dc94', '#7a5b12'];
         corps.push(`<path d="${chemin(f.pts)}Z" fill="${fill}" stroke="${stroke}" stroke-width="${TREILLIS.has(f.genre) ? 1.6 : 1}" stroke-linejoin="round"/>`);
+        if ((f.genre === 'matbas' || f.genre === 'mathaut') && f.pts.length === 4) {
+          const xs = f.pts.map((p) => X(p[0]));
+          const ys = f.pts.map((p) => Y(p[1]));
+          const xr = Math.min(...xs) + (Math.max(...xs) - Math.min(...xs)) * 0.28;
+          corps.push(`<line x1="${xr.toFixed(1)}" x2="${xr.toFixed(1)}" y1="${Math.min(...ys).toFixed(1)}" y2="${Math.max(...ys).toFixed(1)}" stroke="#ffffff" stroke-opacity="0.45" stroke-width="2"/>`);
+        }
         if (TREILLIS.has(f.genre) && f.pts.length === 4) {
           // treillis : diagonales en zigzag entre les deux membrures (verticales pour le mât, horizontales pour les flèches)
           const xs = f.pts.map((p) => X(p[0]));

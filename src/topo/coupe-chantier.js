@@ -111,11 +111,18 @@ export function formesGrue(o, a, u) {
     formes.push(rect(s0 - cw / 2, s0 + cw / 2, nv.pied + 0.25, bas, 'chassisauto'));
     for (const cote of [-1, 1]) formes.push(rect(s0 + cote * cw / 2 - 0.25, s0 + cote * cw / 2 + 0.25, nv.pied, nv.pied + 0.25, 'pied'));
     formes.push(rect(X(-2.5), X(-1.0), bas, bas + 2.3, 'lest'));
-    formes.push(rect(s0 - tour.mat / 2, s0 + tour.mat / 2, bas, milieuMat, 'matbas'));
-    formes.push(rect(s0 - tour.mat / 2, s0 + tour.mat / 2, milieuMat, nv.flecheHaut, 'mathaut'));
-    formes.push({ type: 'ligne', genre: 'bequille', pts: [ptCoupe(X(-1.0), bas + 0.3), ptCoupe(s0 - tour.mat / 2, milieuMat)] });
+    // mât télescopique : 3 tronçons emboîtés (de plus en plus fins), un collier à chaque jonction
+    const l1 = tour.mat * 0.5;
+    const l2 = tour.mat * 0.42;
+    const l3 = tour.mat * 0.35;
+    const z2 = nv.pied + H * 0.72;
+    formes.push(rect(s0 - l1, s0 + l1, bas, milieuMat, 'matbas'));
+    formes.push(rect(s0 - l2, s0 + l2, milieuMat, z2, 'mathaut'));
+    formes.push(rect(s0 - l3, s0 + l3, z2, nv.flecheHaut, 'mathaut'));
+    for (const [z, l] of [[milieuMat, l1], [z2, l2]]) formes.push(rect(s0 - l - 0.08, s0 + l + 0.08, z - 0.12, z + 0.12, 'collier'));
+    formes.push({ type: 'ligne', genre: 'bequille', pts: [ptCoupe(X(-1.0), bas + 0.3), ptCoupe(s0 - l1, milieuMat)] });
     const pointe = [X(-1.1), nv.haut];
-    formes.push({ type: 'poly', genre: 'tete', pts: [ptCoupe(s0 - tour.mat / 2, nv.flecheHaut), ptCoupe(s0 + tour.mat / 2, nv.flecheHaut), ptCoupe(...pointe)] });
+    formes.push({ type: 'poly', genre: 'tete', pts: [ptCoupe(s0 - l3, nv.flecheHaut), ptCoupe(s0 + l3, nv.flecheHaut), ptCoupe(...pointe)] });
     const coupeG = D.flecheDebut + (bout - D.flecheDebut) * 0.35; // partie intérieure grise, puis partie extérieure jaune plus fine
     const [g1, g2] = largeurMin(X(D.flecheDebut), X(coupeG));
     const [o1, o2] = largeurMin(X(coupeG), X(bout));
