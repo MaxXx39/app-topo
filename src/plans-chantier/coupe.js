@@ -3,9 +3,11 @@
 import { echapper } from '../outils/echapper.js';
 
 const COULEURS = {
-  mat: ['#f3cd6b', '#61666a'], fleche: ['#f3cd6b', '#61666a'], contre: ['#f3cd6b', '#61666a'], pied: ['#aab2ba', '#61666a'],
-  massif: ['#b9bfc6', '#6b7280'], crochet: ['#1b1f24', '#1b1f24'],
+  mat: ['#f7dc94', '#7a5b12'], fleche: ['#f7dc94', '#7a5b12'], contre: ['#f7dc94', '#7a5b12'], pied: ['#8d96a0', '#4b535b'],
+  massif: ['url(#hach-beton)', '#6b7280'], crochet: ['#1b1f24', '#1b1f24'], contrepoids: ['#9aa2ab', '#4b535b'],
+  plateforme: ['#7b838c', '#4b535b'], cabine: ['#e8f1f4', '#4b535b'], chariot: ['#3a3f45', '#1b1f24'],
 };
+const TREILLIS = new Set(['mat', 'fleche', 'contre']);
 
 /** SVG de la coupe dans une zone de largeur × hauteur pixels. */
 export function svgCoupe(coupe, largeur = 700, hauteur = 240) {
@@ -40,18 +42,42 @@ export function svgCoupe(coupe, largeur = 700, hauteur = 240) {
   const boites = []; // cadres [x1, y1, x2, y2] déjà occupés par du texte
   const largeurTexte = (t, taille = 11) => t.length * taille * 0.55 + 8;
   for (const b of coupe.batiments) {
-    corps.push(`<rect x="${X(b.s0).toFixed(1)}" y="${Y(b.zHaut).toFixed(1)}" width="${Math.max(1, (b.s1 - b.s0) * echelle).toFixed(1)}" height="${Math.max(1, (b.zHaut - b.zBas) * echelle).toFixed(1)}" fill="#cbd5e1" stroke="#475569" stroke-width="1.2"/>`);
+    corps.push(`<rect x="${X(b.s0).toFixed(1)}" y="${Y(b.zHaut).toFixed(1)}" width="${Math.max(1, (b.s1 - b.s0) * echelle).toFixed(1)}" height="${Math.max(1, (b.zHaut - b.zBas) * echelle).toFixed(1)}" fill="url(#hach-bat)" stroke="#475569" stroke-width="1.4"/>`);
     const tb = `${b.nom} · Z ${b.zBas.toFixed(2)} → ${b.zHaut.toFixed(2)}`;
     const cx = X((b.s0 + b.s1) / 2);
     const cy = Y((b.zHaut + b.zBas) / 2) + 4;
     boites.push([cx - largeurTexte(tb) / 2, cy - 11, cx + largeurTexte(tb) / 2, cy + 3]);
-    corps.push(`<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" class="t">${echapper(tb)}</text>`);
+    corps.push(`<rect x="${(cx - largeurTexte(tb) / 2).toFixed(1)}" y="${(cy - 11).toFixed(1)}" width="${largeurTexte(tb).toFixed(1)}" height="15" rx="3" fill="#fff" fill-opacity="0.9"/><text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" class="t">${echapper(tb)}</text>`);
   }
   for (const g of coupe.grues) {
     for (const f of g.formes) {
-      if (f.type === 'poly') {
-        const [fill, stroke] = COULEURS[f.genre] ?? ['#f3cd6b', '#61666a'];
-        corps.push(`<path d="${chemin(f.pts)}Z" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`);
+      if (f.type === 'poly' && f.genre === 'crochet') {
+        // moufle (bloc) et crochet recourbé
+        const cx = X((f.pts[0][0] + f.pts[1][0]) / 2);
+        const yh = Y(f.pts[2][1]);
+        const yb = Y(f.pts[0][1]);
+        const h = Math.max(4, yb - yh);
+        corps.push(`<rect x="${(cx - 4).toFixed(1)}" y="${yh.toFixed(1)}" width="8" height="${(h * 0.45).toFixed(1)}" rx="1.5" fill="#3a3f45" stroke="#1b1f24"/>`);
+        corps.push(`<path d="M${cx.toFixed(1)} ${(yh + h * 0.45).toFixed(1)}v${(h * 0.3).toFixed(1)}a4 4 0 1 1 -4 4" fill="none" stroke="#1b1f24" stroke-width="2" stroke-linecap="round"/>`);
+      } else if (f.type === 'poly') {
+        const [fill, stroke] = COULEURS[f.genre] ?? ['#f7dc94', '#7a5b12'];
+        corps.push(`<path d="${chemin(f.pts)}Z" fill="${fill}" stroke="${stroke}" stroke-width="${TREILLIS.has(f.genre) ? 1.6 : 1}" stroke-linejoin="round"/>`);
+        if (TREILLIS.has(f.genre) && f.pts.length === 4) {
+          // treillis : diagonales en zigzag entre les deux membrures (verticales pour le mât, horizontales pour les flèches)
+          const xs = f.pts.map((p) => X(p[0]));
+          const ys = f.pts.map((p) => Y(p[1]));
+          const x1 = Math.min(...xs); const x2 = Math.max(...xs); const y1 = Math.min(...ys); const y2 = Math.max(...ys);
+          const mat = f.genre === 'mat';
+          const pasPx = Math.max(5, mat ? (x2 - x1) * 1.15 : (y2 - y1) * 1.0);
+          const longueurPx = mat ? y2 - y1 : x2 - x1;
+          const n = Math.max(1, Math.round(longueurPx / pasPx));
+          const pts = [];
+          for (let k = 0; k <= n; k++) {
+            const t = k / n;
+            pts.push(mat ? `${(k % 2 ? x2 : x1).toFixed(1)} ${(y2 - t * (y2 - y1)).toFixed(1)}` : `${(x1 + t * (x2 - x1)).toFixed(1)} ${(k % 2 ? y1 : y2).toFixed(1)}`);
+          }
+          corps.push(`<polyline points="${pts.join(' ')}" fill="none" stroke="#7a5b12" stroke-width="0.9" stroke-linejoin="round"/>`);
+        }
       } else if (f.type === 'ligne') {
         corps.push(`<path d="${chemin(f.pts)}" fill="none" stroke="#475569" stroke-width="${f.genre === 'cable' ? 1.2 : 0.8}"/>`);
       } else if (f.type === 'cote') {
@@ -104,6 +130,8 @@ export function svgCoupe(coupe, largeur = 700, hauteur = 240) {
   coupe.etiquettesPlacees = boites; // pour les tests (aucun chevauchement)
   const vide = !coupe.grues.length && !coupe.batiments.length && !(coupe.surfaces ?? []).length ? `<text x="${largeur / 2}" y="${hauteur / 2}" text-anchor="middle" class="t">Rien à voir sur cette ligne (grue d'après fiche, zone Bâtiment avec Z bas et Z haut, surface du projet)</text>` : '';
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largeur} ${hauteur}" width="${largeur}" height="${hauteur}" role="img" aria-label="Vue de côté">
+    <defs><pattern id="hach-beton" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="#d1d5db"/><line x1="0" y1="0" x2="0" y2="5" stroke="#6b7280" stroke-width="1"/></pattern>
+      <pattern id="hach-bat" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="7" height="7" fill="#dbe3ec"/><line x1="0" y1="0" x2="0" y2="7" stroke="#b6c2d0" stroke-width="1"/></pattern></defs>
     <style>.z{font:10px sans-serif;fill:#64748b}.t{font:11px sans-serif;fill:#1e293b}.tc{font:11px sans-serif;fill:#7c2d12}</style>
     ${reperes.join('')}
     <line x1="${ml}" x2="${ml}" y1="${mt}" y2="${hauteur - mb}" stroke="#94a3b8"/>

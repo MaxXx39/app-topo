@@ -106,6 +106,13 @@ export function formesGrue(o, a, u) {
   formes.push(rect(c1, c2, nv.flecheBas, nv.flecheHaut, 'contre'));
   const [j1, j2] = largeurMin(X(D.flecheDebut), X(bout));
   formes.push(rect(j1, j2, nv.flecheBas, nv.flecheHaut, 'fleche'));
+  // 0.315.1 : détails (contrepoids, plate-forme, cabine, chariot)
+  const [w1, w2] = largeurMin(X(-arr), X(-arr + Math.min(3.4, arr * 0.4)));
+  formes.push(rect(w1, w2, nv.flecheBas - 0.9, nv.flecheHaut - 0.05, 'contrepoids'));
+  formes.push(rect(X(-2.9), X(2.6), nv.flecheBas - 0.5, nv.flecheBas, 'plateforme'));
+  const cabL = D.cabine?.l ?? 2.4;
+  formes.push(rect(X(0.5), X(0.5 + cabL), nv.flecheBas - 2.2, nv.flecheBas - 0.5, 'cabine'));
+  formes.push(rect(X(Math.min(r, bout - 0.5)) - 0.5, X(Math.min(r, bout - 0.5)) + 0.5, nv.flecheBas - 0.4, nv.flecheBas, 'chariot'));
   formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(s0, nv.haut), ptCoupe(X(bout * 0.72), nv.flecheHaut)] });
   formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(s0, nv.haut), ptCoupe(X(-arr), nv.flecheHaut)] });
   // Crochet à la HSC, au rayon choisi
