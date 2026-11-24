@@ -234,3 +234,57 @@ describe('groupes et étapes', () => {
     expect(v.remblai).toBeCloseTo(50, 6); // 50 m² × 1 m
   });
 });
+
+// --- 0.303.0 : altitudes automatiques, ouvrages ---
+import { altitudesAuto, empriseOuvrage, hautOuvrage, contreUnOuvrage, traverseesOuvrage } from '../src/topo/plateforme.js';
+
+describe('altitudes automatiques', () => {
+  const s = [{ nom: 'S-1', est: 0, nord: 0, alt: null }, { nom: 'S-2', est: 10, nord: 0, alt: null }];
+  it('altitude fixe, décalage (épaisseur / profondeur), d\'après une surface', () => {
+    expect(altitudesAuto(s, { mode: 'altitude', valeur: 98.5 }).map((p) => p.alt)).toEqual([98.5, 98.5]);
+    const dessous = (e) => 100 + e * 0.1;
+    expect(altitudesAuto(s, { mode: 'decalage', valeur: -0.8 }, dessous).map((p) => p.alt)).toEqual([99.2, 100.2]);
+    expect(altitudesAuto(s, { mode: 'decalage', valeur: 1.2 }, dessous).map((p) => p.alt)).toEqual([101.2, 102.2]);
+    expect(altitudesAuto(s, { mode: 'surface', surfaceId: 'x' }, null, () => 103).map((p) => p.alt)).toEqual([103, 103]);
+    expect(altitudesAuto(s, { mode: 'decalage', valeur: 1 }, () => null)[0].alt).toBeNull();
+    expect(altitudesAuto(s, null)).toBe(s);
+  });
+});
+
+describe('ouvrages (murs, radiers, dalles)', () => {
+  it('mur ouvert : la ligne = face extérieure, l\'épaisseur va du côté du bâtiment', () => {
+    const m = { type: 'mur', points: [[0, 0], [10, 0]], epaisseur: 0.3, cote: 'gauche', altBas: 100, hauteur: 3 };
+    const anneau = empriseOuvrage(m).anneaux[0];
+    expect(anneau.map((p) => p.map((v) => Math.round(v * 1000) / 1000))).toEqual([[0, 0], [10, 0], [10, 0.3], [0, 0.3]]);
+    expect(hautOuvrage(m)).toBe(103);
+    const droite = empriseOuvrage({ ...m, cote: 'droite' }).anneaux[0];
+    expect(droite[2][1]).toBeCloseTo(-0.3, 9);
+  });
+  it('mur fermé : 2 anneaux (épaisseur vers l\'intérieur, quel que soit le sens)', () => {
+    for (const pts of [[[0, 0], [10, 0], [10, 8], [0, 8]], [[0, 0], [0, 8], [10, 8], [10, 0]]]) {
+      const [ext, int] = empriseOuvrage({ type: 'mur', points: pts, ferme: true, epaisseur: 0.5 }).anneaux;
+      expect(ext).toEqual(pts);
+      const xs = int.map((p) => p[0]);
+      expect(Math.min(...xs)).toBeCloseTo(0.5, 9);
+      expect(Math.max(...xs)).toBeCloseTo(9.5, 9);
+    }
+  });
+  it('radier : haut = bas + épaisseur', () => {
+    expect(hautOuvrage({ type: 'radier', altBas: 99.6, epaisseur: 0.4 })).toBeCloseTo(100, 9);
+  });
+  it('un côté de plateforme posé sur la face extérieure : contre le mur (pas de talus)', () => {
+    const m = { type: 'mur', points: [[0, 0], [10, 0]], epaisseur: 0.3, cote: 'gauche' };
+    expect(contreUnOuvrage({ est: 2, nord: 0 }, { est: 8, nord: 0.01 }, [m])).toBe(true);
+    expect(contreUnOuvrage({ est: 2, nord: 0 }, { est: 8, nord: -1 }, [m])).toBe(false);
+    expect(contreUnOuvrage({ est: 2, nord: 0 }, { est: 14, nord: 0 }, [m])).toBe(false);
+  });
+  it('coupe : parties dans l\'emprise d\'un mur fermé (2 traversées)', () => {
+    const m = { type: 'mur', points: [[0, 0], [10, 0], [10, 8], [0, 8]], ferme: true, epaisseur: 0.5 };
+    const t = traverseesOuvrage(m, [-5, 4], [15, 4]);
+    expect(t).toHaveLength(2);
+    expect(t[0][0]).toBeCloseTo(5, 6);
+    expect(t[0][1]).toBeCloseTo(5.5, 6);
+    expect(t[1][0]).toBeCloseTo(14.5, 6);
+    expect(t[1][1]).toBeCloseTo(15, 6);
+  });
+});

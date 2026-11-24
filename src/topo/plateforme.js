@@ -594,3 +594,144 @@ export function volumeTerrainAFin(etapes, terrain, bornes, pas = 0.5) {
   }
   return { deblai, remblai };
 }
+
+// --- Altitudes automatiques, sur-profondeur / sur-hauteur, ouvrages (0.303.0, lot c du 24.11) ---
+// pf.auto = { mode: 'altitude' (toutes les altitudes = valeur) | 'decalage' (surface de dessous + valeur : épaisseur
+//   d'un remblai > 0, profondeur d'une sur-profondeur < 0) | 'surface' (altitude d'une autre surface : remblai « jusqu'à un
+//   terrain »), valeur (m), surfaceId } ; les altitudes du tableau sont alors calculées (calc).
+// pf.surprof = { parentId, genre: 'creux' | 'bosse' } : plateforme dessinée DANS sa parente, posée sur elle (une étape),
+//   avec un talus (même pente partout) qui va jusqu'à la parente.
+// projet.ouvragesPlateformes = [{ id, nom, type: 'mur' | 'radier' | 'dalle', points: [[e, n]…] (mur : FACE EXTÉRIEURE ;
+//   radier / dalle : contour), ferme, cote ('gauche' | 'droite' : côté du bâtiment en suivant la ligne, mur ouvert),
+//   epaisseur (m : mur = vers le bâtiment ; radier / dalle = en hauteur), altBas (m), hauteur (m, mur) }].
+// Contre un ouvrage (un côté de plateforme posé sur sa face extérieure), pas de talus.
+
+/**
+ * Sommets avec les altitudes automatiques (copie ; rien n'est changé dans le projet). altDessous(e, n) = surface sur
+ * laquelle la plateforme est posée ; altSurface(e, n) = la surface de « auto.surfaceId ». Un point hors de la surface
+ * voulue garde une altitude vide (le calcul le signale).
+ */
+export function altitudesAuto(sommets, auto, altDessous = null, altSurface = null) {
+  if (!auto?.mode) return sommets;
+  const v = Number(auto.valeur) || 0;
+  const r = (z) => (z == null ? null : Math.round(z * 1000) / 1000);
+  return sommets.map((s) => {
+    let alt = null;
+    if (auto.mode === 'altitude') alt = v;
+    else if (auto.mode === 'decalage') {
+      const z = altDessous ? altDessous(s.est, s.nord) : null;
+      alt = z == null ? null : z + v;
+    } else if (auto.mode === 'surface') alt = altSurface ? altSurface(s.est, s.nord) : null;
+    return { ...s, alt: r(alt), calc: true };
+  });
+}
+
+/** Aire signée d'une suite [[e, n]…] (> 0 dans le sens trigonométrique). */
+const aireXY = (pts) => pts.reduce((a, p, i) => a + p[0] * pts[(i + 1) % pts.length][1] - pts[(i + 1) % pts.length][0] * p[1], 0) / 2;
+
+/** Décalage simple d'une polyligne de d m à gauche (d > 0) en suivant la ligne ; coins aux croisements des côtés décalés. */
+function decaler(points, d, ferme) {
+  const n = points.length;
+  const segs = [];
+  const nb = ferme ? n : n - 1;
+  for (let i = 0; i < nb; i += 1) {
+    const [ax, ay] = points[i];
+    const [bx, by] = points[(i + 1) % n];
+    const l = Math.hypot(bx - ax, by - ay) || 1;
+    const [nx, ny] = [-(by - ay) / l, (bx - ax) / l];
+    segs.push([[ax + nx * d, ay + ny * d], [bx + nx * d, by + ny * d]]);
+  }
+  const croise = (s1, s2) => {
+    const [[x1, y1], [x2, y2]] = s1;
+    const [[x3, y3], [x4, y4]] = s2;
+    const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (Math.abs(den) < 1e-12) return s1[1];
+    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+    return [x1 + t * (x2 - x1), y1 + t * (y2 - y1)];
+  };
+  const res = [];
+  for (let i = 0; i < n; i += 1) {
+    if (ferme) res.push(croise(segs[(i - 1 + segs.length) % segs.length], segs[i % segs.length]));
+    else if (i === 0) res.push(segs[0][0]);
+    else if (i === n - 1) res.push(segs[i - 1][1]);
+    else res.push(croise(segs[i - 1], segs[i]));
+  }
+  return res;
+}
+
+/**
+ * Emprise en plan d'un ouvrage : { anneaux: [[[e, n]…]…] (règle pair-impair : un mur fermé = 2 anneaux), faces: [[e, n]…]
+ * (la face extérieure, fermée si ferme) }. Mur : la face extérieure + son décalage de « epaisseur » vers le bâtiment
+ * (intérieur du contour s'il est fermé, sinon le côté « cote ») ; radier / dalle : le contour.
+ */
+export function empriseOuvrage(o) {
+  const pts = o.points ?? [];
+  if (o.type !== 'mur') return { anneaux: [pts], faces: pts };
+  const e = Math.max(0.01, Number(o.epaisseur) || 0.2);
+  if (o.ferme && pts.length >= 3) {
+    const versInterieur = aireXY(pts) > 0 ? e : -e; // contour trigonométrique : l'intérieur est à gauche
+    return { anneaux: [pts, decaler(pts, versInterieur, true)], faces: pts };
+  }
+  const d = (o.cote ?? 'gauche') === 'gauche' ? e : -e;
+  const autre = decaler(pts, d, false);
+  return { anneaux: [[...pts, ...autre.reverse()]], faces: pts };
+}
+
+/** Haut et bas d'un ouvrage (m) : mur = bas + hauteur ; radier / dalle = bas + épaisseur. */
+export const hautOuvrage = (o) => (Number(o.altBas) || 0) + (o.type === 'mur' ? Number(o.hauteur) || 0 : Number(o.epaisseur) || 0);
+
+/** Distance (m) d'un point { est, nord } à une suite de points [[e, n]…] (fermée si « ferme »). */
+function distanceALaFace(p, pts, ferme) {
+  let d = Infinity;
+  const nb = ferme ? pts.length : pts.length - 1;
+  for (let i = 0; i < nb; i += 1) {
+    const [ax, ay] = pts[i];
+    const [bx, by] = pts[(i + 1) % pts.length];
+    const l2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+    const t = Math.max(0, Math.min(1, ((p.est - ax) * (bx - ax) + (p.nord - ay) * (by - ay)) / l2));
+    d = Math.min(d, Math.hypot(ax + t * (bx - ax) - p.est, ay + t * (by - ay) - p.nord));
+  }
+  return d;
+}
+
+/** Vrai si le côté a → b d'une plateforme est posé sur la face extérieure d'un ouvrage (à « tol » m près) : pas de talus. */
+export function contreUnOuvrage(a, b, ouvrages = [], tol = 0.02) {
+  const m = { est: (a.est + b.est) / 2, nord: (a.nord + b.nord) / 2 };
+  return ouvrages.some((o) => {
+    const { faces } = empriseOuvrage(o);
+    const ferme = o.type !== 'mur' || o.ferme;
+    return [a, b, m].every((p) => distanceALaFace(p, faces, ferme) <= tol);
+  });
+}
+
+/** Parties [d1, d2] (m depuis a) du segment a → b ([e, n]) qui sont dans l'emprise de l'ouvrage (pair-impair). */
+export function traverseesOuvrage(o, a, b) {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (L < 1e-9) return [];
+  const ts = [0, 1];
+  for (const anneau of empriseOuvrage(o).anneaux) {
+    for (let i = 0; i < anneau.length; i += 1) {
+      const [cx, cy] = anneau[i];
+      const [dx, dy] = anneau[(i + 1) % anneau.length];
+      const den = (b[0] - a[0]) * (dy - cy) - (b[1] - a[1]) * (dx - cx);
+      if (Math.abs(den) < 1e-12) continue;
+      const t = ((cx - a[0]) * (dy - cy) - (cy - a[1]) * (dx - cx)) / den;
+      const u = ((cx - a[0]) * (b[1] - a[1]) - (cy - a[1]) * (b[0] - a[0])) / den;
+      if (t > 0 && t < 1 && u >= 0 && u <= 1) ts.push(t);
+    }
+  }
+  ts.sort((x, y) => x - y);
+  const dedans = (x, y) => empriseOuvrage(o).anneaux.reduce((r, an) => {
+    let c = false;
+    for (let i = 0, j = an.length - 1; i < an.length; j = i, i += 1) {
+      if ((an[i][1] > y) !== (an[j][1] > y) && x < ((an[j][0] - an[i][0]) * (y - an[i][1])) / (an[j][1] - an[i][1]) + an[i][0]) c = !c;
+    }
+    return c ? !r : r;
+  }, false);
+  const res = [];
+  for (let i = 0; i + 1 < ts.length; i += 1) {
+    const tm = (ts[i] + ts[i + 1]) / 2;
+    if (ts[i + 1] - ts[i] > 1e-9 && dedans(a[0] + (b[0] - a[0]) * tm, a[1] + (b[1] - a[1]) * tm)) res.push([ts[i] * L, ts[i + 1] * L]);
+  }
+  return res;
+}

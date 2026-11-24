@@ -14924,3 +14924,10 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .berme-cote { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 0.8rem; padding: 2px 0 2px 20px; }
 .berme-cote label { display: flex; align-items: center; gap: 4px; }
 .berme-cote select { font: inherit; font-size: 0.8rem; padding: 1px 4px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); }
+
+/* 0.303.0 : Plateformes : ouvrages (murs, radiers, dalles). */
+.liste-ouvrages { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; }
+.ouvrage-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 3px 4px; border: 1px solid var(--bordure); border-radius: 6px; }
+.ouvrage-ligne label { display: flex; align-items: center; gap: 3px; }
+.panneau-plateformes input.hv-large { width: 78px; }
+.svg-coupe .ouvrage-coupe { fill: #475569; fill-opacity: 0.55; stroke: #334155; stroke-width: 1; }

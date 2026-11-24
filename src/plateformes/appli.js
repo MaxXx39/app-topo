@@ -6,7 +6,7 @@
 // choisie, plan, tableau unique (points puis côtés), panneau à droite (liste, talus, Δ Z, volumes).
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
-import { demanderChoix, demanderTexte } from '../outils/choix.js';
+import { demanderChoix, demanderTexte, demanderChamps } from '../outils/choix.js';
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
 import { accrocher, sourcesDesPlans } from '../topo/accroche.js';
@@ -17,6 +17,7 @@ import {
   ajouterPointMilieu, appliquerDeltaZ, cotePartage, trianglesPlateforme, talusPlateforme, trianglesTalus, reglageDuCote,
   bermeDe, pointsEtFaces, TALUS_DEFAUT, BERME_DEFAUT, lireHV,
   unitesPlateformes, ordreDesEtapes, profilLeLong, volumeTerrainAFin, COULEURS_PLATEFORMES,
+  altitudesAuto, empriseOuvrage, hautOuvrage, contreUnOuvrage, traverseesOuvrage,
 } from '../topo/plateforme.js';
 
 const COULEUR_APPLI = '#6d28d9';
@@ -53,6 +54,8 @@ export function ouvrirPlateformes({
   // 0.302.0 : groupes de plateformes (une seule surface) et coupes (2 au plus) de la page.
   const groupes = () => (projet().groupesPlateformes ??= []);
   const coupes = () => (projet().coupesPlateformes ??= []);
+  // 0.303.0 : murs, radiers, dalles (limites : pas de talus contre leur face extérieure).
+  const ouvrages = () => (projet().ouvragesPlateformes ??= []);
   const groupeDe = (pf) => (pf?.groupeId ? groupes().find((g) => g.id === pf.groupeId) ?? null : null);
   const choisie = () => liste().find((p) => p.id === etat.choisiId) ?? null;
 
@@ -79,7 +82,7 @@ export function ouvrirPlateformes({
 
   // --- Annuler, enregistrer ---
 
-  const instantane = () => JSON.stringify({ p: projet().plateformes ?? [], c: projet().constructionsPlateformes ?? [], g: projet().groupesPlateformes ?? [], k: projet().coupesPlateformes ?? [] });
+  const instantane = () => JSON.stringify({ p: projet().plateformes ?? [], c: projet().constructionsPlateformes ?? [], g: projet().groupesPlateformes ?? [], k: projet().coupesPlateformes ?? [], o: projet().ouvragesPlateformes ?? [] });
   function avantChangement() {
     if (lectureSeule()) {
       message('Projet ouvert en lecture seule ici : rien n\'est modifié.', 4000);
@@ -91,7 +94,8 @@ export function ouvrirPlateformes({
   }
   function annuler() {
     if (!pile.length) return message('Rien à annuler.', 2000);
-    const { p, c, g, k } = JSON.parse(pile.pop());
+    const { p, c, g, k, o } = JSON.parse(pile.pop());
+    projet().ouvragesPlateformes = o ?? [];
     projet().plateformes = p;
     projet().constructionsPlateformes = c;
     projet().groupesPlateformes = g ?? [];
@@ -111,7 +115,8 @@ export function ouvrirPlateformes({
     const tous = liste();
     const r = new Map();
     for (const pf of tous) {
-      const t = trianglesPlateforme(pf, tous, trianglerAvecContraintes);
+      // Altitudes automatiques (0.303.0) : calculées plus bas, quand la surface de dessous est connue.
+      const t = pf.auto?.mode ? { triangles: [], erreur: null } : trianglesPlateforme(pf, tous, trianglerAvecContraintes);
       r.set(pf.id, { sommets: sommetsResolus(pf, tous), triangles: t.triangles ?? [], erreur: t.erreur ?? null, talus: null, trianglesTalus: [], erreursTalus: [], volume: null, unite: null });
     }
     const unites = unitesPlateformes(tous, groupes());
@@ -126,12 +131,27 @@ export function ouvrirPlateformes({
       for (const pf of u.membres) {
         const res = r.get(pf.id);
         res.unite = u.id;
+        if (pf.auto?.mode) {
+          // Altitudes : fixe, surface de dessous ± valeur, ou une autre surface ; triangles refaits avec elles.
+          const triSurf = pf.auto.mode === 'surface' && pf.auto.surfaceId ? trianglesDeSurf.get(pf.auto.surfaceId) ?? trianglesDeSurface(pf.auto.surfaceId) ?? [] : [];
+          const altSurf = triSurf.length ? chercheurAltitude(triSurf) : null;
+          const simples = (liste) => liste.map(({ nom, est, nord, alt, calc }) => ({ nom, est, nord, alt, calc }));
+          const sommetsAuto = altitudesAuto(simples(res.sommets), pf.auto, altRef, altSurf);
+          const interieursAuto = altitudesAuto(simples(pf.interieurs), pf.auto, altRef, altSurf);
+          res.sommets = sommetsAuto.map((x, i) => ({ ...res.sommets[i], alt: x.alt, calc: true }));
+          const t = trianglesPlateforme({ ...pf, sommets: sommetsAuto, interieurs: interieursAuto }, [], trianglerAvecContraintes);
+          res.triangles = t.triangles ?? [];
+          res.erreur = t.erreur ? (pf.auto.mode === 'decalage' && !altRef ? 'choisissez sur quoi elle est posée (altitudes calculées d\'après elle)' : pf.auto.mode === 'surface' && !altSurf ? 'surface des altitudes à choisir' : `${t.erreur} (hors de la surface ?)`) : null;
+          res.altitudesAuto = new Map([...sommetsAuto, ...interieursAuto].map((x) => [x.nom, x.alt]));
+        }
         if (res.erreur) {
           erreur ??= `${pf.nom} : ${res.erreur}`;
           continue;
         }
         if (altRef) {
-          res.talus = talusPlateforme(res.sommets, (i) => reglageDuCote(tous, pf, i), bermeDe(pf), altRef, { pas: 1 });
+          // 0.303.0 : contre la face extérieure d'un mur / radier / dalle, pas de talus.
+          const n = res.sommets.length;
+          res.talus = talusPlateforme(res.sommets, (i) => (contreUnOuvrage(res.sommets[i], res.sommets[(i + 1) % n], ouvrages()) ? null : reglageDuCote(tous, pf, i)), bermeDe(pf), altRef, { pas: 1 });
           res.erreursTalus = res.talus.erreurs;
           res.trianglesTalus = trianglesTalus(res.talus);
         }
@@ -236,6 +256,11 @@ export function ouvrirPlateformes({
     }
     // Deux passes : une étape posée sur une autre a besoin que la surface de celle-ci existe (son id).
     for (let passe = 0; passe < 2; passe += 1) {
+      // 0.303.0 : une sur-profondeur / sur-hauteur est toujours posée sur sa parente (son groupe s'il y en a un).
+      for (const p of liste()) {
+        const parent = p.surprof ? liste().find((q) => q.id === p.surprof.parentId) : null;
+        if (parent) p.terrainId = surfaceDeUnite(uniteDe(parent).id) ?? p.terrainId;
+      }
       memo.cle = '';
       const e = etapesCalculees();
       for (const u of unites) {
@@ -285,6 +310,8 @@ export function ouvrirPlateformes({
     ['rupture', '<path d="M4 18L20 6" stroke-width="2.6"/>', 'Rupture', 'Ligne de rupture : cliquer deux points existants de la plateforme'],
     ['interieur', '<rect x="4" y="4" width="16" height="16" rx="1"/><circle cx="12" cy="12" r="2.2"/>', 'Pt intér.', 'Point intérieur isolé : cliquer dans la plateforme'],
     ['construction', '<path d="M3 20L21 4" stroke-dasharray="3 3"/>', 'Constr.', 'Ligne de construction (2D, pour l\'accroche) : 2 clics'],
+    ['surprof', '<path d="M3 8h5l2 6h4l2-6h5"/>', 'Sur-prof.', 'Sur-profondeur ou sur-hauteur dans la plateforme choisie : cliquer son contour'],
+    ['ouvrage', '<path d="M4 20V8h4v12M8 14h12"/><path d="M4 8h4"/>', 'Ouvrage', 'Mur (la ligne = face extérieure), radier ou dalle : pas de talus contre eux'],
   ];
   const ACCROCHES = [['point', '<circle cx="12" cy="12" r="4"/>', 'Point', 'points levés'], ['sommet', '<rect x="8" y="8" width="8" height="8"/>', 'Sommet', 'plans et plateformes'], ['milieu', '<path d="M4 12h16M12 8l-4 8h8z"/>', 'Milieu', ''], ['ligne', '<path d="M4 18L20 6"/><path d="M10 10l4 4"/>', 'Sur ligne', ''], ['croisement', '<path d="M5 5L19 19M19 5L5 19"/>', 'Croisem.', '']];
   const VOIR = [['noms', '<path d="M5 18V6h5a3 3 0 010 6H5"/>', 'Noms'], ['alt', '<path d="M4 20l6-10 4 6 2-3 4 7z"/>', 'Altitudes'], ['pentes', '<path d="M4 18L20 8M15 8h5v5"/>', 'Pentes'], ['tri', '<path d="M3 20h18L12 4z M12 4v16"/>', 'Triangles'], ['talus', '<path d="M3 8h18M6 8v6M12 8v6M18 8v6"/>', 'Talus']];
@@ -348,6 +375,8 @@ export function ouvrirPlateformes({
       rupture: s?.debut ? `Ligne de rupture depuis ${s.debut} : cliquez le 2e point.` : 'Ligne de rupture : cliquez un point existant de la plateforme choisie, puis un autre.',
       interieur: 'Cliquez dans la plateforme choisie : point intérieur (altitude : « Alt. du clic », sinon celle de la surface).',
       construction: s?.debut ? 'Cliquez le 2e point de la ligne de construction.' : 'Ligne de construction : 2 clics (elle sert seulement à l\'accroche).',
+      surprof: s?.points?.length ? `${s.points.length} point(s) du contour (dans la plateforme parente) ; 1er point ou Entrée pour finir.` : 'Sur-profondeur / sur-hauteur : cliquez son contour DANS la plateforme choisie (sa parente).',
+      ouvrage: s?.points?.length ? `${s.points.length} point(s) ; Entrée = mur ouvert ; 1er point = contour fermé (bâtiment, radier, dalle).` : 'Ouvrage : cliquez la FACE EXTÉRIEURE du mur (ou le contour du radier / de la dalle), accroches sur les plans DXF.',
       coupe: s?.a ? 'Cliquez la fin de la coupe (accroches actives) ; Échap abandonne.' : 'Coupe : cliquez son début (accroches actives). Ses bouts se glissent ensuite avec « Choisir ».',
     }[etat.outil];
   }
@@ -388,7 +417,7 @@ export function ouvrirPlateformes({
       const partage = Boolean(src.lien) || tous.some((q) => q !== pf && q.sommets.some((x) => x.lien?.id === pf.id && x.nom === p.nom));
       lignes.push(`<tr class="ligne-point ${etat.selPoint === p.nom ? 'choisi' : ''}">
         <td>${echapper(p.nom)}</td>
-        <td><input type="text" inputmode="text" class="${p.calc ? 'calc' : ''}" value="${f3(p.alt)}" data-alt="${echapper(p.nom)}" aria-label="Altitude ${echapper(p.nom)}"></td>
+        <td><input type="text" inputmode="text" class="${p.calc || pf.auto?.mode ? 'calc' : ''}" value="${f3(pf.auto?.mode ? resultats().get(pf.id)?.altitudesAuto?.get(p.nom) : p.alt)}" data-alt="${echapper(p.nom)}" ${pf.auto?.mode ? 'readonly title="Altitude calculée (voir « Altitudes » à droite)"' : ''} aria-label="Altitude ${echapper(p.nom)}"></td>
         <td class="centre">${src.lien ? `<button type="button" class="bouton-lien ${src.detache ? 'detache' : ''}" data-lien="${i}" title="${src.detache ? 'Détaché : altitude propre (marche). Toucher = relier' : 'Lié : même altitude que l\'autre plateforme. Toucher = détacher'}">${src.detache ? '✂' : '🔗'}</button>` : partage ? '<span title="Angle partagé par une plateforme accrochée">🔗</span>' : ''}</td>
         <td class="sep" colspan="5"></td></tr>`);
       const j = (i + 1) % s.length;
@@ -469,6 +498,12 @@ export function ouvrirPlateformes({
       <div class="totaux-etapes"><span>Somme des étapes</span><span class="deblai">D ${m3(tot.somme.deblai)}</span><span class="remblai">R ${m3(tot.somme.remblai)}</span>
         <span>Terrain → fin (d'un coup)</span>${tot.fin ? `<span class="deblai">D ${m3(tot.fin.deblai)}</span><span class="remblai">R ${m3(tot.fin.remblai)}</span>` : `<span class="aide-calage" style="grid-column:span 2">${tot.raison || '—'}</span>`}</div>` : ''}
       ${pf ? `
+      <h3>Altitudes de ${echapper(pf.nom)}</h3>
+      ${pf.surprof ? `<p class="aide-calage">${pf.surprof.genre === 'bosse' ? 'Sur-hauteur' : 'Sur-profondeur'} de ${echapper(liste().find((q) => q.id === pf.surprof.parentId)?.nom ?? '?')}</p>` : ''}
+      <label class="champ-calage"><span>Les altitudes viennent</span><select data-auto="mode">
+        ${[['', 'du tableau (tapées)'], ['altitude', 'd\'une altitude fixe'], ['decalage', 'de ce qui est dessous ± une épaisseur'], ['surface', 'd\'une surface (jusqu\'à un terrain)']].map(([v, t]) => `<option value="${v}" ${(pf.auto?.mode ?? '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      ${pf.auto?.mode === 'altitude' || pf.auto?.mode === 'decalage' ? `<label class="champ-calage"><span>${pf.auto.mode === 'altitude' ? 'Altitude (m)' : 'Épaisseur (m ; − = profondeur)'}</span><input type="text" inputmode="text" class="hv" data-auto="valeur" value="${f3(pf.auto.valeur)}"></label>` : ''}
+      ${pf.auto?.mode === 'surface' ? `<label class="champ-calage"><span>Surface</span><select data-auto="surfaceId"><option value="">— choisir —</option>${surfaces().map((x) => `<option value="${echapper(x.id)}" ${x.id === pf.auto.surfaceId ? 'selected' : ''}>${echapper(x.nom)}</option>`).join('')}</select></label>` : ''}
       <h3>Talus de ${echapper(u.nom)}</h3>
       <label class="champ-calage"><span>Posée sur (surface de référence)</span><select data-unite-ref="${echapper(u.id)}">${optionsReference(u.id, u.source.terrainId ?? null)}</select></label>
       <label class="case-chantier"><input type="checkbox" data-berme="on" ${b.on ? 'checked' : ''}> Berme (plate) de ${echapper(pf.nom)}</label>
@@ -481,6 +516,11 @@ export function ouvrirPlateformes({
       <h3>Volumes de l'étape (avec talus)</h3>
       ${r?.volume ? `<p class="resume-volume"><span class="chiffre deblai">Déblai ${r.volume.deblai.toFixed(1)} m³</span> · <span class="chiffre remblai">Remblai ${r.volume.remblai.toFixed(1)} m³</span><br><span class="aide-calage">Emprise ${r.volume.surface.toFixed(1)} m²${r.volume.horsTerrain > 0.01 ? ` · ⚠ ${r.volume.horsTerrain.toFixed(1)} m² hors de la surface de référence` : ''}</span></p>`
     : `<p class="aide-calage">${r?.erreur ? 'Plateforme incomplète.' : 'Choisissez sur quoi elle est posée.'}</p>`}
+      ${ouvrages().length ? `<h3>Ouvrages</h3><div class="liste-ouvrages">${ouvrages().map((o) => `<div class="ouvrage-ligne"><b>${echapper(o.nom)}</b>
+        <label>ép. <input type="text" class="hv" data-ouvrage="${echapper(o.id)}" data-champ-ouvrage="epaisseur" value="${f2(o.epaisseur)}"></label>
+        <label>bas <input type="text" class="hv-large" data-ouvrage="${echapper(o.id)}" data-champ-ouvrage="altBas" value="${f3(o.altBas)}"></label>
+        ${o.type === 'mur' ? `<label>haut. <input type="text" class="hv" data-ouvrage="${echapper(o.id)}" data-champ-ouvrage="hauteur" value="${f2(o.hauteur)}"></label>${o.ferme ? '' : `<button type="button" class="bouton-secondaire petit" data-inverser-mur="${echapper(o.id)}" title="Changer le côté du bâtiment">⇄</button>`}` : ''}
+        <button type="button" class="bouton-lien" data-effacer-ouvrage="${echapper(o.id)}" title="Effacer cet ouvrage">✕</button></div>`).join('')}</div>` : ''}
       <h3>Delta Z</h3>
       <div class="ligne-dz"><input type="text" inputmode="text" class="hv" data-champ="dz" value="0.000" aria-label="Delta Z en m"> m
         <select data-champ="dzQui" aria-label="À quoi appliquer"><option value="seule">Cette plateforme seule</option><option value="toutes">Avec les accrochées</option></select>
@@ -530,7 +570,9 @@ export function ouvrirPlateformes({
     const altDe = (x) => (x.terrain ? (trianglesDeSurface(x.id).length ? chercheurAltitude(trianglesDeSurface(x.id)) : null) : e.parUnite.get(x.id)?.altitude);
     const profils = chaine.map((x) => ({ x, p: altDe(x) ? profilLeLong(altDe(x), k.a, k.b, 0.5) : [] })).filter((y) => y.p.length);
     const L = Math.hypot(k.b[0] - k.a[0], k.b[1] - k.a[1]);
-    const zs = profils.flatMap((y) => y.p.map((q) => q.z)).filter((z) => z != null);
+    // 0.303.0 : ouvrages coupés (rectangles gris du bas au haut)
+    const coupesOuvrages = ouvrages().flatMap((o) => traverseesOuvrage(o, k.a, k.b).map(([d1, d2]) => ({ o, d1, d2, bas: Number(o.altBas) || 0, haut: hautOuvrage(o) })));
+    const zs = [...profils.flatMap((y) => y.p.map((q) => q.z)).filter((z) => z != null), ...coupesOuvrages.flatMap((x) => [x.bas, x.haut])];
     const W = 640;
     const H = 220;
     const g = 46;
@@ -566,6 +608,7 @@ export function ouvrirPlateformes({
         svg += `<polygon points="${px(a.d)},${py(c.z)} ${px(b.d)},${py(dd.z)} ${px(b.d)},${py(b.z)} ${px(a.d)},${py(a.z)}" class="${classe}"/>`;
       }
     }
+    for (const x of coupesOuvrages) svg += `<rect x="${px(x.d1)}" y="${py(x.haut)}" width="${Math.max(1, px(x.d2) - px(x.d1))}" height="${py(x.bas) - py(x.haut)}" class="ouvrage-coupe"><title>${echapper(x.o.nom)}</title></rect>`;
     profils.forEach((y, i) => {
       const morceaux = [];
       let cur = [];
@@ -616,7 +659,7 @@ export function ouvrirPlateformes({
     toile.addEventListener('pointerup', pointerUp);
     toile.addEventListener('pointercancel', pointerUp);
     toile.addEventListener('dblclick', () => {
-      if (etat.outil === 'plateforme') finirPlateforme();
+      if (['plateforme', 'surprof', 'ouvrage'].includes(etat.outil)) finirPlateforme();
     });
     toile.vuePlateformes = () => vue;
     toile.tabIndex = 0; // le plan prend le clavier quand on le touche (Entrée, Échap, Ctrl+Z)
@@ -692,6 +735,28 @@ export function ouvrirPlateformes({
     }
     ctx.setLineDash([]);
     // Talus (sous les plateformes)
+    // 0.303.0 : ouvrages (murs, radiers, dalles) : emprise grise, face extérieure en trait épais.
+    for (const o of ouvrages()) {
+      const { anneaux, faces } = empriseOuvrage(o);
+      ctx.beginPath();
+      for (const an of anneaux) an.forEach(([e, n], i) => { const q = versEcran(e, n, vue); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); }), ctx.closePath();
+      ctx.fillStyle = 'rgba(71,85,105,0.38)';
+      ctx.fill('evenodd');
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      faces.forEach(([e, n], i) => { const q = versEcran(e, n, vue); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
+      if (o.ferme) ctx.closePath();
+      ctx.stroke();
+      // Étiquette au milieu du 1er côté, du côté du bâtiment (loin des altitudes des plateformes collées dehors).
+      const anneauInt = anneaux[anneaux.length - 1];
+      const ci = anneauInt.reduce((c, q) => [c[0] + q[0] / anneauInt.length, c[1] + q[1] / anneauInt.length], [0, 0]);
+      const qc = versEcran(ci[0], ci[1], vue);
+      ctx.textAlign = 'center';
+      texte(ctx, o.nom, qc.x, qc.y - 2, '#334155', 11, true);
+      texte(ctx, `${f2(o.altBas)} → ${f2(hautOuvrage(o))}`, qc.x, qc.y + 12, '#334155', 10);
+      ctx.textAlign = 'start';
+    }
     if (etat.voir.talus) for (const pf of liste()) {
       alphaBase = alphaDe(pf);
       dessinerTalus(ctx, r.get(pf.id));
@@ -980,6 +1045,7 @@ export function ouvrirPlateformes({
       if (s.length >= 2) lignes.push({ points: s.map((p) => ({ est: p.est, nord: p.nord, altitude: p.alt })), ferme: s.length >= 3 });
       for (const p of s) sommetsPf.push({ est: p.est, nord: p.nord, altitude: p.alt, nom: p.nom, pf: pf.id });
     }
+    for (const o of ouvrages()) for (const an of empriseOuvrage(o).anneaux) lignes.push({ points: an.map(([est, nord]) => ({ est, nord, altitude: null })), ferme: o.ferme || an !== empriseOuvrage(o).anneaux[0] || o.type !== 'mur' });
     for (const [e1, n1, e2, n2] of projet().constructionsPlateformes ?? []) lignes.push({ points: [{ est: e1, nord: n1, altitude: null }, { est: e2, nord: n2, altitude: null }], ferme: false });
     return { lignes, cercles: src.cercles, points: src.points, sommetsPf };
   }
@@ -1177,10 +1243,14 @@ export function ouvrirPlateformes({
       return enregistrer();
     }
     const altTapee = nombre(etat.altSuivante);
-    if (etat.outil === 'plateforme') {
-      const s = etat.saisie ?? (etat.saisie = { points: [] });
+    if (['plateforme', 'surprof', 'ouvrage'].includes(etat.outil)) {
+      if (etat.outil === 'surprof' && !etat.saisie && !choisie()) return message('Choisissez d\'abord la plateforme parente (outil « Choisir »), puis dessinez la sur-profondeur dedans.', 4000);
+      const s = etat.saisie ?? (etat.saisie = { points: [], parentId: etat.outil === 'surprof' ? choisie()?.id : null });
       const premier = s.points[0];
-      if (premier && s.points.length >= 3 && Math.hypot(ecran(premier).x - ecran(a).x, ecran(premier).y - ecran(a).y) <= pxTol()) return finirPlateforme();
+      if (premier && s.points.length >= 3 && Math.hypot(ecran(premier).x - ecran(a).x, ecran(premier).y - ecran(a).y) <= pxTol()) {
+        s.ferme = true;
+        return finirPlateforme();
+      }
       s.points.push({ est: a.est, nord: a.nord, alt: altTapee ?? a.altitude ?? null, lien: a.lien ?? null });
       return majTout();
     }
@@ -1239,9 +1309,11 @@ export function ouvrirPlateformes({
     return r;
   }
 
-  function finirPlateforme() {
+  async function finirPlateforme() {
     const s = etat.saisie;
+    if (etat.outil === 'ouvrage') return finirOuvrage();
     if (!s?.points || s.points.length < 3) return message('Une plateforme a au moins 3 angles.', 3000);
+    if (etat.outil === 'surprof') return finirSurprof();
     if (!avantChangement()) return;
     const pf = nouvellePlateforme(liste(), nouvelIdentifiant());
     const m = (v) => Math.round(v * 1000) / 1000;
@@ -1258,6 +1330,79 @@ export function ouvrirPlateformes({
     etat.saisie = null;
     etat.outil = 'choisir';
     message(`${pf.nom} créée : complétez les altitudes dans le tableau.`, 3000);
+    enregistrer();
+  }
+
+  /**
+   * 0.303.0 : sur-profondeur (creux) ou sur-hauteur (bosse) dessinée dans la plateforme parente : une plateforme posée
+   * sur elle, altitudes calculées (fond / dessus à une altitude, ou à une profondeur / hauteur de la parente), talus
+   * de même pente partout jusqu'à la parente.
+   */
+  async function finirSurprof() {
+    const s = etat.saisie;
+    const parent = liste().find((p) => p.id === s.parentId);
+    if (!parent) return message('Plateforme parente introuvable.', 3000);
+    const v = await demanderChamps({
+      titre: `Dans ${parent.nom}`,
+      champs: [
+        { cle: 'genre', titre: 'Genre', choix: [['creux', 'Sur-profondeur (creux)'], ['bosse', 'Sur-hauteur (bosse)']], valeur: 'creux' },
+        { cle: 'mode', titre: 'Donné par', choix: [['profondeur', 'Une profondeur / hauteur (m) par rapport à la plateforme'], ['altitude', 'Une altitude (m)']], valeur: 'profondeur' },
+        { cle: 'valeur', titre: 'Valeur (m)', exemple: '0.80 ou 98.50' },
+        { cle: 'talus', titre: 'Talus des bords (H:V)', valeur: '1:1' },
+      ],
+    });
+    if (!v) return;
+    const valeur = nombre(v.valeur);
+    if (valeur === null) return message('Valeur illisible (exemple : 0.80).', 3500);
+    if (!lireHV(v.talus)) return message('Talus illisible : écrivez H:V, par exemple 1:1.', 3500);
+    if (!avantChangement()) return;
+    const pf = nouvellePlateforme(liste(), nouvelIdentifiant());
+    pf.nom = `${v.genre === 'bosse' ? 'Sur-hauteur' : 'Sur-profondeur'} ${pf.lettre}`;
+    const m = (x) => Math.round(x * 1000) / 1000;
+    for (const p of s.points) pf.sommets.push({ nom: prochainNom(pf), est: m(p.est), nord: m(p.nord), alt: null, calc: true });
+    for (const x of pf.sommets) pf.talus[x.nom] = { on: true, deb: v.talus.trim(), rem: v.talus.trim() };
+    pf.surprof = { parentId: parent.id, genre: v.genre };
+    pf.auto = v.mode === 'altitude' ? { mode: 'altitude', valeur } : { mode: 'decalage', valeur: v.genre === 'bosse' ? Math.abs(valeur) : -Math.abs(valeur) };
+    pf.terrainId = surfaceDeUnite(uniteDe(parent).id);
+    liste().push(pf);
+    etat.choisiId = pf.id;
+    etat.saisie = null;
+    etat.outil = 'choisir';
+    message(`${pf.nom} créée dans ${parent.nom} (une étape posée sur elle).`, 3500);
+    enregistrer();
+  }
+
+  /** 0.303.0 : mur (face extérieure + épaisseur vers le bâtiment), radier ou dalle (contour + épaisseur). */
+  async function finirOuvrage() {
+    const s = etat.saisie;
+    if (!s?.points || s.points.length < 2) return message('Un ouvrage a au moins 2 points.', 3000);
+    const v = await demanderChamps({
+      titre: 'Ouvrage',
+      champs: [
+        { cle: 'type', titre: 'Genre', choix: [['mur', 'Mur (la ligne = face EXTÉRIEURE)'], ['radier', 'Radier'], ['dalle', 'Dalle']], valeur: 'mur' },
+        { cle: 'epaisseur', titre: 'Épaisseur (m)', valeur: '0.30' },
+        { cle: 'altBas', titre: 'Altitude du bas (m)', exemple: '412.50' },
+        { cle: 'hauteur', titre: 'Hauteur du mur (m)', valeur: '3.00', visibleSi: { cle: 'type', valeur: 'mur' } },
+        ...(s.ferme ? [] : [{ cle: 'cote', titre: 'Côté du bâtiment (en suivant la ligne)', choix: [['gauche', 'À gauche'], ['droite', 'À droite']], valeur: 'gauche', visibleSi: { cle: 'type', valeur: 'mur' } }]),
+      ],
+    });
+    if (!v) return;
+    const epaisseur = nombre(v.epaisseur);
+    const altBas = nombre(v.altBas);
+    const hauteur = nombre(v.hauteur);
+    if (!(epaisseur > 0) || altBas === null || (v.type === 'mur' && !(hauteur > 0))) return message('Épaisseur, altitude du bas et hauteur : des nombres (exemple 0.30, 412.50, 3.00).', 4000);
+    if (v.type !== 'mur' && s.points.length < 3) return message('Un radier ou une dalle a au moins 3 points.', 3500);
+    if (!avantChangement()) return;
+    const m = (x) => Math.round(x * 1000) / 1000;
+    const nb = ouvrages().filter((o) => o.type === v.type).length + 1;
+    ouvrages().push({
+      id: nouvelIdentifiant(), nom: `${{ mur: 'Mur', radier: 'Radier', dalle: 'Dalle' }[v.type]} ${nb}`, type: v.type,
+      points: s.points.map((p) => [m(p.est), m(p.nord)]), ferme: v.type !== 'mur' || Boolean(s.ferme),
+      epaisseur, altBas, ...(v.type === 'mur' ? { hauteur, cote: v.cote ?? 'gauche' } : {}),
+    });
+    etat.saisie = null;
+    etat.outil = 'choisir';
+    message('Ouvrage ajouté : un côté de plateforme posé sur sa face extérieure n\'a pas de talus.', 3500);
     enregistrer();
   }
 
@@ -1318,6 +1463,13 @@ export function ouvrirPlateformes({
     if (b.dataset.action === 'effacer-coupe') {
       if (!avantChangement()) return;
       projet().coupesPlateformes = coupes().filter((k) => k.id !== b.dataset.coupe);
+      return enregistrer();
+    }
+    if (b.dataset.effacerOuvrage || b.dataset.inverserMur) {
+      const o = ouvrages().find((x) => x.id === (b.dataset.effacerOuvrage || b.dataset.inverserMur));
+      if (!o || !avantChangement()) return;
+      if (b.dataset.effacerOuvrage) projet().ouvragesPlateformes = ouvrages().filter((x) => x !== o);
+      else o.cote = o.cote === 'droite' ? 'gauche' : 'droite';
       return enregistrer();
     }
     if (b.dataset.bermeCote !== undefined) {
@@ -1430,6 +1582,7 @@ export function ouvrirPlateformes({
       return;
     }
     if (!pf) return;
+    if (c.dataset.alt !== undefined && pf.auto?.mode) return majTableau();
     if (c.dataset.alt !== undefined) {
       const v = c.value.trim() === '' ? null : nombre(c.value);
       if (v === null && c.value.trim() !== '') return message('Altitude illisible (exemple : 412.350).', 3000);
@@ -1464,6 +1617,29 @@ export function ouvrirPlateformes({
       if (c.dataset.talusDeb) t.deb = c.value.trim();
       if (c.dataset.talusRem) t.rem = c.value.trim();
       pf.talus[nom] = t;
+      return enregistrer();
+    }
+    // 0.303.0 : altitudes automatiques, ouvrages
+    if (c.dataset.auto) {
+      const cle = c.dataset.auto;
+      if (cle === 'mode') {
+        if (!avantChangement()) return;
+        if (!c.value) delete pf.auto;
+        else pf.auto = { ...(pf.auto ?? {}), mode: c.value, valeur: pf.auto?.valeur ?? (c.value === 'altitude' ? (sommetsResolus(pf, liste()).find((x) => x.alt != null)?.alt ?? 0) : 0.5) };
+        return enregistrer();
+      }
+      const v = cle === 'valeur' ? nombre(c.value) : c.value || null;
+      if (cle === 'valeur' && v === null) return message('Nombre illisible.', 2500);
+      if (!avantChangement()) return;
+      pf.auto = { ...pf.auto, [cle]: v };
+      return enregistrer();
+    }
+    if (c.dataset.champOuvrage) {
+      const o = ouvrages().find((x) => x.id === c.dataset.ouvrage);
+      const v = nombre(c.value);
+      if (!o || v === null || (c.dataset.champOuvrage !== 'altBas' && !(v > 0))) return message('Nombre illisible.', 2500);
+      if (!avantChangement()) return;
+      o[c.dataset.champOuvrage] = v;
       return enregistrer();
     }
     // 0.302.0 : sur quoi l'étape est posée ; groupe ; berme d'un côté
@@ -1556,7 +1732,7 @@ export function ouvrirPlateformes({
       ev.preventDefault();
       return annuler();
     }
-    if (ev.key === 'Enter' && etat.outil === 'plateforme' && etat.saisie && !dansChamp) {
+    if (ev.key === 'Enter' && ['plateforme', 'surprof', 'ouvrage'].includes(etat.outil) && etat.saisie && !dansChamp) {
       ev.preventDefault();
       return finirPlateforme();
     }
