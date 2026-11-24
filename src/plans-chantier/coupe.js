@@ -5,9 +5,10 @@ import { echapper } from '../outils/echapper.js';
 const COULEURS = {
   mat: ['#f7dc94', '#7a5b12'], fleche: ['#f7dc94', '#7a5b12'], contre: ['#f7dc94', '#7a5b12'], pied: ['#8d96a0', '#4b535b'],
   massif: ['url(#hach-beton)', '#6b7280'], crochet: ['#1b1f24', '#1b1f24'], contrepoids: ['#9aa2ab', '#4b535b'],
-  plateforme: ['#7b838c', '#4b535b'], cabine: ['#e8f1f4', '#4b535b'], chariot: ['#3a3f45', '#1b1f24'],
+  plateforme: ['#7b838c', '#4b535b'], chassisauto: ['#2b2f33', '#111827'], lest: ['#c9ced3', '#6b7280'], matbas: ['#f2b61f', '#7a5b12'],
+  mathaut: ['#a3a9af', '#4b535b'], tete: ['#a3a9af', '#4b535b'], flecheg: ['#d3d8dd', '#6b7280'], cabine: ['#e8f1f4', '#4b535b'], chariot: ['#3a3f45', '#1b1f24'],
 };
-const TREILLIS = new Set(['mat', 'fleche', 'contre']);
+const TREILLIS = new Set(['mat', 'fleche', 'contre', 'flecheg']);
 
 /** SVG de la coupe dans une zone de largeur × hauteur pixels. */
 export function svgCoupe(coupe, largeur = 700, hauteur = 240) {
@@ -57,7 +58,7 @@ export function svgCoupe(coupe, largeur = 700, hauteur = 240) {
         const yh = Y(f.pts[2][1]);
         const yb = Y(f.pts[0][1]);
         const h = Math.max(4, yb - yh);
-        corps.push(`<rect x="${(cx - 4).toFixed(1)}" y="${yh.toFixed(1)}" width="8" height="${(h * 0.45).toFixed(1)}" rx="1.5" fill="#3a3f45" stroke="#1b1f24"/>`);
+        corps.push(`<rect x="${(cx - 4).toFixed(1)}" y="${yh.toFixed(1)}" width="8" height="${(h * 0.45).toFixed(1)}" rx="1.5" fill="#d9363e" stroke="#7f1d1d"/>`);
         corps.push(`<path d="M${cx.toFixed(1)} ${(yh + h * 0.45).toFixed(1)}v${(h * 0.3).toFixed(1)}a4 4 0 1 1 -4 4" fill="none" stroke="#1b1f24" stroke-width="2" stroke-linecap="round"/>`);
       } else if (f.type === 'poly') {
         const [fill, stroke] = COULEURS[f.genre] ?? ['#f7dc94', '#7a5b12'];
@@ -79,7 +80,7 @@ export function svgCoupe(coupe, largeur = 700, hauteur = 240) {
           corps.push(`<polyline points="${pts.join(' ')}" fill="none" stroke="#7a5b12" stroke-width="0.9" stroke-linejoin="round"/>`);
         }
       } else if (f.type === 'ligne') {
-        corps.push(`<path d="${chemin(f.pts)}" fill="none" stroke="#475569" stroke-width="${f.genre === 'cable' ? 1.2 : 0.8}"/>`);
+        corps.push(`<path d="${chemin(f.pts)}" fill="none" stroke="${f.genre === 'bequille' ? '#5b636b' : '#475569'}" stroke-width="${f.genre === 'bequille' ? 3.2 : f.genre === 'cable' ? 1.2 : 0.9}" stroke-linecap="round"/>`);
       } else if (f.type === 'cote') {
         // cote verticale (HSC) : trait, deux petits traits de bout, étiquette à gauche au milieu
         const [p1, p2] = f.pts;

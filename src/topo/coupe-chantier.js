@@ -97,24 +97,50 @@ export function formesGrue(o, a, u) {
   const formes = [];
   const c = tour.pied.c ?? tour.mat + 1;
   if (g.massifs) formes.push(rect(s0 - (c * proj + g.massifL) / 2, s0 + (c * proj + g.massifL) / 2, nv.pied - g.massifH, nv.pied, 'massif'));
-  if (tour.pied.type !== 'FA') formes.push(rect(s0 - (c * proj) / 2, s0 + (c * proj) / 2, nv.pied, nv.pied + 0.5, 'pied'));
-  formes.push(rect(s0 - tour.mat / 2, s0 + tour.mat / 2, nv.pied, nv.flecheHaut, 'mat'));
-  formes.push({ type: 'poly', genre: 'mat', pts: [ptCoupe(s0 - tour.mat / 2, nv.flecheHaut), ptCoupe(s0 + tour.mat / 2, nv.flecheHaut), ptCoupe(s0, nv.haut)] });
   const bout = boutDeFleche(M, f);
   const arr = D.contreFlecheArriere;
-  const [c1, c2] = largeurMin(X(-arr), X(-0.4));
-  formes.push(rect(c1, c2, nv.flecheBas, nv.flecheHaut, 'contre'));
   const [j1, j2] = largeurMin(X(D.flecheDebut), X(bout));
-  formes.push(rect(j1, j2, nv.flecheBas, nv.flecheHaut, 'fleche'));
-  // 0.315.1 : détails (contrepoids, plate-forme, cabine, chariot)
-  const [w1, w2] = largeurMin(X(-arr), X(-arr + Math.min(3.4, arr * 0.4)));
-  formes.push(rect(w1, w2, nv.flecheBas - 0.9, nv.flecheHaut - 0.05, 'contrepoids'));
-  formes.push(rect(X(-2.9), X(2.6), nv.flecheBas - 0.5, nv.flecheBas, 'plateforme'));
-  const cabL = D.cabine?.l ?? 2.4;
-  formes.push(rect(X(0.5), X(0.5 + cabL), nv.flecheBas - 2.2, nv.flecheBas - 0.5, 'cabine'));
-  formes.push(rect(X(Math.min(r, bout - 0.5)) - 0.5, X(Math.min(r, bout - 0.5)) + 0.5, nv.flecheBas - 0.4, nv.flecheBas, 'chariot'));
-  formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(s0, nv.haut), ptCoupe(X(bout * 0.72), nv.flecheHaut)] });
-  formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(s0, nv.haut), ptCoupe(X(-arr), nv.flecheHaut)] });
+  if (M.type === 'automontante') {
+    // 0.315.2 (d'après la photo d'une Liebherr 25 L envoyée le 24.11) : mât plein et fin (jaune en bas, gris en haut), châssis noir
+    // sur stabilisateurs avec lest gris, béquille en diagonale, tête de mât penchée vers l'arrière, haubans, flèche grise puis
+    // jaune plus fine ; pas de contre-flèche. Dimensions estimées : à valider.
+    const cw = c * proj;
+    const H = nv.flecheHaut - nv.pied;
+    const bas = nv.pied + 0.7;
+    const milieuMat = nv.pied + H * 0.4;
+    formes.push(rect(s0 - cw / 2, s0 + cw / 2, nv.pied + 0.25, bas, 'chassisauto'));
+    for (const cote of [-1, 1]) formes.push(rect(s0 + cote * cw / 2 - 0.25, s0 + cote * cw / 2 + 0.25, nv.pied, nv.pied + 0.25, 'pied'));
+    formes.push(rect(X(-2.5), X(-1.0), bas, bas + 2.3, 'lest'));
+    formes.push(rect(s0 - tour.mat / 2, s0 + tour.mat / 2, bas, milieuMat, 'matbas'));
+    formes.push(rect(s0 - tour.mat / 2, s0 + tour.mat / 2, milieuMat, nv.flecheHaut, 'mathaut'));
+    formes.push({ type: 'ligne', genre: 'bequille', pts: [ptCoupe(X(-1.0), bas + 0.3), ptCoupe(s0 - tour.mat / 2, milieuMat)] });
+    const pointe = [X(-1.1), nv.haut];
+    formes.push({ type: 'poly', genre: 'tete', pts: [ptCoupe(s0 - tour.mat / 2, nv.flecheHaut), ptCoupe(s0 + tour.mat / 2, nv.flecheHaut), ptCoupe(...pointe)] });
+    const coupeG = D.flecheDebut + (bout - D.flecheDebut) * 0.35; // partie intérieure grise, puis partie extérieure jaune plus fine
+    const [g1, g2] = largeurMin(X(D.flecheDebut), X(coupeG));
+    const [o1, o2] = largeurMin(X(coupeG), X(bout));
+    formes.push(rect(g1, g2, nv.flecheBas, nv.flecheHaut, 'flecheg'));
+    formes.push(rect(o1, o2, nv.flecheBas + 0.25, nv.flecheHaut - 0.1, 'fleche'));
+    formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(...pointe), ptCoupe(X(bout * 0.72), nv.flecheHaut)] });
+    formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(...pointe), ptCoupe(X(-1.6), bas + 2.3)] });
+    formes.push(rect(X(Math.min(r, bout - 0.5)) - 0.5, X(Math.min(r, bout - 0.5)) + 0.5, nv.flecheBas - 0.4, nv.flecheBas, 'chariot'));
+  } else {
+    if (tour.pied.type !== 'FA') formes.push(rect(s0 - (c * proj) / 2, s0 + (c * proj) / 2, nv.pied, nv.pied + 0.5, 'pied'));
+    formes.push(rect(s0 - tour.mat / 2, s0 + tour.mat / 2, nv.pied, nv.flecheHaut, 'mat'));
+    formes.push({ type: 'poly', genre: 'mat', pts: [ptCoupe(s0 - tour.mat / 2, nv.flecheHaut), ptCoupe(s0 + tour.mat / 2, nv.flecheHaut), ptCoupe(s0, nv.haut)] });
+    const [c1, c2] = largeurMin(X(-arr), X(-0.4));
+    formes.push(rect(c1, c2, nv.flecheBas, nv.flecheHaut, 'contre'));
+    formes.push(rect(j1, j2, nv.flecheBas, nv.flecheHaut, 'fleche'));
+    // 0.315.1 : détails (contrepoids, plate-forme, cabine, chariot)
+    const [w1, w2] = largeurMin(X(-arr), X(-arr + Math.min(3.4, arr * 0.4)));
+    formes.push(rect(w1, w2, nv.flecheBas - 0.9, nv.flecheHaut - 0.05, 'contrepoids'));
+    formes.push(rect(X(-2.9), X(2.6), nv.flecheBas - 0.5, nv.flecheBas, 'plateforme'));
+    const cabL = D.cabine?.l ?? 2.4;
+    formes.push(rect(X(0.5), X(0.5 + cabL), nv.flecheBas - 2.2, nv.flecheBas - 0.5, 'cabine'));
+    formes.push(rect(X(Math.min(r, bout - 0.5)) - 0.5, X(Math.min(r, bout - 0.5)) + 0.5, nv.flecheBas - 0.4, nv.flecheBas, 'chariot'));
+    formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(s0, nv.haut), ptCoupe(X(bout * 0.72), nv.flecheHaut)] });
+    formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(s0, nv.haut), ptCoupe(X(-arr), nv.flecheHaut)] });
+  }
   // Crochet à la HSC, au rayon choisi
   const sc = X(r);
   formes.push({ type: 'ligne', genre: 'cable', pts: [ptCoupe(sc, nv.flecheBas), ptCoupe(sc, nv.crochet + 0.8)] });
