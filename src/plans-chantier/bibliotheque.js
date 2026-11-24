@@ -7,6 +7,8 @@ import { grueMobile } from '../topo/grue-mobile.js';
 import { panneauDeviation, CLE_DEVIATION } from '../topo/panneau-deviation.js';
 import { parkingDynamique, CLE_PARKING } from '../topo/parking-dynamique.js';
 import { pompeDynamique, CLE_POMPE } from '../topo/pompe-dynamique.js';
+import { grueFiche } from '../topo/grue-fiche.js';
+import { tousLesModeles } from '../topo/grue-modele.js';
 import { texteDuDxf } from '../topo/dxf-plan.js';
 
 let promesse = null;
@@ -33,6 +35,12 @@ export function entreesBibliotheque(bib) {
   grue('auto', 'Grue automontante');
   // 0.293.0 : grue mobile dynamique (4 tailles au choix dans le panneau, tourelle et flèche réglables).
   res.push({ cle: 'grue:mobile', nom: 'Grue mobile (camion grue)', categorie: 'Grues', largeur: null, hauteur: null, detail: '40 / 100 / 200 / 350 t, tourelle et flèche réglables', pose: { type: 'grue', modele: 'mobile', tonnes: 100, fleche: 25, tourelle: 0, stabilisateurs: true, rayon: false }, symbole: grueMobile({ tonnes: 100, fleche: 25, tourelle: 0 }) });
+  // 0.311.0 : une entrée par modèle de grue d'après fiche technique (Liebherr, Condecta, ceux de l'utilisateur) : flèche, tour, HSC, charges.
+  for (const m of tousLesModeles()) {
+    const milieu = m.fleches[Math.floor(m.fleches.length / 2)].nom;
+    const pose = { type: 'grue', modele: 'fiche', modeleGrue: m.id, fleche: milieu, tour: m.tours[0].id, hauteur: 30, cercles: 'principaux', rayon: true };
+    res.push({ cle: `grue:fiche:${m.id}`, nom: `Grue ${m.nom} (fiche technique)`, categorie: 'Grues', largeur: null, hauteur: null, detail: `${m.fleches.length} flèches, ${m.tours.length} tour(s), HSC et charges de la fiche`, pose, symbole: grueFiche(pose) });
+  }
   // 0.293.0 : panneau de déviation suisse, texte et sens au choix (dans le panneau de droite une fois posé).
   res.push({ cle: CLE_DEVIATION, nom: 'Panneau de déviation (texte, sens)', categorie: 'Signalisation', largeur: null, hauteur: null, detail: 'texte modifiable, flèche à gauche / droite / tout droit', pose: { type: 'symbole', cle: CLE_DEVIATION, texte: 'Lugano', sens: 'droite' }, symbole: panneauDeviation({ texte: 'Lugano', sens: 'droite' }) });
   // 0.297.0 : places de parking réservées, nombre de places et couleur au choix (dans le bandeau une fois posé)

@@ -398,6 +398,7 @@ export async function creerPdfChantier(donnees, avancement = () => {}) {
   const logo = await chargerImage(adresseLogo(r.logo));
   let doc = null;
   const remarques = [];
+  let derniere = null;
   for (let i = 0; i < pages.length; i++) {
     avancement(`PDF : page ${i + 1} / ${pages.length}…`);
     const prep = preparerPage(donnees, pages[i], s);
@@ -412,6 +413,7 @@ export async function creerPdfChantier(donnees, avancement = () => {}) {
       if (att?.manquantes) remarques.push('carte de situation incomplète (pas de connexion ?)');
     }
     const { page } = prep.mise;
+    derniere = prep.mise;
     const toile = document.createElement('canvas');
     toile.width = Math.round(page.largeur * s);
     toile.height = Math.round(page.hauteur * s);
@@ -440,6 +442,38 @@ export async function creerPdfChantier(donnees, avancement = () => {}) {
       doc.setTextColor(t.couleur);
       doc.text(texteWinAnsi(t.texte), t.x, t.y, { align: t.align, baseline: 'middle' });
     }
+  }
+  // 0.312.0 : page « Vue de côté » (coupe) à la fin, si demandée
+  const largeurSvg = 1400;
+  const cadre = derniere?.cadre;
+  const coupe = cadre && donnees.coupe ? donnees.coupe(largeurSvg, Math.round((largeurSvg * (cadre.h - 16)) / cadre.l)) : null;
+  if (coupe) {
+    avancement('PDF : page « Vue de côté »…');
+    const { page } = derniere;
+    const toile = document.createElement('canvas');
+    toile.width = Math.round(page.largeur * s);
+    toile.height = Math.round(page.hauteur * s);
+    const ctx = toile.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, toile.width, toile.height);
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = Math.max(1, 0.35 * s);
+    ctx.strokeRect(cadre.x * s, cadre.y * s, cadre.l * s, cadre.h * s);
+    const img = new Image();
+    await new Promise((fin) => {
+      img.onload = fin;
+      img.onerror = fin;
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(coupe.svg)}`;
+    });
+    if (img.naturalWidth) ctx.drawImage(img, cadre.x * s, (cadre.y + 14) * s, cadre.l * s, (cadre.h - 16) * s);
+    else remarques.push('vue de côté non dessinée');
+    doc.addPage([page.largeur, page.hauteur], page.largeur > page.hauteur ? 'landscape' : 'portrait');
+    doc.addImage(toile.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, page.largeur, page.hauteur, undefined, 'FAST');
+    toile.width = 0;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor('#1e293b');
+    doc.text(texteWinAnsi(`Vue de côté — ${coupe.titre} — ${donnees.plan.nom}`), cadre.x + 4, cadre.y + 8, { baseline: 'middle' });
   }
   doc.setProperties({ title: texteWinAnsi(donnees.plan.nom), creator: 'Topo' });
   return { blob: doc.output('blob'), remarques: [...new Set(remarques)] };

@@ -2,6 +2,7 @@
 // Feuille A4 / A3 / A1 paysage ou portrait, plan à l'échelle du plan de chantier (plan.echelle), cartouche avec logo,
 // légende automatique (genres et symboles utilisés), nord, barre d'échelle ; une page par phase ou toutes sur une page.
 // Unités : mm de papier (origine en haut à gauche de la feuille, y vers le bas).
+import { modeleDe } from './grue-modele.js';
 import { tailleFeuille, barreEchellePapier } from '../export/echelle.js';
 import { categorieZone, styleLigne, objetsVisibles, objetsVus, bornesObjets, ECHELLE_PAPIER, estPose, materiauTas } from './plan-chantier.js';
 
@@ -13,7 +14,7 @@ export function reglagesFeuille(plan) {
   return {
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    situation: situationDe(f.situation), planning: Boolean(f.planning), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
+    situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
   };
 }
 
@@ -112,7 +113,7 @@ export function elementsLegende(objets, nomSymbole = (c) => String(c).replace(/^
     else if (o.type === 'ligne') ajouter(`ligne:${styleLigne(o.style).cle}:${o.couleur ?? ''}`, styleLigne(o.style).nom.replace(/\s+[<>].*$/, ''), 'ligne', o, 1);
     else if (o.type === 'piste') ajouter('piste', 'Piste de chantier', 'piste', o, 2);
     else if (o.type === 'fleche') ajouter(`fleche:${o.couleur ?? ''}`, 'Sens de circulation', 'fleche', o, 2);
-    else if (o.type === 'grue') ajouter(`grue:${o.modele}:${o.modele === 'mobile' ? o.tonnes : o.fleche}`, o.modele === 'mobile' ? `Grue mobile ${o.tonnes ?? 100} t` : `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'}, flèche ${o.fleche} m`, 'grue', o, 3);
+    else if (o.type === 'grue') ajouter(`grue:${o.modele}:${o.modele === 'mobile' ? o.tonnes : o.fleche}`, o.modele === 'mobile' ? `Grue mobile ${o.tonnes ?? 100} t` : o.modele === 'fiche' ? `Grue ${modeleDe(o.modeleGrue).nom}, flèche ${o.fleche} m` : `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'}, flèche ${o.fleche} m`, 'grue', o, 3);
     else if (o.type === 'symbole') ajouter(o.etage ? 'etage' : `symbole:${o.cle}`, o.etage ? 'Base-vie à étage' : nomSymbole(o.cle), 'symbole', o, 3);
   }
   return [...vus.values()].sort((a, b) => a.rang - b.rang);

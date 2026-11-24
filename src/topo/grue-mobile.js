@@ -9,6 +9,7 @@ import { bornesPrimitives } from './blocs-dxf.js';
 import { panneauDeviation, CLE_DEVIATION } from './panneau-deviation.js';
 import { parkingDynamique, CLE_PARKING } from './parking-dynamique.js';
 import { pompeDynamique, CLE_POMPE } from './pompe-dynamique.js';
+import { grueFiche } from './grue-fiche.js';
 
 const memoire = new Map();
 export const TONNES_MOBILES = AUTOGRUES.map((a) => a.t);
@@ -75,6 +76,7 @@ function rayonAbaque(g, abaque) {
 /** Symbole d'une grue (tour, automontante ou mobile) : l'orientation de la flèche des grues à tour est indépendante du châssis. */
 export function grueDeLObjet(bib, o) {
   if (o.modele === 'mobile') return grueMobile(o);
+  if (o.modele === 'fiche') return grueFiche(o); // 0.311.0 : grue d'après la fiche d'un modèle (Liebherr, Condecta, ou le tien), tout dynamique
   let g = grueLibre(bib, o.modele ?? 'tour', o.fleche ?? 40);
   const abaque = g ? lireAbaque(o.abaqueTexte) : [];
   if (g && abaque.length) g = { ...g, rayon: rayonAbaque(g, abaque) }; // abaque tapé : remplace les cercles tous les 5 m
