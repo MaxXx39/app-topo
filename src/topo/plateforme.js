@@ -7,7 +7,8 @@
 //              même position que l'angle lié mais altitude propre : une marche) }],
 //   interieurs: [{ nom, est, nord, alt, calc }] (points intérieurs isolés),
 //   ruptures: [[nomA, nomB]] (lignes de rupture, entre deux points EXISTANTS de la plateforme),
-//   talus: { [nom du sommet de départ du côté]: { on, deb: 'H:V', rem: 'H:V' } } (talus du côté vers le sommet suivant),
+//   talus: { [nom du sommet de départ du côté]: { on, deb: 'H:V', rem: 'H:V', berme? { mode: 'aucune' | 'propre', hauteur,
+//            largeur, deb, rem } (0.302.0 : berme propre au côté ; absente = celle de la plateforme) } },
 //   terrainId (surface de référence du talus), berme: { on, hauteur (m), largeur (m), deb, rem } }]
 // projet.constructionsPlateformes = [[e1, n1, e2, n2]] : lignes de construction 2D (accroche seulement).
 //
@@ -321,7 +322,8 @@ function entreeProfil(p, u, zBord, nature, p1, berme, altitudeTerrain, distanceM
 /**
  * Talus d'une plateforme jusqu'à la surface de référence, côté par côté.
  * - sommets : sommetsResolus (altitudes connues) ;
- * - reglageCote(i) → { pentes: { deblai, remblai } ({ horizontal, vertical }) } ou null (pas de talus sur ce côté) ;
+ * - reglageCote(i) → { pentes: { deblai, remblai } ({ horizontal, vertical }), berme? (propre au côté : objet ou null = aucune ;
+ *   absent = celle de la plateforme) } ou null (pas de talus sur ce côté) ;
  * - berme : { hauteur, largeur, p3: { deblai, remblai } } ou null ;
  * - altitudeTerrain(est, nord) → m ou null.
  * Renvoie { colonnes: [{ points: [{ est, nord, altitude }…] (du bord à l'entrée en terre, avec les 2 bords de la berme
@@ -343,7 +345,10 @@ export function talusPlateforme(sommets, reglageCote, berme, altitudeTerrain, { 
   const reglages = sommets.map((_, i) => reglageCote(i));
   let chaine = 0;
 
-  const colonne = (p, zBord, dir, pentes, sommet) => {
+  const colonne = (p, zBord, dir, reglage, sommet) => {
+    const pentes = reglage.pentes;
+    // 0.302.0 : berme propre au côté (reglage.berme, null = aucune), sinon celle de la plateforme.
+    const bermeIci = reglage.berme !== undefined ? reglage.berme : berme;
     const t = altitudeTerrain(p.est, p.nord);
     if (t == null) {
       erreurs.push(`surface de référence absente sous E ${p.est.toFixed(1)} N ${p.nord.toFixed(1)}`);
@@ -351,7 +356,7 @@ export function talusPlateforme(sommets, reglageCote, berme, altitudeTerrain, { 
     }
     const nature = zBord - t >= 0 ? 'remblai' : 'deblai';
     const p1 = pentes[nature];
-    const b = berme ? { hauteur: berme.hauteur, largeur: berme.largeur, p3: berme.p3[nature] } : null;
+    const b = bermeIci ? { hauteur: bermeIci.hauteur, largeur: bermeIci.largeur, p3: bermeIci.p3[nature] } : null;
     const lu = Math.hypot(dir.est, dir.nord) || 1;
     const u = { est: dir.est / lu, nord: dir.nord / lu };
     // Le long d'une arête (angle), la distance en plan est plus longue : on garde le profil vu sur la normale.
@@ -397,7 +402,7 @@ export function talusPlateforme(sommets, reglageCote, berme, altitudeTerrain, { 
         dir = produit > 1e-6 ? { est: (n1.est + n2.est) / produit, nord: (n1.nord + n2.nord) / produit } : n2;
       } else dir = ici ? normales[k] : normales[(k + n - 1) % n];
       if (!avant) chaine += 1;
-      const c = colonne(a, a.alt, dir, (ici ?? avant).pentes, k);
+      const c = colonne(a, a.alt, dir, ici ?? avant, k);
       if (c) colonnes.push({ ...c, chaine });
     }
     if (!ici) continue;
@@ -406,12 +411,12 @@ export function talusPlateforme(sommets, reglageCote, berme, altitudeTerrain, { 
     for (let j = 1; j < nombre; j += 1) {
       const t = j / nombre;
       const p = { est: a.est + (b.est - a.est) * t, nord: a.nord + (b.nord - a.nord) * t };
-      const c = colonne(p, a.alt + (b.alt - a.alt) * t, normales[k], ici.pentes, null);
+      const c = colonne(p, a.alt + (b.alt - a.alt) * t, normales[k], ici, null);
       if (c) colonnes.push({ ...c, chaine });
     }
     // Dernier côté avec talus, mais pas le suivant : la colonne de l'angle d'arrivée ferme la suite.
     if (!reglages[(k + 1) % n] && k + 1 === n) {
-      const c = colonne(b, b.alt, normales[k], ici.pentes, (k + 1) % n);
+      const c = colonne(b, b.alt, normales[k], ici, (k + 1) % n);
       if (c) colonnes.push({ ...c, chaine });
     }
   }
@@ -466,7 +471,11 @@ export function reglageDuCote(plateformes, pf, i) {
   if (!t.on) return null;
   const deblai = lireHV(t.deb);
   const remblai = lireHV(t.rem);
-  return deblai && remblai ? { pentes: { deblai, remblai } } : null;
+  if (!deblai || !remblai) return null;
+  // 0.302.0 : berme du côté : « comme la plateforme » (rien), « aucune », ou « propre » (ses réglages).
+  if (t.berme?.mode === 'aucune') return { pentes: { deblai, remblai }, berme: null };
+  if (t.berme?.mode === 'propre') return { pentes: { deblai, remblai }, berme: bermeDe({ berme: { ...t.berme, on: true } }) };
+  return { pentes: { deblai, remblai } };
 }
 
 /** Berme de la plateforme pour talusPlateforme, ou null. */
@@ -492,4 +501,96 @@ export function pointsEtFaces(triangles, prefixe) {
     return index.get(k);
   }));
   return { points, faces };
+}
+
+// --- Groupes et étapes (0.302.0, décisions du 24.11) ---
+// projet.groupesPlateformes = [{ id, nom, couleur, terrainId }] ; une plateforme est dans UN seul groupe (pf.groupeId).
+// Un groupe = une seule surface du projet (ses plateformes + leurs talus ; pas de talus entre elles, côtés partagés) ;
+// sa surface de référence (terrainId) remplace celle de ses plateformes.
+// Étape = une plateforme seule ou un groupe, « posée sur » une surface : le terrain, ou la surface d'une autre étape.
+
+/**
+ * Unités de calcul : [{ id, type: 'plateforme' | 'groupe', nom, couleur, membres: [pf…], terrainId, source }]
+ * (source = la plateforme ou le groupe, où l'on change terrainId). Un groupe vide n'est pas une unité.
+ */
+export function unitesPlateformes(plateformes, groupes = []) {
+  const res = [];
+  for (const g of groupes) {
+    const membres = plateformes.filter((p) => p.groupeId === g.id);
+    if (membres.length) res.push({ id: g.id, type: 'groupe', nom: g.nom, couleur: g.couleur, membres, terrainId: g.terrainId ?? null, source: g });
+  }
+  for (const p of plateformes) {
+    if (p.groupeId && groupes.some((g) => g.id === p.groupeId)) continue;
+    res.push({ id: p.id, type: 'plateforme', nom: p.nom, couleur: p.couleur, membres: [p], terrainId: p.terrainId ?? null, source: p });
+  }
+  return res;
+}
+
+/**
+ * Ordre de calcul des étapes : une unité posée sur la surface d'une autre unité vient après elle.
+ * surfaceDeUnite(id) → id de la surface du projet de cette unité (ou null). Renvoie { ordre: [unités], cycle: [noms] }
+ * (cycle : unités qui se posent les unes sur les autres en boucle ; elles sont mises à la fin, sans référence).
+ */
+export function ordreDesEtapes(unites, surfaceDeUnite) {
+  const parSurface = new Map();
+  for (const u of unites) {
+    const s = surfaceDeUnite(u.id);
+    if (s) parSurface.set(s, u);
+  }
+  const ordre = [];
+  const etat = new Map(); // 1 = en cours, 2 = fait
+  const cycle = [];
+  const visiter = (u, pile) => {
+    if (etat.get(u.id) === 2) return;
+    if (etat.get(u.id) === 1) {
+      cycle.push(...pile.slice(pile.indexOf(u)).map((x) => x.nom));
+      return;
+    }
+    etat.set(u.id, 1);
+    const dessous = u.terrainId ? parSurface.get(u.terrainId) : null;
+    if (dessous && dessous !== u) visiter(dessous, [...pile, u]);
+    etat.set(u.id, 2);
+    ordre.push(u);
+  };
+  for (const u of unites) visiter(u, [u]);
+  return { ordre, cycle: [...new Set(cycle)] };
+}
+
+/** Profil d'une surface (fonction altitude(est, nord) → m ou null) le long du segment a → b : [{ d, z }] tous les « pas » m. */
+export function profilLeLong(altitude, a, b, pas = 0.5) {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const n = Math.max(2, Math.min(4000, Math.ceil(L / pas)));
+  const res = [];
+  for (let i = 0; i <= n; i += 1) {
+    const t = i / n;
+    res.push({ d: t * L, z: altitude(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) });
+  }
+  return res;
+}
+
+/**
+ * Volume « du terrain à la fin, d'un coup » (0.302.0) : sur une grille de « pas » m couvrant les emprises, l'altitude
+ * finale est celle de la dernière étape qui couvre le point (ordre de calcul), comparée au terrain de départ.
+ * etapes = [altitude(e, n) → m ou null] dans l'ordre ; terrain = altitude du terrain ; bornes = { estMin… }.
+ * Renvoie { deblai, remblai } (m³). Approché à la taille de la grille (0,5 m : écart de l'ordre du pour mille).
+ */
+export function volumeTerrainAFin(etapes, terrain, bornes, pas = 0.5) {
+  let deblai = 0;
+  let remblai = 0;
+  const aire = pas * pas;
+  for (let e = bornes.estMin + pas / 2; e < bornes.estMax; e += pas) {
+    for (let n = bornes.nordMin + pas / 2; n < bornes.nordMax; n += pas) {
+      let z = null;
+      for (const f of etapes) {
+        const v = f(e, n);
+        if (v != null) z = v;
+      }
+      if (z == null) continue;
+      const t = terrain(e, n);
+      if (t == null) continue;
+      if (z > t) remblai += (z - t) * aire;
+      else deblai += (t - z) * aire;
+    }
+  }
+  return { deblai, remblai };
 }

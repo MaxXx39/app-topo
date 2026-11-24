@@ -6,7 +6,7 @@
 // choisie, plan, tableau unique (points puis côtés), panneau à droite (liste, talus, Δ Z, volumes).
 import { echapper } from '../outils/echapper.js';
 import { bulle } from '../aide/bulles.js';
-import { demanderChoix } from '../outils/choix.js';
+import { demanderChoix, demanderTexte } from '../outils/choix.js';
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
 import { accrocher, sourcesDesPlans } from '../topo/accroche.js';
@@ -16,6 +16,7 @@ import {
   nouvellePlateforme, prochainNom, sommetsResolus, changerAltitude, penteCote, altitudeParPente, interpolerContour,
   ajouterPointMilieu, appliquerDeltaZ, cotePartage, trianglesPlateforme, talusPlateforme, trianglesTalus, reglageDuCote,
   bermeDe, pointsEtFaces, TALUS_DEFAUT, BERME_DEFAUT, lireHV,
+  unitesPlateformes, ordreDesEtapes, profilLeLong, volumeTerrainAFin, COULEURS_PLATEFORMES,
 } from '../topo/plateforme.js';
 
 const COULEUR_APPLI = '#6d28d9';
@@ -49,6 +50,10 @@ export function ouvrirPlateformes({
     pr.constructionsPlateformes ??= [];
     return pr.plateformes;
   };
+  // 0.302.0 : groupes de plateformes (une seule surface) et coupes (2 au plus) de la page.
+  const groupes = () => (projet().groupesPlateformes ??= []);
+  const coupes = () => (projet().coupesPlateformes ??= []);
+  const groupeDe = (pf) => (pf?.groupeId ? groupes().find((g) => g.id === pf.groupeId) ?? null : null);
   const choisie = () => liste().find((p) => p.id === etat.choisiId) ?? null;
 
   const etat = {
@@ -60,6 +65,9 @@ export function ouvrirPlateformes({
     altSuivante: '', // altitude donnée au prochain point cliqué (vide = celle de l'accroche, sinon aucune)
     selPoint: null, selCote: null, // point / côté surlignés dans le tableau
     curseur: null,
+    // 0.302.0 : étape choisie (id d'une plateforme seule ou d'un groupe), « l'étape seule » sur le plan, onglet du bas
+    // ('tableau', 'c1', 'c2'), côté dont la berme est ouverte dans le tableau.
+    etape: null, etapeSeule: true, onglet: 'tableau', bermeCote: null,
   };
   let pile = [];
   let vue = null;
@@ -71,7 +79,7 @@ export function ouvrirPlateformes({
 
   // --- Annuler, enregistrer ---
 
-  const instantane = () => JSON.stringify({ p: projet().plateformes ?? [], c: projet().constructionsPlateformes ?? [] });
+  const instantane = () => JSON.stringify({ p: projet().plateformes ?? [], c: projet().constructionsPlateformes ?? [], g: projet().groupesPlateformes ?? [], k: projet().coupesPlateformes ?? [] });
   function avantChangement() {
     if (lectureSeule()) {
       message('Projet ouvert en lecture seule ici : rien n\'est modifié.', 4000);
@@ -83,40 +91,102 @@ export function ouvrirPlateformes({
   }
   function annuler() {
     if (!pile.length) return message('Rien à annuler.', 2000);
-    const { p, c } = JSON.parse(pile.pop());
+    const { p, c, g, k } = JSON.parse(pile.pop());
     projet().plateformes = p;
     projet().constructionsPlateformes = c;
+    projet().groupesPlateformes = g ?? [];
+    projet().coupesPlateformes = k ?? [];
     if (!choisie()) etat.choisiId = p[0]?.id ?? null;
     enregistrer();
   }
 
-  // Calculs gardés tant que les plateformes et la surface de référence ne changent pas.
-  let memo = { cle: '', resultats: new Map() };
-  function resultats() {
-    const cle = instantane() + JSON.stringify(liste().map((p) => [p.terrainId, trianglesDeSurface(p.terrainId)?.length ?? 0]));
-    if (memo.cle === cle) return memo.resultats;
-    const r = new Map();
-    for (const pf of liste()) r.set(pf.id, calculer(pf));
-    memo = { cle, resultats: r };
-    return r;
-  }
-
-  /** Triangles, talus et volumes d'une plateforme : { sommets, triangles, erreur, talus, trianglesTalus, volume, erreursTalus }. */
-  function calculer(pf) {
+  // Calculs gardés tant que les plateformes et les surfaces de référence ne changent pas.
+  // 0.302.0 : calcul par ÉTAPE (plateforme seule ou groupe), dans l'ordre où elles se posent les unes sur les autres ;
+  // une étape posée sur une autre prend ses triangles (talus compris) comme surface de référence.
+  let memo = { cle: '', resultats: new Map(), etapes: null };
+  const surfaceDeUnite = (id) => projet().surfaces.find((x) => x.type === 'plateforme' && (x.groupeId === id || (!x.groupeId && x.plateformeId === id)))?.id ?? null;
+  function calculerTout() {
+    const cle = instantane() + JSON.stringify(projet().surfaces.filter((x) => x.type !== 'plateforme').map((x) => [x.id, trianglesDeSurface(x.id)?.length ?? 0]));
+    if (memo.cle === cle) return memo;
     const tous = liste();
-    const sommets = sommetsResolus(pf, tous);
-    const t = trianglesPlateforme(pf, tous, trianglerAvecContraintes);
-    const res = { sommets, triangles: t.triangles ?? [], erreur: t.erreur ?? null, talus: null, trianglesTalus: [], volume: null, erreursTalus: [] };
-    const terrain = pf.terrainId ? trianglesDeSurface(pf.terrainId) : [];
-    if (!t.erreur && terrain.length) {
-      const altitudeTerrain = chercheurAltitude(terrain);
-      res.talus = talusPlateforme(sommets, (i) => reglageDuCote(tous, pf, i), bermeDe(pf), altitudeTerrain, { pas: 1 });
-      res.erreursTalus = res.talus.erreurs;
-      res.trianglesTalus = trianglesTalus(res.talus);
-      const v = volumeEntreSurfaces([...res.triangles, ...res.trianglesTalus], terrain);
-      res.volume = { remblai: v.remblai, deblai: v.deblai, surface: v.surfacePlan, horsTerrain: v.surfaceNonCouverte };
+    const r = new Map();
+    for (const pf of tous) {
+      const t = trianglesPlateforme(pf, tous, trianglerAvecContraintes);
+      r.set(pf.id, { sommets: sommetsResolus(pf, tous), triangles: t.triangles ?? [], erreur: t.erreur ?? null, talus: null, trianglesTalus: [], erreursTalus: [], volume: null, unite: null });
     }
-    return res;
+    const unites = unitesPlateformes(tous, groupes());
+    const { ordre, cycle } = ordreDesEtapes(unites, surfaceDeUnite);
+    const parUnite = new Map(); // id → { triangles (avec talus), volume, erreur, refId, altitude }
+    const trianglesDeSurf = new Map(); // surface d'une étape déjà calculée → ses triangles
+    for (const u of ordre) {
+      const refTri = !u.terrainId || cycle.includes(u.nom) ? [] : trianglesDeSurf.get(u.terrainId) ?? trianglesDeSurface(u.terrainId) ?? [];
+      const altRef = refTri.length ? chercheurAltitude(refTri) : null;
+      const tri = [];
+      let erreur = null;
+      for (const pf of u.membres) {
+        const res = r.get(pf.id);
+        res.unite = u.id;
+        if (res.erreur) {
+          erreur ??= `${pf.nom} : ${res.erreur}`;
+          continue;
+        }
+        if (altRef) {
+          res.talus = talusPlateforme(res.sommets, (i) => reglageDuCote(tous, pf, i), bermeDe(pf), altRef, { pas: 1 });
+          res.erreursTalus = res.talus.erreurs;
+          res.trianglesTalus = trianglesTalus(res.talus);
+        }
+        tri.push(...res.triangles, ...res.trianglesTalus);
+      }
+      let volume = null;
+      if (refTri.length && tri.length && !erreur) {
+        const v = volumeEntreSurfaces(tri, refTri);
+        volume = { remblai: v.remblai, deblai: v.deblai, surface: v.surfacePlan, horsTerrain: v.surfaceNonCouverte };
+      }
+      for (const pf of u.membres) r.get(pf.id).volume = volume;
+      const id = surfaceDeUnite(u.id);
+      if (id && tri.length) trianglesDeSurf.set(id, tri);
+      parUnite.set(u.id, { unite: u, triangles: tri, volume, erreur, altitude: tri.length ? chercheurAltitude(tri) : null });
+    }
+    memo = { cle, resultats: r, etapes: { ordre, cycle, parUnite, totaux: null } };
+    return memo;
+  }
+  const resultats = () => calculerTout().resultats;
+  const etapesCalculees = () => calculerTout().etapes;
+
+  /** Totaux : somme des étapes, et « terrain → fin » d'un coup (seulement si toutes les étapes partent d'un même terrain). */
+  function totauxEtapes() {
+    const e = etapesCalculees();
+    if (e.totaux) return e.totaux;
+    const somme = { deblai: 0, remblai: 0 };
+    for (const u of e.ordre) {
+      const v = e.parUnite.get(u.id)?.volume;
+      if (v) {
+        somme.deblai += v.deblai;
+        somme.remblai += v.remblai;
+      }
+    }
+    // Terrains de départ : références qui ne sont pas des étapes.
+    const surfacesEtapes = new Set(e.ordre.map((u) => surfaceDeUnite(u.id)).filter(Boolean));
+    const racines = [...new Set(e.ordre.map((u) => u.terrainId).filter((id) => id && !surfacesEtapes.has(id)))];
+    let fin = null;
+    let raison = '';
+    if (racines.length === 1 && e.ordre.some((u) => e.parUnite.get(u.id)?.altitude)) {
+      const terrain = trianglesDeSurface(racines[0]);
+      const toutTri = e.ordre.flatMap((u) => e.parUnite.get(u.id)?.triangles ?? []);
+      const b = { estMin: Infinity, estMax: -Infinity, nordMin: Infinity, nordMax: -Infinity };
+      for (const t of toutTri) for (const q of t) {
+        b.estMin = Math.min(b.estMin, q.est); b.estMax = Math.max(b.estMax, q.est);
+        b.nordMin = Math.min(b.nordMin, q.nord); b.nordMax = Math.max(b.nordMax, q.nord);
+      }
+      const aire = (b.estMax - b.estMin) * (b.nordMax - b.nordMin);
+      const pas = Math.max(0.5, Math.sqrt(aire / 160000)); // 160 000 cases au plus
+      if (terrain.length && aire > 0) {
+        fin = volumeTerrainAFin(e.ordre.map((u) => e.parUnite.get(u.id)?.altitude).filter(Boolean), chercheurAltitude(terrain), b, pas);
+        fin.pas = pas;
+      }
+    } else if (racines.length > 1) raison = 'plusieurs terrains de départ';
+    e.totaux = { somme, fin, raison };
+    return e.totaux;
   }
 
   /** Altitude d'une surface (triangles) en un point, ou null : recherche par une grille de 10 m. */
@@ -147,28 +217,42 @@ export function ouvrirPlateformes({
     };
   }
 
-  /** Surfaces du projet « Surf-<nom> » (type 'plateforme') refaites d'après les plateformes ; celles des plateformes effacées partent. */
+  /**
+   * Surfaces du projet (type 'plateforme') refaites d'après les étapes : une par plateforme seule (« Surf-<nom> »,
+   * plateformeId) et une par groupe (groupeId) ; celles des plateformes effacées ou entrées dans un groupe partent.
+   */
   function synchroniserSurfaces() {
     const pr = projet();
-    const ids = new Set(liste().map((p) => p.id));
-    const parties = new Set(pr.surfaces.filter((s) => s.type === 'plateforme' && !ids.has(s.plateformeId)).map((s) => s.id));
-    pr.surfaces = pr.surfaces.filter((s) => !parties.has(s.id));
-    if (parties.size) pr.calculs = (pr.calculs ?? []).filter((c) => !parties.has(c.surface1Id) && !parties.has(c.surface2Id));
-    const r = resultats();
-    for (const pf of liste()) {
-      const res = r.get(pf.id);
-      let s = pr.surfaces.find((x) => x.type === 'plateforme' && x.plateformeId === pf.id);
-      if (res.erreur || !res.triangles.length) {
-        if (s) s.erreurPlateforme = res.erreur ?? 'vide';
-        continue;
+    // Groupes vides retirés.
+    pr.groupesPlateformes = groupes().filter((g) => liste().some((p) => p.groupeId === g.id));
+    for (const p of liste()) if (p.groupeId && !pr.groupesPlateformes.some((g) => g.id === p.groupeId)) delete p.groupeId;
+    const unites = unitesPlateformes(liste(), pr.groupesPlateformes);
+    const garde = (x) => (x.groupeId ? unites.some((u) => u.type === 'groupe' && u.id === x.groupeId) : unites.some((u) => u.type === 'plateforme' && u.id === x.plateformeId));
+    const parties = new Set(pr.surfaces.filter((x) => x.type === 'plateforme' && !garde(x)).map((x) => x.id));
+    pr.surfaces = pr.surfaces.filter((x) => !parties.has(x.id));
+    if (parties.size) {
+      pr.calculs = (pr.calculs ?? []).filter((c) => !parties.has(c.surface1Id) && !parties.has(c.surface2Id));
+      for (const u of [...liste(), ...pr.groupesPlateformes]) if (parties.has(u.terrainId)) u.terrainId = null;
+    }
+    // Deux passes : une étape posée sur une autre a besoin que la surface de celle-ci existe (son id).
+    for (let passe = 0; passe < 2; passe += 1) {
+      memo.cle = '';
+      const e = etapesCalculees();
+      for (const u of unites) {
+        const res = e.parUnite.get(u.id);
+        let x = pr.surfaces.find((y) => y.type === 'plateforme' && (u.type === 'groupe' ? y.groupeId === u.id : !y.groupeId && y.plateformeId === u.id));
+        if (!res || res.erreur || !res.triangles.length) {
+          if (x) x.erreurPlateforme = res?.erreur ?? 'vide';
+          continue;
+        }
+        const { points: pts, faces } = pointsEtFaces(res.triangles, `${u.type === 'groupe' ? 'G' : u.membres[0].lettre}-`);
+        if (!x) {
+          x = { id: nouvelIdentifiant(), type: 'plateforme', ...(u.type === 'groupe' ? { groupeId: u.id } : { plateformeId: u.id }) };
+          pr.surfaces.push(x);
+        }
+        Object.assign(x, { nom: avecPrefixe(u.nom, PREFIXE_SURFACE), nomFichier: u.nom, points: pts, faces });
+        delete x.erreurPlateforme;
       }
-      const { points: pts, faces } = pointsEtFaces([...res.triangles, ...res.trianglesTalus], `${pf.lettre}-`);
-      if (!s) {
-        s = { id: nouvelIdentifiant(), type: 'plateforme', plateformeId: pf.id };
-        pr.surfaces.push(s);
-      }
-      Object.assign(s, { nom: avecPrefixe(pf.nom, PREFIXE_SURFACE), nomFichier: pf.nom, points: pts, faces });
-      delete s.erreurPlateforme;
     }
   }
 
@@ -227,8 +311,11 @@ export function ouvrirPlateformes({
         <div class="travail-plateformes">
           <div class="gauche-plateformes">
             <div class="vue-calage vue-plateformes"><div class="toile-plateformes" data-toile></div><div class="pied-vue etat-chantier" data-zone="etat"></div></div>
-            <section class="carte-calage tableau-plateforme"><h3 data-zone="titre-tableau">Tableau</h3><div class="cadre-tableau-plateforme" data-zone="tableau"></div>
-              <div class="barre-calage"><button type="button" class="bouton-secondaire petit" data-action="interpoler">Interpoler les vides</button><button type="button" class="bouton-secondaire petit" data-action="effacer-calculees">Effacer les calculées</button></div></section>
+            <section class="carte-calage tableau-plateforme">
+              <div class="onglets-plateforme" role="tablist"><button type="button" data-onglet="tableau" role="tab"><span data-zone="titre-tableau">Tableau</span></button><button type="button" data-onglet="c1" role="tab">Coupe 1</button><button type="button" data-onglet="c2" role="tab">Coupe 2</button></div>
+              <div data-zone="partie-tableau"><div class="cadre-tableau-plateforme" data-zone="tableau"></div>
+              <div class="barre-calage"><button type="button" class="bouton-secondaire petit" data-action="interpoler">Interpoler les vides</button><button type="button" class="bouton-secondaire petit" data-action="effacer-calculees">Effacer les calculées</button></div></div>
+              <div data-zone="partie-coupe" class="partie-coupe" hidden></div></section>
           </div>
           <aside class="carte-calage panneau-plateformes" data-zone="panneau"></aside>
         </div>
@@ -246,6 +333,7 @@ export function ouvrirPlateformes({
     majBandeau();
     majTableau();
     majPanneau();
+    majOnglets();
     majConsigne();
     majEtat();
     redessiner();
@@ -260,6 +348,7 @@ export function ouvrirPlateformes({
       rupture: s?.debut ? `Ligne de rupture depuis ${s.debut} : cliquez le 2e point.` : 'Ligne de rupture : cliquez un point existant de la plateforme choisie, puis un autre.',
       interieur: 'Cliquez dans la plateforme choisie : point intérieur (altitude : « Alt. du clic », sinon celle de la surface).',
       construction: s?.debut ? 'Cliquez le 2e point de la ligne de construction.' : 'Ligne de construction : 2 clics (elle sert seulement à l\'accroche).',
+      coupe: s?.a ? 'Cliquez la fin de la coupe (accroches actives) ; Échap abandonne.' : 'Coupe : cliquez son début (accroches actives). Ses bouts se glissent ensuite avec « Choisir ».',
     }[etat.outil];
   }
 
@@ -275,6 +364,8 @@ export function ouvrirPlateformes({
     z.innerHTML = `<b style="color:${echapper(pf.couleur)}">${echapper(pf.nom)}</b>
       <label>Nom <input type="text" data-pf="nom" value="${echapper(pf.nom)}" maxlength="40"></label>
       <label>Couleur <input type="color" data-pf="couleur" value="${echapper(pf.couleur)}"></label>
+      <label>Groupe <select data-pf="groupeId"><option value="">— aucun —</option>${groupes().map((g) => `<option value="${echapper(g.id)}" ${g.id === pf.groupeId ? 'selected' : ''}>${echapper(g.nom)}</option>`).join('')}<option value="__nouveau">＋ Nouveau groupe…</option></select></label>
+      ${groupeDe(pf) ? `<label>Nom du groupe <input type="text" data-groupe-nom value="${echapper(groupeDe(pf).nom)}" maxlength="40"></label>` : ''}
       <span class="aide-calage">${pf.sommets.length} angles · ${pf.interieurs.length} pt intérieur · ${pf.ruptures.length} rupture · ${n} triangles${r?.erreur ? ` · <b class="alerte">⚠ ${echapper(r.erreur)}</b>` : ''}</span>
       ${pf.ruptures.length ? `<button type="button" class="bouton-secondaire petit" data-action="retirer-rupture">✕ Dernière rupture</button>` : ''}`;
   }
@@ -299,7 +390,7 @@ export function ouvrirPlateformes({
         <td>${echapper(p.nom)}</td>
         <td><input type="text" inputmode="text" class="${p.calc ? 'calc' : ''}" value="${f3(p.alt)}" data-alt="${echapper(p.nom)}" aria-label="Altitude ${echapper(p.nom)}"></td>
         <td class="centre">${src.lien ? `<button type="button" class="bouton-lien ${src.detache ? 'detache' : ''}" data-lien="${i}" title="${src.detache ? 'Détaché : altitude propre (marche). Toucher = relier' : 'Lié : même altitude que l\'autre plateforme. Toucher = détacher'}">${src.detache ? '✂' : '🔗'}</button>` : partage ? '<span title="Angle partagé par une plateforme accrochée">🔗</span>' : ''}</td>
-        <td class="sep" colspan="4"></td></tr>`);
+        <td class="sep" colspan="5"></td></tr>`);
       const j = (i + 1) % s.length;
       if (s.length < 2 || (s.length === 2 && i === 1)) return;
       const pente = penteCote(s, i);
@@ -311,48 +402,191 @@ export function ouvrirPlateformes({
         ${coteP ? '<td colspan="3" class="centre"><small>côté partagé : pas de talus</small></td>'
     : `<td class="centre"><input type="checkbox" data-talus-on="${echapper(src.nom)}" ${t.on ? 'checked' : ''} aria-label="Talus de ${echapper(p.nom)} à ${echapper(s[j].nom)}"></td>
         <td><input type="text" class="hv" value="${echapper(t.deb)}" data-talus-deb="${echapper(src.nom)}" ${t.on ? '' : 'disabled'} aria-label="Talus en déblai (H:V)"></td>
-        <td><input type="text" class="hv" value="${echapper(t.rem)}" data-talus-rem="${echapper(src.nom)}" ${t.on ? '' : 'disabled'} aria-label="Talus en remblai (H:V)"></td>`}</tr>`);
+        <td><input type="text" class="hv" value="${echapper(t.rem)}" data-talus-rem="${echapper(src.nom)}" ${t.on ? '' : 'disabled'} aria-label="Talus en remblai (H:V)"></td>`}
+        <td class="centre">${coteP ? '' : `<button type="button" class="bouton-berme ${t.berme ? 'propre' : ''}" data-berme-cote="${i}" title="Berme de ce côté${t.berme ? (t.berme.mode === 'aucune' ? ' : aucune' : ' : propre') : ' : comme la plateforme'}" aria-label="Berme du côté ${echapper(p.nom)}">⋯</button>`}</td></tr>`);
+      // 0.302.0 : berme de ce côté (discrète : ouverte par « ⋯ »)
+      if (etat.bermeCote === i && !coteP) {
+        const bc = t.berme ?? null;
+        const mode = bc?.mode ?? 'comme';
+        const v = { ...BERME_DEFAUT, ...(pf.berme ?? {}), ...(bc ?? {}) };
+        lignes.push(`<tr class="ligne-berme"><td colspan="8"><div class="berme-cote">
+          <label>Berme de ce côté <select data-berme-cote-mode="${echapper(src.nom)}"><option value="comme" ${mode === 'comme' ? 'selected' : ''}>comme la plateforme</option><option value="aucune" ${mode === 'aucune' ? 'selected' : ''}>aucune</option><option value="propre" ${mode === 'propre' ? 'selected' : ''}>propre à ce côté</option></select></label>
+          ${mode === 'propre' ? `<label>① hauteur <input type="text" class="hv" data-berme-cote-champ="hauteur" data-cote-nom="${echapper(src.nom)}" value="${f2(v.hauteur)}"> m</label>
+          <label>② largeur <input type="text" class="hv" data-berme-cote-champ="largeur" data-cote-nom="${echapper(src.nom)}" value="${f2(v.largeur)}"> m</label>
+          <label>③ D <input type="text" class="hv" data-berme-cote-champ="deb" data-cote-nom="${echapper(src.nom)}" value="${echapper(v.deb)}"></label>
+          <label>R <input type="text" class="hv" data-berme-cote-champ="rem" data-cote-nom="${echapper(src.nom)}" value="${echapper(v.rem)}"></label>` : ''}
+        </div></td></tr>`);
+      }
     });
     for (const p of pf.interieurs) {
       lignes.push(`<tr class="ligne-point interieur ${etat.selPoint === p.nom ? 'choisi' : ''}"><td>${echapper(p.nom)} <small>intérieur</small></td>
         <td><input type="text" inputmode="text" class="${p.calc ? 'calc' : ''}" value="${f3(p.alt)}" data-alt="${echapper(p.nom)}" aria-label="Altitude ${echapper(p.nom)}"></td>
-        <td class="centre"><button type="button" class="bouton-lien" data-retirer-interieur="${echapper(p.nom)}" title="Retirer ce point intérieur">✕</button></td><td class="sep" colspan="4"></td></tr>`);
+        <td class="centre"><button type="button" class="bouton-lien" data-retirer-interieur="${echapper(p.nom)}" title="Retirer ce point intérieur">✕</button></td><td class="sep" colspan="5"></td></tr>`);
     }
     z.innerHTML = `<table class="table-plateforme"><thead>
-      <tr><th colspan="3">Point (1 point)</th><th colspan="4" class="groupe-cote sep">Côté (entre 2 points)</th></tr>
-      <tr><th>Point / côté</th><th>Altitude</th><th class="centre">Lien</th><th class="sep">Pente %</th><th class="centre">Talus</th><th>Déblai H:V</th><th>Remblai H:V</th></tr>
-      </thead><tbody>${lignes.join('') || '<tr><td colspan="7" class="aide-calage">Aucun point.</td></tr>'}</tbody></table>`;
+      <tr><th colspan="3">Point (1 point)</th><th colspan="5" class="groupe-cote sep">Côté (entre 2 points)</th></tr>
+      <tr><th>Point / côté</th><th>Altitude</th><th class="centre">Lien</th><th class="sep">Pente %</th><th class="centre">Talus</th><th>Déblai H:V</th><th>Remblai H:V</th><th class="centre" title="Berme de ce côté">Berme</th></tr>
+      </thead><tbody>${lignes.join('') || '<tr><td colspan="8" class="aide-calage">Aucun point.</td></tr>'}</tbody></table>`;
   }
 
   // --- Panneau : liste, talus, Δ Z, volumes ---
 
+  /** Étape (unité) d'une plateforme : son groupe, ou elle-même. */
+  const uniteDe = (pf) => (pf ? (groupeDe(pf) ? { id: pf.groupeId, source: groupeDe(pf), nom: groupeDe(pf).nom, type: 'groupe' } : { id: pf.id, source: pf, nom: pf.nom, type: 'plateforme' }) : null);
+
+  /** Liste « posée sur » : surfaces du projet (terrains…) puis les autres étapes (pas elle-même). */
+  function optionsReference(idUnite, choisi) {
+    const autres = etapesCalculees().ordre.filter((u) => u.id !== idUnite).map((u) => ({ id: surfaceDeUnite(u.id), nom: `Étape : ${u.nom}` })).filter((x) => x.id);
+    return `<option value="">— rien (pas de talus) —</option>${surfaces().map((x) => `<option value="${echapper(x.id)}" ${x.id === choisi ? 'selected' : ''}>${echapper(x.nom)}</option>`).join('')}${autres.length ? `<optgroup label="Autres étapes">${autres.map((x) => `<option value="${echapper(x.id)}" ${x.id === choisi ? 'selected' : ''}>${echapper(x.nom)}</option>`).join('')}</optgroup>` : ''}`;
+  }
+
+  const m3 = (v) => `${Math.round(v).toLocaleString('fr-CH').replace(/\u202f|\s/g, ' ')} m³`;
+
   function majPanneau() {
     const z = page.querySelector('[data-zone="panneau"]');
     const pf = choisie();
+    const u = uniteDe(pf);
     const r = pf ? resultats().get(pf.id) : null;
     const b = { ...BERME_DEFAUT, ...(pf?.berme ?? {}) };
-    const refs = surfaces().filter((s) => !liste().some((p) => projet().surfaces.find((x) => x.id === s.id)?.plateformeId === p.id));
+    const e = etapesCalculees();
+    const tot = totauxEtapes();
+    const etapeChoisie = etat.etape ?? u?.id ?? null;
+    const ligneEtape = (x, k) => {
+      const res = e.parUnite.get(x.id);
+      const v = res?.volume;
+      const dessous = x.terrainId ? (e.ordre.find((y) => surfaceDeUnite(y.id) === x.terrainId)?.nom ?? surfaces().find((y) => y.id === x.terrainId)?.nom ?? '?') : null;
+      return `<li class="etape-pf ${x.id === etapeChoisie ? 'choisie' : ''}" data-etape="${echapper(x.id)}"><span class="rond-etape" style="background:${echapper(x.couleur ?? COULEUR_APPLI)}">${k + 1}</span>
+        <div><div class="titre-etape">${echapper(x.nom)} <span class="puce-type">${x.type === 'groupe' ? `groupe · ${x.membres.length}` : 'plateforme'}</span></div>
+        <div class="aide-calage">${dessous ? `posée sur ${echapper(dessous)}` : 'pas de surface dessous'}${e.cycle.includes(x.nom) ? ' · ⚠ boucle' : ''}</div>
+        ${v ? `<div class="vols-etape"><span class="deblai">D ${m3(v.deblai)}</span><span class="remblai">R ${m3(v.remblai)}</span></div>` : res?.erreur ? `<div class="aide-calage alerte">⚠ ${echapper(res.erreur)}</div>` : ''}</div></li>`;
+    };
     z.innerHTML = `
       <h3>Plateformes</h3>
-      <div class="liste-plateformes">${liste().map((p) => `<button type="button" data-choisir="${echapper(p.id)}" class="${p.id === etat.choisiId ? 'actif' : ''}"><i style="background:${echapper(p.couleur)}"></i>${echapper(p.nom)}<small>${p.sommets.some((s) => s.lien) ? 'accrochée' : ''}</small></button>`).join('') || '<p class="aide-calage">Aucune : outil « Plateforme ».</p>'}</div>
+      <div class="liste-plateformes">${liste().map((p) => `<button type="button" data-choisir="${echapper(p.id)}" class="${p.id === etat.choisiId ? 'actif' : ''}"><i style="background:${echapper(p.couleur)}"></i>${echapper(p.nom)}<small>${groupeDe(p) ? echapper(groupeDe(p).nom) : p.sommets.some((s) => s.lien) ? 'accrochée' : ''}</small></button>`).join('') || '<p class="aide-calage">Aucune : outil « Plateforme ».</p>'}</div>
+      ${e.ordre.length ? `<h3>Étapes</h3>
+      <div class="choix-etape"><button type="button" data-action="etape-seule" class="${etat.etapeSeule ? 'actif' : ''}">L'étape seule</button><button type="button" data-action="etape-toutes" class="${etat.etapeSeule ? '' : 'actif'}">Toutes</button></div>
+      <ol class="chaine-etapes">${e.ordre.map(ligneEtape).join('')}</ol>
+      <div class="totaux-etapes"><span>Somme des étapes</span><span class="deblai">D ${m3(tot.somme.deblai)}</span><span class="remblai">R ${m3(tot.somme.remblai)}</span>
+        <span>Terrain → fin (d'un coup)</span>${tot.fin ? `<span class="deblai">D ${m3(tot.fin.deblai)}</span><span class="remblai">R ${m3(tot.fin.remblai)}</span>` : `<span class="aide-calage" style="grid-column:span 2">${tot.raison || '—'}</span>`}</div>` : ''}
       ${pf ? `
-      <h3>Talus</h3>
-      <label class="champ-calage"><span>Surface de référence</span><select data-pf="terrainId"><option value="">— aucune (pas de talus) —</option>${refs.map((s) => `<option value="${echapper(s.id)}" ${s.id === pf.terrainId ? 'selected' : ''}>${echapper(s.nom)}</option>`).join('')}</select></label>
-      <label class="case-chantier"><input type="checkbox" data-berme="on" ${b.on ? 'checked' : ''}> Berme (plate)</label>
+      <h3>Talus de ${echapper(u.nom)}</h3>
+      <label class="champ-calage"><span>Posée sur (surface de référence)</span><select data-unite-ref="${echapper(u.id)}">${optionsReference(u.id, u.source.terrainId ?? null)}</select></label>
+      <label class="case-chantier"><input type="checkbox" data-berme="on" ${b.on ? 'checked' : ''}> Berme (plate) de ${echapper(pf.nom)}</label>
       ${b.on ? `<div class="grille-berme">
         <span>① Hauteur plateforme → berme</span><span><input type="text" class="hv" data-berme="hauteur" value="${f2(b.hauteur)}"> m</span>
         <span>② Largeur de la berme</span><span><input type="text" class="hv" data-berme="largeur" value="${f2(b.largeur)}"> m</span>
         <span>③ Talus après la berme</span><span>D <input type="text" class="hv" data-berme="deb" value="${echapper(b.deb)}"> R <input type="text" class="hv" data-berme="rem" value="${echapper(b.rem)}"></span>
-      </div><p class="aide-calage">① = pentes du tableau, côté par côté.</p>` : ''}
+      </div><p class="aide-calage">① = pentes du tableau ; « ⋯ » d'un côté = sa berme à part.</p>` : ''}
       ${r?.erreursTalus?.length ? `<p class="note-calage alerte">⚠ ${r.erreursTalus.map(echapper).join('<br>')}</p>` : ''}
-      <h3>Volumes (avec talus)</h3>
+      <h3>Volumes de l'étape (avec talus)</h3>
       ${r?.volume ? `<p class="resume-volume"><span class="chiffre deblai">Déblai ${r.volume.deblai.toFixed(1)} m³</span> · <span class="chiffre remblai">Remblai ${r.volume.remblai.toFixed(1)} m³</span><br><span class="aide-calage">Emprise ${r.volume.surface.toFixed(1)} m²${r.volume.horsTerrain > 0.01 ? ` · ⚠ ${r.volume.horsTerrain.toFixed(1)} m² hors de la surface de référence` : ''}</span></p>`
-    : `<p class="aide-calage">${r?.erreur ? 'Plateforme incomplète.' : 'Choisissez une surface de référence.'}</p>`}
+    : `<p class="aide-calage">${r?.erreur ? 'Plateforme incomplète.' : 'Choisissez sur quoi elle est posée.'}</p>`}
       <h3>Delta Z</h3>
       <div class="ligne-dz"><input type="text" inputmode="text" class="hv" data-champ="dz" value="0.000" aria-label="Delta Z en m"> m
         <select data-champ="dzQui" aria-label="À quoi appliquer"><option value="seule">Cette plateforme seule</option><option value="toutes">Avec les accrochées</option></select>
         <button type="button" class="bouton-secondaire petit" data-action="dz">Appliquer</button></div>` : ''}`;
   }
+
+  // --- Coupes (0.302.0) : 2 au plus, tracées à la main (accroches), bouts déplaçables ---
+
+  function majOnglets() {
+    page.querySelectorAll('[data-onglet]').forEach((b) => {
+      b.classList.toggle('actif', b.dataset.onglet === etat.onglet);
+      b.setAttribute('aria-selected', String(b.dataset.onglet === etat.onglet));
+    });
+    const tableau = page.querySelector('[data-zone="partie-tableau"]');
+    const zc = page.querySelector('[data-zone="partie-coupe"]');
+    tableau.hidden = etat.onglet !== 'tableau';
+    zc.hidden = etat.onglet === 'tableau';
+    if (etat.onglet !== 'tableau') majCoupe(zc, etat.onglet);
+  }
+
+  /** Surfaces montrées sur la coupe : le terrain de départ, puis chaque étape de la chaîne de l'étape choisie. */
+  function chaineDeLEtape(idUnite) {
+    const e = etapesCalculees();
+    const chaine = [];
+    let u = e.ordre.find((x) => x.id === idUnite);
+    const vus = new Set();
+    while (u && !vus.has(u.id)) {
+      vus.add(u.id);
+      chaine.unshift(u);
+      const ref = u.terrainId;
+      u = ref ? e.ordre.find((x) => surfaceDeUnite(x.id) === ref) : null;
+      if (!u && ref) chaine.unshift({ id: ref, terrain: true, nom: surfaces().find((x) => x.id === ref)?.nom ?? 'Terrain' });
+    }
+    return chaine;
+  }
+
+  function majCoupe(zone, id) {
+    const k = coupes().find((x) => x.id === id);
+    const n = id === 'c1' ? 1 : 2;
+    if (!k) {
+      zone.innerHTML = `<p class="aide-calage">Coupe ${n} pas encore tracée.</p><button type="button" class="bouton-secondaire" data-action="tracer-coupe" data-coupe="${id}">Tracer la coupe ${n} (2 clics sur le plan)</button>`;
+      return;
+    }
+    const idEtape = etat.etape ?? uniteDe(choisie())?.id;
+    const chaine = idEtape ? chaineDeLEtape(idEtape) : [];
+    const e = etapesCalculees();
+    const altDe = (x) => (x.terrain ? (trianglesDeSurface(x.id).length ? chercheurAltitude(trianglesDeSurface(x.id)) : null) : e.parUnite.get(x.id)?.altitude);
+    const profils = chaine.map((x) => ({ x, p: altDe(x) ? profilLeLong(altDe(x), k.a, k.b, 0.5) : [] })).filter((y) => y.p.length);
+    const L = Math.hypot(k.b[0] - k.a[0], k.b[1] - k.a[1]);
+    const zs = profils.flatMap((y) => y.p.map((q) => q.z)).filter((z) => z != null);
+    const W = 640;
+    const H = 220;
+    const g = 46;
+    const d = 26;
+    if (!zs.length) {
+      zone.innerHTML = `<p class="aide-calage">Rien à montrer sur la coupe ${n} : choisissez une étape posée sur une surface, ou tracez la coupe sur elle.</p>${boutonsCoupe(id, n)}`;
+      return;
+    }
+    let zmin = Math.min(...zs);
+    let zmax = Math.max(...zs);
+    if (zmax - zmin < 0.5) [zmin, zmax] = [zmin - 0.25, zmax + 0.25];
+    const marge = (zmax - zmin) * 0.12;
+    zmin -= marge;
+    zmax += marge;
+    // Facteur des hauteurs : pixels par mètre en hauteur ÷ pixels par mètre en longueur.
+    const exag = Math.max(1, Math.round((((H - 46) / (zmax - zmin)) / ((W - g - d) / L)) * 10) / 10);
+    const px = (x) => g + (x / L) * (W - g - d);
+    const py = (z) => 18 + ((zmax - z) / (zmax - zmin)) * (H - 46);
+    const pas = Math.pow(10, Math.floor(Math.log10(zmax - zmin))) * ((zmax - zmin) / Math.pow(10, Math.floor(Math.log10(zmax - zmin))) > 5 ? 1 : 0.5);
+    let svg = '';
+    for (let z = Math.ceil(zmin / pas) * pas; z <= zmax; z += pas) svg += `<line x1="${g}" y1="${py(z)}" x2="${W - d}" y2="${py(z)}" class="grille-coupe"/><text x="4" y="${py(z) + 4}" class="axe-coupe">${z.toFixed(pas < 1 ? 1 : 0)}</text>`;
+    const pasL = L > 200 ? 50 : L > 80 ? 20 : L > 30 ? 10 : 5;
+    for (let x = 0; x <= L + 1e-6; x += pasL) svg += `<text x="${px(x)}" y="${H - 8}" class="axe-coupe" text-anchor="middle">${Math.round(x)} m</text>`;
+    // Déblai / remblai de l'étape choisie (dernière de la chaîne) par rapport à celle d'en dessous.
+    const haut = profils.at(-1);
+    const bas = profils.at(-2);
+    if (haut && bas && !haut.x.terrain) {
+      for (let i = 0; i + 1 < haut.p.length; i += 1) {
+        const [a, b] = [haut.p[i], haut.p[i + 1]];
+        const [c, dd] = [bas.p[i], bas.p[i + 1]];
+        if ([a.z, b.z, c?.z, dd?.z].some((v) => v == null)) continue;
+        const classe = (a.z + b.z) / 2 >= (c.z + dd.z) / 2 ? 'remblai-coupe' : 'deblai-coupe';
+        svg += `<polygon points="${px(a.d)},${py(c.z)} ${px(b.d)},${py(dd.z)} ${px(b.d)},${py(b.z)} ${px(a.d)},${py(a.z)}" class="${classe}"/>`;
+      }
+    }
+    profils.forEach((y, i) => {
+      const morceaux = [];
+      let cur = [];
+      for (const q of y.p) {
+        if (q.z == null) {
+          if (cur.length > 1) morceaux.push(cur);
+          cur = [];
+        } else cur.push(`${px(q.d).toFixed(1)},${py(q.z).toFixed(1)}`);
+      }
+      if (cur.length > 1) morceaux.push(cur);
+      const derniere = i === profils.length - 1;
+      const dessous = i === profils.length - 2;
+      const classe = y.x.terrain ? 'terrain-coupe' : derniere ? 'etape-coupe' : dessous ? 'dessous-coupe' : 'autre-coupe';
+      for (const m of morceaux) svg += `<polyline points="${m.join(' ')}" class="${classe}"/>`;
+      const fin = morceaux.at(-1)?.at(-1)?.split(',');
+      if (fin) svg += `<text x="${+fin[0] + 3}" y="${+fin[1] - 4}" class="nom-coupe">${echapper(y.x.terrain ? 'TN' : y.x.nom)}</text>`;
+    });
+    zone.innerHTML = `<div class="tete-coupe"><b>Coupe ${n}</b><span class="aide-calage">${L.toFixed(1)} m · hauteurs ×${exag} · épais = ${echapper(haut?.x.nom ?? '')}, tirets = ce sur quoi elle est posée</span>${boutonsCoupe(id, n)}</div>
+      <svg class="svg-coupe" viewBox="0 0 ${W} ${H}" role="img" aria-label="Coupe ${n}">${svg}</svg>`;
+  }
+  const boutonsCoupe = (id, n) => `<span class="boutons-coupe"><button type="button" class="bouton-secondaire petit" data-action="tracer-coupe" data-coupe="${id}">Retracer</button><button type="button" class="bouton-secondaire petit" data-action="effacer-coupe" data-coupe="${id}">Effacer la coupe ${n}</button></span>`;
 
   // --- Vue (plan) ---
 
@@ -430,6 +664,9 @@ export function ouvrirPlateformes({
 
   /** Flèches de pente et « + » de la plateforme choisie, pour le toucher : [{ type, i, x, y, pf }]. */
   let zonesToucher = [];
+  let alphaBase = 1; // 0.302.0 : les autres étapes pâlies quand « l'étape seule » est choisie
+  /** Opacité d'une plateforme : pâle si une étape est choisie (liste des étapes) et que celle-ci n'en fait pas partie. */
+  const alphaDe = (pf) => (etat.etape && etat.etapeSeule && uniteDe(pf)?.id !== etat.etape ? 0.18 : 1);
 
   function redessinerDessus() {
     if (!vue || !dessus) return;
@@ -455,8 +692,34 @@ export function ouvrirPlateformes({
     }
     ctx.setLineDash([]);
     // Talus (sous les plateformes)
-    if (etat.voir.talus) for (const pf of liste()) dessinerTalus(ctx, r.get(pf.id));
-    for (const pf of liste()) dessinerPlateforme(ctx, pf, r.get(pf.id), pf.id === etat.choisiId);
+    if (etat.voir.talus) for (const pf of liste()) {
+      alphaBase = alphaDe(pf);
+      dessinerTalus(ctx, r.get(pf.id));
+    }
+    for (const pf of liste()) {
+      alphaBase = alphaDe(pf);
+      dessinerPlateforme(ctx, pf, r.get(pf.id), pf.id === etat.choisiId);
+    }
+    alphaBase = 1;
+    ctx.globalAlpha = 1;
+    // 0.302.0 : coupes (rouge, tirets), bouts déplaçables ; aperçu pendant le tracé.
+    const traitCoupe = (a, b, nom, attente) => {
+      const qa = versEcran(a[0], a[1], vue);
+      const qb = versEcran(b[0], b[1], vue);
+      ctx.strokeStyle = '#dc2626';
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash(attente ? [3, 3] : [8, 5]);
+      ctx.beginPath();
+      ctx.moveTo(qa.x, qa.y);
+      ctx.lineTo(qb.x, qb.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (const q of [qa, qb]) carre(ctx, q, '#ffffff', '#dc2626', 4);
+      texte(ctx, nom, qa.x + 7, qa.y - 7, '#dc2626', 12, true);
+      texte(ctx, `${nom}'`, qb.x + 7, qb.y - 7, '#dc2626', 12, true);
+    };
+    for (const k of coupes()) traitCoupe(k.a, k.b, k.id === 'c1' ? 'C1' : 'C2', false);
+    if (etat.outil === 'coupe' && etat.saisie?.a && etat.curseur) traitCoupe(etat.saisie.a, [etat.curseur.est, etat.curseur.nord], etat.saisie.coupe === 'c1' ? 'C1' : 'C2', true);
     // Dessin en cours
     const s = etat.saisie;
     if (s?.points?.length) {
@@ -512,6 +775,7 @@ export function ouvrirPlateformes({
   }
 
   function dessinerTalus(ctx, res) {
+    ctx.globalAlpha = alphaBase;
     if (!res?.talus) return;
     const cols = res.talus.colonnes;
     // Barbules (une sur deux plus courte) du bord à l'entrée en terre, et pied du talus en tirets.
@@ -558,24 +822,26 @@ export function ouvrirPlateformes({
     // Berme : ses deux bords en brun épais pâle
     suite(1, 'rgba(146,64,14,0.45)', [], 3);
     suite(2, 'rgba(146,64,14,0.45)', [], 3);
+    ctx.globalAlpha = 1;
   }
 
   function dessinerPlateforme(ctx, pf, res, estChoisie) {
+    ctx.globalAlpha = alphaBase;
     const s = res?.sommets ?? sommetsResolus(pf, liste());
     if (!s.length) return;
     const pts = s.map(ecran);
     ctx.beginPath();
     pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
     ctx.closePath();
-    ctx.globalAlpha = estChoisie ? 0.22 : 0.1;
+    ctx.globalAlpha = alphaBase * (estChoisie ? 0.22 : 0.1);
     ctx.fillStyle = pf.couleur;
     ctx.fill();
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = alphaBase * (1);
     ctx.strokeStyle = pf.couleur;
     ctx.lineWidth = estChoisie ? 2.5 : 1.5;
     ctx.stroke();
     if (etat.voir.tri && res?.triangles?.length) {
-      ctx.globalAlpha = 0.45;
+      ctx.globalAlpha = alphaBase * (0.45);
       ctx.lineWidth = 0.8;
       for (const t of res.triangles) {
         const q = t.map(ecran);
@@ -586,7 +852,7 @@ export function ouvrirPlateformes({
         ctx.closePath();
         ctx.stroke();
       }
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = alphaBase * (1);
     }
     // Ruptures (rouge)
     const parNom = new Map([...s, ...pf.interieurs].map((p) => [p.nom, p]));
@@ -621,9 +887,13 @@ export function ouvrirPlateformes({
       if (etat.voir.pentes && pente != null && Math.hypot(b.x - a.x, b.y - a.y) > 40 && (estChoisie || !partage)) {
         const ang = Math.atan2(b.y - a.y, b.x - a.x);
         const dir = pente <= 0 ? ang : ang + Math.PI; // la flèche montre le sens qui descend
-        const u = 0.7;
-        const cx = a.x + (b.x - a.x) * u;
-        const cy = a.y + (b.y - a.y) * u;
+        // 0.302.0 : au milieu du côté, à l'intérieur de la plateforme, sous le petit « + ».
+        const lg = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        let [nx, ny] = [-(b.y - a.y) / lg, (b.x - a.x) / lg];
+        const centre = pts.reduce((c, q) => [c[0] + q.x / pts.length, c[1] + q.y / pts.length], [0, 0]);
+        if ((centre[0] - (a.x + b.x) / 2) * nx + (centre[1] - (a.y + b.y) / 2) * ny < 0) [nx, ny] = [-nx, -ny];
+        const cx = (a.x + b.x) / 2 + nx * 16;
+        const cy = (a.y + b.y) / 2 + ny * 16;
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(dir);
@@ -638,8 +908,10 @@ export function ouvrirPlateformes({
         ctx.stroke();
         const retourne = Math.cos(dir) < 0;
         if (retourne) ctx.rotate(Math.PI);
+        // Le texte va encore plus à l'intérieur (côté opposé au bord).
+        const interieurEnBas = (-Math.sin(retourne ? dir + Math.PI : dir)) * nx + Math.cos(retourne ? dir + Math.PI : dir) * ny > 0;
         ctx.textAlign = 'center';
-        texte(ctx, `${Math.abs(pente).toFixed(2)} %`, 0, retourne ? 14 : -6, '#1b2b36', 10);
+        texte(ctx, `${Math.abs(pente).toFixed(2)} %`, 0, interieurEnBas ? 14 : -6, '#1b2b36', 10);
         ctx.textAlign = 'start';
         ctx.restore();
         if (estChoisie) zonesToucher.push({ type: 'pente', i, x: cx, y: cy });
@@ -681,6 +953,7 @@ export function ouvrirPlateformes({
       ctx.stroke();
       etiquette(ctx, p, q, estChoisie);
     }
+    ctx.globalAlpha = 1;
   }
 
   function etiquette(ctx, p, q, estChoisie) {
@@ -738,8 +1011,14 @@ export function ouvrirPlateformes({
 
   function sousLaSouris(x, y) {
     const pf = choisie();
-    if (!pf) return null;
     const t = pxTol();
+    for (const k of coupes()) {
+      for (const [bout, p] of [['a', k.a], ['b', k.b]]) {
+        const q = versEcran(p[0], p[1], vue);
+        if (Math.hypot(q.x - x, q.y - y) <= t) return { type: 'bout-coupe', id: k.id, bout };
+      }
+    }
+    if (!pf) return null;
     for (const z of zonesToucher) if (Math.hypot(z.x - x, z.y - y) <= t) return z;
     const s = sommetsResolus(pf, liste());
     for (let i = 0; i < s.length; i += 1) {
@@ -791,7 +1070,7 @@ export function ouvrirPlateformes({
     if (!geste.glisse && Math.hypot(p.x - geste.x, p.y - geste.y) > 5) {
       geste.glisse = true;
       // Glisser un angle, un point intérieur ou un « + » (= nouveau point qui suit la souris).
-      if (geste.cible && ['sommet', 'interieur', 'plus'].includes(geste.cible.type)) {
+      if (geste.cible && ['sommet', 'interieur', 'plus', 'bout-coupe'].includes(geste.cible.type)) {
         if (!avantChangement()) {
           geste.cible = null;
         } else if (geste.cible.type === 'plus') {
@@ -836,6 +1115,12 @@ export function ouvrirPlateformes({
   function deplacerPoint(cible, a) {
     const pf = choisie();
     const m = (v) => Math.round(v * 1000) / 1000;
+    if (cible.type === 'bout-coupe') {
+      const k = coupes().find((x) => x.id === cible.id);
+      if (k) k[cible.bout] = [m(a.est), m(a.nord)];
+      majOnglets();
+      return;
+    }
     if (cible.type === 'interieur') {
       const p = pf.interieurs.find((x) => x.nom === cible.nom);
       if (p) Object.assign(p, { est: m(a.est), nord: m(a.nord) });
@@ -868,6 +1153,7 @@ export function ouvrirPlateformes({
       const nouvelle = dedans.find((q) => q.id !== etat.choisiId) ?? dedans[0];
       if (nouvelle) {
         etat.choisiId = nouvelle.id;
+        etat.etape = null;
         etat.selPoint = null;
         etat.selCote = null;
         majTout();
@@ -875,6 +1161,21 @@ export function ouvrirPlateformes({
       return;
     }
     const a = pointAccroche(pos);
+    if (etat.outil === 'coupe') {
+      const sc = etat.saisie ?? (etat.saisie = { coupe: coupes().some((k) => k.id === 'c1') ? 'c2' : 'c1' });
+      const m = (v) => Math.round(v * 1000) / 1000;
+      if (!sc.a) {
+        sc.a = [m(a.est), m(a.nord)];
+        return majTout();
+      }
+      if (Math.hypot(a.est - sc.a[0], a.nord - sc.a[1]) < 0.01) return;
+      if (!avantChangement()) return;
+      projet().coupesPlateformes = [...coupes().filter((k) => k.id !== sc.coupe), { id: sc.coupe, a: sc.a, b: [m(a.est), m(a.nord)] }].sort((x, y) => x.id.localeCompare(y.id));
+      etat.onglet = sc.coupe;
+      etat.saisie = null;
+      etat.outil = 'choisir';
+      return enregistrer();
+    }
     const altTapee = nombre(etat.altSuivante);
     if (etat.outil === 'plateforme') {
       const s = etat.saisie ?? (etat.saisie = { points: [] });
@@ -988,9 +1289,42 @@ export function ouvrirPlateformes({
   // --- Événements ---
 
   page.addEventListener('click', async (ev) => {
+    // 0.302.0 : toucher une étape de la liste = la choisir (elle ressort sur le plan et la coupe).
+    const li = ev.target.closest('[data-etape]');
+    if (li && !ev.target.closest('select, input')) {
+      const u = etapesCalculees().ordre.find((x) => x.id === li.dataset.etape);
+      if (u) {
+        etat.etape = u.id;
+        etat.choisiId = u.membres[0].id;
+        return majTout();
+      }
+    }
     const b = ev.target.closest('button');
     if (!b) return;
     const pf = choisie();
+    if (b.dataset.action === 'etape-seule' || b.dataset.action === 'etape-toutes') {
+      etat.etapeSeule = b.dataset.action === 'etape-seule';
+      return majTout();
+    }
+    if (b.dataset.onglet) {
+      etat.onglet = b.dataset.onglet;
+      return majTout();
+    }
+    if (b.dataset.action === 'tracer-coupe') {
+      etat.outil = 'coupe';
+      etat.saisie = { coupe: b.dataset.coupe };
+      return majTout();
+    }
+    if (b.dataset.action === 'effacer-coupe') {
+      if (!avantChangement()) return;
+      projet().coupesPlateformes = coupes().filter((k) => k.id !== b.dataset.coupe);
+      return enregistrer();
+    }
+    if (b.dataset.bermeCote !== undefined) {
+      const i = Number(b.dataset.bermeCote);
+      etat.bermeCote = etat.bermeCote === i ? null : i;
+      return majTableau();
+    }
     if (b.dataset.action === 'retour') return fermer();
     if (b.dataset.outil) {
       etat.outil = b.dataset.outil;
@@ -1011,6 +1345,7 @@ export function ouvrirPlateformes({
     if (b.dataset.action === 'annuler') return annuler();
     if (b.dataset.choisir) {
       etat.choisiId = b.dataset.choisir;
+      etat.etape = null;
       etat.selPoint = null;
       etat.selCote = null;
       return majTout();
@@ -1087,7 +1422,7 @@ export function ouvrirPlateformes({
   // Le tableau est redessiné après un changement : on attend la fin de l'événement (un champ qui perd la main pendant
   // qu'on le remplace provoque une erreur du navigateur).
   page.addEventListener('change', (ev) => setTimeout(() => changement(ev.target), 0));
-  function changement(c) {
+  async function changement(c) {
     if (!c.isConnected && !c.dataset) return;
     const pf = choisie();
     if (c.dataset.champ === 'altSuivante') {
@@ -1128,6 +1463,61 @@ export function ouvrirPlateformes({
       if (c.dataset.talusOn) t.on = c.checked;
       if (c.dataset.talusDeb) t.deb = c.value.trim();
       if (c.dataset.talusRem) t.rem = c.value.trim();
+      pf.talus[nom] = t;
+      return enregistrer();
+    }
+    // 0.302.0 : sur quoi l'étape est posée ; groupe ; berme d'un côté
+    if (c.dataset.uniteRef) {
+      if (!avantChangement()) return;
+      const u = uniteDe(pf);
+      u.source.terrainId = c.value || null;
+      return enregistrer();
+    }
+    if (c.dataset.pf === 'groupeId') {
+      let id = c.value || null;
+      if (id === '__nouveau') {
+        const nom = await demanderTexte({ titre: 'Nom du groupe', valeur: `Groupe ${groupes().length + 1}` });
+        if (!nom?.trim()) return majTout();
+        if (!avantChangement()) return;
+        id = nouvelIdentifiant();
+        groupes().push({ id, nom: nom.trim(), couleur: COULEURS_PLATEFORMES[(groupes().length + 3) % COULEURS_PLATEFORMES.length], terrainId: pf.terrainId ?? null });
+      } else if (!avantChangement()) return;
+      if (id) pf.groupeId = id;
+      else delete pf.groupeId;
+      etat.etape = null;
+      return enregistrer();
+    }
+    if (c.dataset.groupeNom !== undefined) {
+      const g = groupeDe(pf);
+      if (!g || !c.value.trim() || !avantChangement()) return majTout();
+      g.nom = c.value.trim();
+      return enregistrer();
+    }
+    if (c.dataset.bermeCoteMode) {
+      if (!avantChangement()) return;
+      const t = { ...TALUS_DEFAUT, ...(pf.talus[c.dataset.bermeCoteMode] ?? {}) };
+      if (c.value === 'comme') delete t.berme;
+      else if (c.value === 'aucune') t.berme = { mode: 'aucune' };
+      else t.berme = { ...BERME_DEFAUT, ...(pf.berme ?? {}), mode: 'propre' };
+      delete t.berme?.on;
+      pf.talus[c.dataset.bermeCoteMode] = t;
+      return enregistrer();
+    }
+    if (c.dataset.bermeCoteChamp) {
+      const nom = c.dataset.coteNom;
+      const cle = c.dataset.bermeCoteChamp;
+      const t = { ...TALUS_DEFAUT, ...(pf.talus[nom] ?? {}) };
+      if (t.berme?.mode !== 'propre') return;
+      let v;
+      if (cle === 'deb' || cle === 'rem') {
+        if (!lireHV(c.value)) return message('Pente illisible : écrivez H:V, par exemple 3:2.', 3500);
+        v = c.value.trim();
+      } else {
+        v = nombre(c.value);
+        if (v === null || v < 0) return message('Nombre illisible.', 2500);
+      }
+      if (!avantChangement()) return;
+      t.berme = { ...t.berme, [cle]: v };
       pf.talus[nom] = t;
       return enregistrer();
     }

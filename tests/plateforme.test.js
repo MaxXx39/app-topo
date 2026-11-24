@@ -182,3 +182,55 @@ describe('talus', () => {
     expect(trianglesTalus(r).length).toBeGreaterThan(0);
   });
 });
+
+// --- 0.302.0 : berme par côté, groupes, étapes, profil, volume du terrain à la fin ---
+import { unitesPlateformes, ordreDesEtapes, profilLeLong, volumeTerrainAFin } from '../src/topo/plateforme.js';
+
+describe('berme côté par côté', () => {
+  const pentes = { deb: '3:2', rem: '2:1' };
+  it('« aucune » sur un côté, « propre » sur un autre, sinon celle de la plateforme', () => {
+    const pf = pfCarre(105);
+    pf.berme = { on: true, hauteur: 3, largeur: 2, deb: '3:2', rem: '2:1' };
+    pf.talus = { 'A-1': { on: true, ...pentes, berme: { mode: 'aucune' } }, 'A-2': { on: true, ...pentes, berme: { mode: 'propre', hauteur: 1, largeur: 4, deb: '3:2', rem: '2:1' } }, 'A-3': { on: true, ...pentes }, 'A-4': { on: true, ...pentes } };
+    const r = talusPlateforme(sommetsResolus(pf, [pf]), (i) => reglageDuCote([pf], pf, i), bermeDe(pf), terrainPlat(100), { pas: 5 });
+    const milieu = (est, nord) => r.colonnes.find((c) => c.sommet == null && Math.abs(c.points[0].est - est) < 1e-6 && Math.abs(c.points[0].nord - nord) < 1e-6);
+    const lg = (c) => Math.hypot(c.points.at(-1).est - c.points[0].est, c.points.at(-1).nord - c.points[0].nord);
+    // Côté A-1 → A-2 (sud) sans berme : 5 m × 2 = 10 m, 2 points.
+    expect(milieu(E + 10, N).points).toHaveLength(2);
+    expect(lg(milieu(E + 10, N))).toBeCloseTo(10, 2);
+    // Côté A-2 → A-3 (est), berme propre 1 m / 4 m : 1×2 + 4 + 4×2 = 14 m.
+    expect(lg(milieu(E + 20, N + 10))).toBeCloseTo(14, 2);
+    // Côté A-3 → A-4 (nord), berme de la plateforme 3 m / 2 m : 6 + 2 + 4 = 12 m.
+    expect(lg(milieu(E + 10, N + 20))).toBeCloseTo(12, 2);
+  });
+});
+
+describe('groupes et étapes', () => {
+  it('une plateforme dans un groupe ne compte plus seule ; groupe vide ignoré', () => {
+    const a = { id: 'a', nom: 'A', groupeId: 'g1' };
+    const b = { id: 'b', nom: 'B', groupeId: 'g1' };
+    const c = { id: 'c', nom: 'C', terrainId: 'tn' };
+    const u = unitesPlateformes([a, b, c], [{ id: 'g1', nom: 'Radier', terrainId: 'sa' }, { id: 'g2', nom: 'Vide' }]);
+    expect(u.map((x) => [x.id, x.type, x.membres.length, x.terrainId])).toEqual([['g1', 'groupe', 2, 'sa'], ['c', 'plateforme', 1, 'tn']]);
+  });
+  it('ordre : une étape posée sur une autre vient après elle ; boucle signalée', () => {
+    const u = [{ id: 'g', nom: 'G', terrainId: 's-a' }, { id: 'a', nom: 'A', terrainId: 'tn' }, { id: 'd', nom: 'D', terrainId: 's-g' }];
+    const surf = { g: 's-g', a: 's-a', d: 's-d' };
+    expect(ordreDesEtapes(u, (id) => surf[id]).ordre.map((x) => x.id)).toEqual(['a', 'g', 'd']);
+    const boucle = [{ id: 'x', nom: 'X', terrainId: 's-y' }, { id: 'y', nom: 'Y', terrainId: 's-x' }];
+    expect(ordreDesEtapes(boucle, (id) => `s-${id}`).cycle.sort()).toEqual(['X', 'Y']);
+  });
+  it('profil le long d\'une coupe', () => {
+    const p = profilLeLong((e) => 100 + (e - E) * 0.1, [E, N], [E + 10, N], 1);
+    expect(p).toHaveLength(11);
+    expect(p[10]).toEqual({ d: 10, z: 101 });
+  });
+  it('terrain → fin : la dernière étape qui couvre le point compte', () => {
+    // Étape 1 : 10 × 10 m à 98 (sur terrain plat à 100) ; étape 2 : 5 × 10 m à 101 posée dessus.
+    const e1 = (e, n) => (e >= E && e <= E + 10 && n >= N && n <= N + 10 ? 98 : null);
+    const e2 = (e, n) => (e >= E && e <= E + 5 && n >= N && n <= N + 10 ? 101 : null);
+    const v = volumeTerrainAFin([e1, e2], () => 100, { estMin: E, estMax: E + 10, nordMin: N, nordMax: N + 10 }, 0.5);
+    expect(v.deblai).toBeCloseTo(100, 6); // 50 m² × 2 m
+    expect(v.remblai).toBeCloseTo(50, 6); // 50 m² × 1 m
+  });
+});

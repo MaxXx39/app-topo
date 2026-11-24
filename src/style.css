@@ -14886,3 +14886,41 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .ligne-dz { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .contenu-plateformes { padding-bottom: 10px; }
 .toile-plateformes:focus { outline: none; }
+
+/* 0.302.0 : Plateformes : onglets Tableau / Coupe 1 / Coupe 2, coupe, étapes, berme d'un côté. */
+.onglets-plateforme { display: flex; gap: 2px; border-bottom: 1px solid var(--bordure); }
+.onglets-plateforme button { padding: 5px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0; background: none; color: var(--gris); font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.onglets-plateforme button.actif { background: var(--surface); border-color: var(--bordure); color: #6d28d9; margin-bottom: -1px; }
+.partie-coupe { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.tete-coupe { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 0.85rem; }
+.tete-coupe .boutons-coupe { margin-left: auto; display: flex; gap: 6px; }
+.svg-coupe { width: 100%; height: auto; display: block; background: #ffffff; border: 1px solid var(--bordure); border-radius: 8px; }
+.svg-coupe .grille-coupe { stroke: #eef1f3; }
+.svg-coupe .axe-coupe { font-size: 10px; fill: #5f6d77; }
+.svg-coupe .nom-coupe { font-size: 10px; fill: #1b2b36; font-weight: 700; }
+.svg-coupe .terrain-coupe { fill: none; stroke: #7c5a3a; stroke-width: 1.6; }
+.svg-coupe .etape-coupe { fill: none; stroke: #6d28d9; stroke-width: 2.8; }
+.svg-coupe .dessous-coupe { fill: none; stroke: #6d28d9; stroke-width: 1.6; stroke-dasharray: 6 4; }
+.svg-coupe .autre-coupe { fill: none; stroke: #6d28d9; stroke-width: 1; opacity: 0.35; }
+.svg-coupe .deblai-coupe { fill: #c2410c; fill-opacity: 0.32; stroke: none; }
+.svg-coupe .remblai-coupe { fill: #15803d; fill-opacity: 0.32; stroke: none; }
+.choix-etape { display: flex; gap: 4px; }
+.choix-etape button { padding: 3px 10px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.choix-etape button.actif { background: #6d28d9; border-color: #6d28d9; color: #ffffff; }
+.chaine-etapes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.etape-pf { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; padding: 5px 6px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; }
+.etape-pf:hover { border-color: var(--bordure); }
+.etape-pf.choisie { border-color: #6d28d9; background: color-mix(in srgb, #6d28d9 10%, var(--surface)); }
+.rond-etape { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #ffffff; font-size: 0.75rem; font-weight: 700; }
+.titre-etape { font-weight: 700; font-size: 0.88rem; }
+.puce-type { font-size: 0.68rem; padding: 0 6px; border: 1px solid var(--bordure); border-radius: 999px; color: var(--gris); font-weight: 600; }
+.vols-etape { display: flex; gap: 10px; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.vols-etape .deblai, .totaux-etapes .deblai { color: #c2410c; font-weight: 700; }
+.vols-etape .remblai, .totaux-etapes .remblai { color: #15803d; font-weight: 700; }
+.totaux-etapes { display: grid; grid-template-columns: 1fr auto auto; gap: 3px 10px; font-size: 0.82rem; font-variant-numeric: tabular-nums; border-top: 2px solid var(--encre); padding-top: 5px; }
+.bouton-berme { border: none; background: none; color: var(--gris); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 4px; border-radius: 4px; }
+.bouton-berme.propre { color: #92400e; box-shadow: inset 0 -2px 0 #92400e; }
+.table-plateforme tr.ligne-berme td { background: color-mix(in srgb, #92400e 8%, var(--surface)); }
+.berme-cote { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 0.8rem; padding: 2px 0 2px 20px; }
+.berme-cote label { display: flex; align-items: center; gap: 4px; }
+.berme-cote select { font: inherit; font-size: 0.8rem; padding: 1px 4px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); }
