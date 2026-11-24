@@ -6,7 +6,7 @@ import { bornesPrimitives, deplacerPrimitives } from './blocs-dxf.js';
 import { transformerPrimitives, CATEGORIES_SYMBOLES } from './symboles.js';
 import { symbolesDessines, portail, portailCoulissant, trilattes } from './symboles-dessines.js';
 import {
-  camionCiterne, camionCarburant, camionBitume, camionBalai, tracteurBenne, niveleuse, camionGrue, AUTOGRUES, pompeABeton,
+  camionCiterne, camionCarburant, camionBitume, camionBalai, tracteurBenne, niveleuse, camionGrue, AUTOGRUES, pompeABeton, finisseur800,
   nacelle, elevateurCiseaux, compresseur, betonniere,
 } from './symboles-vehicules.js';
 import * as divers from './symboles-divers.js';
@@ -154,6 +154,11 @@ function benneAvecIcone(benne, nom, icone, texteBenne) {
   return { ...benne, cle: `base:${nom}`, nom, primitives: [...prims, ...ajouts], dessine: true };
 }
 
+/** 0.305.0 : tourelles orientables des pelles à pneus et 5 t (voir retoucherBibliotheque). */
+export const PIVOT_PELLE_PNEU = { depuis: 36, centre: [2.14, 0.02] };
+export const PIVOT_PELLE_5T = { indices: [0, 1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 62], centre: [0, 1.4] };
+const CACHES_DESSINES = ['Place de parking réservée', 'Camion pompe à béton (plié)', 'Camion pompe à béton (déplié)'];
+
 /** Camion toupie goulotte dépliée : le camion du DXF et sa goulotte de déversement à 3 éléments articulés derrière. */
 function toupieDeployee(base) {
   const yMax = base.boite[3];
@@ -171,7 +176,8 @@ function toupieDeployee(base) {
   });
   pts.forEach((p, i) => chute.push(...piece('#5f666d', 'metal', cercle(p[0], p[1], 0.18 - i * 0.02, 10))));
   const prims = [...base.primitives, ...chute];
-  return { ...versSymbole('Camion toupie (goulotte dépliée)', 'Véhicules', prims, { centre: false }), dessine: false };
+  // 0.305.0 : la goulotte tourne autour de son attache (le camion reste) : champ « Rotation de la goulotte ».
+  return { ...versSymbole('Camion toupie (goulotte dépliée)', 'Véhicules', prims, { centre: false }), dessine: false, pivote: { depuis: base.primitives.length, centre: pts[0], libelle: 'Rotation de la goulotte (par rapport au camion)' } };
 }
 
 const boiteLigne = (p) => {
@@ -213,8 +219,13 @@ export function retoucherBibliotheque(symboles) {
     if (s.nom === 'Tri lattes + travaux' && par('Panneau Travaux')) t = { ...versSymbole('Tri lattes + travaux', 'Sécurité', trilattesTravaux(par('Panneau Travaux'))), cle: s.cle };
     if (s.nom === 'Benne Decantation') t = { ...versSymbole('Benne Decantation', 'Base-vie', divers.benneDecantation()), cle: s.cle };
     if (s.nom === '2.50interdictiondeparquer') t = { ...t, nom: 'Interdiction de parquer' };
+    if (s.nom === 'Finisseur') t = { ...t, nom: 'Finisseur Super 1900' }; // 0.306.0 : à côté du Super 800 (la clé reste base:Finisseur)
     // 0.293.0 : pelle à tourelle orientable : les 47 premières primitives = chenilles, le reste tourne autour du centre des chenilles.
     if (s.nom === 'Pelle Chenille 20T') t = { ...t, pivote: { depuis: 47, centre: [0, 1.961] } };
+    // 0.305.0 : pelle à pneus (36 premières primitives = roues, lame, appuis, châssis) et pelle 5 t (tourelle = godet,
+    // bras, caisse, cabine : primitives choisies une à une, le reste = chenilles et lame). Centres estimés : à valider.
+    if (s.nom === 'Pelle Pneu') t = { ...t, pivote: PIVOT_PELLE_PNEU };
+    if (s.nom === 'Pelle Chenille 5t') t = { ...t, pivote: PIVOT_PELLE_5T };
     // 0.294.1 : compacteurs : les 2 bandes jaunes des extrémités sont deux fois moins larges (plus de gris et de noir visibles).
     if (['Compact Tandem', 'Compact Mixte', 'Compact pneu'].includes(s.nom)) t = { ...t, primitives: reduireBandesJaunes(t.primitives) };
     if (RETIRES.includes(s.nom)) t = { ...t, cache: true };
@@ -242,7 +253,7 @@ export function retoucherBibliotheque(symboles) {
     ['Camion balai', 'Véhicules', camionBalai()], ['Camion bitume', 'Véhicules', camionBitume()],
     ['Camion pompe à béton (plié)', 'Véhicules', pompeABeton(false), false], ['Camion pompe à béton (déplié)', 'Véhicules', pompeABeton(true), false],
     // Engins
-    ['Niveleuse', 'Engins', niveleuse()], ['Nacelle articulée (repliée)', 'Engins', nacelle(false)], ['Nacelle articulée (déployée)', 'Engins', nacelle(true), false],
+    ['Finisseur Super 800', 'Engins', finisseur800()], ['Niveleuse', 'Engins', niveleuse()], ['Nacelle articulée (repliée)', 'Engins', nacelle(false)], ['Nacelle articulée (déployée)', 'Engins', nacelle(true), false],
     ['Élévateur à ciseaux', 'Engins', elevateurCiseaux()], ['Compresseur', 'Engins', compresseur()], ['Bétonnière', 'Engins', betonniere()],
     // Installations
     ['Centrale à béton mobile', 'Installations', divers.centraleBeton()], ['Silo à ciment', 'Installations', divers.siloCiment()],
@@ -262,7 +273,9 @@ export function retoucherBibliotheque(symboles) {
   ];
   for (const [nom, categorie, prims, centre] of nouveaux) {
     const sym = versSymbole(nom, categorie, prims, { centre: centre !== false });
-    res.push(nom === 'Place de parking réservée' ? { ...sym, cache: true } : sym); // 0.297.0 : remplacée par le parking dynamique (gardée pour les anciens plans)
+    // 0.297.0 : place de parking remplacée par le parking dynamique ; 0.305.0 : pompes fixes remplacées par la pompe
+    // dynamique (topo/pompe-dynamique.js). Gardées cachées pour les anciens plans.
+    res.push(CACHES_DESSINES.includes(nom) ? { ...sym, cache: true } : sym);
   }
   // Camions grues : 4 tailles, repliés et dépliés (le point de base reste le centre du camion).
   for (const a of AUTOGRUES) {

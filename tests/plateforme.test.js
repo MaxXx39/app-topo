@@ -288,3 +288,96 @@ describe('ouvrages (murs, radiers, dalles)', () => {
     expect(t[1][1]).toBeCloseTo(15, 6);
   });
 });
+
+// --- 0.304.0 : vérification des calculs (cas faits à la main) et retrait d'un point ---
+import { retirerPoint, altitudesAuto as autoAlt } from '../src/topo/plateforme.js';
+
+describe('vérification des calculs (à la main)', () => {
+  const tolerance = (v, attendu, pc = 0.5) => {
+    expect(v).toBeGreaterThan(attendu * (1 - pc / 100));
+    expect(v).toBeLessThan(attendu * (1 + pc / 100));
+  };
+  it('déblai : 20 × 20 m à 3 m sous un terrain plat, talus 3:2 → 1 821 m³ (tronc de pyramide)', () => {
+    const pf = pfCarre(97);
+    const tri = trianglesPlateforme(pf, [pf], trianglerAvecContraintes).triangles;
+    const talus = talusPlateforme(sommetsResolus(pf, [pf]), () => ({ pentes: { deblai: lireHV('3:2'), remblai: lireHV('2:1') } }), null, terrainPlat(100), { pas: 2 });
+    const v = volumeEntreSurfaces([...tri, ...trianglesTalus(talus)], trianglesTerrain(100));
+    // Bas 20 × 20, haut (20 + 2 × 4,5)² = 29², milieu 24,5² : V = 3 / 6 × (400 + 841 + 4 × 600,25) = 1821 m³.
+    tolerance(v.deblai, 1821);
+    expect(v.remblai).toBeCloseTo(0, 3);
+  });
+  it('talus sur terrain en pente : entrée en terre au bon endroit', () => {
+    // Bord à 103, terrain z = 100 + 0,05 × (distance vers le sud). Remblai 2:1 vers le sud (côté A-1 → A-2, nord = N) :
+    // 103 − d / 2 = 100 + 0,05 d → d = 3 / 0,55 = 5,4545 m.
+    const pf = pfCarre(103);
+    const terrain = (e, n) => 100 + 0.05 * (N - n);
+    const r = talusPlateforme(sommetsResolus(pf, [pf]), () => ({ pentes: { deblai: lireHV('3:2'), remblai: lireHV('2:1') } }), null, terrain, { pas: 5 });
+    const c = r.colonnes.find((x) => x.sommet == null && Math.abs(x.points[0].nord - N) < 1e-6);
+    expect(N - c.points.at(-1).nord).toBeCloseTo(3 / 0.55, 2);
+    expect(c.points.at(-1).altitude).toBeCloseTo(terrain(0, c.points.at(-1).nord), 2);
+  });
+  it('angle entre deux côtés de pentes différentes : l\'arête suit le croisement des deux talus', () => {
+    // A-1 → A-2 (sud) en 2:1, A-4 → A-1 (ouest) en 1:1, 5 m au-dessus du terrain plat : au coin A-1, le pied est à
+    // 10 m au sud et 5 m à l'ouest.
+    const pf = pfCarre(105);
+    const r = talusPlateforme(sommetsResolus(pf, [pf]), (i) => ({ pentes: { deblai: lireHV('1:1'), remblai: lireHV(i === 3 ? '1:1' : '2:1') } }), null, terrainPlat(100), { pas: 5 });
+    const coin = r.colonnes.find((x) => x.sommet === 0);
+    expect(coin.points.at(-1).est - E).toBeCloseTo(-5, 3);
+    expect(coin.points.at(-1).nord - N).toBeCloseTo(-10, 3);
+    expect(coin.points.at(-1).altitude).toBeCloseTo(100, 3);
+    // Volume : à h m sous le haut, rectangle (20 + 3h) × (20 + 4h) ; ∫₀⁵ = 2000 + 1750 + 500 = 4 250 m³.
+    const tri = trianglesPlateforme(pf, [pf], trianglerAvecContraintes).triangles;
+    const v = volumeEntreSurfaces([...tri, ...trianglesTalus(r)], trianglesTerrain(100));
+    tolerance(v.remblai, 4250);
+    expect(v.surfaceNonCouverte).toBeCloseTo(0, 3);
+  });
+  it('sur-profondeur : fond 10 × 8 m à 0,80 m sous la plateforme, talus 1:1 → 76,2 m³', () => {
+    const parent = (e, n) => 100; // plateforme parente plate à 100
+    const creux = nouvellePlateforme([], 'b');
+    creux.sommets = [[0, 0], [10, 0], [10, 8], [0, 8]].map(([x, y], i) => ({ nom: `B-${i + 1}`, est: E + x, nord: N + y, alt: null, calc: true }));
+    const s = autoAlt(sommetsResolus(creux, [creux]), { mode: 'decalage', valeur: -0.8 }, parent);
+    expect(s.every((p) => Math.abs(p.alt - 99.2) < 1e-9)).toBe(true);
+    const tri = trianglesPlateforme({ ...creux, sommets: s }, [], trianglerAvecContraintes).triangles;
+    const talus = talusPlateforme(s, () => ({ pentes: { deblai: lireHV('1:1'), remblai: lireHV('1:1') } }), null, parent, { pas: 1 });
+    const v = volumeEntreSurfaces([...tri, ...trianglesTalus(talus)], trianglesTerrain(100));
+    // Bas 10 × 8 = 80, haut 11,6 × 9,6 = 111,36, milieu 10,8 × 8,8 = 95,04 : V = 0,8 / 6 × (80 + 111,36 + 380,16) = 76,20.
+    tolerance(v.deblai, 76.2);
+  });
+});
+
+describe('retirer un point', () => {
+  it('angle retiré : les deux côtés n\'en font plus qu\'un, ses ruptures partent ; 3 angles au moins', () => {
+    const pf = pfCarre(100);
+    pf.sommets.push({ nom: 'A-5', est: E + 10, nord: N + 30, alt: 101, calc: false });
+    pf.talus['A-5'] = { on: true, deb: '1:1', rem: '1:1' };
+    pf.ruptures = [['A-1', 'A-5'], ['A-2', 'A-4']];
+    expect(retirerPoint([pf], pf, 'A-5')).toBeNull();
+    expect(pf.sommets.map((s) => s.nom)).toEqual(['A-1', 'A-2', 'A-3', 'A-4']);
+    expect(pf.talus['A-5']).toBeUndefined();
+    expect(pf.ruptures).toEqual([['A-2', 'A-4']]);
+    retirerPoint([pf], pf, 'A-4');
+    expect(retirerPoint([pf], pf, 'A-3')).toMatch(/3 angles/);
+    expect(pf.sommets).toHaveLength(3);
+  });
+  it('un angle lié à lui dans une autre plateforme devient propre (même position et altitude)', () => {
+    const a = pfCarre(100);
+    const b = nouvellePlateforme([a], 'b');
+    b.sommets = [
+      { nom: 'A-2', est: 0, nord: 0, alt: null, calc: false, lien: { id: a.id, nom: 'A-2' } },
+      { nom: 'B-1', est: E + 40, nord: N, alt: 100, calc: false },
+      { nom: 'B-2', est: E + 40, nord: N + 20, alt: 100, calc: false },
+    ];
+    a.sommets[1].alt = 102;
+    retirerPoint([a, b], a, 'A-2');
+    expect(b.sommets[0].lien).toBeUndefined();
+    expect(b.sommets[0]).toMatchObject({ est: E + 20, nord: N, alt: 102 });
+  });
+  it('point intérieur retiré', () => {
+    const pf = pfCarre(100);
+    pf.interieurs = [{ nom: 'A-5', est: E + 5, nord: N + 5, alt: 100 }];
+    pf.ruptures = [['A-1', 'A-5']];
+    retirerPoint([pf], pf, 'A-5');
+    expect(pf.interieurs).toEqual([]);
+    expect(pf.ruptures).toEqual([]);
+  });
+});

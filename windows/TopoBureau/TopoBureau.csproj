@@ -14,7 +14,7 @@
     <Prefer32Bit>false</Prefer32Bit>
     <DefineConstants>$(DefineConstants);BUREAU</DefineConstants>
     <ApplicationManifest>..\Topo\app.manifest</ApplicationManifest>
-    <ApplicationIcon>..\Topo\topo.ico</ApplicationIcon>
+    <ApplicationIcon>bureau.ico</ApplicationIcon>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>

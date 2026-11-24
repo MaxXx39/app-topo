@@ -212,6 +212,20 @@ export function creerVueChantier(conteneur, options) {
         ctx.stroke();
         ctx.fillRect(c.x - 4, c.y - 4, 8, 8);
         ctx.strokeRect(c.x - 4, c.y - 4, 8, 8);
+        // 0.305.0 : les 8 points de base possibles (4 coins, 4 milieux des bords) : en saisir un pour déplacer le bloc
+        // par ce point (il suit la souris et s'accroche) ; celui sous la souris grossit.
+        const coins = coinsSymbole(o, s);
+        const points = [...coins, ...coins.map((q, i) => [(q[0] + coins[(i + 1) % 4][0]) / 2, (q[1] + coins[(i + 1) % 4][1]) / 2])];
+        const souris = curseur ? ecran(curseur) : null;
+        for (const q of points) {
+          const e = ecran(q);
+          const proche = souris && Math.hypot(e.x - souris.x, e.y - souris.y) <= 15;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, proche ? 6.5 : 4, 0, 2 * Math.PI);
+          ctx.fillStyle = proche ? ORANGE : '#ffffff';
+          ctx.fill();
+          ctx.stroke();
+        }
       }
       return;
     }
@@ -388,8 +402,16 @@ export function creerVueChantier(conteneur, options) {
   // Vue lisible depuis l'élément (essais automatiques : cliquer à un endroit précis du terrain).
   conteneur.vueChantier = () => vue;
 
+  // 0.304.0 : quand un bandeau apparaît au-dessus (le haut du plan descend, le bas ne bouge pas), le dessin reste
+  // à sa place à l'écran : on décale la vue de la moitié de la différence de hauteur.
+  let cadreAvant = null;
   const observateur = new ResizeObserver(() => {
     if (!conteneur.clientWidth) return;
+    const r = conteneur.getBoundingClientRect();
+    if (vue && cadreAvant && Math.abs(r.bottom - cadreAvant.bottom) < 1 && Math.abs(r.width - cadreAvant.width) < 1 && Math.abs(r.top - cadreAvant.top) >= 1) {
+      vue = deplacer(vue, 0, (conteneur.clientHeight - cadreAvant.hauteur) / 2);
+    }
+    cadreAvant = { top: r.top, bottom: r.bottom, width: r.width, hauteur: conteneur.clientHeight };
     if (!vue) cadrer();
     else redessiner();
   });

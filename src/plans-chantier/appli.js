@@ -25,6 +25,7 @@ import { dessinerVignette, symboleDeLObjet } from './dessin.js';
 import { geometrieCotation, lignesDuTexte, CATEGORIES_ZONE, STYLES_LIGNE } from '../topo/plan-chantier.js';
 import { SENS_DEVIATION, CLE_DEVIATION } from '../topo/panneau-deviation.js';
 import { CLE_PARKING } from '../topo/parking-dynamique.js';
+import { CLE_POMPE, LONGUEUR_POMPE } from '../topo/pompe-dynamique.js';
 import { ouvrirGestionPhases } from './gestion-phases.js';
 import { ouvrirGestionCalques, plansAvecCalques } from './gestion-calques.js';
 import { autogrueDe, TONNES_MOBILES, FLECHE_MOBILE_MIN } from '../topo/grue-mobile.js';
@@ -381,7 +382,7 @@ export function ouvrirPlansChantier({
         ${groupe('Construction', bt('data-action="construction-visible"', '<path d="M2 12S6 5 12 5S22 12 22 12S18 19 12 19S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', 'Montrer / cacher les lignes de construction (jamais imprimées)'))}
         ${groupe('Zoom', `${bt('data-zoom="tout"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Tout voir')}`)}
       </div>
-      <div class="ruban-element" data-zone="bandeau-element" hidden></div>
+      <div class="ruban-element" data-zone="bandeau-element"></div>
       <p class="consigne-calage" data-zone="consigne"></p>
       <div class="saisie-longueur" data-zone="saisie" hidden>
         <label>Longueur <input type="text" inputmode="decimal" size="7" data-saisie="longueur" placeholder="m" autocomplete="off"></label>
@@ -1390,11 +1391,14 @@ export function ouvrirPlansChantier({
   function majBandeau(o, p, propre = '', reglagesOutil = '') {
     const zone = page.querySelector('[data-zone="bandeau-element"]');
     if (!zone) return;
-    zone.hidden = !o && !(reglagesOutil && etat.outil !== 'choisir');
+    // 0.305.0 : le bandeau est toujours là, à hauteur fixe (rien ne saute quand on choisit un élément ou un outil).
+    zone.hidden = false;
+    const avecOutil = Boolean(reglagesOutil && etat.outil !== 'choisir');
     if (!o) {
       // 0.296.0 : les réglages de l'outil actif sont dans le bandeau du haut (plus dans la colonne de droite)
       const nom = [...OUTILS, ...[['symbole', '', 'Symbole']]].find(([c]) => c === etat.outil)?.[2] ?? 'Outil';
-      zone.innerHTML = zone.hidden ? '' : `<span class="puce-element">Outil : ${echapper(nom)}</span><div class="propre-element">${reglagesOutil}</div>`;
+      zone.innerHTML = avecOutil ? `<span class="puce-element">Outil : ${echapper(nom)}</span><div class="propre-element">${reglagesOutil}</div>`
+        : '<span class="aide-calage">Aucun élément choisi : touchez un élément du plan, ou prenez un outil du ruban.</span>';
       return;
     }
     const k = echelleDeLObjet(o);
@@ -1441,7 +1445,8 @@ export function ouvrirPlansChantier({
       return `<label class="champ-calage"><span>Taille de la grue</span><select data-prop="tonnes">${TONNES_MOBILES.map((t) => `<option value="${t}" ${t === a.t ? 'selected' : ''}>${t} t</option>`).join('')}</select></label>
         ${champNombre('Rotation de la tourelle (par rapport au porteur)', 'prop', 'tourelle', o.tourelle ?? 0, -360, 360, 1, '°')}
         ${champNombre('Longueur de la flèche', 'prop', 'fleche', sy?.fleche ?? o.fleche ?? 20, FLECHE_MOBILE_MIN, a.fleche, 0.5, 'm')}
-        ${champCase('Stabilisateurs sortis', 'prop-case', 'stabilisateurs', o.stabilisateurs !== false)}`;
+        ${champCase('Stabilisateurs sortis', 'prop-case', 'stabilisateurs', o.stabilisateurs !== false)}
+        ${champCase('Repliée (sur la route)', 'prop-case', 'repliee', Boolean(o.repliee))}`;
     }
     if (o.type === 'grue') {
       // 0.290.0 : longueur de flèche et côté du châssis tapés librement (les longueurs du DXF sont proposées).
@@ -1468,6 +1473,12 @@ export function ouvrirPlansChantier({
         <label class="champ-calage"><span>Texte de l'étage</span><input type="text" maxlength="30" value="${echapper(textes[0])}" data-etage-texte="0"></label>
         <label class="champ-calage"><span>Texte du rez</span><input type="text" maxlength="30" value="${echapper(textes[1])}" data-etage-texte="1"></label>`;
     }
+    if (o.cle === CLE_POMPE) {
+      // 0.305.0 : pompe à béton réglable : mât plié / déplié, longueur et rotation du mât.
+      return `${champCase('Mât déplié', 'prop-case', 'deploye', o.deploye !== false)}
+        ${o.deploye !== false ? `${champNombre('Longueur du mât', 'prop', 'longueur', o.longueur ?? LONGUEUR_POMPE.depart, LONGUEUR_POMPE.min, LONGUEUR_POMPE.max, 1, 'm')}
+        ${champNombre('Rotation du mât (par rapport au camion)', 'prop', 'tourelle', o.tourelle ?? 0, -360, 360, 1, '°')}` : ''}`;
+    }
     if (o.cle === CLE_PARKING) {
       return `${champNombre('Nombre de places côte à côte', 'prop', 'nombre', o.nombre ?? 1, 1, 30, 1, '')}
         <label class="champ-calage"><span>Couleur</span><input type="color" value="${o.couleur ?? '#1f5fae'}" data-prop="couleur"></label>`;
@@ -1476,7 +1487,7 @@ export function ouvrirPlansChantier({
       return `<label class="champ-calage"><span>Texte du panneau</span><input type="text" maxlength="30" value="${echapper(o.texte ?? 'Lugano')}" data-prop="texte"></label>
         <label class="champ-calage"><span>Sens</span><select data-prop="sens">${SENS_DEVIATION.map(([v, t]) => `<option value="${v}" ${(o.sens ?? 'droite') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
     }
-    const tourelle = sy?.pivote ? champNombre('Rotation de la tourelle (par rapport au châssis)', 'prop', 'tourelle', o.tourelle ?? 0, -360, 360, 1, '°') : '';
+    const tourelle = sy?.pivote ? champNombre(sy.pivote.libelle ?? 'Rotation de la tourelle (par rapport au châssis)', 'prop', 'tourelle', o.tourelle ?? 0, -360, 360, 1, '°') : '';
     const etiq = `<label class="champ-calage"><span>Texte sur le bloc</span><input type="text" maxlength="40" value="${echapper(o.etiquette ?? '')}" placeholder="ex. Bureaux" data-prop="etiquette"></label>`;
     return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${tourelle}${etiq}${rotation}${orienter}`;
   }
@@ -2026,10 +2037,11 @@ export function ouvrirPlansChantier({
         majPanneau();
         return vue?.redessinerDessus();
       }
-      if (cle === 'stabilisateurs') {
+      if (cle === 'stabilisateurs' || cle === 'repliee' || cle === 'deploye') {
         if (!avantChangement()) return;
-        o.stabilisateurs = c.checked;
+        o[cle] = c.checked;
         enregistrer();
+        majPanneau();
         return vue?.redessinerDessus();
       }
       if (cle === 'rayon') {

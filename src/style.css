@@ -14931,3 +14931,43 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .ouvrage-ligne label { display: flex; align-items: center; gap: 3px; }
 .panneau-plateformes input.hv-large { width: 78px; }
 .svg-coupe .ouvrage-coupe { fill: #475569; fill-opacity: 0.55; stroke: #334155; stroke-width: 1; }
+
+/* 0.304.0 : Plateformes : tableau compact qui défile, bulle de saisie sur le plan. */
+.tableau-plateforme { padding: 6px 8px; gap: 4px; }
+.partie-tableau:not([hidden]) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+.partie-tableau .barre-calage { flex: none; }
+.cadre-tableau-plateforme { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.table-plateforme { font-size: 0.8rem; }
+.table-plateforme th, .table-plateforme td { padding: 0 4px; line-height: 1.25; }
+.table-plateforme th { font-size: 0.7rem; }
+.table-plateforme input[type='text'] { height: 20px; padding: 0 4px; border-radius: 4px; width: 78px; }
+.table-plateforme input.hv { width: 48px; }
+.table-plateforme input[type='checkbox'] { margin: 0; width: 14px; height: 14px; vertical-align: middle; }
+.table-plateforme tr.ligne-cote td { font-size: 0.76rem; }
+.table-plateforme .bouton-lien { font-size: 0.9rem; line-height: 1; }
+.bulle-plateforme { position: absolute; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 5px 7px; background: var(--surface); color: var(--encre); border: 1.5px solid #6d28d9; border-radius: 8px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); font-size: 0.8rem; cursor: default; }
+.bulle-plateforme label { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.bulle-plateforme input { width: 86px; padding: 3px 6px; border: 1px solid var(--bordure); border-radius: 6px; background: var(--surface); color: var(--encre); font: inherit; text-align: right; }
+.bulle-plateforme .petit { padding: 3px 8px; min-height: 0; }
+
+/* 0.304.0 : Plans de chantier : bandeau de l'élément plus bas (moins de vide) ; la partie propre suit la 1re ligne
+   et ne prend que la hauteur de son contenu (au plus 2 lignes, défilement au-delà). */
+.page-chantier .ruban-element { padding: 3px 8px; gap: 4px 8px; }
+.page-chantier .ruban-element .propre-element { flex-basis: auto; flex: 1 1 auto; height: auto; max-height: 68px; padding-top: 0; border-top: none; align-items: center; align-content: flex-start; gap: 4px 10px; }
+.page-chantier .ruban-element .propre-element .champ-calage { flex-direction: row; align-items: center; gap: 4px; min-width: 0; }
+.page-chantier .ruban-element .propre-element .champ-calage > span { white-space: nowrap; }
+.table-plateforme input[type='text'], .table-plateforme button, .bulle-plateforme input, .bulle-plateforme button { min-height: 0; min-width: 0; box-sizing: border-box; }
+.table-plateforme input[type='text'] { height: 20px; }
+.table-plateforme button { height: 20px; padding: 0 3px; }
+.bulle-plateforme input { height: 28px; }
+.bulle-plateforme button { height: 28px; }
+.page-chantier .ruban-element input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']), .page-chantier .ruban-element select, .page-chantier .ruban-element .genre-deroulant summary { min-height: 0; height: 26px; padding-top: 1px; padding-bottom: 1px; box-sizing: border-box; font-size: 12px; }
+.page-chantier .ruban-element .bouton-secondaire.petit { height: 24px; }
+.page-chantier .ruban-element .propre-element { max-height: 92px; row-gap: 3px; }
+.page-chantier .ruban-element .propre-element .case-chantier { min-height: 0; padding: 0; gap: 4px; font-size: 12px; }
+.page-chantier .ruban-element .propre-element input[type='checkbox'] { width: 16px; height: 16px; min-height: 0; margin: 0; }
+
+/* 0.305.0 : Plans de chantier : bandeau toujours visible, à hauteur fixe (le plan ne change plus de taille). */
+.page-chantier .ruban-element { height: 112px; box-sizing: border-box; overflow-y: auto; align-content: flex-start; }
+.page-chantier .ruban-element > .aide-calage { margin: 0; align-self: center; }
+.page-chantier .ruban-element { flex-shrink: 0; }

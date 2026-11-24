@@ -222,7 +222,7 @@ function blocDuPoseBrut(o, bib) {
     const g = grueDeLObjet(bib, o);
     if (!g) return null;
     const ch = chassisLibre(bib, o.chassis);
-    const orient = o.modele === 'mobile' ? `_${g.tonnes}T_T${Math.round(Number(o.tourelle) || 0)}${o.stabilisateurs === false ? '_SANS' : ''}` : Number(o.rotationFleche) ? `_R${Math.round(o.rotationFleche)}` : '';
+    const orient = o.modele === 'mobile' ? `_${g.tonnes}T_T${Math.round(Number(o.tourelle) || 0)}${o.stabilisateurs === false ? '_SANS' : ''}${o.repliee ? '_REPLIEE' : ''}` : Number(o.rotationFleche) ? `_R${Math.round(o.rotationFleche)}` : '';
     const base = `GRUE_${o.modele === 'auto' ? 'AUTO' : o.modele === 'mobile' ? 'MOBILE' : 'TOUR'}_${g.fleche}M${ch ? `_${ch.cote.toFixed(2)}` : ''}${orient}`;
     return { base, nom: nomDeBloc(base), primitives: [...(ch?.primitives ?? []), ...g.primitives], fleche: g.fleche };
   }

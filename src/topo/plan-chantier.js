@@ -13,7 +13,7 @@
 //             (taille = hauteur des lettres en m ; repere = point visé par la ligne de repère, facultatif)
 //   symbole : { point (centre), rotation (°, sens trigonométrique), cle (symbole de la bibliothèque, topo/symboles.js),
 //             etage { pose 0–7, textes ['1er', 'Rez'] } (base-vie à étage) }                         (0.289.0)
-//   grue   : { point (la tour), rotation, modele ('tour' | 'auto' | 'mobile'), rotationFleche (°, tour / auto), tonnes + tourelle (°) + stabilisateurs (mobile), fleche (m), chassis ('4.50'… | 'aucun'), rayon (bool) }
+//   grue   : { point (la tour), rotation, modele ('tour' | 'auto' | 'mobile'), rotationFleche (°, tour / auto), tonnes + tourelle (°) + stabilisateurs + repliee (mobile), fleche (m), chassis ('4.50'… | 'aucun'), rayon (bool) }
 // Unités du dessin (0.288.0) : épaisseurs de trait, taille et espacement des motifs en **mm sur le papier** ; sur le
 // terrain, 1 mm de papier = « échelle du plan » / 1000 m (plan.echelle, 200 au départ : 1 mm = 0,2 m).
 
@@ -438,6 +438,7 @@ export function resumeObjet(o) {
   if (o.type === 'construction') return o.infinie ? 'Construction · droite' : `Construction · segment ${n(longueur(o.points))} m`;
   if (o.type === 'grue' && o.modele === 'mobile') return `Grue mobile ${o.tonnes ?? 100} t · flèche ${o.fleche ?? 25} m`;
   if (o.type === 'grue') return `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'} · flèche ${o.fleche ?? 40} m${o.chassis && o.chassis !== 'aucun' ? ` · châssis ${o.chassis}` : ''}`;
+  if (o.type === 'symbole' && o.cle === 'dyn:pompe') return o.deploye === false ? 'Pompe à béton · mât plié' : `Pompe à béton · mât ${o.longueur ?? 28} m`;
   if (o.type === 'symbole' && o.cle === 'dyn:parking') return `Parking réservé · ${o.nombre ?? 1} place${(o.nombre ?? 1) > 1 ? 's' : ''}`;
   if (o.type === 'symbole' && o.cle === 'dyn:deviation') return `Panneau de déviation « ${o.texte ?? ''} »`;
   if (o.type === 'symbole') return o.etage ? 'Base-vie à étage' : String(o.cle ?? '').replace(/^[a-z]+:/, '');
