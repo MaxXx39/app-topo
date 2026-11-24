@@ -139,6 +139,11 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Étapes 1 à 4 faites** (0.286.0 → 0.289.0, Expert, site PC + Topo Bureau). **Petits restes** : tableau des modes (`docs/modes-base-intermediaire-expert.xlsx`) pas mis à jour (Plans de chantier, Calage, Comparer) ; jamais essayé sur Topo Bureau ni avec swisstopo (bloqué ici) ; la maquette est faite pour 1366 × 768 (portrait tablette non prévu).
 - **À valider avec l'utilisateur** : « une page par phase » = la phase seule + les phases cochées « sur toutes les pages » (choix fait sans lui) ; poses de l'escalier (lecture du bloc « Base vie Etage » : palier le long du petit côté, volée de 3 m le long du grand ; « petit côté » = échange des axes) ; matériaux d'après les couleurs (table `MATERIAUX` de `topo/symboles.js`) ; phares / feux placés par fractions de la boîte (camions : devant = y mini ; chargeuse : devant = x maxi).
 
+## Idées validées par l'utilisateur (24.11, pas encore codées)
+- **Implanter le plan de chantier** : le plan de chantier devient un calque dans Terrain (Implanter : point, ligne, abscisse). Idée jugée intéressante ; mode et détails **à demander avant de coder**.
+- **Zone de survol interdit pour une grue** : zone dessinée et marquée « survol interdit » pour une grue, avec le rayon de la grue coupé en rouge et le secteur autorisé. Idée jugée intéressante ; mode, marge et règles **à demander avant de coder** (valeurs de sécurité données par l'utilisateur, jamais devinées).
+- Les autres idées (maquettes du 24.11) ne sont **pas validées** : ne rien coder sans accord.
+
 ## Demande du 24.11 : 3 lots (décisions de l'utilisateur, maquette Plateformes validée)
 - **Lot 1 = 0.298.0 (fait)** : effacer à la main au nettoyage du calage + PDF dans Caler plan (voir 0.298.0).
 - **Lot 2 = 0.299.0 (fait, voir plus bas)** — Plans de chantier, Expert : points levés **affichés par liste** (fenêtre de cases comme « Plans… ») + **une case commune « noms des points »** ; zones **« Phase »** et **« Autre »** = juste deux nouveaux genres de zone (couleurs à choisir, pas encore données) ; **type de trait du contour** d'une zone réglable ; **hachures en plus du remplissage**, plusieurs formes, **angle et espacement réglables** ; petit **« + » au milieu de chaque côté** (ligne, zone, flèche, piste) = ajouter un point (pas dans Réseaux).
