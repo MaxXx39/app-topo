@@ -29,7 +29,7 @@ import { ouvrirGestionPhases } from './gestion-phases.js';
 import { ouvrirGestionCalques, plansAvecCalques } from './gestion-calques.js';
 import { autogrueDe, TONNES_MOBILES, FLECHE_MOBILE_MIN } from '../topo/grue-mobile.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
-import { categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu } from '../topo/plan-chantier.js';
+import { pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
 import { reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
@@ -39,6 +39,8 @@ import { PALEUR_ORTHO } from './tuiles.js';
 
 const OUTILS = [
   ['zone', '<path d="M4 8L12 4L20 9L17 19H6Z"/>', 'Zone'],
+  ['rectangle', '<path d="M4 9L15 4L20 15L9 20Z"/>', 'Rectangle'],
+  ['rond', '<circle cx="12" cy="12" r="8"/><path d="M12 12H20"/>', 'Rond'],
   ['ligne', '<path d="M3 18L9 8L15 14L21 5"/>', 'Ligne'],
   ['fleche', '<path d="M3 14H15V9L21 15L15 21V16H3Z"/>', 'Flèche'],
   ['texte', '<path d="M5 6H19M12 6V20M9 20H15"/>', 'Texte'],
@@ -439,7 +441,10 @@ export function ouvrirPlansChantier({
             }
             if (!toucheSymbole(o, p, tol)) return false;
             if (!avantChangement()) return false;
-            etat.glisse = { type: 'objet', decal: [p[0] - o.point[0], p[1] - o.point[1]] };
+            // 0.301.0 : saisi près d'un coin ou du milieu d'un bord de sa boîte : c'est CE point qui suit la souris et
+            // s'accroche (coller le coin d'un conteneur sur une ligne) ; ailleurs, le point saisi.
+            const base = sy ? pointDeBase(coinsSymbole(o, sy), p, tol * 1.5) : p;
+            etat.glisse = { type: 'objet', decal: [base[0] - o.point[0], base[1] - o.point[1]] };
             return true;
           }
           let i = sommetSousLePoint(o, p, tol);
@@ -473,6 +478,12 @@ export function ouvrirPlansChantier({
             o.points = ajouterPointAuMilieu(o.points, etat.glisse.index, o.type === 'zone');
             etat.glisse = { type: 'sommet', i: etat.glisse.index + 1 };
           }
+          if (etat.glisse?.type === 'sommet' && o.cercle) {
+            // Rond : centre = le déplacer ; point du bord = changer le rayon.
+            if (etat.glisse.i === 0) deplacerObjet(o, point[0] - o.cercle.centre[0], point[1] - o.cercle.centre[1]);
+            else changerRayon(o, Math.hypot(point[0] - o.cercle.centre[0], point[1] - o.cercle.centre[1]));
+            return;
+          }
           if (etat.glisse?.type === 'sommet') {
             if (o.type === 'texte') o.repere = point;
             else o.points[etat.glisse.i] = point;
@@ -499,6 +510,18 @@ export function ouvrirPlansChantier({
       if (source) return { outil: 'ortho-repere', points: [], source, style: 'libre' };
     }
     const s = etat.saisie;
+    // 0.301.0 : aperçu du rectangle (2 coins posés) et du rond (centre posé) qui suit la souris.
+    if (s && etat.curseur && s.outil === 'rectangle' && s.points.length === 2) {
+      const r = rectangleTroisPoints(s.points[0], s.points[1], etat.curseur);
+      if (r) return { ...s, apercu: [...r, r[0]] };
+    }
+    if (s && etat.curseur && s.outil === 'rond' && s.points.length === 1) {
+      const rayon = Math.hypot(etat.curseur[0] - s.points[0][0], etat.curseur[1] - s.points[0][1]);
+      if (rayon > 0.001) {
+        const r = pointsDuRond(s.points[0], rayon, 48);
+        return { ...s, apercu: [...r, r[0]] };
+      }
+    }
     if (!s?.source || !etat.curseur) return s;
     return { ...s, apercu: decalerPolyligne(s.source, coteDuPoint(s.source, etat.curseur) * etat.distanceDecalage) };
   }
@@ -636,7 +659,7 @@ export function ouvrirPlansChantier({
   /** Supprime le sommet touché de la ligne, piste, flèche ou zone choisie (au moins 2 points, 3 pour une zone). */
   function supprimerSommet(p, tolerance) {
     const o = plan().objets.find((x) => x.id === etat.choisi);
-    if (!o || !Array.isArray(o.points) || o.type === 'construction' || o.type === 'cotation') return false;
+    if (!o || !Array.isArray(o.points) || o.type === 'construction' || o.type === 'cotation' || o.cercle) return false;
     const i = sommetSousLePoint(o, p, tolerance * 1.5);
     if (i < 0) return false;
     const min = o.type === 'zone' ? 3 : 2;
@@ -738,9 +761,45 @@ export function ouvrirPlansChantier({
     const dernier = s.points[s.points.length - 1];
     if (!dernier || Math.hypot(p[0] - dernier[0], p[1] - dernier[1]) > 1e-6) s.points.push(p);
     if (s.outil === 'construction' && s.points.length >= 2) return finirSaisie(); // 2 points : la ligne est faite
+    if (s.outil === 'rectangle' && s.points.length >= 3) return creerForme(); // 0.301.0 : un côté puis la largeur
+    if (s.outil === 'rond' && s.points.length >= 2) return creerForme(); // centre puis un point du bord
     if (s.outil === 'cotation' && s.points.length >= 3) return creerCotation(s.points);
     majConsigne();
     vue?.redessinerDessus();
+  }
+
+  /** 0.301.0 : rectangle (3 clics) ou rond (centre + bord, ou rayon tapé) = une zone du genre choisi. */
+  function creerForme(rayonTape = null) {
+    const s = etat.saisie;
+    if (!s) return;
+    let champs;
+    if (s.outil === 'rond') {
+      const centre = s.points[0];
+      const rayon = rayonTape ?? (s.points[1] ? Math.hypot(s.points[1][0] - centre[0], s.points[1][1] - centre[1]) : 0);
+      if (!(rayon > 0.001)) return message('Rayon nul : cliquez un point du bord ou tapez le rayon.', 3000);
+      const cercle = { centre: centre.map((v) => Math.round(v * 1000) / 1000), rayon: Math.round(rayon * 1000) / 1000 };
+      champs = { cercle, points: pointsDuRond(cercle.centre, cercle.rayon) };
+    } else {
+      const coins = rectangleTroisPoints(...s.points.slice(0, 3));
+      if (!coins) {
+        s.points.length = 2;
+        return message('Le 3e point est sur le côté : cliquez à côté pour donner la largeur.', 3000);
+      }
+      champs = { points: coins };
+    }
+    if (!avantChangement()) return;
+    const o = ajouterObjet(plan(), {
+      type: 'zone', ...champs, categorie: s.categorie, opacite: etat.opacite, contourMm: etat.contourMm ?? undefined,
+      traitContour: etat.traitContour !== 'continu' ? etat.traitContour : undefined,
+      hachure: etat.hachure.motif !== 'aucune' ? compact({ ...etat.hachure, couleur: etat.hachure.couleur || undefined }) : undefined,
+    });
+    for (const k of Object.keys(o)) if (o[k] === undefined) delete o[k];
+    etat.saisie = null;
+    etat.choisi = o.id;
+    etat.outil = 'choisir';
+    vue?.oublierCurseur();
+    enregistrer();
+    majTout();
   }
 
   /** Cotation : longueur = A, B puis un 3e point qui donne le côté et la distance de la ligne de cote ; angle = sommet, P1, P2. */
@@ -833,6 +892,10 @@ export function ouvrirPlansChantier({
       return creerConstruction([dernier, pointALaDistance(dernier, 10, angleTape)], true);
     }
     if (longueurTapee === null || !(longueurTapee > 0)) return message('Tapez une longueur en mètres (plus grande que 0).', 3000);
+    if (s.outil === 'rond') {
+      for (const c of page.querySelectorAll('[data-saisie]')) c.value = '';
+      return creerForme(longueurTapee); // rayon tapé
+    }
     const angle = angleTape ?? (etat.curseur ? angleVers(dernier, etat.curseur) : null);
     if (angle === null) return message('Bougez la souris pour donner la direction, ou tapez un angle.', 3500);
     const p = pointALaDistance(dernier, longueurTapee, angle);
@@ -1159,6 +1222,8 @@ export function ouvrirPlansChantier({
     const textes = {
       choisir: etat.choisi ? (estPose(plan().objets.find((x) => x.id === etat.choisi) ?? {}) ? 'Glisser le symbole = le déplacer (le point saisi s\'accroche) ; poignée ronde = le tourner ; Suppr = l\'effacer ; Échap = ne plus le choisir.' : 'Glisser une poignée (carré) = déplacer ce sommet ; Maj + clic ou double-clic sur un carré = supprimer ce point ; glisser l\'élément = le déplacer ; Suppr = l\'effacer ; Échap = ne plus le choisir.') : 'Cliquez un élément pour le choisir (ou dans la liste à droite). Molette = zoom, glisser dans le vide = déplacer le plan.',
       symbole: etat.pose ? 'Cliquez où poser le symbole (son centre). La rotation de pose se règle à droite.' : 'Choisissez un symbole dans la bibliothèque (à gauche).',
+      rectangle: n === 0 ? 'Rectangle : cliquez le 1er coin.' : n === 1 ? 'Cliquez le 2e coin (le 1er côté).' : 'Cliquez de quel côté et à quelle distance : la largeur.',
+      rond: n === 0 ? 'Rond : cliquez le centre.' : 'Cliquez un point du bord, ou tapez le rayon (m) puis Entrée.',
       zone: n >= 3 ? 'Cliquez le sommet suivant ; cliquez le 1er sommet (ou Entrée, double-clic) pour fermer la zone.' : 'Cliquez les sommets de la zone.',
       ligne: n >= 2 ? 'Point suivant ; Entrée ou double-clic = finir.' : 'Cliquez le départ de la ligne.',
       piste: n >= 2 ? 'Point suivant de l\'axe ; Entrée ou double-clic = finir.' : 'Cliquez le départ de l\'axe de la piste.',
@@ -1185,6 +1250,8 @@ export function ouvrirPlansChantier({
       saisie.hidden = !actif;
       const lon = saisie.querySelector('[data-saisie="longueur"]');
       if (lon) lon.closest('label').hidden = actif && etat.saisie.outil === 'construction' && etat.constructionMode === 'angle';
+      const ang = saisie.querySelector('[data-saisie="angle"]');
+      if (ang) ang.closest('label').hidden = actif && etat.saisie.outil === 'rond'; // rond : seulement le rayon
     }
   }
 
@@ -1252,7 +1319,7 @@ export function ouvrirPlansChantier({
       decaler: `${champNombre('Distance du décalage', 'reglage', 'distanceDecalage', etat.distanceDecalage, 0.01, 100, 0.05, 'm')}
         ${champCase('En ligne de construction (parallèle)', 'reglage-case', 'decalerConstruction', etat.decalerConstruction)}
         ${selectGenresOutil('ligne', etat.style)}`,
-    }[etat.outil] ?? '';
+    }[['rectangle', 'rond'].includes(etat.outil) ? 'zone' : etat.outil] ?? '';
     let choisi = '';
     let propreHtml = '';
     if (o) {
@@ -1264,6 +1331,7 @@ export function ouvrirPlansChantier({
           ${champCurseur('Transparence du fond (opacité)', 'prop', 'opacite', o.opacite ?? OPACITE_ZONE)}
           ${champNombre('Épaisseur du contour', 'prop', 'contourMm', contourZoneMm(o), 0.05, 5, 0.05, 'mm')}
           ${champCase('Afficher la surface (m²)', 'prop-case', 'afficherSurface', o.afficherSurface)}
+          ${o.cercle ? champNombre('Rayon du rond', 'prop', 'rayonRond', o.cercle.rayon, 0.01, 10000, 0.1, 'm') : ''}
           ${champsStyleZone('hachure', o.traitContour, o.hachure, couleurObjet(p, o))}
           <label class="champ-calage"><span>Matériau du stock</span><select data-prop="materiau"><option value="">— (couleur du genre)</option>
             ${MATERIAUX_TAS.map((m) => `<option value="${m.cle}" ${o.materiau === m.cle ? 'selected' : ''}>${m.nom}</option>`).join('')}</select></label>
@@ -2002,6 +2070,12 @@ export function ouvrirPlansChantier({
         if (valeur === null) return majPanneau();
       }
       if (!avantChangement()) return;
+      if (cle === 'rayonRond') {
+        changerRayon(o, valeur);
+        enregistrer();
+        majPanneau();
+        return vue?.redessinerDessus();
+      }
       o[cle] = valeur;
       if (cle === 'fin' && !valeur) delete o.fin;
       if (cle === 'etiquette' && !valeur) delete o.etiquette;

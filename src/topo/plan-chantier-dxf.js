@@ -130,7 +130,9 @@ export function dxfPlanChantier(plan, bib, objets = null) {
     const aci = aciProche(couleurObjet(plan, o));
     if (o.type === 'zone') {
       const c = calque(o, `ZONE_${categorieZone(o.categorie).nom}`, aci);
-      entites.push(...polyligne(o.points, c, { ferme: true }));
+      // 0.301.0 : un rond sort en vrai cercle
+      if (o.cercle) entites.push('0', 'CIRCLE', '8', c, '10', f3(o.cercle.centre[0]), '20', f3(o.cercle.centre[1]), '30', '0', '40', f3(o.cercle.rayon));
+      else entites.push(...polyligne(o.points, c, { ferme: true }));
       // 0.299.0 : hachures = traits (LINE) et petits cercles (points) sur un calque « …_HACHURES ».
       const reglage = hachureDeLaZone(plan, o);
       if (reglage) {

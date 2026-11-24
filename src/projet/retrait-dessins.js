@@ -1,7 +1,9 @@
 // Suppression de Calculs › Dessin (0.300.0, décision du 24.11 : remplacé par l'application Plateformes ; « les
 // supprimer »). À l'ouverture d'un projet, les dessins sont retirés, avec ce qui ne servait qu'à eux : leurs surfaces
 // (surfaces « Surf-… » faites dans Dessin, champ dessinId), les levés « Surface » dédiés à ces surfaces, les calculs de
-// volume qui les utilisaient, et les dessins archivés. La DAO (plan dessiné, dans projet.plansDxf) n'est pas touchée.
+// volume qui les utilisaient, et les dessins archivés.
+// 0.301.0 : la DAO est supprimée aussi (décision du 24.11 : « les effacer ») : les plans DAO (plans du projet avec le
+// champ `dao`) sont retirés, archivés compris.
 
 /** Retire les dessins du projet (il est modifié). Renvoie { dessins, surfaces, leves, calculs } : nombres retirés. */
 export function retirerDessins(projet) {
@@ -20,5 +22,9 @@ export function retirerDessins(projet) {
   projet.dessins = [];
   projet.archives = (projet.archives ?? []).filter((a) => a.type !== 'dessin');
   for (const archive of projet.archives) if (archive.contenu?.dessins) delete archive.contenu.dessins;
-  return { dessins, surfaces: parties.length, leves: levesAvant - (projet.leves ?? []).length, calculs: calculsAvant - (projet.calculs ?? []).length };
+  const plansAvant = (projet.plansDxf ?? []).length;
+  if (projet.plansDxf) projet.plansDxf = projet.plansDxf.filter((p) => !p.dao);
+  for (const archive of projet.archives) if (Array.isArray(archive.contenu?.plansDxf)) archive.contenu.plansDxf = archive.contenu.plansDxf.filter((p) => !p.dao);
+  projet.archives = projet.archives.filter((a) => !(a.type === 'plan' && Array.isArray(a.contenu?.plansDxf) && a.contenu.plansDxf.length === 0));
+  return { dao: plansAvant - (projet.plansDxf ?? []).length, dessins, surfaces: parties.length, leves: levesAvant - (projet.leves ?? []).length, calculs: calculsAvant - (projet.calculs ?? []).length };
 }

@@ -82,7 +82,6 @@ import { suivreClavier } from './outils/clavier.js';
 import { pointAvecDelta, deltaActif } from './topo/delta.js';
 import { ligneDecalee, rangerLigneDecalee } from './topo/ligne-decalee.js';
 import { pointsOutil, penteEngin } from './topo/outil.js';
-import { creerDao } from './dao/dao.js';
 import { creerBoutonRecepteur } from './leve/recepteur.js';
 import { surChangementListes } from './reglages/listes-partagees.js';
 import { lireDossiers, ecrireDossiers, dossiersTries, dossierDuProjet, ajouterDossier, renommerDossier, supprimerDossier, rangerProjet, SANS_DOSSIER } from './projet/dossiers.js';
@@ -370,7 +369,7 @@ const ajoutLevee = { actif: false, accroche: 'point', choix: null };
 // Terrain › Lever ; son panneau reste caché (l'éditeur garde le levé affiché et les triangles en trop).
 const PARTIES_CALCULS = [
   ['volumes', 'Volumes'],
-  ['dessin', 'DAO'], // 0.300.0 : la liste « Dessin » est supprimée (Plateformes) ; restent la DAO et les talus de surface
+  ['dessin', 'Talus'], // 0.300.0 : Dessin supprimé (Plateformes) ; 0.301.0 : DAO supprimée ; reste le talus d'une surface
 ];
 const boutonPartie = ([cle, titre]) => `<button type="button" data-partie="${cle}">${titre}</button>`;
 const estPartieCalculs = (nom) => PARTIES_CALCULS.some(([cle]) => cle === nom);
@@ -416,8 +415,7 @@ document.querySelector('#app').innerHTML = `
         <div id="mesures"></div>
       </section>
       <section class="panneau" data-onglet="dessin">
-        <h2>DAO ${bulle('dessin')}</h2>
-        <button type="button" class="bouton seulement-expert bouton-dao" id="bouton-dao">DAO : dessiner sur le plan</button>
+        <h2>Talus d'une surface ${bulle('dessin')}</h2>
         <div id="dessins" hidden></div><!-- 0.300.0 : Dessin supprimé (remplacé par Plateformes), gardé caché -->
         <div id="talus-surfaces" class="carte-section"></div>
       </section>
@@ -544,7 +542,6 @@ const RELAIS_BANDE = {
   prendre: '#leve-direct .cadre-prise .bouton-prendre',
   implanter: '#leve-direct [data-action="implanterChoix"].bouton-implanter, #leve-direct [data-action="implanterLigneChoisie"].bouton-implanter, #leve-direct [data-action="implanterPointsLigne"].bouton-implanter',
   enregistrer: '#leve-direct [data-action="enregistrerImplantation"]',
-  dao: '#bouton-dao',
   // 0.242.0 : Réseaux › Créer : « Enregistrer le réseau » est dans la bande du bas.
   'enregistrer-reseau': '#reseaux-ecran [data-action="enregistrer-reseau"]',
   // 0.167.0 : Implanter › Altitude (bouton « Alti ici ») et Guidage (choix des lignes) sont dans la bande.
@@ -569,7 +566,6 @@ const ICONE_PHOTO_BANDE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="
  * - Implanter : « Implanter » + nom du point et altitude (ou nom de la ligne) quand un élément est choisi ;
  *   Point en guidage (dès Intermédiaire) : « Enregistrer l'implantation » ;
  * - Contrôle : « Enregistrer le contrôle » quand un point est visé ;
- * - Calculs › Dessin (Expert) : « DAO » ;
  * - Mesure rapide : voir mesureRapideBande ;
  * ailleurs rien : la bande s'efface. Note aussi quel bouton est relayé (body[data-relais]) pour cacher l'original.
  */
@@ -692,9 +688,6 @@ function contenuBande() {
   if (cle === 'controle') {
     const enregistrer = trouver('enregistrer');
     return enregistrer && autocontrole.cible ? boutonDeBande('enregistrer', 'Enregistrer le contrôle', autocontrole.cible.nom, enregistrer.disabled, 'Enreg.') : '';
-  }
-  if (cle === 'calculs' && document.body.dataset.onglet === 'dessin' && aAcces('expert')) {
-    return boutonDeBande('dao', daoAppli?.actif() ? 'Quitter la DAO' : 'DAO', 'dessiner sur le plan');
   }
   if (cle === 'reseaux') return trouver('enregistrer-reseau') ? boutonDeBande('enregistrer-reseau', 'Enregistrer le réseau', '', false, 'Enreg.') : '';
   if (cle === 'mesure') return mesureRapideBande();
@@ -1863,8 +1856,6 @@ function afficherOnglet(demande, { partie = null } = {}) {
   navigation?.fermer();
   majBoutonsTerrain();
   if (nom !== 'plan' && nom !== 'dessin') pilote = null;
-  // DAO (0.147.0) : seulement dans Calculs › Dessin (et le plan sur téléphone).
-  if (nom !== 'plan' && nom !== 'dessin' && daoAppli?.actif()) daoAppli.arreter();
   // Annotation (0.180.3) : en quittant l'application, la loupe « Manuel » disparaît (sinon elle recouvre le plan).
   if (ongletAvant !== nom) fermerEncadreAnnotation();
   if (ongletAvant === 'annotation' && nom !== 'annotation') {
@@ -3941,7 +3932,7 @@ function gererLoupeImplantation() {
 
 function envoyerImplantationAuPlan() {
   // Terrain › Contrôle (sans point choisi) : toucher le plan choisit un point de contrôle.
-  const accrocheActive = reseauxActif() || mesureRapideActive() || annotationActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(controlePlan.planId) || Boolean(daoAppli?.actif());
+  const accrocheActive = reseauxActif() || mesureRapideActive() || annotationActive() || choixLignesGuidageActif() || ((enImplantationDePoint() || enImplantationDeLigne() || (enAutocontrole() && !autocontrole.cible)) && ongletContexte === 'terrain') || pointage.actif || ajoutLevee.actif || Boolean(recalage.planId) || Boolean(controlePlan.planId);
   // 0.159.0 : les applications sont indépendantes : la Mesure rapide ne montre rien d'Implanter.
   const mesure = mesureRapideActive() || annotationActive() || reseauxActif();
   const enLigne = accrocheActive && !mesure && !pointage.actif && !ajoutLevee.actif && enImplantationDeLigne();
@@ -3993,7 +3984,7 @@ function envoyerImplantationAuPlan() {
         pointsControle,
         lignesAutres,
         chantiers,
-        choix: daoAppli?.actif() ? daoAppli.dernierPoint() : controlePlan.planId ? controlePlan.pointPlan : recalage.planId ? choixDuRecalage() : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : mesureRapideActive() && mesureRapideEtat.accroche === 'centrepts' ? centrePtsCalcule() : accrocheActive && !mesure && !enLigne && !enAutocontrole() ? implanter.choix : null,
+        choix: controlePlan.planId ? controlePlan.pointPlan : recalage.planId ? choixDuRecalage() : pointage.actif ? pointage.choix : ajoutLevee.actif ? ajoutLevee.choix : mesureRapideActive() && mesureRapideEtat.accroche === 'centrepts' ? centrePtsCalcule() : accrocheActive && !mesure && !enLigne && !enAutocontrole() ? implanter.choix : null,
         cible: cibleControle ?? (accrocheActive && !mesure && !enLigne && !enAutocontrole() && !ajoutLevee.actif ? implanter.cible : null),
         // Ligne : la ligne choisie (début, fin), sa parallèle s'il y a un décalage, les points en préparation.
         ligne: sommets ? { sommets, parallele: implanter.ligne.decalage && !enTalus() ? ligneParallele(sommets, implanter.ligne.decalage) : null, talus: enTalus() ? { zone: zoneDuTalus(), cote: terrain.talus.cote, ligneEst: terrain.talus.ligneEst } : null } : null,
@@ -6023,10 +6014,6 @@ function toucherPourImplantation(position, tolerance) {
   }
   if (choixLignesGuidageActif()) {
     toucherPourLigneGuidage(position, tolerance);
-    return;
-  }
-  if (daoAppli?.actif()) {
-    daoAppli.toucher(position, tolerance);
     return;
   }
   if (piloteActif()) {
@@ -8240,8 +8227,6 @@ document.addEventListener('visibilitychange', () => {
   else partage.verifierMaintenant();
 });
 
-// DAO (0.147.0, Expert) : voir dao/dao.js ; créée après le plan (plus bas).
-let daoAppli = null;
 const plan = creerPlan(document.querySelector('#plan'), {
   dossiersDuProjet: () => lireSousDossiers(projet),
   // Z sous la souris : altitude de la surface choisie dans Implanter (rien si pas de surface ou hors surface).
@@ -8327,37 +8312,7 @@ const plan = creerPlan(document.querySelector('#plan'), {
   },
 });
 
-// DAO (0.147.0, Expert, Calculs › Dessin) : dessiner des objets sur le plan (voir dao/dao.js).
-daoAppli = creerDao({
-  cadre: () => document.querySelector('#plan .plan-cadre'),
-  projet: () => projet,
-  nouvelId: () => nouvelIdentifiant(),
-  accrocher: (mode, position, tolerance) => {
-    const sources = mode === 'point' ? { lignes: [], cercles: [], points: pointsDuProjet() } : sourcesDesPlans(plansAccrochables(), position, tolerance);
-    return accrocher(mode, position, tolerance, avecToutesLesLignes(mode, sources));
-  },
-  demanderTexte,
-  demanderChamps,
-  confirmer: (texte) => confirm(texte),
-  surfaces: () => projet.surfaces.filter((x) => estMontre(projet, x, 'surface') && trianglesDeSurface(x.id).length > 0).map((x) => [x.id, x.nom]),
-  altitudeSur: (id) => {
-    const triangles = trianglesDeSurface(id);
-    return triangles.length > 0 ? chercheurAltitude(triangles) : null;
-  },
-  traitSous: (position, tolerance) => accrocherTrait(position, tolerance, sourcesDesPlans(plansAccrochables(), position, tolerance).lignes)?.sommets ?? null,
-  message: (texte, duree) => afficherMessage(texte, duree),
-  redessiner: () => recalculer(),
-  enregistrer: () => modifie(),
-  lectureSeule: () => refuserEnLectureSeule(),
-});
-document.querySelector('#bouton-dao').addEventListener('click', () => {
-  if (daoAppli.actif()) daoAppli.arreter();
-  else if (aAcces('expert')) {
-    if (estTelephone()) afficherOnglet('plan');
-    daoAppli.commencer();
-  }
-  navigation?.mettreAJour();
-});
+// 0.301.0 : DAO supprimée (décision du 24.11).
 
 /**
  * Ajoute des photos (réduites) à une surface ou à une mesure : objet.photos. attentePoint : la photo

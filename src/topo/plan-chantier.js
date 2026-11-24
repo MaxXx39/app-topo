@@ -339,6 +339,7 @@ export function objetSousLePoint(objets, p, tolerance, surSymbole = null) {
 export function deplacerObjet(o, dEst, dNord) {
   if (o.type === 'texte' || estPose(o)) o.point = [o.point[0] + dEst, o.point[1] + dNord]; // le point de repère reste en place
   else o.points = o.points.map(([e, n]) => [e + dEst, n + dNord]);
+  if (o.cercle) o.cercle = { ...o.cercle, centre: [o.cercle.centre[0] + dEst, o.cercle.centre[1] + dNord] };
   return o;
 }
 
@@ -445,7 +446,7 @@ export function resumeObjet(o) {
 
 /** Sommet d'un objet sous le point p (à tolerance m près) : son rang, ou -1 (pour le glisser par sa poignée). */
 export function sommetSousLePoint(o, p, tolerance) {
-  const pts = pointsDe(o);
+  const pts = poigneesDe(o);
   let meilleur = -1;
   let dMin = tolerance;
   pts.forEach((q, i) => {
@@ -984,7 +985,7 @@ export function hachureDeLaZone(plan, o) {
  * celui-ci), milieu [e, n] }]. Une zone a aussi le côté qui ferme (dernier → premier).
  */
 export function milieuxDesCotes(o) {
-  if (!['ligne', 'zone', 'fleche', 'piste'].includes(o?.type) || !o.points || o.points.length < 2) return [];
+  if (!['ligne', 'zone', 'fleche', 'piste'].includes(o?.type) || !o.points || o.points.length < 2 || o.cercle) return [];
   const n = o.points.length;
   const res = [];
   const cotes = o.type === 'zone' && n >= 3 ? n : n - 1;
@@ -1004,4 +1005,67 @@ export function ajouterPointAuMilieu(points, index, ferme = false) {
   const b = points[(index + 1) % n];
   const m = [Math.round(((a[0] + b[0]) / 2) * 1000) / 1000, Math.round(((a[1] + b[1]) / 2) * 1000) / 1000];
   return [...points.slice(0, index + 1), m, ...points.slice(index + 1)];
+}
+
+// --- Formes : rectangle et rond (0.301.0, demande du 24.11) ---
+// Ce sont des zones (contour, épaisseur, remplissage, hachures comme toute zone). Le rond garde son centre et son rayon
+// (o.cercle = { centre: [e, n], rayon }) ; ses points (polygone de 72 côtés) servent au dessin, à la surface, aux
+// hachures ; ses poignées sont le centre et un point du bord (rayon). DXF : un vrai cercle (CIRCLE).
+
+export const COTES_ROND = 72;
+
+/** Points d'un rond (polygone régulier de « n » côtés, en m, arrondis au mm). */
+export function pointsDuRond(centre, rayon, n = COTES_ROND) {
+  const m = (v) => Math.round(v * 1000) / 1000;
+  return Array.from({ length: n }, (_, i) => {
+    const a = (2 * Math.PI * i) / n;
+    return [m(centre[0] + rayon * Math.cos(a)), m(centre[1] + rayon * Math.sin(a))];
+  });
+}
+
+/**
+ * Rectangle par 3 clics : a et b = un côté, c donne la largeur (distance de c à la droite a → b, du côté de c).
+ * Renvoie les 4 coins [a, b, b + l, a + l], ou null si a et b sont confondus ou c sur la droite.
+ */
+export function rectangleTroisPoints(a, b, c) {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (L < 1e-6) return null;
+  const nx = -(b[1] - a[1]) / L;
+  const ny = (b[0] - a[0]) / L;
+  const l = (c[0] - a[0]) * nx + (c[1] - a[1]) * ny;
+  if (Math.abs(l) < 1e-6) return null;
+  const m = (v) => Math.round(v * 1000) / 1000;
+  return [a, b, [m(b[0] + nx * l), m(b[1] + ny * l)], [m(a[0] + nx * l), m(a[1] + ny * l)]];
+}
+
+/** Poignées d'un élément (carrés à glisser) : le centre et un point du bord pour un rond, sinon ses points. */
+export function poigneesDe(o) {
+  if (o?.cercle) return [o.cercle.centre, [o.cercle.centre[0] + o.cercle.rayon, o.cercle.centre[1]]];
+  return pointsDe(o);
+}
+
+/** Change le rayon d'un rond (et refait ses points). */
+export function changerRayon(o, rayon) {
+  if (!o?.cercle || !(rayon > 0)) return o;
+  o.cercle = { ...o.cercle, rayon: Math.round(rayon * 1000) / 1000 };
+  o.points = pointsDuRond(o.cercle.centre, o.cercle.rayon);
+  return o;
+}
+
+/**
+ * Point de base pour déplacer un symbole (0.301.0) : le coin ou le milieu de bord de sa boîte le plus proche du point
+ * saisi, à « tolerance » près ; sinon le point saisi lui-même. coins = les 4 coins de la boîte tournée.
+ */
+export function pointDeBase(coins, p, tolerance) {
+  const candidats = [...coins, ...coins.map((c, i) => {
+    const d = coins[(i + 1) % coins.length];
+    return [(c[0] + d[0]) / 2, (c[1] + d[1]) / 2];
+  })];
+  let meilleur = null;
+  let dMin = tolerance;
+  for (const q of candidats) {
+    const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (d <= dMin) [dMin, meilleur] = [d, q];
+  }
+  return meilleur ?? p;
 }

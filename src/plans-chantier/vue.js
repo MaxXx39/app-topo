@@ -5,7 +5,7 @@
 // glisser l'objet choisi = le déplacer (si glisserObjet le permet).
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
-import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles, milieuxDesCotes } from '../topo/plan-chantier.js';
+import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles, milieuxDesCotes, poigneesDe } from '../topo/plan-chantier.js';
 import { dessinerObjet, dessinerObjets, symboleDeLObjet } from './dessin.js';
 import { coinsSymbole, poigneeRotation } from '../topo/symboles.js';
 import { dessinerFondSwisstopo } from './tuiles.js';
@@ -222,7 +222,7 @@ export function creerVueChantier(conteneur, options) {
     }
     ctx.setLineDash([]);
     ctx.fillStyle = '#ffffff';
-    for (const p of pts) {
+    for (const p of poigneesDe(o)) {
       const q = ecran(p);
       ctx.fillRect(q.x - 4, q.y - 4, 8, 8);
       ctx.strokeRect(q.x - 4, q.y - 4, 8, 8);
