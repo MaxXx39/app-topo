@@ -16,6 +16,7 @@
 //   grue   : { point (la tour), rotation, modele ('tour' | 'auto' | 'mobile'), rotationFleche (°, tour / auto), tonnes + tourelle (°) + stabilisateurs + repliee (mobile), fleche (m), chassis ('4.50'… | 'aucun'), rayon (bool) }
 // Unités du dessin (0.288.0) : épaisseurs de trait, taille et espacement des motifs en **mm sur le papier** ; sur le
 // terrain, 1 mm de papier = « échelle du plan » / 1000 m (plan.echelle, 200 au départ : 1 mm = 0,2 m).
+import { modeleDe } from './grue-modele.js';
 
 export const GENRES = [
   ['installation', 'Plan d\'installation de chantier'],
@@ -436,7 +437,7 @@ export function resumeObjet(o) {
   if (o.type === 'texte') return `Texte « ${String(o.texte).split(/\r?\n/)[0]}${/\n/.test(o.texte) ? '…' : ''} »`;
   if (o.type === 'cotation') { const g = geometrieCotation(o); return g ? `Cotation ${o.genre === 'angle' ? 'd\'angle' : 'de longueur'} · ${g.texte.t}` : 'Cotation'; }
   if (o.type === 'construction') return o.infinie ? 'Construction · droite' : `Construction · segment ${n(longueur(o.points))} m`;
-  if (o.type === 'grue' && o.modele === 'ecb172') return `Grue Liebherr 172 EC-B · flèche ${o.fleche ?? 50} m`;
+  if (o.type === 'grue' && o.modele === 'fiche') return `Grue ${modeleDe(o.modeleGrue).nom} · flèche ${o.fleche ?? ''} m`;
   if (o.type === 'grue' && o.modele === 'mobile') return `Grue mobile ${o.tonnes ?? 100} t · flèche ${o.fleche ?? 25} m`;
   if (o.type === 'grue') return `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'} · flèche ${o.fleche ?? 40} m${o.chassis && o.chassis !== 'aucun' ? ` · châssis ${o.chassis}` : ''}`;
   if (o.type === 'symbole' && o.cle === 'dyn:pompe') return o.deploye === false ? 'Pompe à béton · mât plié' : `Pompe à béton · mât ${o.longueur ?? 28} m`;

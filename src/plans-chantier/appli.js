@@ -29,7 +29,11 @@ import { CLE_POMPE, LONGUEUR_POMPE } from '../topo/pompe-dynamique.js';
 import { ouvrirGestionPhases } from './gestion-phases.js';
 import { ouvrirGestionCalques, plansAvecCalques } from './gestion-calques.js';
 import { autogrueDe, TONNES_MOBILES, FLECHE_MOBILE_MIN } from '../topo/grue-mobile.js';
-import { FLECHES_ECB172, TOURS as TOURS_ECB, flecheDe as flecheEcb, tourDe as tourEcb, hauteursDe as hauteursEcb, hauteurChoisie as hauteurEcb, reglagesEcb172, ficheEcb172, RAYON_MIN as RAYON_MIN_ECB } from '../topo/grue-liebherr-172.js';
+import { reglagesGrue, ficheGrue, hauteursDe as hauteursGrue, hauteurChoisie as hauteurGrue, tourDe as tourGrue, flecheDe as flecheGrue, porteeMax as porteeGrue, RAYON_MIN as RAYON_MIN_GRUE, COULEUR_TEXTE } from '../topo/grue-fiche.js';
+import { tousLesModeles, modeleDe, definirModelesPerso } from '../topo/grue-modele.js';
+import { lignesDeCoupe, coupeChantier } from '../topo/coupe-chantier.js';
+import { svgCoupe } from './coupe.js';
+import { ouvrirModelesGrues } from './modeles-grues.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
@@ -83,6 +87,8 @@ export function ouvrirPlansChantier({
     pr.plansChantier ??= [];
     return pr.plansChantier;
   };
+  const synchroModeles = () => definirModelesPerso(leProjet().modelesGrues); // 0.311.0 : modèles de grues du projet (en plus de ceux livrés)
+  synchroModeles();
   /**
    * 0.299.0 : points levés montrés sur le plan de chantier : ceux des listes cochées (plan.fond.listesPointsCachees = ids
    * décochés), un nom ne compte qu'une fois ; rien si les points sont cachés.
@@ -125,6 +131,7 @@ export function ouvrirPlansChantier({
     rotationPose: 0, biblio: { ouvert: false, categorie: '', recherche: '' }, fondEtat: null,
     orienter: null, // 0.290.0 : { id, mode: 'point' | 'ligne' } : le prochain clic oriente le symbole choisi
     constructionMode: 'segment', constructionTrait: 'tirets', // 0.294.1 : segment par défaut ; 0.293.0 : 'droite' (2 points) | 'angle' (1 point + angle tapé) | 'segment' (2 points ou longueur tapée)
+    coupe: { ouvert: false, ligne: null }, // 0.311.0 : vue de côté (coupe) le long d'une grue ou d'une ligne de construction
     decalerConstruction: false, // Décaler : créer une ligne de construction (parallèle) au lieu d'une ligne
   };
   let vue = null;
@@ -271,6 +278,7 @@ export function ouvrirPlansChantier({
   // ================================================================ Page
 
   function dessiner() {
+    synchroModeles();
     vue?.detruire();
     vue = null;
     feuille?.observateur?.disconnect();
@@ -347,7 +355,7 @@ export function ouvrirPlansChantier({
       'Décaler': 'Décaler', 'Cotation': 'Cote', 'Construction': 'Constr.', 'Bibliothèque de symboles': 'Symboles',
       'Accroche : point levé': 'Point', 'Accroche : sommet': 'Sommet', 'Accroche : milieu': 'Milieu', 'Accroche : sur la ligne': 'Ligne', 'Accroche : croisement': 'Croisem.', 'Accroche : perpendiculaire': 'Perpend.',
       'Plans du projet dessous (par phase)': 'Plans', 'Calques des plans affichés (masquer, couleur)': 'Calques', 'Points levés': 'Points', 'Fond : carte nationale': 'Carte', 'Fond : photo aérienne': 'Ortho', 'Fond : cadastre': 'Cadastre', 'Fond : surfaces du projet': 'Surfaces',
-      'Repère à 0° : Nord / Sud / Est / Ouest': 'N S E O', 'Montrer / cacher les lignes de construction (jamais imprimées)': 'Constr.', 'Zoom avant': '+', 'Zoom arrière': '−', 'Tout voir': 'Tout',
+      'Repère à 0° : Nord / Sud / Est / Ouest': 'N S E O', 'Montrer / cacher les lignes de construction (jamais imprimées)': 'Constr.', 'Vue de côté (coupe) le long d\'une grue ou d\'une ligne de construction': 'Coupe', 'Zoom avant': '+', 'Zoom arrière': '−', 'Tout voir': 'Tout',
     };
     const court = (titre) => COURTS[titre] ?? (titre.startsWith('Ortho') ? 'Ortho F8' : titre.startsWith('Repère de l') ? 'Repère' : titre);
     const bt = (attrs, icone, titre, classe = '') => `<button type="button" class="outil-ruban ${classe}" ${attrs} title="${titre}" aria-label="${titre}">${ico(icone)}<span>${court(titre)}</span></button>`;
@@ -381,6 +389,7 @@ export function ouvrirPlansChantier({
           ${bt('data-action="ortho-zero"', '<path d="M12 3V21M3 12H21"/><path d="M12 3L9.5 7H14.5Z"/>', 'Repère à 0° : Nord / Sud / Est / Ouest')}
           ${bt('data-action="ortho-repere"', '<path d="M3 17L21 7"/><path d="M14 12V20L16.4 17.6L19 20.6"/>', 'Repère de l\'Ortho = l\'angle d\'une ligne cliquée')}`)}
         ${groupe('Construction', bt('data-action="construction-visible"', '<path d="M2 12S6 5 12 5S22 12 22 12S18 19 12 19S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', 'Montrer / cacher les lignes de construction (jamais imprimées)'))}
+        ${groupe('Coupe', bt(`data-action="coupe" aria-pressed="${etat.coupe.ouvert}"`, '<path d="M3 20H21"/><path d="M6 20V9H12V20"/><path d="M15 20V4M15 4L21 8H15"/>', 'Vue de côté (coupe) le long d\'une grue ou d\'une ligne de construction'))}
         ${groupe('Zoom', `${bt('data-zoom="tout"', '<path d="M4 9V4H9M20 9V4H15M4 15V20H9M20 15V20H15"/>', 'Tout voir')}`)}
       </div>
       <div class="ruban-element" data-zone="bandeau-element"></div>
@@ -394,6 +403,7 @@ export function ouvrirPlansChantier({
         <aside class="carte-calage biblio-chantier" data-zone="biblio" ${etat.biblio.ouvert ? '' : 'hidden'}></aside>
         <div class="vue-calage vue-chantier">
           <div class="toile-chantier" data-toile></div>
+          <div class="coupe-chantier" data-zone="coupe" ${etat.coupe.ouvert ? '' : 'hidden'}></div>
           <div class="pied-vue etat-chantier" data-zone="etat"></div>
         </div>
         <aside class="carte-calage panneau-chantier" data-zone="panneau"></aside>
@@ -1301,10 +1311,32 @@ export function ouvrirPlansChantier({
 
   /** 0.310.0 : fiche écrite d'une grue Liebherr 172 EC-B choisie (charges, hauteur, contrepoids… : tout vient de la fiche du constructeur). */
   function ficheGrueHtml(o) {
-    if (o?.type !== 'grue' || o.modele !== 'ecb172') return '';
-    const fiche = ficheEcb172(o);
+    if (o?.type !== 'grue' || o.modele !== 'fiche') return '';
+    const fiche = ficheGrue(o);
     const alerte = (t) => `<li class="alerte-fiche">⚠ ${echapper(t)}</li>`;
     return `<h3>Fiche de la grue</h3><ul class="fiche-grue">${fiche.lignes.map((l) => `<li><b>${echapper(l.titre)}</b> : ${echapper(l.valeur)}${l.detail ? `<small>${echapper(l.detail)}</small>` : ''}</li>${l.alerte ? alerte(l.alerte) : ''}`).join('')}${fiche.pasDansLaFiche.map(alerte).join('')}</ul>`;
+  }
+
+  /** 0.311.0 : vue de côté sous le plan (grues d'après fiche et bâtiments = zones avec Z bas / Z haut le long d'une ligne). */
+  function majCoupe() {
+    const zone = page.querySelector('[data-zone="coupe"]');
+    if (!zone) return;
+    zone.hidden = !etat.coupe.ouvert;
+    if (!etat.coupe.ouvert) return;
+    const p = plan();
+    const lignes = lignesDeCoupe(p);
+    const choisie = p?.objets.find((x) => x.id === etat.choisi);
+    if (choisie?.type === 'grue' && choisie.modele === 'fiche' && etat.coupe.suivre !== choisie.id) {
+      etat.coupe.ligne = `grue:${choisie.id}`; // toucher une grue = sa vue de côté
+      etat.coupe.suivre = choisie.id;
+    }
+    if (!lignes.find((l) => l.id === etat.coupe.ligne)) etat.coupe.ligne = lignes[0]?.id ?? null;
+    const ligne = lignes.find((l) => l.id === etat.coupe.ligne);
+    const largeur = Math.max(320, zone.clientWidth || 700);
+    zone.innerHTML = `<div class="entete-coupe"><strong>Vue de côté</strong>
+      ${lignes.length ? `<select data-coupe-ligne aria-label="Ligne de la coupe">${lignes.map((l) => `<option value="${echapper(l.id)}" ${l.id === etat.coupe.ligne ? 'selected' : ''}>${echapper(l.nom)}</option>`).join('')}</select>` : ''}
+      <button type="button" class="bouton-secondaire petit" data-action="coupe-fermer" aria-label="Fermer la vue de côté">✕</button></div>
+      ${ligne ? svgCoupe(coupeChantier(p, ligne), largeur, 230) : '<p class="aide-calage">Poser une grue d\'après fiche, ou dessiner une ligne de construction (outil « Constr. », segment), pour choisir où couper.</p>'}`;
   }
 
   function majPanneau() {
@@ -1348,6 +1380,8 @@ export function ouvrirPlansChantier({
         construction: `<label class="champ-calage"><span>Trait</span><select data-prop="trait">${TRAITS_CONSTRUCTION.map(([v, t]) => `<option value="${v}" ${(o.trait ?? 'tirets') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
           ${champCase('Droite infinie', 'prop-case', 'infinie', Boolean(o.infinie))}`,
         zone: `${selectGenres('zone', o.categorie)}
+          <label class="champ-calage" title="Bâtiment : Z du bas et du haut, visibles sur la vue de côté (vide = pas un bâtiment)"><span>Z bas (bâtiment)</span><input type="number" min="-500" max="5000" step="0.01" value="${o.zBas ?? ''}" data-prop="zBas"></label>
+          <label class="champ-calage"><span>Z haut</span><input type="number" min="-500" max="5000" step="0.01" value="${o.zHaut ?? ''}" data-prop="zHaut"></label>
           <label class="champ-calage"><span>Texte de la zone (au centre)</span><input type="text" maxlength="60" value="${echapper(o.etiquette ?? '')}" placeholder="ex. Stock de sable" data-prop="etiquette"></label>
           ${champCurseur('Transparence du fond (opacité)', 'prop', 'opacite', o.opacite ?? OPACITE_ZONE)}
           ${champNombre('Épaisseur du contour', 'prop', 'contourMm', contourZoneMm(o), 0.05, 5, 0.05, 'mm')}
@@ -1397,12 +1431,14 @@ export function ouvrirPlansChantier({
         <option value="phases" ${p.couleurs === 'phases' ? 'selected' : ''}>Une couleur par phase</option></select></label>
       ${choisi}
       ${ficheGrueHtml(o)}
+      <button type="button" class="bouton-secondaire" data-action="modeles-grues">Modèles de grues…</button>
       <h3>Éléments (${p.objets.length})</h3>
       <ul class="elements-chantier">${[...p.objets].reverse().map((x) => `<li><button type="button" data-choisir="${x.id}" class="${x.id === etat.choisi ? 'actif' : ''}">
         <i style="background:${couleurObjet(p, x)}"></i>${echapper(resumeObjet(x))}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul>`;
     page.querySelector('.ruban-chantier [data-action="effacer"]')?.toggleAttribute('disabled', !etat.choisi);
     zone.querySelectorAll('canvas[data-vignette-pose]').forEach((c) => dessinerPose(c, Number(c.dataset.vignettePose)));
     majBandeau(o, p, propreHtml, reglages);
+    majCoupe();
   }
 
   /**
@@ -1446,7 +1482,7 @@ export function ouvrirPlansChantier({
 
   /** Nom de ce qui va être posé (panneau de l'outil). */
   function nomDeLaPose(pose) {
-    if (pose.type === 'grue') return pose.modele === 'auto' ? 'Grue automontante' : pose.modele === 'mobile' ? 'Grue mobile' : pose.modele === 'ecb172' ? 'Grue Liebherr 172 EC-B' : 'Grue à tour';
+    if (pose.type === 'grue') return pose.modele === 'auto' ? 'Grue automontante' : pose.modele === 'mobile' ? 'Grue mobile' : pose.modele === 'fiche' ? `Grue ${modeleDe(pose.modeleGrue).nom}` : 'Grue à tour';
     if (pose.etage) return 'Base-vie à étage';
     return bib().find((x) => x.cle === pose.cle)?.nom ?? pose.cle;
   }
@@ -1460,19 +1496,26 @@ export function ouvrirPlansChantier({
       ${k !== 1 ? '<button type="button" class="bouton-secondaire" data-echelle-reelle title="Revenir à la taille réelle">Taille réelle</button>' : ''}</div>`;
     const rotation = ''; // 0.293.0 : rotation, échelle et orientation sont dans le bandeau du haut
     const orienter = '';
-    if (o.type === 'grue' && o.modele === 'ecb172') {
-      // 0.310.0 : Liebherr 172 EC-B 8 : tout vient de la fiche du constructeur ; la fiche écrite se met à jour toute seule.
-      const g = reglagesEcb172(o);
-      const familles = [...new Set(TOURS_ECB.map((t) => t.famille))];
-      return `<label class="champ-calage"><span>Longueur de la flèche (m)</span><select data-prop="fleche">${FLECHES_ECB172.map((f) => `<option value="${f}" ${f === g.fleche.nom ? 'selected' : ''}>${f.toFixed(1)} m</option>`).join('')}</select></label>
-        <label class="champ-calage"><span>Tour et pied</span><select data-prop="tour">${familles.map((fa) => `<optgroup label="${echapper(fa)}">${TOURS_ECB.filter((t) => t.famille === fa).map((t) => `<option value="${t.id}" ${t.id === g.tour.id ? 'selected' : ''}>${echapper(t.nom)}</option>`).join('')}</optgroup>`).join('')}</select></label>
-        <label class="champ-calage"><span>Hauteur sous crochet</span><select data-prop="hauteur">${hauteursEcb(g.tour).map((h) => `<option value="${h.h}" ${h.h === g.hauteur.h ? 'selected' : ''}>${h.h.toFixed(1)} m${h.etoile ? ' *' : ''} (rang ${echapper(h.etiquette)})</option>`).join('')}</select></label>
-        ${champNombre('Rayon du crochet (charge au crochet)', 'prop', 'rayonCrochet', g.r, RAYON_MIN_ECB, g.fleche.nom, 0.1, 'm')}
-        <label class="champ-calage"><span>Mode de charge</span><select data-prop="mode"><option value="lm1" ${g.mode === 'lm1' ? 'selected' : ''}>LM 1</option>${g.fleche.lm2 ? `<option value="lm2" ${g.mode === 'lm2' ? 'selected' : ''}>LM 2 (vitesses différentes)</option>` : ''}</select></label>
-        <label class="champ-calage"><span>Treuil de levage</span><select data-prop="treuil"><option value="24" ${g.treuil === 24 ? 'selected' : ''}>24 kW FU (câble 113 m)</option><option value="45" ${g.treuil === 45 ? 'selected' : ''}>45 kW FU (câble 179 m)</option></select></label>
-        <label class="champ-calage"><span>Cercles de charge</span><select data-prop="cercles"><option value="principaux" ${g.cercles === 'principaux' ? 'selected' : ''}>Principaux (tous les 10 m)</option><option value="tous" ${g.cercles === 'tous' ? 'selected' : ''}>Tous (colonnes du tableau)</option><option value="aucun" ${g.cercles === 'aucun' ? 'selected' : ''}>Aucun</option></select></label>
-        ${champNombre('Orientation de la flèche (le pied reste fixe)', 'prop', 'rotationFleche', o.rotationFleche ?? 0, -360, 360, 1, '°')}
-        ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}`;
+    if (o.type === 'grue' && o.modele === 'fiche') {
+      // 0.311.0 : grue d'après la fiche d'un modèle : libellés courts ; la fiche écrite est dans la colonne de droite.
+      const g = reglagesGrue(o);
+      const familles = [...new Set(g.modele.tours.map((t) => t.famille))];
+      const opt = (v, t, ok) => `<option value="${echapper(String(v))}" ${ok ? 'selected' : ''}>${echapper(t)}</option>`;
+      return `<label class="champ-calage"><span>Modèle</span><select data-prop="modeleGrue">${tousLesModeles().map((m) => opt(m.id, m.nom, m.id === g.modele.id)).join('')}</select></label>
+        <label class="champ-calage"><span>Flèche (m)</span><select data-prop="fleche">${g.modele.fleches.map((f) => opt(f.nom, `${f.nom.toFixed(1)} m`, f.nom === g.fleche.nom)).join('')}</select></label>
+        <label class="champ-calage"><span>Tour / pied</span><select data-prop="tour">${familles.map((fa) => `<optgroup label="${echapper(fa)}">${g.modele.tours.filter((t) => t.famille === fa).map((t) => opt(t.id, t.nom, t.id === g.tour.id)).join('')}</optgroup>`).join('')}</select></label>
+        <label class="champ-calage"><span>HSC (m)</span><select data-prop="hauteur">${hauteursGrue(g.tour).map((h) => opt(h.h, `${h.h.toFixed(1)} m${h.etoile ? ' *' : ''} (${h.etiquette})`, h.h === g.hauteur.h)).join('')}</select></label>
+        ${champNombre('Z pied', 'prop', 'zPied', g.zPied, -500, 5000, 0.01, 'm')}
+        ${champNombre('Rayon crochet', 'prop', 'rayonCrochet', g.r, RAYON_MIN_GRUE, porteeGrue(g.fleche), 0.1, 'm')}
+        ${g.fleche.charges2 ? `<label class="champ-calage"><span>Charges</span><select data-prop="mode">${opt('lm1', 'Tableau 1', g.mode === 'lm1')}${opt('lm2', 'Tableau 2', g.mode === 'lm2')}</select></label>` : ''}
+        <label class="champ-calage"><span>Cercles de charge</span><select data-prop="cercles">${opt('principaux', 'Principaux (10 m)', g.cercles === 'principaux')}${opt('tous', 'Tous', g.cercles === 'tous')}${opt('aucun', 'Aucun', g.cercles === 'aucun')}</select></label>
+        ${champNombre('Rotation flèche', 'prop', 'rotationFleche', o.rotationFleche ?? 0, -360, 360, 1, '°')}
+        ${champCase('Texte charge', 'prop-case', 'afficherCharge', g.afficherCharge)}
+        ${champCase('Texte HSC', 'prop-case', 'afficherHsc', g.afficherHsc)}
+        <label class="champ-calage"><span>Couleur des textes</span><input type="color" value="${g.couleurTexte}" data-prop="couleurTexte"></label>
+        ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}
+        ${champCase('Massifs sous le pied', 'prop-case', 'massifs', g.massifs)}
+        ${g.massifs ? `${champNombre('Massif L', 'prop', 'massifL', g.massifL, 0.1, 30, 0.1, 'm')}${champNombre('Massif B', 'prop', 'massifB', g.massifB, 0.1, 30, 0.1, 'm')}${champNombre('Massif H', 'prop', 'massifH', g.massifH, 0.1, 10, 0.1, 'm')}` : ''}`;
     }
     if (o.type === 'grue' && o.modele === 'mobile') {
       // 0.293.0 : grue mobile dynamique (porteur = rotation de l'objet, tourelle et flèche indépendantes).
@@ -1569,7 +1612,7 @@ export function ouvrirPlansChantier({
     });
   }
 
-  const cleDeLaPose = (pose) => (!pose ? null : pose.type === 'grue' ? `grue:${pose.modele}` : pose.etage ? 'etage' : pose.cle);
+  const cleDeLaPose = (pose) => (!pose ? null : pose.type === 'grue' ? (pose.modele === 'fiche' ? `grue:fiche:${pose.modeleGrue}` : `grue:${pose.modele}`) : pose.etage ? 'etage' : pose.cle);
 
   async function importerBlocs() {
     if (lectureSeule()) return message('Projet ouvert en lecture seule ici : rien n\'est modifié.', 5000);
@@ -1673,6 +1716,18 @@ export function ouvrirPlansChantier({
       else o.etage = { ...o.etage, pose: Number(b.dataset.poseEtage) };
       enregistrer();
       return majTout();
+    }
+    if (b.dataset.action === 'coupe' || b.dataset.action === 'coupe-fermer') {
+      etat.coupe.ouvert = b.dataset.action === 'coupe' ? !etat.coupe.ouvert : false;
+      etat.coupe.suivre = null;
+      page.querySelector('[data-action="coupe"]')?.setAttribute('aria-pressed', String(etat.coupe.ouvert));
+      majCoupe();
+      return vue?.redessiner();
+    }
+    if (b.dataset.action === 'modeles-grues') {
+      return ouvrirModelesGrues({
+        projet: leProjet, lectureSeule, message, modeleInitial: () => { const o = plan()?.objets.find((x) => x.id === etat.choisi); return o?.modele === 'fiche' ? o.modeleGrue : null; }, modifie: () => { modifie(); synchroModeles(); }, redessiner: () => { synchroModeles(); majTout(); },
+      });
     }
     if (['fond-carte', 'fond-ortho', 'fond-cadastre', 'fond-surfaces'].includes(b.dataset.action)) {
       if (!avantChangement()) return;
@@ -1936,6 +1991,11 @@ export function ouvrirPlansChantier({
     const p = plan();
     if (!p) return;
     if (etat.ecran === 'feuille') return changeFeuille(c, p);
+    if (c.dataset.coupeLigne !== undefined) {
+      etat.coupe.ligne = c.value;
+      etat.coupe.suivre = etat.choisi;
+      return majCoupe();
+    }
     if (c.dataset.etageTexte !== undefined) {
       const o = p.objets.find((x) => x.id === etat.choisi);
       if (!o?.etage || !avantChangement()) return;
@@ -2073,7 +2133,7 @@ export function ouvrirPlansChantier({
         majPanneau();
         return vue?.redessinerDessus();
       }
-      if (cle === 'stabilisateurs' || cle === 'repliee' || cle === 'deploye') {
+      if (cle === 'stabilisateurs' || cle === 'repliee' || cle === 'deploye' || cle === 'afficherCharge' || cle === 'afficherHsc') {
         if (!avantChangement()) return;
         o[cle] = c.checked;
         enregistrer();
@@ -2111,6 +2171,12 @@ export function ouvrirPlansChantier({
       const o = p.objets.find((x) => x.id === etat.choisi);
       if (!o) return;
       const cle = c.dataset.prop;
+      if ((cle === 'zBas' || cle === 'zHaut') && !c.value.trim()) {
+        if (o[cle] === undefined || !avantChangement()) return;
+        delete o[cle];
+        enregistrer();
+        return majTout();
+      }
       if (cle === 'texte' && !c.value.trim()) return majPanneau();
       let valeur = c.value.trim();
       if (c.type === 'number') {
@@ -2125,11 +2191,22 @@ export function ouvrirPlansChantier({
         return vue?.redessinerDessus();
       }
       o[cle] = valeur;
-      if (o.modele === 'ecb172') {
-        // 0.310.0 : réglages de la Liebherr 172 EC-B : nombres, et hauteur qui reste valable quand la tour change
-        if (['fleche', 'hauteur', 'treuil'].includes(cle)) o[cle] = Number(valeur);
-        if (cle === 'tour') o.hauteur = hauteurEcb(tourEcb(valeur), o.hauteur).h;
-        if (cle === 'fleche') o.rayonCrochet = Math.min(Number(o.rayonCrochet) || flecheEcb(Number(valeur)).nom, flecheEcb(Number(valeur)).nom);
+      if (o.modele === 'fiche') {
+        // 0.311.0 : réglages d'une grue d'après fiche : nombres, et HSC / rayon qui restent valables quand le choix change
+        if (['fleche', 'hauteur'].includes(cle)) o[cle] = Number(valeur);
+        if (cle === 'modeleGrue') {
+          const m = modeleDe(valeur);
+          o.fleche = m.fleches[Math.floor(m.fleches.length / 2)].nom;
+          o.tour = m.tours[0].id;
+          o.hauteur = hauteurGrue(m.tours[0], o.hauteur).h;
+          delete o.rayonCrochet;
+          delete o.mode;
+        }
+        if (cle === 'tour') o.hauteur = hauteurGrue(tourGrue(modeleDe(o.modeleGrue), valeur), o.hauteur).h;
+        if (cle === 'fleche') {
+          const f = flecheGrue(modeleDe(o.modeleGrue), Number(valeur));
+          o.rayonCrochet = Math.min(Number(o.rayonCrochet) || porteeGrue(f), porteeGrue(f));
+        }
       }
       if (cle === 'fin' && !valeur) delete o.fin;
       if (cle === 'etiquette' && !valeur) delete o.etiquette;

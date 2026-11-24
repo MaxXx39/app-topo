@@ -961,7 +961,7 @@ function dessinerRayon(ctx, g, e, mm, rot, texteU, partie = 'tout') {
       ctx.lineWidth = principal ? lw * 1.4 : lw;
       ctx.stroke();
       ctx.setLineDash([]);
-    } else if (p.g === 't') { if (p.brut) texteBrut(ctx, p, e, rot); else texteDansSymbole(ctx, { ...p, k: '#92400e', ...(texteU ? { h: texteU } : {}) }, e, rot); }
+    } else if (p.g === 't') { if (p.brut) texteBrut(ctx, p, e, rot); else texteDansSymbole(ctx, { ...p, k: p.perso ? p.k : '#92400e', ...(texteU ? { h: texteU } : {}) }, e, rot); }
   }
 }
 

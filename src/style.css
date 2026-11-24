@@ -14995,3 +14995,32 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .page-chantier .fiche-grue li { line-height: 1.3; }
 .page-chantier .fiche-grue small { display: block; color: var(--gris); }
 .page-chantier .fiche-grue .alerte-fiche { color: #b45309; }
+.page-chantier .coupe-chantier { flex: 0 0 auto; border-top: 2px solid #b45309; background: #fff; overflow: hidden; }
+.page-chantier .coupe-chantier[hidden] { display: none; }
+.page-chantier .entete-coupe { display: flex; align-items: center; gap: 8px; padding: 4px 10px; font-size: 0.85rem; }
+.page-chantier .entete-coupe select { flex: 1 1 auto; min-width: 0; padding: 4px 6px; border: 1px solid var(--bordure); border-radius: 8px; font: inherit; }
+.page-chantier .coupe-chantier svg { display: block; }
+.fenetre-modeles-grues { width: min(1180px, 97vw); max-height: 94vh; }
+.fenetre-modeles-grues .corps-modeles-grues { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 12px; overflow: auto; max-height: 72vh; }
+.fenetre-modeles-grues .liste-modeles-grues ul { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
+.fenetre-modeles-grues .liste-modeles-grues li button { width: 100%; text-align: left; padding: 6px 8px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); font: inherit; font-size: 0.85rem; cursor: pointer; }
+.fenetre-modeles-grues .liste-modeles-grues li button.actif { border-color: #b45309; background: color-mix(in srgb, #b45309 12%, var(--surface)); }
+.fenetre-modeles-grues .boutons-modeles { display: grid; gap: 4px; }
+.fenetre-modeles-grues h3 { margin: 12px 0 4px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gris); }
+.fenetre-modeles-grues h3 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.fenetre-modeles-grues .grille-modele { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 12px; }
+.fenetre-modeles-grues label { display: grid; gap: 2px; font-size: 0.82rem; color: var(--gris); }
+.fenetre-modeles-grues label.pleine { margin-top: 6px; }
+.fenetre-modeles-grues input, .fenetre-modeles-grues select, .fenetre-modeles-grues textarea { padding: 4px 6px; border: 1px solid var(--bordure); border-radius: 8px; background: var(--surface); color: var(--encre); font: inherit; font-size: 0.85rem; }
+.fenetre-modeles-grues textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.fenetre-modeles-grues .estime { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; }
+.fenetre-modeles-grues .estime input { width: auto; }
+.fenetre-modeles-grues .tableau-calage td { vertical-align: top; }
+.fenetre-modeles-grues .tableau-flèches td:nth-child(2), .fenetre-modeles-grues .tableau-flèches td:nth-child(3) { min-width: 240px; }
+.fenetre-modeles-grues .erreurs-modele { list-style: none; margin: 0 0 8px; padding: 8px 10px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; color: #991b1b; font-size: 0.85rem; }
+@media (max-width: 800px) { .fenetre-modeles-grues .corps-modeles-grues { grid-template-columns: minmax(0, 1fr); } }
+/* 0.311.0 : le bouton « Coupe » s'ajoute au ruban : un peu moins d'air pour que tout tienne sur 1366 px */
+.page-chantier .ruban-une-ligne .groupe-ruban { padding: 0 2px; }
+.page-chantier .ruban-une-ligne .outil-ruban { padding: 2px 3px; }
+.fenetre-modeles-grues .boutons-choix { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.fenetre-modeles-grues .boutons-choix button { width: auto; min-height: 0; padding: 8px 18px; }
