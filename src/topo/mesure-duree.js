@@ -7,6 +7,35 @@
 /** Durées proposées (secondes). */
 export const DUREES_MESURE = [5, 15, 30];
 
+/** Inclinaison (°) au départ en dessous de laquelle la canne est considérée comme « bullée » (demande du 24.11). */
+export const INCLINAISON_BULLEE_DEG = 1;
+
+/** Vrai si le point de départ de la mesure a été pris canne bullée (inclinaison connue et moins de 1°). */
+export const departBulle = (point) => Number.isFinite(point?.inclinaison) && point.inclinaison < INCLINAISON_BULLEE_DEG;
+
+/**
+ * Lecture d'une mesure de durée (0.315.0) : comme un point normal ; mais si le départ a été fait canne bullée (< 1°), une lecture
+ * refusée parce que l'inclinaison est perdue n'arrête pas la mesure : on prend alors la lecture de secours (RTK fixe et
+ * corrections récentes toujours exigés). Renvoie { ok, point } ou { ok: false, raison } ; `etat.perdues` compte ces lectures.
+ */
+export function lectureDeMesure({ lire, secours, etat }) {
+  const reponse = lire();
+  if (reponse?.ok) {
+    if (etat.lectures === 0) etat.bulle = departBulle(reponse.point);
+    etat.lectures += 1;
+    return reponse;
+  }
+  if (etat.lectures > 0 && etat.bulle && secours) {
+    const autre = secours();
+    if (autre?.ok) {
+      etat.lectures += 1;
+      etat.perdues += 1;
+      return autre;
+    }
+  }
+  return reponse;
+}
+
 const moyenne = (valeurs) => valeurs.reduce((t, v) => t + v, 0) / valeurs.length;
 const limites = (valeurs) => ({ min: Math.min(...valeurs), max: Math.max(...valeurs) });
 

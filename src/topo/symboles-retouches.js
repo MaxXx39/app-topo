@@ -155,6 +155,10 @@ function benneAvecIcone(benne, nom, icone, texteBenne) {
 }
 
 /** 0.305.0 : tourelles orientables des pelles à pneus et 5 t (voir retoucherBibliotheque). */
+/** 0.315.0 : les 8 pneus de la pelle à pneus (blocs de 0,93 × 0,29 m, contour #43474c) sont noirs (ils étaient gris métal). */
+export function pneusNoirs(prims) {
+  return prims.map((p, i) => (p.g === 'h' && prims[i - 1]?.g === 'l' && prims[i - 1].k === '#43474c' && p.mat === 'metal' ? { ...p, k: '#1f2328', mat: 'caoutchouc' } : p));
+}
 export const PIVOT_PELLE_PNEU = { depuis: 36, centre: [2.14, 0.02] };
 export const PIVOT_PELLE_5T = { indices: [0, 1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 62], centre: [0, 1.4] };
 const CACHES_DESSINES = ['Place de parking réservée', 'Camion pompe à béton (plié)', 'Camion pompe à béton (déplié)'];
@@ -224,7 +228,7 @@ export function retoucherBibliotheque(symboles) {
     if (s.nom === 'Pelle Chenille 20T') t = { ...t, pivote: { depuis: 47, centre: [0, 1.961] } };
     // 0.305.0 : pelle à pneus (36 premières primitives = roues, lame, appuis, châssis) et pelle 5 t (tourelle = godet,
     // bras, caisse, cabine : primitives choisies une à une, le reste = chenilles et lame). Centres estimés : à valider.
-    if (s.nom === 'Pelle Pneu') t = { ...t, pivote: PIVOT_PELLE_PNEU };
+    if (s.nom === 'Pelle Pneu') t = { ...t, primitives: pneusNoirs(t.primitives), pivote: PIVOT_PELLE_PNEU };
     if (s.nom === 'Pelle Chenille 5t') t = { ...t, pivote: PIVOT_PELLE_5T };
     // 0.294.1 : compacteurs : les 2 bandes jaunes des extrémités sont deux fois moins larges (plus de gris et de noir visibles).
     if (['Compact Tandem', 'Compact Mixte', 'Compact pneu'].includes(s.nom)) t = { ...t, primitives: reduireBandesJaunes(t.primitives) };

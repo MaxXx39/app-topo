@@ -61,7 +61,7 @@ describe('coupe d\'un plan de chantier', () => {
     const plan = { objets: [grue, batiment] };
     const svg = svgCoupe(coupeChantier(plan, lignesDeCoupe(plan)[0]), 700, 230);
     expect(svg).toContain('Bât A');
-    expect(svg).toContain('HSC 27.3 m');
+    expect(svg).toContain("HSC 27.3 m");
     expect(svg).toContain('Z 100.00');
   });
 

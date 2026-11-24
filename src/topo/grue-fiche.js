@@ -314,10 +314,17 @@ function cerclesDeCharge(g) {
   const tab = mode === 'lm2' && f.charges2 ? f.charges2 : f.charges;
   const rMax = tab[tab.length - 1][0];
   const res = [{ g: 'c', k: '#334155', x: 0, y: 0, r: rMax, mat: 'trait' }];
-  const texteCercle = (rr, t) => ({ g: 't', k: g.couleurTexte, perso: true, x: rr, y: -2.4, h: 0.9, a: 90, t: `${rr} m · ${fixe2(t)} t`, ah: 1, av: 2 });
-  if (cercles !== 'aucun') {
-    const choisis = tab.filter(([rr]) => rr < rMax && rr >= 20 && (cercles === 'tous' || Math.abs(rr / 10 - Math.round(rr / 10)) < 1e-9));
-    for (const [rr, t] of choisis) res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' }, texteCercle(rr, t));
+  const texteCercle = (rr, t) => ({ g: 't', k: g.couleurTexte, perso: true, x: Math.sqrt(Math.max(0, rr * rr - 49)), y: -7, h: 0.9, a: 90, t: `${rr} m · ${fixe2(t)} t`, ah: 1, av: 2 });
+  if (cercles === 'tous') {
+    // tous les cercles du tableau de la fiche (portée : charge)
+    // 0.315.0 : si la fiche en donne beaucoup, au plus un cercle tous les 5 m (le premier de chaque tranche est gardé)
+    let dernier = -Infinity;
+    const gardes = tab.filter(([rr]) => rr <= rMax - 5 && rr >= 20).filter(([rr]) => (rr - dernier >= 5 ? ((dernier = rr), true) : false));
+    for (const [rr, t] of gardes) res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' }, texteCercle(rr, t));
+  } else if (cercles === 'principaux') {
+    // 0.314.0 : un cercle tous les 10 m (20, 30, 40…) avec la charge à cette portée (portée suivante du tableau, côté prudent) :
+    // marche pour toutes les fiches, même si leurs portées ne sont pas rondes (Condecta : 21,87 m, 30,68 m…).
+    for (let rr = 20; rr <= rMax - 5; rr += 10) res.push({ g: 'c', k: '#8a9198', x: 0, y: 0, r: rr, mat: 'trait' }, texteCercle(rr, chargeAuRayon(f, rr, mode).t));
   }
   res.push(texteCercle(rMax, tab[tab.length - 1][1]));
   return res;
@@ -339,7 +346,8 @@ export function grueFiche(o = {}) {
     if (g.massifs) cote.push(...coteDuMassif(appuisDuPied(g.tour)[0], g.massifL));
     const bas = [...dessous, ...base, ...mat(g.tour.mat), ...cote];
     let haut = partieHaute(g);
-    if (g.afficherHsc) haut.push(texte(`HSC ${fixe1(g.hauteur.h)} m`, -Math.max(g.modele.dim.arriereTotal * 0.6, 3), (g.tour.pied.c ?? g.tour.mat) / 2 + 1.2, 0.8, { k: '#1e293b' }));
+    // 0.315.0 : UNE étiquette le long de la flèche (côté opposé au texte du crochet) : longueur de flèche + HSC
+    if (g.afficherHsc) haut.push(texte(`Flèche ${fixe1(g.fleche.nom)} m · HSC ${fixe1(g.hauteur.h)} m`, (g.modele.dim.flecheDebut + boutDeFleche(g.modele, g.fleche)) / 2, g.modele.dim.flecheLargeur / 2 + 1.3, 0.9, { k: '#1e293b' }));
     if (g.rotationFleche) haut = tournerPrims(haut, g.rotationFleche);
     const nom = `Grue ${g.modele.nom} · flèche ${fixe1(g.fleche.nom)} m`;
     const s = versSymbole(nom, 'Grues', [...bas, ...haut], { centre: false });

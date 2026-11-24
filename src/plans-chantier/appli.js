@@ -35,13 +35,14 @@ import { lignesDeCoupe, coupeChantier } from '../topo/coupe-chantier.js';
 import { svgCoupe } from './coupe.js';
 import { ouvrirModelesGrues } from './modeles-grues.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
-import { pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote } from '../topo/plan-chantier.js';
+import { pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
 import { reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
 import { nomFichierExport } from '../outils/nom-fichier.js';
 import { PALEUR_ORTHO } from './tuiles.js';
+const DELAI_ARC = 150; // ms : appui sur le « + » avant que glisser courbe le côté (0.315.0 : 0,45 s avant)
 
 const OUTILS = [
   ['zone', '<path d="M4 8L12 4L20 9L17 19H6Z"/>', 'Zone'],
@@ -461,14 +462,22 @@ export function ouvrirPlansChantier({
             etat.glisse = { type: 'objet', decal: [base[0] - o.point[0], base[1] - o.point[1]] };
             return true;
           }
+          // 0.315.0 : la poignée ronde au milieu d'un arc : glisser = courber de nouveau (pas d'appui long)
+          const arcPris = poigneesArcs(o).find((x) => Math.hypot(p[0] - x.point[0], p[1] - x.point[1]) <= tol * 1.3);
+          if (arcPris) {
+            if (!avantChangement()) return false;
+            etat.glisse = { type: 'recourber', numero: arcPris.numero };
+            return true;
+          }
           let i = sommetSousLePoint(o, p, tol);
           // 0.299.0 : le petit « + » au milieu d'un côté : glisser = un nouveau point qui suit la souris.
           const m = i < 0 ? milieuSousLePoint(o, p, tol) : -1;
           if (m >= 0) {
-            // 0.307.0 : appui long (≥ 0,45 s) sur le « + » puis glisser = le côté devient un arc qui suit la souris.
+            // 0.307.0 : appui sur le « + » puis glisser = le côté devient un arc qui suit la souris ; 0.315.0 : appui court
+            // (0,15 s) ; l'arc reste modifiable (poignée ronde au milieu).
             const g = { type: 'milieu', index: m, t0: Date.now() };
             etat.glisse = g;
-            setTimeout(() => { if (etat.glisse === g) message('Arc : glissez pour courber le côté (relâchez pour le garder).', 2500); }, 450);
+            setTimeout(() => { if (etat.glisse === g) message('Arc : glissez pour courber le côté (relâchez pour le garder).', 2500); }, DELAI_ARC);
             return true;
           }
           if (o.type === 'texte' && i === 0) i = -1; // le texte se déplace en entier ; seule la poignée du repère est un sommet
@@ -490,12 +499,19 @@ export function ouvrirPlansChantier({
             o.point = [point[0] - dx, point[1] - dy];
             return;
           }
-          if (etat.glisse?.type === 'milieu' && Date.now() - etat.glisse.t0 >= 450) {
+          if (etat.glisse?.type === 'milieu' && Date.now() - etat.glisse.t0 >= DELAI_ARC) {
             if (!avantChangement()) return;
-            etat.glisse = { type: 'arc', index: etat.glisse.index, base: o.points.map((q) => [...q]) };
+            etat.glisse = { type: 'arc', index: etat.glisse.index, base: o.points.map((q) => [...q]), baseArcs: arcsDe(o).map((a) => ({ ...a })) };
+          }
+          if (etat.glisse?.type === 'recourber') {
+            recourber(o, etat.glisse.numero, point);
+            return;
           }
           if (etat.glisse?.type === 'arc') {
-            o.points = arcSurCote(etat.glisse.base, etat.glisse.index, point, o.type === 'zone');
+            const r = courberCote(etat.glisse.base, etat.glisse.baseArcs, etat.glisse.index, point, o.type === 'zone');
+            o.points = r.points;
+            o.arcs = r.arcs;
+            o.arcsLen = r.arcsLen;
             return;
           }
           if (etat.glisse?.type === 'milieu') {
@@ -1525,21 +1541,23 @@ export function ouvrirPlansChantier({
       const g = reglagesGrue(o);
       const familles = [...new Set(g.modele.tours.map((t) => t.famille))];
       const opt = (v, t, ok) => `<option value="${echapper(String(v))}" ${ok ? 'selected' : ''}>${echapper(t)}</option>`;
-      return `<label class="champ-calage"><span>Modèle</span><select data-prop="modeleGrue">${tousLesModeles().map((m) => opt(m.id, m.nom, m.id === g.modele.id)).join('')}</select></label>
-        <label class="champ-calage"><span>Flèche (m)</span><select data-prop="fleche">${g.modele.fleches.map((f) => opt(f.nom, `${f.nom.toFixed(1)} m`, f.nom === g.fleche.nom)).join('')}</select></label>
-        <label class="champ-calage"><span>Tour / pied</span><select data-prop="tour">${familles.map((fa) => `<optgroup label="${echapper(fa)}">${g.modele.tours.filter((t) => t.famille === fa).map((t) => opt(t.id, t.nom, t.id === g.tour.id)).join('')}</optgroup>`).join('')}</select></label>
-        <label class="champ-calage"><span>HSC (m)</span><select data-prop="hauteur">${hauteursGrue(g.tour).map((h) => opt(h.h, `${h.h.toFixed(1)} m${h.etoile ? ' *' : ''} (${h.etiquette})`, h.h === g.hauteur.h)).join('')}</select></label>
-        ${champNombre('Z pied', 'prop', 'zPied', g.zPied, -500, 5000, 0.01, 'm')}
+      // 0.315.0 : réglages rangés par thème (Modèle · Flèche et charge · Tour et châssis · Affichage)
+      const bloc = (titre, contenu) => `<div class="groupe-grue"><b>${titre}</b>${contenu}</div>`;
+      return bloc('Modèle', `<label class="champ-calage"><span>Modèle</span><select data-prop="modeleGrue">${tousLesModeles().map((m) => opt(m.id, m.nom, m.id === g.modele.id)).join('')}</select></label>`)
+        + bloc('Flèche et charge', `<label class="champ-calage"><span>Flèche (m)</span><select data-prop="fleche">${g.modele.fleches.map((f) => opt(f.nom, `${f.nom.toFixed(1)} m`, f.nom === g.fleche.nom)).join('')}</select></label>
         ${champNombre('Rayon crochet', 'prop', 'rayonCrochet', g.r, RAYON_MIN_GRUE, porteeGrue(g.fleche), 0.1, 'm')}
         ${g.fleche.charges2 ? `<label class="champ-calage"><span>Charges</span><select data-prop="mode">${opt('lm1', 'Tableau 1', g.mode === 'lm1')}${opt('lm2', 'Tableau 2', g.mode === 'lm2')}</select></label>` : ''}
-        <label class="champ-calage"><span>Cercles de charge</span><select data-prop="cercles">${opt('principaux', 'Principaux (10 m)', g.cercles === 'principaux')}${opt('tous', 'Tous', g.cercles === 'tous')}${opt('aucun', 'Aucun', g.cercles === 'aucun')}</select></label>
-        ${champNombre('Rotation flèche', 'prop', 'rotationFleche', o.rotationFleche ?? 0, -360, 360, 1, '°')}
-        ${champCase('Texte charge', 'prop-case', 'afficherCharge', g.afficherCharge)}
-        ${champCase('Texte HSC', 'prop-case', 'afficherHsc', g.afficherHsc)}
-        <label class="champ-calage"><span>Couleur des textes</span><input type="color" value="${g.couleurTexte}" data-prop="couleurTexte"></label>
-        ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}
+        <label class="champ-calage"><span>Cercles de charge</span><select data-prop="cercles">${opt('principaux', 'Principaux (10 m)', g.cercles === 'principaux')}${opt('tous', 'Tous (5 m mini)', g.cercles === 'tous')}${opt('aucun', 'Aucun', g.cercles === 'aucun')}</select></label>
+        ${champNombre('Rotation flèche', 'prop', 'rotationFleche', o.rotationFleche ?? 0, -360, 360, 1, '°')}`)
+        + bloc('Tour et châssis', `<label class="champ-calage"><span>Tour / pied</span><select data-prop="tour">${familles.map((fa) => `<optgroup label="${echapper(fa)}">${g.modele.tours.filter((t) => t.famille === fa).map((t) => opt(t.id, t.nom, t.id === g.tour.id)).join('')}</optgroup>`).join('')}</select></label>
+        <label class="champ-calage"><span>HSC (m)</span><select data-prop="hauteur">${hauteursGrue(g.tour).map((h) => opt(h.h, `${h.h.toFixed(1)} m${h.etoile ? ' *' : ''} (${h.etiquette})`, h.h === g.hauteur.h)).join('')}</select></label>
+        ${champNombre('Z châssis', 'prop', 'zPied', g.zPied, -500, 5000, 0.01, 'm')}
         ${champCase('Massifs sous le pied', 'prop-case', 'massifs', g.massifs)}
-        ${g.massifs ? champNombre('Côté du massif', 'prop', 'massifL', g.massifL, 0.1, 30, 0.1, 'm') : ''}`;
+        ${g.massifs ? champNombre('Côté du massif', 'prop', 'massifL', g.massifL, 0.1, 30, 0.1, 'm') : ''}`)
+        + bloc('Affichage', `${champCase('Texte charge', 'prop-case', 'afficherCharge', g.afficherCharge)}
+        ${champCase('Étiquette flèche + HSC', 'prop-case', 'afficherHsc', g.afficherHsc)}
+        ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}
+        <label class="champ-calage"><span>Couleur des textes</span><input type="color" value="${g.couleurTexte}" data-prop="couleurTexte"></label>`);
     }
     if (o.type === 'grue' && o.modele === 'mobile') {
       // 0.293.0 : grue mobile dynamique (porteur = rotation de l'objet, tourelle et flèche indépendantes).

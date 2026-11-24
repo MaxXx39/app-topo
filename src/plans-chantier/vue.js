@@ -5,7 +5,7 @@
 // glisser l'objet choisi = le déplacer (si glisserObjet le permet).
 import { dessinerPlansDxf } from '../plan/dxf-canvas.js';
 import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../plan/vue.js';
-import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles, milieuxDesCotes, poigneesDe } from '../topo/plan-chantier.js';
+import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles, milieuxDesCotes, poigneesDe, poigneesArcs, pointsDansArcs } from '../topo/plan-chantier.js';
 import { dessinerObjet, dessinerObjets, symboleDeLObjet } from './dessin.js';
 import { coinsSymbole, poigneeRotation } from '../topo/symboles.js';
 import { dessinerFondSwisstopo } from './tuiles.js';
@@ -236,10 +236,24 @@ export function creerVueChantier(conteneur, options) {
     }
     ctx.setLineDash([]);
     ctx.fillStyle = '#ffffff';
-    for (const p of poigneesDe(o)) {
+    const dansArcs = pointsDansArcs(o); // 0.315.0 : pas de carré sur les points intérieurs d'un arc (une poignée ronde à la place)
+    poigneesDe(o).forEach((p, k) => {
+      if (dansArcs.has(k)) return;
       const q = ecran(p);
       ctx.fillRect(q.x - 4, q.y - 4, 8, 8);
       ctx.strokeRect(q.x - 4, q.y - 4, 8, 8);
+    });
+    for (const { point } of poigneesArcs(o)) {
+      const q = ecran(point);
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, 6, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, 2, 0, 2 * Math.PI);
+      ctx.fillStyle = ORANGE;
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
     }
     // 0.299.0 : petit « + » au milieu de chaque côté (ligne, zone, flèche, piste) : clic ou glisser = ajouter un point.
     for (const { index, milieu } of milieuxDesCotes(o)) {
@@ -289,6 +303,17 @@ export function creerVueChantier(conteneur, options) {
       const L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
       const decalage = ((curseur[0] - A[0]) * -(B[1] - A[1]) + (curseur[1] - A[1]) * (B[0] - A[0])) / L;
       dessinerObjet(contexteDessin(ctx, pc), { type: 'cotation', genre: 'longueur', points: [A, B], decalage, phase: pc.phaseActive });
+      return;
+    }
+    // 0.315.0 : rectangle, 2 coins posés : le rectangle entier (trait plein, comme une zone posée) suit la souris et le 3e clic
+    // fixe sa largeur, comme une cote ; plus de trait en tirets qui faisait croire à une polyligne.
+    if (s.outil === 'rectangle' && s.points.length === 2 && curseur && pc && s.apercu?.length > 3) {
+      dessinerObjet(contexteDessin(ctx, pc), { type: 'zone', categorie: s.categorie, points: s.apercu.slice(0, 4), phase: pc.phaseActive, opacite: 20 });
+      ctx.fillStyle = couleurObjet(pc, { type: 'zone', categorie: s.categorie, phase: pc.phaseActive });
+      for (const p of s.points) {
+        const q = ecran(p);
+        ctx.fillRect(q.x - 3, q.y - 3, 6, 6);
+      }
       return;
     }
     const pts = curseur ? [...s.points, curseur] : s.points;

@@ -3,7 +3,7 @@
 // par la ligne. Projection : chaque point est ramené sur la ligne (distance s depuis le début A), les hauteurs sont vraies ;
 // une flèche qui n'est pas dans l'axe de la coupe apparaît raccourcie (× cos de l'angle).
 // Tout en m. Résultat : { longueur, zMin, zMax, batiments, grues, niveaux }.
-import { reglagesGrue, niveauxGrue, boutDeFleche, porteeMax, chargeAuRayon } from './grue-fiche.js';
+import { reglagesGrue, niveauxGrue, boutDeFleche, porteeMax } from './grue-fiche.js';
 import { profilSurface } from './coupe.js';
 import { modeleDe } from './grue-modele.js';
 
@@ -97,24 +97,59 @@ export function formesGrue(o, a, u) {
   const formes = [];
   const c = tour.pied.c ?? tour.mat + 1;
   if (g.massifs) formes.push(rect(s0 - (c * proj + g.massifL) / 2, s0 + (c * proj + g.massifL) / 2, nv.pied - g.massifH, nv.pied, 'massif'));
-  if (tour.pied.type !== 'FA') formes.push(rect(s0 - (c * proj) / 2, s0 + (c * proj) / 2, nv.pied, nv.pied + 0.5, 'pied'));
-  formes.push(rect(s0 - tour.mat / 2, s0 + tour.mat / 2, nv.pied, nv.flecheHaut, 'mat'));
-  formes.push({ type: 'poly', genre: 'mat', pts: [ptCoupe(s0 - tour.mat / 2, nv.flecheHaut), ptCoupe(s0 + tour.mat / 2, nv.flecheHaut), ptCoupe(s0, nv.haut)] });
   const bout = boutDeFleche(M, f);
   const arr = D.contreFlecheArriere;
-  const [c1, c2] = largeurMin(X(-arr), X(-0.4));
-  formes.push(rect(c1, c2, nv.flecheBas, nv.flecheHaut, 'contre'));
   const [j1, j2] = largeurMin(X(D.flecheDebut), X(bout));
-  formes.push(rect(j1, j2, nv.flecheBas, nv.flecheHaut, 'fleche'));
-  formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(s0, nv.haut), ptCoupe(X(bout * 0.72), nv.flecheHaut)] });
-  formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(s0, nv.haut), ptCoupe(X(-arr), nv.flecheHaut)] });
+  if (M.type === 'automontante') {
+    // 0.315.4 (d'après les images de Liebherr automontantes du 24.11) : mât en treillis jaune, châssis noir
+    // sur stabilisateurs avec lest en plaques empilées, tête de mât penchée vers l'arrière, haubans, flèche jaune
+    // plus fine après le tiers ; pas de contre-flèche. Dimensions estimées : à valider.
+    const cw = c * proj;
+    const H = nv.flecheHaut - nv.pied;
+    const bas = nv.pied + 0.7;
+    formes.push(rect(s0 - cw / 2, s0 + cw / 2, nv.pied + 0.25, bas, 'chassisauto'));
+    for (const cote of [-1, 1]) formes.push(rect(s0 + cote * cw / 2 - 0.25, s0 + cote * cw / 2 + 0.25, nv.pied, nv.pied + 0.25, 'pied'));
+    // lest : plaques empilées à côté du pied du mât (d'après la fiche d'une Liebherr automontante)
+    for (let k = 0; k < 6; k++) formes.push(rect(X(-2.2), X(-0.9), bas + k * 0.4, bas + k * 0.4 + 0.34, 'lest'));
+    // mât en treillis jaune, de largeur constante
+    formes.push(rect(s0 - tour.mat / 2, s0 + tour.mat / 2, bas, nv.flecheHaut, 'mat'));
+    const pointe = [X(-1.1), nv.haut];
+    formes.push({ type: 'poly', genre: 'tete', pts: [ptCoupe(s0 - tour.mat / 2, nv.flecheHaut), ptCoupe(s0 + tour.mat / 2, nv.flecheHaut), ptCoupe(...pointe)] });
+    const coupeG = D.flecheDebut + (bout - D.flecheDebut) * 0.35; // partie intérieure grise, puis partie extérieure jaune plus fine
+    const [g1, g2] = largeurMin(X(D.flecheDebut), X(coupeG));
+    const [o1, o2] = largeurMin(X(coupeG), X(bout));
+    formes.push(rect(g1, g2, nv.flecheBas, nv.flecheHaut, 'flecheg'));
+    formes.push(rect(o1, o2, nv.flecheBas + 0.25, nv.flecheHaut - 0.1, 'fleche'));
+    formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(...pointe), ptCoupe(X(bout * 0.72), nv.flecheHaut)] });
+    formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(...pointe), ptCoupe(X(-1.6), bas + 2.3)] });
+    formes.push(rect(X(Math.min(r, bout - 0.5)) - 0.5, X(Math.min(r, bout - 0.5)) + 0.5, nv.flecheBas - 0.4, nv.flecheBas, 'chariot'));
+  } else {
+    if (tour.pied.type !== 'FA') formes.push(rect(s0 - (c * proj) / 2, s0 + (c * proj) / 2, nv.pied, nv.pied + 0.5, 'pied'));
+    formes.push(rect(s0 - tour.mat / 2, s0 + tour.mat / 2, nv.pied, nv.flecheHaut, 'mat'));
+    formes.push({ type: 'poly', genre: 'mat', pts: [ptCoupe(s0 - tour.mat / 2, nv.flecheHaut), ptCoupe(s0 + tour.mat / 2, nv.flecheHaut), ptCoupe(s0, nv.haut)] });
+    const [c1, c2] = largeurMin(X(-arr), X(-0.4));
+    formes.push(rect(c1, c2, nv.flecheBas, nv.flecheHaut, 'contre'));
+    formes.push(rect(j1, j2, nv.flecheBas, nv.flecheHaut, 'fleche'));
+    // 0.315.1 : détails (contrepoids, plate-forme, cabine, chariot)
+    const [w1, w2] = largeurMin(X(-arr), X(-arr + Math.min(3.4, arr * 0.4)));
+    formes.push(rect(w1, w2, nv.flecheBas - 0.9, nv.flecheHaut - 0.05, 'contrepoids'));
+    formes.push(rect(X(-2.9), X(2.6), nv.flecheBas - 0.5, nv.flecheBas, 'plateforme'));
+    const cabL = D.cabine?.l ?? 2.4;
+    formes.push(rect(X(0.5), X(0.5 + cabL), nv.flecheBas - 2.2, nv.flecheBas - 0.5, 'cabine'));
+    formes.push(rect(X(Math.min(r, bout - 0.5)) - 0.5, X(Math.min(r, bout - 0.5)) + 0.5, nv.flecheBas - 0.4, nv.flecheBas, 'chariot'));
+    formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(s0, nv.haut), ptCoupe(X(bout * 0.72), nv.flecheHaut)] });
+    formes.push({ type: 'ligne', genre: 'hauban', pts: [ptCoupe(s0, nv.haut), ptCoupe(X(-arr), nv.flecheHaut)] });
+  }
   // Crochet à la HSC, au rayon choisi
   const sc = X(r);
   formes.push({ type: 'ligne', genre: 'cable', pts: [ptCoupe(sc, nv.flecheBas), ptCoupe(sc, nv.crochet + 0.8)] });
   formes.push(rect(sc - 0.35, sc + 0.35, nv.crochet, nv.crochet + 0.8, 'crochet'));
-  const ch = chargeAuRayon(f, r, g.mode);
-  formes.push({ type: 'texte', genre: 'charge', s: sc, z: nv.crochet - 0.9, t: `${fixe1(ch.rayon)} m · ${ch.t.toFixed(2)} t` });
-  formes.push({ type: 'texte', genre: 'hsc', ancre: 'end', s: s0 - tour.mat / 2 - 0.6, z: nv.pied + 1.2, t: `HSC ${fixe1(h.h)} m · Z pied ${nv.pied.toFixed(2)}` });
+  // 0.315.0 : étiquettes avec flèche (placées sans chevauchement par le dessin) : flèche + HSC, cote de la HSC, Z du châssis, Z haut
+  const sMat = s0 - tour.mat / 2 - 1.2;
+  formes.push({ type: 'cote', genre: 'hsc', pts: [ptCoupe(sMat, nv.pied), ptCoupe(sMat, nv.crochet)], t: `HSC ${fixe1(h.h)} m · Z ${nv.crochet.toFixed(2)}` });
+  formes.push({ type: 'etiquette', genre: 'fleche', s: (j1 + j2) / 2, z: nv.flecheHaut, t: `Flèche ${fixe1(f.nom)} m · HSC ${fixe1(h.h)} m`, pref: 'haut' });
+  formes.push({ type: 'etiquette', genre: 'chassis', s: s0 + (tour.pied.type === 'FA' ? tour.mat : c * proj) / 2, z: nv.pied, t: `Z châssis ${nv.pied.toFixed(2)}`, pref: 'droite-bas' });
+  formes.push({ type: 'etiquette', genre: 'haut', s: s0, z: nv.haut, t: `Z haut de la grue ${nv.haut.toFixed(2)}`, pref: 'haut' });
   return { formes, niveaux: nv, s0, nom: `${M.nom}` };
 }
 
