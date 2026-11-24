@@ -101,7 +101,8 @@ export const APPLIS = [
   },
   {
     // Calage de plans (0.278.0, Expert) : caler un plan reçu sur un plan du projet. Site et Topo Bureau : tout le module ;
-    // APK et Topo Tablette (0.285.0) : version simple sur place, calage sur les points du projet (calage/appli.js `simple`).
+    // APK Android (0.285.0) : version simple sur place, calage sur les points du projet (calage/appli.js `simple`) ;
+    // Topo Tablette : version complète depuis la 0.308.0 (DWG par ODA s'il est installé).
     cle: 'calage',
     titre: 'Calage de plans',
     court: 'Calage',

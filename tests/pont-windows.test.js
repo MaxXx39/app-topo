@@ -47,6 +47,13 @@ describe('pont de l\'appli Windows', () => {
     expect(page.AppliAndroid.modeleAppareil()).toBe('Tablette Windows');
   });
 
+  it('0.308.0 : plans DWG (ODA) aussi dans Topo Tablette et dans Topo Bureau', () => {
+    const { page, messages } = lancer();
+    page.AppliAndroid.choisirDwg(3);
+    expect(messages.at(-1)).toEqual({ fonction: 'choisirDwg', args: [3] });
+    expect(typeof lancer({ bureau: true }).page.AppliAndroid.choisirDwg).toBe('function');
+  });
+
   it('ne fait rien hors de l\'appli Windows, ni si le pont existe déjà', () => {
     const page = {};
     page.top = page;

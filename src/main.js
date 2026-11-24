@@ -1983,8 +1983,9 @@ function ouvrirCalage() {
   ouvrirPageCalage({
     projet,
     // remplace (0.280.0, nouvel indice) : id du plan calé qu'il remplace (même id, même dossier, couleur et affichage).
-    // Tablettes (APK et Topo Tablette, 0.285.0) : version simple sur place (points du projet, sans nettoyage ni indices).
-    simple: estDansAppliAndroid() && !estDansAppliBureau(),
+    // Tablettes Android (0.285.0) : version simple sur place (points du projet, sans nettoyage ni indices).
+    // 0.308.0 : Topo Tablette (Windows) a la version complète, comme le site et Topo Bureau (DWG par ODA s'il est installé).
+    simple: estDansAppliAndroid() && !estDansAppliBureau() && !estDansAppliWindows(),
     // modifier(faire) (0.283.0) : change le projet (afficher un indice, …) sauf en lecture seule.
     modifier: (faire) => {
       if (lectureSeule()) {
