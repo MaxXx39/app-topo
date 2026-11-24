@@ -14966,3 +14966,8 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .page-chantier .ruban-element .propre-element { max-height: 92px; row-gap: 3px; }
 .page-chantier .ruban-element .propre-element .case-chantier { min-height: 0; padding: 0; gap: 4px; font-size: 12px; }
 .page-chantier .ruban-element .propre-element input[type='checkbox'] { width: 16px; height: 16px; min-height: 0; margin: 0; }
+
+/* 0.305.0 : Plans de chantier : bandeau toujours visible, à hauteur fixe (le plan ne change plus de taille). */
+.page-chantier .ruban-element { height: 112px; box-sizing: border-box; overflow-y: auto; align-content: flex-start; }
+.page-chantier .ruban-element > .aide-calage { margin: 0; align-self: center; }
+.page-chantier .ruban-element { flex-shrink: 0; }

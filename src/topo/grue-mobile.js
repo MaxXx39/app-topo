@@ -1,13 +1,14 @@
 // Plans de chantier (0.293.0) : blocs dynamiques. Grue mobile = un seul objet réglable : porteur (rotation de l'objet),
 // tourelle tournée librement par rapport au porteur, longueur de flèche, stabilisateurs sortis ou non, 4 tailles.
 // Grues à tour / automontantes : la flèche s'oriente indépendamment du châssis (`rotationFleche`).
-import { AUTOGRUES, porteurGrueMobile, tourelleGrueMobile, pivotGrueMobile } from './symboles-vehicules.js';
+import { AUTOGRUES, porteurGrueMobile, tourelleGrueMobile, pivotGrueMobile, camionGrue } from './symboles-vehicules.js';
 import { tournerPrims, deplacer } from './symboles-outils.js';
 import { versSymbole } from './symboles-retouches.js';
 import { grueLibre } from './symboles.js';
 import { bornesPrimitives } from './blocs-dxf.js';
 import { panneauDeviation, CLE_DEVIATION } from './panneau-deviation.js';
 import { parkingDynamique, CLE_PARKING } from './parking-dynamique.js';
+import { pompeDynamique, CLE_POMPE } from './pompe-dynamique.js';
 
 const memoire = new Map();
 export const TONNES_MOBILES = AUTOGRUES.map((a) => a.t);
@@ -32,11 +33,13 @@ export function grueMobile(o) {
   const fleche = Math.min(a.fleche, Math.max(FLECHE_MOBILE_MIN, Number(o.fleche) || a.fleche * 0.6));
   const tourelle = Math.round((Number(o.tourelle) || 0) * 10) / 10;
   const stab = o.stabilisateurs !== false;
-  const cle = `${a.t}|${fleche}|${tourelle}|${stab}`;
+  const repliee = Boolean(o.repliee);
+  const cle = `${a.t}|${fleche}|${tourelle}|${stab}|${repliee}`;
   if (!memoire.has(cle)) {
     if (memoire.size > 60) memoire.clear();
-    const tour = deplacerPrims(tournerPrims(tourelleGrueMobile(fleche), tourelle), 0, pivotGrueMobile(a));
-    const s = versSymbole(`Grue mobile ${a.t} t`, 'Grues', [...porteurGrueMobile(a, stab), ...tour], { centre: false });
+    // 0.305.0 : grue repliée (sur la route) : flèche couchée vers l'avant, appuis rentrés (le camion grue « plié »).
+    const prims = repliee ? camionGrue(a, false) : [...porteurGrueMobile(a, stab), ...deplacerPrims(tournerPrims(tourelleGrueMobile(fleche), tourelle), 0, pivotGrueMobile(a))];
+    const s = versSymbole(`Grue mobile ${a.t} t`, 'Grues', prims, { centre: false });
     memoire.set(cle, { ...s, fleche, modele: 'mobile', tonnes: a.t, flecheMax: a.fleche, rayon: [] });
   }
   return memoire.get(cle);
@@ -97,6 +100,7 @@ export function grueDeLObjet(bib, o) {
  */
 export function symboleDeLObjetPose(bib, o) {
   if (o.cle === CLE_DEVIATION) return panneauDeviation(o);
+  if (o.cle === CLE_POMPE) return pompeDynamique(o);
   if (o.cle === CLE_PARKING) return parkingDynamique(o);
   const s = bib.find((x) => x.cle === o.cle) ?? null;
   const a = Number(o.tourelle) || 0;
@@ -105,8 +109,10 @@ export function symboleDeLObjetPose(bib, o) {
   if (!memoire.has(cle)) {
     if (memoire.size > 60) memoire.clear();
     const [cx, cy] = s.pivote.centre;
-    const fixe = s.primitives.slice(0, s.pivote.depuis);
-    const tour = deplacerPrims(tournerPrims(deplacerPrims(s.primitives.slice(s.pivote.depuis), -cx, -cy), a), cx, cy);
+    // 0.305.0 : la tourelle = les primitives à partir de « depuis », ou la liste « indices » (pelle 5 t).
+    const dansTour = s.pivote.indices ? ((_, i) => s.pivote.indices.includes(i)) : ((_, i) => i >= s.pivote.depuis);
+    const fixe = s.primitives.filter((p, i) => !dansTour(p, i));
+    const tour = deplacerPrims(tournerPrims(deplacerPrims(s.primitives.filter(dansTour), -cx, -cy), a), cx, cy);
     const primitives = [...fixe, ...tour];
     const b = bornesPrimitives(primitives);
     memoire.set(cle, { ...s, primitives, boite: b ? [b.xMin, b.yMin, b.xMax, b.yMax] : s.boite });

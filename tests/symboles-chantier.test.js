@@ -120,7 +120,7 @@ describe('modernisation', () => {
 
 describe('bibliothèque livrée (Base_2023.dxf)', () => {
   it('59 symboles proposés, grues et châssis réglables', () => {
-    expect(BIB.filter((s) => !s.cache)).toHaveLength(112); // 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
+    expect(BIB.filter((s) => !s.cache)).toHaveLength(110); // 0.305.0 : 2 pompes fixes cachées (pompe réglable) ; 0.292.0 : 59 du DXF − 8 retirés + manuscop, benne recyclage, 4 bennes de tri, douches, toupie dépliée + 62 dessinés
     expect(flechesDisponibles(BIB, 'tour')).toEqual([25, 30, 35, 40, 45, 50, 55, 60, 65, 70]);
     expect(flechesDisponibles(BIB, 'auto')).toEqual([20, 25, 30, 35, 40, 45, 50]);
     expect(chassisDisponibles(BIB)).toEqual(['3.80', '4.20', '4.50', '4.60', '6']);

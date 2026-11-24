@@ -363,48 +363,56 @@ export function tourelleGrueMobile(fleche) {
 
 /**
  * Camion pompe à béton (devant en bas) : porteur à 4 essieux, trémie à l'arrière, mât de distribution. Replié : mât plié
- * le long du porteur vers l'avant, appuis rentrés. Déplié : mât déployé en zigzag vers l'arrière (5 éléments, ~28 m),
- * tuyau terminal, appuis sortis.
+ * le long du porteur, appuis rentrés. Déplié : mât déployé en zigzag (5 éléments) vers l'arrière, tuyau terminal, appuis
+ * sortis. 0.305.0 : caisse BLANCHE avec « Pompe » écrit dessus (le rouge faisait « pompiers », retour de l'utilisateur) ;
+ * longueur du mât au choix (28 m de départ : les 5 éléments mis à l'échelle) et mât tourné de « tourelle » degrés
+ * autour de son pivot (déplié seulement).
  */
-export function pompeABeton(deploye) {
+export function pompeABeton(deploye, { longueur = 28, tourelle = 0 } = {}) {
   const L = 11.4;
   const W = 2.5;
   const y0 = -L / 2;
   const pivotY = y0 + 3.1;
+  const MAT = '#f4f6f8';
+  const MAT2 = '#c9d1d9';
   const corps = (b) => [
-    ...piece('#d63a3a', 'peinture', rectArrondi(b.x0 + 0.05, b.y0 + 0.1, b.x1 - 0.05, b.y1 - 0.2, 0.12)),
+    ...piece(MAT, 'peinture', rectArrondi(b.x0 + 0.05, b.y0 + 0.1, b.x1 - 0.05, b.y1 - 0.2, 0.12)),
     ...piece('#3a3f45', 'metal', [[-0.95, b.y1 - 2.0], [0.95, b.y1 - 2.0], [0.6, b.y1 - 0.4], [-0.6, b.y1 - 0.4]]),
     ...piece(METAL, 'metal', rectArrondi(-0.5, b.y1 - 3.6, 0.5, b.y1 - 2.1, 0.08)),
   ];
   const res = camion({ L, W, essieux: [0.5, 1.7, 2.9], corps, couleurCabine: BLANC });
   res.push(...appui(y0 + 3.0, 3.6, deploye, W / 2), ...appui(y0 + L - 0.9, 2.9, deploye, W / 2));
-  res.push(...piece(CLAIR, 'metal', cercle(0, pivotY, 0.8, 24)), ...piece('#d63a3a', 'peinture', rectArrondi(-0.55, pivotY - 0.6, 0.55, pivotY + 0.6, 0.12)));
+  // « Pompe » écrit le long de la caisse (lisible quand le camion est couché, comme les bennes).
+  res.push({ g: 't', k: '#1e293b', x: 0, y: y0 + L * 0.62, h: 0.62, a: 90, t: 'Pompe', ah: 1, av: 2 });
+  res.push(...piece(CLAIR, 'metal', cercle(0, pivotY, 0.8, 24)), ...piece(MAT2, 'peinture', rectArrondi(-0.55, pivotY - 0.6, 0.55, pivotY + 0.6, 0.12)));
+  const k = Math.max(0.3, Number(longueur) || 28) / 28;
   if (!deploye) {
-    // Mât plié : posé derrière la cabine, 4 éléments empilés couchés vers l'arrière au-dessus du porteur ; tuyau replié.
+    // Mât plié : 4 éléments couchés vers l'arrière au-dessus du porteur (longueur du porteur, quel que soit le mât).
     const largeurs = [0.66, 0.56, 0.46, 0.36];
     const lon = [7.4, 6.8, 6.0, 5.2];
     largeurs.forEach((w, i) => {
-      res.push(...piece(i % 2 ? '#e9edf0' : '#d63a3a', 'peinture', rectArrondi(-w / 2 + (i - 1.5) * 0.05, pivotY - 0.2, w / 2 + (i - 1.5) * 0.05, pivotY + lon[i], 0.12)));
+      res.push(...piece(i % 2 ? MAT2 : MAT, 'peinture', rectArrondi(-w / 2 + (i - 1.5) * 0.05, pivotY - 0.2, w / 2 + (i - 1.5) * 0.05, pivotY + lon[i], 0.12)));
     });
     res.push(trait([[0.2, pivotY + 7.4], [0.2, pivotY + 7.9]], false, NOIR));
-  } else {
-    const pts = [[0, pivotY]];
-    const lon = [7.6, 6.6, 5.6, 4.6, 3.6];
-    const dev = [90, 90 + 14, 90 - 22, 90 + 26, 90 - 12];
-    lon.forEach((l, i) => {
-      const [x, y] = pts[i];
-      pts.push([x + l * Math.cos((dev[i] * Math.PI) / 180), y + l * Math.sin((dev[i] * Math.PI) / 180)]);
-    });
-    pts.slice(0, -1).forEach((p, i) => {
-      res.push(...piece(i % 2 ? '#e9edf0' : '#d63a3a', 'peinture', epais([p, pts[i + 1]], 0.7 - i * 0.07)));
-    });
-    pts.forEach((p, i) => res.push(...piece(METAL, 'metal', cercle(p[0], p[1], 0.3 - i * 0.02, 12))));
-    const fin = pts[pts.length - 1];
-    const b = pts[pts.length - 2];
-    const d = Math.hypot(fin[0] - b[0], fin[1] - b[1]);
-    const [ux, uy] = [(fin[0] - b[0]) / d, (fin[1] - b[1]) / d];
-    for (let k = 0; k < 4; k++) res.push(trait([[fin[0] + ux * (0.3 + k * 1.0), fin[1] + uy * (0.3 + k * 1.0)], [fin[0] + ux * (0.9 + k * 1.0), fin[1] + uy * (0.9 + k * 1.0)]], false, NOIR));
+    return res;
   }
+  const a0 = (Number(tourelle) || 0);
+  const pts = [[0, pivotY]];
+  const lon = [7.6, 6.6, 5.6, 4.6, 3.6].map((l) => l * k);
+  const dev = [90, 90 + 14, 90 - 22, 90 + 26, 90 - 12].map((d) => d + a0);
+  lon.forEach((l, i) => {
+    const [x, y] = pts[i];
+    pts.push([x + l * Math.cos((dev[i] * Math.PI) / 180), y + l * Math.sin((dev[i] * Math.PI) / 180)]);
+  });
+  pts.slice(0, -1).forEach((p, i) => {
+    res.push(...piece(i % 2 ? MAT2 : MAT, 'peinture', epais([p, pts[i + 1]], 0.7 - i * 0.07)));
+  });
+  pts.forEach((p, i) => res.push(...piece(METAL, 'metal', cercle(p[0], p[1], 0.3 - i * 0.02, 12))));
+  const fin = pts[pts.length - 1];
+  const b = pts[pts.length - 2];
+  const d = Math.hypot(fin[0] - b[0], fin[1] - b[1]);
+  const [ux, uy] = [(fin[0] - b[0]) / d, (fin[1] - b[1]) / d];
+  for (let q = 0; q < 4; q++) res.push(trait([[fin[0] + ux * (0.3 + q * 1.0), fin[1] + uy * (0.3 + q * 1.0)], [fin[0] + ux * (0.9 + q * 1.0), fin[1] + uy * (0.9 + q * 1.0)]], false, NOIR));
   return res;
 }
 
