@@ -54,7 +54,14 @@ export function entreesBibliotheque(bib) {
 export function filtrerEntrees(entrees, categorie = '', recherche = '') {
   const simple = (t) => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const mots = simple(recherche).split(/\s+/).filter(Boolean);
-  return entrees.filter((x) => (!categorie || x.categorie === categorie) && mots.every((m) => simple(x.nom).includes(m)));
+  // 0.307.0 : rangés par type (ordre des catégories) puis par ordre alphabétique.
+  const rang = (c) => {
+    const i = CATEGORIES_SYMBOLES.indexOf(c);
+    return i < 0 ? CATEGORIES_SYMBOLES.length : i;
+  };
+  return entrees
+    .filter((x) => (!categorie || x.categorie === categorie) && mots.every((m) => simple(x.nom).includes(m)))
+    .sort((a, b) => rang(a.categorie) - rang(b.categorie) || String(a.categorie ?? '').localeCompare(String(b.categorie ?? ''), 'fr') || a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base', numeric: true }));
 }
 
 export { CATEGORIES_SYMBOLES };

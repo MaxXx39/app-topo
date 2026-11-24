@@ -242,7 +242,11 @@ export function creerVueChantier(conteneur, options) {
       ctx.strokeRect(q.x - 4, q.y - 4, 8, 8);
     }
     // 0.299.0 : petit « + » au milieu de chaque côté (ligne, zone, flèche, piste) : clic ou glisser = ajouter un point.
-    for (const { milieu } of milieuxDesCotes(o)) {
+    for (const { index, milieu } of milieuxDesCotes(o)) {
+      // 0.307.0 : pas de « + » sur les petits côtés (ceux d'un arc), trop serrés à l'écran.
+      const a = ecran(o.points[index]);
+      const b = ecran(o.points[(index + 1) % o.points.length]);
+      if (Math.hypot(b.x - a.x, b.y - a.y) < 36) continue;
       const q = ecran(milieu);
       ctx.beginPath();
       ctx.arc(q.x, q.y, 5, 0, 2 * Math.PI);
@@ -278,6 +282,15 @@ export function creerVueChantier(conteneur, options) {
       return;
     }
     if (!s || !s.points.length) return;
+    // 0.307.0 : cotation de longueur, 2 points cliqués : la cote elle-même suit la souris (le 3e clic la pose), au lieu
+    // d'un trait vers un 3e point qui faisait croire à un autre point à coter.
+    if (s.outil === 'cotation' && s.genre !== 'angle' && s.points.length === 2 && curseur && pc) {
+      const [A, B] = s.points;
+      const L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
+      const decalage = ((curseur[0] - A[0]) * -(B[1] - A[1]) + (curseur[1] - A[1]) * (B[0] - A[0])) / L;
+      dessinerObjet(contexteDessin(ctx, pc), { type: 'cotation', genre: 'longueur', points: [A, B], decalage, phase: pc.phaseActive });
+      return;
+    }
     const pts = curseur ? [...s.points, curseur] : s.points;
     const couleur = pc ? couleurObjet(pc, { type: s.outil, categorie: s.categorie, style: s.style, phase: pc.phaseActive }) : ORANGE;
     chemin(ctx, pts, s.outil === 'zone');

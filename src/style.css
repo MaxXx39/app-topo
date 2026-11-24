@@ -14971,3 +14971,7 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .page-chantier .ruban-element { height: 112px; box-sizing: border-box; overflow-y: auto; align-content: flex-start; }
 .page-chantier .ruban-element > .aide-calage { margin: 0; align-self: center; }
 .page-chantier .ruban-element { flex-shrink: 0; }
+/* 0.307.0 : le ruban d'outils ne se fait plus écraser par le bandeau (vu dans Topo Bureau, 24.11). */
+.page-chantier .ruban-une-ligne, .page-chantier .consigne-calage { flex-shrink: 0; }
+.page-chantier .ruban-une-ligne { min-height: 54px; }
+.liste-biblio .titre-type-biblio { grid-column: 1 / -1; margin: 6px 0 0; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: #92400e; border-bottom: 1px solid #fed7aa; }

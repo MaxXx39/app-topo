@@ -696,7 +696,9 @@ function creerLecteur(calquesLus, { annotations = false } = {}) {
         }
         const [xp, yp] = point(x, y);
         etendre(xp, yp);
-        brut.textes.push({ c, k, x: xp, y: yp, h: nombre(entite, 40, 1) * echelle, a: angle + angleDe(t), t: lu, ah, av, ...(sourceCourante ? { s: sourceCourante } : entite.type === 'ATTRIB' ? { s: 'ATTRIB' } : {}) });
+        // 0.307.0 : MTEXT de plusieurs lignes : les lignes gardées à part (« Exploser les textes » du calage).
+        const lignes = entite.type === 'MTEXT' && /\\P/.test(brutTexte) ? brutTexte.split('\\P').map((x) => texteSansMiseEnForme(x)).filter(Boolean) : null;
+        brut.textes.push({ c, k, x: xp, y: yp, h: nombre(entite, 40, 1) * echelle, a: angle + angleDe(t), t: lu, ah, av, ...(lignes?.length > 1 ? { lignes } : {}), ...(sourceCourante ? { s: sourceCourante } : entite.type === 'ATTRIB' ? { s: 'ATTRIB' } : {}) });
         break;
       }
       case 'INSERT': {

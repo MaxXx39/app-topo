@@ -103,3 +103,21 @@ export function controlerIndice(reperes, plan, echelle) {
     ? { memeOrigine: true, part, message: `Même origine : ${pourcent} % des repères retrouvés à 2 mm. La recette peut être rejouée.` }
     : { memeOrigine: false, part, message: `Origine différente : ${pourcent} % des repères seulement retrouvés à 2 mm (il en faut 50 %). Le plan a bougé : calez-le à la main.` };
 }
+
+/**
+ * 0.307.0 (demande du 24.11) : nom d'un plan calé = type fixe devant (« DXF- » ou « PDF- », non supprimable) + nom +
+ * « _ind- » + indice : « DXF-Villa Dupont_ind-B ». Un DWG converti est un DXF.
+ */
+export function nomPlanCale(type, base, indice) {
+  const propre = baseDuNomCale(base);
+  const ind = String(indice ?? '').trim();
+  return `${type === 'PDF' ? 'PDF' : 'DXF'}-${propre}${ind ? `_ind-${ind}` : ''}`;
+}
+
+/** Nom sans le type devant ni l'indice derrière (« DXF-Villa_ind-B » → « Villa »). */
+export function baseDuNomCale(nom) {
+  return String(nom ?? '').trim().replace(/^(DXF|PDF|DWG)[-_ ]+/i, '').replace(/_ind-[^_]*$/i, '').trim();
+}
+
+/** Type du fichier reçu pour le nom : « PDF » ou « DXF » (DXF et DWG). */
+export const typeDuFichier = (fichier) => (/\.pdf$/i.test(fichier ?? '') ? 'PDF' : 'DXF');

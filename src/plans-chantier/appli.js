@@ -30,7 +30,7 @@ import { ouvrirGestionPhases } from './gestion-phases.js';
 import { ouvrirGestionCalques, plansAvecCalques } from './gestion-calques.js';
 import { autogrueDe, TONNES_MOBILES, FLECHE_MOBILE_MIN } from '../topo/grue-mobile.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
-import { pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu } from '../topo/plan-chantier.js';
+import { pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
 import { reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
@@ -452,7 +452,10 @@ export function ouvrirPlansChantier({
           // 0.299.0 : le petit « + » au milieu d'un côté : glisser = un nouveau point qui suit la souris.
           const m = i < 0 ? milieuSousLePoint(o, p, tol) : -1;
           if (m >= 0) {
-            etat.glisse = { type: 'milieu', index: m };
+            // 0.307.0 : appui long (≥ 0,45 s) sur le « + » puis glisser = le côté devient un arc qui suit la souris.
+            const g = { type: 'milieu', index: m, t0: Date.now() };
+            etat.glisse = g;
+            setTimeout(() => { if (etat.glisse === g) message('Arc : glissez pour courber le côté (relâchez pour le garder).', 2500); }, 450);
             return true;
           }
           if (o.type === 'texte' && i === 0) i = -1; // le texte se déplace en entier ; seule la poignée du repère est un sommet
@@ -472,6 +475,14 @@ export function ouvrirPlansChantier({
             // Le point saisi suit la souris (et s'accroche) : comme « Déplacer » d'AutoCAD avec un point de base.
             const [dx, dy] = etat.glisse?.decal ?? [0, 0];
             o.point = [point[0] - dx, point[1] - dy];
+            return;
+          }
+          if (etat.glisse?.type === 'milieu' && Date.now() - etat.glisse.t0 >= 450) {
+            if (!avantChangement()) return;
+            etat.glisse = { type: 'arc', index: etat.glisse.index, base: o.points.map((q) => [...q]) };
+          }
+          if (etat.glisse?.type === 'arc') {
+            o.points = arcSurCote(etat.glisse.base, etat.glisse.index, point, o.type === 'zone');
             return;
           }
           if (etat.glisse?.type === 'milieu') {
@@ -753,7 +764,7 @@ export function ouvrirPlansChantier({
       majTout();
       return;
     }
-    const s = etat.saisie ?? (etat.saisie = { outil: etat.outil, points: [], categorie: etat.categorie, style: etat.style, largeur: etat.largeur });
+    const s = etat.saisie ?? (etat.saisie = { outil: etat.outil, points: [], categorie: etat.categorie, style: etat.style, largeur: etat.largeur, genre: etat.cotationGenre });
     // Zone : toucher le 1er sommet la ferme.
     if (s.outil === 'zone' && s.points.length >= 3 && Math.hypot(p[0] - s.points[0][0], p[1] - s.points[0][1]) <= tolerance) {
       finirSaisie();
@@ -1523,7 +1534,8 @@ export function ouvrirPlansChantier({
     }
     const entrees = filtrerEntrees(entreesBibliotheque(bib()), etat.biblio.categorie, etat.biblio.recherche);
     const choisie = etat.outil === 'symbole' ? cleDeLaPose(etat.pose) : null;
-    liste.innerHTML = entrees.map((x) => `<button type="button" class="entree-biblio ${x.cle === choisie ? 'actif' : ''}" data-entree="${echapper(x.cle)}" title="${echapper(x.nom)}">
+    // 0.307.0 : un titre par type (catégorie) quand plusieurs types sont montrés.
+    liste.innerHTML = entrees.map((x, i) => `${!etat.biblio.categorie && x.categorie !== entrees[i - 1]?.categorie ? `<h4 class="titre-type-biblio">${echapper(x.categorie ?? 'Autres')}</h4>` : ''}<button type="button" class="entree-biblio ${x.cle === choisie ? 'actif' : ''}" data-entree="${echapper(x.cle)}" title="${echapper(x.nom)}">
       <canvas data-vignette="${echapper(x.cle)}"></canvas><span class="nom">${echapper(x.nom)}</span>
       <span class="dims">${x.detail ? echapper(x.detail) : `${n1(x.largeur)} × ${n1(x.hauteur)} m`}${x.importe ? ' · projet' : ''}</span></button>`).join('') || '<p class="aide-calage">Aucun symbole.</p>';
     const parCle = new Map(entrees.map((x) => [x.cle, x]));

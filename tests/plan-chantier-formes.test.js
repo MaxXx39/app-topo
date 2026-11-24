@@ -58,3 +58,23 @@ describe('point de base d\'un symbole', () => {
     expect(pointDeBase(coins, [3, 1.2], 0.5)).toEqual([3, 1.2]);
   });
 });
+
+// 0.307.0 : appui long sur le « + » = le côté devient un arc qui passe par la souris.
+import { arcSurCote } from '../src/topo/plan-chantier.js';
+describe('arc sur un côté', () => {
+  it('demi-cercle de 0,0 à 10,0 par 5,5 : tous les points à 5 m du centre, dans le bon sens', () => {
+    const pts = arcSurCote([[0, 0], [10, 0], [10, -10]], 0, [5, 5], false, 8);
+    expect(pts).toHaveLength(3 + 7);
+    for (const p of pts.slice(1, 8)) {
+      expect(Math.hypot(p[0] - 5, p[1])).toBeCloseTo(5, 2);
+      expect(p[1]).toBeGreaterThan(0);
+    }
+    expect(pts.at(-2)).toEqual([10, 0]);
+  });
+  it('points alignés : le côté reste droit ; côté qui ferme une zone', () => {
+    expect(arcSurCote([[0, 0], [10, 0]], 0, [5, 0])).toEqual([[0, 0], [10, 0]]);
+    const z = arcSurCote([[0, 0], [10, 0], [10, 10]], 2, [3, 7], true, 4);
+    expect(z).toHaveLength(6);
+    expect(z.slice(0, 3)).toEqual([[0, 0], [10, 0], [10, 10]]);
+  });
+});
