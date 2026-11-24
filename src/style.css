@@ -14989,3 +14989,9 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .page-plateformes .ruban-plateformes .groupe-ruban { padding: 2px 2px; flex-shrink: 0; }
 .page-plateformes .ruban-plateformes .outil-ruban { min-width: 36px; padding: 2px 3px; }
 .page-plateformes .ruban-plateformes .outil-ruban span { font-size: 0.6rem; }
+
+/* 0.310.0 : fiche écrite de la grue Liebherr 172 EC-B (Plans de chantier) */
+.page-chantier .fiche-grue { list-style: none; margin: 0.4rem 0 0; padding: 0; font-size: 0.85rem; display: grid; gap: 0.3rem; }
+.page-chantier .fiche-grue li { line-height: 1.3; }
+.page-chantier .fiche-grue small { display: block; color: var(--gris); }
+.page-chantier .fiche-grue .alerte-fiche { color: #b45309; }

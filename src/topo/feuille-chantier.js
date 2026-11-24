@@ -112,7 +112,7 @@ export function elementsLegende(objets, nomSymbole = (c) => String(c).replace(/^
     else if (o.type === 'ligne') ajouter(`ligne:${styleLigne(o.style).cle}:${o.couleur ?? ''}`, styleLigne(o.style).nom.replace(/\s+[<>].*$/, ''), 'ligne', o, 1);
     else if (o.type === 'piste') ajouter('piste', 'Piste de chantier', 'piste', o, 2);
     else if (o.type === 'fleche') ajouter(`fleche:${o.couleur ?? ''}`, 'Sens de circulation', 'fleche', o, 2);
-    else if (o.type === 'grue') ajouter(`grue:${o.modele}:${o.modele === 'mobile' ? o.tonnes : o.fleche}`, o.modele === 'mobile' ? `Grue mobile ${o.tonnes ?? 100} t` : `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'}, flèche ${o.fleche} m`, 'grue', o, 3);
+    else if (o.type === 'grue') ajouter(`grue:${o.modele}:${o.modele === 'mobile' ? o.tonnes : o.fleche}`, o.modele === 'mobile' ? `Grue mobile ${o.tonnes ?? 100} t` : o.modele === 'ecb172' ? `Grue Liebherr 172 EC-B, flèche ${o.fleche} m` : `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'}, flèche ${o.fleche} m`, 'grue', o, 3);
     else if (o.type === 'symbole') ajouter(o.etage ? 'etage' : `symbole:${o.cle}`, o.etage ? 'Base-vie à étage' : nomSymbole(o.cle), 'symbole', o, 3);
   }
   return [...vus.values()].sort((a, b) => a.rang - b.rang);

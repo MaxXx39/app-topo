@@ -29,6 +29,7 @@ import { CLE_POMPE, LONGUEUR_POMPE } from '../topo/pompe-dynamique.js';
 import { ouvrirGestionPhases } from './gestion-phases.js';
 import { ouvrirGestionCalques, plansAvecCalques } from './gestion-calques.js';
 import { autogrueDe, TONNES_MOBILES, FLECHE_MOBILE_MIN } from '../topo/grue-mobile.js';
+import { FLECHES_ECB172, TOURS as TOURS_ECB, flecheDe as flecheEcb, tourDe as tourEcb, hauteursDe as hauteursEcb, hauteurChoisie as hauteurEcb, reglagesEcb172, ficheEcb172, RAYON_MIN as RAYON_MIN_ECB } from '../topo/grue-liebherr-172.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
@@ -1298,6 +1299,14 @@ export function ouvrirPlansChantier({
       <label class="champ-calage"><span>Couleur des hachures</span><span class="ligne-couleur-hachure"><input type="color" value="${echapper(h.couleur || couleurZone)}" data-${attr}="couleur">${h.couleur ? `<button type="button" class="bouton-secondaire petit" data-action="${attr}-couleur-zone" title="Même couleur que la zone">↺</button>` : ''}</span></label>`}`;
   }
 
+  /** 0.310.0 : fiche écrite d'une grue Liebherr 172 EC-B choisie (charges, hauteur, contrepoids… : tout vient de la fiche du constructeur). */
+  function ficheGrueHtml(o) {
+    if (o?.type !== 'grue' || o.modele !== 'ecb172') return '';
+    const fiche = ficheEcb172(o);
+    const alerte = (t) => `<li class="alerte-fiche">⚠ ${echapper(t)}</li>`;
+    return `<h3>Fiche de la grue</h3><ul class="fiche-grue">${fiche.lignes.map((l) => `<li><b>${echapper(l.titre)}</b> : ${echapper(l.valeur)}${l.detail ? `<small>${echapper(l.detail)}</small>` : ''}</li>${l.alerte ? alerte(l.alerte) : ''}`).join('')}${fiche.pasDansLaFiche.map(alerte).join('')}</ul>`;
+  }
+
   function majPanneau() {
     const zone = page.querySelector('[data-zone="panneau"]');
     if (!zone) return;
@@ -1387,6 +1396,7 @@ export function ouvrirPlansChantier({
         <option value="objets" ${p.couleurs !== 'phases' ? 'selected' : ''}>Celles des objets</option>
         <option value="phases" ${p.couleurs === 'phases' ? 'selected' : ''}>Une couleur par phase</option></select></label>
       ${choisi}
+      ${ficheGrueHtml(o)}
       <h3>Éléments (${p.objets.length})</h3>
       <ul class="elements-chantier">${[...p.objets].reverse().map((x) => `<li><button type="button" data-choisir="${x.id}" class="${x.id === etat.choisi ? 'actif' : ''}">
         <i style="background:${couleurObjet(p, x)}"></i>${echapper(resumeObjet(x))}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul>`;
@@ -1436,7 +1446,7 @@ export function ouvrirPlansChantier({
 
   /** Nom de ce qui va être posé (panneau de l'outil). */
   function nomDeLaPose(pose) {
-    if (pose.type === 'grue') return pose.modele === 'auto' ? 'Grue automontante' : pose.modele === 'mobile' ? 'Grue mobile' : 'Grue à tour';
+    if (pose.type === 'grue') return pose.modele === 'auto' ? 'Grue automontante' : pose.modele === 'mobile' ? 'Grue mobile' : pose.modele === 'ecb172' ? 'Grue Liebherr 172 EC-B' : 'Grue à tour';
     if (pose.etage) return 'Base-vie à étage';
     return bib().find((x) => x.cle === pose.cle)?.nom ?? pose.cle;
   }
@@ -1450,6 +1460,20 @@ export function ouvrirPlansChantier({
       ${k !== 1 ? '<button type="button" class="bouton-secondaire" data-echelle-reelle title="Revenir à la taille réelle">Taille réelle</button>' : ''}</div>`;
     const rotation = ''; // 0.293.0 : rotation, échelle et orientation sont dans le bandeau du haut
     const orienter = '';
+    if (o.type === 'grue' && o.modele === 'ecb172') {
+      // 0.310.0 : Liebherr 172 EC-B 8 : tout vient de la fiche du constructeur ; la fiche écrite se met à jour toute seule.
+      const g = reglagesEcb172(o);
+      const familles = [...new Set(TOURS_ECB.map((t) => t.famille))];
+      return `<label class="champ-calage"><span>Longueur de la flèche (m)</span><select data-prop="fleche">${FLECHES_ECB172.map((f) => `<option value="${f}" ${f === g.fleche.nom ? 'selected' : ''}>${f.toFixed(1)} m</option>`).join('')}</select></label>
+        <label class="champ-calage"><span>Tour et pied</span><select data-prop="tour">${familles.map((fa) => `<optgroup label="${echapper(fa)}">${TOURS_ECB.filter((t) => t.famille === fa).map((t) => `<option value="${t.id}" ${t.id === g.tour.id ? 'selected' : ''}>${echapper(t.nom)}</option>`).join('')}</optgroup>`).join('')}</select></label>
+        <label class="champ-calage"><span>Hauteur sous crochet</span><select data-prop="hauteur">${hauteursEcb(g.tour).map((h) => `<option value="${h.h}" ${h.h === g.hauteur.h ? 'selected' : ''}>${h.h.toFixed(1)} m${h.etoile ? ' *' : ''} (rang ${echapper(h.etiquette)})</option>`).join('')}</select></label>
+        ${champNombre('Rayon du crochet (charge au crochet)', 'prop', 'rayonCrochet', g.r, RAYON_MIN_ECB, g.fleche.nom, 0.1, 'm')}
+        <label class="champ-calage"><span>Mode de charge</span><select data-prop="mode"><option value="lm1" ${g.mode === 'lm1' ? 'selected' : ''}>LM 1</option>${g.fleche.lm2 ? `<option value="lm2" ${g.mode === 'lm2' ? 'selected' : ''}>LM 2 (vitesses différentes)</option>` : ''}</select></label>
+        <label class="champ-calage"><span>Treuil de levage</span><select data-prop="treuil"><option value="24" ${g.treuil === 24 ? 'selected' : ''}>24 kW FU (câble 113 m)</option><option value="45" ${g.treuil === 45 ? 'selected' : ''}>45 kW FU (câble 179 m)</option></select></label>
+        <label class="champ-calage"><span>Cercles de charge</span><select data-prop="cercles"><option value="principaux" ${g.cercles === 'principaux' ? 'selected' : ''}>Principaux (tous les 10 m)</option><option value="tous" ${g.cercles === 'tous' ? 'selected' : ''}>Tous (colonnes du tableau)</option><option value="aucun" ${g.cercles === 'aucun' ? 'selected' : ''}>Aucun</option></select></label>
+        ${champNombre('Orientation de la flèche (le pied reste fixe)', 'prop', 'rotationFleche', o.rotationFleche ?? 0, -360, 360, 1, '°')}
+        ${champCase('Rayon d\'action', 'prop-case', 'rayon', o.rayon !== false)}`;
+    }
     if (o.type === 'grue' && o.modele === 'mobile') {
       // 0.293.0 : grue mobile dynamique (porteur = rotation de l'objet, tourelle et flèche indépendantes).
       const a = autogrueDe(o.tonnes ?? 100);
@@ -2101,6 +2125,12 @@ export function ouvrirPlansChantier({
         return vue?.redessinerDessus();
       }
       o[cle] = valeur;
+      if (o.modele === 'ecb172') {
+        // 0.310.0 : réglages de la Liebherr 172 EC-B : nombres, et hauteur qui reste valable quand la tour change
+        if (['fleche', 'hauteur', 'treuil'].includes(cle)) o[cle] = Number(valeur);
+        if (cle === 'tour') o.hauteur = hauteurEcb(tourEcb(valeur), o.hauteur).h;
+        if (cle === 'fleche') o.rayonCrochet = Math.min(Number(o.rayonCrochet) || flecheEcb(Number(valeur)).nom, flecheEcb(Number(valeur)).nom);
+      }
       if (cle === 'fin' && !valeur) delete o.fin;
       if (cle === 'etiquette' && !valeur) delete o.etiquette;
       if (cle === 'abaqueTexte' && !valeur) delete o.abaqueTexte;

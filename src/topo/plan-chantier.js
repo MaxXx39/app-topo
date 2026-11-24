@@ -436,6 +436,7 @@ export function resumeObjet(o) {
   if (o.type === 'texte') return `Texte « ${String(o.texte).split(/\r?\n/)[0]}${/\n/.test(o.texte) ? '…' : ''} »`;
   if (o.type === 'cotation') { const g = geometrieCotation(o); return g ? `Cotation ${o.genre === 'angle' ? 'd\'angle' : 'de longueur'} · ${g.texte.t}` : 'Cotation'; }
   if (o.type === 'construction') return o.infinie ? 'Construction · droite' : `Construction · segment ${n(longueur(o.points))} m`;
+  if (o.type === 'grue' && o.modele === 'ecb172') return `Grue Liebherr 172 EC-B · flèche ${o.fleche ?? 50} m`;
   if (o.type === 'grue' && o.modele === 'mobile') return `Grue mobile ${o.tonnes ?? 100} t · flèche ${o.fleche ?? 25} m`;
   if (o.type === 'grue') return `Grue ${o.modele === 'auto' ? 'automontante' : 'à tour'} · flèche ${o.fleche ?? 40} m${o.chassis && o.chassis !== 'aucun' ? ` · châssis ${o.chassis}` : ''}`;
   if (o.type === 'symbole' && o.cle === 'dyn:pompe') return o.deploye === false ? 'Pompe à béton · mât plié' : `Pompe à béton · mât ${o.longueur ?? 28} m`;

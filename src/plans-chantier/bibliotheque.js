@@ -7,6 +7,7 @@ import { grueMobile } from '../topo/grue-mobile.js';
 import { panneauDeviation, CLE_DEVIATION } from '../topo/panneau-deviation.js';
 import { parkingDynamique, CLE_PARKING } from '../topo/parking-dynamique.js';
 import { pompeDynamique, CLE_POMPE } from '../topo/pompe-dynamique.js';
+import { grueEcb172 } from '../topo/grue-liebherr-172.js';
 import { texteDuDxf } from '../topo/dxf-plan.js';
 
 let promesse = null;
@@ -33,6 +34,8 @@ export function entreesBibliotheque(bib) {
   grue('auto', 'Grue automontante');
   // 0.293.0 : grue mobile dynamique (4 tailles au choix dans le panneau, tourelle et flèche réglables).
   res.push({ cle: 'grue:mobile', nom: 'Grue mobile (camion grue)', categorie: 'Grues', largeur: null, hauteur: null, detail: '40 / 100 / 200 / 350 t, tourelle et flèche réglables', pose: { type: 'grue', modele: 'mobile', tonnes: 100, fleche: 25, tourelle: 0, stabilisateurs: true, rayon: false }, symbole: grueMobile({ tonnes: 100, fleche: 25, tourelle: 0 }) });
+  // 0.310.0 : Liebherr 172 EC-B 8 Litronic d'après la fiche du constructeur (flèche, tour, hauteur, rayon, charges).
+  res.push({ cle: 'grue:ecb172', nom: 'Grue Liebherr 172 EC-B 8 (fiche technique)', categorie: 'Grues', largeur: null, hauteur: null, detail: '16 flèches, 19 tours, hauteur, charges et contrepoids de la fiche', pose: { type: 'grue', modele: 'ecb172', fleche: 50, tour: 'hc175-uc460m', hauteur: 30, treuil: 24, mode: 'lm1', cercles: 'principaux', rayon: true }, symbole: grueEcb172({ fleche: 50, tour: 'hc175-uc460m', hauteur: 30 }) });
   // 0.293.0 : panneau de déviation suisse, texte et sens au choix (dans le panneau de droite une fois posé).
   res.push({ cle: CLE_DEVIATION, nom: 'Panneau de déviation (texte, sens)', categorie: 'Signalisation', largeur: null, hauteur: null, detail: 'texte modifiable, flèche à gauche / droite / tout droit', pose: { type: 'symbole', cle: CLE_DEVIATION, texte: 'Lugano', sens: 'droite' }, symbole: panneauDeviation({ texte: 'Lugano', sens: 'droite' }) });
   // 0.297.0 : places de parking réservées, nombre de places et couleur au choix (dans le bandeau une fois posé)
