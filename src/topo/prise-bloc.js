@@ -10,20 +10,21 @@ const milieu = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 
 /** Points de prise [[est, nord], …] d'un bloc posé (o) dont le symbole est « symbole » (peut être null pour une grue). */
 export function pointsDePrise(o, symbole) {
+  const avecCentre = (liste) => (o.point ? [...liste, [o.point[0], o.point[1]]] : liste); // 0.320.7 : le centre du bloc = pastille de déplacement (dernier point)
   if (o.type === 'grue') {
     const l = lignesChassisGrue(o);
     if (l.length) {
       const c = l[0].points.map((q) => [q.est, q.nord]);
-      return [...c, ...c.map((q, i) => milieu(q, c[(i + 1) % c.length])), [l[3].points[0].est, l[3].points[0].nord]];
+      return avecCentre([...c, ...c.map((q, i) => milieu(q, c[(i + 1) % c.length])), [l[3].points[0].est, l[3].points[0].nord]]);
     }
   }
   if (symbole?.prises?.length) {
     const f = versTerrainSymbole(o);
-    return symbole.prises.map(([x, y]) => f(x, y));
+    return avecCentre(symbole.prises.map(([x, y]) => f(x, y)));
   }
   if (!symbole) return [];
   const coins = coinsSymbole(o, symbole);
-  return [...coins, ...coins.map((q, i) => milieu(q, coins[(i + 1) % 4]))];
+  return avecCentre([...coins, ...coins.map((q, i) => milieu(q, coins[(i + 1) % 4]))]);
 }
 
 /** Le point de prise le plus proche de p à « tolerance » près, ou null (alors le bloc ne se déplace pas). */
