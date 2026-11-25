@@ -6,7 +6,7 @@
 // pose, ses deux textes (« 1er », « Rez ») écrits à part (modifiables).
 import {
   styleLigne, categorieZone, couleurObjet, dimensionsFleche, pointeDeFleche, centreZone, texteSurface, positionsLeLong,
-  metresParMm, estPose, texteSymbolesM,
+  metresParMm, estPose, texteSymbolesM, texteDuBlocM,
   geometrieCotation, lignesDuTexte, hachureZone, hachureDeLaZone,
 } from './plan-chantier.js';
 import { couleurAci } from './dxf-plan.js';
@@ -186,12 +186,12 @@ export function dxfPlanChantier(plan, bib, objets = null) {
       if (o.repere) entites.push('0', 'LINE', '8', c, '10', f3(o.point[0]), '20', f3(o.point[1]), '30', '0', '11', f3(o.repere[0]), '21', f3(o.repere[1]), '31', '0');
     } else if (estPose(o)) {
       const k = echelleDeLObjet(o);
-      const pose = blocDuPose(o, bib, texteM / k);
+      const pose = blocDuPose(o, bib, texteDuBlocM(plan, o) / k);
       if (!pose) continue;
       if (!blocs.has(pose.nom)) blocs.set(pose.nom, entitesPrimitives(pose.primitives));
       const c = calque(o, o.type === 'grue' ? 'GRUES' : 'SYMBOLES', 7);
       entites.push('0', 'INSERT', '8', c, '2', pose.nom, '10', f3(o.point[0]), '20', f3(o.point[1]), '30', '0', ...(k !== 1 ? ['41', f3(k), '42', f3(k), '43', f3(k)] : []), '50', (o.rotation ?? 0).toFixed(2));
-      if (o.etiquette) entites.push(...texte(o.point[0], o.point[1], texteM, o.rotation ?? 0, o.etiquette, c));
+      if (o.etiquette) entites.push(...texte(o.point[0], o.point[1], texteDuBlocM(plan, o), o.rotation ?? 0, o.etiquette, c));
       if (o.type === 'grue' && o.rayon !== false) {
         const r = nomDeCalque('PC_GRUES_RAYON');
         calques.set(r, 30);

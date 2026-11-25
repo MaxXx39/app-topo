@@ -85,6 +85,8 @@ export const POINTE_LARGEUR = 0.9; // m, largeur de la pointe à l'échelle ×1
 // 0.292.0 : taille du texte des symboles (mm sur le papier, la même pour tous les blocs) et matériaux des tas de stock.
 export const TAILLE_TEXTE_MM = 3;
 /** Hauteur (m sur le terrain) du texte des symboles : tailleTexteMm × échelle / 1000. */
+/** Taille du texte d'un bloc posé en m (0.320.2) : la sienne (o.texteMm, mm sur le papier) ou celle du plan. */
+export const texteDuBlocM = (plan, o) => texteSymbolesM(o?.texteMm ? { ...plan, tailleTexteMm: o.texteMm } : plan);
 export const texteSymbolesM = (plan) => Math.min(12, Math.max(0.5, plan?.tailleTexteMm ?? TAILLE_TEXTE_MM)) * ((plan?.echelle ?? ECHELLE_PAPIER) / 1000);
 export const MATERIAUX_TAS = [
   { cle: 'terre', nom: 'Terre végétale', couleur: '#6b4a2f' },

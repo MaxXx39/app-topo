@@ -71,3 +71,12 @@ describe('finisseur Super 800 (0.306.0)', () => {
     expect(bib.find((x) => x.cle === 'base:Finisseur').nom).toBe('Finisseur Super 1900');
   });
 });
+
+import { texteDuBlocM, texteSymbolesM } from '../src/topo/plan-chantier.js';
+describe('taille du texte d\'un bloc (0.320.2)', () => {
+  it('celle du plan sauf si le bloc a la sienne', () => {
+    const plan = { tailleTexteMm: 3, echelle: 200 };
+    expect(texteDuBlocM(plan, {})).toBeCloseTo(texteSymbolesM(plan), 9);
+    expect(texteDuBlocM(plan, { texteMm: 6 })).toBeCloseTo(1.2, 9); // 6 mm × 200 / 1000
+  });
+});

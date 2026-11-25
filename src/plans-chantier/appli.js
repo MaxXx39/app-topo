@@ -35,6 +35,7 @@ import { lignesDeCoupe, coupeChantier } from '../topo/coupe-chantier.js';
 import { svgCoupe } from './coupe.js';
 import { ouvrirModelesGrues } from './modeles-grues.js';
 import { lignesChassisGrue } from '../topo/grue-accroches.js';
+import { prisePresDe, pointsDePrise } from '../topo/prise-bloc.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
@@ -80,7 +81,7 @@ const dateCourte = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-CH') : '
  * quandRetour() ; message(texte, durée, options).
  */
 export function ouvrirPlansChantier({
-  projet: projetDonne, modifie, plans = () => [], points = () => [], listesPoints = null, surfaces = () => [], enregistrer: enregistrerFichier = null,
+  projet: projetDonne, modifie, plans: plansDonnes = () => [], points = () => [], listesPoints = null, surfaces = () => [], enregistrer: enregistrerFichier = null,
   auteur = () => '', lectureSeule = () => false, quandRetour = null, message = () => {},
 }) {
   // Le projet est relu à chaque fois (projet() ou objet) : l'appli peut le remplacer (Drive, Annuler général).
@@ -90,6 +91,15 @@ export function ouvrirPlansChantier({
     pr.plansChantier ??= [];
     return pr.plansChantier;
   };
+  // 0.320.2 : tous les plans du projet sont proposés ici, quel que soit le dossier choisi dans le projet (le dossier coche /
+  // décoche l'affichage du plan principal, pas celui des plans de chantier). Copie « visible » gardée en mémoire (même objet
+  // d'un appel à l'autre : le cache de dessin reste valable ; ne jamais copier un plan avec { ...p }).
+  const copiesVisibles = new WeakMap();
+  const plans = () => plansDonnes().map((p) => {
+    if (p.visible !== false) return p;
+    if (!copiesVisibles.has(p)) copiesVisibles.set(p, Object.assign(Object.create(p), { visible: true, sourcePlan: p.sourcePlan ?? p }));
+    return copiesVisibles.get(p);
+  });
   const synchroModeles = () => definirModelesPerso(leProjet().modelesGrues); // 0.311.0 : modèles de grues du projet (en plus de ceux livrés)
   synchroModeles();
   /**
@@ -113,6 +123,7 @@ export function ouvrirPlansChantier({
     }
     return res;
   };
+  let dernierMessagePrise = 0;
   const page = document.createElement('dialog');
   page.className = 'page-chantier';
   document.body.append(page);
@@ -465,11 +476,17 @@ export function ouvrirPlansChantier({
               etat.glisse = { type: 'rotation' };
               return true;
             }
-            if (!toucheSymbole(o, p, tol)) return false;
+            // 0.320.2 : on ne prend un bloc que par l'un de ses points d'accroche (les petits ronds) : le point pris suit la
+            // souris et s'accroche ; ailleurs sur le bloc il ne bouge pas (sinon il se décalait de là où l'on avait cliqué).
+            const base = prisePresDe(o, sy, p, tol * 1.5);
+            if (!base) {
+              if (toucheSymbole(o, p, tol) && Date.now() - dernierMessagePrise > 5000) {
+                dernierMessagePrise = Date.now();
+                message('Pour déplacer ce bloc : prenez-le par un de ses petits ronds (points d\'accroche).', 3000);
+              }
+              return false;
+            }
             if (!avantChangement()) return false;
-            // 0.301.0 : saisi près d'un coin ou du milieu d'un bord de sa boîte : c'est CE point qui suit la souris et
-            // s'accroche (coller le coin d'un conteneur sur une ligne) ; ailleurs, le point saisi.
-            const base = sy ? pointDeBase(coinsSymbole(o, sy), p, tol * 1.5) : p;
             etat.glisse = { type: 'objet', decal: [base[0] - o.point[0], base[1] - o.point[1]] };
             return true;
           }
@@ -590,7 +607,11 @@ export function ouvrirPlansChantier({
   const lignesSymboles = (objets) => objets.filter(estPose).flatMap((o) => {
     if (o.type === 'grue') return lignesChassisGrue(o);
     const sy = symboleDeLObjet(bib(), o);
-    return sy ? [{ points: coinsSymbole(o, sy).map(([est, nord]) => ({ est, nord, altitude: null })), ferme: true }] : [];
+    if (!sy) return [];
+    const boite = { points: coinsSymbole(o, sy).map(([est, nord]) => ({ est, nord, altitude: null })), ferme: true };
+    // 0.320.2 : un bloc qui donne ses propres points (portail : poteaux) les offre à l'accroche « Sommet »
+    const propres = (sy.prises ?? []).length ? pointsDePrise(o, sy).map(([est, nord]) => ({ points: [{ est, nord, altitude: null }, { est: est + 0.001, nord, altitude: null }], ferme: false })) : [];
+    return [boite, ...propres];
   });
 
   /** Accroche pendant un dessin : points levés, puis sommets / milieux / bords des plans et de ce qui est dessiné. */
@@ -1602,6 +1623,7 @@ export function ouvrirPlansChantier({
       : `<label class="champ-bandeau"><span>Couleur</span><input type="color" value="${couleurObjet({ ...p, couleurs: 'objets' }, o)}" data-prop="couleur"></label>${o.couleur ? bouton('data-action="couleur-origine"', '↺', 'Couleur d\'origine') : ''}`;
     const poseHtml = pose ? `${petit('Rotation', 'prop', 'rotation', o.rotation ?? 0, -360, 360, 1, '°')}
       ${bouton('data-tourner="90"', '⟲ 90°', 'Tourner de 90° à gauche')}${bouton('data-tourner="-90"', '⟳ 90°', 'Tourner de 90° à droite')}
+      <label class="champ-bandeau" title="Taille du texte de ce bloc, en mm sur le papier ; vide = celle du plan (Texte des symboles)"><span>Texte (mm)</span><input type="number" min="0.5" max="12" step="0.5" value="${o.texteMm ?? ''}" placeholder="${p.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-prop="texteMm"></label>
       ${o.type === 'grue' ? '' : petit('Échelle', 'prop', 'echelle', k, 0.1, 10, 0.05, '×')}${k !== 1 && o.type !== 'grue' ? bouton('data-echelle-reelle', '1×', 'Taille réelle') : ''}
       ${bouton(`data-orienter="point" class="${etat.orienter?.mode === 'point' ? 'actif' : ''}"`, 'Vers un point', 'Orienter vers un point (cliquer ensuite le point visé)')}
       ${bouton(`data-orienter="ligne" class="${etat.orienter?.mode === 'ligne' ? 'actif' : ''}"`, 'Aligner', 'Aligner sur une ligne (cliquer ensuite une ligne)')}` : '';
@@ -2356,6 +2378,12 @@ export function ouvrirPlansChantier({
       if ((cle === 'zBas' || cle === 'zHaut') && !c.value.trim()) {
         if (o[cle] === undefined || !avantChangement()) return;
         delete o[cle];
+        enregistrer();
+        return majTout();
+      }
+      if (cle === 'texteMm' && !c.value.trim()) {
+        if (o.texteMm === undefined || !avantChangement()) return;
+        delete o.texteMm; // retour à la taille du plan
         enregistrer();
         return majTout();
       }

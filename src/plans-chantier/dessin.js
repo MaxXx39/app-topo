@@ -7,7 +7,7 @@
 import { versEcran } from '../plan/vue.js';
 import {
   couleurObjet, styleLigne, pointeDeFleche, positionsLeLong, morceauxAvecTrous, contourZoneMm, opaciteZone,
-  geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
+  geometrieCotation, lignesDuTexte, dimensionsFleche, centreZone, texteSurface, texteSymbolesM, texteDuBlocM, anneauxDuTas, TAS_HAUTEUR, TAS_TALUS,
   hachureZone, hachureDeLaZone, tiretsContour,
 } from '../topo/plan-chantier.js';
 import { textureMateriau } from './textures.js';
@@ -944,7 +944,7 @@ export function dessinerSymbolePose(d, o) {
   };
   const unique = o.rendu?.mode === 'couleur' ? o.rendu.couleur : d.pc?.couleurs === 'phases' ? d.pc.phases.find((p) => p.id === o.phase)?.couleur : null;
   // 0.292.0 : texte de la même taille partout (mm sur le papier × échelle du plan), indépendante de l'échelle du bloc.
-  const opts = { angle: rot, plat: d.pc?.rendu3d === false, couleurUnique: unique ?? undefined, texteU: d.pc ? texteSymbolesM(d.pc) / k : undefined };
+  const opts = { angle: rot, plat: d.pc?.rendu3d === false, couleurUnique: unique ?? undefined, texteU: d.pc ? texteDuBlocM(d.pc, o) / k : undefined };
   if (o.type === 'grue') {
     const g = grueDeLObjet(bib, o);
     if (!g) return manquant(d, o, q);
