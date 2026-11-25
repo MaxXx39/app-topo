@@ -80,3 +80,13 @@ describe('taille du texte d\'un bloc (0.320.2)', () => {
     expect(texteDuBlocM(plan, { texteMm: 6 })).toBeCloseTo(1.2, 9); // 6 mm × 200 / 1000
   });
 });
+
+describe('0.320.2 inverserSens', () => {
+  it('retourne les points et refuse un objet sans points', async () => {
+    const { inverserSens } = await import('../src/topo/plan-chantier.js');
+    const o = { type: 'ligne', points: [[0, 0], [1, 0], [2, 0]] };
+    expect(inverserSens(o)).toBe(true);
+    expect(o.points.map((p) => p[0])).toEqual([2, 1, 0]);
+    expect(inverserSens({})).toBe(false);
+  });
+});

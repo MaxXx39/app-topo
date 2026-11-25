@@ -25,6 +25,7 @@ import { dessinerVignette, symboleDeLObjet } from './dessin.js';
 import { geometrieCotation, lignesDuTexte, CATEGORIES_ZONE, STYLES_LIGNE } from '../topo/plan-chantier.js';
 import { SENS_DEVIATION, CLE_DEVIATION } from '../topo/panneau-deviation.js';
 import { CLE_PARKING } from '../topo/parking-dynamique.js';
+import { CLE_PORTAIL, GENRES_PORTAIL, PASSAGE_PORTAIL, reglagesPortail } from '../topo/portail-dynamique.js';
 import { CLE_POMPE, LONGUEUR_POMPE } from '../topo/pompe-dynamique.js';
 import { ouvrirGestionPhases } from './gestion-phases.js';
 import { ouvrirGestionCalques, plansAvecCalques } from './gestion-calques.js';
@@ -37,7 +38,7 @@ import { ouvrirModelesGrues } from './modeles-grues.js';
 import { lignesChassisGrue } from '../topo/grue-accroches.js';
 import { prisePresDe, pointsDePrise } from '../topo/prise-bloc.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
-import { pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
+import { inverserSens, pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
 import { plansDeLaFeuille, reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
@@ -80,6 +81,14 @@ const dateCourte = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-CH') : '
  * à dessiner (recalés) ; points() : points levés ; listesPoints() : [{ id, nom, points }] (0.299.0, points montrés par liste) ; lectureSeule() : vrai si le projet ne peut pas être modifié ici ;
  * quandRetour() ; message(texte, durée, options).
  */
+/** Liste déroulante simple pour un réglage (0.320.2) : `attr` = 'prop' (élément choisi) ou 'reglage' (outil). */
+function listeChoix(libelle, attr, cle, options, valeur) {
+  return `<label class="champ-calage"><span>${libelle}</span><select data-${attr}="${cle}">${options.map(([v, t]) => `<option value="${v}" ${valeur === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
+}
+const STYLES_COTE = [['dessus', 'Au-dessus, sans cadre'], ['dessus-cadre', 'Au-dessus, avec cadre'], ['sur', 'Sur la ligne'], ['coupee', 'Ligne coupée sous le texte']];
+const FLECHES_COTE = [['fleche', 'Flèche'], ['point', 'Point'], ['tiret', 'Tiret oblique']];
+const ARRONDIS = [['peu', 'Peu arrondi'], ['carre', 'Carré'], ['normal', 'Très arrondi']];
+
 export function ouvrirPlansChantier({
   projet: projetDonne, modifie, plans: plansDonnes = () => [], points = () => [], listesPoints = null, surfaces = () => [], enregistrer: enregistrerFichier = null,
   auteur = () => '', lectureSeule = () => false, quandRetour = null, message = () => {},
@@ -131,7 +140,7 @@ export function ouvrirPlansChantier({
 
   const etat = {
     ecran: 'liste', planId: null, outil: 'choisir', saisie: null, choisi: null, accroches: new Set(['point', 'sommet']),
-    categorie: 'installation', style: 'cloture', largeur: 4, tailleTexte: 1.2, curseur: null,
+    categorie: 'installation', style: 'cloture', largeur: 4, tailleTexte: 1.2, curseur: null, styleCote: 'dessus', flecheCote: 'fleche', tailleFlecheCote: 2.6, coteTexte: 'fin', arrondi: 'peu',
     // Réglages de l'outil (valeurs données aux éléments dessinés ensuite) : null = celle du genre.
     opacite: OPACITE_ZONE, contourMm: null, afficherSurface: false, epaisseurMm: null, echelleMotif: 1,
     // 0.299.0 : trait du contour d'une zone et hachure (en plus du remplissage) donnés aux zones dessinées ensuite.
@@ -818,7 +827,7 @@ export function ouvrirPlansChantier({
     if (etat.outil === 'texte') {
       const texte = await demanderTexte({ titre: 'Texte à écrire sur le plan' });
       if (!texte || !avantChangement()) return;
-      const o = ajouterObjet(plan(), { type: 'texte', point: p, texte, taille: etat.tailleTexte, ...(etat.texteNu ? { nu: true } : {}) });
+      const o = ajouterObjet(plan(), { type: 'texte', point: p, texte, taille: etat.tailleTexte, ...(etat.texteNu ? { nu: true } : {}), ...(etat.arrondi !== 'peu' ? { arrondi: etat.arrondi } : {}) });
       etat.choisi = o.id;
       etat.outil = 'choisir';
       if (etat.texteRepere) etat.attenteRepere = o.id; // le prochain clic donne le point visé
@@ -881,12 +890,12 @@ export function ouvrirPlansChantier({
     if (!avantChangement()) return;
     let champs;
     if (etat.cotationGenre === 'angle') {
-      champs = { type: 'cotation', genre: 'angle', ordre: 'p1-s-p3', points: pts.slice(0, 3), ...(etat.cotationNu ? { nu: true } : {}) }; // sommet = point 2
+      champs = { type: 'cotation', genre: 'angle', ordre: 'p1-s-p3', points: pts.slice(0, 3), ...(etat.cotationNu ? { nu: true } : {}), ...(etat.arrondi !== 'peu' ? { arrondi: etat.arrondi } : {}) }; // sommet = point 2
     } else {
       const [A, B, C] = pts;
       const L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
       const decalage = (((C[0] - A[0]) * -(B[1] - A[1])) + ((C[1] - A[1]) * (B[0] - A[0]))) / L; // distance signée de C à la droite A → B
-      champs = { type: 'cotation', genre: 'longueur', points: [A, B], decalage: Math.round(decalage * 1000) / 1000, ...(etat.cotationNu ? { nu: true } : {}) };
+      champs = { type: 'cotation', genre: 'longueur', points: [A, B], decalage: Math.round(decalage * 1000) / 1000, ...(etat.cotationNu ? { nu: true } : {}), ...(etat.arrondi !== 'peu' ? { arrondi: etat.arrondi } : {}), styleCote: etat.styleCote, fleche: etat.flecheCote, tailleFlecheMm: etat.tailleFlecheCote, coteTexte: etat.coteTexte };
     }
     const o = ajouterObjet(plan(), champs);
     etat.saisie = null;
@@ -1510,6 +1519,7 @@ export function ouvrirPlansChantier({
         ${champNombre('Échelle de la pointe', 'reglage', 'echelleFleche', etat.echelleFleche, 0.3, 10, 0.1, '×')}`,
       texte: `${champNombre('Hauteur des lettres', 'reglage', 'tailleTexte', etat.tailleTexte, 0.2, 10, 0.1, 'm')}
         ${champCase('Sans cadre ni fond', 'reglage-case', 'texteNu', etat.texteNu)}
+        ${listeChoix('Coins du cadre', 'reglage', 'arrondi', ARRONDIS, etat.arrondi)}
         ${champCase('Avec ligne de repère', 'reglage-case', 'texteRepere', etat.texteRepere)}
         <label class="champ-calage"><span>Bout du repère</span><select data-reglage="repereBout">
           ${[['fleche', 'Flèche'], ['point', 'Point'], ['aucun', 'Rien']].map(([v, t]) => `<option value="${v}" ${etat.repereBout === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`,
@@ -1519,7 +1529,7 @@ export function ouvrirPlansChantier({
         <label class="champ-calage"><span>Type</span><select data-reglage="constructionMode">
           ${[['droite', 'Droite (2 points)'], ['angle', 'Droite par un point et un angle'], ['segment', 'Segment (2 points ou longueur tapée)']].map(([v, t]) => `<option value="${v}" ${etat.constructionMode === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         <p class="aide-calage">Cyan en tirets, jamais imprimées ni exportées ; elles servent d'accroche (Sur ligne, Croisement, Perpendiculaire) et pour aligner. « Décaler » avec la case « En ligne de construction » donne une parallèle.</p>`,
-      cotation: `${champCase('Valeur sans cadre ni fond', 'reglage-case', 'cotationNu', etat.cotationNu)}<label class="champ-calage"><span>Genre de cotation</span><select data-reglage="cotationGenre"><option value="longueur" ${etat.cotationGenre !== 'angle' ? 'selected' : ''}>Longueur alignée</option><option value="angle" ${etat.cotationGenre === 'angle' ? 'selected' : ''}>Angle</option></select></label>`,
+      cotation: `${listeChoix('Valeur', 'reglage', 'styleCote', STYLES_COTE, etat.styleCote)}${listeChoix('Bouts', 'reglage', 'flecheCote', FLECHES_COTE, etat.flecheCote)}${champNombre('Taille des bouts', 'reglage', 'tailleFlecheCote', etat.tailleFlecheCote, 0.8, 8, 0.2, 'mm')}${listeChoix('Si la cote est courte, valeur au', 'reglage', 'coteTexte', [['fin', 'bout B'], ['debut', 'bout A']], etat.coteTexte)}${listeChoix('Coins du cadre', 'reglage', 'arrondi', ARRONDIS, etat.arrondi)}${champCase('Valeur sans cadre ni fond', 'reglage-case', 'cotationNu', etat.cotationNu)}<label class="champ-calage"><span>Genre de cotation</span><select data-reglage="cotationGenre"><option value="longueur" ${etat.cotationGenre !== 'angle' ? 'selected' : ''}>Longueur alignée</option><option value="angle" ${etat.cotationGenre === 'angle' ? 'selected' : ''}>Angle</option></select></label>`,
       decaler: `${champNombre('Distance du décalage', 'reglage', 'distanceDecalage', etat.distanceDecalage, 0.01, 100, 0.05, 'm')}
         ${champCase('En ligne de construction (parallèle)', 'reglage-case', 'decalerConstruction', etat.decalerConstruction)}
         ${selectGenresOutil('ligne', etat.style)}`,
@@ -1547,13 +1557,14 @@ export function ouvrirPlansChantier({
         ligne: `${selectGenres('ligne', styleLigne(o.style).cle)}
           ${styleLigne(o.style).motif?.largeurM ? champNombre('Largeur de la bande', 'prop', 'largeurM', o.largeurM ?? styleLigne(o.style).motif.largeurM, 0.1, 20, 0.1, 'm') : champNombre('Épaisseur', 'prop', 'epaisseurMm', epaisseurLigneMm(o), 0.05, 5, 0.05, 'mm')}
           ${champNombre('Échelle du motif', 'prop', 'echelleMotif', o.echelleMotif ?? 1, 0.3, 5, 0.1, '×')}
-          ${styleLigne(o.style).motif?.type === 'chevron' ? '<button type="button" class="bouton-secondaire" data-action="inverser-sens">⇄ Inverser le sens de la flèche</button>' : ''}`,
+          `,
         piste: champNombre('Largeur', 'prop', 'largeur', o.largeur ?? 4, 1, 30, 0.5, 'm'),
-        cotation: champCase('Valeur sans cadre ni fond', 'prop-case', 'nu', Boolean(o.nu)) + (o.genre === 'angle' ? champNombre('Rayon de l\'arc', 'prop', 'rayon', o.rayon ?? Math.round((geometrieCotation(o)?.arc?.[0] ? Math.hypot(geometrieCotation(o).arc[0][0] - geometrieCotation(o).sommet[0], geometrieCotation(o).arc[0][1] - geometrieCotation(o).sommet[1]) : 1) * 100) / 100, 0.1, 500, 0.1, 'm') : champNombre('Distance de la ligne de cote (+ gauche, − droite)', 'prop', 'decalage', o.decalage ?? 1, -500, 500, 0.1, 'm')),
+        cotation: (o.genre === 'angle' ? '' : listeChoix('Valeur', 'prop', 'styleCote', STYLES_COTE, o.styleCote ?? 'dessus') + listeChoix('Bouts', 'prop', 'fleche', FLECHES_COTE, o.fleche ?? 'fleche') + champNombre('Taille des bouts', 'prop', 'tailleFlecheMm', o.tailleFlecheMm ?? 2.6, 0.8, 8, 0.2, 'mm') + listeChoix('Cote courte : valeur au', 'prop', 'coteTexte', [['fin', 'bout B'], ['debut', 'bout A']], o.coteTexte ?? 'fin')) + listeChoix('Coins du cadre', 'prop', 'arrondi', ARRONDIS, o.arrondi ?? 'peu') + champCase('Valeur sans cadre ni fond', 'prop-case', 'nu', Boolean(o.nu)) + (o.genre === 'angle' ? champNombre('Rayon de l\'arc', 'prop', 'rayon', o.rayon ?? Math.round((geometrieCotation(o)?.arc?.[0] ? Math.hypot(geometrieCotation(o).arc[0][0] - geometrieCotation(o).sommet[0], geometrieCotation(o).arc[0][1] - geometrieCotation(o).sommet[1]) : 1) * 100) / 100, 0.1, 500, 0.1, 'm') : champNombre('Distance de la ligne de cote (+ gauche, − droite)', 'prop', 'decalage', o.decalage ?? 1, -500, 500, 0.1, 'm')),
         texte: `<label class="champ-calage"><span>Texte (Entrée = nouvelle ligne)</span><textarea data-prop="texte" maxlength="400" rows="2">${echapper(o.texte)}</textarea></label>
           <div class="styles-lignes"><span>Style des lignes :</span>${lignesDuTexte(o.texte).map((l, i) => `<span class="style-ligne">${i + 1} <button type="button" data-style-ligne="${i}" data-s="g" class="${o.styles?.[i]?.g ? 'actif' : ''}" title="Gras" style="font-weight:800">G</button><button type="button" data-style-ligne="${i}" data-s="s" class="${o.styles?.[i]?.s ? 'actif' : ''}" title="Souligné" style="text-decoration:underline">S</button></span>`).join('')}</div>
           ${champNombre('Hauteur des lettres', 'prop', 'taille', o.taille ?? 1, 0.2, 10, 0.1, 'm')}
           ${champCase('Sans cadre ni fond', 'prop-case', 'nu', Boolean(o.nu))}
+          ${listeChoix('Coins du cadre', 'prop', 'arrondi', ARRONDIS, o.arrondi ?? 'peu')}
           ${champCase('Ligne de repère', 'prop-case', 'repere', Boolean(o.repere) || etat.attenteRepere === o.id)}
           ${o.repere ? `<label class="champ-calage"><span>Bout du repère</span><select data-prop="repereBout">
             ${[['fleche', 'Flèche'], ['point', 'Point'], ['aucun', 'Rien']].map(([v, t]) => `<option value="${v}" ${(o.repereBout ?? 'fleche') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
@@ -1628,8 +1639,9 @@ export function ouvrirPlansChantier({
       ${bouton(`data-orienter="point" class="${etat.orienter?.mode === 'point' ? 'actif' : ''}"`, 'Vers un point', 'Orienter vers un point (cliquer ensuite le point visé)')}
       ${bouton(`data-orienter="ligne" class="${etat.orienter?.mode === 'ligne' ? 'actif' : ''}"`, 'Aligner', 'Aligner sur une ligne (cliquer ensuite une ligne)')}` : '';
     const decaler = !['texte', 'symbole', 'grue', 'construction', 'cotation'].includes(o.type) && !pose ? bouton('data-action="decaler-choisi"', '⇉ Décaler', 'Décaler une copie') : '';
+    const inverser = ['ligne', 'fleche', 'piste'].includes(o.type) && !o.verrou ? bouton('data-action="inverser-sens"', '⇄ Inverser le sens', 'Inverser le sens : le départ et l\'arrivée s\'échangent (flèche, piéton, chevrons…)') : '';
     zone.innerHTML = `<span class="puce-element">${echapper(resumeObjet(o))}</span>
-      ${poseHtml}${phases}${couleur}
+      ${poseHtml}${phases}${couleur}${inverser}
       <span class="groupe-ordre" role="group" aria-label="Ordre de dessin">${bouton('data-ordre="devant"', '⤒', 'Premier plan')}${bouton('data-ordre="monter"', '▲', 'Un cran au-dessus')}${bouton('data-ordre="descendre"', '▼', 'Un cran en dessous')}${bouton('data-ordre="arriere"', '⤓', 'Arrière-plan')}</span>
       ${bouton(`data-action="verrou" class="${o.verrou ? 'actif' : ''}"`, icoCadenas(o.verrou), o.verrou ? 'Déverrouiller' : 'Verrouiller', o.verrou ? 'Déverrouiller : on pourra de nouveau le déplacer' : 'Verrouiller : l\'élément ne peut plus être déplacé (ni ses points, ni tourné)')}
       ${decaler}${bouton('data-action="effacer"', '✕ Effacer', 'Effacer cet élément')}
@@ -1723,6 +1735,13 @@ export function ouvrirPlansChantier({
     if (o.cle === CLE_PARKING) {
       return `${champNombre('Nombre de places côte à côte', 'prop', 'nombre', o.nombre ?? 1, 1, 30, 1, '')}
         <label class="champ-calage"><span>Couleur</span><input type="color" value="${o.couleur ?? '#1f5fae'}" data-prop="couleur"></label>`;
+    }
+    if (o.cle === CLE_PORTAIL) {
+      const r = reglagesPortail(o);
+      const lim = PASSAGE_PORTAIL[r.genre];
+      return `<label class="champ-calage"><span>Genre</span><select data-prop="genre">${GENRES_PORTAIL.map(([v, t]) => `<option value="${v}" ${r.genre === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        ${champNombre('Largeur de passage (entre les poteaux)', 'prop', 'passage', r.passage, lim.min, lim.max, 0.05, 'm')}
+        ${r.genre === 'portillon' ? `<label class="champ-calage"><span>Charnière</span><select data-prop="charniere"><option value="gauche" ${r.charniere === 'gauche' ? 'selected' : ''}>À gauche</option><option value="droite" ${r.charniere === 'droite' ? 'selected' : ''}>À droite</option></select></label>` : ''}`;
     }
     if (o.cle === CLE_DEVIATION) {
       return `<label class="champ-calage"><span>Texte du panneau</span><input type="text" maxlength="30" value="${echapper(o.texte ?? 'Lugano')}" data-prop="texte"></label>
@@ -1966,8 +1985,7 @@ export function ouvrirPlansChantier({
     if (b.dataset.action === 'inverser-sens') {
       const o = p.objets.find((x) => x.id === etat.choisi);
       if (!o || !avantChangement()) return;
-      if (o.sens === 'inverse') delete o.sens;
-      else o.sens = 'inverse';
+      if (!inverserSens(o)) return;
       enregistrer();
       return majTout();
     }
@@ -2418,6 +2436,7 @@ export function ouvrirPlansChantier({
           o.rayonCrochet = Math.min(Number(o.rayonCrochet) || porteeGrue(f), porteeGrue(f));
         }
       }
+      if (cle === 'genre' && o.cle === CLE_PORTAIL) o.passage = PASSAGE_PORTAIL[valeur]?.depart ?? 5; // un autre genre repart de sa largeur habituelle
       if (cle === 'fin' && !valeur) delete o.fin;
       if (cle === 'etiquette' && !valeur) delete o.etiquette;
       if (cle === 'abaqueTexte' && !valeur) delete o.abaqueTexte;

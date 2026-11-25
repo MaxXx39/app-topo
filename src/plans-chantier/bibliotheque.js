@@ -6,6 +6,7 @@ import { bibliothequeDepuisBlocs, CATEGORIES_SYMBOLES, CLE_CONTENEUR, CLE_ESCALI
 import { grueMobile } from '../topo/grue-mobile.js';
 import { panneauDeviation, CLE_DEVIATION } from '../topo/panneau-deviation.js';
 import { parkingDynamique, CLE_PARKING } from '../topo/parking-dynamique.js';
+import { portailDynamique, CLE_PORTAIL, PASSAGE_PORTAIL } from '../topo/portail-dynamique.js';
 import { pompeDynamique, CLE_POMPE } from '../topo/pompe-dynamique.js';
 import { grueFiche } from '../topo/grue-fiche.js';
 import { tousLesModeles } from '../topo/grue-modele.js';
@@ -45,6 +46,9 @@ export function entreesBibliotheque(bib) {
   res.push({ cle: CLE_DEVIATION, nom: 'Panneau de déviation (texte, sens)', categorie: 'Signalisation', largeur: null, hauteur: null, detail: 'texte modifiable, flèche à gauche / droite / tout droit', pose: { type: 'symbole', cle: CLE_DEVIATION, texte: 'Lugano', sens: 'droite' }, symbole: panneauDeviation({ texte: 'Lugano', sens: 'droite' }) });
   // 0.297.0 : places de parking réservées, nombre de places et couleur au choix (dans le bandeau une fois posé)
   res.push({ cle: CLE_PARKING, nom: 'Parking réservé (places, couleur)', categorie: 'Base-vie', largeur: null, hauteur: null, detail: 'nombre de places côte à côte, couleur', pose: { type: 'symbole', cle: CLE_PARKING, nombre: 1, couleur: '#1f5fae' }, symbole: parkingDynamique({ nombre: 2, couleur: '#1f5fae' }) });
+  // 0.320.2 : portail réglable (largeur de passage) et portillon à 1 vantail ; les anciens portails fixes restent pour les anciens plans
+  res.push({ cle: CLE_PORTAIL, nom: 'Portail (largeur de passage)', categorie: 'Sécurité', largeur: null, hauteur: null, detail: '2 vantaux ou coulissant, passage au choix', pose: { type: 'symbole', cle: CLE_PORTAIL, genre: 'portail', passage: PASSAGE_PORTAIL.portail.depart }, symbole: portailDynamique({ genre: 'portail', passage: 5 }) });
+  res.push({ cle: 'dyn:portillon', nom: 'Portillon (1 vantail)', categorie: 'Sécurité', largeur: null, hauteur: null, detail: 'une porte, passage au choix', pose: { type: 'symbole', cle: CLE_PORTAIL, genre: 'portillon', passage: PASSAGE_PORTAIL.portillon.depart }, symbole: portailDynamique({ genre: 'portillon', passage: 1 }) });
   // 0.305.0 : camion pompe à béton réglable (mât plié / déplié, longueur, rotation du mât).
   res.push({ cle: CLE_POMPE, nom: 'Camion pompe à béton (mât réglable)', categorie: 'Véhicules', largeur: null, hauteur: null, detail: 'mât plié / déplié, longueur et rotation', pose: { type: 'symbole', cle: CLE_POMPE, deploye: true, longueur: 28, tourelle: 0 }, symbole: pompeDynamique({ deploye: true, longueur: 28 }) });
   const conteneur = bib.find((x) => x.cle === CLE_CONTENEUR);
@@ -52,7 +56,7 @@ export function entreesBibliotheque(bib) {
     res.push({ cle: 'etage', nom: 'Base-vie à étage', categorie: 'Base-vie', largeur: conteneur.largeur, hauteur: conteneur.hauteur, detail: '8 poses de l\'escalier', pose: { type: 'symbole', cle: CLE_CONTENEUR, etage: { pose: 0, textes: ['1er', 'Rez'] } }, symbole: { ...conteneur, etageDemo: true } });
   }
   for (const s of bib) {
-    if (s.cache) continue;
+    if (s.cache || s.nom === 'Portail' || s.nom === 'Portail coulissant') continue; // remplacés par le portail réglable
     res.push({ cle: s.cle, nom: s.nom, categorie: s.categorie, largeur: s.largeur, hauteur: s.hauteur, pose: { type: 'symbole', cle: s.cle }, symbole: s, importe: s.cle.startsWith('projet:') });
   }
   return res;

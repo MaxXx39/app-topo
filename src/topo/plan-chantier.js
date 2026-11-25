@@ -1053,6 +1053,19 @@ export function arcSurCote(points, index, m, ferme = false, n = 16) {
 // arcs : o.arcs = [{ i (point de départ), n (points ajoutés), m (point de passage) }] et o.arcsLen (nombre de points quand
 // c'est vrai). Si le nombre de points change autrement (point ajouté ou retiré), les arcs sont oubliés : il reste des segments.
 
+/**
+ * Inverse le sens d'une ligne, d'une piste ou d'une flèche (0.320.2) : départ et arrivée s'échangent (la pointe d'une flèche,
+ * les pictogrammes de piéton, les chevrons suivent) ; les arcs gardent leur forme. Renvoie vrai si c'est fait.
+ */
+export function inverserSens(o) {
+  if (!['ligne', 'fleche', 'piste'].includes(o?.type) || !Array.isArray(o.points) || o.points.length < 2) return false;
+  const arcs = arcsDe(o);
+  const n = o.points.length;
+  o.points = [...o.points].reverse();
+  if (arcs.length) o.arcs = arcs.map((a) => ({ ...a, i: n - 2 - a.i - a.n }));
+  return true;
+}
+
 /** Arcs encore valables d'un élément. */
 export function arcsDe(o) {
   return Array.isArray(o?.arcs) && o.arcsLen === o.points?.length ? o.arcs : [];

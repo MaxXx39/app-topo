@@ -8,6 +8,7 @@ import { grueLibre } from './symboles.js';
 import { bornesPrimitives } from './blocs-dxf.js';
 import { panneauDeviation, CLE_DEVIATION } from './panneau-deviation.js';
 import { parkingDynamique, CLE_PARKING } from './parking-dynamique.js';
+import { portailDynamique, CLE_PORTAIL } from './portail-dynamique.js';
 import { pompeDynamique, CLE_POMPE } from './pompe-dynamique.js';
 import { grueFiche } from './grue-fiche.js';
 
@@ -104,6 +105,7 @@ export function symboleDeLObjetPose(bib, o) {
   if (o.cle === CLE_DEVIATION) return panneauDeviation(o);
   if (o.cle === CLE_POMPE) return pompeDynamique(o);
   if (o.cle === CLE_PARKING) return parkingDynamique(o);
+  if (o.cle === CLE_PORTAIL) return portailDynamique(o);
   const s = bib.find((x) => x.cle === o.cle) ?? null;
   const a = Number(o.tourelle) || 0;
   if (!s?.pivote || !a) return s;

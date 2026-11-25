@@ -73,10 +73,15 @@ function chemin(d, pts, ferme) {
   if (ferme) d.ctx.closePath();
 }
 
+/** Arrondi des coins d'une plaque (0.320.2) : 'normal' (avant), 'peu' (départ), 'carre'. Rayon = fraction de la hauteur. */
+export function rayonArrondi(a) {
+  return a === 'normal' ? 0.35 : a === 'carre' ? 0 : 0.12;
+}
+
 /**
  * Plaque à plusieurs lignes (0.295.1) : styles[i] = { g (gras), s (souligné) } pour la ligne i. Renvoie { w, h } (px).
  */
-export function plaqueMulti(ctx, lignes, x, y, h, couleurTexte, styles = [], nu = false) {
+export function plaqueMulti(ctx, lignes, x, y, h, couleurTexte, styles = [], nu = false, arrondi = 'peu', sansBord = false) {
   const interligne = h * 1.25;
   const police = (i) => `${styles[i]?.g ? 800 : 500} ${h}px system-ui, sans-serif`;
   let largeur = 0;
@@ -91,9 +96,9 @@ export function plaqueMulti(ctx, lignes, x, y, h, couleurTexte, styles = [], nu 
     ctx.strokeStyle = 'rgba(43,52,64,0.45)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(x - w / 2, y - H / 2, w, H, h * 0.35);
+    ctx.roundRect(x - w / 2, y - H / 2, w, H, h * rayonArrondi(arrondi));
     ctx.fill();
-    ctx.stroke();
+    if (!sansBord) ctx.stroke();
   }
   ctx.fillStyle = couleurTexte;
   ctx.textAlign = 'center';
@@ -116,7 +121,7 @@ export function plaqueMulti(ctx, lignes, x, y, h, couleurTexte, styles = [], nu 
 }
 
 /** Plaque blanche arrondie avec un texte centré en (x, y) (texte de plan, surface d'une zone). */
-export function plaque(ctx, texte, x, y, h, poids = 600, couleurTexte = '#1b2b36', nu = false) {
+export function plaque(ctx, texte, x, y, h, poids = 600, couleurTexte = '#1b2b36', nu = false, arrondi = 'peu', sansBord = false) {
   ctx.font = `${poids} ${h}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -126,9 +131,9 @@ export function plaque(ctx, texte, x, y, h, poids = 600, couleurTexte = '#1b2b36
     ctx.strokeStyle = 'rgba(43,52,64,0.45)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(x - w / 2, y - h * 0.68, w, h * 1.36, h * 0.35);
+    ctx.roundRect(x - w / 2, y - h * 0.68, w, h * 1.36, h * rayonArrondi(arrondi));
     ctx.fill();
-    ctx.stroke();
+    if (!sansBord) ctx.stroke();
   }
   ctx.fillStyle = couleurTexte;
   ctx.fillText(texte, x, y + h * 0.04);
@@ -366,11 +371,14 @@ export function dessinerObjet(d, o) {
     }
     if (g.arc) g.arc.forEach((pt, i) => { const q = ecran(pt); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
     ctx.stroke();
-    // Flèches aux deux bouts de la ligne de cote (3 mm sur le papier).
-    const L = Math.max(5, 2.6 * mm);
+    // Flèches aux deux bouts de la ligne de cote (taille réglable, 2,6 mm sur le papier au départ).
+    const L = Math.max(5, (o.tailleFlecheMm ?? 2.6) * mm);
     const h = Math.max(9, (pc ? texteSymbolesM(pc) : 1) * e);
+    const style = o.styleCote ?? 'dessus';
+    const forme = o.fleche ?? 'fleche';
     // 0.317.0 : cote COURTE (la valeur ne tient pas entre les flèches) : flèches à l'extérieur, qui pointent vers les
     // traits de rappel, et valeur écrite au-delà du bout (comme dans AutoCAD) au lieu de tout recouvrir.
+    // 0.320.2 : `o.coteTexte` = 'debut' écrit la valeur au-delà du premier bout ; texte « dessus » = au-dessus de la ligne.
     let courte = false;
     let ux = 1;
     let uy = 0;
@@ -390,6 +398,22 @@ export function dessinerObjet(d, o) {
     for (const f of g.fleches) {
       const q = ecran(f.p);
       let a = Math.atan2(-f.dir[1], f.dir[0]);
+      if (forme === 'point') {
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, L * 0.28, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
+      if (forme === 'tiret') {
+        const b = Math.atan2(-f.dir[1], f.dir[0]) + Math.PI / 4;
+        ctx.beginPath();
+        ctx.moveTo(q.x - (L / 2) * Math.cos(b), q.y - (L / 2) * Math.sin(b));
+        ctx.lineTo(q.x + (L / 2) * Math.cos(b), q.y + (L / 2) * Math.sin(b));
+        ctx.lineWidth = Math.max(1.2, 0.5 * mm);
+        ctx.stroke();
+        ctx.lineWidth = Math.max(0.8, 0.25 * mm);
+        continue;
+      }
       if (courte) {
         a += Math.PI; // le corps de la flèche est dehors, la pointe touche le trait de rappel
         ctx.beginPath();
@@ -404,25 +428,30 @@ export function dessinerObjet(d, o) {
       ctx.closePath();
       ctx.fill();
     }
-    // Valeur sur une plaque blanche, de la même taille que le texte des symboles, le long de la ligne de cote.
+    // Valeur de la même taille que le texte des symboles, le long de la ligne de cote.
     let t = ecran(g.texte.p);
     if (courte) {
       ctx.font = `600 ${h}px system-ui, sans-serif`;
       const demi = (ctx.measureText(g.texte.t).width + h * 0.7) / 2;
-      const bout = ecran(g.fleches[1].p);
-      const recul = 2.2 * L + demi + 4;
-      t = { x: bout.x + ux * recul, y: bout.y + uy * recul };
+      const debut = o.coteTexte === 'debut';
+      const bout = ecran(g.fleches[debut ? 0 : 1].p);
+      const recul = (forme === 'fleche' ? 2.2 * L : L * 0.6) + demi + 4;
+      const sens = debut ? -1 : 1;
+      t = { x: bout.x + sens * ux * recul, y: bout.y + sens * uy * recul };
     }
     ctx.save();
     ctx.translate(t.x, t.y);
     ctx.rotate((-g.texte.angle * Math.PI) / 180);
-    plaque(ctx, g.texte.t, 0, 0, h, 600, '#1b2b36', Boolean(o.nu));
+    // 'dessus' : posé au-dessus de la ligne (pas dessus) ; 'sur' : sur la ligne avec cadre ; 'coupee' : la ligne est cachée sous le texte.
+    const dessus = style === 'dessus' || style === 'dessus-cadre';
+    const decalage = dessus && !courte && o.genre !== 'angle' ? -(h * 0.78 + 0.5 * mm) : 0;
+    plaque(ctx, g.texte.t, 0, decalage, h, 600, '#1b2b36', style === 'dessus' ? true : style === 'dessus-cadre' ? false : style === 'coupee' ? false : Boolean(o.nu), o.arrondi ?? 'peu', style === 'coupee');
     ctx.restore();
   } else if (o.type === 'texte') {
     const q = ecran(o.point);
     const h = Math.max(9, (o.taille ?? 1) * e);
     const lignesTxt = lignesDuTexte(o.texte);
-    const { w, h: hauteur } = (lignesTxt.length > 1 || o.styles?.some((x) => x?.g || x?.s)) ? plaqueMulti(ctx, lignesTxt, q.x, q.y, h, couleur, o.styles ?? [], Boolean(o.nu)) : plaque(ctx, o.texte, q.x, q.y, h, 600, couleur, Boolean(o.nu));
+    const { w, h: hauteur } = (lignesTxt.length > 1 || o.styles?.some((x) => x?.g || x?.s)) ? plaqueMulti(ctx, lignesTxt, q.x, q.y, h, couleur, o.styles ?? [], Boolean(o.nu), o.arrondi ?? 'peu') : plaque(ctx, o.texte, q.x, q.y, h, 600, couleur, Boolean(o.nu), o.arrondi ?? 'peu');
     if (o.repere) dessinerRepere(d, o, q, w, hauteur);
   }
 }

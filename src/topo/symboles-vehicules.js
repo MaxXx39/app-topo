@@ -113,6 +113,20 @@ export function camionCarburant() {
   return [...camion({ L: 9, corps, couleurCabine: PERRIN_JAUNE }), ...pictoCarburant(1.1)];
 }
 
+/**
+ * Camionnette fourgon à benne (0.320.2) : cabine blanche, benne ouverte aux couleurs Perrin (parois orange, fond de benne
+ * plus sombre avec ses nervures, hayon). Environ 2,05 × 5,6 m, devant en bas. Dessinée à la main : à valider.
+ */
+export function fourgonBenne() {
+  const corps = (b) => [
+    ...piece(PERRIN_ORANGE, 'peinture', rectArrondi(b.x0, b.y0, b.x1, b.y1, 0.06)),
+    ...piece('#b97a12', 'metal', rectArrondi(b.x0 + 0.13, b.y0 + 0.13, b.x1 - 0.13, b.y1 - 0.16, 0.04), '#7a4b00'),
+    ...[0.2, 0.4, 0.6, 0.8].map((f) => trait([[b.x0 + 0.13, b.y0 + f * (b.y1 - b.y0)], [b.x1 - 0.13, b.y0 + f * (b.y1 - b.y0)]], false, '#8a5a0c')),
+    ...piece('#d5d9dd', 'metal', rectArrondi(b.x0 + 0.1, b.y1 - 0.1, b.x1 - 0.1, b.y1 + 0.03, 0.02)),
+  ];
+  return camion({ L: 5.6, W: 2.05, essieux: [1.5], couleurCabine: BLANC, corps });
+}
+
 export function camionBitume() {
   const corps = (b) => [
     ...citerne(b, '#3a3f45', { bandes: GRIS, trous: 2 }),
