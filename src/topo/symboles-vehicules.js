@@ -120,7 +120,7 @@ export function camionCarburant() {
 export function fourgonBenne() {
   const corps = (b) => [
     ...piece(PERRIN_ORANGE, 'peinture', rectArrondi(b.x0, b.y0, b.x1, b.y1, 0.06)),
-    ...piece('#b97a12', 'metal', rectArrondi(b.x0 + 0.13, b.y0 + 0.13, b.x1 - 0.13, b.y1 - 0.16, 0.04), '#7a4b00'),
+    ...piece('#8a5a0c', 'peinture', rectArrondi(b.x0 + 0.13, b.y0 + 0.13, b.x1 - 0.13, b.y1 - 0.16, 0.04), '#5c3a06'), // 0.320.4 : fond de benne brun foncé (le métal éclairé le rendait blanc)
     ...[0.2, 0.4, 0.6, 0.8].map((f) => trait([[b.x0 + 0.13, b.y0 + f * (b.y1 - b.y0)], [b.x1 - 0.13, b.y0 + f * (b.y1 - b.y0)]], false, '#8a5a0c')),
     ...piece('#d5d9dd', 'metal', rectArrondi(b.x0 + 0.1, b.y1 - 0.1, b.x1 - 0.1, b.y1 + 0.03, 0.02)),
   ];
