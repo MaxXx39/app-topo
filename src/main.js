@@ -1768,7 +1768,7 @@ navigation = creerNavigation(document.querySelector('#bande-appli'), {
     ecranImport.choisirCategories(categories);
     ouvrirPartieProjet('points');
   },
-  applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces, dansAppli: estDansAppliAndroid() && !estDansAppliBureau() })
+  applis: () => applisDisponibles({ avecRecepteur: recepteurDisponible(), aAcces, dansAppli: estDansAppliAndroid() && !estDansAppliBureau() && !estDansAppliWindows() }) // 0.320.14 : Topo Tablette (Windows, avec souris) montre aussi Plans de chantier, Plateformes, Comparer, Matériel
     // Ordinateur et tablette en largeur : le plan est toujours à droite, pas besoin de sa tuile.
     .filter((a) => a.cle !== 'plan' || !window.matchMedia('(min-width: 900px)').matches),
   courante: () => appliCourante(document.body.dataset.onglet, terrain.mode),
