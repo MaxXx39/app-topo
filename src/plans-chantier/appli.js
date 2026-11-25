@@ -1769,7 +1769,7 @@ export function ouvrirPlansChantier({
     }
     const tourelle = sy?.pivote ? champNombre(sy.pivote.libelle ?? 'Rotation de la tourelle (par rapport au châssis)', 'prop', 'tourelle', o.tourelle ?? 0, -360, 360, 1, '°') : '';
     const etiq = `<label class="champ-calage"><span>Texte sur le bloc</span><input type="text" maxlength="40" value="${echapper(o.etiquette ?? '')}" placeholder="ex. Bureaux" data-prop="etiquette"></label>`;
-    return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${tourelle}${etiq}${rotation}${orienter}`;
+    return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${tourelle}${etiq}${o.cle === CLE_PORTAIL ? `<label class="champ-calage"><span>Texte sous le portail</span><input type="text" maxlength="40" value="${echapper(o.texteSous ?? '')}" placeholder="ex. Accès chantier" data-prop="texteSous"></label>` : ''}${rotation}${orienter}`;
   }
 
   /** Vignette d'une pose de la base-vie à étage. */
@@ -2475,6 +2475,7 @@ export function ouvrirPlansChantier({
       if (cle === 'genre' && o.cle === CLE_PORTAIL) o.passage = PASSAGE_PORTAIL[valeur]?.depart ?? 5; // un autre genre repart de sa largeur habituelle
       if (cle === 'fin' && !valeur) delete o.fin;
       if (cle === 'etiquette' && !valeur) delete o.etiquette;
+      if (cle === 'texteSous' && !valeur) delete o.texteSous; // 0.320.6 : texte aligné sous le portail
       if (cle === 'abaqueTexte' && !valeur) delete o.abaqueTexte;
       if (cle === 'materiau' && !valeur) delete o.materiau;
       if (cle === 'tonnes') o.tonnes = Number(valeur);

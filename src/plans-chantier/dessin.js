@@ -1189,6 +1189,8 @@ export function dessinerSymbolePose(d, o) {
   // 0.320.5 : le texte se décale par sa poignée (o.decalEtiq, repère du bloc)
   const [ex, ey] = o.decalEtiq ?? [0, 0];
   if (o.etiquette) texteDansSymbole(ctx, { x: ex, y: ey, h: opts.texteU ?? 0.5, a: 0, t: o.etiquette, ah: 1, av: 2, k: '#0f172a' }, e, rot);
+  // 0.320.6 : texte centré sous le portail (sous le bas de sa boîte, vers le bas)
+  if (o.texteSous && s.boite) texteDansSymbole(ctx, { x: (s.boite[0] + s.boite[2]) / 2, y: s.boite[1] - 0.15, h: opts.texteU ?? 0.5, a: 0, t: o.texteSous, ah: 1, av: 3, k: '#0f172a' }, e, rot);
   ctx.restore();
 }
 

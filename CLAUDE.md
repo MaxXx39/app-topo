@@ -156,6 +156,9 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Lot c = 0.303.0 (fait, voir plus bas)** — Plateformes : **sur-profondeur** dans une plateforme parente (contour dessiné dedans ; bas = **altitude OU profondeur, au choix** ; bords = **talus H:V**) ; **murs / radiers / dalles** comme limites : **ligne avec épaisseur et/ou contour fermé**, accroche sur DXF ; mur = **altitude du bas + hauteur** ; radier / dalle = **altitude du bas + épaisseur** ; remblai **jusqu'à une hauteur donnée ou jusqu'à un terrain** ; **pas de talus contre le mur**.
 - Réponses du 24.11 (suite) : **une plateforme dans UN seul groupe** ; **sur-hauteur (bosse) : oui, à essayer** en plus de la sur-profondeur ; remblai contre un mur : **on donne une hauteur (altitude) OU une épaisseur** (au choix), ou jusqu'à un terrain. **Maquette du panneau « Étapes »** : https://claude.ai/artifact/926wYQFimZiLnVC6HmGBAL (chaîne TN → étape 1 → 2 → …, chaque étape « posée sur » une précédente avec D / R, plan et coupe où l'étape choisie ressort, « L'étape seule » / « Toutes », somme des étapes + « Terrain → fin d'un coup ») : **à valider avant de coder**.
 
+## 0.320.6 — Plans de chantier : texte sous le portail
+- **Portail** (Expert) : champ « Texte sous le portail » (`o.texteSous`) ; texte centré sous le bas de la boîte du portail (`dessinerSymbolePose`). Pas dans le DXF. Tests `portail-texte.test.js`. Essai visuel pas refait.
+
 ## 0.320.5 — Plans de chantier : texte déplaçable
 - **Texte d'une zone** (surface, tas, texte libre) et **texte d'un bloc** : losange blanc au point du texte (quand l'objet est choisi) ; le prendre = le déplacer (`o.decalEtiq`, repère du bloc, `topo/plan-chantier.js` : `ancreEtiquette`, `decalEtiquette`). Le DXF ne garde pas ce décalage.
 - Tests `etiquette-deplacable.test.js`. Essai visuel pas refait.
