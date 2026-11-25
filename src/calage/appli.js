@@ -60,7 +60,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     // Nouvel indice (0.280.0) : { planId, ancien (plan calé), controle } ; null pour un nouveau plan.
     nouvelIndice: null,
     elements: [], enCours: null,
-    type: 'point', role: 'calage', accroche: 'sommet', affichage: 'deux',
+    type: 'point', axeMode: 'trait', role: 'calage', accroche: 'sommet', affichage: 'deux',
     resultat: null, erreur: '', enregistre: null,
     // Nettoyage : recette en cours, retours en arrière (↶), calque choisi, filtre, zone en cours de dessin.
     // 0.283.0 : calques choisis (clic sur le plan ou dans la liste), puis « Écarter la sélection » ; référence cachée au nettoyage.
@@ -323,6 +323,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     return `
       <div class="ruban-calage" role="toolbar" aria-label="Outils du calage">
         ${groupe('Élément', outil('type', 'point', '⊡', 'Point') + outil('type', 'axe', '╱', 'Axe'))}
+        <div class="groupe-ruban" data-zone="mode-axe" ${etat.type === 'axe' ? '' : 'hidden'}><span class="titre-groupe">Axe par</span><div class="boutons-groupe">${outil('axeMode', 'trait', '╱', 'Un trait')}${outil('axeMode', 'points', '⁚', '2 points')}</div></div>
         ${groupe('Rôle', outil('role', 'calage', `<i class="rond-role" style="background:${COULEUR_CALAGE}"></i>`, 'Calage') + outil('role', 'verification', `<i class="rond-role" style="background:${COULEUR_VERIF}"></i>`, 'Vérification'))}
         ${groupe('Accroche', ACCROCHES.map(([v, i, t]) => outil('accroche', v, i, t)).join(''))}
         ${groupe('Affichage', AFFICHAGES.map(([v, i, t]) => outil('affichage', v, i, t)).join(''))}
@@ -825,10 +826,13 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     if (etat.enCours) {
       const couleur = etat.enCours.role === 'verification' ? COULEUR_VERIF : COULEUR_CALAGE;
       const texte = etiquettes([...etat.elements, etat.enCours]).at(-1);
-      if (cote === 'plan') marques.push({ type: etat.enCours.type, xy: etat.enCours.plan, texte, couleur, attente: true });
+      if (cote === 'plan' && etat.enCours.plan) marques.push({ type: etat.enCours.type, xy: etat.enCours.plan, texte, couleur, attente: true });
+      // Axe par 2 points : les points déjà cliqués (plan reçu, puis référence).
+      if (cote === 'plan') for (const q of etat.enCours.planPts ?? []) marques.push({ type: 'point', xy: q, texte, couleur, attente: true });
+      if (cote === 'ref') for (const q of etat.enCours.refPts ?? []) marques.push({ type: 'point', xy: q, texte, couleur, attente: true });
       // Calage déjà connu : où l'élément devrait tomber sur la référence (aide au clic).
       if (cote === 'ref') for (const [e, n] of etat.enCours.refPoints ?? []) marques.push({ type: 'point', xy: [e, n], texte: texte, couleur, attente: true });
-      if (cote === 'ref' && etat.resultat) {
+      if (cote === 'ref' && etat.resultat && etat.enCours.plan) {
         const s = etat.resultat.similitude;
         const pl = etat.enCours.plan;
         const xy = pl.length === 2 ? appliquerSimilitude(s, pl) : [...appliquerSimilitude(s, pl.slice(0, 2)), ...appliquerSimilitude(s, pl.slice(2))];
@@ -843,7 +847,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
     const sources = sourcesDesPlans(plans, position, tolerance);
     // Référence « Points du projet » : on accroche seulement les points levés (aussi pour un axe : voir clicRef).
     if (cote === 'ref' && referencePoints()) return accrocher('sommet', position, tolerance, sources);
-    if (etat.type === 'axe') {
+    if (etat.type === 'axe' && etat.axeMode !== 'points') {
       const t = accrocherTrait(position, tolerance, sources.lignes);
       if (!t) return null;
       const a = t.sommets[t.segment];
@@ -863,6 +867,21 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
       message(etat.type === 'axe' ? 'Pas de trait ici : cliquez sur une ligne.' : `Rien à accrocher ici (${ACCROCHES.find(([v]) => v === etat.accroche)[2]}).`, 2500);
       return;
     }
+    if (etat.type === 'axe' && etat.axeMode === 'points') {
+      // Axe par 2 points accrochés sur le plan reçu : le 1er point, puis le 2e.
+      const deja = etat.enCours?.planPts ?? [];
+      const q = [a.est, a.nord];
+      if (deja.length === 1 && !etat.enCours.plan) {
+        if (Math.hypot(q[0] - deja[0][0], q[1] - deja[0][1]) < 1e-6) {
+          message('Les deux points sont confondus : cliquez un autre point sur l\'axe.', 2500);
+          return;
+        }
+        etat.enCours = { ...etat.enCours, plan: [...deja[0], ...q], planPts: [] };
+        if (etat.affichage === 'plan') changerAffichage('ref');
+      } else etat.enCours = { type: 'axe', role: etat.role, plan: null, planPts: [q] };
+      majCaler();
+      return;
+    }
     etat.enCours = { type: etat.type, role: etat.role, plan: versCoordonnees(a) };
     if (etat.affichage === 'plan') changerAffichage('ref');
     majCaler();
@@ -871,6 +890,10 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
   function clicRef(position, tolerance) {
     if (!etat.enCours) {
       message('Cliquez d\'abord l\'élément sur le plan reçu.', 2500);
+      return;
+    }
+    if (!etat.enCours.plan) {
+      message('Axe par 2 points : cliquez d\'abord le 2e point sur le plan reçu (à gauche).', 3000);
       return;
     }
     const a = accrocheDans([referenceAffichee()], position, tolerance, 'ref');
@@ -886,6 +909,30 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
         return;
       }
       etat.enCours.refPoints = [...vus, [a.est, a.nord]];
+      majCaler();
+      return;
+    }
+    if (etat.enCours.type === 'axe' && etat.axeMode === 'points') {
+      // Axe par 2 points accrochés sur la référence.
+      if (!a) {
+        message(`Rien à accrocher ici (${ACCROCHES.find(([v]) => v === etat.accroche)[2]}).`, 2500);
+        return;
+      }
+      const vus = etat.enCours.refPts ?? [];
+      const q = [a.est, a.nord];
+      if (vus.length === 0) {
+        etat.enCours.refPts = [q];
+        majCaler();
+        return;
+      }
+      if (Math.hypot(q[0] - vus[0][0], q[1] - vus[0][1]) < 1e-6) {
+        message('Les deux points sont confondus : cliquez un autre point sur l\'axe.', 2500);
+        return;
+      }
+      etat.elements.push({ type: 'axe', role: etat.enCours.role, plan: etat.enCours.plan, ref: [...vus[0], ...q] });
+      etat.enCours = null;
+      recalculer();
+      if (etat.affichage === 'ref') changerAffichage('plan');
       majCaler();
       return;
     }
@@ -988,15 +1035,20 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
   function majCaler() {
     if (etape !== 'caler') return;
     page.querySelectorAll('.outil-ruban[data-outil]').forEach((b) => b.classList.toggle('actif', etat[b.dataset.outil] === b.dataset.valeur));
-    page.querySelectorAll('[data-outil="accroche"]').forEach((b) => { b.disabled = etat.type === 'axe'; });
+    page.querySelectorAll('[data-outil="accroche"]').forEach((b) => { b.disabled = etat.type === 'axe' && etat.axeMode !== 'points'; });
+    const modeAxe = page.querySelector('[data-zone="mode-axe"]');
+    if (modeAxe) modeAxe.hidden = etat.type !== 'axe';
     const noms = etiquettes(etat.elements);
     const prochain = etiquettes([...etat.elements, { type: etat.type, role: etat.role }]).at(-1);
     const bAxe = page.querySelector('[data-zone="finir-axe"]');
     if (bAxe) bAxe.disabled = !(etat.enCours?.type === 'axe' && (etat.enCours.refPoints?.length ?? 0) >= 2);
     page.querySelector('[data-zone="consigne"]').textContent = etat.calculAuto ? 'Calage automatique en cours (quelques secondes)…' : etat.enCours?.type === 'axe' && referencePoints()
       ? `${etiquettes([...etat.elements, etat.enCours]).at(-1)} : cliquez 2 points levés ou plus SUR l'axe (à droite)${etat.enCours.refPoints?.length ? ` : ${etat.enCours.refPoints.length} pris` : ''}, puis « Terminer l'axe ».` : etat.enCours
-      ? `${etiquettes([...etat.elements, etat.enCours]).at(-1)} : cliquez le même ${etat.enCours.type === 'axe' ? 'trait' : 'point'} sur la RÉFÉRENCE (à droite)${etat.resultat ? ' (marque « ? » = où il devrait être)' : ''}.`
-      : `${prochain} : cliquez ${etat.type === 'axe' ? 'un trait (axe)' : 'un point'} sur le PLAN REÇU (à gauche), puis le même sur la référence (à droite).`;
+      ? etat.enCours.type === 'axe' && etat.axeMode === 'points'
+        ? (!etat.enCours.plan ? `${etiquettes([...etat.elements, etat.enCours]).at(-1)} : cliquez le 2e point de l'axe sur le PLAN REÇU (à gauche).` : `${etiquettes([...etat.elements, etat.enCours]).at(-1)} : cliquez le point ${(etat.enCours.refPts?.length ?? 0) + 1} sur la RÉFÉRENCE (à droite), dans le même ordre que sur le plan reçu.`)
+        : `${etiquettes([...etat.elements, etat.enCours]).at(-1)} : cliquez le même ${etat.enCours.type === 'axe' ? 'trait' : 'point'} sur la RÉFÉRENCE (à droite)${etat.resultat ? ' (marque « ? » = où il devrait être)' : ''}.`
+      : etat.type === 'axe' && etat.axeMode === 'points' ? `${prochain} : cliquez 2 points (avec accroche) sur l'axe du PLAN REÇU (à gauche), puis les 2 mêmes points sur la référence (à droite).`
+        : `${prochain} : cliquez ${etat.type === 'axe' ? 'un trait (axe)' : 'un point'} sur le PLAN REÇU (à gauche), puis le même sur la référence (à droite).`;
     const compte = (f) => etat.elements.filter(f).length;
     page.querySelector('[data-zone="titre-elements"]').textContent = `Éléments (${compte((e) => e.role === 'calage' && e.type === 'point')} points + ${compte((e) => e.role === 'calage' && e.type === 'axe')} axes de calage, ${compte((e) => e.role === 'verification')} vérification)`;
     const evalues = etat.resultat?.elements;
@@ -1644,6 +1696,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
         etat[outil] = valeur;
         // Changer de genre d'élément abandonne celui commencé.
         if (outil === 'type' && etat.enCours && etat.enCours.type !== valeur) etat.enCours = null;
+        if (outil === 'axeMode') etat.enCours = null;
         if (outil === 'role' && etat.enCours) etat.enCours.role = valeur;
         majCaler();
       }
@@ -1659,6 +1712,7 @@ export function ouvrirCalage({ projet, simple = false, depart = null, controlerP
       majCaler();
     } else if (action === 'retirer-dernier') {
       if (etat.enCours?.refPoints?.length) etat.enCours.refPoints.pop();
+      else if (etat.enCours?.refPts?.length) etat.enCours.refPts.pop();
       else if (etat.enCours) etat.enCours = null;
       else if (etat.elements.length) etat.elements.pop();
       else etat.auto = null;

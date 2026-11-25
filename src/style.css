@@ -15045,3 +15045,4 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .page-comparateur .ruban-calage select { max-width: 130px; }
 .legende-comparateur label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .legende-comparateur input[type='color'] { width: 20px; height: 20px; padding: 0; border: 1px solid var(--bordure); border-radius: 4px; background: none; }
+.groupe-ruban[hidden] { display: none; }
