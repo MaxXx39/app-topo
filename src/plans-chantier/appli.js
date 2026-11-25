@@ -1082,21 +1082,35 @@ export function ouvrirPlansChantier({
     const c = feuille.canvas;
     c.style.width = `${Math.round(mise.page.largeur * pxParMm)}px`;
     c.style.height = `${Math.round(mise.page.hauteur * pxParMm)}px`;
-    c.width = Math.round(mise.page.largeur * pxParMm * densite);
-    c.height = Math.round(mise.page.hauteur * pxParMm * densite);
-    const ctx = c.getContext('2d');
+    // 0.319.4 : la page est dessinée sur une toile à part puis copiée d'un coup : l'aperçu ne devient plus blanc pendant le calcul,
+    // et une erreur de dessin est écrite au lieu de laisser une page vide.
+    const hors = document.createElement('canvas');
+    hors.width = Math.round(mise.page.largeur * pxParMm * densite);
+    hors.height = Math.round(mise.page.hauteur * pxParMm * densite);
+    const ctx = hors.getContext('2d');
     ctx.setTransform(densite, 0, 0, densite, 0, 0);
-    const donnees = donneesFeuille();
-    const prep = preparerPage(donnees, pages[feuille.page], pxParMm);
-    const logo = await chargerImage(adresseLogo(r.logo));
-    if (!feuille || feuille.canvas !== c) return;
-    dessinerPage(ctx, donnees, prep, pxParMm, {
-      logo,
-      quandTuile: () => {
-        cancelAnimationFrame(imageApercu);
-        imageApercu = requestAnimationFrame(() => dessinerApercu());
-      },
-    });
+    const numero = (feuille.numero = (feuille.numero ?? 0) + 1);
+    let prep;
+    try {
+      const donnees = donneesFeuille();
+      prep = preparerPage(donnees, pages[feuille.page], pxParMm);
+      const logo = await chargerImage(adresseLogo(r.logo));
+      if (!feuille || feuille.canvas !== c || feuille.numero !== numero) return; // un dessin plus récent a pris la suite
+      dessinerPage(ctx, donnees, prep, pxParMm, {
+        logo,
+        quandTuile: () => {
+          cancelAnimationFrame(imageApercu);
+          imageApercu = requestAnimationFrame(() => dessinerApercu());
+        },
+      });
+    } catch (e) {
+      console.error(e);
+      message(`Aperçu de la feuille impossible : ${e?.message ?? e}`, 6000);
+      return;
+    }
+    c.width = hors.width;
+    c.height = hors.height;
+    c.getContext('2d').drawImage(hors, 0, 0);
     const etatZone = page.querySelector('[data-zone="etat-feuille"]');
     if (etatZone) {
       etatZone.innerHTML = `${pages.length > 1 ? `<button type="button" class="bouton-secondaire" data-page-feuille="-1" ${feuille.page ? '' : 'disabled'}>◀</button>
