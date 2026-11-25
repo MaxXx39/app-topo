@@ -5377,11 +5377,11 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
 /* Implantation d'une ligne : cotes écrites le long des traits (pas de bulle), avec un liseré
    blanc pour se lire sur le plan ; prolongement de la ligne en pointillés avant le début ou après la fin. */
 .plan .cote-ligne {
-  font-size: 11.2px;
+  font-size: 16.8px; /* 0.321.0 : ×1,5 */
   font-weight: 800;
   paint-order: stroke;
   stroke: #ffffff;
-  stroke-width: 3.5px;
+  stroke-width: 5px;
   stroke-linejoin: round;
   pointer-events: none;
 }
@@ -5408,6 +5408,17 @@ body.cible-en-haut .vue-guidage .guidage-direct.avec-cible .lignes-guidage {
   stroke-width: 2.5;
   stroke-dasharray: 7 5;
 }
+
+.plan .fleche-pied {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+.plan .fleche-pied.cote-debut { stroke: #15803d; }
+.plan .fleche-pied.cote-prolongement { stroke: #b45309; }
 
 .plan .repere-pied {
   stroke: #0f766e;
