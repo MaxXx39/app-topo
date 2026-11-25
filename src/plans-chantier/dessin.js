@@ -618,7 +618,8 @@ function textesLeLong(ctx, pts, style, couleur, pxMm, o, pxM) {
 }
 
 function dessinerLigneBase(ctx, pts, style, couleur, pxMm, o = {}, pxM = null) {
-  const m = style.motif;
+  // 0.320.9 : EAU, EC, EU, GAZ, ELEC, SWISSCOM = trait simple + texte le long de la ligne (même réglage que les autres lignes)
+  const m = style.motif?.type === 'texte' ? null : style.motif;
   const ech = o.echelleMotif ?? 1;
   const epaisseur = Math.max(0.8, (o.epaisseurMm ?? style.epaisseurMm) * pxMm);
   if (m?.largeurM) return dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM ?? pxMm * 5, o);
