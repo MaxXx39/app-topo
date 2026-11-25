@@ -14,7 +14,7 @@ export function reglagesFeuille(plan) {
   return {
     format: f.format ?? 'a3', orientation: f.orientation ?? 'paysage', pages: f.pages ?? 'une',
     centre: f.centre ?? null, legende: f.legende !== false, nord: f.nord !== false, barre: f.barre !== false,
-    situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
+    plans: f.plans ?? null, situation: situationDe(f.situation), planning: Boolean(f.planning), coupe: Boolean(f.coupe), indice: f.indice ?? 'A', auteur: f.auteur ?? '', date: f.date ?? '', titre: f.titre ?? '', logo: f.logo ?? 'perrin',
   };
 }
 
@@ -164,3 +164,27 @@ export function textesCartouche(cartouche, k, champs) {
 
 /** Nombre d'éléments posés (symboles, grues) d'une liste d'objets (pour les messages). */
 export const nombrePoses = (objets) => objets.filter(estPose).length;
+
+// --- 0.317.0 : plans montrés sur la feuille, réglés à part de l'écran (cases + opacité par plan) ---
+
+const copiesOpacite = new WeakMap(); // plan -> Map(transparence -> copie) : mêmes objets d'un dessin à l'autre (cache de dessin)
+
+/**
+ * Plans à dessiner sur la feuille. tous : tous les plans du projet ; deLEcran : ceux montrés à l'écran pour cette phase ;
+ * reglages : plan.feuille.plans { [id]: { visible, opacite (0 à 100 %) } } ou null (= comme l'écran). Un plan sans réglage
+ * garde sa visibilité d'écran. Renvoie la liste, avec la transparence réglée (copie gardée en mémoire).
+ */
+export function plansDeLaFeuille(tous, deLEcran, reglages) {
+  if (!reglages) return deLEcran;
+  const ecran = new Set(deLEcran.map((p) => p.id));
+  return tous.filter((p) => reglages[p.id]?.visible ?? ecran.has(p.id)).map((p) => {
+    const op = reglages[p.id]?.opacite;
+    if (op === undefined || op === null) return p;
+    const transparence = Math.round(100 - Math.min(100, Math.max(0, op)));
+    if (transparence === (p.transparence ?? 0)) return p;
+    let m = copiesOpacite.get(p);
+    if (!m) copiesOpacite.set(p, (m = new Map()));
+    if (!m.has(transparence)) m.set(transparence, { ...p, transparence });
+    return m.get(transparence);
+  });
+}

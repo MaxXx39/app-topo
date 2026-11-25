@@ -188,10 +188,42 @@ export function creerVueChantier(conteneur, options) {
   const pxParMm = (pc) => vue.echelle * metresParMm(pc);
   const contexteDessin = (ctx, pc) => ({ ctx, vue, pc, bib: bibliotheque(), mm: pxParMm(pc) });
 
+  /** 0.317.0 : petit cadenas à côté d'un élément verrouillé. */
+  function cadenas(ctx, q) {
+    ctx.setLineDash([]);
+    ctx.strokeStyle = ORANGE;
+    ctx.fillStyle = '#ffffff';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(q.x + 12, q.y - 17, 4, Math.PI, 2 * Math.PI);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.roundRect(q.x + 6, q.y - 17, 12, 9, 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
   function dessinerChoix(ctx, o) {
     ctx.strokeStyle = ORANGE;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([5, 4]);
+    if (o.verrou) {
+      // Verrouillé : seulement le contour, sans poignées ni « + », et un cadenas.
+      if (estPose(o)) {
+        const s = symboleDeLObjet(bibliotheque(), o);
+        if (s) {
+          chemin(ctx, coinsSymbole(o, s), true);
+          ctx.stroke();
+        }
+        return cadenas(ctx, ecran(o.point));
+      }
+      const pv = pointsDe(o);
+      if (o.type !== 'texte' && pv.length) {
+        chemin(ctx, pv, o.type === 'zone');
+        ctx.stroke();
+      }
+      return cadenas(ctx, ecran(o.cercle ? o.cercle.centre : pv[0] ?? o.point));
+    }
     if (estPose(o)) {
       // Symbole : sa boîte tournée, son centre, et la poignée ronde de rotation.
       const s = symboleDeLObjet(bibliotheque(), o);

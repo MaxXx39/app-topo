@@ -34,10 +34,11 @@ import { tousLesModeles, modeleDe, definirModelesPerso } from '../topo/grue-mode
 import { lignesDeCoupe, coupeChantier } from '../topo/coupe-chantier.js';
 import { svgCoupe } from './coupe.js';
 import { ouvrirModelesGrues } from './modeles-grues.js';
+import { lignesChassisGrue } from '../topo/grue-accroches.js';
 import { surLeSymbole, poigneeRotation, rotationVers, coinsSymbole, POSES_ETAGE, flechesDisponibles, chassisDisponibles, CLE_CONTENEUR, coteChassis, FLECHE_MIN, FLECHE_MAX, CHASSIS_MIN, CHASSIS_MAX, echelleDeLObjet } from '../topo/symboles.js';
 import { pointsDuRond, rectangleTroisPoints, changerRayon, pointDeBase, categorieZone, TRAITS_CONTOUR, MOTIFS_HACHURE, HACHURE_ANGLE, HACHURE_PAS_MM, milieuxDesCotes, ajouterPointAuMilieu, arcSurCote, courberCote, poigneesArcs, recourber, arcsDe } from '../topo/plan-chantier.js';
 import { estPose, changerOrdre, angleDeLaLigne, MATERIAUX_TAS, TAS_HAUTEUR, TAS_TALUS, TAILLE_TEXTE_MM, segmentLePlusProche, pointALaDistance, angleVers } from '../topo/plan-chantier.js';
-import { reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
+import { plansDeLaFeuille, reglagesFeuille, pagesDeLaFeuille, centreDeDepart, FORMATS_FEUILLE, miseEnPageFeuille, COINS_SITUATION } from '../topo/feuille-chantier.js';
 import { preparerPage, dessinerPage, creerPdfChantier, chargerImage, adresseLogo } from './feuille.js';
 import { dxfPlanChantier } from '../topo/plan-chantier-dxf.js';
 import { nomFichierExport } from '../outils/nom-fichier.js';
@@ -161,6 +162,11 @@ export function ouvrirPlansChantier({
   };
   // 0.296.0 : réglages de calques (masqués, couleurs) propres à ce plan de chantier
   const plansFond = (idPhase) => plansAvecCalques(plansMontres(idPhase), plan()?.fond);
+  // 0.317.0 : plans de la FEUILLE, réglés à part de l'écran (plan.feuille.plans : cases + opacité) ; sans réglage = comme l'écran.
+  const plansFeuille = (idPhase) => {
+    const p = plan();
+    return plansDeLaFeuille(plansAvecCalques(plans(), p?.fond), plansFond(idPhase), p ? reglagesFeuille(p).plans : null);
+  };
 
   let fermee = false;
   function fermer() {
@@ -445,6 +451,10 @@ export function ouvrirPlansChantier({
           if (etat.outil !== 'choisir' || !etat.choisi || etat.orienter) return false;
           const o = plan().objets.find((x) => x.id === etat.choisi);
           if (!o) return false;
+          if (o.verrou) {
+            message('Élément verrouillé : « Déverrouiller » dans le bandeau pour le déplacer.', 2500);
+            return false;
+          }
           if (estPose(o)) {
             // Symbole : la poignée ronde = tourner ; ailleurs sur lui = le déplacer (son centre s'accroche).
             const sy = symboleDeLObjet(bib(), o);
@@ -575,10 +585,11 @@ export function ouvrirPlansChantier({
   /** Élément sous le point (symboles compris). */
   const objetSous = (p, tol) => objetSousLePoint(objetsVisibles(plan()), p, tol, toucheSymbole);
 
-  /** Boîtes des symboles posés, pour l'accroche (sommets, milieux des côtés). */
+  /** Boîtes des symboles posés, pour l'accroche (sommets, milieux des côtés) ; grues : leur châssis. */
   const lignesSymboles = (objets) => objets.filter(estPose).flatMap((o) => {
+    if (o.type === 'grue') return lignesChassisGrue(o);
     const sy = symboleDeLObjet(bib(), o);
-    return sy && o.type !== 'grue' ? [{ points: coinsSymbole(o, sy).map(([est, nord]) => ({ est, nord, altitude: null })), ferme: true }] : [];
+    return sy ? [{ points: coinsSymbole(o, sy).map(([est, nord]) => ({ est, nord, altitude: null })), ferme: true }] : [];
   });
 
   /** Accroche pendant un dessin : points levés, puis sommets / milieux / bords des plans et de ce qui est dessiné. */
@@ -700,7 +711,7 @@ export function ouvrirPlansChantier({
   /** Supprime le sommet touché de la ligne, piste, flèche ou zone choisie (au moins 2 points, 3 pour une zone). */
   function supprimerSommet(p, tolerance) {
     const o = plan().objets.find((x) => x.id === etat.choisi);
-    if (!o || !Array.isArray(o.points) || o.type === 'construction' || o.type === 'cotation' || o.cercle) return false;
+    if (!o || o.verrou || !Array.isArray(o.points) || o.type === 'construction' || o.type === 'cotation' || o.cercle) return false;
     const i = sommetSousLePoint(o, p, tolerance * 1.5);
     if (i < 0) return false;
     const min = o.type === 'zone' ? 3 : 2;
@@ -725,7 +736,7 @@ export function ouvrirPlansChantier({
   /** Clic sur un « + » de l'élément choisi : un point ajouté au milieu de ce côté (0.299.0). */
   function ajouterPointCote(p, tolerance) {
     const o = plan().objets.find((x) => x.id === etat.choisi);
-    if (!o) return false;
+    if (!o || o.verrou) return false;
     const m = milieuSousLePoint(o, p, tolerance);
     if (m < 0 || sommetSousLePoint(o, p, tolerance) >= 0) return false;
     if (!avantChangement()) return true;
@@ -943,6 +954,17 @@ export function ouvrirPlansChantier({
       for (const c of page.querySelectorAll('[data-saisie]')) c.value = '';
       return creerForme(longueurTapee); // rayon tapé
     }
+    if (s.outil === 'rectangle' && s.points.length === 2) {
+      // 0.317.0 : 2e longueur tapée = la largeur, perpendiculaire au 1er côté, du côté où est la souris (à gauche sans souris).
+      const [a, b] = s.points;
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const nx = -(b[1] - a[1]) / L;
+      const ny = (b[0] - a[0]) / L;
+      const cote = etat.curseur && ((etat.curseur[0] - a[0]) * nx + (etat.curseur[1] - a[1]) * ny) < 0 ? -1 : 1;
+      s.points.push([a[0] + nx * cote * longueurTapee, a[1] + ny * cote * longueurTapee]);
+      for (const c of page.querySelectorAll('[data-saisie]')) c.value = '';
+      return creerForme();
+    }
     const angle = angleTape ?? (etat.curseur ? angleVers(dernier, etat.curseur) : null);
     if (angle === null) return message('Bougez la souris pour donner la direction, ou tapez un angle.', 3500);
     const p = pointALaDistance(dernier, longueurTapee, angle);
@@ -995,7 +1017,7 @@ export function ouvrirPlansChantier({
   }
   const donneesFeuille = () => ({
     coupe: coupePourFeuille,
-    plan: plan(), plans: plansFond(), plansPar: (idPhase) => plansFond(idPhase), points: pointsMontres(), surfaces: plan()?.fond?.surfaces === false ? [] : surfaces(),
+    plan: plan(), plans: plansFeuille(), plansPar: (idPhase) => plansFeuille(idPhase), points: pointsMontres(), surfaces: plan()?.fond?.surfaces === false ? [] : surfaces(),
     bib: bib(), projet: leProjet(), auteur: auteur(), centre: centreDeDepart(plan(), plansFond()),
   });
 
@@ -1099,6 +1121,15 @@ export function ouvrirPlansChantier({
       <label class="champ-calage"><span>Pages</span><select data-feuille="pages">${options([['une', 'Toutes les phases sur une page'], ['phases', 'Une page par phase']], r.pages)}</select></label>
       ${r.pages === 'phases' ? `<p class="aide-calage">Phases montrées sur toutes les pages :</p>
         ${p.phases.map((ph) => `<label class="case-chantier"><input type="checkbox" data-phase-commune="${ph.id}" ${ph.commune ? 'checked' : ''}> ${echapper(ph.nom)}</label>`).join('')}` : ''}
+      <h3>Plans de la feuille</h3>
+      ${plans().length ? `<p class="aide-calage">${r.plans ? 'Réglés à part de l\'écran.' : 'Comme à l\'écran.'}</p>
+        ${plans().map((x) => {
+    const eff = plansDeLaFeuille(plansAvecCalques(plans(), p.fond), plansFond(), r.plans).find((y) => y.id === x.id);
+    const op = Math.round(100 - (eff ? (eff.transparence ?? 0) : (r.plans?.[x.id]?.opacite !== undefined ? 100 - r.plans[x.id].opacite : (x.transparence ?? 0))));
+    return `<div class="plan-feuille"><label class="case-chantier"><input type="checkbox" data-feuille-plan="${echapper(x.id)}" ${eff ? 'checked' : ''}> ${echapper(x.nom)}</label>
+          <label class="champ-calage"><span>Opacité : <b data-valeur-de="op-${echapper(x.id)}">${op} %</b></span><input type="range" min="0" max="100" step="5" value="${op}" data-feuille-plan-op="${echapper(x.id)}"></label></div>`;
+  }).join('')}
+        ${r.plans ? '<button type="button" class="lien-calage" data-action="feuille-plans-reinit">Remettre comme à l\'écran</button>' : ''}` : '<p class="aide-calage">Aucun plan dans le projet.</p>'}
       <h3>Fond</h3>
       <label class="case-chantier"><input type="checkbox" data-fond="carte" ${p.fond.carte ? 'checked' : ''}> Carte nationale swisstopo</label>
       <label class="case-chantier"><input type="checkbox" data-fond="ortho" ${p.fond.ortho ? 'checked' : ''}> Photo aérienne swisstopo</label>
@@ -1153,6 +1184,15 @@ export function ouvrirPlansChantier({
       enregistrer();
       return dessinerApercu();
     }
+    if (b.dataset.action === 'feuille-plans-reinit') {
+      if (!avantChangement()) return;
+      const f = { ...(p.feuille ?? {}) };
+      delete f.plans;
+      p.feuille = f;
+      enregistrer();
+      majPanneauFeuille();
+      return dessinerApercu();
+    }
     if (b.dataset.action === 'feuille-logo') return choisirLogo(p);
     if (b.dataset.action === 'feuille-pdf') {
       b.disabled = true;
@@ -1205,8 +1245,28 @@ export function ouvrirPlansChantier({
     majFeuille();
   }
 
+  /** Réglages de plans de la feuille : tous les plans reçoivent leur état actuel (écran ou déjà réglé) avant le 1er changement. */
+  function reglagesPlansFeuille(p) {
+    if (p.feuille?.plans) return { ...p.feuille.plans };
+    const montres = new Set(plansMontres().map((x) => x.id));
+    return Object.fromEntries(plans().map((x) => [x.id, { visible: montres.has(x.id), opacite: Math.round(100 - (x.transparence ?? 0)) }]));
+  }
+
   function entreeFeuille(c) {
     const p = plan();
+    if (c.dataset.feuillePlanOp) {
+      const etiquette = page.querySelector(`[data-valeur-de="op-${c.dataset.feuillePlanOp}"]`);
+      if (etiquette) etiquette.textContent = `${c.value} %`;
+      if (!etat.reglageEnCours) {
+        if (!avantChangement()) return;
+        etat.reglageEnCours = true;
+      }
+      const rg = reglagesPlansFeuille(p);
+      rg[c.dataset.feuillePlanOp] = { ...(rg[c.dataset.feuillePlanOp] ?? { visible: true }), opacite: Number(c.value) };
+      p.feuille = { ...(p.feuille ?? {}), plans: rg };
+      dessinerApercu();
+      return;
+    }
     if (c.dataset.feuilleCurseur === 'paleur') {
       const etiquette = page.querySelector('[data-valeur-de="paleur"]');
       if (etiquette) etiquette.textContent = `${c.value} %`;
@@ -1220,6 +1280,20 @@ export function ouvrirPlansChantier({
   }
 
   function changeFeuille(c, p) {
+    if (c.dataset.feuillePlanOp) {
+      if (etat.reglageEnCours) enregistrer();
+      etat.reglageEnCours = false;
+      return;
+    }
+    if (c.dataset.feuillePlan) {
+      if (!avantChangement()) return majPanneauFeuille();
+      const rg = reglagesPlansFeuille(p);
+      rg[c.dataset.feuillePlan] = { ...(rg[c.dataset.feuillePlan] ?? { opacite: 100 }), visible: c.checked };
+      p.feuille = { ...(p.feuille ?? {}), plans: rg };
+      enregistrer();
+      majFeuille();
+      return majPanneauFeuille();
+    }
     if (c.dataset.feuilleCurseur) {
       if (etat.reglageEnCours) enregistrer();
       etat.reglageEnCours = false;
@@ -1282,7 +1356,7 @@ export function ouvrirPlansChantier({
     const textes = {
       choisir: etat.choisi ? (estPose(plan().objets.find((x) => x.id === etat.choisi) ?? {}) ? 'Glisser le symbole = le déplacer (le point saisi s\'accroche) ; poignée ronde = le tourner ; Suppr = l\'effacer ; Échap = ne plus le choisir.' : 'Glisser une poignée (carré) = déplacer ce sommet ; Maj + clic ou double-clic sur un carré = supprimer ce point ; glisser l\'élément = le déplacer ; Suppr = l\'effacer ; Échap = ne plus le choisir.') : 'Cliquez un élément pour le choisir (ou dans la liste à droite). Molette = zoom, glisser dans le vide = déplacer le plan.',
       symbole: etat.pose ? 'Cliquez où poser le symbole (son centre). La rotation de pose se règle à droite.' : 'Choisissez un symbole dans la bibliothèque (à gauche).',
-      rectangle: n === 0 ? 'Rectangle : cliquez le 1er coin.' : n === 1 ? 'Cliquez le 2e coin (le 1er côté).' : 'Cliquez de quel côté et à quelle distance : la largeur.',
+      rectangle: n === 0 ? 'Rectangle : cliquez le 1er coin.' : n === 1 ? 'Cliquez le 2e coin (le 1er côté), ou dirigez la souris et tapez la 1re longueur puis Entrée.' : 'Cliquez de quel côté et à quelle distance, ou placez la souris du bon côté et tapez la 2e longueur (largeur) puis Entrée.',
       rond: n === 0 ? 'Rond : cliquez le centre.' : 'Cliquez un point du bord, ou tapez le rayon (m) puis Entrée.',
       zone: n >= 3 ? 'Cliquez le sommet suivant ; cliquez le 1er sommet (ou Entrée, double-clic) pour fermer la zone.' : 'Cliquez les sommets de la zone.',
       ligne: n >= 2 ? 'Point suivant ; Entrée ou double-clic = finir.' : 'Cliquez le départ de la ligne.',
@@ -1311,7 +1385,7 @@ export function ouvrirPlansChantier({
       const lon = saisie.querySelector('[data-saisie="longueur"]');
       if (lon) lon.closest('label').hidden = actif && etat.saisie.outil === 'construction' && etat.constructionMode === 'angle';
       const ang = saisie.querySelector('[data-saisie="angle"]');
-      if (ang) ang.closest('label').hidden = actif && etat.saisie.outil === 'rond'; // rond : seulement le rayon
+      if (ang) ang.closest('label').hidden = actif && (etat.saisie.outil === 'rond' || (etat.saisie.outil === 'rectangle' && etat.saisie.points.length === 2)); // rond : le rayon ; rectangle 2e côté : la largeur
     }
   }
 
@@ -1515,8 +1589,11 @@ export function ouvrirPlansChantier({
     zone.innerHTML = `<span class="puce-element">${echapper(resumeObjet(o))}</span>
       ${poseHtml}${phases}${couleur}
       <span class="groupe-ordre" role="group" aria-label="Ordre de dessin">${bouton('data-ordre="devant"', '⤒', 'Premier plan')}${bouton('data-ordre="monter"', '▲', 'Un cran au-dessus')}${bouton('data-ordre="descendre"', '▼', 'Un cran en dessous')}${bouton('data-ordre="arriere"', '⤓', 'Arrière-plan')}</span>
+      ${bouton(`data-action="verrou" class="${o.verrou ? 'actif' : ''}"`, o.verrou ? 'Déverrouiller' : 'Verrouiller', o.verrou ? 'Déverrouiller : on pourra de nouveau le déplacer' : 'Verrouiller : l\'élément ne peut plus être déplacé (ni ses points, ni tourné)')}
       ${decaler}${bouton('data-action="effacer"', '✕ Effacer', 'Effacer cet élément')}
       ${propre ? `<div class="propre-element">${propre}</div>` : ''}`;
+    // 0.317.0 : élément verrouillé = rien de ce qui le déplace (rotation, échelle, orientation) ; effacer, genre, couleur restent possibles.
+    if (o.verrou) zone.querySelectorAll('[data-tourner], [data-prop="rotation"], [data-prop="echelle"], [data-orienter], [data-echelle-reelle]').forEach((c) => { c.disabled = true; });
     zone.querySelectorAll('canvas[data-vignette-pose]').forEach((c) => dessinerPose(c, Number(c.dataset.vignettePose))); // vignettes des 8 poses de l'escalier
   }
 
@@ -1886,6 +1963,17 @@ export function ouvrirPlansChantier({
       return;
     }
     if (b.dataset.action === 'saisie-ok') return placerParSaisie();
+    if (b.dataset.action === 'verrou') {
+      const o = etat.choisi ? plan().objets.find((x) => x.id === etat.choisi) : null;
+      if (!o || !avantChangement()) return;
+      if (o.verrou) delete o.verrou;
+      else o.verrou = true;
+      enregistrer();
+      majTout();
+      vue?.redessinerDessus();
+      message(o.verrou ? 'Élément verrouillé : il ne peut plus être déplacé.' : 'Élément déverrouillé.', 2500, { ok: true });
+      return;
+    }
     if (b.dataset.action === 'decaler-choisi') return decalerChoisi();
     if (b.dataset.action === 'effacer') return supprimerChoisi();
     if (b.dataset.action === 'annuler') return annuler();
@@ -2018,7 +2106,7 @@ export function ouvrirPlansChantier({
       etat.biblio.recherche = c.value;
       return majBiblio();
     }
-    if (etat.ecran === 'feuille' && c.dataset.feuilleCurseur) return entreeFeuille(c);
+    if (etat.ecran === 'feuille' && (c.dataset.feuilleCurseur || c.dataset.feuillePlanOp)) return entreeFeuille(c);
     const p = plan();
     if (!p || c.type !== 'range') return;
     const valeur = Number(c.value);
