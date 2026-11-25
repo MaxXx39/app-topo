@@ -1761,7 +1761,8 @@ export function ouvrirPlansChantier({
       const lim = PASSAGE_PORTAIL[r.genre];
       return `<label class="champ-calage"><span>Genre</span><select data-prop="genre">${GENRES_PORTAIL.map(([v, t]) => `<option value="${v}" ${r.genre === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         ${champNombre('Largeur de passage (entre les poteaux)', 'prop', 'passage', r.passage, lim.min, lim.max, 0.05, 'm')}
-        ${r.genre === 'portillon' ? `<label class="champ-calage"><span>Charnière</span><select data-prop="charniere"><option value="gauche" ${r.charniere === 'gauche' ? 'selected' : ''}>À gauche</option><option value="droite" ${r.charniere === 'droite' ? 'selected' : ''}>À droite</option></select></label>` : ''}`;
+        ${r.genre === 'portillon' ? `<label class="champ-calage"><span>Charnière</span><select data-prop="charniere"><option value="gauche" ${r.charniere === 'gauche' ? 'selected' : ''}>À gauche</option><option value="droite" ${r.charniere === 'droite' ? 'selected' : ''}>À droite</option></select></label>` : ''}
+        <label class="champ-calage"><span>Texte sous le portail</span><input type="text" maxlength="40" value="${echapper(o.texteSous ?? '')}" placeholder="ex. Accès chantier" data-prop="texteSous"></label>`;
     }
     if (o.cle === CLE_DEVIATION) {
       return `<label class="champ-calage"><span>Texte du panneau</span><input type="text" maxlength="30" value="${echapper(o.texte ?? 'Lugano')}" data-prop="texte"></label>
@@ -2475,6 +2476,7 @@ export function ouvrirPlansChantier({
       if (cle === 'genre' && o.cle === CLE_PORTAIL) o.passage = PASSAGE_PORTAIL[valeur]?.depart ?? 5; // un autre genre repart de sa largeur habituelle
       if (cle === 'fin' && !valeur) delete o.fin;
       if (cle === 'etiquette' && !valeur) delete o.etiquette;
+      if (cle === 'texteSous' && !valeur) delete o.texteSous; // 0.320.6 : texte aligné sous le portail
       if (cle === 'abaqueTexte' && !valeur) delete o.abaqueTexte;
       if (cle === 'materiau' && !valeur) delete o.materiau;
       if (cle === 'tonnes') o.tonnes = Number(valeur);

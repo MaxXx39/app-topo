@@ -23,7 +23,8 @@ describe('portail réglable (0.320.2)', () => {
   it('les points de prise suivent la position et la rotation du bloc', () => {
     const o = { type: 'symbole', cle: 'dyn:portail', point: [100, 200], rotation: 90, genre: 'portail', passage: 4 };
     const pts = pointsDePrise(o, symboleDeLObjetPose([], o));
-    expect(pts).toHaveLength(3);
+    expect(pts).toHaveLength(4); // 3 prises + le centre du bloc (pastille de déplacement, 0.320.7)
+    expect(pts[3][0]).toBeCloseTo(100, 6);
     expect(pts[0][0]).toBeCloseTo(100, 6); // tourné de 90° : les poteaux sont alignés sur le nord
     expect(pts[0][1]).toBeCloseTo(200 - 2.15, 6);
   });

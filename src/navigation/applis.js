@@ -7,7 +7,7 @@
 // Une application : cle, titre, couleur (fond du bouton), texte (couleur du texte sur ce fond),
 // icone (tracé SVG 24 × 24), niveau ('intermediaire' / 'expert' : mode minimum), apk (vrai : seulement
 // dans l'appli Android, avec un récepteur), site (vrai : aussi sur le site), titreSite (nom sur le site),
-// siteSeulement (vrai : jamais dans l'APK ni dans Topo Tablette, 0.274.0 ; oui sur le site et dans Topo Bureau, 0.277.0).
+// siteSeulement (vrai : jamais dans l'APK Android ; oui sur le site, dans Topo Bureau (0.277.0) et dans Topo Tablette Windows (0.320.14, demande du 25.11 : souris sur la CC180)).
 // 0.159.0 : Réglages n'est plus une application (bouton à part en bas de la page Applications).
 export const APPLIS = [
   {

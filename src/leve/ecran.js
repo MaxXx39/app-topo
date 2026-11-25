@@ -785,9 +785,10 @@ export function creerEcranLeve(conteneur, actions) {
     const pente = penteSegment == null ? ''
       : `<span class="pente-segment" title="Pente du segment en cours">${penteSegment >= 0 ? '↗ +' : '↘ −'}${Math.abs(penteSegment).toFixed(2)} %</span>`;
     let leLong;
-    if (abscisse < 0) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}Avant le début</span><strong>${m(abscisse)}</strong></div>`;
-    else if (abscisse > longueur) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('fin')}Après la fin</span><strong>${m(abscisse - longueur)}</strong></div>`;
-    else leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}Début</span><strong>${m(abscisse)}</strong></div>
+    // 0.321.0 : seulement « − » (avant le début) ou « + » (depuis le début, ou après la fin), sans les mots.
+    if (abscisse < 0) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}</span><strong>− ${m(abscisse)}</strong></div>`;
+    else if (abscisse > longueur) leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('fin')}</span><strong>+ ${m(abscisse - longueur)}</strong></div>`;
+    else leLong = `<div class="ligne-ecart"><span class="libelle-ecart">${iconeDrapeau('debut')}</span><strong>+ ${m(abscisse)}</strong></div>
         <div class="fin-petite">${pente}${iconeDrapeau('fin')}fin ${m(reste)}</div>`;
     const hauteur = g.ecartAltitude == null
       ? '<div class="bloc-hauteur sans-altitude">pas d\'altitude</div>'

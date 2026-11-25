@@ -602,23 +602,39 @@ function textesLeLong(ctx, pts, style, couleur, pxMm, o, pxM) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
-  const largeur = ctx.measureText(texte).width;
+  const largeur = texte.trim() === '⚡' ? taille * 1.5 : ctx.measureText(texte).width;
   for (const r of positionsLeLong(pts, Math.max(tous * pxM, largeur * 1.3))) {
     ctx.save();
     ctx.translate(r.x, r.y);
     ctx.rotate(r.angle > Math.PI / 2 || r.angle < -Math.PI / 2 ? r.angle + Math.PI : r.angle);
     ctx.strokeStyle = 'rgba(255,255,255,0.92)';
     ctx.lineWidth = Math.max(2, taille * 0.28);
-    ctx.strokeText(texte, 0, taille * 0.04);
     ctx.fillStyle = couleur;
-    ctx.fillText(texte, 0, taille * 0.04);
+    if (texte.trim() === '⚡') {
+      // 0.320.10 : « ⚡ » = un éclair dessiné (pas l'émoji jaune), dans la couleur de la ligne
+      const u = (taille * 1.5) / 12;
+      ctx.beginPath();
+      ctx.moveTo(1.5 * u, -6 * u);
+      ctx.lineTo(-3 * u, 1 * u);
+      ctx.lineTo(0.5 * u, 1 * u);
+      ctx.lineTo(-1.5 * u, 7 * u);
+      ctx.lineTo(4.5 * u, -1 * u);
+      ctx.lineTo(1 * u, -1 * u);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+    } else {
+      ctx.strokeText(texte, 0, taille * 0.04);
+      ctx.fillText(texte, 0, taille * 0.04);
+    }
     ctx.restore();
   }
   ctx.restore();
 }
 
 function dessinerLigneBase(ctx, pts, style, couleur, pxMm, o = {}, pxM = null) {
-  const m = style.motif;
+  // 0.320.9 : EAU, EC, EU, GAZ, ELEC, SWISSCOM = trait simple + texte le long de la ligne (même réglage que les autres lignes)
+  const m = style.motif?.type === 'texte' ? null : style.motif;
   const ech = o.echelleMotif ?? 1;
   const epaisseur = Math.max(0.8, (o.epaisseurMm ?? style.epaisseurMm) * pxMm);
   if (m?.largeurM) return dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM ?? pxMm * 5, o);
@@ -1189,6 +1205,8 @@ export function dessinerSymbolePose(d, o) {
   // 0.320.5 : le texte se décale par sa poignée (o.decalEtiq, repère du bloc)
   const [ex, ey] = o.decalEtiq ?? [0, 0];
   if (o.etiquette) texteDansSymbole(ctx, { x: ex, y: ey, h: opts.texteU ?? 0.5, a: 0, t: o.etiquette, ah: 1, av: 2, k: '#0f172a' }, e, rot);
+  // 0.320.6 : texte centré sous le portail (sous le bas de sa boîte, vers le bas)
+  if (o.texteSous && s.boite) texteDansSymbole(ctx, { x: (s.boite[0] + s.boite[2]) / 2, y: s.boite[1] - 0.15, h: opts.texteU ?? 0.5, a: 0, t: o.texteSous, ah: 1, av: 3, k: '#0f172a' }, e, rot);
   ctx.restore();
 }
 

@@ -278,6 +278,27 @@ export function creerVueChantier(conteneur, options) {
           ctx.fill();
           ctx.stroke();
         }
+        // 0.320.7 : pastille de déplacement au centre du bloc (comme la grue) : un rond avec une croix, à prendre pour le bouger.
+        const cc = ecran(o.point);
+        ctx.beginPath();
+        ctx.arc(cc.x, cc.y, 8, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.strokeStyle = ORANGE;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // quatre petites flèches (icône « déplacer »), pas un « + » qui ferait penser à ajouter
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          ctx.moveTo(cc.x + dx * 1.5, cc.y + dy * 1.5);
+          ctx.lineTo(cc.x + dx * 5.5, cc.y + dy * 5.5);
+          ctx.moveTo(cc.x + dx * 5.5 - (dx ? dx * 2 : 2), cc.y + dy * 5.5 - (dy ? dy * 2 : 2));
+          ctx.lineTo(cc.x + dx * 5.5, cc.y + dy * 5.5);
+          ctx.moveTo(cc.x + dx * 5.5 - (dx ? dx * 2 : -2), cc.y + dy * 5.5 - (dy ? dy * 2 : -2));
+          ctx.lineTo(cc.x + dx * 5.5, cc.y + dy * 5.5);
+        }
+        ctx.stroke();
       }
       poigneeEtiquette(ctx, o);
       return;

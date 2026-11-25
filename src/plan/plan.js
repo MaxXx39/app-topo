@@ -999,15 +999,49 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
       const c = { x: centre.x + (dx / l) * decalage, y: centre.y + (dy / l) * decalage };
       texteLeLong({ x: c.x - (dx / l) * 20, y: c.y - (dy / l) * 20 }, { x: c.x + (dx / l) * 20, y: c.y + (dy / l) * 20 }, texte, classe);
     };
+    // 0.321.0 : distance depuis le début (« + 8.111 m », « − 5.428 m » avant le début, « + 0.412 m » après la fin), écrite AU PIED de la
+    // canne (dans son prolongement le long de la ligne), du côté de la ligne opposé à celui de la canne (et de son texte gauche / droite),
+    // avec une flèche qui part du pied vers le début de la ligne (le zéro).
+    const cotePied = (texte, classe) => {
+      const pied = pointALAbscisse(sommets, abscisse);
+      if (!pied || !sommets[pied.segment + 1]) return;
+      const p = ecran(pied);
+      const a = ecran(sommets[pied.segment]);
+      const b = ecran(sommets[pied.segment + 1]);
+      const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const tx = (b.x - a.x) / l;
+      const ty = (b.y - a.y) / l;
+      const nx = -ty;
+      const ny = tx;
+      const cote = (canne.x - p.x) * nx + (canne.y - p.y) * ny >= 0 ? -1 : 1; // opposé à la canne
+      let angle = (Math.atan2(ty, tx) * 180) / Math.PI;
+      let retourne = false;
+      if (angle > 90) { angle -= 180; retourne = true; } else if (angle < -90) { angle += 180; retourne = true; }
+      const versDebut = abscisse > 0 ? -1 : 1; // dans le sens de la ligne (+1) ou contre (−1)
+      const dir = retourne ? -versDebut : versDebut; // même chose dans le repère du texte
+      // Même dessin que l'écart gauche / droite : pointe pleine + texte à côté, ×1,5 (0.321.1).
+      const g = creerElement('g', { transform: `translate(${(p.x + nx * 26 * cote).toFixed(1)} ${(p.y + ny * 26 * cote).toFixed(1)}) rotate(${angle.toFixed(1)})` });
+      const signe = -dir; // le corps de la flèche et le texte sont derrière la pointe
+      const interieur = creerElement('g', { transform: 'translate(0 -6) scale(1.5)' });
+      const pointe = creerElement('polygon', { points: `0,0 ${15 * signe},-8 ${15 * signe},8`, class: 'pointe-ecart' });
+      const couleur = classe === 'cote-debut' ? '#15803d' : '#b45309';
+      pointe.style.fill = couleur;
+      const t = creerElement('text', { x: 19 * signe, y: 4.5, 'text-anchor': signe > 0 ? 'start' : 'end', class: 'cote-ligne texte-fleche-ecart' });
+      t.style.fill = couleur;
+      t.textContent = texte;
+      interieur.append(pointe, t);
+      g.append(interieur);
+      groupe.append(g);
+    };
     if (abscisse < 0) {
       // Avant le début : prolongement du premier segment jusqu'en face de la canne.
       groupe.append(creerElement('path', { d: tracePar(morceau(abscisse, 0), false), class: 'prolongement-ligne' }));
-      coteMorceau(abscisse, 0, `−${m(abscisse)}`, 'cote-prolongement');
+      cotePied(`− ${m(abscisse)}`, 'cote-prolongement');
     } else if (abscisse > longueur) {
       groupe.append(creerElement('path', { d: tracePar(morceau(longueur, abscisse), false), class: 'prolongement-ligne' }));
-      coteMorceau(longueur, abscisse, `${m(abscisse - longueur)} après la fin`, 'cote-prolongement');
+      cotePied(`+ ${m(abscisse - longueur)}`, 'cote-prolongement');
     } else {
-      coteMorceau(0, abscisse, `+${m(abscisse)}`, 'cote-debut', -1);
+      cotePied(`+ ${m(abscisse)}`, 'cote-debut');
       coteMorceau(abscisse, longueur, `fin ${m(longueur - abscisse)}`, 'cote-fin', 1);
     }
     // Repère au pied de la perpendiculaire (petit trait en travers de la ligne).
@@ -1044,7 +1078,7 @@ export function creerPlan(conteneur, { quandToucherSelectionCalques, quandChoisi
         const signe = place.retourne ? -1 : 1; // retourné : la flèche finit le bloc, pointe contre la ligne
         const bloc = creerElement('g', { class: 'fleche-ecart', transform: `translate(${place.x.toFixed(1)} ${place.y.toFixed(1)}) rotate(${place.angle.toFixed(1)})` });
         // Décalé de 12 px vers le haut (sens de lecture) pour ne pas recouvrir le trait pointillé de la perpendiculaire.
-        const interieur = creerElement('g', { transform: 'translate(0 -12)' });
+        const interieur = creerElement('g', { transform: 'translate(0 -18) scale(1.5)' }); // 0.321.0 : texte ×1,5
         const pointe = creerElement('polygon', { points: `0,0 ${15 * signe},-8 ${15 * signe},8`, class: 'pointe-ecart' });
         pointe.style.fill = couleur;
         const texte = creerElement('text', { x: 19 * signe, y: 4.5, 'text-anchor': place.retourne ? 'end' : 'start', class: 'cote-ligne texte-fleche-ecart' });

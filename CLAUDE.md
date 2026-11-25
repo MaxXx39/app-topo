@@ -156,6 +156,34 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Lot c = 0.303.0 (fait, voir plus bas)** — Plateformes : **sur-profondeur** dans une plateforme parente (contour dessiné dedans ; bas = **altitude OU profondeur, au choix** ; bords = **talus H:V**) ; **murs / radiers / dalles** comme limites : **ligne avec épaisseur et/ou contour fermé**, accroche sur DXF ; mur = **altitude du bas + hauteur** ; radier / dalle = **altitude du bas + épaisseur** ; remblai **jusqu'à une hauteur donnée ou jusqu'à un terrain** ; **pas de talus contre le mur**.
 - Réponses du 24.11 (suite) : **une plateforme dans UN seul groupe** ; **sur-hauteur (bosse) : oui, à essayer** en plus de la sur-profondeur ; remblai contre un mur : **on donne une hauteur (altitude) OU une épaisseur** (au choix), ou jusqu'à un terrain. **Maquette du panneau « Étapes »** : https://claude.ai/artifact/926wYQFimZiLnVC6HmGBAL (chaîne TN → étape 1 → 2 → …, chaque étape « posée sur » une précédente avec D / R, plan et coupe où l'étape choisie ressort, « L'étape seule » / « Toutes », somme des étapes + « Terrain → fin d'un coup ») : **à valider avant de coder**.
 
+## 0.320.14 — Topo Tablette (Windows) : les applis de bureau aussi (demande du 25.11 : souris sur la CC180, travail de bureau sur chantier)
+- **Matériel, Comparer des PDF, Plans de chantier, Plateformes** (les tuiles `siteSeulement`) sont maintenant proposées aussi dans **Topo Tablette** (`main.js`, `applis: … && !estDansAppliWindows()`) ; seul l'**APK Android** ne les a pas. Expert comme avant. Essayé en Playwright (faux pont Windows 1280 × 800) : les 4 tuiles apparaissent, Plans de chantier s'ouvre. **Pas essayé sur la vraie CC180** : mise en page paysage 1280 × 800, doigt / souris, performance avec de gros plans. Les pages ont été faites pour 1366 × 768 à la souris.
+
+## 0.320.13 — Implanter › Point sous Windows : la cible ne disparaît plus entre 2 m et 20 cm (photos CC180 du 25.11)
+- **Cause** : sous Windows le fond de `.cible-haut` est blanc (0.268.0) mais le texte restait **blanc** quand on est loin du point (couleur « sombre » de base) : anneaux, axes, « ▲ devant » et distances (`currentColor`) étaient blancs sur blanc, seuls le N, la croix du centre et le rond de la canne se voyaient. Près du point (vert clair) ça marchait. Corrigé : texte foncé sauf vert clair / orange. Essayé en Playwright (APK simulé, classe `appli-windows` posée à la main) : cible 2 m visible avec son anneau et « 2 m ». **Jamais revu sur la vraie CC180.**
+
+## 0.320.12 — Implanter › Ligne : flèche du pied = même dessin que gauche / droite
+- La flèche et le texte « + 8.111 m » (`cotePied`) reprennent le dessin de l'écart gauche / droite : pointe pleine + texte à côté, même taille (×1,5), couleur verte (+) ou brune (−, prolongement).
+
+## 0.320.11 — Implanter › Ligne : « + » / « − », textes du plan ×1,5, texte au pied avec flèche (retour du 25.11, tablette Windows)
+- **Partie gauche** (`ecran.js`) : plus de « Avant le début / Début / Après la fin » : seulement « − 5.428 m » (avant le début), « + 8.111 m » (depuis le début) ou « + 0.412 m » (après la fin) ; la fin reste en petit.
+- **Plan** (`plan/plan.js`, `cotePied`) : mêmes signes ; textes ×1,5 (`.cote-ligne` 16,8 px, texte de l'écart ×1,5) ; la distance est écrite **au pied de la canne**, du côté de la ligne **opposé à la canne** (donc plus sur le texte gauche / droite), avec une **flèche qui part du pied vers le début** (le zéro). Essayé en Playwright (APK simulé, ligne A–B importée) : 8,111 m, 3 cm, avant le début, après la fin. **Pas fait** : la cible qui disparaît en Implanter › Point sous Windows (à reproduire : question posée à l'utilisateur).
+
+## 0.320.10 — Plans de chantier : ligne Électricité = éclairs seuls
+- Le texte de départ de la ligne Électricité est « ⚡ » : un **éclair dessiné** (couleur de la ligne, halo blanc) répété le long de la ligne ; on peut taper un autre texte dans « Texte le long de la ligne ».
+
+## 0.320.9 — Plans de chantier : lignes EAU / EC / EU / GAZ / ELEC / SWISSCOM
+- Ces lignes sont un trait simple + le **texte le long de la ligne** (comme les autres lignes) : champ « Texte le long de la ligne » pré-rempli (`texteDefaut`, tous les 8 m, modifiable ou vide). Plus de trou dans la ligne ni d'éclair. Le DXF garde son ancien motif (texte du genre, pas le texte modifié).
+
+## 0.320.8 — Plans de chantier : champ du texte sous le portail, icône du centre
+- Le champ « Texte sous le portail » n'apparaissait pas (le portail a sa propre branche dans le panneau) : corrigé. Pastille du centre d'un bloc = 4 petites flèches (plus de « + »).
+
+## 0.320.7 — Plans de chantier : pastille de déplacement au centre de chaque bloc
+- Tout bloc posé (symboles, portails, grues) a une pastille au centre (rond + croix) : la prendre déplace le bloc (`topo/prise-bloc.js`, dernier point de `pointsDePrise`). Tests `portail-dynamique.test.js` adapté.
+
+## 0.320.6 — Plans de chantier : texte sous le portail
+- **Portail** (Expert) : champ « Texte sous le portail » (`o.texteSous`) ; texte centré sous le bas de la boîte du portail (`dessinerSymbolePose`). Pas dans le DXF. Tests `portail-texte.test.js`. Essai visuel pas refait.
+
 ## 0.320.5 — Plans de chantier : texte déplaçable
 - **Texte d'une zone** (surface, tas, texte libre) et **texte d'un bloc** : losange blanc au point du texte (quand l'objet est choisi) ; le prendre = le déplacer (`o.decalEtiq`, repère du bloc, `topo/plan-chantier.js` : `ancreEtiquette`, `decalEtiquette`). Le DXF ne garde pas ce décalage.
 - Tests `etiquette-deplacable.test.js`. Essai visuel pas refait.
