@@ -15097,3 +15097,7 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .oeil-plan .nom-plan-coupe { display: flex; min-width: 0; flex: 1 1 auto; overflow: hidden; }
 .oeil-plan .nom-plan-coupe .debut { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .oeil-plan .nom-plan-coupe .fin { flex: none; white-space: nowrap; overflow: visible; }
+
+/* 0.320.13 (photo du 25.11, CC180) : sous Windows le fond de la cible est blanc, mais le texte restait blanc (loin du point) :
+   anneaux, axes et distances invisibles entre 2 m et 20 cm. Texte foncé sauf pour les couleurs de distance (vert clair / orange). */
+body.appli-windows.vue-implantation .cible-haut:not(.vert-clair):not(.jaune-orange) { color: #1f2937; }
