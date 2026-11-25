@@ -1629,7 +1629,7 @@ export function ouvrirPlansChantier({
         ${champCase('Crochet', 'prop-case', 'afficherCrochet', g.afficherCrochet)}
         ${g.afficherCrochet ? champNombre('Rayon crochet', 'prop', 'rayonCrochet', g.r, RAYON_MIN_GRUE, porteeGrue(g.fleche), 0.1, 'm') : ''}
         ${g.fleche.charges2 ? `<label class="champ-calage"><span>Charges</span><select data-prop="mode">${opt('lm1', 'Tableau 1', g.mode === 'lm1')}${opt('lm2', 'Tableau 2', g.mode === 'lm2')}</select></label>` : ''}
-        ${champCase('Cercles de charge (ceux de la fiche)', 'prop-case', 'cerclesCharge', g.cerclesCharge)}
+        ${champCase('Cercles de charge', 'prop-case', 'cerclesCharge', g.cerclesCharge).replace('<label class="case-chantier"', '<label class="case-chantier" title="Ceux de la fiche technique (jamais inventés)"')}
         ${champNombre('Rotation flèche', 'prop', 'rotationFleche', o.rotationFleche ?? 0, -360, 360, 1, '°')}`)
         + bloc('Tour et châssis', `<label class="champ-calage"><span>Tour / pied</span><select data-prop="tour">${familles.map((fa) => `<optgroup label="${echapper(fa)}">${g.modele.tours.filter((t) => t.famille === fa).map((t) => opt(t.id, t.nom, t.id === g.tour.id)).join('')}</optgroup>`).join('')}</select></label>
         <label class="champ-calage"><span>HSC (m)</span><select data-prop="hauteur">${hauteursGrue(g.tour).map((h) => opt(h.h, `${h.h.toFixed(1)} m${h.etoile ? ' *' : ''} (${h.etiquette})`, h.h === g.hauteur.h)).join('')}</select></label>
