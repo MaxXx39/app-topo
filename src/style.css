@@ -15068,3 +15068,10 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .page-chantier .ruban-element.bandeau-grue .groupe-grue:nth-child(3) { flex: 1 1 580px; }
 .page-chantier .ruban-element.bandeau-grue .groupe-grue:nth-child(4) { flex: 1 1 480px; }
 .page-chantier .ruban-element.bandeau-grue .groupe-grue:nth-child(1) .champ-calage > span { display: none; }
+
+/* 0.319.1 : cadenas seul (liste des éléments et bandeau) */
+.elements-chantier .ligne-element { display: flex; align-items: center; gap: 2px; }
+.elements-chantier .ligne-element > button:first-child { flex: 1; min-width: 0; }
+.elements-chantier button.cadenas-liste { width: 26px; flex: none; justify-content: center; padding: 4px; opacity: 0.45; }
+.elements-chantier button.cadenas-liste.actif { opacity: 1; color: #b45309; }
+.bandeau-element [data-action="verrou"] svg, .ruban-element [data-action="verrou"] svg { display: block; }

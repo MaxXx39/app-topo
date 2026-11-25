@@ -42,7 +42,9 @@ const preparations = new WeakMap();
 function preparer(plan) {
   // revision (0.147.0) : un plan DAO change de contenu ; elle force une nouvelle préparation.
   const cle = `${plan.couleur || ''}|${plan.revision ?? 0}|${plan.calques.map((c) => `${c.visible ? 1 : 0}${c.couleur ?? ''}`).join('')}`;
-  const enCache = preparations.get(plan);
+  // 0.319.1 : une copie réglée (opacité de la feuille) garde la préparation du plan d'origine (pas de recalcul)
+  const racine = plan.sourcePlan ?? plan;
+  const enCache = preparations.get(racine);
   if (enCache?.cle === cle) return enCache;
   const visible = (objet) => plan.calques[objet.c]?.visible !== false;
   // Couleur unique du plan (choisie dans la liste des plans), sinon celle d'AutoCAD.
@@ -61,7 +63,7 @@ function preparer(plan) {
     if (visible(cercle)) ranger(preparation.cercles, cercle, { xMin: cercle.x - cercle.r, yMin: cercle.y - cercle.r, xMax: cercle.x + cercle.r, yMax: cercle.y + cercle.r });
   }
   for (const texte of textes) if (visible(texte)) preparation.textes.push({ ...texte, teinte: couleur(texte) });
-  preparations.set(plan, preparation);
+  preparations.set(racine, preparation);
   return preparation;
 }
 
@@ -242,4 +244,5 @@ export function dessinerPlansDxf(canvas, plans, vue, densite = 1) {
     }
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
 }
