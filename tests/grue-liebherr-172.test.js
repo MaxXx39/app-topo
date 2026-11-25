@@ -198,17 +198,34 @@ describe('dessin à l\'échelle', () => {
     expect(cadre(b)[3]).toBeGreaterThan(cadre(a)[3] + 30);
     expect(cadre(b)[2]).toBeLessThan(cadre(a)[2] - 20);
   });
-  it('cercles : principal à la portée du crochet, cercles du tableau avec leur charge', () => {
-    const s = grueFiche({ fleche: 50, cercles: 'principaux' });
-    expect(s.rayon.filter((p) => p.g === 'c').map((p) => p.r)).toEqual([50, 20, 30, 40]);
+  it('cercles : le principal, puis (case cochée) seulement ceux de la fiche, avec leur charge', () => {
+    const s = grueFiche({ fleche: 50 });
+    const rayons = s.rayon.filter((p) => p.g === 'c').map((p) => p.r);
+    expect(rayons[0]).toBe(50);
+    expect(rayons.slice(1)).toEqual([22, 30, 35, 40, 45]); // portées du tableau de la fiche (dès 20 m, 5 m d'écart au moins)
     expect(s.rayon.find((p) => p.g === 't' && p.t.startsWith('40 m')).t).toBe('40 m · 3.99 t');
-    // Condecta : portées non rondes dans la fiche, mais un cercle tous les 10 m avec la charge de la portée suivante
+    // Condecta : portées non rondes de la fiche, gardées telles quelles (aucune portée inventée tous les 10 m)
     const co = grueFiche({ modeleGrue: C.id, fleche: 45, tour: 'euro4513', hauteur: 24 });
-    expect(co.rayon.filter((p) => p.g === 'c').map((p) => p.r)).toEqual([45, 20, 30, 40]);
-    expect(co.rayon.find((p) => p.g === 't' && p.t.startsWith('20 m')).t).toBe('20 m · 3.20 t'); // portée suivante : 20,72 m
-    expect(co.rayon.find((p) => p.g === 't' && p.t.startsWith('30 m')).t).toBe('30 m · 2.00 t'); // portée suivante : 30,68 m
+    const portees = new Set(C.fleches.find((f) => f.nom === 45).charges.map(([r]) => r));
+    for (const r of co.rayon.filter((p) => p.g === 'c').map((p) => p.r)) expect(portees.has(r)).toBe(true);
+    // case décochée : seulement le cercle principal ; ancien réglage « aucun » = décoché
+    expect(grueFiche({ fleche: 50, cerclesCharge: false }).rayon.filter((p) => p.g === 'c')).toHaveLength(1);
     expect(grueFiche({ fleche: 50, cercles: 'aucun' }).rayon.filter((p) => p.g === 'c')).toHaveLength(1);
-    expect(grueFiche({ fleche: 50, cercles: 'tous' }).rayon.filter((p) => p.g === 'c').length).toBeGreaterThan(4);
+    // Charge décochée : les cercles restent mais sans texte
+    const sans = grueFiche({ fleche: 50, afficherCharge: false });
+    expect(sans.rayon.filter((p) => p.g === 't')).toHaveLength(0);
+    expect(sans.rayon.filter((p) => p.g === 'c').length).toBeGreaterThan(1);
+  });
+  it('crochet à cocher ; étiquette de la flèche toujours là, avec texte libre et HSC facultatif', () => {
+    const textes = (s) => s.primitives.filter((p) => p.g === 't').map((p) => p.t);
+    const a = grueFiche({ fleche: 40, tour: 'hc175-uc460m', hauteur: 30 });
+    expect(textes(a).some((t) => /^Flèche 40\.0 m · HSC /.test(t))).toBe(true);
+    const b = grueFiche({ fleche: 40, tour: 'hc175-uc460m', hauteur: 30, afficherHsc: false, texteFleche: 'Grue G1' });
+    expect(textes(b)).toContain('Grue G1 · Flèche 40.0 m');
+    const c = grueFiche({ fleche: 40, tour: 'hc175-uc460m', hauteur: 30, afficherCrochet: false });
+    expect(textes(c).some((t) => /^r \d/.test(t))).toBe(false);
+    expect(textes(a).some((t) => /^r \d/.test(t))).toBe(true);
+    expect(c.primitives.length).toBeLessThan(a.primitives.length);
   });
   it('pied toujours coté ; 4 massifs carrés (2 m au départ) sous les appuis, cotés', () => {
     const s = grueFiche({ fleche: 40, tour: 'hc175-uc460m' });

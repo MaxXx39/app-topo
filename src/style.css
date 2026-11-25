@@ -15045,3 +15045,26 @@ body.theme-sombre .bandeau-plateforme { background: #241b3a; }
 .page-comparateur .ruban-calage select { max-width: 130px; }
 .legende-comparateur label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .legende-comparateur input[type='color'] { width: 20px; height: 20px; padding: 0; border: 1px solid var(--bordure); border-radius: 4px; background: none; }
+.groupe-ruban[hidden] { display: none; }
+
+/* 0.318.0 : bandeau d'une grue d'après fiche : plus haut, tous les réglages visibles sans défiler. */
+.page-chantier .ruban-element.bandeau-grue { height: auto; overflow: visible; }
+.page-chantier .ruban-element.bandeau-grue .propre-element { height: auto; max-height: none; overflow: visible; flex: 1 1 100%; flex-basis: 100%; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue { align-items: center; }
+
+/* 0.318.1 : bandeau de la grue compact : libellé au-dessus du champ, les groupes se rangent côte à côte (peu de place perdue). */
+.page-chantier .ruban-element.bandeau-grue .propre-element { gap: 4px 6px; align-items: stretch; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue { flex: 0 1 auto; flex-wrap: nowrap; align-items: flex-end; gap: 2px 8px; margin: 0; padding: 2px 6px 3px; position: relative; padding-top: 13px; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue > b { position: absolute; top: 1px; left: 6px; flex: none; font-size: 9px; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue .champ-calage { flex-direction: column; align-items: flex-start; gap: 1px; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue .champ-calage > span { font-size: 10.5px; line-height: 1.1; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue input[type='number'] { width: 66px; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue input[type='text'] { width: 130px; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue select { max-width: 190px; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue .case-chantier { align-self: flex-end; padding-bottom: 3px; white-space: nowrap; }
+/* Les 4 groupes se partagent la largeur : 2 rangées pleines à 1366 px (Modèle + Flèche / Tour + Affichage), 1 seule rangée sur grand écran. */
+.page-chantier .ruban-element.bandeau-grue .groupe-grue:nth-child(1) { flex: 1 1 200px; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue:nth-child(2) { flex: 1 1 580px; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue:nth-child(3) { flex: 1 1 580px; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue:nth-child(4) { flex: 1 1 480px; }
+.page-chantier .ruban-element.bandeau-grue .groupe-grue:nth-child(1) .champ-calage > span { display: none; }
