@@ -287,11 +287,17 @@ export function creerVueChantier(conteneur, options) {
         ctx.strokeStyle = ORANGE;
         ctx.lineWidth = 2;
         ctx.stroke();
+        // quatre petites flèches (icône « déplacer »), pas un « + » qui ferait penser à ajouter
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(cc.x - 5, cc.y);
-        ctx.lineTo(cc.x + 5, cc.y);
-        ctx.moveTo(cc.x, cc.y - 5);
-        ctx.lineTo(cc.x, cc.y + 5);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          ctx.moveTo(cc.x + dx * 1.5, cc.y + dy * 1.5);
+          ctx.lineTo(cc.x + dx * 5.5, cc.y + dy * 5.5);
+          ctx.moveTo(cc.x + dx * 5.5 - (dx ? dx * 2 : 2), cc.y + dy * 5.5 - (dy ? dy * 2 : 2));
+          ctx.lineTo(cc.x + dx * 5.5, cc.y + dy * 5.5);
+          ctx.moveTo(cc.x + dx * 5.5 - (dx ? dx * 2 : -2), cc.y + dy * 5.5 - (dy ? dy * 2 : -2));
+          ctx.lineTo(cc.x + dx * 5.5, cc.y + dy * 5.5);
+        }
         ctx.stroke();
       }
       poigneeEtiquette(ctx, o);

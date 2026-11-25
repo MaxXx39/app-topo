@@ -1761,7 +1761,8 @@ export function ouvrirPlansChantier({
       const lim = PASSAGE_PORTAIL[r.genre];
       return `<label class="champ-calage"><span>Genre</span><select data-prop="genre">${GENRES_PORTAIL.map(([v, t]) => `<option value="${v}" ${r.genre === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         ${champNombre('Largeur de passage (entre les poteaux)', 'prop', 'passage', r.passage, lim.min, lim.max, 0.05, 'm')}
-        ${r.genre === 'portillon' ? `<label class="champ-calage"><span>Charnière</span><select data-prop="charniere"><option value="gauche" ${r.charniere === 'gauche' ? 'selected' : ''}>À gauche</option><option value="droite" ${r.charniere === 'droite' ? 'selected' : ''}>À droite</option></select></label>` : ''}`;
+        ${r.genre === 'portillon' ? `<label class="champ-calage"><span>Charnière</span><select data-prop="charniere"><option value="gauche" ${r.charniere === 'gauche' ? 'selected' : ''}>À gauche</option><option value="droite" ${r.charniere === 'droite' ? 'selected' : ''}>À droite</option></select></label>` : ''}
+        <label class="champ-calage"><span>Texte sous le portail</span><input type="text" maxlength="40" value="${echapper(o.texteSous ?? '')}" placeholder="ex. Accès chantier" data-prop="texteSous"></label>`;
     }
     if (o.cle === CLE_DEVIATION) {
       return `<label class="champ-calage"><span>Texte du panneau</span><input type="text" maxlength="30" value="${echapper(o.texte ?? 'Lugano')}" data-prop="texte"></label>
@@ -1769,7 +1770,7 @@ export function ouvrirPlansChantier({
     }
     const tourelle = sy?.pivote ? champNombre(sy.pivote.libelle ?? 'Rotation de la tourelle (par rapport au châssis)', 'prop', 'tourelle', o.tourelle ?? 0, -360, 360, 1, '°') : '';
     const etiq = `<label class="champ-calage"><span>Texte sur le bloc</span><input type="text" maxlength="40" value="${echapper(o.etiquette ?? '')}" placeholder="ex. Bureaux" data-prop="etiquette"></label>`;
-    return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${tourelle}${etiq}${o.cle === CLE_PORTAIL ? `<label class="champ-calage"><span>Texte sous le portail</span><input type="text" maxlength="40" value="${echapper(o.texteSous ?? '')}" placeholder="ex. Accès chantier" data-prop="texteSous"></label>` : ''}${rotation}${orienter}`;
+    return `<p class="resume-chantier">${echapper(sy?.nom ?? 'Symbole introuvable')}</p>${dims}${tourelle}${etiq}${rotation}${orienter}`;
   }
 
   /** Vignette d'une pose de la base-vie à étage. */

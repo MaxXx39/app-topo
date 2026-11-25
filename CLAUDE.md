@@ -156,6 +156,9 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Lot c = 0.303.0 (fait, voir plus bas)** — Plateformes : **sur-profondeur** dans une plateforme parente (contour dessiné dedans ; bas = **altitude OU profondeur, au choix** ; bords = **talus H:V**) ; **murs / radiers / dalles** comme limites : **ligne avec épaisseur et/ou contour fermé**, accroche sur DXF ; mur = **altitude du bas + hauteur** ; radier / dalle = **altitude du bas + épaisseur** ; remblai **jusqu'à une hauteur donnée ou jusqu'à un terrain** ; **pas de talus contre le mur**.
 - Réponses du 24.11 (suite) : **une plateforme dans UN seul groupe** ; **sur-hauteur (bosse) : oui, à essayer** en plus de la sur-profondeur ; remblai contre un mur : **on donne une hauteur (altitude) OU une épaisseur** (au choix), ou jusqu'à un terrain. **Maquette du panneau « Étapes »** : https://claude.ai/artifact/926wYQFimZiLnVC6HmGBAL (chaîne TN → étape 1 → 2 → …, chaque étape « posée sur » une précédente avec D / R, plan et coupe où l'étape choisie ressort, « L'étape seule » / « Toutes », somme des étapes + « Terrain → fin d'un coup ») : **à valider avant de coder**.
 
+## 0.320.8 — Plans de chantier : champ du texte sous le portail, icône du centre
+- Le champ « Texte sous le portail » n'apparaissait pas (le portail a sa propre branche dans le panneau) : corrigé. Pastille du centre d'un bloc = 4 petites flèches (plus de « + »).
+
 ## 0.320.7 — Plans de chantier : pastille de déplacement au centre de chaque bloc
 - Tout bloc posé (symboles, portails, grues) a une pastille au centre (rond + croix) : la prendre déplace le bloc (`topo/prise-bloc.js`, dernier point de `pointsDePrise`). Tests `portail-dynamique.test.js` adapté.
 
