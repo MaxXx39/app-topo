@@ -184,7 +184,7 @@ export function plansDeLaFeuille(tous, deLEcran, reglages) {
     if (transparence === (p.transparence ?? 0)) return p;
     let m = copiesOpacite.get(p);
     if (!m) copiesOpacite.set(p, (m = new Map()));
-    if (!m.has(transparence)) m.set(transparence, { ...p, transparence });
+    if (!m.has(transparence)) m.set(transparence, { ...p, transparence, sourcePlan: p.sourcePlan ?? p });
     return m.get(transparence);
   });
 }

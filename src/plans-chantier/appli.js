@@ -69,6 +69,7 @@ const TRAITS_CONSTRUCTION = [['tirets', 'Tirets'], ['continu', 'Continu'], ['poi
 const ACCROCHES = [['point', 'Point'], ['sommet', 'Sommet'], ['milieu', 'Milieu'], ['ligne', 'Sur ligne'], ['croisement', 'Croisement'], ['perpendiculaire', 'Perpendiculaire']];
 const ICONE_CHOISIR = '<path d="M6 3L18 13L12 14L15 21L12.5 22L9.5 15L6 19Z"/>';
 const MAX_ANNULER = 50;
+const icoCadenas = (v) => '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="' + (v ? 'M8 11V8a4 4 0 0 1 8 0v3' : 'M8 11V8a4 4 0 0 1 7.5-1.8') + '"/></svg>';
 const ico = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 const n1 = (x) => (Math.abs(x) < 0.05 ? 0 : x).toFixed(1);
 const dateCourte = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-CH') : '');
@@ -1532,6 +1533,7 @@ export function ouvrirPlansChantier({
     zone.innerHTML = `
       <h3>Plan</h3>
       <label class="champ-calage"><span>Échelle d'impression 1 :</span><input type="number" min="1" max="10000" step="50" value="${p.echelle ?? ECHELLE_PAPIER}" data-champ="echelle"></label>
+      <label class="case-chantier" title="Décoché : symboles aux couleurs unies, sans dégradé ni ombre (écran et feuille)"><input type="checkbox" data-champ="rendu3d" ${p.rendu3d === false ? '' : 'checked'}> Effet 3D des symboles</label>
       <label class="champ-calage"><span>Texte des symboles (mm sur le papier)</span><input type="number" min="0.5" max="12" step="0.5" value="${p.tailleTexteMm ?? TAILLE_TEXTE_MM}" data-champ="tailleTexteMm"></label>
       <h3>Phases</h3>
       <ul class="phases-chantier">${p.phases.map((ph) => `<li class="${ph.id === p.phaseActive ? 'active' : ''}">
@@ -1549,8 +1551,8 @@ export function ouvrirPlansChantier({
       ${ficheGrueHtml(o)}
       <button type="button" class="bouton-secondaire" data-action="modeles-grues">Modèles de grues…</button>
       <h3>Éléments (${p.objets.length})</h3>
-      <ul class="elements-chantier">${[...p.objets].reverse().map((x) => `<li><button type="button" data-choisir="${x.id}" class="${x.id === etat.choisi ? 'actif' : ''}">
-        <i style="background:${couleurObjet(p, x)}"></i>${echapper(resumeObjet(x))}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul>`;
+      <ul class="elements-chantier">${[...p.objets].reverse().map((x) => `<li class="ligne-element"><button type="button" data-choisir="${x.id}" class="${x.id === etat.choisi ? 'actif' : ''}">
+        <i style="background:${couleurObjet(p, x)}"></i>${echapper(resumeObjet(x))}</button><button type="button" class="cadenas-liste ${x.verrou ? 'actif' : ''}" data-verrou-id="${x.id}" title="${x.verrou ? 'Verrouillé : toucher pour déverrouiller' : 'Toucher pour verrouiller'}" aria-label="Verrou">${icoCadenas(x.verrou)}</button></li>`).join('') || '<li class="aide-calage">Rien de dessiné.</li>'}</ul>`;
     page.querySelector('.ruban-chantier [data-action="effacer"]')?.toggleAttribute('disabled', !etat.choisi);
     zone.querySelectorAll('canvas[data-vignette-pose]').forEach((c) => dessinerPose(c, Number(c.dataset.vignettePose)));
     majBandeau(o, p, propreHtml, reglages);
@@ -1593,7 +1595,7 @@ export function ouvrirPlansChantier({
     zone.innerHTML = `<span class="puce-element">${echapper(resumeObjet(o))}</span>
       ${poseHtml}${phases}${couleur}
       <span class="groupe-ordre" role="group" aria-label="Ordre de dessin">${bouton('data-ordre="devant"', '⤒', 'Premier plan')}${bouton('data-ordre="monter"', '▲', 'Un cran au-dessus')}${bouton('data-ordre="descendre"', '▼', 'Un cran en dessous')}${bouton('data-ordre="arriere"', '⤓', 'Arrière-plan')}</span>
-      ${bouton(`data-action="verrou" class="${o.verrou ? 'actif' : ''}"`, o.verrou ? 'Déverrouiller' : 'Verrouiller', o.verrou ? 'Déverrouiller : on pourra de nouveau le déplacer' : 'Verrouiller : l\'élément ne peut plus être déplacé (ni ses points, ni tourné)')}
+      ${bouton(`data-action="verrou" class="${o.verrou ? 'actif' : ''}"`, icoCadenas(o.verrou), o.verrou ? 'Déverrouiller' : 'Verrouiller', o.verrou ? 'Déverrouiller : on pourra de nouveau le déplacer' : 'Verrouiller : l\'élément ne peut plus être déplacé (ni ses points, ni tourné)')}
       ${decaler}${bouton('data-action="effacer"', '✕ Effacer', 'Effacer cet élément')}
       ${propre ? `<div class="propre-element">${propre}</div>` : ''}`;
     // 0.317.0 : élément verrouillé = rien de ce qui le déplace (rotation, échelle, orientation) ; effacer, genre, couleur restent possibles.
@@ -1629,7 +1631,7 @@ export function ouvrirPlansChantier({
         ${champCase('Crochet', 'prop-case', 'afficherCrochet', g.afficherCrochet)}
         ${g.afficherCrochet ? champNombre('Rayon crochet', 'prop', 'rayonCrochet', g.r, RAYON_MIN_GRUE, porteeGrue(g.fleche), 0.1, 'm') : ''}
         ${g.fleche.charges2 ? `<label class="champ-calage"><span>Charges</span><select data-prop="mode">${opt('lm1', 'Tableau 1', g.mode === 'lm1')}${opt('lm2', 'Tableau 2', g.mode === 'lm2')}</select></label>` : ''}
-        ${champCase('Cercles de charge', 'prop-case', 'cerclesCharge', g.cerclesCharge).replace('<label class="case-chantier"', '<label class="case-chantier" title="Ceux de la fiche technique (jamais inventés)"')}
+        <label class="champ-calage"><span>Cercles de charge</span><select data-prop="cerclesMode" title="Fiche : portées du tableau avec leur charge ; 5 m : un cercle tous les 5 m dès 20 m (sans charge)">${opt('fiche', 'Ceux de la fiche (charges)', g.cerclesMode === 'fiche')}${opt('cinq', 'Tous les 5 m dès 20 m', g.cerclesMode === 'cinq')}${opt('aucun', 'Aucun', g.cerclesMode === 'aucun')}</select></label>
         ${champNombre('Rotation flèche', 'prop', 'rotationFleche', o.rotationFleche ?? 0, -360, 360, 1, '°')}`)
         + bloc('Tour et châssis', `<label class="champ-calage"><span>Tour / pied</span><select data-prop="tour">${familles.map((fa) => `<optgroup label="${echapper(fa)}">${g.modele.tours.filter((t) => t.famille === fa).map((t) => opt(t.id, t.nom, t.id === g.tour.id)).join('')}</optgroup>`).join('')}</select></label>
         <label class="champ-calage"><span>HSC (m)</span><select data-prop="hauteur">${hauteursGrue(g.tour).map((h) => opt(h.h, `${h.h.toFixed(1)} m${h.etoile ? ' *' : ''} (${h.etiquette})`, h.h === g.hauteur.h)).join('')}</select></label>
@@ -1969,8 +1971,9 @@ export function ouvrirPlansChantier({
       return;
     }
     if (b.dataset.action === 'saisie-ok') return placerParSaisie();
-    if (b.dataset.action === 'verrou') {
-      const o = etat.choisi ? plan().objets.find((x) => x.id === etat.choisi) : null;
+    if (b.dataset.action === 'verrou' || b.dataset.verrouId) {
+      const id = b.dataset.verrouId ?? etat.choisi;
+      const o = id ? plan().objets.find((x) => x.id === id) : null;
       if (!o || !avantChangement()) return;
       if (o.verrou) delete o.verrou;
       else o.verrou = true;
@@ -2204,6 +2207,13 @@ export function ouvrirPlansChantier({
       enregistrer();
       return vue?.redessinerDessus();
     }
+    if (c.dataset.champ === 'rendu3d') {
+      if (!avantChangement()) return majPanneau();
+      if (c.checked) delete p.rendu3d;
+      else p.rendu3d = false;
+      enregistrer();
+      return vue?.redessinerDessus();
+    }
     if (c.dataset.champ === 'tailleTexteMm') {
       const v = nombreDe(c);
       if (v === null || !avantChangement()) return majPanneau();
@@ -2283,7 +2293,7 @@ export function ouvrirPlansChantier({
         majPanneau();
         return vue?.redessinerDessus();
       }
-      if (cle === 'stabilisateurs' || cle === 'repliee' || cle === 'deploye' || cle === 'afficherCharge' || cle === 'afficherHsc' || cle === 'afficherCrochet' || cle === 'cerclesCharge') {
+      if (cle === 'stabilisateurs' || cle === 'repliee' || cle === 'deploye' || cle === 'afficherCharge' || cle === 'afficherHsc' || cle === 'afficherCrochet') {
         if (!avantChangement()) return;
         o[cle] = c.checked;
         enregistrer();

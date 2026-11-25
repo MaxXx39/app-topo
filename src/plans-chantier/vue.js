@@ -8,6 +8,7 @@ import { cadrerSurPoints, versEcran, versTerrain, deplacer, zoomer } from '../pl
 import { objetsVisibles, couleurObjet, bornesObjets, metresParMm, pointsDe, estPose, bordsDesTriangles, milieuxDesCotes, poigneesDe, poigneesArcs, pointsDansArcs } from '../topo/plan-chantier.js';
 import { dessinerObjet, dessinerObjets, symboleDeLObjet } from './dessin.js';
 import { coinsSymbole, poigneeRotation } from '../topo/symboles.js';
+import { lignesChassisGrue } from '../topo/grue-accroches.js';
 import { dessinerFondSwisstopo } from './tuiles.js';
 
 const SEUIL_GLISSER_PX = 5;
@@ -156,6 +157,23 @@ export function creerVueChantier(conteneur, options) {
       dessinerObjets(d, visibles);
       const sel = visibles.find((o) => o.id === choisi()); // phase cachée : plus de cadre de choix
       if (sel) dessinerChoix(ctx, sel);
+      // 0.319.2 : points d'accroche du châssis des grues (4 coins + axe de la tour), petits carrés bleus toujours visibles
+      for (const o of visibles) {
+        if (o.type !== 'grue') continue;
+        const l = lignesChassisGrue(o);
+        if (!l.length) continue;
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#0369a1';
+        ctx.fillStyle = '#ffffff';
+        for (const q of [...l[0].points, l[3].points[0]]) {
+          const e = ecran([q.est, q.nord]);
+          ctx.fillRect(e.x - 3.5, e.y - 3.5, 7, 7);
+          ctx.strokeRect(e.x - 3.5, e.y - 3.5, 7, 7);
+        }
+        ctx.restore();
+      }
       // Symbole à poser (0.289.0) : aperçu transparent sous la souris.
       const fantome = curseur ? apercu() : null;
       if (fantome) {

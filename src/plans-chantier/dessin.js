@@ -804,7 +804,7 @@ function styleRemplissage(ctx, p) {
 export function dessinerPrimitives(ctx, prims, e, mm, options = {}) {
   const trait = Math.max(0.35, 0.09 * mm) / e; // traits fins (0,09 mm de papier)
   // Ombre douce de toute la pièce, en bas à droite (aplat flou de la silhouette).
-  if (options.ombre !== false) {
+  if (options.ombre !== false && !options.plat) {
     const flou = Math.max(1, (options.ombreForte ? 0.45 : 0.25) * e);
     const decal = (options.ombreForte ? 0.45 : 0.22);
     ctx.save();
@@ -826,14 +826,14 @@ export function dessinerPrimitives(ctx, prims, e, mm, options = {}) {
     if (p.g === 'h') {
       cheminContours(ctx, p.p);
       // Ombre entre pièces : la pièce posée sur une autre lui fait une petite ombre (ombrePart).
-      if (!premier && !p.m && options.ombre !== false && !['phare', 'feu'].includes(p.mat)) {
+      if (!premier && !p.m && options.ombre !== false && !options.plat && !['phare', 'feu'].includes(p.mat)) {
         ctx.save();
         ctx.translate(0.05, -0.05);
         ctx.fillStyle = 'rgba(15,23,42,0.16)';
         ctx.fill('evenodd');
         ctx.restore();
       }
-      ctx.fillStyle = options.couleurUnique ?? styleRemplissage(ctx, p);
+      ctx.fillStyle = options.couleurUnique ?? (options.plat ? p.k : styleRemplissage(ctx, p)); // « plat » : couleur unie, ni dégradé ni ombre
       ctx.globalAlpha = p.m ? 0.4 : 1;
       ctx.fill('evenodd');
       ctx.globalAlpha = 1;
@@ -944,7 +944,7 @@ export function dessinerSymbolePose(d, o) {
   };
   const unique = o.rendu?.mode === 'couleur' ? o.rendu.couleur : d.pc?.couleurs === 'phases' ? d.pc.phases.find((p) => p.id === o.phase)?.couleur : null;
   // 0.292.0 : texte de la même taille partout (mm sur le papier × échelle du plan), indépendante de l'échelle du bloc.
-  const opts = { angle: rot, couleurUnique: unique ?? undefined, texteU: d.pc ? texteSymbolesM(d.pc) / k : undefined };
+  const opts = { angle: rot, plat: d.pc?.rendu3d === false, couleurUnique: unique ?? undefined, texteU: d.pc ? texteSymbolesM(d.pc) / k : undefined };
   if (o.type === 'grue') {
     const g = grueDeLObjet(bib, o);
     if (!g) return manquant(d, o, q);
