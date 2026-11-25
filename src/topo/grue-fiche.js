@@ -273,15 +273,8 @@ function partieHaute(g) {
   const w = D.contreFlecheLargeur;
   res.push(...piece(JAUNE, 'peinture', rectArrondi(-arr, -w / 2, -0.4, w / 2, 0.06, 1)));
   res.push(...treillis(-arr, -0.4, w, Math.max(0.9, w * 0.57)), trait([[-arr, 0], [-0.4, 0]], false, '#8a9198'));
-  // Contrepoids (si la fiche donne les blocs) : un bloc par place, de l'arrière vers la tour
-  const cp = contrepoidsDe(f, g.hauteur);
-  if (cp?.blocs && M.blocs) {
-    cp.blocs.forEach((b, i) => {
-      const bl = M.blocs[b];
-      const xa = -D.arriereTotal + i * (bl.ep + 0.03);
-      res.push(...piece(bl.couleur, 'peinture', rectArrondi(xa, -bl.long / 2, xa + bl.ep, bl.long / 2, 0.02, 1)));
-    });
-  }
+  // 0.320.4 : les blocs de contrepoids colorés à l'arrière ne sont plus dessinés (demande du 25.11) ;
+  // le poids reste écrit dans la fiche de la grue (contrepoidsDe).
   if (D.treuil) res.push(...piece(METAL, 'metal', rectArrondi(D.treuil.x0, -0.9, D.treuil.x1, 0.9, 0.06, 2)), ...piece(METAL_FONCE, 'metal', rectArrondi(D.treuil.x0 + 0.4, -0.6, D.treuil.x1 - 1, 0.6, 0.05, 2)));
   if (M.court && arr >= 8) res.push(texte(M.court, -5.6, 0, 0.7, { k: '#1e293b' }));
   // Plate-forme tournante, couronne d'orientation, pointe de mât
@@ -306,7 +299,8 @@ function partieHaute(g) {
   if (g.afficherCrochet) res.push(...piece('#3a3f45', 'metal', rectArrondi(xc - 0.5, -fl * 0.65, xc + 0.5, fl * 0.65, 0.08, 2)), ...piece(NOIR, 'metal', cercle(r, 0, 0.28, 14)));
   if (g.afficherCharge && g.afficherCrochet) {
     const ch = chargeAuRayon(f, r, mode);
-    res.push(texte(`r ${fixe1(ch.rayon)} m · ${fixe2(ch.t)} t`, r, -1.7, 0.9, { k: g.couleurTexte }));
+    // 0.320.4 : texte de charge collé sous la flèche (10 cm sous le chariot), plus à 1,7 m
+    res.push(texte(`r ${fixe1(ch.rayon)} m · ${fixe2(ch.t)} t`, r, -(Math.max(fl / 2, fl * 0.65) + 0.1 + 0.9), 0.9, { k: g.couleurTexte }));
   }
   return res;
 }
@@ -326,7 +320,8 @@ function cerclesDeCharge(g) {
   const longueur = (t) => t.length * 0.9 * 0.55;
   const textCrochet = g.afficherCrochet ? longueur(`r ${fixe1(g.r)} m · ${fixe2(chargeAuRayon(f, g.r, mode).t)} t`) : 0;
   const texteCercle = (rr, txt) => {
-    const y = -(demi + 0.5 + longueur(txt) / 2);
+    // 0.320.4 : texte presque collé au bord de la flèche (10 cm)
+    const y = -(demi + 0.1 + longueur(txt) / 2);
     const x = Math.sqrt(Math.max(0, rr * rr - y * y));
     if (textCrochet && Math.abs(x - g.r) < textCrochet / 2 + 0.6) return null;
     return { g: 't', k: g.couleurTexte, perso: true, x, y, h: 0.9, a: 90, t: txt, ah: 1, av: 2 };

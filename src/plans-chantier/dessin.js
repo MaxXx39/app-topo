@@ -889,9 +889,7 @@ function dessinerBande(ctx, pts, m, couleur, epaisseur, ech, pxM, o) {
       ctx.setLineDash([pas, pas]);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
+      // 0.320.4 : plus de trait noir au milieu des lattes (demande du 25.11)
       ctx.lineCap = 'round';
     };
     for (const r of reperes) {

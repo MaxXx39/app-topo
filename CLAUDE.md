@@ -156,6 +156,12 @@ Le détail version par version est dans `git log` ; ici seulement ce qui est en 
 - **Lot c = 0.303.0 (fait, voir plus bas)** — Plateformes : **sur-profondeur** dans une plateforme parente (contour dessiné dedans ; bas = **altitude OU profondeur, au choix** ; bords = **talus H:V**) ; **murs / radiers / dalles** comme limites : **ligne avec épaisseur et/ou contour fermé**, accroche sur DXF ; mur = **altitude du bas + hauteur** ; radier / dalle = **altitude du bas + épaisseur** ; remblai **jusqu'à une hauteur donnée ou jusqu'à un terrain** ; **pas de talus contre le mur**.
 - Réponses du 24.11 (suite) : **une plateforme dans UN seul groupe** ; **sur-hauteur (bosse) : oui, à essayer** en plus de la sur-profondeur ; remblai contre un mur : **on donne une hauteur (altitude) OU une épaisseur** (au choix), ou jusqu'à un terrain. **Maquette du panneau « Étapes »** : https://claude.ai/artifact/926wYQFimZiLnVC6HmGBAL (chaîne TN → étape 1 → 2 → …, chaque étape « posée sur » une précédente avec D / R, plan et coupe où l'étape choisie ressort, « L'étape seule » / « Toutes », somme des étapes + « Terrain → fin d'un coup ») : **à valider avant de coder**.
 
+## 0.320.4 — Plans de chantier : retours du 25.11 après la 0.320.3
+- **Grue d'après fiche** : textes « Flèche… » (cercles) à 10 cm du bord de la flèche ; texte « r … m · … t » du crochet collé sous la flèche (plus à 1,7 m). **Blocs de contrepoids colorés à l'arrière retirés du dessin** (le poids reste dans la fiche).
+- **Lattes (barrière 2 lattes)** : plus de trait noir au milieu des lattes.
+- **Bandeau d'un élément** : un seul défilement (le bandeau entier, 40 vh au plus), plus de défilement dans le défilement.
+- Tests : `grue-liebherr-172.test.js` (arrière = contre-flèche). Essai visuel pas refait : à voir sur l'écran.
+
 ## 0.320.3 — Plans de chantier : échafaudage, construction, texte libre, symboles (retours du 25.11 après la 0.320.2)
 - **Réponses de l'utilisateur (25.11)** : cote de départ = « sur la ligne avec cadre » (`etat.styleCote: 'sur'`) ; texte le long d'une ligne = **réglage commun à toutes les lignes** ; options du texte validées + **cadre double trait** + **« trait du bas » seul accroché au repère** ; nouveaux symboles en **vue de dessus + silhouette 3/4 pour l'ouvrier**.
 - **Échafaudage** refait (`dessinerBande`, `bordsBande`) : bande à **coins en biseau**, travées régulières **par tronçon** avec un X par travée ; **la couleur de la ligne** s'applique au contour, aux montants et aux croisillons.
