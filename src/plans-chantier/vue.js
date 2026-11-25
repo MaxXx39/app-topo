@@ -157,9 +157,9 @@ export function creerVueChantier(conteneur, options) {
       dessinerObjets(d, visibles);
       const sel = visibles.find((o) => o.id === choisi()); // phase cachée : plus de cadre de choix
       if (sel) dessinerChoix(ctx, sel);
-      // 0.319.2 : points d'accroche du châssis des grues (4 coins + axe de la tour), petits carrés bleus toujours visibles
+      // 0.319.2 : points d'accroche du châssis des grues (4 coins + axe de la tour), petits carrés bleus, seulement quand la grue est choisie
       for (const o of visibles) {
-        if (o.type !== 'grue') continue;
+        if (o.type !== 'grue' || o.id !== choisi()) continue; // seulement la grue choisie
         const l = lignesChassisGrue(o);
         if (!l.length) continue;
         ctx.save();
